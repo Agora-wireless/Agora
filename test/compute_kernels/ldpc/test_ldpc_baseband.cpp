@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
     // Step 1: Generate the information buffers and LDPC-encoded buffers for
     // uplink
     size_t num_symbols_per_cb = 1;
-    size_t bits_per_symbol = cfg->OFDM_DATA_NUM * cfg->mod_order_bits;
+    size_t bits_per_symbol = cfg->ofdm_data_num() * cfg->mod_order_bits;
     if (cfg->LDPC_config.cbCodewLen > bits_per_symbol)
         num_symbols_per_cb = (cfg->LDPC_config.cbCodewLen + bits_per_symbol - 1)
             / bits_per_symbol;
@@ -70,7 +70,7 @@ int main(int argc, char* argv[])
     std::printf("Number of symbols per block: %zu, blocks per frame: %zu\n",
         num_symbols_per_cb, num_cbs_per_ue);
 
-    const size_t num_codeblocks = num_cbs_per_ue * cfg->UE_ANT_NUM;
+    const size_t num_codeblocks = num_cbs_per_ue * cfg->ue_ant_num();
     std::printf("Total number of blocks: %zu\n", num_codeblocks);
     for (size_t noise_id = 0; noise_id < 15; noise_id++) {
 
@@ -78,7 +78,7 @@ int main(int argc, char* argv[])
         std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
         for (size_t i = 0; i < num_codeblocks; i++) {
             data_generator.gen_codeblock_ul(information[i],
-                encoded_codewords[i], i % cfg->UE_NUM /* UE ID */);
+                encoded_codewords[i], i % cfg->ue_num() /* UE ID */);
         }
 
         // Save uplink information bytes to file
@@ -87,8 +87,8 @@ int main(int argc, char* argv[])
         if (kPrintUplinkInformationBytes) {
             std::printf("Uplink information bytes\n");
             for (size_t n = 0; n < num_codeblocks; n++) {
-                std::printf("Symbol %zu, UE %zu\n", n / cfg->UE_ANT_NUM,
-                    n % cfg->UE_ANT_NUM);
+                std::printf("Symbol %zu, UE %zu\n", n / cfg->ue_ant_num(),
+                    n % cfg->ue_ant_num());
                 for (size_t i = 0; i < input_bytes_per_cb; i++) {
                     std::printf("%u ", (uint8_t)information[n][i]);
                 }
@@ -98,11 +98,11 @@ int main(int argc, char* argv[])
 
         // Modulate the encoded codewords
         std::vector<std::vector<complex_float>> modulated_codewords(
-            cfg->UE_ANT_NUM * cfg->data_symbol_num_perframe);
+            cfg->ue_ant_num() * cfg->data_symbol_num_perframe);
         size_t num_used_symbol = num_cbs_per_ue * num_symbols_per_cb;
         size_t num_unused_symbol
             = cfg->data_symbol_num_perframe - num_used_symbol;
-        for (size_t ue_id = 0; ue_id < cfg->UE_ANT_NUM; ue_id++) {
+        for (size_t ue_id = 0; ue_id < cfg->ue_ant_num(); ue_id++) {
             for (size_t i = 0; i < num_cbs_per_ue; i++) {
                 size_t remaining_bits = cfg->LDPC_config.cbCodewLen;
                 size_t offset = 0;
@@ -124,13 +124,13 @@ int main(int argc, char* argv[])
             for (size_t i = 0; i < num_unused_symbol; i++) {
                 modulated_codewords[ue_id * cfg->data_symbol_num_perframe
                     + num_used_symbol + i]
-                    .resize(cfg->OFDM_DATA_NUM);
+                    .resize(cfg->ofdm_data_num());
             }
         }
 
         // Place modulated uplink data codewords into central IFFT bins
         std::vector<std::vector<complex_float>> pre_ifft_data_syms(
-            cfg->UE_ANT_NUM * cfg->data_symbol_num_perframe);
+            cfg->ue_ant_num() * cfg->data_symbol_num_perframe);
         for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
             pre_ifft_data_syms[i]
                 = data_generator.bin_for_ifft(modulated_codewords[i]);
@@ -142,50 +142,50 @@ int main(int argc, char* argv[])
         // Put pilot and data symbols together
         Table<complex_float> tx_data_all_symbols;
         tx_data_all_symbols.calloc(
-            cfg->symbol_num_perframe, cfg->UE_ANT_NUM * cfg->OFDM_CA_NUM, Agora_memory::Alignment_t::k64Align);
+            cfg->symbol_num_perframe, cfg->ue_ant_num() * cfg->ofdm_ca_num(), Agora_memory::Alignment_t::k64Align);
 
         if (cfg->freq_orthogonal_pilot) {
-            for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
+            for (size_t i = 0; i < cfg->ue_ant_num(); i++) {
                 std::vector<complex_float> pilots_t_ue(
-                    cfg->OFDM_CA_NUM); // Zeroed
-                for (size_t j = cfg->OFDM_DATA_START;
-                     j < cfg->OFDM_DATA_START + cfg->OFDM_DATA_NUM;
-                     j += cfg->UE_ANT_NUM) {
+                    cfg->ofdm_ca_num()); // Zeroed
+                for (size_t j = cfg->ofdm_data_start();
+                     j < cfg->ofdm_data_start() + cfg->ofdm_data_num();
+                     j += cfg->ue_ant_num()) {
                     pilots_t_ue[i + j] = pilot_td[i + j];
                 }
                 // Load pilot to the second symbol
                 // The first symbol is reserved for beacon
                 std::memcpy(tx_data_all_symbols[cfg->beacon_symbol_num_perframe]
-                        + i * cfg->OFDM_CA_NUM,
-                    &pilots_t_ue[0], cfg->OFDM_CA_NUM * sizeof(complex_float));
+                        + i * cfg->ofdm_ca_num(),
+                    &pilots_t_ue[0], cfg->ofdm_ca_num() * sizeof(complex_float));
             }
         } else {
-            for (size_t i = 0; i < cfg->UE_ANT_NUM; i++)
+            for (size_t i = 0; i < cfg->ue_ant_num(); i++)
                 std::memcpy(tx_data_all_symbols[i + cfg->beacon_symbol_num_perframe]
-                        + i * cfg->OFDM_CA_NUM,
-                    &pilot_td[0], cfg->OFDM_CA_NUM * sizeof(complex_float));
+                        + i * cfg->ofdm_ca_num(),
+                    &pilot_td[0], cfg->ofdm_ca_num() * sizeof(complex_float));
         }
 
         size_t data_sym_start
             = cfg->pilot_symbol_num_perframe + cfg->beacon_symbol_num_perframe;
         for (size_t i = data_sym_start; i < cfg->symbol_num_perframe; i++) {
             const size_t data_sym_id = (i - data_sym_start);
-            for (size_t j = 0; j < cfg->UE_ANT_NUM; j++) {
-                std::memcpy(tx_data_all_symbols[i] + j * cfg->OFDM_CA_NUM,
+            for (size_t j = 0; j < cfg->ue_ant_num(); j++) {
+                std::memcpy(tx_data_all_symbols[i] + j * cfg->ofdm_ca_num(),
                     &pre_ifft_data_syms[j * cfg->data_symbol_num_perframe
                         + data_sym_id][0],
-                    cfg->OFDM_CA_NUM * sizeof(complex_float));
+                    cfg->ofdm_ca_num() * sizeof(complex_float));
             }
         }
 
         // Generate CSI matrix without noise
         Table<complex_float> csi_matrices_no_noise;
         csi_matrices_no_noise.calloc(
-            cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k32Align);
-        for (size_t i = 0; i < cfg->UE_ANT_NUM * cfg->BS_ANT_NUM; i++) {
+            cfg->ofdm_ca_num(), cfg->ue_ant_num() * cfg->bs_ant_num(), Agora_memory::Alignment_t::k32Align);
+        for (size_t i = 0; i < cfg->ue_ant_num() * cfg->bs_ant_num(); i++) {
             complex_float csi = { static_cast<float>(distribution(generator)),
                 static_cast<float>(distribution(generator)) };
-            for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
+            for (size_t j = 0; j < cfg->ofdm_ca_num(); j++) {
                 csi_matrices_no_noise[j][i].re = csi.re;
                 csi_matrices_no_noise[j][i].im = csi.im;
             }
@@ -194,9 +194,9 @@ int main(int argc, char* argv[])
         // Generate CSI matrix with noise for pilot symbols
         Table<complex_float> csi_matrices_pilot;
         csi_matrices_pilot.calloc(
-            cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k32Align);
-        for (size_t i = 0; i < cfg->UE_ANT_NUM * cfg->BS_ANT_NUM; i++) {
-            for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
+            cfg->ofdm_ca_num(), cfg->ue_ant_num() * cfg->bs_ant_num(), Agora_memory::Alignment_t::k32Align);
+        for (size_t i = 0; i < cfg->ue_ant_num() * cfg->bs_ant_num(); i++) {
+            for (size_t j = 0; j < cfg->ofdm_ca_num(); j++) {
                 complex_float noise
                     = { static_cast<float>(distribution(generator))
                               * noise_levels[noise_id],
@@ -212,9 +212,9 @@ int main(int argc, char* argv[])
         // Generate CSI matrix with noise for data symbols
         Table<complex_float> csi_matrices_data;
         csi_matrices_data.calloc(
-            cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k32Align);
-        for (size_t i = 0; i < cfg->UE_ANT_NUM * cfg->BS_ANT_NUM; i++) {
-            for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
+            cfg->ofdm_ca_num(), cfg->ue_ant_num() * cfg->bs_ant_num(), Agora_memory::Alignment_t::k32Align);
+        for (size_t i = 0; i < cfg->ue_ant_num() * cfg->bs_ant_num(); i++) {
+            for (size_t j = 0; j < cfg->ofdm_ca_num(); j++) {
                 complex_float noise
                     = { static_cast<float>(distribution(generator))
                               * noise_levels[noise_id],
@@ -230,19 +230,19 @@ int main(int argc, char* argv[])
         // Generate RX data received by base station after going through channels
         Table<complex_float> rx_data_all_symbols;
         rx_data_all_symbols.calloc(
-            cfg->symbol_num_perframe, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+            cfg->symbol_num_perframe, cfg->ofdm_ca_num() * cfg->bs_ant_num(), Agora_memory::Alignment_t::k64Align);
         for (size_t i = 0; i < cfg->symbol_num_perframe; i++) {
             arma::cx_fmat mat_input_data(
                 reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
-                cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
+                cfg->ofdm_ca_num(), cfg->ue_ant_num(), false);
             arma::cx_fmat mat_output(
                 reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
-                cfg->OFDM_CA_NUM, cfg->BS_ANT_NUM, false);
+                cfg->ofdm_ca_num(), cfg->bs_ant_num(), false);
 
-            for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
+            for (size_t j = 0; j < cfg->ofdm_ca_num(); j++) {
                 arma::cx_fmat mat_csi(
                     reinterpret_cast<arma::cx_float*>(csi_matrices_data[j]),
-                    cfg->BS_ANT_NUM, cfg->UE_ANT_NUM);
+                    cfg->bs_ant_num(), cfg->ue_ant_num());
                 mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
             }
         }
@@ -250,64 +250,64 @@ int main(int argc, char* argv[])
         // Compute precoder
         Table<complex_float> precoder;
         precoder.calloc(
-            cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k32Align);
-        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
+            cfg->ofdm_ca_num(), cfg->ue_ant_num() * cfg->bs_ant_num(), Agora_memory::Alignment_t::k32Align);
+        for (size_t i = 0; i < cfg->ofdm_ca_num(); i++) {
             arma::cx_fmat mat_input(
                 reinterpret_cast<arma::cx_float*>(csi_matrices_pilot[i]),
-                cfg->BS_ANT_NUM, cfg->UE_ANT_NUM, false);
+                cfg->bs_ant_num(), cfg->ue_ant_num(), false);
             arma::cx_fmat mat_output(
-                reinterpret_cast<arma::cx_float*>(precoder[i]), cfg->UE_ANT_NUM,
-                cfg->BS_ANT_NUM, false);
+                reinterpret_cast<arma::cx_float*>(precoder[i]), cfg->ue_ant_num(),
+                cfg->bs_ant_num(), false);
             pinv(mat_output, mat_input, 1e-2, "dc");
         }
 
         Table<complex_float> equalized_data_all_symbols;
         equalized_data_all_symbols.calloc(
-            cfg->symbol_num_perframe, cfg->OFDM_DATA_NUM * cfg->UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+            cfg->symbol_num_perframe, cfg->ofdm_data_num() * cfg->ue_ant_num(), Agora_memory::Alignment_t::k64Align);
         Table<int8_t> demod_data_all_symbols;
-        demod_data_all_symbols.calloc(cfg->UE_ANT_NUM,
-            cfg->OFDM_DATA_NUM * cfg->data_symbol_num_perframe * 8, Agora_memory::Alignment_t::k64Align);
+        demod_data_all_symbols.calloc(cfg->ue_ant_num(),
+            cfg->ofdm_data_num() * cfg->data_symbol_num_perframe * 8, Agora_memory::Alignment_t::k64Align);
         for (size_t i = data_sym_start; i < cfg->symbol_num_perframe; i++) {
             arma::cx_fmat mat_rx_data(
                 reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
-                cfg->OFDM_CA_NUM, cfg->BS_ANT_NUM, false);
+                cfg->ofdm_ca_num(), cfg->bs_ant_num(), false);
             arma::cx_fmat mat_equalized_data(
                 reinterpret_cast<arma::cx_float*>(
                     equalized_data_all_symbols[i - data_sym_start]),
-                cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
-            for (size_t j = 0; j < cfg->OFDM_DATA_NUM; j++) {
+                cfg->ofdm_data_num(), cfg->ue_ant_num(), false);
+            for (size_t j = 0; j < cfg->ofdm_data_num(); j++) {
                 arma::cx_fmat mat_precoder(
                     reinterpret_cast<arma::cx_float*>(
                         precoder[cfg->freq_orthogonal_pilot
-                                ? (j % cfg->UE_ANT_NUM)
+                                ? (j % cfg->ue_ant_num())
                                 : j]),
-                    cfg->UE_ANT_NUM, cfg->BS_ANT_NUM, false);
+                    cfg->ue_ant_num(), cfg->bs_ant_num(), false);
                 mat_equalized_data.row(j) = (mat_precoder
-                    * mat_rx_data.row(j + cfg->OFDM_DATA_START).st())
+                    * mat_rx_data.row(j + cfg->ofdm_data_start()).st())
                                                 .st();
             }
 
             mat_equalized_data = mat_equalized_data.st();
 
-            for (size_t j = 0; j < cfg->UE_ANT_NUM; j++) {
+            for (size_t j = 0; j < cfg->ue_ant_num(); j++) {
                 size_t cb_id = (i - data_sym_start) / num_symbols_per_cb;
                 size_t symbol_id_in_cb
                     = (i - data_sym_start) % num_symbols_per_cb;
                 auto* demod_ptr = demod_data_all_symbols[j]
                     + (cb_id * num_symbols_per_cb * 8
                           + symbol_id_in_cb * cfg->mod_order_bits)
-                        * cfg->OFDM_DATA_NUM;
+                        * cfg->ofdm_data_num();
                 auto* equal_T_ptr
                     = (float*)(equalized_data_all_symbols[i - data_sym_start]
-                        + j * cfg->OFDM_DATA_NUM);
+                        + j * cfg->ofdm_data_num());
                 switch (cfg->mod_order_bits) {
                 case (4):
                     demod_16qam_soft_avx2(
-                        equal_T_ptr, demod_ptr, cfg->OFDM_DATA_NUM);
+                        equal_T_ptr, demod_ptr, cfg->ofdm_data_num());
                     break;
                 case (6):
                     demod_64qam_soft_avx2(
-                        equal_T_ptr, demod_ptr, cfg->OFDM_DATA_NUM);
+                        equal_T_ptr, demod_ptr, cfg->ofdm_data_num());
                     break;
                 default:
                     std::printf("Demodulation: modulation type %s not supported!\n",
@@ -338,13 +338,13 @@ int main(int argc, char* argv[])
         ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
         Table<uint8_t> decoded_codewords;
-        decoded_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, Agora_memory::Alignment_t::k64Align);
+        decoded_codewords.calloc(num_codeblocks, cfg->ofdm_data_num(), Agora_memory::Alignment_t::k64Align);
         double freq_ghz = measure_rdtsc_freq();
         size_t start_tsc = worker_rdtsc();
-        for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
+        for (size_t i = 0; i < cfg->ue_ant_num(); i++) {
             for (size_t j = 0; j < num_cbs_per_ue; j++) {
                 ldpc_decoder_5gnr_request.varNodes = demod_data_all_symbols[i]
-                    + j * cfg->OFDM_DATA_NUM * 8 * num_symbols_per_cb;
+                    + j * cfg->ofdm_data_num() * 8 * num_symbols_per_cb;
                 ldpc_decoder_5gnr_response.compactedMessageBytes
                     = decoded_codewords[i * num_cbs_per_ue + j];
                 bblib_ldpc_decoder_5gnr(

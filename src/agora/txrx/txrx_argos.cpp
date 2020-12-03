@@ -108,7 +108,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
 
     size_t dl_symbol_idx = cfg->get_dl_symbol_idx(frame_id, symbol_id);
     size_t offset = (c->get_total_data_symbol_idx_dl(frame_id, dl_symbol_idx)
-                        * c->BS_ANT_NUM)
+                        * c->bs_ant_num())
         + ant_id;
 
     // TODO: support nChannels > 1
@@ -135,7 +135,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
         std::vector<std::complex<int16_t>> zeros(c->sampsPerSymbol);
         if (ant_id != c->ref_ant)
             txbuf[ch] = zeros.data();
-        else if (dl_symbol_idx < c->DL_PILOT_SYMS)
+        else if (dl_symbol_idx < c->dl_pilot_syms())
             txbuf[ch] = (void*)c->ue_specific_pilot_t[0];
         else
             txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx];

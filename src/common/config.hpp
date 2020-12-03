@@ -177,28 +177,6 @@ public:
     size_t encode_block_size;
 
     bool freq_orthogonal_pilot;
-    size_t BS_ANT_NUM; // Total number of BS antennas
-    size_t BF_ANT_NUM; // Number of antennas used in beamforming
-    size_t UE_NUM;
-    size_t UE_ANT_NUM;
-
-    // The total number of OFDM subcarriers, which is a power of two
-    size_t OFDM_CA_NUM;
-
-    // The number of cyclic prefix IQ samples. These are taken from the tail of
-    // the time-domain OFDM samples and prepended to the beginning.
-    size_t CP_LEN;
-
-    // The number of OFDM subcarriers that are non-zero in the frequency domain
-    size_t OFDM_DATA_NUM;
-
-    // The index of the first non-zero OFDM subcarrier (in the frequency domain)
-    // in block of OFDM_CA_NUM subcarriers.
-    size_t OFDM_DATA_START;
-
-    // The index of the last non-zero OFDM subcarrier (in the frequency domain)
-    // in block of OFDM_CA_NUM subcarriers.
-    size_t OFDM_DATA_STOP;
 
     // The number of zero IQ samples prepended to a time-domain symbol (i.e.,
     // before the cyclic prefix) before transmission. Its value depends on
@@ -212,7 +190,7 @@ public:
 
     // The number of IQ samples to skip from the beginning of symbol received by
     // Agora on the uplink at the base station. Due to over-the-air and RF
-    // delays, this can be different from (prefix + CP_LEN), and is currently
+    // delays, this can be different from (prefix + cp_len_), and is currently
     // calculated by manual tuning.
     size_t ofdm_rx_zero_prefix_bs_;
 
@@ -221,7 +199,7 @@ public:
 
     // The number of IQ samples to skip from the beginning of symbol received by
     // Agora on the downlink at the client. Due to over-the-air and RF
-    // delays, this can be different from (prefix + CP_LEN), and is currently
+    // delays, this can be different from (prefix + cp_len_), and is currently
     // calculated by manual tuning.
     size_t ofdm_rx_zero_prefix_client_;
 
@@ -235,10 +213,6 @@ public:
     size_t packet_length;
     size_t dl_packet_length;
 
-    size_t OFDM_PILOT_SPACING;
-
-    size_t DL_PILOT_SYMS;
-    size_t UL_PILOT_SYMS;
     int cl_tx_advance;
     // Indicates all UEs that are in this experiment,
     // including the ones instantiated on other runs/machines.
@@ -371,7 +345,7 @@ public:
         mod_order = (size_t)pow(2, mod_order_bits);
         init_modulation_table(mod_table, mod_order);
         LDPC_config.nblocksInSymbol
-            = OFDM_DATA_NUM * mod_order_bits / LDPC_config.cbCodewLen;
+            = ofdm_data_num_ * mod_order_bits / LDPC_config.cbCodewLen;
     }
 
     /// Return total number of data symbols of all frames in a buffer
@@ -421,7 +395,7 @@ public:
     /// matrices of subcarrier [sc_id].
     inline size_t get_zf_sc_id(size_t sc_id) const
     {
-        return freq_orthogonal_pilot ? sc_id - (sc_id % UE_NUM) : sc_id;
+        return freq_orthogonal_pilot ? sc_id - (sc_id % ue_num_) : sc_id;
     }
 
     /// Get the calibration buffer for this frame and subcarrier ID
@@ -429,7 +403,7 @@ public:
         Table<complex_float>& calib_buffer, size_t frame_id, size_t sc_id) const
     {
         size_t frame_slot = frame_id % kFrameWnd;
-        return &calib_buffer[frame_slot][sc_id * BS_ANT_NUM];
+        return &calib_buffer[frame_slot][sc_id * bs_ant_num_];
     }
 
     /// Get the decode buffer for this frame, symbol, user and code block ID
@@ -460,7 +434,7 @@ public:
         size_t num_encoded_bytes_per_cb
             = LDPC_config.cbCodewLen / mod_order_bits;
         return &encoded_buffer[total_data_symbol_id]
-                              [roundup<64>(OFDM_DATA_NUM) * ue_id
+                              [roundup<64>(ofdm_data_num_) * ue_id
                                   + num_encoded_bytes_per_cb * cb_id];
     }
 
@@ -468,11 +442,53 @@ public:
     // phase tracking
     inline size_t get_ofdm_pilot_num() const
     {
-        return OFDM_DATA_NUM / OFDM_PILOT_SPACING;
+        return ofdm_data_num_ / ofdm_pilot_spacing_;
     }
 
     Config(std::string);
-    void genData();
-    ~Config();
+    void genData(void);
+    ~Config(void);
+
+    inline size_t bs_ant_num( void ) const { return this->bs_ant_num_; }
+    inline void   bs_ant_num( size_t n_bs_ant ) { this->bs_ant_num_ = n_bs_ant; } 
+    inline size_t bf_ant_num( void ) const { return this->bf_ant_num_; } 
+    inline size_t ue_num( void ) const { return this->ue_num_; } 
+    inline size_t ue_ant_num( void ) const { return this->ue_ant_num_; } 
+    inline size_t ofdm_ca_num( void ) const { return this->ofdm_ca_num_; } 
+    inline size_t cp_len( void ) const { return this->cp_len_; } 
+    inline size_t ofdm_data_num( void ) const { return this->ofdm_data_num_; } 
+    inline size_t ofdm_data_start( void ) const { return this->ofdm_data_start_; } 
+    inline size_t ofdm_data_stop( void ) const { return this->ofdm_data_stop_; } 
+    inline size_t ofdm_pilot_spacing( void ) const { return this->ofdm_pilot_spacing_; } 
+    inline size_t dl_pilot_syms( void ) const { return this->dl_pilot_syms_; } 
+    inline size_t ul_pilot_syms( void ) const { return this->ul_pilot_syms_; } 
+
+private:
+    size_t bs_ant_num_; // Total number of BS antennas
+    size_t bf_ant_num_; // Number of antennas used in beamforming
+    size_t ue_num_;
+    size_t ue_ant_num_;
+
+    // The total number of OFDM subcarriers, which is a power of two
+    size_t ofdm_ca_num_;
+
+    // The number of cyclic prefix IQ samples. These are taken from the tail of
+    // the time-domain OFDM samples and prepended to the beginning.
+    size_t cp_len_;
+
+    // The number of OFDM subcarriers that are non-zero in the frequency domain
+    size_t ofdm_data_num_;
+
+    // The index of the first non-zero OFDM subcarrier (in the frequency domain)
+    // in block of ofdm_ca_num_ subcarriers.
+    size_t ofdm_data_start_;
+
+    // The index of the last non-zero OFDM subcarrier (in the frequency domain)
+    // in block of ofdm_ca_num_ subcarriers.
+    size_t ofdm_data_stop_;
+
+    size_t ofdm_pilot_spacing_;
+    size_t dl_pilot_syms_;
+    size_t ul_pilot_syms_;
 };
 #endif

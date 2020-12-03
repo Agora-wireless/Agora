@@ -313,13 +313,13 @@ bool RadioConfig::radioStart()
 {
     bool good_calib = false;
     alloc_buffer_1d(&init_calib_dl_,
-        _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float),
+        _cfg->ofdm_data_num() * _cfg->bf_ant_num() * sizeof(arma::cx_float),
         Agora_memory::Alignment_t::k64Align, 1);
     alloc_buffer_1d(&init_calib_ul_,
-        _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float),
+        _cfg->ofdm_data_num() * _cfg->bf_ant_num() * sizeof(arma::cx_float),
         Agora_memory::Alignment_t::k64Align, 1);
     // initialize init_calib to a matrix of ones
-    for (size_t i = 0; i < _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM; i++) {
+    for (size_t i = 0; i < _cfg->ofdm_data_num() * _cfg->bf_ant_num(); i++) {
         init_calib_dl_[i] = 1;
         init_calib_ul_[i] = 1;
     }
@@ -341,9 +341,9 @@ bool RadioConfig::radioStart()
         else
             std::cout << "initial calibration successful!" << std::endl;
         //arma::cx_fmat calib_dl_mat(
-        //    init_calib_dl_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+        //    init_calib_dl_, _cfg->ofdm_data_num(), _cfg->bf_ant_num(), false);
         //arma::cx_fmat calib_ul_mat(
-        //    init_calib_ul_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+        //    init_calib_ul_, _cfg->ofdm_data_num(), _cfg->bf_ant_num(), false);
         //Utils::print_mat(calib_dl_mat);
         //Utils::print_mat(calib_ul_mat);
     }
@@ -427,8 +427,8 @@ bool RadioConfig::radioStart()
                     _cfg->ofdm_tx_zero_postfix_, 0);
                 recipCalDlPilot = CommsLib::compose_partial_pilot_sym(
                     _cfg->common_pilot, _cfg->nChannels * i * kCalibScGroupSize,
-                    kCalibScGroupSize, _cfg->OFDM_CA_NUM, _cfg->OFDM_DATA_NUM,
-                    _cfg->OFDM_DATA_START, _cfg->CP_LEN, false /*block type*/);
+                    kCalibScGroupSize, _cfg->ofdm_ca_num(), _cfg->ofdm_data_num(),
+                    _cfg->ofdm_data_start(), _cfg->cp_len(), false /*block type*/);
                 if (kDebugPrintPilot) {
                     std::cout << "recipCalPilot[" << i << "]: ";
                     for (auto const& calP : recipCalDlPilot)
@@ -444,9 +444,9 @@ bool RadioConfig::radioStart()
                 if (_cfg->nChannels == 2) {
                     recipCalDlPilot = CommsLib::compose_partial_pilot_sym(
                         _cfg->common_pilot, (2 * i + 1) * kCalibScGroupSize,
-                        kCalibScGroupSize, _cfg->OFDM_CA_NUM,
-                        _cfg->OFDM_DATA_NUM, _cfg->OFDM_DATA_START,
-                        _cfg->CP_LEN, false);
+                        kCalibScGroupSize, _cfg->ofdm_ca_num(),
+                        _cfg->ofdm_data_num(), _cfg->ofdm_data_start(),
+                        _cfg->cp_len(), false);
                     baStn[i]->writeRegisters("TX_RAM_B", 0,
                         Utils::cfloat32_to_uint32(
                             recipCalDlPilot, false, "QI"));

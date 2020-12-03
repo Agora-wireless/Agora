@@ -10,7 +10,7 @@
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg(cfg)
     , core_offset(core_offset)
-    , ant_per_cell(cfg->BS_ANT_NUM / cfg->nCells)
+    , ant_per_cell(cfg->bs_ant_num() / cfg->nCells)
     , socket_thread_num(cfg->socket_thread_num)
 {
     if (!kUseArgos && !kUseUHD) {
@@ -61,9 +61,9 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
             return false;
         }
         std::memcpy(calib_dl_buffer[0], radioconfig_->get_calib_dl(),
-            cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM * sizeof(arma::cx_float));
+            cfg->ofdm_data_num() * cfg->bf_ant_num() * sizeof(arma::cx_float));
         std::memcpy(calib_ul_buffer[0], radioconfig_->get_calib_ul(),
-            cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM * sizeof(arma::cx_float));
+            cfg->ofdm_data_num() * cfg->bf_ant_num() * sizeof(arma::cx_float));
     }
 
     for (size_t i = 0; i < socket_thread_num; i++) {
@@ -234,7 +234,7 @@ int PacketTXRX::dequeue_send(int tid)
     size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
     size_t offset
         = (c->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
-              * c->BS_ANT_NUM)
+              * c->bs_ant_num())
         + ant_id;
 
     if (kDebugPrintInTask) {

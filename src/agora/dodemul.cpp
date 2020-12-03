@@ -32,7 +32,7 @@ DoDemul::DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
     // phase offset calibration data
     cx_float* ue_pilot_ptr = (cx_float*)cfg->ue_specific_pilot[0];
     cx_fmat mat_pilot_data(
-        ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
+        ue_pilot_ptr, cfg->ofdm_data_num(), cfg->ue_ant_num(), false);
     ue_pilot_data = mat_pilot_data.st();
 
 #if USE_MKL_JIT
@@ -40,8 +40,8 @@ DoDemul::DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
     MKL_Complex8 beta = { 0, 0 };
 
     mkl_jit_status_t status = mkl_jit_create_cgemm(&jitter, MKL_COL_MAJOR,
-        MKL_NOTRANS, MKL_NOTRANS, cfg->UE_NUM, 1, cfg->BS_ANT_NUM, &alpha,
-        cfg->UE_NUM, cfg->BS_ANT_NUM, &beta, cfg->UE_NUM);
+        MKL_NOTRANS, MKL_NOTRANS, cfg->ue_num(), 1, cfg->bs_ant_num(), &alpha,
+        cfg->ue_num(), cfg->bs_ant_num(), &beta, cfg->ue_num());
     if (MKL_JIT_ERROR == status) {
         std::fprintf(stderr,
             "Error: insufficient memory to JIT and store the DGEMM kernel\n");
@@ -77,24 +77,24 @@ Event_data DoDemul::launch(size_t tag)
     }
 
     size_t max_sc_ite
-        = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
+        = std::min(cfg->demul_block_size, cfg->ofdm_data_num() - base_sc_id);
     assert(max_sc_ite % kSCsPerCacheline == 0);
     // Iterate through cache lines
     for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
         size_t start_tsc0 = worker_rdtsc();
 
         // Step 1: Populate data_gather_buffer as a row-major matrix with
-        // kSCsPerCacheline rows and BS_ANT_NUM columns
+        // kSCsPerCacheline rows and bs_ant_num() columns
 
         // Since kSCsPerCacheline divides demul_block_size and
         // kTransposeBlockSize, all subcarriers (base_sc_id + i) lie in the
         // same partial transpose block.
         const size_t partial_transpose_block_base
             = ((base_sc_id + i) / kTransposeBlockSize)
-            * (kTransposeBlockSize * cfg->BS_ANT_NUM);
+            * (kTransposeBlockSize * cfg->bs_ant_num());
 
         size_t ant_start = 0;
-        if (kUseSIMDGather and cfg->BS_ANT_NUM % 4 == 0 and kUsePartialTrans) {
+        if (kUseSIMDGather and cfg->bs_ant_num() % 4 == 0 and kUsePartialTrans) {
             __m256i index = _mm256_setr_epi32(0, 1, kTransposeBlockSize * 2,
                 kTransposeBlockSize * 2 + 1, kTransposeBlockSize * 4,
                 kTransposeBlockSize * 4 + 1, kTransposeBlockSize * 6,
@@ -105,26 +105,26 @@ Event_data DoDemul::launch(size_t tag)
                 + (base_sc_id + i) % kTransposeBlockSize;
             auto* src = (const float*)&data_buf[cur_sc_offset];
             auto* dst = (float*)data_gather_buffer;
-            for (size_t ant_i = 0; ant_i < cfg->BS_ANT_NUM; ant_i += 4) {
+            for (size_t ant_i = 0; ant_i < cfg->bs_ant_num(); ant_i += 4) {
                 for (size_t j = 0; j < kSCsPerCacheline; j++) {
                     __m256 data_rx = _mm256_i32gather_ps(src + j * 2, index, 4);
-                    _mm256_store_ps(dst + j * cfg->BS_ANT_NUM * 2, data_rx);
+                    _mm256_store_ps(dst + j * cfg->bs_ant_num() * 2, data_rx);
                 }
                 src += (kSCsPerCacheline * kTransposeBlockSize);
                 dst += 8;
             }
             // Set the remaining number of antennas for non-SIMD gather
-            ant_start = cfg->BS_ANT_NUM % 4;
+            ant_start = cfg->bs_ant_num() % 4;
         } else {
             complex_float* dst = data_gather_buffer + ant_start;
             for (size_t j = 0; j < kSCsPerCacheline; j++) {
-                for (size_t ant_i = ant_start; ant_i < cfg->BS_ANT_NUM;
+                for (size_t ant_i = ant_start; ant_i < cfg->bs_ant_num();
                      ant_i++) {
                     *dst++ = kUsePartialTrans
                         ? data_buf[partial_transpose_block_base
                               + (ant_i * kTransposeBlockSize)
                               + ((base_sc_id + i + j) % kTransposeBlockSize)]
-                        : data_buf[ant_i * cfg->OFDM_DATA_NUM + base_sc_id + i
+                        : data_buf[ant_i * cfg->ofdm_data_num() + base_sc_id + i
                               + j];
                 }
             }
@@ -140,16 +140,16 @@ Event_data DoDemul::launch(size_t tag)
             if (kExportConstellation) {
                 equal_ptr
                     = (cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                                [cur_sc_id * cfg->UE_NUM]);
+                                                [cur_sc_id * cfg->ue_num()]);
             } else {
                 equal_ptr
                     = (cx_float*)(&equaled_buffer_temp[(cur_sc_id - base_sc_id)
-                        * cfg->UE_NUM]);
+                        * cfg->ue_num()]);
             }
-            cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
+            cx_fmat mat_equaled(equal_ptr, cfg->ue_num(), 1, false);
 
             auto* data_ptr = reinterpret_cast<cx_float*>(
-                &data_gather_buffer[j * cfg->BS_ANT_NUM]);
+                &data_gather_buffer[j * cfg->bs_ant_num()]);
             // size_t start_tsc2 = worker_rdtsc();
             auto* ul_zf_ptr = reinterpret_cast<cx_float*>(
                 ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(cur_sc_id)]);
@@ -159,41 +159,41 @@ Event_data DoDemul::launch(size_t tag)
             mkl_jit_cgemm(jitter, (MKL_Complex8*)ul_zf_ptr,
                 (MKL_Complex8*)data_ptr, (MKL_Complex8*)equal_ptr);
 #else
-            cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
+            cx_fmat mat_data(data_ptr, cfg->bs_ant_num(), 1, false);
 
-            cx_fmat mat_ul_zf(ul_zf_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+            cx_fmat mat_ul_zf(ul_zf_ptr, cfg->ue_num(), cfg->bs_ant_num(), false);
             mat_equaled = mat_ul_zf * mat_data;
 #endif
 
-            if (symbol_idx_ul < cfg->UL_PILOT_SYMS) { // Calc new phase shift
+            if (symbol_idx_ul < cfg->ul_pilot_syms()) { // Calc new phase shift
                 if (symbol_idx_ul == 0 && cur_sc_id == 0) {
                     // Reset previous frame
                     cx_float* phase_shift_ptr = (cx_float*)
                         ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd];
-                    cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM,
-                        cfg->UL_PILOT_SYMS, false);
+                    cx_fmat mat_phase_shift(phase_shift_ptr, cfg->ue_num(),
+                        cfg->ul_pilot_syms(), false);
                     mat_phase_shift.fill(0);
                 }
                 cx_float* phase_shift_ptr
                     = (cx_float*)&ue_spec_pilot_buffer_[frame_id
-                        % kFrameWnd][symbol_idx_ul * cfg->UE_NUM];
-                cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
+                        % kFrameWnd][symbol_idx_ul * cfg->ue_num()];
+                cx_fmat mat_phase_shift(phase_shift_ptr, cfg->ue_num(), 1, false);
                 cx_fmat shift_sc
                     = sign(mat_equaled % conj(ue_pilot_data.col(cur_sc_id)));
                 mat_phase_shift += shift_sc;
-            } else if (cfg->UL_PILOT_SYMS
+            } else if (cfg->ul_pilot_syms()
                 > 0) { // apply previously calc'ed phase shift to data
                 cx_float* pilot_corr_ptr
                     = (cx_float*)ue_spec_pilot_buffer_[frame_id % kFrameWnd];
                 cx_fmat pilot_corr_mat(
-                    pilot_corr_ptr, cfg->UE_NUM, cfg->UL_PILOT_SYMS, false);
+                    pilot_corr_ptr, cfg->ue_num(), cfg->ul_pilot_syms(), false);
                 fmat theta_mat = arg(pilot_corr_mat);
-                fmat theta_inc = zeros<fmat>(cfg->UE_NUM, 1);
-                for (size_t s = 1; s < cfg->UL_PILOT_SYMS; s++) {
+                fmat theta_inc = zeros<fmat>(cfg->ue_num(), 1);
+                for (size_t s = 1; s < cfg->ul_pilot_syms(); s++) {
                     fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
                     theta_inc += theta_diff;
                 }
-                theta_inc /= (float)std::max(1, (int)cfg->UL_PILOT_SYMS - 1);
+                theta_inc /= (float)std::max(1, (int)cfg->ul_pilot_syms() - 1);
                 fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
                 cx_fmat mat_phase_correct = zeros<cx_fmat>(size(cur_theta));
                 mat_phase_correct.set_real(cos(-cur_theta));
@@ -201,7 +201,7 @@ Event_data DoDemul::launch(size_t tag)
                 mat_equaled %= mat_phase_correct;
 
                 // Measure EVM from ground truth
-                if (symbol_idx_ul == cfg->UL_PILOT_SYMS) {
+                if (symbol_idx_ul == cfg->ul_pilot_syms()) {
                     phy_stats->update_evm_stats(
                         frame_id, cur_sc_id, mat_equaled);
                     if (kPrintPhyStats && cur_sc_id == 0) {
@@ -217,15 +217,15 @@ Event_data DoDemul::launch(size_t tag)
     }
 
     size_t start_tsc3 = worker_rdtsc();
-    __m256i index2 = _mm256_setr_epi32(0, 1, cfg->UE_NUM * 2,
-        cfg->UE_NUM * 2 + 1, cfg->UE_NUM * 4, cfg->UE_NUM * 4 + 1,
-        cfg->UE_NUM * 6, cfg->UE_NUM * 6 + 1);
+    __m256i index2 = _mm256_setr_epi32(0, 1, cfg->ue_num() * 2,
+        cfg->ue_num() * 2 + 1, cfg->ue_num() * 4, cfg->ue_num() * 4 + 1,
+        cfg->ue_num() * 6, cfg->ue_num() * 6 + 1);
     float* equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
-    for (size_t i = 0; i < cfg->UE_NUM; i++) {
+    for (size_t i = 0; i < cfg->ue_num(); i++) {
         float* equal_ptr = nullptr;
         if (kExportConstellation) {
             equal_ptr = (float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                               [base_sc_id * cfg->UE_NUM + i]);
+                                               [base_sc_id * cfg->ue_num() + i]);
         } else {
             equal_ptr = (float*)(equaled_buffer_temp + i);
         }
@@ -234,7 +234,7 @@ Event_data DoDemul::launch(size_t tag)
             __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
             _mm256_store_ps(equal_T_ptr, equal_T_temp);
             equal_T_ptr += 8;
-            equal_ptr += cfg->UE_NUM * kNumDoubleInSIMD256 * 2;
+            equal_ptr += cfg->ue_num() * kNumDoubleInSIMD256 * 2;
         }
         equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
         int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][i]

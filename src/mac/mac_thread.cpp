@@ -90,8 +90,8 @@ void MacThread::send_ran_config_update(Event_data event)
     rc.mod_order_bits = CommsLib::QAM16;
     rc.frame_id = scheduler_next_frame_id_;
     // TODO: change n_antennas to a desired value
-    // cfg_->BS_ANT_NUM is added to fix compiler warning
-    rc.n_antennas = cfg_->BS_ANT_NUM;
+    // cfg_->bs_ant_num() is added to fix compiler warning
+    rc.n_antennas = cfg_->bs_ant_num();
 
     Event_data msg(EventType::kRANUpdate);
     msg.num_tags = 3;
@@ -117,13 +117,13 @@ void MacThread::process_codeblocks_from_master(Event_data event)
     std::stringstream ss; // Debug-only
 
     // Only non-pilot uplink symbols have application data.
-    if (symbol_idx_ul >= cfg_->UL_PILOT_SYMS) {
+    if (symbol_idx_ul >= cfg_->ul_pilot_syms()) {
         auto* pkt = (struct MacPacket*)ul_data_ptr;
 
         // We send data to app irrespective of CRC condition
         // TODO: enable ARQ and ensure reliable data goes to app
         const size_t frame_data__offset
-            = (symbol_idx_ul - cfg_->UL_PILOT_SYMS) * cfg_->mac_payload_length;
+            = (symbol_idx_ul - cfg_->ul_pilot_syms()) * cfg_->mac_payload_length;
         std::memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data,
             cfg_->mac_payload_length);
         server_.n_filled_in_frame_[ue_id] += cfg_->mac_payload_length;
@@ -252,7 +252,7 @@ void MacThread::process_udp_packets_from_apps_server(
     for (size_t i = 0; i < cfg_->LDPC_config.nblocksInSymbol; i++)
         (*dl_bits_buffer_status_)[pkt->ue_id][rx_offset + i] = 1;
     std::memcpy(
-        &(*dl_bits_buffer_)[total_symbol_idx][pkt->ue_id * cfg_->OFDM_DATA_NUM],
+        &(*dl_bits_buffer_)[total_symbol_idx][pkt->ue_id * cfg_->ofdm_data_num()],
         pkt->data, udp_pkt_buf_.size());
 
     Event_data msg(EventType::kPacketFromMac,
@@ -320,7 +320,7 @@ void MacThread::process_udp_packets_from_apps_client(
         tx_queue_->enqueue(msg), "MAC thread: Failed to enqueue uplink packet");
 
     radio_buf_id = (radio_buf_id + 1) % kFrameWnd;
-    next_radio_id_ = (next_radio_id_ + 1) % cfg_->UE_ANT_NUM;
+    next_radio_id_ = (next_radio_id_ + 1) % cfg_->ue_ant_num();
     if (next_radio_id_ == 0)
         next_frame_id_++;
 }
@@ -372,7 +372,7 @@ int PacketTXRX::dequeue_send(int tid)
     size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
 
     size_t offset = (c->get_total_data_symbol_idx(frame_id, data_symbol_idx)
-                        * c->BS_ANT_NUM)
+                        * c->bs_ant_num())
         + ant_id;
 
     if (kDebugPrintInTask) {
@@ -385,7 +385,7 @@ int PacketTXRX::dequeue_send(int tid)
 
     size_t socket_symbol_offset = offset
         % (kFrameWnd * c->data_symbol_num_perframe
-              * c->BS_ANT_NUM);
+              * c->bs_ant_num());
     char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset * c->packet_length;
     auto* pkt = (Packet*)cur_buffer_ptr;
     new (pkt) Packet(frame_id, data_symbol_idx, 0, ant_id);

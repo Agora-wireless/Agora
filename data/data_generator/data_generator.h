@@ -66,20 +66,20 @@ public:
     /**
      * @brief Return the output of modulating the encoded codeword
      * @param encoded_codeword The encoded LDPC codeword bit sequence
-     * @return An array of complex floats with OFDM_DATA_NUM elements
+     * @return An array of complex floats with ofdm_data_num() elements
      */
     std::vector<complex_float> get_modulation(
         const std::vector<int8_t>& encoded_codeword)
     {
-        std::vector<complex_float> modulated_codeword(cfg->OFDM_DATA_NUM);
-        std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
+        std::vector<complex_float> modulated_codeword(cfg->ofdm_data_num());
+        std::vector<uint8_t> mod_input(cfg->ofdm_data_num());
 
         adapt_bits_for_mod(
             reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
             &mod_input[0], cfg->LDPC_config.num_encoded_bytes(),
             cfg->mod_order_bits);
 
-        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
+        for (size_t i = 0; i < cfg->ofdm_data_num(); i++) {
             modulated_codeword[i]
                 = mod_single_uint8(mod_input[i], cfg->mod_table);
         }
@@ -89,14 +89,14 @@ public:
     std::vector<complex_float> get_modulation(
         const int8_t* encoded_codeword, size_t num_bits)
     {
-        std::vector<complex_float> modulated_codeword(cfg->OFDM_DATA_NUM);
-        std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
+        std::vector<complex_float> modulated_codeword(cfg->ofdm_data_num());
+        std::vector<uint8_t> mod_input(cfg->ofdm_data_num());
 
         adapt_bits_for_mod(
             reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
             &mod_input[0], bits_to_bytes(num_bits), cfg->mod_order_bits);
 
-        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
+        for (size_t i = 0; i < cfg->ofdm_data_num(); i++) {
             modulated_codeword[i]
                 = mod_single_uint8(mod_input[i], cfg->mod_table);
         }
@@ -104,34 +104,34 @@ public:
     }
 
     /**
-     * @param modulated_codeword The modulated codeword with OFDM_DATA_NUM
+     * @param modulated_codeword The modulated codeword with ofdm_data_num()
      * elements
-     * @brief An array with OFDM_CA_NUM elements with the OFDM_DATA_NUM
+     * @brief An array with ofdm_ca_num() elements with the ofdm_data_num()
      * modulated elements binned at the center
      */
     std::vector<complex_float> bin_for_ifft(
         const std::vector<complex_float> modulated_codeword) const
     {
-        std::vector<complex_float> pre_ifft_symbol(cfg->OFDM_CA_NUM); // Zeroed
-        std::memcpy(&pre_ifft_symbol[cfg->OFDM_DATA_START],
-            &modulated_codeword[0], cfg->OFDM_DATA_NUM * sizeof(complex_float));
+        std::vector<complex_float> pre_ifft_symbol(cfg->ofdm_ca_num()); // Zeroed
+        std::memcpy(&pre_ifft_symbol[cfg->ofdm_data_start()],
+            &modulated_codeword[0], cfg->ofdm_data_num() * sizeof(complex_float));
 
         return pre_ifft_symbol;
     }
 
-    /// Return the time-domain pilot symbol with OFDM_CA_NUM complex floats
+    /// Return the time-domain pilot symbol with ofdm_ca_num() complex floats
     std::vector<complex_float> get_common_pilot_time_domain() const
     {
         const std::vector<std::complex<float>> zc_seq
             = Utils::double_to_cfloat(CommsLib::getSequence(
-                cfg->OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU));
+                cfg->ofdm_data_num(), CommsLib::LTE_ZADOFF_CHU));
 
         const std::vector<std::complex<float>> zc_common_pilot
             = CommsLib::seqCyclicShift(zc_seq, M_PI / 4.0); // Used in LTE SRS
 
-        std::vector<complex_float> ret(cfg->OFDM_CA_NUM); // Zeroed
-        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
-            ret[i + cfg->OFDM_DATA_START]
+        std::vector<complex_float> ret(cfg->ofdm_ca_num()); // Zeroed
+        for (size_t i = 0; i < cfg->ofdm_data_num(); i++) {
+            ret[i + cfg->ofdm_data_start()]
                 = { zc_common_pilot[i].real(), zc_common_pilot[i].imag() };
         }
 

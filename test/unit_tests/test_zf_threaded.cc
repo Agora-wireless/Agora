@@ -27,7 +27,7 @@ void MasterToWorkerDynamic_master(Config* cfg,
     }
 
     for (size_t bs_ant_idx = 0; bs_ant_idx < kAntTestNum; bs_ant_idx++) {
-        cfg->BS_ANT_NUM = bs_ant_nums[bs_ant_idx];
+        cfg->bs_ant_num( bs_ant_nums[bs_ant_idx] );
         for (size_t i = 0; i < kMaxTestNum; i++) {
             uint32_t frame_id
                 = i / cfg->zf_events_per_symbol + frame_offsets[bs_ant_idx];
@@ -75,7 +75,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     size_t num_tasks = 0;
     Event_data req_event;
     size_t max_frame_id_wo_offset
-        = (kMaxTestNum - 1) / (cfg->OFDM_DATA_NUM / cfg->zf_block_size);
+        = (kMaxTestNum - 1) / (cfg->ofdm_data_num() / cfg->zf_block_size);
     for (size_t i = 0; i < kMaxItrNum; i++) {
         if (event_queue.try_dequeue(req_event)) {
             num_tasks++;
@@ -88,7 +88,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
                 and cur_frame_id - frame_offsets[2] <= max_frame_id_wo_offset) {
                 frame_offset_id = 2;
             }
-            ASSERT_EQ(cfg->BS_ANT_NUM, bs_ant_nums[frame_offset_id]);
+            ASSERT_EQ(cfg->bs_ant_num(), bs_ant_nums[frame_offset_id]);
             Event_data resp_event = computeZF->launch(req_event.tags[0]);
             try_enqueue_fallback(&complete_task_queue, ptok, resp_event);
         }
@@ -99,8 +99,8 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
         num_tasks, ms / num_tasks);
 }
 
-/// Test correctness of BS_ANT_NUM values in multi-threaded zeroforcing
-/// when BS_ANT_NUM varies in runtime
+/// Test correctness of bs_ant_num() values in multi-threaded zeroforcing
+/// when bs_ant_num() varies in runtime
 TEST(TestZF, VaryingConfig)
 {
     static constexpr size_t kNumIters = 10000;

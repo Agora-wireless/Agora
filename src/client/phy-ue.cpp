@@ -17,16 +17,16 @@ Phy_UE::Phy_UE(Config* config)
     initialize_vars_from_cfg();
 
     std::vector<size_t> data_sc_ind_;
-    for (size_t i = config_->OFDM_DATA_START;
-         i < config_->OFDM_DATA_START + config_->OFDM_DATA_NUM; i++)
+    for (size_t i = config_->ofdm_data_start();
+         i < config_->ofdm_data_start() + config_->ofdm_data_num(); i++)
         data_sc_ind_.push_back(i);
 
     non_null_sc_ind_.insert(
         non_null_sc_ind_.end(), data_sc_ind_.begin(), data_sc_ind_.end());
     std::sort(non_null_sc_ind_.begin(), non_null_sc_ind_.end());
 
-    ue_pilot_vec.resize(config_->UE_ANT_NUM);
-    for (size_t i = 0; i < config_->UE_ANT_NUM; i++) {
+    ue_pilot_vec.resize(config_->ue_ant_num());
+    for (size_t i = 0; i < config_->ue_ant_num(); i++) {
         for (size_t j = config->ofdm_tx_zero_prefix_;
              j < config_->sampsPerSymbol - config->ofdm_tx_zero_postfix_; j++) {
             ue_pilot_vec[i].push_back(std::complex<float>(
@@ -36,23 +36,23 @@ Phy_UE::Phy_UE(Config* config)
     }
 
     fft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        kFrameWnd * dl_symbol_perframe * config_->UE_ANT_NUM * 36);
+        kFrameWnd * dl_symbol_perframe * config_->ue_ant_num() * 36);
     demul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        kFrameWnd * dl_data_symbol_perframe * config_->UE_ANT_NUM * 36);
+        kFrameWnd * dl_data_symbol_perframe * config_->ue_ant_num() * 36);
     decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        kFrameWnd * dl_data_symbol_perframe * config_->UE_ANT_NUM * 36);
+        kFrameWnd * dl_data_symbol_perframe * config_->ue_ant_num() * 36);
     message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        kFrameWnd * config_->symbol_num_perframe * config_->UE_ANT_NUM * 36);
+        kFrameWnd * config_->symbol_num_perframe * config_->ue_ant_num() * 36);
     encode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        kFrameWnd * config_->UE_NUM * 36);
+        kFrameWnd * config_->ue_num() * 36);
     modul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        kFrameWnd * config_->UE_NUM * 36);
+        kFrameWnd * config_->ue_num() * 36);
     ifft_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        kFrameWnd * config_->UE_NUM * 36);
+        kFrameWnd * config_->ue_num() * 36);
     tx_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        kFrameWnd * config_->UE_NUM * 36);
+        kFrameWnd * config_->ue_num() * 36);
     to_mac_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        kFrameWnd * config_->UE_NUM * 36);
+        kFrameWnd * config_->ue_num() * 36);
 
     for (size_t i = 0; i < rx_thread_num; i++) {
         rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
@@ -94,31 +94,31 @@ Phy_UE::Phy_UE(Config* config)
     initialize_downlink_buffers();
 
     (void)DftiCreateDescriptor(
-        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, config_->OFDM_CA_NUM);
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, config_->ofdm_ca_num());
     (void)DftiCommitDescriptor(mkl_handle);
 
     // initilize all kinds of checkers
     std::memset(fft_status_, 0, sizeof(size_t) * kFrameWnd);
     for (size_t i = 0; i < kFrameWnd; i++) {
-        fft_checker_[i] = new size_t[config_->UE_ANT_NUM];
-        std::memset(fft_checker_[i], 0, sizeof(size_t) * (config_->UE_ANT_NUM));
+        fft_checker_[i] = new size_t[config_->ue_ant_num()];
+        std::memset(fft_checker_[i], 0, sizeof(size_t) * (config_->ue_ant_num()));
     }
 
     std::memset(demul_status_, 0, sizeof(size_t) * kFrameWnd);
     if (dl_data_symbol_perframe > 0) {
         for (size_t i = 0; i < kFrameWnd; i++) {
-            demul_checker_[i] = new size_t[config_->UE_ANT_NUM];
+            demul_checker_[i] = new size_t[config_->ue_ant_num()];
             std::memset(
-                demul_checker_[i], 0, sizeof(size_t) * (config_->UE_ANT_NUM));
+                demul_checker_[i], 0, sizeof(size_t) * (config_->ue_ant_num()));
         }
     }
 
     std::memset(decode_status_, 0, sizeof(size_t) * kFrameWnd);
     if (dl_data_symbol_perframe > 0) {
         for (size_t i = 0; i < kFrameWnd; i++) {
-            decode_checker_[i] = new size_t[config_->UE_ANT_NUM];
+            decode_checker_[i] = new size_t[config_->ue_ant_num()];
             std::memset(
-                decode_checker_[i], 0, sizeof(size_t) * (config_->UE_ANT_NUM));
+                decode_checker_[i], 0, sizeof(size_t) * (config_->ue_ant_num()));
         }
     }
 
@@ -314,7 +314,7 @@ void Phy_UE::start()
                             frame_id, ant_id);
                     fft_checker_[frame_slot][ant_id] = 0;
                     fft_status_[frame_slot]++;
-                    if (fft_status_[frame_slot] == config_->UE_ANT_NUM) {
+                    if (fft_status_[frame_slot] == config_->ue_ant_num()) {
                         if (kDebugPrintPerFrameDone)
                             std::printf("Main thread: Equalization done on all "
                                         "antennas at frame: %zu\n",
@@ -346,7 +346,7 @@ void Phy_UE::start()
                     max_equaled_frame = frame_id;
                     demul_checker_[frame_slot][ant_id] = 0;
                     demul_status_[frame_slot]++;
-                    if (demul_status_[frame_slot] == config_->UE_ANT_NUM) {
+                    if (demul_status_[frame_slot] == config_->ue_ant_num()) {
                         if (kDebugPrintPerFrameDone)
                             std::printf("Main thread: Demodulation done on all "
                                         "antennas at frame: %zu \n",
@@ -381,9 +381,9 @@ void Phy_UE::start()
                     frame_dl_process_time_[frame_slot * kMaxUEs + ant_id]
                         = get_time_us()
                         - frame_dl_process_time_[frame_slot * kMaxUEs + ant_id];
-                    if (decode_status_[frame_slot] == config_->UE_ANT_NUM) {
+                    if (decode_status_[frame_slot] == config_->ue_ant_num()) {
                         double frame_time_total = 0;
-                        for (size_t i = 0; i < config_->UE_ANT_NUM; i++)
+                        for (size_t i = 0; i < config_->ue_ant_num(); i++)
                             frame_time_total
                                 += frame_dl_process_time_[frame_slot * kMaxUEs
                                     + i];
@@ -426,7 +426,7 @@ void Phy_UE::start()
                 rt_assert(pkt->frame_id == expected_frame_id_from_mac_,
                     "Incorrect frame ID from MAC");
                 current_frame_user_num_
-                    = (current_frame_user_num_ + 1) % config_->UE_ANT_NUM;
+                    = (current_frame_user_num_ + 1) % config_->ue_ant_num();
                 if (current_frame_user_num_ == 0)
                     expected_frame_id_from_mac_++;
 
@@ -529,7 +529,7 @@ void Phy_UE::start()
     if (kPrintPhyStats) {
         const size_t task_buffer_symbol_num_dl
             = dl_data_symbol_perframe * kFrameWnd;
-        for (size_t ue_id = 0; ue_id < config_->UE_ANT_NUM; ue_id++) {
+        for (size_t ue_id = 0; ue_id < config_->ue_ant_num(); ue_id++) {
             size_t total_decoded_bits(0);
             size_t total_bit_errors(0);
             size_t total_decoded_blocks(0);
@@ -623,7 +623,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
     }
 
     size_t sig_offset = config_->ofdm_rx_zero_prefix_client_;
-    if (kPrintDownlinkPilotStats && config_->UE_ANT_NUM == 1) {
+    if (kPrintDownlinkPilotStats && config_->ue_ant_num() == 1) {
         if (config_->isPilot(frame_id, symbol_id)) {
             simd_convert_short_to_float(pkt->data,
                 reinterpret_cast<float*>(rx_samps_tmp),
@@ -673,20 +673,20 @@ void Phy_UE::doFFT(int tid, size_t tag)
     size_t dl_symbol_id = config_->get_dl_symbol_idx(frame_id, symbol_id);
     size_t total_dl_symbol_id = frame_slot * dl_symbol_perframe + dl_symbol_id;
     size_t FFT_buffer_target_id
-        = total_dl_symbol_id * config_->UE_ANT_NUM + ant_id;
+        = total_dl_symbol_id * config_->ue_ant_num() + ant_id;
 
     // transfer ushort to float
     sig_offset = (sig_offset / 16) * 16;
-    size_t delay_offset = (sig_offset + config_->CP_LEN) * 2;
+    size_t delay_offset = (sig_offset + config_->cp_len()) * 2;
     float* fft_buff = (float*)fft_buffer_[FFT_buffer_target_id];
 
     simd_convert_short_to_float(
-        &pkt->data[delay_offset], fft_buff, config_->OFDM_CA_NUM * 2);
+        &pkt->data[delay_offset], fft_buff, config_->ofdm_ca_num() * 2);
 
     // perform fft
     DftiComputeForward(mkl_handle, fft_buffer_[FFT_buffer_target_id]);
 
-    size_t csi_offset = frame_slot * config_->UE_ANT_NUM + ant_id;
+    size_t csi_offset = frame_slot * config_->ue_ant_num() + ant_id;
     cx_float* csi_buffer_ptr = (cx_float*)(csi_buffer_[csi_offset].data());
     cx_float* fft_buffer_ptr = (cx_float*)fft_buffer_[FFT_buffer_target_id];
 
@@ -697,7 +697,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
     // due to relative reciprocity calibration,
     // see Argos paper (Mobicom'12)
     if (dl_symbol_id < dl_pilot_symbol_perframe) {
-        for (size_t j = 0; j < config_->OFDM_DATA_NUM; j++) {
+        for (size_t j = 0; j < config_->ofdm_data_num(); j++) {
             // divide fft output by pilot data to get CSI estimation
             if (dl_symbol_id == 0) {
                 csi_buffer_ptr[j] = 0;
@@ -712,7 +712,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
         size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe
             + dl_symbol_id - dl_pilot_symbol_perframe;
         size_t eq_buffer_offset
-            = total_dl_symbol_id * config_->UE_ANT_NUM + ant_id;
+            = total_dl_symbol_id * config_->ue_ant_num() + ant_id;
 
         cx_float* equ_buffer_ptr
             = (cx_float*)(equal_buffer_[eq_buffer_offset].data());
@@ -720,8 +720,8 @@ void Phy_UE::doFFT(int tid, size_t tag)
         // use pilot subcarriers for phase tracking and correction
         float theta = 0;
         cx_float csi(1, 0);
-        for (size_t j = 0; j < config_->OFDM_DATA_NUM; j++) {
-            if (j % config_->OFDM_PILOT_SPACING == 0) {
+        for (size_t j = 0; j < config_->ofdm_data_num(); j++) {
+            if (j % config_->ofdm_pilot_spacing() == 0) {
                 equ_buffer_ptr[j] = 0;
                 if (dl_pilot_symbol_perframe > 0) {
                     csi = csi_buffer_ptr[j];
@@ -736,8 +736,8 @@ void Phy_UE::doFFT(int tid, size_t tag)
         if (config_->get_ofdm_pilot_num() > 0)
             theta /= config_->get_ofdm_pilot_num();
         auto phc = exp(cx_float(0, -theta));
-        for (size_t j = 0; j < config_->OFDM_DATA_NUM; j++) {
-            if (j % config_->OFDM_PILOT_SPACING != 0) {
+        for (size_t j = 0; j < config_->ofdm_data_num(); j++) {
+            if (j % config_->ofdm_pilot_spacing() != 0) {
                 // divide fft output by pilot data to get CSI estimation
                 size_t sc_id = non_null_sc_ind_[j];
                 if (dl_pilot_symbol_perframe > 0) {
@@ -749,15 +749,15 @@ void Phy_UE::doFFT(int tid, size_t tag)
                 /*
                 complex_float tx
                     = config_
-                          ->dl_iq_f[dl_symbol_id][ant_id * config_->OFDM_CA_NUM
-                              + config_->OFDM_DATA_START + j];
+                          ->dl_iq_f[dl_symbol_id][ant_id * config_->ofdm_ca_num()
+                              + config_->ofdm_data_start() + j];
                 evm += std::norm(equ_buffer_ptr[j] - cx_float(tx.re, tx.im));
 		*/
             }
         }
         /*
         evm = std::sqrt(
-            evm / (config_->OFDM_DATA_NUM - config_->get_ofdm_pilot_num()));
+            evm / (config_->ofdm_data_num() - config_->get_ofdm_pilot_num()));
         if (kPrintPhyStats)
             std::cout << "Frame: " << frame_id << ", Symbol: " << symbol_id
                       << ", User: " << ant_id << ", EVM: " << 100 * evm
@@ -793,19 +793,19 @@ void Phy_UE::doDemul(int tid, size_t tag)
     size_t dl_symbol_id = config_->get_dl_symbol_idx(frame_id, symbol_id);
     size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe
         + dl_symbol_id - dl_pilot_symbol_perframe;
-    size_t offset = total_dl_symbol_id * config_->UE_ANT_NUM + ant_id;
+    size_t offset = total_dl_symbol_id * config_->ue_ant_num() + ant_id;
     float* equal_ptr = (float*)&equal_buffer_[offset][0];
     auto* demul_ptr = dl_demod_buffer_[offset];
 
     // demod_16qam_hard_loop(
-    //    equal_ptr, (uint8_t*)demul_ptr, config_->UE_ANT_NUM);
+    //    equal_ptr, (uint8_t*)demul_ptr, config_->ue_ant_num());
 
     switch (config_->mod_order_bits) {
     case (CommsLib::QAM16):
-        demod_16qam_soft_avx2(equal_ptr, demul_ptr, config_->OFDM_DATA_NUM);
+        demod_16qam_soft_avx2(equal_ptr, demul_ptr, config_->ofdm_data_num());
         break;
     case (CommsLib::QAM64):
-        demod_64qam_soft_avx2(equal_ptr, demul_ptr, config_->OFDM_DATA_NUM);
+        demod_64qam_soft_avx2(equal_ptr, demul_ptr, config_->ofdm_data_num());
         break;
     default:
         std::printf("Demodulation: modulation type %s not supported!\n",
@@ -820,7 +820,7 @@ void Phy_UE::doDemul(int tid, size_t tag)
 
     if (kPrintLLRData) {
         std::printf("LLR data, symbol_offset: %zu\n", offset);
-        for (size_t i = 0; i < config_->OFDM_DATA_NUM; i++) {
+        for (size_t i = 0; i < config_->ofdm_data_num(); i++) {
             std::printf("%x ", (uint8_t) * (demul_ptr + i));
         }
         std::printf("\n");
@@ -848,7 +848,7 @@ void Phy_UE::doDecode(int tid, size_t tag)
     size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe
         + dl_symbol_id - dl_pilot_symbol_perframe;
     size_t symbol_ant_offset
-        = total_dl_symbol_id * config_->UE_ANT_NUM + ant_id;
+        = total_dl_symbol_id * config_->ue_ant_num() + ant_id;
 
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
     };
@@ -987,7 +987,7 @@ void Phy_UE::doEncode(int tid, size_t tag)
                 size_t cb_offset
                     = (ue_id * cfg->LDPC_config.nblocksInSymbol + cb_id)
                     * bytes_per_block;
-                input_ptr = &cfg->ul_bits[ul_symbol_id + config_->UL_PILOT_SYMS]
+                input_ptr = &cfg->ul_bits[ul_symbol_id + config_->ul_pilot_syms()]
                                          [cb_offset];
             }
 
@@ -996,7 +996,7 @@ void Phy_UE::doEncode(int tid, size_t tag)
                 input_ptr);
 
             int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_order_bits;
-            int output_offset = total_ul_symbol_id * config_->OFDM_DATA_NUM
+            int output_offset = total_ul_symbol_id * config_->ofdm_data_num()
                 + cbCodedBytes * cb_id;
 
             adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
@@ -1027,11 +1027,11 @@ void Phy_UE::doModul(int tid, size_t tag)
             size_t total_ul_symbol_id
                 = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
             complex_float* modul_buf = &modul_buffer_[total_ul_symbol_id][ant_id
-                * config_->OFDM_DATA_NUM];
+                * config_->ofdm_data_num()];
             int8_t* ul_bits
                 = (int8_t*)&ul_syms_buffer_[ant_id][total_ul_symbol_id
-                    * config_->OFDM_DATA_NUM];
-            for (size_t sc = 0; sc < config_->OFDM_DATA_NUM; sc++) {
+                    * config_->ofdm_data_num()];
+            for (size_t sc = 0; sc < config_->ofdm_data_num(); sc++) {
                 modul_buf[sc] = mod_single_uint8(
                     (uint8_t)ul_bits[sc], config_->mod_table);
             }
@@ -1055,36 +1055,36 @@ void Phy_UE::doIFFT(int tid, size_t tag)
             size_t total_ul_symbol_id
                 = frame_slot * ul_symbol_perframe + ul_symbol_id;
             size_t buff_offset
-                = total_ul_symbol_id * config_->UE_ANT_NUM + ant_id;
+                = total_ul_symbol_id * config_->ue_ant_num() + ant_id;
             complex_float* ifft_buff = ifft_buffer_[buff_offset];
 
             std::memset(
-                ifft_buff, 0, sizeof(complex_float) * config_->OFDM_DATA_START);
-            if (ul_symbol_id < config_->UL_PILOT_SYMS) {
-                std::memcpy(ifft_buff + config_->OFDM_DATA_START,
+                ifft_buff, 0, sizeof(complex_float) * config_->ofdm_data_start());
+            if (ul_symbol_id < config_->ul_pilot_syms()) {
+                std::memcpy(ifft_buff + config_->ofdm_data_start(),
                     config_->ue_specific_pilot[ant_id],
-                    config_->OFDM_DATA_NUM * sizeof(complex_float));
+                    config_->ofdm_data_num() * sizeof(complex_float));
             } else {
                 size_t total_ul_data_symbol_id
                     = frame_slot * ul_data_symbol_perframe + ul_symbol_id
-                    - config_->UL_PILOT_SYMS;
+                    - config_->ul_pilot_syms();
                 complex_float* modul_buff
                     = &modul_buffer_[total_ul_data_symbol_id]
-                                    [ant_id * config_->OFDM_DATA_NUM];
-                std::memcpy(ifft_buff + config_->OFDM_DATA_START, modul_buff,
-                    config_->OFDM_DATA_NUM * sizeof(complex_float));
+                                    [ant_id * config_->ofdm_data_num()];
+                std::memcpy(ifft_buff + config_->ofdm_data_start(), modul_buff,
+                    config_->ofdm_data_num() * sizeof(complex_float));
             }
-            std::memset(ifft_buff + config_->OFDM_DATA_STOP, 0,
-                sizeof(complex_float) * config_->OFDM_DATA_START);
+            std::memset(ifft_buff + config_->ofdm_data_stop(), 0,
+                sizeof(complex_float) * config_->ofdm_data_start());
 
-            CommsLib::IFFT(ifft_buff, config_->OFDM_CA_NUM, false);
+            CommsLib::IFFT(ifft_buff, config_->ofdm_ca_num(), false);
 
             size_t tx_offset = buff_offset * config_->packet_length;
             char* cur_tx_buffer = &tx_buffer_[tx_offset];
             struct Packet* pkt = (struct Packet*)cur_tx_buffer;
             std::complex<short>* tx_data_ptr = (std::complex<short>*)pkt->data;
-            CommsLib::ifft2tx(ifft_buff, tx_data_ptr, config_->OFDM_CA_NUM,
-                config_->ofdm_tx_zero_prefix_, config_->CP_LEN, config_->scale);
+            CommsLib::ifft2tx(ifft_buff, tx_data_ptr, config_->ofdm_ca_num(),
+                config_->ofdm_tx_zero_prefix_, config_->cp_len(), config_->scale);
         }
     }
 
@@ -1095,23 +1095,23 @@ void Phy_UE::doIFFT(int tid, size_t tag)
 
 void Phy_UE::initialize_vars_from_cfg(void)
 {
-    dl_pilot_symbol_perframe = config_->DL_PILOT_SYMS;
-    ul_pilot_symbol_perframe = config_->UL_PILOT_SYMS;
+    dl_pilot_symbol_perframe = config_->dl_pilot_syms();
+    ul_pilot_symbol_perframe = config_->ul_pilot_syms();
     ul_symbol_perframe = config_->ul_data_symbol_num_perframe;
     dl_symbol_perframe = config_->dl_data_symbol_num_perframe;
     dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe;
     ul_data_symbol_perframe = ul_symbol_perframe - ul_pilot_symbol_perframe;
     nCPUs = std::thread::hardware_concurrency();
     rx_thread_num = (kUseArgos && !config_->hw_framer)
-        ? config_->UE_NUM
-        : std::min(config_->UE_NUM, config_->socket_thread_num);
+        ? config_->ue_num()
+        : std::min(config_->ue_num(), config_->socket_thread_num);
 
     tx_buffer_status_size
-        = (ul_symbol_perframe * config_->UE_ANT_NUM * kFrameWnd);
+        = (ul_symbol_perframe * config_->ue_ant_num() * kFrameWnd);
     tx_buffer_size = config_->packet_length * tx_buffer_status_size;
     rx_buffer_status_size
         = (dl_symbol_perframe + config_->beacon_symbol_num_perframe)
-        * config_->UE_ANT_NUM * kFrameWnd;
+        * config_->ue_ant_num() * kFrameWnd;
     rx_buffer_size = config_->packet_length * rx_buffer_status_size;
 }
 
@@ -1119,24 +1119,24 @@ void Phy_UE::initialize_uplink_buffers()
 {
     // initialize ul data buffer
     ul_bits_buffer_size_ = kFrameWnd * config_->mac_bytes_num_perframe;
-    ul_bits_buffer_.malloc(config_->UE_ANT_NUM, ul_bits_buffer_size_,
+    ul_bits_buffer_.malloc(config_->ue_ant_num(), ul_bits_buffer_size_,
         Agora_memory::Alignment_t::k64Align);
     ul_bits_buffer_status_.calloc(
-        config_->UE_ANT_NUM, kFrameWnd, Agora_memory::Alignment_t::k64Align);
+        config_->ue_ant_num(), kFrameWnd, Agora_memory::Alignment_t::k64Align);
     ul_syms_buffer_size_
-        = kFrameWnd * ul_data_symbol_perframe * config_->OFDM_DATA_NUM;
-    ul_syms_buffer_.calloc(config_->UE_ANT_NUM, ul_syms_buffer_size_,
+        = kFrameWnd * ul_data_symbol_perframe * config_->ofdm_data_num();
+    ul_syms_buffer_.calloc(config_->ue_ant_num(), ul_syms_buffer_size_,
         Agora_memory::Alignment_t::k64Align);
 
     // initialize modulation buffer
     modul_buffer_.calloc(ul_data_symbol_perframe * kFrameWnd,
-        config_->OFDM_DATA_NUM * config_->UE_ANT_NUM,
+        config_->ofdm_data_num() * config_->ue_ant_num(),
         Agora_memory::Alignment_t::k64Align);
 
     // initialize IFFT buffer
     size_t ifft_buffer_block_num
-        = config_->UE_ANT_NUM * ul_symbol_perframe * kFrameWnd;
-    ifft_buffer_.calloc(ifft_buffer_block_num, config_->OFDM_CA_NUM,
+        = config_->ue_ant_num() * ul_symbol_perframe * kFrameWnd;
+    ifft_buffer_.calloc(ifft_buffer_block_num, config_->ofdm_ca_num(),
         Agora_memory::Alignment_t::k64Align);
 
     alloc_buffer_1d(
@@ -1157,27 +1157,27 @@ void Phy_UE::initialize_downlink_buffers()
 
     // initialize FFT buffer
     size_t FFT_buffer_block_num
-        = config_->UE_ANT_NUM * dl_symbol_perframe * kFrameWnd;
-    fft_buffer_.calloc(FFT_buffer_block_num, config_->OFDM_CA_NUM,
+        = config_->ue_ant_num() * dl_symbol_perframe * kFrameWnd;
+    fft_buffer_.calloc(FFT_buffer_block_num, config_->ofdm_ca_num(),
         Agora_memory::Alignment_t::k64Align);
 
     // initialize CSI buffer
-    csi_buffer_.resize(config_->UE_ANT_NUM * kFrameWnd);
+    csi_buffer_.resize(config_->ue_ant_num() * kFrameWnd);
     for (size_t i = 0; i < csi_buffer_.size(); i++)
-        csi_buffer_[i].resize(config_->OFDM_DATA_NUM);
+        csi_buffer_[i].resize(config_->ofdm_data_num());
 
     if (dl_data_symbol_perframe > 0) {
         // initialize equalized data buffer
         const size_t task_buffer_symbol_num_dl
             = dl_data_symbol_perframe * kFrameWnd;
-        size_t buffer_size = config_->UE_ANT_NUM * task_buffer_symbol_num_dl;
+        size_t buffer_size = config_->ue_ant_num() * task_buffer_symbol_num_dl;
         equal_buffer_.resize(buffer_size);
         for (size_t i = 0; i < equal_buffer_.size(); i++)
-            equal_buffer_[i].resize(config_->OFDM_DATA_NUM);
+            equal_buffer_[i].resize(config_->ofdm_data_num());
 
         // initialize demod buffer
         dl_demod_buffer_.calloc(buffer_size,
-            config_->OFDM_DATA_NUM * kMaxModType,
+            config_->ofdm_data_num() * kMaxModType,
             Agora_memory::Alignment_t::k64Align);
 
         // initialize decode buffer
@@ -1190,21 +1190,21 @@ void Phy_UE::initialize_downlink_buffers()
                 Agora_memory::Alignment_t::k64Align,
                 1024 * 1024 * sizeof(int16_t)));
 
-        decoded_bits_count_.calloc(config_->UE_ANT_NUM,
+        decoded_bits_count_.calloc(config_->ue_ant_num(),
             task_buffer_symbol_num_dl, Agora_memory::Alignment_t::k64Align);
-        bit_error_count_.calloc(config_->UE_ANT_NUM, task_buffer_symbol_num_dl,
+        bit_error_count_.calloc(config_->ue_ant_num(), task_buffer_symbol_num_dl,
             Agora_memory::Alignment_t::k64Align);
 
-        decoded_blocks_count_.calloc(config_->UE_ANT_NUM,
+        decoded_blocks_count_.calloc(config_->ue_ant_num(),
             task_buffer_symbol_num_dl, Agora_memory::Alignment_t::k64Align);
-        block_error_count_.calloc(config_->UE_ANT_NUM,
+        block_error_count_.calloc(config_->ue_ant_num(),
             task_buffer_symbol_num_dl, Agora_memory::Alignment_t::k64Align);
-        decoded_symbol_count_ = new size_t[config_->UE_ANT_NUM];
-        symbol_error_count_ = new size_t[config_->UE_ANT_NUM];
+        decoded_symbol_count_ = new size_t[config_->ue_ant_num()];
+        symbol_error_count_ = new size_t[config_->ue_ant_num()];
         std::memset(
-            decoded_symbol_count_, 0, sizeof(size_t) * config_->UE_ANT_NUM);
+            decoded_symbol_count_, 0, sizeof(size_t) * config_->ue_ant_num());
         std::memset(
-            symbol_error_count_, 0, sizeof(size_t) * config_->UE_ANT_NUM);
+            symbol_error_count_, 0, sizeof(size_t) * config_->ue_ant_num());
     }
 }
 
@@ -1212,15 +1212,15 @@ void Phy_UE::getDemulData(long long** ptr, int* size)
 {
     *ptr = (long long*)&equal_buffer_[max_equaled_frame
         * dl_data_symbol_perframe][0];
-    *size = config_->UE_ANT_NUM * config_->OFDM_CA_NUM;
+    *size = config_->ue_ant_num() * config_->ofdm_ca_num();
 }
 
 void Phy_UE::getEqualData(float** ptr, int* size, int ue_id)
 {
     *ptr = (float*)&equal_buffer_[max_equaled_frame * dl_data_symbol_perframe
-            * config_->UE_ANT_NUM
+            * config_->ue_ant_num()
         + ue_id][0];
-    *size = config_->UE_ANT_NUM * config_->OFDM_DATA_NUM * 2;
+    *size = config_->ue_ant_num() * config_->ofdm_data_num() * 2;
 }
 
 extern "C" {

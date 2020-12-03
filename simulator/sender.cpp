@@ -51,7 +51,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     std::memset(packet_count_per_frame, 0, kFrameWnd * sizeof(size_t));
 
     init_iq_from_file(std::string(TOSTRING(PROJECT_DIRECTORY))
-        + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
+        + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->bs_ant_num())
         + ".bin");
 
     task_ptok = reinterpret_cast<moodycamel::ProducerToken**>(
@@ -146,7 +146,7 @@ void* Sender::master_thread(int)
     const size_t max_symbol_id = get_max_symbol_id();
 
     // Push tasks of the first symbol into task queue
-    for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
+    for (size_t i = 0; i < cfg->bs_ant_num(); i++) {
         auto req_tag = gen_tag_t::frm_sym_ant(0, 0, i);
         rt_assert(send_queue_.enqueue(
                       *task_ptok[i % socket_thread_num], req_tag._tag),
@@ -171,7 +171,7 @@ void* Sender::master_thread(int)
 
         packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]++;
         if (packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]
-            == cfg->BS_ANT_NUM) {
+            == cfg->bs_ant_num()) {
 
             packet_count_per_symbol[comp_frame_slot][ctag.symbol_id] = 0;
             packet_count_per_frame[comp_frame_slot]++;
@@ -213,7 +213,7 @@ void* Sender::master_thread(int)
                 next_frame_id = ctag.frame_id;
             }
 
-            for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
+            for (size_t i = 0; i < cfg->bs_ant_num(); i++) {
                 auto req_tag
                     = gen_tag_t::frm_sym_ant(next_frame_id, next_symbol_id, i);
                 rt_assert(send_queue_.enqueue(
@@ -238,14 +238,14 @@ void* Sender::worker_thread(int tid)
 
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     DftiCreateDescriptor(
-        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->ofdm_ca_num());
     DftiCommitDescriptor(mkl_handle);
 
     const size_t max_symbol_id = get_max_symbol_id();
     const size_t radio_lo = tid * cfg->nRadios / socket_thread_num;
     const size_t radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
-    const size_t ant_num_this_thread = cfg->BS_ANT_NUM / socket_thread_num
-        + ((size_t)tid < cfg->BS_ANT_NUM % socket_thread_num ? 1 : 0);
+    const size_t ant_num_this_thread = cfg->bs_ant_num() / socket_thread_num
+        + ((size_t)tid < cfg->bs_ant_num() % socket_thread_num ? 1 : 0);
 #ifdef USE_DPDK
     const size_t port_id = tid % cfg->dpdk_num_ports;
     const size_t queue_id = tid / cfg->dpdk_num_ports;
@@ -255,7 +255,7 @@ void* Sender::worker_thread(int tid)
     UDPClient udp_client;
     auto fft_inout = reinterpret_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
-            cfg->OFDM_CA_NUM * sizeof(complex_float)));
+            cfg->ofdm_ca_num() * sizeof(complex_float)));
     auto* socks_pkt_buf = reinterpret_cast<Packet*>(malloc(cfg->packet_length));
 
     double begin = get_time();
@@ -263,14 +263,14 @@ void* Sender::worker_thread(int tid)
     size_t total_tx_packets_rolling = 0;
     size_t cur_radio = radio_lo;
 
-    std::printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu\n", (size_t)tid,
-        ant_num_this_thread, cfg->BS_ANT_NUM);
+    std::printf("In thread %zu, %zu antennas, bs_ant_num(): %zu\n", (size_t)tid,
+        ant_num_this_thread, cfg->bs_ant_num());
 
     // We currently don't support zero-padding OFDM prefix and postfix
     rt_assert(cfg->packet_length
         == Packet::kOffsetOfData
-            + (kUse12BitIQ ? 3 : 4) * (cfg->CP_LEN + cfg->OFDM_CA_NUM));
-    size_t ant_num_per_cell = cfg->BS_ANT_NUM / cfg->nCells;
+            + (kUse12BitIQ ? 3 : 4) * (cfg->cp_len() + cfg->ofdm_ca_num()));
+    size_t ant_num_per_cell = cfg->bs_ant_num() / cfg->nCells;
 
     size_t tags[kDequeueBulkSize];
     while (true) {
@@ -300,8 +300,8 @@ void* Sender::worker_thread(int tid)
             pkt->cell_id = tag.ant_id / ant_num_per_cell;
             pkt->ant_id = tag.ant_id - ant_num_per_cell * (pkt->cell_id);
             std::memcpy(pkt->data,
-                iq_data_short_[(pkt->symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
-                (cfg->CP_LEN + cfg->OFDM_CA_NUM) * (kUse12BitIQ ? 3 : 4));
+                iq_data_short_[(pkt->symbol_id * cfg->bs_ant_num()) + tag.ant_id],
+                (cfg->cp_len() + cfg->ofdm_ca_num()) * (kUse12BitIQ ? 3 : 4));
             if (cfg->fft_in_rru) {
                 run_fft(pkt, fft_inout, mkl_handle);
             }
@@ -382,21 +382,21 @@ size_t Sender::get_max_symbol_id() const
 
 void Sender::init_iq_from_file(std::string filename)
 {
-    const size_t packets_per_frame = cfg->symbol_num_perframe * cfg->BS_ANT_NUM;
+    const size_t packets_per_frame = cfg->symbol_num_perframe * cfg->bs_ant_num();
     iq_data_short_.calloc(packets_per_frame,
-        (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2,
+        (cfg->cp_len() + cfg->ofdm_ca_num()) * 2,
         Agora_memory::Alignment_t::k64Align);
 
     Table<float> iq_data_float;
     iq_data_float.calloc(packets_per_frame,
-        (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2,
+        (cfg->cp_len() + cfg->ofdm_ca_num()) * 2,
         Agora_memory::Alignment_t::k64Align);
 
     FILE* fp = fopen(filename.c_str(), "rb");
     rt_assert(fp != nullptr, "Failed to open IQ data file");
 
     for (size_t i = 0; i < packets_per_frame; i++) {
-        const size_t expected_count = (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2;
+        const size_t expected_count = (cfg->cp_len() + cfg->ofdm_ca_num()) * 2;
         const size_t actual_count
             = fread(iq_data_float[i], sizeof(float), expected_count, fp);
         if (expected_count != actual_count) {
@@ -451,13 +451,13 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
 void Sender::run_fft(Packet* pkt, complex_float* fft_inout,
     DFTI_DESCRIPTOR_HANDLE mkl_handle) const
 {
-    // pkt->data has (CP_LEN + OFDM_CA_NUM) unsigned short samples. After FFT,
-    // we'll remove the cyclic prefix and have OFDM_CA_NUM short samples left.
-    simd_convert_short_to_float(&pkt->data[2 * cfg->CP_LEN],
-        reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+    // pkt->data has (cp_len() + ofdm_ca_num()) unsigned short samples. After FFT,
+    // we'll remove the cyclic prefix and have ofdm_ca_num() short samples left.
+    simd_convert_short_to_float(&pkt->data[2 * cfg->cp_len()],
+        reinterpret_cast<float*>(fft_inout), cfg->ofdm_ca_num() * 2);
 
     DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
 
     simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data),
-        reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+        reinterpret_cast<float*>(fft_inout), cfg->ofdm_ca_num() * 2);
 }

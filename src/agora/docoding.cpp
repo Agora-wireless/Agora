@@ -177,7 +177,7 @@ Event_data DoDecode::launch(size_t tag)
         std::printf("\n");
     }
 
-    if (!kEnableMac && kPrintPhyStats && symbol_idx_ul == cfg->UL_PILOT_SYMS) {
+    if (!kEnableMac && kPrintPhyStats && symbol_idx_ul == cfg->ul_pilot_syms()) {
         phy_stats->update_decoded_bits(
             ue_id, symbol_offset, cfg->num_bytes_per_cb * 8);
         phy_stats->increment_decoded_blocks(ue_id, symbol_offset);

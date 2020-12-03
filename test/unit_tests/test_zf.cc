@@ -16,20 +16,20 @@ TEST(TestZF, Perf)
     int tid = 0;
 
     PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
-    csi_buffers.rand_alloc_cx_float(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM);
+    csi_buffers.rand_alloc_cx_float(cfg->bs_ant_num() * cfg->ofdm_data_num());
 
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
-        cfg->BS_ANT_NUM * cfg->UE_NUM);
+        cfg->bs_ant_num() * cfg->ue_num());
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
-        cfg->UE_NUM * cfg->BS_ANT_NUM);
+        cfg->ue_num() * cfg->bs_ant_num());
 
     Table<complex_float> calib_dl_buffer;
     calib_dl_buffer.rand_alloc_cx_float(
-        kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+        kFrameWnd, cfg->ofdm_data_num() * cfg->bs_ant_num(), Agora_memory::Alignment_t::k64Align);
 
     Table<complex_float> calib_ul_buffer;
     calib_ul_buffer.rand_alloc_cx_float(
-        kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+        kFrameWnd, cfg->ofdm_data_num() * cfg->bs_ant_num(), Agora_memory::Alignment_t::k64Align);
 
     auto stats = new Stats(cfg);
 
@@ -41,7 +41,7 @@ TEST(TestZF, Perf)
     for (size_t i = 0; i < kNumIters; i++) {
         uint32_t frame_id = fast_rand.next_u32();
         size_t base_sc_id
-            = (fast_rand.next_u32() % (cfg->OFDM_DATA_NUM / cfg->zf_block_size))
+            = (fast_rand.next_u32() % (cfg->ofdm_data_num() / cfg->zf_block_size))
             * cfg->zf_block_size;
         computeZF->launch(gen_tag_t::frm_sc(frame_id, base_sc_id)._tag);
     }

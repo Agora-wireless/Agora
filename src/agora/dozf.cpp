@@ -55,7 +55,7 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
     complex_float* _mat_dl_zf)
 {
     arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
-        cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+        cfg->ue_num(), cfg->bs_ant_num(), false);
     arma::cx_fmat mat_ul_zf_tmp;
     if (kUseInverseForZF) {
         try {
@@ -75,9 +75,9 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
 
     if (cfg->dl_data_symbol_num_perframe > 0) {
         arma::cx_fvec vec_calib(reinterpret_cast<arma::cx_float*>(calib_ptr),
-            cfg->BF_ANT_NUM, false);
+            cfg->bf_ant_num(), false);
 
-        arma::cx_fmat mat_calib(cfg->BF_ANT_NUM, cfg->BF_ANT_NUM);
+        arma::cx_fmat mat_calib(cfg->bf_ant_num(), cfg->bf_ant_num());
         mat_calib = arma::diagmat(vec_calib);
         arma::cx_fmat mat_dl_zf_tmp;
         try {
@@ -92,22 +92,22 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
         }
 
         // We should be scaling the beamforming matrix, so the IFFT
-        // output can be scaled with OFDM_CA_NUM across all antennas.
+        // output can be scaled with ofdm_ca_num() across all antennas.
         // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
         // mat_dl_zf /= abs(mat_dl_zf).max();
         mat_dl_zf_tmp /= abs(mat_dl_zf_tmp).max();
 
         if (cfg->external_ref_node) {
             mat_dl_zf_tmp.insert_rows(cfg->ref_ant,
-                arma::cx_fmat(cfg->nChannels, cfg->UE_NUM, arma::fill::zeros));
+                arma::cx_fmat(cfg->nChannels, cfg->ue_num(), arma::fill::zeros));
         }
         arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
-            cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+            cfg->bs_ant_num(), cfg->ue_num(), false);
         mat_dl_zf = mat_dl_zf_tmp;
     }
     if (cfg->external_ref_node) {
         mat_ul_zf_tmp.insert_cols(cfg->ref_ant,
-            arma::cx_fmat(cfg->UE_NUM, cfg->nChannels, arma::fill::zeros));
+            arma::cx_fmat(cfg->ue_num(), cfg->nChannels, arma::fill::zeros));
     }
     mat_ul_zf = mat_ul_zf_tmp;
 }
@@ -178,7 +178,7 @@ void DoZF::ZF_time_orthogonal(size_t tag)
             tid, frame_id, base_sc_id);
     }
     size_t num_subcarriers
-        = std::min(cfg->zf_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
+        = std::min(cfg->zf_block_size, cfg->ofdm_data_num() - base_sc_id);
 
     // Handle each subcarrier one by one
     for (size_t i = 0; i < num_subcarriers; i++) {
@@ -186,27 +186,27 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         const size_t cur_sc_id = base_sc_id + i;
 
         // Gather CSI matrices of each pilot from partially-transposed CSIs.
-        for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
+        for (size_t ue_idx = 0; ue_idx < cfg->ue_num(); ue_idx++) {
             float* dst_csi_ptr
-                = (float*)(csi_gather_buffer + cfg->BS_ANT_NUM * ue_idx);
+                = (float*)(csi_gather_buffer + cfg->bs_ant_num() * ue_idx);
             if (kUsePartialTrans)
                 partial_transpose_gather(cur_sc_id,
                     (float*)csi_buffers_[frame_slot][ue_idx], dst_csi_ptr,
-                    cfg->BS_ANT_NUM);
+                    cfg->bs_ant_num());
             else
                 transpose_gather(cur_sc_id,
                     (float*)csi_buffers_[frame_slot][ue_idx], dst_csi_ptr,
-                    cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM);
+                    cfg->bs_ant_num(), cfg->ofdm_data_num());
         }
 
         duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
         arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
-            cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+            cfg->bs_ant_num(), cfg->ue_num(), false);
 
         if (cfg->dl_data_symbol_num_perframe > 0) {
             arma::cx_fvec calib_vec(
                 reinterpret_cast<arma::cx_float*>(calib_gather_buffer),
-                cfg->BF_ANT_NUM, false);
+                cfg->bf_ant_num(), false);
             size_t frame_cal_slot = kFrameWnd - 1;
             if (cfg->recipCalEn && frame_id >= TX_FRAME_DELTA) {
                 size_t frame_grp_id
@@ -217,10 +217,10 @@ void DoZF::ZF_time_orthogonal(size_t tag)
             }
             arma::cx_fmat calib_dl_mat(reinterpret_cast<arma::cx_float*>(
                                            calib_dl_buffer_[frame_cal_slot]),
-                cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+                cfg->ofdm_data_num(), cfg->bf_ant_num(), false);
             arma::cx_fmat calib_ul_mat(reinterpret_cast<arma::cx_float*>(
                                            calib_ul_buffer_[frame_cal_slot]),
-                cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+                cfg->ofdm_data_num(), cfg->bf_ant_num(), false);
             arma::cx_fvec calib_dl_vec = calib_dl_mat.row(cur_sc_id).st();
             arma::cx_fvec calib_ul_vec = calib_ul_mat.row(cur_sc_id).st();
             calib_vec = calib_dl_vec / calib_ul_vec;
@@ -255,37 +255,37 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     if (kDebugPrintInTask) {
         std::printf(
             "In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
-            "BS_ANT_NUM: %zu\n",
-            tid, frame_id, base_sc_id, base_sc_id / cfg->UE_NUM,
-            cfg->BS_ANT_NUM);
+            "bs_ant_num(): %zu\n",
+            tid, frame_id, base_sc_id, base_sc_id / cfg->ue_num(),
+            cfg->bs_ant_num());
     }
 
     double start_tsc1 = worker_rdtsc();
 
     // Gather CSIs from partially-transposed CSIs
-    for (size_t i = 0; i < cfg->UE_NUM; i++) {
+    for (size_t i = 0; i < cfg->ue_num(); i++) {
         const size_t cur_sc_id = base_sc_id + i;
-        float* dst_csi_ptr = (float*)(csi_gather_buffer + cfg->BS_ANT_NUM * i);
+        float* dst_csi_ptr = (float*)(csi_gather_buffer + cfg->bs_ant_num() * i);
         partial_transpose_gather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
-            dst_csi_ptr, cfg->BS_ANT_NUM);
+            dst_csi_ptr, cfg->bs_ant_num());
     }
     if (cfg->recipCalEn) {
         arma::cx_fmat calib_dl_mat(
             reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_slot]),
-            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+            cfg->ofdm_data_num(), cfg->bf_ant_num(), false);
         arma::cx_fvec calib_ul_mat(
             reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_slot]),
-            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+            cfg->ofdm_data_num(), cfg->bf_ant_num(), false);
         arma::cx_fvec vec_calib(
             reinterpret_cast<arma::cx_float*>(calib_gather_buffer),
-            cfg->BF_ANT_NUM, false);
+            cfg->bf_ant_num(), false);
 
         vec_calib = calib_dl_mat.row(base_sc_id) / calib_ul_mat.row(base_sc_id);
     }
 
     duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
     arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer),
-        cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+        cfg->bs_ant_num(), cfg->ue_num(), false);
 
     compute_precoder(mat_csi, calib_gather_buffer,
         ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)],
@@ -314,12 +314,12 @@ void DoZF::Predict(size_t tag)
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
     const size_t offset_in_buffer
-        = ((frame_id % kFrameWnd) * cfg->OFDM_DATA_NUM)
+        = ((frame_id % kFrameWnd) * cfg->ofdm_data_num())
         + base_sc_id;
     auto* ptr_in = (arma::cx_float*)pred_csi_buffer;
     std::memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
-        sizeof(arma::cx_float) * cfg->BS_ANT_NUM * cfg->UE_NUM);
-    arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+        sizeof(arma::cx_float) * cfg->bs_ant_num() * cfg->ue_num());
+    arma::cx_fmat mat_input(ptr_in, cfg->bs_ant_num(), cfg->ue_num(), false);
 
     // Input matrix and calibration are for current frame, output precoders are
     // for the next frame

@@ -645,8 +645,8 @@ bool RadioConfig::initial_calib(bool sample_adjust)
             = CommsLib::find_pilot_seq(up[i], _cfg->pilot_cf32, seq_len);
         size_t peak_dn
             = CommsLib::find_pilot_seq(dn[i], _cfg->pilot_cf32, seq_len);
-        start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->CP_LEN;
-        start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->CP_LEN;
+        start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->cp_len();
+        start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->cp_len();
         std::cout << "receive starting position from/to node " << i << ": "
                   << peak_up << "/" << peak_dn << std::endl;
 #if DEBUG_PLOT
@@ -705,33 +705,33 @@ bool RadioConfig::initial_calib(bool sample_adjust)
             id = i - 1;
         // computing reciprocity calibration matrix
         auto first_up = up[i].begin() + start_up[i];
-        auto last_up = up[i].begin() + start_up[i] + _cfg->OFDM_CA_NUM;
+        auto last_up = up[i].begin() + start_up[i] + _cfg->ofdm_ca_num();
         std::vector<std::complex<float>> up_ofdm(first_up, last_up);
-        assert(up_ofdm.size() == _cfg->OFDM_CA_NUM);
+        assert(up_ofdm.size() == _cfg->ofdm_ca_num());
 
         auto first_dn = dn[i].begin() + start_dn[i];
-        auto last_dn = dn[i].begin() + start_dn[i] + _cfg->OFDM_CA_NUM;
+        auto last_dn = dn[i].begin() + start_dn[i] + _cfg->ofdm_ca_num();
         std::vector<std::complex<float>> dn_ofdm(first_dn, last_dn);
-        assert(dn_ofdm.size() == _cfg->OFDM_CA_NUM);
+        assert(dn_ofdm.size() == _cfg->ofdm_ca_num());
 
-        auto dn_f = CommsLib::FFT(dn_ofdm, _cfg->OFDM_CA_NUM);
-        auto up_f = CommsLib::FFT(up_ofdm, _cfg->OFDM_CA_NUM);
+        auto dn_f = CommsLib::FFT(dn_ofdm, _cfg->ofdm_ca_num());
+        auto up_f = CommsLib::FFT(up_ofdm, _cfg->ofdm_ca_num());
         arma::cx_fvec dn_vec(
-            reinterpret_cast<arma::cx_float*>(&dn_f[_cfg->OFDM_DATA_START]),
-            _cfg->OFDM_DATA_NUM, false);
+            reinterpret_cast<arma::cx_float*>(&dn_f[_cfg->ofdm_data_start()]),
+            _cfg->ofdm_data_num(), false);
         arma::cx_fvec calib_dl_vec(
             reinterpret_cast<arma::cx_float*>(
-                &init_calib_dl_[id * _cfg->OFDM_DATA_NUM]),
-            _cfg->OFDM_DATA_NUM, false);
+                &init_calib_dl_[id * _cfg->ofdm_data_num()]),
+            _cfg->ofdm_data_num(), false);
         calib_dl_vec = dn_vec;
 
         arma::cx_fvec up_vec(
-            reinterpret_cast<arma::cx_float*>(&up_f[_cfg->OFDM_DATA_START]),
-            _cfg->OFDM_DATA_NUM, false);
+            reinterpret_cast<arma::cx_float*>(&up_f[_cfg->ofdm_data_start()]),
+            _cfg->ofdm_data_num(), false);
         arma::cx_fvec calib_ul_vec(
             reinterpret_cast<arma::cx_float*>(
-                &init_calib_ul_[id * _cfg->OFDM_DATA_NUM]),
-            _cfg->OFDM_DATA_NUM, false);
+                &init_calib_ul_[id * _cfg->ofdm_data_num()]),
+            _cfg->ofdm_data_num(), false);
         calib_ul_vec = up_vec;
     }
     return good_csi;

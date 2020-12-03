@@ -60,9 +60,15 @@ public:
     void free_uplink_buffers();
 
 private:
-    size_t BS_ANT_NUM, UE_NUM;
+    size_t BS_ANT_NUM;
+    size_t UE_NUM;
     size_t OFDM_CA_NUM;
     size_t OFDM_DATA_NUM;
+    size_t bs_ant_num_;
+    size_t ue_num_;
+    size_t ofdm_ca_num_;
+    size_t ofdm_data_num_;
+
     size_t symbol_num_perframe, data_symbol_num_perframe;
     size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     size_t dl_data_symbol_start, dl_data_symbol_end;

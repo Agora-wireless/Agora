@@ -555,16 +555,16 @@ void Stats::print_summary()
     size_t num_precode_tasks
         = get_total_task_count(DoerType::kPrecode, task_thread_num);
     double csi_frames
-        = (double)num_csi_tasks / c->BS_ANT_NUM / c->pilot_symbol_num_perframe;
+        = (double)num_csi_tasks / c->bs_ant_num() / c->pilot_symbol_num_perframe;
     double zf_frames = (double)num_zf_tasks / c->zf_events_per_symbol;
 
     if (c->downlink_mode) {
-        double precode_frames = (double)num_precode_tasks / c->OFDM_DATA_NUM
+        double precode_frames = (double)num_precode_tasks / c->ofdm_data_num()
             / c->dl_data_symbol_num_perframe;
-        double ifft_frames = (double)num_ifft_tasks / c->BS_ANT_NUM
+        double ifft_frames = (double)num_ifft_tasks / c->bs_ant_num()
             / c->dl_data_symbol_num_perframe;
         double encode_frames = (double)num_encode_tasks
-            / c->LDPC_config.nblocksInSymbol / c->UE_NUM
+            / c->LDPC_config.nblocksInSymbol / c->ue_num()
             / c->dl_data_symbol_num_perframe;
         std::printf("Downlink totals (tasks, frames): ");
         std::printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
@@ -598,12 +598,12 @@ void Stats::print_summary()
             std::printf("\n");
         }
     } else {
-        double fft_frames = (double)num_fft_tasks / c->BS_ANT_NUM
+        double fft_frames = (double)num_fft_tasks / c->bs_ant_num()
             / c->ul_data_symbol_num_perframe;
-        double demul_frames = (double)num_demul_tasks / c->OFDM_DATA_NUM
+        double demul_frames = (double)num_demul_tasks / c->ofdm_data_num()
             / c->ul_data_symbol_num_perframe;
         double decode_frames = (double)num_decode_tasks
-            / c->LDPC_config.nblocksInSymbol / c->UE_NUM
+            / c->LDPC_config.nblocksInSymbol / c->ue_num()
             / c->ul_data_symbol_num_perframe;
         std::printf("Uplink totals (tasks, frames): ");
         std::printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);

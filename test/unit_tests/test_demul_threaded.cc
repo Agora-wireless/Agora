@@ -79,7 +79,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     size_t num_tasks = 0;
     Event_data req_event;
     size_t max_frame_id_wo_offset
-        = (kMaxTestNum - 1) / (cfg->OFDM_DATA_NUM / cfg->zf_block_size);
+        = (kMaxTestNum - 1) / (cfg->ofdm_data_num() / cfg->zf_block_size);
     for (size_t i = 0; i < kMaxItrNum; i++) {
         if (event_queue.try_dequeue(req_event)) {
             num_tasks++;
@@ -103,8 +103,8 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
         num_tasks, ms / num_tasks);
 }
 
-/// Test correctness of BS_ANT_NUM values in multi-threaded DoDemul
-/// when BS_ANT_NUM varies in runtime
+/// Test correctness of bs_ant_num() values in multi-threaded DoDemul
+/// when bs_ant_num() varies in runtime
 TEST(TestDemul, VaryingConfig)
 {
     static constexpr size_t kNumIters = 10000;
@@ -127,10 +127,10 @@ TEST(TestDemul, VaryingConfig)
         kMaxAntennas * kMaxUEs);
     equal_buffer.calloc(cfg->ul_data_symbol_num_perframe * kFrameWnd,
         kMaxDataSCs * kMaxUEs, Agora_memory::Alignment_t::k64Align);
-    ue_spec_pilot_buffer.calloc(kFrameWnd, cfg->UL_PILOT_SYMS * kMaxUEs, Agora_memory::Alignment_t::k64Align);
+    ue_spec_pilot_buffer.calloc(kFrameWnd, cfg->ul_pilot_syms() * kMaxUEs, Agora_memory::Alignment_t::k64Align);
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers(kFrameWnd,
-        cfg->symbol_num_perframe, cfg->UE_NUM,
-        kMaxModType * cfg->OFDM_DATA_NUM);
+        cfg->symbol_num_perframe, cfg->ue_num(),
+        kMaxModType * cfg->ofdm_data_num());
     std::printf(
         "Size of [data_buffer, ul_zf_matrices, equal_buffer, "
         "ue_spec_pilot_buffer, demod_soft_buffer]: [%.1f %.1f %.1f %.1f %.1f] "
@@ -141,7 +141,7 @@ TEST(TestDemul, VaryingConfig)
             / 1024,
         cfg->ul_data_symbol_num_perframe * kFrameWnd * kMaxDataSCs * kMaxUEs * 4
             * 1.0f / 1024 / 1024,
-        kFrameWnd * cfg->UL_PILOT_SYMS * kMaxUEs * 4 * 1.0f / 1024 / 1024,
+        kFrameWnd * cfg->ul_pilot_syms() * kMaxUEs * 4 * 1.0f / 1024 / 1024,
         cfg->ul_data_symbol_num_perframe * kFrameWnd * kMaxModType * kMaxDataSCs
             * kMaxUEs * 1.0f / 1024 / 1024);
 

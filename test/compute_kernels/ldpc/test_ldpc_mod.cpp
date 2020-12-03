@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
     // Step 1: Generate the information buffers and LDPC-encoded buffers for
     // uplink
     size_t num_symbols_per_cb = 1;
-    size_t bits_per_symbol = cfg->OFDM_DATA_NUM * cfg->mod_order_bits;
+    size_t bits_per_symbol = cfg->ofdm_data_num() * cfg->mod_order_bits;
     if (cfg->LDPC_config.cbCodewLen > bits_per_symbol)
         num_symbols_per_cb = (cfg->LDPC_config.cbCodewLen + bits_per_symbol - 1)
             / bits_per_symbol;
@@ -84,7 +84,7 @@ int main(int argc, char* argv[])
     std::printf("Number of symbols per block: %zu, blocks per frame: %zu\n",
         num_symbols_per_cb, num_cbs_per_ue);
 
-    const size_t num_codeblocks = num_cbs_per_ue * cfg->UE_ANT_NUM;
+    const size_t num_codeblocks = num_cbs_per_ue * cfg->ue_ant_num();
     std::printf("Total number of blocks: %zu\n", num_codeblocks);
     for (size_t noise_id = 0; noise_id < 15; noise_id++) {
 
@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
         std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
         for (size_t i = 0; i < num_codeblocks; i++) {
             data_generator.gen_codeblock_ul(information[i],
-                encoded_codewords[i], i % cfg->UE_NUM /* UE ID */);
+                encoded_codewords[i], i % cfg->ue_num() /* UE ID */);
         }
 
         // Save uplink information bytes to file
@@ -101,8 +101,8 @@ int main(int argc, char* argv[])
         if (kPrintUplinkInformationBytes) {
             std::printf("Uplink information bytes\n");
             for (size_t n = 0; n < num_codeblocks; n++) {
-                std::printf("Symbol %zu, UE %zu\n", n / cfg->UE_ANT_NUM,
-                    n % cfg->UE_ANT_NUM);
+                std::printf("Symbol %zu, UE %zu\n", n / cfg->ue_ant_num(),
+                    n % cfg->ue_ant_num());
                 for (size_t i = 0; i < input_bytes_per_cb; i++) {
                     std::printf("%u ", (uint8_t)information[n][i]);
                 }
@@ -111,11 +111,11 @@ int main(int argc, char* argv[])
         }
 
         Table<complex_float> modulated_codewords;
-        modulated_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, Agora_memory::Alignment_t::k64Align);
+        modulated_codewords.calloc(num_codeblocks, cfg->ofdm_data_num(), Agora_memory::Alignment_t::k64Align);
         Table<int8_t> demod_data_all_symbols;
         demod_data_all_symbols.calloc(
-            num_codeblocks, cfg->OFDM_DATA_NUM * 8, Agora_memory::Alignment_t::k64Align);
-        std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
+            num_codeblocks, cfg->ofdm_data_num() * 8, Agora_memory::Alignment_t::k64Align);
+        std::vector<uint8_t> mod_input(cfg->ofdm_data_num());
 
         // Modulate, add noise, and demodulate the encoded codewords
         for (size_t i = 0; i < num_codeblocks; i++) {
@@ -125,12 +125,12 @@ int main(int argc, char* argv[])
                 &mod_input[0], cfg->LDPC_config.num_encoded_bytes(),
                 cfg->mod_order_bits);
 
-            for (size_t j = 0; j < cfg->OFDM_DATA_NUM; j++) {
+            for (size_t j = 0; j < cfg->ofdm_data_num(); j++) {
                 modulated_codewords[i][j]
                     = mod_single_uint8(mod_input[j], cfg->mod_table);
             }
 
-            for (size_t j = 0; j < cfg->OFDM_DATA_NUM; j++) {
+            for (size_t j = 0; j < cfg->ofdm_data_num(); j++) {
                 complex_float noise
                     = { static_cast<float>(distribution(generator))
                               * noise_levels[noise_id],
@@ -145,11 +145,11 @@ int main(int argc, char* argv[])
             switch (cfg->mod_order_bits) {
             case (4):
                 demod_16qam_soft_avx2((float*)modulated_codewords[i],
-                    demod_data_all_symbols[i], cfg->OFDM_DATA_NUM);
+                    demod_data_all_symbols[i], cfg->ofdm_data_num());
                 break;
             case (6):
                 demod_64qam_soft_avx2((float*)modulated_codewords[i],
-                    demod_data_all_symbols[i], cfg->OFDM_DATA_NUM);
+                    demod_data_all_symbols[i], cfg->ofdm_data_num());
                 break;
             default:
                 std::printf("Demodulation: modulation type %s not supported!\n",
@@ -179,7 +179,7 @@ int main(int argc, char* argv[])
         ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
         Table<uint8_t> decoded_codewords;
-        decoded_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, Agora_memory::Alignment_t::k64Align);
+        decoded_codewords.calloc(num_codeblocks, cfg->ofdm_data_num(), Agora_memory::Alignment_t::k64Align);
 
         double freq_ghz = measure_rdtsc_freq();
         size_t start_tsc = worker_rdtsc();

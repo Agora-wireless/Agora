@@ -155,7 +155,7 @@ int RadioTXRX::dequeue_send(int tid)
 
             size_t offset
                 = (c->get_total_data_symbol_idx_ul(frame_id, symbol_id)
-                      * c->UE_ANT_NUM)
+                      * c->ue_ant_num())
                 + ant_id;
 
             if (kDebugPrintInTask) {
@@ -307,7 +307,7 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
          symbol_id++) {
         size_t tx_symbol_id = c->ULSymbols[0][symbol_id];
         size_t offset = (c->get_total_data_symbol_idx_ul(frame_id, symbol_id)
-                            * c->UE_ANT_NUM)
+                            * c->ue_ant_num())
             + ant_id;
 
         void* txbuf[2];

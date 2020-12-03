@@ -57,8 +57,8 @@ void Simulator::start()
     moodycamel::ConsumerToken ctok(message_queue_);
     moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
-    buffer_frame_num = symbol_num_perframe * BS_ANT_NUM * kFrameWnd;
-    max_packet_num_per_frame = BS_ANT_NUM * dl_data_symbol_num_perframe;
+    buffer_frame_num = symbol_num_perframe * bs_ant_num_ * kFrameWnd;
+    max_packet_num_per_frame = bs_ant_num_ * dl_data_symbol_num_perframe;
 
     /* counters for printing summary */
     int frame_count_rx = 0;
@@ -177,10 +177,10 @@ void Simulator::print_per_frame_done(PrintType print_type, size_t frame_id)
 
 void Simulator::initialize_vars_from_cfg(Config* cfg)
 {
-    BS_ANT_NUM = cfg->BS_ANT_NUM;
-    UE_NUM = cfg->UE_NUM;
-    OFDM_CA_NUM = cfg->OFDM_CA_NUM;
-    OFDM_DATA_NUM = cfg->OFDM_DATA_NUM;
+    bs_ant_num_ = cfg->bs_ant_num();
+    ue_num_ = cfg->ue_num();
+    ofdm_ca_num_ = cfg->ofdm_ca_num();
+    ofdm_data_num_ = cfg->ofdm_data_num();
     symbol_num_perframe = cfg->symbol_num_perframe;
     data_symbol_num_perframe = cfg->data_symbol_num_perframe;
     ul_data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
@@ -190,8 +190,8 @@ void Simulator::initialize_vars_from_cfg(Config* cfg)
     packet_length = cfg->packet_length;
 
     demul_block_size = cfg->demul_block_size;
-    demul_block_num = OFDM_DATA_NUM / demul_block_size
-        + (OFDM_DATA_NUM % demul_block_size == 0 ? 0 : 1);
+    demul_block_num = ofdm_data_num_ / demul_block_size
+        + (ofdm_data_num_ % demul_block_size == 0 ? 0 : 1);
 }
 
 void Simulator::initialize_queues()
@@ -220,8 +220,8 @@ void Simulator::initialize_uplink_buffers()
         &context, TASK_THREAD_NUM, Agora_memory::Alignment_t::k64Align, 0);
 
     socket_buffer_size_ = (long long)packet_length * symbol_num_perframe
-        * BS_ANT_NUM * kFrameWnd;
-    socket_buffer_status_size_ = symbol_num_perframe * BS_ANT_NUM * kFrameWnd;
+        * bs_ant_num_ * kFrameWnd;
+    socket_buffer_status_size_ = symbol_num_perframe * bs_ant_num_ * kFrameWnd;
     socket_buffer_.malloc(SOCKET_RX_THREAD_NUM, socket_buffer_size_,
         Agora_memory::Alignment_t::k64Align);
     socket_buffer_status_.calloc(SOCKET_RX_THREAD_NUM,

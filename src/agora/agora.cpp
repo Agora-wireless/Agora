@@ -2,15 +2,15 @@
 
 Agora::Agora(Config* cfg)
     : base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
-    , csi_buffers_(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
+    , csi_buffers_(kFrameWnd, cfg->ue_num(), cfg->bs_ant_num() * cfg->ofdm_data_num())
     , ul_zf_matrices_(
-          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM)
-    , demod_buffers_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
-          kMaxModType * cfg->OFDM_DATA_NUM)
-    , decoded_buffer_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
+          kFrameWnd, cfg->ofdm_data_num(), cfg->bs_ant_num() * cfg->ue_num())
+    , demod_buffers_(kFrameWnd, cfg->symbol_num_perframe, cfg->ue_num(),
+          kMaxModType * cfg->ofdm_data_num())
+    , decoded_buffer_(kFrameWnd, cfg->symbol_num_perframe, cfg->ue_num(),
           cfg->LDPC_config.nblocksInSymbol * roundup<64>(cfg->num_bytes_per_cb))
     , dl_zf_matrices_(
-          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->UE_NUM * cfg->BS_ANT_NUM)
+          kFrameWnd, cfg->ofdm_data_num(), cfg->ue_num() * cfg->bs_ant_num())
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     std::printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
@@ -86,7 +86,7 @@ void Agora::send_snr_report(
 {
     assert(event_type == EventType::kSNRReport);
     auto base_tag = gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0);
-    for (size_t i = 0; i < config_->UE_NUM; i++) {
+    for (size_t i = 0; i < config_->ue_num(); i++) {
         Event_data snr_report(EventType::kSNRReport, base_tag._tag);
         snr_report.num_tags = 2;
         float snr = phy_stats->get_evm_snr(frame_id, i);
@@ -102,8 +102,8 @@ void Agora::schedule_antennas(
     assert(event_type == EventType::kFFT or event_type == EventType::kIFFT);
     auto base_tag = gen_tag_t::frm_sym_ant(frame_id, symbol_id, 0);
 
-    size_t num_blocks = config_->BS_ANT_NUM / config_->fft_block_size;
-    size_t num_remainder = config_->BS_ANT_NUM % config_->fft_block_size;
+    size_t num_blocks = config_->bs_ant_num() / config_->fft_block_size;
+    size_t num_remainder = config_->bs_ant_num() % config_->fft_block_size;
     if (num_remainder > 0)
         num_blocks++;
     Event_data event;
@@ -179,12 +179,12 @@ void Agora::schedule_codeblocks(
     auto base_tag = gen_tag_t::frm_sym_cb(frame_id, symbol_idx, 0);
 
     // for (size_t i = 0;
-    //      i < config_->UE_NUM * config_->LDPC_config.nblocksInSymbol; i++) {
+    //      i < config_->ue_num() * config_->LDPC_config.nblocksInSymbol; i++) {
     //     try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
     //         Event_data(event_type, base_tag._tag));
     //     base_tag.cb_id++;
     // }
-    size_t num_tasks = config_->UE_NUM * config_->LDPC_config.nblocksInSymbol;
+    size_t num_tasks = config_->ue_num() * config_->LDPC_config.nblocksInSymbol;
     size_t num_blocks = num_tasks / config_->encode_block_size;
     size_t num_remainder = num_tasks % config_->encode_block_size;
     if (num_remainder > 0)
@@ -211,7 +211,7 @@ void Agora::schedule_users(
     assert(event_type == EventType::kPacketToMac);
     auto base_tag = gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0);
 
-    for (size_t i = 0; i < config_->UE_NUM; i++) {
+    for (size_t i = 0; i < config_->ue_num(); i++) {
         try_enqueue_fallback(&mac_request_queue_,
             Event_data(EventType::kPacketToMac, base_tag._tag));
         base_tag.ue_id++;
@@ -508,13 +508,13 @@ void Agora::start()
                     if (tx_count == tx_counters_.max_symbol_count * 9000) {
                         tx_count = 0;
                         double diff = get_time_us() - tx_begin;
-                        int samples_num_per_UE = cfg->OFDM_DATA_NUM
+                        int samples_num_per_UE = cfg->ofdm_data_num()
                             * tx_counters_.max_symbol_count * 1000;
 
                         std::printf("TX %d samples (per-client) to %zu clients "
                                     "in %f secs, throughtput %f bps per-client "
                                     "(16QAM), current tx queue length %zu\n",
-                            samples_num_per_UE, cfg->UE_NUM, diff,
+                            samples_num_per_UE, cfg->ue_num(), diff,
                             samples_num_per_UE * log2(16.0f) / diff,
                             get_conq(EventType::kPacketTX, 0)->size_approx());
                         tx_begin = get_time_us();
@@ -1118,7 +1118,7 @@ void Agora::initialize_uplink_buffers()
         Agora_memory::Alignment_t::k64Align, 0);
 
     socket_buffer_status_size_
-        = cfg->BS_ANT_NUM * kFrameWnd * cfg->symbol_num_perframe;
+        = cfg->bs_ant_num() * kFrameWnd * cfg->symbol_num_perframe;
     socket_buffer_size_ = cfg->packet_length * socket_buffer_status_size_;
 
     socket_buffer_.malloc(cfg->socket_thread_num /* RX */, socket_buffer_size_,
@@ -1127,27 +1127,27 @@ void Agora::initialize_uplink_buffers()
         socket_buffer_status_size_, Agora_memory::Alignment_t::k64Align);
 
     data_buffer_.malloc(task_buffer_symbol_num_ul,
-        cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM,
+        cfg->ofdm_data_num() * cfg->bs_ant_num(),
         Agora_memory::Alignment_t::k64Align);
 
     equal_buffer_.malloc(task_buffer_symbol_num_ul,
-        cfg->OFDM_DATA_NUM * cfg->UE_NUM, Agora_memory::Alignment_t::k64Align);
-    ue_spec_pilot_buffer_.calloc(kFrameWnd, cfg->UL_PILOT_SYMS * cfg->UE_NUM,
+        cfg->ofdm_data_num() * cfg->ue_num(), Agora_memory::Alignment_t::k64Align);
+    ue_spec_pilot_buffer_.calloc(kFrameWnd, cfg->ul_pilot_syms() * cfg->ue_num(),
         Agora_memory::Alignment_t::k64Align);
 
-    rx_counters_.num_pkts_per_frame = cfg->BS_ANT_NUM
+    rx_counters_.num_pkts_per_frame = cfg->bs_ant_num()
         * (cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe
               + cfg->recip_pilot_symbol_num_perframe);
     rx_counters_.num_pilot_pkts_per_frame
-        = cfg->BS_ANT_NUM * cfg->pilot_symbol_num_perframe;
-    rx_counters_.num_reciprocity_pkts_per_frame = cfg->BS_ANT_NUM;
+        = cfg->bs_ant_num() * cfg->pilot_symbol_num_perframe;
+    rx_counters_.num_reciprocity_pkts_per_frame = cfg->bs_ant_num();
 
     fft_created_count = 0;
-    fft_counters_.init(cfg->pilot_symbol_num_perframe, cfg->BS_ANT_NUM);
+    fft_counters_.init(cfg->pilot_symbol_num_perframe, cfg->bs_ant_num());
     fft_cur_frame_for_symbol
         = std::vector<size_t>(cfg->ul_data_symbol_num_perframe, SIZE_MAX);
 
-    rc_counters_.init(cfg->BS_ANT_NUM);
+    rc_counters_.init(cfg->bs_ant_num());
 
     zf_counters_.init(config_->zf_events_per_symbol);
 
@@ -1155,9 +1155,9 @@ void Agora::initialize_uplink_buffers()
         cfg->ul_data_symbol_num_perframe, config_->demul_events_per_symbol);
 
     decode_counters_.init(cfg->ul_data_symbol_num_perframe,
-        config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM);
+        config_->LDPC_config.nblocksInSymbol * cfg->ue_num());
 
-    tomac_counters_.init(cfg->ul_data_symbol_num_perframe, cfg->UE_NUM);
+    tomac_counters_.init(cfg->ul_data_symbol_num_perframe, cfg->ue_num());
 }
 
 void Agora::initialize_downlink_buffers()
@@ -1167,7 +1167,7 @@ void Agora::initialize_downlink_buffers()
         = cfg->dl_data_symbol_num_perframe * kFrameWnd;
 
     size_t dl_socket_buffer_status_size
-        = cfg->BS_ANT_NUM * kFrameWnd * cfg->dl_data_symbol_num_perframe;
+        = cfg->bs_ant_num() * kFrameWnd * cfg->dl_data_symbol_num_perframe;
     size_t dl_socket_buffer_size
         = cfg->dl_packet_length * dl_socket_buffer_status_size;
     alloc_buffer_1d(&dl_socket_buffer_, dl_socket_buffer_size,
@@ -1176,36 +1176,36 @@ void Agora::initialize_downlink_buffers()
         Agora_memory::Alignment_t::k64Align, 1);
 
     dl_bits_buffer_.calloc(task_buffer_symbol_num,
-        cfg->OFDM_DATA_NUM * cfg->UE_NUM, Agora_memory::Alignment_t::k64Align);
+        cfg->ofdm_data_num() * cfg->ue_num(), Agora_memory::Alignment_t::k64Align);
     size_t dl_bits_buffer_status_size
         = task_buffer_symbol_num * cfg->LDPC_config.nblocksInSymbol;
-    dl_bits_buffer_status_.calloc(cfg->UE_NUM, dl_bits_buffer_status_size,
+    dl_bits_buffer_status_.calloc(cfg->ue_num(), dl_bits_buffer_status_size,
         Agora_memory::Alignment_t::k64Align);
 
-    dl_ifft_buffer_.calloc(cfg->BS_ANT_NUM * task_buffer_symbol_num,
-        cfg->OFDM_CA_NUM, Agora_memory::Alignment_t::k64Align);
-    calib_dl_buffer_.calloc(kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM,
+    dl_ifft_buffer_.calloc(cfg->bs_ant_num() * task_buffer_symbol_num,
+        cfg->ofdm_ca_num(), Agora_memory::Alignment_t::k64Align);
+    calib_dl_buffer_.calloc(kFrameWnd, cfg->bf_ant_num() * cfg->ofdm_data_num(),
         Agora_memory::Alignment_t::k64Align);
-    calib_ul_buffer_.calloc(kFrameWnd, cfg->BF_ANT_NUM * cfg->OFDM_DATA_NUM,
+    calib_ul_buffer_.calloc(kFrameWnd, cfg->bf_ant_num() * cfg->ofdm_data_num(),
         Agora_memory::Alignment_t::k64Align);
     // initialize the content of the last window to 1
-    for (size_t i = 0; i < cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM; i++) {
+    for (size_t i = 0; i < cfg->ofdm_data_num() * cfg->bf_ant_num(); i++) {
         calib_dl_buffer_[kFrameWnd - 1][i] = { 1, 0 };
         calib_ul_buffer_[kFrameWnd - 1][i] = { 1, 0 };
     }
     dl_encoded_buffer_.calloc(task_buffer_symbol_num,
-        roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM,
+        roundup<64>(cfg->ofdm_data_num()) * cfg->ue_num(),
         Agora_memory::Alignment_t::k64Align);
 
-    frommac_counters_.init(cfg->dl_data_symbol_num_perframe, config_->UE_NUM);
+    frommac_counters_.init(cfg->dl_data_symbol_num_perframe, config_->ue_num());
     encode_counters_.init(cfg->dl_data_symbol_num_perframe,
-        config_->LDPC_config.nblocksInSymbol * cfg->UE_NUM);
+        config_->LDPC_config.nblocksInSymbol * cfg->ue_num());
     encode_cur_frame_for_symbol
         = std::vector<size_t>(cfg->dl_data_symbol_num_perframe, SIZE_MAX);
     precode_counters_.init(
         cfg->dl_data_symbol_num_perframe, config_->demul_events_per_symbol);
-    ifft_counters_.init(cfg->dl_data_symbol_num_perframe, cfg->BS_ANT_NUM);
-    tx_counters_.init(cfg->dl_data_symbol_num_perframe, cfg->BS_ANT_NUM);
+    ifft_counters_.init(cfg->dl_data_symbol_num_perframe, cfg->bs_ant_num());
+    tx_counters_.init(cfg->dl_data_symbol_num_perframe, cfg->bs_ant_num());
 }
 
 void Agora::free_uplink_buffers()
@@ -1239,7 +1239,7 @@ void Agora::save_decode_data_to_file(int frame_id)
     FILE* fp = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; i++) {
-        for (size_t j = 0; j < cfg->UE_NUM; j++) {
+        for (size_t j = 0; j < cfg->ue_num(); j++) {
             uint8_t* ptr = decoded_buffer_[frame_id % kFrameWnd][i][j];
             fwrite(ptr, num_decoded_bytes, sizeof(uint8_t), fp);
         }
@@ -1260,8 +1260,8 @@ void Agora::save_tx_data_to_file(UNUSED int frame_id)
         size_t total_data_symbol_id
             = cfg->get_total_data_symbol_idx_dl(frame_id, i);
 
-        for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
-            size_t offset = total_data_symbol_id * cfg->BS_ANT_NUM + ant_id;
+        for (size_t ant_id = 0; ant_id < cfg->bs_ant_num(); ant_id++) {
+            size_t offset = total_data_symbol_id * cfg->bs_ant_num() + ant_id;
             struct Packet* pkt = (struct Packet*)(&dl_socket_buffer_[offset
                 * cfg->dl_packet_length]);
             short* socket_ptr = pkt->data;
@@ -1275,9 +1275,9 @@ void Agora::getEqualData(float** ptr, int* size)
 {
     auto& cfg = config_;
     auto offset = cfg->get_total_data_symbol_idx_ul(
-        max_equaled_frame, cfg->UL_PILOT_SYMS);
+        max_equaled_frame, cfg->ul_pilot_syms());
     *ptr = (float*)&equal_buffer_[offset][0];
-    *size = cfg->UE_NUM * cfg->OFDM_DATA_NUM * 2;
+    *size = cfg->ue_num() * cfg->ofdm_data_num() * 2;
 }
 
 extern "C" {

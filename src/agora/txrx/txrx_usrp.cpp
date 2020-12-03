@@ -193,10 +193,10 @@ int PacketTXRX::dequeue_send_usrp(int tid)
     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
     size_t offset
-        = (c->get_total_data_symbol_idx(frame_id, symbol_id) * c->BS_ANT_NUM)
+        = (c->get_total_data_symbol_idx(frame_id, symbol_id) * c->bs_ant_num())
         + ant_id;
 
-    symbol_id += c->UE_ANT_NUM;
+    symbol_id += c->ue_ant_num();
     frame_id += TX_FRAME_DELTA;
 
     void* txbuf[2];
@@ -208,10 +208,10 @@ int PacketTXRX::dequeue_send_usrp(int tid)
         size_t dl_symbol_idx = c->get_dl_symbol_idx(frame_id, symbol_id);
         if (ant_id != c->ref_ant)
             txbuf[ch] = zeros.data();
-        else if (dl_symbol_idx < c->DL_PILOT_SYMS)
+        else if (dl_symbol_idx < c->dl_pilot_syms())
             txbuf[ch] = (void*)c->ue_specific_pilot_t[0];
         else
-            txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx - c->DL_PILOT_SYMS];
+            txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx - c->dl_pilot_syms()];
     } else {
         char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
@@ -253,10 +253,10 @@ int PacketTXRX::dequeue_send_usrp(int tid, int frame_id, int symbol_id)
     // size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
     size_t offset
-        = (c->get_total_data_symbol_idx(frame_id, symbol_id) * c->BS_ANT_NUM)
+        = (c->get_total_data_symbol_idx(frame_id, symbol_id) * c->bs_ant_num())
         + ant_id;
 
-    // symbol_id += c->UE_ANT_NUM;
+    // symbol_id += c->ue_ant_num();
     // frame_id += TX_FRAME_DELTA;
 
     std::cout << "ant_id: " << ant_id << ", frame_id: " << frame_id
@@ -272,10 +272,10 @@ int PacketTXRX::dequeue_send_usrp(int tid, int frame_id, int symbol_id)
         size_t dl_symbol_idx = c->get_dl_symbol_idx(frame_id, symbol_id);
         if (ant_id != c->ref_ant)
             txbuf[ch] = zeros.data();
-        else if (dl_symbol_idx < c->DL_PILOT_SYMS)
+        else if (dl_symbol_idx < c->dl_pilot_syms())
             txbuf[ch] = (void*)c->ue_specific_pilot_t[0];
         else
-            txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx - c->DL_PILOT_SYMS];
+            txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx - c->dl_pilot_syms()];
     } else {
         char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
