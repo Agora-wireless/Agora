@@ -120,7 +120,7 @@ Config::Config(std::string jsonfile)
     ofdm_data_start_
         = tddConf.value("ofdm_data_start", (ofdm_ca_num_ - ofdm_data_num_) / 2);
     ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
-    downlink_mode = tddConf.value("downlink_mode", false);
+    downlink_mode_ = tddConf.value("downlink_mode", false);
     bigstation_mode = tddConf.value("bigstation_mode", false);
     freq_orthogonal_pilot = tddConf.value("freq_orthogonal_pilot", false);
     correct_phase_shift = tddConf.value("correct_phase_shift", false);
@@ -133,17 +133,17 @@ Config::Config(std::string jsonfile)
         pilot_symbol_num_perframe = tddConf.value(
             "pilot_num", freq_orthogonal_pilot ? 1 : ue_ant_num_);
         ul_data_symbol_num_perframe = tddConf.value("ul_symbol_num_perframe",
-            downlink_mode
+            downlink_mode_
                 ? 0
                 : symbol_num_perframe - pilot_symbol_num_perframe - 1);
         dl_data_symbol_num_perframe
-            = tddConf.value("dl_symbol_num_perframe", downlink_mode ? 10 : 0);
+            = tddConf.value("dl_symbol_num_perframe", downlink_mode_ ? 10 : 0);
         dl_data_symbol_start = tddConf.value("dl_data_symbol_start", 10);
         std::string sched("B");
         for (size_t s = 0; s < pilot_symbol_num_perframe; s++)
             sched += "P";
         // Below it is assumed either dl or ul to be active at one time
-        if (downlink_mode) {
+        if (downlink_mode_) {
             size_t dl_symbol_start
                 = 1 + pilot_symbol_num_perframe + dl_data_symbol_start;
             size_t dl_symbol_end
@@ -191,7 +191,7 @@ Config::Config(std::string jsonfile)
         - beacon_symbol_num_perframe;
     ul_data_symbol_num_perframe = ULSymbols[0].size();
     dl_data_symbol_num_perframe = DLSymbols[0].size();
-    downlink_mode = dl_data_symbol_num_perframe > 0;
+    downlink_mode_ = dl_data_symbol_num_perframe > 0;
     dl_data_symbol_start
         = dl_data_symbol_num_perframe > 0 ? DLSymbols[0].front() : 0;
     dl_data_symbol_end

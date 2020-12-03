@@ -185,7 +185,7 @@ void* Sender::master_thread(int)
             size_t next_frame_id;
             if (packet_count_per_frame[comp_frame_slot] == max_symbol_id) {
                 // Add end-of-frame delay
-                if (cfg->downlink_mode) {
+                if (cfg->downlink_mode() == true) {
                     delay_ticks(tick_start,
                         get_ticks_for_frame(ctag.frame_id)
                             * cfg->data_symbol_num_perframe);
@@ -374,7 +374,7 @@ uint64_t Sender::get_ticks_for_frame(size_t frame_id)
 
 size_t Sender::get_max_symbol_id() const
 {
-    size_t max_symbol_id = cfg->downlink_mode
+    size_t max_symbol_id = cfg->downlink_mode()
         ? cfg->pilot_symbol_num_perframe
         : cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe;
     return max_symbol_id;

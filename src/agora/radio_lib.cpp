@@ -323,7 +323,7 @@ bool RadioConfig::radioStart()
         init_calib_dl_[i] = 1;
         init_calib_ul_[i] = 1;
     }
-    if (_cfg->downlink_mode) {
+    if (_cfg->downlink_mode() == true) {
         int iter = 0;
         int max_iter = 3;
         while (!good_calib) {

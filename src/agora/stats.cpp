@@ -436,7 +436,7 @@ void Stats::save_to_file()
     rt_assert(fp_debug != nullptr,
         std::string("Open file failed ") + std::to_string(errno));
 
-    if (config_->downlink_mode) {
+    if (config_->downlink_mode() == true) {
         std::fprintf(fp_debug,
             "Pilot RX by socket threads (= reference time), "
             "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
@@ -558,7 +558,7 @@ void Stats::print_summary()
         = (double)num_csi_tasks / c->bs_ant_num() / c->pilot_symbol_num_perframe;
     double zf_frames = (double)num_zf_tasks / c->zf_events_per_symbol;
 
-    if (c->downlink_mode) {
+    if (c->downlink_mode() == true) {
         double precode_frames = (double)num_precode_tasks / c->ofdm_data_num()
             / c->dl_data_symbol_num_perframe;
         double ifft_frames = (double)num_ifft_tasks / c->bs_ant_num()

@@ -59,17 +59,20 @@ Agora::Agora(Config* cfg)
         base_worker_core_offset + cfg->worker_thread_num - 1);
 }
 
-Agora::~Agora()
+Agora::~Agora(void)
 {
     free_uplink_buffers();
     /* Downlink */
-    if (config_->dl_data_symbol_num_perframe > 0)
+    if (config_->dl_data_symbol_num_perframe > 0) {
         free_downlink_buffers();
+    }
 
-    if (kEnableMac)
+    if (kEnableMac == true) {
         mac_std_thread_.join();
-    for (size_t i = 0; i < config_->worker_thread_num; i++)
+    }
+    for (size_t i = 0; i < config_->worker_thread_num; i++) {
         worker_std_threads_[i].join();
+    }
     delete mac_thread_;
 }
 
@@ -587,9 +590,9 @@ void Agora::handle_event_fft(size_t tag)
     if (sym_type == SymbolType::kPilot) {
         if (fft_counters_.last_task(frame_id, symbol_id)) {
             print_per_symbol_done(PrintType::kFFTPilots, frame_id, symbol_id);
-            if (!config_->downlink_mode
-                || (config_->downlink_mode && !config_->recipCalEn)
-                || (config_->downlink_mode && config_->recipCalEn
+            if ((config_->downlink_mode() == false)
+                || ((config_->downlink_mode() == true) && !config_->recipCalEn)
+                || ((config_->downlink_mode() == true) && config_->recipCalEn
                        && rc_last_frame == frame_id)) {
                 /* If CSI of all UEs is ready, schedule ZF/prediction */
                 if (fft_counters_.last_symbol(frame_id)) {

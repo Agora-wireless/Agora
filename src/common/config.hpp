@@ -241,7 +241,6 @@ public:
 
     size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
     size_t dl_data_symbol_start, dl_data_symbol_end;
-    bool downlink_mode; // If true, the frame contains downlink symbols
     bool bigstation_mode; // If true, use pipeline-parallel scheduling
     bool correct_phase_shift; // If true, do phase shift correction
 
@@ -461,7 +460,9 @@ public:
     inline size_t ofdm_data_stop( void ) const { return this->ofdm_data_stop_; } 
     inline size_t ofdm_pilot_spacing( void ) const { return this->ofdm_pilot_spacing_; } 
     inline size_t dl_pilot_syms( void ) const { return this->dl_pilot_syms_; } 
-    inline size_t ul_pilot_syms( void ) const { return this->ul_pilot_syms_; } 
+    inline size_t ul_pilot_syms( void ) const { return this->ul_pilot_syms_; }
+
+    inline bool   downlink_mode( void ) const { return this->downlink_mode_; }
 
 private:
     size_t bs_ant_num_; // Total number of BS antennas
@@ -490,5 +491,7 @@ private:
     size_t ofdm_pilot_spacing_;
     size_t dl_pilot_syms_;
     size_t ul_pilot_syms_;
+
+    bool downlink_mode_; // If true, the frame contains downlink symbols
 };
 #endif
