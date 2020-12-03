@@ -201,13 +201,13 @@ void Simulator::initialize_queues()
     complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         512 * data_symbol_num_perframe * 4);
 
-    rx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
-        64, SOCKET_RX_THREAD_NUM * sizeof(moodycamel::ProducerToken*));
+    rx_ptoks_ptr = static_cast<moodycamel::ProducerToken**>(
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, SOCKET_RX_THREAD_NUM * sizeof(moodycamel::ProducerToken*)));
     for (size_t i = 0; i < SOCKET_RX_THREAD_NUM; i++)
         rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
 
-    task_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(
-        64, TASK_THREAD_NUM * sizeof(moodycamel::ProducerToken*));
+    task_ptoks_ptr =  static_cast<moodycamel::ProducerToken**>(
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, TASK_THREAD_NUM * sizeof(moodycamel::ProducerToken*)));
     for (size_t i = 0; i < TASK_THREAD_NUM; i++)
         task_ptoks_ptr[i] = new moodycamel::ProducerToken(complete_task_queue_);
 }

@@ -362,10 +362,10 @@ void Config::genData()
     common_pilot
         = CommsLib::seqCyclicShift(zc_seq, M_PI / 4); // Used in LTE SRS
 
-    pilots_ = (complex_float*)aligned_alloc(
-        64, OFDM_DATA_NUM * sizeof(complex_float));
-    pilots_sgn_ = (complex_float*)aligned_alloc(
-        64, OFDM_DATA_NUM * sizeof(complex_float)); // used in CSI estimation
+    pilots_ = static_cast<complex_float*>(
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, OFDM_DATA_NUM * sizeof(complex_float)));
+    pilots_sgn_ = static_cast<complex_float*>(
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, OFDM_DATA_NUM * sizeof(complex_float))); // used in CSI estimation
     for (size_t i = 0; i < OFDM_DATA_NUM; i++) {
         pilots_[i] = { common_pilot[i].real(), common_pilot[i].imag() };
         auto pilot_sgn

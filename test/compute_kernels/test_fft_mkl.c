@@ -1,5 +1,6 @@
 #include "cpu_attach.hpp"
 #include "mkl_dfti.h"
+#include "memory_manage.h"
 #include <cmath>
 #include <immintrin.h>
 #include <iostream>
@@ -34,9 +35,9 @@ int flushCacheRuntime(long* p, long long p_size)
 static double bench_fft_1d_mkl(unsigned N, unsigned iterations)
 {
     float _Complex* input
-        = (float _Complex*)aligned_alloc(64, N * sizeof(float _Complex));
+        = static_cast<float _Complex*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, N * sizeof(float _Complex)));
     float _Complex* output
-        = (float _Complex*)aligned_alloc(64, N * sizeof(float _Complex));
+        = static_cast<float _Complex*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, N * sizeof(float _Complex)));
     DFTI_DESCRIPTOR_HANDLE my_desc1_handle;
     MKL_LONG status;
     //...put input data into x[0],...,x[31]; y[0],...,y[31]
@@ -67,9 +68,9 @@ static double bench_fft_1d_mkl(unsigned N, unsigned iterations)
 static double bench_ifft_1d_mkl(unsigned N, unsigned iterations)
 {
     float _Complex* input
-        = (float _Complex*)aligned_alloc(64, N * sizeof(float _Complex));
+        = static_cast<float _Complex*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, N * sizeof(float _Complex)));
     float _Complex* output
-        = (float _Complex*)aligned_alloc(64, N * sizeof(float _Complex));
+        = static_cast<float _Complex*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, N * sizeof(float _Complex));
     DFTI_DESCRIPTOR_HANDLE my_desc1_handle;
     MKL_LONG status;
     //...put input data into x[0],...,x[31]; y[0],...,y[31]
@@ -100,9 +101,9 @@ static double bench_ifft_1d_mkl(unsigned N, unsigned iterations)
 static double bench_fft_1d_mkl_out(unsigned N, unsigned iterations)
 {
     float _Complex* input
-        = (float _Complex*)aligned_alloc(64, N * sizeof(float _Complex));
+        = static_cast<float _Complex*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, N * sizeof(float _Complex)));
     float _Complex* output
-        = (float _Complex*)aligned_alloc(64, N * sizeof(float _Complex));
+        = static_cast<float _Complex*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, N * sizeof(float _Complex)));
     DFTI_DESCRIPTOR_HANDLE my_desc1_handle;
     MKL_LONG status;
     //...put input data into x[0],...,x[31]; y[0],...,y[31]
@@ -134,11 +135,11 @@ static double bench_fft_1d_mkl_out(unsigned N, unsigned iterations)
 static double bench_data_type_convert(unsigned N, unsigned iterations)
 {
     short* input_buffer
-        = (short*)aligned_alloc(64, 2 * N * sizeof(short) * 10000);
+        = static_cast<short*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 2 * N * sizeof(short) * 10000));
     float* input_buffer_float
-        = (float*)aligned_alloc(64, 2 * N * sizeof(float) * 10000);
+        = static_cast<float*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 2 * N * sizeof(float) * 10000));
     float* output_buffer
-        = (float*)aligned_alloc(64, 2 * N * sizeof(float) * 10000);
+        = static_cast<float*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 2 * N * sizeof(float) * 10000));
 
     long long bigger_than_cachesize = 1000 * 1024 * 1024; // 100 * 1024 * 1024;
     long* p = new long[bigger_than_cachesize];
@@ -281,9 +282,9 @@ static void demod_16qam_loop2(float* vec_in, uint8_t* vec_out, int ue_num)
 static double bench_demod(unsigned N, unsigned iterations)
 {
     float* input_buffer
-        = (float*)aligned_alloc(64, 2 * N * sizeof(float) * 10000);
+        = static_cast<float*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 2 * N * sizeof(float) * 10000));
     uint8_t* output_buffer
-        = (uint8_t*)aligned_alloc(64, 2 * N * sizeof(uint8_t) * 10000);
+        = static_cast<uint8_t*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 2 * N * sizeof(uint8_t) * 10000));
 
     long long bigger_than_cachesize = 1000 * 1024 * 1024; // 100 * 1024 * 1024;
     long* p = new long[bigger_than_cachesize];
@@ -296,9 +297,9 @@ static double bench_demod(unsigned N, unsigned iterations)
     }
 
     float _Complex* input
-        = (float _Complex*)aligned_alloc(64, 2048 * sizeof(float _Complex));
+        = static_cast<float _Complex*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 2048 * sizeof(float _Complex)));
     float _Complex* output
-        = (float _Complex*)aligned_alloc(64, 2048 * sizeof(float _Complex));
+        = static_cast<float _Complex*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 2048 * sizeof(float _Complex)));
 
     DFTI_DESCRIPTOR_HANDLE my_desc1_handle;
     MKL_LONG status;
