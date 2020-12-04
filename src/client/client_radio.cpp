@@ -29,7 +29,7 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg)
         pthread_t init_thread_;
         if (pthread_create(&init_thread_, NULL, initClientRadio_launch, context)
             != 0) {
-            perror("init thread create failed");
+            std::perror("init thread create failed");
             std::exit(0);
         }
 #else

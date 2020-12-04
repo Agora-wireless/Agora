@@ -112,13 +112,13 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
                 pthread_fun_wrapper<ChannelSim, &ChannelSim::taskThread>,
                 context)
             != 0) {
-            perror("task thread create failed");
+            std::perror("task thread create failed");
             std::exit(0);
         }
     }
 }
 
-ChannelSim::~ChannelSim()
+ChannelSim::~ChannelSim( void )
 {
     // delete buffers, UDP client and servers
     //delete[] socket_uerx_;

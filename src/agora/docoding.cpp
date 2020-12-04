@@ -98,7 +98,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid,
             1024 * 1024 * sizeof(int16_t)));
 }
 
-DoDecode::~DoDecode() { free(resp_var_nodes); }
+DoDecode::~DoDecode( void ) { std::free(resp_var_nodes); }
 
 Event_data DoDecode::launch(size_t tag)
 {

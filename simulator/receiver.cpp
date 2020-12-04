@@ -39,7 +39,7 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
         if (pthread_create(&recv_thread_, NULL,
                 pthread_fun_wrapper<Receiver, &Receiver::loopRecv>, context)
             != 0) {
-            perror("Socket recv thread create failed");
+            std::perror("Socket recv thread create failed");
             std::exit(0);
         }
         created_threads.push_back(recv_thread_);
@@ -95,7 +95,7 @@ void* Receiver::loopRecv(int tid)
                  cfg->packet_length, 0, (struct sockaddr*)&remote_addr,
                  &addrlen))
             < 0) {
-            perror("recv failed");
+            std::perror("recv failed");
             std::exit(0);
         }
 

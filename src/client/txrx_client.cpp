@@ -73,7 +73,7 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
                         &RadioTXRX::loop_tx_rx_argos>,
                     context)
                 != 0) {
-                perror("socket thread create failed");
+                std::perror("socket thread create failed");
                 std::exit(0);
             }
         } else if (kUseArgos || kUseUHD) {
@@ -82,7 +82,7 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
                         &RadioTXRX::loop_tx_rx_argos_sync>,
                     context)
                 != 0) {
-                perror("socket thread create failed");
+                std::perror("socket thread create failed");
                 std::exit(0);
             }
         } else {
@@ -90,7 +90,7 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
                     pthread_fun_wrapper<RadioTXRX, &RadioTXRX::loop_tx_rx>,
                     context)
                 != 0) {
-                perror("socket thread create failed");
+                std::perror("socket thread create failed");
                 std::exit(0);
             }
         }
@@ -120,7 +120,7 @@ struct Packet* RadioTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
     if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
         if (errno != EAGAIN && config_->running) {
-            perror("recv failed");
+            std::perror("recv failed");
             std::exit(0);
         }
         return (NULL);
