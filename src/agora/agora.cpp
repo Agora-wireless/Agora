@@ -8,7 +8,7 @@ Agora::Agora(Config* cfg)
     , demod_buffers_(kFrameWnd, cfg->symbol_num_perframe, cfg->ue_num(),
           kMaxModType * cfg->ofdm_data_num())
     , decoded_buffer_(kFrameWnd, cfg->symbol_num_perframe, cfg->ue_num(),
-          cfg->LDPC_config.nblocksInSymbol * roundup<64>(cfg->num_bytes_per_cb))
+          cfg->ldpc_config().num_blocks_in_symbol() * roundup<64>(cfg->num_bytes_per_cb))
     , dl_zf_matrices_(
           kFrameWnd, cfg->ofdm_data_num(), cfg->ue_num() * cfg->bs_ant_num())
 {
@@ -182,12 +182,12 @@ void Agora::schedule_codeblocks(
     auto base_tag = gen_tag_t::frm_sym_cb(frame_id, symbol_idx, 0);
 
     // for (size_t i = 0;
-    //      i < config_->ue_num() * config_->LDPC_config.nblocksInSymbol; i++) {
+    //      i < config_->ue_num() * config_->ldpc_config().num_blocks_in_symbol(); i++) {
     //     try_enqueue_fallback(get_conq(event_type), get_ptok(event_type),
     //         Event_data(event_type, base_tag._tag));
     //     base_tag.cb_id++;
     // }
-    size_t num_tasks = config_->ue_num() * config_->LDPC_config.nblocksInSymbol;
+    size_t num_tasks = config_->ue_num() * config_->ldpc_config().num_blocks_in_symbol();
     size_t num_blocks = num_tasks / config_->encode_block_size;
     size_t num_remainder = num_tasks % config_->encode_block_size;
     if (num_remainder > 0)
@@ -1158,7 +1158,7 @@ void Agora::initialize_uplink_buffers()
         cfg->ul_data_symbol_num_perframe, config_->demul_events_per_symbol);
 
     decode_counters_.init(cfg->ul_data_symbol_num_perframe,
-        config_->LDPC_config.nblocksInSymbol * cfg->ue_num());
+        config_->ldpc_config().num_blocks_in_symbol() * cfg->ue_num());
 
     tomac_counters_.init(cfg->ul_data_symbol_num_perframe, cfg->ue_num());
 }
@@ -1181,7 +1181,7 @@ void Agora::initialize_downlink_buffers()
     dl_bits_buffer_.calloc(task_buffer_symbol_num,
         cfg->ofdm_data_num() * cfg->ue_num(), Agora_memory::Alignment_t::k64Align);
     size_t dl_bits_buffer_status_size
-        = task_buffer_symbol_num * cfg->LDPC_config.nblocksInSymbol;
+        = task_buffer_symbol_num * cfg->ldpc_config().num_blocks_in_symbol();
     dl_bits_buffer_status_.calloc(cfg->ue_num(), dl_bits_buffer_status_size,
         Agora_memory::Alignment_t::k64Align);
 
@@ -1202,7 +1202,7 @@ void Agora::initialize_downlink_buffers()
 
     frommac_counters_.init(cfg->dl_data_symbol_num_perframe, config_->ue_num());
     encode_counters_.init(cfg->dl_data_symbol_num_perframe,
-        config_->LDPC_config.nblocksInSymbol * cfg->ue_num());
+        config_->ldpc_config().num_blocks_in_symbol() * cfg->ue_num());
     encode_cur_frame_for_symbol
         = std::vector<size_t>(cfg->dl_data_symbol_num_perframe, SIZE_MAX);
     precode_counters_.init(
@@ -1234,7 +1234,7 @@ void Agora::save_decode_data_to_file(int frame_id)
 {
     auto& cfg = config_;
     const size_t num_decoded_bytes
-        = cfg->num_bytes_per_cb * cfg->LDPC_config.nblocksInSymbol;
+        = cfg->num_bytes_per_cb * cfg->ldpc_config().num_blocks_in_symbol();
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/decode_data.bin";

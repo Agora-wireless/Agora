@@ -3,7 +3,7 @@
 #include "udp_client.h"
 #include <thread>
 
-bool keep_running = true;
+static std::atomic<bool> keep_running = true;
 
 static constexpr size_t kMacAddrBtyes = 17;
 
@@ -13,7 +13,7 @@ std::atomic<size_t> num_workers_ready_atomic;
 void interrupt_handler(int)
 {
     std::cout << "Will exit..." << std::endl;
-    keep_running = false;
+    keep_running.store( false );
 }
 
 void delay_ticks(uint64_t start, uint64_t ticks)
@@ -161,7 +161,7 @@ void* Sender::master_thread(int)
         delay_ticks(tick_start, get_ticks_for_frame(0));
         tick_start = rdtsc();
     }
-    while (keep_running) {
+    while (keep_running.load() == true) {
         gen_tag_t ctag(0); // The completion tag
         int ret = completion_queue_.try_dequeue(ctag._tag);
         if (!ret)
@@ -350,7 +350,7 @@ void* Sender::worker_thread(int tid)
             std::printf("Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, "
                         "num_tags: %zu\n",
                 tid, nb_tx_new, num_tags);
-            keep_running = 0;
+            keep_running.store(false);
             break;
         }
 #endif

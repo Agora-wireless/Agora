@@ -77,8 +77,8 @@ int main(int argc, char* argv[])
     // uplink
     size_t num_symbols_per_cb = 1;
     size_t bits_per_symbol = cfg->ofdm_data_num() * cfg->mod_order_bits;
-    if (cfg->LDPC_config.cbCodewLen > bits_per_symbol)
-        num_symbols_per_cb = (cfg->LDPC_config.cbCodewLen + bits_per_symbol - 1)
+    if (cfg->ldpc_config().num_cb_codew_len() > bits_per_symbol)
+        num_symbols_per_cb = (cfg->ldpc_config().num_cb_codew_len() + bits_per_symbol - 1)
             / bits_per_symbol;
     size_t num_cbs_per_ue = cfg->data_symbol_num_perframe / num_symbols_per_cb;
     std::printf("Number of symbols per block: %zu, blocks per frame: %zu\n",
@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
 
         // Save uplink information bytes to file
         const size_t input_bytes_per_cb = bits_to_bytes(
-            ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+            ldpc_num_input_bits(cfg->ldpc_config().base_graph(), cfg->ldpc_config().expansion_factor()));
         if (kPrintUplinkInformationBytes) {
             std::printf("Uplink information bytes\n");
             for (size_t n = 0; n < num_codeblocks; n++) {
@@ -122,7 +122,7 @@ int main(int argc, char* argv[])
 
             adapt_bits_for_mod(
                 reinterpret_cast<const uint8_t*>(&encoded_codewords[i][0]),
-                &mod_input[0], cfg->LDPC_config.num_encoded_bytes(),
+                &mod_input[0], cfg->ldpc_config().numEncodedBytes(),
                 cfg->mod_order_bits);
 
             for (size_t j = 0; j < cfg->ofdm_data_num(); j++) {
@@ -157,7 +157,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        LDPCconfig LDPC_config = cfg->LDPC_config;
+        const LDPCconfig& ldpc_config = cfg->ldpc_config();
 
         struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
         };
@@ -165,15 +165,15 @@ int main(int argc, char* argv[])
         };
 
         // Decoder setup
-        ldpc_decoder_5gnr_request.numChannelLlrs = LDPC_config.cbCodewLen;
+        ldpc_decoder_5gnr_request.numChannelLlrs = ldpc_config.num_cb_codew_len();
         ldpc_decoder_5gnr_request.numFillerBits = 0;
-        ldpc_decoder_5gnr_request.maxIterations = LDPC_config.decoderIter;
+        ldpc_decoder_5gnr_request.maxIterations = ldpc_config.max_decoder_iter();
         ldpc_decoder_5gnr_request.enableEarlyTermination
-            = LDPC_config.earlyTermination;
-        ldpc_decoder_5gnr_request.Zc = LDPC_config.Zc;
-        ldpc_decoder_5gnr_request.baseGraph = LDPC_config.Bg;
-        ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
-        ldpc_decoder_5gnr_response.numMsgBits = LDPC_config.cbLen;
+            = ldpc_config.early_termination();
+        ldpc_decoder_5gnr_request.Zc = ldpc_config.expansion_factor();
+        ldpc_decoder_5gnr_request.baseGraph = ldpc_config.base_graph();
+        ldpc_decoder_5gnr_request.nRows = ldpc_config.num_rows();
+        ldpc_decoder_5gnr_response.numMsgBits = ldpc_config.num_cb_len();
         auto* resp_var_nodes
             = (int16_t*)Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t));
         ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
@@ -196,12 +196,12 @@ int main(int argc, char* argv[])
 
         // Correctness check
         size_t error_num = 0;
-        size_t total = num_codeblocks * LDPC_config.cbLen;
+        size_t total = num_codeblocks * ldpc_config.num_cb_len();
         size_t block_error_num = 0;
 
         for (size_t i = 0; i < num_codeblocks; i++) {
             size_t error_in_block = 0;
-            for (size_t j = 0; j < LDPC_config.cbLen / 8; j++) {
+            for (size_t j = 0; j < ldpc_config.num_cb_len() / 8; j++) {
                 uint8_t input = (uint8_t)information[i][j];
                 uint8_t output = decoded_codewords[i][j];
                 if (input != output) {

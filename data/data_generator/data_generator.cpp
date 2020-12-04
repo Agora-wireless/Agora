@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
     // Step 1: Generate the information buffers and LDPC-encoded buffers for
     // uplink
     const size_t num_codeblocks = cfg->data_symbol_num_perframe
-        * cfg->LDPC_config.nblocksInSymbol * cfg->ue_ant_num();
+        * cfg->ldpc_config().num_blocks_in_symbol() * cfg->ue_ant_num();
     std::printf("Total number of blocks: %zu\n", num_codeblocks);
 
     std::vector<std::vector<int8_t>> information(num_codeblocks);
@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
     {
         // Save uplink information bytes to file
         const size_t input_bytes_per_cb = bits_to_bytes(
-            ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+            ldpc_num_input_bits(cfg->ldpc_config().base_graph(), cfg->ldpc_config().expansion_factor()));
 
         const std::string filename_input = cur_directory
             + "/data/LDPC_orig_data_" + std::to_string(cfg->ofdm_ca_num())
@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
     }
 
     // Place modulated uplink data codewords into central IFFT bins
-    rt_assert(cfg->LDPC_config.nblocksInSymbol == 1); // TODO: Assumption
+    rt_assert(cfg->ldpc_config().num_blocks_in_symbol() == 1); // TODO: Assumption
     std::vector<std::vector<complex_float>> pre_ifft_data_syms(
         cfg->ue_ant_num() * cfg->data_symbol_num_perframe);
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {

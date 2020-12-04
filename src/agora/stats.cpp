@@ -564,7 +564,7 @@ void Stats::print_summary()
         double ifft_frames = (double)num_ifft_tasks / c->bs_ant_num()
             / c->dl_data_symbol_num_perframe;
         double encode_frames = (double)num_encode_tasks
-            / c->LDPC_config.nblocksInSymbol / c->ue_num()
+            / c->ldpc_config().num_blocks_in_symbol() / c->ue_num()
             / c->dl_data_symbol_num_perframe;
         std::printf("Downlink totals (tasks, frames): ");
         std::printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
@@ -603,7 +603,7 @@ void Stats::print_summary()
         double demul_frames = (double)num_demul_tasks / c->ofdm_data_num()
             / c->ul_data_symbol_num_perframe;
         double decode_frames = (double)num_decode_tasks
-            / c->LDPC_config.nblocksInSymbol / c->ue_num()
+            / c->ldpc_config().num_blocks_in_symbol() / c->ue_num()
             / c->ul_data_symbol_num_perframe;
         std::printf("Uplink totals (tasks, frames): ");
         std::printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);

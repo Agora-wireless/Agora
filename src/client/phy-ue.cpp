@@ -833,7 +833,7 @@ void Phy_UE::doDemul(int tid, size_t tag)
 
 void Phy_UE::doDecode(int tid, size_t tag)
 {
-    LDPCconfig LDPC_config = config_->LDPC_config;
+    const LDPCconfig& LDPC_config = config_->ldpc_config();
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
     size_t ant_id = gen_tag_t(tag).ant_id;
@@ -857,26 +857,26 @@ void Phy_UE::doDecode(int tid, size_t tag)
 
     // Decoder setup
     int16_t numFillerBits = 0;
-    int16_t numChannelLlrs = LDPC_config.cbCodewLen;
+    int16_t numChannelLlrs = LDPC_config.num_cb_codew_len();
 
     ldpc_decoder_5gnr_request.numChannelLlrs = numChannelLlrs;
     ldpc_decoder_5gnr_request.numFillerBits = numFillerBits;
-    ldpc_decoder_5gnr_request.maxIterations = LDPC_config.decoderIter;
+    ldpc_decoder_5gnr_request.maxIterations = LDPC_config.max_decoder_iter();
     ldpc_decoder_5gnr_request.enableEarlyTermination
-        = LDPC_config.earlyTermination;
-    ldpc_decoder_5gnr_request.Zc = LDPC_config.Zc;
-    ldpc_decoder_5gnr_request.baseGraph = LDPC_config.Bg;
-    ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
+        = LDPC_config.early_termination();
+    ldpc_decoder_5gnr_request.Zc = LDPC_config.expansion_factor();
+    ldpc_decoder_5gnr_request.baseGraph = LDPC_config.base_graph();
+    ldpc_decoder_5gnr_request.nRows = LDPC_config.num_rows();
 
-    int numMsgBits = LDPC_config.cbLen - numFillerBits;
+    int numMsgBits = LDPC_config.num_cb_len() - numFillerBits;
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
     size_t block_error(0);
-    for (size_t cb_id = 0; cb_id < config_->LDPC_config.nblocksInSymbol;
+    for (size_t cb_id = 0; cb_id < config_->ldpc_config().num_blocks_in_symbol();
          cb_id++) {
         size_t demod_buffer_offset
-            = cb_id * LDPC_config.cbCodewLen * config_->mod_order_bits;
+            = cb_id * LDPC_config.num_cb_codew_len() * config_->mod_order_bits;
         size_t decode_buffer_offset
             = cb_id * roundup<64>(config_->num_bytes_per_cb);
         auto* llr_buffer_ptr
@@ -945,7 +945,7 @@ void Phy_UE::doDecode(int tid, size_t tag)
 
 void Phy_UE::doEncode(int tid, size_t tag)
 {
-    LDPCconfig LDPC_config = config_->LDPC_config;
+    const LDPCconfig& LDPC_config = config_->ldpc_config();
     // size_t ue_id = rx_tag_t(tag).tid;
     // size_t offset = rx_tag_t(tag).offset;
     const size_t frame_id = gen_tag_t(tag).frame_id;
@@ -957,22 +957,22 @@ void Phy_UE::doEncode(int tid, size_t tag)
     int8_t* encoded_buffer_temp = reinterpret_cast<int8_t*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             ldpc_encoding_encoded_buf_size(
-                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
+                cfg->ldpc_config().base_graph(), cfg->ldpc_config().expansion_factor())));
     int8_t* parity_buffer = reinterpret_cast<int8_t*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             ldpc_encoding_parity_buf_size(
-                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
+                cfg->ldpc_config().base_graph(), cfg->ldpc_config().expansion_factor())));
 
     size_t bytes_per_block = kEnableMac
-        ? (LDPC_config.cbLen) >> 3
-        : roundup<64>(bits_to_bytes(LDPC_config.cbLen));
-    size_t encoded_bytes_per_block = (LDPC_config.cbCodewLen + 7) >> 3;
+        ? (LDPC_config.num_cb_len()) >> 3
+        : roundup<64>(bits_to_bytes(LDPC_config.num_cb_len()));
+    size_t encoded_bytes_per_block = (LDPC_config.num_cb_codew_len() + 7) >> 3;
 
     for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe;
          ul_symbol_id++) {
         size_t total_ul_symbol_id
             = frame_slot * ul_data_symbol_perframe + ul_symbol_id;
-        for (size_t cb_id = 0; cb_id < config_->LDPC_config.nblocksInSymbol;
+        for (size_t cb_id = 0; cb_id < config_->ldpc_config().num_blocks_in_symbol();
              cb_id++) {
             int8_t* input_ptr;
             if (kEnableMac) {
@@ -980,22 +980,22 @@ void Phy_UE::doEncode(int tid, size_t tag)
                     + frame_slot * config_->mac_bytes_num_perframe;
 
                 int input_offset = bytes_per_block
-                        * cfg->LDPC_config.nblocksInSymbol * ul_symbol_id
+                        * cfg->ldpc_config().num_blocks_in_symbol() * ul_symbol_id
                     + bytes_per_block * cb_id;
                 input_ptr = (int8_t*)ul_bits + input_offset;
             } else {
                 size_t cb_offset
-                    = (ue_id * cfg->LDPC_config.nblocksInSymbol + cb_id)
+                    = (ue_id * cfg->ldpc_config().num_blocks_in_symbol() + cb_id)
                     * bytes_per_block;
                 input_ptr = &cfg->ul_bits[ul_symbol_id + config_->ul_pilot_syms()]
                                          [cb_offset];
             }
 
-            ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
-                LDPC_config.nRows, encoded_buffer_temp, parity_buffer,
+            ldpc_encode_helper(LDPC_config.base_graph(), LDPC_config.expansion_factor(),
+                LDPC_config.num_rows(), encoded_buffer_temp, parity_buffer,
                 input_ptr);
 
-            int cbCodedBytes = LDPC_config.cbCodewLen / cfg->mod_order_bits;
+            int cbCodedBytes = LDPC_config.num_cb_codew_len() / cfg->mod_order_bits;
             int output_offset = total_ul_symbol_id * config_->ofdm_data_num()
                 + cbCodedBytes * cb_id;
 
@@ -1184,7 +1184,7 @@ void Phy_UE::initialize_downlink_buffers()
         dl_decode_buffer_.resize(buffer_size);
         for (size_t i = 0; i < dl_decode_buffer_.size(); i++)
             dl_decode_buffer_[i].resize(roundup<64>(config_->num_bytes_per_cb)
-                * config_->LDPC_config.nblocksInSymbol);
+                * config_->ldpc_config().num_blocks_in_symbol());
         resp_var_nodes
             = static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(
                 Agora_memory::Alignment_t::k64Align,

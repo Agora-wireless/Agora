@@ -22,36 +22,57 @@
 
 using json = nlohmann::json;
 #endif
-typedef unsigned char uchar;
-typedef unsigned short ushort;
+
 
 class LDPCconfig {
 public:
-    uint16_t Bg; /// The 5G NR LDPC base graph (one or two)
-    uint16_t Zc; /// The 5G NR LDPC expansion factor
-    int16_t decoderIter; /// Maximum number of decoder iterations per codeblock
-
-    /// Allow the LDPC decoder to terminate without completing all iterations
-    /// if it decodes the codeblock eariler
-    bool earlyTermination;
-
-    size_t nRows; /// Number of rows in the LDPC base graph to use
-    uint32_t cbLen; /// Number of information bits input to LDPC encoding
-    uint32_t cbCodewLen; /// Number of codeword bits output from LDPC encoding
-    size_t nblocksInSymbol;
+    LDPCconfig( uint16_t bg,     uint16_t zc,         int16_t max_dec_itr, 
+                bool early_term, uint32_t num_cb_len, uint32_t num_cb_codew_len, 
+                size_t num_rows, size_t num_blocks_in_symbol)
+        : base_graph_(bg)
+        , expansion_factor_(zc)
+        , max_decoder_iter_(max_dec_itr)
+        , early_termination_(early_term)
+        , num_rows_(num_rows)
+        , num_cb_len_(num_cb_len)
+        , num_cb_codew_len_(num_cb_codew_len)
+        , num_blocks_in_symbol_(num_blocks_in_symbol) {
+    }
 
     // Return the number of bytes in the information bit sequence for LDPC
     // encoding of one code block
-    size_t num_input_bytes() const
-    {
-        return bits_to_bytes(ldpc_num_input_bits(Bg, Zc));
-    }
+    size_t numInputBytes( void )   const { return bits_to_bytes(ldpc_num_input_bits(this->base_graph_, this->expansion_factor_)); }
 
     // Return the number of bytes in the encoded LDPC code word
-    size_t num_encoded_bytes() const
-    {
-        return bits_to_bytes(ldpc_num_encoded_bits(Bg, Zc, nRows));
-    }
+    size_t numEncodedBytes( void ) const { return bits_to_bytes(ldpc_num_encoded_bits(this->base_graph_, this->expansion_factor_, this->num_rows_)); }
+
+    inline void num_blocks_in_symbol ( size_t num_blocks ) { this->num_blocks_in_symbol_ = num_blocks; }
+
+    /* Accessors */
+    inline uint16_t base_graph( void ) const { return this->base_graph_; }
+    inline uint16_t expansion_factor( void ) const { return this->expansion_factor_; }
+    inline int16_t  max_decoder_iter( void ) const { return this->max_decoder_iter_; }
+    inline bool     early_termination( void ) const { return this->early_termination_; }
+    inline uint32_t num_cb_len( void ) const { return this->num_cb_len_; }
+    inline uint32_t num_cb_codew_len( void ) const { return this->num_cb_codew_len_; }
+    inline size_t   num_rows( void ) const { return this->num_rows_; }
+    inline size_t   num_blocks_in_symbol( void ) const { return this->num_blocks_in_symbol_; }
+
+private:
+    LDPCconfig ( void ) { }
+
+    uint16_t base_graph_; /// The 5G NR LDPC base graph (one or two)
+    uint16_t expansion_factor_; /// The 5G NR LDPC expansion factor
+    int16_t  max_decoder_iter_; /// Maximum number of decoder iterations per codeblock
+
+    /// Allow the LDPC decoder to terminate without completing all iterations
+    /// if it decodes the codeblock eariler
+    bool     early_termination_;
+
+    size_t   num_rows_; /// Number of rows in the LDPC base graph to use
+    uint32_t num_cb_len_; /// Number of information bits input to LDPC encoding
+    uint32_t num_cb_codew_len_; /// Number of codeword bits output from LDPC encodings
+    size_t   num_blocks_in_symbol_;
 };
 
 class Config {
@@ -301,7 +322,6 @@ public:
     size_t transport_block_size;
 
     float noise_level;
-    LDPCconfig LDPC_config; // LDPC parameters
 
     // Number of bytes per code block
     size_t num_bytes_per_cb;
@@ -341,10 +361,10 @@ public:
     inline void update_mod_cfgs(size_t new_mod_order_bits)
     {
         mod_order_bits = new_mod_order_bits;
-        mod_order = (size_t)pow(2, mod_order_bits);
+        mod_order = static_cast<size_t>(pow(2, mod_order_bits));
         init_modulation_table(mod_table, mod_order);
-        LDPC_config.nblocksInSymbol
-            = ofdm_data_num_ * mod_order_bits / LDPC_config.cbCodewLen;
+        this->ldpc_config_.num_blocks_in_symbol( 
+            (ofdm_data_num_ * mod_order_bits) / this->ldpc_config_.num_cb_codew_len() );
     }
 
     /// Return total number of data symbols of all frames in a buffer
@@ -374,7 +394,7 @@ public:
     }
 
     /// Return the frame duration in seconds
-    inline double get_frame_duration_sec()
+    inline double get_frame_duration_sec( void )
     {
         return symbol_num_perframe * sampsPerSymbol / rate;
     }
@@ -413,7 +433,7 @@ public:
             = get_total_data_symbol_idx_ul(frame_id, symbol_id);
         return &decoded_buffer[total_data_symbol_id][roundup<64>(
                                                          num_bytes_per_cb)
-            * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
+            * (ldpc_config_.num_blocks_in_symbol() * ue_id + cb_id)];
     }
 
     /// Get ul_bits for this symbol, user and code block ID
@@ -421,7 +441,7 @@ public:
         size_t ue_id, size_t cb_id) const
     {
         return &info_bits[symbol_id][roundup<64>(num_bytes_per_cb)
-            * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
+            * (ldpc_config_.num_blocks_in_symbol() * ue_id + cb_id)];
     }
 
     /// Get encoded_buffer for this frame, symbol, user and code block ID
@@ -431,7 +451,7 @@ public:
         size_t total_data_symbol_id
             = get_total_data_symbol_idx_dl(frame_id, symbol_id);
         size_t num_encoded_bytes_per_cb
-            = LDPC_config.cbCodewLen / mod_order_bits;
+            = ldpc_config_.num_cb_codew_len() / mod_order_bits;
         return &encoded_buffer[total_data_symbol_id]
                               [roundup<64>(ofdm_data_num_) * ue_id
                                   + num_encoded_bytes_per_cb * cb_id];
@@ -439,7 +459,7 @@ public:
 
     // Returns the number of pilot subcarriers in downlink symbols used for
     // phase tracking
-    inline size_t get_ofdm_pilot_num() const
+    inline size_t get_ofdm_pilot_num( void ) const
     {
         return ofdm_data_num_ / ofdm_pilot_spacing_;
     }
@@ -462,7 +482,8 @@ public:
     inline size_t dl_pilot_syms( void ) const { return this->dl_pilot_syms_; } 
     inline size_t ul_pilot_syms( void ) const { return this->ul_pilot_syms_; }
 
-    inline bool   downlink_mode( void ) const { return this->downlink_mode_; }
+    inline bool   downlink_mode( void )           const { return this->downlink_mode_; }
+    inline const  LDPCconfig& ldpc_config( void ) const { return this->ldpc_config_; }
 
 private:
     size_t bs_ant_num_; // Total number of BS antennas
@@ -493,5 +514,7 @@ private:
     size_t ul_pilot_syms_;
 
     bool downlink_mode_; // If true, the frame contains downlink symbols
+
+    LDPCconfig ldpc_config_; // LDPC parameters
 };
 #endif

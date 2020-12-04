@@ -3,7 +3,7 @@
 #include <boost/range/algorithm/count.hpp>
 
 Config::Config(std::string jsonfile)
-    : freq_ghz(measure_rdtsc_freq())
+    : freq_ghz(measure_rdtsc_freq()), ldpc_config_(0, 0, 0, 0, 0, 0, 0, 0)
 {
     pilots_ = nullptr;
     pilots_sgn_ = nullptr;
@@ -239,23 +239,28 @@ Config::Config(std::string jsonfile)
 
     noise_level = tddConf.value("noise_level", 0.03); //default: 30 dB
     std::printf("Noise level: %.2f\n", noise_level);
+
     /* LDPC Coding configurations */
-    LDPC_config.Bg = tddConf.value("base_graph", 1);
-    LDPC_config.earlyTermination = tddConf.value("earlyTermination", 1);
-    LDPC_config.decoderIter = tddConf.value("decoderIter", 5);
-    LDPC_config.Zc = tddConf.value("Zc", 72);
-    LDPC_config.nRows = tddConf.value("nRows", (LDPC_config.Bg == 1) ? 46 : 42);
-    LDPC_config.cbLen = ldpc_num_input_bits(LDPC_config.Bg, LDPC_config.Zc);
-    LDPC_config.cbCodewLen = ldpc_num_encoded_bits(
-        LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows);
+    uint16_t base_graph       = tddConf.value("base_graph", 1);
+    uint16_t zc               = tddConf.value("Zc", 72);
+    bool     early_term       = tddConf.value("earlyTermination", 1);
+    int16_t  max_decoder_iter = tddConf.value("decoderIter", 5);
+    size_t   num_rows         = tddConf.value("nRows", (base_graph == 1) ? 46 : 42);
+    uint32_t num_cb_len       = ldpc_num_input_bits(base_graph, zc);
+    uint32_t num_cb_codew_len = ldpc_num_encoded_bits(base_graph, zc, num_rows);
+
+    /* */
+    ldpc_config_ = LDPCconfig(base_graph, zc, early_term, max_decoder_iter, 
+                              num_cb_len, num_cb_codew_len, num_rows, 0);
 
     /* Modulation configurations */
     mod_order_bits = modulation == "64QAM"
         ? CommsLib::QAM64
         : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
+    /* Updates num_block_in_sym */
     update_mod_cfgs(mod_order_bits);
 
-    rt_assert(LDPC_config.nblocksInSymbol > 0,
+    rt_assert(ldpc_config_.num_blocks_in_symbol() > 0,
         "LDPC expansion factor is too large for number of OFDM data "
         "subcarriers.");
 
@@ -263,11 +268,11 @@ Config::Config(std::string jsonfile)
         "Config: LDPC: Zc: %d, %zu code blocks per symbol, %d information "
         "bits per encoding, %d bits per encoded code word, decoder "
         "iterations: %d, code rate %.3f (nRows = %zu)\n",
-        LDPC_config.Zc, LDPC_config.nblocksInSymbol, LDPC_config.cbLen,
-        LDPC_config.cbCodewLen, LDPC_config.decoderIter,
-        1.f * ldpc_num_input_cols(LDPC_config.Bg)
-            / (ldpc_num_input_cols(LDPC_config.Bg) - 2 + LDPC_config.nRows),
-        LDPC_config.nRows);
+        ldpc_config_.expansion_factor(), ldpc_config_.num_blocks_in_symbol(), ldpc_config_.num_cb_len(),
+        ldpc_config_.num_cb_codew_len(), ldpc_config_.max_decoder_iter(),
+        1.f * ldpc_num_input_cols(ldpc_config_.base_graph())
+            / (ldpc_num_input_cols(ldpc_config_.base_graph()) - 2 + ldpc_config_.num_rows()),
+        ldpc_config_.num_rows());
 
     fft_in_rru = tddConf.value("fft_in_rru", false);
 
@@ -279,8 +284,8 @@ Config::Config(std::string jsonfile)
     rt_assert(
         packet_length < 9000, "Packet size must be smaller than jumbo frame");
 
-    num_bytes_per_cb = LDPC_config.cbLen / 8; // TODO: Use bits_to_bytes()?
-    data_bytes_num_persymbol = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
+    num_bytes_per_cb = ldpc_config_.num_cb_len() / 8; // TODO: Use bits_to_bytes()?
+    data_bytes_num_persymbol = num_bytes_per_cb * ldpc_config_.num_blocks_in_symbol();
     mac_packet_length = data_bytes_num_persymbol;
     mac_payload_length = mac_packet_length - MacPacket::kOffsetOfData;
     mac_packets_perframe = ul_data_symbol_num_perframe - ul_pilot_syms_;
@@ -402,9 +407,9 @@ void Config::genData()
     }
 
     // Get uplink and downlink raw bits either from file or random numbers
-    size_t num_bytes_per_ue = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
+    size_t num_bytes_per_ue = num_bytes_per_cb * ldpc_config_.num_blocks_in_symbol();
     size_t num_bytes_per_ue_pad
-        = roundup<64>(num_bytes_per_cb) * LDPC_config.nblocksInSymbol;
+        = roundup<64>(num_bytes_per_cb) * ldpc_config_.num_blocks_in_symbol();
     dl_bits.malloc(dl_data_symbol_num_perframe,
         num_bytes_per_ue_pad * ue_ant_num_, Agora_memory::Alignment_t::k64Align);
     dl_iq_f.calloc(dl_data_symbol_num_perframe, ofdm_ca_num_ * ue_ant_num_,
@@ -470,22 +475,22 @@ void Config::genData()
     fclose(fd);
 #endif
 
-    const size_t bytes_per_block = bits_to_bytes(LDPC_config.cbLen);
+    const size_t bytes_per_block = bits_to_bytes(ldpc_config_.num_cb_len());
     const size_t encoded_bytes_per_block
-        = bits_to_bytes(LDPC_config.cbCodewLen);
+        = bits_to_bytes(ldpc_config_.num_cb_codew_len());
     const size_t num_blocks_per_symbol
-        = LDPC_config.nblocksInSymbol * ue_ant_num_;
+        = ldpc_config_.num_blocks_in_symbol() * ue_ant_num_;
 
     // Encode uplink bits
     ul_encoded_bits.malloc(ul_data_symbol_num_perframe * num_blocks_per_symbol,
         encoded_bytes_per_block, Agora_memory::Alignment_t::k64Align);
 
     int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
-        LDPC_config.Bg, LDPC_config.Zc)];
+        ldpc_config_.base_graph(), ldpc_config_.expansion_factor())];
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-        for (size_t j = 0; j < LDPC_config.nblocksInSymbol * ue_ant_num_; j++) {
-            ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
-                LDPC_config.nRows,
+        for (size_t j = 0; j < ldpc_config_.num_blocks_in_symbol() * ue_ant_num_; j++) {
+            ldpc_encode_helper(ldpc_config_.base_graph(), ldpc_config_.expansion_factor(),
+                ldpc_config_.num_rows(),
                 ul_encoded_bits[i * num_blocks_per_symbol + j],
                 temp_parity_buffer, ul_bits[i] + j * bytes_per_block);
         }
@@ -495,11 +500,11 @@ void Config::genData()
         Agora_memory::Alignment_t::k32Align);
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < ue_ant_num_; j++) {
-            for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
+            for (size_t k = 0; k < ldpc_config_.num_blocks_in_symbol(); k++) {
                 adapt_bits_for_mod(
                     reinterpret_cast<uint8_t*>(
                         ul_encoded_bits[i * num_blocks_per_symbol
-                            + j * LDPC_config.nblocksInSymbol + k]),
+                            + j * ldpc_config_.num_blocks_in_symbol() + k]),
                     ul_mod_input[i] + j * ofdm_data_num_
                         + k * encoded_bytes_per_block,
                     encoded_bytes_per_block, mod_order_bits);
@@ -513,9 +518,9 @@ void Config::genData()
 
     // Encode downlink bits
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        for (size_t j = 0; j < LDPC_config.nblocksInSymbol * ue_ant_num_; j++) {
-            ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
-                LDPC_config.nRows,
+        for (size_t j = 0; j < ldpc_config_.num_blocks_in_symbol() * ue_ant_num_; j++) {
+            ldpc_encode_helper(ldpc_config_.base_graph(), ldpc_config_.expansion_factor(),
+                ldpc_config_.num_rows(),
                 dl_encoded_bits[i * num_blocks_per_symbol + j],
                 temp_parity_buffer, dl_bits[i] + j * bytes_per_block);
         }
@@ -525,11 +530,11 @@ void Config::genData()
         Agora_memory::Alignment_t::k32Align);
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < ue_ant_num_; j++) {
-            for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
+            for (size_t k = 0; k < ldpc_config_.num_blocks_in_symbol(); k++) {
                 adapt_bits_for_mod(
                     reinterpret_cast<uint8_t*>(
                         dl_encoded_bits[i * num_blocks_per_symbol
-                            + j * LDPC_config.nblocksInSymbol + k]),
+                            + j * ldpc_config_.num_blocks_in_symbol() + k]),
                     dl_mod_input[i] + j * ofdm_data_num_
                         + k * encoded_bytes_per_block,
                     encoded_bytes_per_block, mod_order_bits);

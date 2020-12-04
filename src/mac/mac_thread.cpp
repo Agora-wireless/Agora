@@ -240,7 +240,7 @@ void MacThread::process_udp_packets_from_apps_server(
     const size_t total_symbol_idx
         = cfg_->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
     const size_t rx_offset
-        = total_symbol_idx * cfg_->LDPC_config.nblocksInSymbol;
+        = total_symbol_idx * cfg_->ldpc_config().num_blocks_in_symbol();
 
     if ((*dl_bits_buffer_status_)[pkt->ue_id][rx_offset] == 1) {
         MLPD_ERROR("MAC thread: dl_bits_buffer full, offset %zu. Exiting.\n",
@@ -249,7 +249,7 @@ void MacThread::process_udp_packets_from_apps_server(
         return;
     }
 
-    for (size_t i = 0; i < cfg_->LDPC_config.nblocksInSymbol; i++)
+    for (size_t i = 0; i < cfg_->ldpc_config().num_blocks_in_symbol(); i++)
         (*dl_bits_buffer_status_)[pkt->ue_id][rx_offset + i] = 1;
     std::memcpy(
         &(*dl_bits_buffer_)[total_symbol_idx][pkt->ue_id * cfg_->ofdm_data_num()],

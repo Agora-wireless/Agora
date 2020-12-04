@@ -40,14 +40,14 @@ public:
     void gen_codeblock_ul(std::vector<int8_t>& information,
         std::vector<int8_t>& encoded_codeword, size_t ue_id)
     {
-        const LDPCconfig& lc = cfg->LDPC_config;
+        const LDPCconfig& lc = cfg->ldpc_config();
         std::vector<int8_t> parity;
-        parity.resize(ldpc_encoding_parity_buf_size(lc.Bg, lc.Zc));
+        parity.resize(ldpc_encoding_parity_buf_size(lc.base_graph(), lc.expansion_factor()));
 
-        information.resize(ldpc_encoding_input_buf_size(lc.Bg, lc.Zc));
-        encoded_codeword.resize(ldpc_encoding_encoded_buf_size(lc.Bg, lc.Zc));
+        information.resize(ldpc_encoding_input_buf_size(lc.base_graph(), lc.expansion_factor()));
+        encoded_codeword.resize(ldpc_encoding_encoded_buf_size(lc.base_graph(), lc.expansion_factor()));
 
-        for (size_t i = 0; i < lc.num_input_bytes(); i++) {
+        for (size_t i = 0; i < lc.numInputBytes(); i++) {
             if (profile == Profile::kRandom) {
                 information[i] = static_cast<int8_t>(fast_rand.next_u32());
             } else if (profile == Profile::k123) {
@@ -55,12 +55,12 @@ public:
             }
         }
 
-        ldpc_encode_helper(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc,
-            cfg->LDPC_config.nRows, &encoded_codeword[0], &parity[0],
+        ldpc_encode_helper(cfg->ldpc_config().base_graph(), cfg->ldpc_config().expansion_factor(),
+            cfg->ldpc_config().num_rows(), &encoded_codeword[0], &parity[0],
             &information[0]);
 
-        information.resize(lc.num_input_bytes());
-        encoded_codeword.resize(lc.num_encoded_bytes());
+        information.resize(lc.numInputBytes());
+        encoded_codeword.resize(lc.numEncodedBytes());
     }
 
     /**
@@ -76,7 +76,7 @@ public:
 
         adapt_bits_for_mod(
             reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-            &mod_input[0], cfg->LDPC_config.num_encoded_bytes(),
+            &mod_input[0], cfg->ldpc_config().numEncodedBytes(),
             cfg->mod_order_bits);
 
         for (size_t i = 0; i < cfg->ofdm_data_num(); i++) {

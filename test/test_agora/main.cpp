@@ -70,7 +70,7 @@ void check_correctness_ul(Config* cfg)
     output_data.calloc(data_symbol_num_perframe, ofdm_data_num * ue_num, Agora_memory::Alignment_t::k64Align);
 
     int num_bytes_per_ue
-        = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
+        = (cfg->ldpc_config().num_cb_len() + 7) >> 3 * cfg->ldpc_config().num_blocks_in_symbol();
     read_from_file_ul(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
     read_from_file_ul(output_data_filename, output_data, num_bytes_per_ue, cfg);
 
@@ -185,11 +185,12 @@ int main(int argc, char* argv[])
         agora_cli->start();
 
         std::printf("Start correctness check\n");
-        if (cfg->downlink_mode)
+        if (cfg->downlink_mode()) {
             check_correctness_dl(cfg);
-        else
+        }
+        else {
             check_correctness_ul(cfg);
-
+        }
         ret = EXIT_SUCCESS;
     } catch (SignalException& e) {
         std::cerr << "SignalException: " << e.what() << std::endl;
