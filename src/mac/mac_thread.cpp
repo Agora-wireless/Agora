@@ -23,7 +23,7 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     if (log_filename != "") {
         log_filename_ = log_filename; // Use a non-default log filename
     }
-    log_file_ = fopen(log_filename_.c_str(), "w");
+    log_file_ = std::fopen(log_filename_.c_str(), "w");
     rt_assert(log_file_ != nullptr, "Failed to open MAC log file");
 
     std::printf("MAC thread: Frame duration %.2f ms, tsc_delta %zu\n",
@@ -55,7 +55,7 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
 
 MacThread::~MacThread()
 {
-    fclose(log_file_);
+    std::fclose(log_file_);
     MLPD_INFO("MAC thread destroyed\n");
 }
 

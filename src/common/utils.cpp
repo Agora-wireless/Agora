@@ -232,7 +232,7 @@ void Utils::loadDevices(std::string filename, std::vector<std::string>& data)
 void Utils::loadData(
     const char* filename, std::vector<std::complex<int16_t>>& data, int samples)
 {
-    FILE* fp = fopen(filename, "r");
+    FILE* fp = std::fopen(filename, "r");
     data.resize(samples);
     float real, imag;
     for (int i = 0; i < samples; i++) {
@@ -243,13 +243,13 @@ void Utils::loadData(
             int16_t(real * 32768), int16_t(imag * 32768));
     }
 
-    fclose(fp);
+    std::fclose(fp);
 }
 
 void Utils::loadData(
     const char* filename, std::vector<unsigned>& data, int samples)
 {
-    FILE* fp = fopen(filename, "r");
+    FILE* fp = std::fopen(filename, "r");
     data.resize(samples);
     for (int i = 0; i < samples; i++) {
         int ret = fscanf(fp, "%u", &data[i]);
@@ -257,7 +257,7 @@ void Utils::loadData(
             break;
     }
 
-    fclose(fp);
+    std::fclose(fp);
 }
 
 void Utils::loadTDDConfig(const std::string filename, std::string& jconfig)
@@ -296,9 +296,9 @@ void Utils::printVector(std::vector<std::complex<int16_t>>& data)
 void Utils::writeBinaryFile(
     std::string name, size_t elem_size, size_t buffer_size, void* buff)
 {
-    FILE* f_handle = fopen(name.c_str(), "wb");
+    FILE* f_handle = std::fopen(name.c_str(), "wb");
     fwrite(buff, elem_size, buffer_size, f_handle);
-    fclose(f_handle);
+    std::fclose(f_handle);
 }
 
 void Utils::print_mat(arma::cx_fmat c)

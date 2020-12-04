@@ -651,20 +651,20 @@ void Phy_UE::doFFT(int tid, size_t tag)
             if (frame_id == kRecordFrameIndex) {
                 std::string fname
                     = "rxpilot" + std::to_string(symbol_id) + ".bin";
-                FILE* f = fopen(fname.c_str(), "wb");
+                FILE* f = std::fopen(fname.c_str(), "wb");
                 fwrite(
                     pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
-                fclose(f);
+                std::fclose(f);
             }
 
         } else {
             if (frame_id == kRecordFrameIndex) {
                 std::string fname
                     = "rxdata" + std::to_string(symbol_id) + ".bin";
-                FILE* f = fopen(fname.c_str(), "wb");
+                FILE* f = std::fopen(fname.c_str(), "wb");
                 fwrite(
                     pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
-                fclose(f);
+                std::fclose(f);
             }
         }
     }

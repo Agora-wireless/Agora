@@ -112,7 +112,7 @@ void Simulator::start()
     this->stop();
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult_simulator.txt";
-    FILE* fp = fopen(filename.c_str(), "w");
+    FILE* fp = std::fopen(filename.c_str(), "w");
     if (fp == NULL) {
         std::printf("open file faild\n");
         std::cerr << "Error: " << strerror(errno) << std::endl;

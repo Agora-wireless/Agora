@@ -1,5 +1,5 @@
 function [avg_proc_duration, std_proc_duration] = parse_dl_file(filename)
-    fid = fopen(filename);
+    fid = std::fopen(filename);
 
     PLOT = 0;
     temp = textscan(fid,"%f%f%f%f%f%f%f%f%f%f", 'HeaderLines',2);
@@ -144,7 +144,7 @@ function [avg_proc_duration, std_proc_duration] = parse_dl_file(filename)
         % title('Delay between main thread and rx thread')
 
         %%
-        % fid = fopen('tx_result.txt');
+        % fid = std::fopen('tx_result.txt');
         % temp = textscan(fid,"%f");
         % frame_ends=temp{1};
         % frame_duration_tx = diff(frame_ends);

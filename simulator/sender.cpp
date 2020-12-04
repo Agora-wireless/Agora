@@ -392,13 +392,13 @@ void Sender::init_iq_from_file(std::string filename)
         (cfg->cp_len() + cfg->ofdm_ca_num()) * 2,
         Agora_memory::Alignment_t::k64Align);
 
-    FILE* fp = fopen(filename.c_str(), "rb");
+    FILE* fp = std::fopen(filename.c_str(), "rb");
     rt_assert(fp != nullptr, "Failed to open IQ data file");
 
     for (size_t i = 0; i < packets_per_frame; i++) {
         const size_t expected_count = (cfg->cp_len() + cfg->ofdm_ca_num()) * 2;
         const size_t actual_count
-            = fread(iq_data_float[i], sizeof(float), expected_count, fp);
+            = std::fread(iq_data_float[i], sizeof(float), expected_count, fp);
         if (expected_count != actual_count) {
             std::fprintf(stderr,
                 "Sender: Failed to read IQ data file %s. Packet %zu: expected "
@@ -418,7 +418,7 @@ void Sender::init_iq_from_file(std::string filename)
             }
         }
     }
-    fclose(fp);
+    std::fclose(fp);
     iq_data_float.free();
 }
 
@@ -441,7 +441,7 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
     std::string filename = cur_directory + "/data/tx_result.txt";
     std::printf(
         "Printing sender results to file \"%s\"...\n", filename.c_str());
-    FILE* fp_debug = fopen(filename.c_str(), "w");
+    FILE* fp_debug = std::fopen(filename.c_str(), "w");
     rt_assert(fp_debug != nullptr, "Failed to open stats file");
     for (size_t i = 0; i < tx_frame_count; i++) {
         std::fprintf(fp_debug, "%.5f\n", frame_end[i % kNumStatsFrames]);

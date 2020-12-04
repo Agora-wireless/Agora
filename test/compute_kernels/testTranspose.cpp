@@ -40,7 +40,7 @@ int flushCache()
 
 void saveData(char* filename, complex_float* ptr, int row, int col)
 {
-    FILE* fp = fopen(filename, "w");
+    FILE* fp = std::fopen(filename, "w");
     for (int i = 0; i < row; i++) {
         for (int j = 0; j < col; j++) {
             std::fprintf(fp, "%6.5f+%6.5fi  ", ptr[i * col + j].real,
@@ -48,7 +48,7 @@ void saveData(char* filename, complex_float* ptr, int row, int col)
         }
         std::fprintf(fp, "\n");
     }
-    fclose(fp);
+    std::fclose(fp);
 }
 
 int main(int argc, char** argv)

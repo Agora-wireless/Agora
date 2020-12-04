@@ -1,4 +1,4 @@
-fid = fopen('../data/timeresult.txt');
+fid = std::fopen('../data/timeresult.txt');
 % 1. Pilot RX by socket threads (= reference time), 
 % 2. kPilotRX, 3. kProcessingStarted, 4. kPilotAllRX, 5. kFFTDone, 6. kZFDone, 
 % 7. kDemulDone, 8. kDecodeDone, 9. kRXDone, 10. time in CSI, 11. time in FFT, "
@@ -155,7 +155,7 @@ title('Processing delay')
 % title('Delay between main thread and rx thread')
 
 %%
-% fid = fopen('tx_result.txt');
+% fid = std::fopen('tx_result.txt');
 % temp = textscan(fid,"%f");
 % frame_ends=temp{1};
 % frame_duration_tx = diff(frame_ends);

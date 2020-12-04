@@ -26,21 +26,21 @@ if GENERATE_PILOT
     pilot_f(pilot_f==0) = 1;
     pilot_f(setdiff(1:N_SC, SC_IND_DATA)) = 0;
     pilot_t = ifft(pilot_f, N_SC);
-    fileID = fopen('../data/pilot_f_2048.bin','w');
+    fileID = std::fopen('../data/pilot_f_2048.bin','w');
     fwrite(fileID,pilot_f,'float');
-    fclose(fileID);
-    fileID = fopen('../data/pilot_t_2048.bin','w');
+    std::fclose(fileID);
+    fileID = std::fopen('../data/pilot_t_2048.bin','w');
     fwrite(fileID,pilot_t,'float');
-    fclose(fileID);
+    std::fclose(fileID);
 else
-    fileID = fopen('../data/pilot_f_2048.bin');
-    pilot_f = fread(fileID,[2048,1],'float');
+    fileID = std::fopen('../data/pilot_f_2048.bin');
+    pilot_f = std::fread(fileID,[2048,1],'float');
     pilot_f(setdiff(1:N_SC, SC_IND_DATA)) = 0;
     pilot_t = ifft(pilot_f,2048);
    
-    fclose(fileID);
-%     fileID = fopen('pilot_t.bin');
-%     pilot_t = fread(fileID,[1024,1],'float');
+    std::fclose(fileID);
+%     fileID = std::fopen('pilot_t.bin');
+%     pilot_t = std::fread(fileID,[1024,1],'float');
 end
 
 
@@ -49,18 +49,18 @@ if GENERATE_DATA
     tx_data = randi(MOD_ORDER, 1, N_DATA_SYMS) - 1;
     tx_data_for_saving = reshape(tx_data, length(SC_IND_DATA), N_OFDM_SYMS/NUM_UE, NUM_UE);
     tx_data_for_saving = permute(tx_data_for_saving,[1,3,2]);
-    fileID_data = fopen(sprintf('../data/orig_data_2048_ant%d.bin',NUM_BS_ANT),'w');
+    fileID_data = std::fopen(sprintf('../data/orig_data_2048_ant%d.bin',NUM_BS_ANT),'w');
     fwrite(fileID_data,tx_data_for_saving(:),'uint8');
-    fclose(fileID_data);
+    std::fclose(fileID_data);
 else
-    fileID_data = fopen(sprintf('../data/orig_data_2048_ant%d.bin',NUM_BS_ANT));
-    tx_data_for_saving = fread(fileID_data,[N_DATA_SYMS,1],'uint8');
+    fileID_data = std::fopen(sprintf('../data/orig_data_2048_ant%d.bin',NUM_BS_ANT));
+    tx_data_for_saving = std::fread(fileID_data,[N_DATA_SYMS,1],'uint8');
 %     tx_data_for_saving = reshape(tx_data_for_saving, NUM_UE, length(SC_IND_DATA),N_OFDM_SYMS/NUM_UE);
 %     tx_data = permute(tx_data_for_saving,[2,3,1]);
     tx_data_for_saving = reshape(tx_data_for_saving, length(SC_IND_DATA), NUM_UE, N_OFDM_SYMS/NUM_UE);
     tx_data = permute(tx_data_for_saving,[1,3,2]);
     tx_data = tx_data(:);
-    fclose(fileID);
+    std::fclose(fileID);
 end
 
 %% Modulate data
@@ -135,12 +135,12 @@ if GENERATE_DATA
     H_vec_float = zeros(1,size(H_vec,2)*2);
     H_vec_float(1:2:end) = real(H_vec);
     H_vec_float(2:2:end) = imag(H_vec);   
-    fileID = fopen(sprintf('../data/H_2048_ant%d.bin',NUM_BS_ANT),'w');
+    fileID = std::fopen(sprintf('../data/H_2048_ant%d.bin',NUM_BS_ANT),'w');
     fwrite(fileID,H_vec_float,'float');
-    fclose(fileID);
+    std::fclose(fileID);
 else
-    fileID = fopen(sprintf('../data/H_2048_ant%d.bin',NUM_BS_ANT));
-    H_from_file = fread(fileID,[1,N_SC*NUM_UE*NUM_BS_ANT*2],'float');
+    fileID = std::fopen(sprintf('../data/H_2048_ant%d.bin',NUM_BS_ANT));
+    H_from_file = std::fread(fileID,[1,N_SC*NUM_UE*NUM_BS_ANT*2],'float');
     H_noisy = H_from_file(1:2:end)+1j*H_from_file(2:2:end);
     H_noisy = reshape(H_noisy, N_SC, NUM_UE, NUM_BS_ANT);
 
@@ -187,9 +187,9 @@ if GENERATE_DATA
     rx_vec_float(1:2:end) = real(rx_vec);
     rx_vec_float(2:2:end) = imag(rx_vec);
 
-    fileID = fopen(sprintf('../data/rx_data_2048_ant%d.bin',NUM_BS_ANT),'w');
+    fileID = std::fopen(sprintf('../data/rx_data_2048_ant%d.bin',NUM_BS_ANT),'w');
     fwrite(fileID,rx_vec_float,'float');
-    fclose(fileID);
+    std::fclose(fileID);
     rx_mat_all = permute(rx_mat_all,[1,3,2]);
 end
 
@@ -268,15 +268,15 @@ disp(squeeze(rx_data(1:6,1,:)));
 %% Downlink data analysis
 
 fprintf("Downlink.....\n");
-fileID = fopen(sprintf('../data/rx_data_2048_ant%d.bin',NUM_BS_ANT));
-rx_data_from_file = fread(fileID,[1,N_SC*N_SYMS*NUM_BS_ANT*2],'float');
+fileID = std::fopen(sprintf('../data/rx_data_2048_ant%d.bin',NUM_BS_ANT));
+rx_data_from_file = std::fread(fileID,[1,N_SC*N_SYMS*NUM_BS_ANT*2],'float');
 rx_data_from_file_float = rx_data_from_file(1:2:end)+1j*rx_data_from_file(2:2:end);
 rx_data_from_file_float = reshape(rx_data_from_file_float,N_SC,NUM_BS_ANT,N_SYMS);
 rx_data_from_file_float = permute(rx_data_from_file_float,[1,3,2]);
 % rx_pilot_from_file = rx_data_from_file_float(:,1:8,:);
 
-fileID = fopen(sprintf('../data/H_2048_ant%d.bin',NUM_BS_ANT));
-H_from_file = fread(fileID,[1,N_SC*NUM_UE*NUM_BS_ANT*2],'float');
+fileID = std::fopen(sprintf('../data/H_2048_ant%d.bin',NUM_BS_ANT));
+H_from_file = std::fread(fileID,[1,N_SC*NUM_UE*NUM_BS_ANT*2],'float');
 H_from_file_float = H_from_file(1:2:end)+1j*H_from_file(2:2:end);
 H_from_file_float = reshape(H_from_file_float, N_SC, NUM_UE, NUM_BS_ANT);
 
@@ -319,9 +319,9 @@ if GENERATE_DATA
     dl_rx_data_saving_float(1:2:end) = real(dl_rx_data_saving);
     dl_rx_data_saving_float(2:2:end) = imag(dl_rx_data_saving);
 
-    fileID = fopen(sprintf('../data/dl_ifft_data_2048_ant%d.bin',NUM_BS_ANT),'w');
+    fileID = std::fopen(sprintf('../data/dl_ifft_data_2048_ant%d.bin',NUM_BS_ANT),'w');
     fwrite(fileID,dl_rx_data_saving_float,'float');
-    fclose(fileID);
+    std::fclose(fileID);
 end
 
 

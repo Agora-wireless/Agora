@@ -17,32 +17,32 @@ if GENERATE_PILOT
     pilot_f = randi(3,length(SC_IND_DATA),1)-2;
     pilot_f(pilot_f==0) = 1;
     pilot_t = ifft(pilot_f, 1024);
-    fileID = fopen('pilot_f.bin','w');
+    fileID = std::fopen('pilot_f.bin','w');
     fwrite(fileID,pilot_f,'float');
-    fclose(fileID);
-    fileID = fopen('pilot_t.bin','w');
+    std::fclose(fileID);
+    fileID = std::fopen('pilot_t.bin','w');
     fwrite(fileID,pilot_t,'float');
-    fclose(fileID);
+    std::fclose(fileID);
 else
-    fileID = fopen('pilot_f.bin');
-    pilot_f = fread(fileID,[1024,1],'float');
+    fileID = std::fopen('pilot_f.bin');
+    pilot_f = std::fread(fileID,[1024,1],'float');
     pilot_t = ifft(pilot_f,1024);
-    fclose(fileID);
-%     fileID = fopen('pilot_t.bin');
-%     pilot_t = fread(fileID,[1024,1],'float');
+    std::fclose(fileID);
+%     fileID = std::fopen('pilot_t.bin');
+%     pilot_t = std::fread(fileID,[1024,1],'float');
 end
 
 
 %% Generate data
 if GENERATE_DATA
     tx_data = randi(MOD_ORDER, 1, N_DATA_SYMS) - 1;
-    fileID_data = fopen('orig_data.bin','w');
+    fileID_data = std::fopen('orig_data.bin','w');
     fwrite(fileID_data,tx_data,'int');
-    fclose(fileID_data);
+    std::fclose(fileID_data);
 else
-    fileID_data = fopen('orig_data.bin');
-    tx_data = fread(fileID_data,[N_DATA_SYMS,1],'int');
-    fclose(fileID);
+    fileID_data = std::fopen('orig_data.bin');
+    tx_data = std::fread(fileID_data,[N_DATA_SYMS,1],'int');
+    std::fclose(fileID);
 end
 
 %% Modulate data
@@ -120,9 +120,9 @@ rx_vec = reshape(rx_mat_all, 1, numel(rx_mat_all));
 rx_vec_float = zeros(1,size(rx_vec,2)*2);
 rx_vec_float(1:2:end) = real(rx_vec);
 rx_vec_float(2:2:end) = imag(rx_vec);
-%     fileID = fopen('rx_data.bin','w');
+%     fileID = std::fopen('rx_data.bin','w');
 %     fwrite(fileID,rx_vec_float,'float');
-%     fclose(fileID);
+%     std::fclose(fileID);
 % end
 
     

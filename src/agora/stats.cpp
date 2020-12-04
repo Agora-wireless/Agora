@@ -432,7 +432,7 @@ void Stats::save_to_file()
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult.txt";
     std::printf("Stats: Saving master timestamps to %s\n", filename.c_str());
-    FILE* fp_debug = fopen(filename.c_str(), "w");
+    FILE* fp_debug = std::fopen(filename.c_str(), "w");
     rt_assert(fp_debug != nullptr,
         std::string("Open file failed ") + std::to_string(errno));
 
@@ -489,7 +489,7 @@ void Stats::save_to_file()
         }
     }
 
-    fclose(fp_debug);
+    std::fclose(fp_debug);
 
     if (kIsWorkerTimingEnabled) {
         std::string filename_detailed
@@ -497,7 +497,7 @@ void Stats::save_to_file()
         std::printf("Stats: Printing detailed results to %s\n",
             filename_detailed.c_str());
 
-        FILE* fp_debug_detailed = fopen(filename_detailed.c_str(), "w");
+        FILE* fp_debug_detailed = std::fopen(filename_detailed.c_str(), "w");
         rt_assert(fp_debug_detailed != nullptr,
             std::string("Open file failed ") + std::to_string(errno));
         // Print the header
@@ -517,7 +517,7 @@ void Stats::save_to_file()
                 decode_breakdown_us[0][i], decode_breakdown_us[1][i],
                 decode_breakdown_us[2][i]);
         }
-        fclose(fp_debug_detailed);
+        std::fclose(fp_debug_detailed);
     }
 }
 

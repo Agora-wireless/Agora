@@ -83,12 +83,12 @@ int main(int argc, char* argv[])
             + "_ant" + std::to_string(cfg->ue_ant_num()) + ".bin";
         std::printf(
             "Saving raw data (using LDPC) to %s\n", filename_input.c_str());
-        FILE* fp_input = fopen(filename_input.c_str(), "wb");
+        FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
         for (size_t i = 0; i < num_codeblocks; i++) {
             fwrite(reinterpret_cast<uint8_t*>(&information[i][0]),
                 input_bytes_per_cb, sizeof(uint8_t), fp_input);
         }
-        fclose(fp_input);
+        std::fclose(fp_input);
 
         if (kPrintUplinkInformationBytes) {
             std::printf("Uplink information bytes\n");
@@ -232,13 +232,13 @@ int main(int argc, char* argv[])
         + std::to_string(cfg->ofdm_ca_num()) + "_ant"
         + std::to_string(cfg->bs_ant_num()) + ".bin";
     std::printf("Saving rx data to %s\n", filename_rx.c_str());
-    FILE* fp_rx = fopen(filename_rx.c_str(), "wb");
+    FILE* fp_rx = std::fopen(filename_rx.c_str(), "wb");
     for (size_t i = 0; i < cfg->symbol_num_perframe; i++) {
         auto* ptr = (float*)rx_data_all_symbols[i];
         fwrite(
             ptr, cfg->ofdm_ca_num() * cfg->bs_ant_num() * 2, sizeof(float), fp_rx);
     }
-    fclose(fp_rx);
+    std::fclose(fp_rx);
 
     // std::printf("rx data\n");
     // for (int i = 0; i < 10; i++) {
@@ -383,13 +383,13 @@ int main(int argc, char* argv[])
         + std::to_string(cfg->ofdm_ca_num()) + "_ant"
         + std::to_string(cfg->bs_ant_num()) + ".bin";
     std::printf("Saving dl tx data to %s\n", filename_dl_tx.c_str());
-    FILE* fp_dl_tx = fopen(filename_dl_tx.c_str(), "wb");
+    FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
         short* ptr = (short*)dl_tx_data[i];
         fwrite(ptr, cfg->sampsPerSymbol * cfg->bs_ant_num() * 2, sizeof(short),
             fp_dl_tx);
     }
-    fclose(fp_dl_tx);
+    std::fclose(fp_dl_tx);
 
     // std::printf("rx data\n");
     // for (int i = 0; i < 10; i++) {

@@ -5,7 +5,7 @@ void read_from_file_ul(std::string filename, Table<uint8_t>& data,
 {
     int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
     size_t ue_num = cfg->ue_num();
-    FILE* fp = fopen(filename.c_str(), "rb");
+    FILE* fp = std::fopen(filename.c_str(), "rb");
     if (fp == NULL) {
         std::printf("open file failed: %s\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
@@ -15,7 +15,7 @@ void read_from_file_ul(std::string filename, Table<uint8_t>& data,
     int expect_num_bytes = num_bytes_per_ue * ue_num;
     // std::printf("read data of %d byptes\n", expect_num_bytes);
     for (int i = 0; i < data_symbol_num_perframe; i++) {
-        int num_bytes = fread(data[i], sizeof(uint8_t), expect_num_bytes, fp);
+        int num_bytes = std::fread(data[i], sizeof(uint8_t), expect_num_bytes, fp);
         // if (i == 0) {
         // std::printf("i: %d\n", i);
         // for (int j = 0; j < num_bytes; j++) {
@@ -37,14 +37,14 @@ void read_from_file_dl(
 {
     int data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe;
     size_t bs_ant_num = cfg->bs_ant_num();
-    FILE* fp = fopen(filename.c_str(), "rb");
+    FILE* fp = std::fopen(filename.c_str(), "rb");
     if (fp == NULL) {
         std::printf("open file failed: %s\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
     }
     for (size_t i = 0; i < data_symbol_num_perframe * bs_ant_num; i++) {
         if ((unsigned)ofdm_size * 2
-            != fread(data[i], sizeof(short), ofdm_size * 2, fp)) {
+            != std::fread(data[i], sizeof(short), ofdm_size * 2, fp)) {
             std::printf("read file failed: %s\n", filename.c_str());
             std::cerr << "Error: " << strerror(errno) << std::endl;
         }

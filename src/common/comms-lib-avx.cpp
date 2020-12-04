@@ -80,20 +80,20 @@ int CommsLib::find_beacon_avx(const std::vector<std::complex<float>>& iq,
     std::cout << "Peak Detect AVX took " << diff4 << " usec" << std::endl;
     std::printf("Saving Corr data\n");
     std::string filename = "corr_simd.bin";
-    FILE* fc = fopen(filename.c_str(), "wb");
+    FILE* fc = std::fopen(filename.c_str(), "wb");
     float* cdata_ptr = (float*)gold_corr_avx_2.data();
     fwrite(cdata_ptr, gold_corr_avx_2.size(), sizeof(float), fc);
-    fclose(fc);
+    std::fclose(fc);
     filename = "thresh_simd.bin";
-    FILE* fp = fopen(filename.c_str(), "wb");
+    FILE* fp = std::fopen(filename.c_str(), "wb");
     float* tdata_ptr = (float*)thresh_avx.data();
     fwrite(tdata_ptr, thresh_avx.size(), sizeof(float), fp);
-    fclose(fp);
+    std::fclose(fp);
     filename = "indata.bin";
-    FILE* fi = fopen(filename.c_str(), "wb");
+    FILE* fi = std::fopen(filename.c_str(), "wb");
     float* idata_ptr = (float*)iq.data();
     fwrite(idata_ptr, iq.size() * 2, sizeof(float), fi);
-    fclose(fi);
+    std::fclose(fi);
 #endif
 
     if (valid_peaks.empty()) {

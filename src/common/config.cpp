@@ -440,7 +440,7 @@ void Config::genData()
         + std::to_string(ofdm_ca_num_) + "_ant"
         + std::to_string(total_ue_ant_num) + ".bin";
     std::cout << "Config: Reading raw data from " << filename1 << std::endl;
-    FILE* fd = fopen(filename1.c_str(), "rb");
+    FILE* fd = std::fopen(filename1.c_str(), "rb");
     if (fd == nullptr) {
         std::printf("Failed to open antenna file %s. Error %s.\n",
             filename1.c_str(), strerror(errno));
@@ -450,7 +450,7 @@ void Config::genData()
         if (fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0)
             return;
         for (size_t j = 0; j < ue_ant_num_; j++) {
-            size_t r = fread(ul_bits[i] + j * num_bytes_per_ue_pad,
+            size_t r = std::fread(ul_bits[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue)
                 std::printf("bad read from file %s (batch %zu) \n",
@@ -465,14 +465,14 @@ void Config::genData()
     }
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < ue_ant_num_; j++) {
-            size_t r = fread(dl_bits[i] + j * num_bytes_per_ue_pad,
+            size_t r = std::fread(dl_bits[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue)
                 std::printf("bad read from file %s (batch %zu) \n",
                     filename1.c_str(), i);
         }
     }
-    fclose(fd);
+    std::fclose(fd);
 #endif
 
     const size_t bytes_per_block = bits_to_bytes(ldpc_config_.num_cb_len());

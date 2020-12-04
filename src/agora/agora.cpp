@@ -1239,7 +1239,7 @@ void Agora::save_decode_data_to_file(int frame_id)
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/decode_data.bin";
     std::printf("Saving decode data to %s\n", filename.c_str());
-    FILE* fp = fopen(filename.c_str(), "wb");
+    FILE* fp = std::fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < cfg->ue_num(); j++) {
@@ -1247,7 +1247,7 @@ void Agora::save_decode_data_to_file(int frame_id)
             fwrite(ptr, num_decoded_bytes, sizeof(uint8_t), fp);
         }
     }
-    fclose(fp);
+    std::fclose(fp);
 }
 
 void Agora::save_tx_data_to_file(UNUSED int frame_id)
@@ -1257,7 +1257,7 @@ void Agora::save_tx_data_to_file(UNUSED int frame_id)
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/tx_data.bin";
     std::printf("Saving TX data to %s\n", filename.c_str());
-    FILE* fp = fopen(filename.c_str(), "wb");
+    FILE* fp = std::fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
         size_t total_data_symbol_id
@@ -1271,7 +1271,7 @@ void Agora::save_tx_data_to_file(UNUSED int frame_id)
             fwrite(socket_ptr, cfg->sampsPerSymbol * 2, sizeof(short), fp);
         }
     }
-    fclose(fp);
+    std::fclose(fp);
 }
 
 void Agora::getEqualData(float** ptr, int* size)
