@@ -70,8 +70,8 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg)
                         (clStn[i]->getGain(SOAPY_SDR_RX, c, "PGA")));
                     printf("Actual RX TIA gain: %f...\n",
                         (clStn[i]->getGain(SOAPY_SDR_RX, c, "TIA")));
-                    if (clStn[i]->getHardwareInfo()["frontend"].compare("CBRS")
-                        == 0) {
+                    if (clStn[i]->getHardwareInfo()["frontend"].find("CBRS")
+                        != std::string::npos) {
                         printf("Actual RX LNA1 gain: %f...\n",
                             (clStn[i]->getGain(SOAPY_SDR_RX, c, "LNA1")));
                         printf("Actual RX LNA2 gain: %f...\n",
@@ -99,8 +99,8 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg)
                         (clStn[i]->getGain(SOAPY_SDR_TX, c, "PAD")));
                     printf("Actual TX IAMP gain: %f...\n",
                         (clStn[i]->getGain(SOAPY_SDR_TX, c, "IAMP")));
-                    if (clStn[i]->getHardwareInfo()["frontend"].compare("CBRS")
-                        == 0) {
+                    if (clStn[i]->getHardwareInfo()["frontend"].find("CBRS")
+                        != std::string::npos) {
                         printf("Actual TX PA1 gain: %f...\n",
                             (clStn[i]->getGain(SOAPY_SDR_TX, c, "PA1")));
                         printf("Actual TX PA2 gain: %f...\n",
@@ -189,8 +189,9 @@ void ClientRadioConfig::initClientRadio(ClientRadioConfigContext* in_context)
                 clStn[i]->setGain(
                     SOAPY_SDR_RX, ch, ch ? _cfg->rx_gain_b : _cfg->rx_gain_a);
                 // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
-                clStn[i]->setGain(
-                    SOAPY_SDR_TX, ch, ch ? _cfg->tx_gain_b : _cfg->tx_gain_a);
+                clStn[i]->setGain(SOAPY_SDR_TX, ch,
+                    ch ? _cfg->tx_gain_b + cfg->client_gain_adj_b[i]
+                       : _cfg->tx_gain_a + cfg->client_gain_adj_a[i]);
             } else {
                 if (info["frontend"].find("CBRS") != std::string::npos) {
                     if (cfg->freq > 3e9)
@@ -223,8 +224,9 @@ void ClientRadioConfig::initClientRadio(ClientRadioConfigContext* in_context)
         } else {
             clStn[i]->setGain(
                 SOAPY_SDR_RX, ch, "PGA0", ch ? cfg->rx_gain_b : cfg->rx_gain_a);
-            clStn[i]->setGain(
-                SOAPY_SDR_TX, ch, "PGA0", ch ? cfg->tx_gain_b : cfg->tx_gain_a);
+            clStn[i]->setGain(SOAPY_SDR_TX, ch, "PGA0",
+                ch ? cfg->tx_gain_b + cfg->client_gain_adj_b[i]
+                   : cfg->tx_gain_a + cfg->client_gain_adj_a[i]);
         }
     }
 
