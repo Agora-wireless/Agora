@@ -114,8 +114,8 @@ RadioConfig::RadioConfig(Config* cfg)
                         (baStn[i]->getGain(SOAPY_SDR_RX, c, "PGA")));
                     printf("Actual RX TIA gain: %f...\n",
                         (baStn[i]->getGain(SOAPY_SDR_RX, c, "TIA")));
-                    if (baStn[i]->getHardwareInfo()["frontend"].compare("CBRS")
-                        == 0) {
+                    if (baStn[i]->getHardwareInfo()["frontend"].find("CBRS")
+                        != std::string::npos) {
                         printf("Actual RX LNA1 gain: %f...\n",
                             (baStn[i]->getGain(SOAPY_SDR_RX, c, "LNA1")));
                         printf("Actual RX LNA2 gain: %f...\n",
@@ -143,8 +143,8 @@ RadioConfig::RadioConfig(Config* cfg)
                         (baStn[i]->getGain(SOAPY_SDR_TX, c, "PAD")));
                     printf("Actual TX IAMP gain: %f...\n",
                         (baStn[i]->getGain(SOAPY_SDR_TX, c, "IAMP")));
-                    if (baStn[i]->getHardwareInfo()["frontend"].compare("CBRS")
-                        == 0) {
+                    if (baStn[i]->getHardwareInfo()["frontend"].find("CBRS")
+                        != std::string::npos) {
                         printf("Actual TX PA1 gain: %f...\n",
                             (baStn[i]->getGain(SOAPY_SDR_TX, c, "PA1")));
                         printf("Actual TX PA2 gain: %f...\n",
