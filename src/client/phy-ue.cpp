@@ -729,6 +729,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
         if (config_->get_ofdm_pilot_num() > 0)
             theta /= config_->get_ofdm_pilot_num();
         auto phc = exp(cx_float(0, -theta));
+        float evm = 0;
         for (size_t j = 0; j < config_->OFDM_DATA_NUM; j++) {
             if (j % config_->OFDM_PILOT_SPACING != 0) {
                 // divide fft output by pilot data to get CSI estimation
@@ -738,24 +739,19 @@ void Phy_UE::doFFT(int tid, size_t tag)
                 }
                 cx_float y = fft_buffer_ptr[sc_id];
                 equ_buffer_ptr[j] = (y / csi) * phc;
-                // FIXME: this seems to not work for ant_id > 0,
-                /*
                 complex_float tx
                     = config_
                           ->dl_iq_f[dl_symbol_id][ant_id * config_->OFDM_CA_NUM
                               + config_->OFDM_DATA_START + j];
                 evm += std::norm(equ_buffer_ptr[j] - cx_float(tx.re, tx.im));
-		*/
             }
         }
-        /*
-        evm = std::sqrt(
-            evm / (config_->OFDM_DATA_NUM - config_->get_ofdm_pilot_num()));
+        evm = std::sqrt(evm)
+            / (config_->OFDM_DATA_NUM - config_->get_ofdm_pilot_num());
         if (kPrintPhyStats)
             std::cout << "Frame: " << frame_id << ", Symbol: " << symbol_id
                       << ", User: " << ant_id << ", EVM: " << 100 * evm
                       << "%, SNR: " << -10 * std::log10(evm) << std::endl;
-        */
     }
 
     size_t fft_duration_stat = rdtsc() - start_tsc;
