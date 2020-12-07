@@ -1,5 +1,5 @@
 function [avg_proc_duration, std_proc_duration, avg_proc_start, avg_fft_duration, avg_zf_duration, avg_decode_duration] = parse_ul_file(filename)
-    fid = std::fopen(filename);
+    fid = fopen(filename);
 
     % 1. Pilot RX by socket threads (= reference time), 
     % 2. kPilotRX, 3. kProcessingStarted, 4. kPilotAllRX, 5. kFFTDone, 6. kZFDone, 
