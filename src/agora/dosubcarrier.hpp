@@ -215,10 +215,10 @@ public:
                     precode_cur_sym_dl_ ++;
                     if (precode_cur_sym_dl_ == cfg->dl_data_symbol_num_perframe) {
                         precode_cur_sym_dl_ = 0;
-                        printf("Main thread: Precode done frame: %lu "
-                               "(%lu UL symbols)\n",
-                            precode_cur_frame_,
-                            cfg->dl_data_symbol_num_perframe);
+                        // printf("Main thread: Precode done frame: %lu "
+                        //        "(%lu UL symbols)\n",
+                        //     precode_cur_frame_,
+                        //     cfg->dl_data_symbol_num_perframe);
                         precode_cur_frame_ ++;
                     }
                 }

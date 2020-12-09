@@ -49,7 +49,7 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     memset(packet_count_per_frame, 0, SOCKET_BUFFER_FRAME_NUM * sizeof(size_t));
 
     init_iq_from_file(std::string(TOSTRING(PROJECT_DIRECTORY))
-        + "/data/LDPC_rx_data_256_ant" + std::to_string(cfg->BS_ANT_NUM)
+        + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
         + ".bin");
 
     task_ptok = (moodycamel::ProducerToken**)aligned_alloc(

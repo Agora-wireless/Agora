@@ -2,7 +2,7 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-servers=(hp055 hp080 hp054)
+servers=(roce82)
 
 if [ $# -eq 1 ]
 then
@@ -10,10 +10,12 @@ then
     mv tmp.json $DIR/data/tddconfig-sim-ul-distributed.json
 fi
 
+$DIR/build/data_generator --conf_file $DIR/data/tddconfig-sim-ul-distributed.json
+
 num_servers=$(cat $DIR/data/tddconfig-sim-ul-distributed.json | jq '.bs_server_addr_list | length')
 for (( i=0; i<$num_servers; i++ ))
 do
     cat $DIR/data/tddconfig-sim-ul-distributed.json | jq --argjson i $i '.bs_server_addr_idx=$i' > $DIR/data/tddconfig-sim-ul-distributed_$i.json
-    scp $DIR/data/tddconfig-sim-ul-distributed_$i.json junzhig@${servers[$i]}.utah.cloudlab.us:$DIR/data/tddconfig-sim-ul-distributed.json
-    ssh junzhig@${servers[$i]}.utah.cloudlab.us cd Agora; ./build/data_generator --conf_file ./data/tddconfig-sim-ul-distributed.json
+    scp $DIR/data/tddconfig-sim-ul-distributed_$i.json junzhi@${servers[$i]}:$DIR/data/tddconfig-sim-ul-distributed.json
+    ssh junzhi@${servers[$i]} cd Agora; ./build/data_generator --conf_file ./data/tddconfig-sim-ul-distributed.json
 done

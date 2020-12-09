@@ -20,6 +20,7 @@ public:
         , num_ul_data_symbol_per_frame_(cfg->ul_data_symbol_num_perframe)
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
         , num_decode_tasks_per_frame_(cfg->get_num_ues_to_process())
+        , num_precode_tasks_per_frame_(cfg->get_num_sc_per_server() / cfg->subcarrier_block_size)
         , last_frame_cycles_(worker_rdtsc())
         , freq_ghz_(measure_rdtsc_freq())
     {
@@ -121,6 +122,31 @@ public:
         decode_mutex_.unlock();
     }
 
+    // When precoding is done for a frame from one dosubcarrier worker, call this function
+    // This function will increase cur_frame_ when this frame is precoded so that
+    // we can move on precoding the next frame and release the resources used by this frame
+    void precode_done(size_t frame_id)
+    {
+        rt_assert(frame_id == cur_frame_, "Wrong completed precode task!");
+        precode_mutex_.lock();
+        num_precode_tasks_completed_++;
+        if (num_precode_tasks_completed_ == num_precode_tasks_per_frame_) {
+            cur_frame_++;
+            encode_ready_[(cur_frame_ - 1) % kFrameWnd] = false;
+	        size_t cur_cycle = worker_rdtsc();
+            num_precode_tasks_completed_ = 0;
+            size_t frame_slot = frame_id % kFrameWnd;
+            num_pkts_[frame_slot] = 0;
+            num_pilot_pkts_[frame_slot] = 0;
+            for (size_t j = 0; j < kMaxSymbols; j++) {
+                num_data_pkts_[frame_slot][j] = 0;
+            }
+            printf("Main thread: Precode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
+            last_frame_cycles_ = cur_cycle;
+        }
+        precode_mutex_.unlock();
+    }
+
     // TODO: Instead of having all-atomic counter arrays, can we just make
     // the entire class atomic?
 
@@ -152,6 +178,11 @@ public:
     size_t num_decode_tasks_completed_;
     std::mutex decode_mutex_;
 
+    // Atomic counter for # completed precode tasks
+    // cur_frame_ will be incremented in all tasks are completed
+    size_t num_precode_tasks_completed_;
+    std::mutex precode_mutex_;
+
     // The timestamp when last frame was processed (in cycles)
     size_t last_frame_cycles_;
     
@@ -164,6 +195,7 @@ public:
     const size_t num_ul_data_symbol_per_frame_;
     const size_t num_pkts_per_symbol_;
     const size_t num_decode_tasks_per_frame_;
+    const size_t num_precode_tasks_per_frame_;
 };
 
 // We use DemulStatus to track # completed demul tasks for each symbol
