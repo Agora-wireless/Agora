@@ -219,6 +219,7 @@ public:
                         //        "(%lu UL symbols)\n",
                         //     precode_cur_frame_,
                         //     cfg->dl_data_symbol_num_perframe);
+                        rx_status_->precode_done(precode_cur_frame_);
                         precode_cur_frame_ ++;
                     }
                 }
