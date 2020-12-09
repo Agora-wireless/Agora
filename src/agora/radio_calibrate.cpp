@@ -532,7 +532,6 @@ void RadioConfig::adjustDelays(std::vector<int> offset)
 
 bool RadioConfig::initial_calib(bool sample_adjust)
 {
-    bool good_csi = true;
 
     size_t seq_len = _cfg->pilot_cf32.size();
     size_t read_len = _cfg->pilot_ci16.size();
@@ -570,169 +569,189 @@ bool RadioConfig::initial_calib(bool sample_adjust)
         baStn[i]->activateStream(this->txStreams[i]);
     }
 
-    long long txTime(0);
-    long long rxTime(0);
-    for (size_t i = 0; i < R; i++) {
-        if (good_csi == false)
-            break;
-        int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-        int ret = baStn[i]->writeStream(this->txStreams[i], txbuff0.data(),
-            _cfg->pilot_ci16.size(), tx_flags, txTime, 1000000);
-        if (ret < (int)read_len)
-            std::cout << "bad write\n";
-        for (size_t j = 0; j < R; j++) {
-            if (j == i)
-                continue;
-            int rx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-            ret = baStn[j]->activateStream(
-                this->rxStreams[j], rx_flags, rxTime, read_len);
-        }
+    size_t successful_measurements = 0;
+    size_t num_measurements = 1;
+    for (size_t n = 0; n < num_measurements; n++) {
+        bool good_csi = true;
+        long long txTime(0);
+        long long rxTime(0);
+        for (size_t i = 0; i < R; i++) {
+            if (good_csi == false)
+                break;
+            int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
+            int ret = baStn[i]->writeStream(this->txStreams[i], txbuff0.data(),
+                _cfg->pilot_ci16.size(), tx_flags, txTime, 1000000);
+            if (ret < (int)read_len)
+                std::cout << "bad write\n";
+            for (size_t j = 0; j < R; j++) {
+                if (j == i)
+                    continue;
+                int rx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
+                ret = baStn[j]->activateStream(
+                    this->rxStreams[j], rx_flags, rxTime, read_len);
+            }
 
-        go();
+            go();
 
-        int flags = 0;
-        for (size_t j = 0; j < R; j++) {
-            if (j == i)
-                continue;
-            std::vector<void*> rxbuff(2);
-            rxbuff[0] = buff[(i * R + j)].data();
-            // rxbuff[1] = ant == 2 ? buff[(i*M+j)*ant+1].data() :
-            // dummyBuff.data();
-            rxbuff[1] = dummybuff.data();
-            ret = baStn[j]->readStream(this->rxStreams[j], rxbuff.data(),
-                read_len, flags, rxTime, 1000000);
-            if (ret < (int)read_len) {
-                good_csi = false;
-                std::cout << "bad read (" << ret << ") at node " << j
-                          << " from node " << i << std::endl;
+            int flags = 0;
+            for (size_t j = 0; j < R; j++) {
+                if (j == i)
+                    continue;
+                std::vector<void*> rxbuff(2);
+                rxbuff[0] = buff[(i * R + j)].data();
+                // rxbuff[1] = ant == 2 ? buff[(i*M+j)*ant+1].data() :
+                // dummyBuff.data();
+                rxbuff[1] = dummybuff.data();
+                ret = baStn[j]->readStream(this->rxStreams[j], rxbuff.data(),
+                    read_len, flags, rxTime, 1000000);
+                if (ret < (int)read_len) {
+                    good_csi = false;
+                    std::cout << "bad read (" << ret << ") at node " << j
+                              << " from node " << i << std::endl;
+                }
             }
         }
-    }
 
+        for (size_t i = 0; i < R; i++) {
+            baStn[i]->deactivateStream(this->rxStreams[i]);
+        }
+        std::vector<int> offset(R);
+        std::vector<size_t> start_up(R);
+        std::vector<size_t> start_dn(R);
+
+        std::vector<std::vector<std::complex<float>>> up(R);
+        std::vector<std::vector<std::complex<float>>> dn(R);
+        for (size_t i = 0; i < R; i++) {
+            if (good_csi == false)
+                break;
+            up[i].resize(read_len);
+            dn[i].resize(read_len);
+            if (i == _cfg->ref_ant)
+                continue;
+            std::transform(buff[_cfg->ref_ant * R + i].begin(),
+                buff[_cfg->ref_ant * R + i].end(), up[i].begin(),
+                [](std::complex<int16_t> ci) {
+                    return std::complex<float>(
+                        ci.real() / 32768.0, ci.imag() / 32768.0);
+                });
+            std::transform(buff[i * R + _cfg->ref_ant].begin(),
+                buff[i * R + _cfg->ref_ant].end(), dn[i].begin(),
+                [](std::complex<int16_t> ci) {
+                    return std::complex<float>(
+                        ci.real() / 32768.0, ci.imag() / 32768.0);
+                });
+
+            size_t peak_up
+                = CommsLib::find_pilot_seq(up[i], _cfg->pilot_cf32, seq_len);
+            size_t peak_dn
+                = CommsLib::find_pilot_seq(dn[i], _cfg->pilot_cf32, seq_len);
+            start_up[i]
+                = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->CP_LEN;
+            start_dn[i]
+                = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->CP_LEN;
+            std::cout << "receive starting position from/to node " << i << ": "
+                      << peak_up << "/" << peak_dn << std::endl;
+#if DEBUG_PLOT
+            std::vector<double> up_I(read_len);
+            std::transform(up[i].begin(), up[i].end(), up_I.begin(),
+                [](std::complex<double> cd) { return cd.real(); });
+
+            std::vector<double> dn_I(read_len);
+            std::transform(dn[i].begin(), dn[i].end(), dn_I.begin(),
+                [](std::complex<double> cd) { return cd.real(); });
+
+            plt::figure_size(1200, 780);
+            plt::plot(up_I);
+            // plt::xlim(0, read_len);
+            plt::ylim(-1, 1);
+            plt::title("ant " + std::to_string(_cfg->ref_ant) + " (ref) to ant "
+                + std::to_string(i));
+            plt::legend();
+            plt::save("up_" + std::to_string(i) + ".png");
+
+            plt::figure_size(1200, 780);
+            plt::plot(dn_I);
+            // plt::xlim(0, read_len);
+            plt::ylim(-1, 1);
+            plt::title("ant " + std::to_string(i) + " to ant (ref)"
+                + std::to_string(_cfg->ref_ant));
+            plt::legend();
+            plt::save("dn_" + std::to_string(i) + ".png");
+#endif
+            if (start_up[i] == 0 || start_dn[i] == 0) {
+                good_csi = false;
+                break;
+            }
+            if (i > 0
+                && (std::abs((int)start_up[i] - (int)start_up[i - 1])
+                           > kMaxArraySampleOffset
+                       || std::abs((int)start_dn[i] - (int)start_dn[i - 1])
+                           > kMaxArraySampleOffset)) { // make sure offsets are too different from each other
+                good_csi = false;
+                break;
+            }
+            offset[i] = start_up[i];
+        }
+        // sample_adjusting trigger delays based on lts peak index
+        if (good_csi) {
+            if (sample_adjust)
+                adjustDelays(offset);
+            successful_measurements++;
+        } else
+            continue;
+        //return good_csi;
+
+        for (size_t i = 0; i < R; i++) {
+            size_t id = i;
+            if (_cfg->external_ref_node && i == _cfg->ref_ant)
+                continue;
+            if (_cfg->external_ref_node && i > _cfg->ref_ant)
+                id = i - 1;
+            // computing initial calib vectors
+            auto first_up = up[i].begin() + start_up[i];
+            auto last_up = up[i].begin() + start_up[i] + _cfg->OFDM_CA_NUM;
+            std::vector<std::complex<float>> up_ofdm(first_up, last_up);
+            assert(up_ofdm.size() == _cfg->OFDM_CA_NUM);
+
+            auto first_dn = dn[i].begin() + start_dn[i];
+            auto last_dn = dn[i].begin() + start_dn[i] + _cfg->OFDM_CA_NUM;
+            std::vector<std::complex<float>> dn_ofdm(first_dn, last_dn);
+            assert(dn_ofdm.size() == _cfg->OFDM_CA_NUM);
+
+            auto dn_f = CommsLib::FFT(dn_ofdm, _cfg->OFDM_CA_NUM);
+            auto up_f = CommsLib::FFT(up_ofdm, _cfg->OFDM_CA_NUM);
+            arma::cx_fvec dn_vec(
+                reinterpret_cast<arma::cx_float*>(&dn_f[_cfg->OFDM_DATA_START]),
+                _cfg->OFDM_DATA_NUM, false);
+            arma::cx_fvec calib_dl_vec(
+                reinterpret_cast<arma::cx_float*>(
+                    &init_calib_dl_[id * _cfg->OFDM_DATA_NUM]),
+                _cfg->OFDM_DATA_NUM, false);
+            if (n == 0)
+                calib_dl_vec = dn_vec;
+            else
+                calib_dl_vec += dn_vec;
+
+            arma::cx_fvec up_vec(
+                reinterpret_cast<arma::cx_float*>(&up_f[_cfg->OFDM_DATA_START]),
+                _cfg->OFDM_DATA_NUM, false);
+            arma::cx_fvec calib_ul_vec(
+                reinterpret_cast<arma::cx_float*>(
+                    &init_calib_ul_[id * _cfg->OFDM_DATA_NUM]),
+                _cfg->OFDM_DATA_NUM, false);
+            if (n == 0)
+                calib_ul_vec = up_vec;
+            else
+                calib_ul_vec += up_vec;
+            // Utils::print_vec(dn_vec / up_vec,
+            //     "n" + std::to_string(n) + "_ant" + std::to_string(i));
+        }
+    }
     for (size_t i = 0; i < R; i++) {
         baStn[i]->deactivateStream(this->txStreams[i]);
         baStn[i]->deactivateStream(this->rxStreams[i]);
         baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->tx_gain_a);
     }
 
-    std::vector<int> offset(R);
-    std::vector<size_t> start_up(R);
-    std::vector<size_t> start_dn(R);
-
-    std::vector<std::vector<std::complex<float>>> up(R);
-    std::vector<std::vector<std::complex<float>>> dn(R);
-    for (size_t i = 0; i < R; i++) {
-        if (good_csi == false)
-            break;
-        up[i].resize(read_len);
-        dn[i].resize(read_len);
-        if (i == _cfg->ref_ant)
-            continue;
-        std::transform(buff[_cfg->ref_ant * R + i].begin(),
-            buff[_cfg->ref_ant * R + i].end(), up[i].begin(),
-            [](std::complex<int16_t> ci) {
-                return std::complex<float>(
-                    ci.real() / 32768.0, ci.imag() / 32768.0);
-            });
-        std::transform(buff[i * R + _cfg->ref_ant].begin(),
-            buff[i * R + _cfg->ref_ant].end(), dn[i].begin(),
-            [](std::complex<int16_t> ci) {
-                return std::complex<float>(
-                    ci.real() / 32768.0, ci.imag() / 32768.0);
-            });
-
-        size_t peak_up
-            = CommsLib::find_pilot_seq(up[i], _cfg->pilot_cf32, seq_len);
-        size_t peak_dn
-            = CommsLib::find_pilot_seq(dn[i], _cfg->pilot_cf32, seq_len);
-        start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->CP_LEN;
-        start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->CP_LEN;
-        std::cout << "receive starting position from/to node " << i << ": "
-                  << peak_up << "/" << peak_dn << std::endl;
-#if DEBUG_PLOT
-        std::vector<double> up_I(read_len);
-        std::transform(up[i].begin(), up[i].end(), up_I.begin(),
-            [](std::complex<double> cd) { return cd.real(); });
-
-        std::vector<double> dn_I(read_len);
-        std::transform(dn[i].begin(), dn[i].end(), dn_I.begin(),
-            [](std::complex<double> cd) { return cd.real(); });
-
-        plt::figure_size(1200, 780);
-        plt::plot(up_I);
-        // plt::xlim(0, read_len);
-        plt::ylim(-1, 1);
-        plt::title("ant " + std::to_string(_cfg->ref_ant) + " (ref) to ant "
-            + std::to_string(i));
-        plt::legend();
-        plt::save("up_" + std::to_string(i) + ".png");
-
-        plt::figure_size(1200, 780);
-        plt::plot(dn_I);
-        // plt::xlim(0, read_len);
-        plt::ylim(-1, 1);
-        plt::title("ant " + std::to_string(i) + " to ant (ref)"
-            + std::to_string(_cfg->ref_ant));
-        plt::legend();
-        plt::save("dn_" + std::to_string(i) + ".png");
-#endif
-        if (start_up[i] == 0 || start_dn[i] == 0) {
-            good_csi = false;
-            break;
-        }
-        if (i > 0
-            && (std::abs((int)start_up[i] - (int)start_up[i - 1])
-                       > kMaxArraySampleOffset
-                   || std::abs((int)start_dn[i] - (int)start_dn[i - 1])
-                       > kMaxArraySampleOffset)) { // make sure offsets are too different from each other
-            good_csi = false;
-            break;
-        }
-        offset[i] = start_up[i];
-    }
-    // sample_adjusting trigger delays based on lts peak index
-    if (good_csi) {
-        if (sample_adjust)
-            adjustDelays(offset);
-    } else
-        return good_csi;
-
-    for (size_t i = 0; i < R; i++) {
-        size_t id = i;
-        if (_cfg->external_ref_node && i == _cfg->ref_ant)
-            continue;
-        if (_cfg->external_ref_node && i > _cfg->ref_ant)
-            id = i - 1;
-        // computing reciprocity calibration matrix
-        auto first_up = up[i].begin() + start_up[i];
-        auto last_up = up[i].begin() + start_up[i] + _cfg->OFDM_CA_NUM;
-        std::vector<std::complex<float>> up_ofdm(first_up, last_up);
-        assert(up_ofdm.size() == _cfg->OFDM_CA_NUM);
-
-        auto first_dn = dn[i].begin() + start_dn[i];
-        auto last_dn = dn[i].begin() + start_dn[i] + _cfg->OFDM_CA_NUM;
-        std::vector<std::complex<float>> dn_ofdm(first_dn, last_dn);
-        assert(dn_ofdm.size() == _cfg->OFDM_CA_NUM);
-
-        auto dn_f = CommsLib::FFT(dn_ofdm, _cfg->OFDM_CA_NUM);
-        auto up_f = CommsLib::FFT(up_ofdm, _cfg->OFDM_CA_NUM);
-        arma::cx_fvec dn_vec(
-            reinterpret_cast<arma::cx_float*>(&dn_f[_cfg->OFDM_DATA_START]),
-            _cfg->OFDM_DATA_NUM, false);
-        arma::cx_fvec calib_dl_vec(
-            reinterpret_cast<arma::cx_float*>(
-                &init_calib_dl_[id * _cfg->OFDM_DATA_NUM]),
-            _cfg->OFDM_DATA_NUM, false);
-        calib_dl_vec = dn_vec;
-
-        arma::cx_fvec up_vec(
-            reinterpret_cast<arma::cx_float*>(&up_f[_cfg->OFDM_DATA_START]),
-            _cfg->OFDM_DATA_NUM, false);
-        arma::cx_fvec calib_ul_vec(
-            reinterpret_cast<arma::cx_float*>(
-                &init_calib_ul_[id * _cfg->OFDM_DATA_NUM]),
-            _cfg->OFDM_DATA_NUM, false);
-        calib_ul_vec = up_vec;
-    }
-    return good_csi;
+    return successful_measurements == num_measurements;
 }
