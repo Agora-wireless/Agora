@@ -70,8 +70,7 @@ public:
      * @return True on successfully starting the network I/O threads, false
      * otherwise
      */
-    bool startTXRX(Table<char>& buffer,
-        size_t packet_num_in_buffer, Table<size_t>& frame_start,
+    bool startTXRX(Table<char>& buffer, Table<size_t>& frame_start,
         char* tx_buffer,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers_
         = nullptr,

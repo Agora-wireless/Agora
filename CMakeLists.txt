@@ -305,7 +305,7 @@ add_test(NAME test_ldpc COMMAND test_ldpc)
 
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
-  test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
+  test_concurrent_queue test_zf test_zf_threaded # test_demul_threaded 
   test_ptr_grid test_recipcal)
 
 foreach(test_name IN LISTS UNIT_TESTS)

@@ -1,10 +1,8 @@
 {
-  "ofdm_ca_num": 256,
-  "ofdm_data_num": 256,
   "socket_thread_num": 1,
   "worker_thread_num": 1,
-  "subcarrier_block_size": 128,
-  "demul_block_size": 32,
+  "subcarrier_block_size": 1200,
+  "demul_block_size": 40,
   "antenna_num": 16,
   "ue_num": 4,
   "bs_rru_addr": "10.0.0.1",
@@ -27,7 +25,6 @@
   "demod_tx_port": 8100,
   "demod_rx_port": 8600,
   "frames_to_test": 1,
-  "Zc": 24,
-  "base_graph": 2,
+  "Zc": 104,
   "modulation": "64QAM"
 }

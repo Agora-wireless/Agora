@@ -73,7 +73,7 @@ public:
 private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
     Table<complex_float>& ue_spec_pilot_buffer_;
-    Table<complex_float>& equal_buffer_;
+    Table<complex_float>& equal_buffer_; // Totally unused for now because of we always disable kExportConstellation
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
     Table<char>* socket_buffer_;
     DurationStat* duration_stat;

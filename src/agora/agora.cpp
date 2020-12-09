@@ -4,15 +4,6 @@ using namespace std;
 Agora::Agora(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
     , base_worker_core_offset(cfg->core_offset + 1 + cfg->socket_thread_num)
-    , csi_buffers_(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM)
-    , ul_zf_matrices_(
-          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM)
-    , demod_buffers_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
-          kMaxModType * cfg->OFDM_DATA_NUM)
-    , decoded_buffer_(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM,
-          cfg->LDPC_config.nblocksInSymbol * roundup<64>(cfg->num_bytes_per_cb))
-    , dl_zf_matrices_(
-          kFrameWnd, cfg->OFDM_DATA_NUM, cfg->UE_NUM * cfg->BS_ANT_NUM)
     , rx_status_(cfg)
     , demul_status_(cfg)
     , demod_status_(cfg)
@@ -126,7 +117,7 @@ void Agora::start()
 
     // Start packet I/O
     if (!packet_tx_rx_->startTXRX(socket_buffer_,
-            socket_buffer_status_size_, stats->frame_start, dl_socket_buffer_,
+            stats->frame_start, dl_socket_buffer_,
             &demod_buffers_, &demod_soft_buffer_to_decode_, &dl_encoded_buffer_,
             &dl_encoded_buffer_to_precode_)) {
         this->stop();
@@ -210,21 +201,6 @@ void* Agora::encode_worker(int tid)
     computeEncoding->start_work();
     delete computeEncoding;
     return nullptr;
-}
-
-void Agora::create_threads(void* (*worker)(void*), int tid_start, int tid_end)
-{
-    int ret;
-    for (int i = tid_start; i < tid_end; i++) {
-        auto context = new EventHandlerContext<Agora>;
-        context->obj_ptr = this;
-        context->id = i;
-        ret = pthread_create(&task_threads[i], NULL, worker, context);
-        if (ret != 0) {
-            perror("task thread create failed");
-            exit(0);
-        }
-    }
 }
 
 void Agora::update_ran_config(RanConfig rc)
@@ -495,12 +471,17 @@ void Agora::initialize_uplink_buffers()
     const size_t task_buffer_symbol_num_ul
         = cfg->ul_data_symbol_num_perframe * kFrameWnd;
 
-    alloc_buffer_1d(&task_threads, cfg->worker_thread_num, 64, 0);
-
     socket_buffer_size_ = cfg->packet_length * kFrameWnd * cfg->symbol_num_perframe;
 
     socket_buffer_.malloc(cfg->BS_ANT_NUM,
         socket_buffer_size_, 64);
+
+    csi_buffers_.alloc(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM);
+    ul_zf_matrices_.alloc(kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM);
+    dl_zf_matrices_.alloc(kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM);
+
+    demod_buffers_.alloc(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM, kMaxModType * cfg->OFDM_DATA_NUM);
+    decoded_buffer_.alloc(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM, cfg->LDPC_config.nblocksInSymbol * roundup<64>(cfg->num_bytes_per_cb));
 
     equal_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);

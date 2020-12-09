@@ -56,9 +56,6 @@ public:
     void* decode_worker(int tid);
     void* encode_worker(int tid);
 
-    /* Launch threads to run worker with thread IDs tid_start to tid_end - 1 */
-    void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
-
     void handle_event_fft(size_t tag);
     void update_rx_counters(size_t frame_id, size_t symbol_id);
     void print_per_frame_done(PrintType print_type, size_t frame_id);
@@ -153,7 +150,6 @@ private:
 
     Stats* stats;
     PhyStats* phy_stats;
-    pthread_t* task_threads;
 
     /*****************************************************
      * Buffers
@@ -161,9 +157,6 @@ private:
 
     /* Uplink */
     size_t socket_buffer_size_; // RX buffer size per socket RX thread
-
-    // Max number of packets that can be buffered in one RX thread
-    size_t socket_buffer_status_size_;
 
     // Received data buffers
     // 1st dimension: number of socket RX threads

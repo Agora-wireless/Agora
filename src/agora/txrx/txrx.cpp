@@ -39,14 +39,13 @@ PacketTXRX::~PacketTXRX()
 }
 
 bool PacketTXRX::startTXRX(Table<char>& buffer,
-    size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer,
+    Table<size_t>& frame_start, char* tx_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers,
     Table<int8_t>* demod_soft_buffer_to_decode)
 {
     buffer_ = &buffer;
     frame_start_ = &frame_start;
 
-    packet_num_in_buffer_ = packet_num_in_buffer;
     tx_buffer_ = tx_buffer;
 
     demod_buffers_ = demod_buffers;
