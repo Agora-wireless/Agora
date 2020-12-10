@@ -43,9 +43,9 @@ private:
     Config* uecfg;
 
     Channel* channel;
-
     size_t bs_ant;
     size_t ue_ant;
+    size_t n_samps;
 };
 
 #endif /* SIM_CHAN_MODEL */
