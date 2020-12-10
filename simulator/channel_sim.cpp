@@ -461,12 +461,11 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
         1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->BS_ANT_NUM));
     fmat_dst += noise;
     if (kPrintChannelOutput)
-        Utils::print_mat(fmat_dst);
+        Utils::print_mat(fmat_dst, "rx_ul");
 
     auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_bs[total_offset_bs]);
     simd_convert_float_to_short(reinterpret_cast<float*>(fmat_dst.memptr()),
         dst_ptr, 2 * bscfg->sampsPerSymbol * bscfg->BS_ANT_NUM);
-    std::stringstream ss;
 
     // send the symbol to all base station antennas
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
@@ -517,7 +516,7 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
         1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->UE_ANT_NUM));
     fmat_dst += noise;
     if (kPrintChannelOutput)
-        Utils::print_mat(fmat_dst);
+        Utils::print_mat(fmat_dst, "rx_dl");
 
     auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_ue[total_offset_ue]);
     simd_convert_float_to_short(reinterpret_cast<float*>(fmat_dst.memptr()),

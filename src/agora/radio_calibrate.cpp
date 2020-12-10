@@ -3,6 +3,8 @@
 
 namespace plt = matplotlibcpp;
 static constexpr size_t kMaxArraySampleOffset = 5;
+static constexpr bool kReciprocalCalibPlot = false;
+static constexpr bool kIQImbalancePlot = false;
 
 std::vector<std::complex<float>> RadioConfig::snoopSamples(
     SoapySDR::Device* dev, size_t channel, size_t readSize)
@@ -165,7 +167,7 @@ void RadioConfig::adjustCalibrationGains(std::vector<SoapySDR::Device*> rxDevs,
         }
         toneLevels[r] = toneLevel;
         cout << "Node " << r << ": toneLevel3=" << toneLevel << endl;
-        if (plot) {
+        if (kIQImbalancePlot && plot) {
             auto fftMag = CommsLib::magnitudeFFT(samps, win, N);
             std::vector<double> magDouble(N);
             std::transform(
@@ -365,7 +367,7 @@ void RadioConfig::dciqCalibrationProc(size_t channel)
     double toneBBFreq = sampleRate / 7;
     size_t radioSize = _cfg->nRadios;
 
-    size_t referenceRadio = radioSize / 2;
+    size_t referenceRadio = _cfg->ref_ant / _cfg->nChannels;
     SoapySDR::Device* refDev = baStn[referenceRadio];
 
     /*
@@ -539,9 +541,10 @@ bool RadioConfig::initial_calib(bool sample_adjust)
     // Transmitting from only one chain, create a null vector for chainB
     std::vector<std::complex<int16_t>> dummy_ci16(read_len, 0);
 
+    size_t ch = _cfg->channel == "B" ? 1 : 0;
     std::vector<void*> txbuff0(2);
     txbuff0[0] = _cfg->pilot_ci16.data();
-    txbuff0[1] = dummy_ci16.data();
+    //txbuff0[1 - ch] = dummy_ci16.data();
 
     std::vector<std::vector<std::complex<int16_t>>> buff;
     // int ant = _cfg->nChannels;
@@ -563,7 +566,8 @@ bool RadioConfig::initial_calib(bool sample_adjust)
     drain_buffers();
 
     for (size_t i = 0; i < R; i++) {
-        baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->calib_tx_gain_a);
+        baStn[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
+            ch ? _cfg->calib_tx_gain_b : _cfg->calib_tx_gain_a);
         baStn[i]->writeSetting("TDD_CONFIG", "{\"tdd_enabled\":false}");
         baStn[i]->writeSetting("TDD_MODE", "false");
         baStn[i]->activateStream(this->txStreams[i]);
@@ -601,7 +605,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
                 rxbuff[0] = buff[(i * R + j)].data();
                 // rxbuff[1] = ant == 2 ? buff[(i*M+j)*ant+1].data() :
                 // dummyBuff.data();
-                rxbuff[1] = dummybuff.data();
+                //rxbuff[1 - ch] = dummybuff.data();
                 ret = baStn[j]->readStream(this->rxStreams[j], rxbuff.data(),
                     read_len, flags, rxTime, 1000000);
                 if (ret < (int)read_len) {
@@ -651,33 +655,33 @@ bool RadioConfig::initial_calib(bool sample_adjust)
                 = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->CP_LEN;
             std::cout << "receive starting position from/to node " << i << ": "
                       << peak_up << "/" << peak_dn << std::endl;
-#if DEBUG_PLOT
-            std::vector<double> up_I(read_len);
-            std::transform(up[i].begin(), up[i].end(), up_I.begin(),
-                [](std::complex<double> cd) { return cd.real(); });
+            if (kReciprocalCalibPlot) {
+                std::vector<double> up_I(read_len);
+                std::transform(up[i].begin(), up[i].end(), up_I.begin(),
+                    [](std::complex<double> cd) { return cd.real(); });
 
-            std::vector<double> dn_I(read_len);
-            std::transform(dn[i].begin(), dn[i].end(), dn_I.begin(),
-                [](std::complex<double> cd) { return cd.real(); });
+                std::vector<double> dn_I(read_len);
+                std::transform(dn[i].begin(), dn[i].end(), dn_I.begin(),
+                    [](std::complex<double> cd) { return cd.real(); });
 
-            plt::figure_size(1200, 780);
-            plt::plot(up_I);
-            // plt::xlim(0, read_len);
-            plt::ylim(-1, 1);
-            plt::title("ant " + std::to_string(_cfg->ref_ant) + " (ref) to ant "
-                + std::to_string(i));
-            plt::legend();
-            plt::save("up_" + std::to_string(i) + ".png");
+                plt::figure_size(1200, 780);
+                plt::plot(up_I);
+                // plt::xlim(0, read_len);
+                plt::ylim(-1, 1);
+                plt::title("ant " + std::to_string(_cfg->ref_ant)
+                    + " (ref) to ant " + std::to_string(i));
+                plt::legend();
+                plt::save("up_" + std::to_string(i) + ".png");
 
-            plt::figure_size(1200, 780);
-            plt::plot(dn_I);
-            // plt::xlim(0, read_len);
-            plt::ylim(-1, 1);
-            plt::title("ant " + std::to_string(i) + " to ant (ref)"
-                + std::to_string(_cfg->ref_ant));
-            plt::legend();
-            plt::save("dn_" + std::to_string(i) + ".png");
-#endif
+                plt::figure_size(1200, 780);
+                plt::plot(dn_I);
+                // plt::xlim(0, read_len);
+                plt::ylim(-1, 1);
+                plt::title("ant " + std::to_string(i) + " to ant (ref)"
+                    + std::to_string(_cfg->ref_ant));
+                plt::legend();
+                plt::save("dn_" + std::to_string(i) + ".png");
+            }
             if (start_up[i] == 0 || start_dn[i] == 0) {
                 good_csi = false;
                 break;
@@ -750,7 +754,8 @@ bool RadioConfig::initial_calib(bool sample_adjust)
     for (size_t i = 0; i < R; i++) {
         baStn[i]->deactivateStream(this->txStreams[i]);
         baStn[i]->deactivateStream(this->rxStreams[i]);
-        baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->tx_gain_a);
+        baStn[i]->setGain(
+            SOAPY_SDR_TX, ch, "PAD", ch ? _cfg->tx_gain_b : _cfg->tx_gain_a);
     }
 
     return successful_measurements == num_measurements;

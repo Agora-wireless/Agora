@@ -1,6 +1,8 @@
 #include "radio_lib.hpp"
 #include "comms-lib.h"
 
+static constexpr bool kPrintCalibrationMats = false;
+
 std::atomic<size_t> num_radios_initialized;
 std::atomic<size_t> num_radios_configured;
 
@@ -98,7 +100,7 @@ RadioConfig::RadioConfig(Config* cfg)
     for (size_t i = 0; i < this->_radioNum; i++) {
         std::cout << _cfg->radio_ids.at(i) << ": Front end "
                   << baStn[i]->getHardwareInfo()["frontend"] << std::endl;
-        for (size_t c = 0; c < _cfg->nChannels; c++) {
+        for (auto c : channels) {
             if (c < baStn[i]->getNumChannels(SOAPY_SDR_RX)) {
                 printf("RX Channel %zu\n", c);
                 printf("Actual RX sample rate: %fMSps...\n",
@@ -129,7 +131,7 @@ RadioConfig::RadioConfig(Config* cfg)
             }
         }
 
-        for (size_t c = 0; c < _cfg->nChannels; c++) {
+        for (auto c : channels) {
             if (c < baStn[i]->getNumChannels(SOAPY_SDR_TX)) {
                 printf("TX Channel %zu\n", c);
                 printf("Actual TX sample rate: %fMSps...\n",
@@ -233,7 +235,7 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
         }
 
     SoapySDR::Kwargs info = baStn[i]->getHardwareInfo();
-    for (auto ch : { 0, 1 }) {
+    for (auto ch : channels) {
         if (!kUseUHD) {
             baStn[i]->setBandwidth(SOAPY_SDR_RX, ch, _cfg->bwFilter);
             baStn[i]->setBandwidth(SOAPY_SDR_TX, ch, _cfg->bwFilter);
@@ -296,14 +298,6 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
         baStn[i]->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
     }
 
-    // we disable channel 1 because of the internal LDO issue.
-    // This will be fixed in the next revision (E) of Iris.
-    if (_cfg->nChannels == 1) {
-        if (!kUseUHD) {
-            baStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
-            baStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
-        }
-    }
     num_radios_configured++;
 }
 
@@ -336,12 +330,15 @@ bool RadioConfig::radioStart()
             return good_calib;
         else
             std::cout << "initial calibration successful!" << std::endl;
-        //arma::cx_fmat calib_dl_mat(
-        //    init_calib_dl_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
-        //arma::cx_fmat calib_ul_mat(
-        //    init_calib_ul_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
-        //Utils::print_mat(calib_dl_mat);
-        //Utils::print_mat(calib_ul_mat);
+        if (kPrintCalibrationMats) {
+            arma::cx_fmat calib_dl_mat(
+                init_calib_dl_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+            arma::cx_fmat calib_ul_mat(
+                init_calib_ul_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+            Utils::print_mat(calib_dl_mat, "calib_dl_mat");
+            Utils::print_mat(calib_ul_mat, "calib_ul_mat");
+            Utils::print_mat(calib_dl_mat / calib_ul_mat, "calib_mat");
+        }
     }
 
     std::vector<unsigned> zeros(_cfg->sampsPerSymbol, 0);
