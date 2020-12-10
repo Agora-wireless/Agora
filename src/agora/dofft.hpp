@@ -105,6 +105,7 @@ private:
 
     // Buffer for store 16-bit IQ converted from 12-bit IQ
     uint16_t* temp_16bits_iq;
+    std::complex<float>* rx_samps_tmp; // Temp buffer for received samples
 
     DurationStat* duration_stat_fft;
     DurationStat* duration_stat_csi;
