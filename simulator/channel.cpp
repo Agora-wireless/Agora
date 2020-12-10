@@ -8,7 +8,7 @@
 #include "channel.hpp"
 
 static constexpr bool kPrintChannelOutput = false;
-
+using namespace arma;
 
 Channel::Channel(Config* config_bs, Config* config_ue)
   : bscfg(config_bs)
@@ -16,7 +16,9 @@ Channel::Channel(Config* config_bs, Config* config_ue)
 {
     bs_ant = bscfg->BS_ANT_NUM;
     ue_ant = uecfg->UE_ANT_NUM;
+    n_samps = bscfg->sampsPerSymbol;
 }
+
 
 Channel::~Channel()
 {
@@ -34,8 +36,9 @@ void Channel::apply_chan(const cx_fmat& fmat_src, cx_fmat& fmat_dst, const bool 
     
     // After applying channel
     cx_fmat fmat_H;
-    cx_fmat H(ones<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM),
-		    zeros<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM));
+    fmat rmat(ue_ant, bs_ant, fill::ones);
+    fmat imat(ue_ant, bs_ant, fill::zeros);
+    cx_fmat H = cx_fmat(rmat, imat);
 
     switch(bscfg->chan_model)
     {
@@ -82,18 +85,31 @@ void Channel::awgn(const cx_fmat& src, cx_fmat& dst)
 
     // Power spectral density of noise
     fmat src_sq = square(abs(src));
-    frowvec pwr_vec = sum(src_sq) / n_row;  //pwr = sum(abs(samps)ˆ2)/length(samps)
-
+    frowvec pwr_vec = mean(src_sq, 0); //pwr = sum(abs(samps)ˆ2)/length(samps)
     frowvec n0 = pwr_vec / snr_lin;
     frowvec n = sqrt(n0 / 2);
 
     // Generate noise
     cx_fmat noise(randn<fmat>(n_row, n_col), randn<fmat>(n_row, n_col));
-    fmat n0_mat = repmat(n0, n_row, 1);
-    noise = noise % n0_mat;  // Element-wise multiplication
+    // Supposed to be faster
+    //fmat x(n_row, n_col, fill::randn);
+    //fmat y(n_row, n_col, fill::randn);
+    //cx_fmat noise = cx_fmat(x, y);
+
+    fmat n_mat = repmat(n, n_row, 1);
+    noise = noise % n_mat;  // Element-wise multiplication
 
     // Add noise to signal
     dst = src + noise;
+
+    printf("Inside: \n");
+    Utils::print_mat(dst);
+    // CHECK!!
+    fmat noise_sq = square(abs(noise));
+    frowvec noise_vec = mean(noise_sq, 0);
+    frowvec snr = 10 * log10(pwr_vec / noise_vec);
+    printf("SNR: ");
+    std::cout << snr << std::endl;
 }
 
 void Channel::rayleigh(const cx_fmat& fmat_src, cx_fmat& fmat_dst, const bool is_downlink)
