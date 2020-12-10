@@ -10,6 +10,7 @@ static constexpr bool kPrintIFFTOutput = false;
 static constexpr bool kPrintSocketOutput = false;
 static constexpr bool kUseOutOfPlaceIFFT = false;
 static constexpr bool kMemcpyBeforeIFFT = true;
+static constexpr bool kPrintPilotCorrStats = true;
 
 DoFFT::DoFFT(Config* config, int tid, Table<char>& socket_buffer,
     Table<int>& socket_buffer_status, Table<complex_float>& data_buffer,
@@ -37,6 +38,7 @@ DoFFT::DoFFT(Config* config, int tid, Table<char>& socket_buffer,
         memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
     temp_16bits_iq
         = reinterpret_cast<uint16_t*>(memalign(64, 32 * sizeof(uint16_t)));
+    alloc_buffer_1d(&rx_samps_tmp, cfg->sampsPerSymbol, 64, 1);
 }
 
 DoFFT::~DoFFT()
@@ -114,17 +116,38 @@ Event_data DoFFT::launch(size_t tag)
             simd_convert_short_to_float(&pkt->data[2 * sample_offset],
                 reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
         }
-
         if (kDebugPrintInTask) {
             printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
                 tid, frame_id, symbol_id, ant_id);
-            if (kPrintFFTInput) {
-                printf("FFT input\n");
-                for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
-                    printf("%.4f+%.4fi ", fft_inout[i].re, fft_inout[i].im);
-                }
-                printf("\n");
+        }
+        if (kPrintPilotCorrStats && sym_type == SymbolType::kPilot) {
+            simd_convert_short_to_float(pkt->data,
+                reinterpret_cast<float*>(rx_samps_tmp),
+                2 * cfg->sampsPerSymbol);
+            std::vector<std::complex<float>> samples_vec(
+                rx_samps_tmp, rx_samps_tmp + cfg->sampsPerSymbol);
+            std::vector<std::complex<float>> pilot_corr
+                = CommsLib::correlate_avx(samples_vec, cfg->pilot_cf32);
+            std::vector<float> pilot_corr_abs = CommsLib::abs2_avx(pilot_corr);
+            size_t peak_offset
+                = std::max_element(pilot_corr_abs.begin(), pilot_corr_abs.end())
+                - pilot_corr_abs.begin();
+            float peak = pilot_corr_abs[peak_offset];
+            size_t seq_len = cfg->pilot_cf32.size();
+            size_t sig_offset
+                = peak_offset < seq_len ? 0 : peak_offset - seq_len;
+            printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu, "
+                   "sig_offset %zu, peak %2.4f\n",
+                tid, frame_id, symbol_id, ant_id, sig_offset, peak);
+        }
+        if (kPrintFFTInput) {
+            std::stringstream ss;
+            ss << "FFT_input" << ant_id << "=[";
+            for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
+                ss << fft_inout[i].re << "+1j*" << fft_inout[i].im << " ";
             }
+            ss << "];" << std::endl;
+            std::cout << ss.str();
         }
     }
 
@@ -356,11 +379,14 @@ Event_data DoIFFT::launch(size_t tag)
     }
 
     if (kPrintIFFTOutput) {
-        printf("data after ifft\n");
-        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++)
-            printf("%.1f+%.1fj ", dl_ifft_buffer_[offset][i].re,
-                dl_ifft_buffer_[offset][i].im);
-        printf("\n");
+        std::stringstream ss;
+        ss << "IFFT_output" << ant_id << "=[";
+        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
+            ss << dl_ifft_buffer_[offset][i].re << "+1j*"
+               << dl_ifft_buffer_[offset][i].im << " ";
+        }
+        ss << "];" << std::endl;
+        std::cout << ss.str();
     }
 
     size_t start_tsc2 = worker_rdtsc();
