@@ -801,6 +801,9 @@ void Phy_UE::doDemul(int tid, size_t tag)
     //    equal_ptr, (uint8_t*)demul_ptr, config_->UE_ANT_NUM);
 
     switch (config_->mod_order_bits) {
+    case (CommsLib::QPSK):
+        demod_qpsk_soft_sse(equal_ptr, demul_ptr, config_->OFDM_DATA_NUM);
+        break;
     case (CommsLib::QAM16):
         demod_16qam_soft_avx2(equal_ptr, demul_ptr, config_->OFDM_DATA_NUM);
         break;
