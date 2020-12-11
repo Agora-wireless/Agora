@@ -957,11 +957,11 @@ void Phy_UE::doEncode(int tid, size_t tag)
     auto& cfg = config_;
     // size_t start_tsc = worker_rdtsc();
 
-    int8_t* encoded_buffer_temp = reinterpret_cast<int8_t*>(
+    int8_t* encoded_buffer_temp = static_cast<int8_t *>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             ldpc_encoding_encoded_buf_size(
                 cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
-    int8_t* parity_buffer = reinterpret_cast<int8_t*>(
+    int8_t* parity_buffer = static_cast<int8_t *>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             ldpc_encoding_parity_buf_size(
                 cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
@@ -1189,7 +1189,7 @@ void Phy_UE::initialize_downlink_buffers()
             dl_decode_buffer_[i].resize(roundup<64>(config_->num_bytes_per_cb)
                 * config_->LDPC_config.nblocksInSymbol);
         resp_var_nodes
-            = static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(
+            = static_cast<int16_t *>(Agora_memory::padded_aligned_alloc(
                 Agora_memory::Alignment_t::k64Align,
                 1024 * 1024 * sizeof(int16_t)));
 

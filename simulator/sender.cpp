@@ -54,7 +54,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
         + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
         + ".bin");
 
-    task_ptok = reinterpret_cast<moodycamel::ProducerToken**>(
+    task_ptok = static_cast<moodycamel::ProducerToken**>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             (socket_thread_num * sizeof(moodycamel::ProducerToken*))));
     for (size_t i = 0; i < socket_thread_num; i++)
@@ -253,10 +253,10 @@ void* Sender::worker_thread(int tid)
 #endif
 
     UDPClient udp_client;
-    auto fft_inout = reinterpret_cast<complex_float*>(
+    auto fft_inout = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             cfg->OFDM_CA_NUM * sizeof(complex_float)));
-    auto* socks_pkt_buf = reinterpret_cast<Packet*>(malloc(cfg->packet_length));
+    auto* socks_pkt_buf = static_cast<Packet*>(padded_aligned_alloc(Agora_memory::Alignment_t::k32Align, cfg->packet_length));
 
     double begin = get_time();
     size_t total_tx_packets = 0;

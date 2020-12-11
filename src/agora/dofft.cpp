@@ -32,11 +32,11 @@ DoFFT::DoFFT(Config* config, int tid, Table<char>& socket_buffer,
     DftiCommitDescriptor(mkl_handle);
 
     // Aligned for SIMD
-    fft_inout = reinterpret_cast<complex_float*>(
+    fft_inout = static_cast<complex_float *>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             cfg->OFDM_CA_NUM * sizeof(complex_float)));
     temp_16bits_iq
-        = reinterpret_cast<uint16_t*>(Agora_memory::padded_aligned_alloc(
+        = static_cast<uint16_t *>(Agora_memory::padded_aligned_alloc(
             Agora_memory::Alignment_t::k64Align, 32 * sizeof(uint16_t)));
 }
 
@@ -306,7 +306,7 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
     DftiCommitDescriptor(mkl_handle);
 
     // Aligned for SIMD
-    ifft_out = reinterpret_cast<float*>(
+    ifft_out = static_cast<float *>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             2 * cfg->OFDM_CA_NUM * sizeof(float)));
 }
