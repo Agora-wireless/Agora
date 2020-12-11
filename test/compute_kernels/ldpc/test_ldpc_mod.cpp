@@ -175,7 +175,7 @@ int main(int argc, char* argv[])
         ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
         ldpc_decoder_5gnr_response.numMsgBits = LDPC_config.cbLen;
         auto* resp_var_nodes
-            = (int16_t*)Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t));
+            = static_cast<int16_t *>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
         ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
         Table<uint8_t> decoded_codewords;
