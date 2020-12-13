@@ -284,7 +284,7 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
         size_t pilot_symbol_id = c->pilotSymbols[0][ant_id];
 
         txTime = time0 + tx_frame_id * frm_num_samps
-            + pilot_symbol_id * num_samps - c->cl_tx_advance;
+            + pilot_symbol_id * num_samps - c->cl_tx_advance[ue_id];
         r = radio->radioTx(
             ue_id, pilot_buff0.data(), num_samps, flags_tx_pilot, txTime);
         if (r < num_samps)
@@ -293,7 +293,7 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
         if (c->nChannels == 2) {
             pilot_symbol_id = c->pilotSymbols[0][ant_id + 1];
             txTime = time0 + tx_frame_id * frm_num_samps
-                + pilot_symbol_id * num_samps - c->cl_tx_advance;
+                + pilot_symbol_id * num_samps - c->cl_tx_advance[ue_id];
             r = radio->radioTx(ue_id, pilot_buff1.data(), num_samps, 2, txTime);
             if (r < num_samps)
                 std::cout << "BAD Write (PILOT): " << r << "/" << num_samps
@@ -319,7 +319,7 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
         txTime = c->hw_framer
             ? ((long long)tx_frame_id << 32) | (tx_symbol_id << 16)
             : time0 + tx_frame_id * frm_num_samps + tx_symbol_id * num_samps
-                - c->cl_tx_advance;
+                - c->cl_tx_advance[ue_id];
         int flags_tx_symbol = 1; // HAS_TIME
         if (tx_symbol_id == c->ULSymbols[0].back())
             flags_tx_symbol = 2; // HAS_TIME & END_BURST, fixme
