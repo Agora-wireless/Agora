@@ -256,7 +256,8 @@ void* Sender::worker_thread(int tid)
     auto fft_inout = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             cfg->OFDM_CA_NUM * sizeof(complex_float)));
-    auto* socks_pkt_buf = static_cast<Packet*>(padded_aligned_alloc(Agora_memory::Alignment_t::k32Align, cfg->packet_length));
+    auto* socks_pkt_buf = static_cast<Packet*>(padded_aligned_alloc(
+        Agora_memory::Alignment_t::k32Align, cfg->packet_length));
 
     double begin = get_time();
     size_t total_tx_packets = 0;

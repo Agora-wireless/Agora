@@ -111,10 +111,11 @@ int main(int argc, char* argv[])
         }
 
         Table<complex_float> modulated_codewords;
-        modulated_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, Agora_memory::Alignment_t::k64Align);
+        modulated_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM,
+            Agora_memory::Alignment_t::k64Align);
         Table<int8_t> demod_data_all_symbols;
-        demod_data_all_symbols.calloc(
-            num_codeblocks, cfg->OFDM_DATA_NUM * 8, Agora_memory::Alignment_t::k64Align);
+        demod_data_all_symbols.calloc(num_codeblocks, cfg->OFDM_DATA_NUM * 8,
+            Agora_memory::Alignment_t::k64Align);
         std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
 
         // Modulate, add noise, and demodulate the encoded codewords
@@ -175,11 +176,14 @@ int main(int argc, char* argv[])
         ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
         ldpc_decoder_5gnr_response.numMsgBits = LDPC_config.cbLen;
         auto* resp_var_nodes
-            = static_cast<int16_t *>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
+            = static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(
+                Agora_memory::Alignment_t::k64Align,
+                1024 * 1024 * sizeof(int16_t)));
         ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
         Table<uint8_t> decoded_codewords;
-        decoded_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, Agora_memory::Alignment_t::k64Align);
+        decoded_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM,
+            Agora_memory::Alignment_t::k64Align);
 
         double freq_ghz = measure_rdtsc_freq();
         size_t start_tsc = worker_rdtsc();
@@ -222,9 +226,10 @@ int main(int argc, char* argv[])
             }
         }
 
-        std::printf("Noise: %.3f, snr: %.1f dB, error rate: %zu/%zu = %.6f, block "
-               "error: "
-               "%zu/%zu = %.6f\n",
+        std::printf(
+            "Noise: %.3f, snr: %.1f dB, error rate: %zu/%zu = %.6f, block "
+            "error: "
+            "%zu/%zu = %.6f\n",
             noise_levels[noise_id], snr_levels[noise_id], error_num, total,
             1.f * error_num / total, block_error_num, num_codeblocks,
             1.f * block_error_num / num_codeblocks);

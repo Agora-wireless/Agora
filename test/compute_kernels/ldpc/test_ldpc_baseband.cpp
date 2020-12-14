@@ -141,8 +141,9 @@ int main(int argc, char* argv[])
 
         // Put pilot and data symbols together
         Table<complex_float> tx_data_all_symbols;
-        tx_data_all_symbols.calloc(
-            cfg->symbol_num_perframe, cfg->UE_ANT_NUM * cfg->OFDM_CA_NUM, Agora_memory::Alignment_t::k64Align);
+        tx_data_all_symbols.calloc(cfg->symbol_num_perframe,
+            cfg->UE_ANT_NUM * cfg->OFDM_CA_NUM,
+            Agora_memory::Alignment_t::k64Align);
 
         if (cfg->freq_orthogonal_pilot) {
             for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
@@ -161,7 +162,8 @@ int main(int argc, char* argv[])
             }
         } else {
             for (size_t i = 0; i < cfg->UE_ANT_NUM; i++)
-                std::memcpy(tx_data_all_symbols[i + cfg->beacon_symbol_num_perframe]
+                std::memcpy(
+                    tx_data_all_symbols[i + cfg->beacon_symbol_num_perframe]
                         + i * cfg->OFDM_CA_NUM,
                     &pilot_td[0], cfg->OFDM_CA_NUM * sizeof(complex_float));
         }
@@ -180,8 +182,9 @@ int main(int argc, char* argv[])
 
         // Generate CSI matrix without noise
         Table<complex_float> csi_matrices_no_noise;
-        csi_matrices_no_noise.calloc(
-            cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k32Align);
+        csi_matrices_no_noise.calloc(cfg->OFDM_CA_NUM,
+            cfg->UE_ANT_NUM * cfg->BS_ANT_NUM,
+            Agora_memory::Alignment_t::k32Align);
         for (size_t i = 0; i < cfg->UE_ANT_NUM * cfg->BS_ANT_NUM; i++) {
             complex_float csi = { static_cast<float>(distribution(generator)),
                 static_cast<float>(distribution(generator)) };
@@ -193,8 +196,9 @@ int main(int argc, char* argv[])
 
         // Generate CSI matrix with noise for pilot symbols
         Table<complex_float> csi_matrices_pilot;
-        csi_matrices_pilot.calloc(
-            cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k32Align);
+        csi_matrices_pilot.calloc(cfg->OFDM_CA_NUM,
+            cfg->UE_ANT_NUM * cfg->BS_ANT_NUM,
+            Agora_memory::Alignment_t::k32Align);
         for (size_t i = 0; i < cfg->UE_ANT_NUM * cfg->BS_ANT_NUM; i++) {
             for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
                 complex_float noise
@@ -211,8 +215,9 @@ int main(int argc, char* argv[])
 
         // Generate CSI matrix with noise for data symbols
         Table<complex_float> csi_matrices_data;
-        csi_matrices_data.calloc(
-            cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k32Align);
+        csi_matrices_data.calloc(cfg->OFDM_CA_NUM,
+            cfg->UE_ANT_NUM * cfg->BS_ANT_NUM,
+            Agora_memory::Alignment_t::k32Align);
         for (size_t i = 0; i < cfg->UE_ANT_NUM * cfg->BS_ANT_NUM; i++) {
             for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
                 complex_float noise
@@ -229,8 +234,9 @@ int main(int argc, char* argv[])
 
         // Generate RX data received by base station after going through channels
         Table<complex_float> rx_data_all_symbols;
-        rx_data_all_symbols.calloc(
-            cfg->symbol_num_perframe, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+        rx_data_all_symbols.calloc(cfg->symbol_num_perframe,
+            cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM,
+            Agora_memory::Alignment_t::k64Align);
         for (size_t i = 0; i < cfg->symbol_num_perframe; i++) {
             arma::cx_fmat mat_input_data(
                 reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
@@ -249,8 +255,8 @@ int main(int argc, char* argv[])
 
         // Compute precoder
         Table<complex_float> precoder;
-        precoder.calloc(
-            cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k32Align);
+        precoder.calloc(cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM,
+            Agora_memory::Alignment_t::k32Align);
         for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
             arma::cx_fmat mat_input(
                 reinterpret_cast<arma::cx_float*>(csi_matrices_pilot[i]),
@@ -262,11 +268,13 @@ int main(int argc, char* argv[])
         }
 
         Table<complex_float> equalized_data_all_symbols;
-        equalized_data_all_symbols.calloc(
-            cfg->symbol_num_perframe, cfg->OFDM_DATA_NUM * cfg->UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+        equalized_data_all_symbols.calloc(cfg->symbol_num_perframe,
+            cfg->OFDM_DATA_NUM * cfg->UE_ANT_NUM,
+            Agora_memory::Alignment_t::k64Align);
         Table<int8_t> demod_data_all_symbols;
         demod_data_all_symbols.calloc(cfg->UE_ANT_NUM,
-            cfg->OFDM_DATA_NUM * cfg->data_symbol_num_perframe * 8, Agora_memory::Alignment_t::k64Align);
+            cfg->OFDM_DATA_NUM * cfg->data_symbol_num_perframe * 8,
+            Agora_memory::Alignment_t::k64Align);
         for (size_t i = data_sym_start; i < cfg->symbol_num_perframe; i++) {
             arma::cx_fmat mat_rx_data(
                 reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
@@ -310,7 +318,8 @@ int main(int argc, char* argv[])
                         equal_T_ptr, demod_ptr, cfg->OFDM_DATA_NUM);
                     break;
                 default:
-                    std::printf("Demodulation: modulation type %s not supported!\n",
+                    std::printf(
+                        "Demodulation: modulation type %s not supported!\n",
                         cfg->modulation.c_str());
                 }
             }
@@ -334,11 +343,14 @@ int main(int argc, char* argv[])
         ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
         ldpc_decoder_5gnr_response.numMsgBits = LDPC_config.cbLen;
         auto* resp_var_nodes
-            = static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
+            = static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(
+                Agora_memory::Alignment_t::k64Align,
+                1024 * 1024 * sizeof(int16_t)));
         ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
         Table<uint8_t> decoded_codewords;
-        decoded_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM, Agora_memory::Alignment_t::k64Align);
+        decoded_codewords.calloc(num_codeblocks, cfg->OFDM_DATA_NUM,
+            Agora_memory::Alignment_t::k64Align);
         double freq_ghz = measure_rdtsc_freq();
         size_t start_tsc = worker_rdtsc();
         for (size_t i = 0; i < cfg->UE_ANT_NUM; i++) {
@@ -383,9 +395,10 @@ int main(int argc, char* argv[])
             }
         }
 
-        std::printf("Noise: %.3f, snr: %.1f dB, error rate: %zu/%zu = %.6f, block "
-               "error: "
-               "%zu/%zu = %.6f\n",
+        std::printf(
+            "Noise: %.3f, snr: %.1f dB, error rate: %zu/%zu = %.6f, block "
+            "error: "
+            "%zu/%zu = %.6f\n",
             noise_levels[noise_id], snr_levels[noise_id], error_num, total,
             1.f * error_num / total, block_error_num, num_codeblocks,
             1.f * block_error_num / num_codeblocks);
