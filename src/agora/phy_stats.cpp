@@ -28,7 +28,7 @@ PhyStats::PhyStats(Config* cfg)
             = reinterpret_cast<cx_float*>(cfg->ul_iq_f[cfg->UL_PILOT_SYMS]);
         cx_fmat ul_iq_f_mat(
             ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
-        ul_gt_mat_ = ul_iq_f_mat.st(); /* Out of bounds read.... */
+        ul_gt_mat_ = ul_iq_f_mat.st();
         ul_gt_mat_
             = ul_gt_mat_.cols(cfg->OFDM_DATA_START, (cfg->OFDM_DATA_STOP - 1));
     }
