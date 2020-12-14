@@ -92,9 +92,8 @@ DoDecode::DoDecode(Config* in_config, int in_tid,
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
-    resp_var_nodes = static_cast<int16_t *>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
-            1024 * 1024 * sizeof(int16_t)));
+    resp_var_nodes = static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(
+        Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
 }
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }

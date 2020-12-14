@@ -19,13 +19,13 @@ DoDemul::DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
 
-    data_gather_buffer = static_cast<complex_float *>(
+    data_gather_buffer = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             kSCsPerCacheline * kMaxAntennas * sizeof(complex_float)));
-    equaled_buffer_temp = static_cast<complex_float *>(
+    equaled_buffer_temp = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
-    equaled_buffer_temp_transposed = static_cast<complex_float *>(
+    equaled_buffer_temp_transposed = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
 
