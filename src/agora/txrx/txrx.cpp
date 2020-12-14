@@ -133,7 +133,7 @@ void PacketTXRX::loop_tx_rx(int tid)
     size_t slow_start_factor = 10;
     send_beacon(tid,
         tx_frame_id++); // Send Beacons for the first time to kick off sim
-    while (cfg->running) {
+    while (cfg->running() == true) {
         if (rdtsc() - tx_frame_start > frame_tsc_delta * slow_start_factor) {
             tx_frame_start = rdtsc();
             send_beacon(tid, tx_frame_id++);
@@ -177,12 +177,12 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     // if rx_buffer is full, exit
     if (rx_buffer_status[rx_offset] == 1) {
         std::printf("TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
-        cfg->running = false;
+        cfg->running( false );
         return (NULL);
     }
     struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
     if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
-        if (errno != EAGAIN && cfg->running) {
+        if ((errno != EAGAIN) && (cfg->running() == true)) {
             std::perror("recv failed");
             std::exit(0);
         }
@@ -244,12 +244,12 @@ int PacketTXRX::dequeue_send(int tid)
             offset, message_queue_->size_approx());
     }
 
-    char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length;
+    char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length();
     auto* pkt = (Packet*)cur_buffer_ptr;
     new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
     // Send data (one OFDM symbol)
-    ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->dl_packet_length,
+    ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->dl_packet_length(),
         0, (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
         sizeof(bs_rru_sockaddr_[ant_id]));
     rt_assert(ret > 0, "sendto() failed");

@@ -2,6 +2,10 @@
 #include "utils_ldpc.hpp"
 #include <boost/range/algorithm/count.hpp>
 
+
+static const size_t kDefaultSymbolNumPerFrame = 70;
+
+
 Config::Config(std::string jsonfile)
     : freq_ghz(measure_rdtsc_freq()), ldpc_config_(0, 0, 0, 0, 0, 0, 0, 0)
 {
@@ -128,74 +132,75 @@ Config::Config(std::string jsonfile)
     ul_pilot_syms_ = tddConf.value("client_ul_pilot_syms", 0);
     cl_tx_advance = tddConf.value("tx_advance", 100);
     hw_framer = tddConf.value("hw_framer", true);
-    if (tddConf.find("frames") == tddConf.end()) {
-        symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
-        pilot_symbol_num_perframe = tddConf.value(
-            "pilot_num", freq_orthogonal_pilot ? 1 : ue_ant_num_);
-        ul_data_symbol_num_perframe = tddConf.value("ul_symbol_num_perframe",
-            downlink_mode_
-                ? 0
-                : symbol_num_perframe - pilot_symbol_num_perframe - 1);
-        dl_data_symbol_num_perframe
-            = tddConf.value("dl_symbol_num_perframe", downlink_mode_ ? 10 : 0);
-        dl_data_symbol_start = tddConf.value("dl_data_symbol_start", 10);
+
+    /* If frames not specified explicitly, construct */
+    if (tddConf.find("frames") == tddConf.end() ) {
+        symbol_num_perframe = tddConf.value("symbol_num_perframe", kDefaultSymbolNumPerFrame);
+        pilot_symbol_num_perframe = tddConf.value("pilot_num", freq_orthogonal_pilot ? 1 : ue_ant_num_);
+        
+        ul_data_symbol_num_perframe_  = tddConf.value("ul_symbol_num_perframe", downlink_mode_ ? 0 : symbol_num_perframe - pilot_symbol_num_perframe - 1);
+        dl_data_symbol_num_perframe_  = tddConf.value("dl_symbol_num_perframe", downlink_mode_ ? 10 : 0);
+        dl_data_symbol_start_ = tddConf.value("dl_data_symbol_start", 10);
         std::string sched("B");
-        for (size_t s = 0; s < pilot_symbol_num_perframe; s++)
+        for (size_t s = 0; s < pilot_symbol_num_perframe; s++) {
             sched += "P";
+        }
         // Below it is assumed either dl or ul to be active at one time
         if (downlink_mode_) {
             size_t dl_symbol_start
-                = 1 + pilot_symbol_num_perframe + dl_data_symbol_start;
+                = 1 + pilot_symbol_num_perframe + dl_data_symbol_start_;
             size_t dl_symbol_end
-                = dl_symbol_start + dl_data_symbol_num_perframe;
-            for (size_t s = 1 + pilot_symbol_num_perframe; s < dl_symbol_start;
-                 s++)
+                = dl_symbol_start + dl_data_symbol_num_perframe_;
+            for (size_t s = 1 + pilot_symbol_num_perframe; s < dl_symbol_start; s++) {
                 sched += "G";
-            for (size_t s = dl_symbol_start; s < dl_symbol_end; s++)
+            }
+            for (size_t s = dl_symbol_start; s < dl_symbol_end; s++) {
                 sched += "D";
-            for (size_t s = dl_symbol_end; s < symbol_num_perframe; s++)
+            }
+            for (size_t s = dl_symbol_end; s < symbol_num_perframe; s++){
                 sched += "G";
+            }
         } else {
             size_t ul_data_symbol_end
-                = 1 + pilot_symbol_num_perframe + ul_data_symbol_num_perframe;
+                = 1 + pilot_symbol_num_perframe + ul_data_symbol_num_perframe_;
             for (size_t s = 1 + pilot_symbol_num_perframe;
                  s < ul_data_symbol_end; s++)
                 sched += "U";
             for (size_t s = ul_data_symbol_end; s < symbol_num_perframe; s++)
                 sched += "G";
         }
-        frames.push_back(sched);
+        frames_.push_back(sched);
         std::printf("Config: Frame schedule %s (%zu symbols)\n", sched.c_str(),
             sched.size());
     } else {
         json jframes = tddConf.value("frames", json::array());
         for (size_t f = 0; f < jframes.size(); f++) {
-            frames.push_back(jframes.at(f).get<std::string>());
+            frames_.push_back(jframes.at(f).get<std::string>());
         }
     }
 
-    beaconSymbols = Utils::loadSymbols(frames, 'B');
-    pilotSymbols = Utils::loadSymbols(frames, 'P');
-    ULSymbols = Utils::loadSymbols(frames, 'U');
-    DLSymbols = Utils::loadSymbols(frames, 'D');
-    ULCalSymbols = Utils::loadSymbols(frames, 'L');
-    DLCalSymbols = Utils::loadSymbols(frames, 'C');
+    beaconSymbols = Utils::loadSymbols(frames_, 'B');
+    pilotSymbols = Utils::loadSymbols(frames_, 'P');
+    ULSymbols = Utils::loadSymbols(frames_, 'U');
+    DLSymbols = Utils::loadSymbols(frames_, 'D');
+    ULCalSymbols = Utils::loadSymbols(frames_, 'L');
+    DLCalSymbols = Utils::loadSymbols(frames_, 'C');
     recipCalEn = (ULCalSymbols[0].size() > 0 and DLCalSymbols[0].size() > 0);
     ant_per_group = DLCalSymbols[0].size();
     ant_group_num = recipCalEn ? bf_ant_num_ / ant_per_group : 0;
 
-    symbol_num_perframe = frames.at(0).size();
+    symbol_num_perframe = frames_.at(0).size();
     beacon_symbol_num_perframe = beaconSymbols[0].size();
     pilot_symbol_num_perframe = pilotSymbols[0].size();
     data_symbol_num_perframe = symbol_num_perframe - pilot_symbol_num_perframe
         - beacon_symbol_num_perframe;
-    ul_data_symbol_num_perframe = ULSymbols[0].size();
-    dl_data_symbol_num_perframe = DLSymbols[0].size();
-    downlink_mode_ = dl_data_symbol_num_perframe > 0;
-    dl_data_symbol_start
-        = dl_data_symbol_num_perframe > 0 ? DLSymbols[0].front() : 0;
-    dl_data_symbol_end
-        = dl_data_symbol_num_perframe > 0 ? DLSymbols[0].back() + 1 : 0;
+    ul_data_symbol_num_perframe_ = ULSymbols[0].size();
+    dl_data_symbol_num_perframe_ = DLSymbols[0].size();
+    downlink_mode_ = dl_data_symbol_num_perframe_ > 0;
+    dl_data_symbol_start_
+        = dl_data_symbol_num_perframe_ > 0 ? DLSymbols[0].front() : 0;
+    dl_data_symbol_end_
+        = dl_data_symbol_num_perframe_ > 0 ? DLSymbols[0].back() + 1 : 0;
     recip_pilot_symbol_num_perframe = recipCalEn ? 1 : 0;
 
     if (isUE and !freq_orthogonal_pilot
@@ -280,7 +285,7 @@ Config::Config(std::string jsonfile)
         = ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
     packet_length
         = Packet::kOffsetOfData + ((kUse12BitIQ ? 3 : 4) * sampsPerSymbol);
-    dl_packet_length = Packet::kOffsetOfData + sampsPerSymbol * 4;
+    dl_packet_length_ = Packet::kOffsetOfData + (sampsPerSymbol * 4);
     rt_assert(
         packet_length < 9000, "Packet size must be smaller than jumbo frame");
 
@@ -288,11 +293,11 @@ Config::Config(std::string jsonfile)
     data_bytes_num_persymbol = num_bytes_per_cb * ldpc_config_.num_blocks_in_symbol();
     mac_packet_length = data_bytes_num_persymbol;
     mac_payload_length = mac_packet_length - MacPacket::kOffsetOfData;
-    mac_packets_perframe = ul_data_symbol_num_perframe - ul_pilot_syms_;
+    mac_packets_perframe = ul_data_symbol_num_perframe_ - ul_pilot_syms_;
     mac_data_bytes_num_perframe = mac_payload_length * mac_packets_perframe;
     mac_bytes_num_perframe = mac_packet_length * mac_packets_perframe;
 
-    running = true;
+    this->running_.store( true );
     std::printf(
         "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
         "frame,\n\t"
@@ -301,7 +306,7 @@ Config::Config(std::string jsonfile)
         "%zu OFDM subcarriers (%zu data subcarriers), modulation %s,\n\t"
         "%zu MAC data bytes per frame, %zu MAC bytes per frame\n",
         bs_ant_num_, ue_ant_num_, pilot_symbol_num_perframe,
-        ul_data_symbol_num_perframe, dl_data_symbol_num_perframe, ofdm_ca_num_,
+        ul_data_symbol_num_perframe_, dl_data_symbol_num_perframe_, ofdm_ca_num_,
         ofdm_data_num_, modulation.c_str(), mac_data_bytes_num_perframe,
         mac_bytes_num_perframe);
 }
@@ -410,27 +415,27 @@ void Config::genData()
     size_t num_bytes_per_ue = num_bytes_per_cb * ldpc_config_.num_blocks_in_symbol();
     size_t num_bytes_per_ue_pad
         = roundup<64>(num_bytes_per_cb) * ldpc_config_.num_blocks_in_symbol();
-    dl_bits.malloc(dl_data_symbol_num_perframe,
+    dl_bits.malloc(dl_data_symbol_num_perframe_,
         num_bytes_per_ue_pad * ue_ant_num_, Agora_memory::Alignment_t::k64Align);
-    dl_iq_f.calloc(dl_data_symbol_num_perframe, ofdm_ca_num_ * ue_ant_num_,
+    dl_iq_f.calloc(dl_data_symbol_num_perframe_, ofdm_ca_num_ * ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
-    dl_iq_t.calloc(dl_data_symbol_num_perframe, sampsPerSymbol * ue_ant_num_,
+    dl_iq_t.calloc(dl_data_symbol_num_perframe_, sampsPerSymbol * ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
 
-    ul_bits.malloc(ul_data_symbol_num_perframe,
+    ul_bits.malloc(ul_data_symbol_num_perframe_,
         num_bytes_per_ue_pad * ue_ant_num_, Agora_memory::Alignment_t::k64Align);
-    ul_iq_f.calloc(ul_data_symbol_num_perframe, ofdm_ca_num_ * ue_ant_num_,
+    ul_iq_f.calloc(ul_data_symbol_num_perframe_, ofdm_ca_num_ * ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
-    ul_iq_t.calloc(ul_data_symbol_num_perframe, sampsPerSymbol * ue_ant_num_,
+    ul_iq_t.calloc(ul_data_symbol_num_perframe_, sampsPerSymbol * ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
 
 #ifdef GENERATE_DATA
     for (size_t ue_id = 0; ue_id < ue_ant_num_; ue_id++) {
         for (size_t j = 0; j < num_bytes_per_ue_pad; j++) {
             int cur_offset = j * ue_ant_num_ + ue_id;
-            for (size_t i = 0; i < ul_data_symbol_num_perframe; i++)
+            for (size_t i = 0; i < ul_data_symbol_num_perframe_; i++)
                 ul_bits[i][cur_offset] = rand() % mod_order;
-            for (size_t i = 0; i < dl_data_symbol_num_perframe; i++)
+            for (size_t i = 0; i < dl_data_symbol_num_perframe_; i++)
                 dl_bits[i][cur_offset] = rand() % mod_order;
         }
     }
@@ -446,7 +451,7 @@ void Config::genData()
             filename1.c_str(), strerror(errno));
         std::exit(-1);
     }
-    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < ul_data_symbol_num_perframe_; i++) {
         if (fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0)
             return;
         for (size_t j = 0; j < ue_ant_num_; j++) {
@@ -463,7 +468,7 @@ void Config::genData()
             != 0)
             return;
     }
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < dl_data_symbol_num_perframe_; i++) {
         for (size_t j = 0; j < ue_ant_num_; j++) {
             size_t r = std::fread(dl_bits[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
@@ -482,12 +487,12 @@ void Config::genData()
         = ldpc_config_.num_blocks_in_symbol() * ue_ant_num_;
 
     // Encode uplink bits
-    ul_encoded_bits.malloc(ul_data_symbol_num_perframe * num_blocks_per_symbol,
+    ul_encoded_bits.malloc(ul_data_symbol_num_perframe_ * num_blocks_per_symbol,
         encoded_bytes_per_block, Agora_memory::Alignment_t::k64Align);
 
     int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
         ldpc_config_.base_graph(), ldpc_config_.expansion_factor())];
-    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < ul_data_symbol_num_perframe_; i++) {
         for (size_t j = 0; j < ldpc_config_.num_blocks_in_symbol() * ue_ant_num_; j++) {
             ldpc_encode_helper(ldpc_config_.base_graph(), ldpc_config_.expansion_factor(),
                 ldpc_config_.num_rows(),
@@ -496,9 +501,9 @@ void Config::genData()
         }
     }
 
-    ul_mod_input.calloc(ul_data_symbol_num_perframe, ofdm_data_num_ * ue_ant_num_,
+    ul_mod_input.calloc(ul_data_symbol_num_perframe_, ofdm_data_num_ * ue_ant_num_,
         Agora_memory::Alignment_t::k32Align);
-    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < ul_data_symbol_num_perframe_; i++) {
         for (size_t j = 0; j < ue_ant_num_; j++) {
             for (size_t k = 0; k < ldpc_config_.num_blocks_in_symbol(); k++) {
                 adapt_bits_for_mod(
@@ -513,11 +518,11 @@ void Config::genData()
     }
 
     Table<int8_t> dl_encoded_bits;
-    dl_encoded_bits.malloc(dl_data_symbol_num_perframe * num_blocks_per_symbol,
+    dl_encoded_bits.malloc(dl_data_symbol_num_perframe_ * num_blocks_per_symbol,
         encoded_bytes_per_block, Agora_memory::Alignment_t::k64Align);
 
     // Encode downlink bits
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < dl_data_symbol_num_perframe_; i++) {
         for (size_t j = 0; j < ldpc_config_.num_blocks_in_symbol() * ue_ant_num_; j++) {
             ldpc_encode_helper(ldpc_config_.base_graph(), ldpc_config_.expansion_factor(),
                 ldpc_config_.num_rows(),
@@ -526,9 +531,9 @@ void Config::genData()
         }
     }
 
-    dl_mod_input.calloc(dl_data_symbol_num_perframe, ofdm_data_num_ * ue_ant_num_,
+    dl_mod_input.calloc(dl_data_symbol_num_perframe_, ofdm_data_num_ * ue_ant_num_,
         Agora_memory::Alignment_t::k32Align);
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < dl_data_symbol_num_perframe_; i++) {
         for (size_t j = 0; j < ue_ant_num_; j++) {
             for (size_t k = 0; k < ldpc_config_.num_blocks_in_symbol(); k++) {
                 adapt_bits_for_mod(
@@ -544,9 +549,9 @@ void Config::genData()
 
     // Generate freq-domain downlink symbols
     Table<complex_float> dl_iq_ifft;
-    dl_iq_ifft.calloc(dl_data_symbol_num_perframe, ofdm_ca_num_ * ue_ant_num_,
+    dl_iq_ifft.calloc(dl_data_symbol_num_perframe_, ofdm_ca_num_ * ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < dl_data_symbol_num_perframe_; i++) {
         for (size_t u = 0; u < ue_ant_num_; u++) {
             size_t p = u * ofdm_data_num_;
             size_t q = u * ofdm_ca_num_;
@@ -567,9 +572,9 @@ void Config::genData()
 
     // Generate freq-domain uplink symbols
     Table<complex_float> ul_iq_ifft;
-    ul_iq_ifft.calloc(ul_data_symbol_num_perframe, ofdm_ca_num_ * ue_ant_num_,
+    ul_iq_ifft.calloc(ul_data_symbol_num_perframe_, ofdm_ca_num_ * ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
-    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < ul_data_symbol_num_perframe_; i++) {
         for (size_t u = 0; u < ue_ant_num_; u++) {
 
             size_t p = u * ofdm_data_num_;
@@ -589,9 +594,9 @@ void Config::genData()
 
     // Find normalization factor through searching for max value in IFFT results
     float max_val = CommsLib::find_max_abs(
-        ul_iq_ifft, ul_data_symbol_num_perframe, ue_ant_num_ * ofdm_ca_num_);
+        ul_iq_ifft, ul_data_symbol_num_perframe_, ue_ant_num_ * ofdm_ca_num_);
     float cur_max_val = CommsLib::find_max_abs(
-        dl_iq_ifft, dl_data_symbol_num_perframe, ue_ant_num_ * ofdm_ca_num_);
+        dl_iq_ifft, dl_data_symbol_num_perframe_, ue_ant_num_ * ofdm_ca_num_);
     if (cur_max_val > max_val)
         max_val = cur_max_val;
     cur_max_val
@@ -605,7 +610,7 @@ void Config::genData()
     scale = 2 * max_val; // additional 2^2 (6dB) power backoff
 
     // Generate time domain symbols for downlink
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < dl_data_symbol_num_perframe_; i++) {
         for (size_t u = 0; u < ue_ant_num_; u++) {
             size_t q = u * ofdm_ca_num_;
             size_t r = u * sampsPerSymbol;
@@ -615,7 +620,7 @@ void Config::genData()
     }
 
     // Generate time domain uplink symbols
-    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < ul_data_symbol_num_perframe_; i++) {
         for (size_t u = 0; u < ue_ant_num_; u++) {
             size_t q = u * ofdm_ca_num_;
             size_t r = u * sampsPerSymbol;
@@ -697,7 +702,7 @@ int Config::getSymbolId(size_t symbol_id)
 
 size_t Config::get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
 {
-    size_t fid = frame_id % frames.size();
+    size_t fid = frame_id % frames_.size();
     const auto it
         = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
     if (it != DLSymbols[fid].end())
@@ -708,7 +713,7 @@ size_t Config::get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
 
 size_t Config::get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const
 {
-    size_t fid = frame_id % frames.size();
+    size_t fid = frame_id % frames_.size();
     const auto it
         = find(pilotSymbols[fid].begin(), pilotSymbols[fid].end(), symbol_id);
     if (it != pilotSymbols[fid].end()) {
@@ -723,7 +728,7 @@ size_t Config::get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const
 
 size_t Config::get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const
 {
-    size_t fid = frame_id % frames.size();
+    size_t fid = frame_id % frames_.size();
     const auto it
         = find(ULSymbols[fid].begin(), ULSymbols[fid].end(), symbol_id);
     if (it != ULSymbols[fid].end()) {
@@ -739,8 +744,8 @@ size_t Config::get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const
 bool Config::isPilot(size_t frame_id, size_t symbol_id)
 {
     assert(symbol_id < symbol_num_perframe);
-    size_t fid = frame_id % frames.size();
-    char s = frames[fid].at(symbol_id);
+    size_t fid = frame_id % frames_.size();
+    char s = frames_[fid].at(symbol_id);
 #ifdef DEBUG3
     std::printf("isPilot(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
@@ -751,7 +756,7 @@ bool Config::isPilot(size_t frame_id, size_t symbol_id)
         if (it != DLSymbols[fid].end())
             ind = it - DLSymbols[fid].begin();
         return (ind < (int)dl_pilot_syms_);
-        // return cfg->frames[fid].at(symbol_id) == 'P' ? true : false;
+        // return cfg->frames_[fid].at(symbol_id) == 'P' ? true : false;
     } else
         return s == 'P';
     // return (symbol_id < ue_num_);
@@ -762,7 +767,7 @@ bool Config::isCalDlPilot(size_t frame_id, size_t symbol_id)
     assert(symbol_id < symbol_num_perframe);
     if (isUE)
         return false;
-    return frames[frame_id % frames.size()].at(symbol_id) == 'C';
+    return frames_[frame_id % frames_.size()].at(symbol_id) == 'C';
 }
 
 bool Config::isCalUlPilot(size_t frame_id, size_t symbol_id)
@@ -770,13 +775,13 @@ bool Config::isCalUlPilot(size_t frame_id, size_t symbol_id)
     assert(symbol_id < symbol_num_perframe);
     if (isUE)
         return false;
-    return frames[frame_id % frames.size()].at(symbol_id) == 'L';
+    return frames_[frame_id % frames_.size()].at(symbol_id) == 'L';
 }
 
 bool Config::isUplink(size_t frame_id, size_t symbol_id)
 {
     assert(symbol_id < symbol_num_perframe);
-    char s = frames[frame_id % frames.size()].at(symbol_id);
+    char s = frames_[frame_id % frames_.size()].at(symbol_id);
 #ifdef DEBUG3
     std::printf("isUplink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
@@ -786,7 +791,7 @@ bool Config::isUplink(size_t frame_id, size_t symbol_id)
 bool Config::isDownlink(size_t frame_id, size_t symbol_id)
 {
     assert(symbol_id < symbol_num_perframe);
-    char s = frames[frame_id % frames.size()].at(symbol_id);
+    char s = frames_[frame_id % frames_.size()].at(symbol_id);
 #ifdef DEBUG3
     std::printf("isDownlink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
@@ -799,7 +804,7 @@ bool Config::isDownlink(size_t frame_id, size_t symbol_id)
 SymbolType Config::get_symbol_type(size_t frame_id, size_t symbol_id)
 {
     assert(!isUE); // Currently implemented for only the Agora server
-    char s = frames[frame_id % frames.size()][symbol_id];
+    char s = frames_[frame_id % frames_.size()][symbol_id];
     switch (s) {
     case 'B':
         return SymbolType::kBeacon;

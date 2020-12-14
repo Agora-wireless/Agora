@@ -73,7 +73,7 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
         arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
     }
 
-    if (cfg->dl_data_symbol_num_perframe > 0) {
+    if (cfg->dl_data_symbol_num_perframe() > 0) {
         arma::cx_fvec vec_calib(reinterpret_cast<arma::cx_float*>(calib_ptr),
             cfg->bf_ant_num(), false);
 
@@ -203,7 +203,7 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
             cfg->bs_ant_num(), cfg->ue_num(), false);
 
-        if (cfg->dl_data_symbol_num_perframe > 0) {
+        if (cfg->dl_data_symbol_num_perframe() > 0) {
             arma::cx_fvec calib_vec(
                 reinterpret_cast<arma::cx_float*>(calib_gather_buffer),
                 cfg->bf_ant_num(), false);

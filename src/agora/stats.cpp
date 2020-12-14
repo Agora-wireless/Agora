@@ -560,12 +560,12 @@ void Stats::print_summary()
 
     if (c->downlink_mode() == true) {
         double precode_frames = (double)num_precode_tasks / c->ofdm_data_num()
-            / c->dl_data_symbol_num_perframe;
+            / c->dl_data_symbol_num_perframe();
         double ifft_frames = (double)num_ifft_tasks / c->bs_ant_num()
-            / c->dl_data_symbol_num_perframe;
+            / c->dl_data_symbol_num_perframe();
         double encode_frames = (double)num_encode_tasks
             / c->ldpc_config().num_blocks_in_symbol() / c->ue_num()
-            / c->dl_data_symbol_num_perframe;
+            / c->dl_data_symbol_num_perframe();
         std::printf("Downlink totals (tasks, frames): ");
         std::printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
         std::printf("ZF (%zu, %.2f), ", num_zf_tasks, zf_frames);
@@ -599,12 +599,12 @@ void Stats::print_summary()
         }
     } else {
         double fft_frames = (double)num_fft_tasks / c->bs_ant_num()
-            / c->ul_data_symbol_num_perframe;
+            / c->ul_data_symbol_num_perframe();
         double demul_frames = (double)num_demul_tasks / c->ofdm_data_num()
-            / c->ul_data_symbol_num_perframe;
+            / c->ul_data_symbol_num_perframe();
         double decode_frames = (double)num_decode_tasks
             / c->ldpc_config().num_blocks_in_symbol() / c->ue_num()
-            / c->ul_data_symbol_num_perframe;
+            / c->ul_data_symbol_num_perframe();
         std::printf("Uplink totals (tasks, frames): ");
         std::printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
         std::printf("ZF (%zu, %.2f), ", num_zf_tasks, zf_frames);

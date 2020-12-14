@@ -171,7 +171,7 @@ void Phy_UE::schedule_task(Event_data do_task,
 void Phy_UE::stop()
 {
     std::cout << "stopping threads " << std::endl;
-    config_->running = false;
+    config_->running( false );
     usleep(1000);
     ru_.reset();
 }
@@ -214,7 +214,7 @@ void Phy_UE::start()
     max_equaled_frame = 0;
     size_t frame_id, symbol_id, ant_id;
     size_t cur_frame_id = 0;
-    while (config_->running && !SignalHandler::gotExitSignal()) {
+    while ((config_->running() == true) && (SignalHandler::gotExitSignal() == false)) {
         // get a bulk of events
         ret = message_queue_.try_dequeue_bulk(
             ctok, events_list, kDequeueBulkSizeTXRX);
@@ -577,7 +577,7 @@ void Phy_UE::taskThread(int tid)
     // task_ptok[tid].reset(new moodycamel::ProducerToken(message_queue_));
 
     Event_data event;
-    while (config_->running) {
+    while (config_->running() == true) {
         if (decode_queue_.try_dequeue(event))
             doDecode(tid, event.tags[0]);
         else if (demul_queue_.try_dequeue(event))
@@ -1097,8 +1097,8 @@ void Phy_UE::initialize_vars_from_cfg(void)
 {
     dl_pilot_symbol_perframe = config_->dl_pilot_syms();
     ul_pilot_symbol_perframe = config_->ul_pilot_syms();
-    ul_symbol_perframe = config_->ul_data_symbol_num_perframe;
-    dl_symbol_perframe = config_->dl_data_symbol_num_perframe;
+    ul_symbol_perframe = config_->ul_data_symbol_num_perframe();
+    dl_symbol_perframe = config_->dl_data_symbol_num_perframe();
     dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe;
     ul_data_symbol_perframe = ul_symbol_perframe - ul_pilot_symbol_perframe;
     nCPUs = std::thread::hardware_concurrency();

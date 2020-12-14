@@ -253,9 +253,9 @@ bool ClientRadioConfig::radioStart()
     std::vector<std::string> _tddSched;
     _tddSched.resize(this->_radioNum);
     for (size_t r = 0; r < _radioNum; r++) {
-        _tddSched[r] = _cfg->frames[0];
-        for (size_t s = 0; s < _cfg->frames[0].size(); s++) {
-            char c = _cfg->frames[0].at(s);
+        _tddSched[r] = _cfg->frames().at(0);
+        for (size_t s = 0; s < _cfg->frames().at(0).size(); s++) {
+            char c = _cfg->frames().at(0).at(s);
             if (c == 'P'
                 and ((_cfg->nChannels == 1 and _cfg->pilotSymbols[0][r] != s)
                         or (_cfg->nChannels == 2

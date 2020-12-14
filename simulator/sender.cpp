@@ -376,7 +376,7 @@ size_t Sender::get_max_symbol_id() const
 {
     size_t max_symbol_id = cfg->downlink_mode()
         ? cfg->pilot_symbol_num_perframe
-        : cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe;
+        : cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe();
     return max_symbol_id;
 }
 

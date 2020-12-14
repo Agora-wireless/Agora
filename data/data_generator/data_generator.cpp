@@ -286,10 +286,10 @@ int main(int argc, char* argv[])
 
     // Prepare downlink data from mod_output
     Table<complex_float> dl_mod_data;
-    dl_mod_data.calloc(cfg->dl_data_symbol_num_perframe,
+    dl_mod_data.calloc(cfg->dl_data_symbol_num_perframe(),
         cfg->ofdm_ca_num() * cfg->ue_ant_num(),
         Agora_memory::Alignment_t::k64Align);
-    for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe(); i++) {
         for (size_t j = 0; j < cfg->ue_ant_num(); j++) {
             if (cfg->dl_pilot_syms() > 0 and i <= cfg->dl_pilot_syms() - 1) {
                 for (size_t sc_id = 0; sc_id < cfg->ofdm_data_num(); sc_id++)
@@ -308,7 +308,7 @@ int main(int argc, char* argv[])
     }
 
     // std::printf("dl mod data \n");
-    // for (int i = 0; i < dl_data_symbol_num_perframe; i++) {
+    // for (int i = 0; i < dl_data_symbol_num_perframe(); i++) {
     //     for (int k = cfg->ofdm_data_start(); k < cfg->ofdm_data_start() + cfg->ofdm_data_num();
     //          k++) {
     //         std::printf("symbol %d, subcarrier %d\n", i, k);
@@ -325,14 +325,14 @@ int main(int argc, char* argv[])
 
     // Perform precoding and IFFT
     Table<complex_float> dl_ifft_data;
-    dl_ifft_data.calloc(cfg->dl_data_symbol_num_perframe,
+    dl_ifft_data.calloc(cfg->dl_data_symbol_num_perframe(),
         cfg->ofdm_ca_num() * cfg->bs_ant_num(),
         Agora_memory::Alignment_t::k64Align);
     Table<short> dl_tx_data;
-    dl_tx_data.calloc(cfg->dl_data_symbol_num_perframe,
+    dl_tx_data.calloc(cfg->dl_data_symbol_num_perframe(),
         2 * cfg->sampsPerSymbol * cfg->bs_ant_num(),
         Agora_memory::Alignment_t::k64Align);
-    for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe(); i++) {
         arma::cx_fmat mat_input_data(
             reinterpret_cast<arma::cx_float*>(dl_mod_data[i]), cfg->ofdm_ca_num(),
             cfg->ue_ant_num(), false);
@@ -384,7 +384,7 @@ int main(int argc, char* argv[])
         + std::to_string(cfg->bs_ant_num()) + ".bin";
     std::printf("Saving dl tx data to %s\n", filename_dl_tx.c_str());
     FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
-    for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
+    for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe(); i++) {
         short* ptr = (short*)dl_tx_data[i];
         fwrite(ptr, cfg->sampsPerSymbol * cfg->bs_ant_num() * 2, sizeof(short),
             fp_dl_tx);

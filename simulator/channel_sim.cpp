@@ -43,9 +43,9 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     // initialize parameters from config
     srand(time(NULL));
     dl_data_plus_beacon_symbols
-        = bscfg->dl_data_symbol_num_perframe + 1; // plus beacon
+        = bscfg->dl_data_symbol_num_perframe() + 1; // plus beacon
     ul_data_plus_pilot_symbols
-        = bscfg->ul_data_symbol_num_perframe + bscfg->pilot_symbol_num_perframe;
+        = bscfg->ul_data_symbol_num_perframe() + bscfg->pilot_symbol_num_perframe;
 
     socket_bs_.resize(bs_socket_num);
     servaddr_bs_.resize(bs_socket_num);

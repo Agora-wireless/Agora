@@ -373,7 +373,7 @@ Event_data DoIFFT::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     struct Packet* pkt
-        = (struct Packet*)&dl_socket_buffer_[offset * cfg->dl_packet_length];
+        = (struct Packet*)&dl_socket_buffer_[offset * cfg->dl_packet_length()];
     short* socket_ptr = &pkt->data[2 * cfg->ofdm_tx_zero_prefix_];
 
     // IFFT scaled results by ofdm_ca_num(), we scale down IFFT results

@@ -3,7 +3,7 @@
 void read_from_file_ul(std::string filename, Table<uint8_t>& data,
     int num_bytes_per_ue, Config* cfg)
 {
-    int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
+    int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe();
     size_t ue_num = cfg->ue_num();
     FILE* fp = std::fopen(filename.c_str(), "rb");
     if (fp == NULL) {
@@ -35,7 +35,7 @@ void read_from_file_ul(std::string filename, Table<uint8_t>& data,
 void read_from_file_dl(
     std::string filename, Table<short>& data, int ofdm_size, Config* cfg)
 {
-    int data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe;
+    int data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe();
     size_t bs_ant_num = cfg->bs_ant_num();
     FILE* fp = std::fopen(filename.c_str(), "rb");
     if (fp == NULL) {
@@ -54,7 +54,7 @@ void read_from_file_dl(
 void check_correctness_ul(Config* cfg)
 {
     int ue_num = cfg->ue_num();
-    int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
+    int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe();
     int ofdm_data_num = cfg->ofdm_data_num();
     int ul_pilot_syms = cfg->ul_pilot_syms();
 
@@ -109,7 +109,7 @@ void check_correctness_ul(Config* cfg)
 void check_correctness_dl(Config* cfg)
 {
     int bs_ant_num = cfg->bs_ant_num();
-    int data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe;
+    int data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe();
     int ofdm_ca_num = cfg->ofdm_ca_num();
     int sampsPerSymbol = cfg->sampsPerSymbol;
 

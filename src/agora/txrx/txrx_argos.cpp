@@ -19,7 +19,7 @@ void PacketTXRX::loop_tx_rx_argos(int tid)
 
     int prev_frame_id = -1;
     int radio_id = radio_lo;
-    while (cfg->running) {
+    while (cfg->running() == true) {
         if (-1 != dequeue_send_argos(tid))
             continue;
         // receive data
@@ -58,7 +58,7 @@ struct Packet* PacketTXRX::recv_enqueue_argos(
         if (rx_buffer_status[rx_offset + ch] == 1) {
             std::printf(
                 "TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
-            cfg->running = false;
+            cfg->running( false );
             break;
         }
         pkt[ch] = (struct Packet*)&rx_buffer[(rx_offset + ch) * packet_length];
@@ -66,7 +66,7 @@ struct Packet* PacketTXRX::recv_enqueue_argos(
     }
 
     long long frameTime;
-    if (!cfg->running
+    if ((cfg->running() == false)
         || radioconfig_->radioRx(radio_id, samp, frameTime) <= 0) {
         return NULL;
     }
@@ -140,7 +140,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
         else
             txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx];
     } else {
-        char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length;
+        char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length();
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
         txbuf[ch] = (void*)pkt->data;
     }

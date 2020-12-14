@@ -89,28 +89,24 @@ public:
     std::vector<std::string> radio_ids;
     std::vector<std::string> hub_ids;
 
-    // A string in \p frames contains letters representing the symbol types in
-    // the frame (e.g., 'P' for pilot symbols, 'U' for uplink data symbols)
-    std::vector<std::string> frames;
-
-    // beaconSymbols[i] contains IDs of beacon symbols in frames[i]
+    // beaconSymbols[i] contains IDs of beacon symbols in frames_[i]
     std::vector<std::vector<size_t>> beaconSymbols;
 
-    // pilotSymbols[i] contains IDs of pilot symbols in frames[i]
+    // pilotSymbols[i] contains IDs of pilot symbols in frames_[i]
     std::vector<std::vector<size_t>> pilotSymbols;
 
-    // ULSymbols[i] contains IDs of uplink data symbols in frames[i]
+    // ULSymbols[i] contains IDs of uplink data symbols in frames_[i]
     std::vector<std::vector<size_t>> ULSymbols;
 
-    // DLSymbols[i] contains IDs of downlink data symbols in frames[i]
+    // DLSymbols[i] contains IDs of downlink data symbols in frames_[i]
     std::vector<std::vector<size_t>> DLSymbols;
 
     // ULCalSymbols[i] contains IDs of uplink calibration symbols in
-    // frames[i]
+    // frames_[i]
     std::vector<std::vector<size_t>> ULCalSymbols;
 
     // DLCalSymbols[i] contains IDs of downlink calibration symbols in
-    // frames[i]
+    // frames_[i]
     std::vector<std::vector<size_t>> DLCalSymbols;
 
     // Controls whether the synchronization and frame time keeping is done
@@ -128,7 +124,7 @@ public:
     std::vector<uint32_t> beacon;
     complex_float* pilots_;
     complex_float* pilots_sgn_;
-    Table<int8_t> dl_bits;
+    //Table<int8_t> dl_bits;
     Table<int8_t> ul_bits;
     Table<int8_t> ul_encoded_bits;
     Table<uint8_t> ul_mod_input;
@@ -232,7 +228,6 @@ public:
     // sent by Agora. This includes Agora's packet header, but not the
     // Ethernet/IP/UDP headers.
     size_t packet_length;
-    size_t dl_packet_length;
 
     int cl_tx_advance;
     // Indicates all UEs that are in this experiment,
@@ -260,8 +255,6 @@ public:
     // Total number of pilot symbols in a frame
     size_t recip_pilot_symbol_num_perframe;
 
-    size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
-    size_t dl_data_symbol_start, dl_data_symbol_end;
     bool bigstation_mode; // If true, use pipeline-parallel scheduling
     bool correct_phase_shift; // If true, do phase shift correction
 
@@ -314,7 +307,7 @@ public:
     int mac_tx_port;
     bool init_mac_running;
 
-    // Number of frames sent by sender during testing = number of frames
+    // Number of frames_ sent by sender during testing = number of frames_
     // processed by Agora before exiting.
     size_t frames_to_test;
 
@@ -331,10 +324,9 @@ public:
     bool isUE;
     const size_t maxFrame = 1 << 30;
     const size_t data_offset = sizeof(int) * 16;
-    // int dl_data_symbol_perframe;
-    std::atomic<bool> running;
 
-    size_t getNumAntennas() { return nRadios * nChannels; }
+    size_t getNumAntennas( void ) { return (nRadios * nChannels); }
+    
     int getSymbolId(size_t symbol_id);
 
     // Get the index of this downlink symbol among this frame's downlink symbols
@@ -352,11 +344,11 @@ public:
     bool isDownlink(size_t, size_t);
     bool isUplink(size_t, size_t);
 
-    /// Return the single-gain control decision
-    inline bool single_gain(void) const { return this->single_gain_; }
-
     /// Return the symbol type of this symbol in this frame
     SymbolType get_symbol_type(size_t frame_id, size_t symbol_id);
+
+    /// Return the single-gain control decision
+    inline bool single_gain( void ) const { return this->single_gain_; }
 
     inline void update_mod_cfgs(size_t new_mod_order_bits)
     {
@@ -367,36 +359,36 @@ public:
             (ofdm_data_num_ * mod_order_bits) / this->ldpc_config_.num_cb_codew_len() );
     }
 
-    /// Return total number of data symbols of all frames in a buffer
-    /// that holds data of kFrameWnd frames
+    /// Return total number of data symbols of all frames_ in a buffer
+    /// that holds data of kFrameWnd frames_
     inline size_t get_total_data_symbol_idx(
         size_t frame_id, size_t symbol_id) const
     {
         return ((frame_id % kFrameWnd) * data_symbol_num_perframe) + symbol_id;
     }
 
-    /// Return total number of uplink data symbols of all frames in a buffer
-    /// that holds data of kFrameWnd frames
+    /// Return total number of uplink data symbols of all frames_ in a buffer
+    /// that holds data of kFrameWnd frames_
     inline size_t get_total_data_symbol_idx_ul(
         size_t frame_id, size_t symbol_idx_ul) const
     {
-        return ((frame_id % kFrameWnd) * ul_data_symbol_num_perframe)
+        return ((frame_id % kFrameWnd) * ul_data_symbol_num_perframe_)
             + symbol_idx_ul;
     }
 
-    /// Return total number of downlink data symbols of all frames in a buffer
-    /// that holds data of kFrameWnd frames
+    /// Return total number of downlink data symbols of all frames_ in a buffer
+    /// that holds data of kFrameWnd frames_
     inline size_t get_total_data_symbol_idx_dl(
         size_t frame_id, size_t symbol_idx_dl) const
     {
-        return ((frame_id % kFrameWnd) * dl_data_symbol_num_perframe)
+        return ((frame_id % kFrameWnd) * dl_data_symbol_num_perframe_)
             + symbol_idx_dl;
     }
 
     /// Return the frame duration in seconds
     inline double get_frame_duration_sec( void )
     {
-        return symbol_num_perframe * sampsPerSymbol / rate;
+        return ((symbol_num_perframe * sampsPerSymbol) / rate);
     }
 
     /// Fetch the data buffer for this frame and symbol ID. The symbol must
@@ -405,7 +397,7 @@ public:
         size_t frame_id, size_t symbol_id) const
     {
         size_t frame_slot = frame_id % kFrameWnd;
-        size_t symbol_offset = (frame_slot * ul_data_symbol_num_perframe)
+        size_t symbol_offset = (frame_slot * ul_data_symbol_num_perframe_)
             + get_ul_symbol_idx(frame_id, symbol_id);
         return data_buffers[symbol_offset];
     }
@@ -468,22 +460,33 @@ public:
     void genData(void);
     ~Config(void);
 
-    inline size_t bs_ant_num( void ) const { return this->bs_ant_num_; }
-    inline void   bs_ant_num( size_t n_bs_ant ) { this->bs_ant_num_ = n_bs_ant; } 
-    inline size_t bf_ant_num( void ) const { return this->bf_ant_num_; } 
-    inline size_t ue_num( void ) const { return this->ue_num_; } 
-    inline size_t ue_ant_num( void ) const { return this->ue_ant_num_; } 
-    inline size_t ofdm_ca_num( void ) const { return this->ofdm_ca_num_; } 
-    inline size_t cp_len( void ) const { return this->cp_len_; } 
-    inline size_t ofdm_data_num( void ) const { return this->ofdm_data_num_; } 
-    inline size_t ofdm_data_start( void ) const { return this->ofdm_data_start_; } 
-    inline size_t ofdm_data_stop( void ) const { return this->ofdm_data_stop_; } 
+    inline size_t bs_ant_num( void )         const { return this->bs_ant_num_; }
+    inline void   bs_ant_num( size_t n_bs_ant ) { this->bs_ant_num_ = n_bs_ant; }
+
+    inline size_t bf_ant_num( void )         const { return this->bf_ant_num_; } 
+    inline size_t ue_num( void )             const { return this->ue_num_; } 
+    inline size_t ue_ant_num( void )         const { return this->ue_ant_num_; } 
+    inline size_t ofdm_ca_num( void )        const { return this->ofdm_ca_num_; } 
+    inline size_t cp_len( void )             const { return this->cp_len_; } 
+    inline size_t ofdm_data_num( void )      const { return this->ofdm_data_num_; } 
+    inline size_t ofdm_data_start( void )    const { return this->ofdm_data_start_; } 
+    inline size_t ofdm_data_stop( void )     const { return this->ofdm_data_stop_; } 
     inline size_t ofdm_pilot_spacing( void ) const { return this->ofdm_pilot_spacing_; } 
-    inline size_t dl_pilot_syms( void ) const { return this->dl_pilot_syms_; } 
-    inline size_t ul_pilot_syms( void ) const { return this->ul_pilot_syms_; }
 
     inline bool   downlink_mode( void )           const { return this->downlink_mode_; }
     inline const  LDPCconfig& ldpc_config( void ) const { return this->ldpc_config_; }
+    inline const  std::vector<std::string>& frames( void ) const { return this->frames_; }
+
+    inline void   running( bool value ) { this->running_.store(value); }
+    inline bool   running( void ) const { return this->running_.load(); }
+
+    inline size_t ul_data_symbol_num_perframe( void ) const { return this->ul_data_symbol_num_perframe_; }
+    inline size_t ul_pilot_syms( void )               const { return this->ul_pilot_syms_; }
+    inline size_t dl_data_symbol_num_perframe( void ) const { return this->dl_data_symbol_num_perframe_; }
+    inline size_t dl_data_symbol_start( void )        const { return this->dl_data_symbol_start_; }
+    inline size_t dl_data_symbol_end( void )          const { return this->dl_data_symbol_end_; }
+    inline size_t dl_pilot_syms( void )               const { return this->dl_pilot_syms_; }
+    inline size_t dl_packet_length( void )            const { return this->dl_packet_length_; }
 
 private:
     size_t bs_ant_num_; // Total number of BS antennas
@@ -510,11 +513,26 @@ private:
     size_t ofdm_data_stop_;
 
     size_t ofdm_pilot_spacing_;
-    size_t dl_pilot_syms_;
-    size_t ul_pilot_syms_;
 
     bool downlink_mode_; // If true, the frame contains downlink symbols
 
     LDPCconfig ldpc_config_; // LDPC parameters
+
+    // A string in \p frames_ contains letters representing the symbol types in
+    // the frame (e.g., 'P' for pilot symbols, 'U' for uplink data symbols)
+    std::vector<std::string> frames_;
+
+    std::atomic<bool> running_;
+
+    /* Downlink / uplink tracking variables */
+    size_t ul_data_symbol_num_perframe_;
+    size_t ul_pilot_syms_;
+
+    size_t dl_data_symbol_num_perframe_;
+    size_t dl_data_symbol_start_;
+    size_t dl_data_symbol_end_;
+
+    size_t dl_pilot_syms_;
+    size_t dl_packet_length_;
 };
 #endif

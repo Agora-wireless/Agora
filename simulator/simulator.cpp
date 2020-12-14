@@ -39,7 +39,7 @@ Simulator::~Simulator() { free_uplink_buffers(); }
 void Simulator::stop()
 {
     std::cout << "stopping threads " << std::endl;
-    config_->running = false;
+    config_->running( false );
     usleep(1000);
     receiver_.reset();
     sender_.reset();
@@ -47,7 +47,7 @@ void Simulator::stop()
 
 void Simulator::start()
 {
-    config_->running = true;
+    config_->running( true );
     /* start receiver */
     std::vector<pthread_t> rx_threads
         = receiver_->startRecv(socket_buffer_, socket_buffer_status_,
@@ -68,7 +68,7 @@ void Simulator::start()
 
     /* start transmitter */
     sender_->startTXfromMain(frame_start_tx, frame_end_tx);
-    while (config_->running && !SignalHandler::gotExitSignal()) {
+    while ( (config_->running() == true) && (SignalHandler::gotExitSignal() == false) ) {
         /* get a bulk of events */
         ret = 0;
         ret = message_queue_.try_dequeue_bulk(
@@ -183,10 +183,10 @@ void Simulator::initialize_vars_from_cfg(Config* cfg)
     ofdm_data_num_ = cfg->ofdm_data_num();
     symbol_num_perframe = cfg->symbol_num_perframe;
     data_symbol_num_perframe = cfg->data_symbol_num_perframe;
-    ul_data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe;
-    dl_data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe;
-    dl_data_symbol_start = cfg->dl_data_symbol_start;
-    dl_data_symbol_end = cfg->dl_data_symbol_end;
+    ul_data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe();
+    dl_data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe();
+    dl_data_symbol_start = cfg->dl_data_symbol_start();
+    dl_data_symbol_end = cfg->dl_data_symbol_end();
     packet_length = cfg->packet_length;
 
     demul_block_size = cfg->demul_block_size;

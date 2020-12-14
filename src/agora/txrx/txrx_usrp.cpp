@@ -59,7 +59,7 @@ void PacketTXRX::loop_tx_rx_usrp(int tid)
 
     int prev_frame_id = -1;
     int radio_id = radio_lo;
-    while (cfg->running) {
+    while (cfg->running() == true) {
 
         // transmit data
         // if (-1 != dequeue_send_usrp(tid))
@@ -133,7 +133,7 @@ struct Packet* PacketTXRX::recv_enqueue_usrp(
         if (rx_buffer_status[rx_offset + ch] == 1) {
             std::printf("Receive thread %d rx_buffer full, offset: %d\n", tid,
                 rx_offset);
-            cfg->running = false;
+            cfg->running( false );
             break;
         }
         pkt[ch] = (struct Packet*)&rx_buffer[(rx_offset + ch) * packet_length];
@@ -149,7 +149,7 @@ struct Packet* PacketTXRX::recv_enqueue_usrp(
         tmp_ret = radioconfig_->radioRx(radio_id, samp_buffer.data(), rxTimeBs);
     }
 
-    if (!cfg->running || tmp_ret <= 0
+    if ((cfg->running() == false) || tmp_ret <= 0
         || (!cfg->isPilot(frame_id, symbol_id)
                && !cfg->isUplink(frame_id, symbol_id))) {
         return NULL;

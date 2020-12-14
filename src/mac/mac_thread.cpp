@@ -203,7 +203,7 @@ void MacThread::process_control_information()
         return; // No data received
     } else if (ret == -1) {
         // There was an error in receiving
-        cfg_->running = false;
+        cfg_->running( false );
         return;
     }
 
@@ -222,7 +222,7 @@ void MacThread::process_udp_packets_from_apps(RBIndicator ri)
         return; // No data received
     } else if (ret == -1) {
         // There was an error in receiving
-        cfg_->running = false;
+        cfg_->running( false );
         return;
     }
     rt_assert(static_cast<size_t>(ret) == cfg_->mac_data_bytes_num_perframe);
@@ -245,7 +245,7 @@ void MacThread::process_udp_packets_from_apps_server(
     if ((*dl_bits_buffer_status_)[pkt->ue_id][rx_offset] == 1) {
         MLPD_ERROR("MAC thread: dl_bits_buffer full, offset %zu. Exiting.\n",
             rx_offset);
-        cfg_->running = false;
+        cfg_->running(false);
         return;
     }
 
@@ -332,7 +332,7 @@ void MacThread::run_event_loop()
     pin_to_core_with_offset(
         ThreadType::kWorkerMacTXRX, core_offset_, 0 /* thread ID */);
 
-    while (cfg_->running) {
+    while (cfg_->running() == true) {
         process_rx_from_master();
 
         if (mode_ == Mode::kServer) {

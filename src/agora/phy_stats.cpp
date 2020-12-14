@@ -4,7 +4,7 @@ PhyStats::PhyStats(Config* cfg)
     : config_(cfg)
 {
     const size_t task_buffer_symbol_num_ul
-        = cfg->ul_data_symbol_num_perframe * kFrameWnd;
+        = cfg->ul_data_symbol_num_perframe() * kFrameWnd;
     decoded_bits_count_.calloc(cfg->ue_num(), task_buffer_symbol_num_ul,
         Agora_memory::Alignment_t::k64Align);
     bit_error_count_.calloc(cfg->ue_num(), task_buffer_symbol_num_ul,
@@ -23,7 +23,7 @@ PhyStats::PhyStats(Config* cfg)
     evm_buffer_.calloc(
         kFrameWnd, cfg->ue_ant_num(), Agora_memory::Alignment_t::k64Align);
 
-    if (cfg->ul_data_symbol_num_perframe > 0) {
+    if (cfg->ul_data_symbol_num_perframe() > 0) {
         auto ul_iq_f_ptr
             = reinterpret_cast<cx_float*>(cfg->ul_iq_f[cfg->ul_pilot_syms()]);
         cx_fmat ul_iq_f_mat(
@@ -55,7 +55,7 @@ void PhyStats::print_phy_stats()
 {
     auto& cfg = config_;
     const size_t task_buffer_symbol_num_ul
-        = cfg->ul_data_symbol_num_perframe * kFrameWnd;
+        = cfg->ul_data_symbol_num_perframe() * kFrameWnd;
     for (size_t ue_id = 0; ue_id < cfg->ue_num(); ue_id++) {
         size_t total_decoded_bits(0);
         size_t total_bit_errors(0);
@@ -123,7 +123,7 @@ void PhyStats::update_pilot_snr(
 
 void PhyStats::update_evm_stats(size_t frame_id, size_t sc_id, cx_fmat eq)
 {
-    if (this->config_->ul_data_symbol_num_perframe > 0) {
+    if (this->config_->ul_data_symbol_num_perframe() > 0) {
         fmat evm = abs(eq - ul_gt_mat_.col(sc_id));
         fmat cur_evm_mat(
             evm_buffer_[frame_id % kFrameWnd], config_->ue_num(), 1, false);
