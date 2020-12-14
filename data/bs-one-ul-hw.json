@@ -4,10 +4,11 @@
  "cells" : 1,
  "channel" : "AB",
  "frequency" : 3.56e9,
- "rxgainA" : 20,
- "txgainA" : 35,
- "rxgainB" : 20,
- "txgainB" : 35,
+ "single_gain" : false,
+ "rx_gain_a" : 20,
+ "tx_gain_a" : 40,
+ "rx_gain_b" : 20,
+ "tx_gain_b" : 40,
  "rate" : 5e6,
  "ofdm_tx_zero_prefix" : 160,
  "ofdm_tx_zero_postfix" : 160,
@@ -22,6 +23,7 @@
      "BGGGGGPGGUUUUG"
  ],
  "downlink_mode": false,
+ "modulation" : "16QAM",
  "client_ul_pilot_syms" : 2,
  "worker_thread_num" : 25,
  "demul_block_size" : 48

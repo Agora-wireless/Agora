@@ -16,12 +16,12 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kEncode, in_tid);
-    parity_buffer = reinterpret_cast<int8_t*>(
+    parity_buffer = static_cast<int8_t*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             ldpc_encoding_parity_buf_size(
                 cfg->ldpc_config().base_graph(), cfg->ldpc_config().expansion_factor())));
     assert(parity_buffer != nullptr);
-    encoded_buffer_temp = reinterpret_cast<int8_t*>(
+    encoded_buffer_temp = static_cast<int8_t*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             ldpc_encoding_encoded_buf_size(
                 cfg->ldpc_config().base_graph(), cfg->ldpc_config().expansion_factor())));
@@ -55,7 +55,6 @@ Event_data DoEncode::launch(size_t tag)
     int8_t* input_ptr
         = cfg->get_info_bits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
 
-    //printf("^^^^^^^^^^^^^Sizes %d, %d, %zu", LDPC_config.base_graph(), LDPC_config.expansion_factor(), LDPC_config.num_rows());
     ldpc_encode_helper(LDPC_config.base_graph(), LDPC_config.expansion_factor(), LDPC_config.num_rows(),
         encoded_buffer_temp, parity_buffer, input_ptr); /* overrun */
     int8_t* final_output_ptr = cfg->get_encoded_buf(
@@ -93,9 +92,8 @@ DoDecode::DoDecode(Config* in_config, int in_tid,
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
-    resp_var_nodes = reinterpret_cast<int16_t*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
-            1024 * 1024 * sizeof(int16_t)));
+    resp_var_nodes = static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(
+        Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
 }
 
 DoDecode::~DoDecode( void ) { std::free(resp_var_nodes); }

@@ -10,6 +10,10 @@
 #include <immintrin.h>
 #include <iostream>
 
+#define BPSK_LEVEL M_SQRT1_2
+#define QPSK_LEVEL M_SQRT1_2
+
+#define SCALE_BYTE_CONV_QPSK 20
 #define SCALE_BYTE_CONV_QAM16 100
 #define SCALE_BYTE_CONV_QAM64 100
 #define QAM16_THRESHOLD 2 / sqrt(10)
@@ -26,6 +30,8 @@ complex_float mod_single(int x, Table<complex_float>& mod_table);
 complex_float mod_single_uint8(uint8_t x, Table<complex_float>& mod_table);
 void mod_simd(uint8_t* in, complex_float*& out, size_t len,
     Table<complex_float>& mod_table);
+
+void demod_qpsk_soft_sse(float* vec_in, int8_t* llr, int num);
 
 void demod_16qam_hard_loop(float* vec_in, uint8_t* vec_out, int num);
 void demod_16qam_hard_sse(float* vec_in, uint8_t* vec_out, int num);

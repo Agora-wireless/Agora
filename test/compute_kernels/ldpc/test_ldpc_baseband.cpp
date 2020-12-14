@@ -310,7 +310,8 @@ int main(int argc, char* argv[])
                         equal_T_ptr, demod_ptr, cfg->ofdm_data_num());
                     break;
                 default:
-                    std::printf("Demodulation: modulation type %s not supported!\n",
+                    std::printf(
+                        "Demodulation: modulation type %s not supported!\n",
                         cfg->modulation.c_str());
                 }
             }
@@ -383,9 +384,10 @@ int main(int argc, char* argv[])
             }
         }
 
-        std::printf("Noise: %.3f, snr: %.1f dB, error rate: %zu/%zu = %.6f, block "
-               "error: "
-               "%zu/%zu = %.6f\n",
+        std::printf(
+            "Noise: %.3f, snr: %.1f dB, error rate: %zu/%zu = %.6f, block "
+            "error: "
+            "%zu/%zu = %.6f\n",
             noise_levels[noise_id], snr_levels[noise_id], error_num, total,
             1.f * error_num / total, block_error_num, num_codeblocks,
             1.f * block_error_num / num_codeblocks);

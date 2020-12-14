@@ -801,6 +801,9 @@ void Phy_UE::doDemul(int tid, size_t tag)
     //    equal_ptr, (uint8_t*)demul_ptr, config_->ue_ant_num());
 
     switch (config_->mod_order_bits) {
+    case (CommsLib::QPSK):
+        demod_qpsk_soft_sse(equal_ptr, demul_ptr, config_->ofdm_data_num());
+        break;
     case (CommsLib::QAM16):
         demod_16qam_soft_avx2(equal_ptr, demul_ptr, config_->ofdm_data_num());
         break;
@@ -954,11 +957,11 @@ void Phy_UE::doEncode(int tid, size_t tag)
     auto& cfg = config_;
     // size_t start_tsc = worker_rdtsc();
 
-    int8_t* encoded_buffer_temp = reinterpret_cast<int8_t*>(
+    int8_t* encoded_buffer_temp = static_cast<int8_t*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             ldpc_encoding_encoded_buf_size(
                 cfg->ldpc_config().base_graph(), cfg->ldpc_config().expansion_factor())));
-    int8_t* parity_buffer = reinterpret_cast<int8_t*>(
+    int8_t* parity_buffer = static_cast<int8_t*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             ldpc_encoding_parity_buf_size(
                 cfg->ldpc_config().base_graph(), cfg->ldpc_config().expansion_factor())));

@@ -175,7 +175,7 @@ int main(int argc, char* argv[])
         ldpc_decoder_5gnr_request.nRows = ldpc_config.num_rows();
         ldpc_decoder_5gnr_response.numMsgBits = ldpc_config.num_cb_len();
         auto* resp_var_nodes
-            = (int16_t*)Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t));
+            = static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
         ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
         Table<uint8_t> decoded_codewords;
@@ -222,9 +222,10 @@ int main(int argc, char* argv[])
             }
         }
 
-        std::printf("Noise: %.3f, snr: %.1f dB, error rate: %zu/%zu = %.6f, block "
-               "error: "
-               "%zu/%zu = %.6f\n",
+        std::printf(
+            "Noise: %.3f, snr: %.1f dB, error rate: %zu/%zu = %.6f, block "
+            "error: "
+            "%zu/%zu = %.6f\n",
             noise_levels[noise_id], snr_levels[noise_id], error_num, total,
             1.f * error_num / total, block_error_num, num_codeblocks,
             1.f * block_error_num / num_codeblocks);

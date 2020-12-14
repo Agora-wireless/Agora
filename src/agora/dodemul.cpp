@@ -19,13 +19,13 @@ DoDemul::DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
 
-    data_gather_buffer = reinterpret_cast<complex_float*>(
+    data_gather_buffer = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             kSCsPerCacheline * kMaxAntennas * sizeof(complex_float)));
-    equaled_buffer_temp = reinterpret_cast<complex_float*>(
+    equaled_buffer_temp = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
-    equaled_buffer_temp_transposed = reinterpret_cast<complex_float*>(
+    equaled_buffer_temp_transposed = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
 
@@ -241,6 +241,9 @@ Event_data DoDemul::launch(size_t tag)
             + (cfg->mod_order_bits * base_sc_id);
 
         switch (cfg->mod_order_bits) {
+        case (CommsLib::QPSK):
+            demod_qpsk_soft_sse(equal_T_ptr, demod_ptr, max_sc_ite);
+            break;
         case (CommsLib::QAM16):
             demod_16qam_soft_avx2(equal_T_ptr, demod_ptr, max_sc_ite);
             break;

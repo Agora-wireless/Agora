@@ -60,10 +60,12 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
             std::fprintf(stderr, "Failed to start radio\n");
             return false;
         }
-        std::memcpy(calib_dl_buffer[0], radioconfig_->get_calib_dl(),
-            cfg->ofdm_data_num() * cfg->bf_ant_num() * sizeof(arma::cx_float));
-        std::memcpy(calib_ul_buffer[0], radioconfig_->get_calib_ul(),
-            cfg->ofdm_data_num() * cfg->bf_ant_num() * sizeof(arma::cx_float));
+        if (cfg->downlink_mode() == true) {
+	        std::memcpy(calib_dl_buffer[0], radioconfig_->get_calib_dl(),
+	            cfg->ofdm_data_num() * cfg->bf_ant_num() * sizeof(arma::cx_float));
+	        std::memcpy(calib_ul_buffer[0], radioconfig_->get_calib_ul(),
+	            cfg->ofdm_data_num() * cfg->bf_ant_num() * sizeof(arma::cx_float));
+		}
     }
 
     for (size_t i = 0; i < socket_thread_num; i++) {
