@@ -25,13 +25,30 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
     printf("initialize buffers\n");
     initialize_uplink_buffers();
 
+#ifdef USE_DPDK
+    DpdkTransport::dpdk_init(in_core_offset, SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM);
+    rte_mempool* mbuf_pool = DpdkTransport::create_mempool();
+
+    uint16_t portid = 0; // For now, hard-code to port zero
+    if (DpdkTransport::nic_init(portid, mbuf_pool, in_task_thread_num) != 0)
+        rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
+
     printf("new Sender\n");
     sender_.reset(new Sender(
-        config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true));
+        config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true, "ff:ff:ff:ff:ff:ff", true, mbuf_pool));
 
     printf("new Receiver\n");
     receiver_.reset(new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET,
         &message_queue_, rx_ptoks_ptr));
+#else
+    printf("new Sender\n");
+    sender_.reset(new Sender(
+        config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true, "ff:ff:ff:ff:ff:ff", true));
+
+    printf("new Receiver\n");
+    receiver_.reset(new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET,
+        &message_queue_, rx_ptoks_ptr));
+#endif
 }
 
 Simulator::~Simulator() { free_uplink_buffers(); }

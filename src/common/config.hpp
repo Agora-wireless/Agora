@@ -333,6 +333,7 @@ public:
     // The list of MAC addresses of all Agora servers 
     // Only used in distributed&DPDK version
     std::vector<std::string> bs_server_mac_list;
+    std::string bs_rru_mac_addr;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;

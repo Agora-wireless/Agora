@@ -60,6 +60,29 @@ static inline void simd_convert_short_to_float(
 #endif
 }
 
+static inline void simd_convert_float_to_short(
+    const float* in_buf, short* out_buf, size_t n_elems)
+{
+    for (size_t i = 0; i < n_elems; i += 16) {
+        /* ifft scaled results by OFDM_CA_NUM */
+        __m256 scale_factor = _mm256_set1_ps(32768.0);
+        __m256 ifft1 = _mm256_load_ps(in_buf + i);
+        __m256 ifft2 = _mm256_load_ps(in_buf + i + 8);
+        __m256 scaled_ifft1 = _mm256_mul_ps(ifft1, scale_factor);
+        __m256 scaled_ifft2 = _mm256_mul_ps(ifft2, scale_factor);
+        __m256i integer1 = _mm256_cvtps_epi32(scaled_ifft1);
+        __m256i integer2 = _mm256_cvtps_epi32(scaled_ifft2);
+        integer1 = _mm256_packs_epi32(integer1, integer2);
+        integer1 = _mm256_permute4x64_epi64(integer1, 0xD8);
+        //_mm256_stream_si256((__m256i*)&socket_ptr[2 * sc_id], integer1);
+        _mm256_stream_si256(
+            (__m256i*)&out_buf[i], integer1);
+        if (i >= n_elems) // add CP
+            _mm256_stream_si256((__m256i*)&out_buf[i - n_elems],
+                integer1);
+    }
+}
+
 // Convert a float16 array [in_buf] to a float32 array [out_buf]. Each array
 // must have [n_elems] elements
 // in_buf and out_buf must be 64-byte aligned

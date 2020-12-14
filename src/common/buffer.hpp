@@ -220,6 +220,7 @@ struct Packet {
     enum class PktType {
         kInvalid,
         kIQFromRRU, // A packet containing IQ samples from the RRU
+        kIQFromServer, // A packet containing IQ samples from the server
         kDemod, // A packet generated after the demodulation stage
         kEncode // A packet generated after the encode stage
     };
@@ -239,15 +240,19 @@ struct Packet {
     PktType pkt_type;
     uint32_t frame_id;
     uint32_t symbol_id;
-    union {
-        uint32_t cell_id;
-        uint32_t ue_id;
-    };
-    union {
-        uint32_t ant_id;
-        uint32_t server_id;
-    };
-    uint32_t fill[11]; // Padding for 64-byte alignment needed for SIMD
+    // union {
+    //     uint32_t cell_id;
+    //     uint32_t ue_id;
+    // };
+    // union {
+    //     uint32_t ant_id;
+    //     uint32_t server_id;
+    // };
+    uint32_t cell_id;
+    uint32_t ue_id;
+    uint32_t ant_id;
+    uint32_t server_id;
+    uint32_t fill[9]; // Padding for 64-byte alignment needed for SIMD
     short data[]; // Elements sent by antennae are two bytes (I/Q samples)
     Packet(int f, int s, int c, int a) // TODO: Should be unsigned integers
         : frame_id(f)

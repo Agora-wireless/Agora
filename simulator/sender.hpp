@@ -58,7 +58,7 @@ public:
     Sender(Config* config, size_t num_worker_threads, size_t core_offset = 30,
         size_t frame_duration = 1000, size_t enable_slow_start = 1,
         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
-        bool create_thread_for_master = false);
+        bool create_thread_for_master = false, void* mbuf_pool = nullptr);
 
     ~Sender();
 

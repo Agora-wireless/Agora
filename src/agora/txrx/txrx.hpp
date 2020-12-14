@@ -71,7 +71,7 @@ public:
      * otherwise
      */
     bool startTXRX(Table<char>& buffer, Table<size_t>& frame_start,
-        char* tx_buffer,
+        Table<complex_float>* tx_buffer,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers_
         = nullptr,
         Table<int8_t>* demod_soft_buffer_to_decode = nullptr,
@@ -112,6 +112,7 @@ private:
     Table<int8_t>* demod_soft_buffer_to_decode_;
     size_t packet_num_in_buffer_;
     char* tx_buffer_;
+    Table<complex_float>* dl_ifft_buffer_;
     Table<size_t>* frame_start_;
 
     // Downlink buffers
@@ -127,11 +128,11 @@ private:
     uint8_t* recv_buffer_;
 
 #ifdef USE_DPDK
-    uint32_t bs_rru_addr; // IPv4 address of the simulator sender
-    uint32_t bs_server_addr; // IPv4 address of the Agora server
-    struct rte_mempool* mbuf_pool;
+    uint32_t bs_rru_addr_; // IPv4 address of the simulator sender
+    struct rte_mempool* mbuf_pool_;
     std::vector<uint32_t> bs_server_addrs_;
     std::vector<rte_ether_addr> bs_server_mac_addrs_;
+    rte_ether_addr bs_rru_mac_addr_;
     int recv(int tid);
 #endif
 
@@ -148,6 +149,9 @@ private:
     size_t encode_frame_to_send_ = 0;
     size_t encode_symbol_dl_to_send_ = 0;
     size_t encode_ue_to_send_;
+
+    size_t dl_frame_to_send_ = 0;
+    size_t dl_symbol_to_send_ = 0;
 };
 
 #endif

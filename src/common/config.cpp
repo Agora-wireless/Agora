@@ -220,6 +220,8 @@ Config::Config(std::string jsonfile)
             = tddConf.value("bs_server_mac_list", std::vector<std::string>());
         rt_assert(bs_server_mac_list.size() > 0, "MAC list is 0!");
         rt_assert(bs_server_mac_list.size() == bs_server_addr_list.size(), "Two list not equal!");
+        bs_rru_mac_addr
+            = tddConf.value("bs_rru_mac_addr", "");
     }
 
     // TODO: Should we be using OFDM_DATA_START here?

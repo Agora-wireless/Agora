@@ -23,7 +23,8 @@ void delay_ticks(uint64_t start, uint64_t ticks)
 
 Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     size_t frame_duration, size_t enable_slow_start,
-    std::string server_mac_addr_str, bool create_thread_for_master)
+    std::string server_mac_addr_str, bool create_thread_for_master,
+    void* mbuf_pool)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
@@ -63,12 +64,16 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
             num_worker_threads_, num_worker_threads_ + 1);
 
 #ifdef USE_DPDK
-    DpdkTransport::dpdk_init(core_offset, num_worker_threads_);
-    mbuf_pool = DpdkTransport::create_mempool();
-
     uint16_t portid = 0; // For now, hard-code to port zero
-    if (DpdkTransport::nic_init(portid, mbuf_pool, num_worker_threads_) != 0)
-        rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
+    if (mbuf_pool == nullptr) {
+        DpdkTransport::dpdk_init(core_offset, num_worker_threads_);
+        this->mbuf_pool = DpdkTransport::create_mempool();
+        
+        if (DpdkTransport::nic_init(portid, this->mbuf_pool, num_worker_threads_) != 0)
+            rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
+    } else {
+        this->mbuf_pool = reinterpret_cast<rte_mempool*>(mbuf_pool);
+    }
 
     // Parse IP addresses and MAC addresses
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);

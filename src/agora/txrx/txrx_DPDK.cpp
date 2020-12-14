@@ -5,6 +5,7 @@
  */
 
 #include "txrx.hpp"
+#include <datatype_conversion.h>
 #include <netinet/ether.h>
 
 static constexpr bool kDebugDPDK = false;
@@ -22,27 +23,30 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     , precode_status_(precode_status)
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num + 1);
-    mbuf_pool = DpdkTransport::create_mempool();
+    mbuf_pool_ = DpdkTransport::create_mempool();
     demod_symbol_to_send_ = cfg->pilot_symbol_num_perframe;
     encode_ue_to_send_ = cfg->ue_start;
 
     const uint16_t port_id = 0; // The DPDK port ID
-    if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num + 1) != 0)
+    if (DpdkTransport::nic_init(port_id, mbuf_pool_, socket_thread_num + 1) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
 
-    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
+    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr_);
     rt_assert(ret == 1, "Invalid sender IP address");
 
     bs_server_addrs_.reserve(cfg->bs_server_addr_list.size());
     bs_server_mac_addrs_.reserve(cfg->bs_server_addr_list.size());
 
     ret = inet_pton(AF_INET, cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(), &bs_server_addrs_[cfg->bs_server_addr_idx]);
-    
+    rt_assert(ret == 1, "Invalid sender IP address");
+
     ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[cfg->bs_server_addr_idx].c_str());
     rt_assert(parsed_mac != NULL, "Invalid server mac address");
     memcpy(&bs_server_mac_addrs_[cfg->bs_server_addr_idx], parsed_mac, sizeof(ether_addr));
 
-    rt_assert(ret == 1, "Invalid sender IP address");
+    parsed_mac = ether_aton(cfg->bs_rru_mac_addr.c_str());
+    rt_assert(parsed_mac != NULL, "Invalid rru mac address");
+    memcpy(&bs_rru_mac_addr_, parsed_mac, sizeof(ether_addr));
 
     for (size_t i = 0; i < socket_thread_num; i++) {
         uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port + i);
@@ -53,7 +57,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
             cfg->bs_rru_addr.c_str(), cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(),
             cfg->bs_rru_port + i, cfg->bs_server_port + i, i);
         DpdkTransport::install_flow_rule(
-            port_id, i, bs_rru_addr, bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
+            port_id, i, bs_rru_addr_, bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
     }
 
     for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
@@ -78,10 +82,10 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 }
 
-PacketTXRX::~PacketTXRX() { rte_mempool_free(mbuf_pool); }
+PacketTXRX::~PacketTXRX() { rte_mempool_free(mbuf_pool_); }
 
 bool PacketTXRX::startTXRX(Table<char>& buffer,
-    Table<size_t>& frame_start, char* tx_buffer,
+    Table<size_t>& frame_start, Table<complex_float>* dl_ifft_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers,
     Table<int8_t>* demod_soft_buffer_to_decode, Table<int8_t>* encoded_buffer,
     Table<int8_t>* encoded_buffer_to_precode)
@@ -89,7 +93,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
     buffer_ = &buffer;
     frame_start_ = &frame_start;
 
-    tx_buffer_ = tx_buffer;
+    dl_ifft_buffer_ = dl_ifft_buffer;
 
     demod_buffers_ = demod_buffers;
     demod_soft_buffer_to_decode_ = demod_soft_buffer_to_decode;
@@ -167,7 +171,7 @@ void* PacketTXRX::demod_thread(int tid)
                         ue_id, demod_frame_to_send_, demod_symbol_to_send_ - cfg->pilot_symbol_num_perframe);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-                    tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
+                    tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool_);
                     struct rte_ether_hdr* eth_hdr
                         = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
                     eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
@@ -304,7 +308,7 @@ void* PacketTXRX::encode_thread(int tid)
                     precode_status_->receive_encoded_data(encode_frame_to_send_, encode_symbol_dl_to_send_);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-                    tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
+                    tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool_);
                     struct rte_ether_hdr* eth_hdr
                         = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
                     eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
@@ -431,6 +435,9 @@ void* PacketTXRX::loop_tx_rx(int tid)
 
     while (cfg->running) {
         // Receive data
+        if (dequeue_send(tid) == 1) {
+            continue;
+        }
         int res = recv_relocate(tid);
         // int res = recv(tid);
         if (res == 0)
@@ -473,7 +480,7 @@ int PacketTXRX::recv_relocate(int tid)
             continue;
         }
 
-        if (ip_hdr->src_addr != bs_rru_addr) {
+        if (ip_hdr->src_addr != bs_rru_addr_) {
             fprintf(stderr, "DPDK relocate: Source addr does not match (%x->%x)\n", ip_hdr->src_addr, ip_hdr->dst_addr);
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
@@ -622,67 +629,60 @@ int PacketTXRX::recv(int tid)
 }
 
 // TODO: check correctness of this funcion
-// int PacketTXRX::dequeue_send(int tid)
-// {
-//     auto& c = cfg;
-//     Event_data event;
-//     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
-//         return -1;
+int PacketTXRX::dequeue_send(int tid)
+{
+    if (rx_status_->cur_frame_ > dl_frame_to_send_) {
 
-//     // printf("tx queue length: %d\n", task_queue_->size_approx());
-//     assert(event.event_type == EventType::kPacketTX);
+        struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
+        tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool_);
+        struct rte_ether_hdr* eth_hdr
+            = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
+        eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
+        memcpy(eth_hdr->s_addr.addr_bytes, bs_server_mac_addrs_[cfg->bs_server_addr_idx].addr_bytes,
+            RTE_ETHER_ADDR_LEN);
+        memcpy(eth_hdr->d_addr.addr_bytes, bs_rru_mac_addr_.addr_bytes,
+            RTE_ETHER_ADDR_LEN);
 
-//     size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
-//     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-//     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+        struct rte_ipv4_hdr* ip_h
+            = (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
+        ip_h->src_addr = bs_server_addrs_[cfg->bs_server_addr_idx];
+        ip_h->dst_addr = bs_rru_addr_;
+        ip_h->next_proto_id = IPPROTO_UDP;
 
-//     size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
-//     size_t offset
-//         = (c->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
-//               * c->BS_ANT_NUM)
-//         + ant_id;
+        struct rte_udp_hdr* udp_h
+            = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
+        udp_h->src_port = rte_cpu_to_be_16(cfg->bs_server_port);
+        udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_rru_port);
 
-//     if (kDebugPrintInTask) {
-//         printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
-//                "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-//             tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags[0])._tag,
-//             offset, message_queue_->size_approx());
-//     }
+        tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
+        tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;
 
-//     char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
-//     auto* pkt = (Packet*)cur_buffer_ptr;
-//     new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
+        char* payload = (char*)eth_hdr + kPayloadOffset;
+        auto* pkt = reinterpret_cast<Packet*>(payload);
+        pkt->pkt_type = Packet::PktType::kIQFromServer;
+        pkt->frame_id = dl_frame_to_send_;
+        pkt->symbol_id = dl_symbol_to_send_;
+        pkt->ant_id = tid;
+        size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(pkt->frame_id, pkt->symbol_id);
+        size_t offset = data_symbol_idx_dl * cfg->BS_ANT_NUM + tid;
 
-//     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-//     tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
-//     struct rte_ether_hdr* eth_hdr
-//         = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
-//     eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
+        simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data), reinterpret_cast<float*>((*dl_ifft_buffer_)[offset]), cfg->OFDM_CA_NUM);
+       
+        // Send data (one OFDM symbol)
+        size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
+        if (unlikely(nb_tx_new != 1)) {
+            printf("rte_eth_tx_burst() failed\n");
+            exit(0);
+        }
 
-//     struct rte_ipv4_hdr* ip_h
-//         = (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
-//     ip_h->src_addr = bs_server_addr;
-//     ip_h->dst_addr = bs_rru_addr;
-//     ip_h->next_proto_id = IPPROTO_UDP;
+        dl_symbol_to_send_ ++;
+        if (dl_symbol_to_send_ == cfg->dl_data_symbol_num_perframe) {
+            dl_symbol_to_send_ = 0;
+            dl_frame_to_send_ ++;
+        }
 
-//     struct rte_udp_hdr* udp_h
-//         = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
-//     udp_h->src_port = rte_cpu_to_be_16(cfg->bs_server_port + tid);
-//     udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_rru_port + tid);
-
-//     tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
-//     tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;
-//     char* payload = (char*)eth_hdr + kPayloadOffset;
-//     DpdkTransport::fastMemcpy(payload, (char*)pkt, cfg->packet_length);
-
-//     // Send data (one OFDM symbol)
-//     size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
-//     if (unlikely(nb_tx_new != 1)) {
-//         printf("rte_eth_tx_burst() failed\n");
-//         exit(0);
-//     }
-//     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
-//                   Event_data(EventType::kPacketTX, event.tags[0])),
-//         "Socket message enqueue failed\n");
-//     return 1;
-// }
+        return 1;
+    }
+    
+    return 0;
+}
