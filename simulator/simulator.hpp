@@ -14,12 +14,9 @@
 #include <fcntl.h>
 #include <immintrin.h>
 #include <iostream>
-#include <math.h>
 #include <memory>
 #include <pthread.h>
 #include <queue>
-#include <signal.h>
-#include <stdint.h>
 #include <system_error>
 #include <tuple>
 #include <unistd.h>

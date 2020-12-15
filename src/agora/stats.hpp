@@ -6,8 +6,6 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include <iostream>
-#include <stdio.h>
-#include <string.h>
 
 static constexpr size_t kMaxStatBreakdown = 4;
 
@@ -16,7 +14,7 @@ struct DurationStat {
     size_t task_duration[kMaxStatBreakdown]; // Unit = TSC cycles
     size_t task_count;
     DurationStat() { reset(); }
-    void reset() { memset(this, 0, sizeof(DurationStat)); }
+    void reset() { std::memset(this, 0, sizeof(DurationStat)); }
 };
 
 // Temporary summary statistics assembled from per-thread runtime stats
@@ -25,7 +23,7 @@ struct FrameSummary {
     size_t count_this_thread = 0;
     double us_avg_threads[kMaxStatBreakdown];
     size_t count_all_threads = 0;
-    FrameSummary() { memset(this, 0, sizeof(FrameSummary)); }
+    FrameSummary() { std::memset(this, 0, sizeof(FrameSummary)); }
 };
 
 // Type of timestamps recorded at the master for a frame

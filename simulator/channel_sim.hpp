@@ -14,10 +14,8 @@
 #include <algorithm>
 #include <armadillo>
 #include <arpa/inet.h>
-#include <assert.h>
 #include <ctime>
 #include <iomanip>
-#include <math.h>
 #include <netinet/in.h>
 #include <numeric>
 #include <pthread.h>

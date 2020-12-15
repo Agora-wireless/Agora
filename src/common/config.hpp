@@ -2,14 +2,10 @@
 #define CONFIG_HEADER
 
 #include <boost/range/algorithm/count.hpp>
-#include <complex.h>
 #include <emmintrin.h>
 #include <fstream> // std::ifstream
 #include <immintrin.h>
 #include <iostream>
-#include <stdio.h> /* for fprintf */
-#include <stdlib.h>
-#include <string.h> /* for memcpy */
 #include <unistd.h>
 #include <vector>
 #define JSON
@@ -23,8 +19,7 @@
 #include "utils.h"
 #include "utils_ldpc.hpp"
 #include <nlohmann/json.hpp>
-//#include <itpp/itbase.h>
-// using namespace itpp;
+
 using json = nlohmann::json;
 #endif
 typedef unsigned char uchar;

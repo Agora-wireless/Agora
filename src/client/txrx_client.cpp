@@ -74,7 +74,7 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
                     context)
                 != 0) {
                 perror("socket thread create failed");
-                exit(0);
+                std::exit(0);
             }
         } else if (kUseArgos || kUseUHD) {
             if (pthread_create(&txrx_thread, NULL,
@@ -83,7 +83,7 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
                     context)
                 != 0) {
                 perror("socket thread create failed");
-                exit(0);
+                std::exit(0);
             }
         } else {
             if (pthread_create(&txrx_thread, NULL,
@@ -91,7 +91,7 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
                     context)
                 != 0) {
                 perror("socket thread create failed");
-                exit(0);
+                std::exit(0);
             }
         }
     }
@@ -112,7 +112,7 @@ struct Packet* RadioTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
 
     // if rx_buffer is full, exit
     if (rx_buffer_status[rx_offset] == 1) {
-        printf(
+        std::printf(
             "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
         config_->running = false;
         return (NULL);
@@ -121,7 +121,7 @@ struct Packet* RadioTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
         if (errno != EAGAIN && config_->running) {
             perror("recv failed");
-            exit(0);
+            std::exit(0);
         }
         return (NULL);
     }
@@ -133,8 +133,8 @@ struct Packet* RadioTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     // Push kPacketRX event into the queue.
     Event_data rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset)._tag);
     if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-        printf("socket message enqueue failed\n");
-        exit(0);
+        std::printf("socket message enqueue failed\n");
+        std::exit(0);
     }
     return pkt;
 }
@@ -146,7 +146,7 @@ int RadioTXRX::dequeue_send(int tid)
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
         return -1;
 
-    // printf("tx queue length: %d\n", task_queue_->size_approx());
+    // std::printf("tx queue length: %d\n", task_queue_->size_approx());
     size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
     if (event.event_type == EventType::kPacketTX) {
@@ -159,7 +159,7 @@ int RadioTXRX::dequeue_send(int tid)
                 + ant_id;
 
             if (kDebugPrintInTask) {
-                printf(
+                std::printf(
                     "In TX thread %d: Transmitted frame %zu, data symbol %zu, "
                     "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
                     tid, frame_id, c->ULSymbols[0][symbol_id], ant_id,
@@ -184,14 +184,14 @@ int RadioTXRX::dequeue_send(int tid)
     } else if (event.event_type == EventType::kPacketPilotTX) {
         std::vector<char> zeros(c->packet_length, 0);
         std::vector<char> pilot(c->packet_length, 0);
-        memcpy(&pilot[Packet::kOffsetOfData], c->pilot_ci16.data(),
+        std::memcpy(&pilot[Packet::kOffsetOfData], c->pilot_ci16.data(),
             c->packet_length - Packet::kOffsetOfData);
         for (size_t symbol_idx = 0; symbol_idx < c->pilot_symbol_num_perframe;
              symbol_idx++) {
             if (kDebugPrintInTask) {
-                printf("In TX thread %d: Transmitted pilot in frame %zu, "
-                       "symbol %zu, "
-                       "ant %zu\n",
+                std::printf("In TX thread %d: Transmitted pilot in frame %zu, "
+                            "symbol %zu, "
+                            "ant %zu\n",
                     tid, frame_id, c->pilotSymbols[0][symbol_idx], ant_id);
             }
 
@@ -209,8 +209,8 @@ int RadioTXRX::dequeue_send(int tid)
                       Event_data(EventType::kPacketPilotTX, event.tags[0])),
             "Socket message enqueue failed\n");
     } else {
-        printf("Wrong event type in tx queue!");
-        exit(0);
+        std::printf("Wrong event type in tx queue!");
+        std::exit(0);
     }
     return event.tags[0];
 }
@@ -221,7 +221,7 @@ void* RadioTXRX::loop_tx_rx(int tid)
     size_t rx_offset = 0;
     int radio_lo = tid * config_->nRadios / thread_num_;
     int radio_hi = (tid + 1) * config_->nRadios / thread_num_;
-    printf("Receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
+    std::printf("Receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
@@ -230,8 +230,9 @@ void* RadioTXRX::loop_tx_rx(int tid)
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_[radio_id],
             config_->ue_rru_port + radio_id, config_->bs_rru_addr.c_str());
-        printf("TXRX thread %d: set up UDP socket server listening to port %d"
-               " with remote address %s:%d \n",
+        std::printf(
+            "TXRX thread %d: set up UDP socket server listening to port %d"
+            " with remote address %s:%d \n",
             tid, local_port_id, config_->bs_rru_addr.c_str(),
             config_->ue_rru_port + radio_id);
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
@@ -348,7 +349,8 @@ struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
 
     // if buffer is full, exit
     if (rx_buffer_status[rx_offset] == 1) {
-        printf("RX thread %d at rx_offset %zu buffer full\n", tid, rx_offset);
+        std::printf(
+            "RX thread %d at rx_offset %zu buffer full\n", tid, rx_offset);
         c->running = false;
         return NULL;
     }
@@ -375,14 +377,14 @@ struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
         frame_id = (size_t)(rxTime >> 32);
         symbol_id = (size_t)((rxTime >> 16) & 0xFFFF);
     } else {
-        assert(c->hw_framer
-            || (((rxTime - time0) / (num_samps * c->symbol_num_perframe))
-                   == frame_id));
+        //assert(c->hw_framer
+        //    || (((rxTime - time0) / (num_samps * c->symbol_num_perframe))
+        //           == frame_id));
     }
     if (kDebugPrintInTask) {
-        printf("downlink receive: thread %d, frame_id %zu, symbol_id "
-               "%zu, radio_id %zu "
-               "rxtime %llx\n",
+        std::printf("downlink receive: thread %d, frame_id %zu, symbol_id "
+                    "%zu, radio_id %zu "
+                    "rxtime %llx\n",
             tid, frame_id, symbol_id, radio_id, rxTime);
     }
     size_t ant_id = radio_id * c->nChannels;
@@ -409,12 +411,12 @@ void* RadioTXRX::loop_tx_rx_argos(int tid)
     size_t num_radios = c->nRadios;
     size_t radio_lo = tid * num_radios / thread_num_;
     size_t radio_hi = (tid + 1) * num_radios / thread_num_;
-    printf("receiver thread %d has radios %zu to %zu (%zu)\n", tid, radio_lo,
-        radio_hi - 1, radio_hi - radio_lo);
+    std::printf("receiver thread %d has radios %zu to %zu (%zu)\n", tid,
+        radio_lo, radio_hi - 1, radio_hi - radio_lo);
 
     // Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&mutex);
-    printf("Thread %d: waiting for release\n", tid);
+    std::printf("Thread %d: waiting for release\n", tid);
 
     pthread_cond_wait(&cond, &mutex);
     pthread_mutex_unlock(&mutex); // unlocking for all other threads
@@ -469,7 +471,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
 
     // Use mutex to sychronize data receiving across threads
     pthread_mutex_lock(&mutex);
-    printf("Thread %d: waiting for release\n", tid);
+    std::printf("Thread %d: waiting for release\n", tid);
 
     ClientRadioConfig* radio = radioconfig_;
 
@@ -623,7 +625,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
                     break;
                 }
                 if (kDebugPrintInTask) {
-                    printf(
+                    std::printf(
                         "idle receive: thread %d, frame_id %zu, symbol_id %zu, "
                         "radio_id %d "
                         "rxtime %llx\n",

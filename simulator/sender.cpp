@@ -38,8 +38,9 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     , ticks_wnd_2(
           15 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
 {
-    printf("Initializing sender, sending to base station server at %s, frame "
-           "duration = %.2f ms, slow start = %s\n",
+    std::printf(
+        "Initializing sender, sending to base station server at %s, frame "
+        "duration = %.2f ms, slow start = %s\n",
         cfg->bs_server_addr.c_str(), frame_duration / 1000.0,
         enable_slow_start == 1 ? "yes" : "no");
 
@@ -47,14 +48,15 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     for (size_t i = 0; i < kFrameWnd; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
     }
-    memset(packet_count_per_frame, 0, kFrameWnd * sizeof(size_t));
+    std::memset(packet_count_per_frame, 0, kFrameWnd * sizeof(size_t));
 
     init_iq_from_file(std::string(TOSTRING(PROJECT_DIRECTORY))
         + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
         + ".bin");
 
-    task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
-        64, socket_thread_num * sizeof(moodycamel::ProducerToken*));
+    task_ptok = static_cast<moodycamel::ProducerToken**>(
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            (socket_thread_num * sizeof(moodycamel::ProducerToken*))));
     for (size_t i = 0; i < socket_thread_num; i++)
         task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
 
@@ -93,11 +95,11 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
                 .substr(port_id * (kMacAddrBtyes + 1), kMacAddrBtyes)
                 .c_str());
         rt_assert(parsed_mac != NULL, "Invalid server mac address");
-        memcpy(&server_mac_addr[port_id], parsed_mac, sizeof(ether_addr));
+        std::memcpy(&server_mac_addr[port_id], parsed_mac, sizeof(ether_addr));
 
         ret = rte_eth_macaddr_get(port_id, &sender_mac_addr[port_id]);
         rt_assert(ret == 0, "Cannot get MAC address of the port");
-        printf("Number of DPDK cores: %d\n", rte_lcore_count());
+        std::printf("Number of DPDK cores: %d\n", rte_lcore_count());
     }
 
 #endif
@@ -108,7 +110,7 @@ Sender::~Sender()
 {
     iq_data_short_.free();
     for (size_t i = 0; i < kFrameWnd; i++) {
-        free(packet_count_per_symbol[i]);
+        std::free(packet_count_per_symbol[i]);
     }
 }
 
@@ -189,7 +191,7 @@ void* Sender::master_thread(int)
                             * cfg->data_symbol_num_perframe);
                 }
                 if (kDebugSenderReceiver || kDebugPrintPerFrameDone) {
-                    printf("Sender: Transmitted frame %u in %.1f ms\n",
+                    std::printf("Sender: Transmitted frame %u in %.1f ms\n",
                         ctag.frame_id, (get_time() - start_time) / 1000.0);
                     start_time = get_time();
                 }
@@ -221,7 +223,7 @@ void* Sender::master_thread(int)
         }
     }
     write_stats_to_file(cfg->frames_to_test);
-    exit(0);
+    std::exit(0);
 }
 
 void* Sender::worker_thread(int tid)
@@ -251,16 +253,18 @@ void* Sender::worker_thread(int tid)
 #endif
 
     UDPClient udp_client;
-    auto fft_inout = reinterpret_cast<complex_float*>(
-        memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
-    auto* socks_pkt_buf = reinterpret_cast<Packet*>(malloc(cfg->packet_length));
+    auto fft_inout = static_cast<complex_float*>(
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            cfg->OFDM_CA_NUM * sizeof(complex_float)));
+    auto* socks_pkt_buf = static_cast<Packet*>(padded_aligned_alloc(
+        Agora_memory::Alignment_t::k32Align, cfg->packet_length));
 
     double begin = get_time();
     size_t total_tx_packets = 0;
     size_t total_tx_packets_rolling = 0;
     size_t cur_radio = radio_lo;
 
-    printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu\n", (size_t)tid,
+    std::printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu\n", (size_t)tid,
         ant_num_this_thread, cfg->BS_ANT_NUM);
 
     // We currently don't support zero-padding OFDM prefix and postfix
@@ -296,7 +300,7 @@ void* Sender::worker_thread(int tid)
             pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
             pkt->cell_id = tag.ant_id / ant_num_per_cell;
             pkt->ant_id = tag.ant_id - ant_num_per_cell * (pkt->cell_id);
-            memcpy(pkt->data,
+            std::memcpy(pkt->data,
                 iq_data_short_[(pkt->symbol_id * cfg->BS_ANT_NUM) + tag.ant_id],
                 (cfg->CP_LEN + cfg->OFDM_CA_NUM) * (kUse12BitIQ ? 3 : 4));
             if (cfg->fft_in_rru) {
@@ -310,9 +314,10 @@ void* Sender::worker_thread(int tid)
 #endif
 
             if (kDebugSenderReceiver) {
-                printf("Thread %d (tag = %s) transmit frame %d, symbol %d, ant "
-                       "%d, "
-                       "TX time: %.3f us\n",
+                std::printf(
+                    "Thread %d (tag = %s) transmit frame %d, symbol %d, ant "
+                    "%d, "
+                    "TX time: %.3f us\n",
                     tid, gen_tag_t(tag).to_string().c_str(), pkt->frame_id,
                     pkt->symbol_id, pkt->ant_id,
                     cycles_to_us(rdtsc() - start_tsc_send, freq_ghz));
@@ -326,7 +331,8 @@ void* Sender::worker_thread(int tid)
                 double byte_len = cfg->packet_length * ant_num_this_thread
                     * max_symbol_id * 1000.f;
                 double diff = end - begin;
-                printf("Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
+                std::printf(
+                    "Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
                     (size_t)tid,
                     total_tx_packets / (ant_num_this_thread * max_symbol_id),
                     diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
@@ -342,8 +348,8 @@ void* Sender::worker_thread(int tid)
         size_t nb_tx_new
             = rte_eth_tx_burst(port_id, queue_id, tx_mbufs, num_tags);
         if (unlikely(nb_tx_new != num_tags)) {
-            printf("Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, "
-                   "num_tags: %zu\n",
+            std::printf("Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, "
+                        "num_tags: %zu\n",
                 tid, nb_tx_new, num_tags);
             keep_running = 0;
             break;
@@ -378,12 +384,14 @@ size_t Sender::get_max_symbol_id() const
 void Sender::init_iq_from_file(std::string filename)
 {
     const size_t packets_per_frame = cfg->symbol_num_perframe * cfg->BS_ANT_NUM;
-    iq_data_short_.calloc(
-        packets_per_frame, (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2, 64);
+    iq_data_short_.calloc(packets_per_frame,
+        (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2,
+        Agora_memory::Alignment_t::k64Align);
 
     Table<float> iq_data_float;
-    iq_data_float.calloc(
-        packets_per_frame, (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2, 64);
+    iq_data_float.calloc(packets_per_frame,
+        (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2,
+        Agora_memory::Alignment_t::k64Align);
 
     FILE* fp = fopen(filename.c_str(), "rb");
     rt_assert(fp != nullptr, "Failed to open IQ data file");
@@ -393,12 +401,12 @@ void Sender::init_iq_from_file(std::string filename)
         const size_t actual_count
             = fread(iq_data_float[i], sizeof(float), expected_count, fp);
         if (expected_count != actual_count) {
-            fprintf(stderr,
+            std::fprintf(stderr,
                 "Sender: Failed to read IQ data file %s. Packet %zu: expected "
                 "%zu I/Q samples but read %zu. Errno %s\n",
                 filename.c_str(), i, expected_count, actual_count,
                 strerror(errno));
-            exit(-1);
+            std::exit(-1);
         }
         if (kUse12BitIQ) {
             // Adapt 32-bit IQ samples to 24-bit to reduce network throughput
@@ -432,11 +440,12 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
 {
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/tx_result.txt";
-    printf("Printing sender results to file \"%s\"...\n", filename.c_str());
+    std::printf(
+        "Printing sender results to file \"%s\"...\n", filename.c_str());
     FILE* fp_debug = fopen(filename.c_str(), "w");
     rt_assert(fp_debug != nullptr, "Failed to open stats file");
     for (size_t i = 0; i < tx_frame_count; i++) {
-        fprintf(fp_debug, "%.5f\n", frame_end[i % kNumStatsFrames]);
+        std::fprintf(fp_debug, "%.5f\n", frame_end[i % kNumStatsFrames]);
     }
 }
 

@@ -22,8 +22,6 @@
 #include <memory>
 #include <pthread.h>
 #include <queue>
-#include <signal.h>
-#include <stdint.h>
 #include <system_error>
 #include <unistd.h>
 #include <vector>

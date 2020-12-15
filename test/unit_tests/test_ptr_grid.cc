@@ -23,7 +23,7 @@ TEST(TestPtrGrid, Basic)
 
     // Test that [] operator returns a reference, not a copy
     ptr_grid[0][0] = nullptr;
-    ASSERT_EQ(ptr_grid.mat[0][0], nullptr);
+    ASSERT_EQ(ptr_grid.mat_[0][0], nullptr);
 }
 
 TEST(TestPtrCube, Basic)
@@ -44,7 +44,7 @@ TEST(TestPtrCube, Basic)
 
     // Test that [] operator returns a reference, not a copy
     ptr_cube[0][0][0] = nullptr;
-    ASSERT_EQ(ptr_cube.cube[0][0][0], nullptr);
+    ASSERT_EQ(ptr_cube.cube_[0][0][0], nullptr);
 }
 
 int main(int argc, char** argv)

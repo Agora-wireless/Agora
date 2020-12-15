@@ -14,11 +14,10 @@
 
 #pragma once
 
-#include <errno.h>
+#include <cstring> /* std::strerror, std::memset, std::memcpy */
 #include <fcntl.h>
 #include <netdb.h>
 #include <stdexcept>
-#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -65,7 +64,7 @@ public:
             sizeof(serveraddr));
         if (ret != 0) {
             throw std::runtime_error("UDPServer: Failed to bind socket to port "
-                + std::to_string(port) + ". Error: " + strerror(errno));
+                + std::to_string(port) + ". Error: " + std::strerror(errno));
         }
     }
 
@@ -95,9 +94,9 @@ public:
                 // These errors mean that there's no data to receive
                 return 0;
             } else {
-                fprintf(stderr,
+                std::fprintf(stderr,
                     "UDPServer: recv() failed with unexpected error %s\n",
-                    strerror(errno));
+                    std::strerror(errno));
                 return ret;
             }
         }
