@@ -10,18 +10,12 @@
 #include "Symbols.hpp"
 #include "encoder.hpp"
 #include "gettime.h"
+#include "memory_manage.h"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "utils_ldpc.hpp"
 #include <algorithm>
-#include <assert.h>
 #include <bitset>
 #include <fstream>
-#include <malloc.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
 #include <vector>
 
 static constexpr size_t kNumCodeBlocks = 2;
@@ -35,14 +29,15 @@ static constexpr size_t kNumRows = 46;
 int main()
 {
     double freq_ghz = measure_rdtsc_freq();
-    printf("Spinning for one second for Turbo Boost\n");
+    std::printf("Spinning for one second for Turbo Boost\n");
     nano_sleep(1000 * 1000 * 1000, freq_ghz);
     int8_t* input[kNumCodeBlocks];
     int8_t* parity[kNumCodeBlocks];
     int8_t* encoded[kNumCodeBlocks];
     uint8_t* decoded[kNumCodeBlocks];
 
-    printf("Code rate: %.3f (nRows = %zu)\n", 22.f / (20 + kNumRows), kNumRows);
+    std::printf(
+        "Code rate: %.3f (nRows = %zu)\n", 22.f / (20 + kNumRows), kNumRows);
 
     std::vector<size_t> zc_vec = { 2, 4, 8, 16, 32, 64, 128, 256, 3, 6, 12, 24,
         48, 96, 192, 384, 5, 10, 20, 40, 80, 160, 320, 7, 14, 28, 56, 112, 224,
@@ -51,7 +46,7 @@ int main()
     std::sort(zc_vec.begin(), zc_vec.end());
     for (const size_t& zc : zc_vec) {
         if (zc < ldpc_get_min_zc() || zc > ldpc_get_max_zc()) {
-            fprintf(stderr, "Zc value %zu not supported. Skipping.\n", zc);
+            std::fprintf(stderr, "Zc value %zu not supported. Skipping.\n", zc);
             continue;
         }
         const size_t num_input_bits = ldpc_num_input_bits(kBaseGraph, zc);
@@ -87,7 +82,8 @@ int main()
         // For decoding, generate log-likelihood ratios, one byte per input bit
         int8_t* llrs[kNumCodeBlocks];
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
-            llrs[n] = reinterpret_cast<int8_t*>(memalign(32, num_encoded_bits));
+            llrs[n] = static_cast<int8_t*>(Agora_memory::padded_aligned_alloc(
+                Agora_memory::Alignment_t::k32Align, num_encoded_bits));
             for (size_t i = 0; i < num_encoded_bits; i++) {
                 uint8_t bit_i = (encoded[n][i / 8] >> (i % 8)) & 1;
                 llrs[n][i] = (bit_i == 1 ? -127 : 127);
@@ -109,8 +105,10 @@ int main()
         const size_t buffer_len = 1024 * 1024;
         const size_t numMsgBits = num_input_bits - kNumFillerBits;
         ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
-        ldpc_decoder_5gnr_response.varNodes = reinterpret_cast<int16_t*>(
-            memalign(32, buffer_len * sizeof(int16_t)));
+        ldpc_decoder_5gnr_response.varNodes
+            = static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(
+                Agora_memory::Alignment_t::k32Align,
+                buffer_len * sizeof(int16_t)));
 
         // Decoding
         const size_t decoding_start_tsc = rdtsc();
@@ -130,7 +128,7 @@ int main()
             uint8_t* input_buffer = (uint8_t*)input[n];
             uint8_t* output_buffer = decoded[n];
             for (size_t i = 0; i < bits_to_bytes(num_input_bits); i++) {
-                // printf("input: %i, output: %i\n", input_buffer[i],
+                // std::printf("input: %i, output: %i\n", input_buffer[i],
                 // output_buffer[i]);
                 uint8_t error = input_buffer[i] ^ output_buffer[i];
                 for (size_t j = 0; j < 8; j++) {
@@ -143,8 +141,8 @@ int main()
             }
         }
 
-        printf("Zc = %zu, {encoding, decoding}: {%.2f, %.2f} Mbps, {%.2f, "
-               "%.2f} us per code block. Bit errors = %zu, BER = %.3f\n",
+        std::printf("Zc = %zu, {encoding, decoding}: {%.2f, %.2f} Mbps, {%.2f, "
+                    "%.2f} us per code block. Bit errors = %zu, BER = %.3f\n",
             zc, num_input_bits * kNumCodeBlocks / encoding_us,
             num_input_bits * kNumCodeBlocks / decoding_us,
             encoding_us / kNumCodeBlocks, decoding_us / kNumCodeBlocks, err_cnt,
@@ -155,7 +153,7 @@ int main()
             delete[] parity[i];
             delete[] encoded[i];
             delete[] decoded[i];
-            free(llrs[i]);
+            std::free(llrs[i]);
         }
     }
 

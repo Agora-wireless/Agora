@@ -2,7 +2,6 @@
 #define SYMBOLS
 
 #include <mkl.h>
-#include <stdint.h>
 #include <string>
 
 #define EXPORT __attribute__((visibility("default")))

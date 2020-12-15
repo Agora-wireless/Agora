@@ -9,7 +9,6 @@
 #include <emmintrin.h>
 #include <immintrin.h>
 #include <iostream>
-#include <stdio.h>
 
 #define BPSK_LEVEL M_SQRT1_2
 #define QPSK_LEVEL M_SQRT1_2

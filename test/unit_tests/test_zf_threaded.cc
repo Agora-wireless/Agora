@@ -95,7 +95,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     }
     double ms = cycles_to_ms(rdtsc() - start_tsc, cfg->freq_ghz);
 
-    printf("Worker %zu: %zu tasks, time per task = %.4f ms\n", worker_id,
+    std::printf("Worker %zu: %zu tasks, time per task = %.4f ms\n", worker_id,
         num_tasks, ms / num_tasks);
 }
 
@@ -127,9 +127,9 @@ TEST(TestZF, VaryingConfig)
         kMaxUEs * kMaxAntennas);
 
     calib_dl_buffer.rand_alloc_cx_float(
-        kFrameWnd, kMaxDataSCs * kMaxAntennas, 64);
+        kFrameWnd, kMaxDataSCs * kMaxAntennas, Agora_memory::Alignment_t::k64Align);
     calib_ul_buffer.rand_alloc_cx_float(
-        kFrameWnd, kMaxDataSCs * kMaxAntennas, 64);
+        kFrameWnd, kMaxDataSCs * kMaxAntennas, Agora_memory::Alignment_t::k64Align);
 
     auto stats = new Stats(cfg);
 

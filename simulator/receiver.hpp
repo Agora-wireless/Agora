@@ -18,9 +18,6 @@
 #include <netinet/in.h>
 #include <numeric>
 #include <pthread.h>
-#include <stdio.h> /* for fprintf */
-#include <stdlib.h>
-#include <string.h> /* for memcpy */
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>

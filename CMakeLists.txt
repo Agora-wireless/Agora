@@ -24,18 +24,18 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie")
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   message(STATUS "Using GNU compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
-  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -m64")
+  set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -march=native -m64")
   set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl)
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
   message(STATUS "Using Intel compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/intel-compile-options.cmake)
   set(MKL_LIBS -lpthread -lm -ldl)
-  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -mkl=sequential")
+  set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -march=native -mkl=sequential")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
   message(STATUS "Using Clang compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
 else()
-  set(CMAKE_CXX_STANDARD 11)
+  set(CMAKE_CXX_STANDARD 17)
 endif()
 
 # Unit tests
@@ -48,8 +48,18 @@ if(NOT DEBUG)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG")
 else()
+  message(STATUS "Verbose Makefile")
+  set( CMAKE_VERBOSE_MAKEFILE on )
   message(STATUS "Debugging is enabled. Performance will be low")
+  set(CMAKE_BUILD_TYPE Debug)
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ggdb3 -fstack-protector-all -fsanitize=undefined -fsanitize=address -fsanitize=null")
+  #-fsanitize=thread- fstack-protector-all -fsanitize=address -fstack-check
+  #-fsanitize=address -fsanitize=pointer-compare
+  #-fsanitize=address -fsanitize=pointer-subtract
+  #-fsanitize=leak -fsanitize=undefined -fsanitize=null
 endif()
+
+#if(CMAKE_BUILD_TYPE MATCHES Debug)
 
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
@@ -185,11 +195,12 @@ else()
 endif()
 
 include_directories(
-	src/common/
-	src/mac/
+  src/common/
+  src/mac/
   src/agora/
   src/agora/txrx/
   src/client/
+  /usr/include/mkl/
   data/data_generator)
 
 include_directories(SYSTEM src/third_party)
@@ -204,6 +215,7 @@ set(COMMON_SOURCES
   src/common/modulation_srslte.cpp
   src/common/net.cpp
   src/common/crc.cpp
+  src/common/memory_manage.cc
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
   src/encoder/iobuffer.cpp)

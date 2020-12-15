@@ -26,8 +26,6 @@
 #include <linux/if_arp.h>
 #include <linux/if_packet.h>
 #include <sstream>
-#include <stdint.h>
-#include <string.h>
 #include <string>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -170,8 +168,8 @@ static inline std::string frame_header_to_string(const uint8_t* buf)
 static void inline gen_eth_header(
     eth_hdr_t* eth_header, const uint8_t* src_mac, const uint8_t* dst_mac)
 {
-    memcpy(eth_header->src_mac, src_mac, 6);
-    memcpy(eth_header->dst_mac, dst_mac, 6);
+    std::memcpy(eth_header->src_mac, src_mac, 6);
+    std::memcpy(eth_header->dst_mac, dst_mac, 6);
     eth_header->eth_type = htons(kIPEtherType);
 }
 

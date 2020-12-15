@@ -9,10 +9,9 @@
  */
 
 #include "comms-lib.h"
-#include <queue>
-//#include <itpp/itbase.h>
 #include <immintrin.h>
 #include <iomanip>
+#include <queue>
 
 #define USE_AVX
 #define ALIGNMENT 32
@@ -79,7 +78,7 @@ int CommsLib::find_beacon_avx(const std::vector<std::complex<float>>& iq,
     std::cout << "Corr Abs AVX took " << diff2 << " usec" << std::endl;
     std::cout << "Thresh calc AVX took " << diff3 << " usec" << std::endl;
     std::cout << "Peak Detect AVX took " << diff4 << " usec" << std::endl;
-    printf("Saving Corr data\n");
+    std::printf("Saving Corr data\n");
     std::string filename = "corr_simd.bin";
     FILE* fc = fopen(filename.c_str(), "wb");
     float* cdata_ptr = (float*)gold_corr_avx_2.data();

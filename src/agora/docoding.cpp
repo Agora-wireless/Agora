@@ -2,7 +2,6 @@
 #include "concurrent_queue_wrapper.hpp"
 #include "encoder.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
-#include <malloc.h>
 
 static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
@@ -17,18 +16,22 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kEncode, in_tid);
-    parity_buffer = (int8_t*)memalign(64,
-        ldpc_encoding_parity_buf_size(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
-    encoded_buffer_temp = (int8_t*)memalign(64,
-        ldpc_encoding_encoded_buf_size(
-            cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
+    parity_buffer = static_cast<int8_t*>(
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            ldpc_encoding_parity_buf_size(
+                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
+    assert(parity_buffer != nullptr);
+    encoded_buffer_temp = static_cast<int8_t*>(
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            ldpc_encoding_encoded_buf_size(
+                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
+    assert(encoded_buffer_temp != nullptr);
 }
 
 DoEncode::~DoEncode()
 {
-    free(parity_buffer);
-    free(encoded_buffer_temp);
+    std::free(parity_buffer);
+    std::free(encoded_buffer_temp);
 }
 
 Event_data DoEncode::launch(size_t tag)
@@ -40,7 +43,7 @@ Event_data DoEncode::launch(size_t tag)
     size_t cur_cb_id = cb_id % cfg->LDPC_config.nblocksInSymbol;
     size_t ue_id = cb_id / cfg->LDPC_config.nblocksInSymbol;
     if (kDebugPrintInTask) {
-        printf(
+        std::printf(
             "In doEncode thread %d: frame: %zu, symbol: %zu, code block %zu, "
             "ue_id: %zu\n",
             tid, frame_id, symbol_id, cur_cb_id, ue_id);
@@ -60,18 +63,18 @@ Event_data DoEncode::launch(size_t tag)
         reinterpret_cast<uint8_t*>(final_output_ptr),
         bits_to_bytes(LDPC_config.cbCodewLen), cfg->mod_order_bits);
 
-    // printf("Encoded data\n");
+    // std::printf("Encoded data\n");
     // int num_mod = LDPC_config.cbCodewLen / cfg->mod_order_bits;
     // for(int i = 0; i < num_mod; i++) {
-    //     printf("%u ", *(final_output_ptr + i));
+    //     std::printf("%u ", *(final_output_ptr + i));
     // }
-    // printf("\n");
+    // std::printf("\n");
 
     size_t duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
     duration_stat->task_count++;
     if (cycles_to_us(duration, cfg->freq_ghz) > 500) {
-        printf("Thread %d Encode takes %.2f\n", tid,
+        std::printf("Thread %d Encode takes %.2f\n", tid,
             cycles_to_us(duration, cfg->freq_ghz));
     }
 
@@ -89,7 +92,8 @@ DoDecode::DoDecode(Config* in_config, int in_tid,
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
-    resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
+    resp_var_nodes = static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(
+        Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
 }
 
 DoDecode::~DoDecode() { free(resp_var_nodes); }
@@ -106,8 +110,9 @@ Event_data DoDecode::launch(size_t tag)
     const size_t ue_id = cb_id / cfg->LDPC_config.nblocksInSymbol;
     const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
-        printf("In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
-               "%zu, ue: %zu\n",
+        std::printf(
+            "In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
+            "%zu, ue: %zu\n",
             tid, frame_id, symbol_idx_ul, cur_cb_id, ue_id);
     }
 
@@ -155,19 +160,19 @@ Event_data DoDecode::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     if (kPrintLLRData) {
-        printf("LLR data, symbol_offset: %zu\n", symbol_offset);
+        std::printf("LLR data, symbol_offset: %zu\n", symbol_offset);
         for (size_t i = 0; i < LDPC_config.cbCodewLen; i++) {
-            printf("%d ", *(llr_buffer_ptr + i));
+            std::printf("%d ", *(llr_buffer_ptr + i));
         }
-        printf("\n");
+        std::printf("\n");
     }
 
     if (kPrintDecodedData) {
-        printf("Decoded data\n");
+        std::printf("Decoded data\n");
         for (size_t i = 0; i < (LDPC_config.cbLen >> 3); i++) {
-            printf("%u ", *(decoded_buffer_ptr + i));
+            std::printf("%u ", *(decoded_buffer_ptr + i));
         }
-        printf("\n");
+        std::printf("\n");
     }
 
     if (!kEnableMac && kPrintPhyStats && symbol_idx_ul == cfg->UL_PILOT_SYMS) {
@@ -191,7 +196,7 @@ Event_data DoDecode::launch(size_t tag)
     duration_stat->task_duration[0] += duration;
     duration_stat->task_count++;
     if (cycles_to_us(duration, cfg->freq_ghz) > 500) {
-        printf("Thread %d Decode takes %.2f\n", tid,
+        std::printf("Thread %d Decode takes %.2f\n", tid,
             cycles_to_us(duration, cfg->freq_ghz));
     }
 

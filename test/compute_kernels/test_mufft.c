@@ -1,10 +1,4 @@
 #include "mufft/fft.h"
-#include <complex.h>
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <time.h>
 #include <immintrin.h>
 #include "cpu_attach.hpp"
 
@@ -116,16 +110,16 @@ static void run_benchmark_1d(unsigned N, unsigned iterations)
     double mufft_mflops_fft4 = flops / (1000000.0 * mufft_time_fft4);
     double mufft_mflops_ifft = flops / (1000000.0 * mufft_time_ifft);
 
-    printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
             N, mufft_mflops_fft1, 1000000.0 * mufft_time_fft1 / iterations);
-    printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
             N, mufft_mflops_fft2, 1000000.0 * mufft_time_fft2 / iterations);
-    printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
             N, mufft_mflops_fft3, 1000000.0 * mufft_time_fft3 / iterations);
-    printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
             N, mufft_mflops_fft4, 1000000.0 * mufft_time_fft4 / iterations);
 
-    printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
             N, mufft_mflops_ifft, 1000000.0 * mufft_time_ifft / iterations);
 }
 
@@ -134,18 +128,18 @@ int main(int argc, char *argv[])
 {
     if (argc != 3)
     {
-        fprintf(stderr, "Usage: %s [iterations] [Nx]\n",
+        std::fprintf(stderr, "Usage: %s [iterations] [Nx]\n",
                 argv[0]);
         return 1;
     }
 
     // int main_core_id = 2;
     // if(stick_this_thread_to_core(main_core_id) != 0) {
-    //     printf("Main thread: stitch main thread to core %d failed\n", main_core_id);
-    //     exit(0);
+    //     std::printf("Main thread: stitch main thread to core %d failed\n", main_core_id);
+    //     std::exit(0);
     // }
     // else {
-    //     printf("Main thread: stitch main thread to core %d succeeded\n", main_core_id);
+    //     std::printf("Main thread: stitch main thread to core %d succeeded\n", main_core_id);
     // }
 
 	if (argc == 3)

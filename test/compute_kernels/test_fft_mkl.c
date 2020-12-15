@@ -1,14 +1,8 @@
 #include "cpu_attach.hpp"
 #include "mkl_dfti.h"
 #include <cmath>
-#include <complex.h>
 #include <immintrin.h>
 #include <iostream>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
 
 static double fft_get_time(void)
 {
@@ -364,16 +358,16 @@ static void run_benchmark_1d(unsigned N, unsigned iterations)
     double fft_mflops_fft4 = flops / (1000000.0 * fft_time_fft4);
     double fft_mflops_ifft = flops / (1000000.0 * fft_time_ifft);
 
-    printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
-    printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
-    printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
-    printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
 
-    printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
 }
 
@@ -393,16 +387,16 @@ static void run_benchmark_1d_ifft(unsigned N, unsigned iterations)
     double fft_mflops_fft4 = flops / (1000000.0 * fft_time_fft4);
     double fft_mflops_ifft = flops / (1000000.0 * fft_time_ifft);
 
-    printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
-    printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
-    printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
-    printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
 
-    printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
 }
 
@@ -422,20 +416,20 @@ static void run_benchmark_data_type(unsigned N, unsigned iterations)
     double fft_mflops_fft4 = flops / (1000000.0 * fft_time_fft4);
     double fft_mflops_ifft = flops / (1000000.0 * fft_time_ifft);
 
-    printf("data type convert :              %06u %12.3f Mflops %12.3f us "
+    std::printf("data type convert :              %06u %12.3f Mflops %12.3f us "
            "iteration\n",
         N, fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
-    printf("data type convert :              %06u %12.3f Mflops %12.3f us "
+    std::printf("data type convert :              %06u %12.3f Mflops %12.3f us "
            "iteration\n",
         N, fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
-    printf("data type convert :              %06u %12.3f Mflops %12.3f us "
+    std::printf("data type convert :              %06u %12.3f Mflops %12.3f us "
            "iteration\n",
         N, fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
-    printf("data type convert :              %06u %12.3f Mflops %12.3f us "
+    std::printf("data type convert :              %06u %12.3f Mflops %12.3f us "
            "iteration\n",
         N, fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
 
-    printf("data type convert :              %06u %12.3f Mflops %12.3f us "
+    std::printf("data type convert :              %06u %12.3f Mflops %12.3f us "
            "iteration\n",
         N, fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
 }
@@ -456,16 +450,16 @@ static void run_benchmark_demod(unsigned N, unsigned iterations)
     double fft_mflops_fft4 = flops / (1000000.0 * fft_time_fft4);
     double fft_mflops_ifft = flops / (1000000.0 * fft_time_ifft);
 
-    printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
-    printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
-    printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
-    printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
 
-    printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
+    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
         fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
 }
 
@@ -475,17 +469,17 @@ int main(int argc, char* argv[])
     // putenv("MKL_ENABLE_INSTRUCTIONS=AVX2");
     // putenv("MKL_VERBOSE=1");
     if (argc != 4) {
-        fprintf(stderr, "Usage: %s [iterations] [Nx] [mode]\n", argv[0]);
+        std::fprintf(stderr, "Usage: %s [iterations] [Nx] [mode]\n", argv[0]);
         return 1;
     }
 
     int main_core_id = 2;
     if (stick_this_thread_to_core(main_core_id) != 0) {
-        printf("Main thread: stitch main thread to core %d failed\n",
+        std::printf("Main thread: stitch main thread to core %d failed\n",
             main_core_id);
-        exit(0);
+        std::exit(0);
     } else {
-        printf("Main thread: stitch main thread to core %d succeeded\n",
+        std::printf("Main thread: stitch main thread to core %d succeeded\n",
             main_core_id);
     }
 

@@ -5,8 +5,6 @@
 #include <ctime>
 #include <immintrin.h>
 #include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
 #include <vector>
 
 #include <boost/align/aligned_allocator.hpp>
@@ -26,7 +24,6 @@ struct complex_float {
 typedef std::vector<complex_float,
     boost::alignment::aligned_allocator<complex_float, 128>>
     myVec;
-using namespace std;
 using namespace arma;
 typedef cx_float COMPLEX;
 
@@ -46,10 +43,10 @@ void saveData(char* filename, complex_float* ptr, int row, int col)
     FILE* fp = fopen(filename, "w");
     for (int i = 0; i < row; i++) {
         for (int j = 0; j < col; j++) {
-            fprintf(fp, "%6.5f+%6.5fi  ", ptr[i * col + j].real,
+            std::fprintf(fp, "%6.5f+%6.5fi  ", ptr[i * col + j].real,
                 ptr[i * col + j].imag);
         }
-        fprintf(fp, "\n");
+        std::fprintf(fp, "\n");
     }
     fclose(fp);
 }
@@ -58,7 +55,7 @@ int main(int argc, char** argv)
 {
 
     srand(0);
-    printf("test\n");
+    std::printf("test\n");
     myVec buffer;
     myVec buffer_trans;
     buffer.resize(BS_ANT * OFDM);
@@ -92,7 +89,7 @@ int main(int argc, char** argv)
     for (int i = 0; i < LOOP_NUM; ++i) {
         // just copy
         for (int j = 0; j < BS_ANT; j++) {
-            // memcpy(buffer_trans.data() + j * OFDM, buffer.data() + j * OFDM,
+            // std::memcpy(buffer_trans.data() + j * OFDM, buffer.data() + j * OFDM,
             // sizeof(complex_float) * OFDM);
             std::copy(buffer.data() + j * OFDM, buffer.data() + (j + 1) * OFDM,
                 buffer_trans.data() + j * OFDM);
@@ -100,7 +97,7 @@ int main(int argc, char** argv)
     }
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> diff = end - begin;
-    printf("memcpy copy time %f\n", diff.count());
+    std::printf("std::memcpy copy time %f\n", diff.count());
 
     flushCache();
     begin = std::chrono::system_clock::now();
@@ -114,7 +111,7 @@ int main(int argc, char** argv)
     }
     end = std::chrono::system_clock::now();
     diff = end - begin;
-    printf("naive copy time %f\n", diff.count());
+    std::printf("naive copy time %f\n", diff.count());
 
     flushCache();
     begin = std::chrono::system_clock::now();
@@ -130,7 +127,7 @@ int main(int argc, char** argv)
     }
     end = std::chrono::system_clock::now();
     diff = end - begin;
-    printf("avx2 __m256 copy time %f\n", diff.count());
+    std::printf("avx2 __m256 copy time %f\n", diff.count());
 
     flushCache();
     begin = std::chrono::system_clock::now();
@@ -144,14 +141,14 @@ int main(int argc, char** argv)
     }
     end = std::chrono::system_clock::now();
     diff = end - begin;
-    printf("naive trans time %f\n", diff.count());
+    std::printf("naive trans time %f\n", diff.count());
 
     flushCache();
     begin = std::chrono::system_clock::now();
     for (int i = 0; i < LOOP_NUM; ++i) {
         // just copy
         for (int j = 0; j < BS_ANT; j++) {
-            memcpy(buffer_trans.data() + j * OFDM, buffer.data() + j * OFDM,
+            std::memcpy(buffer_trans.data() + j * OFDM, buffer.data() + j * OFDM,
                 sizeof(complex_float) * OFDM);
         }
         cx_float* mat_ptr = (cx_float*)buffer_trans.data();
@@ -160,7 +157,7 @@ int main(int argc, char** argv)
     }
     end = std::chrono::system_clock::now();
     diff = end - begin;
-    printf("armadillo trans time %f\n", diff.count());
+    std::printf("armadillo trans time %f\n", diff.count());
 
     flushCache();
     begin = std::chrono::system_clock::now();
@@ -180,7 +177,7 @@ int main(int argc, char** argv)
     }
     end = std::chrono::system_clock::now();
     diff = end - begin;
-    printf("only precoding time %f\n", diff.count());
+    std::printf("only precoding time %f\n", diff.count());
 
     flushCache();
     begin = std::chrono::system_clock::now();
@@ -216,7 +213,7 @@ int main(int argc, char** argv)
     }
     end = std::chrono::system_clock::now();
     diff = end - begin;
-    printf("naive trans and precoding time %f\n", diff.count());
+    std::printf("naive trans and precoding time %f\n", diff.count());
 
     flushCache();
     begin = std::chrono::system_clock::now();
@@ -241,7 +238,7 @@ int main(int argc, char** argv)
     }
     end = std::chrono::system_clock::now();
     diff = end - begin;
-    printf("no copy and (read trans) precoding time %f\n", diff.count());
+    std::printf("no copy and (read trans) precoding time %f\n", diff.count());
 
     flushCache();
     begin = std::chrono::system_clock::now();
@@ -274,7 +271,7 @@ int main(int argc, char** argv)
     }
     end = std::chrono::system_clock::now();
     diff = end - begin;
-    printf("no copy and (SIMD read) precoding time %f\n", diff.count());
+    std::printf("no copy and (SIMD read) precoding time %f\n", diff.count());
 
     flushCache();
     begin = std::chrono::system_clock::now();
@@ -298,7 +295,7 @@ int main(int argc, char** argv)
     }
     end = std::chrono::system_clock::now();
     diff = end - begin;
-    printf("block trans time %f\n", diff.count());
+    std::printf("block trans time %f\n", diff.count());
 
     flushCache();
     begin = std::chrono::system_clock::now();
@@ -362,6 +359,6 @@ int main(int argc, char** argv)
     }
     end = std::chrono::system_clock::now();
     diff = end - begin;
-    printf("no copy and (SIMD read trans) precoding time %f\n", diff.count());
+    std::printf("no copy and (SIMD read trans) precoding time %f\n", diff.count());
     saveData("data_trans_block.txt", buffer_trans.data(), OFDM * BS_ANT / 4, 4);
 }

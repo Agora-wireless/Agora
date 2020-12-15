@@ -8,7 +8,6 @@
 #include "utils_ldpc.hpp"
 #include <bitset>
 #include <gtest/gtest.h>
-#include <malloc.h>
 
 static constexpr size_t kSIMDTestNum = 1024;
 
@@ -25,23 +24,23 @@ TEST(Modulation, adapt_bits_for_mod_one)
 
     adapt_bits_for_mod(&input[0], &output[0], kInputBytes, kModOrder);
 
-    printf("adapt_bits_for_mod test input (%zu B): ", kInputBytes);
+    std::printf("adapt_bits_for_mod test input (%zu B): ", kInputBytes);
     for (size_t i = 0; i < kInputBytes; i++) {
-        printf("%s ", std::bitset<8>(input[i]).to_string().c_str());
+        std::printf("%s ", std::bitset<8>(input[i]).to_string().c_str());
     }
-    printf("\noutput (%zu B): ", output.size());
+    std::printf("\noutput (%zu B): ", output.size());
     for (size_t i = 0; i < output.size(); i++) {
-        printf("%s ", std::bitset<8>(output[i]).to_string().c_str());
+        std::printf("%s ", std::bitset<8>(output[i]).to_string().c_str());
     }
 
     std::vector<uint8_t> regen_input(kInputBytes);
     adapt_bits_from_mod(&output[0], &regen_input[0], output.size(), kModOrder);
 
-    printf("\nregenerated input (%zu B): ", kInputBytes);
+    std::printf("\nregenerated input (%zu B): ", kInputBytes);
     for (size_t i = 0; i < kInputBytes; i++) {
-        printf("%s ", std::bitset<8>(regen_input[i]).to_string().c_str());
+        std::printf("%s ", std::bitset<8>(regen_input[i]).to_string().c_str());
     }
-    printf("\n");
+    std::printf("\n");
 
     ASSERT_EQ(input, regen_input);
 }
@@ -92,26 +91,26 @@ TEST(SIMD, float_32_to_16)
 {
     constexpr float allowed_error = 1e-3;
     float* in_buf
-        = reinterpret_cast<float*>(memalign(64, kSIMDTestNum * sizeof(float)));
+        = static_cast<float*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, kSIMDTestNum * sizeof(float)));
     for (size_t i = 0; i < kSIMDTestNum; i++) {
         in_buf[i] = static_cast<float>(rand()) / (RAND_MAX * 1.0);
     }
 
-    float* medium = reinterpret_cast<float*>(
-        memalign(64, kSIMDTestNum / 2 * sizeof(float)));
+    float* medium = static_cast<float*>(
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, kSIMDTestNum / 2 * sizeof(float)));
     simd_convert_float32_to_float16(medium, in_buf, kSIMDTestNum);
 
     float* out_buf
-        = reinterpret_cast<float*>(memalign(64, kSIMDTestNum * sizeof(float)));
+        = static_cast<float*>(Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, kSIMDTestNum * sizeof(float)));
     simd_convert_float16_to_float32(out_buf, medium, kSIMDTestNum);
 
     for (size_t i = 0; i < kSIMDTestNum; i++) {
         ASSERT_LE(abs(in_buf[i] - out_buf[i]), allowed_error);
     }
 
-    free(in_buf);
-    free(medium);
-    free(out_buf);
+    std::free(in_buf);
+    std::free(medium);
+    std::free(out_buf);
 }
 
 int main(int argc, char** argv)

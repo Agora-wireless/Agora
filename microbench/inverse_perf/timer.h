@@ -1,9 +1,5 @@
 #pragma once
 
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -40,7 +36,7 @@ static double measure_rdtsc_freq() {
   }
 
   if (sum != 13580802877818827968ull) {
-    exit(-1);
+    std::exit(-1);
   }
 
   clock_gettime(CLOCK_REALTIME, &end);

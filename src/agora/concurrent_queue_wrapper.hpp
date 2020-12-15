@@ -12,7 +12,7 @@ static inline void try_enqueue_fallback(
     moodycamel::ProducerToken* producer_token, const Event_data& event)
 {
     if (!mc_queue->try_enqueue(*producer_token, event)) {
-        printf("Need more memory\n");
+        std::printf("Need more memory\n");
         rt_assert(mc_queue->enqueue(*producer_token, event),
             "Message enqueue failed");
     }
@@ -24,7 +24,7 @@ static inline void try_enqueue_fallback(
     moodycamel::ConcurrentQueue<Event_data>* mc_queue, const Event_data& event)
 {
     if (!mc_queue->try_enqueue(event)) {
-        printf("Need more memory\n");
+        std::printf("Need more memory\n");
         rt_assert(mc_queue->enqueue(event), "Message enqueue failed");
     }
 }
@@ -38,7 +38,7 @@ static inline void try_enqueue_bulk_fallback(
 {
 
     if (!mc_queue.try_enqueue_bulk(producer_token, event_list, num_events)) {
-        printf("Need more memory\n");
+        std::printf("Need more memory\n");
         rt_assert(mc_queue.enqueue_bulk(producer_token, event_list, num_events),
             "Message bulk enqueue failed\n");
     }

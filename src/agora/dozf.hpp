@@ -11,8 +11,6 @@
 #include "utils.h"
 #include <armadillo>
 #include <iostream>
-#include <stdio.h>
-#include <string.h>
 
 class DoZF : public Doer {
 public:

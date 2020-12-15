@@ -136,7 +136,7 @@ static inline void convert_float_to_12bit_iq(
                       << std::bitset<8>(out_buf[index_short]) << " "
                       << std::bitset<8>(out_buf[index_short + 1]) << " "
                       << std::bitset<8>(out_buf[index_short + 2]) << std::endl;
-            printf("Original: %.4f+%.4fi \n", in_buf[i], in_buf[i + 1]);
+            std::printf("Original: %.4f+%.4fi \n", in_buf[i], in_buf[i + 1]);
         }
         index_short += 3;
     }

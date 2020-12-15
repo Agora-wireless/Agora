@@ -5,6 +5,7 @@
  */
 
 #include "cyclic_shift.hpp"
+#include <cstring> /* std::strerror, std::memset, std::memcpy */
 
 namespace avx2enc {
 inline __m256i cycle_bit_shift_2to64(
@@ -70,7 +71,7 @@ inline __m256i cycle_bit_shift_72to128(
     // shift by bytes
     x0 = _mm256_shuffle_epi8(data, shift_mask0);
 
-    // shift remaining bits
+    // shift remaining memcpybits
     uint8_t* p_data = (uint8_t*)&x0;
     p_out[zc_in_bytes - 1] = (p_data[zc_in_bytes - 1] >> bit_shift)
         | (p_data[0] << (8 - bit_shift));
@@ -114,16 +115,17 @@ inline __m256i cycle_bit_shift_144to256(
     //     p_out_0[i] = p_in[i-zc_in_shorts+packed_shift];
     // }
 
-    memcpy(p_out_0, p_in + packed_shift,
+    std::memcpy(p_out_0, p_in + packed_shift,
         (zc_in_shorts - packed_shift) * sizeof(uint16_t));
-    memcpy(p_out_0 + zc_in_shorts - packed_shift, p_in,
+    std::memcpy(p_out_0 + zc_in_shorts - packed_shift, p_in,
         packed_shift * sizeof(uint16_t));
-    memset(p_out_0 + zc_in_shorts, 0, 32 - zc_in_shorts * sizeof(uint16_t));
+    std::memset(
+        p_out_0 + zc_in_shorts, 0, 32 - zc_in_shorts * sizeof(uint16_t));
 
     x1 = _mm256_srli_si256(x0, 2);
 
-    memcpy(p_out_1 + 7, p_out_0 + 8, 2);
-    memcpy(p_out_1 + zc_in_shorts - 1, p_out_0, 2);
+    std::memcpy(p_out_1 + 7, p_out_0 + 8, 2);
+    std::memcpy(p_out_1 + zc_in_shorts - 1, p_out_0, 2);
     // p_out_1[7] = p_out_0[8];
     // p_out_1[zc_in_shorts-1] = p_out_0[0];
 
