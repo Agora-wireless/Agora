@@ -89,26 +89,6 @@ public:
     std::vector<std::string> radio_ids;
     std::vector<std::string> hub_ids;
 
-    // beaconSymbols[i] contains IDs of beacon symbols in frames_[i]
-    std::vector<std::vector<size_t>> beaconSymbols;
-
-    // pilotSymbols[i] contains IDs of pilot symbols in frames_[i]
-    std::vector<std::vector<size_t>> pilotSymbols;
-
-    // ULSymbols[i] contains IDs of uplink data symbols in frames_[i]
-    std::vector<std::vector<size_t>> ULSymbols;
-
-    // DLSymbols[i] contains IDs of downlink data symbols in frames_[i]
-    std::vector<std::vector<size_t>> DLSymbols;
-
-    // ULCalSymbols[i] contains IDs of uplink calibration symbols in
-    // frames_[i]
-    std::vector<std::vector<size_t>> ULCalSymbols;
-
-    // DLCalSymbols[i] contains IDs of downlink calibration symbols in
-    // frames_[i]
-    std::vector<std::vector<size_t>> DLCalSymbols;
-
     // Controls whether the synchronization and frame time keeping is done
     // in hardware or software
     // true: use hardware correlator; false: use software corrleator
@@ -466,7 +446,13 @@ public:
 
     inline bool   downlink_mode( void )           const { return this->downlink_mode_; }
     inline const  LDPCconfig& ldpc_config( void ) const { return this->ldpc_config_; }
-    inline const  std::vector<std::string>& frames( void ) const { return this->frames_; }
+
+    inline const std::vector<std::string>& frames( void ) const { return this->frames_; }
+
+    inline const std::vector<std::vector<size_t>>& pilot_symbols  ( void ) const { return this->pilot_symbols_; }
+    inline const std::vector<std::vector<size_t>>& ul_symbols     ( void ) const { return this->ul_symbols_; }
+    inline const std::vector<std::vector<size_t>>& dl_symbols     ( void ) const { return this->dl_symbols_; }
+    inline const std::vector<std::vector<size_t>>& dl_cal_symbols ( void ) const { return this->dl_cal_symbols_; }
 
     inline void   running( bool value ) { this->running_.store(value); }
     inline bool   running( void ) const { return this->running_.load(); }
@@ -518,6 +504,26 @@ private:
     // A string in \p frames_ contains letters representing the symbol types in
     // the frame (e.g., 'P' for pilot symbols, 'U' for uplink data symbols)
     std::vector<std::string> frames_;
+
+    // beacon_symbols_[i] contains IDs of beacon symbols in frames_[i]
+    std::vector<std::vector<size_t>> beacon_symbols_; /* No accessor */
+
+    // pilot_symbols_[i] contains IDs of pilot symbols in frames_[i]
+    std::vector<std::vector<size_t>> pilot_symbols_;
+
+    // ul_symbols_[i] contains IDs of uplink data symbols in frames_[i]
+    std::vector<std::vector<size_t>> ul_symbols_;
+
+    // dl_symbols_[i] contains IDs of downlink data symbols in frames_[i]
+    std::vector<std::vector<size_t>> dl_symbols_;
+
+    // ul_cal_symbols_[i] contains IDs of uplink calibration symbols in
+    // frames_[i]
+    std::vector<std::vector<size_t>> ul_cal_symbols_; /* No accessor */
+
+    // dl_cal_symbols_[i] contains IDs of downlink calibration symbols in
+    // frames_[i]
+    std::vector<std::vector<size_t>> dl_cal_symbols_;
 
     std::atomic<bool> running_;
 

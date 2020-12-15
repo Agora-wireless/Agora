@@ -40,7 +40,7 @@ RadioTXRX::~RadioTXRX()
 }
 
 bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
-    int in_buffer_frame_num, int in_buffer_length, char* in_tx_buffer,
+    size_t in_buffer_frame_num, size_t in_buffer_length, char* in_tx_buffer,
     int* in_tx_buffer_status, int in_tx_buffer_frame_num,
     int in_tx_buffer_length)
 {
@@ -162,7 +162,7 @@ int RadioTXRX::dequeue_send(int tid)
                 std::printf(
                     "In TX thread %d: Transmitted frame %zu, data symbol %zu, "
                     "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-                    tid, frame_id, c->ULSymbols[0][symbol_id], ant_id,
+                    tid, frame_id, c->ul_symbols()[0][symbol_id], ant_id,
                     gen_tag_t(event.tags[0])._tag, offset,
                     message_queue_->size_approx());
             }
@@ -170,7 +170,7 @@ int RadioTXRX::dequeue_send(int tid)
             auto* pkt
                 = (struct Packet*)(tx_buffer_ + offset * c->packet_length);
             new (pkt) Packet(
-                frame_id, c->ULSymbols[0][symbol_id], 0 /* cell_id */, ant_id);
+                frame_id, c->ul_symbols()[0][symbol_id], 0 /* cell_id */, ant_id);
 
             // Send data (one OFDM symbol)
             ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length,
@@ -192,12 +192,12 @@ int RadioTXRX::dequeue_send(int tid)
                 std::printf("In TX thread %d: Transmitted pilot in frame %zu, "
                             "symbol %zu, "
                             "ant %zu\n",
-                    tid, frame_id, c->pilotSymbols[0][symbol_idx], ant_id);
+                    tid, frame_id, c->pilot_symbols()[0][symbol_idx], ant_id);
             }
 
             auto* pkt = (symbol_idx == ant_id) ? (struct Packet*)pilot.data()
                                                : (struct Packet*)zeros.data();
-            new (pkt) Packet(frame_id, c->pilotSymbols[0][symbol_idx],
+            new (pkt) Packet(frame_id, c->pilot_symbols()[0][symbol_idx],
                 0 /* cell_id */, ant_id);
             // Send pilots
             ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length,
@@ -282,7 +282,7 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
 
     // Transmit pilot
     if (!c->hw_framer) {
-        size_t pilot_symbol_id = c->pilotSymbols[0][ant_id];
+        size_t pilot_symbol_id = c->pilot_symbols()[0][ant_id];
 
         txTime = time0 + tx_frame_id * frm_num_samps
             + pilot_symbol_id * num_samps - c->cl_tx_advance;
@@ -292,7 +292,7 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
             std::cout << "BAD Write: (PILOT)" << r << "/" << num_samps
                       << std::endl;
         if (c->nChannels == 2) {
-            pilot_symbol_id = c->pilotSymbols[0][ant_id + 1];
+            pilot_symbol_id = c->pilot_symbols()[0][ant_id + 1];
             txTime = time0 + tx_frame_id * frm_num_samps
                 + pilot_symbol_id * num_samps - c->cl_tx_advance;
             r = radio->radioTx(ue_id, pilot_buff1.data(), num_samps, 2, txTime);
@@ -305,7 +305,7 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
     // Transmit data
     for (size_t symbol_id = 0; symbol_id < c->ul_data_symbol_num_perframe();
          symbol_id++) {
-        size_t tx_symbol_id = c->ULSymbols[0][symbol_id];
+        size_t tx_symbol_id = c->ul_symbols()[0][symbol_id];
         size_t offset = (c->get_total_data_symbol_idx_ul(frame_id, symbol_id)
                             * c->ue_ant_num())
             + ant_id;
@@ -322,7 +322,7 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0)
             : time0 + tx_frame_id * frm_num_samps + tx_symbol_id * num_samps
                 - c->cl_tx_advance;
         int flags_tx_symbol = 1; // HAS_TIME
-        if (tx_symbol_id == c->ULSymbols[0].back())
+        if (tx_symbol_id == c->ul_symbols()[0].back())
             flags_tx_symbol = 2; // HAS_TIME & END_BURST, fixme
         r = radio->radioTx(ue_id, txbuf, num_samps, flags_tx_symbol, txTime);
         if (r < num_samps)

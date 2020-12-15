@@ -253,9 +253,9 @@ void Phy_UE::start()
                     "slowly, e.g., in debug mode");
 
                 size_t dl_symbol_id = 0;
-                if (config_->DLSymbols.size() > 0
-                    && config_->DLSymbols[0].size() > 0)
-                    dl_symbol_id = config_->DLSymbols[0][0];
+                if (config_->dl_symbols().size() > 0
+                    && config_->dl_symbols()[0].size() > 0)
+                    dl_symbol_id = config_->dl_symbols()[0][0];
 
                 if (symbol_id == 0 // Beacon in Sim mode!
                     || (!config_->hw_framer && ul_data_symbol_perframe == 0
@@ -263,7 +263,7 @@ void Phy_UE::start()
                                == dl_symbol_id)) { // Send uplink pilots
                     Event_data do_tx_pilot_task(EventType::kPacketPilotTX,
                         gen_tag_t::frm_sym_ue(
-                            frame_id, config_->pilotSymbols[0][ant_id], ant_id)
+                            frame_id, config_->pilot_symbols()[0][ant_id], ant_id)
                             ._tag);
                     schedule_task(do_tx_pilot_task, &tx_queue_,
                         *tx_ptoks_ptr[ant_id % rx_thread_num]);
@@ -282,7 +282,7 @@ void Phy_UE::start()
                 if (dl_data_symbol_perframe > 0
                     && (config_->isPilot(frame_id, symbol_id)
                            || config_->isDownlink(frame_id, symbol_id))) {
-                    if (dl_symbol_id == config_->DLSymbols[0][0])
+                    if (dl_symbol_id == config_->dl_symbols()[0][0])
                         frame_dl_process_time_[(frame_id % kFrameWnd) * kMaxUEs
                             + ant_id]
                             = get_time_us();

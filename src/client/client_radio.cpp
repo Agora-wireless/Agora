@@ -257,10 +257,10 @@ bool ClientRadioConfig::radioStart()
         for (size_t s = 0; s < _cfg->frames().at(0).size(); s++) {
             char c = _cfg->frames().at(0).at(s);
             if (c == 'P'
-                and ((_cfg->nChannels == 1 and _cfg->pilotSymbols[0][r] != s)
+                and ((_cfg->nChannels == 1 and _cfg->pilot_symbols()[0][r] != s)
                         or (_cfg->nChannels == 2
-                               and (_cfg->pilotSymbols[0][2 * r] != s
-                                       and _cfg->pilotSymbols[0][r * 2 + 1]
+                               and (_cfg->pilot_symbols()[0][2 * r] != s
+                                       and _cfg->pilot_symbols()[0][r * 2 + 1]
                                            != s)))) // TODO: change this for
                 // orthogonal pilots
                 _tddSched[r].replace(s, 1, "G");

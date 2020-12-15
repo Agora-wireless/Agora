@@ -78,7 +78,7 @@ public:
      * @param in_buffer_length: size of ring buffer in bytes
      */
     bool startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
-        int in_buffer_frame_num, int in_buffer_length, char* in_tx_buffer,
+        size_t in_buffer_frame_num, size_t in_buffer_length, char* in_tx_buffer,
         int* in_tx_buffer_status, int in_tx_buffer_frame_num,
         int in_tx_buffer_length);
 

@@ -116,7 +116,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
     int nChannels = c->nChannels;
     int ch = ant_id % nChannels;
 
-    if (c->recipCalEn && symbol_id == c->DLSymbols[0].front()) {
+    if (c->recipCalEn && symbol_id == c->dl_symbols()[0].front()) {
         std::vector<std::complex<int16_t>> zeros(
             c->sampsPerSymbol, std::complex<int16_t>(0, 0));
         for (size_t s = 0; s < c->ant_per_group; s++) {
@@ -126,7 +126,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
                 ? c->pilot_ci16.data()
                 : zeros.data();
             long long frameTime = ((long long)(frame_id + TX_FRAME_DELTA) << 32)
-                | (c->DLCalSymbols[0][s] << 16);
+                | (c->dl_cal_symbols()[0][s] << 16);
             radioconfig_->radioTx(ant_id / nChannels, txbuf, 1, frameTime);
         }
     }
@@ -145,7 +145,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
         txbuf[ch] = (void*)pkt->data;
     }
 
-    size_t last = c->DLSymbols[0].back();
+    size_t last = c->dl_symbols()[0].back();
     int flags = (symbol_id != last) ? 1 // HAS_TIME
                                     : 2; // HAS_TIME & END_BURST, fixme
     frame_id += TX_FRAME_DELTA;

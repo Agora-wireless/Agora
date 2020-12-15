@@ -2,9 +2,7 @@
 #include "utils_ldpc.hpp"
 #include <boost/range/algorithm/count.hpp>
 
-
 static const size_t kDefaultSymbolNumPerFrame = 70;
-
 
 Config::Config(std::string jsonfile)
     : freq_ghz(measure_rdtsc_freq()), ldpc_config_(0, 0, 0, 0, 0, 0, 0, 0)
@@ -179,28 +177,28 @@ Config::Config(std::string jsonfile)
         }
     }
 
-    beaconSymbols = Utils::loadSymbols(frames_, 'B');
-    pilotSymbols = Utils::loadSymbols(frames_, 'P');
-    ULSymbols = Utils::loadSymbols(frames_, 'U');
-    DLSymbols = Utils::loadSymbols(frames_, 'D');
-    ULCalSymbols = Utils::loadSymbols(frames_, 'L');
-    DLCalSymbols = Utils::loadSymbols(frames_, 'C');
-    recipCalEn = (ULCalSymbols[0].size() > 0 and DLCalSymbols[0].size() > 0);
-    ant_per_group = DLCalSymbols[0].size();
+    beacon_symbols_ = Utils::loadSymbols(frames_, 'B');
+    pilot_symbols_ = Utils::loadSymbols(frames_, 'P');
+    ul_symbols_ = Utils::loadSymbols(frames_, 'U');
+    dl_symbols_ = Utils::loadSymbols(frames_, 'D');
+    ul_cal_symbols_ = Utils::loadSymbols(frames_, 'L');
+    dl_cal_symbols_ = Utils::loadSymbols(frames_, 'C');
+    recipCalEn = (ul_cal_symbols_[0].size() > 0 and dl_cal_symbols_[0].size() > 0);
+    ant_per_group = dl_cal_symbols_[0].size();
     ant_group_num = recipCalEn ? bf_ant_num_ / ant_per_group : 0;
 
     symbol_num_perframe = frames_.at(0).size();
-    beacon_symbol_num_perframe = beaconSymbols[0].size();
-    pilot_symbol_num_perframe = pilotSymbols[0].size();
+    beacon_symbol_num_perframe = beacon_symbols_[0].size();
+    pilot_symbol_num_perframe = pilot_symbols_[0].size();
     data_symbol_num_perframe = symbol_num_perframe - pilot_symbol_num_perframe
         - beacon_symbol_num_perframe;
-    ul_data_symbol_num_perframe_ = ULSymbols[0].size();
-    dl_data_symbol_num_perframe_ = DLSymbols[0].size();
+    ul_data_symbol_num_perframe_ = ul_symbols_[0].size();
+    dl_data_symbol_num_perframe_ = dl_symbols_[0].size();
     downlink_mode_ = dl_data_symbol_num_perframe_ > 0;
     dl_data_symbol_start_
-        = dl_data_symbol_num_perframe_ > 0 ? DLSymbols[0].front() : 0;
+        = dl_data_symbol_num_perframe_ > 0 ? dl_symbols_[0].front() : 0;
     dl_data_symbol_end_
-        = dl_data_symbol_num_perframe_ > 0 ? DLSymbols[0].back() + 1 : 0;
+        = dl_data_symbol_num_perframe_ > 0 ? dl_symbols_[0].back() + 1 : 0;
     recip_pilot_symbol_num_perframe = recipCalEn ? 1 : 0;
 
     if (isUE and !freq_orthogonal_pilot
@@ -696,17 +694,17 @@ Config::~Config()
 int Config::getSymbolId(size_t symbol_id)
 {
     return (symbol_id < pilot_symbol_num_perframe
-            ? pilotSymbols[0][symbol_id]
-            : ULSymbols[0][symbol_id - pilot_symbol_num_perframe]);
+            ? pilot_symbols_[0][symbol_id]
+            : ul_symbols_[0][symbol_id - pilot_symbol_num_perframe]);
 }
 
 size_t Config::get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
 {
     size_t fid = frame_id % frames_.size();
     const auto it
-        = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
-    if (it != DLSymbols[fid].end())
-        return it - DLSymbols[fid].begin();
+        = std::find(dl_symbols_[fid].begin(), dl_symbols_[fid].end(), symbol_id);
+    if (it != dl_symbols_[fid].end())
+        return it - dl_symbols_[fid].begin();
     else
         return SIZE_MAX;
 }
@@ -715,13 +713,13 @@ size_t Config::get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const
 {
     size_t fid = frame_id % frames_.size();
     const auto it
-        = find(pilotSymbols[fid].begin(), pilotSymbols[fid].end(), symbol_id);
-    if (it != pilotSymbols[fid].end()) {
+        = std::find(pilot_symbols_[fid].begin(), pilot_symbols_[fid].end(), symbol_id);
+    if (it != pilot_symbols_[fid].end()) {
 #ifdef DEBUG3
         std::printf("get_pilot_symbol_idx(%zu, %zu) = %zu\n", frame_id,
-            symbol_id, it - pilotSymbols[fid].begin());
+            symbol_id, it - pilot_symbols_[fid].begin());
 #endif
-        return it - pilotSymbols[fid].begin();
+        return it - pilot_symbols_[fid].begin();
     } else
         return SIZE_MAX;
 }
@@ -730,13 +728,13 @@ size_t Config::get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const
 {
     size_t fid = frame_id % frames_.size();
     const auto it
-        = find(ULSymbols[fid].begin(), ULSymbols[fid].end(), symbol_id);
-    if (it != ULSymbols[fid].end()) {
+        = std::find(ul_symbols_[fid].begin(), ul_symbols_[fid].end(), symbol_id);
+    if (it != ul_symbols_[fid].end()) {
 #ifdef DEBUG3
         std::printf("get_ul_symbol_idx(%zu, %zu) = %zu\n", frame_id, symbol_id,
-            it - ULSymbols[fid].begin());
+            it - ul_symbols_[fid].begin());
 #endif
-        return it - ULSymbols[fid].begin();
+        return it - ul_symbols_[fid].begin();
     } else
         return SIZE_MAX;
 }
@@ -751,10 +749,10 @@ bool Config::isPilot(size_t frame_id, size_t symbol_id)
 #endif
     if (isUE) {
         std::vector<size_t>::iterator it;
-        it = find(DLSymbols[fid].begin(), DLSymbols[fid].end(), symbol_id);
+        it = std::find(dl_symbols_[fid].begin(), dl_symbols_[fid].end(), symbol_id);
         int ind = dl_pilot_syms_;
-        if (it != DLSymbols[fid].end())
-            ind = it - DLSymbols[fid].begin();
+        if (it != dl_symbols_[fid].end())
+            ind = it - dl_symbols_[fid].begin();
         return (ind < (int)dl_pilot_syms_);
         // return cfg->frames_[fid].at(symbol_id) == 'P' ? true : false;
     } else

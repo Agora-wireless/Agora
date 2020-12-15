@@ -320,7 +320,7 @@ void Agora::start()
                              i++) {
                             if (encode_cur_frame_for_symbol[i] == frame_id) {
                                 schedule_subcarriers(EventType::kPrecode,
-                                    frame_id, cfg->DLSymbols[0][i]);
+                                    frame_id, cfg->dl_symbols()[0][i]);
                             }
                         }
                     }
@@ -494,7 +494,7 @@ void Agora::start()
                     print_per_symbol_done(
                         PrintType::kPacketTX, frame_id, symbol_idx_dl);
                     /* If tx of the first symbol is done */
-                    if (symbol_id == cfg->DLSymbols[0].front()) {
+                    if (symbol_id == cfg->dl_symbols()[0].front()) {
                         stats->master_set_tsc(
                             TsType::kTXProcessedFirst, frame_id);
                         print_per_frame_done(
@@ -836,7 +836,7 @@ void Agora::update_rx_counters(size_t frame_id, size_t symbol_id)
         // schedule this frame's encoding
         for (size_t i = 0; i < config_->dl_data_symbol_num_perframe(); i++)
             schedule_codeblocks(
-                EventType::kEncode, frame_id, config_->DLSymbols[0][i]);
+                EventType::kEncode, frame_id, config_->dl_symbols()[0][i]);
         stats->master_set_tsc(TsType::kPilotRX, frame_id);
         if (kDebugPrintPerFrameStart) {
             const size_t prev_frame_slot

@@ -218,7 +218,7 @@ int PacketTXRX::dequeue_send_usrp(int tid)
         txbuf[ch] = reinterpret_cast<void*>(pkt->data);
     }
 
-    size_t last = c->DLSymbols[0].back();
+    size_t last = c->dl_symbols()[0].back();
     int flags = (symbol_id != last) ? 1 // HAS_TIME
                                     : 2; // HAS_TIME & END_BURST, fixme
     long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
@@ -282,7 +282,7 @@ int PacketTXRX::dequeue_send_usrp(int tid, int frame_id, int symbol_id)
         txbuf[ch] = reinterpret_cast<void*>(pkt->data);
     }
 
-    size_t last = c->DLSymbols[0].back();
+    size_t last = c->dl_symbols()[0].back();
     int flags = (symbol_id != static_cast<int>(last)) ? 1 // HAS_TIME
                                          : 2; // HAS_TIME & END_BURST, fixme
     long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
