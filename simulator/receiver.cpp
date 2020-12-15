@@ -187,6 +187,7 @@ void* Receiver::loopRecv(int tid)
                     printf("Error! Socket buffer overflow!\n");
                     exit(1);
                 }
+                printf("Received valid packets!\n");
                 size_t frame_slot = pkt->frame_id % kFrameWnd;
                 size_t symbol_id = pkt->symbol_id;
                 size_t ant_id = pkt->ant_id;
