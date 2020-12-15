@@ -5,15 +5,13 @@
   "demul_block_size": 40,
   "antenna_num": 16,
   "ue_num": 4,
-  "bs_rru_addr": "10.0.0.1",
+  "bs_rru_addr": "192.168.21.181",
   "core_offset": 2,
   "bs_server_addr_list": [
-    "10.0.0.2",
-    "10.0.0.3"
+    "192.168.21.182"
   ],
   "bs_server_mac_list": [
-    "9c:dc:71:5d:57:e1",
-    "9c:dc:71:5b:42:81"
+    "0c:42:a1:50:c7:ee"
   ],
   "frames": [
     "PPPPU"
@@ -24,7 +22,7 @@
   "ue_tx_port": 9000,
   "demod_tx_port": 8100,
   "demod_rx_port": 8600,
-  "frames_to_test": 1,
+  "frames_to_test": 100,
   "Zc": 104,
   "modulation": "64QAM"
 }
