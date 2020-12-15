@@ -25,7 +25,7 @@ PhyStats::PhyStats(Config* cfg)
 
     if (cfg->ul_data_symbol_num_perframe() > 0) {
         auto ul_iq_f_ptr
-            = reinterpret_cast<cx_float*>(cfg->ul_iq_f[cfg->ul_pilot_syms()]);
+            = reinterpret_cast<cx_float*>(cfg->ul_iq_f()[cfg->ul_pilot_syms()]);
         cx_fmat ul_iq_f_mat(
             ul_iq_f_ptr, cfg->ofdm_ca_num(), cfg->ue_ant_num(), false);
         ul_gt_mat_ = ul_iq_f_mat.st(); /* Out of bounds read.... */

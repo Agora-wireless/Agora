@@ -136,9 +136,9 @@ int PacketTXRX::dequeue_send_argos(int tid)
         if (ant_id != c->ref_ant)
             txbuf[ch] = zeros.data();
         else if (dl_symbol_idx < c->dl_pilot_syms())
-            txbuf[ch] = (void*)c->ue_specific_pilot_t[0];
+            txbuf[ch] = reinterpret_cast<void*>(c->ue_specific_pilot_t[0]);
         else
-            txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx];
+            txbuf[ch] = reinterpret_cast<void*>(c->dl_iq_t()[dl_symbol_idx]);
     } else {
         char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length();
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;

@@ -139,8 +139,9 @@ private:
 
     Table<char>* buffer_;
     Table<int>* buffer_status_;
-    int buffer_length_;
-    int buffer_frame_num_;
+
+	size_t buffer_length_; /* Unused */
+    size_t buffer_frame_num_;
 
     char* tx_buffer_;
     int* tx_buffer_status_;

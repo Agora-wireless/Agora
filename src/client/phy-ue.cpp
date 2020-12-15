@@ -899,7 +899,7 @@ void Phy_UE::doDecode(int tid, size_t tag)
             for (size_t i = 0; i < config_->num_bytes_per_cb; i++) {
                 uint8_t rx_byte = decoded_buffer_ptr[i];
                 uint8_t tx_byte = (uint8_t)config_->get_info_bits(
-                    config_->dl_bits, dl_symbol_id, ant_id, cb_id)[i];
+                    config_->dl_bits(), dl_symbol_id, ant_id, cb_id)[i];
                 uint8_t xor_byte(tx_byte ^ rx_byte);
                 size_t bit_errors = 0;
                 for (size_t j = 0; j < 8; j++) {
@@ -920,7 +920,7 @@ void Phy_UE::doDecode(int tid, size_t tag)
             for (size_t i = 0; i < config_->num_bytes_per_cb; i++) {
                 uint8_t rx_byte = decoded_buffer_ptr[i];
                 uint8_t tx_byte = (uint8_t)config_->get_info_bits(
-                    config_->dl_bits, dl_symbol_id, ant_id, cb_id)[i];
+                    config_->dl_bits(), dl_symbol_id, ant_id, cb_id)[i];
                 std::printf("%x(%x) ", rx_byte, tx_byte);
             }
             std::printf("\n");
@@ -985,12 +985,12 @@ void Phy_UE::doEncode(int tid, size_t tag)
                 int input_offset = bytes_per_block
                         * cfg->ldpc_config().num_blocks_in_symbol() * ul_symbol_id
                     + bytes_per_block * cb_id;
-                input_ptr = (int8_t*)ul_bits + input_offset;
+                input_ptr = reinterpret_cast<int8_t *>(ul_bits + input_offset);
             } else {
                 size_t cb_offset
                     = (ue_id * cfg->ldpc_config().num_blocks_in_symbol() + cb_id)
                     * bytes_per_block;
-                input_ptr = &cfg->ul_bits[ul_symbol_id + config_->ul_pilot_syms()]
+                input_ptr = &cfg->ul_bits()[ul_symbol_id + config_->ul_pilot_syms()]
                                          [cb_offset];
             }
 

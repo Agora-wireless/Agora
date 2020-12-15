@@ -209,13 +209,13 @@ int PacketTXRX::dequeue_send_usrp(int tid)
         if (ant_id != c->ref_ant)
             txbuf[ch] = zeros.data();
         else if (dl_symbol_idx < c->dl_pilot_syms())
-            txbuf[ch] = (void*)c->ue_specific_pilot_t[0];
+            txbuf[ch] = reinterpret_cast<void*>(c->ue_specific_pilot_t[0]);
         else
-            txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx - c->dl_pilot_syms()];
+            txbuf[ch] = reinterpret_cast<void*>(c->dl_iq_t()[dl_symbol_idx - c->dl_pilot_syms()]);
     } else {
         char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-        txbuf[ch] = (void*)pkt->data;
+        txbuf[ch] = reinterpret_cast<void*>(pkt->data);
     }
 
     size_t last = c->DLSymbols[0].back();
@@ -273,17 +273,17 @@ int PacketTXRX::dequeue_send_usrp(int tid, int frame_id, int symbol_id)
         if (ant_id != c->ref_ant)
             txbuf[ch] = zeros.data();
         else if (dl_symbol_idx < c->dl_pilot_syms())
-            txbuf[ch] = (void*)c->ue_specific_pilot_t[0];
+            txbuf[ch] = reinterpret_cast <void*>(c->ue_specific_pilot_t[0]);
         else
-            txbuf[ch] = (void*)c->dl_iq_t[dl_symbol_idx - c->dl_pilot_syms()];
+            txbuf[ch] = reinterpret_cast<void*>(c->dl_iq_t()[dl_symbol_idx - c->dl_pilot_syms()]);
     } else {
         char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
-        struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-        txbuf[ch] = (void*)pkt->data;
+        struct Packet* pkt = reinterpret_cast<struct Packet*>(cur_buffer_ptr);
+        txbuf[ch] = reinterpret_cast<void*>(pkt->data);
     }
 
     size_t last = c->DLSymbols[0].back();
-    int flags = (symbol_id != (int)last) ? 1 // HAS_TIME
+    int flags = (symbol_id != static_cast<int>(last)) ? 1 // HAS_TIME
                                          : 2; // HAS_TIME & END_BURST, fixme
     long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);

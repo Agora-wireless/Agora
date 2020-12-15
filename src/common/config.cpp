@@ -415,18 +415,18 @@ void Config::genData()
     size_t num_bytes_per_ue = num_bytes_per_cb * ldpc_config_.num_blocks_in_symbol();
     size_t num_bytes_per_ue_pad
         = roundup<64>(num_bytes_per_cb) * ldpc_config_.num_blocks_in_symbol();
-    dl_bits.malloc(dl_data_symbol_num_perframe_,
+    dl_bits_.malloc(dl_data_symbol_num_perframe_,
         num_bytes_per_ue_pad * ue_ant_num_, Agora_memory::Alignment_t::k64Align);
-    dl_iq_f.calloc(dl_data_symbol_num_perframe_, ofdm_ca_num_ * ue_ant_num_,
+    dl_iq_f_.calloc(dl_data_symbol_num_perframe_, ofdm_ca_num_ * ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
-    dl_iq_t.calloc(dl_data_symbol_num_perframe_, sampsPerSymbol * ue_ant_num_,
+    dl_iq_t_.calloc(dl_data_symbol_num_perframe_, sampsPerSymbol * ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
 
-    ul_bits.malloc(ul_data_symbol_num_perframe_,
+    ul_bits_.malloc(ul_data_symbol_num_perframe_,
         num_bytes_per_ue_pad * ue_ant_num_, Agora_memory::Alignment_t::k64Align);
-    ul_iq_f.calloc(ul_data_symbol_num_perframe_, ofdm_ca_num_ * ue_ant_num_,
+    ul_iq_f_.calloc(ul_data_symbol_num_perframe_, ofdm_ca_num_ * ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
-    ul_iq_t.calloc(ul_data_symbol_num_perframe_, sampsPerSymbol * ue_ant_num_,
+    ul_iq_t_.calloc(ul_data_symbol_num_perframe_, sampsPerSymbol * ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
 
 #ifdef GENERATE_DATA
@@ -434,9 +434,9 @@ void Config::genData()
         for (size_t j = 0; j < num_bytes_per_ue_pad; j++) {
             int cur_offset = j * ue_ant_num_ + ue_id;
             for (size_t i = 0; i < ul_data_symbol_num_perframe_; i++)
-                ul_bits[i][cur_offset] = rand() % mod_order;
+                ul_bits_[i][cur_offset] = rand() % mod_order;
             for (size_t i = 0; i < dl_data_symbol_num_perframe_; i++)
-                dl_bits[i][cur_offset] = rand() % mod_order;
+                dl_bits_[i][cur_offset] = rand() % mod_order;
         }
     }
 #else
@@ -455,7 +455,7 @@ void Config::genData()
         if (fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0)
             return;
         for (size_t j = 0; j < ue_ant_num_; j++) {
-            size_t r = std::fread(ul_bits[i] + j * num_bytes_per_ue_pad,
+            size_t r = std::fread(ul_bits_[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue)
                 std::printf("bad read from file %s (batch %zu) \n",
@@ -470,7 +470,7 @@ void Config::genData()
     }
     for (size_t i = 0; i < dl_data_symbol_num_perframe_; i++) {
         for (size_t j = 0; j < ue_ant_num_; j++) {
-            size_t r = std::fread(dl_bits[i] + j * num_bytes_per_ue_pad,
+            size_t r = std::fread(dl_bits_[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue)
                 std::printf("bad read from file %s (batch %zu) \n",
@@ -497,7 +497,7 @@ void Config::genData()
             ldpc_encode_helper(ldpc_config_.base_graph(), ldpc_config_.expansion_factor(),
                 ldpc_config_.num_rows(),
                 ul_encoded_bits[i * num_blocks_per_symbol + j],
-                temp_parity_buffer, ul_bits[i] + j * bytes_per_block);
+                temp_parity_buffer, ul_bits_[i] + j * bytes_per_block);
         }
     }
 
@@ -527,7 +527,7 @@ void Config::genData()
             ldpc_encode_helper(ldpc_config_.base_graph(), ldpc_config_.expansion_factor(),
                 ldpc_config_.num_rows(),
                 dl_encoded_bits[i * num_blocks_per_symbol + j],
-                temp_parity_buffer, dl_bits[i] + j * bytes_per_block);
+                temp_parity_buffer, dl_bits_[i] + j * bytes_per_block);
         }
     }
 
@@ -560,11 +560,11 @@ void Config::genData()
                 int k = j - ofdm_data_start_;
                 size_t s = p + k;
                 if (k % ofdm_pilot_spacing_ != 0) {
-                    dl_iq_f[i][q + j]
+                    dl_iq_f_[i][q + j]
                         = mod_single_uint8(dl_mod_input[i][s], mod_table);
                 } else
-                    dl_iq_f[i][q + j] = ue_specific_pilot[u][k];
-                dl_iq_ifft[i][q + j] = dl_iq_f[i][q + j];
+                    dl_iq_f_[i][q + j] = ue_specific_pilot[u][k];
+                dl_iq_ifft[i][q + j] = dl_iq_f_[i][q + j];
             }
             CommsLib::IFFT(&dl_iq_ifft[i][q], ofdm_ca_num_, false);
         }
@@ -583,9 +583,9 @@ void Config::genData()
             for (size_t j = ofdm_data_start_; j < ofdm_data_stop_; j++) {
                 size_t k = j - ofdm_data_start_;
                 size_t s = p + k;
-                ul_iq_f[i][q + j]
+                ul_iq_f_[i][q + j]
                     = mod_single_uint8(ul_mod_input[i][s], mod_table);
-                ul_iq_ifft[i][q + j] = ul_iq_f[i][q + j];
+                ul_iq_ifft[i][q + j] = ul_iq_f_[i][q + j];
             }
 
             CommsLib::IFFT(&ul_iq_ifft[i][q], ofdm_ca_num_, false);
@@ -614,7 +614,7 @@ void Config::genData()
         for (size_t u = 0; u < ue_ant_num_; u++) {
             size_t q = u * ofdm_ca_num_;
             size_t r = u * sampsPerSymbol;
-            CommsLib::ifft2tx(&dl_iq_ifft[i][q], &dl_iq_t[i][r], ofdm_ca_num_,
+            CommsLib::ifft2tx(&dl_iq_ifft[i][q], &dl_iq_t_[i][r], ofdm_ca_num_,
                 ofdm_tx_zero_prefix_, cp_len_, scale);
         }
     }
@@ -624,7 +624,7 @@ void Config::genData()
         for (size_t u = 0; u < ue_ant_num_; u++) {
             size_t q = u * ofdm_ca_num_;
             size_t r = u * sampsPerSymbol;
-            CommsLib::ifft2tx(&ul_iq_ifft[i][q], &ul_iq_t[i][r], ofdm_ca_num_,
+            CommsLib::ifft2tx(&ul_iq_ifft[i][q], &ul_iq_t_[i][r], ofdm_ca_num_,
                 ofdm_tx_zero_prefix_, cp_len_, scale);
         }
     }
@@ -685,12 +685,12 @@ Config::~Config()
         pilots_sgn_ = nullptr;
     }
     mod_table.free();
-    dl_bits.free();
-    ul_bits.free();
-    dl_iq_f.free();
-    dl_iq_t.free();
-    ul_iq_f.free();
-    ul_iq_t.free();
+    dl_bits_.free();
+    ul_bits_.free();
+    dl_iq_f_.free();
+    dl_iq_t_.free();
+    ul_iq_f_.free();
+    ul_iq_t_.free();
 }
 
 int Config::getSymbolId(size_t symbol_id)

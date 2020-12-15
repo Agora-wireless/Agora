@@ -183,7 +183,7 @@ Event_data DoDecode::launch(size_t tag)
         for (size_t i = 0; i < cfg->num_bytes_per_cb; i++) {
             uint8_t rx_byte = decoded_buffer_ptr[i];
             uint8_t tx_byte = (uint8_t)cfg->get_info_bits(
-                cfg->ul_bits, symbol_idx_ul, ue_id, cur_cb_id)[i];
+                cfg->ul_bits(), symbol_idx_ul, ue_id, cur_cb_id)[i];
             phy_stats->update_bit_errors(
                 ue_id, symbol_offset, tx_byte, rx_byte);
             if (rx_byte != tx_byte)

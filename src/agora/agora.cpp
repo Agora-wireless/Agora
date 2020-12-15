@@ -653,7 +653,7 @@ void Agora::worker(int tid)
         dl_ifft_buffer_, dl_encoded_buffer_, stats);
 
     auto computeEncoding = new DoEncode(
-        config_, tid, config_->dl_bits, dl_encoded_buffer_, stats);
+        config_, tid, config_->dl_bits(), dl_encoded_buffer_, stats);
 
     auto computeDecoding = new DoDecode(
         config_, tid, demod_buffers_, decoded_buffer_, phy_stats, stats);
@@ -767,7 +767,7 @@ void Agora::worker_decode(int tid)
         ThreadType::kWorkerDecode, base_worker_core_offset, tid);
 
     auto computeEncoding = new DoEncode(
-        config_, tid, config_->dl_bits, dl_encoded_buffer_, stats);
+        config_, tid, config_->dl_bits(), dl_encoded_buffer_, stats);
 
     auto computeDecoding = new DoDecode(
         config_, tid, demod_buffers_, decoded_buffer_, phy_stats, stats);
