@@ -61,9 +61,9 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
             return false;
         }
         if (cfg->downlink_mode) {
-            memcpy(calib_dl_buffer[0], radioconfig_->get_calib_dl(),
+            memcpy(calib_dl_buffer[kFrameWnd - 1], radioconfig_->get_calib_dl(),
                 cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM * sizeof(arma::cx_float));
-            memcpy(calib_ul_buffer[0], radioconfig_->get_calib_ul(),
+            memcpy(calib_ul_buffer[kFrameWnd - 1], radioconfig_->get_calib_ul(),
                 cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM * sizeof(arma::cx_float));
         }
     }
