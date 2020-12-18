@@ -19,7 +19,7 @@ RadioConfig::RadioConfig(Config* cfg)
     std::cout << "radio num is " << this->_radioNum << std::endl;
     if (_cfg->isUE)
         throw std::invalid_argument("Bad config! Not a UE!");
-    if (!kUseUHD || _cfg->hub_ids.size() != 0) {
+    if (!kUseUHD && _cfg->hub_ids.empty() == false) {
         args["driver"] = "remote";
         args["timeout"] = "1000000";
         args["serial"] = _cfg->hub_ids.at(0);
@@ -304,40 +304,77 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
 bool RadioConfig::radioStart()
 {
     bool good_calib = false;
-    alloc_buffer_1d(&init_calib_dl_,
+    alloc_buffer_1d(&init_calib_dl_processed_,
         _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float), 64, 1);
-    alloc_buffer_1d(&init_calib_ul_,
+    alloc_buffer_1d(&init_calib_ul_processed_,
         _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float), 64, 1);
     // initialize init_calib to a matrix of ones
     for (size_t i = 0; i < _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM; i++) {
-        init_calib_dl_[i] = 1;
-        init_calib_ul_[i] = 1;
+        init_calib_dl_processed_[i] = 1;
+        init_calib_ul_processed_[i] = 1;
     }
-    if (_cfg->downlink_mode) {
-        int iter = 0;
-        int max_iter = 3;
-        while (!good_calib) {
-            good_calib = initial_calib(_cfg->sampleCalEn);
-            iter++;
-            if (iter == max_iter && !good_calib) {
-                std::cout << "attempted " << max_iter
-                          << " unsucessful calibration, stopping ..."
-                          << std::endl;
-                break;
+
+    calib_meas_num_ = _cfg->init_calib_repeat;
+    if (calib_meas_num_) {
+        init_calib_ul_.calloc(
+            calib_meas_num_, _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM, 64);
+        init_calib_dl_.calloc(
+            calib_meas_num_, _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM, 64);
+        if (_cfg->downlink_mode) {
+            int iter = 0;
+            int max_iter = 3;
+            std::cout << "Start initial reciprocity calibration..."
+                      << std::endl;
+            while (!good_calib) {
+                good_calib = initial_calib(_cfg->sampleCalEn);
+                iter++;
+                if (iter == max_iter && !good_calib) {
+                    std::cout << "attempted " << max_iter
+                              << " unsucessful calibration, stopping ..."
+                              << std::endl;
+                    break;
+                }
             }
-        }
-        if (!good_calib)
-            return good_calib;
-        else
-            std::cout << "initial calibration successful!" << std::endl;
-        if (kPrintCalibrationMats) {
-            arma::cx_fmat calib_dl_mat(
-                init_calib_dl_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
-            arma::cx_fmat calib_ul_mat(
-                init_calib_ul_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
-            Utils::print_mat(calib_dl_mat, "calib_dl_mat");
-            Utils::print_mat(calib_ul_mat, "calib_ul_mat");
-            Utils::print_mat(calib_dl_mat / calib_ul_mat, "calib_mat");
+            if (!good_calib)
+                return good_calib;
+            else
+                std::cout << "initial calibration successful!" << std::endl;
+
+            // process initial measurements
+            arma::cx_fcube calib_dl_cube(_cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM,
+                calib_meas_num_, arma::fill::zeros);
+            arma::cx_fcube calib_ul_cube(_cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM,
+                calib_meas_num_, arma::fill::zeros);
+            for (size_t i = 0; i < calib_meas_num_; i++) {
+                arma::cx_fmat calib_dl_mat(init_calib_dl_[i],
+                    _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+                arma::cx_fmat calib_ul_mat(init_calib_ul_[i],
+                    _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+                calib_dl_cube.slice(i) = calib_dl_mat;
+                calib_ul_cube.slice(i) = calib_ul_mat;
+                if (kPrintCalibrationMats) {
+                    Utils::print_mat(
+                        calib_dl_mat, "calib_dl_mat" + std::to_string(i));
+                    Utils::print_mat(
+                        calib_ul_mat, "calib_ul_mat" + std::to_string(i));
+                    Utils::print_mat(calib_dl_mat / calib_ul_mat,
+                        "calib_mat" + std::to_string(i));
+                }
+            }
+            arma::cx_fmat calib_dl_mean_mat(init_calib_dl_processed_,
+                _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+            arma::cx_fmat calib_ul_mean_mat(init_calib_ul_processed_,
+                _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+            calib_dl_mean_mat
+                = arma::mean(calib_dl_cube, 2); // mean along dim 2
+            calib_ul_mean_mat
+                = arma::mean(calib_ul_cube, 2); // mean along dim 2
+            if (kPrintCalibrationMats) {
+                Utils::print_mat(calib_dl_mean_mat, "calib_dl_mat");
+                Utils::print_mat(calib_ul_mean_mat, "calib_ul_mat");
+                Utils::print_mat(
+                    calib_dl_mean_mat / calib_ul_mean_mat, "calib_mat");
+            }
         }
     }
 
