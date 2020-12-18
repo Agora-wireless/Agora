@@ -10,7 +10,7 @@ static constexpr bool kPrintIFFTOutput = false;
 static constexpr bool kPrintSocketOutput = false;
 static constexpr bool kUseOutOfPlaceIFFT = false;
 static constexpr bool kMemcpyBeforeIFFT = true;
-static constexpr bool kPrintPilotCorrStats = true;
+static constexpr bool kPrintPilotCorrStats = false;
 
 DoFFT::DoFFT(Config* config, int tid, Table<char>& socket_buffer,
     Table<int>& socket_buffer_status, Table<complex_float>& data_buffer,

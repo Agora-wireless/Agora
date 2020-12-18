@@ -79,6 +79,8 @@ Config::Config(std::string jsonfile)
     beamsweep = tddConf.value("beamsweep", false);
     sampleCalEn = tddConf.value("sample_calibrate", false);
     imbalanceCalEn = tddConf.value("imbalance_calibrate", false);
+    init_calib_repeat = tddConf.value("init_calib_repeat", 1);
+
     modulation = tddConf.value("modulation", "16QAM");
 
     bs_server_addr = tddConf.value("bs_server_addr", "127.0.0.1");

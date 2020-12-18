@@ -147,6 +147,7 @@ public:
     size_t ref_ant;
     size_t beacon_ant;
     size_t beacon_len;
+    size_t init_calib_repeat;
     bool beamsweep;
     bool sampleCalEn;
     bool imbalanceCalEn;
