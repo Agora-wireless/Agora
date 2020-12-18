@@ -617,7 +617,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
     }
 
     size_t sig_offset = config_->ofdm_rx_zero_prefix_client_;
-    if (kPrintDownlinkPilotStats && config_->UE_ANT_NUM == 1) {
+    if (kPrintDownlinkPilotStats) {
         if (config_->isPilot(frame_id, symbol_id)) {
             simd_convert_short_to_float(pkt->data,
                 reinterpret_cast<float*>(rx_samps_tmp),
@@ -631,7 +631,8 @@ void Phy_UE::doFFT(int tid, size_t tag)
             size_t peak_offset
                 = std::max_element(pilot_corr_abs.begin(), pilot_corr_abs.end())
                 - pilot_corr_abs.begin();
-            sig_offset = peak_offset < seq_len ? 0 : peak_offset - seq_len;
+            size_t pilot_offset
+                = peak_offset < seq_len ? 0 : peak_offset - seq_len;
             float noise_power = 0;
             for (size_t i = 0; i < sig_offset; i++)
                 noise_power += std::pow(std::abs(samples_vec[i]), 2);
@@ -640,10 +641,10 @@ void Phy_UE::doFFT(int tid, size_t tag)
                 signal_power += std::pow(std::abs(samples_vec[i]), 2);
             float SNR = 10 * std::log10(signal_power / noise_power);
             printf("frame %zu symbol %zu ant %zu: sig offset %zu, SNR %2.1f \n",
-                frame_id, symbol_id, ant_id, sig_offset, SNR);
+                frame_id, symbol_id, ant_id, pilot_offset, SNR);
             if (frame_id == kRecordFrameIndex) {
-                std::string fname
-                    = "rxpilot" + std::to_string(symbol_id) + ".bin";
+                std::string fname = "rxpilot" + std::to_string(symbol_id) + "_"
+                    + std::to_string(ant_id) + ".bin";
                 FILE* f = fopen(fname.c_str(), "wb");
                 fwrite(
                     pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
@@ -652,8 +653,8 @@ void Phy_UE::doFFT(int tid, size_t tag)
 
         } else {
             if (frame_id == kRecordFrameIndex) {
-                std::string fname
-                    = "rxdata" + std::to_string(symbol_id) + ".bin";
+                std::string fname = "rxdata" + std::to_string(symbol_id) + "_"
+                    + std::to_string(ant_id) + ".bin";
                 FILE* f = fopen(fname.c_str(), "wb");
                 fwrite(
                     pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
@@ -669,7 +670,6 @@ void Phy_UE::doFFT(int tid, size_t tag)
         = total_dl_symbol_id * config_->UE_ANT_NUM + ant_id;
 
     // transfer ushort to float
-    sig_offset = (sig_offset / 16) * 16;
     size_t delay_offset = (sig_offset + config_->CP_LEN) * 2;
     float* fft_buff = (float*)fft_buffer_[FFT_buffer_target_id];
 
