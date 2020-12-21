@@ -1,13 +1,13 @@
 {
  "ofdm_ca_num" : 2048,
  "ofdm_data_num" : 1200,
- "rate" : 30.72e6,
+ "rate" : 5e6,
  "worker_thread_num" : 8,
  "socket_thread_num" : 1,
  "demul_block_size" : 48,
  "antenna_num": 8,
  "ue_num": 2,
- "sim_chan_model": "AWGN",
- "sim_snr_db": 10
+ "sim_chan_model": "RAYLEIGH",
+ "sim_snr_db": 20
 }
 

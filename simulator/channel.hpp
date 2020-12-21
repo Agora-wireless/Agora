@@ -32,9 +32,8 @@ public:
 
     Channel (Config* bscfg, Config* uecfg);
     ~Channel ();
-    void apply_chan(const cx_fmat& fmat_src, cx_fmat& mat_dst, const bool is_downlink);
+    void apply_chan(const cx_fmat& fmat_src, cx_fmat& mat_dst, const bool is_downlink, const bool is_newChan);
     void awgn(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
-    void rayleigh(const cx_fmat& fmat_src, cx_fmat& fmat_dst, const bool is_downlink);
     void lte_3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
 
 private:
@@ -46,6 +45,8 @@ private:
     size_t bs_ant;
     size_t ue_ant;
     size_t n_samps;
+
+    cx_fmat H;
 };
 
 #endif /* SIM_CHAN_MODEL */

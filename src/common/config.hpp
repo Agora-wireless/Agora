@@ -475,8 +475,7 @@ public:
     enum ChanModel {
 	    AWGN,
 	    RAYLEIGH,
-	    RAN_3GPP,
-	    NONE
+	    RAN_3GPP
     } chan_model;
     double sim_snr_db;
 
