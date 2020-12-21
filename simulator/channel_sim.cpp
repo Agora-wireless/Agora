@@ -463,11 +463,12 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
     // Apply Channel
     cx_fmat fmat_dst;
     bool is_downlink = false;
-    auto begin = std::chrono::high_resolution_clock::now();
-    channel->apply_chan(fmat_src, fmat_dst, is_downlink);
-    auto end = std::chrono::high_resolution_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
-    printf("do_tx_BS - FrameID: %d, Time: %.9f seconds.\n", frame_id, elapsed.count() * 1e-9);
+    bool is_newFrame = false;
+
+    if (symbol_id == 0)
+	is_newFrame = true;
+
+    channel->apply_chan(fmat_src, fmat_dst, is_downlink, is_newFrame);
 
     if (kPrintChannelOutput)
         Utils::print_mat(fmat_dst);
@@ -523,15 +524,15 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
     // Apply Channel
     cx_fmat fmat_dst;
     bool is_downlink = true;
-    auto begin = std::chrono::high_resolution_clock::now();
-    channel->apply_chan(fmat_src, fmat_dst, is_downlink);
-    auto end = std::chrono::high_resolution_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
-    printf("do_tx_USER - FrameID: %d, Time: %.9f seconds.\n", frame_id, elapsed.count() * 1e-9);
+    bool is_newFrame = false;
+
+    if (symbol_id == 0)
+	is_newFrame = true;
+
+    channel->apply_chan(fmat_src, fmat_dst, is_downlink, is_newFrame);
 
     if (kPrintChannelOutput)
         Utils::print_mat(fmat_dst);
-
 
     auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_ue[total_offset_ue]);
     simd_convert_float_to_short(reinterpret_cast<float*>(fmat_dst.memptr()),

@@ -300,7 +300,7 @@ Config::Config(std::string jsonfile)
 	chan_model = RAYLEIGH;
     }
     else
-	chan_model = NONE;
+	chan_model = AWGN;
 
     // Done!
     running = true;

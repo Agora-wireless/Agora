@@ -25,7 +25,7 @@ Channel::~Channel()
 
 }
 
-void Channel::apply_chan(const cx_fmat& fmat_src, cx_fmat& fmat_dst, const bool is_downlink)
+void Channel::apply_chan(const cx_fmat& fmat_src, cx_fmat& fmat_dst, const bool is_downlink, const bool is_newChan)
 {
     /* 
      *
@@ -36,40 +36,45 @@ void Channel::apply_chan(const cx_fmat& fmat_src, cx_fmat& fmat_dst, const bool 
     
     // After applying channel
     cx_fmat fmat_H;
-    fmat rmat(ue_ant, bs_ant, fill::ones);
-    fmat imat(ue_ant, bs_ant, fill::zeros);
-    cx_fmat H = cx_fmat(rmat, imat);
 
-    switch(bscfg->chan_model)
-    {
-        case Config::AWGN:
-            if (is_downlink)
-                fmat_H = fmat_src * H.st();
-            else
-                fmat_H = fmat_src * H;
-            awgn(fmat_H, fmat_dst);
-	    break;
+    if (is_newChan) {
+        switch(bscfg->chan_model)
+	{
+	    case Config::AWGN:
+		{
+	        fmat rmat(ue_ant, bs_ant, fill::ones);
+		fmat imat(ue_ant, bs_ant, fill::zeros);
+                H = cx_fmat(rmat, imat);
+		//H = H / abs(H).max();
+		}
+                break;
 
-        case Config::RAYLEIGH:
-	    rayleigh(fmat_src, fmat_H, is_downlink);
-	    awgn(fmat_H, fmat_dst);
-	    break;
+             case Config::RAYLEIGH:
+                // Simple Uncorrelated Rayleigh Channel - Flat fading (single tap)
+		{
+ 	        fmat rmat(ue_ant, bs_ant, fill::randn);
+		fmat imat(ue_ant, bs_ant, fill::randn);
+                H = cx_fmat(rmat, imat);
+                H = (1/sqrt(2)) * H;
+                //H = H / abs(H).max();
+		}
+                break;
 
-        case Config::RAN_3GPP:
-	    lte_3gpp(fmat_src, fmat_dst);
-	    break;
-
-        case Config::NONE:
-            // Mostly for debugging...
-            if (is_downlink)
-                fmat_dst = fmat_src * H.st();
-            else
-                fmat_dst = fmat_src * H;
-	    break;
+             case Config::RAN_3GPP:
+		lte_3gpp(fmat_src, fmat_dst);
+		break;
+        }
     }
+    if (is_downlink)
+        fmat_H = fmat_src * H.st() / std::sqrt(bscfg->BS_ANT_NUM);
+    else
+	fmat_H = fmat_src * H;
+
+    // Add noise
+    awgn(fmat_H, fmat_dst);
 
     if (kPrintChannelOutput)
-        Utils::print_mat(fmat_dst);
+        Utils::print_mat(H);
 }
 
 void Channel::awgn(const cx_fmat& src, cx_fmat& dst)
@@ -102,31 +107,14 @@ void Channel::awgn(const cx_fmat& src, cx_fmat& dst)
     // Add noise to signal
     dst = src + noise;
 
-    printf("Inside: \n");
-    Utils::print_mat(dst);
-    // CHECK!!
+    // Check SNR
+    /*
     fmat noise_sq = square(abs(noise));
     frowvec noise_vec = mean(noise_sq, 0);
     frowvec snr = 10 * log10(pwr_vec / noise_vec);
     printf("SNR: ");
     std::cout << snr << std::endl;
-}
-
-void Channel::rayleigh(const cx_fmat& fmat_src, cx_fmat& fmat_dst, const bool is_downlink)
-{
-    /*
-     * Simple Uncorrelated Rayleigh Channel
-     * - Flat fading (single tap)
-     */
-
-    cx_fmat H(randn<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM),
-        randn<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM));
-    H = (1/sqrt(2)) * H;
-
-    if (is_downlink)
-        fmat_dst = fmat_src * H.st();
-    else
-	fmat_dst = fmat_src * H;
+    */
 }
 
 void Channel::lte_3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst)
