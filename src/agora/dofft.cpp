@@ -43,6 +43,7 @@ DoFFT::~DoFFT()
 {
     DftiFreeDescriptor(&mkl_handle);
     std::free(fft_inout);
+    std::free(temp_16bits_iq);
     calib_ul_buffer_.free();
     calib_dl_buffer_.free();
 }
@@ -154,9 +155,9 @@ Event_data DoFFT::launch(size_t tag)
     if (sym_type == SymbolType::kPilot) {
         if (kCollectPhyStats) {
             phy_stats->update_pilot_snr(frame_id,
-                cfg->get_pilot_symbol_idx(frame_id, symbol_id), fft_inout);
+                cfg->GetPilotSymbolIdx(frame_id, symbol_id), fft_inout);
         }
-        const size_t ue_id = cfg->get_pilot_symbol_idx(frame_id, symbol_id);
+        const size_t ue_id = cfg->GetPilotSymbolIdx(frame_id, symbol_id);
         partial_transpose(
             csi_buffers_[frame_slot][ue_id], ant_id, SymbolType::kPilot);
     } else if (sym_type == SymbolType::kUL) {
@@ -318,7 +319,7 @@ Event_data DoIFFT::launch(size_t tag)
     size_t ant_id = gen_tag_t(tag).ant_id;
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
-    size_t symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t symbol_idx_dl = cfg->GetDLSymbolIdx(frame_id, symbol_id);
 
     if (kDebugPrintInTask) {
         std::printf(

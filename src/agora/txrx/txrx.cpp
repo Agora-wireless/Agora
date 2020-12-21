@@ -233,7 +233,7 @@ int PacketTXRX::dequeue_send(int tid)
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
-    size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t data_symbol_idx_dl = cfg->GetDLSymbolIdx(frame_id, symbol_id);
     size_t offset
         = (c->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
               * c->bs_ant_num())

@@ -32,10 +32,10 @@ void MasterToWorkerDynamic_master(Config* cfg,
         for (size_t i = 0; i < kMaxTestNum; i++) {
             uint32_t frame_id = i
                     / (cfg->demul_events_per_symbol
-                          * cfg->ul_data_symbol_num_perframe())
+                          * cfg->frame().NumULSyms())
                 + frame_offsets[bs_ant_idx];
             uint32_t symbol_id = (i / cfg->demul_events_per_symbol)
-                % cfg->ul_data_symbol_num_perframe();
+                % cfg->frame().NumULSyms();
             size_t base_sc_id
                 = (i % cfg->demul_events_per_symbol) * cfg->zf_block_size;
             event_queue.enqueue(Event_data(EventType::kZF,
@@ -121,28 +121,28 @@ TEST(TestDemul, VaryingConfig)
 
     Table<complex_float> data_buffer, ue_spec_pilot_buffer, equal_buffer;
     data_buffer.rand_alloc_cx_float(
-        cfg->ul_data_symbol_num_perframe() * kFrameWnd,
+        cfg->frame().NumULSyms() * kFrameWnd,
         kMaxAntennas * kMaxDataSCs, Agora_memory::Alignment_t::k64Align);
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
         kMaxAntennas * kMaxUEs);
-    equal_buffer.calloc(cfg->ul_data_symbol_num_perframe() * kFrameWnd,
+    equal_buffer.calloc(cfg->frame().NumULSyms() * kFrameWnd,
         kMaxDataSCs * kMaxUEs, Agora_memory::Alignment_t::k64Align);
-    ue_spec_pilot_buffer.calloc(kFrameWnd, cfg->ul_pilot_syms() * kMaxUEs, Agora_memory::Alignment_t::k64Align);
+    ue_spec_pilot_buffer.calloc(kFrameWnd, cfg->frame().client_ul_pilot_symbols() * kMaxUEs, Agora_memory::Alignment_t::k64Align);
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers(kFrameWnd,
-        cfg->symbol_num_perframe, cfg->ue_num(),
+        cfg->frame().NumTotalSyms(), cfg->ue_num(),
         kMaxModType * cfg->ofdm_data_num());
     std::printf(
         "Size of [data_buffer, ul_zf_matrices, equal_buffer, "
         "ue_spec_pilot_buffer, demod_soft_buffer]: [%.1f %.1f %.1f %.1f %.1f] "
         "MB\n",
-        cfg->ul_data_symbol_num_perframe() * kFrameWnd * kMaxAntennas
+        cfg->frame().NumULSyms() * kFrameWnd * kMaxAntennas
             * kMaxDataSCs * 4 * 1.0f / 1024 / 1024,
         kMaxDataSCs * kFrameWnd * kMaxUEs * kMaxAntennas * 4 * 1.0f / 1024
             / 1024,
-        cfg->ul_data_symbol_num_perframe() * kFrameWnd * kMaxDataSCs * kMaxUEs * 4
+        cfg->frame().NumULSyms() * kFrameWnd * kMaxDataSCs * kMaxUEs * 4
             * 1.0f / 1024 / 1024,
-        kFrameWnd * cfg->ul_pilot_syms() * kMaxUEs * 4 * 1.0f / 1024 / 1024,
-        cfg->ul_data_symbol_num_perframe() * kFrameWnd * kMaxModType * kMaxDataSCs
+        kFrameWnd * cfg->frame().client_ul_pilot_symbols() * kMaxUEs * 4 * 1.0f / 1024 / 1024,
+        cfg->frame().NumULSyms() * kFrameWnd * kMaxModType * kMaxDataSCs
             * kMaxUEs * 1.0f / 1024 / 1024);
 
     auto stats = new Stats(cfg);

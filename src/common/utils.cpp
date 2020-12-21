@@ -190,21 +190,23 @@ std::vector<uint32_t> Utils::cfloat32_to_uint32(
     return out;
 }
 
+// Returns index locations of sym for each frame in frames
 std::vector<std::vector<size_t>> Utils::loadSymbols(
-    std::vector<std::string> frames, char sym)
+    std::vector<std::string> const &frames, char sym)
 {
-    std::vector<std::vector<size_t>> symId;
-    size_t frameSize = frames.size();
-    symId.resize(frameSize);
-    for (size_t f = 0; f < frameSize; f++) {
-        std::string fr = frames[f];
-        for (size_t g = 0; g < fr.size(); g++) {
-            if (fr[g] == sym) {
-                symId[f].push_back(g);
+    std::vector<std::vector<size_t>> symbol_index_vector;
+    size_t num_frames = frames.size();
+    symbol_index_vector.resize(num_frames);
+
+    for (size_t f = 0; f < num_frames; f++) {
+        std::string frame = frames.at(f);
+        for (size_t g = 0; g < frame.length(); g++) {
+            if (frame.at(g) == sym) {
+                symbol_index_vector.at(f).push_back(g);
             }
         }
     }
-    return symId;
+    return symbol_index_vector;
 }
 
 void Utils::loadDevices(std::string filename, std::vector<std::string>& data)

@@ -1,5 +1,8 @@
-#ifndef CONFIG_HEADER
-#define CONFIG_HEADER
+// Copyright (c) 2018-2020, Rice University
+// RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
+
+#ifndef CONFIG_HPP_
+#define CONFIG_HPP_
 
 #include <boost/range/algorithm/count.hpp>
 #include <emmintrin.h>
@@ -8,8 +11,8 @@
 #include <iostream>
 #include <unistd.h>
 #include <vector>
-#define JSON
-#ifdef JSON
+
+#include "framestats.h"
 #include "Symbols.hpp"
 #include "buffer.hpp"
 #include "comms-lib.h"
@@ -18,62 +21,11 @@
 #include "modulation.hpp"
 #include "utils.h"
 #include "utils_ldpc.hpp"
+#include "ldpc_config.hpp"
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
-#endif
 
-
-class LDPCconfig {
-public:
-    LDPCconfig( uint16_t bg,     uint16_t zc,         int16_t max_dec_itr, 
-                bool early_term, uint32_t num_cb_len, uint32_t num_cb_codew_len, 
-                size_t num_rows, size_t num_blocks_in_symbol)
-        : base_graph_(bg)
-        , expansion_factor_(zc)
-        , max_decoder_iter_(max_dec_itr)
-        , early_termination_(early_term)
-        , num_rows_(num_rows)
-        , num_cb_len_(num_cb_len)
-        , num_cb_codew_len_(num_cb_codew_len)
-        , num_blocks_in_symbol_(num_blocks_in_symbol) {
-    }
-
-    // Return the number of bytes in the information bit sequence for LDPC
-    // encoding of one code block
-    size_t numInputBytes( void )   const { return bits_to_bytes(ldpc_num_input_bits(this->base_graph_, this->expansion_factor_)); }
-
-    // Return the number of bytes in the encoded LDPC code word
-    size_t numEncodedBytes( void ) const { return bits_to_bytes(ldpc_num_encoded_bits(this->base_graph_, this->expansion_factor_, this->num_rows_)); }
-
-    inline void num_blocks_in_symbol ( size_t num_blocks ) { this->num_blocks_in_symbol_ = num_blocks; }
-
-    /* Accessors */
-    inline uint16_t base_graph( void ) const { return this->base_graph_; }
-    inline uint16_t expansion_factor( void ) const { return this->expansion_factor_; }
-    inline int16_t  max_decoder_iter( void ) const { return this->max_decoder_iter_; }
-    inline bool     early_termination( void ) const { return this->early_termination_; }
-    inline uint32_t num_cb_len( void ) const { return this->num_cb_len_; }
-    inline uint32_t num_cb_codew_len( void ) const { return this->num_cb_codew_len_; }
-    inline size_t   num_rows( void ) const { return this->num_rows_; }
-    inline size_t   num_blocks_in_symbol( void ) const { return this->num_blocks_in_symbol_; }
-
-private:
-    LDPCconfig ( void ) { }
-
-    uint16_t base_graph_; /// The 5G NR LDPC base graph (one or two)
-    uint16_t expansion_factor_; /// The 5G NR LDPC expansion factor
-    int16_t  max_decoder_iter_; /// Maximum number of decoder iterations per codeblock
-
-    /// Allow the LDPC decoder to terminate without completing all iterations
-    /// if it decodes the codeblock eariler
-    bool     early_termination_;
-
-    size_t   num_rows_; /// Number of rows in the LDPC base graph to use
-    uint32_t num_cb_len_; /// Number of information bits input to LDPC encoding
-    uint32_t num_cb_codew_len_; /// Number of codeword bits output from LDPC encodings
-    size_t   num_blocks_in_symbol_;
-};
 
 class Config {
 public:
@@ -133,7 +85,6 @@ public:
     bool beamsweep;
     bool sampleCalEn;
     bool imbalanceCalEn;
-    bool recipCalEn;
     bool external_ref_node;
     std::string channel;
     size_t ant_group_num;
@@ -209,23 +160,6 @@ public:
     size_t ue_ant_offset;
     float scale; // Scaling factor for all transmit symbols
 
-    // Total number of symbols in a frame, including all types of symbols (e.g.,
-    // pilot symbols, uplink and downlink data symbols, and calibration symbols)
-    size_t symbol_num_perframe;
-
-    // Total number of beacon symbols in a frame
-    size_t beacon_symbol_num_perframe;
-
-    // Total number of pilot symbols in a frame
-    size_t pilot_symbol_num_perframe;
-
-    // Total number of data symbols in a frame, including uplink data symbols
-    // and downlink data symbols
-    size_t data_symbol_num_perframe;
-
-    // Total number of pilot symbols in a frame
-    size_t recip_pilot_symbol_num_perframe;
-
     bool bigstation_mode; // If true, use pipeline-parallel scheduling
     bool correct_phase_shift; // If true, do phase shift correction
 
@@ -298,24 +232,26 @@ public:
 
     size_t getNumAntennas( void ) { return (nRadios * nChannels); }
     
-    int getSymbolId(size_t symbol_id);
+    /// TODO document and review
+    size_t GetSymbolId(size_t symbol_id);
 
     // Get the index of this downlink symbol among this frame's downlink symbols
-    size_t get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const;
+    size_t GetDLSymbolIdx(size_t frame_id, size_t symbol_id) const;
 
     // Get the index of this uplink symbol among this frame's uplink symbols
-    size_t get_ul_symbol_idx(size_t frame_id, size_t symbol_id) const;
+    size_t GetULSymbolIdx(size_t frame_id, size_t symbol_id) const;
 
     // Get the index of this pilot symbol among this frame's pilot symbols
-    size_t get_pilot_symbol_idx(size_t frame_id, size_t symbol_id) const;
+    size_t GetPilotSymbolIdx(size_t frame_id, size_t symbol_id) const;
 
-    bool isPilot(size_t, size_t);
-    bool isCalDlPilot(size_t, size_t);
-    bool isCalUlPilot(size_t, size_t);
-    bool isDownlink(size_t, size_t);
-    bool isUplink(size_t, size_t);
+    bool IsPilot(size_t, size_t) const;
+    bool IsCalDlPilot(size_t, size_t) const;
+    bool IsCalUlPilot(size_t, size_t) const;
+    bool IsDownlink(size_t, size_t) const;
+    bool IsUplink(size_t, size_t) const;
 
     /// Return the symbol type of this symbol in this frame
+    /// \TODO change to table lookup
     SymbolType get_symbol_type(size_t frame_id, size_t symbol_id);
 
     /// Return the single-gain control decision
@@ -335,7 +271,7 @@ public:
     inline size_t get_total_data_symbol_idx(
         size_t frame_id, size_t symbol_id) const
     {
-        return ((frame_id % kFrameWnd) * data_symbol_num_perframe) + symbol_id;
+        return ((frame_id % kFrameWnd) * this->frame_.NumDataSyms() + symbol_id);
     }
 
     /// Return total number of uplink data symbols of all frames_ in a buffer
@@ -343,8 +279,8 @@ public:
     inline size_t get_total_data_symbol_idx_ul(
         size_t frame_id, size_t symbol_idx_ul) const
     {
-        return ((frame_id % kFrameWnd) * ul_data_symbol_num_perframe_)
-            + symbol_idx_ul;
+        return ((frame_id % kFrameWnd) * this->frame_.NumULSyms()
+            + symbol_idx_ul);
     }
 
     /// Return total number of downlink data symbols of all frames_ in a buffer
@@ -352,14 +288,14 @@ public:
     inline size_t get_total_data_symbol_idx_dl(
         size_t frame_id, size_t symbol_idx_dl) const
     {
-        return ((frame_id % kFrameWnd) * dl_data_symbol_num_perframe_)
-            + symbol_idx_dl;
+        return ((frame_id % kFrameWnd) * this->frame_.NumDLSyms()
+            + symbol_idx_dl);
     }
 
     /// Return the frame duration in seconds
     inline double get_frame_duration_sec( void )
     {
-        return ((symbol_num_perframe * sampsPerSymbol) / rate);
+        return ((this->frame_.NumTotalSyms() * sampsPerSymbol) / rate);
     }
 
     /// Fetch the data buffer for this frame and symbol ID. The symbol must
@@ -368,8 +304,8 @@ public:
         size_t frame_id, size_t symbol_id) const
     {
         size_t frame_slot = frame_id % kFrameWnd;
-        size_t symbol_offset = (frame_slot * ul_data_symbol_num_perframe_)
-            + get_ul_symbol_idx(frame_id, symbol_id);
+        size_t symbol_offset = (frame_slot * this->frame_.NumULSyms())
+            + GetULSymbolIdx(frame_id, symbol_id);
         return data_buffers[symbol_offset];
     }
 
@@ -447,24 +383,13 @@ public:
     inline bool   downlink_mode( void )           const { return this->downlink_mode_; }
     inline const  LDPCconfig& ldpc_config( void ) const { return this->ldpc_config_; }
 
-    inline const std::vector<std::string>& frames( void ) const { return this->frames_; }
+    inline const FrameStats& frame( void ) const { return this->frame_; }
 
-    inline const std::vector<std::vector<size_t>>& pilot_symbols  ( void ) const { return this->pilot_symbols_; }
-    inline const std::vector<std::vector<size_t>>& ul_symbols     ( void ) const { return this->ul_symbols_; }
-    inline const std::vector<std::vector<size_t>>& dl_symbols     ( void ) const { return this->dl_symbols_; }
-    inline const std::vector<std::vector<size_t>>& dl_cal_symbols ( void ) const { return this->dl_cal_symbols_; }
 
     inline void   running( bool value ) { this->running_.store(value); }
     inline bool   running( void ) const { return this->running_.load(); }
 
-    inline size_t ul_data_symbol_num_perframe( void ) const { return this->ul_data_symbol_num_perframe_; }
-    inline size_t ul_pilot_syms( void )               const { return this->ul_pilot_syms_; }
-    inline size_t dl_data_symbol_num_perframe( void ) const { return this->dl_data_symbol_num_perframe_; }
-    inline size_t dl_data_symbol_start( void )        const { return this->dl_data_symbol_start_; }
-    inline size_t dl_data_symbol_end( void )          const { return this->dl_data_symbol_end_; }
-    inline size_t dl_pilot_syms( void )               const { return this->dl_pilot_syms_; }
     inline size_t dl_packet_length( void )            const { return this->dl_packet_length_; }
-
 
     inline Table<int8_t>& dl_bits( void ) { return this->dl_bits_; }
     inline Table<int8_t>& ul_bits( void ) { return this->ul_bits_; }
@@ -501,43 +426,13 @@ private:
 
     LDPCconfig ldpc_config_; // LDPC parameters
 
-    // A string in \p frames_ contains letters representing the symbol types in
+    // A class that holds the frame configuration the id contains letters representing the symbol types in
     // the frame (e.g., 'P' for pilot symbols, 'U' for uplink data symbols)
-    std::vector<std::string> frames_;
-
-    // beacon_symbols_[i] contains IDs of beacon symbols in frames_[i]
-    std::vector<std::vector<size_t>> beacon_symbols_; /* No accessor */
-
-    // pilot_symbols_[i] contains IDs of pilot symbols in frames_[i]
-    std::vector<std::vector<size_t>> pilot_symbols_;
-
-    // ul_symbols_[i] contains IDs of uplink data symbols in frames_[i]
-    std::vector<std::vector<size_t>> ul_symbols_;
-
-    // dl_symbols_[i] contains IDs of downlink data symbols in frames_[i]
-    std::vector<std::vector<size_t>> dl_symbols_;
-
-    // ul_cal_symbols_[i] contains IDs of uplink calibration symbols in
-    // frames_[i]
-    std::vector<std::vector<size_t>> ul_cal_symbols_; /* No accessor */
-
-    // dl_cal_symbols_[i] contains IDs of downlink calibration symbols in
-    // frames_[i]
-    std::vector<std::vector<size_t>> dl_cal_symbols_;
+    FrameStats frame_;
 
     std::atomic<bool> running_;
-
-    /* Downlink / uplink tracking variables */
-    size_t ul_data_symbol_num_perframe_;
-    size_t ul_pilot_syms_;
-
-    size_t dl_data_symbol_num_perframe_;
-    size_t dl_data_symbol_start_;
-    size_t dl_data_symbol_end_;
-
-    size_t dl_pilot_syms_;
+    
     size_t dl_packet_length_; // HAS_TIME & END_BURST, fixme
-
 
     Table<int8_t> dl_bits_;
     Table<int8_t> ul_bits_;
@@ -549,4 +444,4 @@ private:
     Table<std::complex<int16_t>> dl_iq_t_;
     Table<std::complex<int16_t>> ul_iq_t_;
 };
-#endif
+#endif /* CONFIG_HPP_ */

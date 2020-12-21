@@ -117,13 +117,13 @@ void MacThread::process_codeblocks_from_master(Event_data event)
     std::stringstream ss; // Debug-only
 
     // Only non-pilot uplink symbols have application data.
-    if (symbol_idx_ul >= cfg_->ul_pilot_syms()) {
+    if (symbol_idx_ul >= cfg_->frame().client_ul_pilot_symbols()) {
         auto* pkt = (struct MacPacket*)ul_data_ptr;
 
         // We send data to app irrespective of CRC condition
         // TODO: enable ARQ and ensure reliable data goes to app
         const size_t frame_data__offset
-            = (symbol_idx_ul - cfg_->ul_pilot_syms()) * cfg_->mac_payload_length;
+            = (symbol_idx_ul - cfg_->frame().client_ul_pilot_symbols()) * cfg_->mac_payload_length;
         std::memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data,
             cfg_->mac_payload_length);
         server_.n_filled_in_frame_[ue_id] += cfg_->mac_payload_length;
@@ -384,7 +384,7 @@ int PacketTXRX::dequeue_send(int tid)
     }
 
     size_t socket_symbol_offset = offset
-        % (kFrameWnd * c->data_symbol_num_perframe
+        % (kFrameWnd * c->frame().NumDataSyms()
               * c->bs_ant_num());
     char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset * c->packet_length;
     auto* pkt = (Packet*)cur_buffer_ptr;

@@ -106,7 +106,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
-    size_t dl_symbol_idx = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t dl_symbol_idx = cfg->GetDLSymbolIdx(frame_id, symbol_id);
     size_t offset = (c->get_total_data_symbol_idx_dl(frame_id, dl_symbol_idx)
                         * c->bs_ant_num())
         + ant_id;
@@ -116,7 +116,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
     int nChannels = c->nChannels;
     int ch = ant_id % nChannels;
 
-    if (c->recipCalEn && symbol_id == c->dl_symbols()[0].front()) {
+    if ((c->frame().IsRecCalEnabled() == true) && (symbol_id == c->frame().GetDLSymbol(0))) {
         std::vector<std::complex<int16_t>> zeros(
             c->sampsPerSymbol, std::complex<int16_t>(0, 0));
         for (size_t s = 0; s < c->ant_per_group; s++) {
@@ -126,7 +126,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
                 ? c->pilot_ci16.data()
                 : zeros.data();
             long long frameTime = ((long long)(frame_id + TX_FRAME_DELTA) << 32)
-                | (c->dl_cal_symbols()[0][s] << 16);
+                | (c->frame().GetDLCalSymbol(s) << 16);
             radioconfig_->radioTx(ant_id / nChannels, txbuf, 1, frameTime);
         }
     }
@@ -135,7 +135,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
         std::vector<std::complex<int16_t>> zeros(c->sampsPerSymbol);
         if (ant_id != c->ref_ant)
             txbuf[ch] = zeros.data();
-        else if (dl_symbol_idx < c->dl_pilot_syms())
+        else if (dl_symbol_idx < c->frame().client_dl_pilot_symbols())
             txbuf[ch] = reinterpret_cast<void*>(c->ue_specific_pilot_t[0]);
         else
             txbuf[ch] = reinterpret_cast<void*>(c->dl_iq_t()[dl_symbol_idx]);
@@ -145,7 +145,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
         txbuf[ch] = (void*)pkt->data;
     }
 
-    size_t last = c->dl_symbols()[0].back();
+    size_t last = c->frame().GetDLSymbolLast();
     int flags = (symbol_id != last) ? 1 // HAS_TIME
                                     : 2; // HAS_TIME & END_BURST, fixme
     frame_id += TX_FRAME_DELTA;

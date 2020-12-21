@@ -32,11 +32,11 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     , enable_slow_start(enable_slow_start)
     , core_offset(core_offset)
     , frame_duration_(frame_duration)
-    , ticks_all(frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
+    , ticks_all(frame_duration_ * ticks_per_usec / cfg->frame().NumTotalSyms())
     , ticks_wnd_1(
-          200000 /* 200 ms */ * ticks_per_usec / cfg->symbol_num_perframe)
+          200000 /* 200 ms */ * ticks_per_usec / cfg->frame().NumTotalSyms())
     , ticks_wnd_2(
-          15 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
+          15 * frame_duration_ * ticks_per_usec / cfg->frame().NumTotalSyms())
 {
     std::printf(
         "Initializing sender, sending to base station server at %s, frame "
@@ -57,8 +57,9 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     task_ptok = static_cast<moodycamel::ProducerToken**>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             (socket_thread_num * sizeof(moodycamel::ProducerToken*))));
-    for (size_t i = 0; i < socket_thread_num; i++)
+    for (size_t i = 0; i < socket_thread_num; i++) {
         task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
+    }
 
     // Create a master thread when started from simulator
     if (create_thread_for_master)
@@ -106,12 +107,17 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     num_workers_ready_atomic = 0;
 }
 
-Sender::~Sender()
+Sender::~Sender( void )
 {
     iq_data_short_.free();
     for (size_t i = 0; i < kFrameWnd; i++) {
         std::free(packet_count_per_symbol[i]);
     }
+
+    for (size_t i = 0; i < socket_thread_num; i++) {
+        delete (task_ptok[i]);
+    }
+    std::free(task_ptok);
 }
 
 void Sender::startTX()
@@ -157,7 +163,7 @@ void* Sender::master_thread(int)
     double start_time = get_time();
     uint64_t tick_start = rdtsc();
     // Add delay for beacon at the beginning of a frame
-    if (cfg->beacon_symbol_num_perframe == 1) {
+    if (cfg->frame().NumBeaconSyms() == 1) {
         delay_ticks(tick_start, get_ticks_for_frame(0));
         tick_start = rdtsc();
     }
@@ -188,7 +194,7 @@ void* Sender::master_thread(int)
                 if (cfg->downlink_mode() == true) {
                     delay_ticks(tick_start,
                         get_ticks_for_frame(ctag.frame_id)
-                            * cfg->data_symbol_num_perframe);
+                            * cfg->frame().NumDataSyms());
                 }
                 if (kDebugSenderReceiver || kDebugPrintPerFrameDone) {
                     std::printf("Sender: Transmitted frame %u in %.1f ms\n",
@@ -205,7 +211,7 @@ void* Sender::master_thread(int)
 
                 tick_start = rdtsc();
                 // Add delay for beacon at the beginning of a frame
-                if (cfg->beacon_symbol_num_perframe == 1) {
+                if (cfg->frame().NumBeaconSyms() == 1) {
                     delay_ticks(tick_start, get_ticks_for_frame(next_frame_id));
                     tick_start = rdtsc();
                 }
@@ -297,7 +303,7 @@ void* Sender::worker_thread(int tid)
             // Update the TX buffer
             auto tag = gen_tag_t(tags[tag_id]);
             pkt->frame_id = tag.frame_id;
-            pkt->symbol_id = cfg->getSymbolId(tag.symbol_id);
+            pkt->symbol_id = cfg->GetSymbolId(tag.symbol_id);
             pkt->cell_id = tag.ant_id / ant_num_per_cell;
             pkt->ant_id = tag.ant_id - ant_num_per_cell * (pkt->cell_id);
             std::memcpy(pkt->data,
@@ -358,6 +364,9 @@ void* Sender::worker_thread(int tid)
         rt_assert(completion_queue_.enqueue_bulk(tags, num_tags),
             "Completion enqueue failed");
     }
+
+    std::free( static_cast<void *>(socks_pkt_buf) );
+    std::free( static_cast<void *>(fft_inout) );
     return nullptr;
 }
 
@@ -376,14 +385,14 @@ uint64_t Sender::get_ticks_for_frame(size_t frame_id)
 size_t Sender::get_max_symbol_id() const
 {
     size_t max_symbol_id = cfg->downlink_mode()
-        ? cfg->pilot_symbol_num_perframe
-        : cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe();
+        ? cfg->frame().NumPilotSyms()
+        : cfg->frame().NumPilotSyms() + cfg->frame().NumULSyms();
     return max_symbol_id;
 }
 
 void Sender::init_iq_from_file(std::string filename)
 {
-    const size_t packets_per_frame = cfg->symbol_num_perframe * cfg->bs_ant_num();
+    const size_t packets_per_frame = cfg->frame().NumTotalSyms() * cfg->bs_ant_num();
     iq_data_short_.calloc(packets_per_frame,
         (cfg->cp_len() + cfg->ofdm_ca_num()) * 2,
         Agora_memory::Alignment_t::k64Align);

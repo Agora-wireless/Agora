@@ -73,7 +73,7 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
         arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
     }
 
-    if (cfg->dl_data_symbol_num_perframe() > 0) {
+    if (cfg->frame().NumDLSyms() > 0) {
         arma::cx_fvec vec_calib(reinterpret_cast<arma::cx_float*>(calib_ptr),
             cfg->bf_ant_num(), false);
 
@@ -203,12 +203,12 @@ void DoZF::ZF_time_orthogonal(size_t tag)
         arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
             cfg->bs_ant_num(), cfg->ue_num(), false);
 
-        if (cfg->dl_data_symbol_num_perframe() > 0) {
+        if (cfg->frame().NumDLSyms() > 0) {
             arma::cx_fvec calib_vec(
                 reinterpret_cast<arma::cx_float*>(calib_gather_buffer),
                 cfg->bf_ant_num(), false);
             size_t frame_cal_slot = kFrameWnd - 1;
-            if (cfg->recipCalEn && frame_id >= TX_FRAME_DELTA) {
+            if (cfg->frame().IsRecCalEnabled() && frame_id >= TX_FRAME_DELTA) {
                 size_t frame_grp_id
                     = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num;
 
@@ -269,7 +269,7 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
         partial_transpose_gather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
             dst_csi_ptr, cfg->bs_ant_num());
     }
-    if (cfg->recipCalEn) {
+    if (cfg->frame().IsRecCalEnabled()) {
         arma::cx_fmat calib_dl_mat(
             reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_slot]),
             cfg->ofdm_data_num(), cfg->bf_ant_num(), false);

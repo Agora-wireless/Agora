@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
 
     // Step 1: Generate the information buffers and LDPC-encoded buffers for
     // uplink
-    const size_t num_codeblocks = cfg->data_symbol_num_perframe
+    const size_t num_codeblocks = cfg->frame().NumDataSyms()
         * cfg->ldpc_config().num_blocks_in_symbol() * cfg->ue_ant_num();
     std::printf("Total number of blocks: %zu\n", num_codeblocks);
 
@@ -113,7 +113,7 @@ int main(int argc, char* argv[])
     // Place modulated uplink data codewords into central IFFT bins
     rt_assert(cfg->ldpc_config().num_blocks_in_symbol() == 1); // TODO: Assumption
     std::vector<std::vector<complex_float>> pre_ifft_data_syms(
-        cfg->ue_ant_num() * cfg->data_symbol_num_perframe);
+        cfg->ue_ant_num() * cfg->frame().NumDataSyms());
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
         pre_ifft_data_syms[i]
             = data_generator.bin_for_ifft(modulated_codewords[i]);
@@ -141,7 +141,7 @@ int main(int argc, char* argv[])
 
     // Put pilot and data symbols together
     Table<complex_float> tx_data_all_symbols;
-    tx_data_all_symbols.calloc(cfg->symbol_num_perframe,
+    tx_data_all_symbols.calloc(cfg->frame().NumTotalSyms(),
         cfg->ue_ant_num() * cfg->ofdm_ca_num(),
         Agora_memory::Alignment_t::k64Align);
 
@@ -155,23 +155,23 @@ int main(int argc, char* argv[])
             }
             // Load pilot to the second symbol
             // The first symbol is reserved for beacon
-            std::memcpy(tx_data_all_symbols[cfg->beacon_symbol_num_perframe]
+            std::memcpy(tx_data_all_symbols[cfg->frame().NumBeaconSyms()]
                     + i * cfg->ofdm_ca_num(),
                 &pilots_t_ue[0], cfg->ofdm_ca_num() * sizeof(complex_float));
         }
     } else {
         for (size_t i = 0; i < cfg->ue_ant_num(); i++)
-            std::memcpy(tx_data_all_symbols[i + cfg->beacon_symbol_num_perframe]
+            std::memcpy(tx_data_all_symbols[i + cfg->frame().NumBeaconSyms()]
                     + i * cfg->ofdm_ca_num(),
                 &pilot_td[0], cfg->ofdm_ca_num() * sizeof(complex_float));
     }
 
     size_t data_sym_start
-        = cfg->pilot_symbol_num_perframe + cfg->beacon_symbol_num_perframe;
-    for (size_t i = data_sym_start; i < cfg->symbol_num_perframe; i++) {
+        = cfg->frame().NumPilotSyms() + cfg->frame().NumBeaconSyms();
+    for (size_t i = data_sym_start; i < cfg->frame().NumTotalSyms(); i++) {
         const size_t data_sym_id = (i - data_sym_start);
         for (size_t j = 0; j < cfg->ue_ant_num(); j++) {
-            if (data_sym_id < cfg->ul_pilot_syms()) {
+            if (data_sym_id < cfg->frame().client_ul_pilot_symbols()) {
                 std::memcpy(tx_data_all_symbols[i] + j * cfg->ofdm_ca_num()
                         + cfg->ofdm_data_start(),
                     ue_specific_pilot[j],
@@ -205,10 +205,10 @@ int main(int argc, char* argv[])
 
     // Generate RX data received by base station after going through channels
     Table<complex_float> rx_data_all_symbols;
-    rx_data_all_symbols.calloc(cfg->symbol_num_perframe,
+    rx_data_all_symbols.calloc(cfg->frame().NumTotalSyms(),
         cfg->ofdm_ca_num() * cfg->bs_ant_num(),
         Agora_memory::Alignment_t::k64Align);
-    for (size_t i = 0; i < cfg->symbol_num_perframe; i++) {
+    for (size_t i = 0; i < cfg->frame().NumTotalSyms(); i++) {
         arma::cx_fmat mat_input_data(
             reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
             cfg->ofdm_ca_num(), cfg->ue_ant_num(), false);
@@ -233,7 +233,7 @@ int main(int argc, char* argv[])
         + std::to_string(cfg->bs_ant_num()) + ".bin";
     std::printf("Saving rx data to %s\n", filename_rx.c_str());
     FILE* fp_rx = std::fopen(filename_rx.c_str(), "wb");
-    for (size_t i = 0; i < cfg->symbol_num_perframe; i++) {
+    for (size_t i = 0; i < cfg->frame().NumTotalSyms(); i++) {
         auto* ptr = (float*)rx_data_all_symbols[i];
         fwrite(
             ptr, cfg->ofdm_ca_num() * cfg->bs_ant_num() * 2, sizeof(float), fp_rx);
@@ -286,12 +286,12 @@ int main(int argc, char* argv[])
 
     // Prepare downlink data from mod_output
     Table<complex_float> dl_mod_data;
-    dl_mod_data.calloc(cfg->dl_data_symbol_num_perframe(),
+    dl_mod_data.calloc(cfg->frame().NumDLSyms(),
         cfg->ofdm_ca_num() * cfg->ue_ant_num(),
         Agora_memory::Alignment_t::k64Align);
-    for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe(); i++) {
+    for (size_t i = 0; i < cfg->frame().NumDLSyms(); i++) {
         for (size_t j = 0; j < cfg->ue_ant_num(); j++) {
-            if (cfg->dl_pilot_syms() > 0 and i <= cfg->dl_pilot_syms() - 1) {
+            if ((cfg->frame().client_dl_pilot_symbols() > 0) && (i <= cfg->frame().client_dl_pilot_symbols() - 1)) {
                 for (size_t sc_id = 0; sc_id < cfg->ofdm_data_num(); sc_id++)
                     dl_mod_data[i][j * cfg->ofdm_ca_num() + sc_id
                         + cfg->ofdm_data_start()]
@@ -325,14 +325,14 @@ int main(int argc, char* argv[])
 
     // Perform precoding and IFFT
     Table<complex_float> dl_ifft_data;
-    dl_ifft_data.calloc(cfg->dl_data_symbol_num_perframe(),
+    dl_ifft_data.calloc(cfg->frame().NumDLSyms(),
         cfg->ofdm_ca_num() * cfg->bs_ant_num(),
         Agora_memory::Alignment_t::k64Align);
     Table<short> dl_tx_data;
-    dl_tx_data.calloc(cfg->dl_data_symbol_num_perframe(),
+    dl_tx_data.calloc(cfg->frame().NumDLSyms(),
         2 * cfg->sampsPerSymbol * cfg->bs_ant_num(),
         Agora_memory::Alignment_t::k64Align);
-    for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe(); i++) {
+    for (size_t i = 0; i < cfg->frame().NumDLSyms(); i++) {
         arma::cx_fmat mat_input_data(
             reinterpret_cast<arma::cx_float*>(dl_mod_data[i]), cfg->ofdm_ca_num(),
             cfg->ue_ant_num(), false);
@@ -384,7 +384,7 @@ int main(int argc, char* argv[])
         + std::to_string(cfg->bs_ant_num()) + ".bin";
     std::printf("Saving dl tx data to %s\n", filename_dl_tx.c_str());
     FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
-    for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe(); i++) {
+    for (size_t i = 0; i < cfg->frame().NumDLSyms(); i++) {
         short* ptr = (short*)dl_tx_data[i];
         fwrite(ptr, cfg->sampsPerSymbol * cfg->bs_ant_num() * 2, sizeof(short),
             fp_dl_tx);

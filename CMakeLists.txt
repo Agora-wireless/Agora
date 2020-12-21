@@ -206,6 +206,7 @@ include_directories(
 include_directories(SYSTEM src/third_party)
 
 set(COMMON_SOURCES
+  src/common/framestats.cc
   src/common/config.cpp
   src/common/utils.cpp
   src/common/comms-lib.cpp

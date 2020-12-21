@@ -14,9 +14,9 @@ class RxStatus {
 public:
     RxStatus(Config* cfg)
         : num_pilot_pkts_per_frame_(
-              cfg->pilot_symbol_num_perframe * cfg->BS_ANT_NUM)
-        , num_pilot_symbols_per_frame_(cfg->pilot_symbol_num_perframe)
-        , num_data_symbol_per_frame_(cfg->data_symbol_num_perframe)
+              cfg->frame().NumPilotSyms() * cfg->BS_ANT_NUM)
+        , num_pilot_symbols_per_frame_(cfg->frame().NumPilotSyms())
+        , num_data_symbol_per_frame_(cfg->frame().NumDataSyms())
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
         , num_decode_tasks_per_frame_(cfg->get_num_ues_to_process())
     {

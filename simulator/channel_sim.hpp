@@ -112,7 +112,7 @@ private:
         if (symbol_id == 0)
             return 0;
         else
-            return bscfg->get_dl_symbol_idx(frame_id, symbol_id) + 1;
+            return bscfg->GetDLSymbolIdx(frame_id, symbol_id) + 1;
     }
 };
 

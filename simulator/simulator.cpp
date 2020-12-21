@@ -34,7 +34,7 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
         &message_queue_, rx_ptoks_ptr));
 }
 
-Simulator::~Simulator() { free_uplink_buffers(); }
+Simulator::~Simulator() { this->free_uplink_buffers(); this->free_queues(); }
 
 void Simulator::stop()
 {
@@ -130,8 +130,9 @@ void Simulator::start()
 inline void Simulator::update_frame_count(int* frame_count)
 {
     *frame_count = *frame_count + 1;
-    if (*frame_count == 1e9)
+    if (*frame_count == 1e9) {
         *frame_count = 0;
+    }
 }
 
 void Simulator::update_rx_counters(
@@ -181,12 +182,21 @@ void Simulator::initialize_vars_from_cfg(Config* cfg)
     ue_num_ = cfg->ue_num();
     ofdm_ca_num_ = cfg->ofdm_ca_num();
     ofdm_data_num_ = cfg->ofdm_data_num();
-    symbol_num_perframe = cfg->symbol_num_perframe;
-    data_symbol_num_perframe = cfg->data_symbol_num_perframe;
-    ul_data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe();
-    dl_data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe();
-    dl_data_symbol_start = cfg->dl_data_symbol_start();
-    dl_data_symbol_end = cfg->dl_data_symbol_end();
+    symbol_num_perframe = cfg->frame().NumTotalSyms();
+    data_symbol_num_perframe = cfg->frame().NumDataSyms();
+    ul_data_symbol_num_perframe = cfg->frame().NumULSyms();
+    dl_data_symbol_num_perframe = cfg->frame().NumDLSyms();
+
+    if (dl_data_symbol_num_perframe > 0)
+    {
+        dl_data_symbol_start = cfg->frame().GetDLSymbol(0);
+        dl_data_symbol_end   = cfg->frame().GetDLSymbolLast();
+    }
+    else
+    {
+        dl_data_symbol_start = dl_data_symbol_end = 0;
+    }
+
     packet_length = cfg->packet_length;
 
     demul_block_size = cfg->demul_block_size;
@@ -203,22 +213,36 @@ void Simulator::initialize_queues()
 
     rx_ptoks_ptr = static_cast<moodycamel::ProducerToken**>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, SOCKET_RX_THREAD_NUM * sizeof(moodycamel::ProducerToken*)));
-    for (size_t i = 0; i < SOCKET_RX_THREAD_NUM; i++)
+    for (size_t i = 0; i < SOCKET_RX_THREAD_NUM; i++) {
         rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
+    }
 
     task_ptoks_ptr =  static_cast<moodycamel::ProducerToken**>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, TASK_THREAD_NUM * sizeof(moodycamel::ProducerToken*)));
-    for (size_t i = 0; i < TASK_THREAD_NUM; i++)
+    for (size_t i = 0; i < TASK_THREAD_NUM; i++) {
         task_ptoks_ptr[i] = new moodycamel::ProducerToken(complete_task_queue_);
+    }
+}
+
+void Simulator::free_queues( void )
+{
+    for (size_t i = 0; i < SOCKET_RX_THREAD_NUM; i++) {
+        delete (rx_ptoks_ptr[i]);
+    }
+
+    std::free(rx_ptoks_ptr);
+    rx_ptoks_ptr = nullptr;
+
+    for (size_t i = 0; i < TASK_THREAD_NUM; i++) {
+        delete (task_ptoks_ptr[i]);
+    }
+
+    std::free(task_ptoks_ptr);
+    task_ptoks_ptr = nullptr;
 }
 
 void Simulator::initialize_uplink_buffers()
 {
-    alloc_buffer_1d(
-        &task_threads, TASK_THREAD_NUM, Agora_memory::Alignment_t::k64Align, 0);
-    alloc_buffer_1d(
-        &context, TASK_THREAD_NUM, Agora_memory::Alignment_t::k64Align, 0);
-
     socket_buffer_size_ = (long long)packet_length * symbol_num_perframe
         * bs_ant_num_ * kFrameWnd;
     socket_buffer_status_size_ = symbol_num_perframe * bs_ant_num_ * kFrameWnd;
@@ -245,8 +269,6 @@ void Simulator::initialize_uplink_buffers()
 
 void Simulator::free_uplink_buffers()
 {
-    // free_buffer_1d(&pilots_);
-
     socket_buffer_.free();
     socket_buffer_status_.free();
 

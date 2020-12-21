@@ -68,7 +68,7 @@ public:
     /// If worker stats collection is enabled, prsize_t a summary of stats
     void print_summary();
 
-    size_t last_frame_id;
+    size_t last_frame_id( void ) const { return this->last_frame_id_; }
 
     /// From the master, set the RDTSC timestamp for a frame ID and timestamp
     /// type
@@ -264,6 +264,8 @@ private:
     double zf_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
     double demul_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
     double decode_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
+
+    size_t last_frame_id_;
 };
 
 #endif

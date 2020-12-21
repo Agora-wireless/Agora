@@ -253,14 +253,14 @@ bool ClientRadioConfig::radioStart()
     std::vector<std::string> _tddSched;
     _tddSched.resize(this->_radioNum);
     for (size_t r = 0; r < _radioNum; r++) {
-        _tddSched[r] = _cfg->frames().at(0);
-        for (size_t s = 0; s < _cfg->frames().at(0).size(); s++) {
-            char c = _cfg->frames().at(0).at(s);
+        _tddSched[r] = _cfg->frame().frame_identifier();
+        for (size_t s = 0; s < _cfg->frame().frame_identifier().length(); s++) {
+            char c = _cfg->frame().frame_identifier().at(s);
             if (c == 'P'
-                and ((_cfg->nChannels == 1 and _cfg->pilot_symbols()[0][r] != s)
+                and ((_cfg->nChannels == 1 and _cfg->frame().GetPilotSymbol(r) != s)
                         or (_cfg->nChannels == 2
-                               and (_cfg->pilot_symbols()[0][2 * r] != s
-                                       and _cfg->pilot_symbols()[0][r * 2 + 1]
+                               and (_cfg->frame().GetPilotSymbol(2 * r) != s
+                                       and _cfg->frame().GetPilotSymbol(r * 2 + 1)
                                            != s)))) // TODO: change this for
                 // orthogonal pilots
                 _tddSched[r].replace(s, 1, "G");
@@ -284,7 +284,7 @@ bool ClientRadioConfig::radioStart()
             conf["tdd_enabled"] = true;
             conf["frame_mode"] = "continuous_resync";
             int max_frame_ = (int)(2.0
-                / ((_cfg->sampsPerSymbol * _cfg->symbol_num_perframe)
+                / ((_cfg->sampsPerSymbol * _cfg->frame().NumTotalSyms())
                       / _cfg->rate));
             conf["max_frame"] = max_frame_;
             conf["dual_pilot"] = (_cfg->nChannels == 2);

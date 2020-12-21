@@ -54,11 +54,6 @@ public:
         size_t symbol_id, size_t ant_id);
     void print_per_frame_done(PrintType print_type, size_t frame_id);
 
-    void initialize_vars_from_cfg(Config* cfg);
-    void initialize_queues();
-    void initialize_uplink_buffers();
-    void free_uplink_buffers();
-
 private:
     size_t BS_ANT_NUM;
     size_t UE_NUM;
@@ -88,8 +83,6 @@ private:
     size_t max_packet_num_per_frame;
     std::unique_ptr<Receiver> receiver_;
     std::unique_ptr<Sender> sender_;
-    pthread_t* task_threads;
-    EventHandlerContext* context;
 
     // Uplink buffers
 
@@ -136,6 +129,12 @@ private:
     double* frame_end_receive;
     double* frame_start_tx;
     double* frame_end_tx;
+
+    void initialize_vars_from_cfg(Config* cfg);
+    void initialize_queues();
+    void initialize_uplink_buffers();
+    void free_uplink_buffers();
+    void free_queues( void );
 };
 
 #endif

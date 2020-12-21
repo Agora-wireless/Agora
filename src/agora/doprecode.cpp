@@ -54,7 +54,7 @@ Event_data DoPrecode::launch(size_t tag)
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
     const size_t symbol_id = gen_tag_t(tag).symbol_id;
-    const size_t symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    const size_t symbol_idx_dl = cfg->GetDLSymbolIdx(frame_id, symbol_id);
     const size_t total_data_symbol_idx
         = cfg->get_total_data_symbol_idx_dl(frame_id, symbol_idx_dl);
     const size_t frame_slot = frame_id % kFrameWnd;
@@ -63,7 +63,7 @@ Event_data DoPrecode::launch(size_t tag)
     // In downlink pilot symbols, all subcarriers are used as pilots
     // In downlink data symbols, pilot subcarriers are every
     // ofdm_pilot_spacing() subcarriers
-    // if (symbol_idx_dl < cfg->dl_pilot_syms()) {
+    // if (symbol_idx_dl < cfg->frame().client_dl_pilot_symbols()) {
     //     std::memset(pilot_sc_flags, 1, cfg->demul_block_size * sizeof(size_t));
     // } else {
     //     // Find subcarriers used as pilot in this block
@@ -153,7 +153,7 @@ void DoPrecode::load_input_data(size_t symbol_idx_dl,
 {
     complex_float* data_ptr
         = modulated_buffer_temp + sc_id_in_block * cfg->ue_num();
-    if (symbol_idx_dl < cfg->dl_pilot_syms()
+    if (symbol_idx_dl < cfg->frame().client_dl_pilot_symbols()
         || sc_id % cfg->ofdm_pilot_spacing() == 0) {
         data_ptr[user_id] = cfg->ue_specific_pilot[user_id][sc_id];
     } else {

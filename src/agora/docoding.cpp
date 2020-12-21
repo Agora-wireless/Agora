@@ -51,7 +51,7 @@ Event_data DoEncode::launch(size_t tag)
 
     size_t start_tsc = worker_rdtsc();
 
-    size_t symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t symbol_idx_dl = cfg->GetDLSymbolIdx(frame_id, symbol_id);
     int8_t* input_ptr
         = cfg->get_info_bits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
 
@@ -175,7 +175,7 @@ Event_data DoDecode::launch(size_t tag)
         std::printf("\n");
     }
 
-    if (!kEnableMac && kPrintPhyStats && symbol_idx_ul == cfg->ul_pilot_syms()) {
+    if (!kEnableMac && kPrintPhyStats && symbol_idx_ul == cfg->frame().client_ul_pilot_symbols()) {
         phy_stats->update_decoded_bits(
             ue_id, symbol_offset, cfg->num_bytes_per_cb * 8);
         phy_stats->increment_decoded_blocks(ue_id, symbol_offset);

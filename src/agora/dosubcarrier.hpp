@@ -119,7 +119,7 @@ public:
             dl_encoded_buffer_, stats);
 
         // Init internal states
-        demul_cur_sym_ = cfg->pilot_symbol_num_perframe;
+        demul_cur_sym_ = cfg->frame().NumPilotSyms();
     }
 
     ~DoSubcarrier()
@@ -167,7 +167,7 @@ public:
                 && rx_status_->is_demod_ready(
                        demul_cur_frame_, demul_cur_sym_)) {
                 do_demul_->independent_launch(demul_cur_frame_,
-                    demul_cur_sym_ - cfg->pilot_symbol_num_perframe,
+                    demul_cur_sym_ - cfg->frame().NumPilotSyms(),
                     sc_range_.start
                         + (n_demul_tasks_done_ * cfg->demul_block_size));
 
@@ -179,7 +179,7 @@ public:
                         usleep(tid * 3000);
                         int8_t* demul_ptr = demod_buffers_[demul_cur_frame_
                             % kFrameWnd][demul_cur_sym_
-                            - cfg->pilot_symbol_num_perframe][i];
+                            - cfg->frame().NumPilotSyms()][i];
                         std::printf("UE %zu: ", i);
                         for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
                             if (i % 20 == 0) {
@@ -195,13 +195,13 @@ public:
                     demul_status_->demul_complete(
                         demul_cur_frame_, demul_cur_sym_, n_demul_tasks_reqd);
                     demul_cur_sym_++;
-                    if (demul_cur_sym_ == cfg->symbol_num_perframe) {
-                        demul_cur_sym_ = cfg->pilot_symbol_num_perframe;
+                    if (demul_cur_sym_ == cfg->frame().NumTotalSyms()) {
+                        demul_cur_sym_ = cfg->frame().NumPilotSyms();
                         std::printf("Main thread: Demodulation done frame: %lu "
                                     "(%lu UL symbols)\n",
                             demul_cur_frame_,
-                            cfg->symbol_num_perframe
-                                - cfg->pilot_symbol_num_perframe);
+                            cfg->frame().NumTotalSyms()
+                                - cfg->frame().NumPilotSyms());
                         demul_cur_frame_++;
                     }
                 }
@@ -217,10 +217,10 @@ private:
 
         complex_float converted_sc[kSCsPerCacheline];
 
-        for (size_t i = 0; i < cfg->pilot_symbol_num_perframe; i++) {
+        for (size_t i = 0; i < cfg->frame().NumPilotSyms(); i++) {
             for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
                 auto* pkt = reinterpret_cast<Packet*>(socket_buffer_[j]
-                    + (frame_slot * cfg->symbol_num_perframe
+                    + (frame_slot * cfg->frame().NumTotalSyms()
                           * cfg->packet_length)
                     + i * cfg->packet_length);
 

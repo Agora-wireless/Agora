@@ -371,28 +371,27 @@ bool RadioConfig::radioStart()
             "TX_SW_DELAY", "30"); // experimentally good value for dev front-end
         baStn[i]->writeSetting("TDD_MODE", "true");
         std::vector<std::string> tddSched;
-        for (size_t f = 0; f < _cfg->frames().size(); f++) {
-            std::string sched = _cfg->frames()[f];
-            size_t schedSize = sched.size();
-            for (size_t s = 0; s < schedSize; s++) {
-                char c = _cfg->frames()[f].at(s);
-                if (c == 'C') {
-                    sched.replace(s, 1, isRefAnt ? "R" : "T");
-                } else if (c == 'L') {
-                    sched.replace(s, 1, isRefAnt ? "P" : "R");
-                } else if (c == 'P')
-                    sched.replace(s, 1, "R");
-                else if (c == 'U')
-                    sched.replace(s, 1, "R");
-                else if (c == 'D')
-                    sched.replace(s, 1, "T");
-                else if (c != 'B')
-                    sched.replace(s, 1, "G");
-            }
-            std::cout << "Radio " << i << " Frame " << f << ": " << sched
-                      << std::endl;
-            tddSched.push_back(sched);
+
+        std::string sched = _cfg->frame().frame_identifier();
+        size_t schedSize = sched.length();
+        for (size_t s = 0; s < schedSize; s++) {
+            char c = _cfg->frame().frame_identifier().at(s);
+            if (c == 'C') {
+                sched.replace(s, 1, isRefAnt ? "R" : "T");
+            } else if (c == 'L') {
+                sched.replace(s, 1, isRefAnt ? "P" : "R");
+            } else if (c == 'P')
+                sched.replace(s, 1, "R");
+            else if (c == 'U')
+                sched.replace(s, 1, "R");
+            else if (c == 'D')
+                sched.replace(s, 1, "T");
+            else if (c != 'B')
+                sched.replace(s, 1, "G");
         }
+        std::cout << "Radio " << i << " Frame 1: " << sched << std::endl;
+        tddSched.push_back(sched);
+
         conf["frames"] = tddSched;
         std::string confString = conf.dump();
         baStn[i]->writeSetting("TDD_CONFIG", confString);
@@ -411,7 +410,7 @@ bool RadioConfig::radioStart()
             ++ndx;
         }
         baStn[i]->writeSetting("BEACON_START", std::to_string(_radioNum));
-        if (_cfg->recipCalEn) {
+        if (_cfg->frame().IsRecCalEnabled()) {
             if (isRefAnt) {
                 baStn[i]->writeRegisters("TX_RAM_A", 0, pilot);
                 // looks like the best solution is to just use one

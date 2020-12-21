@@ -80,7 +80,7 @@ int main(int argc, char* argv[])
     if (cfg->ldpc_config().num_cb_codew_len() > bits_per_symbol)
         num_symbols_per_cb = (cfg->ldpc_config().num_cb_codew_len() + bits_per_symbol - 1)
             / bits_per_symbol;
-    size_t num_cbs_per_ue = cfg->data_symbol_num_perframe / num_symbols_per_cb;
+    size_t num_cbs_per_ue = cfg->frame().NumDataSyms() / num_symbols_per_cb;
     std::printf("Number of symbols per block: %zu, blocks per frame: %zu\n",
         num_symbols_per_cb, num_cbs_per_ue);
 

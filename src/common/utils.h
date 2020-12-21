@@ -93,7 +93,7 @@ public:
     static std::vector<uint32_t> cfloat32_to_uint32(
         std::vector<std::complex<float>> in, bool conj, std::string order);
     static std::vector<std::vector<size_t>> loadSymbols(
-        std::vector<std::string> frames, char sym);
+        std::vector<std::string> const &frames, char sym);
     static void loadDevices(
         std::string filename, std::vector<std::string>& data);
     static void loadData(const char* filename,

@@ -43,9 +43,9 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     // initialize parameters from config
     srand(time(NULL));
     dl_data_plus_beacon_symbols
-        = bscfg->dl_data_symbol_num_perframe() + 1; // plus beacon
+        = bscfg->frame().NumDLSyms() + 1; // plus beacon
     ul_data_plus_pilot_symbols
-        = bscfg->ul_data_symbol_num_perframe() + bscfg->pilot_symbol_num_perframe;
+        = bscfg->frame().NumULSyms() + bscfg->frame().NumPilotSyms();
 
     socket_bs_.resize(bs_socket_num);
     servaddr_bs_.resize(bs_socket_num);
@@ -57,7 +57,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     task_queue_user = moodycamel::ConcurrentQueue<Event_data>(
         kFrameWnd * ul_data_plus_pilot_symbols * uecfg->ue_ant_num() * 36);
     message_queue_ = moodycamel::ConcurrentQueue<Event_data>(kFrameWnd
-        * bscfg->symbol_num_perframe * (bscfg->bs_ant_num() + uecfg->ue_ant_num())
+        * bscfg->frame().NumTotalSyms() * (bscfg->bs_ant_num() + uecfg->ue_ant_num())
         * 36);
 
     assert(bscfg->packet_length == uecfg->packet_length);
@@ -195,13 +195,13 @@ void ChannelSim::start()
                 if (gen_tag_t(event.tags[0]).tag_type
                     == gen_tag_t::TagType::kUsers) {
                     size_t pilot_symbol_id
-                        = uecfg->get_pilot_symbol_idx(frame_id, symbol_id);
+                        = uecfg->GetPilotSymbolIdx(frame_id, symbol_id);
                     size_t ul_symbol_id
-                        = uecfg->get_ul_symbol_idx(frame_id, symbol_id);
+                        = uecfg->GetULSymbolIdx(frame_id, symbol_id);
                     size_t total_symbol_id = pilot_symbol_id;
                     if (pilot_symbol_id == SIZE_MAX)
                         total_symbol_id
-                            = ul_symbol_id + bscfg->pilot_symbol_num_perframe;
+                            = ul_symbol_id + bscfg->frame().NumPilotSyms();
                     size_t frame_offset
                         = (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols
                         + total_symbol_id;
@@ -409,11 +409,11 @@ void* ChannelSim::ue_rx_loop(int tid)
         size_t ant_id = pkt->ant_id;
 
         size_t pilot_symbol_id
-            = uecfg->get_pilot_symbol_idx(frame_id, symbol_id);
-        size_t ul_symbol_id = uecfg->get_ul_symbol_idx(frame_id, symbol_id);
+            = uecfg->GetPilotSymbolIdx(frame_id, symbol_id);
+        size_t ul_symbol_id = uecfg->GetULSymbolIdx(frame_id, symbol_id);
         size_t total_symbol_id = pilot_symbol_id;
         if (pilot_symbol_id == SIZE_MAX)
-            total_symbol_id = ul_symbol_id + bscfg->pilot_symbol_num_perframe;
+            total_symbol_id = ul_symbol_id + bscfg->frame().NumPilotSyms();
         if (kDebugPrintInTask)
             std::printf(
                 "Received UE packet for frame %zu, symbol %zu, ant %zu from "
@@ -442,11 +442,11 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t symbol_id = gen_tag_t(tag).symbol_id;
 
-    size_t pilot_symbol_id = bscfg->get_pilot_symbol_idx(frame_id, symbol_id);
-    size_t ul_symbol_id = bscfg->get_ul_symbol_idx(frame_id, symbol_id);
+    size_t pilot_symbol_id = bscfg->GetPilotSymbolIdx(frame_id, symbol_id);
+    size_t ul_symbol_id = bscfg->GetULSymbolIdx(frame_id, symbol_id);
     size_t total_symbol_id = pilot_symbol_id;
     if (pilot_symbol_id == SIZE_MAX)
-        total_symbol_id = ul_symbol_id + bscfg->pilot_symbol_num_perframe;
+        total_symbol_id = ul_symbol_id + bscfg->frame().NumPilotSyms();
 
     size_t symbol_offset
         = (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols + total_symbol_id;

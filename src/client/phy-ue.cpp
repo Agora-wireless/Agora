@@ -42,7 +42,7 @@ Phy_UE::Phy_UE(Config* config)
     decode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         kFrameWnd * dl_data_symbol_perframe * config_->ue_ant_num() * 36);
     message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-        kFrameWnd * config_->symbol_num_perframe * config_->ue_ant_num() * 36);
+        kFrameWnd * config_->frame().NumTotalSyms() * config_->ue_ant_num() * 36);
     encode_queue_ = moodycamel::ConcurrentQueue<Event_data>(
         kFrameWnd * config_->ue_num() * 36);
     modul_queue_ = moodycamel::ConcurrentQueue<Event_data>(
@@ -253,9 +253,9 @@ void Phy_UE::start()
                     "slowly, e.g., in debug mode");
 
                 size_t dl_symbol_id = 0;
-                if (config_->dl_symbols().size() > 0
-                    && config_->dl_symbols()[0].size() > 0)
-                    dl_symbol_id = config_->dl_symbols()[0][0];
+                if ((config_->frame().NumDLSyms() > 0) ) {
+                    dl_symbol_id = config_->frame().GetDLSymbol(0);
+                }
 
                 if (symbol_id == 0 // Beacon in Sim mode!
                     || (!config_->hw_framer && ul_data_symbol_perframe == 0
@@ -263,7 +263,7 @@ void Phy_UE::start()
                                == dl_symbol_id)) { // Send uplink pilots
                     Event_data do_tx_pilot_task(EventType::kPacketPilotTX,
                         gen_tag_t::frm_sym_ue(
-                            frame_id, config_->pilot_symbols()[0][ant_id], ant_id)
+                            frame_id, config_->frame().GetPilotSymbol(ant_id), ant_id)
                             ._tag);
                     schedule_task(do_tx_pilot_task, &tx_queue_,
                         *tx_ptoks_ptr[ant_id % rx_thread_num]);
@@ -280,9 +280,9 @@ void Phy_UE::start()
                 }
 
                 if (dl_data_symbol_perframe > 0
-                    && (config_->isPilot(frame_id, symbol_id)
-                           || config_->isDownlink(frame_id, symbol_id))) {
-                    if (dl_symbol_id == config_->dl_symbols()[0][0])
+                    && (config_->IsPilot(frame_id, symbol_id)
+                           || config_->IsDownlink(frame_id, symbol_id))) {
+                    if (dl_symbol_id == config_->frame().GetDLSymbol(0))
                         frame_dl_process_time_[(frame_id % kFrameWnd) * kMaxUEs
                             + ant_id]
                             = get_time_us();
@@ -300,7 +300,7 @@ void Phy_UE::start()
                 size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
                 size_t frame_slot = frame_id % kFrameWnd;
                 size_t dl_symbol_idx
-                    = config_->get_dl_symbol_idx(frame_id, symbol_id);
+                    = config_->GetDLSymbolIdx(frame_id, symbol_id);
                 if (dl_symbol_idx >= dl_pilot_symbol_perframe) {
                     Event_data do_demul_task(EventType::kDemul, event.tags[0]);
                     schedule_task(do_demul_task, &demul_queue_, ptok_demul);
@@ -331,7 +331,7 @@ void Phy_UE::start()
                 size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
                 size_t frame_slot = frame_id % kFrameWnd;
                 //size_t dl_symbol_idx
-                //    = config_->get_dl_symbol_idx(frame_id, symbol_id)
+                //    = config_->GetDLSymbolIdx(frame_id, symbol_id)
                 //    - dl_pilot_symbol_perframe;
                 Event_data do_decode_task(EventType::kDecode, event.tags[0]);
                 schedule_task(do_decode_task, &decode_queue_, ptok_decode);
@@ -362,7 +362,7 @@ void Phy_UE::start()
                 size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
                 size_t frame_slot = frame_id % kFrameWnd;
                 //size_t dl_symbol_idx
-                //    = config_->get_dl_symbol_idx(frame_id, symbol_id)
+                //    = config_->GetDLSymbolIdx(frame_id, symbol_id)
                 //    - dl_pilot_symbol_perframe;
                 if (kEnableMac)
                     schedule_task(
@@ -613,8 +613,8 @@ void Phy_UE::doFFT(int tid, size_t tag)
     size_t ant_id = pkt->ant_id;
     size_t frame_slot = frame_id % kFrameWnd;
 
-    if (!config_->isPilot(frame_id, symbol_id)
-        && !(config_->isDownlink(frame_id, symbol_id)))
+    if (!config_->IsPilot(frame_id, symbol_id)
+        && !(config_->IsDownlink(frame_id, symbol_id)))
         return;
 
     if (kDebugPrintInTask) {
@@ -624,7 +624,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
 
     size_t sig_offset = config_->ofdm_rx_zero_prefix_client_;
     if (kPrintDownlinkPilotStats && config_->ue_ant_num() == 1) {
-        if (config_->isPilot(frame_id, symbol_id)) {
+        if (config_->IsPilot(frame_id, symbol_id)) {
             simd_convert_short_to_float(pkt->data,
                 reinterpret_cast<float*>(rx_samps_tmp),
                 2 * config_->sampsPerSymbol);
@@ -670,7 +670,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
     }
 
     // remove CP, do FFT
-    size_t dl_symbol_id = config_->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t dl_symbol_id = config_->GetDLSymbolIdx(frame_id, symbol_id);
     size_t total_dl_symbol_id = frame_slot * dl_symbol_perframe + dl_symbol_id;
     size_t FFT_buffer_target_id
         = total_dl_symbol_id * config_->ue_ant_num() + ant_id;
@@ -790,7 +790,7 @@ void Phy_UE::doDemul(int tid, size_t tag)
     size_t start_tsc = rdtsc();
 
     const size_t frame_slot = frame_id % kFrameWnd;
-    size_t dl_symbol_id = config_->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t dl_symbol_id = config_->GetDLSymbolIdx(frame_id, symbol_id);
     size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe
         + dl_symbol_id - dl_pilot_symbol_perframe;
     size_t offset = total_dl_symbol_id * config_->ue_ant_num() + ant_id;
@@ -847,7 +847,7 @@ void Phy_UE::doDecode(int tid, size_t tag)
     size_t start_tsc = rdtsc();
 
     const size_t frame_slot = frame_id % kFrameWnd;
-    size_t dl_symbol_id = config_->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t dl_symbol_id = config_->GetDLSymbolIdx(frame_id, symbol_id);
     size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe
         + dl_symbol_id - dl_pilot_symbol_perframe;
     size_t symbol_ant_offset
@@ -990,7 +990,7 @@ void Phy_UE::doEncode(int tid, size_t tag)
                 size_t cb_offset
                     = (ue_id * cfg->ldpc_config().num_blocks_in_symbol() + cb_id)
                     * bytes_per_block;
-                input_ptr = &cfg->ul_bits()[ul_symbol_id + config_->ul_pilot_syms()]
+                input_ptr = &cfg->ul_bits()[ul_symbol_id + config_->frame().client_ul_pilot_symbols()]
                                          [cb_offset];
             }
 
@@ -1012,6 +1012,9 @@ void Phy_UE::doEncode(int tid, size_t tag)
     //    std::printf("Thread %d Encode takes %.2f\n", tid,
     //        cycles_to_us(duration, freq_ghz));
     //}
+
+    std::free(encoded_buffer_temp);
+    std::free(parity_buffer);
 
     rt_assert(message_queue_.enqueue(
                   *task_ptok[tid], Event_data(EventType::kEncode, tag)),
@@ -1063,14 +1066,14 @@ void Phy_UE::doIFFT(int tid, size_t tag)
 
             std::memset(
                 ifft_buff, 0, sizeof(complex_float) * config_->ofdm_data_start());
-            if (ul_symbol_id < config_->ul_pilot_syms()) {
+            if (ul_symbol_id < config_->frame().client_ul_pilot_symbols()) {
                 std::memcpy(ifft_buff + config_->ofdm_data_start(),
                     config_->ue_specific_pilot[ant_id],
                     config_->ofdm_data_num() * sizeof(complex_float));
             } else {
                 size_t total_ul_data_symbol_id
                     = frame_slot * ul_data_symbol_perframe + ul_symbol_id
-                    - config_->ul_pilot_syms();
+                    - config_->frame().client_ul_pilot_symbols();
                 complex_float* modul_buff
                     = &modul_buffer_[total_ul_data_symbol_id]
                                     [ant_id * config_->ofdm_data_num()];
@@ -1098,10 +1101,10 @@ void Phy_UE::doIFFT(int tid, size_t tag)
 
 void Phy_UE::initialize_vars_from_cfg(void)
 {
-    dl_pilot_symbol_perframe = config_->dl_pilot_syms();
-    ul_pilot_symbol_perframe = config_->ul_pilot_syms();
-    ul_symbol_perframe = config_->ul_data_symbol_num_perframe();
-    dl_symbol_perframe = config_->dl_data_symbol_num_perframe();
+    dl_pilot_symbol_perframe = config_->frame().client_dl_pilot_symbols();
+    ul_pilot_symbol_perframe = config_->frame().client_ul_pilot_symbols();
+    ul_symbol_perframe = config_->frame().NumULSyms();
+    dl_symbol_perframe = config_->frame().NumDLSyms();
     dl_data_symbol_perframe = dl_symbol_perframe - dl_pilot_symbol_perframe;
     ul_data_symbol_perframe = ul_symbol_perframe - ul_pilot_symbol_perframe;
     nCPUs = std::thread::hardware_concurrency();
@@ -1113,7 +1116,7 @@ void Phy_UE::initialize_vars_from_cfg(void)
         = (ul_symbol_perframe * config_->ue_ant_num() * kFrameWnd);
     tx_buffer_size = config_->packet_length * tx_buffer_status_size;
     rx_buffer_status_size
-        = (dl_symbol_perframe + config_->beacon_symbol_num_perframe)
+        = (dl_symbol_perframe + config_->frame().NumBeaconSyms())
         * config_->ue_ant_num() * kFrameWnd;
     rx_buffer_size = config_->packet_length * rx_buffer_status_size;
 }
@@ -1148,7 +1151,7 @@ void Phy_UE::initialize_uplink_buffers()
         Agora_memory::Alignment_t::k64Align, 1);
 }
 
-void Phy_UE::initialize_downlink_buffers()
+void Phy_UE::initialize_downlink_buffers( void )
 {
     // initialize rx buffer
     rx_buffer_.malloc(

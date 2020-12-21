@@ -66,7 +66,7 @@ int main(int argc, char* argv[])
     if (cfg->ldpc_config().num_cb_codew_len() > bits_per_symbol)
         num_symbols_per_cb = (cfg->ldpc_config().num_cb_codew_len() + bits_per_symbol - 1)
             / bits_per_symbol;
-    size_t num_cbs_per_ue = cfg->data_symbol_num_perframe / num_symbols_per_cb;
+    size_t num_cbs_per_ue = cfg->frame().NumDataSyms() / num_symbols_per_cb;
     std::printf("Number of symbols per block: %zu, blocks per frame: %zu\n",
         num_symbols_per_cb, num_cbs_per_ue);
 
@@ -98,10 +98,10 @@ int main(int argc, char* argv[])
 
         // Modulate the encoded codewords
         std::vector<std::vector<complex_float>> modulated_codewords(
-            cfg->ue_ant_num() * cfg->data_symbol_num_perframe);
+            cfg->ue_ant_num() * cfg->frame().NumDataSyms());
         size_t num_used_symbol = num_cbs_per_ue * num_symbols_per_cb;
         size_t num_unused_symbol
-            = cfg->data_symbol_num_perframe - num_used_symbol;
+            = cfg->frame().NumDataSyms() - num_used_symbol;
         for (size_t ue_id = 0; ue_id < cfg->ue_ant_num(); ue_id++) {
             for (size_t i = 0; i < num_cbs_per_ue; i++) {
                 size_t remaining_bits = cfg->ldpc_config().num_cb_codew_len();
@@ -111,7 +111,7 @@ int main(int argc, char* argv[])
                     size_t num_bits = ((j + 1) < num_symbols_per_cb)
                         ? bits_per_symbol
                         : remaining_bits;
-                    modulated_codewords[ue_id * cfg->data_symbol_num_perframe
+                    modulated_codewords[ue_id * cfg->frame().NumDataSyms()
                         + i * num_symbols_per_cb + j]
                         = data_generator.get_modulation(
                             &encoded_codewords[ue_id * num_cbs_per_ue + i]
@@ -122,7 +122,7 @@ int main(int argc, char* argv[])
                 }
             }
             for (size_t i = 0; i < num_unused_symbol; i++) {
-                modulated_codewords[ue_id * cfg->data_symbol_num_perframe
+                modulated_codewords[ue_id * cfg->frame().NumDataSyms()
                     + num_used_symbol + i]
                     .resize(cfg->ofdm_data_num());
             }
@@ -130,7 +130,7 @@ int main(int argc, char* argv[])
 
         // Place modulated uplink data codewords into central IFFT bins
         std::vector<std::vector<complex_float>> pre_ifft_data_syms(
-            cfg->ue_ant_num() * cfg->data_symbol_num_perframe);
+            cfg->ue_ant_num() * cfg->frame().NumDataSyms());
         for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
             pre_ifft_data_syms[i]
                 = data_generator.bin_for_ifft(modulated_codewords[i]);
@@ -142,7 +142,7 @@ int main(int argc, char* argv[])
         // Put pilot and data symbols together
         Table<complex_float> tx_data_all_symbols;
         tx_data_all_symbols.calloc(
-            cfg->symbol_num_perframe, cfg->ue_ant_num() * cfg->ofdm_ca_num(), Agora_memory::Alignment_t::k64Align);
+            cfg->frame().NumTotalSyms(), cfg->ue_ant_num() * cfg->ofdm_ca_num(), Agora_memory::Alignment_t::k64Align);
 
         if (cfg->freq_orthogonal_pilot) {
             for (size_t i = 0; i < cfg->ue_ant_num(); i++) {
@@ -155,24 +155,24 @@ int main(int argc, char* argv[])
                 }
                 // Load pilot to the second symbol
                 // The first symbol is reserved for beacon
-                std::memcpy(tx_data_all_symbols[cfg->beacon_symbol_num_perframe]
+                std::memcpy(tx_data_all_symbols[cfg->frame().NumBeaconSyms()]
                         + i * cfg->ofdm_ca_num(),
                     &pilots_t_ue[0], cfg->ofdm_ca_num() * sizeof(complex_float));
             }
         } else {
             for (size_t i = 0; i < cfg->ue_ant_num(); i++)
-                std::memcpy(tx_data_all_symbols[i + cfg->beacon_symbol_num_perframe]
+                std::memcpy(tx_data_all_symbols[i + cfg->frame().NumBeaconSyms()]
                         + i * cfg->ofdm_ca_num(),
                     &pilot_td[0], cfg->ofdm_ca_num() * sizeof(complex_float));
         }
 
         size_t data_sym_start
-            = cfg->pilot_symbol_num_perframe + cfg->beacon_symbol_num_perframe;
-        for (size_t i = data_sym_start; i < cfg->symbol_num_perframe; i++) {
+            = cfg->frame().NumPilotSyms() + cfg->frame().NumBeaconSyms();
+        for (size_t i = data_sym_start; i < cfg->frame().NumTotalSyms(); i++) {
             const size_t data_sym_id = (i - data_sym_start);
             for (size_t j = 0; j < cfg->ue_ant_num(); j++) {
                 std::memcpy(tx_data_all_symbols[i] + j * cfg->ofdm_ca_num(),
-                    &pre_ifft_data_syms[j * cfg->data_symbol_num_perframe
+                    &pre_ifft_data_syms[j * cfg->frame().NumDataSyms()
                         + data_sym_id][0],
                     cfg->ofdm_ca_num() * sizeof(complex_float));
             }
@@ -230,8 +230,8 @@ int main(int argc, char* argv[])
         // Generate RX data received by base station after going through channels
         Table<complex_float> rx_data_all_symbols;
         rx_data_all_symbols.calloc(
-            cfg->symbol_num_perframe, cfg->ofdm_ca_num() * cfg->bs_ant_num(), Agora_memory::Alignment_t::k64Align);
-        for (size_t i = 0; i < cfg->symbol_num_perframe; i++) {
+            cfg->frame().NumTotalSyms(), cfg->ofdm_ca_num() * cfg->bs_ant_num(), Agora_memory::Alignment_t::k64Align);
+        for (size_t i = 0; i < cfg->frame().NumTotalSyms(); i++) {
             arma::cx_fmat mat_input_data(
                 reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
                 cfg->ofdm_ca_num(), cfg->ue_ant_num(), false);
@@ -263,11 +263,11 @@ int main(int argc, char* argv[])
 
         Table<complex_float> equalized_data_all_symbols;
         equalized_data_all_symbols.calloc(
-            cfg->symbol_num_perframe, cfg->ofdm_data_num() * cfg->ue_ant_num(), Agora_memory::Alignment_t::k64Align);
+            cfg->frame().NumTotalSyms(), cfg->ofdm_data_num() * cfg->ue_ant_num(), Agora_memory::Alignment_t::k64Align);
         Table<int8_t> demod_data_all_symbols;
         demod_data_all_symbols.calloc(cfg->ue_ant_num(),
-            cfg->ofdm_data_num() * cfg->data_symbol_num_perframe * 8, Agora_memory::Alignment_t::k64Align);
-        for (size_t i = data_sym_start; i < cfg->symbol_num_perframe; i++) {
+            cfg->ofdm_data_num() * cfg->frame().NumDataSyms() * 8, Agora_memory::Alignment_t::k64Align);
+        for (size_t i = data_sym_start; i < cfg->frame().NumTotalSyms(); i++) {
             arma::cx_fmat mat_rx_data(
                 reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
                 cfg->ofdm_ca_num(), cfg->bs_ant_num(), false);
