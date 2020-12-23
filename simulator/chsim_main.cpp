@@ -15,6 +15,8 @@ DEFINE_string(bs_conf_file,
 DEFINE_string(ue_conf_file,
     TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ue.json",
     "UE Config filename");
+DEFINE_string(chan_model, "RAYLEIGH", "Simulator Channel Type: RAYLEIGH/AWGN");
+DEFINE_double(chan_snr, 20.0, "Signal-to-Noise Ratio");
 
 int main(int argc, char* argv[])
 {
@@ -22,7 +24,7 @@ int main(int argc, char* argv[])
     auto* bs_config = new Config(FLAGS_bs_conf_file);
     auto* ue_config = new Config(FLAGS_ue_conf_file);
     auto* sim = new ChannelSim(bs_config, ue_config, FLAGS_bs_threads,
-        FLAGS_ue_threads, FLAGS_worker_threads, FLAGS_core_offset);
+        FLAGS_ue_threads, FLAGS_worker_threads, FLAGS_core_offset, FLAGS_chan_model, FLAGS_chan_snr);
     sim->start();
     return 0;
 }
