@@ -287,21 +287,6 @@ Config::Config(std::string jsonfile)
     mac_data_bytes_num_perframe = mac_payload_length * mac_packets_perframe;
     mac_bytes_num_perframe = mac_packet_length * mac_packets_perframe;
 
-    // Simulator Parameters
-    sim_snr_db = tddConf.value("sim_snr_db", 10);
-    std::string sim_chan_model = tddConf.value("sim_chan_model", "AWGN");
-    if(sim_chan_model == "AWGN")
-        chan_model = AWGN;
-    else if(sim_chan_model == "RAYLEIGH")
-        chan_model = RAYLEIGH;
-    else if(sim_chan_model == "RAN_3GPP") {
-        chan_model = RAN_3GPP;
-        printf("3GPP Model in progress, setting to RAYLEIGH channel \n");
-	chan_model = RAYLEIGH;
-    }
-    else
-	chan_model = AWGN;
-
     // Done!
     running = true;
     std::printf(
@@ -310,12 +295,11 @@ Config::Config(std::string jsonfile)
         "%zu uplink data symbols per frame, %zu downlink data "
         "symbols per frame,\n\t"
         "%zu OFDM subcarriers (%zu data subcarriers), modulation %s,\n\t"
-        "%zu MAC data bytes per frame, %zu MAC bytes per frame\n\t"
-	"Channel sim set to %s \n",
+        "%zu MAC data bytes per frame, %zu MAC bytes per frame\n",
         BS_ANT_NUM, UE_ANT_NUM, pilot_symbol_num_perframe,
         ul_data_symbol_num_perframe, dl_data_symbol_num_perframe, OFDM_CA_NUM,
         OFDM_DATA_NUM, modulation.c_str(), mac_data_bytes_num_perframe,
-        mac_bytes_num_perframe, sim_chan_model.c_str());
+        mac_bytes_num_perframe);
 }
 
 void Config::genData()

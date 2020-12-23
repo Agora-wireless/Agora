@@ -30,7 +30,7 @@ class Channel {
 public:
 
 
-    Channel (Config* bscfg, Config* uecfg);
+    Channel (Config* bscfg, Config* uecfg, std::string channel_type, double channel_snr);
     ~Channel ();
     void apply_chan(const cx_fmat& fmat_src, cx_fmat& mat_dst, const bool is_downlink, const bool is_newChan);
     void awgn(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
@@ -45,6 +45,14 @@ private:
     size_t bs_ant;
     size_t ue_ant;
     size_t n_samps;
+
+    std::string sim_chan_model;
+    double channel_snr_db;
+    enum ChanModel {
+	    AWGN,
+	    RAYLEIGH,
+	    RAN_3GPP
+    } chan_model;
 
     cx_fmat H;
 };

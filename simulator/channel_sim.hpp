@@ -36,7 +36,7 @@ class ChannelSim {
 public:
     ChannelSim(Config* bscfg, Config* uecfg, size_t bs_thread_num,
         size_t user_thread_num, size_t worker_thread_num,
-        size_t in_core_offset = 30);
+        size_t in_core_offset = 30, std::string in_chan_type = "RAYLEIGH", double in_chan_snr = 20);
     ~ChannelSim();
 
     void start();
@@ -102,6 +102,9 @@ private:
     size_t user_socket_num;
     size_t worker_thread_num;
     size_t core_offset;
+
+    std::string channel_type;
+    double channel_snr;
 
     size_t* bs_rx_counter_;
     size_t* user_rx_counter_;

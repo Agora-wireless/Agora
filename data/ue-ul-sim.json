@@ -7,8 +7,6 @@
  "ue_num": 2,
  "core_offset" : 16,
  "UE" : true,
- "socket_thread_num": 1,
- "sim_chan_model": "RAYLEIGH",
- "sim_snr_db": 20
+ "socket_thread_num": 1
 }
 

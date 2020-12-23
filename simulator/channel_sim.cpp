@@ -29,7 +29,9 @@ static void simd_convert_float_to_short(
 
 ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     size_t bs_thread_num, size_t user_thread_num, size_t worker_thread_num,
-    size_t in_core_offset)
+    size_t in_core_offset,
+    std::string in_chan_type,
+    double in_chan_snr)
     : bscfg(config_bs)
     , uecfg(config_ue)
     , bs_thread_num(bs_thread_num)
@@ -38,6 +40,8 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     , user_socket_num(config_ue->UE_ANT_NUM)
     , worker_thread_num(worker_thread_num)
     , core_offset(in_core_offset)
+    , channel_type(in_chan_type)
+    , channel_snr(in_chan_snr)
 {
 
     // initialize parameters from config
@@ -93,7 +97,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     std::memset(user_tx_counter_, 0, sizeof(size_t) * kFrameWnd);
 
     // Initialize channel
-    channel = new Channel(config_bs, config_ue);
+    channel = new Channel(config_bs, config_ue, channel_type, channel_snr);
 
     for (size_t i = 0; i < worker_thread_num; i++) {
         task_ptok[i] = new moodycamel::ProducerToken(message_queue_);
