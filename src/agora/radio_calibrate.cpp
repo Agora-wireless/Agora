@@ -360,10 +360,10 @@ void RadioConfig::dciqCalibrationProc(size_t channel)
     std::cout << "   DC Offset and IQ Imbalance Calibration: Ch " << channel
               << std::endl;
     std::cout << "****************************************************\n";
-    double sampleRate = _cfg->rate;
-    double centerRfFreq = _cfg->radioRfFreq;
+    double sampleRate = _cfg->rate();
+    double centerRfFreq = _cfg->radio_rf_freq();
     double toneBBFreq = sampleRate / 7;
-    size_t radioSize = _cfg->nRadios;
+    size_t radioSize = _cfg->num_radios();
 
     size_t referenceRadio = radioSize / 2;
     SoapySDR::Device* refDev = baStn[referenceRadio];
@@ -513,9 +513,9 @@ void RadioConfig::adjustDelays(std::vector<int> offset)
 {
     // adjust all trigger delay for all radios
     // with respect to the first non-ref radio
-    size_t ref_offset = _cfg->ref_ant == 0 ? 1 : 0;
+    size_t ref_offset = _cfg->ref_ant() == 0 ? 1 : 0;
     for (size_t i = 0; i < offset.size(); i++) {
-        if (i == _cfg->ref_ant)
+        if (i == _cfg->ref_ant())
             continue;
         int delta = offset[ref_offset] - offset[i];
         std::cout << "sample_adjusting delay of node " << i << " by " << delta
@@ -545,9 +545,9 @@ bool RadioConfig::initial_calib(bool sample_adjust)
     txbuff0[1] = dummy_ci16.data();
 
     std::vector<std::vector<std::complex<int16_t>>> buff;
-    // int ant = _cfg->nChannels;
-    size_t M = _cfg->nAntennas;
-    size_t R = _cfg->nRadios;
+    // int ant = _cfg->num_channels();
+    size_t M = _cfg->num_antennas();
+    size_t R = _cfg->num_radios();
     // TODO: Support 2-channels
     assert(M == R);
     buff.resize(M * M);
@@ -564,7 +564,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
     drain_buffers();
 
     for (size_t i = 0; i < R; i++) {
-        baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->calib_tx_gain_a);
+        baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->calib_tx_gain_a());
         baStn[i]->writeSetting("TDD_CONFIG", "{\"tdd_enabled\":false}");
         baStn[i]->writeSetting("TDD_MODE", "false");
         baStn[i]->activateStream(this->txStreams[i]);
@@ -612,7 +612,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
     for (size_t i = 0; i < R; i++) {
         baStn[i]->deactivateStream(this->txStreams[i]);
         baStn[i]->deactivateStream(this->rxStreams[i]);
-        baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->tx_gain_a);
+        baStn[i]->setGain(SOAPY_SDR_TX, 0, "PAD", _cfg->tx_gain_a());
     }
 
     std::vector<int> offset(R);
@@ -626,16 +626,17 @@ bool RadioConfig::initial_calib(bool sample_adjust)
             break;
         up[i].resize(read_len);
         dn[i].resize(read_len);
-        if (i == _cfg->ref_ant)
+        if (i == _cfg->ref_ant()) {
             continue;
-        std::transform(buff[_cfg->ref_ant * R + i].begin(),
-            buff[_cfg->ref_ant * R + i].end(), up[i].begin(),
+		}
+        std::transform(buff[_cfg->ref_ant() * R + i].begin(),
+            buff[_cfg->ref_ant() * R + i].end(), up[i].begin(),
             [](std::complex<int16_t> ci) {
                 return std::complex<float>(
                     ci.real() / 32768.0, ci.imag() / 32768.0);
             });
-        std::transform(buff[i * R + _cfg->ref_ant].begin(),
-            buff[i * R + _cfg->ref_ant].end(), dn[i].begin(),
+        std::transform(buff[i * R + _cfg->ref_ant()].begin(),
+            buff[i * R + _cfg->ref_ant()].end(), dn[i].begin(),
             [](std::complex<int16_t> ci) {
                 return std::complex<float>(
                     ci.real() / 32768.0, ci.imag() / 32768.0);
@@ -662,7 +663,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
         plt::plot(up_I);
         // plt::xlim(0, read_len);
         plt::ylim(-1, 1);
-        plt::title("ant " + std::to_string(_cfg->ref_ant) + " (ref) to ant "
+        plt::title("ant " + std::to_string(_cfg->ref_ant()) + " (ref) to ant "
             + std::to_string(i));
         plt::legend();
         plt::save("up_" + std::to_string(i) + ".png");
@@ -672,7 +673,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
         // plt::xlim(0, read_len);
         plt::ylim(-1, 1);
         plt::title("ant " + std::to_string(i) + " to ant (ref)"
-            + std::to_string(_cfg->ref_ant));
+            + std::to_string(_cfg->ref_ant()));
         plt::legend();
         plt::save("dn_" + std::to_string(i) + ".png");
 #endif
@@ -699,9 +700,9 @@ bool RadioConfig::initial_calib(bool sample_adjust)
 
     for (size_t i = 0; i < R; i++) {
         size_t id = i;
-        if (_cfg->external_ref_node && i == _cfg->ref_ant)
+        if (_cfg->external_ref_node() && i == _cfg->ref_ant())
             continue;
-        if (_cfg->external_ref_node && i > _cfg->ref_ant)
+        if (_cfg->external_ref_node() && i > _cfg->ref_ant())
             id = i - 1;
         // computing reciprocity calibration matrix
         auto first_up = up[i].begin() + start_up[i];

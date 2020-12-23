@@ -87,31 +87,31 @@ Event_data DoFFT::launch(size_t tag)
     size_t buf_offset = fft_req_tag_t(tag).offset;
     size_t start_tsc = worker_rdtsc();
     auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
-        + buf_offset * cfg->packet_length);
+        + buf_offset * cfg->packet_length());
     size_t frame_id = pkt->frame_id;
     size_t frame_slot = frame_id % kFrameWnd;
     size_t symbol_id = pkt->symbol_id;
     size_t ant_id = pkt->ant_id;
-    SymbolType sym_type = cfg->get_symbol_type(frame_id, symbol_id);
+    SymbolType sym_type = cfg->GetSymbolType(frame_id, symbol_id);
 
-    if (cfg->fft_in_rru) {
+    if (cfg->fft_in_rru() == true) {
         simd_convert_float16_to_float32(reinterpret_cast<float*>(fft_inout),
             reinterpret_cast<float*>(
-                &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs_]),
+                &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs()]),
             cfg->ofdm_ca_num() * 2);
     } else {
 
         if (kUse12BitIQ) {
             simd_convert_12bit_iq_to_float(
-                (uint8_t*)pkt->data + 3 * cfg->ofdm_rx_zero_prefix_bs_,
+                (uint8_t*)pkt->data + 3 * cfg->ofdm_rx_zero_prefix_bs(),
                 reinterpret_cast<float*>(fft_inout), temp_16bits_iq,
                 cfg->ofdm_ca_num() * 3);
         } else {
-            size_t sample_offset = cfg->ofdm_rx_zero_prefix_bs_;
+            size_t sample_offset = cfg->ofdm_rx_zero_prefix_bs();
             if (sym_type == SymbolType::kCalDL)
-                sample_offset = cfg->ofdm_rx_zero_prefix_cal_dl_;
+                sample_offset = cfg->ofdm_rx_zero_prefix_cal_dl();
             else if (sym_type == SymbolType::kCalUL)
-                sample_offset = cfg->ofdm_rx_zero_prefix_cal_ul_;
+                sample_offset = cfg->ofdm_rx_zero_prefix_cal_ul();
             simd_convert_short_to_float(&pkt->data[2 * sample_offset],
                 reinterpret_cast<float*>(fft_inout), cfg->ofdm_ca_num() * 2);
         }
@@ -144,7 +144,7 @@ Event_data DoFFT::launch(size_t tag)
     size_t start_tsc1 = worker_rdtsc();
     duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
-    if (!cfg->fft_in_rru) {
+    if (!cfg->fft_in_rru() == true) {
         DftiComputeForward(mkl_handle,
             reinterpret_cast<float*>(fft_inout)); // Compute FFT in-place
     }
@@ -161,27 +161,27 @@ Event_data DoFFT::launch(size_t tag)
         partial_transpose(
             csi_buffers_[frame_slot][ue_id], ant_id, SymbolType::kPilot);
     } else if (sym_type == SymbolType::kUL) {
-        partial_transpose(cfg->get_data_buf(data_buffer_, frame_id, symbol_id),
+        partial_transpose(cfg->GetDataBuf(data_buffer_, frame_id, symbol_id),
             ant_id, SymbolType::kUL);
-    } else if (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant) {
+    } else if (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant()) {
         // Only process uplink for antennas that also do downlink in this frame
         // for consistency with calib downlink processing.
         if (frame_id >= TX_FRAME_DELTA
-            && ant_id / cfg->ant_per_group
-                == (frame_id - TX_FRAME_DELTA) % cfg->ant_group_num) {
+            && ant_id / cfg->ant_per_group()
+                == (frame_id - TX_FRAME_DELTA) % cfg->ant_group_num()) {
             size_t frame_grp_id
-                = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num;
+                = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num();
             size_t frame_grp_slot = frame_grp_id % kFrameWnd;
             partial_transpose(
                 &calib_ul_buffer_[frame_grp_slot][ant_id * cfg->ofdm_data_num()],
                 ant_id, sym_type);
         }
-    } else if (sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant) {
+    } else if (sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant()) {
         if (frame_id >= TX_FRAME_DELTA) {
             size_t frame_grp_id
-                = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num;
+                = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num();
             size_t frame_grp_slot = frame_grp_id % kFrameWnd;
-            size_t cur_ant = frame_id - (frame_grp_id * cfg->ant_group_num);
+            size_t cur_ant = frame_id - (frame_grp_id * cfg->ant_group_num());
             complex_float* calib_dl_ptr
                 = &calib_dl_buffer_[frame_grp_slot]
                                    [cur_ant * cfg->ofdm_data_num()];
@@ -328,7 +328,7 @@ Event_data DoIFFT::launch(size_t tag)
             frame_id, symbol_id, ant_id);
     }
 
-    size_t offset = (cfg->get_total_data_symbol_idx_dl(frame_id, symbol_idx_dl)
+    size_t offset = (cfg->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl)
                         * cfg->bs_ant_num())
         + ant_id;
 
@@ -375,7 +375,7 @@ Event_data DoIFFT::launch(size_t tag)
 
     struct Packet* pkt
         = (struct Packet*)&dl_socket_buffer_[offset * cfg->dl_packet_length()];
-    short* socket_ptr = &pkt->data[2 * cfg->ofdm_tx_zero_prefix_];
+    short* socket_ptr = &pkt->data[2 * cfg->ofdm_tx_zero_prefix()];
 
     // IFFT scaled results by ofdm_ca_num(), we scale down IFFT results
     // during data type coversion

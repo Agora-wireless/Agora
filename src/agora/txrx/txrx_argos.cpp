@@ -13,8 +13,8 @@ void PacketTXRX::loop_tx_rx_argos(int tid)
     pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset, tid);
     size_t* rx_frame_start = (*frame_start_)[tid];
     int rx_offset = 0;
-    int radio_lo = tid * cfg->nRadios / socket_thread_num;
-    int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
+    int radio_lo = tid * cfg->num_radios() / socket_thread_num;
+    int radio_hi = (tid + 1) * cfg->num_radios() / socket_thread_num;
     std::printf("TXRX thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
     int prev_frame_id = -1;
@@ -26,7 +26,7 @@ void PacketTXRX::loop_tx_rx_argos(int tid)
         struct Packet* pkt = recv_enqueue_argos(tid, radio_id, rx_offset);
         if (pkt == NULL)
             continue;
-        rx_offset = (rx_offset + cfg->nChannels) % packet_num_in_buffer_;
+        rx_offset = (rx_offset + cfg->num_channels()) % packet_num_in_buffer_;
 
         if (kIsWorkerTimingEnabled) {
             int frame_id = pkt->frame_id;
@@ -47,10 +47,10 @@ struct Packet* PacketTXRX::recv_enqueue_argos(
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = (*buffer_)[tid];
     int* rx_buffer_status = (*buffer_status_)[tid];
-    int packet_length = cfg->packet_length;
+    int packet_length = cfg->packet_length();
 
     // if rx_buffer is full, exit
-    int nChannels = cfg->nChannels;
+    int nChannels = cfg->num_channels();
     struct Packet* pkt[nChannels];
     void* samp[nChannels];
     for (int ch = 0; ch < nChannels; ++ch) {
@@ -107,22 +107,22 @@ int PacketTXRX::dequeue_send_argos(int tid)
     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
     size_t dl_symbol_idx = cfg->GetDLSymbolIdx(frame_id, symbol_id);
-    size_t offset = (c->get_total_data_symbol_idx_dl(frame_id, dl_symbol_idx)
+    size_t offset = (c->GetTotalDataSymbolIdxDl(frame_id, dl_symbol_idx)
                         * c->bs_ant_num())
         + ant_id;
 
     // TODO: support nChannels > 1
     void* txbuf[2];
-    int nChannels = c->nChannels;
+    int nChannels = c->num_channels();
     int ch = ant_id % nChannels;
 
     if ((c->frame().IsRecCalEnabled() == true) && (symbol_id == c->frame().GetDLSymbol(0))) {
         std::vector<std::complex<int16_t>> zeros(
-            c->sampsPerSymbol, std::complex<int16_t>(0, 0));
-        for (size_t s = 0; s < c->ant_per_group; s++) {
+            c->samps_per_symbol(), std::complex<int16_t>(0, 0));
+        for (size_t s = 0; s < c->ant_per_group(); s++) {
             txbuf[ch]
-                = (frame_id % c->ant_group_num == ant_id / c->ant_per_group
-                      && s == ant_id % c->ant_per_group)
+                = (frame_id % c->ant_group_num() == ant_id / c->ant_per_group()
+                      && s == ant_id % c->ant_per_group())
                 ? c->pilot_ci16().data()
                 : zeros.data();
             long long frameTime = ((long long)(frame_id + TX_FRAME_DELTA) << 32)
@@ -132,8 +132,8 @@ int PacketTXRX::dequeue_send_argos(int tid)
     }
 
     if (kDebugDownlink) {
-        std::vector<std::complex<int16_t>> zeros(c->sampsPerSymbol);
-        if (ant_id != c->ref_ant)
+        std::vector<std::complex<int16_t>> zeros(c->samps_per_symbol());
+        if (ant_id != c->ref_ant())
             txbuf[ch] = zeros.data();
         else if (dl_symbol_idx < c->frame().client_dl_pilot_symbols())
             txbuf[ch] = reinterpret_cast<void*>(c->ue_specific_pilot_t()[0]);

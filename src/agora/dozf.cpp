@@ -42,7 +42,7 @@ DoZF::~DoZF()
 
 Event_data DoZF::launch(size_t tag)
 {
-    if (cfg->freq_orthogonal_pilot)
+    if (cfg->freq_orthogonal_pilot())
         ZF_freq_orthogonal(tag);
     else
         ZF_time_orthogonal(tag);
@@ -97,17 +97,17 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
         // mat_dl_zf /= abs(mat_dl_zf).max();
         mat_dl_zf_tmp /= abs(mat_dl_zf_tmp).max();
 
-        if (cfg->external_ref_node) {
-            mat_dl_zf_tmp.insert_rows(cfg->ref_ant,
-                arma::cx_fmat(cfg->nChannels, cfg->ue_num(), arma::fill::zeros));
+        if (cfg->external_ref_node()) {
+            mat_dl_zf_tmp.insert_rows(cfg->ref_ant(),
+                arma::cx_fmat(cfg->num_channels(), cfg->ue_num(), arma::fill::zeros));
         }
         arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
             cfg->bs_ant_num(), cfg->ue_num(), false);
         mat_dl_zf = mat_dl_zf_tmp;
     }
-    if (cfg->external_ref_node) {
-        mat_ul_zf_tmp.insert_cols(cfg->ref_ant,
-            arma::cx_fmat(cfg->ue_num(), cfg->nChannels, arma::fill::zeros));
+    if (cfg->external_ref_node()) {
+        mat_ul_zf_tmp.insert_cols(cfg->ref_ant(),
+            arma::cx_fmat(cfg->ue_num(), cfg->num_channels(), arma::fill::zeros));
     }
     mat_ul_zf = mat_ul_zf_tmp;
 }
@@ -178,7 +178,7 @@ void DoZF::ZF_time_orthogonal(size_t tag)
             tid, frame_id, base_sc_id);
     }
     size_t num_subcarriers
-        = std::min(cfg->zf_block_size, cfg->ofdm_data_num() - base_sc_id);
+        = std::min(cfg->zf_block_size(), cfg->ofdm_data_num() - base_sc_id);
 
     // Handle each subcarrier one by one
     for (size_t i = 0; i < num_subcarriers; i++) {
@@ -210,7 +210,7 @@ void DoZF::ZF_time_orthogonal(size_t tag)
             size_t frame_cal_slot = kFrameWnd - 1;
             if (cfg->frame().IsRecCalEnabled() && frame_id >= TX_FRAME_DELTA) {
                 size_t frame_grp_id
-                    = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num;
+                    = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num();
 
                 // use the previous window which has a full set of calibration results
                 frame_cal_slot = (frame_grp_id + kFrameWnd - 1) % kFrameWnd;
@@ -224,9 +224,9 @@ void DoZF::ZF_time_orthogonal(size_t tag)
             arma::cx_fvec calib_dl_vec = calib_dl_mat.row(cur_sc_id).st();
             arma::cx_fvec calib_ul_vec = calib_ul_mat.row(cur_sc_id).st();
             calib_vec = calib_dl_vec / calib_ul_vec;
-            if (cfg->external_ref_node) {
+            if (cfg->external_ref_node()) {
                 mat_csi.shed_rows(
-                    cfg->ref_ant, cfg->ref_ant + cfg->nChannels - 1);
+                    cfg->ref_ant(), cfg->ref_ant() + cfg->num_channels() - 1);
             }
         }
 
@@ -288,8 +288,8 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
         cfg->bs_ant_num(), cfg->ue_num(), false);
 
     compute_precoder(mat_csi, calib_gather_buffer,
-        ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)],
-        dl_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)]);
+        ul_zf_matrices_[frame_slot][cfg->GetZfScId(base_sc_id)],
+        dl_zf_matrices_[frame_slot][cfg->GetZfScId(base_sc_id)]);
 
     double start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
@@ -324,7 +324,7 @@ void DoZF::Predict(size_t tag)
     // Input matrix and calibration are for current frame, output precoders are
     // for the next frame
     compute_precoder(mat_input,
-        cfg->get_calib_buffer(calib_buffer_, frame_id, base_sc_id),
+        cfg->GetCalibBuffer(calib_buffer_, frame_id, base_sc_id),
         cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id + 1, base_sc_id),
         cfg->get_dl_zf_mat(dl_zf_buffer_, frame_id + 1, base_sc_id));
 }

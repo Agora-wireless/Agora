@@ -22,7 +22,7 @@ TEST(TestRecip, Correctness)
     calib_buffer.rand_alloc_cx_float(
         kFrameWnd, cfg->ofdm_data_num() * cfg->bs_ant_num(), Agora_memory::Alignment_t::k64Align);
 
-    std::printf("Reference antenna: %zu\n", cfg->ref_ant);
+    std::printf("Reference antenna: %zu\n", cfg->ref_ant());
 
     size_t start_tsc = rdtsc();
 
@@ -32,7 +32,7 @@ TEST(TestRecip, Correctness)
             = reinterpret_cast<arma::cx_float*>(calib_buffer[i % kFrameWnd]);
         arma::cx_fmat mat_input(
             ptr_in, cfg->ofdm_data_num(), cfg->bs_ant_num(), false);
-        arma::cx_fvec vec_calib_ref = mat_input.col(cfg->ref_ant);
+        arma::cx_fvec vec_calib_ref = mat_input.col(cfg->ref_ant());
         arma::cx_float* recip_buff
             = reinterpret_cast<arma::cx_float*>(recip_buffer_0[i % kFrameWnd]);
         arma::cx_fmat calib_mat = mat_input.each_col() / vec_calib_ref;
@@ -87,7 +87,7 @@ TEST(TestRecip, Correctness)
             arma::cx_float* ptr_in = reinterpret_cast<arma::cx_float*>(
                 recip_buffer_1[i % kFrameWnd] + sc_id * cfg->bs_ant_num());
             arma::cx_fvec recip_vec(ptr_in, cfg->bs_ant_num(), false);
-            recip_vec = recip_vec / recip_vec(cfg->ref_ant);
+            recip_vec = recip_vec / recip_vec(cfg->ref_ant());
         }
     }
 

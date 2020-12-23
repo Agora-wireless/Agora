@@ -20,7 +20,7 @@ void MasterToWorkerDynamic_master(Config* cfg,
     moodycamel::ConcurrentQueue<Event_data>& event_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue)
 {
-    pin_to_core_with_offset(ThreadType::kMaster, cfg->core_offset, 0);
+    pin_to_core_with_offset(ThreadType::kMaster, cfg->core_offset(), 0);
     // Wait for all worker threads to be ready
     while (num_workers_ready_atomic != kNumWorkers) {
         // Wait
@@ -30,9 +30,9 @@ void MasterToWorkerDynamic_master(Config* cfg,
         cfg->bs_ant_num( bs_ant_nums[bs_ant_idx] );
         for (size_t i = 0; i < kMaxTestNum; i++) {
             uint32_t frame_id
-                = i / cfg->zf_events_per_symbol + frame_offsets[bs_ant_idx];
+                = i / cfg->zf_events_per_symbol() + frame_offsets[bs_ant_idx];
             size_t base_sc_id
-                = (i % cfg->zf_events_per_symbol) * cfg->zf_block_size;
+                = (i % cfg->zf_events_per_symbol()) * cfg->zf_block_size();
             event_queue.enqueue(Event_data(
                 EventType::kZF, gen_tag_t::frm_sc(frame_id, base_sc_id)._tag));
         }
@@ -60,7 +60,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     Stats* stats)
 {
     pin_to_core_with_offset(
-        ThreadType::kWorker, cfg->core_offset + 1, worker_id);
+        ThreadType::kWorker, cfg->core_offset() + 1, worker_id);
 
     // Wait for all threads (including master) to start runnung
     num_workers_ready_atomic++;
@@ -75,7 +75,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     size_t num_tasks = 0;
     Event_data req_event;
     size_t max_frame_id_wo_offset
-        = (kMaxTestNum - 1) / (cfg->ofdm_data_num() / cfg->zf_block_size);
+        = (kMaxTestNum - 1) / (cfg->ofdm_data_num() / cfg->zf_block_size());
     for (size_t i = 0; i < kMaxItrNum; i++) {
         if (event_queue.try_dequeue(req_event)) {
             num_tasks++;

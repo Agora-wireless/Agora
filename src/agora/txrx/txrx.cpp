@@ -10,12 +10,12 @@
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg(cfg)
     , core_offset(core_offset)
-    , ant_per_cell(cfg->bs_ant_num() / cfg->nCells)
-    , socket_thread_num(cfg->socket_thread_num)
+    , ant_per_cell(cfg->bs_ant_num() / cfg->num_cells())
+    , socket_thread_num(cfg->socket_thread_num())
 {
     if (!kUseArgos && !kUseUHD) {
-        socket_.resize(cfg->nRadios);
-        bs_rru_sockaddr_.resize(cfg->nRadios);
+        socket_.resize(cfg->num_radios());
+        bs_rru_sockaddr_.resize(cfg->num_radios());
     } else {
         radioconfig_ = new RadioConfig(cfg);
     }
@@ -39,7 +39,7 @@ PacketTXRX::~PacketTXRX()
         radioconfig_->radioStop();
         delete radioconfig_;
     }
-    for (size_t i = 0; i < cfg->socket_thread_num; i++)
+    for (size_t i = 0; i < cfg->socket_thread_num(); i++)
         socket_std_threads_[i].join();
 }
 
@@ -87,16 +87,16 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
 
 void PacketTXRX::send_beacon(int tid, size_t frame_id)
 {
-    int radio_lo = tid * cfg->nRadios / socket_thread_num;
-    int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
+    int radio_lo = tid * cfg->num_radios() / socket_thread_num;
+    int radio_hi = (tid + 1) * cfg->num_radios() / socket_thread_num;
 
     // Send a beacon packet in the downlink to trigger user pilot
-    std::vector<uint8_t> udp_pkt_buf(cfg->packet_length, 0);
+    std::vector<uint8_t> udp_pkt_buf(cfg->packet_length(), 0);
     auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
     for (int ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
         new (pkt) Packet(frame_id, 0, 0 /* cell_id */, ant_id);
         ssize_t r = sendto(socket_[ant_id], (char*)udp_pkt_buf.data(),
-            cfg->packet_length, 0, (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
+            cfg->packet_length(), 0, (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
             sizeof(bs_rru_sockaddr_[ant_id]));
         rt_assert(r > 0, "sendto() failed");
     }
@@ -108,26 +108,26 @@ void PacketTXRX::loop_tx_rx(int tid)
         ThreadType::kWorkerTXRX, core_offset, tid, false /* quiet */);
     size_t* rx_frame_start = (*frame_start_)[tid];
     size_t rx_offset = 0;
-    int radio_lo = tid * cfg->nRadios / socket_thread_num;
-    int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
+    int radio_lo = tid * cfg->num_radios() / socket_thread_num;
+    int radio_hi = (tid + 1) * cfg->num_radios() / socket_thread_num;
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
-        int local_port_id = cfg->bs_server_port + radio_id;
+        int local_port_id = cfg->bs_server_port() + radio_id;
         socket_[radio_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&bs_rru_sockaddr_[radio_id],
-            cfg->bs_rru_port + radio_id, cfg->bs_rru_addr.c_str());
+            cfg->bs_rru_port() + radio_id, cfg->bs_rru_addr().c_str());
         MLPD_INFO(
             "TXRX thread %d: set up UDP socket server listening to port %d"
             " with remote address %s:%d \n",
-            tid, local_port_id, cfg->bs_rru_addr.c_str(),
-            cfg->bs_rru_port + radio_id);
+            tid, local_port_id, cfg->bs_rru_addr().c_str(),
+            cfg->bs_rru_port() + radio_id);
         fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
     }
 
     size_t frame_tsc_delta(
-        cfg->get_frame_duration_sec() * 1e9 * measure_rdtsc_freq());
+        cfg->GetFrameDurationSec() * 1e9 * measure_rdtsc_freq());
     int prev_frame_id = -1;
     int radio_id = radio_lo;
     size_t tx_frame_start = rdtsc();
@@ -174,7 +174,7 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
     char* rx_buffer = (*buffer_)[tid];
     int* rx_buffer_status = (*buffer_status_)[tid];
-    int packet_length = cfg->packet_length;
+    int packet_length = cfg->packet_length();
 
     // if rx_buffer is full, exit
     if (rx_buffer_status[rx_offset] == 1) {
@@ -235,7 +235,7 @@ int PacketTXRX::dequeue_send(int tid)
 
     size_t data_symbol_idx_dl = cfg->GetDLSymbolIdx(frame_id, symbol_id);
     size_t offset
-        = (c->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
+        = (c->GetTotalDataSymbolIdxDl(frame_id, data_symbol_idx_dl)
               * c->bs_ant_num())
         + ant_id;
 

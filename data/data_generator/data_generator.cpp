@@ -55,7 +55,7 @@ int main(int argc, char* argv[])
         profile == DataGenerator::Profile::k123 ? "123" : "random");
 
     std::printf("DataGenerator: Using %s-orthogonal pilots\n",
-        cfg->freq_orthogonal_pilot ? "frequency" : "time");
+        cfg->freq_orthogonal_pilot() ? "frequency" : "time");
 
     std::printf("DataGenerator: Generating encoded and modulated data\n");
     srand(time(nullptr));
@@ -145,7 +145,7 @@ int main(int argc, char* argv[])
         cfg->ue_ant_num() * cfg->ofdm_ca_num(),
         Agora_memory::Alignment_t::k64Align);
 
-    if (cfg->freq_orthogonal_pilot) {
+    if (cfg->freq_orthogonal_pilot() == true) {
         for (size_t i = 0; i < cfg->ue_ant_num(); i++) {
             std::vector<complex_float> pilots_t_ue(cfg->ofdm_ca_num()); // Zeroed
             for (size_t j = cfg->ofdm_data_start();
@@ -194,8 +194,8 @@ int main(int argc, char* argv[])
         // std::printf("noise of ant %d, ue %d\n", i % cfg->bs_ant_num(), i / cfg->bs_ant_num() );
         for (size_t j = 0; j < cfg->ofdm_ca_num(); j++) {
             complex_float noise
-                = { rand_float_from_short(-1, 1) * cfg->noise_level,
-                      rand_float_from_short(-1, 1) * cfg->noise_level };
+                = { rand_float_from_short(-1, 1) * cfg->noise_level(),
+                      rand_float_from_short(-1, 1) * cfg->noise_level() };
             // std::printf("%.4f+%.4fi ", noise.re, noise.im);
             csi_matrices[j][i].re = csi.re + noise.re;
             csi_matrices[j][i].im = csi.im + noise.im;
@@ -330,7 +330,7 @@ int main(int argc, char* argv[])
         Agora_memory::Alignment_t::k64Align);
     Table<short> dl_tx_data;
     dl_tx_data.calloc(cfg->frame().NumDLSyms(),
-        2 * cfg->sampsPerSymbol * cfg->bs_ant_num(),
+        2 * cfg->samps_per_symbol() * cfg->bs_ant_num(),
         Agora_memory::Alignment_t::k64Align);
     for (size_t i = 0; i < cfg->frame().NumDLSyms(); i++) {
         arma::cx_fmat mat_input_data(
@@ -358,24 +358,24 @@ int main(int argc, char* argv[])
             complex_float* ptr_ifft = dl_ifft_data[i] + j * cfg->ofdm_ca_num();
             CommsLib::IFFT(ptr_ifft, cfg->ofdm_ca_num(), false);
 
-            short* txSymbol = dl_tx_data[i] + j * cfg->sampsPerSymbol * 2;
+            short* txSymbol = dl_tx_data[i] + j * cfg->samps_per_symbol() * 2;
             std::memset(
-                txSymbol, 0, sizeof(short) * 2 * cfg->ofdm_tx_zero_prefix_);
+                txSymbol, 0, sizeof(short) * 2 * cfg->ofdm_tx_zero_prefix());
             for (size_t k = 0; k < cfg->ofdm_ca_num(); k++) {
-                txSymbol[2 * (k + cfg->cp_len() + cfg->ofdm_tx_zero_prefix_)]
+                txSymbol[2 * (k + cfg->cp_len() + cfg->ofdm_tx_zero_prefix())]
                     = (short)(32768 * ptr_ifft[k].re);
-                txSymbol[2 * (k + cfg->cp_len() + cfg->ofdm_tx_zero_prefix_) + 1]
+                txSymbol[2 * (k + cfg->cp_len() + cfg->ofdm_tx_zero_prefix()) + 1]
                     = (short)(32768 * ptr_ifft[k].im);
             }
             for (size_t k = 0; k < 2 * cfg->cp_len(); k++) {
-                txSymbol[2 * cfg->ofdm_tx_zero_prefix_ + k] = txSymbol[2
-                    * (cfg->ofdm_tx_zero_prefix_ + cfg->ofdm_ca_num())];
+                txSymbol[2 * cfg->ofdm_tx_zero_prefix() + k] = txSymbol[2
+                    * (cfg->ofdm_tx_zero_prefix() + cfg->ofdm_ca_num())];
             }
 
             const size_t tx_zero_postfix_offset = 2
-                * (cfg->ofdm_tx_zero_prefix_ + cfg->cp_len() + cfg->ofdm_ca_num());
+                * (cfg->ofdm_tx_zero_prefix() + cfg->cp_len() + cfg->ofdm_ca_num());
             std::memset(txSymbol + tx_zero_postfix_offset, 0,
-                sizeof(short) * 2 * cfg->ofdm_tx_zero_postfix_);
+                sizeof(short) * 2 * cfg->ofdm_tx_zero_postfix());
         }
     }
 
@@ -386,7 +386,7 @@ int main(int argc, char* argv[])
     FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
     for (size_t i = 0; i < cfg->frame().NumDLSyms(); i++) {
         short* ptr = (short*)dl_tx_data[i];
-        fwrite(ptr, cfg->sampsPerSymbol * cfg->bs_ant_num() * 2, sizeof(short),
+        fwrite(ptr, cfg->samps_per_symbol() * cfg->bs_ant_num() * 2, sizeof(short),
             fp_dl_tx);
     }
     std::fclose(fp_dl_tx);

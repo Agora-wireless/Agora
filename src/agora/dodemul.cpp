@@ -24,10 +24,10 @@ DoDemul::DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
             kSCsPerCacheline * kMaxAntennas * sizeof(complex_float)));
     equaled_buffer_temp = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
-            cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
+            cfg->demul_block_size() * kMaxUEs * sizeof(complex_float)));
     equaled_buffer_temp_transposed = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
-            cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
+            cfg->demul_block_size() * kMaxUEs * sizeof(complex_float)));
 
     // phase offset calibration data
     cx_float* ue_pilot_ptr = reinterpret_cast<cx_float*>(cfg->ue_specific_pilot()[0]);
@@ -64,7 +64,7 @@ Event_data DoDemul::launch(size_t tag)
     const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id;
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
     const size_t total_data_symbol_idx_ul
-        = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
+        = cfg->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
     const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
 
     const size_t frame_slot = frame_id % kFrameWnd;
@@ -77,7 +77,7 @@ Event_data DoDemul::launch(size_t tag)
     }
 
     size_t max_sc_ite
-        = std::min(cfg->demul_block_size, cfg->ofdm_data_num() - base_sc_id);
+        = std::min(cfg->demul_block_size(), cfg->ofdm_data_num() - base_sc_id);
     assert(max_sc_ite % kSCsPerCacheline == 0);
     // Iterate through cache lines
     for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
@@ -152,7 +152,7 @@ Event_data DoDemul::launch(size_t tag)
                 &data_gather_buffer[j * cfg->bs_ant_num()]);
             // size_t start_tsc2 = worker_rdtsc();
             auto* ul_zf_ptr = reinterpret_cast<cx_float*>(
-                ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(cur_sc_id)]);
+                ul_zf_matrices_[frame_slot][cfg->GetZfScId(cur_sc_id)]);
 
             size_t start_tsc2 = worker_rdtsc();
 #if USE_MKL_JIT
@@ -238,9 +238,9 @@ Event_data DoDemul::launch(size_t tag)
         }
         equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
         int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][i]
-            + (cfg->mod_order_bits * base_sc_id);
+            + (cfg->mod_order_bits() * base_sc_id);
 
-        switch (cfg->mod_order_bits) {
+        switch (cfg->mod_order_bits()) {
         case (CommsLib::QPSK):
             demod_qpsk_soft_sse(equal_T_ptr, demod_ptr, max_sc_ite);
             break;
@@ -252,13 +252,13 @@ Event_data DoDemul::launch(size_t tag)
             break;
         default:
             std::printf("Demodulation: modulation type %s not supported!\n",
-                cfg->modulation.c_str());
+                cfg->modulation().c_str());
         }
         // std::printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
         //     tid, frame_id, symbol_idx_ul, base_sc_id);
         // cout << "Demuled data : \n ";
         // cout << " UE " << i << ": ";
-        // for (int k = 0; k < max_sc_ite * cfg->mod_order_bits; k++)
+        // for (int k = 0; k < max_sc_ite * cfg->mod_order_bits(); k++)
         //     std::printf("%i ", demul_ptr[k]);
         // cout << endl;
     }

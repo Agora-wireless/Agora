@@ -3,15 +3,15 @@
 
 Stats::Stats(Config* cfg)
     : config_(cfg)
-    , task_thread_num(cfg->worker_thread_num)
-    , fft_thread_num(cfg->fft_thread_num)
-    , zf_thread_num(cfg->zf_thread_num)
-    , demul_thread_num(cfg->demul_thread_num)
-    , decode_thread_num(cfg->decode_thread_num)
+    , task_thread_num(cfg->worker_thread_num())
+    , fft_thread_num(cfg->fft_thread_num())
+    , zf_thread_num(cfg->zf_thread_num())
+    , demul_thread_num(cfg->demul_thread_num())
+    , decode_thread_num(cfg->decode_thread_num())
     , freq_ghz(cfg->freq_ghz())
     , creation_tsc(rdtsc())
 {
-    frame_start.calloc(config_->socket_thread_num, kNumStatsFrames,
+    frame_start.calloc(config_->socket_thread_num(), kNumStatsFrames,
         Agora_memory::Alignment_t::k64Align);
 }
 
@@ -75,14 +75,16 @@ void Stats::update_stats_in_functions_uplink(size_t frame_id)
     FrameSummary demul_frame_summary;
     FrameSummary decode_frame_summary;
 
-    if (config_->bigstation_mode)
+    if (config_->bigstation_mode() == true) {
         update_stats_in_functions_uplink_bigstation(frame_slot,
             &fft_frame_summary, &csi_frame_summary, &zf_frame_summary,
             &demul_frame_summary, &decode_frame_summary);
-    else
+	}
+    else {
         update_stats_in_functions_uplink_agora(frame_slot, &fft_frame_summary,
             &csi_frame_summary, &zf_frame_summary, &demul_frame_summary,
             &decode_frame_summary);
+	}
 
     fft_us[frame_slot] = fft_frame_summary.us_avg_threads[0];
     csi_us[frame_slot] = csi_frame_summary.us_avg_threads[0];
@@ -130,14 +132,16 @@ void Stats::update_stats_in_functions_downlink(size_t frame_id)
     FrameSummary precode_frame_summary;
     FrameSummary encode_frame_summary;
 
-    if (config_->bigstation_mode)
+    if (config_->bigstation_mode() == true) {
         update_stats_in_functions_downlink_bigstation(frame_slot,
             &ifft_frame_summary, &csi_frame_summary, &zf_frame_summary,
             &precode_frame_summary, &encode_frame_summary);
-    else
+	}
+    else {
         update_stats_in_functions_downlink_agora(frame_slot,
             &ifft_frame_summary, &csi_frame_summary, &zf_frame_summary,
             &precode_frame_summary, &encode_frame_summary);
+	}
 
     csi_us[frame_slot] = csi_frame_summary.us_avg_threads[0];
     ifft_us[frame_slot] = ifft_frame_summary.us_avg_threads[0];
@@ -446,7 +450,7 @@ void Stats::save_to_file()
 
         for (size_t i = 0; i < this->last_frame_id_; i++) {
             size_t ref_tsc = SIZE_MAX;
-            for (size_t j = 0; j < config_->socket_thread_num; j++) {
+            for (size_t j = 0; j < config_->socket_thread_num(); j++) {
                 ref_tsc = std::min(ref_tsc, frame_start[j][i]);
             }
             std::fprintf(fp_debug,
@@ -471,7 +475,7 @@ void Stats::save_to_file()
             "FFT, time in ZF, time in Demul, time in Decode\n");
         for (size_t i = 0; i < this->last_frame_id_; i++) {
             size_t ref_tsc = SIZE_MAX;
-            for (size_t j = 0; j < config_->socket_thread_num; j++) {
+            for (size_t j = 0; j < config_->socket_thread_num(); j++) {
                 ref_tsc = std::min(ref_tsc, frame_start[j][i]);
             }
 
@@ -557,7 +561,7 @@ void Stats::print_summary( void )
         = get_total_task_count(DoerType::kPrecode, task_thread_num);
     double csi_frames
         = (double)num_csi_tasks / this->config_->bs_ant_num() / this->config_->frame().NumPilotSyms();
-    double zf_frames = (double)num_zf_tasks / this->config_->zf_events_per_symbol;
+    double zf_frames = (double)num_zf_tasks / this->config_->zf_events_per_symbol();
 
     if (config_->frame().NumDLSyms() > 0) {
         double precode_frames = (double)num_precode_tasks / this->config_->ofdm_data_num()

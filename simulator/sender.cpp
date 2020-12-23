@@ -41,7 +41,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     std::printf(
         "Initializing sender, sending to base station server at %s, frame "
         "duration = %.2f ms, slow start = %s\n",
-        cfg->bs_server_addr.c_str(), frame_duration / 1000.0,
+        cfg->bs_server_addr().c_str(), frame_duration / 1000.0,
         enable_slow_start == 1 ? "yes" : "no");
 
     _unused(server_mac_addr_str);
@@ -68,12 +68,12 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 
 #ifdef USE_DPDK
     DpdkTransport::dpdk_init(core_offset, socket_thread_num);
-    mbuf_pool = DpdkTransport::create_mempool(cfg->packet_length);
+    mbuf_pool = DpdkTransport::create_mempool(cfg->packet_length());
 
     // Parse IP addresses
-    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
+    int ret = inet_pton(AF_INET, cfg->bs_rru_addr().c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
+    ret = inet_pton(AF_INET, cfg->bs_server_addr().c_str(), &bs_server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
     rt_assert(cfg->dpdk_num_ports <= rte_eth_dev_count_avail(),
@@ -87,7 +87,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 
     for (uint16_t port_id = 0; port_id < cfg->dpdk_num_ports; port_id++) {
         if (DpdkTransport::nic_init(
-                port_id, mbuf_pool, socket_thread_num, cfg->packet_length)
+                port_id, mbuf_pool, socket_thread_num, cfg->packet_length())
             != 0)
             rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
         // Parse MAC addresses
@@ -202,7 +202,7 @@ void* Sender::master_thread(int)
                     start_time = get_time();
                 }
                 next_frame_id = ctag.frame_id + 1;
-                if (next_frame_id == cfg->frames_to_test)
+                if (next_frame_id == cfg->frames_to_test())
                     break;
                 frame_end[ctag.frame_id % kNumStatsFrames] = get_time();
                 packet_count_per_frame[comp_frame_slot] = 0;
@@ -228,7 +228,7 @@ void* Sender::master_thread(int)
             }
         }
     }
-    write_stats_to_file(cfg->frames_to_test);
+    write_stats_to_file(cfg->frames_to_test());
     std::exit(0);
 }
 
@@ -248,8 +248,8 @@ void* Sender::worker_thread(int tid)
     DftiCommitDescriptor(mkl_handle);
 
     const size_t max_symbol_id = get_max_symbol_id();
-    const size_t radio_lo = tid * cfg->nRadios / socket_thread_num;
-    const size_t radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
+    const size_t radio_lo = tid * cfg->num_radios() / socket_thread_num;
+    const size_t radio_hi = (tid + 1) * cfg->num_radios() / socket_thread_num;
     const size_t ant_num_this_thread = cfg->bs_ant_num() / socket_thread_num
         + ((size_t)tid < cfg->bs_ant_num() % socket_thread_num ? 1 : 0);
 #ifdef USE_DPDK
@@ -263,7 +263,7 @@ void* Sender::worker_thread(int tid)
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             cfg->ofdm_ca_num() * sizeof(complex_float)));
     auto* socks_pkt_buf = static_cast<Packet*>(padded_aligned_alloc(
-        Agora_memory::Alignment_t::k32Align, cfg->packet_length));
+        Agora_memory::Alignment_t::k32Align, cfg->packet_length()));
 
     double begin = get_time();
     size_t total_tx_packets = 0;
@@ -274,10 +274,10 @@ void* Sender::worker_thread(int tid)
         ant_num_this_thread, cfg->bs_ant_num());
 
     // We currently don't support zero-padding OFDM prefix and postfix
-    rt_assert(cfg->packet_length
+    rt_assert(cfg->packet_length()
         == Packet::kOffsetOfData
             + (kUse12BitIQ ? 3 : 4) * (cfg->cp_len() + cfg->ofdm_ca_num()));
-    size_t ant_num_per_cell = cfg->bs_ant_num() / cfg->nCells;
+    size_t ant_num_per_cell = cfg->bs_ant_num() / cfg->num_cells();
 
     size_t tags[kDequeueBulkSize];
     while (true) {
@@ -294,8 +294,8 @@ void* Sender::worker_thread(int tid)
 #ifdef USE_DPDK
             tx_mbufs[tag_id] = DpdkTransport::alloc_udp(mbuf_pool,
                 sender_mac_addr[port_id], server_mac_addr[port_id], bs_rru_addr,
-                bs_server_addr, cfg->bs_rru_port + tid,
-                cfg->bs_server_port + tid, cfg->packet_length);
+                bs_server_addr, cfg->bs_rru_port() + tid,
+                cfg->bs_server_port() + tid, cfg->packet_length());
             pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[tag_id], uint8_t*)
                 + kPayloadOffset);
 #endif
@@ -309,14 +309,14 @@ void* Sender::worker_thread(int tid)
             std::memcpy(pkt->data,
                 iq_data_short_[(pkt->symbol_id * cfg->bs_ant_num()) + tag.ant_id],
                 (cfg->cp_len() + cfg->ofdm_ca_num()) * (kUse12BitIQ ? 3 : 4));
-            if (cfg->fft_in_rru) {
+            if (cfg->fft_in_rru()) {
                 run_fft(pkt, fft_inout, mkl_handle);
             }
 
 #ifndef USE_DPDK
-            udp_client.send(cfg->bs_server_addr,
-                cfg->bs_server_port + cur_radio,
-                reinterpret_cast<uint8_t*>(socks_pkt_buf), cfg->packet_length);
+            udp_client.send(cfg->bs_server_addr(),
+                cfg->bs_server_port() + cur_radio,
+                reinterpret_cast<uint8_t*>(socks_pkt_buf), cfg->packet_length());
 #endif
 
             if (kDebugSenderReceiver) {
@@ -334,7 +334,7 @@ void* Sender::worker_thread(int tid)
             if (total_tx_packets_rolling
                 == ant_num_this_thread * max_symbol_id * 1000) {
                 double end = get_time();
-                double byte_len = cfg->packet_length * ant_num_this_thread
+                double byte_len = cfg->packet_length() * ant_num_this_thread
                     * max_symbol_id * 1000.f;
                 double diff = end - begin;
                 std::printf(

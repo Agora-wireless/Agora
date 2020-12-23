@@ -20,7 +20,7 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid,
     alloc_buffer_1d(&modulated_buffer_temp, kSCsPerCacheline * cfg->ue_num(),
         Agora_memory::Alignment_t::k64Align, 0);
     alloc_buffer_1d(&precoded_buffer_temp,
-        cfg->demul_block_size * cfg->bs_ant_num(),
+        cfg->demul_block_size() * cfg->bs_ant_num(),
         Agora_memory::Alignment_t::k64Align, 0);
 
 #if USE_MKL_JIT
@@ -56,7 +56,7 @@ Event_data DoPrecode::launch(size_t tag)
     const size_t symbol_id = gen_tag_t(tag).symbol_id;
     const size_t symbol_idx_dl = cfg->GetDLSymbolIdx(frame_id, symbol_id);
     const size_t total_data_symbol_idx
-        = cfg->get_total_data_symbol_idx_dl(frame_id, symbol_idx_dl);
+        = cfg->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl);
     const size_t frame_slot = frame_id % kFrameWnd;
 
     // Mark pilot subcarriers in this block
@@ -64,14 +64,14 @@ Event_data DoPrecode::launch(size_t tag)
     // In downlink data symbols, pilot subcarriers are every
     // ofdm_pilot_spacing() subcarriers
     // if (symbol_idx_dl < cfg->frame().client_dl_pilot_symbols()) {
-    //     std::memset(pilot_sc_flags, 1, cfg->demul_block_size * sizeof(size_t));
+    //     std::memset(pilot_sc_flags, 1, cfg->demul_block_size() * sizeof(size_t));
     // } else {
     //     // Find subcarriers used as pilot in this block
-    //     std::memset(pilot_sc_flags, 0, cfg->demul_block_size * sizeof(size_t));
+    //     std::memset(pilot_sc_flags, 0, cfg->demul_block_size() * sizeof(size_t));
     //     size_t remainder = base_sc_id % cfg->ofdm_pilot_spacing();
     //     size_t first_pilot_sc
     //         = remainder > 0 ? (cfg->ofdm_pilot_spacing() - remainder) : 0;
-    //     for (size_t i = first_pilot_sc; i < cfg->demul_block_size;
+    //     for (size_t i = first_pilot_sc; i < cfg->demul_block_size();
     //          i += cfg->ofdm_pilot_spacing())
     //         pilot_sc_flags[i] = 1;
     // }
@@ -83,7 +83,7 @@ Event_data DoPrecode::launch(size_t tag)
     }
 
     size_t max_sc_ite
-        = std::min(cfg->demul_block_size, cfg->ofdm_data_num() - base_sc_id);
+        = std::min(cfg->demul_block_size(), cfg->ofdm_data_num() - base_sc_id);
 
     if (kUseSpatialLocality) {
         for (size_t i = 0; i < max_sc_ite; i = i + kSCsPerCacheline) {
@@ -129,7 +129,7 @@ Event_data DoPrecode::launch(size_t tag)
         float* ifft_ptr
             = (float*)&dl_ifft_buffer_[ifft_buffer_offset]
                                       [base_sc_id + cfg->ofdm_data_start()];
-        for (size_t i = 0; i < cfg->demul_block_size / 4; i++) {
+        for (size_t i = 0; i < cfg->demul_block_size() / 4; i++) {
             float* input_shifted_ptr
                 = precoded_ptr + 4 * i * 2 * cfg->bs_ant_num() + ant_id * 2;
             __m256d t_data
@@ -160,7 +160,7 @@ void DoPrecode::load_input_data(size_t symbol_idx_dl,
         int8_t* raw_data_ptr = &dl_raw_data[total_data_symbol_idx][sc_id
             + roundup<64>(cfg->ofdm_data_num()) * user_id];
         data_ptr[user_id]
-            = mod_single_uint8((uint8_t)(*raw_data_ptr), cfg->mod_table);
+            = mod_single_uint8((uint8_t)(*raw_data_ptr), cfg->mod_table());
     }
 }
 
@@ -168,7 +168,7 @@ void DoPrecode::precoding_per_sc(
     size_t frame_slot, size_t sc_id, size_t sc_id_in_block)
 {
     auto* precoder_ptr = reinterpret_cast<cx_float*>(
-        dl_zf_matrices_[frame_slot][cfg->get_zf_sc_id(sc_id)]);
+        dl_zf_matrices_[frame_slot][cfg->GetZfScId(sc_id)]);
     auto* data_ptr = reinterpret_cast<cx_float*>(modulated_buffer_temp
         + (kUseSpatialLocality
                   ? (sc_id_in_block % kSCsPerCacheline * cfg->ue_num())

@@ -21,23 +21,23 @@ void MasterToWorkerDynamic_master(Config* cfg,
     moodycamel::ConcurrentQueue<Event_data>& event_queue,
     moodycamel::ConcurrentQueue<Event_data>& complete_task_queue)
 {
-    pin_to_core_with_offset(ThreadType::kMaster, cfg->core_offset, 0);
+    pin_to_core_with_offset(ThreadType::kMaster, cfg->core_offset(), 0);
     // Wait for all worker threads to be ready
     while (num_workers_ready_atomic != kNumWorkers) {
         // Wait
     }
 
     for (size_t bs_ant_idx = 0; bs_ant_idx < kModTestNum; bs_ant_idx++) {
-        cfg->update_mod_cfgs(mod_bits_nums[bs_ant_idx]);
+        cfg->UpdateModCfgs(mod_bits_nums[bs_ant_idx]);
         for (size_t i = 0; i < kMaxTestNum; i++) {
             uint32_t frame_id = i
-                    / (cfg->demul_events_per_symbol
+                    / (cfg->demul_events_per_symbol()
                           * cfg->frame().NumULSyms())
                 + frame_offsets[bs_ant_idx];
-            uint32_t symbol_id = (i / cfg->demul_events_per_symbol)
+            uint32_t symbol_id = (i / cfg->demul_events_per_symbol())
                 % cfg->frame().NumULSyms();
             size_t base_sc_id
-                = (i % cfg->demul_events_per_symbol) * cfg->zf_block_size;
+                = (i % cfg->demul_events_per_symbol()) * cfg->zf_block_size();
             event_queue.enqueue(Event_data(EventType::kZF,
                 gen_tag_t::frm_sym_sc(frame_id, symbol_id, base_sc_id)._tag));
         }
@@ -64,7 +64,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     PhyStats* phy_stats, Stats* stats)
 {
     pin_to_core_with_offset(
-        ThreadType::kWorker, cfg->core_offset + 1, worker_id);
+        ThreadType::kWorker, cfg->core_offset() + 1, worker_id);
 
     // Wait for all threads (including master) to start runnung
     num_workers_ready_atomic++;
@@ -79,7 +79,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     size_t num_tasks = 0;
     Event_data req_event;
     size_t max_frame_id_wo_offset
-        = (kMaxTestNum - 1) / (cfg->ofdm_data_num() / cfg->zf_block_size);
+        = (kMaxTestNum - 1) / (cfg->ofdm_data_num() / cfg->zf_block_size());
     for (size_t i = 0; i < kMaxItrNum; i++) {
         if (event_queue.try_dequeue(req_event)) {
             num_tasks++;
@@ -92,7 +92,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
                 and cur_frame_id - frame_offsets[2] <= max_frame_id_wo_offset) {
                 frame_offset_id = 2;
             }
-            ASSERT_EQ(cfg->mod_order_bits, mod_bits_nums[frame_offset_id]);
+            ASSERT_EQ(cfg->mod_order_bits(), mod_bits_nums[frame_offset_id]);
             Event_data resp_event = computeDemul->launch(req_event.tags[0]);
             try_enqueue_fallback(&complete_task_queue, ptok, resp_event);
         }

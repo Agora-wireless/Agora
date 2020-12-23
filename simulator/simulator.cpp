@@ -197,9 +197,9 @@ void Simulator::initialize_vars_from_cfg(Config* cfg)
         dl_data_symbol_start = dl_data_symbol_end = 0;
     }
 
-    packet_length = cfg->packet_length;
+    packet_length = cfg->packet_length();
 
-    demul_block_size = cfg->demul_block_size;
+    demul_block_size = cfg->demul_block_size();
     demul_block_num = ofdm_data_num_ / demul_block_size
         + (ofdm_data_num_ % demul_block_size == 0 ? 0 : 1);
 }

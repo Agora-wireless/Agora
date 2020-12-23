@@ -11,15 +11,15 @@ static constexpr bool kDebugDPDK = false;
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg(cfg)
     , core_offset(core_offset)
-    , ant_per_cell(cfg->BS_ANT_NUM / cfg->nCells)
-    , socket_thread_num(cfg->socket_thread_num)
+    , ant_per_cell(cfg->BS_ANT_NUM / cfg->num_cells())
+    , socket_thread_num(cfg->socket_thread_num())
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
     mbuf_pool = DpdkTransport::create_mempool();
 
-    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
+    int ret = inet_pton(AF_INET, cfg->bs_rru_addr().c_str(), &bs_rru_addr);
     rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
+    ret = inet_pton(AF_INET, cfg->bs_server_addr().c_str(), &bs_server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
     rt_assert(cfg->dpdk_num_ports <= rte_eth_dev_count_avail(),
@@ -30,13 +30,13 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
             rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
 
     for (size_t i = 0; i < socket_thread_num; i++) {
-        uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port + i);
-        uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
+        uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port() + i);
+        uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port() + i);
 
         std::printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
                "dst port: %zu, DPDK port %zu, queue: %zu\n",
-            cfg->bs_rru_addr.c_str(), cfg->bs_server_addr.c_str(),
-            cfg->bs_rru_port + i, cfg->bs_server_port + i,
+            cfg->bs_rru_addr().c_str(), cfg->bs_server_addr().c_str(),
+            cfg->bs_rru_port() + i, cfg->bs_server_port() + i,
             i % cfg->dpdk_num_ports, i / cfg->dpdk_num_ports);
         DpdkTransport::install_flow_rule(i % cfg->dpdk_num_ports,
             i / cfg->dpdk_num_ports, bs_rru_addr, bs_server_addr, src_port,
@@ -170,9 +170,9 @@ uint16_t PacketTXRX::dpdk_recv(int tid, uint16_t port_id, uint16_t queue_id,
 
         auto* payload = reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset;
         auto* pkt = reinterpret_cast<Packet*>(
-            &(*buffer_)[tid][rx_offset * cfg->packet_length]);
+            &(*buffer_)[tid][rx_offset * cfg->packet_length()]);
         DpdkTransport::fastMemcpy(
-            reinterpret_cast<uint8_t*>(pkt), payload, cfg->packet_length);
+            reinterpret_cast<uint8_t*>(pkt), payload, cfg->packet_length());
 
         rte_pktmbuf_free(rx_bufs[i]);
 
@@ -212,7 +212,7 @@ int PacketTXRX::dequeue_send(int tid)
 
     size_t data_symbol_idx_dl = cfg->GetDLSymbolIdx(frame_id, symbol_id);
     size_t offset
-        = (c->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
+        = (c->GetTotalDataSymbolIdxDl(frame_id, data_symbol_idx_dl)
               * c->BS_ANT_NUM)
         + ant_id;
 
@@ -241,8 +241,8 @@ int PacketTXRX::dequeue_send(int tid)
 
     struct rte_udp_hdr* udp_h
         = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
-    udp_h->src_port = rte_cpu_to_be_16(cfg->bs_server_port + tid);
-    udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_rru_port + tid);
+    udp_h->src_port = rte_cpu_to_be_16(cfg->bs_server_port() + tid);
+    udp_h->dst_port = rte_cpu_to_be_16(cfg->bs_rru_port() + tid);
 
     tx_bufs[0]->pkt_len = cfg->dl_packet_length() + kPayloadOffset;
     tx_bufs[0]->data_len = cfg->dl_packet_length() + kPayloadOffset;

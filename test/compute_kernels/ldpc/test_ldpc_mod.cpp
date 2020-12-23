@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
         profile == DataGenerator::Profile::k123 ? "123" : "random");
 
     std::printf("DataGenerator: Using %s-orthogonal pilots\n",
-        cfg->freq_orthogonal_pilot ? "frequency" : "time");
+        cfg->freq_orthogonal_pilot() ? "frequency" : "time");
 
     std::printf("DataGenerator: Generating encoded and modulated data\n");
     srand(time(nullptr));
@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
     // Step 1: Generate the information buffers and LDPC-encoded buffers for
     // uplink
     size_t num_symbols_per_cb = 1;
-    size_t bits_per_symbol = cfg->ofdm_data_num() * cfg->mod_order_bits;
+    size_t bits_per_symbol = cfg->ofdm_data_num() * cfg->mod_order_bits();
     if (cfg->ldpc_config().num_cb_codew_len() > bits_per_symbol)
         num_symbols_per_cb = (cfg->ldpc_config().num_cb_codew_len() + bits_per_symbol - 1)
             / bits_per_symbol;
@@ -123,11 +123,11 @@ int main(int argc, char* argv[])
             adapt_bits_for_mod(
                 reinterpret_cast<const uint8_t*>(&encoded_codewords[i][0]),
                 &mod_input[0], cfg->ldpc_config().numEncodedBytes(),
-                cfg->mod_order_bits);
+                cfg->mod_order_bits());
 
             for (size_t j = 0; j < cfg->ofdm_data_num(); j++) {
                 modulated_codewords[i][j]
-                    = mod_single_uint8(mod_input[j], cfg->mod_table);
+                    = mod_single_uint8(mod_input[j], cfg->mod_table());
             }
 
             for (size_t j = 0; j < cfg->ofdm_data_num(); j++) {
@@ -142,7 +142,7 @@ int main(int argc, char* argv[])
                     = modulated_codewords[i][j].im + noise.im;
             }
 
-            switch (cfg->mod_order_bits) {
+            switch (cfg->mod_order_bits()) {
             case (4):
                 demod_16qam_soft_avx2((float*)modulated_codewords[i],
                     demod_data_all_symbols[i], cfg->ofdm_data_num());
@@ -153,7 +153,7 @@ int main(int argc, char* argv[])
                 break;
             default:
                 std::printf("Demodulation: modulation type %s not supported!\n",
-                    cfg->modulation.c_str());
+                    cfg->modulation().c_str());
             }
         }
 

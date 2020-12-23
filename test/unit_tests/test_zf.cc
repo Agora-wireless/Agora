@@ -41,8 +41,8 @@ TEST(TestZF, Perf)
     for (size_t i = 0; i < kNumIters; i++) {
         uint32_t frame_id = fast_rand.next_u32();
         size_t base_sc_id
-            = (fast_rand.next_u32() % (cfg->ofdm_data_num() / cfg->zf_block_size))
-            * cfg->zf_block_size;
+            = (fast_rand.next_u32() % (cfg->ofdm_data_num() / cfg->zf_block_size()))
+            * cfg->zf_block_size();
         computeZF->launch(gen_tag_t::frm_sc(frame_id, base_sc_id)._tag);
     }
     double ms = cycles_to_ms(rdtsc() - start_tsc, cfg->freq_ghz());

@@ -1,14 +1,9 @@
+// Copyright (c) 2018-2020, Rice University
+// RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
+
 #include "config.hpp"
 #include "utils_ldpc.hpp"
 #include <boost/range/algorithm/count.hpp>
-
-static const size_t kDefaultSymbolNumPerFrame = 70;
-static const size_t kDefaultPilotSymPerFrame = 1;
-static const size_t kDefaultULSymPerFrame = 61;
-static const size_t kDefaultULSymStart = 9;
-static const size_t kDefaultDLSymPerFrame = 10;
-static const size_t kDefaultDLSymStart = 10;
-static const bool kDefaultDownlinkMode = false;
 
 
 Config::Config(std::string jsonfile)
@@ -25,54 +20,55 @@ Config::Config(std::string jsonfile)
     if (!kUseUHD) {
         std::string hub_file = tddConf.value("hubs", "");
         if (hub_file.size() > 0)
-            Utils::loadDevices(hub_file, hub_ids);
+            Utils::loadDevices(hub_file, hub_ids_);
     }
     std::string serial_file = tddConf.value("irises", "");
-    ref_ant = tddConf.value("ref_ant", 0);
-    external_ref_node = tddConf.value("external_ref_node", false);
-    nCells = tddConf.value("cells", 1);
-    channel = tddConf.value("channel", "A");
-    nChannels = std::min(channel.size(), (size_t)2);
+    ref_ant_ = tddConf.value("ref_ant_", 0);
+    external_ref_node_ = tddConf.value("external_ref_node", false);
+    num_cells_ = tddConf.value("cells", 1);
+    channel_ = tddConf.value("channel", "A");
+    num_channels_ = std::min(channel_.size(), (size_t)2);
     bs_ant_num_ = tddConf.value("antenna_num", 8);
     is_UE_ = tddConf.value("UE", false);
     ue_num_ = tddConf.value("ue_num", 8);
     ue_ant_num_ = ue_num_;
     if (serial_file.size() > 0)
-        Utils::loadDevices(serial_file, radio_ids);
-    if (radio_ids.size() != 0) {
-        nRadios = radio_ids.size();
-        nAntennas = nChannels * nRadios;
+        Utils::loadDevices(serial_file, radio_ids_);
+    if (radio_ids_.size() != 0) {
+        num_radios_ = radio_ids_.size();
+        num_antennas_ = num_channels_ * num_radios_;
         if (is_UE_) {
-            ue_ant_num_ = nAntennas;
-            ue_num_ = nRadios;
+            ue_ant_num_ = num_antennas_;
+            ue_num_ = num_radios_;
         } else {
-            if (ref_ant >= nAntennas)
-                ref_ant = 0;
-            if (bs_ant_num_ != nAntennas)
-                bs_ant_num_ = nAntennas;
+            if (ref_ant_ >= num_antennas_)
+                ref_ant_ = 0;
+            if (bs_ant_num_ != num_antennas_)
+                bs_ant_num_ = num_antennas_;
         }
-    } else
-        nRadios = tddConf.value("radio_num", is_UE_ ? ue_ant_num_ : bs_ant_num_);
+    } else {
+        num_radios_ = tddConf.value("radio_num", is_UE_ ? ue_ant_num_ : bs_ant_num_);
+    }
     bf_ant_num_ = bs_ant_num_;
-    if (external_ref_node)
-        bf_ant_num_ = bs_ant_num_ - nChannels;
+    if (external_ref_node_)
+        bf_ant_num_ = bs_ant_num_ - num_channels_;
 
     if (kUseArgos || kUseUHD) {
-        rt_assert(nRadios != 0, "Error: No radios exist in Argos mode");
+        rt_assert(num_radios_ != 0, "Error: No radios exist in Argos mode");
     }
 
     /* radio configurations */
-    freq = tddConf.value("frequency", 3.6e9);
+    freq_ = tddConf.value("frequency", 3.6e9);
     single_gain_ = tddConf.value("single_gain", true);
-    tx_gain_a = tddConf.value("tx_gain_a", 20);
-    rx_gain_a = tddConf.value("rx_gain_a", 20);
-    tx_gain_b = tddConf.value("tx_gain_b", 20);
-    rx_gain_b = tddConf.value("rx_gain_b", 20);
-    calib_tx_gain_a = tddConf.value("calib_tx_gain_a", tx_gain_a);
-    calib_tx_gain_b = tddConf.value("calib_tx_gain_b", tx_gain_b);
+    tx_gain_a_ = tddConf.value("tx_gain_a", 20);
+    rx_gain_a_ = tddConf.value("rx_gain_a", 20);
+    tx_gain_b_ = tddConf.value("tx_gain_b", 20);
+    rx_gain_b_ = tddConf.value("rx_gain_b", 20);
+    calib_tx_gain_a_ = tddConf.value("calib_tx_gain_a", tx_gain_a_);
+    calib_tx_gain_b_ = tddConf.value("calib_tx_gain_b", tx_gain_b_);
     auto gain_adj_json_a = tddConf.value("client_gain_adjust_a", json::array());
     if (gain_adj_json_a.empty()) {
-        client_gain_adj_a_.resize(nRadios, 0);
+        client_gain_adj_a_.resize(num_radios_, 0);
 	}
     else {
         client_gain_adj_a_.assign(
@@ -80,36 +76,36 @@ Config::Config(std::string jsonfile)
 	}
     auto gain_adj_json_b = tddConf.value("client_gain_adjust_b", json::array());
     if (gain_adj_json_b.empty()) {
-        client_gain_adj_b_.resize(nRadios, 0);
+        client_gain_adj_b_.resize(num_radios_, 0);
 	}
     else {
         client_gain_adj_b_.assign(
             gain_adj_json_b.begin(), gain_adj_json_b.end());
 	}
-    rate = tddConf.value("rate", 5e6);
-    nco = tddConf.value("nco_frequency", 0.75 * rate);
-    bwFilter = rate + 2 * nco;
-    radioRfFreq = freq - nco;
-    beacon_ant = tddConf.value("beacon_antenna", 0);
-    beamsweep = tddConf.value("beamsweep", false);
-    sampleCalEn = tddConf.value("sample_calibrate", false);
-    imbalanceCalEn = tddConf.value("imbalance_calibrate", false);
-    modulation = tddConf.value("modulation", "16QAM");
+    rate_ = tddConf.value("rate", 5e6);
+    nco_ = tddConf.value("nco_frequency", 0.75 * rate_);
+    bw_filter_ = rate_ + 2 * nco_;
+    radio_rf_freq_ = freq_ - nco_;
+    beacon_ant_ = tddConf.value("beacon_antenna", 0);
+    beamsweep_ = tddConf.value("beamsweep", false);
+    sample_cal_en_ = tddConf.value("sample_calibrate", false);
+    imbalance_cal_en_ = tddConf.value("imbalance_calibrate", false);
+    modulation_ = tddConf.value("modulation", "16QAM");
 
-    bs_server_addr = tddConf.value("bs_server_addr", "127.0.0.1");
-    bs_rru_addr = tddConf.value("bs_rru_addr", "127.0.0.1");
-    ue_server_addr = tddConf.value("ue_server_addr", "127.0.0.1");
-    mac_remote_addr = tddConf.value("mac_remote_addr", "127.0.0.1");
-    bs_server_port = tddConf.value("bs_server_port", 8000);
-    bs_rru_port = tddConf.value("bs_rru_port", 9000);
-    ue_rru_port = tddConf.value("ue_rru_port", 7000);
-    ue_server_port = tddConf.value("ue_sever_port", 6000);
+    bs_server_addr_ = tddConf.value("bs_server_addr", "127.0.0.1");
+    bs_rru_addr_ = tddConf.value("bs_rru_addr", "127.0.0.1");
+    ue_server_addr_ = tddConf.value("ue_server_addr", "127.0.0.1");
+    mac_remote_addr_ = tddConf.value("mac_remote_addr", "127.0.0.1");
+    bs_server_port_ = tddConf.value("bs_server_port", 8000);
+    bs_rru_port_ = tddConf.value("bs_rru_port", 9000);
+    ue_rru_port_ = tddConf.value("ue_rru_port", 7000);
+    ue_server_port_ = tddConf.value("ue_sever_port", 6000);
 
-    dpdk_num_ports = tddConf.value("dpdk_num_ports", 1);
+    dpdk_num_ports_ = tddConf.value("dpdk_num_ports", 1);
 
-    mac_rx_port = tddConf.value("mac_rx_port", 5000);
-    mac_tx_port = tddConf.value("mac_tx_port", 4000);
-    init_mac_running = tddConf.value("init_mac_running", false);
+    mac_rx_port_ = tddConf.value("mac_rx_port", 5000);
+    mac_tx_port_ = tddConf.value("mac_tx_port", 4000);
+    init_mac_running_ = tddConf.value("init_mac_running", false);
 
     /* frame configurations */
     cp_len_ = tddConf.value("cp_len", 0);
@@ -134,12 +130,12 @@ Config::Config(std::string jsonfile)
         = tddConf.value("ofdm_data_start", (ofdm_ca_num_ - ofdm_data_num_) / 2);
     ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
 
-    bigstation_mode = tddConf.value("bigstation_mode", false);
-    freq_orthogonal_pilot = tddConf.value("freq_orthogonal_pilot", false);
-    correct_phase_shift = tddConf.value("correct_phase_shift", false);
+    bigstation_mode_ = tddConf.value("bigstation_mode", false);
+    freq_orthogonal_pilot_ = tddConf.value("freq_orthogonal_pilot", false);
+    correct_phase_shift_ = tddConf.value("correct_phase_shift", false);
 
-    cl_tx_advance = tddConf.value("tx_advance", 100);
-    hw_framer = tddConf.value("hw_framer", true);
+    cl_tx_advance_ = tddConf.value("tx_advance", 100);
+    hw_framer_ = tddConf.value("hw_framer", true);
 
     /* If frames not specified explicitly, construct default based on frame_type / symbol_num_perframe / pilot_num / ul_symbol_num_perframe / dl_symbol_num_perframe / dl_data_symbol_start */
     if (tddConf.find("frames") == tddConf.end() ) {
@@ -162,7 +158,7 @@ Config::Config(std::string jsonfile)
         }
 
         size_t symbol_num_perframe      = tddConf.value("symbol_num_perframe", kDefaultSymbolNumPerFrame);
-        size_t pilot_symbol_num_perframe = tddConf.value("pilot_num", freq_orthogonal_pilot ? kDefaultPilotSymPerFrame : ue_ant_num_);
+        size_t pilot_symbol_num_perframe = tddConf.value("pilot_num", freq_orthogonal_pilot_ ? kDefaultPilotSymPerFrame : ue_ant_num_);
 
         ul_data_symbol_num_perframe  = tddConf.value("ul_symbol_num_perframe", ul_data_symbol_num_perframe);
         ul_data_symbol_start         = tddConf.value("ul_data_symbol_start",   ul_data_symbol_start); /* Start position of the first UL symbol */
@@ -214,8 +210,8 @@ Config::Config(std::string jsonfile)
             second_sym_start  = dl_data_symbol_start;
             second_sym_count  = dl_data_symbol_num_perframe;
         }
-        std::printf("1st Start: %zu, Count: %zu, Symbol %c\n 2nd Start: %zu, Count: %zu, Symbol %c\n Total: %zu\n", 
-                    first_sym_start, first_sym_start, first_sym, second_sym_start, second_sym_start, second_sym, symbol_num_perframe);
+        std::printf("Symbol %c, start %zu, count %zu. Symbol %c, start %zu, count %zu. Total Symbols: %zu\n", 
+                    first_sym, first_sym_start, first_sym_start, second_sym, second_sym_start, second_sym_start, symbol_num_perframe);
 
         std::string sched("B");
         sched.append(pilot_symbol_num_perframe, 'P');
@@ -259,50 +255,50 @@ Config::Config(std::string jsonfile)
 
     frame_.SetClientPilotSyms(client_ul_pilot_syms, client_dl_pilot_syms);
 
-    ant_per_group = frame_.NumDLCalSyms();
-    ant_group_num = frame_.IsRecCalEnabled() ? (bf_ant_num_ / ant_per_group) : 0;
+    ant_per_group_ = frame_.NumDLCalSyms();
+    ant_group_num_ = frame_.IsRecCalEnabled() ? (bf_ant_num_ / ant_per_group_) : 0;
 
     if ((is_UE_ == true) && 
-        (freq_orthogonal_pilot == false) &&
+        (freq_orthogonal_pilot_ == false) &&
         (ue_ant_num_ != frame_.NumPilotSyms()) ) {
         rt_assert(false, "Number of pilot symbols doesn't match number of UEs");
     }
-    if ((is_UE_ == false) && (freq_orthogonal_pilot == false) && (tddConf.find("ue_num") == tddConf.end())) {
+    if ((is_UE_ == false) && (freq_orthogonal_pilot_ == false) && (tddConf.find("ue_num") == tddConf.end())) {
         ue_num_ = frame_.NumPilotSyms();
         ue_ant_num_ = ue_num_;
     }
-    ue_ant_offset = tddConf.value("ue_ant_offset", 0);
-    total_ue_ant_num = tddConf.value("total_ue_ant_num", ue_ant_num_);
+    ue_ant_offset_ = tddConf.value("ue_ant_offset", 0);
+    total_ue_ant_num_ = tddConf.value("total_ue_ant_num", ue_ant_num_);
 
     /* Agora configurations */
-    frames_to_test = tddConf.value("frames_to_test", 9600);
-    core_offset = tddConf.value("core_offset", 0);
-    worker_thread_num = tddConf.value("worker_thread_num", 25);
-    socket_thread_num = tddConf.value("socket_thread_num", 4);
-    fft_thread_num = tddConf.value("fft_thread_num", 5);
-    demul_thread_num = tddConf.value("demul_thread_num", 5);
-    decode_thread_num = tddConf.value("decode_thread_num", 10);
-    zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num
-        - decode_thread_num;
+    frames_to_test_ = tddConf.value("frames_to_test", 9600);
+    core_offset_ = tddConf.value("core_offset", 0);
+    worker_thread_num_ = tddConf.value("worker_thread_num", 25);
+    socket_thread_num_ = tddConf.value("socket_thread_num", 4);
+    fft_thread_num_ = tddConf.value("fft_thread_num", 5);
+    demul_thread_num_ = tddConf.value("demul_thread_num", 5);
+    decode_thread_num_ = tddConf.value("decode_thread_num", 10);
+    zf_thread_num_ = worker_thread_num_ - fft_thread_num_ - demul_thread_num_
+        - decode_thread_num_;
 
-    demul_block_size = tddConf.value("demul_block_size", 48);
-    rt_assert(demul_block_size % kSCsPerCacheline == 0,
+    demul_block_size_ = tddConf.value("demul_block_size", 48);
+    rt_assert(demul_block_size_ % kSCsPerCacheline == 0,
         "Demodulation block size must be a multiple of subcarriers per "
         "cacheline");
-    rt_assert(demul_block_size % kTransposeBlockSize == 0,
+    rt_assert(demul_block_size_ % kTransposeBlockSize == 0,
         "Demodulation block size must be a multiple of transpose block size");
-    demul_events_per_symbol = 1 + (ofdm_data_num_ - 1) / demul_block_size;
+    demul_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / demul_block_size_;
 
-    zf_batch_size = tddConf.value("zf_batch_size", 1);
-    zf_block_size = freq_orthogonal_pilot ? ue_ant_num_
+    zf_batch_size_ = tddConf.value("zf_batch_size", 1);
+    zf_block_size_ = freq_orthogonal_pilot_ ? ue_ant_num_
                                           : tddConf.value("zf_block_size", 1);
-    zf_events_per_symbol = 1 + (ofdm_data_num_ - 1) / zf_block_size;
+    zf_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / zf_block_size_;
 
-    fft_block_size = tddConf.value("fft_block_size", 1);
-    encode_block_size = tddConf.value("encode_block_size", 1);
+    fft_block_size_ = tddConf.value("fft_block_size", 1);
+    encode_block_size_ = tddConf.value("encode_block_size", 1);
 
-    noise_level = tddConf.value("noise_level", 0.03); //default: 30 dB
-    std::printf("Noise level: %.2f\n", noise_level);
+    noise_level_ = tddConf.value("noise_level", 0.03); //default: 30 dB
+    std::printf("Noise level: %.2f\n", noise_level_);
 
     /* LDPC Coding configurations */
     uint16_t base_graph       = tddConf.value("base_graph", 1);
@@ -318,11 +314,11 @@ Config::Config(std::string jsonfile)
                               num_cb_len, num_cb_codew_len, num_rows, 0);
 
     /* Modulation configurations */
-    mod_order_bits = modulation == "64QAM"
+    mod_order_bits_ = modulation_ == "64QAM"
         ? CommsLib::QAM64
-        : (modulation == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
+        : (modulation_ == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
     /* Updates num_block_in_sym */
-    update_mod_cfgs(mod_order_bits);
+    UpdateModCfgs(mod_order_bits_);
 
     rt_assert(ldpc_config_.num_blocks_in_symbol() > 0,
         "LDPC expansion factor is too large for number of OFDM data "
@@ -338,23 +334,23 @@ Config::Config(std::string jsonfile)
             / (ldpc_num_input_cols(ldpc_config_.base_graph()) - 2 + ldpc_config_.num_rows()),
         ldpc_config_.num_rows());
 
-    fft_in_rru = tddConf.value("fft_in_rru", false);
+    fft_in_rru_ = tddConf.value("fft_in_rru", false);
 
-    sampsPerSymbol
+    samps_per_symbol_
         = ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
-    packet_length
-        = Packet::kOffsetOfData + ((kUse12BitIQ ? 3 : 4) * sampsPerSymbol);
-    dl_packet_length_ = Packet::kOffsetOfData + (sampsPerSymbol * 4);
+    packet_length_
+        = Packet::kOffsetOfData + ((kUse12BitIQ ? 3 : 4) * samps_per_symbol_);
+    dl_packet_length_ = Packet::kOffsetOfData + (samps_per_symbol_ * 4);
     rt_assert(
-        packet_length < 9000, "Packet size must be smaller than jumbo frame");
+        packet_length_ < 9000, "Packet size must be smaller than jumbo frame");
 
-    num_bytes_per_cb = ldpc_config_.num_cb_len() / 8; // TODO: Use bits_to_bytes()?
-    data_bytes_num_persymbol = num_bytes_per_cb * ldpc_config_.num_blocks_in_symbol();
-    mac_packet_length = data_bytes_num_persymbol;
-    mac_payload_length = mac_packet_length - MacPacket::kOffsetOfData;
-    mac_packets_perframe = this->frame_.NumULSyms() - client_ul_pilot_syms;
-    mac_data_bytes_num_perframe = mac_payload_length * mac_packets_perframe;
-    mac_bytes_num_perframe = mac_packet_length * mac_packets_perframe;
+    num_bytes_per_cb_ = ldpc_config_.num_cb_len() / 8; // TODO: Use bits_to_bytes()?
+    data_bytes_num_persymbol_ = num_bytes_per_cb_ * ldpc_config_.num_blocks_in_symbol();
+    mac_packet_length_ = data_bytes_num_persymbol_;
+    mac_payload_length_ = mac_packet_length_ - MacPacket::kOffsetOfData;
+    mac_packets_perframe_ = this->frame_.NumULSyms() - client_ul_pilot_syms;
+    mac_data_bytes_num_perframe_ = mac_payload_length_ * mac_packets_perframe_;
+    mac_bytes_num_perframe_ = mac_packet_length_ * mac_packets_perframe_;
 
     this->running_.store( true );
     std::printf(
@@ -364,10 +360,10 @@ Config::Config(std::string jsonfile)
         "symbols per frame,\n\t"
         "%zu OFDM subcarriers (%zu data subcarriers), modulation %s,\n\t"
         "%zu MAC data bytes per frame, %zu MAC bytes per frame\n",
-        bs_ant_num_, ue_ant_num_, this->frame_.NumPilotSyms(),
-        this->frame_.NumULSyms(), this->frame_.NumDLSyms(), ofdm_ca_num_,
-        ofdm_data_num_, modulation.c_str(), mac_data_bytes_num_perframe,
-        mac_bytes_num_perframe);
+        bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(),
+        frame_.NumULSyms(), frame_.NumDLSyms(), ofdm_ca_num_,
+        ofdm_data_num_, modulation_.c_str(), mac_data_bytes_num_perframe_,
+        mac_bytes_num_perframe_);
 }
 
 void Config::GenData( void )
@@ -401,12 +397,12 @@ void Config::GenData( void )
                 gold_ifft_ci16.end());
         }
 
-        beacon_len = this->beacon_ci16_.size();
+        this->beacon_len_ = this->beacon_ci16_.size();
 
-        if (sampsPerSymbol
-            < beacon_len + ofdm_tx_zero_prefix_ + ofdm_tx_zero_postfix_) {
+        if (this->samps_per_symbol_
+            < this->beacon_len_ + this->ofdm_tx_zero_prefix_ + this->ofdm_tx_zero_postfix_) {
             std::string msg = "Minimum supported symbol_size is ";
-            msg += std::to_string(beacon_len);
+            msg += std::to_string(this->beacon_len_);
             throw std::invalid_argument(msg);
         }
 
@@ -414,8 +410,8 @@ void Config::GenData( void )
         this->coeffs_ = Utils::cint16_to_uint32(gold_ifft_ci16, true, "QI");
 
         // Add addition padding for beacon sent from host
-        int fracBeacon = sampsPerSymbol % beacon_len;
-        std::vector<std::complex<int16_t>> preBeacon(ofdm_tx_zero_prefix_, 0);
+        int fracBeacon = this->samps_per_symbol_ % beacon_len_;
+        std::vector<std::complex<int16_t>> preBeacon(this->ofdm_tx_zero_prefix_, 0);
         std::vector<std::complex<int16_t>> postBeacon(
             ofdm_tx_zero_postfix_ + fracBeacon, 0);
         this->beacon_ci16_.insert(
@@ -426,7 +422,7 @@ void Config::GenData( void )
 
     // Generate common pilots based on Zadoff-Chu sequence for channel estimation
     auto zc_seq_double
-        = CommsLib::getSequence(ofdm_data_num_, CommsLib::LTE_ZADOFF_CHU);
+        = CommsLib::getSequence(this->ofdm_data_num_, CommsLib::LTE_ZADOFF_CHU);
     auto zc_seq = Utils::double_to_cfloat(zc_seq_double);
     this->common_pilot_
         = CommsLib::seqCyclicShift(zc_seq, M_PI / 4); // Used in LTE SRS
@@ -452,7 +448,7 @@ void Config::GenData( void )
     this->ue_specific_pilot_.malloc(
         ue_ant_num_, ofdm_data_num_, Agora_memory::Alignment_t::k64Align);
     this->ue_specific_pilot_t_.calloc(
-        ue_ant_num_, sampsPerSymbol, Agora_memory::Alignment_t::k64Align);
+        ue_ant_num_, samps_per_symbol_, Agora_memory::Alignment_t::k64Align);
     
     Table<complex_float> ue_pilot_ifft;
     ue_pilot_ifft.calloc(
@@ -462,48 +458,50 @@ void Config::GenData( void )
     auto zc_ue_pilot = Utils::double_to_cfloat(zc_ue_pilot_double);
     for (size_t i = 0; i < ue_ant_num_; i++) {
         auto zc_ue_pilot_i = CommsLib::seqCyclicShift(
-            zc_ue_pilot, (i + ue_ant_offset) * (float)M_PI / 6); // LTE DMRS
-        for (size_t j = 0; j < ofdm_data_num_; j++) {
+            zc_ue_pilot, (i + this->ue_ant_offset_) * (float)M_PI / 6); // LTE DMRS
+        for (size_t j = 0; j < this->ofdm_data_num_; j++) {
             this->ue_specific_pilot_[i][j]
                 = { zc_ue_pilot_i[j].real(), zc_ue_pilot_i[j].imag() };
-            ue_pilot_ifft[i][j + ofdm_data_start_] = this->ue_specific_pilot_[i][j];
+            ue_pilot_ifft[i][j + this->ofdm_data_start_] = this->ue_specific_pilot_[i][j];
         }
         CommsLib::IFFT(ue_pilot_ifft[i], ofdm_ca_num_, false);
     }
 
     // Get uplink and downlink raw bits either from file or random numbers
-    size_t num_bytes_per_ue = num_bytes_per_cb * ldpc_config_.num_blocks_in_symbol();
+    size_t num_bytes_per_ue = this->num_bytes_per_cb_ * this->ldpc_config_.num_blocks_in_symbol();
     size_t num_bytes_per_ue_pad
-        = roundup<64>(num_bytes_per_cb) * ldpc_config_.num_blocks_in_symbol();
+        = roundup<64>(this->num_bytes_per_cb_) * this->ldpc_config_.num_blocks_in_symbol();
     dl_bits_.malloc(this->frame_.NumDLSyms(),
-        num_bytes_per_ue_pad * ue_ant_num_, Agora_memory::Alignment_t::k64Align);
+        num_bytes_per_ue_pad * this->ue_ant_num_, Agora_memory::Alignment_t::k64Align);
     dl_iq_f_.calloc(this->frame_.NumDLSyms(), ofdm_ca_num_ * ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
-    dl_iq_t_.calloc(this->frame_.NumDLSyms(), sampsPerSymbol * ue_ant_num_,
+    dl_iq_t_.calloc(this->frame_.NumDLSyms(), this->samps_per_symbol_ * this->ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
 
     ul_bits_.malloc(this->frame_.NumULSyms(),
-        num_bytes_per_ue_pad * ue_ant_num_, Agora_memory::Alignment_t::k64Align);
-    ul_iq_f_.calloc(this->frame_.NumULSyms(), ofdm_ca_num_ * ue_ant_num_,
+        num_bytes_per_ue_pad * this->ue_ant_num_, Agora_memory::Alignment_t::k64Align);
+    ul_iq_f_.calloc(this->frame_.NumULSyms(), this->ofdm_ca_num_ * this->ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
-    ul_iq_t_.calloc(this->frame_.NumULSyms(), sampsPerSymbol * ue_ant_num_,
+    ul_iq_t_.calloc(this->frame_.NumULSyms(), this->samps_per_symbol_ * this->ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
 
 #ifdef GENERATE_DATA
-    for (size_t ue_id = 0; ue_id < ue_ant_num_; ue_id++) {
+    for (size_t ue_id = 0; ue_id < this->ue_ant_num_; ue_id++) {
         for (size_t j = 0; j < num_bytes_per_ue_pad; j++) {
             int cur_offset = j * ue_ant_num_ + ue_id;
-            for (size_t i = 0; i < this->frame_.NumULSyms(); i++)
-                ul_bits_[i][cur_offset] = rand() % mod_order;
-            for (size_t i = 0; i < this->frame_.NumDLSyms(); i++)
-                dl_bits_[i][cur_offset] = rand() % mod_order;
+            for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
+                this->ul_bits_[i][cur_offset] = rand() % mod_order;
+			}
+            for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
+                this->dl_bits_[i][cur_offset] = rand() % mod_order;
+			}
         }
     }
 #else
     std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
     std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_"
-        + std::to_string(ofdm_ca_num_) + "_ant"
-        + std::to_string(total_ue_ant_num) + ".bin";
+        + std::to_string(this->ofdm_ca_num_) + "_ant"
+        + std::to_string(this->total_ue_ant_num_) + ".bin";
     std::cout << "Config: Reading raw data from " << filename1 << std::endl;
     FILE* fd = std::fopen(filename1.c_str(), "rb");
     if (fd == nullptr) {
@@ -512,10 +510,10 @@ void Config::GenData( void )
         std::exit(-1);
     }
     for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-        if (std::fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0)
+        if (std::fseek(fd, num_bytes_per_ue * this->ue_ant_offset_, SEEK_SET) != 0)
             return;
-        for (size_t j = 0; j < ue_ant_num_; j++) {
-            size_t r = std::fread(ul_bits_[i] + j * num_bytes_per_ue_pad,
+        for (size_t j = 0; j < this->ue_ant_num_; j++) {
+            size_t r = std::fread(this->ul_bits_[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue)
                 std::printf("bad read from file %s (batch %zu) \n",
@@ -523,14 +521,14 @@ void Config::GenData( void )
         }
         if (std::fseek(fd,
                 num_bytes_per_ue
-                    * (total_ue_ant_num - ue_ant_offset - ue_ant_num_),
+                    * (this->total_ue_ant_num_ - this->ue_ant_offset_ - this->ue_ant_num_),
                 SEEK_SET)
             != 0)
             return;
     }
     for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-        for (size_t j = 0; j < ue_ant_num_; j++) {
-            size_t r = std::fread(dl_bits_[i] + j * num_bytes_per_ue_pad,
+        for (size_t j = 0; j < this->ue_ant_num_; j++) {
+            size_t r = std::fread(this->dl_bits_[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue)
                 std::printf("bad read from file %s (batch %zu) \n",
@@ -540,39 +538,39 @@ void Config::GenData( void )
     std::fclose(fd);
 #endif
 
-    const size_t bytes_per_block = bits_to_bytes(ldpc_config_.num_cb_len());
+    const size_t bytes_per_block = bits_to_bytes(this->ldpc_config_.num_cb_len());
     const size_t encoded_bytes_per_block
-        = bits_to_bytes(ldpc_config_.num_cb_codew_len());
+        = bits_to_bytes(this->ldpc_config_.num_cb_codew_len());
     const size_t num_blocks_per_symbol
-        = ldpc_config_.num_blocks_in_symbol() * ue_ant_num_;
+        = this->ldpc_config_.num_blocks_in_symbol() * this->ue_ant_num_;
 
     // Encode uplink bits
     ul_encoded_bits.malloc(this->frame_.NumULSyms() * num_blocks_per_symbol,
         encoded_bytes_per_block, Agora_memory::Alignment_t::k64Align);
 
     int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
-        ldpc_config_.base_graph(), ldpc_config_.expansion_factor())];
+        this->ldpc_config_.base_graph(), this->ldpc_config_.expansion_factor())];
     for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-        for (size_t j = 0; j < ldpc_config_.num_blocks_in_symbol() * ue_ant_num_; j++) {
-            ldpc_encode_helper(ldpc_config_.base_graph(), ldpc_config_.expansion_factor(),
-                ldpc_config_.num_rows(),
+        for (size_t j = 0; j < this->ldpc_config_.num_blocks_in_symbol() * this->ue_ant_num_; j++) {
+            ldpc_encode_helper(this->ldpc_config_.base_graph(), this->ldpc_config_.expansion_factor(),
+                this->ldpc_config_.num_rows(),
                 ul_encoded_bits[i * num_blocks_per_symbol + j],
                 temp_parity_buffer, ul_bits_[i] + j * bytes_per_block);
         }
     }
 
-    ul_mod_input.calloc(this->frame_.NumULSyms(), ofdm_data_num_ * ue_ant_num_,
+    ul_mod_input.calloc(this->frame_.NumULSyms(), this->ofdm_data_num_ * this->ue_ant_num_,
         Agora_memory::Alignment_t::k32Align);
     for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-        for (size_t j = 0; j < ue_ant_num_; j++) {
-            for (size_t k = 0; k < ldpc_config_.num_blocks_in_symbol(); k++) {
+        for (size_t j = 0; j < this->ue_ant_num_; j++) {
+            for (size_t k = 0; k < this->ldpc_config_.num_blocks_in_symbol(); k++) {
                 adapt_bits_for_mod(
                     reinterpret_cast<uint8_t*>(
                         ul_encoded_bits[i * num_blocks_per_symbol
-                            + j * ldpc_config_.num_blocks_in_symbol() + k]),
-                    ul_mod_input[i] + j * ofdm_data_num_
+                            + j * this->ldpc_config_.num_blocks_in_symbol() + k]),
+                    ul_mod_input[i] + j * this->ofdm_data_num_
                         + k * encoded_bytes_per_block,
-                    encoded_bytes_per_block, mod_order_bits);
+                    encoded_bytes_per_block, this->mod_order_bits_);
             }
         }
     }
@@ -583,144 +581,149 @@ void Config::GenData( void )
 
     // Encode downlink bits
     for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-        for (size_t j = 0; j < ldpc_config_.num_blocks_in_symbol() * ue_ant_num_; j++) {
-            ldpc_encode_helper(ldpc_config_.base_graph(), ldpc_config_.expansion_factor(),
-                ldpc_config_.num_rows(),
+        for (size_t j = 0; j < this->ldpc_config_.num_blocks_in_symbol() * this->ue_ant_num_; j++) {
+            ldpc_encode_helper(this->ldpc_config_.base_graph(), this->ldpc_config_.expansion_factor(),
+                this->ldpc_config_.num_rows(),
                 dl_encoded_bits[i * num_blocks_per_symbol + j],
-                temp_parity_buffer, dl_bits_[i] + j * bytes_per_block);
+                temp_parity_buffer, this->dl_bits_[i] + j * bytes_per_block);
         }
     }
-    dl_mod_input.calloc(this->frame_.NumDLSyms(), ofdm_data_num_ * ue_ant_num_,
+    dl_mod_input.calloc(this->frame_.NumDLSyms(), this->ofdm_data_num_ * this->ue_ant_num_,
         Agora_memory::Alignment_t::k32Align);
     for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-        for (size_t j = 0; j < ue_ant_num_; j++) {
-            for (size_t k = 0; k < ldpc_config_.num_blocks_in_symbol(); k++) {
+        for (size_t j = 0; j < this->ue_ant_num_; j++) {
+            for (size_t k = 0; k < this->ldpc_config_.num_blocks_in_symbol(); k++) {
                 adapt_bits_for_mod(
                     reinterpret_cast<uint8_t*>(
                         dl_encoded_bits[i * num_blocks_per_symbol
-                            + j * ldpc_config_.num_blocks_in_symbol() + k]),
-                    dl_mod_input[i] + j * ofdm_data_num_
+                            + j * this->ldpc_config_.num_blocks_in_symbol() + k]),
+                    dl_mod_input[i] + j * this->ofdm_data_num_
                         + k * encoded_bytes_per_block,
-                    encoded_bytes_per_block, mod_order_bits);
+                    encoded_bytes_per_block, this->mod_order_bits_);
             }
         }
     }
 
     // Generate freq-domain downlink symbols
     Table<complex_float> dl_iq_ifft;
-    dl_iq_ifft.calloc(this->frame_.NumDLSyms(), ofdm_ca_num_ * ue_ant_num_,
+    dl_iq_ifft.calloc(this->frame_.NumDLSyms(), this->ofdm_ca_num_ * this->ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
     for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-        for (size_t u = 0; u < ue_ant_num_; u++) {
-            size_t p = u * ofdm_data_num_;
-            size_t q = u * ofdm_ca_num_;
+        for (size_t u = 0; u < this->ue_ant_num_; u++) {
+            size_t p = u * this->ofdm_data_num_;
+            size_t q = u * this->ofdm_ca_num_;
 
-            for (size_t j = ofdm_data_start_; j < ofdm_data_stop_; j++) {
-                int k = j - ofdm_data_start_;
+            for (size_t j = this->ofdm_data_start_; j < this->ofdm_data_stop_; j++) {
+                int k = j - this->ofdm_data_start_;
                 size_t s = p + k;
-                if (k % ofdm_pilot_spacing_ != 0) {
-                    dl_iq_f_[i][q + j]
-                        = mod_single_uint8(dl_mod_input[i][s], mod_table);
-                } else
-                    dl_iq_f_[i][q + j] = this->ue_specific_pilot_[u][k];
-                dl_iq_ifft[i][q + j] = dl_iq_f_[i][q + j];
+                if (k % this->ofdm_pilot_spacing_ != 0) {
+                    this->dl_iq_f_[i][q + j]
+                        = mod_single_uint8(dl_mod_input[i][s], this->mod_table_);
+                } else {
+                    this->dl_iq_f_[i][q + j] = this->ue_specific_pilot_[u][k];
+				}
+                dl_iq_ifft[i][q + j] = this->dl_iq_f_[i][q + j];
             }
-            CommsLib::IFFT(&dl_iq_ifft[i][q], ofdm_ca_num_, false);
+            CommsLib::IFFT(&dl_iq_ifft[i][q], this->ofdm_ca_num_, false);
         }
     }
 
     // Generate freq-domain uplink symbols
     Table<complex_float> ul_iq_ifft;
-    ul_iq_ifft.calloc(this->frame_.NumULSyms(), ofdm_ca_num_ * ue_ant_num_,
+    ul_iq_ifft.calloc(this->frame_.NumULSyms(), this->ofdm_ca_num_ * this->ue_ant_num_,
         Agora_memory::Alignment_t::k64Align);
     for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-        for (size_t u = 0; u < ue_ant_num_; u++) {
+        for (size_t u = 0; u < this->ue_ant_num_; u++) {
 
-            size_t p = u * ofdm_data_num_;
-            size_t q = u * ofdm_ca_num_;
+            size_t p = u * this->ofdm_data_num_;
+            size_t q = u * this->ofdm_ca_num_;
 
-            for (size_t j = ofdm_data_start_; j < ofdm_data_stop_; j++) {
-                size_t k = j - ofdm_data_start_;
+            for (size_t j = this->ofdm_data_start_; j < this->ofdm_data_stop_; j++) {
+                size_t k = j - this->ofdm_data_start_;
                 size_t s = p + k;
                 ul_iq_f_[i][q + j]
-                    = mod_single_uint8(ul_mod_input[i][s], mod_table);
-                ul_iq_ifft[i][q + j] = ul_iq_f_[i][q + j];
+                    = mod_single_uint8(ul_mod_input[i][s], this->mod_table_);
+                ul_iq_ifft[i][q + j] = this->ul_iq_f_[i][q + j];
             }
 
-            CommsLib::IFFT(&ul_iq_ifft[i][q], ofdm_ca_num_, false);
+            CommsLib::IFFT(&ul_iq_ifft[i][q], this->ofdm_ca_num_, false);
         }
     }
 
     // Find normalization factor through searching for max value in IFFT results
     float max_val = CommsLib::find_max_abs(
-        ul_iq_ifft, this->frame_.NumULSyms(), ue_ant_num_ * ofdm_ca_num_);
+        ul_iq_ifft, this->frame_.NumULSyms(), this->ue_ant_num_ * this->ofdm_ca_num_);
     float cur_max_val = CommsLib::find_max_abs(
-        dl_iq_ifft, this->frame_.NumDLSyms(), ue_ant_num_ * ofdm_ca_num_);
-    if (cur_max_val > max_val)
+        dl_iq_ifft, this->frame_.NumDLSyms(), this->ue_ant_num_ * this->ofdm_ca_num_);
+    if (cur_max_val > max_val) {
         max_val = cur_max_val;
+	}
     cur_max_val
-        = CommsLib::find_max_abs(ue_pilot_ifft, ue_ant_num_, ofdm_ca_num_);
-    if (cur_max_val > max_val)
+        = CommsLib::find_max_abs(ue_pilot_ifft, this->ue_ant_num_, this->ofdm_ca_num_);
+    if (cur_max_val > max_val) {
         max_val = cur_max_val;
-    cur_max_val = CommsLib::find_max_abs(pilot_ifft, ofdm_ca_num_);
-    if (cur_max_val > max_val)
+	}
+    cur_max_val = CommsLib::find_max_abs(pilot_ifft, this->ofdm_ca_num_);
+    if (cur_max_val > max_val) {
         max_val = cur_max_val;
+	}
 
-    scale = 2 * max_val; // additional 2^2 (6dB) power backoff
+    this->scale_ = 2 * max_val; // additional 2^2 (6dB) power backoff
 
     // Generate time domain symbols for downlink
     for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-        for (size_t u = 0; u < ue_ant_num_; u++) {
-            size_t q = u * ofdm_ca_num_;
-            size_t r = u * sampsPerSymbol;
-            CommsLib::ifft2tx(&dl_iq_ifft[i][q], &dl_iq_t_[i][r], ofdm_ca_num_,
-                ofdm_tx_zero_prefix_, cp_len_, scale);
+        for (size_t u = 0; u < this->ue_ant_num_; u++) {
+            size_t q = u * this->ofdm_ca_num_;
+            size_t r = u * this->samps_per_symbol_;
+            CommsLib::ifft2tx(&dl_iq_ifft[i][q], &this->dl_iq_t_[i][r], this->ofdm_ca_num_,
+                this->ofdm_tx_zero_prefix_, this->cp_len_, this->scale_);
         }
     }
 
     // Generate time domain uplink symbols
     for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-        for (size_t u = 0; u < ue_ant_num_; u++) {
-            size_t q = u * ofdm_ca_num_;
-            size_t r = u * sampsPerSymbol;
-            CommsLib::ifft2tx(&ul_iq_ifft[i][q], &ul_iq_t_[i][r], ofdm_ca_num_,
-                ofdm_tx_zero_prefix_, cp_len_, scale);
+        for (size_t u = 0; u < this->ue_ant_num_; u++) {
+            size_t q = u * this->ofdm_ca_num_;
+            size_t r = u * this->samps_per_symbol_;
+            CommsLib::ifft2tx(&ul_iq_ifft[i][q], &ul_iq_t_[i][r], this->ofdm_ca_num_,
+                this->ofdm_tx_zero_prefix_, this->cp_len_, this->scale_);
         }
     }
 
     // Generate time domain ue-specific pilot symbols
-    for (size_t i = 0; i < ue_ant_num_; i++) {
-        CommsLib::ifft2tx(ue_pilot_ifft[i], this->ue_specific_pilot_t_[i], ofdm_ca_num_,
-            ofdm_tx_zero_prefix_, cp_len_, scale);
-        if (kDebugPrintPilot) {
+    for (size_t i = 0; i < this->ue_ant_num_; i++) {
+        CommsLib::ifft2tx(ue_pilot_ifft[i], this->ue_specific_pilot_t_[i], this->ofdm_ca_num_,
+            this->ofdm_tx_zero_prefix_, this->cp_len_, this->scale_);
+        if (kDebugPrintPilot == true) {
             std::printf("ue_specific_pilot%zu=[", i);
-            for (size_t j = 0; j < ofdm_ca_num_; j++)
+            for (size_t j = 0; j < this->ofdm_ca_num_; j++)
                 std::printf("%2.4f+%2.4fi ", ue_pilot_ifft[i][j].re,
                     ue_pilot_ifft[i][j].im);
             std::printf("]\n");
         }
     }
 
-    this->pilot_ci16_.resize(sampsPerSymbol, 0);
+    this->pilot_ci16_.resize(samps_per_symbol_, 0);
     CommsLib::ifft2tx(pilot_ifft, (std::complex<int16_t>*)this->pilot_ci16_.data(),
-        ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale);
+        ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
 
-    for (size_t i = 0; i < ofdm_ca_num_; i++)
+    for (size_t i = 0; i < ofdm_ca_num_; i++) {
         this->pilot_cf32_.push_back(std::complex<float>(
-            pilot_ifft[i].re / scale, pilot_ifft[i].im / scale));
-    this->pilot_cf32_.insert(this->pilot_cf32_.begin(), this->pilot_cf32_.end() - cp_len_,
-        this->pilot_cf32_.end()); // add CP
+            pilot_ifft[i].re / scale_, pilot_ifft[i].im / scale_));
+	}
+    this->pilot_cf32_.insert(this->pilot_cf32_.begin(), this->pilot_cf32_.end() - this->cp_len_,
+    this->pilot_cf32_.end()); // add CP
 
     // generate a UINT32 version to write to FPGA buffers
     this->pilot_ = Utils::cfloat32_to_uint32(this->pilot_cf32_, false, "QI");
 
-    std::vector<uint32_t> pre_uint32(ofdm_tx_zero_prefix_, 0);
+    std::vector<uint32_t> pre_uint32(this->ofdm_tx_zero_prefix_, 0);
     this->pilot_.insert(this->pilot_.begin(), pre_uint32.begin(), pre_uint32.end());
-    this->pilot_.resize(sampsPerSymbol);
+    this->pilot_.resize(this->samps_per_symbol_);
 
-    if (kDebugPrintPilot) {
+    if (kDebugPrintPilot == true) {
         std::cout << "Pilot data: " << std::endl;
-        for (size_t i = 0; i < ofdm_data_num_; i++)
+        for (size_t i = 0; i < this->ofdm_data_num_; i++)
             std::cout << this->pilots_[i].re << "+1i*" << this->pilots_[i].im << ",";
         std::cout << std::endl;
     }
@@ -748,7 +751,7 @@ Config::~Config()
         std::free(pilots_sgn_);
         pilots_sgn_ = nullptr;
     }
-    mod_table.free();
+    mod_table_.free();
     dl_bits_.free();
     ul_bits_.free();
     dl_iq_f_.free();
@@ -776,7 +779,7 @@ size_t Config::GetPilotSymbolIdx(size_t frame_id, size_t symbol_id) const
 }
 
 /* TODO Inspect and document */
-size_t Config::GetSymbolId(size_t input_id )
+size_t Config::GetSymbolId(size_t input_id ) const
 {
     size_t symbol_id = SIZE_MAX;
 
@@ -861,7 +864,7 @@ bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const
 }
 
 /* TODO change to table lookup */
-SymbolType Config::get_symbol_type(size_t frame_id, size_t symbol_id)
+SymbolType Config::GetSymbolType(size_t frame_id, size_t symbol_id) const
 {
     assert((this->is_UE_ == false)); // Currently implemented for only the Agora server
     char s = this->frame_.frame_identifier().at(symbol_id);

@@ -136,9 +136,9 @@ public:
     void start_work()
     {
         const size_t n_zf_tasks_reqd
-            = (sc_range_.end - sc_range_.start) / cfg->zf_block_size;
+            = (sc_range_.end - sc_range_.start) / cfg->zf_block_size();
         const size_t n_demul_tasks_reqd
-            = (sc_range_.end - sc_range_.start) / cfg->demul_block_size;
+            = (sc_range_.end - sc_range_.start) / cfg->demul_block_size();
 
         while (cfg->running && !SignalHandler::gotExitSignal()) {
             if (rx_status_->received_all_pilots(csi_cur_frame_)) {
@@ -152,7 +152,7 @@ public:
 
             if (csi_cur_frame_ > zf_cur_frame_) {
                 do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
-                    sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
+                    sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size())
                                    ._tag);
                 n_zf_tasks_done_++;
                 if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
@@ -169,7 +169,7 @@ public:
                 do_demul_->independent_launch(demul_cur_frame_,
                     demul_cur_sym_ - cfg->frame().NumPilotSyms(),
                     sc_range_.start
-                        + (n_demul_tasks_done_ * cfg->demul_block_size));
+                        + (n_demul_tasks_done_ * cfg->demul_block_size()));
 
                 n_demul_tasks_done_++;
                 if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
@@ -184,7 +184,7 @@ public:
                         for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
                             if (i % 20 == 0) {
                                 std::printf(
-                                    "%d ", demul_ptr[i * cfg->mod_order_bits]);
+                                    "%d ", demul_ptr[i * cfg->mod_order_bits()]);
                             }
                         }
                         std::printf("\n");
@@ -221,8 +221,8 @@ private:
             for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
                 auto* pkt = reinterpret_cast<Packet*>(socket_buffer_[j]
                     + (frame_slot * cfg->frame().NumTotalSyms()
-                          * cfg->packet_length)
-                    + i * cfg->packet_length);
+                          * cfg->packet_length())
+                    + i * cfg->packet_length());
 
                 // Subcarrier ranges should be aligned with kTransposeBlockSize
                 for (size_t block_idx = sc_range_.start / kTransposeBlockSize;

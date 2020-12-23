@@ -53,18 +53,18 @@ Event_data DoEncode::launch(size_t tag)
 
     size_t symbol_idx_dl = cfg->GetDLSymbolIdx(frame_id, symbol_id);
     int8_t* input_ptr
-        = cfg->get_info_bits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
+        = cfg->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
 
     ldpc_encode_helper(LDPC_config.base_graph(), LDPC_config.expansion_factor(), LDPC_config.num_rows(),
         encoded_buffer_temp, parity_buffer, input_ptr);
-    int8_t* final_output_ptr = cfg->get_encoded_buf(
+    int8_t* final_output_ptr = cfg->GetEncodedBuf(
         encoded_buffer_, frame_id, symbol_idx_dl, ue_id, cur_cb_id);
     adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
         reinterpret_cast<uint8_t*>(final_output_ptr),
-        bits_to_bytes(LDPC_config.num_cb_codew_len()), cfg->mod_order_bits);
+        bits_to_bytes(LDPC_config.num_cb_codew_len()), cfg->mod_order_bits());
 
     // std::printf("Encoded data\n");
-    // int num_mod = LDPC_config.num_cb_codew_len() / cfg->mod_order_bits;
+    // int num_mod = LDPC_config.num_cb_codew_len() / cfg->mod_order_bits();
     // for(int i = 0; i < num_mod; i++) {
     //     std::printf("%u ", *(final_output_ptr + i));
     // }
@@ -105,7 +105,7 @@ Event_data DoDecode::launch(size_t tag)
     const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id;
     const size_t cb_id = gen_tag_t(tag).cb_id;
     const size_t symbol_offset
-        = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
+        = cfg->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
     const size_t cur_cb_id = cb_id % cfg->ldpc_config().num_blocks_in_symbol();
     const size_t ue_id = cb_id / cfg->ldpc_config().num_blocks_in_symbol();
     const size_t frame_slot = frame_id % kFrameWnd;
@@ -141,11 +141,11 @@ Event_data DoDecode::launch(size_t tag)
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
     int8_t* llr_buffer_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ue_id]
-        + (cfg->mod_order_bits * (LDPC_config.num_cb_codew_len() * cur_cb_id));
+        + (cfg->mod_order_bits() * (LDPC_config.num_cb_codew_len() * cur_cb_id));
 
     uint8_t* decoded_buffer_ptr
         = decoded_buffers_[frame_slot][symbol_idx_ul][ue_id]
-        + (cur_cb_id * roundup<64>(cfg->num_bytes_per_cb));
+        + (cur_cb_id * roundup<64>(cfg->num_bytes_per_cb()));
 
     ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
     ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
@@ -177,12 +177,12 @@ Event_data DoDecode::launch(size_t tag)
 
     if (!kEnableMac && kPrintPhyStats && symbol_idx_ul == cfg->frame().client_ul_pilot_symbols()) {
         phy_stats->update_decoded_bits(
-            ue_id, symbol_offset, cfg->num_bytes_per_cb * 8);
+            ue_id, symbol_offset, cfg->num_bytes_per_cb() * 8);
         phy_stats->increment_decoded_blocks(ue_id, symbol_offset);
         size_t block_error(0);
-        for (size_t i = 0; i < cfg->num_bytes_per_cb; i++) {
+        for (size_t i = 0; i < cfg->num_bytes_per_cb(); i++) {
             uint8_t rx_byte = decoded_buffer_ptr[i];
-            uint8_t tx_byte = (uint8_t)cfg->get_info_bits(
+            uint8_t tx_byte = (uint8_t)cfg->GetInfoBits(
                 cfg->ul_bits(), symbol_idx_ul, ue_id, cur_cb_id)[i];
             phy_stats->update_bit_errors(
                 ue_id, symbol_offset, tx_byte, rx_byte);

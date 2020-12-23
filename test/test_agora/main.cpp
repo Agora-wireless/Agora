@@ -111,7 +111,7 @@ void check_correctness_dl(Config* cfg)
     int bs_ant_num = cfg->bs_ant_num();
     int data_symbol_num_perframe = cfg->frame().NumDLSyms();
     int ofdm_ca_num = cfg->ofdm_ca_num();
-    int sampsPerSymbol = cfg->sampsPerSymbol;
+    int sampsPerSymbol = cfg->samps_per_symbol();
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string raw_data_filename = cur_directory + "/data/LDPC_dl_tx_data_"

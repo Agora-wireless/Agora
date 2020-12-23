@@ -60,8 +60,8 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
         * bscfg->frame().NumTotalSyms() * (bscfg->bs_ant_num() + uecfg->ue_ant_num())
         * 36);
 
-    assert(bscfg->packet_length == uecfg->packet_length);
-    payload_length = bscfg->packet_length - Packet::kOffsetOfData;
+    assert(bscfg->packet_length() == uecfg->packet_length());
+    payload_length = bscfg->packet_length() - Packet::kOffsetOfData;
 
     // initialize bs-facing and client-facing data buffers
     size_t tx_buffer_ue_size = kFrameWnd * dl_data_plus_beacon_symbols
@@ -310,20 +310,20 @@ void* ChannelSim::bs_rx_loop(int tid)
     // initialize bs-facing sockets
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
-        int local_port_id = bscfg->bs_rru_port + socket_id;
+        int local_port_id = bscfg->bs_rru_port() + socket_id;
         socket_bs_[socket_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_bs_[socket_id],
-            bscfg->bs_server_port + socket_id, bscfg->bs_server_addr.c_str());
+            bscfg->bs_server_port() + socket_id, bscfg->bs_server_addr().c_str());
         std::printf(
             "BS RX thread %d: set up UDP socket server listening to port %d"
             " with remote address %s:%zu\n",
-            tid, local_port_id, bscfg->bs_server_addr.c_str(),
-            bscfg->bs_server_port + socket_id);
+            tid, local_port_id, bscfg->bs_server_addr().c_str(),
+            bscfg->bs_server_port() + socket_id);
         fcntl(socket_bs_[socket_id], F_SETFL, O_NONBLOCK);
     }
 
-    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
+    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length(), 0);
     size_t socket_id = socket_lo;
     while (running) {
         if (-1
@@ -376,20 +376,20 @@ void* ChannelSim::ue_rx_loop(int tid)
     // initialize client-facing sockets
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
-        int local_port_id = uecfg->ue_rru_port + socket_id;
+        int local_port_id = uecfg->ue_rru_port() + socket_id;
         socket_ue_[socket_id]
             = setup_socket_ipv4(local_port_id, true, sock_buf_size);
         setup_sockaddr_remote_ipv4(&servaddr_ue_[socket_id],
-            uecfg->ue_server_port + socket_id, uecfg->ue_server_addr.c_str());
+            uecfg->ue_server_port() + socket_id, uecfg->ue_server_addr().c_str());
         std::printf(
             "UE RX thread %d: set up UDP socket server listening to port %d"
             " with remote address %s:%zu\n",
-            tid, local_port_id, uecfg->ue_server_addr.c_str(),
-            uecfg->ue_server_port + socket_id);
+            tid, local_port_id, uecfg->ue_server_addr().c_str(),
+            uecfg->ue_server_port() + socket_id);
         fcntl(socket_ue_[socket_id], F_SETFL, O_NONBLOCK);
     }
 
-    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
+    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length(), 0);
     size_t socket_id = socket_lo;
     while (running) {
         if (-1
@@ -457,26 +457,26 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
 
     // convert received data to complex float,
     // apply channel, convert back to complex short to TX
-    cx_fmat fmat_src = zeros<cx_fmat>(bscfg->sampsPerSymbol, uecfg->ue_ant_num());
+    cx_fmat fmat_src = zeros<cx_fmat>(bscfg->samps_per_symbol(), uecfg->ue_ant_num());
     simd_convert_short_to_float(src_ptr,
         reinterpret_cast<float*>(fmat_src.memptr()),
-        2 * bscfg->sampsPerSymbol * uecfg->ue_ant_num());
+        2 * bscfg->samps_per_symbol() * uecfg->ue_ant_num());
 
     cx_fmat fmat_dst = fmat_src * channel;
     // add 30dB SNR noise
-    cx_fmat noise(1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->bs_ant_num()),
-        1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->bs_ant_num()));
+    cx_fmat noise(1e-3 * randn<fmat>(uecfg->samps_per_symbol(), bscfg->bs_ant_num()),
+        1e-3 * randn<fmat>(uecfg->samps_per_symbol(), bscfg->bs_ant_num()));
     fmat_dst += noise;
     if (kPrintChannelOutput)
         Utils::print_mat(fmat_dst);
 
     auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_bs[total_offset_bs]);
     simd_convert_float_to_short(reinterpret_cast<float*>(fmat_dst.memptr()),
-        dst_ptr, 2 * bscfg->sampsPerSymbol * bscfg->bs_ant_num());
+        dst_ptr, 2 * bscfg->samps_per_symbol() * bscfg->bs_ant_num());
     std::stringstream ss;
 
     // send the symbol to all base station antennas
-    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
+    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length(), 0);
     auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
     for (size_t ant_id = 0; ant_id < bscfg->bs_ant_num(); ant_id++) {
         pkt->frame_id = frame_id;
@@ -513,25 +513,25 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
 
     // convert received data to complex float,
     // apply channel, convert back to complex short to TX
-    cx_fmat fmat_src = zeros<cx_fmat>(bscfg->sampsPerSymbol, bscfg->bs_ant_num());
+    cx_fmat fmat_src = zeros<cx_fmat>(bscfg->samps_per_symbol(), bscfg->bs_ant_num());
     simd_convert_short_to_float(src_ptr,
         reinterpret_cast<float*>(fmat_src.memptr()),
-        2 * bscfg->sampsPerSymbol * bscfg->bs_ant_num());
+        2 * bscfg->samps_per_symbol() * bscfg->bs_ant_num());
 
     cx_fmat fmat_dst = fmat_src * channel.st() / std::sqrt(bscfg->bs_ant_num());
     // add 30dB SNR noise
-    cx_fmat noise(1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->ue_ant_num()),
-        1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->ue_ant_num()));
+    cx_fmat noise(1e-3 * randn<fmat>(uecfg->samps_per_symbol(), bscfg->ue_ant_num()),
+        1e-3 * randn<fmat>(uecfg->samps_per_symbol(), bscfg->ue_ant_num()));
     fmat_dst += noise;
     if (kPrintChannelOutput)
         Utils::print_mat(fmat_dst);
 
     auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_ue[total_offset_ue]);
     simd_convert_float_to_short(reinterpret_cast<float*>(fmat_dst.memptr()),
-        dst_ptr, 2 * bscfg->sampsPerSymbol * uecfg->ue_ant_num());
+        dst_ptr, 2 * bscfg->samps_per_symbol() * uecfg->ue_ant_num());
 
     // send the symbol to all base station antennas
-    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
+    std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length(), 0);
     auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
     for (size_t ant_id = 0; ant_id < uecfg->ue_ant_num(); ant_id++) {
         pkt->frame_id = frame_id;

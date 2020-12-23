@@ -77,11 +77,11 @@ public:
         adapt_bits_for_mod(
             reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
             &mod_input[0], cfg->ldpc_config().numEncodedBytes(),
-            cfg->mod_order_bits);
+            cfg->mod_order_bits());
 
         for (size_t i = 0; i < cfg->ofdm_data_num(); i++) {
             modulated_codeword[i]
-                = mod_single_uint8(mod_input[i], cfg->mod_table);
+                = mod_single_uint8(mod_input[i], cfg->mod_table());
         }
         return modulated_codeword;
     }
@@ -94,11 +94,11 @@ public:
 
         adapt_bits_for_mod(
             reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-            &mod_input[0], bits_to_bytes(num_bits), cfg->mod_order_bits);
+            &mod_input[0], bits_to_bytes(num_bits), cfg->mod_order_bits());
 
         for (size_t i = 0; i < cfg->ofdm_data_num(); i++) {
             modulated_codeword[i]
-                = mod_single_uint8(mod_input[i], cfg->mod_table);
+                = mod_single_uint8(mod_input[i], cfg->mod_table());
         }
         return modulated_codeword;
     }

@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
         profile == DataGenerator::Profile::k123 ? "123" : "random");
 
     std::printf("DataGenerator: Using %s-orthogonal pilots\n",
-        cfg->freq_orthogonal_pilot ? "frequency" : "time");
+        cfg->freq_orthogonal_pilot() ? "frequency" : "time");
 
     std::printf("DataGenerator: Generating encoded and modulated data\n");
     srand(time(nullptr));
@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
     // Step 1: Generate the information buffers and LDPC-encoded buffers for
     // uplink
     size_t num_symbols_per_cb = 1;
-    size_t bits_per_symbol = cfg->ofdm_data_num() * cfg->mod_order_bits;
+    size_t bits_per_symbol = cfg->ofdm_data_num() * cfg->mod_order_bits();
     if (cfg->ldpc_config().num_cb_codew_len() > bits_per_symbol)
         num_symbols_per_cb = (cfg->ldpc_config().num_cb_codew_len() + bits_per_symbol - 1)
             / bits_per_symbol;
@@ -144,7 +144,7 @@ int main(int argc, char* argv[])
         tx_data_all_symbols.calloc(
             cfg->frame().NumTotalSyms(), cfg->ue_ant_num() * cfg->ofdm_ca_num(), Agora_memory::Alignment_t::k64Align);
 
-        if (cfg->freq_orthogonal_pilot) {
+        if (cfg->freq_orthogonal_pilot() == true) {
             for (size_t i = 0; i < cfg->ue_ant_num(); i++) {
                 std::vector<complex_float> pilots_t_ue(
                     cfg->ofdm_ca_num()); // Zeroed
@@ -278,7 +278,7 @@ int main(int argc, char* argv[])
             for (size_t j = 0; j < cfg->ofdm_data_num(); j++) {
                 arma::cx_fmat mat_precoder(
                     reinterpret_cast<arma::cx_float*>(
-                        precoder[cfg->freq_orthogonal_pilot
+                        precoder[cfg->freq_orthogonal_pilot()
                                 ? (j % cfg->ue_ant_num())
                                 : j]),
                     cfg->ue_ant_num(), cfg->bs_ant_num(), false);
@@ -295,12 +295,12 @@ int main(int argc, char* argv[])
                     = (i - data_sym_start) % num_symbols_per_cb;
                 auto* demod_ptr = demod_data_all_symbols[j]
                     + (cb_id * num_symbols_per_cb * 8
-                          + symbol_id_in_cb * cfg->mod_order_bits)
+                          + symbol_id_in_cb * cfg->mod_order_bits())
                         * cfg->ofdm_data_num();
                 auto* equal_T_ptr
                     = (float*)(equalized_data_all_symbols[i - data_sym_start]
                         + j * cfg->ofdm_data_num());
-                switch (cfg->mod_order_bits) {
+                switch (cfg->mod_order_bits() == true) {
                 case (4):
                     demod_16qam_soft_avx2(
                         equal_T_ptr, demod_ptr, cfg->ofdm_data_num());
@@ -312,7 +312,7 @@ int main(int argc, char* argv[])
                 default:
                     std::printf(
                         "Demodulation: modulation type %s not supported!\n",
-                        cfg->modulation.c_str());
+                        cfg->modulation().c_str());
                 }
             }
         }
