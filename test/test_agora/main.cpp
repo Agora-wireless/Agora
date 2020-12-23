@@ -173,7 +173,7 @@ int main(int argc, char* argv[])
         confFile = std::string(argv[1]);
 
     auto* cfg = new Config(confFile.c_str());
-    cfg->genData();
+    cfg->GenData();
 
     int ret;
     try {
@@ -185,10 +185,12 @@ int main(int argc, char* argv[])
         agora_cli->start();
 
         std::printf("Start correctness check\n");
-        if (cfg->downlink_mode()) {
+        /* TODO make sure this works in the combined case...  */
+        if (cfg->frame().NumDLSyms() > 0) {
             check_correctness_dl(cfg);
         }
-        else {
+        
+        if (cfg->frame().NumULSyms() > 0) {
             check_correctness_ul(cfg);
         }
         ret = EXIT_SUCCESS;

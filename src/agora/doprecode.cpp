@@ -155,7 +155,7 @@ void DoPrecode::load_input_data(size_t symbol_idx_dl,
         = modulated_buffer_temp + sc_id_in_block * cfg->ue_num();
     if (symbol_idx_dl < cfg->frame().client_dl_pilot_symbols()
         || sc_id % cfg->ofdm_pilot_spacing() == 0) {
-        data_ptr[user_id] = cfg->ue_specific_pilot[user_id][sc_id];
+        data_ptr[user_id] = cfg->ue_specific_pilot()[user_id][sc_id];
     } else {
         int8_t* raw_data_ptr = &dl_raw_data[total_data_symbol_idx][sc_id
             + roundup<64>(cfg->ofdm_data_num()) * user_id];

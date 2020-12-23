@@ -236,21 +236,21 @@ void DoFFT::partial_transpose(
             __m512 fft_result
                 = _mm512_load_ps(reinterpret_cast<const float*>(src));
             if (symbol_type == SymbolType::kPilot) {
-                __m512 pilot_tx = _mm512_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
-                    cfg->pilots_sgn_[sc_idx + 7].re,
-                    cfg->pilots_sgn_[sc_idx + 6].im,
-                    cfg->pilots_sgn_[sc_idx + 6].re,
-                    cfg->pilots_sgn_[sc_idx + 5].im,
-                    cfg->pilots_sgn_[sc_idx + 5].re,
-                    cfg->pilots_sgn_[sc_idx + 4].im,
-                    cfg->pilots_sgn_[sc_idx + 4].re,
-                    cfg->pilots_sgn_[sc_idx + 3].im,
-                    cfg->pilots_sgn_[sc_idx + 3].re,
-                    cfg->pilots_sgn_[sc_idx + 2].im,
-                    cfg->pilots_sgn_[sc_idx + 2].re,
-                    cfg->pilots_sgn_[sc_idx + 1].im,
-                    cfg->pilots_sgn_[sc_idx + 1].re,
-                    cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
+                __m512 pilot_tx = _mm512_set_ps(cfg->pilots_sgn()[sc_idx + 7].im,
+                    cfg->pilots_sgn()[sc_idx + 7].re,
+                    cfg->pilots_sgn()[sc_idx + 6].im,
+                    cfg->pilots_sgn()[sc_idx + 6].re,
+                    cfg->pilots_sgn()[sc_idx + 5].im,
+                    cfg->pilots_sgn()[sc_idx + 5].re,
+                    cfg->pilots_sgn()[sc_idx + 4].im,
+                    cfg->pilots_sgn()[sc_idx + 4].re,
+                    cfg->pilots_sgn()[sc_idx + 3].im,
+                    cfg->pilots_sgn()[sc_idx + 3].re,
+                    cfg->pilots_sgn()[sc_idx + 2].im,
+                    cfg->pilots_sgn()[sc_idx + 2].re,
+                    cfg->pilots_sgn()[sc_idx + 1].im,
+                    cfg->pilots_sgn()[sc_idx + 1].re,
+                    cfg->pilots_sgn()[sc_idx].im, cfg->pilots_sgn()[sc_idx].re);
                 fft_result = _mm512_mul_ps(fft_result, pilot_tx);
             }
             _mm512_stream_ps(reinterpret_cast<float*>(dst), fft_result);
@@ -261,25 +261,26 @@ void DoFFT::partial_transpose(
                 = _mm256_load_ps(reinterpret_cast<const float*>(src + 4));
             if (symbol_type == SymbolType::kPilot) {
                 __m256 pilot_tx0 = _mm256_set_ps(
-                    cfg->pilots_sgn_[sc_idx + 3].im,
-                    cfg->pilots_sgn_[sc_idx + 3].re,
-                    cfg->pilots_sgn_[sc_idx + 2].im,
-                    cfg->pilots_sgn_[sc_idx + 2].re,
-                    cfg->pilots_sgn_[sc_idx + 1].im,
-                    cfg->pilots_sgn_[sc_idx + 1].re,
-                    cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
+                    cfg->pilots_sgn()[sc_idx + 3].im,
+                    cfg->pilots_sgn()[sc_idx + 3].re,
+                    cfg->pilots_sgn()[sc_idx + 2].im,
+                    cfg->pilots_sgn()[sc_idx + 2].re,
+                    cfg->pilots_sgn()[sc_idx + 1].im,
+                    cfg->pilots_sgn()[sc_idx + 1].re,
+                    cfg->pilots_sgn()[sc_idx].im, 
+					cfg->pilots_sgn()[sc_idx].re);
                 fft_result0 = CommsLib::__m256_complex_cf32_mult(
                     fft_result0, pilot_tx0, true);
 
                 __m256 pilot_tx1
-                    = _mm256_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
-                        cfg->pilots_sgn_[sc_idx + 7].re,
-                        cfg->pilots_sgn_[sc_idx + 6].im,
-                        cfg->pilots_sgn_[sc_idx + 6].re,
-                        cfg->pilots_sgn_[sc_idx + 5].im,
-                        cfg->pilots_sgn_[sc_idx + 5].re,
-                        cfg->pilots_sgn_[sc_idx + 4].im,
-                        cfg->pilots_sgn_[sc_idx + 4].re);
+                    = _mm256_set_ps(cfg->pilots_sgn()[sc_idx + 7].im,
+                        cfg->pilots_sgn()[sc_idx + 7].re,
+                        cfg->pilots_sgn()[sc_idx + 6].im,
+                        cfg->pilots_sgn()[sc_idx + 6].re,
+                        cfg->pilots_sgn()[sc_idx + 5].im,
+                        cfg->pilots_sgn()[sc_idx + 5].re,
+                        cfg->pilots_sgn()[sc_idx + 4].im,
+                        cfg->pilots_sgn()[sc_idx + 4].re);
                 fft_result1 = CommsLib::__m256_complex_cf32_mult(
                     fft_result1, pilot_tx1, true);
             }

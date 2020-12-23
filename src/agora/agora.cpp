@@ -17,7 +17,7 @@ Agora::Agora(Config* cfg)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     std::printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
-        directory.c_str(), cfg->freq_ghz);
+        directory.c_str(), cfg->freq_ghz());
 
     this->config_ = cfg;
 
@@ -587,9 +587,9 @@ void Agora::handle_event_fft(size_t tag)
     if (sym_type == SymbolType::kPilot) {
         if (fft_counters_.last_task(frame_id, symbol_id)) {
             print_per_symbol_done(PrintType::kFFTPilots, frame_id, symbol_id);
-            if ((config_->downlink_mode() == false)
-                || ((config_->downlink_mode() == true) && (config_->frame().IsRecCalEnabled() == false))
-                || ((config_->downlink_mode() == true) && (config_->frame().IsRecCalEnabled() == true)
+            if ((config_->frame().NumDLSyms() == 0)
+                || ((config_->frame().NumDLSyms() > 0) && (config_->frame().IsRecCalEnabled() == false))
+                || ((config_->frame().NumDLSyms() > 0) && (config_->frame().IsRecCalEnabled() == true)
                        && rc_last_frame == frame_id)) {
                 /* If CSI of all UEs is ready, schedule ZF/prediction */
                 if (fft_counters_.last_symbol(frame_id)) {

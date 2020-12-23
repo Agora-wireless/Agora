@@ -123,7 +123,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
             txbuf[ch]
                 = (frame_id % c->ant_group_num == ant_id / c->ant_per_group
                       && s == ant_id % c->ant_per_group)
-                ? c->pilot_ci16.data()
+                ? c->pilot_ci16().data()
                 : zeros.data();
             long long frameTime = ((long long)(frame_id + TX_FRAME_DELTA) << 32)
                 | (c->frame().GetDLCalSymbol(s) << 16);
@@ -136,7 +136,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
         if (ant_id != c->ref_ant)
             txbuf[ch] = zeros.data();
         else if (dl_symbol_idx < c->frame().client_dl_pilot_symbols())
-            txbuf[ch] = reinterpret_cast<void*>(c->ue_specific_pilot_t[0]);
+            txbuf[ch] = reinterpret_cast<void*>(c->ue_specific_pilot_t()[0]);
         else
             txbuf[ch] = reinterpret_cast<void*>(c->dl_iq_t()[dl_symbol_idx]);
     } else {

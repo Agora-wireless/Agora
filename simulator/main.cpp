@@ -22,7 +22,7 @@ int main(int argc, char const* argv[])
             "Arguments set to default: 4, 22, 5000, %s\n", confFile.c_str());
     }
     auto* cfg = new Config(confFile.c_str());
-    cfg->genData();
+    cfg->GenData();
     Simulator* simulator;
     int ret;
     try {

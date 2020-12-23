@@ -10,7 +10,7 @@ int main(int argc, char const* argv[])
         filename = cur_directory + "/data/userconfig_512.json";
     }
     auto* config = new Config(filename.c_str());
-    config->genData();
+    config->GenData();
     int ret;
     try {
         SignalHandler signalHandler;

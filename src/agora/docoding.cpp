@@ -73,9 +73,9 @@ Event_data DoEncode::launch(size_t tag)
     size_t duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
     duration_stat->task_count++;
-    if (cycles_to_us(duration, cfg->freq_ghz) > 500) {
+    if (cycles_to_us(duration, cfg->freq_ghz()) > 500) {
         std::printf("Thread %d Encode takes %.2f\n", tid,
-            cycles_to_us(duration, cfg->freq_ghz));
+            cycles_to_us(duration, cfg->freq_ghz()));
     }
 
     return Event_data(EventType::kEncode, tag);
@@ -195,9 +195,9 @@ Event_data DoDecode::launch(size_t tag)
     size_t duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
     duration_stat->task_count++;
-    if (cycles_to_us(duration, cfg->freq_ghz) > 500) {
+    if (cycles_to_us(duration, cfg->freq_ghz()) > 500) {
         std::printf("Thread %d Decode takes %.2f\n", tid,
-            cycles_to_us(duration, cfg->freq_ghz));
+            cycles_to_us(duration, cfg->freq_ghz()));
     }
 
     return Event_data(EventType::kDecode, tag);

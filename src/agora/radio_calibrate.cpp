@@ -534,14 +534,14 @@ bool RadioConfig::initial_calib(bool sample_adjust)
 {
     bool good_csi = true;
 
-    size_t seq_len = _cfg->pilot_cf32.size();
-    size_t read_len = _cfg->pilot_ci16.size();
+    size_t seq_len = _cfg->pilot_cf32().size();
+    size_t read_len = _cfg->pilot_ci16().size();
 
     // Transmitting from only one chain, create a null vector for chainB
     std::vector<std::complex<int16_t>> dummy_ci16(read_len, 0);
 
     std::vector<void*> txbuff0(2);
-    txbuff0[0] = _cfg->pilot_ci16.data();
+    txbuff0[0] = _cfg->pilot_ci16().data();
     txbuff0[1] = dummy_ci16.data();
 
     std::vector<std::vector<std::complex<int16_t>>> buff;
@@ -554,7 +554,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
     for (size_t i = 0; i < M; i++) {
         for (size_t j = 0; j < M; j++) {
             if (i == j)
-                buff[i * M + j] = _cfg->pilot_ci16;
+                buff[i * M + j] = _cfg->pilot_ci16();
             else
                 buff[i * M + j].resize(read_len);
         }
@@ -577,7 +577,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
             break;
         int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
         int ret = baStn[i]->writeStream(this->txStreams[i], txbuff0.data(),
-            _cfg->pilot_ci16.size(), tx_flags, txTime, 1000000);
+            _cfg->pilot_ci16().size(), tx_flags, txTime, 1000000);
         if (ret < (int)read_len)
             std::cout << "bad write\n";
         for (size_t j = 0; j < R; j++) {
@@ -642,9 +642,9 @@ bool RadioConfig::initial_calib(bool sample_adjust)
             });
 
         size_t peak_up
-            = CommsLib::find_pilot_seq(up[i], _cfg->pilot_cf32, seq_len);
+            = CommsLib::find_pilot_seq(up[i], _cfg->pilot_cf32(), seq_len);
         size_t peak_dn
-            = CommsLib::find_pilot_seq(dn[i], _cfg->pilot_cf32, seq_len);
+            = CommsLib::find_pilot_seq(dn[i], _cfg->pilot_cf32(), seq_len);
         start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->cp_len();
         start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->cp_len();
         std::cout << "receive starting position from/to node " << i << ": "

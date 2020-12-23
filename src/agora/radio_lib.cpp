@@ -15,8 +15,9 @@ RadioConfig::RadioConfig(Config* cfg)
     this->_radioNum = _cfg->nRadios;
     this->_antennaNum = _radioNum * _cfg->nChannels;
     std::cout << "radio num is " << this->_radioNum << std::endl;
-    if (_cfg->isUE)
+    if (_cfg->is_UE() == true) {
         throw std::invalid_argument("Bad config! Not a UE!");
+    }
     if (!kUseUHD || _cfg->hub_ids.size() != 0) {
         args["driver"] = "remote";
         args["timeout"] = "1000000";
@@ -323,7 +324,7 @@ bool RadioConfig::radioStart()
         init_calib_dl_[i] = 1;
         init_calib_ul_[i] = 1;
     }
-    if (_cfg->downlink_mode() == true) {
+    if (_cfg->frame().NumDLSyms() > 0) {
         int iter = 0;
         int max_iter = 3;
         while (!good_calib) {
@@ -349,10 +350,10 @@ bool RadioConfig::radioStart()
     }
 
     std::vector<unsigned> zeros(_cfg->sampsPerSymbol, 0);
-    std::vector<uint32_t> beacon = _cfg->beacon;
+    std::vector<uint32_t> beacon = _cfg->beacon();
     std::vector<unsigned> beacon_weights(_cfg->nAntennas);
 
-    std::vector<uint32_t> pilot = _cfg->pilot;
+    std::vector<uint32_t> pilot = _cfg->pilot();
 
     std::vector<std::string> _tddSched;
     drain_buffers();
@@ -425,7 +426,7 @@ bool RadioConfig::radioStart()
                 std::vector<std::complex<float>> post(
                     _cfg->ofdm_tx_zero_postfix_, 0);
                 recipCalDlPilot = CommsLib::compose_partial_pilot_sym(
-                    _cfg->common_pilot, _cfg->nChannels * i * kCalibScGroupSize,
+                    _cfg->common_pilot(), _cfg->nChannels * i * kCalibScGroupSize,
                     kCalibScGroupSize, _cfg->ofdm_ca_num(), _cfg->ofdm_data_num(),
                     _cfg->ofdm_data_start(), _cfg->cp_len(), false /*block type*/);
                 if (kDebugPrintPilot) {
@@ -442,7 +443,7 @@ bool RadioConfig::radioStart()
                     Utils::cfloat32_to_uint32(recipCalDlPilot, false, "QI"));
                 if (_cfg->nChannels == 2) {
                     recipCalDlPilot = CommsLib::compose_partial_pilot_sym(
-                        _cfg->common_pilot, (2 * i + 1) * kCalibScGroupSize,
+                        _cfg->common_pilot(), (2 * i + 1) * kCalibScGroupSize,
                         kCalibScGroupSize, _cfg->ofdm_ca_num(),
                         _cfg->ofdm_data_num(), _cfg->ofdm_data_start(),
                         _cfg->cp_len(), false);

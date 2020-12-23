@@ -93,7 +93,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
             try_enqueue_fallback(&complete_task_queue, ptok, resp_event);
         }
     }
-    double ms = cycles_to_ms(rdtsc() - start_tsc, cfg->freq_ghz);
+    double ms = cycles_to_ms(rdtsc() - start_tsc, cfg->freq_ghz());
 
     std::printf("Worker %zu: %zu tasks, time per task = %.4f ms\n", worker_id,
         num_tasks, ms / num_tasks);
@@ -105,7 +105,7 @@ TEST(TestZF, VaryingConfig)
 {
     static constexpr size_t kNumIters = 10000;
     auto* cfg = new Config("data/tddconfig-sim-ul.json");
-    cfg->genData();
+    cfg->GenData();
 
     auto event_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
     moodycamel::ProducerToken* ptoks[kNumWorkers];

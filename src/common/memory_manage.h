@@ -91,6 +91,11 @@ public:
         this->data_ = nullptr;
     }
 
+    T* at(size_t dim1) const
+    {
+        return (*this)[dim1];
+    }
+
     T* operator[](size_t dim1)
     {
         assert(this->dim1_ > dim1);

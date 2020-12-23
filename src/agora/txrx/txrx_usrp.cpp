@@ -22,7 +22,7 @@ void PacketTXRX::loop_tx_rx_usrp(int tid)
     std::vector<void*> zeros(2);
     zeros[0] = calloc(cfg->sampsPerSymbol, sizeof(int16_t) * 2);
     zeros[1] = calloc(cfg->sampsPerSymbol, sizeof(int16_t) * 2);
-    beaconbuff[0] = cfg->beacon_ci16.data();
+    beaconbuff[0] = cfg->beacon_ci16().data();
     beaconbuff[1] = zeros[0];
 
     std::vector<std::complex<int16_t>> samp_buffer0(
@@ -203,15 +203,18 @@ int PacketTXRX::dequeue_send_usrp(int tid)
     int nChannels = c->nChannels;
     int ch = ant_id % nChannels;
 
-    if (kDebugDownlink) {
+    if (kDebugDownlink == true) {
         std::vector<std::complex<int16_t>> zeros(c->sampsPerSymbol);
         size_t dl_symbol_idx = c->GetDLSymbolIdx(frame_id, symbol_id);
-        if (ant_id != c->ref_ant)
+        if (ant_id != c->ref_ant) {
             txbuf[ch] = zeros.data();
-        else if (dl_symbol_idx < c->frame().client_dl_pilot_symbols())
-            txbuf[ch] = reinterpret_cast<void*>(c->ue_specific_pilot_t[0]);
-        else
+        }
+        else if (dl_symbol_idx < c->frame().client_dl_pilot_symbols()) {
+            txbuf[ch] = reinterpret_cast<void*>(c->ue_specific_pilot_t()[0]);
+        }
+        else {
             txbuf[ch] = reinterpret_cast<void*>(c->dl_iq_t()[dl_symbol_idx - c->frame().client_dl_pilot_symbols()]);
+        }
     } else {
         char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
@@ -224,7 +227,7 @@ int PacketTXRX::dequeue_send_usrp(int tid)
     long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
 
-    if (kDebugPrintInTask) {
+    if (kDebugPrintInTask == true) {
         std::printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
                "ant %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, offset,
@@ -273,7 +276,7 @@ int PacketTXRX::dequeue_send_usrp(int tid, int frame_id, int symbol_id)
         if (ant_id != c->ref_ant)
             txbuf[ch] = zeros.data();
         else if (dl_symbol_idx < c->frame().client_dl_pilot_symbols())
-            txbuf[ch] = reinterpret_cast <void*>(c->ue_specific_pilot_t[0]);
+            txbuf[ch] = reinterpret_cast <void*>(c->ue_specific_pilot_t()[0]);
         else
             txbuf[ch] = reinterpret_cast<void*>(c->dl_iq_t()[dl_symbol_idx - c->frame().client_dl_pilot_symbols()]);
     } else {

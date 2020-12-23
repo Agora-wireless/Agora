@@ -8,7 +8,7 @@ Stats::Stats(Config* cfg)
     , zf_thread_num(cfg->zf_thread_num)
     , demul_thread_num(cfg->demul_thread_num)
     , decode_thread_num(cfg->decode_thread_num)
-    , freq_ghz(cfg->freq_ghz)
+    , freq_ghz(cfg->freq_ghz())
     , creation_tsc(rdtsc())
 {
     frame_start.calloc(config_->socket_thread_num, kNumStatsFrames,
@@ -438,7 +438,7 @@ void Stats::save_to_file()
     rt_assert(fp_debug != nullptr,
         std::string("Open file failed ") + std::to_string(errno));
 
-    if (config_->downlink_mode() == true) {
+    if ( config_->frame().NumDLSyms() > 0 ) {
         std::fprintf(fp_debug,
             "Pilot RX by socket threads (= reference time), "
             "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
@@ -540,7 +540,6 @@ void Stats::print_summary( void )
         return;
     }
 
-    auto& c = config_;
     size_t num_csi_tasks
         = get_total_task_count(DoerType::kCSI, task_thread_num);
     size_t num_fft_tasks
@@ -557,17 +556,17 @@ void Stats::print_summary( void )
     size_t num_precode_tasks
         = get_total_task_count(DoerType::kPrecode, task_thread_num);
     double csi_frames
-        = (double)num_csi_tasks / c->bs_ant_num() / c->frame().NumPilotSyms();
-    double zf_frames = (double)num_zf_tasks / c->zf_events_per_symbol;
+        = (double)num_csi_tasks / this->config_->bs_ant_num() / this->config_->frame().NumPilotSyms();
+    double zf_frames = (double)num_zf_tasks / this->config_->zf_events_per_symbol;
 
-    if (c->downlink_mode() == true) {
-        double precode_frames = (double)num_precode_tasks / c->ofdm_data_num()
-            / c->frame().NumDLSyms();
-        double ifft_frames = (double)num_ifft_tasks / c->bs_ant_num()
-            / c->frame().NumDLSyms();
+    if (config_->frame().NumDLSyms() > 0) {
+        double precode_frames = (double)num_precode_tasks / this->config_->ofdm_data_num()
+            / this->config_->frame().NumDLSyms();
+        double ifft_frames = (double)num_ifft_tasks / this->config_->bs_ant_num()
+            / this->config_->frame().NumDLSyms();
         double encode_frames = (double)num_encode_tasks
-            / c->ldpc_config().num_blocks_in_symbol() / c->ue_num()
-            / c->frame().NumDLSyms();
+            / this->config_->ldpc_config().num_blocks_in_symbol() / this->config_->ue_num()
+            / this->config_->frame().NumDLSyms();
         std::printf("Downlink totals (tasks, frames): ");
         std::printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
         std::printf("ZF (%zu, %.2f), ", num_zf_tasks, zf_frames);
@@ -600,13 +599,13 @@ void Stats::print_summary( void )
             std::printf("\n");
         }
     } else {
-        double fft_frames = (double)num_fft_tasks / c->bs_ant_num()
-            / c->frame().NumULSyms();
-        double demul_frames = (double)num_demul_tasks / c->ofdm_data_num()
-            / c->frame().NumULSyms();
+        double fft_frames = (double)num_fft_tasks / this->config_->bs_ant_num()
+            / this->config_->frame().NumULSyms();
+        double demul_frames = (double)num_demul_tasks / this->config_->ofdm_data_num()
+            / this->config_->frame().NumULSyms();
         double decode_frames = (double)num_decode_tasks
-            / c->ldpc_config().num_blocks_in_symbol() / c->ue_num()
-            / c->frame().NumULSyms();
+            / this->config_->ldpc_config().num_blocks_in_symbol() / this->config_->ue_num()
+            / this->config_->frame().NumULSyms();
         std::printf("Uplink totals (tasks, frames): ");
         std::printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
         std::printf("ZF (%zu, %.2f), ", num_zf_tasks, zf_frames);

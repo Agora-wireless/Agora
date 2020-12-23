@@ -12,7 +12,7 @@ TEST(TestRecip, Correctness)
 {
 
     auto* cfg = new Config("data/tddconfig-sim-ul.json");
-    cfg->genData();
+    cfg->GenData();
 
     double freq_ghz = measure_rdtsc_freq();
 

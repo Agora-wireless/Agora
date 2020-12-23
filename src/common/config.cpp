@@ -12,7 +12,7 @@ static const bool kDefaultDownlinkMode = false;
 
 
 Config::Config(std::string jsonfile)
-    : freq_ghz(measure_rdtsc_freq()), ldpc_config_(0, 0, 0, 0, 0, 0, 0, 0), frame_("")
+    : freq_ghz_(measure_rdtsc_freq()), ldpc_config_(0, 0, 0, 0, 0, 0, 0, 0), frame_("")
 {
     pilots_ = nullptr;
     pilots_sgn_ = nullptr;
@@ -34,7 +34,7 @@ Config::Config(std::string jsonfile)
     channel = tddConf.value("channel", "A");
     nChannels = std::min(channel.size(), (size_t)2);
     bs_ant_num_ = tddConf.value("antenna_num", 8);
-    isUE = tddConf.value("UE", false);
+    is_UE_ = tddConf.value("UE", false);
     ue_num_ = tddConf.value("ue_num", 8);
     ue_ant_num_ = ue_num_;
     if (serial_file.size() > 0)
@@ -42,7 +42,7 @@ Config::Config(std::string jsonfile)
     if (radio_ids.size() != 0) {
         nRadios = radio_ids.size();
         nAntennas = nChannels * nRadios;
-        if (isUE) {
+        if (is_UE_) {
             ue_ant_num_ = nAntennas;
             ue_num_ = nRadios;
         } else {
@@ -52,7 +52,7 @@ Config::Config(std::string jsonfile)
                 bs_ant_num_ = nAntennas;
         }
     } else
-        nRadios = tddConf.value("radio_num", isUE ? ue_ant_num_ : bs_ant_num_);
+        nRadios = tddConf.value("radio_num", is_UE_ ? ue_ant_num_ : bs_ant_num_);
     bf_ant_num_ = bs_ant_num_;
     if (external_ref_node)
         bf_ant_num_ = bs_ant_num_ - nChannels;
@@ -71,17 +71,21 @@ Config::Config(std::string jsonfile)
     calib_tx_gain_a = tddConf.value("calib_tx_gain_a", tx_gain_a);
     calib_tx_gain_b = tddConf.value("calib_tx_gain_b", tx_gain_b);
     auto gain_adj_json_a = tddConf.value("client_gain_adjust_a", json::array());
-    if (gain_adj_json_a.empty())
-        client_gain_adj_a.resize(nRadios, 0);
-    else
-        client_gain_adj_a.assign(
+    if (gain_adj_json_a.empty()) {
+        client_gain_adj_a_.resize(nRadios, 0);
+	}
+    else {
+        client_gain_adj_a_.assign(
             gain_adj_json_a.begin(), gain_adj_json_a.end());
+	}
     auto gain_adj_json_b = tddConf.value("client_gain_adjust_b", json::array());
-    if (gain_adj_json_b.empty())
-        client_gain_adj_b.resize(nRadios, 0);
-    else
-        client_gain_adj_b.assign(
+    if (gain_adj_json_b.empty()) {
+        client_gain_adj_b_.resize(nRadios, 0);
+	}
+    else {
+        client_gain_adj_b_.assign(
             gain_adj_json_b.begin(), gain_adj_json_b.end());
+	}
     rate = tddConf.value("rate", 5e6);
     nco = tddConf.value("nco_frequency", 0.75 * rate);
     bwFilter = rate + 2 * nco;
@@ -257,14 +261,13 @@ Config::Config(std::string jsonfile)
 
     ant_per_group = frame_.NumDLCalSyms();
     ant_group_num = frame_.IsRecCalEnabled() ? (bf_ant_num_ / ant_per_group) : 0;
-    downlink_mode_ = frame_.NumDLSyms() > 0;
 
-    if ((isUE == true) && 
+    if ((is_UE_ == true) && 
         (freq_orthogonal_pilot == false) &&
         (ue_ant_num_ != frame_.NumPilotSyms()) ) {
         rt_assert(false, "Number of pilot symbols doesn't match number of UEs");
     }
-    if ((isUE == false) && (freq_orthogonal_pilot == false) && (tddConf.find("ue_num") == tddConf.end())) {
+    if ((is_UE_ == false) && (freq_orthogonal_pilot == false) && (tddConf.find("ue_num") == tddConf.end())) {
         ue_num_ = frame_.NumPilotSyms();
         ue_ant_num_ = ue_num_;
     }
@@ -367,7 +370,7 @@ Config::Config(std::string jsonfile)
         mac_bytes_num_perframe);
 }
 
-void Config::genData()
+void Config::GenData( void )
 {
     if (kUseArgos || kUseUHD) {
         std::vector<std::vector<double>> gold_ifft
@@ -375,7 +378,7 @@ void Config::genData()
         std::vector<std::complex<int16_t>> gold_ifft_ci16
             = Utils::double_to_cint16(gold_ifft);
         for (size_t i = 0; i < 128; i++) {
-            gold_cf32.push_back(
+            this->gold_cf32_.push_back(
                 std::complex<float>(gold_ifft[0][i], gold_ifft[1][i]));
         }
 
@@ -387,18 +390,18 @@ void Config::genData()
         // Populate STS (stsReps repetitions)
         int stsReps = 15;
         for (int i = 0; i < stsReps; i++) {
-            beacon_ci16.insert(
-                beacon_ci16.end(), sts_seq_ci16.begin(), sts_seq_ci16.end());
+            this->beacon_ci16_.insert(
+                this->beacon_ci16_.end(), sts_seq_ci16.begin(), sts_seq_ci16.end());
         }
 
         // Populate gold sequence (two reps, 128 each)
         int goldReps = 2;
         for (int i = 0; i < goldReps; i++) {
-            beacon_ci16.insert(beacon_ci16.end(), gold_ifft_ci16.begin(),
+            this->beacon_ci16_.insert(this->beacon_ci16_.end(), gold_ifft_ci16.begin(),
                 gold_ifft_ci16.end());
         }
 
-        beacon_len = beacon_ci16.size();
+        beacon_len = this->beacon_ci16_.size();
 
         if (sampsPerSymbol
             < beacon_len + ofdm_tx_zero_prefix_ + ofdm_tx_zero_postfix_) {
@@ -407,48 +410,48 @@ void Config::genData()
             throw std::invalid_argument(msg);
         }
 
-        beacon = Utils::cint16_to_uint32(beacon_ci16, false, "QI");
-        coeffs = Utils::cint16_to_uint32(gold_ifft_ci16, true, "QI");
+        this->beacon_ = Utils::cint16_to_uint32(this->beacon_ci16_, false, "QI");
+        this->coeffs_ = Utils::cint16_to_uint32(gold_ifft_ci16, true, "QI");
 
         // Add addition padding for beacon sent from host
         int fracBeacon = sampsPerSymbol % beacon_len;
         std::vector<std::complex<int16_t>> preBeacon(ofdm_tx_zero_prefix_, 0);
         std::vector<std::complex<int16_t>> postBeacon(
             ofdm_tx_zero_postfix_ + fracBeacon, 0);
-        beacon_ci16.insert(
-            beacon_ci16.begin(), preBeacon.begin(), preBeacon.end());
-        beacon_ci16.insert(
-            beacon_ci16.end(), postBeacon.begin(), postBeacon.end());
+        this->beacon_ci16_.insert(
+            this->beacon_ci16_.begin(), preBeacon.begin(), preBeacon.end());
+        this->beacon_ci16_.insert(
+            this->beacon_ci16_.end(), postBeacon.begin(), postBeacon.end());
     }
 
     // Generate common pilots based on Zadoff-Chu sequence for channel estimation
     auto zc_seq_double
         = CommsLib::getSequence(ofdm_data_num_, CommsLib::LTE_ZADOFF_CHU);
     auto zc_seq = Utils::double_to_cfloat(zc_seq_double);
-    common_pilot
+    this->common_pilot_
         = CommsLib::seqCyclicShift(zc_seq, M_PI / 4); // Used in LTE SRS
 
-    pilots_ = static_cast<complex_float*>(
+    this->pilots_ = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, ofdm_data_num_ * sizeof(complex_float)));
-    pilots_sgn_ = static_cast<complex_float*>(
+    this->pilots_sgn_ = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, ofdm_data_num_ * sizeof(complex_float))); // used in CSI estimation
     for (size_t i = 0; i < ofdm_data_num_; i++) {
-        pilots_[i] = { common_pilot[i].real(), common_pilot[i].imag() };
+        this->pilots_[i] = { this->common_pilot_[i].real(), this->common_pilot_[i].imag() };
         auto pilot_sgn
-            = common_pilot[i] / (float)std::pow(std::abs(common_pilot[i]), 2);
-        pilots_sgn_[i] = { pilot_sgn.real(), pilot_sgn.imag() };
+            = this->common_pilot_[i] / (float)std::pow(std::abs(this->common_pilot_[i]), 2);
+        this->pilots_sgn_[i] = { pilot_sgn.real(), pilot_sgn.imag() };
     }
     complex_float* pilot_ifft;
     alloc_buffer_1d(
         &pilot_ifft, ofdm_ca_num_, Agora_memory::Alignment_t::k64Align, 1);
     for (size_t j = 0; j < ofdm_data_num_; j++)
-        pilot_ifft[j + ofdm_data_start_] = pilots_[j];
+        pilot_ifft[j + ofdm_data_start_] = this->pilots_[j];
     CommsLib::IFFT(pilot_ifft, ofdm_ca_num_, false);
 
     // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
-    ue_specific_pilot.malloc(
+    this->ue_specific_pilot_.malloc(
         ue_ant_num_, ofdm_data_num_, Agora_memory::Alignment_t::k64Align);
-    ue_specific_pilot_t.calloc(
+    this->ue_specific_pilot_t_.calloc(
         ue_ant_num_, sampsPerSymbol, Agora_memory::Alignment_t::k64Align);
     
     Table<complex_float> ue_pilot_ifft;
@@ -461,9 +464,9 @@ void Config::genData()
         auto zc_ue_pilot_i = CommsLib::seqCyclicShift(
             zc_ue_pilot, (i + ue_ant_offset) * (float)M_PI / 6); // LTE DMRS
         for (size_t j = 0; j < ofdm_data_num_; j++) {
-            ue_specific_pilot[i][j]
+            this->ue_specific_pilot_[i][j]
                 = { zc_ue_pilot_i[j].real(), zc_ue_pilot_i[j].imag() };
-            ue_pilot_ifft[i][j + ofdm_data_start_] = ue_specific_pilot[i][j];
+            ue_pilot_ifft[i][j + ofdm_data_start_] = this->ue_specific_pilot_[i][j];
         }
         CommsLib::IFFT(ue_pilot_ifft[i], ofdm_ca_num_, false);
     }
@@ -619,7 +622,7 @@ void Config::genData()
                     dl_iq_f_[i][q + j]
                         = mod_single_uint8(dl_mod_input[i][s], mod_table);
                 } else
-                    dl_iq_f_[i][q + j] = ue_specific_pilot[u][k];
+                    dl_iq_f_[i][q + j] = this->ue_specific_pilot_[u][k];
                 dl_iq_ifft[i][q + j] = dl_iq_f_[i][q + j];
             }
             CommsLib::IFFT(&dl_iq_ifft[i][q], ofdm_ca_num_, false);
@@ -687,7 +690,7 @@ void Config::genData()
 
     // Generate time domain ue-specific pilot symbols
     for (size_t i = 0; i < ue_ant_num_; i++) {
-        CommsLib::ifft2tx(ue_pilot_ifft[i], ue_specific_pilot_t[i], ofdm_ca_num_,
+        CommsLib::ifft2tx(ue_pilot_ifft[i], this->ue_specific_pilot_t_[i], ofdm_ca_num_,
             ofdm_tx_zero_prefix_, cp_len_, scale);
         if (kDebugPrintPilot) {
             std::printf("ue_specific_pilot%zu=[", i);
@@ -698,27 +701,27 @@ void Config::genData()
         }
     }
 
-    pilot_ci16.resize(sampsPerSymbol, 0);
-    CommsLib::ifft2tx(pilot_ifft, (std::complex<int16_t>*)pilot_ci16.data(),
+    this->pilot_ci16_.resize(sampsPerSymbol, 0);
+    CommsLib::ifft2tx(pilot_ifft, (std::complex<int16_t>*)this->pilot_ci16_.data(),
         ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale);
 
     for (size_t i = 0; i < ofdm_ca_num_; i++)
-        pilot_cf32.push_back(std::complex<float>(
+        this->pilot_cf32_.push_back(std::complex<float>(
             pilot_ifft[i].re / scale, pilot_ifft[i].im / scale));
-    pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - cp_len_,
-        pilot_cf32.end()); // add CP
+    this->pilot_cf32_.insert(this->pilot_cf32_.begin(), this->pilot_cf32_.end() - cp_len_,
+        this->pilot_cf32_.end()); // add CP
 
     // generate a UINT32 version to write to FPGA buffers
-    pilot = Utils::cfloat32_to_uint32(pilot_cf32, false, "QI");
+    this->pilot_ = Utils::cfloat32_to_uint32(this->pilot_cf32_, false, "QI");
 
     std::vector<uint32_t> pre_uint32(ofdm_tx_zero_prefix_, 0);
-    pilot.insert(pilot.begin(), pre_uint32.begin(), pre_uint32.end());
-    pilot.resize(sampsPerSymbol);
+    this->pilot_.insert(this->pilot_.begin(), pre_uint32.begin(), pre_uint32.end());
+    this->pilot_.resize(sampsPerSymbol);
 
     if (kDebugPrintPilot) {
         std::cout << "Pilot data: " << std::endl;
         for (size_t i = 0; i < ofdm_data_num_; i++)
-            std::cout << pilots_[i].re << "+1i*" << pilots_[i].im << ",";
+            std::cout << this->pilots_[i].re << "+1i*" << this->pilots_[i].im << ",";
         std::cout << std::endl;
     }
 
@@ -730,9 +733,9 @@ void Config::genData()
     ul_mod_input.free();
     ul_encoded_bits.free();
     dl_mod_input.free(); 
-    //ue_specific_pilot_t.free(); TODO: leaking but causes an assertion in UE mode
+    //this->ue_specific_pilot_t_.free(); TODO: leaking but causes an assertion in UE mode
     free_buffer_1d(&pilot_ifft);
-    //ue_specific_pilot.free();  TODO: leaking but causes an assertion when free'd here
+    //this->ue_specific_pilot_.free();  TODO: leaking but causes an assertion when free'd here
 }
 
 Config::~Config()
@@ -791,7 +794,7 @@ size_t Config::GetSymbolId(size_t input_id )
 
 
 /* Returns True if symbol is valid index and is of symbol type 'P' or 
-   if user equiptment and is a client dl pilot.  False otherwise */
+   if user equiptment and is a client dl pilot_.  False otherwise */
 bool Config::IsPilot(size_t frame_id, size_t symbol_id) const {
     bool is_pilot = false;
     assert( symbol_id < this->frame_.NumTotalSyms());
@@ -799,7 +802,7 @@ bool Config::IsPilot(size_t frame_id, size_t symbol_id) const {
 #ifdef DEBUG3
     std::printf("IsPilot(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
-    if (isUE == true) {
+    if (this->is_UE_ == true) {
         if ((s == 'D') && (this->frame_.client_dl_pilot_symbols() > 0) )
         {
             size_t dl_index = this->frame_.GetDLSymbolIdx(symbol_id);
@@ -816,7 +819,7 @@ bool Config::IsCalDlPilot(size_t frame_id, size_t symbol_id) const
 {
     bool is_cal_dl_pilot = false;
     assert( symbol_id < this->frame_.NumTotalSyms());
-    if (isUE == false) {
+    if (this->is_UE_ == false) {
         is_cal_dl_pilot = (this->frame_.frame_identifier().at(symbol_id) == 'C');
     }
     return is_cal_dl_pilot;
@@ -826,7 +829,7 @@ bool Config::IsCalUlPilot(size_t frame_id, size_t symbol_id) const
 {
     bool is_cal_ul_pilot = false;
     assert( symbol_id < this->frame_.NumTotalSyms());
-    if (isUE == false) {
+    if (this->is_UE_ == false) {
         is_cal_ul_pilot = (this->frame_.frame_identifier().at(symbol_id) == 'L');
     }
     return is_cal_ul_pilot;
@@ -849,7 +852,7 @@ bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const
 #ifdef DEBUG3
     std::printf("IsDownlink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
-    if (isUE == true) {
+    if (this->is_UE_ == true) {
         return ((s == 'D') && (this->IsPilot(frame_id, symbol_id) == false));
     }
     else {
@@ -860,7 +863,7 @@ bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const
 /* TODO change to table lookup */
 SymbolType Config::get_symbol_type(size_t frame_id, size_t symbol_id)
 {
-    assert((isUE == false)); // Currently implemented for only the Agora server
+    assert((this->is_UE_ == false)); // Currently implemented for only the Agora server
     char s = this->frame_.frame_identifier().at(symbol_id);
     switch (s) {
     case 'B':
@@ -885,7 +888,7 @@ __attribute__((visibility("default"))) Config* Config_new(char* filename)
 {
 
     auto* cfg = new Config(filename);
-    cfg->genData();
+    cfg->GenData();
     return cfg;
 }
 }

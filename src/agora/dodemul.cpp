@@ -30,7 +30,7 @@ DoDemul::DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
             cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
 
     // phase offset calibration data
-    cx_float* ue_pilot_ptr = (cx_float*)cfg->ue_specific_pilot[0];
+    cx_float* ue_pilot_ptr = reinterpret_cast<cx_float*>(cfg->ue_specific_pilot()[0]);
     cx_fmat mat_pilot_data(
         ue_pilot_ptr, cfg->ofdm_data_num(), cfg->ue_ant_num(), false);
     ue_pilot_data = mat_pilot_data.st();

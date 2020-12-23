@@ -18,7 +18,7 @@ int main(int argc, char* argv[])
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = FLAGS_conf_file;
     auto* cfg = new Config(filename.c_str());
-    cfg->genData();
+    cfg->GenData();
 
     auto* sender = new Sender(cfg, FLAGS_num_threads, FLAGS_core_offset,
         FLAGS_frame_duration, FLAGS_enable_slow_start, FLAGS_server_mac_addr);

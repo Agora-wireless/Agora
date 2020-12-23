@@ -11,7 +11,7 @@ TEST(TestZF, Perf)
 {
     static constexpr size_t kNumIters = 10000;
     auto* cfg = new Config("data/tddconfig-sim-ul.json");
-    cfg->genData();
+    cfg->GenData();
 
     int tid = 0;
 
@@ -45,7 +45,7 @@ TEST(TestZF, Perf)
             * cfg->zf_block_size;
         computeZF->launch(gen_tag_t::frm_sc(frame_id, base_sc_id)._tag);
     }
-    double ms = cycles_to_ms(rdtsc() - start_tsc, cfg->freq_ghz);
+    double ms = cycles_to_ms(rdtsc() - start_tsc, cfg->freq_ghz());
 
     std::printf("Time per zeroforcing iteration = %.4f ms\n", ms / kNumIters);
 }

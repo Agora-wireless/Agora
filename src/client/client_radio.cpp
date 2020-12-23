@@ -218,8 +218,8 @@ void ClientRadioConfig::initClientRadio(ClientRadioConfigContext* in_context)
                 }
                 clStn[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0); //[0,12]
                 clStn[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
-                    ch ? cfg->tx_gain_b + cfg->client_gain_adj_b[i]
-                       : cfg->tx_gain_a + cfg->client_gain_adj_a[i]); //[0,30]
+                    ch ? cfg->tx_gain_b + cfg->client_gain_adj_b()[i]
+                       : cfg->tx_gain_a + cfg->client_gain_adj_a()[i]); //[0,30]
             }
         } else {
             clStn[i]->setGain(
@@ -245,10 +245,10 @@ bool ClientRadioConfig::radioStart()
     // int beacon_ant = 1;
     int flags(0); // = SOAPY_SDR_WAIT_TRIGGER;
     std::vector<unsigned> zeros(_cfg->sampsPerSymbol, 0);
-    std::vector<uint32_t> beacon = _cfg->beacon;
+    std::vector<uint32_t> beacon = _cfg->beacon();
     std::vector<unsigned> beacon_weights(_cfg->nAntennas);
 
-    std::vector<uint32_t> pilot = _cfg->pilot;
+    std::vector<uint32_t> pilot = _cfg->pilot();
 
     std::vector<std::string> _tddSched;
     _tddSched.resize(this->_radioNum);
@@ -312,7 +312,7 @@ bool ClientRadioConfig::radioStart()
                 = "{\"corr_enabled\":true,\"corr_threshold\":"
                 + std::to_string(1) + "}";
             clStn[i]->writeSetting("CORR_CONFIG", corrConfString);
-            clStn[i]->writeRegisters("CORR_COE", 0, _cfg->coeffs);
+            clStn[i]->writeRegisters("CORR_COE", 0, _cfg->coeffs());
 
             clStn[i]->writeSetting(
                 "CORR_START", (_cfg->channel == "B") ? "B" : "A");

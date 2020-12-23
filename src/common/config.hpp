@@ -29,8 +29,87 @@ using json = nlohmann::json;
 
 class Config {
 public:
-    const double freq_ghz; // RDTSC frequency in GHz
+    /* Constants */
+    static constexpr size_t kMaxFrame = (1 << 30);
+    static constexpr size_t kDataOffset = (sizeof(int) * 16);
 
+    Config(std::string);
+    ~Config(void);
+
+    /* Inline accessors */
+    inline bool   is_UE( void )              const { return this->is_UE_; }
+    inline size_t bs_ant_num( void )         const { return this->bs_ant_num_; }
+    inline void   bs_ant_num( size_t n_bs_ant ) { this->bs_ant_num_ = n_bs_ant; }
+
+    inline size_t bf_ant_num( void )         const { return this->bf_ant_num_; } 
+    inline size_t ue_num( void )             const { return this->ue_num_; } 
+    inline size_t ue_ant_num( void )         const { return this->ue_ant_num_; } 
+    inline size_t ofdm_ca_num( void )        const { return this->ofdm_ca_num_; } 
+    inline size_t cp_len( void )             const { return this->cp_len_; } 
+    inline size_t ofdm_data_num( void )      const { return this->ofdm_data_num_; } 
+    inline size_t ofdm_data_start( void )    const { return this->ofdm_data_start_; } 
+    inline size_t ofdm_data_stop( void )     const { return this->ofdm_data_stop_; } 
+    inline size_t ofdm_pilot_spacing( void ) const { return this->ofdm_pilot_spacing_; } 
+    inline double freq_ghz( void )           const { return this->freq_ghz_; };
+
+    inline const  LDPCconfig& ldpc_config( void ) const { return this->ldpc_config_; }
+    inline const  FrameStats& frame( void ) const { return this->frame_; }
+
+    inline void   running( bool value ) { this->running_.store(value); }
+    inline bool   running( void ) const { return this->running_.load(); }
+
+    inline size_t dl_packet_length( void )            const { return this->dl_packet_length_; }
+
+    inline Table<int8_t>& dl_bits( void ) { return this->dl_bits_; }
+    inline Table<int8_t>& ul_bits( void ) { return this->ul_bits_; }
+    inline Table<complex_float>& ul_iq_f ( void ) { return this->ul_iq_f_; }
+    inline Table<std::complex<int16_t>>& dl_iq_t ( void ) { return this->dl_iq_t_; }
+
+    inline const std::vector<std::complex<float>>& pilot_cf32 ( void ) const { return this->pilot_cf32_; };
+    inline const std::vector<std::complex<float>>& gold_cf32 ( void ) const { return this->gold_cf32_; };
+
+    inline const std::vector<uint32_t>& coeffs ( void ) const { return this->coeffs_; };
+    inline const std::vector<uint32_t>& pilot ( void )  const { return this->pilot_; };
+    inline const std::vector<uint32_t>& beacon ( void ) const { return this->beacon_; };
+
+    //inline const complex_float *pilots (void ) const { return this->pilots_; };
+    inline const complex_float *pilots_sgn ( void )                       const { return this->pilots_sgn_; };
+    inline const std::vector<std::complex<float>> & common_pilot ( void ) const { return this->common_pilot_; };
+
+    inline const std::vector<double>& client_gain_adj_a ( void ) const { return this->client_gain_adj_a_; };
+    inline const std::vector<double>& client_gain_adj_b ( void ) const { return this->client_gain_adj_b_; };
+
+    /* non-const */
+    inline Table<complex_float>& ue_specific_pilot ( void )           { return this->ue_specific_pilot_; };
+    inline Table<std::complex<int16_t>>& ue_specific_pilot_t ( void ) { return this->ue_specific_pilot_t_; };
+    inline std::vector<std::complex<int16_t>>& pilot_ci16 ( void )    { return this->pilot_ci16_; };
+    inline std::vector<std::complex<int16_t>>& beacon_ci16 ( void )   { return this->beacon_ci16_; };
+
+    /* Public functions */
+    void GenData(void);
+
+    size_t GetNumAntennas( void ) { return (nRadios * nChannels); }
+    
+    /// TODO document and review
+    size_t GetSymbolId(size_t symbol_id);
+
+    // Get the index of this downlink symbol among this frame's downlink symbols
+    size_t GetDLSymbolIdx(size_t frame_id, size_t symbol_id) const;
+
+    // Get the index of this uplink symbol among this frame's uplink symbols
+    size_t GetULSymbolIdx(size_t frame_id, size_t symbol_id) const;
+
+    // Get the index of this pilot symbol among this frame's pilot symbols
+    size_t GetPilotSymbolIdx(size_t frame_id, size_t symbol_id) const;
+
+    bool IsPilot(size_t, size_t) const;
+    bool IsCalDlPilot(size_t, size_t) const;
+    bool IsCalUlPilot(size_t, size_t) const;
+    bool IsDownlink(size_t, size_t) const;
+    bool IsUplink(size_t, size_t) const;
+
+
+    /* Public variables */
     std::string modulation; // Modulation order as a string, e.g., "16QAM"
     size_t mod_order; // Modulation order (e.g., 4: QPSK, 16: 16QAM, 64: 64QAM)
     size_t mod_order_bits; // Number of binary bits used for a modulation order
@@ -46,20 +125,6 @@ public:
     // true: use hardware correlator; false: use software corrleator
     bool hw_framer;
 
-    std::vector<std::complex<float>> gold_cf32;
-    std::vector<std::complex<int16_t>> beacon_ci16;
-    std::vector<std::vector<uint32_t>> beacon_weights;
-    std::vector<uint32_t> coeffs;
-    std::vector<std::complex<int16_t>> pilot_ci16;
-    std::vector<std::complex<float>> pilot_cf32;
-    std::vector<uint32_t> pilot;
-    std::vector<uint32_t> beacon;
-    complex_float* pilots_;
-    complex_float* pilots_sgn_;
-    Table<complex_float> ue_specific_pilot;
-    Table<std::complex<int16_t>> ue_specific_pilot_t;
-    std::vector<std::complex<float>> common_pilot;
-
     double freq;
     double rate;
     double nco;
@@ -72,8 +137,6 @@ public:
     double rx_gain_b;
     double calib_tx_gain_a;
     double calib_tx_gain_b;
-    std::vector<double> client_gain_adj_a;
-    std::vector<double> client_gain_adj_b;
 
     size_t nCells;
     size_t nRadios;
@@ -226,29 +289,6 @@ public:
 
     bool fft_in_rru; // If true, the RRU does FFT instead of Agora
 
-    bool isUE;
-    const size_t maxFrame = 1 << 30;
-    const size_t data_offset = sizeof(int) * 16;
-
-    size_t getNumAntennas( void ) { return (nRadios * nChannels); }
-    
-    /// TODO document and review
-    size_t GetSymbolId(size_t symbol_id);
-
-    // Get the index of this downlink symbol among this frame's downlink symbols
-    size_t GetDLSymbolIdx(size_t frame_id, size_t symbol_id) const;
-
-    // Get the index of this uplink symbol among this frame's uplink symbols
-    size_t GetULSymbolIdx(size_t frame_id, size_t symbol_id) const;
-
-    // Get the index of this pilot symbol among this frame's pilot symbols
-    size_t GetPilotSymbolIdx(size_t frame_id, size_t symbol_id) const;
-
-    bool IsPilot(size_t, size_t) const;
-    bool IsCalDlPilot(size_t, size_t) const;
-    bool IsCalUlPilot(size_t, size_t) const;
-    bool IsDownlink(size_t, size_t) const;
-    bool IsUplink(size_t, size_t) const;
 
     /// Return the symbol type of this symbol in this frame
     /// \TODO change to table lookup
@@ -358,45 +398,12 @@ public:
 
     // Returns the number of pilot subcarriers in downlink symbols used for
     // phase tracking
-    inline size_t get_ofdm_pilot_num( void ) const
-    {
-        return ofdm_data_num_ / ofdm_pilot_spacing_;
-    }
-
-    Config(std::string);
-    void genData(void);
-    ~Config(void);
-
-    inline size_t bs_ant_num( void )         const { return this->bs_ant_num_; }
-    inline void   bs_ant_num( size_t n_bs_ant ) { this->bs_ant_num_ = n_bs_ant; }
-
-    inline size_t bf_ant_num( void )         const { return this->bf_ant_num_; } 
-    inline size_t ue_num( void )             const { return this->ue_num_; } 
-    inline size_t ue_ant_num( void )         const { return this->ue_ant_num_; } 
-    inline size_t ofdm_ca_num( void )        const { return this->ofdm_ca_num_; } 
-    inline size_t cp_len( void )             const { return this->cp_len_; } 
-    inline size_t ofdm_data_num( void )      const { return this->ofdm_data_num_; } 
-    inline size_t ofdm_data_start( void )    const { return this->ofdm_data_start_; } 
-    inline size_t ofdm_data_stop( void )     const { return this->ofdm_data_stop_; } 
-    inline size_t ofdm_pilot_spacing( void ) const { return this->ofdm_pilot_spacing_; } 
-
-    inline bool   downlink_mode( void )           const { return this->downlink_mode_; }
-    inline const  LDPCconfig& ldpc_config( void ) const { return this->ldpc_config_; }
-
-    inline const FrameStats& frame( void ) const { return this->frame_; }
-
-
-    inline void   running( bool value ) { this->running_.store(value); }
-    inline bool   running( void ) const { return this->running_.load(); }
-
-    inline size_t dl_packet_length( void )            const { return this->dl_packet_length_; }
-
-    inline Table<int8_t>& dl_bits( void ) { return this->dl_bits_; }
-    inline Table<int8_t>& ul_bits( void ) { return this->ul_bits_; }
-    inline Table<complex_float>& ul_iq_f ( void ) { return this->ul_iq_f_; }
-    inline Table<std::complex<int16_t>>& dl_iq_t ( void ) { return this->dl_iq_t_; }
+    inline size_t get_ofdm_pilot_num( void ) const { return ofdm_data_num_ / ofdm_pilot_spacing_; }
 
 private:
+    const double freq_ghz_; // RDTSC frequency in GHz
+    bool   is_UE_;
+
     size_t bs_ant_num_; // Total number of BS antennas
     size_t bf_ant_num_; // Number of antennas used in beamforming
     size_t ue_num_;
@@ -422,8 +429,6 @@ private:
 
     size_t ofdm_pilot_spacing_;
 
-    bool downlink_mode_; // If true, the frame contains downlink symbols
-
     LDPCconfig ldpc_config_; // LDPC parameters
 
     // A class that holds the frame configuration the id contains letters representing the symbol types in
@@ -443,5 +448,22 @@ private:
     Table<complex_float> ul_iq_f_;
     Table<std::complex<int16_t>> dl_iq_t_;
     Table<std::complex<int16_t>> ul_iq_t_;
+
+    std::vector<std::complex<float>> gold_cf32_;
+    std::vector<std::complex<int16_t>> beacon_ci16_;
+    //std::vector<std::vector<uint32_t>> beacon_weights_;
+    std::vector<uint32_t> coeffs_;
+    std::vector<std::complex<int16_t>> pilot_ci16_;
+    std::vector<std::complex<float>> pilot_cf32_;
+    std::vector<uint32_t> pilot_;
+    std::vector<uint32_t> beacon_;
+    complex_float* pilots_;
+    complex_float* pilots_sgn_;
+    Table<complex_float> ue_specific_pilot_;
+    Table<std::complex<int16_t>> ue_specific_pilot_t_;
+    std::vector<std::complex<float>> common_pilot_;
+
+    std::vector<double> client_gain_adj_a_;
+    std::vector<double> client_gain_adj_b_;
 };
 #endif /* CONFIG_HPP_ */

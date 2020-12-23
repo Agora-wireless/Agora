@@ -184,7 +184,7 @@ int RadioTXRX::dequeue_send(int tid)
     } else if (event.event_type == EventType::kPacketPilotTX) {
         std::vector<char> zeros(c->packet_length, 0);
         std::vector<char> pilot(c->packet_length, 0);
-        std::memcpy(&pilot[Packet::kOffsetOfData], c->pilot_ci16.data(),
+        std::memcpy(&pilot[Packet::kOffsetOfData], c->pilot_ci16().data(),
             c->packet_length - Packet::kOffsetOfData);
         for (size_t symbol_idx = 0; symbol_idx < c->frame().NumPilotSyms();
              symbol_idx++) {
@@ -488,12 +488,12 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
     std::vector<std::complex<int16_t>> zeros1(c->sampsPerSymbol, 0);
     pilot_buff0.resize(2);
     pilot_buff1.resize(2);
-    pilot_buff0[0] = c->pilot_ci16.data();
+    pilot_buff0[0u] = c->pilot_ci16().data();
     if (c->nChannels == 2) {
-        pilot_buff0[1] = zeros0.data();
-        pilot_buff1[0] = zeros1.data();
-        pilot_buff1[1] = c->pilot_ci16.data();
-        frm_rx_buff[1] = frm_buff1.data();
+        pilot_buff0[1u] = zeros0.data();
+        pilot_buff1[0u] = zeros1.data();
+        pilot_buff1[1u] = c->pilot_ci16().data();
+        frm_rx_buff[1u] = frm_buff1.data();
     }
 
     long long rxTime(0);
@@ -527,7 +527,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
         for (int i = 0; i < frm_num_samps; i++)
             sync_buff[i] = (std::complex<float>(
                 frm_buff0[i].real() / 32768.0, frm_buff0[i].imag() / 32768.0));
-        sync_index = CommsLib::find_beacon_avx(sync_buff, c->gold_cf32);
+        sync_index = CommsLib::find_beacon_avx(sync_buff, c->gold_cf32());
         if (sync_index < 0)
             continue;
         sout << "Client " << radio_id << ": Beacon detected at Time " << rxTime
@@ -583,7 +583,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
                 sync_buff.push_back(
                     std::complex<float>(frm_buff0[i].real() / 32768.0,
                         frm_buff0[i].imag() / 32768.0));
-            sync_index = CommsLib::find_beacon_avx(sync_buff, c->gold_cf32);
+            sync_index = CommsLib::find_beacon_avx(sync_buff, c->gold_cf32());
             if (sync_index >= 0) {
                 rx_offset
                     = sync_index - c->beacon_len - c->ofdm_tx_zero_prefix_;

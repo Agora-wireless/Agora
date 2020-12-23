@@ -30,8 +30,8 @@ Phy_UE::Phy_UE(Config* config)
         for (size_t j = config->ofdm_tx_zero_prefix_;
              j < config_->sampsPerSymbol - config->ofdm_tx_zero_postfix_; j++) {
             ue_pilot_vec[i].push_back(std::complex<float>(
-                config_->ue_specific_pilot_t[i][j].real() / 32768.0,
-                config_->ue_specific_pilot_t[i][j].imag() / 32768.0));
+                config_->ue_specific_pilot_t()[i][j].real() / 32768.0f,
+                config_->ue_specific_pilot_t()[i][j].imag() / 32768.0f));
         }
     }
 
@@ -702,7 +702,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
             if (dl_symbol_id == 0) {
                 csi_buffer_ptr[j] = 0;
             }
-            complex_float p = config_->ue_specific_pilot[ant_id][j];
+            complex_float p = config_->ue_specific_pilot()[ant_id][j];
             size_t sc_id = non_null_sc_ind_[j];
             csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / cx_float(p.re, p.im));
             if (dl_symbol_id == dl_pilot_symbol_perframe - 1)
@@ -729,7 +729,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
                 size_t sc_id = non_null_sc_ind_[j];
                 cx_float y = fft_buffer_ptr[sc_id];
                 auto pilot_eq = y / csi;
-                auto p = config_->ue_specific_pilot[ant_id][j];
+                auto p = config_->ue_specific_pilot()[ant_id][j];
                 theta += arg(pilot_eq * cx_float(p.re, -p.im));
             }
         }
@@ -1068,7 +1068,7 @@ void Phy_UE::doIFFT(int tid, size_t tag)
                 ifft_buff, 0, sizeof(complex_float) * config_->ofdm_data_start());
             if (ul_symbol_id < config_->frame().client_ul_pilot_symbols()) {
                 std::memcpy(ifft_buff + config_->ofdm_data_start(),
-                    config_->ue_specific_pilot[ant_id],
+                    config_->ue_specific_pilot()[ant_id],
                     config_->ofdm_data_num() * sizeof(complex_float));
             } else {
                 size_t total_ul_data_symbol_id
