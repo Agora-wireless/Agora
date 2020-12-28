@@ -17,10 +17,11 @@ Config::Config(std::string jsonfile)
     const auto tddConf = json::parse(conf);
 
     /* antenna configurations */
-    if (!kUseUHD) {
+    if (kUseUHD == false) {
         std::string hub_file = tddConf.value("hubs", "");
-        if (hub_file.size() > 0)
+        if (hub_file.size() > 0) {
             Utils::loadDevices(hub_file, hub_ids_);
+        }
     }
     std::string serial_file = tddConf.value("irises", "");
     ref_ant_ = tddConf.value("ref_ant_", 0);
@@ -41,19 +42,22 @@ Config::Config(std::string jsonfile)
             ue_ant_num_ = num_antennas_;
             ue_num_ = num_radios_;
         } else {
-            if (ref_ant_ >= num_antennas_)
+            if (ref_ant_ >= num_antennas_) {
                 ref_ant_ = 0;
-            if (bs_ant_num_ != num_antennas_)
+            }
+            if (bs_ant_num_ != num_antennas_) {
                 bs_ant_num_ = num_antennas_;
+            }
         }
     } else {
         num_radios_ = tddConf.value("radio_num", is_UE_ ? ue_ant_num_ : bs_ant_num_);
     }
     bf_ant_num_ = bs_ant_num_;
-    if (external_ref_node_)
+    if (external_ref_node_ == true) {
         bf_ant_num_ = bs_ant_num_ - num_channels_;
+    }
 
-    if (kUseArgos || kUseUHD) {
+    if ((kUseArgos == true) || (kUseUHD == true)) {
         rt_assert(num_radios_ != 0, "Error: No radios exist in Argos mode");
     }
 
@@ -368,7 +372,7 @@ Config::Config(std::string jsonfile)
 
 void Config::GenData( void )
 {
-    if (kUseArgos || kUseUHD) {
+    if ((kUseArgos == true) || (kUseUHD == true)) {
         std::vector<std::vector<double>> gold_ifft
             = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
         std::vector<std::complex<int16_t>> gold_ifft_ci16
@@ -400,7 +404,7 @@ void Config::GenData( void )
         this->beacon_len_ = this->beacon_ci16_.size();
 
         if (this->samps_per_symbol_
-            < this->beacon_len_ + this->ofdm_tx_zero_prefix_ + this->ofdm_tx_zero_postfix_) {
+            < (this->beacon_len_ + this->ofdm_tx_zero_prefix_ + this->ofdm_tx_zero_postfix_)) {
             std::string msg = "Minimum supported symbol_size is ";
             msg += std::to_string(this->beacon_len_);
             throw std::invalid_argument(msg);
@@ -410,10 +414,10 @@ void Config::GenData( void )
         this->coeffs_ = Utils::cint16_to_uint32(gold_ifft_ci16, true, "QI");
 
         // Add addition padding for beacon sent from host
-        int fracBeacon = this->samps_per_symbol_ % beacon_len_;
+        int fracBeacon = this->samps_per_symbol_ % this->beacon_len_;
         std::vector<std::complex<int16_t>> preBeacon(this->ofdm_tx_zero_prefix_, 0);
         std::vector<std::complex<int16_t>> postBeacon(
-            ofdm_tx_zero_postfix_ + fracBeacon, 0);
+            this->ofdm_tx_zero_postfix_ + fracBeacon, 0);
         this->beacon_ci16_.insert(
             this->beacon_ci16_.begin(), preBeacon.begin(), preBeacon.end());
         this->beacon_ci16_.insert(
@@ -428,9 +432,9 @@ void Config::GenData( void )
         = CommsLib::seqCyclicShift(zc_seq, M_PI / 4); // Used in LTE SRS
 
     this->pilots_ = static_cast<complex_float*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, ofdm_data_num_ * sizeof(complex_float)));
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, this->ofdm_data_num_ * sizeof(complex_float)));
     this->pilots_sgn_ = static_cast<complex_float*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, ofdm_data_num_ * sizeof(complex_float))); // used in CSI estimation
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align, this->ofdm_data_num_ * sizeof(complex_float))); // used in CSI estimation
     for (size_t i = 0; i < ofdm_data_num_; i++) {
         this->pilots_[i] = { this->common_pilot_[i].real(), this->common_pilot_[i].imag() };
         auto pilot_sgn
@@ -439,22 +443,22 @@ void Config::GenData( void )
     }
     complex_float* pilot_ifft;
     alloc_buffer_1d(
-        &pilot_ifft, ofdm_ca_num_, Agora_memory::Alignment_t::k64Align, 1);
+        &pilot_ifft, this->ofdm_ca_num_, Agora_memory::Alignment_t::k64Align, 1);
     for (size_t j = 0; j < ofdm_data_num_; j++)
-        pilot_ifft[j + ofdm_data_start_] = this->pilots_[j];
-    CommsLib::IFFT(pilot_ifft, ofdm_ca_num_, false);
+        pilot_ifft[j + this->ofdm_data_start_] = this->pilots_[j];
+    CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
 
     // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
     this->ue_specific_pilot_.malloc(
-        ue_ant_num_, ofdm_data_num_, Agora_memory::Alignment_t::k64Align);
+        this->ue_ant_num_, this->ofdm_data_num_, Agora_memory::Alignment_t::k64Align);
     this->ue_specific_pilot_t_.calloc(
-        ue_ant_num_, samps_per_symbol_, Agora_memory::Alignment_t::k64Align);
+        this->ue_ant_num_, this->samps_per_symbol_, Agora_memory::Alignment_t::k64Align);
     
     Table<complex_float> ue_pilot_ifft;
     ue_pilot_ifft.calloc(
-        ue_ant_num_, ofdm_ca_num_, Agora_memory::Alignment_t::k64Align);
+        this->ue_ant_num_, this->ofdm_ca_num_, Agora_memory::Alignment_t::k64Align);
     auto zc_ue_pilot_double
-        = CommsLib::getSequence(ofdm_data_num_, CommsLib::LTE_ZADOFF_CHU);
+        = CommsLib::getSequence(this->ofdm_data_num_, CommsLib::LTE_ZADOFF_CHU);
     auto zc_ue_pilot = Utils::double_to_cfloat(zc_ue_pilot_double);
     for (size_t i = 0; i < ue_ant_num_; i++) {
         auto zc_ue_pilot_i = CommsLib::seqCyclicShift(
@@ -510,29 +514,33 @@ void Config::GenData( void )
         std::exit(-1);
     }
     for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-        if (std::fseek(fd, num_bytes_per_ue * this->ue_ant_offset_, SEEK_SET) != 0)
+        if (std::fseek(fd, num_bytes_per_ue * this->ue_ant_offset_, SEEK_SET) != 0) {
             return;
+        }
         for (size_t j = 0; j < this->ue_ant_num_; j++) {
             size_t r = std::fread(this->ul_bits_[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
-            if (r < num_bytes_per_ue)
+            if (r < num_bytes_per_ue) {
                 std::printf("bad read from file %s (batch %zu) \n",
                     filename1.c_str(), i);
+            }
         }
         if (std::fseek(fd,
                 num_bytes_per_ue
                     * (this->total_ue_ant_num_ - this->ue_ant_offset_ - this->ue_ant_num_),
                 SEEK_SET)
-            != 0)
+            != 0) {
             return;
+        }
     }
     for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
         for (size_t j = 0; j < this->ue_ant_num_; j++) {
             size_t r = std::fread(this->dl_bits_[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
-            if (r < num_bytes_per_ue)
+            if (r < num_bytes_per_ue) {
                 std::printf("bad read from file %s (batch %zu) \n",
                     filename1.c_str(), i);
+            }
         }
     }
     std::fclose(fd);
@@ -723,8 +731,9 @@ void Config::GenData( void )
 
     if (kDebugPrintPilot == true) {
         std::cout << "Pilot data: " << std::endl;
-        for (size_t i = 0; i < this->ofdm_data_num_; i++)
+        for (size_t i = 0; i < this->ofdm_data_num_; i++) {
             std::cout << this->pilots_[i].re << "+1i*" << this->pilots_[i].im << ",";
+        }
         std::cout << std::endl;
     }
 
@@ -806,8 +815,7 @@ bool Config::IsPilot(size_t frame_id, size_t symbol_id) const {
     std::printf("IsPilot(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
     if (this->is_UE_ == true) {
-        if ((s == 'D') && (this->frame_.client_dl_pilot_symbols() > 0) )
-        {
+        if ((s == 'D') && (this->frame_.client_dl_pilot_symbols() > 0) ) {
             size_t dl_index = this->frame_.GetDLSymbolIdx(symbol_id);
             is_pilot = (this->frame_.client_dl_pilot_symbols() > dl_index);
         }

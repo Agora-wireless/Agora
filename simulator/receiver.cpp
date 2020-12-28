@@ -127,7 +127,7 @@ void* Receiver::loopRecv(int tid)
         Event_data packet_message(
             EventType::kPacketRX, rx_tag_t(tid, offset)._tag);
 
-        if (!message_queue_->enqueue(*local_ptok, packet_message)) {
+        if (message_queue_->enqueue(*local_ptok, packet_message) == false) {
             std::printf("socket message enqueue failed\n");
             std::exit(0);
         }

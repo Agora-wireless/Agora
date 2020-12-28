@@ -74,8 +74,9 @@ void Simulator::start()
         ret = message_queue_.try_dequeue_bulk(
             ctok, events_list, kDequeueBulkSizeSingle);
 
-        if (ret == 0)
+        if (ret == 0) {
             continue;
+        }
 
         /* handle each event */
         for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
@@ -114,7 +115,7 @@ void Simulator::start()
     std::string filename = cur_directory + "/data/timeresult_simulator.txt";
     FILE* fp = std::fopen(filename.c_str(), "w");
     if (fp == NULL) {
-        std::printf("open file faild\n");
+        std::printf("open file failed\n");
         std::cerr << "Error: " << strerror(errno) << std::endl;
         std::exit(0);
     }
