@@ -70,6 +70,8 @@ public:
     void run_ifft(short* src, complex_float* ifft_inout,
         DFTI_DESCRIPTOR_HANDLE mkl_handle) const;
 
+    void save_tx_data_to_file(int frame_id);
+
 private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
@@ -99,6 +101,9 @@ private:
     size_t cur_frame_ = 0;
     std::array<size_t, kFrameWnd> frame_status_;
     std::mutex frame_mutex_;
+
+    // Array to store data after IFFT
+    Table<char> dl_ue_data_buffer_;
     
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pool;

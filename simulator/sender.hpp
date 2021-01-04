@@ -35,6 +35,8 @@
 #include <netinet/ether.h>
 #endif
 
+static constexpr size_t kMaxWorkerNum = 8;
+
 class Sender {
 
 public:
@@ -67,6 +69,8 @@ public:
     // in_frame_start and in_frame_end must have space for at least
     // kNumStatsFrames entries
     void startTXfromMain(double* in_frame_start, double* in_frame_end);
+
+    void join_thread();
 
 private:
     void* master_thread(int tid);
@@ -134,6 +138,9 @@ private:
 
     double* frame_start;
     double* frame_end;
+
+    std::thread master_thread_;
+    std::thread worker_threads_[kMaxWorkerNum];
 
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pool;
