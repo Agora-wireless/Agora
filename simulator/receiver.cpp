@@ -16,12 +16,12 @@ Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset, void* 
     ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
-    bs_server_addr_list.reserve(cfg->bs_server_addr_list.size());
+    bs_server_addr_list.resize(cfg->bs_server_addr_list.size());
     for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
         ret = inet_pton(AF_INET, cfg->bs_server_addr_list[i].c_str(), &bs_server_addr_list[i]);
     }
 
-    server_mac_addr_list.reserve(cfg->bs_server_addr_list.size());
+    server_mac_addr_list.resize(cfg->bs_server_addr_list.size());
     for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
         ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[i].c_str());
         rt_assert(parsed_mac != NULL, "Invalid server mac address");
@@ -50,6 +50,8 @@ Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset, void* 
 #endif
     socket_buffer_.calloc(cfg->BS_ANT_NUM, cfg->packet_length * kFrameWnd * cfg->symbol_num_perframe, 64);
     socket_buffer_status_.calloc(cfg->BS_ANT_NUM, kFrameWnd * cfg->symbol_num_perframe, 64);
+
+    dl_ue_data_buffer_.calloc(cfg->BS_ANT_NUM, cfg->OFDM_CA_NUM * sizeof(short) * 2 * kFrameWnd * cfg->symbol_num_perframe, 64);
 }
 
 Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
@@ -181,7 +183,8 @@ void* Receiver::loopRecv(int tid)
                 continue;
             }
 
-            auto* pkt = reinterpret_cast<Packet*>(eth_hdr) + kPayloadOffset;
+            auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<char*>(eth_hdr) + kPayloadOffset);
+            printf("Received one packet: %u\n", pkt->pkt_type);
             if (pkt->pkt_type == Packet::PktType::kIQFromServer) {
                 if (pkt->frame_id >= cur_frame_ + kFrameWnd) {
                     printf("Error! Socket buffer overflow!\n");
@@ -194,13 +197,16 @@ void* Receiver::loopRecv(int tid)
                 size_t symbol_offset = frame_slot * cfg->symbol_num_perframe + symbol_id;
                 size_t table_offset = symbol_offset * cfg->packet_length 
                     + sizeof(float) * (cfg->OFDM_DATA_START + server_id * cfg->get_num_sc_per_server());
+                printf("Received valid packets ant:%u offset:%u server:%u!\n", pkt->ant_id, table_offset, server_id);
                 DpdkTransport::fastMemcpy(&socket_buffer_[ant_id][table_offset], pkt->data, sizeof(float) * cfg->get_num_sc_per_server());
                 socket_buffer_status_[ant_id][symbol_offset] ++;
                 if (socket_buffer_status_[ant_id][symbol_offset] == cfg->bs_server_addr_list.size()) {
-                    run_ifft(reinterpret_cast<short*>(&socket_buffer_[ant_id][symbol_offset * cfg->packet_length]), 
-                        ifft_inout, mkl_handle);
+                    char* src = &socket_buffer_[ant_id][symbol_offset * cfg->packet_length];
+                    run_ifft(reinterpret_cast<short*>(src), ifft_inout, mkl_handle);
                     socket_buffer_status_[ant_id][symbol_offset] = 0;
                     // TODO: OUTPUT TO PROCESS
+                    size_t buffer_offset = symbol_offset * (sizeof(short) * 2 * cfg->OFDM_CA_NUM);
+                    DpdkTransport::fastMemcpy(&dl_ue_data_buffer_[ant_id][buffer_offset], src, sizeof(short) * 2 * cfg->OFDM_CA_NUM);
                 }
                 frame_mutex_.lock();
                 frame_status_[frame_slot] ++;
@@ -210,11 +216,14 @@ void* Receiver::loopRecv(int tid)
                 }
                 frame_mutex_.unlock();
             } else {
-                printf("Received unknown packet type in demod TX/RX thread\n");
+                printf("Received unknown packet type in receiver thread\n");
                 exit(1);
             }
-
             rte_pktmbuf_free(rx_bufs[i]);
+        }
+
+        if (cur_frame_ == cfg->frames_to_test) {
+            break;
         }
 #else
         int recvlen = -1;
@@ -253,15 +262,28 @@ void* Receiver::loopRecv(int tid)
                 % buffer_length;
 #endif
 
-        /* Push packet received event into the queue */
-        Event_data packet_message(
-            EventType::kPacketRX, rx_tag_t(tid, offset)._tag);
+        printf("Receiver received all packets!\n");
+        save_tx_data_to_file(0);
+    }
+}
 
-        if (!message_queue_->enqueue(*local_ptok, packet_message)) {
-            printf("socket message enqueue failed\n");
-            exit(0);
+void Receiver::save_tx_data_to_file(int frame_id)
+{
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string filename = cur_directory + "/data/tx_data.bin";
+    printf("Saving TX data to %s\n", filename.c_str());
+    FILE* fp = fopen(filename.c_str(), "wb");
+
+    for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
+        size_t total_data_symbol_id
+            = cfg->get_total_data_symbol_idx_dl(frame_id, i);
+
+        for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
+            short* socket_ptr = reinterpret_cast<short*>(&dl_ue_data_buffer_[ant_id][total_data_symbol_id * sizeof(short) * 2 * cfg->OFDM_CA_NUM]);
+            fwrite(socket_ptr, cfg->sampsPerSymbol * 2, sizeof(short), fp);
         }
     }
+    fclose(fp);
 }
 
 void Receiver::run_ifft(short* src, complex_float* ifft_inout,

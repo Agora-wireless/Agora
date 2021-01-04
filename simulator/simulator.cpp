@@ -57,6 +57,7 @@ void Simulator::stop()
 {
     std::cout << "stopping threads " << std::endl;
     config_->running = false;
+    sender_->join_thread();
     usleep(1000);
     receiver_.reset();
     sender_.reset();

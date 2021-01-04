@@ -59,9 +59,12 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
         task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
 
     // Create a master thread when started from simulator
-    if (create_thread_for_master)
-        create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
-            num_worker_threads_, num_worker_threads_ + 1);
+    // if (create_thread_for_master)
+    //     create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
+    //         num_worker_threads_, num_worker_threads_ + 1);
+    if (create_thread_for_master) {
+        master_thread_ = std::thread(&Sender::master_thread, this, num_worker_threads_);
+    }
 
 #ifdef USE_DPDK
     uint16_t portid = 0; // For now, hard-code to port zero
@@ -123,8 +126,18 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     frame_start = in_frame_start;
     frame_end = in_frame_end;
 
-    create_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0,
-        num_worker_threads_);
+    // create_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0,
+    //     num_worker_threads_);
+    for (size_t i = 0; i < num_worker_threads_; i ++) {
+        worker_threads_[i] = std::thread(&Sender::worker_thread, this, i);
+    }
+}
+
+void Sender::join_thread() {
+    master_thread_.join();
+    for (size_t i = 0; i < num_worker_threads_; i ++) {
+        worker_threads_[i].join();
+    }
 }
 
 void* Sender::master_thread(int)
@@ -224,7 +237,8 @@ void* Sender::master_thread(int)
         }
     }
     write_stats_to_file(cfg->frames_to_test);
-    exit(0);
+    printf("Master thread ends!\n");
+    // exit(0);
 }
 
 void* Sender::worker_thread(int tid)
