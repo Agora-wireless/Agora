@@ -81,6 +81,12 @@ public:
     // TODO: Add documentation
     void send_beacon(int tid, size_t frame_id);
 
+    // Not used
+    size_t get_dl_frame_to_send() { return dl_frame_to_send_; }
+
+    // Current sending frame for each socket thread
+    size_t frame_to_send_[kMaxThreads] = {0};
+
 private:
     // The simulation-mode thread function running on thread #tid
     void* loop_tx_rx(int tid);
@@ -89,7 +95,7 @@ private:
     void* demod_thread(int tid);
     void* encode_thread(int tid);
 
-    int dequeue_send(int tid);
+    int dequeue_send(int tid, size_t symbol_to_send, size_t ant_to_send);
     int recv_enqueue(int tid, int radio_id, size_t rx_offset);
 
     // Receive packets and relocate data to the correct address based on
@@ -150,6 +156,7 @@ private:
     size_t encode_symbol_dl_to_send_ = 0;
     size_t encode_ue_to_send_;
 
+    // Not used
     size_t dl_frame_to_send_ = 0;
     size_t dl_symbol_to_send_ = 0;
 };

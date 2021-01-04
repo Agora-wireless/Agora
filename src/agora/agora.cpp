@@ -125,10 +125,21 @@ void Agora::start()
     }
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
-        if (rx_status_.cur_frame_ == cfg->frames_to_test) {
+        if (cfg->downlink_mode) {
+            for (size_t i = 0; i < cfg->socket_thread_num; i ++) {
+                if (packet_tx_rx_->frame_to_send_[i] < cfg->frames_to_test) {
+                    goto keep_sleep;
+                }
+            }
             cfg->running = false;
             goto finish;
+        } else {
+            if (rx_status_.cur_frame_ == cfg->frames_to_test) {
+                cfg->running = false;
+                goto finish;
+            }
         }
+    keep_sleep:
         sleep(1);
     }
     return;

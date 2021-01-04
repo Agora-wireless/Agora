@@ -433,9 +433,22 @@ void* PacketTXRX::loop_tx_rx(int tid)
     int radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
     int radio_id = radio_lo;
 
+    frame_to_send_[tid] = 0;
+    size_t symbol_to_send = 0;
+    size_t ant_to_send = tid * (cfg->nRadios / socket_thread_num);
+
     while (cfg->running) {
         // Receive data
-        if (dequeue_send(tid) == 1) {
+        if (dequeue_send(tid, symbol_to_send, ant_to_send) == 1) {
+            ant_to_send ++;
+            if (ant_to_send == (tid + 1) * cfg->nRadios / socket_thread_num) {
+                ant_to_send = 0;
+                symbol_to_send ++;
+                if (symbol_to_send == cfg->dl_data_symbol_num_perframe) {
+                    symbol_to_send = 0;
+                    frame_to_send_[tid] ++;
+                }
+            }
             continue;
         }
         int res = recv_relocate(tid);
@@ -629,9 +642,9 @@ int PacketTXRX::recv(int tid)
 }
 
 // TODO: check correctness of this funcion
-int PacketTXRX::dequeue_send(int tid)
+int PacketTXRX::dequeue_send(int tid, size_t symbol_to_send, size_t ant_to_send)
 {
-    if (rx_status_->cur_frame_ > dl_frame_to_send_) {
+    if (rx_status_->cur_frame_ > frame_to_send_[tid]) {
 
         struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
         tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool_);
@@ -660,14 +673,17 @@ int PacketTXRX::dequeue_send(int tid)
         char* payload = (char*)eth_hdr + kPayloadOffset;
         auto* pkt = reinterpret_cast<Packet*>(payload);
         pkt->pkt_type = Packet::PktType::kIQFromServer;
-        pkt->frame_id = dl_frame_to_send_;
-        pkt->symbol_id = dl_symbol_to_send_;
-        pkt->ant_id = tid;
+        pkt->frame_id = frame_to_send_[tid];
+        pkt->symbol_id = symbol_to_send;
+        pkt->ant_id = ant_to_send;
+        pkt->server_id = cfg->bs_server_addr_idx;
         size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(pkt->frame_id, pkt->symbol_id);
-        size_t offset = data_symbol_idx_dl * cfg->BS_ANT_NUM + tid;
+        size_t offset = data_symbol_idx_dl * cfg->BS_ANT_NUM + ant_to_send;
 
         simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data), reinterpret_cast<float*>((*dl_ifft_buffer_)[offset]), cfg->OFDM_CA_NUM);
        
+        printf("Send a packet out server:%u\n", pkt->server_id);
+
         // Send data (one OFDM symbol)
         size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
         if (unlikely(nb_tx_new != 1)) {
@@ -675,11 +691,13 @@ int PacketTXRX::dequeue_send(int tid)
             exit(0);
         }
 
-        dl_symbol_to_send_ ++;
-        if (dl_symbol_to_send_ == cfg->dl_data_symbol_num_perframe) {
-            dl_symbol_to_send_ = 0;
-            dl_frame_to_send_ ++;
-        }
+        
+
+        // dl_symbol_to_send_ ++;
+        // if (dl_symbol_to_send_ == cfg->dl_data_symbol_num_perframe) {
+        //     dl_symbol_to_send_ = 0;
+        //     dl_frame_to_send_ ++;
+        // }
 
         return 1;
     }
