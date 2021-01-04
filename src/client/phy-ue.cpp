@@ -147,8 +147,9 @@ Phy_UE::~Phy_UE()
     fft_buffer_.free();
     ifft_buffer_.free();
     std::free(rx_samps_tmp);
-    if (kEnableMac)
+    if (kEnableMac == true) {
         mac_std_thread_.join();
+    }
     delete mac_thread_;
 }
 

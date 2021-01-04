@@ -130,8 +130,10 @@ private:
     size_t* packet_count_per_symbol[kFrameWnd];
     size_t packet_count_per_frame[kFrameWnd];
 
-    double* frame_start;
-    double* frame_end;
+    double* frame_start_;
+    double* frame_end_;
+
+    std::vector<pthread_t> threads_;
 
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pool;

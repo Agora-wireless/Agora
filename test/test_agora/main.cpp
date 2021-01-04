@@ -1,7 +1,7 @@
 #include "agora.hpp"
 
 void read_from_file_ul(std::string filename, Table<uint8_t>& data,
-    int num_bytes_per_ue, Config* cfg)
+    int num_bytes_per_ue, Config const * const cfg)
 {
     int data_symbol_num_perframe = cfg->frame().NumULSyms();
     size_t ue_num = cfg->ue_num();
@@ -33,7 +33,7 @@ void read_from_file_ul(std::string filename, Table<uint8_t>& data,
 }
 
 void read_from_file_dl(
-    std::string filename, Table<short>& data, int ofdm_size, Config* cfg)
+    std::string filename, Table<short>& data, int ofdm_size, Config const * const cfg)
 {
     int data_symbol_num_perframe = cfg->frame().NumDLSyms();
     size_t bs_ant_num = cfg->bs_ant_num();
@@ -51,7 +51,7 @@ void read_from_file_dl(
     }
 }
 
-void check_correctness_ul(Config* cfg)
+void check_correctness_ul(Config const * const cfg)
 {
     int ue_num = cfg->ue_num();
     int data_symbol_num_perframe = cfg->frame().NumULSyms();
@@ -106,7 +106,7 @@ void check_correctness_ul(Config* cfg)
     output_data.free();
 }
 
-void check_correctness_dl(Config* cfg)
+void check_correctness_dl(Config const * const cfg)
 {
     int bs_ant_num = cfg->bs_ant_num();
     int data_symbol_num_perframe = cfg->frame().NumDLSyms();
@@ -172,14 +172,14 @@ int main(int argc, char* argv[])
     if (argc == 2)
         confFile = std::string(argv[1]);
 
-    auto* cfg = new Config(confFile.c_str());
+    std::unique_ptr<Config> cfg( new Config(confFile.c_str()) );
     cfg->GenData();
 
     int ret;
     try {
         SignalHandler signalHandler;
         signalHandler.setupSignalHandlers();
-        auto* agora_cli = new Agora(cfg);
+        std::unique_ptr<Agora> agora_cli( new Agora(cfg.get()) );
         agora_cli->flags.enable_save_decode_data_to_file = true;
         agora_cli->flags.enable_save_tx_data_to_file = true;
         agora_cli->start();
@@ -187,11 +187,11 @@ int main(int argc, char* argv[])
         std::printf("Start correctness check\n");
         /* TODO make sure this works in the combined case...  */
         if (cfg->frame().NumDLSyms() > 0) {
-            check_correctness_dl(cfg);
+            check_correctness_dl(cfg.get());
         }
         
         if (cfg->frame().NumULSyms() > 0) {
-            check_correctness_ul(cfg);
+            check_correctness_ul(cfg.get());
         }
         ret = EXIT_SUCCESS;
     } catch (SignalException& e) {

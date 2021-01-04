@@ -339,7 +339,7 @@ static double bench_demod(unsigned N, unsigned iterations)
     }
     // double end_time = fft_get_time();
     // duration = end_time - start_time;
-
+    DftiFreeDescriptor(&my_desc1_handle);
     return duration;
 }
 

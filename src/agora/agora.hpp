@@ -83,6 +83,7 @@ public:
     void initialize_queues();
     void initialize_uplink_buffers();
     void initialize_downlink_buffers();
+    void free_queues();
     void free_uplink_buffers();
     void free_downlink_buffers();
 
@@ -138,9 +139,8 @@ private:
     std::thread mac_std_thread_; // Handle for the MAC thread
     std::thread worker_std_threads_[kMaxWorkerNum]; // Handle for worker threads
 
-    Stats* stats;
-    PhyStats* phy_stats;
-    pthread_t* task_threads;
+    Stats* stats_;
+    PhyStats* phy_stats_;
 
     /*****************************************************
      * Buffers

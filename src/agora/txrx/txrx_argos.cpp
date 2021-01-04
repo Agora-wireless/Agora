@@ -96,8 +96,9 @@ int PacketTXRX::dequeue_send_argos(int tid)
 {
     auto& c = cfg;
     Event_data event;
-    if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
+    if (task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event) == false) {
         return -1;
+    }
 
     // std::printf("tx queue length: %d\n", task_queue_->size_approx());
     assert(event.event_type == EventType::kPacketTX);
@@ -131,14 +132,17 @@ int PacketTXRX::dequeue_send_argos(int tid)
         }
     }
 
-    if (kDebugDownlink) {
+    if (kDebugDownlink == true) {
         std::vector<std::complex<int16_t>> zeros(c->samps_per_symbol());
-        if (ant_id != c->ref_ant())
+        if (ant_id != c->ref_ant()) {
             txbuf[ch] = zeros.data();
-        else if (dl_symbol_idx < c->frame().client_dl_pilot_symbols())
+        }
+        else if (dl_symbol_idx < c->frame().client_dl_pilot_symbols()) {
             txbuf[ch] = reinterpret_cast<void*>(c->ue_specific_pilot_t()[0]);
-        else
+        }
+        else {
             txbuf[ch] = reinterpret_cast<void*>(c->dl_iq_t()[dl_symbol_idx]);
+        }
     } else {
         char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length();
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
@@ -152,7 +156,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
     long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
     radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
 
-    if (kDebugPrintInTask) {
+    if (kDebugPrintInTask == true) {
         std::printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
                "ant %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, offset,

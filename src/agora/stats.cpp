@@ -15,7 +15,7 @@ Stats::Stats(Config* cfg)
         Agora_memory::Alignment_t::k64Align);
 }
 
-Stats::~Stats() {}
+Stats::~Stats() { frame_start.free(); }
 
 void Stats::populate_summary(
     FrameSummary* frame_summary, size_t thread_id, DoerType doer_type)

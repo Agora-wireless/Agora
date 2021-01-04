@@ -170,7 +170,7 @@ Config::Config(std::string jsonfile)
         dl_data_symbol_start         = tddConf.value("dl_data_symbol_start",   dl_data_symbol_start); /* Start position of the first DL symbol */
 
         /* TODO remove -- backward compatibility workaround */
-        if (dl_data_symbol_start > 0)
+        if ((dl_data_symbol_start > 0) && (downlink_mode == true))
         {
             dl_data_symbol_start += pilot_symbol_num_perframe + 1;
         }
@@ -444,8 +444,9 @@ void Config::GenData( void )
     complex_float* pilot_ifft;
     alloc_buffer_1d(
         &pilot_ifft, this->ofdm_ca_num_, Agora_memory::Alignment_t::k64Align, 1);
-    for (size_t j = 0; j < ofdm_data_num_; j++)
+    for (size_t j = 0; j < ofdm_data_num_; j++) {
         pilot_ifft[j + this->ofdm_data_start_] = this->pilots_[j];
+    }
     CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
 
     // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
@@ -556,7 +557,7 @@ void Config::GenData( void )
     ul_encoded_bits.malloc(this->frame_.NumULSyms() * num_blocks_per_symbol,
         encoded_bytes_per_block, Agora_memory::Alignment_t::k64Align);
 
-    int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
+    int8_t *temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
         this->ldpc_config_.base_graph(), this->ldpc_config_.expansion_factor())];
     for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
         for (size_t j = 0; j < this->ldpc_config_.num_blocks_in_symbol() * this->ue_ant_num_; j++) {
@@ -737,7 +738,7 @@ void Config::GenData( void )
         std::cout << std::endl;
     }
 
-    delete[] temp_parity_buffer;
+    delete [] (temp_parity_buffer);
     dl_encoded_bits.free();
     ul_iq_ifft.free();
     dl_iq_ifft.free();
@@ -745,9 +746,7 @@ void Config::GenData( void )
     ul_mod_input.free();
     ul_encoded_bits.free();
     dl_mod_input.free(); 
-    //this->ue_specific_pilot_t_.free(); TODO: leaking but causes an assertion in UE mode
     free_buffer_1d(&pilot_ifft);
-    //this->ue_specific_pilot_.free();  TODO: leaking but causes an assertion when free'd here
 }
 
 Config::~Config()
@@ -767,6 +766,9 @@ Config::~Config()
     dl_iq_t_.free();
     ul_iq_f_.free();
     ul_iq_t_.free();
+
+    ue_specific_pilot_t_.free(); 
+    ue_specific_pilot_.free();
 }
 
 /* Returns SIZE_MAX if symbol not a DL symbol, otherwise the index into frame_.dl_symbols_ */

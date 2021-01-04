@@ -302,8 +302,9 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
         = in_stats_manager->get_duration_stat(DoerType::kIFFT, in_tid);
     DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->ofdm_ca_num());
-    if (kUseOutOfPlaceIFFT)
+    if (kUseOutOfPlaceIFFT) {
         DftiSetValue(mkl_handle, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
+    }
     DftiCommitDescriptor(mkl_handle);
 
     // Aligned for SIMD
@@ -312,7 +313,7 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
             2 * cfg->ofdm_ca_num() * sizeof(float)));
 }
 
-DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); }
+DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); std::free(ifft_out); }
 
 Event_data DoIFFT::launch(size_t tag)
 {

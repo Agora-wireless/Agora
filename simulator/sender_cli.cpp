@@ -17,11 +17,15 @@ int main(int argc, char* argv[])
     gflags::ParseCommandLineFlags(&argc, &argv, true);
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = FLAGS_conf_file;
-    auto* cfg = new Config(filename.c_str());
-    cfg->GenData();
 
-    auto* sender = new Sender(cfg, FLAGS_num_threads, FLAGS_core_offset,
-        FLAGS_frame_duration, FLAGS_enable_slow_start, FLAGS_server_mac_addr);
-    sender->startTX();
+    {
+        std::unique_ptr<Config> cfg( new Config(filename.c_str()) );
+        cfg->GenData();
+        {
+            std::unique_ptr<Sender> sender ( new Sender(cfg.get(), FLAGS_num_threads, FLAGS_core_offset,
+                FLAGS_frame_duration, FLAGS_enable_slow_start, FLAGS_server_mac_addr) );
+            sender->startTX();
+        } // end context sender
+    } // end context Config
     return 0;
 }
