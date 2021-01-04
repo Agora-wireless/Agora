@@ -116,6 +116,7 @@ Sender::~Sender( void )
     for (pthread_t thread : this->threads_)
     {
         int ret = pthread_join(thread, &val);
+        _unused(ret);
         //std::printf("Sender: Joining threads: %d\n", ret);
     }
 
@@ -252,6 +253,7 @@ void* Sender::master_thread(int tid)
     } // keep_running_ == true
     write_stats_to_file(cfg->frames_to_test());
     //std::printf("Sender main thread %d exit\n", tid);
+    _unused(tid);
     return nullptr;
 }
 
