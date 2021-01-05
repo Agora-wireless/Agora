@@ -46,6 +46,14 @@ DoPrecode::~DoPrecode()
 {
     free_buffer_1d(&modulated_buffer_temp);
     free_buffer_1d(&precoded_buffer_temp);
+
+#if USE_MKL_JIT
+    mkl_jit_status_t status = mkl_jit_destroy(jitter);
+    if (MKL_JIT_ERROR == status) {
+        std::fprintf(stderr,
+            "!!!!Error: Error while destorying MKL JIT\n");
+    }
+#endif
 }
 
 Event_data DoPrecode::launch(size_t tag)

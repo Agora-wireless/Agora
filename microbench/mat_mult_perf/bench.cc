@@ -70,6 +70,7 @@ float mat_mult_perf_jit(std::vector<arma::cx_fmat>& test_matrices,
       test_col_vectors[0].n_rows, test_col_vectors[0].n_cols,
       to_nsec(end_tsc - start_tsc, freq_ghz) / FLAGS_n_iters);
 
+  mkl_jit_destroy(mkl_jitter);
   return ret;
 }
 

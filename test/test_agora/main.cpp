@@ -169,8 +169,9 @@ int main(int argc, char* argv[])
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string confFile
         = cur_directory + "/data/tddconfig-correctness-test-ul.json";
-    if (argc == 2)
+    if (argc == 2) {
         confFile = std::string(argv[1]);
+    }
 
     std::unique_ptr<Config> cfg( new Config(confFile.c_str()) );
     cfg->GenData();
