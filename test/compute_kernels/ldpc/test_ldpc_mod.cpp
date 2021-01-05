@@ -56,12 +56,12 @@ int main(int argc, char* argv[])
 
     const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-    auto* cfg = new Config(FLAGS_conf_file.c_str());
+    std::unique_ptr<Config> cfg ( new Config(FLAGS_conf_file.c_str()) );
 
     const DataGenerator::Profile profile = FLAGS_profile == "123"
         ? DataGenerator::Profile::k123
         : DataGenerator::Profile::kRandom;
-    DataGenerator data_generator(cfg, 0 /* RNG seed */, profile);
+    DataGenerator data_generator(cfg.get(), 0 /* RNG seed */, profile);
 
     std::printf("DataGenerator: Config file: %s, data profile = %s\n",
         FLAGS_conf_file.c_str(),
@@ -229,7 +229,11 @@ int main(int argc, char* argv[])
             noise_levels[noise_id], snr_levels[noise_id], error_num, total,
             1.f * error_num / total, block_error_num, num_codeblocks,
             1.f * block_error_num / num_codeblocks);
-    }
 
+        std::free(resp_var_nodes);
+        modulated_codewords.free();
+        demod_data_all_symbols.free();
+        decoded_codewords.free();
+    }
     return 0;
 }

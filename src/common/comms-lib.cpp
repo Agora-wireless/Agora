@@ -447,6 +447,7 @@ void CommsLib::FFT(complex_float* in, int fftsize)
     /* compute FFT */
     status = DftiComputeForward(mkl_handle, in);
     status = DftiFreeDescriptor(&mkl_handle);
+    (void)(status);
 }
 
 std::vector<std::complex<float>> CommsLib::compose_partial_pilot_sym(

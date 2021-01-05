@@ -10,7 +10,7 @@
 TEST(TestZF, Perf)
 {
     static constexpr size_t kNumIters = 10000;
-    auto* cfg = new Config("data/tddconfig-sim-ul.json");
+    std::unique_ptr<Config> cfg( new Config("data/tddconfig-sim-ul.json") );
     cfg->GenData();
 
     int tid = 0;
@@ -31,10 +31,10 @@ TEST(TestZF, Perf)
     calib_ul_buffer.rand_alloc_cx_float(
         kFrameWnd, cfg->ofdm_data_num() * cfg->bs_ant_num(), Agora_memory::Alignment_t::k64Align);
 
-    auto stats = new Stats(cfg);
+    std::unique_ptr<Stats> stats ( new Stats(cfg.get()) );
 
-    auto computeZF = new DoZF(cfg, tid, csi_buffers, calib_dl_buffer,
-        calib_ul_buffer, ul_zf_matrices, dl_zf_matrices, stats);
+     std::unique_ptr<DoZF> computeZF ( new DoZF(cfg.get(), tid, csi_buffers, calib_dl_buffer,
+        calib_ul_buffer, ul_zf_matrices, dl_zf_matrices, stats.get()) );
 
     FastRand fast_rand;
     size_t start_tsc = rdtsc();
@@ -48,6 +48,9 @@ TEST(TestZF, Perf)
     double ms = cycles_to_ms(rdtsc() - start_tsc, cfg->freq_ghz());
 
     std::printf("Time per zeroforcing iteration = %.4f ms\n", ms / kNumIters);
+
+    calib_dl_buffer.free();
+    calib_ul_buffer.free();
 }
 
 int main(int argc, char** argv)

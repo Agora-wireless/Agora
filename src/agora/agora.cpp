@@ -27,8 +27,8 @@ Agora::Agora(Config* cfg)
     initialize_uplink_buffers();
     initialize_downlink_buffers();
 
-    stats_ = new Stats(cfg);
-    phy_stats_ = new PhyStats(cfg);
+    stats_.reset( new Stats(cfg) );
+    phy_stats_.reset( new PhyStats(cfg) );
 
     /* Initialize TXRX threads */
     packet_tx_rx_.reset(
@@ -70,13 +70,14 @@ Agora::~Agora(void)
         mac_std_thread_.join();
         delete mac_thread_;
     }
-    for (size_t i = 0; i < config_->worker_thread_num(); i++) {
-        std::printf( "Joining worker thread: %zu\n", i);
-        worker_std_threads_[i].join();
+    int i = 0;
+    for ( auto&& worker_thread : workers_ ) {
+        std::printf( "Joining worker thread: %d\n", i++);
+        worker_thread.join();
     }
 
-    delete stats_;
-    delete phy_stats_;
+    stats_.reset();
+    phy_stats_.reset();
     free_queues();
     //std::printf( "Agora: destructed\n" );
 }
@@ -649,24 +650,24 @@ void Agora::worker(int tid)
     /* Initialize operators */
     std::unique_ptr<DoFFT> computeFFT( new DoFFT(config_, tid, socket_buffer_,
         socket_buffer_status_, data_buffer_, csi_buffers_, calib_dl_buffer_,
-        calib_ul_buffer_, this->phy_stats_, this->stats_));
+        calib_ul_buffer_, this->phy_stats_.get(), this->stats_.get()));
 
-    std::unique_ptr<DoIFFT> computeIFFT ( new DoIFFT(config_, tid, dl_ifft_buffer_, dl_socket_buffer_, this->stats_) );
+    std::unique_ptr<DoIFFT> computeIFFT ( new DoIFFT(config_, tid, dl_ifft_buffer_, dl_socket_buffer_, this->stats_.get()) );
 
     std::unique_ptr<DoZF> computeZF ( new DoZF(config_, tid, csi_buffers_, calib_dl_buffer_,
-        calib_ul_buffer_, ul_zf_matrices_, dl_zf_matrices_, this->stats_));
+        calib_ul_buffer_, ul_zf_matrices_, dl_zf_matrices_, this->stats_.get()));
 
     std::unique_ptr<DoDemul> computeDemul( new DoDemul(config_, tid, data_buffer_, ul_zf_matrices_,
-        ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, this->phy_stats_, this->stats_));
+        ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, this->phy_stats_.get(), this->stats_.get()));
 
     std::unique_ptr<DoPrecode> computePrecode ( new DoPrecode(config_, tid, dl_zf_matrices_,
-        dl_ifft_buffer_, dl_encoded_buffer_, this->stats_));
+        dl_ifft_buffer_, dl_encoded_buffer_, this->stats_.get()));
 
     std::unique_ptr<DoEncode> computeEncoding ( new DoEncode(
-        config_, tid, config_->dl_bits(), dl_encoded_buffer_, this->stats_));
+        config_, tid, config_->dl_bits(), dl_encoded_buffer_, this->stats_.get()));
 
     std::unique_ptr<DoDecode> computeDecoding ( new DoDecode(
-        config_, tid, demod_buffers_, decoded_buffer_, this->phy_stats_, this->stats_));
+        config_, tid, demod_buffers_, decoded_buffer_, this->phy_stats_.get(), this->stats_.get()));
 
     std::vector<Doer*> computers_vec;
     std::vector<EventType> events_vec;
@@ -724,18 +725,21 @@ void Agora::worker_fft(int tid)
         ThreadType::kWorkerFFT, base_worker_core_offset, tid);
 
     /* Initialize IFFT operator */
-    auto computeFFT = new DoFFT(config_, tid, socket_buffer_,
+    std::unique_ptr<DoFFT> computeFFT( new DoFFT(config_, tid, socket_buffer_,
         socket_buffer_status_, data_buffer_, csi_buffers_, calib_dl_buffer_,
-        calib_ul_buffer_, this->phy_stats_, this->stats_);
-    auto computeIFFT
-        = new DoIFFT(config_, tid, dl_ifft_buffer_, dl_socket_buffer_, this->stats_);
+        calib_ul_buffer_, this->phy_stats_.get(), this->stats_.get()));
+    std::unique_ptr<DoIFFT> computeIFFT
+        ( new DoIFFT(config_, tid, dl_ifft_buffer_, dl_socket_buffer_, this->stats_.get()) );
 
-    while (true) {
+    while (this->config_->running() == true) {
+        //TODO refactor the if / else 
         if (computeFFT->try_launch(*get_conq(EventType::kFFT, 0),
-                complete_task_queue_[0], worker_ptoks_ptr[tid][0])) {
-        } else if (config_->frame().NumDLSyms() > 0
-            && computeIFFT->try_launch(*get_conq(EventType::kIFFT, 0),
-                   complete_task_queue_[0], worker_ptoks_ptr[tid][0])) {
+                complete_task_queue_[0], worker_ptoks_ptr[tid][0]) == true) {
+            //Do nothing
+        } else if ( (config_->frame().NumDLSyms() > 0)
+            && (computeIFFT->try_launch(*get_conq(EventType::kIFFT, 0),
+                   complete_task_queue_[0], worker_ptoks_ptr[tid][0]) == true) ) {
+            //Do nothing
         }
     }
 }
@@ -746,10 +750,10 @@ void Agora::worker_zf(int tid)
         ThreadType::kWorkerZF, base_worker_core_offset, tid);
 
     /* Initialize ZF operator */
-    auto computeZF = new DoZF(config_, tid, csi_buffers_, calib_dl_buffer_,
-        calib_ul_buffer_, ul_zf_matrices_, dl_zf_matrices_, this->stats_);
+    std::unique_ptr<DoZF> computeZF ( new DoZF(config_, tid, csi_buffers_, calib_dl_buffer_,
+        calib_ul_buffer_, ul_zf_matrices_, dl_zf_matrices_, this->stats_.get()) );
 
-    while (true) {
+    while (this->config_->running() == true) {
         computeZF->try_launch(*get_conq(EventType::kZF, 0),
             complete_task_queue_[0], worker_ptoks_ptr[tid][0]);
     }
@@ -760,14 +764,14 @@ void Agora::worker_demul(int tid)
     pin_to_core_with_offset(
         ThreadType::kWorkerDemul, base_worker_core_offset, tid);
 
-    auto computeDemul = new DoDemul(config_, tid, data_buffer_, ul_zf_matrices_,
-        ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, this->phy_stats_, this->stats_);
+    std::unique_ptr<DoDemul> computeDemul ( new DoDemul(config_, tid, data_buffer_, ul_zf_matrices_,
+        ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, this->phy_stats_.get(), this->stats_.get()) );
 
     /* Initialize Precode operator */
-    auto computePrecode = new DoPrecode(config_, tid, dl_zf_matrices_,
-        dl_ifft_buffer_, dl_encoded_buffer_, this->stats_);
+    std::unique_ptr<DoPrecode> computePrecode ( new DoPrecode(config_, tid, dl_zf_matrices_,
+        dl_ifft_buffer_, dl_encoded_buffer_, this->stats_.get()) );
 
-    while (true) {
+    while (this->config_->running() == true) {
         if (config_->frame().NumDLSyms() > 0) {
             computePrecode->try_launch(*get_conq(EventType::kDemul, 0),
                 complete_task_queue_[0], worker_ptoks_ptr[tid][0]);
@@ -783,13 +787,13 @@ void Agora::worker_decode(int tid)
     pin_to_core_with_offset(
         ThreadType::kWorkerDecode, base_worker_core_offset, tid);
 
-    auto computeEncoding = new DoEncode(
-        config_, tid, config_->dl_bits(), dl_encoded_buffer_, this->stats_);
+    std::unique_ptr<DoEncode> computeEncoding ( new DoEncode(
+        config_, tid, config_->dl_bits(), dl_encoded_buffer_, this->stats_.get()) );
 
-    auto computeDecoding = new DoDecode(
-        config_, tid, demod_buffers_, decoded_buffer_, this->phy_stats_, this->stats_);
+    std::unique_ptr<DoDecode> computeDecoding ( new DoDecode(
+        config_, tid, demod_buffers_, decoded_buffer_, this->phy_stats_.get(), this->stats_.get()));
 
-    while (true) {
+    while (this->config_->running() == true) {
         if (config_->frame().NumDLSyms() > 0) {
             computeEncoding->try_launch(*get_conq(EventType::kEncode, 0),
                 complete_task_queue_[0], worker_ptoks_ptr[tid][0]);
@@ -805,27 +809,26 @@ void Agora::create_threads()
     auto& cfg = config_;
     if (cfg->bigstation_mode() == true) {
         for (size_t i = 0; i < cfg->fft_thread_num(); i++) {
-            worker_std_threads_[i] = std::thread(&Agora::worker_fft, this, i);
+            workers_.push_back( std::thread(&Agora::worker_fft, this, i) );
 		}
         for (size_t i = cfg->fft_thread_num();
              i < cfg->fft_thread_num() + cfg->zf_thread_num(); i++) {
-            worker_std_threads_[i] = std::thread(&Agora::worker_zf, this, i);
+            workers_.push_back( std::thread(&Agora::worker_zf, this, i) );
 		}
         for (size_t i = cfg->fft_thread_num() + cfg->zf_thread_num(); i
              < cfg->fft_thread_num() + cfg->zf_thread_num() + cfg->demul_thread_num();
              i++) {
-            worker_std_threads_[i] = std::thread(&Agora::worker_demul, this, i);
+            workers_.push_back( std::thread(&Agora::worker_demul, this, i) );
 		}
         for (size_t i
              = cfg->fft_thread_num() + cfg->zf_thread_num() + cfg->demul_thread_num();
              i < cfg->worker_thread_num(); i++) {
-            worker_std_threads_[i]
-                = std::thread(&Agora::worker_decode, this, i);
+            workers_.push_back( std::thread(&Agora::worker_decode, this, i) );
 		}
     } else {
         //printf("Agora: creating %zu workers\n", cfg->worker_thread_num());
         for (size_t i = 0; i < cfg->worker_thread_num(); i++) {
-            worker_std_threads_[i] = std::thread(&Agora::worker, this, i);
+            workers_.push_back( std::thread(&Agora::worker, this, i) );
 		}
     }
 }

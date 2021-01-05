@@ -59,22 +59,23 @@ private:
     Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
-    DurationStat* duration_stat;
-    PhyStats* phy_stats;
+    
+    DurationStat* duration_stat_;
+    PhyStats* phy_stats_;
 
     /// Intermediate buffer to gather raw data. Size = subcarriers per cacheline
     /// times number of antennas
-    complex_float* data_gather_buffer;
+    complex_float* data_gather_buffer_;
 
     // Intermediate buffers for equalized data
-    complex_float* equaled_buffer_temp;
-    complex_float* equaled_buffer_temp_transposed;
-    cx_fmat ue_pilot_data;
-    int ue_num_simd256;
+    complex_float* equaled_buffer_temp_;
+    complex_float* equaled_buffer_temp_transposed_;
+    cx_fmat ue_pilot_data_;
+    int ue_num_simd256_;
 
 #if USE_MKL_JIT
-    void* jitter;
-    cgemm_jit_kernel_t mkl_jit_cgemm;
+    void* jitter_;
+    cgemm_jit_kernel_t mkl_jit_cgemm_;
 #endif
 };
 

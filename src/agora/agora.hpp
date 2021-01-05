@@ -137,10 +137,10 @@ private:
 
     MacThread* mac_thread_; // The thread running MAC layer functions
     std::thread mac_std_thread_; // Handle for the MAC thread
-    std::thread worker_std_threads_[kMaxWorkerNum]; // Handle for worker threads
+    std::vector<std::thread> workers_;
 
-    Stats* stats_;
-    PhyStats* phy_stats_;
+    std::unique_ptr<Stats> stats_;
+    std::unique_ptr<PhyStats> phy_stats_;
 
     /*****************************************************
      * Buffers

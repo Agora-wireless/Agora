@@ -42,12 +42,12 @@ int main(int argc, char* argv[])
 
     const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     gflags::ParseCommandLineFlags(&argc, &argv, true);
-    auto* cfg = new Config(FLAGS_conf_file.c_str());
+    std::unique_ptr<Config> cfg ( new Config(FLAGS_conf_file.c_str()) );
 
     const DataGenerator::Profile profile = FLAGS_profile == "123"
         ? DataGenerator::Profile::k123
         : DataGenerator::Profile::kRandom;
-    DataGenerator data_generator(cfg, 0 /* RNG seed */, profile);
+    DataGenerator data_generator(cfg.get(), 0 /* RNG seed */, profile);
 
     std::printf("DataGenerator: Config file: %s, data profile = %s\n",
         FLAGS_conf_file.c_str(),
@@ -300,7 +300,7 @@ int main(int argc, char* argv[])
                 auto* equal_T_ptr
                     = (float*)(equalized_data_all_symbols[i - data_sym_start]
                         + j * cfg->ofdm_data_num());
-                switch (cfg->mod_order_bits() == true) {
+                switch (cfg->mod_order_bits()) {
                 case (4):
                     demod_16qam_soft_avx2(
                         equal_T_ptr, demod_ptr, cfg->ofdm_data_num());
@@ -391,6 +391,17 @@ int main(int argc, char* argv[])
             noise_levels[noise_id], snr_levels[noise_id], error_num, total,
             1.f * error_num / total, block_error_num, num_codeblocks,
             1.f * block_error_num / num_codeblocks);
+
+        std::free( resp_var_nodes );
+        demod_data_all_symbols.free();
+        equalized_data_all_symbols.free();
+        precoder.free();
+        tx_data_all_symbols.free();
+        rx_data_all_symbols.free();
+        csi_matrices_no_noise.free();
+        csi_matrices_pilot.free();
+        csi_matrices_data.free();
+        decoded_codewords.free();
     }
     return 0;
 }

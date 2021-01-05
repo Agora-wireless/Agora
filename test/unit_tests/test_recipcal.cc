@@ -10,8 +10,7 @@ static constexpr size_t kMaxFrameNum = 10;
 /// Test correctness of two-step recriprocal calibration
 TEST(TestRecip, Correctness)
 {
-
-    auto* cfg = new Config("data/tddconfig-sim-ul.json");
+    std::unique_ptr<Config> cfg( new Config("data/tddconfig-sim-ul.json") );
     cfg->GenData();
 
     double freq_ghz = measure_rdtsc_freq();
@@ -105,6 +104,10 @@ TEST(TestRecip, Correctness)
             ASSERT_LE(abs(buf0[j] - buf1[j]), allowed_error);
         }
     }
+
+    calib_buffer.free();
+    recip_buffer_0.free();
+    recip_buffer_1.free();
 }
 
 int main(int argc, char** argv)

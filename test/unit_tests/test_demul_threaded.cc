@@ -47,8 +47,9 @@ void MasterToWorkerDynamic_master(Config* cfg,
         while (num_finished_events < kMaxTestNum) {
             Event_data event;
             int ret = complete_task_queue.try_dequeue(event);
-            if (ret)
+            if (ret == true) {
                 num_finished_events++;
+            }
         }
     }
 }
@@ -72,8 +73,8 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
         // Wait
     }
 
-    auto computeDemul = new DoDemul(cfg, worker_id, data_buffer, ul_zf_matrices,
-        ue_spec_pilot_buffer, equal_buffer, demod_buffers_, phy_stats, stats);
+    std::unique_ptr<DoDemul> computeDemul ( new DoDemul(cfg, worker_id, data_buffer, ul_zf_matrices,
+        ue_spec_pilot_buffer, equal_buffer, demod_buffers_, phy_stats, stats) );
 
     size_t start_tsc = rdtsc();
     size_t num_tasks = 0;
@@ -108,7 +109,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
 TEST(TestDemul, VaryingConfig)
 {
     static constexpr size_t kNumIters = 10000;
-    auto* cfg = new Config("data/tddconfig-sim-ul.json");
+    std::unique_ptr<Config> cfg ( new Config("data/tddconfig-sim-ul.json") );
     cfg->GenData();
 
     auto event_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
@@ -145,22 +146,31 @@ TEST(TestDemul, VaryingConfig)
         cfg->frame().NumULSyms() * kFrameWnd * kMaxModType * kMaxDataSCs
             * kMaxUEs * 1.0f / 1024 / 1024);
 
-    auto stats = new Stats(cfg);
-    auto phy_stats = new PhyStats(cfg);
+    std::unique_ptr<Stats> stats( new Stats(cfg.get()) );
+    std::unique_ptr<PhyStats> phy_stats ( new PhyStats(cfg.get()) );
 
-    auto master = std::thread(MasterToWorkerDynamic_master, cfg,
-        std::ref(event_queue), std::ref(complete_task_queue));
-    std::thread workers[kNumWorkers];
+    std::vector<std::thread> threads;
+    threads.push_back( std::thread(MasterToWorkerDynamic_master, cfg.get(),
+        std::ref(event_queue), std::ref(complete_task_queue)) );
     for (size_t i = 0; i < kNumWorkers; i++) {
-        workers[i] = std::thread(MasterToWorkerDynamic_worker, cfg, i,
+        threads.push_back ( std::thread(MasterToWorkerDynamic_worker, cfg.get(), i,
             std::ref(event_queue), std::ref(complete_task_queue), ptoks[i],
             std::ref(data_buffer), std::ref(ul_zf_matrices),
             std::ref(equal_buffer), std::ref(ue_spec_pilot_buffer),
-            std::ref(demod_buffers), phy_stats, stats);
+            std::ref(demod_buffers), phy_stats.get(), stats.get()) );
     }
-    master.join();
-    for (auto& w : workers)
-        w.join();
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    for (size_t i = 0; i < kNumWorkers; i++) {
+        delete (ptoks[i]);
+    }
+
+    data_buffer.free();
+    ue_spec_pilot_buffer.free();
+    equal_buffer.free();;
 }
 
 int main(int argc, char** argv)

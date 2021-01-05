@@ -42,8 +42,9 @@ void MasterToWorkerDynamic_master(Config* cfg,
         while (num_finished_events < kMaxTestNum) {
             Event_data event;
             int ret = complete_task_queue.try_dequeue(event);
-            if (ret)
+            if (ret == true) {
                 num_finished_events++;
+            }
         }
     }
 }
@@ -68,8 +69,8 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
         // Wait
     }
 
-    auto computeZF = new DoZF(cfg, worker_id, csi_buffers, calib_dl_buffer,
-        calib_ul_buffer, ul_zf_matrices, dl_zf_matrices, stats);
+    std::unique_ptr<DoZF> computeZF (new DoZF(cfg, worker_id, csi_buffers, calib_dl_buffer,
+        calib_ul_buffer, ul_zf_matrices, dl_zf_matrices, stats) );
 
     size_t start_tsc = rdtsc();
     size_t num_tasks = 0;
@@ -104,7 +105,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
 TEST(TestZF, VaryingConfig)
 {
     static constexpr size_t kNumIters = 10000;
-    auto* cfg = new Config("data/tddconfig-sim-ul.json");
+    std::unique_ptr<Config> cfg( new Config("data/tddconfig-sim-ul.json") );
     cfg->GenData();
 
     auto event_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
@@ -131,21 +132,28 @@ TEST(TestZF, VaryingConfig)
     calib_ul_buffer.rand_alloc_cx_float(
         kFrameWnd, kMaxDataSCs * kMaxAntennas, Agora_memory::Alignment_t::k64Align);
 
-    auto stats = new Stats(cfg);
+    std::unique_ptr<Stats> stats( new Stats( cfg.get()) );
 
-    auto master = std::thread(MasterToWorkerDynamic_master, cfg,
-        std::ref(event_queue), std::ref(complete_task_queue));
-    std::thread workers[kNumWorkers];
+    std::vector<std::thread> threads;
+    threads.push_back( std::thread(MasterToWorkerDynamic_master, cfg.get(),
+        std::ref(event_queue), std::ref(complete_task_queue)) );
+
     for (size_t i = 0; i < kNumWorkers; i++) {
-        workers[i] = std::thread(MasterToWorkerDynamic_worker, cfg, i,
+        threads.push_back( std::thread(MasterToWorkerDynamic_worker, cfg.get(), i,
             std::ref(event_queue), std::ref(complete_task_queue), ptoks[i],
             std::ref(csi_buffers), std::ref(calib_dl_buffer),
             std::ref(calib_ul_buffer), std::ref(ul_zf_matrices),
-            std::ref(dl_zf_matrices), stats);
+            std::ref(dl_zf_matrices), stats.get()) );
     }
-    master.join();
-    for (auto& w : workers)
-        w.join();
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    calib_dl_buffer.free();
+    calib_ul_buffer.free();
+    for (size_t i = 0; i < kNumWorkers; i++) {
+        delete (ptoks[i]);
+    }
 }
 
 int main(int argc, char** argv)
