@@ -1226,11 +1226,11 @@ void Agora::initialize_downlink_buffers( void )
         alloc_buffer_1d(&dl_socket_buffer_status_, dl_socket_buffer_status_size,
             Agora_memory::Alignment_t::k64Align, 1);
 
-        dl_bits_buffer_.calloc(task_buffer_symbol_num,
+        this->dl_bits_buffer_.calloc(task_buffer_symbol_num,
             config_->ofdm_data_num() * config_->ue_num(), Agora_memory::Alignment_t::k64Align);
         size_t dl_bits_buffer_status_size
             = task_buffer_symbol_num * config_->ldpc_config().num_blocks_in_symbol();
-        dl_bits_buffer_status_.calloc(config_->ue_num(), dl_bits_buffer_status_size,
+        this->dl_bits_buffer_status_.calloc(config_->ue_num(), dl_bits_buffer_status_size,
             Agora_memory::Alignment_t::k64Align);
 
         dl_ifft_buffer_.calloc(config_->bs_ant_num() * task_buffer_symbol_num,
@@ -1280,6 +1280,8 @@ void Agora::free_downlink_buffers( void )
         calib_dl_buffer_.free();
         calib_ul_buffer_.free();
         dl_encoded_buffer_.free();
+        dl_bits_buffer_.free();
+        dl_bits_buffer_status_.free();
     }
 }
 
