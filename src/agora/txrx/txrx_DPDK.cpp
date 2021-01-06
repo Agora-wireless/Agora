@@ -34,8 +34,8 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr_);
     rt_assert(ret == 1, "Invalid sender IP address");
 
-    bs_server_addrs_.reserve(cfg->bs_server_addr_list.size());
-    bs_server_mac_addrs_.reserve(cfg->bs_server_addr_list.size());
+    bs_server_addrs_.resize(cfg->bs_server_addr_list.size());
+    bs_server_mac_addrs_.resize(cfg->bs_server_addr_list.size());
 
     ret = inet_pton(AF_INET, cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(), &bs_server_addrs_[cfg->bs_server_addr_idx]);
     rt_assert(ret == 1, "Invalid sender IP address");
@@ -280,7 +280,7 @@ void* PacketTXRX::demod_thread(int tid)
                 continue;
             }
 
-            auto* pkt = reinterpret_cast<Packet*>(eth_hdr) + kPayloadOffset;
+            auto* pkt = reinterpret_cast<Packet*>((char*)(eth_hdr) + kPayloadOffset);
             if (pkt->pkt_type == Packet::PktType::kDemod) {
                 const size_t symbol_idx_ul
                     = pkt->symbol_id - cfg->pilot_symbol_num_perframe;
@@ -399,6 +399,7 @@ void* PacketTXRX::encode_thread(int tid)
             auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
             auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
                 reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+            auto* udp_hdr = reinterpret_cast<rte_udp_hdr*>(reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr) + sizeof(rte_ipv4_hdr));
             uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
 
             if (eth_type != RTE_ETHER_TYPE_IPV4
@@ -415,7 +416,11 @@ void* PacketTXRX::encode_thread(int tid)
                 }
             }
             if (!found) {
-                fprintf(stderr, "DPDK: Source addr does not match\n");
+                for (size_t j = 0; j < bs_server_addrs_.size(); j ++) {
+                    fprintf(stderr, "%x ", bs_server_addrs_[j]);
+                }
+                fprintf(stderr, "\n");
+                fprintf(stderr, "DPDK relocate(%u): Source addr does not match (%x:%u->%x:%u)\n", tid, ip_hdr->src_addr, rte_be_to_cpu_16(udp_hdr->src_port), ip_hdr->dst_addr, rte_be_to_cpu_16(udp_hdr->dst_port));
                 rte_pktmbuf_free(rx_bufs[i]);
                 continue;
             }
@@ -425,7 +430,7 @@ void* PacketTXRX::encode_thread(int tid)
                 continue;
             }
 
-            auto* pkt = reinterpret_cast<Packet*>(eth_hdr) + kPayloadOffset;
+            auto* pkt = reinterpret_cast<Packet*>((char*)(eth_hdr) + kPayloadOffset);
             if (pkt->pkt_type == Packet::PktType::kEncode) {
                 printf("TXRX receive encoded data frame %u symbol %u ue %u from server %u\n", pkt->frame_id, pkt->symbol_id, pkt->ue_id, pkt->server_id);
                 const size_t symbol_idx_dl = pkt->symbol_id;
@@ -438,7 +443,7 @@ void* PacketTXRX::encode_thread(int tid)
                     cfg->get_num_sc_per_server());
                 precode_status_->receive_encoded_data(pkt->frame_id, symbol_idx_dl);
             } else {
-                printf("Received unknown packet type in demod TX/RX thread\n");
+                printf("Received unknown packet type in encode TX/RX thread\n");
                 exit(1);
             }
 
