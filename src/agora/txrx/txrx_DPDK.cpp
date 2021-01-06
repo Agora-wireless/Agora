@@ -439,8 +439,9 @@ void* PacketTXRX::encode_thread(int tid)
                 int8_t* dst_ptr
                     = cfg->get_encoded_buf(*encoded_buffer_to_precode_,
                         pkt->frame_id, symbol_idx_dl, pkt->ue_id, 0) + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server();
-                DpdkTransport::fastMemcpy(dst_ptr, pkt->data,
-                    cfg->get_num_sc_per_server());
+                // DpdkTransport::fastMemcpy(dst_ptr, pkt->data,
+                //     cfg->get_num_sc_per_server());
+                memcpy(dst_ptr, pkt->data, cfg->get_num_sc_per_server());
                 precode_status_->receive_encoded_data(pkt->frame_id, symbol_idx_dl);
             } else {
                 printf("Received unknown packet type in encode TX/RX thread\n");
