@@ -29,9 +29,7 @@ static void simd_convert_float_to_short(
 
 ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     size_t bs_thread_num, size_t user_thread_num, size_t worker_thread_num,
-    size_t in_core_offset,
-    std::string in_chan_type,
-    double in_chan_snr)
+    size_t in_core_offset, std::string in_chan_type, double in_chan_snr)
     : bscfg(config_bs)
     , uecfg(config_ue)
     , bs_thread_num(bs_thread_num)
@@ -470,7 +468,7 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
     bool is_newFrame = false;
 
     if (symbol_id == 0)
-	is_newFrame = true;
+        is_newFrame = true;
 
     channel->apply_chan(fmat_src, fmat_dst, is_downlink, is_newFrame);
 
@@ -531,7 +529,7 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
     bool is_newFrame = false;
 
     if (symbol_id == 0)
-	is_newFrame = true;
+        is_newFrame = true;
 
     channel->apply_chan(fmat_src, fmat_dst, is_downlink, is_newFrame);
 
