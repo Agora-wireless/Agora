@@ -60,23 +60,44 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
             port_id, i, bs_rru_addr_, bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
     }
 
-    for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
-        if (i == cfg->bs_server_addr_idx) {
-            continue;
+    if (cfg->downlink_mode) {
+        for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
+            if (i == cfg->bs_server_addr_idx) {
+                continue;
+            }
+            int ret = inet_pton(AF_INET, cfg->bs_server_addr_list[i].c_str(), &bs_server_addrs_[i]);
+            rt_assert(ret == 1, "Invalid sender IP address");
+            ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[i].c_str());
+            rt_assert(parsed_mac != NULL, "Invalid server mac address");
+            memcpy(&bs_server_mac_addrs_[i], parsed_mac, sizeof(ether_addr));
+            uint16_t src_port = rte_cpu_to_be_16(cfg->encode_tx_port);
+            uint16_t dst_port = rte_cpu_to_be_16(cfg->encode_rx_port);
+            printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
+                "dst port: %zu, queue: %zu\n",
+                cfg->bs_server_addr_list[i].c_str(), cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(),
+                cfg->demod_tx_port, cfg->demod_rx_port, socket_thread_num);
+            DpdkTransport::install_flow_rule(
+                port_id, socket_thread_num, bs_server_addrs_[i], bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
         }
-        int ret = inet_pton(AF_INET, cfg->bs_server_addr_list[i].c_str(), &bs_server_addrs_[i]);
-        rt_assert(ret == 1, "Invalid sender IP address");
-        ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[i].c_str());
-        rt_assert(parsed_mac != NULL, "Invalid server mac address");
-        memcpy(&bs_server_mac_addrs_[i], parsed_mac, sizeof(ether_addr));
-        uint16_t src_port = rte_cpu_to_be_16(cfg->demod_tx_port);
-        uint16_t dst_port = rte_cpu_to_be_16(cfg->demod_rx_port);
-        printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
-               "dst port: %zu, queue: %zu\n",
-            cfg->bs_server_addr_list[i].c_str(), cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(),
-            cfg->demod_tx_port, cfg->demod_rx_port, socket_thread_num);
-        DpdkTransport::install_flow_rule(
-            port_id, socket_thread_num, bs_server_addrs_[i], bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
+    } else {
+        for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
+            if (i == cfg->bs_server_addr_idx) {
+                continue;
+            }
+            int ret = inet_pton(AF_INET, cfg->bs_server_addr_list[i].c_str(), &bs_server_addrs_[i]);
+            rt_assert(ret == 1, "Invalid sender IP address");
+            ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[i].c_str());
+            rt_assert(parsed_mac != NULL, "Invalid server mac address");
+            memcpy(&bs_server_mac_addrs_[i], parsed_mac, sizeof(ether_addr));
+            uint16_t src_port = rte_cpu_to_be_16(cfg->demod_tx_port);
+            uint16_t dst_port = rte_cpu_to_be_16(cfg->demod_rx_port);
+            printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
+                "dst port: %zu, queue: %zu\n",
+                cfg->bs_server_addr_list[i].c_str(), cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(),
+                cfg->demod_tx_port, cfg->demod_rx_port, socket_thread_num);
+            DpdkTransport::install_flow_rule(
+                port_id, socket_thread_num, bs_server_addrs_[i], bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
+        }
     }
 
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
