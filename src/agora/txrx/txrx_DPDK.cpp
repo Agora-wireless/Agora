@@ -338,9 +338,11 @@ void* PacketTXRX::encode_thread(int tid)
                     pkt->symbol_id = encode_symbol_dl_to_send_;
                     pkt->ue_id = encode_ue_to_send_;
                     pkt->server_id = cfg->bs_server_addr_idx;
-                    DpdkTransport::fastMemcpy(pkt->data, src_ptr,
-                        cfg->get_num_sc_per_server());
+                    // DpdkTransport::fastMemcpy(pkt->data, src_ptr,
+                    //     cfg->get_num_sc_per_server());
+                    memcpy(pkt->data, src_ptr, cfg->get_num_sc_per_server());
 
+                    printf("Send encoded data frame %u symbol %u ue %u to server %u\n", pkt->frame_id, pkt->symbol_id, pkt->ue_id, server_idx);
                     // Send data (one OFDM symbol)
                     size_t nb_tx_new = rte_eth_tx_burst(0, tid - 1, tx_bufs, 1);
                     if (unlikely(nb_tx_new != 1)) {
@@ -400,6 +402,7 @@ void* PacketTXRX::encode_thread(int tid)
 
             auto* pkt = reinterpret_cast<Packet*>(eth_hdr) + kPayloadOffset;
             if (pkt->pkt_type == Packet::PktType::kEncode) {
+                printf("TXRX receive encoded data frame %u symbol %u ue %u from server %u\n", pkt->frame_id, pkt->symbol_id, pkt->ue_id, pkt->server_id);
                 const size_t symbol_idx_dl = pkt->symbol_id;
                 const size_t ue_id = pkt->ue_id;
 
