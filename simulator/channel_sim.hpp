@@ -3,6 +3,7 @@
 
 #include "Symbols.hpp"
 #include "buffer.hpp"
+#include "channel.hpp"
 #include "concurrent_queue_wrapper.hpp"
 #include "config.hpp"
 #include "gettime.h"
@@ -11,7 +12,6 @@
 #include "signalHandler.hpp"
 #include "udp_client.h"
 #include "udp_server.h"
-#include "channel.hpp"
 #include <algorithm>
 #include <armadillo>
 #include <arpa/inet.h>
@@ -36,7 +36,8 @@ class ChannelSim {
 public:
     ChannelSim(Config* bscfg, Config* uecfg, size_t bs_thread_num,
         size_t user_thread_num, size_t worker_thread_num,
-        size_t in_core_offset = 30, std::string in_chan_type = "RAYLEIGH", double in_chan_snr = 20);
+        size_t in_core_offset = 30, std::string in_chan_type = "RAYLEIGH",
+        double in_chan_snr = 20);
     ~ChannelSim();
 
     void start();

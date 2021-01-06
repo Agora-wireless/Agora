@@ -107,8 +107,6 @@ public:
         std::string name, size_t elem_size, size_t buffer_size, void* buff);
     static void print_vec(arma::cx_fvec, std::string);
     static void print_mat(arma::cx_fmat);
-    static void print_rvec(arma::frowvec, std::string);
-    static void print_rmat(arma::fmat);
 };
 
 /// roundup<N>(x) returns x rounded up to the next multiple of N. N must be
