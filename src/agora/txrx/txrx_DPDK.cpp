@@ -677,10 +677,10 @@ int PacketTXRX::dequeue_send(int tid, size_t symbol_to_send, size_t ant_to_send)
         pkt->symbol_id = symbol_to_send;
         pkt->ant_id = ant_to_send;
         pkt->server_id = cfg->bs_server_addr_idx;
-        size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(pkt->frame_id, pkt->symbol_id);
+        size_t data_symbol_idx_dl = cfg->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
         size_t offset = data_symbol_idx_dl * cfg->BS_ANT_NUM + ant_to_send;
 
-        simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data), reinterpret_cast<float*>((*dl_ifft_buffer_)[offset]), cfg->OFDM_CA_NUM);
+        simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data), reinterpret_cast<float*>(&(*dl_ifft_buffer_)[offset][cfg->OFDM_DATA_START + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server()]), cfg->get_num_sc_per_server() * 2);
        
         printf("Send a packet out server:%u\n", pkt->server_id);
 
