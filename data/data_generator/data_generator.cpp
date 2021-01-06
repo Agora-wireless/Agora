@@ -81,6 +81,18 @@ int main(int argc, char* argv[])
             information[i], encoded_codewords[i], i % cfg->UE_NUM /* UE ID */);
     }
 
+    // Start Debug
+    printf("Raw data:\n");
+    for (size_t i = 0; i < ldpc_encoding_input_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc); i ++) {
+        printf("%02x ", (uint8_t)information[0][i]);
+    }
+    printf("\nEncoded data:\n");
+    for (size_t i = 0; i < ldpc_encoding_encoded_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc); i ++) {
+        printf("%02x ", (uint8_t)encoded_codewords[0][i]);
+    }
+    printf("\n");
+    // End Debug
+
     {
         // Save uplink information bytes to file
         const size_t input_bytes_per_cb = bits_to_bytes(
@@ -116,6 +128,14 @@ int main(int argc, char* argv[])
         modulated_codewords[i]
             = data_generator.get_modulation(encoded_codewords[i]);
     }
+
+    // Start Debug
+    printf("Modulated data:\n");
+    for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i ++) {
+        printf("(%lf %lf) ", modulated_codewords[0][i].re, modulated_codewords[0][i].im);
+    }
+    printf("\n");
+    // End Debug
 
     // Place modulated uplink data codewords into central IFFT bins
     rt_assert(cfg->LDPC_config.nblocksInSymbol == 1); // TODO: Assumption
@@ -307,6 +327,14 @@ int main(int argc, char* argv[])
             }
         }
     }
+    
+    // Begin Debug
+    printf("DL mod output:\n");
+    for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i ++) {
+        printf("(%lf %lf) ", dl_mod_data[0][cfg->OFDM_DATA_START + i].re, dl_mod_data[0][cfg->OFDM_DATA_START + i].im);
+    }
+    printf("\n");
+    // End Debug
 
     // printf("dl mod data \n");
     // for (int i = 0; i < dl_data_symbol_num_perframe; i++) {
@@ -331,10 +359,30 @@ int main(int argc, char* argv[])
     Table<short> dl_tx_data;
     dl_tx_data.calloc(cfg->dl_data_symbol_num_perframe,
         2 * cfg->sampsPerSymbol * cfg->BS_ANT_NUM, 64);
+    // Begin Debug
+    // Table<complex_float> transposed_data;
+    // transposed_data.calloc(cfg->dl_data_symbol_num_perframe,
+    //     cfg->OFDM_CA_NUM * cfg->UE_ANT_NUM, 64);
+    // arma::cx_fmat mat_ori_data(
+    //     reinterpret_cast<arma::cx_float*>(dl_mod_data[0]), cfg->UE_ANT_NUM,
+    //     cfg->OFDM_CA_NUM, false);
+    // arma::cx_fmat mat_transposed_data(
+    //     reinterpret_cast<arma::cx_float*>(transposed_data[0]), cfg->OFDM_CA_NUM,
+    //     cfg->UE_ANT_NUM, false);
+    // mat_transposed_data = arma::trans(mat_ori_data);
+    // printf("Transposed data:\n");
+    // for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i ++) {
+    //     printf("(%lf %lf) ", transposed_data[0][(i + cfg->OFDM_DATA_START) * cfg->UE_ANT_NUM].re, transposed_data[0][(i + cfg->OFDM_DATA_START) * cfg->UE_ANT_NUM].im);
+    // }
+    // printf("\n");
+    // End Debug
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
         arma::cx_fmat mat_input_data(
             reinterpret_cast<arma::cx_float*>(dl_mod_data[i]), cfg->OFDM_CA_NUM,
             cfg->UE_ANT_NUM, false);
+        // arma::cx_fmat mat_input_data(
+        //     reinterpret_cast<arma::cx_float*>(transposed_data[i]), cfg->OFDM_CA_NUM,
+        //     cfg->UE_ANT_NUM, false);
 
         arma::cx_fmat mat_output(
             reinterpret_cast<arma::cx_float*>(dl_ifft_data[i]),
@@ -346,6 +394,13 @@ int main(int argc, char* argv[])
                 reinterpret_cast<arma::cx_float*>(precoder[j]), cfg->UE_ANT_NUM,
                 cfg->BS_ANT_NUM, false);
             mat_precoder /= abs(mat_precoder).max();
+            // printf("Precoder sc %lu\n", j);
+            // for (size_t k = 0; k < cfg->UE_ANT_NUM; k ++) {
+            //     for (size_t l = 0; l < cfg->BS_ANT_NUM; l ++) {
+            //         printf("(%lf %lf) ", precoder[j][l * cfg->UE_ANT_NUM + k].re, precoder[j][l * cfg->UE_ANT_NUM + k].im);
+            //     }
+            //     printf("\n");
+            // }
             mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
 
             // printf("symbol %d, sc: %d\n", i, j - cfg->OFDM_DATA_START);
@@ -353,6 +408,13 @@ int main(int argc, char* argv[])
             // cout << "Data: \n" << mat_input_data.row(j) << endl;
             // cout << "Precoded data: \n" << mat_output.row(j) << endl;
         }
+        // Begin Debug
+        printf("Precoded data:\n");
+        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i ++) {
+            printf("(%lf %lf) ", dl_ifft_data[0][i + cfg->OFDM_DATA_START].re, dl_ifft_data[0][i + cfg->OFDM_DATA_START].im);
+        }
+        printf("\n");
+        // End Debug
         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
             complex_float* ptr_ifft = dl_ifft_data[i] + j * cfg->OFDM_CA_NUM;
             CommsLib::IFFT(ptr_ifft, cfg->OFDM_CA_NUM, false);
@@ -375,6 +437,12 @@ int main(int argc, char* argv[])
             memset(txSymbol + tx_zero_postfix_offset, 0,
                 sizeof(short) * 2 * cfg->ofdm_tx_zero_postfix_);
         }
+
+        printf("IFFT data:\n");
+        for (size_t j = 0; j < cfg->OFDM_DATA_NUM; j ++) {
+            printf("(%d %d) ", dl_tx_data[i][(j + cfg->OFDM_DATA_START) * 2], dl_tx_data[i][(j + cfg->OFDM_DATA_START) * 2 + 1]);
+        }
+        printf("\n");
     }
 
     std::string filename_dl_tx = cur_directory + "/data/LDPC_dl_tx_data_"

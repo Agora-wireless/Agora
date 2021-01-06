@@ -54,12 +54,27 @@ Event_data DoEncode::launch(size_t tag)
 
     size_t start_tsc = worker_rdtsc();
 
-    size_t symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    // size_t symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t symbol_idx_dl = symbol_id;
     int8_t* input_ptr
         = cfg->get_info_bits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
 
     ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows,
         encoded_buffer_temp, parity_buffer, input_ptr);
+    // Start Debug
+    if (ue_id == 0) {
+        printf("frame id: %u, symbol id: %u, symbol idx dl: %u\n", frame_id, symbol_id, symbol_idx_dl);
+        printf("Raw data:\n");
+        for (size_t i = 0; i < ldpc_encoding_input_buf_size(LDPC_config.Bg, LDPC_config.Zc); i ++) {
+            printf("%02x ", (uint8_t)input_ptr[i]);
+        }
+        printf("\nEncoded data:\n");
+        for (size_t i = 0; i < ldpc_encoding_encoded_buf_size(LDPC_config.Bg, LDPC_config.Zc); i ++) {
+            printf("%02x ", (uint8_t)encoded_buffer_temp[i]);
+        }
+        printf("\n");
+    }
+    // End Debug
     int8_t* final_output_ptr = cfg->get_encoded_buf(
         encoded_buffer_, frame_id, symbol_idx_dl, ue_id, cur_cb_id);
     adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
