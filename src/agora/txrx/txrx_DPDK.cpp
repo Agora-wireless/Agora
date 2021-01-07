@@ -378,7 +378,7 @@ void* PacketTXRX::encode_thread(int tid)
             }
     
             encode_ue_to_send_ ++;
-            if (encode_ue_to_send_ == cfg->get_num_ues_to_process()) {
+            if (encode_ue_to_send_ == cfg->ue_end) {
                 encode_ue_to_send_ = cfg->ue_start;
                 encode_symbol_dl_to_send_ ++;
                 if (encode_symbol_dl_to_send_ == cfg->dl_data_symbol_num_perframe) {
@@ -438,7 +438,7 @@ void* PacketTXRX::encode_thread(int tid)
 
                 int8_t* dst_ptr
                     = cfg->get_encoded_buf(*encoded_buffer_to_precode_,
-                        pkt->frame_id, symbol_idx_dl, pkt->ue_id, 0) + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server();
+                        pkt->frame_id, symbol_idx_dl, pkt->ue_id, 0);
                 // DpdkTransport::fastMemcpy(dst_ptr, pkt->data,
                 //     cfg->get_num_sc_per_server());
                 memcpy(dst_ptr, pkt->data, cfg->get_num_sc_per_server());
@@ -718,7 +718,9 @@ int PacketTXRX::dequeue_send(int tid, size_t symbol_to_send, size_t ant_to_send)
         size_t data_symbol_idx_dl = cfg->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
         size_t offset = data_symbol_idx_dl * cfg->BS_ANT_NUM + ant_to_send;
 
-        simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data), reinterpret_cast<float*>(&(*dl_ifft_buffer_)[offset][cfg->OFDM_DATA_START + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server()]), cfg->get_num_sc_per_server() * 2);
+        simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data), 
+            reinterpret_cast<float*>(&(*dl_ifft_buffer_)[offset][0]), 
+            cfg->get_num_sc_per_server() * 2);
        
         printf("Send a packet out server:%u\n", pkt->server_id);
 

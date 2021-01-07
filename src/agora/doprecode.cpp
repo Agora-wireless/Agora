@@ -50,7 +50,7 @@ Event_data DoPrecode::launch(size_t tag)
     __m256i index = _mm256_setr_epi64x(
         0, cfg->BS_ANT_NUM, cfg->BS_ANT_NUM * 2, cfg->BS_ANT_NUM * 3);
     int max_sc_ite
-        = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
+        = std::min(cfg->demul_block_size, cfg->get_num_sc_per_server() - base_sc_id);
 
     // Begin Debug
     printf("DL mod data base sc %u:\n", base_sc_id);
@@ -134,7 +134,7 @@ Event_data DoPrecode::launch(size_t tag)
             = ant_id + cfg->BS_ANT_NUM * total_data_symbol_idx;
         float* ifft_ptr
             = (float*)&dl_ifft_buffer_[ifft_buffer_offset]
-                                      [base_sc_id + cfg->OFDM_DATA_START];
+                                      [base_sc_id];
         for (size_t i = 0; i < cfg->demul_block_size / 4; i++) {
             float* input_shifted_ptr
                 = precoded_ptr + 4 * i * 2 * cfg->BS_ANT_NUM + ant_id * 2;
@@ -147,7 +147,7 @@ Event_data DoPrecode::launch(size_t tag)
     // Begin Debug
     printf("\nPrecoded data base sc %lu:\n", base_sc_id);
     for (size_t i = 0; i < max_sc_ite; i ++) {
-        printf("(%lf %lf) ", dl_ifft_buffer_[0][base_sc_id + cfg->OFDM_DATA_START + i].re, dl_ifft_buffer_[0][base_sc_id + cfg->OFDM_DATA_START + i].im);
+        printf("(%lf %lf) ", dl_ifft_buffer_[0][base_sc_id + i].re, dl_ifft_buffer_[0][base_sc_id + i].im);
     }
     printf("\n");
     // End Debug

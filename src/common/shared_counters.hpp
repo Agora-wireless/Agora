@@ -317,19 +317,20 @@ public:
         , num_encode_tasks_required_(1)
     {
         num_encode_tasks_completed_ = new 
-            std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>[cfg->get_num_ues_to_process()];
+            std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>[cfg->UE_NUM];
     }
 
     void encode_done(size_t ue_id, size_t frame_id, size_t symbol_id_dl) 
     {
         num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl] ++;
-        // printf("Encode done ue %u frame %u symbol %u (%u:%u)\n", ue_id, frame_id, symbol_id_dl, 
-            // num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl].load(), 
-            // num_encode);
+        printf("Encode done ue %u frame %u symbol %u (%u:1)\n", ue_id, frame_id, symbol_id_dl, 
+            num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl].load());
     }
 
     bool ready_to_precode(size_t ue_id, size_t frame_id, size_t symbol_id_dl)
     {
+        // printf("Test precode ue %u frame %u symbol %u (%u:1)\n", ue_id, frame_id, symbol_id_dl, 
+        //     num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl].load());
         if (num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl]
             == num_encode_tasks_required_) {
             num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl] = 0;

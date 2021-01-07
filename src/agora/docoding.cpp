@@ -110,6 +110,7 @@ void DoEncode::start_work()
                        ._tag);
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
+                printf("Encode is done??? ue %u\n", ue_id);
                 cur_cb_ = 0;
                 encode_status_->encode_done(ue_id, cur_frame_, cur_symbol_);
                 cur_symbol_++;

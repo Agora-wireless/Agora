@@ -136,6 +136,8 @@ public:
             = (sc_range_.end - sc_range_.start) / cfg->demul_block_size;
         const size_t n_precode_tasks_reqd
             = (sc_range_.end - sc_range_.start) / cfg->demul_block_size;
+        
+        printf("Range [%u:%u] starts to work\n", sc_range_.start, sc_range_.end);
 
         while (cfg->running && !SignalHandler::gotExitSignal()) {
             if (rx_status_->received_all_pilots(csi_cur_frame_)) {
