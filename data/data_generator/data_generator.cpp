@@ -84,11 +84,11 @@ int main(int argc, char* argv[])
     // Start Debug
     printf("Raw data:\n");
     for (size_t i = 0; i < ldpc_encoding_input_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc); i ++) {
-        printf("%02x ", (uint8_t)information[0][i]);
+        printf("%02x ", (uint8_t)information[2][i]);
     }
     printf("\nEncoded data:\n");
     for (size_t i = 0; i < ldpc_encoding_encoded_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc); i ++) {
-        printf("%02x ", (uint8_t)encoded_codewords[0][i]);
+        printf("%02x ", (uint8_t)encoded_codewords[2][i]);
     }
     printf("\n");
     // End Debug
@@ -135,6 +135,7 @@ int main(int argc, char* argv[])
         printf("(%lf %lf) ", modulated_codewords[0][i].re, modulated_codewords[0][i].im);
     }
     printf("\n");
+    printf("Mod data: (%lf %lf)\n", modulated_codewords[2][1].re, modulated_codewords[2][1].im);
     // End Debug
 
     // Place modulated uplink data codewords into central IFFT bins
@@ -330,8 +331,11 @@ int main(int argc, char* argv[])
     
     // Begin Debug
     printf("DL mod output:\n");
-    for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i ++) {
-        printf("(%lf %lf) ", dl_mod_data[0][cfg->OFDM_DATA_START + i].re, dl_mod_data[0][cfg->OFDM_DATA_START + i].im);
+    // for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i ++) {
+    //     printf("(%lf %lf) ", dl_mod_data[0][cfg->OFDM_DATA_START + i].re, dl_mod_data[0][cfg->OFDM_DATA_START + i].im);
+    // }
+    for (size_t i = 0; i < cfg->UE_NUM; i ++) {
+        printf("(%lf %lf) ", dl_mod_data[0][i * cfg->OFDM_CA_NUM + cfg->OFDM_DATA_START + 1].re, dl_mod_data[0][i * cfg->OFDM_CA_NUM + cfg->OFDM_DATA_START + 1].im);
     }
     printf("\n");
     // End Debug
@@ -394,13 +398,15 @@ int main(int argc, char* argv[])
                 reinterpret_cast<arma::cx_float*>(precoder[j]), cfg->UE_ANT_NUM,
                 cfg->BS_ANT_NUM, false);
             mat_precoder /= abs(mat_precoder).max();
-            // printf("Precoder sc %lu\n", j);
-            // for (size_t k = 0; k < cfg->UE_ANT_NUM; k ++) {
-            //     for (size_t l = 0; l < cfg->BS_ANT_NUM; l ++) {
-            //         printf("(%lf %lf) ", precoder[j][l * cfg->UE_ANT_NUM + k].re, precoder[j][l * cfg->UE_ANT_NUM + k].im);
-            //     }
-            //     printf("\n");
-            // }
+            if (j == cfg->OFDM_DATA_START) {
+                printf("Precoder sc %lu\n", j);
+                for (size_t k = 0; k < cfg->UE_ANT_NUM; k ++) {
+                    for (size_t l = 0; l < cfg->BS_ANT_NUM; l ++) {
+                        printf("(%lf %lf) ", precoder[j][l * cfg->UE_ANT_NUM + k].re, precoder[j][l * cfg->UE_ANT_NUM + k].im);
+                    }
+                    printf("\n");
+                }
+            }
             mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
 
             // printf("symbol %d, sc: %d\n", i, j - cfg->OFDM_DATA_START);

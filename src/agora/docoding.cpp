@@ -19,7 +19,7 @@ DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
     , encoded_buffer_(in_encoded_buffer)
     , rx_status_(rx_status)
     , encode_status_(encode_status)
-    , ue_id(in_tid + in_config->ue_start)
+    , ue_id_(in_tid + in_config->ue_start)
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kEncode, in_tid);
@@ -62,7 +62,7 @@ Event_data DoEncode::launch(size_t tag)
     ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows,
         encoded_buffer_temp, parity_buffer, input_ptr);
     // Start Debug
-    if (ue_id == 0) {
+    if (ue_id == 2) {
         printf("frame id: %u, symbol id: %u, symbol idx dl: %u\n", frame_id, symbol_id, symbol_idx_dl);
         printf("Raw data:\n");
         for (size_t i = 0; i < ldpc_encoding_input_buf_size(LDPC_config.Bg, LDPC_config.Zc); i ++) {
@@ -80,6 +80,11 @@ Event_data DoEncode::launch(size_t tag)
     adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
         reinterpret_cast<uint8_t*>(final_output_ptr),
         bits_to_bytes(LDPC_config.cbCodewLen), cfg->mod_order_bits);
+
+    if (ue_id == 2) {
+        complex_float tf = mod_single_uint8(final_output_ptr[1], cfg->mod_table);
+        printf("Mod data: (%lf %lf)\n", tf.re, tf.im);
+    }
 
     // printf("Encoded data\n");
     // int num_mod = LDPC_config.cbCodewLen / cfg->mod_order_bits;
@@ -104,15 +109,15 @@ void DoEncode::start_work()
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_cb_ > 0
             || rx_status_->is_encode_ready(cur_frame_)) {
-            printf("Start to encode user %lu frame %lu symbol %lu cb %u\n", ue_id, cur_frame_, cur_symbol_, cur_cb_);
+            printf("Start to encode user %lu frame %lu symbol %lu cb %u\n", ue_id_, cur_frame_, cur_symbol_, cur_cb_);
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
-                cur_cb_ + ue_id * cfg->LDPC_config.nblocksInSymbol)
+                cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
-                printf("Encode is done??? ue %u\n", ue_id);
+                printf("Encode is done??? ue %u\n", ue_id_);
                 cur_cb_ = 0;
-                encode_status_->encode_done(ue_id, cur_frame_, cur_symbol_);
+                encode_status_->encode_done(ue_id_, cur_frame_, cur_symbol_);
                 cur_symbol_++;
                 if (cur_symbol_ == cfg->dl_data_symbol_num_perframe) {
                     cur_symbol_ = 0;
@@ -137,7 +142,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     , phy_stats(in_phy_stats)
     , rx_status_(rx_status)
     , decode_status_(decode_status)
-    , ue_id(in_tid + in_config->ue_start)
+    , ue_id_(in_tid + in_config->ue_start)
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
@@ -256,10 +261,10 @@ void DoDecode::start_work()
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_cb_ > 0
             || decode_status_->received_all_demod_data(
-                   ue_id, cur_frame_, cur_symbol_)) {
-            printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id, cur_frame_, cur_symbol_);
+                   ue_id_, cur_frame_, cur_symbol_)) {
+            printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id_, cur_frame_, cur_symbol_);
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
-                cur_cb_ + ue_id * cfg->LDPC_config.nblocksInSymbol)
+                cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {

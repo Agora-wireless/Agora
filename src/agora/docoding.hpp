@@ -46,7 +46,7 @@ private:
     RxStatus* rx_status_;
     EncodeStatus* encode_status_;
 
-    size_t ue_id;
+    size_t ue_id_;
 
     size_t cur_frame_ = 0;
     size_t cur_symbol_ = 0;
@@ -79,7 +79,7 @@ private:
     RxStatus* rx_status_;
     DecodeStatus* decode_status_;
 
-    size_t ue_id;
+    size_t ue_id_;
 
     // decoder process one code block at a time
     size_t cur_frame_ = 0; // Current frame to decode
