@@ -83,7 +83,13 @@ Event_data DoPrecode::launch(size_t tag)
             }
 
             // Begin Debug
-            printf("(%lf %lf) ", data_ptr[0].re, data_ptr[0].im);
+            // printf("(%lf %lf) ", data_ptr[0].re, data_ptr[0].im);
+            if (i == 0 && j == 1) {
+                for (size_t k = 0; k < cfg->UE_NUM; k ++) {
+                    printf("(%lf %lf) ", data_ptr[k].re, data_ptr[k].im);
+                }
+                printf("\n");
+            }
             // End Debug
 
             auto* precoder_ptr = reinterpret_cast<cx_float*>(
@@ -117,13 +123,13 @@ Event_data DoPrecode::launch(size_t tag)
         printf("(%lf %lf) ", precoded_buffer_temp[i * cfg->BS_ANT_NUM].re, precoded_buffer_temp[i * cfg->BS_ANT_NUM].im);
     }
     printf("\n");
-    // printf("Precoder:\n");
-    // for (size_t i = 0; i < cfg->UE_NUM; i ++) {
-    //     for (size_t j = 0; j < cfg->BS_ANT_NUM; j ++) {
-    //         printf("(%lf %lf) ", dl_zf_matrices_[0][base_sc_id][j * cfg->UE_NUM + i].re, dl_zf_matrices_[0][base_sc_id][j * cfg->UE_NUM + i].im);
-    //     }
-    //     printf("\n");
-    // }
+    printf("Precoder:\n");
+    for (size_t i = 0; i < cfg->UE_NUM; i ++) {
+        for (size_t j = 0; j < cfg->BS_ANT_NUM; j ++) {
+            printf("(%lf %lf) ", dl_zf_matrices_[0][base_sc_id][j * cfg->UE_NUM + i].re, dl_zf_matrices_[0][base_sc_id][j * cfg->UE_NUM + i].im);
+        }
+        printf("\n");
+    }
     // End Debug
 
     size_t start_tsc3 = worker_rdtsc();

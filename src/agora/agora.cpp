@@ -174,7 +174,7 @@ void* Agora::subcarrier_worker(int tid)
         Range(tid * config_->subcarrier_block_size,
             (tid + 1) * config_->subcarrier_block_size),
         socket_buffer_, csi_buffers_, calib_buffer_,
-        dl_encoded_buffer_, demod_buffers_, dl_ifft_buffer_,
+        dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
         ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
         phy_stats, stats, &rx_status_, &demul_status_, &precode_status_);
 
