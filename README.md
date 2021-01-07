@@ -1,3 +1,5 @@
+[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Fpilot-types)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/pilot-types/)
+
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
 Some highlights:
@@ -24,6 +26,12 @@ Some highlights:
   Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04 and 18.04. 
   Agora requires CMake 2.8+ and works with both GNU and Intel compilers with C++11 support. 
 ## Setting up the build environment
+  * Setup CI
+  ```sh
+  $ ./config_ci.sh
+  ```
+    Note for developers: You must run this command before checking out your new feature brach. Do not use _ in your branch name. Use - instead. 
+    
   * See `scripts/ubuntu.sh` for required packages, including Linux packages, gtest, Armadillo, nlohmann json-dev and SoapySDR, and the corresponding versions. Run `./scripts/ubuntu.sh` to install these packages.
   * Download and install Intel libraries:
      * Install Intel FlexRAN's FEC SDK for LDPC encoding and decoding
