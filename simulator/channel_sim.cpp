@@ -29,7 +29,7 @@ static void simd_convert_float_to_short(
 
 ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     size_t bs_thread_num, size_t user_thread_num, size_t worker_thread_num,
-    size_t in_core_offset)
+    size_t in_core_offset, std::string in_chan_type, double in_chan_snr)
     : bscfg(config_bs)
     , uecfg(config_ue)
     , bs_thread_num(bs_thread_num)
@@ -38,6 +38,8 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     , user_socket_num(config_ue->UE_ANT_NUM)
     , worker_thread_num(worker_thread_num)
     , core_offset(in_core_offset)
+    , channel_type(in_chan_type)
+    , channel_snr(in_chan_snr)
 {
 
     // initialize parameters from config
@@ -92,10 +94,8 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     std::memset(bs_tx_counter_, 0, sizeof(size_t) * kFrameWnd);
     std::memset(user_tx_counter_, 0, sizeof(size_t) * kFrameWnd);
 
-    // initialize channel as random matrix of size uecfg->UE_ANT_NUM * bscfg->BS_ANT_NUM
-    cx_fmat H(randn<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM),
-        randn<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM));
-    channel = H / abs(H).max();
+    // Initialize channel
+    channel = new Channel(config_bs, config_ue, channel_type, channel_snr);
 
     for (size_t i = 0; i < worker_thread_num; i++) {
         task_ptok[i] = new moodycamel::ProducerToken(message_queue_);
@@ -462,11 +462,16 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
         reinterpret_cast<float*>(fmat_src.memptr()),
         2 * bscfg->sampsPerSymbol * uecfg->UE_ANT_NUM);
 
-    cx_fmat fmat_dst = fmat_src * channel;
-    // add 30dB SNR noise
-    cx_fmat noise(1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->BS_ANT_NUM),
-        1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->BS_ANT_NUM));
-    fmat_dst += noise;
+    // Apply Channel
+    cx_fmat fmat_dst;
+    bool is_downlink = false;
+    bool is_newFrame = false;
+
+    if (symbol_id == 0)
+        is_newFrame = true;
+
+    channel->apply_chan(fmat_src, fmat_dst, is_downlink, is_newFrame);
+
     if (kPrintChannelOutput)
         Utils::print_mat(fmat_dst);
 
@@ -518,11 +523,16 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
         reinterpret_cast<float*>(fmat_src.memptr()),
         2 * bscfg->sampsPerSymbol * bscfg->BS_ANT_NUM);
 
-    cx_fmat fmat_dst = fmat_src * channel.st() / std::sqrt(bscfg->BS_ANT_NUM);
-    // add 30dB SNR noise
-    cx_fmat noise(1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->UE_ANT_NUM),
-        1e-3 * randn<fmat>(uecfg->sampsPerSymbol, bscfg->UE_ANT_NUM));
-    fmat_dst += noise;
+    // Apply Channel
+    cx_fmat fmat_dst;
+    bool is_downlink = true;
+    bool is_newFrame = false;
+
+    if (symbol_id == 0)
+        is_newFrame = true;
+
+    channel->apply_chan(fmat_src, fmat_dst, is_downlink, is_newFrame);
+
     if (kPrintChannelOutput)
         Utils::print_mat(fmat_dst);
 
