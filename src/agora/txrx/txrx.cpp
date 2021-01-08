@@ -55,8 +55,8 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
     packet_num_in_buffer_ = packet_num_in_buffer;
     tx_buffer_ = tx_buffer;
 
-    if (kUseArgos || kUseUHD) {
-        if (!radioconfig_->radioStart()) {
+    if ((kUseArgos == true) || (kUseUHD == true)) {
+        if (radioconfig_->radioStart() == false) {
             std::fprintf(stderr, "Failed to start radio\n");
             return false;
         }
@@ -69,19 +69,23 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
     }
 
     for (size_t i = 0; i < socket_thread_num; i++) {
-        if (kUseArgos)
+        if (kUseArgos == true) {
             socket_std_threads_[i]
                 = std::thread(&PacketTXRX::loop_tx_rx_argos, this, i);
-        else if (kUseUHD)
+        }
+        else if (kUseUHD == true) {
             socket_std_threads_[i]
                 = std::thread(&PacketTXRX::loop_tx_rx_usrp, this, i);
-        else
+        }
+        else {
             socket_std_threads_[i]
                 = std::thread(&PacketTXRX::loop_tx_rx, this, i);
+        }
     }
 
-    if (kUseArgos || kUseUHD)
+    if ((kUseArgos == true) || (kUseUHD == true)) {
         radioconfig_->go();
+    }
     return true;
 }
 

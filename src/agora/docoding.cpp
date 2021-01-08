@@ -175,7 +175,7 @@ Event_data DoDecode::launch(size_t tag)
         std::printf("\n");
     }
 
-    if (!kEnableMac && kPrintPhyStats && symbol_idx_ul == cfg->frame().client_ul_pilot_symbols()) {
+    if ((kEnableMac == false) && (kPrintPhyStats == true) && (symbol_idx_ul == cfg->frame().client_ul_pilot_symbols())) {
         phy_stats->update_decoded_bits(
             ue_id, symbol_offset, cfg->num_bytes_per_cb() * 8);
         phy_stats->increment_decoded_blocks(ue_id, symbol_offset);

@@ -327,20 +327,22 @@ bool RadioConfig::radioStart()
     if (_cfg->frame().NumDLSyms() > 0) {
         int iter = 0;
         int max_iter = 3;
-        while (!good_calib) {
+        while (good_calib == false) {
             good_calib = initial_calib(_cfg->sample_cal_en());
             iter++;
-            if (iter == max_iter && !good_calib) {
+            if ((iter == max_iter) && (good_calib == false)) {
                 std::cout << "attempted " << max_iter
                           << " unsucessful calibration, stopping ..."
                           << std::endl;
                 break;
             }
         }
-        if (!good_calib)
+        if (good_calib == false) {
             return good_calib;
-        else
+        }
+        else {
             std::cout << "initial calibration successful!" << std::endl;
+        }
         //arma::cx_fmat calib_dl_mat(
         //    init_calib_dl_, _cfg->ofdm_data_num(), _cfg->bf_ant_num(), false);
         //arma::cx_fmat calib_ul_mat(

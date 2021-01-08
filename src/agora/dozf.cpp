@@ -105,7 +105,7 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
             cfg->bs_ant_num(), cfg->ue_num(), false);
         mat_dl_zf = mat_dl_zf_tmp;
     }
-    if (cfg->external_ref_node()) {
+    if (cfg->external_ref_node() == true) {
         mat_ul_zf_tmp.insert_cols(cfg->ref_ant(),
             arma::cx_fmat(cfg->ue_num(), cfg->num_channels(), arma::fill::zeros));
     }

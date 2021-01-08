@@ -209,7 +209,6 @@ public:
 
     /* Public functions that do not meet coding standard format */
     /// Return the symbol type of this symbol in this frame
-    /// \TODO change to table lookup
     SymbolType GetSymbolType(size_t frame_id, size_t symbol_id) const;
 
     /* Inline functions */
@@ -223,14 +222,14 @@ public:
             (this->ofdm_data_num_ * this->mod_order_bits_) / this->ldpc_config_.num_cb_codew_len() );
     }
 
-    /// Return total number of data symbols of all frames_ in a buffer
+    /// Return total number of data symbols of all frames in a buffer
     /// that holds data of kFrameWnd frames_
     inline size_t GetTotalDataSymbolIdx(
         size_t frame_id, size_t symbol_id) const {
         return ((frame_id % kFrameWnd) * this->frame_.NumDataSyms() + symbol_id);
     }
 
-    /// Return total number of uplink data symbols of all frames_ in a buffer
+    /// Return total number of uplink data symbols of all frames in a buffer
     /// that holds data of kFrameWnd frames_
     inline size_t GetTotalDataSymbolIdxUl(
         size_t frame_id, size_t symbol_idx_ul) const {
@@ -238,7 +237,7 @@ public:
             + symbol_idx_ul);
     }
 
-    /// Return total number of downlink data symbols of all frames_ in a buffer
+    /// Return total number of downlink data symbols of all frames in a buffer
     /// that holds data of kFrameWnd frames_
     inline size_t GetTotalDataSymbolIdxDl(
         size_t frame_id, size_t symbol_idx_dl) const {

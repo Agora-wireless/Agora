@@ -216,8 +216,8 @@ void DoFFT::partial_transpose(
                 = &fft_inout[sc_idx + cfg->ofdm_data_start()];
 
             complex_float* dst = nullptr;
-            if (symbol_type == SymbolType::kCalDL
-                || symbol_type == SymbolType::kCalUL) {
+            if ((symbol_type == SymbolType::kCalDL)
+                || (symbol_type == SymbolType::kCalUL)) {
                 dst = &out_buf[sc_idx];
             } else {
                 dst = kUsePartialTrans

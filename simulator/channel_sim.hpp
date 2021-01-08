@@ -109,10 +109,12 @@ private:
 
     inline size_t get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
     {
-        if (symbol_id == 0)
+        if (symbol_id == 0) {
             return 0;
-        else
+        }
+        else {
             return bscfg->GetDLSymbolIdx(frame_id, symbol_id) + 1;
+        }
     }
 };
 

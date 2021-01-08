@@ -873,33 +873,15 @@ bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const
     }
 }
 
-/* TODO change to table lookup */
 SymbolType Config::GetSymbolType(size_t frame_id, size_t symbol_id) const
 {
     assert((this->is_UE_ == false)); // Currently implemented for only the Agora server
-    char s = this->frame_.frame_identifier().at(symbol_id);
-    switch (s) {
-    case 'B':
-        return SymbolType::kBeacon;
-    case 'D':
-        return SymbolType::kDL;
-    case 'U':
-        return SymbolType::kUL;
-    case 'P':
-        return SymbolType::kPilot;
-    case 'C':
-        return SymbolType::kCalDL;
-    case 'L':
-        return SymbolType::kCalUL;
-    }
-    rt_assert(false, std::string("Should not reach here") + std::to_string(s));
-    return SymbolType::kUnknown;
+    return kSymbolMap.at(this->frame_.frame_identifier().at(symbol_id));
 } 
 
 extern "C" {
 __attribute__((visibility("default"))) Config* Config_new(char* filename)
 {
-
     auto* cfg = new Config(filename);
     cfg->GenData();
     return cfg;
