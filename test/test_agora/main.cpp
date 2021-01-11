@@ -1,5 +1,6 @@
 #include "agora.hpp"
 
+
 void read_from_file_ul(std::string filename, Table<uint8_t>& data,
     int num_bytes_per_ue, Config const * const cfg)
 {
@@ -12,21 +13,13 @@ void read_from_file_ul(std::string filename, Table<uint8_t>& data,
     } else {
         std::printf("opening file %s\n", filename.c_str());
     }
-    int expect_num_bytes = num_bytes_per_ue * ue_num;
-    // std::printf("read data of %d byptes\n", expect_num_bytes);
+    const unsigned read_size = (num_bytes_per_ue * ue_num);
     for (int i = 0; i < data_symbol_num_perframe; i++) {
-        int num_bytes = std::fread(data[i], sizeof(uint8_t), expect_num_bytes, fp);
-        // if (i == 0) {
-        // std::printf("i: %d\n", i);
-        // for (int j = 0; j < num_bytes; j++) {
-        //     std::printf("%u ", data[i][j]);
-        // }
-        // std::printf("\n");
-        // }
-        if (expect_num_bytes != num_bytes) {
-            std::printf("read file failed: %s, symbol %d, expect: %d, actual: %d "
+        size_t num_bytes = std::fread(data[i], sizeof(uint8_t), read_size, fp);
+        if (read_size != num_bytes) {
+            std::printf("read file failed: %s, symbol %d, expect: %d, actual: %zu "
                    "bytes\n",
-                filename.c_str(), i, expect_num_bytes, num_bytes);
+                filename.c_str(), i, read_size, num_bytes);
             std::cerr << "Error: " << strerror(errno) << std::endl;
         }
     }
@@ -41,15 +34,19 @@ void read_from_file_dl(
     if (fp == NULL) {
         std::printf("open file failed: %s\n", filename.c_str());
         std::cerr << "Error: " << strerror(errno) << std::endl;
+    } else {
+        std::printf("opening file %s\n", filename.c_str());
     }
-    for (size_t i = 0; i < data_symbol_num_perframe * bs_ant_num; i++) {
-        if ((unsigned)ofdm_size * 2
-            != std::fread(data[i], sizeof(short), ofdm_size * 2, fp)) {
+    const unsigned read_size = static_cast<unsigned>(ofdm_size * 2u);
+    for (size_t i = 0; i < (data_symbol_num_perframe * bs_ant_num); i++) {
+        size_t num_bytes = std::fread(data[i], sizeof(short), read_size, fp);
+        if (read_size != num_bytes) {
             std::printf("read file failed: %s\n", filename.c_str());
             std::cerr << "Error: " << strerror(errno) << std::endl;
         }
     }
 }
+
 
 void check_correctness_ul(Config const * const cfg)
 {
@@ -66,41 +63,44 @@ void check_correctness_ul(Config const * const cfg)
 
     Table<uint8_t> raw_data;
     Table<uint8_t> output_data;
-    raw_data.calloc(data_symbol_num_perframe, ofdm_data_num * ue_num, Agora_memory::Alignment_t::k64Align);
-    output_data.calloc(data_symbol_num_perframe, ofdm_data_num * ue_num, Agora_memory::Alignment_t::k64Align);
+    raw_data.calloc(data_symbol_num_perframe, (ofdm_data_num * ue_num), Agora_memory::Alignment_t::k64Align);
+    output_data.calloc(data_symbol_num_perframe, (ofdm_data_num * ue_num), Agora_memory::Alignment_t::k64Align);
 
     int num_bytes_per_ue
         = (cfg->ldpc_config().num_cb_len() + 7) >> 3 * cfg->ldpc_config().num_blocks_in_symbol();
     read_from_file_ul(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
     read_from_file_ul(output_data_filename, output_data, num_bytes_per_ue, cfg);
 
+    std::printf("check_correctness_ul: ue %d, ul syms %d, ofdm %d, ul pilots %d.\n", ue_num, data_symbol_num_perframe, ofdm_data_num, ul_pilot_syms);
+
     int error_cnt = 0;
     int total_count = 0;
     for (int i = 0; i < data_symbol_num_perframe; i++) {
-        if (i < ul_pilot_syms)
-            continue;
-        for (int ue = 0; ue < ue_num; ue++) {
-            for (int j = 0; j < num_bytes_per_ue; j++) {
-                total_count++;
-                int offset_in_raw = num_bytes_per_ue * ue + j;
-                int offset_in_output = num_bytes_per_ue * ue + j;
-                if (raw_data[i][offset_in_raw]
-                    != output_data[i][offset_in_output]) {
-                    error_cnt++;
-                    // std::printf("(%d, %d, %u, %u)\n", i, j,
-                    //     raw_data[i][offset_in_raw],
-                    //     output_data[i][offset_in_output]);
+        if (i >= ul_pilot_syms) {
+            for (int ue = 0; ue < ue_num; ue++) {
+                for (int j = 0; j < num_bytes_per_ue; j++) {
+                    total_count++;
+                    int offset_in_raw = num_bytes_per_ue * ue + j;
+                    int offset_in_output = num_bytes_per_ue * ue + j;
+                    if (raw_data[i][offset_in_raw] != output_data[i][offset_in_output]) {
+                        error_cnt++;
+                        // std::printf("(%d, %d, %u, %u)\n", i, j,
+                        //     raw_data[i][offset_in_raw],
+                        //     output_data[i][offset_in_output]);
+                    }
                 }
-            }
-        }
-    }
+            } //  for (int ue = 0; ue < ue_num; ue++) {
+        } // if (i >= ul_pilot_syms) {
+    } //for (int i = 0; i < data_symbol_num_perframe; i++) {
     std::printf("======================\n");
     std::printf("Uplink test: \n\n");
-    if (error_cnt == 0)
+    if (error_cnt == 0) {
         std::printf("Passed uplink test!\n");
-    else
+    }
+    else {
         std::printf(
             "Failed uplink test! Error rate: %d/%d\n", error_cnt, total_count);
+    }
     std::printf("======================\n\n");
     raw_data.free();
     output_data.free();
@@ -111,7 +111,7 @@ void check_correctness_dl(Config const * const cfg)
     int bs_ant_num = cfg->bs_ant_num();
     int data_symbol_num_perframe = cfg->frame().NumDLSyms();
     int ofdm_ca_num = cfg->ofdm_ca_num();
-    int sampsPerSymbol = cfg->samps_per_symbol();
+    int samps_per_symbol = cfg->samps_per_symbol();
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string raw_data_filename = cur_directory + "/data/LDPC_dl_tx_data_"
@@ -121,12 +121,13 @@ void check_correctness_dl(Config const * const cfg)
     Table<short> raw_data;
     Table<short> tx_data;
     raw_data.calloc(
-        data_symbol_num_perframe * bs_ant_num, sampsPerSymbol * 2, Agora_memory::Alignment_t::k64Align);
+        data_symbol_num_perframe * bs_ant_num, samps_per_symbol * 2, Agora_memory::Alignment_t::k64Align);
     tx_data.calloc(
-        data_symbol_num_perframe * bs_ant_num, sampsPerSymbol * 2, Agora_memory::Alignment_t::k64Align);
+        data_symbol_num_perframe * bs_ant_num, samps_per_symbol * 2, Agora_memory::Alignment_t::k64Align);
 
-    read_from_file_dl(raw_data_filename, raw_data, sampsPerSymbol, cfg);
-    read_from_file_dl(tx_data_filename, tx_data, sampsPerSymbol, cfg);
+    read_from_file_dl(raw_data_filename, raw_data, samps_per_symbol, cfg);
+    read_from_file_dl(tx_data_filename, tx_data, samps_per_symbol, cfg);
+    std::printf("check_correctness_dl: bs ant %d, dl syms %d, ofdm %d, samps per %d. \n", bs_ant_num, data_symbol_num_perframe, ofdm_ca_num, samps_per_symbol);
 
     int error_cnt = 0;
     int total_count = 0;
@@ -136,7 +137,7 @@ void check_correctness_dl(Config const * const cfg)
             // std::printf("symbol %d, antenna %d\n", i, ant);
             sum_diff = 0;
             total_count++;
-            for (int sc = 0; sc < sampsPerSymbol * 2; sc++) {
+            for (int sc = 0; sc < samps_per_symbol * 2; sc++) {
                 int offset = bs_ant_num * i + ant;
                 float diff = fabs(
                     (raw_data[offset][sc] - tx_data[offset][sc]) / 32768.0);
@@ -145,7 +146,7 @@ void check_correctness_dl(Config const * const cfg)
                 // std::printf("symbol %d ant %d sc %d, (%d, %d) diff: %.3f\n", i, ant,
                 //     sc / 2, raw_data[offset][sc], tx_data[offset][sc], diff);
             }
-            float avg_diff = sum_diff / sampsPerSymbol;
+            float avg_diff = sum_diff / samps_per_symbol;
             std::printf("symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant,
                 avg_diff);
             if (avg_diff > 0.03)
@@ -163,6 +164,13 @@ void check_correctness_dl(Config const * const cfg)
     raw_data.free();
     tx_data.free();
 }
+
+
+void check_correctness(Config const * const cfg) {
+    check_correctness_ul(cfg);
+    check_correctness_dl(cfg);
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -186,14 +194,18 @@ int main(int argc, char* argv[])
         agora_cli->start();
 
         std::printf("Start correctness check\n");
-        /* TODO make sure this works in the combined case...  */
-        if (cfg->frame().NumDLSyms() > 0) {
+
+        if ((cfg->frame().NumDLSyms() > 0) && (cfg->frame().NumULSyms() > 0)) {
+            check_correctness(cfg.get());
+        } else if (cfg->frame().NumDLSyms() > 0) {
             check_correctness_dl(cfg.get());
-        }
-        
-        if (cfg->frame().NumULSyms() > 0) {
+        } else if (cfg->frame().NumULSyms() > 0) {
             check_correctness_ul(cfg.get());
+        } else {
+            //Should never happen
+            assert(false);
         }
+
         ret = EXIT_SUCCESS;
     } catch (SignalException& e) {
         std::cerr << "SignalException: " << e.what() << std::endl;

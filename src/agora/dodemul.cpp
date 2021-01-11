@@ -78,7 +78,7 @@ Event_data DoDemul::launch(size_t tag)
     const size_t frame_slot = frame_id % kFrameWnd;
     size_t start_tsc = worker_rdtsc();
 
-    if (kDebugPrintInTask == false) {
+    if (kDebugPrintInTask == true) {
         std::printf(
             "In doDemul tid %d: frame: %zu, symbol idx UL: %zu, subcarrier: %zu \n",
             tid, frame_id, symbol_idx_ul, base_sc_id);

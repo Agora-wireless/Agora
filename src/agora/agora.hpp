@@ -101,6 +101,8 @@ public:
     } flags;
 
 private:
+    bool CheckWorkComplete(size_t frame_id) const;
+
     /// Fetch the concurrent queue for this event type
     moodycamel::ConcurrentQueue<Event_data>* get_conq(
         EventType event_type, size_t qid)
@@ -203,7 +205,6 @@ private:
     FrameCounters ifft_counters_;
     FrameCounters tx_counters_;
     FrameCounters tomac_counters_;
-    FrameCounters frommac_counters_;
     FrameCounters rc_counters_;
     RxCounters rx_counters_;
     size_t zf_last_frame = SIZE_MAX;
