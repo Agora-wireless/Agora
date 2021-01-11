@@ -294,8 +294,8 @@ void Receiver::run_ifft(short* src, complex_float* ifft_inout,
 
     // Begin Debug
     printf("Recovered precoded data:\n");
-    for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i ++) {
-        printf("(%lf %lf) ", ifft_inout[i + cfg->OFDM_DATA_START].re, ifft_inout[i + cfg->OFDM_DATA_START].im);
+    for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
+        printf("(%u %lf %lf) ", i, ifft_inout[i].re, ifft_inout[i].im);
     }
     printf("\n");
     // End Debug
@@ -308,4 +308,12 @@ void Receiver::run_ifft(short* src, complex_float* ifft_inout,
 
     simd_convert_float_to_short(reinterpret_cast<float*>(ifft_inout), 
         src, cfg->OFDM_CA_NUM * 2);
+
+    // Begin Debug
+    printf("IFFT data:\n");
+    for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
+        printf("(%u %d %d) ", i, src[i * 2], src[i * 2 + 1]);
+    }
+    printf("\n");
+    // End Debug
 }
