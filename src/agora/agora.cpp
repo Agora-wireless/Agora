@@ -1133,8 +1133,8 @@ void Agora::print_per_task_done(PrintType print_type, size_t frame_id,
     if (kDebugPrintPerTaskDone == true) {
         switch (print_type) {
         case (PrintType::kZF):
-            //std::printf("Main thread: ZF done frame: %zu, subcarrier %zu\n",
-            //    frame_id, ant_or_sc_id);
+            std::printf("Main thread: ZF done frame: %zu, subcarrier %zu\n",
+                frame_id, ant_or_sc_id);
             break;
         case (PrintType::kRC):
             std::printf("Main thread: RC done frame: %zu, subcarrier %zu\n",
