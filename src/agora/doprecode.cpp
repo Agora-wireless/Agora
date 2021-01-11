@@ -73,7 +73,7 @@ Event_data DoPrecode::launch(size_t tag)
                     int8_t* raw_data_ptr
                         = &dl_raw_data[total_data_symbol_idx][cur_sc_id
                             + roundup<64>(cfg->OFDM_DATA_NUM) * user_id];
-                    if (cur_sc_id % cfg->OFDM_PILOT_SPACING == 0)
+                    if ((cur_sc_id + cfg->subcarrier_start - cfg->OFDM_DATA_START) % cfg->OFDM_PILOT_SPACING == 0)
                         data_ptr[user_id]
                             = cfg->ue_specific_pilot[user_id][cur_sc_id];
                     else

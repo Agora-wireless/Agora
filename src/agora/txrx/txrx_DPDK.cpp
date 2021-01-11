@@ -324,7 +324,7 @@ void* PacketTXRX::encode_thread(int tid)
                 if (server_idx == cfg->bs_server_addr_idx) {
                     printf("TXRX receive in situ encoded data frame %u symbol %u ue %u\n", encode_frame_to_send_, encode_symbol_dl_to_send_, encode_ue_to_send_);
                     int8_t* dst_ptr = cfg->get_encoded_buf(*encoded_buffer_to_precode_, encode_frame_to_send_,
-                        encode_symbol_dl_to_send_, encode_ue_to_send_, 0) + cfg->get_num_sc_per_server() * server_idx;
+                        encode_symbol_dl_to_send_, encode_ue_to_send_, 0);
                     memcpy(dst_ptr, src_ptr, cfg->get_num_sc_per_server());
                     precode_status_->receive_encoded_data(encode_frame_to_send_, encode_symbol_dl_to_send_);
                 } else {

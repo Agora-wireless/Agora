@@ -335,7 +335,7 @@ int main(int argc, char* argv[])
     //     printf("(%lf %lf) ", dl_mod_data[0][cfg->OFDM_DATA_START + i].re, dl_mod_data[0][cfg->OFDM_DATA_START + i].im);
     // }
     for (size_t i = 0; i < cfg->UE_NUM; i ++) {
-        printf("(%lf %lf) ", dl_mod_data[0][i * cfg->OFDM_CA_NUM + cfg->OFDM_DATA_START + 1].re, dl_mod_data[0][i * cfg->OFDM_CA_NUM + cfg->OFDM_DATA_START + 1].im);
+        printf("(%lf %lf) ", dl_mod_data[0][i * cfg->OFDM_CA_NUM + cfg->OFDM_DATA_START + 601].re, dl_mod_data[0][i * cfg->OFDM_CA_NUM + cfg->OFDM_DATA_START + 601].im);
     }
     printf("\n");
     // End Debug
@@ -416,7 +416,7 @@ int main(int argc, char* argv[])
         }
         // Begin Debug
         printf("Precoded data:\n");
-        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i ++) {
+        for (size_t i = 600; i < cfg->OFDM_DATA_NUM; i ++) {
             printf("(%lf %lf) ", dl_ifft_data[0][i + cfg->OFDM_DATA_START].re, dl_ifft_data[0][i + cfg->OFDM_DATA_START].im);
         }
         printf("\n");
@@ -445,7 +445,7 @@ int main(int argc, char* argv[])
         }
 
         printf("IFFT data:\n");
-        for (size_t j = 0; j < cfg->OFDM_DATA_NUM; j ++) {
+        for (size_t j = 600; j < cfg->OFDM_DATA_NUM; j ++) {
             printf("(%d %d) ", dl_tx_data[i][(j + cfg->OFDM_DATA_START) * 2], dl_tx_data[i][(j + cfg->OFDM_DATA_START) * 2 + 1]);
         }
         printf("\n");
