@@ -242,8 +242,6 @@ Config::Config(std::string jsonfile)
         sched.append(add_symbols, 'G');
 
         frame_ = FrameStats(sched);
-        std::printf("Config: Frame schedule %s (%zu symbols)\n", sched.c_str(),
-            sched.length());
     } else {
         json jframes = tddConf.value("frames", json::array());
 
@@ -251,6 +249,8 @@ Config::Config(std::string jsonfile)
         assert(jframes.size() == 1);
         frame_ = FrameStats(jframes.at(0).get<std::string>());
     }
+    std::printf("Config: Frame schedule %s (%zu symbols)\n", frame_.frame_identifier().c_str(),
+            frame_.NumTotalSyms());
 
     /* client_dl_pilot_sym uses the first x 'D' symbols for downlink channel estimation for each user. */
     size_t client_dl_pilot_syms = tddConf.value("client_dl_pilot_syms", 0);
@@ -307,14 +307,14 @@ Config::Config(std::string jsonfile)
     /* LDPC Coding configurations */
     uint16_t base_graph       = tddConf.value("base_graph", 1);
     uint16_t zc               = tddConf.value("Zc", 72);
-    bool     early_term       = tddConf.value("earlyTermination", 1);
+    bool     early_term       = tddConf.value("earlyTermination", true);
     int16_t  max_decoder_iter = tddConf.value("decoderIter", 5);
     size_t   num_rows         = tddConf.value("nRows", (base_graph == 1) ? 46 : 42);
     uint32_t num_cb_len       = ldpc_num_input_bits(base_graph, zc);
     uint32_t num_cb_codew_len = ldpc_num_encoded_bits(base_graph, zc, num_rows);
 
     /* */
-    ldpc_config_ = LDPCconfig(base_graph, zc, early_term, max_decoder_iter, 
+    ldpc_config_ = LDPCconfig(base_graph, zc, max_decoder_iter, early_term,
                               num_cb_len, num_cb_codew_len, num_rows, 0);
 
     /* Modulation configurations */
