@@ -58,7 +58,7 @@ public:
                     pkt->frame_id);
             }
         } else {
-            num_data_pkts_[frame_slot][pkt->symbol_id]++;
+            num_data_pkts_[frame_slot][pkt->symbol_id - num_pilot_symbols_per_frame_]++;
         }
         if (pkt->frame_id > latest_frame_) {
             // TODO: race condition could happen here but the impact is small
@@ -79,12 +79,12 @@ public:
     }
 
     // Check whether demodulation can proceed for a symbol in a frame
-    bool is_demod_ready(size_t frame_id, size_t symbol_id)
+    bool is_demod_ready(size_t frame_id, size_t symbol_id_ul)
     {
         if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
             return false;
         }
-        return num_data_pkts_[frame_id % kFrameWnd][symbol_id]
+        return num_data_pkts_[frame_id % kFrameWnd][symbol_id_ul]
             == num_pkts_per_symbol_;
     }
 
@@ -215,7 +215,7 @@ public:
     }
 
     // Mark [num_tasks] demodulation tasks for this frame and symbol as complete
-    void demul_complete(size_t frame_id, size_t symbol_id, size_t num_tasks)
+    void demul_complete(size_t frame_id, size_t symbol_id_ul, size_t num_tasks)
     {
         max_frame_mutex_.lock();
         if (frame_id > max_frame_) {
@@ -227,19 +227,19 @@ public:
         max_frame_mutex_.unlock();
         rt_assert(frame_id <= max_frame_ && frame_id + kFrameWnd > max_frame_,
             "Complete a wrong frame in demul!");
-        num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id]
+        num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
             += num_tasks;
     }
 
     // Return true iff we have completed demodulation for all subcarriers in
     // this symbol have
-    bool ready_to_decode(size_t frame_id, size_t symbol_id)
+    bool ready_to_decode(size_t frame_id, size_t symbol_id_ul)
     {
         rt_assert(frame_id + kFrameWnd > max_frame_, "Decode too slow!");
         if (frame_id > max_frame_) {
             return false;
         }
-        return num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id]
+        return num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
             == num_demul_tasks_required_;
     }
 
@@ -264,8 +264,8 @@ public:
     {
         cur_frame_ = new size_t[cfg->get_num_ues_to_process()];
         memset(cur_frame_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
-        cur_symbol_ = new size_t[cfg->get_num_ues_to_process()];
-        memset(cur_symbol_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
+        cur_symbol_ul_ = new size_t[cfg->get_num_ues_to_process()];
+        memset(cur_symbol_ul_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
 
         num_demod_data_received_
             = new std::array<std::array<size_t, kMaxSymbols>,
@@ -277,23 +277,22 @@ public:
         }
     }
 
-    void receive_demod_data(size_t ue_id, size_t frame_id, size_t symbol_id)
+    void receive_demod_data(size_t ue_id, size_t frame_id, size_t symbol_id_ul)
     {
-        num_demod_data_received_[ue_id - cfg_->ue_start][frame_id % kFrameWnd]
-                                [symbol_id]++;
-        //printf("Receive demod data for ue %lu symbol %lu\n", ue_id, symbol_id);
+        num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul]++;
+        //printf("Receive demod data for ue %lu symbol %lu\n", ue_id, symbol_id_ul);
     }
 
     bool received_all_demod_data(
-        size_t ue_id, size_t frame_id, size_t symbol_id)
+        size_t ue_id, size_t frame_id, size_t symbol_id_ul)
     {
-        if (num_demod_data_received_[ue_id - cfg_->ue_start]
-                                    [frame_id % kFrameWnd][symbol_id]
+        if (num_demod_data_received_[ue_id]
+                                    [frame_id % kFrameWnd][symbol_id_ul]
             == num_demod_data_required_) {
-            num_demod_data_received_[ue_id - cfg_->ue_start]
-                                    [frame_id % kFrameWnd][symbol_id]
+            num_demod_data_received_[ue_id]
+                                    [frame_id % kFrameWnd][symbol_id_ul]
                 = 0;
-            printf("Received all demod data for user %lu frame %lu symbol %lu\n", ue_id, frame_id, symbol_id);
+            printf("Received all demod data for user %lu frame %lu symbol %lu\n", ue_id, frame_id, symbol_id_ul);
             return true;
         }
         return false;
@@ -302,7 +301,7 @@ public:
 private:
     Config* cfg_;
     size_t* cur_frame_;
-    size_t* cur_symbol_; // symbol ID for UL data
+    size_t* cur_symbol_ul_; // symbol ID for UL data
     const size_t num_demod_data_required_;
 
     std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>*

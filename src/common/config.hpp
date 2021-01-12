@@ -471,12 +471,12 @@ public:
 
     inline int8_t* get_demod_buf_to_decode(
         Table<int8_t>& demod_buffer_to_decode, size_t frame_id,
-        size_t symbol_id, size_t ue_id, size_t sc_id) const
+        size_t symbol_id_ul, size_t ue_id, size_t sc_id) const
     {
         size_t total_data_symbol_id
-            = get_total_data_symbol_idx_ul(frame_id, symbol_id);
+            = get_total_data_symbol_idx_ul(frame_id, symbol_id_ul);
         return &demod_buffer_to_decode[total_data_symbol_id]
-                                      [OFDM_DATA_NUM * 8 * ue_id
+                                      [OFDM_DATA_NUM * kMaxModType * ue_id
                                           + sc_id * mod_order_bits];
     }
 
@@ -490,10 +490,10 @@ public:
 
     /// Get encoded_buffer for this frame, symbol, user and code block ID
     inline int8_t* get_encoded_buf(Table<int8_t>& encoded_buffer,
-        size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const
+        size_t frame_id, size_t symbol_id_dl, size_t ue_id, size_t cb_id) const
     {
         size_t total_data_symbol_id
-            = get_total_data_symbol_idx_dl(frame_id, symbol_id);
+            = get_total_data_symbol_idx_dl(frame_id, symbol_id_dl);
         size_t num_encoded_bytes_per_cb
             = LDPC_config.cbCodewLen / mod_order_bits;
         return &encoded_buffer[total_data_symbol_id]

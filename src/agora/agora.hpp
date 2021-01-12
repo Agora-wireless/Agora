@@ -57,7 +57,7 @@ public:
     void* encode_worker(int tid);
 
     void handle_event_fft(size_t tag);
-    void update_rx_counters(size_t frame_id, size_t symbol_id);
+    void update_rx_counters(size_t frame_id, size_t symbol_id); // Not used
     void print_per_frame_done(PrintType print_type, size_t frame_id);
     void print_per_symbol_done(
         PrintType print_type, size_t frame_id, size_t symbol_id);

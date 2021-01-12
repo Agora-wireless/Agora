@@ -147,7 +147,7 @@ private:
     RxStatus* rx_status_; // Shared states with workers
     DemulStatus* demul_status_;
     size_t demod_frame_to_send_ = 0;
-    size_t demod_symbol_to_send_;
+    size_t demod_symbol_ul_to_send_;
     DecodeStatus* decode_status_;
     EncodeStatus* encode_status_;
     PrecodeStatus* precode_status_;

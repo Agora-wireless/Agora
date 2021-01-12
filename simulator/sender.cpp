@@ -84,12 +84,12 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
     rt_assert(ret == 1, "Invalid server IP address");
 
-    bs_server_addr_list.reserve(cfg->bs_server_addr_list.size());
+    bs_server_addr_list.resize(cfg->bs_server_addr_list.size());
     for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
         ret = inet_pton(AF_INET, cfg->bs_server_addr_list[i].c_str(), &bs_server_addr_list[i]);
     }
 
-    server_mac_addr_list.reserve(cfg->bs_server_addr_list.size());
+    server_mac_addr_list.resize(cfg->bs_server_addr_list.size());
     for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
         ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[i].c_str());
         rt_assert(parsed_mac != NULL, "Invalid server mac address");
@@ -321,8 +321,7 @@ void* Sender::worker_thread(int tid)
         run_fft(data_buf->data, fft_inout, mkl_handle);
 
 #ifdef USE_DPDK
-        const size_t sc_block_size
-            = cfg->OFDM_DATA_NUM / cfg->bs_server_addr_list.size();
+        const size_t sc_block_size = cfg->get_num_sc_per_server();
         for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i++) {
             pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t*) + kPayloadOffset);
             pkt->pkt_type = Packet::PktType::kIQFromRRU;

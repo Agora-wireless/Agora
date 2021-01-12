@@ -117,7 +117,7 @@ public:
             dl_encoded_buffer_, stats);
 
         // Init internal states
-        demul_cur_sym_ = cfg->pilot_symbol_num_perframe;
+        demul_cur_sym_ul_ = 0;
     }
 
     ~DoSubcarrier()
@@ -163,9 +163,9 @@ public:
 
             if (zf_cur_frame_ > demul_cur_frame_
                 && rx_status_->is_demod_ready(
-                       demul_cur_frame_, demul_cur_sym_)) {
+                       demul_cur_frame_, demul_cur_sym_ul_)) {
                 do_demul_->launch(demul_cur_frame_,
-                    demul_cur_sym_ - cfg->pilot_symbol_num_perframe,
+                    demul_cur_sym_ul_,
                     sc_range_.start
                         + (n_demul_tasks_done_ * cfg->demul_block_size));
 
@@ -191,15 +191,14 @@ public:
 
                     n_demul_tasks_done_ = 0;
                     demul_status_->demul_complete(
-                        demul_cur_frame_, demul_cur_sym_, n_demul_tasks_reqd);
-                    demul_cur_sym_++;
-                    if (demul_cur_sym_ == cfg->symbol_num_perframe) {
-                        demul_cur_sym_ = cfg->pilot_symbol_num_perframe;
+                        demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_reqd);
+                    demul_cur_sym_ul_++;
+                    if (demul_cur_sym_ul_ == cfg->ul_data_symbol_num_perframe) {
+                        demul_cur_sym_ul_ = 0;
                         printf("Main thread: Demodulation done frame: %lu "
                                "(%lu UL symbols)\n",
                             demul_cur_frame_,
-                            cfg->symbol_num_perframe
-                                - cfg->pilot_symbol_num_perframe);
+                            cfg->ul_data_symbol_num_perframe);
                         demul_cur_frame_++;
                     }
                 }
@@ -260,7 +259,7 @@ private:
                         simd_convert_float16_to_float32(
                             reinterpret_cast<float*>(converted_sc),
                             reinterpret_cast<float*>(pkt->data
-                                + (cfg->subcarrier_start + sc_idx) * 2),
+                                + (cfg->OFDM_DATA_START + sc_idx) * 2),
                             kSCsPerCacheline * 2);
 
                         const complex_float* src = converted_sc;
@@ -271,8 +270,9 @@ private:
                         // With either of AVX-512 or AVX2, load one cacheline =
                         // 16 float values = 8 subcarriers = kSCsPerCacheline
                         // TODO: AVX512 complex multiply support below
-                        size_t pilots_sgn_offset = cfg->bs_server_addr_idx
-                            * cfg->get_num_sc_per_server();
+                        // size_t pilots_sgn_offset = cfg->bs_server_addr_idx
+                        //     * cfg->get_num_sc_per_server();
+                        size_t pilots_sgn_offset = 0;
 
                         __m256 fft_result0 = _mm256_load_ps(
                             reinterpret_cast<const float*>(src));
@@ -351,7 +351,7 @@ private:
 
     // Internal Demul states
     size_t demul_cur_frame_; // Current frame waiting for ZF matrix
-    size_t demul_cur_sym_ = 0; // Current data symbol wait to process
+    size_t demul_cur_sym_ul_ = 0; // Current data symbol wait to process
     size_t n_demul_tasks_done_ = 0;
 
     // Internal Precode states

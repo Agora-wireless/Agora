@@ -24,7 +24,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num + 1);
     mbuf_pool_ = DpdkTransport::create_mempool();
-    demod_symbol_to_send_ = cfg->pilot_symbol_num_perframe;
+    demod_symbol_ul_to_send_ = 0;
     encode_ue_to_send_ = cfg->ue_start;
 
     const uint16_t port_id = 0; // The DPDK port ID
@@ -176,20 +176,19 @@ void* PacketTXRX::demod_thread(int tid)
     while (cfg->running) {
         // 1. Try to send demodulated data to decoders
         if (demul_status_->ready_to_decode(
-                demod_frame_to_send_, demod_symbol_to_send_)) {
+                demod_frame_to_send_, demod_symbol_ul_to_send_)) {
             for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
-                int8_t* demod_ptr = (*demod_buffers_)[demod_frame_to_send_
-                    % kFrameWnd][demod_symbol_to_send_
-                    - cfg->pilot_symbol_num_perframe][ue_id];
+                int8_t* demod_ptr = &(*demod_buffers_)[demod_frame_to_send_
+                    % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->bs_server_addr_idx * cfg->get_num_sc_per_server()];
 
                 size_t target_server_idx = cfg->get_server_idx_by_ue(ue_id);
                 if (target_server_idx == cfg->bs_server_addr_idx) {
                     int8_t* target_demod_ptr
                         = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
-                            demod_frame_to_send_, demod_symbol_to_send_, ue_id, cfg->bs_server_addr_idx * cfg->get_num_sc_per_server());
+                            demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg->bs_server_addr_idx * cfg->get_num_sc_per_server());
                     memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                     decode_status_->receive_demod_data(
-                        ue_id, demod_frame_to_send_, demod_symbol_to_send_ - cfg->pilot_symbol_num_perframe);
+                        ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
                     tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool_);
@@ -219,7 +218,7 @@ void* PacketTXRX::demod_thread(int tid)
                     auto* pkt = reinterpret_cast<Packet*>(payload);
                     pkt->pkt_type = Packet::PktType::kDemod;
                     pkt->frame_id = demod_frame_to_send_;
-                    pkt->symbol_id = demod_symbol_to_send_;
+                    pkt->symbol_id = demod_symbol_ul_to_send_;
                     pkt->ue_id = ue_id;
                     pkt->server_id = cfg->bs_server_addr_idx;
                     DpdkTransport::fastMemcpy(pkt->data, demod_ptr,
@@ -233,11 +232,10 @@ void* PacketTXRX::demod_thread(int tid)
                     }
                 }
             }
-            demod_symbol_to_send_++;
-            if (demod_symbol_to_send_
-                == cfg->pilot_symbol_num_perframe
-                    + cfg->ul_data_symbol_num_perframe) {
-                demod_symbol_to_send_ = cfg->pilot_symbol_num_perframe;
+            demod_symbol_ul_to_send_++;
+            if (demod_symbol_ul_to_send_
+                == cfg->ul_data_symbol_num_perframe) {
+                demod_symbol_ul_to_send_ = 0;
                 demod_frame_to_send_++;
             }
         }
@@ -282,8 +280,7 @@ void* PacketTXRX::demod_thread(int tid)
 
             auto* pkt = reinterpret_cast<Packet*>((char*)(eth_hdr) + kPayloadOffset);
             if (pkt->pkt_type == Packet::PktType::kDemod) {
-                const size_t symbol_idx_ul
-                    = pkt->symbol_id - cfg->pilot_symbol_num_perframe;
+                const size_t symbol_idx_ul = pkt->symbol_id;
                 const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
 
                 int8_t* demod_ptr
@@ -324,33 +321,11 @@ void* PacketTXRX::encode_thread(int tid)
                 if (server_idx == cfg->bs_server_addr_idx) {
                     printf("TXRX receive in situ encoded data frame %u symbol %u ue %u\n", encode_frame_to_send_, encode_symbol_dl_to_send_, encode_ue_to_send_);
                     int8_t* dst_ptr = cfg->get_encoded_buf(*encoded_buffer_to_precode_, encode_frame_to_send_,
-                        encode_symbol_dl_to_send_, encode_ue_to_send_, 0);
+                        encode_symbol_dl_to_send_, encode_ue_to_send_, 0) + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server();
                     memcpy(dst_ptr, src_ptr, cfg->get_num_sc_per_server());
                     precode_status_->receive_encoded_data(encode_frame_to_send_, encode_symbol_dl_to_send_);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-                    // tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool_);
-                    // struct rte_ether_hdr* eth_hdr
-                    //     = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
-                    // eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
-                    // memcpy(eth_hdr->s_addr.addr_bytes, bs_server_mac_addrs_[cfg->bs_server_addr_idx].addr_bytes,
-                    //     RTE_ETHER_ADDR_LEN);
-                    // memcpy(eth_hdr->d_addr.addr_bytes, bs_server_mac_addrs_[server_idx].addr_bytes,
-                    //     RTE_ETHER_ADDR_LEN);
-
-                    // struct rte_ipv4_hdr* ip_h
-                    //     = (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
-                    // ip_h->src_addr = bs_server_addrs_[cfg->bs_server_addr_idx];
-                    // ip_h->dst_addr = bs_server_addrs_[server_idx];
-                    // ip_h->next_proto_id = IPPROTO_UDP;
-
-                    // struct rte_udp_hdr* udp_h
-                    //     = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
-                    // udp_h->src_port = rte_cpu_to_be_16(cfg->encode_tx_port);
-                    // udp_h->dst_port = rte_cpu_to_be_16(cfg->encode_rx_port);
-
-                    // tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
-                    // tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;
                     tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_, bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[server_idx],
                         bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[server_idx], cfg->encode_tx_port, cfg->encode_rx_port, cfg->packet_length);
                     struct rte_ether_hdr* eth_hdr
@@ -438,14 +413,16 @@ void* PacketTXRX::encode_thread(int tid)
 
                 int8_t* dst_ptr
                     = cfg->get_encoded_buf(*encoded_buffer_to_precode_,
-                        pkt->frame_id, symbol_idx_dl, pkt->ue_id, 0);
+                        pkt->frame_id, symbol_idx_dl, pkt->ue_id, 0) + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server();
                 // DpdkTransport::fastMemcpy(dst_ptr, pkt->data,
                 //     cfg->get_num_sc_per_server());
                 memcpy(dst_ptr, pkt->data, cfg->get_num_sc_per_server());
+                // Begin Debug
                 if (ue_id == 2) {
                     complex_float tf = mod_single_uint8(((uint8_t*)pkt->data)[1], cfg->mod_table);
                     printf("Received mod data: (%lf %lf)\n", tf.re, tf.im);
                 }
+                // End Debug
                 precode_status_->receive_encoded_data(pkt->frame_id, symbol_idx_dl);
             } else {
                 printf("Received unknown packet type in encode TX/RX thread\n");
@@ -684,7 +661,7 @@ int PacketTXRX::recv(int tid)
 }
 
 // TODO: check correctness of this funcion
-int PacketTXRX::dequeue_send(int tid, size_t symbol_to_send, size_t ant_to_send)
+int PacketTXRX::dequeue_send(int tid, size_t symbol_dl_to_send, size_t ant_to_send)
 {
     if (rx_status_->cur_frame_ > frame_to_send_[tid]) {
 
@@ -716,7 +693,7 @@ int PacketTXRX::dequeue_send(int tid, size_t symbol_to_send, size_t ant_to_send)
         auto* pkt = reinterpret_cast<Packet*>(payload);
         pkt->pkt_type = Packet::PktType::kIQFromServer;
         pkt->frame_id = frame_to_send_[tid];
-        pkt->symbol_id = symbol_to_send;
+        pkt->symbol_id = symbol_dl_to_send;
         pkt->ant_id = ant_to_send;
         pkt->server_id = cfg->bs_server_addr_idx;
         size_t data_symbol_idx_dl = cfg->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);

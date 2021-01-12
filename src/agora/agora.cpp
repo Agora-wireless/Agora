@@ -171,8 +171,8 @@ void* Agora::subcarrier_worker(int tid)
         ThreadType::kWorker, base_worker_core_offset + 1, tid);
 
     auto computeSubcarrier = new DoSubcarrier(config_, tid, freq_ghz,
-        Range(tid * config_->subcarrier_block_size,
-            (tid + 1) * config_->subcarrier_block_size),
+        Range(tid * config_->subcarrier_block_size + config_->bs_server_addr_idx * config_->get_num_sc_per_server(),
+            (tid + 1) * config_->subcarrier_block_size + config_->bs_server_addr_idx * config_->get_num_sc_per_server()),
         socket_buffer_, csi_buffers_, calib_buffer_,
         dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
         ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
@@ -219,6 +219,7 @@ void Agora::update_ran_config(RanConfig rc)
     config_->update_mod_cfgs(rc.mod_order_bits);
 }
 
+// Not used
 void Agora::update_rx_counters(size_t frame_id, size_t symbol_id)
 {
     const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
