@@ -246,6 +246,7 @@ void Phy_UE::start()
                 frame_id = pkt->frame_id;
                 symbol_id = pkt->symbol_id;
                 ant_id = pkt->ant_id;
+                size_t ue_id = ant_id / config_->nChannels;
                 rt_assert(pkt->frame_id < cur_frame_id + kFrameWnd,
                     "Error: Received packet for future frame beyond frame "
                     "window. This can happen if PHY is running "
@@ -258,11 +259,12 @@ void Phy_UE::start()
 
                 if (symbol_id == 0 // Beacon in Sim mode!
                     || (!config_->hw_framer && ul_data_symbol_perframe == 0
-                           && symbol_id
-                               == dl_symbol_id)) { // Send uplink pilots
+                           && symbol_id == dl_symbol_id
+                           && ant_id % config_->nChannels
+                               == 0)) { // Send uplink pilots
                     Event_data do_tx_pilot_task(EventType::kPacketPilotTX,
                         gen_tag_t::frm_sym_ue(
-                            frame_id, config_->pilotSymbols[0][ant_id], ant_id)
+                            frame_id, config_->pilotSymbols[0][ue_id], ue_id)
                             ._tag);
                     schedule_task(do_tx_pilot_task, &tx_queue_,
                         *tx_ptoks_ptr[ant_id % rx_thread_num]);
@@ -272,9 +274,7 @@ void Phy_UE::start()
                     && (symbol_id == 0 || symbol_id == dl_symbol_id)
                     && ant_id % config_->nChannels == 0) {
                     Event_data do_encode_task(EventType::kEncode,
-                        gen_tag_t::frm_sym_ue(
-                            frame_id, symbol_id, ant_id / config_->nChannels)
-                            ._tag);
+                        gen_tag_t::frm_sym_ue(frame_id, symbol_id, ue_id)._tag);
                     schedule_task(do_encode_task, &encode_queue_, ptok_encode);
                 }
 
@@ -634,10 +634,10 @@ void Phy_UE::doFFT(int tid, size_t tag)
             size_t pilot_offset
                 = peak_offset < seq_len ? 0 : peak_offset - seq_len;
             float noise_power = 0;
-            for (size_t i = 0; i < sig_offset; i++)
+            for (size_t i = 0; i < pilot_offset; i++)
                 noise_power += std::pow(std::abs(samples_vec[i]), 2);
             float signal_power = 0;
-            for (size_t i = sig_offset; i < 2 * sig_offset; i++)
+            for (size_t i = pilot_offset; i < 2 * pilot_offset; i++)
                 signal_power += std::pow(std::abs(samples_vec[i]), 2);
             float SNR = 10 * std::log10(signal_power / noise_power);
             printf("frame %zu symbol %zu ant %zu: sig offset %zu, SNR %2.1f \n",
