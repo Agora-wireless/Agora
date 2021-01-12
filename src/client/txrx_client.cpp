@@ -478,18 +478,18 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
     std::vector<std::complex<int16_t>> frm_buff0(frm_num_samps, 0);
     std::vector<std::complex<int16_t>> frm_buff1(frm_num_samps, 0);
     std::vector<void*> frm_rx_buff(2);
-    frm_rx_buff[0] = frm_buff0.data();
+    frm_rx_buff.at(0) = frm_buff0.data();
 
     std::vector<std::complex<int16_t>> zeros0(c->sampsPerSymbol, 0);
     std::vector<std::complex<int16_t>> zeros1(c->sampsPerSymbol, 0);
     pilot_buff0.resize(2);
     pilot_buff1.resize(2);
-    pilot_buff0[0] = c->pilot_ci16.data();
+    pilot_buff0.at(0) = c->pilot_ci16.data();
     if (c->nChannels == 2) {
-        pilot_buff0[1] = zeros0.data();
-        pilot_buff1[0] = zeros1.data();
-        pilot_buff1[1] = c->pilot_ci16.data();
-        frm_rx_buff[1] = frm_buff1.data();
+        pilot_buff0.at(1) = zeros0.data();
+        pilot_buff1.at(0) = zeros1.data();
+        pilot_buff1.at(1) = c->pilot_ci16.data();
+        frm_rx_buff.at(1) = frm_buff1.data();
     }
 
     long long rxTime(0);
