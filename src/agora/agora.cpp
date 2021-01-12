@@ -316,11 +316,13 @@ void Agora::start()
                         // If all the data in a frame has arrived when ZF is done
                         std::printf("kZF last task, frame id %zu\n", frame_id);
 
+                        /* todo find the test case for this??? */
                         for (size_t i = 0; i < cfg->frame().NumULSyms(); i++) {
+                            //std::printf("Inspecting %zu %zu\n", i, this->fft_cur_frame_for_symbol_.at(i));
                             if (this->fft_cur_frame_for_symbol_.at(i) == frame_id) {
                                 //std::printf("---kZF kDemul %zu %zu\n\n\n\n", frame_id, i);
                                 schedule_subcarriers(
-                                    EventType::kDemul, frame_id, cfg->frame().GetULSymbol(i)); //*************************************
+                                    EventType::kDemul, frame_id, i); //*************************************
                             }
                         }
                         // Schedule precoding for downlink symbols
@@ -339,7 +341,7 @@ void Agora::start()
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
                 size_t base_sc_id = gen_tag_t(event.tags[0]).sc_id;
-                //std::printf("---Schedule kDemul %zu %zu %zu\n", frame_id, symbol_idx_ul, base_sc_id);
+                //std::printf("---kDemul %zu %zu %zu\n", frame_id, symbol_idx_ul, base_sc_id);
 
                 print_per_task_done(PrintType::kDemul, frame_id, symbol_idx_ul, base_sc_id);
                 bool last_demul_task = this->demul_counters_.CompleteTask(frame_id, symbol_idx_ul);
@@ -384,7 +386,6 @@ void Agora::start()
                         print_per_frame_done(PrintType::kDecode, frame_id);
                         if (kEnableMac == false) {
                             assert(cur_proc_frame_id == frame_id);
-                            cur_proc_frame_id++;
 
                             this->stats_->update_stats_in_functions_uplink(frame_id);
                             bool work_finished = this->CheckWorkComplete(frame_id);
@@ -417,7 +418,6 @@ void Agora::start()
                     bool last_tomac_symbol = this->tomac_counters_.CompleteSymbol(frame_id);
                     if (last_tomac_symbol == true) {
                         assert(cur_proc_frame_id == frame_id);
-                        cur_proc_frame_id++;
                         // this->stats_->master_set_tsc(TsType::kMacTXDone, frame_id);
                         print_per_frame_done(PrintType::kPacketToMac, frame_id);
                         this->stats_->update_stats_in_functions_uplink(frame_id);
@@ -471,7 +471,7 @@ void Agora::start()
                     PrintType::kPrecode, frame_id, symbol_idx_dl, sc_id);
                 bool last_precode_task = this->precode_counters_.CompleteTask(frame_id, symbol_idx_dl);
 
-                //std::printf("Precode %d %zu %zu\n", last_precode_task, this->precode_counters_.GetTaskCount(frame_id, symbol_idx_dl), this->precode_counters_.max_task_count());
+                //std::printf("Precode %d %zu %zu dl_symbol %zu frame sym %zu\n", last_precode_task, this->precode_counters_.GetTaskCount(frame_id, symbol_idx_dl), this->precode_counters_.max_task_count(), symbol_idx_dl, symbol_id);
                 if (last_precode_task == true) {
                     schedule_antennas(EventType::kIFFT, frame_id, symbol_id);
                     print_per_symbol_done(
@@ -509,7 +509,6 @@ void Agora::start()
                             this->stats_->master_set_tsc(TsType::kIFFTDone, frame_id);
                             print_per_frame_done(PrintType::kIFFT, frame_id);
                             assert(frame_id == cur_proc_frame_id);
-                            cur_proc_frame_id++;
                             cur_sche_frame_id++;
                             this->stats_->update_stats_in_functions_downlink(frame_id);
 
@@ -670,11 +669,10 @@ void Agora::handle_event_fft(size_t tag)
                 = config_->GetULSymbolIdx(frame_id, symbol_id);
             fft_cur_frame_for_symbol_.at(symbol_idx_ul) = frame_id;
 
-            //std::printf("fft_cur_frame_for_symbol_ %zu %zu %zu %zu\n", symbol_idx_ul, symbol_id, frame_id, fft_counters_.GetTaskCount(frame_id, symbol_id));
+            //std::printf("fft_cur_frame_for_symbol %zu %zu %zu %zu\n", symbol_idx_ul, symbol_id, frame_id, fft_counters_.GetTaskCount(frame_id, symbol_id));
             print_per_symbol_done(PrintType::kFFTData, frame_id, symbol_id);
             /* If precoder exist, schedule demodulation */
             if (zf_last_frame == frame_id) {
-                std::printf("HELP %zu %zu\n\n", symbol_idx_ul, symbol_id);
                 schedule_subcarriers(
                     EventType::kDemul, frame_id, symbol_idx_ul);
             }
@@ -744,8 +742,7 @@ void Agora::worker(int tid)
         events_vec.push_back(EventType::kEncode);
     }
     
-    /*
-    if (config_->frame().NumULSyms() > 0) {
+    /*if (config_->frame().NumULSyms() > 0) {
         computers_vec.push_back( computeDecoding.get() );
         computers_vec.push_back( computeDemul.get() );
         events_vec.push_back(EventType::kDecode);
@@ -1408,7 +1405,7 @@ void Agora::getEqualData(float** ptr, int* size)
     *size = cfg->ue_num() * cfg->ofdm_data_num() * 2;
 }
 
-bool Agora::CheckWorkComplete( size_t frame_id ) const
+bool Agora::CheckWorkComplete( size_t frame_id )
 {
     bool finished = false;
 
@@ -1416,13 +1413,16 @@ bool Agora::CheckWorkComplete( size_t frame_id ) const
     , this->decode_counters_.IsLastSymbol( frame_id ), this->tomac_counters_.IsLastSymbol( frame_id ));
 
     // Complete if last frame and ifft / decode complete
-    if ( (frame_id == (this->config_->frames_to_test() - 1))     && 
-         (true == this->ifft_counters_.IsLastSymbol( frame_id )) && 
+    if ( (true == this->ifft_counters_.IsLastSymbol( frame_id )) && 
          (true == this->tx_counters_.IsLastSymbol( frame_id ))   &&
          ( ((kEnableMac == false) && (true == this->decode_counters_.IsLastSymbol( frame_id ))) || 
            ((kEnableMac == true)  && (true == this->tomac_counters_.IsLastSymbol(frame_id))) )
           ) {
-        finished = true;
+        this->cur_proc_frame_id++;
+
+        if (frame_id == (this->config_->frames_to_test() - 1)) {
+            finished = true;
+        }
     }
     return finished;
 }

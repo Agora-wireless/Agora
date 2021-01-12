@@ -101,7 +101,7 @@ public:
     } flags;
 
 private:
-    bool CheckWorkComplete(size_t frame_id) const;
+    bool CheckWorkComplete(size_t frame_id);
 
     /// Fetch the concurrent queue for this event type
     moodycamel::ConcurrentQueue<Event_data>* get_conq(

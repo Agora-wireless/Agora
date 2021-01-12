@@ -13,7 +13,7 @@
  "symbol_num_perframe"  : 70,
  "pilot_num"  : 8,
  "dl_data_symbol_start"  : 19,
- "dl_symbol_num_perframe"  : 0,
+ "dl_symbol_num_perframe"  : 1,
  "ul_data_symbol_start"  : 9,
  "ul_symbol_num_perframe"  : 1,
  "frames_to_test" : 1,
