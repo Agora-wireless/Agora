@@ -50,7 +50,7 @@ Event_data DoPrecode::launch(size_t tag)
     __m256i index = _mm256_setr_epi64x(
         0, cfg->BS_ANT_NUM, cfg->BS_ANT_NUM * 2, cfg->BS_ANT_NUM * 3);
     int max_sc_ite
-        = std::min(cfg->demul_block_size, cfg->bs_server_addr_idx * cfg->get_num_sc_per_server() - base_sc_id);
+        = std::min(cfg->demul_block_size, (cfg->bs_server_addr_idx + 1) * cfg->get_num_sc_per_server() - base_sc_id);
 
     // Begin Debug
     printf("DL mod data base sc %u:\n", base_sc_id);
@@ -84,12 +84,11 @@ Event_data DoPrecode::launch(size_t tag)
 
             // Begin Debug
             // printf("(%lf %lf) ", data_ptr[0].re, data_ptr[0].im);
-            if (i == 0 && j == 1) {
-                for (size_t k = 0; k < cfg->UE_NUM; k ++) {
-                    printf("(%lf %lf) ", data_ptr[k].re, data_ptr[k].im);
-                }
-                printf("\n");
+            printf("| ");
+            for (size_t k = 0; k < cfg->UE_NUM; k ++) {
+                printf("(%lf %lf) ", data_ptr[k].re, data_ptr[k].im);
             }
+            printf("| ");
             // End Debug
 
             auto* precoder_ptr = reinterpret_cast<cx_float*>(

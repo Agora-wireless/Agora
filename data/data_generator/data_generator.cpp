@@ -131,11 +131,14 @@ int main(int argc, char* argv[])
 
     // Start Debug
     printf("Modulated data:\n");
-    for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i ++) {
-        printf("(%lf %lf) ", modulated_codewords[0][i].re, modulated_codewords[0][i].im);
+    for (size_t ue = 0; ue < cfg->UE_ANT_NUM; ue ++) {
+        printf("UE %d\n", ue);
+        for (size_t i = 600; i < cfg->OFDM_DATA_NUM; i ++) {
+            printf("(%lf %lf) ", modulated_codewords[ue][i].re, modulated_codewords[ue][i].im);
+        }
+        printf("\n");
     }
     printf("\n");
-    printf("Mod data: (%lf %lf)\n", modulated_codewords[2][1].re, modulated_codewords[2][1].im);
     // End Debug
 
     // Place modulated uplink data codewords into central IFFT bins
@@ -335,7 +338,11 @@ int main(int argc, char* argv[])
     //     printf("(%lf %lf) ", dl_mod_data[0][cfg->OFDM_DATA_START + i].re, dl_mod_data[0][cfg->OFDM_DATA_START + i].im);
     // }
     for (size_t i = 0; i < cfg->UE_NUM; i ++) {
-        printf("(%lf %lf) ", dl_mod_data[0][i * cfg->OFDM_CA_NUM + cfg->OFDM_DATA_START + 601].re, dl_mod_data[0][i * cfg->OFDM_CA_NUM + cfg->OFDM_DATA_START + 601].im);
+        printf("UE %d\n", i);
+        for (size_t j = 600; j < cfg->OFDM_DATA_NUM; j ++) {
+            printf("(%lf %lf) ", dl_mod_data[0][i * cfg->OFDM_CA_NUM + cfg->OFDM_DATA_START + j].re, dl_mod_data[0][i * cfg->OFDM_CA_NUM + cfg->OFDM_DATA_START + j].im);
+        }
+        printf("\n");
     }
     printf("\n");
     // End Debug
@@ -445,8 +452,8 @@ int main(int argc, char* argv[])
         }
 
         printf("IFFT data:\n");
-        for (size_t j = 600; j < cfg->OFDM_DATA_NUM; j ++) {
-            printf("(%d %d) ", dl_tx_data[i][(j + cfg->OFDM_DATA_START) * 2], dl_tx_data[i][(j + cfg->OFDM_DATA_START) * 2 + 1]);
+        for (size_t j = 0; j < cfg->OFDM_CA_NUM; j ++) {
+            printf("(%d %d) ", dl_tx_data[i][j * 2], dl_tx_data[i][j * 2 + 1]);
         }
         printf("\n");
     }
