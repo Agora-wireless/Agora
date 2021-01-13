@@ -96,6 +96,7 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
 
 void* Receiver::loopRecv(int tid)
 {
+    printf("New receiver thread!\n");
     size_t core_offset = core_id_ + rx_thread_num_ + 2;
     pin_to_core_with_offset(ThreadType::kWorkerRX, core_offset, tid);
 
@@ -198,6 +199,10 @@ void* Receiver::loopRecv(int tid)
                 size_t table_offset = symbol_offset * cfg->packet_length 
                     + sizeof(float) * (cfg->OFDM_DATA_START + server_id * cfg->get_num_sc_per_server());
                 printf("Received valid packets ant:%u offset:%u server:%u!\n", pkt->ant_id, table_offset, server_id);
+                for (size_t i = 0; i < cfg->get_num_sc_per_server() * 2; i ++) {
+                    printf("%04x ", (unsigned short)pkt->data[i]);
+                }
+                printf("\n");
                 DpdkTransport::fastMemcpy(&socket_buffer_[ant_id][table_offset], pkt->data, sizeof(float) * cfg->get_num_sc_per_server());
                 socket_buffer_status_[ant_id][symbol_offset] ++;
                 if (socket_buffer_status_[ant_id][symbol_offset] == cfg->bs_server_addr_list.size()) {
@@ -261,10 +266,9 @@ void* Receiver::loopRecv(int tid)
             + (cur_buffer_ptr - buffer_ptr + cfg->packet_length)
                 % buffer_length;
 #endif
-
-        printf("Receiver received all packets!\n");
-        save_tx_data_to_file(0);
     }
+    printf("Receiver received all packets!\n");
+    save_tx_data_to_file(0);
 }
 
 void Receiver::save_tx_data_to_file(int frame_id)
@@ -280,6 +284,13 @@ void Receiver::save_tx_data_to_file(int frame_id)
 
         for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
             short* socket_ptr = reinterpret_cast<short*>(&dl_ue_data_buffer_[ant_id][total_data_symbol_id * sizeof(short) * 2 * cfg->OFDM_CA_NUM]);
+            if (ant_id == 0) {
+                printf("Symbol offset: %u\n", total_data_symbol_id);
+                for (size_t j = 0; j < cfg->OFDM_CA_NUM; j ++) {
+                    printf("(%u %u) ", socket_ptr[j * 2], socket_ptr[j * 2 + 1]);
+                }
+                printf("\n");
+            }
             fwrite(socket_ptr, cfg->sampsPerSymbol * 2, sizeof(short), fp);
         }
     }
