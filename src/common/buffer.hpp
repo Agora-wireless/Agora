@@ -298,6 +298,13 @@ public:
         this->symbol_count_.fill(0);
     }
 
+    void Reset ( size_t frame_id )
+    {
+        const size_t frame_slot = (frame_id % kFrameWnd);
+        this->symbol_count_.at(frame_slot) = 0;
+        this->task_count_.at(frame_slot).fill(0);
+    }
+
     /**
      * @brief Increments and checks the symbol count for input frame
      * @param frame_id The frame id of the symbol to increment
@@ -404,7 +411,7 @@ public:
     }
 
     inline size_t max_symbol_count( void ) const { return this->max_symbol_count_; }
-    inline size_t max_task_count( void ) const { return this->max_task_count_; }
+    inline size_t max_task_count( void )   const { return this->max_task_count_; }
 
 private:
     // task_count[i][j] is the number of tasks completed for

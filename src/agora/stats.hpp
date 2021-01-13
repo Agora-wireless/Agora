@@ -54,6 +54,10 @@ public:
     ~Stats();
 
     /// If worker stats collection is enabled, combine and update per-worker
+    /// stats for all uplink and donwlink Doer types. Else return immediately.
+    void update_stats(size_t frame_id);
+
+    /// If worker stats collection is enabled, combine and update per-worker
     /// stats for all uplink Doer types. Else return immediately.
     void update_stats_in_functions_uplink(size_t frame_id);
 

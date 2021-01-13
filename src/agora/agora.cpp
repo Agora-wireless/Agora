@@ -281,7 +281,7 @@ void Agora::start()
                 auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
                     + (sock_buf_offset * cfg->packet_length()));
 
-                if (pkt->frame_id >= cur_sche_frame_id + kFrameWnd) {
+                if (pkt->frame_id >= (cur_sche_frame_id + kFrameWnd)) {
                     std::printf(
                         "Error: Received packet for future frame %u beyond "
                         "frame window (= %zu + %zu). This can happen if "
@@ -307,11 +307,12 @@ void Agora::start()
                     size_t frame_id = gen_tag_t(event.tags[tag_id]).frame_id;
                     print_per_task_done(PrintType::kZF, frame_id, 0, zf_counters_.GetTaskCount(frame_id));
                     
-                    bool last_zf_task = zf_counters_.CompleteTask(frame_id);
+                    bool last_zf_task = this->zf_counters_.CompleteTask(frame_id);
                     if (last_zf_task == true) {
                         this->stats_->master_set_tsc(TsType::kZFDone, frame_id);
                         zf_last_frame = frame_id;
                         print_per_frame_done(PrintType::kZF, frame_id);
+                        this->zf_counters_.Reset(frame_id);
 
                         // If all the data in a frame has arrived when ZF is done
                         std::printf("kZF last task, frame id %zu\n", frame_id);
@@ -353,10 +354,11 @@ void Agora::start()
                         PrintType::kDemul, frame_id, symbol_idx_ul);
                     bool last_demul_symbol = this->demul_counters_.CompleteSymbol(frame_id);
                     if (last_demul_symbol == true) {
+                        this->demul_counters_.Reset(frame_id);
                         max_equaled_frame = frame_id;
                         if (cfg->bigstation_mode() == false) {
                             assert(cur_sche_frame_id == frame_id);
-                            cur_sche_frame_id++;
+                            //cur_sche_frame_id++;
                         } else {
                             schedule_codeblocks(
                                 EventType::kDecode, frame_id, symbol_idx_ul);
@@ -386,8 +388,7 @@ void Agora::start()
                         print_per_frame_done(PrintType::kDecode, frame_id);
                         if (kEnableMac == false) {
                             assert(cur_proc_frame_id == frame_id);
-
-                            this->stats_->update_stats_in_functions_uplink(frame_id);
+                            //cur_proc_frame_id++;
                             bool work_finished = this->CheckWorkComplete(frame_id);
                             if (work_finished == true) {
                                 std::printf("---kDecode finished---\n");
@@ -418,9 +419,9 @@ void Agora::start()
                     bool last_tomac_symbol = this->tomac_counters_.CompleteSymbol(frame_id);
                     if (last_tomac_symbol == true) {
                         assert(cur_proc_frame_id == frame_id);
+                        //cur_proc_frame_id++;
                         // this->stats_->master_set_tsc(TsType::kMacTXDone, frame_id);
                         print_per_frame_done(PrintType::kPacketToMac, frame_id);
-                        this->stats_->update_stats_in_functions_uplink(frame_id);
                         bool work_finished = this->CheckWorkComplete(frame_id);
                         if (work_finished == true) {
                             std::printf("---kPacketToMac finished---\n");
@@ -450,8 +451,9 @@ void Agora::start()
                         print_per_symbol_done(
                             PrintType::kEncode, frame_id, symbol_idx_dl);
                         
-                        bool last_encode_symbol = encode_counters_.CompleteSymbol(frame_id);
+                        bool last_encode_symbol = this->encode_counters_.CompleteSymbol(frame_id);
                         if (last_encode_symbol == true) {
+                            this->encode_counters_.Reset(frame_id);
                             this->stats_->master_set_tsc(
                                 TsType::kEncodeDone, frame_id);
                             print_per_frame_done(PrintType::kEncode, frame_id);
@@ -479,6 +481,7 @@ void Agora::start()
 
                     bool last_precode_symbol = this->precode_counters_.CompleteSymbol(frame_id);
                     if (last_precode_symbol == true) {
+                        this->precode_counters_.Reset(frame_id);
                         this->stats_->master_set_tsc(TsType::kPrecodeDone, frame_id);
                         print_per_frame_done(PrintType::kPrecode, frame_id);
                     }
@@ -509,10 +512,8 @@ void Agora::start()
                             this->stats_->master_set_tsc(TsType::kIFFTDone, frame_id);
                             print_per_frame_done(PrintType::kIFFT, frame_id);
                             assert(frame_id == cur_proc_frame_id);
-                            cur_sche_frame_id++;
-                            this->stats_->update_stats_in_functions_downlink(frame_id);
-
                             bool work_finished = this->CheckWorkComplete(frame_id);
+                            //cur_sche_frame_id++;
                             if (work_finished == true) {
                                 std::printf("---kIFFT finished---\n");
                                 goto finish;
@@ -548,12 +549,14 @@ void Agora::start()
                     if (last_tx_symbol == true) {
                         this->stats_->master_set_tsc(TsType::kTXDone, frame_id);
                         print_per_frame_done(PrintType::kPacketTX, frame_id);
-
-                        bool work_finished = this->CheckWorkComplete(frame_id);
-                        if (work_finished == true) {
+                        //bool work_finished = this->CheckWorkComplete(frame_id);
+                        //if (work_finished == true) {
+                        this->tx_counters_.Reset(frame_id);
+                        if (frame_id == (this->config_->frames_to_test() - 1)) {
                             std::printf("---nkPacketTX finished---\n");
                             goto finish;
                         }
+                        tx_counters_.Reset( frame_id );
                     }
 
                     tx_count++;
@@ -582,7 +585,7 @@ void Agora::start()
             // either (a) sufficient packets received for the current frame,
             // or (b) the current frame being updated.
             std::queue<fft_req_tag_t>& cur_fftq
-                = fft_queue_arr[cur_sche_frame_id % kFrameWnd];
+                = fft_queue_arr[(cur_sche_frame_id % kFrameWnd)];
             size_t qid = cur_sche_frame_id & 0x1;
             if (cur_fftq.size() >= config_->fft_block_size()) {
                 size_t num_fft_blocks
@@ -602,7 +605,7 @@ void Agora::start()
                             == rx_counters_.num_pkts_per_frame) {
                             fft_created_count = 0;
                             if (cfg->bigstation_mode() == true) {
-                                cur_sche_frame_id++;
+                                //cur_sche_frame_id++;
 							}
                         }
                     }
@@ -650,6 +653,7 @@ void Agora::handle_event_fft(size_t tag)
                 if (last_fft_symbol == true) {
                     this->stats_->master_set_tsc(TsType::kFFTPilotsDone, frame_id);
                     print_per_frame_done(PrintType::kFFTPilots, frame_id);
+                    this->fft_counters_.Reset(frame_id);
                     if (kPrintPhyStats == true) {
                         this->phy_stats_->print_snr_stats(frame_id);
 					}
@@ -683,6 +687,7 @@ void Agora::handle_event_fft(size_t tag)
         bool last_rc_task = this->rc_counters_.CompleteTask(frame_id);
         if (last_rc_task == true) {
             print_per_frame_done(PrintType::kFFTCal, frame_id);
+            this->rc_counters_.Reset(frame_id);
             this->stats_->master_set_tsc(TsType::kRCDone, frame_id);
             rc_last_frame = frame_id;
         }
@@ -1412,13 +1417,19 @@ bool Agora::CheckWorkComplete( size_t frame_id )
     std::printf("\nChecking work complete %zu, ifft %d, tx %d, decode %d, tomac %d\n\n", frame_id, this->ifft_counters_.IsLastSymbol( frame_id ), this->tx_counters_.IsLastSymbol( frame_id )
     , this->decode_counters_.IsLastSymbol( frame_id ), this->tomac_counters_.IsLastSymbol( frame_id ));
 
+    //(true == this->tx_counters_.IsLastSymbol( frame_id )
     // Complete if last frame and ifft / decode complete
     if ( (true == this->ifft_counters_.IsLastSymbol( frame_id )) && 
-         (true == this->tx_counters_.IsLastSymbol( frame_id ))   &&
          ( ((kEnableMac == false) && (true == this->decode_counters_.IsLastSymbol( frame_id ))) || 
-           ((kEnableMac == true)  && (true == this->tomac_counters_.IsLastSymbol(frame_id))) )
-          ) {
+           ((kEnableMac == true)  && (true == this->tomac_counters_.IsLastSymbol(frame_id))) ) ) {
+        this->stats_->update_stats(frame_id);
+        assert(frame_id == this->cur_proc_frame_id);
+        this->decode_counters_.Reset(frame_id);
+        this->tomac_counters_.Reset(frame_id);
+        this->ifft_counters_.Reset(frame_id);
         this->cur_proc_frame_id++;
+        this->cur_sche_frame_id++; //Probably an issue here.
+        std::printf("\nNew Proc Frame %zu\n\n", this->cur_proc_frame_id);
 
         if (frame_id == (this->config_->frames_to_test() - 1)) {
             finished = true;

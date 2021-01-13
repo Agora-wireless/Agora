@@ -61,10 +61,17 @@ void Stats::print_per_frame(const char* doer_string, FrameSummary frame_summary)
         frame_summary.us_avg_threads[3] / 1000.0);
 }
 
-//void Stats::update ( size_t frame_id )
-//{
-//    
-//}
+void Stats::update_stats ( size_t frame_id )
+{
+    this->last_frame_id_ = frame_id;
+    size_t frame_slot    = (frame_id % kNumStatsFrames);
+
+    if (kIsWorkerTimingEnabled == true) {
+        //\TODO combine
+        update_stats_in_functions_downlink( frame_slot );
+        update_stats_in_functions_uplink( frame_slot );
+    }
+}
 
 void Stats::update_stats_in_functions_uplink(size_t frame_id)
 {
@@ -446,20 +453,13 @@ void Stats::save_to_file( void )
 
     //For backwards compatibility, it is easier to make a new file format for
     // the combined case
-    if ( (config_->frame().NumDLSyms() > 0)  && (config_->frame().NumULSyms() > 0))
+    if ( (config_->frame().NumDLSyms() > 0) && (config_->frame().NumULSyms() > 0))
     {
         std::fprintf(fp_debug,
             "Pilot RX by socket threads (= reference time), "
             "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
             "kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kDemulDone, kDecodeDone, kRXDone, time in CSI, time in "
             "FFT, time in ZF, time in Demul, time in Decode\n");
-
-        std::fprintf(fp_debug,
-            "Pilot RX by socket threads (= reference time), "
-            "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
-            "kZFDone, kDemulDone, kDecodeDone, kRXDone, time in CSI, time in "
-            "FFT, time in ZF, time in Demul, time in Decode\n");
-
         for (size_t i = 0; i < this->last_frame_id_; i++) {
             size_t ref_tsc = SIZE_MAX;
             for (size_t j = 0; j < config_->socket_thread_num(); j++) {
@@ -487,7 +487,6 @@ void Stats::save_to_file( void )
             "Pilot RX by socket threads (= reference time), "
             "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
             "kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kRXDone\n");
-
         for (size_t i = 0; i < this->last_frame_id_; i++) {
             size_t ref_tsc = SIZE_MAX;
             for (size_t j = 0; j < config_->socket_thread_num(); j++) {
@@ -518,7 +517,6 @@ void Stats::save_to_file( void )
             for (size_t j = 0; j < config_->socket_thread_num(); j++) {
                 ref_tsc = std::min(ref_tsc, frame_start[j][i]);
             }
-
             std::fprintf(fp_debug,
                 "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.3f %.3f %.3f "
                 "%.3f %.3f\n",
