@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
 
     // Step 1: Generate the information buffers and LDPC-encoded buffers for
     // uplink
-    const size_t num_codeblocks = cfg->data_symbol_num_perframe
+    const size_t num_codeblocks = cfg->ul_data_symbol_num_perframe
         * cfg->LDPC_config.nblocksInSymbol * cfg->UE_ANT_NUM;
     std::printf("Total number of blocks: %zu\n", num_codeblocks);
 
@@ -70,7 +70,7 @@ int main(int argc, char* argv[])
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
         data_generator.gen_codeblock_ul(
-            information[i], encoded_codewords[i], i % cfg->UE_NUM /* UE ID */);
+            information.at(i), encoded_codewords.at(i), (i % cfg->UE_NUM) /* UE ID */);
     }
 
     {
@@ -83,12 +83,12 @@ int main(int argc, char* argv[])
             + "_ant" + std::to_string(cfg->UE_ANT_NUM) + ".bin";
         std::printf(
             "Saving raw data (using LDPC) to %s\n", filename_input.c_str());
-        FILE* fp_input = fopen(filename_input.c_str(), "wb");
+        FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
         for (size_t i = 0; i < num_codeblocks; i++) {
-            fwrite(reinterpret_cast<uint8_t*>(&information[i][0]),
+            std::fwrite(reinterpret_cast<uint8_t*>(&information.at(i).at(0)),
                 input_bytes_per_cb, sizeof(uint8_t), fp_input);
         }
-        fclose(fp_input);
+        std::fclose(fp_input);
 
         if (kPrintUplinkInformationBytes) {
             std::printf("Uplink information bytes\n");
@@ -106,17 +106,17 @@ int main(int argc, char* argv[])
     // Modulate the encoded codewords
     std::vector<std::vector<complex_float>> modulated_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
-        modulated_codewords[i]
+        modulated_codewords.at(i)
             = data_generator.get_modulation(encoded_codewords[i]);
     }
 
     // Place modulated uplink data codewords into central IFFT bins
     rt_assert(cfg->LDPC_config.nblocksInSymbol == 1); // TODO: Assumption
     std::vector<std::vector<complex_float>> pre_ifft_data_syms(
-        cfg->UE_ANT_NUM * cfg->data_symbol_num_perframe);
+        cfg->UE_ANT_NUM * cfg->ul_data_symbol_num_perframe);
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
-        pre_ifft_data_syms[i]
-            = data_generator.bin_for_ifft(modulated_codewords[i]);
+        pre_ifft_data_syms.at(i)
+            = data_generator.bin_for_ifft(modulated_codewords.at(i));
     }
 
     std::vector<complex_float> pilot_td
@@ -151,39 +151,38 @@ int main(int argc, char* argv[])
             for (size_t j = cfg->OFDM_DATA_START;
                  j < cfg->OFDM_DATA_START + cfg->OFDM_DATA_NUM;
                  j += cfg->UE_ANT_NUM) {
-                pilots_t_ue[i + j] = pilot_td[i + j];
+                pilots_t_ue.at(i + j) = pilot_td.at(i + j);
             }
             // Load pilot to the second symbol
             // The first symbol is reserved for beacon
             std::memcpy(tx_data_all_symbols[cfg->beacon_symbol_num_perframe]
-                    + i * cfg->OFDM_CA_NUM,
-                &pilots_t_ue[0], cfg->OFDM_CA_NUM * sizeof(complex_float));
+                    + (i * cfg->OFDM_CA_NUM),
+                &pilots_t_ue.at(0), cfg->OFDM_CA_NUM * sizeof(complex_float));
         }
     } else {
         for (size_t i = 0; i < cfg->UE_ANT_NUM; i++)
             std::memcpy(tx_data_all_symbols[i + cfg->beacon_symbol_num_perframe]
                     + i * cfg->OFDM_CA_NUM,
-                &pilot_td[0], cfg->OFDM_CA_NUM * sizeof(complex_float));
+                &pilot_td.at(0), cfg->OFDM_CA_NUM * sizeof(complex_float));
     }
 
-    size_t data_sym_start
-        = cfg->pilot_symbol_num_perframe + cfg->beacon_symbol_num_perframe;
-    for (size_t i = data_sym_start; i < cfg->symbol_num_perframe; i++) {
-        const size_t data_sym_id = (i - data_sym_start);
+    //UL cal symbol????
+
+    //Populate the UL symbols
+    for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; i++) {
+        const size_t data_sym_id = cfg->ULSymbols.at(0).at(i);
         for (size_t j = 0; j < cfg->UE_ANT_NUM; j++) {
-            if (data_sym_id < cfg->UL_PILOT_SYMS) {
-                std::memcpy(tx_data_all_symbols[i] + j * cfg->OFDM_CA_NUM
-                        + cfg->OFDM_DATA_START,
+            if (i < cfg->UL_PILOT_SYMS) {
+                std::memcpy(tx_data_all_symbols[data_sym_id] + (j * cfg->OFDM_CA_NUM) + cfg->OFDM_DATA_START,
                     ue_specific_pilot[j],
                     cfg->OFDM_DATA_NUM * sizeof(complex_float));
             } else {
-                std::memcpy(tx_data_all_symbols[i] + j * cfg->OFDM_CA_NUM,
-                    &pre_ifft_data_syms[data_sym_id * cfg->UE_ANT_NUM + j][0],
+                std::memcpy(tx_data_all_symbols[data_sym_id] + (j * cfg->OFDM_CA_NUM),
+                    &pre_ifft_data_syms.at(i * cfg->UE_ANT_NUM + j).at(0),
                     cfg->OFDM_CA_NUM * sizeof(complex_float));
             }
         }
     }
-
     // Generate CSI matrix
     Table<complex_float> csi_matrices;
     csi_matrices.calloc(cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM,
@@ -232,13 +231,13 @@ int main(int argc, char* argv[])
         + std::to_string(cfg->OFDM_CA_NUM) + "_ant"
         + std::to_string(cfg->BS_ANT_NUM) + ".bin";
     std::printf("Saving rx data to %s\n", filename_rx.c_str());
-    FILE* fp_rx = fopen(filename_rx.c_str(), "wb");
+    FILE* fp_rx = std::fopen(filename_rx.c_str(), "wb");
     for (size_t i = 0; i < cfg->symbol_num_perframe; i++) {
         auto* ptr = (float*)rx_data_all_symbols[i];
-        fwrite(
+        std::fwrite(
             ptr, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM * 2, sizeof(float), fp_rx);
     }
-    fclose(fp_rx);
+    std::fclose(fp_rx);
 
     // std::printf("rx data\n");
     // for (int i = 0; i < 10; i++) {
@@ -291,18 +290,18 @@ int main(int argc, char* argv[])
         Agora_memory::Alignment_t::k64Align);
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < cfg->UE_ANT_NUM; j++) {
-            if (cfg->DL_PILOT_SYMS > 0 and i <= cfg->DL_PILOT_SYMS - 1) {
-                for (size_t sc_id = 0; sc_id < cfg->OFDM_DATA_NUM; sc_id++)
-                    dl_mod_data[i][j * cfg->OFDM_CA_NUM + sc_id
-                        + cfg->OFDM_DATA_START]
-                        = ue_specific_pilot[j][sc_id];
-            } else {
+            if (i >= cfg->DL_PILOT_SYMS) {
                 for (size_t sc_id = 0; sc_id < cfg->OFDM_DATA_NUM; sc_id++)
                     dl_mod_data[i][j * cfg->OFDM_CA_NUM + sc_id
                         + cfg->OFDM_DATA_START]
                         = (sc_id % cfg->OFDM_PILOT_SPACING == 0)
                         ? ue_specific_pilot[j][sc_id]
-                        : modulated_codewords[i * cfg->UE_ANT_NUM + j][sc_id];
+                        : modulated_codewords.at(i * cfg->UE_ANT_NUM + j).at(sc_id);
+            } else {
+                for (size_t sc_id = 0; sc_id < cfg->OFDM_DATA_NUM; sc_id++)
+                    dl_mod_data[i][j * cfg->OFDM_CA_NUM + sc_id
+                        + cfg->OFDM_DATA_START]
+                        = ue_specific_pilot[j][sc_id];
             }
         }
     }
@@ -383,13 +382,13 @@ int main(int argc, char* argv[])
         + std::to_string(cfg->OFDM_CA_NUM) + "_ant"
         + std::to_string(cfg->BS_ANT_NUM) + ".bin";
     std::printf("Saving dl tx data to %s\n", filename_dl_tx.c_str());
-    FILE* fp_dl_tx = fopen(filename_dl_tx.c_str(), "wb");
+    FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
         short* ptr = (short*)dl_tx_data[i];
-        fwrite(ptr, cfg->sampsPerSymbol * cfg->BS_ANT_NUM * 2, sizeof(short),
+        std::fwrite(ptr, cfg->sampsPerSymbol * cfg->BS_ANT_NUM * 2, sizeof(short),
             fp_dl_tx);
     }
-    fclose(fp_dl_tx);
+    std::fclose(fp_dl_tx);
 
     // std::printf("rx data\n");
     // for (int i = 0; i < 10; i++) {
