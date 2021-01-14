@@ -165,14 +165,13 @@ Config::Config(std::string jsonfile)
                 sched += "G";
         }
         frames.push_back(sched);
-        std::printf("Config: Frame schedule %s (%zu symbols)\n", sched.c_str(),
-            sched.size());
     } else {
         json jframes = tddConf.value("frames", json::array());
         for (size_t f = 0; f < jframes.size(); f++) {
             frames.push_back(jframes.at(f).get<std::string>());
         }
     }
+    std::printf("Config: Frame schedule %s (%zu symbols)\n", frames.at(0).c_str(), frames.at(0).size());
 
     beaconSymbols = Utils::loadSymbols(frames, 'B');
     pilotSymbols = Utils::loadSymbols(frames, 'P');
