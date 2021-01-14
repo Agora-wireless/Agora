@@ -72,6 +72,8 @@ public:
 
     void join_thread();
 
+    bool running_;
+
 private:
     void* master_thread(int tid);
     void* worker_thread(int tid);

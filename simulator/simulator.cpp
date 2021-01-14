@@ -26,7 +26,7 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
     initialize_uplink_buffers();
 
 #ifdef USE_DPDK
-    DpdkTransport::dpdk_init(in_core_offset, SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM);
+    DpdkTransport::dpdk_init(in_core_offset, 1 + SOCKET_RX_THREAD_NUM + SOCKET_TX_THREAD_NUM);
     rte_mempool* mbuf_pool = DpdkTransport::create_mempool();
 
     uint16_t portid = 0; // For now, hard-code to port zero
@@ -38,7 +38,7 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
         config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true, "ff:ff:ff:ff:ff:ff", true, mbuf_pool));
 
     printf("new Receiver\n");
-    receiver_.reset(new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET,
+    receiver_.reset(new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET + 2 + SOCKET_RX_THREAD_NUM,
         &message_queue_, rx_ptoks_ptr));
 #else
     printf("new Sender\n");
@@ -87,47 +87,50 @@ void Simulator::start()
 
     /* start transmitter */
     sender_->startTXfromMain(frame_start_tx, frame_end_tx);
-    while (config_->running && !SignalHandler::gotExitSignal()) {
-        /* get a bulk of events */
-        ret = 0;
-        ret = message_queue_.try_dequeue_bulk(
-            ctok, events_list, kDequeueBulkSizeSingle);
+    // while (config_->running && !SignalHandler::gotExitSignal()) {
+    //     /* get a bulk of events */
+    //     ret = 0;
+    //     ret = message_queue_.try_dequeue_bulk(
+    //         ctok, events_list, kDequeueBulkSizeSingle);
 
-        if (ret == 0)
-            continue;
+    //     if (ret == 0)
+    //         continue;
 
-        /* handle each event */
-        for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
-            Event_data& event = events_list[bulk_count];
-            switch (event.event_type) {
-            case EventType::kPacketRX: {
-                int socket_thread_id = rx_tag_t(event.tags[0]).tid;
-                int buf_offset = rx_tag_t(event.tags[0]).offset;
+    //     /* handle each event */
+    //     for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
+    //         Event_data& event = events_list[bulk_count];
+    //         switch (event.event_type) {
+    //         case EventType::kPacketRX: {
+    //             int socket_thread_id = rx_tag_t(event.tags[0]).tid;
+    //             int buf_offset = rx_tag_t(event.tags[0]).offset;
 
-                char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
-                    + (long long)buf_offset * packet_length;
-                struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
-                int frame_id = pkt->frame_id % 10000;
-                int symbol_id = pkt->symbol_id;
-                int ant_id = pkt->ant_id;
-                int frame_id_in_buffer = (frame_id % TASK_BUFFER_FRAME_NUM);
-                socket_buffer_status_[socket_thread_id][buf_offset] = 0;
+    //             char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
+    //                 + (long long)buf_offset * packet_length;
+    //             struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
+    //             int frame_id = pkt->frame_id % 10000;
+    //             int symbol_id = pkt->symbol_id;
+    //             int ant_id = pkt->ant_id;
+    //             int frame_id_in_buffer = (frame_id % TASK_BUFFER_FRAME_NUM);
+    //             socket_buffer_status_[socket_thread_id][buf_offset] = 0;
 
-                // printf(
-                //     "In main: received from frame %d %d, symbol %d, ant
-                //     %d\n", frame_id, frame_id_in_buffer, symbol_id,
-                //     ant_id);
+    //             // printf(
+    //             //     "In main: received from frame %d %d, symbol %d, ant
+    //             //     %d\n", frame_id, frame_id_in_buffer, symbol_id,
+    //             //     ant_id);
 
-                update_rx_counters(
-                    frame_id, frame_id_in_buffer, symbol_id, ant_id);
-            } break;
+    //             update_rx_counters(
+    //                 frame_id, frame_id_in_buffer, symbol_id, ant_id);
+    //         } break;
 
-            default:
-                printf("Wrong event type in message queue!");
-                exit(0);
-            } /* end of switch */
-        } /* end of for */
-    } /* end of while */
+    //         default:
+    //             printf("Wrong event type in message queue!");
+    //             exit(0);
+    //         } /* end of switch */
+    //     } /* end of for */
+    // } /* end of while */
+    while (sender_->running_ || receiver_->completion_num_ < SOCKET_RX_THREAD_NUM) {
+        continue;
+    }
     this->stop();
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult_simulator.txt";

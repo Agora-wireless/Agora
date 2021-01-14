@@ -72,6 +72,8 @@ public:
 
     void save_tx_data_to_file(int frame_id);
 
+    std::atomic<size_t> completion_num_;
+
 private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;

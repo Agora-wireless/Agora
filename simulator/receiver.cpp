@@ -52,6 +52,8 @@ Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset, void* 
     socket_buffer_status_.calloc(cfg->BS_ANT_NUM, kFrameWnd * cfg->symbol_num_perframe, 64);
 
     dl_ue_data_buffer_.calloc(cfg->BS_ANT_NUM, cfg->OFDM_CA_NUM * sizeof(short) * 2 * kFrameWnd * cfg->symbol_num_perframe, 64);
+
+    completion_num_ = 0;
 }
 
 Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
@@ -97,7 +99,7 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
 void* Receiver::loopRecv(int tid)
 {
     printf("New receiver thread!\n");
-    size_t core_offset = core_id_ + rx_thread_num_ + 2;
+    size_t core_offset = core_id_;
     pin_to_core_with_offset(ThreadType::kWorkerRX, core_offset, tid);
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
@@ -269,6 +271,7 @@ void* Receiver::loopRecv(int tid)
     }
     printf("Receiver received all packets!\n");
     save_tx_data_to_file(0);
+    completion_num_ ++;
 }
 
 void Receiver::save_tx_data_to_file(int frame_id)

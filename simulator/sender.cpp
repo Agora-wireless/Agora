@@ -43,6 +43,8 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
         cfg->bs_server_addr.c_str(), frame_duration / 1000.0,
         enable_slow_start == 1 ? "yes" : "no");
 
+    running_ = true;
+
     _unused(server_mac_addr_str);
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
         packet_count_per_symbol[i] = new size_t[get_max_symbol_id()]();
@@ -57,6 +59,8 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
         64, num_worker_threads_ * sizeof(moodycamel::ProducerToken*));
     for (size_t i = 0; i < num_worker_threads_; i++)
         task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
+
+    num_workers_ready_atomic = 0;
 
     // Create a master thread when started from simulator
     // if (create_thread_for_master)
@@ -100,7 +104,6 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     rt_assert(ret == 0, "Cannot get MAC address of the port");
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 #endif
-    num_workers_ready_atomic = 0;
 }
 
 Sender::~Sender()
@@ -236,6 +239,8 @@ void* Sender::master_thread(int)
             }
         }
     }
+    keep_running = false;
+    running_ = false;
     write_stats_to_file(cfg->frames_to_test);
     printf("Master thread ends!\n");
     // exit(0);
@@ -285,8 +290,12 @@ void* Sender::worker_thread(int tid)
 
     while (true) {
         gen_tag_t tag = 0;
-        if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag._tag))
+        if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag._tag)) {
+            if (!keep_running) {
+                break;
+            }
             continue;
+        }
 
         size_t start_tsc_send = rdtsc();
 
