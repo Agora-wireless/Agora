@@ -216,14 +216,14 @@ void* Sender::master_thread(int)
 
                 size_t next_symbol_id = FindNextSymbol( (ctag.symbol_id + 1) );
                 unsigned symbol_delay = next_symbol_id - ctag.symbol_id;
-                //std::printf("Sender -- finishing symbol %d : %zu : %zu delayed %d\n", ctag.symbol_id, cfg->symbol_num_perframe, next_symbol_id, symbol_delay);
+                //std::printf("Sender -- finishing symbol %d : %zu : %zu delayed %d\n", ctag.symbol_id, cfg->frame().NumTotalSyms(), next_symbol_id, symbol_delay);
                 // Add inter-symbol delay
                 delay_ticks(tick_start, get_ticks_for_frame(ctag.frame_id) * symbol_delay);
                 tick_start = rdtsc();
 
                 size_t next_frame_id = ctag.frame_id;
                 //Check to see if the current frame is finished
-                assert( next_symbol_id > cfg->frame().NumTotalSyms() );
+                assert( next_symbol_id <= cfg->frame().NumTotalSyms() );
                 if ( next_symbol_id == cfg->frame().NumTotalSyms() ) {
                     if ((kDebugSenderReceiver == true) || (kDebugPrintPerFrameDone == true) ) {
                         std::printf("Sender: Transmitted frame %u in %.1f ms\n",
