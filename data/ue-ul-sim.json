@@ -6,6 +6,7 @@
  "demul_block_size" : 48,
  "ue_num": 2,
  "core_offset" : 16,
- "UE" : true
+ "UE" : true,
+ "socket_thread_num": 1
 }
 

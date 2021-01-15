@@ -309,6 +309,7 @@ target_link_libraries(sim ${COMMON_LIBS})
 add_executable(chsim
   simulator/chsim_main.cpp
   simulator/channel_sim.cpp
+  simulator/channel.cpp
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(chsim ${COMMON_LIBS})
 

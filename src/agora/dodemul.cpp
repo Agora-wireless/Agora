@@ -79,7 +79,6 @@ Event_data DoDemul::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
 
     if (kDebugPrintInTask == true) {
-    {
         std::printf(
             "In doDemul tid %d: frame: %zu, symbol idx UL: %zu, subcarrier: %zu, databuffer idx %zu \n",
             tid, frame_id, symbol_idx_ul, base_sc_id, total_data_symbol_idx_ul);

@@ -356,6 +356,7 @@ Config::Config(std::string jsonfile)
     mac_data_bytes_num_perframe_ = mac_payload_length_ * mac_packets_perframe_;
     mac_bytes_num_perframe_ = mac_packet_length_ * mac_packets_perframe_;
 
+    // Done!
     this->running_.store( true );
     std::printf(
         "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
