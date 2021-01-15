@@ -191,11 +191,12 @@ static inline std::string thread_type_str(ThreadType thread_type)
     return "Invalid thread type";
 }
 
-enum class SymbolType { kBeacon, kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
+enum class SymbolType { kBeacon, kUL, kDL, kPilot, kCalDL, kCalUL, kGuard, kUnknown };
 static const std::map<char, SymbolType> kSymbolMap = {
     {'B', SymbolType::kBeacon},
     {'C', SymbolType::kCalDL},
     {'D', SymbolType::kDL},
+	{'G', SymbolType::kGuard},
     {'L', SymbolType::kCalUL},
     {'P', SymbolType::kPilot},
     {'U', SymbolType::kUL}

@@ -91,7 +91,7 @@ int main(int argc, char* argv[])
         std::vector<std::vector<int8_t>> information(num_codeblocks);
         std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
         for (size_t i = 0; i < num_codeblocks; i++) {
-            data_generator.gen_codeblock_ul(information[i],
+            data_generator.gen_codeblock(information.at(i),
                 encoded_codewords[i], i % cfg->ue_num() /* UE ID */);
         }
 

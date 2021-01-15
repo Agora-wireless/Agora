@@ -92,7 +92,7 @@ Event_data DoFFT::launch(size_t tag)
     size_t frame_slot = frame_id % kFrameWnd;
     size_t symbol_id = pkt->symbol_id;
     size_t ant_id = pkt->ant_id;
-    SymbolType sym_type = cfg->GetSymbolType(frame_id, symbol_id);
+    SymbolType sym_type = cfg->GetSymbolType(symbol_id);
 
     if (cfg->fft_in_rru() == true) {
         simd_convert_float16_to_float32(reinterpret_cast<float*>(fft_inout),

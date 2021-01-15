@@ -638,7 +638,7 @@ void Agora::handle_event_fft(size_t tag)
 {
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
-    SymbolType sym_type = config_->GetSymbolType(frame_id, symbol_id);
+    SymbolType sym_type = config_->GetSymbolType(symbol_id);
     //std::printf("***** handle_event_fft %d\n", (int)sym_type);
 
     if (sym_type == SymbolType::kPilot) {

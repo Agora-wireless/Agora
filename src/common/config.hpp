@@ -209,7 +209,7 @@ public:
 
     /* Public functions that do not meet coding standard format */
     /// Return the symbol type of this symbol in this frame
-    SymbolType GetSymbolType(size_t frame_id, size_t symbol_id) const;
+    SymbolType GetSymbolType(size_t symbol_id) const;
 
     /* Inline functions */
     inline size_t GetNumAntennas( void ) const { return (this->num_radios_ * this->num_channels_); }

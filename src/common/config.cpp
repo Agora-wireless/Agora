@@ -516,15 +516,15 @@ void Config::GenData( void )
         std::exit(-1);
     }
     for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-        if (std::fseek(fd, num_bytes_per_ue * this->ue_ant_offset_, SEEK_SET) != 0) {
+        if (std::fseek(fd, (num_bytes_per_ue * this->ue_ant_offset_), SEEK_SET) != 0) {
             return;
         }
         for (size_t j = 0; j < this->ue_ant_num_; j++) {
             size_t r = std::fread(this->ul_bits_[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue) {
-                std::printf("bad read from file %s (batch %zu) \n",
-                    filename1.c_str(), i);
+                std::printf("uplink bad read from file %s (batch %zu : %zu) %zu : %zu\n",
+                    filename1.c_str(), i, j, r, num_bytes_per_ue);
             }
         }
         if (std::fseek(fd,
@@ -535,13 +535,14 @@ void Config::GenData( void )
             return;
         }
     }
+
     for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
         for (size_t j = 0; j < this->ue_ant_num_; j++) {
             size_t r = std::fread(this->dl_bits_[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue) {
-                std::printf("bad read from file %s (batch %zu) \n",
-                    filename1.c_str(), i);
+                std::printf("downlink bad read from file %s (batch %zu : %zu) \n",
+                    filename1.c_str(), i, j);
             }
         }
     }
@@ -875,7 +876,7 @@ bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const
     }
 }
 
-SymbolType Config::GetSymbolType(size_t frame_id, size_t symbol_id) const
+SymbolType Config::GetSymbolType(size_t symbol_id) const
 {
     assert((this->is_UE_ == false)); // Currently implemented for only the Agora server
     return kSymbolMap.at(this->frame_.frame_identifier().at(symbol_id));

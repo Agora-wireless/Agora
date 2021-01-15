@@ -37,7 +37,7 @@ public:
      * @param encoded_codeword The generated encoded codeword bit sequence
      * @param ue_id ID of the UE that this codeblock belongs to
      */
-    void gen_codeblock_ul(std::vector<int8_t>& information,
+    void gen_codeblock(std::vector<int8_t>& information,
         std::vector<int8_t>& encoded_codeword, size_t ue_id)
     {
         const LDPCconfig& lc = cfg->ldpc_config();
@@ -49,15 +49,16 @@ public:
 
         for (size_t i = 0; i < lc.numInputBytes(); i++) {
             if (profile == Profile::kRandom) {
-                information[i] = static_cast<int8_t>(fast_rand.next_u32());
+                information.at(i) = static_cast<int8_t>(fast_rand.next_u32());
             } else if (profile == Profile::k123) {
-                information[i] = 1 + (ue_id * 3) + (i % 3);
+                information.at(i) = 1 + (ue_id * 3) + (i % 3);
             }
         }
 
         ldpc_encode_helper(cfg->ldpc_config().base_graph(), cfg->ldpc_config().expansion_factor(),
-            cfg->ldpc_config().num_rows(), &encoded_codeword[0], &parity[0],
-            &information[0]);
+            cfg->ldpc_config().num_rows(), &encoded_codeword.at(0), &parity.at(0),
+            &information.at(0));
+
 
         information.resize(lc.numInputBytes());
         encoded_codeword.resize(lc.numEncodedBytes());
