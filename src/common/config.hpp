@@ -223,14 +223,14 @@ public:
     }
 
     /// Return total number of data symbols of all frames in a buffer
-    /// that holds data of kFrameWnd frames_
+    /// that holds data of kFrameWnd frames
     inline size_t GetTotalDataSymbolIdx(
         size_t frame_id, size_t symbol_id) const {
         return ((frame_id % kFrameWnd) * this->frame_.NumDataSyms() + symbol_id);
     }
 
     /// Return total number of uplink data symbols of all frames in a buffer
-    /// that holds data of kFrameWnd frames_
+    /// that holds data of kFrameWnd frames
     inline size_t GetTotalDataSymbolIdxUl(
         size_t frame_id, size_t symbol_idx_ul) const {
         return ((frame_id % kFrameWnd) * this->frame_.NumULSyms()
@@ -238,7 +238,7 @@ public:
     }
 
     /// Return total number of downlink data symbols of all frames in a buffer
-    /// that holds data of kFrameWnd frames_
+    /// that holds data of kFrameWnd frames
     inline size_t GetTotalDataSymbolIdxDl(
         size_t frame_id, size_t symbol_idx_dl) const {
         return ((frame_id % kFrameWnd) * this->frame_.NumDLSyms()

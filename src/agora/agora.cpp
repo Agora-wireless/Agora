@@ -8,9 +8,9 @@ Agora::Agora(Config* cfg)
     , csi_buffers_(kFrameWnd, cfg->ue_num(), cfg->bs_ant_num() * cfg->ofdm_data_num())
     , ul_zf_matrices_(
           kFrameWnd, cfg->ofdm_data_num(), cfg->bs_ant_num() * cfg->ue_num())
-    , demod_buffers_(kFrameWnd, cfg->frame().NumTotalSyms(), cfg->ue_num(),
+    , demod_buffers_(kFrameWnd, cfg->frame().NumULSyms(), cfg->ue_num(),
           kMaxModType * cfg->ofdm_data_num())
-    , decoded_buffer_(kFrameWnd, cfg->frame().NumTotalSyms(), cfg->ue_num(),
+    , decoded_buffer_(kFrameWnd, cfg->frame().NumULSyms(), cfg->ue_num(),
           cfg->ldpc_config().num_blocks_in_symbol() * roundup<64>(cfg->num_bytes_per_cb()))
     , dl_zf_matrices_(
           kFrameWnd, cfg->ofdm_data_num(), cfg->ue_num() * cfg->bs_ant_num())
@@ -151,7 +151,7 @@ void Agora::schedule_subcarriers(
         assert(false);
     }
 
-    size_t qid = frame_id & 0x1;
+    size_t qid = (frame_id & 0x1);
     if (event_type == EventType::kZF) {
         Event_data event;
         event.event_type = event_type;
@@ -232,7 +232,7 @@ void Agora::start()
 
     // Start packet I/O
     if (packet_tx_rx_->startTXRX(socket_buffer_, socket_buffer_status_,
-            socket_buffer_status_size_, this->stats_->frame_start, dl_socket_buffer_,
+            socket_buffer_status_size_, this->stats_->frame_start(), dl_socket_buffer_,
             calib_dl_buffer_, calib_ul_buffer_) == false) {
         this->stop();
         return;
@@ -344,7 +344,7 @@ void Agora::start()
                 size_t base_sc_id = gen_tag_t(event.tags[0]).sc_id;
                 //std::printf("---kDemul %zu %zu %zu\n", frame_id, symbol_idx_ul, base_sc_id);
 
-                print_per_task_done(PrintType::kDemul, frame_id, symbol_idx_ul, base_sc_id);
+                print_per_task_done(PrintType::kDemul, frame_id, cfg->frame().GetULSymbol(symbol_idx_ul), base_sc_id);
                 bool last_demul_task = this->demul_counters_.CompleteTask(frame_id, symbol_idx_ul);
 
                 if (last_demul_task == true) {
@@ -373,7 +373,7 @@ void Agora::start()
                 size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
                 size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
 
-                //std::printf("---Schedule kDecode %zu %zu\n", frame_id, symbol_idx_ul);
+                //std::printf("---kDecode Complete %zu %zu\n", frame_id, symbol_idx_ul);
                 bool last_decode_task = this->decode_counters_.CompleteTask(frame_id, symbol_idx_ul);
                 if (last_decode_task == true) {
                     if (kEnableMac == true) {
@@ -645,9 +645,9 @@ void Agora::handle_event_fft(size_t tag)
         bool last_fft_task = fft_counters_.CompleteTask(frame_id, symbol_id);
         if (last_fft_task == true) {
             print_per_symbol_done(PrintType::kFFTPilots, frame_id, symbol_id);
-            if ((config_->frame().NumDLSyms() == 0)
-                || ((config_->frame().NumDLSyms() > 0) && (config_->frame().IsRecCalEnabled() == false))
-                || ((config_->frame().NumDLSyms() > 0) && (config_->frame().IsRecCalEnabled() == true) && (rc_last_frame == frame_id))) {
+
+            if( (config_->frame().IsRecCalEnabled() == false) 
+                || ((config_->frame().IsRecCalEnabled() == true) && (rc_last_frame == frame_id))) {
                 /* If CSI of all UEs is ready, schedule ZF/prediction */
                 bool last_fft_symbol = fft_counters_.CompleteSymbol(frame_id);
                 if (last_fft_symbol == true) {
@@ -1370,8 +1370,8 @@ void Agora::save_decode_data_to_file(int frame_id)
 
     for (size_t i = 0; i < cfg->frame().NumULSyms(); i++) {
         for (size_t j = 0; j < cfg->ue_num(); j++) {
-            uint8_t* ptr = decoded_buffer_[frame_id % kFrameWnd][i][j];
-            fwrite(ptr, num_decoded_bytes, sizeof(uint8_t), fp);
+            uint8_t* ptr = decoded_buffer_[(frame_id % kFrameWnd)][i][j];
+            std::fwrite(ptr, num_decoded_bytes, sizeof(uint8_t), fp);
         }
     }
     std::fclose(fp);
@@ -1395,7 +1395,7 @@ void Agora::save_tx_data_to_file(UNUSED int frame_id)
             struct Packet* pkt = (struct Packet*)(&dl_socket_buffer_[offset
                 * cfg->dl_packet_length()]);
             short* socket_ptr = pkt->data;
-            fwrite(socket_ptr, cfg->samps_per_symbol() * 2, sizeof(short), fp);
+            std::fwrite(socket_ptr, cfg->samps_per_symbol() * 2, sizeof(short), fp);
         }
     }
     std::fclose(fp);

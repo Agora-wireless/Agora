@@ -299,7 +299,7 @@ void Utils::writeBinaryFile(
     std::string name, size_t elem_size, size_t buffer_size, void* buff)
 {
     FILE* f_handle = std::fopen(name.c_str(), "wb");
-    fwrite(buff, elem_size, buffer_size, f_handle);
+    std::fwrite(buff, elem_size, buffer_size, f_handle);
     std::fclose(f_handle);
 }
 

@@ -106,14 +106,14 @@ Event_data DoDecode::launch(size_t tag)
     const size_t cb_id = gen_tag_t(tag).cb_id;
     const size_t symbol_offset
         = cfg->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
-    const size_t cur_cb_id = cb_id % cfg->ldpc_config().num_blocks_in_symbol();
-    const size_t ue_id = cb_id / cfg->ldpc_config().num_blocks_in_symbol();
-    const size_t frame_slot = frame_id % kFrameWnd;
-    if (kDebugPrintInTask) {
+    const size_t cur_cb_id = (cb_id % cfg->ldpc_config().num_blocks_in_symbol());
+    const size_t ue_id = (cb_id / cfg->ldpc_config().num_blocks_in_symbol());
+    const size_t frame_slot = (frame_id % kFrameWnd);
+    if (kDebugPrintInTask == true) {
         std::printf(
             "In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
-            "%zu, ue: %zu\n",
-            tid, frame_id, symbol_idx_ul, cur_cb_id, ue_id);
+            "%zu, ue: %zu offset %zu\n",
+            tid, frame_id, symbol_idx_ul, cur_cb_id, ue_id, symbol_offset);
     }
 
     size_t start_tsc = worker_rdtsc();
@@ -175,19 +175,20 @@ Event_data DoDecode::launch(size_t tag)
         std::printf("\n");
     }
 
-    if ((kEnableMac == false) && (kPrintPhyStats == true) && (symbol_idx_ul == cfg->frame().client_ul_pilot_symbols())) {
-        phy_stats->update_decoded_bits(
-            ue_id, symbol_offset, cfg->num_bytes_per_cb() * 8);
+    if ((kEnableMac == false) && (kPrintPhyStats == true) && 
+        (symbol_idx_ul >= cfg->frame().client_ul_pilot_symbols())) {
+        phy_stats->update_decoded_bits( ue_id, symbol_offset, cfg->num_bytes_per_cb() * 8);
         phy_stats->increment_decoded_blocks(ue_id, symbol_offset);
         size_t block_error(0);
         for (size_t i = 0; i < cfg->num_bytes_per_cb(); i++) {
             uint8_t rx_byte = decoded_buffer_ptr[i];
-            uint8_t tx_byte = (uint8_t)cfg->GetInfoBits(
-                cfg->ul_bits(), symbol_idx_ul, ue_id, cur_cb_id)[i];
+            uint8_t tx_byte = static_cast<uint8_t>(cfg->GetInfoBits(
+                cfg->ul_bits(), symbol_idx_ul, ue_id, cur_cb_id)[i]);
             phy_stats->update_bit_errors(
                 ue_id, symbol_offset, tx_byte, rx_byte);
-            if (rx_byte != tx_byte)
+            if (rx_byte != tx_byte) {
                 block_error++;
+            }
         }
         phy_stats->update_block_errors(ue_id, symbol_offset, block_error);
     }

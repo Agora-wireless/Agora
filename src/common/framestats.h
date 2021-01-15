@@ -43,6 +43,7 @@ class FrameStats
         size_t GetPilotSymbolIdx ( size_t symbol_number ) const;
 
         size_t GetDLCalSymbol( size_t location ) const;
+        size_t GetULCalSymbol( size_t location ) const;
 
         bool   IsRecCalEnabled( void ) const;
         size_t NumDataSyms( void ) const;

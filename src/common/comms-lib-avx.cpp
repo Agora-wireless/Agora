@@ -82,17 +82,17 @@ int CommsLib::find_beacon_avx(const std::vector<std::complex<float>>& iq,
     std::string filename = "corr_simd.bin";
     FILE* fc = std::fopen(filename.c_str(), "wb");
     float* cdata_ptr = (float*)gold_corr_avx_2.data();
-    fwrite(cdata_ptr, gold_corr_avx_2.size(), sizeof(float), fc);
+    std::fwrite(cdata_ptr, gold_corr_avx_2.size(), sizeof(float), fc);
     std::fclose(fc);
     filename = "thresh_simd.bin";
     FILE* fp = std::fopen(filename.c_str(), "wb");
     float* tdata_ptr = (float*)thresh_avx.data();
-    fwrite(tdata_ptr, thresh_avx.size(), sizeof(float), fp);
+    std::fwrite(tdata_ptr, thresh_avx.size(), sizeof(float), fp);
     std::fclose(fp);
     filename = "indata.bin";
     FILE* fi = std::fopen(filename.c_str(), "wb");
     float* idata_ptr = (float*)iq.data();
-    fwrite(idata_ptr, iq.size() * 2, sizeof(float), fi);
+    std::fwrite(idata_ptr, iq.size() * 2, sizeof(float), fi);
     std::fclose(fi);
 #endif
 

@@ -138,10 +138,14 @@ size_t FrameStats::GetDLCalSymbol( size_t location ) const
     return this->dl_cal_symbols_.at(location);
 }
 
-
 size_t FrameStats::GetULSymbol( size_t location ) const
 {
     return this->ul_symbols_.at(location);
+}
+
+size_t FrameStats::GetULCalSymbol( size_t location ) const
+{
+    return this->ul_cal_symbols_.at(location);
 }
 
 size_t FrameStats::GetPilotSymbol( size_t location ) const

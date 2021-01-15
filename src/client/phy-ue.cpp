@@ -652,7 +652,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
                 std::string fname
                     = "rxpilot" + std::to_string(symbol_id) + ".bin";
                 FILE* f = std::fopen(fname.c_str(), "wb");
-                fwrite(
+                std::fwrite(
                     pkt->data, 2 * sizeof(int16_t), config_->samps_per_symbol(), f);
                 std::fclose(f);
             }
@@ -662,7 +662,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
                 std::string fname
                     = "rxdata" + std::to_string(symbol_id) + ".bin";
                 FILE* f = std::fopen(fname.c_str(), "wb");
-                fwrite(
+                std::fwrite(
                     pkt->data, 2 * sizeof(int16_t), config_->samps_per_symbol(), f);
                 std::fclose(f);
             }

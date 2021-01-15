@@ -1,6 +1,6 @@
 #include "phy_stats.hpp"
 
-PhyStats::PhyStats(Config* cfg)
+PhyStats::PhyStats(Config * cfg)
     : config_(cfg)
 {
     const size_t task_buffer_symbol_num_ul
@@ -53,14 +53,16 @@ PhyStats::~PhyStats(void)
 
 void PhyStats::print_phy_stats()
 {
-    auto& cfg = config_;
     const size_t task_buffer_symbol_num_ul
-        = cfg->frame().NumULSyms() * kFrameWnd;
-    for (size_t ue_id = 0; ue_id < cfg->ue_num(); ue_id++) {
+        = this->config_->frame().NumULSyms() * kFrameWnd;
+
+    //std::printf("print_phy_stats %zu\n", task_buffer_symbol_num_ul);
+    for (size_t ue_id = 0; ue_id < this->config_->ue_num(); ue_id++) {
         size_t total_decoded_bits(0);
         size_t total_bit_errors(0);
         size_t total_decoded_blocks(0);
         size_t total_block_errors(0);
+        
         for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
             total_decoded_bits += decoded_bits_count_[ue_id][i];
             total_bit_errors += bit_error_count_[ue_id][i];
@@ -134,10 +136,12 @@ void PhyStats::update_evm_stats(size_t frame_id, size_t sc_id, cx_fmat eq)
 void PhyStats::update_bit_errors(
     size_t ue_id, size_t offset, uint8_t tx_byte, uint8_t rx_byte)
 {
+    static constexpr size_t kBitsInByte = 8;
+    //std::printf("Updating bit errors: %zu %zu %d %d\n", ue_id, offset, tx_byte, rx_byte);
     uint8_t xor_byte(tx_byte ^ rx_byte);
     size_t bit_errors = 0;
-    for (size_t j = 0; j < 8; j++) {
-        bit_errors += xor_byte & 1;
+    for (size_t j = 0; j < kBitsInByte; j++) {
+        bit_errors += (xor_byte & 1);
         xor_byte >>= 1;
     }
     bit_error_count_[ue_id][offset] += bit_errors;

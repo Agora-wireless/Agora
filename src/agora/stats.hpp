@@ -13,8 +13,8 @@ static constexpr size_t kMaxStatBreakdown = 4;
 struct DurationStat {
     size_t task_duration[kMaxStatBreakdown]; // Unit = TSC cycles
     size_t task_count;
-    DurationStat() { reset(); }
-    void reset() { std::memset(this, 0, sizeof(DurationStat)); }
+    DurationStat( void ) { Reset(); }
+    void Reset( void ) { std::memset(this, 0, sizeof(DurationStat)); }
 };
 
 // Temporary summary statistics assembled from per-thread runtime stats
@@ -23,7 +23,7 @@ struct FrameSummary {
     size_t count_this_thread = 0;
     double us_avg_threads[kMaxStatBreakdown];
     size_t count_all_threads = 0;
-    FrameSummary() { std::memset(this, 0, sizeof(FrameSummary)); }
+    FrameSummary( void ) { std::memset(this, 0, sizeof(FrameSummary)); }
 };
 
 // Type of timestamps recorded at the master for a frame
@@ -51,7 +51,7 @@ static constexpr size_t kNumTimestampTypes
 class Stats {
 public:
     Stats(Config* cfg);
-    ~Stats();
+    ~Stats( void );
 
     /// If worker stats collection is enabled, combine and update per-worker
     /// stats for all uplink and donwlink Doer types. Else return immediately.
@@ -72,95 +72,100 @@ public:
     /// If worker stats collection is enabled, prsize_t a summary of stats
     void print_summary();
 
-    size_t last_frame_id( void ) const { return this->last_frame_id_; }
+    inline size_t last_frame_id( void ) const { return this->last_frame_id_; }
+
+    /// Dimensions = number of packet RX threads x kNumStatsFrames.
+    /// frame_start[i][j] is the RDTSC timestamp taken by thread i when it
+    /// starts receiving frame j.
+    inline Table<size_t>& frame_start ( void ) { return this->frame_start_; };
 
     /// From the master, set the RDTSC timestamp for a frame ID and timestamp
     /// type
     void master_set_tsc(TsType timestamp_type, size_t frame_id)
     {
-        master_timestamps[static_cast<size_t>(timestamp_type)]
+        this->master_timestamps_[static_cast<size_t>(timestamp_type)]
                          [frame_id % kNumStatsFrames]
             = rdtsc();
     }
 
     /// From the master, get the RDTSC timestamp for a frame ID and timestamp
     /// type
-    size_t master_get_tsc(TsType timestamp_type, size_t frame_id)
+    size_t master_get_tsc(TsType timestamp_type, size_t frame_id) const
     {
-        return master_timestamps[static_cast<size_t>(timestamp_type)]
-                                [frame_id % kNumStatsFrames];
+        return this->master_timestamps_[static_cast<size_t>(timestamp_type)]
+                                [(frame_id % kNumStatsFrames)];
     }
 
     /// From the master, get the millisecond elapsed since the timestamp of
     /// timestamp_type was taken for frame_id
-    double master_get_ms_since(TsType timestamp_type, size_t frame_id)
+    double master_get_ms_since(TsType timestamp_type, size_t frame_id) const
     {
         return cycles_to_ms(
-            rdtsc() - master_get_tsc(timestamp_type, frame_id), freq_ghz);
+            rdtsc() - master_get_tsc(timestamp_type, frame_id), this->freq_ghz_);
     }
 
     /// From the master, get the microseconds elapsed since the timestamp of
     /// timestamp_type was taken for frame_id
-    double master_get_us_since(TsType timestamp_type, size_t frame_id)
+    double master_get_us_since(TsType timestamp_type, size_t frame_id) const
     {
         return cycles_to_us(
-            rdtsc() - master_get_tsc(timestamp_type, frame_id), freq_ghz);
+            rdtsc() - master_get_tsc(timestamp_type, frame_id), this->freq_ghz_);
     }
 
     /// From the master, get the microseconds between when the timestamp of
     /// timestamp_type was taken for frame_id, and reference_tsc
     double master_get_us_from_ref(
-        TsType timestamp_type, size_t frame_id, size_t reference_tsc)
+        TsType timestamp_type, size_t frame_id, size_t reference_tsc) const
     {
         return cycles_to_us(
-            master_get_tsc(timestamp_type, frame_id) - reference_tsc, freq_ghz);
+            master_get_tsc(timestamp_type, frame_id) - reference_tsc, this->freq_ghz_);
     }
 
     /// From the master, for a frame ID, get the millisecond difference
     /// between two timestamp types
     double master_get_delta_ms(
-        TsType timestamp_type_1, TsType timestamp_type_2, size_t frame_id)
+        TsType timestamp_type_1, TsType timestamp_type_2, size_t frame_id) const
     {
         return cycles_to_ms(master_get_tsc(timestamp_type_1, frame_id)
                 - master_get_tsc(timestamp_type_2, frame_id),
-            freq_ghz);
+            this->freq_ghz_);
     }
 
     /// From the master, for a frame ID, get the microsecond difference
     /// between two timestamp types
     double master_get_delta_us(
-        TsType timestamp_type_1, TsType timestamp_type_2, size_t frame_id)
+        TsType timestamp_type_1, TsType timestamp_type_2, size_t frame_id) const
     {
         return cycles_to_us(master_get_tsc(timestamp_type_1, frame_id)
                 - master_get_tsc(timestamp_type_2, frame_id),
-            freq_ghz);
+            this->freq_ghz_);
     }
 
     /// From the master, get the microsecond difference between the times that
     /// a timestamp type was taken for two frames
     double master_get_delta_ms(
-        TsType timestamp_type, size_t frame_id_1, size_t frame_id_2)
+        TsType timestamp_type, size_t frame_id_1, size_t frame_id_2) const
     {
         return cycles_to_ms(master_get_tsc(timestamp_type, frame_id_1)
                 - master_get_tsc(timestamp_type, frame_id_2),
-            freq_ghz);
+            this->freq_ghz_);
     }
 
     /// From the master, get the microsecond difference between the times that
     /// a timestamp type was taken for two frames
     double master_get_delta_us(
-        TsType timestamp_type, size_t frame_id_1, size_t frame_id_2)
+        TsType timestamp_type, size_t frame_id_1, size_t frame_id_2) const
     {
         return cycles_to_us(master_get_tsc(timestamp_type, frame_id_1)
                 - master_get_tsc(timestamp_type, frame_id_2),
-            freq_ghz);
+            this->freq_ghz_);
     }
 
     /// Get the DurationStat object used by thread thread_id for DoerType
     /// doer_type
     DurationStat* get_duration_stat(DoerType doer_type, size_t thread_id)
     {
-        return &worker_durations[thread_id]
+        return &this->worker_durations_[thread_id]
                     .duration_stat[static_cast<size_t>(doer_type)];
     }
 
@@ -169,14 +174,10 @@ public:
     /// for DoerType doer_type.
     DurationStat* get_duration_stat_old(DoerType doer_type, size_t thread_id)
     {
-        return &worker_durations_old[thread_id]
+        return &this->worker_durations_old_[thread_id]
                     .duration_stat[static_cast<size_t>(doer_type)];
     }
 
-    /// Dimensions = number of packet RX threads x kNumStatsFrames.
-    /// frame_start[i][j] is the RDTSC timestamp taken by thread i when it
-    /// starts receiving frame j.
-    Table<size_t> frame_start;
 
 private:
     // Fill in running time summary stats for the current frame for this
@@ -231,45 +232,54 @@ private:
         FrameSummary* frame_summary_zf, FrameSummary* frame_summary_precode,
         FrameSummary* frame_summary_encode);
 
-    Config* config_;
-    const size_t task_thread_num;
-    const size_t fft_thread_num;
-    const size_t zf_thread_num;
-    const size_t demul_thread_num;
-    const size_t decode_thread_num;
-    const size_t break_down_num = kMaxStatBreakdown;
-    const double freq_ghz;
-    const size_t creation_tsc; // TSC at which this object was created
+    Config const * const config_;
+    
+    const size_t task_thread_num_;
+    const size_t fft_thread_num_;
+    const size_t zf_thread_num_;
+    const size_t demul_thread_num_;
+    const size_t decode_thread_num_;
+    const size_t break_down_num_ = kMaxStatBreakdown;
+    const double freq_ghz_;
+    const size_t creation_tsc_; // TSC at which this object was created
 
     /// Timestamps taken by the master thread at different points in a frame's
     /// processing
-    double master_timestamps[kNumTimestampTypes][kNumStatsFrames];
+    double master_timestamps_[kNumTimestampTypes][kNumStatsFrames];
 
     /// Running time duration statistics. Each worker thread has one
     /// DurationStat object for every Doer type. The master thread keeps stale
     /// ("old") copies of all DurationStat objects.
-    struct {
-        DurationStat duration_stat[kNumDoerTypes];
-        uint8_t false_sharing_padding[64];
-    } worker_durations[kMaxThreads], worker_durations_old[kMaxThreads];
+    struct TimeDurationsStats {
+        std::array<DurationStat, kNumDoerTypes> duration_stat;
+        std::array<uint8_t, 64>  false_sharing_padding;
+    };
+    
+    std::array<TimeDurationsStats, kMaxThreads> worker_durations_;
+    std::array<TimeDurationsStats, kMaxThreads> worker_durations_old_;
 
-    double fft_us[kNumStatsFrames];
-    double csi_us[kNumStatsFrames];
-    double zf_us[kNumStatsFrames];
-    double demul_us[kNumStatsFrames];
-    double ifft_us[kNumStatsFrames];
-    double precode_us[kNumStatsFrames];
-    double decode_us[kNumStatsFrames];
-    double encode_us[kNumStatsFrames];
-    double rc_us[kNumStatsFrames];
+    std::array<double, kNumStatsFrames> fft_us_;
+    std::array<double, kNumStatsFrames> csi_us_;
+    std::array<double, kNumStatsFrames> zf_us_;
+    std::array<double, kNumStatsFrames> demul_us_;
+    std::array<double, kNumStatsFrames> ifft_us_;
+    std::array<double, kNumStatsFrames> precode_us_;
+    std::array<double, kNumStatsFrames> decode_us_;
+    std::array<double, kNumStatsFrames> encode_us_;
+    std::array<double, kNumStatsFrames> rc_us_;
 
-    double fft_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
-    double csi_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
-    double zf_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
-    double demul_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
-    double decode_breakdown_us[kMaxStatBreakdown][kNumStatsFrames];
+    std::array<std::array<double, kNumStatsFrames>, kMaxStatBreakdown> fft_breakdown_us_;
+    std::array<std::array<double, kNumStatsFrames>, kMaxStatBreakdown> csi_breakdown_us_;
+    std::array<std::array<double, kNumStatsFrames>, kMaxStatBreakdown> zf_breakdown_us_;
+    std::array<std::array<double, kNumStatsFrames>, kMaxStatBreakdown> demul_breakdown_us_;
+    std::array<std::array<double, kNumStatsFrames>, kMaxStatBreakdown> decode_breakdown_us_;
 
     size_t last_frame_id_;
+
+    /// Dimensions = number of packet RX threads x kNumStatsFrames.
+    /// frame_start[i][j] is the RDTSC timestamp taken by thread i when it
+    /// starts receiving frame j.
+    Table<size_t> frame_start_;
 };
 
 #endif

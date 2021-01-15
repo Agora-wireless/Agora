@@ -326,6 +326,8 @@ void* Sender::worker_thread(int tid)
                 // Update the TX buffer
                 auto tag = gen_tag_t(tags[tag_id]);
                 pkt->frame_id = tag.frame_id;
+
+                //printf("\nSender symbol %d : %zu \n\n", tag.symbol_id, cfg->GetSymbolId(tag.symbol_id));
                 pkt->symbol_id = cfg->GetSymbolId(tag.symbol_id);
                 pkt->cell_id = tag.ant_id / ant_num_per_cell;
                 pkt->ant_id = tag.ant_id - ant_num_per_cell * (pkt->cell_id);

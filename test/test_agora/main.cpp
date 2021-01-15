@@ -71,7 +71,7 @@ void check_correctness_ul(Config const * const cfg)
     read_from_file_ul(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
     read_from_file_ul(output_data_filename, output_data, num_bytes_per_ue, cfg);
 
-    std::printf("check_correctness_ul: ue %d, ul syms %d, ofdm %d, ul pilots %d.\n", ue_num, data_symbol_num_perframe, ofdm_data_num, ul_pilot_syms);
+    std::printf("check_correctness_ul: ue %d, ul syms %d, ofdm %d, ul pilots %d, bytes per UE %d.\n", ue_num, data_symbol_num_perframe, ofdm_data_num, ul_pilot_syms, num_bytes_per_ue);
 
     int error_cnt = 0;
     int total_count = 0;
@@ -84,7 +84,7 @@ void check_correctness_ul(Config const * const cfg)
                     int offset_in_output = num_bytes_per_ue * ue + j;
                     if (raw_data[i][offset_in_raw] != output_data[i][offset_in_output]) {
                         error_cnt++;
-                        // std::printf("(%d, %d, %u, %u)\n", i, j,
+                        //std::printf("(%d, %d, %u, %u)\n", i, j,
                         //     raw_data[i][offset_in_raw],
                         //     output_data[i][offset_in_output]);
                     }

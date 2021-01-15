@@ -790,15 +790,16 @@ size_t Config::GetPilotSymbolIdx(size_t frame_id, size_t symbol_id) const
 }
 
 /* TODO Inspect and document */
-size_t Config::GetSymbolId(size_t input_id ) const
+size_t Config::GetSymbolId( size_t input_id ) const
 {
     size_t symbol_id = SIZE_MAX;
 
-    if (input_id < this->frame_.NumPilotSyms())
-    {
+    if (input_id < this->frame_.NumPilotSyms()) {
         symbol_id = this->frame().GetPilotSymbol( input_id );
     } else {
         int new_idx = input_id - this->frame_.NumPilotSyms();
+
+        //std::printf("\n*****GetSymbolId %d %zu\n", new_idx, input_id);
         if ((new_idx >= 0) && (static_cast<size_t>(new_idx) < this->frame_.NumULSyms())) {
             symbol_id = this->frame().GetULSymbol( new_idx );
         }

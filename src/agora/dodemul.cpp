@@ -79,9 +79,10 @@ Event_data DoDemul::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
 
     if (kDebugPrintInTask == true) {
+    {
         std::printf(
-            "In doDemul tid %d: frame: %zu, symbol idx UL: %zu, subcarrier: %zu \n",
-            tid, frame_id, symbol_idx_ul, base_sc_id);
+            "In doDemul tid %d: frame: %zu, symbol idx UL: %zu, subcarrier: %zu, databuffer idx %zu \n",
+            tid, frame_id, symbol_idx_ul, base_sc_id, total_data_symbol_idx_ul);
     }
 
     size_t max_sc_ite
@@ -245,6 +246,8 @@ Event_data DoDemul::launch(size_t tag)
             equal_ptr += cfg->ue_num() * kNumDoubleInSIMD256 * 2;
         }
         equal_T_ptr = (float*)(equaled_buffer_temp_transposed_);
+
+        //std::printf("Demod buffer pointer, ul idx %zu base sc %zu mod order %zu\n", symbol_idx_ul, base_sc_id, cfg->mod_order_bits());
         int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][i]
             + (cfg->mod_order_bits() * base_sc_id);
 
