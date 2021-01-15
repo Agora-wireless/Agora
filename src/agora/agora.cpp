@@ -314,10 +314,6 @@ void Agora::start()
                         print_per_frame_done(PrintType::kZF, frame_id);
                         this->zf_counters_.Reset(frame_id);
 
-                        // If all the data in a frame has arrived when ZF is done
-                        std::printf("kZF last task, frame id %zu\n", frame_id);
-
-                        /* todo find the test case for this??? */
                         for (size_t i = 0; i < cfg->frame().NumULSyms(); i++) {
                             //std::printf("Inspecting %zu %zu\n", i, this->fft_cur_frame_for_symbol_.at(i));
                             if (this->fft_cur_frame_for_symbol_.at(i) == frame_id) {
@@ -391,7 +387,6 @@ void Agora::start()
                             //cur_proc_frame_id++;
                             bool work_finished = this->CheckWorkComplete(frame_id);
                             if (work_finished == true) {
-                                std::printf("---kDecode finished---\n");
                                 goto finish;
                             }
                         }
@@ -424,7 +419,6 @@ void Agora::start()
                         print_per_frame_done(PrintType::kPacketToMac, frame_id);
                         bool work_finished = this->CheckWorkComplete(frame_id);
                         if (work_finished == true) {
-                            std::printf("---kPacketToMac finished---\n");
                             goto finish;
                         }
                     }
@@ -515,7 +509,6 @@ void Agora::start()
                             bool work_finished = this->CheckWorkComplete(frame_id);
                             //cur_sche_frame_id++;
                             if (work_finished == true) {
-                                std::printf("---kIFFT finished---\n");
                                 goto finish;
                             }
                         }
@@ -553,7 +546,6 @@ void Agora::start()
                         //if (work_finished == true) {
                         this->tx_counters_.Reset(frame_id);
                         if (frame_id == (this->config_->frames_to_test() - 1)) {
-                            std::printf("---nkPacketTX finished---\n");
                             goto finish;
                         }
                         tx_counters_.Reset( frame_id );
@@ -746,13 +738,6 @@ void Agora::worker(int tid)
         events_vec.push_back(EventType::kPrecode);
         events_vec.push_back(EventType::kEncode);
     }
-    
-    /*if (config_->frame().NumULSyms() > 0) {
-        computers_vec.push_back( computeDecoding.get() );
-        computers_vec.push_back( computeDemul.get() );
-        events_vec.push_back(EventType::kDecode);
-        events_vec.push_back(EventType::kDemul);
-    }*/
 
     size_t cur_qid = 0;
     size_t empty_qeueu_itrs = 0;
@@ -958,174 +943,171 @@ void Agora::update_rx_counters(size_t frame_id, size_t symbol_id)
 
 void Agora::print_per_frame_done(PrintType print_type, size_t frame_id)
 {
-    if (kDebugPrintPerFrameDone == false) {
-        return;
-    }
-
-    switch (print_type) {
-    case (PrintType::kPacketRXPilots):
-        std::printf("Main [frame %zu + %.2f ms]: Received all pilots\n",
-            frame_id,
-            this->stats_->master_get_delta_ms(
-                TsType::kPilotAllRX, TsType::kPilotRX, frame_id));
-        break;
-    case (PrintType::kPacketRX): {
-        std::printf("Main [frame %zu + %.2f ms]: Received all packets\n",
-            frame_id,
-            this->stats_->master_get_delta_ms(
-                TsType::kRXDone, TsType::kPilotRX, frame_id));
-    } break;
-    case (PrintType::kFFTPilots):
-        std::printf("Main [frame %zu + %.2f ms]: FFT-ed all pilots\n", frame_id,
-            this->stats_->master_get_delta_ms(
-                TsType::kFFTPilotsDone, TsType::kPilotRX, frame_id));
-        break;
-    case (PrintType::kFFTCal):
-        std::printf(
-            "Main [frame %zu + %.2f ms]: FFT-ed all calibration symbols\n",
-            frame_id,
-            this->stats_->master_get_us_since(TsType::kRCAllRX, frame_id) / 1000.0);
-        break;
-    case (PrintType::kZF):
-        std::printf("Main [frame %zu + %.2f ms]: Completed zero-forcing\n",
-            frame_id,
-            this->stats_->master_get_delta_ms(
-                TsType::kZFDone, TsType::kPilotRX, frame_id));
-        break;
-    case (PrintType::kDemul):
-        std::printf("Main [frame %zu + %.2f ms]: Completed demodulation\n",
-            frame_id,
-            this->stats_->master_get_delta_ms(
-                TsType::kDemulDone, TsType::kPilotRX, frame_id));
-        break;
-    case (PrintType::kDecode):
-        std::printf(
-            "Main [frame %zu + %.2f ms]: Completed LDPC decoding (%zu UL "
-            "symbols)\n",
-            frame_id,
-            this->stats_->master_get_delta_ms(
-                TsType::kDecodeDone, TsType::kPilotRX, frame_id),
-            config_->frame().NumULSyms());
-        break;
-    case (PrintType::kEncode):
-        std::printf("Main [frame %zu + %.2f ms]: Completed LDPC encoding\n",
-            frame_id,
-            this->stats_->master_get_delta_ms(
-                TsType::kEncodeDone, TsType::kPilotRX, frame_id));
-        break;
-    case (PrintType::kPrecode):
-        std::printf("Main [frame %zu + %.2f ms]: Completed precoding\n",
-            frame_id,
-            this->stats_->master_get_delta_ms(
-                TsType::kPrecodeDone, TsType::kPilotRX, frame_id));
-        break;
-    case (PrintType::kIFFT):
-        std::printf("Main [frame %zu + %.2f ms]: Completed IFFT\n", frame_id,
-            this->stats_->master_get_delta_ms(
-                TsType::kIFFTDone, TsType::kPilotRX, frame_id));
-        break;
-    case (PrintType::kPacketTXFirst):
-        std::printf(
-            "Main [frame %zu + %.2f ms]: Completed TX of first symbol\n",
-            frame_id,
-            this->stats_->master_get_delta_ms(
-                TsType::kTXProcessedFirst, TsType::kPilotRX, frame_id));
-        break;
-    case (PrintType::kPacketTX):
-        std::printf(
-            "Main [frame %zu + %.2f ms]: Completed TX (%zu DL symbols)\n",
-            frame_id,
-            this->stats_->master_get_delta_ms(
-                TsType::kTXDone, TsType::kPilotRX, frame_id),
-            config_->frame().NumDLSyms());
-        break;
-    case (PrintType::kPacketToMac):
-        std::printf("Main [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
-            this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id));
-        break;
-    default:
-        std::printf("Wrong task type in frame done print!");
+    if (kDebugPrintPerFrameDone == true) {
+        switch (print_type) {
+        case (PrintType::kPacketRXPilots):
+            std::printf("Main [frame %zu + %.2f ms]: Received all pilots\n",
+                frame_id,
+                this->stats_->master_get_delta_ms(
+                    TsType::kPilotAllRX, TsType::kPilotRX, frame_id));
+            break;
+        case (PrintType::kPacketRX):
+            std::printf("Main [frame %zu + %.2f ms]: Received all packets\n",
+                frame_id,
+                this->stats_->master_get_delta_ms(
+                    TsType::kRXDone, TsType::kPilotRX, frame_id));
+            break;
+        case (PrintType::kFFTPilots):
+            std::printf("Main [frame %zu + %.2f ms]: FFT-ed all pilots\n", frame_id,
+                this->stats_->master_get_delta_ms(
+                    TsType::kFFTPilotsDone, TsType::kPilotRX, frame_id));
+            break;
+        case (PrintType::kFFTCal):
+            std::printf(
+                "Main [frame %zu + %.2f ms]: FFT-ed all calibration symbols\n",
+                frame_id,
+                this->stats_->master_get_us_since(TsType::kRCAllRX, frame_id) / 1000.0);
+            break;
+        case (PrintType::kZF):
+            std::printf("Main [frame %zu + %.2f ms]: Completed zero-forcing\n",
+                frame_id,
+                this->stats_->master_get_delta_ms(
+                    TsType::kZFDone, TsType::kPilotRX, frame_id));
+            break;
+        case (PrintType::kDemul):
+            std::printf("Main [frame %zu + %.2f ms]: Completed demodulation\n",
+                frame_id,
+                this->stats_->master_get_delta_ms(
+                    TsType::kDemulDone, TsType::kPilotRX, frame_id));
+            break;
+        case (PrintType::kDecode):
+            std::printf(
+                "Main [frame %zu + %.2f ms]: Completed LDPC decoding (%zu UL "
+                "symbols)\n",
+                frame_id,
+                this->stats_->master_get_delta_ms(
+                    TsType::kDecodeDone, TsType::kPilotRX, frame_id),
+                config_->frame().NumULSyms());
+            break;
+        case (PrintType::kEncode):
+            std::printf("Main [frame %zu + %.2f ms]: Completed LDPC encoding\n",
+                frame_id,
+                this->stats_->master_get_delta_ms(
+                    TsType::kEncodeDone, TsType::kPilotRX, frame_id));
+            break;
+        case (PrintType::kPrecode):
+            std::printf("Main [frame %zu + %.2f ms]: Completed precoding\n",
+                frame_id,
+                this->stats_->master_get_delta_ms(
+                    TsType::kPrecodeDone, TsType::kPilotRX, frame_id));
+            break;
+        case (PrintType::kIFFT):
+            std::printf("Main [frame %zu + %.2f ms]: Completed IFFT\n", frame_id,
+                this->stats_->master_get_delta_ms(
+                    TsType::kIFFTDone, TsType::kPilotRX, frame_id));
+            break;
+        case (PrintType::kPacketTXFirst):
+            std::printf(
+                "Main [frame %zu + %.2f ms]: Completed TX of first symbol\n",
+                frame_id,
+                this->stats_->master_get_delta_ms(
+                    TsType::kTXProcessedFirst, TsType::kPilotRX, frame_id));
+            break;
+        case (PrintType::kPacketTX):
+            std::printf(
+                "Main [frame %zu + %.2f ms]: Completed TX (%zu DL symbols)\n",
+                frame_id,
+                this->stats_->master_get_delta_ms(
+                    TsType::kTXDone, TsType::kPilotRX, frame_id),
+                config_->frame().NumDLSyms());
+            break;
+        case (PrintType::kPacketToMac):
+            std::printf("Main [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
+                this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id));
+            break;
+        default:
+            std::printf("Wrong task type in frame done print!");
+        }
     }
 }
 
 void Agora::print_per_symbol_done(
     PrintType print_type, size_t frame_id, size_t symbol_id)
 {
-    if (kDebugPrintPerSymbolDone == false) {
-        return;
-    }
-    switch (print_type) {
-    case (PrintType::kFFTPilots):
-        std::printf(
-            "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed pilot symbol, "
-            "%zu symbols done\n",
-            frame_id, symbol_id,
-            this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
-            fft_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-    case (PrintType::kFFTData):
-        std::printf(
-            "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed data symbol, "
-            "precoder status: %d\n",
-            frame_id, symbol_id,
-            this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
-            zf_last_frame == frame_id);
-        break;
-    case (PrintType::kDemul):
-        std::printf(
-            "Main [frame %zu symbol %zu + %.3f ms]: Completed demodulation, "
-            "%zu symbols done\n",
-            frame_id, symbol_id,
-            this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
-            demul_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-    case (PrintType::kDecode):
-        std::printf(
-            "Main [frame %zu symbol %zu + %.3f ms]: Completed decoding, "
-            "%zu symbols done\n",
-            frame_id, symbol_id,
-            this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
-            decode_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-    case (PrintType::kEncode):
-        std::printf(
-            "Main [frame %zu symbol %zu + %.3f ms]: Completed encoding, "
-            "%zu symbols done\n",
-            frame_id, symbol_id,
-            this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
-            encode_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-    case (PrintType::kPrecode):
-        std::printf(
-            "Main [frame %zu symbol %zu + %.3f ms]: Completed precoding, "
-            "%zu symbols done\n",
-            frame_id, symbol_id,
-            this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
-            precode_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-    case (PrintType::kIFFT):
-        std::printf("Main [frame %zu symbol %zu + %.3f ms]: Completed IFFT, "
-                    "%zu symbols done\n",
-            frame_id, symbol_id,
-            this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
-            ifft_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-    case (PrintType::kPacketTX):
-        std::printf("Main [frame %zu symbol %zu + %.3f ms]: Completed TX, "
-                    "%zu symbols done\n",
-            frame_id, symbol_id,
-            this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
-            tx_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-    case (PrintType::kPacketToMac):
-        std::printf("Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
-                    "%zu symbols done\n",
-            frame_id, symbol_id,
-            this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
-            tomac_counters_.GetSymbolCount(frame_id) + 1);
-        break;
-    default:
-        std::printf("Wrong task type in symbol done print!");
+    if (kDebugPrintPerSymbolDone == true) {
+        switch (print_type) {
+        case (PrintType::kFFTPilots):
+            std::printf(
+                "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed pilot symbol, "
+                "%zu symbols done\n",
+                frame_id, symbol_id,
+                this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
+                fft_counters_.GetSymbolCount(frame_id) + 1);
+            break;
+        case (PrintType::kFFTData):
+            std::printf(
+                "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed data symbol, "
+                "precoder status: %d\n",
+                frame_id, symbol_id,
+                this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
+                zf_last_frame == frame_id);
+            break;
+        case (PrintType::kDemul):
+            std::printf(
+                "Main [frame %zu symbol %zu + %.3f ms]: Completed demodulation, "
+                "%zu symbols done\n",
+                frame_id, symbol_id,
+                this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
+                demul_counters_.GetSymbolCount(frame_id) + 1);
+            break;
+        case (PrintType::kDecode):
+            std::printf(
+                "Main [frame %zu symbol %zu + %.3f ms]: Completed decoding, "
+                "%zu symbols done\n",
+                frame_id, symbol_id,
+                this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
+                decode_counters_.GetSymbolCount(frame_id) + 1);
+            break;
+        case (PrintType::kEncode):
+            std::printf(
+                "Main [frame %zu symbol %zu + %.3f ms]: Completed encoding, "
+                "%zu symbols done\n",
+                frame_id, symbol_id,
+                this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
+                encode_counters_.GetSymbolCount(frame_id) + 1);
+            break;
+        case (PrintType::kPrecode):
+            std::printf(
+                "Main [frame %zu symbol %zu + %.3f ms]: Completed precoding, "
+                "%zu symbols done\n",
+                frame_id, symbol_id,
+                this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
+                precode_counters_.GetSymbolCount(frame_id) + 1);
+            break;
+        case (PrintType::kIFFT):
+            std::printf("Main [frame %zu symbol %zu + %.3f ms]: Completed IFFT, "
+                        "%zu symbols done\n",
+                frame_id, symbol_id,
+                this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
+                ifft_counters_.GetSymbolCount(frame_id) + 1);
+            break;
+        case (PrintType::kPacketTX):
+            std::printf("Main [frame %zu symbol %zu + %.3f ms]: Completed TX, "
+                        "%zu symbols done\n",
+                frame_id, symbol_id,
+                this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
+                tx_counters_.GetSymbolCount(frame_id) + 1);
+            break;
+        case (PrintType::kPacketToMac):
+            std::printf("Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
+                        "%zu symbols done\n",
+                frame_id, symbol_id,
+                this->stats_->master_get_ms_since(TsType::kPilotRX, frame_id),
+                tomac_counters_.GetSymbolCount(frame_id) + 1);
+            break;
+        default:
+            std::printf("Wrong task type in symbol done print!");
+        }
     }
 }
 
@@ -1135,8 +1117,8 @@ void Agora::print_per_task_done(PrintType print_type, size_t frame_id,
     if (kDebugPrintPerTaskDone == true) {
         switch (print_type) {
         case (PrintType::kZF):
-            //std::printf("Main thread: ZF done frame: %zu, subcarrier %zu\n",
-            //    frame_id, ant_or_sc_id);
+            std::printf("Main thread: ZF done frame: %zu, subcarrier %zu\n",
+                frame_id, ant_or_sc_id);
             break;
         case (PrintType::kRC):
             std::printf("Main thread: RC done frame: %zu, subcarrier %zu\n",
@@ -1414,8 +1396,8 @@ bool Agora::CheckWorkComplete( size_t frame_id )
 {
     bool finished = false;
 
-    std::printf("\nChecking work complete %zu, ifft %d, tx %d, decode %d, tomac %d\n\n", frame_id, this->ifft_counters_.IsLastSymbol( frame_id ), this->tx_counters_.IsLastSymbol( frame_id )
-    , this->decode_counters_.IsLastSymbol( frame_id ), this->tomac_counters_.IsLastSymbol( frame_id ));
+    //std::printf("\nChecking work complete %zu, ifft %d, tx %d, decode %d, tomac %d\n\n", frame_id, this->ifft_counters_.IsLastSymbol( frame_id ), this->tx_counters_.IsLastSymbol( frame_id )
+    //, this->decode_counters_.IsLastSymbol( frame_id ), this->tomac_counters_.IsLastSymbol( frame_id ));
 
     //(true == this->tx_counters_.IsLastSymbol( frame_id )
     // Complete if last frame and ifft / decode complete
@@ -1429,7 +1411,6 @@ bool Agora::CheckWorkComplete( size_t frame_id )
         this->ifft_counters_.Reset(frame_id);
         this->cur_proc_frame_id++;
         this->cur_sche_frame_id++; //Probably an issue here.
-        std::printf("\nNew Proc Frame %zu\n\n", this->cur_proc_frame_id);
 
         if (frame_id == (this->config_->frames_to_test() - 1)) {
             finished = true;

@@ -542,7 +542,6 @@ void Config::GenData( void )
     const size_t ul_codeblocks = frame_.NumULSyms() * ldpc_config_.num_blocks_in_symbol() * ue_ant_num_;
     const size_t skip_count = ul_codeblocks * (input_bytes_per_cb * sizeof(uint8_t));
 
-    std::printf(" ***Seeking to DL: %zu from %zu\n", skip_count, std::ftell(fd));
     if (std::fseek(fd, skip_count, SEEK_SET) != 0) {
         std::printf(" ***Error seeking over the ul symbols: %zu : %zu\n", this->frame_.NumULSyms(), skip_count);
     }
