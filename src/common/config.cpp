@@ -442,32 +442,36 @@ void Config::genData()
         std::exit(-1);
     }
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-        if (fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0)
+        if (std::fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0) {
             return;
-        for (size_t j = 0; j < UE_ANT_NUM; j++) {
-            size_t r = fread(ul_bits[i] + j * num_bytes_per_ue_pad,
-                sizeof(int8_t), num_bytes_per_ue, fd);
-            if (r < num_bytes_per_ue)
-                std::printf("bad read from file %s (batch %zu) \n",
-                    filename1.c_str(), i);
         }
-        if (fseek(fd,
+        for (size_t j = 0; j < UE_ANT_NUM; j++) {
+            size_t r = std::fread(ul_bits[i] + j * num_bytes_per_ue_pad,
+                sizeof(int8_t), num_bytes_per_ue, fd);
+            if (r < num_bytes_per_ue) {
+                std::printf("uplink bad read from file %s (batch %zu : %zu) %zu : %zu\n",
+                    filename1.c_str(), i, j, r, num_bytes_per_ue);
+            }
+        }
+        if (std::fseek(fd,
                 num_bytes_per_ue
                     * (total_ue_ant_num - ue_ant_offset - UE_ANT_NUM),
                 SEEK_SET)
-            != 0)
+            != 0) {
             return;
-    }
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        for (size_t j = 0; j < UE_ANT_NUM; j++) {
-            size_t r = fread(dl_bits[i] + j * num_bytes_per_ue_pad,
-                sizeof(int8_t), num_bytes_per_ue, fd);
-            if (r < num_bytes_per_ue)
-                std::printf("bad read from file %s (batch %zu) \n",
-                    filename1.c_str(), i);
         }
     }
-    fclose(fd);
+
+    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+        for (size_t j = 0; j < UE_ANT_NUM; j++) {
+            size_t r = std::fread(dl_bits[i] + j * num_bytes_per_ue_pad,
+                sizeof(int8_t), num_bytes_per_ue, fd);
+            if (r < num_bytes_per_ue)
+                std::printf("downlink bad read from file %s (batch %zu : %zu) \n",
+                    filename1.c_str(), i, j);
+        }
+    }
+    std::fclose(fd);
 #endif
 
     const size_t bytes_per_block = bits_to_bytes(LDPC_config.cbLen);
@@ -808,6 +812,8 @@ SymbolType Config::get_symbol_type(size_t frame_id, size_t symbol_id)
         return SymbolType::kCalDL;
     case 'L':
         return SymbolType::kCalUL;
+    case 'G':
+        return SymbolType::kGuard;
     }
     rt_assert(false, std::string("Should not reach here") + std::to_string(s));
     return SymbolType::kUnknown;
@@ -816,7 +822,6 @@ SymbolType Config::get_symbol_type(size_t frame_id, size_t symbol_id)
 extern "C" {
 __attribute__((visibility("default"))) Config* Config_new(char* filename)
 {
-
     auto* cfg = new Config(filename);
     cfg->genData();
     return cfg;
