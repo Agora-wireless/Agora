@@ -51,7 +51,7 @@ void read_from_file_dl(
 void check_correctness_ul(Config const * const cfg)
 {
     int ue_num = cfg->ue_num();
-    int data_symbol_num_perframe = cfg->frame().NumULSyms();
+    int num_uplink_syms = cfg->frame().NumULSyms();
     int ofdm_data_num = cfg->ofdm_data_num();
     int ul_pilot_syms = cfg->frame().client_ul_pilot_symbols();
 
@@ -63,19 +63,19 @@ void check_correctness_ul(Config const * const cfg)
 
     Table<uint8_t> raw_data;
     Table<uint8_t> output_data;
-    raw_data.calloc(data_symbol_num_perframe, (ofdm_data_num * ue_num), Agora_memory::Alignment_t::k64Align);
-    output_data.calloc(data_symbol_num_perframe, (ofdm_data_num * ue_num), Agora_memory::Alignment_t::k64Align);
+    raw_data.calloc(num_uplink_syms, (ofdm_data_num * ue_num), Agora_memory::Alignment_t::k64Align);
+    output_data.calloc(num_uplink_syms, (ofdm_data_num * ue_num), Agora_memory::Alignment_t::k64Align);
 
     int num_bytes_per_ue
         = (cfg->ldpc_config().num_cb_len() + 7) >> 3 * cfg->ldpc_config().num_blocks_in_symbol();
     read_from_file_ul(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
     read_from_file_ul(output_data_filename, output_data, num_bytes_per_ue, cfg);
 
-    std::printf("check_correctness_ul: ue %d, ul syms %d, ofdm %d, ul pilots %d, bytes per UE %d.\n", ue_num, data_symbol_num_perframe, ofdm_data_num, ul_pilot_syms, num_bytes_per_ue);
+    std::printf("check_correctness_ul: ue %d, ul syms %d, ofdm %d, ul pilots %d, bytes per UE %d.\n", ue_num, num_uplink_syms, ofdm_data_num, ul_pilot_syms, num_bytes_per_ue);
 
     int error_cnt = 0;
     int total_count = 0;
-    for (int i = 0; i < data_symbol_num_perframe; i++) {
+    for (int i = 0; i < num_uplink_syms; i++) {
         if (i >= ul_pilot_syms) {
             for (int ue = 0; ue < ue_num; ue++) {
                 for (int j = 0; j < num_bytes_per_ue; j++) {
@@ -91,7 +91,7 @@ void check_correctness_ul(Config const * const cfg)
                 }
             } //  for (int ue = 0; ue < ue_num; ue++) {
         } // if (i >= ul_pilot_syms) {
-    } //for (int i = 0; i < data_symbol_num_perframe; i++) {
+    } //for (int i = 0; i < num_uplink_syms; i++) {
     std::printf("======================\n");
     std::printf("Uplink test: \n\n");
     if (error_cnt == 0) {
@@ -109,7 +109,7 @@ void check_correctness_ul(Config const * const cfg)
 void check_correctness_dl(Config const * const cfg)
 {
     int bs_ant_num = cfg->bs_ant_num();
-    int data_symbol_num_perframe = cfg->frame().NumDLSyms();
+    int num_data_syms = cfg->frame().NumDLSyms();
     int ofdm_ca_num = cfg->ofdm_ca_num();
     int samps_per_symbol = cfg->samps_per_symbol();
 
@@ -121,24 +121,24 @@ void check_correctness_dl(Config const * const cfg)
     Table<short> raw_data;
     Table<short> tx_data;
     raw_data.calloc(
-        data_symbol_num_perframe * bs_ant_num, samps_per_symbol * 2, Agora_memory::Alignment_t::k64Align);
+        num_data_syms * bs_ant_num, samps_per_symbol * 2, Agora_memory::Alignment_t::k64Align);
     tx_data.calloc(
-        data_symbol_num_perframe * bs_ant_num, samps_per_symbol * 2, Agora_memory::Alignment_t::k64Align);
+        num_data_syms * bs_ant_num, samps_per_symbol * 2, Agora_memory::Alignment_t::k64Align);
 
     read_from_file_dl(raw_data_filename, raw_data, samps_per_symbol, cfg);
     read_from_file_dl(tx_data_filename, tx_data, samps_per_symbol, cfg);
-    std::printf("check_correctness_dl: bs ant %d, dl syms %d, ofdm %d, samps per %d. \n", bs_ant_num, data_symbol_num_perframe, ofdm_ca_num, samps_per_symbol);
+    std::printf("check_correctness_dl: bs ant %d, dl syms %d, ofdm %d, samps per %d. \n", bs_ant_num, num_data_syms, ofdm_ca_num, samps_per_symbol);
 
     int error_cnt = 0;
     int total_count = 0;
     float sum_diff = 0;
-    for (int i = 0; i < data_symbol_num_perframe; i++) {
+    for (int i = 0; i < num_data_syms; i++) {
         for (int ant = 0; ant < bs_ant_num; ant++) {
             // std::printf("symbol %d, antenna %d\n", i, ant);
             sum_diff = 0;
             total_count++;
-            for (int sc = 0; sc < samps_per_symbol * 2; sc++) {
-                int offset = bs_ant_num * i + ant;
+            for (int sc = 0; sc < (samps_per_symbol * 2); sc++) {
+                int offset = (bs_ant_num * i) + ant;
                 float diff = fabs(
                     (raw_data[offset][sc] - tx_data[offset][sc]) / 32768.0);
                 sum_diff += diff;
@@ -149,8 +149,9 @@ void check_correctness_dl(Config const * const cfg)
             float avg_diff = sum_diff / samps_per_symbol;
             std::printf("symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant,
                 avg_diff);
-            if (avg_diff > 0.03)
+            if (avg_diff > 0.03) {
                 error_cnt++;
+            }
         }
     }
     std::printf("======================\n");

@@ -509,31 +509,42 @@ void Config::GenData( void )
         + std::to_string(this->ofdm_ca_num_) + "_ant"
         + std::to_string(this->total_ue_ant_num_) + ".bin";
     std::cout << "Config: Reading raw data from " << filename1 << std::endl;
-    FILE* fd = std::fopen(filename1.c_str(), "rb");
+    FILE* fd = std::fopen(filename1.c_str(), "rb+");
     if (fd == nullptr) {
         std::printf("Failed to open antenna file %s. Error %s.\n",
             filename1.c_str(), strerror(errno));
         std::exit(-1);
     }
+
     for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-        if (std::fseek(fd, (num_bytes_per_ue * this->ue_ant_offset_), SEEK_SET) != 0) {
+        if (std::fseek(fd, (num_bytes_per_ue * this->ue_ant_offset_), SEEK_CUR) != 0) {
             return;
         }
         for (size_t j = 0; j < this->ue_ant_num_; j++) {
-            size_t r = std::fread(this->ul_bits_[i] + j * num_bytes_per_ue_pad,
+            size_t r = std::fread(this->ul_bits_[i] + (j * num_bytes_per_ue_pad),
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue) {
-                std::printf("uplink bad read from file %s (batch %zu : %zu) %zu : %zu\n",
+                std::printf(" *** Error: Uplink bad read from file %s (batch %zu : %zu) %zu : %zu\n",
                     filename1.c_str(), i, j, r, num_bytes_per_ue);
             }
         }
         if (std::fseek(fd,
                 num_bytes_per_ue
                     * (this->total_ue_ant_num_ - this->ue_ant_offset_ - this->ue_ant_num_),
-                SEEK_SET)
+                SEEK_CUR)
             != 0) {
             return;
         }
+    }
+
+    /* Skip over the UL symbols */
+    const size_t input_bytes_per_cb = bits_to_bytes( ldpc_num_input_bits(ldpc_config_.base_graph(), ldpc_config_.expansion_factor()));
+    const size_t ul_codeblocks = frame_.NumULSyms() * ldpc_config_.num_blocks_in_symbol() * ue_ant_num_;
+    const size_t skip_count = ul_codeblocks * (input_bytes_per_cb * sizeof(uint8_t));
+
+    std::printf(" ***Seeking to DL: %zu from %zu\n", skip_count, std::ftell(fd));
+    if (std::fseek(fd, skip_count, SEEK_SET) != 0) {
+        std::printf(" ***Error seeking over the ul symbols: %zu : %zu\n", this->frame_.NumULSyms(), skip_count);
     }
 
     for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
@@ -541,7 +552,7 @@ void Config::GenData( void )
             size_t r = std::fread(this->dl_bits_[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue) {
-                std::printf("downlink bad read from file %s (batch %zu : %zu) \n",
+                std::printf("***Error: Downlink bad read from file %s (batch %zu : %zu) \n",
                     filename1.c_str(), i, j);
             }
         }

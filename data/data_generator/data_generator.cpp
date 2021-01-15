@@ -89,6 +89,7 @@ int main(int argc, char* argv[])
             std::fwrite(reinterpret_cast<uint8_t*>(&ul_information.at(i).at(0)),
                 input_bytes_per_cb, sizeof(uint8_t), fp_input);
         }
+        //std::printf("LDPC file location %zu write size %zu\n", std::ftell(fp_input), input_bytes_per_cb * sizeof(uint8_t));
         std::fclose(fp_input);
 
         if (kPrintUplinkInformationBytes) {
@@ -97,7 +98,7 @@ int main(int argc, char* argv[])
                 std::printf("Symbol %zu, UE %zu\n", n / cfg->ue_ant_num(),
                     n % cfg->ue_ant_num());
                 for (size_t i = 0; i < input_bytes_per_cb; i++) {
-                    std::printf("%u ", (uint8_t)ul_information.at(n).at(i));
+                    std::printf("%u ", static_cast<uint8_t>(ul_information.at(n).at(i)));
                 }
                 std::printf("\n");
             }
@@ -167,18 +168,6 @@ int main(int argc, char* argv[])
                 &pilot_td.at(0), (cfg->ofdm_ca_num() * sizeof(complex_float)));
     }
 
-    //Populate the UL Cal symbols
-    /*
-    for (size_t i = 0; i < cfg->frame().NumULCalSyms(); i++) {
-        const size_t data_sym_id = cfg->frame().GetULCalSymbol(i);
-        for (size_t j = 0; j < cfg->ue_ant_num(); j++) {
-                std::memcpy(tx_data_all_symbols.at(data_sym_id) + (j * cfg->ofdm_ca_num()),
-                    &pre_ifft_data_syms.at(i * cfg->ue_ant_num() + j).at(0),
-                    cfg->ofdm_ca_num() * sizeof(complex_float));
-        }
-    }
-    */
-
     //Populate the UL symbols
     for (size_t i = 0; i < cfg->frame().NumULSyms(); i++) {
         const size_t data_sym_id = cfg->frame().GetULSymbol(i);
@@ -194,6 +183,7 @@ int main(int argc, char* argv[])
             }
         }
     }
+
     // Generate CSI matrix
     Table<complex_float> csi_matrices;
     csi_matrices.calloc(cfg->ofdm_ca_num(), cfg->ue_ant_num() * cfg->bs_ant_num(),
@@ -354,7 +344,7 @@ int main(int argc, char* argv[])
                         + cfg->ofdm_data_start()]
                         = (sc_id % cfg->ofdm_pilot_spacing() == 0)
                         ? ue_specific_pilot[j][sc_id]
-                        : dl_modulated_codewords[i * cfg->ue_ant_num() + j][sc_id]; /* modulated codewords are only as big as the UL symbols */
+                        : dl_modulated_codewords[i * cfg->ue_ant_num() + j][sc_id];
             } else {
                 for (size_t sc_id = 0; sc_id < cfg->ofdm_data_num(); sc_id++)
                     dl_mod_data[i][j * cfg->ofdm_ca_num() + sc_id

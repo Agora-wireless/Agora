@@ -1135,8 +1135,8 @@ void Agora::print_per_task_done(PrintType print_type, size_t frame_id,
     if (kDebugPrintPerTaskDone == true) {
         switch (print_type) {
         case (PrintType::kZF):
-            std::printf("Main thread: ZF done frame: %zu, subcarrier %zu\n",
-                frame_id, ant_or_sc_id);
+            //std::printf("Main thread: ZF done frame: %zu, subcarrier %zu\n",
+            //    frame_id, ant_or_sc_id);
             break;
         case (PrintType::kRC):
             std::printf("Main thread: RC done frame: %zu, subcarrier %zu\n",
@@ -1383,7 +1383,7 @@ void Agora::save_tx_data_to_file(UNUSED int frame_id)
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/tx_data.bin";
-    std::printf("Saving TX data to %s\n", filename.c_str());
+    std::printf("Saving Frame %d TX data to %s\n", frame_id, filename.c_str());
     FILE* fp = std::fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->frame().NumDLSyms(); i++) {
