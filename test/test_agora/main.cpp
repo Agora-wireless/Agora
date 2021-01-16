@@ -192,7 +192,7 @@ int main(int argc, char* argv[])
         std::unique_ptr<Agora> agora_cli( new Agora(cfg.get()) );
         agora_cli->flags.enable_save_decode_data_to_file = true;
         agora_cli->flags.enable_save_tx_data_to_file = true;
-        agora_cli->start();
+        agora_cli->Start();
 
         std::printf("Start correctness check\n");
 

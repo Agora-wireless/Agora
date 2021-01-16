@@ -31,69 +31,18 @@ public:
     // Dequeue batch size, used to reduce the overhead of dequeue in main thread
     static const int kDequeueBulkSizeTXRX = 8;
     static const int kDequeueBulkSizeWorker = 4;
-
     static const int kMaxWorkerNum = 50; // Max number of worker threads allowed
 
     Agora(Config*); /// Create an Agora object and start the worker threads
     ~Agora();
 
-    void start(); /// The main Agora event loop
-    void stop();
-
-    void worker_fft(int tid);
-    void worker_zf(int tid);
-    void worker_demul(int tid);
-    void worker_decode(int tid);
-    void worker(int tid);
-
-    void create_threads(); /// Launch worker threads
-
-    void handle_event_fft(size_t tag);
-    void update_rx_counters(size_t frame_id, size_t symbol_id);
-    void print_per_frame_done(PrintType print_type, size_t frame_id);
-    void print_per_symbol_done(
-        PrintType print_type, size_t frame_id, size_t symbol_id);
-    void print_per_task_done(PrintType print_type, size_t frame_id,
-        size_t symbol_id, size_t ant_or_sc_id);
-
-    /// Update Agora's RAN config parameters
-    void update_ran_config(RanConfig rc);
-
-    void schedule_subcarriers(
-        EventType task_type, size_t frame_id, size_t symbol_id);
-    void schedule_antennas(
-        EventType task_type, size_t frame_id, size_t symbol_id);
-
-    /**
-     * @brief Schedule LDPC decoding or encoding over code blocks
-     * @param task_type Either LDPC decoding or LDPC encoding
-     * @param frame_id The monotonically increasing frame ID
-     * @param symbol_idx The index of the symbol among uplink symbols for LDPC
-     * decoding, and among downlink symbols for LDPC encoding
-     */
-    void schedule_codeblocks(
-        EventType task_type, size_t frame_id, size_t symbol_idx);
-
-    void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
-
-    // Send current frame's SNR measurements from PHY to MAC
-    void send_snr_report(
-        EventType event_type, size_t frame_id, size_t symbol_id);
-
-    void initialize_queues();
-    void initialize_uplink_buffers();
-    void initialize_downlink_buffers();
-    void free_queues();
-    void free_uplink_buffers();
-    void free_downlink_buffers();
-
-    void save_decode_data_to_file(int frame_id);
-    void save_tx_data_to_file(int frame_id);
-    void getEqualData(float** ptr, int* size);
+    void Start(); /// The main Agora event loop
+    void Stop();
+    void GetEqualData(float** ptr, int* size);
 
     // Flags that allow developer control over Agora internals
     struct {
-        // Before exiting, save LDPC-decoded or demodulated data to a file
+        //     void getEqualData(float** ptr, int* size);Before exiting, save LDPC-decoded or demodulated data to a file
         bool enable_save_decode_data_to_file = false;
 
         // Before exiting, save data sent on downlink to a file
@@ -105,37 +54,87 @@ private:
     bool CheckWorkComplete(size_t frame_id);
     void CheckIncrementScheduleFrame ( size_t frame_id, ScheduleProcessingFlags completed );
 
+    void WorkerFft(int tid);
+    void WorkerZf(int tid);
+    void WorkerDemul(int tid);
+    void WorkerDecode(int tid);
+    void Worker(int tid);
+
+    void CreateThreads(); /// Launch worker threads
+
+    void InitializeQueues();
+    void InitializeUplinkBuffers();
+    void InitializeDownlinkBuffers();
+    void FreeQueues();
+    void FreeUplinkBuffers();
+    void FreeDownlinkBuffers();
+
+    void SaveDecodeDataToFile(int frame_id);
+    void SaveTxDataToFile(int frame_id);
+
+    void HandleEventFft(size_t tag);
+    void UpdateRxCounters(size_t frame_id, size_t symbol_id);
+    void PrintPerFrameDone(PrintType print_type, size_t frame_id);
+    void PrintPerSymbolDone(
+        PrintType print_type, size_t frame_id, size_t symbol_id);
+    void PrintPerTaskDone(PrintType print_type, size_t frame_id,
+        size_t symbol_id, size_t ant_or_sc_id);
+
+    /// Update Agora's RAN config parameters
+    void UpdateRanConfig(RanConfig rc);
+
+    void ScheduleSubcarriers(
+        EventType task_type, size_t frame_id, size_t symbol_id);
+    void ScheduleAntennas(
+        EventType task_type, size_t frame_id, size_t symbol_id);
+
+    /**
+     * @brief Schedule LDPC decoding or encoding over code blocks
+     * @param task_type Either LDPC decoding or LDPC encoding
+     * @param frame_id The monotonically increasing frame ID
+     * @param symbol_idx The index of the symbol among uplink symbols for LDPC
+     * decoding, and among downlink symbols for LDPC encoding
+     */
+    void ScheduleCodeblocks(
+        EventType task_type, size_t frame_id, size_t symbol_idx);
+
+    void ScheduleUsers(EventType task_type, size_t frame_id, size_t symbol_id);
+
+    // Send current frame's SNR measurements from PHY to MAC
+    void SendSnrReport(
+        EventType event_type, size_t frame_id, size_t symbol_id);
+
     /// Fetch the concurrent queue for this event type
-    moodycamel::ConcurrentQueue<Event_data>* get_conq(
+    moodycamel::ConcurrentQueue<Event_data>* GetConq(
         EventType event_type, size_t qid)
     {
-        return &sched_info_arr[qid][static_cast<size_t>(event_type)]
+        return &sched_info_arr_[qid][static_cast<size_t>(event_type)]
                     .concurrent_q;
     }
 
     /// Fetch the producer token for this event type
-    moodycamel::ProducerToken* get_ptok(EventType event_type, size_t qid)
+    moodycamel::ProducerToken* GetPtok(EventType event_type, size_t qid) const
     {
-        return sched_info_arr[qid][static_cast<size_t>(event_type)].ptok;
+        return sched_info_arr_[qid][static_cast<size_t>(event_type)].ptok;
     }
 
     /// Return a string containing the sizes of the FFT queues
-    std::string get_fft_queue_sizes_string() const
+    std::string GetFftQueueSizesString( void ) const
     {
         std::ostringstream ret;
         ret << "[";
         for (size_t i = 0; i < kFrameWnd; i++) {
-            ret << std::to_string(fft_queue_arr[i].size()) << " ";
+            ret << std::to_string(fft_queue_arr_[i].size()) << " ";
         }
         ret << "]";
         return ret.str();
     }
 
     // Worker thread i runs on core base_worker_core_offset + i
-    const size_t base_worker_core_offset;
+    const size_t base_worker_core_offset_;
 
     Config* config_;
-    size_t fft_created_count;
+    size_t fft_created_count_;
     size_t max_equaled_frame = SIZE_MAX;
     std::unique_ptr<PacketTXRX> packet_tx_rx_;
 
@@ -143,7 +142,7 @@ private:
     std::thread mac_std_thread_; // Handle for the MAC thread
     std::vector<std::thread> workers_;
 
-    std::unique_ptr<Stats> stats_;
+    std::unique_ptr<Stats>    stats_;
     std::unique_ptr<PhyStats> phy_stats_;
 
     /*****************************************************
@@ -209,8 +208,8 @@ private:
     FrameCounters tomac_counters_;
     FrameCounters rc_counters_;
     RxCounters rx_counters_;
-    size_t zf_last_frame = SIZE_MAX;
-    size_t rc_last_frame = SIZE_MAX;
+    size_t zf_last_frame_ = SIZE_MAX;
+    size_t rc_last_frame_ = SIZE_MAX;
 
     // Agora schedules and processes a frame in FIFO order
     // cur_proc_frame_id is the frame that is currently being processed.
@@ -227,7 +226,7 @@ private:
 
     // Per-frame queues of delayed FFT tasks. The queue contains offsets into
     // TX/RX buffers.
-    std::array<std::queue<fft_req_tag_t>, kFrameWnd> fft_queue_arr;
+    std::array<std::queue<fft_req_tag_t>, kFrameWnd> fft_queue_arr_;
 
     // Data for IFFT
     // 1st dimension: kFrameWnd * number of antennas * number of
@@ -274,7 +273,7 @@ private:
         moodycamel::ConcurrentQueue<Event_data> concurrent_q;
         moodycamel::ProducerToken* ptok;
     };
-    sched_info_t sched_info_arr[2][kNumEventTypes];
+    sched_info_t sched_info_arr_[2][kNumEventTypes];
 
     // Master thread's message queue for receiving packets
     moodycamel::ConcurrentQueue<Event_data> message_queue_;
@@ -287,10 +286,10 @@ private:
 
     // Master thread's message queue for event completion from Doers;
     moodycamel::ConcurrentQueue<Event_data> complete_task_queue_[2];
-    moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads][2];
+    moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads][2];
 
-    moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
-    moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
+    moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
+    moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
 
     uint8_t schedule_process_flags_; 
 };
