@@ -55,33 +55,18 @@ public:
 
     /// If worker stats collection is enabled, combine and update per-worker
     /// stats for all uplink and donwlink Doer types. Else return immediately.
-    void update_stats(size_t frame_id);
-
-    /// If worker stats collection is enabled, combine and update per-worker
-    /// stats for all uplink Doer types. Else return immediately.
-    void update_stats_in_functions_uplink(size_t frame_id);
-
-    /// If worker stats collection is enabled, combine and update per-worker
-    /// stats for all downlink Doer types. Else return immediately.
-    void update_stats_in_functions_downlink(size_t frame_id);
+    void UpdateStats(size_t frame_id);
 
     /// Save master timestamps to a file. If worker stats collection is enabled,
     /// also save detailed worker timing info to a file.
-    void save_to_file();
+    void SaveToFile();
 
     /// If worker stats collection is enabled, prsize_t a summary of stats
-    void print_summary();
-
-    inline size_t last_frame_id(void) const { return this->last_frame_id_; }
-
-    /// Dimensions = number of packet RX threads x kNumStatsFrames.
-    /// frame_start[i][j] is the RDTSC timestamp taken by thread i when it
-    /// starts receiving frame j.
-    inline Table<size_t>& frame_start(void) { return this->frame_start_; };
+    void PrintSummary();
 
     /// From the master, set the RDTSC timestamp for a frame ID and timestamp
     /// type
-    void master_set_tsc(TsType timestamp_type, size_t frame_id)
+    void MasterSetTsc(TsType timestamp_type, size_t frame_id)
     {
         this->master_timestamps_[static_cast<size_t>(timestamp_type)]
                                 [frame_id % kNumStatsFrames]
@@ -90,7 +75,7 @@ public:
 
     /// From the master, get the RDTSC timestamp for a frame ID and timestamp
     /// type
-    size_t master_get_tsc(TsType timestamp_type, size_t frame_id) const
+    size_t MasterGetTsc(TsType timestamp_type, size_t frame_id) const
     {
         return this->master_timestamps_[static_cast<size_t>(timestamp_type)]
                                        [(frame_id % kNumStatsFrames)];
@@ -98,73 +83,73 @@ public:
 
     /// From the master, get the millisecond elapsed since the timestamp of
     /// timestamp_type was taken for frame_id
-    double master_get_ms_since(TsType timestamp_type, size_t frame_id) const
+    double MasterGetMsSince(TsType timestamp_type, size_t frame_id) const
     {
-        return cycles_to_ms(rdtsc() - master_get_tsc(timestamp_type, frame_id),
+        return cycles_to_ms(rdtsc() - MasterGetTsc(timestamp_type, frame_id),
             this->freq_ghz_);
     }
 
     /// From the master, get the microseconds elapsed since the timestamp of
     /// timestamp_type was taken for frame_id
-    double master_get_us_since(TsType timestamp_type, size_t frame_id) const
+    double MasterGetUsSince(TsType timestamp_type, size_t frame_id) const
     {
-        return cycles_to_us(rdtsc() - master_get_tsc(timestamp_type, frame_id),
+        return cycles_to_us(rdtsc() - MasterGetTsc(timestamp_type, frame_id),
             this->freq_ghz_);
     }
 
     /// From the master, get the microseconds between when the timestamp of
     /// timestamp_type was taken for frame_id, and reference_tsc
-    double master_get_us_from_ref(
+    double MasterGetUsFromRef(
         TsType timestamp_type, size_t frame_id, size_t reference_tsc) const
     {
         return cycles_to_us(
-            master_get_tsc(timestamp_type, frame_id) - reference_tsc,
+            MasterGetTsc(timestamp_type, frame_id) - reference_tsc,
             this->freq_ghz_);
     }
 
     /// From the master, for a frame ID, get the millisecond difference
     /// between two timestamp types
-    double master_get_delta_ms(
+    double MasterGetDeltaMs(
         TsType timestamp_type_1, TsType timestamp_type_2, size_t frame_id) const
     {
-        return cycles_to_ms(master_get_tsc(timestamp_type_1, frame_id)
-                - master_get_tsc(timestamp_type_2, frame_id),
+        return cycles_to_ms(MasterGetTsc(timestamp_type_1, frame_id)
+                - MasterGetTsc(timestamp_type_2, frame_id),
             this->freq_ghz_);
     }
 
     /// From the master, for a frame ID, get the microsecond difference
     /// between two timestamp types
-    double master_get_delta_us(
+    double MasterGetDeltaUs(
         TsType timestamp_type_1, TsType timestamp_type_2, size_t frame_id) const
     {
-        return cycles_to_us(master_get_tsc(timestamp_type_1, frame_id)
-                - master_get_tsc(timestamp_type_2, frame_id),
+        return cycles_to_us(MasterGetTsc(timestamp_type_1, frame_id)
+                - MasterGetTsc(timestamp_type_2, frame_id),
             this->freq_ghz_);
     }
 
     /// From the master, get the microsecond difference between the times that
     /// a timestamp type was taken for two frames
-    double master_get_delta_ms(
+    double MasterGetDeltaMs(
         TsType timestamp_type, size_t frame_id_1, size_t frame_id_2) const
     {
-        return cycles_to_ms(master_get_tsc(timestamp_type, frame_id_1)
-                - master_get_tsc(timestamp_type, frame_id_2),
+        return cycles_to_ms(MasterGetTsc(timestamp_type, frame_id_1)
+                - MasterGetTsc(timestamp_type, frame_id_2),
             this->freq_ghz_);
     }
 
     /// From the master, get the microsecond difference between the times that
     /// a timestamp type was taken for two frames
-    double master_get_delta_us(
+    double MasterGetDeltaUs(
         TsType timestamp_type, size_t frame_id_1, size_t frame_id_2) const
     {
-        return cycles_to_us(master_get_tsc(timestamp_type, frame_id_1)
-                - master_get_tsc(timestamp_type, frame_id_2),
+        return cycles_to_us(MasterGetTsc(timestamp_type, frame_id_1)
+                - MasterGetTsc(timestamp_type, frame_id_2),
             this->freq_ghz_);
     }
 
     /// Get the DurationStat object used by thread thread_id for DoerType
     /// doer_type
-    DurationStat* get_duration_stat(DoerType doer_type, size_t thread_id)
+    DurationStat* GetDurationStat(DoerType doer_type, size_t thread_id)
     {
         return &this->worker_durations_[thread_id]
                     .duration_stat[static_cast<size_t>(doer_type)];
@@ -173,61 +158,76 @@ public:
     /// The master thread uses a stale copy of DurationStats to compute
     /// differences. This gets the DurationStat object for thread thread_id
     /// for DoerType doer_type.
-    DurationStat* get_duration_stat_old(DoerType doer_type, size_t thread_id)
+    DurationStat* GetDurationStatOld(DoerType doer_type, size_t thread_id)
     {
         return &this->worker_durations_old_[thread_id]
                     .duration_stat[static_cast<size_t>(doer_type)];
     }
 
+    inline size_t last_frame_id(void) const { return this->last_frame_id_; }
+
+    /// Dimensions = number of packet RX threads x kNumStatsFrames.
+    /// frame_start[i][j] is the RDTSC timestamp taken by thread i when it
+    /// starts receiving frame j.
+    inline Table<size_t>& frame_start(void) { return this->frame_start_; };
+
 private:
+    /// If worker stats collection is enabled, combine and update per-worker
+    /// stats for all uplink Doer types. Else return immediately.
+    void UpdateStatsInFunctionsUplink(size_t frame_id);
+
+    /// If worker stats collection is enabled, combine and update per-worker
+    /// stats for all downlink Doer types. Else return immediately.
+    void UpdateStatsInFunctionsDownlink(size_t frame_id);
+
     // Fill in running time summary stats for the current frame for this
     // thread and Doer type
-    void populate_summary(
+    void PopulateSummary(
         FrameSummary* frame_summary, size_t thread_id, DoerType doer_type);
 
-    static void compute_avg_over_threads(
+    static void ComputeAvgOverThreads(
         FrameSummary* frame_summary, size_t thread_num, size_t break_down_num);
-    static void print_per_thread_per_task(FrameSummary frame_summary);
-    static void print_per_frame(
+    static void PrintPerThreadPerTask(FrameSummary frame_summary);
+    static void PrintPerFrame(
         const char* doer_string, FrameSummary frame_summary);
 
-    size_t get_total_task_count(DoerType doer_type, size_t thread_num);
+    size_t GetTotalTaskCount(DoerType doer_type, size_t thread_num);
 
     /* stats for the worker threads */
-    void update_stats_in_dofft_bigstation(size_t frame_id, size_t thread_num,
+    void UpdateStatsInDofftBigstation(size_t frame_id, size_t thread_num,
         size_t thread_num_offset, FrameSummary* frame_summary_fft,
         FrameSummary* frame_summary_csi);
-    void update_stats_in_dozf_bigstation(size_t frame_id, size_t thread_num,
+    void UpdateStatsInDozfBigstation(size_t frame_id, size_t thread_num,
         size_t thread_num_offset, FrameSummary* frame_summary_zf);
-    void update_stats_in_dodemul_bigstation(size_t frame_id, size_t thread_num,
+    void UpdateStatsInDodemulBigstation(size_t frame_id, size_t thread_num,
         size_t thread_num_offset, FrameSummary* frame_summary_demul);
-    void update_stats_in_dodecode_bigstation(size_t frame_id, size_t thread_num,
+    void UpdateStatsInDodecodeBigstation(size_t frame_id, size_t thread_num,
         size_t thread_num_offset, FrameSummary* frame_summary_demul);
-    void update_stats_in_doifft_bigstation(size_t frame_id, size_t thread_num,
+    void UpdateStatsInDoifftBigstation(size_t frame_id, size_t thread_num,
         size_t thread_num_offset, FrameSummary* frame_summary_ifft,
         FrameSummary* frame_summary_csi);
-    void update_stats_in_doprecode_bigstation(size_t frame_id,
+    void UpdateStatsInDoprecodeBigstation(size_t frame_id,
         size_t thread_num, size_t thread_num_offset,
         FrameSummary* frame_summary_precode);
-    void update_stats_in_doencode_bigstation(size_t frame_id, size_t thread_num,
+    void UpdateStatsInDoencodeBigstation(size_t frame_id, size_t thread_num,
         size_t thread_num_offset, FrameSummary* frame_summary_precode);
 
-    void update_stats_in_functions_uplink_bigstation(size_t frame_id,
+    void UpdateStatsInFunctionsUplinkBigstation(size_t frame_id,
         FrameSummary* frame_summary_fft, FrameSummary* frame_summary_csi,
         FrameSummary* frame_summary_zf, FrameSummary* frame_summary_demul,
         FrameSummary* frame_summary_decode);
 
-    void update_stats_in_functions_uplink_agora(size_t frame_id,
+    void UpdateStatsInFunctionsUplinkAgora(size_t frame_id,
         FrameSummary* frame_summary_fft, FrameSummary* frame_summary_csi,
         FrameSummary* frame_summary_zf, FrameSummary* frame_summary_demul,
         FrameSummary* frame_summary_decode);
 
-    void update_stats_in_functions_downlink_bigstation(size_t frame_id,
+    void UpdateStatsInFunctionsDownlinkBigstation(size_t frame_id,
         FrameSummary* frame_summary_ifft, FrameSummary* frame_summary_csi,
         FrameSummary* frame_summary_zf, FrameSummary* frame_summary_precode,
         FrameSummary* frame_summary_encode);
 
-    void update_stats_in_functions_downlink_agora(size_t frame_id,
+    void UpdateStatsInFunctionsDownlinkAgora(size_t frame_id,
         FrameSummary* frame_summary_ifft, FrameSummary* frame_summary_csi,
         FrameSummary* frame_summary_zf, FrameSummary* frame_summary_precode,
         FrameSummary* frame_summary_encode);

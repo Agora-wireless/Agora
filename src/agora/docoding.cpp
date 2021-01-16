@@ -15,7 +15,7 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
     , encoded_buffer_(in_encoded_buffer)
 {
     duration_stat
-        = in_stats_manager->get_duration_stat(DoerType::kEncode, in_tid);
+        = in_stats_manager->GetDurationStat(DoerType::kEncode, in_tid);
     parity_buffer = static_cast<int8_t*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             ldpc_encoding_parity_buf_size(cfg->ldpc_config().base_graph(),
@@ -91,7 +91,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid,
     , phy_stats(in_phy_stats)
 {
     duration_stat
-        = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
+        = in_stats_manager->GetDurationStat(DoerType::kDecode, in_tid);
     resp_var_nodes = static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(
         Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
 }

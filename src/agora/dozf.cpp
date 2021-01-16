@@ -21,7 +21,7 @@ DoZF::DoZF(Config* config, int tid,
     , ul_zf_matrices_(ul_zf_matrices)
     , dl_zf_matrices_(dl_zf_matrices)
 {
-    duration_stat = stats_manager->get_duration_stat(DoerType::kZF, tid);
+    duration_stat = stats_manager->GetDurationStat(DoerType::kZF, tid);
     pred_csi_buffer = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             kMaxAntennas * kMaxUEs * sizeof(complex_float)));

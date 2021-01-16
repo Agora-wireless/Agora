@@ -17,7 +17,7 @@ DoDemul::DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
     , demod_buffers_(demod_buffers)
     , phy_stats_(in_phy_stats)
 {
-    duration_stat_ = stats_manager->get_duration_stat(DoerType::kDemul, tid);
+    duration_stat_ = stats_manager->GetDurationStat(DoerType::kDemul, tid);
 
     data_gather_buffer_ = static_cast<complex_float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,

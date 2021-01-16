@@ -15,7 +15,7 @@ DoPrecode::DoPrecode(Config* in_config, int in_tid,
     , dl_raw_data(dl_encoded_or_raw_data)
 {
     duration_stat
-        = in_stats_manager->get_duration_stat(DoerType::kPrecode, in_tid);
+        = in_stats_manager->GetDurationStat(DoerType::kPrecode, in_tid);
 
     alloc_buffer_1d(&modulated_buffer_temp, kSCsPerCacheline * cfg->ue_num(),
         Agora_memory::Alignment_t::k64Align, 0);

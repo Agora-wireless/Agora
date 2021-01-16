@@ -25,8 +25,8 @@ DoFFT::DoFFT(Config* config, int tid, Table<char>& socket_buffer,
     , calib_ul_buffer_(calib_ul_buffer)
     , phy_stats(in_phy_stats)
 {
-    duration_stat_fft = stats_manager->get_duration_stat(DoerType::kFFT, tid);
-    duration_stat_csi = stats_manager->get_duration_stat(DoerType::kCSI, tid);
+    duration_stat_fft = stats_manager->GetDurationStat(DoerType::kFFT, tid);
+    duration_stat_csi = stats_manager->GetDurationStat(DoerType::kCSI, tid);
     DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->ofdm_ca_num());
     DftiCommitDescriptor(mkl_handle);
@@ -298,7 +298,7 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
     , dl_socket_buffer_(in_dl_socket_buffer)
 {
     duration_stat
-        = in_stats_manager->get_duration_stat(DoerType::kIFFT, in_tid);
+        = in_stats_manager->GetDurationStat(DoerType::kIFFT, in_tid);
     DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->ofdm_ca_num());
     if (kUseOutOfPlaceIFFT) {
