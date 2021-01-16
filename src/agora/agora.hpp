@@ -101,7 +101,9 @@ public:
     } flags;
 
 private:
+    enum ScheduleProcessingFlags : uint8_t { None = 0, UplinkComplete = 0x1, DownlinkComplete = 0x2, ProcessingComplete = (UplinkComplete + DownlinkComplete) };
     bool CheckWorkComplete(size_t frame_id);
+    void CheckIncrementScheduleFrame ( size_t frame_id, ScheduleProcessingFlags completed );
 
     /// Fetch the concurrent queue for this event type
     moodycamel::ConcurrentQueue<Event_data>* get_conq(
@@ -215,8 +217,8 @@ private:
     // cur_sche_frame_id is the frame that is currently being scheduled.
     // A frame's schduling finishes before processing ends, so the two
     // variables are possible to have different values.
-    size_t cur_proc_frame_id = 0;
-    size_t cur_sche_frame_id = 0;
+    size_t cur_proc_frame_id_ = 0;
+    size_t cur_sche_frame_id_ = 0;
 
     // The frame index for a symbol whose FFT is done
     std::vector<size_t> fft_cur_frame_for_symbol_;
@@ -289,6 +291,8 @@ private:
 
     moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
     moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
+
+    uint8_t schedule_process_flags_; 
 };
 
 #endif

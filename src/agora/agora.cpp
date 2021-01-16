@@ -19,7 +19,11 @@ Agora::Agora(Config* cfg)
     std::printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
         directory.c_str(), cfg->freq_ghz());
 
-    this->config_ = cfg;
+    config_ = cfg;
+    CheckIncrementScheduleFrame( 0 , ScheduleProcessingFlags::ProcessingComplete );
+    //Important to set cur_sche_frame_id_ after the call to CheckIncrementScheduleFrame because it will be incremented
+    //however, CheckIncrementScheduleFrame will initialize the schedule tracking variable correctly.
+    cur_sche_frame_id_ = 0;
 
     pin_to_core_with_offset(
         ThreadType::kMaster, cfg->core_offset(), 0, false /* quiet */);
@@ -263,7 +267,7 @@ void Agora::start()
             num_events += mac_response_queue_.try_dequeue_bulk(
                 events_list + num_events, kDequeueBulkSizeTXRX);
         } else {
-            num_events += complete_task_queue_[cur_proc_frame_id & 0x1]
+            num_events += complete_task_queue_[(this->cur_proc_frame_id_ & 0x1)]
                               .try_dequeue_bulk(
                                   events_list + num_events, max_events_needed);
         }
@@ -281,12 +285,12 @@ void Agora::start()
                 auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
                     + (sock_buf_offset * cfg->packet_length()));
 
-                if (pkt->frame_id >= (cur_sche_frame_id + kFrameWnd)) {
+                if (pkt->frame_id >= ((this->cur_sche_frame_id_ + kFrameWnd))) {
                     std::printf(
                         "Error: Received packet for future frame %u beyond "
                         "frame window (= %zu + %zu). This can happen if "
                         "Agora is running slowly, e.g., in debug mode\n",
-                        pkt->frame_id, cur_sche_frame_id, kFrameWnd);
+                        pkt->frame_id, this->cur_sche_frame_id_, kFrameWnd);
                     cfg->running( false );
                     break;
                 }
@@ -353,8 +357,8 @@ void Agora::start()
                         this->demul_counters_.Reset(frame_id);
                         max_equaled_frame = frame_id;
                         if (cfg->bigstation_mode() == false) {
-                            assert(cur_sche_frame_id == frame_id);
-                            //cur_sche_frame_id++;
+                            assert(cur_sche_frame_id_ == frame_id);
+                            CheckIncrementScheduleFrame( frame_id,  UplinkComplete ); 
                         } else {
                             schedule_codeblocks(
                                 EventType::kDecode, frame_id, symbol_idx_ul);
@@ -383,8 +387,7 @@ void Agora::start()
                         this->stats_->master_set_tsc(TsType::kDecodeDone, frame_id);
                         print_per_frame_done(PrintType::kDecode, frame_id);
                         if (kEnableMac == false) {
-                            assert(cur_proc_frame_id == frame_id);
-                            //cur_proc_frame_id++;
+                            assert(this->cur_proc_frame_id_ == frame_id);
                             bool work_finished = this->CheckWorkComplete(frame_id);
                             if (work_finished == true) {
                                 goto finish;
@@ -413,8 +416,7 @@ void Agora::start()
 
                     bool last_tomac_symbol = this->tomac_counters_.CompleteSymbol(frame_id);
                     if (last_tomac_symbol == true) {
-                        assert(cur_proc_frame_id == frame_id);
-                        //cur_proc_frame_id++;
+                        assert(this->cur_proc_frame_id_ == frame_id);
                         // this->stats_->master_set_tsc(TsType::kMacTXDone, frame_id);
                         print_per_frame_done(PrintType::kPacketToMac, frame_id);
                         bool work_finished = this->CheckWorkComplete(frame_id);
@@ -505,9 +507,9 @@ void Agora::start()
                         if (last_ifft_symbol == true) {
                             this->stats_->master_set_tsc(TsType::kIFFTDone, frame_id);
                             print_per_frame_done(PrintType::kIFFT, frame_id);
-                            assert(frame_id == cur_proc_frame_id);
+                            assert(frame_id == this->cur_proc_frame_id_);
+                            this->CheckIncrementScheduleFrame( frame_id, DownlinkComplete );
                             bool work_finished = this->CheckWorkComplete(frame_id);
-                            //cur_sche_frame_id++;
                             if (work_finished == true) {
                                 goto finish;
                             }
@@ -577,8 +579,8 @@ void Agora::start()
             // either (a) sufficient packets received for the current frame,
             // or (b) the current frame being updated.
             std::queue<fft_req_tag_t>& cur_fftq
-                = fft_queue_arr[(cur_sche_frame_id % kFrameWnd)];
-            size_t qid = cur_sche_frame_id & 0x1;
+                = fft_queue_arr[(this->cur_sche_frame_id_ % kFrameWnd)];
+            size_t qid = this->cur_sche_frame_id_ & 0x1;
             if (cur_fftq.size() >= config_->fft_block_size()) {
                 size_t num_fft_blocks
                     = cur_fftq.size() / config_->fft_block_size();
@@ -592,12 +594,12 @@ void Agora::start()
                         cur_fftq.pop();
                         if (fft_created_count++ == 0) {
                             this->stats_->master_set_tsc(
-                                TsType::kProcessingStarted, cur_sche_frame_id);
+                                TsType::kProcessingStarted, this->cur_sche_frame_id_);
                         } else if (fft_created_count
                             == rx_counters_.num_pkts_per_frame) {
                             fft_created_count = 0;
                             if (cfg->bigstation_mode() == true) {
-                                //cur_sche_frame_id++;
+                                this->CheckIncrementScheduleFrame( cur_sche_frame_id_, UplinkComplete ); 
 							}
                         }
                     }
@@ -756,11 +758,11 @@ void Agora::worker(int tid)
         if (empty_queue == true) {
             empty_qeueu_itrs++;
             if (empty_qeueu_itrs == 5) {
-                if (cur_sche_frame_id != cur_proc_frame_id) {
+                if (this->cur_sche_frame_id_ != this->cur_proc_frame_id_) {
                     cur_qid ^= 0x1;
                 }
                 else {
-                    cur_qid = cur_sche_frame_id & 0x1;
+                    cur_qid = (this->cur_sche_frame_id_ & 0x1);
                 }
                 empty_qeueu_itrs = 0;
             }
@@ -1392,6 +1394,23 @@ void Agora::getEqualData(float** ptr, int* size)
     *size = cfg->ue_num() * cfg->ofdm_data_num() * 2;
 }
 
+
+void Agora::CheckIncrementScheduleFrame ( size_t frame_id, ScheduleProcessingFlags completed )
+{
+    this->schedule_process_flags_ += completed;
+
+    if ( this->schedule_process_flags_ == static_cast<uint8_t>(ScheduleProcessingFlags::ProcessingComplete) ) {
+        this->cur_sche_frame_id_++;
+        this->schedule_process_flags_ = ScheduleProcessingFlags::None;
+        if ( this->config_->frame().NumULSyms() == 0 ) {
+            this->schedule_process_flags_ += ScheduleProcessingFlags::UplinkComplete;
+        }
+        if ( this->config_->frame().NumDLSyms() == 0 ) {
+            this->schedule_process_flags_ += ScheduleProcessingFlags::DownlinkComplete;
+        }
+    }
+}
+
 bool Agora::CheckWorkComplete( size_t frame_id )
 {
     bool finished = false;
@@ -1405,12 +1424,11 @@ bool Agora::CheckWorkComplete( size_t frame_id )
          ( ((kEnableMac == false) && (true == this->decode_counters_.IsLastSymbol( frame_id ))) || 
            ((kEnableMac == true)  && (true == this->tomac_counters_.IsLastSymbol(frame_id))) ) ) {
         this->stats_->update_stats(frame_id);
-        assert(frame_id == this->cur_proc_frame_id);
+        assert(frame_id == this->cur_proc_frame_id_);
         this->decode_counters_.Reset(frame_id);
         this->tomac_counters_.Reset(frame_id);
         this->ifft_counters_.Reset(frame_id);
-        this->cur_proc_frame_id++;
-        this->cur_sche_frame_id++; //Probably an issue here.
+        this->cur_proc_frame_id_++;
 
         if (frame_id == (this->config_->frames_to_test() - 1)) {
             finished = true;
