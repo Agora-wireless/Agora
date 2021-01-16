@@ -179,19 +179,21 @@ void ClientRadioConfig::initClientRadio(ClientRadioConfigContext* in_context)
         // clStn[i]->setSampleRate(SOAPY_SDR_TX, ch, cfg->rate());
 
         clStn[i]->setFrequency(SOAPY_SDR_RX, ch, "RF", cfg->radio_rf_freq());
-        clStn[i]->setFrequency(SOAPY_SDR_RX, ch, "BB", kUseUHD ? 0 : cfg->nco());
+        clStn[i]->setFrequency(
+            SOAPY_SDR_RX, ch, "BB", kUseUHD ? 0 : cfg->nco());
         clStn[i]->setFrequency(SOAPY_SDR_TX, ch, "RF", cfg->radio_rf_freq());
-        clStn[i]->setFrequency(SOAPY_SDR_TX, ch, "BB", kUseUHD ? 0 : cfg->nco());
+        clStn[i]->setFrequency(
+            SOAPY_SDR_TX, ch, "BB", kUseUHD ? 0 : cfg->nco());
 
         if (!kUseUHD) {
             // Unified gains for both lime and frontend
             if (_cfg->single_gain()) {
                 // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
-                clStn[i]->setGain(
-                    SOAPY_SDR_RX, ch, ch ? _cfg->rx_gain_b() : _cfg->rx_gain_a());
+                clStn[i]->setGain(SOAPY_SDR_RX, ch,
+                    ch ? _cfg->rx_gain_b() : _cfg->rx_gain_a());
                 // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
-                clStn[i]->setGain(
-                    SOAPY_SDR_TX, ch, ch ? _cfg->tx_gain_b() : _cfg->tx_gain_a());
+                clStn[i]->setGain(SOAPY_SDR_TX, ch,
+                    ch ? _cfg->tx_gain_b() : _cfg->tx_gain_a());
             } else {
                 if (info["frontend"].find("CBRS") != std::string::npos) {
                     if (cfg->freq() > 3e9)
@@ -219,13 +221,14 @@ void ClientRadioConfig::initClientRadio(ClientRadioConfigContext* in_context)
                 clStn[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0); //[0,12]
                 clStn[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
                     ch ? cfg->tx_gain_b() + cfg->client_gain_adj_b()[i]
-                       : cfg->tx_gain_a() + cfg->client_gain_adj_a()[i]); //[0,30]
+                       : cfg->tx_gain_a()
+                            + cfg->client_gain_adj_a()[i]); //[0,30]
             }
         } else {
-            clStn[i]->setGain(
-                SOAPY_SDR_RX, ch, "PGA0", ch ? cfg->rx_gain_b() : cfg->rx_gain_a());
-            clStn[i]->setGain(
-                SOAPY_SDR_TX, ch, "PGA0", ch ? cfg->tx_gain_b() : cfg->tx_gain_a());
+            clStn[i]->setGain(SOAPY_SDR_RX, ch, "PGA0",
+                ch ? cfg->rx_gain_b() : cfg->rx_gain_a());
+            clStn[i]->setGain(SOAPY_SDR_TX, ch, "PGA0",
+                ch ? cfg->tx_gain_b() : cfg->tx_gain_a());
         }
     }
 
@@ -257,10 +260,12 @@ bool ClientRadioConfig::radioStart()
         for (size_t s = 0; s < _cfg->frame().frame_identifier().length(); s++) {
             char c = _cfg->frame().frame_identifier().at(s);
             if (c == 'P'
-                and ((_cfg->num_channels() == 1 and _cfg->frame().GetPilotSymbol(r) != s)
+                and ((_cfg->num_channels() == 1
+                         and _cfg->frame().GetPilotSymbol(r) != s)
                         or (_cfg->num_channels() == 2
                                and (_cfg->frame().GetPilotSymbol(2 * r) != s
-                                       and _cfg->frame().GetPilotSymbol(r * 2 + 1)
+                                       and _cfg->frame().GetPilotSymbol(
+                                               r * 2 + 1)
                                            != s)))) // TODO: change this for
                 // orthogonal pilots
                 _tddSched[r].replace(s, 1, "G");
@@ -362,7 +367,8 @@ int ClientRadioConfig::radioTx(size_t r /*radio id*/, void** buffs,
         w = clStn[r]->writeStream(
             this->txStreams[r], buffs, num_samps, txFlags, frameTime, 1000000);
     } else {
-        long long frameTimeNs = SoapySDR::ticksToTimeNs(frameTime, _cfg->rate());
+        long long frameTimeNs
+            = SoapySDR::ticksToTimeNs(frameTime, _cfg->rate());
         w = clStn[r]->writeStream(this->txStreams[r], buffs, num_samps, txFlags,
             frameTimeNs, 1000000);
     }

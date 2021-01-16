@@ -628,7 +628,7 @@ bool RadioConfig::initial_calib(bool sample_adjust)
         dn[i].resize(read_len);
         if (i == _cfg->ref_ant()) {
             continue;
-		}
+        }
         std::transform(buff[_cfg->ref_ant() * R + i].begin(),
             buff[_cfg->ref_ant() * R + i].end(), up[i].begin(),
             [](std::complex<int16_t> ci) {
@@ -646,8 +646,10 @@ bool RadioConfig::initial_calib(bool sample_adjust)
             = CommsLib::find_pilot_seq(up[i], _cfg->pilot_cf32(), seq_len);
         size_t peak_dn
             = CommsLib::find_pilot_seq(dn[i], _cfg->pilot_cf32(), seq_len);
-        start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->cp_len();
-        start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->cp_len();
+        start_up[i]
+            = peak_up < seq_len ? 0 : peak_up - seq_len + _cfg->cp_len();
+        start_dn[i]
+            = peak_dn < seq_len ? 0 : peak_dn - seq_len + _cfg->cp_len();
         std::cout << "receive starting position from/to node " << i << ": "
                   << peak_up << "/" << peak_dn << std::endl;
 #if DEBUG_PLOT

@@ -50,9 +50,15 @@ public:
     } flags;
 
 private:
-    enum ScheduleProcessingFlags : uint8_t { None = 0, UplinkComplete = 0x1, DownlinkComplete = 0x2, ProcessingComplete = (UplinkComplete + DownlinkComplete) };
+    enum ScheduleProcessingFlags : uint8_t {
+        None = 0,
+        UplinkComplete = 0x1,
+        DownlinkComplete = 0x2,
+        ProcessingComplete = (UplinkComplete + DownlinkComplete)
+    };
     bool CheckWorkComplete(size_t frame_id);
-    void CheckIncrementScheduleFrame ( size_t frame_id, ScheduleProcessingFlags completed );
+    void CheckIncrementScheduleFrame(
+        size_t frame_id, ScheduleProcessingFlags completed);
 
     void WorkerFft(int tid);
     void WorkerZf(int tid);
@@ -101,8 +107,7 @@ private:
     void ScheduleUsers(EventType task_type, size_t frame_id, size_t symbol_id);
 
     // Send current frame's SNR measurements from PHY to MAC
-    void SendSnrReport(
-        EventType event_type, size_t frame_id, size_t symbol_id);
+    void SendSnrReport(EventType event_type, size_t frame_id, size_t symbol_id);
 
     /// Fetch the concurrent queue for this event type
     moodycamel::ConcurrentQueue<Event_data>* GetConq(
@@ -119,7 +124,7 @@ private:
     }
 
     /// Return a string containing the sizes of the FFT queues
-    std::string GetFftQueueSizesString( void ) const
+    std::string GetFftQueueSizesString(void) const
     {
         std::ostringstream ret;
         ret << "[";
@@ -142,7 +147,7 @@ private:
     std::thread mac_std_thread_; // Handle for the MAC thread
     std::vector<std::thread> workers_;
 
-    std::unique_ptr<Stats>    stats_;
+    std::unique_ptr<Stats> stats_;
     std::unique_ptr<PhyStats> phy_stats_;
 
     /*****************************************************
@@ -291,7 +296,7 @@ private:
     moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
     moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
 
-    uint8_t schedule_process_flags_; 
+    uint8_t schedule_process_flags_;
 };
 
 #endif

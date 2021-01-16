@@ -99,7 +99,8 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
 
         if (cfg->external_ref_node()) {
             mat_dl_zf_tmp.insert_rows(cfg->ref_ant(),
-                arma::cx_fmat(cfg->num_channels(), cfg->ue_num(), arma::fill::zeros));
+                arma::cx_fmat(
+                    cfg->num_channels(), cfg->ue_num(), arma::fill::zeros));
         }
         arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
             cfg->bs_ant_num(), cfg->ue_num(), false);
@@ -107,7 +108,8 @@ void DoZF::compute_precoder(const arma::cx_fmat& mat_csi,
     }
     if (cfg->external_ref_node() == true) {
         mat_ul_zf_tmp.insert_cols(cfg->ref_ant(),
-            arma::cx_fmat(cfg->ue_num(), cfg->num_channels(), arma::fill::zeros));
+            arma::cx_fmat(
+                cfg->ue_num(), cfg->num_channels(), arma::fill::zeros));
     }
     mat_ul_zf = mat_ul_zf_tmp;
 }
@@ -265,7 +267,8 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
     // Gather CSIs from partially-transposed CSIs
     for (size_t i = 0; i < cfg->ue_num(); i++) {
         const size_t cur_sc_id = base_sc_id + i;
-        float* dst_csi_ptr = (float*)(csi_gather_buffer + cfg->bs_ant_num() * i);
+        float* dst_csi_ptr
+            = (float*)(csi_gather_buffer + cfg->bs_ant_num() * i);
         partial_transpose_gather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
             dst_csi_ptr, cfg->bs_ant_num());
     }

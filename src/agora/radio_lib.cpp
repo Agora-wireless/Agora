@@ -246,19 +246,21 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
         // baStn[i]->setSampleRate(SOAPY_SDR_TX, ch, cfg->rate());
 
         baStn[i]->setFrequency(SOAPY_SDR_RX, ch, "RF", _cfg->radio_rf_freq());
-        baStn[i]->setFrequency(SOAPY_SDR_RX, ch, "BB", kUseUHD ? 0 : _cfg->nco());
+        baStn[i]->setFrequency(
+            SOAPY_SDR_RX, ch, "BB", kUseUHD ? 0 : _cfg->nco());
         baStn[i]->setFrequency(SOAPY_SDR_TX, ch, "RF", _cfg->radio_rf_freq());
-        baStn[i]->setFrequency(SOAPY_SDR_TX, ch, "BB", kUseUHD ? 0 : _cfg->nco());
+        baStn[i]->setFrequency(
+            SOAPY_SDR_TX, ch, "BB", kUseUHD ? 0 : _cfg->nco());
 
         if (!kUseUHD) {
             // Unified gains for both lime and frontend
             if (_cfg->single_gain()) {
                 // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
-                baStn[i]->setGain(
-                    SOAPY_SDR_RX, ch, ch ? _cfg->rx_gain_b() : _cfg->rx_gain_a());
+                baStn[i]->setGain(SOAPY_SDR_RX, ch,
+                    ch ? _cfg->rx_gain_b() : _cfg->rx_gain_a());
                 // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
-                baStn[i]->setGain(
-                    SOAPY_SDR_TX, ch, ch ? _cfg->tx_gain_b() : _cfg->tx_gain_a());
+                baStn[i]->setGain(SOAPY_SDR_TX, ch,
+                    ch ? _cfg->tx_gain_b() : _cfg->tx_gain_a());
             } else {
                 if (info["frontend"].find("CBRS") != std::string::npos) {
                     if (_cfg->freq() > 3e9)
@@ -339,8 +341,7 @@ bool RadioConfig::radioStart()
         }
         if (good_calib == false) {
             return good_calib;
-        }
-        else {
+        } else {
             std::cout << "initial calibration successful!" << std::endl;
         }
         //arma::cx_fmat calib_dl_mat(
@@ -401,7 +402,8 @@ bool RadioConfig::radioStart()
 
         baStn[i]->writeRegisters("BEACON_RAM", 0, beacon);
         for (char const& c : _cfg->channel()) {
-            bool isBeaconAntenna = !_cfg->beamsweep() && ndx == _cfg->beacon_ant();
+            bool isBeaconAntenna
+                = !_cfg->beamsweep() && ndx == _cfg->beacon_ant();
             std::vector<unsigned> beacon_weights(
                 _cfg->num_antennas(), isBeaconAntenna ? 1 : 0);
             std::string tx_ram_wgt = "BEACON_RAM_WGT_";
@@ -427,10 +429,12 @@ bool RadioConfig::radioStart()
                     _cfg->ofdm_tx_zero_prefix(), 0);
                 std::vector<std::complex<float>> post(
                     _cfg->ofdm_tx_zero_postfix(), 0);
-                recipCalDlPilot = CommsLib::compose_partial_pilot_sym(
-                    _cfg->common_pilot(), _cfg->num_channels() * i * kCalibScGroupSize,
-                    kCalibScGroupSize, _cfg->ofdm_ca_num(), _cfg->ofdm_data_num(),
-                    _cfg->ofdm_data_start(), _cfg->cp_len(), false /*block type*/);
+                recipCalDlPilot
+                    = CommsLib::compose_partial_pilot_sym(_cfg->common_pilot(),
+                        _cfg->num_channels() * i * kCalibScGroupSize,
+                        kCalibScGroupSize, _cfg->ofdm_ca_num(),
+                        _cfg->ofdm_data_num(), _cfg->ofdm_data_start(),
+                        _cfg->cp_len(), false /*block type*/);
                 if (kDebugPrintPilot) {
                     std::cout << "recipCalPilot[" << i << "]: ";
                     for (auto const& calP : recipCalDlPilot)
@@ -491,8 +495,8 @@ void RadioConfig::radioTx(void** buffs)
     int flags = 0;
     long long frameTime(0);
     for (size_t i = 0; i < this->_radioNum; i++) {
-        baStn[i]->writeStream(this->txStreams[i], buffs, _cfg->samps_per_symbol(),
-            flags, frameTime, 1000000);
+        baStn[i]->writeStream(this->txStreams[i], buffs,
+            _cfg->samps_per_symbol(), flags, frameTime, 1000000);
     }
 }
 
@@ -512,7 +516,8 @@ int RadioConfig::radioTx(
             _cfg->samps_per_symbol(), txFlags, frameTime, 1000000);
     } else {
         // For UHD device xmit from host using frameTimeNs
-        long long frameTimeNs = SoapySDR::ticksToTimeNs(frameTime, _cfg->rate());
+        long long frameTimeNs
+            = SoapySDR::ticksToTimeNs(frameTime, _cfg->rate());
         w = baStn[r]->writeStream(this->txStreams[r], buffs,
             _cfg->samps_per_symbol(), txFlags, frameTimeNs, 1000000);
     }

@@ -298,7 +298,7 @@ public:
         this->symbol_count_.fill(0);
     }
 
-    void Reset ( size_t frame_id )
+    void Reset(size_t frame_id)
     {
         const size_t frame_slot = (frame_id % kFrameWnd);
         this->symbol_count_.at(frame_slot) = 0;
@@ -309,11 +309,11 @@ public:
      * @brief Increments and checks the symbol count for input frame
      * @param frame_id The frame id of the symbol to increment
      */
-    bool CompleteSymbol( size_t frame_id )
+    bool CompleteSymbol(size_t frame_id)
     {
         const size_t frame_slot = (frame_id % kFrameWnd);
         this->symbol_count_.at(frame_slot)++;
-        return this->IsLastSymbol( frame_slot );
+        return this->IsLastSymbol(frame_slot);
     }
 
     /**
@@ -321,7 +321,7 @@ public:
      * @param frame_slot The frame index to increment
      * @param symbol_id The symbol id of the task to increment
      */
-    bool CompleteTask( size_t frame_id, size_t symbol_id )
+    bool CompleteTask(size_t frame_id, size_t symbol_id)
     {
         const size_t frame_slot = (frame_id % kFrameWnd);
         this->task_count_.at(frame_slot).at(symbol_id)++;
@@ -332,7 +332,7 @@ public:
      * @brief Increments the symbol count for input frame
      * @param symbol_id The symbol id to increment
      */
-    bool CompleteTask( size_t frame_id )
+    bool CompleteTask(size_t frame_id)
     {
         return this->CompleteSymbol(frame_id);
     }
@@ -345,14 +345,12 @@ public:
     {
         const size_t frame_slot = (frame_id % kFrameWnd);
         bool is_last;
-        size_t symbol_count = this->symbol_count_.at(frame_slot) ;
+        size_t symbol_count = this->symbol_count_.at(frame_slot);
         if (symbol_count == this->max_symbol_count_) {
             is_last = true;
-        }
-        else if (symbol_count < this->max_symbol_count_) {
+        } else if (symbol_count < this->max_symbol_count_) {
             is_last = false;
-        }
-        else {
+        } else {
             is_last = true;
             /* This should never happen */
             assert(false);
@@ -366,10 +364,7 @@ public:
      * This is used for tasks performed once per frame (e.g., ZF)
      * @param frame_id The frame id to check
      */
-    bool IsLastTask(size_t frame_id) const
-    {
-        return IsLastSymbol(frame_id);
-    }
+    bool IsLastTask(size_t frame_id) const { return IsLastSymbol(frame_id); }
 
     /**
      * @brief Check whether the task is the last task for a given frame and 
@@ -383,11 +378,9 @@ public:
         size_t task_count = this->task_count_.at(frame_slot).at(symbol_id);
         if (task_count == this->max_task_count_) {
             is_last = true;
-        }
-        else if (task_count < this->max_task_count_) {
+        } else if (task_count < this->max_task_count_) {
             is_last = false;
-        }
-        else {
+        } else {
             is_last = true;
             /* This should never happen */
             assert(false);
@@ -410,8 +403,11 @@ public:
         return this->task_count_.at(frame_id % kFrameWnd).at(symbol_id);
     }
 
-    inline size_t max_symbol_count( void ) const { return this->max_symbol_count_; }
-    inline size_t max_task_count( void )   const { return this->max_task_count_; }
+    inline size_t max_symbol_count(void) const
+    {
+        return this->max_symbol_count_;
+    }
+    inline size_t max_task_count(void) const { return this->max_task_count_; }
 
 private:
     // task_count[i][j] is the number of tasks completed for

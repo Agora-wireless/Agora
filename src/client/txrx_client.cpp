@@ -45,8 +45,7 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     int in_tx_buffer_length)
 {
     buffer_frame_num_ = in_buffer_frame_num;
-    assert(in_buffer_length
-        == config_->packet_length() * buffer_frame_num_); 
+    assert(in_buffer_length == config_->packet_length() * buffer_frame_num_);
     buffer_length_ = in_buffer_length;
     buffer_ = &in_buffer; // for save data
     buffer_status_ = &in_buffer_status; // for save status
@@ -114,7 +113,7 @@ struct Packet* RadioTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     if (rx_buffer_status[rx_offset] == 1) {
         std::printf(
             "Receive thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
-        config_->running( false );
+        config_->running(false);
         return (NULL);
     }
     struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
@@ -153,9 +152,8 @@ int RadioTXRX::dequeue_send(int tid)
         for (size_t symbol_id = 0; symbol_id < c->frame().NumULSyms();
              symbol_id++) {
 
-            size_t offset
-                = (c->GetTotalDataSymbolIdxUl(frame_id, symbol_id)
-                      * c->ue_ant_num())
+            size_t offset = (c->GetTotalDataSymbolIdxUl(frame_id, symbol_id)
+                                * c->ue_ant_num())
                 + ant_id;
 
             if (kDebugPrintInTask) {
@@ -169,12 +167,12 @@ int RadioTXRX::dequeue_send(int tid)
 
             auto* pkt
                 = (struct Packet*)(tx_buffer_ + offset * c->packet_length());
-            new (pkt) Packet(
-                frame_id, c->frame().GetULSymbol(symbol_id), 0 /* cell_id */, ant_id);
+            new (pkt) Packet(frame_id, c->frame().GetULSymbol(symbol_id),
+                0 /* cell_id */, ant_id);
 
             // Send data (one OFDM symbol)
-            ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length(),
-                0, (struct sockaddr*)&servaddr_[ant_id],
+            ssize_t ret = sendto(socket_[ant_id], (char*)pkt,
+                c->packet_length(), 0, (struct sockaddr*)&servaddr_[ant_id],
                 sizeof(servaddr_[ant_id]));
             rt_assert(ret > 0, "sendto() failed");
         }
@@ -192,7 +190,8 @@ int RadioTXRX::dequeue_send(int tid)
                 std::printf("In TX thread %d: Transmitted pilot in frame %zu, "
                             "symbol %zu, "
                             "ant %zu\n",
-                    tid, frame_id, c->frame().GetPilotSymbol(symbol_idx), ant_id);
+                    tid, frame_id, c->frame().GetPilotSymbol(symbol_idx),
+                    ant_id);
             }
 
             auto* pkt = (symbol_idx == ant_id) ? (struct Packet*)pilot.data()
@@ -200,8 +199,8 @@ int RadioTXRX::dequeue_send(int tid)
             new (pkt) Packet(frame_id, c->frame().GetPilotSymbol(symbol_idx),
                 0 /* cell_id */, ant_id);
             // Send pilots
-            ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->packet_length(),
-                0, (struct sockaddr*)&servaddr_[ant_id],
+            ssize_t ret = sendto(socket_[ant_id], (char*)pkt,
+                c->packet_length(), 0, (struct sockaddr*)&servaddr_[ant_id],
                 sizeof(servaddr_[ant_id]));
             rt_assert(ret > 0, "sendto() failed");
         }
@@ -353,7 +352,7 @@ struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
     if (rx_buffer_status[rx_offset] == 1) {
         std::printf(
             "RX thread %d at rx_offset %zu buffer full\n", tid, rx_offset);
-        c->running( false );
+        c->running(false);
         return NULL;
     }
 
@@ -372,7 +371,7 @@ struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
                   << rxTime << std::endl;
     if (r < 0) {
         std::cerr << "Receive error! Stopping... " << std::endl;
-        c->running( false );
+        c->running(false);
         return NULL;
     }
     if (c->hw_framer()) {
@@ -550,7 +549,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
     while (c->running() == true) {
 
         if (c->frames_to_test() > 0 && frame_id > c->frames_to_test()) {
-            c->running( false );
+            c->running(false);
             break;
         }
 
@@ -563,7 +562,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
         }
         if (r < 0) {
             std::cerr << "Receive error! Stopping... " << std::endl;
-            c->running( false );
+            c->running(false);
             break;
         }
         if (frame_id == 0) {
@@ -603,7 +602,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
                  << resync_retry_max << "). Stopping..." << std::endl;
             std::cerr << sout.str();
             sout.str(std::string()); // clear stringstream after print
-            c->running( false );
+            c->running(false);
             break;
         }
 
@@ -623,7 +622,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
                 }
                 if (r < 0) {
                     std::cerr << "Receive error! Stopping... " << std::endl;
-                    c->running( false );
+                    c->running(false);
                     break;
                 }
                 if (kDebugPrintInTask) {

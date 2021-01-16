@@ -8,7 +8,7 @@ int main(int argc, char* argv[])
         confFile = std::string(argv[1]);
     }
 
-    std::unique_ptr<Config> cfg ( new Config(confFile.c_str()) );
+    std::unique_ptr<Config> cfg(new Config(confFile.c_str()));
     cfg->GenData();
 
     int ret;
@@ -17,7 +17,7 @@ int main(int argc, char* argv[])
 
         // Register signal handler to handle kill signal
         signalHandler.setupSignalHandlers();
-        std::unique_ptr<Agora> agora_cli( new Agora(cfg.get()) );
+        std::unique_ptr<Agora> agora_cli(new Agora(cfg.get()));
         agora_cli->Start();
         ret = EXIT_SUCCESS;
     } catch (SignalException& e) {

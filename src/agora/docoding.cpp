@@ -18,13 +18,13 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
         = in_stats_manager->get_duration_stat(DoerType::kEncode, in_tid);
     parity_buffer = static_cast<int8_t*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
-            ldpc_encoding_parity_buf_size(
-                cfg->ldpc_config().base_graph(), cfg->ldpc_config().expansion_factor())));
+            ldpc_encoding_parity_buf_size(cfg->ldpc_config().base_graph(),
+                cfg->ldpc_config().expansion_factor())));
     assert(parity_buffer != nullptr);
     encoded_buffer_temp = static_cast<int8_t*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
-            ldpc_encoding_encoded_buf_size(
-                cfg->ldpc_config().base_graph(), cfg->ldpc_config().expansion_factor())));
+            ldpc_encoding_encoded_buf_size(cfg->ldpc_config().base_graph(),
+                cfg->ldpc_config().expansion_factor())));
     assert(encoded_buffer_temp != nullptr);
 }
 
@@ -55,8 +55,8 @@ Event_data DoEncode::launch(size_t tag)
     int8_t* input_ptr
         = cfg->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
 
-    ldpc_encode_helper(LDPC_config.base_graph(), LDPC_config.expansion_factor(), LDPC_config.num_rows(),
-        encoded_buffer_temp, parity_buffer, input_ptr);
+    ldpc_encode_helper(LDPC_config.base_graph(), LDPC_config.expansion_factor(),
+        LDPC_config.num_rows(), encoded_buffer_temp, parity_buffer, input_ptr);
     int8_t* final_output_ptr = cfg->GetEncodedBuf(
         encoded_buffer_, frame_id, symbol_idx_dl, ue_id, cur_cb_id);
     adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
@@ -96,7 +96,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid,
         Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
 }
 
-DoDecode::~DoDecode( void ) { std::free(resp_var_nodes); }
+DoDecode::~DoDecode(void) { std::free(resp_var_nodes); }
 
 Event_data DoDecode::launch(size_t tag)
 {
@@ -106,7 +106,8 @@ Event_data DoDecode::launch(size_t tag)
     const size_t cb_id = gen_tag_t(tag).cb_id;
     const size_t symbol_offset
         = cfg->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
-    const size_t cur_cb_id = (cb_id % cfg->ldpc_config().num_blocks_in_symbol());
+    const size_t cur_cb_id
+        = (cb_id % cfg->ldpc_config().num_blocks_in_symbol());
     const size_t ue_id = (cb_id / cfg->ldpc_config().num_blocks_in_symbol());
     const size_t frame_slot = (frame_id % kFrameWnd);
     if (kDebugPrintInTask == true) {
@@ -141,7 +142,8 @@ Event_data DoDecode::launch(size_t tag)
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
     int8_t* llr_buffer_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ue_id]
-        + (cfg->mod_order_bits() * (LDPC_config.num_cb_codew_len() * cur_cb_id));
+        + (cfg->mod_order_bits()
+              * (LDPC_config.num_cb_codew_len() * cur_cb_id));
 
     uint8_t* decoded_buffer_ptr
         = decoded_buffers_[frame_slot][symbol_idx_ul][ue_id]
@@ -175,9 +177,10 @@ Event_data DoDecode::launch(size_t tag)
         std::printf("\n");
     }
 
-    if ((kEnableMac == false) && (kPrintPhyStats == true) && 
-        (symbol_idx_ul >= cfg->frame().client_ul_pilot_symbols())) {
-        phy_stats->update_decoded_bits( ue_id, symbol_offset, cfg->num_bytes_per_cb() * 8);
+    if ((kEnableMac == false) && (kPrintPhyStats == true)
+        && (symbol_idx_ul >= cfg->frame().client_ul_pilot_symbols())) {
+        phy_stats->update_decoded_bits(
+            ue_id, symbol_offset, cfg->num_bytes_per_cb() * 8);
         phy_stats->increment_decoded_blocks(ue_id, symbol_offset);
         size_t block_error(0);
         for (size_t i = 0; i < cfg->num_bytes_per_cb(); i++) {

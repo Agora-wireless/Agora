@@ -50,8 +50,7 @@ DoPrecode::~DoPrecode()
 #if USE_MKL_JIT
     mkl_jit_status_t status = mkl_jit_destroy(jitter);
     if (MKL_JIT_ERROR == status) {
-        std::fprintf(stderr,
-            "!!!!Error: Error while destorying MKL JIT\n");
+        std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
     }
 #endif
 }

@@ -9,7 +9,7 @@
 using namespace arma;
 class PhyStats {
 public:
-    PhyStats(Config * cfg);
+    PhyStats(Config* cfg);
     ~PhyStats();
     void print_phy_stats();
     void update_bit_errors(size_t, size_t, uint8_t, uint8_t);
@@ -25,7 +25,7 @@ public:
     void print_snr_stats(size_t);
 
 private:
-    Config const * const config_;
+    Config const* const config_;
     Table<size_t> decoded_bits_count_;
     Table<size_t> bit_error_count_;
     Table<size_t> decoded_blocks_count_;

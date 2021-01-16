@@ -1,6 +1,6 @@
 #include "phy_stats.hpp"
 
-PhyStats::PhyStats(Config * cfg)
+PhyStats::PhyStats(Config* cfg)
     : config_(cfg)
 {
     const size_t task_buffer_symbol_num_ul
@@ -24,13 +24,13 @@ PhyStats::PhyStats(Config * cfg)
         kFrameWnd, cfg->ue_ant_num(), Agora_memory::Alignment_t::k64Align);
 
     if (cfg->frame().NumULSyms() > 0) {
-        auto ul_iq_f_ptr
-            = reinterpret_cast<cx_float*>(cfg->ul_iq_f()[cfg->frame().client_ul_pilot_symbols()]);
+        auto ul_iq_f_ptr = reinterpret_cast<cx_float*>(
+            cfg->ul_iq_f()[cfg->frame().client_ul_pilot_symbols()]);
         cx_fmat ul_iq_f_mat(
             ul_iq_f_ptr, cfg->ofdm_ca_num(), cfg->ue_ant_num(), false);
         ul_gt_mat_ = ul_iq_f_mat.st(); /* Out of bounds read.... */
-        ul_gt_mat_
-            = ul_gt_mat_.cols(cfg->ofdm_data_start(), (cfg->ofdm_data_stop() - 1));
+        ul_gt_mat_ = ul_gt_mat_.cols(
+            cfg->ofdm_data_start(), (cfg->ofdm_data_stop() - 1));
     }
     pilot_snr_.calloc(
         kFrameWnd, cfg->ue_ant_num(), Agora_memory::Alignment_t::k64Align);
@@ -62,7 +62,7 @@ void PhyStats::print_phy_stats()
         size_t total_bit_errors(0);
         size_t total_decoded_blocks(0);
         size_t total_block_errors(0);
-        
+
         for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
             total_decoded_bits += decoded_bits_count_[ue_id][i];
             total_bit_errors += bit_error_count_[ue_id][i];
@@ -81,7 +81,8 @@ void PhyStats::print_phy_stats()
 
 void PhyStats::print_evm_stats(size_t frame_id)
 {
-    fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->ue_num(), 1, false);
+    fmat evm_mat(
+        evm_buffer_[frame_id % kFrameWnd], config_->ue_num(), 1, false);
     evm_mat = sqrt(evm_mat) / config_->ofdm_data_num();
     std::stringstream ss;
     ss << "Frame " << frame_id << " Constellation:\n"
@@ -116,8 +117,8 @@ void PhyStats::update_pilot_snr(
     float rssi = as_scalar(sum(fft_abs_mag));
     float noise_per_sc1
         = as_scalar(mean(fft_abs_mag.rows(0, config_->ofdm_data_start() - 1)));
-    float noise_per_sc2 = as_scalar(mean(
-        fft_abs_mag.rows(config_->ofdm_data_stop(), config_->ofdm_ca_num() - 1)));
+    float noise_per_sc2 = as_scalar(mean(fft_abs_mag.rows(
+        config_->ofdm_data_stop(), config_->ofdm_ca_num() - 1)));
     float noise = config_->ofdm_ca_num() * (noise_per_sc1 + noise_per_sc2) / 2;
     float snr = (rssi - noise) / noise;
     pilot_snr_[frame_id % kFrameWnd][ue_id] = 10 * std::log10(snr);

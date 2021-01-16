@@ -91,10 +91,7 @@ public:
         this->data_ = nullptr;
     }
 
-    T* at(size_t dim1) const
-    {
-        return (*this)[dim1];
-    }
+    T* at(size_t dim1) const { return (*this)[dim1]; }
 
     T* operator[](size_t dim1)
     {
@@ -155,11 +152,9 @@ public:
     void alloc(size_t n_rows, size_t n_cols, size_t n_entries)
     {
         const size_t alloc_sz = n_rows * n_cols * n_entries * sizeof(T);
-        this->backing_buf_
-            = static_cast<T*>(Agora_memory::padded_aligned_alloc(
-                Agora_memory::Alignment_t::k64Align, alloc_sz));
-        std::memset(
-            static_cast<void *>(this->backing_buf_), 0, alloc_sz);
+        this->backing_buf_ = static_cast<T*>(Agora_memory::padded_aligned_alloc(
+            Agora_memory::Alignment_t::k64Align, alloc_sz));
+        std::memset(static_cast<void*>(this->backing_buf_), 0, alloc_sz);
 
         // Fill-in the grid with pointers into backing_buf
         size_t offset = 0;
@@ -244,11 +239,9 @@ public:
     void alloc(size_t dim_1, size_t dim_2, size_t dim_3, size_t n_entries)
     {
         const size_t alloc_sz = dim_1 * dim_2 * dim_3 * n_entries * sizeof(T);
-        this->backing_buf_
-            = static_cast<T*>(Agora_memory::padded_aligned_alloc(
-                Agora_memory::Alignment_t::k64Align, alloc_sz));
-        std::memset(
-            static_cast<void *>(this->backing_buf_), 0, alloc_sz);
+        this->backing_buf_ = static_cast<T*>(Agora_memory::padded_aligned_alloc(
+            Agora_memory::Alignment_t::k64Align, alloc_sz));
+        std::memset(static_cast<void*>(this->backing_buf_), 0, alloc_sz);
 
         // Fill-in the grid with pointers into backing_buf
         for (auto& mat : this->cube_) {

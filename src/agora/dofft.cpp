@@ -172,8 +172,8 @@ Event_data DoFFT::launch(size_t tag)
             size_t frame_grp_id
                 = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num();
             size_t frame_grp_slot = frame_grp_id % kFrameWnd;
-            partial_transpose(
-                &calib_ul_buffer_[frame_grp_slot][ant_id * cfg->ofdm_data_num()],
+            partial_transpose(&calib_ul_buffer_[frame_grp_slot]
+                                               [ant_id * cfg->ofdm_data_num()],
                 ant_id, sym_type);
         }
     } else if (sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant()) {
@@ -267,8 +267,7 @@ void DoFFT::partial_transpose(
                     cfg->pilots_sgn()[sc_idx + 2].re,
                     cfg->pilots_sgn()[sc_idx + 1].im,
                     cfg->pilots_sgn()[sc_idx + 1].re,
-                    cfg->pilots_sgn()[sc_idx].im, 
-					cfg->pilots_sgn()[sc_idx].re);
+                    cfg->pilots_sgn()[sc_idx].im, cfg->pilots_sgn()[sc_idx].re);
                 fft_result0 = CommsLib::__m256_complex_cf32_mult(
                     fft_result0, pilot_tx0, true);
 
@@ -313,7 +312,11 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
             2 * cfg->ofdm_ca_num() * sizeof(float)));
 }
 
-DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); std::free(ifft_out); }
+DoIFFT::~DoIFFT()
+{
+    DftiFreeDescriptor(&mkl_handle);
+    std::free(ifft_out);
+}
 
 Event_data DoIFFT::launch(size_t tag)
 {
@@ -341,7 +344,8 @@ Event_data DoIFFT::launch(size_t tag)
         = (kUseOutOfPlaceIFFT || kMemcpyBeforeIFFT) ? ifft_out : ifft_in_ptr;
 
     if (kMemcpyBeforeIFFT) {
-        std::memset(ifft_out_ptr, 0, sizeof(float) * cfg->ofdm_data_start() * 2);
+        std::memset(
+            ifft_out_ptr, 0, sizeof(float) * cfg->ofdm_data_start() * 2);
         std::memset(ifft_out_ptr + (cfg->ofdm_data_stop()) * 2, 0,
             sizeof(float) * cfg->ofdm_data_start() * 2);
         std::memcpy(ifft_out_ptr + (cfg->ofdm_data_start()) * 2,

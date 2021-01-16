@@ -140,7 +140,7 @@ private:
     Table<char>* buffer_;
     Table<int>* buffer_status_;
 
-	size_t buffer_length_; /* Unused */
+    size_t buffer_length_; /* Unused */
     size_t buffer_frame_num_;
 
     char* tx_buffer_;

@@ -123,7 +123,8 @@ void MacThread::process_codeblocks_from_master(Event_data event)
         // We send data to app irrespective of CRC condition
         // TODO: enable ARQ and ensure reliable data goes to app
         const size_t frame_data__offset
-            = (symbol_idx_ul - cfg_->frame().client_ul_pilot_symbols()) * cfg_->mac_payload_length();
+            = (symbol_idx_ul - cfg_->frame().client_ul_pilot_symbols())
+            * cfg_->mac_payload_length();
         std::memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data,
             cfg_->mac_payload_length());
         server_.n_filled_in_frame_[ue_id] += cfg_->mac_payload_length();
@@ -165,7 +166,8 @@ void MacThread::process_codeblocks_from_master(Event_data event)
         server_.n_filled_in_frame_[ue_id] = 0;
 
         udp_client->send(kRemoteHostname, kBaseRemotePort + ue_id,
-            &server_.frame_data_[ue_id][0], cfg_->mac_data_bytes_num_perframe());
+            &server_.frame_data_[ue_id][0],
+            cfg_->mac_data_bytes_num_perframe());
         std::fprintf(log_file_,
             "MAC thread: Sent data for frame %zu, ue %zu, size %zu\n", frame_id,
             ue_id, cfg_->mac_data_bytes_num_perframe());
@@ -203,7 +205,7 @@ void MacThread::process_control_information()
         return; // No data received
     } else if (ret == -1) {
         // There was an error in receiving
-        cfg_->running( false );
+        cfg_->running(false);
         return;
     }
 
@@ -222,7 +224,7 @@ void MacThread::process_udp_packets_from_apps(RBIndicator ri)
         return; // No data received
     } else if (ret == -1) {
         // There was an error in receiving
-        cfg_->running( false );
+        cfg_->running(false);
         return;
     }
     rt_assert(static_cast<size_t>(ret) == cfg_->mac_data_bytes_num_perframe());
@@ -251,8 +253,8 @@ void MacThread::process_udp_packets_from_apps_server(
 
     for (size_t i = 0; i < cfg_->ldpc_config().num_blocks_in_symbol(); i++)
         (*dl_bits_buffer_status_)[pkt->ue_id][rx_offset + i] = 1;
-    std::memcpy(
-        &(*dl_bits_buffer_)[total_symbol_idx][pkt->ue_id * cfg_->ofdm_data_num()],
+    std::memcpy(&(*dl_bits_buffer_)[total_symbol_idx]
+                                   [pkt->ue_id * cfg_->ofdm_data_num()],
         pkt->data, udp_pkt_buf_.size());
 
     Event_data msg(EventType::kPacketFromMac,
@@ -281,7 +283,8 @@ void MacThread::process_udp_packets_from_apps_client(
         std::fprintf(log_file_,
             "MAC thread: Received data from app for frame %zu, ue %zu, size "
             "%zu:\n",
-            next_frame_id_, next_radio_id_, cfg_->mac_data_bytes_num_perframe());
+            next_frame_id_, next_radio_id_,
+            cfg_->mac_data_bytes_num_perframe());
 
         for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe(); i++) {
             ss << std::to_string((uint8_t)(payload[i])) << " ";

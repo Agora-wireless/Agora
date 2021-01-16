@@ -12,20 +12,19 @@
 #include <unistd.h>
 #include <vector>
 
-#include "framestats.h"
 #include "Symbols.hpp"
 #include "buffer.hpp"
 #include "comms-lib.h"
+#include "framestats.h"
 #include "gettime.h"
+#include "ldpc_config.hpp"
 #include "memory_manage.h"
 #include "modulation.hpp"
 #include "utils.h"
 #include "utils_ldpc.hpp"
-#include "ldpc_config.hpp"
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
-
 
 class Config {
 public:
@@ -37,158 +36,289 @@ public:
     Config(std::string);
     ~Config(void);
 
-    inline void   running( bool value ) { this->running_.store(value); }
-    inline bool   running( void ) const { return this->running_.load(); }
-    inline size_t bs_ant_num( void )         const { return this->bs_ant_num_; }
-    inline void   bs_ant_num( size_t n_bs_ant ) { this->bs_ant_num_ = n_bs_ant; }
+    inline void running(bool value) { this->running_.store(value); }
+    inline bool running(void) const { return this->running_.load(); }
+    inline size_t bs_ant_num(void) const { return this->bs_ant_num_; }
+    inline void bs_ant_num(size_t n_bs_ant) { this->bs_ant_num_ = n_bs_ant; }
 
     /* Inline accessors (basic types) */
-    inline bool   is_UE( void )              const { return this->is_UE_; }
-    inline size_t bf_ant_num( void )         const { return this->bf_ant_num_; } 
-    inline size_t ue_num( void )             const { return this->ue_num_; } 
+    inline bool is_UE(void) const { return this->is_UE_; }
+    inline size_t bf_ant_num(void) const { return this->bf_ant_num_; }
+    inline size_t ue_num(void) const { return this->ue_num_; }
 
-    inline size_t ue_ant_num( void )         const { return this->ue_ant_num_; } 
-    inline size_t ofdm_ca_num( void )        const { return this->ofdm_ca_num_; } 
-    inline size_t cp_len( void )             const { return this->cp_len_; } 
-    inline size_t ofdm_data_num( void )      const { return this->ofdm_data_num_; } 
-    inline size_t ofdm_data_start( void )    const { return this->ofdm_data_start_; } 
+    inline size_t ue_ant_num(void) const { return this->ue_ant_num_; }
+    inline size_t ofdm_ca_num(void) const { return this->ofdm_ca_num_; }
+    inline size_t cp_len(void) const { return this->cp_len_; }
+    inline size_t ofdm_data_num(void) const { return this->ofdm_data_num_; }
+    inline size_t ofdm_data_start(void) const { return this->ofdm_data_start_; }
 
-    inline size_t ofdm_data_stop( void )     const { return this->ofdm_data_stop_; } 
-    inline size_t ofdm_pilot_spacing( void ) const { return this->ofdm_pilot_spacing_; } 
-    inline double freq_ghz( void )           const { return this->freq_ghz_; };
-    inline size_t dl_packet_length( void )   const { return this->dl_packet_length_; }
-    inline std::string modulation( void )    const { return this->modulation_; } 
+    inline size_t ofdm_data_stop(void) const { return this->ofdm_data_stop_; }
+    inline size_t ofdm_pilot_spacing(void) const
+    {
+        return this->ofdm_pilot_spacing_;
+    }
+    inline double freq_ghz(void) const { return this->freq_ghz_; };
+    inline size_t dl_packet_length(void) const
+    {
+        return this->dl_packet_length_;
+    }
+    inline std::string modulation(void) const { return this->modulation_; }
 
-    inline size_t mod_order_bits( void )  const { return this->mod_order_bits_; } 
-    inline bool   hw_framer( void )       const { return this->hw_framer_; } 
-    inline double freq( void )            const { return this->freq_; } 
-    inline double rate( void )            const { return this->rate_; } 
-    inline double nco( void )             const { return this->nco_; }
+    inline size_t mod_order_bits(void) const { return this->mod_order_bits_; }
+    inline bool hw_framer(void) const { return this->hw_framer_; }
+    inline double freq(void) const { return this->freq_; }
+    inline double rate(void) const { return this->rate_; }
+    inline double nco(void) const { return this->nco_; }
 
-    inline double radio_rf_freq( void )   const { return this->radio_rf_freq_; }
-    inline double bw_filter( void )       const { return this->bw_filter_; } 
-    inline bool   single_gain( void )     const { return this->single_gain_; } 
-    inline double tx_gain_a( void )       const { return this->tx_gain_a_; } 
-    inline double rx_gain_a( void )       const { return this->rx_gain_a_; } 
+    inline double radio_rf_freq(void) const { return this->radio_rf_freq_; }
+    inline double bw_filter(void) const { return this->bw_filter_; }
+    inline bool single_gain(void) const { return this->single_gain_; }
+    inline double tx_gain_a(void) const { return this->tx_gain_a_; }
+    inline double rx_gain_a(void) const { return this->rx_gain_a_; }
 
-    inline double tx_gain_b( void )       const { return this->tx_gain_b_; } 
-    inline double rx_gain_b( void )       const { return this->rx_gain_b_; } 
-    inline double calib_tx_gain_a( void ) const { return this->calib_tx_gain_a_; } 
-    inline size_t num_cells( void )    const { return this->num_cells_; } 
-    inline size_t num_radios( void )   const { return this->num_radios_; } 
+    inline double tx_gain_b(void) const { return this->tx_gain_b_; }
+    inline double rx_gain_b(void) const { return this->rx_gain_b_; }
+    inline double calib_tx_gain_a(void) const { return this->calib_tx_gain_a_; }
+    inline size_t num_cells(void) const { return this->num_cells_; }
+    inline size_t num_radios(void) const { return this->num_radios_; }
 
-    inline size_t num_antennas( void ) const { return this->num_antennas_; } 
-    inline size_t num_channels( void ) const { return this->num_channels_; } 
-    inline size_t ref_ant( void )      const { return this->ref_ant_; } 
-    inline size_t beacon_ant( void )   const { return this->beacon_ant_; } 
-    inline size_t beacon_len( void )   const { return this->beacon_len_; } 
+    inline size_t num_antennas(void) const { return this->num_antennas_; }
+    inline size_t num_channels(void) const { return this->num_channels_; }
+    inline size_t ref_ant(void) const { return this->ref_ant_; }
+    inline size_t beacon_ant(void) const { return this->beacon_ant_; }
+    inline size_t beacon_len(void) const { return this->beacon_len_; }
 
-    inline bool   beamsweep( void )         const { return this->beamsweep_; } 
-    inline bool   sample_cal_en( void )     const { return this->sample_cal_en_; } 
-    inline bool   imbalance_cal_en( void )  const { return this->imbalance_cal_en_; } 
-    inline bool   external_ref_node( void ) const { return this->external_ref_node_; } 
-    inline std::string channel( void )      const { return this->channel_; } 
-    
-    inline size_t ant_group_num( void )     const { return this->ant_group_num_; } 
-    inline size_t ant_per_group( void )     const { return this->ant_per_group_; } 
-    inline size_t core_offset( void )       const { return this->core_offset_; } 
-    inline size_t worker_thread_num( void ) const { return this->worker_thread_num_; } 
-    inline size_t socket_thread_num( void ) const { return this->socket_thread_num_; } 
+    inline bool beamsweep(void) const { return this->beamsweep_; }
+    inline bool sample_cal_en(void) const { return this->sample_cal_en_; }
+    inline bool imbalance_cal_en(void) const { return this->imbalance_cal_en_; }
+    inline bool external_ref_node(void) const
+    {
+        return this->external_ref_node_;
+    }
+    inline std::string channel(void) const { return this->channel_; }
 
-    inline size_t fft_thread_num( void )    const { return this->fft_thread_num_; }
-    inline size_t demul_thread_num( void )  const { return this->demul_thread_num_; } 
-    inline size_t decode_thread_num( void ) const { return this->decode_thread_num_; } 
-    inline size_t zf_thread_num( void )     const { return this->zf_thread_num_; } 
-    inline size_t demul_block_size( void )  const { return this->demul_block_size_; } 
+    inline size_t ant_group_num(void) const { return this->ant_group_num_; }
+    inline size_t ant_per_group(void) const { return this->ant_per_group_; }
+    inline size_t core_offset(void) const { return this->core_offset_; }
+    inline size_t worker_thread_num(void) const
+    {
+        return this->worker_thread_num_;
+    }
+    inline size_t socket_thread_num(void) const
+    {
+        return this->socket_thread_num_;
+    }
 
-    inline size_t demul_events_per_symbol( void ) const { return this->demul_events_per_symbol_; } 
-    inline size_t zf_block_size( void )     const { return this->zf_block_size_; } 
-    inline size_t zf_batch_size( void )        const { return this->zf_batch_size_; } 
-    inline size_t zf_events_per_symbol( void ) const { return this->zf_events_per_symbol_; } 
-    inline size_t fft_block_size( void )       const { return this->fft_block_size_; } 
+    inline size_t fft_thread_num(void) const { return this->fft_thread_num_; }
+    inline size_t demul_thread_num(void) const
+    {
+        return this->demul_thread_num_;
+    }
+    inline size_t decode_thread_num(void) const
+    {
+        return this->decode_thread_num_;
+    }
+    inline size_t zf_thread_num(void) const { return this->zf_thread_num_; }
+    inline size_t demul_block_size(void) const
+    {
+        return this->demul_block_size_;
+    }
 
-    inline size_t encode_block_size( void )    const { return this->encode_block_size_; } 
-    inline bool   freq_orthogonal_pilot( void ) const { return this->freq_orthogonal_pilot_; } 
-    inline size_t ofdm_tx_zero_prefix( void )        const { return this->ofdm_tx_zero_prefix_; } 
-    inline size_t ofdm_tx_zero_postfix( void )       const { return this->ofdm_tx_zero_postfix_; } 
-    inline size_t ofdm_rx_zero_prefix_bs( void )     const { return this->ofdm_rx_zero_prefix_bs_; } 
+    inline size_t demul_events_per_symbol(void) const
+    {
+        return this->demul_events_per_symbol_;
+    }
+    inline size_t zf_block_size(void) const { return this->zf_block_size_; }
+    inline size_t zf_batch_size(void) const { return this->zf_batch_size_; }
+    inline size_t zf_events_per_symbol(void) const
+    {
+        return this->zf_events_per_symbol_;
+    }
+    inline size_t fft_block_size(void) const { return this->fft_block_size_; }
 
-    inline size_t ofdm_rx_zero_prefix_cal_ul( void ) const { return this->ofdm_rx_zero_prefix_cal_ul_; } 
-    inline size_t ofdm_rx_zero_prefix_cal_dl( void ) const { return this->ofdm_rx_zero_prefix_cal_dl_; } 
-    inline size_t ofdm_rx_zero_prefix_client( void ) const { return this->ofdm_rx_zero_prefix_client_; } 
-    inline size_t samps_per_symbol( void ) const { return this->samps_per_symbol_; } 
-    inline size_t packet_length( void )    const { return this->packet_length_; } 
+    inline size_t encode_block_size(void) const
+    {
+        return this->encode_block_size_;
+    }
+    inline bool freq_orthogonal_pilot(void) const
+    {
+        return this->freq_orthogonal_pilot_;
+    }
+    inline size_t ofdm_tx_zero_prefix(void) const
+    {
+        return this->ofdm_tx_zero_prefix_;
+    }
+    inline size_t ofdm_tx_zero_postfix(void) const
+    {
+        return this->ofdm_tx_zero_postfix_;
+    }
+    inline size_t ofdm_rx_zero_prefix_bs(void) const
+    {
+        return this->ofdm_rx_zero_prefix_bs_;
+    }
 
-    inline int    cl_tx_advance( void )    const { return this->cl_tx_advance_; }
-    inline float  scale( void )            const { return this->scale_; }
-    inline bool   bigstation_mode( void )     const { return this->bigstation_mode_; } 
-    inline size_t mac_data_bytes_num_perframe( void ) const { return this->mac_data_bytes_num_perframe_; } 
-    inline size_t mac_bytes_num_perframe( void ) const { return this->mac_bytes_num_perframe_; } 
+    inline size_t ofdm_rx_zero_prefix_cal_ul(void) const
+    {
+        return this->ofdm_rx_zero_prefix_cal_ul_;
+    }
+    inline size_t ofdm_rx_zero_prefix_cal_dl(void) const
+    {
+        return this->ofdm_rx_zero_prefix_cal_dl_;
+    }
+    inline size_t ofdm_rx_zero_prefix_client(void) const
+    {
+        return this->ofdm_rx_zero_prefix_client_;
+    }
+    inline size_t samps_per_symbol(void) const
+    {
+        return this->samps_per_symbol_;
+    }
+    inline size_t packet_length(void) const { return this->packet_length_; }
 
-    inline size_t mac_packet_length( void ) const { return this->mac_packet_length_; } 
-    inline size_t mac_payload_length( void ) const { return this->mac_payload_length_; } 
-    inline size_t mac_packets_perframe( void ) const { return this->mac_packets_perframe_; } 
-    inline std::string ue_server_addr( void ) const { return this->ue_server_addr_; } 
-    inline std::string bs_server_addr( void ) const { return this->bs_server_addr_; } 
+    inline int cl_tx_advance(void) const { return this->cl_tx_advance_; }
+    inline float scale(void) const { return this->scale_; }
+    inline bool bigstation_mode(void) const { return this->bigstation_mode_; }
+    inline size_t mac_data_bytes_num_perframe(void) const
+    {
+        return this->mac_data_bytes_num_perframe_;
+    }
+    inline size_t mac_bytes_num_perframe(void) const
+    {
+        return this->mac_bytes_num_perframe_;
+    }
 
-    inline std::string bs_rru_addr( void ) const { return this->bs_rru_addr_; } 
-    inline int bs_server_port( void ) const { return this->bs_server_port_; } 
-    inline int bs_rru_port( void ) const { return this->bs_rru_port_; } 
-    inline int ue_server_port( void ) const { return this->ue_server_port_; } 
-    inline int ue_rru_port( void ) const { return this->ue_rru_port_; } 
+    inline size_t mac_packet_length(void) const
+    {
+        return this->mac_packet_length_;
+    }
+    inline size_t mac_payload_length(void) const
+    {
+        return this->mac_payload_length_;
+    }
+    inline size_t mac_packets_perframe(void) const
+    {
+        return this->mac_packets_perframe_;
+    }
+    inline std::string ue_server_addr(void) const
+    {
+        return this->ue_server_addr_;
+    }
+    inline std::string bs_server_addr(void) const
+    {
+        return this->bs_server_addr_;
+    }
 
-    inline size_t frames_to_test( void ) const { return this->frames_to_test_; } 
-    inline float  noise_level( void ) const { return this->noise_level_; } 
-    inline size_t num_bytes_per_cb( void ) const { return this->num_bytes_per_cb_; } 
-    inline bool   fft_in_rru( void ) const { return this->fft_in_rru_; } 
+    inline std::string bs_rru_addr(void) const { return this->bs_rru_addr_; }
+    inline int bs_server_port(void) const { return this->bs_server_port_; }
+    inline int bs_rru_port(void) const { return this->bs_rru_port_; }
+    inline int ue_server_port(void) const { return this->ue_server_port_; }
+    inline int ue_rru_port(void) const { return this->ue_rru_port_; }
 
-    //inline size_t mod_order( void )       const { return this->mod_order_; } 
-    //inline double calib_tx_gain_b( void ) const { return this->calib_tx_gain_b_; } 
-    //inline size_t total_ue_ant_num( void ) const { return this->total_ue_ant_num_; } 
-    //inline size_t ue_ant_offset( void )    const { return this->ue_ant_offset_; } 
-    //inline bool  correct_phase_shift( void ) const { return this->correct_phase_shift_; } 
-    //inline size_t data_bytes_num_persymbol( void ) const { return this->data_bytes_num_persymbol_; } 
-    //inline std::string mac_remote_addr( void ) const { return this->mac_remote_addr_; } 
-    //inline uint16_t dpdk_num_ports( void ) const { return this->dpdk_num_ports_; } 
-    //inline int mac_rx_port( void ) const { return this->mac_rx_port_; } 
-    //inline int mac_tx_port( void ) const { return this->mac_tx_port_; } 
-    //inline bool init_mac_running( void ) const { return this->init_mac_running_; } 
-    //inline size_t transport_block_size( void ) const { return this->transport_block_size_; } 
+    inline size_t frames_to_test(void) const { return this->frames_to_test_; }
+    inline float noise_level(void) const { return this->noise_level_; }
+    inline size_t num_bytes_per_cb(void) const
+    {
+        return this->num_bytes_per_cb_;
+    }
+    inline bool fft_in_rru(void) const { return this->fft_in_rru_; }
+
+    //inline size_t mod_order( void )       const { return this->mod_order_; }
+    //inline double calib_tx_gain_b( void ) const { return this->calib_tx_gain_b_; }
+    //inline size_t total_ue_ant_num( void ) const { return this->total_ue_ant_num_; }
+    //inline size_t ue_ant_offset( void )    const { return this->ue_ant_offset_; }
+    //inline bool  correct_phase_shift( void ) const { return this->correct_phase_shift_; }
+    //inline size_t data_bytes_num_persymbol( void ) const { return this->data_bytes_num_persymbol_; }
+    //inline std::string mac_remote_addr( void ) const { return this->mac_remote_addr_; }
+    //inline uint16_t dpdk_num_ports( void ) const { return this->dpdk_num_ports_; }
+    //inline int mac_rx_port( void ) const { return this->mac_rx_port_; }
+    //inline int mac_tx_port( void ) const { return this->mac_tx_port_; }
+    //inline bool init_mac_running( void ) const { return this->init_mac_running_; }
+    //inline size_t transport_block_size( void ) const { return this->transport_block_size_; }
 
     /* Inline accessors (complex types) */
-    inline const LDPCconfig& ldpc_config( void ) const { return this->ldpc_config_; }
-    inline const FrameStats& frame( void )       const { return this->frame_; }
-    inline const std::vector<std::complex<float>>& pilot_cf32 ( void ) const { return this->pilot_cf32_; };
-    inline const std::vector<std::complex<float>>& gold_cf32 ( void ) const { return this->gold_cf32_; };
-    inline const std::vector<uint32_t>& coeffs ( void ) const { return this->coeffs_; };
+    inline const LDPCconfig& ldpc_config(void) const
+    {
+        return this->ldpc_config_;
+    }
+    inline const FrameStats& frame(void) const { return this->frame_; }
+    inline const std::vector<std::complex<float>>& pilot_cf32(void) const
+    {
+        return this->pilot_cf32_;
+    };
+    inline const std::vector<std::complex<float>>& gold_cf32(void) const
+    {
+        return this->gold_cf32_;
+    };
+    inline const std::vector<uint32_t>& coeffs(void) const
+    {
+        return this->coeffs_;
+    };
 
-    inline const std::vector<uint32_t>& pilot ( void )  const { return this->pilot_; };
-    inline const std::vector<uint32_t>& beacon ( void ) const { return this->beacon_; };
+    inline const std::vector<uint32_t>& pilot(void) const
+    {
+        return this->pilot_;
+    };
+    inline const std::vector<uint32_t>& beacon(void) const
+    {
+        return this->beacon_;
+    };
     //inline const complex_float *pilots (void ) const { return this->pilots_; };
-    inline const complex_float *pilots_sgn ( void )                       const { return this->pilots_sgn_; };
-    inline const std::vector<std::complex<float>> & common_pilot ( void ) const { return this->common_pilot_; };
-    inline const std::vector<double>& client_gain_adj_a ( void ) const { return this->client_gain_adj_a_; };
+    inline const complex_float* pilots_sgn(void) const
+    {
+        return this->pilots_sgn_;
+    };
+    inline const std::vector<std::complex<float>>& common_pilot(void) const
+    {
+        return this->common_pilot_;
+    };
+    inline const std::vector<double>& client_gain_adj_a(void) const
+    {
+        return this->client_gain_adj_a_;
+    };
 
-    inline const std::vector<double>& client_gain_adj_b ( void ) const { return this->client_gain_adj_b_; };
-    inline const std::vector<std::string> & radio_ids ( void ) const { return this->radio_ids_; };
-    inline const std::vector<std::string> & hub_ids ( void ) const { return this->hub_ids_; };
+    inline const std::vector<double>& client_gain_adj_b(void) const
+    {
+        return this->client_gain_adj_b_;
+    };
+    inline const std::vector<std::string>& radio_ids(void) const
+    {
+        return this->radio_ids_;
+    };
+    inline const std::vector<std::string>& hub_ids(void) const
+    {
+        return this->hub_ids_;
+    };
 
     /* non-const (can modify) */
-    inline Table<complex_float>& ue_specific_pilot ( void )           { return this->ue_specific_pilot_; };
-    inline Table<std::complex<int16_t>>& ue_specific_pilot_t ( void ) { return this->ue_specific_pilot_t_; };
-    inline std::vector<std::complex<int16_t>>& pilot_ci16 ( void )    { return this->pilot_ci16_; };
-    inline std::vector<std::complex<int16_t>>& beacon_ci16 ( void )   { return this->beacon_ci16_; };
+    inline Table<complex_float>& ue_specific_pilot(void)
+    {
+        return this->ue_specific_pilot_;
+    };
+    inline Table<std::complex<int16_t>>& ue_specific_pilot_t(void)
+    {
+        return this->ue_specific_pilot_t_;
+    };
+    inline std::vector<std::complex<int16_t>>& pilot_ci16(void)
+    {
+        return this->pilot_ci16_;
+    };
+    inline std::vector<std::complex<int16_t>>& beacon_ci16(void)
+    {
+        return this->beacon_ci16_;
+    };
 
-    inline Table<int8_t>& dl_bits( void )                 { return this->dl_bits_; }
-    inline Table<int8_t>& ul_bits( void )                 { return this->ul_bits_; }
-    inline Table<complex_float>& ul_iq_f ( void )         { return this->ul_iq_f_; }
-    inline Table<std::complex<int16_t>>& dl_iq_t ( void ) { return this->dl_iq_t_; }
-    inline Table<complex_float>& mod_table ( void )       { return this->mod_table_; };
-
+    inline Table<int8_t>& dl_bits(void) { return this->dl_bits_; }
+    inline Table<int8_t>& ul_bits(void) { return this->ul_bits_; }
+    inline Table<complex_float>& ul_iq_f(void) { return this->ul_iq_f_; }
+    inline Table<std::complex<int16_t>>& dl_iq_t(void)
+    {
+        return this->dl_iq_t_;
+    }
+    inline Table<complex_float>& mod_table(void) { return this->mod_table_; };
 
     /* Public functions */
     void GenData(void);
-    
+
     /// TODO document and review
     size_t GetSymbolId(size_t symbol_id) const;
 
@@ -212,48 +342,59 @@ public:
     SymbolType GetSymbolType(size_t symbol_id) const;
 
     /* Inline functions */
-    inline size_t GetNumAntennas( void ) const { return (this->num_radios_ * this->num_channels_); }
+    inline size_t GetNumAntennas(void) const
+    {
+        return (this->num_radios_ * this->num_channels_);
+    }
 
-    inline void UpdateModCfgs(size_t new_mod_order_bits) {
+    inline void UpdateModCfgs(size_t new_mod_order_bits)
+    {
         this->mod_order_bits_ = new_mod_order_bits;
         this->mod_order_ = static_cast<size_t>(pow(2, this->mod_order_bits_));
         init_modulation_table(this->mod_table_, this->mod_order_);
-        this->ldpc_config_.num_blocks_in_symbol( 
-            (this->ofdm_data_num_ * this->mod_order_bits_) / this->ldpc_config_.num_cb_codew_len() );
+        this->ldpc_config_.num_blocks_in_symbol(
+            (this->ofdm_data_num_ * this->mod_order_bits_)
+            / this->ldpc_config_.num_cb_codew_len());
     }
 
     /// Return total number of data symbols of all frames in a buffer
     /// that holds data of kFrameWnd frames
-    inline size_t GetTotalDataSymbolIdx(
-        size_t frame_id, size_t symbol_id) const {
-        return ((frame_id % kFrameWnd) * this->frame_.NumDataSyms() + symbol_id);
+    inline size_t GetTotalDataSymbolIdx(size_t frame_id, size_t symbol_id) const
+    {
+        return (
+            (frame_id % kFrameWnd) * this->frame_.NumDataSyms() + symbol_id);
     }
 
     /// Return total number of uplink data symbols of all frames in a buffer
     /// that holds data of kFrameWnd frames
     inline size_t GetTotalDataSymbolIdxUl(
-        size_t frame_id, size_t symbol_idx_ul) const {
-        return ((frame_id % kFrameWnd) * this->frame_.NumULSyms()
-            + symbol_idx_ul);
+        size_t frame_id, size_t symbol_idx_ul) const
+    {
+        return (
+            (frame_id % kFrameWnd) * this->frame_.NumULSyms() + symbol_idx_ul);
     }
 
     /// Return total number of downlink data symbols of all frames in a buffer
     /// that holds data of kFrameWnd frames
     inline size_t GetTotalDataSymbolIdxDl(
-        size_t frame_id, size_t symbol_idx_dl) const {
-        return ((frame_id % kFrameWnd) * this->frame_.NumDLSyms()
-            + symbol_idx_dl);
+        size_t frame_id, size_t symbol_idx_dl) const
+    {
+        return (
+            (frame_id % kFrameWnd) * this->frame_.NumDLSyms() + symbol_idx_dl);
     }
 
     /// Return the frame duration in seconds
-    inline double GetFrameDurationSec( void ) const {
-        return ((this->frame_.NumTotalSyms() * this->samps_per_symbol_) / this->rate_);
+    inline double GetFrameDurationSec(void) const
+    {
+        return ((this->frame_.NumTotalSyms() * this->samps_per_symbol_)
+            / this->rate_);
     }
 
     /// Fetch the data buffer for this frame and symbol ID. The symbol must
     /// be an uplink symbol.
     inline complex_float* GetDataBuf(Table<complex_float>& data_buffers,
-        size_t frame_id, size_t symbol_id) const {
+        size_t frame_id, size_t symbol_id) const
+    {
         size_t frame_slot = frame_id % kFrameWnd;
         size_t symbol_offset = (frame_slot * this->frame_.NumULSyms())
             + GetULSymbolIdx(frame_id, symbol_id);
@@ -262,27 +403,31 @@ public:
 
     /// Return the subcarrier ID to which we should refer to for the zeroforcing
     /// matrices of subcarrier [sc_id].
-    inline size_t GetZfScId(size_t sc_id) const {
+    inline size_t GetZfScId(size_t sc_id) const
+    {
         return this->freq_orthogonal_pilot_ ? sc_id - (sc_id % ue_num_) : sc_id;
     }
 
     /// Get the calibration buffer for this frame and subcarrier ID
     inline complex_float* GetCalibBuffer(
-        Table<complex_float>& calib_buffer, size_t frame_id, size_t sc_id) const {
+        Table<complex_float>& calib_buffer, size_t frame_id, size_t sc_id) const
+    {
         size_t frame_slot = frame_id % kFrameWnd;
         return &calib_buffer[frame_slot][sc_id * bs_ant_num_];
     }
 
     /// Get ul_bits for this symbol, user and code block ID
     inline int8_t* GetInfoBits(Table<int8_t>& info_bits, size_t symbol_id,
-        size_t ue_id, size_t cb_id) const {
+        size_t ue_id, size_t cb_id) const
+    {
         return &info_bits[symbol_id][roundup<64>(this->num_bytes_per_cb_)
             * (ldpc_config_.num_blocks_in_symbol() * ue_id + cb_id)];
     }
 
     /// Get encoded_buffer for this frame, symbol, user and code block ID
-    inline int8_t* GetEncodedBuf(Table<int8_t>& encoded_buffer,
-        size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const {
+    inline int8_t* GetEncodedBuf(Table<int8_t>& encoded_buffer, size_t frame_id,
+        size_t symbol_id, size_t ue_id, size_t cb_id) const
+    {
         size_t total_data_symbol_id
             = GetTotalDataSymbolIdxDl(frame_id, symbol_id);
         size_t num_encoded_bytes_per_cb
@@ -294,7 +439,10 @@ public:
 
     // Returns the number of pilot subcarriers in downlink symbols used for
     // phase tracking
-    inline size_t GetOFDMPilotNum( void ) const { return ofdm_data_num_ / ofdm_pilot_spacing_; }
+    inline size_t GetOFDMPilotNum(void) const
+    {
+        return ofdm_data_num_ / ofdm_pilot_spacing_;
+    }
 
 private:
     /* Class constants */
@@ -304,11 +452,11 @@ private:
     inline static const size_t kDefaultULSymStart = 9;
     inline static const size_t kDefaultDLSymPerFrame = 10;
     inline static const size_t kDefaultDLSymStart = 10;
-    inline static const bool   kDefaultDownlinkMode = false;
+    inline static const bool kDefaultDownlinkMode = false;
 
     /* Private class variables */
     const double freq_ghz_; // RDTSC frequency in GHz
-    bool   is_UE_;
+    bool is_UE_;
 
     size_t bs_ant_num_; // Total number of BS antennas
     size_t bf_ant_num_; // Number of antennas used in beamforming
@@ -342,7 +490,7 @@ private:
     FrameStats frame_;
 
     std::atomic<bool> running_;
-    
+
     size_t dl_packet_length_; // HAS_TIME & END_BURST, fixme
 
     Table<int8_t> dl_bits_;
@@ -384,14 +532,14 @@ private:
     // Controls whether the synchronization and frame time keeping is done
     // in hardware or software
     // true: use hardware correlator; false: use software corrleator
-    bool   hw_framer_;
+    bool hw_framer_;
 
     double freq_;
     double rate_;
     double nco_;
     double radio_rf_freq_;
     double bw_filter_;
-    bool   single_gain_;
+    bool single_gain_;
     double tx_gain_a_;
     double rx_gain_a_;
     double tx_gain_b_;
@@ -406,10 +554,10 @@ private:
     size_t ref_ant_;
     size_t beacon_ant_;
     size_t beacon_len_;
-    bool   beamsweep_;
-    bool   sample_cal_en_;
-    bool   imbalance_cal_en_;
-    bool   external_ref_node_;
+    bool beamsweep_;
+    bool sample_cal_en_;
+    bool imbalance_cal_en_;
+    bool external_ref_node_;
     std::string channel_;
     size_t ant_group_num_;
     size_t ant_per_group_;

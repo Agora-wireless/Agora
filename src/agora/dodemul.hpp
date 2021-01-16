@@ -59,7 +59,7 @@ private:
     Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
-    
+
     DurationStat* duration_stat_;
     PhyStats* phy_stats_;
 

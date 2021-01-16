@@ -30,7 +30,8 @@ DoDemul::DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
             cfg->demul_block_size() * kMaxUEs * sizeof(complex_float)));
 
     // phase offset calibration data
-    cx_float* ue_pilot_ptr = reinterpret_cast<cx_float*>(cfg->ue_specific_pilot()[0]);
+    cx_float* ue_pilot_ptr
+        = reinterpret_cast<cx_float*>(cfg->ue_specific_pilot()[0]);
     cx_fmat mat_pilot_data(
         ue_pilot_ptr, cfg->ofdm_data_num(), cfg->ue_ant_num(), false);
     ue_pilot_data_ = mat_pilot_data.st();
@@ -60,8 +61,7 @@ DoDemul::~DoDemul()
 #if USE_MKL_JIT
     mkl_jit_status_t status = mkl_jit_destroy(jitter_);
     if (MKL_JIT_ERROR == status) {
-        std::fprintf(stderr,
-            "!!!!Error: Error while destorying MKL JIT\n");
+        std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
     }
 #endif
 }
@@ -79,8 +79,8 @@ Event_data DoDemul::launch(size_t tag)
     size_t start_tsc = worker_rdtsc();
 
     if (kDebugPrintInTask == true) {
-        std::printf(
-            "In doDemul tid %d: frame: %zu, symbol idx UL: %zu, subcarrier: %zu, databuffer idx %zu \n",
+        std::printf("In doDemul tid %d: frame: %zu, symbol idx UL: %zu, "
+                    "subcarrier: %zu, databuffer idx %zu \n",
             tid, frame_id, symbol_idx_ul, base_sc_id, total_data_symbol_idx_ul);
     }
 
@@ -102,7 +102,8 @@ Event_data DoDemul::launch(size_t tag)
             * (kTransposeBlockSize * cfg->bs_ant_num());
 
         size_t ant_start = 0;
-        if (kUseSIMDGather and cfg->bs_ant_num() % 4 == 0 and kUsePartialTrans) {
+        if (kUseSIMDGather and cfg->bs_ant_num() % 4 == 0
+            and kUsePartialTrans) {
             __m256i index = _mm256_setr_epi32(0, 1, kTransposeBlockSize * 2,
                 kTransposeBlockSize * 2 + 1, kTransposeBlockSize * 4,
                 kTransposeBlockSize * 4 + 1, kTransposeBlockSize * 6,
@@ -169,11 +170,14 @@ Event_data DoDemul::launch(size_t tag)
 #else
             cx_fmat mat_data(data_ptr, cfg->bs_ant_num(), 1, false);
 
-            cx_fmat mat_ul_zf(ul_zf_ptr, cfg->ue_num(), cfg->bs_ant_num(), false);
+            cx_fmat mat_ul_zf(
+                ul_zf_ptr, cfg->ue_num(), cfg->bs_ant_num(), false);
             mat_equaled = mat_ul_zf * mat_data;
 #endif
 
-            if (symbol_idx_ul < cfg->frame().client_ul_pilot_symbols()) { // Calc new phase shift
+            if (symbol_idx_ul
+                < cfg->frame()
+                      .client_ul_pilot_symbols()) { // Calc new phase shift
                 if (symbol_idx_ul == 0 && cur_sc_id == 0) {
                     // Reset previous frame
                     cx_float* phase_shift_ptr = (cx_float*)
@@ -185,7 +189,8 @@ Event_data DoDemul::launch(size_t tag)
                 cx_float* phase_shift_ptr
                     = (cx_float*)&ue_spec_pilot_buffer_[frame_id
                         % kFrameWnd][symbol_idx_ul * cfg->ue_num()];
-                cx_fmat mat_phase_shift(phase_shift_ptr, cfg->ue_num(), 1, false);
+                cx_fmat mat_phase_shift(
+                    phase_shift_ptr, cfg->ue_num(), 1, false);
                 cx_fmat shift_sc
                     = sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
                 mat_phase_shift += shift_sc;
@@ -193,15 +198,18 @@ Event_data DoDemul::launch(size_t tag)
                 > 0) { // apply previously calc'ed phase shift to data
                 cx_float* pilot_corr_ptr
                     = (cx_float*)ue_spec_pilot_buffer_[frame_id % kFrameWnd];
-                cx_fmat pilot_corr_mat(
-                    pilot_corr_ptr, cfg->ue_num(), cfg->frame().client_ul_pilot_symbols(), false);
+                cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg->ue_num(),
+                    cfg->frame().client_ul_pilot_symbols(), false);
                 fmat theta_mat = arg(pilot_corr_mat);
                 fmat theta_inc = zeros<fmat>(cfg->ue_num(), 1);
-                for (size_t s = 1; s < cfg->frame().client_ul_pilot_symbols(); s++) {
+                for (size_t s = 1; s < cfg->frame().client_ul_pilot_symbols();
+                     s++) {
                     fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
                     theta_inc += theta_diff;
                 }
-                theta_inc /= (float)std::max(1, static_cast<int>(cfg->frame().client_ul_pilot_symbols() - 1));
+                theta_inc /= (float)std::max(1,
+                    static_cast<int>(
+                        cfg->frame().client_ul_pilot_symbols() - 1));
                 fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
                 cx_fmat mat_phase_correct = zeros<cx_fmat>(size(cur_theta));
                 mat_phase_correct.set_real(cos(-cur_theta));
@@ -232,8 +240,9 @@ Event_data DoDemul::launch(size_t tag)
     for (size_t i = 0; i < cfg->ue_num(); i++) {
         float* equal_ptr = nullptr;
         if (kExportConstellation) {
-            equal_ptr = (float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                               [base_sc_id * cfg->ue_num() + i]);
+            equal_ptr
+                = (float*)(&equal_buffer_[total_data_symbol_idx_ul]
+                                         [base_sc_id * cfg->ue_num() + i]);
         } else {
             equal_ptr = (float*)(equaled_buffer_temp_ + i);
         }
