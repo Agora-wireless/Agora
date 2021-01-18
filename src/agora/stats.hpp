@@ -11,7 +11,7 @@ static constexpr size_t kMaxStatBreakdown = 4;
 
 // Accumulated task duration for all tracked frames in each worker thread
 struct DurationStat {
-    size_t task_duration[kMaxStatBreakdown]; // Unit = TSC cycles
+    std::array<size_t, kMaxStatBreakdown> task_duration; // Unit = TSC cycles
     size_t task_count;
     DurationStat(void) { Reset(); }
     void Reset(void) { std::memset(this, 0, sizeof(DurationStat)); }
@@ -19,9 +19,9 @@ struct DurationStat {
 
 // Temporary summary statistics assembled from per-thread runtime stats
 struct FrameSummary {
-    double us_this_thread[kMaxStatBreakdown];
+    std::array<double, kMaxStatBreakdown> us_this_thread;
     size_t count_this_thread = 0;
-    double us_avg_threads[kMaxStatBreakdown];
+    std::array<double, kMaxStatBreakdown> us_avg_threads;
     size_t count_all_threads = 0;
     FrameSummary(void) { std::memset(this, 0, sizeof(FrameSummary)); }
 };
@@ -68,8 +68,8 @@ public:
     /// type
     void MasterSetTsc(TsType timestamp_type, size_t frame_id)
     {
-        this->master_timestamps_[static_cast<size_t>(timestamp_type)]
-                                [frame_id % kNumStatsFrames]
+        this->master_timestamps_.at(static_cast<size_t>(timestamp_type))
+                                .at(frame_id % kNumStatsFrames)
             = rdtsc();
     }
 
@@ -77,8 +77,8 @@ public:
     /// type
     size_t MasterGetTsc(TsType timestamp_type, size_t frame_id) const
     {
-        return this->master_timestamps_[static_cast<size_t>(timestamp_type)]
-                                       [(frame_id % kNumStatsFrames)];
+        return this->master_timestamps_.at(static_cast<size_t>(timestamp_type))
+                                       .at((frame_id % kNumStatsFrames));
     }
 
     /// From the master, get the millisecond elapsed since the timestamp of
@@ -172,14 +172,6 @@ public:
     inline Table<size_t>& frame_start(void) { return this->frame_start_; };
 
 private:
-    /// If worker stats collection is enabled, combine and update per-worker
-    /// stats for all uplink Doer types. Else return immediately.
-    void UpdateStatsInFunctionsUplink(size_t frame_id);
-
-    /// If worker stats collection is enabled, combine and update per-worker
-    /// stats for all downlink Doer types. Else return immediately.
-    void UpdateStatsInFunctionsDownlink(size_t frame_id);
-
     // Fill in running time summary stats for the current frame for this
     // thread and Doer type
     void PopulateSummary(
@@ -187,50 +179,12 @@ private:
 
     static void ComputeAvgOverThreads(
         FrameSummary* frame_summary, size_t thread_num, size_t break_down_num);
-    static void PrintPerThreadPerTask(FrameSummary frame_summary);
+    static void PrintPerThreadPerTask(std::string const &doer_string, FrameSummary const &s);
     static void PrintPerFrame(
-        const char* doer_string, FrameSummary frame_summary);
+        std::string const &doer_string, FrameSummary const &frame_summary);
 
     size_t GetTotalTaskCount(DoerType doer_type, size_t thread_num);
 
-    /* stats for the worker threads */
-    void UpdateStatsInDofftBigstation(size_t frame_id, size_t thread_num,
-        size_t thread_num_offset, FrameSummary* frame_summary_fft,
-        FrameSummary* frame_summary_csi);
-    void UpdateStatsInDozfBigstation(size_t frame_id, size_t thread_num,
-        size_t thread_num_offset, FrameSummary* frame_summary_zf);
-    void UpdateStatsInDodemulBigstation(size_t frame_id, size_t thread_num,
-        size_t thread_num_offset, FrameSummary* frame_summary_demul);
-    void UpdateStatsInDodecodeBigstation(size_t frame_id, size_t thread_num,
-        size_t thread_num_offset, FrameSummary* frame_summary_demul);
-    void UpdateStatsInDoifftBigstation(size_t frame_id, size_t thread_num,
-        size_t thread_num_offset, FrameSummary* frame_summary_ifft,
-        FrameSummary* frame_summary_csi);
-    void UpdateStatsInDoprecodeBigstation(size_t frame_id,
-        size_t thread_num, size_t thread_num_offset,
-        FrameSummary* frame_summary_precode);
-    void UpdateStatsInDoencodeBigstation(size_t frame_id, size_t thread_num,
-        size_t thread_num_offset, FrameSummary* frame_summary_precode);
-
-    void UpdateStatsInFunctionsUplinkBigstation(size_t frame_id,
-        FrameSummary* frame_summary_fft, FrameSummary* frame_summary_csi,
-        FrameSummary* frame_summary_zf, FrameSummary* frame_summary_demul,
-        FrameSummary* frame_summary_decode);
-
-    void UpdateStatsInFunctionsUplinkAgora(size_t frame_id,
-        FrameSummary* frame_summary_fft, FrameSummary* frame_summary_csi,
-        FrameSummary* frame_summary_zf, FrameSummary* frame_summary_demul,
-        FrameSummary* frame_summary_decode);
-
-    void UpdateStatsInFunctionsDownlinkBigstation(size_t frame_id,
-        FrameSummary* frame_summary_ifft, FrameSummary* frame_summary_csi,
-        FrameSummary* frame_summary_zf, FrameSummary* frame_summary_precode,
-        FrameSummary* frame_summary_encode);
-
-    void UpdateStatsInFunctionsDownlinkAgora(size_t frame_id,
-        FrameSummary* frame_summary_ifft, FrameSummary* frame_summary_csi,
-        FrameSummary* frame_summary_zf, FrameSummary* frame_summary_precode,
-        FrameSummary* frame_summary_encode);
 
     Config const* const config_;
 
@@ -245,7 +199,7 @@ private:
 
     /// Timestamps taken by the master thread at different points in a frame's
     /// processing
-    double master_timestamps_[kNumTimestampTypes][kNumStatsFrames];
+    std::array<std::array<double, kNumStatsFrames>, kNumTimestampTypes> master_timestamps_;
 
     /// Running time duration statistics. Each worker thread has one
     /// DurationStat object for every Doer type. The master thread keeps stale
@@ -258,26 +212,9 @@ private:
     std::array<TimeDurationsStats, kMaxThreads> worker_durations_;
     std::array<TimeDurationsStats, kMaxThreads> worker_durations_old_;
 
-    std::array<double, kNumStatsFrames> fft_us_;
-    std::array<double, kNumStatsFrames> csi_us_;
-    std::array<double, kNumStatsFrames> zf_us_;
-    std::array<double, kNumStatsFrames> demul_us_;
-    std::array<double, kNumStatsFrames> ifft_us_;
-    std::array<double, kNumStatsFrames> precode_us_;
-    std::array<double, kNumStatsFrames> decode_us_;
-    std::array<double, kNumStatsFrames> encode_us_;
-    std::array<double, kNumStatsFrames> rc_us_;
 
-    std::array<std::array<double, kNumStatsFrames>, kMaxStatBreakdown>
-        fft_breakdown_us_;
-    std::array<std::array<double, kNumStatsFrames>, kMaxStatBreakdown>
-        csi_breakdown_us_;
-    std::array<std::array<double, kNumStatsFrames>, kMaxStatBreakdown>
-        zf_breakdown_us_;
-    std::array<std::array<double, kNumStatsFrames>, kMaxStatBreakdown>
-        demul_breakdown_us_;
-    std::array<std::array<double, kNumStatsFrames>, kMaxStatBreakdown>
-        decode_breakdown_us_;
+    std::array<std::array<double, kNumStatsFrames>, kNumDoerTypes> doer_us_;
+    std::array<std::array<std::array<double, kNumStatsFrames>, kMaxStatBreakdown>, kNumDoerTypes> doer_breakdown_us_;
 
     size_t last_frame_id_;
 

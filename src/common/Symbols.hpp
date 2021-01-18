@@ -67,7 +67,16 @@ enum class DoerType : size_t {
     kPrecode,
     kRC
 };
-static constexpr size_t kNumDoerTypes = static_cast<size_t>(DoerType::kRC) + 1;
+static constexpr std::array<DoerType, (static_cast<size_t>(DoerType::kRC)+1)> kAllDoerTypes = { DoerType::kFFT, DoerType::kCSI, DoerType::kZF, DoerType::kDemul, DoerType::kDecode, DoerType::kEncode, DoerType::kIFFT, DoerType::kPrecode, DoerType::kRC };
+static constexpr size_t kNumDoerTypes = kAllDoerTypes.size();
+
+static const std::map<DoerType, std::string> kDoerNames
+    = { { DoerType::kFFT, std::string("FFT") }, { DoerType::kCSI, std::string("CSI") },
+        { DoerType::kZF, std::string("ZF") }, { DoerType::kDemul, std::string("Demul") },
+        { DoerType::kDecode, std::string("Decode") }, { DoerType::kEncode, std::string("Encode") },
+        { DoerType::kIFFT, std::string("iFFT") }, { DoerType::kPrecode, std::string("Precode") },
+        { DoerType::kRC, std::string("RC") } };
+
 
 enum class PrintType : int {
     kPacketRXPilots,

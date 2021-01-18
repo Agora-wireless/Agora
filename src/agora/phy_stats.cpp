@@ -56,26 +56,27 @@ void PhyStats::print_phy_stats()
     const size_t task_buffer_symbol_num_ul
         = this->config_->frame().NumULSyms() * kFrameWnd;
 
-    //std::printf("print_phy_stats %zu\n", task_buffer_symbol_num_ul);
-    for (size_t ue_id = 0; ue_id < this->config_->ue_num(); ue_id++) {
-        size_t total_decoded_bits(0);
-        size_t total_bit_errors(0);
-        size_t total_decoded_blocks(0);
-        size_t total_block_errors(0);
+    if ( this->config_->frame().NumULSyms() > 0) {
+        for (size_t ue_id = 0; ue_id < this->config_->ue_num(); ue_id++) {
+            size_t total_decoded_bits(0);
+            size_t total_bit_errors(0);
+            size_t total_decoded_blocks(0);
+            size_t total_block_errors(0);
 
-        for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
-            total_decoded_bits += decoded_bits_count_[ue_id][i];
-            total_bit_errors += bit_error_count_[ue_id][i];
-            total_decoded_blocks += decoded_blocks_count_[ue_id][i];
-            total_block_errors += block_error_count_[ue_id][i];
+            for (size_t i = 0u; i < task_buffer_symbol_num_ul; i++) {
+                total_decoded_bits += decoded_bits_count_[ue_id][i];
+                total_bit_errors += bit_error_count_[ue_id][i];
+                total_decoded_blocks += decoded_blocks_count_[ue_id][i];
+                total_block_errors += block_error_count_[ue_id][i];
+            }
+            std::cout << "UE " << ue_id << ": bit errors (BER) " << total_bit_errors
+                    << "/" << total_decoded_bits << "("
+                    << 1.0 * total_bit_errors / total_decoded_bits
+                    << "), block errors (BLER) " << total_block_errors << "/"
+                    << total_decoded_blocks << " ("
+                    << 1.0 * total_block_errors / total_decoded_blocks << ")"
+                    << std::endl;
         }
-        std::cout << "UE " << ue_id << ": bit errors (BER) " << total_bit_errors
-                  << "/" << total_decoded_bits << "("
-                  << 1.0 * total_bit_errors / total_decoded_bits
-                  << "), block errors (BLER) " << total_block_errors << "/"
-                  << total_decoded_blocks << " ("
-                  << 1.0 * total_block_errors / total_decoded_blocks << ")"
-                  << std::endl;
     }
 }
 
