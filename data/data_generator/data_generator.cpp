@@ -70,8 +70,8 @@ int main(int argc, char* argv[])
     std::vector<std::vector<int8_t>> ul_information(ul_codeblocks);
     std::vector<std::vector<int8_t>> ul_encoded_codewords(ul_codeblocks);
     for (size_t i = 0; i < ul_codeblocks; i++) {
-        data_generator.gen_codeblock(
-            ul_information.at(i), ul_encoded_codewords.at(i), (i % cfg->UE_NUM) /* UE ID */);
+        data_generator.gen_codeblock(ul_information.at(i),
+            ul_encoded_codewords.at(i), (i % cfg->UE_NUM) /* UE ID */);
     }
 
     {
@@ -82,8 +82,8 @@ int main(int argc, char* argv[])
         const std::string filename_input = cur_directory
             + "/data/LDPC_orig_data_" + std::to_string(cfg->OFDM_CA_NUM)
             + "_ant" + std::to_string(cfg->UE_ANT_NUM) + ".bin";
-        std::printf(
-            "Saving raw uplink data (using LDPC) to %s\n", filename_input.c_str());
+        std::printf("Saving raw uplink data (using LDPC) to %s\n",
+            filename_input.c_str());
         FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
         for (size_t i = 0; i < ul_codeblocks; i++) {
             std::fwrite(reinterpret_cast<uint8_t*>(&ul_information.at(i).at(0)),
@@ -105,7 +105,8 @@ int main(int argc, char* argv[])
     }
 
     // Modulate the encoded codewords
-    std::vector<std::vector<complex_float>> ul_modulated_codewords(ul_codeblocks);
+    std::vector<std::vector<complex_float>> ul_modulated_codewords(
+        ul_codeblocks);
     for (size_t i = 0; i < ul_codeblocks; i++) {
         ul_modulated_codewords.at(i)
             = data_generator.get_modulation(ul_encoded_codewords[i]);
@@ -172,11 +173,13 @@ int main(int argc, char* argv[])
         const size_t data_sym_id = cfg->ULSymbols.at(0).at(i);
         for (size_t j = 0; j < cfg->UE_ANT_NUM; j++) {
             if (i < cfg->UL_PILOT_SYMS) {
-                std::memcpy(tx_data_all_symbols[data_sym_id] + (j * cfg->OFDM_CA_NUM) + cfg->OFDM_DATA_START,
+                std::memcpy(tx_data_all_symbols[data_sym_id]
+                        + (j * cfg->OFDM_CA_NUM) + cfg->OFDM_DATA_START,
                     ue_specific_pilot[j],
                     cfg->OFDM_DATA_NUM * sizeof(complex_float));
             } else {
-                std::memcpy(tx_data_all_symbols[data_sym_id] + (j * cfg->OFDM_CA_NUM),
+                std::memcpy(
+                    tx_data_all_symbols[data_sym_id] + (j * cfg->OFDM_CA_NUM),
                     &pre_ifft_data_syms.at(i * cfg->UE_ANT_NUM + j).at(0),
                     cfg->OFDM_CA_NUM * sizeof(complex_float));
             }
@@ -260,12 +263,13 @@ int main(int argc, char* argv[])
     std::vector<std::vector<int8_t>> dl_information(dl_codeblocks);
     std::vector<std::vector<int8_t>> dl_encoded_codewords(dl_codeblocks);
     for (size_t i = 0; i < dl_codeblocks; i++) {
-        data_generator.gen_codeblock(
-            dl_information.at(i), dl_encoded_codewords.at(i), (i % cfg->UE_NUM) /* UE ID */);
+        data_generator.gen_codeblock(dl_information.at(i),
+            dl_encoded_codewords.at(i), (i % cfg->UE_NUM) /* UE ID */);
     }
 
     // Modulate the encoded codewords
-    std::vector<std::vector<complex_float>> dl_modulated_codewords(dl_codeblocks);
+    std::vector<std::vector<complex_float>> dl_modulated_codewords(
+        dl_codeblocks);
     for (size_t i = 0; i < dl_codeblocks; i++) {
         dl_modulated_codewords.at(i)
             = data_generator.get_modulation(dl_encoded_codewords[i]);
@@ -342,7 +346,8 @@ int main(int argc, char* argv[])
                         + cfg->OFDM_DATA_START]
                         = (sc_id % cfg->OFDM_PILOT_SPACING == 0)
                         ? ue_specific_pilot[j][sc_id]
-                        : dl_modulated_codewords.at(i * cfg->UE_ANT_NUM + j).at(sc_id);
+                        : dl_modulated_codewords.at(i * cfg->UE_ANT_NUM + j)
+                              .at(sc_id);
             } else {
                 for (size_t sc_id = 0; sc_id < cfg->OFDM_DATA_NUM; sc_id++)
                     dl_mod_data[i][j * cfg->OFDM_CA_NUM + sc_id
@@ -431,8 +436,8 @@ int main(int argc, char* argv[])
     FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe; i++) {
         short* ptr = (short*)dl_tx_data[i];
-        std::fwrite(ptr, cfg->sampsPerSymbol * cfg->BS_ANT_NUM * 2, sizeof(short),
-            fp_dl_tx);
+        std::fwrite(ptr, cfg->sampsPerSymbol * cfg->BS_ANT_NUM * 2,
+            sizeof(short), fp_dl_tx);
     }
     std::fclose(fp_dl_tx);
 

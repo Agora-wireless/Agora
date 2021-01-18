@@ -171,7 +171,8 @@ Config::Config(std::string jsonfile)
             frames.push_back(jframes.at(f).get<std::string>());
         }
     }
-    std::printf("Config: Frame schedule %s (%zu symbols)\n", frames.at(0).c_str(), frames.at(0).size());
+    std::printf("Config: Frame schedule %s (%zu symbols)\n",
+        frames.at(0).c_str(), frames.at(0).size());
 
     beaconSymbols = Utils::loadSymbols(frames, 'B');
     pilotSymbols = Utils::loadSymbols(frames, 'P');
@@ -449,7 +450,8 @@ void Config::genData()
             size_t r = std::fread(ul_bits[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue) {
-                std::printf("uplink bad read from file %s (batch %zu : %zu) %zu : %zu\n",
+                std::printf("uplink bad read from file %s (batch %zu : %zu) "
+                            "%zu : %zu\n",
                     filename1.c_str(), i, j, r, num_bytes_per_ue);
             }
         }
@@ -467,7 +469,8 @@ void Config::genData()
             size_t r = std::fread(dl_bits[i] + j * num_bytes_per_ue_pad,
                 sizeof(int8_t), num_bytes_per_ue, fd);
             if (r < num_bytes_per_ue)
-                std::printf("downlink bad read from file %s (batch %zu : %zu) \n",
+                std::printf(
+                    "downlink bad read from file %s (batch %zu : %zu) \n",
                     filename1.c_str(), i, j);
         }
     }
