@@ -91,8 +91,8 @@ int main(int argc, char* argv[])
         std::vector<std::vector<int8_t>> information(num_codeblocks);
         std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
         for (size_t i = 0; i < num_codeblocks; i++) {
-            data_generator.gen_codeblock(information[i],
-                encoded_codewords[i], i % cfg->UE_NUM /* UE ID */);
+            data_generator.gen_codeblock(information[i], encoded_codewords[i],
+                i % cfg->UE_NUM /* UE ID */);
         }
 
         // Save uplink information bytes to file

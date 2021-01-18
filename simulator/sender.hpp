@@ -91,8 +91,8 @@ private:
 
     void write_stats_to_file(size_t tx_frame_count) const;
 
-    size_t FindNextSymbol( size_t frame, size_t start_symbol );
-    void ScheduleSymbol( size_t frame, size_t symbol_id );
+    size_t FindNextSymbol(size_t frame, size_t start_symbol);
+    void ScheduleSymbol(size_t frame, size_t symbol_id);
 
     // Run FFT on the data field in pkt, output to fft_inout
     // Recombine pkt header data and fft output data into payload
@@ -118,7 +118,6 @@ private:
     // of transmission of two symbols for the first several frames
     const uint64_t ticks_wnd_1;
     const uint64_t ticks_wnd_2;
-
 
     moodycamel::ConcurrentQueue<size_t> send_queue_
         = moodycamel::ConcurrentQueue<size_t>(1024);
