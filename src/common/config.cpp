@@ -443,7 +443,7 @@ void Config::genData()
         std::exit(-1);
     }
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-        if (std::fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_SET) != 0) {
+        if (std::fseek(fd, num_bytes_per_ue * ue_ant_offset, SEEK_CUR) != 0) {
             return;
         }
         for (size_t j = 0; j < UE_ANT_NUM; j++) {
@@ -458,7 +458,7 @@ void Config::genData()
         if (std::fseek(fd,
                 num_bytes_per_ue
                     * (total_ue_ant_num - ue_ant_offset - UE_ANT_NUM),
-                SEEK_SET)
+                SEEK_CUR)
             != 0) {
             return;
         }
