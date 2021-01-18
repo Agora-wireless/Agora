@@ -292,7 +292,9 @@ void* PacketTXRX::demod_thread(int tid)
                 int8_t* demod_ptr
                     = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
                         pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
-                DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
+                // DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
+                //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                memcpy(demod_ptr, pkt->data,
                     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                 decode_status_->receive_demod_data(
                     pkt->ue_id, pkt->frame_id, symbol_idx_ul);
