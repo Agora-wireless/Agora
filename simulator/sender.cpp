@@ -192,7 +192,7 @@ void* Sender::master_thread(int)
         packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]++;
 
         // std::printf("Sender -- checking symbol %d : %zu : %zu\n", ctag.symbol_id, 
-		    // comp_frame_slot, packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]);
+        // comp_frame_slot, packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]);
         // Check to see if the current symbol is finished
         if (packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]
             == cfg->BS_ANT_NUM) {
@@ -203,14 +203,14 @@ void* Sender::master_thread(int)
                 = FindNextSymbol(ctag.frame_id, (ctag.symbol_id + 1));
             unsigned symbol_delay = next_symbol_id - ctag.symbol_id;
             // std::printf("Sender -- finishing symbol %d : %zu : %zu delayed %d\n", 
-			      // ctag.symbol_id, cfg->symbol_num_perframe, next_symbol_id, symbol_delay);
+            // ctag.symbol_id, cfg->symbol_num_perframe, next_symbol_id, symbol_delay);
             // Add inter-symbol delay
             delay_ticks(
                 tick_start, get_ticks_for_frame(ctag.frame_id) * symbol_delay);
             tick_start = rdtsc();
 
             size_t next_frame_id = ctag.frame_id;
-            //Check to see if the current frame is finished
+            // Check to see if the current frame is finished
             assert(next_symbol_id <= cfg->symbol_num_perframe);
             if (next_symbol_id == cfg->symbol_num_perframe) {
                 if ((kDebugSenderReceiver == true)
@@ -221,7 +221,7 @@ void* Sender::master_thread(int)
                 }
                 next_frame_id++;
                 if (next_frame_id == cfg->frames_to_test) {
-                    break; /* Finished */
+                    break; // Finished
                 }
                 frame_end[(ctag.frame_id % kNumStatsFrames)] = get_time();
                 frame_start[(next_frame_id % kNumStatsFrames)] = get_time();
@@ -233,7 +233,7 @@ void* Sender::master_thread(int)
                     get_ticks_for_frame(ctag.frame_id) * next_symbol_id);
                 tick_start = rdtsc();
                 // std::printf("Sender -- finished frame %d, next frame %zu, start 
-				        // symbol %zu, delaying\n", ctag.frame_id, next_frame_id, next_symbol_id,);
+                // symbol %zu, delaying\n", ctag.frame_id, next_frame_id, next_symbol_id,);
             }
             ScheduleSymbol(next_frame_id, next_symbol_id);
         }
@@ -321,8 +321,8 @@ void* Sender::worker_thread(int tid)
 #endif
 
             // Update the TX buffer
-            //std::printf("Sender : worker processing symbol %d, %d\n", 
-			//tag.symbol_id, (int)symbol_type);
+            // std::printf("Sender : worker processing symbol %d, %d\n", 
+            // tag.symbol_id, (int)symbol_type);
             pkt->frame_id = tag.frame_id;
             pkt->symbol_id = tag.symbol_id;
             pkt->cell_id = tag.ant_id / ant_num_per_cell;
