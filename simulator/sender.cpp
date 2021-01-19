@@ -171,7 +171,7 @@ void* Sender::master_thread(int)
     uint64_t tick_start = rdtsc();
 
     size_t start_symbol = FindNextSymbol(0, 0);
-    //Delay until the start of the first symbol (pilot)
+    // Delay until the start of the first symbol (pilot)
     if (start_symbol > 0) {
         std::printf("Sender: Starting symbol %zu delaying\n", start_symbol);
         delay_ticks(tick_start, get_ticks_for_frame(0) * start_symbol);
@@ -191,9 +191,9 @@ void* Sender::master_thread(int)
         const size_t comp_frame_slot = (ctag.frame_id % kFrameWnd);
         packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]++;
 
-        //std::printf("Sender -- checking symbol %d : %zu : %zu\n", ctag.symbol_id, 
-		//comp_frame_slot, packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]);
-        //Check to see if the current symbol is finished
+        // std::printf("Sender -- checking symbol %d : %zu : %zu\n", ctag.symbol_id, 
+		    // comp_frame_slot, packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]);
+        // Check to see if the current symbol is finished
         if (packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]
             == cfg->BS_ANT_NUM) {
             //Finished with the current symbol
@@ -202,8 +202,8 @@ void* Sender::master_thread(int)
             size_t next_symbol_id
                 = FindNextSymbol(ctag.frame_id, (ctag.symbol_id + 1));
             unsigned symbol_delay = next_symbol_id - ctag.symbol_id;
-            //std::printf("Sender -- finishing symbol %d : %zu : %zu delayed %d\n", 
-			//ctag.symbol_id, cfg->symbol_num_perframe, next_symbol_id, symbol_delay);
+            // std::printf("Sender -- finishing symbol %d : %zu : %zu delayed %d\n", 
+			      // ctag.symbol_id, cfg->symbol_num_perframe, next_symbol_id, symbol_delay);
             // Add inter-symbol delay
             delay_ticks(
                 tick_start, get_ticks_for_frame(ctag.frame_id) * symbol_delay);
@@ -227,13 +227,13 @@ void* Sender::master_thread(int)
                 frame_start[(next_frame_id % kNumStatsFrames)] = get_time();
                 tick_start = rdtsc();
 
-                /* Find start symbol of next frame and add proper delay */
+                // Find start symbol of next frame and add proper delay
                 next_symbol_id = FindNextSymbol(next_frame_id, 0);
                 delay_ticks(tick_start,
                     get_ticks_for_frame(ctag.frame_id) * next_symbol_id);
                 tick_start = rdtsc();
-                //std::printf("Sender -- finished frame %d, next frame %zu, start 
-				//symbol %zu, delaying\n", ctag.frame_id, next_frame_id, next_symbol_id,);
+                // std::printf("Sender -- finished frame %d, next frame %zu, start 
+				        // symbol %zu, delaying\n", ctag.frame_id, next_frame_id, next_symbol_id,);
             }
             ScheduleSymbol(next_frame_id, next_symbol_id);
         }
@@ -243,7 +243,6 @@ void* Sender::master_thread(int)
     return nullptr;
 }
 
-/* Worker expects only valid transmit symbol_ids 'U' 'P' */
 void* Sender::worker_thread(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + 1, tid);
@@ -304,6 +303,7 @@ void* Sender::worker_thread(int tid)
             size_t start_tsc_send = rdtsc();
 
             auto tag = gen_tag_t(tags[tag_id]);
+            // Worker expects only valid transmit symbol_ids 'U' 'P'
             assert((cfg->get_symbol_type(tag.frame_id, tag.symbol_id)
                        == SymbolType::kPilot)
                 || (cfg->get_symbol_type(tag.frame_id, tag.symbol_id)
