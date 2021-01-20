@@ -63,14 +63,14 @@ int main(int argc, char* argv[]) {
 
   // Step 1: Generate the information buffers and LDPC-encoded buffers for
   // uplink
-  const size_t ul_codeblocks = cfg->Frame().NumULSyms() *
-                               cfg->LdpcConfig().NumBlocksInSymbol() *
-                               cfg->UeAntNum();
-  std::printf("Total number of ul blocks: %zu\n", ul_codeblocks);
+  const size_t num_ul_codeblocks = cfg->Frame().NumULSyms() *
+                                   cfg->LdpcConfig().NumBlocksInSymbol() *
+                                   cfg->UeAntNum();
+  std::printf("Total number of ul blocks: %zu\n", num_ul_codeblocks);
 
-  std::vector<std::vector<int8_t>> ul_information(ul_codeblocks);
-  std::vector<std::vector<int8_t>> ul_encoded_codewords(ul_codeblocks);
-  for (size_t i = 0; i < ul_codeblocks; i++) {
+  std::vector<std::vector<int8_t>> ul_information(num_ul_codeblocks);
+  std::vector<std::vector<int8_t>> ul_encoded_codewords(num_ul_codeblocks);
+  for (size_t i = 0; i < num_ul_codeblocks; i++) {
     data_generator.GenCodeblock(ul_information.at(i),
                                 ul_encoded_codewords.at(i),
                                 (i % cfg->UeNum()) /* UE ID */);
@@ -98,7 +98,7 @@ int main(int argc, char* argv[]) {
 
     if (kPrintUplinkInformationBytes) {
       std::printf("Uplink information bytes\n");
-      for (size_t n = 0; n < ul_codeblocks; n++) {
+      for (size_t n = 0; n < num_ul_codeblocks; n++) {
         std::printf("Symbol %zu, UE %zu\n", n / cfg->UeAntNum(),
                     n % cfg->UeAntNum());
         for (size_t i = 0; i < input_bytes_per_cb; i++) {
@@ -111,7 +111,7 @@ int main(int argc, char* argv[]) {
 
   // Modulate the encoded codewords
   std::vector<std::vector<complex_float>> ul_modulated_codewords(ul_codeblocks);
-  for (size_t i = 0; i < ul_codeblocks; i++) {
+  for (size_t i = 0; i < num_ul_codeblocks; i++) {
     ul_modulated_codewords.at(i) =
         data_generator.GetModulation(ul_encoded_codewords.at(i));
   }
@@ -259,14 +259,14 @@ int main(int argc, char* argv[]) {
   /* ------------------------------------------------
    * Generate data for downlink test
    * ------------------------------------------------ */
-  const size_t dl_codeblocks = cfg->Frame().NumDLSyms() *
-                               cfg->LdpcConfig().NumBlocksInSymbol() *
-                               cfg->UeAntNum();
-  std::printf("Total number of dl blocks: %zu\n", dl_codeblocks);
+  const size_t num_dl_codeblocks = cfg->Frame().NumDLSyms() *
+                                   cfg->LdpcConfig().NumBlocksInSymbol() *
+                                   cfg->UeAntNum();
+  std::printf("Total number of dl blocks: %zu\n", num_dl_codeblocks);
 
-  std::vector<std::vector<int8_t>> dl_information(dl_codeblocks);
-  std::vector<std::vector<int8_t>> dl_encoded_codewords(dl_codeblocks);
-  for (size_t i = 0; i < dl_codeblocks; i++) {
+  std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
+  std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
+  for (size_t i = 0; i < num_dl_codeblocks; i++) {
     data_generator.GenCodeblock(dl_information.at(i),
                                 dl_encoded_codewords.at(i),
                                 (i % cfg->UeNum()) /* UE ID */);
@@ -274,9 +274,9 @@ int main(int argc, char* argv[]) {
 
   // Modulate the encoded codewords
   std::vector<std::vector<complex_float>> dl_modulated_codewords(dl_codeblocks);
-  for (size_t i = 0; i < dl_codeblocks; i++) {
+  for (size_t i = 0; i < num_dl_codeblocks; i++) {
     dl_modulated_codewords.at(i) =
-        data_generator.GetModulation(dl_encoded_codewords[i]);
+        data_generator.GetModulation(dl_encoded_codewords.at(i));
   }
 
   {
@@ -291,7 +291,7 @@ int main(int argc, char* argv[]) {
     std::printf("Saving raw dl data (using LDPC) to %s\n",
                 filename_input.c_str());
     FILE* fp_input = std::fopen(filename_input.c_str(), "ab");
-    for (size_t i = 0; i < dl_codeblocks; i++) {
+    for (size_t i = 0; i < num_dl_codeblocks; i++) {
       std::fwrite(reinterpret_cast<uint8_t*>(&dl_information.at(i).at(0)),
                   input_bytes_per_cb, sizeof(uint8_t), fp_input);
     }
@@ -349,7 +349,8 @@ int main(int argc, char* argv[]) {
           dl_mod_data[i][j * cfg->OfdmCaNum() + sc_id + cfg->OfdmDataStart()] =
               (sc_id % cfg->OfdmPilotSpacing() == 0)
                   ? ue_specific_pilot[j][sc_id]
-                  : dl_modulated_codewords[i * cfg->UeAntNum() + j][sc_id];
+                  : dl_modulated_codewords.at(i * cfg->UeAntNum() + j)
+                        .at(sc_id);
       } else {
         for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum(); sc_id++)
           dl_mod_data[i][j * cfg->OfdmCaNum() + sc_id + cfg->OfdmDataStart()] =
