@@ -30,7 +30,7 @@ static constexpr size_t kFrameWnd = 40;
 
 /// Return true at compile time iff a constant is a power of two
 template <typename T>
-static constexpr inline bool is_power_of_two(T x) {
+static constexpr inline bool IsPowerOfTwo(T x) {
   return x && ((x & T(x - 1)) == 0);
 }
 
@@ -176,7 +176,7 @@ enum class ThreadType {
   kMasterTX,
 };
 
-static inline std::string thread_type_str(ThreadType thread_type) {
+static inline std::string ThreadTypeStr(ThreadType thread_type) {
   switch (thread_type) {
     case ThreadType::kMaster:
       return "Master";
@@ -259,7 +259,7 @@ static constexpr size_t kSCsPerCacheline = 64 / (2 * sizeof(float));
 
 // Number of subcarriers in a partial transpose block
 static constexpr size_t kTransposeBlockSize = 8;
-static_assert(is_power_of_two(kTransposeBlockSize), "");  // For cheap modulo
+static_assert(IsPowerOfTwo(kTransposeBlockSize), "");  // For cheap modulo
 static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
 
 static constexpr size_t kCalibScGroupSize = 8;

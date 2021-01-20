@@ -49,12 +49,12 @@ class DoPrecode : public Doer {
    *     4. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  EventData launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
   // Load input data for a single UE and a single subcarrier
-  void load_input_data(size_t symbol_idx_dl, size_t total_data_symbol_idx,
-                       size_t user_id, size_t sc_id, size_t sc_id_in_block);
-  void precoding_per_sc(size_t frame_slot, size_t sc_id, size_t sc_id_in_block);
+  void LoadInputData(size_t symbol_idx_dl, size_t total_data_symbol_idx,
+                     size_t user_id, size_t sc_id, size_t sc_id_in_block);
+  void PrecodingPerSc(size_t frame_slot, size_t sc_id, size_t sc_id_in_block);
 
  private:
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;

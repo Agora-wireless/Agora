@@ -27,12 +27,12 @@ class Channel {
   ~Channel();
 
   // Dimensions of fmat_src: ( bscfg->sampsPerSymbol, uecfg->UE_ANT_NUM )
-  void apply_chan(const cx_fmat& fmat_src, cx_fmat& mat_dst,
+  void ApplyChan(const cx_fmat& fmat_src, cx_fmat& mat_dst,
                   const bool is_downlink, const bool is_newChan);
 
   // Additive White Gaussian Noise. Dimensions of src: ( bscfg->sampsPerSymbol,
   // uecfg->UE_ANT_NUM )
-  void awgn(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
+  void Awgn(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
 
   /*
    * From "Study on 3D-channel model for Elevation Beamforming
@@ -45,7 +45,7 @@ class Channel {
    * are above surrounding buildings.
    *
    */
-  void lte_3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
+  void Lte3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
 
  private:
   Config* bscfg_;

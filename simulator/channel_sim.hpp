@@ -42,24 +42,24 @@ class ChannelSim {
              double in_chan_snr = 20);
   ~ChannelSim();
 
-  void start();
+  void Start();
 
   // Loop thread receiving symbols from client antennas
-  void* ue_rx_loop(int tid);
+  void* UeRxLoop(int tid);
 
   // Loop thread receiving symbols from BS antennas
-  void* bs_rx_loop(int tid);
+  void* BsRxLoop(int tid);
 
   // Transmits symbol to BS antennas after applying channel
-  void do_tx_bs(int tid, size_t tag);
+  void DoTxBs(int tid, size_t tag);
 
   // Transmit symbols to client antennas after applying channel
-  void do_tx_user(int tid, size_t tag);
+  void DoTxUser(int tid, size_t tag);
 
-  void schedule_task(EventData do_task,
+  void ScheduleTask(EventData do_task,
                      moodycamel::ConcurrentQueue<EventData>* in_queue,
                      moodycamel::ProducerToken const& ptok);
-  void* taskThread(int tid);
+  void* TaskThread(int tid);
 
  private:
   std::vector<struct sockaddr_in> servaddr_bs_;  // BS-facing server addresses
@@ -114,7 +114,7 @@ class ChannelSim {
   size_t bs_tx_counter_[kFrameWnd];
   size_t user_tx_counter_[kFrameWnd];
 
-  inline size_t get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const {
+  inline size_t GetDlSymbolIdx(size_t frame_id, size_t symbol_id) const {
     if (symbol_id == 0) {
       return 0;
     } else {

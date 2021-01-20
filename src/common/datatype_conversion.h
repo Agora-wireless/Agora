@@ -19,7 +19,7 @@
 // n_elems must be a multiple of 16
 // reference:
 // https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
-static inline void simd_convert_short_to_float(const short* in_buf,
+static inline void SimdConvertShortToFloat(const short* in_buf,
                                                float* out_buf, size_t n_elems) {
 #ifdef __AVX512F__
   const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
@@ -68,7 +68,7 @@ static inline void simd_convert_short_to_float(const short* in_buf,
 // in_buf and out_buf must be 64-byte aligned
 // n_elems must be a multiple of 8 for AVX2 and 16 for AVX512
 // scale_down_factor is used for scaling down values in the input array
-static inline void simd_convert_float_to_short(const float* in_buf,
+static inline void SimdConvertFloatToShort(const float* in_buf,
                                                short* out_buf, size_t n_elems,
                                                size_t cp_len,
                                                size_t scale_down_factor) {
@@ -117,7 +117,7 @@ static inline void simd_convert_float_to_short(const float* in_buf,
 // Input array must have [n_elems] elements.
 // Output array must have [n_elems / 2 * 3] elements.
 // n_elems must be multiples of 2
-static inline void convert_float_to_12bit_iq(const float* in_buf,
+static inline void ConvertFloatTo12bitIq(const float* in_buf,
                                              uint8_t* out_buf, size_t n_elems) {
   size_t index_short = 0;
   for (size_t i = 0; i < n_elems; i = i + 2) {
@@ -155,7 +155,7 @@ static inline void simd_convert_16bit_iq_to_float(__m256i val, float* out_buf,
 }
 #endif
 
-static inline void convert_12bit_iq_to_16bit_iq(uint8_t* in_buf,
+static inline void Convert12bitIqTo16bitIq(uint8_t* in_buf,
                                                 uint16_t* out_buf,
                                                 size_t n_elems) {
   for (size_t i = 0; i < n_elems; i += 16) {
@@ -213,7 +213,7 @@ static inline void convert_12bit_iq_to_16bit_iq(uint8_t* in_buf,
 // Input array must have [n_elems] elements.
 // Output array must have [n_elems / 3 * 2] elements.
 // n_elems must be multiples of 3
-static inline void simd_convert_12bit_iq_to_float(uint8_t* in_buf,
+static inline void SimdConvert12bitIqToFloat(uint8_t* in_buf,
                                                   float* out_buf,
                                                   uint16_t* in_16bits_buf,
                                                   size_t n_elems) {
@@ -298,7 +298,7 @@ static inline void simd_convert_12bit_iq_to_float(uint8_t* in_buf,
 // must have [n_elems] elements
 // in_buf and out_buf must be 64-byte aligned
 // n_elems must be a multiple of 16
-static inline void simd_convert_float16_to_float32(float* out_buf,
+static inline void SimdConvertFloat16ToFloat32(float* out_buf,
                                                    const float* in_buf,
                                                    size_t n_elems) {
 #ifdef __AVX512F__
@@ -320,7 +320,7 @@ static inline void simd_convert_float16_to_float32(float* out_buf,
 // must have [n_elems] elements
 // in_buf and out_buf must be 64-byte aligned
 // n_elems must be a multiple of 16
-static inline void simd_convert_float32_to_float16(float* out_buf,
+static inline void SimdConvertFloat32ToFloat16(float* out_buf,
                                                    const float* in_buf,
                                                    size_t n_elems) {
 #ifdef __AVX512F__

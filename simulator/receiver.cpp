@@ -13,7 +13,7 @@ Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
 
 Receiver::~Receiver() { delete cfg_; }
 
-std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
+std::vector<pthread_t> Receiver::StartRecv(Table<char>& in_buffer,
                                            Table<int>& in_buffer_status,
                                            size_t in_buffer_frame_num,
                                            size_t in_buffer_length,
@@ -33,7 +33,7 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
     context->obj_ptr_ = this;
     context->id_ = i;
     if (pthread_create(&recv_thread, NULL,
-                       pthread_fun_wrapper<Receiver, &Receiver::loopRecv>,
+                       PthreadFunWrapper<Receiver, &Receiver::LoopRecv>,
                        context) != 0) {
       std::perror("Socket recv thread create failed");
       std::exit(0);
@@ -43,16 +43,16 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
   return created_threads;
 }
 
-void* Receiver::loopRecv(int tid) {
+void* Receiver::LoopRecv(int tid) {
   size_t core_offset = core_id_ + rx_thread_num_ + 2;
-  pin_to_core_with_offset(ThreadType::kWorkerRX, core_offset, tid);
+  PinToCoreWithOffset(ThreadType::kWorkerRX, core_offset, tid);
 
   int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
   struct sockaddr_in remote_addr;
   int socket_local =
-      setup_socket_ipv4(cfg_->bs_rru_port() + tid, true, sock_buf_size);
-  setup_sockaddr_remote_ipv4(&remote_addr, cfg_->bs_server_port() + tid,
-                             cfg_->bs_server_addr().c_str());
+      SetupSocketIpv4(cfg_->BsRruPort() + tid, true, sock_buf_size);
+  SetupSockaddrRemoteIpv4(&remote_addr, cfg_->BsServerPort() + tid,
+                             cfg_->BsServerAddr().c_str());
 
   /* use token to speed up */
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
@@ -85,9 +85,9 @@ void* Receiver::loopRecv(int tid) {
     int recvlen = -1;
     // if ((recvlen = recv(socket_local, (char*)cur_buffer_ptr,
     // packet_length, 0))<0) {
-    if ((recvlen =
-             recvfrom(socket_local, (char*)cur_buffer_ptr, cfg_->packet_length(),
-                      0, (struct sockaddr*)&remote_addr, &addrlen)) < 0) {
+    if ((recvlen = recvfrom(socket_local, (char*)cur_buffer_ptr,
+                            cfg_->PacketLength(), 0,
+                            (struct sockaddr*)&remote_addr, &addrlen)) < 0) {
       std::perror("recv failed");
       std::exit(0);
     }
@@ -103,7 +103,7 @@ void* Receiver::loopRecv(int tid) {
 
     if (kIsWorkerTimingEnabled) {
       if (frame_id > prev_frame_id) {
-        frame_start[frame_id] = get_time();
+        frame_start[frame_id] = GetTime();
         prev_frame_id = frame_id;
       }
     }
@@ -113,7 +113,7 @@ void* Receiver::loopRecv(int tid) {
     cur_buffer_status_ptr = buffer_status_ptr + (offset + 1) % buffer_frame_num;
     cur_buffer_ptr =
         buffer_ptr +
-        (cur_buffer_ptr - buffer_ptr + cfg_->packet_length()) % buffer_length;
+        (cur_buffer_ptr - buffer_ptr + cfg_->PacketLength()) % buffer_length;
 
     /* Push packet received event into the queue */
     EventData packet_message(EventType::kPacketRX, rx_tag_t(tid, offset).tag_);

@@ -37,11 +37,11 @@ DEFINE_string(conf_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
               "Agora config filename");
 
-float rand_float(float min, float max) {
+float RandFloat(float min, float max) {
   return ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
 }
 
-float rand_float_from_short(float min, float max) {
+float RandFloatFromShort(float min, float max) {
   float rand_val = ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
   short rand_val_ushort = (short)(rand_val * 32768);
   rand_val = (float)rand_val_ushort / 32768;
@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
               profile == DataGenerator::Profile::k123 ? "123" : "random");
 
   std::printf("DataGenerator: Using %s-orthogonal pilots\n",
-              cfg->freq_orthogonal_pilot() ? "frequency" : "time");
+              cfg->FreqOrthogonalPilot() ? "frequency" : "time");
 
   std::printf("DataGenerator: Generating encoded and modulated data\n");
   srand(time(nullptr));
@@ -75,34 +75,34 @@ int main(int argc, char* argv[]) {
   // Step 1: Generate the information buffers and LDPC-encoded buffers for
   // uplink
   size_t num_symbols_per_cb = 1;
-  size_t bits_per_symbol = cfg->ofdm_data_num() * cfg->mod_order_bits();
-  if (cfg->ldpc_config().num_cb_codew_len() > bits_per_symbol)
+  size_t bits_per_symbol = cfg->OfdmDataNum() * cfg->ModOrderBits();
+  if (cfg->LdpcConfig().NumCbCodewLen() > bits_per_symbol)
     num_symbols_per_cb =
-        (cfg->ldpc_config().num_cb_codew_len() + bits_per_symbol - 1) /
+        (cfg->LdpcConfig().NumCbCodewLen() + bits_per_symbol - 1) /
         bits_per_symbol;
-  size_t num_cbs_per_ue = cfg->frame().NumDataSyms() / num_symbols_per_cb;
+  size_t num_cbs_per_ue = cfg->Frame().NumDataSyms() / num_symbols_per_cb;
   std::printf("Number of symbols per block: %zu, blocks per frame: %zu\n",
               num_symbols_per_cb, num_cbs_per_ue);
 
-  const size_t num_codeblocks = num_cbs_per_ue * cfg->ue_ant_num();
+  const size_t num_codeblocks = num_cbs_per_ue * cfg->UeAntNum();
   std::printf("Total number of blocks: %zu\n", num_codeblocks);
   for (size_t noise_id = 0; noise_id < 15; noise_id++) {
     std::vector<std::vector<int8_t>> information(num_codeblocks);
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
-      data_generator.gen_codeblock(information.at(i), encoded_codewords[i],
-                                   i % cfg->ue_num() /* UE ID */);
+      data_generator.GenCodeblock(information.at(i), encoded_codewords[i],
+                                   i % cfg->UeNum() /* UE ID */);
     }
 
     // Save uplink information bytes to file
-    const size_t input_bytes_per_cb = bits_to_bytes(
-        ldpc_num_input_bits(cfg->ldpc_config().base_graph(),
-                            cfg->ldpc_config().expansion_factor()));
+    const size_t input_bytes_per_cb = BitsToBytes(
+        LdpcNumInputBits(cfg->LdpcConfig().BaseGraph(),
+                            cfg->LdpcConfig().ExpansionFactor()));
     if (kPrintUplinkInformationBytes) {
       std::printf("Uplink information bytes\n");
       for (size_t n = 0; n < num_codeblocks; n++) {
-        std::printf("Symbol %zu, UE %zu\n", n / cfg->ue_ant_num(),
-                    n % cfg->ue_ant_num());
+        std::printf("Symbol %zu, UE %zu\n", n / cfg->UeAntNum(),
+                    n % cfg->UeAntNum());
         for (size_t i = 0; i < input_bytes_per_cb; i++) {
           std::printf("%u ", (uint8_t)information[n][i]);
         }
@@ -111,26 +111,26 @@ int main(int argc, char* argv[]) {
     }
 
     Table<complex_float> modulated_codewords;
-    modulated_codewords.calloc(num_codeblocks, cfg->ofdm_data_num(),
+    modulated_codewords.Calloc(num_codeblocks, cfg->OfdmDataNum(),
                                Agora_memory::Alignment_t::k64Align);
     Table<int8_t> demod_data_all_symbols;
-    demod_data_all_symbols.calloc(num_codeblocks, cfg->ofdm_data_num() * 8,
+    demod_data_all_symbols.Calloc(num_codeblocks, cfg->OfdmDataNum() * 8,
                                   Agora_memory::Alignment_t::k64Align);
-    std::vector<uint8_t> mod_input(cfg->ofdm_data_num());
+    std::vector<uint8_t> mod_input(cfg->OfdmDataNum());
 
     // Modulate, add noise, and demodulate the encoded codewords
     for (size_t i = 0; i < num_codeblocks; i++) {
-      adapt_bits_for_mod(
+      AdaptBitsForMod(
           reinterpret_cast<const uint8_t*>(&encoded_codewords[i][0]),
-          &mod_input[0], cfg->ldpc_config().numEncodedBytes(),
-          cfg->mod_order_bits());
+          &mod_input[0], cfg->LdpcConfig().NumEncodedBytes(),
+          cfg->ModOrderBits());
 
-      for (size_t j = 0; j < cfg->ofdm_data_num(); j++) {
+      for (size_t j = 0; j < cfg->OfdmDataNum(); j++) {
         modulated_codewords[i][j] =
-            mod_single_uint8(mod_input[j], cfg->mod_table());
+            ModSingleUint8(mod_input[j], cfg->ModTable());
       }
 
-      for (size_t j = 0; j < cfg->ofdm_data_num(); j++) {
+      for (size_t j = 0; j < cfg->OfdmDataNum(); j++) {
         complex_float noise = {static_cast<float>(distribution(generator)) *
                                    kNoiseLevels[noise_id],
                                static_cast<float>(distribution(generator)) *
@@ -139,68 +139,68 @@ int main(int argc, char* argv[]) {
         modulated_codewords[i][j].im = modulated_codewords[i][j].im + noise.im;
       }
 
-      switch (cfg->mod_order_bits()) {
+      switch (cfg->ModOrderBits()) {
         case (4):
-          demod_16qam_soft_avx2((float*)modulated_codewords[i],
+          Demod16qamSoftAvx2((float*)modulated_codewords[i],
                                 demod_data_all_symbols[i],
-                                cfg->ofdm_data_num());
+                                cfg->OfdmDataNum());
           break;
         case (6):
-          demod_64qam_soft_avx2((float*)modulated_codewords[i],
+          Demod64qamSoftAvx2((float*)modulated_codewords[i],
                                 demod_data_all_symbols[i],
-                                cfg->ofdm_data_num());
+                                cfg->OfdmDataNum());
           break;
         default:
           std::printf("Demodulation: modulation type %s not supported!\n",
-                      cfg->modulation().c_str());
+                      cfg->Modulation().c_str());
       }
     }
 
-    const LDPCconfig& ldpc_config = cfg->ldpc_config();
+    const LDPCconfig& ldpc_config = cfg->LdpcConfig();
 
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
 
     // Decoder setup
-    ldpc_decoder_5gnr_request.numChannelLlrs = ldpc_config.num_cb_codew_len();
+    ldpc_decoder_5gnr_request.numChannelLlrs = ldpc_config.NumCbCodewLen();
     ldpc_decoder_5gnr_request.numFillerBits = 0;
-    ldpc_decoder_5gnr_request.maxIterations = ldpc_config.max_decoder_iter();
+    ldpc_decoder_5gnr_request.maxIterations = ldpc_config.MaxDecoderIter();
     ldpc_decoder_5gnr_request.enableEarlyTermination =
-        ldpc_config.early_termination();
-    ldpc_decoder_5gnr_request.Zc = ldpc_config.expansion_factor();
-    ldpc_decoder_5gnr_request.baseGraph = ldpc_config.base_graph();
-    ldpc_decoder_5gnr_request.nRows = ldpc_config.num_rows();
-    ldpc_decoder_5gnr_response.numMsgBits = ldpc_config.num_cb_len();
+        ldpc_config.EarlyTermination();
+    ldpc_decoder_5gnr_request.Zc = ldpc_config.ExpansionFactor();
+    ldpc_decoder_5gnr_request.baseGraph = ldpc_config.BaseGraph();
+    ldpc_decoder_5gnr_request.nRows = ldpc_config.NumRows();
+    ldpc_decoder_5gnr_response.numMsgBits = ldpc_config.NumCbLen();
     auto* resp_var_nodes = static_cast<int16_t*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::k64Align,
                                            1024 * 1024 * sizeof(int16_t)));
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
     Table<uint8_t> decoded_codewords;
-    decoded_codewords.calloc(num_codeblocks, cfg->ofdm_data_num(),
+    decoded_codewords.Calloc(num_codeblocks, cfg->OfdmDataNum(),
                              Agora_memory::Alignment_t::k64Align);
 
-    double freq_ghz = measure_rdtsc_freq();
-    size_t start_tsc = worker_rdtsc();
+    double freq_ghz = MeasureRdtscFreq();
+    size_t start_tsc = WorkerRdtsc();
     for (size_t i = 0; i < num_codeblocks; i++) {
       ldpc_decoder_5gnr_request.varNodes = demod_data_all_symbols[i];
       ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_codewords[i];
       bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                               &ldpc_decoder_5gnr_response);
     }
-    size_t duration = worker_rdtsc() - start_tsc;
+    size_t duration = WorkerRdtsc() - start_tsc;
     std::printf("Decoding of %zu blocks takes %.2f us per block\n",
                 num_codeblocks,
-                cycles_to_us(duration, freq_ghz) / num_codeblocks);
+                CyclesToUs(duration, freq_ghz) / num_codeblocks);
 
     // Correctness check
     size_t error_num = 0;
-    size_t total = num_codeblocks * ldpc_config.num_cb_len();
+    size_t total = num_codeblocks * ldpc_config.NumCbLen();
     size_t block_error_num = 0;
 
     for (size_t i = 0; i < num_codeblocks; i++) {
       size_t error_in_block = 0;
-      for (size_t j = 0; j < ldpc_config.num_cb_len() / 8; j++) {
+      for (size_t j = 0; j < ldpc_config.NumCbLen() / 8; j++) {
         uint8_t input = (uint8_t)information[i][j];
         uint8_t output = decoded_codewords[i][j];
         if (input != output) {
@@ -230,9 +230,9 @@ int main(int argc, char* argv[]) {
         1.f * block_error_num / num_codeblocks);
 
     std::free(resp_var_nodes);
-    modulated_codewords.free();
-    demod_data_all_symbols.free();
-    decoded_codewords.free();
+    modulated_codewords.Free();
+    demod_data_all_symbols.Free();
+    decoded_codewords.Free();
   }
   return 0;
 }

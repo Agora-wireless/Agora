@@ -54,13 +54,13 @@ class FrameStats {
   size_t NumDataSyms(void) const;
 
   /* Accessors */
-  inline const std::string& frame_identifier(void) const {
+  inline const std::string& FrameIdentifier(void) const {
     return frame_identifier_;
   }
-  inline size_t client_ul_pilot_symbols(void) const {
+  inline size_t ClientUlPilotSymbols(void) const {
     return client_ul_pilot_symbols_;
   }
-  inline size_t client_dl_pilot_symbols(void) const {
+  inline size_t ClientDlPilotSymbols(void) const {
     return client_dl_pilot_symbols_;
   }
 

@@ -22,36 +22,36 @@ class LDPCconfig {
 
   // Return the number of bytes in the information bit sequence for LDPC
   // encoding of one code block
-  size_t numInputBytes(void) const {
-    return bits_to_bytes(
-        ldpc_num_input_bits(this->base_graph_, this->expansion_factor_));
+  size_t NumInputBytes(void) const {
+    return BitsToBytes(
+        LdpcNumInputBits(this->base_graph_, this->expansion_factor_));
   }
 
   // Return the number of bytes in the encoded LDPC code word
-  size_t numEncodedBytes(void) const {
-    return bits_to_bytes(ldpc_num_encoded_bits(
+  size_t NumEncodedBytes(void) const {
+    return BitsToBytes(LdpcNumEncodedBits(
         this->base_graph_, this->expansion_factor_, this->num_rows_));
   }
 
-  inline void num_blocks_in_symbol(size_t num_blocks) {
+  inline void NumBlocksInSymbol(size_t num_blocks) {
     this->num_blocks_in_symbol_ = num_blocks;
   }
 
   /* Accessors */
-  inline uint16_t base_graph(void) const { return this->base_graph_; }
-  inline uint16_t expansion_factor(void) const {
+  inline uint16_t BaseGraph(void) const { return this->base_graph_; }
+  inline uint16_t ExpansionFactor(void) const {
     return this->expansion_factor_;
   }
-  inline int16_t max_decoder_iter(void) const {
+  inline int16_t MaxDecoderIter(void) const {
     return this->max_decoder_iter_;
   }
-  inline bool early_termination(void) const { return this->early_termination_; }
-  inline uint32_t num_cb_len(void) const { return this->num_cb_len_; }
-  inline uint32_t num_cb_codew_len(void) const {
+  inline bool EarlyTermination(void) const { return this->early_termination_; }
+  inline uint32_t NumCbLen(void) const { return this->num_cb_len_; }
+  inline uint32_t NumCbCodewLen(void) const {
     return this->num_cb_codew_len_;
   }
-  inline size_t num_rows(void) const { return this->num_rows_; }
-  inline size_t num_blocks_in_symbol(void) const {
+  inline size_t NumRows(void) const { return this->num_rows_; }
+  inline size_t NumBlocksInSymbol(void) const {
     return this->num_blocks_in_symbol_;
   }
 

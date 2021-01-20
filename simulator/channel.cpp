@@ -9,9 +9,9 @@ Channel::Channel(Config* config_bs, Config* config_ue,
       uecfg_(config_ue),
       sim_chan_model_(in_channel_type),
       channel_snr_db_(in_channel_snr) {
-  bs_ant_ = bscfg_->bs_ant_num();
-  ue_ant_ = uecfg_->ue_ant_num();
-  n_samps_ = bscfg_->samps_per_symbol();
+  bs_ant_ = bscfg_->BsAntNum();
+  ue_ant_ = uecfg_->UeAntNum();
+  n_samps_ = bscfg_->SampsPerSymbol();
 
   if (sim_chan_model_ == "AWGN")
     chan_model_ = AWGN;
@@ -27,7 +27,7 @@ Channel::Channel(Config* config_bs, Config* config_ue,
 
 Channel::~Channel() {}
 
-void Channel::apply_chan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
+void Channel::ApplyChan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
                          const bool is_downlink, const bool is_newChan) {
   cx_fmat fmat_h;
 
@@ -52,22 +52,22 @@ void Channel::apply_chan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
         break;
 
       case RAN_3GPP:
-        lte_3gpp(fmat_src, fmat_dst);
+        Lte3gpp(fmat_src, fmat_dst);
         break;
     }
   }
   if (is_downlink)
-    fmat_h = fmat_src * h_.st() / std::sqrt(bscfg_->bs_ant_num());
+    fmat_h = fmat_src * h_.st() / std::sqrt(bscfg_->BsAntNum());
   else
     fmat_h = fmat_src * h_;
 
   // Add noise
-  awgn(fmat_h, fmat_dst);
+  Awgn(fmat_h, fmat_dst);
 
-  if (kPrintChannelOutput) Utils::print_mat(h_);
+  if (kPrintChannelOutput) Utils::PrintMat(h_);
 }
 
-void Channel::awgn(const cx_fmat& src, cx_fmat& dst) {
+void Channel::Awgn(const cx_fmat& src, cx_fmat& dst) {
   int n_row = src.n_rows;
   int n_col = src.n_cols;
   float snr_lin = pow(10, channel_snr_db_ / 10);
@@ -102,10 +102,10 @@ void Channel::awgn(const cx_fmat& src, cx_fmat& dst) {
   */
 }
 
-void Channel::lte_3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst) {
+void Channel::Lte3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst) {
   // TODO - In progress (Use Rayleigh for now...)
-  cx_fmat h(randn<fmat>(uecfg_->ue_ant_num(), bscfg_->bs_ant_num()),
-            randn<fmat>(uecfg_->ue_ant_num(), bscfg_->bs_ant_num()));
+  cx_fmat h(randn<fmat>(uecfg_->UeAntNum(), bscfg_->BsAntNum()),
+            randn<fmat>(uecfg_->UeAntNum(), bscfg_->BsAntNum()));
   h = (1 / sqrt(2)) * h;
   fmat_dst = fmat_src * h;
 }

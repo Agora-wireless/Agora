@@ -57,7 +57,7 @@ class DoFFT : public Doer {
    *     4. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  EventData launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
   /**
    * Fill-in the partial transpose of the computed FFT for this antenna into
@@ -89,8 +89,8 @@ class DoFFT : public Doer {
    * of the fully-transposed matrix, but laid out in memory in column-major
    * order.
    */
-  void partial_transpose(complex_float* out_buf, size_t ant_id,
-                         SymbolType symbol_type) const;
+  void PartialTranspose(complex_float* out_buf, size_t ant_id,
+                        SymbolType symbol_type) const;
 
  private:
   Table<char>& socket_buffer_;
@@ -139,7 +139,7 @@ class DoIFFT : public Doer {
    *     2. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  EventData launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
  private:
   Table<complex_float>& dl_ifft_buffer_;

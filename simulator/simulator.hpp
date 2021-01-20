@@ -40,21 +40,21 @@ class Simulator {
 
   ~Simulator();
 
-  void start();
-  void stop();
+  void Start();
+  void Stop();
   // while loop of task thread
-  static void* taskThread(void* context);
+  static void* TaskThread(void* context);
 
   struct EventHandlerContext {
     Simulator* obj_ptr_;
     size_t id_;
   };
 
-  inline void update_frame_count(int* frame_count);
+  inline void UpdateFrameCount(int* frame_count);
 
-  void update_rx_counters(size_t frame_id, size_t frame_id_in_buffer,
+  void UpdateRxCounters(size_t frame_id, size_t frame_id_in_buffer,
                           size_t symbol_id, size_t ant_id);
-  void print_per_frame_done(PrintType print_type, size_t frame_id);
+  void PrintPerFrameDone(PrintType print_type, size_t frame_id);
 
  private:
   size_t bs_ant_num_;
@@ -128,11 +128,11 @@ class Simulator {
   double* frame_start_tx_;
   double* frame_end_tx_;
 
-  void initialize_vars_from_cfg(Config* cfg);
-  void initialize_queues();
-  void initialize_uplink_buffers();
-  void free_uplink_buffers();
-  void free_queues(void);
+  void InitializeVarsFromCfg(Config* cfg);
+  void InitializeQueues();
+  void InitializeUplinkBuffers();
+  void FreeUplinkBuffers();
+  void FreeQueues(void);
 };
 
 #endif

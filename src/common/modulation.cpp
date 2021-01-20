@@ -1,12 +1,12 @@
 #include "modulation.hpp"
 
-void print256_epi32(__m256i var) {
+void Print256Epi32(__m256i var) {
   int32_t* val = (int32_t*)&var;
   std::printf("Numerical: %i %i %i %i %i %i %i %i \n", val[0], val[1], val[2],
               val[3], val[4], val[5], val[6], val[7]);
 }
 
-void print256_epi16(__m256i var) {
+void Print256Epi16(__m256i var) {
   int16_t* val = (int16_t*)&var;
   std::printf("Numerical: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i\n",
               val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7],
@@ -14,7 +14,7 @@ void print256_epi16(__m256i var) {
               val[15]);
 }
 
-void print256_epi8(__m256i var) {
+void Print256Epi8(__m256i var) {
   int8_t* val = (int8_t*)&var;
   std::printf(
       "Numerical int8_t: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i "
@@ -25,7 +25,7 @@ void print256_epi8(__m256i var) {
       val[25], val[26], val[27], val[28], val[29], val[30], val[31]);
 }
 
-void print128_epi8(__m128i var) {
+void Print128Epi8(__m128i var) {
   int8_t* val = (int8_t*)&var;
   std::printf(
       "Numerical int8_t: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i \n",
@@ -39,24 +39,24 @@ void print128_epi8(__m128i var) {
  ***********************************************************************************
  */
 
-void init_modulation_table(Table<complex_float>& mod_table, size_t mod_order) {
-  if (!mod_table.is_allocated())
-    mod_table.malloc(1, pow(2, kMaxModType),
+void InitModulationTable(Table<complex_float>& mod_table, size_t mod_order) {
+  if (!mod_table.IsAllocated())
+    mod_table.Malloc(1, pow(2, kMaxModType),
                      Agora_memory::Alignment_t::k32Align);
   // mod_table.malloc(pow(2, kMaxModType), 2, 32);
   switch (mod_order) {
     case 4:
-      init_qpsk_table(mod_table);
+      InitQpskTable(mod_table);
       break;
     case 16:
-      init_qam16_table(mod_table);
+      InitQam16Table(mod_table);
       break;
     case 64:
-      init_qam64_table(mod_table);
+      InitQam64Table(mod_table);
       break;
     default: {
       std::printf("Modulation order not supported, use default value 4\n");
-      init_qam16_table(mod_table);
+      InitQam16Table(mod_table);
     }
   }
 }
@@ -68,7 +68,7 @@ void init_modulation_table(Table<complex_float>& mod_table, size_t mod_order) {
  *---------------> I
  *  00  |  10
  */
-void init_qpsk_table(Table<complex_float>& qpsk_table) {
+void InitQpskTable(Table<complex_float>& qpsk_table) {
   float scale = 1 / sqrt(2);
   float mod_qpsk[2] = {-scale, scale};
   for (int i = 0; i < 4; i++) {
@@ -105,7 +105,7 @@ void init_qpsk_table(Table<complex_float>& qpsk_table) {
  *  1110  1100  |  0100  0110
  *  1111  1101  |  0101  0111
  */
-void init_qam16_table(Table<complex_float>& qam16_table) {
+void InitQam16Table(Table<complex_float>& qam16_table) {
   float scale = 1 / sqrt(10);
   float mod_16qam[4] = {1 * scale, 3 * scale, (-1) * scale, (-3) * scale};
   for (int i = 0; i < 16; i++) {
@@ -133,7 +133,7 @@ void init_qam16_table(Table<complex_float>& qam16_table) {
  *  111111  111101  110101  110111  |  010111  010101  011101  011111
  */
 
-void init_qam64_table(Table<complex_float>& qam64_table) {
+void InitQam64Table(Table<complex_float>& qam64_table) {
   float scale = 1 / sqrt(42);
   float mod_64qam[8] = {3 * scale,    1 * scale,    5 * scale,    7 * scale,
                         (-3) * scale, (-1) * scale, (-5) * scale, (-7) * scale};
@@ -153,16 +153,16 @@ void init_qam64_table(Table<complex_float>& qam64_table) {
  ***********************************************************************************
  */
 
-complex_float mod_single(int x, Table<complex_float>& mod_table) {
+complex_float ModSingle(int x, Table<complex_float>& mod_table) {
   return mod_table[0][x];
 }
 
-complex_float mod_single_uint8(uint8_t x, Table<complex_float>& mod_table) {
+complex_float ModSingleUint8(uint8_t x, Table<complex_float>& mod_table) {
   return mod_table[0][x];
 }
 
 // TODO: test correctness
-void mod_simd(uint8_t* in, complex_float*& out, size_t len,
+void ModSimd(uint8_t* in, complex_float*& out, size_t len,
               Table<complex_float>& mod_table) {
 #ifdef __AVX512F__
   for (size_t i = 0; i < len / kSCsPerCacheline; i++) {
@@ -191,7 +191,7 @@ void mod_simd(uint8_t* in, complex_float*& out, size_t len,
 
   size_t remainder = len % kSCsPerCacheline;
   for (size_t i = 0; i < remainder; i++) {
-    out[i] = mod_single_uint8(in[i], mod_table);
+    out[i] = ModSingleUint8(in[i], mod_table);
   }
 }
 
@@ -243,7 +243,7 @@ void mod_simd(uint8_t* in, complex_float*& out, size_t len,
  *  1110  1100  |  0100  0110
  *  1111  1101  |  0101  0111
  */
-void demod_16qam_hard_loop(float* vec_in, uint8_t* vec_out, int num) {
+void Demod16qamHardLoop(float* vec_in, uint8_t* vec_out, int num) {
   float float_val = QAM16_THRESHOLD;
 
   for (int i = 0; i < num; i++) {
@@ -258,7 +258,7 @@ void demod_16qam_hard_loop(float* vec_in, uint8_t* vec_out, int num) {
   }
 }
 
-void demod_16qam_hard_sse(float* vec_in, uint8_t* vec_out, int num) {
+void Demod16qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
   __m64* result_ptr = (__m64*)vec_out;
   __m128 symbol1, symbol2, symbol3, symbol4;
@@ -357,7 +357,7 @@ void demod_16qam_hard_sse(float* vec_in, uint8_t* vec_out, int num) {
   }
 }
 
-void demod_16qam_hard_avx2(float* vec_in, uint8_t* vec_out, int num) {
+void Demod16qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
   __m128i* result_ptr = (__m128i*)vec_out;
   __m256 symbol1, symbol2, symbol3, symbol4;
@@ -462,11 +462,11 @@ void demod_16qam_hard_avx2(float* vec_in, uint8_t* vec_out, int num) {
   }
   // Demodulate last symbols
   int next_start = 16 * (num / 16);
-  demod_16qam_hard_sse(vec_in + 2 * next_start, vec_out + next_start,
+  Demod16qamHardSse(vec_in + 2 * next_start, vec_out + next_start,
                        num - next_start);
 }
 
-void demod_16qam_soft_avx2(float* vec_in, int8_t* llr, int num) {
+void Demod16qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
   float* symbols_ptr = vec_in;
   __m256i* result_ptr = (__m256i*)llr;
   __m256 symbol1, symbol2, symbol3, symbol4;
@@ -533,7 +533,7 @@ void demod_16qam_soft_avx2(float* vec_in, int8_t* llr, int num) {
   }
   // Demodulate last symbols
   int next_start = 16 * (num / 16);
-  demod_16qam_soft_sse(vec_in + 2 * next_start, llr + next_start * 4,
+  Demod16qamSoftSse(vec_in + 2 * next_start, llr + next_start * 4,
                        num - next_start);
 }
 
@@ -550,7 +550,7 @@ void demod_16qam_soft_avx2(float* vec_in, int8_t* llr, int num) {
  *  111110  111100  110100  110110  |  010110  010100  011100  011110
  *  111111  111101  110101  110111  |  010111  010101  011101  011111
  */
-void demod_64qam_hard_loop(float* vec_in, uint8_t* vec_out, int num) {
+void Demod64qamHardLoop(float* vec_in, uint8_t* vec_out, int num) {
   for (int i = 0; i < num; i++) {
     float real_val = *(vec_in + i * 2);
     float imag_val = *(vec_in + i * 2 + 1);
@@ -579,7 +579,7 @@ void demod_64qam_hard_loop(float* vec_in, uint8_t* vec_out, int num) {
   }
 }
 
-void demod_64qam_hard_sse(float* vec_in, uint8_t* vec_out, int num) {
+void Demod64qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
   __m64* result_ptr = (__m64*)vec_out;
   __m128 symbol1, symbol2, symbol3, symbol4;
@@ -731,7 +731,7 @@ void demod_64qam_hard_sse(float* vec_in, uint8_t* vec_out, int num) {
   }
 }
 
-void demod_64qam_hard_avx2(float* vec_in, uint8_t* vec_out, int num) {
+void Demod64qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
   __m128i* result_ptr = (__m128i*)vec_out;
   __m256 symbol1, symbol2, symbol3, symbol4;
@@ -876,11 +876,11 @@ void demod_64qam_hard_avx2(float* vec_in, uint8_t* vec_out, int num) {
   }
   // Demodulate last symbols
   int next_start = 16 * (num / 16);
-  demod_64qam_hard_sse(vec_in + 2 * next_start, vec_out + next_start,
+  Demod64qamHardSse(vec_in + 2 * next_start, vec_out + next_start,
                        num - next_start);
 }
 
-void demod_64qam_soft_avx2(float* vec_in, int8_t* llr, int num) {
+void Demod64qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
   float* symbols_ptr = (float*)vec_in;
   __m256i* result_ptr = (__m256i*)llr;
   __m256 symbol1, symbol2, symbol3, symbol4;
@@ -986,6 +986,6 @@ void demod_64qam_soft_avx2(float* vec_in, int8_t* llr, int num) {
     result_ptr++;
   }
   int next_start = 16 * (num / 16);
-  demod_64qam_soft_sse(vec_in + 2 * next_start, llr + next_start * 6,
+  Demod64qamSoftSse(vec_in + 2 * next_start, llr + next_start * 6,
                        num - next_start);
 }

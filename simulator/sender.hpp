@@ -63,15 +63,15 @@ class Sender {
 
   ~Sender();
 
-  void startTX();
+  void StartTx();
 
   // in_frame_start and in_frame_end must have space for at least
   // kNumStatsFrames entries
-  void startTXfromMain(double* in_frame_start, double* in_frame_end);
+  void StartTXfromMain(double* in_frame_start, double* in_frame_end);
 
  private:
-  void* master_thread(int tid);
-  void* worker_thread(int tid);
+  void* MasterThread(int tid);
+  void* WorkerThread(int tid);
 
   /**
    * @brief Read time-domain 32-bit floating-point IQ samples from [filename]
@@ -80,26 +80,26 @@ class Sender {
    * [filename] must contain data for one frame. For every symbol and antenna,
    * the file must provide (CP_LEN + OFDM_CA_NUM) IQ samples.
    */
-  void init_iq_from_file(std::string filename);
+  void InitIqFromFile(std::string filename);
 
   // Get number of CPU ticks for a symbol given a frame index
-  uint64_t get_ticks_for_frame(size_t frame_id);
-  size_t get_max_symbol_id() const;
+  uint64_t GetTicksForFrame(size_t frame_id);
+  size_t GetMaxSymbolId() const;
 
   // Launch threads to run worker with thread IDs from tid_start to tid_end
-  void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
+  void CreateThreads(void* (*worker)(void*), int tid_start, int tid_end);
 
-  void delay_for_symbol(size_t tx_frame_count, uint64_t tick_start);
-  void delay_for_frame(size_t tx_frame_count, uint64_t tick_start);
+  void DelayForSymbol(size_t tx_frame_count, uint64_t tick_start);
+  void DelayForFrame(size_t tx_frame_count, uint64_t tick_start);
 
-  void write_stats_to_file(size_t tx_frame_count) const;
+  void WriteStatsToFile(size_t tx_frame_count) const;
 
   size_t FindNextSymbol(size_t start_symbol);
   void ScheduleSymbol(size_t frame, size_t symbol_id);
 
   // Run FFT on the data field in pkt, output to fft_inout
   // Recombine pkt header data and fft output data into payload
-  void run_fft(Packet* pkt, complex_float* fft_inout,
+  void RunFft(Packet* pkt, complex_float* fft_inout,
                DFTI_DESCRIPTOR_HANDLE mkl_handle) const;
 
   Config* cfg_;

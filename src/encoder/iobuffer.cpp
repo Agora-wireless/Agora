@@ -10,7 +10,7 @@
 #include "encoder.hpp"
 
 namespace avx2enc {
-void scatter_slow(uint8_t* dst, const uint8_t* src, unsigned num_bits,
+void ScatterSlow(uint8_t* dst, const uint8_t* src, unsigned num_bits,
                   uint8_t src_offbits) {
   // Process byte by byte
   while (num_bits != 0) {
@@ -29,7 +29,7 @@ void scatter_slow(uint8_t* dst, const uint8_t* src, unsigned num_bits,
   }
 }
 
-void gather_slow(uint8_t* dst, const uint8_t* src, int16_t num_bits,
+void GatherSlow(uint8_t* dst, const uint8_t* src, int16_t num_bits,
                  uint8_t dst_offbits) {
   // Process byte by byte
   bool first_byte = true;
@@ -59,7 +59,7 @@ void gather_slow(uint8_t* dst, const uint8_t* src, int16_t num_bits,
   }
 }
 
-void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
+void Adapter2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
                    uint32_t cbLen, int8_t direct) {
   int8_t *p_buff_0, *p_buff_1;
   uint8_t dst_offbits = 0, src_offbits = 0;
@@ -70,7 +70,7 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
     /* parsing the input
     p_buff_0 is the input, p_buff_1 is the buffer for barrel shifter */
     for (size_t i = 0; i < cbLen / zcSize; i++) {
-      scatter_slow((uint8_t*)p_buff_1, (uint8_t*)p_buff_0, zcSize, src_offbits);
+      ScatterSlow((uint8_t*)p_buff_1, (uint8_t*)p_buff_0, zcSize, src_offbits);
       uint8_t byte_offset = (src_offbits + zcSize) >> 3;
       src_offbits = (src_offbits + zcSize) - (byte_offset << 3);
       p_buff_0 = p_buff_0 + byte_offset;
@@ -80,7 +80,7 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
     /* storing encoded bits into output buffer
     p_buff_0 is the output, p_buff_1 is the buffer for processing data*/
     for (size_t i = 0; i < cbLen / zcSize; i++) {
-      gather_slow((uint8_t*)p_buff_0, (uint8_t*)p_buff_1, (int16_t)zcSize,
+      GatherSlow((uint8_t*)p_buff_0, (uint8_t*)p_buff_1, (int16_t)zcSize,
                   dst_offbits);
       uint8_t byte_offset = (dst_offbits + zcSize) >> 3;
       dst_offbits = (dst_offbits + zcSize) - (byte_offset << 3);
@@ -103,7 +103,7 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
 //            );
 // }
 
-void adapter_64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
+void Adapter64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
                      uint32_t cbLen, int8_t direct) {
   /* after 64, z is always a multiple of 8 so no need for shifting bytes*/
 
@@ -163,7 +163,7 @@ void adapter_64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
   }
 }
 
-void adapter_288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
+void Adapter288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
                       uint32_t cbLen, int8_t direct) {
   /* use two __m256i to store one segment of length zc */
   int8_t *p_buff_in, *p_buff_out;
@@ -192,12 +192,12 @@ void adapter_288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
   }
 }
 
-LDPC_ADAPTER_P ldpc_select_adapter_func(uint16_t zcSize) {
+LDPC_ADAPTER_P LdpcSelectAdapterFunc(uint16_t zcSize) {
   if (zcSize < 64)
-    return adapter_2to64;
+    return Adapter2to64;
   else if (zcSize <= 256)
-    return adapter_64to256;
+    return Adapter64to256;
   else
-    return adapter_288to384;
+    return Adapter288to384;
 }
 }  // namespace avx2enc

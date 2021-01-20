@@ -18,17 +18,17 @@
 class ClientRadioConfig {
  public:
   ClientRadioConfig(Config* cfg);
-  bool radioStart();
-  void radioStop();
-  void readSensors();
-  int radioTx(size_t, void** buffs, size_t num_samps, int flags,
+  bool RadioStart();
+  void RadioStop();
+  void ReadSensors();
+  int RadioTx(size_t, void** buffs, size_t num_samps, int flags,
               long long& frameTime);
-  int radioRx(size_t, void** buffs, size_t num_samps, long long& frameTime);
-  static void drain_rx_buffer(SoapySDR::Device* dev, SoapySDR::Stream* istream,
+  int RadioRx(size_t, void** buffs, size_t num_samps, long long& frameTime);
+  static void DrainRxBuffer(SoapySDR::Device* dev, SoapySDR::Stream* istream,
                               std::vector<void*> buffs, size_t symSamp);
-  void drain_buffers();
-  void go();
-  int triggers(int i);
+  void DrainBuffers();
+  void Go();
+  int Triggers(int i);
   // static void dciqMinimize(SoapySDR::Device*, SoapySDR::Device*, int,
   // size_t, double, double); static void setIQBalance(SoapySDR::Device*, int,
   // size_t, int, int); static void
@@ -43,8 +43,8 @@ class ClientRadioConfig {
     ClientRadioConfig* ptr_;
     size_t tid_;
   };
-  static void* initClientRadio_launch(void* context);
-  void initClientRadio(ClientRadioConfigContext* context);
+  static void* InitClientRadioLaunch(void* context);
+  void InitClientRadio(ClientRadioConfigContext* context);
 
   Config* cfg_;
   std::vector<SoapySDR::Device*> hubs_;

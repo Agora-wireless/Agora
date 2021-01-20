@@ -49,7 +49,7 @@ class Receiver {
    * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
    * RX_THREAD_NUM - 1}
    */
-  std::vector<pthread_t> startRecv(Table<char>& in_buffer,
+  std::vector<pthread_t> StartRecv(Table<char>& in_buffer,
                                    Table<int>& in_buffer_status,
                                    size_t in_buffer_frame_num,
                                    size_t in_buffer_length,
@@ -59,7 +59,7 @@ class Receiver {
    * receive thread
    * context: ReceiverContext type
    */
-  void* loopRecv(int tid);
+  void* LoopRecv(int tid);
 
  private:
   pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;

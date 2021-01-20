@@ -72,28 +72,28 @@ class PacketTXRX {
    * @return True on successfully starting the network I/O threads, false
    * otherwise
    */
-  bool startTXRX(Table<char>& buffer, Table<int>& buffer_status,
+  bool StartTxrx(Table<char>& buffer, Table<int>& buffer_status,
                  size_t packet_num_in_buffer, Table<size_t>& frame_start,
                  char* tx_buffer, Table<complex_float>& calib_dl_buffer_,
                  Table<complex_float>& calib_ul_buffer_);
 
-  void send_beacon(int tid, size_t frame_id);
+  void SendBeacon(int tid, size_t frame_id);
 
  private:
-  void loop_tx_rx(int tid);  // The thread function for thread [tid]
-  int dequeue_send(int tid);
-  struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
+  void LoopTxRx(int tid);  // The thread function for thread [tid]
+  int DequeueSend(int tid);
+  struct Packet* RecvEnqueue(int tid, int radio_id, int rx_offset);
 
-  void loop_tx_rx_argos(int tid);
-  int dequeue_send_argos(int tid);
-  struct Packet* recv_enqueue_argos(int tid, int radio_id, int rx_offset);
+  void LoopTxRxArgos(int tid);
+  int DequeueSendArgos(int tid);
+  struct Packet* RecvEnqueueArgos(int tid, int radio_id, int rx_offset);
 
   long long rx_time_bs_;
   long long tx_time_bs_;
-  void loop_tx_rx_usrp(int tid);
-  int dequeue_send_usrp(int tid);
-  int dequeue_send_usrp(int tid, int frame_id, int symbol_id);
-  struct Packet* recv_enqueue_usrp(int tid, int radio_id, int rx_offset,
+  void LoopTxRxUsrp(int tid);
+  int DequeueSendUsrp(int tid);
+  int DequeueSendUsrp(int tid, int frame_id, int symbol_id);
+  struct Packet* RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
                                    int frame_id, int symbol_id);
 
   Config* cfg_;

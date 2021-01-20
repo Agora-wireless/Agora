@@ -13,12 +13,12 @@
 size_t cpu_layout[MAX_CORE_NUM];
 bool cpu_layout_initlized = false;
 
-void print_bitmask(const struct bitmask* bm) {
+void PrintBitmask(const struct bitmask* bm) {
   for (size_t i = 0; i < bm->size; ++i)
     std::printf("%d", numa_bitmask_isbitset(bm, i));
 }
 
-void set_cpu_layout_on_numa_nodes(bool verbose) {
+void SetCpuLayoutOnNumaNodes(bool verbose) {
   int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
   // numa_set_localalloc();
 
@@ -28,7 +28,7 @@ void set_cpu_layout_on_numa_nodes(bool verbose) {
     numa_node_to_cpus(i, bm);
     if (verbose) {
       std::printf("NUMA node %d ", i);
-      print_bitmask(bm);
+      PrintBitmask(bm);
       std::printf(" CPUs: ");
     }
     for (size_t j = 0; j < bm->size; j++) {
@@ -45,14 +45,14 @@ void set_cpu_layout_on_numa_nodes(bool verbose) {
   cpu_layout_initlized = true;
 }
 
-size_t get_physical_core_id(size_t core_id) {
+size_t GetPhysicalCoreId(size_t core_id) {
   if (cpu_layout_initlized)
     return cpu_layout[core_id];
   else
     return core_id;
 }
 
-int pin_to_core(int core_id) {
+int PinToCore(int core_id) {
   int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
   if (core_id < 0 || core_id >= num_cores) return -1;
 
@@ -64,7 +64,7 @@ int pin_to_core(int core_id) {
   return pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
 }
 
-void pin_to_core_with_offset(ThreadType thread_type, int core_offset,
+void PinToCoreWithOffset(ThreadType thread_type, int core_offset,
                              int thread_id, bool verbose) {
   if (!kEnableThreadPinning) return;
 
@@ -79,25 +79,25 @@ void pin_to_core_with_offset(ThreadType thread_type, int core_offset,
   size_t physical_core_id =
       cpu_layout_initlized ? cpu_layout[actual_core_id] : actual_core_id;
 
-  if (pin_to_core(physical_core_id) != 0) {
+  if (PinToCore(physical_core_id) != 0) {
     std::fprintf(
         stderr,
         "%s thread %d: failed to pin to core %zu. Exiting. "
         "This can happen if the machine has insufficient cores. "
         "Set kEnableThreadPinning to false to run Agora to run despite "
         "this - performance will be low.\n",
-        thread_type_str(thread_type).c_str(), thread_id, physical_core_id);
+        ThreadTypeStr(thread_type).c_str(), thread_id, physical_core_id);
     std::exit(0);
   } else {
     if (verbose) {
       std::printf("%s thread %d: pinned to core %zu\n",
-                  thread_type_str(thread_type).c_str(), thread_id,
+                  ThreadTypeStr(thread_type).c_str(), thread_id,
                   physical_core_id);
     }
   }
 }
 
-std::vector<size_t> Utils::strToChannels(const std::string& channel) {
+std::vector<size_t> Utils::StrToChannels(const std::string& channel) {
   std::vector<size_t> channels;
   if (channel == "A")
     channels = {0};
@@ -108,7 +108,7 @@ std::vector<size_t> Utils::strToChannels(const std::string& channel) {
   return (channels);
 }
 
-std::vector<std::complex<int16_t>> Utils::double_to_cint16(
+std::vector<std::complex<int16_t>> Utils::DoubleToCint16(
     std::vector<std::vector<double>> in) {
   int len = in[0].size();
   std::vector<std::complex<int16_t>> out(len, 0);
@@ -118,7 +118,7 @@ std::vector<std::complex<int16_t>> Utils::double_to_cint16(
   return out;
 }
 
-std::vector<std::complex<float>> Utils::double_to_cfloat(
+std::vector<std::complex<float>> Utils::DoubleToCfloat(
     std::vector<std::vector<double>> in) {
   int len = in[0].size();
   std::vector<std::complex<float>> out(len, 0);
@@ -127,7 +127,7 @@ std::vector<std::complex<float>> Utils::double_to_cfloat(
   return out;
 }
 
-std::vector<std::complex<float>> Utils::uint32tocfloat(
+std::vector<std::complex<float>> Utils::Uint32tocfloat(
     std::vector<uint32_t> in, const std::string& order) {
   int len = in.size();
   std::vector<std::complex<float>> out(len, 0);
@@ -149,7 +149,7 @@ std::vector<std::complex<float>> Utils::uint32tocfloat(
   return out;
 }
 
-std::vector<uint32_t> Utils::cint16_to_uint32(
+std::vector<uint32_t> Utils::Cint16ToUint32(
     std::vector<std::complex<int16_t>> in, bool conj, std::string order) {
   std::vector<uint32_t> out(in.size(), 0);
   for (size_t i = 0; i < in.size(); i++) {
@@ -163,7 +163,7 @@ std::vector<uint32_t> Utils::cint16_to_uint32(
   return out;
 }
 
-std::vector<uint32_t> Utils::cfloat32_to_uint32(
+std::vector<uint32_t> Utils::Cfloat32ToUint32(
     std::vector<std::complex<float>> in, bool conj, std::string order) {
   std::vector<uint32_t> out(in.size(), 0);
   for (size_t i = 0; i < in.size(); i++) {
@@ -179,7 +179,7 @@ std::vector<uint32_t> Utils::cfloat32_to_uint32(
 }
 
 // Returns index locations of sym for each frame in frames
-std::vector<std::vector<size_t>> Utils::loadSymbols(
+std::vector<std::vector<size_t>> Utils::LoadSymbols(
     std::vector<std::string> const& frames, char sym) {
   std::vector<std::vector<size_t>> symbol_index_vector;
   size_t num_frames = frames.size();
@@ -196,7 +196,7 @@ std::vector<std::vector<size_t>> Utils::loadSymbols(
   return symbol_index_vector;
 }
 
-void Utils::loadDevices(std::string filename, std::vector<std::string>& data) {
+void Utils::LoadDevices(std::string filename, std::vector<std::string>& data) {
   std::string line;
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   filename = cur_directory + "/" + filename;
@@ -216,7 +216,7 @@ void Utils::loadDevices(std::string filename, std::vector<std::string>& data) {
     std::printf("Unable to open device file %s\n", filename.c_str());
 }
 
-void Utils::loadData(const char* filename,
+void Utils::LoadData(const char* filename,
                      std::vector<std::complex<int16_t>>& data, int samples) {
   FILE* fp = std::fopen(filename, "r");
   data.resize(samples);
@@ -231,7 +231,7 @@ void Utils::loadData(const char* filename,
   std::fclose(fp);
 }
 
-void Utils::loadData(const char* filename, std::vector<unsigned>& data,
+void Utils::LoadData(const char* filename, std::vector<unsigned>& data,
                      int samples) {
   FILE* fp = std::fopen(filename, "r");
   data.resize(samples);
@@ -243,7 +243,7 @@ void Utils::loadData(const char* filename, std::vector<unsigned>& data,
   std::fclose(fp);
 }
 
-void Utils::loadTDDConfig(const std::string filename, std::string& jconfig) {
+void Utils::LoadTddConfig(const std::string filename, std::string& jconfig) {
   std::string line;
   std::ifstream config_file(filename);
   if (config_file.is_open()) {
@@ -257,7 +257,7 @@ void Utils::loadTDDConfig(const std::string filename, std::string& jconfig) {
     std::printf("Unable to open config file %s\n", filename.c_str());
 }
 
-std::vector<std::string> Utils::split(const std::string& s, char delimiter) {
+std::vector<std::string> Utils::Split(const std::string& s, char delimiter) {
   std::vector<std::string> tokens;
   std::string token;
   std::istringstream token_stream(s);
@@ -267,20 +267,20 @@ std::vector<std::string> Utils::split(const std::string& s, char delimiter) {
   return tokens;
 }
 
-void Utils::printVector(std::vector<std::complex<int16_t>>& data) {
+void Utils::PrintVector(std::vector<std::complex<int16_t>>& data) {
   for (size_t i = 0; i < data.size(); i++) {
     std::cout << real(data.at(i)) << " " << imag(data.at(i)) << std::endl;
   }
 }
 
-void Utils::writeBinaryFile(std::string name, size_t elem_size,
+void Utils::WriteBinaryFile(std::string name, size_t elem_size,
                             size_t buffer_size, void* buff) {
   FILE* f_handle = std::fopen(name.c_str(), "wb");
   std::fwrite(buff, elem_size, buffer_size, f_handle);
   std::fclose(f_handle);
 }
 
-void Utils::print_mat(arma::cx_fmat c) {
+void Utils::PrintMat(arma::cx_fmat c) {
   size_t print_rows = std::min((size_t)c.n_rows, (size_t)NUM_ROWS_PRINT);
   std::cout << "Printing only " << print_rows << " rows !!" << std::endl;
   std::stringstream so;
@@ -295,7 +295,7 @@ void Utils::print_mat(arma::cx_fmat c) {
   std::cout << so.str();
 }
 
-void Utils::print_vec(arma::cx_fvec c, std::string ss) {
+void Utils::PrintVec(arma::cx_fvec c, std::string ss) {
   std::stringstream so;
   so << ss << " = [";
   for (size_t j = 0; j < c.size(); j++)

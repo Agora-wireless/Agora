@@ -22,7 +22,7 @@
 
 #include "comms-lib.h"
 
-size_t CommsLib::find_pilot_seq(std::vector<std::complex<float>> iq,
+size_t CommsLib::FindPilotSeq(std::vector<std::complex<float>> iq,
                                 std::vector<std::complex<float>> pilot,
                                 size_t seq_len) {
   // Re-arrange into complex vector, flip, and compute conjugate
@@ -33,10 +33,10 @@ size_t CommsLib::find_pilot_seq(std::vector<std::complex<float>> iq,
   }
 
   // Equivalent to numpy's sign function
-  auto iq_sign = CommsLib::csign(iq);
+  auto iq_sign = CommsLib::Csign(iq);
 
   // Convolution
-  auto pilot_corr = CommsLib::convolve(iq_sign, pilot_conj);
+  auto pilot_corr = CommsLib::Convolve(iq_sign, pilot_conj);
 
   // Find all peaks
   auto best_peak = std::max_element(pilot_corr.begin(), pilot_corr.end()) -
@@ -44,7 +44,7 @@ size_t CommsLib::find_pilot_seq(std::vector<std::complex<float>> iq,
   return best_peak;
 }
 
-int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen) {
+int CommsLib::FindLts(std::vector<std::complex<double>> iq, int seqLen) {
   /*
    * Find 802.11-based LTS (Long Training Sequence)
    * Input:
@@ -59,7 +59,7 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen) {
   int best_peak;
 
   // Original LTS sequence
-  lts_seq = CommsLib::getSequence(seqLen, LTS_SEQ);
+  lts_seq = CommsLib::GetSequence(seqLen, LTS_SEQ);
 
   // Re-arrange into complex vector, flip, and compute conjugate
   std::vector<std::complex<double>> lts_sym;
@@ -74,10 +74,10 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen) {
   }
 
   // Equivalent to numpy's sign function
-  auto iq_sign = CommsLib::csign(iq);
+  auto iq_sign = CommsLib::Csign(iq);
 
   // Convolution
-  auto lts_corr = CommsLib::convolve(iq_sign, lts_sym_conj);
+  auto lts_corr = CommsLib::Convolve(iq_sign, lts_sym_conj);
   auto lts_peak = *std::max_element(lts_corr.begin(), lts_corr.end());
 
   // Find all peaks
@@ -91,7 +91,7 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen) {
 
   std::vector<std::vector<int>> x_vec(peaks.size());
   std::vector<std::vector<int>> y_vec(peaks.size());
-  CommsLib::meshgrid(peaks, peaks, x_vec, y_vec);
+  CommsLib::Meshgrid(peaks, peaks, x_vec, y_vec);
 
   // Find peaks that are 64 samples apart
   std::vector<int> valid_peaks;
@@ -113,20 +113,20 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen) {
   return best_peak;
 }
 
-float CommsLib::find_max_abs(Table<complex_float> in, size_t dim1,
+float CommsLib::FindMaxAbs(Table<complex_float> in, size_t dim1,
                              size_t dim2) {
   float max_val = 0;
   for (size_t i = 0; i < dim1; i++) {
-    float cur_max_val = CommsLib::find_max_abs(in[i], dim2);
+    float cur_max_val = CommsLib::FindMaxAbs(in[i], dim2);
     if (cur_max_val > max_val) max_val = cur_max_val;
   }
   return max_val;
 }
 
-float CommsLib::find_max_abs(complex_float* in, size_t len) {
+float CommsLib::FindMaxAbs(complex_float* in, size_t len) {
   float max_val = 0;
   for (size_t j = 0; j < len; j++) {
-    auto cur_val = CommsLib::abs_cf(in[j]);
+    auto cur_val = CommsLib::AbsCf(in[j]);
     if (cur_val > max_val) {
       max_val = cur_val;
     }
@@ -134,7 +134,7 @@ float CommsLib::find_max_abs(complex_float* in, size_t len) {
   return max_val;
 }
 
-void CommsLib::meshgrid(std::vector<int> x_in, std::vector<int> y_in,
+void CommsLib::Meshgrid(std::vector<int> x_in, std::vector<int> y_in,
                         std::vector<std::vector<int>>& x,
                         std::vector<std::vector<int>>& y) {
   /*
@@ -160,7 +160,7 @@ void CommsLib::meshgrid(std::vector<int> x_in, std::vector<int> y_in,
 }
 
 template <typename T>
-std::vector<std::complex<T>> CommsLib::csign(std::vector<std::complex<T>> iq) {
+std::vector<std::complex<T>> CommsLib::Csign(std::vector<std::complex<T>> iq) {
   /*
    * Return element-wise indication of the sign of a number (for complex
    * vector).
@@ -185,7 +185,7 @@ std::vector<std::complex<T>> CommsLib::csign(std::vector<std::complex<T>> iq) {
 }
 
 template <typename T>
-std::vector<T> CommsLib::convolve(std::vector<std::complex<T>> const& f,
+std::vector<T> CommsLib::Convolve(std::vector<std::complex<T>> const& f,
                                   std::vector<std::complex<T>> const& g) {
   /* Convolution of two vectors
    * Source:
@@ -207,7 +207,7 @@ std::vector<T> CommsLib::convolve(std::vector<std::complex<T>> const& f,
   return out;
 }
 
-std::vector<float> CommsLib::magnitudeFFT(
+std::vector<float> CommsLib::MagnitudeFft(
     std::vector<std::complex<float>> const& samps,
     std::vector<float> const& win, size_t fftSize) {
   std::vector<std::complex<float>> pre_fft(samps.size());
@@ -234,7 +234,7 @@ std::vector<float> CommsLib::magnitudeFFT(
 }
 
 // Take ffsSize samples of (1 - cos(x)) / 2 from 0 up to 2pi
-std::vector<float> CommsLib::hannWindowFunction(size_t fftSize) {
+std::vector<float> CommsLib::HannWindowFunction(size_t fftSize) {
   std::vector<float> win_fcn(1, 0);
   double step = 2 * M_PI / fftSize;
 
@@ -250,7 +250,7 @@ std::vector<float> CommsLib::hannWindowFunction(size_t fftSize) {
   return win_fcn;
 }
 
-double CommsLib::windowFunctionPower(std::vector<float> const& win) {
+double CommsLib::WindowFunctionPower(std::vector<float> const& win) {
   double window_power = (0);
   size_t n = win.size();
   for (size_t n = 0; n < win.size(); n++) {
@@ -260,7 +260,7 @@ double CommsLib::windowFunctionPower(std::vector<float> const& win) {
   return 20 * std::log10(n * window_power);
 }
 
-float CommsLib::findTone(std::vector<float> const& magnitude, double winGain,
+float CommsLib::FindTone(std::vector<float> const& magnitude, double winGain,
                          double fftBin, size_t fftSize, const size_t delta) {
   /*
    * Find the tone level at a specific interval in the input Power Spectrum
@@ -279,14 +279,14 @@ float CommsLib::findTone(std::vector<float> const& magnitude, double winGain,
   return 10 * std::max(std::log10(ref_level), (float)(-20.0)) - (float)winGain;
 }
 
-float CommsLib::measureTone(std::vector<std::complex<float>> const& samps,
+float CommsLib::MeasureTone(std::vector<std::complex<float>> const& samps,
                             std::vector<float> const& win, double winGain,
                             double fftBin, size_t fftSize, const size_t delta) {
-  return findTone(magnitudeFFT(samps, win, fftSize), winGain, fftBin, fftSize,
+  return FindTone(MagnitudeFft(samps, win, fftSize), winGain, fftBin, fftSize,
                   delta);
 }
 
-std::vector<int> CommsLib::getDataSc(int fftSize) {
+std::vector<int> CommsLib::GetDataSc(int fftSize) {
   std::vector<int> data_sc;
   if (fftSize == 64) {
     int sc_ind[48] = {1,  2,  3,  4,  5,  6,  8,  9,  10, 11, 12, 13,
@@ -299,7 +299,7 @@ std::vector<int> CommsLib::getDataSc(int fftSize) {
   return data_sc;
 }
 
-std::vector<int> CommsLib::getNullSc(int fftSize) {
+std::vector<int> CommsLib::GetNullSc(int fftSize) {
   std::vector<int> null_sc;
   if (fftSize == 64) {
     int null[12] = {0, 1, 2, 3, 4, 5, 32, 59, 60, 61, 62, 63};
@@ -308,7 +308,7 @@ std::vector<int> CommsLib::getNullSc(int fftSize) {
   return null_sc;
 }
 
-std::vector<int> CommsLib::getPilotScInd(int fftSize) {
+std::vector<int> CommsLib::GetPilotScInd(int fftSize) {
   std::vector<int> pilot_sc;
   if (fftSize == 64) {
     int sc_ind[4] = {7, 21, 43, 57};
@@ -317,7 +317,7 @@ std::vector<int> CommsLib::getPilotScInd(int fftSize) {
   return pilot_sc;
 }
 
-std::vector<std::complex<float>> CommsLib::getPilotSc(int fftSize) {
+std::vector<std::complex<float>> CommsLib::GetPilotSc(int fftSize) {
   std::vector<std::complex<float>> pilot_sc;
   if (fftSize == 64) {
     std::complex<float> sc_val[4] = {1.0, 1.0, -1.0, 1.0};
@@ -425,7 +425,7 @@ void CommsLib::FFT(complex_float* in, int fftsize) {
   (void)(status);
 }
 
-std::vector<std::complex<float>> CommsLib::compose_partial_pilot_sym(
+std::vector<std::complex<float>> CommsLib::ComposePartialPilotSym(
     std::vector<std::complex<float>> pilot, size_t offset, size_t pilot_sc_num,
     size_t fftSize, size_t dataSize, size_t dataStart, size_t CP_LEN,
     bool interleaved_pilot, bool timeDomain) {
@@ -446,7 +446,7 @@ std::vector<std::complex<float>> CommsLib::compose_partial_pilot_sym(
     return fft_in;
 }
 
-void CommsLib::ifft2tx(complex_float* in, std::complex<short>* out, size_t N,
+void CommsLib::Ifft2tx(complex_float* in, std::complex<short>* out, size_t N,
                        size_t prefix, size_t cp, float scale) {
   for (size_t j = 0; j < N; j++) {
     out[prefix + cp + j] =
@@ -458,7 +458,7 @@ void CommsLib::ifft2tx(complex_float* in, std::complex<short>* out, size_t N,
   }
 }
 
-std::vector<std::complex<float>> CommsLib::modulate(std::vector<int8_t> in,
+std::vector<std::complex<float>> CommsLib::Modulate(std::vector<int8_t> in,
                                                     int type) {
   std::vector<std::complex<float>> out(in.size());
   if (type == QPSK) {
@@ -520,7 +520,7 @@ std::vector<std::complex<float>> CommsLib::modulate(std::vector<int8_t> in,
   return out;
 }
 
-std::vector<std::complex<float>> CommsLib::seqCyclicShift(
+std::vector<std::complex<float>> CommsLib::SeqCyclicShift(
     std::vector<std::complex<float>> in, float alpha) {
   std::vector<std::complex<float>> out(in.size(), 0);
   for (size_t i = 0; i < in.size(); i++) {
@@ -529,7 +529,7 @@ std::vector<std::complex<float>> CommsLib::seqCyclicShift(
   return out;
 }
 
-std::vector<std::vector<double>> CommsLib::getSequence(int N, int type) {
+std::vector<std::vector<double>> CommsLib::GetSequence(int N, int type) {
   std::vector<std::vector<double>> matrix;
 
   if (type == STS_SEQ) {
@@ -1033,7 +1033,7 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type) {
     if ((N & (N - 1)) == 0) {
       for (int i = 0; i < N; i++) {
         matrix[i].resize(N);
-        for (int j = 0; j < N; j++) matrix[i][j] = hadamard2(i, j);
+        for (int j = 0; j < N; j++) matrix[i][j] = Hadamard2(i, j);
       }
     }
   }

@@ -47,26 +47,26 @@ class PhyUe {
   PhyUe(Config* cfg);
   ~PhyUe();
 
-  void start();
-  void stop();
+  void Start();
+  void Stop();
 
   /*****************************************************
    * Downlink
    *****************************************************/
-  void initialize_downlink_buffers();
+  void InitializeDownlinkBuffers();
 
   /**
    * modulate data from nUEs and does spatial multiplexing by applying
    * beamweights
    */
-  void doEncode(int, size_t);
-  void doModul(int, size_t);
-  void doIFFT(int, size_t);
+  void DoEncode(int, size_t);
+  void DoModul(int, size_t);
+  void DoIfft(int, size_t);
 
   /*****************************************************
    * Uplink
    *****************************************************/
-  void initialize_uplink_buffers();
+  void InitializeUplinkBuffers();
 
   /**
    * Do FFT task for one OFDM symbol
@@ -99,7 +99,7 @@ class PhyUe {
    *     4. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  void doFFT(int, size_t);
+  void DoFft(int, size_t);
 
   /**
    * Do demodulation task for a block of subcarriers (demul_block_size)
@@ -127,12 +127,12 @@ class PhyUe {
    *     4. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  void doDemul(int, size_t);
-  void doDecode(int, size_t);
+  void DoDemul(int, size_t);
+  void DoDecode(int, size_t);
 
-  void getDemulData(long long** ptr, int* size);
-  void getEqualPCData(float** ptr, int* size, int);
-  void getEqualData(float** ptr, int* size, int);
+  void GetDemulData(long long** ptr, int* size);
+  void GetEqualPcData(float** ptr, int* size, int);
+  void GetEqualData(float** ptr, int* size, int);
 
   struct EventHandlerContext {
     PhyUe* obj_ptr_;
@@ -140,15 +140,15 @@ class PhyUe {
   };
 
   // while loop of task thread
-  static void* taskThread_launch(void* context);
-  void taskThread(int tid);
+  static void* TaskThreadLaunch(void* context);
+  void TaskThread(int tid);
 
   /* Add tasks into task queue based on event type */
-  void schedule_task(EventData do_task,
+  void ScheduleTask(EventData do_task,
                      moodycamel::ConcurrentQueue<EventData>* in_queue,
                      moodycamel::ProducerToken const& ptok);
 
-  void initialize_vars_from_cfg(void);
+  void InitializeVarsFromCfg(void);
 
  private:
   Config* config_;

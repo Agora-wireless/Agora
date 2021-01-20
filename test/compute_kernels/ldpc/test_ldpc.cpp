@@ -28,9 +28,9 @@ static constexpr size_t kK5GnrNumPunctured = 2;
 static constexpr size_t kNumRows = 46;
 
 int main() {
-  double freq_ghz = measure_rdtsc_freq();
+  double freq_ghz = MeasureRdtscFreq();
   std::printf("Spinning for one second for Turbo Boost\n");
-  nano_sleep(1000 * 1000 * 1000, freq_ghz);
+  NanoSleep(1000 * 1000 * 1000, freq_ghz);
   int8_t* input[kNumCodeBlocks];
   int8_t* parity[kNumCodeBlocks];
   int8_t* encoded[kNumCodeBlocks];
@@ -46,41 +46,41 @@ int main() {
       176, 352, 13,  26, 52, 104, 208, 15,  30,  60,  120, 240};
   std::sort(zc_vec.begin(), zc_vec.end());
   for (const size_t& zc : zc_vec) {
-    if (zc < ldpc_get_min_zc() || zc > ldpc_get_max_zc()) {
+    if (zc < LdpcGetMinZc() || zc > LdpcGetMaxZc()) {
       std::fprintf(stderr, "Zc value %zu not supported. Skipping.\n", zc);
       continue;
     }
-    const size_t num_input_bits = ldpc_num_input_bits(kBaseGraph, zc);
+    const size_t num_input_bits = LdpcNumInputBits(kBaseGraph, zc);
     const size_t num_encoded_bits =
-        ldpc_num_encoded_bits(kBaseGraph, zc, kNumRows);
+        LdpcNumEncodedBits(kBaseGraph, zc, kNumRows);
 
     for (size_t i = 0; i < kNumCodeBlocks; i++) {
-      input[i] = new int8_t[ldpc_encoding_input_buf_size(kBaseGraph, zc)];
-      parity[i] = new int8_t[ldpc_encoding_parity_buf_size(kBaseGraph, zc)];
-      encoded[i] = new int8_t[ldpc_encoding_encoded_buf_size(kBaseGraph, zc)];
-      decoded[i] = new uint8_t[ldpc_encoding_encoded_buf_size(kBaseGraph, zc)];
+      input[i] = new int8_t[LdpcEncodingInputBufSize(kBaseGraph, zc)];
+      parity[i] = new int8_t[LdpcEncodingParityBufSize(kBaseGraph, zc)];
+      encoded[i] = new int8_t[LdpcEncodingEncodedBufSize(kBaseGraph, zc)];
+      decoded[i] = new uint8_t[LdpcEncodingEncodedBufSize(kBaseGraph, zc)];
     }
 
     // Randomly generate input
     srand(time(NULL));
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
-      for (size_t i = 0; i < bits_to_bytes(num_input_bits); i++)
+      for (size_t i = 0; i < BitsToBytes(num_input_bits); i++)
         input[n][i] = (int8_t)rand();
     }
 
-    const size_t encoding_start_tsc = rdtsc();
+    const size_t encoding_start_tsc = Rdtsc();
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
-      ldpc_encode_helper(kBaseGraph, zc, kNumRows, encoded[n], parity[n],
+      LdpcEncodeHelper(kBaseGraph, zc, kNumRows, encoded[n], parity[n],
                          input[n]);
     }
 
     const double encoding_us =
-        cycles_to_us(rdtsc() - encoding_start_tsc, freq_ghz);
+        CyclesToUs(Rdtsc() - encoding_start_tsc, freq_ghz);
 
     // For decoding, generate log-likelihood ratios, one byte per input bit
     int8_t* llrs[kNumCodeBlocks];
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
-      llrs[n] = static_cast<int8_t*>(Agora_memory::padded_aligned_alloc(
+      llrs[n] = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::k32Align, num_encoded_bits));
       for (size_t i = 0; i < num_encoded_bits; i++) {
         uint8_t bit_i = (encoded[n][i / 8] >> (i % 8)) & 1;
@@ -103,11 +103,11 @@ int main() {
     const size_t num_msg_bits = num_input_bits - kNumFillerBits;
     ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
     ldpc_decoder_5gnr_response.varNodes =
-        static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(
+        static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
             Agora_memory::Alignment_t::k32Align, buffer_len * sizeof(int16_t)));
 
     // Decoding
-    const size_t decoding_start_tsc = rdtsc();
+    const size_t decoding_start_tsc = Rdtsc();
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
       ldpc_decoder_5gnr_request.varNodes = llrs[n];
       ldpc_decoder_5gnr_response.compactedMessageBytes = decoded[n];
@@ -116,14 +116,14 @@ int main() {
     }
 
     const double decoding_us =
-        cycles_to_us(rdtsc() - decoding_start_tsc, freq_ghz);
+        CyclesToUs(Rdtsc() - decoding_start_tsc, freq_ghz);
 
     // Check for errors
     size_t err_cnt = 0;
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
       uint8_t* input_buffer = (uint8_t*)input[n];
       uint8_t* output_buffer = decoded[n];
-      for (size_t i = 0; i < bits_to_bytes(num_input_bits); i++) {
+      for (size_t i = 0; i < BitsToBytes(num_input_bits); i++) {
         // std::printf("input: %i, output: %i\n", input_buffer[i],
         // output_buffer[i]);
         uint8_t error = input_buffer[i] ^ output_buffer[i];

@@ -68,14 +68,14 @@ int main() {
 }
 #endif
 
-void DoCRC::add_crc24(struct MacPacket* p) {
+void DoCRC::AddCrc24(struct MacPacket* p) {
   /* Init
    * TODO: Size of CRC should depend on Transport Block length and should
    * consider both header and data, not just data
    * int tb_len = p->datalen_;    // Transport Block (TB) length in bits
    */
 
-  uint32_t crc = calculate_crc24((unsigned char*)p->data_, p->datalen_);
+  uint32_t crc = CalculateCrc24((unsigned char*)p->data_, p->datalen_);
   /*
   p->crc[0] = HI(crc);
   p->crc[1] = MID(crc);
@@ -84,7 +84,7 @@ void DoCRC::add_crc24(struct MacPacket* p) {
   p->crc_ = crc;
 }
 
-uint32_t DoCRC::calculate_crc24(unsigned char* data, int len) {
+uint32_t DoCRC::CalculateCrc24(unsigned char* data, int len) {
   /*
    *
    */
@@ -100,14 +100,14 @@ uint32_t DoCRC::calculate_crc24(unsigned char* data, int len) {
   return crc;
 }
 
-bool DoCRC::check_crc24(unsigned char* data, int len, uint32_t ref_crc) {
+bool DoCRC::CheckCrc24(unsigned char* data, int len, uint32_t ref_crc) {
   /*
    * Compute CRC for incoming packet and verify it matches the CRC entry.
    * Return TRUE if it matches, FALSE otherwise
    */
 
   bool rval;
-  uint32_t crc = calculate_crc24(data, len);
+  uint32_t crc = CalculateCrc24(data, len);
 
   /*
   rval = (((p->crc[0] == HI(crc)) &&

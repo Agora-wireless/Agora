@@ -29,14 +29,14 @@ DoFFT::DoFFT(Config* config, int tid, Table<char>& socket_buffer,
   duration_stat_fft_ = stats_manager->GetDurationStat(DoerType::kFFT, tid);
   duration_stat_csi_ = stats_manager->GetDurationStat(DoerType::kCSI, tid);
   DftiCreateDescriptor(&mkl_handle_, DFTI_SINGLE, DFTI_COMPLEX, 1,
-                       cfg_->ofdm_ca_num());
+                       cfg_->OfdmCaNum());
   DftiCommitDescriptor(mkl_handle_);
 
   // Aligned for SIMD
-  fft_inout_ = static_cast<complex_float*>(Agora_memory::padded_aligned_alloc(
+  fft_inout_ = static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::k64Align,
-      cfg_->ofdm_ca_num() * sizeof(complex_float)));
-  temp_16bits_iq_ = static_cast<uint16_t*>(Agora_memory::padded_aligned_alloc(
+      cfg_->OfdmCaNum() * sizeof(complex_float)));
+  temp_16bits_iq_ = static_cast<uint16_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::k64Align, 32 * sizeof(uint16_t)));
 }
 
@@ -44,17 +44,16 @@ DoFFT::~DoFFT() {
   DftiFreeDescriptor(&mkl_handle_);
   std::free(fft_inout_);
   std::free(temp_16bits_iq_);
-  calib_ul_buffer_.free();
-  calib_dl_buffer_.free();
+  calib_ul_buffer_.Free();
+  calib_dl_buffer_.Free();
 }
 
 // @brief
 // @in_vec: input complex data to estimate regression params
 // @x0: value of the first x data (assumed consecutive integers)
 // @out_vec: output complex data with linearly regressed phase
-static inline void calib_regression_estimate(arma::cx_fvec in_vec,
-                                             arma::cx_fvec& out_vec,
-                                             size_t x0) {
+static inline void CalibRegressionEstimate(arma::cx_fvec in_vec,
+                                           arma::cx_fvec& out_vec, size_t x0) {
   size_t in_len = in_vec.size();
   size_t out_len = out_vec.size();
   std::vector<float> scs(out_len, 0);
@@ -80,38 +79,38 @@ static inline void calib_regression_estimate(arma::cx_fvec in_vec,
   out_vec *= arma::mean(in_mag);
 }
 
-EventData DoFFT::launch(size_t tag) {
+EventData DoFFT::Launch(size_t tag) {
   size_t socket_thread_id = fft_req_tag_t(tag).tid_;
   size_t buf_offset = fft_req_tag_t(tag).offset_;
-  size_t start_tsc = worker_rdtsc();
+  size_t start_tsc = WorkerRdtsc();
   auto* pkt = (Packet*)(socket_buffer_[socket_thread_id] +
-                        buf_offset * cfg_->packet_length());
+                        buf_offset * cfg_->PacketLength());
   size_t frame_id = pkt->frame_id_;
   size_t frame_slot = frame_id % kFrameWnd;
   size_t symbol_id = pkt->symbol_id_;
   size_t ant_id = pkt->ant_id_;
   SymbolType sym_type = cfg_->GetSymbolType(symbol_id);
 
-  if (cfg_->fft_in_rru() == true) {
-    simd_convert_float16_to_float32(
+  if (cfg_->FftInRru() == true) {
+    SimdConvertFloat16ToFloat32(
         reinterpret_cast<float*>(fft_inout_),
-        reinterpret_cast<float*>(&pkt->data_[2 * cfg_->ofdm_rx_zero_prefix_bs()]),
-        cfg_->ofdm_ca_num() * 2);
+        reinterpret_cast<float*>(&pkt->data_[2 * cfg_->OfdmRxZeroPrefixBs()]),
+        cfg_->OfdmCaNum() * 2);
   } else {
     if (kUse12BitIQ) {
-      simd_convert_12bit_iq_to_float(
-          (uint8_t*)pkt->data_ + 3 * cfg_->ofdm_rx_zero_prefix_bs(),
+      SimdConvert12bitIqToFloat(
+          (uint8_t*)pkt->data_ + 3 * cfg_->OfdmRxZeroPrefixBs(),
           reinterpret_cast<float*>(fft_inout_), temp_16bits_iq_,
-          cfg_->ofdm_ca_num() * 3);
+          cfg_->OfdmCaNum() * 3);
     } else {
-      size_t sample_offset = cfg_->ofdm_rx_zero_prefix_bs();
+      size_t sample_offset = cfg_->OfdmRxZeroPrefixBs();
       if (sym_type == SymbolType::kCalDL)
-        sample_offset = cfg_->ofdm_rx_zero_prefix_cal_dl();
+        sample_offset = cfg_->OfdmRxZeroPrefixCalDl();
       else if (sym_type == SymbolType::kCalUL)
-        sample_offset = cfg_->ofdm_rx_zero_prefix_cal_ul();
-      simd_convert_short_to_float(&pkt->data_[2 * sample_offset],
-                                  reinterpret_cast<float*>(fft_inout_),
-                                  cfg_->ofdm_ca_num() * 2);
+        sample_offset = cfg_->OfdmRxZeroPrefixCalUl();
+      SimdConvertShortToFloat(&pkt->data_[2 * sample_offset],
+                              reinterpret_cast<float*>(fft_inout_),
+                              cfg_->OfdmCaNum() * 2);
     }
 
     if (kDebugPrintInTask) {
@@ -119,7 +118,7 @@ EventData DoFFT::launch(size_t tag) {
                   tid_, frame_id, symbol_id, ant_id);
       if (kPrintFFTInput) {
         std::printf("FFT input\n");
-        for (size_t i = 0; i < cfg_->ofdm_ca_num(); i++) {
+        for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
           std::printf("%.4f+%.4fi ", fft_inout_[i].re, fft_inout_[i].im);
         }
         std::printf("\n");
@@ -137,75 +136,75 @@ EventData DoFFT::launch(size_t tag) {
     duration_stat = &dummy_duration_stat;  // For calibration symbols
   }
 
-  size_t start_tsc1 = worker_rdtsc();
+  size_t start_tsc1 = WorkerRdtsc();
   duration_stat->task_duration_[1] += start_tsc1 - start_tsc;
 
-  if (!cfg_->fft_in_rru() == true) {
+  if (!cfg_->FftInRru() == true) {
     DftiComputeForward(
         mkl_handle_,
         reinterpret_cast<float*>(fft_inout_));  // Compute FFT in-place
   }
 
-  size_t start_tsc2 = worker_rdtsc();
+  size_t start_tsc2 = WorkerRdtsc();
   duration_stat->task_duration_[2] += start_tsc2 - start_tsc1;
 
   if (sym_type == SymbolType::kPilot) {
     if (kCollectPhyStats) {
-      phy_stats_->update_pilot_snr(
+      phy_stats_->UpdatePilotSnr(
           frame_id, cfg_->GetPilotSymbolIdx(frame_id, symbol_id), fft_inout_);
     }
     const size_t ue_id = cfg_->GetPilotSymbolIdx(frame_id, symbol_id);
-    partial_transpose(csi_buffers_[frame_slot][ue_id], ant_id,
-                      SymbolType::kPilot);
+    PartialTranspose(csi_buffers_[frame_slot][ue_id], ant_id,
+                     SymbolType::kPilot);
   } else if (sym_type == SymbolType::kUL) {
-    partial_transpose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
-                      ant_id, SymbolType::kUL);
-  } else if (sym_type == SymbolType::kCalUL and ant_id != cfg_->ref_ant()) {
+    PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
+                     ant_id, SymbolType::kUL);
+  } else if (sym_type == SymbolType::kCalUL and ant_id != cfg_->RefAnt()) {
     // Only process uplink for antennas that also do downlink in this frame
     // for consistency with calib downlink processing.
     if (frame_id >= TX_FRAME_DELTA &&
-        ant_id / cfg_->ant_per_group() ==
-            (frame_id - TX_FRAME_DELTA) % cfg_->ant_group_num()) {
-      size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->ant_group_num();
+        ant_id / cfg_->AntPerGroup() ==
+            (frame_id - TX_FRAME_DELTA) % cfg_->AntGroupNum()) {
+      size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
       size_t frame_grp_slot = frame_grp_id % kFrameWnd;
-      partial_transpose(
-          &calib_ul_buffer_[frame_grp_slot][ant_id * cfg_->ofdm_data_num()],
+      PartialTranspose(
+          &calib_ul_buffer_[frame_grp_slot][ant_id * cfg_->OfdmDataNum()],
           ant_id, sym_type);
     }
-  } else if (sym_type == SymbolType::kCalDL and ant_id == cfg_->ref_ant()) {
+  } else if (sym_type == SymbolType::kCalDL and ant_id == cfg_->RefAnt()) {
     if (frame_id >= TX_FRAME_DELTA) {
-      size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->ant_group_num();
+      size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
       size_t frame_grp_slot = frame_grp_id % kFrameWnd;
-      size_t cur_ant = frame_id - (frame_grp_id * cfg_->ant_group_num());
+      size_t cur_ant = frame_id - (frame_grp_id * cfg_->AntGroupNum());
       complex_float* calib_dl_ptr =
-          &calib_dl_buffer_[frame_grp_slot][cur_ant * cfg_->ofdm_data_num()];
-      partial_transpose(calib_dl_ptr, ant_id, sym_type);
+          &calib_dl_buffer_[frame_grp_slot][cur_ant * cfg_->OfdmDataNum()];
+      PartialTranspose(calib_dl_ptr, ant_id, sym_type);
     }
   } else {
-    rt_assert(false, "Unknown or unsupported symbol type");
+    RtAssert(false, "Unknown or unsupported symbol type");
   }
 
-  duration_stat->task_duration_[3] += worker_rdtsc() - start_tsc2;
+  duration_stat->task_duration_[3] += WorkerRdtsc() - start_tsc2;
   socket_buffer_status_[socket_thread_id][buf_offset] = 0;  // Reset sock buf
   duration_stat->task_count_++;
-  duration_stat->task_duration_[0] += worker_rdtsc() - start_tsc;
+  duration_stat->task_duration_[0] += WorkerRdtsc() - start_tsc;
   return EventData(EventType::kFFT,
-                    gen_tag_t::frm_sym(pkt->frame_id_, pkt->symbol_id_).tag_);
+                   gen_tag_t::FrmSym(pkt->frame_id_, pkt->symbol_id_).tag_);
 }
 
-void DoFFT::partial_transpose(complex_float* out_buf, size_t ant_id,
-                              SymbolType symbol_type) const {
+void DoFFT::PartialTranspose(complex_float* out_buf, size_t ant_id,
+                             SymbolType symbol_type) const {
   // We have ofdm_data_num() % kTransposeBlockSize == 0
-  const size_t num_blocks = cfg_->ofdm_data_num() / kTransposeBlockSize;
+  const size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
 
   for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
     const size_t block_base_offset =
-        block_idx * (kTransposeBlockSize * cfg_->bs_ant_num());
+        block_idx * (kTransposeBlockSize * cfg_->BsAntNum());
     // We have kTransposeBlockSize % kSCsPerCacheline == 0
     for (size_t sc_j = 0; sc_j < kTransposeBlockSize;
          sc_j += kSCsPerCacheline) {
       const size_t sc_idx = (block_idx * kTransposeBlockSize) + sc_j;
-      const complex_float* src = &fft_inout_[sc_idx + cfg_->ofdm_data_start()];
+      const complex_float* src = &fft_inout_[sc_idx + cfg_->OfdmDataStart()];
 
       complex_float* dst = nullptr;
       if ((symbol_type == SymbolType::kCalDL) ||
@@ -215,7 +214,7 @@ void DoFFT::partial_transpose(complex_float* out_buf, size_t ant_id,
         dst = kUsePartialTrans
                   ? &out_buf[block_base_offset +
                              (ant_id * kTransposeBlockSize) + sc_j]
-                  : &out_buf[(cfg_->ofdm_data_num() * ant_id) + sc_j +
+                  : &out_buf[(cfg_->OfdmDataNum() * ant_id) + sc_j +
                              block_idx * kTransposeBlockSize];
       }
 
@@ -252,20 +251,20 @@ void DoFFT::partial_transpose(complex_float* out_buf, size_t ant_id,
           _mm256_load_ps(reinterpret_cast<const float*>(src + 4));
       if (symbol_type == SymbolType::kPilot) {
         __m256 pilot_tx0 = _mm256_set_ps(
-            cfg_->pilots_sgn()[sc_idx + 3].im, cfg_->pilots_sgn()[sc_idx + 3].re,
-            cfg_->pilots_sgn()[sc_idx + 2].im, cfg_->pilots_sgn()[sc_idx + 2].re,
-            cfg_->pilots_sgn()[sc_idx + 1].im, cfg_->pilots_sgn()[sc_idx + 1].re,
-            cfg_->pilots_sgn()[sc_idx].im, cfg_->pilots_sgn()[sc_idx].re);
+            cfg_->PilotsSgn()[sc_idx + 3].im, cfg_->PilotsSgn()[sc_idx + 3].re,
+            cfg_->PilotsSgn()[sc_idx + 2].im, cfg_->PilotsSgn()[sc_idx + 2].re,
+            cfg_->PilotsSgn()[sc_idx + 1].im, cfg_->PilotsSgn()[sc_idx + 1].re,
+            cfg_->PilotsSgn()[sc_idx].im, cfg_->PilotsSgn()[sc_idx].re);
         fft_result0 =
-            CommsLib::__m256_complex_cf32_mult(fft_result0, pilot_tx0, true);
+            CommsLib::M256ComplexCf32Mult(fft_result0, pilot_tx0, true);
 
         __m256 pilot_tx1 = _mm256_set_ps(
-            cfg_->pilots_sgn()[sc_idx + 7].im, cfg_->pilots_sgn()[sc_idx + 7].re,
-            cfg_->pilots_sgn()[sc_idx + 6].im, cfg_->pilots_sgn()[sc_idx + 6].re,
-            cfg_->pilots_sgn()[sc_idx + 5].im, cfg_->pilots_sgn()[sc_idx + 5].re,
-            cfg_->pilots_sgn()[sc_idx + 4].im, cfg_->pilots_sgn()[sc_idx + 4].re);
+            cfg_->PilotsSgn()[sc_idx + 7].im, cfg_->PilotsSgn()[sc_idx + 7].re,
+            cfg_->PilotsSgn()[sc_idx + 6].im, cfg_->PilotsSgn()[sc_idx + 6].re,
+            cfg_->PilotsSgn()[sc_idx + 5].im, cfg_->PilotsSgn()[sc_idx + 5].re,
+            cfg_->PilotsSgn()[sc_idx + 4].im, cfg_->PilotsSgn()[sc_idx + 4].re);
         fft_result1 =
-            CommsLib::__m256_complex_cf32_mult(fft_result1, pilot_tx1, true);
+            CommsLib::M256ComplexCf32Mult(fft_result1, pilot_tx1, true);
       }
       _mm256_stream_ps(reinterpret_cast<float*>(dst), fft_result0);
       _mm256_stream_ps(reinterpret_cast<float*>(dst + 4), fft_result1);
@@ -282,16 +281,16 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
       dl_socket_buffer_(in_dl_socket_buffer) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kIFFT, in_tid);
   DftiCreateDescriptor(&mkl_handle_, DFTI_SINGLE, DFTI_COMPLEX, 1,
-                       cfg_->ofdm_ca_num());
+                       cfg_->OfdmCaNum());
   if (kUseOutOfPlaceIFFT) {
     DftiSetValue(mkl_handle_, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
   }
   DftiCommitDescriptor(mkl_handle_);
 
   // Aligned for SIMD
-  ifft_out_ = static_cast<float*>(Agora_memory::padded_aligned_alloc(
-      Agora_memory::Alignment_t::k64Align,
-      2 * cfg_->ofdm_ca_num() * sizeof(float)));
+  ifft_out_ = static_cast<float*>(
+      Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::k64Align,
+                                       2 * cfg_->OfdmCaNum() * sizeof(float)));
 }
 
 DoIFFT::~DoIFFT() {
@@ -299,8 +298,8 @@ DoIFFT::~DoIFFT() {
   std::free(ifft_out_);
 }
 
-EventData DoIFFT::launch(size_t tag) {
-  size_t start_tsc = worker_rdtsc();
+EventData DoIFFT::Launch(size_t tag) {
+  size_t start_tsc = WorkerRdtsc();
   size_t ant_id = gen_tag_t(tag).ant_id_;
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
@@ -312,10 +311,10 @@ EventData DoIFFT::launch(size_t tag) {
   }
 
   size_t offset = (cfg_->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl) *
-                   cfg_->bs_ant_num()) +
+                   cfg_->BsAntNum()) +
                   ant_id;
 
-  size_t start_tsc1 = worker_rdtsc();
+  size_t start_tsc1 = WorkerRdtsc();
   duration_stat_->task_duration_[1] += start_tsc1 - start_tsc;
 
   auto* ifft_in_ptr = reinterpret_cast<float*>(dl_ifft_buffer_[offset]);
@@ -323,12 +322,12 @@ EventData DoIFFT::launch(size_t tag) {
       (kUseOutOfPlaceIFFT || kMemcpyBeforeIFFT) ? ifft_out_ : ifft_in_ptr;
 
   if (kMemcpyBeforeIFFT) {
-    std::memset(ifft_out_ptr, 0, sizeof(float) * cfg_->ofdm_data_start() * 2);
-    std::memset(ifft_out_ptr + (cfg_->ofdm_data_stop()) * 2, 0,
-                sizeof(float) * cfg_->ofdm_data_start() * 2);
-    std::memcpy(ifft_out_ptr + (cfg_->ofdm_data_start()) * 2,
-                ifft_in_ptr + (cfg_->ofdm_data_start()) * 2,
-                sizeof(float) * cfg_->ofdm_data_num() * 2);
+    std::memset(ifft_out_ptr, 0, sizeof(float) * cfg_->OfdmDataStart() * 2);
+    std::memset(ifft_out_ptr + (cfg_->OfdmDataStop()) * 2, 0,
+                sizeof(float) * cfg_->OfdmDataStart() * 2);
+    std::memcpy(ifft_out_ptr + (cfg_->OfdmDataStart()) * 2,
+                ifft_in_ptr + (cfg_->OfdmDataStart()) * 2,
+                sizeof(float) * cfg_->OfdmDataNum() * 2);
     DftiComputeBackward(mkl_handle_, ifft_out_ptr);
   } else {
     if (kUseOutOfPlaceIFFT) {
@@ -337,44 +336,44 @@ EventData DoIFFT::launch(size_t tag) {
       // to 0 since their values are not changed after IFFT
       DftiComputeBackward(mkl_handle_, ifft_in_ptr, ifft_out_ptr);
     } else {
-      std::memset(ifft_in_ptr, 0, sizeof(float) * cfg_->ofdm_data_start() * 2);
-      std::memset(ifft_in_ptr + (cfg_->ofdm_data_stop()) * 2, 0,
-                  sizeof(float) * cfg_->ofdm_data_start() * 2);
+      std::memset(ifft_in_ptr, 0, sizeof(float) * cfg_->OfdmDataStart() * 2);
+      std::memset(ifft_in_ptr + (cfg_->OfdmDataStop()) * 2, 0,
+                  sizeof(float) * cfg_->OfdmDataStart() * 2);
       DftiComputeBackward(mkl_handle_, ifft_in_ptr);
     }
   }
 
   if (kPrintIFFTOutput) {
     std::printf("data after ifft\n");
-    for (size_t i = 0; i < cfg_->ofdm_ca_num(); i++)
+    for (size_t i = 0; i < cfg_->OfdmCaNum(); i++)
       std::printf("%.1f+%.1fj ", dl_ifft_buffer_[offset][i].re,
                   dl_ifft_buffer_[offset][i].im);
     std::printf("\n");
   }
 
-  size_t start_tsc2 = worker_rdtsc();
+  size_t start_tsc2 = WorkerRdtsc();
   duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
 
   struct Packet* pkt =
-      (struct Packet*)&dl_socket_buffer_[offset * cfg_->dl_packet_length()];
-  short* socket_ptr = &pkt->data_[2 * cfg_->ofdm_tx_zero_prefix()];
+      (struct Packet*)&dl_socket_buffer_[offset * cfg_->DlPacketLength()];
+  short* socket_ptr = &pkt->data_[2 * cfg_->OfdmTxZeroPrefix()];
 
   // IFFT scaled results by ofdm_ca_num(), we scale down IFFT results
   // during data type coversion
-  simd_convert_float_to_short(ifft_out_ptr, socket_ptr, cfg_->ofdm_ca_num(),
-                              cfg_->cp_len(), cfg_->ofdm_ca_num());
+  SimdConvertFloatToShort(ifft_out_ptr, socket_ptr, cfg_->OfdmCaNum(),
+                          cfg_->CpLen(), cfg_->OfdmCaNum());
 
-  duration_stat_->task_duration_[3] += worker_rdtsc() - start_tsc2;
+  duration_stat_->task_duration_[3] += WorkerRdtsc() - start_tsc2;
 
   if (kPrintSocketOutput) {
     std::printf("IFFT data in socket\n");
-    for (size_t i = 0; i < cfg_->ofdm_ca_num(); i++) {
+    for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
       std::printf("%hi+%hij ", socket_ptr[i * 2], socket_ptr[i * 2 + 1]);
     }
     std::printf("\n");
   }
 
   duration_stat_->task_count_++;
-  duration_stat_->task_duration_[0] += worker_rdtsc() - start_tsc;
+  duration_stat_->task_duration_[0] += WorkerRdtsc() - start_tsc;
   return EventData(EventType::kIFFT, tag);
 }

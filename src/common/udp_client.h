@@ -52,7 +52,7 @@ class UDPClient {
    * @param msg Pointer to the message to send
    * @param len Length in bytes of the message to send
    */
-  void send(const std::string rem_hostname, uint16_t rem_port,
+  void Send(const std::string rem_hostname, uint16_t rem_port,
             const uint8_t* msg, size_t len) {
     std::string remote_uri = rem_hostname + ":" + std::to_string(rem_port);
     struct addrinfo* rem_addrinfo = nullptr;
@@ -94,7 +94,7 @@ class UDPClient {
   }
 
   // Enable recording of all packets sent by this UDP client
-  void enable_recording() { enable_recording_flag_ = true; }
+  void EnableRecording() { enable_recording_flag_ = true; }
 
  private:
   int sock_fd_ = -1;

@@ -5,7 +5,7 @@
 #include "iobuffer.hpp"
 
 namespace avx2enc {
-void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut,
+void LdpcEncoderBg1(int8_t* pDataIn, int8_t* pDataOut,
                       const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
                       const int16_t* pShiftMatrix, int16_t zcSize,
                       uint8_t i_LS) {
@@ -14,7 +14,7 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut,
   int16_t addr_offset = 0;
   size_t i = 0;
   __m256i x1, x2, x3, x4, x5, x6, x7, x8, x9;
-  CYCLIC_BIT_SHIFT cycle_bit_shift_p = ldpc_select_shift_func(zcSize);
+  CYCLIC_BIT_SHIFT cycle_bit_shift_p = LdpcSelectShiftFunc(zcSize);
 
   for (size_t j = 0; j < BG1_ROW_TOTAL; j++) {
     _mm256_storeu_si256((__m256i*)(pDataOut + j * kProcBytes),
@@ -109,7 +109,7 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut,
   }
 }
 
-void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut,
+void LdpcEncoderBg2(int8_t* pDataIn, int8_t* pDataOut,
                       const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
                       const int16_t* pShiftMatrix, int16_t zcSize,
                       uint8_t i_LS) {
@@ -118,7 +118,7 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut,
   int16_t addr_offset = 0;
   size_t i = 0;
   __m256i x1, x2, x3, x4, x5, x6, x7, x8, x9;
-  CYCLIC_BIT_SHIFT cycle_bit_shift_p = ldpc_select_shift_func(zcSize);
+  CYCLIC_BIT_SHIFT cycle_bit_shift_p = LdpcSelectShiftFunc(zcSize);
 
   for (size_t j = 0; j < BG2_ROW_TOTAL; j++) {
     _mm256_storeu_si256((__m256i*)(pDataOut + j * kProcBytes),
@@ -208,7 +208,7 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut,
   }
 }
 
-int32_t bblib_ldpc_encoder_5gnr(
+int32_t BblibLdpcEncoder5gnr(
     struct bblib_ldpc_encoder_5gnr_request* request,
     struct bblib_ldpc_encoder_5gnr_response* response) {
   // input -----------------------------------------------------------
@@ -272,9 +272,9 @@ int32_t bblib_ldpc_encoder_5gnr(
   int8_t parity_internal_buffer[BG1_ROW_TOTAL * avx2enc::kProcBytes] = {0};
 
   avx2enc::LDPC_ADAPTER_P ldpc_adapter_func =
-      avx2enc::ldpc_select_adapter_func(zc);
+      avx2enc::LdpcSelectAdapterFunc(zc);
   auto ldpc_encoder_func =
-      (bg == 1 ? avx2enc::ldpc_encoder_bg1 : avx2enc::ldpc_encoder_bg2);
+      (bg == 1 ? avx2enc::LdpcEncoderBg1 : avx2enc::LdpcEncoderBg2);
 
   for (int n = 0; n < number_codeblocks; n++) {
     // Scatter Zc-bit chunks of the input into kProcBytes-sized chunks

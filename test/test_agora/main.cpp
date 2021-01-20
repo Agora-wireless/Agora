@@ -1,9 +1,9 @@
 #include "agora.hpp"
 
-void read_from_file_ul(std::string filename, Table<uint8_t>& data,
+void ReadFromFileUl(std::string filename, Table<uint8_t>& data,
                        int num_bytes_per_ue, Config const* const cfg) {
-  int data_symbol_num_perframe = cfg->frame().NumULSyms();
-  size_t ue_num = cfg->ue_num();
+  int data_symbol_num_perframe = cfg->Frame().NumULSyms();
+  size_t ue_num = cfg->UeNum();
   FILE* fp = std::fopen(filename.c_str(), "rb");
   if (fp == NULL) {
     std::printf("open file failed: %s\n", filename.c_str());
@@ -24,10 +24,10 @@ void read_from_file_ul(std::string filename, Table<uint8_t>& data,
   }
 }
 
-void read_from_file_dl(std::string filename, Table<short>& data, int ofdm_size,
+void ReadFromFileDl(std::string filename, Table<short>& data, int ofdm_size,
                        Config const* const cfg) {
-  int data_symbol_num_perframe = cfg->frame().NumDLSyms();
-  size_t bs_ant_num = cfg->bs_ant_num();
+  int data_symbol_num_perframe = cfg->Frame().NumDLSyms();
+  size_t bs_ant_num = cfg->BsAntNum();
   FILE* fp = std::fopen(filename.c_str(), "rb");
   if (fp == NULL) {
     std::printf("open file failed: %s\n", filename.c_str());
@@ -45,29 +45,29 @@ void read_from_file_dl(std::string filename, Table<short>& data, int ofdm_size,
   }
 }
 
-void check_correctness_ul(Config const* const cfg) {
-  int ue_num = cfg->ue_num();
-  int num_uplink_syms = cfg->frame().NumULSyms();
-  int ofdm_data_num = cfg->ofdm_data_num();
-  int ul_pilot_syms = cfg->frame().client_ul_pilot_symbols();
+void CheckCorrectnessUl(Config const* const cfg) {
+  int ue_num = cfg->UeNum();
+  int num_uplink_syms = cfg->Frame().NumULSyms();
+  int ofdm_data_num = cfg->OfdmDataNum();
+  int ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string raw_data_filename = cur_directory + "/data/LDPC_orig_data_" +
-                                  std::to_string(cfg->ofdm_ca_num()) + "_ant" +
-                                  std::to_string(cfg->ue_num()) + ".bin";
+                                  std::to_string(cfg->OfdmCaNum()) + "_ant" +
+                                  std::to_string(cfg->UeNum()) + ".bin";
   std::string output_data_filename = cur_directory + "/data/decode_data.bin";
 
   Table<uint8_t> raw_data;
   Table<uint8_t> output_data;
-  raw_data.calloc(num_uplink_syms, (ofdm_data_num * ue_num),
+  raw_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
                   Agora_memory::Alignment_t::k64Align);
-  output_data.calloc(num_uplink_syms, (ofdm_data_num * ue_num),
+  output_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
                      Agora_memory::Alignment_t::k64Align);
 
-  int num_bytes_per_ue = (cfg->ldpc_config().num_cb_len() + 7) >>
-                         3 * cfg->ldpc_config().num_blocks_in_symbol();
-  read_from_file_ul(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
-  read_from_file_ul(output_data_filename, output_data, num_bytes_per_ue, cfg);
+  int num_bytes_per_ue = (cfg->LdpcConfig().NumCbLen() + 7) >>
+                         3 * cfg->LdpcConfig().NumBlocksInSymbol();
+  ReadFromFileUl(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
+  ReadFromFileUl(output_data_filename, output_data, num_bytes_per_ue, cfg);
 
   std::printf(
       "check_correctness_ul: ue %d, ul syms %d, ofdm %d, ul pilots %d, bytes "
@@ -102,15 +102,15 @@ void check_correctness_ul(Config const* const cfg) {
                 total_count);
   }
   std::printf("======================\n\n");
-  raw_data.free();
-  output_data.free();
+  raw_data.Free();
+  output_data.Free();
 }
 
-void check_correctness_dl(Config const* const cfg) {
-  int bs_ant_num = cfg->bs_ant_num();
-  int num_data_syms = cfg->frame().NumDLSyms();
-  int ofdm_ca_num = cfg->ofdm_ca_num();
-  int samps_per_symbol = cfg->samps_per_symbol();
+void CheckCorrectnessDl(Config const* const cfg) {
+  int bs_ant_num = cfg->BsAntNum();
+  int num_data_syms = cfg->Frame().NumDLSyms();
+  int ofdm_ca_num = cfg->OfdmCaNum();
+  int samps_per_symbol = cfg->SampsPerSymbol();
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string raw_data_filename = cur_directory + "/data/LDPC_dl_tx_data_" +
@@ -119,13 +119,13 @@ void check_correctness_dl(Config const* const cfg) {
   std::string tx_data_filename = cur_directory + "/data/tx_data.bin";
   Table<short> raw_data;
   Table<short> tx_data;
-  raw_data.calloc(num_data_syms * bs_ant_num, samps_per_symbol * 2,
+  raw_data.Calloc(num_data_syms * bs_ant_num, samps_per_symbol * 2,
                   Agora_memory::Alignment_t::k64Align);
-  tx_data.calloc(num_data_syms * bs_ant_num, samps_per_symbol * 2,
+  tx_data.Calloc(num_data_syms * bs_ant_num, samps_per_symbol * 2,
                  Agora_memory::Alignment_t::k64Align);
 
-  read_from_file_dl(raw_data_filename, raw_data, samps_per_symbol, cfg);
-  read_from_file_dl(tx_data_filename, tx_data, samps_per_symbol, cfg);
+  ReadFromFileDl(raw_data_filename, raw_data, samps_per_symbol, cfg);
+  ReadFromFileDl(tx_data_filename, tx_data, samps_per_symbol, cfg);
   std::printf(
       "check_correctness_dl: bs ant %d, dl syms %d, ofdm %d, samps per %d. \n",
       bs_ant_num, num_data_syms, ofdm_ca_num, samps_per_symbol);
@@ -163,13 +163,13 @@ void check_correctness_dl(Config const* const cfg) {
     std::printf("Failed downlink test! Error rate: %d/%d\n", error_cnt,
                 total_count);
   std::printf("======================\n\n");
-  raw_data.free();
-  tx_data.free();
+  raw_data.Free();
+  tx_data.Free();
 }
 
-void check_correctness(Config const* const cfg) {
-  check_correctness_ul(cfg);
-  check_correctness_dl(cfg);
+void CheckCorrectness(Config const* const cfg) {
+  CheckCorrectnessUl(cfg);
+  CheckCorrectnessDl(cfg);
 }
 
 int main(int argc, char* argv[]) {
@@ -186,7 +186,7 @@ int main(int argc, char* argv[]) {
   int ret;
   try {
     SignalHandler signal_handler;
-    signal_handler.setupSignalHandlers();
+    signal_handler.SetupSignalHandlers();
     std::unique_ptr<Agora> agora_cli(new Agora(cfg.get()));
     agora_cli->flags_.enable_save_decode_data_to_file_ = true;
     agora_cli->flags_.enable_save_tx_data_to_file_ = true;
@@ -194,12 +194,12 @@ int main(int argc, char* argv[]) {
 
     std::printf("Start correctness check\n");
 
-    if ((cfg->frame().NumDLSyms() > 0) && (cfg->frame().NumULSyms() > 0)) {
-      check_correctness(cfg.get());
-    } else if (cfg->frame().NumDLSyms() > 0) {
-      check_correctness_dl(cfg.get());
-    } else if (cfg->frame().NumULSyms() > 0) {
-      check_correctness_ul(cfg.get());
+    if ((cfg->Frame().NumDLSyms() > 0) && (cfg->Frame().NumULSyms() > 0)) {
+      CheckCorrectness(cfg.get());
+    } else if (cfg->Frame().NumDLSyms() > 0) {
+      CheckCorrectnessDl(cfg.get());
+    } else if (cfg->Frame().NumULSyms() > 0) {
+      CheckCorrectnessUl(cfg.get());
     } else {
       // Should never happen
       assert(false);

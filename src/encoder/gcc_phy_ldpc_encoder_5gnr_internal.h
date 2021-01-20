@@ -66,22 +66,22 @@ extern "C" {
 #define WAYS_18to32 16
 #define WAYS_2to16 16
 
-void adapter_from288to384(int8_t** pBuff0, int8_t* pBuff1, uint16_t zcSize,
+void AdapterFrom288to384(int8_t** pBuff0, int8_t* pBuff1, uint16_t zcSize,
                           uint32_t cbLen, int8_t direct);  // 1ways
-void adapter_2ways_from144to256(int8_t** pbuff0, int8_t* pbuff1,
+void Adapter2waysFrom144to256(int8_t** pbuff0, int8_t* pbuff1,
                                 uint16_t zcSize, uint32_t cbLen,
                                 int8_t direct);  // 2ways
-void adapter_4ways_from72to128(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
+void Adapter4waysFrom72to128(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
                                uint32_t cbLen, int8_t direct);  // 4ways
-void adapter_8ways_from36to64(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
+void Adapter8waysFrom36to64(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
                               uint32_t cbLen, int8_t direct);  // 8ways
-void adapter_16ways_from18to32(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
+void Adapter16waysFrom18to32(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
                                uint32_t cbLen, int8_t direct);  // 16ways
-void adapter_16ways_from2to16(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
+void Adapter16waysFrom2to16(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
                               uint32_t cbLen, int8_t direct);  // 16ways
 
 typedef void (*LDPC_ADAPTER_P)(int8_t**, int8_t*, uint16_t, uint32_t, int8_t);
-LDPC_ADAPTER_P ldpc_select_adapter_func(uint16_t zcSize);
+LDPC_ADAPTER_P LdpcSelectAdapterFunc(uint16_t zcSize);
 
 #define PROC_BYTES 64
 #define I_LS_NUM 8
@@ -97,9 +97,9 @@ LDPC_ADAPTER_P ldpc_select_adapter_func(uint16_t zcSize);
 #define BG2_COL_INF_NUM 10
 #define BG2_NONZERO_NUM 188
 
-void ldpc_enc_initial();
+void LdpcEncInitial();
 
-void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut,
+void LdpcEncoderBg1(int8_t* pDataIn, int8_t* pDataOut,
                       const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
                       const int16_t* pShiftMatrix, int16_t zcSize);
 

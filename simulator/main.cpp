@@ -29,9 +29,9 @@ int main(int argc, char const* argv[]) {
     SignalHandler signal_handler;
 
     // Register signal handler to handle kill signal
-    signal_handler.setupSignalHandlers();
+    signal_handler.SetupSignalHandlers();
     simulator = new Simulator(cfg, thread_num, core_offset, delay);
-    simulator->start();
+    simulator->Start();
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;

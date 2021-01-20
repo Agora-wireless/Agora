@@ -40,17 +40,17 @@ class DoZF : public Doer {
    *     2. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  EventData launch(size_t tag);
+  EventData Launch(size_t tag);
 
  private:
-  void ZF_time_orthogonal(size_t tag);
+  void ZfTimeOrthogonal(size_t tag);
 
   /// Compute the uplink zeroforcing detector matrix and/or the downlink
   /// zeroforcing precoder using this CSI matrix and calibration buffer
-  void compute_precoder(const arma::cx_fmat& mat_csi, complex_float* calib_buf,
-                        complex_float* mat_ul_zf, complex_float* mat_dl_zf);
+  void ComputePrecoder(const arma::cx_fmat& mat_csi, complex_float* calib_buf,
+                       complex_float* mat_ul_zf, complex_float* mat_dl_zf);
 
-  void ZF_freq_orthogonal(size_t tag);
+  void ZfFreqOrthogonal(size_t tag);
 
   /**
    * Do prediction task for one subcarrier

@@ -4,20 +4,20 @@
 
 Stats::Stats(Config* cfg)
     : kConfig(cfg),
-      kTaskThreadNum(cfg->worker_thread_num()),
-      kFftThreadNum(cfg->fft_thread_num()),
-      kZfThreadNum(cfg->zf_thread_num()),
-      kDemulThreadNum(cfg->demul_thread_num()),
-      kDecodeThreadNum(cfg->decode_thread_num()),
-      kFreqGhz(cfg->freq_ghz()),
-      kCreationTsc(rdtsc()),
+      kTaskThreadNum(cfg->WorkerThreadNum()),
+      kFftThreadNum(cfg->FftThreadNum()),
+      kZfThreadNum(cfg->ZfThreadNum()),
+      kDemulThreadNum(cfg->DemulThreadNum()),
+      kDecodeThreadNum(cfg->DecodeThreadNum()),
+      kFreqGhz(cfg->FreqGhz()),
+      kCreationTsc(Rdtsc()),
       doer_us_(),
       doer_breakdown_us_() {
-  frame_start_.calloc(kConfig->socket_thread_num(), kNumStatsFrames,
+  frame_start_.Calloc(kConfig->SocketThreadNum(), kNumStatsFrames,
                       Agora_memory::Alignment_t::k64Align);
 }
 
-Stats::~Stats() { frame_start_.free(); }
+Stats::~Stats() { frame_start_.Free(); }
 
 void Stats::PopulateSummary(FrameSummary* frame_summary, size_t thread_id,
                             DoerType doer_type) {
@@ -28,7 +28,7 @@ void Stats::PopulateSummary(FrameSummary* frame_summary, size_t thread_id,
   frame_summary->count_all_threads_ += frame_summary->count_this_thread_;
 
   for (size_t j = 0; j < kBreakDownNum; j++) {
-    frame_summary->us_this_thread_.at(j) = cycles_to_us(
+    frame_summary->us_this_thread_.at(j) = CyclesToUs(
         ds->task_duration_.at(j) - ds_old->task_duration_.at(j), kFreqGhz);
     frame_summary->us_avg_threads_.at(j) += frame_summary->us_this_thread_.at(j);
   }
@@ -133,13 +133,13 @@ void Stats::SaveToFile(void) {
   std::string filename = cur_directory + "/data/timeresult.txt";
   std::printf("Stats: Saving master timestamps to %s\n", filename.c_str());
   FILE* fp_debug = std::fopen(filename.c_str(), "w");
-  rt_assert(fp_debug != nullptr,
+  RtAssert(fp_debug != nullptr,
             std::string("Open file failed ") + std::to_string(errno));
 
   // For backwards compatibility, it is easier to make a new file format for
   // the combined case
-  if ((kConfig->frame().NumDLSyms() > 0) &&
-      (kConfig->frame().NumULSyms() > 0)) {
+  if ((kConfig->Frame().NumDLSyms() > 0) &&
+      (kConfig->Frame().NumULSyms() > 0)) {
     std::fprintf(fp_debug,
                  "Pilot RX by socket threads (= reference time), "
                  "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
@@ -148,7 +148,7 @@ void Stats::SaveToFile(void) {
                  "FFT, time in ZF, time in Demul, time in Decode\n");
     for (size_t i = 0; i < this->last_frame_id_; i++) {
       size_t ref_tsc = SIZE_MAX;
-      for (size_t j = 0; j < kConfig->socket_thread_num(); j++) {
+      for (size_t j = 0; j < kConfig->SocketThreadNum(); j++) {
         ref_tsc = std::min(ref_tsc, this->frame_start_[j][i]);
       }
       std::fprintf(
@@ -156,7 +156,7 @@ void Stats::SaveToFile(void) {
           "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
           "%.3f %.3f %.3f "
           "%.3f %.3f\n",
-          cycles_to_us(ref_tsc - this->kCreationTsc, this->kFreqGhz),
+          CyclesToUs(ref_tsc - this->kCreationTsc, this->kFreqGhz),
           MasterGetUsFromRef(TsType::kPilotRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
@@ -174,19 +174,19 @@ void Stats::SaveToFile(void) {
           this->doer_us_.at(static_cast<size_t>(DoerType::kDemul)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDecode)).at(i));
     }
-  } else if (kConfig->frame().NumDLSyms() > 0) {
+  } else if (kConfig->Frame().NumDLSyms() > 0) {
     std::fprintf(fp_debug,
                  "Pilot RX by socket threads (= reference time), "
                  "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
                  "kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kRXDone\n");
     for (size_t i = 0; i < this->last_frame_id_; i++) {
       size_t ref_tsc = SIZE_MAX;
-      for (size_t j = 0; j < kConfig->socket_thread_num(); j++) {
+      for (size_t j = 0; j < kConfig->SocketThreadNum(); j++) {
         ref_tsc = std::min(ref_tsc, this->frame_start_[j][i]);
       }
       std::fprintf(fp_debug,
                    "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f \n",
-                   cycles_to_us(ref_tsc - this->kCreationTsc, this->kFreqGhz),
+                   CyclesToUs(ref_tsc - this->kCreationTsc, this->kFreqGhz),
                    MasterGetUsFromRef(TsType::kPilotRX, i, ref_tsc),
                    MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
                    MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
@@ -197,7 +197,7 @@ void Stats::SaveToFile(void) {
                    MasterGetUsFromRef(TsType::kEncodeDone, i, ref_tsc),
                    MasterGetUsFromRef(TsType::kRXDone, i, ref_tsc));
     }
-  } else if (kConfig->frame().NumULSyms() > 0) {
+  } else if (kConfig->Frame().NumULSyms() > 0) {
     // Print the header
     std::fprintf(
         fp_debug,
@@ -207,14 +207,14 @@ void Stats::SaveToFile(void) {
         "FFT, time in ZF, time in Demul, time in Decode\n");
     for (size_t i = 0; i < this->last_frame_id_; i++) {
       size_t ref_tsc = SIZE_MAX;
-      for (size_t j = 0; j < kConfig->socket_thread_num(); j++) {
+      for (size_t j = 0; j < kConfig->SocketThreadNum(); j++) {
         ref_tsc = std::min(ref_tsc, this->frame_start_[j][i]);
       }
       std::fprintf(
           fp_debug,
           "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.3f %.3f %.3f "
           "%.3f %.3f\n",
-          cycles_to_us(ref_tsc - this->kCreationTsc, this->kFreqGhz),
+          CyclesToUs(ref_tsc - this->kCreationTsc, this->kFreqGhz),
           MasterGetUsFromRef(TsType::kPilotRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
@@ -231,7 +231,7 @@ void Stats::SaveToFile(void) {
     }
   } else {
     // Shouldn't happen
-    rt_assert(false,
+    RtAssert(false,
               std::string("No uplink or downlink symbols in the frame\n"));
   }
 
@@ -244,7 +244,7 @@ void Stats::SaveToFile(void) {
                 filename_detailed.c_str());
 
     FILE* fp_debug_detailed = std::fopen(filename_detailed.c_str(), "w");
-    rt_assert(fp_debug_detailed != nullptr,
+    RtAssert(fp_debug_detailed != nullptr,
               std::string("Open file failed ") + std::to_string(errno));
     // Print the header
     std::fprintf(
@@ -329,25 +329,25 @@ void Stats::PrintSummary(void) {
     double csi_frames =
         (static_cast<double>(
             num_tasks.at(static_cast<size_t>(DoerType::kCSI)))) /
-        (this->kConfig->bs_ant_num() * this->kConfig->frame().NumPilotSyms());
+        (this->kConfig->BsAntNum() * this->kConfig->Frame().NumPilotSyms());
     double zf_frames = (static_cast<double>(
                            num_tasks.at(static_cast<size_t>(DoerType::kZF)))) /
-                       this->kConfig->zf_events_per_symbol();
+                       this->kConfig->ZfEventsPerSymbol();
 
-    if (kConfig->frame().NumDLSyms() > 0) {
+    if (kConfig->Frame().NumDLSyms() > 0) {
       double precode_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kPrecode)))) /
-          (this->kConfig->ofdm_data_num() * this->kConfig->frame().NumDLSyms());
+          (this->kConfig->OfdmDataNum() * this->kConfig->Frame().NumDLSyms());
       double ifft_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kIFFT)))) /
-          (this->kConfig->bs_ant_num() * this->kConfig->frame().NumDLSyms());
+          (this->kConfig->BsAntNum() * this->kConfig->Frame().NumDLSyms());
       double encode_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kEncode)))) /
-          (this->kConfig->ldpc_config().num_blocks_in_symbol() *
-           this->kConfig->ue_num() * this->kConfig->frame().NumDLSyms());
+          (this->kConfig->LdpcConfig().NumBlocksInSymbol() *
+           this->kConfig->UeNum() * this->kConfig->Frame().NumDLSyms());
       std::printf("Downlink totals (tasks, frames): ");
       std::printf("CSI (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kCSI)),
@@ -366,20 +366,20 @@ void Stats::PrintSummary(void) {
       std::printf("\n");
     }  // config_->frame().NumDLSyms() > 0
 
-    if (kConfig->frame().NumULSyms() > 0) {
+    if (kConfig->Frame().NumULSyms() > 0) {
       double fft_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kFFT)))) /
-          (this->kConfig->bs_ant_num() * this->kConfig->frame().NumULSyms());
+          (this->kConfig->BsAntNum() * this->kConfig->Frame().NumULSyms());
       double demul_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kDemul)))) /
-          (this->kConfig->ofdm_data_num() * this->kConfig->frame().NumULSyms());
+          (this->kConfig->OfdmDataNum() * this->kConfig->Frame().NumULSyms());
       double decode_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kDecode)))) /
-          (this->kConfig->ldpc_config().num_blocks_in_symbol() *
-           this->kConfig->ue_num() * this->kConfig->frame().NumULSyms());
+          (this->kConfig->LdpcConfig().NumBlocksInSymbol() *
+           this->kConfig->UeNum() * this->kConfig->Frame().NumULSyms());
       std::printf("Uplink totals (tasks, frames): ");
       std::printf("CSI (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kCSI)),

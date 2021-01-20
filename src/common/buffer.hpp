@@ -56,7 +56,7 @@ union gen_tag_t {
   gen_tag_t(size_t _tag) : tag_(_tag) {}
 
   // Return a string representation of this tag
-  std::string to_string() {
+  std::string ToString() {
     std::ostringstream ret;
     ret << "[Frame ID " << std::to_string(frame_id_) << ", symbol ID "
         << std::to_string(symbol_id_);
@@ -82,7 +82,7 @@ union gen_tag_t {
 
   // Generate a tag with code block ID, frame ID, and symbol ID bits set and
   // other fields blank
-  static gen_tag_t frm_sym_cb(size_t frame_id, size_t symbol_id, size_t cb_id) {
+  static gen_tag_t FrmSymCb(size_t frame_id, size_t symbol_id, size_t cb_id) {
     gen_tag_t ret(0);
     ret.frame_id_ = frame_id;
     ret.symbol_id_ = symbol_id;
@@ -93,7 +93,7 @@ union gen_tag_t {
 
   // Generate a tag with user ID, frame ID, and symbol ID bits set and
   // other fields blank
-  static gen_tag_t frm_sym_ue(size_t frame_id, size_t symbol_id, size_t ue_id) {
+  static gen_tag_t FrmSymUe(size_t frame_id, size_t symbol_id, size_t ue_id) {
     gen_tag_t ret(0);
     ret.frame_id_ = frame_id;
     ret.symbol_id_ = symbol_id;
@@ -104,7 +104,7 @@ union gen_tag_t {
 
   // Generate a tag with frame ID, symbol ID, and subcarrier ID bits set and
   // other fields blank
-  static gen_tag_t frm_sym_sc(size_t frame_id, size_t symbol_id, size_t sc_id) {
+  static gen_tag_t FrmSymSc(size_t frame_id, size_t symbol_id, size_t sc_id) {
     gen_tag_t ret(0);
     ret.frame_id_ = frame_id;
     ret.symbol_id_ = symbol_id;
@@ -115,7 +115,7 @@ union gen_tag_t {
 
   // Generate a tag with antenna ID, frame ID, and symbol ID bits set and
   // other fields blank
-  static gen_tag_t frm_sym_ant(size_t frame_id, size_t symbol_id,
+  static gen_tag_t FrmSymAnt(size_t frame_id, size_t symbol_id,
                                size_t ant_id) {
     gen_tag_t ret(0);
     ret.frame_id_ = frame_id;
@@ -127,7 +127,7 @@ union gen_tag_t {
 
   // Generate a tag with frame ID and subcarrier ID bits set, and other fields
   // blank
-  static gen_tag_t frm_sc(size_t frame_id, size_t sc_id) {
+  static gen_tag_t FrmSc(size_t frame_id, size_t sc_id) {
     gen_tag_t ret(0);
     ret.frame_id_ = frame_id;
     ret.symbol_id_ = kInvalidSymbolId;
@@ -138,7 +138,7 @@ union gen_tag_t {
 
   // Generate a tag with frame ID and symbol ID bits set, and other fields
   // blank
-  static gen_tag_t frm_sym(size_t frame_id, size_t symbol_id) {
+  static gen_tag_t FrmSym(size_t frame_id, size_t symbol_id) {
     gen_tag_t ret(0);
     ret.frame_id_ = frame_id;
     ret.symbol_id_ = symbol_id;
@@ -184,7 +184,7 @@ struct Packet {
   Packet(int f, int s, int c, int a)  // TODO: Should be unsigned integers
       : frame_id_(f), symbol_id_(s), cell_id_(c), ant_id_(a) {}
 
-  std::string to_string() const {
+  std::string ToString() const {
     std::ostringstream ret;
     ret << "[Frame seq num " << frame_id_ << ", symbol ID " << symbol_id_
         << ", cell ID " << cell_id_ << ", antenna ID " << ant_id_ << ", "
@@ -209,7 +209,7 @@ struct MacPacket {
             int cc)  // TODO: Should be unsigned integers
       : frame_id_(f), symbol_id_(s), ue_id_(u), datalen_(d), crc_(cc) {}
 
-  std::string to_string() const {
+  std::string ToString() const {
     std::ostringstream ret;
     ret << "[Frame seq num " << frame_id_ << ", symbol ID " << symbol_id_
         << ", user ID " << ue_id_ << "]";
@@ -353,8 +353,8 @@ class FrameCounters {
     return this->task_count_.at(frame_id % kFrameWnd).at(symbol_id);
   }
 
-  inline size_t max_symbol_count(void) const { return this->max_symbol_count_; }
-  inline size_t max_task_count(void) const { return this->max_task_count_; }
+  inline size_t MaxSymbolCount(void) const { return this->max_symbol_count_; }
+  inline size_t MaxTaskCount(void) const { return this->max_task_count_; }
 
  private:
   // task_count[i][j] is the number of tasks completed for

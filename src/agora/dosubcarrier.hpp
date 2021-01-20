@@ -151,7 +151,7 @@ class DoSubcarrier : public Doer {
       }
 
       if (csi_cur_frame_ > zf_cur_frame_) {
-        do_zf_->launch(
+        do_zf_->Launch(
             gen_tag_t::frm_sym_sc(
                 zf_cur_frame_, 0,
                 sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size())

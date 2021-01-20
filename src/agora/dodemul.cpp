@@ -21,22 +21,22 @@ DoDemul::DoDemul(
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kDemul, tid);
 
   data_gather_buffer_ =
-      static_cast<complex_float*>(Agora_memory::padded_aligned_alloc(
+      static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::k64Align,
           kSCsPerCacheline * kMaxAntennas * sizeof(complex_float)));
   equaled_buffer_temp_ =
-      static_cast<complex_float*>(Agora_memory::padded_aligned_alloc(
+      static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::k64Align,
-          cfg_->demul_block_size() * kMaxUEs * sizeof(complex_float)));
+          cfg_->DemulBlockSize() * kMaxUEs * sizeof(complex_float)));
   equaled_buffer_temp_transposed_ =
-      static_cast<complex_float*>(Agora_memory::padded_aligned_alloc(
+      static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::k64Align,
-          cfg_->demul_block_size() * kMaxUEs * sizeof(complex_float)));
+          cfg_->DemulBlockSize() * kMaxUEs * sizeof(complex_float)));
 
   // phase offset calibration data
   cx_float* ue_pilot_ptr =
-      reinterpret_cast<cx_float*>(cfg_->ue_specific_pilot()[0]);
-  cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->ofdm_data_num(), cfg_->ue_ant_num(),
+      reinterpret_cast<cx_float*>(cfg_->UeSpecificPilot()[0]);
+  cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(), cfg_->UeAntNum(),
                          false);
   ue_pilot_data_ = mat_pilot_data.st();
 
@@ -45,9 +45,9 @@ DoDemul::DoDemul(
   MKL_Complex8 beta = {0, 0};
 
   mkl_jit_status_t status = mkl_jit_create_cgemm(
-      &jitter_, MKL_COL_MAJOR, MKL_NOTRANS, MKL_NOTRANS, cfg_->ue_num(), 1,
-      cfg_->bs_ant_num(), &alpha, cfg_->ue_num(), cfg_->bs_ant_num(), &beta,
-      cfg_->ue_num());
+      &jitter_, MKL_COL_MAJOR, MKL_NOTRANS, MKL_NOTRANS, cfg_->UeNum(), 1,
+      cfg_->BsAntNum(), &alpha, cfg_->UeNum(), cfg_->BsAntNum(), &beta,
+      cfg_->UeNum());
   if (MKL_JIT_ERROR == status) {
     std::fprintf(
         stderr,
@@ -71,7 +71,7 @@ DoDemul::~DoDemul() {
 #endif
 }
 
-EventData DoDemul::launch(size_t tag) {
+EventData DoDemul::Launch(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id_;
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
@@ -80,7 +80,7 @@ EventData DoDemul::launch(size_t tag) {
   const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
 
   const size_t frame_slot = frame_id % kFrameWnd;
-  size_t start_tsc = worker_rdtsc();
+  size_t start_tsc = WorkerRdtsc();
 
   if (kDebugPrintInTask == true) {
     std::printf(
@@ -90,11 +90,11 @@ EventData DoDemul::launch(size_t tag) {
   }
 
   size_t max_sc_ite =
-      std::min(cfg_->demul_block_size(), cfg_->ofdm_data_num() - base_sc_id);
+      std::min(cfg_->DemulBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
   assert(max_sc_ite % kSCsPerCacheline == 0);
   // Iterate through cache lines
   for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
-    size_t start_tsc0 = worker_rdtsc();
+    size_t start_tsc0 = WorkerRdtsc();
 
     // Step 1: Populate data_gather_buffer as a row-major matrix with
     // kSCsPerCacheline rows and bs_ant_num() columns
@@ -104,10 +104,10 @@ EventData DoDemul::launch(size_t tag) {
     // same partial transpose block.
     const size_t partial_transpose_block_base =
         ((base_sc_id + i) / kTransposeBlockSize) *
-        (kTransposeBlockSize * cfg_->bs_ant_num());
+        (kTransposeBlockSize * cfg_->BsAntNum());
 
     size_t ant_start = 0;
-    if (kUseSIMDGather and cfg_->bs_ant_num() % 4 == 0 and kUsePartialTrans) {
+    if (kUseSIMDGather and cfg_->BsAntNum() % 4 == 0 and kUsePartialTrans) {
       __m256i index = _mm256_setr_epi32(
           0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
           kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
@@ -118,30 +118,30 @@ EventData DoDemul::launch(size_t tag) {
           partial_transpose_block_base + (base_sc_id + i) % kTransposeBlockSize;
       auto* src = (const float*)&data_buf[cur_sc_offset];
       auto* dst = (float*)data_gather_buffer_;
-      for (size_t ant_i = 0; ant_i < cfg_->bs_ant_num(); ant_i += 4) {
+      for (size_t ant_i = 0; ant_i < cfg_->BsAntNum(); ant_i += 4) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
           __m256 data_rx = _mm256_i32gather_ps(src + j * 2, index, 4);
-          _mm256_store_ps(dst + j * cfg_->bs_ant_num() * 2, data_rx);
+          _mm256_store_ps(dst + j * cfg_->BsAntNum() * 2, data_rx);
         }
         src += (kSCsPerCacheline * kTransposeBlockSize);
         dst += 8;
       }
       // Set the remaining number of antennas for non-SIMD gather
-      ant_start = cfg_->bs_ant_num() % 4;
+      ant_start = cfg_->BsAntNum() % 4;
     } else {
       complex_float* dst = data_gather_buffer_ + ant_start;
       for (size_t j = 0; j < kSCsPerCacheline; j++) {
-        for (size_t ant_i = ant_start; ant_i < cfg_->bs_ant_num(); ant_i++) {
+        for (size_t ant_i = ant_start; ant_i < cfg_->BsAntNum(); ant_i++) {
           *dst++ =
               kUsePartialTrans
                   ? data_buf[partial_transpose_block_base +
                              (ant_i * kTransposeBlockSize) +
                              ((base_sc_id + i + j) % kTransposeBlockSize)]
-                  : data_buf[ant_i * cfg_->ofdm_data_num() + base_sc_id + i + j];
+                  : data_buf[ant_i * cfg_->OfdmDataNum() + base_sc_id + i + j];
         }
       }
     }
-    duration_stat_->task_duration_[1] += worker_rdtsc() - start_tsc0;
+    duration_stat_->task_duration_[1] += WorkerRdtsc() - start_tsc0;
 
     // Step 2: For each subcarrier, perform equalization by multiplying the
     // subcarrier's data from each antenna with the subcarrier's precoder
@@ -151,20 +151,20 @@ EventData DoDemul::launch(size_t tag) {
       cx_float* equal_ptr = nullptr;
       if (kExportConstellation) {
         equal_ptr = (cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                              [cur_sc_id * cfg_->ue_num()]);
+                                              [cur_sc_id * cfg_->UeNum()]);
       } else {
         equal_ptr = (cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
-                                                      cfg_->ue_num()]);
+                                                      cfg_->UeNum()]);
       }
-      cx_fmat mat_equaled(equal_ptr, cfg_->ue_num(), 1, false);
+      cx_fmat mat_equaled(equal_ptr, cfg_->UeNum(), 1, false);
 
       auto* data_ptr = reinterpret_cast<cx_float*>(
-          &data_gather_buffer_[j * cfg_->bs_ant_num()]);
+          &data_gather_buffer_[j * cfg_->BsAntNum()]);
       // size_t start_tsc2 = worker_rdtsc();
       auto* ul_zf_ptr = reinterpret_cast<cx_float*>(
           ul_zf_matrices_[frame_slot][cfg_->GetZfScId(cur_sc_id)]);
 
-      size_t start_tsc2 = worker_rdtsc();
+      size_t start_tsc2 = WorkerRdtsc();
 #if USE_MKL_JIT
       mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_zf_ptr, (MKL_Complex8*)data_ptr,
                      (MKL_Complex8*)equal_ptr);
@@ -176,37 +176,36 @@ EventData DoDemul::launch(size_t tag) {
 #endif
 
       if (symbol_idx_ul <
-          cfg_->frame().client_ul_pilot_symbols()) {  // Calc new phase shift
+          cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
         if (symbol_idx_ul == 0 && cur_sc_id == 0) {
           // Reset previous frame
           cx_float* phase_shift_ptr =
               (cx_float*)ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd];
-          cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->ue_num(),
-                                  cfg_->frame().client_ul_pilot_symbols(),
-                                  false);
+          cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeNum(),
+                                  cfg_->Frame().ClientUlPilotSymbols(), false);
           mat_phase_shift.fill(0);
         }
         cx_float* phase_shift_ptr =
             (cx_float*)&ue_spec_pilot_buffer_[frame_id % kFrameWnd]
-                                             [symbol_idx_ul * cfg_->ue_num()];
-        cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->ue_num(), 1, false);
+                                             [symbol_idx_ul * cfg_->UeNum()];
+        cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeNum(), 1, false);
         cx_fmat shift_sc =
             sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
         mat_phase_shift += shift_sc;
-      } else if (cfg_->frame().client_ul_pilot_symbols() >
+      } else if (cfg_->Frame().ClientUlPilotSymbols() >
                  0) {  // apply previously calc'ed phase shift to data
         cx_float* pilot_corr_ptr =
             (cx_float*)ue_spec_pilot_buffer_[frame_id % kFrameWnd];
-        cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->ue_num(),
-                               cfg_->frame().client_ul_pilot_symbols(), false);
+        cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeNum(),
+                               cfg_->Frame().ClientUlPilotSymbols(), false);
         fmat theta_mat = arg(pilot_corr_mat);
-        fmat theta_inc = zeros<fmat>(cfg_->ue_num(), 1);
-        for (size_t s = 1; s < cfg_->frame().client_ul_pilot_symbols(); s++) {
+        fmat theta_inc = zeros<fmat>(cfg_->UeNum(), 1);
+        for (size_t s = 1; s < cfg_->Frame().ClientUlPilotSymbols(); s++) {
           fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
           theta_inc += theta_diff;
         }
         theta_inc /= (float)std::max(
-            1, static_cast<int>(cfg_->frame().client_ul_pilot_symbols() - 1));
+            1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
         fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
         cx_fmat mat_phase_correct = zeros<cx_fmat>(size(cur_theta));
         mat_phase_correct.set_real(cos(-cur_theta));
@@ -214,30 +213,30 @@ EventData DoDemul::launch(size_t tag) {
         mat_equaled %= mat_phase_correct;
 
         // Measure EVM from ground truth
-        if (symbol_idx_ul == cfg_->frame().client_ul_pilot_symbols()) {
-          phy_stats_->update_evm_stats(frame_id, cur_sc_id, mat_equaled);
+        if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols()) {
+          phy_stats_->UpdateEvmStats(frame_id, cur_sc_id, mat_equaled);
           if (kPrintPhyStats && cur_sc_id == 0) {
-            phy_stats_->print_evm_stats(frame_id - 1);
+            phy_stats_->PrintEvmStats(frame_id - 1);
           }
         }
       }
 
-      size_t start_tsc3 = worker_rdtsc();
+      size_t start_tsc3 = WorkerRdtsc();
       duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
       duration_stat_->task_count_++;
     }
   }
 
-  size_t start_tsc3 = worker_rdtsc();
+  size_t start_tsc3 = WorkerRdtsc();
   __m256i index2 = _mm256_setr_epi32(
-      0, 1, cfg_->ue_num() * 2, cfg_->ue_num() * 2 + 1, cfg_->ue_num() * 4,
-      cfg_->ue_num() * 4 + 1, cfg_->ue_num() * 6, cfg_->ue_num() * 6 + 1);
+      0, 1, cfg_->UeNum() * 2, cfg_->UeNum() * 2 + 1, cfg_->UeNum() * 4,
+      cfg_->UeNum() * 4 + 1, cfg_->UeNum() * 6, cfg_->UeNum() * 6 + 1);
   float* equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
-  for (size_t i = 0; i < cfg_->ue_num(); i++) {
+  for (size_t i = 0; i < cfg_->UeNum(); i++) {
     float* equal_ptr = nullptr;
     if (kExportConstellation) {
       equal_ptr = (float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                         [base_sc_id * cfg_->ue_num() + i]);
+                                         [base_sc_id * cfg_->UeNum() + i]);
     } else {
       equal_ptr = (float*)(equaled_buffer_temp_ + i);
     }
@@ -246,28 +245,28 @@ EventData DoDemul::launch(size_t tag) {
       __m256 equal_t_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
       _mm256_store_ps(equal_t_ptr, equal_t_temp);
       equal_t_ptr += 8;
-      equal_ptr += cfg_->ue_num() * k_num_double_in_sim_d256 * 2;
+      equal_ptr += cfg_->UeNum() * k_num_double_in_sim_d256 * 2;
     }
     equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
 
     // std::printf("Demod buffer pointer, ul idx %zu base sc %zu mod order
     // %zu\n", symbol_idx_ul, base_sc_id, cfg->mod_order_bits());
     int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][i] +
-                        (cfg_->mod_order_bits() * base_sc_id);
+                        (cfg_->ModOrderBits() * base_sc_id);
 
-    switch (cfg_->mod_order_bits()) {
+    switch (cfg_->ModOrderBits()) {
       case (CommsLib::QPSK):
-        demod_qpsk_soft_sse(equal_t_ptr, demod_ptr, max_sc_ite);
+        DemodQpskSoftSse(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
       case (CommsLib::QAM16):
-        demod_16qam_soft_avx2(equal_t_ptr, demod_ptr, max_sc_ite);
+        Demod16qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
       case (CommsLib::QAM64):
-        demod_64qam_soft_avx2(equal_t_ptr, demod_ptr, max_sc_ite);
+        Demod64qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
       default:
         std::printf("Demodulation: modulation type %s not supported!\n",
-                    cfg_->modulation().c_str());
+                    cfg_->Modulation().c_str());
     }
     // std::printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
     //     tid, frame_id, symbol_idx_ul, base_sc_id);
@@ -278,7 +277,7 @@ EventData DoDemul::launch(size_t tag) {
     // cout << endl;
   }
 
-  duration_stat_->task_duration_[3] += worker_rdtsc() - start_tsc3;
-  duration_stat_->task_duration_[0] += worker_rdtsc() - start_tsc;
+  duration_stat_->task_duration_[3] += WorkerRdtsc() - start_tsc3;
+  duration_stat_->task_duration_[0] += WorkerRdtsc() - start_tsc;
   return EventData(EventType::kDemul, tag);
 }

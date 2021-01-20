@@ -28,7 +28,7 @@ class DoEncode : public Doer {
            Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager);
   ~DoEncode();
 
-  EventData launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
  private:
   Table<int8_t>& raw_data_buffer_;
@@ -48,7 +48,7 @@ class DoDecode : public Doer {
            PhyStats* in_phy_stats, Stats* in_stats_manager);
   ~DoDecode();
 
-  EventData launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
  private:
   int16_t* resp_var_nodes_;

@@ -21,7 +21,7 @@
 
 #include "modulation.hpp"
 
-void demod_16qam_soft_loop(float* vec_in, int8_t* llr, int num) {
+void Demod16qamSoftLoop(float* vec_in, int8_t* llr, int num) {
   for (int i = 0; i < num; i++) {
     int8_t yre = (int8_t)(SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i]));
     int8_t yim = (int8_t)(SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i + 1]));
@@ -33,7 +33,7 @@ void demod_16qam_soft_loop(float* vec_in, int8_t* llr, int num) {
   }
 }
 
-void demod_16qam_soft_sse(float* vec_in, int8_t* llr, int num) {
+void Demod16qamSoftSse(float* vec_in, int8_t* llr, int num) {
   float* symbols_ptr = vec_in;
   __m128i* result_ptr = (__m128i*)llr;
   __m128 symbol1, symbol2, symbol3, symbol4;
@@ -102,7 +102,7 @@ void demod_16qam_soft_sse(float* vec_in, int8_t* llr, int num) {
   // }
 }
 
-void demod_64qam_soft_loop(float* vec_in, int8_t* llr, int num) {
+void Demod64qamSoftLoop(float* vec_in, int8_t* llr, int num) {
   for (int i = 0; i < num; i++) {
     float yre = (int8_t)(SCALE_BYTE_CONV_QAM64 * (vec_in[2 * i]));
     float yim = (int8_t)(SCALE_BYTE_CONV_QAM64 * (vec_in[2 * i + 1]));
@@ -116,7 +116,7 @@ void demod_64qam_soft_loop(float* vec_in, int8_t* llr, int num) {
   }
 }
 
-void demod_64qam_soft_sse(float* vec_in, int8_t* llr, int num) {
+void Demod64qamSoftSse(float* vec_in, int8_t* llr, int num) {
   float* symbols_ptr = (float*)vec_in;
   __m128i* result_ptr = (__m128i*)llr;
   __m128 symbol1, symbol2, symbol3, symbol4;
@@ -213,7 +213,7 @@ void demod_64qam_soft_sse(float* vec_in, int8_t* llr, int num) {
   }
 }
 
-void demod_qpsk_soft_sse(float* x, int8_t* z, int len) {
+void DemodQpskSoftSse(float* x, int8_t* z, int len) {
   int i = 0;
 
   // Force the use of SSE here instead of AVX since the implementations requires

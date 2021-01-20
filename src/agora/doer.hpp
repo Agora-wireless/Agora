@@ -10,7 +10,7 @@ class Config;
 
 class Doer {
  public:
-  virtual bool try_launch(
+  virtual bool TryLaunch(
       moodycamel::ConcurrentQueue<EventData>& task_queue,
       moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
       moodycamel::ProducerToken* worker_ptok) {
@@ -22,13 +22,13 @@ class Doer {
       resp_event.num_tags_ = req_event.num_tags_;
 
       for (size_t i = 0; i < req_event.num_tags_; i++) {
-        EventData resp_i = launch(req_event.tags_[i]);
-        rt_assert(resp_i.num_tags_ == 1, "Invalid num_tags in resp");
+        EventData resp_i = Launch(req_event.tags_[i]);
+        RtAssert(resp_i.num_tags_ == 1, "Invalid num_tags in resp");
         resp_event.tags_[i] = resp_i.tags_[0];
         resp_event.event_type_ = resp_i.event_type_;
       }
 
-      try_enqueue_fallback(&complete_task_queue, worker_ptok, resp_event);
+      TryEnqueueFallback(&complete_task_queue, worker_ptok, resp_event);
       return true;
     }
     return false;
@@ -36,18 +36,18 @@ class Doer {
 
   /// The main event handling function that performs Doer-specific work.
   /// Doers that handle only one event type use this signature.
-  virtual EventData launch(size_t tag) {
+  virtual EventData Launch(size_t tag) {
     _unused(tag);
-    rt_assert(false, "Doer: launch(tag) not implemented");
+    RtAssert(false, "Doer: Launch(tag) not implemented");
     return EventData();
   }
 
   /// The main event handling function that performs Doer-specific work.
   /// Doers that handle multiple event types use this signature.
-  virtual EventData launch(size_t tag, EventType event_type) {
+  virtual EventData Launch(size_t tag, EventType event_type) {
     _unused(tag);
     _unused(event_type);
-    rt_assert(false, "Doer: launch(tag, event_type) not implemented");
+    RtAssert(false, "Doer: Launch(tag, event_type) not implemented");
     return EventData();
   }
 

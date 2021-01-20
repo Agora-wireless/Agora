@@ -81,7 +81,7 @@ class RadioTXRX {
    *
    * @param in_buffer_length: size of ring buffer in bytes
    */
-  bool startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
+  bool StartTxrx(Table<char>& in_buffer, Table<int>& in_buffer_status,
                  size_t in_buffer_frame_num, size_t in_buffer_length,
                  char* in_tx_buffer, int* in_tx_buffer_status,
                  int in_tx_buffer_frame_num, int in_tx_buffer_length);
@@ -91,32 +91,32 @@ class RadioTXRX {
    * (radio_id) and writes to an offset (rx_offset) in the receive buffer
    * (buffer_)
    */
-  struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
+  struct Packet* RecvEnqueue(int tid, int radio_id, int rx_offset);
 
   /**
    * @brief transmits a tx packet that is ready from PHY through socket to
    * channel simualtor
    */
-  int dequeue_send(int tid);
+  int DequeueSend(int tid);
 
   /**
    * @brief receives a packet from hardware through radio index (radio_id)
    * and writes to an offset (rx_offset) in the receive buffer (buffer_)
    */
-  struct Packet* recv_enqueue_argos(int tid, size_t radio_id, size_t& frame_id,
+  struct Packet* RecvEnqueueArgos(int tid, size_t radio_id, size_t& frame_id,
                                     size_t& symbol_id, size_t rx_offset);
 
   /**
    * @brief transmits a tx samples packet that is ready from PHY through client
    * wireless hardware
    */
-  int dequeue_send_argos(int tid, long long time0);
+  int DequeueSendArgos(int tid, long long time0);
 
   /**
    * @brief loop thread function that performs sample Packet I/O in simulation
    * mode.
    */
-  void* loop_tx_rx(int tid);
+  void* LoopTxRx(int tid);
 
   /**
    * @brief loop thread function that performs sample TX/RX to/from client
@@ -125,7 +125,7 @@ class RadioTXRX {
    * timestamps to schedules transmit of processed uplink symbols with some
    * offset in the future from client wireless hardware.
    */
-  void* loop_tx_rx_argos(int tid);
+  void* LoopTxRxArgos(int tid);
 
   /**
    * @brief loop thread function that performs sample TX/RX to/from client
@@ -136,8 +136,8 @@ class RadioTXRX {
    * the beacon time reference, it writes downlink symbols to rx buffers and
    * schedules uplink symbols for transmission from the hardware.
    */
-  void* loop_tx_rx_argos_sync(int tid);
-  void* loop_tx_rx_usrp_sync(int tid);
+  void* LoopTxRxArgosSync(int tid);
+  void* LoopTxRxUsrpSync(int tid);
 
  private:
   pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;

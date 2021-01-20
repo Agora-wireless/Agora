@@ -15,9 +15,9 @@ int main(int argc, char const* argv[]) {
     SignalHandler signal_handler;
 
     // Register signal handler to handle kill signal
-    signal_handler.setupSignalHandlers();
+    signal_handler.SetupSignalHandlers();
     auto* phy = new PhyUe(config);
-    phy->start();
+    phy->Start();
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;

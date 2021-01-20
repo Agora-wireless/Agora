@@ -15,22 +15,22 @@ TEST(TestZF, Perf) {
   int tid = 0;
 
   PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
-  csi_buffers.rand_alloc_cx_float(cfg->bs_ant_num() * cfg->ofdm_data_num());
+  csi_buffers.RandAllocCxFloat(cfg->BsAntNum() * cfg->OfdmDataNum());
 
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
-      cfg->bs_ant_num() * cfg->ue_num());
+      cfg->BsAntNum() * cfg->UeNum());
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
-      cfg->ue_num() * cfg->bs_ant_num());
+      cfg->UeNum() * cfg->BsAntNum());
 
   Table<complex_float> calib_dl_buffer;
-  calib_dl_buffer.rand_alloc_cx_float(kFrameWnd,
-                                      cfg->ofdm_data_num() * cfg->bs_ant_num(),
-                                      Agora_memory::Alignment_t::k64Align);
+  calib_dl_buffer.RandAllocCxFloat(kFrameWnd,
+                                   cfg->OfdmDataNum() * cfg->BsAntNum(),
+                                   Agora_memory::Alignment_t::k64Align);
 
   Table<complex_float> calib_ul_buffer;
-  calib_ul_buffer.rand_alloc_cx_float(kFrameWnd,
-                                      cfg->ofdm_data_num() * cfg->bs_ant_num(),
-                                      Agora_memory::Alignment_t::k64Align);
+  calib_ul_buffer.RandAllocCxFloat(kFrameWnd,
+                                   cfg->OfdmDataNum() * cfg->BsAntNum(),
+                                   Agora_memory::Alignment_t::k64Align);
 
   std::unique_ptr<Stats> stats(new Stats(cfg.get()));
 
@@ -39,20 +39,20 @@ TEST(TestZF, Perf) {
                ul_zf_matrices, dl_zf_matrices, stats.get()));
 
   FastRand fast_rand;
-  size_t start_tsc = rdtsc();
+  size_t start_tsc = Rdtsc();
   for (size_t i = 0; i < kNumIters; i++) {
-    uint32_t frame_id = fast_rand.next_u32();
+    uint32_t frame_id = fast_rand.NextU32();
     size_t base_sc_id =
-        (fast_rand.next_u32() % (cfg->ofdm_data_num() / cfg->zf_block_size())) *
-        cfg->zf_block_size();
-    compute_zf->launch(gen_tag_t::frm_sc(frame_id, base_sc_id).tag_);
+        (fast_rand.NextU32() % (cfg->OfdmDataNum() / cfg->ZfBlockSize())) *
+        cfg->ZfBlockSize();
+    compute_zf->Launch(gen_tag_t::FrmSc(frame_id, base_sc_id).tag_);
   }
-  double ms = cycles_to_ms(rdtsc() - start_tsc, cfg->freq_ghz());
+  double ms = CyclesToMs(Rdtsc() - start_tsc, cfg->FreqGhz());
 
   std::printf("Time per zeroforcing iteration = %.4f ms\n", ms / kNumIters);
 
-  calib_dl_buffer.free();
-  calib_ul_buffer.free();
+  calib_dl_buffer.Free();
+  calib_ul_buffer.Free();
 }
 
 int main(int argc, char** argv) {

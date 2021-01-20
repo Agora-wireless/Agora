@@ -69,7 +69,7 @@ class Stats {
   /// type
   void MasterSetTsc(TsType timestamp_type, size_t frame_id) {
     this->master_timestamps_.at(static_cast<size_t>(timestamp_type))
-        .at(frame_id % kNumStatsFrames) = rdtsc();
+        .at(frame_id % kNumStatsFrames) = Rdtsc();
   }
 
   /// From the master, get the RDTSC timestamp for a frame ID and timestamp
@@ -82,14 +82,14 @@ class Stats {
   /// From the master, get the millisecond elapsed since the timestamp of
   /// timestamp_type was taken for frame_id
   double MasterGetMsSince(TsType timestamp_type, size_t frame_id) const {
-    return cycles_to_ms(rdtsc() - MasterGetTsc(timestamp_type, frame_id),
+    return CyclesToMs(Rdtsc() - MasterGetTsc(timestamp_type, frame_id),
                         this->kFreqGhz);
   }
 
   /// From the master, get the microseconds elapsed since the timestamp of
   /// timestamp_type was taken for frame_id
   double MasterGetUsSince(TsType timestamp_type, size_t frame_id) const {
-    return cycles_to_us(rdtsc() - MasterGetTsc(timestamp_type, frame_id),
+    return CyclesToUs(Rdtsc() - MasterGetTsc(timestamp_type, frame_id),
                         this->kFreqGhz);
   }
 
@@ -97,7 +97,7 @@ class Stats {
   /// timestamp_type was taken for frame_id, and reference_tsc
   double MasterGetUsFromRef(TsType timestamp_type, size_t frame_id,
                             size_t reference_tsc) const {
-    return cycles_to_us(MasterGetTsc(timestamp_type, frame_id) - reference_tsc,
+    return CyclesToUs(MasterGetTsc(timestamp_type, frame_id) - reference_tsc,
                         this->kFreqGhz);
   }
 
@@ -105,7 +105,7 @@ class Stats {
   /// between two timestamp types
   double MasterGetDeltaMs(TsType timestamp_type_1, TsType timestamp_type_2,
                           size_t frame_id) const {
-    return cycles_to_ms(MasterGetTsc(timestamp_type_1, frame_id) -
+    return CyclesToMs(MasterGetTsc(timestamp_type_1, frame_id) -
                             MasterGetTsc(timestamp_type_2, frame_id),
                         this->kFreqGhz);
   }
@@ -114,7 +114,7 @@ class Stats {
   /// between two timestamp types
   double MasterGetDeltaUs(TsType timestamp_type_1, TsType timestamp_type_2,
                           size_t frame_id) const {
-    return cycles_to_us(MasterGetTsc(timestamp_type_1, frame_id) -
+    return CyclesToUs(MasterGetTsc(timestamp_type_1, frame_id) -
                             MasterGetTsc(timestamp_type_2, frame_id),
                         this->kFreqGhz);
   }
@@ -123,7 +123,7 @@ class Stats {
   /// a timestamp type was taken for two frames
   double MasterGetDeltaMs(TsType timestamp_type, size_t frame_id_1,
                           size_t frame_id_2) const {
-    return cycles_to_ms(MasterGetTsc(timestamp_type, frame_id_1) -
+    return CyclesToMs(MasterGetTsc(timestamp_type, frame_id_1) -
                             MasterGetTsc(timestamp_type, frame_id_2),
                         this->kFreqGhz);
   }
@@ -132,7 +132,7 @@ class Stats {
   /// a timestamp type was taken for two frames
   double MasterGetDeltaUs(TsType timestamp_type, size_t frame_id_1,
                           size_t frame_id_2) const {
-    return cycles_to_us(MasterGetTsc(timestamp_type, frame_id_1) -
+    return CyclesToUs(MasterGetTsc(timestamp_type, frame_id_1) -
                             MasterGetTsc(timestamp_type, frame_id_2),
                         this->kFreqGhz);
   }
@@ -152,12 +152,12 @@ class Stats {
                 .duration_stat_[static_cast<size_t>(doer_type)];
   }
 
-  inline size_t last_frame_id(void) const { return this->last_frame_id_; }
+  inline size_t LastFrameId(void) const { return this->last_frame_id_; }
 
   /// Dimensions = number of packet RX threads x kNumStatsFrames.
   /// frame_start[i][j] is the RDTSC timestamp taken by thread i when it
   /// starts receiving frame j.
-  inline Table<size_t>& frame_start(void) { return this->frame_start_; };
+  inline Table<size_t>& FrameStart(void) { return this->frame_start_; };
 
  private:
   // Fill in running time summary stats for the current frame for this

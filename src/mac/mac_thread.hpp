@@ -70,40 +70,40 @@ class MacThread {
 
   // The main MAC thread event loop. It receives uplink data bits from the
   // master thread and sends them to remote applications.
-  void run_event_loop();
+  void RunEventLoop();
 
  private:
   // Receive events from Agora PHY master thread. Forwards
   // to appropriate function in MAC.
-  void process_rx_from_master();
+  void ProcessRxFromMaster();
 
   // Receive decoded codeblocks from the PHY master thread. Send
   // fully-received frames for UE #i to kRemoteHostname::(kBaseRemotePort + i)
-  void process_codeblocks_from_master(EventData event);
+  void ProcessCodeblocksFromMaster(EventData event);
 
   // Receive SNR report from PHY master thread. Use for RB scheduling.
   // TODO: process CQI report here as well.
-  void process_snr_report_from_master(EventData event);
+  void ProcessSnrReportFromMaster(EventData event);
 
   // Push RAN config update to PHY master thread.
-  void send_ran_config_update(EventData event);
+  void SendRanConfigUpdate(EventData event);
 
   // Send control information over (out-of-band) control channel
   // from server to client
-  void send_control_information();
+  void SendControlInformation();
 
   // At client, process control information received from control
   // channel and forward to PHY UE, so it transmits data in the scheduled
   // time slots.
-  void process_control_information();
+  void ProcessControlInformation();
 
   // Receive user data bits (downlink bits at the MAC thread running at the
   // server, uplink bits at the MAC thread running at the client) and forward
   // them to the PHY.
-  void process_udp_packets_from_apps(RBIndicator ri);
-  void process_udp_packets_from_apps_server(const MacPacket* pkt,
+  void ProcessUdpPacketsFromApps(RBIndicator ri);
+  void ProcessUdpPacketsFromAppsServer(const MacPacket* pkt,
                                             RBIndicator ri);
-  void process_udp_packets_from_apps_client(const char* pkt, RBIndicator ri);
+  void ProcessUdpPacketsFromAppsClient(const char* pkt, RBIndicator ri);
 
   // If Mode::kServer, this thread is running at the Agora server. Else at
   // the client.

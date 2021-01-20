@@ -30,11 +30,11 @@ DEFINE_string(conf_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
               "Agora config filename");
 
-float rand_float(float min, float max) {
+float RandFloat(float min, float max) {
   return ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
 }
 
-float rand_float_from_short(float min, float max) {
+float RandFloatFromShort(float min, float max) {
   float rand_val = ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
   short rand_val_ushort = (short)(rand_val * 32768);
   rand_val = (float)rand_val_ushort / 32768;
@@ -56,36 +56,36 @@ int main(int argc, char* argv[]) {
               profile == DataGenerator::Profile::k123 ? "123" : "random");
 
   std::printf("DataGenerator: Using %s-orthogonal pilots\n",
-              cfg->freq_orthogonal_pilot() ? "frequency" : "time");
+              cfg->FreqOrthogonalPilot() ? "frequency" : "time");
 
   std::printf("DataGenerator: Generating encoded and modulated data\n");
   srand(time(nullptr));
 
   // Step 1: Generate the information buffers and LDPC-encoded buffers for
   // uplink
-  const size_t ul_codeblocks = cfg->frame().NumULSyms() *
-                               cfg->ldpc_config().num_blocks_in_symbol() *
-                               cfg->ue_ant_num();
+  const size_t ul_codeblocks = cfg->Frame().NumULSyms() *
+                               cfg->LdpcConfig().NumBlocksInSymbol() *
+                               cfg->UeAntNum();
   std::printf("Total number of ul blocks: %zu\n", ul_codeblocks);
 
   std::vector<std::vector<int8_t>> ul_information(ul_codeblocks);
   std::vector<std::vector<int8_t>> ul_encoded_codewords(ul_codeblocks);
   for (size_t i = 0; i < ul_codeblocks; i++) {
-    data_generator.gen_codeblock(ul_information.at(i),
+    data_generator.GenCodeblock(ul_information.at(i),
                                  ul_encoded_codewords.at(i),
-                                 (i % cfg->ue_num()) /* UE ID */);
+                                 (i % cfg->UeNum()) /* UE ID */);
   }
 
   {
     // Save uplink information bytes to file
-    const size_t input_bytes_per_cb = bits_to_bytes(
-        ldpc_num_input_bits(cfg->ldpc_config().base_graph(),
-                            cfg->ldpc_config().expansion_factor()));
+    const size_t input_bytes_per_cb = BitsToBytes(
+        LdpcNumInputBits(cfg->LdpcConfig().BaseGraph(),
+                            cfg->LdpcConfig().ExpansionFactor()));
 
     const std::string filename_input =
         cur_directory + "/data/LDPC_orig_data_" +
-        std::to_string(cfg->ofdm_ca_num()) + "_ant" +
-        std::to_string(cfg->ue_ant_num()) + ".bin";
+        std::to_string(cfg->OfdmCaNum()) + "_ant" +
+        std::to_string(cfg->UeAntNum()) + ".bin";
     std::printf("Saving raw uplink data (using LDPC) to %s\n",
                 filename_input.c_str());
     FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
@@ -100,8 +100,8 @@ int main(int argc, char* argv[]) {
     if (kPrintUplinkInformationBytes) {
       std::printf("Uplink information bytes\n");
       for (size_t n = 0; n < ul_codeblocks; n++) {
-        std::printf("Symbol %zu, UE %zu\n", n / cfg->ue_ant_num(),
-                    n % cfg->ue_ant_num());
+        std::printf("Symbol %zu, UE %zu\n", n / cfg->UeAntNum(),
+                    n % cfg->UeAntNum());
         for (size_t i = 0; i < input_bytes_per_cb; i++) {
           std::printf("%u ", static_cast<uint8_t>(ul_information.at(n).at(i)));
         }
@@ -114,34 +114,34 @@ int main(int argc, char* argv[]) {
   std::vector<std::vector<complex_float>> ul_modulated_codewords(ul_codeblocks);
   for (size_t i = 0; i < ul_codeblocks; i++) {
     ul_modulated_codewords.at(i) =
-        data_generator.get_modulation(ul_encoded_codewords.at(i));
+        data_generator.GetModulation(ul_encoded_codewords.at(i));
   }
 
   // Place modulated uplink data codewords into central IFFT bins
-  rt_assert(cfg->ldpc_config().num_blocks_in_symbol() ==
+  RtAssert(cfg->LdpcConfig().NumBlocksInSymbol() ==
             1);  // TODO: Assumption
   std::vector<std::vector<complex_float>> pre_ifft_data_syms(
-      cfg->ue_ant_num() * cfg->frame().NumULSyms());
+      cfg->UeAntNum() * cfg->Frame().NumULSyms());
   for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
     pre_ifft_data_syms.at(i) =
-        data_generator.bin_for_ifft(ul_modulated_codewords.at(i));
+        data_generator.BinForIfft(ul_modulated_codewords.at(i));
   }
 
   std::vector<complex_float> pilot_td =
-      data_generator.get_common_pilot_time_domain();
+      data_generator.GetCommonPilotTimeDomain();
 
   // Generate UE-specific pilots
   Table<complex_float> ue_specific_pilot;
-  const std::vector<std::complex<float>> zc_seq = Utils::double_to_cfloat(
-      CommsLib::getSequence(cfg->ofdm_data_num(), CommsLib::LTE_ZADOFF_CHU));
+  const std::vector<std::complex<float>> zc_seq = Utils::DoubleToCfloat(
+      CommsLib::GetSequence(cfg->OfdmDataNum(), CommsLib::LTE_ZADOFF_CHU));
   const std::vector<std::complex<float>> zc_common_pilot =
-      CommsLib::seqCyclicShift(zc_seq, M_PI / 4.0);  // Used in LTE SRS
-  ue_specific_pilot.malloc(cfg->ue_ant_num(), cfg->ofdm_data_num(),
+      CommsLib::SeqCyclicShift(zc_seq, M_PI / 4.0);  // Used in LTE SRS
+  ue_specific_pilot.Malloc(cfg->UeAntNum(), cfg->OfdmDataNum(),
                            Agora_memory::Alignment_t::k64Align);
-  for (size_t i = 0; i < cfg->ue_ant_num(); i++) {
+  for (size_t i = 0; i < cfg->UeAntNum(); i++) {
     auto zc_ue_pilot_i =
-        CommsLib::seqCyclicShift(zc_seq, i * M_PI / 6.0);  // LTE DMRS
-    for (size_t j = 0; j < cfg->ofdm_data_num(); j++) {
+        CommsLib::SeqCyclicShift(zc_seq, i * M_PI / 6.0);  // LTE DMRS
+    for (size_t j = 0; j < cfg->OfdmDataNum(); j++) {
       ue_specific_pilot[i][j] = {zc_ue_pilot_i[j].real(),
                                  zc_ue_pilot_i[j].imag()};
     }
@@ -149,62 +149,62 @@ int main(int argc, char* argv[]) {
 
   // Put pilot and data symbols together
   Table<complex_float> tx_data_all_symbols;
-  tx_data_all_symbols.calloc(cfg->frame().NumTotalSyms(),
-                             cfg->ue_ant_num() * cfg->ofdm_ca_num(),
+  tx_data_all_symbols.Calloc(cfg->Frame().NumTotalSyms(),
+                             cfg->UeAntNum() * cfg->OfdmCaNum(),
                              Agora_memory::Alignment_t::k64Align);
 
-  if (cfg->freq_orthogonal_pilot() == true) {
-    for (size_t i = 0; i < cfg->ue_ant_num(); i++) {
-      std::vector<complex_float> pilots_t_ue(cfg->ofdm_ca_num());  // Zeroed
-      for (size_t j = cfg->ofdm_data_start();
-           j < cfg->ofdm_data_start() + cfg->ofdm_data_num();
-           j += cfg->ue_ant_num()) {
+  if (cfg->FreqOrthogonalPilot() == true) {
+    for (size_t i = 0; i < cfg->UeAntNum(); i++) {
+      std::vector<complex_float> pilots_t_ue(cfg->OfdmCaNum());  // Zeroed
+      for (size_t j = cfg->OfdmDataStart();
+           j < cfg->OfdmDataStart() + cfg->OfdmDataNum();
+           j += cfg->UeAntNum()) {
         pilots_t_ue.at(i + j) = pilot_td.at(i + j);
       }
       // Load pilot to the second symbol
       // The first symbol is reserved for beacon
-      std::memcpy(tx_data_all_symbols[cfg->frame().NumBeaconSyms()] +
-                      (i * cfg->ofdm_ca_num()),
+      std::memcpy(tx_data_all_symbols[cfg->Frame().NumBeaconSyms()] +
+                      (i * cfg->OfdmCaNum()),
                   &pilots_t_ue.at(0),
-                  (cfg->ofdm_ca_num() * sizeof(complex_float)));
+                  (cfg->OfdmCaNum() * sizeof(complex_float)));
     }
   } else {
-    for (size_t i = 0; i < cfg->ue_ant_num(); i++)
-      std::memcpy(tx_data_all_symbols[i + cfg->frame().NumBeaconSyms()] +
-                      i * cfg->ofdm_ca_num(),
+    for (size_t i = 0; i < cfg->UeAntNum(); i++)
+      std::memcpy(tx_data_all_symbols[i + cfg->Frame().NumBeaconSyms()] +
+                      i * cfg->OfdmCaNum(),
                   &pilot_td.at(0),
-                  (cfg->ofdm_ca_num() * sizeof(complex_float)));
+                  (cfg->OfdmCaNum() * sizeof(complex_float)));
   }
 
   // Populate the UL symbols
-  for (size_t i = 0; i < cfg->frame().NumULSyms(); i++) {
-    const size_t data_sym_id = cfg->frame().GetULSymbol(i);
-    for (size_t j = 0; j < cfg->ue_ant_num(); j++) {
-      if (i < cfg->frame().client_ul_pilot_symbols()) {
+  for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
+    const size_t data_sym_id = cfg->Frame().GetULSymbol(i);
+    for (size_t j = 0; j < cfg->UeAntNum(); j++) {
+      if (i < cfg->Frame().ClientUlPilotSymbols()) {
         std::memcpy(tx_data_all_symbols[data_sym_id] +
-                        (j * cfg->ofdm_ca_num()) + cfg->ofdm_data_start(),
+                        (j * cfg->OfdmCaNum()) + cfg->OfdmDataStart(),
                     ue_specific_pilot[j],
-                    cfg->ofdm_data_num() * sizeof(complex_float));
+                    cfg->OfdmDataNum() * sizeof(complex_float));
       } else {
-        std::memcpy(tx_data_all_symbols[data_sym_id] + (j * cfg->ofdm_ca_num()),
-                    &pre_ifft_data_syms.at(i * cfg->ue_ant_num() + j).at(0),
-                    cfg->ofdm_ca_num() * sizeof(complex_float));
+        std::memcpy(tx_data_all_symbols[data_sym_id] + (j * cfg->OfdmCaNum()),
+                    &pre_ifft_data_syms.at(i * cfg->UeAntNum() + j).at(0),
+                    cfg->OfdmCaNum() * sizeof(complex_float));
       }
     }
   }
 
   // Generate CSI matrix
   Table<complex_float> csi_matrices;
-  csi_matrices.calloc(cfg->ofdm_ca_num(), cfg->ue_ant_num() * cfg->bs_ant_num(),
+  csi_matrices.Calloc(cfg->OfdmCaNum(), cfg->UeAntNum() * cfg->BsAntNum(),
                       Agora_memory::Alignment_t::k32Align);
-  for (size_t i = 0; i < (cfg->ue_ant_num() * cfg->bs_ant_num()); i++) {
-    complex_float csi = {rand_float_from_short(-1, 1),
-                         rand_float_from_short(-1, 1)};
+  for (size_t i = 0; i < (cfg->UeAntNum() * cfg->BsAntNum()); i++) {
+    complex_float csi = {RandFloatFromShort(-1, 1),
+                         RandFloatFromShort(-1, 1)};
     // std::printf("noise of ant %d, ue %d\n", i % cfg->bs_ant_num(), i /
     // cfg->bs_ant_num() );
-    for (size_t j = 0; j < cfg->ofdm_ca_num(); j++) {
-      complex_float noise = {rand_float_from_short(-1, 1) * cfg->noise_level(),
-                             rand_float_from_short(-1, 1) * cfg->noise_level()};
+    for (size_t j = 0; j < cfg->OfdmCaNum(); j++) {
+      complex_float noise = {RandFloatFromShort(-1, 1) * cfg->NoiseLevel(),
+                             RandFloatFromShort(-1, 1) * cfg->NoiseLevel()};
       // std::printf("%.4f+%.4fi ", noise.re, noise.im);
       csi_matrices[j][i].re = csi.re + noise.re;
       csi_matrices[j][i].im = csi.im + noise.im;
@@ -214,36 +214,36 @@ int main(int argc, char* argv[]) {
 
   // Generate RX data received by base station after going through channels
   Table<complex_float> rx_data_all_symbols;
-  rx_data_all_symbols.calloc(cfg->frame().NumTotalSyms(),
-                             cfg->ofdm_ca_num() * cfg->bs_ant_num(),
+  rx_data_all_symbols.Calloc(cfg->Frame().NumTotalSyms(),
+                             cfg->OfdmCaNum() * cfg->BsAntNum(),
                              Agora_memory::Alignment_t::k64Align);
-  for (size_t i = 0; i < cfg->frame().NumTotalSyms(); i++) {
+  for (size_t i = 0; i < cfg->Frame().NumTotalSyms(); i++) {
     arma::cx_fmat mat_input_data(
         reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
-        cfg->ofdm_ca_num(), cfg->ue_ant_num(), false);
+        cfg->OfdmCaNum(), cfg->UeAntNum(), false);
     arma::cx_fmat mat_output(
         reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
-        cfg->ofdm_ca_num(), cfg->bs_ant_num(), false);
+        cfg->OfdmCaNum(), cfg->BsAntNum(), false);
 
-    for (size_t j = 0; j < cfg->ofdm_ca_num(); j++) {
+    for (size_t j = 0; j < cfg->OfdmCaNum(); j++) {
       arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
-                            cfg->bs_ant_num(), cfg->ue_ant_num());
+                            cfg->BsAntNum(), cfg->UeAntNum());
       mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
     }
-    for (size_t j = 0; j < cfg->bs_ant_num(); j++) {
-      CommsLib::IFFT(rx_data_all_symbols[i] + j * cfg->ofdm_ca_num(),
-                     cfg->ofdm_ca_num(), false);
+    for (size_t j = 0; j < cfg->BsAntNum(); j++) {
+      CommsLib::IFFT(rx_data_all_symbols[i] + j * cfg->OfdmCaNum(),
+                     cfg->OfdmCaNum(), false);
     }
   }
 
   std::string filename_rx = cur_directory + "/data/LDPC_rx_data_" +
-                            std::to_string(cfg->ofdm_ca_num()) + "_ant" +
-                            std::to_string(cfg->bs_ant_num()) + ".bin";
+                            std::to_string(cfg->OfdmCaNum()) + "_ant" +
+                            std::to_string(cfg->BsAntNum()) + ".bin";
   std::printf("Saving rx data to %s\n", filename_rx.c_str());
   FILE* fp_rx = std::fopen(filename_rx.c_str(), "wb");
-  for (size_t i = 0; i < cfg->frame().NumTotalSyms(); i++) {
+  for (size_t i = 0; i < cfg->Frame().NumTotalSyms(); i++) {
     auto* ptr = reinterpret_cast<float*>(rx_data_all_symbols[i]);
-    std::fwrite(ptr, cfg->ofdm_ca_num() * cfg->bs_ant_num() * 2, sizeof(float),
+    std::fwrite(ptr, cfg->OfdmCaNum() * cfg->BsAntNum() * 2, sizeof(float),
                 fp_rx);
   }
   std::fclose(fp_rx);
@@ -263,36 +263,36 @@ int main(int argc, char* argv[]) {
   /* ------------------------------------------------
    * Generate data for downlink test
    * ------------------------------------------------ */
-  const size_t dl_codeblocks = cfg->frame().NumDLSyms() *
-                               cfg->ldpc_config().num_blocks_in_symbol() *
-                               cfg->ue_ant_num();
+  const size_t dl_codeblocks = cfg->Frame().NumDLSyms() *
+                               cfg->LdpcConfig().NumBlocksInSymbol() *
+                               cfg->UeAntNum();
   std::printf("Total number of dl blocks: %zu\n", dl_codeblocks);
 
   std::vector<std::vector<int8_t>> dl_information(dl_codeblocks);
   std::vector<std::vector<int8_t>> dl_encoded_codewords(dl_codeblocks);
   for (size_t i = 0; i < dl_codeblocks; i++) {
-    data_generator.gen_codeblock(dl_information.at(i),
+    data_generator.GenCodeblock(dl_information.at(i),
                                  dl_encoded_codewords.at(i),
-                                 (i % cfg->ue_num()) /* UE ID */);
+                                 (i % cfg->UeNum()) /* UE ID */);
   }
 
   // Modulate the encoded codewords
   std::vector<std::vector<complex_float>> dl_modulated_codewords(dl_codeblocks);
   for (size_t i = 0; i < dl_codeblocks; i++) {
     dl_modulated_codewords.at(i) =
-        data_generator.get_modulation(dl_encoded_codewords[i]);
+        data_generator.GetModulation(dl_encoded_codewords[i]);
   }
 
   {
     // Save downlink information bytes to file
-    const size_t input_bytes_per_cb = bits_to_bytes(
-        ldpc_num_input_bits(cfg->ldpc_config().base_graph(),
-                            cfg->ldpc_config().expansion_factor()));
+    const size_t input_bytes_per_cb = BitsToBytes(
+        LdpcNumInputBits(cfg->LdpcConfig().BaseGraph(),
+                            cfg->LdpcConfig().ExpansionFactor()));
 
     const std::string filename_input =
         cur_directory + "/data/LDPC_orig_data_" +
-        std::to_string(cfg->ofdm_ca_num()) + "_ant" +
-        std::to_string(cfg->ue_ant_num()) + ".bin";
+        std::to_string(cfg->OfdmCaNum()) + "_ant" +
+        std::to_string(cfg->UeAntNum()) + ".bin";
     std::printf("Saving raw dl data (using LDPC) to %s\n",
                 filename_input.c_str());
     FILE* fp_input = std::fopen(filename_input.c_str(), "ab");
@@ -305,8 +305,8 @@ int main(int argc, char* argv[]) {
     if (kPrintDownlinkInformationBytes == true) {
       std::printf("Downlink information bytes\n");
       for (size_t n = 0; n < dl_codeblocks; n++) {
-        std::printf("Symbol %zu, UE %zu\n", n / cfg->ue_ant_num(),
-                    n % cfg->ue_ant_num());
+        std::printf("Symbol %zu, UE %zu\n", n / cfg->UeAntNum(),
+                    n % cfg->UeAntNum());
         for (size_t i = 0; i < input_bytes_per_cb; i++) {
           std::printf("%u ", static_cast<unsigned>(dl_information.at(n).at(i)));
         }
@@ -317,13 +317,13 @@ int main(int argc, char* argv[]) {
 
   // Compute precoder
   Table<complex_float> precoder;
-  precoder.calloc(cfg->ofdm_ca_num(), cfg->ue_ant_num() * cfg->bs_ant_num(),
+  precoder.Calloc(cfg->OfdmCaNum(), cfg->UeAntNum() * cfg->BsAntNum(),
                   Agora_memory::Alignment_t::k32Align);
-  for (size_t i = 0; i < cfg->ofdm_ca_num(); i++) {
+  for (size_t i = 0; i < cfg->OfdmCaNum(); i++) {
     arma::cx_fmat mat_input(reinterpret_cast<arma::cx_float*>(csi_matrices[i]),
-                            cfg->bs_ant_num(), cfg->ue_ant_num(), false);
+                            cfg->BsAntNum(), cfg->UeAntNum(), false);
     arma::cx_fmat mat_output(reinterpret_cast<arma::cx_float*>(precoder[i]),
-                             cfg->ue_ant_num(), cfg->bs_ant_num(), false);
+                             cfg->UeAntNum(), cfg->BsAntNum(), false);
     pinv(mat_output, mat_input, 1e-2, "dc");
   }
 
@@ -344,22 +344,22 @@ int main(int argc, char* argv[]) {
 
   // Prepare downlink data from mod_output
   Table<complex_float> dl_mod_data;
-  dl_mod_data.calloc(cfg->frame().NumDLSyms(),
-                     cfg->ofdm_ca_num() * cfg->ue_ant_num(),
+  dl_mod_data.Calloc(cfg->Frame().NumDLSyms(),
+                     cfg->OfdmCaNum() * cfg->UeAntNum(),
                      Agora_memory::Alignment_t::k64Align);
-  for (size_t i = 0; i < cfg->frame().NumDLSyms(); i++) {
-    for (size_t j = 0; j < cfg->ue_ant_num(); j++) {
-      if ((i >= cfg->frame().client_dl_pilot_symbols())) {
-        for (size_t sc_id = 0; sc_id < cfg->ofdm_data_num(); sc_id++)
-          dl_mod_data[i][j * cfg->ofdm_ca_num() + sc_id +
-                         cfg->ofdm_data_start()] =
-              (sc_id % cfg->ofdm_pilot_spacing() == 0)
+  for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
+    for (size_t j = 0; j < cfg->UeAntNum(); j++) {
+      if ((i >= cfg->Frame().ClientDlPilotSymbols())) {
+        for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum(); sc_id++)
+          dl_mod_data[i][j * cfg->OfdmCaNum() + sc_id +
+                         cfg->OfdmDataStart()] =
+              (sc_id % cfg->OfdmPilotSpacing() == 0)
                   ? ue_specific_pilot[j][sc_id]
-                  : dl_modulated_codewords[i * cfg->ue_ant_num() + j][sc_id];
+                  : dl_modulated_codewords[i * cfg->UeAntNum() + j][sc_id];
       } else {
-        for (size_t sc_id = 0; sc_id < cfg->ofdm_data_num(); sc_id++)
-          dl_mod_data[i][j * cfg->ofdm_ca_num() + sc_id +
-                         cfg->ofdm_data_start()] = ue_specific_pilot[j][sc_id];
+        for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum(); sc_id++)
+          dl_mod_data[i][j * cfg->OfdmCaNum() + sc_id +
+                         cfg->OfdmDataStart()] = ue_specific_pilot[j][sc_id];
       }
     }
   }
@@ -385,25 +385,25 @@ int main(int argc, char* argv[]) {
 
   // Perform precoding and IFFT
   Table<complex_float> dl_ifft_data;
-  dl_ifft_data.calloc(cfg->frame().NumDLSyms(),
-                      cfg->ofdm_ca_num() * cfg->bs_ant_num(),
+  dl_ifft_data.Calloc(cfg->Frame().NumDLSyms(),
+                      cfg->OfdmCaNum() * cfg->BsAntNum(),
                       Agora_memory::Alignment_t::k64Align);
   Table<short> dl_tx_data;
-  dl_tx_data.calloc(cfg->frame().NumDLSyms(),
-                    2 * cfg->samps_per_symbol() * cfg->bs_ant_num(),
+  dl_tx_data.Calloc(cfg->Frame().NumDLSyms(),
+                    2 * cfg->SampsPerSymbol() * cfg->BsAntNum(),
                     Agora_memory::Alignment_t::k64Align);
-  for (size_t i = 0; i < cfg->frame().NumDLSyms(); i++) {
+  for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
     arma::cx_fmat mat_input_data(
-        reinterpret_cast<arma::cx_float*>(dl_mod_data[i]), cfg->ofdm_ca_num(),
-        cfg->ue_ant_num(), false);
+        reinterpret_cast<arma::cx_float*>(dl_mod_data[i]), cfg->OfdmCaNum(),
+        cfg->UeAntNum(), false);
 
     arma::cx_fmat mat_output(reinterpret_cast<arma::cx_float*>(dl_ifft_data[i]),
-                             cfg->ofdm_ca_num(), cfg->bs_ant_num(), false);
+                             cfg->OfdmCaNum(), cfg->BsAntNum(), false);
 
-    for (size_t j = cfg->ofdm_data_start();
-         j < cfg->ofdm_data_num() + cfg->ofdm_data_start(); j++) {
+    for (size_t j = cfg->OfdmDataStart();
+         j < cfg->OfdmDataNum() + cfg->OfdmDataStart(); j++) {
       arma::cx_fmat mat_precoder(reinterpret_cast<arma::cx_float*>(precoder[j]),
-                                 cfg->ue_ant_num(), cfg->bs_ant_num(), false);
+                                 cfg->UeAntNum(), cfg->BsAntNum(), false);
       mat_precoder /= abs(mat_precoder).max();
       mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
 
@@ -412,38 +412,38 @@ int main(int argc, char* argv[]) {
       // cout << "Data: \n" << mat_input_data.row(j) << endl;
       // cout << "Precoded data: \n" << mat_output.row(j) << endl;
     }
-    for (size_t j = 0; j < cfg->bs_ant_num(); j++) {
-      complex_float* ptr_ifft = dl_ifft_data[i] + j * cfg->ofdm_ca_num();
-      CommsLib::IFFT(ptr_ifft, cfg->ofdm_ca_num(), false);
+    for (size_t j = 0; j < cfg->BsAntNum(); j++) {
+      complex_float* ptr_ifft = dl_ifft_data[i] + j * cfg->OfdmCaNum();
+      CommsLib::IFFT(ptr_ifft, cfg->OfdmCaNum(), false);
 
-      short* tx_symbol = dl_tx_data[i] + j * cfg->samps_per_symbol() * 2;
-      std::memset(tx_symbol, 0, sizeof(short) * 2 * cfg->ofdm_tx_zero_prefix());
-      for (size_t k = 0; k < cfg->ofdm_ca_num(); k++) {
-        tx_symbol[2 * (k + cfg->cp_len() + cfg->ofdm_tx_zero_prefix())] =
+      short* tx_symbol = dl_tx_data[i] + j * cfg->SampsPerSymbol() * 2;
+      std::memset(tx_symbol, 0, sizeof(short) * 2 * cfg->OfdmTxZeroPrefix());
+      for (size_t k = 0; k < cfg->OfdmCaNum(); k++) {
+        tx_symbol[2 * (k + cfg->CpLen() + cfg->OfdmTxZeroPrefix())] =
             (short)(32768 * ptr_ifft[k].re);
-        tx_symbol[2 * (k + cfg->cp_len() + cfg->ofdm_tx_zero_prefix()) + 1] =
+        tx_symbol[2 * (k + cfg->CpLen() + cfg->OfdmTxZeroPrefix()) + 1] =
             (short)(32768 * ptr_ifft[k].im);
       }
-      for (size_t k = 0; k < (2 * cfg->cp_len()); k++) {
-        tx_symbol[2 * cfg->ofdm_tx_zero_prefix() + k] =
-            tx_symbol[2 * (cfg->ofdm_tx_zero_prefix() + cfg->ofdm_ca_num())];
+      for (size_t k = 0; k < (2 * cfg->CpLen()); k++) {
+        tx_symbol[2 * cfg->OfdmTxZeroPrefix() + k] =
+            tx_symbol[2 * (cfg->OfdmTxZeroPrefix() + cfg->OfdmCaNum())];
       }
 
       const size_t tx_zero_postfix_offset =
-          2 * (cfg->ofdm_tx_zero_prefix() + cfg->cp_len() + cfg->ofdm_ca_num());
+          2 * (cfg->OfdmTxZeroPrefix() + cfg->CpLen() + cfg->OfdmCaNum());
       std::memset(tx_symbol + tx_zero_postfix_offset, 0,
-                  sizeof(short) * 2 * cfg->ofdm_tx_zero_postfix());
+                  sizeof(short) * 2 * cfg->OfdmTxZeroPostfix());
     }
   }
 
   std::string filename_dl_tx = cur_directory + "/data/LDPC_dl_tx_data_" +
-                               std::to_string(cfg->ofdm_ca_num()) + "_ant" +
-                               std::to_string(cfg->bs_ant_num()) + ".bin";
+                               std::to_string(cfg->OfdmCaNum()) + "_ant" +
+                               std::to_string(cfg->BsAntNum()) + ".bin";
   std::printf("Saving dl tx data to %s\n", filename_dl_tx.c_str());
   FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
-  for (size_t i = 0; i < cfg->frame().NumDLSyms(); i++) {
+  for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
     short* ptr = dl_tx_data[i];
-    std::fwrite(ptr, cfg->samps_per_symbol() * cfg->bs_ant_num() * 2,
+    std::fwrite(ptr, cfg->SampsPerSymbol() * cfg->BsAntNum() * 2,
                 sizeof(short), fp_dl_tx);
   }
   std::fclose(fp_dl_tx);
@@ -462,15 +462,15 @@ int main(int argc, char* argv[]) {
   // std::printf("\n");
 
   /* Clean Up memory */
-  dl_ifft_data.free();
-  dl_tx_data.free();
-  dl_mod_data.free();
-  precoder.free();
+  dl_ifft_data.Free();
+  dl_tx_data.Free();
+  dl_mod_data.Free();
+  precoder.Free();
 
-  csi_matrices.free();
-  tx_data_all_symbols.free();
-  rx_data_all_symbols.free();
-  ue_specific_pilot.free();
+  csi_matrices.Free();
+  tx_data_all_symbols.Free();
+  rx_data_all_symbols.Free();
+  ue_specific_pilot.Free();
   delete cfg;
 
   return 0;

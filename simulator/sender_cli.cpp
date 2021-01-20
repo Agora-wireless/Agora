@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
       std::unique_ptr<Sender> sender(new Sender(
           cfg.get(), FLAGS_num_threads, FLAGS_core_offset, FLAGS_frame_duration,
           FLAGS_enable_slow_start, FLAGS_server_mac_addr));
-      sender->startTX();
+      sender->StartTx();
     }  // end context sender
   }    // end context Config
   return 0;

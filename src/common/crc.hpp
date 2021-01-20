@@ -95,22 +95,22 @@ class DoCRC {
    * Not used at the moment. We decided to pre-generate the tables and
    * harcode them here. Left function just for reference
    */
-  static void init_crc24(uint32_t table[256]);
+  static void InitCrc24(uint32_t table[256]);
 
   /**
    * Compute CRC
    */
-  uint32_t calculate_crc24(unsigned char* data, int len);
+  uint32_t CalculateCrc24(unsigned char* data, int len);
 
   /*
    * Compute and add CRC to packet
    */
-  void add_crc24(struct MacPacket* p);
+  void AddCrc24(struct MacPacket* p);
 
   /*
    * Verify CRC
    */
-  bool check_crc24(unsigned char* data, int len, uint32_t ref_crc);
+  bool CheckCrc24(unsigned char* data, int len, uint32_t ref_crc);
 };
 
 #endif
