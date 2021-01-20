@@ -210,54 +210,54 @@ std::vector<T> CommsLib::convolve(std::vector<std::complex<T>> const& f,
 std::vector<float> CommsLib::magnitudeFFT(
     std::vector<std::complex<float>> const& samps,
     std::vector<float> const& win, size_t fftSize) {
-  std::vector<std::complex<float>> preFFT(samps.size());
+  std::vector<std::complex<float>> pre_fft(samps.size());
 
   for (size_t n = 0; n < fftSize; n++) {
-    preFFT[n] = samps[n] * win[n];
+    pre_fft[n] = samps[n] * win[n];
   }
 
-  std::vector<std::complex<float>> fftSamps = CommsLib::FFT(preFFT, fftSize);
+  std::vector<std::complex<float>> fft_samps = CommsLib::FFT(pre_fft, fftSize);
 
   // compute magnitudes
-  std::vector<float> fftMag;
-  fftMag.reserve(fftSize);
+  std::vector<float> fft_mag;
+  fft_mag.reserve(fftSize);
   for (size_t n = fftSize / 2; n < fftSize; n++) {
-    fftMag.push_back(std::norm(fftSamps[n]));
+    fft_mag.push_back(std::norm(fft_samps[n]));
   }
   for (size_t n = 0; n < fftSize / 2; n++) {
-    fftMag.push_back(std::norm(fftSamps[n]));
+    fft_mag.push_back(std::norm(fft_samps[n]));
   }
-  std::reverse(fftMag.begin(),
-               fftMag.end());  // not sure why we need reverse here, but
+  std::reverse(fft_mag.begin(),
+               fft_mag.end());  // not sure why we need reverse here, but
   // this seems to give the right spectrum
-  return fftMag;
+  return fft_mag;
 }
 
 // Take ffsSize samples of (1 - cos(x)) / 2 from 0 up to 2pi
 std::vector<float> CommsLib::hannWindowFunction(size_t fftSize) {
-  std::vector<float> winFcn(1, 0);
+  std::vector<float> win_fcn(1, 0);
   double step = 2 * M_PI / fftSize;
 
   // Compute the samples for the first half.
   for (size_t n = 1; n < fftSize / 2; n++) {
-    winFcn.push_back((1 - std::cos(step * n)) / 2);
+    win_fcn.push_back((1 - std::cos(step * n)) / 2);
   }
   // If a sample lies at the center, just use (1-cos(pi))/2 == 1.
-  if (fftSize % 2 == 0) winFcn.push_back(1);
+  if (fftSize % 2 == 0) win_fcn.push_back(1);
   // The second half is a mirror image of the first, so just copy.
   for (size_t n = fftSize / 2 + 1; n < fftSize; n++)
-    winFcn.push_back(winFcn[fftSize - n]);
-  return winFcn;
+    win_fcn.push_back(win_fcn[fftSize - n]);
+  return win_fcn;
 }
 
 double CommsLib::windowFunctionPower(std::vector<float> const& win) {
-  double windowPower = (0);
-  size_t N = win.size();
+  double window_power = (0);
+  size_t n = win.size();
   for (size_t n = 0; n < win.size(); n++) {
-    windowPower += std::norm(win[n]);
+    window_power += std::norm(win[n]);
   }
-  windowPower = std::sqrt(windowPower / N);
-  return 20 * std::log10(N * windowPower);
+  window_power = std::sqrt(window_power / n);
+  return 20 * std::log10(n * window_power);
 }
 
 float CommsLib::findTone(std::vector<float> const& magnitude, double winGain,
@@ -272,11 +272,11 @@ float CommsLib::findTone(std::vector<float> const& magnitude, double winGain,
       std::max<size_t>(0, std::lround((fftBin + 0.5) * fftSize) - delta);
   size_t last = std::min<size_t>(fftSize - 1,
                                  std::lround((fftBin + 0.5) * fftSize) + delta);
-  float refLevel = magnitude[last];
+  float ref_level = magnitude[last];
   for (size_t n = first; n < last; n++) {
-    if (magnitude[n] > refLevel) refLevel = magnitude[n];
+    if (magnitude[n] > ref_level) ref_level = magnitude[n];
   }
-  return 10 * std::max(std::log10(refLevel), (float)(-20.0)) - (float)winGain;
+  return 10 * std::max(std::log10(ref_level), (float)(-20.0)) - (float)winGain;
 }
 
 float CommsLib::measureTone(std::vector<std::complex<float>> const& samps,
@@ -894,10 +894,10 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type) {
 
     // Grab the last N samples (sequence length specified, provide more
     // flexibility)
-    int startIdx = 160 - N;
+    int start_idx = 160 - N;
     for (int j = 0; j < 2; j++) {
       std::vector<double> a;
-      for (int i = startIdx; i < 160; i++) {
+      for (int i = start_idx; i < 160; i++) {
         if (j == 0) {
           a.push_back(lts_re[i]);
         } else {
@@ -939,20 +939,20 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type) {
         1787, 1789, 1801, 1811, 1823, 1831, 1847, 1861, 1867, 1871, 1873, 1877,
         1879, 1889, 1901, 1907, 1913, 1931, 1933, 1949, 1951, 1973, 1979, 1987,
         1993, 1997, 1999, 2003, 2011, 2017, 2027, 2029, 2039};
-    int M = prime[308];
+    int m = prime[308];
     for (int j = 0; j < 308; j++) {
       if (prime[j] < N && prime[j + 1] > N) {
-        M = prime[j];
+        m = prime[j];
         break;
       }
     }
-    double qh = M * (u + 1) / 31;
+    double qh = m * (u + 1) / 31;
     double q = std::floor(qh + 0.5) + v * std::pow(-1, std::floor(2 * qh));
     std::vector<double> a;
     for (int i = 0; i < N; i++) {
-      int m = i % M;
-      double a_re = std::cos(-M_PI * q * m * (m + 1) / M);
-      double a_im = std::sin(-M_PI * q * m * (m + 1) / M);
+      int m_loop = i % m;
+      double a_re = std::cos(-M_PI * q * m_loop * (m_loop+ 1) / m);
+      double a_im = std::sin(-M_PI * q * m_loop * (m_loop+ 1) / m);
       matrix[0].push_back(a_re);
       matrix[1].push_back(a_im);
     }

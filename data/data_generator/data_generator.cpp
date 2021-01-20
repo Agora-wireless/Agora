@@ -416,22 +416,22 @@ int main(int argc, char* argv[]) {
       complex_float* ptr_ifft = dl_ifft_data[i] + j * cfg->ofdm_ca_num();
       CommsLib::IFFT(ptr_ifft, cfg->ofdm_ca_num(), false);
 
-      short* txSymbol = dl_tx_data[i] + j * cfg->samps_per_symbol() * 2;
-      std::memset(txSymbol, 0, sizeof(short) * 2 * cfg->ofdm_tx_zero_prefix());
+      short* tx_symbol = dl_tx_data[i] + j * cfg->samps_per_symbol() * 2;
+      std::memset(tx_symbol, 0, sizeof(short) * 2 * cfg->ofdm_tx_zero_prefix());
       for (size_t k = 0; k < cfg->ofdm_ca_num(); k++) {
-        txSymbol[2 * (k + cfg->cp_len() + cfg->ofdm_tx_zero_prefix())] =
+        tx_symbol[2 * (k + cfg->cp_len() + cfg->ofdm_tx_zero_prefix())] =
             (short)(32768 * ptr_ifft[k].re);
-        txSymbol[2 * (k + cfg->cp_len() + cfg->ofdm_tx_zero_prefix()) + 1] =
+        tx_symbol[2 * (k + cfg->cp_len() + cfg->ofdm_tx_zero_prefix()) + 1] =
             (short)(32768 * ptr_ifft[k].im);
       }
       for (size_t k = 0; k < (2 * cfg->cp_len()); k++) {
-        txSymbol[2 * cfg->ofdm_tx_zero_prefix() + k] =
-            txSymbol[2 * (cfg->ofdm_tx_zero_prefix() + cfg->ofdm_ca_num())];
+        tx_symbol[2 * cfg->ofdm_tx_zero_prefix() + k] =
+            tx_symbol[2 * (cfg->ofdm_tx_zero_prefix() + cfg->ofdm_ca_num())];
       }
 
       const size_t tx_zero_postfix_offset =
           2 * (cfg->ofdm_tx_zero_prefix() + cfg->cp_len() + cfg->ofdm_ca_num());
-      std::memset(txSymbol + tx_zero_postfix_offset, 0,
+      std::memset(tx_symbol + tx_zero_postfix_offset, 0,
                   sizeof(short) * 2 * cfg->ofdm_tx_zero_postfix());
     }
   }

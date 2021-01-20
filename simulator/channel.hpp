@@ -48,19 +48,19 @@ class Channel {
   void lte_3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
 
  private:
-  Config* bscfg;
-  Config* uecfg;
+  Config* bscfg_;
+  Config* uecfg_;
 
-  Channel* channel;
-  size_t bs_ant;
-  size_t ue_ant;
-  size_t n_samps;
+  Channel* channel_;
+  size_t bs_ant_;
+  size_t ue_ant_;
+  size_t n_samps_;
 
-  std::string sim_chan_model;
-  double channel_snr_db;
-  enum ChanModel { AWGN, RAYLEIGH, RAN_3GPP } chan_model;
+  std::string sim_chan_model_;
+  double channel_snr_db_;
+  enum ChanModel { AWGN, RAYLEIGH, RAN_3GPP } chan_model_;
 
-  cx_fmat H;
+  cx_fmat h_;
 };
 
 #endif /* SIM_CHAN_MODEL */

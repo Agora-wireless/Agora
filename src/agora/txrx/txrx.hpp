@@ -49,8 +49,8 @@ class PacketTXRX {
   PacketTXRX(Config* cfg, size_t in_core_offset = 1);
 
   PacketTXRX(Config* cfg, size_t core_offset,
-             moodycamel::ConcurrentQueue<Event_data>* queue_message,
-             moodycamel::ConcurrentQueue<Event_data>* queue_task,
+             moodycamel::ConcurrentQueue<EventData>* queue_message,
+             moodycamel::ConcurrentQueue<EventData>* queue_task,
              moodycamel::ProducerToken** rx_ptoks,
              moodycamel::ProducerToken** tx_ptoks);
   ~PacketTXRX();
@@ -88,23 +88,23 @@ class PacketTXRX {
   int dequeue_send_argos(int tid);
   struct Packet* recv_enqueue_argos(int tid, int radio_id, int rx_offset);
 
-  long long rxTimeBs;
-  long long txTimeBs;
+  long long rx_time_bs_;
+  long long tx_time_bs_;
   void loop_tx_rx_usrp(int tid);
   int dequeue_send_usrp(int tid);
   int dequeue_send_usrp(int tid, int frame_id, int symbol_id);
   struct Packet* recv_enqueue_usrp(int tid, int radio_id, int rx_offset,
                                    int frame_id, int symbol_id);
 
-  Config* cfg;
+  Config* cfg_;
 
   // The network I/O threads run on cores
   // {core_offset, ..., core_offset + socket_thread_num - 1}
-  const size_t core_offset;
+  const size_t kCoreOffset;
 
-  const size_t ant_per_cell;
+  const size_t kAntPerCell;
 
-  const size_t socket_thread_num;
+  const size_t kSocketThreadNum;
 
   // Handle for socket threads
   std::thread socket_std_threads_[kMaxSocketNum];
@@ -113,8 +113,8 @@ class PacketTXRX {
   size_t packet_num_in_buffer_;
   char* tx_buffer_;
   Table<size_t>* frame_start_;
-  moodycamel::ConcurrentQueue<Event_data>* message_queue_;
-  moodycamel::ConcurrentQueue<Event_data>* task_queue_;
+  moodycamel::ConcurrentQueue<EventData>* message_queue_;
+  moodycamel::ConcurrentQueue<EventData>* task_queue_;
   moodycamel::ProducerToken** rx_ptoks_;
   moodycamel::ProducerToken** tx_ptoks_;
 

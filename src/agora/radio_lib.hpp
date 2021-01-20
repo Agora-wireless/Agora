@@ -26,7 +26,7 @@ class RadioConfig {
   void radioRx(void** buffs);
   int radioTx(size_t, void** buffs, int flags, long long& frameTime);
   int radioRx(size_t, void** buffs, long long& frameTime);
-  bool doCalib() { return calib; }
+  bool doCalib() { return calib_; }
   void go();
   arma::cx_float* get_calib_ul() { return init_calib_ul_; }
   arma::cx_float* get_calib_dl() { return init_calib_dl_; }
@@ -34,8 +34,8 @@ class RadioConfig {
 
  private:
   struct RadioConfigContext {
-    RadioConfig* brs;
-    size_t tid;
+    RadioConfig* brs_;
+    size_t tid_;
   };
   static void* initBSRadio_launch(void* in_context);
   static void* configureBSRadio_launch(void* in_context);
@@ -56,17 +56,17 @@ class RadioConfig {
   static std::vector<std::complex<float>> snoopSamples(SoapySDR::Device*,
                                                        size_t, size_t);
   void dciqCalibrationProc(size_t);
-  Config* _cfg;
-  std::vector<SoapySDR::Device*> hubs;
-  std::vector<SoapySDR::Device*> baStn;
-  SoapySDR::Stream* refRxStream;
-  std::vector<SoapySDR::Stream*> txStreams;
-  std::vector<SoapySDR::Stream*> rxStreams;
+  Config* cfg_;
+  std::vector<SoapySDR::Device*> hubs_;
+  std::vector<SoapySDR::Device*> ba_stn_;
+  SoapySDR::Stream* ref_rx_stream_;
+  std::vector<SoapySDR::Stream*> tx_streams_;
+  std::vector<SoapySDR::Stream*> rx_streams_;
   arma::cx_float* init_calib_ul_;
   arma::cx_float* init_calib_dl_;
-  size_t _radioNum;
-  size_t _antennaNum;
-  bool isUE;
-  bool calib;
+  size_t radio_num_;
+  size_t antenna_num_;
+  bool is_ue_;
+  bool calib_;
 };
 #endif

@@ -12,7 +12,7 @@ class SignalException : public runtime_error {
 
 class SignalHandler {
  protected:
-  static bool mbGotExitSignal;
+  static bool mb_got_exit_signal;
 
  public:
   SignalHandler();

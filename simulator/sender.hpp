@@ -102,38 +102,38 @@ class Sender {
   void run_fft(Packet* pkt, complex_float* fft_inout,
                DFTI_DESCRIPTOR_HANDLE mkl_handle) const;
 
-  Config* cfg;
-  const double freq_ghz;           // RDTSC frequency in GHz
-  const double ticks_per_usec;     // RDTSC frequency in GHz
-  const size_t socket_thread_num;  // Number of worker threads sending pkts
-  const size_t enable_slow_start;  // If 1, send frames slowly at first
+  Config* cfg_;
+  const double kFreqGhz;           // RDTSC frequency in GHz
+  const double kTicksPerUsec;     // RDTSC frequency in GHz
+  const size_t kSocketThreadNum;  // Number of worker threads sending pkts
+  const size_t kEnableSlowStart;  // If 1, send frames slowly at first
 
   // The master thread runs on core core_offset. Worker threads use cores
   // {core_offset + 1, ..., core_offset + thread_num - 1}
-  const size_t core_offset;
-  const size_t frame_duration_;
+  const size_t kCoreOffset;
+  const size_t kFrameDuration;
 
   // RDTSC clock ticks between the start of transmission of two symbols in
   // the steady state
-  const uint64_t ticks_all;
+  const uint64_t kTicksAll;
 
   // ticks_wnd_1 and ticks_wnd_2 are the RDTSC clock ticks between the start
   // of transmission of two symbols for the first several frames
-  const uint64_t ticks_wnd_1;
-  const uint64_t ticks_wnd_2;
+  const uint64_t kTicksWnd1;
+  const uint64_t kTicksWnd2;
 
   moodycamel::ConcurrentQueue<size_t> send_queue_ =
       moodycamel::ConcurrentQueue<size_t>(1024);
   moodycamel::ConcurrentQueue<size_t> completion_queue_ =
       moodycamel::ConcurrentQueue<size_t>(1024);
-  moodycamel::ProducerToken** task_ptok;
+  moodycamel::ProducerToken** task_ptok_;
 
   // First dimension: symbol_num_perframe * BS_ANT_NUM
   // Second dimension: (CP_LEN + OFDM_CA_NUM) * 2
   Table<unsigned short> iq_data_short_;
 
   // Number of packets transmitted for each symbol in a frame
-  size_t* packet_count_per_symbol[kFrameWnd];
+  size_t* packet_count_per_symbol_[kFrameWnd];
 
   double* frame_start_;
   double* frame_end_;

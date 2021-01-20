@@ -259,8 +259,8 @@ void demod_16qam_hard_loop(float* vec_in, uint8_t* vec_out, int num) {
 }
 
 void demod_16qam_hard_sse(float* vec_in, uint8_t* vec_out, int num) {
-  float* symbolsPtr = vec_in;
-  __m64* resultPtr = (__m64*)vec_out;
+  float* symbols_ptr = vec_in;
+  __m64* result_ptr = (__m64*)vec_out;
   __m128 symbol1, symbol2, symbol3, symbol4;
   __m128i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_12, symbol_34;
   __m128i symbol_abs_1, symbol_abs_2;
@@ -289,14 +289,14 @@ void demod_16qam_hard_sse(float* vec_in, uint8_t* vec_out, int num) {
                                          0xff, 0xff, 14, 12, 10, 8, 6, 4, 2, 0);
 
   for (int i = 0; i < num / 8; i++) {
-    symbol1 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol2 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol3 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol4 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
+    symbol1 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol2 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol3 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol4 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
 
     symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
     symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
@@ -341,8 +341,8 @@ void demod_16qam_hard_sse(float* vec_in, uint8_t* vec_out, int num) {
     result = _mm_add_epi16(result, bit3);
 
     result = _mm_shuffle_epi8(result, shuffle_16_to_8);
-    _mm_storel_pi(resultPtr, (__m128)result);
-    resultPtr++;
+    _mm_storel_pi(result_ptr, (__m128)result);
+    result_ptr++;
   }
   // Demodulate last symbols
   for (int i = 8 * (num / 8); i < num; i++) {
@@ -358,8 +358,8 @@ void demod_16qam_hard_sse(float* vec_in, uint8_t* vec_out, int num) {
 }
 
 void demod_16qam_hard_avx2(float* vec_in, uint8_t* vec_out, int num) {
-  float* symbolsPtr = vec_in;
-  __m128i* resultPtr = (__m128i*)vec_out;
+  float* symbols_ptr = vec_in;
+  __m128i* result_ptr = (__m128i*)vec_out;
   __m256 symbol1, symbol2, symbol3, symbol4;
   __m256i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_12, symbol_34;
   __m256i symbol_abs_1, symbol_abs_2;
@@ -390,14 +390,14 @@ void demod_16qam_hard_avx2(float* vec_in, uint8_t* vec_out, int num) {
                       0xff, 0xff, 14, 12, 10, 8, 6, 4, 2, 0);
 
   for (int i = 0; i < num / 16; i++) {
-    symbol1 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
-    symbol2 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
-    symbol3 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
-    symbol4 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
+    symbol1 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol2 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol3 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol4 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
 
     symbol_i1 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol1, scale_v));
     symbol_i2 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol2, scale_v));
@@ -457,8 +457,8 @@ void demod_16qam_hard_avx2(float* vec_in, uint8_t* vec_out, int num) {
 
     result = _mm256_shuffle_epi8(result, shuffle_16_to_8);
     result = _mm256_permute4x64_epi64(result, 0xd8);
-    _mm_storeu_si128(resultPtr, _mm256_extracti128_si256(result, 0));
-    resultPtr++;
+    _mm_storeu_si128(result_ptr, _mm256_extracti128_si256(result, 0));
+    result_ptr++;
   }
   // Demodulate last symbols
   int next_start = 16 * (num / 16);
@@ -467,8 +467,8 @@ void demod_16qam_hard_avx2(float* vec_in, uint8_t* vec_out, int num) {
 }
 
 void demod_16qam_soft_avx2(float* vec_in, int8_t* llr, int num) {
-  float* symbolsPtr = vec_in;
-  __m256i* resultPtr = (__m256i*)llr;
+  float* symbols_ptr = vec_in;
+  __m256i* result_ptr = (__m256i*)llr;
   __m256 symbol1, symbol2, symbol3, symbol4;
   __m256i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_i, symbol_abs,
       symbol_12, symbol_34;
@@ -493,14 +493,14 @@ void demod_16qam_soft_avx2(float* vec_in, int8_t* llr, int num) {
                       0xff, 11, 10, 0xff, 0xff, 9, 8, 0xff, 0xff);
 
   for (int i = 0; i < num / 16; i++) {
-    symbol1 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
-    symbol2 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
-    symbol3 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
-    symbol4 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
+    symbol1 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol2 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol3 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol4 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
     symbol_i1 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol1, scale_v));
     symbol_i2 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol2, scale_v));
     symbol_i3 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol3, scale_v));
@@ -524,12 +524,12 @@ void demod_16qam_soft_avx2(float* vec_in, int8_t* llr, int num) {
     result1na = _mm256_or_si256(result1n, result1a);
     result2na = _mm256_or_si256(result2n, result2a);
 
-    _mm256_store_si256(resultPtr,
+    _mm256_store_si256(result_ptr,
                        _mm256_permute2x128_si256(result1na, result2na, 0x20));
-    resultPtr++;
-    _mm256_store_si256(resultPtr,
+    result_ptr++;
+    _mm256_store_si256(result_ptr,
                        _mm256_permute2x128_si256(result1na, result2na, 0x31));
-    resultPtr++;
+    result_ptr++;
   }
   // Demodulate last symbols
   int next_start = 16 * (num / 16);
@@ -580,8 +580,8 @@ void demod_64qam_hard_loop(float* vec_in, uint8_t* vec_out, int num) {
 }
 
 void demod_64qam_hard_sse(float* vec_in, uint8_t* vec_out, int num) {
-  float* symbolsPtr = vec_in;
-  __m64* resultPtr = (__m64*)vec_out;
+  float* symbols_ptr = vec_in;
+  __m64* result_ptr = (__m64*)vec_out;
   __m128 symbol1, symbol2, symbol3, symbol4;
   __m128i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_12, symbol_34;
   __m128i symbol_abs_1, symbol_abs_2;
@@ -615,14 +615,14 @@ void demod_64qam_hard_sse(float* vec_in, uint8_t* vec_out, int num) {
                                          0xff, 0xff, 14, 12, 10, 8, 6, 4, 2, 0);
 
   for (int i = 0; i < num / 8; i++) {
-    symbol1 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol2 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol3 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol4 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
+    symbol1 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol2 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol3 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol4 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
 
     symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
     symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
@@ -699,8 +699,8 @@ void demod_64qam_hard_sse(float* vec_in, uint8_t* vec_out, int num) {
     result = _mm_add_epi16(result, bit5);
 
     result = _mm_shuffle_epi8(result, shuffle_16_to_8);
-    _mm_storel_pi(resultPtr, (__m128)result);
-    resultPtr++;
+    _mm_storel_pi(result_ptr, (__m128)result);
+    result_ptr++;
   }
   // Demodulate last symbols
   for (int i = 8 * (num / 8); i < num; i++) {
@@ -732,8 +732,8 @@ void demod_64qam_hard_sse(float* vec_in, uint8_t* vec_out, int num) {
 }
 
 void demod_64qam_hard_avx2(float* vec_in, uint8_t* vec_out, int num) {
-  float* symbolsPtr = vec_in;
-  __m128i* resultPtr = (__m128i*)vec_out;
+  float* symbols_ptr = vec_in;
+  __m128i* result_ptr = (__m128i*)vec_out;
   __m256 symbol1, symbol2, symbol3, symbol4;
   __m256i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_12, symbol_34;
   __m256i symbol_abs_1, symbol_abs_2;
@@ -768,14 +768,14 @@ void demod_64qam_hard_avx2(float* vec_in, uint8_t* vec_out, int num) {
                       0xff, 0xff, 14, 12, 10, 8, 6, 4, 2, 0);
 
   for (int i = 0; i < num / 16; i++) {
-    symbol1 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
-    symbol2 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
-    symbol3 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
-    symbol4 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
+    symbol1 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol2 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol3 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol4 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
 
     symbol_i1 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol1, scale_v));
     symbol_i2 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol2, scale_v));
@@ -871,8 +871,8 @@ void demod_64qam_hard_avx2(float* vec_in, uint8_t* vec_out, int num) {
 
     result = _mm256_shuffle_epi8(result, shuffle_16_to_8);
     result = _mm256_permute4x64_epi64(result, 0xd8);
-    _mm_storeu_si128(resultPtr, _mm256_extracti128_si256(result, 0));
-    resultPtr++;
+    _mm_storeu_si128(result_ptr, _mm256_extracti128_si256(result, 0));
+    result_ptr++;
   }
   // Demodulate last symbols
   int next_start = 16 * (num / 16);
@@ -881,8 +881,8 @@ void demod_64qam_hard_avx2(float* vec_in, uint8_t* vec_out, int num) {
 }
 
 void demod_64qam_soft_avx2(float* vec_in, int8_t* llr, int num) {
-  float* symbolsPtr = (float*)vec_in;
-  __m256i* resultPtr = (__m256i*)llr;
+  float* symbols_ptr = (float*)vec_in;
+  __m256i* result_ptr = (__m256i*)llr;
   __m256 symbol1, symbol2, symbol3, symbol4;
   __m256i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_i, symbol_abs,
       symbol_abs2, symbol_12, symbol_34;
@@ -933,14 +933,14 @@ void demod_64qam_soft_avx2(float* vec_in, int8_t* llr, int num) {
                       13, 12, 0xff, 0xff, 0xff, 0xff, 11, 10, 0xff, 0xff);
 
   for (int i = 0; i < num / 16; i++) {
-    symbol1 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
-    symbol2 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
-    symbol3 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
-    symbol4 = _mm256_load_ps(symbolsPtr);
-    symbolsPtr += 8;
+    symbol1 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol2 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol3 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol4 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
     symbol_i1 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol1, scale_v));
     symbol_i2 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol2, scale_v));
     symbol_i3 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol3, scale_v));
@@ -975,15 +975,15 @@ void demod_64qam_soft_avx2(float* vec_in, int8_t* llr, int num) {
     result_final3 =
         _mm256_or_si256(_mm256_or_si256(result31, result32), result33);
 
-    _mm256_storeu_si256(resultPtr, _mm256_permute2x128_si256(
+    _mm256_storeu_si256(result_ptr, _mm256_permute2x128_si256(
                                        result_final1, result_final2, 0x20));
-    resultPtr++;
-    _mm256_storeu_si256(resultPtr, _mm256_permute2x128_si256(
+    result_ptr++;
+    _mm256_storeu_si256(result_ptr, _mm256_permute2x128_si256(
                                        result_final3, result_final1, 0x30));
-    resultPtr++;
-    _mm256_storeu_si256(resultPtr, _mm256_permute2x128_si256(
+    result_ptr++;
+    _mm256_storeu_si256(result_ptr, _mm256_permute2x128_si256(
                                        result_final2, result_final3, 0x31));
-    resultPtr++;
+    result_ptr++;
   }
   int next_start = 16 * (num / 16);
   demod_64qam_soft_sse(vec_in + 2 * next_start, llr + next_start * 6,

@@ -12,11 +12,11 @@ int main(int argc, char const* argv[]) {
   config->GenData();
   int ret;
   try {
-    SignalHandler signalHandler;
+    SignalHandler signal_handler;
 
     // Register signal handler to handle kill signal
-    signalHandler.setupSignalHandlers();
-    auto* phy = new Phy_UE(config);
+    signal_handler.setupSignalHandlers();
+    auto* phy = new PhyUe(config);
     phy->start();
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {

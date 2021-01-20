@@ -8,7 +8,7 @@
 #include "utils_ldpc.hpp"
 
 Config::Config(std::string jsonfile)
-    : freq_ghz_(measure_rdtsc_freq()),
+    : kFreqGhz(measure_rdtsc_freq()),
       ldpc_config_(0, 0, 0, 0, 0, 0, 0, 0),
       frame_("") {
   pilots_ = nullptr;
@@ -16,30 +16,30 @@ Config::Config(std::string jsonfile)
   set_cpu_layout_on_numa_nodes();
   std::string conf;
   Utils::loadTDDConfig(jsonfile, conf);
-  const auto tddConf = json::parse(conf);
+  const auto tdd_conf = json::parse(conf);
 
   /* antenna configurations */
   if (kUseUHD == false) {
-    std::string hub_file = tddConf.value("hubs", "");
+    std::string hub_file = tdd_conf.value("hubs", "");
     if (hub_file.size() > 0) {
       Utils::loadDevices(hub_file, hub_ids_);
     }
   }
-  std::string serial_file = tddConf.value("irises", "");
-  ref_ant_ = tddConf.value("ref_ant_", 0);
-  external_ref_node_ = tddConf.value("external_ref_node", false);
-  num_cells_ = tddConf.value("cells", 1);
-  channel_ = tddConf.value("channel", "A");
+  std::string serial_file = tdd_conf.value("irises", "");
+  ref_ant_ = tdd_conf.value("ref_ant_", 0);
+  external_ref_node_ = tdd_conf.value("external_ref_node", false);
+  num_cells_ = tdd_conf.value("cells", 1);
+  channel_ = tdd_conf.value("channel", "A");
   num_channels_ = std::min(channel_.size(), (size_t)2);
-  bs_ant_num_ = tddConf.value("antenna_num", 8);
-  is_UE_ = tddConf.value("UE", false);
-  ue_num_ = tddConf.value("ue_num", 8);
+  bs_ant_num_ = tdd_conf.value("antenna_num", 8);
+  is_ue_ = tdd_conf.value("UE", false);
+  ue_num_ = tdd_conf.value("ue_num", 8);
   ue_ant_num_ = ue_num_;
   if (serial_file.size() > 0) Utils::loadDevices(serial_file, radio_ids_);
   if (radio_ids_.size() != 0) {
     num_radios_ = radio_ids_.size();
     num_antennas_ = num_channels_ * num_radios_;
-    if (is_UE_) {
+    if (is_ue_) {
       ue_ant_num_ = num_antennas_;
       ue_num_ = num_radios_;
     } else {
@@ -52,7 +52,7 @@ Config::Config(std::string jsonfile)
     }
   } else {
     num_radios_ =
-        tddConf.value("radio_num", is_UE_ ? ue_ant_num_ : bs_ant_num_);
+        tdd_conf.value("radio_num", is_ue_ ? ue_ant_num_ : bs_ant_num_);
   }
   bf_ant_num_ = bs_ant_num_;
   if (external_ref_node_ == true) {
@@ -64,85 +64,85 @@ Config::Config(std::string jsonfile)
   }
 
   /* radio configurations */
-  freq_ = tddConf.value("frequency", 3.6e9);
-  single_gain_ = tddConf.value("single_gain", true);
-  tx_gain_a_ = tddConf.value("tx_gain_a", 20);
-  rx_gain_a_ = tddConf.value("rx_gain_a", 20);
-  tx_gain_b_ = tddConf.value("tx_gain_b", 20);
-  rx_gain_b_ = tddConf.value("rx_gain_b", 20);
-  calib_tx_gain_a_ = tddConf.value("calib_tx_gain_a", tx_gain_a_);
-  calib_tx_gain_b_ = tddConf.value("calib_tx_gain_b", tx_gain_b_);
-  auto gain_adj_json_a = tddConf.value("client_gain_adjust_a", json::array());
+  freq_ = tdd_conf.value("frequency", 3.6e9);
+  single_gain_ = tdd_conf.value("single_gain", true);
+  tx_gain_a_ = tdd_conf.value("tx_gain_a", 20);
+  rx_gain_a_ = tdd_conf.value("rx_gain_a", 20);
+  tx_gain_b_ = tdd_conf.value("tx_gain_b", 20);
+  rx_gain_b_ = tdd_conf.value("rx_gain_b", 20);
+  calib_tx_gain_a_ = tdd_conf.value("calib_tx_gain_a", tx_gain_a_);
+  calib_tx_gain_b_ = tdd_conf.value("calib_tx_gain_b", tx_gain_b_);
+  auto gain_adj_json_a = tdd_conf.value("client_gain_adjust_a", json::array());
   if (gain_adj_json_a.empty()) {
     client_gain_adj_a_.resize(num_radios_, 0);
   } else {
     client_gain_adj_a_.assign(gain_adj_json_a.begin(), gain_adj_json_a.end());
   }
-  auto gain_adj_json_b = tddConf.value("client_gain_adjust_b", json::array());
+  auto gain_adj_json_b = tdd_conf.value("client_gain_adjust_b", json::array());
   if (gain_adj_json_b.empty()) {
     client_gain_adj_b_.resize(num_radios_, 0);
   } else {
     client_gain_adj_b_.assign(gain_adj_json_b.begin(), gain_adj_json_b.end());
   }
-  rate_ = tddConf.value("rate", 5e6);
-  nco_ = tddConf.value("nco_frequency", 0.75 * rate_);
+  rate_ = tdd_conf.value("rate", 5e6);
+  nco_ = tdd_conf.value("nco_frequency", 0.75 * rate_);
   bw_filter_ = rate_ + 2 * nco_;
   radio_rf_freq_ = freq_ - nco_;
-  beacon_ant_ = tddConf.value("beacon_antenna", 0);
-  beamsweep_ = tddConf.value("beamsweep", false);
-  sample_cal_en_ = tddConf.value("sample_calibrate", false);
-  imbalance_cal_en_ = tddConf.value("imbalance_calibrate", false);
-  modulation_ = tddConf.value("modulation", "16QAM");
+  beacon_ant_ = tdd_conf.value("beacon_antenna", 0);
+  beamsweep_ = tdd_conf.value("beamsweep", false);
+  sample_cal_en_ = tdd_conf.value("sample_calibrate", false);
+  imbalance_cal_en_ = tdd_conf.value("imbalance_calibrate", false);
+  modulation_ = tdd_conf.value("modulation", "16QAM");
 
-  bs_server_addr_ = tddConf.value("bs_server_addr", "127.0.0.1");
-  bs_rru_addr_ = tddConf.value("bs_rru_addr", "127.0.0.1");
-  ue_server_addr_ = tddConf.value("ue_server_addr", "127.0.0.1");
-  mac_remote_addr_ = tddConf.value("mac_remote_addr", "127.0.0.1");
-  bs_server_port_ = tddConf.value("bs_server_port", 8000);
-  bs_rru_port_ = tddConf.value("bs_rru_port", 9000);
-  ue_rru_port_ = tddConf.value("ue_rru_port", 7000);
-  ue_server_port_ = tddConf.value("ue_sever_port", 6000);
+  bs_server_addr_ = tdd_conf.value("bs_server_addr", "127.0.0.1");
+  bs_rru_addr_ = tdd_conf.value("bs_rru_addr", "127.0.0.1");
+  ue_server_addr_ = tdd_conf.value("ue_server_addr", "127.0.0.1");
+  mac_remote_addr_ = tdd_conf.value("mac_remote_addr", "127.0.0.1");
+  bs_server_port_ = tdd_conf.value("bs_server_port", 8000);
+  bs_rru_port_ = tdd_conf.value("bs_rru_port", 9000);
+  ue_rru_port_ = tdd_conf.value("ue_rru_port", 7000);
+  ue_server_port_ = tdd_conf.value("ue_sever_port", 6000);
 
-  dpdk_num_ports_ = tddConf.value("dpdk_num_ports", 1);
+  dpdk_num_ports_ = tdd_conf.value("dpdk_num_ports", 1);
 
-  mac_rx_port_ = tddConf.value("mac_rx_port", 5000);
-  mac_tx_port_ = tddConf.value("mac_tx_port", 4000);
-  init_mac_running_ = tddConf.value("init_mac_running", false);
+  mac_rx_port_ = tdd_conf.value("mac_rx_port", 5000);
+  mac_tx_port_ = tdd_conf.value("mac_tx_port", 4000);
+  init_mac_running_ = tdd_conf.value("init_mac_running", false);
 
   /* frame configurations */
-  cp_len_ = tddConf.value("cp_len", 0);
-  ofdm_ca_num_ = tddConf.value("ofdm_ca_num", 2048);
-  ofdm_data_num_ = tddConf.value("ofdm_data_num", 1200);
-  ofdm_tx_zero_prefix_ = tddConf.value("ofdm_tx_zero_prefix", 0);
-  ofdm_tx_zero_postfix_ = tddConf.value("ofdm_tx_zero_postfix", 0);
+  cp_len_ = tdd_conf.value("cp_len", 0);
+  ofdm_ca_num_ = tdd_conf.value("ofdm_ca_num", 2048);
+  ofdm_data_num_ = tdd_conf.value("ofdm_data_num", 1200);
+  ofdm_tx_zero_prefix_ = tdd_conf.value("ofdm_tx_zero_prefix", 0);
+  ofdm_tx_zero_postfix_ = tdd_conf.value("ofdm_tx_zero_postfix", 0);
   ofdm_rx_zero_prefix_bs_ =
-      tddConf.value("ofdm_rx_zero_prefix_bs", 0) + cp_len_;
-  ofdm_rx_zero_prefix_client_ = tddConf.value("ofdm_rx_zero_prefix_client", 0);
+      tdd_conf.value("ofdm_rx_zero_prefix_bs", 0) + cp_len_;
+  ofdm_rx_zero_prefix_client_ = tdd_conf.value("ofdm_rx_zero_prefix_client", 0);
   ofdm_rx_zero_prefix_cal_ul_ =
-      tddConf.value("ofdm_rx_zero_prefix_cal_ul", 0) + cp_len_;
+      tdd_conf.value("ofdm_rx_zero_prefix_cal_ul", 0) + cp_len_;
   ofdm_rx_zero_prefix_cal_dl_ =
-      tddConf.value("ofdm_rx_zero_prefix_cal_dl", 0) + cp_len_;
+      tdd_conf.value("ofdm_rx_zero_prefix_cal_dl", 0) + cp_len_;
   rt_assert(ofdm_data_num_ % kSCsPerCacheline == 0,
             "ofdm_data_num_ must be a multiple of subcarriers per cacheline");
   rt_assert(ofdm_data_num_ % kTransposeBlockSize == 0,
             "Transpose block size must divide number of OFDM data subcarriers");
-  ofdm_pilot_spacing_ = tddConf.value("ofdm_pilot_spacing", 16);
+  ofdm_pilot_spacing_ = tdd_conf.value("ofdm_pilot_spacing", 16);
   ofdm_data_start_ =
-      tddConf.value("ofdm_data_start", (ofdm_ca_num_ - ofdm_data_num_) / 2);
+      tdd_conf.value("ofdm_data_start", (ofdm_ca_num_ - ofdm_data_num_) / 2);
   ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
 
-  bigstation_mode_ = tddConf.value("bigstation_mode", false);
-  freq_orthogonal_pilot_ = tddConf.value("freq_orthogonal_pilot", false);
-  correct_phase_shift_ = tddConf.value("correct_phase_shift", false);
+  bigstation_mode_ = tdd_conf.value("bigstation_mode", false);
+  freq_orthogonal_pilot_ = tdd_conf.value("freq_orthogonal_pilot", false);
+  correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
 
-  cl_tx_advance_ = tddConf.value("tx_advance", 100);
-  hw_framer_ = tddConf.value("hw_framer", true);
+  cl_tx_advance_ = tdd_conf.value("tx_advance", 100);
+  hw_framer_ = tdd_conf.value("hw_framer", true);
 
   /* If frames not specified explicitly, construct default based on frame_type /
    * symbol_num_perframe / pilot_num / ul_symbol_num_perframe /
    * dl_symbol_num_perframe / dl_data_symbol_start */
-  if (tddConf.find("frames") == tddConf.end()) {
-    bool downlink_mode = tddConf.value("downlink_mode", kDefaultDownlinkMode);
+  if (tdd_conf.find("frames") == tdd_conf.end()) {
+    bool downlink_mode = tdd_conf.value("downlink_mode", kDefaultDownlinkMode);
     size_t ul_data_symbol_num_perframe = kDefaultULSymPerFrame;
     size_t ul_data_symbol_start = kDefaultULSymStart;
     size_t dl_data_symbol_num_perframe = kDefaultDLSymPerFrame;
@@ -158,19 +158,19 @@ Config::Config(std::string jsonfile)
     }
 
     size_t symbol_num_perframe =
-        tddConf.value("symbol_num_perframe", kDefaultSymbolNumPerFrame);
-    size_t pilot_symbol_num_perframe = tddConf.value(
+        tdd_conf.value("symbol_num_perframe", kDefaultSymbolNumPerFrame);
+    size_t pilot_symbol_num_perframe = tdd_conf.value(
         "pilot_num",
         freq_orthogonal_pilot_ ? kDefaultPilotSymPerFrame : ue_ant_num_);
 
     ul_data_symbol_num_perframe =
-        tddConf.value("ul_symbol_num_perframe", ul_data_symbol_num_perframe);
-    ul_data_symbol_start = tddConf.value(
+        tdd_conf.value("ul_symbol_num_perframe", ul_data_symbol_num_perframe);
+    ul_data_symbol_start = tdd_conf.value(
         "ul_data_symbol_start",
         ul_data_symbol_start); /* Start position of the first UL symbol */
     dl_data_symbol_num_perframe =
-        tddConf.value("dl_symbol_num_perframe", dl_data_symbol_num_perframe);
-    dl_data_symbol_start = tddConf.value(
+        tdd_conf.value("dl_symbol_num_perframe", dl_data_symbol_num_perframe);
+    dl_data_symbol_start = tdd_conf.value(
         "dl_data_symbol_start",
         dl_data_symbol_start); /* Start position of the first DL symbol */
 
@@ -259,7 +259,7 @@ Config::Config(std::string jsonfile)
 
     frame_ = FrameStats(sched);
   } else {
-    json jframes = tddConf.value("frames", json::array());
+    json jframes = tdd_conf.value("frames", json::array());
 
     /* Only allow 1 unique frame type */
     assert(jframes.size() == 1);
@@ -270,10 +270,10 @@ Config::Config(std::string jsonfile)
 
   /* client_dl_pilot_sym uses the first x 'D' symbols for downlink channel
    * estimation for each user. */
-  size_t client_dl_pilot_syms = tddConf.value("client_dl_pilot_syms", 0);
+  size_t client_dl_pilot_syms = tdd_conf.value("client_dl_pilot_syms", 0);
   /* client_dl_pilot_sym uses the first x 'D' symbols for downlink channel
    * estimation for each user. */
-  size_t client_ul_pilot_syms = tddConf.value("client_ul_pilot_syms", 0);
+  size_t client_ul_pilot_syms = tdd_conf.value("client_ul_pilot_syms", 0);
 
   frame_.SetClientPilotSyms(client_ul_pilot_syms, client_dl_pilot_syms);
 
@@ -281,30 +281,30 @@ Config::Config(std::string jsonfile)
   ant_group_num_ =
       frame_.IsRecCalEnabled() ? (bf_ant_num_ / ant_per_group_) : 0;
 
-  if ((is_UE_ == true) && (freq_orthogonal_pilot_ == false) &&
+  if ((is_ue_ == true) && (freq_orthogonal_pilot_ == false) &&
       (ue_ant_num_ != frame_.NumPilotSyms())) {
     rt_assert(false, "Number of pilot symbols doesn't match number of UEs");
   }
-  if ((is_UE_ == false) && (freq_orthogonal_pilot_ == false) &&
-      (tddConf.find("ue_num") == tddConf.end())) {
+  if ((is_ue_ == false) && (freq_orthogonal_pilot_ == false) &&
+      (tdd_conf.find("ue_num") == tdd_conf.end())) {
     ue_num_ = frame_.NumPilotSyms();
     ue_ant_num_ = ue_num_;
   }
-  ue_ant_offset_ = tddConf.value("ue_ant_offset", 0);
-  total_ue_ant_num_ = tddConf.value("total_ue_ant_num", ue_ant_num_);
+  ue_ant_offset_ = tdd_conf.value("ue_ant_offset", 0);
+  total_ue_ant_num_ = tdd_conf.value("total_ue_ant_num", ue_ant_num_);
 
   /* Agora configurations */
-  frames_to_test_ = tddConf.value("frames_to_test", 9600);
-  core_offset_ = tddConf.value("core_offset", 0);
-  worker_thread_num_ = tddConf.value("worker_thread_num", 25);
-  socket_thread_num_ = tddConf.value("socket_thread_num", 4);
-  fft_thread_num_ = tddConf.value("fft_thread_num", 5);
-  demul_thread_num_ = tddConf.value("demul_thread_num", 5);
-  decode_thread_num_ = tddConf.value("decode_thread_num", 10);
+  frames_to_test_ = tdd_conf.value("frames_to_test", 9600);
+  core_offset_ = tdd_conf.value("core_offset", 0);
+  worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
+  socket_thread_num_ = tdd_conf.value("socket_thread_num", 4);
+  fft_thread_num_ = tdd_conf.value("fft_thread_num", 5);
+  demul_thread_num_ = tdd_conf.value("demul_thread_num", 5);
+  decode_thread_num_ = tdd_conf.value("decode_thread_num", 10);
   zf_thread_num_ = worker_thread_num_ - fft_thread_num_ - demul_thread_num_ -
                    decode_thread_num_;
 
-  demul_block_size_ = tddConf.value("demul_block_size", 48);
+  demul_block_size_ = tdd_conf.value("demul_block_size", 48);
   rt_assert(demul_block_size_ % kSCsPerCacheline == 0,
             "Demodulation block size must be a multiple of subcarriers per "
             "cacheline");
@@ -313,23 +313,23 @@ Config::Config(std::string jsonfile)
       "Demodulation block size must be a multiple of transpose block size");
   demul_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / demul_block_size_;
 
-  zf_batch_size_ = tddConf.value("zf_batch_size", 1);
+  zf_batch_size_ = tdd_conf.value("zf_batch_size", 1);
   zf_block_size_ =
-      freq_orthogonal_pilot_ ? ue_ant_num_ : tddConf.value("zf_block_size", 1);
+      freq_orthogonal_pilot_ ? ue_ant_num_ : tdd_conf.value("zf_block_size", 1);
   zf_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / zf_block_size_;
 
-  fft_block_size_ = tddConf.value("fft_block_size", 1);
-  encode_block_size_ = tddConf.value("encode_block_size", 1);
+  fft_block_size_ = tdd_conf.value("fft_block_size", 1);
+  encode_block_size_ = tdd_conf.value("encode_block_size", 1);
 
-  noise_level_ = tddConf.value("noise_level", 0.03);  // default: 30 dB
+  noise_level_ = tdd_conf.value("noise_level", 0.03);  // default: 30 dB
   std::printf("Noise level: %.2f\n", noise_level_);
 
   /* LDPC Coding configurations */
-  uint16_t base_graph = tddConf.value("base_graph", 1);
-  uint16_t zc = tddConf.value("Zc", 72);
-  bool early_term = tddConf.value("earlyTermination", true);
-  int16_t max_decoder_iter = tddConf.value("decoderIter", 5);
-  size_t num_rows = tddConf.value("nRows", (base_graph == 1) ? 46 : 42);
+  uint16_t base_graph = tdd_conf.value("base_graph", 1);
+  uint16_t zc = tdd_conf.value("Zc", 72);
+  bool early_term = tdd_conf.value("earlyTermination", true);
+  int16_t max_decoder_iter = tdd_conf.value("decoderIter", 5);
+  size_t num_rows = tdd_conf.value("nRows", (base_graph == 1) ? 46 : 42);
   uint32_t num_cb_len = ldpc_num_input_bits(base_graph, zc);
   uint32_t num_cb_codew_len = ldpc_num_encoded_bits(base_graph, zc, num_rows);
 
@@ -361,7 +361,7 @@ Config::Config(std::string jsonfile)
            ldpc_config_.num_rows()),
       ldpc_config_.num_rows());
 
-  fft_in_rru_ = tddConf.value("fft_in_rru", false);
+  fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
 
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
@@ -412,15 +412,15 @@ void Config::GenData(void) {
         Utils::double_to_cint16(sts_seq);
 
     // Populate STS (stsReps repetitions)
-    int stsReps = 15;
-    for (int i = 0; i < stsReps; i++) {
+    int sts_reps = 15;
+    for (int i = 0; i < sts_reps; i++) {
       this->beacon_ci16_.insert(this->beacon_ci16_.end(), sts_seq_ci16.begin(),
                                 sts_seq_ci16.end());
     }
 
     // Populate gold sequence (two reps, 128 each)
-    int goldReps = 2;
-    for (int i = 0; i < goldReps; i++) {
+    int gold_reps = 2;
+    for (int i = 0; i < gold_reps; i++) {
       this->beacon_ci16_.insert(this->beacon_ci16_.end(),
                                 gold_ifft_ci16.begin(), gold_ifft_ci16.end());
     }
@@ -439,14 +439,14 @@ void Config::GenData(void) {
     this->coeffs_ = Utils::cint16_to_uint32(gold_ifft_ci16, true, "QI");
 
     // Add addition padding for beacon sent from host
-    int fracBeacon = this->samps_per_symbol_ % this->beacon_len_;
-    std::vector<std::complex<int16_t>> preBeacon(this->ofdm_tx_zero_prefix_, 0);
-    std::vector<std::complex<int16_t>> postBeacon(
-        this->ofdm_tx_zero_postfix_ + fracBeacon, 0);
-    this->beacon_ci16_.insert(this->beacon_ci16_.begin(), preBeacon.begin(),
-                              preBeacon.end());
-    this->beacon_ci16_.insert(this->beacon_ci16_.end(), postBeacon.begin(),
-                              postBeacon.end());
+    int frac_beacon = this->samps_per_symbol_ % this->beacon_len_;
+    std::vector<std::complex<int16_t>> pre_beacon(this->ofdm_tx_zero_prefix_, 0);
+    std::vector<std::complex<int16_t>> post_beacon(
+        this->ofdm_tx_zero_postfix_ + frac_beacon, 0);
+    this->beacon_ci16_.insert(this->beacon_ci16_.begin(), pre_beacon.begin(),
+                              pre_beacon.end());
+    this->beacon_ci16_.insert(this->beacon_ci16_.end(), post_beacon.begin(),
+                              post_beacon.end());
   }
 
   // Generate common pilots based on Zadoff-Chu sequence for channel estimation
@@ -611,7 +611,7 @@ void Config::GenData(void) {
       this->ldpc_config_.num_blocks_in_symbol() * this->ue_ant_num_;
 
   // Encode uplink bits
-  ul_encoded_bits.malloc(this->frame_.NumULSyms() * num_blocks_per_symbol,
+  ul_encoded_bits_.malloc(this->frame_.NumULSyms() * num_blocks_per_symbol,
                          encoded_bytes_per_block,
                          Agora_memory::Alignment_t::k64Align);
 
@@ -624,12 +624,12 @@ void Config::GenData(void) {
       ldpc_encode_helper(this->ldpc_config_.base_graph(),
                          this->ldpc_config_.expansion_factor(),
                          this->ldpc_config_.num_rows(),
-                         ul_encoded_bits[i * num_blocks_per_symbol + j],
+                         ul_encoded_bits_[i * num_blocks_per_symbol + j],
                          temp_parity_buffer, ul_bits_[i] + j * bytes_per_block);
     }
   }
 
-  ul_mod_input.calloc(this->frame_.NumULSyms(),
+  ul_mod_input_.calloc(this->frame_.NumULSyms(),
                       this->ofdm_data_num_ * this->ue_ant_num_,
                       Agora_memory::Alignment_t::k32Align);
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
@@ -637,10 +637,10 @@ void Config::GenData(void) {
       for (size_t k = 0; k < this->ldpc_config_.num_blocks_in_symbol(); k++) {
         adapt_bits_for_mod(
             reinterpret_cast<uint8_t*>(
-                ul_encoded_bits[i * num_blocks_per_symbol +
+                ul_encoded_bits_[i * num_blocks_per_symbol +
                                 j * this->ldpc_config_.num_blocks_in_symbol() +
                                 k]),
-            ul_mod_input[i] + j * this->ofdm_data_num_ +
+            ul_mod_input_[i] + j * this->ofdm_data_num_ +
                 k * encoded_bytes_per_block,
             encoded_bytes_per_block, this->mod_order_bits_);
       }
@@ -664,7 +664,7 @@ void Config::GenData(void) {
           this->dl_bits_[i] + j * bytes_per_block);
     }
   }
-  dl_mod_input.calloc(this->frame_.NumDLSyms(),
+  dl_mod_input_.calloc(this->frame_.NumDLSyms(),
                       this->ofdm_data_num_ * this->ue_ant_num_,
                       Agora_memory::Alignment_t::k32Align);
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
@@ -675,7 +675,7 @@ void Config::GenData(void) {
                 dl_encoded_bits[i * num_blocks_per_symbol +
                                 j * this->ldpc_config_.num_blocks_in_symbol() +
                                 k]),
-            dl_mod_input[i] + j * this->ofdm_data_num_ +
+            dl_mod_input_[i] + j * this->ofdm_data_num_ +
                 k * encoded_bytes_per_block,
             encoded_bytes_per_block, this->mod_order_bits_);
       }
@@ -697,7 +697,7 @@ void Config::GenData(void) {
         size_t s = p + k;
         if (k % this->ofdm_pilot_spacing_ != 0) {
           this->dl_iq_f_[i][q + j] =
-              mod_single_uint8(dl_mod_input[i][s], this->mod_table_);
+              mod_single_uint8(dl_mod_input_[i][s], this->mod_table_);
         } else {
           this->dl_iq_f_[i][q + j] = this->ue_specific_pilot_[u][k];
         }
@@ -721,7 +721,7 @@ void Config::GenData(void) {
         size_t k = j - this->ofdm_data_start_;
         size_t s = p + k;
         ul_iq_f_[i][q + j] =
-            mod_single_uint8(ul_mod_input[i][s], this->mod_table_);
+            mod_single_uint8(ul_mod_input_[i][s], this->mod_table_);
         ul_iq_ifft[i][q + j] = this->ul_iq_f_[i][q + j];
       }
 
@@ -821,9 +821,9 @@ void Config::GenData(void) {
   ul_iq_ifft.free();
   dl_iq_ifft.free();
   ue_pilot_ifft.free();
-  ul_mod_input.free();
-  ul_encoded_bits.free();
-  dl_mod_input.free();
+  ul_mod_input_.free();
+  ul_encoded_bits_.free();
+  dl_mod_input_.free();
   free_buffer_1d(&pilot_ifft);
 }
 
@@ -893,7 +893,7 @@ bool Config::IsPilot(size_t frame_id, size_t symbol_id) const {
 #ifdef DEBUG3
   std::printf("IsPilot(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
-  if (this->is_UE_ == true) {
+  if (this->is_ue_ == true) {
     if ((s == 'D') && (this->frame_.client_dl_pilot_symbols() > 0)) {
       size_t dl_index = this->frame_.GetDLSymbolIdx(symbol_id);
       is_pilot = (this->frame_.client_dl_pilot_symbols() > dl_index);
@@ -908,7 +908,7 @@ bool Config::IsPilot(size_t frame_id, size_t symbol_id) const {
 bool Config::IsCalDlPilot(size_t frame_id, size_t symbol_id) const {
   bool is_cal_dl_pilot = false;
   assert(symbol_id < this->frame_.NumTotalSyms());
-  if (this->is_UE_ == false) {
+  if (this->is_ue_ == false) {
     is_cal_dl_pilot = (this->frame_.frame_identifier().at(symbol_id) == 'C');
   }
   return is_cal_dl_pilot;
@@ -917,7 +917,7 @@ bool Config::IsCalDlPilot(size_t frame_id, size_t symbol_id) const {
 bool Config::IsCalUlPilot(size_t frame_id, size_t symbol_id) const {
   bool is_cal_ul_pilot = false;
   assert(symbol_id < this->frame_.NumTotalSyms());
-  if (this->is_UE_ == false) {
+  if (this->is_ue_ == false) {
     is_cal_ul_pilot = (this->frame_.frame_identifier().at(symbol_id) == 'L');
   }
   return is_cal_ul_pilot;
@@ -938,7 +938,7 @@ bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const {
 #ifdef DEBUG3
   std::printf("IsDownlink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
-  if (this->is_UE_ == true) {
+  if (this->is_ue_ == true) {
     return ((s == 'D') && (this->IsPilot(frame_id, symbol_id) == false));
   } else {
     return (s == 'D');
@@ -946,9 +946,9 @@ bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const {
 }
 
 SymbolType Config::GetSymbolType(size_t symbol_id) const {
-  assert((this->is_UE_ ==
+  assert((this->is_ue_ ==
           false));  // Currently implemented for only the Agora server
-  return kSymbolMap.at(this->frame_.frame_identifier().at(symbol_id));
+  return k_symbol_map.at(this->frame_.frame_identifier().at(symbol_id));
 }
 
 extern "C" {

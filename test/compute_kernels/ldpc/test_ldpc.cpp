@@ -24,7 +24,7 @@ static constexpr size_t kBaseGraph = 1;
 static constexpr bool kEnableEarlyTermination = false;
 static constexpr size_t kNumFillerBits = 0;
 static constexpr size_t kMaxDecoderIters = 8;
-static constexpr size_t k5GNRNumPunctured = 2;
+static constexpr size_t kK5GnrNumPunctured = 2;
 static constexpr size_t kNumRows = 46;
 
 int main() {
@@ -100,8 +100,8 @@ int main() {
     ldpc_decoder_5gnr_request.nRows = kNumRows;
 
     const size_t buffer_len = 1024 * 1024;
-    const size_t numMsgBits = num_input_bits - kNumFillerBits;
-    ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
+    const size_t num_msg_bits = num_input_bits - kNumFillerBits;
+    ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
     ldpc_decoder_5gnr_response.varNodes =
         static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(
             Agora_memory::Alignment_t::k32Align, buffer_len * sizeof(int16_t)));

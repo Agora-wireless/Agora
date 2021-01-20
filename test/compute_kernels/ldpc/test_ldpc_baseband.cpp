@@ -25,10 +25,10 @@
 
 static constexpr bool kVerbose = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
-static constexpr float noise_levels[15] = {
+static constexpr float kNoiseLevels[15] = {
     1.7783, 1.3335, 1.0000, 0.7499, 0.5623, 0.4217, 0.3162, 0.2371,
     0.1778, 0.1334, 0.1000, 0.0750, 0.0562, 0.0422, 0.0316};
-static constexpr float snr_levels[15] = {-5, -2.5, 0,  2.5,  5,  7.5,  10, 12.5,
+static constexpr float kSnrLevels[15] = {-5, -2.5, 0,  2.5,  5,  7.5,  10, 12.5,
                                          15, 17.5, 20, 22.5, 25, 27.5, 30};
 DEFINE_string(profile, "random",
               "The profile of the input user bytes (e.g., 'random', '123')");
@@ -199,9 +199,9 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < cfg->ue_ant_num() * cfg->bs_ant_num(); i++) {
       for (size_t j = 0; j < cfg->ofdm_ca_num(); j++) {
         complex_float noise = {static_cast<float>(distribution(generator)) *
-                                   noise_levels[noise_id],
+                                   kNoiseLevels[noise_id],
                                static_cast<float>(distribution(generator)) *
-                                   noise_levels[noise_id]};
+                                   kNoiseLevels[noise_id]};
         csi_matrices_pilot[j][i].re = csi_matrices_no_noise[j][i].re + noise.re;
         csi_matrices_pilot[j][i].im = csi_matrices_no_noise[j][i].im + noise.im;
       }
@@ -215,9 +215,9 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < cfg->ue_ant_num() * cfg->bs_ant_num(); i++) {
       for (size_t j = 0; j < cfg->ofdm_ca_num(); j++) {
         complex_float noise = {static_cast<float>(distribution(generator)) *
-                                   noise_levels[noise_id],
+                                   kNoiseLevels[noise_id],
                                static_cast<float>(distribution(generator)) *
-                                   noise_levels[noise_id]};
+                                   kNoiseLevels[noise_id]};
         csi_matrices_data[j][i].re = csi_matrices_no_noise[j][i].re + noise.re;
         csi_matrices_data[j][i].im = csi_matrices_no_noise[j][i].im + noise.im;
       }
@@ -294,15 +294,15 @@ int main(int argc, char* argv[]) {
                           (cb_id * num_symbols_per_cb * 8 +
                            symbol_id_in_cb * cfg->mod_order_bits()) *
                               cfg->ofdm_data_num();
-        auto* equal_T_ptr =
+        auto* equal_t_ptr =
             (float*)(equalized_data_all_symbols[i - data_sym_start] +
                      j * cfg->ofdm_data_num());
         switch (cfg->mod_order_bits()) {
           case (4):
-            demod_16qam_soft_avx2(equal_T_ptr, demod_ptr, cfg->ofdm_data_num());
+            demod_16qam_soft_avx2(equal_t_ptr, demod_ptr, cfg->ofdm_data_num());
             break;
           case (6):
-            demod_64qam_soft_avx2(equal_T_ptr, demod_ptr, cfg->ofdm_data_num());
+            demod_64qam_soft_avx2(equal_t_ptr, demod_ptr, cfg->ofdm_data_num());
             break;
           default:
             std::printf("Demodulation: modulation type %s not supported!\n",
@@ -384,7 +384,7 @@ int main(int argc, char* argv[]) {
         "Noise: %.3f, snr: %.1f dB, error rate: %zu/%zu = %.6f, block "
         "error: "
         "%zu/%zu = %.6f\n",
-        noise_levels[noise_id], snr_levels[noise_id], error_num, total,
+        kNoiseLevels[noise_id], kSnrLevels[noise_id], error_num, total,
         1.f * error_num / total, block_error_num, num_codeblocks,
         1.f * block_error_num / num_codeblocks);
 

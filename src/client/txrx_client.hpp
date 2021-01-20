@@ -42,8 +42,8 @@ class RadioConfig;
 class RadioTXRX {
  public:
   struct RadioTXRXContext {
-    RadioTXRX* ptr;
-    int tid;
+    RadioTXRX* ptr_;
+    int tid_;
   };
 
  public:
@@ -54,8 +54,8 @@ class RadioTXRX {
    * in_queue: message queue to communicate with main thread
    */
   RadioTXRX(Config* cfg, int n_tx_thread, int in_core_id,
-            moodycamel::ConcurrentQueue<Event_data>* in_queue,
-            moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
+            moodycamel::ConcurrentQueue<EventData>* in_queue,
+            moodycamel::ConcurrentQueue<EventData>* in_queue_task,
             moodycamel::ProducerToken** in_rx_ptoks,
             moodycamel::ProducerToken** in_tx_ptoks);
   ~RadioTXRX();
@@ -140,8 +140,8 @@ class RadioTXRX {
   void* loop_tx_rx_usrp_sync(int tid);
 
  private:
-  pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-  pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+  pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
+  pthread_cond_t cond_ = PTHREAD_COND_INITIALIZER;
   Config* config_;
   ClientRadioConfig* radioconfig_;           // Used only in Argos mode
   std::vector<struct sockaddr_in> servaddr_; /* server address */
@@ -161,15 +161,15 @@ class RadioTXRX {
   int thread_num_;
   int tx_thread_num_;
   // pointer of message_queue_
-  moodycamel::ConcurrentQueue<Event_data>* message_queue_;
-  moodycamel::ConcurrentQueue<Event_data>* task_queue_;
+  moodycamel::ConcurrentQueue<EventData>* message_queue_;
+  moodycamel::ConcurrentQueue<EventData>* task_queue_;
   moodycamel::ProducerToken** rx_ptoks_;
   moodycamel::ProducerToken** tx_ptoks_;
   int core_id_;
   int tx_core_id_;
 
   // helper buffers
-  std::vector<void*> pilot_buff0;
-  std::vector<void*> pilot_buff1;
+  std::vector<void*> pilot_buff0_;
+  std::vector<void*> pilot_buff1_;
 };
 #endif

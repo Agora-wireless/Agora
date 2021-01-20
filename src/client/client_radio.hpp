@@ -40,21 +40,21 @@ class ClientRadioConfig {
 
  private:
   struct ClientRadioConfigContext {
-    ClientRadioConfig* ptr;
-    size_t tid;
+    ClientRadioConfig* ptr_;
+    size_t tid_;
   };
   static void* initClientRadio_launch(void* context);
   void initClientRadio(ClientRadioConfigContext* context);
 
-  Config* _cfg;
-  std::vector<SoapySDR::Device*> hubs;
-  std::vector<SoapySDR::Device*> clStn;
-  SoapySDR::Device* ref;
-  SoapySDR::Stream* refRxStream;
-  std::vector<SoapySDR::Stream*> txStreams;
-  std::vector<SoapySDR::Stream*> rxStreams;
-  size_t _radioNum;
-  size_t _antennaNum;
-  ClientRadioConfigContext* context;
+  Config* cfg_;
+  std::vector<SoapySDR::Device*> hubs_;
+  std::vector<SoapySDR::Device*> cl_stn_;
+  SoapySDR::Device* ref_;
+  SoapySDR::Stream* ref_rx_stream_;
+  std::vector<SoapySDR::Stream*> tx_streams_;
+  std::vector<SoapySDR::Stream*> rx_streams_;
+  size_t radio_num_;
+  size_t antenna_num_;
+  ClientRadioConfigContext* context_;
 };
 #endif

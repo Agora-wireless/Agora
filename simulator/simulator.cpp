@@ -2,10 +2,10 @@
 
 Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
                      size_t in_core_offset, size_t sender_delay)
-    : TASK_THREAD_NUM(in_task_thread_num),
-      SOCKET_RX_THREAD_NUM(in_task_thread_num),
-      SOCKET_TX_THREAD_NUM(in_task_thread_num),
-      CORE_OFFSET(in_core_offset) {
+    : task_thread_num_(in_task_thread_num),
+      socket_rx_thread_num_(in_task_thread_num),
+      socket_tx_thread_num_(in_task_thread_num),
+      core_offset_(in_core_offset) {
   std::string directory = TOSTRING(PROJECT_DIRECTORY);
   std::printf("PROJECT_DIRECTORY: %s\n", directory.c_str());
   std::printf("Main thread: on core %d\n", sched_getcpu());
@@ -17,7 +17,7 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
   this->config_ = cfg;
 
   initialize_vars_from_cfg(cfg);
-  pin_to_core_with_offset(ThreadType::kMaster, CORE_OFFSET, 0);
+  pin_to_core_with_offset(ThreadType::kMaster, core_offset_, 0);
 
   initialize_queues();
 
@@ -25,12 +25,12 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
   initialize_uplink_buffers();
 
   std::printf("new Sender\n");
-  sender_.reset(new Sender(config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1,
+  sender_.reset(new Sender(config_, socket_tx_thread_num_, core_offset_ + 1,
                            sender_delay, true));
 
   std::printf("new Receiver\n");
-  receiver_.reset(new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET,
-                               &message_queue_, rx_ptoks_ptr));
+  receiver_.reset(new Receiver(config_, socket_rx_thread_num_, core_offset_,
+                               &message_queue_, rx_ptoks_ptr_));
 }
 
 Simulator::~Simulator() {
@@ -51,23 +51,23 @@ void Simulator::start() {
   /* start receiver */
   std::vector<pthread_t> rx_threads = receiver_->startRecv(
       socket_buffer_, socket_buffer_status_, socket_buffer_status_size_,
-      socket_buffer_size_, frame_start);
+      socket_buffer_size_, frame_start_);
 
   /* tokens used for dequeue */
   moodycamel::ConsumerToken ctok(message_queue_);
   moodycamel::ConsumerToken ctok_complete(complete_task_queue_);
 
-  buffer_frame_num = symbol_num_perframe * bs_ant_num_ * kFrameWnd;
-  max_packet_num_per_frame = bs_ant_num_ * dl_data_symbol_num_perframe;
+  buffer_frame_num_ = symbol_num_perframe_ * bs_ant_num_ * kFrameWnd;
+  max_packet_num_per_frame_ = bs_ant_num_ * dl_data_symbol_num_perframe_;
 
   /* counters for printing summary */
   int frame_count_rx = 0;
 
   int ret = 0;
-  Event_data events_list[kDequeueBulkSize];
+  EventData events_list[kDequeueBulkSize];
 
   /* start transmitter */
-  sender_->startTXfromMain(frame_start_tx, frame_end_tx);
+  sender_->startTXfromMain(frame_start_tx_, frame_end_tx_);
   while ((config_->running() == true) &&
          (SignalHandler::gotExitSignal() == false)) {
     /* get a bulk of events */
@@ -81,18 +81,18 @@ void Simulator::start() {
 
     /* handle each event */
     for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
-      Event_data& event = events_list[bulk_count];
-      switch (event.event_type) {
+      EventData& event = events_list[bulk_count];
+      switch (event.event_type_) {
         case EventType::kPacketRX: {
-          int socket_thread_id = rx_tag_t(event.tags[0]).tid;
-          int buf_offset = rx_tag_t(event.tags[0]).offset;
+          int socket_thread_id = rx_tag_t(event.tags_[0]).tid_;
+          int buf_offset = rx_tag_t(event.tags_[0]).offset_;
 
           char* socket_buffer_ptr = socket_buffer_[socket_thread_id] +
-                                    (long long)buf_offset * packet_length;
+                                    (long long)buf_offset * packet_length_;
           struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
-          int frame_id = pkt->frame_id % 10000;
-          int symbol_id = pkt->symbol_id;
-          int ant_id = pkt->ant_id;
+          int frame_id = pkt->frame_id_ % 10000;
+          int symbol_id = pkt->symbol_id_;
+          int ant_id = pkt->ant_id_;
           int frame_id_in_buffer = (frame_id % kFrameWnd);
           socket_buffer_status_[socket_thread_id][buf_offset] = 0;
 
@@ -122,9 +122,9 @@ void Simulator::start() {
 
   std::printf("Printing results to file......\n");
   for (int ii = 0; ii < frame_count_rx; ii++) {
-    std::fprintf(fp, "%.3f %.3f %.3f %.3f\n", frame_start[0][ii],
-                 frame_start[1][ii], frame_start_receive[ii],
-                 frame_end_receive[ii]);
+    std::fprintf(fp, "%.3f %.3f %.3f %.3f\n", frame_start_[0][ii],
+                 frame_start_[1][ii], frame_start_receive_[ii],
+                 frame_end_receive_[ii]);
   }
   std::exit(0);
 }
@@ -140,18 +140,18 @@ void Simulator::update_rx_counters(size_t frame_id, size_t frame_id_in_buffer,
                                    size_t symbol_id, size_t ant_id) {
   rx_counter_packets_[frame_id_in_buffer]++;
   if (rx_counter_packets_[frame_id_in_buffer] == 1) {
-    frame_start_receive[frame_id] = get_time();
+    frame_start_receive_[frame_id] = get_time();
     if (kDebugPrintPerFrameStart) {
       std::printf(
           "Main thread: data received from frame %zu, symbol %zu, ant "
           "%zu, in %.2f since tx, in %.2f us since last frame\n",
           frame_id, symbol_id, ant_id,
-          frame_start_receive[frame_id] - frame_start_tx[frame_id],
-          frame_start_receive[frame_id] - frame_start_receive[frame_id - 1]);
+          frame_start_receive_[frame_id] - frame_start_tx_[frame_id],
+          frame_start_receive_[frame_id] - frame_start_receive_[frame_id - 1]);
     }
   } else if (rx_counter_packets_[frame_id_in_buffer] ==
-             max_packet_num_per_frame) {
-    frame_end_receive[frame_id] = get_time();
+             max_packet_num_per_frame_) {
+    frame_end_receive_[frame_id] = get_time();
     print_per_frame_done(PrintType::kPacketRX, frame_id);
     rx_counter_packets_[frame_id_in_buffer] = 0;
   }
@@ -164,9 +164,9 @@ void Simulator::print_per_frame_done(PrintType print_type, size_t frame_id) {
       std::printf(
           "Main thread: received all packets in frame: %zu, in %.2f us since "
           "tx, in %.2f us since rx, tx duration: %.2f us\n",
-          frame_id, frame_end_receive[frame_id] - frame_start_tx[frame_id],
-          frame_end_receive[frame_id] - frame_start_receive[frame_id],
-          frame_end_tx[frame_id] - frame_start_tx[frame_id]);
+          frame_id, frame_end_receive_[frame_id] - frame_start_tx_[frame_id],
+          frame_end_receive_[frame_id] - frame_start_receive_[frame_id],
+          frame_end_tx_[frame_id] - frame_start_tx_[frame_id]);
     } break;
     default:
       std::printf("Wrong task type in frame done print!");
@@ -178,86 +178,86 @@ void Simulator::initialize_vars_from_cfg(Config* cfg) {
   ue_num_ = cfg->ue_num();
   ofdm_ca_num_ = cfg->ofdm_ca_num();
   ofdm_data_num_ = cfg->ofdm_data_num();
-  symbol_num_perframe = cfg->frame().NumTotalSyms();
-  data_symbol_num_perframe = cfg->frame().NumDataSyms();
-  ul_data_symbol_num_perframe = cfg->frame().NumULSyms();
-  dl_data_symbol_num_perframe = cfg->frame().NumDLSyms();
+  symbol_num_perframe_ = cfg->frame().NumTotalSyms();
+  data_symbol_num_perframe_ = cfg->frame().NumDataSyms();
+  ul_data_symbol_num_perframe_ = cfg->frame().NumULSyms();
+  dl_data_symbol_num_perframe_ = cfg->frame().NumDLSyms();
 
-  if (dl_data_symbol_num_perframe > 0) {
-    dl_data_symbol_start = cfg->frame().GetDLSymbol(0);
-    dl_data_symbol_end = cfg->frame().GetDLSymbolLast();
+  if (dl_data_symbol_num_perframe_ > 0) {
+    dl_data_symbol_start_ = cfg->frame().GetDLSymbol(0);
+    dl_data_symbol_end_ = cfg->frame().GetDLSymbolLast();
   } else {
-    dl_data_symbol_start = dl_data_symbol_end = 0;
+    dl_data_symbol_start_ = dl_data_symbol_end_ = 0;
   }
 
-  packet_length = cfg->packet_length();
+  packet_length_ = cfg->packet_length();
 
-  demul_block_size = cfg->demul_block_size();
-  demul_block_num = ofdm_data_num_ / demul_block_size +
-                    (ofdm_data_num_ % demul_block_size == 0 ? 0 : 1);
+  demul_block_size_ = cfg->demul_block_size();
+  demul_block_num_ = ofdm_data_num_ / demul_block_size_ +
+                    (ofdm_data_num_ % demul_block_size_ == 0 ? 0 : 1);
 }
 
 void Simulator::initialize_queues() {
   message_queue_ =
-      moodycamel::ConcurrentQueue<Event_data>(512 * data_symbol_num_perframe);
-  complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(
-      512 * data_symbol_num_perframe * 4);
+      moodycamel::ConcurrentQueue<EventData>(512 * data_symbol_num_perframe_);
+  complete_task_queue_ = moodycamel::ConcurrentQueue<EventData>(
+      512 * data_symbol_num_perframe_ * 4);
 
-  rx_ptoks_ptr = static_cast<moodycamel::ProducerToken**>(
+  rx_ptoks_ptr_ = static_cast<moodycamel::ProducerToken**>(
       Agora_memory::padded_aligned_alloc(
           Agora_memory::Alignment_t::k64Align,
-          SOCKET_RX_THREAD_NUM * sizeof(moodycamel::ProducerToken*)));
-  for (size_t i = 0; i < SOCKET_RX_THREAD_NUM; i++) {
-    rx_ptoks_ptr[i] = new moodycamel::ProducerToken(message_queue_);
+          socket_rx_thread_num_ * sizeof(moodycamel::ProducerToken*)));
+  for (size_t i = 0; i < socket_rx_thread_num_; i++) {
+    rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(message_queue_);
   }
 
-  task_ptoks_ptr = static_cast<moodycamel::ProducerToken**>(
+  task_ptoks_ptr_ = static_cast<moodycamel::ProducerToken**>(
       Agora_memory::padded_aligned_alloc(
           Agora_memory::Alignment_t::k64Align,
-          TASK_THREAD_NUM * sizeof(moodycamel::ProducerToken*)));
-  for (size_t i = 0; i < TASK_THREAD_NUM; i++) {
-    task_ptoks_ptr[i] = new moodycamel::ProducerToken(complete_task_queue_);
+          task_thread_num_ * sizeof(moodycamel::ProducerToken*)));
+  for (size_t i = 0; i < task_thread_num_; i++) {
+    task_ptoks_ptr_[i] = new moodycamel::ProducerToken(complete_task_queue_);
   }
 }
 
 void Simulator::free_queues(void) {
-  for (size_t i = 0; i < SOCKET_RX_THREAD_NUM; i++) {
-    delete (rx_ptoks_ptr[i]);
+  for (size_t i = 0; i < socket_rx_thread_num_; i++) {
+    delete (rx_ptoks_ptr_[i]);
   }
 
-  std::free(rx_ptoks_ptr);
-  rx_ptoks_ptr = nullptr;
+  std::free(rx_ptoks_ptr_);
+  rx_ptoks_ptr_ = nullptr;
 
-  for (size_t i = 0; i < TASK_THREAD_NUM; i++) {
-    delete (task_ptoks_ptr[i]);
+  for (size_t i = 0; i < task_thread_num_; i++) {
+    delete (task_ptoks_ptr_[i]);
   }
 
-  std::free(task_ptoks_ptr);
-  task_ptoks_ptr = nullptr;
+  std::free(task_ptoks_ptr_);
+  task_ptoks_ptr_ = nullptr;
 }
 
 void Simulator::initialize_uplink_buffers() {
   socket_buffer_size_ =
-      (long long)packet_length * symbol_num_perframe * bs_ant_num_ * kFrameWnd;
-  socket_buffer_status_size_ = symbol_num_perframe * bs_ant_num_ * kFrameWnd;
-  socket_buffer_.malloc(SOCKET_RX_THREAD_NUM, socket_buffer_size_,
+      (long long)packet_length_ * symbol_num_perframe_ * bs_ant_num_ * kFrameWnd;
+  socket_buffer_status_size_ = symbol_num_perframe_ * bs_ant_num_ * kFrameWnd;
+  socket_buffer_.malloc(socket_rx_thread_num_, socket_buffer_size_,
                         Agora_memory::Alignment_t::k64Align);
-  socket_buffer_status_.calloc(SOCKET_RX_THREAD_NUM, socket_buffer_status_size_,
+  socket_buffer_status_.calloc(socket_rx_thread_num_, socket_buffer_status_size_,
                                Agora_memory::Alignment_t::k64Align);
 
   /* initilize all uplink status checkers */
   alloc_buffer_1d(&rx_counter_packets_, kFrameWnd,
                   Agora_memory::Alignment_t::k64Align, 1);
 
-  frame_start.calloc(SOCKET_RX_THREAD_NUM, kNumStatsFrames,
+  frame_start_.calloc(socket_rx_thread_num_, kNumStatsFrames,
                      Agora_memory::Alignment_t::k4096Align);
-  alloc_buffer_1d(&frame_start_receive, kNumStatsFrames,
+  alloc_buffer_1d(&frame_start_receive_, kNumStatsFrames,
                   Agora_memory::Alignment_t::k4096Align, 1);
-  alloc_buffer_1d(&frame_end_receive, kNumStatsFrames,
+  alloc_buffer_1d(&frame_end_receive_, kNumStatsFrames,
                   Agora_memory::Alignment_t::k4096Align, 1);
-  alloc_buffer_1d(&frame_start_tx, kNumStatsFrames,
+  alloc_buffer_1d(&frame_start_tx_, kNumStatsFrames,
                   Agora_memory::Alignment_t::k4096Align, 1);
-  alloc_buffer_1d(&frame_end_tx, kNumStatsFrames,
+  alloc_buffer_1d(&frame_end_tx_, kNumStatsFrames,
                   Agora_memory::Alignment_t::k4096Align, 1);
 }
 
@@ -267,9 +267,9 @@ void Simulator::free_uplink_buffers() {
 
   free_buffer_1d(&rx_counter_packets_);
 
-  frame_start.free();
-  free_buffer_1d(&frame_start_receive);
-  free_buffer_1d(&frame_end_receive);
-  free_buffer_1d(&frame_start_tx);
-  free_buffer_1d(&frame_end_tx);
+  frame_start_.free();
+  free_buffer_1d(&frame_start_receive_);
+  free_buffer_1d(&frame_end_receive_);
+  free_buffer_1d(&frame_start_tx_);
+  free_buffer_1d(&frame_end_tx_);
 }

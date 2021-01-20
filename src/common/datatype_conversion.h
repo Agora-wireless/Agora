@@ -121,16 +121,16 @@ static inline void convert_float_to_12bit_iq(const float* in_buf,
                                              uint8_t* out_buf, size_t n_elems) {
   size_t index_short = 0;
   for (size_t i = 0; i < n_elems; i = i + 2) {
-    ushort temp_I = (unsigned short)(in_buf[i] * 32768 * 4);
-    ushort temp_Q = (unsigned short)(in_buf[i + 1] * 32768 * 4);
+    ushort temp_i = (unsigned short)(in_buf[i] * 32768 * 4);
+    ushort temp_q = (unsigned short)(in_buf[i + 1] * 32768 * 4);
     // Take the higher 12 bits and ignore the lower 4 bits
-    out_buf[index_short] = (uint8_t)(temp_I >> 4);
+    out_buf[index_short] = (uint8_t)(temp_i >> 4);
     out_buf[index_short + 1] =
-        ((uint8_t)(temp_I >> 12)) | ((uint8_t)(temp_Q & 0xf0));
-    out_buf[index_short + 2] = (uint8_t)(temp_Q >> 8);
+        ((uint8_t)(temp_i >> 12)) | ((uint8_t)(temp_q & 0xf0));
+    out_buf[index_short + 2] = (uint8_t)(temp_q >> 8);
     if (kDebug12BitIQ) {
-      std::cout << "i: " << i << " " << std::bitset<16>(temp_I) << " "
-                << std::bitset<16>(temp_Q) << " => "
+      std::cout << "i: " << i << " " << std::bitset<16>(temp_i) << " "
+                << std::bitset<16>(temp_q) << " => "
                 << std::bitset<8>(out_buf[index_short]) << " "
                 << std::bitset<8>(out_buf[index_short + 1]) << " "
                 << std::bitset<8>(out_buf[index_short + 2]) << std::endl;
@@ -161,7 +161,7 @@ static inline void convert_12bit_iq_to_16bit_iq(uint8_t* in_buf,
   for (size_t i = 0; i < n_elems; i += 16) {
     _mm256_loadu_si256((__m256i const*)in_buf);
     _mm256_loadu_si256((__m256i const*)(in_buf + 16));
-    __m256i temp_I =
+    __m256i temp_i =
         _mm256_setr_epi16(*(uint16_t*)in_buf, *(uint16_t*)(in_buf + 3),
                           *(uint16_t*)(in_buf + 6), *(uint16_t*)(in_buf + 9),
                           *(uint16_t*)(in_buf + 12), *(uint16_t*)(in_buf + 15),
@@ -171,8 +171,8 @@ static inline void convert_12bit_iq_to_16bit_iq(uint8_t* in_buf,
                           *(uint16_t*)(in_buf + 36), *(uint16_t*)(in_buf + 39),
                           *(uint16_t*)(in_buf + 42), *(uint16_t*)(in_buf + 45));
 
-    __m256i mask_Q = _mm256_set1_epi16(0xfff0);
-    __m256i temp_Q =
+    __m256i mask_q = _mm256_set1_epi16(0xfff0);
+    __m256i temp_q =
         _mm256_setr_epi16(*(uint16_t*)(in_buf + 1), *(uint16_t*)(in_buf + 4),
                           *(uint16_t*)(in_buf + 7), *(uint16_t*)(in_buf + 10),
                           *(uint16_t*)(in_buf + 13), *(uint16_t*)(in_buf + 16),
@@ -182,11 +182,11 @@ static inline void convert_12bit_iq_to_16bit_iq(uint8_t* in_buf,
                           *(uint16_t*)(in_buf + 37), *(uint16_t*)(in_buf + 40),
                           *(uint16_t*)(in_buf + 43), *(uint16_t*)(in_buf + 46));
 
-    temp_Q = _mm256_and_si256(temp_Q, mask_Q);  // Set lower 4 bits to 0
-    temp_I = _mm256_slli_epi16(temp_I, 4);      // Shift left by 4 bits
+    temp_q = _mm256_and_si256(temp_q, mask_q);  // Set lower 4 bits to 0
+    temp_i = _mm256_slli_epi16(temp_i, 4);      // Shift left by 4 bits
 
-    __m256i iq_0 = _mm256_unpacklo_epi16(temp_I, temp_Q);
-    __m256i iq_1 = _mm256_unpackhi_epi16(temp_I, temp_Q);
+    __m256i iq_0 = _mm256_unpacklo_epi16(temp_i, temp_q);
+    __m256i iq_1 = _mm256_unpackhi_epi16(temp_i, temp_q);
     __m256i output_0 = _mm256_permute2f128_si256(iq_0, iq_1, 0x20);
     __m256i output_1 = _mm256_permute2f128_si256(iq_0, iq_1, 0x31);
     _mm256_store_si256((__m256i*)(out_buf + i * 2), output_0);
@@ -228,7 +228,7 @@ static inline void simd_convert_12bit_iq_to_float(uint8_t* in_buf,
   for (size_t i = 0; i < n_elems / 3; i += 16) {
     // Convert 16 IQ smaples from 48 uint8_t to 32 shorts
     // convert_12bit_iq_to_16bit_iq(in_buf + i * 3, in_16bits_buf, 16);
-    __m256i temp_I =
+    __m256i temp_i =
         _mm256_setr_epi16(*(uint16_t*)in_buf, *(uint16_t*)(in_buf + 3),
                           *(uint16_t*)(in_buf + 6), *(uint16_t*)(in_buf + 9),
                           *(uint16_t*)(in_buf + 12), *(uint16_t*)(in_buf + 15),
@@ -238,8 +238,8 @@ static inline void simd_convert_12bit_iq_to_float(uint8_t* in_buf,
                           *(uint16_t*)(in_buf + 36), *(uint16_t*)(in_buf + 39),
                           *(uint16_t*)(in_buf + 42), *(uint16_t*)(in_buf + 45));
 
-    __m256i mask_Q = _mm256_set1_epi16(0xfff0);
-    __m256i temp_Q =
+    __m256i mask_q = _mm256_set1_epi16(0xfff0);
+    __m256i temp_q =
         _mm256_setr_epi16(*(uint16_t*)(in_buf + 1), *(uint16_t*)(in_buf + 4),
                           *(uint16_t*)(in_buf + 7), *(uint16_t*)(in_buf + 10),
                           *(uint16_t*)(in_buf + 13), *(uint16_t*)(in_buf + 16),
@@ -249,11 +249,11 @@ static inline void simd_convert_12bit_iq_to_float(uint8_t* in_buf,
                           *(uint16_t*)(in_buf + 37), *(uint16_t*)(in_buf + 40),
                           *(uint16_t*)(in_buf + 43), *(uint16_t*)(in_buf + 46));
 
-    temp_Q = _mm256_and_si256(temp_Q, mask_Q);  // Set lower 4 bits to 0
-    temp_I = _mm256_slli_epi16(temp_I, 4);      // Shift left by 4 bits
+    temp_q = _mm256_and_si256(temp_q, mask_q);  // Set lower 4 bits to 0
+    temp_i = _mm256_slli_epi16(temp_i, 4);      // Shift left by 4 bits
 
-    __m256i iq_0 = _mm256_unpacklo_epi16(temp_I, temp_Q);
-    __m256i iq_1 = _mm256_unpackhi_epi16(temp_I, temp_Q);
+    __m256i iq_0 = _mm256_unpacklo_epi16(temp_i, temp_q);
+    __m256i iq_1 = _mm256_unpackhi_epi16(temp_i, temp_q);
     __m256i output_0 = _mm256_permute2f128_si256(iq_0, iq_1, 0x20);
     __m256i output_1 = _mm256_permute2f128_si256(iq_0, iq_1, 0x31);
 #ifdef __AVX512F__

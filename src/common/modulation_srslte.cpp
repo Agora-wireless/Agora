@@ -34,8 +34,8 @@ void demod_16qam_soft_loop(float* vec_in, int8_t* llr, int num) {
 }
 
 void demod_16qam_soft_sse(float* vec_in, int8_t* llr, int num) {
-  float* symbolsPtr = vec_in;
-  __m128i* resultPtr = (__m128i*)llr;
+  float* symbols_ptr = vec_in;
+  __m128i* result_ptr = (__m128i*)llr;
   __m128 symbol1, symbol2, symbol3, symbol4;
   __m128i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_i, symbol_abs,
       symbol_12, symbol_34;
@@ -55,14 +55,14 @@ void demod_16qam_soft_sse(float* vec_in, int8_t* llr, int num) {
                                        11, 10, 0xff, 0xff, 9, 8, 0xff, 0xff);
 
   for (int i = 0; i < num / 8; i++) {
-    symbol1 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol2 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol3 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol4 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
+    symbol1 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol2 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol3 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol4 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
     symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
     symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
     symbol_i3 = _mm_cvtps_epi32(_mm_mul_ps(symbol3, scale_v));
@@ -80,10 +80,10 @@ void demod_16qam_soft_sse(float* vec_in, int8_t* llr, int num) {
     result2n = _mm_shuffle_epi8(symbol_i, shuffle_negated_2);
     result2a = _mm_shuffle_epi8(symbol_abs, shuffle_abs_2);
 
-    _mm_store_si128(resultPtr, _mm_or_si128(result1n, result1a));
-    resultPtr++;
-    _mm_store_si128(resultPtr, _mm_or_si128(result2n, result2a));
-    resultPtr++;
+    _mm_store_si128(result_ptr, _mm_or_si128(result1n, result1a));
+    result_ptr++;
+    _mm_store_si128(result_ptr, _mm_or_si128(result2n, result2a));
+    result_ptr++;
   }
   // Demodulate last symbols
   for (int i = 8 * (num / 8); i < num; i++) {
@@ -117,8 +117,8 @@ void demod_64qam_soft_loop(float* vec_in, int8_t* llr, int num) {
 }
 
 void demod_64qam_soft_sse(float* vec_in, int8_t* llr, int num) {
-  float* symbolsPtr = (float*)vec_in;
-  __m128i* resultPtr = (__m128i*)llr;
+  float* symbols_ptr = (float*)vec_in;
+  __m128i* result_ptr = (__m128i*)llr;
   __m128 symbol1, symbol2, symbol3, symbol4;
   __m128i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_i, symbol_abs,
       symbol_abs2, symbol_12, symbol_34;
@@ -158,14 +158,14 @@ void demod_64qam_soft_sse(float* vec_in, int8_t* llr, int num) {
                    0xff, 11, 10, 0xff, 0xff);
 
   for (int i = 0; i < num / 8; i++) {
-    symbol1 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol2 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol3 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol4 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
+    symbol1 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol2 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol3 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol4 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
     symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
     symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
     symbol_i3 = _mm_cvtps_epi32(_mm_mul_ps(symbol3, scale_v));
@@ -190,15 +190,15 @@ void demod_64qam_soft_sse(float* vec_in, int8_t* llr, int num) {
     result32 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_3);
     result33 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_3);
 
-    _mm_store_si128(resultPtr,
+    _mm_store_si128(result_ptr,
                     _mm_or_si128(_mm_or_si128(result11, result12), result13));
-    resultPtr++;
-    _mm_store_si128(resultPtr,
+    result_ptr++;
+    _mm_store_si128(result_ptr,
                     _mm_or_si128(_mm_or_si128(result21, result22), result23));
-    resultPtr++;
-    _mm_store_si128(resultPtr,
+    result_ptr++;
+    _mm_store_si128(result_ptr,
                     _mm_or_si128(_mm_or_si128(result31, result32), result33));
-    resultPtr++;
+    result_ptr++;
   }
   for (int i = 8 * (num / 8); i < num; i++) {
     float yre = (int8_t)(SCALE_BYTE_CONV_QAM64 * (vec_in[2 * i]));

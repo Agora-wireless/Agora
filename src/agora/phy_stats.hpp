@@ -26,7 +26,7 @@ class PhyStats {
   void print_snr_stats(size_t);
 
  private:
-  Config const* const config_;
+  Config const* const kConfig;
   Table<size_t> decoded_bits_count_;
   Table<size_t> bit_error_count_;
   Table<size_t> decoded_blocks_count_;

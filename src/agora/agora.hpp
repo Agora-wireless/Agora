@@ -46,11 +46,11 @@ class Agora {
   struct {
     //     void getEqualData(float** ptr, int* size);Before exiting, save
     //     LDPC-decoded or demodulated data to a file
-    bool enable_save_decode_data_to_file = false;
+    bool enable_save_decode_data_to_file_ = false;
 
     // Before exiting, save data sent on downlink to a file
-    bool enable_save_tx_data_to_file = false;
-  } flags;
+    bool enable_save_tx_data_to_file_ = false;
+  } flags_;
 
  private:
   enum ScheduleProcessingFlags : uint8_t {
@@ -112,14 +112,14 @@ class Agora {
   void SendSnrReport(EventType event_type, size_t frame_id, size_t symbol_id);
 
   /// Fetch the concurrent queue for this event type
-  moodycamel::ConcurrentQueue<Event_data>* GetConq(EventType event_type,
+  moodycamel::ConcurrentQueue<EventData>* GetConq(EventType event_type,
                                                    size_t qid) {
-    return &sched_info_arr_[qid][static_cast<size_t>(event_type)].concurrent_q;
+    return &sched_info_arr_[qid][static_cast<size_t>(event_type)].concurrent_q_;
   }
 
   /// Fetch the producer token for this event type
   moodycamel::ProducerToken* GetPtok(EventType event_type, size_t qid) const {
-    return sched_info_arr_[qid][static_cast<size_t>(event_type)].ptok;
+    return sched_info_arr_[qid][static_cast<size_t>(event_type)].ptok_;
   }
 
   /// Return a string containing the sizes of the FFT queues
@@ -134,11 +134,11 @@ class Agora {
   }
 
   // Worker thread i runs on core base_worker_core_offset + i
-  const size_t base_worker_core_offset_;
+  const size_t kBaseWorkerCoreOffset;
 
   Config* config_;
   size_t fft_created_count_;
-  size_t max_equaled_frame = SIZE_MAX;
+  size_t max_equaled_frame_ = SIZE_MAX;
   std::unique_ptr<PacketTXRX> packet_tx_rx_;
 
   MacThread* mac_thread_;       // The thread running MAC layer functions
@@ -272,23 +272,23 @@ class Agora {
   char* dl_socket_buffer_;
   int* dl_socket_buffer_status_;
 
-  struct sched_info_t {
-    moodycamel::ConcurrentQueue<Event_data> concurrent_q;
-    moodycamel::ProducerToken* ptok;
+  struct SchedInfoT {
+    moodycamel::ConcurrentQueue<EventData> concurrent_q_;
+    moodycamel::ProducerToken* ptok_;
   };
-  sched_info_t sched_info_arr_[2][kNumEventTypes];
+  SchedInfoT sched_info_arr_[2][kNumEventTypes];
 
   // Master thread's message queue for receiving packets
-  moodycamel::ConcurrentQueue<Event_data> message_queue_;
+  moodycamel::ConcurrentQueue<EventData> message_queue_;
 
   // Master-to-worker queue for MAC
-  moodycamel::ConcurrentQueue<Event_data> mac_request_queue_;
+  moodycamel::ConcurrentQueue<EventData> mac_request_queue_;
 
   // Worker-to-master queue for MAC
-  moodycamel::ConcurrentQueue<Event_data> mac_response_queue_;
+  moodycamel::ConcurrentQueue<EventData> mac_response_queue_;
 
   // Master thread's message queue for event completion from Doers;
-  moodycamel::ConcurrentQueue<Event_data> complete_task_queue_[2];
+  moodycamel::ConcurrentQueue<EventData> complete_task_queue_[2];
   moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads][2];
 
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];

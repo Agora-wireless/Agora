@@ -7,13 +7,13 @@
 
 static constexpr size_t kMacAddrBtyes = 17;
 
-static std::atomic<bool> keep_running_ = true;
+static std::atomic<bool> keep_running = true;
 // A spinning barrier to synchronize the start of worker threads
-static std::atomic<size_t> num_workers_ready_atomic_ = 0;
+static std::atomic<size_t> num_workers_ready_atomic = 0;
 
 void interrupt_handler(int) {
   std::cout << "Will exit..." << std::endl;
-  keep_running_.store(false);
+  keep_running.store(false);
 }
 
 void delay_ticks(uint64_t start, uint64_t ticks) {
@@ -25,17 +25,17 @@ void delay_ticks(uint64_t start, uint64_t ticks) {
 Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
                size_t frame_duration, size_t enable_slow_start,
                std::string server_mac_addr_str, bool create_thread_for_master)
-    : cfg(cfg),
-      freq_ghz(measure_rdtsc_freq()),
-      ticks_per_usec(freq_ghz * 1e3),
-      socket_thread_num(socket_thread_num),
-      enable_slow_start(enable_slow_start),
-      core_offset(core_offset),
-      frame_duration_(frame_duration),
-      ticks_all(frame_duration_ * ticks_per_usec / cfg->frame().NumTotalSyms()),
-      ticks_wnd_1(200000 /* 200 ms */ * ticks_per_usec /
+    : cfg_(cfg),
+      kFreqGhz(measure_rdtsc_freq()),
+      kTicksPerUsec(kFreqGhz * 1e3),
+      kSocketThreadNum(socket_thread_num),
+      kEnableSlowStart(enable_slow_start),
+      kCoreOffset(core_offset),
+      kFrameDuration(frame_duration),
+      kTicksAll(kFrameDuration * kTicksPerUsec / cfg->frame().NumTotalSyms()),
+      kTicksWnd1(200000 /* 200 ms */ * kTicksPerUsec /
                   cfg->frame().NumTotalSyms()),
-      ticks_wnd_2(15 * frame_duration_ * ticks_per_usec /
+      kTicksWnd2(15 * kFrameDuration * kTicksPerUsec /
                   cfg->frame().NumTotalSyms()) {
   std::printf(
       "Initializing sender, sending to base station server at %s, frame "
@@ -45,19 +45,19 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 
   _unused(server_mac_addr_str);
   for (size_t i = 0; i < kFrameWnd; i++) {
-    packet_count_per_symbol[i] = new size_t[cfg->frame().NumTotalSyms()]();
+    packet_count_per_symbol_[i] = new size_t[cfg->frame().NumTotalSyms()]();
   }
 
   init_iq_from_file(std::string(TOSTRING(PROJECT_DIRECTORY)) +
                     "/data/LDPC_rx_data_2048_ant" +
                     std::to_string(cfg->bs_ant_num()) + ".bin");
 
-  task_ptok = static_cast<moodycamel::ProducerToken**>(
+  task_ptok_ = static_cast<moodycamel::ProducerToken**>(
       Agora_memory::padded_aligned_alloc(
           Agora_memory::Alignment_t::k64Align,
           (socket_thread_num * sizeof(moodycamel::ProducerToken*))));
   for (size_t i = 0; i < socket_thread_num; i++) {
-    task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
+    task_ptok_[i] = new moodycamel::ProducerToken(send_queue_);
   }
 
   // Create a master thread when started from simulator
@@ -102,11 +102,11 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   }
 
 #endif
-  num_workers_ready_atomic_.store(0);
+  num_workers_ready_atomic.store(0);
 }
 
 Sender::~Sender(void) {
-  keep_running_.store(false);
+  keep_running.store(false);
 
   void* val;
   for (pthread_t thread : this->threads_) {
@@ -117,13 +117,13 @@ Sender::~Sender(void) {
 
   iq_data_short_.free();
   for (size_t i = 0; i < kFrameWnd; i++) {
-    delete[] packet_count_per_symbol[i];
+    delete[] packet_count_per_symbol_[i];
   }
 
-  for (size_t i = 0; i < socket_thread_num; i++) {
-    delete (task_ptok[i]);
+  for (size_t i = 0; i < kSocketThreadNum; i++) {
+    delete (task_ptok_[i]);
   }
-  std::free(task_ptok);
+  std::free(task_ptok_);
 }
 
 void Sender::startTX() {
@@ -131,7 +131,7 @@ void Sender::startTX() {
   this->frame_end_ = new double[kNumStatsFrames]();
 
   create_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0,
-                 socket_thread_num);
+                 kSocketThreadNum);
   master_thread(0);  // Start the master thread
 
   delete[](this->frame_start_);
@@ -143,14 +143,14 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end) {
   frame_end_ = in_frame_end;
 
   create_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0,
-                 socket_thread_num);
+                 kSocketThreadNum);
 }
 
 size_t Sender::FindNextSymbol(size_t start_symbol) {
   size_t next_symbol_id;
   for (next_symbol_id = start_symbol;
-       (next_symbol_id < cfg->frame().NumTotalSyms()); next_symbol_id++) {
-    SymbolType symbol_type = cfg->GetSymbolType(next_symbol_id);
+       (next_symbol_id < cfg_->frame().NumTotalSyms()); next_symbol_id++) {
+    SymbolType symbol_type = cfg_->GetSymbolType(next_symbol_id);
     if ((symbol_type == SymbolType::kPilot) ||
         (symbol_type == SymbolType::kUL)) {
       break;
@@ -160,20 +160,20 @@ size_t Sender::FindNextSymbol(size_t start_symbol) {
 }
 
 void Sender::ScheduleSymbol(size_t frame, size_t symbol_id) {
-  for (size_t i = 0; i < cfg->bs_ant_num(); i++) {
+  for (size_t i = 0; i < cfg_->bs_ant_num(); i++) {
     auto req_tag = gen_tag_t::frm_sym_ant(frame, symbol_id, i);
     rt_assert(
-        send_queue_.enqueue(*task_ptok[i % socket_thread_num], req_tag._tag),
+        send_queue_.enqueue(*task_ptok_[i % kSocketThreadNum], req_tag.tag_),
         "Send task enqueue failed");
   }
 }
 
 void* Sender::master_thread(int) {
   signal(SIGINT, interrupt_handler);
-  pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
+  pin_to_core_with_offset(ThreadType::kMasterTX, kCoreOffset, 0);
 
   // Wait for all worker threads to be ready
-  while (num_workers_ready_atomic_.load() != socket_thread_num) {
+  while (num_workers_ready_atomic.load() != kSocketThreadNum) {
     // Wait
   }
 
@@ -188,58 +188,58 @@ void* Sender::master_thread(int) {
     delay_ticks(tick_start, get_ticks_for_frame(0) * start_symbol);
     tick_start = rdtsc();
   }
-  rt_assert(start_symbol != cfg->frame().NumTotalSyms(),
+  rt_assert(start_symbol != cfg_->frame().NumTotalSyms(),
             "Sender: No valid symbols to transmit");
   ScheduleSymbol(0, start_symbol);
 
-  while (keep_running_.load() == true) {
+  while (keep_running.load() == true) {
     gen_tag_t ctag(0);  // The completion tag
-    int ret = completion_queue_.try_dequeue(ctag._tag);
+    int ret = completion_queue_.try_dequeue(ctag.tag_);
     if (ret > 0) {
-      const size_t comp_frame_slot = (ctag.frame_id % kFrameWnd);
-      packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]++;
+      const size_t comp_frame_slot = (ctag.frame_id_ % kFrameWnd);
+      packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_]++;
 
       // std::printf("Sender -- checking symbol %d : %zu : %zu\n",
       // ctag.symbol_id, comp_frame_slot,
       // packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]); Check to see
       // if the current symbol is finished
-      if (packet_count_per_symbol[comp_frame_slot][ctag.symbol_id] ==
-          cfg->bs_ant_num()) {
+      if (packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_] ==
+          cfg_->bs_ant_num()) {
         // Finished with the current symbol
-        packet_count_per_symbol[comp_frame_slot][ctag.symbol_id] = 0;
+        packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_] = 0;
 
-        size_t next_symbol_id = FindNextSymbol((ctag.symbol_id + 1));
-        unsigned symbol_delay = next_symbol_id - ctag.symbol_id;
+        size_t next_symbol_id = FindNextSymbol((ctag.symbol_id_ + 1));
+        unsigned symbol_delay = next_symbol_id - ctag.symbol_id_;
         // std::printf("Sender -- finishing symbol %d : %zu : %zu delayed %d\n",
         // ctag.symbol_id, cfg->frame().NumTotalSyms(), next_symbol_id,
         // symbol_delay);
         // Add inter-symbol delay
         delay_ticks(tick_start,
-                    get_ticks_for_frame(ctag.frame_id) * symbol_delay);
+                    get_ticks_for_frame(ctag.frame_id_) * symbol_delay);
         tick_start = rdtsc();
 
-        size_t next_frame_id = ctag.frame_id;
+        size_t next_frame_id = ctag.frame_id_;
         // Check to see if the current frame is finished
-        assert(next_symbol_id <= cfg->frame().NumTotalSyms());
-        if (next_symbol_id == cfg->frame().NumTotalSyms()) {
+        assert(next_symbol_id <= cfg_->frame().NumTotalSyms());
+        if (next_symbol_id == cfg_->frame().NumTotalSyms()) {
           if ((kDebugSenderReceiver == true) ||
               (kDebugPrintPerFrameDone == true)) {
             std::printf("Sender: Transmitted frame %u in %.1f ms\n",
-                        ctag.frame_id, (get_time() - start_time) / 1000.0);
+                        ctag.frame_id_, (get_time() - start_time) / 1000.0);
             start_time = get_time();
           }
           next_frame_id++;
-          if (next_frame_id == cfg->frames_to_test()) {
+          if (next_frame_id == cfg_->frames_to_test()) {
             break; /* Finished */
           }
-          this->frame_end_[(ctag.frame_id % kNumStatsFrames)] = get_time();
+          this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = get_time();
           this->frame_start_[(next_frame_id % kNumStatsFrames)] = get_time();
           tick_start = rdtsc();
 
           /* Find start symbol of next frame and add proper delay */
           next_symbol_id = FindNextSymbol(0);
           delay_ticks(tick_start,
-                      get_ticks_for_frame(ctag.frame_id) * next_symbol_id);
+                      get_ticks_for_frame(ctag.frame_id_) * next_symbol_id);
           tick_start = rdtsc();
           // std::printf("Sender -- finished frame %d, next frame %zu, start
           // symbol %zu, delaying\n", ctag.frame_id, next_frame_id,
@@ -249,33 +249,33 @@ void* Sender::master_thread(int) {
       }
     }  // end (ret > 0)
   }
-  write_stats_to_file(cfg->frames_to_test());
+  write_stats_to_file(cfg_->frames_to_test());
   return nullptr;
 }
 
 /* Worker expects only valid transmit symbol_ids 'U' 'P' */
 void* Sender::worker_thread(int tid) {
-  pin_to_core_with_offset(ThreadType::kWorkerTX, (core_offset + 1), tid);
+  pin_to_core_with_offset(ThreadType::kWorkerTX, (kCoreOffset + 1), tid);
 
   // Wait for all Sender threads (including master) to start runnung
-  num_workers_ready_atomic_.fetch_add(1);
-  while (num_workers_ready_atomic_.load() != socket_thread_num) {
+  num_workers_ready_atomic.fetch_add(1);
+  while (num_workers_ready_atomic.load() != kSocketThreadNum) {
     // Wait
   }
 
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
   DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1,
-                       cfg->ofdm_ca_num());
+                       cfg_->ofdm_ca_num());
   DftiCommitDescriptor(mkl_handle);
 
   const size_t max_symbol_id =
-      cfg->frame().NumPilotSyms() +
-      cfg->frame().NumULSyms();  // TEMP not sure if this is ok
-  const size_t radio_lo = tid * cfg->num_radios() / socket_thread_num;
-  const size_t radio_hi = (tid + 1) * cfg->num_radios() / socket_thread_num;
+      cfg_->frame().NumPilotSyms() +
+      cfg_->frame().NumULSyms();  // TEMP not sure if this is ok
+  const size_t radio_lo = tid * cfg_->num_radios() / kSocketThreadNum;
+  const size_t radio_hi = (tid + 1) * cfg_->num_radios() / kSocketThreadNum;
   const size_t ant_num_this_thread =
-      cfg->bs_ant_num() / socket_thread_num +
-      ((size_t)tid < cfg->bs_ant_num() % socket_thread_num ? 1 : 0);
+      cfg_->bs_ant_num() / kSocketThreadNum +
+      ((size_t)tid < cfg_->bs_ant_num() % kSocketThreadNum ? 1 : 0);
 #ifdef USE_DPDK
   const size_t port_id = tid % cfg->dpdk_num_ports;
   const size_t queue_id = tid / cfg->dpdk_num_ports;
@@ -286,9 +286,9 @@ void* Sender::worker_thread(int tid) {
   auto fft_inout =
       static_cast<complex_float*>(Agora_memory::padded_aligned_alloc(
           Agora_memory::Alignment_t::k64Align,
-          cfg->ofdm_ca_num() * sizeof(complex_float)));
+          cfg_->ofdm_ca_num() * sizeof(complex_float)));
   auto* socks_pkt_buf = static_cast<Packet*>(padded_aligned_alloc(
-      Agora_memory::Alignment_t::k32Align, cfg->packet_length()));
+      Agora_memory::Alignment_t::k32Align, cfg_->packet_length()));
 
   double begin = get_time();
   size_t total_tx_packets = 0;
@@ -296,18 +296,18 @@ void* Sender::worker_thread(int tid) {
   size_t cur_radio = radio_lo;
 
   std::printf("In thread %d, %zu antennas, bs_ant_num(): %zu\n", tid,
-              ant_num_this_thread, cfg->bs_ant_num());
+              ant_num_this_thread, cfg_->bs_ant_num());
 
   // We currently don't support zero-padding OFDM prefix and postfix
-  rt_assert(cfg->packet_length() ==
+  rt_assert(cfg_->packet_length() ==
             Packet::kOffsetOfData +
-                (kUse12BitIQ ? 3 : 4) * (cfg->cp_len() + cfg->ofdm_ca_num()));
-  size_t ant_num_per_cell = cfg->bs_ant_num() / cfg->num_cells();
+                (kUse12BitIQ ? 3 : 4) * (cfg_->cp_len() + cfg_->ofdm_ca_num()));
+  size_t ant_num_per_cell = cfg_->bs_ant_num() / cfg_->num_cells();
 
   size_t tags[kDequeueBulkSize];
-  while (keep_running_.load() == true) {
+  while (keep_running.load() == true) {
     size_t num_tags = send_queue_.try_dequeue_bulk_from_producer(
-        *(task_ptok[tid]), tags, kDequeueBulkSize);
+        *(task_ptok_[tid]), tags, kDequeueBulkSize);
     if (num_tags == 0) {
       continue;
     }
@@ -316,8 +316,8 @@ void* Sender::worker_thread(int tid) {
       size_t start_tsc_send = rdtsc();
 
       auto tag = gen_tag_t(tags[tag_id]);
-      assert((cfg->GetSymbolType(tag.symbol_id) == SymbolType::kPilot) ||
-             (cfg->GetSymbolType(tag.symbol_id) == SymbolType::kUL));
+      assert((cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kPilot) ||
+             (cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kUL));
 
       // Send a message to the server. We assume that the server is running.
       Packet* pkt = socks_pkt_buf;
@@ -333,22 +333,22 @@ void* Sender::worker_thread(int tid) {
       // Update the TX buffer
       // std::printf("Sender : worker processing symbol %d, %d\n",
       // tag.symbol_id, (int)symbol_type);
-      pkt->frame_id = tag.frame_id;
-      pkt->symbol_id = tag.symbol_id;
-      pkt->cell_id = tag.ant_id / ant_num_per_cell;
-      pkt->ant_id = tag.ant_id - ant_num_per_cell * (pkt->cell_id);
+      pkt->frame_id_ = tag.frame_id_;
+      pkt->symbol_id_ = tag.symbol_id_;
+      pkt->cell_id_ = tag.ant_id_ / ant_num_per_cell;
+      pkt->ant_id_ = tag.ant_id_ - ant_num_per_cell * (pkt->cell_id_);
       std::memcpy(
-          pkt->data,
-          iq_data_short_[(pkt->symbol_id * cfg->bs_ant_num()) + tag.ant_id],
-          (cfg->cp_len() + cfg->ofdm_ca_num()) * (kUse12BitIQ ? 3 : 4));
-      if (cfg->fft_in_rru() == true) {
+          pkt->data_,
+          iq_data_short_[(pkt->symbol_id_ * cfg_->bs_ant_num()) + tag.ant_id_],
+          (cfg_->cp_len() + cfg_->ofdm_ca_num()) * (kUse12BitIQ ? 3 : 4));
+      if (cfg_->fft_in_rru() == true) {
         run_fft(pkt, fft_inout, mkl_handle);
       }
 
 #ifndef USE_DPDK
-      udp_client.send(cfg->bs_server_addr(), cfg->bs_server_port() + cur_radio,
+      udp_client.send(cfg_->bs_server_addr(), cfg_->bs_server_port() + cur_radio,
                       reinterpret_cast<uint8_t*>(socks_pkt_buf),
-                      cfg->packet_length());
+                      cfg_->packet_length());
 #endif
 
       if (kDebugSenderReceiver == true) {
@@ -356,9 +356,9 @@ void* Sender::worker_thread(int tid) {
             "Thread %d (tag = %s) transmit frame %d, symbol %d, ant "
             "%d, "
             "TX time: %.3f us\n",
-            tid, gen_tag_t(tag).to_string().c_str(), pkt->frame_id,
-            pkt->symbol_id, pkt->ant_id,
-            cycles_to_us(rdtsc() - start_tsc_send, freq_ghz));
+            tid, gen_tag_t(tag).to_string().c_str(), pkt->frame_id_,
+            pkt->symbol_id_, pkt->ant_id_,
+            cycles_to_us(rdtsc() - start_tsc_send, kFreqGhz));
       }
 
       total_tx_packets_rolling++;
@@ -367,7 +367,7 @@ void* Sender::worker_thread(int tid) {
           ant_num_this_thread * max_symbol_id * 1000) {
         double end = get_time();
         double byte_len =
-            cfg->packet_length() * ant_num_this_thread * max_symbol_id * 1000.f;
+            cfg_->packet_length() * ant_num_this_thread * max_symbol_id * 1000.f;
         double diff = end - begin;
         std::printf("Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
                     (size_t)tid,
@@ -406,34 +406,34 @@ void* Sender::worker_thread(int tid) {
 }
 
 uint64_t Sender::get_ticks_for_frame(size_t frame_id) {
-  if (enable_slow_start == 0) {
-    return ticks_all;
+  if (kEnableSlowStart == 0) {
+    return kTicksAll;
   } else if (frame_id < kFrameWnd) {
-    return ticks_wnd_1;
+    return kTicksWnd1;
   } else if (frame_id < (kFrameWnd * 4)) {
-    return ticks_wnd_2;
+    return kTicksWnd2;
   } else {
-    return ticks_all;
+    return kTicksAll;
   }
 }
 
 void Sender::init_iq_from_file(std::string filename) {
   const size_t packets_per_frame =
-      cfg->frame().NumTotalSyms() * cfg->bs_ant_num();
+      cfg_->frame().NumTotalSyms() * cfg_->bs_ant_num();
   iq_data_short_.calloc(packets_per_frame,
-                        (cfg->cp_len() + cfg->ofdm_ca_num()) * 2,
+                        (cfg_->cp_len() + cfg_->ofdm_ca_num()) * 2,
                         Agora_memory::Alignment_t::k64Align);
 
   Table<float> iq_data_float;
   iq_data_float.calloc(packets_per_frame,
-                       (cfg->cp_len() + cfg->ofdm_ca_num()) * 2,
+                       (cfg_->cp_len() + cfg_->ofdm_ca_num()) * 2,
                        Agora_memory::Alignment_t::k64Align);
 
   FILE* fp = std::fopen(filename.c_str(), "rb");
   rt_assert(fp != nullptr, "Failed to open IQ data file");
 
   for (size_t i = 0; i < packets_per_frame; i++) {
-    const size_t expected_count = (cfg->cp_len() + cfg->ofdm_ca_num()) * 2;
+    const size_t expected_count = (cfg_->cp_len() + cfg_->ofdm_ca_num()) * 2;
     const size_t actual_count =
         std::fread(iq_data_float[i], sizeof(float), expected_count, fp);
     if (expected_count != actual_count) {
@@ -466,8 +466,8 @@ void Sender::create_threads(void* (*worker)(void*), int tid_start,
   for (int i = tid_start; i < tid_end; i++) {
     pthread_t thread;
     auto context = new EventHandlerContext<Sender>;
-    context->obj_ptr = this;
-    context->id = i;
+    context->obj_ptr_ = this;
+    context->id_ = i;
     ret = pthread_create(&thread, NULL, worker, context);
     rt_assert(ret == 0, "pthread_create() failed");
     this->threads_.push_back(thread);
@@ -489,13 +489,13 @@ void Sender::run_fft(Packet* pkt, complex_float* fft_inout,
                      DFTI_DESCRIPTOR_HANDLE mkl_handle) const {
   // pkt->data has (cp_len() + ofdm_ca_num()) unsigned short samples. After FFT,
   // we'll remove the cyclic prefix and have ofdm_ca_num() short samples left.
-  simd_convert_short_to_float(&pkt->data[2 * cfg->cp_len()],
+  simd_convert_short_to_float(&pkt->data_[2 * cfg_->cp_len()],
                               reinterpret_cast<float*>(fft_inout),
-                              cfg->ofdm_ca_num() * 2);
+                              cfg_->ofdm_ca_num() * 2);
 
   DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
 
-  simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data),
+  simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data_),
                                   reinterpret_cast<float*>(fft_inout),
-                                  cfg->ofdm_ca_num() * 2);
+                                  cfg_->ofdm_ca_num() * 2);
 }

@@ -16,8 +16,8 @@ RadioTXRX::RadioTXRX(Config* cfg, int n_threads, int in_core_id)
 }
 
 RadioTXRX::RadioTXRX(Config* config, int n_threads, int in_core_id,
-                     moodycamel::ConcurrentQueue<Event_data>* in_message_queue,
-                     moodycamel::ConcurrentQueue<Event_data>* in_task_queue,
+                     moodycamel::ConcurrentQueue<EventData>* in_message_queue,
+                     moodycamel::ConcurrentQueue<EventData>* in_task_queue,
                      moodycamel::ProducerToken** in_rx_ptoks,
                      moodycamel::ProducerToken** in_tx_ptoks)
     : RadioTXRX(config, n_threads, in_core_id) {
@@ -57,8 +57,8 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
     pthread_t txrx_thread;
     // record the thread id
     auto context = new EventHandlerContext<RadioTXRX>;
-    context->obj_ptr = this;
-    context->id = i;
+    context->obj_ptr_ = this;
+    context->id_ = i;
     // start socket thread
     if ((kUseArgos == true) && (config_->hw_framer() == true)) {
       if (pthread_create(
@@ -88,7 +88,7 @@ bool RadioTXRX::startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
 
   // give time for all threads to lock
   sleep(1);
-  pthread_cond_broadcast(&cond);
+  pthread_cond_broadcast(&cond_);
 
   return true;
 }
@@ -120,7 +120,7 @@ struct Packet* RadioTXRX::recv_enqueue(int tid, int radio_id, int rx_offset) {
   rx_buffer_status[rx_offset] = 1;
 
   // Push kPacketRX event into the queue.
-  Event_data rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset)._tag);
+  EventData rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset).tag_);
   if (!message_queue_->enqueue(*local_ptok, rx_message)) {
     std::printf("socket message enqueue failed\n");
     std::exit(0);
@@ -130,14 +130,14 @@ struct Packet* RadioTXRX::recv_enqueue(int tid, int radio_id, int rx_offset) {
 
 int RadioTXRX::dequeue_send(int tid) {
   auto& c = config_;
-  Event_data event;
+  EventData event;
   if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
     return -1;
 
   // std::printf("tx queue length: %d\n", task_queue_->size_approx());
-  size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
-  size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-  if (event.event_type == EventType::kPacketTX) {
+  size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+  size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+  if (event.event_type_ == EventType::kPacketTX) {
     for (size_t symbol_id = 0; symbol_id < c->frame().NumULSyms();
          symbol_id++) {
       size_t offset =
@@ -149,7 +149,7 @@ int RadioTXRX::dequeue_send(int tid) {
             "In TX thread %d: Transmitted frame %zu, data symbol %zu, "
             "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, c->frame().GetULSymbol(symbol_id), ant_id,
-            gen_tag_t(event.tags[0])._tag, offset,
+            gen_tag_t(event.tags_[0]).tag_, offset,
             message_queue_->size_approx());
       }
 
@@ -165,9 +165,9 @@ int RadioTXRX::dequeue_send(int tid) {
     }
     rt_assert(
         message_queue_->enqueue(
-            *rx_ptoks_[tid], Event_data(EventType::kPacketTX, event.tags[0])),
+            *rx_ptoks_[tid], EventData(EventType::kPacketTX, event.tags_[0])),
         "Socket message enqueue failed\n");
-  } else if (event.event_type == EventType::kPacketPilotTX) {
+  } else if (event.event_type_ == EventType::kPacketPilotTX) {
     std::vector<char> zeros(c->packet_length(), 0);
     std::vector<char> pilot(c->packet_length(), 0);
     std::memcpy(&pilot[Packet::kOffsetOfData], c->pilot_ci16().data(),
@@ -194,13 +194,13 @@ int RadioTXRX::dequeue_send(int tid) {
     }
     rt_assert(message_queue_->enqueue(
                   *rx_ptoks_[tid],
-                  Event_data(EventType::kPacketPilotTX, event.tags[0])),
+                  EventData(EventType::kPacketPilotTX, event.tags_[0])),
               "Socket message enqueue failed\n");
   } else {
     std::printf("Wrong event type in tx queue!");
     std::exit(0);
   }
-  return event.tags[0];
+  return event.tags_[0];
 }
 
 void* RadioTXRX::loop_tx_rx(int tid) {
@@ -250,34 +250,34 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0) {
   // 1: HAS_TIME, 2: HAS_TIME | END_BURST
   int flags_tx_pilot = (kUseUHD && c->num_channels() == 2) ? 1 : 2;
 
-  Event_data event;
+  EventData event;
   if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
     return -1;
 
-  assert(event.event_type == EventType::kPacketTX);
+  assert(event.event_type_ == EventType::kPacketTX);
 
-  size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-  size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
+  size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+  size_t ue_id = gen_tag_t(event.tags_[0]).ant_id_;
   size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
   size_t ant_id = ue_id * c->num_channels();
-  long long txTime(0);
+  long long tx_time(0);
   int r;
 
   // Transmit pilot
   if (!c->hw_framer()) {
     size_t pilot_symbol_id = c->frame().GetPilotSymbol(ant_id);
 
-    txTime = time0 + tx_frame_id * frm_num_samps + pilot_symbol_id * num_samps -
+    tx_time = time0 + tx_frame_id * frm_num_samps + pilot_symbol_id * num_samps -
              c->cl_tx_advance();
-    r = radio->radioTx(ue_id, pilot_buff0.data(), num_samps, flags_tx_pilot,
-                       txTime);
+    r = radio->radioTx(ue_id, pilot_buff0_.data(), num_samps, flags_tx_pilot,
+                       tx_time);
     if (r < num_samps)
       std::cout << "BAD Write: (PILOT)" << r << "/" << num_samps << std::endl;
     if (c->num_channels() == 2) {
       pilot_symbol_id = c->frame().GetPilotSymbol(ant_id + 1);
-      txTime = time0 + tx_frame_id * frm_num_samps +
+      tx_time = time0 + tx_frame_id * frm_num_samps +
                pilot_symbol_id * num_samps - c->cl_tx_advance();
-      r = radio->radioTx(ue_id, pilot_buff1.data(), num_samps, 2, txTime);
+      r = radio->radioTx(ue_id, pilot_buff1_.data(), num_samps, 2, tx_time);
       if (r < num_samps)
         std::cout << "BAD Write (PILOT): " << r << "/" << num_samps
                   << std::endl;
@@ -295,10 +295,10 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0) {
     for (size_t ch = 0; ch < c->num_channels(); ++ch) {
       struct Packet* pkt =
           (struct Packet*)(tx_buffer_ + (offset + ch) * packet_length);
-      txbuf[ch] = (void*)pkt->data;
+      txbuf[ch] = (void*)pkt->data_;
       tx_buffer_status_[offset + ch] = 0;
     }
-    txTime = c->hw_framer()
+    tx_time = c->hw_framer()
                  ? ((long long)tx_frame_id << 32) | (tx_symbol_id << 16)
                  : time0 + tx_frame_id * frm_num_samps +
                        tx_symbol_id * num_samps - c->cl_tx_advance();
@@ -306,7 +306,7 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0) {
     if (tx_symbol_id == c->frame().GetULSymbolLast()) {
       flags_tx_symbol = 2;  // HAS_TIME & END_BURST, fixme
     }
-    r = radio->radioTx(ue_id, txbuf, num_samps, flags_tx_symbol, txTime);
+    r = radio->radioTx(ue_id, txbuf, num_samps, flags_tx_symbol, tx_time);
     if (r < num_samps) {
       std::cout << "BAD Write (UL): " << r << "/" << num_samps << std::endl;
     }
@@ -314,9 +314,9 @@ int RadioTXRX::dequeue_send_argos(int tid, long long time0) {
 
   rt_assert(
       message_queue_->enqueue(*rx_ptoks_[tid],
-                              Event_data(EventType::kPacketTX, event.tags[0])),
+                              EventData(EventType::kPacketTX, event.tags_[0])),
       "Socket message enqueue failed\n");
-  return event.tags[0];
+  return event.tags_[0];
 }
 
 struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
@@ -338,27 +338,27 @@ struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
     return NULL;
   }
 
-  long long rxTime(0);
+  long long rx_time(0);
   struct Packet* pkt[c->num_channels()];
   void* samp[c->num_channels()];
   for (size_t ch = 0; ch < c->num_channels(); ++ch) {
     pkt[ch] =
         (struct Packet*)&rx_buffer[((rx_offset + ch) % buffer_frame_num_) *
                                    packet_length];
-    samp[ch] = pkt[ch]->data;
+    samp[ch] = pkt[ch]->data_;
   }
-  int r = radio->radioRx(radio_id, samp, num_samps, rxTime);
+  int r = radio->radioRx(radio_id, samp, num_samps, rx_time);
   if (r < num_samps)
     std::cerr << "BAD Receive(" << r << "/" << num_samps << ") at Time "
-              << rxTime << std::endl;
+              << rx_time << std::endl;
   if (r < 0) {
     std::cerr << "Receive error! Stopping... " << std::endl;
     c->running(false);
     return NULL;
   }
   if (c->hw_framer()) {
-    frame_id = (size_t)(rxTime >> 32);
-    symbol_id = (size_t)((rxTime >> 16) & 0xFFFF);
+    frame_id = (size_t)(rx_time >> 32);
+    symbol_id = (size_t)((rx_time >> 16) & 0xFFFF);
   } else {
     // assert(c->hw_framer()
     //    || (((rxTime - time0) / (num_samps * c->frame().NumTotalSyms()))
@@ -369,7 +369,7 @@ struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
         "downlink receive: thread %d, frame_id %zu, symbol_id "
         "%zu, radio_id %zu "
         "rxtime %llx\n",
-        tid, frame_id, symbol_id, radio_id, rxTime);
+        tid, frame_id, symbol_id, radio_id, rx_time);
   }
   size_t ant_id = radio_id * c->num_channels();
   for (size_t ch = 0; ch < c->num_channels(); ++ch) {
@@ -379,8 +379,8 @@ struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
     // move ptr & set status to full
     rx_buffer_status[rx_offset + ch] = 1;
 
-    Event_data rx_message(EventType::kPacketRX,
-                          rx_tag_t(tid, rx_offset + ch)._tag);
+    EventData rx_message(EventType::kPacketRX,
+                          rx_tag_t(tid, rx_offset + ch).tag_);
 
     rt_assert(message_queue_->enqueue(*local_ptok, rx_message),
               "socket message enqueue failed");
@@ -398,11 +398,11 @@ void* RadioTXRX::loop_tx_rx_argos(int tid) {
               radio_hi - 1, radio_hi - radio_lo);
 
   // Use mutex to sychronize data receiving across threads
-  pthread_mutex_lock(&mutex);
+  pthread_mutex_lock(&mutex_);
   std::printf("Thread %d: waiting for release\n", tid);
 
-  pthread_cond_wait(&cond, &mutex);
-  pthread_mutex_unlock(&mutex);  // unlocking for all other threads
+  pthread_cond_wait(&cond_, &mutex_);
+  pthread_mutex_unlock(&mutex_);  // unlocking for all other threads
 
   ClientRadioConfig* radio = radioconfig_;
 
@@ -448,7 +448,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid) {
   auto& c = config_;
 
   // Use mutex to sychronize data receiving across threads
-  pthread_mutex_lock(&mutex);
+  pthread_mutex_lock(&mutex_);
   std::printf("Thread %d: waiting for release\n", tid);
 
   ClientRadioConfig* radio = radioconfig_;
@@ -462,25 +462,25 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid) {
 
   std::vector<std::complex<int16_t>> zeros0(c->samps_per_symbol(), 0);
   std::vector<std::complex<int16_t>> zeros1(c->samps_per_symbol(), 0);
-  pilot_buff0.resize(2);
-  pilot_buff1.resize(2);
-  pilot_buff0[0u] = c->pilot_ci16().data();
+  pilot_buff0_.resize(2);
+  pilot_buff1_.resize(2);
+  pilot_buff0_[0u] = c->pilot_ci16().data();
   if (c->num_channels() == 2) {
-    pilot_buff0[1u] = zeros0.data();
-    pilot_buff1[0u] = zeros1.data();
-    pilot_buff1[1u] = c->pilot_ci16().data();
+    pilot_buff0_[1u] = zeros0.data();
+    pilot_buff1_[0u] = zeros1.data();
+    pilot_buff1_[1u] = c->pilot_ci16().data();
     frm_rx_buff[1u] = frm_buff1.data();
   }
 
-  long long rxTime(0);
+  long long rx_time(0);
   int radio_id = tid;
   int sync_index(-1);
   int rx_offset(0);
   size_t cursor(0);
   std::stringstream sout;
 
-  pthread_cond_wait(&cond, &mutex);
-  pthread_mutex_unlock(&mutex);  // unlocking for all other threads
+  pthread_cond_wait(&cond_, &mutex_);
+  pthread_mutex_unlock(&mutex_);  // unlocking for all other threads
 
   // Keep receiving one frame of data until a beacon is found
   // Perform initial beacon detection every kBeaconDetectInterval frames
@@ -488,11 +488,11 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid) {
     int r;
     for (size_t find_beacon_retry = 0;
          find_beacon_retry < kBeaconDetectInterval; find_beacon_retry++) {
-      r = radio->radioRx(radio_id, frm_rx_buff.data(), frm_num_samps, rxTime);
+      r = radio->radioRx(radio_id, frm_rx_buff.data(), frm_num_samps, rx_time);
 
       if (r != frm_num_samps) {
         std::cerr << "BAD SYNC Receive(" << r << "/" << frm_num_samps
-                  << ") at Time " << rxTime << std::endl;
+                  << ") at Time " << rx_time << std::endl;
         continue;
       }
     }
@@ -504,7 +504,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid) {
                                           frm_buff0[i].imag() / 32768.0));
     sync_index = CommsLib::find_beacon_avx(sync_buff, c->gold_cf32());
     if (sync_index < 0) continue;
-    sout << "Client " << radio_id << ": Beacon detected at Time " << rxTime
+    sout << "Client " << radio_id << ": Beacon detected at Time " << rx_time
          << ", sync_index: " << sync_index << std::endl;
     std::cout << sout.str();
     sout.str(std::string());  // clear stringstream after print
@@ -512,7 +512,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid) {
   }
 
   // Read rx_offset to align with the begining of a frame
-  radio->radioRx(radio_id, frm_rx_buff.data(), rx_offset, rxTime);
+  radio->radioRx(radio_id, frm_rx_buff.data(), rx_offset, rx_time);
 
   long long time0(0);
   size_t frame_id(0);
@@ -529,10 +529,10 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid) {
 
     // recv corresponding to symbol_id = 0 (Beacon)
     int r = radio->radioRx(radio_id, frm_rx_buff.data(), num_samps + rx_offset,
-                           rxTime);
+                           rx_time);
     if (r != num_samps + rx_offset) {
       std::cerr << "BAD Beacon Receive(" << r << "/" << num_samps
-                << ") at Time " << rxTime << std::endl;
+                << ") at Time " << rx_time << std::endl;
     }
     if (r < 0) {
       std::cerr << "Receive error! Stopping... " << std::endl;
@@ -540,7 +540,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid) {
       break;
     }
     if (frame_id == 0) {
-      time0 = rxTime;
+      time0 = rx_time;
     }
 
     // resync every X=1000 frames:
@@ -586,10 +586,10 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid) {
          symbol_id++) {
       if (!config_->IsPilot(frame_id, symbol_id) &&
           !(config_->IsDownlink(frame_id, symbol_id))) {
-        radio->radioRx(radio_id, frm_rx_buff.data(), num_samps, rxTime);
+        radio->radioRx(radio_id, frm_rx_buff.data(), num_samps, rx_time);
         if (r < num_samps) {
           std::cerr << "BAD Receive(" << r << "/" << num_samps << ") at Time "
-                    << rxTime << std::endl;
+                    << rx_time << std::endl;
         }
         if (r < 0) {
           std::cerr << "Receive error! Stopping... " << std::endl;
@@ -601,7 +601,7 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid) {
               "idle receive: thread %d, frame_id %zu, symbol_id %zu, "
               "radio_id %d "
               "rxtime %llx\n",
-              tid, frame_id, symbol_id, radio_id, rxTime);
+              tid, frame_id, symbol_id, radio_id, rx_time);
         }
       } else {
         struct Packet* pkt =

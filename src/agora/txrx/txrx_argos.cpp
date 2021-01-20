@@ -9,24 +9,24 @@
 static constexpr bool kDebugDownlink = false;
 
 void PacketTXRX::loop_tx_rx_argos(int tid) {
-  pin_to_core_with_offset(ThreadType::kWorkerTXRX, core_offset, tid);
+  pin_to_core_with_offset(ThreadType::kWorkerTXRX, kCoreOffset, tid);
   size_t* rx_frame_start = (*frame_start_)[tid];
   int rx_offset = 0;
-  int radio_lo = tid * cfg->num_radios() / socket_thread_num;
-  int radio_hi = (tid + 1) * cfg->num_radios() / socket_thread_num;
+  int radio_lo = tid * cfg_->num_radios() / kSocketThreadNum;
+  int radio_hi = (tid + 1) * cfg_->num_radios() / kSocketThreadNum;
   std::printf("TXRX thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
   int prev_frame_id = -1;
   int radio_id = radio_lo;
-  while (cfg->running() == true) {
+  while (cfg_->running() == true) {
     if (-1 != dequeue_send_argos(tid)) continue;
     // receive data
     struct Packet* pkt = recv_enqueue_argos(tid, radio_id, rx_offset);
     if (pkt == NULL) continue;
-    rx_offset = (rx_offset + cfg->num_channels()) % packet_num_in_buffer_;
+    rx_offset = (rx_offset + cfg_->num_channels()) % packet_num_in_buffer_;
 
     if (kIsWorkerTimingEnabled) {
-      int frame_id = pkt->frame_id;
+      int frame_id = pkt->frame_id_;
       if (frame_id > prev_frame_id) {
         rx_frame_start[frame_id % kNumStatsFrames] = rdtsc();
         prev_frame_id = frame_id;
@@ -42,42 +42,42 @@ struct Packet* PacketTXRX::recv_enqueue_argos(int tid, int radio_id,
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
   char* rx_buffer = (*buffer_)[tid];
   int* rx_buffer_status = (*buffer_status_)[tid];
-  int packet_length = cfg->packet_length();
+  int packet_length = cfg_->packet_length();
 
   // if rx_buffer is full, exit
-  int nChannels = cfg->num_channels();
-  struct Packet* pkt[nChannels];
-  void* samp[nChannels];
-  for (int ch = 0; ch < nChannels; ++ch) {
+  int n_channels = cfg_->num_channels();
+  struct Packet* pkt[n_channels];
+  void* samp[n_channels];
+  for (int ch = 0; ch < n_channels; ++ch) {
     // if rx_buffer is full, exit
     if (rx_buffer_status[rx_offset + ch] == 1) {
       std::printf("TXRX thread %d rx_buffer full, offset: %d\n", tid,
                   rx_offset);
-      cfg->running(false);
+      cfg_->running(false);
       break;
     }
     pkt[ch] = (struct Packet*)&rx_buffer[(rx_offset + ch) * packet_length];
-    samp[ch] = pkt[ch]->data;
+    samp[ch] = pkt[ch]->data_;
   }
 
-  long long frameTime;
-  if ((cfg->running() == false) ||
-      radioconfig_->radioRx(radio_id, samp, frameTime) <= 0) {
+  long long frame_time;
+  if ((cfg_->running() == false) ||
+      radioconfig_->radioRx(radio_id, samp, frame_time) <= 0) {
     return NULL;
   }
 
-  int frame_id = (int)(frameTime >> 32);
-  int symbol_id = (int)((frameTime >> 16) & 0xFFFF);
-  int ant_id = radio_id * nChannels;
-  for (int ch = 0; ch < nChannels; ++ch) {
+  int frame_id = (int)(frame_time >> 32);
+  int symbol_id = (int)((frame_time >> 16) & 0xFFFF);
+  int ant_id = radio_id * n_channels;
+  for (int ch = 0; ch < n_channels; ++ch) {
     new (pkt[ch]) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
     // move ptr & set status to full
     rx_buffer_status[rx_offset + ch] =
         1;  // has data, after it is read, it is set to 0
 
     // Push kPacketRX event into the queue.
-    Event_data rx_message(EventType::kPacketRX,
-                          rx_tag_t(tid, rx_offset + ch)._tag);
+    EventData rx_message(EventType::kPacketRX,
+                          rx_tag_t(tid, rx_offset + ch).tag_);
 
     if (!message_queue_->enqueue(*local_ptok, rx_message)) {
       std::printf("socket message enqueue failed\n");
@@ -88,28 +88,28 @@ struct Packet* PacketTXRX::recv_enqueue_argos(int tid, int radio_id,
 }
 
 int PacketTXRX::dequeue_send_argos(int tid) {
-  auto& c = cfg;
-  Event_data event;
+  auto& c = cfg_;
+  EventData event;
   if (task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event) == false) {
     return -1;
   }
 
   // std::printf("tx queue length: %d\n", task_queue_->size_approx());
-  assert(event.event_type == EventType::kPacketTX);
+  assert(event.event_type_ == EventType::kPacketTX);
 
-  size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
-  size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-  size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+  size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+  size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+  size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
 
-  size_t dl_symbol_idx = cfg->GetDLSymbolIdx(frame_id, symbol_id);
+  size_t dl_symbol_idx = cfg_->GetDLSymbolIdx(frame_id, symbol_id);
   size_t offset =
       (c->GetTotalDataSymbolIdxDl(frame_id, dl_symbol_idx) * c->bs_ant_num()) +
       ant_id;
 
   // TODO: support nChannels > 1
   void* txbuf[2];
-  int nChannels = c->num_channels();
-  int ch = ant_id % nChannels;
+  int n_channels = c->num_channels();
+  int ch = ant_id % n_channels;
 
   if ((c->frame().IsRecCalEnabled() == true) &&
       (symbol_id == c->frame().GetDLSymbol(0))) {
@@ -121,9 +121,9 @@ int PacketTXRX::dequeue_send_argos(int tid) {
            s == ant_id % c->ant_per_group())
               ? c->pilot_ci16().data()
               : zeros.data();
-      long long frameTime = ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
+      long long frame_time = ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
                             (c->frame().GetDLCalSymbol(s) << 16);
-      radioconfig_->radioTx(ant_id / nChannels, txbuf, 1, frameTime);
+      radioconfig_->radioTx(ant_id / n_channels, txbuf, 1, frame_time);
     }
   }
 
@@ -139,15 +139,15 @@ int PacketTXRX::dequeue_send_argos(int tid) {
   } else {
     char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length();
     struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-    txbuf[ch] = (void*)pkt->data;
+    txbuf[ch] = (void*)pkt->data_;
   }
 
   size_t last = c->frame().GetDLSymbolLast();
   int flags = (symbol_id != last) ? 1   // HAS_TIME
                                   : 2;  // HAS_TIME & END_BURST, fixme
   frame_id += TX_FRAME_DELTA;
-  long long frameTime = ((long long)frame_id << 32) | (symbol_id << 16);
-  radioconfig_->radioTx(ant_id / nChannels, txbuf, flags, frameTime);
+  long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
+  radioconfig_->radioTx(ant_id / n_channels, txbuf, flags, frame_time);
 
   if (kDebugPrintInTask == true) {
     std::printf(
@@ -159,7 +159,7 @@ int PacketTXRX::dequeue_send_argos(int tid) {
 
   rt_assert(
       message_queue_->enqueue(*rx_ptoks_[tid],
-                              Event_data(EventType::kPacketTX, event.tags[0])),
+                              EventData(EventType::kPacketTX, event.tags_[0])),
       "Socket message enqueue failed\n");
-  return event.tags[0];
+  return event.tags_[0];
 }

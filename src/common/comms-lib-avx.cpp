@@ -27,7 +27,7 @@ int CommsLib::find_beacon_avx(const std::vector<std::complex<float>>& iq,
   std::queue<int> valid_peaks;
 
   // Original LTS sequence
-  int seqLen = seq.size();
+  int seq_len = seq.size();
   struct timespec tv, tv2;
   clock_gettime(CLOCK_MONOTONIC, &tv);
 
@@ -41,7 +41,7 @@ int CommsLib::find_beacon_avx(const std::vector<std::complex<float>>& iq,
 
   clock_gettime(CLOCK_MONOTONIC, &tv);
   // multiply the corre result with its (gold seq length-) shifted copy
-  auto gold_auto_corr = CommsLib::auto_corr_mult_avx(gold_corr_avx, seqLen);
+  auto gold_auto_corr = CommsLib::auto_corr_mult_avx(gold_corr_avx, seq_len);
   // calculate the abs (use the result for peak detection)
   auto gold_corr_avx_2 = CommsLib::abs2_avx(gold_auto_corr);
   clock_gettime(CLOCK_MONOTONIC, &tv2);
@@ -51,7 +51,7 @@ int CommsLib::find_beacon_avx(const std::vector<std::complex<float>>& iq,
 #endif
 
   // calculate the adaptive theshold
-  std::vector<float> consts1(seqLen, 1);
+  std::vector<float> consts1(seq_len, 1);
   clock_gettime(CLOCK_MONOTONIC, &tv);
   // calculate the moving sum of the abs of corr result and use as threshold
   auto corr_abs_avx = CommsLib::abs2_avx(gold_corr_avx);
@@ -145,15 +145,15 @@ std::vector<std::complex<int16_t>> CommsLib::complex_mult_avx(
 
   __m256i res __attribute__((aligned(ALIGNMENT)));
 
-  size_t vecSize = res_len / AVX_PACKED_CS;
-  for (size_t i = 0; i < vecSize; i++) {
+  size_t vec_size = res_len / AVX_PACKED_CS;
+  for (size_t i = 0; i < vec_size; i++) {
     data0 = _mm256_loadu_si256(in0 + i);
     data1 = _mm256_loadu_si256(in1 + i);
     res = __m256_complex_cs16_mult(data0, data1, conj);
     _mm256_storeu_si256(outf + i, res);
   }
 
-  for (size_t i = vecSize * AVX_PACKED_CS; i < res_len; i++) {
+  for (size_t i = vec_size * AVX_PACKED_CS; i < res_len; i++) {
     int16_t i0 = f[i].real();
     int16_t i1 = g[i].real();
     int16_t q0 = f[i].imag();
@@ -312,14 +312,14 @@ std::vector<int32_t> CommsLib::abs2_avx(
   std::vector<int32_t> out(len, 0);
   __m256i* outf = (__m256i*)out.data();
 
-  size_t vecSize = len / AVX_PACKED_CS;
-  for (size_t i = 0; i < vecSize; i++) {
+  size_t vec_size = len / AVX_PACKED_CS;
+  for (size_t i = 0; i < vec_size; i++) {
     __m256i data0 = _mm256_loadu_si256(in0 + i);
     __m256i mag = _mm256_madd_epi16(data0, data0);
     _mm256_storeu_si256(outf + i, mag);
   }
 
-  for (size_t i = vecSize * AVX_PACKED_CS; i < len; i++) {
+  for (size_t i = vec_size * AVX_PACKED_CS; i < len; i++) {
     int16_t i0 = f[i].real();
     int16_t q0 = f[i].imag();
     out[i] = i0 * i0 + q0 * q0;
@@ -424,7 +424,7 @@ std::vector<float> CommsLib::correlate_avx_s(std::vector<float> const& f,
     in.at(i) = f.at(j);
   }
 
-  float* in_data_ptr_ = in.data();
+  float* in_data_ptr = in.data();
   const float* in_g = g.data();
 
   __m256 data __attribute__((aligned(ALIGNMENT)));
@@ -437,19 +437,19 @@ std::vector<float> CommsLib::correlate_avx_s(std::vector<float> const& f,
     seq_samp[i] = _mm256_broadcast_ss(&in_g[i]);
   }
 
-  static const size_t kAddressIncrement = ALIGNMENT / sizeof(float);
+  static const size_t k_address_increment = ALIGNMENT / sizeof(float);
   static_assert((ALIGNMENT % sizeof(float)) == 0,
                 "Address alignment not correct");
 
-  size_t padding = kAddressIncrement - (length_f % kAddressIncrement);
+  size_t padding = k_address_increment - (length_f % k_address_increment);
   std::vector<float> out(length_f + padding);
 
   // Verify no memory overruns
-  assert((out.size() % kAddressIncrement) == 0);
-  for (size_t i = 0; i < (out.size() - 1); i += kAddressIncrement) {
+  assert((out.size() % k_address_increment) == 0);
+  for (size_t i = 0; i < (out.size() - 1); i += k_address_increment) {
     accm = _mm256_setzero_ps();
     for (size_t j = 0; j < length_g; j++) {
-      data = _mm256_loadu_ps(in_data_ptr_ + i + j);
+      data = _mm256_loadu_ps(in_data_ptr + i + j);
       prod = _mm256_mul_ps(data, seq_samp[j]);
       accm = _mm256_add_ps(prod, accm);
     }

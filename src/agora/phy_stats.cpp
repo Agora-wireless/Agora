@@ -1,6 +1,6 @@
 #include "phy_stats.hpp"
 
-PhyStats::PhyStats(Config* cfg) : config_(cfg) {
+PhyStats::PhyStats(Config* cfg) : kConfig(cfg) {
   const size_t task_buffer_symbol_num_ul = cfg->frame().NumULSyms() * kFrameWnd;
   decoded_bits_count_.calloc(cfg->ue_num(), task_buffer_symbol_num_ul,
                              Agora_memory::Alignment_t::k64Align);
@@ -49,10 +49,10 @@ PhyStats::~PhyStats(void) {
 
 void PhyStats::print_phy_stats() {
   const size_t task_buffer_symbol_num_ul =
-      this->config_->frame().NumULSyms() * kFrameWnd;
+      this->kConfig->frame().NumULSyms() * kFrameWnd;
 
-  if (this->config_->frame().NumULSyms() > 0) {
-    for (size_t ue_id = 0; ue_id < this->config_->ue_num(); ue_id++) {
+  if (this->kConfig->frame().NumULSyms() > 0) {
+    for (size_t ue_id = 0; ue_id < this->kConfig->ue_num(); ue_id++) {
       size_t total_decoded_bits(0);
       size_t total_bit_errors(0);
       size_t total_decoded_blocks(0);
@@ -76,8 +76,8 @@ void PhyStats::print_phy_stats() {
 }
 
 void PhyStats::print_evm_stats(size_t frame_id) {
-  fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->ue_num(), 1, false);
-  evm_mat = sqrt(evm_mat) / config_->ofdm_data_num();
+  fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], kConfig->ue_num(), 1, false);
+  evm_mat = sqrt(evm_mat) / kConfig->ofdm_data_num();
   std::stringstream ss;
   ss << "Frame " << frame_id << " Constellation:\n"
      << "  EVM " << 100 * evm_mat.st() << ", SNR " << -10 * log10(evm_mat.st());
@@ -86,14 +86,14 @@ void PhyStats::print_evm_stats(size_t frame_id) {
 
 float PhyStats::get_evm_snr(size_t frame_id, size_t ue_id) {
   float evm = evm_buffer_[frame_id % kFrameWnd][ue_id];
-  evm = sqrt(evm) / config_->ofdm_data_num();
+  evm = sqrt(evm) / kConfig->ofdm_data_num();
   return -10 * std::log10(evm);
 }
 
 void PhyStats::print_snr_stats(size_t frame_id) {
   std::stringstream ss;
   ss << "Frame " << frame_id << " Pilot Signal SNR: ";
-  for (size_t i = 0; i < config_->ue_num(); i++)
+  for (size_t i = 0; i < kConfig->ue_num(); i++)
     ss << pilot_snr_[frame_id % kFrameWnd][i] << " ";
   ss << std::endl;
   std::cout << ss.str();
@@ -101,23 +101,23 @@ void PhyStats::print_snr_stats(size_t frame_id) {
 
 void PhyStats::update_pilot_snr(size_t frame_id, size_t ue_id,
                                 complex_float* fft_data) {
-  cx_fmat fft_mat((cx_float*)fft_data, config_->ofdm_ca_num(), 1, false);
+  cx_fmat fft_mat((cx_float*)fft_data, kConfig->ofdm_ca_num(), 1, false);
   fmat fft_abs_mat = abs(fft_mat);
   fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
   float rssi = as_scalar(sum(fft_abs_mag));
   float noise_per_sc1 =
-      as_scalar(mean(fft_abs_mag.rows(0, config_->ofdm_data_start() - 1)));
+      as_scalar(mean(fft_abs_mag.rows(0, kConfig->ofdm_data_start() - 1)));
   float noise_per_sc2 = as_scalar(mean(
-      fft_abs_mag.rows(config_->ofdm_data_stop(), config_->ofdm_ca_num() - 1)));
-  float noise = config_->ofdm_ca_num() * (noise_per_sc1 + noise_per_sc2) / 2;
+      fft_abs_mag.rows(kConfig->ofdm_data_stop(), kConfig->ofdm_ca_num() - 1)));
+  float noise = kConfig->ofdm_ca_num() * (noise_per_sc1 + noise_per_sc2) / 2;
   float snr = (rssi - noise) / noise;
   pilot_snr_[frame_id % kFrameWnd][ue_id] = 10 * std::log10(snr);
 }
 
 void PhyStats::update_evm_stats(size_t frame_id, size_t sc_id, cx_fmat eq) {
-  if (this->config_->frame().NumULSyms() > 0) {
+  if (this->kConfig->frame().NumULSyms() > 0) {
     fmat evm = abs(eq - ul_gt_mat_.col(sc_id));
-    fmat cur_evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->ue_num(), 1,
+    fmat cur_evm_mat(evm_buffer_[frame_id % kFrameWnd], kConfig->ue_num(), 1,
                      false);
     cur_evm_mat += evm % evm;
   }

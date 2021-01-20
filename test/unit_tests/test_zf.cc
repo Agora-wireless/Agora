@@ -34,7 +34,7 @@ TEST(TestZF, Perf) {
 
   std::unique_ptr<Stats> stats(new Stats(cfg.get()));
 
-  std::unique_ptr<DoZF> computeZF(
+  std::unique_ptr<DoZF> compute_zf(
       new DoZF(cfg.get(), tid, csi_buffers, calib_dl_buffer, calib_ul_buffer,
                ul_zf_matrices, dl_zf_matrices, stats.get()));
 
@@ -45,7 +45,7 @@ TEST(TestZF, Perf) {
     size_t base_sc_id =
         (fast_rand.next_u32() % (cfg->ofdm_data_num() / cfg->zf_block_size())) *
         cfg->zf_block_size();
-    computeZF->launch(gen_tag_t::frm_sc(frame_id, base_sc_id)._tag);
+    compute_zf->launch(gen_tag_t::frm_sc(frame_id, base_sc_id).tag_);
   }
   double ms = cycles_to_ms(rdtsc() - start_tsc, cfg->freq_ghz());
 

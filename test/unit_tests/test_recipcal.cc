@@ -96,12 +96,12 @@ TEST(TestRecip, Correctness) {
               ms0 / kMaxFrameNum, ms1 / kMaxFrameNum);
 
   // Check correctness
-  constexpr float allowed_error = 1e-3;
+  constexpr float kAllowedError = 1e-3;
   for (size_t i = 0; i < kMaxFrameNum; i++) {
     float* buf0 = (float*)recip_buffer_0[i % kFrameWnd];
     float* buf1 = (float*)recip_buffer_1[i % kFrameWnd];
     for (size_t j = 0; j < cfg->ofdm_data_num() * cfg->bs_ant_num(); j++) {
-      ASSERT_LE(abs(buf0[j] - buf1[j]), allowed_error);
+      ASSERT_LE(abs(buf0[j] - buf1[j]), kAllowedError);
     }
   }
 

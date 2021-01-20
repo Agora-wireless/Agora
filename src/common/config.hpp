@@ -43,7 +43,7 @@ class Config {
   inline void bs_ant_num(size_t n_bs_ant) { this->bs_ant_num_ = n_bs_ant; }
 
   /* Inline accessors (basic types) */
-  inline bool is_UE(void) const { return this->is_UE_; }
+  inline bool is_UE(void) const { return this->is_ue_; }
   inline size_t bf_ant_num(void) const { return this->bf_ant_num_; }
   inline size_t ue_num(void) const { return this->ue_num_; }
 
@@ -57,7 +57,7 @@ class Config {
   inline size_t ofdm_pilot_spacing(void) const {
     return this->ofdm_pilot_spacing_;
   }
-  inline double freq_ghz(void) const { return this->freq_ghz_; };
+  inline double freq_ghz(void) const { return this->kFreqGhz; };
   inline size_t dl_packet_length(void) const { return this->dl_packet_length_; }
   inline std::string modulation(void) const { return this->modulation_; }
 
@@ -386,8 +386,8 @@ class Config {
   inline static const bool kDefaultDownlinkMode = false;
 
   /* Private class variables */
-  const double freq_ghz_;  // RDTSC frequency in GHz
-  bool is_UE_;
+  const double kFreqGhz;  // RDTSC frequency in GHz
+  bool is_ue_;
 
   size_t bs_ant_num_;  // Total number of BS antennas
   size_t bf_ant_num_;  // Number of antennas used in beamforming
@@ -427,9 +427,9 @@ class Config {
 
   Table<int8_t> dl_bits_;
   Table<int8_t> ul_bits_;
-  Table<int8_t> ul_encoded_bits;
-  Table<uint8_t> ul_mod_input;
-  Table<uint8_t> dl_mod_input;
+  Table<int8_t> ul_encoded_bits_;
+  Table<uint8_t> ul_mod_input_;
+  Table<uint8_t> dl_mod_input_;
   Table<complex_float> dl_iq_f_;
   Table<complex_float> ul_iq_f_;
   Table<std::complex<int16_t>> dl_iq_t_;

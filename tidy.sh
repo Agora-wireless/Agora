@@ -11,7 +11,7 @@ function fix_class_case() {
   run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
     -checks='-*,readability-identifier-naming' \
     -config="{CheckOptions: [ {key: readability-identifier-naming.ClassCase, value: CamelCase} ]}" \
-    -fix 1>/dev/null 2>/dev/null
+    -fix
 }
 
 function fix_function_case() {
@@ -35,7 +35,7 @@ function fix_member_case() {
   run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
     -checks='-*,readability-identifier-naming' \
     -config="{CheckOptions: [ {key: readability-identifier-naming.MemberCase, value: lower_case}, {key: readability-identifier-naming.MemberSuffix, value: '_'}, { key: readability-identifier-naming.ConstantMemberCase, value: CamelCase }, { key: readability-identifier-naming.ConstantMemberPrefix, value: k } ]}" \
-    -fix 1>/dev/null 2>/dev/null
+    -fix
 }
 
 function fix_variable_case() {
@@ -51,7 +51,7 @@ function fix_variable_case() {
                               { key: readability-identifier-naming.ClassConstantCase, value: CamelCase },
                               { key: readability-identifier-naming.ClassConstantPrefix, value: k }
                               ]}" \
-    -fix 1>/dev/null 2>/dev/null
+    -fix
 }
 
 function modernize_headers() {
@@ -101,7 +101,7 @@ function modernize3() {
 #modernize3
 #fix_function_case
 
-
+#cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DDEBUG=true ..
 
 #fix_member_case
 #fix_class_case
@@ -117,6 +117,6 @@ function modernize3() {
 fix_class_case
 fix_variable_case
 fix_member_case
-fix_function_case
+#fix_function_case
 
 

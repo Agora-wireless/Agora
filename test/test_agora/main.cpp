@@ -174,22 +174,22 @@ void check_correctness(Config const* const cfg) {
 
 int main(int argc, char* argv[]) {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string confFile =
+  std::string conf_file =
       cur_directory + "/data/tddconfig-correctness-test-ul.json";
   if (argc == 2) {
-    confFile = std::string(argv[1]);
+    conf_file = std::string(argv[1]);
   }
 
-  std::unique_ptr<Config> cfg(new Config(confFile.c_str()));
+  std::unique_ptr<Config> cfg(new Config(conf_file.c_str()));
   cfg->GenData();
 
   int ret;
   try {
-    SignalHandler signalHandler;
-    signalHandler.setupSignalHandlers();
+    SignalHandler signal_handler;
+    signal_handler.setupSignalHandlers();
     std::unique_ptr<Agora> agora_cli(new Agora(cfg.get()));
-    agora_cli->flags.enable_save_decode_data_to_file = true;
-    agora_cli->flags.enable_save_tx_data_to_file = true;
+    agora_cli->flags_.enable_save_decode_data_to_file_ = true;
+    agora_cli->flags_.enable_save_tx_data_to_file_ = true;
     agora_cli->Start();
 
     std::printf("Start correctness check\n");

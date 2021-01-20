@@ -14,15 +14,15 @@ void scatter_slow(uint8_t* dst, const uint8_t* src, unsigned num_bits,
                   uint8_t src_offbits) {
   // Process byte by byte
   while (num_bits != 0) {
-    unsigned num_bits_inB = MIN(8, num_bits);
-    uint8_t newB;
+    unsigned num_bits_in_b = MIN(8, num_bits);
+    uint8_t new_b;
     if (src_offbits == 0)
-      newB = src[0];
+      new_b = src[0];
     else
-      newB = ((src[0] & 0xFF) >> src_offbits) |
+      new_b = ((src[0] & 0xFF) >> src_offbits) |
              ((src[1] & 0xFF) << (8 - src_offbits));
-    dst[0] = newB & BITMASKU8(num_bits_inB);
-    num_bits -= num_bits_inB;
+    dst[0] = new_b & BITMASKU8(num_bits_in_b);
+    num_bits -= num_bits_in_b;
 
     dst++;
     src++;
@@ -32,29 +32,29 @@ void scatter_slow(uint8_t* dst, const uint8_t* src, unsigned num_bits,
 void gather_slow(uint8_t* dst, const uint8_t* src, int16_t num_bits,
                  uint8_t dst_offbits) {
   // Process byte by byte
-  bool firstByte = true;
+  bool first_byte = true;
   while (num_bits > 0) {
-    unsigned num_bits_inB = MIN(8, num_bits);
-    uint8_t newB;
+    unsigned num_bits_in_b = MIN(8, num_bits);
+    uint8_t new_b;
     if (dst_offbits == 0) {
       // simple copy
-      newB = src[0] & BITMASKU8(num_bits_inB);
+      new_b = src[0] & BITMASKU8(num_bits_in_b);
       src++;
     } else {
-      if (firstByte) {
-        newB = (dst[0] & BITMASKU8(dst_offbits)) | (src[0] & 0xFF)
+      if (first_byte) {
+        new_b = (dst[0] & BITMASKU8(dst_offbits)) | (src[0] & 0xFF)
                                                        << dst_offbits;
-        num_bits_inB = 8 - dst_offbits;
-        firstByte = false;
+        num_bits_in_b = 8 - dst_offbits;
+        first_byte = false;
       } else {
-        newB = ((src[0] & 0xFF) >> (8 - dst_offbits) | (src[1] & 0xFF)
+        new_b = ((src[0] & 0xFF) >> (8 - dst_offbits) | (src[1] & 0xFF)
                                                            << dst_offbits) &
-               BITMASKU8(num_bits_inB);
+               BITMASKU8(num_bits_in_b);
         src++;
       }
     }
-    dst[0] = newB;
-    num_bits -= num_bits_inB;
+    dst[0] = new_b;
+    num_bits -= num_bits_in_b;
     dst++;
   }
 }
@@ -71,9 +71,9 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
     p_buff_0 is the input, p_buff_1 is the buffer for barrel shifter */
     for (size_t i = 0; i < cbLen / zcSize; i++) {
       scatter_slow((uint8_t*)p_buff_1, (uint8_t*)p_buff_0, zcSize, src_offbits);
-      uint8_t byteOffset = (src_offbits + zcSize) >> 3;
-      src_offbits = (src_offbits + zcSize) - (byteOffset << 3);
-      p_buff_0 = p_buff_0 + byteOffset;
+      uint8_t byte_offset = (src_offbits + zcSize) >> 3;
+      src_offbits = (src_offbits + zcSize) - (byte_offset << 3);
+      p_buff_0 = p_buff_0 + byte_offset;
       p_buff_1 = p_buff_1 + kProcBytes;
     }
   } else {
@@ -82,9 +82,9 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
     for (size_t i = 0; i < cbLen / zcSize; i++) {
       gather_slow((uint8_t*)p_buff_0, (uint8_t*)p_buff_1, (int16_t)zcSize,
                   dst_offbits);
-      uint8_t byteOffset = (dst_offbits + zcSize) >> 3;
-      dst_offbits = (dst_offbits + zcSize) - (byteOffset << 3);
-      p_buff_0 = p_buff_0 + byteOffset;
+      uint8_t byte_offset = (dst_offbits + zcSize) >> 3;
+      dst_offbits = (dst_offbits + zcSize) - (byte_offset << 3);
+      p_buff_0 = p_buff_0 + byte_offset;
       p_buff_1 = p_buff_1 + kProcBytes;
     }
   }

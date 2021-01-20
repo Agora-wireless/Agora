@@ -245,12 +245,12 @@ void Utils::loadData(const char* filename, std::vector<unsigned>& data,
 
 void Utils::loadTDDConfig(const std::string filename, std::string& jconfig) {
   std::string line;
-  std::ifstream configFile(filename);
-  if (configFile.is_open()) {
-    while (getline(configFile, line)) {
+  std::ifstream config_file(filename);
+  if (config_file.is_open()) {
+    while (getline(config_file, line)) {
       jconfig += line;
     }
-    configFile.close();
+    config_file.close();
   }
 
   else
@@ -260,8 +260,8 @@ void Utils::loadTDDConfig(const std::string filename, std::string& jconfig) {
 std::vector<std::string> Utils::split(const std::string& s, char delimiter) {
   std::vector<std::string> tokens;
   std::string token;
-  std::istringstream tokenStream(s);
-  while (std::getline(tokenStream, token, delimiter)) {
+  std::istringstream token_stream(s);
+  while (std::getline(token_stream, token, delimiter)) {
     tokens.push_back(token);
   }
   return tokens;

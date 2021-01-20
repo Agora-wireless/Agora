@@ -95,24 +95,24 @@ static inline void adapt_bits_from_mod(const uint8_t* vec_in, uint8_t* vec_out,
 }
 
 static inline uint8_t select_base_matrix_entry(uint16_t Zc) {
-  uint8_t i_LS;
+  uint8_t i_ls;
   if ((Zc % 15) == 0)
-    i_LS = 7;
+    i_ls = 7;
   else if ((Zc % 13) == 0)
-    i_LS = 6;
+    i_ls = 6;
   else if ((Zc % 11) == 0)
-    i_LS = 5;
+    i_ls = 5;
   else if ((Zc % 9) == 0)
-    i_LS = 4;
+    i_ls = 4;
   else if ((Zc % 7) == 0)
-    i_LS = 3;
+    i_ls = 3;
   else if ((Zc % 5) == 0)
-    i_LS = 2;
+    i_ls = 2;
   else if ((Zc % 3) == 0)
-    i_LS = 1;
+    i_ls = 1;
   else
-    i_LS = 0;
-  return i_LS;
+    i_ls = 0;
+  return i_ls;
 }
 
 // Return the number of bytes needed to store n_bits bits
@@ -214,11 +214,11 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
 
   // Copy punctured input bits from the encoding request, and parity bits from
   // the encoding response into encoded_buffer
-  static size_t kNumPuncturedCols = 2;
+  static size_t k_num_punctured_cols = 2;
   if (zc % 4 == 0) {
     // In this case, the start and end of punctured input bits is
     // byte-aligned, so we can std::memcpy
-    const size_t num_punctured_bytes = bits_to_bytes(zc * kNumPuncturedCols);
+    const size_t num_punctured_bytes = bits_to_bytes(zc * k_num_punctured_cols);
     const size_t num_input_bytes_to_copy =
         bits_to_bytes(num_input_bits) - num_punctured_bytes;
 
@@ -255,11 +255,11 @@ static inline void ldpc_encode_helper(size_t base_graph, size_t zc,
 
     // Concactenate the chunks for input and parity
     std::memcpy(internal_buffer2,
-                internal_buffer0 + kNumPuncturedCols * avx2enc::kProcBytes,
-                (ldpc_num_input_cols(base_graph) - kNumPuncturedCols) *
+                internal_buffer0 + k_num_punctured_cols * avx2enc::kProcBytes,
+                (ldpc_num_input_cols(base_graph) - k_num_punctured_cols) *
                     avx2enc::kProcBytes);
     std::memcpy(internal_buffer2 +
-                    (ldpc_num_input_cols(base_graph) - kNumPuncturedCols) *
+                    (ldpc_num_input_cols(base_graph) - k_num_punctured_cols) *
                         avx2enc::kProcBytes,
                 internal_buffer1,
                 ldpc_max_num_rows(base_graph) * avx2enc::kProcBytes);

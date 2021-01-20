@@ -9,9 +9,9 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut,
                       const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
                       const int16_t* pShiftMatrix, int16_t zcSize,
                       uint8_t i_LS) {
-  const int16_t *pTempAddr, *pTempMatrix;
-  int8_t *pTempIn, *pTempOut;
-  int16_t addrOffset = 0;
+  const int16_t *p_temp_addr, *p_temp_matrix;
+  int8_t *p_temp_in, *p_temp_out;
+  int16_t addr_offset = 0;
   size_t i = 0;
   __m256i x1, x2, x3, x4, x5, x6, x7, x8, x9;
   CYCLIC_BIT_SHIFT cycle_bit_shift_p = ldpc_select_shift_func(zcSize);
@@ -21,29 +21,29 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut,
                         _mm256_set1_epi8(0));
   }
 
-  pTempAddr = pAddr;
-  pTempMatrix = pShiftMatrix;
-  pTempIn = pDataIn;
-  pTempOut = pDataOut;
+  p_temp_addr = pAddr;
+  p_temp_matrix = pShiftMatrix;
+  p_temp_in = pDataIn;
+  p_temp_out = pDataOut;
 
-  x1 = _mm256_loadu_si256((__m256i*)(pTempIn + i * kProcBytes));
+  x1 = _mm256_loadu_si256((__m256i*)(p_temp_in + i * kProcBytes));
 
   // getting lambdas
   for (int32_t j = 0; j < *(pMatrixNumPerCol + i); j++) {
-    x2 = cycle_bit_shift_p(x1, *pTempMatrix++, zcSize);
-    addrOffset = (*pTempAddr++) >> 1;
-    _mm256_storeu_si256((__m256i*)(pTempOut + addrOffset), x2);
+    x2 = cycle_bit_shift_p(x1, *p_temp_matrix++, zcSize);
+    addr_offset = (*p_temp_addr++) >> 1;
+    _mm256_storeu_si256((__m256i*)(p_temp_out + addr_offset), x2);
   }
 
   i = 1;
   for (; i < BG1_COL_INF_NUM; i++) {
-    x1 = _mm256_loadu_si256((__m256i*)(pTempIn + i * kProcBytes));
+    x1 = _mm256_loadu_si256((__m256i*)(p_temp_in + i * kProcBytes));
     for (int32_t j = 0; j < *(pMatrixNumPerCol + i); j++) {
-      addrOffset = (*pTempAddr++) >> 1;
-      x2 = cycle_bit_shift_p(x1, *pTempMatrix++, zcSize);
-      x3 = _mm256_loadu_si256((__m256i*)(pTempOut + addrOffset));
+      addr_offset = (*p_temp_addr++) >> 1;
+      x2 = cycle_bit_shift_p(x1, *p_temp_matrix++, zcSize);
+      x3 = _mm256_loadu_si256((__m256i*)(p_temp_out + addr_offset));
       x4 = _mm256_xor_si256(x2, x3);
-      _mm256_storeu_si256((__m256i*)(pTempOut + addrOffset), x4);
+      _mm256_storeu_si256((__m256i*)(p_temp_out + addr_offset), x4);
     }
   }
 
@@ -55,10 +55,10 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut,
 
   // Row Transform to resolve the small 4x4 parity matrix
   // lambdas
-  x1 = _mm256_loadu_si256((__m256i*)pTempOut);
-  x2 = _mm256_loadu_si256((__m256i*)(pTempOut + kProcBytes));
-  x3 = _mm256_loadu_si256((__m256i*)(pTempOut + 2 * kProcBytes));
-  x4 = _mm256_loadu_si256((__m256i*)(pTempOut + 3 * kProcBytes));
+  x1 = _mm256_loadu_si256((__m256i*)p_temp_out);
+  x2 = _mm256_loadu_si256((__m256i*)(p_temp_out + kProcBytes));
+  x3 = _mm256_loadu_si256((__m256i*)(p_temp_out + 2 * kProcBytes));
+  x4 = _mm256_loadu_si256((__m256i*)(p_temp_out + 3 * kProcBytes));
 
   // first 384
   // x5 is p_a1
@@ -99,12 +99,12 @@ void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut,
     x1 = _mm256_loadu_si256(
         (__m256i*)(pDataOut + (i - BG1_COL_INF_NUM) * kProcBytes));
     for (int32_t j = 0; j < *(pMatrixNumPerCol + i); j++) {
-      addrOffset = (*pTempAddr++) >> 1;
+      addr_offset = (*p_temp_addr++) >> 1;
       // addrOffset = *pTempAddr++;
-      x2 = cycle_bit_shift_p(x1, *pTempMatrix++, zcSize);
-      x3 = _mm256_loadu_si256((__m256i*)(pTempOut + addrOffset));
+      x2 = cycle_bit_shift_p(x1, *p_temp_matrix++, zcSize);
+      x3 = _mm256_loadu_si256((__m256i*)(p_temp_out + addr_offset));
       x4 = _mm256_xor_si256(x2, x3);
-      _mm256_storeu_si256((__m256i*)(pTempOut + addrOffset), x4);
+      _mm256_storeu_si256((__m256i*)(p_temp_out + addr_offset), x4);
     }
   }
 }
@@ -113,9 +113,9 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut,
                       const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
                       const int16_t* pShiftMatrix, int16_t zcSize,
                       uint8_t i_LS) {
-  const int16_t *pTempAddr, *pTempMatrix;
-  int8_t *pTempIn, *pTempOut;
-  int16_t addrOffset = 0;
+  const int16_t *p_temp_addr, *p_temp_matrix;
+  int8_t *p_temp_in, *p_temp_out;
+  int16_t addr_offset = 0;
   size_t i = 0;
   __m256i x1, x2, x3, x4, x5, x6, x7, x8, x9;
   CYCLIC_BIT_SHIFT cycle_bit_shift_p = ldpc_select_shift_func(zcSize);
@@ -125,39 +125,39 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut,
                         _mm256_set1_epi8(0));
   }
 
-  pTempAddr = pAddr;
-  pTempMatrix = pShiftMatrix;
-  pTempIn = pDataIn;
-  pTempOut = pDataOut;
+  p_temp_addr = pAddr;
+  p_temp_matrix = pShiftMatrix;
+  p_temp_in = pDataIn;
+  p_temp_out = pDataOut;
 
-  x1 = _mm256_loadu_si256((__m256i*)(pTempIn + i * kProcBytes));
+  x1 = _mm256_loadu_si256((__m256i*)(p_temp_in + i * kProcBytes));
 
   // getting lambdas
   for (int32_t j = 0; j < *(pMatrixNumPerCol + i); j++) {
-    x2 = cycle_bit_shift_p(x1, *pTempMatrix++, zcSize);
-    addrOffset = (*pTempAddr++) >> 1;
-    _mm256_storeu_si256((__m256i*)(pTempOut + addrOffset), x2);
+    x2 = cycle_bit_shift_p(x1, *p_temp_matrix++, zcSize);
+    addr_offset = (*p_temp_addr++) >> 1;
+    _mm256_storeu_si256((__m256i*)(p_temp_out + addr_offset), x2);
   }
   i = 1;
   for (; i < BG2_COL_INF_NUM; i++) {
-    x1 = _mm256_loadu_si256((__m256i*)(pTempIn + i * kProcBytes));
+    x1 = _mm256_loadu_si256((__m256i*)(p_temp_in + i * kProcBytes));
     // can add threading here
     // *********************************************************
     for (int32_t j = 0; j < *(pMatrixNumPerCol + i); j++) {
-      addrOffset = (*pTempAddr++) >> 1;
-      x2 = cycle_bit_shift_p(x1, *pTempMatrix++, zcSize);
-      x3 = _mm256_loadu_si256((__m256i*)(pTempOut + addrOffset));
+      addr_offset = (*p_temp_addr++) >> 1;
+      x2 = cycle_bit_shift_p(x1, *p_temp_matrix++, zcSize);
+      x3 = _mm256_loadu_si256((__m256i*)(p_temp_out + addr_offset));
       x4 = _mm256_xor_si256(x2, x3);
-      _mm256_storeu_si256((__m256i*)(pTempOut + addrOffset), x4);
+      _mm256_storeu_si256((__m256i*)(p_temp_out + addr_offset), x4);
     }
   }
 
   // Row Transform to resolve the small 4x4 parity matrix
   // lambdas
-  x1 = _mm256_loadu_si256((__m256i*)pTempOut);
-  x2 = _mm256_loadu_si256((__m256i*)(pTempOut + kProcBytes));
-  x3 = _mm256_loadu_si256((__m256i*)(pTempOut + 2 * kProcBytes));
-  x4 = _mm256_loadu_si256((__m256i*)(pTempOut + 3 * kProcBytes));
+  x1 = _mm256_loadu_si256((__m256i*)p_temp_out);
+  x2 = _mm256_loadu_si256((__m256i*)(p_temp_out + kProcBytes));
+  x3 = _mm256_loadu_si256((__m256i*)(p_temp_out + 2 * kProcBytes));
+  x4 = _mm256_loadu_si256((__m256i*)(p_temp_out + 3 * kProcBytes));
 
   // first 384
   // x5 is p_a1
@@ -199,11 +199,11 @@ void ldpc_encoder_bg2(int8_t* pDataIn, int8_t* pDataOut,
     x1 = _mm256_loadu_si256(
         (__m256i*)(pDataOut + (i - BG2_COL_INF_NUM) * kProcBytes));
     for (int32_t j = 0; j < *(pMatrixNumPerCol + i); j++) {
-      addrOffset = (*pTempAddr++) >> 1;
-      x2 = cycle_bit_shift_p(x1, *pTempMatrix++, zcSize);
-      x3 = _mm256_loadu_si256((__m256i*)(pTempOut + addrOffset));
+      addr_offset = (*p_temp_addr++) >> 1;
+      x2 = cycle_bit_shift_p(x1, *p_temp_matrix++, zcSize);
+      x3 = _mm256_loadu_si256((__m256i*)(p_temp_out + addr_offset));
       x4 = _mm256_xor_si256(x2, x3);
-      _mm256_storeu_si256((__m256i*)(pTempOut + addrOffset), x4);
+      _mm256_storeu_si256((__m256i*)(p_temp_out + addr_offset), x4);
     }
   }
 }
@@ -213,57 +213,57 @@ int32_t bblib_ldpc_encoder_5gnr(
     struct bblib_ldpc_encoder_5gnr_response* response) {
   // input -----------------------------------------------------------
   // these values depend on the application
-  uint16_t Zc = request->Zc;
-  if (Zc > ZC_MAX) {
+  uint16_t zc = request->Zc;
+  if (zc > ZC_MAX) {
     std::fprintf(stderr, "Error: This AVX2 encoder supports only Zc <= %d\n",
                  ZC_MAX);
     std::exit(-1);
   }
 
-  int numberCodeblocks = request->numberCodeblocks;
-  uint16_t Bg = request->baseGraph;
+  int number_codeblocks = request->numberCodeblocks;
+  uint16_t bg = request->baseGraph;
 
   // int nRows = (Bg == 1) ? BG1_ROW_TOTAL : BG2_ROW_TOTAL;
-  uint32_t cbEncLen = request->nRows * Zc;
-  uint32_t cbLen = (Bg == 1) ? Zc * BG1_COL_INF_NUM : Zc * BG2_COL_INF_NUM;
+  uint32_t cb_enc_len = request->nRows * zc;
+  uint32_t cb_len = (bg == 1) ? zc * BG1_COL_INF_NUM : zc * BG2_COL_INF_NUM;
 
-  int8_t* input[numberCodeblocks];
-  int8_t* parity[numberCodeblocks];
-  for (int i = 0; i < numberCodeblocks; i++) {
+  int8_t* input[number_codeblocks];
+  int8_t* parity[number_codeblocks];
+  for (int i = 0; i < number_codeblocks; i++) {
     input[i] = request->input[i];
     parity[i] = response->output[i];
   }
 
   // i_Ls decides the base matrix entries
-  uint8_t i_LS;
-  if ((Zc % 15) == 0)
-    i_LS = 7;
-  else if ((Zc % 13) == 0)
-    i_LS = 6;
-  else if ((Zc % 11) == 0)
-    i_LS = 5;
-  else if ((Zc % 9) == 0)
-    i_LS = 4;
-  else if ((Zc % 7) == 0)
-    i_LS = 3;
-  else if ((Zc % 5) == 0)
-    i_LS = 2;
-  else if ((Zc % 3) == 0)
-    i_LS = 1;
+  uint8_t i_ls;
+  if ((zc % 15) == 0)
+    i_ls = 7;
+  else if ((zc % 13) == 0)
+    i_ls = 6;
+  else if ((zc % 11) == 0)
+    i_ls = 5;
+  else if ((zc % 9) == 0)
+    i_ls = 4;
+  else if ((zc % 7) == 0)
+    i_ls = 3;
+  else if ((zc % 5) == 0)
+    i_ls = 2;
+  else if ((zc % 3) == 0)
+    i_ls = 1;
   else
-    i_LS = 0;
+    i_ls = 0;
 
-  const int16_t* pShiftMatrix;
-  const int16_t* pMatrixNumPerCol;
-  const int16_t* pAddr;
-  if (Bg == 1) {
-    pShiftMatrix = Bg1HShiftMatrix + i_LS * BG1_NONZERO_NUM;
-    pMatrixNumPerCol = Bg1MatrixNumPerCol;
-    pAddr = Bg1Address;
+  const int16_t* p_shift_matrix;
+  const int16_t* p_matrix_num_per_col;
+  const int16_t* p_addr;
+  if (bg == 1) {
+    p_shift_matrix = kBg1HShiftMatrix + i_ls * BG1_NONZERO_NUM;
+    p_matrix_num_per_col = kBg1MatrixNumPerCol;
+    p_addr = kBg1Address;
   } else {
-    pShiftMatrix = Bg2HShiftMatrix + i_LS * BG2_NONZERO_NUM;
-    pMatrixNumPerCol = Bg2MatrixNumPerCol;
-    pAddr = Bg2Address;
+    p_shift_matrix = kBg2HShiftMatrix + i_ls * BG2_NONZERO_NUM;
+    p_matrix_num_per_col = kBg2MatrixNumPerCol;
+    p_addr = kBg2Address;
   }
 
   __attribute__((aligned(64)))
@@ -272,22 +272,22 @@ int32_t bblib_ldpc_encoder_5gnr(
   int8_t parity_internal_buffer[BG1_ROW_TOTAL * avx2enc::kProcBytes] = {0};
 
   avx2enc::LDPC_ADAPTER_P ldpc_adapter_func =
-      avx2enc::ldpc_select_adapter_func(Zc);
+      avx2enc::ldpc_select_adapter_func(zc);
   auto ldpc_encoder_func =
-      (Bg == 1 ? avx2enc::ldpc_encoder_bg1 : avx2enc::ldpc_encoder_bg2);
+      (bg == 1 ? avx2enc::ldpc_encoder_bg1 : avx2enc::ldpc_encoder_bg2);
 
-  for (int n = 0; n < numberCodeblocks; n++) {
+  for (int n = 0; n < number_codeblocks; n++) {
     // Scatter Zc-bit chunks of the input into kProcBytes-sized chunks
     // of input_internal_buffer
-    ldpc_adapter_func(input[n], input_internal_buffer, Zc, cbLen, 1);
+    ldpc_adapter_func(input[n], input_internal_buffer, zc, cb_len, 1);
 
     // Encode into parity_internal_buffer
     ldpc_encoder_func(input_internal_buffer, parity_internal_buffer,
-                      pMatrixNumPerCol, pAddr, pShiftMatrix, (int16_t)Zc, i_LS);
+                      p_matrix_num_per_col, p_addr, p_shift_matrix, (int16_t)zc, i_ls);
 
     // Gather parity bits from kProcBytes-sized chunks of
     // parity_internal_buffer
-    ldpc_adapter_func(parity[n], parity_internal_buffer, Zc, cbEncLen, 0);
+    ldpc_adapter_func(parity[n], parity_internal_buffer, zc, cb_enc_len, 0);
   }
 
   return 0;

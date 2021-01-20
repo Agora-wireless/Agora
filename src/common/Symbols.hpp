@@ -74,7 +74,7 @@ static constexpr std::array<DoerType, (static_cast<size_t>(DoerType::kRC) + 1)>
                      DoerType::kIFFT,  DoerType::kPrecode, DoerType::kRC};
 static constexpr size_t kNumDoerTypes = kAllDoerTypes.size();
 
-static const std::map<DoerType, std::string> kDoerNames = {
+static const std::map<DoerType, std::string> k_doer_names = {
     {DoerType::kFFT, std::string("FFT")},
     {DoerType::kCSI, std::string("CSI")},
     {DoerType::kZF, std::string("ZF")},
@@ -216,7 +216,7 @@ enum class SymbolType {
   kGuard,
   kUnknown
 };
-static const std::map<char, SymbolType> kSymbolMap = {
+static const std::map<char, SymbolType> k_symbol_map = {
     {'B', SymbolType::kBeacon}, {'C', SymbolType::kCalDL},
     {'D', SymbolType::kDL},     {'G', SymbolType::kGuard},
     {'L', SymbolType::kCalUL},  {'P', SymbolType::kPilot},

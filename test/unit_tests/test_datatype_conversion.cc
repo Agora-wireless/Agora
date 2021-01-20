@@ -83,7 +83,7 @@ TEST(Modulation, adapt_bits_for_mod_stress) {
 }
 
 TEST(SIMD, float_32_to_16) {
-  constexpr float allowed_error = 1e-3;
+  constexpr float kAllowedError = 1e-3;
   float* in_buf = static_cast<float*>(Agora_memory::padded_aligned_alloc(
       Agora_memory::Alignment_t::k64Align, kSIMDTestNum * sizeof(float)));
   for (size_t i = 0; i < kSIMDTestNum; i++) {
@@ -99,7 +99,7 @@ TEST(SIMD, float_32_to_16) {
   simd_convert_float16_to_float32(out_buf, medium, kSIMDTestNum);
 
   for (size_t i = 0; i < kSIMDTestNum; i++) {
-    ASSERT_LE(abs(in_buf[i] - out_buf[i]), allowed_error);
+    ASSERT_LE(abs(in_buf[i] - out_buf[i]), kAllowedError);
   }
 
   std::free(in_buf);

@@ -13,14 +13,14 @@ static constexpr size_t kNumWorkers = 14;
 static constexpr size_t kMaxTestNum = 100;
 static constexpr size_t kMaxItrNum = (1 << 30);
 static constexpr size_t kModTestNum = 3;
-static constexpr size_t mod_bits_nums[kModTestNum] = {4, 6, 4};
-static constexpr size_t frame_offsets[kModTestNum] = {0, 20, 30};
+static constexpr size_t kModBitsNums[kModTestNum] = {4, 6, 4};
+static constexpr size_t kFrameOffsets[kModTestNum] = {0, 20, 30};
 // A spinning barrier to synchronize the start of worker threads
 std::atomic<size_t> num_workers_ready_atomic;
 
 void MasterToWorkerDynamic_master(
-    Config* cfg, moodycamel::ConcurrentQueue<Event_data>& event_queue,
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue) {
+    Config* cfg, moodycamel::ConcurrentQueue<EventData>& event_queue,
+    moodycamel::ConcurrentQueue<EventData>& complete_task_queue) {
   pin_to_core_with_offset(ThreadType::kMaster, cfg->core_offset(), 0);
   // Wait for all worker threads to be ready
   while (num_workers_ready_atomic != kNumWorkers) {
@@ -28,24 +28,24 @@ void MasterToWorkerDynamic_master(
   }
 
   for (size_t bs_ant_idx = 0; bs_ant_idx < kModTestNum; bs_ant_idx++) {
-    cfg->UpdateModCfgs(mod_bits_nums[bs_ant_idx]);
+    cfg->UpdateModCfgs(kModBitsNums[bs_ant_idx]);
     for (size_t i = 0; i < kMaxTestNum; i++) {
       uint32_t frame_id =
           i / (cfg->demul_events_per_symbol() * cfg->frame().NumULSyms()) +
-          frame_offsets[bs_ant_idx];
+          kFrameOffsets[bs_ant_idx];
       uint32_t symbol_id =
           (i / cfg->demul_events_per_symbol()) % cfg->frame().NumULSyms();
       size_t base_sc_id =
           (i % cfg->demul_events_per_symbol()) * cfg->zf_block_size();
-      event_queue.enqueue(Event_data(
+      event_queue.enqueue(EventData(
           EventType::kZF,
-          gen_tag_t::frm_sym_sc(frame_id, symbol_id, base_sc_id)._tag));
+          gen_tag_t::frm_sym_sc(frame_id, symbol_id, base_sc_id).tag_));
     }
 
     // Dequeue all events in queue to avoid overflow
     size_t num_finished_events = 0;
     while (num_finished_events < kMaxTestNum) {
-      Event_data event;
+      EventData event;
       int ret = complete_task_queue.try_dequeue(event);
       if (ret == true) {
         num_finished_events++;
@@ -56,8 +56,8 @@ void MasterToWorkerDynamic_master(
 
 void MasterToWorkerDynamic_worker(
     Config* cfg, size_t worker_id,
-    moodycamel::ConcurrentQueue<Event_data>& event_queue,
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+    moodycamel::ConcurrentQueue<EventData>& event_queue,
+    moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
     moodycamel::ProducerToken* ptok, Table<complex_float>& data_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     Table<complex_float>& ue_spec_pilot_buffer,
@@ -73,29 +73,29 @@ void MasterToWorkerDynamic_worker(
     // Wait
   }
 
-  std::unique_ptr<DoDemul> computeDemul(new DoDemul(
+  std::unique_ptr<DoDemul> compute_demul(new DoDemul(
       cfg, worker_id, data_buffer, ul_zf_matrices, ue_spec_pilot_buffer,
       equal_buffer, demod_buffers_, phy_stats, stats));
 
   size_t start_tsc = rdtsc();
   size_t num_tasks = 0;
-  Event_data req_event;
+  EventData req_event;
   size_t max_frame_id_wo_offset =
       (kMaxTestNum - 1) / (cfg->ofdm_data_num() / cfg->zf_block_size());
   for (size_t i = 0; i < kMaxItrNum; i++) {
     if (event_queue.try_dequeue(req_event)) {
       num_tasks++;
       size_t frame_offset_id = 0;
-      size_t cur_frame_id = gen_tag_t(req_event.tags[0]).frame_id;
-      if (cur_frame_id >= frame_offsets[1] and
-          cur_frame_id - frame_offsets[1] <= max_frame_id_wo_offset) {
+      size_t cur_frame_id = gen_tag_t(req_event.tags_[0]).frame_id_;
+      if (cur_frame_id >= kFrameOffsets[1] and
+          cur_frame_id - kFrameOffsets[1] <= max_frame_id_wo_offset) {
         frame_offset_id = 1;
-      } else if (cur_frame_id >= frame_offsets[2] and
-                 cur_frame_id - frame_offsets[2] <= max_frame_id_wo_offset) {
+      } else if (cur_frame_id >= kFrameOffsets[2] and
+                 cur_frame_id - kFrameOffsets[2] <= max_frame_id_wo_offset) {
         frame_offset_id = 2;
       }
-      ASSERT_EQ(cfg->mod_order_bits(), mod_bits_nums[frame_offset_id]);
-      Event_data resp_event = computeDemul->launch(req_event.tags[0]);
+      ASSERT_EQ(cfg->mod_order_bits(), kModBitsNums[frame_offset_id]);
+      EventData resp_event = compute_demul->launch(req_event.tags_[0]);
       try_enqueue_fallback(&complete_task_queue, ptok, resp_event);
     }
   }
@@ -112,10 +112,10 @@ TEST(TestDemul, VaryingConfig) {
   std::unique_ptr<Config> cfg(new Config("data/tddconfig-sim-ul.json"));
   cfg->GenData();
 
-  auto event_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
+  auto event_queue = moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
   moodycamel::ProducerToken* ptoks[kNumWorkers];
   auto complete_task_queue =
-      moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
+      moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
   for (size_t i = 0; i < kNumWorkers; i++) {
     ptoks[i] = new moodycamel::ProducerToken(complete_task_queue);
   }

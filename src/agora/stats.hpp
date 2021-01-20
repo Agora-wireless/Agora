@@ -12,18 +12,18 @@ static constexpr size_t kMaxStatBreakdown = 4;
 
 // Accumulated task duration for all tracked frames in each worker thread
 struct DurationStat {
-  std::array<size_t, kMaxStatBreakdown> task_duration;  // Unit = TSC cycles
-  size_t task_count;
+  std::array<size_t, kMaxStatBreakdown> task_duration_;  // Unit = TSC cycles
+  size_t task_count_;
   DurationStat(void) { Reset(); }
   void Reset(void) { std::memset(this, 0, sizeof(DurationStat)); }
 };
 
 // Temporary summary statistics assembled from per-thread runtime stats
 struct FrameSummary {
-  std::array<double, kMaxStatBreakdown> us_this_thread;
-  size_t count_this_thread = 0;
-  std::array<double, kMaxStatBreakdown> us_avg_threads;
-  size_t count_all_threads = 0;
+  std::array<double, kMaxStatBreakdown> us_this_thread_;
+  size_t count_this_thread_ = 0;
+  std::array<double, kMaxStatBreakdown> us_avg_threads_;
+  size_t count_all_threads_ = 0;
   FrameSummary(void) { std::memset(this, 0, sizeof(FrameSummary)); }
 };
 
@@ -83,14 +83,14 @@ class Stats {
   /// timestamp_type was taken for frame_id
   double MasterGetMsSince(TsType timestamp_type, size_t frame_id) const {
     return cycles_to_ms(rdtsc() - MasterGetTsc(timestamp_type, frame_id),
-                        this->freq_ghz_);
+                        this->kFreqGhz);
   }
 
   /// From the master, get the microseconds elapsed since the timestamp of
   /// timestamp_type was taken for frame_id
   double MasterGetUsSince(TsType timestamp_type, size_t frame_id) const {
     return cycles_to_us(rdtsc() - MasterGetTsc(timestamp_type, frame_id),
-                        this->freq_ghz_);
+                        this->kFreqGhz);
   }
 
   /// From the master, get the microseconds between when the timestamp of
@@ -98,7 +98,7 @@ class Stats {
   double MasterGetUsFromRef(TsType timestamp_type, size_t frame_id,
                             size_t reference_tsc) const {
     return cycles_to_us(MasterGetTsc(timestamp_type, frame_id) - reference_tsc,
-                        this->freq_ghz_);
+                        this->kFreqGhz);
   }
 
   /// From the master, for a frame ID, get the millisecond difference
@@ -107,7 +107,7 @@ class Stats {
                           size_t frame_id) const {
     return cycles_to_ms(MasterGetTsc(timestamp_type_1, frame_id) -
                             MasterGetTsc(timestamp_type_2, frame_id),
-                        this->freq_ghz_);
+                        this->kFreqGhz);
   }
 
   /// From the master, for a frame ID, get the microsecond difference
@@ -116,7 +116,7 @@ class Stats {
                           size_t frame_id) const {
     return cycles_to_us(MasterGetTsc(timestamp_type_1, frame_id) -
                             MasterGetTsc(timestamp_type_2, frame_id),
-                        this->freq_ghz_);
+                        this->kFreqGhz);
   }
 
   /// From the master, get the microsecond difference between the times that
@@ -125,7 +125,7 @@ class Stats {
                           size_t frame_id_2) const {
     return cycles_to_ms(MasterGetTsc(timestamp_type, frame_id_1) -
                             MasterGetTsc(timestamp_type, frame_id_2),
-                        this->freq_ghz_);
+                        this->kFreqGhz);
   }
 
   /// From the master, get the microsecond difference between the times that
@@ -134,14 +134,14 @@ class Stats {
                           size_t frame_id_2) const {
     return cycles_to_us(MasterGetTsc(timestamp_type, frame_id_1) -
                             MasterGetTsc(timestamp_type, frame_id_2),
-                        this->freq_ghz_);
+                        this->kFreqGhz);
   }
 
   /// Get the DurationStat object used by thread thread_id for DoerType
   /// doer_type
   DurationStat* GetDurationStat(DoerType doer_type, size_t thread_id) {
     return &this->worker_durations_[thread_id]
-                .duration_stat[static_cast<size_t>(doer_type)];
+                .duration_stat_[static_cast<size_t>(doer_type)];
   }
 
   /// The master thread uses a stale copy of DurationStats to compute
@@ -149,7 +149,7 @@ class Stats {
   /// for DoerType doer_type.
   DurationStat* GetDurationStatOld(DoerType doer_type, size_t thread_id) {
     return &this->worker_durations_old_[thread_id]
-                .duration_stat[static_cast<size_t>(doer_type)];
+                .duration_stat_[static_cast<size_t>(doer_type)];
   }
 
   inline size_t last_frame_id(void) const { return this->last_frame_id_; }
@@ -174,16 +174,16 @@ class Stats {
 
   size_t GetTotalTaskCount(DoerType doer_type, size_t thread_num);
 
-  Config const* const config_;
+  Config const* const kConfig;
 
-  const size_t task_thread_num_;
-  const size_t fft_thread_num_;
-  const size_t zf_thread_num_;
-  const size_t demul_thread_num_;
-  const size_t decode_thread_num_;
-  const size_t break_down_num_ = kMaxStatBreakdown;
-  const double freq_ghz_;
-  const size_t creation_tsc_;  // TSC at which this object was created
+  const size_t kTaskThreadNum;
+  const size_t kFftThreadNum;
+  const size_t kZfThreadNum;
+  const size_t kDemulThreadNum;
+  const size_t kDecodeThreadNum;
+  const size_t kBreakDownNum = kMaxStatBreakdown;
+  const double kFreqGhz;
+  const size_t kCreationTsc;  // TSC at which this object was created
 
   /// Timestamps taken by the master thread at different points in a frame's
   /// processing
@@ -194,8 +194,8 @@ class Stats {
   /// DurationStat object for every Doer type. The master thread keeps stale
   /// ("old") copies of all DurationStat objects.
   struct TimeDurationsStats {
-    std::array<DurationStat, kNumDoerTypes> duration_stat;
-    std::array<uint8_t, 64> false_sharing_padding;
+    std::array<DurationStat, kNumDoerTypes> duration_stat_;
+    std::array<uint8_t, 64> false_sharing_padding_;
   };
 
   std::array<TimeDurationsStats, kMaxThreads> worker_durations_;
