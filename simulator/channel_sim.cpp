@@ -42,7 +42,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
       channel_type_(in_chan_type),
       channel_snr_(in_chan_snr) {
   // initialize parameters from config
-  srand(time(NULL));
+  srand(time(nullptr));
   dl_data_plus_beacon_symbols_ =
       bscfg_->Frame().NumDLSyms() + 1;  // plus beacon
   ul_data_plus_pilot_symbols_ =
@@ -107,7 +107,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     auto context = new EventHandlerContext<ChannelSim>;
     context->obj_ptr_ = this;
     context->id_ = i;
-    if (pthread_create(&task_threads_[i], NULL,
+    if (pthread_create(&task_threads_[i], nullptr,
                        PthreadFunWrapper<ChannelSim, &ChannelSim::TaskThread>,
                        context) != 0) {
       std::perror("task thread create failed");
@@ -150,7 +150,7 @@ void ChannelSim::Start() {
     bs_context->id_ = i;
 
     int ret = pthread_create(
-        &recv_thread_bs, NULL,
+        &recv_thread_bs, nullptr,
         PthreadFunWrapper<ChannelSim, &ChannelSim::BsRxLoop>, bs_context);
     RtAssert(ret == 0, "Failed to create BS recv thread!");
   }
@@ -163,7 +163,7 @@ void ChannelSim::Start() {
     ue_context->id_ = i;
 
     int ret = pthread_create(
-        &recv_thread_ue, NULL,
+        &recv_thread_ue, nullptr,
         PthreadFunWrapper<ChannelSim, &ChannelSim::UeRxLoop>, ue_context);
     RtAssert(ret == 0, "Failed to create UE recv thread!");
   }
@@ -283,7 +283,7 @@ void* ChannelSim::TaskThread(int tid) {
     else if (task_queue_user_.try_dequeue(event))
       DoTxUser(tid, event.tags_[0]);
   }
-  return 0;
+  return nullptr;
 }
 
 void* ChannelSim::BsRxLoop(int tid) {
@@ -345,7 +345,7 @@ void* ChannelSim::BsRxLoop(int tid) {
         "BS socket message enqueue failed!");
     if (++socket_id == socket_hi) socket_id = socket_lo;
   }
-  return 0;
+  return nullptr;
 }
 
 void* ChannelSim::UeRxLoop(int tid) {
@@ -414,7 +414,7 @@ void* ChannelSim::UeRxLoop(int tid) {
         "UE Socket message enqueue failed!");
     if (++socket_id == socket_hi) socket_id = socket_lo;
   }
-  return 0;
+  return nullptr;
 }
 
 void ChannelSim::DoTxBs(int tid, size_t tag) {

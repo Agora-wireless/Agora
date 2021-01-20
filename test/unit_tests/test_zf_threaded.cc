@@ -133,16 +133,16 @@ TEST(TestZF, VaryingConfig) {
   std::unique_ptr<Stats> stats(new Stats(cfg.get()));
 
   std::vector<std::thread> threads;
-  threads.push_back(std::thread(MasterToWorkerDynamicMaster, cfg.get(),
+  threads.emplace_back(MasterToWorkerDynamicMaster, cfg.get(),
                                 std::ref(event_queue),
-                                std::ref(complete_task_queue)));
+                                std::ref(complete_task_queue));
 
   for (size_t i = 0; i < kNumWorkers; i++) {
-    threads.push_back(std::thread(
+    threads.emplace_back(
         MasterToWorkerDynamicWorker, cfg.get(), i, std::ref(event_queue),
         std::ref(complete_task_queue), ptoks[i], std::ref(csi_buffers),
         std::ref(calib_dl_buffer), std::ref(calib_ul_buffer),
-        std::ref(ul_zf_matrices), std::ref(dl_zf_matrices), stats.get()));
+        std::ref(ul_zf_matrices), std::ref(dl_zf_matrices), stats.get());
   }
   for (auto& thread : threads) {
     thread.join();

@@ -50,7 +50,7 @@ class LDPCconfig {
   }
 
  private:
-  LDPCconfig() {}
+  LDPCconfig() = default;
 
   uint16_t base_graph_;        /// The 5G NR LDPC base graph (one or two)
   uint16_t expansion_factor_;  /// The 5G NR LDPC expansion factor

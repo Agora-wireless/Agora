@@ -1,5 +1,7 @@
 #include "simulator.hpp"
 
+#include <memory>
+
 Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
                      size_t in_core_offset, size_t sender_delay)
     : task_thread_num_(in_task_thread_num),
@@ -25,12 +27,12 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
   InitializeUplinkBuffers();
 
   std::printf("new Sender\n");
-  sender_.reset(new Sender(config_, socket_tx_thread_num_, core_offset_ + 1,
-                           sender_delay, true));
+  sender_ = std::make_unique<Sender>(config_, socket_tx_thread_num_, core_offset_ + 1,
+                           sender_delay, true);
 
   std::printf("new Receiver\n");
-  receiver_.reset(new Receiver(config_, socket_rx_thread_num_, core_offset_,
-                               &message_queue_, rx_ptoks_ptr_));
+  receiver_ = std::make_unique<Receiver>(config_, socket_rx_thread_num_, core_offset_,
+                               &message_queue_, rx_ptoks_ptr_);
 }
 
 Simulator::~Simulator() {
@@ -114,7 +116,7 @@ void Simulator::Start() {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = cur_directory + "/data/timeresult_simulator.txt";
   FILE* fp = std::fopen(filename.c_str(), "w");
-  if (fp == NULL) {
+  if (fp == nullptr) {
     std::printf("open file failed\n");
     std::cerr << "Error: " << strerror(errno) << std::endl;
     std::exit(0);

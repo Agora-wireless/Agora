@@ -67,8 +67,8 @@ int CommsLib::FindLts(std::vector<std::complex<double>> iq, int seqLen) {
   for (int i = 0; i < 64; i++) {
     // lts_seq is a 2x160 matrix (real/imag by seqLen=160 elements)
     // grab one symbol and flip around
-    lts_sym.push_back(std::complex<double>(lts_seq[0][seqLen - 1 - i],
-                                           lts_seq[1][seqLen - 1 - i]));
+    lts_sym.emplace_back(lts_seq[0][seqLen - 1 - i],
+                                           lts_seq[1][seqLen - 1 - i]);
     // conjugate
     lts_sym_conj.push_back(std::conj(lts_sym[i]));
   }

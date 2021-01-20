@@ -87,7 +87,7 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
       global_frame_id++;
     }
 
-    if (pkt == NULL) continue;
+    if (pkt == nullptr) { continue; }
     rx_offset = (rx_offset + cfg_->NumChannels()) % packet_num_in_buffer_;
 
     if (kIsWorkerTimingEnabled) {
@@ -145,7 +145,7 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
   if ((cfg_->Running() == false) || tmp_ret <= 0 ||
       (!cfg_->IsPilot(frame_id, symbol_id) &&
        !cfg_->IsUplink(frame_id, symbol_id))) {
-    return NULL;
+    return nullptr;
   }
 
   int ant_id = radio_id * n_channels;

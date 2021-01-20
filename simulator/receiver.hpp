@@ -26,7 +26,7 @@
 #include "gettime.h"
 #include "net.hpp"
 
-typedef unsigned short ushort;
+using ushort = unsigned short;
 class Receiver {
  public:
   Receiver(Config* cfg, size_t rx_thread_num = 1, size_t core_offset = 1);

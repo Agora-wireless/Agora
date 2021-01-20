@@ -1,5 +1,7 @@
 #include "phy-ue.hpp"
 
+#include <memory>
+
 #include "phy_ldpc_decoder_5gnr.h"
 #include "utils_ldpc.hpp"
 
@@ -11,7 +13,7 @@ static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr size_t kRecordFrameIndex = 1000;
 
 PhyUe::PhyUe(Config* config) {
-  srand(time(NULL));
+  srand(time(nullptr));
 
   this->config_ = config;
   InitializeVarsFromCfg();
@@ -68,9 +70,9 @@ PhyUe::PhyUe(Config* config) {
     task_ptok_[i] = new moodycamel::ProducerToken(message_queue_);
   }
 
-  ru_.reset(new RadioTXRX(config_, rx_thread_num_, config_->CoreOffset() + 1,
+  ru_ = std::make_unique<RadioTXRX>(config_, rx_thread_num_, config_->CoreOffset() + 1,
                           &message_queue_, &tx_queue_, rx_ptoks_ptr_,
-                          tx_ptoks_ptr_));
+                          tx_ptoks_ptr_);
 
   if (kEnableMac) {
     // TODO [ankalia]: dummy_decoded_buffer is used at the base station
@@ -129,7 +131,7 @@ PhyUe::PhyUe(Config* config) {
     context->id_ = i;
 
     // std::printf("create thread %d\n", i);
-    if (pthread_create(&task_threads_[i], NULL, TaskThreadLaunch, context) !=
+    if (pthread_create(&task_threads_[i], nullptr, TaskThreadLaunch, context) !=
         0) {
       perror("task thread create failed");
       std::exit(0);
@@ -553,7 +555,7 @@ void* PhyUe::TaskThreadLaunch(void* in_context) {
   int tid = context->id_;
   delete context;
   me->TaskThread(tid);
-  return 0;
+  return nullptr;
 }
 
 void PhyUe::TaskThread(int tid) {

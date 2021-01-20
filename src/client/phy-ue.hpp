@@ -32,9 +32,7 @@
 #include "signalHandler.hpp"
 #include "txrx_client.hpp"
 
-typedef std::vector<complex_float,
-                    boost::alignment::aligned_allocator<complex_float, 64>>
-    myVec;
+using myVec = std::vector<complex_float, boost::alignment::aligned_allocator<complex_float, 64>>;
 
 using namespace arma;
 

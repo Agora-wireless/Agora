@@ -152,16 +152,15 @@ TEST(TestDemul, VaryingConfig) {
   std::unique_ptr<PhyStats> phy_stats(new PhyStats(cfg.get()));
 
   std::vector<std::thread> threads;
-  threads.push_back(std::thread(MasterToWorkerDynamicMaster, cfg.get(),
+  threads.emplace_back(MasterToWorkerDynamicMaster, cfg.get(),
                                 std::ref(event_queue),
-                                std::ref(complete_task_queue)));
+                                std::ref(complete_task_queue));
   for (size_t i = 0; i < kNumWorkers; i++) {
-    threads.push_back(
-        std::thread(MasterToWorkerDynamicWorker, cfg.get(), i,
+    threads.emplace_back(MasterToWorkerDynamicWorker, cfg.get(), i,
                     std::ref(event_queue), std::ref(complete_task_queue),
                     ptoks[i], std::ref(data_buffer), std::ref(ul_zf_matrices),
                     std::ref(equal_buffer), std::ref(ue_spec_pilot_buffer),
-                    std::ref(demod_buffers), phy_stats.get(), stats.get()));
+                    std::ref(demod_buffers), phy_stats.get(), stats.get());
   }
 
   for (auto& thread : threads) {

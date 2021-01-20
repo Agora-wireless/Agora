@@ -33,10 +33,10 @@ using fft_req_tag_t = rx_tag_t;
 // have only a subset of the fields initialized.
 union gen_tag_t {
   static constexpr size_t kInvalidSymbolId = (1ull << 13) - 1;
-  static_assert(kMaxSymbols < ((1ull << 13) - 1), "");
-  static_assert(kMaxUEs < UINT16_MAX, "");
-  static_assert(kMaxAntennas < UINT16_MAX, "");
-  static_assert(kMaxDataSCs < UINT16_MAX, "");
+  static_assert(kMaxSymbols < ((1ull << 13) - 1) );
+  static_assert(kMaxUEs < UINT16_MAX );
+  static_assert(kMaxAntennas < UINT16_MAX );
+  static_assert(kMaxDataSCs < UINT16_MAX );
 
   enum TagType { kCodeblocks, kUsers, kAntennas, kSubcarriers, kNone };
 
@@ -145,7 +145,7 @@ union gen_tag_t {
     return ret;
   }
 };
-static_assert(sizeof(gen_tag_t) == sizeof(size_t), "");
+static_assert(sizeof(gen_tag_t) == sizeof(size_t) );
 
 /**
  * Agora uses these event messages for communication between threads. Each
@@ -154,7 +154,7 @@ static_assert(sizeof(gen_tag_t) == sizeof(size_t), "");
 struct EventData {
   static constexpr size_t kMaxTags = 7;
   EventType event_type_;
-  uint32_t num_tags_;
+  uint32_t num_tags_{0};
   size_t tags_[7];
 
   // Initialize and event with only the event type field set
@@ -166,9 +166,9 @@ struct EventData {
     tags_[0] = tag;
   }
 
-  EventData() : num_tags_(0) {}
+  EventData()  {}
 };
-static_assert(sizeof(EventData) == 64, "");
+static_assert(sizeof(EventData) == 64 );
 
 struct Packet {
   // The packet's data starts at kOffsetOfData bytes from the start

@@ -1,5 +1,7 @@
 #include "agora.hpp"
 
+#include <memory>
+
 static const size_t k_default_message_queue_size = 512;
 static const size_t k_default_worker_queue_size = 256;
 
@@ -34,13 +36,13 @@ Agora::Agora(Config* cfg)
   InitializeUplinkBuffers();
   InitializeDownlinkBuffers();
 
-  stats_.reset(new Stats(cfg));
-  phy_stats_.reset(new PhyStats(cfg));
+  stats_ = std::make_unique<Stats>(cfg);
+  phy_stats_ = std::make_unique<PhyStats>(cfg);
 
   /* Initialize TXRX threads */
-  packet_tx_rx_.reset(new PacketTXRX(
+  packet_tx_rx_ = std::make_unique<PacketTXRX>(
       cfg, cfg->CoreOffset() + 1, &message_queue_,
-      GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_));
+      GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_);
 
   if (kEnableMac == true) {
     const size_t mac_cpu_core =
@@ -882,26 +884,26 @@ void Agora::CreateThreads() {
   auto& cfg = config_;
   if (cfg->BigstationMode() == true) {
     for (size_t i = 0; i < cfg->FftThreadNum(); i++) {
-      workers_.push_back(std::thread(&Agora::WorkerFft, this, i));
+      workers_.emplace_back(&Agora::WorkerFft, this, i);
     }
     for (size_t i = cfg->FftThreadNum();
          i < cfg->FftThreadNum() + cfg->ZfThreadNum(); i++) {
-      workers_.push_back(std::thread(&Agora::WorkerZf, this, i));
+      workers_.emplace_back(&Agora::WorkerZf, this, i);
     }
     for (size_t i = cfg->FftThreadNum() + cfg->ZfThreadNum();
          i < cfg->FftThreadNum() + cfg->ZfThreadNum() + cfg->DemulThreadNum();
          i++) {
-      workers_.push_back(std::thread(&Agora::WorkerDemul, this, i));
+      workers_.emplace_back(&Agora::WorkerDemul, this, i);
     }
     for (size_t i =
              cfg->FftThreadNum() + cfg->ZfThreadNum() + cfg->DemulThreadNum();
          i < cfg->WorkerThreadNum(); i++) {
-      workers_.push_back(std::thread(&Agora::WorkerDecode, this, i));
+      workers_.emplace_back(&Agora::WorkerDecode, this, i);
     }
   } else {
     // printf("Agora: creating %zu workers\n", cfg->worker_thread_num());
     for (size_t i = 0; i < cfg->WorkerThreadNum(); i++) {
-      workers_.push_back(std::thread(&Agora::Worker, this, i));
+      workers_.emplace_back(&Agora::Worker, this, i);
     }
   }
 }

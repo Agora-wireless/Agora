@@ -89,7 +89,7 @@ class UDPClient {
     }
 
     if (enable_recording_flag_) {
-      sent_vec_.push_back(std::vector<uint8_t>(msg, msg + len));
+      sent_vec_.emplace_back(msg, msg + len);
     }
   }
 

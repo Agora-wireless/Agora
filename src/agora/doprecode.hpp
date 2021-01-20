@@ -21,7 +21,7 @@ class DoPrecode : public Doer {
             PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
             Table<complex_float>& in_dl_ifft_buffer,
             Table<int8_t>& dl_encoded_buffer, Stats* in_stats_manager);
-  ~DoPrecode();
+  ~DoPrecode() override;
 
   /**
    * Do demodulation task for a block of subcarriers (demul_block_size)

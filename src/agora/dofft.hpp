@@ -23,7 +23,7 @@ class DoFFT : public Doer {
         Table<complex_float>& calib_dl_buffer,
         Table<complex_float>& calib_ul_buffer, PhyStats* in_phy_stats,
         Stats* stats_manager);
-  ~DoFFT();
+  ~DoFFT() override;
 
   /**
    * Do FFT task for one OFDM symbol
@@ -114,7 +114,7 @@ class DoIFFT : public Doer {
  public:
   DoIFFT(Config* in_config, int in_tid, Table<complex_float>& in_dl_ifft_buffer,
          char* in_dl_socket_buffer, Stats* in_stats_manager);
-  ~DoIFFT();
+  ~DoIFFT() override;
 
   /**
    * Do modulation and ifft tasks for one OFDM symbol

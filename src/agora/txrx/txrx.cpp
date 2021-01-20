@@ -150,7 +150,7 @@ void PacketTXRX::LoopTxRx(int tid) {
     if (-1 != DequeueSend(tid)) continue;
     // receive data
     struct Packet* pkt = RecvEnqueue(tid, radio_id, rx_offset);
-    if (pkt == NULL) continue;
+    if (pkt == nullptr) { continue; }
     rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
 
     if (kIsWorkerTimingEnabled) {
@@ -175,7 +175,7 @@ struct Packet* PacketTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
   if (rx_buffer_status[rx_offset] == 1) {
     std::printf("TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
     cfg_->Running(false);
-    return (NULL);
+    return (nullptr);
   }
   struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
   if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
@@ -183,7 +183,7 @@ struct Packet* PacketTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
       std::perror("recv failed");
       std::exit(0);
     }
-    return (NULL);
+    return (nullptr);
   }
   if (kDebugPrintInTask) {
     std::printf("In TXRX thread %d: Received frame %d, symbol %d, ant %d\n",

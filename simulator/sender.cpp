@@ -466,7 +466,7 @@ void Sender::CreateThreads(void* (*worker)(void*), int tid_start, int tid_end) {
     auto context = new EventHandlerContext<Sender>;
     context->obj_ptr_ = this;
     context->id_ = i;
-    ret = pthread_create(&thread, NULL, worker, context);
+    ret = pthread_create(&thread, nullptr, worker, context);
     RtAssert(ret == 0, "pthread_create() failed");
     this->threads_.push_back(thread);
   }

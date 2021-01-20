@@ -24,7 +24,7 @@ class DoDemul : public Doer {
           Table<complex_float>& equal_buffer,
           PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
           PhyStats* in_phy_stats, Stats* in_stats_manager);
-  ~DoDemul();
+  ~DoDemul() override;
 
   /**
    * Do demodulation task for a block of subcarriers (demul_block_size)

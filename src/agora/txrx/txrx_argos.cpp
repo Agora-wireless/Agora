@@ -22,7 +22,7 @@ void PacketTXRX::LoopTxRxArgos(int tid) {
     if (-1 != DequeueSendArgos(tid)) continue;
     // receive data
     struct Packet* pkt = RecvEnqueueArgos(tid, radio_id, rx_offset);
-    if (pkt == NULL) continue;
+    if (pkt == nullptr) { continue; }
     rx_offset = (rx_offset + cfg_->NumChannels()) % packet_num_in_buffer_;
 
     if (kIsWorkerTimingEnabled) {
@@ -63,7 +63,7 @@ struct Packet* PacketTXRX::RecvEnqueueArgos(int tid, int radio_id,
   long long frame_time;
   if ((cfg_->Running() == false) ||
       radioconfig_->RadioRx(radio_id, samp, frame_time) <= 0) {
-    return NULL;
+    return nullptr;
   }
 
   int frame_id = (int)(frame_time >> 32);

@@ -26,7 +26,7 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg) : cfg_(cfg) {
     context->tid_ = i;
 #ifdef THREADED_INIT
     pthread_t init_thread;
-    if (pthread_create(&init_thread, NULL, InitClientRadioLaunch, context) !=
+    if (pthread_create(&init_thread, nullptr, InitClientRadioLaunch, context) !=
         0) {
       std::perror("init thread create failed");
       std::exit(0);
@@ -122,7 +122,7 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg) : cfg_(cfg) {
 void* ClientRadioConfig::InitClientRadioLaunch(void* in_context) {
   auto* context = (ClientRadioConfigContext*)in_context;
   context->ptr_->InitClientRadio(context);
-  return 0;
+  return nullptr;
 }
 
 void ClientRadioConfig::InitClientRadio(ClientRadioConfigContext* in_context) {

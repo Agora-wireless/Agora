@@ -25,7 +25,7 @@ Channel::Channel(Config* config_bs, Config* config_ue,
     chan_model_ = AWGN;
 }
 
-Channel::~Channel() {}
+Channel::~Channel() = default;
 
 void Channel::ApplyChan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
                         const bool is_downlink, const bool is_newChan) {

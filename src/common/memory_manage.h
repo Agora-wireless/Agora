@@ -21,12 +21,12 @@ void* PaddedAlignedAlloc(Alignment_t alignment, size_t size);
 template <typename T>
 class Table {
  private:
-  size_t dim2_;
-  size_t dim1_;
+  size_t dim2_{0};
+  size_t dim1_{0};
   T* data_;
 
  public:
-  Table() : dim2_(0), dim1_(0), data_(nullptr) {}
+  Table() :  data_(nullptr) {}
 
   void Malloc(size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment) {
     this->dim2_ = dim2;

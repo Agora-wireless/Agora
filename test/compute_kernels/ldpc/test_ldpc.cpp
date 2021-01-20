@@ -62,7 +62,7 @@ int main() {
     }
 
     // Randomly generate input
-    srand(time(NULL));
+    srand(time(nullptr));
     for (auto& n : input) {
       for (size_t i = 0; i < BitsToBytes(num_input_bits); i++)
         n[i] = static_cast<int8_t>(rand());
