@@ -462,7 +462,7 @@ void* PacketTXRX::loop_tx_rx(int tid)
 
     while (cfg->running) {
         // Receive data
-        if (dequeue_send(tid, symbol_to_send, ant_to_send) == 1) {
+        if (cfg->downlink_mode && dequeue_send(tid, symbol_to_send, ant_to_send) == 1) {
             ant_to_send ++;
             if (ant_to_send == (tid + 1) * cfg->nRadios / socket_thread_num) {
                 ant_to_send = 0;
