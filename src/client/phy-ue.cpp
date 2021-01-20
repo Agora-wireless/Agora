@@ -70,9 +70,9 @@ PhyUe::PhyUe(Config* config) {
     task_ptok_[i] = new moodycamel::ProducerToken(message_queue_);
   }
 
-  ru_ = std::make_unique<RadioTXRX>(config_, rx_thread_num_, config_->CoreOffset() + 1,
-                          &message_queue_, &tx_queue_, rx_ptoks_ptr_,
-                          tx_ptoks_ptr_);
+  ru_ = std::make_unique<RadioTXRX>(config_, rx_thread_num_,
+                                    config_->CoreOffset() + 1, &message_queue_,
+                                    &tx_queue_, rx_ptoks_ptr_, tx_ptoks_ptr_);
 
   if (kEnableMac) {
     // TODO [ankalia]: dummy_decoded_buffer is used at the base station

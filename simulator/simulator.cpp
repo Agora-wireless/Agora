@@ -27,12 +27,13 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
   InitializeUplinkBuffers();
 
   std::printf("new Sender\n");
-  sender_ = std::make_unique<Sender>(config_, socket_tx_thread_num_, core_offset_ + 1,
-                           sender_delay, true);
+  sender_ = std::make_unique<Sender>(config_, socket_tx_thread_num_,
+                                     core_offset_ + 1, sender_delay, true);
 
   std::printf("new Receiver\n");
-  receiver_ = std::make_unique<Receiver>(config_, socket_rx_thread_num_, core_offset_,
-                               &message_queue_, rx_ptoks_ptr_);
+  receiver_ =
+      std::make_unique<Receiver>(config_, socket_rx_thread_num_, core_offset_,
+                                 &message_queue_, rx_ptoks_ptr_);
 }
 
 Simulator::~Simulator() {

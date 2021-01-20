@@ -80,7 +80,7 @@ void Adapter16waysFrom18to32(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
 void Adapter16waysFrom2to16(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
                             uint32_t cbLen, int8_t direct);  // 16ways
 
-using LDPC_ADAPTER_P = void (*)(int8_t **, int8_t *, uint16_t, uint32_t, int8_t);
+using LDPC_ADAPTER_P = void (*)(int8_t**, int8_t*, uint16_t, uint32_t, int8_t);
 LDPC_ADAPTER_P LdpcSelectAdapterFunc(uint16_t zcSize);
 
 #define PROC_BYTES 64

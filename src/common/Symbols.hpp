@@ -259,11 +259,11 @@ static constexpr size_t kSCsPerCacheline = 64 / (2 * sizeof(float));
 
 // Number of subcarriers in a partial transpose block
 static constexpr size_t kTransposeBlockSize = 8;
-static_assert(IsPowerOfTwo(kTransposeBlockSize) );  // For cheap modulo
-static_assert(kTransposeBlockSize % kSCsPerCacheline == 0 );
+static_assert(IsPowerOfTwo(kTransposeBlockSize));  // For cheap modulo
+static_assert(kTransposeBlockSize % kSCsPerCacheline == 0);
 
 static constexpr size_t kCalibScGroupSize = 8;
-static_assert(kCalibScGroupSize % kSCsPerCacheline == 0 );
+static_assert(kCalibScGroupSize % kSCsPerCacheline == 0);
 
 #ifdef USE_AVX2_ENCODER
 static constexpr bool kUseAVX2Encoder = true;
@@ -273,4 +273,4 @@ static constexpr bool kUseAVX2Encoder = false;
 
 // Enable debugging for sender and receiver applications
 static constexpr bool kDebugSenderReceiver = false;
-#endif // SYMBOLS_H_
+#endif  // SYMBOLS_H_

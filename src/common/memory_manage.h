@@ -26,7 +26,7 @@ class Table {
   T* data_;
 
  public:
-  Table() :  data_(nullptr) {}
+  Table() : data_(nullptr) {}
 
   void Malloc(size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment) {
     this->dim2_ = dim2;

@@ -134,8 +134,7 @@ TEST(TestZF, VaryingConfig) {
 
   std::vector<std::thread> threads;
   threads.emplace_back(MasterToWorkerDynamicMaster, cfg.get(),
-                                std::ref(event_queue),
-                                std::ref(complete_task_queue));
+                       std::ref(event_queue), std::ref(complete_task_queue));
 
   for (size_t i = 0; i < kNumWorkers; i++) {
     threads.emplace_back(

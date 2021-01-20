@@ -230,7 +230,9 @@ void* RadioTXRX::LoopTxRx(int tid) {
     if (-1 != DequeueSend(tid)) continue;
     // receive data
     struct Packet* pkt = RecvEnqueue(tid, radio_id, rx_offset);
-    if (pkt == nullptr) { continue; }
+    if (pkt == nullptr) {
+      continue;
+    }
     rx_offset = (rx_offset + 1) % buffer_frame_num_;
 
     if (++radio_id == radio_hi) radio_id = radio_lo;
@@ -554,7 +556,7 @@ void* RadioTXRX::LoopTxRxArgosSync(int tid) {
       sync_buff.reserve(num_samps);
       for (int i = 0; i < num_samps; i++) {
         sync_buff.emplace_back(frm_buff0[i].real() / 32768.0,
-                                                frm_buff0[i].imag() / 32768.0);
+                               frm_buff0[i].imag() / 32768.0);
       }
       sync_index = CommsLib::FindBeaconAvx(sync_buff, c->GoldCf32());
       if (sync_index >= 0) {
@@ -607,7 +609,9 @@ void* RadioTXRX::LoopTxRxArgosSync(int tid) {
       } else {
         struct Packet* pkt =
             RecvEnqueueArgos(tid, radio_id, frame_id, symbol_id, cursor);
-        if (pkt == nullptr) { break; }
+        if (pkt == nullptr) {
+          break;
+        }
 
         cursor += c->NumChannels();
         cursor %= buffer_frame_num_;

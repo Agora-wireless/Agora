@@ -35,7 +35,8 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
     context->tid_ = i;
 #ifdef THREADED_INIT
     pthread_t init_thread;
-    if (pthread_create(&init_thread, nullptr, InitBsRadioLaunch, context) != 0) {
+    if (pthread_create(&init_thread, nullptr, InitBsRadioLaunch, context) !=
+        0) {
       std::perror("init thread create failed");
       std::exit(0);
     }

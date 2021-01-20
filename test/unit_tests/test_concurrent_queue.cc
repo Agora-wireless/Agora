@@ -11,10 +11,11 @@ struct ItemT {
   size_t value_;
   size_t padding_[7];
 
-  ItemT()= default;;
+  ItemT() = default;
+  ;
   ItemT(size_t value) : value_(value) {}
 };
-static_assert(sizeof(ItemT) == 64 );
+static_assert(sizeof(ItemT) == 64);
 
 // Test if the master can enqueue to specific workers
 void MasterToWorkerStaticMaster(moodycamel::ConcurrentQueue<ItemT>* queue,

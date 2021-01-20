@@ -87,7 +87,9 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
       global_frame_id++;
     }
 
-    if (pkt == nullptr) { continue; }
+    if (pkt == nullptr) {
+      continue;
+    }
     rx_offset = (rx_offset + cfg_->NumChannels()) % packet_num_in_buffer_;
 
     if (kIsWorkerTimingEnabled) {

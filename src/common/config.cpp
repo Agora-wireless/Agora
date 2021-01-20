@@ -790,7 +790,7 @@ void Config::GenData() {
 
   for (size_t i = 0; i < ofdm_ca_num_; i++) {
     this->pilot_cf32_.emplace_back(pilot_ifft[i].re / scale_,
-                                                    pilot_ifft[i].im / scale_);
+                                   pilot_ifft[i].im / scale_);
   }
   this->pilot_cf32_.insert(this->pilot_cf32_.begin(),
                            this->pilot_cf32_.end() - this->cp_len_,
