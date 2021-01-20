@@ -34,8 +34,7 @@ DoDemul::DoDemul(
           cfg_->DemulBlockSize() * kMaxUEs * sizeof(complex_float)));
 
   // phase offset calibration data
-  cx_float* ue_pilot_ptr =
-      reinterpret_cast<cx_float*>(cfg_->UeSpecificPilot()[0]);
+  auto* ue_pilot_ptr = reinterpret_cast<cx_float*>(cfg_->UeSpecificPilot()[0]);
   cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(), cfg_->UeAntNum(),
                          false);
   ue_pilot_data_ = mat_pilot_data.st();
@@ -120,7 +119,7 @@ EventData DoDemul::Launch(size_t tag) {
       auto* dst = (float*)data_gather_buffer_;
       for (size_t ant_i = 0; ant_i < cfg_->BsAntNum(); ant_i += 4) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
-          __m256 data_rx = _mm256_i32gather_ps(src + j * 2, index, 4);
+          auto data_rx = _mm256_i32gather_ps(src + j * 2, index, 4);
           _mm256_store_ps(dst + j * cfg_->BsAntNum() * 2, data_rx);
         }
         src += (kSCsPerCacheline * kTransposeBlockSize);
@@ -179,23 +178,23 @@ EventData DoDemul::Launch(size_t tag) {
           cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
         if (symbol_idx_ul == 0 && cur_sc_id == 0) {
           // Reset previous frame
-          cx_float* phase_shift_ptr =
-              (cx_float*)ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd];
+          auto* phase_shift_ptr = reinterpret_cast<cx_float*>(
+              ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
           cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeNum(),
                                   cfg_->Frame().ClientUlPilotSymbols(), false);
           mat_phase_shift.fill(0);
         }
-        cx_float* phase_shift_ptr =
-            (cx_float*)&ue_spec_pilot_buffer_[frame_id % kFrameWnd]
-                                             [symbol_idx_ul * cfg_->UeNum()];
+        auto* phase_shift_ptr = reinterpret_cast<cx_float*>(
+            &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
+                                  [symbol_idx_ul * cfg_->UeNum()]);
         cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeNum(), 1, false);
         cx_fmat shift_sc =
             sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
         mat_phase_shift += shift_sc;
       } else if (cfg_->Frame().ClientUlPilotSymbols() >
                  0) {  // apply previously calc'ed phase shift to data
-        cx_float* pilot_corr_ptr =
-            (cx_float*)ue_spec_pilot_buffer_[frame_id % kFrameWnd];
+        auto* pilot_corr_ptr = reinterpret_cast<cx_float*>(
+            ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
         cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeNum(),
                                cfg_->Frame().ClientUlPilotSymbols(), false);
         fmat theta_mat = arg(pilot_corr_mat);
@@ -231,18 +230,19 @@ EventData DoDemul::Launch(size_t tag) {
   __m256i index2 = _mm256_setr_epi32(
       0, 1, cfg_->UeNum() * 2, cfg_->UeNum() * 2 + 1, cfg_->UeNum() * 4,
       cfg_->UeNum() * 4 + 1, cfg_->UeNum() * 6, cfg_->UeNum() * 6 + 1);
-  float* equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
+  auto* equal_t_ptr = reinterpret_cast<float*>(equaled_buffer_temp_transposed_);
   for (size_t i = 0; i < cfg_->UeNum(); i++) {
     float* equal_ptr = nullptr;
     if (kExportConstellation) {
-      equal_ptr = (float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                         [base_sc_id * cfg_->UeNum() + i]);
+      equal_ptr = reinterpret_cast<float*>(
+          &equal_buffer_[total_data_symbol_idx_ul]
+                        [base_sc_id * cfg_->UeNum() + i]);
     } else {
-      equal_ptr = (float*)(equaled_buffer_temp_ + i);
+      equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + i);
     }
     size_t k_num_double_in_sim_d256 = sizeof(__m256) / sizeof(double);  // == 4
     for (size_t j = 0; j < max_sc_ite / k_num_double_in_sim_d256; j++) {
-      __m256 equal_t_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
+      auto equal_t_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
       _mm256_store_ps(equal_t_ptr, equal_t_temp);
       equal_t_ptr += 8;
       equal_ptr += cfg_->UeNum() * k_num_double_in_sim_d256 * 2;

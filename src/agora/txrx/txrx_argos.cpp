@@ -139,7 +139,7 @@ int PacketTXRX::DequeueSendArgos(int tid) {
     }
   } else {
     char* cur_buffer_ptr = tx_buffer_ + offset * c->DlPacketLength();
-    struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
+    auto* pkt = reinterpret_cast<struct Packet*>(cur_buffer_ptr);
     txbuf[ch] = (void*)pkt->data_;
   }
 

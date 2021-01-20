@@ -1397,8 +1397,8 @@ void Agora::SaveTxDataToFile(UNUSED int frame_id) {
 
     for (size_t ant_id = 0; ant_id < cfg->BsAntNum(); ant_id++) {
       size_t offset = total_data_symbol_id * cfg->BsAntNum() + ant_id;
-      struct Packet* pkt =
-          (struct Packet*)(&dl_socket_buffer_[offset * cfg->DlPacketLength()]);
+      auto* pkt = reinterpret_cast<struct Packet*>(
+          &dl_socket_buffer_[offset * cfg->DlPacketLength()]);
       short* socket_ptr = pkt->data_;
       std::fwrite(socket_ptr, cfg->SampsPerSymbol() * 2, sizeof(short), fp);
     }

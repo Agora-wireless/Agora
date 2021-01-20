@@ -132,8 +132,8 @@ std::vector<std::complex<float>> Utils::Uint32tocfloat(
   int len = in.size();
   std::vector<std::complex<float>> out(len, 0);
   for (size_t i = 0; i < in.size(); i++) {
-    int16_t arr_hi_int = (int16_t)(in[i] >> 16);
-    int16_t arr_lo_int = (int16_t)(in[i] & 0x0FFFF);
+    auto arr_hi_int = static_cast<int16_t>(in[i] >> 16);
+    auto arr_lo_int = static_cast<int16_t>(in[i] & 0x0FFFF);
 
     float arr_hi = (float)arr_hi_int / 32768.0;
     float arr_lo = (float)arr_lo_int / 32768.0;
@@ -154,8 +154,8 @@ std::vector<uint32_t> Utils::Cint16ToUint32(
     const std::string& order) {
   std::vector<uint32_t> out(in.size(), 0);
   for (size_t i = 0; i < in.size(); i++) {
-    uint16_t re = (uint16_t)in[i].real();
-    uint16_t im = (uint16_t)(conj ? -in[i].imag() : in[i].imag());
+    auto re = static_cast<uint16_t>(in[i].real());
+    auto im = static_cast<uint16_t>(conj ? -in[i].imag() : in[i].imag());
     if (order == "IQ")
       out[i] = (uint32_t)re << 16 | im;
     else if (order == "QI")
@@ -168,9 +168,10 @@ std::vector<uint32_t> Utils::Cfloat32ToUint32(
     std::vector<std::complex<float>> in, bool conj, const std::string& order) {
   std::vector<uint32_t> out(in.size(), 0);
   for (size_t i = 0; i < in.size(); i++) {
-    uint16_t re = (uint16_t)(int16_t(in[i].real() * 32768.0));
-    uint16_t im =
-        (uint16_t)(int16_t((conj ? -in[i].imag() : in[i].imag()) * 32768));
+    auto re =
+        static_cast<uint16_t>(static_cast<int16_t>(in[i].real() * 32768.0));
+    auto im = static_cast<uint16_t>(
+        static_cast<int16_t>((conj ? -in[i].imag() : in[i].imag()) * 32768));
     if (order == "IQ")
       out[i] = (uint32_t)re << 16 | im;
     else if (order == "QI")

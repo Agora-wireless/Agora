@@ -614,7 +614,7 @@ void Config::GenData() {
                           encoded_bytes_per_block,
                           Agora_memory::Alignment_t::k64Align);
 
-  int8_t* temp_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
+  auto* temp_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
       this->ldpc_config_.BaseGraph(), this->ldpc_config_.ExpansionFactor())];
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t j = 0;

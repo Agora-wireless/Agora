@@ -356,7 +356,7 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < num_codeblocks; i++) {
       size_t error_in_block = 0;
       for (size_t j = 0; j < ldpc_config.NumCbLen() / 8; j++) {
-        uint8_t input = (uint8_t)information[i][j];
+        auto input = static_cast<uint8_t>(information.at(i).at(j));
         uint8_t output = decoded_codewords[i][j];
         if (input != output) {
           for (size_t k = 0; k < 8; k++) {

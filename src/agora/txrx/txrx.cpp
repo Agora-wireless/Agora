@@ -179,7 +179,8 @@ struct Packet* PacketTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
     cfg_->Running(false);
     return (nullptr);
   }
-  struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
+  auto* pkt =
+      reinterpret_cast<struct Packet*>(&rx_buffer[rx_offset * packet_length]);
   if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
     if ((errno != EAGAIN) && (cfg_->Running() == true)) {
       std::perror("recv failed");

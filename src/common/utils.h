@@ -61,7 +61,7 @@ struct EventHandlerContext {
 
 template <class C, void* (C::*run_thread)(int)>
 void* PthreadFunWrapper(void* context) {
-  EventHandlerContext<C>* eh_context = (EventHandlerContext<C>*)context;
+  auto* eh_context = static_cast<EventHandlerContext<C>*>(context);
   C* obj = reinterpret_cast<C*>(eh_context->obj_ptr_);
   int id = eh_context->id_;
   delete eh_context;
@@ -70,7 +70,7 @@ void* PthreadFunWrapper(void* context) {
 
 template <class C, void (C::*run_thread)(int)>
 void PthreadFunWrapper(void* context) {
-  EventHandlerContext<C>* eh_context = (EventHandlerContext<C>*)context;
+  auto* eh_context = static_cast<EventHandlerContext<C>*>(context);
   C* obj = reinterpret_cast<C*>(eh_context->obj_ptr);
   int id = eh_context->id;
   delete eh_context;

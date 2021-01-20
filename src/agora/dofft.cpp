@@ -354,8 +354,8 @@ EventData DoIFFT::Launch(size_t tag) {
   size_t start_tsc2 = WorkerRdtsc();
   duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
 
-  struct Packet* pkt =
-      (struct Packet*)&dl_socket_buffer_[offset * cfg_->DlPacketLength()];
+  auto* pkt = reinterpret_cast<struct Packet*>(
+      &dl_socket_buffer_[offset * cfg_->DlPacketLength()]);
   short* socket_ptr = &pkt->data_[2 * cfg_->OfdmTxZeroPrefix()];
 
   // IFFT scaled results by ofdm_ca_num(), we scale down IFFT results

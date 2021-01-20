@@ -32,7 +32,7 @@ static inline size_t WorkerRdtsc() {
 static inline void NanoSleep(size_t ns, double freq_ghz) {
   size_t start = Rdtsc();
   size_t end = start;
-  size_t upp = static_cast<size_t>(freq_ghz * ns);
+  auto upp = static_cast<size_t>(freq_ghz * ns);
   while (end - start < upp) end = Rdtsc();
 }
 

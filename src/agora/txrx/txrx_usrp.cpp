@@ -209,7 +209,7 @@ int PacketTXRX::DequeueSendUsrp(int tid) {
     }
   } else {
     char* cur_buffer_ptr = tx_buffer_ + offset * c->PacketLength();
-    struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
+    auto* pkt = reinterpret_cast<struct Packet*>(cur_buffer_ptr);
     txbuf[ch] = reinterpret_cast<void*>(pkt->data_);
   }
 
@@ -274,7 +274,7 @@ int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id) {
           c->DlIqT()[dl_symbol_idx - c->Frame().ClientDlPilotSymbols()]);
   } else {
     char* cur_buffer_ptr = tx_buffer_ + offset * c->PacketLength();
-    struct Packet* pkt = reinterpret_cast<struct Packet*>(cur_buffer_ptr);
+    auto* pkt = reinterpret_cast<struct Packet*>(cur_buffer_ptr);
     txbuf[ch] = reinterpret_cast<void*>(pkt->data_);
   }
 

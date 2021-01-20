@@ -158,8 +158,10 @@ std::vector<std::complex<int16_t>> CommsLib::ComplexMultAvx(
     int16_t i1 = g[i].real();
     int16_t q0 = f[i].imag();
     int16_t q1 = g[i].imag();
-    int16_t ires = (int16_t)((i0 * i1 + (conj ? 1 : -1) * q0 * q1) >> 15);
-    int16_t qres = (int16_t)((i1 * q0 + (conj ? -1 : 1) * i0 * q1) >> 15);
+    auto ires =
+        static_cast<int16_t>((i0 * i1 + (conj ? 1 : -1) * q0 * q1) >> 15);
+    auto qres =
+        static_cast<int16_t>((i1 * q0 + (conj ? -1 : 1) * i0 * q1) >> 15);
     out[i] = std::complex<int16_t>(ires, qres);
   }
 
@@ -201,10 +203,10 @@ std::vector<std::complex<float>> CommsLib::ComplexMultAvx(
   size_t length0 = 2 * f.size();
   size_t res_len = std::min(length0, length1);
 
-  float* in0 = (float*)(f.data());
-  float* in1 = (float*)(g.data());
+  const auto* in0 = reinterpret_cast<const float*>(f.data());
+  const auto* in1 = reinterpret_cast<const float*>(g.data());
   std::vector<std::complex<float>> out(res_len / 2, 0);
-  float* outf = (float*)out.data();
+  auto* outf = reinterpret_cast<float*>(out.data());
 
   __m256 data0 __attribute__((aligned(ALIGNMENT)));
   __m256 data1 __attribute__((aligned(ALIGNMENT)));
@@ -270,9 +272,9 @@ std::vector<std::complex<int16_t>> CommsLib::AutoCorrMultAvx(
 std::vector<float> CommsLib::Abs2Avx(
     std::vector<std::complex<float>> const& f) {
   size_t length = 2 * f.size();
-  float* in = (float*)(f.data());
+  const auto* in = reinterpret_cast<const float*>(f.data());
   std::vector<float> out(length / 2, 0);
-  float* outf = (float*)(out.data());
+  auto* outf = static_cast<float*>(out.data());
 
   __m256 data1 __attribute__((aligned(ALIGNMENT)));
   __m256 data2 __attribute__((aligned(ALIGNMENT)));
@@ -294,12 +296,13 @@ std::vector<float> CommsLib::Abs2Avx(
 
       res = _mm256_hadd_ps(prod0, prod1);
       res = _mm256_permutevar8x32_ps(res, perm0);
-      _mm256_storeu_ps(outf + i / 2, res);
+      _mm256_storeu_ps(outf + (i / 2), res);
     }
   }
 
-  for (size_t i = rem; i < length; i += 2)
+  for (size_t i = rem; i < length; i += 2) {
     outf[i / 2] = in[i] * in[i] + in[i + 1] * in[i + 1];
+  }
   return out;
 }
 
@@ -307,9 +310,9 @@ std::vector<int32_t> CommsLib::Abs2Avx(
     std::vector<std::complex<int16_t>> const& f) {
   size_t len = f.size();
 
-  __m256i* in0 = (__m256i*)(f.data());
+  const auto* in0 = reinterpret_cast<const __m256i*>(f.data());
   std::vector<int32_t> out(len, 0);
-  __m256i* outf = (__m256i*)out.data();
+  auto* outf = reinterpret_cast<__m256i*>(out.data());
 
   size_t vec_size = len / AVX_PACKED_CS;
   for (size_t i = 0; i < vec_size; i++) {
@@ -337,7 +340,7 @@ std::vector<std::complex<int16_t>> CommsLib::CorrelateAvx(
   in.insert(in.end(), f.begin(), f.end());
   size_t length = in.size();
 
-  int16_t* in1 = (int16_t*)(g.data());
+  const auto* in1 = reinterpret_cast<const int16_t*>(g.data());
   std::vector<std::complex<int16_t>> out(length, 0);
 
   size_t sz = sizeof(std::complex<int16_t>);
@@ -353,12 +356,12 @@ std::vector<std::complex<int16_t>> CommsLib::CorrelateAvx(
   for (size_t i = 0; i < (length - length1); i += AVX_PACKED_SI) {
     __m256i accm = _mm256_set1_epi16(0x0);
     for (size_t j = 0; j < length1; j++) {
-      __m256i* in_temp = (__m256i*)(in.data() + (i + j) * sz);
+      auto* in_temp = reinterpret_cast<__m256i*>(in.data() + (i + j) * sz);
       __m256i data = _mm256_loadu_si256(in_temp);
       __m256i prod = M256ComplexCs16Mult(data, seq_samp[j], true);
       accm = _mm256_add_epi16(prod, accm);
     }
-    __m256i* out_temp = (__m256i*)(out.data() + i * sz);
+    auto* out_temp = reinterpret_cast<__m256i*>(out.data() + i * sz);
     _mm256_storeu_si256(out_temp, accm);
   }
 
@@ -381,10 +384,10 @@ std::vector<std::complex<float>> CommsLib::CorrelateAvx(
   }
   size_t length = in.size();
 
-  float* in0 = (float*)(in.data());
-  float* in1 = (float*)(g.data());
+  const auto* in0 = reinterpret_cast<const float*>(in.data());
+  const auto* in1 = reinterpret_cast<const float*>(g.data());
   std::vector<std::complex<float>> out(length, 0);
-  float* outf = (float*)out.data();
+  auto* outf = reinterpret_cast<float*>(out.data());
 
   __m256 seq_samp[length1] __attribute__((aligned(ALIGNMENT)));
 

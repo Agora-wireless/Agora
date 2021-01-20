@@ -35,7 +35,7 @@ void ReadFromFileDl(const std::string& filename, Table<short>& data,
   } else {
     std::printf("opening file %s\n", filename.c_str());
   }
-  const unsigned read_size = static_cast<unsigned>(ofdm_size * 2u);
+  const auto read_size = static_cast<unsigned>(ofdm_size * 2u);
   for (size_t i = 0; i < (data_symbol_num_perframe * bs_ant_num); i++) {
     size_t num_bytes = std::fread(data[i], sizeof(short), read_size, fp);
     if (read_size != num_bytes) {

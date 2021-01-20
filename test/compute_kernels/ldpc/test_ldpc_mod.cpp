@@ -42,8 +42,11 @@ float RandFloat(float min, float max) {
 }
 
 float RandFloatFromShort(float min, float max) {
-  float rand_val = ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
-  short rand_val_ushort = (short)(rand_val * 32768);
+  float rand_val =
+      ((static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) *
+       (max - min)) +
+      min;
+  auto rand_val_ushort = static_cast<short>(rand_val * 32768);
   rand_val = (float)rand_val_ushort / 32768;
   return rand_val;
 }
@@ -198,7 +201,7 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < num_codeblocks; i++) {
       size_t error_in_block = 0;
       for (size_t j = 0; j < ldpc_config.NumCbLen() / 8; j++) {
-        uint8_t input = (uint8_t)information[i][j];
+        auto input = static_cast<uint8_t>(information.at(i).at(j));
         uint8_t output = decoded_codewords[i][j];
         if (input != output) {
           for (size_t k = 0; k < 8; k++) {

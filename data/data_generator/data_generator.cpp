@@ -36,7 +36,7 @@ float RandFloat(float min, float max) {
 
 float RandFloatFromShort(float min, float max) {
   float rand_val = ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
-  short rand_val_ushort = (short)(rand_val * 32768);
+  auto rand_val_ushort = static_cast<short>(rand_val * 32768);
   rand_val = (float)rand_val_ushort / 32768;
   return rand_val;
 }

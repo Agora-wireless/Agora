@@ -237,9 +237,9 @@ void PhyUe::Start() {
           size_t rx_thread_id = rx_tag_t(event.tags_[0]).tid_;
           size_t offset_in_current_buffer = rx_tag_t(event.tags_[0]).offset_;
 
-          struct Packet* pkt = (struct Packet*)(rx_buffer_[rx_thread_id] +
-                                                offset_in_current_buffer *
-                                                    config_->PacketLength());
+          auto* pkt = reinterpret_cast<struct Packet*>(
+              rx_buffer_[rx_thread_id] +
+              offset_in_current_buffer * config_->PacketLength());
           size_t frame_id = pkt->frame_id_;
           size_t symbol_id = pkt->symbol_id_;
           size_t ant_id = pkt->ant_id_;
@@ -413,7 +413,7 @@ void PhyUe::Start() {
           size_t radio_buf_id = rx_tag_t(event.tags_[0]).offset_;
           RtAssert(radio_buf_id == expected_frame_id_from_mac_ % kFrameWnd);
 
-          MacPacket* pkt = reinterpret_cast<MacPacket*>(
+          auto* pkt = reinterpret_cast<MacPacket*>(
               &ul_bits_buffer_[ue_id]
                               [radio_buf_id * config_->MacBytesNumPerframe()]);
           RtAssert(pkt->frame_id_ == expected_frame_id_from_mac_,
@@ -550,7 +550,7 @@ void PhyUe::Start() {
 }
 
 void* PhyUe::TaskThreadLaunch(void* in_context) {
-  EventHandlerContext* context = (EventHandlerContext*)in_context;
+  auto* context = static_cast<EventHandlerContext*>(in_context);
   PhyUe* me = context->obj_ptr_;
   int tid = context->id_;
   delete context;
@@ -594,9 +594,9 @@ void PhyUe::DoFft(int tid, size_t tag) {
   size_t start_tsc = Rdtsc();
 
   // read info of one frame
-  struct Packet* pkt =
-      (struct Packet*)(rx_buffer_[rx_thread_id] +
-                       offset_in_current_buffer * config_->PacketLength());
+  auto* pkt = reinterpret_cast<struct Packet*>(rx_buffer_[rx_thread_id] +
+                                               offset_in_current_buffer *
+                                                   config_->PacketLength());
   size_t frame_id = pkt->frame_id_;
   size_t symbol_id = pkt->symbol_id_;
   // int cell_id = pkt->cell_id;
@@ -665,7 +665,7 @@ void PhyUe::DoFft(int tid, size_t tag) {
   // transfer ushort to float
   sig_offset = (sig_offset / 16) * 16;
   size_t delay_offset = (sig_offset + config_->CpLen()) * 2;
-  float* fft_buff = (float*)fft_buffer_[fft_buffer_target_id];
+  auto* fft_buff = reinterpret_cast<float*>(fft_buffer_[fft_buffer_target_id]);
 
   SimdConvertShortToFloat(&pkt->data_[delay_offset], fft_buff,
                           config_->OfdmCaNum() * 2);
@@ -674,8 +674,10 @@ void PhyUe::DoFft(int tid, size_t tag) {
   DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
   size_t csi_offset = frame_slot * config_->UeAntNum() + ant_id;
-  cx_float* csi_buffer_ptr = (cx_float*)(csi_buffer_[csi_offset].data());
-  cx_float* fft_buffer_ptr = (cx_float*)fft_buffer_[fft_buffer_target_id];
+  auto* csi_buffer_ptr =
+      reinterpret_cast<cx_float*>(csi_buffer_[csi_offset].data());
+  auto* fft_buffer_ptr =
+      reinterpret_cast<cx_float*>(fft_buffer_[fft_buffer_target_id]);
 
   EventData fft_finish_event;
 
@@ -701,8 +703,8 @@ void PhyUe::DoFft(int tid, size_t tag) {
     size_t eq_buffer_offset =
         total_dl_data_symbol_id * config_->UeAntNum() + ant_id;
 
-    cx_float* equ_buffer_ptr =
-        (cx_float*)(equal_buffer_[eq_buffer_offset].data());
+    auto* equ_buffer_ptr =
+        reinterpret_cast<cx_float*>(equal_buffer_[eq_buffer_offset].data());
 
     // use pilot subcarriers for phase tracking and correction
     float theta = 0;
@@ -778,7 +780,7 @@ void PhyUe::DoDemul(int tid, size_t tag) {
   size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe_ +
                               dl_symbol_id - dl_pilot_symbol_perframe_;
   size_t offset = total_dl_symbol_id * config_->UeAntNum() + ant_id;
-  float* equal_ptr = (float*)&equal_buffer_[offset][0];
+  auto* equal_ptr = reinterpret_cast<float*>(&equal_buffer_[offset][0]);
   auto* demul_ptr = dl_demod_buffer_[offset];
 
   // demod_16qam_hard_loop(
@@ -877,8 +879,8 @@ void PhyUe::DoDecode(int tid, size_t tag) {
       size_t byte_error(0);
       for (size_t i = 0; i < config_->NumBytesPerCb(); i++) {
         uint8_t rx_byte = decoded_buffer_ptr[i];
-        uint8_t tx_byte = (uint8_t)config_->GetInfoBits(
-            config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i];
+        auto tx_byte = static_cast<uint8_t>(config_->GetInfoBits(
+            config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i]);
         uint8_t xor_byte(tx_byte ^ rx_byte);
         size_t bit_errors = 0;
         for (size_t j = 0; j < 8; j++) {
@@ -897,8 +899,8 @@ void PhyUe::DoDecode(int tid, size_t tag) {
       std::printf("Decoded data (original byte)\n");
       for (size_t i = 0; i < config_->NumBytesPerCb(); i++) {
         uint8_t rx_byte = decoded_buffer_ptr[i];
-        uint8_t tx_byte = (uint8_t)config_->GetInfoBits(
-            config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i];
+        auto tx_byte = static_cast<uint8_t>(config_->GetInfoBits(
+            config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i]);
         std::printf("%x(%x) ", rx_byte, tx_byte);
       }
       std::printf("\n");
@@ -934,12 +936,12 @@ void PhyUe::DoEncode(int tid, size_t tag) {
   auto& cfg = config_;
   // size_t start_tsc = worker_rdtsc();
 
-  int8_t* encoded_buffer_temp =
+  auto* encoded_buffer_temp =
       static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::k64Align,
           LdpcEncodingEncodedBufSize(cfg->LdpcConfig().BaseGraph(),
                                      cfg->LdpcConfig().ExpansionFactor())));
-  int8_t* parity_buffer = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
+  auto* parity_buffer = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::k64Align,
       LdpcEncodingParityBufSize(cfg->LdpcConfig().BaseGraph(),
                                 cfg->LdpcConfig().ExpansionFactor())));
@@ -1013,9 +1015,9 @@ void PhyUe::DoModul(int tid, size_t tag) {
           frame_slot * ul_data_symbol_perframe_ + ul_symbol_id;
       complex_float* modul_buf =
           &modul_buffer_[total_ul_symbol_id][ant_id * config_->OfdmDataNum()];
-      int8_t* ul_bits =
-          (int8_t*)&ul_syms_buffer_[ant_id][total_ul_symbol_id *
-                                            config_->OfdmDataNum()];
+      auto* ul_bits = reinterpret_cast<int8_t*>(
+          &ul_syms_buffer_[ant_id]
+                          [total_ul_symbol_id * config_->OfdmDataNum()]);
       for (size_t sc = 0; sc < config_->OfdmDataNum(); sc++) {
         modul_buf[sc] =
             ModSingleUint8((uint8_t)ul_bits[sc], config_->ModTable());
@@ -1063,8 +1065,8 @@ void PhyUe::DoIfft(int tid, size_t tag) {
 
       size_t tx_offset = buff_offset * config_->PacketLength();
       char* cur_tx_buffer = &tx_buffer_[tx_offset];
-      struct Packet* pkt = (struct Packet*)cur_tx_buffer;
-      std::complex<short>* tx_data_ptr = (std::complex<short>*)pkt->data_;
+      auto* pkt = reinterpret_cast<struct Packet*>(cur_tx_buffer);
+      auto* tx_data_ptr = reinterpret_cast<std::complex<short>*>(pkt->data_);
       CommsLib::Ifft2tx(ifft_buff, tx_data_ptr, config_->OfdmCaNum(),
                         config_->OfdmTxZeroPrefix(), config_->CpLen(),
                         config_->Scale());

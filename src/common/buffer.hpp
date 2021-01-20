@@ -158,7 +158,7 @@ struct EventData {
   size_t tags_[7];
 
   // Initialize and event with only the event type field set
-  EventData(EventType event_type) : event_type_(event_type), num_tags_(0) {}
+  EventData(EventType event_type) : event_type_(event_type) {}
 
   // Create an event with one tag
   EventData(EventType event_type, size_t tag)
@@ -166,7 +166,7 @@ struct EventData {
     tags_[0] = tag;
   }
 
-  EventData() {}
+  EventData() = default;
 };
 static_assert(sizeof(EventData) == 64);
 

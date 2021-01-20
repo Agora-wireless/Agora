@@ -92,7 +92,7 @@ void Simulator::Start() {
 
           char* socket_buffer_ptr = socket_buffer_[socket_thread_id] +
                                     (long long)buf_offset * packet_length_;
-          struct Packet* pkt = (struct Packet*)socket_buffer_ptr;
+          auto* pkt = reinterpret_cast<struct Packet*>(socket_buffer_ptr);
           int frame_id = pkt->frame_id_ % 10000;
           int symbol_id = pkt->symbol_id_;
           int ant_id = pkt->ant_id_;

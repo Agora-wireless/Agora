@@ -132,7 +132,7 @@ static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
     src = src + offset_in_src_buffer * 2;
     for (size_t ant_idx = 0; ant_idx < bs_ant_num; ant_idx += 4) {
       // fetch 4 complex floats for 4 ants
-      __m256 t = _mm256_i32gather_ps(src, index, 4);
+      auto t = _mm256_i32gather_ps(src, index, 4);
       _mm256_storeu_ps(dst, t);
       src += 8 * kTransposeBlockSize;
       dst += 8;
@@ -143,7 +143,7 @@ static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
   if (ant_start < bs_ant_num) {
     const size_t pt_base_offset =
         (cur_sc_id / kTransposeBlockSize) * (kTransposeBlockSize * bs_ant_num);
-    complex_float* cx_src = (complex_float*)src;
+    auto* cx_src = reinterpret_cast<complex_float*>(src);
     complex_float* cx_dst = (complex_float*)dst + ant_start;
     for (size_t ant_i = ant_start; ant_i < bs_ant_num; ant_i++) {
       *cx_dst = cx_src[pt_base_offset + (ant_i * kTransposeBlockSize) +
@@ -157,8 +157,8 @@ static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
 // produced by dofft
 static inline void TransposeGather(size_t cur_sc_id, float* src, float*& dst,
                                    size_t bs_ant_num, size_t ofdm_data_num) {
-  complex_float* cx_src = (complex_float*)src;
-  complex_float* cx_dst = (complex_float*)dst;
+  auto* cx_src = reinterpret_cast<complex_float*>(src);
+  auto* cx_dst = reinterpret_cast<complex_float*>(dst);
   for (size_t ant_i = 0; ant_i < bs_ant_num; ant_i++) {
     *cx_dst = cx_src[ant_i * ofdm_data_num + cur_sc_id];
     cx_dst++;
@@ -183,15 +183,16 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
 
     // Gather CSI matrices of each pilot from partially-transposed CSIs.
     for (size_t ue_idx = 0; ue_idx < cfg_->UeNum(); ue_idx++) {
-      float* dst_csi_ptr =
-          (float*)(csi_gather_buffer_ + cfg_->BsAntNum() * ue_idx);
-      if (kUsePartialTrans)
+      auto* dst_csi_ptr = reinterpret_cast<float*>(csi_gather_buffer_ +
+                                                   cfg_->BsAntNum() * ue_idx);
+      if (kUsePartialTrans) {
         PartialTransposeGather(cur_sc_id,
                                (float*)csi_buffers_[frame_slot][ue_idx],
                                dst_csi_ptr, cfg_->BsAntNum());
-      else
+      } else {
         TransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][ue_idx],
                         dst_csi_ptr, cfg_->BsAntNum(), cfg_->OfdmDataNum());
+      }
     }
 
     duration_stat_->task_duration_[1] += WorkerRdtsc() - start_tsc1;
@@ -258,7 +259,8 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
   // Gather CSIs from partially-transposed CSIs
   for (size_t i = 0; i < cfg_->UeNum(); i++) {
     const size_t cur_sc_id = base_sc_id + i;
-    float* dst_csi_ptr = (float*)(csi_gather_buffer_ + cfg_->BsAntNum() * i);
+    auto* dst_csi_ptr =
+        reinterpret_cast<float*>(csi_gather_buffer_ + cfg_->BsAntNum() * i);
     PartialTransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
                            dst_csi_ptr, cfg_->BsAntNum());
   }
