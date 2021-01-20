@@ -7,7 +7,7 @@
 
 #include "utils_ldpc.hpp"
 
-Config::Config(std::string jsonfile)
+Config::Config(const std::string& jsonfile)
     : kFreqGhz(MeasureRdtscFreq()),
       ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_("") {

@@ -322,6 +322,7 @@ void Stats::PrintSummary() {
   } else {
     std::vector<size_t> num_tasks;
 
+    num_tasks.reserve(kAllDoerTypes.size());
     for (auto kAllDoerType : kAllDoerTypes) {
       num_tasks.push_back(GetTotalTaskCount(kAllDoerType, kTaskThreadNum));
     }
