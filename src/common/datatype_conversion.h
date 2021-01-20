@@ -112,6 +112,12 @@ static inline void simd_convert_float16_to_float32(
 static inline void simd_convert_float32_to_float16(
     float* out_buf, const float* in_buf, size_t n_elems)
 {
+    void* ptr = out_buf;
+    if (ptr % 64 != 0) {
+        ptr = (ptr / 64) * 64;
+        out_buf = (float*) ptr;
+    }
+    n_elems = (n_elems / 16 + 1) * 16;
 #ifdef __AVX512F__
     for (size_t i = 0; i < n_elems; i += 16) {
         __m512 val_a = _mm512_load_ps(in_buf + i);
