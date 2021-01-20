@@ -117,10 +117,10 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
 
     // We send data to app irrespective of CRC condition
     // TODO: enable ARQ and ensure reliable data goes to app
-    const size_t frame_data__offset =
+    const size_t frame_data_offset =
         (symbol_idx_ul - cfg_->Frame().ClientUlPilotSymbols()) *
         cfg_->MacPayloadLength();
-    std::memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data_,
+    std::memcpy(&server_.frame_data_[ue_id][frame_data_offset], pkt->data_,
                 cfg_->MacPayloadLength());
     server_.n_filled_in_frame_[ue_id] += cfg_->MacPayloadLength();
 
@@ -136,7 +136,7 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
                      "MAC thread received frame %zu, uplink symbol index %zu, "
                      "size %zu, copied to frame data offset %zu\n",
                      frame_id, symbol_idx_ul, cfg_->MacPayloadLength(),
-                     frame_data__offset);
+                     frame_data_offset);
 
         ss << "Header Info:\n"
            << "FRAME_ID: " << pkt->frame_id_

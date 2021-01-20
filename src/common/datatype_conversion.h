@@ -214,7 +214,7 @@ static inline void Convert12bitIqTo16bitIq(uint8_t* in_buf, uint16_t* out_buf,
 static inline void SimdConvert12bitIqToFloat(uint8_t* in_buf, float* out_buf,
                                              uint16_t* in_16bits_buf,
                                              size_t n_elems) {
-  _unused(in_16bits_buf);
+  unused(in_16bits_buf);
 #ifdef __AVX512F__
   const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 131072.f);
   const __m512i magic_i = _mm512_castps_si512(magic);

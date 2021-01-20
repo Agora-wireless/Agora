@@ -6,8 +6,8 @@
  * AVX-512.
  */
 
-#ifndef _ENCODER_H_
-#define _ENCODER_H_
+#ifndef ENCODER_H_
+#define ENCODER_H_
 
 #include "gcc_phy_ldpc_encoder_5gnr_internal.h"
 #include "phy_ldpc_encoder_5gnr.h"
@@ -30,4 +30,4 @@ int32_t BblibLdpcEncoder5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
 // Using the larger of the two works for padding buffers.
 static constexpr size_t kMaxProcBytes = 64;
 
-#endif
+#endif // ENCODER_H_
