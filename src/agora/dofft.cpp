@@ -44,8 +44,6 @@ DoFFT::~DoFFT() {
   DftiFreeDescriptor(&mkl_handle_);
   std::free(fft_inout_);
   std::free(temp_16bits_iq_);
-  calib_ul_buffer_.Free();
-  calib_dl_buffer_.Free();
 }
 
 // @brief
