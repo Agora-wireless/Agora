@@ -201,8 +201,8 @@ int main(int argc, char* argv[]) {
         uint8_t input = (uint8_t)information[i][j];
         uint8_t output = decoded_codewords[i][j];
         if (input != output) {
-          for (size_t i = 0; i < 8; i++) {
-            uint8_t mask = 1 << i;
+          for (size_t k = 0; k < 8; k++) {
+            uint8_t mask = 1 << k;
             if ((input & mask) != (output & mask)) {
               error_num++;
               error_in_block++;

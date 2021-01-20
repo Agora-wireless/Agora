@@ -2,8 +2,8 @@
 
 #include "comms-lib.h"
 
-std::atomic<size_t> num_radios_initialized;
-std::atomic<size_t> num_radios_configured;
+static std::atomic<size_t> num_radios_initialized;
+static std::atomic<size_t> num_radios_configured;
 
 RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
   SoapySDR::Kwargs args;
@@ -46,14 +46,14 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
 
   // Block until all radios are initialized
   size_t num_checks = 0;
-  while (num_radios_initialized != this->radio_num_) {
-    size_t num_radios_initialized = num_radios_initialized;
+  while (num_radios_initialized.load() != this->radio_num_) {
+    size_t num_radios_init = num_radios_initialized.load();
     num_checks++;
     if (num_checks > 1e9) {
       std::printf(
           "RadioConfig: Waiting for radio initialization, %zu of %zu "
           "ready\n",
-          num_radios_initialized, this->radio_num_);
+          num_radios_init, this->radio_num_);
       num_checks = 0;
     }
   }
@@ -81,14 +81,14 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
   }
 
   // Block until all radios are configured
-  while (num_radios_configured != this->radio_num_) {
-    size_t num_radios_configured = num_radios_configured;
+  while (num_radios_configured.load() != this->radio_num_) {
+    size_t num_radios_config = num_radios_configured.load();
     num_checks++;
     if (num_checks > 1e9) {
       std::printf(
           "RadioConfig: Waiting for radio initialization, %zu of %zu "
           "ready\n",
-          num_radios_configured, this->radio_num_);
+          num_radios_config, this->radio_num_);
       num_checks = 0;
     }
   }
@@ -335,11 +335,8 @@ bool RadioConfig::RadioStart() {
 
   std::vector<unsigned> zeros(cfg_->SampsPerSymbol(), 0);
   std::vector<uint32_t> beacon = cfg_->Beacon();
-  std::vector<unsigned> beacon_weights(cfg_->NumAntennas());
-
   std::vector<uint32_t> pilot = cfg_->Pilot();
 
-  std::vector<std::string> tdd_sched;
   DrainBuffers();
   json conf;
   conf["tdd_enabled"] = true;

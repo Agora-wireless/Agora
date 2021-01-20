@@ -88,7 +88,7 @@ int main(int argc, char* argv[]) {
     std::printf("Saving raw uplink data (using LDPC) to %s\n",
                 filename_input.c_str());
     FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
-    for (size_t i = 0; i < ul_codeblocks; i++) {
+    for (size_t i = 0; i < num_ul_codeblocks; i++) {
       std::fwrite(reinterpret_cast<uint8_t*>(&ul_information.at(i).at(0)),
                   input_bytes_per_cb, sizeof(uint8_t), fp_input);
     }
@@ -110,7 +110,8 @@ int main(int argc, char* argv[]) {
   }
 
   // Modulate the encoded codewords
-  std::vector<std::vector<complex_float>> ul_modulated_codewords(ul_codeblocks);
+  std::vector<std::vector<complex_float>> ul_modulated_codewords(
+      num_ul_codeblocks);
   for (size_t i = 0; i < num_ul_codeblocks; i++) {
     ul_modulated_codewords.at(i) =
         data_generator.GetModulation(ul_encoded_codewords.at(i));
@@ -273,7 +274,8 @@ int main(int argc, char* argv[]) {
   }
 
   // Modulate the encoded codewords
-  std::vector<std::vector<complex_float>> dl_modulated_codewords(dl_codeblocks);
+  std::vector<std::vector<complex_float>> dl_modulated_codewords(
+      num_dl_codeblocks);
   for (size_t i = 0; i < num_dl_codeblocks; i++) {
     dl_modulated_codewords.at(i) =
         data_generator.GetModulation(dl_encoded_codewords.at(i));
@@ -299,7 +301,7 @@ int main(int argc, char* argv[]) {
 
     if (kPrintDownlinkInformationBytes == true) {
       std::printf("Downlink information bytes\n");
-      for (size_t n = 0; n < dl_codeblocks; n++) {
+      for (size_t n = 0; n < num_dl_codeblocks; n++) {
         std::printf("Symbol %zu, UE %zu\n", n / cfg->UeAntNum(),
                     n % cfg->UeAntNum());
         for (size_t i = 0; i < input_bytes_per_cb; i++) {

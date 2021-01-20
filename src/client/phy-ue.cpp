@@ -206,7 +206,7 @@ void PhyUe::Start() {
   EventData events_list[kDequeueBulkSizeTXRX];
   int ret = 0;
   max_equaled_frame_ = 0;
-  size_t frame_id, symbol_id, ant_id;
+  // size_t frame_id, symbol_id, ant_id;
   size_t cur_frame_id = 0;
   while ((config_->Running() == true) &&
          (SignalHandler::GotExitSignal() == false)) {
@@ -238,9 +238,9 @@ void PhyUe::Start() {
           struct Packet* pkt = (struct Packet*)(rx_buffer_[rx_thread_id] +
                                                 offset_in_current_buffer *
                                                     config_->PacketLength());
-          frame_id = pkt->frame_id_;
-          symbol_id = pkt->symbol_id_;
-          ant_id = pkt->ant_id_;
+          size_t frame_id = pkt->frame_id_;
+          size_t symbol_id = pkt->symbol_id_;
+          size_t ant_id = pkt->ant_id_;
           RtAssert(pkt->frame_id_ < cur_frame_id + kFrameWnd,
                    "Error: Received packet for future frame beyond frame "
                    "window. This can happen if PHY is running "
@@ -694,9 +694,10 @@ void PhyUe::DoFft(int tid, size_t tag) {
         csi_buffer_ptr[j] /= dl_pilot_symbol_perframe_;
     }
   } else {
-    size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe_ +
-                                dl_symbol_id - dl_pilot_symbol_perframe_;
-    size_t eq_buffer_offset = total_dl_symbol_id * config_->UeAntNum() + ant_id;
+    size_t total_dl_data_symbol_id = frame_slot * dl_data_symbol_perframe_ +
+                                     dl_symbol_id - dl_pilot_symbol_perframe_;
+    size_t eq_buffer_offset =
+        total_dl_data_symbol_id * config_->UeAntNum() + ant_id;
 
     cx_float* equ_buffer_ptr =
         (cx_float*)(equal_buffer_[eq_buffer_offset].data());

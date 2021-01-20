@@ -18,10 +18,10 @@
 #define SCALE_BYTE_CONV_QPSK 20
 #define SCALE_BYTE_CONV_QAM16 100
 #define SCALE_BYTE_CONV_QAM64 100
-#define QAM16_THRESHOLD 2 / sqrt(10)
-#define QAM64_THRESHOLD_1 2 / sqrt(42)
-#define QAM64_THRESHOLD_2 4 / sqrt(42)
-#define QAM64_THRESHOLD_3 6 / sqrt(42)
+#define QAM16_THRESHOLD (2 / sqrt(10))
+#define QAM64_THRESHOLD_1 (2 / sqrt(42))
+#define QAM64_THRESHOLD_2 (4 / sqrt(42))
+#define QAM64_THRESHOLD_3 (6 / sqrt(42))
 
 void InitModulationTable(Table<complex_float>& table, size_t mod_order);
 void InitQpskTable(Table<complex_float>& table);

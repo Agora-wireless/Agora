@@ -251,12 +251,12 @@ std::vector<float> CommsLib::HannWindowFunction(size_t fftSize) {
 
 double CommsLib::WindowFunctionPower(std::vector<float> const& win) {
   double window_power = (0);
-  size_t n = win.size();
-  for (float n : win) {
-    window_power += std::norm(n);
+  size_t window_size = win.size();
+  for (float i : win) {
+    window_power += std::norm(i);
   }
-  window_power = std::sqrt(window_power / n);
-  return 20 * std::log10(n * window_power);
+  window_power = std::sqrt(window_power / window_size);
+  return 20 * std::log10(window_size * window_power);
 }
 
 float CommsLib::FindTone(std::vector<float> const& magnitude, double winGain,

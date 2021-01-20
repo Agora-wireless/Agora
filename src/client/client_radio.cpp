@@ -39,13 +39,13 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg) : cfg_(cfg) {
 #ifdef THREADED_INIT
   size_t num_checks = 0;
   while (num_client_radios_initialized != this->radio_num_) {
-    size_t num_client_radios_initialized = num_client_radios_initialized;
+    size_t num_client_radios_init = num_client_radios_initialized;
     num_checks++;
     if (num_checks > 1e9) {
       std::printf(
           "RadioConfig: Waiting for radio initialization, %zu of %zu "
           "ready\n",
-          num_client_radios_initialized, this->radio_num_);
+          num_client_radios_init, this->radio_num_);
       num_checks = 0;
     }
   }
