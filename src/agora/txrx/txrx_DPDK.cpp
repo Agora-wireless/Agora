@@ -708,7 +708,7 @@ int PacketTXRX::dequeue_send(int tid, size_t symbol_dl_to_send, size_t ant_to_se
         size_t offset = data_symbol_idx_dl * cfg->BS_ANT_NUM + ant_to_send;
 
         simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data), 
-            reinterpret_cast<float*>(&(*dl_ifft_buffer_)[offset][cfg->get_num_sc_per_server() * cfg->bs_server_addr_idx]), 
+            reinterpret_cast<float*>(&(*dl_ifft_buffer_)[offset][0]), 
             cfg->get_num_sc_per_server() * 2);
        
         printf("Send a packet out server:%u\n", pkt->server_id);

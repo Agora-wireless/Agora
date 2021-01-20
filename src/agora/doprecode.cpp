@@ -139,7 +139,7 @@ Event_data DoPrecode::launch(size_t tag)
             = ant_id + cfg->BS_ANT_NUM * total_data_symbol_idx;
         float* ifft_ptr
             = (float*)&dl_ifft_buffer_[ifft_buffer_offset]
-                                      [base_sc_id];
+                                      [base_sc_id - cfg->subcarrier_start];
         for (size_t i = 0; i < cfg->demul_block_size / 4; i++) {
             float* input_shifted_ptr
                 = precoded_ptr + 4 * i * 2 * cfg->BS_ANT_NUM + ant_id * 2;
@@ -152,7 +152,7 @@ Event_data DoPrecode::launch(size_t tag)
     // Begin Debug
     printf("\nPrecoded data base sc %lu:\n", base_sc_id);
     for (size_t i = 0; i < max_sc_ite; i ++) {
-        printf("(%lf %lf) ", dl_ifft_buffer_[0][base_sc_id + i].re, dl_ifft_buffer_[0][base_sc_id + i].im);
+        printf("(%lf %lf) ", dl_ifft_buffer_[0][base_sc_id + i - cfg->subcarrier_start].re, dl_ifft_buffer_[0][base_sc_id + i - cfg->subcarrier_start].im);
     }
     printf("\n");
     // End Debug
