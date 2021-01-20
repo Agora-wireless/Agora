@@ -1,14 +1,16 @@
 #ifndef MOD_COMMON
 #define MOD_COMMON
 
+#include <emmintrin.h>
+#include <immintrin.h>
+
+#include <cmath>
+#include <iostream>
+
 #include "Symbols.hpp"
 #include "buffer.hpp"
 #include "gettime.h"
 #include "memory_manage.h"
-#include <cmath>
-#include <emmintrin.h>
-#include <immintrin.h>
-#include <iostream>
 
 #define BPSK_LEVEL M_SQRT1_2
 #define QPSK_LEVEL M_SQRT1_2
@@ -29,7 +31,7 @@ void init_qam64_table(Table<complex_float>& table);
 complex_float mod_single(int x, Table<complex_float>& mod_table);
 complex_float mod_single_uint8(uint8_t x, Table<complex_float>& mod_table);
 void mod_simd(uint8_t* in, complex_float*& out, size_t len,
-    Table<complex_float>& mod_table);
+              Table<complex_float>& mod_table);
 
 void demod_qpsk_soft_sse(float* vec_in, int8_t* llr, int num);
 

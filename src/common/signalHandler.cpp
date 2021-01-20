@@ -1,9 +1,9 @@
 // http://www.yolinux.com/TUTORIALS/C++Signals.html
 
+#include "signalHandler.hpp"
+
 #include <cerrno>
 #include <csignal>
-
-#include "signalHandler.hpp"
 
 bool SignalHandler::mbGotExitSignal = false;
 
@@ -26,9 +26,8 @@ bool SignalHandler::gotExitSignal() { return mbGotExitSignal; }
 /**
  * Sets the bool flag indicating whether we received an exit signal
  */
-void SignalHandler::setExitSignal(bool _bExitSignal)
-{
-    mbGotExitSignal = _bExitSignal;
+void SignalHandler::setExitSignal(bool _bExitSignal) {
+  mbGotExitSignal = _bExitSignal;
 }
 
 /**
@@ -41,9 +40,8 @@ void SignalHandler::exitSignalHandler(int) { mbGotExitSignal = true; }
 /**
  * Set up the signal handlers for CTRL-C.
  */
-void SignalHandler::setupSignalHandlers()
-{
-    if (signal((int)SIGINT, SignalHandler::exitSignalHandler) == SIG_ERR) {
-        throw SignalException("!!!!! Error setting up signal handlers !!!!!");
-    }
+void SignalHandler::setupSignalHandlers() {
+  if (signal((int)SIGINT, SignalHandler::exitSignalHandler) == SIG_ERR) {
+    throw SignalException("!!!!! Error setting up signal handlers !!!!!");
+  }
 }
