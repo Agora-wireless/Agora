@@ -112,7 +112,7 @@ static inline __m256i M256ComplexCs16Mult(__m256i data1, __m256i data2,
   __m256i temp0 = _mm256_xor_si256(data2, neg0);
   temp0 = _mm256_add_epi32(temp0, neg1);
 
-  __m256i temp1 = _mm256_shufflehi_epi16(conj ? temp0 : data2, 0xb1);
+  auto temp1 = _mm256_shufflehi_epi16(conj ? temp0 : data2, 0xb1);
   temp1 = _mm256_shufflelo_epi16(temp1, 0xb1);
 
   __m256i re = _mm256_madd_epi16(data1, conj ? data2 : temp0);
@@ -135,10 +135,10 @@ std::vector<std::complex<int16_t>> CommsLib::ComplexMultAvx(
   size_t length0 = f.size();
   size_t res_len = std::min(length0, length1);
 
-  __m256i* in0 = (__m256i*)(f.data());
-  __m256i* in1 = (__m256i*)(g.data());
+  const auto* in0 = reinterpret_cast<const __m256i*>(f.data());
+  const auto* in1 = reinterpret_cast<const __m256i*>(g.data());
   std::vector<std::complex<int16_t>> out(res_len, 0);
-  __m256i* outf = (__m256i*)out.data();
+  auto* outf = reinterpret_cast<__m256i*>(out.data());
 
   __m256i data0 __attribute__((aligned(ALIGNMENT)));
   __m256i data1 __attribute__((aligned(ALIGNMENT)));
