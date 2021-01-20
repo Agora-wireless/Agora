@@ -164,6 +164,8 @@ class Config {
   inline size_t NumBytesPerCb() const { return this->num_bytes_per_cb_; }
   inline bool FftInRru() const { return this->fft_in_rru_; }
 
+  inline uint16_t DpdkNumPorts() const { return this->dpdk_num_ports_; }
+
   // inline size_t mod_order( void )       const { return this->mod_order_; }
   // inline double calib_tx_gain_b( void ) const { return
   // this->calib_tx_gain_b_; } inline size_t total_ue_ant_num( void ) const {

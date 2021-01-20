@@ -653,15 +653,17 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
     plt::legend();
     plt::save("dn_" + std::to_string(i) + ".png");
 #endif
-    if (start_up[i] == 0 || start_dn[i] == 0) {
+    if ((start_up[i] == 0) || (start_dn[i] == 0)) {
       good_csi = false;
       break;
     }
-    if (i > 0 && (std::abs((int)start_up[i] - (int)start_up[i - 1]) >
-                      kMaxArraySampleOffset ||
-                  std::abs((int)start_dn[i] - (int)start_dn[i - 1]) >
-                      kMaxArraySampleOffset)) {  // make sure offsets are too
-                                                 // different from each other
+    if ((i > 0) &&
+        ((std::abs((int)start_up[i] - (int)start_up[i - 1]) >
+          static_cast<int>(kMaxArraySampleOffset)) ||
+         (std::abs((int)start_dn[i] - (int)start_dn[i - 1]) >
+          static_cast<int>(
+              kMaxArraySampleOffset)))) {  // make sure offsets are too
+                                           // different from each other
       good_csi = false;
       break;
     }

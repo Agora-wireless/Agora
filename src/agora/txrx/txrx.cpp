@@ -13,7 +13,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
       kCoreOffset(core_offset),
       kAntPerCell(cfg->BsAntNum() / cfg->NumCells()),
       kSocketThreadNum(cfg->SocketThreadNum()) {
-  if (!kUseArgos && !kUseUHD) {
+  if ((kUseArgos == false) && (kUseUHD == false)) {
     socket_.resize(cfg->NumRadios());
     bs_rru_sockaddr_.resize(cfg->NumRadios());
   } else {

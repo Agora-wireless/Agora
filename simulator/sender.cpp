@@ -69,36 +69,36 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 
 #ifdef USE_DPDK
   DpdkTransport::dpdk_init(core_offset, socket_thread_num);
-  mbuf_pool = DpdkTransport::create_mempool(cfg->packet_length());
+  this->mbuf_pool_ = DpdkTransport::create_mempool(cfg->PacketLength());
 
   // Parse IP addresses
-  int ret = inet_pton(AF_INET, cfg->bs_rru_addr().c_str(), &bs_rru_addr);
-  rt_assert(ret == 1, "Invalid sender IP address");
-  ret = inet_pton(AF_INET, cfg->bs_server_addr().c_str(), &bs_server_addr);
-  rt_assert(ret == 1, "Invalid server IP address");
+  int ret = inet_pton(AF_INET, cfg->BsRruAddr().c_str(), &bs_rru_addr_);
+  RtAssert(ret == 1, "Invalid sender IP address");
+  ret = inet_pton(AF_INET, cfg->BsServerAddr().c_str(), &bs_server_addr_);
+  RtAssert(ret == 1, "Invalid server IP address");
 
-  rt_assert(cfg->dpdk_num_ports <= rte_eth_dev_count_avail(),
-            "Invalid number of DPDK ports");
+  RtAssert(cfg->DpdkNumPorts() <= rte_eth_dev_count_avail(),
+           "Invalid number of DPDK ports");
 
-  rt_assert(server_mac_addr_str.length() ==
-                (cfg->dpdk_num_ports * (kMacAddrBtyes + 1) - 1),
-            "Invalid length of server MAC address");
-  sender_mac_addr.resize(cfg->dpdk_num_ports);
-  server_mac_addr.resize(cfg->dpdk_num_ports);
+  RtAssert(server_mac_addr_str.length() ==
+               (cfg->DpdkNumPorts() * (kMacAddrBtyes + 1) - 1),
+           "Invalid length of server MAC address");
+  sender_mac_addr_.resize(cfg->DpdkNumPorts());
+  server_mac_addr_.resize(cfg->DpdkNumPorts());
 
-  for (uint16_t port_id = 0; port_id < cfg->dpdk_num_ports; port_id++) {
-    if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num,
-                                cfg->packet_length()) != 0)
+  for (uint16_t port_id = 0; port_id < cfg->DpdkNumPorts(); port_id++) {
+    if (DpdkTransport::nic_init(port_id, mbuf_pool_, socket_thread_num,
+                                cfg->PacketLength()) != 0)
       rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
     // Parse MAC addresses
     ether_addr* parsed_mac = ether_aton(
         server_mac_addr_str.substr(port_id * (kMacAddrBtyes + 1), kMacAddrBtyes)
             .c_str());
-    rt_assert(parsed_mac != NULL, "Invalid server mac address");
-    std::memcpy(&server_mac_addr[port_id], parsed_mac, sizeof(ether_addr));
+    RtAssert(parsed_mac != NULL, "Invalid server mac address");
+    std::memcpy(&server_mac_addr_[port_id], parsed_mac, sizeof(ether_addr));
 
-    ret = rte_eth_macaddr_get(port_id, &sender_mac_addr[port_id]);
-    rt_assert(ret == 0, "Cannot get MAC address of the port");
+    ret = rte_eth_macaddr_get(port_id, &sender_mac_addr_[port_id]);
+    RtAssert(ret == 0, "Cannot get MAC address of the port");
     std::printf("Number of DPDK cores: %d\n", rte_lcore_count());
   }
 
@@ -277,8 +277,8 @@ void* Sender::WorkerThread(int tid) {
       cfg_->BsAntNum() / kSocketThreadNum +
       ((size_t)tid < cfg_->BsAntNum() % kSocketThreadNum ? 1 : 0);
 #ifdef USE_DPDK
-  const size_t port_id = tid % cfg->dpdk_num_ports;
-  const size_t queue_id = tid / cfg->dpdk_num_ports;
+  const size_t port_id = tid % cfg_->DpdkNumPorts();
+  const size_t queue_id = tid / cfg_->DpdkNumPorts();
   rte_mbuf* tx_mbufs[kDequeueBulkSize];
 #endif
 
@@ -322,11 +322,11 @@ void* Sender::WorkerThread(int tid) {
       Packet* pkt = socks_pkt_buf;
 #ifdef USE_DPDK
       tx_mbufs[tag_id] = DpdkTransport::alloc_udp(
-          mbuf_pool, sender_mac_addr[port_id], server_mac_addr[port_id],
-          bs_rru_addr, bs_server_addr, cfg->bs_rru_port + tid,
-          cfg->bs_server_port + tid, cfg->packet_length);
-      pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[tag_id], uint8_t*) +
-                      kPayloadOffset);
+          mbuf_pool_, sender_mac_addr_[port_id], server_mac_addr_[port_id],
+          bs_rru_addr_, bs_server_addr_, this->cfg_->BsRruPort() + tid,
+          this->cfg_->BsServerPort() + tid, this->cfg_->PacketLength());
+      pkt = reinterpret_cast<Packet*>(
+          rte_pktmbuf_mtod(tx_mbufs[tag_id], uint8_t*) + kPayloadOffset);
 #endif
 
       // Update the TX buffer
@@ -388,7 +388,7 @@ void* Sender::WorkerThread(int tid) {
           "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, "
           "num_tags: %zu\n",
           tid, nb_tx_new, num_tags);
-      keep_running_.store(false);
+      keep_running.store(false);
       break;
     }
 #endif

@@ -39,12 +39,12 @@ int DpdkTransport::nic_init(uint16_t port, struct rte_mempool* mbuf_pool,
   rte_eth_dev_set_mtu(port, 9000);
   uint16_t mtu_size = 0;
   rte_eth_dev_get_mtu(port, &mtu_size);
-  rt_assert(mtu_size == 9000, "Invalid MTU (must be 9000 bytes)");
+  RtAssert(mtu_size == 9000, "Invalid MTU (must be 9000 bytes)");
 
   int promiscuous_en = rte_eth_promiscuous_get(port);
   rte_eth_promiscuous_enable(port);
   promiscuous_en = rte_eth_promiscuous_get(port);
-  rt_assert(promiscuous_en == 1, "Unable to set promiscuous mode");
+  RtAssert(promiscuous_en == 1, "Unable to set promiscuous mode");
 
   rte_eth_dev_info_get(port, &dev_info);
   if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
@@ -130,7 +130,7 @@ std::string DpdkTransport::pkt_to_string(const rte_mbuf* pkt) {
       << " unused bytes ] ";
 
   auto* packet = reinterpret_cast<const Packet*>(buf + kPayloadOffset);
-  ret << packet->to_string();
+  ret << packet->ToString();
   return ret.str();
 }
 
@@ -218,10 +218,10 @@ void DpdkTransport::install_flow_rule(uint16_t port_id, uint16_t rx_q,
 
   rte_flow_error error;
   int res = rte_flow_validate(port_id, &attr, pattern, action, &error);
-  rt_assert(res == 0, "DPDK: Failed to validate flow rule");
+  RtAssert(res == 0, "DPDK: Failed to validate flow rule");
 
   rte_flow* flow = rte_flow_create(port_id, &attr, pattern, action, &error);
-  rt_assert(flow != nullptr, "DPDK: Failed to install flow rule");
+  RtAssert(flow != nullptr, "DPDK: Failed to install flow rule");
 }
 
 rte_mbuf* DpdkTransport::alloc_udp(rte_mempool* mbuf_pool,
@@ -269,10 +269,10 @@ rte_mbuf* DpdkTransport::alloc_udp(rte_mempool* mbuf_pool,
 
 void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num) {
   // DPDK setup
-  std::string core_list = std::to_string(get_physical_core_id(core_offset));
+  std::string core_list = std::to_string(GetPhysicalCoreId(core_offset));
   for (size_t i = 1; i < thread_num + 1; i++)
     core_list =
-        core_list + "," + std::to_string(get_physical_core_id(core_offset + i));
+        core_list + "," + std::to_string(GetPhysicalCoreId(core_offset + i));
   // n: channels, m: maximum memory in megabytes
   const char* rte_argv[] = {"txrx",        "-l", core_list.c_str(),
                             "--log-level", "0",  nullptr};
@@ -280,7 +280,7 @@ void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num) {
 
   // Initialize DPDK environment
   int ret = rte_eal_init(rte_argc, const_cast<char**>(rte_argv));
-  rt_assert(ret >= 0, "Failed to initialize DPDK");
+  RtAssert(ret >= 0, "Failed to initialize DPDK");
 }
 
 rte_mempool* DpdkTransport::create_mempool(size_t packet_length) {
@@ -292,7 +292,7 @@ rte_mempool* DpdkTransport::create_mempool(size_t packet_length) {
       rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
                               MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
 
-  rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
+  RtAssert(mbuf_pool != NULL, "Cannot create mbuf pool");
 
   return mbuf_pool;
 }

@@ -58,8 +58,8 @@ class PacketTXRX {
 #ifdef USE_DPDK
   // At thread [tid], receive packets from the NIC and enqueue them to the
   // master thread
-  uint16_t dpdk_recv(int tid, uint16_t port_id, uint16_t queue_id,
-                     size_t& prev_frame_id, size_t& rx_offset);
+  uint16_t DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
+                    size_t& prev_frame_id, size_t& rx_offset);
 #endif
 
   /**
