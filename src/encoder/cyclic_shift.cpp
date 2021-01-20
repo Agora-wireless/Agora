@@ -9,8 +9,7 @@
 #include <cstring> /* std::strerror, std::memset, std::memcpy */
 
 namespace avx2enc {
-inline __m256i CycleBitShift2to64(__m256i data, int16_t cyc_shift,
-                                     int16_t zc) {
+inline __m256i CycleBitShift2to64(__m256i data, int16_t cyc_shift, int16_t zc) {
   __m256i x1, x2, bit_mask;
   cyc_shift = cyc_shift % zc;
   __int64_t e0;
@@ -33,7 +32,7 @@ inline __m256i CycleBitShift2to64(__m256i data, int16_t cyc_shift,
 }
 
 inline __m256i CycleBitShift72to128(__m256i data, int16_t cyc_shift,
-                                       int16_t zc) {
+                                    int16_t zc) {
   /* when zc is 88 or 104 or 120 */
   int8_t shuffle_table[8][32] = {
       {0, 1, 2,  3,  4,  5,  6,  7,  8,  0,  1,  2,  3,  4,  5,  6,
@@ -91,7 +90,7 @@ inline __m256i CycleBitShift72to128(__m256i data, int16_t cyc_shift,
 }
 
 inline __m256i CycleBitShift144to256(__m256i data, int16_t cyc_shift,
-                                        int16_t zc) {
+                                     int16_t zc) {
   /* zc in this range is always a multiple of 16 */
 
   __m256i x0, x1, x2, bit_mask;

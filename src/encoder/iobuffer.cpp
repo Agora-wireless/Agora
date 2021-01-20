@@ -11,7 +11,7 @@
 
 namespace avx2enc {
 void ScatterSlow(uint8_t* dst, const uint8_t* src, unsigned num_bits,
-                  uint8_t src_offbits) {
+                 uint8_t src_offbits) {
   // Process byte by byte
   while (num_bits != 0) {
     unsigned num_bits_in_b = MIN(8, num_bits);
@@ -20,7 +20,7 @@ void ScatterSlow(uint8_t* dst, const uint8_t* src, unsigned num_bits,
       new_b = src[0];
     else
       new_b = ((src[0] & 0xFF) >> src_offbits) |
-             ((src[1] & 0xFF) << (8 - src_offbits));
+              ((src[1] & 0xFF) << (8 - src_offbits));
     dst[0] = new_b & BITMASKU8(num_bits_in_b);
     num_bits -= num_bits_in_b;
 
@@ -30,7 +30,7 @@ void ScatterSlow(uint8_t* dst, const uint8_t* src, unsigned num_bits,
 }
 
 void GatherSlow(uint8_t* dst, const uint8_t* src, int16_t num_bits,
-                 uint8_t dst_offbits) {
+                uint8_t dst_offbits) {
   // Process byte by byte
   bool first_byte = true;
   while (num_bits > 0) {
@@ -43,13 +43,13 @@ void GatherSlow(uint8_t* dst, const uint8_t* src, int16_t num_bits,
     } else {
       if (first_byte) {
         new_b = (dst[0] & BITMASKU8(dst_offbits)) | (src[0] & 0xFF)
-                                                       << dst_offbits;
+                                                        << dst_offbits;
         num_bits_in_b = 8 - dst_offbits;
         first_byte = false;
       } else {
         new_b = ((src[0] & 0xFF) >> (8 - dst_offbits) | (src[1] & 0xFF)
-                                                           << dst_offbits) &
-               BITMASKU8(num_bits_in_b);
+                                                            << dst_offbits) &
+                BITMASKU8(num_bits_in_b);
         src++;
       }
     }
@@ -60,7 +60,7 @@ void GatherSlow(uint8_t* dst, const uint8_t* src, int16_t num_bits,
 }
 
 void Adapter2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
-                   uint32_t cbLen, int8_t direct) {
+                  uint32_t cbLen, int8_t direct) {
   int8_t *p_buff_0, *p_buff_1;
   uint8_t dst_offbits = 0, src_offbits = 0;
   p_buff_0 = pBuff0;
@@ -81,7 +81,7 @@ void Adapter2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
     p_buff_0 is the output, p_buff_1 is the buffer for processing data*/
     for (size_t i = 0; i < cbLen / zcSize; i++) {
       GatherSlow((uint8_t*)p_buff_0, (uint8_t*)p_buff_1, (int16_t)zcSize,
-                  dst_offbits);
+                 dst_offbits);
       uint8_t byte_offset = (dst_offbits + zcSize) >> 3;
       dst_offbits = (dst_offbits + zcSize) - (byte_offset << 3);
       p_buff_0 = p_buff_0 + byte_offset;
@@ -104,7 +104,7 @@ void Adapter2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
 // }
 
 void Adapter64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
-                     uint32_t cbLen, int8_t direct) {
+                    uint32_t cbLen, int8_t direct) {
   /* after 64, z is always a multiple of 8 so no need for shifting bytes*/
 
   int8_t *p_buff_0, *p_buff_1;
@@ -164,7 +164,7 @@ void Adapter64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
 }
 
 void Adapter288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
-                      uint32_t cbLen, int8_t direct) {
+                     uint32_t cbLen, int8_t direct) {
   /* use two __m256i to store one segment of length zc */
   int8_t *p_buff_in, *p_buff_out;
   __m256i x0, bit_mask;

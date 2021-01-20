@@ -28,7 +28,7 @@ Channel::Channel(Config* config_bs, Config* config_ue,
 Channel::~Channel() {}
 
 void Channel::ApplyChan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
-                         const bool is_downlink, const bool is_newChan) {
+                        const bool is_downlink, const bool is_newChan) {
   cx_fmat fmat_h;
 
   if (is_newChan) {

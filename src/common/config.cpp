@@ -123,9 +123,9 @@ Config::Config(std::string jsonfile)
   ofdm_rx_zero_prefix_cal_dl_ =
       tdd_conf.value("ofdm_rx_zero_prefix_cal_dl", 0) + cp_len_;
   RtAssert(ofdm_data_num_ % kSCsPerCacheline == 0,
-            "ofdm_data_num_ must be a multiple of subcarriers per cacheline");
+           "ofdm_data_num_ must be a multiple of subcarriers per cacheline");
   RtAssert(ofdm_data_num_ % kTransposeBlockSize == 0,
-            "Transpose block size must divide number of OFDM data subcarriers");
+           "Transpose block size must divide number of OFDM data subcarriers");
   ofdm_pilot_spacing_ = tdd_conf.value("ofdm_pilot_spacing", 16);
   ofdm_data_start_ =
       tdd_conf.value("ofdm_data_start", (ofdm_ca_num_ - ofdm_data_num_) / 2);
@@ -306,8 +306,8 @@ Config::Config(std::string jsonfile)
 
   demul_block_size_ = tdd_conf.value("demul_block_size", 48);
   RtAssert(demul_block_size_ % kSCsPerCacheline == 0,
-            "Demodulation block size must be a multiple of subcarriers per "
-            "cacheline");
+           "Demodulation block size must be a multiple of subcarriers per "
+           "cacheline");
   RtAssert(
       demul_block_size_ % kTransposeBlockSize == 0,
       "Demodulation block size must be a multiple of transpose block size");
@@ -346,8 +346,8 @@ Config::Config(std::string jsonfile)
   UpdateModCfgs(mod_order_bits_);
 
   RtAssert(ldpc_config_.NumBlocksInSymbol() > 0,
-            "LDPC expansion factor is too large for number of OFDM data "
-            "subcarriers.");
+           "LDPC expansion factor is too large for number of OFDM data "
+           "subcarriers.");
 
   std::printf(
       "Config: LDPC: Zc: %d, %zu code blocks per symbol, %d information "
@@ -369,7 +369,7 @@ Config::Config(std::string jsonfile)
       Packet::kOffsetOfData + ((kUse12BitIQ ? 3 : 4) * samps_per_symbol_);
   dl_packet_length_ = Packet::kOffsetOfData + (samps_per_symbol_ * 4);
   RtAssert(packet_length_ < 9000,
-            "Packet size must be smaller than jumbo frame");
+           "Packet size must be smaller than jumbo frame");
 
   num_bytes_per_cb_ =
       ldpc_config_.NumCbLen() / 8;  // TODO: Use bits_to_bytes()?
@@ -440,7 +440,8 @@ void Config::GenData(void) {
 
     // Add addition padding for beacon sent from host
     int frac_beacon = this->samps_per_symbol_ % this->beacon_len_;
-    std::vector<std::complex<int16_t>> pre_beacon(this->ofdm_tx_zero_prefix_, 0);
+    std::vector<std::complex<int16_t>> pre_beacon(this->ofdm_tx_zero_prefix_,
+                                                  0);
     std::vector<std::complex<int16_t>> post_beacon(
         this->ofdm_tx_zero_postfix_ + frac_beacon, 0);
     this->beacon_ci16_.insert(this->beacon_ci16_.begin(), pre_beacon.begin(),
@@ -456,10 +457,9 @@ void Config::GenData(void) {
   this->common_pilot_ =
       CommsLib::SeqCyclicShift(zc_seq, M_PI / 4);  // Used in LTE SRS
 
-  this->pilots_ =
-      static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k64Align,
-          this->ofdm_data_num_ * sizeof(complex_float)));
+  this->pilots_ = static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
+      Agora_memory::Alignment_t::k64Align,
+      this->ofdm_data_num_ * sizeof(complex_float)));
   this->pilots_sgn_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::k64Align,
@@ -474,7 +474,7 @@ void Config::GenData(void) {
   }
   complex_float* pilot_ifft;
   AllocBuffer1d(&pilot_ifft, this->ofdm_ca_num_,
-                  Agora_memory::Alignment_t::k64Align, 1);
+                Agora_memory::Alignment_t::k64Align, 1);
   for (size_t j = 0; j < ofdm_data_num_; j++) {
     pilot_ifft[j + this->ofdm_data_start_] = this->pilots_[j];
   }
@@ -612,34 +612,33 @@ void Config::GenData(void) {
 
   // Encode uplink bits
   ul_encoded_bits_.Malloc(this->frame_.NumULSyms() * num_blocks_per_symbol,
-                         encoded_bytes_per_block,
-                         Agora_memory::Alignment_t::k64Align);
+                          encoded_bytes_per_block,
+                          Agora_memory::Alignment_t::k64Align);
 
   int8_t* temp_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
       this->ldpc_config_.BaseGraph(), this->ldpc_config_.ExpansionFactor())];
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t j = 0;
-         j < this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
-         j++) {
+         j < this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_; j++) {
       LdpcEncodeHelper(this->ldpc_config_.BaseGraph(),
-                         this->ldpc_config_.ExpansionFactor(),
-                         this->ldpc_config_.NumRows(),
-                         ul_encoded_bits_[i * num_blocks_per_symbol + j],
-                         temp_parity_buffer, ul_bits_[i] + j * bytes_per_block);
+                       this->ldpc_config_.ExpansionFactor(),
+                       this->ldpc_config_.NumRows(),
+                       ul_encoded_bits_[i * num_blocks_per_symbol + j],
+                       temp_parity_buffer, ul_bits_[i] + j * bytes_per_block);
     }
   }
 
   ul_mod_input_.Calloc(this->frame_.NumULSyms(),
-                      this->ofdm_data_num_ * this->ue_ant_num_,
-                      Agora_memory::Alignment_t::k32Align);
+                       this->ofdm_data_num_ * this->ue_ant_num_,
+                       Agora_memory::Alignment_t::k32Align);
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t j = 0; j < this->ue_ant_num_; j++) {
       for (size_t k = 0; k < this->ldpc_config_.NumBlocksInSymbol(); k++) {
         AdaptBitsForMod(
             reinterpret_cast<uint8_t*>(
                 ul_encoded_bits_[i * num_blocks_per_symbol +
-                                j * this->ldpc_config_.NumBlocksInSymbol() +
-                                k]),
+                                 j * this->ldpc_config_.NumBlocksInSymbol() +
+                                 k]),
             ul_mod_input_[i] + j * this->ofdm_data_num_ +
                 k * encoded_bytes_per_block,
             encoded_bytes_per_block, this->mod_order_bits_);
@@ -655,18 +654,17 @@ void Config::GenData(void) {
   // Encode downlink bits
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
     for (size_t j = 0;
-         j < this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
-         j++) {
+         j < this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_; j++) {
       LdpcEncodeHelper(
-          this->ldpc_config_.BaseGraph(),
-          this->ldpc_config_.ExpansionFactor(), this->ldpc_config_.NumRows(),
+          this->ldpc_config_.BaseGraph(), this->ldpc_config_.ExpansionFactor(),
+          this->ldpc_config_.NumRows(),
           dl_encoded_bits[i * num_blocks_per_symbol + j], temp_parity_buffer,
           this->dl_bits_[i] + j * bytes_per_block);
     }
   }
   dl_mod_input_.Calloc(this->frame_.NumDLSyms(),
-                      this->ofdm_data_num_ * this->ue_ant_num_,
-                      Agora_memory::Alignment_t::k32Align);
+                       this->ofdm_data_num_ * this->ue_ant_num_,
+                       Agora_memory::Alignment_t::k32Align);
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
     for (size_t j = 0; j < this->ue_ant_num_; j++) {
       for (size_t k = 0; k < this->ldpc_config_.NumBlocksInSymbol(); k++) {
@@ -730,17 +728,16 @@ void Config::GenData(void) {
   }
 
   // Find normalization factor through searching for max value in IFFT results
-  float max_val =
-      CommsLib::FindMaxAbs(ul_iq_ifft, this->frame_.NumULSyms(),
-                             this->ue_ant_num_ * this->ofdm_ca_num_);
+  float max_val = CommsLib::FindMaxAbs(ul_iq_ifft, this->frame_.NumULSyms(),
+                                       this->ue_ant_num_ * this->ofdm_ca_num_);
   float cur_max_val =
       CommsLib::FindMaxAbs(dl_iq_ifft, this->frame_.NumDLSyms(),
-                             this->ue_ant_num_ * this->ofdm_ca_num_);
+                           this->ue_ant_num_ * this->ofdm_ca_num_);
   if (cur_max_val > max_val) {
     max_val = cur_max_val;
   }
   cur_max_val = CommsLib::FindMaxAbs(ue_pilot_ifft, this->ue_ant_num_,
-                                       this->ofdm_ca_num_);
+                                     this->ofdm_ca_num_);
   if (cur_max_val > max_val) {
     max_val = cur_max_val;
   }

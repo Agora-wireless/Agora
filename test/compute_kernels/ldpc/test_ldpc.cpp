@@ -71,7 +71,7 @@ int main() {
     const size_t encoding_start_tsc = Rdtsc();
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
       LdpcEncodeHelper(kBaseGraph, zc, kNumRows, encoded[n], parity[n],
-                         input[n]);
+                       input[n]);
     }
 
     const double encoding_us =

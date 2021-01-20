@@ -43,8 +43,8 @@ class RadioConfig {
   void ConfigureBsRadio(RadioConfigContext* context);
   bool InitialCalib(bool);
   static void DrainRxBuffer(SoapySDR::Device* ibsSdrs,
-                              SoapySDR::Stream* istream,
-                              std::vector<void*> buffs, size_t symSamp);
+                            SoapySDR::Stream* istream, std::vector<void*> buffs,
+                            size_t symSamp);
   void DrainBuffers();
   void AdjustDelays(std::vector<int>);
   static void DciqMinimize(SoapySDR::Device*, SoapySDR::Device*, int, size_t,

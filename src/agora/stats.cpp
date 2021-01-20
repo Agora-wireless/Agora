@@ -30,7 +30,8 @@ void Stats::PopulateSummary(FrameSummary* frame_summary, size_t thread_id,
   for (size_t j = 0; j < kBreakDownNum; j++) {
     frame_summary->us_this_thread_.at(j) = CyclesToUs(
         ds->task_duration_.at(j) - ds_old->task_duration_.at(j), kFreqGhz);
-    frame_summary->us_avg_threads_.at(j) += frame_summary->us_this_thread_.at(j);
+    frame_summary->us_avg_threads_.at(j) +=
+        frame_summary->us_this_thread_.at(j);
   }
   *ds_old = *ds;
 }
@@ -134,7 +135,7 @@ void Stats::SaveToFile(void) {
   std::printf("Stats: Saving master timestamps to %s\n", filename.c_str());
   FILE* fp_debug = std::fopen(filename.c_str(), "w");
   RtAssert(fp_debug != nullptr,
-            std::string("Open file failed ") + std::to_string(errno));
+           std::string("Open file failed ") + std::to_string(errno));
 
   // For backwards compatibility, it is easier to make a new file format for
   // the combined case
@@ -232,7 +233,7 @@ void Stats::SaveToFile(void) {
   } else {
     // Shouldn't happen
     RtAssert(false,
-              std::string("No uplink or downlink symbols in the frame\n"));
+             std::string("No uplink or downlink symbols in the frame\n"));
   }
 
   std::fclose(fp_debug);
@@ -245,7 +246,7 @@ void Stats::SaveToFile(void) {
 
     FILE* fp_debug_detailed = std::fopen(filename_detailed.c_str(), "w");
     RtAssert(fp_debug_detailed != nullptr,
-              std::string("Open file failed ") + std::to_string(errno));
+             std::string("Open file failed ") + std::to_string(errno));
     // Print the header
     std::fprintf(
         fp_debug_detailed,
@@ -407,8 +408,8 @@ void Stats::PrintSummary(void) {
           double percent_stat =
               (static_cast<double>(duration_stat) * 100.0f) / num_tasks.at(j);
           std::printf("%s (%zu, %.2f%%), ",
-                      k_doer_names.at(kAllDoerTypes.at(j)).c_str(), duration_stat,
-                      percent_stat);
+                      k_doer_names.at(kAllDoerTypes.at(j)).c_str(),
+                      duration_stat, percent_stat);
         }
       }
       std::printf("\n");

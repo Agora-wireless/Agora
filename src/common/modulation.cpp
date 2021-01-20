@@ -163,7 +163,7 @@ complex_float ModSingleUint8(uint8_t x, Table<complex_float>& mod_table) {
 
 // TODO: test correctness
 void ModSimd(uint8_t* in, complex_float*& out, size_t len,
-              Table<complex_float>& mod_table) {
+             Table<complex_float>& mod_table) {
 #ifdef __AVX512F__
   for (size_t i = 0; i < len / kSCsPerCacheline; i++) {
     __m512i index = _mm512_setr_epi64(in[0], in[1], in[2], in[3], in[4], in[5],
@@ -463,7 +463,7 @@ void Demod16qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
   // Demodulate last symbols
   int next_start = 16 * (num / 16);
   Demod16qamHardSse(vec_in + 2 * next_start, vec_out + next_start,
-                       num - next_start);
+                    num - next_start);
 }
 
 void Demod16qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
@@ -534,7 +534,7 @@ void Demod16qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
   // Demodulate last symbols
   int next_start = 16 * (num / 16);
   Demod16qamSoftSse(vec_in + 2 * next_start, llr + next_start * 4,
-                       num - next_start);
+                    num - next_start);
 }
 
 /**
@@ -877,7 +877,7 @@ void Demod64qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
   // Demodulate last symbols
   int next_start = 16 * (num / 16);
   Demod64qamHardSse(vec_in + 2 * next_start, vec_out + next_start,
-                       num - next_start);
+                    num - next_start);
 }
 
 void Demod64qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
@@ -976,16 +976,16 @@ void Demod64qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
         _mm256_or_si256(_mm256_or_si256(result31, result32), result33);
 
     _mm256_storeu_si256(result_ptr, _mm256_permute2x128_si256(
-                                       result_final1, result_final2, 0x20));
+                                        result_final1, result_final2, 0x20));
     result_ptr++;
     _mm256_storeu_si256(result_ptr, _mm256_permute2x128_si256(
-                                       result_final3, result_final1, 0x30));
+                                        result_final3, result_final1, 0x30));
     result_ptr++;
     _mm256_storeu_si256(result_ptr, _mm256_permute2x128_si256(
-                                       result_final2, result_final3, 0x31));
+                                        result_final2, result_final3, 0x31));
     result_ptr++;
   }
   int next_start = 16 * (num / 16);
   Demod64qamSoftSse(vec_in + 2 * next_start, llr + next_start * 6,
-                       num - next_start);
+                    num - next_start);
 }

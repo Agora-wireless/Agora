@@ -91,13 +91,12 @@ int main(int argc, char* argv[]) {
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
       data_generator.GenCodeblock(information.at(i), encoded_codewords[i],
-                                   i % cfg->UeNum() /* UE ID */);
+                                  i % cfg->UeNum() /* UE ID */);
     }
 
     // Save uplink information bytes to file
-    const size_t input_bytes_per_cb = BitsToBytes(
-        LdpcNumInputBits(cfg->LdpcConfig().BaseGraph(),
-                            cfg->LdpcConfig().ExpansionFactor()));
+    const size_t input_bytes_per_cb = BitsToBytes(LdpcNumInputBits(
+        cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor()));
     if (kPrintUplinkInformationBytes) {
       std::printf("Uplink information bytes\n");
       for (size_t n = 0; n < num_codeblocks; n++) {
@@ -142,13 +141,11 @@ int main(int argc, char* argv[]) {
       switch (cfg->ModOrderBits()) {
         case (4):
           Demod16qamSoftAvx2((float*)modulated_codewords[i],
-                                demod_data_all_symbols[i],
-                                cfg->OfdmDataNum());
+                             demod_data_all_symbols[i], cfg->OfdmDataNum());
           break;
         case (6):
           Demod64qamSoftAvx2((float*)modulated_codewords[i],
-                                demod_data_all_symbols[i],
-                                cfg->OfdmDataNum());
+                             demod_data_all_symbols[i], cfg->OfdmDataNum());
           break;
         default:
           std::printf("Demodulation: modulation type %s not supported!\n",
@@ -173,7 +170,7 @@ int main(int argc, char* argv[]) {
     ldpc_decoder_5gnr_response.numMsgBits = ldpc_config.NumCbLen();
     auto* resp_var_nodes = static_cast<int16_t*>(
         Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::k64Align,
-                                           1024 * 1024 * sizeof(int16_t)));
+                                         1024 * 1024 * sizeof(int16_t)));
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
     Table<uint8_t> decoded_codewords;

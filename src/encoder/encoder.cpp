@@ -6,9 +6,8 @@
 
 namespace avx2enc {
 void LdpcEncoderBg1(int8_t* pDataIn, int8_t* pDataOut,
-                      const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
-                      const int16_t* pShiftMatrix, int16_t zcSize,
-                      uint8_t i_LS) {
+                    const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
+                    const int16_t* pShiftMatrix, int16_t zcSize, uint8_t i_LS) {
   const int16_t *p_temp_addr, *p_temp_matrix;
   int8_t *p_temp_in, *p_temp_out;
   int16_t addr_offset = 0;
@@ -110,9 +109,8 @@ void LdpcEncoderBg1(int8_t* pDataIn, int8_t* pDataOut,
 }
 
 void LdpcEncoderBg2(int8_t* pDataIn, int8_t* pDataOut,
-                      const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
-                      const int16_t* pShiftMatrix, int16_t zcSize,
-                      uint8_t i_LS) {
+                    const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
+                    const int16_t* pShiftMatrix, int16_t zcSize, uint8_t i_LS) {
   const int16_t *p_temp_addr, *p_temp_matrix;
   int8_t *p_temp_in, *p_temp_out;
   int16_t addr_offset = 0;
@@ -283,7 +281,8 @@ int32_t BblibLdpcEncoder5gnr(
 
     // Encode into parity_internal_buffer
     ldpc_encoder_func(input_internal_buffer, parity_internal_buffer,
-                      p_matrix_num_per_col, p_addr, p_shift_matrix, (int16_t)zc, i_ls);
+                      p_matrix_num_per_col, p_addr, p_shift_matrix, (int16_t)zc,
+                      i_ls);
 
     // Gather parity bits from kProcBytes-sized chunks of
     // parity_internal_buffer

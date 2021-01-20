@@ -28,7 +28,7 @@ class Channel {
 
   // Dimensions of fmat_src: ( bscfg->sampsPerSymbol, uecfg->UE_ANT_NUM )
   void ApplyChan(const cx_fmat& fmat_src, cx_fmat& mat_dst,
-                  const bool is_downlink, const bool is_newChan);
+                 const bool is_downlink, const bool is_newChan);
 
   // Additive White Gaussian Noise. Dimensions of src: ( bscfg->sampsPerSymbol,
   // uecfg->UE_ANT_NUM )

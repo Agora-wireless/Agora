@@ -1,7 +1,7 @@
 #include "agora.hpp"
 
 void ReadFromFileUl(std::string filename, Table<uint8_t>& data,
-                       int num_bytes_per_ue, Config const* const cfg) {
+                    int num_bytes_per_ue, Config const* const cfg) {
   int data_symbol_num_perframe = cfg->Frame().NumULSyms();
   size_t ue_num = cfg->UeNum();
   FILE* fp = std::fopen(filename.c_str(), "rb");
@@ -25,7 +25,7 @@ void ReadFromFileUl(std::string filename, Table<uint8_t>& data,
 }
 
 void ReadFromFileDl(std::string filename, Table<short>& data, int ofdm_size,
-                       Config const* const cfg) {
+                    Config const* const cfg) {
   int data_symbol_num_perframe = cfg->Frame().NumDLSyms();
   size_t bs_ant_num = cfg->BsAntNum();
   FILE* fp = std::fopen(filename.c_str(), "rb");

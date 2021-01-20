@@ -115,8 +115,7 @@ union gen_tag_t {
 
   // Generate a tag with antenna ID, frame ID, and symbol ID bits set and
   // other fields blank
-  static gen_tag_t FrmSymAnt(size_t frame_id, size_t symbol_id,
-                               size_t ant_id) {
+  static gen_tag_t FrmSymAnt(size_t frame_id, size_t symbol_id, size_t ant_id) {
     gen_tag_t ret(0);
     ret.frame_id_ = frame_id;
     ret.symbol_id_ = symbol_id;
@@ -200,9 +199,9 @@ struct MacPacket {
   uint16_t frame_id_;
   uint16_t symbol_id_;
   uint16_t ue_id_;
-  uint16_t datalen_;          // length of payload in bytes or array data[]
-  uint16_t crc_;              // 16 bits CRC over calculated for the data[] array
-  uint16_t rsvd_[3];          // reserved for future use
+  uint16_t datalen_;  // length of payload in bytes or array data[]
+  uint16_t crc_;      // 16 bits CRC over calculated for the data[] array
+  uint16_t rsvd_[3];  // reserved for future use
   RBIndicator rb_indicator_;  // RAN scheduling details for PHY
   char data_[];               // Mac packet payload data
   MacPacket(int f, int s, int u, int d,

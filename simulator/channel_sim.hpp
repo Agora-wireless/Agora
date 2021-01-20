@@ -57,8 +57,8 @@ class ChannelSim {
   void DoTxUser(int tid, size_t tag);
 
   void ScheduleTask(EventData do_task,
-                     moodycamel::ConcurrentQueue<EventData>* in_queue,
-                     moodycamel::ProducerToken const& ptok);
+                    moodycamel::ConcurrentQueue<EventData>* in_queue,
+                    moodycamel::ProducerToken const& ptok);
   void* TaskThread(int tid);
 
  private:

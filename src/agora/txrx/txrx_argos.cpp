@@ -38,7 +38,7 @@ void PacketTXRX::LoopTxRxArgos(int tid) {
 }
 
 struct Packet* PacketTXRX::RecvEnqueueArgos(int tid, int radio_id,
-                                              int rx_offset) {
+                                            int rx_offset) {
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
   char* rx_buffer = (*buffer_)[tid];
   int* rx_buffer_status = (*buffer_status_)[tid];
@@ -77,7 +77,7 @@ struct Packet* PacketTXRX::RecvEnqueueArgos(int tid, int radio_id,
 
     // Push kPacketRX event into the queue.
     EventData rx_message(EventType::kPacketRX,
-                          rx_tag_t(tid, rx_offset + ch).tag_);
+                         rx_tag_t(tid, rx_offset + ch).tag_);
 
     if (!message_queue_->enqueue(*local_ptok, rx_message)) {
       std::printf("socket message enqueue failed\n");
@@ -116,13 +116,12 @@ int PacketTXRX::DequeueSendArgos(int tid) {
     std::vector<std::complex<int16_t>> zeros(c->SampsPerSymbol(),
                                              std::complex<int16_t>(0, 0));
     for (size_t s = 0; s < c->AntPerGroup(); s++) {
-      txbuf[ch] =
-          (frame_id % c->AntGroupNum() == ant_id / c->AntPerGroup() &&
-           s == ant_id % c->AntPerGroup())
-              ? c->PilotCi16().data()
-              : zeros.data();
+      txbuf[ch] = (frame_id % c->AntGroupNum() == ant_id / c->AntPerGroup() &&
+                   s == ant_id % c->AntPerGroup())
+                      ? c->PilotCi16().data()
+                      : zeros.data();
       long long frame_time = ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
-                            (c->Frame().GetDLCalSymbol(s) << 16);
+                             (c->Frame().GetDLCalSymbol(s) << 16);
       radioconfig_->RadioTx(ant_id / n_channels, txbuf, 1, frame_time);
     }
   }

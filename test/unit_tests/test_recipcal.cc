@@ -20,9 +20,8 @@ TEST(TestRecip, Correctness) {
                         Agora_memory::Alignment_t::k64Align);
   recip_buffer_1.Calloc(kFrameWnd, cfg->OfdmDataNum() * cfg->BsAntNum(),
                         Agora_memory::Alignment_t::k64Align);
-  calib_buffer.RandAllocCxFloat(kFrameWnd,
-                                   cfg->OfdmDataNum() * cfg->BsAntNum(),
-                                   Agora_memory::Alignment_t::k64Align);
+  calib_buffer.RandAllocCxFloat(kFrameWnd, cfg->OfdmDataNum() * cfg->BsAntNum(),
+                                Agora_memory::Alignment_t::k64Align);
 
   std::printf("Reference antenna: %zu\n", cfg->RefAnt());
 
@@ -32,8 +31,7 @@ TEST(TestRecip, Correctness) {
   for (size_t i = 0; i < kMaxFrameNum; i++) {
     arma::cx_float* ptr_in =
         reinterpret_cast<arma::cx_float*>(calib_buffer[i % kFrameWnd]);
-    arma::cx_fmat mat_input(ptr_in, cfg->OfdmDataNum(), cfg->BsAntNum(),
-                            false);
+    arma::cx_fmat mat_input(ptr_in, cfg->OfdmDataNum(), cfg->BsAntNum(), false);
     arma::cx_fvec vec_calib_ref = mat_input.col(cfg->RefAnt());
     arma::cx_float* recip_buff =
         reinterpret_cast<arma::cx_float*>(recip_buffer_0[i % kFrameWnd]);
@@ -47,8 +45,8 @@ TEST(TestRecip, Correctness) {
          sc_id += cfg->BsAntNum()) {
       // TODO: interpolate instead of steps
       recip_mat
-          .cols(sc_id, std::min(sc_id + cfg->BsAntNum() - 1,
-                                cfg->OfdmDataNum() - 1))
+          .cols(sc_id,
+                std::min(sc_id + cfg->BsAntNum() - 1, cfg->OfdmDataNum() - 1))
           .each_col() = recip_mat.col(sc_id);
     }
   }
@@ -62,8 +60,7 @@ TEST(TestRecip, Correctness) {
   for (size_t i = 0; i < kMaxFrameNum; i++) {
     // In dofft
     for (size_t ant_id = 0; ant_id < cfg->BsAntNum(); ant_id++) {
-      auto* ptr_in =
-          calib_buffer[i % kFrameWnd] + ant_id * cfg->OfdmDataNum();
+      auto* ptr_in = calib_buffer[i % kFrameWnd] + ant_id * cfg->OfdmDataNum();
       for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum();
            sc_id += cfg->BsAntNum()) {
         for (size_t j = 0; j < cfg->BsAntNum(); j++)

@@ -55,8 +55,8 @@ class CommsLib {
   static void FFT(complex_float*, int);
   static void IFFT(complex_float*, int, bool normalize = true);
   static size_t FindPilotSeq(std::vector<std::complex<float>> iq,
-                               std::vector<std::complex<float>> pilot,
-                               size_t seqLen);
+                             std::vector<std::complex<float>> pilot,
+                             size_t seqLen);
   static int FindLts(std::vector<std::complex<double>> iq, int seqLen);
   template <typename T>
   static std::vector<T> Convolve(std::vector<std::complex<T>> const& f,
@@ -95,9 +95,9 @@ class CommsLib {
     return std::abs(std::complex<float>(d.re, d.im));
   }
   static int FindBeaconAvx(const std::vector<std::complex<float>>& iq,
-                             const std::vector<std::complex<float>>& seq);
+                           const std::vector<std::complex<float>>& seq);
   static std::vector<float> CorrelateAvxS(std::vector<float> const& f,
-                                            std::vector<float> const& g);
+                                          std::vector<float> const& g);
   static std::vector<float> Abs2Avx(std::vector<std::complex<float>> const& f);
   static std::vector<int32_t> Abs2Avx(
       std::vector<std::complex<int16_t>> const& f);

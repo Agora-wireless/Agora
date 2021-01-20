@@ -113,7 +113,7 @@ class Agora {
 
   /// Fetch the concurrent queue for this event type
   moodycamel::ConcurrentQueue<EventData>* GetConq(EventType event_type,
-                                                   size_t qid) {
+                                                  size_t qid) {
     return &sched_info_arr_[qid][static_cast<size_t>(event_type)].concurrent_q_;
   }
 

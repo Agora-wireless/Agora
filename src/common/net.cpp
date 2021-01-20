@@ -79,7 +79,7 @@ void SetupSockaddrLocalIpv6(struct sockaddr_in6* local_addr, int port_id) {
 }
 
 void SetupSockaddrRemoteIpv4(struct sockaddr_in* remote_addr, int port_id,
-                                const char* remote_inet_addr) {
+                             const char* remote_inet_addr) {
   (*remote_addr).sin_family = AF_INET;
   (*remote_addr).sin_port = htons(port_id);
   (*remote_addr).sin_addr.s_addr = inet_addr(remote_inet_addr);
@@ -87,7 +87,7 @@ void SetupSockaddrRemoteIpv4(struct sockaddr_in* remote_addr, int port_id,
 }
 
 void SetupSockaddrRemoteIpv6(struct sockaddr_in6* remote_addr, int port_id,
-                                const char* remote_inet_addr) {
+                             const char* remote_inet_addr) {
   (*remote_addr).sin6_family = AF_INET6;
   (*remote_addr).sin6_port = htons(port_id);
   inet_pton(AF_INET6, remote_inet_addr, &((*remote_addr).sin6_addr));

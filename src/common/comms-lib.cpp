@@ -23,8 +23,8 @@
 #include "comms-lib.h"
 
 size_t CommsLib::FindPilotSeq(std::vector<std::complex<float>> iq,
-                                std::vector<std::complex<float>> pilot,
-                                size_t seq_len) {
+                              std::vector<std::complex<float>> pilot,
+                              size_t seq_len) {
   // Re-arrange into complex vector, flip, and compute conjugate
   std::vector<std::complex<float>> pilot_conj;
   for (size_t i = 0; i < seq_len; i++) {
@@ -113,8 +113,7 @@ int CommsLib::FindLts(std::vector<std::complex<double>> iq, int seqLen) {
   return best_peak;
 }
 
-float CommsLib::FindMaxAbs(Table<complex_float> in, size_t dim1,
-                             size_t dim2) {
+float CommsLib::FindMaxAbs(Table<complex_float> in, size_t dim1, size_t dim2) {
   float max_val = 0;
   for (size_t i = 0; i < dim1; i++) {
     float cur_max_val = CommsLib::FindMaxAbs(in[i], dim2);
@@ -951,8 +950,8 @@ std::vector<std::vector<double>> CommsLib::GetSequence(int N, int type) {
     std::vector<double> a;
     for (int i = 0; i < N; i++) {
       int m_loop = i % m;
-      double a_re = std::cos(-M_PI * q * m_loop * (m_loop+ 1) / m);
-      double a_im = std::sin(-M_PI * q * m_loop * (m_loop+ 1) / m);
+      double a_re = std::cos(-M_PI * q * m_loop * (m_loop + 1) / m);
+      double a_im = std::sin(-M_PI * q * m_loop * (m_loop + 1) / m);
       matrix[0].push_back(a_re);
       matrix[1].push_back(a_im);
     }

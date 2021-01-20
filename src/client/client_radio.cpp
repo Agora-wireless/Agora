@@ -182,10 +182,10 @@ void ClientRadioConfig::InitClientRadio(ClientRadioConfigContext* in_context) {
       if (cfg_->SingleGain()) {
         // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
         cl_stn_[i]->setGain(SOAPY_SDR_RX, ch,
-                          ch ? cfg_->RxGainB() : cfg_->RxGainA());
+                            ch ? cfg_->RxGainB() : cfg_->RxGainA());
         // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
         cl_stn_[i]->setGain(SOAPY_SDR_TX, ch,
-                          ch ? cfg_->TxGainB() : cfg_->TxGainA());
+                            ch ? cfg_->TxGainB() : cfg_->TxGainA());
       } else {
         if (info["frontend"].find("CBRS") != std::string::npos) {
           if (cfg->Freq() > 3e9)
@@ -198,9 +198,9 @@ void ClientRadioConfig::InitClientRadio(ClientRadioConfigContext* in_context) {
         }
 
         cl_stn_[i]->setGain(SOAPY_SDR_RX, ch, "LNA",
-                          ch ? cfg->RxGainB() : cfg->RxGainA());  //[0,30]
-        cl_stn_[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0);                //[0,12]
-        cl_stn_[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0);                //[-12,19]
+                            ch ? cfg->RxGainB() : cfg->RxGainA());  //[0,30]
+        cl_stn_[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0);            //[0,12]
+        cl_stn_[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0);            //[-12,19]
 
         if (info["frontend"].find("CBRS") != std::string::npos) {
           cl_stn_[i]->setGain(SOAPY_SDR_TX, ch, "ATTN", -6);  //[-18,0] by 3
@@ -214,9 +214,9 @@ void ClientRadioConfig::InitClientRadio(ClientRadioConfigContext* in_context) {
       }
     } else {
       cl_stn_[i]->setGain(SOAPY_SDR_RX, ch, "PGA0",
-                        ch ? cfg->RxGainB() : cfg->RxGainA());
+                          ch ? cfg->RxGainB() : cfg->RxGainA());
       cl_stn_[i]->setGain(SOAPY_SDR_TX, ch, "PGA0",
-                        ch ? cfg->TxGainB() : cfg->TxGainA());
+                          ch ? cfg->TxGainB() : cfg->TxGainA());
     }
   }
 
@@ -273,9 +273,8 @@ bool ClientRadioConfig::RadioStart() {
       conf["tdd_enabled"] = true;
       conf["frame_mode"] = "continuous_resync";
       int max_frame =
-          (int)(2.0 /
-                ((cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms()) /
-                 cfg_->Rate()));
+          (int)(2.0 / ((cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms()) /
+                       cfg_->Rate()));
       conf["max_frame"] = max_frame;
       conf["dual_pilot"] = (cfg_->NumChannels() == 2);
       std::vector<std::string> jframes;
@@ -305,7 +304,7 @@ bool ClientRadioConfig::RadioStart() {
       cl_stn_[i]->writeRegisters("CORR_COE", 0, cfg_->Coeffs());
 
       cl_stn_[i]->writeSetting("CORR_START",
-                             (cfg_->Channel() == "B") ? "B" : "A");
+                               (cfg_->Channel() == "B") ? "B" : "A");
     } else {
       if (!kUseUHD) {
         cl_stn_[i]->setHardwareTime(0, "TRIGGER");
@@ -314,10 +313,10 @@ bool ClientRadioConfig::RadioStart() {
         cl_stn_[i]->writeSetting("TRIGGER_GEN", "");
       } else {
         cl_stn_[i]->setHardwareTime(0, "UNKNOWN_PPS");
-        cl_stn_[i]->activateStream(this->rx_streams_[i], SOAPY_SDR_HAS_TIME, 1e9,
-                                 0);
-        cl_stn_[i]->activateStream(this->tx_streams_[i], SOAPY_SDR_HAS_TIME, 1e9,
-                                 0);
+        cl_stn_[i]->activateStream(this->rx_streams_[i], SOAPY_SDR_HAS_TIME,
+                                   1e9, 0);
+        cl_stn_[i]->activateStream(this->tx_streams_[i], SOAPY_SDR_HAS_TIME,
+                                   1e9, 0);
       }
     }
   }
@@ -348,19 +347,19 @@ int ClientRadioConfig::RadioTx(size_t r /*radio id*/, void** buffs,
     tx_flags = SOAPY_SDR_HAS_TIME | SOAPY_SDR_END_BURST;
   int w(0);
   if (cfg_->HwFramer()) {
-    w = cl_stn_[r]->writeStream(this->tx_streams_[r], buffs, num_samps, tx_flags,
-                              frameTime, 1000000);
+    w = cl_stn_[r]->writeStream(this->tx_streams_[r], buffs, num_samps,
+                                tx_flags, frameTime, 1000000);
   } else {
     long long frame_time_ns = SoapySDR::ticksToTimeNs(frameTime, cfg_->Rate());
-    w = cl_stn_[r]->writeStream(this->tx_streams_[r], buffs, num_samps, tx_flags,
-                              frame_time_ns, 1000000);
+    w = cl_stn_[r]->writeStream(this->tx_streams_[r], buffs, num_samps,
+                                tx_flags, frame_time_ns, 1000000);
   }
   if (kDebugRadioTX) {
     size_t chan_mask;
     long timeout_us(0);
     int status_flag = 0;
-    int s = cl_stn_[r]->readStreamStatus(this->tx_streams_[r], chan_mask, status_flag,
-                                       frameTime, timeout_us);
+    int s = cl_stn_[r]->readStreamStatus(this->tx_streams_[r], chan_mask,
+                                         status_flag, frameTime, timeout_us);
     std::cout << "radio " << r << " tx returned " << w << " and status " << s
               << " when flags was " << flags << std::endl;
   }
@@ -373,12 +372,12 @@ int ClientRadioConfig::RadioRx(size_t r /*radio id*/, void** buffs,
   if (r < this->radio_num_) {
     int ret(0);
     if (cfg_->HwFramer()) {
-      ret = cl_stn_[r]->readStream(this->rx_streams_[r], buffs, num_samps, flags,
-                                 frameTime, 1000000);
+      ret = cl_stn_[r]->readStream(this->rx_streams_[r], buffs, num_samps,
+                                   flags, frameTime, 1000000);
     } else {
       long long frame_time_ns = 0;
-      ret = cl_stn_[r]->readStream(this->rx_streams_[r], buffs, num_samps, flags,
-                                 frame_time_ns, 1000000);
+      ret = cl_stn_[r]->readStream(this->rx_streams_[r], buffs, num_samps,
+                                   flags, frame_time_ns, 1000000);
       frameTime = SoapySDR::timeNsToTicks(frame_time_ns, cfg_->Rate());
     }
     if (kDebugRadioRX) {
@@ -402,14 +401,14 @@ void ClientRadioConfig::DrainBuffers() {
   dummybuffs[1] = dummy_buff1.data();
   for (size_t i = 0; i < cfg_->NumRadios(); i++) {
     ClientRadioConfig::DrainRxBuffer(cl_stn_[i], rx_streams_[i], dummybuffs,
-                                       cfg_->SampsPerSymbol());
+                                     cfg_->SampsPerSymbol());
   }
 }
 
 void ClientRadioConfig::DrainRxBuffer(SoapySDR::Device* dev,
-                                        SoapySDR::Stream* istream,
-                                        std::vector<void*> buffs,
-                                        size_t symSamp) {
+                                      SoapySDR::Stream* istream,
+                                      std::vector<void*> buffs,
+                                      size_t symSamp) {
   long long frame_time = 0;
   int flags = 0, r = 0, i = 0;
   long timeout_us(0);
@@ -432,15 +431,16 @@ void ClientRadioConfig::ReadSensors() {
               << std::endl;
     std::cout << "LMS7_TEMP  : " << cl_stn_[i]->readSensor("LMS7_TEMP")
               << std::endl;
-    std::cout << "FE_TEMP  : " << cl_stn_[i]->readSensor("FE_TEMP") << std::endl;
-    std::cout << "TX0 TEMP  : " << cl_stn_[i]->readSensor(SOAPY_SDR_TX, 0, "TEMP")
+    std::cout << "FE_TEMP  : " << cl_stn_[i]->readSensor("FE_TEMP")
               << std::endl;
-    std::cout << "TX1 TEMP  : " << cl_stn_[i]->readSensor(SOAPY_SDR_TX, 1, "TEMP")
-              << std::endl;
-    std::cout << "RX0 TEMP  : " << cl_stn_[i]->readSensor(SOAPY_SDR_RX, 0, "TEMP")
-              << std::endl;
-    std::cout << "RX1 TEMP  : " << cl_stn_[i]->readSensor(SOAPY_SDR_RX, 1, "TEMP")
-              << std::endl;
+    std::cout << "TX0 TEMP  : "
+              << cl_stn_[i]->readSensor(SOAPY_SDR_TX, 0, "TEMP") << std::endl;
+    std::cout << "TX1 TEMP  : "
+              << cl_stn_[i]->readSensor(SOAPY_SDR_TX, 1, "TEMP") << std::endl;
+    std::cout << "RX0 TEMP  : "
+              << cl_stn_[i]->readSensor(SOAPY_SDR_RX, 0, "TEMP") << std::endl;
+    std::cout << "RX1 TEMP  : "
+              << cl_stn_[i]->readSensor(SOAPY_SDR_RX, 1, "TEMP") << std::endl;
     std::cout << std::endl;
   }
 }

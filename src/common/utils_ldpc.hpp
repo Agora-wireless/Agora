@@ -54,8 +54,8 @@ static inline uint8_t Bitreverse8(uint8_t x) {
  * 6 for 64-QAM modulation)
  */
 static inline void AdaptBitsForMod(const uint8_t* bit_seq_in,
-                                      uint8_t* bytes_out, size_t len,
-                                      size_t mod_type) {
+                                   uint8_t* bytes_out, size_t len,
+                                   size_t mod_type) {
   uint16_t bits = 0;      // Bits collected from the input
   size_t bits_avail = 0;  // Number of valid bits filled into [bits]
   for (size_t i = 0; i < len; i++) {
@@ -80,7 +80,7 @@ static inline void AdaptBitsForMod(const uint8_t* bit_seq_in,
  * Storage at vec_out must be at least (m*len+7)/8 bytes.
  */
 static inline void AdaptBitsFromMod(const uint8_t* vec_in, uint8_t* vec_out,
-                                       int len, int mod_type) {
+                                    int len, int mod_type) {
   int bits_avail = 0;
   uint16_t bits = 0;
   for (int i = 0; i < len; i++) {
@@ -152,35 +152,30 @@ static inline size_t LdpcMaxNumEncodedBits(size_t base_graph, size_t zc) {
 // Return the number of total bits per codeword (i.e., including both input
 // bits and parity bits) with this base graph and expansion factor
 static inline size_t LdpcNumEncodedBits(size_t base_graph, size_t zc,
-                                           size_t nRows) {
+                                        size_t nRows) {
   static size_t num_punctured_cols = 2;
   return zc * (LdpcNumInputCols(base_graph) + nRows - num_punctured_cols);
 }
 
 // Return the number of bytes required in the input buffer used for LDPC
 // encoding
-static inline size_t LdpcEncodingInputBufSize(size_t base_graph,
-                                                  size_t zc) {
+static inline size_t LdpcEncodingInputBufSize(size_t base_graph, size_t zc) {
   // We add kMaxProcBytes as padding for the encoder's scatter function
   return BitsToBytes(LdpcNumInputBits(base_graph, zc)) + kMaxProcBytes;
 }
 
 // Return the number of bytes required in the parity buffer used for LDPC
 // encoding
-static inline size_t LdpcEncodingParityBufSize(size_t base_graph,
-                                                   size_t zc) {
+static inline size_t LdpcEncodingParityBufSize(size_t base_graph, size_t zc) {
   // We add kMaxProcBytes as padding for the encoder's gather function
-  return BitsToBytes(LdpcMaxNumParityBits(base_graph, zc)) +
-         kMaxProcBytes;
+  return BitsToBytes(LdpcMaxNumParityBits(base_graph, zc)) + kMaxProcBytes;
 }
 
 // Return the number of bytes required in the output encoded codeword buffer
 // used for LDPC encoding
-static inline size_t LdpcEncodingEncodedBufSize(size_t base_graph,
-                                                    size_t zc) {
+static inline size_t LdpcEncodingEncodedBufSize(size_t base_graph, size_t zc) {
   // We add kMaxProcBytes as padding for the encoder's gather function
-  return BitsToBytes(LdpcMaxNumEncodedBits(base_graph, zc)) +
-         kMaxProcBytes;
+  return BitsToBytes(LdpcMaxNumEncodedBits(base_graph, zc)) + kMaxProcBytes;
 }
 
 // Return the minimum LDPC expansion factor supported
@@ -192,10 +187,10 @@ static inline size_t LdpcGetMaxZc() {
 }
 
 // Generate the codeword output and parity buffer for this input buffer
-static inline void LdpcEncodeHelper(size_t base_graph, size_t zc,
-                                      size_t nRows, int8_t* encoded_buffer,
-                                      int8_t* parity_buffer,
-                                      const int8_t* input_buffer) {
+static inline void LdpcEncodeHelper(size_t base_graph, size_t zc, size_t nRows,
+                                    int8_t* encoded_buffer,
+                                    int8_t* parity_buffer,
+                                    const int8_t* input_buffer) {
   const size_t num_input_bits = LdpcNumInputBits(base_graph, zc);
   const size_t num_parity_bits = nRows * zc;
 

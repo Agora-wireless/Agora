@@ -35,14 +35,14 @@ MacThread::MacThread(
   client_.ul_bits_buffer_status_ = ul_bits_buffer_status;
 
   server_.n_filled_in_frame_.fill(0);
-  for (auto& v : server_.frame_data_)
-    v.resize(cfg_->MacDataBytesNumPerframe());
+  for (auto& v : server_.frame_data_) v.resize(cfg_->MacDataBytesNumPerframe());
 
   client_.ul_bits_buffer_id_.fill(0);
 
   const size_t udp_pkt_len = cfg_->MacDataBytesNumPerframe();
   udp_pkt_buf_.resize(udp_pkt_len);
-  udp_server_ = new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+  udp_server_ =
+      new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
 
   const size_t udp_control_len = sizeof(RBIndicator);
   udp_control_buf_.resize(udp_control_len);
@@ -94,7 +94,7 @@ void MacThread::SendRanConfigUpdate(EventData event) {
   msg.tags_[1] = rc.mod_order_bits_;
   msg.tags_[2] = rc.frame_id_;
   RtAssert(tx_queue_->enqueue(msg),
-            "MAC thread: failed to send RAN update to Agora");
+           "MAC thread: failed to send RAN update to Agora");
 
   scheduler_next_frame_id_++;
 }
@@ -138,9 +138,9 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
                      frame_data__offset);
 
         ss << "Header Info:\n"
-           << "FRAME_ID: " << pkt->frame_id_ << "\nSYMBOL_ID: " << pkt->symbol_id_
-           << "\nUE_ID: " << pkt->ue_id_ << "\nDATLEN: " << pkt->datalen_
-           << "\nPAYLOAD:\n";
+           << "FRAME_ID: " << pkt->frame_id_
+           << "\nSYMBOL_ID: " << pkt->symbol_id_ << "\nUE_ID: " << pkt->ue_id_
+           << "\nDATLEN: " << pkt->datalen_ << "\nPAYLOAD:\n";
         for (size_t i = 0; i < cfg_->MacPayloadLength(); i++) {
           ss << std::to_string(ul_data_ptr[i]) << " ";
         }
@@ -153,13 +153,12 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
   }
 
   // When the frame is full, send it to the application
-  if (server_.n_filled_in_frame_[ue_id] ==
-      cfg_->MacDataBytesNumPerframe()) {
+  if (server_.n_filled_in_frame_[ue_id] == cfg_->MacDataBytesNumPerframe()) {
     server_.n_filled_in_frame_[ue_id] = 0;
 
     udp_client_->Send(k_remote_hostname_, kBaseRemotePort + ue_id,
-                     &server_.frame_data_[ue_id][0],
-                     cfg_->MacDataBytesNumPerframe());
+                      &server_.frame_data_[ue_id][0],
+                      cfg_->MacDataBytesNumPerframe());
     std::fprintf(log_file_,
                  "MAC thread: Sent data for frame %zu, ue %zu, size %zu\n",
                  frame_id, ue_id, cfg_->MacDataBytesNumPerframe());
@@ -181,7 +180,7 @@ void MacThread::SendControlInformation() {
   ri.ue_id_ = next_radio_id_;
   ri.mod_order_bits_ = CommsLib::QAM16;
   udp_client_->Send(cfg_->UeServerAddr(), kBaseClientPort + ri.ue_id_,
-                   (uint8_t*)&ri, sizeof(RBIndicator));
+                    (uint8_t*)&ri, sizeof(RBIndicator));
 
   // update RAN config within Agora
   SendRanConfigUpdate(EventData(EventType::kRANUpdate));
@@ -224,7 +223,7 @@ void MacThread::ProcessUdpPacketsFromApps(RBIndicator ri) {
 }
 
 void MacThread::ProcessUdpPacketsFromAppsServer(const MacPacket* pkt,
-                                                     RBIndicator ri) {
+                                                RBIndicator ri) {
   // We've received bits for the downlink
   const size_t total_symbol_idx =
       cfg_->GetTotalDataSymbolIdxDl(pkt->frame_id_, pkt->symbol_id_);
@@ -248,11 +247,11 @@ void MacThread::ProcessUdpPacketsFromAppsServer(const MacPacket* pkt,
       EventType::kPacketFromMac,
       gen_tag_t::FrmSymUe(pkt->frame_id_, pkt->symbol_id_, pkt->ue_id_).tag_);
   RtAssert(tx_queue_->enqueue(msg),
-            "MAC thread: Failed to enqueue downlink packet");
+           "MAC thread: Failed to enqueue downlink packet");
 }
 
 void MacThread::ProcessUdpPacketsFromAppsClient(const char* payload,
-                                                     RBIndicator ri) {
+                                                RBIndicator ri) {
   // We've received bits for the uplink. The received MAC packet does not
   // specify a radio ID, send to radios in round-robin order
   size_t& radio_buf_id = client_.ul_bits_buffer_id_[next_radio_id_];
@@ -298,15 +297,15 @@ void MacThread::ProcessUdpPacketsFromAppsClient(const char* payload,
                 cfg_->MacPayloadLength());
     // Insert CRC
     pkt->crc_ = (uint16_t)(crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
-                                                   cfg_->MacPayloadLength()) &
-                          0xFFFF);
+                                                    cfg_->MacPayloadLength()) &
+                           0xFFFF);
   }
 
   (*client_.ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
   EventData msg(EventType::kPacketFromMac,
-                 rx_tag_t(next_radio_id_, radio_buf_id).tag_);
+                rx_tag_t(next_radio_id_, radio_buf_id).tag_);
   RtAssert(tx_queue_->enqueue(msg),
-            "MAC thread: Failed to enqueue uplink packet");
+           "MAC thread: Failed to enqueue uplink packet");
 
   radio_buf_id = (radio_buf_id + 1) % kFrameWnd;
   next_radio_id_ = (next_radio_id_ + 1) % cfg_->UeAntNum();
@@ -317,7 +316,7 @@ void MacThread::RunEventLoop() {
   MLPD_INFO("Running MAC thread event loop, logging to file %s\n",
             log_filename_.c_str());
   PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, kCoreOffset,
-                          0 /* thread ID */);
+                      0 /* thread ID */);
 
   while (cfg_->Running() == true) {
     ProcessRxFromMaster();

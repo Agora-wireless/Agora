@@ -137,7 +137,7 @@ inline void Simulator::UpdateFrameCount(int* frame_count) {
 }
 
 void Simulator::UpdateRxCounters(size_t frame_id, size_t frame_id_in_buffer,
-                                   size_t symbol_id, size_t ant_id) {
+                                 size_t symbol_id, size_t ant_id) {
   rx_counter_packets_[frame_id_in_buffer]++;
   if (rx_counter_packets_[frame_id_in_buffer] == 1) {
     frame_start_receive_[frame_id] = GetTime();
@@ -194,7 +194,7 @@ void Simulator::InitializeVarsFromCfg(Config* cfg) {
 
   demul_block_size_ = cfg->DemulBlockSize();
   demul_block_num_ = ofdm_data_num_ / demul_block_size_ +
-                    (ofdm_data_num_ % demul_block_size_ == 0 ? 0 : 1);
+                     (ofdm_data_num_ % demul_block_size_ == 0 ? 0 : 1);
 }
 
 void Simulator::InitializeQueues() {
@@ -203,16 +203,16 @@ void Simulator::InitializeQueues() {
   complete_task_queue_ = moodycamel::ConcurrentQueue<EventData>(
       512 * data_symbol_num_perframe_ * 4);
 
-  rx_ptoks_ptr_ = static_cast<moodycamel::ProducerToken**>(
-      Agora_memory::PaddedAlignedAlloc(
+  rx_ptoks_ptr_ =
+      static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::k64Align,
           socket_rx_thread_num_ * sizeof(moodycamel::ProducerToken*)));
   for (size_t i = 0; i < socket_rx_thread_num_; i++) {
     rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(message_queue_);
   }
 
-  task_ptoks_ptr_ = static_cast<moodycamel::ProducerToken**>(
-      Agora_memory::PaddedAlignedAlloc(
+  task_ptoks_ptr_ =
+      static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::k64Align,
           task_thread_num_ * sizeof(moodycamel::ProducerToken*)));
   for (size_t i = 0; i < task_thread_num_; i++) {
@@ -237,28 +237,29 @@ void Simulator::FreeQueues(void) {
 }
 
 void Simulator::InitializeUplinkBuffers() {
-  socket_buffer_size_ =
-      (long long)packet_length_ * symbol_num_perframe_ * bs_ant_num_ * kFrameWnd;
+  socket_buffer_size_ = (long long)packet_length_ * symbol_num_perframe_ *
+                        bs_ant_num_ * kFrameWnd;
   socket_buffer_status_size_ = symbol_num_perframe_ * bs_ant_num_ * kFrameWnd;
   socket_buffer_.Malloc(socket_rx_thread_num_, socket_buffer_size_,
                         Agora_memory::Alignment_t::k64Align);
-  socket_buffer_status_.Calloc(socket_rx_thread_num_, socket_buffer_status_size_,
+  socket_buffer_status_.Calloc(socket_rx_thread_num_,
+                               socket_buffer_status_size_,
                                Agora_memory::Alignment_t::k64Align);
 
   /* initilize all uplink status checkers */
   AllocBuffer1d(&rx_counter_packets_, kFrameWnd,
-                  Agora_memory::Alignment_t::k64Align, 1);
+                Agora_memory::Alignment_t::k64Align, 1);
 
   frame_start_.Calloc(socket_rx_thread_num_, kNumStatsFrames,
-                     Agora_memory::Alignment_t::k4096Align);
+                      Agora_memory::Alignment_t::k4096Align);
   AllocBuffer1d(&frame_start_receive_, kNumStatsFrames,
-                  Agora_memory::Alignment_t::k4096Align, 1);
+                Agora_memory::Alignment_t::k4096Align, 1);
   AllocBuffer1d(&frame_end_receive_, kNumStatsFrames,
-                  Agora_memory::Alignment_t::k4096Align, 1);
+                Agora_memory::Alignment_t::k4096Align, 1);
   AllocBuffer1d(&frame_start_tx_, kNumStatsFrames,
-                  Agora_memory::Alignment_t::k4096Align, 1);
+                Agora_memory::Alignment_t::k4096Align, 1);
   AllocBuffer1d(&frame_end_tx_, kNumStatsFrames,
-                  Agora_memory::Alignment_t::k4096Align, 1);
+                Agora_memory::Alignment_t::k4096Align, 1);
 }
 
 void Simulator::FreeUplinkBuffers() {

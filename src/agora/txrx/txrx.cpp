@@ -71,11 +71,9 @@ bool PacketTXRX::StartTxrx(Table<char>& buffer, Table<int>& buffer_status,
 
   for (size_t i = 0; i < kSocketThreadNum; i++) {
     if (kUseArgos == true) {
-      socket_std_threads_[i] =
-          std::thread(&PacketTXRX::LoopTxRxArgos, this, i);
+      socket_std_threads_[i] = std::thread(&PacketTXRX::LoopTxRxArgos, this, i);
     } else if (kUseUHD == true) {
-      socket_std_threads_[i] =
-          std::thread(&PacketTXRX::LoopTxRxUsrp, this, i);
+      socket_std_threads_[i] = std::thread(&PacketTXRX::LoopTxRxUsrp, this, i);
     } else {
       socket_std_threads_[i] = std::thread(&PacketTXRX::LoopTxRx, this, i);
     }
@@ -106,7 +104,7 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
 
 void PacketTXRX::LoopTxRx(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, kCoreOffset, tid,
-                          false /* quiet */);
+                      false /* quiet */);
   size_t* rx_frame_start = (*frame_start_)[tid];
   size_t rx_offset = 0;
   int radio_lo = tid * cfg_->NumRadios() / kSocketThreadNum;
@@ -117,8 +115,8 @@ void PacketTXRX::LoopTxRx(int tid) {
     int local_port_id = cfg_->BsServerPort() + radio_id;
     socket_[radio_id] = SetupSocketIpv4(local_port_id, true, sock_buf_size);
     SetupSockaddrRemoteIpv4(&bs_rru_sockaddr_[radio_id],
-                               cfg_->BsRruPort() + radio_id,
-                               cfg_->BsRruAddr().c_str());
+                            cfg_->BsRruPort() + radio_id,
+                            cfg_->BsRruAddr().c_str());
     MLPD_INFO(
         "TXRX thread %d: set up UDP socket server listening to port %d"
         " with remote address %s:%d \n",
@@ -134,9 +132,8 @@ void PacketTXRX::LoopTxRx(int tid) {
   size_t tx_frame_start = Rdtsc();
   size_t tx_frame_id = 0;
   size_t slow_start_factor = 10;
-  SendBeacon(
-      tid,
-      tx_frame_id++);  // Send Beacons for the first time to kick off sim
+  SendBeacon(tid,
+             tx_frame_id++);  // Send Beacons for the first time to kick off sim
   while (cfg_->Running() == true) {
     if (Rdtsc() - tx_frame_start > frame_tsc_delta * slow_start_factor) {
       tx_frame_start = Rdtsc();
@@ -241,8 +238,8 @@ int PacketTXRX::DequeueSend(int tid) {
     std::printf(
         "In TXRX thread %d: Transmitted frame %zu, symbol %zu, "
         "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-        tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags_[0]).tag_, offset,
-        message_queue_->size_approx());
+        tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags_[0]).tag_,
+        offset, message_queue_->size_approx());
   }
 
   char* cur_buffer_ptr = tx_buffer_ + offset * c->DlPacketLength();
@@ -250,8 +247,8 @@ int PacketTXRX::DequeueSend(int tid) {
   new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
   // Send data (one OFDM symbol)
-  ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->DlPacketLength(),
-                       0, (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
+  ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->DlPacketLength(), 0,
+                       (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
                        sizeof(bs_rru_sockaddr_[ant_id]));
   RtAssert(ret > 0, "sendto() failed");
 

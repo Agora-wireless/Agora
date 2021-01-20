@@ -72,20 +72,19 @@ int main(int argc, char* argv[]) {
   std::vector<std::vector<int8_t>> ul_encoded_codewords(ul_codeblocks);
   for (size_t i = 0; i < ul_codeblocks; i++) {
     data_generator.GenCodeblock(ul_information.at(i),
-                                 ul_encoded_codewords.at(i),
-                                 (i % cfg->UeNum()) /* UE ID */);
+                                ul_encoded_codewords.at(i),
+                                (i % cfg->UeNum()) /* UE ID */);
   }
 
   {
     // Save uplink information bytes to file
-    const size_t input_bytes_per_cb = BitsToBytes(
-        LdpcNumInputBits(cfg->LdpcConfig().BaseGraph(),
-                            cfg->LdpcConfig().ExpansionFactor()));
+    const size_t input_bytes_per_cb = BitsToBytes(LdpcNumInputBits(
+        cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor()));
 
-    const std::string filename_input =
-        cur_directory + "/data/LDPC_orig_data_" +
-        std::to_string(cfg->OfdmCaNum()) + "_ant" +
-        std::to_string(cfg->UeAntNum()) + ".bin";
+    const std::string filename_input = cur_directory + "/data/LDPC_orig_data_" +
+                                       std::to_string(cfg->OfdmCaNum()) +
+                                       "_ant" +
+                                       std::to_string(cfg->UeAntNum()) + ".bin";
     std::printf("Saving raw uplink data (using LDPC) to %s\n",
                 filename_input.c_str());
     FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
@@ -118,8 +117,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Place modulated uplink data codewords into central IFFT bins
-  RtAssert(cfg->LdpcConfig().NumBlocksInSymbol() ==
-            1);  // TODO: Assumption
+  RtAssert(cfg->LdpcConfig().NumBlocksInSymbol() == 1);  // TODO: Assumption
   std::vector<std::vector<complex_float>> pre_ifft_data_syms(
       cfg->UeAntNum() * cfg->Frame().NumULSyms());
   for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
@@ -172,8 +170,7 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < cfg->UeAntNum(); i++)
       std::memcpy(tx_data_all_symbols[i + cfg->Frame().NumBeaconSyms()] +
                       i * cfg->OfdmCaNum(),
-                  &pilot_td.at(0),
-                  (cfg->OfdmCaNum() * sizeof(complex_float)));
+                  &pilot_td.at(0), (cfg->OfdmCaNum() * sizeof(complex_float)));
   }
 
   // Populate the UL symbols
@@ -181,8 +178,8 @@ int main(int argc, char* argv[]) {
     const size_t data_sym_id = cfg->Frame().GetULSymbol(i);
     for (size_t j = 0; j < cfg->UeAntNum(); j++) {
       if (i < cfg->Frame().ClientUlPilotSymbols()) {
-        std::memcpy(tx_data_all_symbols[data_sym_id] +
-                        (j * cfg->OfdmCaNum()) + cfg->OfdmDataStart(),
+        std::memcpy(tx_data_all_symbols[data_sym_id] + (j * cfg->OfdmCaNum()) +
+                        cfg->OfdmDataStart(),
                     ue_specific_pilot[j],
                     cfg->OfdmDataNum() * sizeof(complex_float));
       } else {
@@ -198,8 +195,7 @@ int main(int argc, char* argv[]) {
   csi_matrices.Calloc(cfg->OfdmCaNum(), cfg->UeAntNum() * cfg->BsAntNum(),
                       Agora_memory::Alignment_t::k32Align);
   for (size_t i = 0; i < (cfg->UeAntNum() * cfg->BsAntNum()); i++) {
-    complex_float csi = {RandFloatFromShort(-1, 1),
-                         RandFloatFromShort(-1, 1)};
+    complex_float csi = {RandFloatFromShort(-1, 1), RandFloatFromShort(-1, 1)};
     // std::printf("noise of ant %d, ue %d\n", i % cfg->bs_ant_num(), i /
     // cfg->bs_ant_num() );
     for (size_t j = 0; j < cfg->OfdmCaNum(); j++) {
@@ -272,8 +268,8 @@ int main(int argc, char* argv[]) {
   std::vector<std::vector<int8_t>> dl_encoded_codewords(dl_codeblocks);
   for (size_t i = 0; i < dl_codeblocks; i++) {
     data_generator.GenCodeblock(dl_information.at(i),
-                                 dl_encoded_codewords.at(i),
-                                 (i % cfg->UeNum()) /* UE ID */);
+                                dl_encoded_codewords.at(i),
+                                (i % cfg->UeNum()) /* UE ID */);
   }
 
   // Modulate the encoded codewords
@@ -285,14 +281,13 @@ int main(int argc, char* argv[]) {
 
   {
     // Save downlink information bytes to file
-    const size_t input_bytes_per_cb = BitsToBytes(
-        LdpcNumInputBits(cfg->LdpcConfig().BaseGraph(),
-                            cfg->LdpcConfig().ExpansionFactor()));
+    const size_t input_bytes_per_cb = BitsToBytes(LdpcNumInputBits(
+        cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor()));
 
-    const std::string filename_input =
-        cur_directory + "/data/LDPC_orig_data_" +
-        std::to_string(cfg->OfdmCaNum()) + "_ant" +
-        std::to_string(cfg->UeAntNum()) + ".bin";
+    const std::string filename_input = cur_directory + "/data/LDPC_orig_data_" +
+                                       std::to_string(cfg->OfdmCaNum()) +
+                                       "_ant" +
+                                       std::to_string(cfg->UeAntNum()) + ".bin";
     std::printf("Saving raw dl data (using LDPC) to %s\n",
                 filename_input.c_str());
     FILE* fp_input = std::fopen(filename_input.c_str(), "ab");
@@ -351,15 +346,14 @@ int main(int argc, char* argv[]) {
     for (size_t j = 0; j < cfg->UeAntNum(); j++) {
       if ((i >= cfg->Frame().ClientDlPilotSymbols())) {
         for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum(); sc_id++)
-          dl_mod_data[i][j * cfg->OfdmCaNum() + sc_id +
-                         cfg->OfdmDataStart()] =
+          dl_mod_data[i][j * cfg->OfdmCaNum() + sc_id + cfg->OfdmDataStart()] =
               (sc_id % cfg->OfdmPilotSpacing() == 0)
                   ? ue_specific_pilot[j][sc_id]
                   : dl_modulated_codewords[i * cfg->UeAntNum() + j][sc_id];
       } else {
         for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum(); sc_id++)
-          dl_mod_data[i][j * cfg->OfdmCaNum() + sc_id +
-                         cfg->OfdmDataStart()] = ue_specific_pilot[j][sc_id];
+          dl_mod_data[i][j * cfg->OfdmCaNum() + sc_id + cfg->OfdmDataStart()] =
+              ue_specific_pilot[j][sc_id];
       }
     }
   }
@@ -443,8 +437,8 @@ int main(int argc, char* argv[]) {
   FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
   for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
     short* ptr = dl_tx_data[i];
-    std::fwrite(ptr, cfg->SampsPerSymbol() * cfg->BsAntNum() * 2,
-                sizeof(short), fp_dl_tx);
+    std::fwrite(ptr, cfg->SampsPerSymbol() * cfg->BsAntNum() * 2, sizeof(short),
+                fp_dl_tx);
   }
   std::fclose(fp_dl_tx);
 

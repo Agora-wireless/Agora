@@ -23,7 +23,7 @@
 
 /// Correlation and Peak detection of a beacon with Gold code  (2 repetitions)
 int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
-                              const std::vector<std::complex<float>>& seq) {
+                            const std::vector<std::complex<float>>& seq) {
   std::queue<int> valid_peaks;
 
   // Original LTS sequence
@@ -104,7 +104,7 @@ int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
 }
 
 static inline __m256i M256ComplexCs16Mult(__m256i data1, __m256i data2,
-                                               bool conj) {
+                                          bool conj) {
   const __m256i neg0 = _mm256_set1_epi32(0xFFFF0000);
   const __m256i neg1 = _mm256_set1_epi32(0x00010000);
   const __m256i mix = _mm256_set1_epi32(0x0000FFFF);
@@ -166,8 +166,7 @@ std::vector<std::complex<int16_t>> CommsLib::ComplexMultAvx(
   return out;
 }
 
-__m256 CommsLib::M256ComplexCf32Mult(__m256 data1, __m256 data2,
-                                          bool conj) {
+__m256 CommsLib::M256ComplexCf32Mult(__m256 data1, __m256 data2, bool conj) {
   __m256 prod0 __attribute__((aligned(ALIGNMENT)));
   __m256 prod1 __attribute__((aligned(ALIGNMENT)));
   __m256 res __attribute__((aligned(ALIGNMENT)));
@@ -409,7 +408,7 @@ std::vector<std::complex<float>> CommsLib::CorrelateAvx(
 }
 
 std::vector<float> CommsLib::CorrelateAvxS(std::vector<float> const& f,
-                                             std::vector<float> const& g) {
+                                           std::vector<float> const& g) {
   size_t length_f = f.size();
   size_t length_g = g.size();
   assert(length_f > length_g);

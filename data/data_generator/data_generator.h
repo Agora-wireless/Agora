@@ -37,7 +37,7 @@ class DataGenerator {
    * @param ue_id ID of the UE that this codeblock belongs to
    */
   void GenCodeblock(std::vector<int8_t>& information,
-                     std::vector<int8_t>& encoded_codeword, size_t ue_id) {
+                    std::vector<int8_t>& encoded_codeword, size_t ue_id) {
     const LDPCconfig& lc = cfg_->LdpcConfig();
     std::vector<int8_t> parity;
     parity.resize(
@@ -57,9 +57,9 @@ class DataGenerator {
     }
 
     LdpcEncodeHelper(cfg_->LdpcConfig().BaseGraph(),
-                       cfg_->LdpcConfig().ExpansionFactor(),
-                       cfg_->LdpcConfig().NumRows(), &encoded_codeword.at(0),
-                       &parity.at(0), &information.at(0));
+                     cfg_->LdpcConfig().ExpansionFactor(),
+                     cfg_->LdpcConfig().NumRows(), &encoded_codeword.at(0),
+                     &parity.at(0), &information.at(0));
 
     information.resize(lc.NumInputBytes());
     encoded_codeword.resize(lc.NumEncodedBytes());
@@ -76,8 +76,8 @@ class DataGenerator {
     std::vector<uint8_t> mod_input(cfg_->OfdmDataNum());
 
     AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-                       &mod_input[0], cfg_->LdpcConfig().NumEncodedBytes(),
-                       cfg_->ModOrderBits());
+                    &mod_input[0], cfg_->LdpcConfig().NumEncodedBytes(),
+                    cfg_->ModOrderBits());
 
     for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
       modulated_codeword[i] = ModSingleUint8(mod_input[i], cfg_->ModTable());
@@ -86,13 +86,12 @@ class DataGenerator {
   }
 
   std::vector<complex_float> GetModulation(const int8_t* encoded_codeword,
-                                            size_t num_bits) {
+                                           size_t num_bits) {
     std::vector<complex_float> modulated_codeword(cfg_->OfdmDataNum());
     std::vector<uint8_t> mod_input(cfg_->OfdmDataNum());
 
     AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-                       &mod_input[0], BitsToBytes(num_bits),
-                       cfg_->ModOrderBits());
+                    &mod_input[0], BitsToBytes(num_bits), cfg_->ModOrderBits());
 
     for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
       modulated_codeword[i] = ModSingleUint8(mod_input[i], cfg_->ModTable());
@@ -109,8 +108,7 @@ class DataGenerator {
   std::vector<complex_float> BinForIfft(
       const std::vector<complex_float> modulated_codeword) const {
     std::vector<complex_float> pre_ifft_symbol(cfg_->OfdmCaNum());  // Zeroed
-    std::memcpy(&pre_ifft_symbol[cfg_->OfdmDataStart()],
-                &modulated_codeword[0],
+    std::memcpy(&pre_ifft_symbol[cfg_->OfdmDataStart()], &modulated_codeword[0],
                 cfg_->OfdmDataNum() * sizeof(complex_float));
 
     return pre_ifft_symbol;
@@ -127,7 +125,7 @@ class DataGenerator {
     std::vector<complex_float> ret(cfg_->OfdmCaNum());  // Zeroed
     for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
       ret[i + cfg_->OfdmDataStart()] = {zc_common_pilot[i].real(),
-                                         zc_common_pilot[i].imag()};
+                                        zc_common_pilot[i].imag()};
     }
 
     return ret;

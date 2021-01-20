@@ -13,15 +13,14 @@ static inline void TryEnqueueFallback(
   if (!mc_queue->try_enqueue(*producer_token, event)) {
     std::printf("Need more memory\n");
     RtAssert(mc_queue->enqueue(*producer_token, event),
-              "Message enqueue failed");
+             "Message enqueue failed");
   }
 }
 
 /// Enqueue one event to a concurrent queue and print a warning message
 /// if we're short on queue space
 static inline void TryEnqueueFallback(
-    moodycamel::ConcurrentQueue<EventData>* mc_queue,
-    const EventData& event) {
+    moodycamel::ConcurrentQueue<EventData>* mc_queue, const EventData& event) {
   if (!mc_queue->try_enqueue(event)) {
     std::printf("Need more memory\n");
     RtAssert(mc_queue->enqueue(event), "Message enqueue failed");
@@ -37,7 +36,7 @@ static inline void TryEnqueueBulkFallback(
   if (!mc_queue.try_enqueue_bulk(producer_token, event_list, num_events)) {
     std::printf("Need more memory\n");
     RtAssert(mc_queue.enqueue_bulk(producer_token, event_list, num_events),
-              "Message bulk enqueue failed\n");
+             "Message bulk enqueue failed\n");
   }
 }
 

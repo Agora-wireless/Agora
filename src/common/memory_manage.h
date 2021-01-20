@@ -44,7 +44,7 @@ class Table {
   // Allocate the table and fill it with random floating point values between
   // -1.0 and 1.0
   void RandAllocFloat(size_t dim1, size_t dim2,
-                        Agora_memory::Alignment_t alignment) {
+                      Agora_memory::Alignment_t alignment) {
     std::default_random_engine generator;
     std::uniform_real_distribution<float> distribution(-1.0, 1.0);
 
@@ -59,7 +59,7 @@ class Table {
   // Allocate the table and fill it with random complex floating point values
   // between -1.0 and 1.0
   void RandAllocCxFloat(size_t dim1, size_t dim2,
-                           Agora_memory::Alignment_t alignment) {
+                        Agora_memory::Alignment_t alignment) {
     std::default_random_engine generator;
     std::uniform_real_distribution<float> distribution(-1.0, 1.0);
 
@@ -92,11 +92,9 @@ class Table {
 
 template <typename T, typename U>
 static void AllocBuffer1d(T** buffer, U dim,
-                            Agora_memory::Alignment_t alignment,
-                            int init_zero) {
+                          Agora_memory::Alignment_t alignment, int init_zero) {
   size_t size = dim * sizeof(T);
-  *buffer =
-      static_cast<T*>(Agora_memory::PaddedAlignedAlloc(alignment, size));
+  *buffer = static_cast<T*>(Agora_memory::PaddedAlignedAlloc(alignment, size));
   if (init_zero) {
     std::memset(*buffer, 0u, size);
   }

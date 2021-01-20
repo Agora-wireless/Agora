@@ -52,7 +52,7 @@ void* Receiver::LoopRecv(int tid) {
   int socket_local =
       SetupSocketIpv4(cfg_->BsRruPort() + tid, true, sock_buf_size);
   SetupSockaddrRemoteIpv4(&remote_addr, cfg_->BsServerPort() + tid,
-                             cfg_->BsServerAddr().c_str());
+                          cfg_->BsServerAddr().c_str());
 
   /* use token to speed up */
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
@@ -85,9 +85,9 @@ void* Receiver::LoopRecv(int tid) {
     int recvlen = -1;
     // if ((recvlen = recv(socket_local, (char*)cur_buffer_ptr,
     // packet_length, 0))<0) {
-    if ((recvlen = recvfrom(socket_local, (char*)cur_buffer_ptr,
-                            cfg_->PacketLength(), 0,
-                            (struct sockaddr*)&remote_addr, &addrlen)) < 0) {
+    if ((recvlen =
+             recvfrom(socket_local, (char*)cur_buffer_ptr, cfg_->PacketLength(),
+                      0, (struct sockaddr*)&remote_addr, &addrlen)) < 0) {
       std::perror("recv failed");
       std::exit(0);
     }

@@ -42,14 +42,10 @@ class LDPCconfig {
   inline uint16_t ExpansionFactor(void) const {
     return this->expansion_factor_;
   }
-  inline int16_t MaxDecoderIter(void) const {
-    return this->max_decoder_iter_;
-  }
+  inline int16_t MaxDecoderIter(void) const { return this->max_decoder_iter_; }
   inline bool EarlyTermination(void) const { return this->early_termination_; }
   inline uint32_t NumCbLen(void) const { return this->num_cb_len_; }
-  inline uint32_t NumCbCodewLen(void) const {
-    return this->num_cb_codew_len_;
-  }
+  inline uint32_t NumCbCodewLen(void) const { return this->num_cb_codew_len_; }
   inline size_t NumRows(void) const { return this->num_rows_; }
   inline size_t NumBlocksInSymbol(void) const {
     return this->num_blocks_in_symbol_;

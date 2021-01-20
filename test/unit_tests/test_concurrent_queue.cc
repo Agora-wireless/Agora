@@ -18,15 +18,15 @@ static_assert(sizeof(ItemT) == 64, "");
 
 // Test if the master can enqueue to specific workers
 void MasterToWorkerStaticMaster(moodycamel::ConcurrentQueue<ItemT>* queue,
-                                 moodycamel::ProducerToken** ptoks) {
+                                moodycamel::ProducerToken** ptoks) {
   for (size_t i = 0; i < kMaxTestNum; i++) {
     queue->enqueue(*ptoks[i % kNumWorkers], ItemT(i));
   }
 }
 
 void MasterToWorkerStaticWorker(size_t worker_id,
-                                 moodycamel::ConcurrentQueue<ItemT>* queue,
-                                 moodycamel::ProducerToken* ptok) {
+                                moodycamel::ConcurrentQueue<ItemT>* queue,
+                                moodycamel::ProducerToken* ptok) {
   size_t next_expected = worker_id;
   while (next_expected < kMaxTestNum) {
     ItemT item;
@@ -69,9 +69,9 @@ void WorkerToMasterMaster(moodycamel::ConcurrentQueue<ItemT>* queue) {
   }
 }
 
-void WorkerToMasterWorkerWithToken(
-    size_t worker_id, moodycamel::ConcurrentQueue<ItemT>* queue,
-    moodycamel::ProducerToken* ptok) {
+void WorkerToMasterWorkerWithToken(size_t worker_id,
+                                   moodycamel::ConcurrentQueue<ItemT>* queue,
+                                   moodycamel::ProducerToken* ptok) {
   size_t next_expected = worker_id;
   while (next_expected < kMaxTestNum) {
     ItemT item(next_expected);

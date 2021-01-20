@@ -94,18 +94,12 @@ class Config {
   inline size_t AntGroupNum(void) const { return this->ant_group_num_; }
   inline size_t AntPerGroup(void) const { return this->ant_per_group_; }
   inline size_t CoreOffset(void) const { return this->core_offset_; }
-  inline size_t WorkerThreadNum(void) const {
-    return this->worker_thread_num_;
-  }
-  inline size_t SocketThreadNum(void) const {
-    return this->socket_thread_num_;
-  }
+  inline size_t WorkerThreadNum(void) const { return this->worker_thread_num_; }
+  inline size_t SocketThreadNum(void) const { return this->socket_thread_num_; }
 
   inline size_t FftThreadNum(void) const { return this->fft_thread_num_; }
   inline size_t DemulThreadNum(void) const { return this->demul_thread_num_; }
-  inline size_t DecodeThreadNum(void) const {
-    return this->decode_thread_num_;
-  }
+  inline size_t DecodeThreadNum(void) const { return this->decode_thread_num_; }
   inline size_t ZfThreadNum(void) const { return this->zf_thread_num_; }
   inline size_t DemulBlockSize(void) const { return this->demul_block_size_; }
 
@@ -119,9 +113,7 @@ class Config {
   }
   inline size_t FftBlockSize(void) const { return this->fft_block_size_; }
 
-  inline size_t EncodeBlockSize(void) const {
-    return this->encode_block_size_;
-  }
+  inline size_t EncodeBlockSize(void) const { return this->encode_block_size_; }
   inline bool FreqOrthogonalPilot(void) const {
     return this->freq_orthogonal_pilot_;
   }
@@ -157,21 +149,15 @@ class Config {
     return this->mac_bytes_num_perframe_;
   }
 
-  inline size_t MacPacketLength(void) const {
-    return this->mac_packet_length_;
-  }
+  inline size_t MacPacketLength(void) const { return this->mac_packet_length_; }
   inline size_t MacPayloadLength(void) const {
     return this->mac_payload_length_;
   }
   inline size_t MacPacketsPerframe(void) const {
     return this->mac_packets_perframe_;
   }
-  inline std::string UeServerAddr(void) const {
-    return this->ue_server_addr_;
-  }
-  inline std::string BsServerAddr(void) const {
-    return this->bs_server_addr_;
-  }
+  inline std::string UeServerAddr(void) const { return this->ue_server_addr_; }
+  inline std::string BsServerAddr(void) const { return this->bs_server_addr_; }
 
   inline std::string BsRruAddr(void) const { return this->bs_rru_addr_; }
   inline int BsServerPort(void) const { return this->bs_server_port_; }
@@ -196,13 +182,11 @@ class Config {
   // void ) const { return this->dpdk_num_ports_; } inline int mac_rx_port( void
   // ) const { return this->mac_rx_port_; } inline int mac_tx_port( void ) const
   // { return this->mac_tx_port_; } inline bool init_mac_running( void ) const {
-  // return this->init_mac_running_; } inline size_t transport_block_size( void )
-  // const { return this->transport_block_size_; }
+  // return this->init_mac_running_; } inline size_t transport_block_size( void
+  // ) const { return this->transport_block_size_; }
 
   /* Inline accessors (complex types) */
-  inline const LDPCconfig& LdpcConfig(void) const {
-    return this->ldpc_config_;
-  }
+  inline const LDPCconfig& LdpcConfig(void) const { return this->ldpc_config_; }
   inline const FrameStats& Frame(void) const { return this->frame_; }
   inline const std::vector<std::complex<float>>& PilotCf32(void) const {
     return this->pilot_cf32_;

@@ -145,8 +145,8 @@ class PhyUe {
 
   /* Add tasks into task queue based on event type */
   void ScheduleTask(EventData do_task,
-                     moodycamel::ConcurrentQueue<EventData>* in_queue,
-                     moodycamel::ProducerToken const& ptok);
+                    moodycamel::ConcurrentQueue<EventData>* in_queue,
+                    moodycamel::ProducerToken const& ptok);
 
   void InitializeVarsFromCfg(void);
 

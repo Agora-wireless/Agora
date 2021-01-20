@@ -94,7 +94,7 @@ class PacketTXRX {
   int DequeueSendUsrp(int tid);
   int DequeueSendUsrp(int tid, int frame_id, int symbol_id);
   struct Packet* RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
-                                   int frame_id, int symbol_id);
+                                 int frame_id, int symbol_id);
 
   Config* cfg_;
 

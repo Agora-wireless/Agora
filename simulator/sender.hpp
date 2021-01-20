@@ -100,10 +100,10 @@ class Sender {
   // Run FFT on the data field in pkt, output to fft_inout
   // Recombine pkt header data and fft output data into payload
   void RunFft(Packet* pkt, complex_float* fft_inout,
-               DFTI_DESCRIPTOR_HANDLE mkl_handle) const;
+              DFTI_DESCRIPTOR_HANDLE mkl_handle) const;
 
   Config* cfg_;
-  const double kFreqGhz;           // RDTSC frequency in GHz
+  const double kFreqGhz;          // RDTSC frequency in GHz
   const double kTicksPerUsec;     // RDTSC frequency in GHz
   const size_t kSocketThreadNum;  // Number of worker threads sending pkts
   const size_t kEnableSlowStart;  // If 1, send frames slowly at first

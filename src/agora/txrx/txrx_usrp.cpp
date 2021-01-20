@@ -65,12 +65,12 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
     // receive data
     // struct Packet* pkt = recv_enqueue_usrp(tid, radio_id, rx_offset);
     struct Packet* pkt = RecvEnqueueUsrp(tid, radio_id, rx_offset,
-                                           global_frame_id, global_symbol_id);
+                                         global_frame_id, global_symbol_id);
 
     // Schedule beacon in the future
     if (global_symbol_id == 0) {
-      tx_time_bs_ =
-          rx_time_bs_ + cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms() * 20;
+      tx_time_bs_ = rx_time_bs_ +
+                    cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms() * 20;
       int tx_ret = radioconfig_->RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
       if (tx_ret != (int)cfg_->SampsPerSymbol())
         std::cerr << "BAD Transmit(" << tx_ret << "/" << cfg_->SampsPerSymbol()
@@ -101,9 +101,8 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
   }
 }
 
-struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id,
-                                             int rx_offset, int frame_id,
-                                             int symbol_id) {
+struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
+                                           int frame_id, int symbol_id) {
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
   char* rx_buffer = (*buffer_)[tid];
   int* rx_buffer_status = (*buffer_status_)[tid];
@@ -136,7 +135,8 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id,
 
   int tmp_ret;
 
-  if (cfg_->IsPilot(frame_id, symbol_id) || cfg_->IsUplink(frame_id, symbol_id)) {
+  if (cfg_->IsPilot(frame_id, symbol_id) ||
+      cfg_->IsUplink(frame_id, symbol_id)) {
     tmp_ret = radioconfig_->RadioRx(radio_id, samp, rx_time_bs_);
   } else {
     tmp_ret = radioconfig_->RadioRx(radio_id, samp_buffer.data(), rx_time_bs_);
@@ -149,7 +149,8 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id,
   }
 
   int ant_id = radio_id * n_channels;
-  if (cfg_->IsPilot(frame_id, symbol_id) || cfg_->IsUplink(frame_id, symbol_id)) {
+  if (cfg_->IsPilot(frame_id, symbol_id) ||
+      cfg_->IsUplink(frame_id, symbol_id)) {
     for (int ch = 0; ch < n_channels; ++ch) {
       new (pkt[ch]) Packet(frame_id, symbol_id, 0, ant_id + ch);
       // move ptr & set status to full
@@ -158,7 +159,7 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id,
 
       // Push kPacketRX event into the queue
       EventData rx_message(EventType::kPacketRX,
-                            rx_tag_t(tid, rx_offset + ch).tag_);
+                           rx_tag_t(tid, rx_offset + ch).tag_);
 
       if (!message_queue_->enqueue(*local_ptok, rx_message)) {
         std::printf("socket message enqueue failed\n");
@@ -184,8 +185,7 @@ int PacketTXRX::DequeueSendUsrp(int tid) {
   size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
 
   size_t offset =
-      (c->GetTotalDataSymbolIdx(frame_id, symbol_id) * c->BsAntNum()) +
-      ant_id;
+      (c->GetTotalDataSymbolIdx(frame_id, symbol_id) * c->BsAntNum()) + ant_id;
 
   symbol_id += c->UeAntNum();
   frame_id += TX_FRAME_DELTA;
@@ -247,8 +247,7 @@ int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id) {
   // size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
   size_t offset =
-      (c->GetTotalDataSymbolIdx(frame_id, symbol_id) * c->BsAntNum()) +
-      ant_id;
+      (c->GetTotalDataSymbolIdx(frame_id, symbol_id) * c->BsAntNum()) + ant_id;
 
   // symbol_id += c->ue_ant_num();
   // frame_id += TX_FRAME_DELTA;

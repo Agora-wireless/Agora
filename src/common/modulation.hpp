@@ -31,7 +31,7 @@ void InitQam64Table(Table<complex_float>& table);
 complex_float ModSingle(int x, Table<complex_float>& mod_table);
 complex_float ModSingleUint8(uint8_t x, Table<complex_float>& mod_table);
 void ModSimd(uint8_t* in, complex_float*& out, size_t len,
-              Table<complex_float>& mod_table);
+             Table<complex_float>& mod_table);
 
 void DemodQpskSoftSse(float* vec_in, int8_t* llr, int num);
 

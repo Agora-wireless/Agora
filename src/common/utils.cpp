@@ -64,8 +64,8 @@ int PinToCore(int core_id) {
   return pthread_setaffinity_np(current_thread, sizeof(cpu_set_t), &cpuset);
 }
 
-void PinToCoreWithOffset(ThreadType thread_type, int core_offset,
-                             int thread_id, bool verbose) {
+void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
+                         bool verbose) {
   if (!kEnableThreadPinning) return;
 
   int actual_core_id = core_offset + thread_id;

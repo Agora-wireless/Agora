@@ -19,8 +19,8 @@
 // n_elems must be a multiple of 16
 // reference:
 // https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
-static inline void SimdConvertShortToFloat(const short* in_buf,
-                                               float* out_buf, size_t n_elems) {
+static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
+                                           size_t n_elems) {
 #ifdef __AVX512F__
   const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
   const __m512i magic_i = _mm512_castps_si512(magic);
@@ -68,10 +68,9 @@ static inline void SimdConvertShortToFloat(const short* in_buf,
 // in_buf and out_buf must be 64-byte aligned
 // n_elems must be a multiple of 8 for AVX2 and 16 for AVX512
 // scale_down_factor is used for scaling down values in the input array
-static inline void SimdConvertFloatToShort(const float* in_buf,
-                                               short* out_buf, size_t n_elems,
-                                               size_t cp_len,
-                                               size_t scale_down_factor) {
+static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
+                                           size_t n_elems, size_t cp_len,
+                                           size_t scale_down_factor) {
   const float scale_factor_float = 32768.0 / scale_down_factor;
 
 #ifdef __AVX512F__
@@ -117,8 +116,8 @@ static inline void SimdConvertFloatToShort(const float* in_buf,
 // Input array must have [n_elems] elements.
 // Output array must have [n_elems / 2 * 3] elements.
 // n_elems must be multiples of 2
-static inline void ConvertFloatTo12bitIq(const float* in_buf,
-                                             uint8_t* out_buf, size_t n_elems) {
+static inline void ConvertFloatTo12bitIq(const float* in_buf, uint8_t* out_buf,
+                                         size_t n_elems) {
   size_t index_short = 0;
   for (size_t i = 0; i < n_elems; i = i + 2) {
     ushort temp_i = (unsigned short)(in_buf[i] * 32768 * 4);
@@ -155,9 +154,8 @@ static inline void simd_convert_16bit_iq_to_float(__m256i val, float* out_buf,
 }
 #endif
 
-static inline void Convert12bitIqTo16bitIq(uint8_t* in_buf,
-                                                uint16_t* out_buf,
-                                                size_t n_elems) {
+static inline void Convert12bitIqTo16bitIq(uint8_t* in_buf, uint16_t* out_buf,
+                                           size_t n_elems) {
   for (size_t i = 0; i < n_elems; i += 16) {
     _mm256_loadu_si256((__m256i const*)in_buf);
     _mm256_loadu_si256((__m256i const*)(in_buf + 16));
@@ -213,10 +211,9 @@ static inline void Convert12bitIqTo16bitIq(uint8_t* in_buf,
 // Input array must have [n_elems] elements.
 // Output array must have [n_elems / 3 * 2] elements.
 // n_elems must be multiples of 3
-static inline void SimdConvert12bitIqToFloat(uint8_t* in_buf,
-                                                  float* out_buf,
-                                                  uint16_t* in_16bits_buf,
-                                                  size_t n_elems) {
+static inline void SimdConvert12bitIqToFloat(uint8_t* in_buf, float* out_buf,
+                                             uint16_t* in_16bits_buf,
+                                             size_t n_elems) {
   _unused(in_16bits_buf);
 #ifdef __AVX512F__
   const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 131072.f);
@@ -299,8 +296,8 @@ static inline void SimdConvert12bitIqToFloat(uint8_t* in_buf,
 // in_buf and out_buf must be 64-byte aligned
 // n_elems must be a multiple of 16
 static inline void SimdConvertFloat16ToFloat32(float* out_buf,
-                                                   const float* in_buf,
-                                                   size_t n_elems) {
+                                               const float* in_buf,
+                                               size_t n_elems) {
 #ifdef __AVX512F__
   for (size_t i = 0; i < n_elems; i += 16) {
     __m256i val_a = _mm256_load_si256((__m256i*)(in_buf + i / 2));
@@ -321,8 +318,8 @@ static inline void SimdConvertFloat16ToFloat32(float* out_buf,
 // in_buf and out_buf must be 64-byte aligned
 // n_elems must be a multiple of 16
 static inline void SimdConvertFloat32ToFloat16(float* out_buf,
-                                                   const float* in_buf,
-                                                   size_t n_elems) {
+                                               const float* in_buf,
+                                               size_t n_elems) {
 #ifdef __AVX512F__
   for (size_t i = 0; i < n_elems; i += 16) {
     __m512 val_a = _mm512_load_ps(in_buf + i);

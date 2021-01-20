@@ -83,14 +83,14 @@ class Stats {
   /// timestamp_type was taken for frame_id
   double MasterGetMsSince(TsType timestamp_type, size_t frame_id) const {
     return CyclesToMs(Rdtsc() - MasterGetTsc(timestamp_type, frame_id),
-                        this->kFreqGhz);
+                      this->kFreqGhz);
   }
 
   /// From the master, get the microseconds elapsed since the timestamp of
   /// timestamp_type was taken for frame_id
   double MasterGetUsSince(TsType timestamp_type, size_t frame_id) const {
     return CyclesToUs(Rdtsc() - MasterGetTsc(timestamp_type, frame_id),
-                        this->kFreqGhz);
+                      this->kFreqGhz);
   }
 
   /// From the master, get the microseconds between when the timestamp of
@@ -98,7 +98,7 @@ class Stats {
   double MasterGetUsFromRef(TsType timestamp_type, size_t frame_id,
                             size_t reference_tsc) const {
     return CyclesToUs(MasterGetTsc(timestamp_type, frame_id) - reference_tsc,
-                        this->kFreqGhz);
+                      this->kFreqGhz);
   }
 
   /// From the master, for a frame ID, get the millisecond difference
@@ -106,8 +106,8 @@ class Stats {
   double MasterGetDeltaMs(TsType timestamp_type_1, TsType timestamp_type_2,
                           size_t frame_id) const {
     return CyclesToMs(MasterGetTsc(timestamp_type_1, frame_id) -
-                            MasterGetTsc(timestamp_type_2, frame_id),
-                        this->kFreqGhz);
+                          MasterGetTsc(timestamp_type_2, frame_id),
+                      this->kFreqGhz);
   }
 
   /// From the master, for a frame ID, get the microsecond difference
@@ -115,8 +115,8 @@ class Stats {
   double MasterGetDeltaUs(TsType timestamp_type_1, TsType timestamp_type_2,
                           size_t frame_id) const {
     return CyclesToUs(MasterGetTsc(timestamp_type_1, frame_id) -
-                            MasterGetTsc(timestamp_type_2, frame_id),
-                        this->kFreqGhz);
+                          MasterGetTsc(timestamp_type_2, frame_id),
+                      this->kFreqGhz);
   }
 
   /// From the master, get the microsecond difference between the times that
@@ -124,8 +124,8 @@ class Stats {
   double MasterGetDeltaMs(TsType timestamp_type, size_t frame_id_1,
                           size_t frame_id_2) const {
     return CyclesToMs(MasterGetTsc(timestamp_type, frame_id_1) -
-                            MasterGetTsc(timestamp_type, frame_id_2),
-                        this->kFreqGhz);
+                          MasterGetTsc(timestamp_type, frame_id_2),
+                      this->kFreqGhz);
   }
 
   /// From the master, get the microsecond difference between the times that
@@ -133,8 +133,8 @@ class Stats {
   double MasterGetDeltaUs(TsType timestamp_type, size_t frame_id_1,
                           size_t frame_id_2) const {
     return CyclesToUs(MasterGetTsc(timestamp_type, frame_id_1) -
-                            MasterGetTsc(timestamp_type, frame_id_2),
-                        this->kFreqGhz);
+                          MasterGetTsc(timestamp_type, frame_id_2),
+                      this->kFreqGhz);
   }
 
   /// Get the DurationStat object used by thread thread_id for DoerType

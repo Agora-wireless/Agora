@@ -53,7 +53,7 @@ class Simulator {
   inline void UpdateFrameCount(int* frame_count);
 
   void UpdateRxCounters(size_t frame_id, size_t frame_id_in_buffer,
-                          size_t symbol_id, size_t ant_id);
+                        size_t symbol_id, size_t ant_id);
   void PrintPerFrameDone(PrintType print_type, size_t frame_id);
 
  private:

@@ -23,8 +23,7 @@ PhyStats::PhyStats(Config* cfg) : kConfig(cfg) {
   if (cfg->Frame().NumULSyms() > 0) {
     auto ul_iq_f_ptr = reinterpret_cast<cx_float*>(
         cfg->UlIqF()[cfg->Frame().ClientUlPilotSymbols()]);
-    cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(),
-                        false);
+    cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(), false);
     ul_gt_mat_ = ul_iq_f_mat.st(); /* Out of bounds read.... */
     ul_gt_mat_ =
         ul_gt_mat_.cols(cfg->OfdmDataStart(), (cfg->OfdmDataStop() - 1));
@@ -100,7 +99,7 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
 }
 
 void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id,
-                                complex_float* fft_data) {
+                              complex_float* fft_data) {
   cx_fmat fft_mat((cx_float*)fft_data, kConfig->OfdmCaNum(), 1, false);
   fmat fft_abs_mat = abs(fft_mat);
   fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
@@ -124,7 +123,7 @@ void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id, cx_fmat eq) {
 }
 
 void PhyStats::UpdateBitErrors(size_t ue_id, size_t offset, uint8_t tx_byte,
-                                 uint8_t rx_byte) {
+                               uint8_t rx_byte) {
   static constexpr size_t kBitsInByte = 8;
   // std::printf("Updating bit errors: %zu %zu %d %d\n", ue_id, offset, tx_byte,
   // rx_byte);
@@ -138,12 +137,12 @@ void PhyStats::UpdateBitErrors(size_t ue_id, size_t offset, uint8_t tx_byte,
 }
 
 void PhyStats::UpdateDecodedBits(size_t ue_id, size_t offset,
-                                   size_t new_bits_num) {
+                                 size_t new_bits_num) {
   decoded_bits_count_[ue_id][offset] += new_bits_num;
 }
 
 void PhyStats::UpdateBlockErrors(size_t ue_id, size_t offset,
-                                   size_t block_error_count) {
+                                 size_t block_error_count) {
   block_error_count_[ue_id][offset] += (block_error_count > 0);
 }
 
@@ -152,8 +151,8 @@ void PhyStats::IncrementDecodedBlocks(size_t ue_id, size_t offset) {
 }
 
 void PhyStats::UpdateUncodedBitErrors(size_t ue_id, size_t offset,
-                                         size_t mod_bit_size, uint8_t tx_byte,
-                                         uint8_t rx_byte) {
+                                      size_t mod_bit_size, uint8_t tx_byte,
+                                      uint8_t rx_byte) {
   uint8_t xor_byte(tx_byte ^ rx_byte);
   size_t bit_errors = 0;
   for (size_t j = 0; j < mod_bit_size; j++) {
@@ -164,6 +163,6 @@ void PhyStats::UpdateUncodedBitErrors(size_t ue_id, size_t offset,
 }
 
 void PhyStats::UpdateUncodedBits(size_t ue_id, size_t offset,
-                                   size_t new_bits_num) {
+                                 size_t new_bits_num) {
   uncoded_bits_count_[ue_id][offset] += new_bits_num;
 }
