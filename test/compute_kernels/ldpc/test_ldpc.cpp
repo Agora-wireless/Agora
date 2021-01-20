@@ -63,9 +63,9 @@ int main() {
 
     // Randomly generate input
     srand(time(NULL));
-    for (size_t n = 0; n < kNumCodeBlocks; n++) {
+    for (auto& n : input) {
       for (size_t i = 0; i < BitsToBytes(num_input_bits); i++)
-        input[n][i] = (int8_t)rand();
+        n[i] = static_cast<int8_t>(rand());
     }
 
     const size_t encoding_start_tsc = Rdtsc();

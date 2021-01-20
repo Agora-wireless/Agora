@@ -298,8 +298,7 @@ bool ClientRadioConfig::RadioStart() {
       cl_stn_[i]->activateStream(this->tx_streams_[i]);
 
       std::string corr_conf_string =
-          "{\"corr_enabled\":true,\"corr_threshold\":" + std::to_string(1) +
-          "}";
+          R"({"corr_enabled":true,"corr_threshold":)" + std::to_string(1) + "}";
       cl_stn_[i]->writeSetting("CORR_CONFIG", corr_conf_string);
       cl_stn_[i]->writeRegisters("CORR_COE", 0, cfg_->Coeffs());
 

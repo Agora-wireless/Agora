@@ -48,7 +48,7 @@ void RadioConfig::AdjustCalibrationGains(std::vector<SoapySDR::Device*> rxDevs,
   std::this_thread::sleep_for(std::chrono::milliseconds(SETTLE_TIME_MS));
 
   float max_tone_level = -200;
-  std::vector<bool> adjusted_radios(rx_devs_size, 0);
+  std::vector<bool> adjusted_radios(rx_devs_size, false);
   std::vector<float> tone_levels(rx_devs_size, 0);
   size_t remaining_radios = adjusted_radios.size();
   for (size_t r = 0; r < rx_devs_size; r++) {

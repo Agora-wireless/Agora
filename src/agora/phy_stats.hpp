@@ -19,7 +19,7 @@ class PhyStats {
   void IncrementDecodedBlocks(size_t, size_t);
   void UpdateUncodedBitErrors(size_t, size_t, size_t, uint8_t, uint8_t);
   void UpdateUncodedBits(size_t, size_t, size_t);
-  void UpdateEvmStats(size_t, size_t, cx_fmat);
+  void UpdateEvmStats(size_t, size_t, const cx_fmat&);
   void PrintEvmStats(size_t);
   void UpdatePilotSnr(size_t, size_t, complex_float*);
   float GetEvmSnr(size_t frame_id, size_t ue_id);

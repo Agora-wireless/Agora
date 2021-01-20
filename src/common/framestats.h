@@ -20,16 +20,16 @@ class FrameStats {
 
   void SetClientPilotSyms(size_t ul, size_t dl);
 
-  size_t NumDLCalSyms(void) const;
-  size_t NumULCalSyms(void) const;
-  size_t NumDLSyms(void) const;
-  size_t NumULSyms(void) const;
-  size_t NumPilotSyms(void) const;
-  size_t NumBeaconSyms(void) const;
-  size_t NumTotalSyms(void) const;
+  size_t NumDLCalSyms() const;
+  size_t NumULCalSyms() const;
+  size_t NumDLSyms() const;
+  size_t NumULSyms() const;
+  size_t NumPilotSyms() const;
+  size_t NumBeaconSyms() const;
+  size_t NumTotalSyms() const;
 
   size_t GetDLSymbol(size_t location) const;
-  inline size_t GetDLSymbolLast(void) const {
+  inline size_t GetDLSymbolLast() const {
     return ((this->dl_symbols_.size() == 0) ? SIZE_MAX
                                             : this->dl_symbols_.back());
   }
@@ -37,7 +37,7 @@ class FrameStats {
   size_t GetDLSymbolIdx(size_t symbol_number) const;
 
   size_t GetULSymbol(size_t location) const;
-  inline size_t GetULSymbolLast(void) const {
+  inline size_t GetULSymbolLast() const {
     return ((this->ul_symbols_.size() == 0) ? SIZE_MAX
                                             : this->ul_symbols_.back());
   }
@@ -50,17 +50,17 @@ class FrameStats {
   size_t GetDLCalSymbol(size_t location) const;
   size_t GetULCalSymbol(size_t location) const;
 
-  bool IsRecCalEnabled(void) const;
-  size_t NumDataSyms(void) const;
+  bool IsRecCalEnabled() const;
+  size_t NumDataSyms() const;
 
   /* Accessors */
-  inline const std::string& FrameIdentifier(void) const {
+  inline const std::string& FrameIdentifier() const {
     return frame_identifier_;
   }
-  inline size_t ClientUlPilotSymbols(void) const {
+  inline size_t ClientUlPilotSymbols() const {
     return client_ul_pilot_symbols_;
   }
-  inline size_t ClientDlPilotSymbols(void) const {
+  inline size_t ClientDlPilotSymbols() const {
     return client_dl_pilot_symbols_;
   }
 

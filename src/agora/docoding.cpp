@@ -94,7 +94,7 @@ DoDecode::DoDecode(
       Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
 }
 
-DoDecode::~DoDecode(void) { std::free(resp_var_nodes_); }
+DoDecode::~DoDecode() { std::free(resp_var_nodes_); }
 
 EventData DoDecode::Launch(size_t tag) {
   const LDPCconfig& ldpc_config = cfg_->LdpcConfig();

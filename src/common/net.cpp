@@ -1,10 +1,9 @@
 #include "net.hpp"
 
+#include <cerrno>
 #include <cstdio>  /* std::printf */
 #include <cstdlib> /* std::exit */
 #include <cstring> /* std::strerror, std::memset, std::memcpy */
-
-#include "errno.h"
 
 void SetSocketBufSize(int socket_local, int sock_buf_size) {
   // use SO_REUSEPORT option, so that multiple sockets could receive packets

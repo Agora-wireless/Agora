@@ -1,11 +1,10 @@
 #ifndef SIM_CHAN_MODEL
 #define SIM_CHAN_MODEL
 
-#include <assert.h>
-#include <math.h>
-
 #include <algorithm>
 #include <armadillo>
+#include <cassert>
+#include <cmath>
 #include <ctime>
 #include <iomanip>
 #include <numeric>

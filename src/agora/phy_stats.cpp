@@ -32,7 +32,7 @@ PhyStats::PhyStats(Config* cfg) : kConfig(cfg) {
                     Agora_memory::Alignment_t::k64Align);
 }
 
-PhyStats::~PhyStats(void) {
+PhyStats::~PhyStats() {
   decoded_bits_count_.Free();
   bit_error_count_.Free();
 
@@ -113,7 +113,8 @@ void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id,
   pilot_snr_[frame_id % kFrameWnd][ue_id] = 10 * std::log10(snr);
 }
 
-void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id, cx_fmat eq) {
+void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
+                              const cx_fmat& eq) {
   if (this->kConfig->Frame().NumULSyms() > 0) {
     fmat evm = abs(eq - ul_gt_mat_.col(sc_id));
     fmat cur_evm_mat(evm_buffer_[frame_id % kFrameWnd], kConfig->UeNum(), 1,

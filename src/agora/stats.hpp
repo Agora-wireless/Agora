@@ -14,8 +14,8 @@ static constexpr size_t kMaxStatBreakdown = 4;
 struct DurationStat {
   std::array<size_t, kMaxStatBreakdown> task_duration_;  // Unit = TSC cycles
   size_t task_count_;
-  DurationStat(void) { Reset(); }
-  void Reset(void) { std::memset(this, 0, sizeof(DurationStat)); }
+  DurationStat() { Reset(); }
+  void Reset() { std::memset(this, 0, sizeof(DurationStat)); }
 };
 
 // Temporary summary statistics assembled from per-thread runtime stats
@@ -24,7 +24,7 @@ struct FrameSummary {
   size_t count_this_thread_ = 0;
   std::array<double, kMaxStatBreakdown> us_avg_threads_;
   size_t count_all_threads_ = 0;
-  FrameSummary(void) { std::memset(this, 0, sizeof(FrameSummary)); }
+  FrameSummary() { std::memset(this, 0, sizeof(FrameSummary)); }
 };
 
 // Type of timestamps recorded at the master for a frame
@@ -52,7 +52,7 @@ static constexpr size_t kNumTimestampTypes =
 class Stats {
  public:
   Stats(Config* cfg);
-  ~Stats(void);
+  ~Stats();
 
   /// If worker stats collection is enabled, combine and update per-worker
   /// stats for all uplink and donwlink Doer types. Else return immediately.
@@ -152,12 +152,12 @@ class Stats {
                 .duration_stat_[static_cast<size_t>(doer_type)];
   }
 
-  inline size_t LastFrameId(void) const { return this->last_frame_id_; }
+  inline size_t LastFrameId() const { return this->last_frame_id_; }
 
   /// Dimensions = number of packet RX threads x kNumStatsFrames.
   /// frame_start[i][j] is the RDTSC timestamp taken by thread i when it
   /// starts receiving frame j.
-  inline Table<size_t>& FrameStart(void) { return this->frame_start_; };
+  inline Table<size_t>& FrameStart() { return this->frame_start_; };
 
  private:
   // Fill in running time summary stats for the current frame for this

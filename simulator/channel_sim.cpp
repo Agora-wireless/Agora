@@ -116,7 +116,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
   }
 }
 
-ChannelSim::~ChannelSim(void) {
+ChannelSim::~ChannelSim() {
   // delete buffers, UDP client and servers
   // delete[] socket_uerx_;
   // delete[] socket_bsrx_;

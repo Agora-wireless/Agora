@@ -150,7 +150,8 @@ std::vector<std::complex<float>> Utils::Uint32tocfloat(
 }
 
 std::vector<uint32_t> Utils::Cint16ToUint32(
-    std::vector<std::complex<int16_t>> in, bool conj, std::string order) {
+    std::vector<std::complex<int16_t>> in, bool conj,
+    const std::string& order) {
   std::vector<uint32_t> out(in.size(), 0);
   for (size_t i = 0; i < in.size(); i++) {
     uint16_t re = (uint16_t)in[i].real();
@@ -164,7 +165,7 @@ std::vector<uint32_t> Utils::Cint16ToUint32(
 }
 
 std::vector<uint32_t> Utils::Cfloat32ToUint32(
-    std::vector<std::complex<float>> in, bool conj, std::string order) {
+    std::vector<std::complex<float>> in, bool conj, const std::string& order) {
   std::vector<uint32_t> out(in.size(), 0);
   for (size_t i = 0; i < in.size(); i++) {
     uint16_t re = (uint16_t)(int16_t(in[i].real() * 32768.0));
@@ -243,7 +244,7 @@ void Utils::LoadData(const char* filename, std::vector<unsigned>& data,
   std::fclose(fp);
 }
 
-void Utils::LoadTddConfig(const std::string filename, std::string& jconfig) {
+void Utils::LoadTddConfig(const std::string& filename, std::string& jconfig) {
   std::string line;
   std::ifstream config_file(filename);
   if (config_file.is_open()) {
@@ -268,12 +269,12 @@ std::vector<std::string> Utils::Split(const std::string& s, char delimiter) {
 }
 
 void Utils::PrintVector(std::vector<std::complex<int16_t>>& data) {
-  for (size_t i = 0; i < data.size(); i++) {
-    std::cout << real(data.at(i)) << " " << imag(data.at(i)) << std::endl;
+  for (auto& i : data) {
+    std::cout << real(i) << " " << imag(i) << std::endl;
   }
 }
 
-void Utils::WriteBinaryFile(std::string name, size_t elem_size,
+void Utils::WriteBinaryFile(const std::string& name, size_t elem_size,
                             size_t buffer_size, void* buff) {
   FILE* f_handle = std::fopen(name.c_str(), "wb");
   std::fwrite(buff, elem_size, buffer_size, f_handle);
@@ -295,7 +296,7 @@ void Utils::PrintMat(arma::cx_fmat c) {
   std::cout << so.str();
 }
 
-void Utils::PrintVec(arma::cx_fvec c, std::string ss) {
+void Utils::PrintVec(arma::cx_fvec c, const std::string& ss) {
   std::stringstream so;
   so << ss << " = [";
   for (size_t j = 0; j < c.size(); j++)

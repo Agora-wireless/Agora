@@ -132,7 +132,7 @@ class Simulator {
   void InitializeQueues();
   void InitializeUplinkBuffers();
   void FreeUplinkBuffers();
-  void FreeQueues(void);
+  void FreeQueues();
 };
 
 #endif

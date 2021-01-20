@@ -9,7 +9,8 @@ MacThread::MacThread(
     Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
     Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
     moodycamel::ConcurrentQueue<EventData>* rx_queue,
-    moodycamel::ConcurrentQueue<EventData>* tx_queue, std::string log_filename)
+    moodycamel::ConcurrentQueue<EventData>* tx_queue,
+    const std::string& log_filename)
     : kMode(mode),
       cfg_(cfg),
       kFreqGhz(MeasureRdtscFreq()),

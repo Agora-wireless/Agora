@@ -123,7 +123,7 @@ class Agora {
   }
 
   /// Return a string containing the sizes of the FFT queues
-  std::string GetFftQueueSizesString(void) const {
+  std::string GetFftQueueSizesString() const {
     std::ostringstream ret;
     ret << "[";
     for (size_t i = 0; i < kFrameWnd; i++) {

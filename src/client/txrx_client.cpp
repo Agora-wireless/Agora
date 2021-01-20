@@ -551,9 +551,11 @@ void* RadioTXRX::LoopTxRxArgosSync(int tid) {
     if (resync) {
       // convert data to complex float for sync detection
       std::vector<std::complex<float>> sync_buff;
-      for (int i = 0; i < num_samps; i++)
+      sync_buff.reserve(num_samps);
+      for (int i = 0; i < num_samps; i++) {
         sync_buff.push_back(std::complex<float>(frm_buff0[i].real() / 32768.0,
                                                 frm_buff0[i].imag() / 32768.0));
+      }
       sync_index = CommsLib::FindBeaconAvx(sync_buff, c->GoldCf32());
       if (sync_index >= 0) {
         rx_offset = sync_index - c->BeaconLen() - c->OfdmTxZeroPrefix();

@@ -64,7 +64,7 @@ Agora::Agora(Config* cfg)
       kBaseWorkerCoreOffset + cfg->WorkerThreadNum() - 1);
 }
 
-Agora::~Agora(void) {
+Agora::~Agora() {
   // std::printf( "Agora: destructing\n" );
   FreeUplinkBuffers();
   /* Downlink */
@@ -1285,7 +1285,7 @@ void Agora::InitializeUplinkBuffers() {
   tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->UeNum());
 }
 
-void Agora::InitializeDownlinkBuffers(void) {
+void Agora::InitializeDownlinkBuffers() {
   if (config_->Frame().NumDLSyms() > 0) {
     std::printf("Agora: Initializing downlink buffers\n");
 
@@ -1341,7 +1341,7 @@ void Agora::InitializeDownlinkBuffers(void) {
   }
 }
 
-void Agora::FreeUplinkBuffers(void) {
+void Agora::FreeUplinkBuffers() {
   socket_buffer_.Free();
   socket_buffer_status_.Free();
   data_buffer_.Free();
@@ -1349,7 +1349,7 @@ void Agora::FreeUplinkBuffers(void) {
   ue_spec_pilot_buffer_.Free();
 }
 
-void Agora::FreeDownlinkBuffers(void) {
+void Agora::FreeDownlinkBuffers() {
   if (config_->Frame().NumDLSyms() > 0) {
     FreeBuffer1d(&dl_socket_buffer_);
     FreeBuffer1d(&dl_socket_buffer_status_);

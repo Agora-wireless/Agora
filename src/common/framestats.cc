@@ -6,6 +6,7 @@
  * @brief Class implementation for frame tracking
  */
 #include "framestats.h"
+
 #include <algorithm>
 #include <cassert>
 
@@ -74,42 +75,42 @@ void FrameStats::SetClientPilotSyms(size_t ul, size_t dl)
     this->client_dl_pilot_symbols_ = dl;
 }
 
-size_t FrameStats::NumDLCalSyms(void) const
+size_t FrameStats::NumDLCalSyms() const
 {
     return this->dl_cal_symbols_.size();
 }
 
-size_t FrameStats::NumULCalSyms(void) const
+size_t FrameStats::NumULCalSyms() const
 {
     return this->ul_cal_symbols_.size();
 }
 
-size_t FrameStats::NumDLSyms(void) const { return this->dl_symbols_.size(); }
+size_t FrameStats::NumDLSyms() const { return this->dl_symbols_.size(); }
 
-size_t FrameStats::NumULSyms(void) const { return this->ul_symbols_.size(); }
+size_t FrameStats::NumULSyms() const { return this->ul_symbols_.size(); }
 
-size_t FrameStats::NumBeaconSyms(void) const
+size_t FrameStats::NumBeaconSyms() const
 {
     return this->beacon_symbols_.size();
 }
 
-size_t FrameStats::NumPilotSyms(void) const
+size_t FrameStats::NumPilotSyms() const
 {
     return this->pilot_symbols_.size();
 }
 
-size_t FrameStats::NumTotalSyms(void) const
+size_t FrameStats::NumTotalSyms() const
 {
     return this->frame_identifier_.length();
 }
 
-bool FrameStats::IsRecCalEnabled(void) const
+bool FrameStats::IsRecCalEnabled() const
 {
     return ((this->ul_cal_symbols_.size() > 0)
         && (this->dl_cal_symbols_.size() > 0));
 }
 
-size_t FrameStats::NumDataSyms(void) const
+size_t FrameStats::NumDataSyms() const
 {
     return (this->NumTotalSyms()
         - (this->pilot_symbols_.size() + this->beacon_symbols_.size()));

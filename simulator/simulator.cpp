@@ -220,7 +220,7 @@ void Simulator::InitializeQueues() {
   }
 }
 
-void Simulator::FreeQueues(void) {
+void Simulator::FreeQueues() {
   for (size_t i = 0; i < socket_rx_thread_num_; i++) {
     delete (rx_ptoks_ptr_[i]);
   }

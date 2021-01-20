@@ -106,7 +106,7 @@ class DataGenerator {
    * modulated elements binned at the center
    */
   std::vector<complex_float> BinForIfft(
-      const std::vector<complex_float> modulated_codeword) const {
+      const std::vector<complex_float>& modulated_codeword) const {
     std::vector<complex_float> pre_ifft_symbol(cfg_->OfdmCaNum());  // Zeroed
     std::memcpy(&pre_ifft_symbol[cfg_->OfdmDataStart()], &modulated_codeword[0],
                 cfg_->OfdmDataNum() * sizeof(complex_float));

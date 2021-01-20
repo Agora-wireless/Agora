@@ -35,140 +35,134 @@ class Config {
 
   /* Constructors */
   Config(std::string);
-  ~Config(void);
+  ~Config();
 
   inline void Running(bool value) { this->running_.store(value); }
-  inline bool Running(void) const { return this->running_.load(); }
-  inline size_t BsAntNum(void) const { return this->bs_ant_num_; }
+  inline bool Running() const { return this->running_.load(); }
+  inline size_t BsAntNum() const { return this->bs_ant_num_; }
   inline void BsAntNum(size_t n_bs_ant) { this->bs_ant_num_ = n_bs_ant; }
 
   /* Inline accessors (basic types) */
-  inline bool IsUe(void) const { return this->is_ue_; }
-  inline size_t BfAntNum(void) const { return this->bf_ant_num_; }
-  inline size_t UeNum(void) const { return this->ue_num_; }
+  inline bool IsUe() const { return this->is_ue_; }
+  inline size_t BfAntNum() const { return this->bf_ant_num_; }
+  inline size_t UeNum() const { return this->ue_num_; }
 
-  inline size_t UeAntNum(void) const { return this->ue_ant_num_; }
-  inline size_t OfdmCaNum(void) const { return this->ofdm_ca_num_; }
-  inline size_t CpLen(void) const { return this->cp_len_; }
-  inline size_t OfdmDataNum(void) const { return this->ofdm_data_num_; }
-  inline size_t OfdmDataStart(void) const { return this->ofdm_data_start_; }
+  inline size_t UeAntNum() const { return this->ue_ant_num_; }
+  inline size_t OfdmCaNum() const { return this->ofdm_ca_num_; }
+  inline size_t CpLen() const { return this->cp_len_; }
+  inline size_t OfdmDataNum() const { return this->ofdm_data_num_; }
+  inline size_t OfdmDataStart() const { return this->ofdm_data_start_; }
 
-  inline size_t OfdmDataStop(void) const { return this->ofdm_data_stop_; }
-  inline size_t OfdmPilotSpacing(void) const {
-    return this->ofdm_pilot_spacing_;
-  }
-  inline double FreqGhz(void) const { return this->kFreqGhz; };
-  inline size_t DlPacketLength(void) const { return this->dl_packet_length_; }
-  inline std::string Modulation(void) const { return this->modulation_; }
+  inline size_t OfdmDataStop() const { return this->ofdm_data_stop_; }
+  inline size_t OfdmPilotSpacing() const { return this->ofdm_pilot_spacing_; }
+  inline double FreqGhz() const { return this->kFreqGhz; };
+  inline size_t DlPacketLength() const { return this->dl_packet_length_; }
+  inline std::string Modulation() const { return this->modulation_; }
 
-  inline size_t ModOrderBits(void) const { return this->mod_order_bits_; }
-  inline bool HwFramer(void) const { return this->hw_framer_; }
-  inline double Freq(void) const { return this->freq_; }
-  inline double Rate(void) const { return this->rate_; }
-  inline double Nco(void) const { return this->nco_; }
+  inline size_t ModOrderBits() const { return this->mod_order_bits_; }
+  inline bool HwFramer() const { return this->hw_framer_; }
+  inline double Freq() const { return this->freq_; }
+  inline double Rate() const { return this->rate_; }
+  inline double Nco() const { return this->nco_; }
 
-  inline double RadioRfFreq(void) const { return this->radio_rf_freq_; }
-  inline double BwFilter(void) const { return this->bw_filter_; }
-  inline bool SingleGain(void) const { return this->single_gain_; }
-  inline double TxGainA(void) const { return this->tx_gain_a_; }
-  inline double RxGainA(void) const { return this->rx_gain_a_; }
+  inline double RadioRfFreq() const { return this->radio_rf_freq_; }
+  inline double BwFilter() const { return this->bw_filter_; }
+  inline bool SingleGain() const { return this->single_gain_; }
+  inline double TxGainA() const { return this->tx_gain_a_; }
+  inline double RxGainA() const { return this->rx_gain_a_; }
 
-  inline double TxGainB(void) const { return this->tx_gain_b_; }
-  inline double RxGainB(void) const { return this->rx_gain_b_; }
-  inline double CalibTxGainA(void) const { return this->calib_tx_gain_a_; }
-  inline size_t NumCells(void) const { return this->num_cells_; }
-  inline size_t NumRadios(void) const { return this->num_radios_; }
+  inline double TxGainB() const { return this->tx_gain_b_; }
+  inline double RxGainB() const { return this->rx_gain_b_; }
+  inline double CalibTxGainA() const { return this->calib_tx_gain_a_; }
+  inline size_t NumCells() const { return this->num_cells_; }
+  inline size_t NumRadios() const { return this->num_radios_; }
 
-  inline size_t NumAntennas(void) const { return this->num_antennas_; }
-  inline size_t NumChannels(void) const { return this->num_channels_; }
-  inline size_t RefAnt(void) const { return this->ref_ant_; }
-  inline size_t BeaconAnt(void) const { return this->beacon_ant_; }
-  inline size_t BeaconLen(void) const { return this->beacon_len_; }
+  inline size_t NumAntennas() const { return this->num_antennas_; }
+  inline size_t NumChannels() const { return this->num_channels_; }
+  inline size_t RefAnt() const { return this->ref_ant_; }
+  inline size_t BeaconAnt() const { return this->beacon_ant_; }
+  inline size_t BeaconLen() const { return this->beacon_len_; }
 
-  inline bool Beamsweep(void) const { return this->beamsweep_; }
-  inline bool SampleCalEn(void) const { return this->sample_cal_en_; }
-  inline bool ImbalanceCalEn(void) const { return this->imbalance_cal_en_; }
-  inline bool ExternalRefNode(void) const { return this->external_ref_node_; }
-  inline std::string Channel(void) const { return this->channel_; }
+  inline bool Beamsweep() const { return this->beamsweep_; }
+  inline bool SampleCalEn() const { return this->sample_cal_en_; }
+  inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
+  inline bool ExternalRefNode() const { return this->external_ref_node_; }
+  inline std::string Channel() const { return this->channel_; }
 
-  inline size_t AntGroupNum(void) const { return this->ant_group_num_; }
-  inline size_t AntPerGroup(void) const { return this->ant_per_group_; }
-  inline size_t CoreOffset(void) const { return this->core_offset_; }
-  inline size_t WorkerThreadNum(void) const { return this->worker_thread_num_; }
-  inline size_t SocketThreadNum(void) const { return this->socket_thread_num_; }
+  inline size_t AntGroupNum() const { return this->ant_group_num_; }
+  inline size_t AntPerGroup() const { return this->ant_per_group_; }
+  inline size_t CoreOffset() const { return this->core_offset_; }
+  inline size_t WorkerThreadNum() const { return this->worker_thread_num_; }
+  inline size_t SocketThreadNum() const { return this->socket_thread_num_; }
 
-  inline size_t FftThreadNum(void) const { return this->fft_thread_num_; }
-  inline size_t DemulThreadNum(void) const { return this->demul_thread_num_; }
-  inline size_t DecodeThreadNum(void) const { return this->decode_thread_num_; }
-  inline size_t ZfThreadNum(void) const { return this->zf_thread_num_; }
-  inline size_t DemulBlockSize(void) const { return this->demul_block_size_; }
+  inline size_t FftThreadNum() const { return this->fft_thread_num_; }
+  inline size_t DemulThreadNum() const { return this->demul_thread_num_; }
+  inline size_t DecodeThreadNum() const { return this->decode_thread_num_; }
+  inline size_t ZfThreadNum() const { return this->zf_thread_num_; }
+  inline size_t DemulBlockSize() const { return this->demul_block_size_; }
 
-  inline size_t DemulEventsPerSymbol(void) const {
+  inline size_t DemulEventsPerSymbol() const {
     return this->demul_events_per_symbol_;
   }
-  inline size_t ZfBlockSize(void) const { return this->zf_block_size_; }
-  inline size_t ZfBatchSize(void) const { return this->zf_batch_size_; }
-  inline size_t ZfEventsPerSymbol(void) const {
+  inline size_t ZfBlockSize() const { return this->zf_block_size_; }
+  inline size_t ZfBatchSize() const { return this->zf_batch_size_; }
+  inline size_t ZfEventsPerSymbol() const {
     return this->zf_events_per_symbol_;
   }
-  inline size_t FftBlockSize(void) const { return this->fft_block_size_; }
+  inline size_t FftBlockSize() const { return this->fft_block_size_; }
 
-  inline size_t EncodeBlockSize(void) const { return this->encode_block_size_; }
-  inline bool FreqOrthogonalPilot(void) const {
+  inline size_t EncodeBlockSize() const { return this->encode_block_size_; }
+  inline bool FreqOrthogonalPilot() const {
     return this->freq_orthogonal_pilot_;
   }
-  inline size_t OfdmTxZeroPrefix(void) const {
-    return this->ofdm_tx_zero_prefix_;
-  }
-  inline size_t OfdmTxZeroPostfix(void) const {
+  inline size_t OfdmTxZeroPrefix() const { return this->ofdm_tx_zero_prefix_; }
+  inline size_t OfdmTxZeroPostfix() const {
     return this->ofdm_tx_zero_postfix_;
   }
-  inline size_t OfdmRxZeroPrefixBs(void) const {
+  inline size_t OfdmRxZeroPrefixBs() const {
     return this->ofdm_rx_zero_prefix_bs_;
   }
 
-  inline size_t OfdmRxZeroPrefixCalUl(void) const {
+  inline size_t OfdmRxZeroPrefixCalUl() const {
     return this->ofdm_rx_zero_prefix_cal_ul_;
   }
-  inline size_t OfdmRxZeroPrefixCalDl(void) const {
+  inline size_t OfdmRxZeroPrefixCalDl() const {
     return this->ofdm_rx_zero_prefix_cal_dl_;
   }
-  inline size_t OfdmRxZeroPrefixClient(void) const {
+  inline size_t OfdmRxZeroPrefixClient() const {
     return this->ofdm_rx_zero_prefix_client_;
   }
-  inline size_t SampsPerSymbol(void) const { return this->samps_per_symbol_; }
-  inline size_t PacketLength(void) const { return this->packet_length_; }
+  inline size_t SampsPerSymbol() const { return this->samps_per_symbol_; }
+  inline size_t PacketLength() const { return this->packet_length_; }
 
-  inline int ClTxAdvance(void) const { return this->cl_tx_advance_; }
-  inline float Scale(void) const { return this->scale_; }
-  inline bool BigstationMode(void) const { return this->bigstation_mode_; }
-  inline size_t MacDataBytesNumPerframe(void) const {
+  inline int ClTxAdvance() const { return this->cl_tx_advance_; }
+  inline float Scale() const { return this->scale_; }
+  inline bool BigstationMode() const { return this->bigstation_mode_; }
+  inline size_t MacDataBytesNumPerframe() const {
     return this->mac_data_bytes_num_perframe_;
   }
-  inline size_t MacBytesNumPerframe(void) const {
+  inline size_t MacBytesNumPerframe() const {
     return this->mac_bytes_num_perframe_;
   }
 
-  inline size_t MacPacketLength(void) const { return this->mac_packet_length_; }
-  inline size_t MacPayloadLength(void) const {
-    return this->mac_payload_length_;
-  }
-  inline size_t MacPacketsPerframe(void) const {
+  inline size_t MacPacketLength() const { return this->mac_packet_length_; }
+  inline size_t MacPayloadLength() const { return this->mac_payload_length_; }
+  inline size_t MacPacketsPerframe() const {
     return this->mac_packets_perframe_;
   }
-  inline std::string UeServerAddr(void) const { return this->ue_server_addr_; }
-  inline std::string BsServerAddr(void) const { return this->bs_server_addr_; }
+  inline std::string UeServerAddr() const { return this->ue_server_addr_; }
+  inline std::string BsServerAddr() const { return this->bs_server_addr_; }
 
-  inline std::string BsRruAddr(void) const { return this->bs_rru_addr_; }
-  inline int BsServerPort(void) const { return this->bs_server_port_; }
-  inline int BsRruPort(void) const { return this->bs_rru_port_; }
-  inline int UeServerPort(void) const { return this->ue_server_port_; }
-  inline int UeRruPort(void) const { return this->ue_rru_port_; }
+  inline std::string BsRruAddr() const { return this->bs_rru_addr_; }
+  inline int BsServerPort() const { return this->bs_server_port_; }
+  inline int BsRruPort() const { return this->bs_rru_port_; }
+  inline int UeServerPort() const { return this->ue_server_port_; }
+  inline int UeRruPort() const { return this->ue_rru_port_; }
 
-  inline size_t FramesToTest(void) const { return this->frames_to_test_; }
-  inline float NoiseLevel(void) const { return this->noise_level_; }
-  inline size_t NumBytesPerCb(void) const { return this->num_bytes_per_cb_; }
-  inline bool FftInRru(void) const { return this->fft_in_rru_; }
+  inline size_t FramesToTest() const { return this->frames_to_test_; }
+  inline float NoiseLevel() const { return this->noise_level_; }
+  inline size_t NumBytesPerCb() const { return this->num_bytes_per_cb_; }
+  inline bool FftInRru() const { return this->fft_in_rru_; }
 
   // inline size_t mod_order( void )       const { return this->mod_order_; }
   // inline double calib_tx_gain_b( void ) const { return
@@ -186,67 +180,59 @@ class Config {
   // ) const { return this->transport_block_size_; }
 
   /* Inline accessors (complex types) */
-  inline const LDPCconfig& LdpcConfig(void) const { return this->ldpc_config_; }
-  inline const FrameStats& Frame(void) const { return this->frame_; }
-  inline const std::vector<std::complex<float>>& PilotCf32(void) const {
+  inline const LDPCconfig& LdpcConfig() const { return this->ldpc_config_; }
+  inline const FrameStats& Frame() const { return this->frame_; }
+  inline const std::vector<std::complex<float>>& PilotCf32() const {
     return this->pilot_cf32_;
   };
-  inline const std::vector<std::complex<float>>& GoldCf32(void) const {
+  inline const std::vector<std::complex<float>>& GoldCf32() const {
     return this->gold_cf32_;
   };
-  inline const std::vector<uint32_t>& Coeffs(void) const {
-    return this->coeffs_;
-  };
+  inline const std::vector<uint32_t>& Coeffs() const { return this->coeffs_; };
 
-  inline const std::vector<uint32_t>& Pilot(void) const {
-    return this->pilot_;
-  };
-  inline const std::vector<uint32_t>& Beacon(void) const {
-    return this->beacon_;
-  };
+  inline const std::vector<uint32_t>& Pilot() const { return this->pilot_; };
+  inline const std::vector<uint32_t>& Beacon() const { return this->beacon_; };
   // inline const complex_float *pilots (void ) const { return this->pilots_; };
-  inline const complex_float* PilotsSgn(void) const {
-    return this->pilots_sgn_;
-  };
-  inline const std::vector<std::complex<float>>& CommonPilot(void) const {
+  inline const complex_float* PilotsSgn() const { return this->pilots_sgn_; };
+  inline const std::vector<std::complex<float>>& CommonPilot() const {
     return this->common_pilot_;
   };
-  inline const std::vector<double>& ClientGainAdjA(void) const {
+  inline const std::vector<double>& ClientGainAdjA() const {
     return this->client_gain_adj_a_;
   };
 
-  inline const std::vector<double>& ClientGainAdjB(void) const {
+  inline const std::vector<double>& ClientGainAdjB() const {
     return this->client_gain_adj_b_;
   };
-  inline const std::vector<std::string>& RadioIds(void) const {
+  inline const std::vector<std::string>& RadioIds() const {
     return this->radio_ids_;
   };
-  inline const std::vector<std::string>& HubIds(void) const {
+  inline const std::vector<std::string>& HubIds() const {
     return this->hub_ids_;
   };
 
   /* non-const (can modify) */
-  inline Table<complex_float>& UeSpecificPilot(void) {
+  inline Table<complex_float>& UeSpecificPilot() {
     return this->ue_specific_pilot_;
   };
-  inline Table<std::complex<int16_t>>& UeSpecificPilotT(void) {
+  inline Table<std::complex<int16_t>>& UeSpecificPilotT() {
     return this->ue_specific_pilot_t_;
   };
-  inline std::vector<std::complex<int16_t>>& PilotCi16(void) {
+  inline std::vector<std::complex<int16_t>>& PilotCi16() {
     return this->pilot_ci16_;
   };
-  inline std::vector<std::complex<int16_t>>& BeaconCi16(void) {
+  inline std::vector<std::complex<int16_t>>& BeaconCi16() {
     return this->beacon_ci16_;
   };
 
-  inline Table<int8_t>& DlBits(void) { return this->dl_bits_; }
-  inline Table<int8_t>& UlBits(void) { return this->ul_bits_; }
-  inline Table<complex_float>& UlIqF(void) { return this->ul_iq_f_; }
-  inline Table<std::complex<int16_t>>& DlIqT(void) { return this->dl_iq_t_; }
-  inline Table<complex_float>& ModTable(void) { return this->mod_table_; };
+  inline Table<int8_t>& DlBits() { return this->dl_bits_; }
+  inline Table<int8_t>& UlBits() { return this->ul_bits_; }
+  inline Table<complex_float>& UlIqF() { return this->ul_iq_f_; }
+  inline Table<std::complex<int16_t>>& DlIqT() { return this->dl_iq_t_; }
+  inline Table<complex_float>& ModTable() { return this->mod_table_; };
 
   /* Public functions */
-  void GenData(void);
+  void GenData();
 
   /// TODO document and review
   size_t GetSymbolId(size_t symbol_id) const;
@@ -271,7 +257,7 @@ class Config {
   SymbolType GetSymbolType(size_t symbol_id) const;
 
   /* Inline functions */
-  inline size_t GetNumAntennas(void) const {
+  inline size_t GetNumAntennas() const {
     return (this->num_radios_ * this->num_channels_);
   }
 
@@ -305,7 +291,7 @@ class Config {
   }
 
   /// Return the frame duration in seconds
-  inline double GetFrameDurationSec(void) const {
+  inline double GetFrameDurationSec() const {
     return ((this->frame_.NumTotalSyms() * this->samps_per_symbol_) /
             this->rate_);
   }
@@ -355,7 +341,7 @@ class Config {
 
   // Returns the number of pilot subcarriers in downlink symbols used for
   // phase tracking
-  inline size_t GetOFDMPilotNum(void) const {
+  inline size_t GetOFDMPilotNum() const {
     return ofdm_data_num_ / ofdm_pilot_spacing_;
   }
 

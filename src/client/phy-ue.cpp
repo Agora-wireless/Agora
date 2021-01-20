@@ -99,25 +99,24 @@ PhyUe::PhyUe(Config* config) {
 
   // initilize all kinds of checkers
   std::memset(fft_status_, 0, sizeof(size_t) * kFrameWnd);
-  for (size_t i = 0; i < kFrameWnd; i++) {
-    fft_checker_[i] = new size_t[config_->UeAntNum()];
-    std::memset(fft_checker_[i], 0, sizeof(size_t) * (config_->UeAntNum()));
+  for (auto& i : fft_checker_) {
+    i = new size_t[config_->UeAntNum()];
+    std::memset(i, 0, sizeof(size_t) * (config_->UeAntNum()));
   }
 
   std::memset(demul_status_, 0, sizeof(size_t) * kFrameWnd);
   if (dl_data_symbol_perframe_ > 0) {
-    for (size_t i = 0; i < kFrameWnd; i++) {
-      demul_checker_[i] = new size_t[config_->UeAntNum()];
-      std::memset(demul_checker_[i], 0, sizeof(size_t) * (config_->UeAntNum()));
+    for (auto& i : demul_checker_) {
+      i = new size_t[config_->UeAntNum()];
+      std::memset(i, 0, sizeof(size_t) * (config_->UeAntNum()));
     }
   }
 
   std::memset(decode_status_, 0, sizeof(size_t) * kFrameWnd);
   if (dl_data_symbol_perframe_ > 0) {
-    for (size_t i = 0; i < kFrameWnd; i++) {
-      decode_checker_[i] = new size_t[config_->UeAntNum()];
-      std::memset(decode_checker_[i], 0,
-                  sizeof(size_t) * (config_->UeAntNum()));
+    for (auto& i : decode_checker_) {
+      i = new size_t[config_->UeAntNum()];
+      std::memset(i, 0, sizeof(size_t) * (config_->UeAntNum()));
     }
   }
 
@@ -1074,7 +1073,7 @@ void PhyUe::DoIfft(int tid, size_t tag) {
            "Muliplexing message enqueue failed");
 }
 
-void PhyUe::InitializeVarsFromCfg(void) {
+void PhyUe::InitializeVarsFromCfg() {
   dl_pilot_symbol_perframe_ = config_->Frame().ClientDlPilotSymbols();
   ul_pilot_symbol_perframe_ = config_->Frame().ClientUlPilotSymbols();
   ul_symbol_perframe_ = config_->Frame().NumULSyms();
@@ -1124,7 +1123,7 @@ void PhyUe::InitializeUplinkBuffers() {
                 Agora_memory::Alignment_t::k64Align, 1);
 }
 
-void PhyUe::InitializeDownlinkBuffers(void) {
+void PhyUe::InitializeDownlinkBuffers() {
   // initialize rx buffer
   rx_buffer_.Malloc(rx_thread_num_, rx_buffer_size_,
                     Agora_memory::Alignment_t::k64Align);
@@ -1141,8 +1140,9 @@ void PhyUe::InitializeDownlinkBuffers(void) {
 
   // initialize CSI buffer
   csi_buffer_.resize(config_->UeAntNum() * kFrameWnd);
-  for (size_t i = 0; i < csi_buffer_.size(); i++)
-    csi_buffer_[i].resize(config_->OfdmDataNum());
+  for (auto& i : csi_buffer_) {
+    i.resize(config_->OfdmDataNum());
+  }
 
   if (dl_data_symbol_perframe_ > 0) {
     // initialize equalized data buffer
@@ -1150,8 +1150,9 @@ void PhyUe::InitializeDownlinkBuffers(void) {
         dl_data_symbol_perframe_ * kFrameWnd;
     size_t buffer_size = config_->UeAntNum() * task_buffer_symbol_num_dl;
     equal_buffer_.resize(buffer_size);
-    for (size_t i = 0; i < equal_buffer_.size(); i++)
-      equal_buffer_[i].resize(config_->OfdmDataNum());
+    for (auto& i : equal_buffer_) {
+      i.resize(config_->OfdmDataNum());
+    }
 
     // initialize demod buffer
     dl_demod_buffer_.Calloc(buffer_size, config_->OfdmDataNum() * kMaxModType,
@@ -1159,9 +1160,10 @@ void PhyUe::InitializeDownlinkBuffers(void) {
 
     // initialize decode buffer
     dl_decode_buffer_.resize(buffer_size);
-    for (size_t i = 0; i < dl_decode_buffer_.size(); i++)
-      dl_decode_buffer_[i].resize(Roundup<64>(config_->NumBytesPerCb()) *
-                                  config_->LdpcConfig().NumBlocksInSymbol());
+    for (auto& i : dl_decode_buffer_) {
+      i.resize(Roundup<64>(config_->NumBytesPerCb()) *
+               config_->LdpcConfig().NumBlocksInSymbol());
+    }
     resp_var_nodes_ = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
         Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
 

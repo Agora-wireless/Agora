@@ -252,8 +252,8 @@ std::vector<float> CommsLib::HannWindowFunction(size_t fftSize) {
 double CommsLib::WindowFunctionPower(std::vector<float> const& win) {
   double window_power = (0);
   size_t n = win.size();
-  for (size_t n = 0; n < win.size(); n++) {
-    window_power += std::norm(win[n]);
+  for (float n : win) {
+    window_power += std::norm(n);
   }
   window_power = std::sqrt(window_power / n);
   return 20 * std::log10(n * window_power);
@@ -436,8 +436,9 @@ std::vector<std::complex<float>> CommsLib::ComposePartialPilotSym(
   }
   if (timeDomain) {
     auto pilot_cf32 = CommsLib::IFFT(fft_in, fftSize);
-    for (size_t i = 0; i < pilot_cf32.size(); i++)
-      pilot_cf32[i] /= std::sqrt(period);
+    for (auto& i : pilot_cf32) {
+      i /= std::sqrt(period);
+    }
     pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
                       pilot_cf32.end());  // add CP
     return pilot_cf32;

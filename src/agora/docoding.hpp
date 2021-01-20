@@ -1,10 +1,9 @@
 #ifndef DOCODING
 #define DOCODING
 
-#include <stdio.h>
-#include <string.h>
-
 #include <armadillo>
+#include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <vector>
 

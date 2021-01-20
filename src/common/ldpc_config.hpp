@@ -22,13 +22,13 @@ class LDPCconfig {
 
   // Return the number of bytes in the information bit sequence for LDPC
   // encoding of one code block
-  size_t NumInputBytes(void) const {
+  size_t NumInputBytes() const {
     return BitsToBytes(
         LdpcNumInputBits(this->base_graph_, this->expansion_factor_));
   }
 
   // Return the number of bytes in the encoded LDPC code word
-  size_t NumEncodedBytes(void) const {
+  size_t NumEncodedBytes() const {
     return BitsToBytes(LdpcNumEncodedBits(
         this->base_graph_, this->expansion_factor_, this->num_rows_));
   }
@@ -38,21 +38,19 @@ class LDPCconfig {
   }
 
   /* Accessors */
-  inline uint16_t BaseGraph(void) const { return this->base_graph_; }
-  inline uint16_t ExpansionFactor(void) const {
-    return this->expansion_factor_;
-  }
-  inline int16_t MaxDecoderIter(void) const { return this->max_decoder_iter_; }
-  inline bool EarlyTermination(void) const { return this->early_termination_; }
-  inline uint32_t NumCbLen(void) const { return this->num_cb_len_; }
-  inline uint32_t NumCbCodewLen(void) const { return this->num_cb_codew_len_; }
-  inline size_t NumRows(void) const { return this->num_rows_; }
-  inline size_t NumBlocksInSymbol(void) const {
+  inline uint16_t BaseGraph() const { return this->base_graph_; }
+  inline uint16_t ExpansionFactor() const { return this->expansion_factor_; }
+  inline int16_t MaxDecoderIter() const { return this->max_decoder_iter_; }
+  inline bool EarlyTermination() const { return this->early_termination_; }
+  inline uint32_t NumCbLen() const { return this->num_cb_len_; }
+  inline uint32_t NumCbCodewLen() const { return this->num_cb_codew_len_; }
+  inline size_t NumRows() const { return this->num_rows_; }
+  inline size_t NumBlocksInSymbol() const {
     return this->num_blocks_in_symbol_;
   }
 
  private:
-  LDPCconfig(void) {}
+  LDPCconfig() {}
 
   uint16_t base_graph_;        /// The 5G NR LDPC base graph (one or two)
   uint16_t expansion_factor_;  /// The 5G NR LDPC expansion factor

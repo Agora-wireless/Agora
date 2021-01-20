@@ -110,8 +110,8 @@ TEST(TestZF, VaryingConfig) {
   moodycamel::ProducerToken* ptoks[kNumWorkers];
   auto complete_task_queue =
       moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
-  for (size_t i = 0; i < kNumWorkers; i++) {
-    ptoks[i] = new moodycamel::ProducerToken(complete_task_queue);
+  for (auto& ptok : ptoks) {
+    ptok = new moodycamel::ProducerToken(complete_task_queue);
   }
 
   Table<complex_float> calib_dl_buffer;
@@ -150,8 +150,8 @@ TEST(TestZF, VaryingConfig) {
 
   calib_dl_buffer.Free();
   calib_ul_buffer.Free();
-  for (size_t i = 0; i < kNumWorkers; i++) {
-    delete (ptoks[i]);
+  for (auto& ptok : ptoks) {
+    delete ptok;
   }
 }
 

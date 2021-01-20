@@ -352,8 +352,8 @@ class FrameCounters {
     return this->task_count_.at(frame_id % kFrameWnd).at(symbol_id);
   }
 
-  inline size_t MaxSymbolCount(void) const { return this->max_symbol_count_; }
-  inline size_t MaxTaskCount(void) const { return this->max_task_count_; }
+  inline size_t MaxSymbolCount() const { return this->max_symbol_count_; }
+  inline size_t MaxTaskCount() const { return this->max_task_count_; }
 
  private:
   // task_count[i][j] is the number of tasks completed for

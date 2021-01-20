@@ -148,7 +148,7 @@ class PhyUe {
                     moodycamel::ConcurrentQueue<EventData>* in_queue,
                     moodycamel::ProducerToken const& ptok);
 
-  void InitializeVarsFromCfg(void);
+  void InitializeVarsFromCfg();
 
  private:
   Config* config_;

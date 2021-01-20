@@ -129,7 +129,7 @@ void Stats::UpdateStats(size_t frame_id) {
   }
 }
 
-void Stats::SaveToFile(void) {
+void Stats::SaveToFile() {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = cur_directory + "/data/timeresult.txt";
   std::printf("Stats: Saving master timestamps to %s\n", filename.c_str());
@@ -315,16 +315,15 @@ size_t Stats::GetTotalTaskCount(DoerType doer_type, size_t thread_num) {
   return total_count;
 }
 
-void Stats::PrintSummary(void) {
+void Stats::PrintSummary() {
   std::printf("Stats: total processed frames %zu\n", this->last_frame_id_ + 1);
   if (kIsWorkerTimingEnabled == false) {
     std::printf("Stats: Worker timing is disabled. Not printing summary\n");
   } else {
     std::vector<size_t> num_tasks;
 
-    for (size_t j = 0u; j < kAllDoerTypes.size(); j++) {
-      num_tasks.push_back(
-          GetTotalTaskCount(kAllDoerTypes.at(j), kTaskThreadNum));
+    for (auto kAllDoerType : kAllDoerTypes) {
+      num_tasks.push_back(GetTotalTaskCount(kAllDoerType, kTaskThreadNum));
     }
 
     double csi_frames =

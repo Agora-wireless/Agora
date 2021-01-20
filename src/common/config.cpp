@@ -9,7 +9,7 @@
 
 Config::Config(std::string jsonfile)
     : kFreqGhz(MeasureRdtscFreq()),
-      ldpc_config_(0, 0, 0, 0, 0, 0, 0, 0),
+      ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_("") {
   pilots_ = nullptr;
   pilots_sgn_ = nullptr;
@@ -395,7 +395,7 @@ Config::Config(std::string jsonfile)
       mac_data_bytes_num_perframe_, mac_bytes_num_perframe_);
 }
 
-void Config::GenData(void) {
+void Config::GenData() {
   if ((kUseArgos == true) || (kUseUHD == true)) {
     std::vector<std::vector<double>> gold_ifft =
         CommsLib::GetSequence(128, CommsLib::GOLD_IFFT);
