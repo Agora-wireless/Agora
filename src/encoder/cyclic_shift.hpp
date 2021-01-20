@@ -16,4 +16,4 @@ typedef __m256i (*CYCLIC_BIT_SHIFT)(__m256i, int16_t, int16_t);
 CYCLIC_BIT_SHIFT LdpcSelectShiftFunc(int16_t zcSize);
 }  // namespace avx2enc
 
-#endif // CYCLIC_SHIFT_H_
+#endif  // CYCLIC_SHIFT_H_

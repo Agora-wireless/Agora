@@ -24,4 +24,4 @@ class SignalHandler {
   void SetupSignalHandlers();
   static void ExitSignalHandler(int _ignored);
 };
-#endif // SIGNALHANDLER_H_
+#endif  // SIGNALHANDLER_H_

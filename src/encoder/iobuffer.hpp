@@ -19,4 +19,4 @@ using LDPC_ADAPTER_P = void (*)(int8_t*, int8_t*, uint16_t, uint32_t, int8_t);
 LDPC_ADAPTER_P LdpcSelectAdapterFunc(uint16_t zcSize);
 }  // namespace avx2enc
 
-#endif // IOBUFFER_H_
+#endif  // IOBUFFER_H_

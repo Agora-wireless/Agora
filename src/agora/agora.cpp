@@ -1412,7 +1412,7 @@ void Agora::GetEqualData(float** ptr, int* size) {
   *size = cfg->UeNum() * cfg->OfdmDataNum() * 2;
 }
 
-void Agora::CheckIncrementScheduleFrame(size_t frame_id,
+void Agora::CheckIncrementScheduleFrame(size_t /*frame_id*/,
                                         ScheduleProcessingFlags completed) {
   this->schedule_process_flags_ += completed;
 

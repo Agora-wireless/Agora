@@ -30,4 +30,4 @@ int32_t BblibLdpcEncoder5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
 // Using the larger of the two works for padding buffers.
 static constexpr size_t kMaxProcBytes = 64;
 
-#endif // ENCODER_H_
+#endif  // ENCODER_H_

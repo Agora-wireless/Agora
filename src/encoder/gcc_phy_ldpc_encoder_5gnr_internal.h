@@ -449,4 +449,4 @@ __attribute__((
 }
 #endif
 
-#endif // PHY_LDPC_ENCODER_5GNR_INTERNAL_H_
+#endif  // PHY_LDPC_ENCODER_5GNR_INTERNAL_H_

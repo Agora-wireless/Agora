@@ -15,4 +15,4 @@ void SetupSockaddrRemoteIpv4(struct sockaddr_in* remote_addr, int port_id,
 void SetupSockaddrRemoteIpv6(struct sockaddr_in6* remote_addr, int port_id,
                              const char* remote_inet_addr);
 
-#endif // NET_H_
+#endif  // NET_H_

@@ -204,4 +204,4 @@ class FastRand {
     return static_cast<uint32_t>(seed_ >> 32);
   }
 };
-#endif // UTILS_HEADER_
+#endif  // UTILS_HEADER_

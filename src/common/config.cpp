@@ -847,19 +847,19 @@ Config::~Config() {
 
 /* Returns SIZE_MAX if symbol not a DL symbol, otherwise the index into
  * frame_.dl_symbols_ */
-size_t Config::GetDLSymbolIdx(size_t frame_id, size_t symbol_id) const {
+size_t Config::GetDLSymbolIdx(size_t /*frame_id*/, size_t symbol_id) const {
   return this->frame_.GetDLSymbolIdx(symbol_id);
 }
 
 /* Returns SIZE_MAX if symbol not a DL symbol, otherwise the index into
  * frame_.dl_symbols_ */
-size_t Config::GetULSymbolIdx(size_t frame_id, size_t symbol_id) const {
+size_t Config::GetULSymbolIdx(size_t /*frame_id*/, size_t symbol_id) const {
   return this->frame_.GetULSymbolIdx(symbol_id);
 }
 
 /* Returns SIZE_MAX if symbol not a Pilot symbol, otherwise the index into
  * frame_.pilot_symbols_ */
-size_t Config::GetPilotSymbolIdx(size_t frame_id, size_t symbol_id) const {
+size_t Config::GetPilotSymbolIdx(size_t /*frame_id*/, size_t symbol_id) const {
   return this->frame_.GetPilotSymbolIdx(symbol_id);
 }
 
@@ -883,7 +883,7 @@ size_t Config::GetSymbolId(size_t input_id) const {
 
 /* Returns True if symbol is valid index and is of symbol type 'P' or
    if user equiptment and is a client dl pilot_.  False otherwise */
-bool Config::IsPilot(size_t frame_id, size_t symbol_id) const {
+bool Config::IsPilot(size_t /*frame_id*/, size_t symbol_id) const {
   bool is_pilot = false;
   assert(symbol_id < this->frame_.NumTotalSyms());
   char s = frame_.FrameIdentifier().at(symbol_id);
@@ -902,7 +902,7 @@ bool Config::IsPilot(size_t frame_id, size_t symbol_id) const {
   return is_pilot;
 }
 
-bool Config::IsCalDlPilot(size_t frame_id, size_t symbol_id) const {
+bool Config::IsCalDlPilot(size_t /*frame_id*/, size_t symbol_id) const {
   bool is_cal_dl_pilot = false;
   assert(symbol_id < this->frame_.NumTotalSyms());
   if (this->is_ue_ == false) {
@@ -911,7 +911,7 @@ bool Config::IsCalDlPilot(size_t frame_id, size_t symbol_id) const {
   return is_cal_dl_pilot;
 }
 
-bool Config::IsCalUlPilot(size_t frame_id, size_t symbol_id) const {
+bool Config::IsCalUlPilot(size_t /*frame_id*/, size_t symbol_id) const {
   bool is_cal_ul_pilot = false;
   assert(symbol_id < this->frame_.NumTotalSyms());
   if (this->is_ue_ == false) {
@@ -920,7 +920,7 @@ bool Config::IsCalUlPilot(size_t frame_id, size_t symbol_id) const {
   return is_cal_ul_pilot;
 }
 
-bool Config::IsUplink(size_t frame_id, size_t symbol_id) const {
+bool Config::IsUplink(size_t /*frame_id*/, size_t symbol_id) const {
   assert(symbol_id < this->frame_.NumTotalSyms());
   char s = frame_.FrameIdentifier().at(symbol_id);
 #ifdef DEBUG3
