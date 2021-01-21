@@ -258,6 +258,7 @@ Event_data DoDecode::launch(size_t tag)
 
 void DoDecode::start_work()
 {
+    printf("Decode for ue %u starts to work!\n", ue_id_);
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_cb_ > 0
             || decode_status_->received_all_demod_data(
@@ -266,6 +267,7 @@ void DoDecode::start_work()
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                 cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
+            // printf("Start to decode user %lu frame %lu symbol %lu end\n", ue_id_, cur_frame_, cur_symbol_);
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                 cur_cb_ = 0;
