@@ -30,8 +30,6 @@ Agora::Agora(Config* cfg)
   // correctly.
   cur_sche_frame_id_ = 0;
 
-  PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0,
-                      false /* quiet */);
   InitializeQueues();
   InitializeUplinkBuffers();
   InitializeDownlinkBuffers();
@@ -230,7 +228,7 @@ void Agora::Start() {
   const auto& cfg = this->config_;
 
   // Start packet I/O
-  if (packet_tx_rx_->StartTxrx(socket_buffer_, socket_buffer_status_,
+  if (packet_tx_rx_->StartTxRx(socket_buffer_, socket_buffer_status_,
                                socket_buffer_status_size_,
                                this->stats_->FrameStart(), dl_socket_buffer_,
                                calib_dl_buffer_, calib_ul_buffer_) == false) {
@@ -239,7 +237,7 @@ void Agora::Start() {
   }
 
   PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0,
-                      false /* quiet */);
+                      true /* quiet */);
 
   // Counters for printing summary
   size_t tx_count = 0;
@@ -546,13 +544,10 @@ void Agora::Start() {
             if (last_tx_symbol == true) {
               this->stats_->MasterSetTsc(TsType::kTXDone, frame_id);
               PrintPerFrameDone(PrintType::kPacketTX, frame_id);
-              // bool work_finished = this->CheckWorkComplete(frame_id);
-              // if (work_finished == true) {
               this->tx_counters_.Reset(frame_id);
               if (frame_id == (this->config_->FramesToTest() - 1)) {
                 goto finish;
               }
-              tx_counters_.Reset(frame_id);
             }
 
             tx_count++;
@@ -695,7 +690,7 @@ void Agora::HandleEventFft(size_t tag) {
 
 void Agora::Worker(int tid) {
   PinToCoreWithOffset(ThreadType::kWorker, kBaseWorkerCoreOffset, tid,
-                      false /* quiet */);
+                      true /* quiet */);
 
   /* Initialize operators */
   std::unique_ptr<DoZF> compute_zf(
@@ -1435,11 +1430,16 @@ void Agora::CheckIncrementScheduleFrame(size_t /*frame_id*/,
 bool Agora::CheckWorkComplete(size_t frame_id) {
   bool finished = false;
 
-  // std::printf("\nChecking work complete %zu, ifft %d, tx %d, decode %d, tomac
-  // %d\n\n", frame_id, this->ifft_counters_.IsLastSymbol( frame_id ),
-  // this->tx_counters_.IsLastSymbol( frame_id ) ,
-  // this->decode_counters_.IsLastSymbol( frame_id ),
-  // this->tomac_counters_.IsLastSymbol( frame_id ));
+  std::printf(
+      "\nChecking work complete %zu, ifft %d, tx %d, decode %d, tomac %d, "
+      "finished %d\n",
+      frame_id, this->ifft_counters_.IsLastSymbol(frame_id),
+      this->tx_counters_.IsLastSymbol(frame_id),
+      this->decode_counters_.IsLastSymbol(frame_id),
+      this->tomac_counters_.IsLastSymbol(frame_id),
+      ((this->decode_counters_.IsLastSymbol(frame_id) == true) &&
+       (this->ifft_counters_.IsLastSymbol(frame_id) == true) &&
+       (true == this->tomac_counters_.IsLastSymbol(frame_id))));
 
   //(true == this->tx_counters_.IsLastSymbol( frame_id )
   // Complete if last frame and ifft / decode complete
