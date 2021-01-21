@@ -72,7 +72,7 @@ class PacketTXRX {
    * @return True on successfully starting the network I/O threads, false
    * otherwise
    */
-  bool StartTxrx(Table<char>& buffer, Table<int>& buffer_status,
+  bool StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
                  size_t packet_num_in_buffer, Table<size_t>& frame_start,
                  char* tx_buffer, Table<complex_float>& calib_dl_buffer_,
                  Table<complex_float>& calib_ul_buffer_);

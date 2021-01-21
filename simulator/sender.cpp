@@ -56,19 +56,19 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   task_ptok_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::k64Align,
-          (socket_thread_num * sizeof(moodycamel::ProducerToken*))));
-  for (size_t i = 0; i < socket_thread_num; i++) {
+          (kSocketThreadNum * sizeof(moodycamel::ProducerToken*))));
+  for (size_t i = 0; i < kSocketThreadNum; i++) {
     task_ptok_[i] = new moodycamel::ProducerToken(send_queue_);
   }
 
   // Create a master thread when started from simulator
   if (create_thread_for_master == true) {
-    CreateThreads(PthreadFunWrapper<Sender, &Sender::MasterThread>,
-                  socket_thread_num, socket_thread_num + 1);
+    this->threads_.push_back(
+        std::thread(&Sender::MasterThread, this, kSocketThreadNum));
   }
 
 #ifdef USE_DPDK
-  DpdkTransport::dpdk_init(core_offset, socket_thread_num);
+  DpdkTransport::dpdk_init(core_offset, kSocketThreadNum);
   this->mbuf_pool_ = DpdkTransport::create_mempool(cfg->PacketLength());
 
   // Parse IP addresses
@@ -87,7 +87,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   server_mac_addr_.resize(cfg->DpdkNumPorts());
 
   for (uint16_t port_id = 0; port_id < cfg->DpdkNumPorts(); port_id++) {
-    if (DpdkTransport::nic_init(port_id, mbuf_pool_, socket_thread_num,
+    if (DpdkTransport::nic_init(port_id, mbuf_pool_, kSocketThreadNum,
                                 cfg->PacketLength()) != 0)
       rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
     // Parse MAC addresses
@@ -109,11 +109,9 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 Sender::~Sender() {
   keep_running.store(false);
 
-  void* val;
-  for (pthread_t thread : this->threads_) {
-    int ret = pthread_join(thread, &val);
-    unused(ret);
-    // std::printf("Sender: Joining threads: %d\n", ret);
+  for (auto& thread : this->threads_) {
+    thread.join();
+    std::printf("Sender: Joining threads\n");
   }
 
   iq_data_short_.Free();
@@ -131,8 +129,7 @@ void Sender::StartTx() {
   this->frame_start_ = new double[kNumStatsFrames]();
   this->frame_end_ = new double[kNumStatsFrames]();
 
-  CreateThreads(PthreadFunWrapper<Sender, &Sender::WorkerThread>, 0,
-                kSocketThreadNum);
+  CreateWorkerThreads(kSocketThreadNum);
   MasterThread(0);  // Start the master thread
 
   delete[](this->frame_start_);
@@ -143,8 +140,7 @@ void Sender::StartTXfromMain(double* in_frame_start, double* in_frame_end) {
   frame_start_ = in_frame_start;
   frame_end_ = in_frame_end;
 
-  CreateThreads(PthreadFunWrapper<Sender, &Sender::WorkerThread>, 0,
-                kSocketThreadNum);
+  CreateWorkerThreads(kSocketThreadNum);
 }
 
 size_t Sender::FindNextSymbol(size_t start_symbol) {
@@ -163,6 +159,7 @@ size_t Sender::FindNextSymbol(size_t start_symbol) {
 void Sender::ScheduleSymbol(size_t frame, size_t symbol_id) {
   for (size_t i = 0; i < cfg_->BsAntNum(); i++) {
     auto req_tag = gen_tag_t::FrmSymAnt(frame, symbol_id, i);
+    // Split up the antennas amoung the worker threads
     RtAssert(
         send_queue_.enqueue(*task_ptok_[i % kSocketThreadNum], req_tag.tag_),
         "Send task enqueue failed");
@@ -171,10 +168,11 @@ void Sender::ScheduleSymbol(size_t frame, size_t symbol_id) {
 
 void* Sender::MasterThread(int) {
   signal(SIGINT, InterruptHandler);
-  PinToCoreWithOffset(ThreadType::kMasterTX, kCoreOffset, 0);
+  PinToCoreWithOffset(ThreadType::kMasterTX, kCoreOffset, 0, true);
 
-  // Wait for all worker threads to be ready
-  while (num_workers_ready_atomic.load() != kSocketThreadNum) {
+  // Wait for all worker threads to be ready (+1 for Master)
+  num_workers_ready_atomic.fetch_add(1);
+  while (num_workers_ready_atomic.load() < (kSocketThreadNum + 1)) {
     // Wait
   }
 
@@ -187,8 +185,8 @@ void* Sender::MasterThread(int) {
   if (start_symbol > 0) {
     std::printf("Sender: Starting symbol %zu delaying\n", start_symbol);
     DelayTicks(tick_start, GetTicksForFrame(0) * start_symbol);
-    tick_start = Rdtsc();
   }
+  tick_start = Rdtsc();
   RtAssert(start_symbol != cfg_->Frame().NumTotalSyms(),
            "Sender: No valid symbols to transmit");
   ScheduleSymbol(0, start_symbol);
@@ -238,13 +236,14 @@ void* Sender::MasterThread(int) {
 
           /* Find start symbol of next frame and add proper delay */
           next_symbol_id = FindNextSymbol(0);
+          //std::printf(
+          //    "Sender -- finished frame %d, next frame %zu, start symbol %zu, "
+          //    "delaying\n",
+          //    ctag.frame_id_, next_frame_id, next_symbol_id);
           DelayTicks(tick_start,
                      GetTicksForFrame(ctag.frame_id_) * next_symbol_id);
-          tick_start = Rdtsc();
-          // std::printf("Sender -- finished frame %d, next frame %zu, start
-          // symbol %zu, delaying\n", ctag.frame_id, next_frame_id,
-          // next_symbol_id,);
-        }
+        }  // if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
+        tick_start = Rdtsc();
         ScheduleSymbol(next_frame_id, next_symbol_id);
       }
     }  // end (ret > 0)
@@ -255,13 +254,14 @@ void* Sender::MasterThread(int) {
 
 /* Worker expects only valid transmit symbol_ids 'U' 'P' */
 void* Sender::WorkerThread(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerTX, (kCoreOffset + 1), tid);
+  PinToCoreWithOffset(ThreadType::kWorkerTX, (kCoreOffset + 1), tid, true);
 
   // Wait for all Sender threads (including master) to start runnung
   num_workers_ready_atomic.fetch_add(1);
-  while (num_workers_ready_atomic.load() != kSocketThreadNum) {
+  while (num_workers_ready_atomic.load() < (kSocketThreadNum + 1)) {
     // Wait
   }
+  std::printf("Sender worker thread %d running\n", tid);
 
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
   DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1,
@@ -271,18 +271,19 @@ void* Sender::WorkerThread(int tid) {
   const size_t max_symbol_id =
       cfg_->Frame().NumPilotSyms() +
       cfg_->Frame().NumULSyms();  // TEMP not sure if this is ok
-  const size_t radio_lo = tid * cfg_->NumRadios() / kSocketThreadNum;
-  const size_t radio_hi = (tid + 1) * cfg_->NumRadios() / kSocketThreadNum;
+  const size_t radio_lo = (tid * cfg_->NumRadios()) / kSocketThreadNum;
+  const size_t radio_hi = ((tid + 1) * cfg_->NumRadios()) / kSocketThreadNum;
   const size_t ant_num_this_thread =
       cfg_->BsAntNum() / kSocketThreadNum +
-      ((size_t)tid < cfg_->BsAntNum() % kSocketThreadNum ? 1 : 0);
+      (static_cast<size_t>(tid) < cfg_->BsAntNum() % kSocketThreadNum ? 1 : 0);
 #ifdef USE_DPDK
   const size_t port_id = tid % cfg_->DpdkNumPorts();
   const size_t queue_id = tid / cfg_->DpdkNumPorts();
   rte_mbuf* tx_mbufs[kDequeueBulkSize];
+#else
+  UDPClient udp_client;
 #endif
 
-  UDPClient udp_client;
   auto fft_inout = static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::k64Align,
       cfg_->OfdmCaNum() * sizeof(complex_float)));
@@ -294,7 +295,7 @@ void* Sender::WorkerThread(int tid) {
   size_t total_tx_packets_rolling = 0;
   size_t cur_radio = radio_lo;
 
-  std::printf("In thread %d, %zu antennas, bs_ant_num(): %zu\n", tid,
+  std::printf("In thread %d, %zu antennas, total bs antennas: %zu\n", tid,
               ant_num_this_thread, cfg_->BsAntNum());
 
   // We currently don't support zero-padding OFDM prefix and postfix
@@ -305,96 +306,97 @@ void* Sender::WorkerThread(int tid) {
 
   size_t tags[kDequeueBulkSize];
   while (keep_running.load() == true) {
-    size_t num_tags = send_queue_.try_dequeue_bulk_from_producer(
-        *(task_ptok_[tid]), tags, kDequeueBulkSize);
-    if (num_tags == 0) {
-      continue;
-    }
+    size_t num_tags = this->send_queue_.try_dequeue_bulk_from_producer(
+        *(this->task_ptok_[tid]), tags, kDequeueBulkSize);
+    if (num_tags > 0) {
+      for (size_t tag_id = 0; (tag_id < num_tags); tag_id++) {
+        size_t start_tsc_send = Rdtsc();
 
-    for (size_t tag_id = 0; tag_id < num_tags; tag_id++) {
-      size_t start_tsc_send = Rdtsc();
+        auto tag = gen_tag_t(tags[tag_id]);
+        assert((cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kPilot) ||
+               (cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kUL));
 
-      auto tag = gen_tag_t(tags[tag_id]);
-      assert((cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kPilot) ||
-             (cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kUL));
-
-      // Send a message to the server. We assume that the server is running.
-      Packet* pkt = socks_pkt_buf;
+        // Send a message to the server. We assume that the server is running.
+        Packet* pkt = socks_pkt_buf;
 #ifdef USE_DPDK
-      tx_mbufs[tag_id] = DpdkTransport::alloc_udp(
-          mbuf_pool_, sender_mac_addr_[port_id], server_mac_addr_[port_id],
-          bs_rru_addr_, bs_server_addr_, this->cfg_->BsRruPort() + tid,
-          this->cfg_->BsServerPort() + tid, this->cfg_->PacketLength());
-      pkt = reinterpret_cast<Packet*>(
-          rte_pktmbuf_mtod(tx_mbufs[tag_id], uint8_t*) + kPayloadOffset);
+        tx_mbufs[tag_id] = DpdkTransport::alloc_udp(
+            mbuf_pool_, sender_mac_addr_[port_id], server_mac_addr_[port_id],
+            bs_rru_addr_, bs_server_addr_, this->cfg_->BsRruPort() + tid,
+            this->cfg_->BsServerPort() + tid, this->cfg_->PacketLength());
+        pkt = reinterpret_cast<Packet*>(
+            rte_pktmbuf_mtod(tx_mbufs[tag_id], uint8_t*) + kPayloadOffset);
 #endif
 
-      // Update the TX buffer
-      // std::printf("Sender : worker processing symbol %d, %d\n",
-      // tag.symbol_id, (int)symbol_type);
-      pkt->frame_id_ = tag.frame_id_;
-      pkt->symbol_id_ = tag.symbol_id_;
-      pkt->cell_id_ = tag.ant_id_ / ant_num_per_cell;
-      pkt->ant_id_ = tag.ant_id_ - ant_num_per_cell * (pkt->cell_id_);
-      std::memcpy(
-          pkt->data_,
-          iq_data_short_[(pkt->symbol_id_ * cfg_->BsAntNum()) + tag.ant_id_],
-          (cfg_->CpLen() + cfg_->OfdmCaNum()) * (kUse12BitIQ ? 3 : 4));
-      if (cfg_->FftInRru() == true) {
-        RunFft(pkt, fft_inout, mkl_handle);
-      }
+        // Update the TX buffer
+        // std::printf(
+        //    "Sender : worker %d processing frame %d symbol %d, type %d\n",
+        //    tid, tag.frame_id_, tag.symbol_id_,
+        //    static_cast<int>(cfg_->GetSymbolType(tag.symbol_id_)));
+        pkt->frame_id_ = tag.frame_id_;
+        pkt->symbol_id_ = tag.symbol_id_;
+        pkt->cell_id_ = tag.ant_id_ / ant_num_per_cell;
+        pkt->ant_id_ = tag.ant_id_ - ant_num_per_cell * (pkt->cell_id_);
+        std::memcpy(
+            pkt->data_,
+            iq_data_short_[(pkt->symbol_id_ * cfg_->BsAntNum()) + tag.ant_id_],
+            (cfg_->CpLen() + cfg_->OfdmCaNum()) * (kUse12BitIQ ? 3 : 4));
+        if (cfg_->FftInRru() == true) {
+          RunFft(pkt, fft_inout, mkl_handle);
+        }
 
 #ifndef USE_DPDK
-      udp_client.Send(cfg_->BsServerAddr(), cfg_->BsServerPort() + cur_radio,
-                      reinterpret_cast<uint8_t*>(socks_pkt_buf),
-                      cfg_->PacketLength());
+        udp_client.Send(cfg_->BsServerAddr(), cfg_->BsServerPort() + cur_radio,
+                        reinterpret_cast<uint8_t*>(socks_pkt_buf),
+                        cfg_->PacketLength());
 #endif
 
-      if (kDebugSenderReceiver == true) {
-        std::printf(
-            "Thread %d (tag = %s) transmit frame %d, symbol %d, ant "
-            "%d, "
-            "TX time: %.3f us\n",
-            tid, gen_tag_t(tag).ToString().c_str(), pkt->frame_id_,
-            pkt->symbol_id_, pkt->ant_id_,
-            CyclesToUs(Rdtsc() - start_tsc_send, kFreqGhz));
-      }
+        if (kDebugSenderReceiver == true) {
+          std::printf(
+              "Thread %d (tag = %s) transmit frame %d, symbol %d, ant "
+              "%d, "
+              "TX time: %.3f us\n",
+              tid, gen_tag_t(tag).ToString().c_str(), pkt->frame_id_,
+              pkt->symbol_id_, pkt->ant_id_,
+              CyclesToUs(Rdtsc() - start_tsc_send, kFreqGhz));
+        }
 
-      total_tx_packets_rolling++;
-      total_tx_packets++;
-      if (total_tx_packets_rolling ==
-          ant_num_this_thread * max_symbol_id * 1000) {
-        double end = GetTime();
-        double byte_len =
-            cfg_->PacketLength() * ant_num_this_thread * max_symbol_id * 1000.f;
-        double diff = end - begin;
-        std::printf("Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
-                    (size_t)tid,
-                    total_tx_packets / (ant_num_this_thread * max_symbol_id),
-                    diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
-        begin = GetTime();
-        total_tx_packets_rolling = 0;
-      }
+        total_tx_packets_rolling++;
+        total_tx_packets++;
+        if (total_tx_packets_rolling ==
+            ant_num_this_thread * max_symbol_id * 1000) {
+          double end = GetTime();
+          double byte_len = cfg_->PacketLength() * ant_num_this_thread *
+                            max_symbol_id * 1000.f;
+          double diff = end - begin;
+          std::printf("Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
+                      (size_t)tid,
+                      total_tx_packets / (ant_num_this_thread * max_symbol_id),
+                      diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
+          begin = GetTime();
+          total_tx_packets_rolling = 0;
+        }
 
-      if (++cur_radio == radio_hi) {
-        cur_radio = radio_lo;
+        if (++cur_radio == radio_hi) {
+          cur_radio = radio_lo;
+        }
       }
-    }
 
 #ifdef USE_DPDK
-    size_t nb_tx_new = rte_eth_tx_burst(port_id, queue_id, tx_mbufs, num_tags);
-    if (unlikely(nb_tx_new != num_tags)) {
-      std::printf(
-          "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, "
-          "num_tags: %zu\n",
-          tid, nb_tx_new, num_tags);
-      keep_running.store(false);
-      break;
-    }
+      size_t nb_tx_new =
+          rte_eth_tx_burst(port_id, queue_id, tx_mbufs, num_tags);
+      if (unlikely(nb_tx_new != num_tags)) {
+        std::printf(
+            "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, "
+            "num_tags: %zu\n",
+            tid, nb_tx_new, num_tags);
+        keep_running.store(false);
+        break;
+      }
 #endif
-    RtAssert(completion_queue_.enqueue_bulk(tags, num_tags),
-             "Completion enqueue failed");
-  }
+      RtAssert(completion_queue_.enqueue_bulk(tags, num_tags),
+               "Completion enqueue failed");
+    }  // if (num_tags > 0)
+  }    // while (keep_running.load() == true)
 
   DftiFreeDescriptor(&mkl_handle);
 
@@ -459,16 +461,9 @@ void Sender::InitIqFromFile(const std::string& filename) {
   iq_data_float.Free();
 }
 
-void Sender::CreateThreads(void* (*worker)(void*), int tid_start, int tid_end) {
-  int ret;
-  for (int i = tid_start; i < tid_end; i++) {
-    pthread_t thread;
-    auto context = new EventHandlerContext<Sender>;
-    context->obj_ptr_ = this;
-    context->id_ = i;
-    ret = pthread_create(&thread, nullptr, worker, context);
-    RtAssert(ret == 0, "pthread_create() failed");
-    this->threads_.push_back(thread);
+void Sender::CreateWorkerThreads(size_t num_workers) {
+  for (size_t i = 0u; i < num_workers; i++) {
+    this->threads_.push_back(std::thread(&Sender::WorkerThread, this, i));
   }
 }
 

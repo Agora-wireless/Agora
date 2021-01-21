@@ -54,7 +54,9 @@ size_t GetPhysicalCoreId(size_t core_id) {
 
 int PinToCore(int core_id) {
   int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-  if (core_id < 0 || core_id >= num_cores) return -1;
+  if ((core_id < 0) || (core_id >= num_cores)) {
+    return -1;
+  }
 
   cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
@@ -66,45 +68,46 @@ int PinToCore(int core_id) {
 
 void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
                          bool verbose) {
-  if (!kEnableThreadPinning) return;
+  if (kEnableThreadPinning == true) {
+    int actual_core_id = core_offset + thread_id;
+    int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
 
-  int actual_core_id = core_offset + thread_id;
-  int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-
-  /* Reserve core 0 for kernel threads */
-  if (actual_core_id >= num_cores) {
-    actual_core_id = (actual_core_id % num_cores) + 1;
-  }
-
-  size_t physical_core_id =
-      cpu_layout_initlized ? cpu_layout[actual_core_id] : actual_core_id;
-
-  if (PinToCore(physical_core_id) != 0) {
-    std::fprintf(
-        stderr,
-        "%s thread %d: failed to pin to core %zu. Exiting. "
-        "This can happen if the machine has insufficient cores. "
-        "Set kEnableThreadPinning to false to run Agora to run despite "
-        "this - performance will be low.\n",
-        ThreadTypeStr(thread_type).c_str(), thread_id, physical_core_id);
-    std::exit(0);
-  } else {
-    if (verbose) {
-      std::printf("%s thread %d: pinned to core %zu\n",
-                  ThreadTypeStr(thread_type).c_str(), thread_id,
-                  physical_core_id);
+    /* Reserve core 0 for kernel threads */
+    if (actual_core_id >= num_cores) {
+      actual_core_id = (actual_core_id % num_cores) + 1;
     }
+
+    size_t physical_core_id =
+        cpu_layout_initlized ? cpu_layout[actual_core_id] : actual_core_id;
+
+    if (PinToCore(physical_core_id) != 0) {
+      std::fprintf(
+          stderr,
+          "%s thread %d: failed to pin to core %zu. Exiting. "
+          "This can happen if the machine has insufficient cores. "
+          "Set kEnableThreadPinning to false to run Agora to run despite "
+          "this - performance will be low.\n",
+          ThreadTypeStr(thread_type).c_str(), thread_id, physical_core_id);
+      std::exit(0);
+    } else {
+      if (verbose == true) {
+        std::printf("%s thread %d: pinned to core %zu\n",
+                    ThreadTypeStr(thread_type).c_str(), thread_id,
+                    physical_core_id);
+      }
+    }  // EnableThreadPinning == true
   }
 }
 
 std::vector<size_t> Utils::StrToChannels(const std::string& channel) {
   std::vector<size_t> channels;
-  if (channel == "A")
+  if (channel == "A") {
     channels = {0};
-  else if (channel == "B")
+  } else if (channel == "B") {
     channels = {1};
-  else
+  } else {
     channels = {0, 1};
+  }
   return (channels);
 }
 

@@ -35,7 +35,7 @@ RadioTXRX::~RadioTXRX() {
   delete config_;
 }
 
-bool RadioTXRX::StartTxrx(Table<char>& in_buffer, Table<int>& in_buffer_status,
+bool RadioTXRX::StartTxRx(Table<char>& in_buffer, Table<int>& in_buffer_status,
                           size_t in_buffer_frame_num, size_t in_buffer_length,
                           char* in_tx_buffer, int* in_tx_buffer_status,
                           int in_tx_buffer_frame_num, int in_tx_buffer_length) {
@@ -50,8 +50,11 @@ bool RadioTXRX::StartTxrx(Table<char>& in_buffer, Table<int>& in_buffer_status,
   tx_buffer_ = in_tx_buffer;
   tx_buffer_status_ = in_tx_buffer_status;
 
-  if (kUseArgos || kUseUHD)
-    if (!radioconfig_->RadioStart()) return false;
+  if ((kUseArgos == true) || (kUseUHD == true)) {
+    if (radioconfig_->RadioStart() == false) {
+      return false;
+    }
+  }
 
   for (int i = 0; i < thread_num_; i++) {
     pthread_t txrx_thread;
@@ -89,7 +92,6 @@ bool RadioTXRX::StartTxrx(Table<char>& in_buffer, Table<int>& in_buffer_status,
   // give time for all threads to lock
   sleep(1);
   pthread_cond_broadcast(&cond_);
-
   return true;
 }
 

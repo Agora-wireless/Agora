@@ -3,7 +3,6 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <immintrin.h>
-#include <pthread.h>
 #include <sys/epoll.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -17,6 +16,7 @@
 #include <memory>
 #include <queue>
 #include <system_error>
+#include <thread>
 #include <tuple>
 
 #include "buffer.hpp"
@@ -139,8 +139,6 @@ class PhyUe {
     int id_;
   };
 
-  // while loop of task thread
-  static void* TaskThreadLaunch(void* context);
   void TaskThread(int tid);
 
   /* Add tasks into task queue based on event type */
@@ -322,7 +320,7 @@ class PhyUe {
   moodycamel::ConcurrentQueue<EventData> encode_queue_;
   moodycamel::ConcurrentQueue<EventData> modul_queue_;
 
-  pthread_t task_threads_[kMaxThreads];
+  std::array<std::thread, kMaxThreads> task_threads_;
 
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];

@@ -1,10 +1,9 @@
-#ifndef SENDER
-#define SENDER
+#ifndef SENDER_H_
+#define SENDER_H_
 
 #include <arpa/inet.h>
 #include <emmintrin.h>
 #include <immintrin.h>
-#include <pthread.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -87,7 +86,7 @@ class Sender {
   size_t GetMaxSymbolId() const;
 
   // Launch threads to run worker with thread IDs from tid_start to tid_end
-  void CreateThreads(void* (*worker)(void*), int tid_start, int tid_end);
+  void CreateWorkerThreads(size_t num_workers);
 
   void DelayForSymbol(size_t tx_frame_count, uint64_t tick_start);
   void DelayForFrame(size_t tx_frame_count, uint64_t tick_start);
@@ -138,7 +137,7 @@ class Sender {
   double* frame_start_;
   double* frame_end_;
 
-  std::vector<pthread_t> threads_;
+  std::vector<std::thread> threads_;
 
 #ifdef USE_DPDK
   struct rte_mempool* mbuf_pool_;
@@ -151,4 +150,4 @@ class Sender {
 #endif
 };
 
-#endif
+#endif  // SENDER_H_

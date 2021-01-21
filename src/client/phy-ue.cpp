@@ -124,22 +124,18 @@ PhyUe::PhyUe(Config* config) {
 
   std::memset(frame_dl_process_time_, 0, sizeof(size_t) * kFrameWnd * kMaxUEs);
 
-  // create task thread
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
-    auto* context = new EventHandlerContext();
-    context->obj_ptr_ = this;
-    context->id_ = i;
-
-    // std::printf("create thread %d\n", i);
-    if (pthread_create(&task_threads_[i], nullptr, TaskThreadLaunch, context) !=
-        0) {
-      perror("task thread create failed");
-      std::exit(0);
-    }
+    task_threads_.at(i) = std::thread(&PhyUe::TaskThread, this, i);
   }
 }
 
 PhyUe::~PhyUe() {
+  for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
+    std::printf("Joining Phy worker: %zu : %zu\n", i,
+                config_->WorkerThreadNum());
+    task_threads_.at(i).join();
+  }
+
   DftiFreeDescriptor(&mkl_handle_);
   // release FFT_buffer
   fft_buffer_.Free();
@@ -176,7 +172,7 @@ void PhyUe::Stop() {
 void PhyUe::Start() {
   PinToCoreWithOffset(ThreadType::kMaster, config_->CoreOffset(), 0);
 
-  if (!ru_->StartTxrx(rx_buffer_, rx_buffer_status_, rx_buffer_status_size_,
+  if (!ru_->StartTxRx(rx_buffer_, rx_buffer_status_, rx_buffer_status_size_,
                       rx_buffer_size_, tx_buffer_, tx_buffer_status_,
                       tx_buffer_status_size_, tx_buffer_size_)) {
     this->Stop();
@@ -549,21 +545,12 @@ void PhyUe::Start() {
   this->Stop();
 }
 
-void* PhyUe::TaskThreadLaunch(void* in_context) {
-  auto* context = static_cast<EventHandlerContext*>(in_context);
-  PhyUe* me = context->obj_ptr_;
-  int tid = context->id_;
-  delete context;
-  me->TaskThread(tid);
-  return nullptr;
-}
-
 void PhyUe::TaskThread(int tid) {
-  // std::printf("task thread %d starts\n", tid);
+  std::printf("PhyUE: task thread %d starts\n", tid);
   PinToCoreWithOffset(ThreadType::kWorker,
                       config_->CoreOffset() + rx_thread_num_ + 1 +
                           (kEnableMac ? rx_thread_num_ : 0),
-                      tid);
+                      tid, true);
 
   // task_ptok[tid].reset(new moodycamel::ProducerToken(message_queue_));
 

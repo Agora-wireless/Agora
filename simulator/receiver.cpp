@@ -11,7 +11,7 @@ Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
   rx_ptoks_ = in_rx_ptoks;
 }
 
-Receiver::~Receiver() { delete cfg_; }
+Receiver::~Receiver() {}
 
 std::vector<pthread_t> Receiver::StartRecv(Table<char>& in_buffer,
                                            Table<int>& in_buffer_status,
