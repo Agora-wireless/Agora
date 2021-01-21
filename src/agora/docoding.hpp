@@ -28,6 +28,7 @@ public:
     ~DoEncode();
 
     Event_data launch(size_t tag);
+    rMatching();
 
 private:
     Table<int8_t>& raw_data_buffer_;
@@ -35,6 +36,7 @@ private:
 
     // Intermediate buffer to hold LDPC encoding output
     int8_t* encoded_buffer_temp;
+    int8_t* rmatched_buffer_;
     Table<int8_t>& encoded_buffer_;
     DurationStat* duration_stat;
 };
@@ -48,6 +50,7 @@ public:
     ~DoDecode();
 
     Event_data launch(size_t tag);
+    dMatching();
 
 private:
     int16_t* resp_var_nodes;
