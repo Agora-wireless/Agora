@@ -34,20 +34,20 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
     printf("new Sender\n");
-    sender_.reset(new Sender(
-        config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true, "ff:ff:ff:ff:ff:ff", true, mbuf_pool));
+    sender_ = new Sender(
+        config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true, "ff:ff:ff:ff:ff:ff", true, mbuf_pool);
 
     printf("new Receiver\n");
-    receiver_.reset(new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET + 2 + SOCKET_RX_THREAD_NUM,
-        &message_queue_, rx_ptoks_ptr));
+    receiver_ = new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET + 2 + SOCKET_RX_THREAD_NUM,
+        &message_queue_, rx_ptoks_ptr);
 #else
     printf("new Sender\n");
-    sender_.reset(new Sender(
-        config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true, "ff:ff:ff:ff:ff:ff", true));
+    sender_ = new Sender(
+        config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true, "ff:ff:ff:ff:ff:ff", true);
 
     printf("new Receiver\n");
-    receiver_.reset(new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET,
-        &message_queue_, rx_ptoks_ptr));
+    receiver_ = new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET,
+        &message_queue_, rx_ptoks_ptr);
 #endif
 }
 
@@ -58,18 +58,23 @@ void Simulator::stop()
     std::cout << "stopping threads " << std::endl;
     config_->running = false;
     sender_->join_thread();
+    receiver_->join_thread();
     usleep(1000);
-    receiver_.reset();
-    sender_.reset();
+    delete receiver_;
+    receiver_ = NULL;
+    delete sender_;
+    sender_ = NULL;
 }
 
 void Simulator::start()
 {
     config_->running = true;
     /* start receiver */
-    std::vector<pthread_t> rx_threads
-        = receiver_->startRecv(socket_buffer_, socket_buffer_status_,
-            socket_buffer_status_size_, socket_buffer_size_, frame_start);
+    // std::vector<pthread_t> rx_threads
+    //     = receiver_->startRecv(socket_buffer_, socket_buffer_status_,
+    //         socket_buffer_status_size_, socket_buffer_size_, frame_start);
+    receiver_->startRecv(socket_buffer_, socket_buffer_status_,
+        socket_buffer_status_size_, socket_buffer_size_, frame_start);
 
     /* tokens used for dequeue */
     moodycamel::ConsumerToken ctok(message_queue_);
@@ -129,8 +134,13 @@ void Simulator::start()
     //     } /* end of for */
     // } /* end of while */
     while (sender_->running_ || receiver_->completion_num_ < SOCKET_RX_THREAD_NUM) {
-        continue;
+    // while (sender_->running_) {
+    // while (receiver_->completion_num_ < SOCKET_RX_THREAD_NUM) {
+        // printf("Test sender %u receiver %u\n", sender_->running_, receiver_->completion_num_.load());
+        // printf("Test receiver %u\n", receiver_->completion_num_.load());
+        sleep(1);
     }
+    printf("Simulator: sender finishes\n");
     this->stop();
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/timeresult_simulator.txt";

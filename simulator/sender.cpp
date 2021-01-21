@@ -66,9 +66,9 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     // if (create_thread_for_master)
     //     create_threads(pthread_fun_wrapper<Sender, &Sender::master_thread>,
     //         num_worker_threads_, num_worker_threads_ + 1);
-    if (create_thread_for_master) {
-        master_thread_ = std::thread(&Sender::master_thread, this, num_worker_threads_);
-    }
+    // if (create_thread_for_master) {
+    //     master_thread_ = std::thread(&Sender::master_thread, this, num_worker_threads_);
+    // }
 
 #ifdef USE_DPDK
     uint16_t portid = 0; // For now, hard-code to port zero
@@ -131,6 +131,7 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
 
     // create_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0,
     //     num_worker_threads_);
+    master_thread_ = std::thread(&Sender::master_thread, this, num_worker_threads_);
     for (size_t i = 0; i < num_worker_threads_; i ++) {
         worker_threads_[i] = std::thread(&Sender::worker_thread, this, i);
     }
@@ -244,6 +245,7 @@ void* Sender::master_thread(int)
     write_stats_to_file(cfg->frames_to_test);
     printf("Master thread ends!\n");
     // exit(0);
+    return NULL;
 }
 
 void* Sender::worker_thread(int tid)
@@ -399,6 +401,8 @@ void* Sender::worker_thread(int tid)
         if (++cur_radio == radio_hi)
             cur_radio = radio_lo;
     }
+    printf("Worker thread ends\n");
+    return NULL;
 }
 
 uint64_t Sender::get_ticks_for_frame(size_t frame_id)

@@ -292,7 +292,7 @@ public:
             num_demod_data_received_[ue_id]
                                     [frame_id % kFrameWnd][symbol_id_ul]
                 = 0;
-            printf("Received all demod data for user %lu frame %lu symbol %lu\n", ue_id, frame_id, symbol_id_ul);
+            // printf("Received all demod data for user %lu frame %lu symbol %lu\n", ue_id, frame_id, symbol_id_ul);
             return true;
         }
         return false;
@@ -322,8 +322,8 @@ public:
     void encode_done(size_t ue_id, size_t frame_id, size_t symbol_id_dl) 
     {
         num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl] ++;
-        printf("Encode done ue %u frame %u symbol %u (%u:1)\n", ue_id, frame_id, symbol_id_dl, 
-            num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl].load());
+        // printf("Encode done ue %u frame %u symbol %u (%u:1)\n", ue_id, frame_id, symbol_id_dl, 
+        //     num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl].load());
     }
 
     bool ready_to_precode(size_t ue_id, size_t frame_id, size_t symbol_id_dl)
@@ -333,7 +333,7 @@ public:
         if (num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl]
             == num_encode_tasks_required_) {
             num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl] = 0;
-            printf("Encode is done for user %u frame %u symbol %u\n", ue_id, frame_id, symbol_id_dl);
+            // printf("Encode is done for user %u frame %u symbol %u\n", ue_id, frame_id, symbol_id_dl);
             return true;
         }
         return false;
@@ -364,9 +364,9 @@ public:
             max_frame_ = frame_id;
         }
         num_encoded_data_received_[frame_id % kFrameWnd][symbol_id_dl] ++;
-        printf("Receive encoded data frame %u symbol %u (%u:%u)\n", frame_id, symbol_id_dl, 
-            num_encoded_data_received_[frame_id % kFrameWnd][symbol_id_dl],
-            num_encoded_data_required_);
+        // printf("Receive encoded data frame %u symbol %u (%u:%u)\n", frame_id, symbol_id_dl, 
+        //     num_encoded_data_received_[frame_id % kFrameWnd][symbol_id_dl],
+        //     num_encoded_data_required_);
     }
 
     bool received_all_encoded_data(size_t frame_id, size_t symbol_id_dl) {

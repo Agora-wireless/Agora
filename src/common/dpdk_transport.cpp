@@ -292,10 +292,6 @@ rte_mempool* DpdkTransport::create_mempool()
     rte_mempool* mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL",
         NUM_MBUFS * nb_ports, MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
 
-if (mbuf_pool == NULL) {
-	        printf("Error is %d\n", rte_errno);
-		    }
-
     rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
 
     return mbuf_pool;

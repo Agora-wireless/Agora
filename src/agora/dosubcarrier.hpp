@@ -207,8 +207,8 @@ public:
             if (precode_status_->received_all_encoded_data(precode_cur_frame_, precode_cur_sym_dl_) 
                 && zf_cur_frame_ > precode_cur_frame_) {
                 size_t base_sc_id = n_precode_tasks_done_ * cfg->demul_block_size + sc_range_.start;
-                printf("Precode frame %u symbol %u subcarrier %u\n", precode_cur_frame_, 
-                    precode_cur_sym_dl_, base_sc_id);
+                // printf("Precode frame %u symbol %u subcarrier %u\n", precode_cur_frame_, 
+                    // precode_cur_sym_dl_, base_sc_id);
                 do_precode_->launch(gen_tag_t::frm_sym_sc(precode_cur_frame_, precode_cur_sym_dl_, base_sc_id)._tag);
                 n_precode_tasks_done_ ++;
                 if (n_precode_tasks_done_ == n_precode_tasks_reqd) {

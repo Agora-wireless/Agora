@@ -25,10 +25,10 @@ int main(int argc, char const* argv[])
     Simulator* simulator;
     int ret;
     try {
-        SignalHandler signalHandler;
+        // SignalHandler signalHandler;
 
         // Register signal handler to handle kill signal
-        signalHandler.setupSignalHandlers();
+        // signalHandler.setupSignalHandlers();
         simulator = new Simulator(cfg, thread_num, core_offset, delay);
         simulator->start();
         ret = EXIT_SUCCESS;

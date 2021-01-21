@@ -54,6 +54,10 @@ Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset, void* 
     dl_ue_data_buffer_.calloc(cfg->BS_ANT_NUM, cfg->OFDM_CA_NUM * sizeof(short) * 2 * kFrameWnd * cfg->symbol_num_perframe, 64);
 
     completion_num_ = 0;
+
+    for (size_t i = 0; i < kFrameWnd; i ++) {
+        frame_status_[i] = 0;
+    }
 }
 
 Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
@@ -67,7 +71,10 @@ Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
 
 Receiver::~Receiver() { delete cfg; }
 
-std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
+// std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
+//     Table<int>& in_buffer_status, size_t in_buffer_frame_num,
+//     size_t in_buffer_length, Table<double>& in_frame_start)
+void Receiver::startRecv(Table<char>& in_buffer,
     Table<int>& in_buffer_status, size_t in_buffer_frame_num,
     size_t in_buffer_length, Table<double>& in_frame_start)
 {
@@ -78,22 +85,32 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
     frame_start_ = &in_frame_start;
 
     printf("start Recv thread\n");
-    std::vector<pthread_t> created_threads;
+    // std::vector<pthread_t> created_threads;
 
-    for (size_t i = 0; i < rx_thread_num_; i++) {
-        pthread_t recv_thread_;
-        auto context = new EventHandlerContext<Receiver>;
-        context->obj_ptr = this;
-        context->id = i;
-        if (pthread_create(&recv_thread_, NULL,
-                pthread_fun_wrapper<Receiver, &Receiver::loopRecv>, context)
-            != 0) {
-            perror("Socket recv thread create failed");
-            exit(0);
-        }
-        created_threads.push_back(recv_thread_);
+    // for (size_t i = 0; i < rx_thread_num_; i++) {
+    //     pthread_t recv_thread_;
+    //     auto context = new EventHandlerContext<Receiver>;
+    //     context->obj_ptr = this;
+    //     context->id = i;
+    //     if (pthread_create(&recv_thread_, NULL,
+    //             pthread_fun_wrapper<Receiver, &Receiver::loopRecv>, context)
+    //         != 0) {
+    //         perror("Socket recv thread create failed");
+    //         exit(0);
+    //     }
+    //     created_threads.push_back(recv_thread_);
+    // }
+    // return created_threads;
+
+    for (size_t i = 0; i < rx_thread_num_; i ++) {
+        receiver_threads_[i] = std::thread(&Receiver::loopRecv, this, i);
     }
-    return created_threads;
+}
+
+void Receiver::join_thread() {
+    for (size_t i = 0; i < rx_thread_num_; i ++) {
+        receiver_threads_[i].join();
+    }
 }
 
 void* Receiver::loopRecv(int tid)
@@ -117,12 +134,6 @@ void* Receiver::loopRecv(int tid)
     long long buffer_length = buffer_length_;
     int buffer_frame_num = buffer_frame_num_;
     double* frame_start = (*frame_start_)[tid];
-
-    // // walk through all the pages
-    // double temp;
-    // for (int i = 0; i < 20; i++) {
-    //     temp = frame_start[i * 512];
-    // }
 
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     (void)DftiCreateDescriptor(
@@ -187,7 +198,7 @@ void* Receiver::loopRecv(int tid)
             }
 
             auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<char*>(eth_hdr) + kPayloadOffset);
-            printf("Received one packet: %u\n", pkt->pkt_type);
+            // printf("Received one packet: %u\n", pkt->pkt_type);
             if (pkt->pkt_type == Packet::PktType::kIQFromServer) {
                 if (pkt->frame_id >= cur_frame_ + kFrameWnd) {
                     printf("Error! Socket buffer overflow!\n");
@@ -200,11 +211,11 @@ void* Receiver::loopRecv(int tid)
                 size_t symbol_offset = frame_slot * cfg->symbol_num_perframe + symbol_id;
                 size_t table_offset = symbol_offset * cfg->packet_length 
                     + sizeof(float) * (cfg->OFDM_DATA_START + server_id * cfg->get_num_sc_per_server());
-                printf("Received valid packets ant:%u offset:%u server:%u!\n", pkt->ant_id, table_offset, server_id);
-                for (size_t i = 0; i < cfg->get_num_sc_per_server() * 2; i ++) {
-                    printf("%04x ", (unsigned short)pkt->data[i]);
-                }
-                printf("\n");
+                // printf("Received valid packets ant:%u offset:%u server:%u!\n", pkt->ant_id, table_offset, server_id);
+                // for (size_t i = 0; i < cfg->get_num_sc_per_server() * 2; i ++) {
+                //     printf("%04x ", (unsigned short)pkt->data[i]);
+                // }
+                // printf("\n");
                 DpdkTransport::fastMemcpy(&socket_buffer_[ant_id][table_offset], pkt->data, sizeof(float) * cfg->get_num_sc_per_server());
                 socket_buffer_status_[ant_id][symbol_offset] ++;
                 if (socket_buffer_status_[ant_id][symbol_offset] == cfg->bs_server_addr_list.size()) {
@@ -217,7 +228,9 @@ void* Receiver::loopRecv(int tid)
                 }
                 frame_mutex_.lock();
                 frame_status_[frame_slot] ++;
-                if (frame_status_[frame_slot] == cfg->symbol_num_perframe * cfg->bs_server_addr_list.size() * cfg->BS_ANT_NUM) {
+                // printf("Received %u(%u) packets in frame %u\n", frame_status_[frame_slot], cfg->dl_data_symbol_num_perframe * cfg->bs_server_addr_list.size() * cfg->BS_ANT_NUM, pkt->frame_id);
+                if (frame_status_[frame_slot] == cfg->dl_data_symbol_num_perframe * cfg->bs_server_addr_list.size() * cfg->BS_ANT_NUM) {
+                    // printf("Received all packets in frame %u\n", pkt->frame_id);
                     frame_status_[frame_slot] = 0;
                     cur_frame_ ++;
                 }
@@ -272,6 +285,8 @@ void* Receiver::loopRecv(int tid)
     printf("Receiver received all packets!\n");
     save_tx_data_to_file(0);
     completion_num_ ++;
+
+    return NULL;
 }
 
 void Receiver::save_tx_data_to_file(int frame_id)
@@ -287,13 +302,13 @@ void Receiver::save_tx_data_to_file(int frame_id)
 
         for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
             short* socket_ptr = reinterpret_cast<short*>(&dl_ue_data_buffer_[ant_id][total_data_symbol_id * sizeof(short) * 2 * cfg->OFDM_CA_NUM]);
-            if (ant_id == 0) {
-                printf("Symbol offset: %u\n", total_data_symbol_id);
-                for (size_t j = 0; j < cfg->OFDM_CA_NUM; j ++) {
-                    printf("(%u %u) ", socket_ptr[j * 2], socket_ptr[j * 2 + 1]);
-                }
-                printf("\n");
-            }
+            // if (ant_id == 0) {
+            //     printf("Symbol offset: %u\n", total_data_symbol_id);
+            //     for (size_t j = 0; j < cfg->OFDM_CA_NUM; j ++) {
+            //         printf("(%u %u) ", socket_ptr[j * 2], socket_ptr[j * 2 + 1]);
+            //     }
+            //     printf("\n");
+            // }
             fwrite(socket_ptr, cfg->sampsPerSymbol * 2, sizeof(short), fp);
         }
     }
@@ -307,11 +322,11 @@ void Receiver::run_ifft(short* src, complex_float* ifft_inout,
         reinterpret_cast<const float*>(src), cfg->OFDM_CA_NUM * 2);
 
     // Begin Debug
-    printf("Recovered precoded data:\n");
-    for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
-        printf("(%u %lf %lf) ", i, ifft_inout[i].re, ifft_inout[i].im);
-    }
-    printf("\n");
+    // printf("Recovered precoded data:\n");
+    // for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
+    //     printf("(%u %lf %lf) ", i, ifft_inout[i].re, ifft_inout[i].im);
+    // }
+    // printf("\n");
     // End Debug
     
     DftiComputeBackward(mkl_handle, ifft_inout);
@@ -324,10 +339,10 @@ void Receiver::run_ifft(short* src, complex_float* ifft_inout,
         src, cfg->OFDM_CA_NUM * 2);
 
     // Begin Debug
-    printf("IFFT data:\n");
-    for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
-        printf("(%u %d %d) ", i, src[i * 2], src[i * 2 + 1]);
-    }
-    printf("\n");
+    // printf("IFFT data:\n");
+    // for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
+    //     printf("(%u %d %d) ", i, src[i * 2], src[i * 2 + 1]);
+    // }
+    // printf("\n");
     // End Debug
 }

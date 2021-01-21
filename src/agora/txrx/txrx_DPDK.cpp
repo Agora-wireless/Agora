@@ -253,7 +253,7 @@ void* PacketTXRX::demod_thread(int tid)
             continue;
 
         for (size_t i = 0; i < nb_rx; i++) {
-            printf("Received packet!\n");
+            // printf("Received packet!\n");
             rte_mbuf* dpdk_pkt = rx_bufs[i];
             auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
             auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
@@ -322,12 +322,12 @@ void* PacketTXRX::encode_thread(int tid)
                 encode_ue_to_send_, encode_frame_to_send_, encode_symbol_dl_to_send_)) {
             int8_t* ptr = cfg->get_encoded_buf(*encoded_buffer_, encode_frame_to_send_, 
                 encode_symbol_dl_to_send_, encode_ue_to_send_, 0);
-            printf("Start to send encoded data frame %u symbol %u ue %u\n", encode_frame_to_send_, encode_symbol_dl_to_send_, encode_ue_to_send_);
+            // printf("Start to send encoded data frame %u symbol %u ue %u\n", encode_frame_to_send_, encode_symbol_dl_to_send_, encode_ue_to_send_);
             
             for (size_t server_idx = 0; server_idx < cfg->bs_server_addr_list.size(); server_idx ++) {
                 int8_t* src_ptr = ptr + cfg->get_num_sc_per_server() * server_idx;
                 if (server_idx == cfg->bs_server_addr_idx) {
-                    printf("TXRX receive in situ encoded data frame %u symbol %u ue %u\n", encode_frame_to_send_, encode_symbol_dl_to_send_, encode_ue_to_send_);
+                    // printf("TXRX receive in situ encoded data frame %u symbol %u ue %u\n", encode_frame_to_send_, encode_symbol_dl_to_send_, encode_ue_to_send_);
                     int8_t* dst_ptr = cfg->get_encoded_buf(*encoded_buffer_to_precode_, encode_frame_to_send_,
                         encode_symbol_dl_to_send_, encode_ue_to_send_, 0) + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server();
                     memcpy(dst_ptr, src_ptr, cfg->get_num_sc_per_server());
@@ -350,7 +350,7 @@ void* PacketTXRX::encode_thread(int tid)
                     //     cfg->get_num_sc_per_server());
                     memcpy(pkt->data, src_ptr, cfg->get_num_sc_per_server());
 
-                    printf("Send encoded data frame %u symbol %u ue %u to server %u\n", pkt->frame_id, pkt->symbol_id, pkt->ue_id, server_idx);
+                    // printf("Send encoded data frame %u symbol %u ue %u to server %u\n", pkt->frame_id, pkt->symbol_id, pkt->ue_id, server_idx);
                     // Send data (one OFDM symbol)
                     size_t nb_tx_new = rte_eth_tx_burst(0, tid - 1, tx_bufs, 1);
                     if (unlikely(nb_tx_new != 1)) {
@@ -415,7 +415,7 @@ void* PacketTXRX::encode_thread(int tid)
 
             auto* pkt = reinterpret_cast<Packet*>((char*)(eth_hdr) + kPayloadOffset);
             if (pkt->pkt_type == Packet::PktType::kEncode) {
-                printf("TXRX receive encoded data frame %u symbol %u ue %u from server %u\n", pkt->frame_id, pkt->symbol_id, pkt->ue_id, pkt->server_id);
+                // printf("TXRX receive encoded data frame %u symbol %u ue %u from server %u\n", pkt->frame_id, pkt->symbol_id, pkt->ue_id, pkt->server_id);
                 const size_t symbol_idx_dl = pkt->symbol_id;
                 const size_t ue_id = pkt->ue_id;
 
@@ -426,10 +426,10 @@ void* PacketTXRX::encode_thread(int tid)
                 //     cfg->get_num_sc_per_server());
                 memcpy(dst_ptr, pkt->data, cfg->get_num_sc_per_server());
                 // Begin Debug
-                if (ue_id == 2) {
-                    complex_float tf = mod_single_uint8(((uint8_t*)pkt->data)[1], cfg->mod_table);
-                    printf("Received mod data: (%lf %lf)\n", tf.re, tf.im);
-                }
+                // if (ue_id == 2) {
+                //     complex_float tf = mod_single_uint8(((uint8_t*)pkt->data)[1], cfg->mod_table);
+                //     printf("Received mod data: (%lf %lf)\n", tf.re, tf.im);
+                // }
                 // End Debug
                 precode_status_->receive_encoded_data(pkt->frame_id, symbol_idx_dl);
             } else {
@@ -529,9 +529,9 @@ int PacketTXRX::recv_relocate(int tid)
         }
 
         auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset);
-        if (tid == 0 || tid == 1) {
-            printf("Received packets tid(%u)! (%x:%u->%x:%u)\n", tid, ip_hdr->src_addr, rte_be_to_cpu_16(udp_hdr->src_port), ip_hdr->dst_addr, rte_be_to_cpu_16(udp_hdr->dst_port));
-        }
+        // if (tid == 0 || tid == 1) {
+        //     printf("Received packets tid(%u)! (%x:%u->%x:%u)\n", tid, ip_hdr->src_addr, rte_be_to_cpu_16(udp_hdr->src_port), ip_hdr->dst_addr, rte_be_to_cpu_16(udp_hdr->dst_port));
+        // }
         if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
             char* rx_buffer = (*buffer_)[pkt->ant_id];
             const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)
@@ -711,7 +711,7 @@ int PacketTXRX::dequeue_send(int tid, size_t symbol_dl_to_send, size_t ant_to_se
             reinterpret_cast<float*>(&(*dl_ifft_buffer_)[offset][0]), 
             cfg->get_num_sc_per_server() * 2);
        
-        printf("Send a packet out server:%u\n", pkt->server_id);
+        // printf("Send a packet out server:%u\n", pkt->server_id);
 
         // Send data (one OFDM symbol)
         size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);

@@ -53,7 +53,7 @@ Event_data DoPrecode::launch(size_t tag)
         = std::min(cfg->demul_block_size, (cfg->bs_server_addr_idx + 1) * cfg->get_num_sc_per_server() - base_sc_id);
 
     // Begin Debug
-    printf("DL mod data base sc %u:\n", base_sc_id);
+    // printf("DL mod data base sc %u:\n", base_sc_id);
     // End Debug
 
     for (int i = 0; i < max_sc_ite; i = i + 4) {
@@ -84,11 +84,11 @@ Event_data DoPrecode::launch(size_t tag)
 
             // Begin Debug
             // printf("(%lf %lf) ", data_ptr[0].re, data_ptr[0].im);
-            printf("| ");
-            for (size_t k = 0; k < cfg->UE_NUM; k ++) {
-                printf("(%lf %lf) ", data_ptr[k].re, data_ptr[k].im);
-            }
-            printf("| ");
+            // printf("| ");
+            // for (size_t k = 0; k < cfg->UE_NUM; k ++) {
+            //     printf("(%lf %lf) ", data_ptr[k].re, data_ptr[k].im);
+            // }
+            // printf("| ");
             // End Debug
 
             auto* precoder_ptr = reinterpret_cast<cx_float*>(
@@ -117,18 +117,18 @@ Event_data DoPrecode::launch(size_t tag)
     }
 
     // Begin Debug
-    printf("\nPrecoded data base sc %lu:\n", base_sc_id);
-    for (size_t i = 0; i < max_sc_ite; i ++) {
-        printf("(%lf %lf) ", precoded_buffer_temp[i * cfg->BS_ANT_NUM].re, precoded_buffer_temp[i * cfg->BS_ANT_NUM].im);
-    }
-    printf("\n");
-    printf("Precoder:\n");
-    for (size_t i = 0; i < cfg->UE_NUM; i ++) {
-        for (size_t j = 0; j < cfg->BS_ANT_NUM; j ++) {
-            printf("(%lf %lf) ", dl_zf_matrices_[0][base_sc_id][j * cfg->UE_NUM + i].re, dl_zf_matrices_[0][base_sc_id][j * cfg->UE_NUM + i].im);
-        }
-        printf("\n");
-    }
+    // printf("\nPrecoded data base sc %lu:\n", base_sc_id);
+    // for (size_t i = 0; i < max_sc_ite; i ++) {
+    //     printf("(%lf %lf) ", precoded_buffer_temp[i * cfg->BS_ANT_NUM].re, precoded_buffer_temp[i * cfg->BS_ANT_NUM].im);
+    // }
+    // printf("\n");
+    // printf("Precoder:\n");
+    // for (size_t i = 0; i < cfg->UE_NUM; i ++) {
+    //     for (size_t j = 0; j < cfg->BS_ANT_NUM; j ++) {
+    //         printf("(%lf %lf) ", dl_zf_matrices_[0][base_sc_id][j * cfg->UE_NUM + i].re, dl_zf_matrices_[0][base_sc_id][j * cfg->UE_NUM + i].im);
+    //     }
+    //     printf("\n");
+    // }
     // End Debug
 
     size_t start_tsc3 = worker_rdtsc();
@@ -150,11 +150,11 @@ Event_data DoPrecode::launch(size_t tag)
     }
 
     // Begin Debug
-    printf("\nPrecoded data base sc %lu:\n", base_sc_id);
-    for (size_t i = 0; i < max_sc_ite; i ++) {
-        printf("(%lf %lf) ", dl_ifft_buffer_[0][base_sc_id + i - cfg->subcarrier_start].re, dl_ifft_buffer_[0][base_sc_id + i - cfg->subcarrier_start].im);
-    }
-    printf("\n");
+    // printf("\nPrecoded data base sc %lu:\n", base_sc_id);
+    // for (size_t i = 0; i < max_sc_ite; i ++) {
+    //     printf("(%lf %lf) ", dl_ifft_buffer_[0][base_sc_id + i - cfg->subcarrier_start].re, dl_ifft_buffer_[0][base_sc_id + i - cfg->subcarrier_start].im);
+    // }
+    // printf("\n");
     // End Debug
 
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;

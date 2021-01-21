@@ -28,11 +28,14 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <vector>
+#include <thread>
 
 #ifdef USE_DPDK
 #include "dpdk_transport.hpp"
 #include <netinet/ether.h>
 #endif
+
+static constexpr size_t kMaxRecvNum = 16UL;
 
 typedef unsigned short ushort;
 class Receiver {
@@ -57,7 +60,10 @@ public:
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
      * RX_THREAD_NUM - 1}
      */
-    std::vector<pthread_t> startRecv(Table<char>& in_buffer,
+    // std::vector<pthread_t> startRecv(Table<char>& in_buffer,
+    //     Table<int>& in_buffer_status, size_t in_buffer_frame_num,
+    //     size_t in_buffer_length, Table<double>& in_frame_start);
+    void startRecv(Table<char>& in_buffer,
         Table<int>& in_buffer_status, size_t in_buffer_frame_num,
         size_t in_buffer_length, Table<double>& in_frame_start);
 
@@ -66,6 +72,8 @@ public:
      * context: ReceiverContext type
      */
     void* loopRecv(int tid);
+
+    void join_thread();
 
     void run_ifft(short* src, complex_float* ifft_inout,
         DFTI_DESCRIPTOR_HANDLE mkl_handle) const;
@@ -106,6 +114,9 @@ private:
 
     // Array to store data after IFFT
     Table<char> dl_ue_data_buffer_;
+
+    // Receiver threads
+    std::thread receiver_threads_[kMaxRecvNum];
     
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pool;

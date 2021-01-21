@@ -83,8 +83,10 @@ private:
     float csi_format_offset;
     size_t buffer_frame_num;
     size_t max_packet_num_per_frame;
-    std::unique_ptr<Receiver> receiver_;
-    std::unique_ptr<Sender> sender_;
+    // std::unique_ptr<Receiver> receiver_;
+    // std::unique_ptr<Sender> sender_;
+    Receiver* receiver_;
+    Sender* sender_;
     pthread_t* task_threads;
     EventHandlerContext* context;
 
