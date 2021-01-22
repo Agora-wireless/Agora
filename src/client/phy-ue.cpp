@@ -7,6 +7,7 @@ static constexpr bool kDebugPrintPacketsToMac = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
+static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr size_t kRecordFrameIndex = 1000;
 
 Phy_UE::Phy_UE(Config* config)
@@ -695,7 +696,9 @@ void Phy_UE::doFFT(int tid, size_t tag)
             if (dl_symbol_id == 0) {
                 csi_buffer_ptr[j] = 0;
             }
-            complex_float p = config_->ue_specific_pilot[ant_id][j];
+            // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
+            // in the downlink receiver
+            complex_float p = config_->ue_specific_pilot[0][j];
             size_t sc_id = non_null_sc_ind_[j];
             csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / cx_float(p.re, p.im));
             if (dl_symbol_id == dl_pilot_symbol_perframe - 1)
@@ -722,7 +725,9 @@ void Phy_UE::doFFT(int tid, size_t tag)
                 size_t sc_id = non_null_sc_ind_[j];
                 cx_float y = fft_buffer_ptr[sc_id];
                 auto pilot_eq = y / csi;
-                auto p = config_->ue_specific_pilot[ant_id][j];
+                // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
+                // in the downlink receiver
+                auto p = config_->ue_specific_pilot[0][j];
                 theta += arg(pilot_eq * cx_float(p.re, -p.im));
             }
         }
@@ -746,12 +751,30 @@ void Phy_UE::doFFT(int tid, size_t tag)
                 evm += std::norm(equ_buffer_ptr[j] - cx_float(tx.re, tx.im));
             }
         }
+        if (kPrintEqualizedSymbols) {
+            complex_float* tx
+                = &config_->dl_iq_f[dl_symbol_id][ant_id * config_->OFDM_CA_NUM
+                    + config_->OFDM_DATA_START];
+            arma::cx_fvec x_vec(
+                reinterpret_cast<cx_float*>(tx), config_->OFDM_DATA_NUM, false);
+            Utils::print_vec(x_vec,
+                std::string("x") + std::to_string(total_dl_symbol_id)
+                    + std::string("_") + std::to_string(ant_id));
+            arma::cx_fvec equal_vec(
+                equ_buffer_ptr, config_->OFDM_DATA_NUM, false);
+            Utils::print_vec(equal_vec,
+                std::string("equ") + std::to_string(total_dl_symbol_id)
+                    + std::string("_") + std::to_string(ant_id));
+        }
         evm = std::sqrt(evm)
             / (config_->OFDM_DATA_NUM - config_->get_ofdm_pilot_num());
-        if (kPrintPhyStats)
-            std::cout << "Frame: " << frame_id << ", Symbol: " << symbol_id
-                      << ", User: " << ant_id << ", EVM: " << 100 * evm
-                      << "%, SNR: " << -10 * std::log10(evm) << std::endl;
+        if (kPrintPhyStats) {
+            std::stringstream ss;
+            ss << "Frame: " << frame_id << ", Symbol: " << symbol_id
+               << ", User: " << ant_id << ", EVM: " << 100 * evm
+               << "%, SNR: " << -10 * std::log10(evm) << std::endl;
+            std::cout << ss.str();
+        }
     }
 
     size_t fft_duration_stat = rdtsc() - start_tsc;
@@ -904,14 +927,19 @@ void Phy_UE::doDecode(int tid, size_t tag)
         }
 
         if (kPrintDecodedData) {
-            printf("Decoded data (original byte)\n");
+            std::stringstream ss;
+            ss << "Decoded data (original byte) in frame " << frame_id
+               << " symbol " << symbol_id << " ant " << ant_id << ":\n"
+               << std::hex << std::setfill('0');
             for (size_t i = 0; i < config_->num_bytes_per_cb; i++) {
                 uint8_t rx_byte = decoded_buffer_ptr[i];
                 uint8_t tx_byte = (uint8_t)config_->get_info_bits(
                     config_->dl_bits, dl_symbol_id, ant_id, cb_id)[i];
-                printf("%x(%x) ", rx_byte, tx_byte);
+                ss << std::hex << std::setw(2) << static_cast<int>(rx_byte)
+                   << "(" << static_cast<int>(tx_byte) << ") ";
             }
-            printf("\n");
+            ss << std::dec << std::endl;
+            std::cout << ss.str();
         }
     }
     if (kCollectPhyStats) {
