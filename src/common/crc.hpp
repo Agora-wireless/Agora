@@ -15,8 +15,6 @@
 
 #include "buffer.hpp"
 #include <iostream>
-#include <stdio.h> /* for fprintf */
-#include <stdlib.h>
 #include <unistd.h>
 
 // Generating polynomial

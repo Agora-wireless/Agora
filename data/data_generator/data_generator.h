@@ -37,7 +37,7 @@ public:
      * @param encoded_codeword The generated encoded codeword bit sequence
      * @param ue_id ID of the UE that this codeblock belongs to
      */
-    void gen_codeblock_ul(std::vector<int8_t>& information,
+    void gen_codeblock(std::vector<int8_t>& information,
         std::vector<int8_t>& encoded_codeword, size_t ue_id)
     {
         const LDPCconfig& lc = cfg->LDPC_config;
@@ -49,15 +49,15 @@ public:
 
         for (size_t i = 0; i < lc.num_input_bytes(); i++) {
             if (profile == Profile::kRandom) {
-                information[i] = static_cast<int8_t>(fast_rand.next_u32());
+                information.at(i) = static_cast<int8_t>(fast_rand.next_u32());
             } else if (profile == Profile::k123) {
-                information[i] = 1 + (ue_id * 3) + (i % 3);
+                information.at(i) = 1 + (ue_id * 3) + (i % 3);
             }
         }
 
         ldpc_encode_helper(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc,
-            cfg->LDPC_config.nRows, &encoded_codeword[0], &parity[0],
-            &information[0]);
+            cfg->LDPC_config.nRows, &encoded_codeword.at(0), &parity.at(0),
+            &information.at(0));
 
         information.resize(lc.num_input_bytes());
         encoded_codeword.resize(lc.num_encoded_bytes());
@@ -113,8 +113,8 @@ public:
         const std::vector<complex_float> modulated_codeword) const
     {
         std::vector<complex_float> pre_ifft_symbol(cfg->OFDM_CA_NUM); // Zeroed
-        memcpy(&pre_ifft_symbol[cfg->OFDM_DATA_START], &modulated_codeword[0],
-            cfg->OFDM_DATA_NUM * sizeof(complex_float));
+        std::memcpy(&pre_ifft_symbol[cfg->OFDM_DATA_START],
+            &modulated_codeword[0], cfg->OFDM_DATA_NUM * sizeof(complex_float));
 
         return pre_ifft_symbol;
     }

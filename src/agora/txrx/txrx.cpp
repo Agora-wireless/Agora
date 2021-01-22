@@ -57,13 +57,16 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
 
     if (kUseArgos || kUseUHD) {
         if (!radioconfig_->radioStart()) {
-            fprintf(stderr, "Failed to start radio\n");
+            std::fprintf(stderr, "Failed to start radio\n");
             return false;
         }
+
         if (cfg->downlink_mode) {
-            memcpy(calib_dl_buffer[kFrameWnd - 1], radioconfig_->get_calib_dl(),
+            std::memcpy(calib_dl_buffer[kFrameWnd - 1],
+                radioconfig_->get_calib_dl(),
                 cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM * sizeof(arma::cx_float));
-            memcpy(calib_ul_buffer[kFrameWnd - 1], radioconfig_->get_calib_ul(),
+            std::memcpy(calib_ul_buffer[kFrameWnd - 1],
+                radioconfig_->get_calib_ul(),
                 cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM * sizeof(arma::cx_float));
         }
     }
@@ -178,7 +181,8 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
 
     // if rx_buffer is full, exit
     if (rx_buffer_status[rx_offset] == 1) {
-        printf("TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
+        std::printf(
+            "TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
         cfg->running = false;
         return (NULL);
     }
@@ -186,23 +190,23 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
         if (errno != EAGAIN && cfg->running) {
             perror("recv failed");
-            exit(0);
+            std::exit(0);
         }
         return (NULL);
     }
     if (kDebugPrintInTask) {
-        printf("In TXRX thread %d: Received frame %d, symbol %d, ant %d\n", tid,
-            pkt->frame_id, pkt->symbol_id, pkt->ant_id);
+        std::printf("In TXRX thread %d: Received frame %d, symbol %d, ant %d\n",
+            tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id);
     }
     if (kDebugMulticell) {
-        printf("Before packet combining: receiving data stream from the "
-               "antenna %d in cell %d,\n",
+        std::printf("Before packet combining: receiving data stream from the "
+                    "antenna %d in cell %d,\n",
             pkt->ant_id, pkt->cell_id);
     }
     pkt->ant_id += pkt->cell_id * ant_per_cell;
     if (kDebugMulticell) {
-        printf("After packet combining: the combined antenna ID is %d, it "
-               "comes from the cell %d\n",
+        std::printf("After packet combining: the combined antenna ID is %d, it "
+                    "comes from the cell %d\n",
             pkt->ant_id, pkt->cell_id);
     }
 
@@ -213,8 +217,8 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
     // Push kPacketRX event into the queue.
     Event_data rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset)._tag);
     if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-        printf("socket message enqueue failed\n");
-        exit(0);
+        std::printf("socket message enqueue failed\n");
+        std::exit(0);
     }
     return pkt;
 }
@@ -226,7 +230,7 @@ int PacketTXRX::dequeue_send(int tid)
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
         return -1;
 
-    // printf("tx queue length: %d\n", task_queue_->size_approx());
+    // std::printf("tx queue length: %d\n", task_queue_->size_approx());
     assert(event.event_type == EventType::kPacketTX);
 
     size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
@@ -240,8 +244,8 @@ int PacketTXRX::dequeue_send(int tid)
         + ant_id;
 
     if (kDebugPrintInTask) {
-        printf("In TXRX thread %d: Transmitted frame %zu, symbol %zu, "
-               "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+        std::printf("In TXRX thread %d: Transmitted frame %zu, symbol %zu, "
+                    "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags[0])._tag,
             offset, message_queue_->size_approx());
     }

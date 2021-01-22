@@ -5,22 +5,50 @@ PhyStats::PhyStats(Config* cfg)
 {
     const size_t task_buffer_symbol_num_ul
         = cfg->ul_data_symbol_num_perframe * kFrameWnd;
-    decoded_bits_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
-    bit_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
+    decoded_bits_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul,
+        Agora_memory::Alignment_t::k64Align);
+    bit_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul,
+        Agora_memory::Alignment_t::k64Align);
 
-    decoded_blocks_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
-    block_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
+    decoded_blocks_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul,
+        Agora_memory::Alignment_t::k64Align);
+    block_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul,
+        Agora_memory::Alignment_t::k64Align);
 
-    uncoded_bits_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
-    uncoded_bit_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul, 64);
+    uncoded_bits_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul,
+        Agora_memory::Alignment_t::k64Align);
+    uncoded_bit_error_count_.calloc(cfg->UE_NUM, task_buffer_symbol_num_ul,
+        Agora_memory::Alignment_t::k64Align);
 
-    evm_buffer_.calloc(kFrameWnd, cfg->UE_ANT_NUM, 64);
-    cx_float* ul_iq_f_ptr = (cx_float*)cfg->ul_iq_f[cfg->UL_PILOT_SYMS];
-    cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
-    ul_gt_mat = ul_iq_f_mat.st();
-    ul_gt_mat = ul_gt_mat.cols(cfg->OFDM_DATA_START, cfg->OFDM_DATA_STOP - 1);
+    evm_buffer_.calloc(
+        kFrameWnd, cfg->UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
 
-    pilot_snr_.calloc(kFrameWnd, cfg->UE_ANT_NUM, 64);
+    if (cfg->ul_data_symbol_num_perframe > 0) {
+        auto ul_iq_f_ptr
+            = reinterpret_cast<cx_float*>(cfg->ul_iq_f[cfg->UL_PILOT_SYMS]);
+        cx_fmat ul_iq_f_mat(
+            ul_iq_f_ptr, cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
+        ul_gt_mat_ = ul_iq_f_mat.st();
+        ul_gt_mat_
+            = ul_gt_mat_.cols(cfg->OFDM_DATA_START, (cfg->OFDM_DATA_STOP - 1));
+    }
+    pilot_snr_.calloc(
+        kFrameWnd, cfg->UE_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+}
+
+PhyStats::~PhyStats(void)
+{
+    decoded_bits_count_.free();
+    bit_error_count_.free();
+
+    decoded_blocks_count_.free();
+    block_error_count_.free();
+
+    uncoded_bits_count_.free();
+    uncoded_bit_error_count_.free();
+
+    evm_buffer_.free();
+    pilot_snr_.free();
 }
 
 void PhyStats::print_phy_stats()
@@ -28,24 +56,27 @@ void PhyStats::print_phy_stats()
     auto& cfg = config_;
     const size_t task_buffer_symbol_num_ul
         = cfg->ul_data_symbol_num_perframe * kFrameWnd;
-    for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
-        size_t total_decoded_bits(0);
-        size_t total_bit_errors(0);
-        size_t total_decoded_blocks(0);
-        size_t total_block_errors(0);
-        for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
-            total_decoded_bits += decoded_bits_count_[ue_id][i];
-            total_bit_errors += bit_error_count_[ue_id][i];
-            total_decoded_blocks += decoded_blocks_count_[ue_id][i];
-            total_block_errors += block_error_count_[ue_id][i];
+
+    if (cfg->ul_data_symbol_num_perframe > 0) {
+        for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
+            size_t total_decoded_bits(0);
+            size_t total_bit_errors(0);
+            size_t total_decoded_blocks(0);
+            size_t total_block_errors(0);
+            for (size_t i = 0; i < task_buffer_symbol_num_ul; i++) {
+                total_decoded_bits += decoded_bits_count_[ue_id][i];
+                total_bit_errors += bit_error_count_[ue_id][i];
+                total_decoded_blocks += decoded_blocks_count_[ue_id][i];
+                total_block_errors += block_error_count_[ue_id][i];
+            }
+            std::cout << "UE " << ue_id << ": bit errors (BER) "
+                      << total_bit_errors << "/" << total_decoded_bits << "("
+                      << 1.0 * total_bit_errors / total_decoded_bits
+                      << "), block errors (BLER) " << total_block_errors << "/"
+                      << total_decoded_blocks << " ("
+                      << 1.0 * total_block_errors / total_decoded_blocks << ")"
+                      << std::endl;
         }
-        std::cout << "UE " << ue_id << ": bit errors (BER) " << total_bit_errors
-                  << "/" << total_decoded_bits << "("
-                  << 1.0 * total_bit_errors / total_decoded_bits
-                  << "), block errors (BLER) " << total_block_errors << "/"
-                  << total_decoded_blocks << " ("
-                  << 1.0 * total_block_errors / total_decoded_blocks << ")"
-                  << std::endl;
     }
 }
 
@@ -95,11 +126,12 @@ void PhyStats::update_pilot_snr(
 
 void PhyStats::update_evm_stats(size_t frame_id, size_t sc_id, cx_fmat eq)
 {
-    //assert(eq.size() == ul_gt_mat.col(sc_id).size());
-    fmat evm = abs(eq - ul_gt_mat.col(sc_id));
-    fmat cur_evm_mat(
-        evm_buffer_[frame_id % kFrameWnd], config_->UE_NUM, 1, false);
-    cur_evm_mat += evm % evm;
+    if (this->config_->ul_data_symbol_num_perframe > 0) {
+        fmat evm = abs(eq - ul_gt_mat_.col(sc_id));
+        fmat cur_evm_mat(
+            evm_buffer_[frame_id % kFrameWnd], config_->UE_NUM, 1, false);
+        cur_evm_mat += evm % evm;
+    }
 }
 
 void PhyStats::update_bit_errors(
@@ -147,19 +179,4 @@ void PhyStats::update_uncoded_bits(
     size_t ue_id, size_t offset, size_t new_bits_num)
 {
     uncoded_bits_count_[ue_id][offset] += new_bits_num;
-}
-
-PhyStats::~PhyStats()
-{
-    decoded_bits_count_.free();
-    bit_error_count_.free();
-
-    decoded_blocks_count_.free();
-    block_error_count_.free();
-
-    uncoded_bits_count_.free();
-    uncoded_bit_error_count_.free();
-
-    evm_buffer_.free();
-    pilot_snr_.free();
 }

@@ -29,9 +29,9 @@
  *
    //CRC check
    bool is_good = crc_up->checkCRC24(pkt_curr);
-   printf("\nCRC GOOD? %d \n", is_good);
+   std::printf("\nCRC GOOD? %d \n", is_good);
    if (!is_good)
-       exit(0); //continue;
+       std::exit(0); //continue;
  */
 
 #include "crc.hpp"
@@ -65,7 +65,7 @@ int main()
     init_crc24(crc_table);
 
     for (i = 0; i < 256; i++) {
-        printf("0x%04X, ", crc_table[i]);
+        std::printf("0x%04X, ", crc_table[i]);
         if ((i % 4) == 3)
             putchar('\n');
     }

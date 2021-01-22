@@ -32,7 +32,7 @@ std::pair<std::vector<arma::cx_fmat>, double> arma_pseudo_inverses(
       try {
         output = arma::inv_sympd(input.t() * input) * input.t();
       } catch (std::runtime_error) {
-        printf("Failed to invert A. Condition number of input = %.2f\n",
+        std::printf("Failed to invert A. Condition number of input = %.2f\n",
                arma::cond(input.t() * input));
         output = arma::pinv(input);
       }
@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
 
   // Header: "<matrix size> <Microseconds with formula> <Microseconds with SVD>
   // <Speedup with formula>"
-  printf("%zux%zu %.1f %.1f %.1f\n", FLAGS_n_rows, FLAGS_n_cols,
+  std::printf("%zux%zu %.1f %.1f %.1f\n", FLAGS_n_rows, FLAGS_n_cols,
          ret_formula.second, ret_svd.second,
          ret_svd.second / ret_formula.second);
 
@@ -74,5 +74,5 @@ int main(int argc, char** argv) {
   for (size_t i = 0; i < FLAGS_n_iters; i++) {
     norm_sum += arma::norm(ret_formula.first[i] - ret_svd.first[i]);
   }
-  fprintf(stderr, "Computation proof = %.2f\n", norm_sum);
+  std::fprintf(stderr, "Computation proof = %.2f\n", norm_sum);
 }

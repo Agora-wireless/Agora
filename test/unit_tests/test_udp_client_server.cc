@@ -60,7 +60,7 @@ void server_func()
         }
     }
 
-    printf("Bandwidth = %.2f Gbps/s, number of reordered packets = %zu\n",
+    std::printf("Bandwidth = %.2f Gbps/s, number of reordered packets = %zu\n",
         (kNumPackets * kMessageSize * 8)
             / cycles_to_ns(rdtsc() - start_time, freq_ghz),
         num_pkts_reordered);

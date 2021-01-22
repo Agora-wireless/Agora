@@ -1,7 +1,7 @@
 // http://www.yolinux.com/TUTORIALS/C++Signals.html
 
-#include <errno.h>
-#include <signal.h>
+#include <cerrno>
+#include <csignal>
 
 #include "signalHandler.hpp"
 

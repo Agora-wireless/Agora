@@ -1,5 +1,8 @@
 #include "net.hpp"
 #include "errno.h"
+#include <cstdio> /* std::printf */
+#include <cstdlib> /* std::exit */
+#include <cstring> /* std::strerror, std::memset, std::memcpy */
 
 void set_socket_buf_size(int socket_local, int sock_buf_size)
 {
@@ -12,8 +15,8 @@ void set_socket_buf_size(int socket_local, int sock_buf_size)
     if (setsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size,
             sizeof(sock_buf_size))
         < 0) {
-        printf("Error setting buffer size to %d\n", sock_buf_size);
-        exit(-1);
+        std::printf("Error setting buffer size to %d\n", sock_buf_size);
+        std::exit(-1);
     }
 }
 
@@ -26,8 +29,8 @@ int setup_socket_ipv4(int port_id, bool set_sock_size, int sock_buf_size)
 
     int socket_local;
     if ((socket_local = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { // UDP socket
-        printf("ERROR: cannot create IPV4 socket\n");
-        exit(0);
+        std::printf("ERROR: cannot create IPV4 socket\n");
+        std::exit(0);
     }
 
     if (set_sock_size)
@@ -35,8 +38,8 @@ int setup_socket_ipv4(int port_id, bool set_sock_size, int sock_buf_size)
 
     if (bind(socket_local, (struct sockaddr*)&local_addr, sizeof(local_addr))
         != 0) {
-        fprintf(stderr, "Socket bind failed: %s", strerror(errno));
-        exit(0);
+        std::fprintf(stderr, "Socket bind failed: %s", std::strerror(errno));
+        std::exit(0);
     }
     return socket_local;
 }
@@ -50,18 +53,18 @@ int setup_socket_ipv6(int port_id, bool set_sock_size, int sock_buf_size)
 
     int socket_local;
     if ((socket_local = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) { // UDP socket
-        printf("ERROR: cannot create IPV6 socket\n");
-        exit(0);
+        std::printf("ERROR: cannot create IPV6 socket\n");
+        std::exit(0);
     } else {
-        printf("Created IPV6 socket on port %d\n", port_id);
+        std::printf("Created IPV6 socket on port %d\n", port_id);
     }
     if (set_sock_size)
         set_socket_buf_size(socket_local, sock_buf_size);
 
     if (bind(socket_local, (struct sockaddr*)&local_addr, sizeof(local_addr))
         != 0) {
-        fprintf(stderr, "Socket bind failed: %s", strerror(errno));
-        exit(0);
+        std::fprintf(stderr, "Socket bind failed: %s", std::strerror(errno));
+        std::exit(0);
     }
     return socket_local;
 }
@@ -71,7 +74,7 @@ void setup_sockaddr_local_ipv4(struct sockaddr_in* local_addr, int port_id)
     (*local_addr).sin_family = AF_INET;
     (*local_addr).sin_port = htons(port_id);
     (*local_addr).sin_addr.s_addr = INADDR_ANY;
-    memset((*local_addr).sin_zero, 0, sizeof((*local_addr).sin_zero));
+    std::memset((*local_addr).sin_zero, 0, sizeof((*local_addr).sin_zero));
 }
 
 void setup_sockaddr_local_ipv6(struct sockaddr_in6* local_addr, int port_id)
@@ -87,7 +90,7 @@ void setup_sockaddr_remote_ipv4(
     (*remote_addr).sin_family = AF_INET;
     (*remote_addr).sin_port = htons(port_id);
     (*remote_addr).sin_addr.s_addr = inet_addr(remote_inet_addr);
-    memset((*remote_addr).sin_zero, 0, sizeof((*remote_addr).sin_zero));
+    std::memset((*remote_addr).sin_zero, 0, sizeof((*remote_addr).sin_zero));
 }
 
 void setup_sockaddr_remote_ipv6(
