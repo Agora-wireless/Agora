@@ -17,12 +17,12 @@ TEST(TestRecip, Correctness)
     double freq_ghz = measure_rdtsc_freq();
 
     Table<complex_float> calib_buffer, recip_buffer_0, recip_buffer_1;
-    recip_buffer_0.calloc(kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
-    recip_buffer_1.calloc(kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+    recip_buffer_0.calloc(kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
+    recip_buffer_1.calloc(kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
     calib_buffer.rand_alloc_cx_float(
-        kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+        kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, Agora_memory::Alignment_t::k64Align);
 
-    printf("Reference antenna: %zu\n", cfg->ref_ant);
+    std::printf("Reference antenna: %zu\n", cfg->ref_ant);
 
     size_t start_tsc = rdtsc();
 
@@ -93,7 +93,7 @@ TEST(TestRecip, Correctness)
 
     double ms1 = cycles_to_ms(rdtsc() - start_tsc, freq_ghz);
 
-    printf("Time per frame (algorithm1, algorithm2) = (%.4f, %.4f) ms\n",
+    std::printf("Time per frame (algorithm1, algorithm2) = (%.4f, %.4f) ms\n",
         ms0 / kMaxFrameNum, ms1 / kMaxFrameNum);
 
     // Check correctness

@@ -97,7 +97,7 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
 // void print256_epi8(__m256i var)
 // {
 //     int8_t *val = (int8_t*) &var;
-//     printf("Numerical int8_t: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i
+//     std::printf("Numerical int8_t: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i
 //     %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i \n",
 //            val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7],
 //            val[8], val[9], val[10], val[11], val[12], val[13], val[14],
@@ -145,9 +145,9 @@ void adapter_64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
             x0 = _mm256_loadu_si256((__m256i*)(p_buff_0 + i * byte_num));
             x1 = _mm256_and_si256(x0, bit_mask);
             _mm256_storeu_si256((__m256i*)p_buff_1, x1);
-            // printf("before: ");
+            // std::printf("before: ");
             // print256_epi8(x0);
-            // printf("after: ");
+            // std::printf("after: ");
             // print256_epi8(x1);
             p_buff_1 = p_buff_1 + kProcBytes;
         }
@@ -158,9 +158,9 @@ void adapter_64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
             x0 = _mm256_loadu_si256((__m256i*)p_buff_1);
             x1 = _mm256_and_si256(x0, bit_mask);
             _mm256_storeu_si256((__m256i*)p_buff_0, x1);
-            // printf("before: ");
+            // std::printf("before: ");
             // print256_epi8(x0);
-            // printf("after: ");
+            // std::printf("after: ");
             // print256_epi8(x1);
             p_buff_1 = p_buff_1 + kProcBytes;
             p_buff_0 = p_buff_0 + byte_num;

@@ -33,14 +33,12 @@
 #include <pthread.h>
 #include <random>
 #include <sstream>
-#include <stdlib.h>
 #include <string>
 #include <thread>
-#include <time.h>
 #include <unistd.h>
 #include <vector>
 
-#define MAX_CORE_NUM 200
+#define MAX_CORE_NUM (200)
 
 void set_cpu_layout_on_numa_nodes(bool verbose = false);
 

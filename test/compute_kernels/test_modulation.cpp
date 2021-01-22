@@ -3,10 +3,6 @@
 #include "memory_manage.h"
 #include "modulation.hpp"
 #include "utils.h"
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 void flushCache()
 {
@@ -46,21 +42,21 @@ static double bench_mod_16qam(unsigned iterations, unsigned mode)
     for (unsigned i = 0; i < num; i++)
         input[i] = rand() % 16;
 
-    printf("input: \n");
+    std::printf("input: \n");
     for (unsigned i = 0; i < num; i++) {
-        printf("%d ", input[i]);
+        std::printf("%d ", input[i]);
     }
-    printf("\n");
+    std::printf("\n");
 
     double start_time = get_time();
     for (unsigned i = 0; i < iterations; i++) {
         for (unsigned j = 0; j < num; j++)
             output_mod[j] = mod_single(input[j], mod_table);
-        // printf("modulated: \n");
+        // std::printf("modulated: \n");
         // for (unsigned i = 0; i < num; i++) {
-        //     printf("(%.3f, %.3f) ", output_mod[i].re, output_mod[i].im);
+        //     std::printf("(%.3f, %.3f) ", output_mod[i].re, output_mod[i].im);
         // }
-        // printf("\n");
+        // std::printf("\n");
         if (mode == 0) {
             demod_16qam_hard_loop((float*)output_mod, output_demod_loop, num);
             demod_16qam_hard_sse((float*)output_mod, output_demod_sse, num);
@@ -77,51 +73,51 @@ static double bench_mod_16qam(unsigned iterations, unsigned mode)
     double end_time = get_time();
 
     if (mode == 1) {
-        printf("\noutput loop: \n");
+        std::printf("\noutput loop: \n");
         for (unsigned i = 0; i < num * 4; i++) {
-            printf("%i ", (int8_t)output_demod_loop[i]);
+            std::printf("%i ", (int8_t)output_demod_loop[i]);
         }
-        printf("\n");
+        std::printf("\n");
 
-        printf("output sse: \n");
+        std::printf("output sse: \n");
         for (unsigned i = 0; i < num * 4; i++) {
-            printf("%i ", (int8_t)output_demod_sse[i]);
+            std::printf("%i ", (int8_t)output_demod_sse[i]);
         }
-        printf("\n");
+        std::printf("\n");
 
-        printf("output avx2: \n");
+        std::printf("output avx2: \n");
         for (unsigned i = 0; i < num * 4; i++) {
-            printf("%i ", (int8_t)output_demod_avx2[i]);
+            std::printf("%i ", (int8_t)output_demod_avx2[i]);
         }
-        printf("\n");
+        std::printf("\n");
 
         int num_error = 0;
         for (unsigned i = 0; i < num * 4; i++) {
             if (output_demod_sse[i] != output_demod_avx2[i]) {
                 num_error++;
-                // printf("error at %d: %i, %i\n", i,
+                // std::printf("error at %d: %i, %i\n", i,
                 // (int8_t)output_demod_sse[i], (int8_t)output_demod_avx2[i]);
             }
         }
-        printf("error rate %d/%d\n", num_error, num * 4);
+        std::printf("error rate %d/%d\n", num_error, num * 4);
     } else {
-        printf("\noutput loop: \n");
+        std::printf("\noutput loop: \n");
         for (unsigned i = 0; i < num; i++) {
-            printf("%i ", output_demod_loop[i]);
+            std::printf("%i ", output_demod_loop[i]);
         }
-        printf("\n");
+        std::printf("\n");
 
-        printf("output sse: \n");
+        std::printf("output sse: \n");
         for (unsigned i = 0; i < num; i++) {
-            printf("%i ", output_demod_sse[i]);
+            std::printf("%i ", output_demod_sse[i]);
         }
-        printf("\n");
+        std::printf("\n");
 
-        printf("output avx2: \n");
+        std::printf("output avx2: \n");
         for (unsigned i = 0; i < num; i++) {
-            printf("%i ", output_demod_avx2[i]);
+            std::printf("%i ", output_demod_avx2[i]);
         }
-        printf("\n");
+        std::printf("\n");
     }
 
     return end_time - start_time;
@@ -156,11 +152,11 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode)
         input[i] = i % 64;
     // input[i] = rand() % 64;
 
-    printf("input: \n");
+    std::printf("input: \n");
     for (unsigned i = 0; i < num; i++) {
-        printf("%d ", input[i]);
+        std::printf("%d ", input[i]);
     }
-    printf("\n");
+    std::printf("\n");
 
     double start_time = get_time();
     for (unsigned i = 0; i < iterations; i++) {
@@ -168,7 +164,7 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode)
             output_mod[j] = mod_single(input[j], mod_table);
 
         // for (unsigned i = 0; i < num; i++) {
-        //     printf("(%.3f, %.3f) ", output_mod[i].re, output_mod[i].im);
+        //     std::printf("(%.3f, %.3f) ", output_mod[i].re, output_mod[i].im);
         // }
 
         if (mode == 0) {
@@ -187,52 +183,52 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode)
     double end_time = get_time();
 
     if (mode == 1) {
-        printf("\noutput loop: \n");
+        std::printf("\noutput loop: \n");
         for (unsigned i = 0; i < num * 6; i++) {
-            printf("%i ", (int8_t)output_demod_loop[i]);
+            std::printf("%i ", (int8_t)output_demod_loop[i]);
         }
-        printf("\n");
+        std::printf("\n");
 
-        printf("output sse: \n");
+        std::printf("output sse: \n");
         for (unsigned i = 0; i < num * 6; i++) {
-            printf("%i ", (int8_t)output_demod_sse[i]);
+            std::printf("%i ", (int8_t)output_demod_sse[i]);
         }
-        printf("\n");
+        std::printf("\n");
 
-        printf("output avx2: \n");
+        std::printf("output avx2: \n");
         for (unsigned i = 0; i < num * 6; i++) {
-            printf("%i ", (int8_t)output_demod_avx2[i]);
+            std::printf("%i ", (int8_t)output_demod_avx2[i]);
         }
-        printf("\n");
+        std::printf("\n");
 
         int num_error = 0;
         for (unsigned i = 0; i < num * 6; i++) {
             if (output_demod_sse[i] != output_demod_avx2[i]) {
                 num_error++;
-                // printf("error at %d: %i, %i\n", i,
+                // std::printf("error at %d: %i, %i\n", i,
                 // (int8_t)output_demod_sse[i], (int8_t)output_demod_avx2[i]);
             }
         }
-        printf("error rate %d/%d\n", num_error, num * 6);
+        std::printf("error rate %d/%d\n", num_error, num * 6);
 
     } else {
-        printf("\noutput loop: \n");
+        std::printf("\noutput loop: \n");
         for (unsigned i = 0; i < num; i++) {
-            printf("%i ", output_demod_loop[i]);
+            std::printf("%i ", output_demod_loop[i]);
         }
-        printf("\n");
+        std::printf("\n");
 
-        printf("output sse: \n");
+        std::printf("output sse: \n");
         for (unsigned i = 0; i < num; i++) {
-            printf("%i ", output_demod_sse[i]);
+            std::printf("%i ", output_demod_sse[i]);
         }
-        printf("\n");
+        std::printf("\n");
 
-        printf("output avx2: \n");
+        std::printf("output avx2: \n");
         for (unsigned i = 0; i < num; i++) {
-            printf("%i ", output_demod_avx2[i]);
+            std::printf("%i ", output_demod_avx2[i]);
         }
-        printf("\n");
+        std::printf("\n");
     }
 
     return end_time - start_time;
@@ -241,19 +237,19 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode)
 static void run_benchmark_16qam(unsigned iterations, unsigned mode)
 {
     double time = bench_mod_16qam(iterations, mode);
-    printf("time: %.2f us per iteration\n", time / iterations);
+    std::printf("time: %.2f us per iteration\n", time / iterations);
 }
 
 static void run_benchmark_64qam(unsigned iterations, unsigned mode)
 {
     double time = bench_mod_64qam(iterations, mode);
-    printf("time: %.2f us per iteration\n", time / iterations);
+    std::printf("time: %.2f us per iteration\n", time / iterations);
 }
 
 int main(int argc, char* argv[])
 {
     if (argc != 4) {
-        fprintf(stderr,
+        std::fprintf(stderr,
             "Usage: %s [modulation order 4/16/64] [mode hard(0)/soft(1)] "
             "[iterations]\n",
             argv[0]);
@@ -262,11 +258,11 @@ int main(int argc, char* argv[])
 
     // int main_core_id = 2;
     // if(stick_this_thread_to_core(main_core_id) != 0) {
-    //     printf("Main thread: stitch main thread to core %d failed\n",
-    //     main_core_id); exit(0);
+    //     std::printf("Main thread: stitch main thread to core %d failed\n",
+    //     main_core_id); std::exit(0);
     // }
     // else {
-    //     printf("Main thread: stitch main thread to core %d succeeded\n",
+    //     std::printf("Main thread: stitch main thread to core %d succeeded\n",
     //     main_core_id);
     // }
 
@@ -281,6 +277,6 @@ int main(int argc, char* argv[])
         else if (mod_order == 64)
             run_benchmark_64qam(iterations, mode);
         else
-            printf("Error: modulation order not supported!\n");
+            std::printf("Error: modulation order not supported!\n");
     }
 }

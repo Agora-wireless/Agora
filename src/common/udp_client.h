@@ -14,10 +14,10 @@
 
 #pragma once
 
+#include <cstring> /* std::strerror, std::memset, std::memcpy */
 #include <map>
 #include <netdb.h>
 #include <stdexcept>
-#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <vector>
@@ -69,7 +69,7 @@ public:
             snprintf(port_str, sizeof(port_str), "%u", rem_port);
 
             struct addrinfo hints;
-            memset(&hints, 0, sizeof(hints));
+            std::memset(&hints, 0, sizeof(hints));
             hints.ai_family = AF_INET;
             hints.ai_socktype = SOCK_DGRAM;
             hints.ai_protocol = IPPROTO_UDP;
@@ -90,8 +90,8 @@ public:
         ssize_t ret = sendto(sock_fd, msg, len, 0, rem_addrinfo->ai_addr,
             rem_addrinfo->ai_addrlen);
         if (ret != static_cast<ssize_t>(len)) {
-            throw std::runtime_error(
-                "sendto() failed. errno = " + std::string(strerror(errno)));
+            throw std::runtime_error("sendto() failed. errno = "
+                + std::string(std::strerror(errno)));
         }
 
         if (enable_recording_flag) {

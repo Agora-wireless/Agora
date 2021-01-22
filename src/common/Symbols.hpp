@@ -2,7 +2,6 @@
 #define SYMBOLS
 
 #include <mkl.h>
-#include <stdint.h>
 #include <string>
 
 #define EXPORT __attribute__((visibility("default")))
@@ -191,7 +190,16 @@ static inline std::string thread_type_str(ThreadType thread_type)
     return "Invalid thread type";
 }
 
-enum class SymbolType { kBeacon, kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
+enum class SymbolType {
+    kBeacon,
+    kUL,
+    kDL,
+    kPilot,
+    kCalDL,
+    kCalUL,
+    kGuard,
+    kUnknown
+};
 
 // Intervals for beacon detection at the client (in frames)
 static constexpr size_t kBeaconDetectInterval = 10;

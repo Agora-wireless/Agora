@@ -13,8 +13,8 @@ char* read_binfile(std::string filename, int buffer_size)
     infile.open(filename, std::ios::binary | std::ios::in);
 
     if (!infile.is_open()) {
-        fprintf(stderr, "Failed to open file %s\n", filename.c_str());
-        exit(-1);
+        std::fprintf(stderr, "Failed to open file %s\n", filename.c_str());
+        std::exit(-1);
     }
 
     auto* x = new char[buffer_size]();
@@ -53,10 +53,11 @@ void run_test(size_t base_graph, size_t zc)
         if (memcmp(parity[n], parity_reference[n],
                 bits_to_bytes(ldpc_max_num_parity_bits(base_graph, zc)))
             != 0) {
-            fprintf(stderr, "Mismatch for Zc = %zu, base graph = %zu\n", zc,
-                base_graph);
+            std::fprintf(stderr, "Mismatch for Zc = %zu, base graph = %zu\n",
+                zc, base_graph);
         } else {
-            printf("Passed for Zc = %zu, base graph = %zu\n", zc, base_graph);
+            std::printf(
+                "Passed for Zc = %zu, base graph = %zu\n", zc, base_graph);
         }
     }
 
@@ -82,7 +83,7 @@ int main()
 
     for (const size_t& zc : zc_all_vec) {
         if (zc < ldpc_get_min_zc() || zc > ldpc_get_max_zc()) {
-            fprintf(stderr, "Zc value %zu not supported. Skipping.\n", zc);
+            std::fprintf(stderr, "Zc value %zu not supported. Skipping.\n", zc);
             continue;
         }
 
@@ -91,7 +92,7 @@ int main()
             != std::end(zc_nofiles_vec);
 
         if (!no_files) {
-            printf("Running for zc = %zu\n", zc);
+            std::printf("Running for zc = %zu\n", zc);
             run_test(1 /* base graph */, zc);
             run_test(2 /* base graph */, zc);
         }
