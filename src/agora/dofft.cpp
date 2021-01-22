@@ -399,16 +399,18 @@ Event_data DoIFFT::launch(size_t tag)
     // IFFT scaled results by OFDM_CA_NUM, we scale down IFFT results
     // during data type coversion
     simd_convert_float_to_short(ifft_out_ptr, socket_ptr, cfg->OFDM_CA_NUM,
-        cfg->CP_LEN, cfg->OFDM_CA_NUM);
+        cfg->CP_LEN, cfg->OFDM_CA_NUM / cfg->BF_ANT_NUM);
 
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
 
     if (kPrintSocketOutput) {
-        printf("IFFT data in socket\n");
-        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i++) {
-            printf("%hi+%hij ", socket_ptr[i * 2], socket_ptr[i * 2 + 1]);
+        std::stringstream ss;
+        ss << "socket_tx_data" << ant_id << "=[";
+        for (size_t i = 0; i < cfg->sampsPerSymbol; i++) {
+            ss << socket_ptr[i * 2] << "+1j*" << socket_ptr[i * 2 + 1] << " ";
         }
-        printf("\n");
+        ss << "];" << std::endl;
+        std::cout << ss.str();
     }
 
     duration_stat->task_count++;
