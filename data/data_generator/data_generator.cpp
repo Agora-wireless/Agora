@@ -44,12 +44,12 @@ float RandFloatFromShort(float min, float max) {
 int main(int argc, char* argv[]) {
   const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  auto* cfg = new Config(FLAGS_conf_file.c_str());
+  auto cfg = std::make_unique<Config>(FLAGS_conf_file.c_str());
 
   const DataGenerator::Profile profile = FLAGS_profile == "123"
                                              ? DataGenerator::Profile::k123
                                              : DataGenerator::Profile::kRandom;
-  DataGenerator data_generator(cfg, 0 /* RNG seed */, profile);
+  DataGenerator data_generator(cfg.get(), 0 /* RNG seed */, profile);
 
   std::printf("DataGenerator: Config file: %s, data profile = %s\n",
               FLAGS_conf_file.c_str(),
@@ -468,7 +468,6 @@ int main(int argc, char* argv[]) {
   tx_data_all_symbols.Free();
   rx_data_all_symbols.Free();
   ue_specific_pilot.Free();
-  delete cfg;
 
   return 0;
 }

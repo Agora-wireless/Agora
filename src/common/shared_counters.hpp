@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SHARED_COUNTERS_H_
+#define SHARED_COUNTERS_H_
 
 #include <mutex>
 #include <sstream>
@@ -234,3 +235,5 @@ class DecodeStatus {
   std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>*
       num_demod_data_received_;
 };
+
+#endif // SHARED_COUNTERS_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef LOGGER_H_
+#define LOGGER_H_
 
 /***************************************************************************
  *   Copyright (C) 2008 by H-Store Project                                 *
@@ -151,3 +152,5 @@ static inline void MlpdOutputLogHeader(FILE* stream, int level) {
 static inline bool IsLogLevelReasonable() {
   return MLPD_LOG_LEVEL <= MLPD_LOG_LEVEL_INFO;
 }
+
+#endif  // LOGGER_H_

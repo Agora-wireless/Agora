@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DOSUBCARRIER_H_
+#define DOSUBCARRIER_H_
 
 #include <armadillo>
 #include <iostream>
@@ -334,3 +335,5 @@ class DoSubcarrier : public Doer {
   // Shared status with Decode threads
   DemulStatus* demul_status_;
 };
+
+#endif  // DOSUBCARRIER_H_

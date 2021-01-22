@@ -17,7 +17,8 @@
  * @brief Common definitons for Ethernet-based transports
  */
 
-#pragma once
+#ifndef ETH_COMMON_H_
+#define ETH_COMMON_H_
 
 #include <arpa/inet.h>
 #include <assert.h>
@@ -233,3 +234,5 @@ static inline void fill_interface_mac(std::string interface, uint8_t* mac) {
     mac[i] = static_cast<uint8_t>(ifr.ifr_hwaddr.sa_data[i]);
   }
 }
+
+#endif  // ETH_COMMON_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MAC_THREAD_H_
+#define MAC_THREAD_H_
 
 #include <queue>
 
@@ -188,3 +189,5 @@ class MacThread {
   // CRC
   DoCRC* crc_obj_;
 };
+
+#endif  // MAC_THREAD_H_

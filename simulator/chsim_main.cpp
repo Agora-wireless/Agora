@@ -24,10 +24,12 @@ int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   auto bs_config = std::make_unique<Config>(FLAGS_bs_conf_file);
   auto ue_config = std::make_unique<Config>(FLAGS_ue_conf_file);
-  auto sim = std::make_unique<ChannelSim>(
-      bs_config, ue_config, FLAGS_bs_threads, FLAGS_ue_threads,
-      FLAGS_worker_threads, FLAGS_core_offset, FLAGS_chan_model,
-      FLAGS_chan_snr);
-  sim->Start();
+  {
+    auto sim = std::make_unique<ChannelSim>(
+        bs_config.get(), ue_config.get(), FLAGS_bs_threads, FLAGS_ue_threads,
+        FLAGS_worker_threads, FLAGS_core_offset, FLAGS_chan_model,
+        FLAGS_chan_snr);
+    sim->Start();
+  }
   return 0;
 }

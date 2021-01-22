@@ -1,5 +1,5 @@
-#ifndef PACKETTXRX
-#define PACKETTXRX
+#ifndef PACKETTXRX_H_
+#define PACKETTXRX_H_
 
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -128,4 +128,4 @@ class PacketTXRX {
   RadioConfig* radioconfig_;  // Used only in Argos mode
 };
 
-#endif
+#endif  // PACKETTXRX_H_

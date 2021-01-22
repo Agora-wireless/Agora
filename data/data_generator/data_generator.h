@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DATA_GENERATOR_H_
+#define DATA_GENERATOR_H_
 
 #include <string>
 
@@ -136,3 +137,5 @@ class DataGenerator {
   Config* cfg_;            // The global Agora config
   const Profile kProfile;  // The pattern of the input byte sequence
 };
+
+#endif  // DATA_GENERATOR_H_

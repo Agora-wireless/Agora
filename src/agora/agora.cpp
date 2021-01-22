@@ -1441,7 +1441,6 @@ bool Agora::CheckWorkComplete(size_t frame_id) {
        (this->ifft_counters_.IsLastSymbol(frame_id) == true) &&
        (true == this->tomac_counters_.IsLastSymbol(frame_id))));
 
-  //(true == this->tx_counters_.IsLastSymbol( frame_id )
   // Complete if last frame and ifft / decode complete
   if ((true == this->ifft_counters_.IsLastSymbol(frame_id)) &&
       (((kEnableMac == false) &&

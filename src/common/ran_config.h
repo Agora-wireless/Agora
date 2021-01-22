@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAN_CONFIG_H_
+#define RAN_CONFIG_H_
 
 /**
  * @brief The struct that contains the RAN configuration that Agora must
@@ -29,3 +30,5 @@ class RBIndicator {
   size_t ue_id_;           /// UE ID
   size_t mod_order_bits_;  /// modulation type (number of bits)
 };
+
+#endif  // RAN_CONFIG_H_
