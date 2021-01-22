@@ -154,7 +154,9 @@ void DoPrecode::load_input_data(size_t symbol_idx_dl,
         = modulated_buffer_temp + sc_id_in_block * cfg->UE_NUM;
     if (symbol_idx_dl < cfg->DL_PILOT_SYMS
         || sc_id % cfg->OFDM_PILOT_SPACING == 0) {
-        data_ptr[user_id] = cfg->ue_specific_pilot[user_id][sc_id];
+        // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
+        // in the downlink receiver
+        data_ptr[user_id] = cfg->ue_specific_pilot[0][sc_id];
     } else {
         int8_t* raw_data_ptr = &dl_raw_data[total_data_symbol_idx][sc_id
             + roundup<64>(cfg->OFDM_DATA_NUM) * user_id];
