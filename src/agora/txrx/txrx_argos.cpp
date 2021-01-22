@@ -116,7 +116,8 @@ int PacketTXRX::dequeue_send_argos(int tid)
     int nChannels = c->nChannels;
     int ch = ant_id % nChannels;
 
-    if (c->recipCalEn && symbol_id == c->DLSymbols[0].front()) {
+    if (c->recipCalEn && symbol_id == c->DLSymbols[0].front()
+        && ant_id != c->ref_ant) {
         std::vector<std::complex<int16_t>> zeros(
             c->sampsPerSymbol, std::complex<int16_t>(0, 0));
         for (size_t s = 0; s < c->ant_per_group; s++) {
@@ -133,7 +134,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
 
     if (kDebugDownlink) {
         std::vector<std::complex<int16_t>> zeros(c->sampsPerSymbol);
-        if (ant_id != c->ref_ant)
+        if (ant_id != 0)
             txbuf[ch] = zeros.data();
         else if (dl_symbol_idx < c->DL_PILOT_SYMS)
             txbuf[ch] = (void*)c->ue_specific_pilot_t[0];
