@@ -1,6 +1,6 @@
 #include "phy_stats.hpp"
 
-PhyStats::PhyStats(Config* cfg) : kConfig(cfg) {
+PhyStats::PhyStats(Config* const cfg) : kConfig(cfg) {
   const size_t task_buffer_symbol_num_ul = cfg->Frame().NumULSyms() * kFrameWnd;
   decoded_bits_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
                              Agora_memory::Alignment_t::k64Align);

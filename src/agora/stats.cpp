@@ -2,7 +2,7 @@
 
 #include <typeinfo>
 
-Stats::Stats(Config* cfg)
+Stats::Stats(const Config* const cfg)
     : kConfig(cfg),
       kTaskThreadNum(cfg->WorkerThreadNum()),
       kFftThreadNum(cfg->FftThreadNum()),

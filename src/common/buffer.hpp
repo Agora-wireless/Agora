@@ -252,10 +252,15 @@ class RxCounters {
  */
 class FrameCounters {
  public:
+  FrameCounters() : task_count_(), symbol_count_() {}
+
   void Init(size_t max_symbol_count, size_t max_task_count = 0) {
     this->max_symbol_count_ = max_symbol_count;
     this->max_task_count_ = max_task_count;
     this->symbol_count_.fill(0);
+    for (auto &frame : task_count_) {
+      frame.fill(0);
+    }
   }
 
   void Reset(size_t frame_id) {

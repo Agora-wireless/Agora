@@ -136,7 +136,7 @@ class Agora {
   // Worker thread i runs on core base_worker_core_offset + i
   const size_t kBaseWorkerCoreOffset;
 
-  Config* config_;
+  Config* const config_;
   size_t fft_created_count_;
   size_t max_equaled_frame_ = SIZE_MAX;
   std::unique_ptr<PacketTXRX> packet_tx_rx_;
@@ -200,7 +200,8 @@ class Agora {
   Table<complex_float> ue_spec_pilot_buffer_;
 
   // Counters related to various modules
-  FrameCounters fft_counters_;
+  FrameCounters pilot_fft_counters_;
+  FrameCounters uplink_fft_counters_;
   FrameCounters zf_counters_;
   FrameCounters demul_counters_;
   FrameCounters decode_counters_;
@@ -219,8 +220,8 @@ class Agora {
   // cur_sche_frame_id is the frame that is currently being scheduled.
   // A frame's schduling finishes before processing ends, so the two
   // variables are possible to have different values.
-  size_t cur_proc_frame_id_ = 0;
-  size_t cur_sche_frame_id_ = 0;
+  size_t cur_proc_frame_id_;
+  size_t cur_sche_frame_id_;
 
   // The frame index for a symbol whose FFT is done
   std::vector<size_t> fft_cur_frame_for_symbol_;

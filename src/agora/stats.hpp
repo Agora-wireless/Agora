@@ -51,7 +51,7 @@ static constexpr size_t kNumTimestampTypes =
 
 class Stats {
  public:
-  Stats(Config* cfg);
+  Stats(const Config* const cfg);
   ~Stats();
 
   /// If worker stats collection is enabled, combine and update per-worker
@@ -174,7 +174,7 @@ class Stats {
 
   size_t GetTotalTaskCount(DoerType doer_type, size_t thread_num);
 
-  Config const* const kConfig;
+  const Config* const kConfig;
 
   const size_t kTaskThreadNum;
   const size_t kFftThreadNum;
