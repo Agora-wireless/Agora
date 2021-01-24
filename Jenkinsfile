@@ -107,6 +107,12 @@ pipeline {
 			steps {
 				echo "CI unit testing ..."
 				dir("${WORKSPACE}") {
+					echo "Building data for unit tests ..."
+					sh '''
+						export LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2020.3.279/linux/mkl/lib/intel64/:$LD_LIBRARY_PATH
+						./build/data_generator --conf_file data/tddconfig-sim-ul.json
+					'''
+					
 					echo "Testing test_datatype_conversion ..."
 					sh '''
 						export LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2020.3.279/linux/mkl/lib/intel64/:$LD_LIBRARY_PATH

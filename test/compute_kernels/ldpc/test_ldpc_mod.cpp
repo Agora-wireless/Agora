@@ -188,6 +188,13 @@ int main(int argc, char* argv[]) {
       bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                               &ldpc_decoder_5gnr_response);
     }
+
+    // Descramble the deocded buffer
+    for (size_t i = 0; i < num_codeblocks; i++) {
+      WlanScramble((int8_t*)decoded_codewords[i], ldpc_config.NumCbLen() / 8,
+                   kScramblerInitState);
+    }
+    
     size_t duration = WorkerRdtsc() - start_tsc;
     std::printf("Decoding of %zu blocks takes %.2f us per block\n",
                 num_codeblocks,
