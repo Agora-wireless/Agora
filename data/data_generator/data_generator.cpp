@@ -84,7 +84,7 @@ int main(int argc, char* argv[])
             + "_ant" + std::to_string(cfg->UE_ANT_NUM) + ".bin";
         std::printf("Saving raw uplink data (using LDPC) to %s\n",
             filename_input.c_str());
-        FILE* fp_input = std::fopen(filename_input.c_str(), "ab");
+        FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
         for (size_t i = 0; i < num_ul_codeblocks; i++) {
             std::fwrite(reinterpret_cast<uint8_t*>(&ul_information.at(i).at(0)),
                 input_bytes_per_cb, sizeof(uint8_t), fp_input);
@@ -285,7 +285,7 @@ int main(int argc, char* argv[])
             + "_ant" + std::to_string(cfg->UE_ANT_NUM) + ".bin";
         std::printf(
             "Saving raw dl data (using LDPC) to %s\n", filename_input.c_str());
-        FILE* fp_input = std::fopen(filename_input.c_str(), "ab");
+        FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
         for (size_t i = 0; i < num_dl_codeblocks; i++) {
             std::fwrite(reinterpret_cast<uint8_t*>(&dl_information.at(i).at(0)),
                 input_bytes_per_cb, sizeof(uint8_t), fp_input);
