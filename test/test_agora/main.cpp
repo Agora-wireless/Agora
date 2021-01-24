@@ -24,8 +24,9 @@ void read_from_file_ul(std::string filename, Table<uint8_t>& data,
         // std::printf("\n");
         // }
         if (expect_num_bytes != num_bytes) {
-            std::printf("read file failed: %s, symbol %d, expect: %d, actual: %d "
-                   "bytes\n",
+            std::printf(
+                "read file failed: %s, symbol %d, expect: %d, actual: %d "
+                "bytes\n",
                 filename.c_str(), i, expect_num_bytes, num_bytes);
             std::cerr << "Error: " << strerror(errno) << std::endl;
         }
@@ -59,15 +60,17 @@ void check_correctness_ul(Config* cfg)
     int UL_PILOT_SYMS = cfg->UL_PILOT_SYMS;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string raw_data_filename = cur_directory + "/data/LDPC_orig_data_"
+    std::string raw_data_filename = cur_directory + "/data/LDPC_orig_ul_data_"
         + std::to_string(cfg->OFDM_CA_NUM) + "_ant"
         + std::to_string(cfg->UE_NUM) + ".bin";
     std::string output_data_filename = cur_directory + "/data/decode_data.bin";
 
     Table<uint8_t> raw_data;
     Table<uint8_t> output_data;
-    raw_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, Agora_memory::Alignment_t::k64Align);
-    output_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, Agora_memory::Alignment_t::k64Align);
+    raw_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM,
+        Agora_memory::Alignment_t::k64Align);
+    output_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM,
+        Agora_memory::Alignment_t::k64Align);
 
     int num_bytes_per_ue
         = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
@@ -120,10 +123,10 @@ void check_correctness_dl(Config* cfg)
     std::string tx_data_filename = cur_directory + "/data/tx_data.bin";
     Table<short> raw_data;
     Table<short> tx_data;
-    raw_data.calloc(
-        data_symbol_num_perframe * BS_ANT_NUM, sampsPerSymbol * 2, Agora_memory::Alignment_t::k64Align);
-    tx_data.calloc(
-        data_symbol_num_perframe * BS_ANT_NUM, sampsPerSymbol * 2, Agora_memory::Alignment_t::k64Align);
+    raw_data.calloc(data_symbol_num_perframe * BS_ANT_NUM, sampsPerSymbol * 2,
+        Agora_memory::Alignment_t::k64Align);
+    tx_data.calloc(data_symbol_num_perframe * BS_ANT_NUM, sampsPerSymbol * 2,
+        Agora_memory::Alignment_t::k64Align);
 
     read_from_file_dl(raw_data_filename, raw_data, sampsPerSymbol, cfg);
     read_from_file_dl(tx_data_filename, tx_data, sampsPerSymbol, cfg);
@@ -146,8 +149,8 @@ void check_correctness_dl(Config* cfg)
                 //     sc / 2, raw_data[offset][sc], tx_data[offset][sc], diff);
             }
             float avg_diff = sum_diff / sampsPerSymbol;
-            std::printf("symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant,
-                avg_diff);
+            std::printf("symbol %d, ant %d, mean per-sample diff %.3f\n", i,
+                ant, avg_diff);
             if (avg_diff > 0.03)
                 error_cnt++;
         }

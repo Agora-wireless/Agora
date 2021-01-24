@@ -80,11 +80,11 @@ int main(int argc, char* argv[])
             ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
 
         const std::string filename_input = cur_directory
-            + "/data/LDPC_orig_data_" + std::to_string(cfg->OFDM_CA_NUM)
+            + "/data/LDPC_orig_ul_data_" + std::to_string(cfg->OFDM_CA_NUM)
             + "_ant" + std::to_string(cfg->UE_ANT_NUM) + ".bin";
         std::printf("Saving raw uplink data (using LDPC) to %s\n",
             filename_input.c_str());
-        FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
+        FILE* fp_input = std::fopen(filename_input.c_str(), "ab");
         for (size_t i = 0; i < num_ul_codeblocks; i++) {
             std::fwrite(reinterpret_cast<uint8_t*>(&ul_information.at(i).at(0)),
                 input_bytes_per_cb, sizeof(uint8_t), fp_input);
@@ -281,7 +281,7 @@ int main(int argc, char* argv[])
             ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
 
         const std::string filename_input = cur_directory
-            + "/data/LDPC_orig_data_" + std::to_string(cfg->OFDM_CA_NUM)
+            + "/data/LDPC_orig_dl_data_" + std::to_string(cfg->OFDM_CA_NUM)
             + "_ant" + std::to_string(cfg->UE_ANT_NUM) + ".bin";
         std::printf(
             "Saving raw dl data (using LDPC) to %s\n", filename_input.c_str());
