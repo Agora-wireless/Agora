@@ -437,15 +437,15 @@ void Config::genData()
         }
     }
 #else
-    std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_"
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string ul_data_file = cur_directory + "/data/LDPC_orig_ul_data_"
         + std::to_string(OFDM_CA_NUM) + "_ant"
         + std::to_string(total_ue_ant_num) + ".bin";
-    std::cout << "Config: Reading raw data from " << filename1 << std::endl;
-    FILE* fd = fopen(filename1.c_str(), "rb");
+    std::cout << "Config: Reading raw data from " << ul_data_file << std::endl;
+    FILE* fd = fopen(ul_data_file.c_str(), "rb");
     if (fd == nullptr) {
         std::printf("Failed to open antenna file %s. Error %s.\n",
-            filename1.c_str(), strerror(errno));
+            ul_data_file.c_str(), strerror(errno));
         std::exit(-1);
     }
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
@@ -458,7 +458,7 @@ void Config::genData()
             if (r < num_bytes_per_ue) {
                 std::printf("uplink bad read from file %s (batch %zu : %zu) "
                             "%zu : %zu\n",
-                    filename1.c_str(), i, j, r, num_bytes_per_ue);
+                    ul_data_file.c_str(), i, j, r, num_bytes_per_ue);
             }
         }
         if (std::fseek(fd,
@@ -469,7 +469,18 @@ void Config::genData()
             return;
         }
     }
+    std::fclose(fd);
 
+    std::string dl_data_file = cur_directory + "/data/LDPC_orig_dl_data_"
+        + std::to_string(OFDM_CA_NUM) + "_ant"
+        + std::to_string(total_ue_ant_num) + ".bin";
+    std::cout << "Config: Reading raw data from " << dl_data_file << std::endl;
+    fd = fopen(dl_data_file.c_str(), "rb");
+    if (fd == nullptr) {
+        std::printf("Failed to open antenna file %s. Error %s.\n",
+            dl_data_file.c_str(), strerror(errno));
+        std::exit(-1);
+    }
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < UE_ANT_NUM; j++) {
             size_t r = std::fread(dl_bits[i] + j * num_bytes_per_ue_pad,
@@ -477,7 +488,7 @@ void Config::genData()
             if (r < num_bytes_per_ue)
                 std::printf(
                     "downlink bad read from file %s (batch %zu : %zu) \n",
-                    filename1.c_str(), i, j);
+                    dl_data_file.c_str(), i, j);
         }
     }
     std::fclose(fd);
