@@ -186,6 +186,133 @@ static inline size_t LdpcGetMaxZc() {
   return kUseAVX2Encoder ? avx2enc::kZcMax : ZC_MAX;
 }
 
+static constexpr int8_t kScramblerInitState = 93;  // [1, 127]
+static constexpr int8_t kScramblerlength = 127;
+
+/**
+ * @brief                        Convert a byte array to a bit array. MSB first
+ *
+ * @param  in_byte_buffer        Input byte array
+ * @param  byte_buffer_size      Input byte array size
+ * @param  out_bit_buffer        Output bit array
+ */
+static inline void ConvertBytesToBits(const int8_t* in_byte_buffer,
+                                      size_t byte_buffer_size,
+                                      int8_t* out_bit_buffer) {
+  for (size_t i = 0; i < byte_buffer_size; i++) {
+    for (size_t j = 0; j < 8; j++) {
+      out_bit_buffer[i * 8 + j] =
+          (in_byte_buffer[i] & (1 << (7 - j))) >> (7 - j);
+    }
+  }
+
+  return;
+}
+
+/**
+ * @brief                        Convert a bit array to a byte array. MSB first
+ *
+ * @param  in_bit_buffer         Input bit array
+ * @param  byte_buffer_size      Output byte array size
+ * @param  out_byte_buffer       Output byte array
+ */
+static inline void ConvertBitsToBytes(const int8_t* in_bit_buffer,
+                                      size_t byte_buffer_size,
+                                      int8_t* out_byte_buffer) {
+  for (size_t i = 0; i < byte_buffer_size; i++) {
+    out_byte_buffer[i] = 0;
+    for (size_t j = 0; j < 8; j++) {
+      out_byte_buffer[i] <<= 1;
+      out_byte_buffer[i] += in_bit_buffer[i * 8 + j];
+    }
+  }
+
+  return;
+}
+
+/**
+ * @brief                        WLAN Scrambler of IEEE 802.11-2012
+ *
+ * Section 18.3.5.5. The same scrambler is used to both scramble bits at the
+ * transmitter and descramble at the receiver.
+ *
+ * The input is scrambled with a length-127 frame-synchronous scrambler using
+ * the generator polynomial s(x) = x7 + x4 + 1 and a pseudorandom nonzero
+ * initial state (default 0x5D), which is an integer picked in the range
+ * [1,127]. The mapping of the seed to the generator is Bit0 ~ Bit6 to x1 ~ x7.
+ * The output is the scrambld data of the same size and type as the input.
+ *
+ * @param  byte_buffer           Byte array for both input and scrambled data
+ * @param  byte_buffer_size      Byte array size
+ * @param  scram_init            Scamber initial state
+ */
+static inline void WlanScramble(int8_t* byte_buffer, size_t byte_buffer_size,
+                                const int8_t scram_init) {
+  int8_t b_scrambler_init_bits[7];
+  int8_t scrambler_init_bits[7];
+  int8_t tmp;
+  size_t j;
+  size_t buff_size;
+  int8_t res_xor;
+  int8_t* scram_seq_data;
+  int8_t* bit_buffer;
+  scram_seq_data = (int8_t*)std::calloc(kScramblerlength, sizeof(int8_t));
+  bit_buffer = (int8_t*)std::calloc(byte_buffer_size*8, sizeof(int8_t));
+
+  ConvertBytesToBits(&byte_buffer[0], byte_buffer_size, &bit_buffer[0]);
+
+  // Do scrambling
+  if (byte_buffer_size != 0) {
+    // Generate scrambler initial state array from scram_init
+    for (size_t i = 0; i < 7; i++) scrambler_init_bits[i] = 0;
+    j = 1;
+    tmp = scram_init;
+    while ((j <= 7) && (tmp > 0)) {
+      scrambler_init_bits[j - 1] = tmp % 2;
+      tmp /= 2;
+      j++;
+    }
+
+    // Inverse the initial state array
+    for (size_t i = 0; i < 7; i++)
+      b_scrambler_init_bits[i] = scrambler_init_bits[6 - i];
+    for (size_t i = 0; i < 7; i++)
+      scrambler_init_bits[i] = b_scrambler_init_bits[i];
+
+    // Generate the scrambling sequence using the generator polynomial
+    buff_size = byte_buffer_size * 8;
+    if (buff_size > 127) buff_size = 127;
+    for (j = 0; j < buff_size; j++) {
+      //  x7 xor x4
+      res_xor = (scrambler_init_bits[0] != 0) != (scrambler_init_bits[3] != 0);
+      scram_seq_data[j] = res_xor;
+      //  Left-shift
+      for (size_t i = 0; i < 6; i++)
+        scrambler_init_bits[i] = scrambler_init_bits[i + 1];
+      //  Update x1
+      scrambler_init_bits[6] = res_xor;
+    }
+
+    // Generate scrambled sequence by xor-ing input to the scrambling sequence
+    j = 0;
+    for (size_t i = 0; i < byte_buffer_size * 8; i++) {
+      if (j == buff_size)
+        j = 1;
+      else
+        j++;
+
+      bit_buffer[i] = ((bit_buffer[i] != 0) != (scram_seq_data[j - 1] != 0));
+    }
+  }
+
+  ConvertBitsToBytes(&bit_buffer[0], byte_buffer_size, &byte_buffer[0]);
+
+  std::free(scram_seq_data);
+  std::free(bit_buffer);
+
+  return;
+}
+
 // Generate the codeword output and parity buffer for this input buffer
 static inline void LdpcEncodeHelper(size_t base_graph, size_t zc, size_t nRows,
                                     int8_t* encoded_buffer,

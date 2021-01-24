@@ -608,6 +608,8 @@ void Config::GenData() {
       BitsToBytes(this->ldpc_config_.NumCbCodewLen());
   const size_t num_blocks_per_symbol =
       this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
+  int8_t* scramble_buffer_ptr;
+  scramble_buffer_ptr = (int8_t*)std::calloc(bytes_per_block, sizeof(int8_t));
 
   // Encode uplink bits
   ul_encoded_bits_.Malloc(this->frame_.NumULSyms() * num_blocks_per_symbol,
@@ -619,11 +621,15 @@ void Config::GenData() {
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t j = 0;
          j < this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_; j++) {
+      for (size_t k = 0; k < bytes_per_block; k++)
+        scramble_buffer_ptr[k] = (ul_bits_[i] + j * bytes_per_block)[k];
+      WlanScramble(scramble_buffer_ptr, bytes_per_block, kScramblerInitState);
+
       LdpcEncodeHelper(this->ldpc_config_.BaseGraph(),
                        this->ldpc_config_.ExpansionFactor(),
                        this->ldpc_config_.NumRows(),
                        ul_encoded_bits_[i * num_blocks_per_symbol + j],
-                       temp_parity_buffer, ul_bits_[i] + j * bytes_per_block);
+                       temp_parity_buffer, scramble_buffer_ptr);
     }
   }
 
@@ -654,11 +660,15 @@ void Config::GenData() {
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
     for (size_t j = 0;
          j < this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_; j++) {
-      LdpcEncodeHelper(
-          this->ldpc_config_.BaseGraph(), this->ldpc_config_.ExpansionFactor(),
-          this->ldpc_config_.NumRows(),
-          dl_encoded_bits[i * num_blocks_per_symbol + j], temp_parity_buffer,
-          this->dl_bits_[i] + j * bytes_per_block);
+      for (size_t k = 0; k < bytes_per_block; k++)
+        scramble_buffer_ptr[k] = (this->dl_bits_[i] + j * bytes_per_block)[k];
+      WlanScramble(scramble_buffer_ptr, bytes_per_block, kScramblerInitState);
+
+      LdpcEncodeHelper(this->ldpc_config_.BaseGraph(),
+                       this->ldpc_config_.ExpansionFactor(),
+                       this->ldpc_config_.NumRows(),
+                       dl_encoded_bits[i * num_blocks_per_symbol + j],
+                       temp_parity_buffer, scramble_buffer_ptr);
     }
   }
   dl_mod_input_.Calloc(this->frame_.NumDLSyms(),
@@ -821,6 +831,7 @@ void Config::GenData() {
   ul_encoded_bits_.Free();
   dl_mod_input_.Free();
   FreeBuffer1d(&pilot_ifft);
+  std::free(scramble_buffer_ptr);
 }
 
 Config::~Config() {

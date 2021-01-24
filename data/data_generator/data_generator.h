@@ -57,10 +57,22 @@ class DataGenerator {
       }
     }
 
+    // Scramble the raw information
+    int8_t scramble_buffer[LdpcEncodingInputBufSize(lc.BaseGraph(),
+                                                    lc.ExpansionFactor())];
+    for (size_t i = 0;
+         i < LdpcEncodingInputBufSize(lc.BaseGraph(), lc.ExpansionFactor());
+         i++) {
+      scramble_buffer[i] = information.at(i);
+    }
+    WlanScramble(scramble_buffer,
+                 LdpcEncodingInputBufSize(lc.BaseGraph(), lc.ExpansionFactor()),
+                 kScramblerInitState);
+
     LdpcEncodeHelper(cfg_->LdpcConfig().BaseGraph(),
                      cfg_->LdpcConfig().ExpansionFactor(),
                      cfg_->LdpcConfig().NumRows(), &encoded_codeword.at(0),
-                     &parity.at(0), &information.at(0));
+                     &parity.at(0), scramble_buffer);
 
     information.resize(lc.NumInputBytes());
     encoded_codeword.resize(lc.NumEncodedBytes());

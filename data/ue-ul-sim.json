@@ -4,7 +4,7 @@
  "rate" : 30.72e6,
  "worker_thread_num" : 2,
  "demul_block_size" : 48,
- "ue_num": 2,
+ "ue_num": 4,
  "core_offset" : 16,
  "UE" : true,
  "socket_thread_num": 1

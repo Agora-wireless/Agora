@@ -859,6 +859,10 @@ void PhyUe::DoDecode(int tid, size_t tag) {
     bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                             &ldpc_decoder_5gnr_response);
 
+    // Descramble the decoded buffer
+    WlanScramble((int8_t*)decoded_buffer_ptr, config_->NumBytesPerCb(),
+                 kScramblerInitState);
+
     if (kCollectPhyStats) {
       decoded_bits_count_[ant_id][total_dl_symbol_id] +=
           8 * config_->NumBytesPerCb();
@@ -945,6 +949,8 @@ void PhyUe::DoEncode(int tid, size_t tag) {
     for (size_t cb_id = 0; cb_id < config_->LdpcConfig().NumBlocksInSymbol();
          cb_id++) {
       int8_t* input_ptr;
+      int8_t* scramble_buffer_ptr;
+      scramble_buffer_ptr = (int8_t*)std::calloc(bytes_per_block, sizeof(int8_t));
       if (kEnableMac) {
         uint8_t* ul_bits = ul_bits_buffer_[ue_id] +
                            frame_slot * config_->MacBytesNumPerframe();
@@ -963,9 +969,14 @@ void PhyUe::DoEncode(int tid, size_t tag) {
                            config_->Frame().ClientUlPilotSymbols()][cb_offset];
       }
 
+      // Scramble the raw information
+      for (size_t i = 0; i < bytes_per_block; i++)
+        scramble_buffer_ptr[i] = input_ptr[i];
+      WlanScramble(scramble_buffer_ptr, bytes_per_block, kScramblerInitState);
+
       LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                        ldpc_config.NumRows(), encoded_buffer_temp,
-                       parity_buffer, input_ptr);
+                       parity_buffer, scramble_buffer_ptr);
 
       int cb_coded_bytes = ldpc_config.NumCbCodewLen() / cfg->ModOrderBits();
       int output_offset =
@@ -974,6 +985,8 @@ void PhyUe::DoEncode(int tid, size_t tag) {
       AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
                       &ul_syms_buffer_[ue_id][output_offset],
                       encoded_bytes_per_block, cfg->ModOrderBits());
+      
+      std::free(scramble_buffer_ptr);
     }
   }
   // double duration = worker_rdtsc() - start_tsc;

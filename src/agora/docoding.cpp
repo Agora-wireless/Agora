@@ -51,10 +51,18 @@ EventData DoEncode::Launch(size_t tag) {
   size_t symbol_idx_dl = cfg_->GetDLSymbolIdx(frame_id, symbol_id);
   int8_t* input_ptr =
       cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
+  int8_t* scramble_buffer_ptr;
+  scramble_buffer_ptr =
+      (int8_t*)std::calloc(cfg_->NumBytesPerCb(), sizeof(int8_t));
+  
+  // Scramble the raw information
+  for (size_t i = 0; i < cfg_->NumBytesPerCb(); i++)
+    scramble_buffer_ptr[i] = input_ptr[i];
+  WlanScramble(scramble_buffer_ptr, cfg_->NumBytesPerCb(), kScramblerInitState);
 
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                    ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
-                   input_ptr);
+                   scramble_buffer_ptr);
   int8_t* final_output_ptr = cfg_->GetEncodedBuf(
       encoded_buffer_, frame_id, symbol_idx_dl, ue_id, cur_cb_id);
   AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp_),
@@ -75,6 +83,8 @@ EventData DoEncode::Launch(size_t tag) {
   if (CyclesToUs(duration, cfg_->FreqGhz()) > 500) {
     std::printf("Thread %d Encode takes %.2f\n", tid_,
                 CyclesToUs(duration, cfg_->FreqGhz()));
+  
+  std::free(scramble_buffer_ptr);
   }
 
   return EventData(EventType::kEncode, tag);
@@ -151,6 +161,10 @@ EventData DoDecode::Launch(size_t tag) {
 
   bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                           &ldpc_decoder_5gnr_response);
+
+  // Descramble the decoded buffer
+  WlanScramble((int8_t*)decoded_buffer_ptr, cfg_->NumBytesPerCb(),
+               kScramblerInitState);
 
   size_t start_tsc2 = WorkerRdtsc();
   duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
