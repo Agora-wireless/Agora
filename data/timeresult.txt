@@ -1,1 +1,0 @@
-Pilot RX by socket threads (= reference time), kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kDemulDone, kDecodeDone, kRXDone, time in CSI, time in FFT, time in ZF, time in Demul, time in Decode
