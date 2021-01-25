@@ -119,7 +119,7 @@ public:
                 cur_frame_ ++;
                 encode_ready_[(cur_frame_ - 1) % kFrameWnd] = false;
                 size_t cur_cycle = worker_rdtsc();
-                num_decode_tasks_completed_ = 0;
+                num_decode_tasks_completed_[(cur_frame_ - 1) % kFrameWnd] = 0;
                 size_t frame_slot = (cur_frame_ - 1) % kFrameWnd;
                 num_pkts_[frame_slot] = 0;
                 num_pilot_pkts_[frame_slot] = 0;
