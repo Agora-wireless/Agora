@@ -102,28 +102,35 @@ public:
     // this frame
     void decode_done(size_t frame_id)
     {
-        rt_assert(frame_id == cur_frame_, "Wrong completed decode task!");
+        rt_assert(frame_id >= cur_frame_ + kFrameWnd, "Wrong completed decode task!");
         // if (frame_id != cur_frame_) {
         //     fprintf(stderr, "Wrong completed decode task (%u:%u)\n", frame_id, cur_frame_);
         //     exit(1);
         // }
-        decode_mutex_.lock();
-        num_decode_tasks_completed_++;
-        if (num_decode_tasks_completed_ == num_decode_tasks_per_frame_) {
-            cur_frame_++;
-            encode_ready_[(cur_frame_ - 1) % kFrameWnd] = false;
-	        size_t cur_cycle = worker_rdtsc();
-            num_decode_tasks_completed_ = 0;
-            size_t frame_slot = frame_id % kFrameWnd;
-            num_pkts_[frame_slot] = 0;
-            num_pilot_pkts_[frame_slot] = 0;
-            for (size_t j = 0; j < kMaxSymbols; j++) {
-                num_data_pkts_[frame_slot][j] = 0;
+        bool cont = false;
+        decode_mutex_[frame_id % kFrameWnd].lock();
+        num_decode_tasks_completed_[frame_id % kFrameWnd]++;
+        cont = (num_decode_tasks_completed_[frame_id % kFrameWnd] == num_decode_tasks_per_frame_);
+        decode_mutex_[frame_id % kFrameWnd].unlock();
+
+        if (unlikely(cont)) {
+            cur_frame_mutex_.lock();
+            while (num_decode_tasks_completed_[cur_frame_ % kFrameWnd] == num_decode_tasks_per_frame_) {
+                cur_frame_ ++;
+                encode_ready_[(cur_frame_ - 1) % kFrameWnd] = false;
+                size_t cur_cycle = worker_rdtsc();
+                num_decode_tasks_completed_ = 0;
+                size_t frame_slot = (cur_frame_ - 1) % kFrameWnd;
+                num_pkts_[frame_slot] = 0;
+                num_pilot_pkts_[frame_slot] = 0;
+                for (size_t j = 0; j < kMaxSymbols; j++) {
+                    num_data_pkts_[frame_slot][j] = 0;
+                }
+                printf("Main thread: Decode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
+                last_frame_cycles_ = cur_cycle;
             }
-            printf("Main thread: Decode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
-            last_frame_cycles_ = cur_cycle;
+            cur_frame_mutex_.unlock();
         }
-        decode_mutex_.unlock();
     }
 
     // When precoding is done for a frame from one dosubcarrier worker, call this function
@@ -179,8 +186,9 @@ public:
 
     // Atomic counter for # completed decode tasks
     // cur_frame will be incremented in all tasks are completed
-    size_t num_decode_tasks_completed_;
-    std::mutex decode_mutex_;
+    std::array<size_t, kFrameWnd> num_decode_tasks_completed_ = {};
+    std::array<std::mutex, kFrameWnd> decode_mutex_ = {};
+    std::mutex cur_frame_mutex_;
 
     // Atomic counter for # completed precode tasks
     // cur_frame_ will be incremented in all tasks are completed
