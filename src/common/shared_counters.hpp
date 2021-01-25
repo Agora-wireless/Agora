@@ -102,7 +102,7 @@ public:
     // this frame
     void decode_done(size_t frame_id)
     {
-        rt_assert(frame_id < cur_frame_ + kFrameWnd || frame_id >= cur_frame_, "Wrong completed decode task!");
+        rt_assert(frame_id < cur_frame_ + kFrameWnd && frame_id >= cur_frame_, "Wrong completed decode task!");
         // if (frame_id >= cur_frame_ + kFrameWnd) {
             // fprintf(stderr, "Wrong completed decode task (%u:%u)\n", frame_id, cur_frame_);
             // exit(1);
