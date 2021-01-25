@@ -80,6 +80,7 @@ private:
     DecodeStatus* decode_status_;
 
     size_t ue_id_;
+    size_t tid_in_ue_;
 
     // decoder process one code block at a time
     size_t cur_frame_ = 0; // Current frame to decode

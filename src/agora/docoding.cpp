@@ -142,7 +142,8 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     , phy_stats(in_phy_stats)
     , rx_status_(rx_status)
     , decode_status_(decode_status)
-    , ue_id_(in_tid + in_config->ue_start)
+    , ue_id_(in_tid / cfg->decode_thread_num_per_ue + in_config->ue_start)
+    , tid_in_ue_(in_tid % cfg->decode_thread_num_per_ue)
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
@@ -258,7 +259,8 @@ Event_data DoDecode::launch(size_t tag)
 
 void DoDecode::start_work()
 {
-    printf("Decode for ue %u starts to work!\n", ue_id_);
+    printf("Decode for ue %u tid %u starts to work!\n", ue_id_, tid_in_ue_);
+    cur_symbol_ = tid_in_ue_;
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_cb_ > 0
             || decode_status_->received_all_demod_data(
@@ -271,9 +273,9 @@ void DoDecode::start_work()
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                 cur_cb_ = 0;
-                cur_symbol_++;
-                if (cur_symbol_ == cfg->ul_data_symbol_num_perframe) {
-                    cur_symbol_ = 0;
+                cur_symbol_ += cfg->decode_thread_num_per_ue;
+                if (cur_symbol_ > cfg->ul_data_symbol_num_perframe) {
+                    cur_symbol_ = tid_in_ue_;
                     rx_status_->decode_done(cur_frame_);
                     cur_frame_++;
                 }

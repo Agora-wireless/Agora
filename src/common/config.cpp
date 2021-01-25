@@ -205,6 +205,8 @@ Config::Config(std::string jsonfile)
         "Subcarrier block size should be a multiple of lcm(zf_block_size, "
         "demul_block_size)!");
 
+    decode_thread_num_per_ue = tddConf.value("decode_thread_num_per_ue", 1);
+
     // rt_assert(pilot_symbol_num_perframe + ul_data_symbol_num_perframe
     //         == symbol_num_perframe,
     //     "Masterless mode supports only pilot and uplink data syms for now");
