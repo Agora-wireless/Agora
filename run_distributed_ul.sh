@@ -16,6 +16,6 @@ num_servers=$(cat $DIR/data/tddconfig-sim-ul-distributed.json | jq '.bs_server_a
 for (( i=0; i<$num_servers; i++ ))
 do
     cat $DIR/data/tddconfig-sim-ul-distributed.json | jq --argjson i $i '.bs_server_addr_idx=$i' > $DIR/data/tddconfig-sim-ul-distributed_$i.json
-    scp $DIR/data/tddconfig-sim-ul-distributed_$i.json junzhi@${servers[$i]}:$DIR/data/tddconfig-sim-ul-distributed.json
-    ssh junzhi@${servers[$i]} cd Agora; ./build/data_generator --conf_file ./data/tddconfig-sim-ul-distributed.json
+    scp $DIR/data/tddconfig-sim-ul-distributed_$i.json ${servers[$i]}:$DIR/data/tddconfig-sim-ul-distributed.json
+    ssh ${servers[$i]} cd Agora; ./build/data_generator --conf_file ./data/tddconfig-sim-ul-distributed.json
 done

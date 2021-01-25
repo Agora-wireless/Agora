@@ -304,11 +304,11 @@ void* Sender::worker_thread(int tid)
         // Send a message to the server. We assume that the server is running.
         Packet* pkt = socks_pkt_buf;
 #ifdef USE_DPDK
-        rte_mbuf* tx_mbuf = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
-            server_mac_addr, bs_rru_addr, bs_server_addr,
-            cfg->bs_rru_port + tid, cfg->bs_server_port + tid,
-            cfg->packet_length);
-        pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbuf, uint8_t*) + kPayloadOffset);
+        // rte_mbuf* tx_mbuf = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
+        //     server_mac_addr, bs_rru_addr, bs_server_addr,
+        //     cfg->bs_rru_port + tid, cfg->bs_server_port + tid,
+        //     cfg->packet_length);
+        // pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbuf, uint8_t*) + kPayloadOffset);
         
         rte_mbuf** tx_mbufs = new rte_mbuf*[cfg->bs_server_addr_list.size()];
         for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
