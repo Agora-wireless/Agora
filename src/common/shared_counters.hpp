@@ -102,10 +102,10 @@ public:
     // this frame
     void decode_done(size_t frame_id)
     {
-        rt_assert(frame_id >= cur_frame_ + kFrameWnd, "Wrong completed decode task!");
-        // if (frame_id != cur_frame_) {
-        //     fprintf(stderr, "Wrong completed decode task (%u:%u)\n", frame_id, cur_frame_);
-        //     exit(1);
+        rt_assert(frame_id < cur_frame_ + kFrameWnd || frame_id >= cur_frame_, "Wrong completed decode task!");
+        // if (frame_id >= cur_frame_ + kFrameWnd) {
+            // fprintf(stderr, "Wrong completed decode task (%u:%u)\n", frame_id, cur_frame_);
+            // exit(1);
         // }
         bool cont = false;
         decode_mutex_[frame_id % kFrameWnd].lock();
