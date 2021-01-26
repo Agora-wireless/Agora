@@ -407,7 +407,7 @@ Event_data DoIFFT::launch(size_t tag)
     // IFFT scaled results by OFDM_CA_NUM, we scale down IFFT results
     // during data type coversion
     simd_convert_float_to_short(ifft_out_ptr, socket_ptr, cfg->OFDM_CA_NUM,
-        cfg->CP_LEN, cfg->OFDM_CA_NUM / cfg->BF_ANT_NUM);
+        cfg->CP_LEN, cfg->OFDM_CA_NUM / std::sqrt(cfg->BF_ANT_NUM * 1.f));
 
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
 
