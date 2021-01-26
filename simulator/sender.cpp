@@ -5,6 +5,7 @@
 #include "datatype_conversion.h"
 #include "udp_client.h"
 
+static constexpr size_t kDebugPrintSender = false;
 static constexpr size_t kMacAddrBtyes = 17;
 
 static std::atomic<bool> keep_running = true;
@@ -198,10 +199,12 @@ void* Sender::MasterThread(int) {
       const size_t comp_frame_slot = (ctag.frame_id_ % kFrameWnd);
       packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_]++;
 
-      // std::printf("Sender -- checking symbol %d : %zu : %zu\n",
-      // ctag.symbol_id, comp_frame_slot,
-      // packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]); Check to see
-      // if the current symbol is finished
+      if (kDebugPrintSender == true) {
+        std::printf("Sender -- checking symbol %d : %zu : %zu\n",
+                    ctag.symbol_id_, comp_frame_slot,
+                    packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_]);
+      }
+      // Check to see if the current symbol is finished
       if (packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_] ==
           cfg_->BsAntNum()) {
         // Finished with the current symbol
@@ -209,9 +212,11 @@ void* Sender::MasterThread(int) {
 
         size_t next_symbol_id = FindNextSymbol((ctag.symbol_id_ + 1));
         unsigned symbol_delay = next_symbol_id - ctag.symbol_id_;
-        // std::printf("Sender -- finishing symbol %d : %zu : %zu delayed %d\n",
-        // ctag.symbol_id, cfg->frame().NumTotalSyms(), next_symbol_id,
-        // symbol_delay);
+        if (kDebugPrintSender == true) {
+          std::printf("Sender -- finishing symbol %d : %zu : %zu delayed %d\n",
+                      ctag.symbol_id_, cfg_->Frame().NumTotalSyms(),
+                      next_symbol_id, symbol_delay);
+        }
         // Add inter-symbol delay
         DelayTicks(tick_start, GetTicksForFrame(ctag.frame_id_) * symbol_delay);
         tick_start = Rdtsc();
@@ -234,12 +239,15 @@ void* Sender::MasterThread(int) {
           this->frame_start_[(next_frame_id % kNumStatsFrames)] = GetTime();
           tick_start = Rdtsc();
 
-          /* Find start symbol of next frame and add proper delay */
+          // Find start symbol of next frame and add proper delay
           next_symbol_id = FindNextSymbol(0);
-          //std::printf(
-          //    "Sender -- finished frame %d, next frame %zu, start symbol %zu, "
-          //    "delaying\n",
-          //    ctag.frame_id_, next_frame_id, next_symbol_id);
+          if (kDebugPrintSender == true) {
+            std::printf(
+                "Sender -- finished frame %d, next frame %zu, start symbol "
+                "%zu, "
+                "delaying\n",
+                ctag.frame_id_, next_frame_id, next_symbol_id);
+          }
           DelayTicks(tick_start,
                      GetTicksForFrame(ctag.frame_id_) * next_symbol_id);
         }  // if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
@@ -327,11 +335,14 @@ void* Sender::WorkerThread(int tid) {
             rte_pktmbuf_mtod(tx_mbufs[tag_id], uint8_t*) + kPayloadOffset);
 #endif
 
+        if ((kDebugPrintSender == true) || (kDebugSenderReceiver == true)) {
+          std::printf(
+              "Sender : worker %d processing frame %d symbol %d, type %d\n",
+              tid, tag.frame_id_, tag.symbol_id_,
+              static_cast<int>(cfg_->GetSymbolType(tag.symbol_id_)));
+        }
+
         // Update the TX buffer
-        // std::printf(
-        //    "Sender : worker %d processing frame %d symbol %d, type %d\n",
-        //    tid, tag.frame_id_, tag.symbol_id_,
-        //    static_cast<int>(cfg_->GetSymbolType(tag.symbol_id_)));
         pkt->frame_id_ = tag.frame_id_;
         pkt->symbol_id_ = tag.symbol_id_;
         pkt->cell_id_ = tag.ant_id_ / ant_num_per_cell;

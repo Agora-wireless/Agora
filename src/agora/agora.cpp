@@ -626,9 +626,6 @@ void Agora::HandleEventFft(size_t tag) {
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
   SymbolType sym_type = config_->GetSymbolType(symbol_id);
-  // std::printf("***** HandleEventFft %d frame %zu symbol %zu\n",
-  // (int)sym_type,
-  //            frame_id, symbol_id);
 
   if (sym_type == SymbolType::kPilot) {
     bool last_fft_task = pilot_fft_counters_.CompleteTask(frame_id, symbol_id);
@@ -839,7 +836,6 @@ void Agora::WorkerDemul(int tid) {
       new DoPrecode(config_, tid, dl_zf_matrices_, dl_ifft_buffer_,
                     dl_encoded_buffer_, this->stats_.get()));
 
-  // std::printf("!!!!!!!!!!!!! demul worker !!!!!!!!!!!!!!!!!1 \n");
   assert(false);
 
   while (this->config_->Running() == true) {
@@ -900,7 +896,7 @@ void Agora::CreateThreads() {
       workers_.emplace_back(&Agora::WorkerDecode, this, i);
     }
   } else {
-    // printf("Agora: creating %zu workers\n", cfg->worker_thread_num());
+    // std::printf("Agora: creating %zu workers\n", cfg->worker_thread_num());
     for (size_t i = 0; i < cfg->WorkerThreadNum(); i++) {
       workers_.emplace_back(&Agora::Worker, this, i);
     }
