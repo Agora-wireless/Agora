@@ -274,7 +274,7 @@ void DoDecode::start_work()
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                 cur_cb_ = 0;
                 cur_symbol_ += cfg->decode_thread_num_per_ue;
-                if (cur_symbol_ > cfg->ul_data_symbol_num_perframe) {
+                if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
                     cur_symbol_ = tid_in_ue_;
                     rx_status_->decode_done(cur_frame_);
                     cur_frame_++;
