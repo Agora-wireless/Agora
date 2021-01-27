@@ -89,12 +89,17 @@ int main(int argc, char* argv[]) {
 
   const size_t num_codeblocks = num_cbs_per_ue * cfg->UeAntNum();
   std::printf("Total number of blocks: %zu\n", num_codeblocks);
+  size_t input_size = LdpcEncodingInputBufSize(
+      cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor());
+  int8_t* input_ptr = new int8_t[input_size];
   for (size_t noise_id = 0; noise_id < 15; noise_id++) {
     std::vector<std::vector<int8_t>> information(num_codeblocks);
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
-      data_generator.GenCodeblock(information.at(i), encoded_codewords.at(i),
-                                  i % cfg->UeNum() /* UE ID */);
+      data_generator.GenRawData(information.at(i),
+                                i % cfg->UeNum() /* UE ID */);
+      std::memcpy(input_ptr, information.at(i).data(), input_size);
+      data_generator.GenCodeblock(input_ptr, encoded_codewords.at(i));
     }
 
     // Save uplink information bytes to file
@@ -189,12 +194,6 @@ int main(int argc, char* argv[]) {
                               &ldpc_decoder_5gnr_response);
     }
 
-    // Descramble the deocded buffer
-    for (size_t i = 0; i < num_codeblocks; i++) {
-      WlanScramble((int8_t*)decoded_codewords[i], ldpc_config.NumCbLen() / 8,
-                   kScramblerInitState);
-    }
-    
     size_t duration = WorkerRdtsc() - start_tsc;
     std::printf("Decoding of %zu blocks takes %.2f us per block\n",
                 num_codeblocks,

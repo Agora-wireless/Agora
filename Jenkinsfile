@@ -191,7 +191,7 @@ pipeline {
 						./build/test_scrambler
 					'''
 					script {
-						unitTest(logFile, "[  PASSED  ] 2 tests.")
+						unitTest(logFile, "[  PASSED  ] 3 tests.")
 					}
 				}
 			}

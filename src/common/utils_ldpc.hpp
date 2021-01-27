@@ -246,20 +246,19 @@ static inline void ConvertBitsToBytes(const int8_t* in_bit_buffer,
  * @param  byte_buffer_size      Byte array size
  * @param  scram_init            Scamber initial state
  */
-static inline void WlanScramble(int8_t* byte_buffer, size_t byte_buffer_size,
+static inline void WlanScramble(void* byte_buffer, size_t byte_buffer_size,
                                 const int8_t scram_init) {
+  int8_t* byte_buffer_ptr = reinterpret_cast<int8_t*>(byte_buffer);
   int8_t b_scrambler_init_bits[7];
   int8_t scrambler_init_bits[7];
   int8_t tmp;
   size_t j;
   size_t buff_size;
   int8_t res_xor;
-  int8_t* scram_seq_data;
-  int8_t* bit_buffer;
-  scram_seq_data = (int8_t*)std::calloc(kScramblerlength, sizeof(int8_t));
-  bit_buffer = (int8_t*)std::calloc(byte_buffer_size*8, sizeof(int8_t));
+  int8_t* scram_seq_data = new int8_t[kScramblerlength];
+  int8_t* bit_buffer = new int8_t[byte_buffer_size * 8];
 
-  ConvertBytesToBits(&byte_buffer[0], byte_buffer_size, &bit_buffer[0]);
+  ConvertBytesToBits(&byte_buffer_ptr[0], byte_buffer_size, &bit_buffer[0]);
 
   // Do scrambling
   if (byte_buffer_size != 0) {
@@ -305,10 +304,10 @@ static inline void WlanScramble(int8_t* byte_buffer, size_t byte_buffer_size,
     }
   }
 
-  ConvertBitsToBytes(&bit_buffer[0], byte_buffer_size, &byte_buffer[0]);
+  ConvertBitsToBytes(&bit_buffer[0], byte_buffer_size, &byte_buffer_ptr[0]);
 
-  std::free(scram_seq_data);
-  std::free(bit_buffer);
+  delete[] scram_seq_data;
+  delete[] bit_buffer;
 
   return;
 }

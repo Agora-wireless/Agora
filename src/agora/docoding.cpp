@@ -49,45 +49,44 @@ EventData DoEncode::Launch(size_t tag) {
   size_t start_tsc = WorkerRdtsc();
 
   size_t symbol_idx_dl = cfg_->GetDLSymbolIdx(frame_id, symbol_id);
-  int8_t* input_ptr =
-      cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
-  int8_t* scramble_buffer_ptr;
-  scramble_buffer_ptr =
-      (int8_t*)std::calloc(cfg_->NumBytesPerCb(), sizeof(int8_t));
-  
-  // Scramble the raw information
-  for (size_t i = 0; i < cfg_->NumBytesPerCb(); i++)
-    scramble_buffer_ptr[i] = input_ptr[i];
-  WlanScramble(scramble_buffer_ptr, cfg_->NumBytesPerCb(), kScramblerInitState);
+  int8_t* input_ptr = new int8_t[cfg_->NumBytesPerCb()];
+  std::memcpy(
+      input_ptr,
+      cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id),
+      cfg_->NumBytesPerCb());
 
-  LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
-                   ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
-                   scramble_buffer_ptr);
-  int8_t* final_output_ptr = cfg_->GetEncodedBuf(
-      encoded_buffer_, frame_id, symbol_idx_dl, ue_id, cur_cb_id);
-  AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp_),
-                  reinterpret_cast<uint8_t*>(final_output_ptr),
-                  BitsToBytes(ldpc_config.NumCbCodewLen()),
-                  cfg_->ModOrderBits());
-
-  // std::printf("Encoded data\n");
-  // int num_mod = LDPC_config.num_cb_codew_len() / cfg->mod_order_bits();
-  // for(int i = 0; i < num_mod; i++) {
-  //     std::printf("%u ", *(final_output_ptr + i));
-  // }
-  // std::printf("\n");
-
-  size_t duration = WorkerRdtsc() - start_tsc;
-  duration_stat_->task_duration_[0] += duration;
-  duration_stat_->task_count_++;
-  if (CyclesToUs(duration, cfg_->FreqGhz()) > 500) {
-    std::printf("Thread %d Encode takes %.2f\n", tid_,
-                CyclesToUs(duration, cfg_->FreqGhz()));
-  
-  std::free(scramble_buffer_ptr);
+  if (cfg_->Scramble()) {
+    WlanScramble(input_ptr, cfg_->NumBytesPerCb(), kScramblerInitState);
   }
 
-  return EventData(EventType::kEncode, tag);
+    LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
+                     ldpc_config.NumRows(), encoded_buffer_temp_,
+                     parity_buffer_, input_ptr);
+    int8_t* final_output_ptr = cfg_->GetEncodedBuf(
+        encoded_buffer_, frame_id, symbol_idx_dl, ue_id, cur_cb_id);
+    AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp_),
+                    reinterpret_cast<uint8_t*>(final_output_ptr),
+                    BitsToBytes(ldpc_config.NumCbCodewLen()),
+                    cfg_->ModOrderBits());
+
+    // std::printf("Encoded data\n");
+    // int num_mod = LDPC_config.num_cb_codew_len() / cfg->mod_order_bits();
+    // for(int i = 0; i < num_mod; i++) {
+    //     std::printf("%u ", *(final_output_ptr + i));
+    // }
+    // std::printf("\n");
+
+    size_t duration = WorkerRdtsc() - start_tsc;
+    duration_stat_->task_duration_[0] += duration;
+    duration_stat_->task_count_++;
+    if (CyclesToUs(duration, cfg_->FreqGhz()) > 500) {
+      std::printf("Thread %d Encode takes %.2f\n", tid_,
+                  CyclesToUs(duration, cfg_->FreqGhz()));
+    }
+
+    delete[] input_ptr;
+
+    return EventData(EventType::kEncode, tag);
 }
 
 DoDecode::DoDecode(
@@ -163,53 +162,55 @@ EventData DoDecode::Launch(size_t tag) {
                           &ldpc_decoder_5gnr_response);
 
   // Descramble the decoded buffer
-  WlanScramble((int8_t*)decoded_buffer_ptr, cfg_->NumBytesPerCb(),
-               kScramblerInitState);
-
-  size_t start_tsc2 = WorkerRdtsc();
-  duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
-
-  if (kPrintLLRData) {
-    std::printf("LLR data, symbol_offset: %zu\n", symbol_offset);
-    for (size_t i = 0; i < ldpc_config.NumCbCodewLen(); i++) {
-      std::printf("%d ", *(llr_buffer_ptr + i));
-    }
-    std::printf("\n");
+  if (cfg_->Scramble()) {
+    WlanScramble(decoded_buffer_ptr, cfg_->NumBytesPerCb(),
+                 kScramblerInitState);
   }
 
-  if (kPrintDecodedData) {
-    std::printf("Decoded data\n");
-    for (size_t i = 0; i < (ldpc_config.NumCbLen() >> 3); i++) {
-      std::printf("%u ", *(decoded_buffer_ptr + i));
-    }
-    std::printf("\n");
-  }
+    size_t start_tsc2 = WorkerRdtsc();
+    duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
 
-  if ((kEnableMac == false) && (kPrintPhyStats == true) &&
-      (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
-    phy_stats_->UpdateDecodedBits(ue_id, symbol_offset,
-                                  cfg_->NumBytesPerCb() * 8);
-    phy_stats_->IncrementDecodedBlocks(ue_id, symbol_offset);
-    size_t block_error(0);
-    for (size_t i = 0; i < cfg_->NumBytesPerCb(); i++) {
-      uint8_t rx_byte = decoded_buffer_ptr[i];
-      auto tx_byte = static_cast<uint8_t>(cfg_->GetInfoBits(
-          cfg_->UlBits(), symbol_idx_ul, ue_id, cur_cb_id)[i]);
-      phy_stats_->UpdateBitErrors(ue_id, symbol_offset, tx_byte, rx_byte);
-      if (rx_byte != tx_byte) {
-        block_error++;
+    if (kPrintLLRData) {
+      std::printf("LLR data, symbol_offset: %zu\n", symbol_offset);
+      for (size_t i = 0; i < ldpc_config.NumCbCodewLen(); i++) {
+        std::printf("%d ", *(llr_buffer_ptr + i));
       }
+      std::printf("\n");
     }
-    phy_stats_->UpdateBlockErrors(ue_id, symbol_offset, block_error);
-  }
 
-  size_t duration = WorkerRdtsc() - start_tsc;
-  duration_stat_->task_duration_[0] += duration;
-  duration_stat_->task_count_++;
-  if (CyclesToUs(duration, cfg_->FreqGhz()) > 500) {
-    std::printf("Thread %d Decode takes %.2f\n", tid_,
-                CyclesToUs(duration, cfg_->FreqGhz()));
-  }
+    if (kPrintDecodedData) {
+      std::printf("Decoded data\n");
+      for (size_t i = 0; i < (ldpc_config.NumCbLen() >> 3); i++) {
+        std::printf("%u ", *(decoded_buffer_ptr + i));
+      }
+      std::printf("\n");
+    }
 
-  return EventData(EventType::kDecode, tag);
+    if ((kEnableMac == false) && (kPrintPhyStats == true) &&
+        (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
+      phy_stats_->UpdateDecodedBits(ue_id, symbol_offset,
+                                    cfg_->NumBytesPerCb() * 8);
+      phy_stats_->IncrementDecodedBlocks(ue_id, symbol_offset);
+      size_t block_error(0);
+      for (size_t i = 0; i < cfg_->NumBytesPerCb(); i++) {
+        uint8_t rx_byte = decoded_buffer_ptr[i];
+        auto tx_byte = static_cast<uint8_t>(cfg_->GetInfoBits(
+            cfg_->UlBits(), symbol_idx_ul, ue_id, cur_cb_id)[i]);
+        phy_stats_->UpdateBitErrors(ue_id, symbol_offset, tx_byte, rx_byte);
+        if (rx_byte != tx_byte) {
+          block_error++;
+        }
+      }
+      phy_stats_->UpdateBlockErrors(ue_id, symbol_offset, block_error);
+    }
+
+    size_t duration = WorkerRdtsc() - start_tsc;
+    duration_stat_->task_duration_[0] += duration;
+    duration_stat_->task_count_++;
+    if (CyclesToUs(duration, cfg_->FreqGhz()) > 500) {
+      std::printf("Thread %d Decode takes %.2f\n", tid_,
+                  CyclesToUs(duration, cfg_->FreqGhz()));
+    }
+
+    return EventData(EventType::kDecode, tag);
 }

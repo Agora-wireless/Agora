@@ -14,9 +14,9 @@ static constexpr size_t kNumInputBytes = 125;
  * @brief  Construct a new TEST object
  *
  * The test data and the expected output are hardcoded in byte_buffer[] and
- * expect[].
+ * expect[] as int8_t.
  */
-TEST(Scrambler, fixed_input_scramble_only) {
+TEST(Scrambler, fixed_input_scramble_int8_t) {
   int8_t byte_buffer[kNumInputBytes] = {
       -121, 104, 66,  23,   126, -69,  -50,  111,  -120, 36,   -13,  67,   -107,
       30,   118, 89,  -61,  -21, -127, -127, -69,  -22,  -100, 108,  85,   102,
@@ -42,8 +42,44 @@ TEST(Scrambler, fixed_input_scramble_only) {
 
   WlanScramble(byte_buffer, kNumInputBytes, kScramblerInitState);
 
-  for (size_t i = 0; i < kNumInputBytes; i++)
+  for (size_t i = 0; i < kNumInputBytes; i++) {
     ASSERT_EQ(byte_buffer[i], expect[i]);
+  }
+}
+
+/**
+ * @brief  Construct a new TEST object
+ *
+ * The test data and the expected output are hardcoded in byte_buffer[] and
+ * expect[] as uint8_t.
+ */
+TEST(Scrambler, fixed_input_scramble_uint8_t) {
+  uint8_t byte_buffer[kNumInputBytes] = {
+      1,   2,   3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,
+      15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,
+      29,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40,  41,  42,
+      43,  44,  45,  46,  47,  48,  49,  50,  51,  52,  53,  54,  55,  56,
+      57,  58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  68,  69,  70,
+      71,  72,  73,  74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,
+      85,  86,  87,  88,  89,  90,  91,  92,  93,  94,  95,  96,  97,  98,
+      99,  100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112,
+      113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125};
+  uint8_t expect[kNumInputBytes] = {
+      109, 27,  170, 203, 109, 83,  243, 171, 120, 246, 48,  199, 41,  6,
+      151, 170, 201, 33,  64,  138, 197, 189, 254, 94,  250, 226, 108, 138,
+      85,  15,  46,  85,  145, 68,  132, 25,  132, 113, 245, 165, 238, 218,
+      196, 0,   189, 12,  77,  219, 81,  255, 125, 79,  119, 153, 146, 35,
+      182, 219, 229, 101, 29,  122, 250, 150, 128, 216, 223, 178, 192, 25,
+      13,  127, 86,  137, 247, 254, 13,  199, 196, 253, 210, 103, 106, 185,
+      95,  232, 195, 54,  102, 221, 34,  56,  220, 77,  72,  59,  103, 8,
+      16,  190, 112, 27,  79,  180, 22,  100, 153, 165, 111, 72,  65,  198,
+      125, 166, 148, 192, 95,  140, 38,  192, 135, 103, 158, 238, 121};
+
+  WlanScramble(byte_buffer, kNumInputBytes, kScramblerInitState);
+
+  for (size_t i = 0; i < kNumInputBytes; i++) {
+    ASSERT_EQ(byte_buffer[i], expect[i]);
+  }
 }
 
 /**
@@ -72,8 +108,9 @@ TEST(Scrambler, random_input_scramble_descramble) {
   // Descramble
   WlanScramble(byte_buffer, kNumInputBytes, kScramblerInitState);
 
-  for (size_t i = 0; i < kNumInputBytes; i++)
+  for (size_t i = 0; i < kNumInputBytes; i++) {
     ASSERT_EQ(byte_buffer[i], byte_buffer_orig[i]);
+  }
 
   std::free(byte_buffer);
   std::free(byte_buffer_orig);
