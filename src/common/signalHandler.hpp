@@ -7,7 +7,7 @@ using std::runtime_error;
 
 class SignalException : public runtime_error {
  public:
-  SignalException(const std::string& _message) : std::runtime_error(_message) {}
+  explicit SignalException(const std::string& _message) : std::runtime_error(_message) {}
 };
 
 class SignalHandler {

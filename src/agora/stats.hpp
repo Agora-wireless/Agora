@@ -51,7 +51,7 @@ static constexpr size_t kNumTimestampTypes =
 
 class Stats {
  public:
-  Stats(const Config* const cfg);
+  explicit Stats(const Config* const cfg);
   ~Stats();
 
   /// If worker stats collection is enabled, combine and update per-worker

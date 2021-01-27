@@ -34,7 +34,7 @@ class Config {
   // inline static constexpr size_t kDataOffset = (sizeof(int) * 16);
 
   /* Constructors */
-  Config(const std::string&);
+  explicit Config(const std::string&);
   ~Config();
 
   inline void Running(bool value) { this->running_.store(value); }

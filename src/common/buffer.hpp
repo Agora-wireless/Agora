@@ -23,7 +23,7 @@ union rx_tag_t {
 
   rx_tag_t(size_t tid, size_t offset) : tid_(tid), offset_(offset) {}
 
-  rx_tag_t(size_t _tag) : tag_(_tag) {}
+  explicit rx_tag_t(size_t _tag) : tag_(_tag) {}
 };
 
 // Event data tag for FFT task requests
@@ -53,7 +53,7 @@ union gen_tag_t {
   };
 
   size_t tag_;
-  gen_tag_t(size_t _tag) : tag_(_tag) {}
+  explicit gen_tag_t(size_t _tag) : tag_(_tag) {}
 
   // Return a string representation of this tag
   std::string ToString() {
@@ -158,7 +158,7 @@ struct EventData {
   size_t tags_[7];
 
   // Initialize and event with only the event type field set
-  EventData(EventType event_type) : event_type_(event_type) {}
+  explicit EventData(EventType event_type) : event_type_(event_type) {}
 
   // Create an event with one tag
   EventData(EventType event_type, size_t tag)

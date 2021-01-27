@@ -15,7 +15,7 @@
 
 class FrameStats {
  public:
-  FrameStats(std::string new_frame_id);
+  explicit FrameStats(std::string new_frame_id);
   FrameStats(std::string new_frame_id, size_t ul, size_t dl);
 
   void SetClientPilotSyms(size_t ul, size_t dl);

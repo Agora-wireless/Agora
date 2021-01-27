@@ -28,7 +28,7 @@ class UDPServer {
  public:
   // Initialize a UDP server listening on this UDP port with socket buffer
   // size = rx_buffer_size
-  UDPServer(uint16_t port, size_t rx_buffer_size = 0) : port_(port) {
+  explicit UDPServer(uint16_t port, size_t rx_buffer_size = 0) : port_(port) {
     sock_fd_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock_fd_ == -1) {
       throw std::runtime_error("UDPServer: Failed to create local socket.");

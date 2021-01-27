@@ -10,7 +10,7 @@
 using namespace arma;
 class PhyStats {
  public:
-  PhyStats(Config* const cfg);
+  explicit PhyStats(Config* const cfg);
   ~PhyStats();
   void PrintPhyStats();
   void UpdateBitErrors(size_t, size_t, uint8_t, uint8_t);

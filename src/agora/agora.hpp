@@ -35,7 +35,7 @@ class Agora {
   static const int kDequeueBulkSizeWorker = 4;
   static const int kMaxWorkerNum = 50;  // Max number of worker threads allowed
 
-  Agora(Config*);  /// Create an Agora object and start the worker threads
+  explicit Agora(Config*);  /// Create an Agora object and start the worker threads
   ~Agora();
 
   void Start();  /// The main Agora event loop

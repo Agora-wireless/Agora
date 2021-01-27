@@ -13,7 +13,7 @@ struct ItemT {
 
   ItemT() = default;
   ;
-  ItemT(size_t value) : value_(value) {}
+  explicit ItemT(size_t value) : value_(value) {}
 };
 static_assert(sizeof(ItemT) == 64);
 

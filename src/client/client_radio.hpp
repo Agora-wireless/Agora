@@ -17,7 +17,7 @@
 
 class ClientRadioConfig {
  public:
-  ClientRadioConfig(Config* cfg);
+  explicit ClientRadioConfig(Config* cfg);
   bool RadioStart();
   void RadioStop();
   void ReadSensors();
