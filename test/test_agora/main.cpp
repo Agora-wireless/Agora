@@ -157,11 +157,12 @@ void CheckCorrectnessDl(Config const* const cfg) {
   }
   std::printf("======================\n");
   std::printf("Downlink test: \n\n");
-  if (error_cnt == 0)
+  if (error_cnt == 0) {
     std::printf("Passed downlink test!\n");
-  else
+  } else {
     std::printf("Failed downlink test! Error rate: %d/%d\n", error_cnt,
                 total_count);
+  }
   std::printf("======================\n\n");
   raw_data.Free();
   tx_data.Free();

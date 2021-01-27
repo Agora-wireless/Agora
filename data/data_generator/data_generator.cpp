@@ -168,10 +168,11 @@ int main(int argc, char* argv[]) {
                   (cfg->OfdmCaNum() * sizeof(complex_float)));
     }
   } else {
-    for (size_t i = 0; i < cfg->UeAntNum(); i++)
+    for (size_t i = 0; i < cfg->UeAntNum(); i++) {
       std::memcpy(tx_data_all_symbols[i + cfg->Frame().NumBeaconSyms()] +
                       i * cfg->OfdmCaNum(),
                   &pilot_td.at(0), (cfg->OfdmCaNum() * sizeof(complex_float)));
+    }
   }
 
   // Populate the UL symbols
@@ -347,16 +348,18 @@ int main(int argc, char* argv[]) {
   for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
     for (size_t j = 0; j < cfg->UeAntNum(); j++) {
       if ((i >= cfg->Frame().ClientDlPilotSymbols())) {
-        for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum(); sc_id++)
+        for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum(); sc_id++) {
           dl_mod_data[i][j * cfg->OfdmCaNum() + sc_id + cfg->OfdmDataStart()] =
               (sc_id % cfg->OfdmPilotSpacing() == 0)
                   ? ue_specific_pilot[j][sc_id]
                   : dl_modulated_codewords.at(i * cfg->UeAntNum() + j)
                         .at(sc_id);
+        }
       } else {
-        for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum(); sc_id++)
+        for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum(); sc_id++) {
           dl_mod_data[i][j * cfg->OfdmCaNum() + sc_id + cfg->OfdmDataStart()] =
               ue_specific_pilot[j][sc_id];
+        }
       }
     }
   }

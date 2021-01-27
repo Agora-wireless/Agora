@@ -19,7 +19,9 @@ void PacketTXRX::LoopTxRxArgos(int tid) {
   int prev_frame_id = -1;
   int radio_id = radio_lo;
   while (cfg_->Running() == true) {
-    if (-1 != DequeueSendArgos(tid)) continue;
+    if (-1 != DequeueSendArgos(tid)) {
+      continue;
+    }
     // receive data
     struct Packet* pkt = RecvEnqueueArgos(tid, radio_id, rx_offset);
     if (pkt == nullptr) {
@@ -35,7 +37,9 @@ void PacketTXRX::LoopTxRxArgos(int tid) {
       }
     }
 
-    if (++radio_id == radio_hi) radio_id = radio_lo;
+    if (++radio_id == radio_hi) {
+      radio_id = radio_lo;
+    }
   }
 }
 

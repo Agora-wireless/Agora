@@ -21,7 +21,7 @@ Config::Config(const std::string& jsonfile)
   /* antenna configurations */
   if (kUseUHD == false) {
     std::string hub_file = tdd_conf.value("hubs", "");
-    if (hub_file.size() > 0) {
+    if (!hub_file.empty()) {
       Utils::LoadDevices(hub_file, hub_ids_);
     }
   }
@@ -35,8 +35,10 @@ Config::Config(const std::string& jsonfile)
   is_ue_ = tdd_conf.value("UE", false);
   ue_num_ = tdd_conf.value("ue_num", 8);
   ue_ant_num_ = ue_num_;
-  if (serial_file.size() > 0) Utils::LoadDevices(serial_file, radio_ids_);
-  if (radio_ids_.size() != 0) {
+  if (serial_file.empty() == false) {
+    Utils::LoadDevices(serial_file, radio_ids_);
+  }
+  if (radio_ids_.empty() == false) {
     num_radios_ = radio_ids_.size();
     num_antennas_ = num_channels_ * num_radios_;
     if (is_ue_) {
@@ -211,8 +213,12 @@ Config::Config(const std::string& jsonfile)
       assert(false);
     }
 
-    char first_sym, second_sym;
-    size_t first_sym_start, first_sym_count, second_sym_start, second_sym_count;
+    char first_sym;
+    char second_sym;
+    size_t first_sym_start;
+    size_t first_sym_count;
+    size_t second_sym_start;
+    size_t second_sym_count;
     if (dl_data_symbol_start <= ul_data_symbol_start) {
       first_sym = 'D';
       first_sym_start = dl_data_symbol_start;
@@ -776,9 +782,10 @@ void Config::GenData() {
                       this->cp_len_, this->scale_);
     if (kDebugPrintPilot == true) {
       std::printf("ue_specific_pilot%zu=[", i);
-      for (size_t j = 0; j < this->ofdm_ca_num_; j++)
+      for (size_t j = 0; j < this->ofdm_ca_num_; j++) {
         std::printf("%2.4f+%2.4fi ", ue_pilot_ifft[i][j].re,
                     ue_pilot_ifft[i][j].im);
+      }
       std::printf("]\n");
     }
   }

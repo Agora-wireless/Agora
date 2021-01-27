@@ -117,7 +117,9 @@ float CommsLib::FindMaxAbs(Table<complex_float> in, size_t dim1, size_t dim2) {
   float max_val = 0;
   for (size_t i = 0; i < dim1; i++) {
     float cur_max_val = CommsLib::FindMaxAbs(in[i], dim2);
-    if (cur_max_val > max_val) max_val = cur_max_val;
+    if (cur_max_val > max_val) {
+      max_val = cur_max_val;
+    }
   }
   return max_val;
 }
@@ -242,10 +244,13 @@ std::vector<float> CommsLib::HannWindowFunction(size_t fftSize) {
     win_fcn.push_back((1 - std::cos(step * n)) / 2);
   }
   // If a sample lies at the center, just use (1-cos(pi))/2 == 1.
-  if (fftSize % 2 == 0) win_fcn.push_back(1);
+  if (fftSize % 2 == 0) {
+    win_fcn.push_back(1);
+  }
   // The second half is a mirror image of the first, so just copy.
-  for (size_t n = fftSize / 2 + 1; n < fftSize; n++)
+  for (size_t n = fftSize / 2 + 1; n < fftSize; n++) {
     win_fcn.push_back(win_fcn[fftSize - n]);
+  }
   return win_fcn;
 }
 
@@ -273,7 +278,9 @@ float CommsLib::FindTone(std::vector<float> const& magnitude, double winGain,
                                  std::lround((fftBin + 0.5) * fftSize) + delta);
   float ref_level = magnitude[last];
   for (size_t n = first; n < last; n++) {
-    if (magnitude[n] > ref_level) ref_level = magnitude[n];
+    if (magnitude[n] > ref_level) {
+      ref_level = magnitude[n];
+    }
   }
   return 10 * std::max(std::log10(ref_level), (float)(-20.0)) - (float)winGain;
 }
@@ -293,8 +300,11 @@ std::vector<int> CommsLib::GetDataSc(int fftSize) {
                       38, 39, 40, 41, 42, 44, 45, 46, 47, 48, 49, 50,
                       51, 52, 53, 54, 55, 56, 58, 59, 60, 61, 62, 63};
     data_sc.assign(sc_ind, sc_ind + 48);
-  } else
-    for (int i = 0; i < fftSize; i++) data_sc.push_back(i);
+  } else {
+    for (int i = 0; i < fftSize; i++) {
+      data_sc.push_back(i);
+    }
+  }
   return data_sc;
 }
 
@@ -343,7 +353,9 @@ std::vector<std::complex<float>> CommsLib::IFFT(
     }
     // std::cout << "IFFT output is normalized with "
     //         << std::to_string(max_val) << std::endl;
-    for (int i = 0; i < fftsize; i++) in[i] /= (max_val / scale);
+    for (int i = 0; i < fftsize; i++) {
+      in[i] /= (max_val / scale);
+    }
   } else {
     for (int i = 0; i < fftsize; i++) {
       in[i] /= fftsize;
@@ -369,23 +381,23 @@ void CommsLib::IFFT(complex_float* in, int fftsize, bool normalize) {
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
   MKL_LONG status =
       DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
-  if (DftiErrorClass(status, DFTI_NO_ERROR) == false) {
+  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
     std::printf("Error in DftiCreateDescriptor: %s\n",
                 DftiErrorMessage(status));
     assert(status != 0);
   }
   status = DftiCommitDescriptor(mkl_handle);
-  if (DftiErrorClass(status, DFTI_NO_ERROR) == false) {
+  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
     std::printf("Error in DftiErrorClass: %s\n", DftiErrorMessage(status));
     assert(status != 0);
   }
   status = DftiComputeBackward(mkl_handle, in);
-  if (DftiErrorClass(status, DFTI_NO_ERROR) == false) {
+  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
     std::printf("Error in DftiComputeBackward: %s\n", DftiErrorMessage(status));
     assert(status != 0);
   }
   status = DftiFreeDescriptor(&mkl_handle);
-  if (DftiErrorClass(status, DFTI_NO_ERROR) == false) {
+  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
     std::printf("Error in DftiFreeDescriptor: %s\n", DftiErrorMessage(status));
     assert(status != 0);
   }
@@ -442,8 +454,9 @@ std::vector<std::complex<float>> CommsLib::ComposePartialPilotSym(
     pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
                       pilot_cf32.end());  // add CP
     return pilot_cf32;
-  } else
+  } else {
     return fft_in;
+  }
 }
 
 void CommsLib::Ifft2tx(complex_float* in, std::complex<short>* out, size_t N,
@@ -470,10 +483,10 @@ std::vector<std::complex<float>> CommsLib::Modulate(std::vector<int8_t> in,
       qpsk_table[1][i] = mod_qpsk[i % 2];
     }
     for (size_t i = 0; i < in.size(); i++) {
-      if (in[i] >= 0 and in[i] < 4)
+      if (in[i] >= 0 and in[i] < 4) {
         out[i] =
             std::complex<float>(qpsk_table[0][in[i]], qpsk_table[1][in[i]]);
-      else {
+      } else {
         std::cout << "Error: No compatible input vector!" << std::endl;
         break;
       }
@@ -487,10 +500,10 @@ std::vector<std::complex<float>> CommsLib::Modulate(std::vector<int8_t> in,
       qam16_table[1][i] = mod_16qam[i % 4];
     }
     for (size_t i = 0; i < in.size(); i++) {
-      if (in[i] >= 0 and in[i] < 16)
+      if (in[i] >= 0 and in[i] < 16) {
         out[i] =
             std::complex<float>(qam16_table[0][in[i]], qam16_table[1][in[i]]);
-      else {
+      } else {
         std::cout << "Error: No compatible input vector!" << std::endl;
         break;
       }
@@ -505,10 +518,10 @@ std::vector<std::complex<float>> CommsLib::Modulate(std::vector<int8_t> in,
       qam64_table[1][i] = mod_64qam[i % 8];
     }
     for (size_t i = 0; i < in.size(); i++) {
-      if (in[i] >= 0 and in[i] < 64)
+      if (in[i] >= 0 and in[i] < 64) {
         out[i] =
             std::complex<float>(qam64_table[0][in[i]], qam64_table[1][in[i]]);
-      else {
+      } else {
         std::cout << "Error: No compatible input vector!" << std::endl;
         break;
       }
@@ -1033,7 +1046,9 @@ std::vector<std::vector<double>> CommsLib::GetSequence(int N, int type) {
     if ((N & (N - 1)) == 0) {
       for (int i = 0; i < N; i++) {
         matrix[i].resize(N);
-        for (int j = 0; j < N; j++) matrix[i][j] = Hadamard2(i, j);
+        for (int j = 0; j < N; j++) {
+          matrix[i][j] = Hadamard2(i, j);
+        }
       }
     }
   }

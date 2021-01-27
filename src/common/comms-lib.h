@@ -43,20 +43,23 @@ class CommsLib {
   ~CommsLib();
 
   static std::vector<std::vector<double>> GetSequence(int N, int type);
-  static std::vector<std::complex<float>> Modulate(std::vector<int8_t>, int);
+  static std::vector<std::complex<float>> Modulate(std::vector<int8_t> /*in*/,
+                                                   int /*type*/);
   static std::vector<int> GetDataSc(int fftSize);
   static std::vector<int> GetNullSc(int fftSize);
   static std::vector<int> GetPilotScInd(int fftSize);
   static std::vector<std::complex<float>> GetPilotSc(int fftSize);
-  static std::vector<std::complex<float>> FFT(std::vector<std::complex<float>>,
-                                              int);
-  static std::vector<std::complex<float>> IFFT(std::vector<std::complex<float>>,
-                                               int, bool scale = true);
-  static void FFT(complex_float*, int);
-  static void IFFT(complex_float*, int, bool normalize = true);
+  static std::vector<std::complex<float>> FFT(
+      std::vector<std::complex<float>> /*in*/, int /*fftsize*/);
+  static std::vector<std::complex<float>> IFFT(
+      std::vector<std::complex<float>> /*in*/, int /*fftsize*/,
+      bool normalize = true);
+  static void FFT(complex_float* /*in*/, int /*fftsize*/);
+  static void IFFT(complex_float* /*in*/, int /*fftsize*/,
+                   bool normalize = true);
   static size_t FindPilotSeq(std::vector<std::complex<float>> iq,
                              std::vector<std::complex<float>> pilot,
-                             size_t seqLen);
+                             size_t seq_len);
   static int FindLts(std::vector<std::complex<double>> iq, int seqLen);
   template <typename T>
   static std::vector<T> Convolve(std::vector<std::complex<T>> const& f,
@@ -70,27 +73,33 @@ class CommsLib {
     return (__builtin_parity(i & j) != 0 ? -1 : 1);
   }
   static std::vector<float> MagnitudeFft(
-      std::vector<std::complex<float>> const&, std::vector<float> const&,
-      size_t);
-  static std::vector<float> HannWindowFunction(size_t);
-  static double WindowFunctionPower(std::vector<float> const&);
+      std::vector<std::complex<float>> const& /*samps*/,
+      std::vector<float> const& /*win*/, size_t /*fftSize*/);
+  static std::vector<float> HannWindowFunction(size_t /*fftSize*/);
+  static double WindowFunctionPower(std::vector<float> const& /*win*/);
   // template <typename T>
   // static T findTone(std::vector<T> const&, double, double, size_t, const
   // size_t delta = 10);
-  static float FindTone(std::vector<float> const&, double, double, size_t,
-                        const size_t delta = 10);
-  static float MeasureTone(std::vector<std::complex<float>> const&,
-                           std::vector<float> const&, double, double, size_t,
-                           const size_t delta = 10);
+  static float FindTone(std::vector<float> const& /*magnitude*/,
+                        double /*winGain*/, double /*fftBin*/,
+                        size_t /*fftSize*/, const size_t delta = 10);
+  static float MeasureTone(std::vector<std::complex<float>> const& /*samps*/,
+                           std::vector<float> const& /*win*/,
+                           double /*winGain*/, double /*fftBin*/,
+                           size_t /*fftSize*/, const size_t delta = 10);
   static std::vector<std::complex<float>> ComposePartialPilotSym(
-      std::vector<std::complex<float>>, size_t, size_t, size_t, size_t, size_t,
-      size_t, bool, bool timeDomain = true);
+      std::vector<std::complex<float>> /*pilot*/, size_t /*offset*/,
+      size_t /*pilot_sc_num*/, size_t /*fftSize*/, size_t /*dataSize*/,
+      size_t /*dataStart*/, size_t /*CP_LEN*/, bool /*interleaved_pilot*/,
+      bool timeDomain = true);
   static std::vector<std::complex<float>> SeqCyclicShift(
-      std::vector<std::complex<float>>, float);
-  static float FindMaxAbs(complex_float*, size_t);
-  static float FindMaxAbs(Table<complex_float>, size_t, size_t);
-  static void Ifft2tx(complex_float*, std::complex<short>*, size_t, size_t,
-                      size_t, float);
+      std::vector<std::complex<float>> /*in*/, float /*alpha*/);
+  static float FindMaxAbs(complex_float* /*in*/, size_t /*len*/);
+  static float FindMaxAbs(Table<complex_float> /*in*/, size_t /*dim1*/,
+                          size_t /*dim2*/);
+  static void Ifft2tx(complex_float* /*in*/, std::complex<short>* /*out*/,
+                      size_t /*N*/, size_t /*prefix*/, size_t /*cp*/,
+                      float /*scale*/);
   static float AbsCf(complex_float d) {
     return std::abs(std::complex<float>(d.re, d.im));
   }

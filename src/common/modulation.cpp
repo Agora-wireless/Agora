@@ -40,9 +40,10 @@ void Print128Epi8(__m128i var) {
  */
 
 void InitModulationTable(Table<complex_float>& mod_table, size_t mod_order) {
-  if (!mod_table.IsAllocated())
+  if (!mod_table.IsAllocated()) {
     mod_table.Malloc(1, pow(2, kMaxModType),
                      Agora_memory::Alignment_t::k32Align);
+  }
   // mod_table.malloc(pow(2, kMaxModType), 2, 32);
   switch (mod_order) {
     case 4:
@@ -243,7 +244,7 @@ void ModSimd(uint8_t* in, complex_float*& out, size_t len,
  *  1110  1100  |  0100  0110
  *  1111  1101  |  0101  0111
  */
-void Demod16qamHardLoop(float* vec_in, uint8_t* vec_out, int num) {
+void Demod16qamHardLoop(const float* vec_in, uint8_t* vec_out, int num) {
   float float_val = QAM16_THRESHOLD;
 
   for (int i = 0; i < num; i++) {
@@ -251,24 +252,52 @@ void Demod16qamHardLoop(float* vec_in, uint8_t* vec_out, int num) {
     float imag_val = *(vec_in + i * 2 + 1);
 
     *(vec_out + i) = 0;
-    if (real_val <= 0) *(vec_out + i) |= 1UL << 3;
-    if (std::abs(real_val) > float_val) *(vec_out + i) |= 1UL << 1;
-    if (imag_val <= 0) *(vec_out + i) |= 1UL << 2;
-    if (std::abs(imag_val) > float_val) *(vec_out + i) |= 1UL;
+    if (real_val <= 0) {
+      *(vec_out + i) |= 1UL << 3;
+    }
+    if (std::abs(real_val) > float_val) {
+      *(vec_out + i) |= 1UL << 1;
+    }
+    if (imag_val <= 0) {
+      *(vec_out + i) |= 1UL << 2;
+    }
+    if (std::abs(imag_val) > float_val) {
+      *(vec_out + i) |= 1UL;
+    }
   }
 }
 
 void Demod16qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
   auto* result_ptr = reinterpret_cast<__m64*>(vec_out);
-  __m128 symbol1, symbol2, symbol3, symbol4;
-  __m128i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_12, symbol_34;
-  __m128i symbol_abs_1, symbol_abs_2;
-  __m128i symbol_gt_0_1, symbol_gt_threshold_1, symbol_gt_0_2,
-      symbol_gt_threshold_2;
-  __m128i bit0_1, bit1_1, bit2_1, bit3_1;
-  __m128i bit0_2, bit1_2, bit2_2, bit3_2;
-  __m128i bit0, bit1, bit2, bit3;
+  __m128 symbol1;
+  __m128 symbol2;
+  __m128 symbol3;
+  __m128 symbol4;
+  __m128i symbol_i1;
+  __m128i symbol_i2;
+  __m128i symbol_i3;
+  __m128i symbol_i4;
+  __m128i symbol_12;
+  __m128i symbol_34;
+  __m128i symbol_abs_1;
+  __m128i symbol_abs_2;
+  __m128i symbol_gt_0_1;
+  __m128i symbol_gt_threshold_1;
+  __m128i symbol_gt_0_2;
+  __m128i symbol_gt_threshold_2;
+  __m128i bit0_1;
+  __m128i bit1_1;
+  __m128i bit2_1;
+  __m128i bit3_1;
+  __m128i bit0_2;
+  __m128i bit1_2;
+  __m128i bit2_2;
+  __m128i bit3_2;
+  __m128i bit0;
+  __m128i bit1;
+  __m128i bit2;
+  __m128i bit3;
   __m128i result;
   __m128 scale_v = _mm_set1_ps(-SCALE_BYTE_CONV_QAM16);
   __m128i vec_zero = _mm_set1_epi16(0);
@@ -350,24 +379,52 @@ void Demod16qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
     float imag_val = *(vec_in + i * 2 + 1);
 
     *(vec_out + i) = 0;
-    if (real_val <= 0) *(vec_out + i) |= 1UL << 3;
-    if (std::abs(real_val) > QAM16_THRESHOLD) *(vec_out + i) |= 1UL << 1;
-    if (imag_val <= 0) *(vec_out + i) |= 1UL << 2;
-    if (std::abs(imag_val) > QAM16_THRESHOLD) *(vec_out + i) |= 1UL;
+    if (real_val <= 0) {
+      *(vec_out + i) |= 1UL << 3;
+    }
+    if (std::abs(real_val) > QAM16_THRESHOLD) {
+      *(vec_out + i) |= 1UL << 1;
+    }
+    if (imag_val <= 0) {
+      *(vec_out + i) |= 1UL << 2;
+    }
+    if (std::abs(imag_val) > QAM16_THRESHOLD) {
+      *(vec_out + i) |= 1UL;
+    }
   }
 }
 
 void Demod16qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
   auto* result_ptr = reinterpret_cast<__m128i*>(vec_out);
-  __m256 symbol1, symbol2, symbol3, symbol4;
-  __m256i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_12, symbol_34;
-  __m256i symbol_abs_1, symbol_abs_2;
-  __m256i symbol_gt_0_1, symbol_gt_threshold_1, symbol_gt_0_2,
-      symbol_gt_threshold_2;
-  __m256i bit0_1, bit1_1, bit2_1, bit3_1;
-  __m256i bit0_2, bit1_2, bit2_2, bit3_2;
-  __m256i bit0, bit1, bit2, bit3;
+  __m256 symbol1;
+  __m256 symbol2;
+  __m256 symbol3;
+  __m256 symbol4;
+  __m256i symbol_i1;
+  __m256i symbol_i2;
+  __m256i symbol_i3;
+  __m256i symbol_i4;
+  __m256i symbol_12;
+  __m256i symbol_34;
+  __m256i symbol_abs_1;
+  __m256i symbol_abs_2;
+  __m256i symbol_gt_0_1;
+  __m256i symbol_gt_threshold_1;
+  __m256i symbol_gt_0_2;
+  __m256i symbol_gt_threshold_2;
+  __m256i bit0_1;
+  __m256i bit1_1;
+  __m256i bit2_1;
+  __m256i bit3_1;
+  __m256i bit0_2;
+  __m256i bit1_2;
+  __m256i bit2_2;
+  __m256i bit3_2;
+  __m256i bit0;
+  __m256i bit1;
+  __m256i bit2;
+  __m256i bit3;
   __m256i result;
   __m256 scale_v = _mm256_set1_ps(-SCALE_BYTE_CONV_QAM16);
   __m256i vec_zero = _mm256_set1_epi16(0);
@@ -469,11 +526,25 @@ void Demod16qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
 void Demod16qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
   float* symbols_ptr = vec_in;
   auto* result_ptr = reinterpret_cast<__m256i*>(llr);
-  __m256 symbol1, symbol2, symbol3, symbol4;
-  __m256i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_i, symbol_abs,
-      symbol_12, symbol_34;
+  __m256 symbol1;
+  __m256 symbol2;
+  __m256 symbol3;
+  __m256 symbol4;
+  __m256i symbol_i1;
+  __m256i symbol_i2;
+  __m256i symbol_i3;
+  __m256i symbol_i4;
+  __m256i symbol_i;
+  __m256i symbol_abs;
+  __m256i symbol_12;
+  __m256i symbol_34;
   __m256i offset = _mm256_set1_epi8(2 * SCALE_BYTE_CONV_QAM16 / sqrt(10));
-  __m256i result1n, result1a, result2n, result2a, result1na, result2na;
+  __m256i result1n;
+  __m256i result1a;
+  __m256i result2n;
+  __m256i result2a;
+  __m256i result1na;
+  __m256i result2na;
   __m256 scale_v = _mm256_set1_ps(SCALE_BYTE_CONV_QAM16);
 
   __m256i shuffle_negated_1 = _mm256_set_epi8(
@@ -550,14 +621,16 @@ void Demod16qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
  *  111110  111100  110100  110110  |  010110  010100  011100  011110
  *  111111  111101  110101  110111  |  010111  010101  011101  011111
  */
-void Demod64qamHardLoop(float* vec_in, uint8_t* vec_out, int num) {
+void Demod64qamHardLoop(const float* vec_in, uint8_t* vec_out, int num) {
   for (int i = 0; i < num; i++) {
     float real_val = *(vec_in + i * 2);
     float imag_val = *(vec_in + i * 2 + 1);
 
     *(vec_out + i) = 0;
 
-    if (real_val <= 0) *(vec_out + i) |= 1UL << 5;
+    if (real_val <= 0) {
+      *(vec_out + i) |= 1UL << 5;
+    }
     if (std::abs(real_val) > QAM64_THRESHOLD_3) {
       *(vec_out + i) |= 1UL << 3;
       *(vec_out + i) |= 1UL << 1;
@@ -567,7 +640,9 @@ void Demod64qamHardLoop(float* vec_in, uint8_t* vec_out, int num) {
       *(vec_out + i) |= 1UL << 1;
     }
 
-    if (imag_val <= 0) *(vec_out + i) |= 1UL << 4;
+    if (imag_val <= 0) {
+      *(vec_out + i) |= 1UL << 4;
+    }
     if (std::abs(imag_val) > QAM64_THRESHOLD_3) {
       *(vec_out + i) |= 1UL << 2;
       *(vec_out + i) |= 1UL;
@@ -582,17 +657,50 @@ void Demod64qamHardLoop(float* vec_in, uint8_t* vec_out, int num) {
 void Demod64qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
   auto* result_ptr = reinterpret_cast<__m64*>(vec_out);
-  __m128 symbol1, symbol2, symbol3, symbol4;
-  __m128i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_12, symbol_34;
-  __m128i symbol_abs_1, symbol_abs_2;
-  __m128i symbol_gt_0_1, symbol_gt_0_2;
-  __m128i symbol_lt_threshold1_1, symbol_lt_threshold1_2;
-  __m128i symbol_gt_threshold2_1, symbol_gt_threshold2_2;
-  __m128i symbol_gt_threshold3_1, symbol_gt_threshold3_2;
-  __m128i bit01_1, bit23_1, bit45_1, bit01_2, bit23_2, bit45_2;
-  __m128i bit0_1, bit1_1, bit2_1, bit3_1, bit4_1, bit5_1;
-  __m128i bit0_2, bit1_2, bit2_2, bit3_2, bit4_2, bit5_2;
-  __m128i bit0, bit1, bit2, bit3, bit4, bit5;
+  __m128 symbol1;
+  __m128 symbol2;
+  __m128 symbol3;
+  __m128 symbol4;
+  __m128i symbol_i1;
+  __m128i symbol_i2;
+  __m128i symbol_i3;
+  __m128i symbol_i4;
+  __m128i symbol_12;
+  __m128i symbol_34;
+  __m128i symbol_abs_1;
+  __m128i symbol_abs_2;
+  __m128i symbol_gt_0_1;
+  __m128i symbol_gt_0_2;
+  __m128i symbol_lt_threshold1_1;
+  __m128i symbol_lt_threshold1_2;
+  __m128i symbol_gt_threshold2_1;
+  __m128i symbol_gt_threshold2_2;
+  __m128i symbol_gt_threshold3_1;
+  __m128i symbol_gt_threshold3_2;
+  __m128i bit01_1;
+  __m128i bit23_1;
+  __m128i bit45_1;
+  __m128i bit01_2;
+  __m128i bit23_2;
+  __m128i bit45_2;
+  __m128i bit0_1;
+  __m128i bit1_1;
+  __m128i bit2_1;
+  __m128i bit3_1;
+  __m128i bit4_1;
+  __m128i bit5_1;
+  __m128i bit0_2;
+  __m128i bit1_2;
+  __m128i bit2_2;
+  __m128i bit3_2;
+  __m128i bit4_2;
+  __m128i bit5_2;
+  __m128i bit0;
+  __m128i bit1;
+  __m128i bit2;
+  __m128i bit3;
+  __m128i bit4;
+  __m128i bit5;
   __m128i result;
   __m128 scale_v = _mm_set1_ps(-SCALE_BYTE_CONV_QAM16);
   __m128i vec_zero = _mm_set1_epi16(0);
@@ -709,7 +817,9 @@ void Demod64qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
 
     *(vec_out + i) = 0;
 
-    if (real_val <= 0) *(vec_out + i) |= 1UL << 5;
+    if (real_val <= 0) {
+      *(vec_out + i) |= 1UL << 5;
+    }
     if (std::abs(real_val) > QAM64_THRESHOLD_3) {
       *(vec_out + i) |= 1UL << 3;
       *(vec_out + i) |= 1UL << 1;
@@ -719,7 +829,9 @@ void Demod64qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
       *(vec_out + i) |= 1UL << 1;
     }
 
-    if (imag_val <= 0) *(vec_out + i) |= 1UL << 4;
+    if (imag_val <= 0) {
+      *(vec_out + i) |= 1UL << 4;
+    }
     if (std::abs(imag_val) > QAM64_THRESHOLD_3) {
       *(vec_out + i) |= 1UL << 2;
       *(vec_out + i) |= 1UL;
@@ -734,17 +846,50 @@ void Demod64qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
 void Demod64qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
   auto* result_ptr = reinterpret_cast<__m128i*>(vec_out);
-  __m256 symbol1, symbol2, symbol3, symbol4;
-  __m256i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_12, symbol_34;
-  __m256i symbol_abs_1, symbol_abs_2;
-  __m256i symbol_gt_0_1, symbol_gt_0_2;
-  __m256i symbol_lt_threshold1_1, symbol_lt_threshold1_2;
-  __m256i symbol_gt_threshold2_1, symbol_gt_threshold2_2;
-  __m256i symbol_gt_threshold3_1, symbol_gt_threshold3_2;
-  __m256i bit01_1, bit23_1, bit45_1, bit01_2, bit23_2, bit45_2;
-  __m256i bit0_1, bit1_1, bit2_1, bit3_1, bit4_1, bit5_1;
-  __m256i bit0_2, bit1_2, bit2_2, bit3_2, bit4_2, bit5_2;
-  __m256i bit0, bit1, bit2, bit3, bit4, bit5;
+  __m256 symbol1;
+  __m256 symbol2;
+  __m256 symbol3;
+  __m256 symbol4;
+  __m256i symbol_i1;
+  __m256i symbol_i2;
+  __m256i symbol_i3;
+  __m256i symbol_i4;
+  __m256i symbol_12;
+  __m256i symbol_34;
+  __m256i symbol_abs_1;
+  __m256i symbol_abs_2;
+  __m256i symbol_gt_0_1;
+  __m256i symbol_gt_0_2;
+  __m256i symbol_lt_threshold1_1;
+  __m256i symbol_lt_threshold1_2;
+  __m256i symbol_gt_threshold2_1;
+  __m256i symbol_gt_threshold2_2;
+  __m256i symbol_gt_threshold3_1;
+  __m256i symbol_gt_threshold3_2;
+  __m256i bit01_1;
+  __m256i bit23_1;
+  __m256i bit45_1;
+  __m256i bit01_2;
+  __m256i bit23_2;
+  __m256i bit45_2;
+  __m256i bit0_1;
+  __m256i bit1_1;
+  __m256i bit2_1;
+  __m256i bit3_1;
+  __m256i bit4_1;
+  __m256i bit5_1;
+  __m256i bit0_2;
+  __m256i bit1_2;
+  __m256i bit2_2;
+  __m256i bit3_2;
+  __m256i bit4_2;
+  __m256i bit5_2;
+  __m256i bit0;
+  __m256i bit1;
+  __m256i bit2;
+  __m256i bit3;
+  __m256i bit4;
+  __m256i bit5;
   __m256i result;
   __m256 scale_v = _mm256_set1_ps(-SCALE_BYTE_CONV_QAM16);
   __m256i vec_zero = _mm256_set1_epi16(0);
@@ -883,15 +1028,34 @@ void Demod64qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
 void Demod64qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
   auto* symbols_ptr = static_cast<float*>(vec_in);
   auto* result_ptr = reinterpret_cast<__m256i*>(llr);
-  __m256 symbol1, symbol2, symbol3, symbol4;
-  __m256i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_i, symbol_abs,
-      symbol_abs2, symbol_12, symbol_34;
+  __m256 symbol1;
+  __m256 symbol2;
+  __m256 symbol3;
+  __m256 symbol4;
+  __m256i symbol_i1;
+  __m256i symbol_i2;
+  __m256i symbol_i3;
+  __m256i symbol_i4;
+  __m256i symbol_i;
+  __m256i symbol_abs;
+  __m256i symbol_abs2;
+  __m256i symbol_12;
+  __m256i symbol_34;
   __m256i offset1 = _mm256_set1_epi8(4 * SCALE_BYTE_CONV_QAM64 / sqrt(42));
   __m256i offset2 = _mm256_set1_epi8(2 * SCALE_BYTE_CONV_QAM64 / sqrt(42));
   __m256 scale_v = _mm256_set1_ps(SCALE_BYTE_CONV_QAM64);
-  __m256i result11, result12, result13, result22, result21, result23, result31,
-      result32, result33;
-  __m256i result_final1, result_final2, result_final3;
+  __m256i result11;
+  __m256i result12;
+  __m256i result13;
+  __m256i result22;
+  __m256i result21;
+  __m256i result23;
+  __m256i result31;
+  __m256i result32;
+  __m256i result33;
+  __m256i result_final1;
+  __m256i result_final2;
+  __m256i result_final3;
 
   __m256i shuffle_negated_1 =
       _mm256_set_epi8(0xff, 0xff, 5, 4, 0xff, 0xff, 0xff, 0xff, 3, 2, 0xff,

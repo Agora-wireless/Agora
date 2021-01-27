@@ -30,7 +30,9 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
                                                   0);
   std::vector<void*> samp_buffer(2);
   samp_buffer[0] = samp_buffer0.data();
-  if (true) samp_buffer[1] = samp_buffer1.data();
+  if (true) {
+    samp_buffer[1] = samp_buffer1.data();
+  }
 
   // long long rxTimeBs(0);
   // long long txTimeBs(0);
@@ -72,13 +74,16 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
       tx_time_bs_ = rx_time_bs_ +
                     cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms() * 20;
       int tx_ret = radioconfig_->RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
-      if (tx_ret != (int)cfg_->SampsPerSymbol())
+      if (tx_ret != (int)cfg_->SampsPerSymbol()) {
         std::cerr << "BAD Transmit(" << tx_ret << "/" << cfg_->SampsPerSymbol()
                   << ") at Time " << tx_time_bs_ << ", frame count "
                   << global_frame_id << std::endl;
+      }
     }
 
-    if (++radio_id == radio_hi) radio_id = radio_lo;
+    if (++radio_id == radio_hi) {
+      radio_id = radio_lo;
+    }
 
     // Update global frame_id and symbol_id
     global_symbol_id++;
@@ -117,7 +122,9 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
       cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms(), 0);
   std::vector<void*> samp_buffer(2);
   samp_buffer[0] = samp_buffer0.data();
-  if (cfg_->NumChannels() == 2) samp_buffer[1] = samp_buffer1.data();
+  if (cfg_->NumChannels() == 2) {
+    samp_buffer[1] = samp_buffer1.data();
+  }
 
   // if rx_buffer is full, exit
   int n_channels = cfg_->NumChannels();
@@ -176,8 +183,9 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
 int PacketTXRX::DequeueSendUsrp(int tid) {
   auto& c = cfg_;
   EventData event;
-  if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
+  if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
     return -1;
+  }
 
   std::printf("tx queue length: %zu\n", task_queue_->size_approx());
   assert(event.event_type_ == EventType::kPacketTX);
@@ -237,8 +245,9 @@ int PacketTXRX::DequeueSendUsrp(int tid) {
 int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id) {
   auto& c = cfg_;
   EventData event;
-  if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
+  if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
     return -1;
+  }
   std::cout << "DDD" << std::endl;
 
   std::printf("tx queue length: %zu\n", task_queue_->size_approx());
@@ -265,13 +274,14 @@ int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id) {
   if (kDebugDownlink) {
     std::vector<std::complex<int16_t>> zeros(c->SampsPerSymbol());
     size_t dl_symbol_idx = c->GetDLSymbolIdx(frame_id, symbol_id);
-    if (ant_id != c->RefAnt())
+    if (ant_id != c->RefAnt()) {
       txbuf[ch] = zeros.data();
-    else if (dl_symbol_idx < c->Frame().ClientDlPilotSymbols())
+    } else if (dl_symbol_idx < c->Frame().ClientDlPilotSymbols()) {
       txbuf[ch] = reinterpret_cast<void*>(c->UeSpecificPilotT()[0]);
-    else
+    } else {
       txbuf[ch] = reinterpret_cast<void*>(
           c->DlIqT()[dl_symbol_idx - c->Frame().ClientDlPilotSymbols()]);
+    }
   } else {
     char* cur_buffer_ptr = tx_buffer_ + offset * c->PacketLength();
     auto* pkt = reinterpret_cast<struct Packet*>(cur_buffer_ptr);

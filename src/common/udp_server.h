@@ -71,7 +71,9 @@ class UDPServer {
   UDPServer(const UDPServer&) = delete;
 
   ~UDPServer() {
-    if (sock_fd_ != -1) close(sock_fd_);
+    if (sock_fd_ != -1) {
+      close(sock_fd_);
+    }
   }
 
   /**
@@ -83,7 +85,7 @@ class UDPServer {
    *
    * return 0.
    */
-  ssize_t RecvNonblocking(uint8_t* buf, size_t len) {
+  ssize_t RecvNonblocking(uint8_t* buf, size_t len) const {
     ssize_t ret = recv(sock_fd_, static_cast<void*>(buf), len, 0);
     if (ret == -1) {
       if (errno == EAGAIN || ret == EWOULDBLOCK) {

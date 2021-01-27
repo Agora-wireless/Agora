@@ -97,15 +97,18 @@ EventData DoPrecode::Launch(size_t tag) {
   if (kUseSpatialLocality) {
     for (size_t i = 0; i < max_sc_ite; i = i + kSCsPerCacheline) {
       size_t start_tsc1 = WorkerRdtsc();
-      for (size_t user_id = 0; user_id < cfg_->UeNum(); user_id++)
-        for (size_t j = 0; j < kSCsPerCacheline; j++)
+      for (size_t user_id = 0; user_id < cfg_->UeNum(); user_id++) {
+        for (size_t j = 0; j < kSCsPerCacheline; j++) {
           LoadInputData(symbol_idx_dl, total_data_symbol_idx, user_id,
                         base_sc_id + i + j, j);
+        }
+      }
 
       size_t start_tsc2 = WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
-      for (size_t j = 0; j < kSCsPerCacheline; j++)
+      for (size_t j = 0; j < kSCsPerCacheline; j++) {
         PrecodingPerSc(frame_slot, base_sc_id + i + j, i + j);
+      }
       duration_stat_->task_count_ =
           duration_stat_->task_count_ + kSCsPerCacheline;
       duration_stat_->task_duration_[2] += WorkerRdtsc() - start_tsc2;
@@ -114,9 +117,10 @@ EventData DoPrecode::Launch(size_t tag) {
     for (size_t i = 0; i < max_sc_ite; i++) {
       size_t start_tsc1 = WorkerRdtsc();
       int cur_sc_id = base_sc_id + i;
-      for (size_t user_id = 0; user_id < cfg_->UeNum(); user_id++)
+      for (size_t user_id = 0; user_id < cfg_->UeNum(); user_id++) {
         LoadInputData(symbol_idx_dl, total_data_symbol_idx, user_id, cur_sc_id,
                       0);
+      }
       size_t start_tsc2 = WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 

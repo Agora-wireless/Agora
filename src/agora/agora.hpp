@@ -35,7 +35,8 @@ class Agora {
   static const int kDequeueBulkSizeWorker = 4;
   static const int kMaxWorkerNum = 50;  // Max number of worker threads allowed
 
-  explicit Agora(Config*);  /// Create an Agora object and start the worker threads
+  explicit Agora(
+      Config* /*cfg*/);  /// Create an Agora object and start the worker threads
   ~Agora();
 
   void Start();  /// The main Agora event loop
@@ -92,9 +93,10 @@ class Agora {
   /// Update Agora's RAN config parameters
   void UpdateRanConfig(RanConfig rc);
 
-  void ScheduleSubcarriers(EventType task_type, size_t frame_id,
+  void ScheduleSubcarriers(EventType event_type, size_t frame_id,
                            size_t symbol_id);
-  void ScheduleAntennas(EventType task_type, size_t frame_id, size_t symbol_id);
+  void ScheduleAntennas(EventType event_type, size_t frame_id,
+                        size_t symbol_id);
 
   /**
    * @brief Schedule LDPC decoding or encoding over code blocks
@@ -103,10 +105,10 @@ class Agora {
    * @param symbol_idx The index of the symbol among uplink symbols for LDPC
    * decoding, and among downlink symbols for LDPC encoding
    */
-  void ScheduleCodeblocks(EventType task_type, size_t frame_id,
+  void ScheduleCodeblocks(EventType event_type, size_t frame_id,
                           size_t symbol_idx);
 
-  void ScheduleUsers(EventType task_type, size_t frame_id, size_t symbol_id);
+  void ScheduleUsers(EventType event_type, size_t frame_id, size_t symbol_id);
 
   // Send current frame's SNR measurements from PHY to MAC
   void SendSnrReport(EventType event_type, size_t frame_id, size_t symbol_id);

@@ -35,7 +35,9 @@ void SignalHandler::SetExitSignal(bool _bExitSignal) {
  * @param[in] _ignored Not used but required by function prototype
  *                     to match required handler.
  */
-void SignalHandler::ExitSignalHandler(int) { mb_got_exit_signal = true; }
+void SignalHandler::ExitSignalHandler(int /*unused*/) {
+  mb_got_exit_signal = true;
+}
 
 /**
  * Set up the signal handlers for CTRL-C.

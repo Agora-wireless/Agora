@@ -6,7 +6,7 @@
 static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
-static constexpr size_t kUseInverseForZF = true;
+static constexpr size_t kUseInverseForZF = 1u;
 
 DoZF::DoZF(Config* config, int tid,
            PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
@@ -42,10 +42,11 @@ DoZF::~DoZF() {
 }
 
 EventData DoZF::Launch(size_t tag) {
-  if (cfg_->FreqOrthogonalPilot())
+  if (cfg_->FreqOrthogonalPilot()) {
     ZfFreqOrthogonal(tag);
-  else
+  } else {
     ZfTimeOrthogonal(tag);
+  }
 
   return EventData(EventType::kZF, tag);
 }
@@ -56,7 +57,7 @@ void DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
   arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
                           cfg_->UeNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_zf_tmp;
-  if (kUseInverseForZF) {
+  if (kUseInverseForZF != 0u) {
     try {
       // mat_ul_zf = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
       mat_ul_zf_tmp = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
@@ -270,7 +271,7 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
         cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
     arma::cx_fvec calib_ul_mat(
         reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_slot]),
-        cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+        cfg_->OfdmDataNum(), cfg_->BfAntNum() != 0u, false);
     arma::cx_fvec vec_calib(
         reinterpret_cast<arma::cx_float*>(calib_gather_buffer_),
         cfg_->BfAntNum(), false);

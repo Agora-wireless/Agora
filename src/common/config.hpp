@@ -34,7 +34,7 @@ class Config {
   // inline static constexpr size_t kDataOffset = (sizeof(int) * 16);
 
   /* Constructors */
-  explicit Config(const std::string&);
+  explicit Config(const std::string& /*jsonfile*/);
   ~Config();
 
   inline void Running(bool value) { this->running_.store(value); }
@@ -237,7 +237,7 @@ class Config {
   void GenData();
 
   /// TODO document and review
-  size_t GetSymbolId(size_t symbol_id) const;
+  size_t GetSymbolId(size_t input_id) const;
 
   // Get the index of this downlink symbol among this frame's downlink symbols
   size_t GetDLSymbolIdx(size_t frame_id, size_t symbol_id) const;
@@ -248,11 +248,11 @@ class Config {
   // Get the index of this pilot symbol among this frame's pilot symbols
   size_t GetPilotSymbolIdx(size_t frame_id, size_t symbol_id) const;
 
-  bool IsPilot(size_t, size_t) const;
-  bool IsCalDlPilot(size_t, size_t) const;
-  bool IsCalUlPilot(size_t, size_t) const;
-  bool IsDownlink(size_t, size_t) const;
-  bool IsUplink(size_t, size_t) const;
+  bool IsPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
+  bool IsCalDlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
+  bool IsCalUlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
+  bool IsDownlink(size_t /*frame_id*/, size_t /*symbol_id*/) const;
+  bool IsUplink(size_t /*unused*/, size_t /*symbol_id*/) const;
 
   /* Public functions that do not meet coding standard format */
   /// Return the symbol type of this symbol in this frame

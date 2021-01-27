@@ -13,16 +13,17 @@ Channel::Channel(Config* config_bs, Config* config_ue,
   ue_ant_ = uecfg_->UeAntNum();
   n_samps_ = bscfg_->SampsPerSymbol();
 
-  if (sim_chan_model_ == "AWGN")
+  if (sim_chan_model_ == "AWGN") {
     chan_model_ = AWGN;
-  else if (sim_chan_model_ == "RAYLEIGH")
+  } else if (sim_chan_model_ == "RAYLEIGH") {
     chan_model_ = RAYLEIGH;
-  else if (sim_chan_model_ == "RAN_3GPP") {
+  } else if (sim_chan_model_ == "RAN_3GPP") {
     chan_model_ = RAN_3GPP;
     printf("3GPP Model in progress, setting to RAYLEIGH channel \n");
     chan_model_ = RAYLEIGH;
-  } else
+  } else {
     chan_model_ = AWGN;
+  }
 }
 
 Channel::~Channel() = default;
@@ -56,18 +57,21 @@ void Channel::ApplyChan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
         break;
     }
   }
-  if (is_downlink)
+  if (is_downlink) {
     fmat_h = fmat_src * h_.st() / std::sqrt(bscfg_->BsAntNum());
-  else
+  } else {
     fmat_h = fmat_src * h_;
+  }
 
   // Add noise
   Awgn(fmat_h, fmat_dst);
 
-  if (kPrintChannelOutput) Utils::PrintMat(h_);
+  if (kPrintChannelOutput) {
+    Utils::PrintMat(h_);
+  }
 }
 
-void Channel::Awgn(const cx_fmat& src, cx_fmat& dst) {
+void Channel::Awgn(const cx_fmat& src, cx_fmat& dst) const {
   int n_row = src.n_rows;
   int n_col = src.n_cols;
   float snr_lin = pow(10, channel_snr_db_ / 10);

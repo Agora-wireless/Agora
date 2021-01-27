@@ -51,7 +51,9 @@ TEST(TestConcurrentQueue, MasterToWorkerStatic) {
     workers[i] = std::thread(MasterToWorkerStaticWorker, i, &queue, ptoks[i]);
   }
   master.join();
-  for (auto& w : workers) w.join();
+  for (auto& w : workers) {
+    w.join();
+  }
 
   for (auto& ptok : ptoks) {
     delete ptok;
@@ -107,7 +109,9 @@ TEST(TestConcurrentQueue, WorkerToMasterWithTokens) {
         std::thread(WorkerToMasterWorkerWithToken, i, &queue, ptoks[i]);
   }
   master.join();
-  for (auto& w : workers) w.join();
+  for (auto& w : workers) {
+    w.join();
+  }
 
   for (auto& ptok : ptoks) {
     delete ptok;
@@ -123,7 +127,9 @@ TEST(TestConcurrentQueue, WorkerToMasterWithoutTokens) {
     workers[i] = std::thread(WorkerToMasterWorkerWithoutToken, i, &queue);
   }
   master.join();
-  for (auto& w : workers) w.join();
+  for (auto& w : workers) {
+    w.join();
+  }
 }
 
 int main(int argc, char** argv) {

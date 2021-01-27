@@ -64,10 +64,11 @@ int main(int argc, char* argv[]) {
   // uplink
   size_t num_symbols_per_cb = 1;
   size_t bits_per_symbol = cfg->OfdmDataNum() * cfg->ModOrderBits();
-  if (cfg->LdpcConfig().NumCbCodewLen() > bits_per_symbol)
+  if (cfg->LdpcConfig().NumCbCodewLen() > bits_per_symbol) {
     num_symbols_per_cb =
         (cfg->LdpcConfig().NumCbCodewLen() + bits_per_symbol - 1) /
         bits_per_symbol;
+  }
   size_t num_cbs_per_ue = cfg->Frame().NumDataSyms() / num_symbols_per_cb;
   std::printf("Number of symbols per block: %zu, blocks per frame: %zu\n",
               num_symbols_per_cb, num_cbs_per_ue);
@@ -156,10 +157,11 @@ int main(int argc, char* argv[]) {
                     &pilots_t_ue[0], cfg->OfdmCaNum() * sizeof(complex_float));
       }
     } else {
-      for (size_t i = 0; i < cfg->UeAntNum(); i++)
+      for (size_t i = 0; i < cfg->UeAntNum(); i++) {
         std::memcpy(tx_data_all_symbols[i + cfg->Frame().NumBeaconSyms()] +
                         i * cfg->OfdmCaNum(),
                     &pilot_td[0], cfg->OfdmCaNum() * sizeof(complex_float));
+      }
     }
 
     size_t data_sym_start =

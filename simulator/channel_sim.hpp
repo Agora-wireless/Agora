@@ -36,7 +36,7 @@ using namespace arma;
  */
 class ChannelSim {
  public:
-  ChannelSim(Config* bscfg, Config* uecfg, size_t bs_thread_num,
+  ChannelSim(Config* config_bs, Config* config_ue, size_t bs_thread_num,
              size_t user_thread_num, size_t worker_thread_num,
              size_t in_core_offset = 30, std::string in_chan_type = "RAYLEIGH",
              double in_chan_snr = 20);

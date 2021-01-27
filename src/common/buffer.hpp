@@ -56,7 +56,7 @@ union gen_tag_t {
   explicit gen_tag_t(size_t _tag) : tag_(_tag) {}
 
   // Return a string representation of this tag
-  std::string ToString() {
+  std::string ToString() const {
     std::ostringstream ret;
     ret << "[Frame ID " << std::to_string(frame_id_) << ", symbol ID "
         << std::to_string(symbol_id_);

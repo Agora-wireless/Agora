@@ -21,7 +21,7 @@
 
 #include "modulation.hpp"
 
-void Demod16qamSoftLoop(float* vec_in, int8_t* llr, int num) {
+void Demod16qamSoftLoop(const float* vec_in, int8_t* llr, int num) {
   for (int i = 0; i < num; i++) {
     auto yre = static_cast<int8_t>(SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i]));
     auto yim = static_cast<int8_t>(SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i + 1]));
@@ -36,11 +36,23 @@ void Demod16qamSoftLoop(float* vec_in, int8_t* llr, int num) {
 void Demod16qamSoftSse(float* vec_in, int8_t* llr, int num) {
   float* symbols_ptr = vec_in;
   auto* result_ptr = reinterpret_cast<__m128i*>(llr);
-  __m128 symbol1, symbol2, symbol3, symbol4;
-  __m128i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_i, symbol_abs,
-      symbol_12, symbol_34;
+  __m128 symbol1;
+  __m128 symbol2;
+  __m128 symbol3;
+  __m128 symbol4;
+  __m128i symbol_i1;
+  __m128i symbol_i2;
+  __m128i symbol_i3;
+  __m128i symbol_i4;
+  __m128i symbol_i;
+  __m128i symbol_abs;
+  __m128i symbol_12;
+  __m128i symbol_34;
   __m128i offset = _mm_set1_epi8(2 * SCALE_BYTE_CONV_QAM16 / sqrt(10));
-  __m128i result1n, result1a, result2n, result2a;
+  __m128i result1n;
+  __m128i result1a;
+  __m128i result2n;
+  __m128i result2a;
   __m128 scale_v = _mm_set1_ps(SCALE_BYTE_CONV_QAM16);
 
   __m128i shuffle_negated_1 = _mm_set_epi8(0xff, 0xff, 7, 6, 0xff, 0xff, 5, 4,
@@ -102,7 +114,7 @@ void Demod16qamSoftSse(float* vec_in, int8_t* llr, int num) {
   // }
 }
 
-void Demod64qamSoftLoop(float* vec_in, int8_t* llr, int num) {
+void Demod64qamSoftLoop(const float* vec_in, int8_t* llr, int num) {
   for (int i = 0; i < num; i++) {
     float yre = (int8_t)(SCALE_BYTE_CONV_QAM64 * (vec_in[2 * i]));
     float yim = (int8_t)(SCALE_BYTE_CONV_QAM64 * (vec_in[2 * i + 1]));
@@ -119,14 +131,31 @@ void Demod64qamSoftLoop(float* vec_in, int8_t* llr, int num) {
 void Demod64qamSoftSse(float* vec_in, int8_t* llr, int num) {
   auto* symbols_ptr = static_cast<float*>(vec_in);
   auto* result_ptr = reinterpret_cast<__m128i*>(llr);
-  __m128 symbol1, symbol2, symbol3, symbol4;
-  __m128i symbol_i1, symbol_i2, symbol_i3, symbol_i4, symbol_i, symbol_abs,
-      symbol_abs2, symbol_12, symbol_34;
+  __m128 symbol1;
+  __m128 symbol2;
+  __m128 symbol3;
+  __m128 symbol4;
+  __m128i symbol_i1;
+  __m128i symbol_i2;
+  __m128i symbol_i3;
+  __m128i symbol_i4;
+  __m128i symbol_i;
+  __m128i symbol_abs;
+  __m128i symbol_abs2;
+  __m128i symbol_12;
+  __m128i symbol_34;
   __m128i offset1 = _mm_set1_epi8(4 * SCALE_BYTE_CONV_QAM64 / sqrt(42));
   __m128i offset2 = _mm_set1_epi8(2 * SCALE_BYTE_CONV_QAM64 / sqrt(42));
   __m128 scale_v = _mm_set1_ps(SCALE_BYTE_CONV_QAM64);
-  __m128i result11, result12, result13, result22, result21, result23, result31,
-      result32, result33;
+  __m128i result11;
+  __m128i result12;
+  __m128i result13;
+  __m128i result22;
+  __m128i result21;
+  __m128i result23;
+  __m128i result31;
+  __m128i result32;
+  __m128i result33;
 
   __m128i shuffle_negated_1 =
       _mm_set_epi8(0xff, 0xff, 5, 4, 0xff, 0xff, 0xff, 0xff, 3, 2, 0xff, 0xff,

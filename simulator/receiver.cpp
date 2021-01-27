@@ -29,7 +29,7 @@ std::vector<pthread_t> Receiver::StartRecv(Table<char>& in_buffer,
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
     pthread_t recv_thread;
-    auto context = new EventHandlerContext<Receiver>;
+    auto* context = new EventHandlerContext<Receiver>;
     context->obj_ptr_ = this;
     context->id_ = i;
     if (pthread_create(&recv_thread, nullptr,

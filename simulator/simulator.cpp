@@ -161,7 +161,9 @@ void Simulator::UpdateRxCounters(size_t frame_id, size_t frame_id_in_buffer,
 }
 
 void Simulator::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
-  if (!kDebugPrintPerFrameDone) return;
+  if (!kDebugPrintPerFrameDone) {
+    return;
+  }
   switch (print_type) {
     case (PrintType::kPacketRX): {
       std::printf(

@@ -40,8 +40,8 @@ void MasterToWorkerDynamicMaster(
     size_t num_finished_events = 0;
     while (num_finished_events < kMaxTestNum) {
       EventData event;
-      int ret = complete_task_queue.try_dequeue(event);
-      if (ret == true) {
+      int ret = static_cast<int>(complete_task_queue.try_dequeue(event));
+      if (ret == 1) {
         num_finished_events++;
       }
     }

@@ -47,7 +47,7 @@ class DoZF : public Doer {
 
   /// Compute the uplink zeroforcing detector matrix and/or the downlink
   /// zeroforcing precoder using this CSI matrix and calibration buffer
-  void ComputePrecoder(const arma::cx_fmat& mat_csi, complex_float* calib_buf,
+  void ComputePrecoder(const arma::cx_fmat& mat_csi, complex_float* calib_ptr,
                        complex_float* mat_ul_zf, complex_float* mat_dl_zf);
 
   void ZfFreqOrthogonal(size_t tag);

@@ -14,8 +14,9 @@ size_t cpu_layout[MAX_CORE_NUM];
 bool cpu_layout_initlized = false;
 
 void PrintBitmask(const struct bitmask* bm) {
-  for (size_t i = 0; i < bm->size; ++i)
+  for (size_t i = 0; i < bm->size; ++i) {
     std::printf("%d", numa_bitmask_isbitset(bm, i));
+  }
 }
 
 void SetCpuLayoutOnNumaNodes(bool verbose) {
@@ -32,13 +33,17 @@ void SetCpuLayoutOnNumaNodes(bool verbose) {
       std::printf(" CPUs: ");
     }
     for (size_t j = 0; j < bm->size; j++) {
-      if (numa_bitmask_isbitset(bm, j)) {
-        if (verbose) std::printf("%zu ", j);
+      if (numa_bitmask_isbitset(bm, j) != 0) {
+        if (verbose) {
+          std::printf("%zu ", j);
+        }
         cpu_layout[cpu_id] = j;
         cpu_id++;
       }
     }
-    if (verbose) std::printf("\n");
+    if (verbose) {
+      std::printf("\n");
+    }
   }
 
   numa_bitmask_free(bm);
@@ -46,10 +51,11 @@ void SetCpuLayoutOnNumaNodes(bool verbose) {
 }
 
 size_t GetPhysicalCoreId(size_t core_id) {
-  if (cpu_layout_initlized)
+  if (cpu_layout_initlized) {
     return cpu_layout[core_id];
-  else
+  } else {
     return core_id;
+  }
 }
 
 int PinToCore(int core_id) {
@@ -115,9 +121,10 @@ std::vector<std::complex<int16_t>> Utils::DoubleToCint16(
     std::vector<std::vector<double>> in) {
   int len = in[0].size();
   std::vector<std::complex<int16_t>> out(len, 0);
-  for (int i = 0; i < len; i++)
+  for (int i = 0; i < len; i++) {
     out[i] = std::complex<int16_t>((int16_t)(in[0][i] * 32768),
                                    (int16_t)(in[1][i] * 32768));
+  }
   return out;
 }
 
@@ -125,8 +132,9 @@ std::vector<std::complex<float>> Utils::DoubleToCfloat(
     std::vector<std::vector<double>> in) {
   int len = in[0].size();
   std::vector<std::complex<float>> out(len, 0);
-  for (int i = 0; i < len; i++)
+  for (int i = 0; i < len; i++) {
     out[i] = std::complex<float>(in[0][i], in[1][i]);
+  }
   return out;
 }
 
@@ -159,10 +167,11 @@ std::vector<uint32_t> Utils::Cint16ToUint32(
   for (size_t i = 0; i < in.size(); i++) {
     auto re = static_cast<uint16_t>(in[i].real());
     auto im = static_cast<uint16_t>(conj ? -in[i].imag() : in[i].imag());
-    if (order == "IQ")
+    if (order == "IQ") {
       out[i] = (uint32_t)re << 16 | im;
-    else if (order == "QI")
+    } else if (order == "QI") {
       out[i] = (uint32_t)im << 16 | re;
+    }
   }
   return out;
 }
@@ -175,10 +184,11 @@ std::vector<uint32_t> Utils::Cfloat32ToUint32(
         static_cast<uint16_t>(static_cast<int16_t>(in[i].real() * 32768.0));
     auto im = static_cast<uint16_t>(
         static_cast<int16_t>((conj ? -in[i].imag() : in[i].imag()) * 32768));
-    if (order == "IQ")
+    if (order == "IQ") {
       out[i] = (uint32_t)re << 16 | im;
-    else if (order == "QI")
+    } else if (order == "QI") {
       out[i] = (uint32_t)im << 16 | re;
+    }
   }
   return out;
 }
@@ -210,25 +220,31 @@ void Utils::LoadDevices(std::string filename, std::vector<std::string>& data) {
     while (getline(myfile, line)) {
       // line.erase( std::remove (line.begin(), line.end(), ' '),
       // line.end());
-      if (line.at(0) == '#') continue;
+      if (line.at(0) == '#') {
+        continue;
+      }
       data.push_back(line);
       std::cout << line << '\n';
     }
     myfile.close();
   }
 
-  else
+  else {
     std::printf("Unable to open device file %s\n", filename.c_str());
+  }
 }
 
 void Utils::LoadData(const char* filename,
                      std::vector<std::complex<int16_t>>& data, int samples) {
   FILE* fp = std::fopen(filename, "r");
   data.resize(samples);
-  float real, imag;
+  float real;
+  float imag;
   for (int i = 0; i < samples; i++) {
     int ret = fscanf(fp, "%f %f", &real, &imag);
-    if (ret < 0) break;
+    if (ret < 0) {
+      break;
+    }
     data[i] =
         std::complex<int16_t>(int16_t(real * 32768), int16_t(imag * 32768));
   }
@@ -242,7 +258,9 @@ void Utils::LoadData(const char* filename, std::vector<unsigned>& data,
   data.resize(samples);
   for (int i = 0; i < samples; i++) {
     int ret = fscanf(fp, "%u", &data[i]);
-    if (ret < 0) break;
+    if (ret < 0) {
+      break;
+    }
   }
 
   std::fclose(fp);
@@ -258,8 +276,9 @@ void Utils::LoadTddConfig(const std::string& filename, std::string& jconfig) {
     config_file.close();
   }
 
-  else
+  else {
     std::printf("Unable to open config file %s\n", filename.c_str());
+  }
 }
 
 std::vector<std::string> Utils::Split(const std::string& s, char delimiter) {
@@ -291,9 +310,10 @@ void Utils::PrintMat(arma::cx_fmat c) {
   std::stringstream so;
   for (size_t i = 0; i < c.n_cols; i++) {
     so << "row" << i << " = [";
-    for (size_t j = 0; j < print_rows; j++)
+    for (size_t j = 0; j < print_rows; j++) {
       so << std::fixed << std::setw(5) << std::setprecision(3)
          << c.at(j, i).real() << "+" << c.at(j, i).imag() << "i ";
+    }
     so << "];\n";
   }
   so << std::endl;
@@ -303,9 +323,10 @@ void Utils::PrintMat(arma::cx_fmat c) {
 void Utils::PrintVec(arma::cx_fvec c, const std::string& ss) {
   std::stringstream so;
   so << ss << " = [";
-  for (size_t j = 0; j < c.size(); j++)
+  for (size_t j = 0; j < c.size(); j++) {
     so << std::fixed << std::setw(5) << std::setprecision(3) << c.at(j).real()
        << "+" << c.at(j).imag() << "i ";
+  }
   so << "];\n";
   so << std::endl;
   std::cout << so.str();

@@ -46,8 +46,8 @@ void MasterToWorkerDynamicMaster(
     size_t num_finished_events = 0;
     while (num_finished_events < kMaxTestNum) {
       EventData event;
-      int ret = complete_task_queue.try_dequeue(event);
-      if (ret == true) {
+      int ret = static_cast<int>(complete_task_queue.try_dequeue(event));
+      if (ret == 1) {
         num_finished_events++;
       }
     }
@@ -119,7 +119,9 @@ TEST(TestDemul, VaryingConfig) {
     ptok = new moodycamel::ProducerToken(complete_task_queue);
   }
 
-  Table<complex_float> data_buffer, ue_spec_pilot_buffer, equal_buffer;
+  Table<complex_float> data_buffer;
+  Table<complex_float> ue_spec_pilot_buffer;
+  Table<complex_float> equal_buffer;
   data_buffer.RandAllocCxFloat(cfg->Frame().NumULSyms() * kFrameWnd,
                                kMaxAntennas * kMaxDataSCs,
                                Agora_memory::Alignment_t::k64Align);

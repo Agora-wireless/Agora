@@ -103,7 +103,7 @@ class MacThread {
   // them to the PHY.
   void ProcessUdpPacketsFromApps(RBIndicator ri);
   void ProcessUdpPacketsFromAppsServer(const MacPacket* pkt, RBIndicator ri);
-  void ProcessUdpPacketsFromAppsClient(const char* pkt, RBIndicator ri);
+  void ProcessUdpPacketsFromAppsClient(const char* payload, RBIndicator ri);
 
   // If Mode::kServer, this thread is running at the Agora server. Else at
   // the client.

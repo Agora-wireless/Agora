@@ -30,16 +30,14 @@ class FrameStats {
 
   size_t GetDLSymbol(size_t location) const;
   inline size_t GetDLSymbolLast() const {
-    return ((this->dl_symbols_.size() == 0) ? SIZE_MAX
-                                            : this->dl_symbols_.back());
+    return ((this->dl_symbols_.empty()) ? SIZE_MAX : this->dl_symbols_.back());
   }
   /* Returns SIZE_MAX if there are no DL symbols */
   size_t GetDLSymbolIdx(size_t symbol_number) const;
 
   size_t GetULSymbol(size_t location) const;
   inline size_t GetULSymbolLast() const {
-    return ((this->ul_symbols_.size() == 0) ? SIZE_MAX
-                                            : this->ul_symbols_.back());
+    return ((this->ul_symbols_.empty()) ? SIZE_MAX : this->ul_symbols_.back());
   }
   /* Returns SIZE_MAX if there are no UL symbols */
   size_t GetULSymbolIdx(size_t symbol_number) const;

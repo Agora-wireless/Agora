@@ -20,8 +20,9 @@ PhyUe::PhyUe(Config* config) {
 
   std::vector<size_t> data_sc_ind;
   for (size_t i = config_->OfdmDataStart();
-       i < config_->OfdmDataStart() + config_->OfdmDataNum(); i++)
+       i < config_->OfdmDataStart() + config_->OfdmDataNum(); i++) {
     data_sc_ind.push_back(i);
+  }
 
   non_null_sc_ind_.insert(non_null_sc_ind_.end(), data_sc_ind.begin(),
                           data_sc_ind.end());
@@ -276,9 +277,10 @@ void PhyUe::Start() {
           if (dl_data_symbol_perframe_ > 0 &&
               (config_->IsPilot(frame_id, symbol_id) ||
                config_->IsDownlink(frame_id, symbol_id))) {
-            if (dl_symbol_id == config_->Frame().GetDLSymbol(0))
+            if (dl_symbol_id == config_->Frame().GetDLSymbol(0)) {
               frame_dl_process_time_[(frame_id % kFrameWnd) * kMaxUEs +
                                      ant_id] = GetTimeUs();
+            }
             EventData do_fft_task(EventType::kFFT, event.tags_[0]);
             ScheduleTask(do_fft_task, &fft_queue_, ptok_fft);
           } else {  // if we are not entering doFFT, reset buffer here
@@ -299,19 +301,21 @@ void PhyUe::Start() {
           }
           fft_checker_[frame_slot][ant_id]++;
           if (fft_checker_[frame_slot][ant_id] == dl_symbol_perframe_) {
-            if (kDebugPrintPerTaskDone)
+            if (kDebugPrintPerTaskDone) {
               std::printf(
                   "Main thread: Equalization done frame: %zu, "
                   "ant_id %zu\n",
                   frame_id, ant_id);
+            }
             fft_checker_[frame_slot][ant_id] = 0;
             fft_status_[frame_slot]++;
             if (fft_status_[frame_slot] == config_->UeAntNum()) {
-              if (kDebugPrintPerFrameDone)
+              if (kDebugPrintPerFrameDone) {
                 std::printf(
                     "Main thread: Equalization done on all "
                     "antennas at frame: %zu\n",
                     frame_id);
+              }
               fft_status_[frame_slot] = 0;
             }
           }
@@ -330,20 +334,22 @@ void PhyUe::Start() {
           ScheduleTask(do_decode_task, &decode_queue_, ptok_decode);
           demul_checker_[frame_slot][ant_id]++;
           if (demul_checker_[frame_slot][ant_id] == dl_data_symbol_perframe_) {
-            if (kDebugPrintPerTaskDone)
+            if (kDebugPrintPerTaskDone) {
               std::printf(
                   "Main thread: Demodulation done frame: %zu, "
                   "ant %zu\n",
                   frame_id, ant_id);
+            }
             max_equaled_frame_ = frame_id;
             demul_checker_[frame_slot][ant_id] = 0;
             demul_status_[frame_slot]++;
             if (demul_status_[frame_slot] == config_->UeAntNum()) {
-              if (kDebugPrintPerFrameDone)
+              if (kDebugPrintPerFrameDone) {
                 std::printf(
                     "Main thread: Demodulation done on all "
                     "antennas at frame: %zu \n",
                     frame_id);
+              }
               demul_status_[frame_slot] = 0;
             }
           }
@@ -357,16 +363,18 @@ void PhyUe::Start() {
           // size_t dl_symbol_idx
           //    = config_->GetDLSymbolIdx(frame_id, symbol_id)
           //    - dl_pilot_symbol_perframe;
-          if (kEnableMac)
+          if (kEnableMac) {
             ScheduleTask(EventData(EventType::kPacketToMac, event.tags_[0]),
                          &to_mac_queue_, ptok_mac);
+          }
           decode_checker_[frame_slot][ant_id]++;
           if (decode_checker_[frame_slot][ant_id] == dl_data_symbol_perframe_) {
-            if (kDebugPrintPerTaskDone)
+            if (kDebugPrintPerTaskDone) {
               std::printf(
                   "Main thread: Decoding done frame: %zu, "
                   "ant %zu\n",
                   frame_id, ant_id);
+            }
             decode_checker_[frame_slot][ant_id] = 0;
             decode_status_[frame_slot]++;
             frame_dl_process_time_[frame_slot * kMaxUEs + ant_id] =
@@ -374,17 +382,21 @@ void PhyUe::Start() {
                 frame_dl_process_time_[frame_slot * kMaxUEs + ant_id];
             if (decode_status_[frame_slot] == config_->UeAntNum()) {
               double frame_time_total = 0;
-              for (size_t i = 0; i < config_->UeAntNum(); i++)
+              for (size_t i = 0; i < config_->UeAntNum(); i++) {
                 frame_time_total +=
                     frame_dl_process_time_[frame_slot * kMaxUEs + i];
-              if (kDebugPrintPerFrameDone)
+              }
+              if (kDebugPrintPerFrameDone) {
                 std::printf(
                     "Main thread: Decode done on all antennas "
                     "at frame %zu"
                     " in %.2f us\n",
                     frame_id, frame_time_total);
+              }
               decode_status_[frame_slot] = 0;
-              if (!kEnableMac) cur_frame_id = frame_id;
+              if (!kEnableMac) {
+                cur_frame_id = frame_id;
+              }
             }
           }
         } break;
@@ -416,7 +428,9 @@ void PhyUe::Start() {
                    "Incorrect frame ID from MAC");
           current_frame_user_num_ =
               (current_frame_user_num_ + 1) % config_->UeAntNum();
-          if (current_frame_user_num_ == 0) expected_frame_id_from_mac_++;
+          if (current_frame_user_num_ == 0) {
+            expected_frame_id_from_mac_++;
+          }
 
           if (kDebugPrintPacketsFromMac) {
             std::printf(
@@ -453,12 +467,13 @@ void PhyUe::Start() {
               EventType::kIFFT,
               gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
           ScheduleTask(do_ifft_task, &ifft_queue_, ptok_ifft);
-          if (kDebugPrintPerTaskDone)
+          if (kDebugPrintPerTaskDone) {
             std::printf(
                 "Main thread: frame: %zu, symbol: %zu, finished "
                 "modulating "
                 "uplink data for user %zu\n",
                 frame_id, symbol_id, ue_id);
+          }
           //}
         } break;
 
@@ -468,18 +483,21 @@ void PhyUe::Start() {
           EventData do_tx_task(EventType::kPacketTX, event.tags_[0]);
           ScheduleTask(do_tx_task, &tx_queue_,
                        *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
-          if (kDebugPrintPerTaskDone)
+          if (kDebugPrintPerTaskDone) {
             std::printf(
                 "Main thread: frame: %zu, finished IFFT of "
                 "uplink data for user %zu\n",
                 frame_id, ue_id);
+          }
         } break;
 
         case EventType::kPacketPilotTX: {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
-          if (ul_data_symbol_perframe_ == 0) cur_frame_id++;
+          if (ul_data_symbol_perframe_ == 0) {
+            cur_frame_id++;
+          }
           if (kDebugPrintPerSymbolDone) {
             std::printf(
                 "Main thread: finished Pilot TX for user %zu"
@@ -556,18 +574,19 @@ void PhyUe::TaskThread(int tid) {
 
   EventData event;
   while (config_->Running() == true) {
-    if (decode_queue_.try_dequeue(event))
+    if (decode_queue_.try_dequeue(event)) {
       DoDecode(tid, event.tags_[0]);
-    else if (demul_queue_.try_dequeue(event))
+    } else if (demul_queue_.try_dequeue(event)) {
       DoDemul(tid, event.tags_[0]);
-    else if (ifft_queue_.try_dequeue(event))
+    } else if (ifft_queue_.try_dequeue(event)) {
       DoIfft(tid, event.tags_[0]);
-    else if (modul_queue_.try_dequeue(event))
+    } else if (modul_queue_.try_dequeue(event)) {
       DoModul(tid, event.tags_[0]);
-    else if (encode_queue_.try_dequeue(event))
+    } else if (encode_queue_.try_dequeue(event)) {
       DoEncode(tid, event.tags_[0]);
-    else if (fft_queue_.try_dequeue(event))
+    } else if (fft_queue_.try_dequeue(event)) {
       DoFft(tid, event.tags_[0]);
+    }
   }
 }
 
@@ -591,8 +610,9 @@ void PhyUe::DoFft(int tid, size_t tag) {
   size_t frame_slot = frame_id % kFrameWnd;
 
   if (!config_->IsPilot(frame_id, symbol_id) &&
-      !(config_->IsDownlink(frame_id, symbol_id)))
+      !(config_->IsDownlink(frame_id, symbol_id))) {
     return;
+  }
 
   if (kDebugPrintInTask) {
     std::printf("In doFFT TID %d: frame %zu, symbol %zu, ant_id %zu\n", tid,
@@ -616,11 +636,13 @@ void PhyUe::DoFft(int tid, size_t tag) {
           pilot_corr_abs.begin();
       sig_offset = peak_offset < seq_len ? 0 : peak_offset - seq_len;
       float noise_power = 0;
-      for (size_t i = 0; i < sig_offset; i++)
+      for (size_t i = 0; i < sig_offset; i++) {
         noise_power += std::pow(std::abs(samples_vec[i]), 2);
+      }
       float signal_power = 0;
-      for (size_t i = sig_offset; i < 2 * sig_offset; i++)
+      for (size_t i = sig_offset; i < 2 * sig_offset; i++) {
         signal_power += std::pow(std::abs(samples_vec[i]), 2);
+      }
       float snr = 10 * std::log10(signal_power / noise_power);
       std::printf("frame %zu symbol %zu ant %zu: sig offset %zu, SNR %2.1f \n",
                   frame_id, symbol_id, ant_id, sig_offset, snr);
@@ -681,8 +703,9 @@ void PhyUe::DoFft(int tid, size_t tag) {
       complex_float p = config_->UeSpecificPilot()[ant_id][j];
       size_t sc_id = non_null_sc_ind_[j];
       csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / cx_float(p.re, p.im));
-      if (dl_symbol_id == dl_pilot_symbol_perframe_ - 1)
+      if (dl_symbol_id == dl_pilot_symbol_perframe_ - 1) {
         csi_buffer_ptr[j] /= dl_pilot_symbol_perframe_;
+      }
     }
   } else {
     size_t total_dl_data_symbol_id = frame_slot * dl_data_symbol_perframe_ +
@@ -709,7 +732,9 @@ void PhyUe::DoFft(int tid, size_t tag) {
         theta += arg(pilot_eq * cx_float(p.re, -p.im));
       }
     }
-    if (config_->GetOFDMPilotNum() > 0) theta /= config_->GetOFDMPilotNum();
+    if (config_->GetOFDMPilotNum() > 0) {
+      theta /= config_->GetOFDMPilotNum();
+    }
     auto phc = exp(cx_float(0, -theta));
     for (size_t j = 0; j < config_->OfdmDataNum(); j++) {
       if (j % config_->OfdmPilotSpacing() != 0) {
@@ -741,9 +766,10 @@ void PhyUe::DoFft(int tid, size_t tag) {
   }
 
   size_t fft_duration_stat = Rdtsc() - start_tsc;
-  if (kDebugPrintPerTaskDone)
+  if (kDebugPrintPerTaskDone) {
     std::printf("FFT Duration (%zu, %zu, %zu): %2.4f us\n", frame_id, symbol_id,
                 ant_id, CyclesToUs(fft_duration_stat, MeasureRdtscFreq()));
+  }
 
   rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0;  // now empty
   fft_finish_event = EventData(
@@ -789,10 +815,11 @@ void PhyUe::DoDemul(int tid, size_t tag) {
   }
 
   size_t dem_duration_stat = Rdtsc() - start_tsc;
-  if (kDebugPrintPerTaskDone)
+  if (kDebugPrintPerTaskDone) {
     std::printf("Demodul Duration (%zu, %zu, %zu): %2.4f us\n", frame_id,
                 symbol_id, ant_id,
                 CyclesToUs(dem_duration_stat, MeasureRdtscFreq()));
+  }
 
   if (kPrintLLRData) {
     std::printf("LLR data, symbol_offset: %zu\n", offset);
@@ -874,12 +901,15 @@ void PhyUe::DoDecode(int tid, size_t tag) {
           bit_errors += xor_byte & 1;
           xor_byte >>= 1;
         }
-        if (rx_byte != tx_byte) byte_error++;
+        if (rx_byte != tx_byte) {
+          byte_error++;
+        }
 
         bit_error_count_[ant_id][total_dl_symbol_id] += bit_errors;
       }
-      block_error_count_[ant_id][total_dl_symbol_id] += (byte_error > 0);
-      block_error += (byte_error > 0);
+      block_error_count_[ant_id][total_dl_symbol_id] +=
+          static_cast<unsigned long>(byte_error > 0);
+      block_error += static_cast<unsigned long>(byte_error > 0);
     }
 
     if (kPrintDecodedData) {
@@ -895,14 +925,15 @@ void PhyUe::DoDecode(int tid, size_t tag) {
   }
   if (kCollectPhyStats) {
     decoded_symbol_count_[ant_id]++;
-    symbol_error_count_[ant_id] += (block_error > 0);
+    symbol_error_count_[ant_id] += static_cast<unsigned long>(block_error > 0);
   }
 
   size_t dec_duration_stat = Rdtsc() - start_tsc;
-  if (kDebugPrintPerTaskDone)
+  if (kDebugPrintPerTaskDone) {
     std::printf("Decode Duration (%zu, %zu, %zu): %2.4f us\n", frame_id,
                 symbol_id, ant_id,
                 CyclesToUs(dec_duration_stat, MeasureRdtscFreq()));
+  }
 
   RtAssert(message_queue_.enqueue(*task_ptok_[tid],
                                   EventData(EventType::kDecode, tag)),

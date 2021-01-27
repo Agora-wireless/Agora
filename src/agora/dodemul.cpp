@@ -115,7 +115,7 @@ EventData DoDemul::Launch(size_t tag) {
       // line, 1 subcarrier and 4 ants per iteration
       size_t cur_sc_offset =
           partial_transpose_block_base + (base_sc_id + i) % kTransposeBlockSize;
-      auto* src = (const float*)&data_buf[cur_sc_offset];
+      const auto* src = (const float*)&data_buf[cur_sc_offset];
       auto* dst = (float*)data_gather_buffer_;
       for (size_t ant_i = 0; ant_i < cfg_->BsAntNum(); ant_i += 4) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {

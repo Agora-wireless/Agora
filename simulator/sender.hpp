@@ -36,7 +36,6 @@ class Sender {
  public:
   static constexpr size_t kDequeueBulkSize = 4;
 
- public:
   /**
    * @brief Create and optionally start a Sender that sends IQ packets to a
    * server with MAC address [server_mac_addr_str]
@@ -55,7 +54,7 @@ class Sender {
    *
    * @param server_mac_addr_str The MAC address of the server's NIC
    */
-  Sender(Config* config, size_t socket_thread_num, size_t core_offset = 30,
+  Sender(Config* cfg, size_t socket_thread_num, size_t core_offset = 30,
          size_t frame_duration = 1000, size_t enable_slow_start = 1,
          const std::string& server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
          bool create_thread_for_master = false);
@@ -82,7 +81,7 @@ class Sender {
   void InitIqFromFile(const std::string& filename);
 
   // Get number of CPU ticks for a symbol given a frame index
-  uint64_t GetTicksForFrame(size_t frame_id);
+  uint64_t GetTicksForFrame(size_t frame_id) const;
   size_t GetMaxSymbolId() const;
 
   // Launch threads to run worker with thread IDs from tid_start to tid_end

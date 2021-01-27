@@ -33,21 +33,21 @@ complex_float ModSingleUint8(uint8_t x, Table<complex_float>& mod_table);
 void ModSimd(uint8_t* in, complex_float*& out, size_t len,
              Table<complex_float>& mod_table);
 
-void DemodQpskSoftSse(float* vec_in, int8_t* llr, int num);
+void DemodQpskSoftSse(float* x, int8_t* z, int len);
 
-void Demod16qamHardLoop(float* vec_in, uint8_t* vec_out, int num);
+void Demod16qamHardLoop(const float* vec_in, uint8_t* vec_out, int num);
 void Demod16qamHardSse(float* vec_in, uint8_t* vec_out, int num);
 void Demod16qamHardAvx2(float* vec_in, uint8_t* vec_out, int num);
 
-void Demod16qamSoftLoop(float* vec_in, int8_t* llr, int num);
+void Demod16qamSoftLoop(const float* vec_in, int8_t* llr, int num);
 void Demod16qamSoftSse(float* vec_in, int8_t* llr, int num);
 void Demod16qamSoftAvx2(float* vec_in, int8_t* llr, int num);
 
-void Demod64qamHardLoop(float* vec_in, uint8_t* vec_out, int num);
+void Demod64qamHardLoop(const float* vec_in, uint8_t* vec_out, int num);
 void Demod64qamHardSse(float* vec_in, uint8_t* vec_out, int num);
 void Demod64qamHardAvx2(float* vec_in, uint8_t* vec_out, int num);
 
-void Demod64qamSoftLoop(float* vec_in, int8_t* llr, int num);
+void Demod64qamSoftLoop(const float* vec_in, int8_t* llr, int num);
 void Demod64qamSoftSse(float* vec_in, int8_t* llr, int num);
 void Demod64qamSoftAvx2(float* vec_in, int8_t* llr, int num);
 

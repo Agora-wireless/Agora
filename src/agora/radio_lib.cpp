@@ -17,7 +17,7 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
   if (cfg_->IsUe() == true) {
     throw std::invalid_argument("Bad config! Not a UE!");
   }
-  if (!kUseUHD || cfg_->HubIds().size() != 0) {
+  if ((kUseUHD == false) || (cfg_->HubIds().empty() == false)) {
     args["driver"] = "remote";
     args["timeout"] = "1000000";
     args["serial"] = cfg_->HubIds().at(0);
@@ -61,8 +61,12 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
 
   // Perform DC Offset & IQ Imbalance Calibration
   if (cfg_->ImbalanceCalEn()) {
-    if (cfg_->Channel().find('A') != std::string::npos) DciqCalibrationProc(0);
-    if (cfg_->Channel().find('B') != std::string::npos) DciqCalibrationProc(1);
+    if (cfg_->Channel().find('A') != std::string::npos) {
+      DciqCalibrationProc(0);
+    }
+    if (cfg_->Channel().find('B') != std::string::npos) {
+      DciqCalibrationProc(1);
+    }
   }
 
   for (size_t i = 0; i < this->radio_num_; i++) {
@@ -160,10 +164,11 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
   }
 
   if (!kUseUHD) {
-    if (hubs_.size() == 0)
+    if (hubs_.empty()) {
       ba_stn_[0]->writeSetting("SYNC_DELAYS", "");
-    else
+    } else {
       hubs_[0]->writeSetting("SYNC_DELAYS", "");
+    }
   }
 
   std::cout << "radio init done!" << std::endl;
@@ -217,13 +222,14 @@ void RadioConfig::ConfigureBsRadio(RadioConfigContext* context) {
   ba_stn_[i]->writeSetting("RESET_DATA_LOGIC", "");
 
   // use the TRX antenna port for both tx and rx
-  for (auto ch : channels)
-    if (!kUseUHD)
+  for (auto ch : channels) {
+    if (!kUseUHD) {
       ba_stn_[i]->setAntenna(SOAPY_SDR_RX, ch, "TRX");
-    else {
+    } else {
       ba_stn_[i]->setAntenna(SOAPY_SDR_RX, ch, "RX2");
       ba_stn_[i]->setAntenna(SOAPY_SDR_TX, ch, "TX/RX");
     }
+  }
 
   SoapySDR::Kwargs info = ba_stn_[i]->getHardwareInfo();
   for (auto ch : {0, 1}) {
@@ -245,39 +251,42 @@ void RadioConfig::ConfigureBsRadio(RadioConfigContext* context) {
       if (cfg_->SingleGain()) {
         // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
         ba_stn_[i]->setGain(SOAPY_SDR_RX, ch,
-                            ch ? cfg_->RxGainB() : cfg_->RxGainA());
+                            ch != 0 ? cfg_->RxGainB() : cfg_->RxGainA());
         // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
         ba_stn_[i]->setGain(SOAPY_SDR_TX, ch,
-                            ch ? cfg_->TxGainB() : cfg_->TxGainA());
+                            ch != 0 ? cfg_->TxGainB() : cfg_->TxGainA());
       } else {
         if (info["frontend"].find("CBRS") != std::string::npos) {
-          if (cfg_->Freq() > 3e9)
+          if (cfg_->Freq() > 3e9) {
             ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -6);  //[-18,0]
-          else if ((cfg_->Freq() > 2e9) && (cfg_->Freq() < 3e9))
+          } else if ((cfg_->Freq() > 2e9) && (cfg_->Freq() < 3e9)) {
             ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -18);  //[-18,0]
-          else
+          } else {
             ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -12);  //[-18,0]
-          ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "LNA2", 17);     //[0,17]
+          }
+          ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "LNA2", 17);  //[0,17]
         }
 
-        ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "LNA",
-                            ch ? cfg_->RxGainB() : cfg_->RxGainA());  //[0,30]
-        ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0);              //[0,12]
-        ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0);              //[-12,19]
+        ba_stn_[i]->setGain(
+            SOAPY_SDR_RX, ch, "LNA",
+            ch != 0 ? cfg_->RxGainB() : cfg_->RxGainA());  //[0,30]
+        ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0);   //[0,12]
+        ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0);   //[-12,19]
 
         if (info["frontend"].find("CBRS") != std::string::npos) {
           ba_stn_[i]->setGain(SOAPY_SDR_TX, ch, "ATTN", -6);  //[-18,0] by 3
           ba_stn_[i]->setGain(SOAPY_SDR_TX, ch, "PA2", 0);    //[0|15]
         }
         ba_stn_[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);  //[-12,12]
-        ba_stn_[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
-                            ch ? cfg_->TxGainB() : cfg_->TxGainA());  //[0,30]
+        ba_stn_[i]->setGain(
+            SOAPY_SDR_TX, ch, "PAD",
+            ch != 0 ? cfg_->TxGainB() : cfg_->TxGainA());  //[0,30]
       }
     } else {
       ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "PGA0",
-                          ch ? cfg_->RxGainB() : cfg_->RxGainA());
+                          ch != 0 ? cfg_->RxGainB() : cfg_->RxGainA());
       ba_stn_[i]->setGain(SOAPY_SDR_TX, ch, "PGA0",
-                          ch ? cfg_->TxGainB() : cfg_->TxGainA());
+                          ch != 0 ? cfg_->TxGainB() : cfg_->TxGainA());
     }
   }
 
@@ -363,14 +372,15 @@ bool RadioConfig::RadioStart() {
         sched.replace(s, 1, is_ref_ant ? "R" : "T");
       } else if (c == 'L') {
         sched.replace(s, 1, is_ref_ant ? "P" : "R");
-      } else if (c == 'P')
+      } else if (c == 'P') {
         sched.replace(s, 1, "R");
-      else if (c == 'U')
+      } else if (c == 'U') {
         sched.replace(s, 1, "R");
-      else if (c == 'D')
+      } else if (c == 'D') {
         sched.replace(s, 1, "T");
-      else if (c != 'B')
+      } else if (c != 'B') {
         sched.replace(s, 1, "G");
+      }
     }
     std::cout << "Radio " << i << " Frame 1: " << sched << std::endl;
     tdd_sched.push_back(sched);
@@ -386,8 +396,9 @@ bool RadioConfig::RadioStart() {
                                            is_beacon_antenna ? 1 : 0);
       std::string tx_ram_wgt = "BEACON_RAM_WGT_";
       if (cfg_->Beamsweep()) {
-        for (size_t j = 0; j < cfg_->NumAntennas(); j++)
+        for (size_t j = 0; j < cfg_->NumAntennas(); j++) {
           beacon_weights[j] = CommsLib::Hadamard2(ndx, j);
+        }
       }
       ba_stn_[i]->writeRegisters(tx_ram_wgt + c, 0, beacon_weights);
       ++ndx;
@@ -411,8 +422,9 @@ bool RadioConfig::RadioStart() {
             cfg_->OfdmDataStart(), cfg_->CpLen(), false /*block type*/);
         if (kDebugPrintPilot) {
           std::cout << "recipCalPilot[" << i << "]: ";
-          for (auto const& cal_p : recip_cal_dl_pilot)
+          for (auto const& cal_p : recip_cal_dl_pilot) {
             std::cout << real(cal_p) << ", ";
+          }
           std::cout << std::endl;
         }
         recip_cal_dl_pilot.insert(recip_cal_dl_pilot.begin(), pre.begin(),
@@ -453,7 +465,7 @@ bool RadioConfig::RadioStart() {
 
 void RadioConfig::Go() {
   if (!kUseUHD) {
-    if (hubs_.size() == 0) {
+    if (hubs_.empty()) {
       // std::cout << "triggering first Iris ..." << std::endl;
       ba_stn_[0]->writeSetting("TRIGGER_GEN", "");
     } else {
@@ -475,10 +487,11 @@ void RadioConfig::RadioTx(void** buffs) {
 int RadioConfig::RadioTx(size_t r /*radio id*/, void** buffs, int flags,
                          long long& frameTime) {
   int tx_flags = 0;
-  if (flags == 1)
+  if (flags == 1) {
     tx_flags = SOAPY_SDR_HAS_TIME;
-  else if (flags == 2)
+  } else if (flags == 2) {
     tx_flags = SOAPY_SDR_HAS_TIME | SOAPY_SDR_END_BURST;
+  }
   // long long frameTime(0);
 
   int w;
@@ -533,11 +546,12 @@ int RadioConfig::RadioRx(size_t r /*radio id*/, void** buffs,
     }
 
     if (kDebugRadioRX) {
-      if (ret != (int)cfg_->SampsPerSymbol())
+      if (ret != (int)cfg_->SampsPerSymbol()) {
         std::cout << "invalid return " << ret << " from radio " << r
                   << std::endl;
-      else
+      } else {
         std::cout << "radio " << r << "received " << ret << std::endl;
+      }
     }
     return ret;
   }
@@ -561,7 +575,9 @@ void RadioConfig::DrainRxBuffer(SoapySDR::Device* ibsSdrs,
                                 SoapySDR::Stream* istream,
                                 std::vector<void*> buffs, size_t symSamp) {
   long long frame_time = 0;
-  int flags = 0, r = 0, i = 0;
+  int flags = 0;
+  int r = 0;
+  int i = 0;
   long timeout_us(0);
   while (r != -1) {
     r = ibsSdrs->readStream(istream, buffs.data(), symSamp, flags, frame_time,

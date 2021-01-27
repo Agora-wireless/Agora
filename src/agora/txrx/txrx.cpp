@@ -232,8 +232,9 @@ struct Packet* PacketTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
 int PacketTXRX::DequeueSend(int tid) {
   auto& c = cfg_;
   EventData event;
-  if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
+  if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
     return -1;
+  }
 
   // std::printf("tx queue length: %d\n", task_queue_->size_approx());
   assert(event.event_type_ == EventType::kPacketTX);

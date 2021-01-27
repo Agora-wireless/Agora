@@ -5,14 +5,14 @@
 #include "datatype_conversion.h"
 #include "udp_client.h"
 
-static constexpr size_t kDebugPrintSender = false;
+static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kMacAddrBtyes = 17;
 
 static std::atomic<bool> keep_running = true;
 // A spinning barrier to synchronize the start of worker threads
 static std::atomic<size_t> num_workers_ready_atomic = 0;
 
-void InterruptHandler(int) {
+void InterruptHandler(int /*unused*/) {
   std::cout << "Will exit..." << std::endl;
   keep_running.store(false);
 }
@@ -167,7 +167,7 @@ void Sender::ScheduleSymbol(size_t frame, size_t symbol_id) {
   }
 }
 
-void* Sender::MasterThread(int) {
+void* Sender::MasterThread(int /*unused*/) {
   signal(SIGINT, InterruptHandler);
   PinToCoreWithOffset(ThreadType::kMasterTX, kCoreOffset, 0, true);
 
@@ -194,7 +194,7 @@ void* Sender::MasterThread(int) {
 
   while (keep_running.load() == true) {
     gen_tag_t ctag(0);  // The completion tag
-    int ret = completion_queue_.try_dequeue(ctag.tag_);
+    int ret = static_cast<int>(completion_queue_.try_dequeue(ctag.tag_));
     if (ret > 0) {
       const size_t comp_frame_slot = (ctag.frame_id_ % kFrameWnd);
       packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_]++;
@@ -292,9 +292,10 @@ void* Sender::WorkerThread(int tid) {
   UDPClient udp_client;
 #endif
 
-  auto fft_inout = static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::k64Align,
-      cfg_->OfdmCaNum() * sizeof(complex_float)));
+  auto* fft_inout =
+      static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
+          Agora_memory::Alignment_t::k64Align,
+          cfg_->OfdmCaNum() * sizeof(complex_float)));
   auto* socks_pkt_buf = static_cast<Packet*>(PaddedAlignedAlloc(
       Agora_memory::Alignment_t::k32Align, cfg_->PacketLength()));
 
@@ -417,7 +418,7 @@ void* Sender::WorkerThread(int tid) {
   return nullptr;
 }
 
-uint64_t Sender::GetTicksForFrame(size_t frame_id) {
+uint64_t Sender::GetTicksForFrame(size_t frame_id) const {
   if (kEnableSlowStart == 0) {
     return kTicksAll;
   } else if (frame_id < kFrameWnd) {

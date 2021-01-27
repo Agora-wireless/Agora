@@ -21,9 +21,10 @@ class ClientRadioConfig {
   bool RadioStart();
   void RadioStop();
   void ReadSensors();
-  int RadioTx(size_t, void** buffs, size_t num_samps, int flags,
+  int RadioTx(size_t /*r*/, void** buffs, size_t num_samps, int flags,
               long long& frameTime);
-  int RadioRx(size_t, void** buffs, size_t num_samps, long long& frameTime);
+  int RadioRx(size_t /*r*/, void** buffs, size_t num_samps,
+              long long& frameTime);
   static void DrainRxBuffer(SoapySDR::Device* dev, SoapySDR::Stream* istream,
                             std::vector<void*> buffs, size_t symSamp);
   void DrainBuffers();

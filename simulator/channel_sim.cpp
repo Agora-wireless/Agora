@@ -5,7 +5,7 @@
 static bool running = true;
 static constexpr bool kPrintChannelOutput = false;
 
-static void SimdConvertFloatToShort(float* in_buf, short* out_buf,
+static void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
                                     size_t length) {
   /*
   for (size_t i = 0; i < length; i += 16) {
@@ -104,7 +104,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
 
   // create task threads (transmit to base station and client antennas)
   for (size_t i = 0; i < worker_thread_num; i++) {
-    auto context = new EventHandlerContext<ChannelSim>;
+    auto* context = new EventHandlerContext<ChannelSim>;
     context->obj_ptr_ = this;
     context->id_ = i;
     if (pthread_create(&task_threads_[i], nullptr,
@@ -145,7 +145,7 @@ void ChannelSim::Start() {
   for (size_t i = 0; i < bs_thread_num_; i++) {
     pthread_t recv_thread_bs;
 
-    auto bs_context = new EventHandlerContext<ChannelSim>;
+    auto* bs_context = new EventHandlerContext<ChannelSim>;
     bs_context->obj_ptr_ = this;
     bs_context->id_ = i;
 
@@ -158,7 +158,7 @@ void ChannelSim::Start() {
   for (size_t i = 0; i < user_thread_num_; i++) {
     pthread_t recv_thread_ue;
 
-    auto ue_context = new EventHandlerContext<ChannelSim>;
+    auto* ue_context = new EventHandlerContext<ChannelSim>;
     ue_context->obj_ptr_ = this;
     ue_context->id_ = i;
 
@@ -191,8 +191,9 @@ void ChannelSim::Start() {
                 uecfg_->GetPilotSymbolIdx(frame_id, symbol_id);
             size_t ul_symbol_id = uecfg_->GetULSymbolIdx(frame_id, symbol_id);
             size_t total_symbol_id = pilot_symbol_id;
-            if (pilot_symbol_id == SIZE_MAX)
+            if (pilot_symbol_id == SIZE_MAX) {
               total_symbol_id = ul_symbol_id + bscfg_->Frame().NumPilotSyms();
+            }
             size_t frame_offset =
                 (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ +
                 total_symbol_id;
@@ -200,13 +201,14 @@ void ChannelSim::Start() {
             // when received all client antennas on this symbol, kick-off BS TX
             if (user_rx_counter_[frame_offset] == uecfg_->UeAntNum()) {
               user_rx_counter_[frame_offset] = 0;
-              if (kDebugPrintPerSymbolDone)
+              if (kDebugPrintPerSymbolDone) {
                 std::printf(
                     "Scheduling uplink transmission of frame %zu, "
                     "symbol %zu, from %zu "
                     "user to %zu BS antennas\n",
                     frame_id, symbol_id, uecfg_->UeAntNum(),
                     bscfg_->BsAntNum());
+              }
               ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
                            &task_queue_bs_, ptok_bs);
             }
@@ -222,7 +224,7 @@ void ChannelSim::Start() {
             // when received all BS antennas on this symbol, kick-off client TX
             if (bs_rx_counter_[frame_offset] == bscfg_->BsAntNum()) {
               bs_rx_counter_[frame_offset] = 0;
-              if (kDebugPrintPerSymbolDone)
+              if (kDebugPrintPerSymbolDone) {
                 std::printf(
                     "Scheduling downlink transmission in frame "
                     "%zu, "
@@ -230,6 +232,7 @@ void ChannelSim::Start() {
                     "BS to %zu user antennas\n",
                     frame_id, symbol_id, bscfg_->BsAntNum(),
                     uecfg_->UeAntNum());
+              }
               ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
                            &task_queue_user_, ptok_user);
             }
@@ -243,22 +246,24 @@ void ChannelSim::Start() {
               gen_tag_t::TagType::kUsers) {
             user_tx_counter_[offset]++;
             if (user_tx_counter_[offset] == dl_data_plus_beacon_symbols_) {
-              if (kDebugPrintPerFrameDone)
+              if (kDebugPrintPerFrameDone) {
                 std::printf(
                     "Finished downlink transmission %zu symbols "
                     "in frame %zu\n",
                     dl_data_plus_beacon_symbols_, frame_id);
+              }
               user_tx_counter_[offset] = 0;
             }
           } else if (gen_tag_t(event.tags_[0]).tag_type_ ==
                      gen_tag_t::TagType::kAntennas) {
             bs_tx_counter_[offset]++;
             if (bs_tx_counter_[offset] == ul_data_plus_pilot_symbols_) {
-              if (kDebugPrintPerFrameDone)
+              if (kDebugPrintPerFrameDone) {
                 std::printf(
                     "Finished uplink transmission of %zu "
                     "symbols in frame %zu\n",
                     ul_data_plus_pilot_symbols_, frame_id);
+              }
               bs_tx_counter_[offset] = 0;
             }
           }
@@ -278,10 +283,11 @@ void* ChannelSim::TaskThread(int tid) {
 
   EventData event;
   while (running) {
-    if (task_queue_bs_.try_dequeue(event))
+    if (task_queue_bs_.try_dequeue(event)) {
       DoTxBs(tid, event.tags_[0]);
-    else if (task_queue_user_.try_dequeue(event))
+    } else if (task_queue_user_.try_dequeue(event)) {
       DoTxUser(tid, event.tags_[0]);
+    }
   }
   return nullptr;
 }
@@ -325,11 +331,12 @@ void* ChannelSim::BsRxLoop(int tid) {
     size_t frame_id = pkt->frame_id_;
     size_t symbol_id = pkt->symbol_id_;
     size_t ant_id = pkt->ant_id_;
-    if (kDebugPrintInTask)
+    if (kDebugPrintInTask) {
       std::printf(
           "Received BS packet for frame %zu, symbol %zu, ant %zu from "
           "socket %zu\n",
           frame_id, symbol_id, ant_id, socket_id);
+    }
     size_t dl_symbol_id = GetDlSymbolIdx(frame_id, symbol_id);
     size_t symbol_offset =
         (frame_id % kFrameWnd) * dl_data_plus_beacon_symbols_ + dl_symbol_id;
@@ -343,7 +350,9 @@ void* ChannelSim::BsRxLoop(int tid) {
             EventData(EventType::kPacketRX,
                       gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_)),
         "BS socket message enqueue failed!");
-    if (++socket_id == socket_hi) socket_id = socket_lo;
+    if (++socket_id == socket_hi) {
+      socket_id = socket_lo;
+    }
   }
   return nullptr;
 }
@@ -393,13 +402,15 @@ void* ChannelSim::UeRxLoop(int tid) {
     size_t pilot_symbol_id = uecfg_->GetPilotSymbolIdx(frame_id, symbol_id);
     size_t ul_symbol_id = uecfg_->GetULSymbolIdx(frame_id, symbol_id);
     size_t total_symbol_id = pilot_symbol_id;
-    if (pilot_symbol_id == SIZE_MAX)
+    if (pilot_symbol_id == SIZE_MAX) {
       total_symbol_id = ul_symbol_id + bscfg_->Frame().NumPilotSyms();
-    if (kDebugPrintInTask)
+    }
+    if (kDebugPrintInTask) {
       std::printf(
           "Received UE packet for frame %zu, symbol %zu, ant %zu from "
           "socket %zu\n",
           frame_id, symbol_id, ant_id, socket_id);
+    }
     size_t symbol_offset =
         (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ + total_symbol_id;
     size_t offset = symbol_offset * uecfg_->UeAntNum() + ant_id;
@@ -412,7 +423,9 @@ void* ChannelSim::UeRxLoop(int tid) {
             EventData(EventType::kPacketRX,
                       gen_tag_t::FrmSymUe(frame_id, symbol_id, ant_id).tag_)),
         "UE Socket message enqueue failed!");
-    if (++socket_id == socket_hi) socket_id = socket_lo;
+    if (++socket_id == socket_hi) {
+      socket_id = socket_lo;
+    }
   }
   return nullptr;
 }
@@ -424,8 +437,9 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
   size_t pilot_symbol_id = bscfg_->GetPilotSymbolIdx(frame_id, symbol_id);
   size_t ul_symbol_id = bscfg_->GetULSymbolIdx(frame_id, symbol_id);
   size_t total_symbol_id = pilot_symbol_id;
-  if (pilot_symbol_id == SIZE_MAX)
+  if (pilot_symbol_id == SIZE_MAX) {
     total_symbol_id = ul_symbol_id + bscfg_->Frame().NumPilotSyms();
+  }
 
   size_t symbol_offset =
       (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ + total_symbol_id;
@@ -451,7 +465,9 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
   }
   channel_->ApplyChan(fmat_src, fmat_dst, is_downlink, is_new_frame);
 
-  if (kPrintChannelOutput) Utils::PrintMat(fmat_dst);
+  if (kPrintChannelOutput) {
+    Utils::PrintMat(fmat_dst);
+  }
 
   auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_bs_[total_offset_bs]);
   SimdConvertFloatToShort(reinterpret_cast<float*>(fmat_dst.memptr()), dst_ptr,
@@ -511,7 +527,9 @@ void ChannelSim::DoTxUser(int tid, size_t tag) {
   }
   channel_->ApplyChan(fmat_src, fmat_dst, is_downlink, is_new_frame);
 
-  if (kPrintChannelOutput) Utils::PrintMat(fmat_dst);
+  if (kPrintChannelOutput) {
+    Utils::PrintMat(fmat_dst);
+  }
 
   auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_ue_[total_offset_ue]);
   SimdConvertFloatToShort(reinterpret_cast<float*>(fmat_dst.memptr()), dst_ptr,

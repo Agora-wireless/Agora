@@ -3,7 +3,9 @@
 int main(int argc, char const* argv[]) {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string conf_file;
-  int thread_num, core_offset, delay;
+  int thread_num;
+  int core_offset;
+  int delay;
   if (argc == 5) {
     thread_num = strtol(argv[1], nullptr, 10);
     core_offset = strtol(argv[2], nullptr, 10);

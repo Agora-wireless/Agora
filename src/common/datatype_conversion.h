@@ -104,9 +104,10 @@ static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
     integer1 = _mm256_permute4x64_epi64(integer1, 0xD8);
     _mm256_stream_si256((__m256i*)&out_buf[2 * (i + cp_len)], integer1);
     // Set cyclic prefix
-    if (i >= n_elems - cp_len)
+    if (i >= n_elems - cp_len) {
       _mm256_stream_si256((__m256i*)&out_buf[2 * (i + cp_len - n_elems)],
                           integer1);
+    }
   }
 #endif
 }
@@ -211,7 +212,8 @@ static inline void Convert12bitIqTo16bitIq(uint8_t* in_buf, uint16_t* out_buf,
 // Input array must have [n_elems] elements.
 // Output array must have [n_elems / 3 * 2] elements.
 // n_elems must be multiples of 3
-static inline void SimdConvert12bitIqToFloat(uint8_t* in_buf, float* out_buf,
+static inline void SimdConvert12bitIqToFloat(const uint8_t* in_buf,
+                                             float* out_buf,
                                              uint16_t* in_16bits_buf,
                                              size_t n_elems) {
   unused(in_16bits_buf);

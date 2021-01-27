@@ -33,14 +33,17 @@ static inline void NanoSleep(size_t ns, double freq_ghz) {
   size_t start = Rdtsc();
   size_t end = start;
   auto upp = static_cast<size_t>(freq_ghz * ns);
-  while (end - start < upp) end = Rdtsc();
+  while (end - start < upp) {
+    end = Rdtsc();
+  }
 }
 
 /// Measure the frequency of RDTSC based by comparing against
 /// CLOCK_REALTIME. This is a pretty function that should be called only
 /// during initialization.
 static inline double MeasureRdtscFreq() {
-  struct timespec start, end;
+  struct timespec start;
+  struct timespec end;
   clock_gettime(CLOCK_REALTIME, &start);
   uint64_t rdtsc_start = Rdtsc();
 

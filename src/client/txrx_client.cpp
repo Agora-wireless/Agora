@@ -59,7 +59,7 @@ bool RadioTXRX::StartTxRx(Table<char>& in_buffer, Table<int>& in_buffer_status,
   for (int i = 0; i < thread_num_; i++) {
     pthread_t txrx_thread;
     // record the thread id
-    auto context = new EventHandlerContext<RadioTXRX>;
+    auto* context = new EventHandlerContext<RadioTXRX>;
     context->obj_ptr_ = this;
     context->id_ = i;
     // start socket thread
@@ -134,8 +134,9 @@ struct Packet* RadioTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
 int RadioTXRX::DequeueSend(int tid) {
   auto& c = config_;
   EventData event;
-  if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
+  if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
     return -1;
+  }
 
   // std::printf("tx queue length: %d\n", task_queue_->size_approx());
   size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
@@ -230,7 +231,9 @@ void* RadioTXRX::LoopTxRx(int tid) {
 
   int radio_id = radio_lo;
   while (config_->Running() == true) {
-    if (-1 != DequeueSend(tid)) continue;
+    if (-1 != DequeueSend(tid)) {
+      continue;
+    }
     // receive data
     struct Packet* pkt = RecvEnqueue(tid, radio_id, rx_offset);
     if (pkt == nullptr) {
@@ -238,7 +241,9 @@ void* RadioTXRX::LoopTxRx(int tid) {
     }
     rx_offset = (rx_offset + 1) % buffer_frame_num_;
 
-    if (++radio_id == radio_hi) radio_id = radio_lo;
+    if (++radio_id == radio_hi) {
+      radio_id = radio_lo;
+    }
   }
   return nullptr;
 }
@@ -256,8 +261,9 @@ int RadioTXRX::DequeueSendArgos(int tid, long long time0) {
   int flags_tx_pilot = (kUseUHD && c->NumChannels() == 2) ? 1 : 2;
 
   EventData event;
-  if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
+  if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
     return -1;
+  }
 
   assert(event.event_type_ == EventType::kPacketTX);
 
@@ -276,16 +282,18 @@ int RadioTXRX::DequeueSendArgos(int tid, long long time0) {
               pilot_symbol_id * num_samps - c->ClTxAdvance();
     r = radio->RadioTx(ue_id, pilot_buff0_.data(), num_samps, flags_tx_pilot,
                        tx_time);
-    if (r < num_samps)
+    if (r < num_samps) {
       std::cout << "BAD Write: (PILOT)" << r << "/" << num_samps << std::endl;
+    }
     if (c->NumChannels() == 2) {
       pilot_symbol_id = c->Frame().GetPilotSymbol(ant_id + 1);
       tx_time = time0 + tx_frame_id * frm_num_samps +
                 pilot_symbol_id * num_samps - c->ClTxAdvance();
       r = radio->RadioTx(ue_id, pilot_buff1_.data(), num_samps, 2, tx_time);
-      if (r < num_samps)
+      if (r < num_samps) {
         std::cout << "BAD Write (PILOT): " << r << "/" << num_samps
                   << std::endl;
+      }
     }
   }
 
@@ -352,9 +360,10 @@ struct Packet* RadioTXRX::RecvEnqueueArgos(int tid, size_t radio_id,
     samp[ch] = pkt[ch]->data_;
   }
   int r = radio->RadioRx(radio_id, samp, num_samps, rx_time);
-  if (r < num_samps)
+  if (r < num_samps) {
     std::cerr << "BAD Receive(" << r << "/" << num_samps << ") at Time "
               << rx_time << std::endl;
+  }
   if (r < 0) {
     std::cerr << "Receive error! Stopping... " << std::endl;
     c->Running(false);
@@ -411,7 +420,8 @@ void* RadioTXRX::LoopTxRxArgos(int tid) {
   ClientRadioConfig* radio = radioconfig_;
 
   std::vector<int> all_trigs(radio_hi - radio_lo, 0);
-  struct timespec tv, tv2;
+  struct timespec tv;
+  struct timespec tv2;
   clock_gettime(CLOCK_MONOTONIC, &tv);
 
   size_t rx_offset = 0;
@@ -433,15 +443,21 @@ void* RadioTXRX::LoopTxRxArgos(int tid) {
       tv = tv2;
     }
     // transmit data
-    if (-1 != DequeueSendArgos(tid, 0)) continue;
+    if (-1 != DequeueSendArgos(tid, 0)) {
+      continue;
+    }
 
     struct Packet* pkt =
         RecvEnqueueArgos(tid, radio_id, frame_id, symbol_id, rx_offset);
-    if (pkt == nullptr) continue;
+    if (pkt == nullptr) {
+      continue;
+    }
 
     rx_offset += c->NumChannels();
     rx_offset %= buffer_frame_num_;
-    if (++radio_id == radio_hi) radio_id = radio_lo;
+    if (++radio_id == radio_hi) {
+      radio_id = radio_lo;
+    }
   }
   return nullptr;
 }
@@ -503,11 +519,14 @@ void* RadioTXRX::LoopTxRxArgosSync(int tid) {
 
     // convert data to complex float for sync detection
     std::vector<std::complex<float>> sync_buff(frm_num_samps, 0);
-    for (int i = 0; i < frm_num_samps; i++)
+    for (int i = 0; i < frm_num_samps; i++) {
       sync_buff[i] = (std::complex<float>(frm_buff0[i].real() / 32768.0,
                                           frm_buff0[i].imag() / 32768.0));
+    }
     sync_index = CommsLib::FindBeaconAvx(sync_buff, c->GoldCf32());
-    if (sync_index < 0) continue;
+    if (sync_index < 0) {
+      continue;
+    }
     sout << "Client " << radio_id << ": Beacon detected at Time " << rx_time
          << ", sync_index: " << sync_index << std::endl;
     std::cout << sout.str();
@@ -571,8 +590,9 @@ void* RadioTXRX::LoopTxRxArgosSync(int tid) {
              << rx_offset << " after " << resync_retry_cnt + 1 << " tries\n";
         std::cout << sout.str();
         sout.str(std::string());  // clear stringstream after print
-      } else
+      } else {
         resync_retry_cnt++;
+      }
     }
     if (resync && resync_retry_cnt > resync_retry_max) {
       sout << "Client " << radio_id << ": Exceeded resync retry limit ("
@@ -584,8 +604,9 @@ void* RadioTXRX::LoopTxRxArgosSync(int tid) {
     }
 
     // schedule transmit pilots and symbols
-    while (-1 != DequeueSendArgos(tid, time0))
+    while (-1 != DequeueSendArgos(tid, time0)) {
       ;
+    }
 
     // receive the remaining of the frame
     for (size_t symbol_id = 1; symbol_id < c->Frame().NumTotalSyms();

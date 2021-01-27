@@ -46,16 +46,15 @@ class RadioTXRX {
     int tid_;
   };
 
- public:
-  RadioTXRX(Config* cfg, int n_rx_thread, int in_core_id);
+  RadioTXRX(Config* cfg, int n_threads, int in_core_id);
   /**
    * N_THREAD: socket thread number
    * mode: tx=1 or rx=0 operation
    * in_queue: message queue to communicate with main thread
    */
-  RadioTXRX(Config* cfg, int n_tx_thread, int in_core_id,
-            moodycamel::ConcurrentQueue<EventData>* in_queue,
-            moodycamel::ConcurrentQueue<EventData>* in_queue_task,
+  RadioTXRX(Config* config, int n_threads, int in_core_id,
+            moodycamel::ConcurrentQueue<EventData>* in_message_queue,
+            moodycamel::ConcurrentQueue<EventData>* in_task_queue,
             moodycamel::ProducerToken** in_rx_ptoks,
             moodycamel::ProducerToken** in_tx_ptoks);
   ~RadioTXRX();

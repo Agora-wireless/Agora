@@ -28,7 +28,8 @@ int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
 
   // Original LTS sequence
   int seq_len = seq.size();
-  struct timespec tv, tv2;
+  struct timespec tv;
+  struct timespec tv2;
   clock_gettime(CLOCK_MONOTONIC, &tv);
 
   // correlate signal with beacon
@@ -65,7 +66,9 @@ int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
   // perform thresholding and find peak
   clock_gettime(CLOCK_MONOTONIC, &tv);
   for (size_t i = 0; i < gold_corr_avx_2.size(); i++) {
-    if (gold_corr_avx_2[i] > thresh_avx[i]) valid_peaks.push(i);
+    if (gold_corr_avx_2[i] > thresh_avx[i]) {
+      valid_peaks.push(i);
+    }
   }
   clock_gettime(CLOCK_MONOTONIC, &tv2);
 #ifdef TEST_BENCH
@@ -221,8 +224,9 @@ std::vector<std::complex<float>> CommsLib::ComplexMultAvx(
     _mm256_storeu_ps(outf + i, res);
   }
 
-  for (size_t i = rem; i < res_len; i += 2)
+  for (size_t i = rem; i < res_len; i += 2) {
     out[i / 2] = f[i / 2] * (conj ? std::conj(g[i / 2]) : g[i / 2]);
+  }
 
   return out;
 }

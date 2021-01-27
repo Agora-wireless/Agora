@@ -69,9 +69,9 @@ FrameStats::FrameStats(std::string new_frame_id, size_t ul, size_t dl)
 void FrameStats::SetClientPilotSyms(size_t ul, size_t dl)
 {
     /* Client pilot symbols must be strictly less than the number of corresponding data symbols */
-    assert((this->ul_symbols_.size() == 0) || (ul < this->ul_symbols_.size()));
+    assert((this->ul_symbols_.empty()) || (ul < this->ul_symbols_.size()));
     this->client_ul_pilot_symbols_ = ul;
-    assert((this->dl_symbols_.size() == 0) || (dl < this->dl_symbols_.size()));
+    assert((this->dl_symbols_.empty()) || (dl < this->dl_symbols_.size()));
     this->client_dl_pilot_symbols_ = dl;
 }
 
@@ -106,8 +106,8 @@ size_t FrameStats::NumTotalSyms() const
 
 bool FrameStats::IsRecCalEnabled() const
 {
-    return ((this->ul_cal_symbols_.size() > 0)
-        && (this->dl_cal_symbols_.size() > 0));
+    return ((!this->ul_cal_symbols_.empty())
+        && (!this->dl_cal_symbols_.empty()));
 }
 
 size_t FrameStats::NumDataSyms() const

@@ -100,7 +100,7 @@ class DoCRC {
   /**
    * Compute CRC
    */
-  uint32_t CalculateCrc24(unsigned char* data, int len);
+  uint32_t CalculateCrc24(const unsigned char* data, int len);
 
   /*
    * Compute and add CRC to packet

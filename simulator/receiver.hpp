@@ -29,7 +29,8 @@
 using ushort = unsigned short;
 class Receiver {
  public:
-  explicit Receiver(Config* cfg, size_t rx_thread_num = 1, size_t core_offset = 1);
+  explicit Receiver(Config* cfg, size_t rx_thread_num = 1,
+                    size_t core_offset = 1);
 
   /**
    * rx_thread_num: RX thread number

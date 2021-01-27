@@ -21,7 +21,7 @@ using namespace arma;
 
 class Channel {
  public:
-  Channel(Config* bscfg, Config* uecfg, std::string channel_type,
+  Channel(Config* config_bs, Config* config_ue, std::string channel_type,
           double channel_snr);
   ~Channel();
 
@@ -31,7 +31,7 @@ class Channel {
 
   // Additive White Gaussian Noise. Dimensions of src: ( bscfg->sampsPerSymbol,
   // uecfg->UE_ANT_NUM )
-  void Awgn(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
+  void Awgn(const cx_fmat& fmat_src, cx_fmat& fmat_dst) const;
 
   /*
    * From "Study on 3D-channel model for Elevation Beamforming

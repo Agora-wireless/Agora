@@ -106,8 +106,8 @@ class Utils {
   static void PrintVector(std::vector<std::complex<int16_t>>& data);
   static void WriteBinaryFile(const std::string& name, size_t elem_size,
                               size_t buffer_size, void* buff);
-  static void PrintVec(arma::cx_fvec, const std::string&);
-  static void PrintMat(arma::cx_fmat);
+  static void PrintVec(arma::cx_fvec /*c*/, const std::string& /*ss*/);
+  static void PrintMat(arma::cx_fmat /*c*/);
 };
 
 /// roundup<N>(x) returns x rounded up to the next multiple of N. N must be
@@ -123,19 +123,25 @@ static constexpr T Roundup(T x) {
 /// This is faster than rt_assert(cond, std::string) as it avoids string
 /// construction.
 static inline void RtAssert(bool condition, const char* throw_str) {
-  if (unlikely(!condition)) throw std::runtime_error(throw_str);
+  if (unlikely(!condition)) {
+    throw std::runtime_error(throw_str);
+  }
 }
 
 /// Check a condition at runtime. If the condition is false, throw exception.
 /// This is faster than rt_assert(cond, std::string) as it avoids string
 /// construction.
 static inline void RtAssert(bool condition) {
-  if (unlikely(!condition)) throw std::runtime_error("Error");
+  if (unlikely(!condition)) {
+    throw std::runtime_error("Error");
+  }
 }
 
 /// Check a condition at runtime. If the condition is false, throw exception.
 static inline void RtAssert(bool condition, const std::string& throw_str) {
-  if (unlikely(!condition)) throw std::runtime_error(throw_str);
+  if (unlikely(!condition)) {
+    throw std::runtime_error(throw_str);
+  }
 }
 
 /// Check a condition at runtime. If the condition is false, throw exception.
@@ -148,7 +154,9 @@ static inline void RtAssert(bool condition, const std::string& throw_str,
 
 /// Returns the greatest common divisor of `a` and `b`.
 inline size_t Gcd(size_t a, size_t b) {
-  if (a == 0) return b;
+  if (a == 0) {
+    return b;
+  }
   return Gcd(b % a, a);
 }
 

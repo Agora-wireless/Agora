@@ -15,7 +15,9 @@ TEST(TestRecip, Correctness) {
 
   double freq_ghz = MeasureRdtscFreq();
 
-  Table<complex_float> calib_buffer, recip_buffer_0, recip_buffer_1;
+  Table<complex_float> calib_buffer;
+  Table<complex_float> recip_buffer_0;
+  Table<complex_float> recip_buffer_1;
   recip_buffer_0.Calloc(kFrameWnd, cfg->OfdmDataNum() * cfg->BsAntNum(),
                         Agora_memory::Alignment_t::k64Align);
   recip_buffer_1.Calloc(kFrameWnd, cfg->OfdmDataNum() * cfg->BsAntNum(),
@@ -63,8 +65,9 @@ TEST(TestRecip, Correctness) {
       auto* ptr_in = calib_buffer[i % kFrameWnd] + ant_id * cfg->OfdmDataNum();
       for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum();
            sc_id += cfg->BsAntNum()) {
-        for (size_t j = 0; j < cfg->BsAntNum(); j++)
+        for (size_t j = 0; j < cfg->BsAntNum(); j++) {
           ptr_in[std::min(sc_id + j, cfg->OfdmDataNum() - 1)] = ptr_in[sc_id];
+        }
       }
     }
     // Transpose

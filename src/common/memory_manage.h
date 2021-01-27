@@ -193,7 +193,9 @@ class PtrCube {
 
   /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where each
   /// cube cell points to an array of [n_entries]
-  explicit PtrCube(size_t num_entries) { this->Alloc(DIM1, DIM2, DIM3, num_entries); }
+  explicit PtrCube(size_t num_entries) {
+    this->Alloc(DIM1, DIM2, DIM3, num_entries);
+  }
 
   /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where
   /// only the cube with dimensions [dim_1, dim_2, dim_3] has cells

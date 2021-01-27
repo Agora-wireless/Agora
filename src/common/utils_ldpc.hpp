@@ -96,22 +96,23 @@ static inline void AdaptBitsFromMod(const uint8_t* vec_in, uint8_t* vec_out,
 
 static inline uint8_t SelectBaseMatrixEntry(uint16_t Zc) {
   uint8_t i_ls;
-  if ((Zc % 15) == 0)
+  if ((Zc % 15) == 0) {
     i_ls = 7;
-  else if ((Zc % 13) == 0)
+  } else if ((Zc % 13) == 0) {
     i_ls = 6;
-  else if ((Zc % 11) == 0)
+  } else if ((Zc % 11) == 0) {
     i_ls = 5;
-  else if ((Zc % 9) == 0)
+  } else if ((Zc % 9) == 0) {
     i_ls = 4;
-  else if ((Zc % 7) == 0)
+  } else if ((Zc % 7) == 0) {
     i_ls = 3;
-  else if ((Zc % 5) == 0)
+  } else if ((Zc % 5) == 0) {
     i_ls = 2;
-  else if ((Zc % 3) == 0)
+  } else if ((Zc % 3) == 0) {
     i_ls = 1;
-  else
+  } else {
     i_ls = 0;
+  }
   return i_ls;
 }
 

@@ -24,9 +24,9 @@ class RadioConfig {
   void ReadSensors();
   void RadioTx(void** buffs);
   void RadioRx(void** buffs);
-  int RadioTx(size_t, void** buffs, int flags, long long& frameTime);
-  int RadioRx(size_t, void** buffs, long long& frameTime);
-  bool DoCalib() { return calib_; }
+  int RadioTx(size_t /*r*/, void** buffs, int flags, long long& frameTime);
+  int RadioRx(size_t /*r*/, void** buffs, long long& frameTime);
+  bool DoCalib() const { return calib_; }
   void Go();
   arma::cx_float* GetCalibUl() { return init_calib_ul_; }
   arma::cx_float* GetCalibDl() { return init_calib_dl_; }
@@ -41,21 +41,25 @@ class RadioConfig {
   static void* ConfigureBsRadioLaunch(void* in_context);
   void InitBsRadio(RadioConfigContext* context);
   void ConfigureBsRadio(RadioConfigContext* context);
-  bool InitialCalib(bool);
+  bool InitialCalib(bool /*sample_adjust*/);
   static void DrainRxBuffer(SoapySDR::Device* ibsSdrs,
                             SoapySDR::Stream* istream, std::vector<void*> buffs,
                             size_t symSamp);
   void DrainBuffers();
-  void AdjustDelays(std::vector<int>);
-  static void DciqMinimize(SoapySDR::Device*, SoapySDR::Device*, int, size_t,
-                           double, double);
-  static void SetIqBalance(SoapySDR::Device*, int, size_t, int, int);
-  static void AdjustCalibrationGains(std::vector<SoapySDR::Device*>,
-                                     SoapySDR::Device*, size_t, double,
+  void AdjustDelays(std::vector<int> /*offset*/);
+  static void DciqMinimize(SoapySDR::Device* /*targetDev*/,
+                           SoapySDR::Device* /*refDev*/, int /*direction*/,
+                           size_t /*channel*/, double /*rxCenterTone*/,
+                           double /*txCenterTone*/);
+  static void SetIqBalance(SoapySDR::Device* /*dev*/, int /*direction*/,
+                           size_t /*channel*/, int /*gcorr*/, int /*iqcorr*/);
+  static void AdjustCalibrationGains(std::vector<SoapySDR::Device*> /*rxDevs*/,
+                                     SoapySDR::Device* /*txDev*/,
+                                     size_t /*channel*/, double /*fftBin*/,
                                      bool plot = false);
-  static std::vector<std::complex<float>> SnoopSamples(SoapySDR::Device*,
-                                                       size_t, size_t);
-  void DciqCalibrationProc(size_t);
+  static std::vector<std::complex<float>> SnoopSamples(
+      SoapySDR::Device* /*dev*/, size_t /*channel*/, size_t /*readSize*/);
+  void DciqCalibrationProc(size_t /*channel*/);
   Config* cfg_;
   std::vector<SoapySDR::Device*> hubs_;
   std::vector<SoapySDR::Device*> ba_stn_;

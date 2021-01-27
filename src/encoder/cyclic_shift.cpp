@@ -10,14 +10,17 @@
 
 namespace avx2enc {
 inline __m256i CycleBitShift2to64(__m256i data, int16_t cyc_shift, int16_t zc) {
-  __m256i x1, x2, bit_mask;
+  __m256i x1;
+  __m256i x2;
+  __m256i bit_mask;
   cyc_shift = cyc_shift % zc;
   __int64_t e0;
 
-  if (zc >= 64)
+  if (zc >= 64) {
     e0 = 0xffffffffffffffff;
-  else
+  } else {
     e0 = (1UL << zc) - 1;
+  }
 
   bit_mask = _mm256_set_epi64x(0, 0, 0, e0);
   data = _mm256_and_si256(data, bit_mask);
@@ -53,7 +56,10 @@ inline __m256i CycleBitShift72to128(__m256i data, int16_t cyc_shift,
        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},  // 128
   };
 
-  __m256i x0, x2, bit_mask, shift_mask0;
+  __m256i x0;
+  __m256i x2;
+  __m256i bit_mask;
+  __m256i shift_mask0;
   int64_t e0;
   int zc_in_bytes = zc >> 3;
   auto* p_out = reinterpret_cast<uint8_t*>(&x2);
@@ -79,10 +85,11 @@ inline __m256i CycleBitShift72to128(__m256i data, int16_t cyc_shift,
   }
 
   // zero out the bits outside zc range in the output
-  if (zc >= 128)
+  if (zc >= 128) {
     e0 = 0xffffffffffffffff;
-  else
+  } else {
     e0 = (1UL << (zc - 64)) - 1;
+  }
   bit_mask = _mm256_set_epi64x(0, 0, e0, 0xffffffffffffffff);
   x2 = _mm256_and_si256(x2, bit_mask);
 
@@ -93,8 +100,12 @@ inline __m256i CycleBitShift144to256(__m256i data, int16_t cyc_shift,
                                      int16_t zc) {
   /* zc in this range is always a multiple of 16 */
 
-  __m256i x0, x1, x2, bit_mask;
-  int64_t e0, e1;
+  __m256i x0;
+  __m256i x1;
+  __m256i x2;
+  __m256i bit_mask;
+  int64_t e0;
+  int64_t e1;
   cyc_shift = cyc_shift % zc;
   int packed_shift = cyc_shift >> 4;
   int bit_shift = cyc_shift & 0xf;

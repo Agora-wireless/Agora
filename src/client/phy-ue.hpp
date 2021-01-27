@@ -44,7 +44,7 @@ class PhyUe {
   // thread
   static const int kDequeueBulkSizeTXRX = 8;
 
-  explicit PhyUe(Config* cfg);
+  explicit PhyUe(Config* config);
   ~PhyUe();
 
   void Start();
@@ -59,9 +59,9 @@ class PhyUe {
    * modulate data from nUEs and does spatial multiplexing by applying
    * beamweights
    */
-  void DoEncode(int, size_t);
-  void DoModul(int, size_t);
-  void DoIfft(int, size_t);
+  void DoEncode(int /*tid*/, size_t /*tag*/);
+  void DoModul(int /*tid*/, size_t /*tag*/);
+  void DoIfft(int /*tid*/, size_t /*tag*/);
 
   /*****************************************************
    * Uplink
@@ -99,7 +99,7 @@ class PhyUe {
    *     4. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  void DoFft(int, size_t);
+  void DoFft(int /*tid*/, size_t /*tag*/);
 
   /**
    * Do demodulation task for a block of subcarriers (demul_block_size)
@@ -127,12 +127,12 @@ class PhyUe {
    *     4. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  void DoDemul(int, size_t);
-  void DoDecode(int, size_t);
+  void DoDemul(int /*tid*/, size_t /*tag*/);
+  void DoDecode(int /*tid*/, size_t /*tag*/);
 
   void GetDemulData(long long** ptr, int* size);
   void GetEqualPcData(float** ptr, int* size, int);
-  void GetEqualData(float** ptr, int* size, int);
+  void GetEqualData(float** ptr, int* size, int /*ue_id*/);
 
   struct EventHandlerContext {
     PhyUe* obj_ptr_;

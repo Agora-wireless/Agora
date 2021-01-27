@@ -8,11 +8,21 @@ namespace avx2enc {
 void LdpcEncoderBg1(int8_t* pDataIn, int8_t* pDataOut,
                     const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
                     const int16_t* pShiftMatrix, int16_t zcSize, uint8_t i_LS) {
-  const int16_t *p_temp_addr, *p_temp_matrix;
-  int8_t *p_temp_in, *p_temp_out;
+  const int16_t* p_temp_addr;
+  const int16_t* p_temp_matrix;
+  int8_t* p_temp_in;
+  int8_t* p_temp_out;
   int16_t addr_offset = 0;
   size_t i = 0;
-  __m256i x1, x2, x3, x4, x5, x6, x7, x8, x9;
+  __m256i x1;
+  __m256i x2;
+  __m256i x3;
+  __m256i x4;
+  __m256i x5;
+  __m256i x6;
+  __m256i x7;
+  __m256i x8;
+  __m256i x9;
   CYCLIC_BIT_SHIFT cycle_bit_shift_p = LdpcSelectShiftFunc(zcSize);
 
   for (size_t j = 0; j < BG1_ROW_TOTAL; j++) {
@@ -69,15 +79,17 @@ void LdpcEncoderBg1(int8_t* pDataIn, int8_t* pDataOut,
   if (i_LS == 6) {
     x5 = cycle_bit_shift_p(x5, 103, zcSize);
     _mm256_storeu_si256((__m256i*)pDataOut, x5);
-  } else
+  } else {
     _mm256_storeu_si256((__m256i*)pDataOut, x5);
+  }
 
   // second 384
   // x7 is p_a2
-  if (i_LS == 6)
+  if (i_LS == 6) {
     x6 = x5;
-  else
+  } else {
     x6 = cycle_bit_shift_p(x5, 1, zcSize);
+  }
 
   x7 = _mm256_xor_si256(x1, x6);
   _mm256_storeu_si256((__m256i*)(pDataOut + kProcBytes), x7);
@@ -111,11 +123,21 @@ void LdpcEncoderBg1(int8_t* pDataIn, int8_t* pDataOut,
 void LdpcEncoderBg2(int8_t* pDataIn, int8_t* pDataOut,
                     const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
                     const int16_t* pShiftMatrix, int16_t zcSize, uint8_t i_LS) {
-  const int16_t *p_temp_addr, *p_temp_matrix;
-  int8_t *p_temp_in, *p_temp_out;
+  const int16_t* p_temp_addr;
+  const int16_t* p_temp_matrix;
+  int8_t* p_temp_in;
+  int8_t* p_temp_out;
   int16_t addr_offset = 0;
   size_t i = 0;
-  __m256i x1, x2, x3, x4, x5, x6, x7, x8, x9;
+  __m256i x1;
+  __m256i x2;
+  __m256i x3;
+  __m256i x4;
+  __m256i x5;
+  __m256i x6;
+  __m256i x7;
+  __m256i x8;
+  __m256i x9;
   CYCLIC_BIT_SHIFT cycle_bit_shift_p = LdpcSelectShiftFunc(zcSize);
 
   for (size_t j = 0; j < BG2_ROW_TOTAL; j++) {
@@ -164,19 +186,20 @@ void LdpcEncoderBg2(int8_t* pDataIn, int8_t* pDataOut,
   x5 = _mm256_xor_si256(x5, x4);
 
   // Special case for the circulant
-  if ((i_LS == 3) || (i_LS == 7))
+  if ((i_LS == 3) || (i_LS == 7)) {
     _mm256_storeu_si256((__m256i*)pDataOut, x5);
-  else {
+  } else {
     x5 = cycle_bit_shift_p(x5, (zcSize - 1), zcSize);
     _mm256_storeu_si256((__m256i*)pDataOut, x5);
   }
 
   // second 384
   // x7 is p_a2
-  if ((i_LS == 3) || (i_LS == 7))
+  if ((i_LS == 3) || (i_LS == 7)) {
     x6 = cycle_bit_shift_p(x5, 1, zcSize);
-  else
+  } else {
     x6 = x5;
+  }
 
   x7 = _mm256_xor_si256(x1, x6);
   _mm256_storeu_si256((__m256i*)(pDataOut + kProcBytes), x7);
@@ -234,22 +257,23 @@ int32_t BblibLdpcEncoder5gnr(
 
   // i_Ls decides the base matrix entries
   uint8_t i_ls;
-  if ((zc % 15) == 0)
+  if ((zc % 15) == 0) {
     i_ls = 7;
-  else if ((zc % 13) == 0)
+  } else if ((zc % 13) == 0) {
     i_ls = 6;
-  else if ((zc % 11) == 0)
+  } else if ((zc % 11) == 0) {
     i_ls = 5;
-  else if ((zc % 9) == 0)
+  } else if ((zc % 9) == 0) {
     i_ls = 4;
-  else if ((zc % 7) == 0)
+  } else if ((zc % 7) == 0) {
     i_ls = 3;
-  else if ((zc % 5) == 0)
+  } else if ((zc % 5) == 0) {
     i_ls = 2;
-  else if ((zc % 3) == 0)
+  } else if ((zc % 3) == 0) {
     i_ls = 1;
-  else
+  } else {
     i_ls = 0;
+  }
 
   const int16_t* p_shift_matrix;
   const int16_t* p_matrix_num_per_col;

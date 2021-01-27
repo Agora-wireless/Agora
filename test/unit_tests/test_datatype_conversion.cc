@@ -66,8 +66,12 @@ TEST(Modulation, adapt_bits_for_mod_stress) {
       // Sanity check: Input and output must have same number of set bits
       size_t set_bits_in_input = 0;
       size_t set_bits_in_output = 0;
-      for (uint8_t& i : input) set_bits_in_input += __builtin_popcount(i);
-      for (uint8_t& o : output) set_bits_in_output += __builtin_popcount(o);
+      for (uint8_t& i : input) {
+        set_bits_in_input += __builtin_popcount(i);
+      }
+      for (uint8_t& o : output) {
+        set_bits_in_output += __builtin_popcount(o);
+      }
       ASSERT_EQ(set_bits_in_input, set_bits_in_output);
 
       // Sanity check: Output bytes must have at most mod_type bits set

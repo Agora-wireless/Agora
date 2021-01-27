@@ -84,7 +84,7 @@ void DoCRC::AddCrc24(struct MacPacket* p) {
   p->crc_ = crc;
 }
 
-uint32_t DoCRC::CalculateCrc24(unsigned char* data, int len) {
+uint32_t DoCRC::CalculateCrc24(const unsigned char* data, int len) {
   /*
    *
    */

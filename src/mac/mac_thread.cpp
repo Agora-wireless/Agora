@@ -22,7 +22,7 @@ MacThread::MacThread(
       rx_queue_(rx_queue),
       tx_queue_(tx_queue) {
   // Set up MAC log file
-  if (log_filename != "") {
+  if (!log_filename.empty()) {
     log_filename_ = log_filename;  // Use a non-default log filename
   }
   log_file_ = std::fopen(log_filename_.c_str(), "w");
@@ -36,7 +36,9 @@ MacThread::MacThread(
   client_.ul_bits_buffer_status_ = ul_bits_buffer_status;
 
   server_.n_filled_in_frame_.fill(0);
-  for (auto& v : server_.frame_data_) v.resize(cfg_->MacDataBytesNumPerframe());
+  for (auto& v : server_.frame_data_) {
+    v.resize(cfg_->MacDataBytesNumPerframe());
+  }
 
   client_.ul_bits_buffer_id_.fill(0);
 
@@ -61,12 +63,15 @@ MacThread::~MacThread() {
 
 void MacThread::ProcessRxFromMaster() {
   EventData event;
-  if (!rx_queue_->try_dequeue(event)) return;
+  if (!rx_queue_->try_dequeue(event)) {
+    return;
+  }
 
-  if (event.event_type_ == EventType::kPacketToMac)
+  if (event.event_type_ == EventType::kPacketToMac) {
     ProcessCodeblocksFromMaster(event);
-  else if (event.event_type_ == EventType::kSNRReport)
+  } else if (event.event_type_ == EventType::kSNRReport) {
     ProcessSnrReportFromMaster(event);
+  }
 }
 
 void MacThread::ProcessSnrReportFromMaster(EventData event) {
@@ -238,8 +243,9 @@ void MacThread::ProcessUdpPacketsFromAppsServer(const MacPacket* pkt,
     return;
   }
 
-  for (size_t i = 0; i < cfg_->LdpcConfig().NumBlocksInSymbol(); i++)
+  for (size_t i = 0; i < cfg_->LdpcConfig().NumBlocksInSymbol(); i++) {
     (*dl_bits_buffer_status_)[pkt->ue_id_][rx_offset + i] = 1;
+  }
   std::memcpy(
       &(*dl_bits_buffer_)[total_symbol_idx][pkt->ue_id_ * cfg_->OfdmDataNum()],
       pkt->data_, udp_pkt_buf_.size());
@@ -310,7 +316,9 @@ void MacThread::ProcessUdpPacketsFromAppsClient(const char* payload,
 
   radio_buf_id = (radio_buf_id + 1) % kFrameWnd;
   next_radio_id_ = (next_radio_id_ + 1) % cfg_->UeAntNum();
-  if (next_radio_id_ == 0) next_frame_id_++;
+  if (next_radio_id_ == 0) {
+    next_frame_id_++;
+  }
 }
 
 void MacThread::RunEventLoop() {

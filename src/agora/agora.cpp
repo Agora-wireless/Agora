@@ -114,14 +114,17 @@ void Agora::ScheduleAntennas(EventType event_type, size_t frame_id,
 
   size_t num_blocks = config_->BsAntNum() / config_->FftBlockSize();
   size_t num_remainder = config_->BsAntNum() % config_->FftBlockSize();
-  if (num_remainder > 0) num_blocks++;
+  if (num_remainder > 0) {
+    num_blocks++;
+  }
   EventData event;
   event.num_tags_ = config_->FftBlockSize();
   event.event_type_ = event_type;
   size_t qid = frame_id & 0x1;
   for (size_t i = 0; i < num_blocks; i++) {
-    if ((i == num_blocks - 1) && num_remainder > 0)
+    if ((i == num_blocks - 1) && num_remainder > 0) {
       event.num_tags_ = num_remainder;
+    }
     for (size_t j = 0; j < event.num_tags_; j++) {
       event.tags_[j] = base_tag.tag_;
       base_tag.ant_id_++;
@@ -158,10 +161,13 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
     event.num_tags_ = config_->ZfBatchSize();
     size_t num_blocks = num_events / event.num_tags_;
     size_t num_remainder = num_events % event.num_tags_;
-    if (num_remainder > 0) num_blocks++;
+    if (num_remainder > 0) {
+      num_blocks++;
+    }
     for (size_t i = 0; i < num_blocks; i++) {
-      if ((i == num_blocks - 1) && num_remainder > 0)
+      if ((i == num_blocks - 1) && num_remainder > 0) {
         event.num_tags_ = num_remainder;
+      }
       for (size_t j = 0; j < event.num_tags_; j++) {
         event.tags_[j] =
             gen_tag_t::FrmSymSc(frame_id, symbol_id,
@@ -195,14 +201,17 @@ void Agora::ScheduleCodeblocks(EventType event_type, size_t frame_id,
       config_->UeNum() * config_->LdpcConfig().NumBlocksInSymbol();
   size_t num_blocks = num_tasks / config_->EncodeBlockSize();
   size_t num_remainder = num_tasks % config_->EncodeBlockSize();
-  if (num_remainder > 0) num_blocks++;
+  if (num_remainder > 0) {
+    num_blocks++;
+  }
   EventData event;
   event.num_tags_ = config_->EncodeBlockSize();
   event.event_type_ = event_type;
   size_t qid = frame_id & 0x1;
   for (size_t i = 0; i < num_blocks; i++) {
-    if ((i == num_blocks - 1) && num_remainder > 0)
+    if ((i == num_blocks - 1) && num_remainder > 0) {
       event.num_tags_ = num_remainder;
+    }
     for (size_t j = 0; j < event.num_tags_; j++) {
       event.tags_[j] = base_tag.tag_;
       base_tag.cb_id_++;
@@ -876,7 +885,7 @@ void Agora::WorkerDecode(int tid) {
 }
 
 void Agora::CreateThreads() {
-  auto& cfg = config_;
+  const auto& cfg = config_;
   if (cfg->BigstationMode() == true) {
     for (size_t i = 0; i < cfg->FftThreadNum(); i++) {
       workers_.emplace_back(&Agora::WorkerFft, this, i);
@@ -928,9 +937,10 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
   // Receive first packet in a frame
   if (rx_counters_.num_pkts_[frame_slot] == 0) {
     // schedule this frame's encoding
-    for (size_t i = 0; i < config_->Frame().NumDLSyms(); i++)
+    for (size_t i = 0; i < config_->Frame().NumDLSyms(); i++) {
       ScheduleCodeblocks(EventType::kEncode, frame_id,
                          config_->Frame().GetDLSymbol(i));
+    }
     this->stats_->MasterSetTsc(TsType::kPilotRX, frame_id);
     if (kDebugPrintPerFrameStart) {
       const size_t prev_frame_slot = (frame_slot + kFrameWnd - 1) % kFrameWnd;
@@ -1061,7 +1071,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             frame_id, symbol_id,
             this->stats_->MasterGetMsSince(TsType::kPilotRX, frame_id),
             uplink_fft_counters_.GetSymbolCount(frame_id) + 1,
-            zf_last_frame_ == frame_id);
+            static_cast<int>(zf_last_frame_ == frame_id));
         break;
       case (PrintType::kDemul):
         std::printf(
@@ -1232,7 +1242,7 @@ void Agora::FreeQueues() {
 }
 
 void Agora::InitializeUplinkBuffers() {
-  auto& cfg = config_;
+  const auto& cfg = config_;
   const size_t task_buffer_symbol_num_ul = cfg->Frame().NumULSyms() * kFrameWnd;
 
   socket_buffer_status_size_ =
@@ -1363,7 +1373,7 @@ void Agora::FreeDownlinkBuffers() {
 }
 
 void Agora::SaveDecodeDataToFile(int frame_id) {
-  auto& cfg = config_;
+  const auto& cfg = config_;
   const size_t num_decoded_bytes =
       cfg->NumBytesPerCb() * cfg->LdpcConfig().NumBlocksInSymbol();
 
@@ -1382,7 +1392,7 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
 }
 
 void Agora::SaveTxDataToFile(UNUSED int frame_id) {
-  auto& cfg = config_;
+  const auto& cfg = config_;
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = cur_directory + "/data/tx_data.bin";
@@ -1404,7 +1414,7 @@ void Agora::SaveTxDataToFile(UNUSED int frame_id) {
 }
 
 void Agora::GetEqualData(float** ptr, int* size) {
-  auto& cfg = config_;
+  const auto& cfg = config_;
   auto offset = cfg->GetTotalDataSymbolIdxUl(
       max_equaled_frame_, cfg->Frame().ClientUlPilotSymbols());
   *ptr = (float*)&equal_buffer_[offset][0];
@@ -1435,13 +1445,14 @@ bool Agora::CheckWorkComplete(size_t frame_id) {
   std::printf(
       "\nChecking work complete %zu, ifft %d, tx %d, decode %d, tomac %d, "
       "finished %d\n",
-      frame_id, this->ifft_counters_.IsLastSymbol(frame_id),
-      this->tx_counters_.IsLastSymbol(frame_id),
-      this->decode_counters_.IsLastSymbol(frame_id),
-      this->tomac_counters_.IsLastSymbol(frame_id),
-      ((this->decode_counters_.IsLastSymbol(frame_id) == true) &&
-       (this->ifft_counters_.IsLastSymbol(frame_id) == true) &&
-       (true == this->tomac_counters_.IsLastSymbol(frame_id))));
+      frame_id, static_cast<int>(this->ifft_counters_.IsLastSymbol(frame_id)),
+      static_cast<int>(this->tx_counters_.IsLastSymbol(frame_id)),
+      static_cast<int>(this->decode_counters_.IsLastSymbol(frame_id)),
+      static_cast<int>(this->tomac_counters_.IsLastSymbol(frame_id)),
+      static_cast<int>(
+          (this->decode_counters_.IsLastSymbol(frame_id) == true) &&
+          (this->ifft_counters_.IsLastSymbol(frame_id) == true) &&
+          (true == this->tomac_counters_.IsLastSymbol(frame_id))));
 
   // Complete if last frame and ifft / decode complete
   if ((true == this->ifft_counters_.IsLastSymbol(frame_id)) &&

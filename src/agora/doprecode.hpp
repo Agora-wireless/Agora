@@ -20,7 +20,7 @@ class DoPrecode : public Doer {
   DoPrecode(Config* in_config, int in_tid,
             PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
             Table<complex_float>& in_dl_ifft_buffer,
-            Table<int8_t>& dl_encoded_buffer, Stats* in_stats_manager);
+            Table<int8_t>& dl_encoded_or_raw_data, Stats* in_stats_manager);
   ~DoPrecode() override;
 
   /**

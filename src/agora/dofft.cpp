@@ -55,7 +55,9 @@ static inline void CalibRegressionEstimate(const arma::cx_fvec& in_vec,
   size_t in_len = in_vec.size();
   size_t out_len = out_vec.size();
   std::vector<float> scs(out_len, 0);
-  for (size_t i = 0; i < out_len; i++) scs[i] = i;
+  for (size_t i = 0; i < out_len; i++) {
+    scs[i] = i;
+  }
   arma::fvec x_vec((float*)scs.data() + x0, in_len, false);
   arma::fvec in_phase = arg(in_vec);
   arma::fvec in_mag = abs(in_vec);
@@ -102,10 +104,11 @@ EventData DoFFT::Launch(size_t tag) {
           cfg_->OfdmCaNum() * 3);
     } else {
       size_t sample_offset = cfg_->OfdmRxZeroPrefixBs();
-      if (sym_type == SymbolType::kCalDL)
+      if (sym_type == SymbolType::kCalDL) {
         sample_offset = cfg_->OfdmRxZeroPrefixCalDl();
-      else if (sym_type == SymbolType::kCalUL)
+      } else if (sym_type == SymbolType::kCalUL) {
         sample_offset = cfg_->OfdmRxZeroPrefixCalUl();
+      }
       SimdConvertShortToFloat(&pkt->data_[2 * sample_offset],
                               reinterpret_cast<float*>(fft_inout_),
                               cfg_->OfdmCaNum() * 2);
@@ -343,9 +346,10 @@ EventData DoIFFT::Launch(size_t tag) {
 
   if (kPrintIFFTOutput) {
     std::printf("data after ifft\n");
-    for (size_t i = 0; i < cfg_->OfdmCaNum(); i++)
+    for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
       std::printf("%.1f+%.1fj ", dl_ifft_buffer_[offset][i].re,
                   dl_ifft_buffer_[offset][i].im);
+    }
     std::printf("\n");
   }
 

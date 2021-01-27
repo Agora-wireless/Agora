@@ -16,11 +16,12 @@ void ScatterSlow(uint8_t* dst, const uint8_t* src, unsigned num_bits,
   while (num_bits != 0) {
     unsigned num_bits_in_b = MIN(8, num_bits);
     uint8_t new_b;
-    if (src_offbits == 0)
+    if (src_offbits == 0) {
       new_b = src[0];
-    else
+    } else {
       new_b = ((src[0] & 0xFF) >> src_offbits) |
               ((src[1] & 0xFF) << (8 - src_offbits));
+    }
     dst[0] = new_b & BITMASKU8(num_bits_in_b);
     num_bits -= num_bits_in_b;
 
@@ -61,8 +62,10 @@ void GatherSlow(uint8_t* dst, const uint8_t* src, int16_t num_bits,
 
 void Adapter2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
                   uint32_t cbLen, int8_t direct) {
-  int8_t *p_buff_0, *p_buff_1;
-  uint8_t dst_offbits = 0, src_offbits = 0;
+  int8_t* p_buff_0;
+  int8_t* p_buff_1;
+  uint8_t dst_offbits = 0;
+  uint8_t src_offbits = 0;
   p_buff_0 = pBuff0;
   p_buff_1 = pBuff1;
 
@@ -107,9 +110,14 @@ void Adapter64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
                     uint32_t cbLen, int8_t direct) {
   /* after 64, z is always a multiple of 8 so no need for shifting bytes*/
 
-  int8_t *p_buff_0, *p_buff_1;
-  __m256i bit_mask, x0, x1;
-  int64_t e0, e1, e2;
+  int8_t* p_buff_0;
+  int8_t* p_buff_1;
+  __m256i bit_mask;
+  __m256i x0;
+  __m256i x1;
+  int64_t e0;
+  int64_t e1;
+  int64_t e2;
   int16_t byte_num = zcSize >> 3;
 
   p_buff_0 = pBuff0;
@@ -166,8 +174,10 @@ void Adapter64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
 void Adapter288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
                      uint32_t cbLen, int8_t direct) {
   /* use two __m256i to store one segment of length zc */
-  int8_t *p_buff_in, *p_buff_out;
-  __m256i x0, bit_mask;
+  int8_t* p_buff_in;
+  int8_t* p_buff_out;
+  __m256i x0;
+  __m256i bit_mask;
 
   p_buff_in = pBuff0;
   p_buff_out = pBuff1;
@@ -193,11 +203,12 @@ void Adapter288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
 }
 
 LDPC_ADAPTER_P LdpcSelectAdapterFunc(uint16_t zcSize) {
-  if (zcSize < 64)
+  if (zcSize < 64) {
     return Adapter2to64;
-  else if (zcSize <= 256)
+  } else if (zcSize <= 256) {
     return Adapter64to256;
-  else
+  } else {
     return Adapter288to384;
+  }
 }
 }  // namespace avx2enc
