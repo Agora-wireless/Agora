@@ -1,3 +1,9 @@
+/**
+ * @file txrx.hpp
+ * @brief common definations for PacketTXRX. Including datapath
+ * functions for communicating with simulators.
+ */
+
 #ifndef PACKETTXRX_H_
 #define PACKETTXRX_H_
 

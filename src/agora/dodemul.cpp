@@ -1,6 +1,12 @@
+/**
+ * @file dodemul.cpp
+ * @brief Implmentation file for the DoDemul class.
+ */
 #include "dodemul.hpp"
 
 #include "concurrent_queue_wrapper.hpp"
+
+using namespace arma;
 
 static constexpr bool kUseSIMDGather = true;
 

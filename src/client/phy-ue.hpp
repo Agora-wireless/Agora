@@ -36,8 +36,6 @@ using myVec =
     std::vector<complex_float,
                 boost::alignment::aligned_allocator<complex_float, 64>>;
 
-using namespace arma;
-
 class PhyUe {
  public:
   // dequeue bulk size, used to reduce the overhead of dequeue in main

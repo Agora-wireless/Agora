@@ -17,8 +17,6 @@
 #include "signalHandler.hpp"
 #include "utils.h"
 
-using namespace arma;
-
 class Channel {
  public:
   Channel(Config* config_bs, Config* config_ue, std::string channel_type,
@@ -26,12 +24,12 @@ class Channel {
   ~Channel();
 
   // Dimensions of fmat_src: ( bscfg->sampsPerSymbol, uecfg->UE_ANT_NUM )
-  void ApplyChan(const cx_fmat& fmat_src, cx_fmat& mat_dst,
+  void ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& mat_dst,
                  const bool is_downlink, const bool is_newChan);
 
   // Additive White Gaussian Noise. Dimensions of src: ( bscfg->sampsPerSymbol,
   // uecfg->UE_ANT_NUM )
-  void Awgn(const cx_fmat& fmat_src, cx_fmat& fmat_dst) const;
+  void Awgn(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst) const;
 
   /*
    * From "Study on 3D-channel model for Elevation Beamforming
@@ -44,7 +42,7 @@ class Channel {
    * are above surrounding buildings.
    *
    */
-  void Lte3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
+  void Lte3gpp(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst);
 
  private:
   Config* bscfg_;
@@ -59,7 +57,7 @@ class Channel {
   double channel_snr_db_;
   enum ChanModel { AWGN, RAYLEIGH, RAN_3GPP } chan_model_;
 
-  cx_fmat h_;
+  arma::cx_fmat h_;
 };
 
 #endif /* SIM_CHAN_MODEL */

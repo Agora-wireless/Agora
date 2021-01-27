@@ -2,6 +2,8 @@
 
 #include "datatype_conversion.h"
 
+using namespace arma;
+
 static bool running = true;
 static constexpr bool kPrintChannelOutput = false;
 

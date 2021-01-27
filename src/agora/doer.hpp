@@ -1,7 +1,6 @@
-#ifndef DOER
-#define DOER
+#ifndef DOER_H_
+#define DOER_H_
 
-class Config;
 #include "buffer.hpp"
 #include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
@@ -59,4 +58,4 @@ class Doer {
   Config* cfg_;
   int tid_;  // Thread ID of this Doer
 };
-#endif /* DOER */
+#endif  // DOER_H_

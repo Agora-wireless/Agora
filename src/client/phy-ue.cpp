@@ -5,6 +5,8 @@
 #include "phy_ldpc_decoder_5gnr.h"
 #include "utils_ldpc.hpp"
 
+using namespace arma;
+
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
 static constexpr bool kPrintLLRData = false;

@@ -1,5 +1,9 @@
-#ifndef DODEMUL
-#define DODEMUL
+/**
+ * @file dodemul.hpp
+ * @brief Declaration file for the DoDemul class.
+ */
+#ifndef DODEMUL_H_
+#define DODEMUL_H_
 
 #include <armadillo>
 #include <iostream>
@@ -15,7 +19,6 @@
 #include "phy_stats.hpp"
 #include "stats.hpp"
 
-using namespace arma;
 class DoDemul : public Doer {
  public:
   DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
@@ -71,7 +74,7 @@ class DoDemul : public Doer {
   // Intermediate buffers for equalized data
   complex_float* equaled_buffer_temp_;
   complex_float* equaled_buffer_temp_transposed_;
-  cx_fmat ue_pilot_data_;
+  arma::cx_fmat ue_pilot_data_;
   int ue_num_simd256_;
 
 #if USE_MKL_JIT
@@ -80,4 +83,4 @@ class DoDemul : public Doer {
 #endif
 };
 
-#endif
+#endif  // DODEMUL_H_

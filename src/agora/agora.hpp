@@ -1,5 +1,10 @@
-#ifndef AGORA_HEAD
-#define AGORA_HEAD
+/**
+ * @file agora.hpp
+ * @brief Defination file for the main agora class
+ */
+
+#ifndef AGORA_H_
+#define AGORA_H_
 
 #include <pthread.h>
 #include <unistd.h>
@@ -300,4 +305,4 @@ class Agora {
   uint8_t schedule_process_flags_;
 };
 
-#endif
+#endif  // AGORA_H_

@@ -22,8 +22,6 @@
 #include "signalHandler.hpp"
 #include "stats.hpp"
 
-using namespace arma;
-
 /**
  * @brief A worker class that handles all subcarrier-parallel processing tasks.
  *

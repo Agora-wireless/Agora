@@ -1,3 +1,8 @@
+/**
+ * @file docoding.cpp
+ * @brief Implmentation file for the Docoding class.  Includes the DoEncode and
+ * DoDecode classes.
+ */
 #include "docoding.hpp"
 
 #include "concurrent_queue_wrapper.hpp"
@@ -62,12 +67,14 @@ EventData DoEncode::Launch(size_t tag) {
                   BitsToBytes(ldpc_config.NumCbCodewLen()),
                   cfg_->ModOrderBits());
 
-  // std::printf("Encoded data\n");
-  // int num_mod = LDPC_config.num_cb_codew_len() / cfg->mod_order_bits();
-  // for(int i = 0; i < num_mod; i++) {
-  //     std::printf("%u ", *(final_output_ptr + i));
-  // }
-  // std::printf("\n");
+  if (kPrintEncodedData == true) {
+    std::printf("Encoded data\n");
+    int num_mod = cfg_->LdpcConfig().NumCbCodewLen() / cfg_->ModOrderBits();
+    for (int i = 0; i < num_mod; i++) {
+      std::printf("%u ", *(final_output_ptr + i));
+    }
+    std::printf("\n");
+  }
 
   size_t duration = WorkerRdtsc() - start_tsc;
   duration_stat_->task_duration_[0] += duration;

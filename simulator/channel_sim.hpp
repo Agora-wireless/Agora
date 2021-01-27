@@ -25,8 +25,6 @@
 #include "udp_client.h"
 #include "udp_server.h"
 
-using namespace arma;
-
 /**
  * @brief Simualtor for many-antenna MU-MIMO channel to work with
  * Agora BS and UE applications. It generates channel matrice(s)
