@@ -281,18 +281,44 @@ void DoZF::ZF_freq_orthogonal(size_t tag)
         partial_transpose_gather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
             dst_csi_ptr, cfg->BS_ANT_NUM);
     }
-    if (cfg->recipCalEn) {
-        arma::cx_fmat calib_dl_mat(
-            reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_slot]),
-            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
-        arma::cx_fvec calib_ul_mat(
-            reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_slot]),
-            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
-        arma::cx_fvec vec_calib(
+    if (cfg->dl_data_symbol_num_perframe > 0) {
+        arma::cx_fvec calib_vec(
             reinterpret_cast<arma::cx_float*>(calib_gather_buffer),
             cfg->BF_ANT_NUM, false);
+        size_t frame_cal_slot = kFrameWnd - 1;
+        size_t frame_cal_slot_prev = kFrameWnd - 1;
+        if (cfg->recipCalEn && frame_id >= TX_FRAME_DELTA) {
+            size_t frame_grp_id
+                = (frame_id - TX_FRAME_DELTA) / cfg->ant_group_num;
 
-        vec_calib = calib_dl_mat.row(base_sc_id) / calib_ul_mat.row(base_sc_id);
+            // use the previous window which has a full set of calibration results
+            frame_cal_slot = (frame_grp_id + kFrameWnd - 1) % kFrameWnd;
+            if (frame_id >= TX_FRAME_DELTA + cfg->ant_group_num)
+                frame_cal_slot_prev
+                    = (frame_grp_id + kFrameWnd - 2) % kFrameWnd;
+        }
+        arma::cx_fmat calib_dl_mat(
+            reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_cal_slot]),
+            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+        arma::cx_fvec calib_ul_mat(
+            reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_cal_slot]),
+            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+
+        arma::cx_fmat calib_dl_mat_prev(
+            reinterpret_cast<arma::cx_float*>(
+                calib_dl_buffer_[frame_cal_slot_prev]),
+            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+        arma::cx_fmat calib_ul_mat_prev(
+            reinterpret_cast<arma::cx_float*>(
+                calib_ul_buffer_[frame_cal_slot_prev]),
+            cfg->OFDM_DATA_NUM, cfg->BF_ANT_NUM, false);
+        arma::cx_fmat calib_dl_mat_mean
+            = (calib_dl_mat + calib_dl_mat_prev) / 2;
+        arma::cx_fmat calib_ul_mat_mean
+            = (calib_ul_mat + calib_ul_mat_prev) / 2;
+        arma::cx_fvec calib_dl_vec = calib_dl_mat_mean.row(base_sc_id).st();
+        arma::cx_fvec calib_ul_vec = calib_ul_mat_mean.row(base_sc_id).st();
+        calib_vec = calib_dl_vec / calib_ul_vec;
     }
 
     duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
