@@ -179,11 +179,6 @@ function readability_autofix() {
 
 #cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DDEBUG=true ..
 
-#fix_member_case
-#fix_class_case
-#fix_variable_case
-
-#fix_function_case
 
 #modernize_headers
 #performance
@@ -201,4 +196,10 @@ function readability_autofix() {
 #misc_autofix (see warnings)
 #readability_autofix
 #performance_autofix (move / sqrt function)
-modernize_autofix
+#modernize_autofix
+
+fix_member_case
+fix_class_case
+fix_variable_case
+fix_function_case
+
