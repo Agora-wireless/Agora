@@ -15,7 +15,7 @@ SignalHandler::SignalHandler() = default;
 /**
  * Destructor.
  */
-SignalHandler::~SignalHandler() = default;
+
 
 /**
  * Returns the bool flag indicating whether we received an exit signal

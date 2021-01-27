@@ -17,7 +17,7 @@ class SignalHandler {
 
  public:
   SignalHandler();
-  ~SignalHandler();
+  ~SignalHandler() = default;
 
   static bool GotExitSignal();
   static void SetExitSignal(bool _bExitSignal);

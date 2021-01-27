@@ -64,8 +64,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 
   // Create a master thread when started from simulator
   if (create_thread_for_master == true) {
-    this->threads_.push_back(
-        std::thread(&Sender::MasterThread, this, kSocketThreadNum));
+    this->threads_.emplace_back(&Sender::MasterThread, this, kSocketThreadNum);
   }
 
 #ifdef USE_DPDK
@@ -475,7 +474,7 @@ void Sender::InitIqFromFile(const std::string& filename) {
 
 void Sender::CreateWorkerThreads(size_t num_workers) {
   for (size_t i = 0u; i < num_workers; i++) {
-    this->threads_.push_back(std::thread(&Sender::WorkerThread, this, i));
+    this->threads_.emplace_back(&Sender::WorkerThread, this, i);
   }
 }
 
