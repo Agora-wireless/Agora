@@ -78,7 +78,7 @@ class ChannelSim {
 
   // Data buffer for symbols to be transmitted to client antennas (downlink)
   std::vector<char> tx_buffer_ue_;
-  SIMULATOR_HEAD
+
   // Data buffer for received symbols from BS antennas (downlink)
   std::vector<char> rx_buffer_bs_;
 
@@ -100,7 +100,7 @@ class ChannelSim {
   size_t ul_data_plus_pilot_symbols_;
   size_t dl_data_plus_beacon_symbols_;
   size_t payload_length_;
-  SIMULATOR_HEAD
+
   size_t bs_thread_num_;
   size_t user_thread_num_;
   size_t bs_socket_num_;
