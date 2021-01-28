@@ -223,28 +223,28 @@ set(COMMON_SOURCES
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(AGORA_SOURCES 
-  src/agora/agora.cpp
-  src/agora/stats.cpp 
-  src/agora/phy_stats.cpp 
-  src/agora/dofft.cpp
-  src/agora/dozf.cpp
-  src/agora/dodemul.cpp
-  src/agora/doprecode.cpp
-  src/agora/docoding.cpp
-  src/agora/radio_lib.cpp
-  src/agora/radio_calibrate.cpp
+  src/agora/agora.cc
+  src/agora/stats.cc
+  src/agora/phy_stats.cc
+  src/agora/dofft.cc
+  src/agora/dozf.cc
+  src/agora/dodemul.cc
+  src/agora/doprecode.cc
+  src/agora/docoding.cc
+  src/agora/radio_lib.cc
+  src/agora/radio_calibrate.cc
   src/mac/mac_thread.cpp)
 
 if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
   set(AGORA_SOURCES ${AGORA_SOURCES} 
-    src/agora/txrx/txrx_DPDK.cpp
+    src/agora/txrx/txrx_DPDK.cc
     src/common/dpdk_transport.cpp)
 else()
   set(AGORA_SOURCES ${AGORA_SOURCES} 
-    src/agora/txrx/txrx.cpp
-    src/agora/txrx/txrx_argos.cpp
-    src/agora/txrx/txrx_usrp.cpp)
+    src/agora/txrx/txrx.cc
+    src/agora/txrx/txrx_argos.cc
+    src/agora/txrx/txrx_usrp.cc)
 endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
@@ -273,7 +273,7 @@ set(COMMON_LIBS armadillo -lnuma ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
 # test if compiling against precompiled objects instead of compiling directly
 # against sources reduces performance.
 add_executable(agora
-  src/agora/main.cpp
+  src/agora/main.cc
   $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(agora ${COMMON_LIBS})

@@ -1,4 +1,4 @@
-#include "agora.hpp"
+#include "agora.h"
 
 void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
                     int num_bytes_per_ue, Config const* const cfg) {

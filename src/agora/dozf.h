@@ -1,5 +1,9 @@
-#ifndef DOZF
-#define DOZF
+/**
+ * @file dozf.h
+ * @brief Declaration file for the DoZf class.  Zero forcing for one subcarrier.
+ */
+#ifndef DOZF_H_
+#define DOZF_H_
 
 #include <armadillo>
 #include <iostream>
@@ -8,9 +12,9 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
-#include "doer.hpp"
+#include "doer.h"
 #include "gettime.h"
-#include "stats.hpp"
+#include "stats.h"
 #include "utils.h"
 
 class DoZF : public Doer {
@@ -89,4 +93,4 @@ class DoZF : public Doer {
   complex_float* calib_gather_buffer_;
 };
 
-#endif
+#endif  // DOZF_H_

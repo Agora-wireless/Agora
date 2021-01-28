@@ -1,6 +1,10 @@
-#include "doprecode.hpp"
+/**
+ * @file doprecode.cc
+ * @brief Implementation file for the DoPrecode class.
+ */
+#include "doprecode.h"
 
-#include "concurrent_queue_wrapper.hpp"
+#include "concurrent_queue_wrapper.inc"
 
 using namespace arma;
 static constexpr bool kUseSpatialLocality = true;

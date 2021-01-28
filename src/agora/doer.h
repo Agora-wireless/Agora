@@ -1,11 +1,16 @@
+/**
+ * @file doer.h
+ * @brief Declaration file for the Doer class.  The is the base class for all
+ * agora doers
+ */
 #ifndef DOER_H_
 #define DOER_H_
 
 #include "buffer.hpp"
-#include "concurrent_queue_wrapper.hpp"
+#include "concurrent_queue_wrapper.inc"
 #include "concurrentqueue.h"
 #include "logger.h"
-#include "stats.hpp"
+#include "stats.h"
 
 class Doer {
  public:

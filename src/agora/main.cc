@@ -1,4 +1,8 @@
-#include "agora.hpp"
+/**
+ * @file main.cc
+ * @brief Main file for the agora server
+ */
+#include "agora.h"
 
 int main(int argc, char* argv[]) {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);

@@ -1,5 +1,5 @@
-#ifndef RadioTXRX_HEADER
-#define RadioTXRX_HEADER
+#ifndef RADIOTXRX_H_
+#define RADIOTXRX_H_
 
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -171,4 +171,4 @@ class RadioTXRX {
   std::vector<void*> pilot_buff0_;
   std::vector<void*> pilot_buff1_;
 };
-#endif
+#endif  // RADIOTXRX_H_

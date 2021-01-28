@@ -1,6 +1,6 @@
 /**
- * @file txrx.hpp
- * @brief common definations for PacketTXRX. Including datapath
+ * @file txrx.h
+ * @brief Common definations for PacketTXRX. Including datapath
  * functions for communicating with simulators.
  */
 
@@ -30,7 +30,7 @@
 #include "config.hpp"
 #include "gettime.h"
 #include "net.hpp"
-#include "radio_lib.hpp"
+#include "radio_lib.h"
 
 #ifdef USE_DPDK
 #include "dpdk_transport.hpp"

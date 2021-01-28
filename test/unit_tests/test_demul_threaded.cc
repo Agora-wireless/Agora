@@ -4,9 +4,9 @@
 
 #include "concurrentqueue.h"
 #include "config.hpp"
-#include "dodemul.hpp"
+#include "dodemul.h"
 #include "gettime.h"
-#include "phy_stats.hpp"
+#include "phy_stats.h"
 #include "utils.h"
 
 static constexpr size_t kNumWorkers = 14;

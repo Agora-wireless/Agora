@@ -1,5 +1,5 @@
 /**
- * @file dodemul.hpp
+ * @file dodemul.h
  * @brief Declaration file for the DoDemul class.
  */
 #ifndef DODEMUL_H_
@@ -13,11 +13,11 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
-#include "doer.hpp"
+#include "doer.h"
 #include "gettime.h"
 #include "modulation.hpp"
-#include "phy_stats.hpp"
-#include "stats.hpp"
+#include "phy_stats.h"
+#include "stats.h"
 
 class DoDemul : public Doer {
  public:

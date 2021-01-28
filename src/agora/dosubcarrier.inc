@@ -1,3 +1,7 @@
+/**
+ * @file dozf.h
+ * @brief Self-Contained Implmentation file implmenting a worker class that handles all subcarrier-parallel processing tasks.
+ */
 #ifndef DOSUBCARRIER_H_
 #define DOSUBCARRIER_H_
 
@@ -11,16 +15,16 @@
 #include "concurrentqueue.h"
 #include "config.hpp"
 #include "datatype_conversion.h"
-#include "dodemul.hpp"
-#include "doer.hpp"
-#include "doprecode.hpp"
-#include "dozf.hpp"
+#include "dodemul.h"
+#include "doer.h"
+#include "doprecode.h"
+#include "dozf.h"
 #include "gettime.h"
 #include "modulation.hpp"
-#include "phy_stats.hpp"
+#include "phy_stats.h"
 #include "shared_counters.hpp"
 #include "signalHandler.hpp"
-#include "stats.hpp"
+#include "stats.h"
 
 /**
  * @brief A worker class that handles all subcarrier-parallel processing tasks.

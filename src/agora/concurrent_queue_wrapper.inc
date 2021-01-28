@@ -1,5 +1,5 @@
 /**
- * @file concurrent_queue_wrapper.hpp
+ * @file concurrent_queue_wrapper.inc
  * @brief Wrapper class for the moodycamel concurrent queue
  */
 

@@ -1,6 +1,6 @@
 /**
- * @file docoding.hpp
- * @brief Defination file for the Docoding class.  Includes the DoEncode and
+ * @file docoding.h
+ * @brief Declaration file for the Docoding class.  Includes the DoEncode and
  * DoDecode classes.
  */
 
@@ -17,14 +17,14 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
-#include "doer.hpp"
+#include "doer.h"
 #include "encoder.hpp"
 #include "gettime.h"
 #include "iobuffer.hpp"
 #include "memory_manage.h"
 #include "modulation.hpp"
-#include "phy_stats.hpp"
-#include "stats.hpp"
+#include "phy_stats.h"
+#include "stats.h"
 #include "utils_ldpc.hpp"
 
 class DoEncode : public Doer {
@@ -63,4 +63,4 @@ class DoDecode : public Doer {
   DurationStat* duration_stat_;
 };
 
-#endif // DOCODING_H_
+#endif  // DOCODING_H_

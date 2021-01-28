@@ -1,10 +1,10 @@
 /**
- * @file dodemul.cpp
+ * @file dodemul.cc
  * @brief Implmentation file for the DoDemul class.
  */
-#include "dodemul.hpp"
+#include "dodemul.h"
 
-#include "concurrent_queue_wrapper.hpp"
+#include "concurrent_queue_wrapper.inc"
 
 using namespace arma;
 

@@ -1,10 +1,10 @@
 /**
- * @file txrx.cpp
+ * @file txrx.cc
  * @brief Implementation of PacketTXRX initialization functions, and datapath
  * functions for communicating with simulators.
  */
 
-#include "txrx.hpp"
+#include "txrx.h"
 
 #include "logger.h"
 

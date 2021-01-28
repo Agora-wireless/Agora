@@ -16,7 +16,7 @@
 #include "Symbols.hpp"
 #include "buffer.hpp"
 #include "channel.hpp"
-#include "concurrent_queue_wrapper.hpp"
+#include "concurrent_queue_wrapper.inc"
 #include "config.hpp"
 #include "gettime.h"
 #include "memory_manage.h"

@@ -1,5 +1,9 @@
+/**
+ * @file radio_calibrate.cc
+ * @brief Implementation file for the radio configuration calibration functions
+ */
 #include "matplotlibcpp.h"
-#include "radio_lib.hpp"
+#include "radio_lib.h"
 
 namespace plt = matplotlibcpp;
 static constexpr size_t kMaxArraySampleOffset = 5;

@@ -1,5 +1,9 @@
-#ifndef DOFFT
-#define DOFFT
+/**
+ * @file dofft.h
+ * @brief Declaration file for the DoFFT class.
+ */
+#ifndef DOFFT_H_
+#define DOFFT_H_
 
 #include <armadillo>
 #include <iostream>
@@ -9,11 +13,11 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
-#include "doer.hpp"
+#include "doer.h"
 #include "gettime.h"
 #include "mkl_dfti.h"
-#include "phy_stats.hpp"
-#include "stats.hpp"
+#include "phy_stats.h"
+#include "stats.h"
 
 class DoFFT : public Doer {
  public:
@@ -149,4 +153,4 @@ class DoIFFT : public Doer {
   float* ifft_out_;  // Buffer for IFFT output
 };
 
-#endif
+#endif  // DOFFT_H_

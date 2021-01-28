@@ -1,7 +1,12 @@
-#include "dozf.hpp"
+/**
+ * @file dozf.cc
+ * @brief Implementation file for the DoZf class.  Zero forcing for one
+ * subcarrier.
+ */
+#include "dozf.h"
 
-#include "concurrent_queue_wrapper.hpp"
-#include "doer.hpp"
+#include "concurrent_queue_wrapper.inc"
+#include "doer.h"
 
 static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.

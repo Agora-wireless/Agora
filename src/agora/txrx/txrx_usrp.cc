@@ -1,10 +1,10 @@
 /**
- * @file txrx_usrp.cpp
+ * @file txrx_usrp.cc
  * @brief Implementation of PacketTXRX datapath functions for communicating
  * with USRP hardware
  */
 
-#include "txrx.hpp"
+#include "txrx.h"
 
 static constexpr bool kDebugDownlink = false;
 

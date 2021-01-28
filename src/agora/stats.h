@@ -1,5 +1,10 @@
-#ifndef STATS
-#define STATS
+/**
+ * @file stats.h
+ * @brief Declaration file for the Stats class. Includes definations for
+ * DurationStat and FrameSummery types.
+ */
+#ifndef STATS_H_
+#define STATS_H_
 
 #include <iostream>
 
@@ -27,7 +32,7 @@ struct FrameSummary {
   FrameSummary() { std::memset(this, 0, sizeof(FrameSummary)); }
 };
 
-// Type of timestamps recorded at the master for a frame
+// Type of timestamps recorded at the master for a framePhyStats
 // TODO: Add definitions of what each event means
 enum class TsType : size_t {
   kPilotRX,            // First pilot packet received
@@ -153,7 +158,6 @@ class Stats {
   }
 
   inline size_t LastFrameId() const { return this->last_frame_id_; }
-
   /// Dimensions = number of packet RX threads x kNumStatsFrames.
   /// frame_start[i][j] is the RDTSC timestamp taken by thread i when it
   /// starts receiving frame j.
@@ -214,4 +218,4 @@ class Stats {
   Table<size_t> frame_start_;
 };
 
-#endif
+#endif  // STATS_H_

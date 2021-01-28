@@ -1,10 +1,10 @@
 /**
- * @file txrx_argos.cpp
+ * @file txrx_argos.cc
  * @brief Implementation of PacketTXRX datapath functions for communicating
  * with real Argos hardware
  */
 
-#include "txrx.hpp"
+#include "txrx.h"
 
 static constexpr bool kDebugDownlink = false;
 

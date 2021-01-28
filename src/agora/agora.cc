@@ -1,9 +1,9 @@
 /**
- * @file agora.cpp
+ * @file agora.cc
  * @brief Implementation file for the main agora class
  */
 
-#include "agora.hpp"
+#include "agora.h"
 
 #include <memory>
 

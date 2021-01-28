@@ -1,6 +1,10 @@
-#include "dofft.hpp"
+/**
+ * @file dofft.cc
+ * @brief Implementation file for the DoFFT class.
+ */
+#include "dofft.h"
 
-#include "concurrent_queue_wrapper.hpp"
+#include "concurrent_queue_wrapper.inc"
 #include "datatype_conversion.h"
 
 using namespace arma;

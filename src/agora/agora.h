@@ -1,6 +1,6 @@
 /**
- * @file agora.hpp
- * @brief Defination file for the main agora class
+ * @file agora.h
+ * @brief Declaration file for the main agora class
  */
 
 #ifndef AGORA_H_
@@ -17,20 +17,20 @@
 #include <vector>
 
 #include "buffer.hpp"
-#include "concurrent_queue_wrapper.hpp"
+#include "concurrent_queue_wrapper.inc"
 #include "concurrentqueue.h"
 #include "config.hpp"
-#include "docoding.hpp"
-#include "dodemul.hpp"
-#include "dofft.hpp"
-#include "doprecode.hpp"
-#include "dozf.hpp"
+#include "docoding.h"
+#include "dodemul.h"
+#include "dofft.h"
+#include "doprecode.h"
+#include "dozf.h"
 #include "mac_thread.hpp"
 #include "memory_manage.h"
-#include "phy_stats.hpp"
+#include "phy_stats.h"
 #include "signalHandler.hpp"
-#include "stats.hpp"
-#include "txrx.hpp"
+#include "stats.h"
+#include "txrx.h"
 #include "utils.h"
 
 class Agora {

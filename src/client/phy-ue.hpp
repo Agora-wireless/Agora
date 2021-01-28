@@ -1,5 +1,5 @@
-#ifndef COMP_HEAD
-#define COMP_HEAD
+#ifndef PHY_UE_H_
+#define PHY_UE_H_
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <immintrin.h>
@@ -21,7 +21,7 @@
 
 #include "buffer.hpp"
 #include "comms-lib.h"
-#include "concurrent_queue_wrapper.hpp"
+#include "concurrent_queue_wrapper.inc"
 #include "concurrentqueue.h"
 #include "config.hpp"
 #include "datatype_conversion.h"
@@ -353,4 +353,4 @@ class PhyUe {
   // float* equal_output;
   size_t record_frame_ = SIZE_MAX;
 };
-#endif
+#endif  // PHY_UE_H_

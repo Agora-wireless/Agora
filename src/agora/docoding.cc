@@ -1,11 +1,11 @@
 /**
- * @file docoding.cpp
+ * @file docoding.cc
  * @brief Implmentation file for the Docoding class.  Includes the DoEncode and
  * DoDecode classes.
  */
-#include "docoding.hpp"
+#include "docoding.h"
 
-#include "concurrent_queue_wrapper.hpp"
+#include "concurrent_queue_wrapper.inc"
 #include "encoder.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
 

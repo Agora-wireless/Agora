@@ -1,5 +1,9 @@
-#ifndef DOPRECODE
-#define DOPRECODE
+/**
+ * @file doprecode.h
+ * @brief Declaration file for the DoPrecode class.
+ */
+#ifndef DOPRECODE_H_
+#define DOPRECODE_H_
 
 #include <armadillo>
 #include <iostream>
@@ -9,11 +13,11 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
-#include "doer.hpp"
+#include "doer.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
-#include "stats.hpp"
+#include "stats.h"
 
 class DoPrecode : public Doer {
  public:
@@ -70,4 +74,4 @@ class DoPrecode : public Doer {
 #endif
 };
 
-#endif
+#endif  // DOPRECODE_H_

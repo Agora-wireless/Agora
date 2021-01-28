@@ -1,4 +1,8 @@
-#include "radio_lib.hpp"
+/**
+ * @file radio_lib.cc
+ * @brief Implementation file for the RadioConfig class.
+ */
+#include "radio_lib.h"
 
 #include "comms-lib.h"
 

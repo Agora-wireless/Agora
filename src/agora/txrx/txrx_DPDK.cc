@@ -1,10 +1,10 @@
 /**
- * @file txrx_DPDK.cpp
+ * @file txrx_DPDK.cc
  * @brief Implementation of PacketTXRX datapath functions for communicating
  * with DPDK
  */
 
-#include "txrx.hpp"
+#include "txrx.h"
 
 static constexpr bool kDebugDPDK = false;
 

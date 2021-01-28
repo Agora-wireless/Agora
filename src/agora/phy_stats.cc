@@ -1,4 +1,8 @@
-#include "phy_stats.hpp"
+/**
+ * @file phy_stats.cc
+ * @brief Declaration file for the PhyStats class.
+ */
+#include "phy_stats.h"
 
 using namespace arma;
 
