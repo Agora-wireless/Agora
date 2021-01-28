@@ -21,6 +21,8 @@
 #include "iobuffer.hpp"
 #include "utils_ldpc.hpp"
 
+#include "rmatching_5gnr_c.h"
+
 class DoEncode : public Doer {
 public:
     DoEncode(Config* in_config, int in_tid, Table<int8_t>& in_raw_data_buffer,
@@ -28,7 +30,7 @@ public:
     ~DoEncode();
 
     Event_data launch(size_t tag);
-    rMatching();
+    void rMatching();
 
 private:
     Table<int8_t>& raw_data_buffer_;
@@ -36,9 +38,11 @@ private:
 
     // Intermediate buffer to hold LDPC encoding output
     int8_t* encoded_buffer_temp;
-    int8_t* rmatched_buffer_;
+    uint8_t* rmatched_buffer_;
     Table<int8_t>& encoded_buffer_;
     DurationStat* duration_stat;
+
+    LDPCconfig LDPC_config;
 };
 
 class DoDecode : public Doer {
@@ -50,7 +54,7 @@ public:
     ~DoDecode();
 
     Event_data launch(size_t tag);
-    dMatching();
+    void dMatching();
 
 private:
     int16_t* resp_var_nodes;
@@ -58,6 +62,8 @@ private:
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers_;
     PhyStats* phy_stats;
     DurationStat* duration_stat;
+
+    LDPCconfig LDPC_config;
 };
 
 #endif

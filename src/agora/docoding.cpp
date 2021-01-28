@@ -2,7 +2,6 @@
 #include "concurrent_queue_wrapper.hpp"
 #include "encoder.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
-#include "phy_LDPC_ratematch_5gnr.h"
 
 static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
@@ -29,7 +28,7 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
                 cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
     assert(encoded_buffer_temp != nullptr);
 
-    rmatched_buffer_ = static_cast<int8_t*>(
+    rmatched_buffer_ = static_cast<uint8_t*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             ldpc_encoding_encoded_buf_size(
                 cfg->LDPC_config.Bg, cfg->LDPC_config.Zc))); // OBCH FIXME - last parameter, check size!!
@@ -45,7 +44,7 @@ DoEncode::~DoEncode()
 
 Event_data DoEncode::launch(size_t tag)
 {
-    LDPCconfig LDPC_config = cfg->LDPC_config;
+    LDPC_config = cfg->LDPC_config;
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
     size_t cb_id = gen_tag_t(tag).cb_id;
@@ -68,15 +67,20 @@ Event_data DoEncode::launch(size_t tag)
         encoded_buffer_temp, parity_buffer, input_ptr);
     int8_t* final_output_ptr = cfg->get_encoded_buf(
         encoded_buffer_, frame_id, symbol_idx_dl, ue_id, cur_cb_id);
-    // Rate Matching
+
+    // Rate Matching OBCH TODO
+    // (1) size of rmatched_buffer_??
+    // (2) Need to change size of final_output_ptr ?? depends on size of encoded_buffer_
+    // (3) Size passed to adapt_bits_for_mod( ?? 
     rMatching();
 
+    /* /// OBCH ENABLE THIS
     adapt_bits_for_mod(reinterpret_cast<uint8_t*>(rmatched_buffer_),
         reinterpret_cast<uint8_t*>(final_output_ptr),
-        bits_to_bytes(LDPC_config.cbCodewLen), cfg->mod_order_bits);*
-    /*adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
-        reinterpret_cast<uint8_t*>(final_output_ptr),
         bits_to_bytes(LDPC_config.cbCodewLen), cfg->mod_order_bits);*/
+    adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
+        reinterpret_cast<uint8_t*>(final_output_ptr),
+        bits_to_bytes(LDPC_config.cbCodewLen), cfg->mod_order_bits);
 
     // std::printf("Encoded data\n");
     // int num_mod = LDPC_config.cbCodewLen / cfg->mod_order_bits;
@@ -115,7 +119,7 @@ DoDecode::~DoDecode() { free(resp_var_nodes); }
 
 Event_data DoDecode::launch(size_t tag)
 {
-    LDPCconfig LDPC_config = cfg->LDPC_config;
+    LDPC_config = cfg->LDPC_config;
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id;
     const size_t cb_id = gen_tag_t(tag).cb_id;
@@ -219,14 +223,14 @@ Event_data DoDecode::launch(size_t tag)
     return Event_data(EventType::kDecode, tag);
 }
 
-DoEncode::rMatching()
+void DoEncode::rMatching()
 {
-    LDPCconfig config = cfg->LDPC_config;
+    LDPC_config = cfg->LDPC_config;
     bblib_LDPC_ratematch_5gnr_request req;
     bblib_LDPC_ratematch_5gnr_response resp;
 
     // Request Params... OBCH TODO - Verify all
-    req.Ncb = 1;
+    req.Ncb = LDPC_config.cbCodewLen;  // max 8448*8 ?;
     req.Zc = LDPC_config.Zc;
     req.E = LDPC_config.cbCodewLen;
     req.Qm = cfg->mod_order_bits;
@@ -234,18 +238,29 @@ DoEncode::rMatching()
     req.baseGraph = LDPC_config.Bg;
     req.nullIndex = -1;
     req.nLen = 0;
-    req.input[0] = const_cast<int8_t*>(encoded_buffer_temp);
+    req.input = (uint8_t*)encoded_buffer_temp;
+    printf("XXXXXXXXXXXZ Ncb: %d, Zc: %d, E: %d, Qm: %d \n", req.Ncb, req.Zc, req.E, req.Qm);
 
     // Response Params
-    resp.output[0] = rmatched_buffer_;
+    resp.output = rmatched_buffer_;
 
     // Call Rate Matching function
     // FIXME which one to use??
-    kUseAVX2Encoder ? avx2rm::bblib_LDPC_ratematch_5gnr(&req, &resp)
+    /* kUseAVX2Encoder ? agora_LDPC_ratematch_5gnr_c(&req, &resp)
                     : bblib_LDPC_ratematch_5gnr(&req, &resp);
+    */
+    int32_t success = bblib_LDPC_ratematch_5gnr_c(&req, &resp);
+    printf("Rate Matching Success? %d \n", success);
+
+    /*
+    std::memcpy(encoded_buffer, input_buffer + num_punctured_bytes,
+            num_input_bytes_to_copy);
+    std::memcpy(encoded_buffer + num_input_bytes_to_copy, parity_buffer,
+            bits_to_bytes(num_parity_bits));
+     */
 }
 
-DoDecode::dMatching()
+void DoDecode::dMatching()
 {
 
 }

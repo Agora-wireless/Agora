@@ -218,7 +218,8 @@ set(COMMON_SOURCES
   src/common/memory_manage.cc
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
-  src/encoder/iobuffer.cpp)
+  src/encoder/iobuffer.cpp
+  src/encoder/rmatching_5gnr_c.cpp)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(AGORA_SOURCES 
@@ -265,8 +266,11 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
+#set(COMMON_LIBS armadillo -lnuma ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
+#  ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
+
 set(COMMON_LIBS armadillo -lnuma ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
-  ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
+  ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} -lippcore -lipps util gflags gtest)
 
 # TODO: The main agora executable is performance-critical, so we need to
 # test if compiling against precompiled objects instead of compiling directly
