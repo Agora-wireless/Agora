@@ -1,4 +1,11 @@
-#include "cpu_attach.hpp"
+/**
+ * @file cpu_attach.cpp
+ * @brief Implementation file for cpu attachment helper functions
+ */
+#include "cpu_attach.h"
+
+#include <pthread.h>
+#include <unistd.h>
 
 int stick_this_thread_to_core(int core_id) {
   int num_cores = sysconf(_SC_NPROCESSORS_ONLN);

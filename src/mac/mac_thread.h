@@ -1,3 +1,7 @@
+/**
+ * @file mac_thread.h
+ * @brief Declaration file for the MacThread class
+ */
 #ifndef MAC_THREAD_H_
 #define MAC_THREAD_H_
 

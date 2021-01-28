@@ -5,7 +5,6 @@
  * We need an AVX2-based LDPC encoder because FlexRAN's LDPC encoder requires
  * AVX-512.
  */
-
 #ifndef ENCODER_H_
 #define ENCODER_H_
 

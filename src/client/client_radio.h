@@ -1,3 +1,8 @@
+/**
+ * @file client_radio.h
+ * @brief Declaration file for the client radio config class
+ */
+
 #ifndef CLIENT_RADIO_LIB_H_
 #define CLIENT_RADIO_LIB_H_
 

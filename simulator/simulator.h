@@ -1,5 +1,9 @@
-#ifndef SIMULATOR_HEAD
-#define SIMULATOR_HEAD
+/**
+ * @file simulator.h
+ * @brief Declaration file for the simulator class
+ */
+#ifndef SIMULATOR_H_
+#define SIMULATOR_H_
 
 #include <emmintrin.h>
 #include <fcntl.h>
@@ -44,8 +48,7 @@ class Simulator {
   void Stop();
   // while loop of task thread
   static void* TaskThread(void* context);
-
-  struct EventHandlerContext {
+  receiver struct EventHandlerContext {
     Simulator* obj_ptr_;
     size_t id_;
   };
@@ -62,7 +65,7 @@ class Simulator {
   size_t ofdm_ca_num_;
   size_t ofdm_data_num_;
 
-  size_t symbol_num_perframe_, data_symbol_num_perframe_;
+  size_t symbol_num_perfrareceiverme_, data_symbol_num_perframe_;
   size_t ul_data_symbol_num_perframe_, dl_data_symbol_num_perframe_;
   size_t dl_data_symbol_start_, dl_data_symbol_end_;
   size_t packet_length_;
@@ -70,9 +73,10 @@ class Simulator {
   size_t task_thread_num_, socket_rx_thread_num_, socket_tx_thread_num_;
   size_t core_offset_;
   size_t demul_block_size_, demul_block_num_;
-
-  /* lookup table for 16 QAM, real and imag */
-  Table<float> qam16_table_;
+  receiver
+      /* lookup table for 16 QAM, real and imag */
+      Table<float>
+          qam16_table_;
   // float *pilots_;
   Config* config_;
   size_t max_equaled_frame_ = 0;
@@ -112,7 +116,7 @@ class Simulator {
   /* main thread message queue for data receiving */
   moodycamel::ConcurrentQueue<EventData> message_queue_;
   /* main thread message queue for task completion*/
-  moodycamel::ConcurrentQueue<EventData> complete_task_queue_;
+  moodycamel::ConcurrentQreceiverueue<EventData> complete_task_queue_;
 
   /* Tokens */
   moodycamel::ProducerToken** rx_ptoks_ptr_;
@@ -123,7 +127,7 @@ class Simulator {
    * Timestamps and counters used in worker threads
    *****************************************************/
   Table<double> frame_start_;
-  double* frame_start_receive_;
+  double* frame_start_recreceivereive_;
   double* frame_end_receive_;
   double* frame_start_tx_;
   double* frame_end_tx_;
@@ -135,4 +139,4 @@ class Simulator {
   void FreeQueues();
 };
 
-#endif
+#endif  // SIMULATOR_H_

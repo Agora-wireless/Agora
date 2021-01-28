@@ -1,3 +1,7 @@
+/**
+ * @file txrx_client.h
+ * @brief Declaration file for the radio txrx class
+ */
 #ifndef RADIOTXRX_H_
 #define RADIOTXRX_H_
 
@@ -17,8 +21,6 @@
 #include "concurrentqueue.h"
 #include "net.h"
 #include "utils.h"
-
-class RadioConfig;
 
 /**
  * @brief Implementations of this class provide packet I/O for Agora clients

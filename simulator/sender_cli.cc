@@ -1,3 +1,7 @@
+/**
+ * @file sender_cli.cc
+ * @brief Main file for the sender executable
+ */
 #include <gflags/gflags.h>
 
 #include "sender.h"

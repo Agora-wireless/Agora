@@ -1,3 +1,7 @@
+/**
+ * @file phy-ue.cc
+ * @brief Implementation file for the phy ue class
+ */
 #include "phy-ue.h"
 
 #include <memory>

@@ -1,3 +1,7 @@
+/**
+ * @file main.cc
+ * @brief Main file for the simulator executable
+ */
 #include "simulator.h"
 
 int main(int argc, char const* argv[]) {

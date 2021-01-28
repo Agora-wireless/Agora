@@ -1,4 +1,9 @@
-#include "cpu_attach.hpp"
+/**
+ * @file test_matrix.cc
+ * @brief Testing functions for zf matrix computations
+ */
+
+#include "cpu_attach.h"
 // #include "ittnotify.h"
 #include <sys/resource.h>
 #include <sys/time.h>

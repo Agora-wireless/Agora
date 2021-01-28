@@ -1,5 +1,5 @@
 /**
- * @file test_ldpc.cpp
+ * @file test_ldpc.cc
  *
  * @brief Accuracy and performance test for LDPC. The encoder is Agora's
  * avx2enc - unlike FlexRAN's encoder, avx2enc works with AVX2 (i.e., unlike

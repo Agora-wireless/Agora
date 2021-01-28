@@ -1,3 +1,7 @@
+/**
+ * @file sender.cc
+ * @brief Implementation file for the sender class
+ */
 #include "sender.h"
 
 #include <thread>

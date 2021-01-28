@@ -1,3 +1,7 @@
+/**
+ * @file sender.h
+ * @brief Declaration file for the sender class
+ */
 #ifndef SENDER_H_
 #define SENDER_H_
 

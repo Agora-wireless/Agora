@@ -1,3 +1,7 @@
+/**
+ * @file test_mufft.cc
+ * @brief Testing functions for benchmarking mu fft routines
+ */
 #include <immintrin.h>
 
 #include "cpu_attach.h"

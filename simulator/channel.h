@@ -1,5 +1,9 @@
-#ifndef SIM_CHAN_MODEL
-#define SIM_CHAN_MODEL
+/**
+ * @file channel.h
+ * @brief Declaration file for the channel class
+ */
+#ifndef CHANNEL_H_
+#define CHANNEL_H_
 
 #include <algorithm>
 #include <armadillo>
@@ -60,4 +64,4 @@ class Channel {
   arma::cx_fmat h_;
 };
 
-#endif /* SIM_CHAN_MODEL */
+#endif  // CHANNEL_H_

@@ -1,3 +1,8 @@
+/**
+ * @file client_radio.cc
+ * @brief Implementation file for the client radio config class
+ */
+
 #include "client_radio.h"
 
 #include "comms-lib.h"

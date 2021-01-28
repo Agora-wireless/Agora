@@ -1,3 +1,7 @@
+/**
+ * @file mac_thread.cc
+ * @brief Implementation file for the MacThread class.
+ */
 #include "mac_thread.h"
 
 #include "logger.h"

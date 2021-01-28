@@ -1,5 +1,5 @@
 /**
- * @file test_ldpc_baseband.cpp
+ * @file test_ldpc_baseband.cc
  * @brief Test LDPC performance after encoding, modulation, demodulation,
  * and decoding when different levels of
  * Gaussian noise is added to CSI

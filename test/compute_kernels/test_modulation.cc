@@ -1,3 +1,7 @@
+/**
+ * @file test_modulation.cc
+ * @brief Testing functions for benchmarking modulation routines
+ */
 #include "buffer.inc"
 #include "gettime.h"
 #include "memory_manage.h"
@@ -149,7 +153,11 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode) {
   std::printf("input: \n");
   for (unsigned i = 0; i < num; i++) {
     std::printf("%d ", input[i]);
-  }
+  } /**
+     * @file test_matrix.cc
+     * @brief Testing functions for zf matrix computations
+     */
+
   std::printf("\n");
 
   double start_time = get_time();

@@ -1,3 +1,7 @@
+/**
+ * @file txrx_client.cc
+ * @brief Implementation file for the radio txrx class
+ */
 #include "txrx_client.h"
 
 #include "config.h"

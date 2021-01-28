@@ -1,3 +1,7 @@
+/**
+ * @file chsim_main.cc
+ * @brief Main file for the chsim executable
+ */
 #include <gflags/gflags.h>
 
 #include "channel_sim.h"

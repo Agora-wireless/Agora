@@ -1,3 +1,7 @@
+/**
+ * @file test_transpose.cc
+ * @brief Testing functions for benchmarking transpose computations
+ */
 #include <immintrin.h>
 
 #include <armadillo>

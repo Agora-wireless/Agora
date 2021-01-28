@@ -1,3 +1,7 @@
+/**
+ * @file simulator.cc
+ * @brief Implementation file for the simulator class
+ */
 #include "simulator.h"
 
 #include <memory>

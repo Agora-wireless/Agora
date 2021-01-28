@@ -1,3 +1,7 @@
+/**
+ * @file iobuffer.h
+ * @brief Declaration for for the avx2enc iobuffer functions
+ */
 #ifndef IOBUFFER_H_
 #define IOBUFFER_H_
 

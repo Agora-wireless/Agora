@@ -1,3 +1,10 @@
+/**
+ * @file encoder.cc
+ * @brief Implementations for Agora's AVX2-based LDPC encoder.
+ *
+ * We need an AVX2-based LDPC encoder because FlexRAN's LDPC encoder requires
+ * AVX-512.
+ */
 #include "encoder.h"
 
 #include "common_typedef_sdk.h"
