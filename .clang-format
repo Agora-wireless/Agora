@@ -1,8 +1,9 @@
 ---
-#Based on clang-format 11.0.0
+# Based on clang-format 11.0.0
 Language:        Cpp
 BasedOnStyle:    google
-Standard:        c++17
+# Standard:        c++17
+Standard:        Auto
 UseTab:          Never
 ColumnLimit:     80
 ...

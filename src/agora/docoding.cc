@@ -8,6 +8,7 @@
 #include "concurrent_queue_wrapper.inc"
 #include "encoder.h"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "scrambler.h"
 
 static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
@@ -39,6 +40,7 @@ DoEncode::~DoEncode() {
 
 EventData DoEncode::Launch(size_t tag) {
   const LDPCconfig& ldpc_config = cfg_->LdpcConfig();
+  Scrambler scrambler;
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
   size_t cb_id = gen_tag_t(tag).cb_id_;
@@ -54,8 +56,15 @@ EventData DoEncode::Launch(size_t tag) {
   size_t start_tsc = WorkerRdtsc();
 
   size_t symbol_idx_dl = cfg_->GetDLSymbolIdx(frame_id, symbol_id);
-  int8_t* input_ptr =
-      cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
+  int8_t* input_ptr = new int8_t[cfg_->NumBytesPerCb()];
+  std::memcpy(
+      input_ptr,
+      cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id),
+      cfg_->NumBytesPerCb());
+
+  if (cfg_->Scramble()) {
+    scrambler.WlanScramble(input_ptr, cfg_->NumBytesPerCb());
+  }
 
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                    ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
@@ -84,6 +93,8 @@ EventData DoEncode::Launch(size_t tag) {
                 CyclesToUs(duration, cfg_->FreqGhz()));
   }
 
+  delete[] input_ptr;
+
   return EventData(EventType::kEncode, tag);
 }
 
@@ -105,6 +116,7 @@ DoDecode::~DoDecode() { std::free(resp_var_nodes_); }
 
 EventData DoDecode::Launch(size_t tag) {
   const LDPCconfig& ldpc_config = cfg_->LdpcConfig();
+  Scrambler scrambler;
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id_;
   const size_t cb_id = gen_tag_t(tag).cb_id_;
@@ -158,6 +170,10 @@ EventData DoDecode::Launch(size_t tag) {
 
   bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                           &ldpc_decoder_5gnr_response);
+
+  if (cfg_->Scramble()) {
+    scrambler.WlanDescramble(decoded_buffer_ptr, cfg_->NumBytesPerCb());
+  }
 
   size_t start_tsc2 = WorkerRdtsc();
   duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;

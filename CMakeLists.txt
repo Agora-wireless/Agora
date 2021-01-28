@@ -217,6 +217,7 @@ set(COMMON_SOURCES
   src/common/net.cc
   src/common/crc.cc
   src/common/memory_manage.cc
+  src/common/scrambler.cc
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc
   src/encoder/iobuffer.cc)
@@ -338,7 +339,7 @@ endforeach()
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
-  test_ptr_grid test_recipcal)
+  test_ptr_grid test_recipcal test_scrambler)
 
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}

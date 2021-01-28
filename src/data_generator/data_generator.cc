@@ -18,6 +18,7 @@
 #include "config.h"
 #include "memory_manage.h"
 #include "modulation.h"
+#include "scrambler.h"
 #include "utils_ldpc.h"
 
 static constexpr bool kVerbose = false;
@@ -70,10 +71,21 @@ int main(int argc, char* argv[]) {
 
   std::vector<std::vector<int8_t>> ul_information(num_ul_codeblocks);
   std::vector<std::vector<int8_t>> ul_encoded_codewords(num_ul_codeblocks);
+  size_t input_size = LdpcEncodingInputBufSize(
+      cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor());
+  Scrambler scrambler;
+  int8_t* input_ptr = new int8_t[input_size];
   for (size_t i = 0; i < num_ul_codeblocks; i++) {
-    data_generator.GenCodeblock(ul_information.at(i),
-                                ul_encoded_codewords.at(i),
-                                (i % cfg->UeNum()) /* UE ID */);
+    data_generator.GenRawData(ul_information.at(i),
+                              (i % cfg->UeNum()) /* UE ID */);
+
+    std::memcpy(input_ptr, ul_information.at(i).data(), input_size);
+
+    if (cfg->Scramble()) {
+      scrambler.WlanScramble(input_ptr, input_size);
+    }
+
+    data_generator.GenCodeblock(input_ptr, ul_encoded_codewords.at(i));
   }
 
   {
@@ -269,9 +281,16 @@ int main(int argc, char* argv[]) {
   std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
   std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
   for (size_t i = 0; i < num_dl_codeblocks; i++) {
-    data_generator.GenCodeblock(dl_information.at(i),
-                                dl_encoded_codewords.at(i),
-                                (i % cfg->UeNum()) /* UE ID */);
+    data_generator.GenRawData(dl_information.at(i),
+                              (i % cfg->UeNum()) /* UE ID */);
+
+    std::memcpy(input_ptr, dl_information.at(i).data(), input_size);
+
+    if (cfg->Scramble()) {
+      scrambler.WlanScramble(input_ptr, input_size);
+    }
+
+    data_generator.GenCodeblock(input_ptr, dl_encoded_codewords.at(i));
   }
 
   // Modulate the encoded codewords
@@ -471,6 +490,7 @@ int main(int argc, char* argv[]) {
   tx_data_all_symbols.Free();
   rx_data_all_symbols.Free();
   ue_specific_pilot.Free();
+  delete[] input_ptr;
 
   return 0;
 }
