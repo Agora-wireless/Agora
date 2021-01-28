@@ -255,15 +255,17 @@ void Phy_UE::start()
                     "slowly, e.g., in debug mode");
 
                 size_t dl_symbol_id = 0;
-                if (config_->DLSymbols.size() > 0
-                    && config_->DLSymbols[0].size() > 0)
+                if ((config_->DLSymbols.size() > 0)
+                    && (config_->DLSymbols[0].size() > 0))
                     dl_symbol_id = config_->DLSymbols[0][0];
 
-                if (symbol_id == 0 // Beacon in Sim mode!
-                    || (!config_->hw_framer && ul_data_symbol_perframe == 0
-                           && symbol_id == dl_symbol_id
-                           && ant_id % config_->nChannels
-                               == 0)) { // Send uplink pilots
+                if ((symbol_id == 0) // Beacon in Sim mode!
+                    || ((config_->hw_framer == false)
+                           && (ul_data_symbol_perframe == 0)
+                           && (symbol_id == dl_symbol_id)
+                           && (ant_id % config_->nChannels
+                                  == 0)) // first DL symbols in downlink-only mode
+                ) { // Send uplink pilots
                     Event_data do_tx_pilot_task(EventType::kPacketPilotTX,
                         gen_tag_t::frm_sym_ue(
                             frame_id, config_->pilotSymbols[0][ue_id], ue_id)
@@ -272,15 +274,15 @@ void Phy_UE::start()
                         *tx_ptoks_ptr[ant_id % rx_thread_num]);
                 }
 
-                if (ul_data_symbol_perframe > 0
+                if ((ul_data_symbol_perframe > 0)
                     && (symbol_id == 0 || symbol_id == dl_symbol_id)
-                    && ant_id % config_->nChannels == 0) {
+                    && (ant_id % config_->nChannels == 0)) {
                     Event_data do_encode_task(EventType::kEncode,
                         gen_tag_t::frm_sym_ue(frame_id, symbol_id, ue_id)._tag);
                     schedule_task(do_encode_task, &encode_queue_, ptok_encode);
                 }
 
-                if (dl_data_symbol_perframe > 0
+                if ((dl_data_symbol_perframe > 0)
                     && (config_->isPilot(frame_id, symbol_id)
                            || config_->isDownlink(frame_id, symbol_id))) {
                     if (dl_symbol_id == config_->DLSymbols[0][0])
@@ -1089,7 +1091,7 @@ void Phy_UE::doIFFT(int tid, size_t tag)
                 ifft_buff, 0, sizeof(complex_float) * config_->OFDM_DATA_START);
             if (ul_symbol_id < config_->UL_PILOT_SYMS) {
                 std::memcpy(ifft_buff + config_->OFDM_DATA_START,
-                    config_->ue_specific_pilot[ant_id],
+                    config_->ue_specific_pilot[0],
                     config_->OFDM_DATA_NUM * sizeof(complex_float));
             } else {
                 size_t total_ul_data_symbol_id

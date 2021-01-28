@@ -38,15 +38,16 @@ DoFFT::DoFFT(Config* config, int tid, Table<char>& socket_buffer,
             cfg->OFDM_CA_NUM * sizeof(complex_float)));
     temp_16bits_iq = static_cast<uint16_t*>(Agora_memory::padded_aligned_alloc(
         Agora_memory::Alignment_t::k64Align, 32 * sizeof(uint16_t)));
-    alloc_buffer_1d(&rx_samps_tmp,
-        cfg->sampsPerSymbol * sizeof(std::complex<float>),
-        Agora_memory::Alignment_t::k64Align, 1);
+    rx_samps_tmp = static_cast<std::complex<float>*>(
+        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
+            cfg->sampsPerSymbol * sizeof(std::complex<float>)));
 }
 
 DoFFT::~DoFFT()
 {
     DftiFreeDescriptor(&mkl_handle);
     std::free(fft_inout);
+    std::free(rx_samps_tmp);
     calib_ul_buffer_.free();
     calib_dl_buffer_.free();
 }

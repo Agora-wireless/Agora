@@ -382,6 +382,8 @@ bool RadioConfig::radioStart()
                     calib_dl_mean_mat / calib_ul_mean_mat, "calib_mat");
             }
         }
+        init_calib_dl_.free();
+        init_calib_ul_.free();
     }
 
     std::vector<unsigned> zeros(_cfg->sampsPerSymbol, 0);
@@ -667,6 +669,8 @@ void RadioConfig::radioStop()
 
 RadioConfig::~RadioConfig()
 {
+    free_buffer_1d(&init_calib_dl_processed_);
+    free_buffer_1d(&init_calib_ul_processed_);
     for (size_t i = 0; i < this->_radioNum; i++) {
         baStn[i]->closeStream(this->rxStreams[i]);
         baStn[i]->closeStream(this->txStreams[i]);

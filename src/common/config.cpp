@@ -129,10 +129,11 @@ Config::Config(std::string jsonfile)
     DL_PILOT_SYMS = tddConf.value("client_dl_pilot_syms", 0);
     UL_PILOT_SYMS = tddConf.value("client_ul_pilot_syms", 0);
     auto tx_advance = tddConf.value("tx_advance", json::array());
-    if (tx_advance.empty())
+    if (tx_advance.empty()) {
         cl_tx_advance.resize(nRadios, 0);
-    else
+    } else {
         cl_tx_advance.assign(tx_advance.begin(), tx_advance.end());
+    }
     hw_framer = tddConf.value("hw_framer", true);
     if (tddConf.find("frames") == tddConf.end()) {
         symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
