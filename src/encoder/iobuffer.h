@@ -3,7 +3,7 @@
 
 #include <immintrin.h>
 
-#include "encoder.hpp"
+#include "encoder.h"
 
 namespace avx2enc {
 void Adapter2to64(int8_t* pBuff0, __int8_t* pBuff1, uint16_t zcSize,

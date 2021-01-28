@@ -1,3 +1,8 @@
+/**
+ * @file cyclic_shift.h
+ * @brief Declaration for for the avx2enc cyclic shift functions
+ */
+
 #ifndef CYCLIC_SHIFT_H_
 #define CYCLIC_SHIFT_H_
 

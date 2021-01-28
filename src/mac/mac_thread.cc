@@ -1,4 +1,4 @@
-#include "mac_thread.hpp"
+#include "mac_thread.h"
 
 #include "logger.h"
 #include "utils_ldpc.hpp"

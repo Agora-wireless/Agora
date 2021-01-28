@@ -1,4 +1,4 @@
-#include "encoder.hpp"
+#include "encoder.h"
 
 #include <algorithm>
 #include <fstream>

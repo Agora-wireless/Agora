@@ -3,7 +3,7 @@
 # AVX-512 encoder
 
 FLEXRAN_FEC_SDK_DIR="/opt/FlexRAN-FEC-SDK-19-04/sdk"
-SOURCES="encoder_test.cpp encoder.cpp cyclic_shift.cpp iobuffer.cpp"
+SOURCES="encoder_test.cc encoder.cc cyclic_shift.cc iobuffer.cc"
 CPU_FEATURES_DETECT_AVX512=`cat /proc/cpuinfo | grep avx512 | wc -l`
 
 compile_with_agora_encoder() {

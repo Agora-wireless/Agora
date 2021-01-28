@@ -4,10 +4,10 @@
  * z-bit segments to bytes
  */
 
-#include "iobuffer.hpp"
+#include "iobuffer.h"
 
 #include "common_typedef_sdk.h"
-#include "encoder.hpp"
+#include "encoder.h"
 
 namespace avx2enc {
 void ScatterSlow(uint8_t* dst, const uint8_t* src, unsigned num_bits,

@@ -1,3 +1,8 @@
+/**
+ * @file data_generator.h
+ * @brief Implementation file for the Data generator class to generate binary
+ * files as inputs to Agora, sender and correctness tests
+ */
 #ifndef DATA_GENERATOR_H_
 #define DATA_GENERATOR_H_
 

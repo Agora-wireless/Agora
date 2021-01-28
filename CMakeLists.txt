@@ -201,7 +201,7 @@ include_directories(
   src/agora/txrx/
   src/client/
   /usr/include/mkl/
-  data/data_generator)
+  src/data_generator)
 
 include_directories(SYSTEM src/third_party)
 
@@ -217,9 +217,9 @@ set(COMMON_SOURCES
   src/common/net.cpp
   src/common/crc.cpp
   src/common/memory_manage.cc
-  src/encoder/cyclic_shift.cpp
-  src/encoder/encoder.cpp
-  src/encoder/iobuffer.cpp)
+  src/encoder/cyclic_shift.cc
+  src/encoder/encoder.cc
+  src/encoder/iobuffer.cc)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(AGORA_SOURCES 
@@ -233,7 +233,7 @@ set(AGORA_SOURCES
   src/agora/docoding.cc
   src/agora/radio_lib.cc
   src/agora/radio_calibrate.cc
-  src/mac/mac_thread.cpp)
+  src/mac/mac_thread.cc)
 
 if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
@@ -249,10 +249,10 @@ endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
-  src/client/client_radio.cpp
-  src/client/phy-ue.cpp
-  src/client/txrx_client.cpp
-  src/mac/mac_thread.cpp)
+  src/client/client_radio.cc
+  src/client/phy-ue.cc
+  src/client/txrx_client.cc
+  src/mac/mac_thread.cc)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
 
 include_directories(
@@ -279,13 +279,13 @@ add_executable(agora
 target_link_libraries(agora ${COMMON_LIBS})
 
 add_executable(data_generator
-  ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(data_generator ${COMMON_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
 add_executable(user
-  src/client/user-main.cpp
+  src/client/user-main.cc
   $<TARGET_OBJECTS:client_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(user ${COMMON_LIBS})

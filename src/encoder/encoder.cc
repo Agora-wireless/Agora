@@ -1,8 +1,8 @@
-#include "encoder.hpp"
+#include "encoder.h"
 
 #include "common_typedef_sdk.h"
-#include "cyclic_shift.hpp"
-#include "iobuffer.hpp"
+#include "cyclic_shift.h"
+#include "iobuffer.h"
 
 namespace avx2enc {
 void LdpcEncoderBg1(int8_t* pDataIn, int8_t* pDataOut,

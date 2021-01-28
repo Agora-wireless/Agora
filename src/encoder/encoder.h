@@ -1,5 +1,5 @@
 /**
- * @file encoder.hpp
+ * @file encoder.h
  * @brief Definitions for Agora's AVX2-based LDPC encoder.
  *
  * We need an AVX2-based LDPC encoder because FlexRAN's LDPC encoder requires
