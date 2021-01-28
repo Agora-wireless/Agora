@@ -1,6 +1,6 @@
-#include "channel_sim.hpp"
+#include "channel_sim.h"
 
-#include "datatype_conversion.h"
+#include "datatype_conversion.inc"
 
 using namespace arma;
 

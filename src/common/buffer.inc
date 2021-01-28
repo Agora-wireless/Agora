@@ -4,7 +4,7 @@
 #include <sstream>
 #include <vector>
 
-#include "Symbols.hpp"
+#include "symbols.h"
 #include "memory_manage.h"
 #include "ran_config.h"
 

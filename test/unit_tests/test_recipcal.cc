@@ -2,7 +2,7 @@
 // For some reason, gtest include order matters
 #include <armadillo>
 
-#include "config.hpp"
+#include "config.h"
 #include "gettime.h"
 #include "utils.h"
 

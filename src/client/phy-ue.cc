@@ -1,9 +1,9 @@
-#include "phy-ue.hpp"
+#include "phy-ue.h"
 
 #include <memory>
 
 #include "phy_ldpc_decoder_5gnr.h"
-#include "utils_ldpc.hpp"
+#include "utils_ldpc.h"
 
 using namespace arma;
 

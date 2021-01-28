@@ -1,6 +1,6 @@
 #include <gflags/gflags.h>
 
-#include "channel_sim.hpp"
+#include "channel_sim.h"
 
 DEFINE_uint64(bs_threads, 1,
               "Number of threads for handling reception of BS packets");

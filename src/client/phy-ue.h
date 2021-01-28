@@ -19,18 +19,18 @@
 #include <thread>
 #include <tuple>
 
-#include "buffer.hpp"
+#include "buffer.inc"
 #include "comms-lib.h"
 #include "concurrent_queue_wrapper.inc"
 #include "concurrentqueue.h"
-#include "config.hpp"
-#include "datatype_conversion.h"
-#include "mac_thread.hpp"
+#include "config.h"
+#include "datatype_conversion.inc"
+#include "mac_thread.h"
 #include "mkl_dfti.h"
-#include "modulation.hpp"
-#include "net.hpp"
-#include "signalHandler.hpp"
-#include "txrx_client.hpp"
+#include "modulation.h"
+#include "net.h"
+#include "signal_handler.h"
+#include "txrx_client.h"
 
 using myVec =
     std::vector<complex_float,

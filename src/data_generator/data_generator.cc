@@ -15,10 +15,10 @@
 #include <iostream>
 
 #include "comms-lib.h"
-#include "config.hpp"
+#include "config.h"
 #include "memory_manage.h"
-#include "modulation.hpp"
-#include "utils_ldpc.hpp"
+#include "modulation.h"
+#include "utils_ldpc.h"
 
 static constexpr bool kVerbose = false;
 static constexpr bool kPrintUplinkInformationBytes = false;

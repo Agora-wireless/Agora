@@ -9,12 +9,12 @@
 #include <iomanip>
 #include <numeric>
 
-#include "Symbols.hpp"
-#include "buffer.hpp"
-#include "config.hpp"
+#include "buffer.inc"
+#include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
-#include "signalHandler.hpp"
+#include "signal_handler.h"
+#include "symbols.h"
 #include "utils.h"
 
 class Channel {

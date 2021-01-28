@@ -9,21 +9,21 @@
 #include <iostream>
 #include <vector>
 
-#include "Symbols.hpp"
-#include "buffer.hpp"
+#include "symbols.h"
+#include "buffer.inc"
 #include "comms-lib.h"
 #include "concurrentqueue.h"
-#include "config.hpp"
-#include "datatype_conversion.h"
+#include "config.h"
+#include "datatype_conversion.inc"
 #include "dodemul.h"
 #include "doer.h"
 #include "doprecode.h"
 #include "dozf.h"
 #include "gettime.h"
-#include "modulation.hpp"
+#include "modulation.h"
 #include "phy_stats.h"
 #include "shared_counters.hpp"
-#include "signalHandler.hpp"
+#include "signal_handler.h"
 #include "stats.h"
 
 /**

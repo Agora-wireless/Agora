@@ -207,15 +207,15 @@ include_directories(SYSTEM src/third_party)
 
 set(COMMON_SOURCES
   src/common/framestats.cc
-  src/common/config.cpp
-  src/common/utils.cpp
-  src/common/comms-lib.cpp
-  src/common/comms-lib-avx.cpp
-  src/common/signalHandler.cpp
-  src/common/modulation.cpp
-  src/common/modulation_srslte.cpp
-  src/common/net.cpp
-  src/common/crc.cpp
+  src/common/config.cc
+  src/common/utils.cc
+  src/common/comms-lib.cc
+  src/common/comms-lib-avx.cc
+  src/common/signal_handler.cc
+  src/common/modulation.cc
+  src/common/modulation_srslte.cc
+  src/common/net.cc
+  src/common/crc.cc
   src/common/memory_manage.cc
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc
@@ -239,7 +239,7 @@ if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
   set(AGORA_SOURCES ${AGORA_SOURCES} 
     src/agora/txrx/txrx_DPDK.cc
-    src/common/dpdk_transport.cpp)
+    src/common/dpdk_transport.cc)
 else()
   set(AGORA_SOURCES ${AGORA_SOURCES} 
     src/agora/txrx/txrx.cc
@@ -291,32 +291,32 @@ add_executable(user
 target_link_libraries(user ${COMMON_LIBS})
 
 add_executable(sender
-  simulator/sender_cli.cpp
-  simulator/sender.cpp
-  src/common/dpdk_transport.cpp
+  simulator/sender_cli.cc
+  simulator/sender.cc
+  src/common/dpdk_transport.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sender ${COMMON_LIBS})
 
 add_executable(sim
-  simulator/main.cpp
-  simulator/simulator.cpp
-  simulator/sender.cpp
-  simulator/receiver.cpp
-  src/common/dpdk_transport.cpp
+  simulator/main.cc
+  simulator/simulator.cc
+  simulator/sender.cc
+  simulator/receiver.cc
+  src/common/dpdk_transport.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
 
 add_executable(chsim
-  simulator/chsim_main.cpp
-  simulator/channel_sim.cpp
-  simulator/channel.cpp
+  simulator/chsim_main.cc
+  simulator/channel_sim.cc
+  simulator/channel.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(chsim ${COMMON_LIBS})
 
 
 # End-to-end test
 add_executable(test_agora
-  test/test_agora/main.cpp
+  test/test_agora/main.cc
   $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_agora ${COMMON_LIBS})
@@ -325,7 +325,7 @@ target_link_libraries(test_agora ${COMMON_LIBS})
 set(LDPC_TESTS test_ldpc test_ldpc_mod test_ldpc_baseband)
 foreach(test_name IN LISTS LDPC_TESTS)
   add_executable(${test_name}
-    test/compute_kernels/ldpc/${test_name}.cpp
+    test/compute_kernels/ldpc/${test_name}.cc
     $<TARGET_OBJECTS:common_sources_lib>)
   # Unit tests should pass without memory errors
   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")

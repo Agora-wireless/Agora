@@ -6,7 +6,7 @@
 #ifndef CONCURRENT_QUEUE_WRAPPER_H_
 #define CONCURRENT_QUEUE_WRAPPER_H_
 
-#include "buffer.hpp"
+#include "buffer.inc"
 #include "concurrentqueue.h"
 #include "utils.h"
 

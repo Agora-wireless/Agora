@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <cstdlib>
 
-#include "utils_ldpc.hpp"
+#include "utils_ldpc.h"
 
 class LDPCconfig {
  public:

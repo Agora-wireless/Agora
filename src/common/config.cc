@@ -1,11 +1,11 @@
 // Copyright (c) 2018-2020, Rice University
 // RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
-#include "config.hpp"
+#include "config.h"
 
 #include <boost/range/algorithm/count.hpp>
 
-#include "utils_ldpc.hpp"
+#include "utils_ldpc.h"
 
 Config::Config(const std::string& jsonfile)
     : kFreqGhz(MeasureRdtscFreq()),

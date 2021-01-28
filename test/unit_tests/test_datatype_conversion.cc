@@ -8,8 +8,8 @@
 #include <bitset>
 
 #include "comms-lib.h"
-#include "datatype_conversion.h"
-#include "utils_ldpc.hpp"
+#include "datatype_conversion.inc"
+#include "utils_ldpc.h"
 
 static constexpr size_t kSIMDTestNum = 1024;
 

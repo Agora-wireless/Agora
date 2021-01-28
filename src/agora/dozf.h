@@ -8,10 +8,10 @@
 #include <armadillo>
 #include <iostream>
 
-#include "Symbols.hpp"
-#include "buffer.hpp"
+#include "symbols.h"
+#include "buffer.inc"
 #include "concurrentqueue.h"
-#include "config.hpp"
+#include "config.h"
 #include "doer.h"
 #include "gettime.h"
 #include "stats.h"

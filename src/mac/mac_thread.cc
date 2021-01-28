@@ -1,7 +1,7 @@
 #include "mac_thread.h"
 
 #include "logger.h"
-#include "utils_ldpc.hpp"
+#include "utils_ldpc.h"
 
 MacThread::MacThread(
     Mode mode, Config* cfg, size_t core_offset,

@@ -1,4 +1,4 @@
-#include "net.hpp"
+#include "net.h"
 
 #include <cerrno>
 #include <cstdio>  /* std::printf */

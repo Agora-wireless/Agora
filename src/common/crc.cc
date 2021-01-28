@@ -34,7 +34,7 @@
        std::exit(0); //continue;
  */
 
-#include "crc.hpp"
+#include "crc.h"
 
 #ifdef REBUILD_TABLE
 static void DoCRC::init_crc24(uint32_t table[256]) {

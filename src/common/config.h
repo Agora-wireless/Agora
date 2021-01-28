@@ -14,16 +14,16 @@
 #include <nlohmann/json.hpp>
 #include <vector>
 
-#include "Symbols.hpp"
-#include "buffer.hpp"
+#include "buffer.inc"
 #include "comms-lib.h"
 #include "framestats.h"
 #include "gettime.h"
-#include "ldpc_config.hpp"
+#include "ldpc_config.inc"
 #include "memory_manage.h"
-#include "modulation.hpp"
+#include "modulation.h"
+#include "symbols.h"
 #include "utils.h"
-#include "utils_ldpc.hpp"
+#include "utils_ldpc.h"
 
 using json = nlohmann::json;
 

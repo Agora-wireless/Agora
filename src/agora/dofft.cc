@@ -5,7 +5,7 @@
 #include "dofft.h"
 
 #include "concurrent_queue_wrapper.inc"
-#include "datatype_conversion.h"
+#include "datatype_conversion.inc"
 
 using namespace arma;
 

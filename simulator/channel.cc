@@ -1,4 +1,4 @@
-#include "channel.hpp"
+#include "channel.h"
 
 static constexpr bool kPrintChannelOutput = false;
 using namespace arma;

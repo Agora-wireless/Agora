@@ -3,7 +3,7 @@
 #include <thread>
 
 #include "concurrentqueue.h"
-#include "config.hpp"
+#include "config.h"
 #include "dodemul.h"
 #include "gettime.h"
 #include "phy_stats.h"

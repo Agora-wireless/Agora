@@ -1,4 +1,4 @@
-#include "simulator.hpp"
+#include "simulator.h"
 
 int main(int argc, char const* argv[]) {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);

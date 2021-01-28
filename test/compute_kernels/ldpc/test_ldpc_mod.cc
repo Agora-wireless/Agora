@@ -16,13 +16,13 @@
 #include <random>
 
 #include "comms-lib.h"
-#include "config.hpp"
+#include "config.h"
 #include "data_generator.h"
 #include "gettime.h"
 #include "memory_manage.h"
-#include "modulation.hpp"
+#include "modulation.h"
 #include "phy_ldpc_decoder_5gnr.h"
-#include "utils_ldpc.hpp"
+#include "utils_ldpc.h"
 
 static constexpr bool kVerbose = false;
 static constexpr bool kPrintUplinkInformationBytes = false;

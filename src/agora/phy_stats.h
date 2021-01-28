@@ -7,8 +7,8 @@
 
 #include <armadillo>
 
-#include "Symbols.hpp"
-#include "config.hpp"
+#include "symbols.h"
+#include "config.h"
 #include "memory_manage.h"
 
 class PhyStats {

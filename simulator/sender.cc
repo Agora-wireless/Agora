@@ -1,8 +1,8 @@
-#include "sender.hpp"
+#include "sender.h"
 
 #include <thread>
 
-#include "datatype_conversion.h"
+#include "datatype_conversion.inc"
 #include "udp_client.h"
 
 static constexpr bool kDebugPrintSender = false;

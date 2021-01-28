@@ -1,12 +1,12 @@
 #ifdef USE_DPDK
 
-#include "dpdk_transport.hpp"
+#include "dpdk_transport.h"
 
 #include <immintrin.h>
 
 #include <string>
 
-#include "buffer.hpp"
+#include "buffer.inc"
 #include "eth_common.h"
 #include "utils.h"
 

@@ -1,6 +1,6 @@
 // http://www.yolinux.com/TUTORIALS/C++Signals.html
 
-#include "signalHandler.hpp"
+#include "signal_handler.h"
 
 #include <cerrno>
 #include <csignal>
@@ -15,7 +15,6 @@ SignalHandler::SignalHandler() = default;
 /**
  * Destructor.
  */
-
 
 /**
  * Returns the bool flag indicating whether we received an exit signal

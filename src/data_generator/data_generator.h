@@ -8,8 +8,8 @@
 
 #include <string>
 
-#include "config.hpp"
-#include "utils_ldpc.hpp"
+#include "config.h"
+#include "utils_ldpc.h"
 
 /**
  * @brief Building blocks for generating end-to-end or unit test workloads for

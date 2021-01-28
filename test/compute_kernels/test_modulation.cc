@@ -1,7 +1,7 @@
-#include "buffer.hpp"
+#include "buffer.inc"
 #include "gettime.h"
 #include "memory_manage.h"
-#include "modulation.hpp"
+#include "modulation.h"
 #include "utils.h"
 
 void flushCache() {

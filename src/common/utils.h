@@ -38,7 +38,7 @@
 #include <thread>
 #include <vector>
 
-#include "Symbols.hpp"
+#include "symbols.h"
 
 #define MAX_CORE_NUM (200)
 

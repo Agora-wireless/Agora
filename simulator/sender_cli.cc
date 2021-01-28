@@ -1,6 +1,6 @@
 #include <gflags/gflags.h>
 
-#include "sender.hpp"
+#include "sender.h"
 
 DEFINE_uint64(num_threads, 4, "Number of sender threads");
 DEFINE_uint64(core_offset, 0, "Core ID of the first sender thread");

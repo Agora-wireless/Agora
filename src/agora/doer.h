@@ -6,7 +6,7 @@
 #ifndef DOER_H_
 #define DOER_H_
 
-#include "buffer.hpp"
+#include "buffer.inc"
 #include "concurrent_queue_wrapper.inc"
 #include "concurrentqueue.h"
 #include "logger.h"

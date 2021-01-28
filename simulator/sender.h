@@ -16,20 +16,20 @@
 #include <thread>
 #include <vector>
 
-#include "Symbols.hpp"
 #include "concurrentqueue.h"
-#include "config.hpp"
-#include "datatype_conversion.h"
+#include "config.h"
+#include "datatype_conversion.inc"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
-#include "net.hpp"
+#include "net.h"
+#include "symbols.h"
 #include "utils.h"
 
 #ifdef USE_DPDK
 #include <netinet/ether.h>
 
-#include "dpdk_transport.hpp"
+#include "dpdk_transport.h"
 #endif
 
 class Sender {

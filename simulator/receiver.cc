@@ -1,4 +1,4 @@
-#include "receiver.hpp"
+#include "receiver.h"
 
 Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset)
     : rx_thread_num_(rx_thread_num), core_id_(core_offset), cfg_(cfg) {}

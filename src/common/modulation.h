@@ -7,8 +7,8 @@
 #include <cmath>
 #include <iostream>
 
-#include "Symbols.hpp"
-#include "buffer.hpp"
+#include "symbols.h"
+#include "buffer.inc"
 #include "gettime.h"
 #include "memory_manage.h"
 

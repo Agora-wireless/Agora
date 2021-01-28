@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 // For some reason, gtest include order matters
 #include "concurrentqueue.h"
-#include "config.hpp"
+#include "config.h"
 #include "dozf.h"
 #include "gettime.h"
 #include "utils.h"

@@ -19,7 +19,7 @@
  *
  */
 
-#include "modulation.hpp"
+#include "modulation.h"
 
 void Demod16qamSoftLoop(const float* vec_in, int8_t* llr, int num) {
   for (int i = 0; i < num; i++) {

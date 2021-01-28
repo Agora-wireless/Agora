@@ -13,9 +13,9 @@
 #include <fstream>
 #include <vector>
 
-#include "client_radio.hpp"
+#include "client_radio.h"
 #include "concurrentqueue.h"
-#include "net.hpp"
+#include "net.h"
 #include "utils.h"
 
 class RadioConfig;

@@ -13,19 +13,19 @@
 #include <iostream>
 #include <vector>
 
-#include "Symbols.hpp"
-#include "buffer.hpp"
+#include "buffer.inc"
 #include "concurrentqueue.h"
-#include "config.hpp"
+#include "config.h"
 #include "doer.h"
-#include "encoder.hpp"
+#include "encoder.h"
 #include "gettime.h"
-#include "iobuffer.hpp"
+#include "iobuffer.h"
 #include "memory_manage.h"
-#include "modulation.hpp"
+#include "modulation.h"
 #include "phy_stats.h"
 #include "stats.h"
-#include "utils_ldpc.hpp"
+#include "symbols.h"
+#include "utils_ldpc.h"
 
 class DoEncode : public Doer {
  public:

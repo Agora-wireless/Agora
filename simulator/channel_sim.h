@@ -13,15 +13,15 @@
 #include <iomanip>
 #include <numeric>
 
-#include "Symbols.hpp"
-#include "buffer.hpp"
-#include "channel.hpp"
+#include "buffer.inc"
+#include "channel.h"
 #include "concurrent_queue_wrapper.inc"
-#include "config.hpp"
+#include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
-#include "net.hpp"
-#include "signalHandler.hpp"
+#include "net.h"
+#include "signal_handler.h"
+#include "symbols.h"
 #include "udp_client.h"
 #include "udp_server.h"
 

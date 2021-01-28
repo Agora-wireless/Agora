@@ -6,7 +6,7 @@
 #include "docoding.h"
 
 #include "concurrent_queue_wrapper.inc"
-#include "encoder.hpp"
+#include "encoder.h"
 #include "phy_ldpc_decoder_5gnr.h"
 
 static constexpr bool kPrintEncodedData = false;

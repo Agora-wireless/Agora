@@ -12,12 +12,12 @@
 #include <fstream>
 #include <vector>
 
-#include "Symbols.hpp"
-#include "encoder.hpp"
+#include "encoder.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "phy_ldpc_decoder_5gnr.h"
-#include "utils_ldpc.hpp"
+#include "symbols.h"
+#include "utils_ldpc.h"
 
 static constexpr size_t kNumCodeBlocks = 2;
 static constexpr size_t kBaseGraph = 1;

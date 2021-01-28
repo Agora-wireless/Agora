@@ -2,7 +2,7 @@
  * @file receiver_clip.cc
  * @brief Main file for the receiver class testing.
  */
-#include "Receiver.hpp"
+#include "receiver.h"
 
 int main(int argc, char const* argv[]) {
   int thread_num = strtol(argv[1], NULL, 10);

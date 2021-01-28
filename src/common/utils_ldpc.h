@@ -3,10 +3,10 @@
 
 #include <cstdlib> /* for std::aligned_alloc */
 
-#include "Symbols.hpp"
-#include "encoder.hpp"
-#include "iobuffer.hpp"
+#include "encoder.h"
+#include "iobuffer.h"
 #include "phy_ldpc_encoder_5gnr.h"
+#include "symbols.h"
 #include "utils.h"
 
 LDPC_ADAPTER_P LdpcSelectAdapterFunc(uint16_t zcSize, uint8_t num_ways);

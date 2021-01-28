@@ -5,8 +5,8 @@
 #include <sstream>
 #include <vector>
 
-#include "Symbols.hpp"
-#include "config.hpp"
+#include "symbols.h"
+#include "config.h"
 #include "logger.h"
 #include "utils.h"
 

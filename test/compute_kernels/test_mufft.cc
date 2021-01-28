@@ -1,6 +1,6 @@
 #include <immintrin.h>
 
-#include "cpu_attach.hpp"
+#include "cpu_attach.h"
 #include "mufft/fft.h"
 
 static double mufft_get_time(void) {

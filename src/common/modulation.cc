@@ -1,4 +1,4 @@
-#include "modulation.hpp"
+#include "modulation.h"
 
 void Print256Epi32(__m256i var) {
   auto* val = reinterpret_cast<int32_t*>(&var);

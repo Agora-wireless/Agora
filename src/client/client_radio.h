@@ -13,7 +13,7 @@
 #include <iostream>
 #include <string>
 
-#include "config.hpp"
+#include "config.h"
 
 class ClientRadioConfig {
  public:

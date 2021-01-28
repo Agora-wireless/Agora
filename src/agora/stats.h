@@ -8,8 +8,8 @@
 
 #include <iostream>
 
-#include "Symbols.hpp"
-#include "config.hpp"
+#include "symbols.h"
+#include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
 

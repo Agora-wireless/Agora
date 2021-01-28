@@ -16,19 +16,19 @@
 #include <system_error>
 #include <vector>
 
-#include "buffer.hpp"
+#include "buffer.inc"
 #include "concurrent_queue_wrapper.inc"
 #include "concurrentqueue.h"
-#include "config.hpp"
+#include "config.h"
 #include "docoding.h"
 #include "dodemul.h"
 #include "dofft.h"
 #include "doprecode.h"
 #include "dozf.h"
-#include "mac_thread.hpp"
+#include "mac_thread.h"
 #include "memory_manage.h"
 #include "phy_stats.h"
-#include "signalHandler.hpp"
+#include "signal_handler.h"
 #include "stats.h"
 #include "txrx.h"
 #include "utils.h"

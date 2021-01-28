@@ -3,14 +3,14 @@
 
 #include <queue>
 
-#include "Symbols.hpp"
-#include "buffer.hpp"
+#include "buffer.inc"
 #include "concurrentqueue.h"
-#include "config.hpp"
-#include "crc.hpp"
+#include "config.h"
+#include "crc.h"
 #include "gettime.h"
-#include "net.hpp"
+#include "net.h"
 #include "ran_config.h"
+#include "symbols.h"
 #include "udp_client.h"
 #include "udp_server.h"
 

@@ -24,16 +24,16 @@
 #include <numeric>
 #include <vector>
 
-#include "Symbols.hpp"
-#include "buffer.hpp"
+#include "buffer.inc"
 #include "concurrentqueue.h"
-#include "config.hpp"
+#include "config.h"
 #include "gettime.h"
-#include "net.hpp"
+#include "net.h"
 #include "radio_lib.h"
+#include "symbols.h"
 
 #ifdef USE_DPDK
-#include "dpdk_transport.hpp"
+#include "dpdk_transport.h"
 #endif
 
 /**

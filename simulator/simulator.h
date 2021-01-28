@@ -15,14 +15,14 @@
 #include <tuple>
 #include <vector>
 
-#include "buffer.hpp"
+#include "buffer.inc"
 #include "concurrentqueue.h"
-#include "config.hpp"
+#include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
-#include "receiver.hpp"
-#include "sender.hpp"
-#include "signalHandler.hpp"
+#include "receiver.h"
+#include "sender.h"
+#include "signal_handler.h"
 
 class Simulator {
  public:
