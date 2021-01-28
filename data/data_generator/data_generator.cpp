@@ -413,10 +413,10 @@ int main(int argc, char* argv[])
                 txSymbol, 0, sizeof(short) * 2 * cfg->ofdm_tx_zero_prefix_);
             for (size_t k = 0; k < cfg->OFDM_CA_NUM; k++) {
                 txSymbol[2 * (k + cfg->CP_LEN + cfg->ofdm_tx_zero_prefix_)]
-                    = (short)(32768 * ptr_ifft[k].re
+                    = static_cast<short>(32768 * ptr_ifft[k].re
                         * std::sqrt(cfg->BS_ANT_NUM * 1.f));
                 txSymbol[2 * (k + cfg->CP_LEN + cfg->ofdm_tx_zero_prefix_) + 1]
-                    = (short)(32768 * ptr_ifft[k].im
+                    = static_cast<short>(32768 * ptr_ifft[k].im
                         * std::sqrt(cfg->BS_ANT_NUM * 1.f));
             }
             for (size_t k = 0; k < 2 * cfg->CP_LEN; k++) {
