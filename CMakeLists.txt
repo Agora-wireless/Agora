@@ -217,6 +217,7 @@ set(COMMON_SOURCES
   src/common/net.cpp
   src/common/crc.cpp
   src/common/memory_manage.cc
+  src/common/scrambler.cpp
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
   src/encoder/iobuffer.cpp)

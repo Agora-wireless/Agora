@@ -4,6 +4,7 @@
 
 #include "phy_ldpc_decoder_5gnr.h"
 #include "utils_ldpc.hpp"
+#include "scrambler.hpp"
 
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
@@ -809,6 +810,7 @@ void PhyUe::DoDemul(int tid, size_t tag) {
 
 void PhyUe::DoDecode(int tid, size_t tag) {
   const LDPCconfig& ldpc_config = config_->LdpcConfig();
+  Scrambler scrambler;
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
   size_t ant_id = gen_tag_t(tag).ant_id_;
@@ -859,10 +861,8 @@ void PhyUe::DoDecode(int tid, size_t tag) {
     bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                             &ldpc_decoder_5gnr_response);
 
-    // Descramble the decoded buffer
     if (config_->Scramble()) {
-      WlanScramble(decoded_buffer_ptr, config_->NumBytesPerCb(),
-                   kScramblerInitState);
+      scrambler.WlanDescramble(decoded_buffer_ptr, config_->NumBytesPerCb());
     }
 
       if (kCollectPhyStats) {
@@ -921,6 +921,7 @@ void PhyUe::DoDecode(int tid, size_t tag) {
 
 void PhyUe::DoEncode(int tid, size_t tag) {
   const LDPCconfig& ldpc_config = config_->LdpcConfig();
+  Scrambler scrambler;
   // size_t ue_id = rx_tag_t(tag).tid;
   // size_t offset = rx_tag_t(tag).offset;
   const size_t frame_id = gen_tag_t(tag).frame_id_;
@@ -974,7 +975,7 @@ void PhyUe::DoEncode(int tid, size_t tag) {
       }
 
       if (config_->Scramble()) {
-        WlanScramble(input_ptr, bytes_per_block, kScramblerInitState);
+        scrambler.WlanScramble(input_ptr, bytes_per_block);
       }
       
       LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),

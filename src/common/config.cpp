@@ -2,6 +2,7 @@
 // RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
 #include "config.hpp"
+#include "scrambler.hpp"
 
 #include <boost/range/algorithm/count.hpp>
 
@@ -611,6 +612,7 @@ void Config::GenData() {
       BitsToBytes(this->ldpc_config_.NumCbCodewLen());
   const size_t num_blocks_per_symbol =
       this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
+  Scrambler scrambler;
   int8_t* input_ptr = new int8_t[bytes_per_block];
 
   // Encode uplink bits
@@ -627,7 +629,7 @@ void Config::GenData() {
       std::memcpy(input_ptr, ul_bits_[i] + j * bytes_per_block, bytes_per_block);
       
       if (this->Scramble()) {
-        WlanScramble(input_ptr, bytes_per_block, kScramblerInitState);
+        scrambler.WlanScramble(input_ptr, bytes_per_block);
       }
 
       LdpcEncodeHelper(this->ldpc_config_.BaseGraph(),
@@ -669,7 +671,7 @@ void Config::GenData() {
       std::memcpy(input_ptr, this->dl_bits_[i] + j * bytes_per_block,
                   bytes_per_block);
       if (this->Scramble()) {
-        WlanScramble(input_ptr, bytes_per_block, kScramblerInitState);
+        scrambler.WlanScramble(input_ptr, bytes_per_block);
       }
 
         LdpcEncodeHelper(this->ldpc_config_.BaseGraph(),

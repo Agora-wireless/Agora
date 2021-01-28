@@ -6,9 +6,12 @@
 #include <gtest/gtest.h>
 #include <time.h>
 #include <vector>
+
 #include "utils_ldpc.hpp"
+#include "scrambler.hpp"
 
 static constexpr size_t kNumInputBytes = 125;
+Scrambler scrambler;
 
 /**
  * @brief  Construct a new TEST object
@@ -16,7 +19,7 @@ static constexpr size_t kNumInputBytes = 125;
  * The test data and the expected output are hardcoded in byte_buffer[] and
  * expect[] as int8_t.
  */
-TEST(Scrambler, fixed_input_scramble_int8_t) {
+TEST(WLAN_Scrambler, fixed_input_scramble_int8_t) {
   int8_t byte_buffer[kNumInputBytes] = {
       -121, 104, 66,  23,   126, -69,  -50,  111,  -120, 36,   -13,  67,   -107,
       30,   118, 89,  -61,  -21, -127, -127, -69,  -22,  -100, 108,  85,   102,
@@ -40,7 +43,7 @@ TEST(Scrambler, fixed_input_scramble_int8_t) {
       -51,  115,  -96,  -43,  37,  -116, -72,  96,  82,  55,   44,  -46,  -14,
       102,  -116, -17,  102,  -28, 45,   -127, -90};
 
-  WlanScramble(byte_buffer, kNumInputBytes, kScramblerInitState);
+  scrambler.WlanScramble(byte_buffer, kNumInputBytes);
 
   for (size_t i = 0; i < kNumInputBytes; i++) {
     ASSERT_EQ(byte_buffer[i], expect[i]);
@@ -53,7 +56,7 @@ TEST(Scrambler, fixed_input_scramble_int8_t) {
  * The test data and the expected output are hardcoded in byte_buffer[] and
  * expect[] as uint8_t.
  */
-TEST(Scrambler, fixed_input_scramble_uint8_t) {
+TEST(WLAN_Scrambler, fixed_input_scramble_uint8_t) {
   uint8_t byte_buffer[kNumInputBytes] = {
       1,   2,   3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,
       15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,
@@ -75,7 +78,7 @@ TEST(Scrambler, fixed_input_scramble_uint8_t) {
       16,  190, 112, 27,  79,  180, 22,  100, 153, 165, 111, 72,  65,  198,
       125, 166, 148, 192, 95,  140, 38,  192, 135, 103, 158, 238, 121};
 
-  WlanScramble(byte_buffer, kNumInputBytes, kScramblerInitState);
+  scrambler.WlanScramble(byte_buffer, kNumInputBytes);
 
   for (size_t i = 0; i < kNumInputBytes; i++) {
     ASSERT_EQ(byte_buffer[i], expect[i]);
@@ -90,7 +93,7 @@ TEST(Scrambler, fixed_input_scramble_uint8_t) {
  * The expected output is the same as the test data, which is scrambled and
  * then descrambled.
  */
-TEST(Scrambler, random_input_scramble_descramble) {
+TEST(WLAN_Scrambler, random_input_scramble_descramble) {
   int8_t* byte_buffer;
   int8_t* byte_buffer_orig;
   byte_buffer = (int8_t*)std::calloc(kNumInputBytes, sizeof(int8_t));
@@ -103,10 +106,10 @@ TEST(Scrambler, random_input_scramble_descramble) {
   }
 
   // Scramble
-  WlanScramble(byte_buffer, kNumInputBytes, kScramblerInitState);
+  scrambler.WlanScramble(byte_buffer, kNumInputBytes);
 
   // Descramble
-  WlanScramble(byte_buffer, kNumInputBytes, kScramblerInitState);
+  scrambler.WlanScramble(byte_buffer, kNumInputBytes);
 
   for (size_t i = 0; i < kNumInputBytes; i++) {
     ASSERT_EQ(byte_buffer[i], byte_buffer_orig[i]);

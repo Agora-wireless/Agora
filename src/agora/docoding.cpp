@@ -3,6 +3,7 @@
 #include "concurrent_queue_wrapper.hpp"
 #include "encoder.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "scrambler.hpp"
 
 static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
@@ -34,6 +35,7 @@ DoEncode::~DoEncode() {
 
 EventData DoEncode::Launch(size_t tag) {
   const LDPCconfig& ldpc_config = cfg_->LdpcConfig();
+  Scrambler scrambler;
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
   size_t cb_id = gen_tag_t(tag).cb_id_;
@@ -56,7 +58,7 @@ EventData DoEncode::Launch(size_t tag) {
       cfg_->NumBytesPerCb());
 
   if (cfg_->Scramble()) {
-    WlanScramble(input_ptr, cfg_->NumBytesPerCb(), kScramblerInitState);
+    scrambler.WlanScramble(input_ptr, cfg_->NumBytesPerCb());
   }
 
     LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
@@ -107,6 +109,7 @@ DoDecode::~DoDecode() { std::free(resp_var_nodes_); }
 
 EventData DoDecode::Launch(size_t tag) {
   const LDPCconfig& ldpc_config = cfg_->LdpcConfig();
+  Scrambler scrambler;
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id_;
   const size_t cb_id = gen_tag_t(tag).cb_id_;
@@ -161,10 +164,8 @@ EventData DoDecode::Launch(size_t tag) {
   bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                           &ldpc_decoder_5gnr_response);
 
-  // Descramble the decoded buffer
   if (cfg_->Scramble()) {
-    WlanScramble(decoded_buffer_ptr, cfg_->NumBytesPerCb(),
-                 kScramblerInitState);
+    scrambler.WlanDescramble(decoded_buffer_ptr, cfg_->NumBytesPerCb());
   }
 
     size_t start_tsc2 = WorkerRdtsc();
