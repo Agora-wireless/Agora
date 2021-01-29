@@ -5,9 +5,9 @@
 #include <sstream>
 #include <vector>
 
-#include "symbols.h"
 #include "config.h"
 #include "logger.h"
+#include "symbols.h"
 #include "utils.h"
 
 // We use one RxStatus object to track packet reception status.

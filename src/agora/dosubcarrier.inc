@@ -1,6 +1,7 @@
 /**
  * @file dozf.h
- * @brief Self-Contained Implmentation file implmenting a worker class that handles all subcarrier-parallel processing tasks.
+ * @brief Self-Contained Implmentation file implmenting a worker class that
+ * handles all subcarrier-parallel processing tasks.
  */
 #ifndef DOSUBCARRIER_H_
 #define DOSUBCARRIER_H_
@@ -9,7 +10,6 @@
 #include <iostream>
 #include <vector>
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "comms-lib.h"
 #include "concurrentqueue.h"
@@ -25,6 +25,7 @@
 #include "shared_counters.hpp"
 #include "signal_handler.h"
 #include "stats.h"
+#include "symbols.h"
 
 /**
  * @brief A worker class that handles all subcarrier-parallel processing tasks.

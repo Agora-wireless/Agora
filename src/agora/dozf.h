@@ -8,13 +8,13 @@
 #include <armadillo>
 #include <iostream>
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
 #include "gettime.h"
 #include "stats.h"
+#include "symbols.h"
 #include "utils.h"
 
 class DoZF : public Doer {

@@ -7,10 +7,10 @@
 #include <cmath>
 #include <iostream>
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "symbols.h"
 
 #define BPSK_LEVEL M_SQRT1_2
 #define QPSK_LEVEL M_SQRT1_2

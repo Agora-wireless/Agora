@@ -4,9 +4,9 @@
 #include <sstream>
 #include <vector>
 
-#include "symbols.h"
 #include "memory_manage.h"
 #include "ran_config.h"
+#include "symbols.h"
 
 /* boost is required for aligned memory allocation (for SIMD instructions) */
 #include <boost/align/aligned_allocator.hpp>

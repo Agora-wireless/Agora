@@ -9,7 +9,6 @@
 #include <iostream>
 #include <vector>
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "concurrentqueue.h"
 #include "config.h"
@@ -18,6 +17,7 @@
 #include "modulation.h"
 #include "phy_stats.h"
 #include "stats.h"
+#include "symbols.h"
 
 class DoDemul : public Doer {
  public:

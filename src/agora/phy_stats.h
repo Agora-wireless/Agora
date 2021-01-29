@@ -7,9 +7,9 @@
 
 #include <armadillo>
 
-#include "symbols.h"
 #include "config.h"
 #include "memory_manage.h"
+#include "symbols.h"
 
 class PhyStats {
  public:
