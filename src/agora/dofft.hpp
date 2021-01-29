@@ -148,6 +148,7 @@ private:
     DurationStat* duration_stat;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     float* ifft_out; // Buffer for IFFT output
+    float ifft_scale_factor;
 };
 
 #endif
