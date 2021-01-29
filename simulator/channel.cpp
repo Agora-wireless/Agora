@@ -67,7 +67,7 @@ void Channel::apply_chan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
     awgn(fmat_H, fmat_dst);
 
     if (kPrintChannelOutput)
-        Utils::print_mat(H);
+        Utils::print_mat(H, "H");
 }
 
 void Channel::awgn(const cx_fmat& src, cx_fmat& dst)

@@ -7,6 +7,7 @@ static constexpr bool kDebugPrintPacketsToMac = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
+static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr size_t kRecordFrameIndex = 1000;
 
 Phy_UE::Phy_UE(Config* config)
@@ -247,39 +248,41 @@ void Phy_UE::start()
                 frame_id = pkt->frame_id;
                 symbol_id = pkt->symbol_id;
                 ant_id = pkt->ant_id;
+                size_t ue_id = ant_id / config_->nChannels;
                 rt_assert(pkt->frame_id < cur_frame_id + kFrameWnd,
                     "Error: Received packet for future frame beyond frame "
                     "window. This can happen if PHY is running "
                     "slowly, e.g., in debug mode");
 
                 size_t dl_symbol_id = 0;
-                if (config_->DLSymbols.size() > 0
-                    && config_->DLSymbols[0].size() > 0)
+                if ((config_->DLSymbols.size() > 0)
+                    && (config_->DLSymbols[0].size() > 0))
                     dl_symbol_id = config_->DLSymbols[0][0];
 
-                if (symbol_id == 0 // Beacon in Sim mode!
-                    || (!config_->hw_framer && ul_data_symbol_perframe == 0
-                           && symbol_id
-                               == dl_symbol_id)) { // Send uplink pilots
+                if ((symbol_id == 0) // Beacon in Sim mode!
+                    || ((config_->hw_framer == false)
+                           && (ul_data_symbol_perframe == 0)
+                           && (symbol_id == dl_symbol_id)
+                           && (ant_id % config_->nChannels
+                                  == 0)) // first DL symbols in downlink-only mode
+                ) { // Send uplink pilots
                     Event_data do_tx_pilot_task(EventType::kPacketPilotTX,
                         gen_tag_t::frm_sym_ue(
-                            frame_id, config_->pilotSymbols[0][ant_id], ant_id)
+                            frame_id, config_->pilotSymbols[0][ue_id], ue_id)
                             ._tag);
                     schedule_task(do_tx_pilot_task, &tx_queue_,
                         *tx_ptoks_ptr[ant_id % rx_thread_num]);
                 }
 
-                if (ul_data_symbol_perframe > 0
+                if ((ul_data_symbol_perframe > 0)
                     && (symbol_id == 0 || symbol_id == dl_symbol_id)
-                    && ant_id % config_->nChannels == 0) {
+                    && (ant_id % config_->nChannels == 0)) {
                     Event_data do_encode_task(EventType::kEncode,
-                        gen_tag_t::frm_sym_ue(
-                            frame_id, symbol_id, ant_id / config_->nChannels)
-                            ._tag);
+                        gen_tag_t::frm_sym_ue(frame_id, symbol_id, ue_id)._tag);
                     schedule_task(do_encode_task, &encode_queue_, ptok_encode);
                 }
 
-                if (dl_data_symbol_perframe > 0
+                if ((dl_data_symbol_perframe > 0)
                     && (config_->isPilot(frame_id, symbol_id)
                            || config_->isDownlink(frame_id, symbol_id))) {
                     if (dl_symbol_id == config_->DLSymbols[0][0])
@@ -623,7 +626,7 @@ void Phy_UE::doFFT(int tid, size_t tag)
     }
 
     size_t sig_offset = config_->ofdm_rx_zero_prefix_client_;
-    if (kPrintDownlinkPilotStats && config_->UE_ANT_NUM == 1) {
+    if (kPrintDownlinkPilotStats) {
         if (config_->isPilot(frame_id, symbol_id)) {
             simd_convert_short_to_float(pkt->data,
                 reinterpret_cast<float*>(rx_samps_tmp),
@@ -637,20 +640,21 @@ void Phy_UE::doFFT(int tid, size_t tag)
             size_t peak_offset
                 = std::max_element(pilot_corr_abs.begin(), pilot_corr_abs.end())
                 - pilot_corr_abs.begin();
-            sig_offset = peak_offset < seq_len ? 0 : peak_offset - seq_len;
+            size_t pilot_offset
+                = peak_offset < seq_len ? 0 : peak_offset - seq_len;
             float noise_power = 0;
-            for (size_t i = 0; i < sig_offset; i++)
+            for (size_t i = 0; i < pilot_offset; i++)
                 noise_power += std::pow(std::abs(samples_vec[i]), 2);
             float signal_power = 0;
-            for (size_t i = sig_offset; i < 2 * sig_offset; i++)
+            for (size_t i = pilot_offset; i < 2 * pilot_offset; i++)
                 signal_power += std::pow(std::abs(samples_vec[i]), 2);
             float SNR = 10 * std::log10(signal_power / noise_power);
             std::printf(
                 "frame %zu symbol %zu ant %zu: sig offset %zu, SNR %2.1f \n",
-                frame_id, symbol_id, ant_id, sig_offset, SNR);
+                frame_id, symbol_id, ant_id, pilot_offset, SNR);
             if (frame_id == kRecordFrameIndex) {
-                std::string fname
-                    = "rxpilot" + std::to_string(symbol_id) + ".bin";
+                std::string fname = "rxpilot" + std::to_string(symbol_id) + "_"
+                    + std::to_string(ant_id) + ".bin";
                 FILE* f = fopen(fname.c_str(), "wb");
                 fwrite(
                     pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
@@ -659,8 +663,8 @@ void Phy_UE::doFFT(int tid, size_t tag)
 
         } else {
             if (frame_id == kRecordFrameIndex) {
-                std::string fname
-                    = "rxdata" + std::to_string(symbol_id) + ".bin";
+                std::string fname = "rxdata" + std::to_string(symbol_id) + "_"
+                    + std::to_string(ant_id) + ".bin";
                 FILE* f = fopen(fname.c_str(), "wb");
                 fwrite(
                     pkt->data, 2 * sizeof(int16_t), config_->sampsPerSymbol, f);
@@ -676,7 +680,6 @@ void Phy_UE::doFFT(int tid, size_t tag)
         = total_dl_symbol_id * config_->UE_ANT_NUM + ant_id;
 
     // transfer ushort to float
-    sig_offset = (sig_offset / 16) * 16;
     size_t delay_offset = (sig_offset + config_->CP_LEN) * 2;
     float* fft_buff = (float*)fft_buffer_[FFT_buffer_target_id];
 
@@ -702,7 +705,9 @@ void Phy_UE::doFFT(int tid, size_t tag)
             if (dl_symbol_id == 0) {
                 csi_buffer_ptr[j] = 0;
             }
-            complex_float p = config_->ue_specific_pilot[ant_id][j];
+            // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
+            // in the downlink receiver
+            complex_float p = config_->ue_specific_pilot[0][j];
             size_t sc_id = non_null_sc_ind_[j];
             csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / cx_float(p.re, p.im));
             if (dl_symbol_id == dl_pilot_symbol_perframe - 1)
@@ -729,13 +734,16 @@ void Phy_UE::doFFT(int tid, size_t tag)
                 size_t sc_id = non_null_sc_ind_[j];
                 cx_float y = fft_buffer_ptr[sc_id];
                 auto pilot_eq = y / csi;
-                auto p = config_->ue_specific_pilot[ant_id][j];
+                // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
+                // in the downlink receiver
+                auto p = config_->ue_specific_pilot[0][j];
                 theta += arg(pilot_eq * cx_float(p.re, -p.im));
             }
         }
         if (config_->get_ofdm_pilot_num() > 0)
             theta /= config_->get_ofdm_pilot_num();
         auto phc = exp(cx_float(0, -theta));
+        float evm = 0;
         for (size_t j = 0; j < config_->OFDM_DATA_NUM; j++) {
             if (j % config_->OFDM_PILOT_SPACING != 0) {
                 // divide fft output by pilot data to get CSI estimation
@@ -745,24 +753,37 @@ void Phy_UE::doFFT(int tid, size_t tag)
                 }
                 cx_float y = fft_buffer_ptr[sc_id];
                 equ_buffer_ptr[j] = (y / csi) * phc;
-                // FIXME: this seems to not work for ant_id > 0,
-                /*
                 complex_float tx
                     = config_
                           ->dl_iq_f[dl_symbol_id][ant_id * config_->OFDM_CA_NUM
                               + config_->OFDM_DATA_START + j];
                 evm += std::norm(equ_buffer_ptr[j] - cx_float(tx.re, tx.im));
-		*/
             }
         }
-        /*
-        evm = std::sqrt(
-            evm / (config_->OFDM_DATA_NUM - config_->get_ofdm_pilot_num()));
-        if (kPrintPhyStats)
-            std::cout << "Frame: " << frame_id << ", Symbol: " << symbol_id
-                      << ", User: " << ant_id << ", EVM: " << 100 * evm
-                      << "%, SNR: " << -10 * std::log10(evm) << std::endl;
-        */
+        if (kPrintEqualizedSymbols) {
+            complex_float* tx
+                = &config_->dl_iq_f[dl_symbol_id][ant_id * config_->OFDM_CA_NUM
+                    + config_->OFDM_DATA_START];
+            arma::cx_fvec x_vec(
+                reinterpret_cast<cx_float*>(tx), config_->OFDM_DATA_NUM, false);
+            Utils::print_vec(x_vec,
+                std::string("x") + std::to_string(total_dl_symbol_id)
+                    + std::string("_") + std::to_string(ant_id));
+            arma::cx_fvec equal_vec(
+                equ_buffer_ptr, config_->OFDM_DATA_NUM, false);
+            Utils::print_vec(equal_vec,
+                std::string("equ") + std::to_string(total_dl_symbol_id)
+                    + std::string("_") + std::to_string(ant_id));
+        }
+        evm = std::sqrt(evm)
+            / (config_->OFDM_DATA_NUM - config_->get_ofdm_pilot_num());
+        if (kPrintPhyStats) {
+            std::stringstream ss;
+            ss << "Frame: " << frame_id << ", Symbol: " << symbol_id
+               << ", User: " << ant_id << ", EVM: " << 100 * evm
+               << "%, SNR: " << -10 * std::log10(evm) << std::endl;
+            std::cout << ss.str();
+        }
     }
 
     size_t fft_duration_stat = rdtsc() - start_tsc;
@@ -916,14 +937,19 @@ void Phy_UE::doDecode(int tid, size_t tag)
         }
 
         if (kPrintDecodedData) {
-            std::printf("Decoded data (original byte)\n");
+            std::stringstream ss;
+            ss << "Decoded data (original byte) in frame " << frame_id
+               << " symbol " << symbol_id << " ant " << ant_id << ":\n"
+               << std::hex << std::setfill('0');
             for (size_t i = 0; i < config_->num_bytes_per_cb; i++) {
                 uint8_t rx_byte = decoded_buffer_ptr[i];
                 uint8_t tx_byte = (uint8_t)config_->get_info_bits(
                     config_->dl_bits, dl_symbol_id, ant_id, cb_id)[i];
-                std::printf("%x(%x) ", rx_byte, tx_byte);
+                ss << std::hex << std::setw(2) << static_cast<int>(rx_byte)
+                   << "(" << static_cast<int>(tx_byte) << ") ";
             }
-            std::printf("\n");
+            ss << std::dec << std::endl;
+            std::cout << ss.str();
         }
     }
     if (kCollectPhyStats) {
@@ -1065,7 +1091,7 @@ void Phy_UE::doIFFT(int tid, size_t tag)
                 ifft_buff, 0, sizeof(complex_float) * config_->OFDM_DATA_START);
             if (ul_symbol_id < config_->UL_PILOT_SYMS) {
                 std::memcpy(ifft_buff + config_->OFDM_DATA_START,
-                    config_->ue_specific_pilot[ant_id],
+                    config_->ue_specific_pilot[0],
                     config_->OFDM_DATA_NUM * sizeof(complex_float));
             } else {
                 size_t total_ul_data_symbol_id

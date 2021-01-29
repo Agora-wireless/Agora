@@ -1,6 +1,8 @@
 #include "radio_lib.hpp"
 #include "comms-lib.h"
 
+static constexpr bool kPrintCalibrationMats = false;
+
 std::atomic<size_t> num_radios_initialized;
 std::atomic<size_t> num_radios_configured;
 
@@ -17,7 +19,7 @@ RadioConfig::RadioConfig(Config* cfg)
     std::cout << "radio num is " << this->_radioNum << std::endl;
     if (_cfg->isUE)
         throw std::invalid_argument("Bad config! Not a UE!");
-    if (!kUseUHD || _cfg->hub_ids.size() != 0) {
+    if (!kUseUHD && _cfg->hub_ids.empty() == false) {
         args["driver"] = "remote";
         args["timeout"] = "1000000";
         args["serial"] = _cfg->hub_ids.at(0);
@@ -100,7 +102,7 @@ RadioConfig::RadioConfig(Config* cfg)
     for (size_t i = 0; i < this->_radioNum; i++) {
         std::cout << _cfg->radio_ids.at(i) << ": Front end "
                   << baStn[i]->getHardwareInfo()["frontend"] << std::endl;
-        for (size_t c = 0; c < _cfg->nChannels; c++) {
+        for (auto c : channels) {
             if (c < baStn[i]->getNumChannels(SOAPY_SDR_RX)) {
                 std::printf("RX Channel %zu\n", c);
                 std::printf("Actual RX sample rate: %fMSps...\n",
@@ -116,8 +118,8 @@ RadioConfig::RadioConfig(Config* cfg)
                         (baStn[i]->getGain(SOAPY_SDR_RX, c, "PGA")));
                     std::printf("Actual RX TIA gain: %f...\n",
                         (baStn[i]->getGain(SOAPY_SDR_RX, c, "TIA")));
-                    if (baStn[i]->getHardwareInfo()["frontend"].compare("CBRS")
-                        == 0) {
+                    if (baStn[i]->getHardwareInfo()["frontend"].find("CBRS")
+                        != std::string::npos) {
                         std::printf("Actual RX LNA1 gain: %f...\n",
                             (baStn[i]->getGain(SOAPY_SDR_RX, c, "LNA1")));
                         std::printf("Actual RX LNA2 gain: %f...\n",
@@ -131,7 +133,7 @@ RadioConfig::RadioConfig(Config* cfg)
             }
         }
 
-        for (size_t c = 0; c < _cfg->nChannels; c++) {
+        for (auto c : channels) {
             if (c < baStn[i]->getNumChannels(SOAPY_SDR_TX)) {
                 std::printf("TX Channel %zu\n", c);
                 std::printf("Actual TX sample rate: %fMSps...\n",
@@ -145,8 +147,8 @@ RadioConfig::RadioConfig(Config* cfg)
                         (baStn[i]->getGain(SOAPY_SDR_TX, c, "PAD")));
                     std::printf("Actual TX IAMP gain: %f...\n",
                         (baStn[i]->getGain(SOAPY_SDR_TX, c, "IAMP")));
-                    if (baStn[i]->getHardwareInfo()["frontend"].compare("CBRS")
-                        == 0) {
+                    if (baStn[i]->getHardwareInfo()["frontend"].find("CBRS")
+                        != std::string::npos) {
                         std::printf("Actual TX PA1 gain: %f...\n",
                             (baStn[i]->getGain(SOAPY_SDR_TX, c, "PA1")));
                         std::printf("Actual TX PA2 gain: %f...\n",
@@ -235,7 +237,7 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
         }
 
     SoapySDR::Kwargs info = baStn[i]->getHardwareInfo();
-    for (auto ch : { 0, 1 }) {
+    for (auto ch : channels) {
         if (!kUseUHD) {
             baStn[i]->setBandwidth(SOAPY_SDR_RX, ch, _cfg->bwFilter);
             baStn[i]->setBandwidth(SOAPY_SDR_TX, ch, _cfg->bwFilter);
@@ -298,54 +300,90 @@ void RadioConfig::configureBSRadio(RadioConfigContext* context)
         baStn[i]->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
     }
 
-    // we disable channel 1 because of the internal LDO issue.
-    // This will be fixed in the next revision (E) of Iris.
-    if (_cfg->nChannels == 1) {
-        if (!kUseUHD) {
-            baStn[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
-            baStn[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
-        }
-    }
     num_radios_configured++;
 }
 
 bool RadioConfig::radioStart()
 {
     bool good_calib = false;
-    alloc_buffer_1d(&init_calib_dl_,
+    alloc_buffer_1d(&init_calib_dl_processed_,
         _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float),
         Agora_memory::Alignment_t::k64Align, 1);
-    alloc_buffer_1d(&init_calib_ul_,
+    alloc_buffer_1d(&init_calib_ul_processed_,
         _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM * sizeof(arma::cx_float),
         Agora_memory::Alignment_t::k64Align, 1);
     // initialize init_calib to a matrix of ones
     for (size_t i = 0; i < _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM; i++) {
-        init_calib_dl_[i] = 1;
-        init_calib_ul_[i] = 1;
+        init_calib_dl_processed_[i] = 1;
+        init_calib_ul_processed_[i] = 1;
     }
-    if (_cfg->downlink_mode) {
-        int iter = 0;
-        int max_iter = 3;
-        while (!good_calib) {
-            good_calib = initial_calib(_cfg->sampleCalEn);
-            iter++;
-            if (iter == max_iter && !good_calib) {
-                std::cout << "attempted " << max_iter
-                          << " unsucessful calibration, stopping ..."
-                          << std::endl;
-                break;
+
+    calib_meas_num_ = _cfg->init_calib_repeat;
+    if (calib_meas_num_) {
+        init_calib_ul_.calloc(calib_meas_num_,
+            _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM,
+            Agora_memory::Alignment_t::k64Align);
+        init_calib_dl_.calloc(calib_meas_num_,
+            _cfg->OFDM_DATA_NUM * _cfg->BF_ANT_NUM,
+            Agora_memory::Alignment_t::k64Align);
+        if (_cfg->downlink_mode) {
+            int iter = 0;
+            int max_iter = 3;
+            std::cout << "Start initial reciprocity calibration..."
+                      << std::endl;
+            while (!good_calib) {
+                good_calib = initial_calib(_cfg->sampleCalEn);
+                iter++;
+                if (iter == max_iter && !good_calib) {
+                    std::cout << "attempted " << max_iter
+                              << " unsucessful calibration, stopping ..."
+                              << std::endl;
+                    break;
+                }
+            }
+            if (!good_calib)
+                return good_calib;
+            else
+                std::cout << "initial calibration successful!" << std::endl;
+
+            // process initial measurements
+            arma::cx_fcube calib_dl_cube(_cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM,
+                calib_meas_num_, arma::fill::zeros);
+            arma::cx_fcube calib_ul_cube(_cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM,
+                calib_meas_num_, arma::fill::zeros);
+            for (size_t i = 0; i < calib_meas_num_; i++) {
+                arma::cx_fmat calib_dl_mat(init_calib_dl_[i],
+                    _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+                arma::cx_fmat calib_ul_mat(init_calib_ul_[i],
+                    _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+                calib_dl_cube.slice(i) = calib_dl_mat;
+                calib_ul_cube.slice(i) = calib_ul_mat;
+                if (kPrintCalibrationMats) {
+                    Utils::print_mat(
+                        calib_dl_mat, "calib_dl_mat" + std::to_string(i));
+                    Utils::print_mat(
+                        calib_ul_mat, "calib_ul_mat" + std::to_string(i));
+                    Utils::print_mat(calib_dl_mat / calib_ul_mat,
+                        "calib_mat" + std::to_string(i));
+                }
+            }
+            arma::cx_fmat calib_dl_mean_mat(init_calib_dl_processed_,
+                _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+            arma::cx_fmat calib_ul_mean_mat(init_calib_ul_processed_,
+                _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
+            calib_dl_mean_mat
+                = arma::mean(calib_dl_cube, 2); // mean along dim 2
+            calib_ul_mean_mat
+                = arma::mean(calib_ul_cube, 2); // mean along dim 2
+            if (kPrintCalibrationMats) {
+                Utils::print_mat(calib_dl_mean_mat, "calib_dl_mat");
+                Utils::print_mat(calib_ul_mean_mat, "calib_ul_mat");
+                Utils::print_mat(
+                    calib_dl_mean_mat / calib_ul_mean_mat, "calib_mat");
             }
         }
-        if (!good_calib)
-            return good_calib;
-        else
-            std::cout << "initial calibration successful!" << std::endl;
-        //arma::cx_fmat calib_dl_mat(
-        //    init_calib_dl_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
-        //arma::cx_fmat calib_ul_mat(
-        //    init_calib_ul_, _cfg->OFDM_DATA_NUM, _cfg->BF_ANT_NUM, false);
-        //Utils::print_mat(calib_dl_mat);
-        //Utils::print_mat(calib_ul_mat);
+        init_calib_dl_.free();
+        init_calib_ul_.free();
     }
 
     std::vector<unsigned> zeros(_cfg->sampsPerSymbol, 0);
@@ -631,6 +669,8 @@ void RadioConfig::radioStop()
 
 RadioConfig::~RadioConfig()
 {
+    free_buffer_1d(&init_calib_dl_processed_);
+    free_buffer_1d(&init_calib_ul_processed_);
     for (size_t i = 0; i < this->_radioNum; i++) {
         baStn[i]->closeStream(this->rxStreams[i]);
         baStn[i]->closeStream(this->txStreams[i]);

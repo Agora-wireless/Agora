@@ -62,9 +62,11 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<int>& buffer_status,
         }
 
         if (cfg->downlink_mode) {
-            std::memcpy(calib_dl_buffer[0], radioconfig_->get_calib_dl(),
+            std::memcpy(calib_dl_buffer[kFrameWnd - 1],
+                radioconfig_->get_calib_dl(),
                 cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM * sizeof(arma::cx_float));
-            std::memcpy(calib_ul_buffer[0], radioconfig_->get_calib_ul(),
+            std::memcpy(calib_ul_buffer[kFrameWnd - 1],
+                radioconfig_->get_calib_ul(),
                 cfg->OFDM_DATA_NUM * cfg->BF_ANT_NUM * sizeof(arma::cx_float));
         }
     }
@@ -179,7 +181,8 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
 
     // if rx_buffer is full, exit
     if (rx_buffer_status[rx_offset] == 1) {
-        std::printf("TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
+        std::printf(
+            "TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
         cfg->running = false;
         return (NULL);
     }
@@ -192,18 +195,18 @@ struct Packet* PacketTXRX::recv_enqueue(int tid, int radio_id, int rx_offset)
         return (NULL);
     }
     if (kDebugPrintInTask) {
-        std::printf("In TXRX thread %d: Received frame %d, symbol %d, ant %d\n", tid,
-            pkt->frame_id, pkt->symbol_id, pkt->ant_id);
+        std::printf("In TXRX thread %d: Received frame %d, symbol %d, ant %d\n",
+            tid, pkt->frame_id, pkt->symbol_id, pkt->ant_id);
     }
     if (kDebugMulticell) {
         std::printf("Before packet combining: receiving data stream from the "
-               "antenna %d in cell %d,\n",
+                    "antenna %d in cell %d,\n",
             pkt->ant_id, pkt->cell_id);
     }
     pkt->ant_id += pkt->cell_id * ant_per_cell;
     if (kDebugMulticell) {
         std::printf("After packet combining: the combined antenna ID is %d, it "
-               "comes from the cell %d\n",
+                    "comes from the cell %d\n",
             pkt->ant_id, pkt->cell_id);
     }
 
@@ -242,7 +245,7 @@ int PacketTXRX::dequeue_send(int tid)
 
     if (kDebugPrintInTask) {
         std::printf("In TXRX thread %d: Transmitted frame %zu, symbol %zu, "
-               "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+                    "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags[0])._tag,
             offset, message_queue_->size_approx());
     }

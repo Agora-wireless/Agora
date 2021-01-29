@@ -81,6 +81,8 @@ Config::Config(std::string jsonfile)
     beamsweep = tddConf.value("beamsweep", false);
     sampleCalEn = tddConf.value("sample_calibrate", false);
     imbalanceCalEn = tddConf.value("imbalance_calibrate", false);
+    init_calib_repeat = tddConf.value("init_calib_repeat", 1);
+
     modulation = tddConf.value("modulation", "16QAM");
 
     bs_server_addr = tddConf.value("bs_server_addr", "127.0.0.1");
@@ -126,7 +128,12 @@ Config::Config(std::string jsonfile)
     correct_phase_shift = tddConf.value("correct_phase_shift", false);
     DL_PILOT_SYMS = tddConf.value("client_dl_pilot_syms", 0);
     UL_PILOT_SYMS = tddConf.value("client_ul_pilot_syms", 0);
-    cl_tx_advance = tddConf.value("tx_advance", 100);
+    auto tx_advance = tddConf.value("tx_advance", json::array());
+    if (tx_advance.empty()) {
+        cl_tx_advance.resize(nRadios, 0);
+    } else {
+        cl_tx_advance.assign(tx_advance.begin(), tx_advance.end());
+    }
     hw_framer = tddConf.value("hw_framer", true);
     if (tddConf.find("frames") == tddConf.end()) {
         symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
@@ -431,15 +438,15 @@ void Config::genData()
         }
     }
 #else
-    std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
-    std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_"
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string ul_data_file = cur_directory + "/data/LDPC_orig_ul_data_"
         + std::to_string(OFDM_CA_NUM) + "_ant"
         + std::to_string(total_ue_ant_num) + ".bin";
-    std::cout << "Config: Reading raw data from " << filename1 << std::endl;
-    FILE* fd = fopen(filename1.c_str(), "rb");
+    std::cout << "Config: Reading raw data from " << ul_data_file << std::endl;
+    FILE* fd = fopen(ul_data_file.c_str(), "rb");
     if (fd == nullptr) {
         std::printf("Failed to open antenna file %s. Error %s.\n",
-            filename1.c_str(), strerror(errno));
+            ul_data_file.c_str(), strerror(errno));
         std::exit(-1);
     }
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
@@ -452,7 +459,7 @@ void Config::genData()
             if (r < num_bytes_per_ue) {
                 std::printf("uplink bad read from file %s (batch %zu : %zu) "
                             "%zu : %zu\n",
-                    filename1.c_str(), i, j, r, num_bytes_per_ue);
+                    ul_data_file.c_str(), i, j, r, num_bytes_per_ue);
             }
         }
         if (std::fseek(fd,
@@ -463,7 +470,18 @@ void Config::genData()
             return;
         }
     }
+    std::fclose(fd);
 
+    std::string dl_data_file = cur_directory + "/data/LDPC_orig_dl_data_"
+        + std::to_string(OFDM_CA_NUM) + "_ant"
+        + std::to_string(total_ue_ant_num) + ".bin";
+    std::cout << "Config: Reading raw data from " << dl_data_file << std::endl;
+    fd = fopen(dl_data_file.c_str(), "rb");
+    if (fd == nullptr) {
+        std::printf("Failed to open antenna file %s. Error %s.\n",
+            dl_data_file.c_str(), strerror(errno));
+        std::exit(-1);
+    }
     for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < UE_ANT_NUM; j++) {
             size_t r = std::fread(dl_bits[i] + j * num_bytes_per_ue_pad,
@@ -471,13 +489,12 @@ void Config::genData()
             if (r < num_bytes_per_ue)
                 std::printf(
                     "downlink bad read from file %s (batch %zu : %zu) \n",
-                    filename1.c_str(), i, j);
+                    dl_data_file.c_str(), i, j);
         }
     }
     std::fclose(fd);
 #endif
 
-    const size_t bytes_per_block = bits_to_bytes(LDPC_config.cbLen);
     const size_t encoded_bytes_per_block
         = bits_to_bytes(LDPC_config.cbCodewLen);
     const size_t num_blocks_per_symbol
@@ -486,84 +503,26 @@ void Config::genData()
     // Encode uplink bits
     ul_encoded_bits.malloc(ul_data_symbol_num_perframe * num_blocks_per_symbol,
         encoded_bytes_per_block, Agora_memory::Alignment_t::k64Align);
-
-    int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
-        LDPC_config.Bg, LDPC_config.Zc)];
-    for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
-        for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_ANT_NUM; j++) {
-            ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
-                LDPC_config.nRows,
-                ul_encoded_bits[i * num_blocks_per_symbol + j],
-                temp_parity_buffer, ul_bits[i] + j * bytes_per_block);
-        }
-    }
-
     ul_mod_input.calloc(ul_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM,
         Agora_memory::Alignment_t::k32Align);
+    int8_t* temp_parity_buffer = new int8_t[ldpc_encoding_parity_buf_size(
+        LDPC_config.Bg, LDPC_config.Zc)];
+
     for (size_t i = 0; i < ul_data_symbol_num_perframe; i++) {
         for (size_t j = 0; j < UE_ANT_NUM; j++) {
             for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
-                adapt_bits_for_mod(
-                    reinterpret_cast<uint8_t*>(
-                        ul_encoded_bits[i * num_blocks_per_symbol
-                            + j * LDPC_config.nblocksInSymbol + k]),
+                int8_t* bits_ptr = get_info_bits(ul_bits, i, j, k);
+                int8_t* coded_bits_ptr
+                    = ul_encoded_bits[i * num_blocks_per_symbol
+                        + j * LDPC_config.nblocksInSymbol + k];
+                ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
+                    LDPC_config.nRows, coded_bits_ptr, temp_parity_buffer,
+                    bits_ptr);
+                adapt_bits_for_mod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
                     ul_mod_input[i] + j * OFDM_DATA_NUM
-                        + k * encoded_bytes_per_block,
+                        + k * encoded_bytes_per_block / mod_order_bits,
                     encoded_bytes_per_block, mod_order_bits);
             }
-        }
-    }
-
-    Table<int8_t> dl_encoded_bits;
-    dl_encoded_bits.malloc(dl_data_symbol_num_perframe * num_blocks_per_symbol,
-        encoded_bytes_per_block, Agora_memory::Alignment_t::k64Align);
-
-    // Encode downlink bits
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        for (size_t j = 0; j < LDPC_config.nblocksInSymbol * UE_ANT_NUM; j++) {
-            ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
-                LDPC_config.nRows,
-                dl_encoded_bits[i * num_blocks_per_symbol + j],
-                temp_parity_buffer, dl_bits[i] + j * bytes_per_block);
-        }
-    }
-
-    dl_mod_input.calloc(dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM,
-        Agora_memory::Alignment_t::k32Align);
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        for (size_t j = 0; j < UE_ANT_NUM; j++) {
-            for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
-                adapt_bits_for_mod(
-                    reinterpret_cast<uint8_t*>(
-                        dl_encoded_bits[i * num_blocks_per_symbol
-                            + j * LDPC_config.nblocksInSymbol + k]),
-                    dl_mod_input[i] + j * OFDM_DATA_NUM
-                        + k * encoded_bytes_per_block,
-                    encoded_bytes_per_block, mod_order_bits);
-            }
-        }
-    }
-
-    // Generate freq-domain downlink symbols
-    Table<complex_float> dl_iq_ifft;
-    dl_iq_ifft.calloc(dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM,
-        Agora_memory::Alignment_t::k64Align);
-    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
-        for (size_t u = 0; u < UE_ANT_NUM; u++) {
-            size_t p = u * OFDM_DATA_NUM;
-            size_t q = u * OFDM_CA_NUM;
-
-            for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
-                int k = j - OFDM_DATA_START;
-                size_t s = p + k;
-                if (k % OFDM_PILOT_SPACING != 0) {
-                    dl_iq_f[i][q + j]
-                        = mod_single_uint8(dl_mod_input[i][s], mod_table);
-                } else
-                    dl_iq_f[i][q + j] = ue_specific_pilot[u][k];
-                dl_iq_ifft[i][q + j] = dl_iq_f[i][q + j];
-            }
-            CommsLib::IFFT(&dl_iq_ifft[i][q], OFDM_CA_NUM, false);
         }
     }
 
@@ -586,6 +545,54 @@ void Config::genData()
             }
 
             CommsLib::IFFT(&ul_iq_ifft[i][q], OFDM_CA_NUM, false);
+        }
+    }
+
+    // Encode downlink bits
+    Table<int8_t> dl_encoded_bits;
+    dl_encoded_bits.malloc(dl_data_symbol_num_perframe * num_blocks_per_symbol,
+        encoded_bytes_per_block, Agora_memory::Alignment_t::k64Align);
+    dl_mod_input.calloc(dl_data_symbol_num_perframe, OFDM_DATA_NUM * UE_ANT_NUM,
+        Agora_memory::Alignment_t::k32Align);
+    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+        for (size_t j = 0; j < UE_ANT_NUM; j++) {
+            for (size_t k = 0; k < LDPC_config.nblocksInSymbol; k++) {
+                int8_t* bits_ptr = get_info_bits(dl_bits, i, j, k);
+                int8_t* coded_bits_ptr
+                    = dl_encoded_bits[i * num_blocks_per_symbol
+                        + j * LDPC_config.nblocksInSymbol + k];
+                ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc,
+                    LDPC_config.nRows, coded_bits_ptr, temp_parity_buffer,
+                    bits_ptr);
+                adapt_bits_for_mod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
+                    dl_mod_input[i] + j * OFDM_DATA_NUM
+                        + k * encoded_bytes_per_block / mod_order_bits,
+                    encoded_bytes_per_block, mod_order_bits);
+            }
+        }
+    }
+
+    // Generate freq-domain downlink symbols
+    Table<complex_float> dl_iq_ifft;
+    dl_iq_ifft.calloc(dl_data_symbol_num_perframe, OFDM_CA_NUM * UE_ANT_NUM,
+        Agora_memory::Alignment_t::k64Align);
+    for (size_t i = 0; i < dl_data_symbol_num_perframe; i++) {
+        for (size_t u = 0; u < UE_ANT_NUM; u++) {
+            size_t p = u * OFDM_DATA_NUM;
+            size_t q = u * OFDM_CA_NUM;
+
+            for (size_t j = OFDM_DATA_START; j < OFDM_DATA_STOP; j++) {
+                int k = j - OFDM_DATA_START;
+                size_t s = p + k;
+                if (k % OFDM_PILOT_SPACING != 0) {
+                    dl_iq_f[i][q + j]
+                        = mod_single_uint8(dl_mod_input[i][s], mod_table);
+                } else {
+                    dl_iq_f[i][q + j] = ue_specific_pilot[u][k];
+                }
+                dl_iq_ifft[i][q + j] = dl_iq_f[i][q + j];
+            }
+            CommsLib::IFFT(&dl_iq_ifft[i][q], OFDM_CA_NUM, false);
         }
     }
 
@@ -631,7 +638,7 @@ void Config::genData()
         CommsLib::ifft2tx(ue_pilot_ifft[i], ue_specific_pilot_t[i], OFDM_CA_NUM,
             ofdm_tx_zero_prefix_, CP_LEN, scale);
         if (kDebugPrintPilot) {
-            std::printf("ue_specific_pilot%zu=[", i);
+            std::printf("ue_specific_pilot_t%zu=[", i);
             for (size_t j = 0; j < OFDM_CA_NUM; j++)
                 std::printf("%2.4f+%2.4fi ", ue_pilot_ifft[i][j].re,
                     ue_pilot_ifft[i][j].im);
@@ -661,6 +668,16 @@ void Config::genData()
         for (size_t i = 0; i < OFDM_DATA_NUM; i++)
             std::cout << pilots_[i].re << "+1i*" << pilots_[i].im << ",";
         std::cout << std::endl;
+    }
+
+    if (kDebugPrintPilot) {
+        for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
+            std::cout << "UE" << ue_id << "_pilot_data =[" << std::endl;
+            for (size_t i = 0; i < OFDM_DATA_NUM; i++)
+                std::cout << ue_specific_pilot[ue_id][i].re << "+1i*"
+                          << ue_specific_pilot[ue_id][i].im << " ";
+            std::cout << "];" << std::endl;
+        }
     }
 
     delete[] temp_parity_buffer;
