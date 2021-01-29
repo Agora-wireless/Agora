@@ -80,7 +80,7 @@ int main(int argc, char* argv[])
             ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
 
         const std::string filename_input = cur_directory
-            + "/data/LDPC_orig_data_" + std::to_string(cfg->OFDM_CA_NUM)
+            + "/data/LDPC_orig_ul_data_" + std::to_string(cfg->OFDM_CA_NUM)
             + "_ant" + std::to_string(cfg->UE_ANT_NUM) + ".bin";
         std::printf("Saving raw uplink data (using LDPC) to %s\n",
             filename_input.c_str());
@@ -281,11 +281,11 @@ int main(int argc, char* argv[])
             ldpc_num_input_bits(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
 
         const std::string filename_input = cur_directory
-            + "/data/LDPC_orig_data_" + std::to_string(cfg->OFDM_CA_NUM)
+            + "/data/LDPC_orig_dl_data_" + std::to_string(cfg->OFDM_CA_NUM)
             + "_ant" + std::to_string(cfg->UE_ANT_NUM) + ".bin";
         std::printf(
             "Saving raw dl data (using LDPC) to %s\n", filename_input.c_str());
-        FILE* fp_input = std::fopen(filename_input.c_str(), "ab");
+        FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
         for (size_t i = 0; i < num_dl_codeblocks; i++) {
             std::fwrite(reinterpret_cast<uint8_t*>(&dl_information.at(i).at(0)),
                 input_bytes_per_cb, sizeof(uint8_t), fp_input);
@@ -345,14 +345,14 @@ int main(int argc, char* argv[])
                     dl_mod_data[i][j * cfg->OFDM_CA_NUM + sc_id
                         + cfg->OFDM_DATA_START]
                         = (sc_id % cfg->OFDM_PILOT_SPACING == 0)
-                        ? ue_specific_pilot[j][sc_id]
+                        ? ue_specific_pilot[0][sc_id]
                         : dl_modulated_codewords.at(i * cfg->UE_ANT_NUM + j)
                               .at(sc_id);
             } else {
                 for (size_t sc_id = 0; sc_id < cfg->OFDM_DATA_NUM; sc_id++)
                     dl_mod_data[i][j * cfg->OFDM_CA_NUM + sc_id
                         + cfg->OFDM_DATA_START]
-                        = ue_specific_pilot[j][sc_id];
+                        = ue_specific_pilot[0][sc_id];
             }
         }
     }
@@ -413,9 +413,11 @@ int main(int argc, char* argv[])
                 txSymbol, 0, sizeof(short) * 2 * cfg->ofdm_tx_zero_prefix_);
             for (size_t k = 0; k < cfg->OFDM_CA_NUM; k++) {
                 txSymbol[2 * (k + cfg->CP_LEN + cfg->ofdm_tx_zero_prefix_)]
-                    = (short)(32768 * ptr_ifft[k].re);
+                    = static_cast<short>(32768 * ptr_ifft[k].re
+                        * std::sqrt(cfg->BS_ANT_NUM * 1.f));
                 txSymbol[2 * (k + cfg->CP_LEN + cfg->ofdm_tx_zero_prefix_) + 1]
-                    = (short)(32768 * ptr_ifft[k].im);
+                    = static_cast<short>(32768 * ptr_ifft[k].im
+                        * std::sqrt(cfg->BS_ANT_NUM * 1.f));
             }
             for (size_t k = 0; k < 2 * cfg->CP_LEN; k++) {
                 txSymbol[2 * cfg->ofdm_tx_zero_prefix_ + k] = txSymbol[2

@@ -50,8 +50,8 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     }
 
     init_iq_from_file(std::string(TOSTRING(PROJECT_DIRECTORY))
-        + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
-        + ".bin");
+        + "/data/LDPC_rx_data_" + std::to_string(cfg->OFDM_CA_NUM) + "_ant"
+        + std::to_string(cfg->BS_ANT_NUM) + ".bin");
 
     task_ptok = static_cast<moodycamel::ProducerToken**>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
@@ -191,7 +191,7 @@ void* Sender::master_thread(int)
         const size_t comp_frame_slot = (ctag.frame_id % kFrameWnd);
         packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]++;
 
-        // std::printf("Sender -- checking symbol %d : %zu : %zu\n", ctag.symbol_id, 
+        // std::printf("Sender -- checking symbol %d : %zu : %zu\n", ctag.symbol_id,
         // comp_frame_slot, packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]);
         // Check to see if the current symbol is finished
         if (packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]
@@ -202,7 +202,7 @@ void* Sender::master_thread(int)
             size_t next_symbol_id
                 = FindNextSymbol(ctag.frame_id, (ctag.symbol_id + 1));
             unsigned symbol_delay = next_symbol_id - ctag.symbol_id;
-            // std::printf("Sender -- finishing symbol %d : %zu : %zu delayed %d\n", 
+            // std::printf("Sender -- finishing symbol %d : %zu : %zu delayed %d\n",
             // ctag.symbol_id, cfg->symbol_num_perframe, next_symbol_id, symbol_delay);
             // Add inter-symbol delay
             delay_ticks(
@@ -232,7 +232,7 @@ void* Sender::master_thread(int)
                 delay_ticks(tick_start,
                     get_ticks_for_frame(ctag.frame_id) * next_symbol_id);
                 tick_start = rdtsc();
-                // std::printf("Sender -- finished frame %d, next frame %zu, start 
+                // std::printf("Sender -- finished frame %d, next frame %zu, start
                 // symbol %zu, delaying\n", ctag.frame_id, next_frame_id, next_symbol_id,);
             }
             ScheduleSymbol(next_frame_id, next_symbol_id);
@@ -258,8 +258,8 @@ void* Sender::worker_thread(int tid)
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
     DftiCommitDescriptor(mkl_handle);
 
-    const size_t max_symbol_id = cfg->pilot_symbol_num_perframe
-        + cfg->ul_data_symbol_num_perframe;
+    const size_t max_symbol_id
+        = cfg->pilot_symbol_num_perframe + cfg->ul_data_symbol_num_perframe;
     const size_t radio_lo = tid * cfg->nRadios / socket_thread_num;
     const size_t radio_hi = (tid + 1) * cfg->nRadios / socket_thread_num;
     const size_t ant_num_this_thread = cfg->BS_ANT_NUM / socket_thread_num
@@ -321,7 +321,7 @@ void* Sender::worker_thread(int tid)
 #endif
 
             // Update the TX buffer
-            // std::printf("Sender : worker processing symbol %d, %d\n", 
+            // std::printf("Sender : worker processing symbol %d, %d\n",
             // tag.symbol_id, (int)symbol_type);
             pkt->frame_id = tag.frame_id;
             pkt->symbol_id = tag.symbol_id;
