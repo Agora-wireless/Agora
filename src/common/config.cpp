@@ -2,10 +2,10 @@
 // RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
 #include "config.hpp"
-#include "scrambler.hpp"
 
 #include <boost/range/algorithm/count.hpp>
 
+#include "scrambler.hpp"
 #include "utils_ldpc.hpp"
 
 Config::Config(const std::string& jsonfile)
@@ -612,8 +612,13 @@ void Config::GenData() {
       BitsToBytes(this->ldpc_config_.NumCbCodewLen());
   const size_t num_blocks_per_symbol =
       this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
-  Scrambler scrambler;
-  int8_t* input_ptr = new int8_t[bytes_per_block];
+
+  auto scrambler = std::make_unique<Scrambler>();
+  // Used as an input ptr to
+  int8_t* scramble_buffer =
+      new int8_t[bytes_per_block +
+                 kLdpcHelperFunctionInputBufferSizePaddingBytes]();
+  int8_t* ldpc_input = nullptr;
 
   // Encode uplink bits
   ul_encoded_bits_.Malloc(this->frame_.NumULSyms() * num_blocks_per_symbol,
@@ -625,18 +630,20 @@ void Config::GenData() {
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t j = 0;
          j < this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_; j++) {
-      
-      std::memcpy(input_ptr, ul_bits_[i] + j * bytes_per_block, bytes_per_block);
-      
       if (this->Scramble()) {
-        scrambler.WlanScramble(input_ptr, bytes_per_block);
+        std::memcpy(scramble_buffer, ul_bits_[i] + (j * bytes_per_block),
+                    bytes_per_block);
+        scrambler->WlanScramble(scramble_buffer, bytes_per_block);
+        ldpc_input = scramble_buffer;
+      } else {
+        ldpc_input = ul_bits_[i] + (j * bytes_per_block);
       }
 
       LdpcEncodeHelper(this->ldpc_config_.BaseGraph(),
                        this->ldpc_config_.ExpansionFactor(),
                        this->ldpc_config_.NumRows(),
-                       ul_encoded_bits_[i * num_blocks_per_symbol + j],
-                       temp_parity_buffer, input_ptr);
+                       ul_encoded_bits_[(i * num_blocks_per_symbol) + j],
+                       temp_parity_buffer, ldpc_input);
     }
   }
 
@@ -667,18 +674,20 @@ void Config::GenData() {
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
     for (size_t j = 0;
          j < this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_; j++) {
-      
-      std::memcpy(input_ptr, this->dl_bits_[i] + j * bytes_per_block,
-                  bytes_per_block);
       if (this->Scramble()) {
-        scrambler.WlanScramble(input_ptr, bytes_per_block);
+        std::memcpy(scramble_buffer, dl_bits_[i] + (j * bytes_per_block),
+                    bytes_per_block);
+        scrambler->WlanScramble(scramble_buffer, bytes_per_block);
+        ldpc_input = scramble_buffer;
+      } else {
+        ldpc_input = dl_bits_[i] + (j * bytes_per_block);
       }
 
-        LdpcEncodeHelper(this->ldpc_config_.BaseGraph(),
-                         this->ldpc_config_.ExpansionFactor(),
-                         this->ldpc_config_.NumRows(),
-                         dl_encoded_bits[i * num_blocks_per_symbol + j],
-                         temp_parity_buffer, input_ptr);
+      LdpcEncodeHelper(this->ldpc_config_.BaseGraph(),
+                       this->ldpc_config_.ExpansionFactor(),
+                       this->ldpc_config_.NumRows(),
+                       dl_encoded_bits[i * num_blocks_per_symbol + j],
+                       temp_parity_buffer, ldpc_input);
     }
   }
   dl_mod_input_.Calloc(this->frame_.NumDLSyms(),
@@ -841,7 +850,7 @@ void Config::GenData() {
   ul_encoded_bits_.Free();
   dl_mod_input_.Free();
   FreeBuffer1d(&pilot_ifft);
-  delete[] input_ptr;
+  delete[] scramble_buffer;
 }
 
 Config::~Config() {

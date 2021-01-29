@@ -236,10 +236,9 @@ void* Sender::MasterThread(int) {
 
           /* Find start symbol of next frame and add proper delay */
           next_symbol_id = FindNextSymbol(0);
-          //std::printf(
-          //    "Sender -- finished frame %d, next frame %zu, start symbol %zu, "
-          //    "delaying\n",
-          //    ctag.frame_id_, next_frame_id, next_symbol_id);
+          // std::printf(
+          //    "Sender -- finished frame %d, next frame %zu, start symbol %zu,
+          //    " "delaying\n", ctag.frame_id_, next_frame_id, next_symbol_id);
           DelayTicks(tick_start,
                      GetTicksForFrame(ctag.frame_id_) * next_symbol_id);
         }  // if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {

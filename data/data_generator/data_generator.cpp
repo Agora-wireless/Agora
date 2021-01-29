@@ -18,8 +18,8 @@
 #include "config.hpp"
 #include "memory_manage.h"
 #include "modulation.hpp"
-#include "utils_ldpc.hpp"
 #include "scrambler.hpp"
+#include "utils_ldpc.hpp"
 
 static constexpr bool kVerbose = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
@@ -289,7 +289,7 @@ int main(int argc, char* argv[]) {
       scrambler.WlanScramble(input_ptr, input_size);
     }
 
-      data_generator.GenCodeblock(input_ptr, dl_encoded_codewords.at(i));
+    data_generator.GenCodeblock(input_ptr, dl_encoded_codewords.at(i));
   }
 
   // Modulate the encoded codewords

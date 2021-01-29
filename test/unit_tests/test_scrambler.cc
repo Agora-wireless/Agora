@@ -5,10 +5,11 @@
 
 #include <gtest/gtest.h>
 #include <time.h>
+
 #include <vector>
 
-#include "utils_ldpc.hpp"
 #include "scrambler.hpp"
+#include "utils_ldpc.hpp"
 
 static constexpr size_t kNumInputBytes = 125;
 Scrambler scrambler;

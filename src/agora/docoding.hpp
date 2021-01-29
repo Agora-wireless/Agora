@@ -1,5 +1,11 @@
-#ifndef DOCODING
-#define DOCODING
+/**
+ * @file docoding.h
+ * @brief Declaration file for the Docoding class.  Includes the DoEncode and
+ * DoDecode classes.
+ */
+
+#ifndef DOCODING_H_
+#define DOCODING_H_
 
 #include <armadillo>
 #include <cstdio>
@@ -18,6 +24,7 @@
 #include "memory_manage.h"
 #include "modulation.hpp"
 #include "phy_stats.hpp"
+#include "scrambler.hpp"
 #include "stats.hpp"
 #include "utils_ldpc.hpp"
 
@@ -37,6 +44,8 @@ class DoEncode : public Doer {
   int8_t* encoded_buffer_temp_;
   Table<int8_t>& encoded_buffer_;
   DurationStat* duration_stat_;
+  std::unique_ptr<Scrambler> scrambler_;
+  int8_t* scrambler_buffer_;
 };
 
 class DoDecode : public Doer {
@@ -55,6 +64,7 @@ class DoDecode : public Doer {
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers_;
   PhyStats* phy_stats_;
   DurationStat* duration_stat_;
+  std::unique_ptr<Scrambler> scrambler_;
 };
 
-#endif
+#endif  // DOCODING_H_

@@ -236,4 +236,4 @@ class DecodeStatus {
       num_demod_data_received_;
 };
 
-#endif // SHARED_COUNTERS_H_
+#endif  // SHARED_COUNTERS_H_

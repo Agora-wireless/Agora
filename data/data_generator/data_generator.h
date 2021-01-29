@@ -50,8 +50,8 @@ class DataGenerator {
   }
 
   /**
-   * @brief                        Generate the encoded bit sequence for one code
-   * block for the active LDPC configuration from the input bit sequence
+   * @brief                        Generate the encoded bit sequence for one
+   * code block for the active LDPC configuration from the input bit sequence
    *
    * @param  input_ptr             The input bit sequence to be encoded
    * @param  encoded_codeword      The generated encoded codeword bit sequence

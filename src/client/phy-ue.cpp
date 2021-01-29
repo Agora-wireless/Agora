@@ -3,8 +3,8 @@
 #include <memory>
 
 #include "phy_ldpc_decoder_5gnr.h"
-#include "utils_ldpc.hpp"
 #include "scrambler.hpp"
+#include "utils_ldpc.hpp"
 
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
@@ -865,39 +865,39 @@ void PhyUe::DoDecode(int tid, size_t tag) {
       scrambler.WlanDescramble(decoded_buffer_ptr, config_->NumBytesPerCb());
     }
 
-      if (kCollectPhyStats) {
-        decoded_bits_count_[ant_id][total_dl_symbol_id] +=
-            8 * config_->NumBytesPerCb();
-        decoded_blocks_count_[ant_id][total_dl_symbol_id]++;
-        size_t byte_error(0);
-        for (size_t i = 0; i < config_->NumBytesPerCb(); i++) {
-          uint8_t rx_byte = decoded_buffer_ptr[i];
-          auto tx_byte = static_cast<uint8_t>(config_->GetInfoBits(
-              config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i]);
-          uint8_t xor_byte(tx_byte ^ rx_byte);
-          size_t bit_errors = 0;
-          for (size_t j = 0; j < 8; j++) {
-            bit_errors += xor_byte & 1;
-            xor_byte >>= 1;
-          }
-          if (rx_byte != tx_byte) byte_error++;
-
-          bit_error_count_[ant_id][total_dl_symbol_id] += bit_errors;
+    if (kCollectPhyStats) {
+      decoded_bits_count_[ant_id][total_dl_symbol_id] +=
+          8 * config_->NumBytesPerCb();
+      decoded_blocks_count_[ant_id][total_dl_symbol_id]++;
+      size_t byte_error(0);
+      for (size_t i = 0; i < config_->NumBytesPerCb(); i++) {
+        uint8_t rx_byte = decoded_buffer_ptr[i];
+        auto tx_byte = static_cast<uint8_t>(config_->GetInfoBits(
+            config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i]);
+        uint8_t xor_byte(tx_byte ^ rx_byte);
+        size_t bit_errors = 0;
+        for (size_t j = 0; j < 8; j++) {
+          bit_errors += xor_byte & 1;
+          xor_byte >>= 1;
         }
-        block_error_count_[ant_id][total_dl_symbol_id] += (byte_error > 0);
-        block_error += (byte_error > 0);
-      }
+        if (rx_byte != tx_byte) byte_error++;
 
-      if (kPrintDecodedData) {
-        std::printf("Decoded data (original byte)\n");
-        for (size_t i = 0; i < config_->NumBytesPerCb(); i++) {
-          uint8_t rx_byte = decoded_buffer_ptr[i];
-          auto tx_byte = static_cast<uint8_t>(config_->GetInfoBits(
-              config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i]);
-          std::printf("%x(%x) ", rx_byte, tx_byte);
-        }
-        std::printf("\n");
+        bit_error_count_[ant_id][total_dl_symbol_id] += bit_errors;
       }
+      block_error_count_[ant_id][total_dl_symbol_id] += (byte_error > 0);
+      block_error += (byte_error > 0);
+    }
+
+    if (kPrintDecodedData) {
+      std::printf("Decoded data (original byte)\n");
+      for (size_t i = 0; i < config_->NumBytesPerCb(); i++) {
+        uint8_t rx_byte = decoded_buffer_ptr[i];
+        auto tx_byte = static_cast<uint8_t>(config_->GetInfoBits(
+            config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i]);
+        std::printf("%x(%x) ", rx_byte, tx_byte);
+      }
+      std::printf("\n");
+    }
   }
   if (kCollectPhyStats) {
     decoded_symbol_count_[ant_id]++;
@@ -977,7 +977,7 @@ void PhyUe::DoEncode(int tid, size_t tag) {
       if (config_->Scramble()) {
         scrambler.WlanScramble(input_ptr, bytes_per_block);
       }
-      
+
       LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                        ldpc_config.NumRows(), encoded_buffer_temp,
                        parity_buffer, input_ptr);
@@ -989,7 +989,6 @@ void PhyUe::DoEncode(int tid, size_t tag) {
       AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
                       &ul_syms_buffer_[ue_id][output_offset],
                       encoded_bytes_per_block, cfg->ModOrderBits());
-
     }
   }
   // double duration = worker_rdtsc() - start_tsc;
