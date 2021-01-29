@@ -339,7 +339,7 @@ Config::Config(const std::string& jsonfile)
                             num_cb_len, num_cb_codew_len, num_rows, 0);
 
   /* Scrambler and descrambler configurations*/
-  scramble_ = tdd_conf.value("wlan_scrambler", true);
+  scramble_enabled_ = tdd_conf.value("wlan_scrambler", true);
 
   /* Modulation configurations */
   mod_order_bits_ =
@@ -630,7 +630,7 @@ void Config::GenData() {
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t j = 0;
          j < this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_; j++) {
-      if (this->Scramble()) {
+      if (this->ScrambleEnabled()) {
         std::memcpy(scramble_buffer, ul_bits_[i] + (j * bytes_per_block),
                     bytes_per_block);
         scrambler->WlanScramble(scramble_buffer, bytes_per_block);
@@ -674,7 +674,7 @@ void Config::GenData() {
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
     for (size_t j = 0;
          j < this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_; j++) {
-      if (this->Scramble()) {
+      if (this->ScrambleEnabled()) {
         std::memcpy(scramble_buffer, dl_bits_[i] + (j * bytes_per_block),
                     bytes_per_block);
         scrambler->WlanScramble(scramble_buffer, bytes_per_block);

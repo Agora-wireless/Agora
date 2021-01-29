@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
 
     std::memcpy(input_ptr, ul_information.at(i).data(), input_size);
 
-    if (cfg->Scramble()) {
+    if (cfg->ScrambleEnabled()) {
       scrambler.WlanScramble(input_ptr, input_size);
     }
 
@@ -285,7 +285,7 @@ int main(int argc, char* argv[]) {
 
     std::memcpy(input_ptr, dl_information.at(i).data(), input_size);
 
-    if (cfg->Scramble()) {
+    if (cfg->ScrambleEnabled()) {
       scrambler.WlanScramble(input_ptr, input_size);
     }
 

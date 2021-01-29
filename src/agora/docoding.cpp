@@ -62,7 +62,7 @@ EventData DoEncode::Launch(size_t tag) {
   size_t symbol_idx_dl = cfg_->GetDLSymbolIdx(frame_id, symbol_id);
   int8_t* ldpc_input = nullptr;
 
-  if (this->cfg_->Scramble()) {
+  if (this->cfg_->ScrambleEnabled()) {
     std::memcpy(
         scrambler_buffer_,
         cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id),
@@ -176,7 +176,7 @@ EventData DoDecode::Launch(size_t tag) {
   bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                           &ldpc_decoder_5gnr_response);
 
-  if (cfg_->Scramble()) {
+  if (cfg_->ScrambleEnabled()) {
     this->scrambler_->WlanDescramble(decoded_buffer_ptr, cfg_->NumBytesPerCb());
   }
 

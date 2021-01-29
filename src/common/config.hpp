@@ -64,7 +64,7 @@ class Config {
   inline double Freq() const { return this->freq_; }
   inline double Rate() const { return this->rate_; }
   inline double Nco() const { return this->nco_; }
-  inline bool Scramble() const { return this->scramble_; }
+  inline bool ScrambleEnabled() const { return this->scramble_enabled_; }
 
   inline double RadioRfFreq() const { return this->radio_rf_freq_; }
   inline double BwFilter() const { return this->bw_filter_; }
@@ -442,7 +442,7 @@ class Config {
   double freq_;
   double rate_;
   double nco_;
-  bool scramble_;
+  bool scramble_enabled_;
   double radio_rf_freq_;
   double bw_filter_;
   bool single_gain_;
