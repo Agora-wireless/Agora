@@ -334,6 +334,7 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
     ifft_out = static_cast<float*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             2 * cfg->OFDM_CA_NUM * sizeof(float)));
+    ifft_scale_factor = cfg->OFDM_CA_NUM / std::sqrt(cfg->BF_ANT_NUM * 1.f);
 }
 
 DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); }
@@ -408,7 +409,7 @@ Event_data DoIFFT::launch(size_t tag)
     // IFFT scaled results by OFDM_CA_NUM, we scale down IFFT results
     // during data type coversion
     simd_convert_float_to_short(ifft_out_ptr, socket_ptr, cfg->OFDM_CA_NUM,
-        cfg->CP_LEN, cfg->OFDM_CA_NUM / std::sqrt(cfg->BF_ANT_NUM * 1.f));
+        cfg->CP_LEN, ifft_scale_factor);
 
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
 
