@@ -1,4 +1,8 @@
-#include "scrambler.hpp"
+/**
+ * @file                         scrambler.cc
+ * @brief                        Implmentation file for the Scramble Class
+ */
+#include "scrambler.h"
 
 void ConvertBytesToBits(const int8_t* in_byte_buffer, size_t byte_buffer_size,
                         int8_t* out_bit_buffer) {

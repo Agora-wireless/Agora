@@ -2,8 +2,8 @@
  * @file                         scrambler.hpp
  * @brief                        Scramble Class and helper functions
  */
-#ifndef SCRAMBLER_HPP_
-#define SCRAMBLER_HPP_
+#ifndef SCRAMBLER_H_
+#define SCRAMBLER_H_
 
 #include <cstdio>
 #include <functional>
@@ -65,4 +65,4 @@ class Scrambler {
   std::function<void(void*, size_t)> WlanDescramble = WlanScrambler;
 };
 
-#endif  // SCRAMBLER_HPP_
+#endif  // SCRAMBLER_H_
