@@ -92,7 +92,8 @@ int main(int argc, char* argv[]) {
   std::printf("Total number of blocks: %zu\n", num_codeblocks);
   size_t input_size = LdpcEncodingInputBufSize(
       cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor());
-  int8_t* input_ptr = new int8_t[input_size];
+  int8_t* input_ptr =
+      new int8_t[input_size + kLdpcHelperFunctionInputBufferSizePaddingBytes];
   for (size_t noise_id = 0; noise_id < 15; noise_id++) {
     std::vector<std::vector<int8_t>> information(num_codeblocks);
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
@@ -241,5 +242,6 @@ int main(int argc, char* argv[]) {
     demod_data_all_symbols.Free();
     decoded_codewords.Free();
   }
+  delete[] input_ptr;
   return 0;
 }

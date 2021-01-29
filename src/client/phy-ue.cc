@@ -894,7 +894,7 @@ void PhyUe::DoDecode(int tid, size_t tag) {
     bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                             &ldpc_decoder_5gnr_response);
 
-    if (config_->Scramble()) {
+    if (config_->ScrambleEnabled()) {
       scrambler.WlanDescramble(decoded_buffer_ptr, config_->NumBytesPerCb());
     }
 
@@ -1011,7 +1011,7 @@ void PhyUe::DoEncode(int tid, size_t tag) {
             bytes_per_block);
       }
 
-      if (config_->Scramble()) {
+      if (config_->ScrambleEnabled()) {
         scrambler.WlanScramble(input_ptr, bytes_per_block);
       }
 

@@ -54,13 +54,13 @@ void WlanScrambler(void* byte_buffer, size_t byte_buffer_size);
 
 /**
  * @brief                        Scrambler Class for scramble and descramble
- * 
+ *
  */
 class Scrambler {
  public:
   Scrambler();
   ~Scrambler();
-  
+
   std::function<void(void*, size_t)> WlanScramble = WlanScrambler;
   std::function<void(void*, size_t)> WlanDescramble = WlanScrambler;
 };

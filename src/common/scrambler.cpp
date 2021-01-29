@@ -1,8 +1,7 @@
 #include "scrambler.hpp"
 
-void ConvertBytesToBits(const int8_t* in_byte_buffer,
-                                      size_t byte_buffer_size,
-                                      int8_t* out_bit_buffer) {
+void ConvertBytesToBits(const int8_t* in_byte_buffer, size_t byte_buffer_size,
+                        int8_t* out_bit_buffer) {
   for (size_t i = 0; i < byte_buffer_size; i++) {
     for (size_t j = 0; j < 8; j++) {
       out_bit_buffer[i * 8 + j] =
@@ -13,9 +12,8 @@ void ConvertBytesToBits(const int8_t* in_byte_buffer,
   return;
 }
 
-void ConvertBitsToBytes(const int8_t* in_bit_buffer,
-                                      size_t byte_buffer_size,
-                                      int8_t* out_byte_buffer) {
+void ConvertBitsToBytes(const int8_t* in_bit_buffer, size_t byte_buffer_size,
+                        int8_t* out_byte_buffer) {
   for (size_t i = 0; i < byte_buffer_size; i++) {
     out_byte_buffer[i] = 0;
     for (size_t j = 0; j < 8; j++) {
@@ -92,6 +90,8 @@ void WlanScrambler(void* byte_buffer, size_t byte_buffer_size) {
   return;
 }
 
-Scrambler::Scrambler(void) { /* Placeholder */ }
+Scrambler::Scrambler(void) { /* Placeholder */
+}
 
-Scrambler::~Scrambler(void) { /* Placeholder */}
+Scrambler::~Scrambler(void) { /* Placeholder */
+}

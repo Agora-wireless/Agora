@@ -19,7 +19,8 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
                    Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager)
     : Doer(in_config, in_tid),
       raw_data_buffer_(in_raw_data_buffer),
-      encoded_buffer_(in_encoded_buffer) {
+      encoded_buffer_(in_encoded_buffer),
+      scrambler_(std::make_unique<Scrambler>()) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kEncode, in_tid);
   parity_buffer_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::k64Align,
@@ -30,17 +31,21 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
       Agora_memory::Alignment_t::k64Align,
       LdpcEncodingEncodedBufSize(cfg_->LdpcConfig().BaseGraph(),
                                  cfg_->LdpcConfig().ExpansionFactor())));
+
+  scrambler_buffer_ =
+      new int8_t[cfg_->NumBytesPerCb() +
+                 kLdpcHelperFunctionInputBufferSizePaddingBytes]();
   assert(encoded_buffer_temp_ != nullptr);
 }
 
 DoEncode::~DoEncode() {
   std::free(parity_buffer_);
   std::free(encoded_buffer_temp_);
+  delete[] scrambler_buffer_;
 }
 
 EventData DoEncode::Launch(size_t tag) {
   const LDPCconfig& ldpc_config = cfg_->LdpcConfig();
-  Scrambler scrambler;
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
   size_t cb_id = gen_tag_t(tag).cb_id_;
@@ -54,21 +59,24 @@ EventData DoEncode::Launch(size_t tag) {
   }
 
   size_t start_tsc = WorkerRdtsc();
-
   size_t symbol_idx_dl = cfg_->GetDLSymbolIdx(frame_id, symbol_id);
-  int8_t* input_ptr = new int8_t[cfg_->NumBytesPerCb()];
-  std::memcpy(
-      input_ptr,
-      cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id),
-      cfg_->NumBytesPerCb());
+  int8_t* ldpc_input = nullptr;
 
-  if (cfg_->Scramble()) {
-    scrambler.WlanScramble(input_ptr, cfg_->NumBytesPerCb());
+  if (this->cfg_->ScrambleEnabled()) {
+    std::memcpy(
+        scrambler_buffer_,
+        cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id),
+        cfg_->NumBytesPerCb());
+    this->scrambler_->WlanScramble(scrambler_buffer_, cfg_->NumBytesPerCb());
+    ldpc_input = scrambler_buffer_;
+  } else {
+    ldpc_input =
+        cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
   }
 
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                    ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
-                   input_ptr);
+                   ldpc_input);
   int8_t* final_output_ptr = cfg_->GetEncodedBuf(
       encoded_buffer_, frame_id, symbol_idx_dl, ue_id, cur_cb_id);
   AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp_),
@@ -92,9 +100,6 @@ EventData DoEncode::Launch(size_t tag) {
     std::printf("Thread %d Encode takes %.2f\n", tid_,
                 CyclesToUs(duration, cfg_->FreqGhz()));
   }
-
-  delete[] input_ptr;
-
   return EventData(EventType::kEncode, tag);
 }
 
@@ -106,7 +111,8 @@ DoDecode::DoDecode(
     : Doer(in_config, in_tid),
       demod_buffers_(demod_buffers),
       decoded_buffers_(decoded_buffers),
-      phy_stats_(in_phy_stats) {
+      phy_stats_(in_phy_stats),
+      scrambler_(std::make_unique<Scrambler>()) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kDecode, in_tid);
   resp_var_nodes_ = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
@@ -116,7 +122,6 @@ DoDecode::~DoDecode() { std::free(resp_var_nodes_); }
 
 EventData DoDecode::Launch(size_t tag) {
   const LDPCconfig& ldpc_config = cfg_->LdpcConfig();
-  Scrambler scrambler;
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id_;
   const size_t cb_id = gen_tag_t(tag).cb_id_;
@@ -171,8 +176,8 @@ EventData DoDecode::Launch(size_t tag) {
   bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                           &ldpc_decoder_5gnr_response);
 
-  if (cfg_->Scramble()) {
-    scrambler.WlanDescramble(decoded_buffer_ptr, cfg_->NumBytesPerCb());
+  if (cfg_->ScrambleEnabled()) {
+    this->scrambler_->WlanDescramble(decoded_buffer_ptr, cfg_->NumBytesPerCb());
   }
 
   size_t start_tsc2 = WorkerRdtsc();

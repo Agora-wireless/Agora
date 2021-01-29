@@ -110,7 +110,7 @@ TEST(WLAN_Scrambler, random_input_scramble_descramble) {
   scrambler.WlanScramble(byte_buffer, kNumInputBytes);
 
   // Descramble
-  scrambler.WlanScramble(byte_buffer, kNumInputBytes);
+  scrambler.WlanDescramble(byte_buffer, kNumInputBytes);
 
   for (size_t i = 0; i < kNumInputBytes; i++) {
     ASSERT_EQ(byte_buffer[i], byte_buffer_orig[i]);
