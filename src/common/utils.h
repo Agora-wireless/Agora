@@ -107,7 +107,7 @@ class Utils {
   static void WriteBinaryFile(const std::string& name, size_t elem_size,
                               size_t buffer_size, void* buff);
   static void PrintVec(arma::cx_fvec /*c*/, const std::string& /*ss*/);
-  static void PrintMat(arma::cx_fmat /*c*/);
+  static void PrintMat(arma::cx_fmat, std::string);
 };
 
 /// roundup<N>(x) returns x rounded up to the next multiple of N. N must be

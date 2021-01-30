@@ -472,13 +472,12 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
   channel_->ApplyChan(fmat_src, fmat_dst, is_downlink, is_new_frame);
 
   if (kPrintChannelOutput) {
-    Utils::PrintMat(fmat_dst);
+    Utils::PrintMat(fmat_dst, "rx_ul");
   }
 
   auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_bs_[total_offset_bs]);
   SimdConvertFloatToShort(reinterpret_cast<float*>(fmat_dst.memptr()), dst_ptr,
                           2 * bscfg_->SampsPerSymbol() * bscfg_->BsAntNum());
-  std::stringstream ss;
 
   // send the symbol to all base station antennas
   std::vector<uint8_t> udp_pkt_buf(bscfg_->PacketLength(), 0);
@@ -534,7 +533,7 @@ void ChannelSim::DoTxUser(int tid, size_t tag) {
   channel_->ApplyChan(fmat_src, fmat_dst, is_downlink, is_new_frame);
 
   if (kPrintChannelOutput) {
-    Utils::PrintMat(fmat_dst);
+    Utils::PrintMat(fmat_dst, "rx_dl");
   }
 
   auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_ue_[total_offset_ue]);

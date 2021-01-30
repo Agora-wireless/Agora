@@ -95,6 +95,8 @@ Config::Config(const std::string& jsonfile)
   beamsweep_ = tdd_conf.value("beamsweep", false);
   sample_cal_en_ = tdd_conf.value("sample_calibrate", false);
   imbalance_cal_en_ = tdd_conf.value("imbalance_calibrate", false);
+  init_calib_repeat_ = tdd_conf.value("init_calib_repeat", 1);
+
   modulation_ = tdd_conf.value("modulation", "16QAM");
 
   bs_server_addr_ = tdd_conf.value("bs_server_addr", "127.0.0.1");
@@ -138,7 +140,12 @@ Config::Config(const std::string& jsonfile)
   freq_orthogonal_pilot_ = tdd_conf.value("freq_orthogonal_pilot", false);
   correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
 
-  cl_tx_advance_ = tdd_conf.value("tx_advance", 100);
+  auto tx_advance = tdd_conf.value("tx_advance", json::array());
+  if (tx_advance.empty()) {
+    cl_tx_advance_.resize(num_radios_, 0);
+  } else {
+    cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
+  }
   hw_framer_ = tdd_conf.value("hw_framer", true);
 
   /* If frames not specified explicitly, construct default based on frame_type /
@@ -550,15 +557,15 @@ void Config::GenData() {
     }
   }
 #else
-  std::string cur_directory1 = TOSTRING(PROJECT_DIRECTORY);
-  std::string filename1 = cur_directory1 + "/data/LDPC_orig_data_" +
-                          std::to_string(this->ofdm_ca_num_) + "_ant" +
-                          std::to_string(this->total_ue_ant_num_) + ".bin";
-  std::cout << "Config: Reading raw data from " << filename1 << std::endl;
-  FILE* fd = std::fopen(filename1.c_str(), "rb+");
+  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+  std::string ul_data_file = cur_directory + "/data/LDPC_orig_ul_data_" +
+                             std::to_string(this->ofdm_ca_num_) + "_ant" +
+                             std::to_string(this->total_ue_ant_num_) + ".bin";
+  std::cout << "Config: Reading raw data from " << ul_data_file << std::endl;
+  FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
   if (fd == nullptr) {
     std::printf("Failed to open antenna file %s. Error %s.\n",
-                filename1.c_str(), strerror(errno));
+                ul_data_file.c_str(), strerror(errno));
     std::exit(-1);
   }
 
@@ -574,7 +581,7 @@ void Config::GenData() {
         std::printf(
             " *** Error: Uplink bad read from file %s (batch %zu : %zu) %zu : "
             "%zu\n",
-            filename1.c_str(), i, j, r, num_bytes_per_ue);
+            ul_data_file.c_str(), i, j, r, num_bytes_per_ue);
       }
     }
     if (std::fseek(
@@ -585,18 +592,17 @@ void Config::GenData() {
       return;
     }
   }
+  std::fclose(fd);
 
-  /* Skip over the UL symbols */
-  const size_t input_bytes_per_cb = BitsToBytes(LdpcNumInputBits(
-      ldpc_config_.BaseGraph(), ldpc_config_.ExpansionFactor()));
-  const size_t ul_codeblocks =
-      frame_.NumULSyms() * ldpc_config_.NumBlocksInSymbol() * ue_ant_num_;
-  const size_t skip_count =
-      ul_codeblocks * (input_bytes_per_cb * sizeof(uint8_t));
-
-  if (std::fseek(fd, skip_count, SEEK_SET) != 0) {
-    std::printf(" ***Error seeking over the ul symbols: %zu : %zu\n",
-                this->frame_.NumULSyms(), skip_count);
+  std::string dl_data_file = cur_directory + "/data/LDPC_orig_dl_data_" +
+                             std::to_string(this->ofdm_ca_num_) + "_ant" +
+                             std::to_string(this->total_ue_ant_num_) + ".bin";
+  std::cout << "Config: Reading raw data from " << dl_data_file << std::endl;
+  fd = std::fopen(dl_data_file.c_str(), "rb");
+  if (fd == nullptr) {
+    std::printf("Failed to open antenna file %s. Error %s.\n",
+                dl_data_file.c_str(), strerror(errno));
+    std::exit(-1);
   }
 
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
@@ -606,14 +612,13 @@ void Config::GenData() {
       if (r < num_bytes_per_ue) {
         std::printf(
             "***Error: Downlink bad read from file %s (batch %zu : %zu) \n",
-            filename1.c_str(), i, j);
+            dl_data_file.c_str(), i, j);
       }
     }
   }
   std::fclose(fd);
 #endif
 
-  const size_t bytes_per_block = BitsToBytes(this->ldpc_config_.NumCbLen());
   const size_t encoded_bytes_per_block =
       BitsToBytes(this->ldpc_config_.NumCbCodewLen());
   const size_t num_blocks_per_symbol =
@@ -622,7 +627,7 @@ void Config::GenData() {
   auto scrambler = std::make_unique<Scrambler>();
   // Used as an input ptr to
   int8_t* scramble_buffer =
-      new int8_t[bytes_per_block +
+      new int8_t[num_bytes_per_cb_ +
                  kLdpcHelperFunctionInputBufferSizePaddingBytes]();
   int8_t* ldpc_input = nullptr;
 
@@ -630,112 +635,36 @@ void Config::GenData() {
   ul_encoded_bits_.Malloc(this->frame_.NumULSyms() * num_blocks_per_symbol,
                           encoded_bytes_per_block,
                           Agora_memory::Alignment_t::k64Align);
-
-  auto* temp_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
-      this->ldpc_config_.BaseGraph(), this->ldpc_config_.ExpansionFactor())];
-  for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-    for (size_t j = 0;
-         j < this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_; j++) {
-      if (this->ScrambleEnabled()) {
-        std::memcpy(scramble_buffer, ul_bits_[i] + (j * bytes_per_block),
-                    bytes_per_block);
-        scrambler->WlanScramble(scramble_buffer, bytes_per_block);
-        ldpc_input = scramble_buffer;
-      } else {
-        ldpc_input = ul_bits_[i] + (j * bytes_per_block);
-      }
-
-      LdpcEncodeHelper(this->ldpc_config_.BaseGraph(),
-                       this->ldpc_config_.ExpansionFactor(),
-                       this->ldpc_config_.NumRows(),
-                       ul_encoded_bits_[(i * num_blocks_per_symbol) + j],
-                       temp_parity_buffer, ldpc_input);
-    }
-  }
-
   ul_mod_input_.Calloc(this->frame_.NumULSyms(),
                        this->ofdm_data_num_ * this->ue_ant_num_,
                        Agora_memory::Alignment_t::k32Align);
-  for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-    for (size_t j = 0; j < this->ue_ant_num_; j++) {
-      for (size_t k = 0; k < this->ldpc_config_.NumBlocksInSymbol(); k++) {
-        AdaptBitsForMod(
-            reinterpret_cast<uint8_t*>(
-                ul_encoded_bits_[i * num_blocks_per_symbol +
-                                 j * this->ldpc_config_.NumBlocksInSymbol() +
-                                 k]),
-            ul_mod_input_[i] + j * this->ofdm_data_num_ +
-                k * encoded_bytes_per_block,
-            encoded_bytes_per_block, this->mod_order_bits_);
-      }
-    }
-  }
+  auto* temp_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
+      this->ldpc_config_.BaseGraph(), this->ldpc_config_.ExpansionFactor())];
 
-  Table<int8_t> dl_encoded_bits;
-  dl_encoded_bits.Malloc(this->frame_.NumDLSyms() * num_blocks_per_symbol,
-                         encoded_bytes_per_block,
-                         Agora_memory::Alignment_t::k64Align);
+  for (size_t i = 0; i < frame_.NumULSyms(); i++) {
+    for (size_t j = 0; j < ue_ant_num_; j++) {
+      for (size_t k = 0; k < ldpc_config_.NumBlocksInSymbol(); k++) {
+        int8_t* coded_bits_ptr =
+            ul_encoded_bits_[i * num_blocks_per_symbol +
+                             j * ldpc_config_.NumBlocksInSymbol() + k];
 
-  // Encode downlink bits
-  for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-    for (size_t j = 0;
-         j < this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_; j++) {
-      if (this->ScrambleEnabled()) {
-        std::memcpy(scramble_buffer, dl_bits_[i] + (j * bytes_per_block),
-                    bytes_per_block);
-        scrambler->WlanScramble(scramble_buffer, bytes_per_block);
-        ldpc_input = scramble_buffer;
-      } else {
-        ldpc_input = dl_bits_[i] + (j * bytes_per_block);
-      }
-
-      LdpcEncodeHelper(this->ldpc_config_.BaseGraph(),
-                       this->ldpc_config_.ExpansionFactor(),
-                       this->ldpc_config_.NumRows(),
-                       dl_encoded_bits[i * num_blocks_per_symbol + j],
-                       temp_parity_buffer, ldpc_input);
-    }
-  }
-  dl_mod_input_.Calloc(this->frame_.NumDLSyms(),
-                       this->ofdm_data_num_ * this->ue_ant_num_,
-                       Agora_memory::Alignment_t::k32Align);
-  for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-    for (size_t j = 0; j < this->ue_ant_num_; j++) {
-      for (size_t k = 0; k < this->ldpc_config_.NumBlocksInSymbol(); k++) {
-        AdaptBitsForMod(
-            reinterpret_cast<uint8_t*>(
-                dl_encoded_bits[i * num_blocks_per_symbol +
-                                j * this->ldpc_config_.NumBlocksInSymbol() +
-                                k]),
-            dl_mod_input_[i] + j * this->ofdm_data_num_ +
-                k * encoded_bytes_per_block,
-            encoded_bytes_per_block, this->mod_order_bits_);
-      }
-    }
-  }
-
-  // Generate freq-domain downlink symbols
-  Table<complex_float> dl_iq_ifft;
-  dl_iq_ifft.Calloc(this->frame_.NumDLSyms(),
-                    this->ofdm_ca_num_ * this->ue_ant_num_,
-                    Agora_memory::Alignment_t::k64Align);
-  for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-    for (size_t u = 0; u < this->ue_ant_num_; u++) {
-      size_t p = u * this->ofdm_data_num_;
-      size_t q = u * this->ofdm_ca_num_;
-
-      for (size_t j = this->ofdm_data_start_; j < this->ofdm_data_stop_; j++) {
-        int k = j - this->ofdm_data_start_;
-        size_t s = p + k;
-        if (k % this->ofdm_pilot_spacing_ != 0) {
-          this->dl_iq_f_[i][q + j] =
-              ModSingleUint8(dl_mod_input_[i][s], this->mod_table_);
+        if (scramble_enabled_) {
+          std::memcpy(scramble_buffer, GetInfoBits(ul_bits_, i, j, k),
+                      num_bytes_per_cb_);
+          scrambler->WlanScramble(scramble_buffer, num_bytes_per_cb_);
+          ldpc_input = scramble_buffer;
         } else {
-          this->dl_iq_f_[i][q + j] = this->ue_specific_pilot_[u][k];
+          ldpc_input = GetInfoBits(ul_bits_, i, j, k);
         }
-        dl_iq_ifft[i][q + j] = this->dl_iq_f_[i][q + j];
+
+        LdpcEncodeHelper(ldpc_config_.BaseGraph(),
+                         ldpc_config_.ExpansionFactor(), ldpc_config_.NumRows(),
+                         coded_bits_ptr, temp_parity_buffer, ldpc_input);
+        AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
+                        ul_mod_input_[i] + j * ofdm_data_num_ +
+                            k * encoded_bytes_per_block / mod_order_bits_,
+                        encoded_bytes_per_block, mod_order_bits_);
       }
-      CommsLib::IFFT(&dl_iq_ifft[i][q], this->ofdm_ca_num_, false);
     }
   }
 
@@ -750,14 +679,71 @@ void Config::GenData() {
       size_t q = u * this->ofdm_ca_num_;
 
       for (size_t j = this->ofdm_data_start_; j < this->ofdm_data_stop_; j++) {
-        size_t k = j - this->ofdm_data_start_;
+        size_t k = j - ofdm_data_start_;
         size_t s = p + k;
-        ul_iq_f_[i][q + j] =
-            ModSingleUint8(ul_mod_input_[i][s], this->mod_table_);
-        ul_iq_ifft[i][q + j] = this->ul_iq_f_[i][q + j];
+        ul_iq_f_[i][q + j] = ModSingleUint8(ul_mod_input_[i][s], mod_table_);
+        ul_iq_ifft[i][q + j] = ul_iq_f_[i][q + j];
       }
 
-      CommsLib::IFFT(&ul_iq_ifft[i][q], this->ofdm_ca_num_, false);
+      CommsLib::IFFT(&ul_iq_ifft[i][q], ofdm_ca_num_, false);
+    }
+  }
+
+  // Encode downlink bits
+  Table<int8_t> dl_encoded_bits;
+  dl_encoded_bits.Malloc(this->frame_.NumDLSyms() * num_blocks_per_symbol,
+                         encoded_bytes_per_block,
+                         Agora_memory::Alignment_t::k64Align);
+  dl_mod_input_.Calloc(this->frame_.NumDLSyms(), ofdm_data_num_ * ue_ant_num_,
+                       Agora_memory::Alignment_t::k32Align);
+
+  for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
+    for (size_t j = 0; j < this->ue_ant_num_; j++) {
+      for (size_t k = 0; k < ldpc_config_.NumBlocksInSymbol(); k++) {
+        int8_t* coded_bits_ptr =
+            dl_encoded_bits[i * num_blocks_per_symbol +
+                            j * ldpc_config_.NumBlocksInSymbol() + k];
+
+        if (scramble_enabled_) {
+          std::memcpy(scramble_buffer, GetInfoBits(dl_bits_, i, j, k),
+                      num_bytes_per_cb_);
+          scrambler->WlanScramble(scramble_buffer, num_bytes_per_cb_);
+          ldpc_input = scramble_buffer;
+        } else {
+          ldpc_input = GetInfoBits(dl_bits_, i, j, k);
+        }
+
+        LdpcEncodeHelper(ldpc_config_.BaseGraph(),
+                         ldpc_config_.ExpansionFactor(), ldpc_config_.NumRows(),
+                         coded_bits_ptr, temp_parity_buffer, ldpc_input);
+        AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
+                        dl_mod_input_[i] + j * ofdm_data_num_ +
+                            k * encoded_bytes_per_block / mod_order_bits_,
+                        encoded_bytes_per_block, mod_order_bits_);
+      }
+    }
+  }
+
+  // Generate freq-domain downlink symbols
+  Table<complex_float> dl_iq_ifft;
+  dl_iq_ifft.Calloc(this->frame_.NumDLSyms(), ofdm_ca_num_ * ue_ant_num_,
+                    Agora_memory::Alignment_t::k64Align);
+  for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
+    for (size_t u = 0; u < ue_ant_num_; u++) {
+      size_t p = u * ofdm_data_num_;
+      size_t q = u * ofdm_ca_num_;
+
+      for (size_t j = ofdm_data_start_; j < ofdm_data_stop_; j++) {
+        int k = j - ofdm_data_start_;
+        size_t s = p + k;
+        if (k % ofdm_pilot_spacing_ != 0) {
+          dl_iq_f_[i][q + j] = ModSingleUint8(dl_mod_input_[i][s], mod_table_);
+        } else {
+          dl_iq_f_[i][q + j] = ue_specific_pilot_[u][k];
+        }
+        dl_iq_ifft[i][q + j] = dl_iq_f_[i][q + j];
+      }
+      CommsLib::IFFT(&dl_iq_ifft[i][q], ofdm_ca_num_, false);
     }
   }
 
@@ -810,7 +796,7 @@ void Config::GenData() {
                       this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
                       this->cp_len_, this->scale_);
     if (kDebugPrintPilot == true) {
-      std::printf("ue_specific_pilot%zu=[", i);
+      std::printf("ue_specific_pilot_t%zu=[", i);
       for (size_t j = 0; j < this->ofdm_ca_num_; j++) {
         std::printf("%2.4f+%2.4fi ", ue_pilot_ifft[i][j].re,
                     ue_pilot_ifft[i][j].im);
@@ -846,6 +832,16 @@ void Config::GenData() {
       std::cout << this->pilots_[i].re << "+1i*" << this->pilots_[i].im << ",";
     }
     std::cout << std::endl;
+  }
+
+  if (kDebugPrintPilot) {
+    for (size_t ue_id = 0; ue_id < ue_ant_num_; ue_id++) {
+      std::cout << "UE" << ue_id << "_pilot_data =[" << std::endl;
+      for (size_t i = 0; i < ofdm_data_num_; i++)
+        std::cout << ue_specific_pilot_[ue_id][i].re << "+1i*"
+                  << ue_specific_pilot_[ue_id][i].im << " ";
+      std::cout << "];" << std::endl;
+    }
   }
 
   delete[](temp_parity_buffer);

@@ -55,8 +55,8 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   }
 
   InitIqFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)) +
-                 "/data/LDPC_rx_data_2048_ant" +
-                 std::to_string(cfg->BsAntNum()) + ".bin");
+                 +"/data/LDPC_rx_data_" + std::to_string(cfg->OfdmCaNum()) +
+                 "_ant" + std::to_string(cfg->BsAntNum()) + ".bin");
 
   task_ptok_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
@@ -207,6 +207,8 @@ void* Sender::MasterThread(int /*unused*/) {
                     ctag.symbol_id_, comp_frame_slot,
                     packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_]);
       }
+      // std::printf("Sender -- checking symbol %d : %zu : %zu\n",
+      // ctag.symbol_id,
       // Check to see if the current symbol is finished
       if (packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_] ==
           cfg_->BsAntNum()) {
@@ -253,6 +255,7 @@ void* Sender::MasterThread(int /*unused*/) {
           }
           DelayTicks(tick_start,
                      GetTicksForFrame(ctag.frame_id_) * next_symbol_id);
+          // std::printf("Sender -- finished frame %d, next frame %zu, start
         }  // if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
         tick_start = Rdtsc();
         ScheduleSymbol(next_frame_id, next_symbol_id);
@@ -347,6 +350,7 @@ void* Sender::WorkerThread(int tid) {
         }
 
         // Update the TX buffer
+        // std::printf("Sender : worker processing symbol %d, %d\n",
         pkt->frame_id_ = tag.frame_id_;
         pkt->symbol_id_ = tag.symbol_id_;
         pkt->cell_id_ = tag.ant_id_ / ant_num_per_cell;

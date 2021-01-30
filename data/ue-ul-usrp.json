@@ -19,7 +19,7 @@
      "GGDDGGPGGGUUUG"
  ],
  "hw_framer": false,
- "tx_advance" : 78,
+ "tx_advance" : [78],
  "UE" : true,
  "client_ul_pilot_syms" : 2,
  "client_dl_pilot_syms" : 2,

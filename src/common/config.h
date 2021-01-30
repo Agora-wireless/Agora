@@ -75,8 +75,10 @@ class Config {
   inline double TxGainB() const { return this->tx_gain_b_; }
   inline double RxGainB() const { return this->rx_gain_b_; }
   inline double CalibTxGainA() const { return this->calib_tx_gain_a_; }
+  inline double CalibTxGainB() const { return this->calib_tx_gain_b_; }
   inline size_t NumCells() const { return this->num_cells_; }
   inline size_t NumRadios() const { return this->num_radios_; }
+  inline size_t InitCalibRepeat() const { return this->init_calib_repeat_; }
 
   inline size_t NumAntennas() const { return this->num_antennas_; }
   inline size_t NumChannels() const { return this->num_channels_; }
@@ -136,7 +138,6 @@ class Config {
   inline size_t SampsPerSymbol() const { return this->samps_per_symbol_; }
   inline size_t PacketLength() const { return this->packet_length_; }
 
-  inline int ClTxAdvance() const { return this->cl_tx_advance_; }
   inline float Scale() const { return this->scale_; }
   inline bool BigstationMode() const { return this->bigstation_mode_; }
   inline size_t MacDataBytesNumPerframe() const {
@@ -183,6 +184,10 @@ class Config {
   // ) const { return this->transport_block_size_; }
 
   /* Inline accessors (complex types) */
+  inline const std::vector<int>& ClTxAdvance() const {
+    return this->cl_tx_advance_;
+  }
+
   inline const LDPCconfig& LdpcConfig() const { return this->ldpc_config_; }
   inline const FrameStats& Frame() const { return this->frame_; }
   inline const std::vector<std::complex<float>>& PilotCf32() const {
@@ -231,6 +236,7 @@ class Config {
   inline Table<int8_t>& DlBits() { return this->dl_bits_; }
   inline Table<int8_t>& UlBits() { return this->ul_bits_; }
   inline Table<complex_float>& UlIqF() { return this->ul_iq_f_; }
+  inline Table<complex_float>& DlIqF() { return this->dl_iq_f_; }
   inline Table<std::complex<int16_t>>& DlIqT() { return this->dl_iq_t_; }
   inline Table<complex_float>& ModTable() { return this->mod_table_; };
 
@@ -460,6 +466,7 @@ class Config {
   size_t ref_ant_;
   size_t beacon_ant_;
   size_t beacon_len_;
+  size_t init_calib_repeat_;
   bool beamsweep_;
   bool sample_cal_en_;
   bool imbalance_cal_en_;
@@ -529,7 +536,7 @@ class Config {
   // Ethernet/IP/UDP headers.
   size_t packet_length_;
 
-  int cl_tx_advance_;
+  std::vector<int> cl_tx_advance_;
   // Indicates all UEs that are in this experiment,
   // including the ones instantiated on other runs/machines.
   size_t total_ue_ant_num_;

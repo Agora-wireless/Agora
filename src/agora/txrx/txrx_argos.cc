@@ -118,7 +118,7 @@ int PacketTXRX::DequeueSendArgos(int tid) {
   int ch = ant_id % n_channels;
 
   if ((c->Frame().IsRecCalEnabled() == true) &&
-      (symbol_id == c->Frame().GetDLSymbol(0))) {
+      (symbol_id == c->Frame().GetDLSymbol(0)) && (ant_id != c->RefAnt())) {
     std::vector<std::complex<int16_t>> zeros(c->SampsPerSymbol(),
                                              std::complex<int16_t>(0, 0));
     for (size_t s = 0; s < c->AntPerGroup(); s++) {
@@ -134,7 +134,7 @@ int PacketTXRX::DequeueSendArgos(int tid) {
 
   if (kDebugDownlink == true) {
     std::vector<std::complex<int16_t>> zeros(c->SampsPerSymbol());
-    if (ant_id != c->RefAnt()) {
+    if (ant_id != 0) {
       txbuf[ch] = zeros.data();
     } else if (dl_symbol_idx < c->Frame().ClientDlPilotSymbols()) {
       txbuf[ch] = reinterpret_cast<void*>(c->UeSpecificPilotT()[0]);

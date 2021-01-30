@@ -8,8 +8,6 @@
 
 #include "utils.h"
 
-#define NUM_ROWS_PRINT 10  // Used to truncate matrix printout
-
 size_t cpu_layout[MAX_CORE_NUM];
 bool cpu_layout_initlized = false;
 
@@ -304,18 +302,17 @@ void Utils::WriteBinaryFile(const std::string& name, size_t elem_size,
   std::fclose(f_handle);
 }
 
-void Utils::PrintMat(arma::cx_fmat c) {
-  size_t print_rows = std::min((size_t)c.n_rows, (size_t)NUM_ROWS_PRINT);
-  std::cout << "Printing only " << print_rows << " rows !!" << std::endl;
+void Utils::PrintMat(arma::cx_fmat c, std::string ss) {
   std::stringstream so;
+  so << ss << " = [";
   for (size_t i = 0; i < c.n_cols; i++) {
-    so << "row" << i << " = [";
-    for (size_t j = 0; j < print_rows; j++) {
+    so << "[";
+    for (size_t j = 0; j < c.n_rows; j++)
       so << std::fixed << std::setw(5) << std::setprecision(3)
          << c.at(j, i).real() << "+" << c.at(j, i).imag() << "i ";
-    }
     so << "];\n";
   }
+  so << "];\n";
   so << std::endl;
   std::cout << so.str();
 }
