@@ -70,7 +70,8 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg) : cfg_(cfg) {
                       (cl_stn_[i]->getGain(SOAPY_SDR_RX, c, "PGA")));
           std::printf("Actual RX TIA gain: %f...\n",
                       (cl_stn_[i]->getGain(SOAPY_SDR_RX, c, "TIA")));
-          if (cl_stn_[i]->getHardwareInfo()["frontend"].compare("CBRS") == 0) {
+          if (cl_stn_[i]->getHardwareInfo()["frontend"].find("CBRS") !=
+              std::string::npos) {
             std::printf("Actual RX LNA1 gain: %f...\n",
                         (cl_stn_[i]->getGain(SOAPY_SDR_RX, c, "LNA1")));
             std::printf("Actual RX LNA2 gain: %f...\n",
@@ -98,7 +99,8 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg) : cfg_(cfg) {
                       (cl_stn_[i]->getGain(SOAPY_SDR_TX, c, "PAD")));
           std::printf("Actual TX IAMP gain: %f...\n",
                       (cl_stn_[i]->getGain(SOAPY_SDR_TX, c, "IAMP")));
-          if (cl_stn_[i]->getHardwareInfo()["frontend"].compare("CBRS") == 0) {
+          if (cl_stn_[i]->getHardwareInfo()["frontend"].find("CBRS") !=
+              std::string::npos) {
             std::printf("Actual TX PA1 gain: %f...\n",
                         (cl_stn_[i]->getGain(SOAPY_SDR_TX, c, "PA1")));
             std::printf("Actual TX PA2 gain: %f...\n",
@@ -172,8 +174,8 @@ void ClientRadioConfig::InitClientRadio(ClientRadioConfigContext* in_context) {
     cl_stn_[i]->setBandwidth(SOAPY_SDR_RX, ch, cfg->BwFilter());
     cl_stn_[i]->setBandwidth(SOAPY_SDR_TX, ch, cfg->BwFilter());
 
-    // clStn[i]->setSampleRate(SOAPY_SDR_RX, ch, cfg->rate());
-    // clStn[i]->setSampleRate(SOAPY_SDR_TX, ch, cfg->rate());
+    // cl_stn_[i]->setSampleRate(SOAPY_SDR_RX, ch, cfg->rate());
+    // cl_stn_[i]->setSampleRate(SOAPY_SDR_TX, ch, cfg->rate());
 
     cl_stn_[i]->setFrequency(SOAPY_SDR_RX, ch, "RF", cfg->RadioRfFreq());
     cl_stn_[i]->setFrequency(SOAPY_SDR_RX, ch, "BB", kUseUHD ? 0 : cfg->Nco());
@@ -187,8 +189,10 @@ void ClientRadioConfig::InitClientRadio(ClientRadioConfigContext* in_context) {
         cl_stn_[i]->setGain(SOAPY_SDR_RX, ch,
                             ch != 0u ? cfg_->RxGainB() : cfg_->RxGainA());
         // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
-        cl_stn_[i]->setGain(SOAPY_SDR_TX, ch,
-                            ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());
+        cl_stn_[i]->setGain(
+            SOAPY_SDR_TX, ch,
+            ch ? cfg_->TxGainB() + cfg_->ClientGainAdjB().at(i)
+               : cfg_->TxGainA() + cfg_->ClientGainAdjA().at(i));
       } else {
         if (info["frontend"].find("CBRS") != std::string::npos) {
           if (cfg->Freq() > 3e9) {
@@ -214,20 +218,21 @@ void ClientRadioConfig::InitClientRadio(ClientRadioConfigContext* in_context) {
         cl_stn_[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);  //[0,12]
         cl_stn_[i]->setGain(
             SOAPY_SDR_TX, ch, "PAD",
-            ch != 0u ? cfg->TxGainB() + cfg->ClientGainAdjB()[i]
-                     : cfg->TxGainA() + cfg->ClientGainAdjA()[i]);  //[0,30]
+            ch != 0u ? cfg->TxGainB() + cfg->ClientGainAdjB().at(i)
+                     : cfg->TxGainA() + cfg->ClientGainAdjA().at(i));  //[0,30]
       }
     } else {
       cl_stn_[i]->setGain(SOAPY_SDR_RX, ch, "PGA0",
                           ch != 0u ? cfg->RxGainB() : cfg->RxGainA());
       cl_stn_[i]->setGain(SOAPY_SDR_TX, ch, "PGA0",
-                          ch != 0u ? cfg->TxGainB() : cfg->TxGainA());
+                          ch ? cfg->TxGainB() + cfg->ClientGainAdjB().at(i)
+                             : cfg->TxGainA() + cfg->ClientGainAdjA().at(i));
     }
   }
 
   for (auto ch : channels) {
-    // clStn[i]->writeSetting(SOAPY_SDR_RX, ch, "CALIBRATE", "SKLK");
-    // clStn[i]->writeSetting(SOAPY_SDR_TX, ch, "CALIBRATE", "");
+    // cl_stn_[i]->writeSetting(SOAPY_SDR_RX, ch, "CALIBRATE", "SKLK");
+    // cl_stn_[i]->writeSetting(SOAPY_SDR_TX, ch, "CALIBRATE", "");
     if (!kUseUHD) {
       cl_stn_[i]->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
     }

@@ -2,7 +2,10 @@
 #include "radio_lib.hpp"
 
 namespace plt = matplotlibcpp;
-static constexpr size_t kMaxArraySampleOffset = 5;
+static constexpr size_t kMaxArraySampleOffset = 10;
+static constexpr bool kReciprocalCalibPlot = false;
+static constexpr bool kIQImbalancePlot = false;
+static constexpr bool kVerboseCalibration = false;
 
 std::vector<std::complex<float>> RadioConfig::SnoopSamples(
     SoapySDR::Device* dev, size_t channel, size_t readSize) {
@@ -173,7 +176,7 @@ void RadioConfig::AdjustCalibrationGains(std::vector<SoapySDR::Device*> rxDevs,
     }
     tone_levels[r] = tone_level;
     cout << "Node " << r << ": toneLevel3=" << tone_level << endl;
-    if (plot) {
+    if (kIQImbalancePlot && plot) {
       auto fft_mag = CommsLib::MagnitudeFft(samps, win, n);
       std::vector<double> mag_double(n);
       std::transform(fft_mag.begin(), fft_mag.end(), mag_double.begin(),
@@ -376,7 +379,7 @@ void RadioConfig::DciqCalibrationProc(size_t channel) {
   double tone_bb_freq = sample_rate / 7;
   size_t radio_size = cfg_->NumRadios();
 
-  size_t reference_radio = radio_size / 2;
+  size_t reference_radio = cfg_->RefAnt() / cfg_->NumChannels();
   SoapySDR::Device* ref_dev = ba_stn_[reference_radio];
 
   /*
@@ -550,20 +553,18 @@ void RadioConfig::AdjustDelays(std::vector<int> offset) {
 }
 
 bool RadioConfig::InitialCalib(bool sample_adjust) {
-  bool good_csi = true;
-
   size_t seq_len = cfg_->PilotCf32().size();
   size_t read_len = cfg_->PilotCi16().size();
 
   // Transmitting from only one chain, create a null vector for chainB
   std::vector<std::complex<int16_t>> dummy_ci16(read_len, 0);
 
+  size_t ch = cfg_->Channel() == "B" ? 1 : 0;
   std::vector<void*> txbuff0(2);
   txbuff0[0] = cfg_->PilotCi16().data();
-  txbuff0[1] = dummy_ci16.data();
 
   std::vector<std::vector<std::complex<int16_t>>> buff;
-  // int ant = _cfg->num_channels();
+  // int ant = cfg_->num_channels();
   size_t m = cfg_->NumAntennas();
   size_t r = cfg_->NumRadios();
   // TODO: Support 2-channels
@@ -583,184 +584,267 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
   DrainBuffers();
 
   for (size_t i = 0; i < r; i++) {
-    ba_stn_[i]->setGain(SOAPY_SDR_TX, 0, "PAD", cfg_->CalibTxGainA());
+    ba_stn_[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
+                        ch ? cfg_->CalibTxGainB() : cfg_->CalibTxGainA());
     ba_stn_[i]->writeSetting("TDD_CONFIG", "{\"tdd_enabled\":false}");
     ba_stn_[i]->writeSetting("TDD_MODE", "false");
     ba_stn_[i]->activateStream(this->tx_streams_[i]);
   }
 
-  long long tx_time(0);
-  long long rx_time(0);
-  for (size_t i = 0; i < r; i++) {
-    if (good_csi == false) {
-      break;
-    }
-    int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-    int ret = ba_stn_[i]->writeStream(this->tx_streams_[i], txbuff0.data(),
-                                      cfg_->PilotCi16().size(), tx_flags,
-                                      tx_time, 1000000);
-    if (ret < (int)read_len) {
-      std::cout << "bad write\n";
-    }
-    for (size_t j = 0; j < r; j++) {
-      if (j == i) {
-        continue;
+  size_t good_csi_cnt = 0;
+  size_t n = 0;
+  // second condition is for when too many attemps fail
+  while ((good_csi_cnt < calib_meas_num_) && (n < (2 * calib_meas_num_))) {
+    bool good_csi = true;
+    long long tx_time(0);
+    long long rx_time(0);
+    for (size_t i = 0; i < r; i++) {
+      if (good_csi == false) break;
+      int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
+      int ret = ba_stn_[i]->writeStream(this->tx_streams_[i], txbuff0.data(),
+                                        cfg_->PilotCi16().size(), tx_flags,
+                                        tx_time, 1000000);
+      if (ret < (int)read_len) {
+        std::cout << "bad write\n";
       }
-      int rx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-      ret = ba_stn_[j]->activateStream(this->rx_streams_[j], rx_flags, rx_time,
-                                       read_len);
+      for (size_t j = 0; j < r; j++) {
+        if (j == i) {
+          continue;
+        }
+        int rx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
+        ret = ba_stn_[j]->activateStream(this->rx_streams_[j], rx_flags,
+                                         rx_time, read_len);
+      }
+
+      Go();
+
+      int flags = 0;
+      for (size_t j = 0; j < r; j++) {
+        if (j == i) {
+          continue;
+        }
+        std::vector<void*> rxbuff(2);
+        rxbuff[0] = buff[(i * r + j)].data();
+        // rxbuff[1] = ant == 2 ? buff[(i*M+j)*ant+1].data() :
+        // dummyBuff.data();
+        // rxbuff[1 - ch] = dummybuff.data();
+        ret = ba_stn_[j]->readStream(this->rx_streams_[j], rxbuff.data(),
+                                     read_len, flags, rx_time, 1000000);
+        if (ret < (int)read_len) {
+          good_csi = false;
+          std::cout << "bad read (" << ret << ") at node " << j << " from node "
+                    << i << std::endl;
+        }
+      }
     }
 
-    Go();
-
-    int flags = 0;
-    for (size_t j = 0; j < r; j++) {
-      if (j == i) {
-        continue;
-      }
+    for (size_t i = 0; i < r; i++) {
+      int rx_flags = SOAPY_SDR_END_BURST;
+      int flags = 0;
+      int ret = ba_stn_[i]->activateStream(this->rx_streams_[i], rx_flags,
+                                           rx_time, read_len);
       std::vector<void*> rxbuff(2);
-      rxbuff[0] = buff[(i * r + j)].data();
-      // rxbuff[1] = ant == 2 ? buff[(i*M+j)*ant+1].data() :
-      // dummyBuff.data();
-      rxbuff[1] = dummybuff.data();
-      ret = ba_stn_[j]->readStream(this->rx_streams_[j], rxbuff.data(),
+      rxbuff[0] = buff[(i * r + i)].data();
+      ret = ba_stn_[i]->readStream(this->rx_streams_[i], rxbuff.data(),
                                    read_len, flags, rx_time, 1000000);
       if (ret < (int)read_len) {
         good_csi = false;
-        std::cout << "bad read (" << ret << ") at node " << j << " from node "
-                  << i << std::endl;
+        std::cout << "bad noise read (" << ret << ") at node " << i
+                  << std::endl;
       }
+      ba_stn_[i]->deactivateStream(this->rx_streams_[i]);
     }
-  }
 
+    std::vector<int> offset(r);
+    std::vector<size_t> start_up(r);
+    std::vector<size_t> start_dn(r);
+
+    std::vector<std::vector<std::complex<float>>> up(r);
+    std::vector<std::vector<std::complex<float>>> dn(r);
+    std::vector<std::vector<std::complex<float>>> noise(r);
+    for (size_t i = 0; i < r; i++) {
+      noise[i].resize(read_len);
+      std::transform(buff[i * r + i].begin(), buff[i * r + i].end(),
+                     noise[i].begin(), [](std::complex<int16_t> ci) {
+                       return std::complex<float>(ci.real() / 32768.0,
+                                                  ci.imag() / 32768.0);
+                     });
+    }
+    std::stringstream ss0;
+    ss0 << "SNR_dn" << n << " = [";
+    std::stringstream ss1;
+    ss1 << "SNR_up" << n << " = [";
+    for (size_t i = 0; i < r; i++) {
+      if (good_csi == false) {
+        break;
+      }
+      up[i].resize(read_len);
+      dn[i].resize(read_len);
+      if (i == cfg_->RefAnt()) {
+        continue;
+      }
+      std::transform(buff[cfg_->RefAnt() * r + i].begin(),
+                     buff[cfg_->RefAnt() * r + i].end(), up[i].begin(),
+                     [](std::complex<int16_t> ci) {
+                       return std::complex<float>(ci.real() / 32768.0,
+                                                  ci.imag() / 32768.0);
+                     });
+      std::transform(buff[i * r + cfg_->RefAnt()].begin(),
+                     buff[i * r + cfg_->RefAnt()].end(), dn[i].begin(),
+                     [](std::complex<int16_t> ci) {
+                       return std::complex<float>(ci.real() / 32768.0,
+                                                  ci.imag() / 32768.0);
+                     });
+
+      size_t peak_up =
+          CommsLib::FindPilotSeq(up[i], cfg_->PilotCf32(), seq_len);
+      size_t peak_dn =
+          CommsLib::FindPilotSeq(dn[i], cfg_->PilotCf32(), seq_len);
+      start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + cfg_->CpLen();
+      start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + cfg_->CpLen();
+      if (kVerboseCalibration)
+        std::cout << "receive starting position from/to node " << i << ": "
+                  << peak_up << "/" << peak_dn << std::endl;
+
+      float sig_up = 0;
+      float noise_up = 0;
+      for (size_t q = 0; q < cfg_->OfdmCaNum(); q++) {
+        sig_up += std::pow(std::abs(up[i][q + start_up[i]]), 2);
+        noise_up += std::pow(std::abs(noise[i][q + start_up[i]]), 2);
+      }
+      ss1 << 10 * std::log10(sig_up / noise_up) << " ";
+
+      float sig_dn = 0;
+      float noise_dn = 0;
+      for (size_t q = 0; q < cfg_->OfdmCaNum(); q++) {
+        sig_dn += std::pow(std::abs(dn[i][q + start_dn[i]]), 2);
+        noise_dn +=
+            std::pow(std::abs(noise[cfg_->RefAnt()][q + start_dn[i]]), 2);
+      }
+      ss0 << 10 * std::log10(sig_dn / noise_dn) << " ";
+
+      if (kReciprocalCalibPlot) {
+        std::vector<double> up_I(read_len);
+        std::transform(up[i].begin(), up[i].end(), up_I.begin(),
+                       [](std::complex<double> cd) { return cd.real(); });
+
+        std::vector<double> dn_I(read_len);
+        std::transform(dn[i].begin(), dn[i].end(), dn_I.begin(),
+                       [](std::complex<double> cd) { return cd.real(); });
+
+        plt::figure_size(1200, 780);
+        plt::plot(up_I);
+        // plt::xlim(0, read_len);
+        plt::ylim(-1, 1);
+        plt::title("ant " + std::to_string(cfg_->RefAnt()) + " (ref) to ant " +
+                   std::to_string(i));
+        plt::legend();
+        plt::save("up_" + std::to_string(i) + ".png");
+
+        plt::figure_size(1200, 780);
+        plt::plot(dn_I);
+        // plt::xlim(0, read_len);
+        plt::ylim(-1, 1);
+        plt::title("ant " + std::to_string(i) + " to ant (ref)" +
+                   std::to_string(cfg_->RefAnt()));
+        plt::legend();
+        plt::save("dn_" + std::to_string(i) + ".png");
+      }
+      if ((start_up[i] == 0) || (start_dn[i] == 0)) {
+        good_csi = false;
+        break;
+      }
+      if ((i > 0) &&
+          ((std::abs((int)start_up[i] - (int)start_up[i - 1]) >
+            static_cast<int>(kMaxArraySampleOffset)) ||
+           (std::abs((int)start_dn[i] - (int)start_dn[i - 1]) >
+            static_cast<int>(
+                kMaxArraySampleOffset)))) {  // make sure offsets are not too
+                                             // different from each other
+        good_csi = false;
+        break;
+      }
+      offset[i] = start_up[i];
+    }
+    ss0 << "];\n";
+    ss1 << "];\n";
+    if (kVerboseCalibration) {
+      std::cout << ss1.str();
+      std::cout << ss0.str();
+    }
+
+    n++;  // increment number of measurement attemps
+    if (good_csi == false) {
+      continue;
+    }
+
+    for (size_t i = 0; i < r; i++) {
+      size_t id = i;
+      if (cfg_->ExternalRefNode() && i == cfg_->RefAnt()) {
+        continue;
+      }
+      if (cfg_->ExternalRefNode() && (i > cfg_->RefAnt())) {
+        id = i - 1;
+      }
+      if (kVerboseCalibration) {  // print time-domain data
+        std::cout << "up_t" << id << " = [";
+        for (size_t j = 0; j < read_len; j++) {
+          std::cout << buff[cfg_->RefAnt() * r + i][j].real() << "+1j*"
+                    << buff[cfg_->RefAnt() * r + i][j].imag() << " ";
+        }
+        std::cout << "];" << std::endl;
+        std::cout << "dn_t" << id << " = [";
+        for (size_t j = 0; j < read_len; j++) {
+          std::cout << buff[i * r + cfg_->RefAnt()][j].real() << "+1j*"
+                    << buff[i * r + cfg_->RefAnt()][j].imag() << " ";
+        }
+        std::cout << "];" << std::endl;
+      }
+      // computing reciprocity calibration matrix
+      auto first_up = up[i].begin() + start_up[i];
+      auto last_up = up[i].begin() + start_up[i] + cfg_->OfdmCaNum();
+      std::vector<std::complex<float>> up_ofdm(first_up, last_up);
+      assert(up_ofdm.size() == cfg_->OfdmCaNum());
+
+      auto first_dn = dn[i].begin() + start_dn[i];
+      auto last_dn = dn[i].begin() + start_dn[i] + cfg_->OfdmCaNum();
+      std::vector<std::complex<float>> dn_ofdm(first_dn, last_dn);
+      assert(dn_ofdm.size() == cfg_->OfdmCaNum());
+
+      auto dn_f = CommsLib::FFT(dn_ofdm, cfg_->OfdmCaNum());
+      auto up_f = CommsLib::FFT(up_ofdm, cfg_->OfdmCaNum());
+      arma::cx_fvec dn_vec(
+          reinterpret_cast<arma::cx_float*>(&dn_f[cfg_->OfdmDataStart()]),
+          cfg_->OfdmDataNum(), false);
+      arma::cx_fvec calib_dl_vec(
+          reinterpret_cast<arma::cx_float*>(
+              &init_calib_dl_[good_csi_cnt][id * cfg_->OfdmDataNum()]),
+          cfg_->OfdmDataNum(), false);
+      calib_dl_vec = dn_vec;
+
+      arma::cx_fvec up_vec(
+          reinterpret_cast<arma::cx_float*>(&up_f[cfg_->OfdmDataStart()]),
+          cfg_->OfdmDataNum(), false);
+      arma::cx_fvec calib_ul_vec(
+          reinterpret_cast<arma::cx_float*>(
+              &init_calib_ul_[good_csi_cnt][id * cfg_->OfdmDataNum()]),
+          cfg_->OfdmDataNum(), false);
+      calib_ul_vec = up_vec;
+      // Utils::print_vec(dn_vec / up_vec,
+      //     "n" + std::to_string(good_csi_cnt) + "_ant" + std::to_string(i));
+    }
+
+    // sample_adjusting trigger delays based on lts peak index
+    if (sample_adjust && good_csi_cnt == 0) {  // just do it once
+      AdjustDelays(offset);
+    }
+    good_csi_cnt++;
+  }
   for (size_t i = 0; i < r; i++) {
     ba_stn_[i]->deactivateStream(this->tx_streams_[i]);
     ba_stn_[i]->deactivateStream(this->rx_streams_[i]);
-    ba_stn_[i]->setGain(SOAPY_SDR_TX, 0, "PAD", cfg_->TxGainA());
+    ba_stn_[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
+                        ch ? cfg_->TxGainB() : cfg_->TxGainA());
   }
-
-  std::vector<int> offset(r);
-  std::vector<size_t> start_up(r);
-  std::vector<size_t> start_dn(r);
-
-  std::vector<std::vector<std::complex<float>>> up(r);
-  std::vector<std::vector<std::complex<float>>> dn(r);
-  for (size_t i = 0; i < r; i++) {
-    if (good_csi == false) {
-      break;
-    }
-    up[i].resize(read_len);
-    dn[i].resize(read_len);
-    if (i == cfg_->RefAnt()) {
-      continue;
-    }
-    std::transform(buff[cfg_->RefAnt() * r + i].begin(),
-                   buff[cfg_->RefAnt() * r + i].end(), up[i].begin(),
-                   [](std::complex<int16_t> ci) {
-                     return std::complex<float>(ci.real() / 32768.0,
-                                                ci.imag() / 32768.0);
-                   });
-    std::transform(buff[i * r + cfg_->RefAnt()].begin(),
-                   buff[i * r + cfg_->RefAnt()].end(), dn[i].begin(),
-                   [](std::complex<int16_t> ci) {
-                     return std::complex<float>(ci.real() / 32768.0,
-                                                ci.imag() / 32768.0);
-                   });
-
-    size_t peak_up = CommsLib::FindPilotSeq(up[i], cfg_->PilotCf32(), seq_len);
-    size_t peak_dn = CommsLib::FindPilotSeq(dn[i], cfg_->PilotCf32(), seq_len);
-    start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + cfg_->CpLen();
-    start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + cfg_->CpLen();
-    std::cout << "receive starting position from/to node " << i << ": "
-              << peak_up << "/" << peak_dn << std::endl;
-#if DEBUG_PLOT
-    std::vector<double> up_I(read_len);
-    std::transform(up[i].begin(), up[i].end(), up_I.begin(),
-                   [](std::complex<double> cd) { return cd.real(); });
-
-    std::vector<double> dn_I(read_len);
-    std::transform(dn[i].begin(), dn[i].end(), dn_I.begin(),
-                   [](std::complex<double> cd) { return cd.real(); });
-
-    plt::figure_size(1200, 780);
-    plt::plot(up_I);
-    // plt::xlim(0, read_len);
-    plt::ylim(-1, 1);
-    plt::title("ant " + std::to_string(_cfg->ref_ant()) + " (ref) to ant " +
-               std::to_string(i));
-    plt::legend();
-    plt::save("up_" + std::to_string(i) + ".png");
-
-    plt::figure_size(1200, 780);
-    plt::plot(dn_I);
-    // plt::xlim(0, read_len);
-    plt::ylim(-1, 1);
-    plt::title("ant " + std::to_string(i) + " to ant (ref)" +
-               std::to_string(_cfg->ref_ant()));
-    plt::legend();
-    plt::save("dn_" + std::to_string(i) + ".png");
-#endif
-    if ((start_up[i] == 0) || (start_dn[i] == 0)) {
-      good_csi = false;
-      break;
-    }
-    if ((i > 0) &&
-        ((std::abs((int)start_up[i] - (int)start_up[i - 1]) >
-          static_cast<int>(kMaxArraySampleOffset)) ||
-         (std::abs((int)start_dn[i] - (int)start_dn[i - 1]) >
-          static_cast<int>(
-              kMaxArraySampleOffset)))) {  // make sure offsets are too
-                                           // different from each other
-      good_csi = false;
-      break;
-    }
-    offset[i] = start_up[i];
-  }
-  // sample_adjusting trigger delays based on lts peak index
-  if (good_csi) {
-    if (sample_adjust) {
-      AdjustDelays(offset);
-    }
-  } else {
-    return good_csi;
-  }
-
-  for (size_t i = 0; i < r; i++) {
-    size_t id = i;
-    if (cfg_->ExternalRefNode() && i == cfg_->RefAnt()) {
-      continue;
-    }
-    if (cfg_->ExternalRefNode() && i > cfg_->RefAnt()) {
-      id = i - 1;
-    }
-    // computing reciprocity calibration matrix
-    auto first_up = up[i].begin() + start_up[i];
-    auto last_up = up[i].begin() + start_up[i] + cfg_->OfdmCaNum();
-    std::vector<std::complex<float>> up_ofdm(first_up, last_up);
-    assert(up_ofdm.size() == cfg_->OfdmCaNum());
-
-    auto first_dn = dn[i].begin() + start_dn[i];
-    auto last_dn = dn[i].begin() + start_dn[i] + cfg_->OfdmCaNum();
-    std::vector<std::complex<float>> dn_ofdm(first_dn, last_dn);
-    assert(dn_ofdm.size() == cfg_->OfdmCaNum());
-
-    auto dn_f = CommsLib::FFT(dn_ofdm, cfg_->OfdmCaNum());
-    auto up_f = CommsLib::FFT(up_ofdm, cfg_->OfdmCaNum());
-    arma::cx_fvec dn_vec(
-        reinterpret_cast<arma::cx_float*>(&dn_f[cfg_->OfdmDataStart()]),
-        cfg_->OfdmDataNum(), false);
-    arma::cx_fvec calib_dl_vec(reinterpret_cast<arma::cx_float*>(
-                                   &init_calib_dl_[id * cfg_->OfdmDataNum()]),
-                               cfg_->OfdmDataNum(), false);
-    calib_dl_vec = dn_vec;
-
-    arma::cx_fvec up_vec(
-        reinterpret_cast<arma::cx_float*>(&up_f[cfg_->OfdmDataStart()]),
-        cfg_->OfdmDataNum(), false);
-    arma::cx_fvec calib_ul_vec(reinterpret_cast<arma::cx_float*>(
-                                   &init_calib_ul_[id * cfg_->OfdmDataNum()]),
-                               cfg_->OfdmDataNum(), false);
-    calib_ul_vec = up_vec;
-  }
-  return good_csi;
+  return good_csi_cnt == calib_meas_num_;
 }

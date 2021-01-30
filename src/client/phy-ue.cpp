@@ -12,6 +12,7 @@ static constexpr bool kDebugPrintPacketsToMac = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
+static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr size_t kRecordFrameIndex = 1000;
 
 PhyUe::PhyUe(Config* config) {
@@ -242,24 +243,27 @@ void PhyUe::Start() {
           size_t frame_id = pkt->frame_id_;
           size_t symbol_id = pkt->symbol_id_;
           size_t ant_id = pkt->ant_id_;
+          size_t ue_id = ant_id / config_->NumChannels();
           RtAssert(pkt->frame_id_ < cur_frame_id + kFrameWnd,
                    "Error: Received packet for future frame beyond frame "
                    "window. This can happen if PHY is running "
                    "slowly, e.g., in debug mode");
 
           size_t dl_symbol_id = 0;
-          if ((config_->Frame().NumDLSyms() > 0)) {
+          if (config_->Frame().NumDLSyms() > 0) {
             dl_symbol_id = config_->Frame().GetDLSymbol(0);
           }
 
           if ((symbol_id == 0)  // Beacon in Sim mode!
-              || ((config_->HwFramer() == false) &&
-                  (ul_data_symbol_perframe_ == 0) &&
-                  (symbol_id == dl_symbol_id))) {  // Send uplink pilots
+              ||
+              ((config_->HwFramer() == false) &&
+               (ul_data_symbol_perframe_ == 0) && (symbol_id == dl_symbol_id) &&
+               ((ant_id % config_->NumChannels()) == 0))) {
+            // first DL symbols in downlink-only mode
             EventData do_tx_pilot_task(
                 EventType::kPacketPilotTX,
                 gen_tag_t::FrmSymUe(
-                    frame_id, config_->Frame().GetPilotSymbol(ant_id), ant_id)
+                    frame_id, config_->Frame().GetPilotSymbol(ue_id), ue_id)
                     .tag_);
             ScheduleTask(do_tx_pilot_task, &tx_queue_,
                          *tx_ptoks_ptr_[ant_id % rx_thread_num_]);
@@ -270,13 +274,11 @@ void PhyUe::Start() {
               ant_id % config_->NumChannels() == 0) {
             EventData do_encode_task(
                 EventType::kEncode,
-                gen_tag_t::FrmSymUe(frame_id, symbol_id,
-                                    ant_id / config_->NumChannels())
-                    .tag_);
+                gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
             ScheduleTask(do_encode_task, &encode_queue_, ptok_encode);
           }
 
-          if (dl_data_symbol_perframe_ > 0 &&
+          if ((dl_data_symbol_perframe_ > 0) &&
               (config_->IsPilot(frame_id, symbol_id) ||
                config_->IsDownlink(frame_id, symbol_id))) {
             if (dl_symbol_id == config_->Frame().GetDLSymbol(0)) {
@@ -622,7 +624,7 @@ void PhyUe::DoFft(int tid, size_t tag) {
   }
 
   size_t sig_offset = config_->OfdmRxZeroPrefixClient();
-  if (kPrintDownlinkPilotStats && config_->UeAntNum() == 1) {
+  if (kPrintDownlinkPilotStats) {
     if (config_->IsPilot(frame_id, symbol_id)) {
       SimdConvertShortToFloat(pkt->data_,
                               reinterpret_cast<float*>(rx_samps_tmp_),
@@ -636,20 +638,21 @@ void PhyUe::DoFft(int tid, size_t tag) {
       size_t peak_offset =
           std::max_element(pilot_corr_abs.begin(), pilot_corr_abs.end()) -
           pilot_corr_abs.begin();
-      sig_offset = peak_offset < seq_len ? 0 : peak_offset - seq_len;
+      size_t pilot_offset = peak_offset < seq_len ? 0 : peak_offset - seq_len;
       float noise_power = 0;
-      for (size_t i = 0; i < sig_offset; i++) {
+      for (size_t i = 0; i < pilot_offset; i++) {
         noise_power += std::pow(std::abs(samples_vec[i]), 2);
       }
       float signal_power = 0;
-      for (size_t i = sig_offset; i < 2 * sig_offset; i++) {
+      for (size_t i = pilot_offset; i < 2 * pilot_offset; i++) {
         signal_power += std::pow(std::abs(samples_vec[i]), 2);
       }
       float snr = 10 * std::log10(signal_power / noise_power);
       std::printf("frame %zu symbol %zu ant %zu: sig offset %zu, SNR %2.1f \n",
-                  frame_id, symbol_id, ant_id, sig_offset, snr);
+                  frame_id, symbol_id, ant_id, pilot_offset, snr);
       if (frame_id == kRecordFrameIndex) {
-        std::string fname = "rxpilot" + std::to_string(symbol_id) + ".bin";
+        std::string fname = "rxpilot" + std::to_string(symbol_id) + "_" +
+                            std::to_string(ant_id) + ".bin";
         FILE* f = std::fopen(fname.c_str(), "wb");
         std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_->SampsPerSymbol(),
                     f);
@@ -658,7 +661,8 @@ void PhyUe::DoFft(int tid, size_t tag) {
 
     } else {
       if (frame_id == kRecordFrameIndex) {
-        std::string fname = "rxdata" + std::to_string(symbol_id) + ".bin";
+        std::string fname = "rxdata" + std::to_string(symbol_id) + "_" +
+                            std::to_string(ant_id) + ".bin";
         FILE* f = std::fopen(fname.c_str(), "wb");
         std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_->SampsPerSymbol(),
                     f);
@@ -674,7 +678,6 @@ void PhyUe::DoFft(int tid, size_t tag) {
       total_dl_symbol_id * config_->UeAntNum() + ant_id;
 
   // transfer ushort to float
-  sig_offset = (sig_offset / 16) * 16;
   size_t delay_offset = (sig_offset + config_->CpLen()) * 2;
   auto* fft_buff = reinterpret_cast<float*>(fft_buffer_[fft_buffer_target_id]);
 
@@ -702,7 +705,9 @@ void PhyUe::DoFft(int tid, size_t tag) {
       if (dl_symbol_id == 0) {
         csi_buffer_ptr[j] = 0;
       }
-      complex_float p = config_->UeSpecificPilot()[ant_id][j];
+      // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
+      // in the downlink receiver
+      complex_float p = config_->UeSpecificPilot()[0][j];
       size_t sc_id = non_null_sc_ind_[j];
       csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / cx_float(p.re, p.im));
       if (dl_symbol_id == dl_pilot_symbol_perframe_ - 1) {
@@ -730,7 +735,9 @@ void PhyUe::DoFft(int tid, size_t tag) {
         size_t sc_id = non_null_sc_ind_[j];
         cx_float y = fft_buffer_ptr[sc_id];
         auto pilot_eq = y / csi;
-        auto p = config_->UeSpecificPilot()[ant_id][j];
+        // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
+        // in the downlink receiver
+        auto p = config_->UeSpecificPilot()[0][j];
         theta += arg(pilot_eq * cx_float(p.re, -p.im));
       }
     }
@@ -738,6 +745,7 @@ void PhyUe::DoFft(int tid, size_t tag) {
       theta /= config_->GetOFDMPilotNum();
     }
     auto phc = exp(cx_float(0, -theta));
+    float evm = 0;
     for (size_t j = 0; j < config_->OfdmDataNum(); j++) {
       if (j % config_->OfdmPilotSpacing() != 0) {
         // divide fft output by pilot data to get CSI estimation
@@ -747,24 +755,35 @@ void PhyUe::DoFft(int tid, size_t tag) {
         }
         cx_float y = fft_buffer_ptr[sc_id];
         equ_buffer_ptr[j] = (y / csi) * phc;
-        // FIXME: this seems to not work for ant_id > 0,
-        /*
-        complex_float tx
-            = config_
-                  ->dl_iq_f[dl_symbol_id][ant_id * config_->ofdm_ca_num()
-                      + config_->ofdm_data_start() + j];
+        complex_float tx =
+            config_->DlIqF()[dl_symbol_id][ant_id * config_->OfdmCaNum() +
+                                           config_->OfdmDataStart() + j];
         evm += std::norm(equ_buffer_ptr[j] - cx_float(tx.re, tx.im));
-        */
       }
     }
-    /*
-    evm = std::sqrt(
-        evm / (config_->ofdm_data_num() - config_->GetOFDMPilotNum()));
-    if (kPrintPhyStats)
-        std::cout << "Frame: " << frame_id << ", Symbol: " << symbol_id
-                  << ", User: " << ant_id << ", EVM: " << 100 * evm
-                  << "%, SNR: " << -10 * std::log10(evm) << std::endl;
-    */
+    if (kPrintEqualizedSymbols) {
+      complex_float* tx =
+          &config_->DlIqF()[dl_symbol_id][ant_id * config_->OfdmCaNum() +
+                                          config_->OfdmDataStart()];
+      arma::cx_fvec x_vec(reinterpret_cast<cx_float*>(tx),
+                          config_->OfdmDataNum(), false);
+      Utils::PrintVec(x_vec, std::string("x") +
+                                 std::to_string(total_dl_symbol_id) +
+                                 std::string("_") + std::to_string(ant_id));
+      arma::cx_fvec equal_vec(equ_buffer_ptr, config_->OfdmDataNum(), false);
+      Utils::PrintVec(equal_vec, std::string("equ") +
+                                     std::to_string(total_dl_symbol_id) +
+                                     std::string("_") + std::to_string(ant_id));
+    }
+    evm =
+        std::sqrt(evm) / (config_->OfdmDataNum() - config_->GetOFDMPilotNum());
+    if (kPrintPhyStats) {
+      std::stringstream ss;
+      ss << "Frame: " << frame_id << ", Symbol: " << symbol_id
+         << ", User: " << ant_id << ", EVM: " << 100 * evm
+         << "%, SNR: " << -10 * std::log10(evm) << std::endl;
+      std::cout << ss.str();
+    }
   }
 
   size_t fft_duration_stat = Rdtsc() - start_tsc;
@@ -915,14 +934,19 @@ void PhyUe::DoDecode(int tid, size_t tag) {
     }
 
     if (kPrintDecodedData) {
-      std::printf("Decoded data (original byte)\n");
+      std::stringstream ss;
+      ss << "Decoded data (original byte) in frame " << frame_id << " symbol "
+         << symbol_id << " ant " << ant_id << ":\n"
+         << std::hex << std::setfill('0');
       for (size_t i = 0; i < config_->NumBytesPerCb(); i++) {
         uint8_t rx_byte = decoded_buffer_ptr[i];
         auto tx_byte = static_cast<uint8_t>(config_->GetInfoBits(
             config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i]);
-        std::printf("%x(%x) ", rx_byte, tx_byte);
+        ss << std::hex << std::setw(2) << static_cast<int>(rx_byte) << "("
+           << static_cast<int>(tx_byte) << ") ";
       }
-      std::printf("\n");
+      ss << std::dec << std::endl;
+      std::cout << ss.str();
     }
   }
   if (kCollectPhyStats) {
@@ -1066,7 +1090,8 @@ void PhyUe::DoIfft(int tid, size_t tag) {
                   sizeof(complex_float) * config_->OfdmDataStart());
       if (ul_symbol_id < config_->Frame().ClientUlPilotSymbols()) {
         std::memcpy(ifft_buff + config_->OfdmDataStart(),
-                    config_->UeSpecificPilot()[ant_id],
+                    // TODO FIXME
+                    config_->UeSpecificPilot()[0],
                     config_->OfdmDataNum() * sizeof(complex_float));
       } else {
         size_t total_ul_data_symbol_id =

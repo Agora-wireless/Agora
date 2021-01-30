@@ -63,4 +63,4 @@ class DoDecode : public Doer {
   DurationStat* duration_stat_;
 };
 
-#endif // DOCODING_H_
+#endif  // DOCODING_H_

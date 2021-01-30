@@ -2,6 +2,8 @@
 
 #include "comms-lib.h"
 
+static constexpr bool kPrintCalibrationMats = false;
+
 static std::atomic<size_t> num_radios_initialized;
 static std::atomic<size_t> num_radios_configured;
 
@@ -17,7 +19,7 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
   if (cfg_->IsUe() == true) {
     throw std::invalid_argument("Bad config! Not a UE!");
   }
-  if ((kUseUHD == false) || (cfg_->HubIds().empty() == false)) {
+  if ((kUseUHD == false) && (cfg_->HubIds().empty() == false)) {
     args["driver"] = "remote";
     args["timeout"] = "1000000";
     args["serial"] = cfg_->HubIds().at(0);
@@ -101,7 +103,7 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
   for (size_t i = 0; i < this->radio_num_; i++) {
     std::cout << cfg_->RadioIds().at(i) << ": Front end "
               << ba_stn_[i]->getHardwareInfo()["frontend"] << std::endl;
-    for (size_t c = 0; c < cfg_->NumChannels(); c++) {
+    for (auto c : channels) {
       if (c < ba_stn_[i]->getNumChannels(SOAPY_SDR_RX)) {
         std::printf("RX Channel %zu\n", c);
         std::printf("Actual RX sample rate: %fMSps...\n",
@@ -117,7 +119,8 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
                       (ba_stn_[i]->getGain(SOAPY_SDR_RX, c, "PGA")));
           std::printf("Actual RX TIA gain: %f...\n",
                       (ba_stn_[i]->getGain(SOAPY_SDR_RX, c, "TIA")));
-          if (ba_stn_[i]->getHardwareInfo()["frontend"].compare("CBRS") == 0) {
+          if (ba_stn_[i]->getHardwareInfo()["frontend"].find("CBRS") !=
+              std::string::npos) {
             std::printf("Actual RX LNA1 gain: %f...\n",
                         (ba_stn_[i]->getGain(SOAPY_SDR_RX, c, "LNA1")));
             std::printf("Actual RX LNA2 gain: %f...\n",
@@ -131,7 +134,7 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
       }
     }
 
-    for (size_t c = 0; c < cfg_->NumChannels(); c++) {
+    for (auto c : channels) {
       if (c < ba_stn_[i]->getNumChannels(SOAPY_SDR_TX)) {
         std::printf("TX Channel %zu\n", c);
         std::printf("Actual TX sample rate: %fMSps...\n",
@@ -145,7 +148,8 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
                       (ba_stn_[i]->getGain(SOAPY_SDR_TX, c, "PAD")));
           std::printf("Actual TX IAMP gain: %f...\n",
                       (ba_stn_[i]->getGain(SOAPY_SDR_TX, c, "IAMP")));
-          if (ba_stn_[i]->getHardwareInfo()["frontend"].compare("CBRS") == 0) {
+          if (ba_stn_[i]->getHardwareInfo()["frontend"].find("CBRS") !=
+              std::string::npos) {
             std::printf("Actual TX PA1 gain: %f...\n",
                         (ba_stn_[i]->getGain(SOAPY_SDR_TX, c, "PA1")));
             std::printf("Actual TX PA2 gain: %f...\n",
@@ -232,7 +236,7 @@ void RadioConfig::ConfigureBsRadio(RadioConfigContext* context) {
   }
 
   SoapySDR::Kwargs info = ba_stn_[i]->getHardwareInfo();
-  for (auto ch : {0, 1}) {
+  for (auto ch : channels) {
     if (!kUseUHD) {
       ba_stn_[i]->setBandwidth(SOAPY_SDR_RX, ch, cfg_->BwFilter());
       ba_stn_[i]->setBandwidth(SOAPY_SDR_TX, ch, cfg_->BwFilter());
@@ -294,53 +298,84 @@ void RadioConfig::ConfigureBsRadio(RadioConfigContext* context) {
     ba_stn_[i]->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
   }
 
-  // we disable channel 1 because of the internal LDO issue.
-  // This will be fixed in the next revision (E) of Iris.
-  if (cfg_->NumChannels() == 1) {
-    if (kUseUHD == false) {
-      ba_stn_[i]->writeSetting(SOAPY_SDR_RX, 1, "ENABLE_CHANNEL", "false");
-      ba_stn_[i]->writeSetting(SOAPY_SDR_TX, 1, "ENABLE_CHANNEL", "false");
-    }
-  }
   num_radios_configured++;
 }
 
 bool RadioConfig::RadioStart() {
   bool good_calib = false;
-  AllocBuffer1d(&init_calib_dl_,
+  AllocBuffer1d(&init_calib_dl_processed_,
                 cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
                 Agora_memory::Alignment_t::k64Align, 1);
-  AllocBuffer1d(&init_calib_ul_,
+  AllocBuffer1d(&init_calib_ul_processed_,
                 cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
                 Agora_memory::Alignment_t::k64Align, 1);
   // initialize init_calib to a matrix of ones
   for (size_t i = 0; i < cfg_->OfdmDataNum() * cfg_->BfAntNum(); i++) {
-    init_calib_dl_[i] = 1;
-    init_calib_ul_[i] = 1;
+    init_calib_dl_processed_[i] = 1;
+    init_calib_ul_processed_[i] = 1;
   }
-  if (cfg_->Frame().NumDLSyms() > 0) {
-    int iter = 0;
-    int max_iter = 3;
-    while (good_calib == false) {
-      good_calib = InitialCalib(cfg_->SampleCalEn());
-      iter++;
-      if ((iter == max_iter) && (good_calib == false)) {
-        std::cout << "attempted " << max_iter
-                  << " unsucessful calibration, stopping ..." << std::endl;
-        break;
+
+  calib_meas_num_ = cfg_->InitCalibRepeat();
+  if (calib_meas_num_) {
+    init_calib_ul_.Calloc(calib_meas_num_,
+                          cfg_->OfdmDataNum() * cfg_->BfAntNum(),
+                          Agora_memory::Alignment_t::k64Align);
+    init_calib_dl_.Calloc(calib_meas_num_,
+                          cfg_->OfdmDataNum() * cfg_->BfAntNum(),
+                          Agora_memory::Alignment_t::k64Align);
+    if (cfg_->Frame().NumDLSyms() > 0) {
+      int iter = 0;
+      int max_iter = 3;
+      std::cout << "Start initial reciprocity calibration..." << std::endl;
+      while (good_calib == false) {
+        good_calib = InitialCalib(cfg_->SampleCalEn());
+        iter++;
+        if ((iter == max_iter) && (good_calib == false)) {
+          std::cout << "attempted " << max_iter
+                    << " unsucessful calibration, stopping ..." << std::endl;
+          break;
+        }
+      }
+      if (good_calib == false) {
+        return good_calib;
+      } else {
+        std::cout << "initial calibration successful!" << std::endl;
+      }
+      // process initial measurements
+      arma::cx_fcube calib_dl_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
+                                   calib_meas_num_, arma::fill::zeros);
+      arma::cx_fcube calib_ul_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
+                                   calib_meas_num_, arma::fill::zeros);
+      for (size_t i = 0; i < calib_meas_num_; i++) {
+        arma::cx_fmat calib_dl_mat(init_calib_dl_[i], cfg_->OfdmDataNum(),
+                                   cfg_->BfAntNum(), false);
+        arma::cx_fmat calib_ul_mat(init_calib_ul_[i], cfg_->OfdmDataNum(),
+                                   cfg_->BfAntNum(), false);
+        calib_dl_cube.slice(i) = calib_dl_mat;
+        calib_ul_cube.slice(i) = calib_ul_mat;
+        if (kPrintCalibrationMats) {
+          Utils::PrintMat(calib_dl_mat, "calib_dl_mat" + std::to_string(i));
+          Utils::PrintMat(calib_ul_mat, "calib_ul_mat" + std::to_string(i));
+          Utils::PrintMat(calib_dl_mat / calib_ul_mat,
+                          "calib_mat" + std::to_string(i));
+        }
+      }
+      arma::cx_fmat calib_dl_mean_mat(init_calib_dl_processed_,
+                                      cfg_->OfdmDataNum(), cfg_->BfAntNum(),
+                                      false);
+      arma::cx_fmat calib_ul_mean_mat(init_calib_ul_processed_,
+                                      cfg_->OfdmDataNum(), cfg_->BfAntNum(),
+                                      false);
+      calib_dl_mean_mat = arma::mean(calib_dl_cube, 2);  // mean along dim 2
+      calib_ul_mean_mat = arma::mean(calib_ul_cube, 2);  // mean along dim 2
+      if (kPrintCalibrationMats) {
+        Utils::PrintMat(calib_dl_mean_mat, "calib_dl_mat");
+        Utils::PrintMat(calib_ul_mean_mat, "calib_ul_mat");
+        Utils::PrintMat(calib_dl_mean_mat / calib_ul_mean_mat, "calib_mat");
       }
     }
-    if (good_calib == false) {
-      return good_calib;
-    } else {
-      std::cout << "initial calibration successful!" << std::endl;
-    }
-    // arma::cx_fmat calib_dl_mat(
-    //    init_calib_dl_, _cfg->ofdm_data_num(), _cfg->bf_ant_num(), false);
-    // arma::cx_fmat calib_ul_mat(
-    //    init_calib_ul_, _cfg->ofdm_data_num(), _cfg->bf_ant_num(), false);
-    // Utils::print_mat(calib_dl_mat);
-    // Utils::print_mat(calib_ul_mat);
+    init_calib_dl_.Free();
+    init_calib_ul_.Free();
   }
 
   std::vector<unsigned> zeros(cfg_->SampsPerSymbol(), 0);
@@ -621,6 +656,8 @@ void RadioConfig::RadioStop() {
 }
 
 RadioConfig::~RadioConfig() {
+  FreeBuffer1d(&init_calib_dl_processed_);
+  FreeBuffer1d(&init_calib_ul_processed_);
   for (size_t i = 0; i < this->radio_num_; i++) {
     ba_stn_[i]->closeStream(this->rx_streams_[i]);
     ba_stn_[i]->closeStream(this->tx_streams_[i]);

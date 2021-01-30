@@ -279,7 +279,7 @@ int RadioTXRX::DequeueSendArgos(int tid, long long time0) {
     size_t pilot_symbol_id = c->Frame().GetPilotSymbol(ant_id);
 
     tx_time = time0 + tx_frame_id * frm_num_samps +
-              pilot_symbol_id * num_samps - c->ClTxAdvance();
+              +pilot_symbol_id * num_samps - c->ClTxAdvance().at(ue_id);
     r = radio->RadioTx(ue_id, pilot_buff0_.data(), num_samps, flags_tx_pilot,
                        tx_time);
     if (r < num_samps) {
@@ -288,7 +288,7 @@ int RadioTXRX::DequeueSendArgos(int tid, long long time0) {
     if (c->NumChannels() == 2) {
       pilot_symbol_id = c->Frame().GetPilotSymbol(ant_id + 1);
       tx_time = time0 + tx_frame_id * frm_num_samps +
-                pilot_symbol_id * num_samps - c->ClTxAdvance();
+                +pilot_symbol_id * num_samps - c->ClTxAdvance().at(ue_id);
       r = radio->RadioTx(ue_id, pilot_buff1_.data(), num_samps, 2, tx_time);
       if (r < num_samps) {
         std::cout << "BAD Write (PILOT): " << r << "/" << num_samps
@@ -311,10 +311,10 @@ int RadioTXRX::DequeueSendArgos(int tid, long long time0) {
       txbuf[ch] = (void*)pkt->data_;
       tx_buffer_status_[offset + ch] = 0;
     }
-    tx_time = c->HwFramer()
-                  ? ((long long)tx_frame_id << 32) | (tx_symbol_id << 16)
-                  : time0 + tx_frame_id * frm_num_samps +
-                        tx_symbol_id * num_samps - c->ClTxAdvance();
+    tx_time =
+        c->HwFramer()
+            ? ((long long)tx_frame_id << 32) | (tx_symbol_id << 16)
+            : time0 + tx_frame_id * frm_num_samps + -c->ClTxAdvance().at(ue_id);
     int flags_tx_symbol = 1;  // HAS_TIME
     if (tx_symbol_id == c->Frame().GetULSymbolLast()) {
       flags_tx_symbol = 2;  // HAS_TIME & END_BURST, fixme
@@ -478,18 +478,18 @@ void* RadioTXRX::LoopTxRxArgosSync(int tid) {
   std::vector<std::complex<int16_t>> frm_buff0(frm_num_samps, 0);
   std::vector<std::complex<int16_t>> frm_buff1(frm_num_samps, 0);
   std::vector<void*> frm_rx_buff(2);
-  frm_rx_buff[0] = frm_buff0.data();
+  frm_rx_buff.at(0) = frm_buff0.data();
 
   std::vector<std::complex<int16_t>> zeros0(c->SampsPerSymbol(), 0);
   std::vector<std::complex<int16_t>> zeros1(c->SampsPerSymbol(), 0);
   pilot_buff0_.resize(2);
   pilot_buff1_.resize(2);
-  pilot_buff0_[0u] = c->PilotCi16().data();
+  pilot_buff0_.at(0) = c->PilotCi16().data();
   if (c->NumChannels() == 2) {
-    pilot_buff0_[1u] = zeros0.data();
-    pilot_buff1_[0u] = zeros1.data();
-    pilot_buff1_[1u] = c->PilotCi16().data();
-    frm_rx_buff[1u] = frm_buff1.data();
+    pilot_buff0_.at(1) = zeros0.data();
+    pilot_buff1_.at(0) = zeros1.data();
+    pilot_buff1_.at(1) = c->PilotCi16().data();
+    frm_rx_buff.at(1) = frm_buff1.data();
   }
 
   long long rx_time(0);

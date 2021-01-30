@@ -52,7 +52,7 @@ void CheckCorrectnessUl(Config const* const cfg) {
   int ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string raw_data_filename = cur_directory + "/data/LDPC_orig_data_" +
+  std::string raw_data_filename = cur_directory + "/data/LDPC_orig_ul_data_" +
                                   std::to_string(cfg->OfdmCaNum()) + "_ant" +
                                   std::to_string(cfg->UeNum()) + ".bin";
   std::string output_data_filename = cur_directory + "/data/decode_data.bin";

@@ -81,10 +81,10 @@ int main(int argc, char* argv[]) {
     const size_t input_bytes_per_cb = BitsToBytes(LdpcNumInputBits(
         cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor()));
 
-    const std::string filename_input = cur_directory + "/data/LDPC_orig_data_" +
-                                       std::to_string(cfg->OfdmCaNum()) +
-                                       "_ant" +
-                                       std::to_string(cfg->UeAntNum()) + ".bin";
+    const std::string filename_input =
+        cur_directory + "/data/LDPC_orig_ul_data_" +
+        std::to_string(cfg->OfdmCaNum()) + "_ant" +
+        std::to_string(cfg->UeAntNum()) + ".bin";
     std::printf("Saving raw uplink data (using LDPC) to %s\n",
                 filename_input.c_str());
     FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
@@ -287,13 +287,13 @@ int main(int argc, char* argv[]) {
     const size_t input_bytes_per_cb = BitsToBytes(LdpcNumInputBits(
         cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor()));
 
-    const std::string filename_input = cur_directory + "/data/LDPC_orig_data_" +
-                                       std::to_string(cfg->OfdmCaNum()) +
-                                       "_ant" +
-                                       std::to_string(cfg->UeAntNum()) + ".bin";
+    const std::string filename_input =
+        cur_directory + "/data/LDPC_orig_dl_data_" +
+        std::to_string(cfg->OfdmCaNum()) + "_ant" +
+        std::to_string(cfg->UeAntNum()) + ".bin";
     std::printf("Saving raw dl data (using LDPC) to %s\n",
                 filename_input.c_str());
-    FILE* fp_input = std::fopen(filename_input.c_str(), "ab");
+    FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
     for (size_t i = 0; i < num_dl_codeblocks; i++) {
       std::fwrite(reinterpret_cast<uint8_t*>(&dl_information.at(i).at(0)),
                   input_bytes_per_cb, sizeof(uint8_t), fp_input);
@@ -351,14 +351,14 @@ int main(int argc, char* argv[]) {
         for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum(); sc_id++) {
           dl_mod_data[i][j * cfg->OfdmCaNum() + sc_id + cfg->OfdmDataStart()] =
               (sc_id % cfg->OfdmPilotSpacing() == 0)
-                  ? ue_specific_pilot[j][sc_id]
+                  ? ue_specific_pilot[0][sc_id]  // TODO FIX ME
                   : dl_modulated_codewords.at(i * cfg->UeAntNum() + j)
                         .at(sc_id);
         }
       } else {
         for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum(); sc_id++) {
           dl_mod_data[i][j * cfg->OfdmCaNum() + sc_id + cfg->OfdmDataStart()] =
-              ue_specific_pilot[j][sc_id];
+              ue_specific_pilot[0][sc_id];  // TODO FIX ME
         }
       }
     }
@@ -420,9 +420,11 @@ int main(int argc, char* argv[]) {
       std::memset(tx_symbol, 0, sizeof(short) * 2 * cfg->OfdmTxZeroPrefix());
       for (size_t k = 0; k < cfg->OfdmCaNum(); k++) {
         tx_symbol[2 * (k + cfg->CpLen() + cfg->OfdmTxZeroPrefix())] =
-            (short)(32768 * ptr_ifft[k].re);
+            static_cast<short>(32768 * ptr_ifft[k].re *
+                               std::sqrt(cfg->BsAntNum() * 1.f));
         tx_symbol[2 * (k + cfg->CpLen() + cfg->OfdmTxZeroPrefix()) + 1] =
-            (short)(32768 * ptr_ifft[k].im);
+            static_cast<short>(32768 * ptr_ifft[k].im *
+                               std::sqrt(cfg->BsAntNum() * 1.f));
       }
       for (size_t k = 0; k < (2 * cfg->CpLen()); k++) {
         tx_symbol[2 * cfg->OfdmTxZeroPrefix() + k] =

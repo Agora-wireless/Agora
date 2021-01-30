@@ -16,7 +16,6 @@ SignalHandler::SignalHandler() = default;
  * Destructor.
  */
 
-
 /**
  * Returns the bool flag indicating whether we received an exit signal
  * @return Flag indicating shutdown of program

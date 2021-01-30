@@ -104,6 +104,7 @@ class DoFFT : public Doer {
 
   // Buffer for store 16-bit IQ converted from 12-bit IQ
   uint16_t* temp_16bits_iq_;
+  std::complex<float>* rx_samps_tmp_;  // Temp buffer for received samples
 
   DurationStat* duration_stat_fft_;
   DurationStat* duration_stat_csi_;
@@ -147,6 +148,7 @@ class DoIFFT : public Doer {
   DurationStat* duration_stat_;
   DFTI_DESCRIPTOR_HANDLE mkl_handle_;
   float* ifft_out_;  // Buffer for IFFT output
+  float ifft_scale_factor_;
 };
 
 #endif

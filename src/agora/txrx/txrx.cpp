@@ -60,12 +60,13 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
       std::fprintf(stderr, "Failed to start radio\n");
       return false;
     }
+
     if (cfg_->Frame().NumDLSyms() > 0) {
       std::memcpy(
-          calib_dl_buffer[0], radioconfig_->GetCalibDl(),
+          calib_dl_buffer[kFrameWnd - 1], radioconfig_->GetCalibDl(),
           cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float));
       std::memcpy(
-          calib_ul_buffer[0], radioconfig_->GetCalibUl(),
+          calib_ul_buffer[kFrameWnd - 1], radioconfig_->GetCalibUl(),
           cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float));
     }
   }

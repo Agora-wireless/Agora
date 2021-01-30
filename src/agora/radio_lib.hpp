@@ -28,8 +28,8 @@ class RadioConfig {
   int RadioRx(size_t /*r*/, void** buffs, long long& frameTime);
   bool DoCalib() const { return calib_; }
   void Go();
-  arma::cx_float* GetCalibUl() { return init_calib_ul_; }
-  arma::cx_float* GetCalibDl() { return init_calib_dl_; }
+  arma::cx_float* GetCalibUl() { return init_calib_ul_processed_; }
+  arma::cx_float* GetCalibDl() { return init_calib_ul_processed_; }
   ~RadioConfig();
 
  private:
@@ -66,11 +66,14 @@ class RadioConfig {
   SoapySDR::Stream* ref_rx_stream_;
   std::vector<SoapySDR::Stream*> tx_streams_;
   std::vector<SoapySDR::Stream*> rx_streams_;
-  arma::cx_float* init_calib_ul_;
-  arma::cx_float* init_calib_dl_;
+  arma::cx_float* init_calib_ul_processed_;
+  arma::cx_float* init_calib_dl_processed_;
+  Table<arma::cx_float> init_calib_ul_;
+  Table<arma::cx_float> init_calib_dl_;
   size_t radio_num_;
   size_t antenna_num_;
   bool is_ue_;
   bool calib_;
+  size_t calib_meas_num_;
 };
 #endif
