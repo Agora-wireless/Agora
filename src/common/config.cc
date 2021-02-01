@@ -5,6 +5,7 @@
 
 #include <boost/range/algorithm/count.hpp>
 
+#include "logger.h"
 #include "scrambler.h"
 #include "utils_ldpc.h"
 
@@ -181,28 +182,26 @@ Config::Config(const std::string& jsonfile)
 
     if ((ul_data_symbol_num_perframe + dl_data_symbol_num_perframe +
          pilot_symbol_num_perframe) > symbol_num_perframe) {
-      std::printf(
+      MLPD_ERROR(
           "!!!!! Invalid configuration pilot + ul + dl exceeds total symbols "
           "!!!!!\n");
-      std::printf(
+      MLPD_ERROR(
           "Uplink symbols: %zu, Downlink Symbols :%zu, Pilot Symbols: %zu, "
           "Total Symbols: %zu\n",
           ul_data_symbol_num_perframe, dl_data_symbol_num_perframe,
           pilot_symbol_num_perframe, symbol_num_perframe);
-      std::fflush(stdout);
       assert(false);
     } else if (((ul_data_symbol_start >= dl_data_symbol_start) &&
                 (ul_data_symbol_start < dl_data_symbol_stop)) ||
                ((ul_data_symbol_stop > dl_data_symbol_start) &&
                 (ul_data_symbol_stop <= dl_data_symbol_stop))) {
-      std::printf(
+      MLPD_ERROR(
           "!!!!! Invalid configuration ul and dl symbol overlap detected "
           "!!!!!\n");
-      std::printf(
+      MLPD_ERROR(
           "Uplink - start: %zu - stop :%zu, Downlink - start: %zu - stop %zu\n",
           ul_data_symbol_start, ul_data_symbol_stop, dl_data_symbol_start,
           dl_data_symbol_stop);
-      std::fflush(stdout);
       assert(false);
     }
 
@@ -227,7 +226,7 @@ Config::Config(const std::string& jsonfile)
       second_sym_start = dl_data_symbol_start;
       second_sym_count = dl_data_symbol_num_perframe;
     }
-    std::printf(
+    MLPD_SYMBOL(
         "Symbol %c, start %zu, count %zu. Symbol %c, start %zu, count %zu. "
         "Total Symbols: %zu\n",
         first_sym, first_sym_start, first_sym_start, second_sym,
@@ -264,8 +263,8 @@ Config::Config(const std::string& jsonfile)
     assert(jframes.size() == 1);
     frame_ = FrameStats(jframes.at(0).get<std::string>());
   }
-  std::printf("Config: Frame schedule %s (%zu symbols)\n",
-              frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
+  MLPD_INFO("Config: Frame schedule %s (%zu symbols)\n",
+            frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
 
   /* client_dl_pilot_sym uses the first x 'D' symbols for downlink channel
    * estimation for each user. */
@@ -321,7 +320,7 @@ Config::Config(const std::string& jsonfile)
   encode_block_size_ = tdd_conf.value("encode_block_size", 1);
 
   noise_level_ = tdd_conf.value("noise_level", 0.03);  // default: 30 dB
-  std::printf("Noise level: %.2f\n", noise_level_);
+  MLPD_SYMBOL("Noise level: %.2f\n", noise_level_);
 
   /* LDPC Coding configurations */
   uint16_t base_graph = tdd_conf.value("base_graph", 1);
@@ -351,7 +350,7 @@ Config::Config(const std::string& jsonfile)
            "LDPC expansion factor is too large for number of OFDM data "
            "subcarriers.");
 
-  std::printf(
+  MLPD_INFO(
       "Config: LDPC: Zc: %d, %zu code blocks per symbol, %d information "
       "bits per encoding, %d bits per encoded code word, decoder "
       "iterations: %d, code rate %.3f (nRows = %zu)\n",
@@ -385,7 +384,7 @@ Config::Config(const std::string& jsonfile)
 
   // Done!
   this->running_.store(true);
-  std::printf(
+  MLPD_INFO(
       "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
       "frame,\n\t"
       "%zu uplink data symbols per frame, %zu downlink data "
@@ -546,19 +545,19 @@ void Config::GenData() {
   std::string ul_data_file = cur_directory + "/data/LDPC_orig_ul_data_" +
                              std::to_string(this->ofdm_ca_num_) + "_ant" +
                              std::to_string(this->total_ue_ant_num_) + ".bin";
-  std::cout << "Config: Reading raw ul data from " << ul_data_file << std::endl;
+  MLPD_SYMBOL("Config: Reading raw ul data from %s\n", ul_data_file.c_str());
   FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
   if (fd == nullptr) {
-    std::printf("Failed to open antenna file %s. Error %s.\n",
-                ul_data_file.c_str(), strerror(errno));
+    MLPD_ERROR("Failed to open antenna file %s. Error %s.\n",
+               ul_data_file.c_str(), strerror(errno));
     std::exit(-1);
   }
 
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     if (std::fseek(fd, (num_bytes_per_ue * this->ue_ant_offset_), SEEK_CUR) !=
         0) {
-      std::printf(" *** Error: failed to seek propertly (pre) into %s file\n",
-                  ul_data_file.c_str());
+      MLPD_ERROR(" *** Error: failed to seek propertly (pre) into %s file\n",
+                 ul_data_file.c_str());
       RtAssert(false,
                "Failed to seek propertly into " + ul_data_file + "file\n");
     }
@@ -566,7 +565,7 @@ void Config::GenData() {
       size_t r = std::fread(this->ul_bits_[i] + (j * num_bytes_per_ue_pad),
                             sizeof(int8_t), num_bytes_per_ue, fd);
       if (r < num_bytes_per_ue) {
-        std::printf(
+        MLPD_ERROR(
             " *** Error: Uplink bad read from file %s (batch %zu : %zu) %zu : "
             "%zu\n",
             ul_data_file.c_str(), i, j, r, num_bytes_per_ue);
@@ -577,8 +576,8 @@ void Config::GenData() {
             num_bytes_per_ue * (this->total_ue_ant_num_ - this->ue_ant_offset_ -
                                 this->ue_ant_num_),
             SEEK_CUR) != 0) {
-      std::printf(" *** Error: failed to seek propertly (post) into %s file\n",
-                  ul_data_file.c_str());
+      MLPD_ERROR(" *** Error: failed to seek propertly (post) into %s file\n",
+                 ul_data_file.c_str());
       RtAssert(false,
                "Failed to seek propertly into " + ul_data_file + "file\n");
     }
@@ -588,11 +587,12 @@ void Config::GenData() {
   std::string dl_data_file = cur_directory + "/data/LDPC_orig_dl_data_" +
                              std::to_string(this->ofdm_ca_num_) + "_ant" +
                              std::to_string(this->total_ue_ant_num_) + ".bin";
-  std::cout << "Config: Reading raw dl data from " << dl_data_file << std::endl;
+
+  MLPD_SYMBOL("Config: Reading raw dl data from %s\n", dl_data_file.c_str());
   fd = std::fopen(dl_data_file.c_str(), "rb");
   if (fd == nullptr) {
-    std::printf("Failed to open antenna file %s. Error %s.\n",
-                dl_data_file.c_str(), strerror(errno));
+    MLPD_ERROR("Failed to open antenna file %s. Error %s.\n",
+               dl_data_file.c_str(), strerror(errno));
     std::exit(-1);
   }
 
@@ -601,7 +601,7 @@ void Config::GenData() {
       size_t r = std::fread(this->dl_bits_[i] + j * num_bytes_per_ue_pad,
                             sizeof(int8_t), num_bytes_per_ue, fd);
       if (r < num_bytes_per_ue) {
-        std::printf(
+        MLPD_ERROR(
             "***Error: Downlink bad read from file %s (batch %zu : %zu) \n",
             dl_data_file.c_str(), i, j);
       }
@@ -675,7 +675,6 @@ void Config::GenData() {
         ul_iq_f_[i][q + j] = ModSingleUint8(ul_mod_input_[i][s], mod_table_);
         ul_iq_ifft[i][q + j] = ul_iq_f_[i][q + j];
       }
-
       CommsLib::IFFT(&ul_iq_ifft[i][q], ofdm_ca_num_, false);
     }
   }

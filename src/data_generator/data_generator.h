@@ -34,6 +34,8 @@ class DataGenerator {
     }
   }
 
+  void DoDataGeneration(const std::string& directory);
+
   /**
    * @brief                        Generate one raw information bit sequence
    *

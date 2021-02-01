@@ -362,7 +362,6 @@ class Config {
   inline static const size_t kDefaultULSymStart = 9;
   inline static const size_t kDefaultDLSymPerFrame = 30;
   inline static const size_t kDefaultDLSymStart = 40;
-  inline static const bool kDefaultDownlinkMode = false;
 
   /* Private class variables */
   const double kFreqGhz;  // RDTSC frequency in GHz

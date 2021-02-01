@@ -79,7 +79,7 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
       socket_std_threads_.at(i) =
           std::thread(&PacketTXRX::LoopTxRxUsrp, this, i);
     } else {
-      std::printf("Starting LoopTxRx %zu\n", i);
+      MLPD_SYMBOL("LoopTXRX: Starting thread %zu\n", i);
       socket_std_threads_.at(i) = std::thread(&PacketTXRX::LoopTxRx, this, i);
     }
   }
@@ -109,8 +109,7 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
 }
 
 void PacketTXRX::LoopTxRx(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerTXRX, kCoreOffset, tid,
-                      true /* quiet */);
+  PinToCoreWithOffset(ThreadType::kWorkerTXRX, kCoreOffset, tid);
   size_t* rx_frame_start = (*frame_start_)[tid];
   size_t rx_offset = 0;
   int radio_lo = tid * cfg_->NumRadios() / kSocketThreadNum;
@@ -123,7 +122,7 @@ void PacketTXRX::LoopTxRx(int tid) {
     SetupSockaddrRemoteIpv4(&bs_rru_sockaddr_[radio_id],
                             cfg_->BsRruPort() + radio_id,
                             cfg_->BsRruAddr().c_str());
-    MLPD_INFO(
+    MLPD_FRAME(
         "TXRX thread %d: set up UDP socket server listening to port %d"
         " with remote address %s:%d \n",
         tid, local_port_id, cfg_->BsRruAddr().c_str(),
@@ -186,7 +185,7 @@ struct Packet* PacketTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
 
   // if rx_buffer is full, exit
   if (rx_buffer_status[rx_offset] == 1) {
-    std::printf("TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
+    MLPD_ERROR("TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
     cfg_->Running(false);
     return (nullptr);
   }
@@ -194,7 +193,7 @@ struct Packet* PacketTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
       reinterpret_cast<struct Packet*>(&rx_buffer[rx_offset * packet_length]);
   if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
     if ((errno != EAGAIN) && (cfg_->Running() == true)) {
-      std::perror("recv failed");
+      MLPD_ERROR("Recv failed");
       std::exit(0);
     }
     return (nullptr);
@@ -223,8 +222,8 @@ struct Packet* PacketTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
 
   // Push kPacketRX event into the queue.
   EventData rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset).tag_);
-  if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-    std::printf("socket message enqueue failed\n");
+  if (message_queue_->enqueue(*local_ptok, rx_message) == false) {
+    MLPD_ERROR("socket message enqueue failed\n");
     std::exit(0);
   }
   return pkt;

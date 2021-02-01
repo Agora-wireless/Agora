@@ -577,7 +577,7 @@ void PhyUe::TaskThread(int tid) {
   PinToCoreWithOffset(ThreadType::kWorker,
                       config_->CoreOffset() + rx_thread_num_ + 1 +
                           (kEnableMac ? rx_thread_num_ : 0),
-                      tid, true);
+                      tid);
 
   // task_ptok[tid].reset(new moodycamel::ProducerToken(message_queue_));
 

@@ -7,6 +7,7 @@
 #include <thread>
 
 #include "datatype_conversion.inc"
+#include "logger.h"
 #include "udp_client.h"
 
 static constexpr bool kDebugPrintSender = false;
@@ -43,7 +44,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
                  cfg->Frame().NumTotalSyms()),
       kTicksWnd2(15 * kFrameDuration * kTicksPerUsec /
                  cfg->Frame().NumTotalSyms()) {
-  std::printf(
+  MLPD_WARN(
       "Initializing sender, sending to base station server at %s, frame "
       "duration = %.2f ms, slow start = %s\n",
       cfg->BsServerAddr().c_str(), frame_duration / 1000.0,
@@ -114,8 +115,8 @@ Sender::~Sender() {
   keep_running.store(false);
 
   for (auto& thread : this->threads_) {
+    MLPD_INFO("Sender: Joining threads\n");
     thread.join();
-    std::printf("Sender: Joining threads\n");
   }
 
   iq_data_short_.Free();
@@ -172,7 +173,7 @@ void Sender::ScheduleSymbol(size_t frame, size_t symbol_id) {
 
 void* Sender::MasterThread(int /*unused*/) {
   signal(SIGINT, InterruptHandler);
-  PinToCoreWithOffset(ThreadType::kMasterTX, kCoreOffset, 0, true);
+  PinToCoreWithOffset(ThreadType::kMasterTX, kCoreOffset, 0);
 
   // Wait for all worker threads to be ready (+1 for Master)
   num_workers_ready_atomic.fetch_add(1);
@@ -187,7 +188,7 @@ void* Sender::MasterThread(int /*unused*/) {
   size_t start_symbol = FindNextSymbol(0);
   // Delay until the start of the first symbol (pilot)
   if (start_symbol > 0) {
-    std::printf("Sender: Starting symbol %zu delaying\n", start_symbol);
+    MLPD_INFO("Sender: Starting symbol %zu delaying\n", start_symbol);
     DelayTicks(tick_start, GetTicksForFrame(0) * start_symbol);
   }
   tick_start = Rdtsc();
@@ -203,8 +204,8 @@ void* Sender::MasterThread(int /*unused*/) {
       packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_]++;
 
       if (kDebugPrintSender == true) {
-        std::printf("Sender -- checking symbol %d : %zu : %zu\n",
-                    ctag.symbol_id_, comp_frame_slot,
+        std::printf("Sender: Checking symbol %d : %zu : %zu\n", ctag.symbol_id_,
+                    comp_frame_slot,
                     packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_]);
       }
       // std::printf("Sender -- checking symbol %d : %zu : %zu\n",
@@ -218,7 +219,7 @@ void* Sender::MasterThread(int /*unused*/) {
         size_t next_symbol_id = FindNextSymbol((ctag.symbol_id_ + 1));
         unsigned symbol_delay = next_symbol_id - ctag.symbol_id_;
         if (kDebugPrintSender == true) {
-          std::printf("Sender -- finishing symbol %d : %zu : %zu delayed %d\n",
+          std::printf("Sender: Finishing symbol %d : %zu : %zu delayed %d\n",
                       ctag.symbol_id_, cfg_->Frame().NumTotalSyms(),
                       next_symbol_id, symbol_delay);
         }
@@ -268,14 +269,14 @@ void* Sender::MasterThread(int /*unused*/) {
 
 /* Worker expects only valid transmit symbol_ids 'U' 'P' */
 void* Sender::WorkerThread(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerTX, (kCoreOffset + 1), tid, true);
+  PinToCoreWithOffset(ThreadType::kWorkerTX, (kCoreOffset + 1), tid);
 
   // Wait for all Sender threads (including master) to start runnung
   num_workers_ready_atomic.fetch_add(1);
   while (num_workers_ready_atomic.load() < (kSocketThreadNum + 1)) {
     // Wait
   }
-  std::printf("Sender worker thread %d running\n", tid);
+  MLPD_FRAME("Sender: worker thread %d running\n", tid);
 
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
   DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1,
@@ -310,8 +311,8 @@ void* Sender::WorkerThread(int tid) {
   size_t total_tx_packets_rolling = 0;
   size_t cur_radio = radio_lo;
 
-  std::printf("In thread %d, %zu antennas, total bs antennas: %zu\n", tid,
-              ant_num_this_thread, cfg_->BsAntNum());
+  MLPD_INFO("Sender: In thread %d, %zu antennas, total bs antennas: %zu\n", tid,
+            ant_num_this_thread, cfg_->BsAntNum());
 
   // We currently don't support zero-padding OFDM prefix and postfix
   RtAssert(cfg_->PacketLength() ==
@@ -421,7 +422,7 @@ void* Sender::WorkerThread(int tid) {
 
   std::free(static_cast<void*>(socks_pkt_buf));
   std::free(static_cast<void*>(fft_inout));
-  std::printf("Sender worker thread %d exit\n", tid);
+  MLPD_FRAME("Sender: worker thread %d exit\n", tid);
   return nullptr;
 }
 

@@ -58,10 +58,10 @@ Agora::Agora(Config* const cfg)
     mac_std_thread_ = std::thread(&MacThread::RunEventLoop, mac_thread_);
   }
 
-  /* Create worker threads */
+  // Create worker threads
   CreateThreads();
 
-  std::printf(
+  MLPD_INFO(
       "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
       "cores %zu--%zu\n",
       cfg->CoreOffset(), cfg->CoreOffset() + 1,
@@ -70,19 +70,16 @@ Agora::Agora(Config* const cfg)
 }
 
 Agora::~Agora() {
-  // std::printf( "Agora: destructing\n" );
   FreeUplinkBuffers();
-  /* Downlink */
   FreeDownlinkBuffers();
-  // std::printf( "Buffers freed\n" );
+
   if (kEnableMac == true) {
-    // std::printf( "Joining mac thread\n" );
     mac_std_thread_.join();
     delete mac_thread_;
   }
-  int i = 0;
+
   for (auto&& worker_thread : workers_) {
-    std::printf("Joining worker thread: %d\n", i++);
+    MLPD_SYMBOL("Agora: Joining worker thread: %d\n", i++);
     worker_thread.join();
   }
 
@@ -92,7 +89,7 @@ Agora::~Agora() {
 }
 
 void Agora::Stop() {
-  std::cout << "Agora: stopping threads" << std::endl;
+  MLPD_WARN("Agora: terminating\n");
   config_->Running(false);
   usleep(1000);
   packet_tx_rx_.reset();
@@ -250,8 +247,7 @@ void Agora::Start() {
     return;
   }
 
-  PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0,
-                      true /* quiet */);
+  PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0);
 
   // Counters for printing summary
   size_t tx_count = 0;
@@ -298,7 +294,7 @@ void Agora::Start() {
                                 (sock_buf_offset * cfg->PacketLength()));
 
           if (pkt->frame_id_ >= ((this->cur_sche_frame_id_ + kFrameWnd))) {
-            std::printf(
+            MLPD_ERROR(
                 "Error: Received packet for future frame %u beyond "
                 "frame window (= %zu + %zu). This can happen if "
                 "Agora is running slowly, e.g., in debug mode\n",
@@ -351,8 +347,6 @@ void Agora::Start() {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_idx_ul = gen_tag_t(event.tags_[0]).symbol_id_;
           size_t base_sc_id = gen_tag_t(event.tags_[0]).sc_id_;
-          // std::printf("---kDemul %zu %zu %zu\n", frame_id, symbol_idx_ul,
-          // base_sc_id);
 
           PrintPerTaskDone(PrintType::kDemul, frame_id,
                            cfg->Frame().GetULSymbol(symbol_idx_ul), base_sc_id);
@@ -383,8 +377,6 @@ void Agora::Start() {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_idx_ul = gen_tag_t(event.tags_[0]).symbol_id_;
 
-          // std::printf("---kDecode Complete %zu %zu\n", frame_id,
-          // symbol_idx_ul);
           bool last_decode_task =
               this->decode_counters_.CompleteTask(frame_id, symbol_idx_ul);
           if (last_decode_task == true) {
@@ -450,8 +442,6 @@ void Agora::Start() {
             bool last_encode_task =
                 encode_counters_.CompleteTask(frame_id, symbol_idx_dl);
             if (last_encode_task == true) {
-              // std::printf("encode_cur_frame_for_symbol %zu %zu %zu\n",
-              // symbol_idx_dl, symbol_id, frame_id);
               this->encode_cur_frame_for_symbol_.at(symbol_idx_dl) = frame_id;
               // If precoder of the current frame exists
               if (zf_last_frame_ == frame_id) {
@@ -480,10 +470,6 @@ void Agora::Start() {
           bool last_precode_task =
               this->precode_counters_.CompleteTask(frame_id, symbol_idx_dl);
 
-          // std::printf("Precode %d %zu %zu dl_symbol %zu frame sym %zu\n",
-          // last_precode_task, this->precode_counters_.GetTaskCount(frame_id,
-          // symbol_idx_dl), this->precode_counters_.max_task_count(),
-          // symbol_idx_dl, symbol_id);
           if (last_precode_task == true) {
             ScheduleAntennas(EventType::kIFFT, frame_id, symbol_id);
             PrintPerSymbolDone(PrintType::kPrecode, frame_id, symbol_idx_dl);
@@ -567,7 +553,7 @@ void Agora::Start() {
               int samples_num_per_ue =
                   cfg->OfdmDataNum() * tx_counters_.MaxSymbolCount() * 1000;
 
-              std::printf(
+              MLPD_INFO(
                   "TX %d samples (per-client) to %zu clients "
                   "in %f secs, throughtput %f bps per-client "
                   "(16QAM), current tx queue length %zu\n",
@@ -579,7 +565,7 @@ void Agora::Start() {
           }
         } break;
         default:
-          std::printf("Wrong event type in message queue!");
+          MLPD_ERROR("Wrong event type in message queue!");
           std::exit(0);
       } /* End of switch */
 
@@ -619,7 +605,7 @@ void Agora::Start() {
   }   /* End of while */
 
 finish:
-  std::printf("Agora: printing stats and saving to file\n");
+  MLPD_INFO("Agora: printing stats and saving to file\n");
   this->stats_->PrintSummary();
   this->stats_->SaveToFile();
   if (flags_.enable_save_decode_data_to_file_ == true) {
@@ -669,23 +655,17 @@ void Agora::HandleEventFft(size_t tag) {
     size_t symbol_idx_ul = config_->GetULSymbolIdx(frame_id, symbol_id);
     bool last_fft_per_symbol =
         uplink_fft_counters_.CompleteTask(frame_id, symbol_id);
-    // std::printf("FFT UL Symbol frame: %zu symbol %zu done %zu\n", frame_id,
-    //            symbol_id,
-    //            uplink_fft_counters_.GetTaskCount(frame_id, symbol_id));
+
     if (last_fft_per_symbol == true) {
       fft_cur_frame_for_symbol_.at(symbol_idx_ul) = frame_id;
-      // std::printf("fft_cur_frame_for_symbol %zu %zu %zu %zu\n",
-      // symbol_idx_ul, symbol_id, frame_id,
+
       PrintPerSymbolDone(PrintType::kFFTData, frame_id, symbol_id);
       // If precoder exist, schedule demodulation
       if (zf_last_frame_ == frame_id) {
-        // std::printf("\n---kUL Schedule kDemul %zu, ul index %zu\n\n",
-        // frame_id, symbol_idx_ul);
         ScheduleSubcarriers(EventType::kDemul, frame_id, symbol_idx_ul);
       }
       bool last_uplink_fft = uplink_fft_counters_.CompleteSymbol(frame_id);
       if (last_uplink_fft == true) {
-        // std::printf("\n---Last UL FFT %zu %zu\n\n", frame_id, symbol_idx_ul);
         uplink_fft_counters_.Reset(frame_id);
       }
     }
@@ -704,8 +684,7 @@ void Agora::HandleEventFft(size_t tag) {
 }
 
 void Agora::Worker(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorker, kBaseWorkerCoreOffset, tid,
-                      true /* quiet */);
+  PinToCoreWithOffset(ThreadType::kWorker, kBaseWorkerCoreOffset, tid);
 
   /* Initialize operators */
   std::unique_ptr<DoZF> compute_zf(
@@ -793,7 +772,7 @@ void Agora::Worker(int tid) {
       empty_queue = true;
     }
   }
-  std::printf("Agora worker %d exit\n", tid);
+  MLPD_SYMBOL("Agora worker %d exit\n", tid);
 }
 
 void Agora::WorkerFft(int tid) {
@@ -910,7 +889,7 @@ void Agora::CreateThreads() {
       workers_.emplace_back(&Agora::WorkerDecode, this, i);
     }
   } else {
-    // std::printf("Agora: creating %zu workers\n", cfg->worker_thread_num());
+    MLPD_SYMBOL("Agora: creating %zu workers\n", cfg->WorkerThreadNum());
     for (size_t i = 0; i < cfg->WorkerThreadNum(); i++) {
       workers_.emplace_back(&Agora::Worker, this, i);
     }
@@ -1447,8 +1426,8 @@ void Agora::CheckIncrementScheduleFrame(size_t /*frame_id*/,
 bool Agora::CheckWorkComplete(size_t frame_id) {
   bool finished = false;
 
-  std::printf(
-      "\nChecking work complete %zu, ifft %d, tx %d, decode %d, tomac %d, "
+  MLPD_TRACE(
+      "Checking work complete %zu, ifft %d, tx %d, decode %d, tomac %d, "
       "finished %d\n",
       frame_id, static_cast<int>(this->ifft_counters_.IsLastSymbol(frame_id)),
       static_cast<int>(this->tx_counters_.IsLastSymbol(frame_id)),

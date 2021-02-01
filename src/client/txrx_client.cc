@@ -5,6 +5,7 @@
 #include "txrx_client.h"
 
 #include "config.h"
+#include "logger.h"
 
 RadioTXRX::RadioTXRX(Config* cfg, int n_threads, int in_core_id)
     : config_(cfg), thread_num_(n_threads), core_id_(in_core_id) {
@@ -225,7 +226,7 @@ void* RadioTXRX::LoopTxRx(int tid) {
     SetupSockaddrRemoteIpv4(&servaddr_[radio_id],
                             config_->UeRruPort() + radio_id,
                             config_->BsRruAddr().c_str());
-    std::printf(
+    MLPD_FRAME(
         "TXRX thread %d: set up UDP socket server listening to port %d"
         " with remote address %s:%d \n",
         tid, local_port_id, config_->BsRruAddr().c_str(),

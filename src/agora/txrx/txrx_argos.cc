@@ -3,7 +3,7 @@
  * @brief Implementation of PacketTXRX datapath functions for communicating
  * with real Argos hardware
  */
-
+#include "logger.h"
 #include "txrx.h"
 
 static constexpr bool kDebugDownlink = false;
@@ -14,7 +14,7 @@ void PacketTXRX::LoopTxRxArgos(int tid) {
   int rx_offset = 0;
   int radio_lo = tid * cfg_->NumRadios() / kSocketThreadNum;
   int radio_hi = (tid + 1) * cfg_->NumRadios() / kSocketThreadNum;
-  std::printf("TXRX thread %d has %d radios\n", tid, radio_hi - radio_lo);
+  MLPD_INFO("TXRX thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
   int prev_frame_id = -1;
   int radio_id = radio_lo;
@@ -57,8 +57,7 @@ struct Packet* PacketTXRX::RecvEnqueueArgos(int tid, int radio_id,
   for (int ch = 0; ch < n_channels; ++ch) {
     // if rx_buffer is full, exit
     if (rx_buffer_status[rx_offset + ch] == 1) {
-      std::printf("TXRX thread %d rx_buffer full, offset: %d\n", tid,
-                  rx_offset);
+      MLPD_ERROR("TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
       cfg_->Running(false);
       break;
     }
