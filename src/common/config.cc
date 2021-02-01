@@ -561,7 +561,7 @@ void Config::GenData() {
   std::string ul_data_file = cur_directory + "/data/LDPC_orig_ul_data_" +
                              std::to_string(this->ofdm_ca_num_) + "_ant" +
                              std::to_string(this->total_ue_ant_num_) + ".bin";
-  std::cout << "Config: Reading raw data from " << ul_data_file << std::endl;
+  std::cout << "Config: Reading raw ul data from " << ul_data_file << std::endl;
   FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
   if (fd == nullptr) {
     std::printf("Failed to open antenna file %s. Error %s.\n",
@@ -572,7 +572,10 @@ void Config::GenData() {
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     if (std::fseek(fd, (num_bytes_per_ue * this->ue_ant_offset_), SEEK_CUR) !=
         0) {
-      return;
+      std::printf(" *** Error: failed to seek propertly (pre) into %s file\n",
+                  ul_data_file.c_str());
+      RtAssert(false,
+               "Failed to seek propertly into " + ul_data_file + "file\n");
     }
     for (size_t j = 0; j < this->ue_ant_num_; j++) {
       size_t r = std::fread(this->ul_bits_[i] + (j * num_bytes_per_ue_pad),
@@ -589,7 +592,10 @@ void Config::GenData() {
             num_bytes_per_ue * (this->total_ue_ant_num_ - this->ue_ant_offset_ -
                                 this->ue_ant_num_),
             SEEK_CUR) != 0) {
-      return;
+      std::printf(" *** Error: failed to seek propertly (post) into %s file\n",
+                  ul_data_file.c_str());
+      RtAssert(false,
+               "Failed to seek propertly into " + ul_data_file + "file\n");
     }
   }
   std::fclose(fd);
@@ -597,7 +603,7 @@ void Config::GenData() {
   std::string dl_data_file = cur_directory + "/data/LDPC_orig_dl_data_" +
                              std::to_string(this->ofdm_ca_num_) + "_ant" +
                              std::to_string(this->total_ue_ant_num_) + ".bin";
-  std::cout << "Config: Reading raw data from " << dl_data_file << std::endl;
+  std::cout << "Config: Reading raw dl data from " << dl_data_file << std::endl;
   fd = std::fopen(dl_data_file.c_str(), "rb");
   if (fd == nullptr) {
     std::printf("Failed to open antenna file %s. Error %s.\n",

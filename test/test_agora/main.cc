@@ -1,51 +1,44 @@
 #include "agora.h"
 
-void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
-                    int num_bytes_per_ue, Config const* const cfg) {
-  int data_symbol_num_perframe = cfg->Frame().NumULSyms();
-  size_t ue_num = cfg->UeNum();
+static const bool kDebugPrintUlCorr = false;
+static const bool kDebugPrintDlCorr = false;
+
+template <class TableType>
+static void ReadFromFile(const std::string& filename, Table<TableType>& data,
+                         size_t num_reads, size_t read_elements,
+                         size_t element_size) {
   FILE* fp = std::fopen(filename.c_str(), "rb");
   if (fp == nullptr) {
-    std::printf("open file failed: %s\n", filename.c_str());
-    std::cerr << "Error: " << strerror(errno) << std::endl;
+    MLPD_ERROR("Open file failed: %s, error %s\n", filename.c_str(),
+               strerror(errno));
   } else {
-    std::printf("opening file %s\n", filename.c_str());
+    MLPD_INFO("Opening file %s\n", filename.c_str());
   }
-  const unsigned read_size = (num_bytes_per_ue * ue_num);
-  for (int i = 0; i < data_symbol_num_perframe; i++) {
-    size_t num_bytes = std::fread(data[i], sizeof(uint8_t), read_size, fp);
-    if (read_size != num_bytes) {
-      std::printf(
-          "read file failed: %s, symbol %d, expect: %d, actual: %zu "
-          "bytes\n",
-          filename.c_str(), i, read_size, num_bytes);
-      std::cerr << "Error: " << strerror(errno) << std::endl;
+
+  for (size_t i = 0; i < num_reads; i++) {
+    size_t elements = std::fread(data[i], element_size, read_elements, fp);
+    if (read_elements != elements) {
+      MLPD_ERROR(
+          "Read file failed: %s, symbol %zu, expect: %zu, actual: %zu "
+          "bytes, error %s\n",
+          filename.c_str(), i, read_elements, elements, strerror(errno));
     }
   }
 }
 
-void ReadFromFileDl(const std::string& filename, Table<short>& data,
-                    int ofdm_size, Config const* const cfg) {
-  int data_symbol_num_perframe = cfg->Frame().NumDLSyms();
-  size_t bs_ant_num = cfg->BsAntNum();
-  FILE* fp = std::fopen(filename.c_str(), "rb");
-  if (fp == nullptr) {
-    std::printf("open file failed: %s\n", filename.c_str());
-    std::cerr << "Error: " << strerror(errno) << std::endl;
-  } else {
-    std::printf("opening file %s\n", filename.c_str());
-  }
-  const auto read_size = static_cast<unsigned>(ofdm_size * 2u);
-  for (size_t i = 0; i < (data_symbol_num_perframe * bs_ant_num); i++) {
-    size_t num_bytes = std::fread(data[i], sizeof(short), read_size, fp);
-    if (read_size != num_bytes) {
-      std::printf("read file failed: %s\n", filename.c_str());
-      std::cerr << "Error: " << strerror(errno) << std::endl;
-    }
-  }
+static void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
+                           int num_bytes_per_ue, Config const* const cfg) {
+  ReadFromFile(filename, data, cfg->Frame().NumULSyms(),
+               (num_bytes_per_ue * cfg->UeNum()), sizeof(uint8_t));
 }
 
-void CheckCorrectnessUl(Config const* const cfg) {
+static void ReadFromFileDl(const std::string& filename, Table<short>& data,
+                           int ofdm_size, Config const* const cfg) {
+  ReadFromFile(filename, data, cfg->Frame().NumDLSyms() * cfg->BsAntNum(),
+               (ofdm_size * 2), sizeof(short));
+}
+
+static unsigned int CheckCorrectnessUl(Config const* const cfg) {
   int ue_num = cfg->UeNum();
   int num_uplink_syms = cfg->Frame().NumULSyms();
   int ofdm_data_num = cfg->OfdmDataNum();
@@ -74,8 +67,8 @@ void CheckCorrectnessUl(Config const* const cfg) {
       "per UE %d.\n",
       ue_num, num_uplink_syms, ofdm_data_num, ul_pilot_syms, num_bytes_per_ue);
 
-  int error_cnt = 0;
-  int total_count = 0;
+  unsigned int error_cnt = 0;
+  unsigned int total_count = 0;
   for (int i = 0; i < num_uplink_syms; i++) {
     if (i >= ul_pilot_syms) {
       for (int ue = 0; ue < ue_num; ue++) {
@@ -85,28 +78,24 @@ void CheckCorrectnessUl(Config const* const cfg) {
           int offset_in_output = num_bytes_per_ue * ue + j;
           if (raw_data[i][offset_in_raw] != output_data[i][offset_in_output]) {
             error_cnt++;
-            // std::printf("(%d, %d, %u, %u)\n", i, j,
-            //     raw_data[i][offset_in_raw],
-            //     output_data[i][offset_in_output]);
+            if (kDebugPrintUlCorr) {
+              std::printf("(%d, %d, %u, %u)\n", i, j,
+                          raw_data[i][offset_in_raw],
+                          output_data[i][offset_in_output]);
+            }
           }
         }
-      }  //  for (int ue = 0; ue < ue_num; ue++) {
-    }    // if (i >= ul_pilot_syms) {
-  }      // for (int i = 0; i < num_uplink_syms; i++) {
-  std::printf("======================\n");
-  std::printf("Uplink test: \n\n");
-  if (error_cnt == 0) {
-    std::printf("Passed uplink test!\n");
-  } else {
-    std::printf("Failed uplink test! Error rate: %d/%d\n", error_cnt,
-                total_count);
-  }
-  std::printf("======================\n\n");
+      }  //  for (int ue = 0; ue < ue_num; ue++)
+    }    // if (i >= ul_pilot_syms)
+  }      // for (int i = 0; i < num_uplink_syms; i++)
+
   raw_data.Free();
   output_data.Free();
+
+  return error_cnt;
 }
 
-void CheckCorrectnessDl(Config const* const cfg) {
+unsigned int CheckCorrectnessDl(Config const* const cfg) {
   int bs_ant_num = cfg->BsAntNum();
   int num_data_syms = cfg->Frame().NumDLSyms();
   int ofdm_ca_num = cfg->OfdmCaNum();
@@ -130,22 +119,22 @@ void CheckCorrectnessDl(Config const* const cfg) {
       "check_correctness_dl: bs ant %d, dl syms %d, ofdm %d, samps per %d. \n",
       bs_ant_num, num_data_syms, ofdm_ca_num, samps_per_symbol);
 
-  int error_cnt = 0;
-  int total_count = 0;
+  unsigned int error_cnt = 0;
   float sum_diff = 0;
   for (int i = 0; i < num_data_syms; i++) {
     for (int ant = 0; ant < bs_ant_num; ant++) {
-      // std::printf("symbol %d, antenna %d\n", i, ant);
       sum_diff = 0;
-      total_count++;
       for (int sc = 0; sc < (samps_per_symbol * 2); sc++) {
         int offset = (bs_ant_num * i) + ant;
         float diff =
             fabs((raw_data[offset][sc] - tx_data[offset][sc]) / 32768.0);
         sum_diff += diff;
-        // if (i == 0)
-        // std::printf("symbol %d ant %d sc %d, (%d, %d) diff: %.3f\n", i, ant,
-        //     sc / 2, raw_data[offset][sc], tx_data[offset][sc], diff);
+        if (kDebugPrintDlCorr) {
+          if (i == 0)
+            std::printf("symbol %d ant %d sc %d, (%d, %d) diff: %.3f\n", i, ant,
+                        sc / 2, raw_data[offset][sc], tx_data[offset][sc],
+                        diff);
+        }
       }
       float avg_diff = sum_diff / samps_per_symbol;
       std::printf("symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant,
@@ -155,22 +144,17 @@ void CheckCorrectnessDl(Config const* const cfg) {
       }
     }
   }
-  std::printf("======================\n");
-  std::printf("Downlink test: \n\n");
-  if (error_cnt == 0) {
-    std::printf("Passed downlink test!\n");
-  } else {
-    std::printf("Failed downlink test! Error rate: %d/%d\n", error_cnt,
-                total_count);
-  }
-  std::printf("======================\n\n");
   raw_data.Free();
   tx_data.Free();
+
+  return error_cnt;
 }
 
-void CheckCorrectness(Config const* const cfg) {
-  CheckCorrectnessUl(cfg);
-  CheckCorrectnessDl(cfg);
+static unsigned int CheckCorrectness(Config const* const cfg) {
+  unsigned int error_count = 0;
+  error_count = CheckCorrectnessUl(cfg);
+  error_count += CheckCorrectnessDl(cfg);
+  return error_count;
 }
 
 int main(int argc, char* argv[]) {
@@ -194,17 +178,32 @@ int main(int argc, char* argv[]) {
     agora_cli->Start();
 
     std::printf("Start correctness check\n");
+    unsigned int error_count = 0;
+    std::string test_name;
 
     if ((cfg->Frame().NumDLSyms() > 0) && (cfg->Frame().NumULSyms() > 0)) {
-      CheckCorrectness(cfg.get());
+      test_name = "combined";
+      error_count = CheckCorrectness(cfg.get());
     } else if (cfg->Frame().NumDLSyms() > 0) {
-      CheckCorrectnessDl(cfg.get());
+      test_name = "downlink";
+      error_count = CheckCorrectnessDl(cfg.get());
     } else if (cfg->Frame().NumULSyms() > 0) {
-      CheckCorrectnessUl(cfg.get());
+      test_name = "uplink";
+      error_count = CheckCorrectnessUl(cfg.get());
     } else {
       // Should never happen
       assert(false);
     }
+
+    std::printf("======================\n");
+    std::printf("%s test: \n", test_name.c_str());
+    if (error_count == 0) {
+      std::printf("Passed %s test!\n", test_name.c_str());
+    } else {
+      std::printf("Failed %s test! Error count: %d\n", test_name.c_str(),
+                  error_count);
+    }
+    std::printf("======================\n\n");
 
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {

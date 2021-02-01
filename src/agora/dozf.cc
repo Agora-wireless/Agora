@@ -203,8 +203,9 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
 
         // use the previous window which has a full set of calibration results
         frame_cal_slot = (frame_grp_id + kFrameWnd - 1) % kFrameWnd;
-        if (frame_id >= TX_FRAME_DELTA + cfg_->AntGroupNum())
+        if (frame_id >= TX_FRAME_DELTA + cfg_->AntGroupNum()) {
           frame_cal_slot_prev = (frame_grp_id + kFrameWnd - 2) % kFrameWnd;
+        }
       }
       arma::cx_fmat calib_dl_mat(
           reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_cal_slot]),
