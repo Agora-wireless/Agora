@@ -1,12 +1,16 @@
 {
- "ofdm_ca_num" : 2048,
- "ofdm_data_num" : 1200,
- "rate" : 30.72e6,
- "worker_thread_num" : 2,
- "demul_block_size" : 48,
- "ue_num": 2,
- "core_offset" : 16,
- "UE" : true,
- "socket_thread_num": 1
+  "ofdm_ca_num": 2048,
+  "ofdm_data_num": 1200,
+  "rate": 30.72e6,
+  "worker_thread_num": 2,
+  "demul_block_size": 48,
+  "ue_num": 2,
+  "core_offset": 16,
+  "UE": true,
+  "socket_thread_num": 1,
+  "symbol_num_perframe": 70,
+  "dl_data_symbol_start": 0,
+  "dl_symbol_num_perframe": 0,
+  "ul_data_symbol_start": 4,
+  "ul_symbol_num_perframe": 20
 }
-

@@ -357,11 +357,11 @@ class Config {
  private:
   /* Class constants */
   inline static const size_t kDefaultSymbolNumPerFrame = 70;
-  inline static const size_t kDefaultPilotSymPerFrame = 1;
-  inline static const size_t kDefaultULSymPerFrame = 61;
+  inline static const size_t kDefaultPilotSymPerFrame = 8;
+  inline static const size_t kDefaultULSymPerFrame = 30;
   inline static const size_t kDefaultULSymStart = 9;
-  inline static const size_t kDefaultDLSymPerFrame = 10;
-  inline static const size_t kDefaultDLSymStart = 10;
+  inline static const size_t kDefaultDLSymPerFrame = 30;
+  inline static const size_t kDefaultDLSymStart = 40;
   inline static const bool kDefaultDownlinkMode = false;
 
   /* Private class variables */

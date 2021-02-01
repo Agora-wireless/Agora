@@ -152,20 +152,10 @@ Config::Config(const std::string& jsonfile)
    * symbol_num_perframe / pilot_num / ul_symbol_num_perframe /
    * dl_symbol_num_perframe / dl_data_symbol_start */
   if (tdd_conf.find("frames") == tdd_conf.end()) {
-    bool downlink_mode = tdd_conf.value("downlink_mode", kDefaultDownlinkMode);
     size_t ul_data_symbol_num_perframe = kDefaultULSymPerFrame;
     size_t ul_data_symbol_start = kDefaultULSymStart;
     size_t dl_data_symbol_num_perframe = kDefaultDLSymPerFrame;
     size_t dl_data_symbol_start = kDefaultDLSymStart;
-
-    /* TODO remove */
-    if (downlink_mode == true) {
-      ul_data_symbol_num_perframe = 0;
-      ul_data_symbol_start = 0;
-    } else {
-      dl_data_symbol_num_perframe = 0;
-      dl_data_symbol_start = 0;
-    }
 
     size_t symbol_num_perframe =
         tdd_conf.value("symbol_num_perframe", kDefaultSymbolNumPerFrame);
@@ -183,11 +173,6 @@ Config::Config(const std::string& jsonfile)
     dl_data_symbol_start = tdd_conf.value(
         "dl_data_symbol_start",
         dl_data_symbol_start); /* Start position of the first DL symbol */
-
-    /* TODO remove -- backward compatibility workaround */
-    if ((dl_data_symbol_start > 0) && (downlink_mode == true)) {
-      dl_data_symbol_start += pilot_symbol_num_perframe + 1;
-    }
 
     size_t ul_data_symbol_stop =
         ul_data_symbol_start + ul_data_symbol_num_perframe;
