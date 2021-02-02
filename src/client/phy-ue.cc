@@ -826,13 +826,13 @@ void PhyUe::DoDemul(int tid, size_t tag) {
   //    equal_ptr, (uint8_t*)demul_ptr, config_->ue_ant_num());
 
   switch (config_->ModOrderBits()) {
-    case (CommsLib::QPSK):
+    case (CommsLib::kQpsk):
       DemodQpskSoftSse(equal_ptr, demul_ptr, config_->OfdmDataNum());
       break;
-    case (CommsLib::QAM16):
+    case (CommsLib::kQaM16):
       Demod16qamSoftAvx2(equal_ptr, demul_ptr, config_->OfdmDataNum());
       break;
-    case (CommsLib::QAM64):
+    case (CommsLib::kQaM64):
       Demod64qamSoftAvx2(equal_ptr, demul_ptr, config_->OfdmDataNum());
       break;
     default:
@@ -862,7 +862,6 @@ void PhyUe::DoDemul(int tid, size_t tag) {
 
 void PhyUe::DoDecode(int tid, size_t tag) {
   const LDPCconfig& ldpc_config = config_->LdpcConfig();
-  Scrambler scrambler;
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
   size_t ant_id = gen_tag_t(tag).ant_id_;
@@ -914,7 +913,7 @@ void PhyUe::DoDecode(int tid, size_t tag) {
                             &ldpc_decoder_5gnr_response);
 
     if (config_->ScrambleEnabled()) {
-      scrambler.WlanDescramble(decoded_buffer_ptr, config_->NumBytesPerCb());
+      Scrambler::WlanDescramble(decoded_buffer_ptr, config_->NumBytesPerCb());
     }
 
     if (kCollectPhyStats) {
@@ -982,7 +981,6 @@ void PhyUe::DoDecode(int tid, size_t tag) {
 
 void PhyUe::DoEncode(int tid, size_t tag) {
   const LDPCconfig& ldpc_config = config_->LdpcConfig();
-  Scrambler scrambler;
   // size_t ue_id = rx_tag_t(tag).tid;
   // size_t offset = rx_tag_t(tag).offset;
   const size_t frame_id = gen_tag_t(tag).frame_id_;
@@ -993,11 +991,11 @@ void PhyUe::DoEncode(int tid, size_t tag) {
 
   auto* encoded_buffer_temp =
       static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k64Align,
+          Agora_memory::Alignment_t::kAlign64,
           LdpcEncodingEncodedBufSize(cfg->LdpcConfig().BaseGraph(),
                                      cfg->LdpcConfig().ExpansionFactor())));
   auto* parity_buffer = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::k64Align,
+      Agora_memory::Alignment_t::kAlign64,
       LdpcEncodingParityBufSize(cfg->LdpcConfig().BaseGraph(),
                                 cfg->LdpcConfig().ExpansionFactor())));
 
@@ -1036,7 +1034,7 @@ void PhyUe::DoEncode(int tid, size_t tag) {
       }
 
       if (config_->ScrambleEnabled()) {
-        scrambler.WlanScramble(input_ptr, bytes_per_block);
+        Scrambler::WlanScramble(input_ptr, bytes_per_block);
       }
 
       LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
@@ -1168,45 +1166,45 @@ void PhyUe::InitializeUplinkBuffers() {
   // initialize ul data buffer
   ul_bits_buffer_size_ = kFrameWnd * config_->MacBytesNumPerframe();
   ul_bits_buffer_.Malloc(config_->UeAntNum(), ul_bits_buffer_size_,
-                         Agora_memory::Alignment_t::k64Align);
+                         Agora_memory::Alignment_t::kAlign64);
   ul_bits_buffer_status_.Calloc(config_->UeAntNum(), kFrameWnd,
-                                Agora_memory::Alignment_t::k64Align);
+                                Agora_memory::Alignment_t::kAlign64);
   ul_syms_buffer_size_ =
       kFrameWnd * ul_data_symbol_perframe_ * config_->OfdmDataNum();
   ul_syms_buffer_.Calloc(config_->UeAntNum(), ul_syms_buffer_size_,
-                         Agora_memory::Alignment_t::k64Align);
+                         Agora_memory::Alignment_t::kAlign64);
 
   // initialize modulation buffer
   modul_buffer_.Calloc(ul_data_symbol_perframe_ * kFrameWnd,
                        config_->OfdmDataNum() * config_->UeAntNum(),
-                       Agora_memory::Alignment_t::k64Align);
+                       Agora_memory::Alignment_t::kAlign64);
 
   // initialize IFFT buffer
   size_t ifft_buffer_block_num =
       config_->UeAntNum() * ul_symbol_perframe_ * kFrameWnd;
   ifft_buffer_.Calloc(ifft_buffer_block_num, config_->OfdmCaNum(),
-                      Agora_memory::Alignment_t::k64Align);
+                      Agora_memory::Alignment_t::kAlign64);
 
   AllocBuffer1d(&tx_buffer_, tx_buffer_size_,
-                Agora_memory::Alignment_t::k64Align, 0);
+                Agora_memory::Alignment_t::kAlign64, 0);
   AllocBuffer1d(&tx_buffer_status_, tx_buffer_status_size_,
-                Agora_memory::Alignment_t::k64Align, 1);
+                Agora_memory::Alignment_t::kAlign64, 1);
 }
 
 void PhyUe::InitializeDownlinkBuffers() {
   // initialize rx buffer
   rx_buffer_.Malloc(rx_thread_num_, rx_buffer_size_,
-                    Agora_memory::Alignment_t::k64Align);
+                    Agora_memory::Alignment_t::kAlign64);
   rx_buffer_status_.Calloc(rx_thread_num_, rx_buffer_status_size_,
-                           Agora_memory::Alignment_t::k64Align);
+                           Agora_memory::Alignment_t::kAlign64);
   AllocBuffer1d(&rx_samps_tmp_, config_->SampsPerSymbol(),
-                Agora_memory::Alignment_t::k64Align, 1);
+                Agora_memory::Alignment_t::kAlign64, 1);
 
   // initialize FFT buffer
   size_t fft_buffer_block_num =
       config_->UeAntNum() * dl_symbol_perframe_ * kFrameWnd;
   fft_buffer_.Calloc(fft_buffer_block_num, config_->OfdmCaNum(),
-                     Agora_memory::Alignment_t::k64Align);
+                     Agora_memory::Alignment_t::kAlign64);
 
   // initialize CSI buffer
   csi_buffer_.resize(config_->UeAntNum() * kFrameWnd);
@@ -1226,7 +1224,7 @@ void PhyUe::InitializeDownlinkBuffers() {
 
     // initialize demod buffer
     dl_demod_buffer_.Calloc(buffer_size, config_->OfdmDataNum() * kMaxModType,
-                            Agora_memory::Alignment_t::k64Align);
+                            Agora_memory::Alignment_t::kAlign64);
 
     // initialize decode buffer
     dl_decode_buffer_.resize(buffer_size);
@@ -1235,17 +1233,17 @@ void PhyUe::InitializeDownlinkBuffers() {
                config_->LdpcConfig().NumBlocksInSymbol());
     }
     resp_var_nodes_ = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
-        Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
+        Agora_memory::Alignment_t::kAlign64, 1024 * 1024 * sizeof(int16_t)));
 
     decoded_bits_count_.Calloc(config_->UeAntNum(), task_buffer_symbol_num_dl,
-                               Agora_memory::Alignment_t::k64Align);
+                               Agora_memory::Alignment_t::kAlign64);
     bit_error_count_.Calloc(config_->UeAntNum(), task_buffer_symbol_num_dl,
-                            Agora_memory::Alignment_t::k64Align);
+                            Agora_memory::Alignment_t::kAlign64);
 
     decoded_blocks_count_.Calloc(config_->UeAntNum(), task_buffer_symbol_num_dl,
-                                 Agora_memory::Alignment_t::k64Align);
+                                 Agora_memory::Alignment_t::kAlign64);
     block_error_count_.Calloc(config_->UeAntNum(), task_buffer_symbol_num_dl,
-                              Agora_memory::Alignment_t::k64Align);
+                              Agora_memory::Alignment_t::kAlign64);
     decoded_symbol_count_ = new size_t[config_->UeAntNum()];
     symbol_error_count_ = new size_t[config_->UeAntNum()];
     std::memset(decoded_symbol_count_, 0, sizeof(size_t) * config_->UeAntNum());

@@ -10,9 +10,9 @@
 
 namespace Agora_memory {
 enum class Alignment_t : size_t {
-  k32Align = 32,
-  k64Align = 64,
-  k4096Align = 4096
+  kAlign32 = 32,
+  kAlign64 = 64,
+  kAlign4096 = 4096
 };
 
 void* PaddedAlignedAlloc(Alignment_t alignment, size_t size);
@@ -136,7 +136,7 @@ class PtrGrid {
   void Alloc(size_t n_rows, size_t n_cols, size_t n_entries) {
     const size_t alloc_sz = n_rows * n_cols * n_entries * sizeof(T);
     this->backing_buf_ = static_cast<T*>(Agora_memory::PaddedAlignedAlloc(
-        Agora_memory::Alignment_t::k64Align, alloc_sz));
+        Agora_memory::Alignment_t::kAlign64, alloc_sz));
     std::memset(static_cast<void*>(this->backing_buf_), 0, alloc_sz);
 
     // Fill-in the grid with pointers into backing_buf
@@ -217,7 +217,7 @@ class PtrCube {
   void Alloc(size_t dim_1, size_t dim_2, size_t dim_3, size_t n_entries) {
     const size_t alloc_sz = dim_1 * dim_2 * dim_3 * n_entries * sizeof(T);
     this->backing_buf_ = static_cast<T*>(Agora_memory::PaddedAlignedAlloc(
-        Agora_memory::Alignment_t::k64Align, alloc_sz));
+        Agora_memory::Alignment_t::kAlign64, alloc_sz));
     std::memset(static_cast<void*>(this->backing_buf_), 0, alloc_sz);
 
     // Fill-in the grid with pointers into backing_buf

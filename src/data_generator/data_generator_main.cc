@@ -30,14 +30,14 @@ int main(int argc, char* argv[]) {
   auto cfg = std::make_unique<Config>(FLAGS_conf_file.c_str());
 
   const DataGenerator::Profile profile = FLAGS_profile == "123"
-                                             ? DataGenerator::Profile::k123
+                                             ? DataGenerator::Profile::kProfile123
                                              : DataGenerator::Profile::kRandom;
   std::unique_ptr<DataGenerator> data_generator =
       std::make_unique<DataGenerator>(cfg.get(), 0 /* RNG seed */, profile);
 
   MLPD_INFO("DataGenerator: Config file: %s, data profile = %s\n",
             FLAGS_conf_file.c_str(),
-            profile == DataGenerator::Profile::k123 ? "123" : "random");
+            profile == DataGenerator::Profile::kProfile123 ? "123" : "random");
 
   MLPD_INFO("DataGenerator: Using %s-orthogonal pilots\n",
             cfg->FreqOrthogonalPilot() ? "frequency" : "time");

@@ -9,11 +9,11 @@
 static constexpr bool kDebugDownlink = false;
 
 void PacketTXRX::LoopTxRxUsrp(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerTXRX, kCoreOffset, tid);
+  PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid);
   size_t* rx_frame_start = (*frame_start_)[tid];
   int rx_offset = 0;
-  int radio_lo = tid * cfg_->NumRadios() / kSocketThreadNum;
-  int radio_hi = (tid + 1) * cfg_->NumRadios() / kSocketThreadNum;
+  int radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
+  int radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
   std::printf("receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
   // prepare BS beacon in host buffer

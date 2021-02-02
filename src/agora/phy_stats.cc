@@ -6,25 +6,25 @@
 
 using namespace arma;
 
-PhyStats::PhyStats(Config* const cfg) : kConfig(cfg) {
+PhyStats::PhyStats(Config* const cfg) : config_(cfg) {
   const size_t task_buffer_symbol_num_ul = cfg->Frame().NumULSyms() * kFrameWnd;
   decoded_bits_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
-                             Agora_memory::Alignment_t::k64Align);
+                             Agora_memory::Alignment_t::kAlign64);
   bit_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
-                          Agora_memory::Alignment_t::k64Align);
+                          Agora_memory::Alignment_t::kAlign64);
 
   decoded_blocks_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
-                               Agora_memory::Alignment_t::k64Align);
+                               Agora_memory::Alignment_t::kAlign64);
   block_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
-                            Agora_memory::Alignment_t::k64Align);
+                            Agora_memory::Alignment_t::kAlign64);
 
   uncoded_bits_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
-                             Agora_memory::Alignment_t::k64Align);
+                             Agora_memory::Alignment_t::kAlign64);
   uncoded_bit_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
-                                  Agora_memory::Alignment_t::k64Align);
+                                  Agora_memory::Alignment_t::kAlign64);
 
   evm_buffer_.Calloc(kFrameWnd, cfg->UeAntNum(),
-                     Agora_memory::Alignment_t::k64Align);
+                     Agora_memory::Alignment_t::kAlign64);
 
   if (cfg->Frame().NumULSyms() > 0) {
     auto* ul_iq_f_ptr = reinterpret_cast<cx_float*>(
@@ -35,7 +35,7 @@ PhyStats::PhyStats(Config* const cfg) : kConfig(cfg) {
         ul_gt_mat_.cols(cfg->OfdmDataStart(), (cfg->OfdmDataStop() - 1));
   }
   pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum(),
-                    Agora_memory::Alignment_t::k64Align);
+                    Agora_memory::Alignment_t::kAlign64);
 }
 
 PhyStats::~PhyStats() {
@@ -54,10 +54,10 @@ PhyStats::~PhyStats() {
 
 void PhyStats::PrintPhyStats() {
   const size_t task_buffer_symbol_num_ul =
-      this->kConfig->Frame().NumULSyms() * kFrameWnd;
+      this->config_->Frame().NumULSyms() * kFrameWnd;
 
-  if (this->kConfig->Frame().NumULSyms() > 0) {
-    for (size_t ue_id = 0; ue_id < this->kConfig->UeNum(); ue_id++) {
+  if (this->config_->Frame().NumULSyms() > 0) {
+    for (size_t ue_id = 0; ue_id < this->config_->UeNum(); ue_id++) {
       size_t total_decoded_bits(0);
       size_t total_bit_errors(0);
       size_t total_decoded_blocks(0);
@@ -81,8 +81,8 @@ void PhyStats::PrintPhyStats() {
 }
 
 void PhyStats::PrintEvmStats(size_t frame_id) {
-  fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], kConfig->UeNum(), 1, false);
-  evm_mat = sqrt(evm_mat) / kConfig->OfdmDataNum();
+  fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeNum(), 1, false);
+  evm_mat = sqrt(evm_mat) / config_->OfdmDataNum();
   std::stringstream ss;
   ss << "Frame " << frame_id << " Constellation:\n"
      << "  EVM " << 100 * evm_mat.st() << ", SNR " << -10 * log10(evm_mat.st());
@@ -91,14 +91,14 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
 
 float PhyStats::GetEvmSnr(size_t frame_id, size_t ue_id) {
   float evm = evm_buffer_[frame_id % kFrameWnd][ue_id];
-  evm = sqrt(evm) / kConfig->OfdmDataNum();
+  evm = sqrt(evm) / config_->OfdmDataNum();
   return -10 * std::log10(evm);
 }
 
 void PhyStats::PrintSnrStats(size_t frame_id) {
   std::stringstream ss;
   ss << "Frame " << frame_id << " Pilot Signal SNR: ";
-  for (size_t i = 0; i < kConfig->UeNum(); i++) {
+  for (size_t i = 0; i < config_->UeNum(); i++) {
     ss << pilot_snr_[frame_id % kFrameWnd][i] << " ";
   }
   ss << std::endl;
@@ -107,24 +107,24 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
 
 void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id,
                               complex_float* fft_data) {
-  cx_fmat fft_mat((cx_float*)fft_data, kConfig->OfdmCaNum(), 1, false);
+  cx_fmat fft_mat((cx_float*)fft_data, config_->OfdmCaNum(), 1, false);
   fmat fft_abs_mat = abs(fft_mat);
   fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
   float rssi = as_scalar(sum(fft_abs_mag));
   float noise_per_sc1 =
-      as_scalar(mean(fft_abs_mag.rows(0, kConfig->OfdmDataStart() - 1)));
+      as_scalar(mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
   float noise_per_sc2 = as_scalar(mean(
-      fft_abs_mag.rows(kConfig->OfdmDataStop(), kConfig->OfdmCaNum() - 1)));
-  float noise = kConfig->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
+      fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
+  float noise = config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
   float snr = (rssi - noise) / noise;
   pilot_snr_[frame_id % kFrameWnd][ue_id] = 10 * std::log10(snr);
 }
 
 void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
                               const cx_fmat& eq) {
-  if (this->kConfig->Frame().NumULSyms() > 0) {
+  if (this->config_->Frame().NumULSyms() > 0) {
     fmat evm = abs(eq - ul_gt_mat_.col(sc_id));
-    fmat cur_evm_mat(evm_buffer_[frame_id % kFrameWnd], kConfig->UeNum(), 1,
+    fmat cur_evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeNum(), 1,
                      false);
     cur_evm_mat += evm % evm;
   }

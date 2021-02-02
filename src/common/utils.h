@@ -165,23 +165,23 @@ inline size_t Lcm(size_t a, size_t b) { return (a * b) / Gcd(a, b); }
 
 /// A range type with an inclusive start bound and an exclusive end bound.
 struct Range {
-  const size_t kStart;
-  const size_t kEnd;
+  const size_t start_;
+  const size_t end_;
 
   /// Create a new Range with the given `start` and `end` values.
   /// `end` must be greater than or equal to `start`.
-  Range(size_t start, size_t end) : kStart(start), kEnd(end) {
+  Range(size_t start, size_t end) : start_(start), end_(end) {
     RtAssert(end >= start, "Invalid range, end must be >= start");
   }
 
   /// Returns `true` if this range contains the given `value`.
   bool Contains(size_t value) const {
-    return (value >= kStart) && (value < kEnd);
+    return (value >= start_) && (value < end_);
   }
 
   std::string ToString() const {
     std::ostringstream ret;
-    ret << "[" << kStart << ":" << kEnd << ")";
+    ret << "[" << start_ << ":" << end_ << ")";
     return ret.str();
   }
 };

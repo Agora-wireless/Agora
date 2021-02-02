@@ -7,11 +7,11 @@
 
 #include <memory>
 
-static const size_t k_default_message_queue_size = 512;
-static const size_t k_default_worker_queue_size = 256;
+static const size_t kKDefaultMessageQueueSize = 512;
+static const size_t kKDefaultWorkerQueueSize = 256;
 
 Agora::Agora(Config* const cfg)
-    : kBaseWorkerCoreOffset(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
+    : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
       stats_(std::make_unique<Stats>(cfg)),
       phy_stats_(std::make_unique<PhyStats>(cfg)),
@@ -30,7 +30,7 @@ Agora::Agora(Config* const cfg)
   std::printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
               directory.c_str(), cfg->FreqGhz());
 
-  CheckIncrementScheduleFrame(0, ScheduleProcessingFlags::ProcessingComplete);
+  CheckIncrementScheduleFrame(0, ScheduleProcessingFlags::kProcessingComplete);
   // Important to set cur_sche_frame_id_ after the call to
   // CheckIncrementScheduleFrame because it will be incremented however,
   // CheckIncrementScheduleFrame will initialize the schedule tracking variable
@@ -65,8 +65,9 @@ Agora::Agora(Config* const cfg)
       "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
       "cores %zu--%zu\n",
       cfg->CoreOffset(), cfg->CoreOffset() + 1,
-      cfg->CoreOffset() + 1 + cfg->SocketThreadNum() - 1, kBaseWorkerCoreOffset,
-      kBaseWorkerCoreOffset + cfg->WorkerThreadNum() - 1);
+      cfg->CoreOffset() + 1 + cfg->SocketThreadNum() - 1,
+      base_worker_core_offset_,
+      base_worker_core_offset_ + cfg->WorkerThreadNum() - 1);
 }
 
 Agora::~Agora() {
@@ -363,7 +364,7 @@ void Agora::Start() {
               max_equaled_frame_ = frame_id;
               if (cfg->BigstationMode() == false) {
                 assert(cur_sche_frame_id_ == frame_id);
-                CheckIncrementScheduleFrame(frame_id, UplinkComplete);
+                CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
               } else {
                 ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_idx_ul);
               }
@@ -507,7 +508,7 @@ void Agora::Start() {
                 this->stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
                 PrintPerFrameDone(PrintType::kIFFT, frame_id);
                 assert(frame_id == this->cur_proc_frame_id_);
-                this->CheckIncrementScheduleFrame(frame_id, DownlinkComplete);
+                this->CheckIncrementScheduleFrame(frame_id, kDownlinkComplete);
                 bool work_finished = this->CheckWorkComplete(frame_id);
                 if (work_finished == true) {
                   goto finish;
@@ -593,7 +594,7 @@ void Agora::Start() {
               this->fft_created_count_ = 0;
               if (cfg->BigstationMode() == true) {
                 this->CheckIncrementScheduleFrame(cur_sche_frame_id_,
-                                                  UplinkComplete);
+                                                  kUplinkComplete);
               }
             }
           }
@@ -684,7 +685,7 @@ void Agora::HandleEventFft(size_t tag) {
 }
 
 void Agora::Worker(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorker, kBaseWorkerCoreOffset, tid);
+  PinToCoreWithOffset(ThreadType::kWorker, base_worker_core_offset_, tid);
 
   /* Initialize operators */
   std::unique_ptr<DoZF> compute_zf(
@@ -776,7 +777,7 @@ void Agora::Worker(int tid) {
 }
 
 void Agora::WorkerFft(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerFFT, kBaseWorkerCoreOffset, tid);
+  PinToCoreWithOffset(ThreadType::kWorkerFFT, base_worker_core_offset_, tid);
 
   /* Initialize IFFT operator */
   std::unique_ptr<DoFFT> compute_fft(
@@ -802,7 +803,7 @@ void Agora::WorkerFft(int tid) {
 }
 
 void Agora::WorkerZf(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerZF, kBaseWorkerCoreOffset, tid);
+  PinToCoreWithOffset(ThreadType::kWorkerZF, base_worker_core_offset_, tid);
 
   /* Initialize ZF operator */
   std::unique_ptr<DoZF> compute_zf(
@@ -817,7 +818,7 @@ void Agora::WorkerZf(int tid) {
 
 // TODO rework to decouple kDemul or kPrecode
 void Agora::WorkerDemul(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerDemul, kBaseWorkerCoreOffset, tid);
+  PinToCoreWithOffset(ThreadType::kWorkerDemul, base_worker_core_offset_, tid);
 
   std::unique_ptr<DoDemul> compute_demul(
       new DoDemul(config_, tid, data_buffer_, ul_zf_matrices_,
@@ -846,7 +847,7 @@ void Agora::WorkerDemul(int tid) {
 
 // TODO rework to decouple kEncode and kDecode
 void Agora::WorkerDecode(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerDecode, kBaseWorkerCoreOffset, tid);
+  PinToCoreWithOffset(ThreadType::kWorkerDecode, base_worker_core_offset_, tid);
 
   std::unique_ptr<DoEncode> compute_encoding(new DoEncode(
       config_, tid, config_->DlBits(), dl_encoded_buffer_, this->stats_.get()));
@@ -1178,15 +1179,15 @@ void Agora::InitializeQueues() {
 
   int data_symbol_num_perframe = config_->Frame().NumDataSyms();
   message_queue_ =
-      mt_queue_t(k_default_message_queue_size * data_symbol_num_perframe);
+      mt_queue_t(kKDefaultMessageQueueSize * data_symbol_num_perframe);
   for (auto& c : complete_task_queue_) {
-    c = mt_queue_t(k_default_worker_queue_size * data_symbol_num_perframe);
+    c = mt_queue_t(kKDefaultWorkerQueueSize * data_symbol_num_perframe);
   }
   // Create concurrent queues for each Doer
   for (auto& vec : sched_info_arr_) {
     for (auto& s : vec) {
       s.concurrent_q_ =
-          mt_queue_t(k_default_worker_queue_size * data_symbol_num_perframe);
+          mt_queue_t(kKDefaultWorkerQueueSize * data_symbol_num_perframe);
       s.ptok_ = new moodycamel::ProducerToken(s.concurrent_q_);
     }
   }
@@ -1234,21 +1235,21 @@ void Agora::InitializeUplinkBuffers() {
   socket_buffer_size_ = cfg->PacketLength() * socket_buffer_status_size_;
 
   socket_buffer_.Malloc(cfg->SocketThreadNum() /* RX */, socket_buffer_size_,
-                        Agora_memory::Alignment_t::k64Align);
+                        Agora_memory::Alignment_t::kAlign64);
   socket_buffer_status_.Calloc(cfg->SocketThreadNum() /* RX */,
                                socket_buffer_status_size_,
-                               Agora_memory::Alignment_t::k64Align);
+                               Agora_memory::Alignment_t::kAlign64);
 
   data_buffer_.Malloc(task_buffer_symbol_num_ul,
                       cfg->OfdmDataNum() * cfg->BsAntNum(),
-                      Agora_memory::Alignment_t::k64Align);
+                      Agora_memory::Alignment_t::kAlign64);
 
   equal_buffer_.Malloc(task_buffer_symbol_num_ul,
                        cfg->OfdmDataNum() * cfg->UeNum(),
-                       Agora_memory::Alignment_t::k64Align);
+                       Agora_memory::Alignment_t::kAlign64);
   ue_spec_pilot_buffer_.Calloc(
       kFrameWnd, cfg->Frame().ClientUlPilotSymbols() * cfg->UeNum(),
-      Agora_memory::Alignment_t::k64Align);
+      Agora_memory::Alignment_t::kAlign64);
 
   rx_counters_.num_pkts_per_frame_ =
       cfg->BsAntNum() *
@@ -1290,28 +1291,28 @@ void Agora::InitializeDownlinkBuffers() {
     size_t dl_socket_buffer_size =
         config_->DlPacketLength() * dl_socket_buffer_status_size;
     AllocBuffer1d(&dl_socket_buffer_, dl_socket_buffer_size,
-                  Agora_memory::Alignment_t::k64Align, 0);
+                  Agora_memory::Alignment_t::kAlign64, 0);
     AllocBuffer1d(&dl_socket_buffer_status_, dl_socket_buffer_status_size,
-                  Agora_memory::Alignment_t::k64Align, 1);
+                  Agora_memory::Alignment_t::kAlign64, 1);
 
     this->dl_bits_buffer_.Calloc(task_buffer_symbol_num,
                                  config_->OfdmDataNum() * config_->UeNum(),
-                                 Agora_memory::Alignment_t::k64Align);
+                                 Agora_memory::Alignment_t::kAlign64);
     size_t dl_bits_buffer_status_size =
         task_buffer_symbol_num * config_->LdpcConfig().NumBlocksInSymbol();
     this->dl_bits_buffer_status_.Calloc(config_->UeNum(),
                                         dl_bits_buffer_status_size,
-                                        Agora_memory::Alignment_t::k64Align);
+                                        Agora_memory::Alignment_t::kAlign64);
 
     dl_ifft_buffer_.Calloc(config_->BsAntNum() * task_buffer_symbol_num,
                            config_->OfdmCaNum(),
-                           Agora_memory::Alignment_t::k64Align);
+                           Agora_memory::Alignment_t::kAlign64);
     calib_dl_buffer_.Calloc(kFrameWnd,
                             config_->BfAntNum() * config_->OfdmDataNum(),
-                            Agora_memory::Alignment_t::k64Align);
+                            Agora_memory::Alignment_t::kAlign64);
     calib_ul_buffer_.Calloc(kFrameWnd,
                             config_->BfAntNum() * config_->OfdmDataNum(),
-                            Agora_memory::Alignment_t::k64Align);
+                            Agora_memory::Alignment_t::kAlign64);
     // initialize the content of the last window to 1
     for (size_t i = 0; i < config_->OfdmDataNum() * config_->BfAntNum(); i++) {
       calib_dl_buffer_[kFrameWnd - 1][i] = {1, 0};
@@ -1320,7 +1321,7 @@ void Agora::InitializeDownlinkBuffers() {
     dl_encoded_buffer_.Calloc(
         task_buffer_symbol_num,
         Roundup<64>(config_->OfdmDataNum()) * config_->UeNum(),
-        Agora_memory::Alignment_t::k64Align);
+        Agora_memory::Alignment_t::kAlign64);
 
     encode_counters_.Init(
         config_->Frame().NumDLSyms(),
@@ -1410,15 +1411,15 @@ void Agora::CheckIncrementScheduleFrame(size_t /*frame_id*/,
   this->schedule_process_flags_ += completed;
 
   if (this->schedule_process_flags_ ==
-      static_cast<uint8_t>(ScheduleProcessingFlags::ProcessingComplete)) {
+      static_cast<uint8_t>(ScheduleProcessingFlags::kProcessingComplete)) {
     this->cur_sche_frame_id_++;
-    this->schedule_process_flags_ = ScheduleProcessingFlags::None;
+    this->schedule_process_flags_ = ScheduleProcessingFlags::kNone;
     if (this->config_->Frame().NumULSyms() == 0) {
-      this->schedule_process_flags_ += ScheduleProcessingFlags::UplinkComplete;
+      this->schedule_process_flags_ += ScheduleProcessingFlags::kUplinkComplete;
     }
     if (this->config_->Frame().NumDLSyms() == 0) {
       this->schedule_process_flags_ +=
-          ScheduleProcessingFlags::DownlinkComplete;
+          ScheduleProcessingFlags::kDownlinkComplete;
     }
   }
 }

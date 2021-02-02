@@ -12,6 +12,8 @@
 static constexpr int8_t kScramblerInitState = 93;  // [1, 127]
 static constexpr int8_t kScramblerlength = 127;
 
+namespace Scrambler {
+
 /**
  * @brief                        Convert a byte array to a bit array. MSB
  * first
@@ -52,17 +54,10 @@ void ConvertBytesToBits(const int8_t* in_byte_buffer, size_t byte_buffer_size,
  */
 void WlanScrambler(void* byte_buffer, size_t byte_buffer_size);
 
-/**
- * @brief                        Scrambler Class for scramble and descramble
- *
- */
-class Scrambler {
- public:
-  Scrambler();
-  ~Scrambler();
+void WlanScramble(void* byte_buffer, size_t byte_buffer_size);
 
-  std::function<void(void*, size_t)> WlanScramble = WlanScrambler;
-  std::function<void(void*, size_t)> WlanDescramble = WlanScrambler;
-};
+void WlanDescramble(void* byte_buffer, size_t byte_buffer_size);
+
+};  // namespace Scrambler
 
 #endif  // SCRAMBLER_H_

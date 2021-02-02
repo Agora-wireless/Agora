@@ -309,10 +309,10 @@ bool RadioConfig::RadioStart() {
   bool good_calib = false;
   AllocBuffer1d(&init_calib_dl_processed_,
                 cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
-                Agora_memory::Alignment_t::k64Align, 1);
+                Agora_memory::Alignment_t::kAlign64, 1);
   AllocBuffer1d(&init_calib_ul_processed_,
                 cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
-                Agora_memory::Alignment_t::k64Align, 1);
+                Agora_memory::Alignment_t::kAlign64, 1);
   // initialize init_calib to a matrix of ones
   for (size_t i = 0; i < cfg_->OfdmDataNum() * cfg_->BfAntNum(); i++) {
     init_calib_dl_processed_[i] = 1;
@@ -323,10 +323,10 @@ bool RadioConfig::RadioStart() {
   if (calib_meas_num_) {
     init_calib_ul_.Calloc(calib_meas_num_,
                           cfg_->OfdmDataNum() * cfg_->BfAntNum(),
-                          Agora_memory::Alignment_t::k64Align);
+                          Agora_memory::Alignment_t::kAlign64);
     init_calib_dl_.Calloc(calib_meas_num_,
                           cfg_->OfdmDataNum() * cfg_->BfAntNum(),
-                          Agora_memory::Alignment_t::k64Align);
+                          Agora_memory::Alignment_t::kAlign64);
     if (cfg_->Frame().NumDLSyms() > 0) {
       int iter = 0;
       int max_iter = 3;

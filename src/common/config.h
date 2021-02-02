@@ -55,7 +55,7 @@ class Config {
 
   inline size_t OfdmDataStop() const { return this->ofdm_data_stop_; }
   inline size_t OfdmPilotSpacing() const { return this->ofdm_pilot_spacing_; }
-  inline double FreqGhz() const { return this->kFreqGhz; };
+  inline double FreqGhz() const { return this->freq_ghz_; };
   inline size_t DlPacketLength() const { return this->dl_packet_length_; }
   inline std::string Modulation() const { return this->modulation_; }
 
@@ -364,7 +364,7 @@ class Config {
   inline static const size_t kDefaultDLSymStart = 40;
 
   /* Private class variables */
-  const double kFreqGhz;  // RDTSC frequency in GHz
+  const double freq_ghz_;  // RDTSC frequency in GHz
   bool is_ue_;
 
   size_t bs_ant_num_;  // Total number of BS antennas

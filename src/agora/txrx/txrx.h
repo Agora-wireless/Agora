@@ -106,9 +106,9 @@ class PacketTXRX {
 
   // The network I/O threads run on cores
   // {core_offset, ..., core_offset + socket_thread_num - 1}
-  const size_t kCoreOffset;
-  const size_t kAntPerCell;
-  const size_t kSocketThreadNum;
+  const size_t core_offset_;
+  const size_t ant_per_cell_;
+  const size_t socket_thread_num_;
 
   // Handle for socket threads
   std::array<std::thread, kMaxSocketNum> socket_std_threads_;

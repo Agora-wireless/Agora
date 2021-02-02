@@ -12,7 +12,6 @@
 #include "utils_ldpc.h"
 
 static constexpr size_t kNumInputBytes = 125;
-Scrambler scrambler;
 
 /**
  * @brief  Construct a new TEST object
@@ -44,7 +43,7 @@ TEST(WLAN_Scrambler, fixed_input_scramble_int8_t) {
       -51,  115,  -96,  -43,  37,  -116, -72,  96,  82,  55,   44,  -46,  -14,
       102,  -116, -17,  102,  -28, 45,   -127, -90};
 
-  scrambler.WlanScramble(byte_buffer, kNumInputBytes);
+  Scrambler::WlanScramble(byte_buffer, kNumInputBytes);
 
   for (size_t i = 0; i < kNumInputBytes; i++) {
     ASSERT_EQ(byte_buffer[i], expect[i]);
@@ -79,7 +78,7 @@ TEST(WLAN_Scrambler, fixed_input_scramble_uint8_t) {
       16,  190, 112, 27,  79,  180, 22,  100, 153, 165, 111, 72,  65,  198,
       125, 166, 148, 192, 95,  140, 38,  192, 135, 103, 158, 238, 121};
 
-  scrambler.WlanScramble(byte_buffer, kNumInputBytes);
+  Scrambler::WlanScramble(byte_buffer, kNumInputBytes);
 
   for (size_t i = 0; i < kNumInputBytes; i++) {
     ASSERT_EQ(byte_buffer[i], expect[i]);
@@ -107,10 +106,10 @@ TEST(WLAN_Scrambler, random_input_scramble_descramble) {
   }
 
   // Scramble
-  scrambler.WlanScramble(byte_buffer, kNumInputBytes);
+  Scrambler::WlanScramble(byte_buffer, kNumInputBytes);
 
   // Descramble
-  scrambler.WlanDescramble(byte_buffer, kNumInputBytes);
+  Scrambler::WlanDescramble(byte_buffer, kNumInputBytes);
 
   for (size_t i = 0; i < kNumInputBytes; i++) {
     ASSERT_EQ(byte_buffer[i], byte_buffer_orig[i]);

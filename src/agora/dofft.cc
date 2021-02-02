@@ -39,13 +39,13 @@ DoFFT::DoFFT(Config* config, int tid, Table<char>& socket_buffer,
 
   // Aligned for SIMD
   fft_inout_ = static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::k64Align,
+      Agora_memory::Alignment_t::kAlign64,
       cfg_->OfdmCaNum() * sizeof(complex_float)));
   temp_16bits_iq_ = static_cast<uint16_t*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::k64Align, 32 * sizeof(uint16_t)));
+      Agora_memory::Alignment_t::kAlign64, 32 * sizeof(uint16_t)));
   rx_samps_tmp_ =
       static_cast<std::complex<float>*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k64Align,
+          Agora_memory::Alignment_t::kAlign64,
           cfg_->SampsPerSymbol() * sizeof(std::complex<float>)));
 }
 
@@ -322,7 +322,7 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
 
   // Aligned for SIMD
   ifft_out_ = static_cast<float*>(
-      Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::k64Align,
+      Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        2 * cfg_->OfdmCaNum() * sizeof(float)));
   ifft_scale_factor_ = cfg_->OfdmCaNum() / std::sqrt(cfg_->BfAntNum() * 1.f);
 }

@@ -14,7 +14,7 @@
 static constexpr size_t kSIMDTestNum = 1024;
 
 TEST(Modulation, adapt_bits_for_mod_one) {
-  static constexpr auto kModOrder = CommsLib::ModulationOrder::QAM64;
+  static constexpr auto kModOrder = CommsLib::ModulationOrder::kQaM64;
   static constexpr size_t kInputBytes = 8;
   std::vector<uint8_t> input(kInputBytes);
   std::vector<uint8_t> output(std::ceil(kInputBytes * 8.0 / kModOrder));
@@ -47,8 +47,8 @@ TEST(Modulation, adapt_bits_for_mod_one) {
 }
 
 TEST(Modulation, adapt_bits_for_mod_stress) {
-  std::vector<size_t> modulations = {CommsLib::ModulationOrder::QAM16,
-                                     CommsLib::ModulationOrder::QAM64};
+  std::vector<size_t> modulations = {CommsLib::ModulationOrder::kQaM16,
+                                     CommsLib::ModulationOrder::kQaM64};
 
   for (size_t mod_type : modulations) {
     for (size_t iter = 0; iter < 1000; iter++) {
@@ -89,17 +89,17 @@ TEST(Modulation, adapt_bits_for_mod_stress) {
 TEST(SIMD, float_32_to_16) {
   constexpr float kAllowedError = 1e-3;
   auto* in_buf = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::k64Align, kSIMDTestNum * sizeof(float)));
+      Agora_memory::Alignment_t::kAlign64, kSIMDTestNum * sizeof(float)));
   for (size_t i = 0; i < kSIMDTestNum; i++) {
     in_buf[i] = static_cast<float>(rand()) / (RAND_MAX * 1.0);
   }
 
   auto* medium = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::k64Align, kSIMDTestNum / 2 * sizeof(float)));
+      Agora_memory::Alignment_t::kAlign64, kSIMDTestNum / 2 * sizeof(float)));
   SimdConvertFloat32ToFloat16(medium, in_buf, kSIMDTestNum);
 
   auto* out_buf = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::k64Align, kSIMDTestNum * sizeof(float)));
+      Agora_memory::Alignment_t::kAlign64, kSIMDTestNum * sizeof(float)));
   SimdConvertFloat16ToFloat32(out_buf, medium, kSIMDTestNum);
 
   for (size_t i = 0; i < kSIMDTestNum; i++) {

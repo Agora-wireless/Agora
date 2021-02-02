@@ -19,11 +19,11 @@ TEST(TestRecip, Correctness) {
   Table<complex_float> recip_buffer_0;
   Table<complex_float> recip_buffer_1;
   recip_buffer_0.Calloc(kFrameWnd, cfg->OfdmDataNum() * cfg->BsAntNum(),
-                        Agora_memory::Alignment_t::k64Align);
+                        Agora_memory::Alignment_t::kAlign64);
   recip_buffer_1.Calloc(kFrameWnd, cfg->OfdmDataNum() * cfg->BsAntNum(),
-                        Agora_memory::Alignment_t::k64Align);
+                        Agora_memory::Alignment_t::kAlign64);
   calib_buffer.RandAllocCxFloat(kFrameWnd, cfg->OfdmDataNum() * cfg->BsAntNum(),
-                                Agora_memory::Alignment_t::k64Align);
+                                Agora_memory::Alignment_t::kAlign64);
 
   std::printf("Reference antenna: %zu\n", cfg->RefAnt());
 

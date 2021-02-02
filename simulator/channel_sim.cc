@@ -106,7 +106,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     task_ptok_[i] = new moodycamel::ProducerToken(message_queue_);
   }
   AllocBuffer1d(&task_threads_, worker_thread_num,
-                Agora_memory::Alignment_t::k64Align, 0);
+                Agora_memory::Alignment_t::kAlign64, 0);
 
   // create task threads (transmit to base station and client antennas)
   for (size_t i = 0; i < worker_thread_num; i++) {

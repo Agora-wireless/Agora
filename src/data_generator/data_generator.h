@@ -23,12 +23,12 @@ class DataGenerator {
 
     // The input informatioon bytes are {1, 2, 3, 1, 2, 3, ...} for UE 0,
     // {4, 5, 6, 4, 5, 6, ...} for UE 1, and so on
-    k123
+    kProfile123
   };
 
   explicit DataGenerator(Config* cfg, uint64_t seed = 0,
                          Profile profile = Profile::kRandom)
-      : cfg_(cfg), kProfile(profile) {
+      : cfg_(cfg), profile_(profile) {
     if (seed != 0) {
       fast_rand_.seed_ = seed;
     }
@@ -48,9 +48,9 @@ class DataGenerator {
         LdpcEncodingInputBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
 
     for (size_t i = 0; i < lc.NumInputBytes(); i++) {
-      if (kProfile == Profile::kRandom) {
+      if (profile_ == Profile::kRandom) {
         information.at(i) = static_cast<int8_t>(fast_rand_.NextU32());
-      } else if (kProfile == Profile::k123) {
+      } else if (profile_ == Profile::kProfile123) {
         information.at(i) = 1 + (ue_id * 3) + (i % 3);
       }
     }
@@ -133,7 +133,7 @@ class DataGenerator {
   /// Return the time-domain pilot symbol with ofdm_ca_num() complex floats
   std::vector<complex_float> GetCommonPilotTimeDomain() const {
     const std::vector<std::complex<float>> zc_seq = Utils::DoubleToCfloat(
-        CommsLib::GetSequence(cfg_->OfdmDataNum(), CommsLib::LTE_ZADOFF_CHU));
+        CommsLib::GetSequence(cfg_->OfdmDataNum(), CommsLib::kLteZadoffChu));
 
     const std::vector<std::complex<float>> zc_common_pilot =
         CommsLib::SeqCyclicShift(zc_seq, M_PI / 4.0);  // Used in LTE SRS
@@ -150,7 +150,7 @@ class DataGenerator {
  private:
   FastRand fast_rand_;     // A fast random number generator
   Config* cfg_;            // The global Agora config
-  const Profile kProfile;  // The pattern of the input byte sequence
+  const Profile profile_;  // The pattern of the input byte sequence
 };
 
 #endif  // DATA_GENERATOR_H_

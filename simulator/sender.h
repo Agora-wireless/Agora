@@ -105,24 +105,24 @@ class Sender {
               DFTI_DESCRIPTOR_HANDLE mkl_handle) const;
 
   Config* cfg_;
-  const double kFreqGhz;          // RDTSC frequency in GHz
-  const double kTicksPerUsec;     // RDTSC frequency in GHz
-  const size_t kSocketThreadNum;  // Number of worker threads sending pkts
-  const size_t kEnableSlowStart;  // If 1, send frames slowly at first
+  const double freq_ghz_;           // RDTSC frequency in GHz
+  const double ticks_per_usec_;     // RDTSC frequency in GHz
+  const size_t socket_thread_num_;  // Number of worker threads sending pkts
+  const size_t enable_slow_start_;  // If 1, send frames slowly at first
 
   // The master thread runs on core core_offset. Worker threads use cores
   // {core_offset + 1, ..., core_offset + thread_num - 1}
-  const size_t kCoreOffset;
-  const size_t kFrameDuration;
+  const size_t core_offset_;
+  const size_t frame_duration_;
 
   // RDTSC clock ticks between the start of transmission of two symbols in
   // the steady state
-  const uint64_t kTicksAll;
+  const uint64_t ticks_all_;
 
   // ticks_wnd_1 and ticks_wnd_2 are the RDTSC clock ticks between the start
   // of transmission of two symbols for the first several frames
-  const uint64_t kTicksWnd1;
-  const uint64_t kTicksWnd2;
+  const uint64_t ticks_wnd1_;
+  const uint64_t ticks_wnd2_;
 
   moodycamel::ConcurrentQueue<size_t> send_queue_ =
       moodycamel::ConcurrentQueue<size_t>(1024);

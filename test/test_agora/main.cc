@@ -53,9 +53,9 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
   Table<uint8_t> raw_data;
   Table<uint8_t> output_data;
   raw_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
-                  Agora_memory::Alignment_t::k64Align);
+                  Agora_memory::Alignment_t::kAlign64);
   output_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
-                     Agora_memory::Alignment_t::k64Align);
+                     Agora_memory::Alignment_t::kAlign64);
 
   int num_bytes_per_ue = (cfg->LdpcConfig().NumCbLen() + 7) >>
                          3 * cfg->LdpcConfig().NumBlocksInSymbol();
@@ -109,9 +109,9 @@ unsigned int CheckCorrectnessDl(Config const* const cfg) {
   Table<short> raw_data;
   Table<short> tx_data;
   raw_data.Calloc(num_data_syms * bs_ant_num, samps_per_symbol * 2,
-                  Agora_memory::Alignment_t::k64Align);
+                  Agora_memory::Alignment_t::kAlign64);
   tx_data.Calloc(num_data_syms * bs_ant_num, samps_per_symbol * 2,
-                 Agora_memory::Alignment_t::k64Align);
+                 Agora_memory::Alignment_t::kAlign64);
 
   ReadFromFileDl(raw_data_filename, raw_data, samps_per_symbol, cfg);
   ReadFromFileDl(tx_data_filename, tx_data, samps_per_symbol, cfg);

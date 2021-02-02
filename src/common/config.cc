@@ -10,7 +10,7 @@
 #include "utils_ldpc.h"
 
 Config::Config(const std::string& jsonfile)
-    : kFreqGhz(MeasureRdtscFreq()),
+    : freq_ghz_(MeasureRdtscFreq()),
       ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_("") {
   pilots_ = nullptr;
@@ -341,8 +341,8 @@ Config::Config(const std::string& jsonfile)
   /* Modulation configurations */
   mod_order_bits_ =
       modulation_ == "64QAM"
-          ? CommsLib::QAM64
-          : (modulation_ == "16QAM" ? CommsLib::QAM16 : CommsLib::QPSK);
+          ? CommsLib::kQaM64
+          : (modulation_ == "16QAM" ? CommsLib::kQaM16 : CommsLib::kQpsk);
   /* Updates num_block_in_sym */
   UpdateModCfgs(mod_order_bits_);
 
@@ -399,7 +399,7 @@ Config::Config(const std::string& jsonfile)
 void Config::GenData() {
   if ((kUseArgos == true) || (kUseUHD == true)) {
     std::vector<std::vector<double>> gold_ifft =
-        CommsLib::GetSequence(128, CommsLib::GOLD_IFFT);
+        CommsLib::GetSequence(128, CommsLib::kGoldIfft);
     std::vector<std::complex<int16_t>> gold_ifft_ci16 =
         Utils::DoubleToCint16(gold_ifft);
     for (size_t i = 0; i < 128; i++) {
@@ -407,7 +407,7 @@ void Config::GenData() {
     }
 
     std::vector<std::vector<double>> sts_seq =
-        CommsLib::GetSequence(0, CommsLib::STS_SEQ);
+        CommsLib::GetSequence(0, CommsLib::kStsSeq);
     std::vector<std::complex<int16_t>> sts_seq_ci16 =
         Utils::DoubleToCint16(sts_seq);
 
@@ -452,17 +452,17 @@ void Config::GenData() {
 
   // Generate common pilots based on Zadoff-Chu sequence for channel estimation
   auto zc_seq_double =
-      CommsLib::GetSequence(this->ofdm_data_num_, CommsLib::LTE_ZADOFF_CHU);
+      CommsLib::GetSequence(this->ofdm_data_num_, CommsLib::kLteZadoffChu);
   auto zc_seq = Utils::DoubleToCfloat(zc_seq_double);
   this->common_pilot_ =
       CommsLib::SeqCyclicShift(zc_seq, M_PI / 4);  // Used in LTE SRS
 
   this->pilots_ = static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::k64Align,
+      Agora_memory::Alignment_t::kAlign64,
       this->ofdm_data_num_ * sizeof(complex_float)));
   this->pilots_sgn_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k64Align,
+          Agora_memory::Alignment_t::kAlign64,
           this->ofdm_data_num_ *
               sizeof(complex_float)));  // used in CSI estimation
   for (size_t i = 0; i < ofdm_data_num_; i++) {
@@ -474,7 +474,7 @@ void Config::GenData() {
   }
   complex_float* pilot_ifft;
   AllocBuffer1d(&pilot_ifft, this->ofdm_ca_num_,
-                Agora_memory::Alignment_t::k64Align, 1);
+                Agora_memory::Alignment_t::kAlign64, 1);
   for (size_t j = 0; j < ofdm_data_num_; j++) {
     pilot_ifft[j + this->ofdm_data_start_] = this->pilots_[j];
   }
@@ -482,15 +482,15 @@ void Config::GenData() {
 
   // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
   this->ue_specific_pilot_.Malloc(this->ue_ant_num_, this->ofdm_data_num_,
-                                  Agora_memory::Alignment_t::k64Align);
+                                  Agora_memory::Alignment_t::kAlign64);
   this->ue_specific_pilot_t_.Calloc(this->ue_ant_num_, this->samps_per_symbol_,
-                                    Agora_memory::Alignment_t::k64Align);
+                                    Agora_memory::Alignment_t::kAlign64);
 
   Table<complex_float> ue_pilot_ifft;
   ue_pilot_ifft.Calloc(this->ue_ant_num_, this->ofdm_ca_num_,
-                       Agora_memory::Alignment_t::k64Align);
+                       Agora_memory::Alignment_t::kAlign64);
   auto zc_ue_pilot_double =
-      CommsLib::GetSequence(this->ofdm_data_num_, CommsLib::LTE_ZADOFF_CHU);
+      CommsLib::GetSequence(this->ofdm_data_num_, CommsLib::kLteZadoffChu);
   auto zc_ue_pilot = Utils::DoubleToCfloat(zc_ue_pilot_double);
   for (size_t i = 0; i < ue_ant_num_; i++) {
     auto zc_ue_pilot_i = CommsLib::SeqCyclicShift(
@@ -511,22 +511,22 @@ void Config::GenData() {
                                 this->ldpc_config_.NumBlocksInSymbol();
   dl_bits_.Malloc(this->frame_.NumDLSyms(),
                   num_bytes_per_ue_pad * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::k64Align);
+                  Agora_memory::Alignment_t::kAlign64);
   dl_iq_f_.Calloc(this->frame_.NumDLSyms(), ofdm_ca_num_ * ue_ant_num_,
-                  Agora_memory::Alignment_t::k64Align);
+                  Agora_memory::Alignment_t::kAlign64);
   dl_iq_t_.Calloc(this->frame_.NumDLSyms(),
                   this->samps_per_symbol_ * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::k64Align);
+                  Agora_memory::Alignment_t::kAlign64);
 
   ul_bits_.Malloc(this->frame_.NumULSyms(),
                   num_bytes_per_ue_pad * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::k64Align);
+                  Agora_memory::Alignment_t::kAlign64);
   ul_iq_f_.Calloc(this->frame_.NumULSyms(),
                   this->ofdm_ca_num_ * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::k64Align);
+                  Agora_memory::Alignment_t::kAlign64);
   ul_iq_t_.Calloc(this->frame_.NumULSyms(),
                   this->samps_per_symbol_ * this->ue_ant_num_,
-                  Agora_memory::Alignment_t::k64Align);
+                  Agora_memory::Alignment_t::kAlign64);
 
 #ifdef GENERATE_DATA
   for (size_t ue_id = 0; ue_id < this->ue_ant_num_; ue_id++) {
@@ -615,7 +615,6 @@ void Config::GenData() {
   const size_t num_blocks_per_symbol =
       this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
 
-  auto scrambler = std::make_unique<Scrambler>();
   // Used as an input ptr to
   int8_t* scramble_buffer =
       new int8_t[num_bytes_per_cb_ +
@@ -625,10 +624,10 @@ void Config::GenData() {
   // Encode uplink bits
   ul_encoded_bits_.Malloc(this->frame_.NumULSyms() * num_blocks_per_symbol,
                           encoded_bytes_per_block,
-                          Agora_memory::Alignment_t::k64Align);
+                          Agora_memory::Alignment_t::kAlign64);
   ul_mod_input_.Calloc(this->frame_.NumULSyms(),
                        this->ofdm_data_num_ * this->ue_ant_num_,
-                       Agora_memory::Alignment_t::k32Align);
+                       Agora_memory::Alignment_t::kAlign32);
   auto* temp_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
       this->ldpc_config_.BaseGraph(), this->ldpc_config_.ExpansionFactor())];
 
@@ -642,7 +641,7 @@ void Config::GenData() {
         if (scramble_enabled_) {
           std::memcpy(scramble_buffer, GetInfoBits(ul_bits_, i, j, k),
                       num_bytes_per_cb_);
-          scrambler->WlanScramble(scramble_buffer, num_bytes_per_cb_);
+          Scrambler::WlanScramble(scramble_buffer, num_bytes_per_cb_);
           ldpc_input = scramble_buffer;
         } else {
           ldpc_input = GetInfoBits(ul_bits_, i, j, k);
@@ -663,7 +662,7 @@ void Config::GenData() {
   Table<complex_float> ul_iq_ifft;
   ul_iq_ifft.Calloc(this->frame_.NumULSyms(),
                     this->ofdm_ca_num_ * this->ue_ant_num_,
-                    Agora_memory::Alignment_t::k64Align);
+                    Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t u = 0; u < this->ue_ant_num_; u++) {
       size_t p = u * this->ofdm_data_num_;
@@ -683,9 +682,9 @@ void Config::GenData() {
   Table<int8_t> dl_encoded_bits;
   dl_encoded_bits.Malloc(this->frame_.NumDLSyms() * num_blocks_per_symbol,
                          encoded_bytes_per_block,
-                         Agora_memory::Alignment_t::k64Align);
+                         Agora_memory::Alignment_t::kAlign64);
   dl_mod_input_.Calloc(this->frame_.NumDLSyms(), ofdm_data_num_ * ue_ant_num_,
-                       Agora_memory::Alignment_t::k32Align);
+                       Agora_memory::Alignment_t::kAlign32);
 
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
     for (size_t j = 0; j < this->ue_ant_num_; j++) {
@@ -697,7 +696,7 @@ void Config::GenData() {
         if (scramble_enabled_) {
           std::memcpy(scramble_buffer, GetInfoBits(dl_bits_, i, j, k),
                       num_bytes_per_cb_);
-          scrambler->WlanScramble(scramble_buffer, num_bytes_per_cb_);
+          Scrambler::WlanScramble(scramble_buffer, num_bytes_per_cb_);
           ldpc_input = scramble_buffer;
         } else {
           ldpc_input = GetInfoBits(dl_bits_, i, j, k);
@@ -717,7 +716,7 @@ void Config::GenData() {
   // Generate freq-domain downlink symbols
   Table<complex_float> dl_iq_ifft;
   dl_iq_ifft.Calloc(this->frame_.NumDLSyms(), ofdm_ca_num_ * ue_ant_num_,
-                    Agora_memory::Alignment_t::k64Align);
+                    Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
     for (size_t u = 0; u < ue_ant_num_; u++) {
       size_t p = u * ofdm_data_num_;
@@ -967,7 +966,7 @@ bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const {
 SymbolType Config::GetSymbolType(size_t symbol_id) const {
   assert((this->is_ue_ ==
           false));  // Currently implemented for only the Agora server
-  return k_symbol_map.at(this->frame_.FrameIdentifier().at(symbol_id));
+  return kSymbolMap.at(this->frame_.FrameIdentifier().at(symbol_id));
 }
 
 extern "C" {

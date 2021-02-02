@@ -728,16 +728,16 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
       ss0 << 10 * std::log10(sig_dn / noise_dn) << " ";
 
       if (kReciprocalCalibPlot) {
-        std::vector<double> up_I(read_len);
-        std::transform(up[i].begin(), up[i].end(), up_I.begin(),
+        std::vector<double> up_i(read_len);
+        std::transform(up[i].begin(), up[i].end(), up_i.begin(),
                        [](std::complex<double> cd) { return cd.real(); });
 
-        std::vector<double> dn_I(read_len);
-        std::transform(dn[i].begin(), dn[i].end(), dn_I.begin(),
+        std::vector<double> dn_i(read_len);
+        std::transform(dn[i].begin(), dn[i].end(), dn_i.begin(),
                        [](std::complex<double> cd) { return cd.real(); });
 
         plt::figure_size(1200, 780);
-        plt::plot(up_I);
+        plt::plot(up_i);
         // plt::xlim(0, read_len);
         plt::ylim(-1, 1);
         plt::title("ant " + std::to_string(cfg_->RefAnt()) + " (ref) to ant " +
@@ -746,7 +746,7 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
         plt::save("up_" + std::to_string(i) + ".png");
 
         plt::figure_size(1200, 780);
-        plt::plot(dn_I);
+        plt::plot(dn_i);
         // plt::xlim(0, read_len);
         plt::ylim(-1, 1);
         plt::title("ant " + std::to_string(i) + " to ant (ref)" +

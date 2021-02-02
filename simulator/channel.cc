@@ -18,15 +18,15 @@ Channel::Channel(Config* config_bs, Config* config_ue,
   n_samps_ = bscfg_->SampsPerSymbol();
 
   if (sim_chan_model_ == "AWGN") {
-    chan_model_ = AWGN;
+    chan_model_ = kAwgn;
   } else if (sim_chan_model_ == "RAYLEIGH") {
-    chan_model_ = RAYLEIGH;
+    chan_model_ = kRayleigh;
   } else if (sim_chan_model_ == "RAN_3GPP") {
-    chan_model_ = RAN_3GPP;
+    chan_model_ = kRan3Gpp;
     printf("3GPP Model in progress, setting to RAYLEIGH channel \n");
-    chan_model_ = RAYLEIGH;
+    chan_model_ = kRayleigh;
   } else {
-    chan_model_ = AWGN;
+    chan_model_ = kAwgn;
   }
 }
 
@@ -38,14 +38,14 @@ void Channel::ApplyChan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
 
   if (is_newChan) {
     switch (chan_model_) {
-      case AWGN: {
+      case kAwgn: {
         fmat rmat(ue_ant_, bs_ant_, fill::ones);
         fmat imat(ue_ant_, bs_ant_, fill::zeros);
         h_ = cx_fmat(rmat, imat);
         // H = H / abs(H).max();
       } break;
 
-      case RAYLEIGH:
+      case kRayleigh:
         // Simple Uncorrelated Rayleigh Channel - Flat fading (single tap)
         {
           fmat rmat(ue_ant_, bs_ant_, fill::randn);
@@ -56,7 +56,7 @@ void Channel::ApplyChan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
         }
         break;
 
-      case RAN_3GPP:
+      case kRan3Gpp:
         Lte3gpp(fmat_src, fmat_dst);
         break;
     }

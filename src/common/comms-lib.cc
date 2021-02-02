@@ -59,7 +59,7 @@ int CommsLib::FindLts(std::vector<std::complex<double>> iq, int seqLen) {
   int best_peak;
 
   // Original LTS sequence
-  lts_seq = CommsLib::GetSequence(seqLen, LTS_SEQ);
+  lts_seq = CommsLib::GetSequence(seqLen, kLtsSeq);
 
   // Re-arrange into complex vector, flip, and compute conjugate
   std::vector<std::complex<double>> lts_sym;
@@ -474,7 +474,7 @@ void CommsLib::Ifft2tx(complex_float* in, std::complex<short>* out, size_t N,
 std::vector<std::complex<float>> CommsLib::Modulate(std::vector<int8_t> in,
                                                     int type) {
   std::vector<std::complex<float>> out(in.size());
-  if (type == QPSK) {
+  if (type == kQpsk) {
     float qpsk_table[2][4];  // = init_qpsk();
     float scale = 1 / sqrt(2);
     float mod_qpsk[2] = {-scale, scale};
@@ -491,7 +491,7 @@ std::vector<std::complex<float>> CommsLib::Modulate(std::vector<int8_t> in,
         break;
       }
     }
-  } else if (type == QAM16) {
+  } else if (type == kQaM16) {
     float qam16_table[2][16];  //= init_qam16();
     float scale = 1 / sqrt(10);
     float mod_16qam[4] = {-3 * scale, -1 * scale, 3 * scale, scale};
@@ -508,7 +508,7 @@ std::vector<std::complex<float>> CommsLib::Modulate(std::vector<int8_t> in,
         break;
       }
     }
-  } else if (type == QAM64) {
+  } else if (type == kQaM64) {
     float qam64_table[2][64];  // = init_qam64();
     float scale = 1 / sqrt(42);
     float mod_64qam[8] = {-7 * scale, -5 * scale, -3 * scale, -1 * scale,
@@ -545,7 +545,7 @@ std::vector<std::complex<float>> CommsLib::SeqCyclicShift(
 std::vector<std::vector<double>> CommsLib::GetSequence(int N, int type) {
   std::vector<std::vector<double>> matrix;
 
-  if (type == STS_SEQ) {
+  if (type == kStsSeq) {
     // STS - 802.11 Short training sequence (one symbol)
     matrix.resize(2);
 
@@ -570,7 +570,7 @@ std::vector<std::vector<double>> CommsLib::GetSequence(int N, int type) {
       }
       matrix[j] = a;
     }
-  } else if (type == LTS_F_SEQ) {
+  } else if (type == kLtsFSeq) {
     matrix.resize(1);
     std::vector<double> lts_f = {
         0, 1,  -1, -1, 1,  1,  -1, 1, -1, 1,  -1, -1, -1, -1, -1, 1,
@@ -578,7 +578,7 @@ std::vector<std::vector<double>> CommsLib::GetSequence(int N, int type) {
         0, 0,  0,  0,  0,  0,  1,  1, -1, -1, 1,  1,  -1, 1,  -1, 1,
         1, 1,  1,  1,  1,  -1, -1, 1, 1,  -1, 1,  -1, 1,  1,  1,  1};
     matrix[0] = (lts_f);
-  } else if (type == LTS_SEQ) {
+  } else if (type == kLtsSeq) {
     // LTS - 802.11 Long training sequence (2.5 symbols, cp length of 32
     // samples)
     matrix.resize(2);
@@ -919,7 +919,7 @@ std::vector<std::vector<double>> CommsLib::GetSequence(int N, int type) {
       }
       matrix[j] = a;
     }
-  } else if (type == LTE_ZADOFF_CHU) {
+  } else if (type == kLteZadoffChu) {
     // https://www.etsi.org/deliver/etsi_ts/136200_136299/136211/10.01.00_60/ts_136211v100100p.pdf
     // ETSI TS 136 211 V10.1.0 (sec. 5.5)
     matrix.resize(2);
@@ -969,7 +969,7 @@ std::vector<std::vector<double>> CommsLib::GetSequence(int N, int type) {
       matrix[0].push_back(a_re);
       matrix[1].push_back(a_im);
     }
-  } else if (type == GOLD_IFFT) {
+  } else if (type == kGoldIfft) {
     // Gold IFFT Sequence - seq_length=128, cp=32, upsample=1
     matrix.resize(2);
 
@@ -1040,7 +1040,7 @@ std::vector<std::vector<double>> CommsLib::GetSequence(int N, int type) {
       }
       matrix[j] = a;
     }
-  } else if (type == HADAMARD) {
+  } else if (type == kHadamard) {
     // Hadamard - using Sylvester's construction for powers of 2.
     matrix.resize(N);
     if ((N & (N - 1)) == 0) {

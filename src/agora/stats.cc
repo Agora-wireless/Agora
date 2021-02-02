@@ -7,18 +7,18 @@
 #include <typeinfo>
 
 Stats::Stats(const Config* const cfg)
-    : kConfig(cfg),
-      kTaskThreadNum(cfg->WorkerThreadNum()),
-      kFftThreadNum(cfg->FftThreadNum()),
-      kZfThreadNum(cfg->ZfThreadNum()),
-      kDemulThreadNum(cfg->DemulThreadNum()),
-      kDecodeThreadNum(cfg->DecodeThreadNum()),
-      kFreqGhz(cfg->FreqGhz()),
-      kCreationTsc(Rdtsc()),
+    : config_(cfg),
+      task_thread_num_(cfg->WorkerThreadNum()),
+      fft_thread_num_(cfg->FftThreadNum()),
+      zf_thread_num_(cfg->ZfThreadNum()),
+      demul_thread_num_(cfg->DemulThreadNum()),
+      decode_thread_num_(cfg->DecodeThreadNum()),
+      freq_ghz_(cfg->FreqGhz()),
+      creation_tsc_(Rdtsc()),
       doer_us_(),
       doer_breakdown_us_() {
-  frame_start_.Calloc(kConfig->SocketThreadNum(), kNumStatsFrames,
-                      Agora_memory::Alignment_t::k64Align);
+  frame_start_.Calloc(config_->SocketThreadNum(), kNumStatsFrames,
+                      Agora_memory::Alignment_t::kAlign64);
 }
 
 Stats::~Stats() { frame_start_.Free(); }
@@ -31,9 +31,9 @@ void Stats::PopulateSummary(FrameSummary* frame_summary, size_t thread_id,
   frame_summary->count_this_thread_ = ds->task_count_ - ds_old->task_count_;
   frame_summary->count_all_threads_ += frame_summary->count_this_thread_;
 
-  for (size_t j = 0; j < kBreakDownNum; j++) {
+  for (size_t j = 0; j < break_down_num_; j++) {
     frame_summary->us_this_thread_.at(j) = CyclesToUs(
-        ds->task_duration_.at(j) - ds_old->task_duration_.at(j), kFreqGhz);
+        ds->task_duration_.at(j) - ds_old->task_duration_.at(j), freq_ghz_);
     frame_summary->us_avg_threads_.at(j) +=
         frame_summary->us_this_thread_.at(j);
   }
@@ -88,7 +88,7 @@ void Stats::UpdateStats(size_t frame_id) {
 
   if (kIsWorkerTimingEnabled == true) {
     std::vector<FrameSummary> work_summary(kAllDoerTypes.size());
-    for (size_t i = 0u; i < kTaskThreadNum; i++) {
+    for (size_t i = 0u; i < task_thread_num_; i++) {
       for (size_t j = 0u; j < kAllDoerTypes.size(); j++) {
         PopulateSummary(&work_summary.at(j), i, kAllDoerTypes.at(j));
       }
@@ -97,7 +97,7 @@ void Stats::UpdateStats(size_t frame_id) {
         std::printf("In frame %zu, thread %zu, \t", frame_id, i);
         double sum_us_this_frame_this_thread = 0;
         for (size_t j = 0u; j < kAllDoerTypes.size(); j++) {
-          PrintPerThreadPerTask(k_doer_names.at(kAllDoerTypes.at(j)),
+          PrintPerThreadPerTask(kDoerNames.at(kAllDoerTypes.at(j)),
                                 work_summary.at(j));
           sum_us_this_frame_this_thread +=
               work_summary.at(j).us_this_thread_.at(0);
@@ -106,7 +106,7 @@ void Stats::UpdateStats(size_t frame_id) {
       }
     }
     for (auto& summary : work_summary) {
-      ComputeAvgOverThreads(&summary, kTaskThreadNum, kBreakDownNum);
+      ComputeAvgOverThreads(&summary, task_thread_num_, break_down_num_);
     }
 
     double sum_us = 0.0f;
@@ -116,7 +116,7 @@ void Stats::UpdateStats(size_t frame_id) {
       sum_us += us_avg;
     }
 
-    for (size_t i = 1; i < this->kBreakDownNum; i++) {
+    for (size_t i = 1; i < this->break_down_num_; i++) {
       for (size_t doer = 0; doer < work_summary.size(); doer++) {
         this->doer_breakdown_us_.at(doer).at(i - 1).at(frame_slot) =
             work_summary.at(doer).us_avg_threads_.at(i);
@@ -126,7 +126,7 @@ void Stats::UpdateStats(size_t frame_id) {
     if (kStatsPrintFrameSummary == true) {
       std::printf("Frame %zu summary: ", frame_id);
       for (size_t i = 0u; i < kAllDoerTypes.size(); i++) {
-        PrintPerFrame(k_doer_names.at(kAllDoerTypes.at(i)), work_summary.at(i));
+        PrintPerFrame(kDoerNames.at(kAllDoerTypes.at(i)), work_summary.at(i));
       }
       std::printf("Total: %.2f ms\n", sum_us / 1000);
     }
@@ -143,8 +143,8 @@ void Stats::SaveToFile() {
 
   // For backwards compatibility, it is easier to make a new file format for
   // the combined case
-  if ((kConfig->Frame().NumDLSyms() > 0) &&
-      (kConfig->Frame().NumULSyms() > 0)) {
+  if ((config_->Frame().NumDLSyms() > 0) &&
+      (config_->Frame().NumULSyms() > 0)) {
     std::fprintf(fp_debug,
                  "Pilot RX by socket threads (= reference time), "
                  "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
@@ -153,7 +153,7 @@ void Stats::SaveToFile() {
                  "FFT, time in ZF, time in Demul, time in Decode\n");
     for (size_t i = 0; i < this->last_frame_id_; i++) {
       size_t ref_tsc = SIZE_MAX;
-      for (size_t j = 0; j < kConfig->SocketThreadNum(); j++) {
+      for (size_t j = 0; j < config_->SocketThreadNum(); j++) {
         ref_tsc = std::min(ref_tsc, this->frame_start_[j][i]);
       }
       std::fprintf(
@@ -161,7 +161,7 @@ void Stats::SaveToFile() {
           "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
           "%.3f %.3f %.3f "
           "%.3f %.3f\n",
-          CyclesToUs(ref_tsc - this->kCreationTsc, this->kFreqGhz),
+          CyclesToUs(ref_tsc - this->creation_tsc_, this->freq_ghz_),
           MasterGetUsFromRef(TsType::kPilotRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
@@ -179,19 +179,19 @@ void Stats::SaveToFile() {
           this->doer_us_.at(static_cast<size_t>(DoerType::kDemul)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDecode)).at(i));
     }
-  } else if (kConfig->Frame().NumDLSyms() > 0) {
+  } else if (config_->Frame().NumDLSyms() > 0) {
     std::fprintf(fp_debug,
                  "Pilot RX by socket threads (= reference time), "
                  "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
                  "kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kRXDone\n");
     for (size_t i = 0; i < this->last_frame_id_; i++) {
       size_t ref_tsc = SIZE_MAX;
-      for (size_t j = 0; j < kConfig->SocketThreadNum(); j++) {
+      for (size_t j = 0; j < config_->SocketThreadNum(); j++) {
         ref_tsc = std::min(ref_tsc, this->frame_start_[j][i]);
       }
       std::fprintf(fp_debug,
                    "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f \n",
-                   CyclesToUs(ref_tsc - this->kCreationTsc, this->kFreqGhz),
+                   CyclesToUs(ref_tsc - this->creation_tsc_, this->freq_ghz_),
                    MasterGetUsFromRef(TsType::kPilotRX, i, ref_tsc),
                    MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
                    MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
@@ -202,7 +202,7 @@ void Stats::SaveToFile() {
                    MasterGetUsFromRef(TsType::kEncodeDone, i, ref_tsc),
                    MasterGetUsFromRef(TsType::kRXDone, i, ref_tsc));
     }
-  } else if (kConfig->Frame().NumULSyms() > 0) {
+  } else if (config_->Frame().NumULSyms() > 0) {
     // Print the header
     std::fprintf(
         fp_debug,
@@ -212,14 +212,14 @@ void Stats::SaveToFile() {
         "FFT, time in ZF, time in Demul, time in Decode\n");
     for (size_t i = 0; i < this->last_frame_id_; i++) {
       size_t ref_tsc = SIZE_MAX;
-      for (size_t j = 0; j < kConfig->SocketThreadNum(); j++) {
+      for (size_t j = 0; j < config_->SocketThreadNum(); j++) {
         ref_tsc = std::min(ref_tsc, this->frame_start_[j][i]);
       }
       std::fprintf(
           fp_debug,
           "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.3f %.3f %.3f "
           "%.3f %.3f\n",
-          CyclesToUs(ref_tsc - this->kCreationTsc, this->kFreqGhz),
+          CyclesToUs(ref_tsc - this->creation_tsc_, this->freq_ghz_),
           MasterGetUsFromRef(TsType::kPilotRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
@@ -327,32 +327,32 @@ void Stats::PrintSummary() {
     std::vector<size_t> num_tasks;
 
     num_tasks.reserve(kAllDoerTypes.size());
-    for (auto kAllDoerType : kAllDoerTypes) {
-      num_tasks.push_back(GetTotalTaskCount(kAllDoerType, kTaskThreadNum));
+    for (auto k_all_doer_type : kAllDoerTypes) {
+      num_tasks.push_back(GetTotalTaskCount(k_all_doer_type, task_thread_num_));
     }
 
     double csi_frames =
         (static_cast<double>(
             num_tasks.at(static_cast<size_t>(DoerType::kCSI)))) /
-        (this->kConfig->BsAntNum() * this->kConfig->Frame().NumPilotSyms());
+        (this->config_->BsAntNum() * this->config_->Frame().NumPilotSyms());
     double zf_frames = (static_cast<double>(
                            num_tasks.at(static_cast<size_t>(DoerType::kZF)))) /
-                       this->kConfig->ZfEventsPerSymbol();
+                       this->config_->ZfEventsPerSymbol();
 
-    if (kConfig->Frame().NumDLSyms() > 0) {
+    if (config_->Frame().NumDLSyms() > 0) {
       double precode_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kPrecode)))) /
-          (this->kConfig->OfdmDataNum() * this->kConfig->Frame().NumDLSyms());
+          (this->config_->OfdmDataNum() * this->config_->Frame().NumDLSyms());
       double ifft_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kIFFT)))) /
-          (this->kConfig->BsAntNum() * this->kConfig->Frame().NumDLSyms());
+          (this->config_->BsAntNum() * this->config_->Frame().NumDLSyms());
       double encode_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kEncode)))) /
-          (this->kConfig->LdpcConfig().NumBlocksInSymbol() *
-           this->kConfig->UeNum() * this->kConfig->Frame().NumDLSyms());
+          (this->config_->LdpcConfig().NumBlocksInSymbol() *
+           this->config_->UeNum() * this->config_->Frame().NumDLSyms());
       std::printf("Downlink totals (tasks, frames): ");
       std::printf("CSI (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kCSI)),
@@ -371,20 +371,20 @@ void Stats::PrintSummary() {
       std::printf("\n");
     }  // config_->frame().NumDLSyms() > 0
 
-    if (kConfig->Frame().NumULSyms() > 0) {
+    if (config_->Frame().NumULSyms() > 0) {
       double fft_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kFFT)))) /
-          (this->kConfig->BsAntNum() * this->kConfig->Frame().NumULSyms());
+          (this->config_->BsAntNum() * this->config_->Frame().NumULSyms());
       double demul_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kDemul)))) /
-          (this->kConfig->OfdmDataNum() * this->kConfig->Frame().NumULSyms());
+          (this->config_->OfdmDataNum() * this->config_->Frame().NumULSyms());
       double decode_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kDecode)))) /
-          (this->kConfig->LdpcConfig().NumBlocksInSymbol() *
-           this->kConfig->UeNum() * this->kConfig->Frame().NumULSyms());
+          (this->config_->LdpcConfig().NumBlocksInSymbol() *
+           this->config_->UeNum() * this->config_->Frame().NumULSyms());
       std::printf("Uplink totals (tasks, frames): ");
       std::printf("CSI (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kCSI)),
@@ -403,7 +403,7 @@ void Stats::PrintSummary() {
       std::printf("\n");
     }  // config_->frame().NumULSyms() > 0
 
-    for (size_t i = 0; i < kTaskThreadNum; i++) {
+    for (size_t i = 0; i < task_thread_num_; i++) {
       std::printf("Thread %zu performed (tasks, fraction of tasks): ", i);
       for (size_t j = 0u; j < kAllDoerTypes.size(); j++) {
         size_t duration_stat =
@@ -412,8 +412,8 @@ void Stats::PrintSummary() {
           double percent_stat =
               (static_cast<double>(duration_stat) * 100.0f) / num_tasks.at(j);
           std::printf("%s (%zu, %.2f%%), ",
-                      k_doer_names.at(kAllDoerTypes.at(j)).c_str(),
-                      duration_stat, percent_stat);
+                      kDoerNames.at(kAllDoerTypes.at(j)).c_str(), duration_stat,
+                      percent_stat);
         }
       }
       std::printf("\n");

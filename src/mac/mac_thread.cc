@@ -15,11 +15,11 @@ MacThread::MacThread(
     moodycamel::ConcurrentQueue<EventData>* rx_queue,
     moodycamel::ConcurrentQueue<EventData>* tx_queue,
     const std::string& log_filename)
-    : kMode(mode),
+    : mode_(mode),
       cfg_(cfg),
-      kFreqGhz(MeasureRdtscFreq()),
-      kTscDelta((cfg_->GetFrameDurationSec() * 1e9) / kFreqGhz),
-      kCoreOffset(core_offset),
+      freq_ghz_(MeasureRdtscFreq()),
+      tsc_delta_((cfg_->GetFrameDurationSec() * 1e9) / freq_ghz_),
+      core_offset_(core_offset),
       decoded_buffer_(decoded_buffer),
       dl_bits_buffer_(dl_bits_buffer),
       dl_bits_buffer_status_(dl_bits_buffer_status),
@@ -33,7 +33,7 @@ MacThread::MacThread(
   RtAssert(log_file_ != nullptr, "Failed to open MAC log file");
 
   std::printf("MAC thread: Frame duration %.2f ms, tsc_delta %zu\n",
-              cfg_->GetFrameDurationSec() * 1000, kTscDelta);
+              cfg_->GetFrameDurationSec() * 1000, tsc_delta_);
 
   // Set up buffers
   client_.ul_bits_buffer_ = ul_bits_buffer;
@@ -92,7 +92,7 @@ void MacThread::ProcessSnrReportFromMaster(EventData event) {
 void MacThread::SendRanConfigUpdate(EventData /*event*/) {
   RanConfig rc;
   rc.n_antennas_ = 0;  // TODO [arjun]: What's the correct value here?
-  rc.mod_order_bits_ = CommsLib::QAM16;
+  rc.mod_order_bits_ = CommsLib::kQaM16;
   rc.frame_id_ = scheduler_next_frame_id_;
   // TODO: change n_antennas to a desired value
   // cfg_->bs_ant_num() is added to fix compiler warning
@@ -188,7 +188,7 @@ void MacThread::SendControlInformation() {
   // send RAN control information UE
   RBIndicator ri;
   ri.ue_id_ = next_radio_id_;
-  ri.mod_order_bits_ = CommsLib::QAM16;
+  ri.mod_order_bits_ = CommsLib::kQaM16;
   udp_client_->Send(cfg_->UeServerAddr(), kBaseClientPort + ri.ue_id_,
                     (uint8_t*)&ri, sizeof(RBIndicator));
 
@@ -228,7 +228,7 @@ void MacThread::ProcessUdpPacketsFromApps(RBIndicator ri) {
   RtAssert(static_cast<size_t>(ret) == cfg_->MacDataBytesNumPerframe());
 
   const auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
-  kMode == Mode::kServer ? ProcessUdpPacketsFromAppsServer(pkt, ri)
+  mode_ == Mode::kServer ? ProcessUdpPacketsFromAppsServer(pkt, ri)
                          : ProcessUdpPacketsFromAppsClient((char*)pkt, ri);
 }
 
@@ -328,14 +328,14 @@ void MacThread::ProcessUdpPacketsFromAppsClient(const char* payload,
 void MacThread::RunEventLoop() {
   MLPD_INFO("Running MAC thread event loop, logging to file %s\n",
             log_filename_.c_str());
-  PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, kCoreOffset,
+  PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_,
                       0 /* thread ID */);
 
   while (cfg_->Running() == true) {
     ProcessRxFromMaster();
 
-    if (kMode == Mode::kServer) {
-      if (Rdtsc() - last_frame_tx_tsc_ > kTscDelta) {
+    if (mode_ == Mode::kServer) {
+      if (Rdtsc() - last_frame_tx_tsc_ > tsc_delta_) {
         SendControlInformation();
         last_frame_tx_tsc_ = Rdtsc();
       }

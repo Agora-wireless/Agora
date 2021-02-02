@@ -33,17 +33,18 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
                const std::string& server_mac_addr_str,
                bool create_thread_for_master)
     : cfg_(cfg),
-      kFreqGhz(MeasureRdtscFreq()),
-      kTicksPerUsec(kFreqGhz * 1e3),
-      kSocketThreadNum(socket_thread_num),
-      kEnableSlowStart(enable_slow_start),
-      kCoreOffset(core_offset),
-      kFrameDuration(frame_duration),
-      kTicksAll(kFrameDuration * kTicksPerUsec / cfg->Frame().NumTotalSyms()),
-      kTicksWnd1(200000 /* 200 ms */ * kTicksPerUsec /
+      freq_ghz_(MeasureRdtscFreq()),
+      ticks_per_usec_(freq_ghz_ * 1e3),
+      socket_thread_num_(socket_thread_num),
+      enable_slow_start_(enable_slow_start),
+      core_offset_(core_offset),
+      frame_duration_(frame_duration),
+      ticks_all_(frame_duration_ * ticks_per_usec_ /
                  cfg->Frame().NumTotalSyms()),
-      kTicksWnd2(15 * kFrameDuration * kTicksPerUsec /
-                 cfg->Frame().NumTotalSyms()) {
+      ticks_wnd1_(200000 /* 200 ms */ * ticks_per_usec_ /
+                  cfg->Frame().NumTotalSyms()),
+      ticks_wnd2_(15 * frame_duration_ * ticks_per_usec_ /
+                  cfg->Frame().NumTotalSyms()) {
   MLPD_WARN(
       "Initializing sender, sending to base station server at %s, frame "
       "duration = %.2f ms, slow start = %s\n",
@@ -61,15 +62,16 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 
   task_ptok_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k64Align,
-          (kSocketThreadNum * sizeof(moodycamel::ProducerToken*))));
-  for (size_t i = 0; i < kSocketThreadNum; i++) {
+          Agora_memory::Alignment_t::kAlign64,
+          (socket_thread_num_ * sizeof(moodycamel::ProducerToken*))));
+  for (size_t i = 0; i < socket_thread_num_; i++) {
     task_ptok_[i] = new moodycamel::ProducerToken(send_queue_);
   }
 
   // Create a master thread when started from simulator
   if (create_thread_for_master == true) {
-    this->threads_.emplace_back(&Sender::MasterThread, this, kSocketThreadNum);
+    this->threads_.emplace_back(&Sender::MasterThread, this,
+                                socket_thread_num_);
   }
 
 #ifdef USE_DPDK
@@ -124,7 +126,7 @@ Sender::~Sender() {
     delete[] i;
   }
 
-  for (size_t i = 0; i < kSocketThreadNum; i++) {
+  for (size_t i = 0; i < socket_thread_num_; i++) {
     delete (task_ptok_[i]);
   }
   std::free(task_ptok_);
@@ -134,7 +136,7 @@ void Sender::StartTx() {
   this->frame_start_ = new double[kNumStatsFrames]();
   this->frame_end_ = new double[kNumStatsFrames]();
 
-  CreateWorkerThreads(kSocketThreadNum);
+  CreateWorkerThreads(socket_thread_num_);
   MasterThread(0);  // Start the master thread
 
   delete[](this->frame_start_);
@@ -145,7 +147,7 @@ void Sender::StartTXfromMain(double* in_frame_start, double* in_frame_end) {
   frame_start_ = in_frame_start;
   frame_end_ = in_frame_end;
 
-  CreateWorkerThreads(kSocketThreadNum);
+  CreateWorkerThreads(socket_thread_num_);
 }
 
 size_t Sender::FindNextSymbol(size_t start_symbol) {
@@ -166,18 +168,18 @@ void Sender::ScheduleSymbol(size_t frame, size_t symbol_id) {
     auto req_tag = gen_tag_t::FrmSymAnt(frame, symbol_id, i);
     // Split up the antennas amoung the worker threads
     RtAssert(
-        send_queue_.enqueue(*task_ptok_[i % kSocketThreadNum], req_tag.tag_),
+        send_queue_.enqueue(*task_ptok_[i % socket_thread_num_], req_tag.tag_),
         "Send task enqueue failed");
   }
 }
 
 void* Sender::MasterThread(int /*unused*/) {
   signal(SIGINT, InterruptHandler);
-  PinToCoreWithOffset(ThreadType::kMasterTX, kCoreOffset, 0);
+  PinToCoreWithOffset(ThreadType::kMasterTX, core_offset_, 0);
 
   // Wait for all worker threads to be ready (+1 for Master)
   num_workers_ready_atomic.fetch_add(1);
-  while (num_workers_ready_atomic.load() < (kSocketThreadNum + 1)) {
+  while (num_workers_ready_atomic.load() < (socket_thread_num_ + 1)) {
     // Wait
   }
 
@@ -269,11 +271,11 @@ void* Sender::MasterThread(int /*unused*/) {
 
 /* Worker expects only valid transmit symbol_ids 'U' 'P' */
 void* Sender::WorkerThread(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerTX, (kCoreOffset + 1), tid);
+  PinToCoreWithOffset(ThreadType::kWorkerTX, (core_offset_ + 1), tid);
 
   // Wait for all Sender threads (including master) to start runnung
   num_workers_ready_atomic.fetch_add(1);
-  while (num_workers_ready_atomic.load() < (kSocketThreadNum + 1)) {
+  while (num_workers_ready_atomic.load() < (socket_thread_num_ + 1)) {
     // Wait
   }
   MLPD_FRAME("Sender: worker thread %d running\n", tid);
@@ -286,11 +288,12 @@ void* Sender::WorkerThread(int tid) {
   const size_t max_symbol_id =
       cfg_->Frame().NumPilotSyms() +
       cfg_->Frame().NumULSyms();  // TEMP not sure if this is ok
-  const size_t radio_lo = (tid * cfg_->NumRadios()) / kSocketThreadNum;
-  const size_t radio_hi = ((tid + 1) * cfg_->NumRadios()) / kSocketThreadNum;
+  const size_t radio_lo = (tid * cfg_->NumRadios()) / socket_thread_num_;
+  const size_t radio_hi = ((tid + 1) * cfg_->NumRadios()) / socket_thread_num_;
   const size_t ant_num_this_thread =
-      cfg_->BsAntNum() / kSocketThreadNum +
-      (static_cast<size_t>(tid) < cfg_->BsAntNum() % kSocketThreadNum ? 1 : 0);
+      cfg_->BsAntNum() / socket_thread_num_ +
+      (static_cast<size_t>(tid) < cfg_->BsAntNum() % socket_thread_num_ ? 1
+                                                                        : 0);
 #ifdef USE_DPDK
   const size_t port_id = tid % cfg_->DpdkNumPorts();
   const size_t queue_id = tid / cfg_->DpdkNumPorts();
@@ -301,10 +304,10 @@ void* Sender::WorkerThread(int tid) {
 
   auto* fft_inout =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k64Align,
+          Agora_memory::Alignment_t::kAlign64,
           cfg_->OfdmCaNum() * sizeof(complex_float)));
   auto* socks_pkt_buf = static_cast<Packet*>(PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::k32Align, cfg_->PacketLength()));
+      Agora_memory::Alignment_t::kAlign32, cfg_->PacketLength()));
 
   double begin = GetTime();
   size_t total_tx_packets = 0;
@@ -377,7 +380,7 @@ void* Sender::WorkerThread(int tid) {
               "TX time: %.3f us\n",
               tid, gen_tag_t(tag).ToString().c_str(), pkt->frame_id_,
               pkt->symbol_id_, pkt->ant_id_,
-              CyclesToUs(Rdtsc() - start_tsc_send, kFreqGhz));
+              CyclesToUs(Rdtsc() - start_tsc_send, freq_ghz_));
         }
 
         total_tx_packets_rolling++;
@@ -427,14 +430,14 @@ void* Sender::WorkerThread(int tid) {
 }
 
 uint64_t Sender::GetTicksForFrame(size_t frame_id) const {
-  if (kEnableSlowStart == 0) {
-    return kTicksAll;
+  if (enable_slow_start_ == 0) {
+    return ticks_all_;
   } else if (frame_id < kFrameWnd) {
-    return kTicksWnd1;
+    return ticks_wnd1_;
   } else if (frame_id < (kFrameWnd * 4)) {
-    return kTicksWnd2;
+    return ticks_wnd2_;
   } else {
-    return kTicksAll;
+    return ticks_all_;
   }
 }
 
@@ -443,12 +446,12 @@ void Sender::InitIqFromFile(const std::string& filename) {
       cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum();
   iq_data_short_.Calloc(packets_per_frame,
                         (cfg_->CpLen() + cfg_->OfdmCaNum()) * 2,
-                        Agora_memory::Alignment_t::k64Align);
+                        Agora_memory::Alignment_t::kAlign64);
 
   Table<float> iq_data_float;
   iq_data_float.Calloc(packets_per_frame,
                        (cfg_->CpLen() + cfg_->OfdmCaNum()) * 2,
-                       Agora_memory::Alignment_t::k64Align);
+                       Agora_memory::Alignment_t::kAlign64);
 
   FILE* fp = std::fopen(filename.c_str(), "rb");
   RtAssert(fp != nullptr, "Failed to open IQ data file");

@@ -10,9 +10,9 @@
 
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg_(cfg),
-      kCoreOffset(core_offset),
-      kAntPerCell(cfg->BsAntNum() / cfg->NumCells()),
-      kSocketThreadNum(cfg->SocketThreadNum()) {
+      core_offset_(core_offset),
+      ant_per_cell_(cfg->BsAntNum() / cfg->NumCells()),
+      socket_thread_num_(cfg->SocketThreadNum()) {
   if ((kUseArgos == false) && (kUseUHD == false)) {
     socket_.resize(cfg->NumRadios());
     bs_rru_sockaddr_.resize(cfg->NumRadios());
@@ -71,7 +71,7 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
     }
   }
 
-  for (size_t i = 0; i < kSocketThreadNum; i++) {
+  for (size_t i = 0; i < socket_thread_num_; i++) {
     if (kUseArgos == true) {
       socket_std_threads_.at(i) =
           std::thread(&PacketTXRX::LoopTxRxArgos, this, i);
@@ -91,8 +91,8 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
 }
 
 void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
-  int radio_lo = tid * cfg_->NumRadios() / kSocketThreadNum;
-  int radio_hi = (tid + 1) * cfg_->NumRadios() / kSocketThreadNum;
+  int radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
+  int radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
 
   // Send a beacon packet in the downlink to trigger user pilot
   std::vector<uint8_t> udp_pkt_buf(cfg_->PacketLength(), 0);
@@ -109,11 +109,11 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
 }
 
 void PacketTXRX::LoopTxRx(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerTXRX, kCoreOffset, tid);
+  PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid);
   size_t* rx_frame_start = (*frame_start_)[tid];
   size_t rx_offset = 0;
-  int radio_lo = tid * cfg_->NumRadios() / kSocketThreadNum;
-  int radio_hi = (tid + 1) * cfg_->NumRadios() / kSocketThreadNum;
+  int radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
+  int radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
 
   int sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
   for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
@@ -208,7 +208,7 @@ struct Packet* PacketTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
         "antenna %d in cell %d,\n",
         pkt->ant_id_, pkt->cell_id_);
   }
-  pkt->ant_id_ += pkt->cell_id_ * kAntPerCell;
+  pkt->ant_id_ += pkt->cell_id_ * ant_per_cell_;
   if (kDebugMulticell) {
     std::printf(
         "After packet combining: the combined antenna ID is %d, it "

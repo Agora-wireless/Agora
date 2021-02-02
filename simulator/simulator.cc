@@ -214,7 +214,7 @@ void Simulator::InitializeQueues() {
 
   rx_ptoks_ptr_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k64Align,
+          Agora_memory::Alignment_t::kAlign64,
           socket_rx_thread_num_ * sizeof(moodycamel::ProducerToken*)));
   for (size_t i = 0; i < socket_rx_thread_num_; i++) {
     rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(message_queue_);
@@ -222,7 +222,7 @@ void Simulator::InitializeQueues() {
 
   task_ptoks_ptr_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k64Align,
+          Agora_memory::Alignment_t::kAlign64,
           task_thread_num_ * sizeof(moodycamel::ProducerToken*)));
   for (size_t i = 0; i < task_thread_num_; i++) {
     task_ptoks_ptr_[i] = new moodycamel::ProducerToken(complete_task_queue_);
@@ -250,25 +250,25 @@ void Simulator::InitializeUplinkBuffers() {
                         bs_ant_num_ * kFrameWnd;
   socket_buffer_status_size_ = symbol_num_perframe_ * bs_ant_num_ * kFrameWnd;
   socket_buffer_.Malloc(socket_rx_thread_num_, socket_buffer_size_,
-                        Agora_memory::Alignment_t::k64Align);
+                        Agora_memory::Alignment_t::kAlign64);
   socket_buffer_status_.Calloc(socket_rx_thread_num_,
                                socket_buffer_status_size_,
-                               Agora_memory::Alignment_t::k64Align);
+                               Agora_memory::Alignment_t::kAlign64);
 
   /* initilize all uplink status checkers */
   AllocBuffer1d(&rx_counter_packets_, kFrameWnd,
-                Agora_memory::Alignment_t::k64Align, 1);
+                Agora_memory::Alignment_t::kAlign64, 1);
 
   frame_start_.Calloc(socket_rx_thread_num_, kNumStatsFrames,
-                      Agora_memory::Alignment_t::k4096Align);
+                      Agora_memory::Alignment_t::kAlign4096);
   AllocBuffer1d(&frame_start_receive_, kNumStatsFrames,
-                Agora_memory::Alignment_t::k4096Align, 1);
+                Agora_memory::Alignment_t::kAlign4096, 1);
   AllocBuffer1d(&frame_end_receive_, kNumStatsFrames,
-                Agora_memory::Alignment_t::k4096Align, 1);
+                Agora_memory::Alignment_t::kAlign4096, 1);
   AllocBuffer1d(&frame_start_tx_, kNumStatsFrames,
-                Agora_memory::Alignment_t::k4096Align, 1);
+                Agora_memory::Alignment_t::kAlign4096, 1);
   AllocBuffer1d(&frame_end_tx_, kNumStatsFrames,
-                Agora_memory::Alignment_t::k4096Align, 1);
+                Agora_memory::Alignment_t::kAlign4096, 1);
 }
 
 void Simulator::FreeUplinkBuffers() {

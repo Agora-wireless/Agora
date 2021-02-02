@@ -51,7 +51,6 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       LdpcEncodingInputBufSize(this->cfg_->LdpcConfig().BaseGraph(),
                                this->cfg_->LdpcConfig().ExpansionFactor());
 
-  auto scrambler = std::make_unique<Scrambler>();
   auto* scrambler_buffer =
       new int8_t[input_size + kLdpcHelperFunctionInputBufferSizePaddingBytes];
   for (size_t i = 0; i < num_ul_codeblocks; i++) {
@@ -61,7 +60,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::memcpy(scrambler_buffer, ul_information.at(i).data(), input_size);
 
     if (this->cfg_->ScrambleEnabled()) {
-      scrambler->WlanScramble(scrambler_buffer, input_size);
+      Scrambler::WlanScramble(scrambler_buffer, input_size);
     }
     this->GenCodeblock(scrambler_buffer, ul_encoded_codewords.at(i));
   }
@@ -121,11 +120,11 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   Table<complex_float> ue_specific_pilot;
   const std::vector<std::complex<float>> zc_seq =
       Utils::DoubleToCfloat(CommsLib::GetSequence(this->cfg_->OfdmDataNum(),
-                                                  CommsLib::LTE_ZADOFF_CHU));
+                                                  CommsLib::kLteZadoffChu));
   const std::vector<std::complex<float>> zc_common_pilot =
       CommsLib::SeqCyclicShift(zc_seq, M_PI / 4.0);  // Used in LTE SRS
   ue_specific_pilot.Malloc(this->cfg_->UeAntNum(), this->cfg_->OfdmDataNum(),
-                           Agora_memory::Alignment_t::k64Align);
+                           Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
     auto zc_ue_pilot_i =
         CommsLib::SeqCyclicShift(zc_seq, i * M_PI / 6.0);  // LTE DMRS
@@ -139,7 +138,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   Table<complex_float> tx_data_all_symbols;
   tx_data_all_symbols.Calloc(this->cfg_->Frame().NumTotalSyms(),
                              this->cfg_->UeAntNum() * this->cfg_->OfdmCaNum(),
-                             Agora_memory::Alignment_t::k64Align);
+                             Agora_memory::Alignment_t::kAlign64);
 
   if (this->cfg_->FreqOrthogonalPilot() == true) {
     for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
@@ -189,7 +188,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   Table<complex_float> csi_matrices;
   csi_matrices.Calloc(this->cfg_->OfdmCaNum(),
                       this->cfg_->UeAntNum() * this->cfg_->BsAntNum(),
-                      Agora_memory::Alignment_t::k32Align);
+                      Agora_memory::Alignment_t::kAlign32);
   for (size_t i = 0; i < (this->cfg_->UeAntNum() * this->cfg_->BsAntNum());
        i++) {
     complex_float csi = {RandFloatFromShort(-1, 1), RandFloatFromShort(-1, 1)};
@@ -210,7 +209,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   Table<complex_float> rx_data_all_symbols;
   rx_data_all_symbols.Calloc(this->cfg_->Frame().NumTotalSyms(),
                              this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum(),
-                             Agora_memory::Alignment_t::k64Align);
+                             Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
     arma::cx_fmat mat_input_data(
         reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
@@ -274,7 +273,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::memcpy(scrambler_buffer, dl_information.at(i).data(), input_size);
 
     if (this->cfg_->ScrambleEnabled()) {
-      scrambler->WlanScramble(scrambler_buffer, input_size);
+      Scrambler::WlanScramble(scrambler_buffer, input_size);
     }
     this->GenCodeblock(scrambler_buffer, dl_encoded_codewords.at(i));
   }
@@ -323,7 +322,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   Table<complex_float> precoder;
   precoder.Calloc(this->cfg_->OfdmCaNum(),
                   this->cfg_->UeAntNum() * this->cfg_->BsAntNum(),
-                  Agora_memory::Alignment_t::k32Align);
+                  Agora_memory::Alignment_t::kAlign32);
   for (size_t i = 0; i < this->cfg_->OfdmCaNum(); i++) {
     arma::cx_fmat mat_input(reinterpret_cast<arma::cx_float*>(csi_matrices[i]),
                             this->cfg_->BsAntNum(), this->cfg_->UeAntNum(),
@@ -358,7 +357,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   Table<complex_float> dl_mod_data;
   dl_mod_data.Calloc(this->cfg_->Frame().NumDLSyms(),
                      this->cfg_->OfdmCaNum() * this->cfg_->UeAntNum(),
-                     Agora_memory::Alignment_t::k64Align);
+                     Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
     for (size_t j = 0; j < this->cfg_->UeAntNum(); j++) {
       if ((i >= this->cfg_->Frame().ClientDlPilotSymbols())) {
@@ -403,11 +402,11 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   Table<complex_float> dl_ifft_data;
   dl_ifft_data.Calloc(this->cfg_->Frame().NumDLSyms(),
                       this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum(),
-                      Agora_memory::Alignment_t::k64Align);
+                      Agora_memory::Alignment_t::kAlign64);
   Table<short> dl_tx_data;
   dl_tx_data.Calloc(this->cfg_->Frame().NumDLSyms(),
                     2 * this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum(),
-                    Agora_memory::Alignment_t::k64Align);
+                    Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
     arma::cx_fmat mat_input_data(
         reinterpret_cast<arma::cx_float*>(dl_mod_data[i]),

@@ -25,12 +25,12 @@ TEST(TestZF, Perf) {
   Table<complex_float> calib_dl_buffer;
   calib_dl_buffer.RandAllocCxFloat(kFrameWnd,
                                    cfg->OfdmDataNum() * cfg->BsAntNum(),
-                                   Agora_memory::Alignment_t::k64Align);
+                                   Agora_memory::Alignment_t::kAlign64);
 
   Table<complex_float> calib_ul_buffer;
   calib_ul_buffer.RandAllocCxFloat(kFrameWnd,
                                    cfg->OfdmDataNum() * cfg->BsAntNum(),
-                                   Agora_memory::Alignment_t::k64Align);
+                                   Agora_memory::Alignment_t::kAlign64);
 
   std::unique_ptr<Stats> stats(new Stats(cfg.get()));
 

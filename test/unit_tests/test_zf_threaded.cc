@@ -126,9 +126,9 @@ TEST(TestZF, VaryingConfig) {
                                                                 kMaxAntennas);
 
   calib_dl_buffer.RandAllocCxFloat(kFrameWnd, kMaxDataSCs * kMaxAntennas,
-                                   Agora_memory::Alignment_t::k64Align);
+                                   Agora_memory::Alignment_t::kAlign64);
   calib_ul_buffer.RandAllocCxFloat(kFrameWnd, kMaxDataSCs * kMaxAntennas,
-                                   Agora_memory::Alignment_t::k64Align);
+                                   Agora_memory::Alignment_t::kAlign64);
 
   std::unique_ptr<Stats> stats(new Stats(cfg.get()));
 

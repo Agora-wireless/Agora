@@ -29,15 +29,15 @@
 class CommsLib {
  public:
   enum SequenceType {
-    STS_SEQ,
-    LTS_SEQ,
-    LTS_F_SEQ,
-    LTE_ZADOFF_CHU,
-    GOLD_IFFT,
-    HADAMARD
+    kStsSeq,
+    kLtsSeq,
+    kLtsFSeq,
+    kLteZadoffChu,
+    kGoldIfft,
+    kHadamard
   };
 
-  enum ModulationOrder { QPSK = 2, QAM16 = 4, QAM64 = 6 };
+  enum ModulationOrder { kQpsk = 2, kQaM16 = 4, kQaM64 = 6 };
 
   explicit CommsLib(std::string);
   ~CommsLib();

@@ -111,15 +111,15 @@ class MacThread {
 
   // If Mode::kServer, this thread is running at the Agora server. Else at
   // the client.
-  const Mode kMode;
+  const Mode mode_;
   Config* cfg_;
 
-  const double kFreqGhz;  // RDTSC frequency in GHz
+  const double freq_ghz_;  // RDTSC frequency in GHz
   // We check for new MAC packets from applications every [tsc_delta_]
   // clock ticks
-  const size_t kTscDelta;
+  const size_t tsc_delta_;
 
-  const size_t kCoreOffset;  // The CPU core on which this thread runs
+  const size_t core_offset_;  // The CPU core on which this thread runs
 
   FILE* log_file_;  // Log file used to store MAC layer outputs
   std::string log_filename_ = k_default_log_filename_;  // Name of the log file

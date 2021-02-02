@@ -82,7 +82,7 @@ int main() {
     int8_t* llrs[kNumCodeBlocks];
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
       llrs[n] = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k32Align, num_encoded_bits));
+          Agora_memory::Alignment_t::kAlign32, num_encoded_bits));
       for (size_t i = 0; i < num_encoded_bits; i++) {
         uint8_t bit_i = (encoded[n][i / 8] >> (i % 8)) & 1;
         llrs[n][i] = (bit_i == 1 ? -127 : 127);
@@ -105,7 +105,7 @@ int main() {
     ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
     ldpc_decoder_5gnr_response.varNodes =
         static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
-            Agora_memory::Alignment_t::k32Align, buffer_len * sizeof(int16_t)));
+            Agora_memory::Alignment_t::kAlign32, buffer_len * sizeof(int16_t)));
 
     // Decoding
     const size_t decoding_start_tsc = Rdtsc();

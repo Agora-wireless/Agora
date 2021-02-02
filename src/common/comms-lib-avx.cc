@@ -443,16 +443,16 @@ std::vector<float> CommsLib::CorrelateAvxS(std::vector<float> const& f,
     seq_samp[i] = _mm256_broadcast_ss(&in_g[i]);
   }
 
-  static const size_t k_address_increment = ALIGNMENT / sizeof(float);
+  static const size_t kKAddressIncrement = ALIGNMENT / sizeof(float);
   static_assert((ALIGNMENT % sizeof(float)) == 0,
                 "Address alignment not correct");
 
-  size_t padding = k_address_increment - (length_f % k_address_increment);
+  size_t padding = kKAddressIncrement - (length_f % kKAddressIncrement);
   std::vector<float> out(length_f + padding);
 
   // Verify no memory overruns
-  assert((out.size() % k_address_increment) == 0);
-  for (size_t i = 0; i < (out.size() - 1); i += k_address_increment) {
+  assert((out.size() % kKAddressIncrement) == 0);
+  for (size_t i = 0; i < (out.size() - 1); i += kKAddressIncrement) {
     accm = _mm256_setzero_ps();
     for (size_t j = 0; j < length_g; j++) {
       data = _mm256_loadu_ps(in_data_ptr + i + j);

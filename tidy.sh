@@ -1,58 +1,36 @@
-function check_class_case() {
-  echo "Checking class case"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
-    -checks='-*,readability-identifier-naming' \
-    -config="{CheckOptions: [ {key: readability-identifier-naming.ClassCase, value: CamelCase} ]}" \
-    2>/dev/null
-}
 
-function fix_class_case() {
-  echo "Fixing class case"
+function fix_naming() {
+  echo "Checking code readability standardings"
   run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
     -checks='-*,readability-identifier-naming' \
-    -config="{CheckOptions: [ {key: readability-identifier-naming.ClassCase, value: CamelCase} ]}" \
-    -fix
-}
-
-function fix_function_case() {
-  echo "Fixing function case"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
-    -checks='-*,readability-identifier-naming' \
-    -config="{ CheckOptions: [ {key: readability-identifier-naming.PublicMethodCase, value: CamelCase},{key: readability-identifier-naming.ProtectedMethodCase, value: CamelCase},{key: readability-identifier-naming.PrivateMethodCase, value: CamelCase},{key: readability-identifier-naming.GlobalFunctionCase, value: CamelCase},{key: readability-identifier-naming.FunctionCase, value: CamelCase} ]}" \
-    -fix
-}
-
-function fix_function_case_backup() {
-  echo "Fixing function case"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
-    -checks='-*,readability-identifier-naming' \
-    -config="{CheckOptions: [ {key: readability-identifier-naming.ClassMethodCase, value: CamelCase},{key: readability-identifier-naming.FunctionCase, value: CamelCase}, {key: readability-identifier-naming.MethodCase, value: CamelCase},{key: readability-identifier-naming.PublicMethodCase, value: CamelCase},{key: readability-identifier-naming.PrivateMethodCase, value: CamelCase},{key: readability-identifier-naming.ProtectedMethodCase, value: CamelCase}  ]}" \
-    -fix
-}
-
-function fix_member_case() {
-  echo "Fixing member case"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
-    -checks='-*,readability-identifier-naming' \
-    -config="{CheckOptions: [ {key: readability-identifier-naming.MemberCase, value: lower_case}, {key: readability-identifier-naming.MemberSuffix, value: '_'}, { key: readability-identifier-naming.ConstantMemberCase, value: CamelCase }, { key: readability-identifier-naming.ConstantMemberPrefix, value: k } ]}" \
-    -fix
-}
-
-function fix_variable_case() {
-  echo "Fixing variable case"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
-    -checks='-*,readability-identifier-naming' \
-    -config="{CheckOptions: [ {key: readability-identifier-naming.VariableCase, value: lower_case},
+    -config="{CheckOptions: [ {key: readability-identifier-naming.ClassCase, value: CamelCase},
+                              {key: readability-identifier-naming.ClassMethodCase, value: CamelCase},
+                              {key: readability-identifier-naming.GlobalFunctionCase, value: CamelCase},
+                              {key: readability-identifier-naming.FunctionCase, value: CamelCase},
+                              {key: readability-identifier-naming.EnumConstantCase, value: CamelCase},
+                              {key: readability-identifier-naming.EnumConstantPrefix, value: k},
+                    	       {key: readability-identifier-naming.GlobalConstantCase, value: CamelCase},
+                              {key: readability-identifier-naming.GlobalConstantPrefix, value: k},
+                  	       {key: readability-identifier-naming.StaticConstantCase, value: CamelCase},
+                              {key: readability-identifier-naming.StaticConstantPrefix, value: k},
+                	       {key: readability-identifier-naming.ScopedEnumConstantCase, value: CamelCase},
+                              {key: readability-identifier-naming.ScopedEnumConstantPrefix, value: k},
+                              {key: readability-identifier-naming.ConstexprVariableCase, value: CamelCase },
+                              {key: readability-identifier-naming.ConstexprVariablePrefix, value: k },
+                              {key: readability-identifier-naming.ClassConstantCase, value: CamelCase },
+                              {key: readability-identifier-naming.ClassConstantPrefix, value: k },
+                              {key: readability-identifier-naming.MemberCase, value: lower_case}, 
+                              {key: readability-identifier-naming.MemberSuffix, value: '_'}, 
+                              {key: readability-identifier-naming.VariableCase, value: lower_case},
                               {key: readability-identifier-naming.VariableSuffix, value: ''},
-                              { key: readability-identifier-naming.ConstexprVariableCase, value: CamelCase },
-                              { key: readability-identifier-naming.ConstexprVariablePrefix, value: k },
-                              { key: readability-identifier-naming.ConstantMemberCase, value: CamelCase },
-                              { key: readability-identifier-naming.ConstantMemberPrefix, value: k },
-                              { key: readability-identifier-naming.ClassConstantCase, value: CamelCase },
-                              { key: readability-identifier-naming.ClassConstantPrefix, value: k }
-                              ]}" \
-    -fix
+                              {key: readability-identifier-naming.ConstantPointerParameterCase, value: lower_case},
+                              {key: readability-identifier-naming.LocalConstantPointerCase, value: lower_case}
+                               ]}" \
+    1>/dev/null 2>/dev/null
 }
+
+#                              {key: readability-identifier-naming.ConstantMemberCase, value: CamelCase }, 
+#                              {key: readability-identifier-naming.ConstantMemberPrefix, value: k },
 
 function modernize_headers() {
   echo "Modernize Headers"
@@ -198,8 +176,5 @@ function readability_autofix() {
 #performance_autofix (move / sqrt function)
 #modernize_autofix
 
-fix_member_case
-fix_class_case
-fix_variable_case
-fix_function_case
+fix_naming
 

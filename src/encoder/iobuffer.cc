@@ -97,7 +97,7 @@ void Adapter2to64(int8_t* ptr_buff_0, int8_t* ptr_buff_1, uint16_t zc_size,
   }
 }
 
-void print256_epi8(__m256i var) {
+void Print256Epi8(__m256i var) {
   int8_t* val = (int8_t*)&var;
   std::printf(
       "Numerical int8_t: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i "
@@ -184,9 +184,9 @@ void Adapter64to256(int8_t* ptr_buff_0, int8_t* ptr_buff_1, uint16_t zc_size,
 
     if (kPrintAdapterDebug) {
       std::printf("before: ");
-      print256_epi8(x0);
+      Print256Epi8(x0);
       std::printf("after: ");
-      print256_epi8(x1);
+      Print256Epi8(x1);
     }
     p_buff_1 = (p_buff_1 + kProcBytes);
     p_buff_0 = (p_buff_0 + byte_num);

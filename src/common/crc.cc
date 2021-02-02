@@ -92,7 +92,7 @@ uint32_t DoCRC::CalculateCrc24(const unsigned char* data, int len) {
   uint32_t crc = 0;
 
   for (i = 0; i < len; i++) {
-    crc = (crc << 8) ^ kCrc24Table[data[i] ^ (unsigned char)(crc >> 16)];
+    crc = (crc << 8) ^ crc24_table_[data[i] ^ (unsigned char)(crc >> 16)];
   }
 
   crc = (crc & 0x00ffffff);

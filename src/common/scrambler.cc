@@ -4,6 +4,8 @@
  */
 #include "scrambler.h"
 
+namespace Scrambler {
+
 void ConvertBytesToBits(const int8_t* in_byte_buffer, size_t byte_buffer_size,
                         int8_t* out_bit_buffer) {
   for (size_t i = 0; i < byte_buffer_size; i++) {
@@ -94,8 +96,12 @@ void WlanScrambler(void* byte_buffer, size_t byte_buffer_size) {
   return;
 }
 
-Scrambler::Scrambler(void) { /* Placeholder */
+void WlanScramble(void* byte_buffer, size_t byte_buffer_size) {
+  WlanScrambler(byte_buffer, byte_buffer_size);
 }
 
-Scrambler::~Scrambler(void) { /* Placeholder */
+void WlanDescramble(void* byte_buffer, size_t byte_buffer_size) {
+  WlanScrambler(byte_buffer, byte_buffer_size);
 }
+
+};  // end namespace Scrambler

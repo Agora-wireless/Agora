@@ -37,7 +37,7 @@ class PhyStats {
   void PrintSnrStats(size_t /*frame_id*/);
 
  private:
-  Config const* const kConfig;
+  Config const* const config_;
   Table<size_t> decoded_bits_count_;
   Table<size_t> bit_error_count_;
   Table<size_t> decoded_blocks_count_;

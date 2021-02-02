@@ -46,13 +46,13 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<Config> cfg(new Config(FLAGS_conf_file.c_str()));
 
   const DataGenerator::Profile profile = FLAGS_profile == "123"
-                                             ? DataGenerator::Profile::k123
+                                             ? DataGenerator::Profile::kProfile123
                                              : DataGenerator::Profile::kRandom;
   DataGenerator data_generator(cfg.get(), 0 /* RNG seed */, profile);
 
   std::printf("DataGenerator: Config file: %s, data profile = %s\n",
               FLAGS_conf_file.c_str(),
-              profile == DataGenerator::Profile::k123 ? "123" : "random");
+              profile == DataGenerator::Profile::kProfile123 ? "123" : "random");
 
   std::printf("DataGenerator: Using %s-orthogonal pilots\n",
               cfg->FreqOrthogonalPilot() ? "frequency" : "time");
@@ -146,7 +146,7 @@ int main(int argc, char* argv[]) {
     Table<complex_float> tx_data_all_symbols;
     tx_data_all_symbols.Calloc(cfg->Frame().NumTotalSyms(),
                                cfg->UeAntNum() * cfg->OfdmCaNum(),
-                               Agora_memory::Alignment_t::k64Align);
+                               Agora_memory::Alignment_t::kAlign64);
 
     if (cfg->FreqOrthogonalPilot() == true) {
       for (size_t i = 0; i < cfg->UeAntNum(); i++) {
@@ -186,7 +186,7 @@ int main(int argc, char* argv[]) {
     Table<complex_float> csi_matrices_no_noise;
     csi_matrices_no_noise.Calloc(cfg->OfdmCaNum(),
                                  cfg->UeAntNum() * cfg->BsAntNum(),
-                                 Agora_memory::Alignment_t::k32Align);
+                                 Agora_memory::Alignment_t::kAlign32);
     for (size_t i = 0; i < cfg->UeAntNum() * cfg->BsAntNum(); i++) {
       complex_float csi = {static_cast<float>(distribution(generator)),
                            static_cast<float>(distribution(generator))};
@@ -200,7 +200,7 @@ int main(int argc, char* argv[]) {
     Table<complex_float> csi_matrices_pilot;
     csi_matrices_pilot.Calloc(cfg->OfdmCaNum(),
                               cfg->UeAntNum() * cfg->BsAntNum(),
-                              Agora_memory::Alignment_t::k32Align);
+                              Agora_memory::Alignment_t::kAlign32);
     for (size_t i = 0; i < cfg->UeAntNum() * cfg->BsAntNum(); i++) {
       for (size_t j = 0; j < cfg->OfdmCaNum(); j++) {
         complex_float noise = {static_cast<float>(distribution(generator)) *
@@ -216,7 +216,7 @@ int main(int argc, char* argv[]) {
     Table<complex_float> csi_matrices_data;
     csi_matrices_data.Calloc(cfg->OfdmCaNum(),
                              cfg->UeAntNum() * cfg->BsAntNum(),
-                             Agora_memory::Alignment_t::k32Align);
+                             Agora_memory::Alignment_t::kAlign32);
     for (size_t i = 0; i < cfg->UeAntNum() * cfg->BsAntNum(); i++) {
       for (size_t j = 0; j < cfg->OfdmCaNum(); j++) {
         complex_float noise = {static_cast<float>(distribution(generator)) *
@@ -232,7 +232,7 @@ int main(int argc, char* argv[]) {
     Table<complex_float> rx_data_all_symbols;
     rx_data_all_symbols.Calloc(cfg->Frame().NumTotalSyms(),
                                cfg->OfdmCaNum() * cfg->BsAntNum(),
-                               Agora_memory::Alignment_t::k64Align);
+                               Agora_memory::Alignment_t::kAlign64);
     for (size_t i = 0; i < cfg->Frame().NumTotalSyms(); i++) {
       arma::cx_fmat mat_input_data(
           reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
@@ -252,7 +252,7 @@ int main(int argc, char* argv[]) {
     // Compute precoder
     Table<complex_float> precoder;
     precoder.Calloc(cfg->OfdmCaNum(), cfg->UeAntNum() * cfg->BsAntNum(),
-                    Agora_memory::Alignment_t::k32Align);
+                    Agora_memory::Alignment_t::kAlign32);
     for (size_t i = 0; i < cfg->OfdmCaNum(); i++) {
       arma::cx_fmat mat_input(
           reinterpret_cast<arma::cx_float*>(csi_matrices_pilot[i]),
@@ -265,11 +265,11 @@ int main(int argc, char* argv[]) {
     Table<complex_float> equalized_data_all_symbols;
     equalized_data_all_symbols.Calloc(cfg->Frame().NumTotalSyms(),
                                       cfg->OfdmDataNum() * cfg->UeAntNum(),
-                                      Agora_memory::Alignment_t::k64Align);
+                                      Agora_memory::Alignment_t::kAlign64);
     Table<int8_t> demod_data_all_symbols;
     demod_data_all_symbols.Calloc(
         cfg->UeAntNum(), cfg->OfdmDataNum() * cfg->Frame().NumDataSyms() * 8,
-        Agora_memory::Alignment_t::k64Align);
+        Agora_memory::Alignment_t::kAlign64);
     for (size_t i = data_sym_start; i < cfg->Frame().NumTotalSyms(); i++) {
       arma::cx_fmat mat_rx_data(
           reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
@@ -331,13 +331,13 @@ int main(int argc, char* argv[]) {
     ldpc_decoder_5gnr_request.nRows = ldpc_config.NumRows();
     ldpc_decoder_5gnr_response.numMsgBits = ldpc_config.NumCbLen();
     auto* resp_var_nodes = static_cast<int16_t*>(
-        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::k64Align,
+        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                          1024 * 1024 * sizeof(int16_t)));
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
     Table<uint8_t> decoded_codewords;
     decoded_codewords.Calloc(num_codeblocks, cfg->OfdmDataNum(),
-                             Agora_memory::Alignment_t::k64Align);
+                             Agora_memory::Alignment_t::kAlign64);
     double freq_ghz = MeasureRdtscFreq();
     size_t start_tsc = WorkerRdtsc();
     for (size_t i = 0; i < cfg->UeAntNum(); i++) {

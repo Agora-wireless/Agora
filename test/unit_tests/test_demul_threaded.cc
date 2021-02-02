@@ -124,15 +124,15 @@ TEST(TestDemul, VaryingConfig) {
   Table<complex_float> equal_buffer;
   data_buffer.RandAllocCxFloat(cfg->Frame().NumULSyms() * kFrameWnd,
                                kMaxAntennas * kMaxDataSCs,
-                               Agora_memory::Alignment_t::k64Align);
+                               Agora_memory::Alignment_t::kAlign64);
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(kMaxAntennas *
                                                                 kMaxUEs);
   equal_buffer.Calloc(cfg->Frame().NumULSyms() * kFrameWnd,
                       kMaxDataSCs * kMaxUEs,
-                      Agora_memory::Alignment_t::k64Align);
+                      Agora_memory::Alignment_t::kAlign64);
   ue_spec_pilot_buffer.Calloc(kFrameWnd,
                               cfg->Frame().ClientUlPilotSymbols() * kMaxUEs,
-                              Agora_memory::Alignment_t::k64Align);
+                              Agora_memory::Alignment_t::kAlign64);
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers(
       kFrameWnd, cfg->Frame().NumTotalSyms(), cfg->UeNum(),
       kMaxModType * cfg->OfdmDataNum());

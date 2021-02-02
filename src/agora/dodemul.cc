@@ -28,15 +28,15 @@ DoDemul::DoDemul(
 
   data_gather_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k64Align,
+          Agora_memory::Alignment_t::kAlign64,
           kSCsPerCacheline * kMaxAntennas * sizeof(complex_float)));
   equaled_buffer_temp_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k64Align,
+          Agora_memory::Alignment_t::kAlign64,
           cfg_->DemulBlockSize() * kMaxUEs * sizeof(complex_float)));
   equaled_buffer_temp_transposed_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k64Align,
+          Agora_memory::Alignment_t::kAlign64,
           cfg_->DemulBlockSize() * kMaxUEs * sizeof(complex_float)));
 
   // phase offset calibration data
@@ -261,13 +261,13 @@ EventData DoDemul::Launch(size_t tag) {
                         (cfg_->ModOrderBits() * base_sc_id);
 
     switch (cfg_->ModOrderBits()) {
-      case (CommsLib::QPSK):
+      case (CommsLib::kQpsk):
         DemodQpskSoftSse(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
-      case (CommsLib::QAM16):
+      case (CommsLib::kQaM16):
         Demod16qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
-      case (CommsLib::QAM64):
+      case (CommsLib::kQaM64):
         Demod64qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
       default:

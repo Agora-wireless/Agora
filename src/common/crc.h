@@ -32,11 +32,11 @@
 
 class DoCRC {
  private:
-  const uint32_t kCrc24Table[256];
+  const uint32_t crc24_table_[256];
 
  public:
   DoCRC()
-      : kCrc24Table{
+      : crc24_table_{
             0x00000000u, 0x01864CFBu, 0x028AD50Du, 0x030C99F6u, 0x0493E6E1u,
             0x0515AA1Au, 0x061933ECu, 0x079F7F17u, 0x08A18139u, 0x0927CDC2u,
             0x0A2B5434u, 0x0BAD18CFu, 0x0C3267D8u, 0x0DB42B23u, 0x0EB8B2D5u,

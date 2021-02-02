@@ -29,14 +29,14 @@ DoZF::DoZF(Config* config, int tid,
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kZF, tid);
   pred_csi_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k64Align,
+          Agora_memory::Alignment_t::kAlign64,
           kMaxAntennas * kMaxUEs * sizeof(complex_float)));
   csi_gather_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::k64Align,
+          Agora_memory::Alignment_t::kAlign64,
           kMaxAntennas * kMaxUEs * sizeof(complex_float)));
   calib_gather_buffer_ = static_cast<complex_float*>(
-      Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::k64Align,
+      Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        kMaxAntennas * sizeof(complex_float)));
 }
 

@@ -60,10 +60,10 @@ class Agora {
 
  private:
   enum ScheduleProcessingFlags : uint8_t {
-    None = 0,
-    UplinkComplete = 0x1,
-    DownlinkComplete = 0x2,
-    ProcessingComplete = (UplinkComplete + DownlinkComplete)
+    kNone = 0,
+    kUplinkComplete = 0x1,
+    kDownlinkComplete = 0x2,
+    kProcessingComplete = (kUplinkComplete + kDownlinkComplete)
   };
   bool CheckWorkComplete(size_t frame_id);
   void CheckIncrementScheduleFrame(size_t frame_id,
@@ -141,7 +141,7 @@ class Agora {
   }
 
   // Worker thread i runs on core base_worker_core_offset + i
-  const size_t kBaseWorkerCoreOffset;
+  const size_t base_worker_core_offset_;
 
   Config* const config_;
   size_t fft_created_count_;
