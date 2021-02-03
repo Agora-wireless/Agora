@@ -153,6 +153,7 @@ int main() {
       delete[] decoded[i];
       std::free(llrs[i]);
     }
+        std::free(ldpc_decoder_5gnr_response.varNodes);
   }
 
   return 0;
