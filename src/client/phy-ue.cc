@@ -259,12 +259,8 @@ void PhyUe::Start() {
             dl_symbol_id = config_->Frame().GetDLSymbol(0);
           }
 
-          if ((symbol_id == 0)  // Beacon in Sim mode!
-              ||
-              ((config_->HwFramer() == false) &&
-               (ul_data_symbol_perframe_ == 0) && (symbol_id == dl_symbol_id) &&
-               ((ant_id % config_->NumChannels()) == 0))) {
-            // first DL symbols in downlink-only mode
+          if ((kUseArgos == false) &&
+              (symbol_id == 0)) {  // Beacon in Sim mode!
             EventData do_tx_pilot_task(
                 EventType::kPacketPilotTX,
                 gen_tag_t::FrmSymUe(
@@ -274,9 +270,11 @@ void PhyUe::Start() {
                          *tx_ptoks_ptr_[ant_id % rx_thread_num_]);
           }
 
-          if (ul_data_symbol_perframe_ > 0 &&
-              (symbol_id == 0 || symbol_id == dl_symbol_id) &&
-              ant_id % config_->NumChannels() == 0) {
+          if (ul_data_symbol_perframe_ > 0 &&  // schedule uplink syms
+              ((kUseArgos == false && symbol_id == 0) ||  // sym 0 in Sim mode
+               ((kUseArgos == true) && (symbol_id == dl_symbol_id) &&
+                (ant_id % config_->NumChannels() ==
+                 0)))) {  // first rx sym in hardware mode
             EventData do_encode_task(
                 EventType::kEncode,
                 gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
@@ -1108,8 +1106,7 @@ void PhyUe::DoIfft(int tid, size_t tag) {
                   sizeof(complex_float) * config_->OfdmDataStart());
       if (ul_symbol_id < config_->Frame().ClientUlPilotSymbols()) {
         std::memcpy(ifft_buff + config_->OfdmDataStart(),
-                    // TODO FIXME
-                    config_->UeSpecificPilot()[0],
+                    config_->UeSpecificPilot()[ant_id],
                     config_->OfdmDataNum() * sizeof(complex_float));
       } else {
         size_t total_ul_data_symbol_id =
