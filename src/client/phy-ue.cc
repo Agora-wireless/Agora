@@ -97,8 +97,6 @@ PhyUe::PhyUe(Config* config) {
     mac_std_thread_ = std::thread(&MacThread::RunEventLoop, mac_thread_);
   }
 
-  std::printf("initializing buffers...\n");
-
   // uplink buffers init (tx)
   InitializeUplinkBuffers();
   // downlink buffers init (rx)
@@ -260,7 +258,7 @@ void PhyUe::Start() {
           }
 
           if ((kUseArgos == false) &&
-              (symbol_id == 0)) {  // Beacon in Sim mode!
+              (symbol_id == this->config_->Frame().GetBeaconSymbolLast())) {
             EventData do_tx_pilot_task(
                 EventType::kPacketPilotTX,
                 gen_tag_t::FrmSymUe(
@@ -270,11 +268,13 @@ void PhyUe::Start() {
                          *tx_ptoks_ptr_[ant_id % rx_thread_num_]);
           }
 
-          if (ul_data_symbol_perframe_ > 0 &&  // schedule uplink syms
-              ((kUseArgos == false && symbol_id == 0) ||  // sym 0 in Sim mode
+          // schedule uplink syms
+          if ((ul_data_symbol_perframe_ > 0) &&
+              (((kUseArgos == false) &&
+                (symbol_id == this->config_->Frame().GetBeaconSymbolLast())) ||
                ((kUseArgos == true) && (symbol_id == dl_symbol_id) &&
-                (ant_id % config_->NumChannels() ==
-                 0)))) {  // first rx sym in hardware mode
+                // first rx sym in hardware mode
+                (ant_id % config_->NumChannels() == 0)))) {
             EventData do_encode_task(
                 EventType::kEncode,
                 gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);

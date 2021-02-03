@@ -64,7 +64,14 @@ class ChannelSim {
   void* TaskThread(int tid);
 
  private:
-  std::vector<struct sockaddr_in> servaddr_bs_;  // BS-facing server addresses
+  void DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
+            std::vector<char>& tx_buffer, size_t buffer_offset,
+            std::vector<int>& send_socket,
+            std::vector<struct sockaddr_in>& servaddr,
+            arma::cx_fmat& format_dest);
+
+  std::vector<struct sockaddr_in> servaddr_bs_;  // BS-facing server
+                                                 // addresses
   std::vector<int> socket_bs_;                   // BS-facing sockets
   std::vector<struct sockaddr_in> servaddr_ue_;  // UE-facing server addresses
   std::vector<int> socket_ue_;                   // UE-facing sockets
@@ -113,16 +120,8 @@ class ChannelSim {
 
   size_t* bs_rx_counter_;
   size_t* user_rx_counter_;
-  size_t bs_tx_counter_[kFrameWnd];
-  size_t user_tx_counter_[kFrameWnd];
-
-  inline size_t GetDlSymbolIdx(size_t frame_id, size_t symbol_id) const {
-    if (symbol_id == 0) {
-      return 0;
-    } else {
-      return bscfg_->GetDLSymbolIdx(frame_id, symbol_id) + 1;
-    }
-  }
+  std::array<size_t, kFrameWnd> bs_tx_counter_;
+  std::array<size_t, kFrameWnd> user_tx_counter_;
 };
 
 #endif  // CHANNEL_SIM_H_
