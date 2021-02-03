@@ -28,7 +28,7 @@ Config::Config(const std::string& jsonfile)
     }
   }
   std::string serial_file = tdd_conf.value("irises", "");
-  ref_ant_ = tdd_conf.value("ref_ant_", 0);
+  ref_ant_ = tdd_conf.value("ref_ant", 0);
   external_ref_node_ = tdd_conf.value("external_ref_node", false);
   num_cells_ = tdd_conf.value("cells", 1);
   channel_ = tdd_conf.value("channel", "A");
