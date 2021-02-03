@@ -60,14 +60,15 @@ int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   std::unique_ptr<Config> cfg(new Config(FLAGS_conf_file.c_str()));
 
-  const DataGenerator::Profile profile = FLAGS_profile == "123"
-                                             ? DataGenerator::Profile::kProfile123
-                                             : DataGenerator::Profile::kRandom;
+  const DataGenerator::Profile profile =
+      FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123
+                             : DataGenerator::Profile::kRandom;
   DataGenerator data_generator(cfg.get(), 0 /* RNG seed */, profile);
 
-  std::printf("DataGenerator: Config file: %s, data profile = %s\n",
-              FLAGS_conf_file.c_str(),
-              profile == DataGenerator::Profile::kProfile123 ? "123" : "random");
+  std::printf(
+      "DataGenerator: Config file: %s, data profile = %s\n",
+      FLAGS_conf_file.c_str(),
+      profile == DataGenerator::Profile::kProfile123 ? "123" : "random");
 
   std::printf("DataGenerator: Using %s-orthogonal pilots\n",
               cfg->FreqOrthogonalPilot() ? "frequency" : "time");

@@ -29,9 +29,9 @@ int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   auto cfg = std::make_unique<Config>(FLAGS_conf_file.c_str());
 
-  const DataGenerator::Profile profile = FLAGS_profile == "123"
-                                             ? DataGenerator::Profile::kProfile123
-                                             : DataGenerator::Profile::kRandom;
+  const DataGenerator::Profile profile =
+      FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123
+                             : DataGenerator::Profile::kRandom;
   std::unique_ptr<DataGenerator> data_generator =
       std::make_unique<DataGenerator>(cfg.get(), 0 /* RNG seed */, profile);
 

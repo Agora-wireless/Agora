@@ -36,7 +36,7 @@ inline __m256i CycleBitShift2to64(__m256i data, int16_t cyc_shift, int16_t zc) {
 inline __m256i CycleBitShift72to128(__m256i data, int16_t cyc_shift,
                                     int16_t zc) {
   /* when zc is 88 or 104 or 120 */
-    int8_t shuffle_table[9][32] = {
+  int8_t shuffle_table[9][32] = {
       {0, 1, 2,  3,  4,  5,  6,  7,  8,  0,  1,  2,  3,  4,  5,  6,
        7, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},  // 72
       {0, 1, 2, 3, 4,  5,  6,  7,  8,  9,  0,  1,  2,  3,  4,  5,
@@ -53,8 +53,9 @@ inline __m256i CycleBitShift72to128(__m256i data, int16_t cyc_shift,
        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, -1, -1},  // 120
       {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},  // 128
-      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-       0, 0, 0, 0, 0, 0, 0, 0, 0 }, // padding to avoid memory overrun
+      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},  // padding to avoid memory
+                                                      // overrun
   };
 
   __m256i x0;
