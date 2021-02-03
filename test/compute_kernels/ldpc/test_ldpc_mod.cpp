@@ -233,7 +233,14 @@ int main(int argc, char* argv[])
             noise_levels[noise_id], snr_levels[noise_id], error_num, total,
             1.f * error_num / total, block_error_num, num_codeblocks,
             1.f * block_error_num / num_codeblocks);
+
+        modulated_codewords.free();
+        demod_data_all_symbols.free();
+        decoded_codewords.free();
+        std::free(resp_var_nodes);
     }
+
+    delete cfg;
 
     return 0;
 }
