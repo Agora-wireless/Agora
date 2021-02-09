@@ -52,6 +52,7 @@ else()
   set( CMAKE_VERBOSE_MAKEFILE on )
   message(STATUS "Debugging is enabled. Performance will be low")
   set(CMAKE_BUILD_TYPE Debug)
+  #set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wshadow -ggdb3 -fstack-protector-all -fsanitize=undefined -fsanitize=address -fsanitize=null")
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ggdb3 -fstack-protector-all -fsanitize=undefined -fsanitize=address -fsanitize=null")
   #-fsanitize=thread- fstack-protector-all -fsanitize=address -fstack-check
   #-fsanitize=address -fsanitize=pointer-compare
@@ -71,7 +72,7 @@ find_package(Armadillo)
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
-set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
+set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 set(USE_AVX2_ENCODER False CACHE STRING "Use Agora's AVX2 encoder instead of FlexRAN's AVX512 encoder")
 # TODO: add SoapyUHD check
@@ -201,59 +202,59 @@ include_directories(
   src/agora/txrx/
   src/client/
   /usr/include/mkl/
-  data/data_generator)
+  src/data_generator)
 
 include_directories(SYSTEM src/third_party)
 
 set(COMMON_SOURCES
-  src/common/config.cpp
-  src/common/utils.cpp
-  src/common/comms-lib.cpp
-  src/common/comms-lib-avx.cpp
-  src/common/signalHandler.cpp
-  src/common/modulation.cpp
-  src/common/modulation_srslte.cpp
-  src/common/net.cpp
-  src/common/crc.cpp
+  src/common/config.cc
+  src/common/utils.cc
+  src/common/comms-lib.cc
+  src/common/comms-lib-avx.cc
+  src/common/signal_handler.cc
+  src/common/modulation.cc
+  src/common/modulation_srslte.cc
+  src/common/net.cc
+  src/common/crc.cc
   src/common/memory_manage.cc
-  src/encoder/cyclic_shift.cpp
-  src/encoder/encoder.cpp
-  src/encoder/iobuffer.cpp)
+  src/encoder/cyclic_shift.cc
+  src/encoder/encoder.cc
+  src/encoder/iobuffer.cc)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(AGORA_SOURCES 
-  src/agora/agora.cpp
-  src/agora/stats.cpp 
-  src/agora/phy_stats.cpp 
-  src/agora/dofft.cpp
-  src/agora/dozf.cpp
-  src/agora/dodemul.cpp
-  src/agora/doprecode.cpp
-  src/agora/docoding.cpp
-  src/agora/radio_lib.cpp
-  src/agora/radio_calibrate.cpp
-  src/mac/mac_thread.cpp)
+  src/agora/agora.cc
+  src/agora/stats.cc
+  src/agora/phy_stats.cc
+  src/agora/dofft.cc
+  src/agora/dozf.cc
+  src/agora/dodemul.cc
+  src/agora/doprecode.cc
+  src/agora/docoding.cc
+  src/agora/radio_lib.cc
+  src/agora/radio_calibrate.cc
+  src/mac/mac_thread.cc)
 
 if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
   set(AGORA_SOURCES ${AGORA_SOURCES} 
-    src/agora/txrx/txrx_DPDK.cpp
-    src/common/dpdk_transport.cpp)
+    src/agora/txrx/txrx_DPDK.cc
+    src/common/dpdk_transport.cc)
 else()
   set(AGORA_SOURCES ${AGORA_SOURCES} 
-    src/agora/txrx/txrx.cpp
-    src/agora/txrx/txrx_argos.cpp
-    src/agora/txrx/txrx_usrp.cpp)
+    src/agora/txrx/txrx.cc
+    src/agora/txrx/txrx_argos.cc
+    src/agora/txrx/txrx_usrp.cc)
 endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
-  src/client/client_radio.cpp
-  src/client/phy-ue.cpp
-  src/client/txrx_client.cpp
-  src/mac/mac_thread.cpp)
+  src/client/client_radio.cc
+  src/client/phy-ue.cc
+  src/client/txrx_client.cc
+  src/mac/mac_thread.cc)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
-
+  
 include_directories(
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
@@ -272,50 +273,50 @@ set(COMMON_LIBS armadillo -lnuma ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
 # test if compiling against precompiled objects instead of compiling directly
 # against sources reduces performance.
 add_executable(agora
-  src/agora/main.cpp
+  src/agora/main.cc
   $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(agora ${COMMON_LIBS})
 
 add_executable(data_generator
-  ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(data_generator ${COMMON_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
 add_executable(user
-  src/client/user-main.cpp
+  src/client/user-main.cc
   $<TARGET_OBJECTS:client_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(user ${COMMON_LIBS})
 
 add_executable(sender
-  simulator/sender_cli.cpp
-  simulator/sender.cpp
-  src/common/dpdk_transport.cpp
+  simulator/sender_cli.cc
+  simulator/sender.cc
+  src/common/dpdk_transport.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sender ${COMMON_LIBS})
 
 add_executable(sim
-  simulator/main.cpp
-  simulator/simulator.cpp
-  simulator/sender.cpp
-  simulator/receiver.cpp
-  src/common/dpdk_transport.cpp
+  simulator/main.cc
+  simulator/simulator.cc
+  simulator/sender.cc
+  simulator/receiver.cc
+  src/common/dpdk_transport.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
 
 add_executable(chsim
-  simulator/chsim_main.cpp
-  simulator/channel_sim.cpp
-  simulator/channel.cpp
+  simulator/chsim_main.cc
+  simulator/channel_sim.cc
+  simulator/channel.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(chsim ${COMMON_LIBS})
 
 
 # End-to-end test
 add_executable(test_agora
-  test/test_agora/main.cpp
+  test/test_agora/main.cc
   $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_agora ${COMMON_LIBS})
@@ -324,7 +325,7 @@ target_link_libraries(test_agora ${COMMON_LIBS})
 set(LDPC_TESTS test_ldpc test_ldpc_mod test_ldpc_baseband)
 foreach(test_name IN LISTS LDPC_TESTS)
   add_executable(${test_name}
-    test/compute_kernels/ldpc/${test_name}.cpp
+    test/compute_kernels/ldpc/${test_name}.cc
     $<TARGET_OBJECTS:common_sources_lib>)
   # Unit tests should pass without memory errors
   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")

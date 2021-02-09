@@ -15,7 +15,7 @@
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
-#include "Symbols.hpp"
+#include "symbols.h"
 #include <armadillo>
 #include <atomic>
 #include <chrono>

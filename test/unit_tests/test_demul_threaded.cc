@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 // For some reason, gtest include order matters
 #include "concurrentqueue.h"
-#include "config.hpp"
-#include "dodemul.hpp"
+#include "config.h"
+#include "dodemul.h"
 #include "gettime.h"
-#include "phy_stats.hpp"
+#include "phy_stats.h"
 #include "utils.h"
 #include <thread>
 

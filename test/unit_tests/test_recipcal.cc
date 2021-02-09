@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 // For some reason, gtest include order matters
-#include "config.hpp"
+#include "config.h"
 #include "gettime.h"
 #include "utils.h"
 #include <armadillo>
