@@ -6,25 +6,22 @@
 using std::runtime_error;
 
 class SignalException : public runtime_error {
-public:
-    SignalException(const std::string& _message)
-        : std::runtime_error(_message)
-    {
-    }
+ public:
+  SignalException(const std::string& _message) : std::runtime_error(_message) {}
 };
 
 class SignalHandler {
-protected:
-    static bool mb_got_exit_signal;
+ protected:
+  static bool mb_got_exit_signal;
 
-public:
-    SignalHandler();
-    ~SignalHandler();
+ public:
+  SignalHandler();
+  ~SignalHandler();
 
-    static bool GotExitSignal();
-    static void SetExitSignal(bool _bExitSignal);
+  static bool GotExitSignal();
+  static void SetExitSignal(bool _bExitSignal);
 
-    void SetupSignalHandlers();
-    static void ExitSignalHandler(int _ignored);
+  void SetupSignalHandlers();
+  static void ExitSignalHandler(int _ignored);
 };
 #endif

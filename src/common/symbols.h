@@ -2,6 +2,7 @@
 #define SYMBOLS
 
 #include <mkl.h>
+
 #include <string>
 
 #define EXPORT __attribute__((visibility("default")))
@@ -27,64 +28,64 @@ static constexpr size_t kFrameWnd = 40;
 #endif
 
 /// Return true at compile time iff a constant is a power of two
-template <typename T> static constexpr inline bool IsPowerOfTwo(T x)
-{
-    return x && ((x & T(x - 1)) == 0);
+template <typename T>
+static constexpr inline bool IsPowerOfTwo(T x) {
+  return x && ((x & T(x - 1)) == 0);
 }
 
 // TODO: Merge EventType and DoerType into WorkType
 enum class EventType : int {
-    kPacketRX,
-    kFFT,
-    kZF,
-    kDemul,
-    kIFFT,
-    kPrecode,
-    kPacketTX,
-    kPacketPilotTX,
-    kDecode,
-    kEncode,
-    kModul,
-    kPacketFromMac,
-    kPacketToMac,
-    kSNRReport, // Signal new SNR measurement from PHY to MAC
-    kRANUpdate, // Signal new RAN config to Agora
-    kRBIndicator // Signal RB schedule to UEs
+  kPacketRX,
+  kFFT,
+  kZF,
+  kDemul,
+  kIFFT,
+  kPrecode,
+  kPacketTX,
+  kPacketPilotTX,
+  kDecode,
+  kEncode,
+  kModul,
+  kPacketFromMac,
+  kPacketToMac,
+  kSNRReport,   // Signal new SNR measurement from PHY to MAC
+  kRANUpdate,   // Signal new RAN config to Agora
+  kRBIndicator  // Signal RB schedule to UEs
 };
-static constexpr size_t kNumEventTypes
-    = static_cast<size_t>(EventType::kPacketToMac) + 1;
+static constexpr size_t kNumEventTypes =
+    static_cast<size_t>(EventType::kPacketToMac) + 1;
 
 // Types of Agora Doers
 enum class DoerType : size_t {
-    kFFT,
-    kCSI,
-    kZF,
-    kDemul,
-    kDecode,
-    kEncode,
-    kIFFT,
-    kPrecode,
-    kRC
+  kFFT,
+  kCSI,
+  kZF,
+  kDemul,
+  kDecode,
+  kEncode,
+  kIFFT,
+  kPrecode,
+  kRC
 };
 static constexpr size_t kNumDoerTypes = static_cast<size_t>(DoerType::kRC) + 1;
 
 enum class PrintType : int {
-    kPacketRXPilots,
-    kPacketRX,
-    kFFTPilots,
-    kFFTData,
-    kFFTCal,
-    kZF,
-    kDemul,
-    kIFFT,
-    kPrecode,
-    kPacketTXFirst,
-    kPacketTX,
-    kDecode,
-    kEncode,
-    kRC,
-    kPacketFromMac,
-    kPacketToMac
+  kPacketRXPilots,
+  kPacketRX,
+  kFFTPilots,
+  kFFTData,
+  kFFTCal,
+  kZF,
+  kDemul,
+  kIFFT,
+  kPrecode,
+  kPacketTXFirst,
+  kPacketTX,
+  kDecode,
+  kEncode,
+  kRC,
+  kPacketFromMac,
+  kPacketToMac
 };
 
 // Enable thread pinning and exit if thread pinning fails. Thread pinning is
@@ -145,60 +146,59 @@ static constexpr bool kDebugRadioRX = false;
 static constexpr bool kLogMacPackets = true;
 
 enum class ThreadType {
-    kMaster,
-    kWorker,
-    kWorkerFFT,
-    kWorkerZF,
-    kWorkerDemul,
-    kWorkerDecode,
-    kWorkerRX,
-    kWorkerTX,
-    kWorkerTXRX,
-    kWorkerMacTXRX,
-    kMasterRX,
-    kMasterTX,
+  kMaster,
+  kWorker,
+  kWorkerFFT,
+  kWorkerZF,
+  kWorkerDemul,
+  kWorkerDecode,
+  kWorkerRX,
+  kWorkerTX,
+  kWorkerTXRX,
+  kWorkerMacTXRX,
+  kMasterRX,
+  kMasterTX,
 };
 
-static inline std::string ThreadTypeStr(ThreadType thread_type)
-{
-    switch (thread_type) {
+static inline std::string ThreadTypeStr(ThreadType thread_type) {
+  switch (thread_type) {
     case ThreadType::kMaster:
-        return "Master";
+      return "Master";
     case ThreadType::kWorker:
-        return "Worker";
+      return "Worker";
     case ThreadType::kWorkerFFT:
-        return "Worker (FFT)";
+      return "Worker (FFT)";
     case ThreadType::kWorkerZF:
-        return "Worker (ZF)";
+      return "Worker (ZF)";
     case ThreadType::kWorkerDemul:
-        return "Worker (Demul)";
+      return "Worker (Demul)";
     case ThreadType::kWorkerDecode:
-        return "Worker (Decode)";
+      return "Worker (Decode)";
     case ThreadType::kWorkerRX:
-        return "RX";
+      return "RX";
     case ThreadType::kWorkerTX:
-        return "TX";
+      return "TX";
     case ThreadType::kWorkerTXRX:
-        return "TXRX";
+      return "TXRX";
     case ThreadType::kWorkerMacTXRX:
-        return "MAC TXRX";
+      return "MAC TXRX";
     case ThreadType::kMasterRX:
-        return "Master (RX)";
+      return "Master (RX)";
     case ThreadType::kMasterTX:
-        return "Master (TX)";
-    }
-    return "Invalid thread type";
+      return "Master (TX)";
+  }
+  return "Invalid thread type";
 }
 
 enum class SymbolType {
-    kBeacon,
-    kUL,
-    kDL,
-    kPilot,
-    kCalDL,
-    kCalUL,
-    kGuard,
-    kUnknown
+  kBeacon,
+  kUL,
+  kDL,
+  kPilot,
+  kCalDL,
+  kCalUL,
+  kGuard,
+  kUnknown
 };
 
 // Intervals for beacon detection at the client (in frames)
@@ -238,7 +238,7 @@ static constexpr size_t kSCsPerCacheline = 64 / (2 * sizeof(float));
 
 // Number of subcarriers in a partial transpose block
 static constexpr size_t kTransposeBlockSize = 8;
-static_assert(IsPowerOfTwo(kTransposeBlockSize), ""); // For cheap modulo
+static_assert(IsPowerOfTwo(kTransposeBlockSize), "");  // For cheap modulo
 static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
 
 static constexpr size_t kCalibScGroupSize = 8;
