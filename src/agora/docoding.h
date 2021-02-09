@@ -12,7 +12,7 @@
 #include "config.h"
 #include "doer.h"
 #include "encoder.h"
-#include "gettime.h"
+#include "gettime.inc"
 #include "iobuffer.h"
 #include "memory_manage.h"
 #include "modulation.h"

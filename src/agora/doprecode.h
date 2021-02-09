@@ -9,7 +9,7 @@
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
-#include "gettime.h"
+#include "gettime.inc"
 #include "memory_manage.h"
 #include "modulation.h"
 #include "stats.h"

@@ -22,7 +22,7 @@
 #include "buffer.inc"
 #include "concurrentqueue.h"
 #include "config.h"
-#include "gettime.h"
+#include "gettime.inc"
 #include "net.h"
 #include "symbols.h"
 

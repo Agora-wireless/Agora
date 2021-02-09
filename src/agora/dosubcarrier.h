@@ -13,7 +13,7 @@
 #include "doer.h"
 #include "doprecode.h"
 #include "dozf.h"
-#include "gettime.h"
+#include "gettime.inc"
 #include "modulation.h"
 #include "phy_stats.h"
 #include "shared_counters.hpp"
@@ -254,26 +254,26 @@ class DoSubcarrier : public Doer {
             __m256 fft_result1 =
                 _mm256_load_ps(reinterpret_cast<const float*>(src + 4));
             __m256 pilot_tx0 = _mm256_set_ps(
-                cfg->pilots_sgn_[sc_idx + 3 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 3 + pilots_sgn_offset].re,
-                cfg->pilots_sgn_[sc_idx + 2 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 2 + pilots_sgn_offset].re,
-                cfg->pilots_sgn_[sc_idx + 1 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 1 + pilots_sgn_offset].re,
-                cfg->pilots_sgn_[sc_idx + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + pilots_sgn_offset].re);
+                cfg->PilotsSgn()[sc_idx + 3 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 3 + pilots_sgn_offset].re,
+                cfg->PilotsSgn()[sc_idx + 2 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 2 + pilots_sgn_offset].re,
+                cfg->PilotsSgn()[sc_idx + 1 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 1 + pilots_sgn_offset].re,
+                cfg->PilotsSgn()[sc_idx + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + pilots_sgn_offset].re);
             fft_result0 = CommsLib::__m256_complex_cf32_mult(fft_result0,
                                                              pilot_tx0, true);
 
             __m256 pilot_tx1 = _mm256_set_ps(
-                cfg->pilots_sgn_[sc_idx + 7 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 7 + pilots_sgn_offset].re,
-                cfg->pilots_sgn_[sc_idx + 6 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 6 + pilots_sgn_offset].re,
-                cfg->pilots_sgn_[sc_idx + 5 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 5 + pilots_sgn_offset].re,
-                cfg->pilots_sgn_[sc_idx + 4 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 4 + pilots_sgn_offset].re);
+                cfg->PilotsSgn()[sc_idx + 7 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 7 + pilots_sgn_offset].re,
+                cfg->PilotsSgn()[sc_idx + 6 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 6 + pilots_sgn_offset].re,
+                cfg->PilotsSgn()[sc_idx + 5 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 5 + pilots_sgn_offset].re,
+                cfg->PilotsSgn()[sc_idx + 4 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 4 + pilots_sgn_offset].re);
             fft_result1 = CommsLib::__m256_complex_cf32_mult(fft_result1,
                                                              pilot_tx1, true);
             _mm256_stream_ps(reinterpret_cast<float*>(dst), fft_result0);

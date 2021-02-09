@@ -20,7 +20,7 @@
 #include "concurrentqueue.h"
 #include "config.h"
 #include "datatype_conversion.inc"
-#include "gettime.h"
+#include "gettime.inc"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 #include "net.h"

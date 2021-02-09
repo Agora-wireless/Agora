@@ -6,7 +6,7 @@
 #include "concurrentqueue.h"
 #include "config.h"
 #include "crc.h"
-#include "gettime.h"
+#include "gettime.inc"
 #include "net.h"
 #include "ran_config.h"
 #include "symbols.h"

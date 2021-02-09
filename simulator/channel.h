@@ -11,7 +11,7 @@
 
 #include "buffer.inc"
 #include "config.h"
-#include "gettime.h"
+#include "gettime.inc"
 #include "memory_manage.h"
 #include "signal_handler.h"
 #include "symbols.h"

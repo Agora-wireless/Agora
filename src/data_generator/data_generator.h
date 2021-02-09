@@ -38,12 +38,15 @@ class DataGenerator {
    */
   void GenCodeblock(std::vector<int8_t>& information,
                     std::vector<int8_t>& encoded_codeword, size_t ue_id) {
-    const LDPCconfig& lc = cfg_->ldpc_config_;
+    const LDPCconfig& lc = cfg_->LdpcConfig();
     std::vector<int8_t> parity;
-    parity.resize(LdpcEncodingParityBufSize(lc.bg_, lc.zc_));
+    parity.resize(
+        LdpcEncodingParityBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
 
-    information.resize(LdpcEncodingInputBufSize(lc.bg_, lc.zc_));
-    encoded_codeword.resize(LdpcEncodingEncodedBufSize(lc.bg_, lc.zc_));
+    information.resize(
+        LdpcEncodingInputBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
+    encoded_codeword.resize(
+        LdpcEncodingEncodedBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
 
     for (size_t i = 0; i < lc.NumInputBytes(); i++) {
       if (profile_ == Profile::kRandom) {
@@ -53,8 +56,9 @@ class DataGenerator {
       }
     }
 
-    LdpcEncodeHelper(cfg_->ldpc_config_.bg_, cfg_->ldpc_config_.zc_,
-                     cfg_->ldpc_config_.n_rows_, &encoded_codeword.at(0),
+    LdpcEncodeHelper(cfg_->LdpcConfig().BaseGraph(),
+                     cfg_->LdpcConfig().ExpansionFactor(),
+                     cfg_->LdpcConfig().NumRows(), &encoded_codeword.at(0),
                      &parity.at(0), &information.at(0));
 
     information.resize(lc.NumInputBytes());
@@ -68,30 +72,29 @@ class DataGenerator {
    */
   std::vector<complex_float> GetModulation(
       const std::vector<int8_t>& encoded_codeword) {
-    std::vector<complex_float> modulated_codeword(cfg_->ofdm_data_num_);
-    std::vector<uint8_t> mod_input(cfg_->ofdm_data_num_);
+    std::vector<complex_float> modulated_codeword(cfg_->OfdmDataNum());
+    std::vector<uint8_t> mod_input(cfg_->OfdmDataNum());
 
     AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-                    &mod_input[0], cfg_->ldpc_config_.NumEncodedBytes(),
-                    cfg_->mod_order_bits_);
+                    &mod_input[0], cfg_->LdpcConfig().NumEncodedBytes(),
+                    cfg_->ModOrderBits());
 
-    for (size_t i = 0; i < cfg_->ofdm_data_num_; i++) {
-      modulated_codeword[i] = ModSingleUint8(mod_input[i], cfg_->mod_table_);
+    for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
+      modulated_codeword[i] = ModSingleUint8(mod_input[i], cfg_->ModTable());
     }
     return modulated_codeword;
   }
 
   std::vector<complex_float> GetModulation(const int8_t* encoded_codeword,
                                            size_t num_bits) {
-    std::vector<complex_float> modulated_codeword(cfg_->ofdm_data_num_);
-    std::vector<uint8_t> mod_input(cfg_->ofdm_data_num_);
+    std::vector<complex_float> modulated_codeword(cfg_->OfdmDataNum());
+    std::vector<uint8_t> mod_input(cfg_->OfdmDataNum());
 
     AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-                    &mod_input[0], BitsToBytes(num_bits),
-                    cfg_->mod_order_bits_);
+                    &mod_input[0], BitsToBytes(num_bits), cfg_->ModOrderBits());
 
-    for (size_t i = 0; i < cfg_->ofdm_data_num_; i++) {
-      modulated_codeword[i] = ModSingleUint8(mod_input[i], cfg_->mod_table_);
+    for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
+      modulated_codeword[i] = ModSingleUint8(mod_input[i], cfg_->ModTable());
     }
     return modulated_codeword;
   }
@@ -104,10 +107,9 @@ class DataGenerator {
    */
   std::vector<complex_float> BinForIfft(
       const std::vector<complex_float> modulated_codeword) const {
-    std::vector<complex_float> pre_ifft_symbol(cfg_->ofdm_ca_num_);  // Zeroed
-    std::memcpy(&pre_ifft_symbol[cfg_->ofdm_data_start_],
-                &modulated_codeword[0],
-                cfg_->ofdm_data_num_ * sizeof(complex_float));
+    std::vector<complex_float> pre_ifft_symbol(cfg_->OfdmCaNum());  // Zeroed
+    std::memcpy(&pre_ifft_symbol[cfg_->OfdmDataStart()], &modulated_codeword[0],
+                cfg_->OfdmDataNum() * sizeof(complex_float));
 
     return pre_ifft_symbol;
   }
@@ -115,15 +117,15 @@ class DataGenerator {
   /// Return the time-domain pilot symbol with OFDM_CA_NUM complex floats
   std::vector<complex_float> GetCommonPilotTimeDomain() const {
     const std::vector<std::complex<float>> zc_seq = Utils::DoubleToCfloat(
-        CommsLib::GetSequence(cfg_->ofdm_data_num_, CommsLib::kLteZadoffChu));
+        CommsLib::GetSequence(cfg_->OfdmDataNum(), CommsLib::kLteZadoffChu));
 
     const std::vector<std::complex<float>> zc_common_pilot =
         CommsLib::SeqCyclicShift(zc_seq, M_PI / 4.0);  // Used in LTE SRS
 
-    std::vector<complex_float> ret(cfg_->ofdm_ca_num_);  // Zeroed
-    for (size_t i = 0; i < cfg_->ofdm_data_num_; i++) {
-      ret[i + cfg_->ofdm_data_start_] = {zc_common_pilot[i].real(),
-                                         zc_common_pilot[i].imag()};
+    std::vector<complex_float> ret(cfg_->OfdmCaNum());  // Zeroed
+    for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
+      ret[i + cfg_->OfdmDataStart()] = {zc_common_pilot[i].real(),
+                                        zc_common_pilot[i].imag()};
     }
 
     return ret;
