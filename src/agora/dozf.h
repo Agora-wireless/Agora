@@ -39,18 +39,18 @@ public:
      *     2. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(size_t tag);
+    EventData launch(size_t tag);
 
 private:
-    void ZF_time_orthogonal(size_t tag);
+    void ZfTimeOrthogonal(size_t tag);
 
     /// Compute the uplink zeroforcing detector matrix and/or the downlink
     /// zeroforcing precoder using this CSI matrix and calibration buffer
-    void compute_precoder(const arma::cx_fmat& mat_csi,
-        complex_float* calib_buf, complex_float* mat_ul_zf,
+    void ComputePrecoder(const arma::cx_fmat& mat_csi,
+        complex_float* calib_ptr, complex_float* mat_ul_zf,
         complex_float* mat_dl_zf);
 
-    void ZF_freq_orthogonal(size_t tag);
+    void ZfFreqOrthogonal(size_t tag);
 
     /**
      * Do prediction task for one subcarrier
@@ -77,16 +77,16 @@ private:
     void Predict(size_t offset);
 
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
-    complex_float* pred_csi_buffer;
+    complex_float* pred_csi_buffer_;
     Table<complex_float> calib_dl_buffer_;
     Table<complex_float> calib_ul_buffer_;
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;
-    DurationStat* duration_stat;
+    DurationStat* duration_stat_;
 
-    complex_float* csi_gather_buffer; // Intermediate buffer to gather CSI
+    complex_float* csi_gather_buffer_; // Intermediate buffer to gather CSI
     // Intermediate buffer to gather reciprical calibration data vector
-    complex_float* calib_gather_buffer;
+    complex_float* calib_gather_buffer_;
 };
 
 #endif

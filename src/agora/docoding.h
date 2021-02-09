@@ -27,16 +27,16 @@ public:
         Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager);
     ~DoEncode();
 
-    Event_data launch(size_t tag);
+    EventData launch(size_t tag);
 
 private:
     Table<int8_t>& raw_data_buffer_;
-    int8_t* parity_buffer; // Intermediate buffer to hold LDPC encoding parity
+    int8_t* parity_buffer_; // Intermediate buffer to hold LDPC encoding parity
 
     // Intermediate buffer to hold LDPC encoding output
-    int8_t* encoded_buffer_temp;
+    int8_t* encoded_buffer_temp_;
     Table<int8_t>& encoded_buffer_;
-    DurationStat* duration_stat;
+    DurationStat* duration_stat_;
 };
 
 class DoDecode : public Doer {
@@ -47,14 +47,14 @@ public:
         PhyStats* in_phy_stats, Stats* in_stats_manager);
     ~DoDecode();
 
-    Event_data launch(size_t tag);
+    EventData launch(size_t tag);
 
 private:
-    int16_t* resp_var_nodes;
+    int16_t* resp_var_nodes_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers_;
-    PhyStats* phy_stats;
-    DurationStat* duration_stat;
+    PhyStats* phy_stats_;
+    DurationStat* duration_stat_;
 };
 
 #endif

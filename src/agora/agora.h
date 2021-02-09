@@ -34,35 +34,35 @@ public:
 
     static const int kMaxWorkerNum = 50; // Max number of worker threads allowed
 
-    Agora(Config*); /// Create an Agora object and start the worker threads
+    Agora(Config* /*cfg*/); /// Create an Agora object and start the worker threads
     ~Agora();
 
-    void start(); /// The main Agora event loop
-    void stop();
+    void Start(); /// The main Agora event loop
+    void Stop();
 
-    void worker_fft(int tid);
-    void worker_zf(int tid);
-    void worker_demul(int tid);
-    void worker_decode(int tid);
-    void worker(int tid);
+    void WorkerFft(int tid);
+    void WorkerZf(int tid);
+    void WorkerDemul(int tid);
+    void WorkerDecode(int tid);
+    void Worker(int tid);
 
-    void create_threads(); /// Launch worker threads
+    void CreateThreads(); /// Launch worker threads
 
-    void handle_event_fft(size_t tag);
-    void update_rx_counters(size_t frame_id, size_t symbol_id);
-    void print_per_frame_done(PrintType print_type, size_t frame_id);
-    void print_per_symbol_done(
+    void HandleEventFft(size_t tag);
+    void UpdateRxCounters(size_t frame_id, size_t symbol_id);
+    void PrintPerFrameDone(PrintType print_type, size_t frame_id);
+    void PrintPerSymbolDone(
         PrintType print_type, size_t frame_id, size_t symbol_id);
-    void print_per_task_done(PrintType print_type, size_t frame_id,
+    void PrintPerTaskDone(PrintType print_type, size_t frame_id,
         size_t symbol_id, size_t ant_or_sc_id);
 
     /// Update Agora's RAN config parameters
-    void update_ran_config(RanConfig rc);
+    void UpdateRanConfig(RanConfig rc);
 
-    void schedule_subcarriers(
-        EventType task_type, size_t frame_id, size_t symbol_id);
-    void schedule_antennas(
-        EventType task_type, size_t frame_id, size_t symbol_id);
+    void ScheduleSubcarriers(
+        EventType event_type, size_t frame_id, size_t symbol_id);
+    void ScheduleAntennas(
+        EventType event_type, size_t frame_id, size_t symbol_id);
 
     /**
      * @brief Schedule LDPC decoding or encoding over code blocks
@@ -71,76 +71,76 @@ public:
      * @param symbol_idx The index of the symbol among uplink symbols for LDPC
      * decoding, and among downlink symbols for LDPC encoding
      */
-    void schedule_codeblocks(
-        EventType task_type, size_t frame_id, size_t symbol_idx);
+    void ScheduleCodeblocks(
+        EventType event_type, size_t frame_id, size_t symbol_idx);
 
-    void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
+    void ScheduleUsers(EventType event_type, size_t frame_id, size_t symbol_id);
 
     // Send current frame's SNR measurements from PHY to MAC
-    void send_snr_report(
+    void SendSnrReport(
         EventType event_type, size_t frame_id, size_t symbol_id);
 
-    void initialize_queues();
-    void initialize_uplink_buffers();
-    void initialize_downlink_buffers();
-    void free_uplink_buffers();
-    void free_downlink_buffers();
+    void InitializeQueues();
+    void InitializeUplinkBuffers();
+    void InitializeDownlinkBuffers();
+    void FreeUplinkBuffers();
+    void FreeDownlinkBuffers();
 
-    void save_decode_data_to_file(int frame_id);
-    void save_tx_data_to_file(int frame_id);
-    void getEqualData(float** ptr, int* size);
+    void SaveDecodeDataToFile(int frame_id);
+    void SaveTxDataToFile(int frame_id);
+    void GetEqualData(float** ptr, int* size);
 
     // Flags that allow developer control over Agora internals
     struct {
         // Before exiting, save LDPC-decoded or demodulated data to a file
-        bool enable_save_decode_data_to_file = false;
+        bool enable_save_decode_data_to_file_ = false;
 
         // Before exiting, save data sent on downlink to a file
-        bool enable_save_tx_data_to_file = false;
-    } flags;
+        bool enable_save_tx_data_to_file_ = false;
+    } flags_;
 
 private:
     /// Fetch the concurrent queue for this event type
-    moodycamel::ConcurrentQueue<Event_data>* get_conq(
+    moodycamel::ConcurrentQueue<EventData>* GetConq(
         EventType event_type, size_t qid)
     {
-        return &sched_info_arr[qid][static_cast<size_t>(event_type)]
-                    .concurrent_q;
+        return &sched_info_arr_[qid][static_cast<size_t>(event_type)]
+                    .concurrent_q_;
     }
 
     /// Fetch the producer token for this event type
-    moodycamel::ProducerToken* get_ptok(EventType event_type, size_t qid)
+    moodycamel::ProducerToken* GetPtok(EventType event_type, size_t qid)
     {
-        return sched_info_arr[qid][static_cast<size_t>(event_type)].ptok;
+        return sched_info_arr_[qid][static_cast<size_t>(event_type)].ptok_;
     }
 
     /// Return a string containing the sizes of the FFT queues
-    std::string get_fft_queue_sizes_string() const
+    std::string GetFftQueueSizesString() const
     {
         std::ostringstream ret;
         ret << "[";
         for (size_t i = 0; i < kFrameWnd; i++) {
-            ret << std::to_string(fft_queue_arr[i].size()) << " ";
+            ret << std::to_string(fft_queue_arr_[i].size()) << " ";
         }
         ret << "]";
         return ret.str();
     }
 
     // Worker thread i runs on core base_worker_core_offset + i
-    const size_t base_worker_core_offset;
+    const size_t base_worker_core_offset_;
 
     Config* config_;
-    size_t fft_created_count;
-    size_t max_equaled_frame = SIZE_MAX;
+    size_t fft_created_count_;
+    size_t max_equaled_frame_ = SIZE_MAX;
     std::unique_ptr<PacketTXRX> packet_tx_rx_;
 
     MacThread* mac_thread_; // The thread running MAC layer functions
     std::thread mac_std_thread_; // Handle for the MAC thread
     std::thread worker_std_threads_[kMaxWorkerNum]; // Handle for worker threads
 
-    Stats* stats;
-    PhyStats* phy_stats;
-    pthread_t* task_threads;
+    Stats* stats_;
+    PhyStats* phy_stats_;
+    pthread_t* task_threads_;
 
     /*****************************************************
      * Buffers
@@ -206,25 +206,25 @@ private:
     FrameCounters frommac_counters_;
     FrameCounters rc_counters_;
     RxCounters rx_counters_;
-    size_t zf_last_frame = SIZE_MAX;
-    size_t rc_last_frame = SIZE_MAX;
+    size_t zf_last_frame_ = SIZE_MAX;
+    size_t rc_last_frame_ = SIZE_MAX;
 
     // Agora schedules and processes a frame in FIFO order
     // cur_proc_frame_id is the frame that is currently being processed.
     // cur_sche_frame_id is the frame that is currently being scheduled.
     // A frame's schduling finishes before processing ends, so the two
     // variables are possible to have different values.
-    size_t cur_proc_frame_id = 0;
-    size_t cur_sche_frame_id = 0;
+    size_t cur_proc_frame_id_ = 0;
+    size_t cur_sche_frame_id_ = 0;
 
     // The frame index for a symbol whose FFT is done
-    std::vector<size_t> fft_cur_frame_for_symbol;
+    std::vector<size_t> fft_cur_frame_for_symbol_;
     // The frame index for a symbol whose encode is done
-    std::vector<size_t> encode_cur_frame_for_symbol;
+    std::vector<size_t> encode_cur_frame_for_symbol_;
 
     // Per-frame queues of delayed FFT tasks. The queue contains offsets into
     // TX/RX buffers.
-    std::array<std::queue<fft_req_tag_t>, kFrameWnd> fft_queue_arr;
+    std::array<std::queue<fft_req_tag_t>, kFrameWnd> fft_queue_arr_;
 
     // Data for IFFT
     // 1st dimension: kFrameWnd * number of antennas * number of
@@ -267,27 +267,27 @@ private:
     char* dl_socket_buffer_;
     int* dl_socket_buffer_status_;
 
-    struct sched_info_t {
-        moodycamel::ConcurrentQueue<Event_data> concurrent_q;
-        moodycamel::ProducerToken* ptok;
+    struct SchedInfoT {
+        moodycamel::ConcurrentQueue<EventData> concurrent_q_;
+        moodycamel::ProducerToken* ptok_;
     };
-    sched_info_t sched_info_arr[2][kNumEventTypes];
+    SchedInfoT sched_info_arr_[2][kNumEventTypes];
 
     // Master thread's message queue for receiving packets
-    moodycamel::ConcurrentQueue<Event_data> message_queue_;
+    moodycamel::ConcurrentQueue<EventData> message_queue_;
 
     // Master-to-worker queue for MAC
-    moodycamel::ConcurrentQueue<Event_data> mac_request_queue_;
+    moodycamel::ConcurrentQueue<EventData> mac_request_queue_;
 
     // Worker-to-master queue for MAC
-    moodycamel::ConcurrentQueue<Event_data> mac_response_queue_;
+    moodycamel::ConcurrentQueue<EventData> mac_response_queue_;
 
     // Master thread's message queue for event completion from Doers;
-    moodycamel::ConcurrentQueue<Event_data> complete_task_queue_[2];
-    moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads][2];
+    moodycamel::ConcurrentQueue<EventData> complete_task_queue_[2];
+    moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads][2];
 
-    moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
-    moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
+    moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
+    moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
 };
 
 #endif

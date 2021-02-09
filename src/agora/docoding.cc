@@ -14,54 +14,54 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
     , raw_data_buffer_(in_raw_data_buffer)
     , encoded_buffer_(in_encoded_buffer)
 {
-    duration_stat
-        = in_stats_manager->get_duration_stat(DoerType::kEncode, in_tid);
-    parity_buffer = static_cast<int8_t*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
-            ldpc_encoding_parity_buf_size(
-                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
-    assert(parity_buffer != nullptr);
-    encoded_buffer_temp = static_cast<int8_t*>(
-        Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
-            ldpc_encoding_encoded_buf_size(
-                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc)));
-    assert(encoded_buffer_temp != nullptr);
+    duration_stat_
+        = in_stats_manager->GetDurationStat(DoerType::kEncode, in_tid);
+    parity_buffer_ = static_cast<int8_t*>(
+        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kK64Align,
+            LdpcEncodingParityBufSize(
+                cfg_->ldpc_config_.bg_, cfg_->ldpc_config_.zc_)));
+    assert(parity_buffer_ != nullptr);
+    encoded_buffer_temp_ = static_cast<int8_t*>(
+        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kK64Align,
+            LdpcEncodingEncodedBufSize(
+                cfg_->ldpc_config_.bg_, cfg_->ldpc_config_.zc_)));
+    assert(encoded_buffer_temp_ != nullptr);
 }
 
 DoEncode::~DoEncode()
 {
-    std::free(parity_buffer);
-    std::free(encoded_buffer_temp);
+    std::free(parity_buffer_);
+    std::free(encoded_buffer_temp_);
 }
 
-Event_data DoEncode::launch(size_t tag)
+EventData DoEncode::launch(size_t tag)
 {
-    LDPCconfig LDPC_config = cfg->LDPC_config;
-    size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t symbol_id = gen_tag_t(tag).symbol_id;
-    size_t cb_id = gen_tag_t(tag).cb_id;
-    size_t cur_cb_id = cb_id % cfg->LDPC_config.nblocksInSymbol;
-    size_t ue_id = cb_id / cfg->LDPC_config.nblocksInSymbol;
+    LDPCconfig ldpc_config = cfg_->ldpc_config_;
+    size_t frame_id = gen_tag_t(tag).frame_id_;
+    size_t symbol_id = gen_tag_t(tag).symbol_id_;
+    size_t cb_id = gen_tag_t(tag).cb_id_;
+    size_t cur_cb_id = cb_id % cfg_->ldpc_config_.nblocks_in_symbol_;
+    size_t ue_id = cb_id / cfg_->ldpc_config_.nblocks_in_symbol_;
     if (kDebugPrintInTask) {
         std::printf(
             "In doEncode thread %d: frame: %zu, symbol: %zu, code block %zu, "
             "ue_id: %zu\n",
-            tid, frame_id, symbol_id, cur_cb_id, ue_id);
+            tid_, frame_id, symbol_id, cur_cb_id, ue_id);
     }
 
-    size_t start_tsc = worker_rdtsc();
+    size_t start_tsc = WorkerRdtsc();
 
-    size_t symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t symbol_idx_dl = cfg_->GetDlSymbolIdx(frame_id, symbol_id);
     int8_t* input_ptr
-        = cfg->get_info_bits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
+        = cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
 
-    ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows,
-        encoded_buffer_temp, parity_buffer, input_ptr);
-    int8_t* final_output_ptr = cfg->get_encoded_buf(
+    LdpcEncodeHelper(ldpc_config.bg_, ldpc_config.zc_, ldpc_config.n_rows_,
+        encoded_buffer_temp_, parity_buffer_, input_ptr);
+    int8_t* final_output_ptr = cfg_->GetEncodedBuf(
         encoded_buffer_, frame_id, symbol_idx_dl, ue_id, cur_cb_id);
-    adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
+    AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp_),
         reinterpret_cast<uint8_t*>(final_output_ptr),
-        bits_to_bytes(LDPC_config.cbCodewLen), cfg->mod_order_bits);
+        BitsToBytes(ldpc_config.cb_codew_len_), cfg_->mod_order_bits_);
 
     // std::printf("Encoded data\n");
     // int num_mod = LDPC_config.cbCodewLen / cfg->mod_order_bits;
@@ -70,15 +70,15 @@ Event_data DoEncode::launch(size_t tag)
     // }
     // std::printf("\n");
 
-    size_t duration = worker_rdtsc() - start_tsc;
-    duration_stat->task_duration[0] += duration;
-    duration_stat->task_count++;
-    if (cycles_to_us(duration, cfg->freq_ghz) > 500) {
-        std::printf("Thread %d Encode takes %.2f\n", tid,
-            cycles_to_us(duration, cfg->freq_ghz));
+    size_t duration = WorkerRdtsc() - start_tsc;
+    duration_stat_->task_duration_[0] += duration;
+    duration_stat_->task_count_++;
+    if (CyclesToUs(duration, cfg_->freq_ghz_) > 500) {
+        std::printf("Thread %d Encode takes %.2f\n", tid_,
+            CyclesToUs(duration, cfg_->freq_ghz_));
     }
 
-    return Event_data(EventType::kEncode, tag);
+    return EventData(EventType::kEncode, tag);
 }
 
 DoDecode::DoDecode(Config* in_config, int in_tid,
@@ -88,35 +88,35 @@ DoDecode::DoDecode(Config* in_config, int in_tid,
     : Doer(in_config, in_tid)
     , demod_buffers_(demod_buffers)
     , decoded_buffers_(decoded_buffers)
-    , phy_stats(in_phy_stats)
+    , phy_stats_(in_phy_stats)
 {
-    duration_stat
-        = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
-    resp_var_nodes = static_cast<int16_t*>(Agora_memory::padded_aligned_alloc(
-        Agora_memory::Alignment_t::k64Align, 1024 * 1024 * sizeof(int16_t)));
+    duration_stat_
+        = in_stats_manager->GetDurationStat(DoerType::kDecode, in_tid);
+    resp_var_nodes_ = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
+        Agora_memory::Alignment_t::kK64Align, 1024 * 1024 * sizeof(int16_t)));
 }
 
-DoDecode::~DoDecode() { free(resp_var_nodes); }
+DoDecode::~DoDecode() { free(resp_var_nodes_); }
 
-Event_data DoDecode::launch(size_t tag)
+EventData DoDecode::launch(size_t tag)
 {
-    LDPCconfig LDPC_config = cfg->LDPC_config;
-    const size_t frame_id = gen_tag_t(tag).frame_id;
-    const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id;
-    const size_t cb_id = gen_tag_t(tag).cb_id;
+    LDPCconfig ldpc_config = cfg_->ldpc_config_;
+    const size_t frame_id = gen_tag_t(tag).frame_id_;
+    const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id_;
+    const size_t cb_id = gen_tag_t(tag).cb_id_;
     const size_t symbol_offset
-        = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
-    const size_t cur_cb_id = cb_id % cfg->LDPC_config.nblocksInSymbol;
-    const size_t ue_id = cb_id / cfg->LDPC_config.nblocksInSymbol;
+        = cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
+    const size_t cur_cb_id = cb_id % cfg_->ldpc_config_.nblocks_in_symbol_;
+    const size_t ue_id = cb_id / cfg_->ldpc_config_.nblocks_in_symbol_;
     const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
         std::printf(
             "In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
             "%zu, ue: %zu\n",
-            tid, frame_id, symbol_idx_ul, cur_cb_id, ue_id);
+            tid_, frame_id, symbol_idx_ul, cur_cb_id, ue_id);
     }
 
-    size_t start_tsc = worker_rdtsc();
+    size_t start_tsc = WorkerRdtsc();
 
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
     };
@@ -124,44 +124,44 @@ Event_data DoDecode::launch(size_t tag)
     };
 
     // Decoder setup
-    int16_t numFillerBits = 0;
-    int16_t numChannelLlrs = LDPC_config.cbCodewLen;
+    int16_t num_filler_bits = 0;
+    int16_t num_channel_llrs = ldpc_config.cb_codew_len_;
 
-    ldpc_decoder_5gnr_request.numChannelLlrs = numChannelLlrs;
-    ldpc_decoder_5gnr_request.numFillerBits = numFillerBits;
-    ldpc_decoder_5gnr_request.maxIterations = LDPC_config.decoderIter;
+    ldpc_decoder_5gnr_request.numChannelLlrs = num_channel_llrs;
+    ldpc_decoder_5gnr_request.numFillerBits = num_filler_bits;
+    ldpc_decoder_5gnr_request.maxIterations = ldpc_config.decoder_iter_;
     ldpc_decoder_5gnr_request.enableEarlyTermination
-        = LDPC_config.earlyTermination;
-    ldpc_decoder_5gnr_request.Zc = LDPC_config.Zc;
-    ldpc_decoder_5gnr_request.baseGraph = LDPC_config.Bg;
-    ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
+        = ldpc_config.early_termination_;
+    ldpc_decoder_5gnr_request.Zc = ldpc_config.zc_;
+    ldpc_decoder_5gnr_request.baseGraph = ldpc_config.bg_;
+    ldpc_decoder_5gnr_request.nRows = ldpc_config.n_rows_;
 
-    int numMsgBits = LDPC_config.cbLen - numFillerBits;
-    ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
-    ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
+    int num_msg_bits = ldpc_config.cb_len_ - num_filler_bits;
+    ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
+    ldpc_decoder_5gnr_response.varNodes = resp_var_nodes_;
 
     int8_t* llr_buffer_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ue_id]
-        + (cfg->mod_order_bits * (LDPC_config.cbCodewLen * cur_cb_id));
+        + (cfg_->mod_order_bits_ * (ldpc_config.cb_codew_len_ * cur_cb_id));
 
     uint8_t* decoded_buffer_ptr
         = decoded_buffers_[frame_slot][symbol_idx_ul][ue_id]
-        + (cur_cb_id * roundup<64>(cfg->num_bytes_per_cb));
+        + (cur_cb_id * Roundup<64>(cfg_->num_bytes_per_cb_));
 
     ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
     ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
 
-    size_t start_tsc1 = worker_rdtsc();
-    duration_stat->task_duration[1] += start_tsc1 - start_tsc;
+    size_t start_tsc1 = WorkerRdtsc();
+    duration_stat_->task_duration_[1] += start_tsc1 - start_tsc;
 
     bblib_ldpc_decoder_5gnr(
         &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
 
-    size_t start_tsc2 = worker_rdtsc();
-    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
+    size_t start_tsc2 = WorkerRdtsc();
+    duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
 
     if (kPrintLLRData) {
         std::printf("LLR data, symbol_offset: %zu\n", symbol_offset);
-        for (size_t i = 0; i < LDPC_config.cbCodewLen; i++) {
+        for (size_t i = 0; i < ldpc_config.cb_codew_len_; i++) {
             std::printf("%d ", *(llr_buffer_ptr + i));
         }
         std::printf("\n");
@@ -169,37 +169,38 @@ Event_data DoDecode::launch(size_t tag)
 
     if (kPrintDecodedData) {
         std::printf("Decoded data\n");
-        for (size_t i = 0; i < (LDPC_config.cbLen >> 3); i++) {
+        for (size_t i = 0; i < (ldpc_config.cb_len_ >> 3); i++) {
             std::printf("%u ", *(decoded_buffer_ptr + i));
         }
         std::printf("\n");
     }
 
     if ((kEnableMac == false) && (kPrintPhyStats == true)
-        && (symbol_idx_ul >= cfg->UL_PILOT_SYMS)) {
-        phy_stats->update_decoded_bits(
-            ue_id, symbol_offset, cfg->num_bytes_per_cb * 8);
-        phy_stats->increment_decoded_blocks(ue_id, symbol_offset);
+        && (symbol_idx_ul >= cfg_->ul_pilot_syms_)) {
+        phy_stats_->UpdateDecodedBits(
+            ue_id, symbol_offset, cfg_->num_bytes_per_cb_ * 8);
+        phy_stats_->IncrementDecodedBlocks(ue_id, symbol_offset);
         size_t block_error(0);
-        for (size_t i = 0; i < cfg->num_bytes_per_cb; i++) {
+        for (size_t i = 0; i < cfg_->num_bytes_per_cb_; i++) {
             uint8_t rx_byte = decoded_buffer_ptr[i];
-            uint8_t tx_byte = (uint8_t)cfg->get_info_bits(
-                cfg->ul_bits, symbol_idx_ul, ue_id, cur_cb_id)[i];
-            phy_stats->update_bit_errors(
+            uint8_t tx_byte = (uint8_t)cfg_->GetInfoBits(
+                cfg_->ul_bits_, symbol_idx_ul, ue_id, cur_cb_id)[i];
+            phy_stats_->UpdateBitErrors(
                 ue_id, symbol_offset, tx_byte, rx_byte);
-            if (rx_byte != tx_byte)
+            if (rx_byte != tx_byte) {
                 block_error++;
+}
         }
-        phy_stats->update_block_errors(ue_id, symbol_offset, block_error);
+        phy_stats_->UpdateBlockErrors(ue_id, symbol_offset, block_error);
     }
 
-    size_t duration = worker_rdtsc() - start_tsc;
-    duration_stat->task_duration[0] += duration;
-    duration_stat->task_count++;
-    if (cycles_to_us(duration, cfg->freq_ghz) > 500) {
-        std::printf("Thread %d Decode takes %.2f\n", tid,
-            cycles_to_us(duration, cfg->freq_ghz));
+    size_t duration = WorkerRdtsc() - start_tsc;
+    duration_stat_->task_duration_[0] += duration;
+    duration_stat_->task_count_++;
+    if (CyclesToUs(duration, cfg_->freq_ghz_) > 500) {
+        std::printf("Thread %d Decode takes %.2f\n", tid_,
+            CyclesToUs(duration, cfg_->freq_ghz_));
     }
 
-    return Event_data(EventType::kDecode, tag);
+    return EventData(EventType::kDecode, tag);
 }

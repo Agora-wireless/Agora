@@ -21,16 +21,16 @@ using namespace arma;
 class Channel {
 
 public:
-    Channel(Config* bscfg, Config* uecfg, std::string channel_type,
+    Channel(Config* config_bs, Config* config_ue, std::string channel_type,
         double channel_snr);
     ~Channel();
 
     // Dimensions of fmat_src: ( bscfg->sampsPerSymbol, uecfg->UE_ANT_NUM )
-    void apply_chan(const cx_fmat& fmat_src, cx_fmat& mat_dst,
+    void ApplyChan(const cx_fmat& fmat_src, cx_fmat& mat_dst,
         const bool is_downlink, const bool is_newChan);
 
     // Additive White Gaussian Noise. Dimensions of src: ( bscfg->sampsPerSymbol, uecfg->UE_ANT_NUM )
-    void awgn(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
+    void Awgn(const cx_fmat& fmat_src, cx_fmat& fmat_dst) const;
 
     /*
      * From "Study on 3D-channel model for Elevation Beamforming
@@ -43,22 +43,22 @@ public:
      * are above surrounding buildings.
      *
      */
-    void lte_3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
+    void Lte3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst);
 
 private:
-    Config* bscfg;
-    Config* uecfg;
+    Config* bscfg_;
+    Config* uecfg_;
 
-    Channel* channel;
-    size_t bs_ant;
-    size_t ue_ant;
-    size_t n_samps;
+    Channel* channel_;
+    size_t bs_ant_;
+    size_t ue_ant_;
+    size_t n_samps_;
 
-    std::string sim_chan_model;
-    double channel_snr_db;
-    enum ChanModel { AWGN, RAYLEIGH, RAN_3GPP } chan_model;
+    std::string sim_chan_model_;
+    double channel_snr_db_;
+    enum ChanModel { kAwgn, kRayleigh, kRan3Gpp } chan_model_;
 
-    cx_fmat H;
+    cx_fmat h_;
 };
 
 #endif /* SIM_CHAN_MODEL */

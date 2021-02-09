@@ -3,12 +3,12 @@
 Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset)
     : rx_thread_num_(rx_thread_num)
     , core_id_(core_offset)
-    , cfg(cfg)
+    , cfg_(cfg)
 {
 }
 
 Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
-    moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
+    moodycamel::ConcurrentQueue<EventData>* in_queue_message,
     moodycamel::ProducerToken** in_rx_ptoks)
     : Receiver(cfg, rx_thread_num, core_offset)
 {
@@ -16,9 +16,9 @@ Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
     rx_ptoks_ = in_rx_ptoks;
 }
 
-Receiver::~Receiver() { delete cfg; }
+Receiver::~Receiver() { delete cfg_; }
 
-std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
+std::vector<pthread_t> Receiver::StartRecv(Table<char>& in_buffer,
     Table<int>& in_buffer_status, size_t in_buffer_frame_num,
     size_t in_buffer_length, Table<double>& in_frame_start)
 {
@@ -32,32 +32,32 @@ std::vector<pthread_t> Receiver::startRecv(Table<char>& in_buffer,
     std::vector<pthread_t> created_threads;
 
     for (size_t i = 0; i < rx_thread_num_; i++) {
-        pthread_t recv_thread_;
-        auto context = new EventHandlerContext<Receiver>;
-        context->obj_ptr = this;
-        context->id = i;
-        if (pthread_create(&recv_thread_, NULL,
-                pthread_fun_wrapper<Receiver, &Receiver::loopRecv>, context)
+        pthread_t recv_thread;
+        auto *context = new EventHandlerContext<Receiver>;
+        context->obj_ptr_ = this;
+        context->id_ = i;
+        if (pthread_create(&recv_thread, NULL,
+                PthreadFunWrapper<Receiver, &Receiver::LoopRecv>, context)
             != 0) {
             perror("Socket recv thread create failed");
             std::exit(0);
         }
-        created_threads.push_back(recv_thread_);
+        created_threads.push_back(recv_thread);
     }
     return created_threads;
 }
 
-void* Receiver::loopRecv(int tid)
+void* Receiver::LoopRecv(int tid)
 {
     size_t core_offset = core_id_ + rx_thread_num_ + 2;
-    pin_to_core_with_offset(ThreadType::kWorkerRX, core_offset, tid);
+    PinToCoreWithOffset(ThreadType::kWorkerRX, core_offset, tid);
 
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     struct sockaddr_in remote_addr;
     int socket_local
-        = setup_socket_ipv4(cfg->bs_rru_port + tid, true, sock_buf_size);
-    setup_sockaddr_remote_ipv4(
-        &remote_addr, cfg->bs_server_port + tid, cfg->bs_server_addr.c_str());
+        = SetupSocketIpv4(cfg_->bs_rru_port_ + tid, true, sock_buf_size);
+    SetupSockaddrRemoteIpv4(
+        &remote_addr, cfg_->bs_server_port_ + tid, cfg_->bs_server_addr_.c_str());
 
     /* use token to speed up */
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
@@ -92,7 +92,7 @@ void* Receiver::loopRecv(int tid)
         // if ((recvlen = recv(socket_local, (char*)cur_buffer_ptr,
         // packet_length, 0))<0) {
         if ((recvlen = recvfrom(socket_local, (char*)cur_buffer_ptr,
-                 cfg->packet_length, 0, (struct sockaddr*)&remote_addr,
+                 cfg_->packet_length_, 0, (struct sockaddr*)&remote_addr,
                  &addrlen))
             < 0) {
             perror("recv failed");
@@ -101,16 +101,16 @@ void* Receiver::loopRecv(int tid)
 
         // Read information from received packet
         auto* pkt = (struct Packet*)cur_buffer_ptr;
-        int frame_id = pkt->frame_id;
+        int frame_id = pkt->frame_id_;
 
         if (kDebugSenderReceiver) {
             std::printf("RX thread %d received frame %d symbol %d, ant %d\n ",
-                tid, frame_id, pkt->symbol_id, pkt->ant_id);
+                tid, frame_id, pkt->symbol_id_, pkt->ant_id_);
         }
 
         if (kIsWorkerTimingEnabled) {
             if (frame_id > prev_frame_id) {
-                frame_start[frame_id] = get_time();
+                frame_start[frame_id] = GetTime();
                 prev_frame_id = frame_id;
             }
         }
@@ -120,12 +120,12 @@ void* Receiver::loopRecv(int tid)
         cur_buffer_status_ptr
             = buffer_status_ptr + (offset + 1) % buffer_frame_num;
         cur_buffer_ptr = buffer_ptr
-            + (cur_buffer_ptr - buffer_ptr + cfg->packet_length)
+            + (cur_buffer_ptr - buffer_ptr + cfg_->packet_length_)
                 % buffer_length;
 
         /* Push packet received event into the queue */
-        Event_data packet_message(
-            EventType::kPacketRX, rx_tag_t(tid, offset)._tag);
+        EventData packet_message(
+            EventType::kPacketRX, rx_tag_t(tid, offset).tag_);
 
         if (!message_queue_->enqueue(*local_ptok, packet_message)) {
             std::printf("socket message enqueue failed\n");

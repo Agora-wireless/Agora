@@ -36,35 +36,35 @@ typedef std::vector<complex_float,
 
 using namespace arma;
 
-class Phy_UE {
+class PhyUe {
 public:
     // dequeue bulk size, used to reduce the overhead of dequeue in main
     // thread
     static const int kDequeueBulkSizeTXRX = 8;
 
-    Phy_UE(Config* cfg);
-    ~Phy_UE();
+    PhyUe(Config* config);
+    ~PhyUe();
 
-    void start();
-    void stop();
+    void Start();
+    void Stop();
 
     /*****************************************************
      * Downlink
      *****************************************************/
-    void initialize_downlink_buffers();
+    void InitializeDownlinkBuffers();
 
     /**
      * modulate data from nUEs and does spatial multiplexing by applying
      * beamweights
      */
-    void doEncode(int, size_t);
-    void doModul(int, size_t);
-    void doIFFT(int, size_t);
+    void DoEncode(int /*tid*/, size_t /*tag*/);
+    void DoModul(int /*tid*/, size_t /*tag*/);
+    void DoIfft(int /*tid*/, size_t /*tag*/);
 
     /*****************************************************
      * Uplink
      *****************************************************/
-    void initialize_uplink_buffers();
+    void InitializeUplinkBuffers();
 
     /**
      * Do FFT task for one OFDM symbol
@@ -97,7 +97,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    void doFFT(int, size_t);
+    void DoFft(int /*tid*/, size_t /*tag*/);
 
     /**
      * Do demodulation task for a block of subcarriers (demul_block_size)
@@ -125,62 +125,62 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    void doDemul(int, size_t);
-    void doDecode(int, size_t);
+    void DoDemul(int /*tid*/, size_t /*tag*/);
+    void DoDecode(int /*tid*/, size_t /*tag*/);
 
-    void getDemulData(long long** ptr, int* size);
-    void getEqualPCData(float** ptr, int* size, int);
-    void getEqualData(float** ptr, int* size, int);
+    void GetDemulData(long long** ptr, int* size);
+    void GetEqualPcData(float** ptr, int* size, int);
+    void GetEqualData(float** ptr, int* size, int /*ue_id*/);
 
     struct EventHandlerContext {
-        Phy_UE* obj_ptr;
-        int id;
+        PhyUe* obj_ptr_;
+        int id_;
     };
 
     // while loop of task thread
-    static void* taskThread_launch(void* context);
-    void taskThread(int tid);
+    static void* TaskThreadLaunch(void* context);
+    void TaskThread(int tid);
 
     /* Add tasks into task queue based on event type */
-    void schedule_task(Event_data do_task,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue,
+    void ScheduleTask(EventData do_task,
+        moodycamel::ConcurrentQueue<EventData>* in_queue,
         moodycamel::ProducerToken const& ptok);
 
-    void initialize_vars_from_cfg(void);
+    void InitializeVarsFromCfg(void);
 
 private:
     Config* config_;
-    size_t symbol_perframe;
-    size_t ul_pilot_symbol_perframe;
-    size_t dl_pilot_symbol_perframe;
-    size_t ul_data_symbol_perframe;
-    size_t dl_data_symbol_perframe;
-    size_t ul_symbol_perframe;
-    size_t dl_symbol_perframe;
-    size_t tx_symbol_perframe;
-    size_t symbol_len; // samples in sym without prefix and postfix
-    size_t ofdm_syms; // number of OFDM symbols in general symbol (i.e. symbol)
-    size_t FFT_LEN;
-    size_t CP_LEN;
-    size_t nUEs;
-    size_t antenna_num;
-    size_t hdr_size;
-    size_t nCPUs;
-    size_t core_offset;
-    size_t worker_thread_num;
-    size_t rx_thread_num;
-    size_t tx_thread_num;
-    size_t packet_length;
-    size_t tx_packet_length;
-    FILE *fp, *fd;
+    size_t symbol_perframe_;
+    size_t ul_pilot_symbol_perframe_;
+    size_t dl_pilot_symbol_perframe_;
+    size_t ul_data_symbol_perframe_;
+    size_t dl_data_symbol_perframe_;
+    size_t ul_symbol_perframe_;
+    size_t dl_symbol_perframe_;
+    size_t tx_symbol_perframe_;
+    size_t symbol_len_; // samples in sym without prefix and postfix
+    size_t ofdm_syms_; // number of OFDM symbols in general symbol (i.e. symbol)
+    size_t fft_len_;
+    size_t cp_len_;
+    size_t n_u_es_;
+    size_t antenna_num_;
+    size_t hdr_size_;
+    size_t n_cp_us_;
+    size_t core_offset_;
+    size_t worker_thread_num_;
+    size_t rx_thread_num_;
+    size_t tx_thread_num_;
+    size_t packet_length_;
+    size_t tx_packet_length_;
+    FILE *fp_, *fd_;
 
-    size_t pilot_sc_len;
-    size_t data_sc_len;
-    size_t data_sc_start;
-    size_t non_null_sc_len;
+    size_t pilot_sc_len_;
+    size_t data_sc_len_;
+    size_t data_sc_start_;
+    size_t non_null_sc_len_;
 
-    size_t RX_BUFFER_FRAME_NUM;
-    size_t TX_BUFFER_FRAME_NUM;
+    size_t rx_buffer_frame_num_;
+    size_t tx_buffer_frame_num_;
 
     MacThread* mac_thread_; // The thread running MAC layer functions
     std::thread mac_std_thread_; // Handle for the MAC thread
@@ -207,8 +207,8 @@ private:
     char* tx_buffer_;
     int* tx_buffer_status_;
 
-    int tx_buffer_size;
-    int tx_buffer_status_size;
+    int tx_buffer_size_;
+    int tx_buffer_status_size_;
 
     /**
      * Data for IFFT, (prefix added)
@@ -217,7 +217,7 @@ private:
      * Second dimension: OFDM_CA_NUM
      */
     Table<complex_float> ifft_buffer_;
-    DFTI_DESCRIPTOR_HANDLE mkl_handle;
+    DFTI_DESCRIPTOR_HANDLE mkl_handle_;
 
     /**
      * Data before modulation
@@ -253,8 +253,8 @@ private:
     Table<char> rx_buffer_;
     Table<int> rx_buffer_status_;
 
-    int rx_buffer_size;
-    int rx_buffer_status_size;
+    int rx_buffer_size_;
+    int rx_buffer_status_size_;
 
     /**
      * Data for FFT, after time sync (prefix removed)
@@ -292,12 +292,12 @@ private:
      *
      */
     std::vector<std::vector<uint8_t>> dl_decode_buffer_;
-    std::complex<float>* rx_samps_tmp; // Temp buffer for received samples
+    std::complex<float>* rx_samps_tmp_; // Temp buffer for received samples
 
-    int16_t* resp_var_nodes;
+    int16_t* resp_var_nodes_;
     std::vector<std::complex<float>> pilot_sc_val_;
     std::vector<size_t> non_null_sc_ind_;
-    std::vector<std::vector<std::complex<float>>> ue_pilot_vec;
+    std::vector<std::vector<std::complex<float>>> ue_pilot_vec_;
     Table<size_t> decoded_bits_count_;
     Table<size_t> bit_error_count_;
     Table<size_t> decoded_blocks_count_;
@@ -307,27 +307,27 @@ private:
 
     /* Concurrent queues */
     /* task queue for downlink FFT */
-    moodycamel::ConcurrentQueue<Event_data> fft_queue_;
+    moodycamel::ConcurrentQueue<EventData> fft_queue_;
     /* task queue for downlink demodulation */
-    moodycamel::ConcurrentQueue<Event_data> demul_queue_;
+    moodycamel::ConcurrentQueue<EventData> demul_queue_;
     /* task queue for downlink decoding */
-    moodycamel::ConcurrentQueue<Event_data> decode_queue_;
+    moodycamel::ConcurrentQueue<EventData> decode_queue_;
     /* main thread message queue */
-    moodycamel::ConcurrentQueue<Event_data> message_queue_;
-    moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
-    moodycamel::ConcurrentQueue<Event_data> tx_queue_;
-    moodycamel::ConcurrentQueue<Event_data> to_mac_queue_;
-    moodycamel::ConcurrentQueue<Event_data> encode_queue_;
-    moodycamel::ConcurrentQueue<Event_data> modul_queue_;
+    moodycamel::ConcurrentQueue<EventData> message_queue_;
+    moodycamel::ConcurrentQueue<EventData> ifft_queue_;
+    moodycamel::ConcurrentQueue<EventData> tx_queue_;
+    moodycamel::ConcurrentQueue<EventData> to_mac_queue_;
+    moodycamel::ConcurrentQueue<EventData> encode_queue_;
+    moodycamel::ConcurrentQueue<EventData> modul_queue_;
 
-    pthread_t task_threads[kMaxThreads];
+    pthread_t task_threads_[kMaxThreads];
 
-    moodycamel::ProducerToken* rx_ptoks_ptr[kMaxThreads];
-    moodycamel::ProducerToken* tx_ptoks_ptr[kMaxThreads];
-    moodycamel::ProducerToken* mac_rx_ptoks_ptr[kMaxThreads];
-    moodycamel::ProducerToken* mac_tx_ptoks_ptr[kMaxThreads];
+    moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
+    moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
+    moodycamel::ProducerToken* mac_rx_ptoks_ptr_[kMaxThreads];
+    moodycamel::ProducerToken* mac_tx_ptoks_ptr_[kMaxThreads];
     // moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
-    moodycamel::ProducerToken* task_ptok[kMaxThreads];
+    moodycamel::ProducerToken* task_ptok_[kMaxThreads];
 
     // all checkers
     size_t* fft_checker_[kFrameWnd];
@@ -344,15 +344,15 @@ private:
     size_t decode_status_[kFrameWnd];
 
     double frame_dl_process_time_[kFrameWnd * kMaxUEs];
-    std::queue<std::tuple<int, int>> taskWaitList;
+    std::queue<std::tuple<int, int>> task_wait_list_;
 
     // for python
     /**
      * dimension: OFDM*UE_NUM
      */
-    int max_equaled_frame = 0;
+    int max_equaled_frame_ = 0;
     // long long* demul_output;
     // float* equal_output;
-    size_t record_frame = SIZE_MAX;
+    size_t record_frame_ = SIZE_MAX;
 };
 #endif

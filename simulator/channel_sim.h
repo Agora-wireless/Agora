@@ -34,30 +34,30 @@ using namespace arma;
  */
 class ChannelSim {
 public:
-    ChannelSim(Config* bscfg, Config* uecfg, size_t bs_thread_num,
+    ChannelSim(Config* config_bs, Config* config_ue, size_t bs_thread_num,
         size_t user_thread_num, size_t worker_thread_num,
         size_t in_core_offset = 30, std::string in_chan_type = "RAYLEIGH",
         double in_chan_snr = 20);
     ~ChannelSim();
 
-    void start();
+    void Start();
 
     // Loop thread receiving symbols from client antennas
-    void* ue_rx_loop(int tid);
+    void* UeRxLoop(int tid);
 
     // Loop thread receiving symbols from BS antennas
-    void* bs_rx_loop(int tid);
+    void* BsRxLoop(int tid);
 
     // Transmits symbol to BS antennas after applying channel
-    void do_tx_bs(int tid, size_t tag);
+    void DoTxBs(int tid, size_t tag);
 
     // Transmit symbols to client antennas after applying channel
-    void do_tx_user(int tid, size_t tag);
+    void DoTxUser(int tid, size_t tag);
 
-    void schedule_task(Event_data do_task,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue,
+    void ScheduleTask(EventData do_task,
+        moodycamel::ConcurrentQueue<EventData>* in_queue,
         moodycamel::ProducerToken const& ptok);
-    void* taskThread(int tid);
+    void* TaskThread(int tid);
 
 private:
     std::vector<struct sockaddr_in> servaddr_bs_; // BS-facing server addresses
@@ -65,59 +65,60 @@ private:
     std::vector<struct sockaddr_in> servaddr_ue_; // UE-facing server addresses
     std::vector<int> socket_ue_; // UE-facing sockets
 
-    Config* bscfg;
-    Config* uecfg;
-    Channel* channel;
+    Config* bscfg_;
+    Config* uecfg_;
+    Channel* channel_;
 
     // Data buffer for symbols to be transmitted to BS antennas (uplink)
-    std::vector<char> tx_buffer_bs;
+    std::vector<char> tx_buffer_bs_;
 
     // Data buffer for symbols to be transmitted to client antennas (downlink)
-    std::vector<char> tx_buffer_ue;
+    std::vector<char> tx_buffer_ue_;
 
     // Data buffer for received symbols from BS antennas (downlink)
-    std::vector<char> rx_buffer_bs;
+    std::vector<char> rx_buffer_bs_;
 
     // Data buffer for received symbols from client antennas (uplink)
-    std::vector<char> rx_buffer_ue;
+    std::vector<char> rx_buffer_ue_;
 
     // Task Queue for tasks related to incoming BS packets
-    moodycamel::ConcurrentQueue<Event_data> task_queue_bs;
+    moodycamel::ConcurrentQueue<EventData> task_queue_bs_;
 
     // Task Queue for tasks related to incoming Users' packets
-    moodycamel::ConcurrentQueue<Event_data> task_queue_user;
+    moodycamel::ConcurrentQueue<EventData> task_queue_user_;
 
     // Master thread's message queue for event completions;
-    moodycamel::ConcurrentQueue<Event_data> message_queue_;
-    moodycamel::ProducerToken* task_ptok[kMaxThreads];
+    moodycamel::ConcurrentQueue<EventData> message_queue_;
+    moodycamel::ProducerToken* task_ptok_[kMaxThreads];
 
-    pthread_t* task_threads;
+    pthread_t* task_threads_;
 
-    size_t ul_data_plus_pilot_symbols;
-    size_t dl_data_plus_beacon_symbols;
-    size_t payload_length;
+    size_t ul_data_plus_pilot_symbols_;
+    size_t dl_data_plus_beacon_symbols_;
+    size_t payload_length_;
 
-    size_t bs_thread_num;
-    size_t user_thread_num;
-    size_t bs_socket_num;
-    size_t user_socket_num;
-    size_t worker_thread_num;
-    size_t core_offset;
+    size_t bs_thread_num_;
+    size_t user_thread_num_;
+    size_t bs_socket_num_;
+    size_t user_socket_num_;
+    size_t worker_thread_num_;
+    size_t core_offset_;
 
-    std::string channel_type;
-    double channel_snr;
+    std::string channel_type_;
+    double channel_snr_;
 
     size_t* bs_rx_counter_;
     size_t* user_rx_counter_;
     size_t bs_tx_counter_[kFrameWnd];
     size_t user_tx_counter_[kFrameWnd];
 
-    inline size_t get_dl_symbol_idx(size_t frame_id, size_t symbol_id) const
+    inline size_t GetDlSymbolIdx(size_t frame_id, size_t symbol_id) const
     {
-        if (symbol_id == 0)
+        if (symbol_id == 0) {
             return 0;
-        else
-            return bscfg->get_dl_symbol_idx(frame_id, symbol_id) + 1;
+        } else {
+            return bscfg_->GetDlSymbolIdx(frame_id, symbol_id) + 1;
+}
     }
 };
 

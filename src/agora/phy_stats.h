@@ -11,18 +11,18 @@ class PhyStats {
 public:
     PhyStats(Config* cfg);
     ~PhyStats();
-    void print_phy_stats();
-    void update_bit_errors(size_t, size_t, uint8_t, uint8_t);
-    void update_decoded_bits(size_t, size_t, size_t);
-    void update_block_errors(size_t, size_t, size_t);
-    void increment_decoded_blocks(size_t, size_t);
-    void update_uncoded_bit_errors(size_t, size_t, size_t, uint8_t, uint8_t);
-    void update_uncoded_bits(size_t, size_t, size_t);
-    void update_evm_stats(size_t, size_t, cx_fmat);
-    void print_evm_stats(size_t);
-    void update_pilot_snr(size_t, size_t, complex_float*);
-    float get_evm_snr(size_t frame_id, size_t ue_id);
-    void print_snr_stats(size_t);
+    void PrintPhyStats();
+    void UpdateBitErrors(size_t /*ue_id*/, size_t /*offset*/, uint8_t /*tx_byte*/, uint8_t /*rx_byte*/);
+    void UpdateDecodedBits(size_t /*ue_id*/, size_t /*offset*/, size_t /*new_bits_num*/);
+    void UpdateBlockErrors(size_t /*ue_id*/, size_t /*offset*/, size_t /*block_error_count*/);
+    void IncrementDecodedBlocks(size_t /*ue_id*/, size_t /*offset*/);
+    void UpdateUncodedBitErrors(size_t /*ue_id*/, size_t /*offset*/, size_t /*mod_bit_size*/, uint8_t /*tx_byte*/, uint8_t /*rx_byte*/);
+    void UpdateUncodedBits(size_t /*ue_id*/, size_t /*offset*/, size_t /*new_bits_num*/);
+    void UpdateEvmStats(size_t /*frame_id*/, size_t /*sc_id*/, cx_fmat /*eq*/);
+    void PrintEvmStats(size_t /*frame_id*/);
+    void UpdatePilotSnr(size_t /*frame_id*/, size_t /*ue_id*/, complex_float* /*fft_data*/);
+    float GetEvmSnr(size_t frame_id, size_t ue_id);
+    void PrintSnrStats(size_t /*frame_id*/);
 
 private:
     Config* config_;

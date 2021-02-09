@@ -20,18 +20,19 @@
 #define AVX_PACKED_CS 8 // complex short int
 
 /// Correlation and Peak detection of a beacon with Gold code  (2 repetitions)
-int CommsLib::find_beacon_avx(const std::vector<std::complex<float>>& iq,
+int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
     const std::vector<std::complex<float>>& seq)
 {
     std::queue<int> valid_peaks;
 
     // Original LTS sequence
-    int seqLen = seq.size();
-    struct timespec tv, tv2;
+    int seq_len = seq.size();
+    struct timespec tv;
+    struct timespec tv2;
     clock_gettime(CLOCK_MONOTONIC, &tv);
 
     // correlate signal with beacon
-    auto gold_corr_avx = CommsLib::correlate_avx(iq, seq);
+    auto gold_corr_avx = CommsLib::CorrelateAvx(iq, seq);
     clock_gettime(CLOCK_MONOTONIC, &tv2);
 #ifdef TEST_BENCH
     double diff1
@@ -40,9 +41,9 @@ int CommsLib::find_beacon_avx(const std::vector<std::complex<float>>& iq,
 
     clock_gettime(CLOCK_MONOTONIC, &tv);
     // multiply the corre result with its (gold seq length-) shifted copy
-    auto gold_auto_corr = CommsLib::auto_corr_mult_avx(gold_corr_avx, seqLen);
+    auto gold_auto_corr = CommsLib::AutoCorrMultAvx(gold_corr_avx, seq_len);
     // calculate the abs (use the result for peak detection)
-    auto gold_corr_avx_2 = CommsLib::abs2_avx(gold_auto_corr);
+    auto gold_corr_avx_2 = CommsLib::Abs2Avx(gold_auto_corr);
     clock_gettime(CLOCK_MONOTONIC, &tv2);
 #ifdef TEST_BENCH
     double diff2
@@ -50,11 +51,11 @@ int CommsLib::find_beacon_avx(const std::vector<std::complex<float>>& iq,
 #endif
 
     // calculate the adaptive theshold
-    std::vector<float> consts1(seqLen, 1);
+    std::vector<float> consts1(seq_len, 1);
     clock_gettime(CLOCK_MONOTONIC, &tv);
     // calculate the moving sum of the abs of corr result and use as threshold
-    auto corr_abs_avx = CommsLib::abs2_avx(gold_corr_avx);
-    auto thresh_avx = CommsLib::correlate_avx_s(corr_abs_avx, consts1);
+    auto corr_abs_avx = CommsLib::Abs2Avx(gold_corr_avx);
+    auto thresh_avx = CommsLib::CorrelateAvxS(corr_abs_avx, consts1);
     clock_gettime(CLOCK_MONOTONIC, &tv2);
 #ifdef TEST_BENCH
     double diff3
@@ -64,8 +65,9 @@ int CommsLib::find_beacon_avx(const std::vector<std::complex<float>>& iq,
     // perform thresholding and find peak
     clock_gettime(CLOCK_MONOTONIC, &tv);
     for (size_t i = 0; i < gold_corr_avx_2.size(); i++) {
-        if (gold_corr_avx_2[i] > thresh_avx[i])
+        if (gold_corr_avx_2[i] > thresh_avx[i]) {
             valid_peaks.push(i);
+        }
     }
     clock_gettime(CLOCK_MONOTONIC, &tv2);
 #ifdef TEST_BENCH
@@ -103,7 +105,7 @@ int CommsLib::find_beacon_avx(const std::vector<std::complex<float>>& iq,
     return valid_peaks.front();
 }
 
-static inline __m256i __m256_complex_cs16_mult(
+static inline __m256i M256ComplexCs16Mult(
     __m256i data1, __m256i data2, bool conj)
 {
     const __m256i neg0 = _mm256_set1_epi32(0xFFFF0000);
@@ -129,7 +131,7 @@ static inline __m256i __m256_complex_cs16_mult(
     return _mm256_or_si256(re, im);
 }
 
-std::vector<std::complex<int16_t>> CommsLib::complex_mult_avx(
+std::vector<std::complex<int16_t>> CommsLib::ComplexMultAvx(
     std::vector<std::complex<int16_t>> const& f,
     std::vector<std::complex<int16_t>> const& g, const bool conj)
 {
@@ -147,15 +149,15 @@ std::vector<std::complex<int16_t>> CommsLib::complex_mult_avx(
 
     __m256i res __attribute__((aligned(ALIGNMENT)));
 
-    size_t vecSize = res_len / AVX_PACKED_CS;
-    for (size_t i = 0; i < vecSize; i++) {
+    size_t vec_size = res_len / AVX_PACKED_CS;
+    for (size_t i = 0; i < vec_size; i++) {
         data0 = _mm256_loadu_si256(in0 + i);
         data1 = _mm256_loadu_si256(in1 + i);
-        res = __m256_complex_cs16_mult(data0, data1, conj);
+        res = M256ComplexCs16Mult(data0, data1, conj);
         _mm256_storeu_si256(outf + i, res);
     }
 
-    for (size_t i = vecSize * AVX_PACKED_CS; i < res_len; i++) {
+    for (size_t i = vec_size * AVX_PACKED_CS; i < res_len; i++) {
         int16_t i0 = f[i].real();
         int16_t i1 = g[i].real();
         int16_t q0 = f[i].imag();
@@ -168,7 +170,7 @@ std::vector<std::complex<int16_t>> CommsLib::complex_mult_avx(
     return out;
 }
 
-__m256 CommsLib::__m256_complex_cf32_mult(__m256 data1, __m256 data2, bool conj)
+__m256 CommsLib::M256ComplexCf32Mult(__m256 data1, __m256 data2, bool conj)
 {
     __m256 prod0 __attribute__((aligned(ALIGNMENT)));
     __m256 prod1 __attribute__((aligned(ALIGNMENT)));
@@ -199,7 +201,7 @@ __m256 CommsLib::__m256_complex_cf32_mult(__m256 data1, __m256 data2, bool conj)
     return res;
 }
 
-std::vector<std::complex<float>> CommsLib::complex_mult_avx(
+std::vector<std::complex<float>> CommsLib::ComplexMultAvx(
     std::vector<std::complex<float>> const& f,
     std::vector<std::complex<float>> const& g, const bool conj)
 {
@@ -221,17 +223,18 @@ std::vector<std::complex<float>> CommsLib::complex_mult_avx(
     for (size_t i = 0; i < rem; i += AVX_PACKED_SP) {
         data0 = _mm256_loadu_ps(in0 + i);
         data1 = _mm256_loadu_ps(in1 + i);
-        res = __m256_complex_cf32_mult(data0, data1, conj);
+        res = M256ComplexCf32Mult(data0, data1, conj);
         _mm256_storeu_ps(outf + i, res);
     }
 
-    for (size_t i = rem; i < res_len; i += 2)
+    for (size_t i = rem; i < res_len; i += 2) {
         out[i / 2] = f[i / 2] * (conj ? std::conj(g[i / 2]) : g[i / 2]);
+    }
 
     return out;
 }
 
-std::vector<std::complex<float>> CommsLib::auto_corr_mult_avx(
+std::vector<std::complex<float>> CommsLib::AutoCorrMultAvx(
     std::vector<std::complex<float>> const& f, const int dly, const bool conj)
 {
 #if 0
@@ -261,20 +264,20 @@ std::vector<std::complex<float>> CommsLib::auto_corr_mult_avx(
     std::vector<std::complex<float>> g(f.begin(), f.end() - dly);
     std::vector<std::complex<float>> z(dly, 0);
     g.insert(g.begin(), z.begin(), z.end());
-    return CommsLib::complex_mult_avx(f, g, conj);
+    return CommsLib::ComplexMultAvx(f, g, conj);
 #endif
 }
 
-std::vector<std::complex<int16_t>> CommsLib::auto_corr_mult_avx(
+std::vector<std::complex<int16_t>> CommsLib::AutoCorrMultAvx(
     std::vector<std::complex<int16_t>> const& f, const int dly, const bool conj)
 {
     std::vector<std::complex<int16_t>> g(f.begin(), f.end() - dly);
     std::vector<std::complex<int16_t>> z(dly, 0);
     g.insert(g.begin(), z.begin(), z.end());
-    return CommsLib::complex_mult_avx(f, g, conj);
+    return CommsLib::ComplexMultAvx(f, g, conj);
 }
 
-std::vector<float> CommsLib::abs2_avx(std::vector<std::complex<float>> const& f)
+std::vector<float> CommsLib::Abs2Avx(std::vector<std::complex<float>> const& f)
 {
     size_t length = 2 * f.size();
     float* in = (float*)(f.data());
@@ -305,12 +308,13 @@ std::vector<float> CommsLib::abs2_avx(std::vector<std::complex<float>> const& f)
         }
     }
 
-    for (size_t i = rem; i < length; i += 2)
+    for (size_t i = rem; i < length; i += 2) {
         outf[i / 2] = in[i] * in[i] + in[i + 1] * in[i + 1];
+    }
     return out;
 }
 
-std::vector<int32_t> CommsLib::abs2_avx(
+std::vector<int32_t> CommsLib::Abs2Avx(
     std::vector<std::complex<int16_t>> const& f)
 {
     size_t len = f.size();
@@ -319,14 +323,14 @@ std::vector<int32_t> CommsLib::abs2_avx(
     std::vector<int32_t> out(len, 0);
     __m256i* outf = (__m256i*)out.data();
 
-    size_t vecSize = len / AVX_PACKED_CS;
-    for (size_t i = 0; i < vecSize; i++) {
+    size_t vec_size = len / AVX_PACKED_CS;
+    for (size_t i = 0; i < vec_size; i++) {
         __m256i data0 = _mm256_loadu_si256(in0 + i);
         __m256i mag = _mm256_madd_epi16(data0, data0);
         _mm256_storeu_si256(outf + i, mag);
     }
 
-    for (size_t i = vecSize * AVX_PACKED_CS; i < len; i++) {
+    for (size_t i = vec_size * AVX_PACKED_CS; i < len; i++) {
         int16_t i0 = f[i].real();
         int16_t q0 = f[i].imag();
         out[i] = i0 * i0 + q0 * q0;
@@ -335,7 +339,7 @@ std::vector<int32_t> CommsLib::abs2_avx(
     return out;
 }
 
-std::vector<std::complex<int16_t>> CommsLib::correlate_avx(
+std::vector<std::complex<int16_t>> CommsLib::CorrelateAvx(
     std::vector<std::complex<int16_t>> const& f,
     std::vector<std::complex<int16_t>> const& g)
 {
@@ -364,7 +368,7 @@ std::vector<std::complex<int16_t>> CommsLib::correlate_avx(
         for (size_t j = 0; j < length1; j++) {
             __m256i* in_temp = (__m256i*)(in.data() + (i + j) * sz);
             __m256i data = _mm256_loadu_si256(in_temp);
-            __m256i prod = __m256_complex_cs16_mult(data, seq_samp[j], true);
+            __m256i prod = M256ComplexCs16Mult(data, seq_samp[j], true);
             accm = _mm256_add_epi16(prod, accm);
         }
         __m256i* out_temp = (__m256i*)(out.data() + i * sz);
@@ -374,7 +378,7 @@ std::vector<std::complex<int16_t>> CommsLib::correlate_avx(
     return out;
 }
 
-std::vector<std::complex<float>> CommsLib::correlate_avx(
+std::vector<std::complex<float>> CommsLib::CorrelateAvx(
     std::vector<std::complex<float>> const& f,
     std::vector<std::complex<float>> const& g)
 {
@@ -409,7 +413,7 @@ std::vector<std::complex<float>> CommsLib::correlate_avx(
         __m256 accm = _mm256_setzero_ps();
         for (size_t j = 0; j < length1; j++) {
             __m256 data = _mm256_loadu_ps(in0 + i + j * 2);
-            __m256 prod = __m256_complex_cf32_mult(data, seq_samp[j], true);
+            __m256 prod = M256ComplexCf32Mult(data, seq_samp[j], true);
             accm = _mm256_add_ps(prod, accm);
         }
         _mm256_storeu_ps(outf + i, accm);
@@ -417,7 +421,7 @@ std::vector<std::complex<float>> CommsLib::correlate_avx(
     return out;
 }
 
-std::vector<float> CommsLib::correlate_avx_s(
+std::vector<float> CommsLib::CorrelateAvxS(
     std::vector<float> const& f, std::vector<float> const& g)
 {
     // assuming length0 is larger or equal to length1

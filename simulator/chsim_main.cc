@@ -26,6 +26,6 @@ int main(int argc, char* argv[])
     auto* sim = new ChannelSim(bs_config, ue_config, FLAGS_bs_threads,
         FLAGS_ue_threads, FLAGS_worker_threads, FLAGS_core_offset,
         FLAGS_chan_model, FLAGS_chan_snr);
-    sim->start();
+    sim->Start();
     return 0;
 }
