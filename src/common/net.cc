@@ -4,7 +4,7 @@
 #include <cstdlib> /* std::exit */
 #include <cstring> /* std::strerror, std::memset, std::memcpy */
 
-void set_socket_buf_size(int socket_local, int sock_buf_size)
+void SetSocketBufSize(int socket_local, int sock_buf_size)
 {
     // use SO_REUSEPORT option, so that multiple sockets could receive packets
     // simultaneously, though the load is not balance
@@ -20,7 +20,7 @@ void set_socket_buf_size(int socket_local, int sock_buf_size)
     }
 }
 
-int setup_socket_ipv4(int port_id, bool set_sock_size, int sock_buf_size)
+int SetupSocketIpv4(int port_id, bool set_sock_size, int sock_buf_size)
 {
     struct sockaddr_in local_addr;
     local_addr.sin_family = AF_INET;
@@ -33,8 +33,9 @@ int setup_socket_ipv4(int port_id, bool set_sock_size, int sock_buf_size)
         std::exit(0);
     }
 
-    if (set_sock_size)
-        set_socket_buf_size(socket_local, sock_buf_size);
+    if (set_sock_size) {
+        SetSocketBufSize(socket_local, sock_buf_size);
+}
 
     if (bind(socket_local, (struct sockaddr*)&local_addr, sizeof(local_addr))
         != 0) {
@@ -44,7 +45,7 @@ int setup_socket_ipv4(int port_id, bool set_sock_size, int sock_buf_size)
     return socket_local;
 }
 
-int setup_socket_ipv6(int port_id, bool set_sock_size, int sock_buf_size)
+int SetupSocketIpv6(int port_id, bool set_sock_size, int sock_buf_size)
 {
     struct sockaddr_in6 local_addr;
     local_addr.sin6_family = AF_INET6;
@@ -58,8 +59,9 @@ int setup_socket_ipv6(int port_id, bool set_sock_size, int sock_buf_size)
     } else {
         std::printf("Created IPV6 socket on port %d\n", port_id);
     }
-    if (set_sock_size)
-        set_socket_buf_size(socket_local, sock_buf_size);
+    if (set_sock_size) {
+        SetSocketBufSize(socket_local, sock_buf_size);
+}
 
     if (bind(socket_local, (struct sockaddr*)&local_addr, sizeof(local_addr))
         != 0) {
@@ -69,7 +71,7 @@ int setup_socket_ipv6(int port_id, bool set_sock_size, int sock_buf_size)
     return socket_local;
 }
 
-void setup_sockaddr_local_ipv4(struct sockaddr_in* local_addr, int port_id)
+void SetupSockaddrLocalIpv4(struct sockaddr_in* local_addr, int port_id)
 {
     (*local_addr).sin_family = AF_INET;
     (*local_addr).sin_port = htons(port_id);
@@ -77,14 +79,14 @@ void setup_sockaddr_local_ipv4(struct sockaddr_in* local_addr, int port_id)
     std::memset((*local_addr).sin_zero, 0, sizeof((*local_addr).sin_zero));
 }
 
-void setup_sockaddr_local_ipv6(struct sockaddr_in6* local_addr, int port_id)
+void SetupSockaddrLocalIpv6(struct sockaddr_in6* local_addr, int port_id)
 {
     (*local_addr).sin6_family = AF_INET6;
     (*local_addr).sin6_port = htons(port_id);
     (*local_addr).sin6_addr = in6addr_any;
 }
 
-void setup_sockaddr_remote_ipv4(
+void SetupSockaddrRemoteIpv4(
     struct sockaddr_in* remote_addr, int port_id, const char* remote_inet_addr)
 {
     (*remote_addr).sin_family = AF_INET;
@@ -93,7 +95,7 @@ void setup_sockaddr_remote_ipv4(
     std::memset((*remote_addr).sin_zero, 0, sizeof((*remote_addr).sin_zero));
 }
 
-void setup_sockaddr_remote_ipv6(
+void SetupSockaddrRemoteIpv6(
     struct sockaddr_in6* remote_addr, int port_id, const char* remote_inet_addr)
 {
     (*remote_addr).sin6_family = AF_INET6;

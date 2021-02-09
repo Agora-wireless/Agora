@@ -22,7 +22,7 @@
 
 #include "comms-lib.h"
 
-size_t CommsLib::find_pilot_seq(std::vector<std::complex<float>> iq,
+size_t CommsLib::FindPilotSeq(std::vector<std::complex<float>> iq,
     std::vector<std::complex<float>> pilot, size_t seq_len)
 {
 
@@ -34,10 +34,10 @@ size_t CommsLib::find_pilot_seq(std::vector<std::complex<float>> iq,
     }
 
     // Equivalent to numpy's sign function
-    auto iq_sign = CommsLib::csign(iq);
+    auto iq_sign = CommsLib::Csign(iq);
 
     // Convolution
-    auto pilot_corr = CommsLib::convolve(iq_sign, pilot_conj);
+    auto pilot_corr = CommsLib::Convolve(iq_sign, pilot_conj);
 
     // Find all peaks
     auto best_peak = std::max_element(pilot_corr.begin(), pilot_corr.end())
@@ -45,7 +45,7 @@ size_t CommsLib::find_pilot_seq(std::vector<std::complex<float>> iq,
     return best_peak;
 }
 
-int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
+int CommsLib::FindLts(std::vector<std::complex<double>> iq, int seqLen)
 {
     /*
      * Find 802.11-based LTS (Long Training Sequence)
@@ -61,7 +61,7 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
     int best_peak;
 
     // Original LTS sequence
-    lts_seq = CommsLib::getSequence(seqLen, LTS_SEQ);
+    lts_seq = CommsLib::GetSequence(seqLen, kLtsSeq);
 
     // Re-arrange into complex vector, flip, and compute conjugate
     std::vector<std::complex<double>> lts_sym;
@@ -76,10 +76,10 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
     }
 
     // Equivalent to numpy's sign function
-    auto iq_sign = CommsLib::csign(iq);
+    auto iq_sign = CommsLib::Csign(iq);
 
     // Convolution
-    auto lts_corr = CommsLib::convolve(iq_sign, lts_sym_conj);
+    auto lts_corr = CommsLib::Convolve(iq_sign, lts_sym_conj);
     auto lts_peak = *std::max_element(lts_corr.begin(), lts_corr.end());
 
     // Find all peaks
@@ -93,7 +93,7 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
 
     std::vector<std::vector<int>> x_vec(peaks.size());
     std::vector<std::vector<int>> y_vec(peaks.size());
-    CommsLib::meshgrid(peaks, peaks, x_vec, y_vec);
+    CommsLib::Meshgrid(peaks, peaks, x_vec, y_vec);
 
     // Find peaks that are 64 samples apart
     std::vector<int> valid_peaks;
@@ -115,22 +115,23 @@ int CommsLib::findLTS(std::vector<std::complex<double>> iq, int seqLen)
     return best_peak;
 }
 
-float CommsLib::find_max_abs(Table<complex_float> in, size_t dim1, size_t dim2)
+float CommsLib::FindMaxAbs(Table<complex_float> in, size_t dim1, size_t dim2)
 {
     float max_val = 0;
     for (size_t i = 0; i < dim1; i++) {
-        float cur_max_val = CommsLib::find_max_abs(in[i], dim2);
-        if (cur_max_val > max_val)
+        float cur_max_val = CommsLib::FindMaxAbs(in[i], dim2);
+        if (cur_max_val > max_val) {
             max_val = cur_max_val;
+        }
     }
     return max_val;
 }
 
-float CommsLib::find_max_abs(complex_float* in, size_t len)
+float CommsLib::FindMaxAbs(complex_float* in, size_t len)
 {
     float max_val = 0;
     for (size_t j = 0; j < len; j++) {
-        auto cur_val = CommsLib::abs_cf(in[j]);
+        auto cur_val = CommsLib::AbsCf(in[j]);
         if (cur_val > max_val) {
             max_val = cur_val;
         }
@@ -138,7 +139,7 @@ float CommsLib::find_max_abs(complex_float* in, size_t len)
     return max_val;
 }
 
-void CommsLib::meshgrid(std::vector<int> x_in, std::vector<int> y_in,
+void CommsLib::Meshgrid(std::vector<int> x_in, std::vector<int> y_in,
     std::vector<std::vector<int>>& x, std::vector<std::vector<int>>& y)
 {
     /*
@@ -164,7 +165,7 @@ void CommsLib::meshgrid(std::vector<int> x_in, std::vector<int> y_in,
 }
 
 template <typename T>
-std::vector<std::complex<T>> CommsLib::csign(std::vector<std::complex<T>> iq)
+std::vector<std::complex<T>> CommsLib::Csign(std::vector<std::complex<T>> iq)
 {
     /*
      * Return element-wise indication of the sign of a number (for complex
@@ -190,7 +191,7 @@ std::vector<std::complex<T>> CommsLib::csign(std::vector<std::complex<T>> iq)
 }
 
 template <typename T>
-std::vector<T> CommsLib::convolve(std::vector<std::complex<T>> const& f,
+std::vector<T> CommsLib::Convolve(std::vector<std::complex<T>> const& f,
     std::vector<std::complex<T>> const& g)
 {
     /* Convolution of two vectors
@@ -213,64 +214,67 @@ std::vector<T> CommsLib::convolve(std::vector<std::complex<T>> const& f,
     return out;
 }
 
-std::vector<float> CommsLib::magnitudeFFT(
+std::vector<float> CommsLib::MagnitudeFft(
     std::vector<std::complex<float>> const& samps,
     std::vector<float> const& win, size_t fftSize)
 {
-    std::vector<std::complex<float>> preFFT(samps.size());
+    std::vector<std::complex<float>> pre_fft(samps.size());
 
     for (size_t n = 0; n < fftSize; n++) {
-        preFFT[n] = samps[n] * win[n];
+        pre_fft[n] = samps[n] * win[n];
     }
 
-    std::vector<std::complex<float>> fftSamps = CommsLib::FFT(preFFT, fftSize);
+    std::vector<std::complex<float>> fft_samps
+        = CommsLib::FFT(pre_fft, fftSize);
 
     // compute magnitudes
-    std::vector<float> fftMag;
-    fftMag.reserve(fftSize);
+    std::vector<float> fft_mag;
+    fft_mag.reserve(fftSize);
     for (size_t n = fftSize / 2; n < fftSize; n++) {
-        fftMag.push_back(std::norm(fftSamps[n]));
+        fft_mag.push_back(std::norm(fft_samps[n]));
     }
     for (size_t n = 0; n < fftSize / 2; n++) {
-        fftMag.push_back(std::norm(fftSamps[n]));
+        fft_mag.push_back(std::norm(fft_samps[n]));
     }
-    std::reverse(
-        fftMag.begin(), fftMag.end()); // not sure why we need reverse here, but
+    std::reverse(fft_mag.begin(),
+        fft_mag.end()); // not sure why we need reverse here, but
     // this seems to give the right spectrum
-    return fftMag;
+    return fft_mag;
 }
 
 // Take ffsSize samples of (1 - cos(x)) / 2 from 0 up to 2pi
-std::vector<float> CommsLib::hannWindowFunction(size_t fftSize)
+std::vector<float> CommsLib::HannWindowFunction(size_t fftSize)
 {
-    std::vector<float> winFcn(1, 0);
+    std::vector<float> win_fcn(1, 0);
     double step = 2 * M_PI / fftSize;
 
     // Compute the samples for the first half.
     for (size_t n = 1; n < fftSize / 2; n++) {
-        winFcn.push_back((1 - std::cos(step * n)) / 2);
+        win_fcn.push_back((1 - std::cos(step * n)) / 2);
     }
     // If a sample lies at the center, just use (1-cos(pi))/2 == 1.
-    if (fftSize % 2 == 0)
-        winFcn.push_back(1);
-    // The second half is a mirror image of the first, so just copy.
-    for (size_t n = fftSize / 2 + 1; n < fftSize; n++)
-        winFcn.push_back(winFcn[fftSize - n]);
-    return winFcn;
-}
-
-double CommsLib::windowFunctionPower(std::vector<float> const& win)
-{
-    double windowPower = (0);
-    size_t N = win.size();
-    for (size_t n = 0; n < win.size(); n++) {
-        windowPower += std::norm(win[n]);
+    if (fftSize % 2 == 0) {
+        win_fcn.push_back(1);
     }
-    windowPower = std::sqrt(windowPower / N);
-    return 20 * std::log10(N * windowPower);
+    // The second half is a mirror image of the first, so just copy.
+    for (size_t n = fftSize / 2 + 1; n < fftSize; n++) {
+        win_fcn.push_back(win_fcn[fftSize - n]);
+    }
+    return win_fcn;
 }
 
-float CommsLib::findTone(std::vector<float> const& magnitude, double winGain,
+double CommsLib::WindowFunctionPower(std::vector<float> const& win)
+{
+    double window_power = (0);
+    size_t n = win.size();
+    for (size_t n = 0; n < win.size(); n++) {
+        window_power += std::norm(win[n]);
+    }
+    window_power = std::sqrt(window_power / n);
+    return 20 * std::log10(n * window_power);
+}
+
+float CommsLib::FindTone(std::vector<float> const& magnitude, double winGain,
     double fftBin, size_t fftSize, const size_t delta)
 {
     /*
@@ -283,23 +287,25 @@ float CommsLib::findTone(std::vector<float> const& magnitude, double winGain,
         = std::max<size_t>(0, std::lround((fftBin + 0.5) * fftSize) - delta);
     size_t last = std::min<size_t>(
         fftSize - 1, std::lround((fftBin + 0.5) * fftSize) + delta);
-    float refLevel = magnitude[last];
+    float ref_level = magnitude[last];
     for (size_t n = first; n < last; n++) {
-        if (magnitude[n] > refLevel)
-            refLevel = magnitude[n];
+        if (magnitude[n] > ref_level) {
+            ref_level = magnitude[n];
+        }
     }
-    return 10 * std::max(std::log10(refLevel), (float)(-20.0)) - (float)winGain;
+    return 10 * std::max(std::log10(ref_level), (float)(-20.0))
+        - (float)winGain;
 }
 
-float CommsLib::measureTone(std::vector<std::complex<float>> const& samps,
+float CommsLib::MeasureTone(std::vector<std::complex<float>> const& samps,
     std::vector<float> const& win, double winGain, double fftBin,
     size_t fftSize, const size_t delta)
 {
-    return findTone(
-        magnitudeFFT(samps, win, fftSize), winGain, fftBin, fftSize, delta);
+    return FindTone(
+        MagnitudeFft(samps, win, fftSize), winGain, fftBin, fftSize, delta);
 }
 
-std::vector<int> CommsLib::getDataSc(int fftSize)
+std::vector<int> CommsLib::GetDataSc(int fftSize)
 {
     std::vector<int> data_sc;
     if (fftSize == 64) {
@@ -307,13 +313,15 @@ std::vector<int> CommsLib::getDataSc(int fftSize)
             17, 18, 19, 20, 22, 23, 24, 25, 26, 38, 39, 40, 41, 42, 44, 45, 46,
             47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 58, 59, 60, 61, 62, 63 };
         data_sc.assign(sc_ind, sc_ind + 48);
-    } else
-        for (int i = 0; i < fftSize; i++)
+    } else {
+        for (int i = 0; i < fftSize; i++) {
             data_sc.push_back(i);
+        }
+    }
     return data_sc;
 }
 
-std::vector<int> CommsLib::getNullSc(int fftSize)
+std::vector<int> CommsLib::GetNullSc(int fftSize)
 {
     std::vector<int> null_sc;
     if (fftSize == 64) {
@@ -323,7 +331,7 @@ std::vector<int> CommsLib::getNullSc(int fftSize)
     return null_sc;
 }
 
-std::vector<int> CommsLib::getPilotScInd(int fftSize)
+std::vector<int> CommsLib::GetPilotScInd(int fftSize)
 {
     std::vector<int> pilot_sc;
     if (fftSize == 64) {
@@ -333,7 +341,7 @@ std::vector<int> CommsLib::getPilotScInd(int fftSize)
     return pilot_sc;
 }
 
-std::vector<std::complex<float>> CommsLib::getPilotSc(int fftSize)
+std::vector<std::complex<float>> CommsLib::GetPilotSc(int fftSize)
 {
     std::vector<std::complex<float>> pilot_sc;
     if (fftSize == 64) {
@@ -362,8 +370,9 @@ std::vector<std::complex<float>> CommsLib::IFFT(
         }
         //std::cout << "IFFT output is normalized with "
         //         << std::to_string(max_val) << std::endl;
-        for (int i = 0; i < fftsize; i++)
+        for (int i = 0; i < fftsize; i++) {
             in[i] /= (max_val / scale);
+        }
     } else {
         for (int i = 0; i < fftsize; i++) {
             in[i] /= fftsize;
@@ -406,9 +415,10 @@ void CommsLib::IFFT(complex_float* in, int fftsize, bool normalize)
         }
         //std::cout << "IFFT output is normalized with "
         //         << std::to_string(max_val) << std::endl;
-        for (int i = 0; i < fftsize; i++)
+        for (int i = 0; i < fftsize; i++) {
             in[i] = { in[i].re / (max_val / scale),
                 in[i].im / (max_val / scale) };
+        }
     } else {
         for (int i = 0; i < fftsize; i++) {
             in[i].re /= fftsize;
@@ -428,7 +438,7 @@ void CommsLib::FFT(complex_float* in, int fftsize)
     DftiFreeDescriptor(&mkl_handle);
 }
 
-std::vector<std::complex<float>> CommsLib::compose_partial_pilot_sym(
+std::vector<std::complex<float>> CommsLib::ComposePartialPilotSym(
     std::vector<std::complex<float>> pilot, size_t offset, size_t pilot_sc_num,
     size_t fftSize, size_t dataSize, size_t dataStart, size_t CP_LEN,
     bool interleaved_pilot, bool timeDomain)
@@ -441,16 +451,18 @@ std::vector<std::complex<float>> CommsLib::compose_partial_pilot_sym(
     }
     if (timeDomain) {
         auto pilot_cf32 = CommsLib::IFFT(fft_in, fftSize);
-        for (size_t i = 0; i < pilot_cf32.size(); i++)
+        for (size_t i = 0; i < pilot_cf32.size(); i++) {
             pilot_cf32[i] /= std::sqrt(period);
+        }
         pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
             pilot_cf32.end()); // add CP
         return pilot_cf32;
-    } else
+    } else {
         return fft_in;
+    }
 }
 
-void CommsLib::ifft2tx(complex_float* in, std::complex<short>* out, size_t N,
+void CommsLib::Ifft2tx(complex_float* in, std::complex<short>* out, size_t N,
     size_t prefix, size_t cp, float scale)
 {
     for (size_t j = 0; j < N; j++) {
@@ -463,11 +475,11 @@ void CommsLib::ifft2tx(complex_float* in, std::complex<short>* out, size_t N,
     }
 }
 
-std::vector<std::complex<float>> CommsLib::modulate(
+std::vector<std::complex<float>> CommsLib::Modulate(
     std::vector<int8_t> in, int type)
 {
     std::vector<std::complex<float>> out(in.size());
-    if (type == QPSK) {
+    if (type == kQpsk) {
         float qpsk_table[2][4]; // = init_qpsk();
         float scale = 1 / sqrt(2);
         float mod_qpsk[2] = { -scale, scale };
@@ -476,15 +488,15 @@ std::vector<std::complex<float>> CommsLib::modulate(
             qpsk_table[1][i] = mod_qpsk[i % 2];
         }
         for (size_t i = 0; i < in.size(); i++) {
-            if (in[i] >= 0 and in[i] < 4)
+            if (in[i] >= 0 and in[i] < 4) {
                 out[i] = std::complex<float>(
                     qpsk_table[0][in[i]], qpsk_table[1][in[i]]);
-            else {
+            } else {
                 std::cout << "Error: No compatible input vector!" << std::endl;
                 break;
             }
         }
-    } else if (type == QAM16) {
+    } else if (type == kQaM16) {
         float qam16_table[2][16]; //= init_qam16();
         float scale = 1 / sqrt(10);
         float mod_16qam[4] = { -3 * scale, -1 * scale, 3 * scale, scale };
@@ -493,15 +505,15 @@ std::vector<std::complex<float>> CommsLib::modulate(
             qam16_table[1][i] = mod_16qam[i % 4];
         }
         for (size_t i = 0; i < in.size(); i++) {
-            if (in[i] >= 0 and in[i] < 16)
+            if (in[i] >= 0 and in[i] < 16) {
                 out[i] = std::complex<float>(
                     qam16_table[0][in[i]], qam16_table[1][in[i]]);
-            else {
+            } else {
                 std::cout << "Error: No compatible input vector!" << std::endl;
                 break;
             }
         }
-    } else if (type == QAM64) {
+    } else if (type == kQaM64) {
         float qam64_table[2][64]; // = init_qam64();
         float scale = 1 / sqrt(42);
         float mod_64qam[8] = { -7 * scale, -5 * scale, -3 * scale, -1 * scale,
@@ -511,10 +523,10 @@ std::vector<std::complex<float>> CommsLib::modulate(
             qam64_table[1][i] = mod_64qam[i % 8];
         }
         for (size_t i = 0; i < in.size(); i++) {
-            if (in[i] >= 0 and in[i] < 64)
+            if (in[i] >= 0 and in[i] < 64) {
                 out[i] = std::complex<float>(
                     qam64_table[0][in[i]], qam64_table[1][in[i]]);
-            else {
+            } else {
                 std::cout << "Error: No compatible input vector!" << std::endl;
                 break;
             }
@@ -527,7 +539,7 @@ std::vector<std::complex<float>> CommsLib::modulate(
     return out;
 }
 
-std::vector<std::complex<float>> CommsLib::seqCyclicShift(
+std::vector<std::complex<float>> CommsLib::SeqCyclicShift(
     std::vector<std::complex<float>> in, float alpha)
 {
     std::vector<std::complex<float>> out(in.size(), 0);
@@ -537,11 +549,11 @@ std::vector<std::complex<float>> CommsLib::seqCyclicShift(
     return out;
 }
 
-std::vector<std::vector<double>> CommsLib::getSequence(int N, int type)
+std::vector<std::vector<double>> CommsLib::GetSequence(int N, int type)
 {
     std::vector<std::vector<double>> matrix;
 
-    if (type == STS_SEQ) {
+    if (type == kStsSeq) {
         // STS - 802.11 Short training sequence (one symbol)
         matrix.resize(2);
 
@@ -566,14 +578,14 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type)
             }
             matrix[j] = a;
         }
-    } else if (type == LTS_F_SEQ) {
+    } else if (type == kLtsFSeq) {
         matrix.resize(1);
         std::vector<double> lts_f = { 0, 1, -1, -1, 1, 1, -1, 1, -1, 1, -1, -1,
             -1, -1, -1, 1, 1, -1, -1, 1, -1, 1, -1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1, 1, 1, 1, 1, 1,
             -1, -1, 1, 1, -1, 1, -1, 1, 1, 1, 1 };
         matrix[0] = (lts_f);
-    } else if (type == LTS_SEQ) {
+    } else if (type == kLtsSeq) {
         // LTS - 802.11 Long training sequence (2.5 symbols, cp length of 32
         // samples)
         matrix.resize(2);
@@ -688,10 +700,10 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type)
 
         // Grab the last N samples (sequence length specified, provide more
         // flexibility)
-        int startIdx = 160 - N;
+        int start_idx = 160 - N;
         for (int j = 0; j < 2; j++) {
             std::vector<double> a;
-            for (int i = startIdx; i < 160; i++) {
+            for (int i = start_idx; i < 160; i++) {
                 if (j == 0) {
                     a.push_back(lts_re[i]);
                 } else {
@@ -700,7 +712,7 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type)
             }
             matrix[j] = a;
         }
-    } else if (type == LTE_ZADOFF_CHU) {
+    } else if (type == kLteZadoffChu) {
         // https://www.etsi.org/deliver/etsi_ts/136200_136299/136211/10.01.00_60/ts_136211v100100p.pdf
         // ETSI TS 136 211 V10.1.0 (sec. 5.5)
         matrix.resize(2);
@@ -732,24 +744,24 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type)
             1847, 1861, 1867, 1871, 1873, 1877, 1879, 1889, 1901, 1907, 1913,
             1931, 1933, 1949, 1951, 1973, 1979, 1987, 1993, 1997, 1999, 2003,
             2011, 2017, 2027, 2029, 2039 };
-        int M = prime[308];
+        int m = prime[308];
         for (int j = 0; j < 308; j++) {
             if (prime[j] < N && prime[j + 1] > N) {
-                M = prime[j];
+                m = prime[j];
                 break;
             }
         }
-        double qh = M * (u + 1) / 31;
+        double qh = m * (u + 1) / 31;
         double q = std::floor(qh + 0.5) + v * std::pow(-1, std::floor(2 * qh));
         std::vector<double> a;
         for (int i = 0; i < N; i++) {
-            int m = i % M;
-            double a_re = std::cos(-M_PI * q * m * (m + 1) / M);
-            double a_im = std::sin(-M_PI * q * m * (m + 1) / M);
+            int m_local = i % m;
+            double a_re = std::cos(-M_PI * q * m_local * (m_local + 1) / m);
+            double a_im = std::sin(-M_PI * q * m_local * (m_local + 1) / m);
             matrix[0].push_back(a_re);
             matrix[1].push_back(a_im);
         }
-    } else if (type == GOLD_IFFT) {
+    } else if (type == kGoldIfft) {
         // Gold IFFT Sequence - seq_length=128, cp=32, upsample=1
         matrix.resize(2);
 
@@ -818,14 +830,15 @@ std::vector<std::vector<double>> CommsLib::getSequence(int N, int type)
             }
             matrix[j] = a;
         }
-    } else if (type == HADAMARD) {
+    } else if (type == kHadamard) {
         // Hadamard - using Sylvester's construction for powers of 2.
         matrix.resize(N);
         if ((N & (N - 1)) == 0) {
             for (int i = 0; i < N; i++) {
                 matrix[i].resize(N);
-                for (int j = 0; j < N; j++)
-                    matrix[i][j] = hadamard2(i, j);
+                for (int j = 0; j < N; j++) {
+                    matrix[i][j] = Hadamard2(i, j);
+                }
             }
         }
     }

@@ -9,62 +9,65 @@
 #include "encoder.h"
 
 namespace avx2enc {
-void scatter_slow(
+void ScatterSlow(
     uint8_t* dst, const uint8_t* src, unsigned num_bits, uint8_t src_offbits)
 {
     // Process byte by byte
     while (num_bits != 0) {
-        unsigned num_bits_inB = MIN(8, num_bits);
-        uint8_t newB;
-        if (src_offbits == 0)
-            newB = src[0];
-        else
-            newB = ((src[0] & 0xFF) >> src_offbits)
+        unsigned num_bits_in_b = MIN(8, num_bits);
+        uint8_t new_b;
+        if (src_offbits == 0) {
+            new_b = src[0];
+        } else {
+            new_b = ((src[0] & 0xFF) >> src_offbits)
                 | ((src[1] & 0xFF) << (8 - src_offbits));
-        dst[0] = newB & BITMASKU8(num_bits_inB);
-        num_bits -= num_bits_inB;
+}
+        dst[0] = new_b & BITMASKU8(num_bits_in_b);
+        num_bits -= num_bits_in_b;
 
         dst++;
         src++;
     }
 }
 
-void gather_slow(
+void GatherSlow(
     uint8_t* dst, const uint8_t* src, int16_t num_bits, uint8_t dst_offbits)
 {
     // Process byte by byte
-    bool firstByte = true;
+    bool first_byte = true;
     while (num_bits > 0) {
-        unsigned num_bits_inB = MIN(8, num_bits);
-        uint8_t newB;
+        unsigned num_bits_in_b = MIN(8, num_bits);
+        uint8_t new_b;
         if (dst_offbits == 0) {
             // simple copy
-            newB = src[0] & BITMASKU8(num_bits_inB);
+            new_b = src[0] & BITMASKU8(num_bits_in_b);
             src++;
         } else {
-            if (firstByte) {
-                newB = (dst[0] & BITMASKU8(dst_offbits))
+            if (first_byte) {
+                new_b = (dst[0] & BITMASKU8(dst_offbits))
                     | (src[0] & 0xFF) << dst_offbits;
-                num_bits_inB = 8 - dst_offbits;
-                firstByte = false;
+                num_bits_in_b = 8 - dst_offbits;
+                first_byte = false;
             } else {
-                newB = ((src[0] & 0xFF) >> (8 - dst_offbits)
+                new_b = ((src[0] & 0xFF) >> (8 - dst_offbits)
                            | (src[1] & 0xFF) << dst_offbits)
-                    & BITMASKU8(num_bits_inB);
+                    & BITMASKU8(num_bits_in_b);
                 src++;
             }
         }
-        dst[0] = newB;
-        num_bits -= num_bits_inB;
+        dst[0] = new_b;
+        num_bits -= num_bits_in_b;
         dst++;
     }
 }
 
-void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
+void Adapter2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
     uint32_t cbLen, int8_t direct)
 {
-    int8_t *p_buff_0, *p_buff_1;
-    uint8_t dst_offbits = 0, src_offbits = 0;
+    int8_t *p_buff_0;
+    int8_t *p_buff_1;
+    uint8_t dst_offbits = 0;
+    uint8_t src_offbits = 0;
     p_buff_0 = pBuff0;
     p_buff_1 = pBuff1;
 
@@ -73,22 +76,22 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
         p_buff_0 is the input, p_buff_1 is the buffer for barrel shifter */
         for (size_t i = 0; i < cbLen / zcSize; i++) {
 
-            scatter_slow(
+            ScatterSlow(
                 (uint8_t*)p_buff_1, (uint8_t*)p_buff_0, zcSize, src_offbits);
-            uint8_t byteOffset = (src_offbits + zcSize) >> 3;
-            src_offbits = (src_offbits + zcSize) - (byteOffset << 3);
-            p_buff_0 = p_buff_0 + byteOffset;
+            uint8_t byte_offset = (src_offbits + zcSize) >> 3;
+            src_offbits = (src_offbits + zcSize) - (byte_offset << 3);
+            p_buff_0 = p_buff_0 + byte_offset;
             p_buff_1 = p_buff_1 + kProcBytes;
         }
     } else {
         /* storing encoded bits into output buffer
         p_buff_0 is the output, p_buff_1 is the buffer for processing data*/
         for (size_t i = 0; i < cbLen / zcSize; i++) {
-            gather_slow((uint8_t*)p_buff_0, (uint8_t*)p_buff_1, (int16_t)zcSize,
+            GatherSlow((uint8_t*)p_buff_0, (uint8_t*)p_buff_1, (int16_t)zcSize,
                 dst_offbits);
-            uint8_t byteOffset = (dst_offbits + zcSize) >> 3;
-            dst_offbits = (dst_offbits + zcSize) - (byteOffset << 3);
-            p_buff_0 = p_buff_0 + byteOffset;
+            uint8_t byte_offset = (dst_offbits + zcSize) >> 3;
+            dst_offbits = (dst_offbits + zcSize) - (byte_offset << 3);
+            p_buff_0 = p_buff_0 + byte_offset;
             p_buff_1 = p_buff_1 + kProcBytes;
         }
     }
@@ -107,14 +110,19 @@ void adapter_2to64(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
 //            );
 // }
 
-void adapter_64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
+void Adapter64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
     uint32_t cbLen, int8_t direct)
 {
     /* after 64, z is always a multiple of 8 so no need for shifting bytes*/
 
-    int8_t *p_buff_0, *p_buff_1;
-    __m256i bit_mask, x0, x1;
-    int64_t e0, e1, e2;
+    int8_t *p_buff_0;
+    int8_t *p_buff_1;
+    __m256i bit_mask;
+    __m256i x0;
+    __m256i x1;
+    int64_t e0;
+    int64_t e1;
+    int64_t e2;
     int16_t byte_num = zcSize >> 3;
 
     p_buff_0 = pBuff0;
@@ -168,12 +176,14 @@ void adapter_64to256(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
     }
 }
 
-void adapter_288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
+void Adapter288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
     uint32_t cbLen, int8_t direct)
 {
     /* use two __m256i to store one segment of length zc */
-    int8_t *p_buff_in, *p_buff_out;
-    __m256i x0, bit_mask;
+    int8_t *p_buff_in;
+    int8_t *p_buff_out;
+    __m256i x0;
+    __m256i bit_mask;
 
     p_buff_in = pBuff0;
     p_buff_out = pBuff1;
@@ -198,13 +208,14 @@ void adapter_288to384(int8_t* pBuff0, int8_t* pBuff1, uint16_t zcSize,
     }
 }
 
-LDPC_ADAPTER_P ldpc_select_adapter_func(uint16_t zcSize)
+LDPC_ADAPTER_P LdpcSelectAdapterFunc(uint16_t zcSize)
 {
-    if (zcSize < 64)
-        return adapter_2to64;
-    else if (zcSize <= 256)
-        return adapter_64to256;
-    else
-        return adapter_288to384;
+    if (zcSize < 64) {
+        return Adapter2to64;
+    } else if (zcSize <= 256) {
+        return Adapter64to256;
+    } else {
+        return Adapter288to384;
+}
 }
 } // namespace avx2en

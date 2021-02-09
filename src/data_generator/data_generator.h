@@ -16,16 +16,16 @@ public:
 
         // The input informatioon bytes are {1, 2, 3, 1, 2, 3, ...} for UE 0,
         // {4, 5, 6, 4, 5, 6, ...} for UE 1, and so on
-        k123
+        kK123
     };
 
     DataGenerator(
         Config* cfg, uint64_t seed = 0, Profile profile = Profile::kRandom)
-        : cfg(cfg)
-        , profile(profile)
+        : cfg_(cfg)
+        , profile_(profile)
     {
         if (seed != 0) {
-            fast_rand.seed = seed;
+            fast_rand_.seed_ = seed;
         }
     }
 
@@ -37,30 +37,30 @@ public:
      * @param encoded_codeword The generated encoded codeword bit sequence
      * @param ue_id ID of the UE that this codeblock belongs to
      */
-    void gen_codeblock(std::vector<int8_t>& information,
+    void GenCodeblock(std::vector<int8_t>& information,
         std::vector<int8_t>& encoded_codeword, size_t ue_id)
     {
-        const LDPCconfig& lc = cfg->LDPC_config;
+        const LDPCconfig& lc = cfg_->ldpc_config_;
         std::vector<int8_t> parity;
-        parity.resize(ldpc_encoding_parity_buf_size(lc.Bg, lc.Zc));
+        parity.resize(LdpcEncodingParityBufSize(lc.bg_, lc.zc_));
 
-        information.resize(ldpc_encoding_input_buf_size(lc.Bg, lc.Zc));
-        encoded_codeword.resize(ldpc_encoding_encoded_buf_size(lc.Bg, lc.Zc));
+        information.resize(LdpcEncodingInputBufSize(lc.bg_, lc.zc_));
+        encoded_codeword.resize(LdpcEncodingEncodedBufSize(lc.bg_, lc.zc_));
 
-        for (size_t i = 0; i < lc.num_input_bytes(); i++) {
-            if (profile == Profile::kRandom) {
-                information.at(i) = static_cast<int8_t>(fast_rand.next_u32());
-            } else if (profile == Profile::k123) {
+        for (size_t i = 0; i < lc.NumInputBytes(); i++) {
+            if (profile_ == Profile::kRandom) {
+                information.at(i) = static_cast<int8_t>(fast_rand_.NextU32());
+            } else if (profile_ == Profile::kK123) {
                 information.at(i) = 1 + (ue_id * 3) + (i % 3);
             }
         }
 
-        ldpc_encode_helper(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc,
-            cfg->LDPC_config.nRows, &encoded_codeword.at(0), &parity.at(0),
+        LdpcEncodeHelper(cfg_->ldpc_config_.bg_, cfg_->ldpc_config_.zc_,
+            cfg_->ldpc_config_.n_rows_, &encoded_codeword.at(0), &parity.at(0),
             &information.at(0));
 
-        information.resize(lc.num_input_bytes());
-        encoded_codeword.resize(lc.num_encoded_bytes());
+        information.resize(lc.NumInputBytes());
+        encoded_codeword.resize(lc.NumEncodedBytes());
     }
 
     /**
@@ -68,37 +68,37 @@ public:
      * @param encoded_codeword The encoded LDPC codeword bit sequence
      * @return An array of complex floats with OFDM_DATA_NUM elements
      */
-    std::vector<complex_float> get_modulation(
+    std::vector<complex_float> GetModulation(
         const std::vector<int8_t>& encoded_codeword)
     {
-        std::vector<complex_float> modulated_codeword(cfg->OFDM_DATA_NUM);
-        std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
+        std::vector<complex_float> modulated_codeword(cfg_->ofdm_data_num_);
+        std::vector<uint8_t> mod_input(cfg_->ofdm_data_num_);
 
-        adapt_bits_for_mod(
+        AdaptBitsForMod(
             reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-            &mod_input[0], cfg->LDPC_config.num_encoded_bytes(),
-            cfg->mod_order_bits);
+            &mod_input[0], cfg_->ldpc_config_.NumEncodedBytes(),
+            cfg_->mod_order_bits_);
 
-        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
+        for (size_t i = 0; i < cfg_->ofdm_data_num_; i++) {
             modulated_codeword[i]
-                = mod_single_uint8(mod_input[i], cfg->mod_table);
+                = ModSingleUint8(mod_input[i], cfg_->mod_table_);
         }
         return modulated_codeword;
     }
 
-    std::vector<complex_float> get_modulation(
+    std::vector<complex_float> GetModulation(
         const int8_t* encoded_codeword, size_t num_bits)
     {
-        std::vector<complex_float> modulated_codeword(cfg->OFDM_DATA_NUM);
-        std::vector<uint8_t> mod_input(cfg->OFDM_DATA_NUM);
+        std::vector<complex_float> modulated_codeword(cfg_->ofdm_data_num_);
+        std::vector<uint8_t> mod_input(cfg_->ofdm_data_num_);
 
-        adapt_bits_for_mod(
+        AdaptBitsForMod(
             reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-            &mod_input[0], bits_to_bytes(num_bits), cfg->mod_order_bits);
+            &mod_input[0], BitsToBytes(num_bits), cfg_->mod_order_bits_);
 
-        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
+        for (size_t i = 0; i < cfg_->ofdm_data_num_; i++) {
             modulated_codeword[i]
-                = mod_single_uint8(mod_input[i], cfg->mod_table);
+                = ModSingleUint8(mod_input[i], cfg_->mod_table_);
         }
         return modulated_codeword;
     }
@@ -109,29 +109,29 @@ public:
      * @brief An array with OFDM_CA_NUM elements with the OFDM_DATA_NUM
      * modulated elements binned at the center
      */
-    std::vector<complex_float> bin_for_ifft(
+    std::vector<complex_float> BinForIfft(
         const std::vector<complex_float> modulated_codeword) const
     {
-        std::vector<complex_float> pre_ifft_symbol(cfg->OFDM_CA_NUM); // Zeroed
-        std::memcpy(&pre_ifft_symbol[cfg->OFDM_DATA_START],
-            &modulated_codeword[0], cfg->OFDM_DATA_NUM * sizeof(complex_float));
+        std::vector<complex_float> pre_ifft_symbol(cfg_->ofdm_ca_num_); // Zeroed
+        std::memcpy(&pre_ifft_symbol[cfg_->ofdm_data_start_],
+            &modulated_codeword[0], cfg_->ofdm_data_num_ * sizeof(complex_float));
 
         return pre_ifft_symbol;
     }
 
     /// Return the time-domain pilot symbol with OFDM_CA_NUM complex floats
-    std::vector<complex_float> get_common_pilot_time_domain() const
+    std::vector<complex_float> GetCommonPilotTimeDomain() const
     {
         const std::vector<std::complex<float>> zc_seq
-            = Utils::double_to_cfloat(CommsLib::getSequence(
-                cfg->OFDM_DATA_NUM, CommsLib::LTE_ZADOFF_CHU));
+            = Utils::DoubleToCfloat(CommsLib::GetSequence(
+                cfg_->ofdm_data_num_, CommsLib::kLteZadoffChu));
 
         const std::vector<std::complex<float>> zc_common_pilot
-            = CommsLib::seqCyclicShift(zc_seq, M_PI / 4.0); // Used in LTE SRS
+            = CommsLib::SeqCyclicShift(zc_seq, M_PI / 4.0); // Used in LTE SRS
 
-        std::vector<complex_float> ret(cfg->OFDM_CA_NUM); // Zeroed
-        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
-            ret[i + cfg->OFDM_DATA_START]
+        std::vector<complex_float> ret(cfg_->ofdm_ca_num_); // Zeroed
+        for (size_t i = 0; i < cfg_->ofdm_data_num_; i++) {
+            ret[i + cfg_->ofdm_data_start_]
                 = { zc_common_pilot[i].real(), zc_common_pilot[i].imag() };
         }
 
@@ -139,7 +139,7 @@ public:
     }
 
 private:
-    FastRand fast_rand; // A fast random number generator
-    Config* cfg; // The global Agora config
-    const Profile profile; // The pattern of the input byte sequence
+    FastRand fast_rand_; // A fast random number generator
+    Config* cfg_; // The global Agora config
+    const Profile profile_; // The pattern of the input byte sequence
 };

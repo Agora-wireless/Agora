@@ -5,76 +5,79 @@ using namespace arma;
 
 Channel::Channel(Config* config_bs, Config* config_ue,
     std::string in_channel_type, double in_channel_snr)
-    : bscfg(config_bs)
-    , uecfg(config_ue)
-    , sim_chan_model(in_channel_type)
-    , channel_snr_db(in_channel_snr)
+    : bscfg_(config_bs)
+    , uecfg_(config_ue)
+    , sim_chan_model_(in_channel_type)
+    , channel_snr_db_(in_channel_snr)
 {
-    bs_ant = bscfg->BS_ANT_NUM;
-    ue_ant = uecfg->UE_ANT_NUM;
-    n_samps = bscfg->sampsPerSymbol;
+    bs_ant_ = bscfg_->bs_ant_num_;
+    ue_ant_ = uecfg_->ue_ant_num_;
+    n_samps_ = bscfg_->samps_per_symbol_;
 
-    if (sim_chan_model == "AWGN")
-        chan_model = AWGN;
-    else if (sim_chan_model == "RAYLEIGH")
-        chan_model = RAYLEIGH;
-    else if (sim_chan_model == "RAN_3GPP") {
-        chan_model = RAN_3GPP;
+    if (sim_chan_model_ == "AWGN") {
+        chan_model_ = kAwgn;
+    } else if (sim_chan_model_ == "RAYLEIGH") {
+        chan_model_ = kRayleigh;
+    } else if (sim_chan_model_ == "RAN_3GPP") {
+        chan_model_ = kRan3Gpp;
         printf("3GPP Model in progress, setting to RAYLEIGH channel \n");
-        chan_model = RAYLEIGH;
-    } else
-        chan_model = AWGN;
+        chan_model_ = kRayleigh;
+    } else {
+        chan_model_ = kAwgn;
+}
 }
 
 Channel::~Channel() {}
 
-void Channel::apply_chan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
+void Channel::ApplyChan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
     const bool is_downlink, const bool is_newChan)
 {
-    cx_fmat fmat_H;
+    cx_fmat fmat_h;
 
     if (is_newChan) {
-        switch (chan_model) {
-        case AWGN: {
-            fmat rmat(ue_ant, bs_ant, fill::ones);
-            fmat imat(ue_ant, bs_ant, fill::zeros);
-            H = cx_fmat(rmat, imat);
+        switch (chan_model_) {
+        case kAwgn: {
+            fmat rmat(ue_ant_, bs_ant_, fill::ones);
+            fmat imat(ue_ant_, bs_ant_, fill::zeros);
+            h_ = cx_fmat(rmat, imat);
             // H = H / abs(H).max();
         } break;
 
-        case RAYLEIGH:
+        case kRayleigh:
             // Simple Uncorrelated Rayleigh Channel - Flat fading (single tap)
             {
-                fmat rmat(ue_ant, bs_ant, fill::randn);
-                fmat imat(ue_ant, bs_ant, fill::randn);
-                H = cx_fmat(rmat, imat);
-                H = (1 / sqrt(2)) * H;
+                fmat rmat(ue_ant_, bs_ant_, fill::randn);
+                fmat imat(ue_ant_, bs_ant_, fill::randn);
+                h_ = cx_fmat(rmat, imat);
+                h_ = (1 / sqrt(2)) * h_;
                 // H = H / abs(H).max();
             }
             break;
 
-        case RAN_3GPP:
-            lte_3gpp(fmat_src, fmat_dst);
+        case kRan3Gpp:
+            Lte3gpp(fmat_src, fmat_dst);
             break;
         }
     }
-    if (is_downlink)
-        fmat_H = fmat_src * H.st() / std::sqrt(bscfg->BS_ANT_NUM);
-    else
-        fmat_H = fmat_src * H;
-
-    // Add noise
-    awgn(fmat_H, fmat_dst);
-
-    if (kPrintChannelOutput)
-        Utils::print_mat(H, "H");
+    if (is_downlink) {
+        fmat_h = fmat_src * h_.st() / std::sqrt(bscfg_->bs_ant_num_);
+    } else {
+        fmat_h = fmat_src * h_;
 }
 
-void Channel::awgn(const cx_fmat& src, cx_fmat& dst)
+    // Add noise
+    Awgn(fmat_h, fmat_dst);
+
+    if (kPrintChannelOutput) {
+        Utils::PrintMat(h_, "H");
+}
+}
+
+void Channel::Awgn(const cx_fmat& src, cx_fmat& dst) const
 {
     int n_row = src.n_rows;
     int n_col = src.n_cols;
-    float snr_lin = pow(10, channel_snr_db / 10);
+    float snr_lin = pow(10, channel_snr_db_ / 10);
 
     // Power spectral density of noise
     fmat src_sq = square(abs(src));
@@ -106,11 +109,11 @@ void Channel::awgn(const cx_fmat& src, cx_fmat& dst)
     */
 }
 
-void Channel::lte_3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst)
+void Channel::Lte3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst)
 {
     // TODO - In progress (Use Rayleigh for now...)
-    cx_fmat H(randn<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM),
-        randn<fmat>(uecfg->UE_ANT_NUM, bscfg->BS_ANT_NUM));
-    H = (1 / sqrt(2)) * H;
-    fmat_dst = fmat_src * H;
+    cx_fmat h(randn<fmat>(uecfg_->ue_ant_num_, bscfg_->bs_ant_num_),
+        randn<fmat>(uecfg_->ue_ant_num_, bscfg_->bs_ant_num_));
+    h = (1 / sqrt(2)) * h;
+    fmat_dst = fmat_src * h;
 }

@@ -19,7 +19,7 @@ public:
     DoPrecode(Config* in_config, int in_tid,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
         Table<complex_float>& in_dl_ifft_buffer,
-        Table<int8_t>& dl_encoded_buffer, Stats* in_stats_manager);
+        Table<int8_t>& dl_encoded_or_raw_data, Stats* in_stats_manager);
     ~DoPrecode();
 
     /**
@@ -48,25 +48,25 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(size_t tag);
+    EventData launch(size_t tag);
 
     // Load input data for a single UE and a single subcarrier
-    void load_input_data(size_t symbol_idx_dl, size_t total_data_symbol_idx,
+    void LoadInputData(size_t symbol_idx_dl, size_t total_data_symbol_idx,
         size_t user_id, size_t sc_id, size_t sc_id_in_block);
-    void precoding_per_sc(
+    void PrecodingPerSc(
         size_t frame_slot, size_t sc_id, size_t sc_id_in_block);
 
 private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;
     Table<complex_float>& dl_ifft_buffer_;
-    Table<int8_t>& dl_raw_data;
-    Table<float> qam_table;
-    DurationStat* duration_stat;
-    complex_float* modulated_buffer_temp;
-    complex_float* precoded_buffer_temp;
+    Table<int8_t>& dl_raw_data_;
+    Table<float> qam_table_;
+    DurationStat* duration_stat_;
+    complex_float* modulated_buffer_temp_;
+    complex_float* precoded_buffer_temp_;
 #if USE_MKL_JIT
-    void* jitter;
-    cgemm_jit_kernel_t my_cgemm;
+    void* jitter_;
+    cgemm_jit_kernel_t my_cgemm_;
 #endif
 };
 

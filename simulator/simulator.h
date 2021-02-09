@@ -38,52 +38,52 @@ public:
 
     ~Simulator();
 
-    void start();
-    void stop();
+    void Start();
+    void Stop();
     // while loop of task thread
-    static void* taskThread(void* context);
+    static void* TaskThread(void* context);
 
     struct EventHandlerContext {
-        Simulator* obj_ptr;
-        size_t id;
+        Simulator* obj_ptr_;
+        size_t id_;
     };
 
-    inline void update_frame_count(int* frame_count);
+    inline void UpdateFrameCount(int* frame_count);
 
-    void update_rx_counters(size_t frame_id, size_t frame_id_in_buffer,
+    void UpdateRxCounters(size_t frame_id, size_t frame_id_in_buffer,
         size_t symbol_id, size_t ant_id);
-    void print_per_frame_done(PrintType print_type, size_t frame_id);
+    void PrintPerFrameDone(PrintType print_type, size_t frame_id);
 
-    void initialize_vars_from_cfg(Config* cfg);
-    void initialize_queues();
-    void initialize_uplink_buffers();
-    void free_uplink_buffers();
+    void InitializeVarsFromCfg(Config* cfg);
+    void InitializeQueues();
+    void InitializeUplinkBuffers();
+    void FreeUplinkBuffers();
 
 private:
-    size_t BS_ANT_NUM, UE_NUM;
-    size_t OFDM_CA_NUM;
-    size_t OFDM_DATA_NUM;
-    size_t symbol_num_perframe, data_symbol_num_perframe;
-    size_t ul_data_symbol_num_perframe, dl_data_symbol_num_perframe;
-    size_t dl_data_symbol_start, dl_data_symbol_end;
-    size_t packet_length;
+    size_t bs_ant_num_, ue_num_;
+    size_t ofdm_ca_num_;
+    size_t ofdm_data_num_;
+    size_t symbol_num_perframe_, data_symbol_num_perframe_;
+    size_t ul_data_symbol_num_perframe_, dl_data_symbol_num_perframe_;
+    size_t dl_data_symbol_start_, dl_data_symbol_end_;
+    size_t packet_length_;
 
-    size_t TASK_THREAD_NUM, SOCKET_RX_THREAD_NUM, SOCKET_TX_THREAD_NUM;
-    size_t CORE_OFFSET;
-    size_t demul_block_size, demul_block_num;
+    size_t task_thread_num_, socket_rx_thread_num_, socket_tx_thread_num_;
+    size_t core_offset_;
+    size_t demul_block_size_, demul_block_num_;
 
     /* lookup table for 16 QAM, real and imag */
     Table<float> qam16_table_;
     // float *pilots_;
     Config* config_;
-    size_t max_equaled_frame = 0;
-    float csi_format_offset;
-    size_t buffer_frame_num;
-    size_t max_packet_num_per_frame;
+    size_t max_equaled_frame_ = 0;
+    float csi_format_offset_;
+    size_t buffer_frame_num_;
+    size_t max_packet_num_per_frame_;
     std::unique_ptr<Receiver> receiver_;
     std::unique_ptr<Sender> sender_;
-    pthread_t* task_threads;
-    EventHandlerContext* context;
+    pthread_t* task_threads_;
+    EventHandlerContext* context_;
 
     // Uplink buffers
 
@@ -113,23 +113,23 @@ private:
      * Concurrent queues
      *****************************************************/
     /* main thread message queue for data receiving */
-    moodycamel::ConcurrentQueue<Event_data> message_queue_;
+    moodycamel::ConcurrentQueue<EventData> message_queue_;
     /* main thread message queue for task completion*/
-    moodycamel::ConcurrentQueue<Event_data> complete_task_queue_;
+    moodycamel::ConcurrentQueue<EventData> complete_task_queue_;
 
     /* Tokens */
-    moodycamel::ProducerToken** rx_ptoks_ptr;
-    moodycamel::ProducerToken** tx_ptoks_ptr;
-    moodycamel::ProducerToken** task_ptoks_ptr;
+    moodycamel::ProducerToken** rx_ptoks_ptr_;
+    moodycamel::ProducerToken** tx_ptoks_ptr_;
+    moodycamel::ProducerToken** task_ptoks_ptr_;
 
     /*****************************************************
      * Timestamps and counters used in worker threads
      *****************************************************/
-    Table<double> frame_start;
-    double* frame_start_receive;
-    double* frame_end_receive;
-    double* frame_start_tx;
-    double* frame_end_tx;
+    Table<double> frame_start_;
+    double* frame_start_receive_;
+    double* frame_end_receive_;
+    double* frame_start_tx_;
+    double* frame_end_tx_;
 };
 
 #endif

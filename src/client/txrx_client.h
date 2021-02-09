@@ -39,20 +39,20 @@ class RadioConfig;
 class RadioTXRX {
 public:
     struct RadioTXRXContext {
-        RadioTXRX* ptr;
-        int tid;
+        RadioTXRX* ptr_;
+        int tid_;
     };
 
-public:
-    RadioTXRX(Config* cfg, int n_rx_thread, int in_core_id);
+
+    RadioTXRX(Config* cfg, int n_threads, int in_core_id);
     /**
      * N_THREAD: socket thread number
      * mode: tx=1 or rx=0 operation
      * in_queue: message queue to communicate with main thread
      */
-    RadioTXRX(Config* cfg, int n_tx_thread, int in_core_id,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
+    RadioTXRX(Config* config, int n_threads, int in_core_id,
+        moodycamel::ConcurrentQueue<EventData>* in_message_queue,
+        moodycamel::ConcurrentQueue<EventData>* in_task_queue,
         moodycamel::ProducerToken** in_rx_ptoks,
         moodycamel::ProducerToken** in_tx_ptoks);
     ~RadioTXRX();
@@ -77,7 +77,7 @@ public:
      *
      * @param in_buffer_length: size of ring buffer in bytes
      */
-    bool startTXRX(Table<char>& in_buffer, Table<int>& in_buffer_status,
+    bool StartTxrx(Table<char>& in_buffer, Table<int>& in_buffer_status,
         int in_buffer_frame_num, int in_buffer_length, char* in_tx_buffer,
         int* in_tx_buffer_status, int in_tx_buffer_frame_num,
         int in_tx_buffer_length);
@@ -86,29 +86,29 @@ public:
      * @brief receives a packet from channel simulator through socket index (radio_id)
      * and writes to an offset (rx_offset) in the receive buffer (buffer_)
      */
-    struct Packet* recv_enqueue(int tid, int radio_id, int rx_offset);
+    struct Packet* RecvEnqueue(int tid, int radio_id, int rx_offset);
 
     /**
      * @brief transmits a tx packet that is ready from PHY through socket to channel simualtor
      */
-    int dequeue_send(int tid);
+    int DequeueSend(int tid);
 
     /**
      * @brief receives a packet from hardware through radio index (radio_id)
      * and writes to an offset (rx_offset) in the receive buffer (buffer_)
      */
-    struct Packet* recv_enqueue_argos(int tid, size_t radio_id,
+    struct Packet* RecvEnqueueArgos(int tid, size_t radio_id,
         size_t& frame_id, size_t& symbol_id, size_t rx_offset);
 
     /**
      * @brief transmits a tx samples packet that is ready from PHY through client wireless hardware
      */
-    int dequeue_send_argos(int tid, long long time0);
+    int DequeueSendArgos(int tid, long long time0);
 
     /**
      * @brief loop thread function that performs sample Packet I/O in simulation mode.
      */
-    void* loop_tx_rx(int tid);
+    void* LoopTxRx(int tid);
 
     /**
      * @brief loop thread function that performs sample TX/RX to/from client wireless hardware
@@ -116,7 +116,7 @@ public:
      * from received symbols and uses the timestamps to schedules transmit of processed uplink symbols
      * with some offset in the future from client wireless hardware.
      */
-    void* loop_tx_rx_argos(int tid);
+    void* LoopTxRxArgos(int tid);
 
     /**
      * @brief loop thread function that performs sample TX/RX to/from client wireless hardware
@@ -126,12 +126,12 @@ public:
      * Based on the beacon time reference, it writes downlink symbols to rx buffers and schedules
      * uplink symbols for transmission from the hardware.
      */
-    void* loop_tx_rx_argos_sync(int tid);
-    void* loop_tx_rx_usrp_sync(int tid);
+    void* LoopTxRxArgosSync(int tid);
+    void* LoopTxRxUsrpSync(int tid);
 
 private:
-    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+    pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
+    pthread_cond_t cond_ = PTHREAD_COND_INITIALIZER;
     Config* config_;
     ClientRadioConfig* radioconfig_; // Used only in Argos mode
     std::vector<struct sockaddr_in> servaddr_; /* server address */
@@ -150,15 +150,15 @@ private:
     int thread_num_;
     int tx_thread_num_;
     // pointer of message_queue_
-    moodycamel::ConcurrentQueue<Event_data>* message_queue_;
-    moodycamel::ConcurrentQueue<Event_data>* task_queue_;
+    moodycamel::ConcurrentQueue<EventData>* message_queue_;
+    moodycamel::ConcurrentQueue<EventData>* task_queue_;
     moodycamel::ProducerToken** rx_ptoks_;
     moodycamel::ProducerToken** tx_ptoks_;
     int core_id_;
     int tx_core_id_;
 
     // helper buffers
-    std::vector<void*> pilot_buff0;
-    std::vector<void*> pilot_buff1;
+    std::vector<void*> pilot_buff0_;
+    std::vector<void*> pilot_buff1_;
 };
 #endif

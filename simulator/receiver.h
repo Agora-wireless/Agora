@@ -1,12 +1,12 @@
 #ifndef RECEIVER
 #define RECEIVER
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "gettime.h"
 #include "net.h"
+#include "symbols.h"
 #include <algorithm>
 #include <arpa/inet.h>
 #include <cassert>
@@ -34,7 +34,7 @@ public:
      * in_queue: message queue to communicate with main thread
      */
     Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
+        moodycamel::ConcurrentQueue<EventData>* in_queue_message,
         moodycamel::ProducerToken** in_rx_ptoks);
     ~Receiver();
 
@@ -47,7 +47,7 @@ public:
      * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
      * RX_THREAD_NUM - 1}
      */
-    std::vector<pthread_t> startRecv(Table<char>& in_buffer,
+    std::vector<pthread_t> StartRecv(Table<char>& in_buffer,
         Table<int>& in_buffer_status, size_t in_buffer_frame_num,
         size_t in_buffer_length, Table<double>& in_frame_start);
 
@@ -55,11 +55,11 @@ public:
      * receive thread
      * context: ReceiverContext type
      */
-    void* loopRecv(int tid);
+    void* LoopRecv(int tid);
 
 private:
-    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+    pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
+    pthread_cond_t cond_ = PTHREAD_COND_INITIALIZER;
 
     Table<char>* buffer_;
     Table<int>* buffer_status_;
@@ -75,10 +75,10 @@ private:
     size_t tx_thread_num_;
 
     Table<double>* frame_start_;
-    moodycamel::ConcurrentQueue<Event_data>* message_queue_;
+    moodycamel::ConcurrentQueue<EventData>* message_queue_;
     moodycamel::ProducerToken** rx_ptoks_;
     size_t core_id_;
-    Config* cfg;
+    Config* cfg_;
     // int radios_per_thread;
 };
 

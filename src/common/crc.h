@@ -29,11 +29,11 @@
 
 class DoCRC {
 private:
-    const uint32_t crc24_table[256];
+    const uint32_t crc24_table_[256];
 
 public:
     DoCRC()
-        : crc24_table{ 0x00000000u, 0x01864CFBu, 0x028AD50Du, 0x030C99F6u,
+        : crc24_table_{ 0x00000000u, 0x01864CFBu, 0x028AD50Du, 0x030C99F6u,
             0x0493E6E1u, 0x0515AA1Au, 0x061933ECu, 0x079F7F17u, 0x08A18139u,
             0x0927CDC2u, 0x0A2B5434u, 0x0BAD18CFu, 0x0C3267D8u, 0x0DB42B23u,
             0x0EB8B2D5u, 0x0F3EFE2Eu, 0x10C54E89u, 0x11430272u, 0x124F9B84u,
@@ -93,22 +93,22 @@ public:
      * Not used at the moment. We decided to pre-generate the tables and
      * harcode them here. Left function just for reference
      */
-    static void init_crc24(uint32_t table[256]);
+    static void InitCrc24(uint32_t table[256]);
 
     /**
      * Compute CRC 
      */
-    uint32_t calculate_crc24(unsigned char* data, int len);
+    uint32_t CalculateCrc24(const unsigned char* data, int len);
 
     /*
      * Compute and add CRC to packet
      */
-    void add_crc24(struct MacPacket* p);
+    void AddCrc24(struct MacPacket* p);
 
     /*
      * Verify CRC
      */
-    bool check_crc24(unsigned char* data, int len, uint32_t ref_crc);
+    bool CheckCrc24(unsigned char* data, int len, uint32_t ref_crc);
 };
 
 #endif

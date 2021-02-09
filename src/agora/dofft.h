@@ -56,7 +56,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(size_t tag);
+    EventData launch(size_t tag);
 
     /**
      * Fill-in the partial transpose of the computed FFT for this antenna into
@@ -88,7 +88,7 @@ public:
      * of the fully-transposed matrix, but laid out in memory in column-major
      * order.
      */
-    void partial_transpose(
+    void PartialTranspose(
         complex_float* out_buf, size_t ant_id, SymbolType symbol_type) const;
 
 private:
@@ -98,16 +98,16 @@ private:
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
     Table<complex_float>& calib_dl_buffer_;
     Table<complex_float>& calib_ul_buffer_;
-    DFTI_DESCRIPTOR_HANDLE mkl_handle;
-    complex_float* fft_inout; // Buffer for both FFT input and output
+    DFTI_DESCRIPTOR_HANDLE mkl_handle_;
+    complex_float* fft_inout_; // Buffer for both FFT input and output
 
     // Buffer for store 16-bit IQ converted from 12-bit IQ
-    uint16_t* temp_16bits_iq;
-    std::complex<float>* rx_samps_tmp; // Temp buffer for received samples
+    uint16_t* temp_16bits_iq_;
+    std::complex<float>* rx_samps_tmp_; // Temp buffer for received samples
 
-    DurationStat* duration_stat_fft;
-    DurationStat* duration_stat_csi;
-    PhyStats* phy_stats;
+    DurationStat* duration_stat_fft_;
+    DurationStat* duration_stat_csi_;
+    PhyStats* phy_stats_;
 };
 
 class DoIFFT : public Doer {
@@ -140,15 +140,15 @@ public:
      *     2. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(size_t tag);
+    EventData launch(size_t tag);
 
 private:
     Table<complex_float>& dl_ifft_buffer_;
     char* dl_socket_buffer_;
-    DurationStat* duration_stat;
-    DFTI_DESCRIPTOR_HANDLE mkl_handle;
-    float* ifft_out; // Buffer for IFFT output
-    float ifft_scale_factor;
+    DurationStat* duration_stat_;
+    DFTI_DESCRIPTOR_HANDLE mkl_handle_;
+    float* ifft_out_; // Buffer for IFFT output
+    float ifft_scale_factor_;
 };
 
 #endif

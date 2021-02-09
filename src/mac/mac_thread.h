@@ -28,11 +28,11 @@ public:
     };
 
     // Default log file for MAC layer outputs
-    const char* kDefaultLogFilename = "/tmp/mac_log";
+    const char* k_default_log_filename_ = "/tmp/mac_log";
 
     // After receiving decoded codeblocks from the PHY (uplink at the
     // server, downlink at the client), we send UDP packets to kRemoteHostname
-    const char* kRemoteHostname = "127.0.0.1";
+    const char* k_remote_hostname_ = "127.0.0.1";
 
     // Agora sends UDP packets for UE #i (uplink packets at the server,
     // downlink packets at the client) with destination port kBaseRemotePort + i
@@ -59,48 +59,48 @@ public:
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer,
         Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
         Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
-        moodycamel::ConcurrentQueue<Event_data>* rx_queue,
-        moodycamel::ConcurrentQueue<Event_data>* tx_queue,
+        moodycamel::ConcurrentQueue<EventData>* rx_queue,
+        moodycamel::ConcurrentQueue<EventData>* tx_queue,
         std::string log_filename = "");
 
     ~MacThread();
 
     // The main MAC thread event loop. It receives uplink data bits from the
     // master thread and sends them to remote applications.
-    void run_event_loop();
+    void RunEventLoop();
 
 private:
     // Receive events from Agora PHY master thread. Forwards
     // to appropriate function in MAC.
-    void process_rx_from_master();
+    void ProcessRxFromMaster();
 
     // Receive decoded codeblocks from the PHY master thread. Send
     // fully-received frames for UE #i to kRemoteHostname::(kBaseRemotePort + i)
-    void process_codeblocks_from_master(Event_data event);
+    void ProcessCodeblocksFromMaster(EventData event);
 
     // Receive SNR report from PHY master thread. Use for RB scheduling.
     // TODO: process CQI report here as well.
-    void process_snr_report_from_master(Event_data event);
+    void ProcessSnrReportFromMaster(EventData event);
 
     // Push RAN config update to PHY master thread.
-    void send_ran_config_update(Event_data event);
+    void SendRanConfigUpdate(EventData event);
 
     // Send control information over (out-of-band) control channel
     // from server to client
-    void send_control_information();
+    void SendControlInformation();
 
     // At client, process control information received from control
     // channel and forward to PHY UE, so it transmits data in the scheduled
     // time slots.
-    void process_control_information();
+    void ProcessControlInformation();
 
     // Receive user data bits (downlink bits at the MAC thread running at the
     // server, uplink bits at the MAC thread running at the client) and forward
     // them to the PHY.
-    void process_udp_packets_from_apps(RBIndicator ri);
-    void process_udp_packets_from_apps_server(
+    void ProcessUdpPacketsFromApps(RBIndicator ri);
+    void ProcessUdpPacketsFromAppsServer(
         const MacPacket* pkt, RBIndicator ri);
-    void process_udp_packets_from_apps_client(const char* pkt, RBIndicator ri);
+    void ProcessUdpPacketsFromAppsClient(const char* payload, RBIndicator ri);
 
     // If Mode::kServer, this thread is running at the Agora server. Else at
     // the client.
@@ -115,17 +115,17 @@ private:
     const size_t core_offset_; // The CPU core on which this thread runs
 
     FILE* log_file_; // Log file used to store MAC layer outputs
-    std::string log_filename_ = kDefaultLogFilename; // Name of the log file
+    std::string log_filename_ = k_default_log_filename_; // Name of the log file
 
-    UDPClient* udp_client; // UDP endpoint used for sending messages
-    UDPServer* udp_server; // UDP endpoint used for receiving messages
+    UDPClient* udp_client_; // UDP endpoint used for sending messages
+    UDPServer* udp_server_; // UDP endpoint used for receiving messages
 
     // TODO: decoded_buffer_ is used by only the server, so it should be moved
     // to server_ for clarity.
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer_;
 
     // UDP endpoint for receiving control channel messages
-    UDPServer* udp_control_channel;
+    UDPServer* udp_control_channel_;
 
     Table<uint8_t>* dl_bits_buffer_;
     Table<uint8_t>* dl_bits_buffer_status_;
@@ -178,11 +178,11 @@ private:
     } client_;
 
     // FIFO queue for receiving messages from the master thread
-    moodycamel::ConcurrentQueue<Event_data>* rx_queue_;
+    moodycamel::ConcurrentQueue<EventData>* rx_queue_;
 
     // FIFO queue for sending messages to the master thread
-    moodycamel::ConcurrentQueue<Event_data>* tx_queue_;
+    moodycamel::ConcurrentQueue<EventData>* tx_queue_;
 
     // CRC
-    DoCRC* crc_obj;
+    DoCRC* crc_obj_;
 };
