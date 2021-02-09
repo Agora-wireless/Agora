@@ -1,13 +1,13 @@
 #ifndef DOZF
 #define DOZF
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
 #include "gettime.h"
 #include "stats.h"
+#include "symbols.h"
 #include "utils.h"
 #include <armadillo>
 #include <iostream>
@@ -39,16 +39,15 @@ public:
      *     2. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    EventData launch(size_t tag);
+    EventData Launch(size_t tag);
 
 private:
     void ZfTimeOrthogonal(size_t tag);
 
     /// Compute the uplink zeroforcing detector matrix and/or the downlink
     /// zeroforcing precoder using this CSI matrix and calibration buffer
-    void ComputePrecoder(const arma::cx_fmat& mat_csi,
-        complex_float* calib_ptr, complex_float* mat_ul_zf,
-        complex_float* mat_dl_zf);
+    void ComputePrecoder(const arma::cx_fmat& mat_csi, complex_float* calib_ptr,
+        complex_float* mat_ul_zf, complex_float* mat_dl_zf);
 
     void ZfFreqOrthogonal(size_t tag);
 

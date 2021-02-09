@@ -5,8 +5,7 @@
 #include <stdexcept>
 
 namespace avx2enc {
-inline __m256i CycleBitShift2to64(
-    __m256i data, int16_t cyc_shift, int16_t zc);
+inline __m256i CycleBitShift2to64(__m256i data, int16_t cyc_shift, int16_t zc);
 inline __m256i CycleBitShift72to128(
     __m256i data, int16_t cyc_shift, int16_t zc);
 inline __m256i CycleBitShift144to256(

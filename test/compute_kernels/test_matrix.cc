@@ -145,20 +145,20 @@ static void run_benchmark_ZF(unsigned Nx, unsigned Ny, unsigned iterations)
     // __itt_pause();
     // hpctoolkit_sampling_start();
 
-    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
-        1000000.0 * zf_time1 / iterations);
-    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
-        1000000.0 * zf_time2 / iterations);
-    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
-        1000000.0 * zf_time3 / iterations);
-    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
-        1000000.0 * zf_time4 / iterations);
-    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
-        1000000.0 * zf_time5 / iterations);
-    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
-        1000000.0 * zf_time6 / iterations);
-    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx, Ny,
-        1000000.0 * zf_time7 / iterations);
+    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx,
+        Ny, 1000000.0 * zf_time1 / iterations);
+    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx,
+        Ny, 1000000.0 * zf_time2 / iterations);
+    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx,
+        Ny, 1000000.0 * zf_time3 / iterations);
+    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx,
+        Ny, 1000000.0 * zf_time4 / iterations);
+    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx,
+        Ny, 1000000.0 * zf_time5 / iterations);
+    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx,
+        Ny, 1000000.0 * zf_time6 / iterations);
+    std::printf("ZF:              %04u x %04u  %12.3f us per iteration\n", Nx,
+        Ny, 1000000.0 * zf_time7 / iterations);
 }
 
 static void run_benchmark_multiply(
@@ -181,16 +181,16 @@ static void run_benchmark_multiply(
         std::printf("(1 x %04u) * (%04u x %04u)\n", Nx, Nx, Ny);
     if (dim == 2)
         std::printf("(%04u x %04u) * (%04u x 1)\n", Nx, Ny, Ny);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time1 / iterations);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time2 / iterations);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time3 / iterations);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time4 / iterations);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time5 / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time1 / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time2 / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time3 / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time4 / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time5 / iterations);
 }
 
 static void run_benchmark_precode(unsigned Nx, unsigned Ny, unsigned iterations)
@@ -208,28 +208,28 @@ static void run_benchmark_precode(unsigned Nx, unsigned Ny, unsigned iterations)
     double mul_time5_precode = bench_multiply_transpose(Nx, Ny, iterations);
 
     std::printf("Equalization: (%04u x %04u) * (%04u x 1)\n", Nx, Ny, Ny);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time1_equal / iterations);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time2_equal / iterations);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time3_equal / iterations);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time4_equal / iterations);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time5_equal / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time1_equal / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time2_equal / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time3_equal / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time4_equal / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time5_equal / iterations);
 
     std::printf("Precoding: (%04u x %04u) * (%04u x 1)\n", Ny, Nx, Nx);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time1_precode / iterations);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time2_precode / iterations);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time3_precode / iterations);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time4_precode / iterations);
-    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n", Nx,
-        Ny, 1000000.0 * mul_time5_precode / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time1_precode / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time2_precode / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time3_precode / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time4_precode / iterations);
+    std::printf("Multiply:              %04u x %04u  %12.3f us per iteration\n",
+        Nx, Ny, 1000000.0 * mul_time5_precode / iterations);
 }
 
 int main(int argc, char* argv[])
@@ -240,7 +240,8 @@ int main(int argc, char* argv[])
     //           << std::endl;
     // putenv("MKL_VERBOSE=1");
     if (argc != 5) {
-        std::fprintf(stderr, "Usage: %s [iterations] [Nx] [Ny] mode\n", argv[0]);
+        std::fprintf(
+            stderr, "Usage: %s [iterations] [Nx] [Ny] mode\n", argv[0]);
         return 1;
     }
 

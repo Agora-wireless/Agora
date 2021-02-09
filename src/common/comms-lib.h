@@ -41,7 +41,8 @@ public:
     ~CommsLib();
 
     static std::vector<std::vector<double>> GetSequence(int N, int type);
-    static std::vector<std::complex<float>> Modulate(std::vector<int8_t> /*in*/, int /*type*/);
+    static std::vector<std::complex<float>> Modulate(
+        std::vector<int8_t> /*in*/, int /*type*/);
     static std::vector<int> GetDataSc(int fftSize);
     static std::vector<int> GetNullSc(int fftSize);
     static std::vector<int> GetPilotScInd(int fftSize);
@@ -49,9 +50,11 @@ public:
     static std::vector<std::complex<float>> FFT(
         std::vector<std::complex<float>> /*in*/, int /*fftsize*/);
     static std::vector<std::complex<float>> IFFT(
-        std::vector<std::complex<float>> /*in*/, int /*fftsize*/, bool normalize = true);
+        std::vector<std::complex<float>> /*in*/, int /*fftsize*/,
+        bool normalize = true);
     static void FFT(complex_float* /*in*/, int /*fftsize*/);
-    static void IFFT(complex_float* /*in*/, int /*fftsize*/, bool normalize = true);
+    static void IFFT(
+        complex_float* /*in*/, int /*fftsize*/, bool normalize = true);
     static size_t FindPilotSeq(std::vector<std::complex<float>> iq,
         std::vector<std::complex<float>> pilot, size_t seq_len);
     static int FindLts(std::vector<std::complex<double>> iq, int seqLen);
@@ -67,27 +70,31 @@ public:
         return (__builtin_parity(i & j) != 0 ? -1 : 1);
     }
     static std::vector<float> MagnitudeFft(
-        std::vector<std::complex<float>> const& /*samps*/, std::vector<float> const& /*win*/,
-        size_t /*fftSize*/);
+        std::vector<std::complex<float>> const& /*samps*/,
+        std::vector<float> const& /*win*/, size_t /*fftSize*/);
     static std::vector<float> HannWindowFunction(size_t /*fftSize*/);
     static double WindowFunctionPower(std::vector<float> const& /*win*/);
     // template <typename T>
     // static T findTone(std::vector<T> const&, double, double, size_t, const
     // size_t delta = 10);
-    static float FindTone(std::vector<float> const& /*magnitude*/, double /*winGain*/, double /*fftBin*/, size_t /*fftSize*/,
+    static float FindTone(std::vector<float> const& /*magnitude*/,
+        double /*winGain*/, double /*fftBin*/, size_t /*fftSize*/,
         const size_t delta = 10);
     static float MeasureTone(std::vector<std::complex<float>> const& /*samps*/,
-        std::vector<float> const& /*win*/, double /*winGain*/, double /*fftBin*/, size_t /*fftSize*/,
-        const size_t delta = 10);
+        std::vector<float> const& /*win*/, double /*winGain*/,
+        double /*fftBin*/, size_t /*fftSize*/, const size_t delta = 10);
     static std::vector<std::complex<float>> ComposePartialPilotSym(
-        std::vector<std::complex<float>> /*pilot*/, size_t /*offset*/, size_t /*pilot_sc_num*/, size_t /*fftSize*/, size_t /*dataSize*/,
-        size_t /*dataStart*/, size_t /*CP_LEN*/, bool /*interleaved_pilot*/, bool timeDomain = true);
+        std::vector<std::complex<float>> /*pilot*/, size_t /*offset*/,
+        size_t /*pilot_sc_num*/, size_t /*fftSize*/, size_t /*dataSize*/,
+        size_t /*dataStart*/, size_t /*CP_LEN*/, bool /*interleaved_pilot*/,
+        bool timeDomain = true);
     static std::vector<std::complex<float>> SeqCyclicShift(
         std::vector<std::complex<float>> /*in*/, float /*alpha*/);
     static float FindMaxAbs(complex_float* /*in*/, size_t /*len*/);
-    static float FindMaxAbs(Table<complex_float> /*in*/, size_t /*dim1*/, size_t /*dim2*/);
-    static void Ifft2tx(
-        complex_float* /*in*/, std::complex<short>* /*out*/, size_t /*N*/, size_t /*prefix*/, size_t /*cp*/, float /*scale*/);
+    static float FindMaxAbs(
+        Table<complex_float> /*in*/, size_t /*dim1*/, size_t /*dim2*/);
+    static void Ifft2tx(complex_float* /*in*/, std::complex<short>* /*out*/,
+        size_t /*N*/, size_t /*prefix*/, size_t /*cp*/, float /*scale*/);
     static float AbsCf(complex_float d)
     {
         return std::abs(std::complex<float>(d.re, d.im));
@@ -119,8 +126,7 @@ public:
         std::vector<std::complex<int16_t>> const& f,
         std::vector<std::complex<int16_t>> const& g);
 
-    static __m256 M256ComplexCf32Mult(
-        __m256 data1, __m256 data2, bool conj);
+    static __m256 M256ComplexCf32Mult(__m256 data1, __m256 data2, bool conj);
 };
 
 #endif

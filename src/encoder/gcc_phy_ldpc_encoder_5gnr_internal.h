@@ -67,8 +67,8 @@ extern "C" {
 
 void AdapterFrom288to384(int8_t** pBuff0, int8_t* pBuff1, uint16_t zcSize,
     uint32_t cbLen, int8_t direct); //1ways
-void Adapter2waysFrom144to256(int8_t** pbuff0, int8_t* pbuff1,
-    uint16_t zcSize, uint32_t cbLen, int8_t direct); //2ways
+void Adapter2waysFrom144to256(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
+    uint32_t cbLen, int8_t direct); //2ways
 void Adapter4waysFrom72to128(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
     uint32_t cbLen, int8_t direct); //4ways
 void Adapter8waysFrom36to64(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
@@ -103,10 +103,10 @@ void LdpcEncoderBg1(int8_t* pDataIn, int8_t* pDataOut,
 
 /* Table generated for BG1 from H Matrix in Table 5.3.2-3 in 38.212 */
 /* Number of non-null elements per columns in BG1 */
-static constexpr int16_t kBg1MatrixNumPerCol[BG1_COL_TOTAL] = { 30, 28, 7, 11, 9,
-    4, 8, 12, 8, 7, 12, 10, 12, 11, 10, 7, 10, 10, 13, 7, 8, 11, 9, 3, 4, 4, 1,
+static constexpr int16_t kBg1MatrixNumPerCol[BG1_COL_TOTAL] = { 30, 28, 7, 11,
+    9, 4, 8, 12, 8, 7, 12, 10, 12, 11, 10, 7, 10, 10, 13, 7, 8, 11, 9, 3, 4, 4,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 
 /* Table generated for BG1 from H Matrix in Table 5.3.2-3 in 38.212 */
 /* Addresses of each non-null elements in matrix (removed the 4x4 parity non identify matrix) */
@@ -294,9 +294,9 @@ __attribute__((aligned(
 
 /* Table generated for BG2 from H Matrix in Table 5.3.2-3 in 38.212 */
 /* Number of non-null elements per columns in BG2 */
-static constexpr int16_t kBg2MatrixNumPerCol[BG2_COL_TOTAL] = { 22, 23, 10, 5, 5,
-    14, 7, 13, 6, 8, 6, 14, 7, 10, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+static constexpr int16_t kBg2MatrixNumPerCol[BG2_COL_TOTAL] = { 22, 23, 10, 5,
+    5, 14, 7, 13, 6, 8, 6, 14, 7, 10, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 
 /* Table generated for BG2 from H Matrix in Table 5.3.2-3 in 38.212 */
 /* Addresses of each non-null elements in matrix (removed the 4x4 parity non identify matrix) */

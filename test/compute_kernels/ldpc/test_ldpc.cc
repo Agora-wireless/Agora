@@ -7,11 +7,11 @@
  * FlexRAN's decoder, which supports AVX2.
  */
 
-#include "symbols.h"
 #include "encoder.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "symbols.h"
 #include "utils_ldpc.h"
 #include <algorithm>
 #include <bitset>
@@ -55,10 +55,8 @@ int main()
 
         for (size_t i = 0; i < kNumCodeBlocks; i++) {
             input[i] = new int8_t[LdpcEncodingInputBufSize(kBaseGraph, zc)];
-            parity[i]
-                = new int8_t[LdpcEncodingParityBufSize(kBaseGraph, zc)];
-            encoded[i]
-                = new int8_t[LdpcEncodingEncodedBufSize(kBaseGraph, zc)];
+            parity[i] = new int8_t[LdpcEncodingParityBufSize(kBaseGraph, zc)];
+            encoded[i] = new int8_t[LdpcEncodingEncodedBufSize(kBaseGraph, zc)];
             decoded[i]
                 = new uint8_t[LdpcEncodingEncodedBufSize(kBaseGraph, zc)];
         }
@@ -68,7 +66,7 @@ int main()
         for (size_t n = 0; n < kNumCodeBlocks; n++) {
             for (size_t i = 0; i < BitsToBytes(num_input_bits); i++) {
                 input[n][i] = (int8_t)rand();
-}
+            }
         }
 
         const size_t encoding_start_tsc = Rdtsc();

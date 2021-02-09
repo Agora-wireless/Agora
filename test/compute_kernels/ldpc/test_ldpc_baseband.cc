@@ -64,9 +64,10 @@ int main(int argc, char* argv[])
     size_t num_symbols_per_cb = 1;
     size_t bits_per_symbol = cfg->ofdm_data_num_ * cfg->mod_order_bits_;
     if (cfg->ldpc_config_.cb_codew_len_ > bits_per_symbol) {
-        num_symbols_per_cb = (cfg->ldpc_config_.cb_codew_len_ + bits_per_symbol - 1)
+        num_symbols_per_cb
+            = (cfg->ldpc_config_.cb_codew_len_ + bits_per_symbol - 1)
             / bits_per_symbol;
-}
+    }
     size_t num_cbs_per_ue = cfg->data_symbol_num_perframe_ / num_symbols_per_cb;
     std::printf("Number of symbols per block: %zu, blocks per frame: %zu\n",
         num_symbols_per_cb, num_cbs_per_ue);
@@ -157,7 +158,8 @@ int main(int argc, char* argv[])
                 }
                 // Load pilot to the second symbol
                 // The first symbol is reserved for beacon
-                std::memcpy(tx_data_all_symbols[cfg->beacon_symbol_num_perframe_]
+                std::memcpy(
+                    tx_data_all_symbols[cfg->beacon_symbol_num_perframe_]
                         + i * cfg->ofdm_ca_num_,
                     &pilots_t_ue[0], cfg->ofdm_ca_num_ * sizeof(complex_float));
             }
@@ -167,11 +169,11 @@ int main(int argc, char* argv[])
                     tx_data_all_symbols[i + cfg->beacon_symbol_num_perframe_]
                         + i * cfg->ofdm_ca_num_,
                     &pilot_td[0], cfg->ofdm_ca_num_ * sizeof(complex_float));
-}
+            }
         }
 
-        size_t data_sym_start
-            = cfg->pilot_symbol_num_perframe_ + cfg->beacon_symbol_num_perframe_;
+        size_t data_sym_start = cfg->pilot_symbol_num_perframe_
+            + cfg->beacon_symbol_num_perframe_;
         for (size_t i = data_sym_start; i < cfg->symbol_num_perframe_; i++) {
             const size_t data_sym_id = (i - data_sym_start);
             for (size_t j = 0; j < cfg->ue_ant_num_; j++) {
@@ -264,8 +266,8 @@ int main(int argc, char* argv[])
                 reinterpret_cast<arma::cx_float*>(csi_matrices_pilot[i]),
                 cfg->bs_ant_num_, cfg->ue_ant_num_, false);
             arma::cx_fmat mat_output(
-                reinterpret_cast<arma::cx_float*>(precoder[i]), cfg->ue_ant_num_,
-                cfg->bs_ant_num_, false);
+                reinterpret_cast<arma::cx_float*>(precoder[i]),
+                cfg->ue_ant_num_, cfg->bs_ant_num_, false);
             pinv(mat_output, mat_input, 1e-2, "dc");
         }
 

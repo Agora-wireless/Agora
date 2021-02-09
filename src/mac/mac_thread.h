@@ -1,6 +1,5 @@
 #pragma once
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "concurrentqueue.h"
 #include "config.h"
@@ -8,6 +7,7 @@
 #include "gettime.h"
 #include "net.h"
 #include "ran_config.h"
+#include "symbols.h"
 #include "udp_client.h"
 #include "udp_server.h"
 #include <queue>
@@ -98,8 +98,7 @@ private:
     // server, uplink bits at the MAC thread running at the client) and forward
     // them to the PHY.
     void ProcessUdpPacketsFromApps(RBIndicator ri);
-    void ProcessUdpPacketsFromAppsServer(
-        const MacPacket* pkt, RBIndicator ri);
+    void ProcessUdpPacketsFromAppsServer(const MacPacket* pkt, RBIndicator ri);
     void ProcessUdpPacketsFromAppsClient(const char* payload, RBIndicator ri);
 
     // If Mode::kServer, this thread is running at the Agora server. Else at

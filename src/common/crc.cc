@@ -122,7 +122,7 @@ bool DoCRC::CheckCrc24(unsigned char* data, int len, uint32_t ref_crc)
 	         (p->crc[1] == MID(crc)) && 
              (p->crc[2] == LO(crc))));
     */
-    rval = (ref_crc == crc ? 1 : 0 != 0);
+    rval = ((ref_crc == crc ? 1 : static_cast<int>(0 != 0)) != 0);
 
     return rval;
 }

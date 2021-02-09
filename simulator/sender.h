@@ -1,7 +1,6 @@
 #ifndef SENDER
 #define SENDER
 
-#include "symbols.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "datatype_conversion.inc"
@@ -9,6 +8,7 @@
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 #include "net.h"
+#include "symbols.h"
 #include "utils.h"
 #include <algorithm>
 #include <arpa/inet.h>
@@ -33,7 +33,6 @@
 class Sender {
 public:
     static constexpr size_t kDequeueBulkSize = 4;
-
 
     /**
      * @brief Create and optionally start a Sender that sends IQ packets to a

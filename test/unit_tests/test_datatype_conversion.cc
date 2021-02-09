@@ -62,18 +62,17 @@ TEST(Modulation, adapt_bits_for_mod_stress)
                 output[i] = 0;
             }
 
-            AdaptBitsForMod(
-                &input[0], &output[0], num_input_bytes, mod_type);
+            AdaptBitsForMod(&input[0], &output[0], num_input_bytes, mod_type);
 
             // Sanity check: Input and output must have same number of set bits
             size_t set_bits_in_input = 0;
             size_t set_bits_in_output = 0;
             for (uint8_t& i : input) {
                 set_bits_in_input += __builtin_popcount(i);
-}
+            }
             for (uint8_t& o : output) {
                 set_bits_in_output += __builtin_popcount(o);
-}
+            }
             ASSERT_EQ(set_bits_in_input, set_bits_in_output);
 
             // Sanity check: Output bytes must have at most mod_type bits set
@@ -92,18 +91,19 @@ TEST(Modulation, adapt_bits_for_mod_stress)
 TEST(SIMD, float_32_to_16)
 {
     constexpr float kAllowedError = 1e-3;
-    float* in_buf
-        = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kK64Align, kSIMDTestNum * sizeof(float)));
+    float* in_buf = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(
+        Agora_memory::Alignment_t::kK64Align, kSIMDTestNum * sizeof(float)));
     for (size_t i = 0; i < kSIMDTestNum; i++) {
         in_buf[i] = static_cast<float>(rand()) / (RAND_MAX * 1.0);
     }
 
     float* medium = static_cast<float*>(
-        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kK64Align, kSIMDTestNum / 2 * sizeof(float)));
+        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kK64Align,
+            kSIMDTestNum / 2 * sizeof(float)));
     SimdConvertFloat32ToFloat16(medium, in_buf, kSIMDTestNum);
 
-    float* out_buf
-        = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kK64Align, kSIMDTestNum * sizeof(float)));
+    float* out_buf = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(
+        Agora_memory::Alignment_t::kK64Align, kSIMDTestNum * sizeof(float)));
     SimdConvertFloat16ToFloat32(out_buf, medium, kSIMDTestNum);
 
     for (size_t i = 0; i < kSIMDTestNum; i++) {

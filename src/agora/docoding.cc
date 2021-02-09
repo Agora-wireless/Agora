@@ -34,7 +34,7 @@ DoEncode::~DoEncode()
     std::free(encoded_buffer_temp_);
 }
 
-EventData DoEncode::launch(size_t tag)
+EventData DoEncode::Launch(size_t tag)
 {
     LDPCconfig ldpc_config = cfg_->ldpc_config_;
     size_t frame_id = gen_tag_t(tag).frame_id_;
@@ -98,7 +98,7 @@ DoDecode::DoDecode(Config* in_config, int in_tid,
 
 DoDecode::~DoDecode() { free(resp_var_nodes_); }
 
-EventData DoDecode::launch(size_t tag)
+EventData DoDecode::Launch(size_t tag)
 {
     LDPCconfig ldpc_config = cfg_->ldpc_config_;
     const size_t frame_id = gen_tag_t(tag).frame_id_;
@@ -185,11 +185,10 @@ EventData DoDecode::launch(size_t tag)
             uint8_t rx_byte = decoded_buffer_ptr[i];
             uint8_t tx_byte = (uint8_t)cfg_->GetInfoBits(
                 cfg_->ul_bits_, symbol_idx_ul, ue_id, cur_cb_id)[i];
-            phy_stats_->UpdateBitErrors(
-                ue_id, symbol_offset, tx_byte, rx_byte);
+            phy_stats_->UpdateBitErrors(ue_id, symbol_offset, tx_byte, rx_byte);
             if (rx_byte != tx_byte) {
                 block_error++;
-}
+            }
         }
         phy_stats_->UpdateBlockErrors(ue_id, symbol_offset, block_error);
     }

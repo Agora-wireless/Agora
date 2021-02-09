@@ -75,7 +75,7 @@ public:
     {
         if (sock_fd_ != -1) {
             close(sock_fd_);
-}
+        }
     }
 
     /**

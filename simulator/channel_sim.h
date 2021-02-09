@@ -1,7 +1,6 @@
 #ifndef SIMULATOR_HEADER
 #define SIMULATOR_HEADER
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "channel.h"
 #include "concurrent_queue_wrapper.inc"
@@ -10,6 +9,7 @@
 #include "memory_manage.h"
 #include "net.h"
 #include "signal_handler.h"
+#include "symbols.h"
 #include "udp_client.h"
 #include "udp_server.h"
 #include <algorithm>
@@ -118,7 +118,7 @@ private:
             return 0;
         } else {
             return bscfg_->GetDlSymbolIdx(frame_id, symbol_id) + 1;
-}
+        }
     }
 };
 

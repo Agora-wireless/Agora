@@ -14,7 +14,7 @@ static double fft_get_time(void)
 int flushCache()
 {
     const size_t bigger_than_cachesize = 100 * 1024 * 1024; // 100 * 1024 *
-                                                            // 1024;
+        // 1024;
     long* p = new long[bigger_than_cachesize];
     // When you want to "flush" cache.
     for (long long i = 0; i < bigger_than_cachesize; i++) {
@@ -358,17 +358,17 @@ static void run_benchmark_1d(unsigned N, unsigned iterations)
     double fft_mflops_fft4 = flops / (1000000.0 * fft_time_fft4);
     double fft_mflops_ifft = flops / (1000000.0 * fft_time_ifft);
 
-    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
-    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
-    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
-    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
+    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
+    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
+    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
+    std::printf("FFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
 
-    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
+    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
 }
 
 static void run_benchmark_1d_ifft(unsigned N, unsigned iterations)
@@ -387,17 +387,17 @@ static void run_benchmark_1d_ifft(unsigned N, unsigned iterations)
     double fft_mflops_fft4 = flops / (1000000.0 * fft_time_fft4);
     double fft_mflops_ifft = flops / (1000000.0 * fft_time_ifft);
 
-    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
-    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
-    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
-    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
+    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
+    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
+    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
+    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
 
-    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
+    std::printf("IFFT :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
 }
 
 static void run_benchmark_data_type(unsigned N, unsigned iterations)
@@ -417,20 +417,20 @@ static void run_benchmark_data_type(unsigned N, unsigned iterations)
     double fft_mflops_ifft = flops / (1000000.0 * fft_time_ifft);
 
     std::printf("data type convert :              %06u %12.3f Mflops %12.3f us "
-           "iteration\n",
+                "iteration\n",
         N, fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
     std::printf("data type convert :              %06u %12.3f Mflops %12.3f us "
-           "iteration\n",
+                "iteration\n",
         N, fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
     std::printf("data type convert :              %06u %12.3f Mflops %12.3f us "
-           "iteration\n",
+                "iteration\n",
         N, fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
     std::printf("data type convert :              %06u %12.3f Mflops %12.3f us "
-           "iteration\n",
+                "iteration\n",
         N, fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
 
     std::printf("data type convert :              %06u %12.3f Mflops %12.3f us "
-           "iteration\n",
+                "iteration\n",
         N, fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
 }
 
@@ -450,17 +450,17 @@ static void run_benchmark_demod(unsigned N, unsigned iterations)
     double fft_mflops_fft4 = flops / (1000000.0 * fft_time_fft4);
     double fft_mflops_ifft = flops / (1000000.0 * fft_time_ifft);
 
-    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
-    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
-    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
-    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
+    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_fft1, 1000000.0 * fft_time_fft1 / iterations);
+    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_fft2, 1000000.0 * fft_time_fft2 / iterations);
+    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_fft3, 1000000.0 * fft_time_fft3 / iterations);
+    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_fft4, 1000000.0 * fft_time_fft4 / iterations);
 
-    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n", N,
-        fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
+    std::printf("demod :              %06u %12.3f Mflops %12.3f us iteration\n",
+        N, fft_mflops_ifft, 1000000.0 * fft_time_ifft / iterations);
 }
 
 int main(int argc, char* argv[])

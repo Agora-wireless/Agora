@@ -1,5 +1,5 @@
 #include "net.h"
-#include "errno.h"
+#include <cerrno>
 #include <cstdio> /* std::printf */
 #include <cstdlib> /* std::exit */
 #include <cstring> /* std::strerror, std::memset, std::memcpy */
@@ -35,7 +35,7 @@ int SetupSocketIpv4(int port_id, bool set_sock_size, int sock_buf_size)
 
     if (set_sock_size) {
         SetSocketBufSize(socket_local, sock_buf_size);
-}
+    }
 
     if (bind(socket_local, (struct sockaddr*)&local_addr, sizeof(local_addr))
         != 0) {
@@ -61,7 +61,7 @@ int SetupSocketIpv6(int port_id, bool set_sock_size, int sock_buf_size)
     }
     if (set_sock_size) {
         SetSocketBufSize(socket_local, sock_buf_size);
-}
+    }
 
     if (bind(socket_local, (struct sockaddr*)&local_addr, sizeof(local_addr))
         != 0) {

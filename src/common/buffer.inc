@@ -1,9 +1,9 @@
 #ifndef BUFFER_HEAD
 #define BUFFER_HEAD
 
-#include "symbols.h"
 #include "memory_manage.h"
 #include "ran_config.h"
+#include "symbols.h"
 #include <sstream>
 #include <vector>
 
@@ -127,8 +127,7 @@ union gen_tag_t {
 
     // Generate a tag with antenna ID, frame ID, and symbol ID bits set and
     // other fields blank
-    static gen_tag_t FrmSymAnt(
-        size_t frame_id, size_t symbol_id, size_t ant_id)
+    static gen_tag_t FrmSymAnt(size_t frame_id, size_t symbol_id, size_t ant_id)
     {
         gen_tag_t ret(0);
         ret.frame_id_ = frame_id;

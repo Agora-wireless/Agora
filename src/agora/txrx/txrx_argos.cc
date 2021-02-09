@@ -22,12 +22,12 @@ void PacketTXRX::LoopTxRxArgos(int tid)
     while (cfg_->running_) {
         if (-1 != DequeueSendArgos(tid)) {
             continue;
-}
+        }
         // receive data
         struct Packet* pkt = RecvEnqueueArgos(tid, radio_id, rx_offset);
         if (pkt == NULL) {
             continue;
-}
+        }
         rx_offset = (rx_offset + cfg_->n_channels_) % packet_num_in_buffer_;
 
         if (kIsWorkerTimingEnabled) {
@@ -40,7 +40,7 @@ void PacketTXRX::LoopTxRxArgos(int tid)
 
         if (++radio_id == radio_hi) {
             radio_id = radio_lo;
-}
+        }
     }
 }
 
@@ -101,7 +101,7 @@ int PacketTXRX::DequeueSendArgos(int tid)
     EventData event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
         return -1;
-}
+    }
 
     // std::printf("tx queue length: %d\n", task_queue_->size_approx());
     assert(event.event_type_ == EventType::kPacketTX);
@@ -111,8 +111,8 @@ int PacketTXRX::DequeueSendArgos(int tid)
     size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
 
     size_t dl_symbol_idx = cfg_->GetDlSymbolIdx(frame_id, symbol_id);
-    size_t offset = (c->GetTotalDataSymbolIdxDl(frame_id, dl_symbol_idx)
-                        * c->bs_ant_num_)
+    size_t offset
+        = (c->GetTotalDataSymbolIdxDl(frame_id, dl_symbol_idx) * c->bs_ant_num_)
         + ant_id;
 
     // TODO: support nChannels > 1
@@ -130,7 +130,8 @@ int PacketTXRX::DequeueSendArgos(int tid)
                       && s == ant_id % c->ant_per_group_)
                 ? c->pilot_ci16_.data()
                 : zeros.data();
-            long long frame_time = ((long long)(frame_id + TX_FRAME_DELTA) << 32)
+            long long frame_time
+                = ((long long)(frame_id + TX_FRAME_DELTA) << 32)
                 | (c->dl_cal_symbols_[0][s] << 16);
             radioconfig_->RadioTx(ant_id / n_channels, txbuf, 1, frame_time);
         }
@@ -144,7 +145,7 @@ int PacketTXRX::DequeueSendArgos(int tid)
             txbuf[ch] = (void*)c->ue_specific_pilot_t_[0];
         } else {
             txbuf[ch] = (void*)c->dl_iq_t_[dl_symbol_idx];
-}
+        }
     } else {
         char* cur_buffer_ptr = tx_buffer_ + offset * c->dl_packet_length_;
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
@@ -160,13 +161,13 @@ int PacketTXRX::DequeueSendArgos(int tid)
 
     if (kDebugPrintInTask) {
         std::printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
-               "ant %zu, offset: %zu, msg_queue_length: %zu\n",
+                    "ant %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, offset,
             message_queue_->size_approx());
     }
 
     RtAssert(message_queue_->enqueue(*rx_ptoks_[tid],
-                  EventData(EventType::kPacketTX, event.tags_[0])),
+                 EventData(EventType::kPacketTX, event.tags_[0])),
         "Socket message enqueue failed\n");
     return event.tags_[0];
 }

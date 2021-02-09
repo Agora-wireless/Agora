@@ -33,7 +33,7 @@ std::vector<pthread_t> Receiver::StartRecv(Table<char>& in_buffer,
 
     for (size_t i = 0; i < rx_thread_num_; i++) {
         pthread_t recv_thread;
-        auto *context = new EventHandlerContext<Receiver>;
+        auto* context = new EventHandlerContext<Receiver>;
         context->obj_ptr_ = this;
         context->id_ = i;
         if (pthread_create(&recv_thread, NULL,
@@ -56,8 +56,8 @@ void* Receiver::LoopRecv(int tid)
     struct sockaddr_in remote_addr;
     int socket_local
         = SetupSocketIpv4(cfg_->bs_rru_port_ + tid, true, sock_buf_size);
-    SetupSockaddrRemoteIpv4(
-        &remote_addr, cfg_->bs_server_port_ + tid, cfg_->bs_server_addr_.c_str());
+    SetupSockaddrRemoteIpv4(&remote_addr, cfg_->bs_server_port_ + tid,
+        cfg_->bs_server_addr_.c_str());
 
     /* use token to speed up */
     moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];

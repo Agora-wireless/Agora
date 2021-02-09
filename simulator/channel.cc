@@ -24,7 +24,7 @@ Channel::Channel(Config* config_bs, Config* config_ue,
         chan_model_ = kRayleigh;
     } else {
         chan_model_ = kAwgn;
-}
+    }
 }
 
 Channel::~Channel() {}
@@ -63,14 +63,14 @@ void Channel::ApplyChan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
         fmat_h = fmat_src * h_.st() / std::sqrt(bscfg_->bs_ant_num_);
     } else {
         fmat_h = fmat_src * h_;
-}
+    }
 
     // Add noise
     Awgn(fmat_h, fmat_dst);
 
     if (kPrintChannelOutput) {
         Utils::PrintMat(h_, "H");
-}
+    }
 }
 
 void Channel::Awgn(const cx_fmat& src, cx_fmat& dst) const

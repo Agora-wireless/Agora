@@ -1,13 +1,13 @@
 #ifndef PACKETTXRX
 #define PACKETTXRX
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "gettime.h"
 #include "net.h"
 #include "radio_lib.h"
+#include "symbols.h"
 #include <algorithm>
 #include <arpa/inet.h>
 #include <cassert>

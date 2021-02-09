@@ -148,8 +148,8 @@ int main(int argc, char** argv)
     for (int i = 0; i < LOOP_NUM; ++i) {
         // just copy
         for (int j = 0; j < BS_ANT; j++) {
-            std::memcpy(buffer_trans.data() + j * OFDM, buffer.data() + j * OFDM,
-                sizeof(complex_float) * OFDM);
+            std::memcpy(buffer_trans.data() + j * OFDM,
+                buffer.data() + j * OFDM, sizeof(complex_float) * OFDM);
         }
         cx_float* mat_ptr = (cx_float*)buffer_trans.data();
         cx_fmat mat_data(mat_ptr, BS_ANT, OFDM, false);
@@ -359,6 +359,7 @@ int main(int argc, char** argv)
     }
     end = std::chrono::system_clock::now();
     diff = end - begin;
-    std::printf("no copy and (SIMD read trans) precoding time %f\n", diff.count());
+    std::printf(
+        "no copy and (SIMD read trans) precoding time %f\n", diff.count());
     saveData("data_trans_block.txt", buffer_trans.data(), OFDM * BS_ANT / 4, 4);
 }

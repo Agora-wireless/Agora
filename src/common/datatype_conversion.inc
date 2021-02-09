@@ -69,8 +69,8 @@ static inline void SimdConvertShortToFloat(
 // in_buf and out_buf must be 64-byte aligned
 // n_elems must be a multiple of 8 for AVX2 and 16 for AVX512
 // scale_down_factor is used for scaling down values in the input array
-static inline void SimdConvertFloatToShort(const float* in_buf,
-    short* out_buf, size_t n_elems, size_t cp_len, size_t scale_down_factor)
+static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
+    size_t n_elems, size_t cp_len, size_t scale_down_factor)
 {
 
     const float scale_factor_float = 32768.0 / scale_down_factor;
@@ -109,7 +109,7 @@ static inline void SimdConvertFloatToShort(const float* in_buf,
         if (i >= n_elems - cp_len) {
             _mm256_stream_si256(
                 (__m256i*)&out_buf[2 * (i + cp_len - n_elems)], integer1);
-}
+        }
     }
 #endif
 }
@@ -217,8 +217,8 @@ static inline void Convert12bitIqTo16bitIq(
 // Input array must have [n_elems] elements.
 // Output array must have [n_elems / 3 * 2] elements.
 // n_elems must be multiples of 3
-static inline void SimdConvert12bitIqToFloat(
-    const uint8_t* in_buf, float* out_buf, uint16_t* in_16bits_buf, size_t n_elems)
+static inline void SimdConvert12bitIqToFloat(const uint8_t* in_buf,
+    float* out_buf, uint16_t* in_16bits_buf, size_t n_elems)
 {
     _unused(in_16bits_buf);
 #ifdef __AVX512F__

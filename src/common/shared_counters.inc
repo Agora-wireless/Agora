@@ -1,8 +1,8 @@
 #pragma once
 
-#include "symbols.h"
 #include "config.h"
 #include "logger.inc"
+#include "symbols.h"
 #include "utils.h"
 #include <mutex>
 #include <sstream>
@@ -14,7 +14,7 @@ class RxStatus {
 public:
     RxStatus(Config* cfg)
         : num_pilot_pkts_per_frame_(
-              cfg->pilot_symbol_num_perframe * cfg->BS_ANT_NUM)
+            cfg->pilot_symbol_num_perframe * cfg->BS_ANT_NUM)
         , num_pilot_symbols_per_frame_(cfg->pilot_symbol_num_perframe)
         , num_data_symbol_per_frame_(cfg->data_symbol_num_perframe)
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
@@ -149,7 +149,7 @@ class DemulStatus {
 public:
     DemulStatus(Config* cfg)
         : num_demul_tasks_required_(
-              cfg->get_num_sc_per_server() / cfg->demul_block_size)
+            cfg->get_num_sc_per_server() / cfg->demul_block_size)
     {
         for (size_t i = 0; i < kFrameWnd; i++) {
             for (size_t j = 0; j < kMaxSymbols; j++) {

@@ -1,7 +1,6 @@
 #ifndef DOCODING
 #define DOCODING
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "concurrentqueue.h"
 #include "config.h"
@@ -11,10 +10,11 @@
 #include "modulation.h"
 #include "phy_stats.h"
 #include "stats.h"
+#include "symbols.h"
 #include <armadillo>
+#include <cstdio>
+#include <cstring>
 #include <iostream>
-#include <stdio.h>
-#include <string.h>
 #include <vector>
 
 #include "encoder.h"
@@ -27,7 +27,7 @@ public:
         Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager);
     ~DoEncode();
 
-    EventData launch(size_t tag);
+    EventData Launch(size_t tag);
 
 private:
     Table<int8_t>& raw_data_buffer_;
@@ -47,7 +47,7 @@ public:
         PhyStats* in_phy_stats, Stats* in_stats_manager);
     ~DoDecode();
 
-    EventData launch(size_t tag);
+    EventData Launch(size_t tag);
 
 private:
     int16_t* resp_var_nodes_;

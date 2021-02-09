@@ -163,10 +163,11 @@ int main(int argc, char* argv[])
         }
     } else {
         for (size_t i = 0; i < cfg->ue_ant_num_; i++) {
-            std::memcpy(tx_data_all_symbols[i + cfg->beacon_symbol_num_perframe_]
+            std::memcpy(
+                tx_data_all_symbols[i + cfg->beacon_symbol_num_perframe_]
                     + i * cfg->ofdm_ca_num_,
                 &pilot_td.at(0), cfg->ofdm_ca_num_ * sizeof(complex_float));
-}
+        }
     }
 
     // Populate the UL symbols
@@ -237,8 +238,8 @@ int main(int argc, char* argv[])
     FILE* fp_rx = std::fopen(filename_rx.c_str(), "wb");
     for (size_t i = 0; i < cfg->symbol_num_perframe_; i++) {
         auto* ptr = (float*)rx_data_all_symbols[i];
-        std::fwrite(
-            ptr, cfg->ofdm_ca_num_ * cfg->bs_ant_num_ * 2, sizeof(float), fp_rx);
+        std::fwrite(ptr, cfg->ofdm_ca_num_ * cfg->bs_ant_num_ * 2,
+            sizeof(float), fp_rx);
     }
     std::fclose(fp_rx);
 
@@ -312,8 +313,8 @@ int main(int argc, char* argv[])
         Agora_memory::Alignment_t::kK32Align);
     for (size_t i = 0; i < cfg->ofdm_ca_num_; i++) {
         arma::cx_fmat mat_input(
-            reinterpret_cast<arma::cx_float*>(csi_matrices[i]), cfg->bs_ant_num_,
-            cfg->ue_ant_num_, false);
+            reinterpret_cast<arma::cx_float*>(csi_matrices[i]),
+            cfg->bs_ant_num_, cfg->ue_ant_num_, false);
         arma::cx_fmat mat_output(reinterpret_cast<arma::cx_float*>(precoder[i]),
             cfg->ue_ant_num_, cfg->bs_ant_num_, false);
         pinv(mat_output, mat_input, 1e-2, "dc");
@@ -349,13 +350,13 @@ int main(int argc, char* argv[])
                         ? ue_specific_pilot[0][sc_id]
                         : dl_modulated_codewords.at(i * cfg->ue_ant_num_ + j)
                               .at(sc_id);
-}
+                }
             } else {
                 for (size_t sc_id = 0; sc_id < cfg->ofdm_data_num_; sc_id++) {
                     dl_mod_data[i][j * cfg->ofdm_ca_num_ + sc_id
                         + cfg->ofdm_data_start_]
                         = ue_specific_pilot[0][sc_id];
-}
+                }
             }
         }
     }
@@ -387,8 +388,8 @@ int main(int argc, char* argv[])
         Agora_memory::Alignment_t::kK64Align);
     for (size_t i = 0; i < cfg->dl_data_symbol_num_perframe_; i++) {
         arma::cx_fmat mat_input_data(
-            reinterpret_cast<arma::cx_float*>(dl_mod_data[i]), cfg->ofdm_ca_num_,
-            cfg->ue_ant_num_, false);
+            reinterpret_cast<arma::cx_float*>(dl_mod_data[i]),
+            cfg->ofdm_ca_num_, cfg->ue_ant_num_, false);
 
         arma::cx_fmat mat_output(
             reinterpret_cast<arma::cx_float*>(dl_ifft_data[i]),
@@ -397,8 +398,8 @@ int main(int argc, char* argv[])
         for (size_t j = cfg->ofdm_data_start_;
              j < cfg->ofdm_data_num_ + cfg->ofdm_data_start_; j++) {
             arma::cx_fmat mat_precoder(
-                reinterpret_cast<arma::cx_float*>(precoder[j]), cfg->ue_ant_num_,
-                cfg->bs_ant_num_, false);
+                reinterpret_cast<arma::cx_float*>(precoder[j]),
+                cfg->ue_ant_num_, cfg->bs_ant_num_, false);
             mat_precoder /= abs(mat_precoder).max();
             mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
 
@@ -418,7 +419,8 @@ int main(int argc, char* argv[])
                 tx_symbol[2 * (k + cfg->cp_len_ + cfg->ofdm_tx_zero_prefix_)]
                     = static_cast<short>(32768 * ptr_ifft[k].re
                         * std::sqrt(cfg->bs_ant_num_ * 1.f));
-                tx_symbol[2 * (k + cfg->cp_len_ + cfg->ofdm_tx_zero_prefix_) + 1]
+                tx_symbol[2 * (k + cfg->cp_len_ + cfg->ofdm_tx_zero_prefix_)
+                    + 1]
                     = static_cast<short>(32768 * ptr_ifft[k].im
                         * std::sqrt(cfg->bs_ant_num_ * 1.f));
             }
@@ -428,7 +430,8 @@ int main(int argc, char* argv[])
             }
 
             const size_t tx_zero_postfix_offset = 2
-                * (cfg->ofdm_tx_zero_prefix_ + cfg->cp_len_ + cfg->ofdm_ca_num_);
+                * (cfg->ofdm_tx_zero_prefix_ + cfg->cp_len_
+                    + cfg->ofdm_ca_num_);
             std::memset(tx_symbol + tx_zero_postfix_offset, 0,
                 sizeof(short) * 2 * cfg->ofdm_tx_zero_postfix_);
         }

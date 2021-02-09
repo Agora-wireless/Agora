@@ -64,7 +64,7 @@ static inline void CalibRegressionEstimate(
     std::vector<float> scs(out_len, 0);
     for (size_t i = 0; i < out_len; i++) {
         scs[i] = i;
-}
+    }
     arma::fvec x_vec((float*)scs.data() + x0, in_len, false);
     arma::fvec in_phase = arg(in_vec);
     arma::fvec in_mag = abs(in_vec);
@@ -86,7 +86,7 @@ static inline void CalibRegressionEstimate(
     out_vec *= arma::mean(in_mag);
 }
 
-EventData DoFFT::launch(size_t tag)
+EventData DoFFT::Launch(size_t tag)
 {
     size_t socket_thread_id = fft_req_tag_t(tag).tid_;
     size_t buf_offset = fft_req_tag_t(tag).offset_;
@@ -117,7 +117,7 @@ EventData DoFFT::launch(size_t tag)
                 sample_offset = cfg_->ofdm_rx_zero_prefix_cal_dl_;
             } else if (sym_type == SymbolType::kCalUL) {
                 sample_offset = cfg_->ofdm_rx_zero_prefix_cal_ul_;
-}
+            }
             SimdConvertShortToFloat(&pkt->data_[2 * sample_offset],
                 reinterpret_cast<float*>(fft_inout_), cfg_->ofdm_ca_num_ * 2);
         }
@@ -199,8 +199,8 @@ EventData DoFFT::launch(size_t tag)
             size_t frame_grp_id
                 = (frame_id - TX_FRAME_DELTA) / cfg_->ant_group_num_;
             size_t frame_grp_slot = frame_grp_id % kFrameWnd;
-            PartialTranspose(
-                &calib_ul_buffer_[frame_grp_slot][ant_id * cfg_->ofdm_data_num_],
+            PartialTranspose(&calib_ul_buffer_[frame_grp_slot]
+                                              [ant_id * cfg_->ofdm_data_num_],
                 ant_id, sym_type);
         }
     } else if (sym_type == SymbolType::kCalDL and ant_id == cfg_->ref_ant_) {
@@ -249,9 +249,9 @@ void DoFFT::PartialTranspose(
             } else {
                 dst = kUsePartialTrans
                     ? &out_buf[block_base_offset
-                          + (ant_id * kTransposeBlockSize) + sc_j]
+                        + (ant_id * kTransposeBlockSize) + sc_j]
                     : &out_buf[(cfg_->ofdm_data_num_ * ant_id) + sc_j
-                          + block_idx * kTransposeBlockSize];
+                        + block_idx * kTransposeBlockSize];
             }
 
             // With either of AVX-512 or AVX2, load one cacheline =
@@ -324,25 +324,25 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_socket_buffer_(in_dl_socket_buffer)
 {
-    duration_stat_
-        = in_stats_manager->GetDurationStat(DoerType::kIFFT, in_tid);
+    duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kIFFT, in_tid);
     DftiCreateDescriptor(
         &mkl_handle_, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg_->ofdm_ca_num_);
     if (kUseOutOfPlaceIFFT) {
         DftiSetValue(mkl_handle_, DFTI_PLACEMENT, DFTI_NOT_INPLACE);
-}
+    }
     DftiCommitDescriptor(mkl_handle_);
 
     // Aligned for SIMD
     ifft_out_ = static_cast<float*>(
         Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kK64Align,
             2 * cfg_->ofdm_ca_num_ * sizeof(float)));
-    ifft_scale_factor_ = cfg_->ofdm_ca_num_ / std::sqrt(cfg_->bf_ant_num_ * 1.f);
+    ifft_scale_factor_
+        = cfg_->ofdm_ca_num_ / std::sqrt(cfg_->bf_ant_num_ * 1.f);
 }
 
 DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle_); }
 
-EventData DoIFFT::launch(size_t tag)
+EventData DoIFFT::Launch(size_t tag)
 {
     size_t start_tsc = WorkerRdtsc();
     size_t ant_id = gen_tag_t(tag).ant_id_;
@@ -352,8 +352,8 @@ EventData DoIFFT::launch(size_t tag)
 
     if (kDebugPrintInTask) {
         std::printf(
-            "In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n", tid_,
-            frame_id, symbol_id, ant_id);
+            "In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
+            tid_, frame_id, symbol_id, ant_id);
     }
 
     size_t offset = (cfg_->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl)
@@ -368,7 +368,8 @@ EventData DoIFFT::launch(size_t tag)
         = (kUseOutOfPlaceIFFT || kMemcpyBeforeIFFT) ? ifft_out_ : ifft_in_ptr;
 
     if (kMemcpyBeforeIFFT) {
-        std::memset(ifft_out_ptr, 0, sizeof(float) * cfg_->ofdm_data_start_ * 2);
+        std::memset(
+            ifft_out_ptr, 0, sizeof(float) * cfg_->ofdm_data_start_ * 2);
         std::memset(ifft_out_ptr + (cfg_->ofdm_data_stop_) * 2, 0,
             sizeof(float) * cfg_->ofdm_data_start_ * 2);
         std::memcpy(ifft_out_ptr + (cfg_->ofdm_data_start_) * 2,

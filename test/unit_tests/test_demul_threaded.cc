@@ -32,7 +32,7 @@ void MasterToWorkerDynamicMaster(Config* cfg,
         for (size_t i = 0; i < kMaxTestNum; i++) {
             uint32_t frame_id = i
                     / (cfg->demul_events_per_symbol_
-                          * cfg->ul_data_symbol_num_perframe_)
+                        * cfg->ul_data_symbol_num_perframe_)
                 + kFrameOffsets[bs_ant_idx];
             uint32_t symbol_id = (i / cfg->demul_events_per_symbol_)
                 % cfg->ul_data_symbol_num_perframe_;
@@ -49,7 +49,7 @@ void MasterToWorkerDynamicMaster(Config* cfg,
             int ret = static_cast<int>(complete_task_queue.try_dequeue(event));
             if (ret != 0) {
                 num_finished_events++;
-}
+            }
         }
     }
 }
@@ -64,8 +64,7 @@ void MasterToWorkerDynamicWorker(Config* cfg, size_t worker_id,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
     PhyStats* phy_stats, Stats* stats)
 {
-    PinToCoreWithOffset(
-        ThreadType::kWorker, cfg->core_offset_ + 1, worker_id);
+    PinToCoreWithOffset(ThreadType::kWorker, cfg->core_offset_ + 1, worker_id);
 
     // Wait for all threads (including master) to start runnung
     num_workers_ready_atomic++;
@@ -73,8 +72,9 @@ void MasterToWorkerDynamicWorker(Config* cfg, size_t worker_id,
         // Wait
     }
 
-    auto *compute_demul = new DoDemul(cfg, worker_id, data_buffer, ul_zf_matrices,
-        ue_spec_pilot_buffer, equal_buffer, demod_buffers_, phy_stats, stats);
+    auto* compute_demul = new DoDemul(cfg, worker_id, data_buffer,
+        ul_zf_matrices, ue_spec_pilot_buffer, equal_buffer, demod_buffers_,
+        phy_stats, stats);
 
     size_t start_tsc = Rdtsc();
     size_t num_tasks = 0;
@@ -94,7 +94,7 @@ void MasterToWorkerDynamicWorker(Config* cfg, size_t worker_id,
                 frame_offset_id = 2;
             }
             ASSERT_EQ(cfg->mod_order_bits_, kModBitsNums[frame_offset_id]);
-            EventData resp_event = compute_demul->launch(req_event.tags_[0]);
+            EventData resp_event = compute_demul->Launch(req_event.tags_[0]);
             TryEnqueueFallback(&complete_task_queue, ptok, resp_event);
         }
     }
@@ -123,14 +123,14 @@ TEST(TestDemul, VaryingConfig)
     Table<complex_float> data_buffer;
     Table<complex_float> ue_spec_pilot_buffer;
     Table<complex_float> equal_buffer;
-    data_buffer.RandAllocCxFloat(
-        cfg->ul_data_symbol_num_perframe_ * kFrameWnd,
+    data_buffer.RandAllocCxFloat(cfg->ul_data_symbol_num_perframe_ * kFrameWnd,
         kMaxAntennas * kMaxDataSCs, Agora_memory::Alignment_t::kK64Align);
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
         kMaxAntennas * kMaxUEs);
     equal_buffer.Calloc(cfg->ul_data_symbol_num_perframe_ * kFrameWnd,
         kMaxDataSCs * kMaxUEs, Agora_memory::Alignment_t::kK64Align);
-    ue_spec_pilot_buffer.Calloc(kFrameWnd, cfg->ul_pilot_syms_ * kMaxUEs, Agora_memory::Alignment_t::kK64Align);
+    ue_spec_pilot_buffer.Calloc(kFrameWnd, cfg->ul_pilot_syms_ * kMaxUEs,
+        Agora_memory::Alignment_t::kK64Align);
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers(kFrameWnd,
         cfg->symbol_num_perframe_, cfg->ue_num_,
         kMaxModType * cfg->ofdm_data_num_);
@@ -142,14 +142,14 @@ TEST(TestDemul, VaryingConfig)
             * kMaxDataSCs * 4 * 1.0f / 1024 / 1024,
         kMaxDataSCs * kFrameWnd * kMaxUEs * kMaxAntennas * 4 * 1.0f / 1024
             / 1024,
-        cfg->ul_data_symbol_num_perframe_ * kFrameWnd * kMaxDataSCs * kMaxUEs * 4
-            * 1.0f / 1024 / 1024,
+        cfg->ul_data_symbol_num_perframe_ * kFrameWnd * kMaxDataSCs * kMaxUEs
+            * 4 * 1.0f / 1024 / 1024,
         kFrameWnd * cfg->ul_pilot_syms_ * kMaxUEs * 4 * 1.0f / 1024 / 1024,
-        cfg->ul_data_symbol_num_perframe_ * kFrameWnd * kMaxModType * kMaxDataSCs
-            * kMaxUEs * 1.0f / 1024 / 1024);
+        cfg->ul_data_symbol_num_perframe_ * kFrameWnd * kMaxModType
+            * kMaxDataSCs * kMaxUEs * 1.0f / 1024 / 1024);
 
-    auto *stats = new Stats(cfg);
-    auto *phy_stats = new PhyStats(cfg);
+    auto* stats = new Stats(cfg);
+    auto* phy_stats = new PhyStats(cfg);
 
     auto master = std::thread(MasterToWorkerDynamicMaster, cfg,
         std::ref(event_queue), std::ref(complete_task_queue));
@@ -164,7 +164,7 @@ TEST(TestDemul, VaryingConfig)
     master.join();
     for (auto& w : workers) {
         w.join();
-}
+    }
 }
 
 int main(int argc, char** argv)

@@ -8,8 +8,7 @@
 #include <cstring> /* std::strerror, std::memset, std::memcpy */
 
 namespace avx2enc {
-inline __m256i CycleBitShift2to64(
-    __m256i data, int16_t cyc_shift, int16_t zc)
+inline __m256i CycleBitShift2to64(__m256i data, int16_t cyc_shift, int16_t zc)
 {
     __m256i x1;
     __m256i x2;
@@ -21,7 +20,7 @@ inline __m256i CycleBitShift2to64(
         e0 = 0xffffffffffffffff;
     } else {
         e0 = (1UL << zc) - 1;
-}
+    }
 
     bit_mask = _mm256_set_epi64x(0, 0, 0, e0);
     data = _mm256_and_si256(data, bit_mask);
@@ -35,8 +34,7 @@ inline __m256i CycleBitShift2to64(
     return x1;
 }
 
-inline __m256i CycleBitShift72to128(
-    __m256i data, int16_t cyc_shift, int16_t zc)
+inline __m256i CycleBitShift72to128(__m256i data, int16_t cyc_shift, int16_t zc)
 {
     /* when zc is 88 or 104 or 120 */
     int8_t shuffle_table[9][32] = {
@@ -93,7 +91,7 @@ inline __m256i CycleBitShift72to128(
         e0 = 0xffffffffffffffff;
     } else {
         e0 = (1UL << (zc - 64)) - 1;
-}
+    }
     bit_mask = _mm256_set_epi64x(0, 0, e0, 0xffffffffffffffff);
     x2 = _mm256_and_si256(x2, bit_mask);
 
@@ -179,6 +177,6 @@ CYCLIC_BIT_SHIFT LdpcSelectShiftFunc(int16_t zcSize)
     } else {
         throw std::invalid_argument(
             "cyclic shifter for zc larger than 256 has not been implemented");
-}
+    }
 }
 } // namespace avx2enc

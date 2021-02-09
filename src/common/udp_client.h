@@ -41,10 +41,10 @@ public:
     {
         for (auto kv : addrinfo_map_) {
             freeaddrinfo(kv.second);
-}
+        }
         if (sock_fd_ != -1) {
             close(sock_fd_);
-}
+        }
     }
 
     /**

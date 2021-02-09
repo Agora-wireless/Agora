@@ -33,7 +33,7 @@ void PacketTXRX::LoopTxRxUsrp(int tid)
     samp_buffer[0] = samp_buffer0.data();
     if (true) {
         samp_buffer[1] = samp_buffer1.data();
-}
+    }
 
     // long long rxTimeBs(0);
     // long long txTimeBs(0);
@@ -43,11 +43,12 @@ void PacketTXRX::LoopTxRxUsrp(int tid)
     std::cout << "Sync BS host and FGPA timestamp..." << std::endl;
     radioconfig_->RadioRx(0, samp_buffer.data(), rx_time_bs_);
     // Schedule the first beacon in the future
-    tx_time_bs_ = rx_time_bs_ + cfg_->samps_per_symbol_ * cfg_->symbol_num_perframe_ * 40;
+    tx_time_bs_ = rx_time_bs_
+        + cfg_->samps_per_symbol_ * cfg_->symbol_num_perframe_ * 40;
     radioconfig_->RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
     long long bs_init_rx_offset = tx_time_bs_ - rx_time_bs_;
-    for (int it = 0; it < std::floor(bs_init_rx_offset / cfg_->samps_per_symbol_);
-         it++) {
+    for (int it = 0;
+         it < std::floor(bs_init_rx_offset / cfg_->samps_per_symbol_); it++) {
         radioconfig_->RadioRx(0, samp_buffer.data(), rx_time_bs_);
     }
 
@@ -78,14 +79,15 @@ void PacketTXRX::LoopTxRxUsrp(int tid)
                 = radioconfig_->RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
             if (tx_ret != (int)cfg_->samps_per_symbol_) {
                 std::cerr << "BAD Transmit(" << tx_ret << "/"
-                          << cfg_->samps_per_symbol_ << ") at Time " << tx_time_bs_
-                          << ", frame count " << global_frame_id << std::endl;
-}
+                          << cfg_->samps_per_symbol_ << ") at Time "
+                          << tx_time_bs_ << ", frame count " << global_frame_id
+                          << std::endl;
+            }
         }
 
         if (++radio_id == radio_hi) {
             radio_id = radio_lo;
-}
+        }
 
         // Update global frame_id and symbol_id
         global_symbol_id++;
@@ -96,7 +98,7 @@ void PacketTXRX::LoopTxRxUsrp(int tid)
 
         if (pkt == NULL) {
             continue;
-}
+        }
         rx_offset = (rx_offset + cfg_->n_channels_) % packet_num_in_buffer_;
 
         if (kIsWorkerTimingEnabled) {
@@ -127,7 +129,7 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(
     samp_buffer[0] = samp_buffer0.data();
     if (cfg_->n_channels_ == 2) {
         samp_buffer[1] = samp_buffer1.data();
-}
+    }
 
     // if rx_buffer is full, exit
     int n_channels = cfg_->n_channels_;
@@ -151,12 +153,13 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(
         || cfg_->IsUplink(frame_id, symbol_id)) {
         tmp_ret = radioconfig_->RadioRx(radio_id, samp, rx_time_bs_);
     } else {
-        tmp_ret = radioconfig_->RadioRx(radio_id, samp_buffer.data(), rx_time_bs_);
+        tmp_ret
+            = radioconfig_->RadioRx(radio_id, samp_buffer.data(), rx_time_bs_);
     }
 
     if (!cfg_->running_ || tmp_ret <= 0
         || (!cfg_->IsPilot(frame_id, symbol_id)
-               && !cfg_->IsUplink(frame_id, symbol_id))) {
+            && !cfg_->IsUplink(frame_id, symbol_id))) {
         return NULL;
     }
 
@@ -189,7 +192,7 @@ int PacketTXRX::DequeueSendUsrp(int tid)
     EventData event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
         return -1;
-}
+    }
 
     std::printf("tx queue length: %zu\n", task_queue_->size_approx());
     assert(event.event_type_ == EventType::kPacketTX);
@@ -218,7 +221,7 @@ int PacketTXRX::DequeueSendUsrp(int tid)
             txbuf[ch] = (void*)c->ue_specific_pilot_t_[0];
         } else {
             txbuf[ch] = (void*)c->dl_iq_t_[dl_symbol_idx - c->dl_pilot_syms_];
-}
+        }
     } else {
         char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length_;
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
@@ -233,13 +236,13 @@ int PacketTXRX::DequeueSendUsrp(int tid)
 
     if (kDebugPrintInTask) {
         std::printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
-               "ant %zu, offset: %zu, msg_queue_length: %zu\n",
+                    "ant %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, offset,
             message_queue_->size_approx());
     }
 
     RtAssert(message_queue_->enqueue(*rx_ptoks_[tid],
-                  EventData(EventType::kPacketTX, event.tags_[0])),
+                 EventData(EventType::kPacketTX, event.tags_[0])),
         "Socket message enqueue failed\n");
     return event.tags_[0];
 }
@@ -250,7 +253,7 @@ int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id)
     EventData event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
         return -1;
-}
+    }
     std::cout << "DDD" << std::endl;
 
     std::printf("tx queue length: %zu\n", task_queue_->size_approx());
@@ -284,7 +287,7 @@ int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id)
             txbuf[ch] = (void*)c->ue_specific_pilot_t_[0];
         } else {
             txbuf[ch] = (void*)c->dl_iq_t_[dl_symbol_idx - c->dl_pilot_syms_];
-}
+        }
     } else {
         char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length_;
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
@@ -299,13 +302,13 @@ int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id)
 
     if (kDebugPrintInTask) {
         std::printf("In TX thread %d: Transmitted frame %d, symbol %d, "
-               "ant %zu, offset: %zu, msg_queue_length: %zu\n",
+                    "ant %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, offset,
             message_queue_->size_approx());
     }
 
     RtAssert(message_queue_->enqueue(*rx_ptoks_[tid],
-                  EventData(EventType::kPacketTX, event.tags_[0])),
+                 EventData(EventType::kPacketTX, event.tags_[0])),
         "Socket message enqueue failed\n");
     return event.tags_[0];
 }

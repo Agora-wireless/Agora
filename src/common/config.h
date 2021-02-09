@@ -10,12 +10,12 @@
 #include <vector>
 #define JSON
 #ifdef JSON
-#include "symbols.h"
 #include "buffer.inc"
 #include "comms-lib.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.h"
+#include "symbols.h"
 #include "utils.h"
 #include "utils_ldpc.h"
 #include <nlohmann/json.hpp>
@@ -29,7 +29,8 @@ class LDPCconfig {
 public:
     uint16_t bg_; /// The 5G NR LDPC base graph (one or two)
     uint16_t zc_; /// The 5G NR LDPC expansion factor
-    int16_t decoder_iter_; /// Maximum number of decoder iterations per codeblock
+    int16_t
+        decoder_iter_; /// Maximum number of decoder iterations per codeblock
 
     /// Allow the LDPC decoder to terminate without completing all iterations
     /// if it decodes the codeblock eariler
@@ -37,7 +38,8 @@ public:
 
     size_t n_rows_; /// Number of rows in the LDPC base graph to use
     uint32_t cb_len_; /// Number of information bits input to LDPC encoding
-    uint32_t cb_codew_len_; /// Number of codeword bits output from LDPC encoding
+    uint32_t
+        cb_codew_len_; /// Number of codeword bits output from LDPC encoding
     size_t nblocks_in_symbol_;
 
     // Return the number of bytes in the information bit sequence for LDPC
@@ -377,8 +379,7 @@ public:
 
     /// Return total number of data symbols of all frames in a buffer
     /// that holds data of kFrameWnd frames
-    inline size_t GetTotalDataSymbolIdx(
-        size_t frame_id, size_t symbol_id) const
+    inline size_t GetTotalDataSymbolIdx(size_t frame_id, size_t symbol_id) const
     {
         return ((frame_id % kFrameWnd) * data_symbol_num_perframe_) + symbol_id;
     }
@@ -453,8 +454,8 @@ public:
     }
 
     /// Get encoded_buffer for this frame, symbol, user and code block ID
-    inline int8_t* GetEncodedBuf(Table<int8_t>& encoded_buffer,
-        size_t frame_id, size_t symbol_id, size_t ue_id, size_t cb_id) const
+    inline int8_t* GetEncodedBuf(Table<int8_t>& encoded_buffer, size_t frame_id,
+        size_t symbol_id, size_t ue_id, size_t cb_id) const
     {
         size_t total_data_symbol_id
             = GetTotalDataSymbolIdxDl(frame_id, symbol_id);

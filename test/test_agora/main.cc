@@ -72,8 +72,8 @@ void CheckCorrectnessUl(Config* cfg)
     output_data.Calloc(data_symbol_num_perframe, ofdm_data_num * ue_num,
         Agora_memory::Alignment_t::kK64Align);
 
-    int num_bytes_per_ue
-        = (cfg->ldpc_config_.cb_len_ + 7) >> 3 * cfg->ldpc_config_.nblocks_in_symbol_;
+    int num_bytes_per_ue = (cfg->ldpc_config_.cb_len_ + 7)
+        >> 3 * cfg->ldpc_config_.nblocks_in_symbol_;
     ReadFromFileUl(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
     ReadFromFileUl(output_data_filename, output_data, num_bytes_per_ue, cfg);
 
@@ -82,7 +82,7 @@ void CheckCorrectnessUl(Config* cfg)
     for (int i = 0; i < data_symbol_num_perframe; i++) {
         if (i < ul_pilot_syms) {
             continue;
-}
+        }
         for (int ue = 0; ue < ue_num; ue++) {
             for (int j = 0; j < num_bytes_per_ue; j++) {
                 total_count++;
@@ -105,7 +105,7 @@ void CheckCorrectnessUl(Config* cfg)
     } else {
         std::printf(
             "Failed uplink test! Error rate: %d/%d\n", error_cnt, total_count);
-}
+    }
     std::printf("======================\n\n");
     raw_data.Free();
     output_data.Free();
@@ -155,7 +155,7 @@ void CheckCorrectnessDl(Config* cfg)
                 ant, avg_diff);
             if (avg_diff > 0.03) {
                 error_cnt++;
-}
+            }
         }
     }
     std::printf("======================\n");
@@ -165,7 +165,7 @@ void CheckCorrectnessDl(Config* cfg)
     } else {
         std::printf("Failed downlink test! Error rate: %d/%d\n", error_cnt,
             total_count);
-}
+    }
     std::printf("======================\n\n");
     raw_data.Free();
     tx_data.Free();
@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
         = cur_directory + "/data/tddconfig-correctness-test-ul.json";
     if (argc == 2) {
         conf_file = std::string(argv[1]);
-}
+    }
 
     auto* cfg = new Config(conf_file.c_str());
     cfg->GenData();
@@ -197,7 +197,7 @@ int main(int argc, char* argv[])
             CheckCorrectnessDl(cfg);
         } else {
             CheckCorrectnessUl(cfg);
-}
+        }
 
         ret = EXIT_SUCCESS;
     } catch (SignalException& e) {

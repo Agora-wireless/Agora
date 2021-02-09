@@ -44,7 +44,7 @@ void MasterToWorkerDynamicMaster(Config* cfg,
             int ret = static_cast<int>(complete_task_queue.try_dequeue(event));
             if (ret != 0) {
                 num_finished_events++;
-}
+            }
         }
     }
 }
@@ -60,8 +60,7 @@ void MasterToWorkerDynamicWorker(Config* cfg, size_t worker_id,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     Stats* stats)
 {
-    PinToCoreWithOffset(
-        ThreadType::kWorker, cfg->core_offset_ + 1, worker_id);
+    PinToCoreWithOffset(ThreadType::kWorker, cfg->core_offset_ + 1, worker_id);
 
     // Wait for all threads (including master) to start runnung
     num_workers_ready_atomic++;
@@ -69,7 +68,7 @@ void MasterToWorkerDynamicWorker(Config* cfg, size_t worker_id,
         // Wait
     }
 
-    auto *compute_zf = new DoZF(cfg, worker_id, csi_buffers, calib_dl_buffer,
+    auto* compute_zf = new DoZF(cfg, worker_id, csi_buffers, calib_dl_buffer,
         calib_ul_buffer, ul_zf_matrices, dl_zf_matrices, stats);
 
     size_t start_tsc = Rdtsc();
@@ -90,7 +89,7 @@ void MasterToWorkerDynamicWorker(Config* cfg, size_t worker_id,
                 frame_offset_id = 2;
             }
             ASSERT_EQ(cfg->bs_ant_num_, kBsAntNums[frame_offset_id]);
-            EventData resp_event = compute_zf->launch(req_event.tags_[0]);
+            EventData resp_event = compute_zf->Launch(req_event.tags_[0]);
             TryEnqueueFallback(&complete_task_queue, ptok, resp_event);
         }
     }
@@ -127,12 +126,12 @@ TEST(TestZF, VaryingConfig)
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
         kMaxUEs * kMaxAntennas);
 
-    calib_dl_buffer.RandAllocCxFloat(
-        kFrameWnd, kMaxDataSCs * kMaxAntennas, Agora_memory::Alignment_t::kK64Align);
-    calib_ul_buffer.RandAllocCxFloat(
-        kFrameWnd, kMaxDataSCs * kMaxAntennas, Agora_memory::Alignment_t::kK64Align);
+    calib_dl_buffer.RandAllocCxFloat(kFrameWnd, kMaxDataSCs * kMaxAntennas,
+        Agora_memory::Alignment_t::kK64Align);
+    calib_ul_buffer.RandAllocCxFloat(kFrameWnd, kMaxDataSCs * kMaxAntennas,
+        Agora_memory::Alignment_t::kK64Align);
 
-    auto *stats = new Stats(cfg);
+    auto* stats = new Stats(cfg);
 
     auto master = std::thread(MasterToWorkerDynamicMaster, cfg,
         std::ref(event_queue), std::ref(complete_task_queue));
@@ -147,7 +146,7 @@ TEST(TestZF, VaryingConfig)
     master.join();
     for (auto& w : workers) {
         w.join();
-}
+    }
 }
 
 int main(int argc, char** argv)

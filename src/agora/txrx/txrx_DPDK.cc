@@ -33,8 +33,9 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
         uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port + i);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
 
-        std::printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
-               "dst port: %zu, DPDK port %zu, queue: %zu\n",
+        std::printf(
+            "Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
+            "dst port: %zu, DPDK port %zu, queue: %zu\n",
             cfg->bs_rru_addr.c_str(), cfg->bs_server_addr.c_str(),
             cfg->bs_rru_port + i, cfg->bs_server_port + i,
             i % cfg->dpdk_num_ports, i / cfg->dpdk_num_ports);
@@ -218,7 +219,7 @@ int PacketTXRX::dequeue_send(int tid)
 
     if (kDebugPrintInTask) {
         std::printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
-               "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+                    "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags[0])._tag,
             offset, message_queue_->size_approx());
     }

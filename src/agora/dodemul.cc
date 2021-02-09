@@ -58,7 +58,7 @@ DoDemul::~DoDemul()
     std::free(equaled_buffer_temp_transposed_);
 }
 
-EventData DoDemul::launch(size_t tag)
+EventData DoDemul::Launch(size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id_;
     const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id_;
@@ -94,7 +94,8 @@ EventData DoDemul::launch(size_t tag)
             * (kTransposeBlockSize * cfg_->bs_ant_num_);
 
         size_t ant_start = 0;
-        if (kUseSIMDGather and cfg_->bs_ant_num_ % 4 == 0 and kUsePartialTrans) {
+        if (kUseSIMDGather and cfg_->bs_ant_num_ % 4 == 0
+            and kUsePartialTrans) {
             __m256i index = _mm256_setr_epi32(0, 1, kTransposeBlockSize * 2,
                 kTransposeBlockSize * 2 + 1, kTransposeBlockSize * 4,
                 kTransposeBlockSize * 4 + 1, kTransposeBlockSize * 6,
@@ -122,10 +123,10 @@ EventData DoDemul::launch(size_t tag)
                      ant_i++) {
                     *dst++ = kUsePartialTrans
                         ? data_buf[partial_transpose_block_base
-                              + (ant_i * kTransposeBlockSize)
-                              + ((base_sc_id + i + j) % kTransposeBlockSize)]
+                            + (ant_i * kTransposeBlockSize)
+                            + ((base_sc_id + i + j) % kTransposeBlockSize)]
                         : data_buf[ant_i * cfg_->ofdm_data_num_ + base_sc_id + i
-                              + j];
+                            + j];
                 }
             }
         }
@@ -177,7 +178,8 @@ EventData DoDemul::launch(size_t tag)
                 cx_float* phase_shift_ptr
                     = (cx_float*)&ue_spec_pilot_buffer_[frame_id
                         % kFrameWnd][symbol_idx_ul * cfg_->ue_num_];
-                cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->ue_num_, 1, false);
+                cx_fmat mat_phase_shift(
+                    phase_shift_ptr, cfg_->ue_num_, 1, false);
                 cx_fmat shift_sc
                     = sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
                 mat_phase_shift += shift_sc;
@@ -224,12 +226,14 @@ EventData DoDemul::launch(size_t tag)
     for (size_t i = 0; i < cfg_->ue_num_; i++) {
         float* equal_ptr = nullptr;
         if (kExportConstellation) {
-            equal_ptr = (float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                               [base_sc_id * cfg_->ue_num_ + i]);
+            equal_ptr
+                = (float*)(&equal_buffer_[total_data_symbol_idx_ul]
+                                         [base_sc_id * cfg_->ue_num_ + i]);
         } else {
             equal_ptr = (float*)(equaled_buffer_temp_ + i);
         }
-        size_t k_num_double_in_sim_d256 = sizeof(__m256) / sizeof(double); // == 4
+        size_t k_num_double_in_sim_d256
+            = sizeof(__m256) / sizeof(double); // == 4
         for (size_t j = 0; j < max_sc_ite / k_num_double_in_sim_d256; j++) {
             __m256 equal_t_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
             _mm256_store_ps(equal_t_ptr, equal_t_temp);

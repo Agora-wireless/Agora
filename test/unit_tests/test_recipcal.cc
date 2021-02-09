@@ -19,10 +19,13 @@ TEST(TestRecip, Correctness)
     Table<complex_float> calib_buffer;
     Table<complex_float> recip_buffer_0;
     Table<complex_float> recip_buffer_1;
-    recip_buffer_0.Calloc(kFrameWnd, cfg->ofdm_data_num_ * cfg->bs_ant_num_, Agora_memory::Alignment_t::kK64Align);
-    recip_buffer_1.Calloc(kFrameWnd, cfg->ofdm_data_num_ * cfg->bs_ant_num_, Agora_memory::Alignment_t::kK64Align);
-    calib_buffer.RandAllocCxFloat(
-        kFrameWnd, cfg->ofdm_data_num_ * cfg->bs_ant_num_, Agora_memory::Alignment_t::kK64Align);
+    recip_buffer_0.Calloc(kFrameWnd, cfg->ofdm_data_num_ * cfg->bs_ant_num_,
+        Agora_memory::Alignment_t::kK64Align);
+    recip_buffer_1.Calloc(kFrameWnd, cfg->ofdm_data_num_ * cfg->bs_ant_num_,
+        Agora_memory::Alignment_t::kK64Align);
+    calib_buffer.RandAllocCxFloat(kFrameWnd,
+        cfg->ofdm_data_num_ * cfg->bs_ant_num_,
+        Agora_memory::Alignment_t::kK64Align);
 
     std::printf("Reference antenna: %zu\n", cfg->ref_ant_);
 
@@ -71,7 +74,7 @@ TEST(TestRecip, Correctness)
                 for (size_t j = 0; j < cfg->bs_ant_num_; j++) {
                     ptr_in[std::min(sc_id + j, cfg->ofdm_data_num_ - 1)]
                         = ptr_in[sc_id];
-}
+                }
             }
         }
         // Transpose
