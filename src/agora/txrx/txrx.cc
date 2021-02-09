@@ -122,8 +122,8 @@ void PacketTXRX::LoopTxRx(int tid) {
     MLPD_INFO(
         "TXRX thread %d: set up UDP socket server listening to port %d"
         " with remote address %s:%d \n",
-        tid, local_port_id, cfg->bs_rru_addr.c_str(),
-        cfg->bs_rru_port + radio_id);
+        tid, local_port_id, cfg_->bs_rru_addr_.c_str(),
+        cfg_->bs_rru_port_ + radio_id);
     fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
   }
 
