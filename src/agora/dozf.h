@@ -8,7 +8,7 @@
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
-#include "gettime.h"
+#include "gettime.inc"
 #include "stats.h"
 #include "symbols.h"
 #include "utils.h"

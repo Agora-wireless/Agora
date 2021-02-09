@@ -4,7 +4,7 @@
 #include <iostream>
 
 #include "config.h"
-#include "gettime.h"
+#include "gettime.inc"
 #include "memory_manage.h"
 #include "symbols.h"
 

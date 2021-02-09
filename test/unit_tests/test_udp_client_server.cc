@@ -3,7 +3,7 @@
 #include <atomic>
 #include <thread>
 
-#include "gettime.h"
+#include "gettime.inc"
 #include "udp_client.h"
 #include "udp_server.h"
 #include "utils.h"

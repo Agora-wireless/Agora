@@ -17,7 +17,7 @@
 #include "channel.h"
 #include "concurrent_queue_wrapper.inc"
 #include "config.h"
-#include "gettime.h"
+#include "gettime.inc"
 #include "memory_manage.h"
 #include "net.h"
 #include "signal_handler.h"
@@ -118,7 +118,7 @@ class ChannelSim {
     if (symbol_id == 0) {
       return 0;
     } else {
-      return bscfg_->GetDlSymbolIdx(frame_id, symbol_id) + 1;
+      return bscfg_->Frame().GetDLSymbolIdx(symbol_id) + 1;
     }
   }
 };

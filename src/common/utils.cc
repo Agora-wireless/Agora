@@ -72,7 +72,7 @@ int PinToCore(int core_id) {
 
 void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
                          bool verbose) {
-  if (kEnableThreadPinning == 0u) {
+  if (kEnableThreadPinning == false) {
     return;
   }
 

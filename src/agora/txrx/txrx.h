@@ -21,7 +21,7 @@
 #include "buffer.inc"
 #include "concurrentqueue.h"
 #include "config.h"
-#include "gettime.h"
+#include "gettime.inc"
 #include "net.h"
 #include "radio_lib.h"
 #include "symbols.h"

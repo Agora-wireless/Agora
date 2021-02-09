@@ -1,5 +1,5 @@
 #include "buffer.inc"
-#include "gettime.h"
+#include "gettime.inc"
 #include "memory_manage.h"
 #include "modulation.h"
 #include "utils.h"
