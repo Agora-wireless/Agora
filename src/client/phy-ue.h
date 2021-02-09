@@ -152,8 +152,7 @@ class PhyUe {
 
  private:
   Config* config_;
-  size_t symbol_perframe_;
-  size_t ul_pilot_symbol_perframe_;
+  // size_t symbol_perframe_;
   size_t dl_pilot_symbol_perframe_;
   size_t ul_data_symbol_perframe_;
   size_t dl_data_symbol_perframe_;
@@ -167,7 +166,7 @@ class PhyUe {
   size_t n_u_es_;
   size_t antenna_num_;
   size_t hdr_size_;
-  size_t n_cp_us_;
+  size_t num_cp_us_;
   size_t core_offset_;
   size_t worker_thread_num_;
   size_t rx_thread_num_;

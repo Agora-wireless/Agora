@@ -15,7 +15,8 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
 
   this->radio_num_ = cfg_->NumRadios();
   this->antenna_num_ = radio_num_ * cfg_->NumChannels();
-  std::cout << "radio num is " << this->radio_num_ << std::endl;
+  std::cout << "Radio num is " << this->radio_num_
+            << " Antenna num: " << antenna_num_ << std::endl;
   if (cfg_->IsUe()) {
     throw std::invalid_argument("Bad config! Not a UE!");
   }
@@ -42,7 +43,7 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
       std::exit(0);
     }
 #else
-    initBSRadio(context);
+    InitBSRadio(context);
 #endif
   }
 
@@ -82,7 +83,7 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
       std::exit(0);
     }
 #else
-    configureBSRadio(context);
+    ConfigureBSRadio(context);
 #endif
   }
 

@@ -121,7 +121,7 @@ class DoSubcarrier : public Doer {
         dl_zf_matrices_, dl_ifft_buffer_, dl_encoded_buffer_, stats);
 
     // Init internal states
-    demul_cur_sym_ = cfg->pilot_symbol_num_perframe;
+    demul_cur_sym_ = cfg->Frame().NumPilotSyms();
   }
 
   ~DoSubcarrier() {
@@ -167,7 +167,7 @@ class DoSubcarrier : public Doer {
       if (zf_cur_frame_ > demul_cur_frame_ &&
           rx_status_->is_demod_ready(demul_cur_frame_, demul_cur_sym_)) {
         do_demul_->independent_launch(
-            demul_cur_frame_, demul_cur_sym_ - cfg->pilot_symbol_num_perframe,
+            demul_cur_frame_, demul_cur_sym_ - cfg->Frame().NumPilotSyms(),
             sc_range_.start + (n_demul_tasks_done_ * cfg->demul_block_size));
 
         n_demul_tasks_done_++;
@@ -178,7 +178,7 @@ class DoSubcarrier : public Doer {
               usleep(tid * 3000);
               int8_t* demul_ptr = demod_buffers_[demul_cur_frame_
                   % kFrameWnd][demul_cur_sym_
-                  - cfg->pilot_symbol_num_perframe][i];
+                  - cfg->Frame().NumPilotSyms()][i];
               std::printf("UE %zu: ", i);
               for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
                   if (i % 20 == 0) {
@@ -195,12 +195,12 @@ class DoSubcarrier : public Doer {
                                         n_demul_tasks_reqd);
           demul_cur_sym_++;
           if (demul_cur_sym_ == cfg->symbol_num_perframe) {
-            demul_cur_sym_ = cfg->pilot_symbol_num_perframe;
+            demul_cur_sym_ = cfg->Frame().NumPilotSyms();
             std::printf(
                 "Main thread: Demodulation done frame: %lu "
                 "(%lu UL symbols)\n",
                 demul_cur_frame_,
-                cfg->symbol_num_perframe - cfg->pilot_symbol_num_perframe);
+                cfg->symbol_num_perframe - cfg->Frame().NumPilotSyms());
             demul_cur_frame_++;
           }
         }
@@ -215,8 +215,8 @@ class DoSubcarrier : public Doer {
 
     complex_float converted_sc[kSCsPerCacheline];
 
-    for (size_t i = 0; i < cfg->pilot_symbol_num_perframe; i++) {
-      for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
+    for (size_t i = 0; i < cfg->Frame().NumPilotSyms(); i++) {
+      for (size_t j = 0; j < cfg->BsAntNum(); j++) {
         auto* pkt = reinterpret_cast<Packet*>(
             socket_buffer_[j] +
             (frame_slot * cfg->symbol_num_perframe * cfg->packet_length) +
@@ -226,7 +226,7 @@ class DoSubcarrier : public Doer {
         for (size_t block_idx = sc_range_.start / kTransposeBlockSize;
              block_idx < sc_range_.end / kTransposeBlockSize; block_idx++) {
           const size_t block_base_offset =
-              block_idx * (kTransposeBlockSize * cfg->BS_ANT_NUM);
+              block_idx * (kTransposeBlockSize * cfg->BsAntNum());
 
           for (size_t sc_j = 0; sc_j < kTransposeBlockSize;
                sc_j += kSCsPerCacheline) {

@@ -11,14 +11,14 @@ static constexpr bool kDebugDPDK = false;
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg(cfg),
       core_offset(core_offset),
-      ant_per_cell(cfg->BS_ANT_NUM / cfg->nCells),
-      socket_thread_num(cfg->socket_thread_num) {
+      ant_per_cell(cfg->BsAntNum() / cfg->NumCells()),
+      socket_thread_num(cfg->SocketThreadNum()) {
   DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num);
   mbuf_pool = DpdkTransport::create_mempool();
 
-  int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
+  int ret = inet_pton(AF_INET, cfg->BsRruAddr().c_str(), &bs_rru_addr);
   rt_assert(ret == 1, "Invalid sender IP address");
-  ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
+  ret = inet_pton(AF_INET, cfg->BsServerAddr().c_str(), &bs_server_addr);
   rt_assert(ret == 1, "Invalid server IP address");
 
   rt_assert(cfg->dpdk_num_ports <= rte_eth_dev_count_avail(),
@@ -35,7 +35,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     std::printf(
         "Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
         "dst port: %zu, DPDK port %zu, queue: %zu\n",
-        cfg->bs_rru_addr.c_str(), cfg->bs_server_addr.c_str(),
+        cfg->BsRruAddr().c_str(), cfg->BsServerAddr().c_str(),
         cfg->bs_rru_port + i, cfg->bs_server_port + i, i % cfg->dpdk_num_ports,
         i / cfg->dpdk_num_ports);
     DpdkTransport::install_flow_rule(i % cfg->dpdk_num_ports,
@@ -207,7 +207,7 @@ int PacketTXRX::dequeue_send(int tid) {
   size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
   size_t offset =
       (c->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl) *
-       c->BS_ANT_NUM) +
+       c->BsAntNum()) +
       ant_id;
 
   if (kDebugPrintInTask) {

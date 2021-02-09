@@ -172,7 +172,7 @@ EventData DoDecode::Launch(size_t tag) {
   }
 
   if ((kEnableMac == false) && (kPrintPhyStats == true) &&
-      (symbol_idx_ul >= cfg_->Frame().NumPilotSyms())) {
+      (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
     phy_stats_->UpdateDecodedBits(ue_id, symbol_offset,
                                   cfg_->NumBytesPerCb() * 8);
     phy_stats_->IncrementDecodedBlocks(ue_id, symbol_offset);

@@ -130,7 +130,8 @@ TEST(TestDemul, VaryingConfig) {
   equal_buffer.Calloc(cfg->Frame().NumULSyms() * kFrameWnd,
                       kMaxDataSCs * kMaxUEs,
                       Agora_memory::Alignment_t::kAlign64);
-  ue_spec_pilot_buffer.Calloc(kFrameWnd, cfg->Frame().NumPilotSyms() * kMaxUEs,
+  ue_spec_pilot_buffer.Calloc(kFrameWnd,
+                              cfg->Frame().ClientUlPilotSymbols() * kMaxUEs,
                               Agora_memory::Alignment_t::kAlign64);
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers(
       kFrameWnd, cfg->Frame().NumTotalSyms(), cfg->UeNum(),
@@ -144,8 +145,8 @@ TEST(TestDemul, VaryingConfig) {
       kMaxDataSCs * kFrameWnd * kMaxUEs * kMaxAntennas * 4 * 1.0f / 1024 / 1024,
       cfg->Frame().NumULSyms() * kFrameWnd * kMaxDataSCs * kMaxUEs * 4 * 1.0f /
           1024 / 1024,
-      kFrameWnd * cfg->Frame().NumPilotSyms() * kMaxUEs * 4 * 1.0f / 1024 /
-          1024,
+      kFrameWnd * cfg->Frame().ClientUlPilotSymbols() * kMaxUEs * 4 * 1.0f /
+          1024 / 1024,
       cfg->Frame().NumULSyms() * kFrameWnd * kMaxModType * kMaxDataSCs *
           kMaxUEs * 1.0f / 1024 / 1024);
 

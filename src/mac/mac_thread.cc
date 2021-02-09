@@ -90,7 +90,7 @@ void MacThread::SendRanConfigUpdate(EventData event) {
   rc.mod_order_bits_ = CommsLib::kQaM16;
   rc.frame_id_ = scheduler_next_frame_id_;
   // TODO: change n_antennas to a desired value
-  // cfg_->BS_ANT_NUM is added to fix compiler warning
+  // cfg_->BsAntNum() is added to fix compiler warning
   rc.n_antennas_ = cfg_->BsAntNum();
 
   EventData msg(EventType::kRANUpdate);
@@ -116,13 +116,13 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
   std::stringstream ss;  // Debug-only
 
   // Only non-pilot uplink symbols have application data.
-  if (symbol_idx_ul >= cfg_->Frame().NumPilotSyms()) {
+  if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
     auto* pkt = (struct MacPacket*)ul_data_ptr;
 
     // We send data to app irrespective of CRC condition
     // TODO: enable ARQ and ensure reliable data goes to app
     const size_t frame_data__offset =
-        (symbol_idx_ul - cfg_->Frame().NumPilotSyms()) *
+        (symbol_idx_ul - cfg_->Frame().ClientUlPilotSymbols()) *
         cfg_->MacPayloadLength();
     std::memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data_,
                 cfg_->MacPayloadLength());
@@ -367,7 +367,7 @@ int PacketTXRX::dequeue_send(int tid)
     size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
 
     size_t offset = (c->get_total_data_symbol_idx(frame_id, data_symbol_idx)
-                        * c->BS_ANT_NUM)
+                        * c->BsAntNum())
         + ant_id;
 
     if (kDebugPrintInTask) {
@@ -379,14 +379,14 @@ int PacketTXRX::dequeue_send(int tid)
     }
 
     size_t socket_symbol_offset = offset
-        % (kFrameWnd * c->data_symbol_num_perframe
-              * c->BS_ANT_NUM);
+        % (kFrameWnd * c->Frame().NumDataSyms()
+              * c->BsAntNum());
     char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset * c->packet_length;
     auto* pkt = (Packet*)cur_buffer_ptr;
     new (pkt) Packet(frame_id, data_symbol_idx, 0, ant_id);
 
     // Send data (one OFDM symbol)
-    ssize_t ret = sendto(socket_[ant_id % config_->socket_thread_num],
+    ssize_t ret = sendto(socket_[ant_id % config_->SocketThreadNum()],
         cur_buffer_ptr, c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
         sizeof(servaddr_[tid]));
     rt_assert(ret > 0, "sendto() failed");

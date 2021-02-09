@@ -338,8 +338,8 @@ void DoZF::Predict(size_t tag)
         + base_sc_id;
     auto* ptr_in = (arma::cx_float*)pred_csi_buffer;
     std::memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
-        sizeof(arma::cx_float) * cfg->BS_ANT_NUM * cfg->UE_NUM);
-    arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+        sizeof(arma::cx_float) * cfg->BsAntNum() * cfg->UE_NUM);
+    arma::cx_fmat mat_input(ptr_in, cfg->BsAntNum(), cfg->UE_NUM, false);
 
     // Input matrix and calibration are for current frame, output precoders are
     // for the next frame

@@ -1022,8 +1022,9 @@ void PhyUe::DoEncode(int tid, size_t tag) {
         size_t cb_offset =
             (ue_id * cfg->LdpcConfig().NumBlocksInSymbol() + cb_id) *
             bytes_per_block;
-        input_ptr = &cfg->UlBits()[ul_symbol_id +
-                                   config_->Frame().NumPilotSyms()][cb_offset];
+        input_ptr =
+            &cfg->UlBits()[ul_symbol_id +
+                           config_->Frame().ClientUlPilotSymbols()][cb_offset];
       }
 
       LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
@@ -1091,14 +1092,14 @@ void PhyUe::DoIfft(int tid, size_t tag) {
 
       std::memset(ifft_buff, 0,
                   sizeof(complex_float) * config_->OfdmDataStart());
-      if (ul_symbol_id < config_->Frame().NumPilotSyms()) {
+      if (ul_symbol_id < config_->Frame().ClientUlPilotSymbols()) {
         std::memcpy(ifft_buff + config_->OfdmDataStart(),
                     config_->UeSpecificPilot()[0],
                     config_->OfdmDataNum() * sizeof(complex_float));
       } else {
-        size_t total_ul_data_symbol_id = frame_slot * ul_data_symbol_perframe_ +
-                                         ul_symbol_id -
-                                         config_->Frame().NumPilotSyms();
+        size_t total_ul_data_symbol_id =
+            frame_slot * ul_data_symbol_perframe_ + ul_symbol_id -
+            config_->Frame().ClientUlPilotSymbols();
         complex_float* modul_buff =
             &modul_buffer_[total_ul_data_symbol_id]
                           [ant_id * config_->OfdmDataNum()];
@@ -1127,12 +1128,15 @@ void PhyUe::DoIfft(int tid, size_t tag) {
 
 void PhyUe::InitializeVarsFromCfg(void) {
   dl_pilot_symbol_perframe_ = config_->Frame().ClientDlPilotSymbols();
-  ul_pilot_symbol_perframe_ = config_->Frame().NumPilotSyms();
+  size_t ul_pilot_symbol_perframe = config_->Frame().ClientUlPilotSymbols();
   ul_symbol_perframe_ = config_->Frame().NumULSyms();
   dl_symbol_perframe_ = config_->Frame().NumDLSyms();
   dl_data_symbol_perframe_ = dl_symbol_perframe_ - dl_pilot_symbol_perframe_;
-  ul_data_symbol_perframe_ = ul_symbol_perframe_ - ul_pilot_symbol_perframe_;
-  n_cp_us_ = std::thread::hardware_concurrency();
+  ul_data_symbol_perframe_ = ul_symbol_perframe_ - ul_pilot_symbol_perframe;
+
+  assert(dl_pilot_symbol_perframe_ <= dl_symbol_perframe_);
+  assert(ul_pilot_symbol_perframe <= ul_symbol_perframe_);
+  num_cp_us_ = std::thread::hardware_concurrency();
   rx_thread_num_ = (kUseArgos && !config_->HwFramer())
                        ? config_->UeNum()
                        : std::min(config_->UeNum(), config_->SocketThreadNum());

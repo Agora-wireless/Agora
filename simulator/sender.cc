@@ -73,9 +73,9 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   mbuf_pool = DpdkTransport::create_mempool(cfg->packet_length);
 
   // Parse IP addresses
-  int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
+  int ret = inet_pton(AF_INET, cfg->BsRruAddr().c_str(), &bs_rru_addr);
   rt_assert(ret == 1, "Invalid sender IP address");
-  ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
+  ret = inet_pton(AF_INET, cfg->BsServerAddr().c_str(), &bs_server_addr);
   rt_assert(ret == 1, "Invalid server IP address");
 
   rt_assert(cfg->dpdk_num_ports <= rte_eth_dev_count_avail(),

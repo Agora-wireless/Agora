@@ -1121,9 +1121,9 @@ void Agora::InitializeUplinkBuffers() {
   equal_buffer_.Malloc(task_buffer_symbol_num_ul,
                        cfg->OfdmDataNum() * cfg->UeNum(),
                        Agora_memory::Alignment_t::kAlign64);
-  ue_spec_pilot_buffer_.Calloc(kFrameWnd,
-                               cfg->Frame().NumPilotSyms() * cfg->UeNum(),
-                               Agora_memory::Alignment_t::kAlign64);
+  ue_spec_pilot_buffer_.Calloc(
+      kFrameWnd, cfg->Frame().ClientUlPilotSymbols() * cfg->UeNum(),
+      Agora_memory::Alignment_t::kAlign64);
 
   rx_counters_.num_pkts_per_frame_ =
       cfg->BsAntNum() *
@@ -1260,8 +1260,8 @@ void Agora::SaveTxDataToFile(UNUSED int frame_id) {
 
 void Agora::GetEqualData(float** ptr, int* size) {
   auto& cfg = config_;
-  auto offset = cfg->GetTotalDataSymbolIdxUl(max_equaled_frame_,
-                                             cfg->Frame().NumPilotSyms());
+  auto offset = cfg->GetTotalDataSymbolIdxUl(
+      max_equaled_frame_, cfg->Frame().ClientUlPilotSymbols());
   *ptr = (float*)&equal_buffer_[offset][0];
   *size = cfg->UeNum() * cfg->OfdmDataNum() * 2;
 }

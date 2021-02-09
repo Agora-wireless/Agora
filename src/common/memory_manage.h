@@ -8,6 +8,8 @@
 #include <cstring>
 #include <random>
 
+#include "utils.h"
+
 namespace Agora_memory {
 enum class Alignment_t : size_t {
   kAlign32 = 32,
@@ -31,12 +33,13 @@ class Table {
   void Malloc(size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment) {
     this->dim2_ = dim2;
     this->dim1_ = dim1;
+    // RtAssert(((dim1 > 0) && (dim2 == 0)), "Table: Malloc one dimension = 0");
     size_t alloc_size = (this->dim1_ * this->dim2_ * sizeof(T));
     this->data_ = static_cast<T*>(
         Agora_memory::PaddedAlignedAlloc(alignment, alloc_size));
   }
   void Calloc(size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment) {
-    // assert(!((dim1 == 0) || (dim2 == 0)));
+    // RtAssert(((dim1 > 0) && (dim2 == 0)), "Table: Calloc one dimension = 0");
     this->Malloc(dim1, dim2, alignment);
     std::memset(this->data_, 0, (this->dim1_ * this->dim2_ * sizeof(T)));
   }
@@ -92,6 +95,7 @@ template <typename T, typename U>
 static void AllocBuffer1d(T** buffer, U dim,
                           Agora_memory::Alignment_t alignment, int init_zero) {
   size_t size = dim * sizeof(T);
+  // RtAssert(((dim > 0)), "AllocBuffer1d: size = 0");
   *buffer = static_cast<T*>(Agora_memory::PaddedAlignedAlloc(alignment, size));
   if (init_zero) {
     std::memset(*buffer, 0u, size);

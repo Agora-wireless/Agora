@@ -32,7 +32,7 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg) : cfg_(cfg) {
       std::exit(0);
     }
 #else
-    initClientRadio(context);
+    InitClientRadio(context);
 #endif
   }
 

@@ -160,20 +160,20 @@ EventData DoDemul::Launch(size_t tag) {
       mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_zf_ptr, (MKL_Complex8*)data_ptr,
                      (MKL_Complex8*)equal_ptr);
 #else
-      cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
+      cx_fmat mat_data(data_ptr, cfg->BsAntNum(), 1, false);
 
-      cx_fmat mat_ul_zf(ul_zf_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+      cx_fmat mat_ul_zf(ul_zf_ptr, cfg->UE_NUM, cfg->BsAntNum(), false);
       mat_equaled = mat_ul_zf * mat_data;
 #endif
 
       if (symbol_idx_ul <
-          cfg_->Frame().NumPilotSyms()) {  // Calc new phase shift
+          cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
         if (symbol_idx_ul == 0 && cur_sc_id == 0) {
           // Reset previous frame
           cx_float* phase_shift_ptr =
               (cx_float*)ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd];
           cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeNum(),
-                                  cfg_->Frame().NumPilotSyms(), false);
+                                  cfg_->Frame().ClientUlPilotSymbols(), false);
           mat_phase_shift.fill(0);
         }
         cx_float* phase_shift_ptr =
@@ -183,19 +183,20 @@ EventData DoDemul::Launch(size_t tag) {
         cx_fmat shift_sc =
             sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
         mat_phase_shift += shift_sc;
-      } else if (cfg_->Frame().NumPilotSyms() >
+      } else if (cfg_->Frame().ClientUlPilotSymbols() >
                  0) {  // apply previously calc'ed phase shift to data
         cx_float* pilot_corr_ptr =
             (cx_float*)ue_spec_pilot_buffer_[frame_id % kFrameWnd];
         cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeNum(),
-                               cfg_->Frame().NumPilotSyms(), false);
+                               cfg_->Frame().ClientUlPilotSymbols(), false);
         fmat theta_mat = arg(pilot_corr_mat);
         fmat theta_inc = zeros<fmat>(cfg_->UeNum(), 1);
-        for (size_t s = 1; s < cfg_->Frame().NumPilotSyms(); s++) {
+        for (size_t s = 1; s < cfg_->Frame().ClientUlPilotSymbols(); s++) {
           fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
           theta_inc += theta_diff;
         }
-        theta_inc /= (float)std::max(1, (int)cfg_->Frame().NumPilotSyms() - 1);
+        theta_inc /=
+            (float)std::max(1, (int)cfg_->Frame().ClientUlPilotSymbols() - 1);
         fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
         cx_fmat mat_phase_correct = zeros<cx_fmat>(size(cur_theta));
         mat_phase_correct.set_real(cos(-cur_theta));
@@ -203,7 +204,7 @@ EventData DoDemul::Launch(size_t tag) {
         mat_equaled %= mat_phase_correct;
 
         // Measure EVM from ground truth
-        if (symbol_idx_ul == cfg_->Frame().NumPilotSyms()) {
+        if (symbol_idx_ul == cfg_->Frame().ClientUlPilotSymbols()) {
           phy_stats_->UpdateEvmStats(frame_id, cur_sc_id, mat_equaled);
           if (kPrintPhyStats && cur_sc_id == 0) {
             phy_stats_->PrintEvmStats(frame_id - 1);
