@@ -1,7 +1,7 @@
 #ifndef GETTIME_H
 #define GETTIME_H
 
-#include "Symbols.hpp"
+#include "symbols.h"
 
 // Get current time in microseconds
 static inline double get_time_us(void)
