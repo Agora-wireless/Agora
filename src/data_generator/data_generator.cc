@@ -176,7 +176,7 @@ int main(int argc, char* argv[]) {
   for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
     const size_t data_sym_id = cfg->Frame().GetULSymbol(i);
     for (size_t j = 0; j < cfg->UeAntNum(); j++) {
-      if (i < cfg->Frame().NumPilotSyms()) {
+      if (i < cfg->Frame().ClientUlPilotSymbols()) {
         std::memcpy(tx_data_all_symbols[data_sym_id] + (j * cfg->OfdmCaNum()) +
                         cfg->OfdmDataStart(),
                     ue_specific_pilot[j],
@@ -194,8 +194,8 @@ int main(int argc, char* argv[]) {
                       Agora_memory::Alignment_t::kAlign32);
   for (size_t i = 0; i < cfg->UeAntNum() * cfg->BsAntNum(); i++) {
     complex_float csi = {RandFloatFromShort(-1, 1), RandFloatFromShort(-1, 1)};
-    // std::printf("noise of ant %d, ue %d\n", i % cfg->BS_ANT_NUM, i /
-    // cfg->BS_ANT_NUM );
+    // std::printf("noise of ant %d, ue %d\n", i % cfg->BsAntNum(), i /
+    // cfg->BsAntNum() );
     for (size_t j = 0; j < cfg->OfdmCaNum(); j++) {
       complex_float noise = {RandFloatFromShort(-1, 1) * cfg->NoiseLevel(),
                              RandFloatFromShort(-1, 1) * cfg->NoiseLevel()};
@@ -244,7 +244,7 @@ int main(int argc, char* argv[]) {
 
   // std::printf("rx data\n");
   // for (int i = 0; i < 10; i++) {
-  //     for (int j = 0; j < cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM; j++) {
+  //     for (int j = 0; j < cfg->OFDM_CA_NUM * cfg->BsAntNum(); j++) {
   //         if (j % cfg->OFDM_CA_NUM == 0) {
   //             std::printf("\nsymbol %d ant %d\n", i, j / cfg->OFDM_CA_NUM);
   //         }
@@ -323,14 +323,14 @@ int main(int argc, char* argv[]) {
 
   // std::printf("CSI \n");
   // // for (int i = 0; i < cfg->OFDM_CA_NUM; i++)
-  // for (int j = 0; j < cfg->UE_ANT_NUM * cfg->BS_ANT_NUM; j++)
+  // for (int j = 0; j < cfg->UE_ANT_NUM * cfg->BsAntNum(); j++)
   //     std::printf("%.3f+%.3fi ",
   //         csi_matrices[cfg->OFDM_DATA_START][j].re,
   //         csi_matrices[cfg->OFDM_DATA_START][j].im);
   // std::printf("\n");
   // std::printf("precoder \n");
   // // for (int i = 0; i < cfg->OFDM_CA_NUM; i++)
-  // for (int j = 0; j < cfg->UE_ANT_NUM * cfg->BS_ANT_NUM; j++)
+  // for (int j = 0; j < cfg->UE_ANT_NUM * cfg->BsAntNum(); j++)
   //     std::printf("%.3f+%.3fi ",
   //         precoder[cfg->OFDM_DATA_START][j].re,
   //         precoder[cfg->OFDM_DATA_START][j].im);
@@ -449,7 +449,7 @@ int main(int argc, char* argv[]) {
   // std::printf("rx data\n");
   // for (int i = 0; i < 10; i++) {
 
-  //     for (int j = 0; j < cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM; j++) {
+  //     for (int j = 0; j < cfg->OFDM_CA_NUM * cfg->BsAntNum(); j++) {
   //         if (j % cfg->OFDM_CA_NUM == 0) {
   //             std::printf("symbol %d ant %d\n", i, j / cfg->OFDM_CA_NUM);
   //         }

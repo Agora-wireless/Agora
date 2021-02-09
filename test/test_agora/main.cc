@@ -54,7 +54,7 @@ void CheckCorrectnessUl(Config* cfg) {
   int ue_num = cfg->UeNum();
   int data_symbol_num_perframe = cfg->Frame().NumULSyms();
   int ofdm_data_num = cfg->OfdmDataNum();
-  int ul_pilot_syms = cfg->Frame().NumPilotSyms();
+  int ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string raw_data_filename = cur_directory + "/data/LDPC_orig_ul_data_" +

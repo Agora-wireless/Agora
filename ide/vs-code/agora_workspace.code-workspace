@@ -77,7 +77,8 @@
 			"*.ipp": "cpp",
 			"cassert": "cpp",
 			"armadillo": "cpp",
-			"*.inc": "cpp"
+			"*.inc": "cpp",
+			"netfwd": "cpp"
 		}
 	}
 }

@@ -21,8 +21,8 @@ PhyStats::PhyStats(Config* cfg) : config_(cfg) {
                      Agora_memory::Alignment_t::kAlign64);
 
   if (cfg->Frame().NumULSyms() > 0) {
-    auto* ul_iq_f_ptr =
-        reinterpret_cast<cx_float*>(cfg->UlIqF()[cfg->Frame().NumPilotSyms()]);
+    auto* ul_iq_f_ptr = reinterpret_cast<cx_float*>(
+        cfg->UlIqF()[cfg->Frame().ClientUlPilotSymbols()]);
     cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(), false);
     ul_gt_mat_ = ul_iq_f_mat.st();
     ul_gt_mat_ =
