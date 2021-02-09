@@ -48,7 +48,7 @@
 
 #if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_ERROR
 #define MLPD_ERROR(...)                                                        \
-    MlpdOutputLogHeader(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_ERROR);     \
+    MlpdOutputLogHeader(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_ERROR);        \
     std::fprintf(MLPD_LOG_DEFAULT_STREAM, __VA_ARGS__);                        \
     fflush(MLPD_LOG_DEFAULT_STREAM)
 #else
@@ -57,7 +57,7 @@
 
 #if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_WARN
 #define MLPD_WARN(...)                                                         \
-    MlpdOutputLogHeader(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_WARN);      \
+    MlpdOutputLogHeader(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_WARN);         \
     std::fprintf(MLPD_LOG_DEFAULT_STREAM, __VA_ARGS__);                        \
     fflush(MLPD_LOG_DEFAULT_STREAM)
 #else
@@ -66,7 +66,7 @@
 
 #if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_INFO
 #define MLPD_INFO(...)                                                         \
-    MlpdOutputLogHeader(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_INFO);      \
+    MlpdOutputLogHeader(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_INFO);         \
     std::fprintf(MLPD_LOG_DEFAULT_STREAM, __VA_ARGS__);                        \
     fflush(MLPD_LOG_DEFAULT_STREAM)
 #else
@@ -75,7 +75,7 @@
 
 #if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_FRAME
 #define MLPD_FRAME(...)                                                        \
-    MlpdOutputLogHeader(                                                    \
+    MlpdOutputLogHeader(                                                       \
         mlpd_trace_file_or_default_stream, MLPD_LOG_LEVEL_FRAME);              \
     std::fprintf(mlpd_trace_file_or_default_stream, __VA_ARGS__);              \
     fflush(mlpd_trace_file_or_default_stream)
@@ -85,7 +85,7 @@
 
 #if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_SYMBOL
 #define MLPD_SYMBOL(...)                                                       \
-    MlpdOutputLogHeader(                                                    \
+    MlpdOutputLogHeader(                                                       \
         mlpd_trace_file_or_default_stream, MLPD_LOG_LEVEL_SYMBOL);             \
     std::fprintf(mlpd_trace_file_or_default_stream, __VA_ARGS__);              \
     fflush(mlpd_trace_file_or_default_stream)
@@ -95,7 +95,7 @@
 
 #if MLPD_LOG_LEVEL >= MLPD_LOG_LEVEL_TRACE
 #define MLPD_TRACE(...)                                                        \
-    MlpdOutputLogHeader(                                                    \
+    MlpdOutputLogHeader(                                                       \
         mlpd_trace_file_or_default_stream, MLPD_LOG_LEVEL_TRACE);              \
     std::fprintf(mlpd_trace_file_or_default_stream, __VA_ARGS__);              \
     fflush(mlpd_trace_file_or_default_stream)

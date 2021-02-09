@@ -1,7 +1,6 @@
 #ifndef DOFFT
 #define DOFFT
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "concurrentqueue.h"
 #include "config.h"
@@ -10,6 +9,7 @@
 #include "mkl_dfti.h"
 #include "phy_stats.h"
 #include "stats.h"
+#include "symbols.h"
 #include <armadillo>
 #include <iostream>
 #include <vector>
@@ -56,7 +56,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    EventData launch(size_t tag);
+    EventData Launch(size_t tag);
 
     /**
      * Fill-in the partial transpose of the computed FFT for this antenna into
@@ -140,7 +140,7 @@ public:
      *     2. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    EventData launch(size_t tag);
+    EventData Launch(size_t tag);
 
 private:
     Table<complex_float>& dl_ifft_buffer_;

@@ -76,7 +76,7 @@ void Simulator::Start()
 
         if (ret == 0) {
             continue;
-}
+        }
 
         /* handle each event */
         for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
@@ -123,7 +123,8 @@ void Simulator::Start()
     std::printf("Printing results to file......\n");
     for (int ii = 0; ii < frame_count_rx; ii++) {
         std::fprintf(fp, "%.3f %.3f %.3f %.3f\n", frame_start_[0][ii],
-            frame_start_[1][ii], frame_start_receive_[ii], frame_end_receive_[ii]);
+            frame_start_[1][ii], frame_start_receive_[ii],
+            frame_end_receive_[ii]);
     }
     std::exit(0);
 }
@@ -133,7 +134,7 @@ inline void Simulator::UpdateFrameCount(int* frame_count)
     *frame_count = *frame_count + 1;
     if (*frame_count == 1e9) {
         *frame_count = 0;
-}
+    }
 }
 
 void Simulator::UpdateRxCounters(
@@ -163,7 +164,7 @@ void Simulator::PrintPerFrameDone(PrintType print_type, size_t frame_id)
 {
     if (!kDebugPrintPerFrameDone) {
         return;
-}
+    }
     switch (print_type) {
     case (PrintType::kPacketRX): {
         std::printf(
@@ -208,19 +209,20 @@ void Simulator::InitializeQueues()
         64, socket_rx_thread_num_ * sizeof(moodycamel::ProducerToken*));
     for (size_t i = 0; i < socket_rx_thread_num_; i++) {
         rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(message_queue_);
-}
+    }
 
     task_ptoks_ptr_ = (moodycamel::ProducerToken**)aligned_alloc(
         64, task_thread_num_ * sizeof(moodycamel::ProducerToken*));
     for (size_t i = 0; i < task_thread_num_; i++) {
-        task_ptoks_ptr_[i] = new moodycamel::ProducerToken(complete_task_queue_);
-}
+        task_ptoks_ptr_[i]
+            = new moodycamel::ProducerToken(complete_task_queue_);
+    }
 }
 
 void Simulator::InitializeUplinkBuffers()
 {
-    AllocBuffer1d(
-        &task_threads_, task_thread_num_, Agora_memory::Alignment_t::kK64Align, 0);
+    AllocBuffer1d(&task_threads_, task_thread_num_,
+        Agora_memory::Alignment_t::kK64Align, 0);
     AllocBuffer1d(
         &context_, task_thread_num_, Agora_memory::Alignment_t::kK64Align, 0);
 

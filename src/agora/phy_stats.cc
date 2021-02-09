@@ -24,13 +24,13 @@ PhyStats::PhyStats(Config* cfg)
         kFrameWnd, cfg->ue_ant_num_, Agora_memory::Alignment_t::kK64Align);
 
     if (cfg->ul_data_symbol_num_perframe_ > 0) {
-        auto *ul_iq_f_ptr
+        auto* ul_iq_f_ptr
             = reinterpret_cast<cx_float*>(cfg->ul_iq_f_[cfg->ul_pilot_syms_]);
         cx_fmat ul_iq_f_mat(
             ul_iq_f_ptr, cfg->ofdm_ca_num_, cfg->ue_ant_num_, false);
         ul_gt_mat_ = ul_iq_f_mat.st();
-        ul_gt_mat_
-            = ul_gt_mat_.cols(cfg->ofdm_data_start_, (cfg->ofdm_data_stop_ - 1));
+        ul_gt_mat_ = ul_gt_mat_.cols(
+            cfg->ofdm_data_start_, (cfg->ofdm_data_stop_ - 1));
     }
     pilot_snr_.Calloc(
         kFrameWnd, cfg->ue_ant_num_, Agora_memory::Alignment_t::kK64Align);
@@ -104,7 +104,7 @@ void PhyStats::PrintSnrStats(size_t frame_id)
     ss << "Frame " << frame_id << " Pilot Signal SNR: ";
     for (size_t i = 0; i < config_->ue_num_; i++) {
         ss << pilot_snr_[frame_id % kFrameWnd][i] << " ";
-}
+    }
     ss << std::endl;
     std::cout << ss.str();
 }
@@ -156,7 +156,8 @@ void PhyStats::UpdateDecodedBits(
 void PhyStats::UpdateBlockErrors(
     size_t ue_id, size_t offset, size_t block_error_count)
 {
-    block_error_count_[ue_id][offset] += static_cast<unsigned long>(block_error_count > 0);
+    block_error_count_[ue_id][offset]
+        += static_cast<unsigned long>(block_error_count > 0);
 }
 
 void PhyStats::IncrementDecodedBlocks(size_t ue_id, size_t offset)

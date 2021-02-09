@@ -6,7 +6,7 @@ int main(int argc, char* argv[])
     std::string conf_file = cur_directory + "/data/tddconfig-sim-ul.json";
     if (argc == 2) {
         conf_file = std::string(argv[1]);
-}
+    }
     auto* cfg = new Config(conf_file.c_str());
     cfg->GenData();
     Agora* agora_cli;

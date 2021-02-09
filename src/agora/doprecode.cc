@@ -48,7 +48,7 @@ DoPrecode::~DoPrecode()
     FreeBuffer1d(&precoded_buffer_temp_);
 }
 
-EventData DoPrecode::launch(size_t tag)
+EventData DoPrecode::Launch(size_t tag)
 {
     size_t start_tsc = WorkerRdtsc();
     const size_t frame_id = gen_tag_t(tag).frame_id_;
@@ -91,16 +91,16 @@ EventData DoPrecode::launch(size_t tag)
             size_t start_tsc1 = WorkerRdtsc();
             for (size_t user_id = 0; user_id < cfg_->ue_num_; user_id++) {
                 for (size_t j = 0; j < kSCsPerCacheline; j++) {
-                    LoadInputData(symbol_idx_dl, total_data_symbol_idx,
-                        user_id, base_sc_id + i + j, j);
-}
-}
+                    LoadInputData(symbol_idx_dl, total_data_symbol_idx, user_id,
+                        base_sc_id + i + j, j);
+                }
+            }
 
             size_t start_tsc2 = WorkerRdtsc();
             duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
             for (size_t j = 0; j < kSCsPerCacheline; j++) {
                 PrecodingPerSc(frame_slot, base_sc_id + i + j, i + j);
-}
+            }
             duration_stat_->task_count_
                 = duration_stat_->task_count_ + kSCsPerCacheline;
             duration_stat_->task_duration_[2] += WorkerRdtsc() - start_tsc2;
@@ -112,7 +112,7 @@ EventData DoPrecode::launch(size_t tag)
             for (size_t user_id = 0; user_id < cfg_->ue_num_; user_id++) {
                 LoadInputData(symbol_idx_dl, total_data_symbol_idx, user_id,
                     cur_sc_id, 0);
-}
+            }
             size_t start_tsc2 = WorkerRdtsc();
             duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
@@ -177,8 +177,8 @@ void DoPrecode::PrecodingPerSc(
         dl_zf_matrices_[frame_slot][cfg_->GetZfScId(sc_id)]);
     auto* data_ptr = reinterpret_cast<cx_float*>(modulated_buffer_temp_
         + (kUseSpatialLocality
-                  ? (sc_id_in_block % kSCsPerCacheline * cfg_->ue_num_)
-                  : 0));
+                ? (sc_id_in_block % kSCsPerCacheline * cfg_->ue_num_)
+                : 0));
     auto* precoded_ptr = reinterpret_cast<cx_float*>(
         precoded_buffer_temp_ + sc_id_in_block * cfg_->bs_ant_num_);
 #if USE_MKL_JIT

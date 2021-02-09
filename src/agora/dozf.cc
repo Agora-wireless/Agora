@@ -40,13 +40,13 @@ DoZF::~DoZF()
     std::free(calib_gather_buffer_);
 }
 
-EventData DoZF::launch(size_t tag)
+EventData DoZF::Launch(size_t tag)
 {
     if (cfg_->freq_orthogonal_pilot_) {
         ZfFreqOrthogonal(tag);
     } else {
         ZfTimeOrthogonal(tag);
-}
+    }
 
     return EventData(EventType::kZF, tag);
 }
@@ -88,7 +88,8 @@ void DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
 
         if (cfg_->external_ref_node_) {
             mat_dl_zf_tmp.insert_cols(cfg_->ref_ant_,
-                arma::cx_fmat(cfg_->ue_num_, cfg_->n_channels_, arma::fill::zeros));
+                arma::cx_fmat(
+                    cfg_->ue_num_, cfg_->n_channels_, arma::fill::zeros));
         }
         arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
             cfg_->bs_ant_num_, cfg_->ue_num_, false);
@@ -186,7 +187,7 @@ void DoZF::ZfTimeOrthogonal(size_t tag)
                 TransposeGather(cur_sc_id,
                     (float*)csi_buffers_[frame_slot][ue_idx], dst_csi_ptr,
                     cfg_->bs_ant_num_, cfg_->ofdm_data_num_);
-}
+            }
         }
 
         duration_stat_->task_duration_[1] += WorkerRdtsc() - start_tsc1;
@@ -208,7 +209,7 @@ void DoZF::ZfTimeOrthogonal(size_t tag)
                 if (frame_id >= TX_FRAME_DELTA + cfg_->ant_group_num_) {
                     frame_cal_slot_prev
                         = (frame_grp_id + kFrameWnd - 2) % kFrameWnd;
-}
+                }
             }
             arma::cx_fmat calib_dl_mat(reinterpret_cast<arma::cx_float*>(
                                            calib_dl_buffer_[frame_cal_slot]),
@@ -273,7 +274,8 @@ void DoZF::ZfFreqOrthogonal(size_t tag)
     // Gather CSIs from partially-transposed CSIs
     for (size_t i = 0; i < cfg_->ue_num_; i++) {
         const size_t cur_sc_id = base_sc_id + i;
-        float* dst_csi_ptr = (float*)(csi_gather_buffer_ + cfg_->bs_ant_num_ * i);
+        float* dst_csi_ptr
+            = (float*)(csi_gather_buffer_ + cfg_->bs_ant_num_ * i);
         PartialTransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
             dst_csi_ptr, cfg_->bs_ant_num_);
     }
@@ -292,7 +294,7 @@ void DoZF::ZfFreqOrthogonal(size_t tag)
             if (frame_id >= TX_FRAME_DELTA + cfg_->ant_group_num_) {
                 frame_cal_slot_prev
                     = (frame_grp_id + kFrameWnd - 2) % kFrameWnd;
-}
+            }
         }
         arma::cx_fmat calib_dl_mat(
             reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_cal_slot]),

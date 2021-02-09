@@ -43,7 +43,6 @@ public:
         int tid_;
     };
 
-
     RadioTXRX(Config* cfg, int n_threads, int in_core_id);
     /**
      * N_THREAD: socket thread number
@@ -97,8 +96,8 @@ public:
      * @brief receives a packet from hardware through radio index (radio_id)
      * and writes to an offset (rx_offset) in the receive buffer (buffer_)
      */
-    struct Packet* RecvEnqueueArgos(int tid, size_t radio_id,
-        size_t& frame_id, size_t& symbol_id, size_t rx_offset);
+    struct Packet* RecvEnqueueArgos(int tid, size_t radio_id, size_t& frame_id,
+        size_t& symbol_id, size_t rx_offset);
 
     /**
      * @brief transmits a tx samples packet that is ready from PHY through client wireless hardware

@@ -24,26 +24,28 @@ TEST(TestZF, Perf)
         cfg->ue_num_ * cfg->bs_ant_num_);
 
     Table<complex_float> calib_dl_buffer;
-    calib_dl_buffer.RandAllocCxFloat(
-        kFrameWnd, cfg->ofdm_data_num_ * cfg->bs_ant_num_, Agora_memory::Alignment_t::kK64Align);
+    calib_dl_buffer.RandAllocCxFloat(kFrameWnd,
+        cfg->ofdm_data_num_ * cfg->bs_ant_num_,
+        Agora_memory::Alignment_t::kK64Align);
 
     Table<complex_float> calib_ul_buffer;
-    calib_ul_buffer.RandAllocCxFloat(
-        kFrameWnd, cfg->ofdm_data_num_ * cfg->bs_ant_num_, Agora_memory::Alignment_t::kK64Align);
+    calib_ul_buffer.RandAllocCxFloat(kFrameWnd,
+        cfg->ofdm_data_num_ * cfg->bs_ant_num_,
+        Agora_memory::Alignment_t::kK64Align);
 
-    auto *stats = new Stats(cfg);
+    auto* stats = new Stats(cfg);
 
-    auto *compute_zf = new DoZF(cfg, tid, csi_buffers, calib_dl_buffer,
+    auto* compute_zf = new DoZF(cfg, tid, csi_buffers, calib_dl_buffer,
         calib_ul_buffer, ul_zf_matrices, dl_zf_matrices, stats);
 
     FastRand fast_rand;
     size_t start_tsc = Rdtsc();
     for (size_t i = 0; i < kNumIters; i++) {
         uint32_t frame_id = fast_rand.NextU32();
-        size_t base_sc_id
-            = (fast_rand.NextU32() % (cfg->ofdm_data_num_ / cfg->zf_block_size_))
+        size_t base_sc_id = (fast_rand.NextU32()
+                                % (cfg->ofdm_data_num_ / cfg->zf_block_size_))
             * cfg->zf_block_size_;
-        compute_zf->launch(gen_tag_t::FrmSc(frame_id, base_sc_id).tag_);
+        compute_zf->Launch(gen_tag_t::FrmSc(frame_id, base_sc_id).tag_);
     }
     double ms = CyclesToMs(Rdtsc() - start_tsc, cfg->freq_ghz_);
 

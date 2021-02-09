@@ -1,6 +1,5 @@
 #pragma once
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "comms-lib.h"
 #include "concurrentqueue.h"
@@ -16,6 +15,7 @@
 #include "shared_counters.hpp"
 #include "signal_handler.h"
 #include "stats.h"
+#include "symbols.h"
 #include <armadillo>
 #include <iostream>
 #include <vector>
@@ -86,8 +86,8 @@ public:
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
         PhyStats* phy_stats, Stats* stats, RxStatus* rx_status = nullptr,
         DemulStatus* demul_status = nullptr)
-        : Doer(config, tid, freq_ghz, dummy_conq_, dummy_conq_,
-              nullptr /* tok */)
+        : Doer(
+            config, tid, freq_ghz, dummy_conq_, dummy_conq_, nullptr /* tok */)
         , sc_range_(subcarrier_range)
         , socket_buffer_(socket_buffer)
         , socket_buffer_status_(socket_buffer_status)
@@ -165,7 +165,7 @@ public:
 
             if (zf_cur_frame_ > demul_cur_frame_
                 && rx_status_->is_demod_ready(
-                       demul_cur_frame_, demul_cur_sym_)) {
+                    demul_cur_frame_, demul_cur_sym_)) {
                 do_demul_->independent_launch(demul_cur_frame_,
                     demul_cur_sym_ - cfg->pilot_symbol_num_perframe,
                     sc_range_.start
@@ -221,7 +221,7 @@ private:
             for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
                 auto* pkt = reinterpret_cast<Packet*>(socket_buffer_[j]
                     + (frame_slot * cfg->symbol_num_perframe
-                          * cfg->packet_length)
+                        * cfg->packet_length)
                     + i * cfg->packet_length);
 
                 // Subcarrier ranges should be aligned with kTransposeBlockSize

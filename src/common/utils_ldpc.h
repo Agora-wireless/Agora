@@ -1,18 +1,17 @@
 #ifndef UTILS_LDPC
 #define UTILS_LDPC
 
-#include "symbols.h"
 #include "encoder.h"
 #include "iobuffer.h"
 #include "phy_ldpc_encoder_5gnr.h"
+#include "symbols.h"
 #include "utils.h"
 
 #include <cstdlib> /* for std::aligned_alloc */
 
 LDPC_ADAPTER_P LdpcSelectAdapterFunc(uint16_t zcSize, uint8_t num_ways);
 
-template <typename T>
-T* AlignedMalloc(const int size, const unsigned alignment)
+template <typename T> T* AlignedMalloc(const int size, const unsigned alignment)
 {
 #ifdef _BBLIB_DPDK_
     return reinterpret_cast<T*>(rte_malloc(NULL, sizeof(T) * size, alignment));
@@ -117,7 +116,7 @@ static inline uint8_t SelectBaseMatrixEntry(uint16_t Zc)
         i_ls = 1;
     } else {
         i_ls = 0;
-}
+    }
     return i_ls;
 }
 
@@ -183,18 +182,15 @@ static inline size_t LdpcEncodingInputBufSize(size_t base_graph, size_t zc)
 static inline size_t LdpcEncodingParityBufSize(size_t base_graph, size_t zc)
 {
     // We add kMaxProcBytes as padding for the encoder's gather function
-    return BitsToBytes(LdpcMaxNumParityBits(base_graph, zc))
-        + kMaxProcBytes;
+    return BitsToBytes(LdpcMaxNumParityBits(base_graph, zc)) + kMaxProcBytes;
 }
 
 // Return the number of bytes required in the output encoded codeword buffer
 // used for LDPC encoding
-static inline size_t LdpcEncodingEncodedBufSize(
-    size_t base_graph, size_t zc)
+static inline size_t LdpcEncodingEncodedBufSize(size_t base_graph, size_t zc)
 {
     // We add kMaxProcBytes as padding for the encoder's gather function
-    return BitsToBytes(LdpcMaxNumEncodedBits(base_graph, zc))
-        + kMaxProcBytes;
+    return BitsToBytes(LdpcMaxNumEncodedBits(base_graph, zc)) + kMaxProcBytes;
 }
 
 // Return the minimum LDPC expansion factor supported
@@ -207,9 +203,8 @@ static inline size_t LdpcGetMaxZc()
 }
 
 // Generate the codeword output and parity buffer for this input buffer
-static inline void LdpcEncodeHelper(size_t base_graph, size_t zc,
-    size_t nRows, int8_t* encoded_buffer, int8_t* parity_buffer,
-    const int8_t* input_buffer)
+static inline void LdpcEncodeHelper(size_t base_graph, size_t zc, size_t nRows,
+    int8_t* encoded_buffer, int8_t* parity_buffer, const int8_t* input_buffer)
 {
     const size_t num_input_bits = LdpcNumInputBits(base_graph, zc);
     const size_t num_parity_bits = nRows * zc;
@@ -280,8 +275,7 @@ static inline void LdpcEncodeHelper(size_t base_graph, size_t zc,
         std::memcpy(internal_buffer2
                 + (LdpcNumInputCols(base_graph) - k_num_punctured_cols)
                     * avx2enc::kProcBytes,
-            internal_buffer1,
-            LdpcMaxNumRows(base_graph) * avx2enc::kProcBytes);
+            internal_buffer1, LdpcMaxNumRows(base_graph) * avx2enc::kProcBytes);
 
         // Gather the concatenated chunks to create the encoded buffer
         adapter_func(encoded_buffer, internal_buffer2, zc,

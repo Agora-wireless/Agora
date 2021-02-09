@@ -1,19 +1,19 @@
 #ifndef SIM_CHAN_MODEL
 #define SIM_CHAN_MODEL
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "signal_handler.h"
+#include "symbols.h"
 #include "utils.h"
 #include <algorithm>
 #include <armadillo>
-#include <assert.h>
+#include <cassert>
+#include <cmath>
 #include <ctime>
 #include <iomanip>
-#include <math.h>
 #include <numeric>
 
 using namespace arma;

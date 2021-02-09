@@ -78,9 +78,10 @@ int main(int argc, char* argv[])
     size_t num_symbols_per_cb = 1;
     size_t bits_per_symbol = cfg->ofdm_data_num_ * cfg->mod_order_bits_;
     if (cfg->ldpc_config_.cb_codew_len_ > bits_per_symbol) {
-        num_symbols_per_cb = (cfg->ldpc_config_.cb_codew_len_ + bits_per_symbol - 1)
+        num_symbols_per_cb
+            = (cfg->ldpc_config_.cb_codew_len_ + bits_per_symbol - 1)
             / bits_per_symbol;
-}
+    }
     size_t num_cbs_per_ue = cfg->data_symbol_num_perframe_ / num_symbols_per_cb;
     std::printf("Number of symbols per block: %zu, blocks per frame: %zu\n",
         num_symbols_per_cb, num_cbs_per_ue);

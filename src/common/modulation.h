@@ -1,10 +1,10 @@
 #ifndef MOD_COMMON
 #define MOD_COMMON
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "symbols.h"
 #include <cmath>
 #include <emmintrin.h>
 #include <immintrin.h>

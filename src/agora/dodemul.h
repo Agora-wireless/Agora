@@ -1,7 +1,6 @@
 #ifndef DODEMUL
 #define DODEMUL
 
-#include "symbols.h"
 #include "buffer.inc"
 #include "concurrentqueue.h"
 #include "config.h"
@@ -10,6 +9,7 @@
 #include "modulation.h"
 #include "phy_stats.h"
 #include "stats.h"
+#include "symbols.h"
 #include <armadillo>
 #include <iostream>
 #include <vector>
@@ -51,7 +51,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    EventData launch(size_t tag);
+    EventData Launch(size_t tag);
 
 private:
     Table<complex_float>& data_buffer_;

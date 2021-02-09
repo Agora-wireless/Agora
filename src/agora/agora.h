@@ -34,7 +34,8 @@ public:
 
     static const int kMaxWorkerNum = 50; // Max number of worker threads allowed
 
-    Agora(Config* /*cfg*/); /// Create an Agora object and start the worker threads
+    Agora(
+        Config* /*cfg*/); /// Create an Agora object and start the worker threads
     ~Agora();
 
     void Start(); /// The main Agora event loop
@@ -77,8 +78,7 @@ public:
     void ScheduleUsers(EventType event_type, size_t frame_id, size_t symbol_id);
 
     // Send current frame's SNR measurements from PHY to MAC
-    void SendSnrReport(
-        EventType event_type, size_t frame_id, size_t symbol_id);
+    void SendSnrReport(EventType event_type, size_t frame_id, size_t symbol_id);
 
     void InitializeQueues();
     void InitializeUplinkBuffers();

@@ -36,7 +36,7 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     server_.n_filled_in_frame_.fill(0);
     for (auto& v : server_.frame_data_) {
         v.resize(cfg_->mac_data_bytes_num_perframe_);
-}
+    }
 
     client_.ul_bits_buffer_id_.fill(0);
 
@@ -65,13 +65,13 @@ void MacThread::ProcessRxFromMaster()
     EventData event;
     if (!rx_queue_->try_dequeue(event)) {
         return;
-}
+    }
 
     if (event.event_type_ == EventType::kPacketToMac) {
         ProcessCodeblocksFromMaster(event);
     } else if (event.event_type_ == EventType::kSNRReport) {
         ProcessSnrReportFromMaster(event);
-}
+    }
 }
 
 void MacThread::ProcessSnrReportFromMaster(EventData event)
@@ -125,8 +125,8 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event)
 
         // We send data to app irrespective of CRC condition
         // TODO: enable ARQ and ensure reliable data goes to app
-        const size_t frame_data__offset
-            = (symbol_idx_ul - cfg_->ul_pilot_syms_) * cfg_->mac_payload_length_;
+        const size_t frame_data__offset = (symbol_idx_ul - cfg_->ul_pilot_syms_)
+            * cfg_->mac_payload_length_;
         std::memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data_,
             cfg_->mac_payload_length_);
         server_.n_filled_in_frame_[ue_id] += cfg_->mac_payload_length_;
@@ -149,8 +149,8 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event)
                 ss << "Header Info:\n"
                    << "FRAME_ID: " << pkt->frame_id_
                    << "\nSYMBOL_ID: " << pkt->symbol_id_
-                   << "\nUE_ID: " << pkt->ue_id_ << "\nDATLEN: " << pkt->datalen_
-                   << "\nPAYLOAD:\n";
+                   << "\nUE_ID: " << pkt->ue_id_
+                   << "\nDATLEN: " << pkt->datalen_ << "\nPAYLOAD:\n";
                 for (size_t i = 0; i < cfg_->mac_payload_length_; i++) {
                     ss << std::to_string(ul_data_ptr[i]) << " ";
                 }
@@ -231,9 +231,8 @@ void MacThread::ProcessUdpPacketsFromApps(RBIndicator ri)
     RtAssert(static_cast<size_t>(ret) == cfg_->mac_data_bytes_num_perframe_);
 
     const auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
-    mode_ == Mode::kServer
-        ? ProcessUdpPacketsFromAppsServer(pkt, ri)
-        : ProcessUdpPacketsFromAppsClient((char*)pkt, ri);
+    mode_ == Mode::kServer ? ProcessUdpPacketsFromAppsServer(pkt, ri)
+                           : ProcessUdpPacketsFromAppsClient((char*)pkt, ri);
 }
 
 void MacThread::ProcessUdpPacketsFromAppsServer(
@@ -254,9 +253,9 @@ void MacThread::ProcessUdpPacketsFromAppsServer(
 
     for (size_t i = 0; i < cfg_->ldpc_config_.nblocks_in_symbol_; i++) {
         (*dl_bits_buffer_status_)[pkt->ue_id_][rx_offset + i] = 1;
-}
-    std::memcpy(
-        &(*dl_bits_buffer_)[total_symbol_idx][pkt->ue_id_ * cfg_->ofdm_data_num_],
+    }
+    std::memcpy(&(*dl_bits_buffer_)[total_symbol_idx]
+                                   [pkt->ue_id_ * cfg_->ofdm_data_num_],
         pkt->data_, udp_pkt_buf_.size());
 
     EventData msg(EventType::kPacketFromMac,
@@ -327,7 +326,7 @@ void MacThread::ProcessUdpPacketsFromAppsClient(
     next_radio_id_ = (next_radio_id_ + 1) % cfg_->ue_ant_num_;
     if (next_radio_id_ == 0) {
         next_frame_id_++;
-}
+    }
 }
 
 void MacThread::RunEventLoop()

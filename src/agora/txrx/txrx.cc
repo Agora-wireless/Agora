@@ -41,7 +41,7 @@ PacketTXRX::~PacketTXRX()
     }
     for (size_t i = 0; i < cfg_->socket_thread_num_; i++) {
         socket_std_threads_[i].join();
-}
+    }
 }
 
 bool PacketTXRX::StartTxrx(Table<char>& buffer, Table<int>& buffer_status,
@@ -65,10 +65,12 @@ bool PacketTXRX::StartTxrx(Table<char>& buffer, Table<int>& buffer_status,
         if (cfg_->downlink_mode_) {
             std::memcpy(calib_dl_buffer[kFrameWnd - 1],
                 radioconfig_->GetCalibDl(),
-                cfg_->ofdm_data_num_ * cfg_->bf_ant_num_ * sizeof(arma::cx_float));
+                cfg_->ofdm_data_num_ * cfg_->bf_ant_num_
+                    * sizeof(arma::cx_float));
             std::memcpy(calib_ul_buffer[kFrameWnd - 1],
                 radioconfig_->GetCalibUl(),
-                cfg_->ofdm_data_num_ * cfg_->bf_ant_num_ * sizeof(arma::cx_float));
+                cfg_->ofdm_data_num_ * cfg_->bf_ant_num_
+                    * sizeof(arma::cx_float));
         }
     }
 
@@ -82,12 +84,12 @@ bool PacketTXRX::StartTxrx(Table<char>& buffer, Table<int>& buffer_status,
         } else {
             socket_std_threads_[i]
                 = std::thread(&PacketTXRX::LoopTxRx, this, i);
-}
+        }
     }
 
     if (kUseArgos || kUseUHD) {
         radioconfig_->Go();
-}
+    }
     return true;
 }
 
@@ -102,7 +104,8 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id)
     for (int ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
         new (pkt) Packet(frame_id, 0, 0 /* cell_id */, ant_id);
         ssize_t r = sendto(socket_[ant_id], (char*)udp_pkt_buf.data(),
-            cfg_->packet_length_, 0, (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
+            cfg_->packet_length_, 0,
+            (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
             sizeof(bs_rru_sockaddr_[ant_id]));
         RtAssert(r > 0, "sendto() failed");
     }
@@ -120,8 +123,7 @@ void PacketTXRX::LoopTxRx(int tid)
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
     for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
         int local_port_id = cfg_->bs_server_port_ + radio_id;
-        socket_[radio_id]
-            = SetupSocketIpv4(local_port_id, true, sock_buf_size);
+        socket_[radio_id] = SetupSocketIpv4(local_port_id, true, sock_buf_size);
         SetupSockaddrRemoteIpv4(&bs_rru_sockaddr_[radio_id],
             cfg_->bs_rru_port_ + radio_id, cfg_->bs_rru_addr_.c_str());
         MLPD_INFO(
@@ -153,16 +155,16 @@ void PacketTXRX::LoopTxRx(int tid)
                 slow_start_factor = 2;
             } else if (tx_frame_id > 500) {
                 slow_start_factor = 1;
-}
+            }
         }
         if (-1 != DequeueSend(tid)) {
             continue;
-}
+        }
         // receive data
         struct Packet* pkt = RecvEnqueue(tid, radio_id, rx_offset);
         if (pkt == NULL) {
             continue;
-}
+        }
         rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
 
         if (kIsWorkerTimingEnabled) {
@@ -175,7 +177,7 @@ void PacketTXRX::LoopTxRx(int tid)
 
         if (++radio_id == radio_hi) {
             radio_id = radio_lo;
-}
+        }
     }
 }
 
@@ -236,7 +238,7 @@ int PacketTXRX::DequeueSend(int tid)
     EventData event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
         return -1;
-}
+    }
 
     // std::printf("tx queue length: %d\n", task_queue_->size_approx());
     assert(event.event_type_ == EventType::kPacketTX);
@@ -246,9 +248,8 @@ int PacketTXRX::DequeueSend(int tid)
     size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
 
     size_t data_symbol_idx_dl = cfg_->GetDlSymbolIdx(frame_id, symbol_id);
-    size_t offset
-        = (c->GetTotalDataSymbolIdxDl(frame_id, data_symbol_idx_dl)
-              * c->bs_ant_num_)
+    size_t offset = (c->GetTotalDataSymbolIdxDl(frame_id, data_symbol_idx_dl)
+                        * c->bs_ant_num_)
         + ant_id;
 
     if (kDebugPrintInTask) {
@@ -269,7 +270,7 @@ int PacketTXRX::DequeueSend(int tid)
     RtAssert(ret > 0, "sendto() failed");
 
     RtAssert(message_queue_->enqueue(*rx_ptoks_[tid],
-                  EventData(EventType::kPacketTX, event.tags_[0])),
+                 EventData(EventType::kPacketTX, event.tags_[0])),
         "Socket message enqueue failed\n");
     return event.tags_[0];
 }

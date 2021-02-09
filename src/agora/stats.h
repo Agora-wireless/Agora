@@ -1,10 +1,10 @@
 #ifndef STATS
 #define STATS
 
-#include "symbols.h"
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
+#include "symbols.h"
 #include <iostream>
 
 static constexpr size_t kMaxStatBreakdown = 4;
@@ -75,7 +75,7 @@ public:
     void MasterSetTsc(TsType timestamp_type, size_t frame_id)
     {
         master_timestamps_[static_cast<size_t>(timestamp_type)]
-                         [frame_id % kNumStatsFrames]
+                          [frame_id % kNumStatsFrames]
             = Rdtsc();
     }
 
@@ -84,7 +84,7 @@ public:
     size_t MasterGetTsc(TsType timestamp_type, size_t frame_id)
     {
         return master_timestamps_[static_cast<size_t>(timestamp_type)]
-                                [frame_id % kNumStatsFrames];
+                                 [frame_id % kNumStatsFrames];
     }
 
     /// From the master, get the millisecond elapsed since the timestamp of
@@ -201,9 +201,8 @@ private:
     void UpdateStatsInDoifftBigstation(size_t frame_id, size_t thread_num,
         size_t thread_num_offset, FrameSummary* ifft_frame_summary,
         FrameSummary* csi_frame_summary);
-    void UpdateStatsInDoprecodeBigstation(size_t frame_id,
-        size_t thread_num, size_t thread_num_offset,
-        FrameSummary* precode_frame_summary);
+    void UpdateStatsInDoprecodeBigstation(size_t frame_id, size_t thread_num,
+        size_t thread_num_offset, FrameSummary* precode_frame_summary);
     void UpdateStatsInDoencodeBigstation(size_t frame_id, size_t thread_num,
         size_t thread_num_offset, FrameSummary* encode_frame_summary);
 

@@ -47,7 +47,7 @@ void InitModulationTable(Table<complex_float>& mod_table, size_t mod_order)
     if (!mod_table.IsAllocated()) {
         mod_table.Malloc(
             1, pow(2, kMaxModType), Agora_memory::Alignment_t::kK32Align);
-}
+    }
     // mod_table.malloc(pow(2, kMaxModType), 2, 32);
     switch (mod_order) {
     case 4:
@@ -266,16 +266,16 @@ void Demod16qamHardLoop(const float* vec_in, uint8_t* vec_out, int num)
         *(vec_out + i) = 0;
         if (real_val <= 0) {
             *(vec_out + i) |= 1UL << 3;
-}
+        }
         if (std::abs(real_val) > float_val) {
             *(vec_out + i) |= 1UL << 1;
-}
+        }
         if (imag_val <= 0) {
             *(vec_out + i) |= 1UL << 2;
-}
+        }
         if (std::abs(imag_val) > float_val) {
             *(vec_out + i) |= 1UL;
-}
+        }
     }
 }
 
@@ -397,16 +397,16 @@ void Demod16qamHardSse(float* vec_in, uint8_t* vec_out, int num)
         *(vec_out + i) = 0;
         if (real_val <= 0) {
             *(vec_out + i) |= 1UL << 3;
-}
+        }
         if (std::abs(real_val) > QAM16_THRESHOLD) {
             *(vec_out + i) |= 1UL << 1;
-}
+        }
         if (imag_val <= 0) {
             *(vec_out + i) |= 1UL << 2;
-}
+        }
         if (std::abs(imag_val) > QAM16_THRESHOLD) {
             *(vec_out + i) |= 1UL;
-}
+        }
     }
 }
 
@@ -646,7 +646,7 @@ void Demod64qamHardLoop(const float* vec_in, uint8_t* vec_out, int num)
 
         if (real_val <= 0) {
             *(vec_out + i) |= 1UL << 5;
-}
+        }
         if (std::abs(real_val) > QAM64_THRESHOLD_3) {
             *(vec_out + i) |= 1UL << 3;
             *(vec_out + i) |= 1UL << 1;
@@ -658,7 +658,7 @@ void Demod64qamHardLoop(const float* vec_in, uint8_t* vec_out, int num)
 
         if (imag_val <= 0) {
             *(vec_out + i) |= 1UL << 4;
-}
+        }
         if (std::abs(imag_val) > QAM64_THRESHOLD_3) {
             *(vec_out + i) |= 1UL << 2;
             *(vec_out + i) |= 1UL;
@@ -836,7 +836,7 @@ void Demod64qamHardSse(float* vec_in, uint8_t* vec_out, int num)
 
         if (real_val <= 0) {
             *(vec_out + i) |= 1UL << 5;
-}
+        }
         if (std::abs(real_val) > QAM64_THRESHOLD_3) {
             *(vec_out + i) |= 1UL << 3;
             *(vec_out + i) |= 1UL << 1;
@@ -848,7 +848,7 @@ void Demod64qamHardSse(float* vec_in, uint8_t* vec_out, int num)
 
         if (imag_val <= 0) {
             *(vec_out + i) |= 1UL << 4;
-}
+        }
         if (std::abs(imag_val) > QAM64_THRESHOLD_3) {
             *(vec_out + i) |= 1UL << 2;
             *(vec_out + i) |= 1UL;

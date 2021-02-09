@@ -74,8 +74,7 @@ public:
         std::vector<complex_float> modulated_codeword(cfg_->ofdm_data_num_);
         std::vector<uint8_t> mod_input(cfg_->ofdm_data_num_);
 
-        AdaptBitsForMod(
-            reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
+        AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
             &mod_input[0], cfg_->ldpc_config_.NumEncodedBytes(),
             cfg_->mod_order_bits_);
 
@@ -92,8 +91,7 @@ public:
         std::vector<complex_float> modulated_codeword(cfg_->ofdm_data_num_);
         std::vector<uint8_t> mod_input(cfg_->ofdm_data_num_);
 
-        AdaptBitsForMod(
-            reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
+        AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
             &mod_input[0], BitsToBytes(num_bits), cfg_->mod_order_bits_);
 
         for (size_t i = 0; i < cfg_->ofdm_data_num_; i++) {
@@ -112,9 +110,11 @@ public:
     std::vector<complex_float> BinForIfft(
         const std::vector<complex_float> modulated_codeword) const
     {
-        std::vector<complex_float> pre_ifft_symbol(cfg_->ofdm_ca_num_); // Zeroed
+        std::vector<complex_float> pre_ifft_symbol(
+            cfg_->ofdm_ca_num_); // Zeroed
         std::memcpy(&pre_ifft_symbol[cfg_->ofdm_data_start_],
-            &modulated_codeword[0], cfg_->ofdm_data_num_ * sizeof(complex_float));
+            &modulated_codeword[0],
+            cfg_->ofdm_data_num_ * sizeof(complex_float));
 
         return pre_ifft_symbol;
     }

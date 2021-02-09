@@ -22,9 +22,10 @@ public:
     void ReadSensors();
     int RadioTx(size_t /*r*/, void** buffs, size_t num_samps, int flags,
         long long& frameTime);
-    int RadioRx(size_t /*r*/, void** buffs, size_t num_samps, long long& frameTime);
-    static void DrainRxBuffer(SoapySDR::Device* dev,
-        SoapySDR::Stream* istream, std::vector<void*> buffs, size_t symSamp);
+    int RadioRx(
+        size_t /*r*/, void** buffs, size_t num_samps, long long& frameTime);
+    static void DrainRxBuffer(SoapySDR::Device* dev, SoapySDR::Stream* istream,
+        std::vector<void*> buffs, size_t symSamp);
     void DrainBuffers();
     void Go();
     int Triggers(int i);
