@@ -1,10 +1,10 @@
 #pragma once
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "comms-lib.h"
 #include "concurrentqueue.h"
 #include "config.h"
-#include "datatype_conversion.inc"
+#include "datatype_conversion.h"
 #include "dodemul.h"
 #include "doer.h"
 #include "doprecode.h"

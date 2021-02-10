@@ -1,7 +1,7 @@
 #ifndef DODEMUL
 #define DODEMUL
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"

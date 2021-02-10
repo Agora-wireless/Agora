@@ -1,7 +1,7 @@
 #ifndef DOPRECODE
 #define DOPRECODE
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"

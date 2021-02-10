@@ -13,7 +13,7 @@
 #ifndef COMMSLIB_HEADER
 #define COMMSLIB_HEADER
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 #include <algorithm>

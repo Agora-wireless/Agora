@@ -1,5 +1,5 @@
 #include "sender.h"
-#include "datatype_conversion.inc"
+#include "datatype_conversion.h"
 #include "udp_client.h"
 #include <thread>
 

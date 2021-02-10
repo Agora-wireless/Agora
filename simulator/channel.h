@@ -1,7 +1,7 @@
 #ifndef SIM_CHAN_MODEL
 #define SIM_CHAN_MODEL
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"

@@ -13,7 +13,7 @@
 #ifndef CRC_H
 #define CRC_H
 
-#include "buffer.inc"
+#include "buffer.h"
 #include <iostream>
 #include <unistd.h>
 

@@ -1,7 +1,7 @@
 #ifndef DOZF
 #define DOZF
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
