@@ -1,4 +1,4 @@
-[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Fwip-uplink-downlink)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/wip-uplink-downlink/)
+[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Frefactor-naming)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/refactor-naming/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
