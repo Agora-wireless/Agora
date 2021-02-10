@@ -75,36 +75,36 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 
 #ifdef USE_DPDK
   DpdkTransport::dpdk_init(core_offset, socket_thread_num);
-  mbuf_pool = DpdkTransport::create_mempool(cfg->packet_length);
+  mbuf_pool = DpdkTransport::create_mempool(cfg->PacketLength());
 
   // Parse IP addresses
   int ret = inet_pton(AF_INET, cfg->BsRruAddr().c_str(), &bs_rru_addr);
-  rt_assert(ret == 1, "Invalid sender IP address");
+  RtAssert(ret == 1, "Invalid sender IP address");
   ret = inet_pton(AF_INET, cfg->BsServerAddr().c_str(), &bs_server_addr);
-  rt_assert(ret == 1, "Invalid server IP address");
+  RtAssert(ret == 1, "Invalid server IP address");
 
-  rt_assert(cfg->dpdk_num_ports <= rte_eth_dev_count_avail(),
-            "Invalid number of DPDK ports");
+  RtAssert(cfg->DpdkNumPorts() <= rte_eth_dev_count_avail(),
+           "Invalid number of DPDK ports");
 
-  rt_assert(server_mac_addr_str.length() ==
-                (cfg->dpdk_num_ports * (kMacAddrBtyes + 1) - 1),
-            "Invalid length of server MAC address");
-  sender_mac_addr.resize(cfg->dpdk_num_ports);
-  server_mac_addr.resize(cfg->dpdk_num_ports);
+  RtAssert(server_mac_addr_str.length() ==
+               (cfg->DpdkNumPorts() * (kMacAddrBtyes + 1) - 1),
+           "Invalid length of server MAC address");
+  sender_mac_addr.resize(cfg->DpdkNumPorts());
+  server_mac_addr.resize(cfg->DpdkNumPorts());
 
-  for (uint16_t port_id = 0; port_id < cfg->dpdk_num_ports; port_id++) {
+  for (uint16_t port_id = 0; port_id < cfg->DpdkNumPorts(); port_id++) {
     if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num,
-                                cfg->packet_length) != 0)
+                                cfg->PacketLength()) != 0)
       rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
     // Parse MAC addresses
     ether_addr* parsed_mac = ether_aton(
         server_mac_addr_str.substr(port_id * (kMacAddrBtyes + 1), kMacAddrBtyes)
             .c_str());
-    rt_assert(parsed_mac != NULL, "Invalid server mac address");
+    RtAssert(parsed_mac != NULL, "Invalid server mac address");
     std::memcpy(&server_mac_addr[port_id], parsed_mac, sizeof(ether_addr));
 
     ret = rte_eth_macaddr_get(port_id, &sender_mac_addr[port_id]);
-    rt_assert(ret == 0, "Cannot get MAC address of the port");
+    RtAssert(ret == 0, "Cannot get MAC address of the port");
     std::printf("Number of DPDK cores: %d\n", rte_lcore_count());
   }
 
@@ -267,8 +267,8 @@ void* Sender::WorkerThread(int tid) {
       cfg_->BsAntNum() / socket_thread_num_ +
       ((size_t)tid < cfg_->BsAntNum() % socket_thread_num_ ? 1 : 0);
 #ifdef USE_DPDK
-  const size_t port_id = tid % cfg->dpdk_num_ports;
-  const size_t queue_id = tid / cfg->dpdk_num_ports;
+  const size_t port_id = tid % cfg_->DpdkNumPorts();
+  const size_t queue_id = tid / cfg_->DpdkNumPorts();
   rte_mbuf* tx_mbufs[kDequeueBulkSize];
 #endif
 
@@ -315,8 +315,8 @@ void* Sender::WorkerThread(int tid) {
 #ifdef USE_DPDK
       tx_mbufs[tag_id] = DpdkTransport::alloc_udp(
           mbuf_pool, sender_mac_addr[port_id], server_mac_addr[port_id],
-          bs_rru_addr, bs_server_addr, cfg->bs_rru_port + tid,
-          cfg->bs_server_port + tid, cfg->packet_length);
+          bs_rru_addr, bs_server_addr, cfg_->BsRruPort() + tid,
+          cfg_->BsServerPort() + tid, cfg_->PacketLength());
       pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[tag_id], uint8_t*) +
                       kPayloadOffset);
 #endif
