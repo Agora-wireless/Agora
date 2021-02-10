@@ -69,7 +69,7 @@ class MacThread {
             Table<uint8_t>* dl_bits_buffer_status,
             moodycamel::ConcurrentQueue<EventData>* rx_queue,
             moodycamel::ConcurrentQueue<EventData>* tx_queue,
-            std::string log_filename = "");
+            const std::string& log_filename = "");
 
   ~MacThread();
 

@@ -29,7 +29,8 @@ class PhyStats {
                               uint8_t /*rx_byte*/);
   void UpdateUncodedBits(size_t /*ue_id*/, size_t /*offset*/,
                          size_t /*new_bits_num*/);
-  void UpdateEvmStats(size_t /*frame_id*/, size_t /*sc_id*/, cx_fmat /*eq*/);
+  void UpdateEvmStats(size_t /*frame_id*/, size_t /*sc_id*/,
+                      const cx_fmat& /*eq*/);
   void PrintEvmStats(size_t /*frame_id*/);
   void UpdatePilotSnr(size_t /*frame_id*/, size_t /*ue_id*/,
                       complex_float* /*fft_data*/);

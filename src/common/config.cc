@@ -435,8 +435,7 @@ void Config::GenData() {
     std::vector<std::complex<int16_t>> gold_ifft_ci16 =
         Utils::DoubleToCint16(gold_ifft);
     for (size_t i = 0; i < 128; i++) {
-      gold_cf32_.push_back(
-          std::complex<float>(gold_ifft[0][i], gold_ifft[1][i]));
+      gold_cf32_.emplace_back(gold_ifft[0][i], gold_ifft[1][i]);
     }
 
     std::vector<std::vector<double>> sts_seq =
@@ -810,8 +809,8 @@ void Config::GenData() {
                     ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
 
   for (size_t i = 0; i < ofdm_ca_num_; i++) {
-    pilot_cf32_.push_back(std::complex<float>(pilot_ifft[i].re / scale_,
-                                              pilot_ifft[i].im / scale_));
+    pilot_cf32_.emplace_back(pilot_ifft[i].re / scale_,
+                             pilot_ifft[i].im / scale_);
   }
   this->pilot_cf32_.insert(this->pilot_cf32_.begin(),
                            this->pilot_cf32_.end() - this->cp_len_,

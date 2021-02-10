@@ -1,5 +1,7 @@
 #include "channel.h"
 
+#include <utility>
+
 static constexpr bool kPrintChannelOutput = false;
 using namespace arma;
 
@@ -7,7 +9,7 @@ Channel::Channel(Config* config_bs, Config* config_ue,
                  std::string in_channel_type, double in_channel_snr)
     : bscfg_(config_bs),
       uecfg_(config_ue),
-      sim_chan_model_(in_channel_type),
+      sim_chan_model_(std::move(in_channel_type)),
       channel_snr_db_(in_channel_snr) {
   bs_ant_ = bscfg_->BsAntNum();
   ue_ant_ = uecfg_->UeAntNum();
@@ -26,7 +28,7 @@ Channel::Channel(Config* config_bs, Config* config_ue,
   }
 }
 
-Channel::~Channel() {}
+Channel::~Channel() = default;
 
 void Channel::ApplyChan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
                         const bool is_downlink, const bool is_newChan) {

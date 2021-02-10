@@ -4,6 +4,8 @@
  */
 #include "phy-ue.h"
 
+#include <memory>
+
 #include "phy_ldpc_decoder_5gnr.h"
 #include "utils_ldpc.h"
 
@@ -16,7 +18,7 @@ static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr size_t kRecordFrameIndex = 1000;
 
 PhyUe::PhyUe(Config* config) {
-  srand(time(NULL));
+  srand(time(nullptr));
 
   this->config_ = config;
   InitializeVarsFromCfg();
@@ -74,9 +76,9 @@ PhyUe::PhyUe(Config* config) {
     task_ptok_[i] = new moodycamel::ProducerToken(message_queue_);
   }
 
-  ru_.reset(new RadioTxRx(config_, rx_thread_num_, config_->CoreOffset() + 1,
-                          &message_queue_, &tx_queue_, rx_ptoks_ptr_,
-                          tx_ptoks_ptr_));
+  ru_ = std::make_unique<RadioTxRx>(config_, rx_thread_num_,
+                                    config_->CoreOffset() + 1, &message_queue_,
+                                    &tx_queue_, rx_ptoks_ptr_, tx_ptoks_ptr_);
 
   if (kEnableMac) {
     // TODO [ankalia]: dummy_decoded_buffer is used at the base station
@@ -105,25 +107,24 @@ PhyUe::PhyUe(Config* config) {
 
   // initilize all kinds of checkers
   std::memset(fft_status_, 0, sizeof(size_t) * kFrameWnd);
-  for (size_t i = 0; i < kFrameWnd; i++) {
-    fft_checker_[i] = new size_t[config_->UeAntNum()];
-    std::memset(fft_checker_[i], 0, sizeof(size_t) * (config_->UeAntNum()));
+  for (auto& i : fft_checker_) {
+    i = new size_t[config_->UeAntNum()];
+    std::memset(i, 0, sizeof(size_t) * (config_->UeAntNum()));
   }
 
   std::memset(demul_status_, 0, sizeof(size_t) * kFrameWnd);
   if (dl_data_symbol_perframe_ > 0) {
-    for (size_t i = 0; i < kFrameWnd; i++) {
-      demul_checker_[i] = new size_t[config_->UeAntNum()];
-      std::memset(demul_checker_[i], 0, sizeof(size_t) * (config_->UeAntNum()));
+    for (auto& i : demul_checker_) {
+      i = new size_t[config_->UeAntNum()];
+      std::memset(i, 0, sizeof(size_t) * (config_->UeAntNum()));
     }
   }
 
   std::memset(decode_status_, 0, sizeof(size_t) * kFrameWnd);
   if (dl_data_symbol_perframe_ > 0) {
-    for (size_t i = 0; i < kFrameWnd; i++) {
-      decode_checker_[i] = new size_t[config_->UeAntNum()];
-      std::memset(decode_checker_[i], 0,
-                  sizeof(size_t) * (config_->UeAntNum()));
+    for (auto& i : decode_checker_) {
+      i = new size_t[config_->UeAntNum()];
+      std::memset(i, 0, sizeof(size_t) * (config_->UeAntNum()));
     }
   }
 
@@ -136,7 +137,7 @@ PhyUe::PhyUe(Config* config) {
     context->id_ = i;
 
     // std::printf("create thread %d\n", i);
-    if (pthread_create(&task_threads_[i], NULL, TaskThreadLaunch, context) !=
+    if (pthread_create(&task_threads_[i], nullptr, TaskThreadLaunch, context) !=
         0) {
       perror("task thread create failed");
       std::exit(0);
@@ -580,7 +581,7 @@ void* PhyUe::TaskThreadLaunch(void* in_context) {
   int tid = context->id_;
   delete context;
   me->TaskThread(tid);
-  return 0;
+  return nullptr;
 }
 
 void PhyUe::TaskThread(int tid) {
@@ -1130,7 +1131,7 @@ void PhyUe::DoIfft(int tid, size_t tag) {
            "Muliplexing message enqueue failed");
 }
 
-void PhyUe::InitializeVarsFromCfg(void) {
+void PhyUe::InitializeVarsFromCfg() {
   dl_pilot_symbol_perframe_ = config_->Frame().ClientDlPilotSymbols();
   size_t ul_pilot_symbol_perframe = config_->Frame().ClientUlPilotSymbols();
   ul_symbol_perframe_ = config_->Frame().NumULSyms();
@@ -1200,8 +1201,8 @@ void PhyUe::InitializeDownlinkBuffers() {
 
   // initialize CSI buffer
   csi_buffer_.resize(config_->UeAntNum() * kFrameWnd);
-  for (size_t i = 0; i < csi_buffer_.size(); i++) {
-    csi_buffer_[i].resize(config_->OfdmDataNum());
+  for (auto& i : csi_buffer_) {
+    i.resize(config_->OfdmDataNum());
   }
 
   if (dl_data_symbol_perframe_ > 0) {
@@ -1210,8 +1211,8 @@ void PhyUe::InitializeDownlinkBuffers() {
         dl_data_symbol_perframe_ * kFrameWnd;
     size_t buffer_size = config_->UeAntNum() * task_buffer_symbol_num_dl;
     equal_buffer_.resize(buffer_size);
-    for (size_t i = 0; i < equal_buffer_.size(); i++) {
-      equal_buffer_[i].resize(config_->OfdmDataNum());
+    for (auto& i : equal_buffer_) {
+      i.resize(config_->OfdmDataNum());
     }
 
     // initialize demod buffer
@@ -1220,9 +1221,9 @@ void PhyUe::InitializeDownlinkBuffers() {
 
     // initialize decode buffer
     dl_decode_buffer_.resize(buffer_size);
-    for (size_t i = 0; i < dl_decode_buffer_.size(); i++) {
-      dl_decode_buffer_[i].resize(Roundup<64>(config_->NumBytesPerCb()) *
-                                  config_->LdpcConfig().NumBlocksInSymbol());
+    for (auto& i : dl_decode_buffer_) {
+      i.resize(Roundup<64>(config_->NumBytesPerCb()) *
+               config_->LdpcConfig().NumBlocksInSymbol());
     }
     resp_var_nodes_ = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
         Agora_memory::Alignment_t::kAlign64, 1024 * 1024 * sizeof(int16_t)));

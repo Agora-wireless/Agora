@@ -5,6 +5,9 @@
 
 #include "agora.h"
 
+#include <cmath>
+#include <memory>
+
 Agora::Agora(Config* cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       csi_buffers_(kFrameWnd, cfg->UeNum(),
@@ -38,9 +41,9 @@ Agora::Agora(Config* cfg)
   phy_stats_ = new PhyStats(cfg);
 
   /* Initialize TXRX threads */
-  packet_tx_rx_.reset(new PacketTXRX(
+  packet_tx_rx_ = std::make_unique<PacketTXRX>(
       cfg, cfg->CoreOffset() + 1, &message_queue_,
-      GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_));
+      GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_);
 
   if (kEnableMac) {
     const size_t mac_cpu_core =
@@ -88,7 +91,7 @@ void Agora::Stop() {
   packet_tx_rx_.reset();
 }
 
-void Agora::SendSnrReport(EventType  /*event_type*/, size_t frame_id,
+void Agora::SendSnrReport(EventType /*event_type*/, size_t frame_id,
                           size_t symbol_id) {
   assert(event_type == EventType::kSNRReport);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
@@ -215,7 +218,7 @@ void Agora::ScheduleCodeblocks(EventType event_type, size_t frame_id,
   }
 }
 
-void Agora::ScheduleUsers(EventType  /*event_type*/, size_t frame_id,
+void Agora::ScheduleUsers(EventType /*event_type*/, size_t frame_id,
                           size_t symbol_id) {
   assert(event_type == EventType::kPacketToMac);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
@@ -507,7 +510,7 @@ void Agora::Start() {
                   "in %f secs, throughtput %f bps per-client "
                   "(16QAM), current tx queue length %zu\n",
                   samples_num_per_ue, cfg->UeNum(), diff,
-                  samples_num_per_ue * log2(16.0f) / diff,
+                  samples_num_per_ue * std::log2(16.0f) / diff,
                   GetConq(EventType::kPacketTX, 0)->size_approx());
               tx_begin = GetTimeUs();
             }

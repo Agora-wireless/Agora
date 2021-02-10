@@ -61,7 +61,7 @@ DoFFT::~DoFFT() {
 // @in_vec: input complex data to estimate regression params
 // @x0: value of the first x data (assumed consecutive integers)
 // @out_vec: output complex data with linearly regressed phase
-static inline void CalibRegressionEstimate(arma::cx_fvec in_vec,
+static inline void CalibRegressionEstimate(const arma::cx_fvec& in_vec,
                                            arma::cx_fvec& out_vec, size_t x0) {
   size_t in_len = in_vec.size();
   size_t out_len = out_vec.size();

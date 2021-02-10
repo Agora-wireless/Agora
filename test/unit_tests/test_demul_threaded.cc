@@ -115,8 +115,8 @@ TEST(TestDemul, VaryingConfig) {
   moodycamel::ProducerToken* ptoks[kNumWorkers];
   auto complete_task_queue =
       moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
-  for (size_t i = 0; i < kNumWorkers; i++) {
-    ptoks[i] = new moodycamel::ProducerToken(complete_task_queue);
+  for (auto& ptok : ptoks) {
+    ptok = new moodycamel::ProducerToken(complete_task_queue);
   }
 
   Table<complex_float> data_buffer;

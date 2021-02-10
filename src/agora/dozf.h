@@ -26,7 +26,7 @@ class DoZF : public Doer {
        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_,
        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
        Stats* stats_manager);
-  ~DoZF();
+  ~DoZF() override;
 
   /**
    * Do ZF task for one subcarrier with all pilots in a frame
@@ -44,7 +44,7 @@ class DoZF : public Doer {
    *     2. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  EventData Launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
  private:
   void ZfTimeOrthogonal(size_t tag);

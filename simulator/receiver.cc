@@ -32,7 +32,7 @@ std::vector<pthread_t> Receiver::StartRecv(Table<char>& in_buffer,
     auto* context = new EventHandlerContext<Receiver>;
     context->obj_ptr_ = this;
     context->id_ = i;
-    if (pthread_create(&recv_thread, NULL,
+    if (pthread_create(&recv_thread, nullptr,
                        PthreadFunWrapper<Receiver, &Receiver::LoopRecv>,
                        context) != 0) {
       perror("Socket recv thread create failed");

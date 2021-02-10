@@ -25,7 +25,8 @@ void DelayTicks(uint64_t start, uint64_t ticks) {
 
 Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
                size_t frame_duration, size_t enable_slow_start,
-               std::string server_mac_addr_str, bool create_thread_for_master)
+               const std::string& server_mac_addr_str,
+               bool create_thread_for_master)
     : cfg_(cfg),
       freq_ghz_(MeasureRdtscFreq()),
       ticks_per_usec_(freq_ghz_ * 1e3),
@@ -46,8 +47,8 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
       enable_slow_start == 1 ? "yes" : "no");
 
   unused(server_mac_addr_str);
-  for (size_t i = 0; i < kFrameWnd; i++) {
-    packet_count_per_symbol_[i] = new size_t[cfg->Frame().NumTotalSyms()]();
+  for (auto& i : packet_count_per_symbol_) {
+    i = new size_t[cfg->Frame().NumTotalSyms()]();
   }
 
   InitIqFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)) +
@@ -109,8 +110,8 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 
 Sender::~Sender() {
   iq_data_short_.Free();
-  for (size_t i = 0; i < kFrameWnd; i++) {
-    std::free(packet_count_per_symbol_[i]);
+  for (auto& i : packet_count_per_symbol_) {
+    std::free(i);
   }
 }
 
@@ -131,7 +132,7 @@ void Sender::StartTXfromMain(double* in_frame_start, double* in_frame_end) {
                 socket_thread_num_);
 }
 
-size_t Sender::FindNextSymbol(size_t  /*frame*/, size_t start_symbol) {
+size_t Sender::FindNextSymbol(size_t /*frame*/, size_t start_symbol) {
   size_t next_symbol_id;
   for (next_symbol_id = start_symbol;
        (next_symbol_id < cfg_->Frame().NumTotalSyms()); next_symbol_id++) {
@@ -397,7 +398,7 @@ uint64_t Sender::GetTicksForFrame(size_t frame_id) const {
   }
 }
 
-void Sender::InitIqFromFile(std::string filename) {
+void Sender::InitIqFromFile(const std::string& filename) {
   const size_t packets_per_frame =
       cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum();
   iq_data_short_.Calloc(packets_per_frame,
@@ -447,7 +448,7 @@ void Sender::CreateThreads(void* (*worker)(void*), int tid_start, int tid_end) {
     auto* context = new EventHandlerContext<Sender>;
     context->obj_ptr_ = this;
     context->id_ = i;
-    ret = pthread_create(&thread, NULL, worker, context);
+    ret = pthread_create(&thread, nullptr, worker, context);
     RtAssert(ret == 0, "pthread_create() failed");
   }
 }

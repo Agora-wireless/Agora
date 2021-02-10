@@ -4,6 +4,8 @@
  */
 #include "phy_stats.h"
 
+#include <cmath>
+
 PhyStats::PhyStats(Config* cfg) : config_(cfg) {
   const size_t task_buffer_symbol_num_ul = cfg->Frame().NumULSyms() * kFrameWnd;
   decoded_bits_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
@@ -36,7 +38,7 @@ PhyStats::PhyStats(Config* cfg) : config_(cfg) {
                     Agora_memory::Alignment_t::kAlign64);
 }
 
-PhyStats::~PhyStats(void) {
+PhyStats::~PhyStats() {
   decoded_bits_count_.Free();
   bit_error_count_.Free();
 
@@ -88,7 +90,7 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
 
 float PhyStats::GetEvmSnr(size_t frame_id, size_t ue_id) {
   float evm = evm_buffer_[frame_id % kFrameWnd][ue_id];
-  evm = sqrt(evm) / config_->OfdmDataNum();
+  evm = std::sqrt(evm) / config_->OfdmDataNum();
   return -10 * std::log10(evm);
 }
 
@@ -117,7 +119,8 @@ void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id,
   pilot_snr_[frame_id % kFrameWnd][ue_id] = 10 * std::log10(snr);
 }
 
-void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id, cx_fmat eq) {
+void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
+                              const cx_fmat& eq) {
   if (this->config_->Frame().NumULSyms() > 0) {
     fmat evm = abs(eq - ul_gt_mat_.col(sc_id));
     fmat cur_evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeNum(), 1,

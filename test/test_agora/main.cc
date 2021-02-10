@@ -1,11 +1,11 @@
 #include "agora.h"
 
-void ReadFromFileUl(std::string filename, Table<uint8_t>& data,
+void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
                     int num_bytes_per_ue, Config* cfg) {
   int data_symbol_num_perframe = cfg->Frame().NumULSyms();
   size_t ue_num = cfg->UeNum();
   FILE* fp = fopen(filename.c_str(), "rb");
-  if (fp == NULL) {
+  if (fp == nullptr) {
     std::printf("open file failed: %s\n", filename.c_str());
     std::cerr << "Error: " << strerror(errno) << std::endl;
   } else {
@@ -32,12 +32,12 @@ void ReadFromFileUl(std::string filename, Table<uint8_t>& data,
   }
 }
 
-void ReadFromFileDl(std::string filename, Table<short>& data, int ofdm_size,
-                    Config* cfg) {
+void ReadFromFileDl(const std::string& filename, Table<short>& data,
+                    int ofdm_size, Config* cfg) {
   int data_symbol_num_perframe = cfg->Frame().NumDLSyms();
   size_t bs_ant_num = cfg->BsAntNum();
   FILE* fp = fopen(filename.c_str(), "rb");
-  if (fp == NULL) {
+  if (fp == nullptr) {
     std::printf("open file failed: %s\n", filename.c_str());
     std::cerr << "Error: " << strerror(errno) << std::endl;
   }

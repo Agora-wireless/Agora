@@ -31,9 +31,9 @@ class DoEncode : public Doer {
  public:
   DoEncode(Config* in_config, int in_tid, Table<int8_t>& in_raw_data_buffer,
            Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager);
-  ~DoEncode();
+  ~DoEncode() override;
 
-  EventData Launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
  private:
   Table<int8_t>& raw_data_buffer_;
@@ -51,9 +51,9 @@ class DoDecode : public Doer {
            PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
            PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
            PhyStats* in_phy_stats, Stats* in_stats_manager);
-  ~DoDecode();
+  ~DoDecode() override;
 
-  EventData Launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
  private:
   int16_t* resp_var_nodes_;

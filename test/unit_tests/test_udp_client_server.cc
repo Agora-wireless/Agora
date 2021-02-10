@@ -22,7 +22,7 @@ void ClientFunc() {
   }
 
   for (size_t i = 1; i <= kNumPackets; i++) {
-    static_assert(kMessageSize >= sizeof(size_t), "");
+    static_assert(kMessageSize >= sizeof(size_t));
     *reinterpret_cast<size_t*>(&packet[0]) = i;
     udp_client.Send("localhost", kServerUDPPort, &packet[0], kMessageSize);
   }
