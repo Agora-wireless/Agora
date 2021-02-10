@@ -1,3 +1,7 @@
+/**
+ * @file stats.cc
+ * @brief Implmentation file for the Stats class.
+ */
 #include "stats.h"
 
 #include <typeinfo>

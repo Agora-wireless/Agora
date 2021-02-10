@@ -48,8 +48,8 @@
     The algorithm is implemented as defined in TS38212 5.3.2.
 */
 
-#ifndef _PHY_LDPC_ENCODER_5GNR_INTERNAL_H_
-#define _PHY_LDPC_ENCODER_5GNR_INTERNAL_H_
+#ifndef PHY_LDPC_ENCODER_5GNR_INTERNAL_H_
+#define PHY_LDPC_ENCODER_5GNR_INTERNAL_H_
 
 #include <immintrin.h>  // AVX
 

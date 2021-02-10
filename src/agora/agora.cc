@@ -1,3 +1,8 @@
+/**
+ * @file agora.cc
+ * @brief Implementation file for the main agora class
+ */
+
 #include "agora.h"
 
 Agora::Agora(Config* cfg)
@@ -226,7 +231,7 @@ void Agora::Start() {
   auto& cfg = config_;
 
   // Start packet I/O
-  if (!packet_tx_rx_->StartTxrx(socket_buffer_, socket_buffer_status_,
+  if (!packet_tx_rx_->StartTxRx(socket_buffer_, socket_buffer_status_,
                                 socket_buffer_status_size_,
                                 stats_->frame_start_, dl_socket_buffer_,
                                 calib_dl_buffer_, calib_ul_buffer_)) {

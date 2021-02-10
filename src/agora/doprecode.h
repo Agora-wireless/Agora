@@ -1,5 +1,9 @@
-#ifndef DOPRECODE
-#define DOPRECODE
+/**
+ * @file doprecode.h
+ * @brief Declaration file for the DoPrecode class.
+ */
+#ifndef DOPRECODE_H_
+#define DOPRECODE_H_
 
 #include <armadillo>
 #include <iostream>
@@ -70,4 +74,4 @@ class DoPrecode : public Doer {
 #endif
 };
 
-#endif
+#endif  // DOPRECODE_H_

@@ -1,3 +1,7 @@
+/**
+ * @file doprecode.cc
+ * @brief Implementation file for the DoPrecode class.
+ */
 #include "doprecode.h"
 
 #include "concurrent_queue_wrapper.inc"
@@ -27,9 +31,9 @@ DoPrecode::DoPrecode(
 #if USE_MKL_JIT
   MKL_Complex8 alpha = {1, 0};
   MKL_Complex8 beta = {0, 0};
-  // Input: A: BS_ANT_NUM x UE_NUM , B: UE_NUM x 1
-  // Output: C: BS_ANT_NUM x 1
-  // Leading dimensions: A: BS_ANT_NUM, B: UE_NUM, C: BS_ANT_NUM
+  // Input: A: BsAntNum() x UeNum() , B: UeNum() x 1
+  // Output: C: BsAntNum() x 1
+  // Leading dimensions: A: bs_ant_num(), B: ue_num(), C: bs_ant_num()
   mkl_jit_status_t status = mkl_jit_create_cgemm(
       &jitter_, MKL_COL_MAJOR, MKL_NOTRANS, MKL_NOTRANS, cfg_->BsAntNum(), 1,
       cfg_->UeNum(), &alpha, cfg_->BsAntNum(), cfg_->UeNum(), &beta,
@@ -63,17 +67,18 @@ EventData DoPrecode::Launch(size_t tag) {
   // Mark pilot subcarriers in this block
   // In downlink pilot symbols, all subcarriers are used as pilots
   // In downlink data symbols, pilot subcarriers are every
-  // OFDM_PILOT_SPACING subcarriers
-  // if (symbol_idx_dl < cfg->DL_PILOT_SYMS) {
-  //     std::memset(pilot_sc_flags, 1, cfg->demul_block_size * sizeof(size_t));
+  // OfdmPilotSpacing() subcarriers
+  // if (symbol_idx_dl < cfg->Frame().ClientDlPilotSymbols()) {
+  //     std::memset(pilot_sc_flags, 1, cfg->DemulBlockSize() *
+  //     sizeof(size_t));
   // } else {
   //     // Find subcarriers used as pilot in this block
-  //     std::memset(pilot_sc_flags, 0, cfg->demul_block_size * sizeof(size_t));
-  //     size_t remainder = base_sc_id % cfg->OFDM_PILOT_SPACING;
-  //     size_t first_pilot_sc
-  //         = remainder > 0 ? (cfg->OFDM_PILOT_SPACING - remainder) : 0;
-  //     for (size_t i = first_pilot_sc; i < cfg->demul_block_size;
-  //          i += cfg->OFDM_PILOT_SPACING)
+  //     std::memset(pilot_sc_flags, 0, cfg->DemulBlockSize() *
+  //     sizeof(size_t)); size_t remainder = base_sc_id %
+  //     cfg->OfdmPilotSpacing(); size_t first_pilot_sc
+  //         = remainder > 0 ? (cfg->OfdmPilotSpacing() - remainder) : 0;
+  //     for (size_t i = first_pilot_sc; i < cfg->DemulBlockSize();
+  //          i += cfg->OfdmPilotSpacing())
   //         pilot_sc_flags[i] = 1;
   // }
 
@@ -156,9 +161,9 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
                               size_t sc_id, size_t sc_id_in_block) {
   complex_float* data_ptr =
       modulated_buffer_temp_ + sc_id_in_block * cfg_->UeNum();
-  if (symbol_idx_dl < cfg_->Frame().ClientDlPilotSymbols() ||
-      sc_id % cfg_->OfdmPilotSpacing() == 0) {
-    // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
+  if ((symbol_idx_dl < cfg_->Frame().ClientDlPilotSymbols()) ||
+      ((sc_id % cfg_->OfdmPilotSpacing()) == 0)) {
+    // FIXME: cfg_->UeSpecificPilot()[user_id] index creates errors
     // in the downlink receiver
     data_ptr[user_id] = cfg_->UeSpecificPilot()[0][sc_id];
   } else {
@@ -184,8 +189,8 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
   my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
             (MKL_Complex8*)precoded_ptr);
 #else
-  cx_fmat mat_precoder(precoder_ptr, cfg->BsAntNum(), cfg->UE_NUM, false);
-  cx_fmat mat_data(data_ptr, cfg->UE_NUM, 1, false);
+  cx_fmat mat_precoder(precoder_ptr, cfg->BsAntNum(), cfg->UeNum(), false);
+  cx_fmat mat_data(data_ptr, cfg->UeNum(), 1, false);
   cx_fmat mat_precoded(precoded_ptr, cfg->BsAntNum(), 1, false);
   mat_precoded = mat_precoder * mat_data;
   // cout << "Precoder: \n" << mat_precoder << endl;

@@ -1,3 +1,7 @@
+/**
+ * @file test_modulation.cc
+ * @brief Testing functions for benchmarking modulation routines
+ */
 #include "buffer.inc"
 #include "gettime.inc"
 #include "memory_manage.h"
@@ -18,22 +22,22 @@ static double bench_mod_16qam(unsigned iterations, unsigned mode) {
   int* input;
   complex_float* output_mod;
   Table<complex_float> mod_table;
-  init_modulation_table(mod_table, 16);
+  InitModulationTable(mod_table, 16);
   uint8_t* output_demod_loop;
   uint8_t* output_demod_sse;
   uint8_t* output_demod_avx2;
 
   unsigned int num = 40;
-  alloc_buffer_1d(&input, num, 32, 1);
-  alloc_buffer_1d(&output_mod, num, 32, 1);
+  AllocBuffer1d(&input, num, 32, 1);
+  AllocBuffer1d(&output_mod, num, 32, 1);
   if (mode == 0) {
-    alloc_buffer_1d(&output_demod_loop, num, 32, 1);
-    alloc_buffer_1d(&output_demod_sse, num, 32, 1);
-    alloc_buffer_1d(&output_demod_avx2, num, 32, 1);
+    AllocBuffer1d(&output_demod_loop, num, 32, 1);
+    AllocBuffer1d(&output_demod_sse, num, 32, 1);
+    AllocBuffer1d(&output_demod_avx2, num, 32, 1);
   } else {
-    alloc_buffer_1d(&output_demod_loop, num * 4, 32, 1);
-    alloc_buffer_1d(&output_demod_sse, num * 4, 32, 1);
-    alloc_buffer_1d(&output_demod_avx2, num * 4, 32, 1);
+    AllocBuffer1d(&output_demod_loop, num * 4, 32, 1);
+    AllocBuffer1d(&output_demod_sse, num * 4, 32, 1);
+    AllocBuffer1d(&output_demod_avx2, num * 4, 32, 1);
   }
 
   srand(0);
@@ -48,22 +52,20 @@ static double bench_mod_16qam(unsigned iterations, unsigned mode) {
   double start_time = get_time();
   for (unsigned i = 0; i < iterations; i++) {
     for (unsigned j = 0; j < num; j++)
-      output_mod[j] = mod_single(input[j], mod_table);
+      output_mod[j] = ModSingle(input[j], mod_table);
     // std::printf("modulated: \n");
     // for (unsigned i = 0; i < num; i++) {
     //     std::printf("(%.3f, %.3f) ", output_mod[i].re, output_mod[i].im);
     // }
     // std::printf("\n");
     if (mode == 0) {
-      demod_16qam_hard_loop((float*)output_mod, output_demod_loop, num);
-      demod_16qam_hard_sse((float*)output_mod, output_demod_sse, num);
-      demod_16qam_hard_avx2((float*)output_mod, output_demod_avx2, num);
+      Demod16qamHardLoop((float*)output_mod, output_demod_loop, num);
+      Demod16qamHardSse((float*)output_mod, output_demod_sse, num);
+      Demod16qamHardAvx2((float*)output_mod, output_demod_avx2, num);
     } else {
-      demod_16qam_soft_loop((float*)output_mod, (int8_t*)output_demod_loop,
-                            num);
-      demod_16qam_soft_sse((float*)output_mod, (int8_t*)output_demod_sse, num);
-      demod_16qam_soft_avx2((float*)output_mod, (int8_t*)output_demod_avx2,
-                            num);
+      Demod16qamSoftLoop((float*)output_mod, (int8_t*)output_demod_loop, num);
+      Demod16qamSoftSse((float*)output_mod, (int8_t*)output_demod_sse, num);
+      Demod16qamSoftAvx2((float*)output_mod, (int8_t*)output_demod_avx2, num);
     }
   }
   double end_time = get_time();
@@ -124,22 +126,23 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode) {
   complex_float* output_mod;
 
   Table<complex_float> mod_table;
-  init_modulation_table(mod_table, 64);
+  InitModulationTable(mod_table, 64);
   unsigned int num = 100;
   uint8_t* output_demod_loop;
   uint8_t* output_demod_sse;
   uint8_t* output_demod_avx2;
 
-  alloc_buffer_1d(&input, num, 32, 1);
-  alloc_buffer_1d(&output_mod, num, 32, 1);
+  AllocBuffer1d(&input, num, 32, 1);
+  AllocBuffer1d(&output_mod, num, 32, 1);
   if (mode == 0) {
-    alloc_buffer_1d(&output_demod_loop, num, 32, 1);
-    alloc_buffer_1d(&output_demod_sse, num, 32, 1);
-    alloc_buffer_1d(&output_demod_avx2, num, 32, 1);
+    Demod64qamHardsse((float*)output_mod, output_demod_sse, num);
+    AllocBuffer1d(&output_demod_loop, num, 32, 1);
+    AllocBuffer1d(&output_demod_sse, num, 32, 1);
+    AllocBuffer1d(&output_demod_avx2, num, 32, 1);
   } else {
-    alloc_buffer_1d(&output_demod_loop, num * 6, 32, 1);
-    alloc_buffer_1d(&output_demod_sse, num * 6, 32, 1);
-    alloc_buffer_1d(&output_demod_avx2, num * 6, 32, 1);
+    AllocBuffer1d(&output_demod_loop, num * 6, 32, 1);
+    AllocBuffer1d(&output_demod_sse, num * 6, 32, 1);
+    AllocBuffer1d(&output_demod_avx2, num * 6, 32, 1);
   }
 
   srand(0);
@@ -162,15 +165,13 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode) {
     // }
 
     if (mode == 0) {
-      demod_64qam_hard_loop((float*)output_mod, output_demod_loop, num);
-      demod_64qam_hard_sse((float*)output_mod, output_demod_sse, num);
-      demod_64qam_hard_avx2((float*)output_mod, output_demod_avx2, num);
+      Demod64qamHardLoop((float*)output_mod, output_demod_loop, num);
+      Demod64qamHardSse((float*)output_mod, output_demod_sse, num);
+      Demod64qamHardAvx2((float*)output_mod, output_demod_avx2, num);
     } else {
-      demod_64qam_soft_loop((float*)output_mod, (int8_t*)output_demod_loop,
-                            num);
-      demod_64qam_soft_sse((float*)output_mod, (int8_t*)output_demod_sse, num);
-      demod_64qam_soft_avx2((float*)output_mod, (int8_t*)output_demod_avx2,
-                            num);
+      Demod64qamSoftLoop((float*)output_mod, (int8_t*)output_demod_loop, num);
+      Demod64qamSoftSse((float*)output_mod, (int8_t*)output_demod_sse, num);
+      Demod64qamSoftAvx2((float*)output_mod, (int8_t*)output_demod_avx2, num);
     }
   }
   double end_time = get_time();

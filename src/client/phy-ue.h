@@ -1,5 +1,11 @@
-#ifndef COMP_HEAD
-#define COMP_HEAD
+/**
+ * @file phy-ue.h
+ * @brief Declaration file for the phy ue class
+ */
+
+#ifndef PHY_UE_H_
+#define PHY_UE_H_
+
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <immintrin.h>
@@ -242,7 +248,7 @@ class PhyUe {
    * Downlink
    *****************************************************/
 
-  std::unique_ptr<RadioTXRX> ru_;
+  std::unique_ptr<RadioTxRx> ru_;
 
   /**
    * Received data
@@ -356,4 +362,4 @@ class PhyUe {
   // float* equal_output;
   size_t record_frame_ = SIZE_MAX;
 };
-#endif
+#endif  // PHY_UE_H_

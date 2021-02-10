@@ -1,3 +1,12 @@
+// Copyright (c) 2018-2020, Rice University
+// RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
+
+/**
+ * @file config.cc
+ * @brief Implementation file for the configuration class which importants
+ * json configuration values into class variables
+ */
+
 #include "config.h"
 
 #include <boost/range/algorithm/count.hpp>

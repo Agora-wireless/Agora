@@ -1,8 +1,12 @@
+/**
+ * @file txrx_client.cc
+ * @brief Implementation file for the radio txrx class
+ */
 #include "txrx_client.h"
 
 #include "config.h"
 
-RadioTXRX::RadioTXRX(Config* cfg, int n_threads, int in_core_id)
+RadioTxRx::RadioTxRx(Config* cfg, int n_threads, int in_core_id)
     : config_(cfg), thread_num_(n_threads), core_id_(in_core_id) {
   if (!kUseArgos && !kUseUHD) {
     socket_.resize(config_->NumRadios());
@@ -15,19 +19,19 @@ RadioTXRX::RadioTXRX(Config* cfg, int n_threads, int in_core_id)
   srand(time(NULL));
 }
 
-RadioTXRX::RadioTXRX(Config* config, int n_threads, int in_core_id,
+RadioTxRx::RadioTxRx(Config* config, int n_threads, int in_core_id,
                      moodycamel::ConcurrentQueue<EventData>* in_message_queue,
                      moodycamel::ConcurrentQueue<EventData>* in_task_queue,
                      moodycamel::ProducerToken** in_rx_ptoks,
                      moodycamel::ProducerToken** in_tx_ptoks)
-    : RadioTXRX(config, n_threads, in_core_id) {
+    : RadioTxRx(config, n_threads, in_core_id) {
   message_queue_ = in_message_queue;
   task_queue_ = in_task_queue;
   rx_ptoks_ = in_rx_ptoks;
   tx_ptoks_ = in_tx_ptoks;
 }
 
-RadioTXRX::~RadioTXRX() {
+RadioTxRx::~RadioTxRx() {
   if (kUseArgos || kUseUHD) {
     radioconfig_->RadioStop();
     delete radioconfig_;
@@ -35,8 +39,8 @@ RadioTXRX::~RadioTXRX() {
   delete config_;
 }
 
-bool RadioTXRX::StartTxrx(Table<char>& in_buffer, Table<int>& in_buffer_status,
-                          int in_buffer_frame_num, int in_buffer_length,
+bool RadioTxRx::StartTxRx(Table<char>& in_buffer, Table<int>& in_buffer_status,
+                          size_t in_buffer_frame_num, size_t in_buffer_length,
                           char* in_tx_buffer, int* in_tx_buffer_status,
                           int in_tx_buffer_frame_num, int in_tx_buffer_length) {
   buffer_frame_num_ = in_buffer_frame_num;
@@ -60,14 +64,14 @@ bool RadioTXRX::StartTxrx(Table<char>& in_buffer, Table<int>& in_buffer_status,
   for (int i = 0; i < thread_num_; i++) {
     pthread_t txrx_thread;
     // record the thread id
-    auto* context = new EventHandlerContext<RadioTXRX>;
+    auto* context = new EventHandlerContext<RadioTxRx>;
     context->obj_ptr_ = this;
     context->id_ = i;
     // start socket thread
     if (kUseArgos && config_->HwFramer()) {
       if (pthread_create(
               &txrx_thread, NULL,
-              PthreadFunWrapper<RadioTXRX, &RadioTXRX::LoopTxRxArgos>,
+              PthreadFunWrapper<RadioTxRx, &RadioTxRx::LoopTxRxArgos>,
               context) != 0) {
         perror("socket thread create failed");
         std::exit(0);
@@ -75,14 +79,14 @@ bool RadioTXRX::StartTxrx(Table<char>& in_buffer, Table<int>& in_buffer_status,
     } else if (kUseArgos || kUseUHD) {
       if (pthread_create(
               &txrx_thread, NULL,
-              PthreadFunWrapper<RadioTXRX, &RadioTXRX::LoopTxRxArgosSync>,
+              PthreadFunWrapper<RadioTxRx, &RadioTxRx::LoopTxRxArgosSync>,
               context) != 0) {
         perror("socket thread create failed");
         std::exit(0);
       }
     } else {
       if (pthread_create(&txrx_thread, NULL,
-                         PthreadFunWrapper<RadioTXRX, &RadioTXRX::LoopTxRx>,
+                         PthreadFunWrapper<RadioTxRx, &RadioTxRx::LoopTxRx>,
                          context) != 0) {
         perror("socket thread create failed");
         std::exit(0);
@@ -97,7 +101,7 @@ bool RadioTXRX::StartTxrx(Table<char>& in_buffer, Table<int>& in_buffer_status,
   return true;
 }
 
-struct Packet* RadioTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
+struct Packet* RadioTxRx::RecvEnqueue(int tid, int radio_id, int rx_offset) {
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
   char* rx_buffer = (*buffer_)[tid];
   int* rx_buffer_status = (*buffer_status_)[tid];
@@ -132,7 +136,7 @@ struct Packet* RadioTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
   return pkt;
 }
 
-int RadioTXRX::DequeueSend(int tid) {
+int RadioTxRx::DequeueSend(int tid) {
   auto& c = config_;
   EventData event;
   if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
@@ -208,7 +212,7 @@ int RadioTXRX::DequeueSend(int tid) {
   return event.tags_[0];
 }
 
-void* RadioTXRX::LoopTxRx(int tid) {
+void* RadioTxRx::LoopTxRx(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_id_, tid);
   size_t rx_offset = 0;
   int radio_lo = tid * config_->NumRadios() / thread_num_;
@@ -250,7 +254,7 @@ void* RadioTXRX::LoopTxRx(int tid) {
 }
 
 // dequeue_send_sdr
-int RadioTXRX::DequeueSendArgos(int tid, long long time0) {
+int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
   auto& c = config_;
   auto& radio = radioconfig_;
   int packet_length = c->PacketLength();
@@ -333,7 +337,7 @@ int RadioTXRX::DequeueSendArgos(int tid, long long time0) {
   return event.tags_[0];
 }
 
-struct Packet* RadioTXRX::RecvEnqueueArgos(int tid, size_t radio_id,
+struct Packet* RadioTxRx::RecvEnqueueArgos(int tid, size_t radio_id,
                                            size_t& frame_id, size_t& symbol_id,
                                            size_t rx_offset) {
   auto& c = config_;
@@ -402,7 +406,7 @@ struct Packet* RadioTXRX::RecvEnqueueArgos(int tid, size_t radio_id,
   return pkt[0];
 }
 
-void* RadioTXRX::LoopTxRxArgos(int tid) {
+void* RadioTxRx::LoopTxRxArgos(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_id_, tid);
   auto& c = config_;
   size_t num_radios = c->NumRadios();
@@ -463,7 +467,7 @@ void* RadioTXRX::LoopTxRxArgos(int tid) {
   return 0;
 }
 
-void* RadioTXRX::LoopTxRxArgosSync(int tid) {
+void* RadioTxRx::LoopTxRxArgosSync(int tid) {
   // FIXME: This only works when there is 1 radio per thread.
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_id_, tid);
   auto& c = config_;

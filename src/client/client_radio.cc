@@ -1,3 +1,8 @@
+/**
+ * @file client_radio.cc
+ * @brief Implementation file for the client radio config class
+ */
+
 #include "client_radio.h"
 
 #include "comms-lib.h"
@@ -255,7 +260,7 @@ bool ClientRadioConfig::RadioStart() {
   tdd_sched.resize(this->radio_num_);
   for (size_t r = 0; r < radio_num_; r++) {
     tdd_sched[r] = cfg_->Frame().FrameIdentifier();
-    for (size_t s = 0; s < cfg_->Frame().FrameIdentifier().size(); s++) {
+    for (size_t s = 0; s < cfg_->Frame().FrameIdentifier().length(); s++) {
       char c = cfg_->Frame().FrameIdentifier().at(s);
       if (c == 'P' and ((cfg_->NumChannels() == 1 and
                          cfg_->Frame().GetPilotSymbol(r) != s) or

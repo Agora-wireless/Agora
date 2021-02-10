@@ -1,3 +1,7 @@
+/**
+ * @file radio_lib.cc
+ * @brief Implementation file for the RadioConfig class.
+ */
 #include "radio_lib.h"
 
 #include "comms-lib.h"
@@ -17,7 +21,7 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
   this->antenna_num_ = radio_num_ * cfg_->NumChannels();
   std::cout << "Radio num is " << this->radio_num_
             << " Antenna num: " << antenna_num_ << std::endl;
-  if (cfg_->IsUe()) {
+  if (cfg_->IsUe() == true) {
     throw std::invalid_argument("Bad config! Not a UE!");
   }
   if (!kUseUHD && cfg_->HubIds().empty() == false) {
@@ -43,7 +47,7 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
       std::exit(0);
     }
 #else
-    InitBSRadio(context);
+    InitBsRadio(context);
 #endif
   }
 
@@ -404,7 +408,7 @@ bool RadioConfig::RadioStart() {
     std::vector<std::string> tdd_sched;
 
     std::string sched = cfg_->Frame().FrameIdentifier();
-    size_t sched_size = sched.size();
+    size_t sched_size = sched.length();
     for (size_t s = 0; s < sched_size; s++) {
       char c = cfg_->Frame().FrameIdentifier().at(s);
       if (c == 'C') {
@@ -420,9 +424,10 @@ bool RadioConfig::RadioStart() {
       } else if (c != 'B') {
         sched.replace(s, 1, "G");
       }
-      std::cout << "Radio " << i << " Frame: " << sched << std::endl;
-      tdd_sched.push_back(sched);
     }
+    std::cout << "Radio " << i << " Frame 1: " << sched << std::endl;
+    tdd_sched.push_back(sched);
+
     conf["frames"] = tdd_sched;
     std::string conf_string = conf.dump();
     ba_stn_[i]->writeSetting("TDD_CONFIG", conf_string);

@@ -1,3 +1,7 @@
+/**
+ * @file radio_calibrate.cc
+ * @brief Implementation file for the radio configuration calibration functions
+ */
 #include "matplotlibcpp.h"
 #include "radio_lib.h"
 
@@ -562,10 +566,9 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
   size_t ch = cfg_->Channel() == "B" ? 1 : 0;
   std::vector<void*> txbuff0(2);
   txbuff0[0] = cfg_->PilotCi16().data();
-  // txbuff0[1 - ch] = dummy_ci16.data();
 
   std::vector<std::vector<std::complex<int16_t>>> buff;
-  // int ant = _cfg->nChannels;
+  // int ant = cfg_->num_channels();
   size_t m = cfg_->NumAntennas();
   size_t r = cfg_->NumRadios();
   // TODO: Support 2-channels
@@ -594,7 +597,6 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
 
   size_t good_csi_cnt = 0;
   size_t n = 0;
-  // for (size_t n = 0; n < calib_meas_num_; n++) {
   // second condition is for when too many attemps fail
   while (good_csi_cnt < calib_meas_num_ && n < 2 * calib_meas_num_) {
     bool good_csi = true;
@@ -804,7 +806,7 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
         }
         std::cout << "];" << std::endl;
       }
-      // computing initial calib vectors
+      // computing reciprocity calibration matrix
       auto first_up = up[i].begin() + start_up[i];
       auto last_up = up[i].begin() + start_up[i] + cfg_->OfdmCaNum();
       std::vector<std::complex<float>> up_ofdm(first_up, last_up);
@@ -850,6 +852,5 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
     ba_stn_[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
                         ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());
   }
-
   return good_csi_cnt == calib_meas_num_;
 }

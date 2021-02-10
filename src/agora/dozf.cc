@@ -1,3 +1,8 @@
+/**
+ * @file dozf.cc
+ * @brief Implementation file for the DoZf class.  Zero forcing for one
+ * subcarrier.
+ */
 #include "dozf.h"
 
 #include "concurrent_queue_wrapper.inc"
@@ -78,7 +83,7 @@ void DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     arma::cx_fmat mat_dl_zf_tmp = mat_ul_zf_tmp * inv(calib_mat);
 
     // We should be scaling the beamforming matrix, so the IFFT
-    // output can be scaled with OFDM_CA_NUM across all antennas.
+    // output can be scaled with OfdmCaNum() across all antennas.
     // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
     float scale = 1 / (abs(mat_dl_zf_tmp).max());
     mat_dl_zf_tmp *= scale;
@@ -92,7 +97,7 @@ void DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
                             cfg_->BsAntNum(), cfg_->UeNum(), false);
     mat_dl_zf = mat_dl_zf_tmp.st();
   }
-  if (cfg_->ExternalRefNode()) {
+  if (cfg_->ExternalRefNode() == true) {
     mat_ul_zf_tmp.insert_cols(
         cfg_->RefAnt(),
         arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(), arma::fill::zeros));
@@ -334,7 +339,7 @@ void DoZF::Predict(size_t tag)
     // Use stale CSI as predicted CSI
     // TODO: add prediction algorithm
     const size_t offset_in_buffer
-        = ((frame_id % kFrameWnd) * cfg->OFDM_DATA_NUM)
+        = ((frame_id % kFrameWnd) * cfg_->OfdmDataNum())
         + base_sc_id;
     auto* ptr_in = (arma::cx_float*)pred_csi_buffer;
     std::memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
@@ -344,8 +349,8 @@ void DoZF::Predict(size_t tag)
     // Input matrix and calibration are for current frame, output precoders are
     // for the next frame
     compute_precoder(mat_input,
-        cfg->get_calib_buffer(calib_buffer_, frame_id, base_sc_id),
-        cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id + 1, base_sc_id),
-        cfg->get_dl_zf_mat(dl_zf_buffer_, frame_id + 1, base_sc_id));
+        cfg_->GetCalibBuffer(calib_buffer_, frame_id, base_sc_id),
+        cfg_->get_ul_zf_mat(ul_zf_buffer_, frame_id + 1, base_sc_id),
+        cfg_->get_dl_zf_mat(dl_zf_buffer_, frame_id + 1, base_sc_id));
 }
 */

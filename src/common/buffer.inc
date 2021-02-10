@@ -1,5 +1,9 @@
-#ifndef BUFFER_HEAD
-#define BUFFER_HEAD
+/**
+ * @file buffer.inc
+ * @brief Self defined functions for message storage and passing
+ */
+#ifndef BUFFER_INC_
+#define BUFFER_INC_
 
 #include <sstream>
 #include <vector>
@@ -332,4 +336,4 @@ class FrameCounters {
   std::array<size_t, kFrameWnd> symbol_count_;
 };
 
-#endif
+#endif  // BUFFER_INC_

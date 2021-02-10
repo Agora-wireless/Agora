@@ -1,3 +1,7 @@
+/**
+ * @file phy_stats.cc
+ * @brief Declaration file for the PhyStats class.
+ */
 #include "phy_stats.h"
 
 PhyStats::PhyStats(Config* cfg) : config_(cfg) {

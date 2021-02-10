@@ -1,5 +1,10 @@
-#ifndef CLIENT_RADIO_LIB
-#define CLIENT_RADIO_LIB
+/**
+ * @file client_radio.h
+ * @brief Declaration file for the client radio config class
+ */
+
+#ifndef CLIENT_RADIO_LIB_H_
+#define CLIENT_RADIO_LIB_H_
 
 #include <SoapySDR/Device.hpp>
 #include <SoapySDR/Errors.hpp>
@@ -58,4 +63,4 @@ class ClientRadioConfig {
   size_t antenna_num_;
   ClientRadioConfigContext* context_;
 };
-#endif
+#endif  // CLIENT_RADIO_LIB_H_

@@ -45,7 +45,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
       cfg->BsServerAddr().c_str(), frame_duration / 1000.0,
       enable_slow_start == 1 ? "yes" : "no");
 
-  _unused(server_mac_addr_str);
+  unused(server_mac_addr_str);
   for (size_t i = 0; i < kFrameWnd; i++) {
     packet_count_per_symbol_[i] = new size_t[cfg->Frame().NumTotalSyms()]();
   }

@@ -1,4 +1,10 @@
-#pragma once
+/**
+ * @file dosubcarrier.inc
+ * @brief Self-Contained Implmentation file implmenting a worker class that
+ * handles all subcarrier-parallel processing tasks.
+ */
+#ifndef DOSUBCARRIER_H_
+#define DOSUBCARRIER_H_
 
 #include <armadillo>
 #include <iostream>
@@ -20,8 +26,6 @@
 #include "signal_handler.h"
 #include "stats.h"
 #include "symbols.h"
-
-using namespace arma;
 
 /**
  * @brief A worker class that handles all subcarrier-parallel processing tasks.
@@ -136,9 +140,9 @@ class DoSubcarrier : public Doer {
 
   void start_work() {
     const size_t n_zf_tasks_reqd =
-        (sc_range_.end - sc_range_.start) / cfg->zf_block_size;
+        (sc_range_.end - sc_range_.start) / cfg->ZfBlockSize();
     const size_t n_demul_tasks_reqd =
-        (sc_range_.end - sc_range_.start) / cfg->demul_block_size;
+        (sc_range_.end - sc_range_.start) / cfg->DemulBlockSize();
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
       if (rx_status_->received_all_pilots(csi_cur_frame_)) {
@@ -151,10 +155,10 @@ class DoSubcarrier : public Doer {
       }
 
       if (csi_cur_frame_ > zf_cur_frame_) {
-        do_zf_->launch(
+        do_zf_->Launch(
             gen_tag_t::frm_sym_sc(
                 zf_cur_frame_, 0,
-                sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
+                sc_range_.start + n_zf_tasks_done_ * cfg->ZfBlockSize())
                 ._tag);
         n_zf_tasks_done_++;
         if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
@@ -168,7 +172,7 @@ class DoSubcarrier : public Doer {
           rx_status_->is_demod_ready(demul_cur_frame_, demul_cur_sym_)) {
         do_demul_->independent_launch(
             demul_cur_frame_, demul_cur_sym_ - cfg->Frame().NumPilotSyms(),
-            sc_range_.start + (n_demul_tasks_done_ * cfg->demul_block_size));
+            sc_range_.start + (n_demul_tasks_done_ * cfg->DemulBlockSize));
 
         n_demul_tasks_done_++;
         if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
@@ -183,7 +187,7 @@ class DoSubcarrier : public Doer {
               for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
                   if (i % 20 == 0) {
                       std::printf(
-                          "%d ", demul_ptr[i * cfg->mod_order_bits]);
+                          "%d ", demul_ptr[i * cfg->ModOrderBits()]);
                   }
               }
               std::printf("\n");
@@ -194,13 +198,13 @@ class DoSubcarrier : public Doer {
           demul_status_->demul_complete(demul_cur_frame_, demul_cur_sym_,
                                         n_demul_tasks_reqd);
           demul_cur_sym_++;
-          if (demul_cur_sym_ == cfg->symbol_num_perframe) {
-            demul_cur_sym_ = cfg->Frame().NumPilotSyms();
+          if (demul_cur_sym_ == cfg->frame().NumTotalSyms()) {
+            demul_cur_sym_ = cfg->frame().NumPilotSyms();
             std::printf(
                 "Main thread: Demodulation done frame: %lu "
                 "(%lu UL symbols)\n",
                 demul_cur_frame_,
-                cfg->symbol_num_perframe - cfg->Frame().NumPilotSyms());
+                cfg->frame().NumTotalSyms() - cfg->frame().NumPilotSyms());
             demul_cur_frame_++;
           }
         }
@@ -219,8 +223,8 @@ class DoSubcarrier : public Doer {
       for (size_t j = 0; j < cfg->BsAntNum(); j++) {
         auto* pkt = reinterpret_cast<Packet*>(
             socket_buffer_[j] +
-            (frame_slot * cfg->symbol_num_perframe * cfg->packet_length) +
-            i * cfg->packet_length);
+            (frame_slot * cfg->frame().NumTotalSyms() * cfg->PacketLength()) +
+            i * cfg->PacketLength());
 
         // Subcarrier ranges should be aligned with kTransposeBlockSize
         for (size_t block_idx = sc_range_.start / kTransposeBlockSize;
@@ -334,3 +338,5 @@ class DoSubcarrier : public Doer {
   // Shared status with Decode threads
   DemulStatus* demul_status_;
 };
+
+#endif  // DOSUBCARRIER_H_
