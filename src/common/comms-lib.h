@@ -39,7 +39,7 @@ class CommsLib {
 
   enum ModulationOrder { kQpsk = 2, kQaM16 = 4, kQaM64 = 6 };
 
-  CommsLib(std::string);
+  explicit CommsLib(std::string);
   ~CommsLib();
 
   static std::vector<std::vector<double>> GetSequence(int N, int type);

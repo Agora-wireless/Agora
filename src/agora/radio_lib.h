@@ -22,7 +22,7 @@
 
 class RadioConfig {
  public:
-  RadioConfig(Config* cfg);
+  explicit RadioConfig(Config* cfg);
   bool RadioStart();
   void RadioStop();
   void ReadSensors();

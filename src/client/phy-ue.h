@@ -50,7 +50,7 @@ class PhyUe {
   // thread
   static const int kDequeueBulkSizeTXRX = 8;
 
-  PhyUe(Config* config);
+  explicit PhyUe(Config* config);
   ~PhyUe();
 
   void Start();

@@ -121,7 +121,7 @@ class PtrGrid {
 
   /// Create a grid of pointers where each grid cell points to an array of
   /// [n_entries]
-  PtrGrid(size_t n_entries) { this->Alloc(ROWS, COLS, n_entries); }
+  explicit PtrGrid(size_t n_entries) { this->Alloc(ROWS, COLS, n_entries); }
 
   /// Create a grid of pointers with dimensions [ROWS, COLS], where
   /// only the grid with dimensions [n_rows, n_cols] has cells pointing to an
@@ -200,7 +200,7 @@ class PtrCube {
 
   /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where each
   /// cube cell points to an array of [n_entries]
-  PtrCube(size_t n_entries) { this->Alloc(DIM1, DIM2, DIM3, n_entries); }
+  explicit PtrCube(size_t n_entries) { this->Alloc(DIM1, DIM2, DIM3, n_entries); }
 
   /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where
   /// only the cube with dimensions [dim_1, dim_2, dim_3] has cells

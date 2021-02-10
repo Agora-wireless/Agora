@@ -26,7 +26,7 @@ class DataGenerator {
     kProfile123
   };
 
-  DataGenerator(Config* cfg, uint64_t seed = 0,
+  explicit DataGenerator(Config* cfg, uint64_t seed = 0,
                 Profile profile = Profile::kRandom)
       : cfg_(cfg), profile_(profile) {
     if (seed != 0) {
