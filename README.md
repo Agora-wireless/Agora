@@ -1,4 +1,4 @@
-[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Fagora-ci)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/agora-ci/)
+[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Fpr-readability)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/pr-readability/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
