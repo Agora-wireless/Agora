@@ -175,8 +175,7 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
 
     if (kIsWorkerTimingEnabled) {
       if (prev_frame_id == SIZE_MAX or pkt->frame_id_ > prev_frame_id) {
-        (*frame_start_)[tid][pkt->frame_id_ % kNumStatsFrames] =
-            GetTime::Rdtsc();
+        (*frame_start_)[tid][pkt->frame_id_ % kNumStatsFrames] = Rdtsc();
         prev_frame_id = pkt->frame_id_;
       }
     }
@@ -198,64 +197,64 @@ int PacketTXRX::DequeueSend(int tid) {
   EventData event;
   if (task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event) == false) {
     return -1;
-
-    // std::printf("tx queue length: %d\n", task_queue_->size_approx());
-    assert(event.event_type_ == EventType::kPacketTX);
-
-    size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
-    size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-    size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-
-    size_t data_symbol_idx_dl = this->cfg_->Frame().GetDLSymbolIdx(symbol_id);
-    size_t offset =
-        (this->cfg_->GetTotalDataSymbolIdxDl(frame_id, data_symbol_idx_dl) *
-         this->cfg_->BsAntNum()) +
-        ant_id;
-
-    if (kDebugPrintInTask) {
-      std::printf(
-          "In TX thread %d: Transmitted frame %zu, symbol %zu, "
-          "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-          tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags_[0]).tag_,
-          offset, message_queue_->size_approx());
-    }
-
-    char* cur_buffer_ptr = tx_buffer_ + offset * this->cfg_->DlPacketLength();
-    auto* pkt = (Packet*)cur_buffer_ptr;
-    new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
-
-    struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-    tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
-    struct rte_ether_hdr* eth_hdr =
-        rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
-    eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
-
-    struct rte_ipv4_hdr* ip_h =
-        (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
-    ip_h->src_addr = bs_server_addr;
-    ip_h->dst_addr = bs_rru_addr;
-    ip_h->next_proto_id = IPPROTO_UDP;
-
-    struct rte_udp_hdr* udp_h =
-        (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
-    udp_h->src_port = rte_cpu_to_be_16(this->cfg_->BsServerPort() + tid);
-    udp_h->dst_port = rte_cpu_to_be_16(this->cfg_->BsRruPort() + tid);
-
-    tx_bufs[0]->pkt_len = this->cfg_->DlPacketLength() + kPayloadOffset;
-    tx_bufs[0]->data_len = this->cfg_->DlPacketLength() + kPayloadOffset;
-    char* payload = (char*)eth_hdr + kPayloadOffset;
-    DpdkTransport::fastMemcpy(payload, (char*)pkt,
-                              this->cfg_->DlPacketLength());
-
-    // Send data (one OFDM symbol)
-    size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
-    if (unlikely(nb_tx_new != 1)) {
-      std::printf("rte_eth_tx_burst() failed\n");
-      std::exit(0);
-    }
-    RtAssert(
-        message_queue_->enqueue(
-            *rx_ptoks_[tid], EventData(EventType::kPacketTX, event.tags_[0])),
-        "Socket message enqueue failed\n");
-    return 1;
   }
+
+  // std::printf("tx queue length: %d\n", task_queue_->size_approx());
+  assert(event.event_type_ == EventType::kPacketTX);
+
+  size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+  size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+  size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+
+  size_t data_symbol_idx_dl = this->cfg_->Frame().GetDLSymbolIdx(symbol_id);
+  size_t offset =
+      (this->cfg_->GetTotalDataSymbolIdxDl(frame_id, data_symbol_idx_dl) *
+       this->cfg_->BsAntNum()) +
+      ant_id;
+
+  if (kDebugPrintInTask) {
+    std::printf(
+        "In TX thread %d: Transmitted frame %zu, symbol %zu, "
+        "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+        tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags_[0]).tag_,
+        offset, message_queue_->size_approx());
+  }
+
+  char* cur_buffer_ptr = tx_buffer_ + offset * this->cfg_->DlPacketLength();
+  auto* pkt = (Packet*)cur_buffer_ptr;
+  new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
+
+  struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
+  tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
+  struct rte_ether_hdr* eth_hdr =
+      rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
+  eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
+
+  struct rte_ipv4_hdr* ip_h =
+      (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
+  ip_h->src_addr = bs_server_addr;
+  ip_h->dst_addr = bs_rru_addr;
+  ip_h->next_proto_id = IPPROTO_UDP;
+
+  struct rte_udp_hdr* udp_h =
+      (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
+  udp_h->src_port = rte_cpu_to_be_16(this->cfg_->BsServerPort() + tid);
+  udp_h->dst_port = rte_cpu_to_be_16(this->cfg_->BsRruPort() + tid);
+
+  tx_bufs[0]->pkt_len = this->cfg_->DlPacketLength() + kPayloadOffset;
+  tx_bufs[0]->data_len = this->cfg_->DlPacketLength() + kPayloadOffset;
+  char* payload = (char*)eth_hdr + kPayloadOffset;
+  DpdkTransport::fastMemcpy(payload, (char*)pkt, this->cfg_->DlPacketLength());
+
+  // Send data (one OFDM symbol)
+  size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
+  if (unlikely(nb_tx_new != 1)) {
+    std::printf("rte_eth_tx_burst() failed\n");
+    std::exit(0);
+  }
+  RtAssert(
+      message_queue_->enqueue(*rx_ptoks_[tid],
+                              EventData(EventType::kPacketTX, event.tags_[0])),
+      "Socket message enqueue failed\n");
+  return 1;
+}
