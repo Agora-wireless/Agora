@@ -3,7 +3,7 @@
 #include <armadillo>
 
 #include "config.h"
-#include "gettime.inc"
+#include "gettime.h"
 #include "utils.h"
 
 static constexpr size_t kMaxFrameNum = 10;

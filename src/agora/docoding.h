@@ -13,12 +13,12 @@
 #include <iostream>
 #include <vector>
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
 #include "encoder.h"
-#include "gettime.inc"
+#include "gettime.h"
 #include "iobuffer.h"
 #include "memory_manage.h"
 #include "modulation.h"

@@ -22,7 +22,7 @@
 #include <iostream>
 #include <vector>
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 

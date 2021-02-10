@@ -8,11 +8,11 @@
 #include <armadillo>
 #include <iostream>
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "doer.h"
-#include "gettime.inc"
+#include "gettime.h"
 #include "stats.h"
 #include "symbols.h"
 #include "utils.h"

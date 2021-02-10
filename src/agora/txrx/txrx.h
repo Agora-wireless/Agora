@@ -24,10 +24,10 @@
 #include <numeric>
 #include <vector>
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
-#include "gettime.inc"
+#include "gettime.h"
 #include "net.h"
 #include "radio_lib.h"
 #include "symbols.h"

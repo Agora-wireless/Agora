@@ -6,7 +6,7 @@
 
 #include <utility>
 
-#include "datatype_conversion.inc"
+#include "datatype_conversion.h"
 
 static bool running = true;
 static constexpr bool kPrintChannelOutput = false;

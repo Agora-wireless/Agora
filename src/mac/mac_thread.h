@@ -7,11 +7,11 @@
 
 #include <queue>
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "crc.h"
-#include "gettime.inc"
+#include "gettime.h"
 #include "net.h"
 #include "ran_config.h"
 #include "symbols.h"

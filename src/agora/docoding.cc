@@ -5,7 +5,7 @@
  */
 #include "docoding.h"
 
-#include "concurrent_queue_wrapper.inc"
+#include "concurrent_queue_wrapper.h"
 #include "encoder.h"
 #include "phy_ldpc_decoder_5gnr.h"
 
