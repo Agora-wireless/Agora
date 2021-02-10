@@ -52,7 +52,7 @@ class PacketTXRX {
  public:
   static const int kMaxSocketNum = 10;  // Max number of socket threads allowed
 
-  PacketTXRX(Config* cfg, size_t in_core_offset = 1);
+  explicit PacketTXRX(Config* cfg, size_t in_core_offset = 1);
 
   PacketTXRX(Config* cfg, size_t core_offset,
              moodycamel::ConcurrentQueue<EventData>* queue_message,

@@ -12,7 +12,7 @@ struct ItemT {
   size_t padding_[7];
 
   ItemT(){};
-  ItemT(size_t value) : value_(value) {}
+  explicit ItemT(size_t value) : value_(value) {}
 };
 static_assert(sizeof(ItemT) == 64, "");
 

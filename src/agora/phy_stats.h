@@ -14,7 +14,7 @@
 using namespace arma;
 class PhyStats {
  public:
-  PhyStats(Config* cfg);
+  explicit PhyStats(Config* cfg);
   ~PhyStats();
   void PrintPhyStats();
   void UpdateBitErrors(size_t /*ue_id*/, size_t /*offset*/, uint8_t /*tx_byte*/,

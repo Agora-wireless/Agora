@@ -88,7 +88,7 @@ void MacThread::ProcessSnrReportFromMaster(EventData event) {
   server_.snr_[ue_id].push(snr);
 }
 
-void MacThread::SendRanConfigUpdate(EventData event) {
+void MacThread::SendRanConfigUpdate(EventData  /*event*/) {
   RanConfig rc;
   rc.n_antennas_ = 0;  // TODO [arjun]: What's the correct value here?
   rc.mod_order_bits_ = CommsLib::kQaM16;
@@ -232,7 +232,7 @@ void MacThread::ProcessUdpPacketsFromApps(RBIndicator ri) {
 }
 
 void MacThread::ProcessUdpPacketsFromAppsServer(const MacPacket* pkt,
-                                                RBIndicator ri) {
+                                                RBIndicator  /*ri*/) {
   // We've received bits for the downlink
   const size_t total_symbol_idx =
       cfg_->GetTotalDataSymbolIdxDl(pkt->frame_id_, pkt->symbol_id_);

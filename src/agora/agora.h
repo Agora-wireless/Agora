@@ -41,7 +41,7 @@ class Agora {
 
   static const int kMaxWorkerNum = 50;  // Max number of worker threads allowed
 
-  Agora(
+  explicit Agora(
       Config* /*cfg*/);  /// Create an Agora object and start the worker threads
   ~Agora();
 

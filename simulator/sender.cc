@@ -131,7 +131,7 @@ void Sender::StartTXfromMain(double* in_frame_start, double* in_frame_end) {
                 socket_thread_num_);
 }
 
-size_t Sender::FindNextSymbol(size_t frame, size_t start_symbol) {
+size_t Sender::FindNextSymbol(size_t  /*frame*/, size_t start_symbol) {
   size_t next_symbol_id;
   for (next_symbol_id = start_symbol;
        (next_symbol_id < cfg_->Frame().NumTotalSyms()); next_symbol_id++) {

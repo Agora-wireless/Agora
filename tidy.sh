@@ -29,6 +29,13 @@ function check_readability() {
     -fix
 }
 
+function keychecks_autofix() {
+  echo "Key Checks autofix"
+  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
+    -checks='-*,bugprone-argument-comment, bugprone-bool-pointer-implicit-conversion, bugprone-copy-constructor-init, bugprone-inaccurate-erase, bugprone-macro-parentheses, bugprone-misplaced-operator-in-strlen-in-alloc, bugprone-misplaced-pointer-arithmetic-in-alloc, bugprone-move-forwarding-reference, bugprone-not-null-terminated-result, bugprone-parent-virtual-call, bugprone-posix-return, bugprone-redundant-branch-condition, bugprone-reserved-identifier, bugprone-string-constructor, bugprone-string-integer-assignment, bugprone-suspicious-memset-usage, bugprone-suspicious-semicolon, bugprone-suspicious-string-compare, bugprone-swapped-arguments, bugprone-terminating-continue, bugprone-unused-raii, bugprone-virtual-near-miss, cppcoreguidelines-pro-type-static-cast-downcast, google-explicit-constructor, google-upgrade-googletest-case, misc-definitions-in-headers, misc-redundant-expression, misc-static-assert, misc-uniqueptr-reset-release, misc-unused-alias-decls, misc-unused-parameters, misc-unused-using-decls' \
+    -fix 
+}
+
 #readability with fixes
 #readability-braces-around-statements, readability-const-return-type, readability-container-size-empty, readability-implicit-bool-conversion, readability-inconsistent-declaration-parameter-name, readability-isolate-declaration, readability-make-member-function-const, readability-misplaced-array-index, readability-named-parameter, readability-non-const-parameter, readability-qualified-auto, readability-redundant-access-specifiers, readability-redundant-control-flow, readability-redundant-declaration, readability-redundant-function-ptr-dereference,readability-static-accessed-through-instance
 
@@ -61,10 +68,11 @@ function bugprone_autofix() {
 function cppcore_autofix() {
   echo "Cppcore autofix"
   run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
-    -checks='-*,cppcoreguidelines-pro-type-member-init, cppcoreguidelines-pro-type-static-cast-downcast' \
+    -checks='-*,cppcoreguidelines-pro-type-static-cast-downcast' \
     -fix 
 }
 
+#cppcoreguidelines-pro-type-member-init,
 
 function check_cppcore() {
   my_header_filter="(src|test|microbench|simulator|data).*"
@@ -147,21 +155,18 @@ function performance_autofix() {
 #performance_autofix (move / sqrt function)
 #modernize_autofix
 
-check_readability
-result_naming=$?
-#bugprone_autofix
-#result_bugprone=$?
+#-check_readability
+#-result_naming=$?
+keychecks_autofix
+
+
 #modernize_autofix
 #result_modernize=$?
-#misc_autofix
-#result_misc=$?
-#cppcore_autofix
 #performance_autofix
-#google_autofix
 #check_cppcore
 #result_cppcore=$?
 
-echo "Result: " $result_naming
+#echo "Result: " $result_naming
 #echo "Result: " $result_bugprone
 #echo "Result: " $result_modernize
 #echo "Result: " $result_misc
