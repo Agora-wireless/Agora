@@ -1,8 +1,8 @@
 
-function check_readability() {
+function readability_autofix() {
   echo "Checking code readability standards"
   run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
-    -checks='-*,modernize-deprecated-headers,readability-identifier-naming, readability-braces-around-statements, readability-const-return-type, readability-container-size-empty, readability-implicit-bool-conversion, readability-inconsistent-declaration-parameter-name, readability-isolate-declaration, readability-make-member-function-const, readability-misplaced-array-index, readability-named-parameter, readability-non-const-parameter, readability-qualified-auto, readability-redundant-access-specifiers, readability-redundant-control-flow, readability-redundant-declaration, readability-redundant-function-ptr-dereference,readability-static-accessed-through-instance' \
+    -checks='-*,modernize-deprecated-headers,readability-identifier-naming, readability-braces-around-statements, readability-const-return-type, readability-container-size-empty, readability-implicit-bool-conversion, readability-inconsistent-declaration-parameter-name, readability-isolate-declaration, readability-make-member-function-const, readability-misplaced-array-index, readability-named-parameter, readability-non-const-parameter, readability-qualified-auto, readability-redundant-access-specifiers, readability-redundant-control-flow, readability-redundant-declaration, readability-redundant-function-ptr-dereference,readability-static-accessed-through-instance,readability-redundant-member-init' \
     -config="{CheckOptions: [ {key: readability-identifier-naming.ClassCase, value: CamelCase},
                               {key: readability-identifier-naming.ClassMethodCase, value: CamelCase},
                               {key: readability-identifier-naming.GlobalFunctionCase, value: CamelCase},
@@ -29,21 +29,13 @@ function check_readability() {
     -fix
 }
 
+#readability with fixes
+#readability-braces-around-statements, readability-const-return-type, readability-container-size-empty, readability-implicit-bool-conversion, readability-inconsistent-declaration-parameter-name, readability-isolate-declaration, readability-make-member-function-const, readability-misplaced-array-index, readability-named-parameter, readability-non-const-parameter, readability-qualified-auto, readability-redundant-access-specifiers, readability-redundant-control-flow, readability-redundant-declaration, readability-redundant-function-ptr-dereference,readability-static-accessed-through-instance,readability-redundant-member-init
+
 function keychecks_autofix() {
   echo "Key Checks autofix"
   run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
     -checks='-*,bugprone-argument-comment, bugprone-bool-pointer-implicit-conversion, bugprone-copy-constructor-init, bugprone-inaccurate-erase, bugprone-macro-parentheses, bugprone-misplaced-operator-in-strlen-in-alloc, bugprone-misplaced-pointer-arithmetic-in-alloc, bugprone-move-forwarding-reference, bugprone-not-null-terminated-result, bugprone-parent-virtual-call, bugprone-posix-return, bugprone-redundant-branch-condition, bugprone-reserved-identifier, bugprone-string-constructor, bugprone-string-integer-assignment, bugprone-suspicious-memset-usage, bugprone-suspicious-semicolon, bugprone-suspicious-string-compare, bugprone-swapped-arguments, bugprone-terminating-continue, bugprone-unused-raii, bugprone-virtual-near-miss, cppcoreguidelines-pro-type-static-cast-downcast, google-explicit-constructor, google-upgrade-googletest-case, misc-definitions-in-headers, misc-redundant-expression, misc-static-assert, misc-uniqueptr-reset-release, misc-unused-alias-decls, misc-unused-parameters, misc-unused-using-decls' \
-    -fix 
-}
-
-#readability with fixes
-#readability-braces-around-statements, readability-const-return-type, readability-container-size-empty, readability-implicit-bool-conversion, readability-inconsistent-declaration-parameter-name, readability-isolate-declaration, readability-make-member-function-const, readability-misplaced-array-index, readability-named-parameter, readability-non-const-parameter, readability-qualified-auto, readability-redundant-access-specifiers, readability-redundant-control-flow, readability-redundant-declaration, readability-redundant-function-ptr-dereference,readability-static-accessed-through-instance
-
-function readability_autofix() {
-  echo "Readability checks with autofix"
-  run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
-    -checks='-*,readability-braces-around-statements, readability-const-return-type, readability-container-size-empty, readability-implicit-bool-conversion, readability-inconsistent-declaration-parameter-name, readability-isolate-declaration, readability-make-member-function-const, readability-misplaced-array-index, readability-named-parameter, readability-non-const-parameter, readability-qualified-auto, readability-redundant-access-specifiers, readability-redundant-control-flow, readability-redundant-declaration, readability-redundant-function-ptr-dereference,readability-static-accessed-through-instance
-' \
     -fix 
 }
 
@@ -72,20 +64,7 @@ function cppcore_autofix() {
     -fix 
 }
 
-#cppcoreguidelines-pro-type-member-init,
-
-function check_cppcore() {
-  my_header_filter="(src|test|microbench|simulator|data).*"
-  my_checks="-*,cppcoreguidelines-pro-type-member-init, cppcoreguidelines-pro-type-static-cast-downcast"
-  #tidy_params="-header-filter=\"${my_header_filter}\" -checks='${my_checks}'"
-  tidy_params="-checks='${my_checks}'"
-
-  echo "Cppcore code check" ${tidy_params}
-  run-clang-tidy-11.py ${tidy_params}
-  #run-clang-tidy-11.py -checks='-*,cppcoreguidelines-pro-type-member-init, cppcoreguidelines-pro-type-static-cast-downcast'
-}
-
-#-config="{Checks: '$my_checks'}, {WarningsAsErrors: '*'}, {HeaderFilterRegex1: '(src|test|microbench|simulator|data).*'}"
+#Removed cppcoreguidelines-pro-type-member-init,
 
 #cppcore with fixed (cppcoreguidelines-pro-type-member-init)
 #cppcoreguidelines-init-variables, cppcoreguidelines-pro-bounds-constant-array-index, cppcoreguidelines-pro-type-cstyle-cast, cppcoreguidelines-pro-type-member-init, cppcoreguidelines-pro-type-static-cast-downcast
@@ -114,12 +93,12 @@ function misc_autofix() {
 function modernize_autofix() {
   echo "Modernize checks with autofix"
   run-clang-tidy-11.py -header-filter="(src|test|microbench|simulator|data).*" \
-    -checks='-*,modernize-avoid-bind, modernize-concat-nested-namespaces, modernize-deprecated-headers, modernize-deprecated-ios-base-aliases,modernize-loop-convert,modernize-make-shared,modernize-make-unique,modernize-pass-by-value,modernize-raw-string-literal,modernize-redundant-void-arg,modernize-replace-auto-ptr,modernize-replace-disallow-copy-and-assign-macro,modernize-replace-random-shuffle,modernize-return-braced-init-list,modernize-shrink-to-fit,modernize-unary-static-assert,modernize-use-auto,modernize-use-bool-literals,modernize-use-default-member-init,modernize-use-emplace,modernize-use-equals-default,modernize-use-equals-delete,modernize-use-noexcept,modernize-use-nullptr,modernize-use-override,modernize-use-transparent-functors,modernize-use-uncaught-exceptions,modernize-use-using' \
+    -checks='-*,modernize-avoid-bind, modernize-concat-nested-namespaces, modernize-deprecated-headers, modernize-deprecated-ios-base-aliases,modernize-loop-convert,modernize-make-shared,modernize-make-unique,modernize-pass-by-value,modernize-raw-string-literal,modernize-redundant-void-arg,modernize-replace-auto-ptr,modernize-replace-disallow-copy-and-assign-macro,modernize-replace-random-shuffle,modernize-return-braced-init-list,modernize-shrink-to-fit,modernize-unary-static-assert,modernize-use-bool-literals,modernize-use-default-member-init,modernize-use-emplace,modernize-use-equals-default,modernize-use-equals-delete,modernize-use-noexcept,modernize-use-nullptr,modernize-use-override,modernize-use-transparent-functors,modernize-use-uncaught-exceptions,modernize-use-using' \
     -fix 
 }
 
 #modernize with fixes
-#removed modernize-use-trailing-return-type modernize-use-nodiscard
+#removed modernize-use-trailing-return-type modernize-use-nodiscard  modernize-use-auto
 #modernize-avoid-bind, modernize-concat-nested-namespaces, modernize-deprecated-headers, modernize-deprecated-ios-base-aliases,modernize-loop-convert,modernize-make-shared,modernize-make-unique,modernize-pass-by-value,modernize-raw-string-literal,modernize-redundant-void-arg,modernize-replace-auto-ptr,modernize-replace-disallow-copy-and-assign-macro,modernize-replace-random-shuffle,modernize-return-braced-init-list,modernize-shrink-to-fit,modernize-unary-static-assert,modernize-use-auto,modernize-use-bool-literals,modernize-use-default-member-init,modernize-use-emplace,modernize-use-equals-default,modernize-use-equals-delete,modernize-use-nodiscard,modernize-use-noexcept,modernize-use-nullptr,modernize-use-override,modernize-use-trailing-return-type,modernize-use-transparent-functors,modernize-use-uncaught-exceptions,modernize-use-using
 
 function performance_autofix() {
@@ -155,18 +134,15 @@ function performance_autofix() {
 #performance_autofix (move / sqrt function)
 #modernize_autofix
 
-#-check_readability
-#-result_naming=$?
+#readability_autofix
+#result_naming=$?
+
 keychecks_autofix
+modernize_autofix
+performance_autofix
 
 
-#modernize_autofix
-#result_modernize=$?
-#performance_autofix
-#check_cppcore
-#result_cppcore=$?
-
-#echo "Result: " $result_naming
+echo "Result: " $result_naming
 #echo "Result: " $result_bugprone
 #echo "Result: " $result_modernize
 #echo "Result: " $result_misc

@@ -38,9 +38,9 @@
 #include "signal_handler.h"
 #include "txrx_client.h"
 
-typedef std::vector<complex_float,
-                    boost::alignment::aligned_allocator<complex_float, 64>>
-    myVec;
+using myVec =
+    std::vector<complex_float,
+                boost::alignment::aligned_allocator<complex_float, 64>>;
 
 using namespace arma;
 
@@ -154,7 +154,7 @@ class PhyUe {
                     moodycamel::ConcurrentQueue<EventData>* in_queue,
                     moodycamel::ProducerToken const& ptok);
 
-  void InitializeVarsFromCfg(void);
+  void InitializeVarsFromCfg();
 
  private:
   Config* config_;

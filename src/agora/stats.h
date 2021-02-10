@@ -57,7 +57,7 @@ static constexpr size_t kNumTimestampTypes =
 class Stats {
  public:
   explicit Stats(Config* cfg);
-  ~Stats();
+  ~Stats() = default;
 
   /// If worker stats collection is enabled, combine and update per-worker
   /// stats for all uplink Doer types. Else return immediately.

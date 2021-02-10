@@ -1,5 +1,7 @@
 #include "channel_sim.h"
 
+#include <utility>
+
 #include "datatype_conversion.inc"
 
 static bool running = true;
@@ -39,10 +41,10 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
       user_socket_num_(config_ue->UeAntNum()),
       worker_thread_num_(worker_thread_num),
       core_offset_(in_core_offset),
-      channel_type_(in_chan_type),
+      channel_type_(std::move(in_chan_type)),
       channel_snr_(in_chan_snr) {
   // initialize parameters from config
-  srand(time(NULL));
+  srand(time(nullptr));
   dl_data_plus_beacon_symbols_ =
       bscfg_->Frame().NumDLSyms() + 1;  // plus beacon
   ul_data_plus_pilot_symbols_ =
@@ -107,7 +109,7 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     auto* context = new EventHandlerContext<ChannelSim>;
     context->obj_ptr_ = this;
     context->id_ = i;
-    if (pthread_create(&task_threads_[i], NULL,
+    if (pthread_create(&task_threads_[i], nullptr,
                        PthreadFunWrapper<ChannelSim, &ChannelSim::TaskThread>,
                        context) != 0) {
       perror("task thread create failed");
@@ -150,7 +152,7 @@ void ChannelSim::Start() {
     bs_context->id_ = i;
 
     int ret = pthread_create(
-        &recv_thread_bs, NULL,
+        &recv_thread_bs, nullptr,
         PthreadFunWrapper<ChannelSim, &ChannelSim::BsRxLoop>, bs_context);
     RtAssert(ret == 0, "Failed to create BS recv thread!");
   }
@@ -163,7 +165,7 @@ void ChannelSim::Start() {
     ue_context->id_ = i;
 
     int ret = pthread_create(
-        &recv_thread_ue, NULL,
+        &recv_thread_ue, nullptr,
         PthreadFunWrapper<ChannelSim, &ChannelSim::UeRxLoop>, ue_context);
     RtAssert(ret == 0, "Failed to create UE recv thread!");
   }
@@ -289,7 +291,7 @@ void* ChannelSim::TaskThread(int tid) {
       DoTxUser(tid, event.tags_[0]);
     }
   }
-  return 0;
+  return nullptr;
 }
 
 void* ChannelSim::BsRxLoop(int tid) {
@@ -354,7 +356,7 @@ void* ChannelSim::BsRxLoop(int tid) {
       socket_id = socket_lo;
     }
   }
-  return 0;
+  return nullptr;
 }
 
 void* ChannelSim::UeRxLoop(int tid) {
@@ -427,7 +429,7 @@ void* ChannelSim::UeRxLoop(int tid) {
       socket_id = socket_lo;
     }
   }
-  return 0;
+  return nullptr;
 }
 
 void ChannelSim::DoTxBs(int tid, size_t tag) {

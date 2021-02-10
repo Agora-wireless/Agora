@@ -28,12 +28,12 @@ void* PaddedAlignedAlloc(Alignment_t alignment, size_t size);
 template <typename T>
 class Table {
  private:
-  size_t dim2_;
-  size_t dim1_;
+  size_t dim2_{0};
+  size_t dim1_{0};
   T* data_;
 
  public:
-  Table(void) : dim2_(0), dim1_(0), data_(nullptr) {}
+  Table() : data_(nullptr) {}
 
   void Malloc(size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment) {
     this->dim2_ = dim2;
@@ -79,9 +79,9 @@ class Table {
     }
   }
 
-  bool IsAllocated(void) { return (this->data_ != nullptr); }
+  bool IsAllocated() { return (this->data_ != nullptr); }
 
-  void Free(void) {
+  void Free() {
     if (this->data_ != nullptr) {
       std::free(this->data_);
     }
@@ -117,7 +117,7 @@ static void FreeBuffer1d(T** buffer) {
 template <size_t ROWS, size_t COLS, class T>
 class PtrGrid {
  public:
-  PtrGrid(void) : backing_buf_(nullptr) {}
+  PtrGrid() : backing_buf_(nullptr) {}
 
   /// Create a grid of pointers where each grid cell points to an array of
   /// [n_entries]
@@ -132,7 +132,7 @@ class PtrGrid {
     this->Alloc(n_rows, n_cols, n_entries);
   }
 
-  ~PtrGrid(void) {
+  ~PtrGrid() {
     if (this->backing_buf_ != nullptr) {
       std::free(this->backing_buf_);
       this->backing_buf_ = nullptr;
@@ -196,11 +196,13 @@ class PtrGrid {
 template <size_t DIM1, size_t DIM2, size_t DIM3, class T>
 class PtrCube {
  public:
-  PtrCube(void) : backing_buf_(nullptr) {}
+  PtrCube() : backing_buf_(nullptr) {}
 
   /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where each
   /// cube cell points to an array of [n_entries]
-  explicit PtrCube(size_t n_entries) { this->Alloc(DIM1, DIM2, DIM3, n_entries); }
+  explicit PtrCube(size_t n_entries) {
+    this->Alloc(DIM1, DIM2, DIM3, n_entries);
+  }
 
   /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where
   /// only the cube with dimensions [dim_1, dim_2, dim_3] has cells
@@ -211,7 +213,7 @@ class PtrCube {
     this->Alloc(dim_1, dim_2, dim_3, n_entries);
   }
 
-  ~PtrCube(void) {
+  ~PtrCube() {
     if (this->backing_buf_ != nullptr) {
       std::free(this->backing_buf_);
       this->backing_buf_ = nullptr;

@@ -19,8 +19,6 @@ Stats::Stats(Config* cfg)
                       Agora_memory::Alignment_t::kAlign64);
 }
 
-Stats::~Stats() {}
-
 void Stats::PopulateSummary(FrameSummary* frame_summary, size_t thread_id,
                             DoerType doer_type) {
   DurationStat* ds = GetDurationStat(doer_type, thread_id);

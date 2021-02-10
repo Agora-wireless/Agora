@@ -31,7 +31,7 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg) : cfg_(cfg) {
     context->tid_ = i;
 #ifdef THREADED_INIT
     pthread_t init_thread;
-    if (pthread_create(&init_thread, NULL, InitClientRadioLaunch, context) !=
+    if (pthread_create(&init_thread, nullptr, InitClientRadioLaunch, context) !=
         0) {
       perror("init thread create failed");
       std::exit(0);
@@ -129,7 +129,7 @@ ClientRadioConfig::ClientRadioConfig(Config* cfg) : cfg_(cfg) {
 void* ClientRadioConfig::InitClientRadioLaunch(void* in_context) {
   auto* context = (ClientRadioConfigContext*)in_context;
   context->ptr_->InitClientRadio(context);
-  return 0;
+  return nullptr;
 }
 
 void ClientRadioConfig::InitClientRadio(ClientRadioConfigContext* in_context) {
@@ -316,8 +316,7 @@ bool ClientRadioConfig::RadioStart() {
       cl_stn_[i]->activateStream(this->tx_streams_[i]);
 
       std::string corr_conf_string =
-          "{\"corr_enabled\":true,\"corr_threshold\":" + std::to_string(1) +
-          "}";
+          R"({"corr_enabled":true,"corr_threshold":)" + std::to_string(1) + "}";
       cl_stn_[i]->writeSetting("CORR_CONFIG", corr_conf_string);
       cl_stn_[i]->writeRegisters("CORR_COE", 0, cfg_->Coeffs());
 

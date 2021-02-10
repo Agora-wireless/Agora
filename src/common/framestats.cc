@@ -12,7 +12,7 @@
 #include <utility>
 
 FrameStats::FrameStats(std::string new_frame_id)
-    : frame_identifier_(new_frame_id),
+    : frame_identifier_(std::move(new_frame_id)),
       client_ul_pilot_symbols_(0),
       client_dl_pilot_symbols_(0) {
   for (size_t i = 0; i < frame_identifier_.length(); i++) {
@@ -61,7 +61,7 @@ FrameStats::FrameStats(std::string new_frame_id)
 }
 
 FrameStats::FrameStats(std::string new_frame_id, size_t ul, size_t dl)
-    : FrameStats(new_frame_id) {
+    : FrameStats(std::move(new_frame_id)) {
   this->SetClientPilotSyms(ul, dl);
 }
 

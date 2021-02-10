@@ -16,7 +16,7 @@ inline __m256i CycleBitShift72to128(__m256i data, int16_t cyc_shift,
 inline __m256i CycleBitShift144to256(__m256i data, int16_t cyc_shift,
                                      int16_t zc);
 
-typedef __m256i (*CYCLIC_BIT_SHIFT)(__m256i, int16_t, int16_t);
+using CYCLIC_BIT_SHIFT = __m256i (*)(__m256i, int16_t, int16_t);
 CYCLIC_BIT_SHIFT LdpcSelectShiftFunc(int16_t zcSize);
 }  // namespace avx2enc
 

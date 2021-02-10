@@ -27,7 +27,7 @@ class DoFFT : public Doer {
         Table<complex_float>& calib_dl_buffer,
         Table<complex_float>& calib_ul_buffer, PhyStats* in_phy_stats,
         Stats* stats_manager);
-  ~DoFFT();
+  ~DoFFT() override;
 
   /**
    * Do FFT task for one OFDM symbol
@@ -61,7 +61,7 @@ class DoFFT : public Doer {
    *     4. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  EventData Launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
   /**
    * Fill-in the partial transpose of the computed FFT for this antenna into
@@ -119,7 +119,7 @@ class DoIFFT : public Doer {
  public:
   DoIFFT(Config* in_config, int in_tid, Table<complex_float>& in_dl_ifft_buffer,
          char* in_dl_socket_buffer, Stats* in_stats_manager);
-  ~DoIFFT();
+  ~DoIFFT() override;
 
   /**
    * Do modulation and ifft tasks for one OFDM symbol
@@ -144,7 +144,7 @@ class DoIFFT : public Doer {
    *     2. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  EventData Launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
  private:
   Table<complex_float>& dl_ifft_buffer_;

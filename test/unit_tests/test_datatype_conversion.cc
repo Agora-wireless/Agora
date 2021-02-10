@@ -30,8 +30,8 @@ TEST(Modulation, adapt_bits_for_mod_one) {
     std::printf("%s ", std::bitset<8>(input[i]).to_string().c_str());
   }
   std::printf("\noutput (%zu B): ", output.size());
-  for (size_t i = 0; i < output.size(); i++) {
-    std::printf("%s ", std::bitset<8>(output[i]).to_string().c_str());
+  for (unsigned char i : output) {
+    std::printf("%s ", std::bitset<8>(i).to_string().c_str());
   }
 
   std::vector<uint8_t> regen_input(kInputBytes);

@@ -27,7 +27,7 @@ class DoDemul : public Doer {
           Table<complex_float>& equal_buffer,
           PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
           PhyStats* in_phy_stats, Stats* in_stats_manager);
-  ~DoDemul();
+  ~DoDemul() override;
 
   /**
    * Do demodulation task for a block of subcarriers (demul_block_size)
@@ -55,7 +55,7 @@ class DoDemul : public Doer {
    *     4. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  EventData Launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
  private:
   Table<complex_float>& data_buffer_;

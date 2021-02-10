@@ -42,7 +42,8 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
     context->tid_ = i;
 #ifdef THREADED_INIT
     pthread_t init_thread;
-    if (pthread_create(&init_thread, NULL, InitBsRadioLaunch, context) != 0) {
+    if (pthread_create(&init_thread, nullptr, InitBsRadioLaunch, context) !=
+        0) {
       perror("init thread create failed");
       std::exit(0);
     }
@@ -81,7 +82,7 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
     context->tid_ = i;
 #ifdef THREADED_INIT
     pthread_t configure_thread;
-    if (pthread_create(&configure_thread, NULL,
+    if (pthread_create(&configure_thread, nullptr,
                        RadioConfig::ConfigureBsRadioLaunch, context) != 0) {
       perror("init thread create failed");
       std::exit(0);
@@ -185,7 +186,7 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
 void* RadioConfig::InitBsRadioLaunch(void* in_context) {
   auto* context = (RadioConfigContext*)in_context;
   context->brs_->InitBsRadio(context);
-  return 0;
+  return nullptr;
 }
 
 void RadioConfig::InitBsRadio(RadioConfigContext* context) {
@@ -217,7 +218,7 @@ void* RadioConfig::ConfigureBsRadioLaunch(void* in_context) {
   RadioConfigContext* context = ((RadioConfigContext*)in_context);
   RadioConfig* brs = context->brs_;
   brs->ConfigureBsRadio(context);
-  return 0;
+  return nullptr;
 }
 
 void RadioConfig::ConfigureBsRadio(RadioConfigContext* context) {

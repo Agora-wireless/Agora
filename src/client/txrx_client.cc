@@ -16,7 +16,7 @@ RadioTxRx::RadioTxRx(Config* cfg, int n_threads, int in_core_id)
   }
 
   /* initialize random seed: */
-  srand(time(NULL));
+  srand(time(nullptr));
 }
 
 RadioTxRx::RadioTxRx(Config* config, int n_threads, int in_core_id,
@@ -70,7 +70,7 @@ bool RadioTxRx::StartTxRx(Table<char>& in_buffer, Table<int>& in_buffer_status,
     // start socket thread
     if (kUseArgos && config_->HwFramer()) {
       if (pthread_create(
-              &txrx_thread, NULL,
+              &txrx_thread, nullptr,
               PthreadFunWrapper<RadioTxRx, &RadioTxRx::LoopTxRxArgos>,
               context) != 0) {
         perror("socket thread create failed");
@@ -78,14 +78,14 @@ bool RadioTxRx::StartTxRx(Table<char>& in_buffer, Table<int>& in_buffer_status,
       }
     } else if (kUseArgos || kUseUHD) {
       if (pthread_create(
-              &txrx_thread, NULL,
+              &txrx_thread, nullptr,
               PthreadFunWrapper<RadioTxRx, &RadioTxRx::LoopTxRxArgosSync>,
               context) != 0) {
         perror("socket thread create failed");
         std::exit(0);
       }
     } else {
-      if (pthread_create(&txrx_thread, NULL,
+      if (pthread_create(&txrx_thread, nullptr,
                          PthreadFunWrapper<RadioTxRx, &RadioTxRx::LoopTxRx>,
                          context) != 0) {
         perror("socket thread create failed");
@@ -112,7 +112,7 @@ struct Packet* RadioTxRx::RecvEnqueue(int tid, int radio_id, int rx_offset) {
     std::printf("Receive thread %d rx_buffer full, offset: %d\n", tid,
                 rx_offset);
     config_->Running(false);
-    return (NULL);
+    return (nullptr);
   }
   struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
   if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
@@ -120,7 +120,7 @@ struct Packet* RadioTxRx::RecvEnqueue(int tid, int radio_id, int rx_offset) {
       perror("recv failed");
       std::exit(0);
     }
-    return (NULL);
+    return (nullptr);
   }
 
   // get the position in rx_buffer
@@ -241,7 +241,7 @@ void* RadioTxRx::LoopTxRx(int tid) {
     }
     // receive data
     struct Packet* pkt = RecvEnqueue(tid, radio_id, rx_offset);
-    if (pkt == NULL) {
+    if (pkt == nullptr) {
       continue;
     }
     rx_offset = (rx_offset + 1) % buffer_frame_num_;
@@ -250,7 +250,7 @@ void* RadioTxRx::LoopTxRx(int tid) {
       radio_id = radio_lo;
     }
   }
-  return 0;
+  return nullptr;
 }
 
 // dequeue_send_sdr
@@ -352,7 +352,7 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(int tid, size_t radio_id,
   if (rx_buffer_status[rx_offset] == 1) {
     std::printf("RX thread %d at rx_offset %zu buffer full\n", tid, rx_offset);
     c->Running(false);
-    return NULL;
+    return nullptr;
   }
 
   long long rx_time(0);
@@ -372,7 +372,7 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(int tid, size_t radio_id,
   if (r < 0) {
     std::cerr << "Receive error! Stopping... " << std::endl;
     c->Running(false);
-    return NULL;
+    return nullptr;
   }
   if (c->HwFramer()) {
     frame_id = (size_t)(rx_time >> 32);
@@ -454,7 +454,7 @@ void* RadioTxRx::LoopTxRxArgos(int tid) {
 
     struct Packet* pkt =
         RecvEnqueueArgos(tid, radio_id, frame_id, symbol_id, rx_offset);
-    if (pkt == NULL) {
+    if (pkt == nullptr) {
       continue;
     }
 
@@ -464,7 +464,7 @@ void* RadioTxRx::LoopTxRxArgos(int tid) {
       radio_id = radio_lo;
     }
   }
-  return 0;
+  return nullptr;
 }
 
 void* RadioTxRx::LoopTxRxArgosSync(int tid) {
@@ -580,9 +580,10 @@ void* RadioTxRx::LoopTxRxArgosSync(int tid) {
     if (resync) {
       // convert data to complex float for sync detection
       std::vector<std::complex<float>> sync_buff;
+      sync_buff.reserve(num_samps);
       for (int i = 0; i < num_samps; i++) {
-        sync_buff.push_back(std::complex<float>(frm_buff0[i].real() / 32768.0,
-                                                frm_buff0[i].imag() / 32768.0));
+        sync_buff.emplace_back(frm_buff0[i].real() / 32768.0,
+                               frm_buff0[i].imag() / 32768.0);
       }
       sync_index = CommsLib::FindBeaconAvx(sync_buff, c->GoldCf32());
       if (sync_index >= 0) {
@@ -637,7 +638,7 @@ void* RadioTxRx::LoopTxRxArgosSync(int tid) {
       } else {
         struct Packet* pkt =
             RecvEnqueueArgos(tid, radio_id, frame_id, symbol_id, cursor);
-        if (pkt == NULL) {
+        if (pkt == nullptr) {
           break;
         }
 
@@ -647,5 +648,5 @@ void* RadioTxRx::LoopTxRxArgosSync(int tid) {
     }
     frame_id++;
   }
-  return 0;
+  return nullptr;
 }
