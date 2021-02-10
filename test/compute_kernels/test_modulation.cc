@@ -1,4 +1,4 @@
-#include "buffer.inc"
+#include "buffer.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.h"

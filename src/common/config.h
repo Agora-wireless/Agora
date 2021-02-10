@@ -13,7 +13,7 @@
 #ifdef JSON
 #include <nlohmann/json.hpp>
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "comms-lib.h"
 #include "gettime.h"
 #include "memory_manage.h"
