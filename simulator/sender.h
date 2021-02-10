@@ -1,5 +1,9 @@
-#ifndef SENDER
-#define SENDER
+/**
+ * @file sender.h
+ * @brief Declaration file for the sender class
+ */
+#ifndef SENDER_H_
+#define SENDER_H_
 
 #include <arpa/inet.h>
 #include <emmintrin.h>
@@ -148,4 +152,4 @@ class Sender {
 #endif
 };
 
-#endif
+#endif  // SENDER_H_

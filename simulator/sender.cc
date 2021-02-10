@@ -1,3 +1,7 @@
+/**
+ * @file sender.cc
+ * @brief Implementation file for the sender class
+ */
 #include "sender.h"
 
 #include <thread>
@@ -410,13 +414,13 @@ void Sender::InitIqFromFile(const std::string& filename) {
                        (cfg_->CpLen() + cfg_->OfdmCaNum()) * 2,
                        Agora_memory::Alignment_t::kAlign64);
 
-  FILE* fp = fopen(filename.c_str(), "rb");
+  FILE* fp = std::fopen(filename.c_str(), "rb");
   RtAssert(fp != nullptr, "Failed to open IQ data file");
 
   for (size_t i = 0; i < packets_per_frame; i++) {
     const size_t expected_count = (cfg_->CpLen() + cfg_->OfdmCaNum()) * 2;
     const size_t actual_count =
-        fread(iq_data_float[i], sizeof(float), expected_count, fp);
+        std::fread(iq_data_float[i], sizeof(float), expected_count, fp);
     if (expected_count != actual_count) {
       std::fprintf(
           stderr,
@@ -437,7 +441,7 @@ void Sender::InitIqFromFile(const std::string& filename) {
       }
     }
   }
-  fclose(fp);
+  std::fclose(fp);
   iq_data_float.Free();
 }
 
@@ -457,7 +461,7 @@ void Sender::WriteStatsToFile(size_t tx_frame_count) const {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = cur_directory + "/data/tx_result.txt";
   std::printf("Printing sender results to file \"%s\"...\n", filename.c_str());
-  FILE* fp_debug = fopen(filename.c_str(), "w");
+  FILE* fp_debug = std::fopen(filename.c_str(), "w");
   RtAssert(fp_debug != nullptr, "Failed to open stats file");
   for (size_t i = 0; i < tx_frame_count; i++) {
     std::fprintf(fp_debug, "%.5f\n", frame_end_[i % kNumStatsFrames]);
@@ -466,8 +470,8 @@ void Sender::WriteStatsToFile(size_t tx_frame_count) const {
 
 void Sender::RunFft(Packet* pkt, complex_float* fft_inout,
                     DFTI_DESCRIPTOR_HANDLE mkl_handle) const {
-  // pkt->data has (CP_LEN + OFDM_CA_NUM) unsigned short samples. After FFT,
-  // we'll remove the cyclic prefix and have OFDM_CA_NUM short samples left.
+  // pkt->data has (cp_len + ofdm_ca_num) unsigned short samples. After FFT,
+  // we'll remove the cyclic prefix and have ofdm_ca_num() short samples left.
   SimdConvertShortToFloat(&pkt->data_[2 * cfg_->CpLen()],
                           reinterpret_cast<float*>(fft_inout),
                           cfg_->OfdmCaNum() * 2);

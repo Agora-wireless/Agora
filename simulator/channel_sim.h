@@ -1,5 +1,9 @@
-#ifndef SIMULATOR_HEADER
-#define SIMULATOR_HEADER
+/**
+ * @file channel_sim.h
+ * @brief Declaration file for the channel simulator class
+ */
+#ifndef CHANNEL_SIM_H_
+#define CHANNEL_SIM_H_
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -123,4 +127,4 @@ class ChannelSim {
   }
 };
 
-#endif
+#endif  // CHANNEL_SIM_H_

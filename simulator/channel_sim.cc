@@ -1,3 +1,7 @@
+/**
+ * @file channel_sim.cc
+ * @brief Implementation file for the channel simulator class
+ */
 #include "channel_sim.h"
 
 #include <utility>

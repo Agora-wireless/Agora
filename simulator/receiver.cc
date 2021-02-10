@@ -1,3 +1,7 @@
+/**
+ * @file receiver.cc
+ * @brief Implementation file for the receiver class
+ */
 #include "receiver.h"
 
 Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset)

@@ -1,5 +1,9 @@
-#ifndef SIMULATOR_HEAD
-#define SIMULATOR_HEAD
+/**
+ * @file simulator.h
+ * @brief Declaration file for the simulator class
+ */
+#ifndef SIMULATOR_H_
+#define SIMULATOR_H_
 
 #include <emmintrin.h>
 #include <fcntl.h>
@@ -62,7 +66,8 @@ class Simulator {
   void FreeUplinkBuffers();
 
  private:
-  size_t bs_ant_num_, ue_num_;
+  size_t bs_ant_num_;
+  size_t ue_num_;
   size_t ofdm_ca_num_;
   size_t ofdm_data_num_;
   size_t symbol_num_perframe_, data_symbol_num_perframe_;
@@ -134,4 +139,4 @@ class Simulator {
   double* frame_end_tx_;
 };
 
-#endif
+#endif  // SIMULATOR_H_

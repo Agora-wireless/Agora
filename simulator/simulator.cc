@@ -1,3 +1,7 @@
+/**
+ * @file simulator.cc
+ * @brief Implementation file for the simulator class
+ */
 #include "simulator.h"
 
 #include <memory>
@@ -243,8 +247,6 @@ void Simulator::InitializeUplinkBuffers() {
 }
 
 void Simulator::FreeUplinkBuffers() {
-  // free_buffer_1d(&pilots_);
-
   socket_buffer_.Free();
   socket_buffer_status_.Free();
 

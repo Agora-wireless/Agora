@@ -162,8 +162,7 @@ struct EventData {
   size_t tags_[7];
 
   // Initialize and event with only the event type field set
-  explicit EventData(EventType event_type)
-      : event_type_(event_type) {}
+  explicit EventData(EventType event_type) : event_type_(event_type) {}
 
   // Create an event with one tag
   EventData(EventType event_type, size_t tag)
