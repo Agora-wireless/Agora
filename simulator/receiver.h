@@ -1,5 +1,9 @@
-#ifndef RECEIVER
-#define RECEIVER
+/**
+ * @file receiver.h
+ * @brief Declaration file for the receiver class
+ */
+#ifndef RECEIVER_H_
+#define RECEIVER_H_
 
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -87,4 +91,4 @@ class Receiver {
   // int radios_per_thread;
 };
 
-#endif
+#endif  // RECEIVER_H_

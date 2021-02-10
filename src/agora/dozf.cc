@@ -257,7 +257,7 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
   if (kDebugPrintInTask) {
     std::printf(
         "In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
-        "BS_ANT_NUM: %zu\n",
+        "Basestation ant number: %zu\n",
         tid_, frame_id, base_sc_id, base_sc_id / cfg_->UeNum(),
         cfg_->BsAntNum());
   }
@@ -289,9 +289,9 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
     arma::cx_fmat calib_dl_mat(
         reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_cal_slot]),
         cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-    arma::cx_fvec calib_ul_mat(
+    arma::cx_fmat calib_ul_mat(
         reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_cal_slot]),
-        cfg_->OfdmDataNum(), cfg_->BfAntNum() != 0u, false);
+        cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
 
     arma::cx_fmat calib_dl_mat_prev(reinterpret_cast<arma::cx_float*>(
                                         calib_dl_buffer_[frame_cal_slot_prev]),

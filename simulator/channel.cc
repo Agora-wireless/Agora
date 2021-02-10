@@ -1,3 +1,7 @@
+/**
+ * @file channel.h
+ * @brief Implementation file for the channel class
+ */
 #include "channel.h"
 
 #include <utility>
