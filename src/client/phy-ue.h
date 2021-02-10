@@ -25,12 +25,12 @@
 #include <system_error>
 #include <tuple>
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "comms-lib.h"
-#include "concurrent_queue_wrapper.inc"
+#include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
 #include "config.h"
-#include "datatype_conversion.inc"
+#include "datatype_conversion.h"
 #include "mac_thread.h"
 #include "mkl_dfti.h"
 #include "modulation.h"

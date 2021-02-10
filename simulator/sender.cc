@@ -6,7 +6,7 @@
 
 #include <thread>
 
-#include "datatype_conversion.inc"
+#include "datatype_conversion.h"
 #include "udp_client.h"
 
 bool keep_running = true;

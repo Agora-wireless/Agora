@@ -20,10 +20,10 @@
 #include <nlohmann/json.hpp>
 #include <vector>
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "comms-lib.h"
 #include "framestats.h"
-#include "gettime.inc"
+#include "gettime.h"
 #include "ldpc_config.inc"
 #include "memory_manage.h"
 #include "modulation.h"

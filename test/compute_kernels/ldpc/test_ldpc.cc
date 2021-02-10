@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "encoder.h"
-#include "gettime.inc"
+#include "gettime.h"
 #include "memory_manage.h"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "symbols.h"

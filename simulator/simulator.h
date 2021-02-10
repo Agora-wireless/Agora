@@ -19,10 +19,10 @@
 #include <tuple>
 #include <vector>
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
-#include "gettime.inc"
+#include "gettime.h"
 #include "memory_manage.h"
 #include "receiver.h"
 #include "sender.h"

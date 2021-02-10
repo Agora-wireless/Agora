@@ -2,8 +2,8 @@
  * @file test_modulation.cc
  * @brief Testing functions for benchmarking modulation routines
  */
-#include "buffer.inc"
-#include "gettime.inc"
+#include "buffer.h"
+#include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.h"
 #include "utils.h"

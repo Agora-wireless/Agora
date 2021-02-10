@@ -11,7 +11,7 @@
 
 #include <boost/range/algorithm/count.hpp>
 
-#include "logger.inc"
+#include "logger.h"
 #include "utils_ldpc.h"
 
 Config::Config(const std::string& jsonfile)

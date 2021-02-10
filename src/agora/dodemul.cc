@@ -4,7 +4,7 @@
  */
 #include "dodemul.h"
 
-#include "concurrent_queue_wrapper.inc"
+#include "concurrent_queue_wrapper.h"
 
 static constexpr bool kUseSIMDGather = true;
 

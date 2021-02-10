@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "config.h"
-#include "logger.inc"
+#include "logger.h"
 #include "symbols.h"
 #include "utils.h"
 

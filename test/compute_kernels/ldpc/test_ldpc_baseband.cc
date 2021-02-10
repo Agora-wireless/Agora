@@ -17,7 +17,7 @@
 #include "comms-lib.h"
 #include "config.h"
 #include "data_generator.h"
-#include "gettime.inc"
+#include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.h"
 #include "phy_ldpc_decoder_5gnr.h"

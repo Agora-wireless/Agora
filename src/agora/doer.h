@@ -6,10 +6,10 @@
 #ifndef DOER_H_
 #define DOER_H_
 
-#include "buffer.inc"
-#include "concurrent_queue_wrapper.inc"
+#include "buffer.h"
+#include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
-#include "logger.inc"
+#include "logger.h"
 #include "stats.h"
 
 class Doer {

@@ -9,7 +9,7 @@
 #include <iostream>
 
 #include "config.h"
-#include "gettime.inc"
+#include "gettime.h"
 #include "memory_manage.h"
 #include "symbols.h"
 

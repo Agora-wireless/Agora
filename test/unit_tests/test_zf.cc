@@ -3,7 +3,7 @@
 #include "concurrentqueue.h"
 #include "config.h"
 #include "dozf.h"
-#include "gettime.inc"
+#include "gettime.h"
 #include "utils.h"
 
 /// Measure performance of zeroforcing
