@@ -1,5 +1,5 @@
 #include "doprecode.h"
-#include "concurrent_queue_wrapper.inc"
+#include "concurrent_queue_wrapper.h"
 
 using namespace arma;
 static constexpr bool kUseSpatialLocality = true;

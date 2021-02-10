@@ -1,5 +1,5 @@
 #include "mac_thread.h"
-#include "logger.inc"
+#include "logger.h"
 #include "utils_ldpc.h"
 
 MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,

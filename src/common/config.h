@@ -10,7 +10,7 @@
 #include <vector>
 #define JSON
 #ifdef JSON
-#include "buffer.inc"
+#include "buffer.h"
 #include "comms-lib.h"
 #include "gettime.h"
 #include "memory_manage.h"

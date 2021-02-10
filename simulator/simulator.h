@@ -1,7 +1,7 @@
 #ifndef SIMULATOR_HEAD
 #define SIMULATOR_HEAD
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "gettime.h"

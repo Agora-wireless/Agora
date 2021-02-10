@@ -5,7 +5,7 @@
  */
 
 #include "txrx.h"
-#include "logger.inc"
+#include "logger.h"
 
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg_(cfg)

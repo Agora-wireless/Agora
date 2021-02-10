@@ -1,7 +1,7 @@
 #ifndef MOD_COMMON
 #define MOD_COMMON
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "symbols.h"

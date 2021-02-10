@@ -4,7 +4,7 @@
  */
 
 #include "comms-lib.h"
-#include "datatype_conversion.inc"
+#include "datatype_conversion.h"
 #include "utils_ldpc.h"
 #include <bitset>
 #include <gtest/gtest.h>

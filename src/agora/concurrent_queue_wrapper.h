@@ -1,7 +1,7 @@
 #ifndef CONCURRENT_QUEUE_WRAPPER
 #define CONCURRENT_QUEUE_WRAPPER
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "concurrentqueue.h"
 #include "utils.h"
 

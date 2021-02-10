@@ -3,7 +3,7 @@
 
 #include "concurrentqueue.h"
 #include "config.h"
-#include "datatype_conversion.inc"
+#include "datatype_conversion.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "mkl_dfti.h"

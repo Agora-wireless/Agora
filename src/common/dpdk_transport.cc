@@ -1,7 +1,7 @@
 #ifdef USE_DPDK
 
 #include "dpdk_transport.h"
-#include "buffer.inc"
+#include "buffer.h"
 #include "eth_common.h"
 #include "utils.h"
 #include <immintrin.h>

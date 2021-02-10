@@ -1,8 +1,8 @@
 #ifndef AGORA_HEAD
 #define AGORA_HEAD
 
-#include "buffer.inc"
-#include "concurrent_queue_wrapper.inc"
+#include "buffer.h"
+#include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "docoding.h"

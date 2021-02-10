@@ -1,7 +1,7 @@
 #pragma once
 
 #include "config.h"
-#include "logger.inc"
+#include "logger.h"
 #include "symbols.h"
 #include "utils.h"
 #include <mutex>
