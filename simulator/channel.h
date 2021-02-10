@@ -9,7 +9,7 @@
 #include <iomanip>
 #include <numeric>
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"

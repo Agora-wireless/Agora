@@ -6,7 +6,7 @@
 
 #include <string>
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "eth_common.h"
 #include "utils.h"
 

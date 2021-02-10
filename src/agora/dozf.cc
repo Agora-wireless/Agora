@@ -1,6 +1,6 @@
 #include "dozf.h"
 
-#include "concurrent_queue_wrapper.inc"
+#include "concurrent_queue_wrapper.h"
 #include "doer.h"
 
 static constexpr bool kUseSIMDGather = true;

@@ -13,9 +13,9 @@
 #include <iomanip>
 #include <numeric>
 
-#include "buffer.inc"
+#include "buffer.h"
 #include "channel.h"
-#include "concurrent_queue_wrapper.inc"
+#include "concurrent_queue_wrapper.h"
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
