@@ -1,5 +1,9 @@
-#ifndef PHY_STATS
-#define PHY_STATS
+/**
+ * @file phy_stats.h
+ * @brief Declaration file for the PhyStats class.
+ */
+#ifndef PHY_STATS_H_
+#define PHY_STATS_H_
 
 #include <armadillo>
 
@@ -46,4 +50,4 @@ class PhyStats {
   cx_fmat ul_gt_mat_;
 };
 
-#endif
+#endif  // PHY_STATS_H_

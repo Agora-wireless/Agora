@@ -1,4 +1,10 @@
-#pragma once
+/**
+ * @file data_generator.h
+ * @brief Implementation file for the Data generator class to generate binary
+ * files as inputs to Agora, sender and correctness tests
+ */
+#ifndef DATA_GENERATOR_H_
+#define DATA_GENERATOR_H_
 
 #include <string>
 
@@ -17,7 +23,7 @@ class DataGenerator {
 
     // The input informatioon bytes are {1, 2, 3, 1, 2, 3, ...} for UE 0,
     // {4, 5, 6, 4, 5, 6, ...} for UE 1, and so on
-    kK123
+    kProfile123
   };
 
   DataGenerator(Config* cfg, uint64_t seed = 0,
@@ -51,7 +57,7 @@ class DataGenerator {
     for (size_t i = 0; i < lc.NumInputBytes(); i++) {
       if (profile_ == Profile::kRandom) {
         information.at(i) = static_cast<int8_t>(fast_rand_.NextU32());
-      } else if (profile_ == Profile::kK123) {
+      } else if (profile_ == Profile::kProfile123) {
         information.at(i) = 1 + (ue_id * 3) + (i % 3);
       }
     }
@@ -68,7 +74,7 @@ class DataGenerator {
   /**
    * @brief Return the output of modulating the encoded codeword
    * @param encoded_codeword The encoded LDPC codeword bit sequence
-   * @return An array of complex floats with OFDM_DATA_NUM elements
+   * @return An array of complex floats with OfdmDataNum() elements
    */
   std::vector<complex_float> GetModulation(
       const std::vector<int8_t>& encoded_codeword) {
@@ -100,9 +106,9 @@ class DataGenerator {
   }
 
   /**
-   * @param modulated_codeword The modulated codeword with OFDM_DATA_NUM
+   * @param modulated_codeword The modulated codeword with OfdmDataNum()
    * elements
-   * @brief An array with OFDM_CA_NUM elements with the OFDM_DATA_NUM
+   * @brief An array with OfdmDataNum() elements with the OfdmDataNum()
    * modulated elements binned at the center
    */
   std::vector<complex_float> BinForIfft(
@@ -114,7 +120,7 @@ class DataGenerator {
     return pre_ifft_symbol;
   }
 
-  /// Return the time-domain pilot symbol with OFDM_CA_NUM complex floats
+  /// Return the time-domain pilot symbol with OfdmCaNum complex floats
   std::vector<complex_float> GetCommonPilotTimeDomain() const {
     const std::vector<std::complex<float>> zc_seq = Utils::DoubleToCfloat(
         CommsLib::GetSequence(cfg_->OfdmDataNum(), CommsLib::kLteZadoffChu));
@@ -136,3 +142,5 @@ class DataGenerator {
   Config* cfg_;            // The global Agora config
   const Profile profile_;  // The pattern of the input byte sequence
 };
+
+#endif  // DATA_GENERATOR_H_

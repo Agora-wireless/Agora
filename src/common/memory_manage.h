@@ -1,5 +1,10 @@
-#ifndef MEMORY_MANAGE
-#define MEMORY_MANAGE
+/**
+ * @file dpdk_transport.h
+ * @brief Declaration file for the Memory related storage classes.
+ * Table / PtrGrid / PtrCube / 1D buffer allocation & free
+ */
+#ifndef MEMORY_MANAGE_H_
+#define MEMORY_MANAGE_H_
 #include <array>
 #include <cassert>
 #include <complex>
@@ -257,4 +262,4 @@ class PtrCube {
   T* backing_buf_;
 };
 
-#endif
+#endif  // MEMORY_MANAGE_H_

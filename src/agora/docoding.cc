@@ -1,3 +1,8 @@
+/**
+ * @file docoding.cc
+ * @brief Implmentation file for the Docoding class.  Includes the DoEncode and
+ * DoDecode classes.
+ */
 #include "docoding.h"
 
 #include "concurrent_queue_wrapper.inc"

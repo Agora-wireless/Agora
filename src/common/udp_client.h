@@ -11,8 +11,8 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-
-#pragma once
+#ifndef UDP_CLIENT_H_
+#define UDP_CLIENT_H_
 
 #include <netdb.h>
 #include <sys/socket.h>
@@ -111,3 +111,5 @@ class UDPClient {
 
   bool enable_recording_flag_ = false;  // If true, we record all sent packets
 };
+
+#endif  // UDP_CLIENT_H_

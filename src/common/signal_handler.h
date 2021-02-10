@@ -1,7 +1,7 @@
 // http://www.yolinux.com/TUTORIALS/C++Signals.html
 
-#ifndef __SIGNALHANDLER_H__
-#define __SIGNALHANDLER_H__
+#ifndef SIGNALHANDLER_H_
+#define SIGNALHANDLER_H_
 #include <stdexcept>
 using std::runtime_error;
 
@@ -24,4 +24,4 @@ class SignalHandler {
   void SetupSignalHandlers();
   static void ExitSignalHandler(int _ignored);
 };
-#endif
+#endif  // SIGNALHANDLER_H_

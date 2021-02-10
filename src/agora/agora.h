@@ -1,5 +1,10 @@
-#ifndef AGORA_HEAD
-#define AGORA_HEAD
+/**
+ * @file agora.h
+ * @brief Declaration file for the main agora class
+ */
+
+#ifndef AGORA_H_
+#define AGORA_H_
 
 #include <pthread.h>
 #include <unistd.h>
@@ -288,4 +293,4 @@ class Agora {
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
 };
 
-#endif
+#endif  // AGORA_H_

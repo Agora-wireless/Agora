@@ -1,5 +1,11 @@
-#ifndef DOCODING
-#define DOCODING
+/**
+ * @file docoding.h
+ * @brief Declaration file for the Docoding class.  Includes the DoEncode and
+ * DoDecode classes.
+ */
+
+#ifndef DOCODING_H_
+#define DOCODING_H_
 
 #include <armadillo>
 #include <cstdio>
@@ -57,4 +63,4 @@ class DoDecode : public Doer {
   DurationStat* duration_stat_;
 };
 
-#endif
+#endif  // DOCODING_H_

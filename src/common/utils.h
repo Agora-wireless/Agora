@@ -7,11 +7,11 @@
  * @author Rahman Doost-Mohamamdy: doost@rice.edu
  */
 
-#ifndef UTILS_HEADER
-#define UTILS_HEADER
+#ifndef UTILS_H_
+#define UTILS_H_
 
 #define UNUSED __attribute__((unused))
-#define _unused(x) ((void)(x))
+#define unused(x) ((void)(x))
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
@@ -210,4 +210,4 @@ class FastRand {
     return static_cast<uint32_t>(seed_ >> 32);
   }
 };
-#endif
+#endif  // UTILS_H_

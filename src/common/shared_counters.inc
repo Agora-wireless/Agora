@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SHARED_COUNTERS_INC_
+#define SHARED_COUNTERS_INC_
 
 #include <mutex>
 #include <sstream>
@@ -142,7 +143,7 @@ class DemulStatus {
  public:
   DemulStatus(Config* cfg)
       : num_demul_tasks_required_(cfg->get_num_sc_per_server() /
-                                  cfg->demul_block_size) {
+                                  cfg->DemulBlockSize()) {
     for (size_t i = 0; i < kFrameWnd; i++) {
       for (size_t j = 0; j < kMaxSymbols; j++) {
         num_demul_tasks_completed_[i][j] = 0;
@@ -234,3 +235,5 @@ class DecodeStatus {
   std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>*
       num_demod_data_received_;
 };
+
+#endif  // SHARED_COUNTERS_INC_

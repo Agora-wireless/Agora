@@ -1,3 +1,7 @@
+/**
+ * @file dodemul.cc
+ * @brief Implmentation file for the DoDemul class.
+ */
 #include "dodemul.h"
 
 #include "concurrent_queue_wrapper.inc"

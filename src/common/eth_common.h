@@ -17,7 +17,8 @@
  * @brief Common definitons for Ethernet-based transports
  */
 
-#pragma once
+#ifndef ETH_COMMON_H_
+#define ETH_COMMON_H_
 
 #include <arpa/inet.h>
 #include <assert.h>
@@ -50,7 +51,7 @@ static inline std::string mac_to_string(const uint8_t* mac) {
 static inline uint32_t ipv4_from_str(const char* ip) {
   uint32_t addr;
   int ret = inet_pton(AF_INET, ip, &addr);
-  rt_assert(ret == 1, "inet_pton() failed for " + std::string(ip));
+  RtAssert(ret == 1, "inet_pton() failed for " + std::string(ip));
   return addr;
 }
 
@@ -58,7 +59,7 @@ static inline uint32_t ipv4_from_str(const char* ip) {
 static inline std::string ipv4_to_string(uint32_t ipv4_addr) {
   char str[INET_ADDRSTRLEN];
   const char* ret = inet_ntop(AF_INET, &ipv4_addr, str, sizeof(str));
-  rt_assert(ret == str, "inet_ntop failed");
+  RtAssert(ret == str, "inet_ntop failed");
   str[INET_ADDRSTRLEN - 1] = 0;  // Null-terminate
   return str;
 }
@@ -194,7 +195,7 @@ static inline void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port,
 /// Return the IPv4 address of a kernel-visible interface in host-byte order
 static inline uint32_t get_interface_ipv4_addr(std::string interface) {
   struct ifaddrs *ifaddr, *ifa;
-  rt_assert(getifaddrs(&ifaddr) == 0);
+  RtAssert(getifaddrs(&ifaddr) == 0);
   uint32_t ipv4_addr = 0;
 
   for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
@@ -209,8 +210,8 @@ static inline uint32_t get_interface_ipv4_addr(std::string interface) {
     ipv4_addr = ntohl(*reinterpret_cast<uint32_t*>(&sin_addr->sin_addr));
   }
 
-  rt_assert(ipv4_addr != 0,
-            std::string("Failed to find interface ") + interface);
+  RtAssert(ipv4_addr != 0,
+           std::string("Failed to find interface ") + interface);
 
   freeifaddrs(ifaddr);
   return ipv4_addr;
@@ -226,10 +227,12 @@ static inline void fill_interface_mac(std::string interface, uint8_t* mac) {
   assert(fd >= 0);
 
   int ret = ioctl(fd, SIOCGIFHWADDR, &ifr);
-  rt_assert(ret == 0, "MAC address IOCTL failed");
+  RtAssert(ret == 0, "MAC address IOCTL failed");
   close(fd);
 
   for (size_t i = 0; i < 6; i++) {
     mac[i] = static_cast<uint8_t>(ifr.ifr_hwaddr.sa_data[i]);
   }
 }
+
+#endif  // ETH_COMMON_H_

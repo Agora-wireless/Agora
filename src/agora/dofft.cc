@@ -1,3 +1,7 @@
+/**
+ * @file dofft.cc
+ * @brief Implementation file for the DoFFT class.
+ */
 #include "dofft.h"
 
 #include "concurrent_queue_wrapper.inc"
@@ -224,7 +228,7 @@ EventData DoFFT::Launch(size_t tag) {
 
 void DoFFT::PartialTranspose(complex_float* out_buf, size_t ant_id,
                              SymbolType symbol_type) const {
-  // We have OFDM_DATA_NUM % kTransposeBlockSize == 0
+  // We have OfdmDataNum() % kTransposeBlockSize == 0
   const size_t num_blocks = cfg_->OfdmDataNum() / kTransposeBlockSize;
 
   for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {

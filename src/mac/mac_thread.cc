@@ -1,3 +1,7 @@
+/**
+ * @file mac_thread.cc
+ * @brief Implementation file for the MacThread class.
+ */
 #include "mac_thread.h"
 
 #include "logger.inc"
@@ -24,7 +28,7 @@ MacThread::MacThread(
   if (!log_filename.empty()) {
     log_filename_ = log_filename;  // Use a non-default log filename
   }
-  log_file_ = fopen(log_filename_.c_str(), "w");
+  log_file_ = std::fopen(log_filename_.c_str(), "w");
   RtAssert(log_file_ != nullptr, "Failed to open MAC log file");
 
   std::printf("MAC thread: Frame duration %.2f ms, tsc_delta %zu\n",
@@ -56,7 +60,7 @@ MacThread::MacThread(
 }
 
 MacThread::~MacThread() {
-  fclose(log_file_);
+  std::fclose(log_file_);
   MLPD_INFO("MAC thread destroyed\n");
 }
 
@@ -121,10 +125,10 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
 
     // We send data to app irrespective of CRC condition
     // TODO: enable ARQ and ensure reliable data goes to app
-    const size_t frame_data__offset =
+    const size_t frame_data_offset =
         (symbol_idx_ul - cfg_->Frame().ClientUlPilotSymbols()) *
         cfg_->MacPayloadLength();
-    std::memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data_,
+    std::memcpy(&server_.frame_data_[ue_id][frame_data_offset], pkt->data_,
                 cfg_->MacPayloadLength());
     server_.n_filled_in_frame_[ue_id] += cfg_->MacPayloadLength();
 
@@ -140,7 +144,7 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
                      "MAC thread received frame %zu, uplink symbol index %zu, "
                      "size %zu, copied to frame data offset %zu\n",
                      frame_id, symbol_idx_ul, cfg_->MacPayloadLength(),
-                     frame_data__offset);
+                     frame_data_offset);
 
         ss << "Header Info:\n"
            << "FRAME_ID: " << pkt->frame_id_
@@ -366,7 +370,7 @@ int PacketTXRX::dequeue_send(int tid)
     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
     size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
 
-    size_t offset = (c->get_total_data_symbol_idx(frame_id, data_symbol_idx)
+    size_t offset = (c->GetTotalDataSymbolIdx(frame_id, data_symbol_idx)
                         * c->BsAntNum())
         + ant_id;
 
@@ -381,15 +385,15 @@ int PacketTXRX::dequeue_send(int tid)
     size_t socket_symbol_offset = offset
         % (kFrameWnd * c->Frame().NumDataSyms()
               * c->BsAntNum());
-    char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset * c->packet_length;
-    auto* pkt = (Packet*)cur_buffer_ptr;
-    new (pkt) Packet(frame_id, data_symbol_idx, 0, ant_id);
+    char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset *
+c->PacketLength(); auto* pkt = (Packet*)cur_buffer_ptr; new (pkt)
+Packet(frame_id, data_symbol_idx, 0, ant_id);
 
     // Send data (one OFDM symbol)
     ssize_t ret = sendto(socket_[ant_id % config_->SocketThreadNum()],
-        cur_buffer_ptr, c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
-        sizeof(servaddr_[tid]));
-    rt_assert(ret > 0, "sendto() failed");
+        cur_buffer_ptr, c->PacketLength(), 0, (struct
+sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid])); rt_assert(ret > 0, "sendto()
+failed");
 
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
                   Event_data(EventType::kPacketTX, event.tags[0])),

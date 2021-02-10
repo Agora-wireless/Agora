@@ -1,5 +1,9 @@
-#ifndef DOFFT
-#define DOFFT
+/**
+ * @file dofft.h
+ * @brief Declaration file for the DoFFT class.
+ */
+#ifndef DOFFT_H_
+#define DOFFT_H_
 
 #include <armadillo>
 #include <iostream>
@@ -151,4 +155,4 @@ class DoIFFT : public Doer {
   float ifft_scale_factor_;
 };
 
-#endif
+#endif  // DOFFT_H_

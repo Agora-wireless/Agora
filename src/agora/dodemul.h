@@ -1,5 +1,9 @@
-#ifndef DODEMUL
-#define DODEMUL
+/**
+ * @file dodemul.h
+ * @brief Declaration file for the DoDemul class.
+ */
+#ifndef DODEMUL_H_
+#define DODEMUL_H_
 
 #include <armadillo>
 #include <iostream>
@@ -15,7 +19,6 @@
 #include "stats.h"
 #include "symbols.h"
 
-using namespace arma;
 class DoDemul : public Doer {
  public:
   DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
@@ -79,4 +82,4 @@ class DoDemul : public Doer {
 #endif
 };
 
-#endif
+#endif  // DODEMUL_H_

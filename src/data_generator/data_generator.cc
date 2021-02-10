@@ -1,5 +1,5 @@
 /**
- * @file data_generator.cpp
+ * @file data_generator.cc
  * @brief Data generator to generate binary files as inputs to Agora, sender
  * and correctness tests
  */
@@ -46,14 +46,15 @@ int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   auto* cfg = new Config(FLAGS_conf_file.c_str());
 
-  const DataGenerator::Profile profile = FLAGS_profile == "123"
-                                             ? DataGenerator::Profile::kK123
-                                             : DataGenerator::Profile::kRandom;
+  const DataGenerator::Profile profile =
+      FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123
+                             : DataGenerator::Profile::kRandom;
   DataGenerator data_generator(cfg, 0 /* RNG seed */, profile);
 
-  std::printf("DataGenerator: Config file: %s, data profile = %s\n",
-              FLAGS_conf_file.c_str(),
-              profile == DataGenerator::Profile::kK123 ? "123" : "random");
+  std::printf(
+      "DataGenerator: Config file: %s, data profile = %s\n",
+      FLAGS_conf_file.c_str(),
+      profile == DataGenerator::Profile::kProfile123 ? "123" : "random");
 
   std::printf("DataGenerator: Using %s-orthogonal pilots\n",
               cfg->FreqOrthogonalPilot() ? "frequency" : "time");

@@ -1,3 +1,7 @@
+/**
+ * @file receiver_cli.cc
+ * @brief Main file for the receiver class testing.
+ */
 #include "receiver.h"
 
 int main(int argc, char const* argv[]) {

@@ -1,3 +1,7 @@
+/**
+ * @file phy-ue.cc
+ * @brief Implementation file for the phy ue class
+ */
 #include "phy-ue.h"
 
 #include "phy_ldpc_decoder_5gnr.h"
@@ -70,7 +74,7 @@ PhyUe::PhyUe(Config* config) {
     task_ptok_[i] = new moodycamel::ProducerToken(message_queue_);
   }
 
-  ru_.reset(new RadioTXRX(config_, rx_thread_num_, config_->CoreOffset() + 1,
+  ru_.reset(new RadioTxRx(config_, rx_thread_num_, config_->CoreOffset() + 1,
                           &message_queue_, &tx_queue_, rx_ptoks_ptr_,
                           tx_ptoks_ptr_));
 
@@ -177,7 +181,7 @@ void PhyUe::Stop() {
 void PhyUe::Start() {
   PinToCoreWithOffset(ThreadType::kMaster, config_->CoreOffset(), 0);
 
-  if (!ru_->StartTxrx(rx_buffer_, rx_buffer_status_, rx_buffer_status_size_,
+  if (!ru_->StartTxRx(rx_buffer_, rx_buffer_status_, rx_buffer_status_size_,
                       rx_buffer_size_, tx_buffer_, tx_buffer_status_,
                       tx_buffer_status_size_, tx_buffer_size_)) {
     this->Stop();

@@ -1,5 +1,10 @@
-#ifndef GETTIME_H
-#define GETTIME_H
+/**
+ * @file gettime.inc
+ * @brief Self defined file for the gettime helper functions.
+ */
+
+#ifndef GETTIME_INC_
+#define GETTIME_INC_
 
 #include "symbols.h"
 
@@ -123,4 +128,4 @@ static inline double NsSince(const struct timespec& t0) {
   return (t1.tv_sec - t0.tv_sec) * 1000000000.0 + (t1.tv_nsec - t0.tv_nsec);
 }
 
-#endif
+#endif  // GETTIME_INC_

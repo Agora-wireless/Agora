@@ -1,5 +1,5 @@
 /**
- * @file test_ldpc_baseband.cpp
+ * @file test_ldpc_baseband.cc
  * @brief Test LDPC performance in baseband procesing when different levels of
  * Gaussian noise is added to CSI
  */
@@ -45,14 +45,15 @@ int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   auto* cfg = new Config(FLAGS_conf_file.c_str());
 
-  const DataGenerator::Profile profile = FLAGS_profile == "123"
-                                             ? DataGenerator::Profile::kK123
-                                             : DataGenerator::Profile::kRandom;
+  const DataGenerator::Profile profile =
+      FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123
+                             : DataGenerator::Profile::kRandom;
   DataGenerator data_generator(cfg, 0 /* RNG seed */, profile);
 
-  std::printf("DataGenerator: Config file: %s, data profile = %s\n",
-              FLAGS_conf_file.c_str(),
-              profile == DataGenerator::Profile::kK123 ? "123" : "random");
+  std::printf(
+      "DataGenerator: Config file: %s, data profile = %s\n",
+      FLAGS_conf_file.c_str(),
+      profile == DataGenerator::Profile::kProfile123 ? "123" : "random");
 
   std::printf("DataGenerator: Using %s-orthogonal pilots\n",
               cfg->FreqOrthogonalPilot() ? "frequency" : "time");
@@ -150,8 +151,7 @@ int main(int argc, char* argv[]) {
              j += cfg->UeAntNum()) {
           pilots_t_ue[i + j] = pilot_td[i + j];
         }
-        // Load pilot to the second symbol
-        // The first symbol is reserved for beacon
+        // Load pilot
         std::memcpy(tx_data_all_symbols[cfg->Frame().NumBeaconSyms()] +
                         i * cfg->OfdmCaNum(),
                     &pilots_t_ue[0], cfg->OfdmCaNum() * sizeof(complex_float));
@@ -309,7 +309,7 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    LDPCconfig ldpc_config = cfg->LdpcConfig();
+    const LDPCconfig& ldpc_config = cfg->LdpcConfig();
 
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};

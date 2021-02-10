@@ -12,7 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-#pragma once
+#ifndef UDP_SERVER_H_
+#define UDP_SERVER_H_
 
 #include <fcntl.h>
 #include <netdb.h>
@@ -104,3 +105,5 @@ class UDPServer {
   uint16_t port_;  // The UDP port to listen on
   int sock_fd_ = -1;
 };
+
+#endif  // UDP_SERVER_H_
