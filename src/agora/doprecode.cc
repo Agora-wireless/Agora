@@ -63,7 +63,7 @@ DoPrecode::~DoPrecode() {
 }
 
 EventData DoPrecode::Launch(size_t tag) {
-  size_t start_tsc = WorkerRdtsc();
+  size_t start_tsc = GetTime::WorkerRdtsc();
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
@@ -101,7 +101,7 @@ EventData DoPrecode::Launch(size_t tag) {
 
   if (kUseSpatialLocality) {
     for (size_t i = 0; i < max_sc_ite; i = i + kSCsPerCacheline) {
-      size_t start_tsc1 = WorkerRdtsc();
+      size_t start_tsc1 = GetTime::WorkerRdtsc();
       for (size_t user_id = 0; user_id < cfg_->UeNum(); user_id++) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
           LoadInputData(symbol_idx_dl, total_data_symbol_idx, user_id,
@@ -109,33 +109,33 @@ EventData DoPrecode::Launch(size_t tag) {
         }
       }
 
-      size_t start_tsc2 = WorkerRdtsc();
+      size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
       for (size_t j = 0; j < kSCsPerCacheline; j++) {
         PrecodingPerSc(frame_slot, base_sc_id + i + j, i + j);
       }
       duration_stat_->task_count_ =
           duration_stat_->task_count_ + kSCsPerCacheline;
-      duration_stat_->task_duration_[2] += WorkerRdtsc() - start_tsc2;
+      duration_stat_->task_duration_[2] += GetTime::WorkerRdtsc() - start_tsc2;
     }
   } else {
     for (size_t i = 0; i < max_sc_ite; i++) {
-      size_t start_tsc1 = WorkerRdtsc();
+      size_t start_tsc1 = GetTime::WorkerRdtsc();
       int cur_sc_id = base_sc_id + i;
       for (size_t user_id = 0; user_id < cfg_->UeNum(); user_id++) {
         LoadInputData(symbol_idx_dl, total_data_symbol_idx, user_id, cur_sc_id,
                       0);
       }
-      size_t start_tsc2 = WorkerRdtsc();
+      size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
       PrecodingPerSc(frame_slot, cur_sc_id, i);
       duration_stat_->task_count_++;
-      duration_stat_->task_duration_[2] += WorkerRdtsc() - start_tsc2;
+      duration_stat_->task_duration_[2] += GetTime::WorkerRdtsc() - start_tsc2;
     }
   }
 
-  size_t start_tsc3 = WorkerRdtsc();
+  size_t start_tsc3 = GetTime::WorkerRdtsc();
 
   __m256i index = _mm256_setr_epi64x(0, cfg_->BsAntNum(), cfg_->BsAntNum() * 2,
                                      cfg_->BsAntNum() * 3);
@@ -148,13 +148,13 @@ EventData DoPrecode::Launch(size_t tag) {
     for (size_t i = 0; i < cfg_->DemulBlockSize() / 4; i++) {
       float* input_shifted_ptr =
           precoded_ptr + 4 * i * 2 * cfg_->BsAntNum() + ant_id * 2;
-      __m256d t_data =
-          _mm256_i64gather_pd((double*)input_shifted_ptr, index, 8);
-      _mm256_stream_pd((double*)(ifft_ptr + i * 8), t_data);
+      __m256d t_data = _mm256_i64gather_pd(
+          reinterpret_cast<double*>(input_shifted_ptr), index, 8);
+      _mm256_stream_pd(reinterpret_cast<double*>(ifft_ptr + i * 8), t_data);
     }
   }
-  duration_stat_->task_duration_[3] += WorkerRdtsc() - start_tsc3;
-  duration_stat_->task_duration_[0] += WorkerRdtsc() - start_tsc;
+  duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
+  duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
   if (kDebugPrintInTask) {
     std::printf(
         "In doPrecode thread %d: finished frame: %zu, symbol: %zu, "

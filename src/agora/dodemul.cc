@@ -86,7 +86,7 @@ EventData DoDemul::Launch(size_t tag) {
   const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
 
   const size_t frame_slot = frame_id % kFrameWnd;
-  size_t start_tsc = WorkerRdtsc();
+  size_t start_tsc = GetTime::WorkerRdtsc();
 
   if (kDebugPrintInTask == true) {
     std::printf(
@@ -99,7 +99,7 @@ EventData DoDemul::Launch(size_t tag) {
   assert(max_sc_ite % kSCsPerCacheline == 0);
   // Iterate through cache lines
   for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
-    size_t start_tsc0 = WorkerRdtsc();
+    size_t start_tsc0 = GetTime::WorkerRdtsc();
 
     // Step 1: Populate data_gather_buffer as a row-major matrix with
     // kSCsPerCacheline rows and BsAntNum() columns
@@ -146,7 +146,7 @@ EventData DoDemul::Launch(size_t tag) {
         }
       }
     }
-    duration_stat_->task_duration_[1] += WorkerRdtsc() - start_tsc0;
+    duration_stat_->task_duration_[1] += GetTime::WorkerRdtsc() - start_tsc0;
 
     // Step 2: For each subcarrier, perform equalization by multiplying the
     // subcarrier's data from each antenna with the subcarrier's precoder
@@ -169,7 +169,7 @@ EventData DoDemul::Launch(size_t tag) {
       auto* ul_zf_ptr = reinterpret_cast<cx_float*>(
           ul_zf_matrices_[frame_slot][cfg_->GetZfScId(cur_sc_id)]);
 
-      size_t start_tsc2 = WorkerRdtsc();
+      size_t start_tsc2 = GetTime::WorkerRdtsc();
 #if USE_MKL_JIT
       mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_zf_ptr, (MKL_Complex8*)data_ptr,
                      (MKL_Complex8*)equal_ptr);
@@ -226,14 +226,13 @@ EventData DoDemul::Launch(size_t tag) {
           }
         }
       }
-
-      size_t start_tsc3 = WorkerRdtsc();
+      size_t start_tsc3 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
       duration_stat_->task_count_++;
     }
   }
 
-  size_t start_tsc3 = WorkerRdtsc();
+  size_t start_tsc3 = GetTime::WorkerRdtsc();
   __m256i index2 = _mm256_setr_epi32(
       0, 1, cfg_->UeNum() * 2, cfg_->UeNum() * 2 + 1, cfg_->UeNum() * 4,
       cfg_->UeNum() * 4 + 1, cfg_->UeNum() * 6, cfg_->UeNum() * 6 + 1);
@@ -281,7 +280,7 @@ EventData DoDemul::Launch(size_t tag) {
     // cout << endl;
   }
 
-  duration_stat_->task_duration_[3] += WorkerRdtsc() - start_tsc3;
-  duration_stat_->task_duration_[0] += WorkerRdtsc() - start_tsc;
+  duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
+  duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
   return EventData(EventType::kDemul, tag);
 }

@@ -92,7 +92,7 @@ static inline void CalibRegressionEstimate(const arma::cx_fvec& in_vec,
 EventData DoFFT::Launch(size_t tag) {
   size_t socket_thread_id = fft_req_tag_t(tag).tid_;
   size_t buf_offset = fft_req_tag_t(tag).offset_;
-  size_t start_tsc = WorkerRdtsc();
+  size_t start_tsc = GetTime::WorkerRdtsc();
   auto* pkt = (Packet*)(socket_buffer_[socket_thread_id] +
                         buf_offset * cfg_->PacketLength());
   size_t frame_id = pkt->frame_id_;
@@ -169,7 +169,7 @@ EventData DoFFT::Launch(size_t tag) {
     duration_stat = &dummy_duration_stat;  // For calibration symbols
   }
 
-  size_t start_tsc1 = WorkerRdtsc();
+  size_t start_tsc1 = GetTime::WorkerRdtsc();
   duration_stat->task_duration_[1] += start_tsc1 - start_tsc;
 
   if (!cfg_->FftInRru() == true) {
@@ -178,7 +178,7 @@ EventData DoFFT::Launch(size_t tag) {
         reinterpret_cast<float*>(fft_inout_));  // Compute FFT in-place
   }
 
-  size_t start_tsc2 = WorkerRdtsc();
+  size_t start_tsc2 = GetTime::WorkerRdtsc();
   duration_stat->task_duration_[2] += start_tsc2 - start_tsc1;
 
   if (sym_type == SymbolType::kPilot) {
@@ -220,10 +220,10 @@ EventData DoFFT::Launch(size_t tag) {
     RtAssert(false, error_message);
   }
 
-  duration_stat->task_duration_[3] += WorkerRdtsc() - start_tsc2;
+  duration_stat->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc2;
   socket_buffer_status_[socket_thread_id][buf_offset] = 0;  // Reset sock buf
   duration_stat->task_count_++;
-  duration_stat->task_duration_[0] += WorkerRdtsc() - start_tsc;
+  duration_stat->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
   return EventData(EventType::kFFT,
                    gen_tag_t::FrmSym(pkt->frame_id_, pkt->symbol_id_).tag_);
 }
@@ -336,7 +336,7 @@ DoIFFT::~DoIFFT() {
 }
 
 EventData DoIFFT::Launch(size_t tag) {
-  size_t start_tsc = WorkerRdtsc();
+  size_t start_tsc = GetTime::WorkerRdtsc();
   size_t ant_id = gen_tag_t(tag).ant_id_;
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
@@ -351,7 +351,7 @@ EventData DoIFFT::Launch(size_t tag) {
                    cfg_->BsAntNum()) +
                   ant_id;
 
-  size_t start_tsc1 = WorkerRdtsc();
+  size_t start_tsc1 = GetTime::WorkerRdtsc();
   duration_stat_->task_duration_[1] += start_tsc1 - start_tsc;
 
   auto* ifft_in_ptr = reinterpret_cast<float*>(dl_ifft_buffer_[offset]);
@@ -392,7 +392,7 @@ EventData DoIFFT::Launch(size_t tag) {
     std::cout << ss.str();
   }
 
-  size_t start_tsc2 = WorkerRdtsc();
+  size_t start_tsc2 = GetTime::WorkerRdtsc();
   duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
 
   auto* pkt = reinterpret_cast<struct Packet*>(
@@ -404,7 +404,7 @@ EventData DoIFFT::Launch(size_t tag) {
   SimdConvertFloatToShort(ifft_out_ptr, socket_ptr, cfg_->OfdmCaNum(),
                           cfg_->CpLen(), ifft_scale_factor_);
 
-  duration_stat_->task_duration_[3] += WorkerRdtsc() - start_tsc2;
+  duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc2;
 
   if (kPrintSocketOutput) {
     std::stringstream ss;
@@ -417,6 +417,6 @@ EventData DoIFFT::Launch(size_t tag) {
   }
 
   duration_stat_->task_count_++;
-  duration_stat_->task_duration_[0] += WorkerRdtsc() - start_tsc;
+  duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
   return EventData(EventType::kIFFT, tag);
 }

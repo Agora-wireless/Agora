@@ -2,10 +2,10 @@
     "antenna_num": 8,
     "ue_num": 8,
     "core_offset": 4,
-    "worker_thread_num": 2,
-    "socket_thread_num": 1,
+    "worker_thread_num": 22,
+    "socket_thread_num": 2,
     "frames": [
-        "PUUUUUUUUUUUUU"
+        "BPUUUUUGGDDDDD"
     ],
     "modulation": "64QAM",
     "Zc": 104,

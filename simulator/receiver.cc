@@ -96,7 +96,7 @@ void* Receiver::LoopRecv(int tid) {
 
     if (kIsWorkerTimingEnabled) {
       if (frame_id > prev_frame_id) {
-        frame_start[frame_id] = GetTime();
+        frame_start[frame_id] = GetTime::GetTime();
         prev_frame_id = frame_id;
       }
     }

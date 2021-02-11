@@ -17,7 +17,7 @@ MacThread::MacThread(
     const std::string& log_filename)
     : mode_(mode),
       cfg_(cfg),
-      freq_ghz_(MeasureRdtscFreq()),
+      freq_ghz_(GetTime::MeasureRdtscFreq()),
       tsc_delta_((cfg_->GetFrameDurationSec() * 1e9) / freq_ghz_),
       core_offset_(core_offset),
       decoded_buffer_(decoded_buffer),
@@ -335,9 +335,9 @@ void MacThread::RunEventLoop() {
     ProcessRxFromMaster();
 
     if (mode_ == Mode::kServer) {
-      if (Rdtsc() - last_frame_tx_tsc_ > tsc_delta_) {
+      if (GetTime::Rdtsc() - last_frame_tx_tsc_ > tsc_delta_) {
         SendControlInformation();
-        last_frame_tx_tsc_ = Rdtsc();
+        last_frame_tx_tsc_ = GetTime::Rdtsc();
       }
     } else {
       ProcessControlInformation();

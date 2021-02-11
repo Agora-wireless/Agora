@@ -61,7 +61,7 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
       return false;
     }
 
-    if (cfg_->DownlinkMode()) {
+    if (cfg_->Frame().NumDLSyms() > 0) {
       std::memcpy(
           calib_dl_buffer[kFrameWnd - 1], radioconfig_->GetCalibDl(),
           cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float));
@@ -109,8 +109,7 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
 }
 
 void PacketTXRX::LoopTxRx(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid,
-                      false /* quiet */);
+  PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid);
   size_t* rx_frame_start = (*frame_start_)[tid];
   size_t rx_offset = 0;
   int radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
@@ -132,17 +131,18 @@ void PacketTXRX::LoopTxRx(int tid) {
   }
 
   size_t frame_tsc_delta(cfg_->GetFrameDurationSec() * 1e9 *
-                         MeasureRdtscFreq());
+                         GetTime::MeasureRdtscFreq());
   int prev_frame_id = -1;
   int radio_id = radio_lo;
-  size_t tx_frame_start = Rdtsc();
+  size_t tx_frame_start = GetTime::Rdtsc();
   size_t tx_frame_id = 0;
   size_t slow_start_factor = 10;
   SendBeacon(tid,
              tx_frame_id++);  // Send Beacons for the first time to kick off sim
   while (cfg_->Running() == true) {
-    if (Rdtsc() - tx_frame_start > frame_tsc_delta * slow_start_factor) {
-      tx_frame_start = Rdtsc();
+    if (GetTime::Rdtsc() - tx_frame_start >
+        frame_tsc_delta * slow_start_factor) {
+      tx_frame_start = GetTime::Rdtsc();
       SendBeacon(tid, tx_frame_id++);
       if (tx_frame_id > 5) {
         slow_start_factor = 5;
@@ -167,7 +167,7 @@ void PacketTXRX::LoopTxRx(int tid) {
     if (kIsWorkerTimingEnabled) {
       int frame_id = pkt->frame_id_;
       if (frame_id > prev_frame_id) {
-        rx_frame_start[frame_id % kNumStatsFrames] = Rdtsc();
+        rx_frame_start[frame_id % kNumStatsFrames] = GetTime::Rdtsc();
         prev_frame_id = frame_id;
       }
     }

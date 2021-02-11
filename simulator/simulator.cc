@@ -151,7 +151,7 @@ void Simulator::UpdateRxCounters(size_t frame_id, size_t frame_id_in_buffer,
                                  size_t symbol_id, size_t ant_id) {
   rx_counter_packets_[frame_id_in_buffer]++;
   if (rx_counter_packets_[frame_id_in_buffer] == 1) {
-    frame_start_receive_[frame_id] = GetTime();
+    frame_start_receive_[frame_id] = GetTime::GetTime();
     if (kDebugPrintPerFrameStart) {
       std::printf(
           "Main thread: data received from frame %zu, symbol %zu, ant "
@@ -162,7 +162,7 @@ void Simulator::UpdateRxCounters(size_t frame_id, size_t frame_id_in_buffer,
     }
   } else if (rx_counter_packets_[frame_id_in_buffer] ==
              max_packet_num_per_frame_) {
-    frame_end_receive_[frame_id] = GetTime();
+    frame_end_receive_[frame_id] = GetTime::GetTime();
     PrintPerFrameDone(PrintType::kPacketRX, frame_id);
     rx_counter_packets_[frame_id_in_buffer] = 0;
   }

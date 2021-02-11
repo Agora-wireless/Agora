@@ -290,7 +290,7 @@ void PhyUe::Start() {
                config_->IsDownlink(frame_id, symbol_id))) {
             if (dl_symbol_id == config_->Frame().GetDLSymbol(0)) {
               frame_dl_process_time_[(frame_id % kFrameWnd) * kMaxUEs +
-                                     ant_id] = GetTimeUs();
+                                     ant_id] = GetTime::GetTimeUs();
             }
             EventData do_fft_task(EventType::kFFT, event.tags_[0]);
             ScheduleTask(do_fft_task, &fft_queue_, ptok_fft);
@@ -382,7 +382,7 @@ void PhyUe::Start() {
             decode_checker_[frame_slot][ant_id] = 0;
             decode_status_[frame_slot]++;
             frame_dl_process_time_[frame_slot * kMaxUEs + ant_id] =
-                GetTimeUs() -
+                GetTime::GetTimeUs() -
                 frame_dl_process_time_[frame_slot * kMaxUEs + ant_id];
             if (decode_status_[frame_slot] == config_->UeAntNum()) {
               double frame_time_total = 0;
@@ -600,7 +600,7 @@ void PhyUe::TaskThread(int tid) {
 void PhyUe::DoFft(int tid, size_t tag) {
   size_t rx_thread_id = fft_req_tag_t(tag).tid_;
   size_t offset_in_current_buffer = fft_req_tag_t(tag).offset_;
-  size_t start_tsc = Rdtsc();
+  size_t start_tsc = GetTime::Rdtsc();
 
   // read info of one frame
   auto* pkt = reinterpret_cast<struct Packet*>(rx_buffer_[rx_thread_id] +
@@ -785,10 +785,11 @@ void PhyUe::DoFft(int tid, size_t tag) {
     }
   }
 
-  size_t fft_duration_stat = Rdtsc() - start_tsc;
+  size_t fft_duration_stat = GetTime::Rdtsc() - start_tsc;
   if (kDebugPrintPerTaskDone) {
-    std::printf("FFT Duration (%zu, %zu, %zu): %2.4f us\n", frame_id, symbol_id,
-                ant_id, CyclesToUs(fft_duration_stat, MeasureRdtscFreq()));
+    std::printf(
+        "FFT Duration (%zu, %zu, %zu): %2.4f us\n", frame_id, symbol_id, ant_id,
+        GetTime::CyclesToUs(fft_duration_stat, GetTime::MeasureRdtscFreq()));
   }
 
   rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0;  // now empty
@@ -806,7 +807,7 @@ void PhyUe::DoDemul(int tid, size_t tag) {
     std::printf("In doDemul TID %d: frame %zu, symbol %zu, ant_id %zu\n", tid,
                 frame_id, symbol_id, ant_id);
   }
-  size_t start_tsc = Rdtsc();
+  size_t start_tsc = GetTime::Rdtsc();
 
   const size_t frame_slot = frame_id % kFrameWnd;
   size_t dl_symbol_id = config_->Frame().GetDLSymbolIdx(symbol_id);
@@ -834,11 +835,12 @@ void PhyUe::DoDemul(int tid, size_t tag) {
                   config_->Modulation().c_str());
   }
 
-  size_t dem_duration_stat = Rdtsc() - start_tsc;
+  size_t dem_duration_stat = GetTime::Rdtsc() - start_tsc;
   if (kDebugPrintPerTaskDone) {
-    std::printf("Demodul Duration (%zu, %zu, %zu): %2.4f us\n", frame_id,
-                symbol_id, ant_id,
-                CyclesToUs(dem_duration_stat, MeasureRdtscFreq()));
+    std::printf(
+        "Demodul Duration (%zu, %zu, %zu): %2.4f us\n", frame_id, symbol_id,
+        ant_id,
+        GetTime::CyclesToUs(dem_duration_stat, GetTime::MeasureRdtscFreq()));
   }
 
   if (kPrintLLRData) {
@@ -863,7 +865,7 @@ void PhyUe::DoDecode(int tid, size_t tag) {
     std::printf("In doDecode TID %d: frame %zu, symbol %zu, ant_id %zu\n", tid,
                 frame_id, symbol_id, ant_id);
   }
-  size_t start_tsc = Rdtsc();
+  size_t start_tsc = GetTime::Rdtsc();
 
   const size_t frame_slot = frame_id % kFrameWnd;
   size_t dl_symbol_id = config_->Frame().GetDLSymbolIdx(symbol_id);
@@ -953,11 +955,12 @@ void PhyUe::DoDecode(int tid, size_t tag) {
     symbol_error_count_[ant_id] += static_cast<unsigned long>(block_error > 0);
   }
 
-  size_t dec_duration_stat = Rdtsc() - start_tsc;
+  size_t dec_duration_stat = GetTime::Rdtsc() - start_tsc;
   if (kDebugPrintPerTaskDone) {
-    std::printf("Decode Duration (%zu, %zu, %zu): %2.4f us\n", frame_id,
-                symbol_id, ant_id,
-                CyclesToUs(dec_duration_stat, MeasureRdtscFreq()));
+    std::printf(
+        "Decode Duration (%zu, %zu, %zu): %2.4f us\n", frame_id, symbol_id,
+        ant_id,
+        GetTime::CyclesToUs(dec_duration_stat, GetTime::MeasureRdtscFreq()));
   }
 
   RtAssert(message_queue_.enqueue(*task_ptok_[tid],

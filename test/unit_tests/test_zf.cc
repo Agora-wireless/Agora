@@ -39,7 +39,7 @@ TEST(TestZF, Perf) {
       ul_zf_matrices, dl_zf_matrices, stats.get());
 
   FastRand fast_rand;
-  size_t start_tsc = Rdtsc();
+  size_t start_tsc = GetTime::Rdtsc();
   for (size_t i = 0; i < kNumIters; i++) {
     uint32_t frame_id = fast_rand.NextU32();
     size_t base_sc_id =
@@ -47,7 +47,7 @@ TEST(TestZF, Perf) {
         cfg->ZfBlockSize();
     compute_zf->Launch(gen_tag_t::FrmSc(frame_id, base_sc_id).tag_);
   }
-  double ms = CyclesToMs(Rdtsc() - start_tsc, cfg->FreqGhz());
+  double ms = GetTime::CyclesToMs(GetTime::Rdtsc() - start_tsc, cfg->FreqGhz());
 
   std::printf("Time per zeroforcing iteration = %.4f ms\n", ms / kNumIters);
 
