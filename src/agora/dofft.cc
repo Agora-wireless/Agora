@@ -182,11 +182,11 @@ EventData DoFFT::Launch(size_t tag) {
   duration_stat->task_duration_[2] += start_tsc2 - start_tsc1;
 
   if (sym_type == SymbolType::kPilot) {
+    size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
     if (kCollectPhyStats) {
-      phy_stats_->UpdatePilotSnr(
-          frame_id, cfg_->Frame().GetPilotSymbolIdx(symbol_id), fft_inout_);
+      phy_stats_->UpdatePilotSnr(frame_id, pilot_symbol_id, fft_inout_);
     }
-    const size_t ue_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
+    const size_t ue_id = pilot_symbol_id;
     PartialTranspose(csi_buffers_[frame_slot][ue_id], ant_id,
                      SymbolType::kPilot);
   } else if (sym_type == SymbolType::kUL) {
