@@ -43,7 +43,7 @@ class Receiver {
   Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
            moodycamel::ConcurrentQueue<EventData>* in_queue_message,
            moodycamel::ProducerToken** in_rx_ptoks);
-  ~Receiver();
+  ~Receiver() = default;
 
   /**
    * Called in main threads to start the socket threads

@@ -55,12 +55,12 @@ int main(int argc, char* argv[]) {
 
   const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  auto* cfg = new Config(FLAGS_conf_file.c_str());
+  auto cfg = std::make_unique<Config>(FLAGS_conf_file.c_str());
 
   const DataGenerator::Profile profile =
       FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123
                              : DataGenerator::Profile::kRandom;
-  DataGenerator data_generator(cfg, 0 /* RNG seed */, profile);
+  DataGenerator data_generator(cfg.get(), 0 /* RNG seed */, profile);
 
   std::printf(
       "DataGenerator: Config file: %s, data profile = %s\n",
@@ -155,7 +155,7 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    LDPCconfig ldpc_config = cfg->LdpcConfig();
+    const LDPCconfig& ldpc_config = cfg->LdpcConfig();
 
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
@@ -200,11 +200,11 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < num_codeblocks; i++) {
       size_t error_in_block = 0;
       for (size_t j = 0; j < ldpc_config.NumCbLen() / 8; j++) {
-        uint8_t input = (uint8_t)information[i][j];
+        auto input = static_cast<uint8_t>(information.at(i).at(j));
         uint8_t output = decoded_codewords[i][j];
         if (input != output) {
-          for (size_t i = 0; i < 8; i++) {
-            uint8_t mask = 1 << i;
+          for (size_t k = 0; k < 8; k++) {
+            uint8_t mask = 1 << k;
             if ((input & mask) != (output & mask)) {
               error_num++;
               error_in_block++;
@@ -228,13 +228,10 @@ int main(int argc, char* argv[]) {
         1.f * error_num / total, block_error_num, num_codeblocks,
         1.f * block_error_num / num_codeblocks);
 
+    std::free(resp_var_nodes);
     modulated_codewords.Free();
     demod_data_all_symbols.Free();
     decoded_codewords.Free();
-    std::free(resp_var_nodes);
   }
-
-  delete cfg;
-
   return 0;
 }

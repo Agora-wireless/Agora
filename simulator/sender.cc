@@ -7,18 +7,19 @@
 #include <thread>
 
 #include "datatype_conversion.h"
+#include "logger.h"
 #include "udp_client.h"
 
-bool keep_running = true;
-
+static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kMacAddrBtyes = 17;
 
+static std::atomic<bool> keep_running = true;
 // A spinning barrier to synchronize the start of worker threads
-std::atomic<size_t> num_workers_ready_atomic;
+static std::atomic<size_t> num_workers_ready_atomic = 0;
 
 void InterruptHandler(int /*unused*/) {
   std::cout << "Will exit..." << std::endl;
-  keep_running = false;
+  keep_running.store(false);
 }
 
 void DelayTicks(uint64_t start, uint64_t ticks) {
@@ -74,13 +75,13 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   }
 
 #ifdef USE_DPDK
-  DpdkTransport::dpdk_init(core_offset, socket_thread_num);
-  mbuf_pool = DpdkTransport::create_mempool(cfg->PacketLength());
+  DpdkTransport::dpdk_init(core_offset, socket_thread_num_);
+  this->mbuf_pool_ = DpdkTransport::create_mempool(cfg->PacketLength());
 
   // Parse IP addresses
-  int ret = inet_pton(AF_INET, cfg->BsRruAddr().c_str(), &bs_rru_addr);
+  int ret = inet_pton(AF_INET, cfg->BsRruAddr().c_str(), &bs_rru_addr_);
   RtAssert(ret == 1, "Invalid sender IP address");
-  ret = inet_pton(AF_INET, cfg->BsServerAddr().c_str(), &bs_server_addr);
+  ret = inet_pton(AF_INET, cfg->BsServerAddr().c_str(), &bs_server_addr_);
   RtAssert(ret == 1, "Invalid server IP address");
 
   RtAssert(cfg->DpdkNumPorts() <= rte_eth_dev_count_avail(),
@@ -89,11 +90,11 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   RtAssert(server_mac_addr_str.length() ==
                (cfg->DpdkNumPorts() * (kMacAddrBtyes + 1) - 1),
            "Invalid length of server MAC address");
-  sender_mac_addr.resize(cfg->DpdkNumPorts());
-  server_mac_addr.resize(cfg->DpdkNumPorts());
+  sender_mac_addr_.resize(cfg->DpdkNumPorts());
+  server_mac_addr_.resize(cfg->DpdkNumPorts());
 
   for (uint16_t port_id = 0; port_id < cfg->DpdkNumPorts(); port_id++) {
-    if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num,
+    if (DpdkTransport::nic_init(port_id, mbuf_pool_, socket_thread_num_,
                                 cfg->PacketLength()) != 0)
       rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
     // Parse MAC addresses
@@ -101,31 +102,42 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
         server_mac_addr_str.substr(port_id * (kMacAddrBtyes + 1), kMacAddrBtyes)
             .c_str());
     RtAssert(parsed_mac != NULL, "Invalid server mac address");
-    std::memcpy(&server_mac_addr[port_id], parsed_mac, sizeof(ether_addr));
+    std::memcpy(&server_mac_addr_[port_id], parsed_mac, sizeof(ether_addr));
 
-    ret = rte_eth_macaddr_get(port_id, &sender_mac_addr[port_id]);
+    ret = rte_eth_macaddr_get(port_id, &sender_mac_addr_[port_id]);
     RtAssert(ret == 0, "Cannot get MAC address of the port");
     std::printf("Number of DPDK cores: %d\n", rte_lcore_count());
   }
 
 #endif
-  num_workers_ready_atomic = 0;
+  num_workers_ready_atomic.store(0);
 }
 
 Sender::~Sender() {
+  keep_running.store(false);
+
+  //\TODO join sender threads
   iq_data_short_.Free();
   for (auto& i : packet_count_per_symbol_) {
-    std::free(i);
+    delete[] i;
   }
+
+  for (size_t i = 0; i < socket_thread_num_; i++) {
+    delete (task_ptok_[i]);
+  }
+  std::free(task_ptok_);
 }
 
 void Sender::StartTx() {
-  frame_start_ = new double[kNumStatsFrames]();
-  frame_end_ = new double[kNumStatsFrames]();
+  this->frame_start_ = new double[kNumStatsFrames]();
+  this->frame_end_ = new double[kNumStatsFrames]();
 
   CreateThreads(PthreadFunWrapper<Sender, &Sender::WorkerThread>, 0,
                 socket_thread_num_);
   MasterThread(0);  // Start the master thread
+
+  delete[](this->frame_start_);
+  delete[](this->frame_end_);
 }
 
 void Sender::StartTXfromMain(double* in_frame_start, double* in_frame_end) {
@@ -162,8 +174,9 @@ void* Sender::MasterThread(int /*unused*/) {
   signal(SIGINT, InterruptHandler);
   PinToCoreWithOffset(ThreadType::kMasterTX, core_offset_, 0);
 
-  // Wait for all worker threads to be ready
-  while (num_workers_ready_atomic != socket_thread_num_) {
+  // Wait for all worker threads to be ready (+1 for Master)
+  num_workers_ready_atomic.fetch_add(1);
+  while (num_workers_ready_atomic.load() < (socket_thread_num_ + 1)) {
     // Wait
   }
 
@@ -182,7 +195,7 @@ void* Sender::MasterThread(int /*unused*/) {
            "Sender: No valid symbols to transmit");
   ScheduleSymbol(0, start_symbol);
 
-  while (keep_running) {
+  while (keep_running.load() == true) {
     gen_tag_t ctag(0);  // The completion tag
     int ret = static_cast<int>(completion_queue_.try_dequeue(ctag.tag_));
     if (ret == 0) {
@@ -245,14 +258,16 @@ void* Sender::MasterThread(int /*unused*/) {
   return nullptr;
 }
 
+/* Worker expects only valid transmit symbol_ids 'U' 'P' */
 void* Sender::WorkerThread(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerTX, core_offset_ + 1, tid);
+  PinToCoreWithOffset(ThreadType::kWorkerTX, (core_offset_ + 1), tid);
 
   // Wait for all Sender threads (including master) to start runnung
-  num_workers_ready_atomic++;
-  while (num_workers_ready_atomic != socket_thread_num_) {
+  num_workers_ready_atomic.fetch_add(1);
+  while (num_workers_ready_atomic.load() < (socket_thread_num_ + 1)) {
     // Wait
   }
+  MLPD_FRAME("Sender: worker thread %d running\n", tid);
 
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
   DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1,
@@ -260,19 +275,22 @@ void* Sender::WorkerThread(int tid) {
   DftiCommitDescriptor(mkl_handle);
 
   const size_t max_symbol_id =
-      cfg_->Frame().NumPilotSyms() + cfg_->Frame().NumULSyms();
-  const size_t radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
-  const size_t radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
+      cfg_->Frame().NumPilotSyms() +
+      cfg_->Frame().NumULSyms();  // TEMP not sure if this is ok
+  const size_t radio_lo = (tid * cfg_->NumRadios()) / socket_thread_num_;
+  const size_t radio_hi = ((tid + 1) * cfg_->NumRadios()) / socket_thread_num_;
   const size_t ant_num_this_thread =
       cfg_->BsAntNum() / socket_thread_num_ +
-      ((size_t)tid < cfg_->BsAntNum() % socket_thread_num_ ? 1 : 0);
+      (static_cast<size_t>(tid) < cfg_->BsAntNum() % socket_thread_num_ ? 1
+                                                                        : 0);
 #ifdef USE_DPDK
   const size_t port_id = tid % cfg_->DpdkNumPorts();
   const size_t queue_id = tid / cfg_->DpdkNumPorts();
   rte_mbuf* tx_mbufs[kDequeueBulkSize];
+#else
+  UDPClient udp_client;
 #endif
 
-  UDPClient udp_client;
   auto* fft_inout =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
@@ -285,8 +303,8 @@ void* Sender::WorkerThread(int tid) {
   size_t total_tx_packets_rolling = 0;
   size_t cur_radio = radio_lo;
 
-  std::printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu\n", (size_t)tid,
-              ant_num_this_thread, cfg_->BsAntNum());
+  MLPD_INFO("Sender: In thread %d, %zu antennas, total bs antennas: %zu\n", tid,
+            ant_num_this_thread, cfg_->BsAntNum());
 
   // We currently don't support zero-padding OFDM prefix and postfix
   RtAssert(cfg_->PacketLength() ==
@@ -295,9 +313,10 @@ void* Sender::WorkerThread(int tid) {
   size_t ant_num_per_cell = cfg_->BsAntNum() / cfg_->NumCells();
 
   size_t tags[kDequeueBulkSize];
-  while (true) {
-    size_t num_tags = send_queue_.try_dequeue_bulk_from_producer(
-        *(task_ptok_[tid]), tags, kDequeueBulkSize);
+  while (keep_running.load() == true) {
+    size_t num_tags = this->send_queue_.try_dequeue_bulk_from_producer(
+        *(this->task_ptok_[tid]), tags, kDequeueBulkSize);
+
     if (num_tags == 0) {
       continue;
     }
@@ -387,6 +406,11 @@ void* Sender::WorkerThread(int tid) {
     RtAssert(completion_queue_.enqueue_bulk(tags, num_tags),
              "Completion enqueue failed");
   }
+  DftiFreeDescriptor(&mkl_handle);
+
+  std::free(static_cast<void*>(socks_pkt_buf));
+  std::free(static_cast<void*>(fft_inout));
+  MLPD_FRAME("Sender: worker thread %d exit\n", tid);
   return nullptr;
 }
 

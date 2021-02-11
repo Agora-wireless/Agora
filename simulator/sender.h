@@ -142,13 +142,13 @@ class Sender {
   double* frame_end_;
 
 #ifdef USE_DPDK
-  struct rte_mempool* mbuf_pool;
-  uint32_t bs_rru_addr;     // IPv4 address of this data sender
-  uint32_t bs_server_addr;  // IPv4 address of the remote target Agora server
+  struct rte_mempool* mbuf_pool_;
+  uint32_t bs_rru_addr_;     // IPv4 address of this data sender
+  uint32_t bs_server_addr_;  // IPv4 address of the remote target Agora server
   // MAC addresses of this data sender
-  std::vector<rte_ether_addr> sender_mac_addr;
+  std::vector<rte_ether_addr> sender_mac_addr_;
   // MAC addresses of the remote target Agora server
-  std::vector<rte_ether_addr> server_mac_addr;
+  std::vector<rte_ether_addr> server_mac_addr_;
 #endif
 };
 

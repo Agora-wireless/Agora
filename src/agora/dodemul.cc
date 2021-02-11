@@ -6,6 +6,8 @@
 
 #include "concurrent_queue_wrapper.h"
 
+using namespace arma;
+
 static constexpr bool kUseSIMDGather = true;
 
 DoDemul::DoDemul(
@@ -38,7 +40,7 @@ DoDemul::DoDemul(
           cfg_->DemulBlockSize() * kMaxUEs * sizeof(complex_float)));
 
   // phase offset calibration data
-  cx_float* ue_pilot_ptr = (cx_float*)cfg_->UeSpecificPilot()[0];
+  auto* ue_pilot_ptr = reinterpret_cast<cx_float*>(cfg_->UeSpecificPilot()[0]);
   cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(), cfg_->UeAntNum(),
                          false);
   ue_pilot_data_ = mat_pilot_data.st();
@@ -65,6 +67,13 @@ DoDemul::~DoDemul() {
   std::free(data_gather_buffer_);
   std::free(equaled_buffer_temp_);
   std::free(equaled_buffer_temp_transposed_);
+
+#if USE_MKL_JIT
+  mkl_jit_status_t status = mkl_jit_destroy(jitter_);
+  if (MKL_JIT_ERROR == status) {
+    std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
+  }
+#endif
 }
 
 EventData DoDemul::Launch(size_t tag) {
@@ -92,7 +101,7 @@ EventData DoDemul::Launch(size_t tag) {
     size_t start_tsc0 = WorkerRdtsc();
 
     // Step 1: Populate data_gather_buffer as a row-major matrix with
-    // kSCsPerCacheline rows and BS_ANT_NUM columns
+    // kSCsPerCacheline rows and BsAntNum() columns
 
     // Since kSCsPerCacheline divides demul_block_size and
     // kTransposeBlockSize, all subcarriers (base_sc_id + i) lie in the
@@ -166,7 +175,7 @@ EventData DoDemul::Launch(size_t tag) {
 #else
       cx_fmat mat_data(data_ptr, cfg->BsAntNum(), 1, false);
 
-      cx_fmat mat_ul_zf(ul_zf_ptr, cfg->UE_NUM, cfg->BsAntNum(), false);
+      cx_fmat mat_ul_zf(ul_zf_ptr, cfg->UeNum, cfg->BsAntNum(), false);
       mat_equaled = mat_ul_zf * mat_data;
 #endif
 
@@ -264,7 +273,7 @@ EventData DoDemul::Launch(size_t tag) {
     //     tid, frame_id, symbol_idx_ul, base_sc_id);
     // cout << "Demuled data : \n ";
     // cout << " UE " << i << ": ";
-    // for (int k = 0; k < max_sc_ite * cfg->mod_order_bits; k++)
+    // for (int k = 0; k < max_sc_ite * cfg->ModOrderBits(); k++)
     //     std::printf("%i ", demul_ptr[k]);
     // cout << endl;
   }

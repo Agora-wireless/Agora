@@ -92,6 +92,7 @@ class Agora {
   void InitializeDownlinkBuffers();
   void FreeUplinkBuffers();
   void FreeDownlinkBuffers();
+  void FreeQueues();
 
   void SaveDecodeDataToFile(int frame_id);
   void SaveTxDataToFile(int frame_id);
@@ -114,7 +115,7 @@ class Agora {
   }
 
   /// Fetch the producer token for this event type
-  moodycamel::ProducerToken* GetPtok(EventType event_type, size_t qid) {
+  moodycamel::ProducerToken* GetPtok(EventType event_type, size_t qid) const {
     return sched_info_arr_[qid][static_cast<size_t>(event_type)].ptok_;
   }
 
@@ -132,17 +133,19 @@ class Agora {
   // Worker thread i runs on core base_worker_core_offset + i
   const size_t base_worker_core_offset_;
 
-  Config* config_;
+  Config* const config_;
   size_t fft_created_count_;
   size_t max_equaled_frame_ = SIZE_MAX;
   std::unique_ptr<PacketTXRX> packet_tx_rx_;
 
-  MacThread* mac_thread_;       // The thread running MAC layer functions
-  std::thread mac_std_thread_;  // Handle for the MAC thread
+  // The thread running MAC layer functions
+  std::unique_ptr<MacThread> mac_thread_;
+  std::thread mac_std_thread_;                     // Handle for the MAC thread
   std::thread worker_std_threads_[kMaxWorkerNum];  // Handle for worker threads
 
-  Stats* stats_;
-  PhyStats* phy_stats_;
+  std::unique_ptr<Stats> stats_;
+  std::unique_ptr<PhyStats> phy_stats_;
+
   pthread_t* task_threads_;
 
   /*****************************************************
@@ -206,7 +209,6 @@ class Agora {
   FrameCounters ifft_counters_;
   FrameCounters tx_counters_;
   FrameCounters tomac_counters_;
-  FrameCounters frommac_counters_;
   FrameCounters rc_counters_;
   RxCounters rx_counters_;
   size_t zf_last_frame_ = SIZE_MAX;

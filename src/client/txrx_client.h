@@ -20,7 +20,6 @@
 #include "client_radio.h"
 #include "concurrentqueue.h"
 #include "net.h"
-#include "radio_lib.h"
 #include "utils.h"
 
 /**
@@ -49,13 +48,13 @@ class RadioTxRx {
     int tid_;
   };
 
-  RadioTxRx(Config* cfg, int n_threads, int in_core_id);
+  RadioTxRx(Config* const cfg, int n_threads, int in_core_id);
   /**
    * N_THREAD: socket thread number
    * mode: tx=1 or rx=0 operation
    * in_queue: message queue to communicate with main thread
    */
-  RadioTxRx(Config* config, int n_threads, int in_core_id,
+  RadioTxRx(Config* const config, int n_threads, int in_core_id,
             moodycamel::ConcurrentQueue<EventData>* in_message_queue,
             moodycamel::ConcurrentQueue<EventData>* in_task_queue,
             moodycamel::ProducerToken** in_rx_ptoks,
@@ -144,9 +143,9 @@ class RadioTxRx {
  private:
   pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
   pthread_cond_t cond_ = PTHREAD_COND_INITIALIZER;
-  Config* config_;
-  ClientRadioConfig* radioconfig_;           // Used only in Argos mode
-  std::vector<struct sockaddr_in> servaddr_; /* server address */
+  Config* const config_;
+  std::unique_ptr<ClientRadioConfig> radioconfig_;  // Used only in Argos mode
+  std::vector<struct sockaddr_in> servaddr_;        /* server address */
   std::vector<int> socket_;
 
   Table<char>* buffer_;

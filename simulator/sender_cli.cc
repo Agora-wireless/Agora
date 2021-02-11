@@ -22,12 +22,16 @@ int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = FLAGS_conf_file;
-  auto* cfg = new Config(filename.c_str());
-  cfg->GenData();
 
-  auto* sender = new Sender(cfg, FLAGS_num_threads, FLAGS_core_offset,
-                            FLAGS_frame_duration, FLAGS_enable_slow_start,
-                            FLAGS_server_mac_addr);
-  sender->StartTx();
+  {
+    auto cfg = std::make_unique<Config>(filename.c_str());
+    cfg->GenData();
+    {
+      auto sender = std::make_unique<Sender>(
+          cfg.get(), FLAGS_num_threads, FLAGS_core_offset, FLAGS_frame_duration,
+          FLAGS_enable_slow_start, FLAGS_server_mac_addr);
+      sender->StartTx();
+    }  // end context sender
+  }    // end context Config
   return 0;
 }

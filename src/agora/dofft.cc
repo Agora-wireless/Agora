@@ -53,8 +53,7 @@ DoFFT::~DoFFT() {
   DftiFreeDescriptor(&mkl_handle_);
   std::free(fft_inout_);
   std::free(rx_samps_tmp_);
-  calib_ul_buffer_.Free();
-  calib_dl_buffer_.Free();
+  std::free(temp_16bits_iq_);
 }
 
 // @brief
@@ -102,7 +101,7 @@ EventData DoFFT::Launch(size_t tag) {
   size_t ant_id = pkt->ant_id_;
   SymbolType sym_type = cfg_->GetSymbolType(symbol_id);
 
-  if (cfg_->FftInRru()) {
+  if (cfg_->FftInRru() == true) {
     SimdConvertFloat16ToFloat32(
         reinterpret_cast<float*>(fft_inout_),
         reinterpret_cast<float*>(&pkt->data_[2 * cfg_->OfdmRxZeroPrefixBs()]),
@@ -173,7 +172,7 @@ EventData DoFFT::Launch(size_t tag) {
   size_t start_tsc1 = WorkerRdtsc();
   duration_stat->task_duration_[1] += start_tsc1 - start_tsc;
 
-  if (!cfg_->FftInRru()) {
+  if (!cfg_->FftInRru() == true) {
     DftiComputeForward(
         mkl_handle_,
         reinterpret_cast<float*>(fft_inout_));  // Compute FFT in-place
@@ -215,7 +214,10 @@ EventData DoFFT::Launch(size_t tag) {
       PartialTranspose(calib_dl_ptr, ant_id, sym_type);
     }
   } else {
-    RtAssert(false, "Unknown or unsupported symbol type");
+    std::string error_message = "Unknown or unsupported symbol type " +
+                                std::to_string(static_cast<int>(sym_type)) +
+                                "\n";
+    RtAssert(false, error_message);
   }
 
   duration_stat->task_duration_[3] += WorkerRdtsc() - start_tsc2;
@@ -241,8 +243,8 @@ void DoFFT::PartialTranspose(complex_float* out_buf, size_t ant_id,
       const complex_float* src = &fft_inout_[sc_idx + cfg_->OfdmDataStart()];
 
       complex_float* dst = nullptr;
-      if (symbol_type == SymbolType::kCalDL ||
-          symbol_type == SymbolType::kCalUL) {
+      if ((symbol_type == SymbolType::kCalDL) ||
+          (symbol_type == SymbolType::kCalUL)) {
         dst = &out_buf[sc_idx];
       } else {
         dst = kUsePartialTrans
@@ -328,7 +330,10 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
   ifft_scale_factor_ = cfg_->OfdmCaNum() / std::sqrt(cfg_->BfAntNum() * 1.f);
 }
 
-DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle_); }
+DoIFFT::~DoIFFT() {
+  DftiFreeDescriptor(&mkl_handle_);
+  std::free(ifft_out_);
+}
 
 EventData DoIFFT::Launch(size_t tag) {
   size_t start_tsc = WorkerRdtsc();
@@ -390,11 +395,11 @@ EventData DoIFFT::Launch(size_t tag) {
   size_t start_tsc2 = WorkerRdtsc();
   duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
 
-  struct Packet* pkt =
-      (struct Packet*)&dl_socket_buffer_[offset * cfg_->DlPacketLength()];
+  auto* pkt = reinterpret_cast<struct Packet*>(
+      &dl_socket_buffer_[offset * cfg_->DlPacketLength()]);
   short* socket_ptr = &pkt->data_[2 * cfg_->OfdmTxZeroPrefix()];
 
-  // IFFT scaled results by OFDM_CA_NUM, we scale down IFFT results
+  // IFFT scaled results by OfdmCaNum(), we scale down IFFT results
   // during data type coversion
   SimdConvertFloatToShort(ifft_out_ptr, socket_ptr, cfg_->OfdmCaNum(),
                           cfg_->CpLen(), ifft_scale_factor_);

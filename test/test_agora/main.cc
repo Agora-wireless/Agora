@@ -174,23 +174,23 @@ int main(int argc, char* argv[]) {
     conf_file = std::string(argv[1]);
   }
 
-  auto* cfg = new Config(conf_file.c_str());
+  auto cfg = std::make_unique<Config>(conf_file.c_str());
   cfg->GenData();
 
   int ret;
   try {
     SignalHandler signal_handler;
     signal_handler.SetupSignalHandlers();
-    auto* agora_cli = new Agora(cfg);
+    auto agora_cli = std::make_unique<Agora>(cfg.get());
     agora_cli->flags_.enable_save_decode_data_to_file_ = true;
     agora_cli->flags_.enable_save_tx_data_to_file_ = true;
     agora_cli->Start();
 
     std::printf("Start correctness check\n");
     if (cfg->DownlinkMode()) {
-      CheckCorrectnessDl(cfg);
+      CheckCorrectnessDl(cfg.get());
     } else {
-      CheckCorrectnessUl(cfg);
+      CheckCorrectnessUl(cfg.get());
     }
 
     ret = EXIT_SUCCESS;

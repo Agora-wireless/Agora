@@ -9,8 +9,8 @@
 static constexpr bool kPrintChannelOutput = false;
 using namespace arma;
 
-Channel::Channel(Config* config_bs, Config* config_ue,
-                 std::string in_channel_type, double in_channel_snr)
+Channel::Channel(const Config* const config_bs, const Config* const config_ue,
+                 std::string& in_channel_type, double in_channel_snr)
     : bscfg_(config_bs),
       uecfg_(config_ue),
       sim_chan_model_(std::move(in_channel_type)),
