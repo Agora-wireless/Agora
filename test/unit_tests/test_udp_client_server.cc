@@ -11,7 +11,7 @@ static constexpr size_t kMessageSize = 9000;
 static constexpr size_t kNumPackets = 10000;
 std::atomic<size_t> server_ready;
 
-void client_func()
+void ClientFunc()
 {
     std::vector<uint8_t> packet(kMessageSize);
     UDPClient udp_client;
@@ -23,14 +23,14 @@ void client_func()
     for (size_t i = 1; i <= kNumPackets; i++) {
         static_assert(kMessageSize >= sizeof(size_t), "");
         *reinterpret_cast<size_t*>(&packet[0]) = i;
-        udp_client.send("localhost", kServerUDPPort, &packet[0], kMessageSize);
+        udp_client.Send("localhost", kServerUDPPort, &packet[0], kMessageSize);
     }
 }
 
 // Spin until kNumPackets are received
-void server_func()
+void ServerFunc()
 {
-    double freq_ghz = measure_rdtsc_freq();
+    double freq_ghz = MeasureRdtscFreq();
     FastRand fast_rand;
 
     // Without buffer resizing, the server will sometimes drop packets and
@@ -40,11 +40,11 @@ void server_func()
 
     server_ready = 1;
     size_t largest_pkt_index = 0;
-    size_t start_time = rdtsc();
+    size_t start_time = Rdtsc();
     size_t num_pkts_received = 0;
     size_t num_pkts_reordered = 0;
     while (true) {
-        ssize_t ret = udp_server.recv_nonblocking(&pkt_buf[0], kMessageSize);
+        ssize_t ret = udp_server.RecvNonblocking(&pkt_buf[0], kMessageSize);
         ASSERT_GE(ret, 0);
         if (ret != 0) {
             auto pkt_index = *reinterpret_cast<size_t*>(&pkt_buf[0]);
@@ -62,7 +62,7 @@ void server_func()
 
     std::printf("Bandwidth = %.2f Gbps/s, number of reordered packets = %zu\n",
         (kNumPackets * kMessageSize * 8)
-            / cycles_to_ns(rdtsc() - start_time, freq_ghz),
+            / CyclesToNs(Rdtsc() - start_time, freq_ghz),
         num_pkts_reordered);
 }
 
@@ -70,8 +70,8 @@ void server_func()
 TEST(UDPClientServer, Perf)
 {
     server_ready = 0;
-    std::thread server_thread(server_func);
-    std::thread client_thread(client_func);
+    std::thread server_thread(ServerFunc);
+    std::thread client_thread(ClientFunc);
 
     server_thread.join();
     client_thread.join();
@@ -85,7 +85,7 @@ TEST(UDPClientServer, ServerIsNonBlocking)
 
     // If the UDP server is blocking, this call never completes because there is
     // no data to receive
-    ssize_t ret = udp_server.recv_nonblocking(&packet[0], kMessageSize);
+    ssize_t ret = udp_server.RecvNonblocking(&packet[0], kMessageSize);
     ASSERT_EQ(ret, 0);
 }
 

@@ -28,8 +28,8 @@ class UDPClient {
 public:
     UDPClient()
     {
-        sock_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        if (sock_fd == -1) {
+        sock_fd_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (sock_fd_ == -1) {
             throw std::runtime_error(
                 "UDPClient: Failed to create local socket.");
         }
@@ -39,10 +39,12 @@ public:
 
     ~UDPClient()
     {
-        for (auto kv : addrinfo_map)
+        for (auto kv : addrinfo_map_) {
             freeaddrinfo(kv.second);
-        if (sock_fd != -1)
-            close(sock_fd);
+        }
+        if (sock_fd_ != -1) {
+            close(sock_fd_);
+        }
     }
 
     /**
@@ -56,14 +58,14 @@ public:
      * @param msg Pointer to the message to send
      * @param len Length in bytes of the message to send
      */
-    void send(const std::string rem_hostname, uint16_t rem_port,
+    void Send(const std::string rem_hostname, uint16_t rem_port,
         const uint8_t* msg, size_t len)
     {
         std::string remote_uri = rem_hostname + ":" + std::to_string(rem_port);
         struct addrinfo* rem_addrinfo = nullptr;
 
-        if (addrinfo_map.count(remote_uri) != 0) {
-            rem_addrinfo = addrinfo_map.at(remote_uri);
+        if (addrinfo_map_.count(remote_uri) != 0) {
+            rem_addrinfo = addrinfo_map_.at(remote_uri);
         } else {
             char port_str[16];
             snprintf(port_str, sizeof(port_str), "%u", rem_port);
@@ -84,32 +86,32 @@ public:
                 throw std::runtime_error(issue_msg);
             }
 
-            addrinfo_map[remote_uri] = rem_addrinfo;
+            addrinfo_map_[remote_uri] = rem_addrinfo;
         }
 
-        ssize_t ret = sendto(sock_fd, msg, len, 0, rem_addrinfo->ai_addr,
+        ssize_t ret = sendto(sock_fd_, msg, len, 0, rem_addrinfo->ai_addr,
             rem_addrinfo->ai_addrlen);
         if (ret != static_cast<ssize_t>(len)) {
             throw std::runtime_error("sendto() failed. errno = "
                 + std::string(std::strerror(errno)));
         }
 
-        if (enable_recording_flag) {
-            sent_vec.push_back(std::vector<uint8_t>(msg, msg + len));
+        if (enable_recording_flag_) {
+            sent_vec_.push_back(std::vector<uint8_t>(msg, msg + len));
         }
     }
 
     // Enable recording of all packets sent by this UDP client
-    void enable_recording() { enable_recording_flag = true; }
+    void EnableRecording() { enable_recording_flag_ = true; }
 
 private:
-    int sock_fd = -1;
+    int sock_fd_ = -1;
 
     // A cache mapping hostname:udp_port to addrinfo
-    std::map<std::string, struct addrinfo*> addrinfo_map;
+    std::map<std::string, struct addrinfo*> addrinfo_map_;
 
     // The list of all packets sent, maintained if recording is enabled
-    std::vector<std::vector<uint8_t>> sent_vec;
+    std::vector<std::vector<uint8_t>> sent_vec_;
 
-    bool enable_recording_flag = false; // If true, we record all sent packets
+    bool enable_recording_flag_ = false; // If true, we record all sent packets
 };

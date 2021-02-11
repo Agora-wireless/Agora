@@ -1,10 +1,10 @@
 #ifndef GETTIME_H
 #define GETTIME_H
 
-#include "Symbols.hpp"
+#include "symbols.h"
 
 // Get current time in microseconds
-static inline double get_time_us(void)
+static inline double GetTimeUs(void)
 {
     struct timespec tv;
     clock_gettime(CLOCK_MONOTONIC, &tv);
@@ -13,10 +13,10 @@ static inline double get_time_us(void)
 
 // Get current time in microseconds. This can be deleted after we replace
 // all occurences of get_time() with get_time_us()
-static inline double get_time(void) { return get_time_us(); }
+static inline double GetTime(void) { return GetTimeUs(); }
 
 /// Return the TSC
-static inline size_t rdtsc()
+static inline size_t Rdtsc()
 {
     uint64_t rax;
     uint64_t rdx;
@@ -26,29 +26,31 @@ static inline size_t rdtsc()
 
 /// Return the TSC or zero, depending on whether timing of workers is
 /// enabled
-static inline size_t worker_rdtsc()
+static inline size_t WorkerRdtsc()
 {
-    return kIsWorkerTimingEnabled ? rdtsc() : 0;
+    return kIsWorkerTimingEnabled ? Rdtsc() : 0;
 }
 
 /// Sleep for some nanoseconds
-static inline void nano_sleep(size_t ns, double freq_ghz)
+static inline void NanoSleep(size_t ns, double freq_ghz)
 {
-    size_t start = rdtsc();
+    size_t start = Rdtsc();
     size_t end = start;
     size_t upp = static_cast<size_t>(freq_ghz * ns);
-    while (end - start < upp)
-        end = rdtsc();
+    while (end - start < upp) {
+        end = Rdtsc();
+    }
 }
 
 /// Measure the frequency of RDTSC based by comparing against
 /// CLOCK_REALTIME. This is a pretty function that should be called only
 /// during initialization.
-static inline double measure_rdtsc_freq()
+static inline double MeasureRdtscFreq()
 {
-    struct timespec start, end;
+    struct timespec start;
+    struct timespec end;
     clock_gettime(CLOCK_REALTIME, &start);
-    uint64_t rdtsc_start = rdtsc();
+    uint64_t rdtsc_start = Rdtsc();
 
     // Do not change this loop! The hardcoded value below depends on this
     // loop and prevents it from being optimized out.
@@ -65,7 +67,7 @@ static inline double measure_rdtsc_freq()
     uint64_t clock_ns
         = static_cast<uint64_t>(end.tv_sec - start.tv_sec) * 1000000000
         + static_cast<uint64_t>(end.tv_nsec - start.tv_nsec);
-    uint64_t rdtsc_cycles = rdtsc() - rdtsc_start;
+    uint64_t rdtsc_cycles = Rdtsc() - rdtsc_start;
 
     double freq_ghz = rdtsc_cycles * 1.0 / clock_ns;
 
@@ -78,49 +80,49 @@ static inline double measure_rdtsc_freq()
 }
 
 /// Convert cycles measured by rdtsc with frequence \p freq_ghz to seconds
-static inline double cycles_to_sec(size_t cycles, double freq_ghz)
+static inline double CyclesToSec(size_t cycles, double freq_ghz)
 {
     return (cycles / (freq_ghz * 1000000000));
 }
 
 /// Convert cycles measured by rdtsc with frequence \p freq_ghz to
 /// milliseconds
-static inline double cycles_to_ms(size_t cycles, double freq_ghz)
+static inline double CyclesToMs(size_t cycles, double freq_ghz)
 {
     return (cycles / (freq_ghz * 1000000));
 }
 
 /// Convert cycles measured by rdtsc with frequence \p freq_ghz to
 /// microseconds
-static inline double cycles_to_us(size_t cycles, double freq_ghz)
+static inline double CyclesToUs(size_t cycles, double freq_ghz)
 {
     return (cycles / (freq_ghz * 1000));
 }
 
 /// Convert cycles measured by rdtsc with frequence \p freq_ghz to
 /// nanoseconds
-static inline double cycles_to_ns(size_t cycles, double freq_ghz)
+static inline double CyclesToNs(size_t cycles, double freq_ghz)
 {
     return (cycles / freq_ghz);
 }
 
-static inline size_t ms_to_cycles(double ms, double freq_ghz)
+static inline size_t MsToCycles(double ms, double freq_ghz)
 {
     return static_cast<size_t>(ms * 1000 * 1000 * freq_ghz);
 }
 
-static inline size_t us_to_cycles(double us, double freq_ghz)
+static inline size_t UsToCycles(double us, double freq_ghz)
 {
     return static_cast<size_t>(us * 1000 * freq_ghz);
 }
 
-static inline size_t ns_to_cycles(double ns, double freq_ghz)
+static inline size_t NsToCycles(double ns, double freq_ghz)
 {
     return static_cast<size_t>(ns * freq_ghz);
 }
 
 /// Return seconds elapsed since timestamp \p t0
-static inline double sec_since(const struct timespec& t0)
+static inline double SecSince(const struct timespec& t0)
 {
     struct timespec t1;
     clock_gettime(CLOCK_REALTIME, &t1);
@@ -128,7 +130,7 @@ static inline double sec_since(const struct timespec& t0)
 }
 
 /// Return nanoseconds elapsed since timestamp \p t0
-static inline double ns_since(const struct timespec& t0)
+static inline double NsSince(const struct timespec& t0)
 {
     struct timespec t1;
     clock_gettime(CLOCK_REALTIME, &t1);
