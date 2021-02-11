@@ -15,7 +15,7 @@
 #include "utils_ldpc.h"
 
 Config::Config(const std::string& jsonfile)
-    : freq_ghz_(MeasureRdtscFreq()),
+    : freq_ghz_(GetTime::MeasureRdtscFreq()),
       ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_("") {
   pilots_ = nullptr;
@@ -141,7 +141,7 @@ Config::Config(const std::string& jsonfile)
   ofdm_data_start_ =
       tdd_conf.value("ofdm_data_start", (ofdm_ca_num_ - ofdm_data_num_) / 2);
   ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
-  downlink_mode_ = tdd_conf.value("downlink_mode", false);
+
   bigstation_mode_ = tdd_conf.value("bigstation_mode", false);
   freq_orthogonal_pilot_ = tdd_conf.value("freq_orthogonal_pilot", false);
   correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
@@ -326,7 +326,6 @@ Config::Config(const std::string& jsonfile)
   }
   ue_ant_offset_ = tdd_conf.value("ue_ant_offset", 0);
   total_ue_ant_num_ = tdd_conf.value("total_ue_ant_num", ue_ant_num_);
-  downlink_mode_ = frame_.NumDLSyms() > 0;
 
   // Agora configurations
   frames_to_test_ = tdd_conf.value("frames_to_test", 9600);

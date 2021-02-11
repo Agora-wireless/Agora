@@ -175,7 +175,8 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
 
     if (kIsWorkerTimingEnabled) {
       if (prev_frame_id == SIZE_MAX or pkt->frame_id_ > prev_frame_id) {
-        (*frame_start_)[tid][pkt->frame_id_ % kNumStatsFrames] = Rdtsc();
+        (*frame_start_)[tid][pkt->frame_id_ % kNumStatsFrames] =
+            GetTime::Rdtsc();
         prev_frame_id = pkt->frame_id_;
       }
     }

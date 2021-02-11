@@ -309,7 +309,7 @@ bool RadioConfig::RadioStart() {
     init_calib_dl_.Calloc(calib_meas_num_,
                           cfg_->OfdmDataNum() * cfg_->BfAntNum(),
                           Agora_memory::Alignment_t::kAlign64);
-    if (cfg_->DownlinkMode()) {
+    if (cfg_->Frame().NumDLSyms() > 0) {
       int iter = 0;
       int max_iter = 3;
       std::cout << "Start initial reciprocity calibration..." << std::endl;

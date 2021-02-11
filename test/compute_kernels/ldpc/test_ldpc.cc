@@ -28,9 +28,9 @@ static constexpr size_t kK5GnrNumPunctured = 2;
 static constexpr size_t kNumRows = 46;
 
 int main() {
-  double freq_ghz = MeasureRdtscFreq();
+  double freq_ghz = GetTime::MeasureRdtscFreq();
   std::printf("Spinning for one second for Turbo Boost\n");
-  NanoSleep(1000 * 1000 * 1000, freq_ghz);
+  GetTime::NanoSleep(1000 * 1000 * 1000, freq_ghz);
   int8_t* input[kNumCodeBlocks];
   int8_t* parity[kNumCodeBlocks];
   int8_t* encoded[kNumCodeBlocks];
@@ -69,14 +69,14 @@ int main() {
       }
     }
 
-    const size_t encoding_start_tsc = Rdtsc();
+    const size_t encoding_start_tsc = GetTime::Rdtsc();
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
       LdpcEncodeHelper(kBaseGraph, zc, kNumRows, encoded[n], parity[n],
                        input[n]);
     }
 
     const double encoding_us =
-        CyclesToUs(Rdtsc() - encoding_start_tsc, freq_ghz);
+        GetTime::CyclesToUs(GetTime::Rdtsc() - encoding_start_tsc, freq_ghz);
 
     // For decoding, generate log-likelihood ratios, one byte per input bit
     int8_t* llrs[kNumCodeBlocks];
@@ -108,7 +108,7 @@ int main() {
             Agora_memory::Alignment_t::kAlign32, buffer_len * sizeof(int16_t)));
 
     // Decoding
-    const size_t decoding_start_tsc = Rdtsc();
+    const size_t decoding_start_tsc = GetTime::Rdtsc();
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
       ldpc_decoder_5gnr_request.varNodes = llrs[n];
       ldpc_decoder_5gnr_response.compactedMessageBytes = decoded[n];
@@ -117,7 +117,7 @@ int main() {
     }
 
     const double decoding_us =
-        CyclesToUs(Rdtsc() - decoding_start_tsc, freq_ghz);
+        GetTime::CyclesToUs(GetTime::Rdtsc() - decoding_start_tsc, freq_ghz);
 
     // Check for errors
     size_t err_cnt = 0;

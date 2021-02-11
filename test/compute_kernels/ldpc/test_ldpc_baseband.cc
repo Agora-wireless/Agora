@@ -332,8 +332,8 @@ int main(int argc, char* argv[]) {
     Table<uint8_t> decoded_codewords;
     decoded_codewords.Calloc(num_codeblocks, cfg->OfdmDataNum(),
                              Agora_memory::Alignment_t::kAlign64);
-    double freq_ghz = MeasureRdtscFreq();
-    size_t start_tsc = WorkerRdtsc();
+    double freq_ghz = GetTime::MeasureRdtscFreq();
+    size_t start_tsc = GetTime::WorkerRdtsc();
     for (size_t i = 0; i < cfg->UeAntNum(); i++) {
       for (size_t j = 0; j < num_cbs_per_ue; j++) {
         ldpc_decoder_5gnr_request.varNodes =
@@ -345,10 +345,11 @@ int main(int argc, char* argv[]) {
                                 &ldpc_decoder_5gnr_response);
       }
     }
-    size_t duration = WorkerRdtsc() - start_tsc;
+
+    size_t duration = GetTime::WorkerRdtsc() - start_tsc;
     std::printf("Decoding of %zu blocks takes %.2f us per block\n",
                 num_codeblocks,
-                CyclesToUs(duration, freq_ghz) / num_codeblocks);
+                GetTime::CyclesToUs(duration, freq_ghz) / num_codeblocks);
 
     // Correctness check
     size_t error_num = 0;
@@ -386,16 +387,16 @@ int main(int argc, char* argv[]) {
         1.f * error_num / total, block_error_num, num_codeblocks,
         1.f * block_error_num / num_codeblocks);
 
+    std::free(resp_var_nodes);
+    demod_data_all_symbols.Free();
+    equalized_data_all_symbols.Free();
+    precoder.Free();
     tx_data_all_symbols.Free();
+    rx_data_all_symbols.Free();
     csi_matrices_no_noise.Free();
     csi_matrices_pilot.Free();
     csi_matrices_data.Free();
-    rx_data_all_symbols.Free();
-    precoder.Free();
-    equalized_data_all_symbols.Free();
-    demod_data_all_symbols.Free();
     decoded_codewords.Free();
-    std::free(resp_var_nodes);
   }
   return 0;
 }

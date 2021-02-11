@@ -58,6 +58,16 @@ class Agora {
   } flags_;
 
  private:
+  enum ScheduleProcessingFlags : uint8_t {
+    kNone = 0,
+    kUplinkComplete = 0x1,
+    kDownlinkComplete = 0x2,
+    kProcessingComplete = (kUplinkComplete + kDownlinkComplete)
+  };
+  bool CheckWorkComplete(size_t frame_id);
+  void CheckIncrementScheduleFrame(size_t frame_id,
+                                   ScheduleProcessingFlags completed);
+
   void WorkerFft(int tid);
   void WorkerZf(int tid);
   void WorkerDemul(int tid);
@@ -198,7 +208,8 @@ class Agora {
   Table<complex_float> ue_spec_pilot_buffer_;
 
   // Counters related to various modules
-  FrameCounters fft_counters_;
+  FrameCounters pilot_fft_counters_;
+  FrameCounters uplink_fft_counters_;
   FrameCounters zf_counters_;
   FrameCounters demul_counters_;
   FrameCounters decode_counters_;
@@ -224,6 +235,9 @@ class Agora {
   std::vector<size_t> fft_cur_frame_for_symbol_;
   // The frame index for a symbol whose encode is done
   std::vector<size_t> encode_cur_frame_for_symbol_;
+
+  // The frame index for a symbol whose precode is done
+  std::vector<size_t> precode_cur_frame_for_symbol_;
 
   // Per-frame queues of delayed FFT tasks. The queue contains offsets into
   // TX/RX buffers.
@@ -291,6 +305,8 @@ class Agora {
 
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
+
+  uint8_t schedule_process_flags_;
 };
 
 #endif  // AGORA_H_

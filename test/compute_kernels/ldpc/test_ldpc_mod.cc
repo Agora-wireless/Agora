@@ -42,8 +42,11 @@ float RandFloat(float min, float max) {
 }
 
 float RandFloatFromShort(float min, float max) {
-  float rand_val = ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
-  short rand_val_ushort = (short)(rand_val * 32768);
+  float rand_val =
+      ((static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) *
+       (max - min)) +
+      min;
+  auto rand_val_ushort = static_cast<short>(rand_val * 32768);
   rand_val = (float)rand_val_ushort / 32768;
   return rand_val;
 }
@@ -179,18 +182,19 @@ int main(int argc, char* argv[]) {
     decoded_codewords.Calloc(num_codeblocks, cfg->OfdmDataNum(),
                              Agora_memory::Alignment_t::kAlign64);
 
-    double freq_ghz = MeasureRdtscFreq();
-    size_t start_tsc = WorkerRdtsc();
+    double freq_ghz = GetTime::MeasureRdtscFreq();
+    size_t start_tsc = GetTime::WorkerRdtsc();
     for (size_t i = 0; i < num_codeblocks; i++) {
       ldpc_decoder_5gnr_request.varNodes = demod_data_all_symbols[i];
       ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_codewords[i];
       bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                               &ldpc_decoder_5gnr_response);
     }
-    size_t duration = WorkerRdtsc() - start_tsc;
+
+    size_t duration = GetTime::WorkerRdtsc() - start_tsc;
     std::printf("Decoding of %zu blocks takes %.2f us per block\n",
                 num_codeblocks,
-                CyclesToUs(duration, freq_ghz) / num_codeblocks);
+                GetTime::CyclesToUs(duration, freq_ghz) / num_codeblocks);
 
     // Correctness check
     size_t error_num = 0;

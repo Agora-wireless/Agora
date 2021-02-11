@@ -33,19 +33,18 @@ Agora::Agora(Config* const cfg)
 
   PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0,
                       false /* quiet */);
+  CheckIncrementScheduleFrame(0, ScheduleProcessingFlags::kProcessingComplete);
   // Important to set cur_sche_frame_id_ after the call to
   // CheckIncrementScheduleFrame because it will be incremented however,
   // CheckIncrementScheduleFrame will initialize the schedule tracking variable
   // correctly.
   cur_sche_frame_id_ = 0;
   cur_proc_frame_id_ = 0;
+
   InitializeQueues();
   InitializeUplinkBuffers();
+  InitializeDownlinkBuffers();
 
-  if (config_->Frame().NumDLSyms() > 0) {
-    std::printf("Agora: Initializing downlink buffers\n");
-    InitializeDownlinkBuffers();
-  }
   /* Initialize TXRX threads */
   packet_tx_rx_ = std::make_unique<PacketTXRX>(
       cfg, cfg->CoreOffset() + 1, &message_queue_,
@@ -62,7 +61,7 @@ Agora::Agora(Config* const cfg)
     mac_std_thread_ = std::thread(&MacThread::RunEventLoop, mac_thread_.get());
   }
 
-  /* Create worker threads */
+  // Create worker threads
   CreateThreads();
 
   MLPD_INFO(
@@ -84,12 +83,12 @@ Agora::~Agora() {
     worker_thread.join();
   }
 
-  FreeQueues();
   FreeUplinkBuffers();
-  /* Downlink */
-  if (config_->Frame().NumDLSyms() > 0) {
-    FreeDownlinkBuffers();
-  }
+  FreeDownlinkBuffers();
+
+  stats_.reset();
+  phy_stats_.reset();
+  FreeQueues();
 }
 
 void Agora::Stop() {
@@ -243,20 +242,19 @@ void Agora::Start() {
   const auto& cfg = this->config_;
 
   // Start packet I/O
-  if (!packet_tx_rx_->StartTxRx(socket_buffer_, socket_buffer_status_,
-                                socket_buffer_status_size_,
-                                stats_->frame_start_, dl_socket_buffer_,
-                                calib_dl_buffer_, calib_ul_buffer_)) {
+  if (packet_tx_rx_->StartTxRx(socket_buffer_, socket_buffer_status_,
+                               socket_buffer_status_size_,
+                               this->stats_->FrameStart(), dl_socket_buffer_,
+                               calib_dl_buffer_, calib_ul_buffer_) == false) {
     this->Stop();
     return;
   }
 
-  PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0,
-                      false /* quiet */);
+  PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0);
 
   // Counters for printing summary
   size_t tx_count = 0;
-  double tx_begin = GetTimeUs();
+  double tx_begin = GetTime::GetTimeUs();
 
   bool is_turn_to_dequeue_from_io = true;
   const size_t max_events_needed =
@@ -324,14 +322,15 @@ void Agora::Start() {
             size_t frame_id = gen_tag_t(event.tags_[tag_id]).frame_id_;
             PrintPerTaskDone(PrintType::kZF, frame_id, 0,
                              zf_counters_.GetTaskCount(frame_id));
-            if (zf_counters_.LastTask(frame_id)) {
-              stats_->MasterSetTsc(TsType::kZFDone, frame_id);
+            bool last_zf_task = this->zf_counters_.CompleteTask(frame_id);
+            if (last_zf_task == true) {
+              this->stats_->MasterSetTsc(TsType::kZFDone, frame_id);
               zf_last_frame_ = frame_id;
               PrintPerFrameDone(PrintType::kZF, frame_id);
+              this->zf_counters_.Reset(frame_id);
 
-              // If all the data in a frame has arrived when ZF is done
               for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
-                if (fft_cur_frame_for_symbol_[i] == frame_id) {
+                if (this->fft_cur_frame_for_symbol_.at(i) == frame_id) {
                   ScheduleSubcarriers(EventType::kDemul, frame_id, i);
                 }
               }
@@ -344,7 +343,7 @@ void Agora::Start() {
                                       cfg->Frame().GetDLSymbol(i));
                 }
               }
-            }
+            }  // end if (zf_counters_.last_task(frame_id) == true)
           }
         } break;
 
@@ -353,20 +352,26 @@ void Agora::Start() {
           size_t symbol_idx_ul = gen_tag_t(event.tags_[0]).symbol_id_;
           size_t base_sc_id = gen_tag_t(event.tags_[0]).sc_id_;
 
-          PrintPerTaskDone(PrintType::kDemul, frame_id, symbol_idx_ul,
-                           base_sc_id);
-          if (demul_counters_.LastTask(frame_id, symbol_idx_ul)) {
+          PrintPerTaskDone(PrintType::kDemul, frame_id,
+                           cfg->Frame().GetULSymbol(symbol_idx_ul), base_sc_id);
+          bool last_demul_task =
+              this->demul_counters_.CompleteTask(frame_id, symbol_idx_ul);
+
+          if (last_demul_task == true) {
             ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_idx_ul);
             PrintPerSymbolDone(PrintType::kDemul, frame_id, symbol_idx_ul);
-            if (demul_counters_.LastSymbol(frame_id)) {
+            bool last_demul_symbol =
+                this->demul_counters_.CompleteSymbol(frame_id);
+            if (last_demul_symbol == true) {
+              this->demul_counters_.Reset(frame_id);
               max_equaled_frame_ = frame_id;
-              if (!cfg->BigstationMode()) {
+              if (cfg->BigstationMode() == false) {
                 assert(cur_sche_frame_id_ == frame_id);
-                cur_sche_frame_id_++;
+                CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
               } else {
                 ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_idx_ul);
               }
-              stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
+              this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
               PrintPerFrameDone(PrintType::kDemul, frame_id);
             }
           }
@@ -376,19 +381,22 @@ void Agora::Start() {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_idx_ul = gen_tag_t(event.tags_[0]).symbol_id_;
 
-          if (decode_counters_.LastTask(frame_id, symbol_idx_ul)) {
-            if (kEnableMac) {
+          bool last_decode_task =
+              this->decode_counters_.CompleteTask(frame_id, symbol_idx_ul);
+          if (last_decode_task == true) {
+            if (kEnableMac == true) {
               ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_idx_ul);
             }
             PrintPerSymbolDone(PrintType::kDecode, frame_id, symbol_idx_ul);
-            if (decode_counters_.LastSymbol(frame_id)) {
-              stats_->MasterSetTsc(TsType::kDecodeDone, frame_id);
+            bool last_decode_symbol =
+                this->decode_counters_.CompleteSymbol(frame_id);
+            if (last_decode_symbol == true) {
+              this->stats_->MasterSetTsc(TsType::kDecodeDone, frame_id);
               PrintPerFrameDone(PrintType::kDecode, frame_id);
-              if (!kEnableMac) {
-                assert(cur_proc_frame_id_ == frame_id);
-                cur_proc_frame_id_++;
-                stats_->UpdateStatsInFunctionsUplink(frame_id);
-                if (stats_->last_frame_id_ == cfg->FramesToTest() - 1) {
+              if (kEnableMac == false) {
+                assert(this->cur_proc_frame_id_ == frame_id);
+                bool work_finished = this->CheckWorkComplete(frame_id);
+                if (work_finished == true) {
                   goto finish;
                 }
               }
@@ -407,16 +415,21 @@ void Agora::Start() {
         case EventType::kPacketToMac: {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_idx_ul = gen_tag_t(event.tags_[0]).symbol_id_;
-          if (tomac_counters_.LastTask(frame_id, symbol_idx_ul)) {
+
+          bool last_tomac_task =
+              this->tomac_counters_.CompleteTask(frame_id, symbol_idx_ul);
+          if (last_tomac_task == true) {
             PrintPerSymbolDone(PrintType::kPacketToMac, frame_id,
                                symbol_idx_ul);
-            if (tomac_counters_.LastSymbol(frame_id)) {
-              assert(cur_proc_frame_id_ == frame_id);
-              cur_proc_frame_id_++;
-              // stats->master_set_tsc(TsType::kMacTXDone, frame_id);
+
+            bool last_tomac_symbol =
+                this->tomac_counters_.CompleteSymbol(frame_id);
+            if (last_tomac_symbol == true) {
+              assert(this->cur_proc_frame_id_ == frame_id);
+              // this->stats_->MasterSetTsc(TsType::kMacTXDone, frame_id);
               PrintPerFrameDone(PrintType::kPacketToMac, frame_id);
-              stats_->UpdateStatsInFunctionsUplink(frame_id);
-              if (stats_->last_frame_id_ == cfg->FramesToTest() - 1) {
+              bool work_finished = this->CheckWorkComplete(frame_id);
+              if (work_finished == true) {
                 goto finish;
               }
             }
@@ -429,15 +442,22 @@ void Agora::Start() {
             size_t frame_id = gen_tag_t(event.tags_[i]).frame_id_;
             size_t symbol_id = gen_tag_t(event.tags_[i]).symbol_id_;
             size_t symbol_idx_dl = cfg->Frame().GetDLSymbolIdx(symbol_id);
-            if (encode_counters_.LastTask(frame_id, symbol_idx_dl)) {
-              encode_cur_frame_for_symbol_[symbol_idx_dl] = frame_id;
+
+            bool last_encode_task =
+                encode_counters_.CompleteTask(frame_id, symbol_idx_dl);
+            if (last_encode_task == true) {
+              this->encode_cur_frame_for_symbol_.at(symbol_idx_dl) = frame_id;
               // If precoder of the current frame exists
               if (zf_last_frame_ == frame_id) {
                 ScheduleSubcarriers(EventType::kPrecode, frame_id, symbol_id);
               }
               PrintPerSymbolDone(PrintType::kEncode, frame_id, symbol_idx_dl);
-              if (encode_counters_.LastSymbol(frame_id)) {
-                stats_->MasterSetTsc(TsType::kEncodeDone, frame_id);
+
+              bool last_encode_symbol =
+                  this->encode_counters_.CompleteSymbol(frame_id);
+              if (last_encode_symbol == true) {
+                this->encode_counters_.Reset(frame_id);
+                this->stats_->MasterSetTsc(TsType::kEncodeDone, frame_id);
                 PrintPerFrameDone(PrintType::kEncode, frame_id);
               }
             }
@@ -445,17 +465,24 @@ void Agora::Start() {
         } break;
 
         case EventType::kPrecode: {
-          /* Precoding is done, schedule ifft */
+          // Precoding is done, schedule ifft
           size_t sc_id = gen_tag_t(event.tags_[0]).sc_id_;
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           size_t symbol_idx_dl = cfg->Frame().GetDLSymbolIdx(symbol_id);
           PrintPerTaskDone(PrintType::kPrecode, frame_id, symbol_idx_dl, sc_id);
-          if (precode_counters_.LastTask(frame_id, symbol_idx_dl)) {
+          bool last_precode_task =
+              this->precode_counters_.CompleteTask(frame_id, symbol_idx_dl);
+
+          if (last_precode_task == true) {
             ScheduleAntennas(EventType::kIFFT, frame_id, symbol_id);
             PrintPerSymbolDone(PrintType::kPrecode, frame_id, symbol_idx_dl);
-            if (precode_counters_.LastSymbol(frame_id)) {
-              stats_->MasterSetTsc(TsType::kPrecodeDone, frame_id);
+
+            bool last_precode_symbol =
+                this->precode_counters_.CompleteSymbol(frame_id);
+            if (last_precode_symbol == true) {
+              this->precode_counters_.Reset(frame_id);
+              this->stats_->MasterSetTsc(TsType::kPrecodeDone, frame_id);
               PrintPerFrameDone(PrintType::kPrecode, frame_id);
             }
           }
@@ -473,16 +500,20 @@ void Agora::Start() {
                                EventData(EventType::kPacketTX, event.tags_[0]));
             PrintPerTaskDone(PrintType::kIFFT, frame_id, symbol_idx_dl, ant_id);
 
-            if (ifft_counters_.LastTask(frame_id, symbol_idx_dl)) {
+            bool last_ifft_task =
+                this->ifft_counters_.CompleteTask(frame_id, symbol_idx_dl);
+            if (last_ifft_task == true) {
               PrintPerSymbolDone(PrintType::kIFFT, frame_id, symbol_idx_dl);
-              if (ifft_counters_.LastSymbol(frame_id)) {
-                stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
+
+              bool last_ifft_symbol =
+                  this->ifft_counters_.CompleteSymbol(frame_id);
+              if (last_ifft_symbol == true) {
+                this->stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
                 PrintPerFrameDone(PrintType::kIFFT, frame_id);
-                assert(frame_id == cur_proc_frame_id_);
-                cur_proc_frame_id_++;
-                cur_sche_frame_id_++;
-                stats_->UpdateStatsInFunctionsDownlink(frame_id);
-                if (stats_->last_frame_id_ == cfg->FramesToTest() - 1) {
+                assert(frame_id == this->cur_proc_frame_id_);
+                this->CheckIncrementScheduleFrame(frame_id, kDownlinkComplete);
+                bool work_finished = this->CheckWorkComplete(frame_id);
+                if (work_finished == true) {
                   goto finish;
                 }
               }
@@ -491,49 +522,55 @@ void Agora::Start() {
         } break;
 
         case EventType::kPacketTX: {
-          /* Data is sent */
+          // Data is sent
           size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           size_t symbol_idx_dl = cfg->Frame().GetDLSymbolIdx(symbol_id);
           PrintPerTaskDone(PrintType::kPacketTX, frame_id, symbol_idx_dl,
                            ant_id);
-          if (tx_counters_.LastTask(frame_id, symbol_idx_dl)) {
+
+          bool last_tx_task =
+              this->tx_counters_.CompleteTask(frame_id, symbol_idx_dl);
+          if (last_tx_task == true) {
             PrintPerSymbolDone(PrintType::kPacketTX, frame_id, symbol_idx_dl);
             /* If tx of the first symbol is done */
             if (symbol_id == cfg->Frame().GetDLSymbol(0)) {
-              stats_->MasterSetTsc(TsType::kTXProcessedFirst, frame_id);
+              this->stats_->MasterSetTsc(TsType::kTXProcessedFirst, frame_id);
               PrintPerFrameDone(PrintType::kPacketTXFirst, frame_id);
             }
-            if (tx_counters_.LastSymbol(frame_id)) {
-              stats_->MasterSetTsc(TsType::kTXDone, frame_id);
+
+            bool last_tx_symbol = this->tx_counters_.CompleteSymbol(frame_id);
+            if (last_tx_symbol == true) {
+              this->stats_->MasterSetTsc(TsType::kTXDone, frame_id);
               PrintPerFrameDone(PrintType::kPacketTX, frame_id);
-              if (stats_->last_frame_id_ == cfg->FramesToTest() - 1) {
+              this->tx_counters_.Reset(frame_id);
+              if (frame_id == (this->config_->FramesToTest() - 1)) {
                 goto finish;
               }
             }
 
             tx_count++;
-            if (tx_count == tx_counters_.max_symbol_count_ * 9000) {
+            if (tx_count == tx_counters_.MaxSymbolCount() * 9000) {
               tx_count = 0;
-              double diff = GetTimeUs() - tx_begin;
+              double diff = GetTime::GetTimeUs() - tx_begin;
               int samples_num_per_ue =
-                  cfg->OfdmDataNum() * tx_counters_.max_symbol_count_ * 1000;
+                  cfg->OfdmDataNum() * tx_counters_.MaxSymbolCount() * 1000;
 
-              std::printf(
+              MLPD_INFO(
                   "TX %d samples (per-client) to %zu clients "
                   "in %f secs, throughtput %f bps per-client "
                   "(16QAM), current tx queue length %zu\n",
                   samples_num_per_ue, cfg->UeNum(), diff,
                   samples_num_per_ue * std::log2(16.0f) / diff,
                   GetConq(EventType::kPacketTX, 0)->size_approx());
-              tx_begin = GetTimeUs();
+              tx_begin = GetTime::GetTimeUs();
             }
           }
         } break;
         default:
-          std::printf("Wrong event type in message queue!");
-          throw std::runtime_error("Agora: Wrong event type in message queue!");
+          MLPD_ERROR("Wrong event type in message queue!");
+          std::exit(0);
       } /* End of switch */
 
       // We schedule FFT processing if the event handling above results in
@@ -552,13 +589,17 @@ void Agora::Start() {
           for (size_t j = 0; j < config_->FftBlockSize(); j++) {
             do_fft_task.tags_[j] = cur_fftq.front().tag_;
             cur_fftq.pop();
-            if (fft_created_count_++ == 0) {
-              stats_->MasterSetTsc(TsType::kProcessingStarted,
-                                   cur_sche_frame_id_);
-            } else if (fft_created_count_ == rx_counters_.num_pkts_per_frame_) {
-              fft_created_count_ = 0;
-              if (cfg->BigstationMode()) {
-                cur_sche_frame_id_++;
+
+            if (this->fft_created_count_ == 0) {
+              this->stats_->MasterSetTsc(TsType::kProcessingStarted,
+                                         this->cur_sche_frame_id_);
+            }
+            this->fft_created_count_++;
+            if (this->fft_created_count_ == rx_counters_.num_pkts_per_frame_) {
+              this->fft_created_count_ = 0;
+              if (cfg->BigstationMode() == true) {
+                this->CheckIncrementScheduleFrame(cur_sche_frame_id_,
+                                                  kUplinkComplete);
               }
             }
           }
@@ -570,20 +611,19 @@ void Agora::Start() {
   }   /* End of while */
 
 finish:
-
-  std::printf("Agora: printing stats and saving to file\n");
-  stats_->PrintSummary();
-  stats_->SaveToFile();
-  if (flags_.enable_save_decode_data_to_file_) {
-    SaveDecodeDataToFile(stats_->last_frame_id_);
+  MLPD_INFO("Agora: printing stats and saving to file\n");
+  this->stats_->PrintSummary();
+  this->stats_->SaveToFile();
+  if (flags_.enable_save_decode_data_to_file_ == true) {
+    SaveDecodeDataToFile(this->stats_->LastFrameId());
   }
-  if (flags_.enable_save_tx_data_to_file_) {
-    SaveTxDataToFile(stats_->last_frame_id_);
+  if (flags_.enable_save_tx_data_to_file_ == true) {
+    SaveTxDataToFile(this->stats_->LastFrameId());
   }
 
   // Calculate and print per-user BER
-  if (!kEnableMac && kPrintPhyStats) {
-    phy_stats_->PrintPhyStats();
+  if ((kEnableMac == false) && (kPrintPhyStats == true)) {
+    this->phy_stats_->PrintPhyStats();
   }
   this->Stop();
 }
@@ -594,20 +634,23 @@ void Agora::HandleEventFft(size_t tag) {
   SymbolType sym_type = config_->GetSymbolType(symbol_id);
 
   if (sym_type == SymbolType::kPilot) {
-    if (fft_counters_.LastTask(frame_id, symbol_id)) {
+    bool last_fft_task = pilot_fft_counters_.CompleteTask(frame_id, symbol_id);
+    if (last_fft_task == true) {
       PrintPerSymbolDone(PrintType::kFFTPilots, frame_id, symbol_id);
-      if (!config_->DownlinkMode() ||
-          (config_->DownlinkMode() && !config_->Frame().IsRecCalEnabled()) ||
-          (config_->DownlinkMode() && config_->Frame().IsRecCalEnabled() &&
-           rc_last_frame_ == frame_id)) {
-        /* If CSI of all UEs is ready, schedule ZF/prediction */
-        if (fft_counters_.LastSymbol(frame_id)) {
-          stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
+
+      if ((config_->Frame().IsRecCalEnabled() == false) ||
+          ((config_->Frame().IsRecCalEnabled() == true) &&
+           (this->rc_last_frame_ == frame_id))) {
+        // If CSI of all UEs is ready, schedule ZF/prediction
+        bool last_pilot_fft = pilot_fft_counters_.CompleteSymbol(frame_id);
+        if (last_pilot_fft == true) {
+          this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
           PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
-          if (kPrintPhyStats) {
-            phy_stats_->PrintSnrStats(frame_id);
+          this->pilot_fft_counters_.Reset(frame_id);
+          if (kPrintPhyStats == true) {
+            this->phy_stats_->PrintSnrStats(frame_id);
           }
-          if (kEnableMac) {
+          if (kEnableMac == true) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);
           }
           ScheduleSubcarriers(EventType::kZF, frame_id, 0);
@@ -615,21 +658,34 @@ void Agora::HandleEventFft(size_t tag) {
       }
     }
   } else if (sym_type == SymbolType::kUL) {
-    if (fft_counters_.LastTask(frame_id, symbol_id)) {
-      size_t symbol_idx_ul = config_->Frame().GetULSymbolIdx(symbol_id);
-      fft_cur_frame_for_symbol_[symbol_idx_ul] = frame_id;
+    size_t symbol_idx_ul = config_->Frame().GetULSymbolIdx(symbol_id);
+
+    bool last_fft_per_symbol =
+        uplink_fft_counters_.CompleteTask(frame_id, symbol_id);
+
+    if (last_fft_per_symbol == true) {
+      fft_cur_frame_for_symbol_.at(symbol_idx_ul) = frame_id;
+
       PrintPerSymbolDone(PrintType::kFFTData, frame_id, symbol_id);
-      /* If precoder exist, schedule demodulation */
+      // If precoder exist, schedule demodulation
       if (zf_last_frame_ == frame_id) {
         ScheduleSubcarriers(EventType::kDemul, frame_id, symbol_idx_ul);
       }
+      bool last_uplink_fft = uplink_fft_counters_.CompleteSymbol(frame_id);
+      if (last_uplink_fft == true) {
+        uplink_fft_counters_.Reset(frame_id);
+      }
     }
-  } else if (sym_type == SymbolType::kCalDL or sym_type == SymbolType::kCalUL) {
+  } else if ((sym_type == SymbolType::kCalDL) ||
+             (sym_type == SymbolType::kCalUL)) {
     PrintPerSymbolDone(PrintType::kFFTCal, frame_id, symbol_id);
-    if (rc_counters_.LastTask(frame_id)) {
+
+    bool last_rc_task = this->rc_counters_.CompleteTask(frame_id);
+    if (last_rc_task == true) {
       PrintPerFrameDone(PrintType::kFFTCal, frame_id);
-      stats_->MasterSetTsc(TsType::kRCDone, frame_id);
-      rc_last_frame_ = frame_id;
+      this->rc_counters_.Reset(frame_id);
+      this->stats_->MasterSetTsc(TsType::kRCDone, frame_id);
+      this->rc_last_frame_ = frame_id;
     }
   }
 }
@@ -673,16 +729,26 @@ void Agora::Worker(int tid) {
 
   std::vector<Doer*> computers_vec;
   std::vector<EventType> events_vec;
+  ///*************************
+  computers_vec.push_back(compute_zf.get());
+  computers_vec.push_back(compute_fft.get());
+  events_vec.push_back(EventType::kZF);
+  events_vec.push_back(EventType::kFFT);
+
+  if (config_->Frame().NumULSyms() > 0) {
+    computers_vec.push_back(compute_decoding.get());
+    computers_vec.push_back(compute_demul.get());
+    events_vec.push_back(EventType::kDecode);
+    events_vec.push_back(EventType::kDemul);
+  }
+
   if (config_->Frame().NumDLSyms() > 0) {
-    computers_vec = {compute_zf.get(), compute_fft.get(), compute_ifft.get(),
-                     compute_precode.get(), compute_encoding.get()};
-    events_vec = {EventType::kZF, EventType::kFFT, EventType::kIFFT,
-                  EventType::kPrecode, EventType::kEncode};
-  } else {
-    computers_vec = {compute_zf.get(), compute_fft.get(),
-                     compute_decoding.get(), compute_demul.get()};
-    events_vec = {EventType::kZF, EventType::kFFT, EventType::kDecode,
-                  EventType::kDemul};
+    computers_vec.push_back(compute_ifft.get());
+    computers_vec.push_back(compute_precode.get());
+    computers_vec.push_back(compute_encoding.get());
+    events_vec.push_back(EventType::kIFFT);
+    events_vec.push_back(EventType::kPrecode);
+    events_vec.push_back(EventType::kEncode);
   }
 
   size_t cur_qid = 0;
@@ -991,14 +1057,15 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             "%zu symbols done\n",
             frame_id, symbol_id,
             this->stats_->MasterGetMsSince(TsType::kPilotRX, frame_id),
-            fft_counters_.GetSymbolCount(frame_id) + 1);
+            pilot_fft_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kFFTData):
         std::printf(
             "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed data symbol, "
-            "precoder status: %d\n",
+            "%zu precoder status: %d\n",
             frame_id, symbol_id,
             this->stats_->MasterGetMsSince(TsType::kPilotRX, frame_id),
+            uplink_fft_counters_.GetSymbolCount(frame_id) + 1,
             static_cast<int>(zf_last_frame_ == frame_id));
         break;
       case (PrintType::kDemul):
@@ -1203,7 +1270,8 @@ void Agora::InitializeUplinkBuffers() {
   rx_counters_.num_reciprocity_pkts_per_frame_ = cfg->BsAntNum();
 
   fft_created_count_ = 0;
-  fft_counters_.Init(cfg->Frame().NumPilotSyms(), cfg->BsAntNum());
+  pilot_fft_counters_.Init(cfg->Frame().NumPilotSyms(), cfg->BsAntNum());
+  uplink_fft_counters_.Init(cfg->Frame().NumULSyms(), cfg->BsAntNum());
   fft_cur_frame_for_symbol_ =
       std::vector<size_t>(cfg->Frame().NumULSyms(), SIZE_MAX);
 
@@ -1346,6 +1414,58 @@ void Agora::GetEqualData(float** ptr, int* size) {
       max_equaled_frame_, cfg->Frame().ClientUlPilotSymbols());
   *ptr = (float*)&equal_buffer_[offset][0];
   *size = cfg->UeNum() * cfg->OfdmDataNum() * 2;
+}
+void Agora::CheckIncrementScheduleFrame(size_t /*frame_id*/,
+                                        ScheduleProcessingFlags completed) {
+  this->schedule_process_flags_ += completed;
+
+  if (this->schedule_process_flags_ ==
+      static_cast<uint8_t>(ScheduleProcessingFlags::kProcessingComplete)) {
+    this->cur_sche_frame_id_++;
+    this->schedule_process_flags_ = ScheduleProcessingFlags::kNone;
+    if (this->config_->Frame().NumULSyms() == 0) {
+      this->schedule_process_flags_ += ScheduleProcessingFlags::kUplinkComplete;
+    }
+    if (this->config_->Frame().NumDLSyms() == 0) {
+      this->schedule_process_flags_ +=
+          ScheduleProcessingFlags::kDownlinkComplete;
+    }
+  }
+}
+
+bool Agora::CheckWorkComplete(size_t frame_id) {
+  bool finished = false;
+
+  MLPD_TRACE(
+      "Checking work complete %zu, ifft %d, tx %d, decode %d, tomac %d, "
+      "finished %d\n",
+      frame_id, static_cast<int>(this->ifft_counters_.IsLastSymbol(frame_id)),
+      static_cast<int>(this->tx_counters_.IsLastSymbol(frame_id)),
+      static_cast<int>(this->decode_counters_.IsLastSymbol(frame_id)),
+      static_cast<int>(this->tomac_counters_.IsLastSymbol(frame_id)),
+      static_cast<int>(
+          (this->decode_counters_.IsLastSymbol(frame_id) == true) &&
+          (this->ifft_counters_.IsLastSymbol(frame_id) == true) &&
+          (true == this->tomac_counters_.IsLastSymbol(frame_id))));
+
+  // Complete if last frame and ifft / decode complete
+  if ((true == this->ifft_counters_.IsLastSymbol(frame_id)) &&
+      (((kEnableMac == false) &&
+        (true == this->decode_counters_.IsLastSymbol(frame_id))) ||
+       ((kEnableMac == true) &&
+        (true == this->tomac_counters_.IsLastSymbol(frame_id))))) {
+    this->stats_->UpdateStats(frame_id);
+    assert(frame_id == this->cur_proc_frame_id_);
+    this->decode_counters_.Reset(frame_id);
+    this->tomac_counters_.Reset(frame_id);
+    this->ifft_counters_.Reset(frame_id);
+    this->cur_proc_frame_id_++;
+
+    if (frame_id == (this->config_->FramesToTest() - 1)) {
+      finished = true;
+    }
+  }
+  return finished;
 }
 
 extern "C" {

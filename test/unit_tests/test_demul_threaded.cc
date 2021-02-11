@@ -76,7 +76,7 @@ void MasterToWorkerDynamicWorker(
       cfg, worker_id, data_buffer, ul_zf_matrices, ue_spec_pilot_buffer,
       equal_buffer, demod_buffers_, phy_stats, stats);
 
-  size_t start_tsc = Rdtsc();
+  size_t start_tsc = GetTime::Rdtsc();
   size_t num_tasks = 0;
   EventData req_event;
   size_t max_frame_id_wo_offset =
@@ -98,7 +98,7 @@ void MasterToWorkerDynamicWorker(
       TryEnqueueFallback(&complete_task_queue, ptok, resp_event);
     }
   }
-  double ms = CyclesToMs(Rdtsc() - start_tsc, cfg->FreqGhz());
+  double ms = GetTime::CyclesToMs(GetTime::Rdtsc() - start_tsc, cfg->FreqGhz());
 
   std::printf("Worker %zu: %zu tasks, time per task = %.4f ms\n", worker_id,
               num_tasks, ms / num_tasks);

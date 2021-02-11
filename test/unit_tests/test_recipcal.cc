@@ -13,7 +13,7 @@ TEST(TestRecip, Correctness) {
   auto cfg = std::make_unique<Config>("data/tddconfig-sim-ul.json");
   cfg->GenData();
 
-  double freq_ghz = MeasureRdtscFreq();
+  double freq_ghz = GetTime::MeasureRdtscFreq();
 
   Table<complex_float> calib_buffer;
   Table<complex_float> recip_buffer_0;
@@ -27,7 +27,7 @@ TEST(TestRecip, Correctness) {
 
   std::printf("Reference antenna: %zu\n", cfg->RefAnt());
 
-  size_t start_tsc = Rdtsc();
+  size_t start_tsc = GetTime::Rdtsc();
 
   // Algorithm in reciprocity.cpp (use as ground truth)
   for (size_t i = 0; i < kMaxFrameNum; i++) {
@@ -53,9 +53,9 @@ TEST(TestRecip, Correctness) {
     }
   }
 
-  double ms0 = CyclesToMs(Rdtsc() - start_tsc, freq_ghz);
+  double ms0 = GetTime::CyclesToMs(GetTime::Rdtsc() - start_tsc, freq_ghz);
 
-  start_tsc = Rdtsc();
+  start_tsc = GetTime::Rdtsc();
 
   // 2-step algorithm used in dofft and dozf
   // Partially tranpose is not tested here
@@ -90,7 +90,7 @@ TEST(TestRecip, Correctness) {
     }
   }
 
-  double ms1 = CyclesToMs(Rdtsc() - start_tsc, freq_ghz);
+  double ms1 = GetTime::CyclesToMs(GetTime::Rdtsc() - start_tsc, freq_ghz);
 
   std::printf("Time per frame (algorithm1, algorithm2) = (%.4f, %.4f) ms\n",
               ms0 / kMaxFrameNum, ms1 / kMaxFrameNum);

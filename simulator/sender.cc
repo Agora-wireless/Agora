@@ -23,7 +23,7 @@ void InterruptHandler(int /*unused*/) {
 }
 
 void DelayTicks(uint64_t start, uint64_t ticks) {
-  while ((Rdtsc() - start) < ticks) {
+  while ((GetTime::Rdtsc() - start) < ticks) {
     _mm_pause();
   }
 }
@@ -33,7 +33,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
                const std::string& server_mac_addr_str,
                bool create_thread_for_master)
     : cfg_(cfg),
-      freq_ghz_(MeasureRdtscFreq()),
+      freq_ghz_(GetTime::MeasureRdtscFreq()),
       ticks_per_usec_(freq_ghz_ * 1e3),
       socket_thread_num_(socket_thread_num),
       enable_slow_start_(enable_slow_start),
@@ -183,9 +183,9 @@ void* Sender::MasterThread(int /*unused*/) {
     // Wait
   }
 
-  frame_start_[0] = GetTime();
-  double start_time = GetTime();
-  uint64_t tick_start = Rdtsc();
+  this->frame_start_[0] = GetTime::GetTime();
+  double start_time = GetTime::GetTime();
+  uint64_t tick_start = GetTime::Rdtsc();
 
   size_t start_symbol = FindNextSymbol(0);
   // Delay until the start of the first symbol (pilot)
@@ -193,7 +193,7 @@ void* Sender::MasterThread(int /*unused*/) {
     MLPD_INFO("Sender: Starting symbol %zu delaying\n", start_symbol);
     DelayTicks(tick_start, GetTicksForFrame(0) * start_symbol);
   }
-  tick_start = Rdtsc();
+  tick_start = GetTime::Rdtsc();
   RtAssert(start_symbol != cfg_->Frame().NumTotalSyms(),
            "Sender: No valid symbols to transmit");
   ScheduleSymbol(0, start_symbol);
@@ -227,7 +227,7 @@ void* Sender::MasterThread(int /*unused*/) {
         }
         // Add inter-symbol delay
         DelayTicks(tick_start, GetTicksForFrame(ctag.frame_id_) * symbol_delay);
-        tick_start = Rdtsc();
+        tick_start = GetTime::Rdtsc();
 
         size_t next_frame_id = ctag.frame_id_;
         // Check to see if the current frame is finished
@@ -236,16 +236,19 @@ void* Sender::MasterThread(int /*unused*/) {
           if ((kDebugSenderReceiver == true) ||
               (kDebugPrintPerFrameDone == true)) {
             std::printf("Sender: Transmitted frame %u in %.1f ms\n",
-                        ctag.frame_id_, (GetTime() - start_time) / 1000.0);
-            start_time = GetTime();
+                        ctag.frame_id_,
+                        (GetTime::GetTime() - start_time) / 1000.0);
+            start_time = GetTime::GetTime();
           }
           next_frame_id++;
           if (next_frame_id == cfg_->FramesToTest()) {
             break; /* Finished */
           }
-          this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = GetTime();
-          this->frame_start_[(next_frame_id % kNumStatsFrames)] = GetTime();
-          tick_start = Rdtsc();
+          this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] =
+              GetTime::GetTime();
+          this->frame_start_[(next_frame_id % kNumStatsFrames)] =
+              GetTime::GetTime();
+          tick_start = GetTime::Rdtsc();
 
           // Find start symbol of next frame and add proper delay
           next_symbol_id = FindNextSymbol(0);
@@ -260,7 +263,7 @@ void* Sender::MasterThread(int /*unused*/) {
                      GetTicksForFrame(ctag.frame_id_) * next_symbol_id);
           // std::printf("Sender -- finished frame %d, next frame %zu, start
         }  // if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
-        tick_start = Rdtsc();
+        tick_start = GetTime::Rdtsc();
         ScheduleSymbol(next_frame_id, next_symbol_id);
       }
     }  // end (ret > 0)
@@ -309,7 +312,7 @@ void* Sender::WorkerThread(int tid) {
   auto* socks_pkt_buf = static_cast<Packet*>(PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign32, cfg_->PacketLength()));
 
-  double begin = GetTime();
+  double begin = GetTime::GetTime();
   size_t total_tx_packets = 0;
   size_t total_tx_packets_rolling = 0;
   size_t cur_radio = radio_lo;
@@ -329,7 +332,7 @@ void* Sender::WorkerThread(int tid) {
         *(this->task_ptok_[tid]), tags, kDequeueBulkSize);
     if (num_tags > 0) {
       for (size_t tag_id = 0; (tag_id < num_tags); tag_id++) {
-        size_t start_tsc_send = Rdtsc();
+        size_t start_tsc_send = GetTime::Rdtsc();
 
         auto tag = gen_tag_t(tags[tag_id]);
         assert((cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kPilot) ||
@@ -380,14 +383,15 @@ void* Sender::WorkerThread(int tid) {
               "TX time: %.3f us\n",
               tid, gen_tag_t(tag).ToString().c_str(), pkt->frame_id_,
               pkt->symbol_id_, pkt->ant_id_,
-              CyclesToUs(Rdtsc() - start_tsc_send, freq_ghz_));
+              GetTime::CyclesToUs(GetTime::Rdtsc() - start_tsc_send,
+                                  freq_ghz_));
         }
 
         total_tx_packets_rolling++;
         total_tx_packets++;
         if (total_tx_packets_rolling ==
             ant_num_this_thread * max_symbol_id * 1000) {
-          double end = GetTime();
+          double end = GetTime::GetTime();
           double byte_len = cfg_->PacketLength() * ant_num_this_thread *
                             max_symbol_id * 1000.f;
           double diff = end - begin;
@@ -395,7 +399,7 @@ void* Sender::WorkerThread(int tid) {
                       (size_t)tid,
                       total_tx_packets / (ant_num_this_thread * max_symbol_id),
                       diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
-          begin = GetTime();
+          begin = GetTime::GetTime();
           total_tx_packets_rolling = 0;
         }
 
