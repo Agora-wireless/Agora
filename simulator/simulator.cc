@@ -56,7 +56,7 @@ void Simulator::Stop() {
 void Simulator::Start() {
   config_->Running(true);
   /* start receiver */
-  std::vector<pthread_t> rx_threads = receiver_->StartRecv(
+  std::vector<std::thread> rx_threads = receiver_->StartRecv(
       socket_buffer_, socket_buffer_status_, socket_buffer_status_size_,
       socket_buffer_size_, frame_start_);
 
@@ -113,7 +113,8 @@ void Simulator::Start() {
 
         default:
           std::printf("Wrong event type in message queue!");
-          std::exit(0);
+          throw std::runtime_error(
+              "Simulator: Wrong event type in message queue!");
       } /* end of switch */
     }   /* end of for */
   }     /* end of while */
@@ -124,7 +125,7 @@ void Simulator::Start() {
   if (fp == nullptr) {
     std::printf("open file failed\n");
     std::cerr << "Error: " << strerror(errno) << std::endl;
-    std::exit(0);
+    throw std::runtime_error("Simulator: open file failed");
   }
 
   std::printf("Printing results to file......\n");
@@ -133,7 +134,10 @@ void Simulator::Start() {
                  frame_start_[1][ii], frame_start_receive_[ii],
                  frame_end_receive_[ii]);
   }
-  std::exit(0);
+
+  for (auto& join_thread : rx_threads) {
+    join_thread.join();
+  }
 }
 
 inline void Simulator::UpdateFrameCount(int* frame_count) {
@@ -191,8 +195,14 @@ void Simulator::InitializeVarsFromCfg(Config* cfg) {
   data_symbol_num_perframe_ = cfg->Frame().NumDataSyms();
   ul_data_symbol_num_perframe_ = cfg->Frame().NumULSyms();
   dl_data_symbol_num_perframe_ = cfg->Frame().NumDLSyms();
-  dl_data_symbol_start_ = cfg->Frame().GetDLSymbol(0);
-  dl_data_symbol_end_ = cfg->Frame().GetDLSymbolLast();
+
+  if (dl_data_symbol_num_perframe_ > 0) {
+    dl_data_symbol_start_ = cfg->Frame().GetDLSymbol(0);
+    dl_data_symbol_end_ = cfg->Frame().GetDLSymbolLast();
+  } else {
+    dl_data_symbol_start_ = dl_data_symbol_end_ = 0;
+  }
+
   packet_length_ = cfg->PacketLength();
 
   demul_block_size_ = cfg->DemulBlockSize();

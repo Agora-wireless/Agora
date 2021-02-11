@@ -24,7 +24,7 @@
 #include "comms-lib.h"
 #include "framestats.h"
 #include "gettime.h"
-#include "ldpc_config.inc"
+#include "ldpc_config.h"
 #include "memory_manage.h"
 #include "modulation.h"
 #include "symbols.h"

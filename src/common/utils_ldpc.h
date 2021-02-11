@@ -237,7 +237,8 @@ static inline void LdpcEncodeHelper(size_t base_graph, size_t zc, size_t nRows,
                    "Zc values >= %zu that are not multiples of four are not "
                    "supported yet.\n",
                    zc);
-      std::exit(-1);
+      throw std::runtime_error(
+          "Zc values >= values that are not multiples of four");
     }
 
     __attribute__((aligned(avx2enc::kProcBytes)))

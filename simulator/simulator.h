@@ -8,7 +8,6 @@
 #include <emmintrin.h>
 #include <fcntl.h>
 #include <immintrin.h>
-#include <pthread.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -48,7 +47,6 @@ class Simulator {
   void Stop();
   // while loop of task thread
   static void* TaskThread(void* context);
-
   struct EventHandlerContext {
     Simulator* obj_ptr_;
     size_t id_;
@@ -65,6 +63,7 @@ class Simulator {
   size_t ue_num_;
   size_t ofdm_ca_num_;
   size_t ofdm_data_num_;
+
   size_t symbol_num_perframe_, data_symbol_num_perframe_;
   size_t ul_data_symbol_num_perframe_, dl_data_symbol_num_perframe_;
   size_t dl_data_symbol_start_, dl_data_symbol_end_;

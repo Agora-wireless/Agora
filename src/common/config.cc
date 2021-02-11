@@ -582,7 +582,7 @@ void Config::GenData() {
   if (fd == nullptr) {
     MLPD_ERROR("Failed to open antenna file %s. Error %s.\n",
                ul_data_file.c_str(), strerror(errno));
-    std::exit(-1);
+    throw std::runtime_error("Config: Failed to open antenna file");
   }
 
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
@@ -625,7 +625,7 @@ void Config::GenData() {
   if (fd == nullptr) {
     MLPD_ERROR("Failed to open antenna file %s. Error %s.\n",
                dl_data_file.c_str(), strerror(errno));
-    std::exit(-1);
+    throw std::runtime_error("Config: Failed to open dl antenna file");
   }
 
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {

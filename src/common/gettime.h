@@ -60,7 +60,7 @@ static inline double MeasureRdtscFreq() {
   }
   if (sum != 13580802877818827968ull) {
     std::printf("Error in RDTSC freq measurement");
-    std::exit(-1);
+    throw std::runtime_error("Error in RDTSC freq measurement");
   }
 
   clock_gettime(CLOCK_REALTIME, &end);
@@ -74,7 +74,7 @@ static inline double MeasureRdtscFreq() {
   // RDTSC frequencies outside these ranges are rare
   if (freq_ghz < 1.0 && freq_ghz > 4.0) {
     std::printf("Invalid RDTSC frequency %.2f\n", freq_ghz);
-    std::exit(-1);
+    throw std::runtime_error("Invalid RDTSC frequency");
   }
   return freq_ghz;
 }

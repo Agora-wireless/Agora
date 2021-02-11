@@ -17,6 +17,8 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <thread>
+#include <vector>
 
 #include "config.h"
 
@@ -45,12 +47,7 @@ class ClientRadioConfig {
   ~ClientRadioConfig();
 
  private:
-  struct ClientRadioConfigContext {
-    ClientRadioConfig* ptr_;
-    size_t tid_;
-  };
-  static void* InitClientRadioLaunch(void* context);
-  void InitClientRadio(ClientRadioConfigContext* context);
+  void InitClientRadio(size_t tid);
 
   const Config* const cfg_;
   std::vector<SoapySDR::Device*> hubs_;
@@ -61,7 +58,7 @@ class ClientRadioConfig {
   std::vector<SoapySDR::Stream*> rx_streams_;
   size_t radio_num_;
   size_t antenna_num_;
-  ClientRadioConfigContext* context_;
+
   std::atomic<size_t> num_client_radios_initialized_;
 };
 #endif  // CLIENT_RADIO_LIB_H_

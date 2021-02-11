@@ -8,7 +8,6 @@
 #include <arpa/inet.h>
 #include <emmintrin.h>
 #include <immintrin.h>
-#include <pthread.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -90,14 +89,14 @@ class Sender {
   size_t GetMaxSymbolId() const;
 
   // Launch threads to run worker with thread IDs from tid_start to tid_end
-  void CreateThreads(void* (*worker)(void*), int tid_start, int tid_end);
+  void CreateWorkerThreads(size_t num_workers);
 
   void DelayForSymbol(size_t tx_frame_count, uint64_t tick_start);
   void DelayForFrame(size_t tx_frame_count, uint64_t tick_start);
 
   void WriteStatsToFile(size_t tx_frame_count) const;
 
-  size_t FindNextSymbol(size_t frame, size_t start_symbol);
+  size_t FindNextSymbol(size_t start_symbol);
   void ScheduleSymbol(size_t frame, size_t symbol_id);
 
   // Run FFT on the data field in pkt, output to fft_inout
@@ -122,8 +121,8 @@ class Sender {
 
   // ticks_wnd_1 and ticks_wnd_2 are the RDTSC clock ticks between the start
   // of transmission of two symbols for the first several frames
-  const uint64_t ticks_wnd_1_;
-  const uint64_t ticks_wnd_2_;
+  const uint64_t ticks_wnd1_;
+  const uint64_t ticks_wnd2_;
 
   moodycamel::ConcurrentQueue<size_t> send_queue_ =
       moodycamel::ConcurrentQueue<size_t>(1024);
@@ -140,6 +139,8 @@ class Sender {
 
   double* frame_start_;
   double* frame_end_;
+
+  std::vector<std::thread> threads_;
 
 #ifdef USE_DPDK
   struct rte_mempool* mbuf_pool_;

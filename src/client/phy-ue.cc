@@ -129,16 +129,7 @@ PhyUe::PhyUe(Config* config) {
   }
 
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
-    auto* context = new EventHandlerContext();
-    context->obj_ptr_ = this;
-    context->id_ = i;
-
-    // std::printf("create thread %d\n", i);
-    if (pthread_create(&task_threads_[i], nullptr, TaskThreadLaunch, context) !=
-        0) {
-      perror("task thread create failed");
-      std::exit(0);
-    }
+    task_threads_.at(i) = std::thread(&PhyUe::TaskThread, this, i);
   }
 }
 
@@ -146,8 +137,7 @@ PhyUe::~PhyUe() {
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
     std::printf("Joining Phy worker: %zu : %zu\n", i,
                 config_->WorkerThreadNum());
-    void* ret_value;
-    pthread_join(task_threads_[i], &ret_value);
+    task_threads_.at(i).join();
     delete task_ptok_[i];
   }
 
@@ -175,7 +165,7 @@ void PhyUe::ScheduleTask(EventData do_task,
     std::printf("need more memory\n");
     if (!in_queue->enqueue(ptok, do_task)) {
       std::printf("task enqueue failed\n");
-      std::exit(0);
+      throw std::runtime_error("PhyUe: task enqueue failed");
     }
   }
 }
@@ -542,7 +532,7 @@ void PhyUe::Start() {
 
         default:
           std::cout << "Invalid Event Type!" << std::endl;
-          std::exit(0);
+          throw std::runtime_error("PhyUe: Invalid Event Type");
       }
     }
   }
@@ -574,15 +564,6 @@ void PhyUe::Start() {
     }
   }
   this->Stop();
-}
-
-void* PhyUe::TaskThreadLaunch(void* in_context) {
-  EventHandlerContext* context = (EventHandlerContext*)in_context;
-  PhyUe* me = context->obj_ptr_;
-  int tid = context->id_;
-  delete context;
-  me->TaskThread(tid);
-  return nullptr;
 }
 
 void PhyUe::TaskThread(int tid) {
