@@ -43,6 +43,7 @@ class DoEncode : public Doer {
   int8_t* encoded_buffer_temp_;
   Table<int8_t>& encoded_buffer_;
   DurationStat* duration_stat_;
+  int8_t* scrambler_buffer_;
 };
 
 class DoDecode : public Doer {

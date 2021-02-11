@@ -416,42 +416,51 @@ std::vector<std::complex<float>> CommsLib::CorrelateAvx(
 
 std::vector<float> CommsLib::CorrelateAvxS(std::vector<float> const& f,
                                            std::vector<float> const& g) {
-  // assuming length0 is larger or equal to length1
-  size_t length0 = f.size();
-  size_t length1 = g.size();
+  size_t length_f = f.size();
+  size_t length_g = g.size();
+  assert(length_f > length_g);
 
-  std::vector<float> in(length0 + length1 - 1, 0);
-  // in.insert(in.end(), f.begin(), f.end());
-  for (size_t i = length1 - 1; i < in.size(); i++) {
-    size_t j = i - length1 + 1;
-    in[i] = f[j];
-  }
+  std::vector<float> in(length_f + length_g, 0);
   size_t length = in.size();
 
-  float* in0 = (float*)(in.data());
-  float* in1 = (float*)(g.data());
-  std::vector<float> out(length, 0);
-  float* outf = (float*)out.data();
+  // MLPD_TRACE("correlate_avx_s len_f: %zu, len_g: %zu, length: %zu\n",
+  // length_f, length_g, length); in[length_g:length] = f[0:length_f]
+  for (size_t i = length_g; i < length; i++) {
+    size_t j = i - length_g;
+    in.at(i) = f.at(j);
+  }
+
+  float* in_data_ptr = in.data();
+  const float* in_g = g.data();
 
   __m256 data __attribute__((aligned(ALIGNMENT)));
   __m256 prod __attribute__((aligned(ALIGNMENT)));
   __m256 accm __attribute__((aligned(ALIGNMENT)));
-
-  __m256 seq_samp[length1] __attribute__((aligned(ALIGNMENT)));
+  __m256 seq_samp[length_g] __attribute__((aligned(ALIGNMENT)));
 
   // Repeat the kernel across the vector
-  for (size_t i = 0; i < length1; i++) {
-    seq_samp[i] = _mm256_broadcast_ss(&in1[i]);
+  for (size_t i = 0; i < length_g; i++) {
+    seq_samp[i] = _mm256_broadcast_ss(&in_g[i]);
   }
 
-  for (size_t i = 0; i < (length - length1); i += AVX_PACKED_SP) {
+  static const size_t kKAddressIncrement = ALIGNMENT / sizeof(float);
+  static_assert((ALIGNMENT % sizeof(float)) == 0,
+                "Address alignment not correct");
+
+  size_t padding = kKAddressIncrement - (length_f % kKAddressIncrement);
+  std::vector<float> out(length_f + padding);
+
+  // Verify no memory overruns
+  assert((out.size() % kKAddressIncrement) == 0);
+  for (size_t i = 0; i < (out.size() - 1); i += kKAddressIncrement) {
     accm = _mm256_setzero_ps();
-    for (size_t j = 0; j < length1; j++) {
-      data = _mm256_loadu_ps(in0 + i + j);
+    for (size_t j = 0; j < length_g; j++) {
+      data = _mm256_loadu_ps(in_data_ptr + i + j);
       prod = _mm256_mul_ps(data, seq_samp[j]);
       accm = _mm256_add_ps(prod, accm);
     }
-    _mm256_storeu_ps(outf + i, accm);
+    _mm256_storeu_ps(out.data() + i, accm);
   }
+  out.resize(length_f);
   return out;
 }
