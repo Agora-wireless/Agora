@@ -91,7 +91,7 @@ void Agora::Stop() {
   packet_tx_rx_.reset();
 }
 
-void Agora::SendSnrReport(EventType /*event_type*/, size_t frame_id,
+void Agora::SendSnrReport(EventType event_type, size_t frame_id,
                           size_t symbol_id) {
   assert(event_type == EventType::kSNRReport);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
@@ -218,7 +218,7 @@ void Agora::ScheduleCodeblocks(EventType event_type, size_t frame_id,
   }
 }
 
-void Agora::ScheduleUsers(EventType /*event_type*/, size_t frame_id,
+void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
                           size_t symbol_id) {
   assert(event_type == EventType::kPacketToMac);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);

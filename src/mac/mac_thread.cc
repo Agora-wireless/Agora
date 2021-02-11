@@ -134,10 +134,10 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
     server_.n_filled_in_frame_[ue_id] += cfg_->MacPayloadLength();
 
     // Check CRC
-    uint16_t crc =
-        (uint16_t)(crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
-                                            cfg_->MacPayloadLength()) &
-                   0xFFFF);
+    auto crc = static_cast<uint16_t>(
+        crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
+                                 cfg_->MacPayloadLength()) &
+        0xFFFF);
     if (crc == pkt->crc_) {
       // Print information about the received symbol
       if (kLogMacPackets) {
@@ -331,7 +331,7 @@ void MacThread::RunEventLoop() {
   PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_,
                       0 /* thread ID */);
 
-  while (cfg_->Running()) {
+  while (cfg_->Running() == true) {
     ProcessRxFromMaster();
 
     if (mode_ == Mode::kServer) {

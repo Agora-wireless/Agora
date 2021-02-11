@@ -23,8 +23,8 @@
 
 void Demod16qamSoftLoop(const float* vec_in, int8_t* llr, int num) {
   for (int i = 0; i < num; i++) {
-    int8_t yre = (int8_t)(SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i]));
-    int8_t yim = (int8_t)(SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i + 1]));
+    auto yre = static_cast<int8_t>(SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i]));
+    auto yim = static_cast<int8_t>(SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i + 1]));
 
     llr[4 * i + 0] = yre;
     llr[4 * i + 1] = yim;
@@ -35,7 +35,7 @@ void Demod16qamSoftLoop(const float* vec_in, int8_t* llr, int num) {
 
 void Demod16qamSoftSse(float* vec_in, int8_t* llr, int num) {
   float* symbols_ptr = vec_in;
-  __m128i* result_ptr = (__m128i*)llr;
+  auto* result_ptr = reinterpret_cast<__m128i*>(llr);
   __m128 symbol1;
   __m128 symbol2;
   __m128 symbol3;
@@ -99,8 +99,8 @@ void Demod16qamSoftSse(float* vec_in, int8_t* llr, int num) {
   }
   // Demodulate last symbols
   for (int i = 8 * (num / 8); i < num; i++) {
-    int8_t yre = (int8_t)(SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i]));
-    int8_t yim = (int8_t)(SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i + 1]));
+    auto yre = static_cast<int8_t>(SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i]));
+    auto yim = static_cast<int8_t>(SCALE_BYTE_CONV_QAM16 * (vec_in[2 * i + 1]));
 
     llr[4 * i + 0] = yre;
     llr[4 * i + 1] = yim;
@@ -129,8 +129,8 @@ void Demod64qamSoftLoop(const float* vec_in, int8_t* llr, int num) {
 }
 
 void Demod64qamSoftSse(float* vec_in, int8_t* llr, int num) {
-  float* symbols_ptr = (float*)vec_in;
-  __m128i* result_ptr = (__m128i*)llr;
+  auto* symbols_ptr = static_cast<float*>(vec_in);
+  auto* result_ptr = reinterpret_cast<__m128i*>(llr);
   __m128 symbol1;
   __m128 symbol2;
   __m128 symbol3;

@@ -17,7 +17,7 @@ static constexpr size_t kMaxStatBreakdown = 4;
 
 // Accumulated task duration for all tracked frames in each worker thread
 struct DurationStat {
-  size_t task_duration_[kMaxStatBreakdown];  // Unit = TSC cycles
+  std::array<size_t, kMaxStatBreakdown> task_duration_;  // Unit = TSC cycles
   size_t task_count_;
   DurationStat() { Reset(); }
   void Reset() { std::memset(this, 0, sizeof(DurationStat)); }
@@ -25,9 +25,9 @@ struct DurationStat {
 
 // Temporary summary statistics assembled from per-thread runtime stats
 struct FrameSummary {
-  double us_this_thread_[kMaxStatBreakdown];
+  std::array<double, kMaxStatBreakdown> us_this_thread_;
   size_t count_this_thread_ = 0;
-  double us_avg_threads_[kMaxStatBreakdown];
+  std::array<double, kMaxStatBreakdown> us_avg_threads_;
   size_t count_all_threads_ = 0;
   FrameSummary() { std::memset(this, 0, sizeof(FrameSummary)); }
 };
@@ -56,8 +56,8 @@ static constexpr size_t kNumTimestampTypes =
 
 class Stats {
  public:
-  explicit Stats(Config* cfg);
-  ~Stats() = default;
+  explicit Stats(const Config* const cfg);
+  ~Stats();
 
   /// If worker stats collection is enabled, combine and update per-worker
   /// stats for all uplink Doer types. Else return immediately.
@@ -231,7 +231,7 @@ class Stats {
                                            FrameSummary* precode_frame_summary,
                                            FrameSummary* encode_frame_summary);
 
-  Config* config_;
+  const Config* const config_;
   const size_t task_thread_num_;
   const size_t fft_thread_num_;
   const size_t zf_thread_num_;

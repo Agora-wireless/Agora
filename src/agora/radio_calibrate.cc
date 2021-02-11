@@ -598,7 +598,7 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
   size_t good_csi_cnt = 0;
   size_t n = 0;
   // second condition is for when too many attemps fail
-  while (good_csi_cnt < calib_meas_num_ && n < 2 * calib_meas_num_) {
+  while ((good_csi_cnt < calib_meas_num_) && (n < (2 * calib_meas_num_))) {
     bool good_csi = true;
     long long tx_time(0);
     long long rx_time(0);
@@ -757,16 +757,17 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
         plt::legend();
         plt::save("dn_" + std::to_string(i) + ".png");
       }
-      if (start_up[i] == 0 || start_dn[i] == 0) {
+      if ((start_up[i] == 0) || (start_dn[i] == 0)) {
         good_csi = false;
         break;
       }
-      if (i > 0 &&
-          (std::abs((int)start_up[i] - (int)start_up[i - 1]) >
-               kMaxArraySampleOffset ||
-           std::abs((int)start_dn[i] - (int)start_dn[i - 1]) >
-               kMaxArraySampleOffset)) {  // make sure offsets are not too
-                                          // different from each other
+      if ((i > 0) &&
+          ((std::abs((int)start_up[i] - (int)start_up[i - 1]) >
+            static_cast<int>(kMaxArraySampleOffset)) ||
+           (std::abs((int)start_dn[i] - (int)start_dn[i - 1]) >
+            static_cast<int>(
+                kMaxArraySampleOffset)))) {  // make sure offsets are not too
+                                             // different from each other
         good_csi = false;
         break;
       }
@@ -780,7 +781,7 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
     }
 
     n++;  // increment number of measurement attemps
-    if (!good_csi) {
+    if (good_csi == false) {
       continue;
     }
 
@@ -789,7 +790,7 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
       if (cfg_->ExternalRefNode() && i == cfg_->RefAnt()) {
         continue;
       }
-      if (cfg_->ExternalRefNode() && i > cfg_->RefAnt()) {
+      if (cfg_->ExternalRefNode() && (i > cfg_->RefAnt())) {
         id = i - 1;
       }
       if (kVerboseCalibration) {  // print time-domain data
