@@ -15,11 +15,11 @@ Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
   rx_ptoks_ = in_rx_ptoks;
 }
 
-std::vector<pthread_t> Receiver::StartRecv(Table<char>& in_buffer,
-                                           Table<int>& in_buffer_status,
-                                           size_t in_buffer_frame_num,
-                                           size_t in_buffer_length,
-                                           Table<double>& in_frame_start) {
+std::vector<std::thread> Receiver::StartRecv(Table<char>& in_buffer,
+                                             Table<int>& in_buffer_status,
+                                             size_t in_buffer_frame_num,
+                                             size_t in_buffer_length,
+                                             Table<double>& in_frame_start) {
   buffer_frame_num_ = in_buffer_frame_num;
   buffer_length_ = in_buffer_length;
   buffer_ = &in_buffer;
@@ -27,20 +27,11 @@ std::vector<pthread_t> Receiver::StartRecv(Table<char>& in_buffer,
   frame_start_ = &in_frame_start;
 
   std::printf("Start Recv thread\n");
-  std::vector<pthread_t> created_threads;
+  std::vector<std::thread> created_threads;
+  created_threads.resize(rx_thread_num_);
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
-    pthread_t recv_thread;
-    auto* context = new EventHandlerContext<Receiver>;
-    context->obj_ptr_ = this;
-    context->id_ = i;
-    if (pthread_create(&recv_thread, nullptr,
-                       PthreadFunWrapper<Receiver, &Receiver::LoopRecv>,
-                       context) != 0) {
-      perror("Socket recv thread create failed");
-      std::exit(0);
-    }
-    created_threads.push_back(recv_thread);
+    created_threads.at(i) = std::thread(&Receiver::LoopRecv, this, i);
   }
   return created_threads;
 }
@@ -81,7 +72,7 @@ void* Receiver::LoopRecv(int tid) {
     /* if buffer is full, exit */
     if (cur_buffer_status_ptr[0] == 1) {
       std::printf("Receive thread %d buffer full, offset: %zu\n", tid, offset);
-      std::exit(0);
+      throw std::runtime_error("Receiver: Receive thread buffer full");
     }
 
     int recvlen = -1;
@@ -91,7 +82,7 @@ void* Receiver::LoopRecv(int tid) {
              recvfrom(socket_local, (char*)cur_buffer_ptr, cfg_->PacketLength(),
                       0, (struct sockaddr*)&remote_addr, &addrlen)) < 0) {
       std::perror("recv failed");
-      std::exit(0);
+      throw std::runtime_error("Receiver: recv failed");
     }
 
     // Read information from received packet
@@ -122,7 +113,7 @@ void* Receiver::LoopRecv(int tid) {
 
     if (message_queue_->enqueue(*local_ptok, packet_message) == false) {
       std::printf("socket message enqueue failed\n");
-      std::exit(0);
+      throw std::runtime_error("Receiver: socket message enqueue failed");
     }
   }
 }

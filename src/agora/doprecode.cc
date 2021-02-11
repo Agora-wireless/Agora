@@ -43,7 +43,8 @@ DoPrecode::DoPrecode(
     std::fprintf(
         stderr,
         "Error: insufficient memory to JIT and store the DGEMM kernel\n");
-    std::exit(1);
+    throw std::runtime_error(
+        "DoPrecode: insufficient memory to JIT and store the DGEMM kernel");
   }
   my_cgemm_ = mkl_jit_get_cgemm_ptr(jitter_);
 #endif
@@ -141,9 +142,9 @@ EventData DoPrecode::Launch(size_t tag) {
   auto* precoded_ptr = reinterpret_cast<float*>(precoded_buffer_temp_);
   for (size_t ant_id = 0; ant_id < cfg_->BsAntNum(); ant_id++) {
     int ifft_buffer_offset = ant_id + cfg_->BsAntNum() * total_data_symbol_idx;
-    float* ifft_ptr =
-        (float*)&dl_ifft_buffer_[ifft_buffer_offset]
-                                [base_sc_id + cfg_->OfdmDataStart()];
+    auto* ifft_ptr = reinterpret_cast<float*>(
+        &dl_ifft_buffer_[ifft_buffer_offset]
+                        [base_sc_id + cfg_->OfdmDataStart()]);
     for (size_t i = 0; i < cfg_->DemulBlockSize() / 4; i++) {
       float* input_shifted_ptr =
           precoded_ptr + 4 * i * 2 * cfg_->BsAntNum() + ant_id * 2;

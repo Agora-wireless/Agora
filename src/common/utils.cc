@@ -93,7 +93,7 @@ void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
           "Set kEnableThreadPinning to false to run Agora to run despite "
           "this - performance will be low.\n",
           ThreadTypeStr(thread_type).c_str(), thread_id, physical_core_id);
-      std::exit(0);
+      throw std::runtime_error("Utils: failed to pin to core");
     } else {
       if (verbose == true) {
         std::printf("%s thread %d: pinned to core %zu\n",

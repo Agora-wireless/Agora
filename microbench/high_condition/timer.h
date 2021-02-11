@@ -34,7 +34,7 @@ static double measure_rdtsc_freq() {
   }
 
   if (sum != 13580802877818827968ull) {
-    std::exit(-1);
+    throw std::runtime_error("measure_rdtsc_freq is incorrect");
   }
 
   clock_gettime(CLOCK_REALTIME, &end);

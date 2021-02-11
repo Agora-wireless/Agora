@@ -21,22 +21,13 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   tx_streams_.resize(radio_num_);
   rx_streams_.resize(radio_num_);
 
-  std::vector<ClientRadioConfigContext> client_radio_config_ctx(
-      this->radio_num_);
+  std::vector<std::thread> radio_threads;
   num_client_radios_initialized_ = 0;
   for (size_t i = 0; i < this->radio_num_; i++) {
-    auto* context = &client_radio_config_ctx[i];
-    context->ptr_ = this;
-    context->tid_ = i;
 #ifdef THREADED_INIT
-    pthread_t init_thread;
-    if (pthread_create(&init_thread, nullptr, InitClientRadioLaunch, context) !=
-        0) {
-      perror("init thread create failed");
-      std::exit(0);
-    }
+    radio_threads.emplace_back(&ClientRadioConfig::InitClientRadio, this, i);
 #else
-    InitClientRadio(context);
+    InitClientRadio(tid);
 #endif
   }  // end for (size_t i = 0; i < this->radio_num_; i++)
 
@@ -54,6 +45,10 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
       num_checks = 0;
     }
     num_client_radios_init = num_client_radios_initialized_.load();
+  }
+
+  for (auto& init_thread : radio_threads) {
+    init_thread.join();
   }
 #endif
 
@@ -127,18 +122,9 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   std::cout << "radio init done!" << std::endl;
 }
 
-void* ClientRadioConfig::InitClientRadioLaunch(void* in_context) {
-  auto* context = (ClientRadioConfigContext*)in_context;
-  context->ptr_->InitClientRadio(context);
-  return nullptr;
-}
-
-void ClientRadioConfig::InitClientRadio(ClientRadioConfigContext* in_context) {
-  size_t tid = in_context->tid_;
-  const Config* const cfg = cfg_;
-
+void ClientRadioConfig::InitClientRadio(size_t tid) {
   // load channels
-  auto channels = Utils::StrToChannels(cfg->Channel());
+  auto channels = Utils::StrToChannels(cfg_->Channel());
 
   SoapySDR::Kwargs args;
   SoapySDR::Kwargs sargs;

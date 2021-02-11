@@ -33,20 +33,13 @@ RadioConfig::RadioConfig(Config* cfg)
   tx_streams_.resize(radio_num_);
   rx_streams_.resize(radio_num_);
 
-  std::vector<RadioConfigContext> radio_config_ctx_vec(this->radio_num_);
+  std::vector<std::thread> init_bs_threads;
+
   for (size_t i = 0; i < this->radio_num_; i++) {
-    auto* context = &radio_config_ctx_vec[i];
-    context->brs_ = this;
-    context->tid_ = i;
 #ifdef THREADED_INIT
-    pthread_t init_thread;
-    if (pthread_create(&init_thread, nullptr, InitBsRadioLaunch, context) !=
-        0) {
-      perror("init thread create failed");
-      std::exit(0);
-    }
+    init_bs_threads.emplace_back(&RadioConfig::InitBsRadio, this, i);
 #else
-    InitBsRadio(context);
+    InitBsRadio(i);
 #endif
   }
 
@@ -65,6 +58,10 @@ RadioConfig::RadioConfig(Config* cfg)
     num_radios_init = num_radios_initialized_.load();
   }
 
+  for (auto& join_thread : init_bs_threads) {
+    join_thread.join();
+  }
+
   // Perform DC Offset & IQ Imbalance Calibration
   if (cfg_->ImbalanceCalEn()) {
     if (cfg_->Channel().find('A') != std::string::npos) {
@@ -75,19 +72,12 @@ RadioConfig::RadioConfig(Config* cfg)
     }
   }
 
+  std::vector<std::thread> config_bs_threads;
   for (size_t i = 0; i < this->radio_num_; i++) {
-    auto* context = &radio_config_ctx_vec[i];
-    context->brs_ = this;
-    context->tid_ = i;
 #ifdef THREADED_INIT
-    pthread_t configure_thread;
-    if (pthread_create(&configure_thread, nullptr,
-                       RadioConfig::ConfigureBsRadioLaunch, context) != 0) {
-      perror("init thread create failed");
-      std::exit(0);
-    }
+    config_bs_threads.emplace_back(&RadioConfig::ConfigureBsRadio, this, i);
 #else
-    ConfigureBsRadio(context);
+    ConfigureBsRadio(i);
 #endif
   }
 
@@ -104,6 +94,10 @@ RadioConfig::RadioConfig(Config* cfg)
       num_checks = 0;
     }
     num_radios_config = num_radios_configured_.load();
+  }
+
+  for (auto& join_thread : config_bs_threads) {
+    join_thread.join();
   }
 
   for (size_t i = 0; i < this->radio_num_; i++) {
@@ -184,14 +178,8 @@ RadioConfig::RadioConfig(Config* cfg)
   std::cout << "radio init done!" << std::endl;
 }
 
-void* RadioConfig::InitBsRadioLaunch(void* in_context) {
-  auto* context = (RadioConfigContext*)in_context;
-  context->brs_->InitBsRadio(context);
-  return nullptr;
-}
-
-void RadioConfig::InitBsRadio(RadioConfigContext* context) {
-  size_t i = context->tid_;
+void RadioConfig::InitBsRadio(size_t tid) {
+  size_t i = tid;
   auto channels = Utils::StrToChannels(cfg_->Channel());
   SoapySDR::Kwargs args;
   SoapySDR::Kwargs sargs;
@@ -215,16 +203,7 @@ void RadioConfig::InitBsRadio(RadioConfigContext* context) {
   this->num_radios_initialized_.fetch_add(1);
 }
 
-void* RadioConfig::ConfigureBsRadioLaunch(void* in_context) {
-  RadioConfigContext* context = ((RadioConfigContext*)in_context);
-  RadioConfig* brs = context->brs_;
-  brs->ConfigureBsRadio(context);
-  return nullptr;
-}
-
-void RadioConfig::ConfigureBsRadio(RadioConfigContext* context) {
-  size_t tid = context->tid_;
-
+void RadioConfig::ConfigureBsRadio(size_t tid) {
   // load channels
   auto channels = Utils::StrToChannels(cfg_->Channel());
 

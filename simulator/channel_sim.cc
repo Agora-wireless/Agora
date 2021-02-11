@@ -113,29 +113,19 @@ ChannelSim::ChannelSim(const Config* const config_bs,
   for (size_t i = 0; i < worker_thread_num; i++) {
     task_ptok_[i] = new moodycamel::ProducerToken(message_queue_);
   }
-  AllocBuffer1d(&task_threads_, worker_thread_num,
-                Agora_memory::Alignment_t::kAlign64, 0);
+
+  task_threads_.resize(worker_thread_num);
 
   // create task threads (transmit to base station and client antennas)
   for (size_t i = 0; i < worker_thread_num; i++) {
-    auto* context = new EventHandlerContext<ChannelSim>;
-    context->obj_ptr_ = this;
-    context->id_ = i;
-    if (pthread_create(&task_threads_[i], nullptr,
-                       PthreadFunWrapper<ChannelSim, &ChannelSim::TaskThread>,
-                       context) != 0) {
-      perror("task thread create failed");
-      std::exit(0);
-    }
+    task_threads_.at(i) = std::thread(&ChannelSim::TaskThread, this, i);
   }
 }
 
 ChannelSim::~ChannelSim() {
   running.store(false);
-  void* join_status = nullptr;
-  // Join threads
-  for (size_t i = 0; i < worker_thread_num_; i++) {
-    pthread_join(task_threads_[i], &join_status);
+  for (auto& join_thread : task_threads_) {
+    join_thread.join();
   }
 
   for (size_t i = 0; i < worker_thread_num_; i++) {
@@ -153,7 +143,7 @@ void ChannelSim::ScheduleTask(EventData do_task,
     std::printf("need more memory\n");
     if (!in_queue->enqueue(ptok, do_task)) {
       std::printf("task enqueue failed\n");
-      std::exit(0);
+      throw std::runtime_error("ChannelSim: task enqueue failed");
     }
   }
 }
@@ -166,34 +156,21 @@ void ChannelSim::Start() {
   moodycamel::ProducerToken ptok_user(task_queue_user_);
   moodycamel::ConsumerToken ctok(message_queue_);
 
+  std::vector<std::thread> base_station_rec_threads;
+  base_station_rec_threads.resize(bs_thread_num_);
+
   for (size_t i = 0; i < bs_thread_num_; i++) {
-    pthread_t recv_thread_bs;
-
-    auto* bs_context = new EventHandlerContext<ChannelSim>;
-    bs_context->obj_ptr_ = this;
-    bs_context->id_ = i;
-
-    int ret = pthread_create(
-        &recv_thread_bs, nullptr,
-        PthreadFunWrapper<ChannelSim, &ChannelSim::BsRxLoop>, bs_context);
-    RtAssert(ret == 0, "Failed to create BS recv thread!");
+    base_station_rec_threads.at(i) =
+        std::thread(&ChannelSim::BsRxLoop, this, i);
   }
 
+  std::vector<std::thread> user_rx_threads;
+  user_rx_threads.resize(user_thread_num_);
   for (size_t i = 0; i < user_thread_num_; i++) {
-    pthread_t recv_thread_ue;
-
-    auto* ue_context = new EventHandlerContext<ChannelSim>;
-    ue_context->obj_ptr_ = this;
-    ue_context->id_ = i;
-
-    int ret = pthread_create(
-        &recv_thread_ue, nullptr,
-        PthreadFunWrapper<ChannelSim, &ChannelSim::UeRxLoop>, ue_context);
-    RtAssert(ret == 0, "Failed to create UE recv thread!");
+    user_rx_threads.at(i) = std::thread(&ChannelSim::UeRxLoop, this, i);
   }
 
   sleep(1);
-
   int ret = 0;
 
   static constexpr size_t kDequeueBulkSize = 5;
@@ -298,6 +275,14 @@ void ChannelSim::Start() {
       }
     }
   }
+
+  // Join the joinable threads
+  for (auto& join_thread : base_station_rec_threads) {
+    join_thread.join();
+  }
+  for (auto& join_thread : user_rx_threads) {
+    join_thread.join();
+  }
 }
 
 void* ChannelSim::TaskThread(int tid) {
@@ -346,7 +331,7 @@ void* ChannelSim::BsRxLoop(int tid) {
                    udp_pkt_buf.size(), 0)) {
       if (errno != EAGAIN && running) {
         std::printf("BS socket %zu receive failed\n", socket_id);
-        std::exit(0);
+        throw std::runtime_error("ChannelSim: BS socket receive failed");
       }
       continue;
     }
@@ -412,7 +397,7 @@ void* ChannelSim::UeRxLoop(int tid) {
                    udp_pkt_buf.size(), 0)) {
       if (errno != EAGAIN && running) {
         std::printf("UE socket %zu receive failed\n", socket_id);
-        std::exit(0);
+        throw std::runtime_error("ChannelSim: UE socket receive failed");
       }
       continue;
     }
@@ -515,7 +500,6 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
   if (symbol_id == 0) {
     is_new_frame = true;
   }
-
   channel_->ApplyChan(fmat_src, fmat_dst, is_downlink, is_new_frame);
 
   if (kPrintChannelOutput) {
@@ -564,7 +548,6 @@ void ChannelSim::DoTxUser(int tid, size_t tag) {
   if (symbol_id == 0) {
     is_new_frame = true;
   }
-
   channel_->ApplyChan(fmat_src, fmat_dst, is_downlink, is_new_frame);
 
   if (kPrintChannelOutput) {

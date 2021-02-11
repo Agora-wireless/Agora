@@ -7,7 +7,6 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include <pthread.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
@@ -103,7 +102,7 @@ class ChannelSim {
   moodycamel::ConcurrentQueue<EventData> message_queue_;
   moodycamel::ProducerToken* task_ptok_[kMaxThreads];
 
-  pthread_t* task_threads_;
+  std::vector<std::thread> task_threads_;
 
   size_t ul_data_plus_pilot_symbols_;
   size_t dl_data_plus_beacon_symbols_;

@@ -8,13 +8,13 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
-#include <pthread.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
 #include <complex>
 #include <fstream>
+#include <thread>
 #include <vector>
 
 #include "client_radio.h"
@@ -141,11 +141,15 @@ class RadioTxRx {
   void* LoopTxRxUsrpSync(int tid);
 
  private:
-  pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
-  pthread_cond_t cond_ = PTHREAD_COND_INITIALIZER;
+  std::mutex mutex_;
+  std::condition_variable cond_;
+  bool thread_sync_;
+
+  std::vector<std::thread> txrx_threads_;
+
   Config* const config_;
   std::unique_ptr<ClientRadioConfig> radioconfig_;  // Used only in Argos mode
-  std::vector<struct sockaddr_in> servaddr_;        /* server address */
+  std::vector<struct sockaddr_in> servaddr_;        // server address
   std::vector<int> socket_;
 
   Table<char>* buffer_;

@@ -6,7 +6,6 @@
 #ifndef AGORA_H_
 #define AGORA_H_
 
-#include <pthread.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -38,7 +37,6 @@ class Agora {
   // Dequeue batch size, used to reduce the overhead of dequeue in main thread
   static const int kDequeueBulkSizeTXRX = 8;
   static const int kDequeueBulkSizeWorker = 4;
-
   static const int kMaxWorkerNum = 50;  // Max number of worker threads allowed
 
   explicit Agora(
@@ -47,7 +45,19 @@ class Agora {
 
   void Start();  /// The main Agora event loop
   void Stop();
+  void GetEqualData(float** ptr, int* size);
 
+  // Flags that allow developer control over Agora internals
+  struct {
+    //     void getEqualData(float** ptr, int* size);Before exiting, save
+    //     LDPC-decoded or demodulated data to a file
+    bool enable_save_decode_data_to_file_ = false;
+
+    // Before exiting, save data sent on downlink to a file
+    bool enable_save_tx_data_to_file_ = false;
+  } flags_;
+
+ private:
   void WorkerFft(int tid);
   void WorkerZf(int tid);
   void WorkerDemul(int tid);
@@ -55,6 +65,16 @@ class Agora {
   void Worker(int tid);
 
   void CreateThreads();  /// Launch worker threads
+
+  void InitializeQueues();
+  void InitializeUplinkBuffers();
+  void InitializeDownlinkBuffers();
+  void FreeQueues();
+  void FreeUplinkBuffers();
+  void FreeDownlinkBuffers();
+
+  void SaveDecodeDataToFile(int frame_id);
+  void SaveTxDataToFile(int frame_id);
 
   void HandleEventFft(size_t tag);
   void UpdateRxCounters(size_t frame_id, size_t symbol_id);
@@ -87,27 +107,6 @@ class Agora {
   // Send current frame's SNR measurements from PHY to MAC
   void SendSnrReport(EventType event_type, size_t frame_id, size_t symbol_id);
 
-  void InitializeQueues();
-  void InitializeUplinkBuffers();
-  void InitializeDownlinkBuffers();
-  void FreeUplinkBuffers();
-  void FreeDownlinkBuffers();
-  void FreeQueues();
-
-  void SaveDecodeDataToFile(int frame_id);
-  void SaveTxDataToFile(int frame_id);
-  void GetEqualData(float** ptr, int* size);
-
-  // Flags that allow developer control over Agora internals
-  struct {
-    // Before exiting, save LDPC-decoded or demodulated data to a file
-    bool enable_save_decode_data_to_file_ = false;
-
-    // Before exiting, save data sent on downlink to a file
-    bool enable_save_tx_data_to_file_ = false;
-  } flags_;
-
- private:
   /// Fetch the concurrent queue for this event type
   moodycamel::ConcurrentQueue<EventData>* GetConq(EventType event_type,
                                                   size_t qid) {
@@ -140,13 +139,12 @@ class Agora {
 
   // The thread running MAC layer functions
   std::unique_ptr<MacThread> mac_thread_;
-  std::thread mac_std_thread_;                     // Handle for the MAC thread
-  std::thread worker_std_threads_[kMaxWorkerNum];  // Handle for worker threads
+  // Handle for the MAC thread
+  std::thread mac_std_thread_;
+  std::vector<std::thread> workers_;
 
   std::unique_ptr<Stats> stats_;
   std::unique_ptr<PhyStats> phy_stats_;
-
-  pthread_t* task_threads_;
 
   /*****************************************************
    * Buffers

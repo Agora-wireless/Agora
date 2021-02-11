@@ -475,7 +475,8 @@ int main(int argc, char* argv[]) {
   if (stick_this_thread_to_core(main_core_id) != 0) {
     std::printf("Main thread: stitch main thread to core %d failed\n",
                 main_core_id);
-    std::exit(0);
+    throw std::runtime_error(
+        "FFT MKL Test: Main thread: stitch main thread to core ");
   } else {
     std::printf("Main thread: stitch main thread to core %d succeeded\n",
                 main_core_id);

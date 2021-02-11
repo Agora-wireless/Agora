@@ -19,7 +19,7 @@ char* read_binfile(std::string filename, int buffer_size) {
 
   if (!infile.is_open()) {
     std::fprintf(stderr, "Failed to open file %s\n", filename.c_str());
-    std::exit(-1);
+    throw std::runtime_error("Failed to open file");
   }
 
   auto* x = new char[buffer_size]();

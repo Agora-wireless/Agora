@@ -57,7 +57,8 @@ DoDemul::DoDemul(
     std::fprintf(
         stderr,
         "Error: insufficient memory to JIT and store the DGEMM kernel\n");
-    std::exit(1);
+    throw std::runtime_error(
+        "DoDemul: insufficient memory to JIT and store the DGEMM kernel");
   }
   mkl_jit_cgemm_ = mkl_jit_get_cgemm_ptr(jitter_);
 #endif
@@ -87,7 +88,7 @@ EventData DoDemul::Launch(size_t tag) {
   const size_t frame_slot = frame_id % kFrameWnd;
   size_t start_tsc = WorkerRdtsc();
 
-  if (kDebugPrintInTask) {
+  if (kDebugPrintInTask == true) {
     std::printf(
         "In doDemul tid %d: frame: %zu, symbol: %zu, subcarrier: %zu \n", tid_,
         frame_id, symbol_idx_ul, base_sc_id);
@@ -183,23 +184,24 @@ EventData DoDemul::Launch(size_t tag) {
           cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
         if (symbol_idx_ul == 0 && cur_sc_id == 0) {
           // Reset previous frame
-          cx_float* phase_shift_ptr =
-              (cx_float*)ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd];
+          auto* phase_shift_ptr = reinterpret_cast<cx_float*>(
+              ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
           cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeNum(),
                                   cfg_->Frame().ClientUlPilotSymbols(), false);
           mat_phase_shift.fill(0);
         }
-        cx_float* phase_shift_ptr =
-            (cx_float*)&ue_spec_pilot_buffer_[frame_id % kFrameWnd]
-                                             [symbol_idx_ul * cfg_->UeNum()];
+        auto* phase_shift_ptr = reinterpret_cast<cx_float*>(
+            &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
+                                  [symbol_idx_ul * cfg_->UeNum()]);
         cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeNum(), 1, false);
         cx_fmat shift_sc =
             sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
         mat_phase_shift += shift_sc;
-      } else if (cfg_->Frame().ClientUlPilotSymbols() >
-                 0) {  // apply previously calc'ed phase shift to data
-        cx_float* pilot_corr_ptr =
-            (cx_float*)ue_spec_pilot_buffer_[frame_id % kFrameWnd];
+      }
+      // apply previously calc'ed phase shift to data
+      else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
+        auto* pilot_corr_ptr = reinterpret_cast<cx_float*>(
+            ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
         cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeNum(),
                                cfg_->Frame().ClientUlPilotSymbols(), false);
         fmat theta_mat = arg(pilot_corr_mat);
@@ -235,14 +237,15 @@ EventData DoDemul::Launch(size_t tag) {
   __m256i index2 = _mm256_setr_epi32(
       0, 1, cfg_->UeNum() * 2, cfg_->UeNum() * 2 + 1, cfg_->UeNum() * 4,
       cfg_->UeNum() * 4 + 1, cfg_->UeNum() * 6, cfg_->UeNum() * 6 + 1);
-  float* equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
+  auto* equal_t_ptr = reinterpret_cast<float*>(equaled_buffer_temp_transposed_);
   for (size_t i = 0; i < cfg_->UeNum(); i++) {
     float* equal_ptr = nullptr;
     if (kExportConstellation) {
-      equal_ptr = (float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                         [base_sc_id * cfg_->UeNum() + i]);
+      equal_ptr = reinterpret_cast<float*>(
+          &equal_buffer_[total_data_symbol_idx_ul]
+                        [base_sc_id * cfg_->UeNum() + i]);
     } else {
-      equal_ptr = (float*)(equaled_buffer_temp_ + i);
+      equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + i);
     }
     size_t k_num_double_in_sim_d256 = sizeof(__m256) / sizeof(double);  // == 4
     for (size_t j = 0; j < max_sc_ite / k_num_double_in_sim_d256; j++) {
