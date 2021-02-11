@@ -260,13 +260,8 @@ void PhyUe::Start() {
             dl_symbol_id = config_->Frame().GetDLSymbol(0);
           }
 
-          if ((symbol_id == 0)  // Beacon in Sim mode!
-              ||
-              ((config_->HwFramer() == false) &&
-               (ul_data_symbol_perframe_ == 0) && (symbol_id == dl_symbol_id) &&
-               (ant_id % config_->NumChannels() ==
-                0))  // first DL symbols in downlink-only mode
-          ) {        // Send uplink pilots
+          if ((kUseArgos == false) &&
+              (symbol_id == this->config_->Frame().GetBeaconSymbolLast())) {
             EventData do_tx_pilot_task(
                 EventType::kPacketPilotTX,
                 gen_tag_t::FrmSymUe(
@@ -276,9 +271,13 @@ void PhyUe::Start() {
                          *tx_ptoks_ptr_[ant_id % rx_thread_num_]);
           }
 
+          // schedule uplink syms
           if ((ul_data_symbol_perframe_ > 0) &&
-              (symbol_id == 0 || symbol_id == dl_symbol_id) &&
-              (ant_id % config_->NumChannels() == 0)) {
+              (((kUseArgos == false) &&
+                (symbol_id == this->config_->Frame().GetBeaconSymbolLast())) ||
+               ((kUseArgos == true) && (symbol_id == dl_symbol_id) &&
+                // first rx sym in hardware mode
+                (ant_id % config_->NumChannels() == 0)))) {
             EventData do_encode_task(
                 EventType::kEncode,
                 gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);

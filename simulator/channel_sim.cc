@@ -55,7 +55,7 @@ ChannelSim::ChannelSim(const Config* const config_bs,
   // initialize parameters from config
   srand(time(nullptr));
   dl_data_plus_beacon_symbols_ =
-      bscfg_->Frame().NumDLSyms() + 1;  // plus beacon
+      bscfg_->Frame().NumDLSyms() + bscfg_->Frame().NumBeaconSyms();
   ul_data_plus_pilot_symbols_ =
       bscfg_->Frame().NumULSyms() + bscfg_->Frame().NumPilotSyms();
 

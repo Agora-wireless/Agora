@@ -20,9 +20,9 @@ Agora::Agora(Config* const cfg)
                    cfg->BsAntNum() * cfg->OfdmDataNum()),
       ul_zf_matrices_(kFrameWnd, cfg->OfdmDataNum(),
                       cfg->BsAntNum() * cfg->UeNum()),
-      demod_buffers_(kFrameWnd, cfg->Frame().NumTotalSyms(), cfg->UeNum(),
+      demod_buffers_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeNum(),
                      kMaxModType * cfg->OfdmDataNum()),
-      decoded_buffer_(kFrameWnd, cfg->Frame().NumTotalSyms(), cfg->UeNum(),
+      decoded_buffer_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeNum(),
                       cfg->LdpcConfig().NumBlocksInSymbol() *
                           Roundup<64>(cfg->NumBytesPerCb())),
       dl_zf_matrices_(kFrameWnd, cfg->OfdmDataNum(),
@@ -82,7 +82,6 @@ Agora::~Agora() {
     MLPD_SYMBOL("Agora: Joining worker thread\n");
     worker_thread.join();
   }
-
   FreeUplinkBuffers();
   FreeDownlinkBuffers();
 
@@ -331,7 +330,8 @@ void Agora::Start() {
 
               for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
                 if (this->fft_cur_frame_for_symbol_.at(i) == frame_id) {
-                  ScheduleSubcarriers(EventType::kDemul, frame_id, i);
+                  ScheduleSubcarriers(EventType::kDemul, frame_id,
+                                      cfg->Frame().GetULSymbol(i));
                 }
               }
               // Schedule precoding for downlink symbols
@@ -349,17 +349,16 @@ void Agora::Start() {
 
         case EventType::kDemul: {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t symbol_idx_ul = gen_tag_t(event.tags_[0]).symbol_id_;
+          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           size_t base_sc_id = gen_tag_t(event.tags_[0]).sc_id_;
 
-          PrintPerTaskDone(PrintType::kDemul, frame_id,
-                           cfg->Frame().GetULSymbol(symbol_idx_ul), base_sc_id);
+          PrintPerTaskDone(PrintType::kDemul, frame_id, symbol_id, base_sc_id);
           bool last_demul_task =
-              this->demul_counters_.CompleteTask(frame_id, symbol_idx_ul);
+              this->demul_counters_.CompleteTask(frame_id, symbol_id);
 
           if (last_demul_task == true) {
-            ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_idx_ul);
-            PrintPerSymbolDone(PrintType::kDemul, frame_id, symbol_idx_ul);
+            ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_id);
+            PrintPerSymbolDone(PrintType::kDemul, frame_id, symbol_id);
             bool last_demul_symbol =
                 this->demul_counters_.CompleteSymbol(frame_id);
             if (last_demul_symbol == true) {
@@ -369,7 +368,7 @@ void Agora::Start() {
                 assert(cur_sche_frame_id_ == frame_id);
                 CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
               } else {
-                ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_idx_ul);
+                ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_id);
               }
               this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
               PrintPerFrameDone(PrintType::kDemul, frame_id);
@@ -379,15 +378,15 @@ void Agora::Start() {
 
         case EventType::kDecode: {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t symbol_idx_ul = gen_tag_t(event.tags_[0]).symbol_id_;
+          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
 
           bool last_decode_task =
-              this->decode_counters_.CompleteTask(frame_id, symbol_idx_ul);
+              this->decode_counters_.CompleteTask(frame_id, symbol_id);
           if (last_decode_task == true) {
             if (kEnableMac == true) {
-              ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_idx_ul);
+              ScheduleUsers(EventType::kPacketToMac, frame_id, symbol_id);
             }
-            PrintPerSymbolDone(PrintType::kDecode, frame_id, symbol_idx_ul);
+            PrintPerSymbolDone(PrintType::kDecode, frame_id, symbol_id);
             bool last_decode_symbol =
                 this->decode_counters_.CompleteSymbol(frame_id);
             if (last_decode_symbol == true) {
@@ -414,13 +413,12 @@ void Agora::Start() {
 
         case EventType::kPacketToMac: {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t symbol_idx_ul = gen_tag_t(event.tags_[0]).symbol_id_;
+          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
 
           bool last_tomac_task =
-              this->tomac_counters_.CompleteTask(frame_id, symbol_idx_ul);
+              this->tomac_counters_.CompleteTask(frame_id, symbol_id);
           if (last_tomac_task == true) {
-            PrintPerSymbolDone(PrintType::kPacketToMac, frame_id,
-                               symbol_idx_ul);
+            PrintPerSymbolDone(PrintType::kPacketToMac, frame_id, symbol_id);
 
             bool last_tomac_symbol =
                 this->tomac_counters_.CompleteSymbol(frame_id);
@@ -441,17 +439,17 @@ void Agora::Start() {
           for (size_t i = 0; i < event.num_tags_; i++) {
             size_t frame_id = gen_tag_t(event.tags_[i]).frame_id_;
             size_t symbol_id = gen_tag_t(event.tags_[i]).symbol_id_;
-            size_t symbol_idx_dl = cfg->Frame().GetDLSymbolIdx(symbol_id);
 
             bool last_encode_task =
-                encode_counters_.CompleteTask(frame_id, symbol_idx_dl);
+                encode_counters_.CompleteTask(frame_id, symbol_id);
             if (last_encode_task == true) {
-              this->encode_cur_frame_for_symbol_.at(symbol_idx_dl) = frame_id;
+              this->encode_cur_frame_for_symbol_.at(
+                  cfg->Frame().GetDLSymbolIdx(symbol_id)) = frame_id;
               // If precoder of the current frame exists
               if (zf_last_frame_ == frame_id) {
                 ScheduleSubcarriers(EventType::kPrecode, frame_id, symbol_id);
               }
-              PrintPerSymbolDone(PrintType::kEncode, frame_id, symbol_idx_dl);
+              PrintPerSymbolDone(PrintType::kEncode, frame_id, symbol_id);
 
               bool last_encode_symbol =
                   this->encode_counters_.CompleteSymbol(frame_id);
@@ -469,14 +467,15 @@ void Agora::Start() {
           size_t sc_id = gen_tag_t(event.tags_[0]).sc_id_;
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          size_t symbol_idx_dl = cfg->Frame().GetDLSymbolIdx(symbol_id);
-          PrintPerTaskDone(PrintType::kPrecode, frame_id, symbol_idx_dl, sc_id);
+          PrintPerTaskDone(PrintType::kPrecode, frame_id, symbol_id, sc_id);
           bool last_precode_task =
-              this->precode_counters_.CompleteTask(frame_id, symbol_idx_dl);
+              this->precode_counters_.CompleteTask(frame_id, symbol_id);
 
           if (last_precode_task == true) {
+            // precode_cur_frame_for_symbol_.at(
+            //    this->config_->Frame().GetDLSymbolIdx(symbol_id)) = frame_id;
             ScheduleAntennas(EventType::kIFFT, frame_id, symbol_id);
-            PrintPerSymbolDone(PrintType::kPrecode, frame_id, symbol_idx_dl);
+            PrintPerSymbolDone(PrintType::kPrecode, frame_id, symbol_id);
 
             bool last_precode_symbol =
                 this->precode_counters_.CompleteSymbol(frame_id);
@@ -494,16 +493,15 @@ void Agora::Start() {
             size_t ant_id = gen_tag_t(event.tags_[i]).ant_id_;
             size_t frame_id = gen_tag_t(event.tags_[i]).frame_id_;
             size_t symbol_id = gen_tag_t(event.tags_[i]).symbol_id_;
-            size_t symbol_idx_dl = cfg->Frame().GetDLSymbolIdx(symbol_id);
             TryEnqueueFallback(GetConq(EventType::kPacketTX, 0),
                                tx_ptoks_ptr_[ant_id % cfg->SocketThreadNum()],
                                EventData(EventType::kPacketTX, event.tags_[0]));
-            PrintPerTaskDone(PrintType::kIFFT, frame_id, symbol_idx_dl, ant_id);
+            PrintPerTaskDone(PrintType::kIFFT, frame_id, symbol_id, ant_id);
 
             bool last_ifft_task =
-                this->ifft_counters_.CompleteTask(frame_id, symbol_idx_dl);
+                this->ifft_counters_.CompleteTask(frame_id, symbol_id);
             if (last_ifft_task == true) {
-              PrintPerSymbolDone(PrintType::kIFFT, frame_id, symbol_idx_dl);
+              PrintPerSymbolDone(PrintType::kIFFT, frame_id, symbol_id);
 
               bool last_ifft_symbol =
                   this->ifft_counters_.CompleteSymbol(frame_id);
@@ -526,15 +524,13 @@ void Agora::Start() {
           size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          size_t symbol_idx_dl = cfg->Frame().GetDLSymbolIdx(symbol_id);
-          PrintPerTaskDone(PrintType::kPacketTX, frame_id, symbol_idx_dl,
-                           ant_id);
+          PrintPerTaskDone(PrintType::kPacketTX, frame_id, symbol_id, ant_id);
 
           bool last_tx_task =
-              this->tx_counters_.CompleteTask(frame_id, symbol_idx_dl);
+              this->tx_counters_.CompleteTask(frame_id, symbol_id);
           if (last_tx_task == true) {
-            PrintPerSymbolDone(PrintType::kPacketTX, frame_id, symbol_idx_dl);
-            /* If tx of the first symbol is done */
+            PrintPerSymbolDone(PrintType::kPacketTX, frame_id, symbol_id);
+            // If tx of the first symbol is done
             if (symbol_id == cfg->Frame().GetDLSymbol(0)) {
               this->stats_->MasterSetTsc(TsType::kTXProcessedFirst, frame_id);
               PrintPerFrameDone(PrintType::kPacketTXFirst, frame_id);
@@ -669,7 +665,7 @@ void Agora::HandleEventFft(size_t tag) {
       PrintPerSymbolDone(PrintType::kFFTData, frame_id, symbol_id);
       // If precoder exist, schedule demodulation
       if (zf_last_frame_ == frame_id) {
-        ScheduleSubcarriers(EventType::kDemul, frame_id, symbol_idx_ul);
+        ScheduleSubcarriers(EventType::kDemul, frame_id, symbol_id);
       }
       bool last_uplink_fft = uplink_fft_counters_.CompleteSymbol(frame_id);
       if (last_uplink_fft == true) {
@@ -1340,6 +1336,8 @@ void Agora::InitializeDownlinkBuffers() {
         std::vector<size_t>(config_->Frame().NumDLSyms(), SIZE_MAX);
     precode_counters_.Init(config_->Frame().NumDLSyms(),
                            config_->DemulEventsPerSymbol());
+    // precode_cur_frame_for_symbol_ =
+    //    std::vector<size_t>(config_->Frame().NumDLSyms(), SIZE_MAX);
     ifft_counters_.Init(config_->Frame().NumDLSyms(), config_->BsAntNum());
     tx_counters_.Init(config_->Frame().NumDLSyms(), config_->BsAntNum());
   }

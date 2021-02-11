@@ -33,7 +33,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
 
 #ifdef THREADED_INIT
   size_t num_checks = 0;
-  
+
   size_t num_client_radios_init = num_client_radios_initialized_.load();
   while (num_client_radios_init != this->radio_num_) {
     num_checks++;
@@ -44,7 +44,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
           num_client_radios_init, this->radio_num_);
       num_checks = 0;
     }
-	num_client_radios_init = num_client_radios_initialized_.load();
+    num_client_radios_init = num_client_radios_initialized_.load();
   }
 
   for (auto& init_thread : radio_threads) {
