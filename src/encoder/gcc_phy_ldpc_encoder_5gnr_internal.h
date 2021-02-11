@@ -65,21 +65,21 @@ extern "C" {
 #define WAYS_18to32 16
 #define WAYS_2to16 16
 
-void adapter_from288to384(int8_t** pBuff0, int8_t* pBuff1, uint16_t zcSize,
+void AdapterFrom288to384(int8_t** pBuff0, int8_t* pBuff1, uint16_t zcSize,
     uint32_t cbLen, int8_t direct); //1ways
-void adapter_2ways_from144to256(int8_t** pbuff0, int8_t* pbuff1,
-    uint16_t zcSize, uint32_t cbLen, int8_t direct); //2ways
-void adapter_4ways_from72to128(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
+void Adapter2waysFrom144to256(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
+    uint32_t cbLen, int8_t direct); //2ways
+void Adapter4waysFrom72to128(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
     uint32_t cbLen, int8_t direct); //4ways
-void adapter_8ways_from36to64(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
+void Adapter8waysFrom36to64(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
     uint32_t cbLen, int8_t direct); //8ways
-void adapter_16ways_from18to32(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
+void Adapter16waysFrom18to32(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
     uint32_t cbLen, int8_t direct); //16ways
-void adapter_16ways_from2to16(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
+void Adapter16waysFrom2to16(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
     uint32_t cbLen, int8_t direct); //16ways
 
 typedef void (*LDPC_ADAPTER_P)(int8_t**, int8_t*, uint16_t, uint32_t, int8_t);
-LDPC_ADAPTER_P ldpc_select_adapter_func(uint16_t zcSize);
+LDPC_ADAPTER_P LdpcSelectAdapterFunc(uint16_t zcSize);
 
 #define PROC_BYTES 64
 #define I_LS_NUM 8
@@ -95,22 +95,22 @@ LDPC_ADAPTER_P ldpc_select_adapter_func(uint16_t zcSize);
 #define BG2_COL_INF_NUM 10
 #define BG2_NONZERO_NUM 188
 
-void ldpc_enc_initial();
+void LdpcEncInitial();
 
-void ldpc_encoder_bg1(int8_t* pDataIn, int8_t* pDataOut,
+void LdpcEncoderBg1(int8_t* pDataIn, int8_t* pDataOut,
     const int16_t* pMatrixNumPerCol, const int16_t* pAddr,
     const int16_t* pShiftMatrix, int16_t zcSize);
 
 /* Table generated for BG1 from H Matrix in Table 5.3.2-3 in 38.212 */
 /* Number of non-null elements per columns in BG1 */
-static constexpr int16_t Bg1MatrixNumPerCol[BG1_COL_TOTAL] = { 30, 28, 7, 11, 9,
-    4, 8, 12, 8, 7, 12, 10, 12, 11, 10, 7, 10, 10, 13, 7, 8, 11, 9, 3, 4, 4, 1,
+static constexpr int16_t kBg1MatrixNumPerCol[BG1_COL_TOTAL] = { 30, 28, 7, 11,
+    9, 4, 8, 12, 8, 7, 12, 10, 12, 11, 10, 7, 10, 10, 13, 7, 8, 11, 9, 3, 4, 4,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 
 /* Table generated for BG1 from H Matrix in Table 5.3.2-3 in 38.212 */
 /* Addresses of each non-null elements in matrix (removed the 4x4 parity non identify matrix) */
-static constexpr int16_t Bg1Address[BG1_NONZERO_NUM] = { 0, 64, 128, 192, 256,
+static constexpr int16_t kBg1Address[BG1_NONZERO_NUM] = { 0, 64, 128, 192, 256,
     320, 384, 448, 512, 576, 704, 768, 832, 896, 960, 1088, 1216, 1280, 1408,
     1536, 1664, 1792, 1920, 2048, 2176, 2304, 2432, 2560, 2688, 2816, 0, 128,
     192, 256, 320, 448, 512, 576, 640, 704, 768, 960, 1024, 1152, 1216, 1344,
@@ -136,7 +136,7 @@ static constexpr int16_t Bg1Address[BG1_NONZERO_NUM] = { 0, 64, 128, 192, 256,
 
 /* Table generated for BG1 from H Matrix in Table 5.3.2-3 in 38.212 */
 __attribute__((aligned(
-    64))) static constexpr int16_t Bg1HShiftMatrix[BG1_NONZERO_NUM * I_LS_NUM]
+    64))) static constexpr int16_t kBg1HShiftMatrix[BG1_NONZERO_NUM * I_LS_NUM]
     = { 250, 2, 106, 121, 157, 205, 183, 220, 112, 103, 77, 160, 177, 206, 40,
           7, 60, 151, 64, 112, 195, 128, 216, 221, 127, 37, 167, 157, 149, 139,
           69, 111, 89, 102, 236, 44, 4, 182, 98, 41, 42, 96, 64, 42, 73, 249,
@@ -294,13 +294,13 @@ __attribute__((aligned(
 
 /* Table generated for BG2 from H Matrix in Table 5.3.2-3 in 38.212 */
 /* Number of non-null elements per columns in BG2 */
-static constexpr int16_t Bg2MatrixNumPerCol[BG2_COL_TOTAL] = { 22, 23, 10, 5, 5,
-    14, 7, 13, 6, 8, 6, 14, 7, 10, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+static constexpr int16_t kBg2MatrixNumPerCol[BG2_COL_TOTAL] = { 22, 23, 10, 5,
+    5, 14, 7, 13, 6, 8, 6, 14, 7, 10, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 
 /* Table generated for BG2 from H Matrix in Table 5.3.2-3 in 38.212 */
 /* Addresses of each non-null elements in matrix (removed the 4x4 parity non identify matrix) */
-static constexpr int16_t Bg2Address[BG2_NONZERO_NUM] = { 0, 64, 128, 256, 320,
+static constexpr int16_t kBg2Address[BG2_NONZERO_NUM] = { 0, 64, 128, 256, 320,
     384, 512, 640, 704, 832, 960, 1152, 1216, 1344, 1472, 1600, 1728, 1856,
     2048, 2176, 2304, 2496, 0, 128, 192, 256, 320, 448, 512, 576, 640, 768, 832,
     896, 1024, 1088, 1216, 1280, 1408, 1536, 1792, 1984, 2240, 2432, 2624, 0,
@@ -318,7 +318,7 @@ static constexpr int16_t Bg2Address[BG2_NONZERO_NUM] = { 0, 64, 128, 256, 320,
 
 /* Table generated for BG2 from H Matrix in Table 5.3.2-3 in 38.212 */
 __attribute__((aligned(
-    64))) static constexpr int16_t Bg2HShiftMatrix[BG2_NONZERO_NUM * I_LS_NUM]
+    64))) static constexpr int16_t kBg2HShiftMatrix[BG2_NONZERO_NUM * I_LS_NUM]
     = { 9, 167, 81, 179, 231, 155, 142, 11, 11, 83, 51, 220, 87, 76, 23, 228, 8,
           18, 242, 147, 140, 239, 117, 114, 8, 214, 41, 129, 94, 203, 185, 63,
           2, 115, 203, 254, 20, 26, 222, 46, 98, 106, 57, 31, 129, 204, 58, 63,

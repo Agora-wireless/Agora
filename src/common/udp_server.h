@@ -73,8 +73,9 @@ public:
 
     ~UDPServer()
     {
-        if (sock_fd_ != -1)
+        if (sock_fd_ != -1) {
             close(sock_fd_);
+        }
     }
 
     /**
@@ -86,7 +87,7 @@ public:
      *
      * return 0.
      */
-    ssize_t recv_nonblocking(uint8_t* buf, size_t len)
+    ssize_t RecvNonblocking(uint8_t* buf, size_t len) const
     {
         ssize_t ret = recv(sock_fd_, static_cast<void*>(buf), len, 0);
         if (ret == -1) {

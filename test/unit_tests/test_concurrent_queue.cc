@@ -5,35 +5,35 @@
 static constexpr size_t kNumWorkers = 14;
 static constexpr size_t kMaxTestNum = (1 << 24);
 
-struct item_t {
-    size_t value;
-    size_t padding[7];
+struct ItemT {
+    size_t value_;
+    size_t padding_[7];
 
-    item_t(){};
-    item_t(size_t value)
-        : value(value)
+    ItemT(){};
+    ItemT(size_t value)
+        : value_(value)
     {
     }
 };
-static_assert(sizeof(item_t) == 64, "");
+static_assert(sizeof(ItemT) == 64, "");
 
 // Test if the master can enqueue to specific workers
-void MasterToWorkerStatic_master(moodycamel::ConcurrentQueue<item_t>* queue,
+void MasterToWorkerStaticMaster(moodycamel::ConcurrentQueue<ItemT>* queue,
     moodycamel::ProducerToken** ptoks)
 {
     for (size_t i = 0; i < kMaxTestNum; i++) {
-        queue->enqueue(*ptoks[i % kNumWorkers], item_t(i));
+        queue->enqueue(*ptoks[i % kNumWorkers], ItemT(i));
     }
 }
 
-void MasterToWorkerStatic_worker(size_t worker_id,
-    moodycamel::ConcurrentQueue<item_t>* queue, moodycamel::ProducerToken* ptok)
+void MasterToWorkerStaticWorker(size_t worker_id,
+    moodycamel::ConcurrentQueue<ItemT>* queue, moodycamel::ProducerToken* ptok)
 {
     size_t next_expected = worker_id;
     while (next_expected < kMaxTestNum) {
-        item_t item;
+        ItemT item;
         if (queue->try_dequeue_from_producer(*ptok, item)) {
-            ASSERT_EQ(item.value, next_expected);
+            ASSERT_EQ(item.value_, next_expected);
             next_expected += kNumWorkers;
         }
     }
@@ -41,21 +41,22 @@ void MasterToWorkerStatic_worker(size_t worker_id,
 
 TEST(TestConcurrentQueue, MasterToWorkerStatic)
 {
-    moodycamel::ConcurrentQueue<item_t> queue;
+    moodycamel::ConcurrentQueue<ItemT> queue;
     moodycamel::ProducerToken* ptoks[kNumWorkers];
     for (size_t i = 0; i < kNumWorkers; i++) {
         ptoks[i] = new moodycamel::ProducerToken(queue);
     }
 
-    auto master = std::thread(MasterToWorkerStatic_master, &queue, ptoks);
+    auto master = std::thread(MasterToWorkerStaticMaster, &queue, ptoks);
     std::thread workers[kNumWorkers];
     for (size_t i = 0; i < kNumWorkers; i++) {
         workers[i]
-            = std::thread(MasterToWorkerStatic_worker, i, &queue, ptoks[i]);
+            = std::thread(MasterToWorkerStaticWorker, i, &queue, ptoks[i]);
     }
     master.join();
-    for (auto& w : workers)
+    for (auto& w : workers) {
         w.join();
+    }
 
     for (size_t i = 0; i < kNumWorkers; i++) {
         delete ptoks[i];
@@ -63,9 +64,9 @@ TEST(TestConcurrentQueue, MasterToWorkerStatic)
 }
 
 // Test if the token affects the performance when master dequeues items from workers
-void WorkerToMaster_master(moodycamel::ConcurrentQueue<item_t>* queue)
+void WorkerToMasterMaster(moodycamel::ConcurrentQueue<ItemT>* queue)
 {
-    item_t item;
+    ItemT item;
     size_t sum = 0;
     while (sum < kMaxTestNum) {
         if (queue->try_dequeue(item)) {
@@ -74,24 +75,24 @@ void WorkerToMaster_master(moodycamel::ConcurrentQueue<item_t>* queue)
     }
 }
 
-void WorkerToMaster_worker_with_token(size_t worker_id,
-    moodycamel::ConcurrentQueue<item_t>* queue, moodycamel::ProducerToken* ptok)
+void WorkerToMasterWorkerWithToken(size_t worker_id,
+    moodycamel::ConcurrentQueue<ItemT>* queue, moodycamel::ProducerToken* ptok)
 {
     size_t next_expected = worker_id;
     while (next_expected < kMaxTestNum) {
-        item_t item(next_expected);
+        ItemT item(next_expected);
         if (queue->enqueue(*ptok, item)) {
             next_expected += kNumWorkers;
         }
     }
 }
 
-void WorkerToMaster_worker_without_token(
-    size_t worker_id, moodycamel::ConcurrentQueue<item_t>* queue)
+void WorkerToMasterWorkerWithoutToken(
+    size_t worker_id, moodycamel::ConcurrentQueue<ItemT>* queue)
 {
     size_t next_expected = worker_id;
     while (next_expected < kMaxTestNum) {
-        item_t item(next_expected);
+        ItemT item(next_expected);
         if (queue->enqueue(item)) {
             next_expected += kNumWorkers;
         }
@@ -100,21 +101,22 @@ void WorkerToMaster_worker_without_token(
 
 TEST(TestConcurrentQueue, WorkerToMasterWithTokens)
 {
-    moodycamel::ConcurrentQueue<item_t> queue;
+    moodycamel::ConcurrentQueue<ItemT> queue;
     moodycamel::ProducerToken* ptoks[kNumWorkers];
     for (size_t i = 0; i < kNumWorkers; i++) {
         ptoks[i] = new moodycamel::ProducerToken(queue);
     }
 
-    auto master = std::thread(WorkerToMaster_master, &queue);
+    auto master = std::thread(WorkerToMasterMaster, &queue);
     std::thread workers[kNumWorkers];
     for (size_t i = 0; i < kNumWorkers; i++) {
-        workers[i] = std::thread(
-            WorkerToMaster_worker_with_token, i, &queue, ptoks[i]);
+        workers[i]
+            = std::thread(WorkerToMasterWorkerWithToken, i, &queue, ptoks[i]);
     }
     master.join();
-    for (auto& w : workers)
+    for (auto& w : workers) {
         w.join();
+    }
 
     for (size_t i = 0; i < kNumWorkers; i++) {
         delete ptoks[i];
@@ -123,17 +125,17 @@ TEST(TestConcurrentQueue, WorkerToMasterWithTokens)
 
 TEST(TestConcurrentQueue, WorkerToMasterWithoutTokens)
 {
-    moodycamel::ConcurrentQueue<item_t> queue;
+    moodycamel::ConcurrentQueue<ItemT> queue;
 
-    auto master = std::thread(WorkerToMaster_master, &queue);
+    auto master = std::thread(WorkerToMasterMaster, &queue);
     std::thread workers[kNumWorkers];
     for (size_t i = 0; i < kNumWorkers; i++) {
-        workers[i]
-            = std::thread(WorkerToMaster_worker_without_token, i, &queue);
+        workers[i] = std::thread(WorkerToMasterWorkerWithoutToken, i, &queue);
     }
     master.join();
-    for (auto& w : workers)
+    for (auto& w : workers) {
         w.join();
+    }
 }
 
 int main(int argc, char** argv)

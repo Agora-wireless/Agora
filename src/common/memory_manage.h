@@ -10,12 +10,12 @@
 
 namespace Agora_memory {
 enum class Alignment_t : size_t {
-    k32Align = 32,
-    k64Align = 64,
-    k4096Align = 4096
+    kK32Align = 32,
+    kK64Align = 64,
+    kK4096Align = 4096
 };
 
-void* padded_aligned_alloc(Alignment_t alignment, size_t size);
+void* PaddedAlignedAlloc(Alignment_t alignment, size_t size);
 }
 
 template <typename T> class Table {
@@ -32,31 +32,31 @@ public:
     {
     }
 
-    void malloc(size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment)
+    void Malloc(size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment)
     {
         this->dim2_ = dim2;
         this->dim1_ = dim1;
         size_t alloc_size = (this->dim1_ * this->dim2_ * sizeof(T));
         this->data_ = static_cast<T*>(
-            Agora_memory::padded_aligned_alloc(alignment, alloc_size));
+            Agora_memory::PaddedAlignedAlloc(alignment, alloc_size));
     }
-    void calloc(size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment)
+    void Calloc(size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment)
     {
         //assert(!((dim1 == 0) || (dim2 == 0)));
-        this->malloc(dim1, dim2, alignment);
+        this->Malloc(dim1, dim2, alignment);
         std::memset(this->data_, 0, (this->dim1_ * this->dim2_ * sizeof(T)));
     }
 
     // Allocate the table and fill it with random floating point values between
     // -1.0 and 1.0
-    void rand_alloc_float(
+    void RandAllocFloat(
         size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment)
     {
         std::default_random_engine generator;
         std::uniform_real_distribution<float> distribution(-1.0, 1.0);
 
         assert(sizeof(T) >= sizeof(float));
-        this->malloc(dim1, dim2, alignment);
+        this->Malloc(dim1, dim2, alignment);
         auto* base = reinterpret_cast<float*>(this->data_);
         for (size_t i = 0; i < (dim1 * dim2); i++) {
             base[i] = distribution(generator);
@@ -65,23 +65,23 @@ public:
 
     // Allocate the table and fill it with random complex floating point values
     // between -1.0 and 1.0
-    void rand_alloc_cx_float(
+    void RandAllocCxFloat(
         size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment)
     {
         std::default_random_engine generator;
         std::uniform_real_distribution<float> distribution(-1.0, 1.0);
 
         assert(sizeof(T) >= sizeof(std::complex<float>));
-        this->malloc(dim1, dim2, alignment);
+        this->Malloc(dim1, dim2, alignment);
         auto* base = reinterpret_cast<std::complex<float>*>(this->data_);
         for (size_t i = 0; i < (dim1 * dim2); i++) {
             base[i] = { distribution(generator), distribution(generator) };
         }
     }
 
-    bool is_allocated(void) { return (this->data_ != nullptr); }
+    bool IsAllocated(void) { return (this->data_ != nullptr); }
 
-    void free(void)
+    void Free(void)
     {
         if (this->data_ != nullptr) {
             std::free(this->data_);
@@ -99,18 +99,18 @@ public:
 };
 
 template <typename T, typename U>
-static void alloc_buffer_1d(
+static void AllocBuffer1d(
     T** buffer, U dim, Agora_memory::Alignment_t alignment, int init_zero)
 {
     size_t size = dim * sizeof(T);
     *buffer
-        = static_cast<T*>(Agora_memory::padded_aligned_alloc(alignment, size));
+        = static_cast<T*>(Agora_memory::PaddedAlignedAlloc(alignment, size));
     if (init_zero) {
         std::memset(*buffer, 0u, size);
     }
 };
 
-template <typename T> static void free_buffer_1d(T** buffer)
+template <typename T> static void FreeBuffer1d(T** buffer)
 {
     std::free(*buffer);
 };
@@ -126,7 +126,7 @@ public:
 
     /// Create a grid of pointers where each grid cell points to an array of
     /// [n_entries]
-    PtrGrid(size_t n_entries) { this->alloc(ROWS, COLS, n_entries); }
+    PtrGrid(size_t n_entries) { this->Alloc(ROWS, COLS, n_entries); }
 
     /// Create a grid of pointers with dimensions [ROWS, COLS], where
     /// only the grid with dimensions [n_rows, n_cols] has cells pointing to an
@@ -135,7 +135,7 @@ public:
     PtrGrid(size_t n_rows, size_t n_cols, size_t n_entries)
     {
         assert(n_rows <= ROWS && n_cols <= COLS);
-        this->alloc(n_rows, n_cols, n_entries);
+        this->Alloc(n_rows, n_cols, n_entries);
     }
 
     ~PtrGrid(void)
@@ -147,14 +147,12 @@ public:
     }
 
     /// Allocate [n_entries] entries per pointer cell
-    void alloc(size_t n_rows, size_t n_cols, size_t n_entries)
+    void Alloc(size_t n_rows, size_t n_cols, size_t n_entries)
     {
         const size_t alloc_sz = n_rows * n_cols * n_entries * sizeof(T);
-        this->backing_buf_
-            = static_cast<T*>(Agora_memory::padded_aligned_alloc(
-                Agora_memory::Alignment_t::k64Align, alloc_sz));
-        std::memset(
-            static_cast<void *>(this->backing_buf_), 0, alloc_sz);
+        this->backing_buf_ = static_cast<T*>(Agora_memory::PaddedAlignedAlloc(
+            Agora_memory::Alignment_t::kK64Align, alloc_sz));
+        std::memset(static_cast<void*>(this->backing_buf_), 0, alloc_sz);
 
         // Fill-in the grid with pointers into backing_buf
         size_t offset = 0;
@@ -168,11 +166,11 @@ public:
 
     /// Allocate [n_entries] entries per pointer cell.
     /// Each entry is a random float between -1.0 and 1.0.
-    void rand_alloc_cx_float(size_t n_entries)
+    void RandAllocCxFloat(size_t n_entries)
     {
         static_assert(
             sizeof(T) == 2 * sizeof(float), "T must be complex_float");
-        alloc(ROWS, COLS, n_entries);
+        Alloc(ROWS, COLS, n_entries);
 
         std::default_random_engine generator;
         std::uniform_real_distribution<float> distribution(-1.0, 1.0);
@@ -215,7 +213,7 @@ public:
 
     /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where each
     /// cube cell points to an array of [n_entries]
-    PtrCube(size_t n_entries) { this->alloc(DIM1, DIM2, DIM3, n_entries); }
+    PtrCube(size_t n_entries) { this->Alloc(DIM1, DIM2, DIM3, n_entries); }
 
     /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where
     /// only the cube with dimensions [dim_1, dim_2, dim_3] has cells
@@ -224,7 +222,7 @@ public:
     PtrCube(size_t dim_1, size_t dim_2, size_t dim_3, size_t n_entries)
     {
         assert(dim_1 <= DIM1 && dim_2 <= DIM2 && dim_3 <= DIM3);
-        this->alloc(dim_1, dim_2, dim_3, n_entries);
+        this->Alloc(dim_1, dim_2, dim_3, n_entries);
     }
 
     ~PtrCube(void)
@@ -236,14 +234,12 @@ public:
     }
 
     /// Allocate [n_entries] entries per pointer cell
-    void alloc(size_t dim_1, size_t dim_2, size_t dim_3, size_t n_entries)
+    void Alloc(size_t dim_1, size_t dim_2, size_t dim_3, size_t n_entries)
     {
         const size_t alloc_sz = dim_1 * dim_2 * dim_3 * n_entries * sizeof(T);
-        this->backing_buf_
-            = static_cast<T*>(Agora_memory::padded_aligned_alloc(
-                Agora_memory::Alignment_t::k64Align, alloc_sz));
-        std::memset(
-            static_cast<void *>(this->backing_buf_), 0, alloc_sz);
+        this->backing_buf_ = static_cast<T*>(Agora_memory::PaddedAlignedAlloc(
+            Agora_memory::Alignment_t::kK64Align, alloc_sz));
+        std::memset(static_cast<void*>(this->backing_buf_), 0, alloc_sz);
 
         // Fill-in the grid with pointers into backing_buf
         for (auto& mat : this->cube_) {
