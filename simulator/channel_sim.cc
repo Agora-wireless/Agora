@@ -8,8 +8,12 @@
 
 #include "datatype_conversion.h"
 
-static bool running = true;
+using namespace arma;
+
+static std::atomic<bool> running = true;
 static constexpr bool kPrintChannelOutput = false;
+static const size_t kDefaultQueueSize = 36;
+static const bool kPrintDebugTxUser = false;
 
 static void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
                                     size_t length) {
@@ -33,10 +37,11 @@ static void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
   }
 }
 
-ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
-                       size_t bs_thread_num, size_t user_thread_num,
-                       size_t worker_thread_num, size_t in_core_offset,
-                       std::string in_chan_type, double in_chan_snr)
+ChannelSim::ChannelSim(const Config* const config_bs,
+                       const Config* const config_ue, size_t bs_thread_num,
+                       size_t user_thread_num, size_t worker_thread_num,
+                       size_t in_core_offset, std::string in_chan_type,
+                       double in_chan_snr)
     : bscfg_(config_bs),
       uecfg_(config_ue),
       bs_thread_num_(bs_thread_num),
@@ -60,12 +65,14 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
   servaddr_ue_.resize(user_socket_num_);
 
   task_queue_bs_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * dl_data_plus_beacon_symbols_ * bscfg_->BsAntNum() * 36);
+      kFrameWnd * dl_data_plus_beacon_symbols_ * bscfg_->BsAntNum() *
+      kDefaultQueueSize);
   task_queue_user_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * ul_data_plus_pilot_symbols_ * uecfg_->UeAntNum() * 36);
+      kFrameWnd * ul_data_plus_pilot_symbols_ * uecfg_->UeAntNum() *
+      kDefaultQueueSize);
   message_queue_ = moodycamel::ConcurrentQueue<EventData>(
       kFrameWnd * bscfg_->Frame().NumTotalSyms() *
-      (bscfg_->BsAntNum() + uecfg_->UeAntNum()) * 36);
+      (bscfg_->BsAntNum() + uecfg_->UeAntNum()) * kDefaultQueueSize);
 
   assert(bscfg_->PacketLength() == uecfg_->PacketLength());
   payload_length_ = bscfg_->PacketLength() - Packet::kOffsetOfData;
@@ -96,11 +103,12 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
   std::memset(user_rx_counter_, 0,
               sizeof(size_t) * ul_data_plus_pilot_symbols_ * kFrameWnd);
 
-  std::memset(bs_tx_counter_, 0, sizeof(size_t) * kFrameWnd);
-  std::memset(user_tx_counter_, 0, sizeof(size_t) * kFrameWnd);
+  bs_tx_counter_.fill(0);
+  user_tx_counter_.fill(0);
 
   // Initialize channel
-  channel_ = new Channel(config_bs, config_ue, channel_type_, channel_snr_);
+  channel_ = std::make_unique<Channel>(config_bs, config_ue, channel_type_,
+                                       channel_snr_);
 
   for (size_t i = 0; i < worker_thread_num; i++) {
     task_ptok_[i] = new moodycamel::ProducerToken(message_queue_);
@@ -123,9 +131,19 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
 }
 
 ChannelSim::~ChannelSim() {
-  // delete buffers, UDP client and servers
-  // delete[] socket_uerx_;
-  // delete[] socket_bsrx_;
+  running.store(false);
+  void* join_status = nullptr;
+  // Join threads
+  for (size_t i = 0; i < worker_thread_num_; i++) {
+    pthread_join(task_threads_[i], &join_status);
+  }
+
+  for (size_t i = 0; i < worker_thread_num_; i++) {
+    delete task_ptok_[i];
+  }
+
+  delete[] bs_rx_counter_;
+  delete[] user_rx_counter_;
 }
 
 void ChannelSim::ScheduleTask(EventData do_task,
@@ -180,7 +198,7 @@ void ChannelSim::Start() {
 
   static constexpr size_t kDequeueBulkSize = 5;
   EventData events_list[kDequeueBulkSize];
-  while (true) {
+  while (running.load() == true) {
     ret = message_queue_.try_dequeue_bulk(ctok, events_list, kDequeueBulkSize);
 
     for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
@@ -436,6 +454,34 @@ void* ChannelSim::UeRxLoop(int tid) {
   return nullptr;
 }
 
+void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
+                      std::vector<char>& tx_buffer, size_t buffer_offset,
+                      std::vector<int>& send_socket,
+                      std::vector<struct sockaddr_in>& servaddr,
+                      cx_fmat& format_dest) {
+  auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer.at(buffer_offset));
+  SimdConvertFloatToShort(reinterpret_cast<float*>(format_dest.memptr()),
+                          dst_ptr, 2 * bscfg_->SampsPerSymbol() * max_ant);
+
+  std::vector<uint8_t> udp_pkt_buf(bscfg_->PacketLength(), 0);
+  auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
+  for (size_t ant_id = 0; ant_id < max_ant; ant_id++) {
+    pkt->frame_id_ = frame_id;
+    pkt->symbol_id_ = symbol_id;
+    pkt->ant_id_ = ant_id;
+    pkt->cell_id_ = 0;
+    std::memcpy(pkt->data_,
+                &tx_buffer[buffer_offset + ant_id * payload_length_],
+                payload_length_);
+    ssize_t ret =
+        sendto(send_socket.at(ant_id),
+               reinterpret_cast<char*>(udp_pkt_buf.data()), udp_pkt_buf.size(),
+               0, reinterpret_cast<struct sockaddr*>(&servaddr.at(ant_id)),
+               sizeof(servaddr.at(ant_id)));
+    RtAssert(ret > 0, "Sendto() failed");
+  }
+}
+
 void ChannelSim::DoTxBs(int tid, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
@@ -452,7 +498,7 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
   size_t total_offset_ue = symbol_offset * payload_length_ * uecfg_->UeAntNum();
   size_t total_offset_bs = symbol_offset * payload_length_ * bscfg_->BsAntNum();
 
-  auto* src_ptr = reinterpret_cast<short*>(&rx_buffer_ue_[total_offset_ue]);
+  auto* src_ptr = reinterpret_cast<short*>(&rx_buffer_ue_.at(total_offset_ue));
 
   // convert received data to complex float,
   // apply channel, convert back to complex short to TX
@@ -476,26 +522,8 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
     Utils::PrintMat(fmat_dst, "rx_ul");
   }
 
-  auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_bs_[total_offset_bs]);
-  SimdConvertFloatToShort(reinterpret_cast<float*>(fmat_dst.memptr()), dst_ptr,
-                          2 * bscfg_->SampsPerSymbol() * bscfg_->BsAntNum());
-
-  // send the symbol to all base station antennas
-  std::vector<uint8_t> udp_pkt_buf(bscfg_->PacketLength(), 0);
-  auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
-  for (size_t ant_id = 0; ant_id < bscfg_->BsAntNum(); ant_id++) {
-    pkt->frame_id_ = frame_id;
-    pkt->symbol_id_ = symbol_id;
-    pkt->ant_id_ = ant_id;
-    pkt->cell_id_ = 0;
-    std::memcpy(pkt->data_,
-                &tx_buffer_bs_[total_offset_bs + ant_id * payload_length_],
-                payload_length_);
-    ssize_t ret = sendto(
-        socket_bs_[ant_id], (char*)udp_pkt_buf.data(), udp_pkt_buf.size(), 0,
-        (struct sockaddr*)&servaddr_bs_[ant_id], sizeof(servaddr_bs_[ant_id]));
-    RtAssert(ret > 0, "sendto() failed");
-  }
+  DoTx(frame_id, symbol_id, bscfg_->BsAntNum(), tx_buffer_bs_, total_offset_bs,
+       socket_bs_, servaddr_bs_, fmat_dst);
 
   RtAssert(message_queue_.enqueue(
                *task_ptok_[tid],
@@ -509,12 +537,17 @@ void ChannelSim::DoTxUser(int tid, size_t tag) {
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
   size_t dl_symbol_id = GetDlSymbolIdx(frame_id, symbol_id);
 
+  if (kPrintDebugTxUser) {
+    std::printf("Channel Sim: DoTxUser processing symbol %zu, dl symbol %zu\n",
+                symbol_id, dl_symbol_id);
+  }
+
   size_t symbol_offset =
       (frame_id % kFrameWnd) * dl_data_plus_beacon_symbols_ + dl_symbol_id;
   size_t total_offset_ue = symbol_offset * payload_length_ * uecfg_->UeAntNum();
   size_t total_offset_bs = symbol_offset * payload_length_ * bscfg_->BsAntNum();
 
-  auto* src_ptr = reinterpret_cast<short*>(&rx_buffer_bs_[total_offset_bs]);
+  auto* src_ptr = reinterpret_cast<short*>(&rx_buffer_bs_.at(total_offset_bs));
 
   // convert received data to complex float,
   // apply channel, convert back to complex short to TX
@@ -538,26 +571,8 @@ void ChannelSim::DoTxUser(int tid, size_t tag) {
     Utils::PrintMat(fmat_dst, "rx_dl");
   }
 
-  auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer_ue_[total_offset_ue]);
-  SimdConvertFloatToShort(reinterpret_cast<float*>(fmat_dst.memptr()), dst_ptr,
-                          2 * bscfg_->SampsPerSymbol() * uecfg_->UeAntNum());
-
-  // send the symbol to all base station antennas
-  std::vector<uint8_t> udp_pkt_buf(bscfg_->PacketLength(), 0);
-  auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
-  for (size_t ant_id = 0; ant_id < uecfg_->UeAntNum(); ant_id++) {
-    pkt->frame_id_ = frame_id;
-    pkt->symbol_id_ = symbol_id;
-    pkt->ant_id_ = ant_id;
-    pkt->cell_id_ = 0;
-    std::memcpy(pkt->data_,
-                &tx_buffer_ue_[total_offset_ue + ant_id * payload_length_],
-                payload_length_);
-    ssize_t ret = sendto(
-        socket_ue_[ant_id], (char*)udp_pkt_buf.data(), udp_pkt_buf.size(), 0,
-        (struct sockaddr*)&servaddr_ue_[ant_id], sizeof(servaddr_ue_[ant_id]));
-    RtAssert(ret > 0, "sendto() failed");
-  }
+  DoTx(frame_id, symbol_id, uecfg_->UeAntNum(), tx_buffer_ue_, total_offset_ue,
+       socket_ue_, servaddr_ue_, fmat_dst);
 
   RtAssert(message_queue_.enqueue(
                *task_ptok_[tid],

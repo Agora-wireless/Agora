@@ -43,12 +43,12 @@ int main(int argc, char* argv[]) {
 
   const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  auto* cfg = new Config(FLAGS_conf_file.c_str());
+  auto cfg = std::make_unique<Config>(FLAGS_conf_file.c_str());
 
   const DataGenerator::Profile profile =
       FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123
                              : DataGenerator::Profile::kRandom;
-  DataGenerator data_generator(cfg, 0 /* RNG seed */, profile);
+  DataGenerator data_generator(cfg.get(), 0 /* RNG seed */, profile);
 
   std::printf(
       "DataGenerator: Config file: %s, data profile = %s\n",
@@ -143,7 +143,7 @@ int main(int argc, char* argv[]) {
                                cfg->UeAntNum() * cfg->OfdmCaNum(),
                                Agora_memory::Alignment_t::kAlign64);
 
-    if (cfg->FreqOrthogonalPilot()) {
+    if (cfg->FreqOrthogonalPilot() == true) {
       for (size_t i = 0; i < cfg->UeAntNum(); i++) {
         std::vector<complex_float> pilots_t_ue(cfg->OfdmCaNum());  // Zeroed
         for (size_t j = cfg->OfdmDataStart();
@@ -358,11 +358,11 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < num_codeblocks; i++) {
       size_t error_in_block = 0;
       for (size_t j = 0; j < ldpc_config.NumCbLen() / 8; j++) {
-        uint8_t input = (uint8_t)information[i][j];
+        auto input = static_cast<uint8_t>(information.at(i).at(j));
         uint8_t output = decoded_codewords[i][j];
         if (input != output) {
-          for (size_t i = 0; i < 8; i++) {
-            uint8_t mask = 1 << i;
+          for (size_t k = 0; k < 8; k++) {
+            uint8_t mask = 1 << k;
             if ((input & mask) != (output & mask)) {
               error_num++;
               error_in_block++;
@@ -397,8 +397,5 @@ int main(int argc, char* argv[]) {
     decoded_codewords.Free();
     std::free(resp_var_nodes);
   }
-
-  delete cfg;
-
   return 0;
 }

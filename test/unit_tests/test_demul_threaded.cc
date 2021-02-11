@@ -16,7 +16,7 @@ static constexpr size_t kModTestNum = 3;
 static constexpr size_t kModBitsNums[kModTestNum] = {4, 6, 4};
 static constexpr size_t kFrameOffsets[kModTestNum] = {0, 20, 30};
 // A spinning barrier to synchronize the start of worker threads
-std::atomic<size_t> num_workers_ready_atomic;
+static std::atomic<size_t> num_workers_ready_atomic;
 
 void MasterToWorkerDynamicMaster(
     Config* cfg, moodycamel::ConcurrentQueue<EventData>& event_queue,
@@ -72,9 +72,9 @@ void MasterToWorkerDynamicWorker(
     // Wait
   }
 
-  auto* compute_demul = new DoDemul(cfg, worker_id, data_buffer, ul_zf_matrices,
-                                    ue_spec_pilot_buffer, equal_buffer,
-                                    demod_buffers_, phy_stats, stats);
+  auto compute_demul = std::make_unique<DoDemul>(
+      cfg, worker_id, data_buffer, ul_zf_matrices, ue_spec_pilot_buffer,
+      equal_buffer, demod_buffers_, phy_stats, stats);
 
   size_t start_tsc = Rdtsc();
   size_t num_tasks = 0;
@@ -104,11 +104,11 @@ void MasterToWorkerDynamicWorker(
               num_tasks, ms / num_tasks);
 }
 
-/// Test correctness of BS_ANT_NUM values in multi-threaded DoDemul
-/// when BS_ANT_NUM varies in runtime
+/// Test correctness of bs_ant_num() values in multi-threaded DoDemul
+/// when bs_ant_num() varies in runtime
 TEST(TestDemul, VaryingConfig) {
   static constexpr size_t kNumIters = 10000;
-  auto* cfg = new Config("data/tddconfig-sim-ul.json");
+  auto cfg = std::make_unique<Config>("data/tddconfig-sim-ul.json");
   cfg->GenData();
 
   auto event_queue = moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
@@ -150,25 +150,32 @@ TEST(TestDemul, VaryingConfig) {
       cfg->Frame().NumULSyms() * kFrameWnd * kMaxModType * kMaxDataSCs *
           kMaxUEs * 1.0f / 1024 / 1024);
 
-  auto* stats = new Stats(cfg);
-  auto* phy_stats = new PhyStats(cfg);
+  auto stats = std::make_unique<Stats>(cfg.get());
+  auto phy_stats = std::make_unique<PhyStats>(cfg.get());
 
-  auto master =
-      std::thread(MasterToWorkerDynamicMaster, cfg, std::ref(event_queue),
-                  std::ref(complete_task_queue));
-  std::thread workers[kNumWorkers];
+  std::vector<std::thread> threads;
+  threads.emplace_back(MasterToWorkerDynamicMaster, cfg.get(),
+                       std::ref(event_queue), std::ref(complete_task_queue));
   for (size_t i = 0; i < kNumWorkers; i++) {
-    workers[i] =
-        std::thread(MasterToWorkerDynamicWorker, cfg, i, std::ref(event_queue),
-                    std::ref(complete_task_queue), ptoks[i],
-                    std::ref(data_buffer), std::ref(ul_zf_matrices),
-                    std::ref(equal_buffer), std::ref(ue_spec_pilot_buffer),
-                    std::ref(demod_buffers), phy_stats, stats);
+    threads.emplace_back(MasterToWorkerDynamicWorker, cfg.get(), i,
+                         std::ref(event_queue), std::ref(complete_task_queue),
+                         ptoks[i], std::ref(data_buffer),
+                         std::ref(ul_zf_matrices), std::ref(equal_buffer),
+                         std::ref(ue_spec_pilot_buffer),
+                         std::ref(demod_buffers), phy_stats.get(), stats.get());
   }
-  master.join();
-  for (auto& w : workers) {
-    w.join();
+
+  for (auto& thread : threads) {
+    thread.join();
   }
+
+  for (auto& ptok : ptoks) {
+    delete ptok;
+  }
+
+  data_buffer.Free();
+  ue_spec_pilot_buffer.Free();
+  equal_buffer.Free();
 }
 
 int main(int argc, char** argv) {

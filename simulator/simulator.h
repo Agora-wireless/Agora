@@ -60,11 +60,6 @@ class Simulator {
                         size_t symbol_id, size_t ant_id);
   void PrintPerFrameDone(PrintType print_type, size_t frame_id);
 
-  void InitializeVarsFromCfg(Config* cfg);
-  void InitializeQueues();
-  void InitializeUplinkBuffers();
-  void FreeUplinkBuffers();
-
  private:
   size_t bs_ant_num_;
   size_t ue_num_;
@@ -89,8 +84,6 @@ class Simulator {
   size_t max_packet_num_per_frame_;
   std::unique_ptr<Receiver> receiver_;
   std::unique_ptr<Sender> sender_;
-  pthread_t* task_threads_;
-  EventHandlerContext* context_;
 
   // Uplink buffers
 
@@ -137,6 +130,12 @@ class Simulator {
   double* frame_end_receive_;
   double* frame_start_tx_;
   double* frame_end_tx_;
+
+  void InitializeVarsFromCfg(Config* cfg);
+  void InitializeQueues();
+  void InitializeUplinkBuffers();
+  void FreeUplinkBuffers();
+  void FreeQueues();
 };
 
 #endif  // SIMULATOR_H_

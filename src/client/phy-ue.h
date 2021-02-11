@@ -42,8 +42,6 @@ using myVec =
     std::vector<complex_float,
                 boost::alignment::aligned_allocator<complex_float, 64>>;
 
-using namespace arma;
-
 class PhyUe {
  public:
   // dequeue bulk size, used to reduce the overhead of dequeue in main
@@ -157,8 +155,10 @@ class PhyUe {
   void InitializeVarsFromCfg();
 
  private:
+  void FreeUplinkBuffers();
+  void FreeDownlinkBuffers();
+
   Config* config_;
-  // size_t symbol_perframe_;
   size_t dl_pilot_symbol_perframe_;
   size_t ul_data_symbol_perframe_;
   size_t dl_data_symbol_perframe_;
@@ -179,7 +179,8 @@ class PhyUe {
   size_t tx_thread_num_;
   size_t packet_length_;
   size_t tx_packet_length_;
-  FILE *fp_, *fd_;
+  FILE* fp_;
+  FILE* fd_;
 
   size_t pilot_sc_len_;
   size_t data_sc_len_;
@@ -189,8 +190,10 @@ class PhyUe {
   size_t rx_buffer_frame_num_;
   size_t tx_buffer_frame_num_;
 
-  MacThread* mac_thread_;       // The thread running MAC layer functions
-  std::thread mac_std_thread_;  // Handle for the MAC thread
+  // The thread running MAC layer functions
+  std::unique_ptr<MacThread> mac_thread_;
+  // Handle for the MAC thread
+  std::thread mac_std_thread_;
 
   // The frame ID of the next MAC packet we expect to receive from the MAC
   // thread
@@ -309,8 +312,8 @@ class PhyUe {
   Table<size_t> bit_error_count_;
   Table<size_t> decoded_blocks_count_;
   Table<size_t> block_error_count_;
-  size_t* decoded_symbol_count_;
-  size_t* symbol_error_count_;
+  std::vector<size_t> decoded_symbol_count_;
+  std::vector<size_t> symbol_error_count_;
 
   /* Concurrent queues */
   /* task queue for downlink FFT */
@@ -333,24 +336,20 @@ class PhyUe {
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* mac_rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* mac_tx_ptoks_ptr_[kMaxThreads];
-  // moodycamel::ProducerToken* worker_ptoks_ptr[kMaxThreads];
   moodycamel::ProducerToken* task_ptok_[kMaxThreads];
 
   // all checkers
-  size_t* fft_checker_[kFrameWnd];
-  size_t fft_status_[kFrameWnd];
+  std::array<std::vector<size_t>, kFrameWnd> fft_checker_;
+  std::array<size_t, kFrameWnd> fft_status_;
 
   // can possibly remove this checker
-  size_t* demul_checker_[kFrameWnd];
-  size_t demul_status_[kFrameWnd];
+  std::array<std::vector<size_t>, kFrameWnd> demul_checker_;
+  std::array<size_t, kFrameWnd> demul_status_;
 
-  size_t* demodul_checker_[kFrameWnd];
-  size_t demodul_status_[kFrameWnd];
+  std::array<std::vector<size_t>, kFrameWnd> decode_checker_;
+  std::array<size_t, kFrameWnd> decode_status_;
 
-  size_t* decode_checker_[kFrameWnd];
-  size_t decode_status_[kFrameWnd];
-
-  double frame_dl_process_time_[kFrameWnd * kMaxUEs];
+  std::array<double, kFrameWnd * kMaxUEs> frame_dl_process_time_;
   std::queue<std::tuple<int, int>> task_wait_list_;
 
   // for python

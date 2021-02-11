@@ -52,6 +52,13 @@ DoPrecode::DoPrecode(
 DoPrecode::~DoPrecode() {
   FreeBuffer1d(&modulated_buffer_temp_);
   FreeBuffer1d(&precoded_buffer_temp_);
+
+#if USE_MKL_JIT
+  mkl_jit_status_t status = mkl_jit_destroy(jitter_);
+  if (MKL_JIT_ERROR == status) {
+    std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
+  }
+#endif
 }
 
 EventData DoPrecode::Launch(size_t tag) {
@@ -131,7 +138,7 @@ EventData DoPrecode::Launch(size_t tag) {
 
   __m256i index = _mm256_setr_epi64x(0, cfg_->BsAntNum(), cfg_->BsAntNum() * 2,
                                      cfg_->BsAntNum() * 3);
-  float* precoded_ptr = (float*)precoded_buffer_temp_;
+  auto* precoded_ptr = reinterpret_cast<float*>(precoded_buffer_temp_);
   for (size_t ant_id = 0; ant_id < cfg_->BsAntNum(); ant_id++) {
     int ifft_buffer_offset = ant_id + cfg_->BsAntNum() * total_data_symbol_idx;
     float* ifft_ptr =

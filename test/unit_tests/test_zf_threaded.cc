@@ -67,9 +67,9 @@ void MasterToWorkerDynamicWorker(
     // Wait
   }
 
-  auto* compute_zf =
-      new DoZF(cfg, worker_id, csi_buffers, calib_dl_buffer, calib_ul_buffer,
-               ul_zf_matrices, dl_zf_matrices, stats);
+  auto compute_zf = std::make_unique<DoZF>(
+      cfg, worker_id, csi_buffers, calib_dl_buffer, calib_ul_buffer,
+      ul_zf_matrices, dl_zf_matrices, stats);
 
   size_t start_tsc = Rdtsc();
   size_t num_tasks = 0;
@@ -99,11 +99,11 @@ void MasterToWorkerDynamicWorker(
               num_tasks, ms / num_tasks);
 }
 
-/// Test correctness of BS_ANT_NUM values in multi-threaded zeroforcing
-/// when BS_ANT_NUM varies in runtime
+/// Test correctness of BsAntNum() values in multi-threaded zeroforcing
+/// when BsAntNum() varies in runtime
 TEST(TestZF, VaryingConfig) {
   static constexpr size_t kNumIters = 10000;
-  auto* cfg = new Config("data/tddconfig-sim-ul.json");
+  auto cfg = std::make_unique<Config>("data/tddconfig-sim-ul.json");
   cfg->GenData();
 
   auto event_queue = moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
@@ -130,22 +130,27 @@ TEST(TestZF, VaryingConfig) {
   calib_ul_buffer.RandAllocCxFloat(kFrameWnd, kMaxDataSCs * kMaxAntennas,
                                    Agora_memory::Alignment_t::kAlign64);
 
-  auto* stats = new Stats(cfg);
+  auto stats = std::make_unique<Stats>(cfg.get());
 
-  auto master =
-      std::thread(MasterToWorkerDynamicMaster, cfg, std::ref(event_queue),
-                  std::ref(complete_task_queue));
-  std::thread workers[kNumWorkers];
+  std::vector<std::thread> threads;
+  threads.emplace_back(MasterToWorkerDynamicMaster, cfg.get(),
+                       std::ref(event_queue), std::ref(complete_task_queue));
+
   for (size_t i = 0; i < kNumWorkers; i++) {
-    workers[i] = std::thread(
-        MasterToWorkerDynamicWorker, cfg, i, std::ref(event_queue),
+    threads.emplace_back(
+        MasterToWorkerDynamicWorker, cfg.get(), i, std::ref(event_queue),
         std::ref(complete_task_queue), ptoks[i], std::ref(csi_buffers),
         std::ref(calib_dl_buffer), std::ref(calib_ul_buffer),
-        std::ref(ul_zf_matrices), std::ref(dl_zf_matrices), stats);
+        std::ref(ul_zf_matrices), std::ref(dl_zf_matrices), stats.get());
   }
-  master.join();
-  for (auto& w : workers) {
-    w.join();
+  for (auto& thread : threads) {
+    thread.join();
+  }
+
+  calib_dl_buffer.Free();
+  calib_ul_buffer.Free();
+  for (auto& ptok : ptoks) {
+    delete ptok;
   }
 }
 

@@ -10,7 +10,7 @@ static constexpr size_t kMaxFrameNum = 10;
 
 /// Test correctness of two-step recriprocal calibration
 TEST(TestRecip, Correctness) {
-  auto* cfg = new Config("data/tddconfig-sim-ul.json");
+  auto cfg = std::make_unique<Config>("data/tddconfig-sim-ul.json");
   cfg->GenData();
 
   double freq_ghz = MeasureRdtscFreq();
@@ -31,11 +31,11 @@ TEST(TestRecip, Correctness) {
 
   // Algorithm in reciprocity.cpp (use as ground truth)
   for (size_t i = 0; i < kMaxFrameNum; i++) {
-    arma::cx_float* ptr_in =
+    auto* ptr_in =
         reinterpret_cast<arma::cx_float*>(calib_buffer[i % kFrameWnd]);
     arma::cx_fmat mat_input(ptr_in, cfg->OfdmDataNum(), cfg->BsAntNum(), false);
     arma::cx_fvec vec_calib_ref = mat_input.col(cfg->RefAnt());
-    arma::cx_float* recip_buff =
+    auto* recip_buff =
         reinterpret_cast<arma::cx_float*>(recip_buffer_0[i % kFrameWnd]);
     arma::cx_fmat calib_mat = mat_input.each_col() / vec_calib_ref;
 
@@ -71,11 +71,11 @@ TEST(TestRecip, Correctness) {
       }
     }
     // Transpose
-    arma::cx_float* ptr_calib =
+    auto* ptr_calib =
         reinterpret_cast<arma::cx_float*>(calib_buffer[i % kFrameWnd]);
     arma::cx_fmat calib_mat(ptr_calib, cfg->OfdmDataNum(), cfg->BsAntNum(),
                             false);
-    arma::cx_float* recip_buff =
+    auto* recip_buff =
         reinterpret_cast<arma::cx_float*>(recip_buffer_1[i % kFrameWnd]);
     arma::cx_fmat recip_mat(recip_buff, cfg->BsAntNum(), cfg->OfdmDataNum(),
                             false);
@@ -83,7 +83,7 @@ TEST(TestRecip, Correctness) {
 
     // In dozf
     for (size_t sc_id = 0; sc_id < cfg->OfdmDataNum(); sc_id++) {
-      arma::cx_float* ptr_in = reinterpret_cast<arma::cx_float*>(
+      auto* ptr_in = reinterpret_cast<arma::cx_float*>(
           recip_buffer_1[i % kFrameWnd] + sc_id * cfg->BsAntNum());
       arma::cx_fvec recip_vec(ptr_in, cfg->BsAntNum(), false);
       recip_vec = recip_vec / recip_vec(cfg->RefAnt());
@@ -98,12 +98,16 @@ TEST(TestRecip, Correctness) {
   // Check correctness
   constexpr float kAllowedError = 1e-3;
   for (size_t i = 0; i < kMaxFrameNum; i++) {
-    float* buf0 = (float*)recip_buffer_0[i % kFrameWnd];
-    float* buf1 = (float*)recip_buffer_1[i % kFrameWnd];
+    auto* buf0 = reinterpret_cast<float*>(recip_buffer_0[i % kFrameWnd]);
+    auto* buf1 = reinterpret_cast<float*>(recip_buffer_1[i % kFrameWnd]);
     for (size_t j = 0; j < cfg->OfdmDataNum() * cfg->BsAntNum(); j++) {
       ASSERT_LE(abs(buf0[j] - buf1[j]), kAllowedError);
     }
   }
+
+  calib_buffer.Free();
+  recip_buffer_0.Free();
+  recip_buffer_1.Free();
 }
 
 int main(int argc, char** argv) {

@@ -15,8 +15,6 @@ Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
   rx_ptoks_ = in_rx_ptoks;
 }
 
-Receiver::~Receiver() { delete cfg_; }
-
 std::vector<pthread_t> Receiver::StartRecv(Table<char>& in_buffer,
                                            Table<int>& in_buffer_status,
                                            size_t in_buffer_frame_num,
@@ -28,7 +26,7 @@ std::vector<pthread_t> Receiver::StartRecv(Table<char>& in_buffer,
   buffer_status_ = &in_buffer_status;
   frame_start_ = &in_frame_start;
 
-  std::printf("start Recv thread\n");
+  std::printf("Start Recv thread\n");
   std::vector<pthread_t> created_threads;
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
@@ -92,7 +90,7 @@ void* Receiver::LoopRecv(int tid) {
     if ((recvlen =
              recvfrom(socket_local, (char*)cur_buffer_ptr, cfg_->PacketLength(),
                       0, (struct sockaddr*)&remote_addr, &addrlen)) < 0) {
-      perror("recv failed");
+      std::perror("recv failed");
       std::exit(0);
     }
 
@@ -122,7 +120,7 @@ void* Receiver::LoopRecv(int tid) {
     /* Push packet received event into the queue */
     EventData packet_message(EventType::kPacketRX, rx_tag_t(tid, offset).tag_);
 
-    if (!message_queue_->enqueue(*local_ptok, packet_message)) {
+    if (message_queue_->enqueue(*local_ptok, packet_message) == false) {
       std::printf("socket message enqueue failed\n");
       std::exit(0);
     }
