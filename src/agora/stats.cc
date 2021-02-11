@@ -6,7 +6,7 @@
 
 #include <typeinfo>
 
-Stats::Stats(Config* cfg)
+Stats::Stats(const Config* const cfg)
     : config_(cfg),
       task_thread_num_(cfg->WorkerThreadNum()),
       fft_thread_num_(cfg->FftThreadNum()),
@@ -18,6 +18,8 @@ Stats::Stats(Config* cfg)
   frame_start_.Calloc(config_->SocketThreadNum(), kNumStatsFrames,
                       Agora_memory::Alignment_t::kAlign64);
 }
+
+Stats::~Stats() { frame_start_.Free(); }
 
 void Stats::PopulateSummary(FrameSummary* frame_summary, size_t thread_id,
                             DoerType doer_type) {

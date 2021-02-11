@@ -9,7 +9,7 @@
 #include "utils.h"
 
 size_t cpu_layout[MAX_CORE_NUM];
-bool cpu_layout_initlized = false;
+bool cpu_layout_initialized = false;
 
 void PrintBitmask(const struct bitmask* bm) {
   for (size_t i = 0; i < bm->size; ++i) {
@@ -18,47 +18,48 @@ void PrintBitmask(const struct bitmask* bm) {
 }
 
 void SetCpuLayoutOnNumaNodes(bool verbose) {
-  int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-  // numa_set_localalloc();
+  if (cpu_layout_initialized == false) {
+    int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+    // numa_set_localalloc();
 
-  bitmask* bm = numa_bitmask_alloc(num_cores);
-  int cpu_id = 0;
-  for (int i = 0; i <= numa_max_node(); ++i) {
-    numa_node_to_cpus(i, bm);
-    if (verbose) {
-      std::printf("NUMA node %d ", i);
-      PrintBitmask(bm);
-      std::printf(" CPUs: ");
-    }
-    for (size_t j = 0; j < bm->size; j++) {
-      if (numa_bitmask_isbitset(bm, j) != 0) {
-        if (verbose) {
-          std::printf("%zu ", j);
+    bitmask* bm = numa_bitmask_alloc(num_cores);
+    int cpu_id = 0;
+    for (int i = 0; i <= numa_max_node(); ++i) {
+      numa_node_to_cpus(i, bm);
+      if (verbose) {
+        std::printf("NUMA node %d ", i);
+        PrintBitmask(bm);
+        std::printf(" CPUs: ");
+      }
+      for (size_t j = 0; j < bm->size; j++) {
+        if (numa_bitmask_isbitset(bm, j) != 0) {
+          if (verbose) {
+            std::printf("%zu ", j);
+          }
+          cpu_layout[cpu_id] = j;
+          cpu_id++;
         }
-        cpu_layout[cpu_id] = j;
-        cpu_id++;
+      }
+      if (verbose) {
+        std::printf("\n");
       }
     }
-    if (verbose) {
-      std::printf("\n");
-    }
-  }
 
-  numa_bitmask_free(bm);
-  cpu_layout_initlized = true;
+    numa_bitmask_free(bm);
+    cpu_layout_initialized = true;
+  }
 }
 
 size_t GetPhysicalCoreId(size_t core_id) {
-  if (cpu_layout_initlized) {
+  if (cpu_layout_initialized) {
     return cpu_layout[core_id];
-  } else {
-    return core_id;
   }
+  return core_id;
 }
 
 int PinToCore(int core_id) {
   int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-  if (core_id < 0 || core_id >= num_cores) {
+  if ((core_id < 0) || (core_id >= num_cores)) {
     return -1;
   }
 
@@ -72,36 +73,34 @@ int PinToCore(int core_id) {
 
 void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
                          bool verbose) {
-  if (kEnableThreadPinning == false) {
-    return;
-  }
+  if (kEnableThreadPinning == true) {
+    int actual_core_id = core_offset + thread_id;
+    int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
 
-  int actual_core_id = core_offset + thread_id;
-  int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-
-  /* Reserve core 0 for kernel threads */
-  if (actual_core_id >= num_cores) {
-    actual_core_id = (actual_core_id % num_cores) + 1;
-  }
-
-  size_t physical_core_id =
-      cpu_layout_initlized ? cpu_layout[actual_core_id] : actual_core_id;
-
-  if (PinToCore(physical_core_id) != 0) {
-    std::fprintf(
-        stderr,
-        "%s thread %d: failed to pin to core %zu. Exiting. "
-        "This can happen if the machine has insufficient cores. "
-        "Set kEnableThreadPinning to false to run Agora to run despite "
-        "this - performance will be low.\n",
-        ThreadTypeStr(thread_type).c_str(), thread_id, physical_core_id);
-    std::exit(0);
-  } else {
-    if (verbose) {
-      std::printf("%s thread %d: pinned to core %zu\n",
-                  ThreadTypeStr(thread_type).c_str(), thread_id,
-                  physical_core_id);
+    /* Reserve core 0 for kernel threads */
+    if (actual_core_id >= num_cores) {
+      actual_core_id = (actual_core_id % num_cores) + 1;
     }
+
+    size_t physical_core_id =
+        cpu_layout_initialized ? cpu_layout[actual_core_id] : actual_core_id;
+
+    if (PinToCore(physical_core_id) != 0) {
+      std::fprintf(
+          stderr,
+          "%s thread %d: failed to pin to core %zu. Exiting. "
+          "This can happen if the machine has insufficient cores. "
+          "Set kEnableThreadPinning to false to run Agora to run despite "
+          "this - performance will be low.\n",
+          ThreadTypeStr(thread_type).c_str(), thread_id, physical_core_id);
+      std::exit(0);
+    } else {
+      if (verbose == true) {
+        std::printf("%s thread %d: pinned to core %zu\n",
+                    ThreadTypeStr(thread_type).c_str(), thread_id,
+                    physical_core_id);
+      }
+    }  // EnableThreadPinning == true
   }
 }
 
@@ -143,8 +142,8 @@ std::vector<std::complex<float>> Utils::Uint32tocfloat(
   int len = in.size();
   std::vector<std::complex<float>> out(len, 0);
   for (size_t i = 0; i < in.size(); i++) {
-    int16_t arr_hi_int = (int16_t)(in[i] >> 16);
-    int16_t arr_lo_int = (int16_t)(in[i] & 0x0FFFF);
+    auto arr_hi_int = static_cast<int16_t>(in[i] >> 16);
+    auto arr_lo_int = static_cast<int16_t>(in[i] & 0x0FFFF);
 
     float arr_hi = (float)arr_hi_int / 32768.0;
     float arr_lo = (float)arr_lo_int / 32768.0;
@@ -165,8 +164,8 @@ std::vector<uint32_t> Utils::Cint16ToUint32(
     const std::string& order) {
   std::vector<uint32_t> out(in.size(), 0);
   for (size_t i = 0; i < in.size(); i++) {
-    uint16_t re = (uint16_t)in[i].real();
-    uint16_t im = (uint16_t)(conj ? -in[i].imag() : in[i].imag());
+    auto re = static_cast<uint16_t>(in[i].real());
+    auto im = static_cast<uint16_t>(conj ? -in[i].imag() : in[i].imag());
     if (order == "IQ") {
       out[i] = (uint32_t)re << 16 | im;
     } else if (order == "QI") {
@@ -180,9 +179,10 @@ std::vector<uint32_t> Utils::Cfloat32ToUint32(
     std::vector<std::complex<float>> in, bool conj, const std::string& order) {
   std::vector<uint32_t> out(in.size(), 0);
   for (size_t i = 0; i < in.size(); i++) {
-    uint16_t re = (uint16_t)(int16_t(in[i].real() * 32768.0));
-    uint16_t im =
-        (uint16_t)(int16_t((conj ? -in[i].imag() : in[i].imag()) * 32768));
+    auto re =
+        static_cast<uint16_t>(static_cast<int16_t>(in[i].real() * 32768.0));
+    auto im = static_cast<uint16_t>(
+        static_cast<int16_t>((conj ? -in[i].imag() : in[i].imag()) * 32768));
     if (order == "IQ") {
       out[i] = (uint32_t)re << 16 | im;
     } else if (order == "QI") {
@@ -192,20 +192,22 @@ std::vector<uint32_t> Utils::Cfloat32ToUint32(
   return out;
 }
 
+// Returns index locations of sym for each frame in frames
 std::vector<std::vector<size_t>> Utils::LoadSymbols(
-    std::vector<std::string> frames, char sym) {
-  std::vector<std::vector<size_t>> sym_id;
-  size_t frame_size = frames.size();
-  sym_id.resize(frame_size);
-  for (size_t f = 0; f < frame_size; f++) {
-    std::string fr = frames[f];
-    for (size_t g = 0; g < fr.size(); g++) {
-      if (fr[g] == sym) {
-        sym_id[f].push_back(g);
+    std::vector<std::string> const& frames, char sym) {
+  std::vector<std::vector<size_t>> symbol_index_vector;
+  size_t num_frames = frames.size();
+  symbol_index_vector.resize(num_frames);
+
+  for (size_t f = 0; f < num_frames; f++) {
+    std::string frame = frames.at(f);
+    for (size_t g = 0; g < frame.length(); g++) {
+      if (frame.at(g) == sym) {
+        symbol_index_vector.at(f).push_back(g);
       }
     }
   }
-  return sym_id;
+  return symbol_index_vector;
 }
 
 void Utils::LoadDevices(std::string filename, std::vector<std::string>& data) {
@@ -233,7 +235,7 @@ void Utils::LoadDevices(std::string filename, std::vector<std::string>& data) {
 
 void Utils::LoadData(const char* filename,
                      std::vector<std::complex<int16_t>>& data, int samples) {
-  FILE* fp = fopen(filename, "r");
+  FILE* fp = std::fopen(filename, "r");
   data.resize(samples);
   float real;
   float imag;
@@ -245,13 +247,12 @@ void Utils::LoadData(const char* filename,
     data[i] =
         std::complex<int16_t>(int16_t(real * 32768), int16_t(imag * 32768));
   }
-
-  fclose(fp);
+  std::fclose(fp);
 }
 
 void Utils::LoadData(const char* filename, std::vector<unsigned>& data,
                      int samples) {
-  FILE* fp = fopen(filename, "r");
+  FILE* fp = std::fopen(filename, "r");
   data.resize(samples);
   for (int i = 0; i < samples; i++) {
     int ret = fscanf(fp, "%u", &data[i]);
@@ -259,8 +260,7 @@ void Utils::LoadData(const char* filename, std::vector<unsigned>& data,
       break;
     }
   }
-
-  fclose(fp);
+  std::fclose(fp);
 }
 
 void Utils::LoadTddConfig(const std::string& filename, std::string& jconfig) {
@@ -296,9 +296,9 @@ void Utils::PrintVector(std::vector<std::complex<int16_t>>& data) {
 
 void Utils::WriteBinaryFile(const std::string& name, size_t elem_size,
                             size_t buffer_size, void* buff) {
-  FILE* f_handle = fopen(name.c_str(), "wb");
-  fwrite(buff, elem_size, buffer_size, f_handle);
-  fclose(f_handle);
+  FILE* f_handle = std::fopen(name.c_str(), "wb");
+  std::fwrite(buff, elem_size, buffer_size, f_handle);
+  std::fclose(f_handle);
 }
 
 void Utils::PrintMat(arma::cx_fmat c, const std::string& ss) {

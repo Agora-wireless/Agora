@@ -42,7 +42,7 @@ class Doer {
   /// Doers that handle only one event type use this signature.
   virtual EventData Launch(size_t tag) {
     unused(tag);
-    RtAssert(false, "Doer: launch(tag) not implemented");
+    RtAssert(false, "Doer: Launch(tag) not implemented");
     return EventData();
   }
 
@@ -51,7 +51,7 @@ class Doer {
   virtual EventData Launch(size_t tag, EventType event_type) {
     unused(tag);
     unused(event_type);
-    RtAssert(false, "Doer: launch(tag, event_type) not implemented");
+    RtAssert(false, "Doer: Launch(tag, event_type) not implemented");
     return EventData();
   }
 

@@ -65,7 +65,7 @@ int main() {
     srand(time(nullptr));
     for (auto& n : input) {
       for (size_t i = 0; i < BitsToBytes(num_input_bits); i++) {
-        n[i] = (int8_t)rand();
+        n[i] = static_cast<int8_t>(rand());
       }
     }
 
@@ -122,7 +122,7 @@ int main() {
     // Check for errors
     size_t err_cnt = 0;
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
-      uint8_t* input_buffer = (uint8_t*)input[n];
+      auto* input_buffer = reinterpret_cast<uint8_t*>(input[n]);
       uint8_t* output_buffer = decoded[n];
       for (size_t i = 0; i < BitsToBytes(num_input_bits); i++) {
         // std::printf("input: %i, output: %i\n", input_buffer[i],

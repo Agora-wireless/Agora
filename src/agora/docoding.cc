@@ -38,7 +38,7 @@ DoEncode::~DoEncode() {
 }
 
 EventData DoEncode::Launch(size_t tag) {
-  LDPCconfig ldpc_config = cfg_->LdpcConfig();
+  const LDPCconfig& ldpc_config = cfg_->LdpcConfig();
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
   size_t cb_id = gen_tag_t(tag).cb_id_;
@@ -99,10 +99,10 @@ DoDecode::DoDecode(
       Agora_memory::Alignment_t::kAlign64, 1024 * 1024 * sizeof(int16_t)));
 }
 
-DoDecode::~DoDecode() { free(resp_var_nodes_); }
+DoDecode::~DoDecode() { std::free(resp_var_nodes_); }
 
 EventData DoDecode::Launch(size_t tag) {
-  LDPCconfig ldpc_config = cfg_->LdpcConfig();
+  const LDPCconfig& ldpc_config = cfg_->LdpcConfig();
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id_;
   const size_t cb_id = gen_tag_t(tag).cb_id_;
