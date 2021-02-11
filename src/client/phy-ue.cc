@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "phy_ldpc_decoder_5gnr.h"
+#include "scrambler.h"
 #include "utils_ldpc.h"
 
 using namespace arma;
@@ -907,6 +908,10 @@ void PhyUe::DoDecode(int tid, size_t tag) {
     bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                             &ldpc_decoder_5gnr_response);
 
+    if (config_->ScrambleEnabled()) {
+      Scrambler::WlanDescramble(decoded_buffer_ptr, config_->NumBytesPerCb());
+    }
+
     if (kCollectPhyStats) {
       decoded_bits_count_[ant_id][total_dl_symbol_id] +=
           8 * config_->NumBytesPerCb();
@@ -995,6 +1000,8 @@ void PhyUe::DoEncode(int tid, size_t tag) {
       kEnableMac ? (ldpc_config.NumCbLen()) >> 3
                  : Roundup<64>(BitsToBytes(ldpc_config.NumCbLen()));
   size_t encoded_bytes_per_block = (ldpc_config.NumCbCodewLen() + 7) >> 3;
+  auto* input_ptr = new int8_t[bytes_per_block +
+                               kLdpcHelperFunctionInputBufferSizePaddingBytes];
 
   for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe_;
        ul_symbol_id++) {
@@ -1002,7 +1009,6 @@ void PhyUe::DoEncode(int tid, size_t tag) {
         frame_slot * ul_data_symbol_perframe_ + ul_symbol_id;
     for (size_t cb_id = 0; cb_id < config_->LdpcConfig().NumBlocksInSymbol();
          cb_id++) {
-      int8_t* input_ptr;
       if (kEnableMac) {
         uint8_t* ul_bits = ul_bits_buffer_[ue_id] +
                            frame_slot * config_->MacBytesNumPerframe();
@@ -1011,14 +1017,22 @@ void PhyUe::DoEncode(int tid, size_t tag) {
                                cfg->LdpcConfig().NumBlocksInSymbol() *
                                ul_symbol_id +
                            bytes_per_block * cb_id;
-        input_ptr = (int8_t*)ul_bits + input_offset;
+        std::memcpy(input_ptr,
+                    reinterpret_cast<int8_t*>(ul_bits + input_offset),
+                    bytes_per_block);
       } else {
         size_t cb_offset =
             (ue_id * cfg->LdpcConfig().NumBlocksInSymbol() + cb_id) *
             bytes_per_block;
-        input_ptr =
+        std::memcpy(
+            input_ptr,
             &cfg->UlBits()[ul_symbol_id +
-                           config_->Frame().ClientUlPilotSymbols()][cb_offset];
+                           config_->Frame().ClientUlPilotSymbols()][cb_offset],
+            bytes_per_block);
+      }
+
+      if (config_->ScrambleEnabled()) {
+        Scrambler::WlanScramble(input_ptr, bytes_per_block);
       }
 
       LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
@@ -1042,6 +1056,7 @@ void PhyUe::DoEncode(int tid, size_t tag) {
 
   std::free(encoded_buffer_temp);
   std::free(parity_buffer);
+  delete[] input_ptr;
 
   RtAssert(message_queue_.enqueue(*task_ptok_[tid],
                                   EventData(EventType::kEncode, tag)),

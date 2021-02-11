@@ -12,6 +12,7 @@
 #include <boost/range/algorithm/count.hpp>
 
 #include "logger.h"
+#include "scrambler.h"
 #include "utils_ldpc.h"
 
 Config::Config(const std::string& jsonfile)
@@ -370,7 +371,10 @@ Config::Config(const std::string& jsonfile)
   ldpc_config_ = LDPCconfig(base_graph, zc, max_decoder_iter, early_term,
                             num_cb_len, num_cb_codew_len, num_rows, 0);
 
-  /* Modulation configurations */
+  // Scrambler and descrambler configurations
+  scramble_enabled_ = tdd_conf.value("wlan_scrambler", true);
+
+  // Modulation configurations
   mod_order_bits_ =
       modulation_ == "64QAM"
           ? CommsLib::kQaM64
@@ -646,6 +650,12 @@ void Config::GenData() {
   const size_t num_blocks_per_symbol =
       this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
 
+  // Used as an input ptr to
+  auto* scramble_buffer =
+      new int8_t[num_bytes_per_cb_ +
+                 kLdpcHelperFunctionInputBufferSizePaddingBytes]();
+  int8_t* ldpc_input = nullptr;
+
   // Encode uplink bits
   ul_encoded_bits_.Malloc(this->frame_.NumULSyms() * num_blocks_per_symbol,
                           encoded_bytes_per_block,
@@ -659,13 +669,22 @@ void Config::GenData() {
   for (size_t i = 0; i < frame_.NumULSyms(); i++) {
     for (size_t j = 0; j < ue_ant_num_; j++) {
       for (size_t k = 0; k < ldpc_config_.NumBlocksInSymbol(); k++) {
-        int8_t* bits_ptr = GetInfoBits(ul_bits_, i, j, k);
         int8_t* coded_bits_ptr =
             ul_encoded_bits_[i * num_blocks_per_symbol +
                              j * ldpc_config_.NumBlocksInSymbol() + k];
+
+        if (scramble_enabled_) {
+          std::memcpy(scramble_buffer, GetInfoBits(ul_bits_, i, j, k),
+                      num_bytes_per_cb_);
+          Scrambler::WlanScramble(scramble_buffer, num_bytes_per_cb_);
+          ldpc_input = scramble_buffer;
+        } else {
+          ldpc_input = GetInfoBits(ul_bits_, i, j, k);
+        }
+
         LdpcEncodeHelper(ldpc_config_.BaseGraph(),
                          ldpc_config_.ExpansionFactor(), ldpc_config_.NumRows(),
-                         coded_bits_ptr, temp_parity_buffer, bits_ptr);
+                         coded_bits_ptr, temp_parity_buffer, ldpc_input);
         AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
                         ul_mod_input_[i] + j * ofdm_data_num_ +
                             k * encoded_bytes_per_block / mod_order_bits_,
@@ -690,7 +709,6 @@ void Config::GenData() {
         ul_iq_f_[i][q + j] = ModSingleUint8(ul_mod_input_[i][s], mod_table_);
         ul_iq_ifft[i][q + j] = ul_iq_f_[i][q + j];
       }
-
       CommsLib::IFFT(&ul_iq_ifft[i][q], ofdm_ca_num_, false);
     }
   }
@@ -706,13 +724,22 @@ void Config::GenData() {
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
     for (size_t j = 0; j < this->ue_ant_num_; j++) {
       for (size_t k = 0; k < ldpc_config_.NumBlocksInSymbol(); k++) {
-        int8_t* bits_ptr = GetInfoBits(dl_bits_, i, j, k);
         int8_t* coded_bits_ptr =
             dl_encoded_bits[i * num_blocks_per_symbol +
                             j * ldpc_config_.NumBlocksInSymbol() + k];
+
+        if (scramble_enabled_) {
+          std::memcpy(scramble_buffer, GetInfoBits(dl_bits_, i, j, k),
+                      num_bytes_per_cb_);
+          Scrambler::WlanScramble(scramble_buffer, num_bytes_per_cb_);
+          ldpc_input = scramble_buffer;
+        } else {
+          ldpc_input = GetInfoBits(dl_bits_, i, j, k);
+        }
+
         LdpcEncodeHelper(ldpc_config_.BaseGraph(),
                          ldpc_config_.ExpansionFactor(), ldpc_config_.NumRows(),
-                         coded_bits_ptr, temp_parity_buffer, bits_ptr);
+                         coded_bits_ptr, temp_parity_buffer, ldpc_input);
         AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
                         dl_mod_input_[i] + j * ofdm_data_num_ +
                             k * encoded_bytes_per_block / mod_order_bits_,
@@ -851,6 +878,7 @@ void Config::GenData() {
   ul_encoded_bits_.Free();
   dl_mod_input_.Free();
   FreeBuffer1d(&pilot_ifft);
+  delete[] scramble_buffer;
 }
 
 Config::~Config() {

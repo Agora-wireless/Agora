@@ -76,12 +76,18 @@ int main(int argc, char* argv[]) {
 
   const size_t num_codeblocks = num_cbs_per_ue * cfg->UeAntNum();
   std::printf("Total number of blocks: %zu\n", num_codeblocks);
+  size_t input_size = LdpcEncodingInputBufSize(
+      cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor());
+  auto* input_ptr =
+      new int8_t[input_size + kLdpcHelperFunctionInputBufferSizePaddingBytes];
   for (size_t noise_id = 0; noise_id < 15; noise_id++) {
     std::vector<std::vector<int8_t>> information(num_codeblocks);
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
-      data_generator.GenCodeblock(information[i], encoded_codewords[i],
-                                  i % cfg->UeNum() /* UE ID */);
+      data_generator.GenRawData(information.at(i),
+                                i % cfg->UeNum() /* UE ID */);
+      std::memcpy(input_ptr, information.at(i).data(), input_size);
+      data_generator.GenCodeblock(input_ptr, encoded_codewords.at(i));
     }
 
     // Save uplink information bytes to file
@@ -398,5 +404,6 @@ int main(int argc, char* argv[]) {
     csi_matrices_data.Free();
     decoded_codewords.Free();
   }
+  delete[] input_ptr;
   return 0;
 }

@@ -8,6 +8,7 @@
 #include "concurrent_queue_wrapper.h"
 #include "encoder.h"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "scrambler.h"
 
 static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
@@ -29,12 +30,17 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
       Agora_memory::Alignment_t::kAlign64,
       LdpcEncodingEncodedBufSize(cfg_->LdpcConfig().BaseGraph(),
                                  cfg_->LdpcConfig().ExpansionFactor())));
+
+  scrambler_buffer_ =
+      new int8_t[cfg_->NumBytesPerCb() +
+                 kLdpcHelperFunctionInputBufferSizePaddingBytes]();
   assert(encoded_buffer_temp_ != nullptr);
 }
 
 DoEncode::~DoEncode() {
   std::free(parity_buffer_);
   std::free(encoded_buffer_temp_);
+  delete[] scrambler_buffer_;
 }
 
 EventData DoEncode::Launch(size_t tag) {
@@ -53,12 +59,23 @@ EventData DoEncode::Launch(size_t tag) {
 
   size_t start_tsc = GetTime::WorkerRdtsc();
   size_t symbol_idx_dl = cfg_->Frame().GetDLSymbolIdx(symbol_id);
-  int8_t* input_ptr =
-      cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
+  int8_t* ldpc_input = nullptr;
+
+  if (this->cfg_->ScrambleEnabled()) {
+    std::memcpy(
+        scrambler_buffer_,
+        cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id),
+        cfg_->NumBytesPerCb());
+    Scrambler::WlanScramble(scrambler_buffer_, cfg_->NumBytesPerCb());
+    ldpc_input = scrambler_buffer_;
+  } else {
+    ldpc_input =
+        cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
+  }
 
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                    ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
-                   input_ptr);
+                   ldpc_input);
   int8_t* final_output_ptr = cfg_->GetEncodedBuf(
       encoded_buffer_, frame_id, symbol_idx_dl, ue_id, cur_cb_id);
   AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp_),
@@ -157,6 +174,10 @@ EventData DoDecode::Launch(size_t tag) {
 
   bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                           &ldpc_decoder_5gnr_response);
+
+  if (cfg_->ScrambleEnabled()) {
+    Scrambler::WlanDescramble(decoded_buffer_ptr, cfg_->NumBytesPerCb());
+  }
 
   size_t start_tsc2 = GetTime::WorkerRdtsc();
   duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
