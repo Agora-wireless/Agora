@@ -22,8 +22,8 @@ static constexpr size_t kZcMax = 255;
 
 static constexpr size_t kProcBytes = 32;
 int32_t BblibLdpcEncoder5gnr(struct bblib_ldpc_encoder_5gnr_request* request,
-    struct bblib_ldpc_encoder_5gnr_response* response);
-};
+                             struct bblib_ldpc_encoder_5gnr_response* response);
+};  // namespace avx2enc
 
 // PROC_BYTES (maximum bytes processed as an LDPC chunk) is 64 bytes in
 // FlexRAN's LDPC encoder and 32 bytes in Agora's derived LDPC encoder.

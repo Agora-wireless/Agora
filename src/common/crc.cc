@@ -18,7 +18,7 @@
  *
  * Code based on GPSD project implementation:
  * https://gitlab.com/gpsd/gpsd/-/blob/master/crc24q.c
- * 
+ *
  * Other implementations found at:
  * http://docs.ros.org/indigo/api/swiftnav/html/group__crc.html
  *
@@ -37,92 +37,84 @@
 #include "crc.h"
 
 #ifdef REBUILD_TABLE
-static void DoCRC::init_crc24(uint32_t table[256])
-{
-    /*
-     * Generate table of all posible remainders given all possible 8-bit
-     * dividends.
-     */
-    unsigned i, j;
-    unsigned h;
+static void DoCRC::init_crc24(uint32_t table[256]) {
+  /*
+   * Generate table of all posible remainders given all possible 8-bit
+   * dividends.
+   */
+  unsigned i, j;
+  unsigned h;
 
-    table[0] = CRCSEED;
-    table[1] = h = G_CRC_24A;
+  table[0] = CRCSEED;
+  table[1] = h = G_CRC_24A;
 
-    for (i = 2; i < 256; i *= 2) {
-        if ((h <<= 1) & 0x1000000)
-            h ^= G_CRC_24A;
-        for (j = 0; j < i; j++)
-            table[i + j] = table[j] ^ h;
-    }
+  for (i = 2; i < 256; i *= 2) {
+    if ((h <<= 1) & 0x1000000) h ^= G_CRC_24A;
+    for (j = 0; j < i; j++) table[i + j] = table[j] ^ h;
+  }
 }
 
-int main()
-{
-    // Default: CRC24
-    int i;
-    uint32_t crc_table[256];
-    init_crc24(crc_table);
+int main() {
+  // Default: CRC24
+  int i;
+  uint32_t crc_table[256];
+  init_crc24(crc_table);
 
-    for (i = 0; i < 256; i++) {
-        std::printf("0x%04X, ", crc_table[i]);
-        if ((i % 4) == 3)
-            putchar('\n');
-    }
-    return 0;
+  for (i = 0; i < 256; i++) {
+    std::printf("0x%04X, ", crc_table[i]);
+    if ((i % 4) == 3) putchar('\n');
+  }
+  return 0;
 }
 #endif
 
-void DoCRC::AddCrc24(struct MacPacket* p)
-{
-    /* Init
-     * TODO: Size of CRC should depend on Transport Block length and should 
-     * consider both header and data, not just data
-     * int tb_len = p->datalen_;    // Transport Block (TB) length in bits
-     */
+void DoCRC::AddCrc24(struct MacPacket* p) {
+  /* Init
+   * TODO: Size of CRC should depend on Transport Block length and should
+   * consider both header and data, not just data
+   * int tb_len = p->datalen_;    // Transport Block (TB) length in bits
+   */
 
-    uint32_t crc = CalculateCrc24((unsigned char*)p->data_, p->datalen_);
-    /*
-    p->crc[0] = HI(crc);
-    p->crc[1] = MID(crc);
-    p->crc[2] = LO(crc);
-    */
-    p->crc_ = crc;
+  uint32_t crc = CalculateCrc24((unsigned char*)p->data_, p->datalen_);
+  /*
+  p->crc[0] = HI(crc);
+  p->crc[1] = MID(crc);
+  p->crc[2] = LO(crc);
+  */
+  p->crc_ = crc;
 }
 
-uint32_t DoCRC::CalculateCrc24(const unsigned char* data, int len)
-{
-    /*
-     *
-     */
-    int i;
-    uint32_t crc = 0;
+uint32_t DoCRC::CalculateCrc24(const unsigned char* data, int len) {
+  /*
+   *
+   */
+  int i;
+  uint32_t crc = 0;
 
-    for (i = 0; i < len; i++) {
-        crc = (crc << 8) ^ crc24_table_[data[i] ^ (unsigned char)(crc >> 16)];
-    }
+  for (i = 0; i < len; i++) {
+    crc = (crc << 8) ^ crc24_table_[data[i] ^ (unsigned char)(crc >> 16)];
+  }
 
-    crc = (crc & 0x00ffffff);
+  crc = (crc & 0x00ffffff);
 
-    return crc;
+  return crc;
 }
 
-bool DoCRC::CheckCrc24(unsigned char* data, int len, uint32_t ref_crc)
-{
-    /*
-     * Compute CRC for incoming packet and verify it matches the CRC entry.
-     * Return TRUE if it matches, FALSE otherwise
-     */
+bool DoCRC::CheckCrc24(unsigned char* data, int len, uint32_t ref_crc) {
+  /*
+   * Compute CRC for incoming packet and verify it matches the CRC entry.
+   * Return TRUE if it matches, FALSE otherwise
+   */
 
-    bool rval;
-    uint32_t crc = CalculateCrc24(data, len);
+  bool rval;
+  uint32_t crc = CalculateCrc24(data, len);
 
-    /*
-    rval = (((p->crc[0] == HI(crc)) &&
-	         (p->crc[1] == MID(crc)) && 
-             (p->crc[2] == LO(crc))));
-    */
-    rval = ((ref_crc == crc ? 1 : static_cast<int>(0 != 0)) != 0);
+  /*
+  rval = (((p->crc[0] == HI(crc)) &&
+               (p->crc[1] == MID(crc)) &&
+           (p->crc[2] == LO(crc))));
+  */
+  rval = ((ref_crc == crc ? 1 : static_cast<int>(0 != 0)) != 0);
 
-    return rval;
+  return rval;
 }
