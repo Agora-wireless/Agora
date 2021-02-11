@@ -22,7 +22,7 @@
 
 class ClientRadioConfig {
  public:
-  explicit ClientRadioConfig(Config* cfg);
+  explicit ClientRadioConfig(const Config* const cfg);
   bool RadioStart();
   void RadioStop();
   void ReadSensors();
@@ -52,7 +52,7 @@ class ClientRadioConfig {
   static void* InitClientRadioLaunch(void* context);
   void InitClientRadio(ClientRadioConfigContext* context);
 
-  Config* cfg_;
+  const Config* const cfg_;
   std::vector<SoapySDR::Device*> hubs_;
   std::vector<SoapySDR::Device*> cl_stn_;
   SoapySDR::Device* ref_;
@@ -62,5 +62,6 @@ class ClientRadioConfig {
   size_t radio_num_;
   size_t antenna_num_;
   ClientRadioConfigContext* context_;
+  std::atomic<size_t> num_client_radios_initialized_;
 };
 #endif  // CLIENT_RADIO_LIB_H_

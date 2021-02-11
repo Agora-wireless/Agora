@@ -52,8 +52,7 @@ else()
   set( CMAKE_VERBOSE_MAKEFILE on )
   message(STATUS "Debugging is enabled. Performance will be low")
   set(CMAKE_BUILD_TYPE Debug)
-  #set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wshadow -ggdb3 -fstack-protector-all -fsanitize=undefined -fsanitize=address -fsanitize=null")
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ggdb3 -fstack-protector-all -fsanitize=undefined -fsanitize=address -fsanitize=null")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wshadow -ggdb3 -fstack-protector-all -fsanitize=undefined -fsanitize=address -fsanitize=null")
   #-fsanitize=thread- fstack-protector-all -fsanitize=address -fstack-check
   #-fsanitize=address -fsanitize=pointer-compare
   #-fsanitize=address -fsanitize=pointer-subtract
