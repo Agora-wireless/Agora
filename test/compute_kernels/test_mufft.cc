@@ -15,7 +15,7 @@ static double mufft_get_time(void) {
 
 int flushCache() {
   const size_t bigger_than_cachesize = 2 * 1024;  // 100 * 1024 * 1024;
-  long* p = new long[bigger_than_cachesize];
+  long *p = new long[bigger_than_cachesize];
   // When you want to "flush" cache.
   for (int i = 0; i < bigger_than_cachesize; i++) {
     p[i] = rand();
@@ -24,9 +24,10 @@ int flushCache() {
 }
 
 static double bench_fft_1d(unsigned N, unsigned iterations, int direction) {
-  complex float* input = (complex float*)mufft_alloc(N * sizeof(complex float));
-  complex float* output =
-      (complex float*)mufft_alloc(N * sizeof(complex float));
+  complex float *input =
+      (complex float *)mufft_alloc(N * sizeof(complex float));
+  complex float *output =
+      (complex float *)mufft_alloc(N * sizeof(complex float));
 
   srand(0);
   for (unsigned i = 0; i < N; i++) {
@@ -35,7 +36,7 @@ static double bench_fft_1d(unsigned N, unsigned iterations, int direction) {
     input[i] = real + _Complex_I * imag;
   }
 
-  mufft_plan_1d* muplan =
+  mufft_plan_1d *muplan =
       mufft_create_plan_1d_c2c(N, direction, MUFFT_FLAG_CPU_ANY);
 
   double start_time = mufft_get_time();
@@ -52,9 +53,10 @@ static double bench_fft_1d(unsigned N, unsigned iterations, int direction) {
 }
 
 static double bench_fft_1d_0(unsigned N, unsigned iterations, int direction) {
-  complex float* input = (complex float*)mufft_alloc(N * sizeof(complex float));
-  complex float* output =
-      (complex float*)mufft_alloc(N * sizeof(complex float));
+  complex float *input =
+      (complex float *)mufft_alloc(N * sizeof(complex float));
+  complex float *output =
+      (complex float *)mufft_alloc(N * sizeof(complex float));
 
   srand(0);
   for (unsigned i = 0; i < N; i++) {
@@ -63,7 +65,7 @@ static double bench_fft_1d_0(unsigned N, unsigned iterations, int direction) {
     input[i] = real + _Complex_I * imag;
   }
 
-  mufft_plan_1d* muplan =
+  mufft_plan_1d *muplan =
       mufft_create_plan_1d_c2c(N, direction, MUFFT_FLAG_CPU_ANY);
 
   double start_time = mufft_get_time();
@@ -118,7 +120,7 @@ static void run_benchmark_1d(unsigned N, unsigned iterations) {
               mufft_mflops_ifft, 1000000.0 * mufft_time_ifft / iterations);
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   if (argc != 3) {
     std::fprintf(stderr, "Usage: %s [iterations] [Nx]\n", argv[0]);
     return 1;
