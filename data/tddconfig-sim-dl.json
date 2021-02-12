@@ -2,7 +2,7 @@
     "antenna_num": 8,
     "ue_num": 8,
     "core_offset": 4,
-    "worker_thread_num": 2,
+    "worker_thread_num": 22,
     "socket_thread_num": 1,
     "frames": [
         "PDDDDDDDDDDDDD"

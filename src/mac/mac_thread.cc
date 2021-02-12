@@ -113,8 +113,7 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
   assert(event.event_type_ == EventType::kPacketToMac);
 
   const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-  const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-  const size_t symbol_idx_ul = this->cfg_->Frame().GetULSymbolIdx(symbol_id);
+  const size_t symbol_idx_ul = gen_tag_t(event.tags_[0]).symbol_id_;
   const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
   const uint8_t* ul_data_ptr =
       decoded_buffer_[frame_id % kFrameWnd][symbol_idx_ul][ue_id];

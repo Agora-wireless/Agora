@@ -121,8 +121,7 @@ DoDecode::~DoDecode() { std::free(resp_var_nodes_); }
 EventData DoDecode::Launch(size_t tag) {
   const LDPCconfig& ldpc_config = cfg_->LdpcConfig();
   const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t symbol_idx_ul = cfg_->Frame().GetULSymbolIdx(symbol_id);
+  const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id_;
   const size_t cb_id = gen_tag_t(tag).cb_id_;
   const size_t symbol_offset =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
@@ -132,8 +131,8 @@ EventData DoDecode::Launch(size_t tag) {
   if (kDebugPrintInTask == true) {
     std::printf(
         "In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
-        "%zu, ue: %zu offset %zu\n",
-        tid_, frame_id, symbol_id, cur_cb_id, ue_id, symbol_offset);
+        "%zu, ue: %zu\n",
+        tid_, frame_id, symbol_idx_ul, cur_cb_id, ue_id);
   }
 
   size_t start_tsc = GetTime::WorkerRdtsc();

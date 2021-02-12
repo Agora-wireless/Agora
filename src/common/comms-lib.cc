@@ -380,29 +380,12 @@ std::vector<std::complex<float>> CommsLib::FFT(
 
 void CommsLib::IFFT(complex_float* in, int fftsize, bool normalize) {
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
-  MKL_LONG status =
-      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
-  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
-    std::printf("Error in DftiCreateDescriptor: %s\n",
-                DftiErrorMessage(status));
-    assert(status != 0);
-  }
-  status = DftiCommitDescriptor(mkl_handle);
-  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
-    std::printf("Error in DftiErrorClass: %s\n", DftiErrorMessage(status));
-    assert(status != 0);
-  }
-  status = DftiComputeBackward(mkl_handle, in);
-  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
-    std::printf("Error in DftiComputeBackward: %s\n", DftiErrorMessage(status));
-    assert(status != 0);
-  }
-  status = DftiFreeDescriptor(&mkl_handle);
-  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
-    std::printf("Error in DftiFreeDescriptor: %s\n", DftiErrorMessage(status));
-    assert(status != 0);
-  }
-  if (normalize == true) {
+  (void)DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1,
+                             fftsize);
+  (void)DftiCommitDescriptor(mkl_handle);
+  DftiComputeBackward(mkl_handle, in);
+  DftiFreeDescriptor(&mkl_handle);
+  if (normalize) {
     float max_val = 0;
     // int max_ind = 0;
     float scale = 0.5;
@@ -428,13 +411,12 @@ void CommsLib::IFFT(complex_float* in, int fftsize, bool normalize) {
 
 void CommsLib::FFT(complex_float* in, int fftsize) {
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
-  MKL_LONG status =
-      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
-  status = DftiCommitDescriptor(mkl_handle);
+  (void)DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1,
+                             fftsize);
+  (void)DftiCommitDescriptor(mkl_handle);
   /* compute FFT */
-  status = DftiComputeForward(mkl_handle, in);
-  status = DftiFreeDescriptor(&mkl_handle);
-  (void)(status);
+  DftiComputeForward(mkl_handle, in);
+  DftiFreeDescriptor(&mkl_handle);
 }
 
 std::vector<std::complex<float>> CommsLib::ComposePartialPilotSym(
