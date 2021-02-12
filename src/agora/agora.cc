@@ -124,6 +124,27 @@ void Agora::ScheduleAntennas(EventType event_type, size_t frame_id,
   }
 }
 
+void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
+  auto base_tag = gen_tag_t::FrmSymAnt(frame_id, symbol_id, 0);
+
+  size_t num_blocks = config_->bs_ant_num_ / config_->n_channels_;
+  EventData events_list[4];  // Max # of channels: 4
+  for (size_t i = 0; i < config_->n_channels_; i++) {
+    events_list[i].num_tags_ = 1;
+    events_list[i].event_type_ = EventType::kPacketTX;
+  }
+
+  for (size_t i = 0; i < num_blocks; i++) {
+    for (size_t j = 0; j < config_->n_channels_; j++) {
+      events_list[j].tags_[0] = base_tag.tag_;
+      base_tag.ant_id_++;
+    }
+    TryEnqueueBulkFallback(GetConq(EventType::kPacketTX, 0),
+                           tx_ptoks_ptr_[i % config_->socket_thread_num_],
+                           events_list, config_->n_channels_);
+  }
+}
+
 void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
                                 size_t symbol_id) {
   auto base_tag = gen_tag_t::FrmSymSc(frame_id, symbol_id, 0);
@@ -445,14 +466,22 @@ void Agora::Start() {
             size_t frame_id = gen_tag_t(event.tags_[i]).frame_id_;
             size_t symbol_id = gen_tag_t(event.tags_[i]).symbol_id_;
             size_t symbol_idx_dl = cfg->GetDlSymbolIdx(frame_id, symbol_id);
-            TryEnqueueFallback(GetConq(EventType::kPacketTX, 0),
-                               tx_ptoks_ptr_[ant_id % cfg->socket_thread_num_],
-                               EventData(EventType::kPacketTX, event.tags_[0]));
             PrintPerTaskDone(PrintType::kIFFT, frame_id, symbol_idx_dl, ant_id);
 
             if (ifft_counters_.LastTask(frame_id, symbol_idx_dl)) {
+              if (symbol_idx_dl == ifft_counters_.GetSymbolCount(frame_id)) {
+                for (size_t sym_id = ifft_next_symbol_; sym_id <= symbol_idx_dl;
+                     sym_id++)
+                  ScheduleAntennasTX(frame_id, cfg->dl_symbols_[0][sym_id]);
+                ifft_next_symbol_ = symbol_idx_dl + 1;
+              }
               PrintPerSymbolDone(PrintType::kIFFT, frame_id, symbol_idx_dl);
               if (ifft_counters_.LastSymbol(frame_id)) {
+                // Schedule the remaining symbols
+                for (size_t sym_id = ifft_next_symbol_;
+                     sym_id < cfg->dl_data_symbol_num_perframe_; sym_id++)
+                  ScheduleAntennasTX(frame_id, cfg->dl_symbols_[0][sym_id]);
+                ifft_next_symbol_ = 0;
                 stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
                 PrintPerFrameDone(PrintType::kIFFT, frame_id);
                 assert(frame_id == cur_proc_frame_id_);

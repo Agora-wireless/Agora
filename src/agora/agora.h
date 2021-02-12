@@ -66,6 +66,7 @@ class Agora {
                            size_t symbol_id);
   void ScheduleAntennas(EventType event_type, size_t frame_id,
                         size_t symbol_id);
+  void ScheduleAntennasTX(size_t frame_id, size_t symbol_id);
 
   /**
    * @brief Schedule LDPC decoding or encoding over code blocks
@@ -206,6 +207,7 @@ class Agora {
   RxCounters rx_counters_;
   size_t zf_last_frame_ = SIZE_MAX;
   size_t rc_last_frame_ = SIZE_MAX;
+  size_t ifft_next_symbol_ = 0;
 
   // Agora schedules and processes a frame in FIFO order
   // cur_proc_frame_id is the frame that is currently being processed.
