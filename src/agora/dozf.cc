@@ -188,7 +188,9 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
       }
     }
 
-    duration_stat_->task_duration_[1] += GetTime::WorkerRdtsc() - start_tsc1;
+    size_t start_tsc2 = GetTime::WorkerRdtsc();
+    duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
+
     arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_, cfg_->BsAntNum(),
                           cfg_->UeNum(), false);
 
@@ -221,10 +223,10 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
           reinterpret_cast<arma::cx_float*>(
               calib_ul_buffer_[frame_cal_slot_prev]),
           cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-      arma::cx_fmat calib_dl_mat_mean = (calib_dl_mat + calib_dl_mat_prev) / 2;
-      arma::cx_fmat calib_ul_mat_mean = (calib_ul_mat + calib_ul_mat_prev) / 2;
-      arma::cx_fvec calib_dl_vec = calib_dl_mat_mean.row(cur_sc_id).st();
-      arma::cx_fvec calib_ul_vec = calib_ul_mat_mean.row(cur_sc_id).st();
+      arma::cx_fvec calib_dl_vec =
+          (calib_dl_mat.row(cur_sc_id) + calib_dl_mat_prev.row(cur_sc_id)).st();
+      arma::cx_fvec calib_ul_vec =
+          (calib_ul_mat.row(cur_sc_id) + calib_ul_mat_prev.row(cur_sc_id)).st();
       calib_vec = calib_dl_vec / calib_ul_vec;
 
       if (cfg_->ExternalRefNode()) {
@@ -233,15 +235,14 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
       }
     }
 
-    double start_tsc2 = GetTime::WorkerRdtsc();
-    duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
+    double start_tsc3 = GetTime::WorkerRdtsc();
+    duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
+
     ComputePrecoder(mat_csi, calib_gather_buffer_,
                     ul_zf_matrices_[frame_slot][cur_sc_id],
                     dl_zf_matrices_[frame_slot][cur_sc_id]);
 
-    // cout<<"Precoder:" <<mat_output<<endl;
-    double duration3 = GetTime::WorkerRdtsc() - start_tsc2;
-    duration_stat_->task_duration_[3] += duration3;
+    duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
     duration_stat_->task_count_++;
     duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
     // if (duration > 500) {
@@ -272,6 +273,10 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
     PartialTransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
                            dst_csi_ptr, cfg_->BsAntNum());
   }
+
+  size_t start_tsc2 = GetTime::WorkerRdtsc();
+  duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
+
   if (cfg_->Frame().NumDLSyms() > 0) {
     arma::cx_fvec calib_vec(
         reinterpret_cast<arma::cx_float*>(calib_gather_buffer_),
@@ -293,7 +298,6 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
     arma::cx_fmat calib_ul_mat(
         reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_cal_slot]),
         cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-
     arma::cx_fmat calib_dl_mat_prev(reinterpret_cast<arma::cx_float*>(
                                         calib_dl_buffer_[frame_cal_slot_prev]),
                                     cfg_->OfdmDataNum(), cfg_->BfAntNum(),
@@ -302,14 +306,16 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
                                         calib_ul_buffer_[frame_cal_slot_prev]),
                                     cfg_->OfdmDataNum(), cfg_->BfAntNum(),
                                     false);
-    arma::cx_fmat calib_dl_mat_mean = (calib_dl_mat + calib_dl_mat_prev) / 2;
-    arma::cx_fmat calib_ul_mat_mean = (calib_ul_mat + calib_ul_mat_prev) / 2;
-    arma::cx_fvec calib_dl_vec = calib_dl_mat_mean.row(base_sc_id).st();
-    arma::cx_fvec calib_ul_vec = calib_ul_mat_mean.row(base_sc_id).st();
+    arma::cx_fvec calib_dl_vec =
+        (calib_dl_mat.row(base_sc_id) + calib_dl_mat_prev.row(base_sc_id)).st();
+    arma::cx_fvec calib_ul_vec =
+        (calib_ul_mat.row(base_sc_id) + calib_ul_mat_prev.row(base_sc_id)).st();
     calib_vec = calib_dl_vec / calib_ul_vec;
   }
 
-  duration_stat_->task_duration_[1] += GetTime::WorkerRdtsc() - start_tsc1;
+  double start_tsc3 = GetTime::WorkerRdtsc();
+  duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
+
   arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
                         cfg_->BsAntNum(), cfg_->UeNum(), false);
 
@@ -317,11 +323,7 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
                   ul_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)],
                   dl_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)]);
 
-  double start_tsc2 = GetTime::WorkerRdtsc();
-  duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
-
-  // cout<<"Precoder:" <<mat_output<<endl;
-  duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc2;
+  duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
   duration_stat_->task_count_++;
   duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
 

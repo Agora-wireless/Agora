@@ -1,4 +1,4 @@
-[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Fpr-memory-cleanup)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/pr-memory-cleanup/)
+[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Fpr-tidy-checks)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/pr-tidy-checks/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
