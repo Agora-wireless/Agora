@@ -477,12 +477,9 @@ void Agora::Start() {
             PrintPerTaskDone(PrintType::kIFFT, frame_id, symbol_idx_dl, ant_id);
 
             if (ifft_counters_.LastTask(frame_id, symbol_idx_dl)) {
-              if (symbol_idx_dl == ifft_counters_.GetSymbolCount(frame_id)) {
-                for (size_t sym_id = ifft_next_symbol_; sym_id <= symbol_idx_dl;
-                     sym_id++)
-                  ScheduleAntennasTX(frame_id,
-                                     cfg->Frame().GetDLSymbol(sym_id));
-                ifft_next_symbol_ = symbol_idx_dl + 1;
+              if (symbol_idx_dl == ifft_next_symbol_) {
+                ScheduleAntennasTX(frame_id, symbol_id);
+                ifft_next_symbol_++;
               }
               PrintPerSymbolDone(PrintType::kIFFT, frame_id, symbol_idx_dl);
               if (ifft_counters_.LastSymbol(frame_id)) {
