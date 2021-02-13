@@ -79,8 +79,10 @@ DoDemul::~DoDemul() {
 
 EventData DoDemul::Launch(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id_;
+  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
+
+  const size_t symbol_idx_ul = this->cfg_->Frame().GetULSymbolIdx(symbol_id);
   const size_t total_data_symbol_idx_ul =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
   const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
@@ -90,8 +92,10 @@ EventData DoDemul::Launch(size_t tag) {
 
   if (kDebugPrintInTask == true) {
     std::printf(
-        "In doDemul tid %d: frame: %zu, symbol: %zu, subcarrier: %zu \n", tid_,
-        frame_id, symbol_idx_ul, base_sc_id);
+        "In doDemul tid %d: frame: %zu, symbol idx: %zu, symbol idx ul: %zu, "
+        "subcarrier: %zu, databuffer idx %zu \n",
+        tid_, frame_id, symbol_id, symbol_idx_ul, base_sc_id,
+        total_data_symbol_idx_ul);
   }
 
   size_t max_sc_ite =
@@ -210,8 +214,8 @@ EventData DoDemul::Launch(size_t tag) {
           fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
           theta_inc += theta_diff;
         }
-        theta_inc /=
-            (float)std::max(1, (int)cfg_->Frame().ClientUlPilotSymbols() - 1);
+        theta_inc /= (float)std::max(
+            1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
         fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
         cx_fmat mat_phase_correct = zeros<cx_fmat>(size(cur_theta));
         mat_phase_correct.set_real(cos(-cur_theta));
