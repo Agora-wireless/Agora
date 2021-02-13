@@ -261,6 +261,7 @@ void PhyUe::Start() {
             dl_symbol_id = config_->Frame().GetDLSymbol(0);
           }
 
+          // \todo convert to this->config_->Frame().GetBeaconSymbolLast()
           if ((symbol_id == 0)  // Beacon in Sim mode!
               ||
               ((config_->HwFramer() == false) &&

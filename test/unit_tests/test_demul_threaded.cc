@@ -37,9 +37,11 @@ void MasterToWorkerDynamicMaster(
           (i / cfg->DemulEventsPerSymbol()) % cfg->Frame().NumULSyms();
       size_t base_sc_id =
           (i % cfg->DemulEventsPerSymbol()) * cfg->ZfBlockSize();
-      event_queue.enqueue(
-          EventData(EventType::kZF,
-                    gen_tag_t::FrmSymSc(frame_id, symbol_id, base_sc_id).tag_));
+      event_queue.enqueue(EventData(
+          EventType::kZF,
+          gen_tag_t::FrmSymSc(frame_id, cfg->Frame().GetULSymbol(symbol_id),
+                              base_sc_id)
+              .tag_));
     }
 
     // Dequeue all events in queue to avoid overflow
