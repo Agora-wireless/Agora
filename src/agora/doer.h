@@ -1,7 +1,11 @@
-#ifndef DOER
-#define DOER
+/**
+ * @file doer.h
+ * @brief Declaration file for the Doer class.  The is the base class for all
+ * agora doers
+ */
+#ifndef DOER_H_
+#define DOER_H_
 
-class Config;
 #include "buffer.h"
 #include "concurrent_queue_wrapper.h"
 #include "concurrentqueue.h"
@@ -37,7 +41,7 @@ class Doer {
   /// The main event handling function that performs Doer-specific work.
   /// Doers that handle only one event type use this signature.
   virtual EventData Launch(size_t tag) {
-    _unused(tag);
+    unused(tag);
     RtAssert(false, "Doer: launch(tag) not implemented");
     return EventData();
   }
@@ -45,8 +49,8 @@ class Doer {
   /// The main event handling function that performs Doer-specific work.
   /// Doers that handle multiple event types use this signature.
   virtual EventData Launch(size_t tag, EventType event_type) {
-    _unused(tag);
-    _unused(event_type);
+    unused(tag);
+    unused(event_type);
     RtAssert(false, "Doer: launch(tag, event_type) not implemented");
     return EventData();
   }
@@ -59,4 +63,4 @@ class Doer {
   Config* cfg_;
   int tid_;  // Thread ID of this Doer
 };
-#endif /* DOER */
+#endif  // DOER_H_

@@ -1,4 +1,10 @@
-#pragma once
+/**
+ * @file dosubcarrier.inc
+ * @brief Self-Contained Implmentation file implmenting a worker class that
+ * handles all subcarrier-parallel processing tasks.
+ */
+#ifndef DOSUBCARRIER_H_
+#define DOSUBCARRIER_H_
 
 #include <armadillo>
 #include <iostream>
@@ -20,8 +26,6 @@
 #include "signal_handler.h"
 #include "stats.h"
 #include "symbols.h"
-
-using namespace arma;
 
 /**
  * @brief A worker class that handles all subcarrier-parallel processing tasks.
@@ -121,7 +125,7 @@ class DoSubcarrier : public Doer {
         dl_zf_matrices_, dl_ifft_buffer_, dl_encoded_buffer_, stats);
 
     // Init internal states
-    demul_cur_sym_ = cfg->pilot_symbol_num_perframe;
+    demul_cur_sym_ = cfg->Frame().NumPilotSyms();
   }
 
   ~DoSubcarrier() {
@@ -136,9 +140,9 @@ class DoSubcarrier : public Doer {
 
   void start_work() {
     const size_t n_zf_tasks_reqd =
-        (sc_range_.end - sc_range_.start) / cfg->zf_block_size;
+        (sc_range_.end - sc_range_.start) / cfg->ZfBlockSize();
     const size_t n_demul_tasks_reqd =
-        (sc_range_.end - sc_range_.start) / cfg->demul_block_size;
+        (sc_range_.end - sc_range_.start) / cfg->DemulBlockSize();
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
       if (rx_status_->received_all_pilots(csi_cur_frame_)) {
@@ -151,10 +155,10 @@ class DoSubcarrier : public Doer {
       }
 
       if (csi_cur_frame_ > zf_cur_frame_) {
-        do_zf_->launch(
+        do_zf_->Launch(
             gen_tag_t::frm_sym_sc(
                 zf_cur_frame_, 0,
-                sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
+                sc_range_.start + n_zf_tasks_done_ * cfg->ZfBlockSize())
                 ._tag);
         n_zf_tasks_done_++;
         if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
@@ -167,8 +171,8 @@ class DoSubcarrier : public Doer {
       if (zf_cur_frame_ > demul_cur_frame_ &&
           rx_status_->is_demod_ready(demul_cur_frame_, demul_cur_sym_)) {
         do_demul_->independent_launch(
-            demul_cur_frame_, demul_cur_sym_ - cfg->pilot_symbol_num_perframe,
-            sc_range_.start + (n_demul_tasks_done_ * cfg->demul_block_size));
+            demul_cur_frame_, demul_cur_sym_ - cfg->Frame().NumPilotSyms(),
+            sc_range_.start + (n_demul_tasks_done_ * cfg->DemulBlockSize));
 
         n_demul_tasks_done_++;
         if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
@@ -178,12 +182,12 @@ class DoSubcarrier : public Doer {
               usleep(tid * 3000);
               int8_t* demul_ptr = demod_buffers_[demul_cur_frame_
                   % kFrameWnd][demul_cur_sym_
-                  - cfg->pilot_symbol_num_perframe][i];
+                  - cfg->Frame().NumPilotSyms()][i];
               std::printf("UE %zu: ", i);
               for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
                   if (i % 20 == 0) {
                       std::printf(
-                          "%d ", demul_ptr[i * cfg->mod_order_bits]);
+                          "%d ", demul_ptr[i * cfg->ModOrderBits()]);
                   }
               }
               std::printf("\n");
@@ -194,13 +198,13 @@ class DoSubcarrier : public Doer {
           demul_status_->demul_complete(demul_cur_frame_, demul_cur_sym_,
                                         n_demul_tasks_reqd);
           demul_cur_sym_++;
-          if (demul_cur_sym_ == cfg->symbol_num_perframe) {
-            demul_cur_sym_ = cfg->pilot_symbol_num_perframe;
+          if (demul_cur_sym_ == cfg->frame().NumTotalSyms()) {
+            demul_cur_sym_ = cfg->frame().NumPilotSyms();
             std::printf(
                 "Main thread: Demodulation done frame: %lu "
                 "(%lu UL symbols)\n",
                 demul_cur_frame_,
-                cfg->symbol_num_perframe - cfg->pilot_symbol_num_perframe);
+                cfg->frame().NumTotalSyms() - cfg->frame().NumPilotSyms());
             demul_cur_frame_++;
           }
         }
@@ -215,18 +219,18 @@ class DoSubcarrier : public Doer {
 
     complex_float converted_sc[kSCsPerCacheline];
 
-    for (size_t i = 0; i < cfg->pilot_symbol_num_perframe; i++) {
-      for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
+    for (size_t i = 0; i < cfg->Frame().NumPilotSyms(); i++) {
+      for (size_t j = 0; j < cfg->BsAntNum(); j++) {
         auto* pkt = reinterpret_cast<Packet*>(
             socket_buffer_[j] +
-            (frame_slot * cfg->symbol_num_perframe * cfg->packet_length) +
-            i * cfg->packet_length);
+            (frame_slot * cfg->frame().NumTotalSyms() * cfg->PacketLength()) +
+            i * cfg->PacketLength());
 
         // Subcarrier ranges should be aligned with kTransposeBlockSize
         for (size_t block_idx = sc_range_.start / kTransposeBlockSize;
              block_idx < sc_range_.end / kTransposeBlockSize; block_idx++) {
           const size_t block_base_offset =
-              block_idx * (kTransposeBlockSize * cfg->BS_ANT_NUM);
+              block_idx * (kTransposeBlockSize * cfg->BsAntNum());
 
           for (size_t sc_j = 0; sc_j < kTransposeBlockSize;
                sc_j += kSCsPerCacheline) {
@@ -254,26 +258,26 @@ class DoSubcarrier : public Doer {
             __m256 fft_result1 =
                 _mm256_load_ps(reinterpret_cast<const float*>(src + 4));
             __m256 pilot_tx0 = _mm256_set_ps(
-                cfg->pilots_sgn_[sc_idx + 3 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 3 + pilots_sgn_offset].re,
-                cfg->pilots_sgn_[sc_idx + 2 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 2 + pilots_sgn_offset].re,
-                cfg->pilots_sgn_[sc_idx + 1 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 1 + pilots_sgn_offset].re,
-                cfg->pilots_sgn_[sc_idx + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + pilots_sgn_offset].re);
+                cfg->PilotsSgn()[sc_idx + 3 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 3 + pilots_sgn_offset].re,
+                cfg->PilotsSgn()[sc_idx + 2 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 2 + pilots_sgn_offset].re,
+                cfg->PilotsSgn()[sc_idx + 1 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 1 + pilots_sgn_offset].re,
+                cfg->PilotsSgn()[sc_idx + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + pilots_sgn_offset].re);
             fft_result0 = CommsLib::__m256_complex_cf32_mult(fft_result0,
                                                              pilot_tx0, true);
 
             __m256 pilot_tx1 = _mm256_set_ps(
-                cfg->pilots_sgn_[sc_idx + 7 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 7 + pilots_sgn_offset].re,
-                cfg->pilots_sgn_[sc_idx + 6 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 6 + pilots_sgn_offset].re,
-                cfg->pilots_sgn_[sc_idx + 5 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 5 + pilots_sgn_offset].re,
-                cfg->pilots_sgn_[sc_idx + 4 + pilots_sgn_offset].im,
-                cfg->pilots_sgn_[sc_idx + 4 + pilots_sgn_offset].re);
+                cfg->PilotsSgn()[sc_idx + 7 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 7 + pilots_sgn_offset].re,
+                cfg->PilotsSgn()[sc_idx + 6 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 6 + pilots_sgn_offset].re,
+                cfg->PilotsSgn()[sc_idx + 5 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 5 + pilots_sgn_offset].re,
+                cfg->PilotsSgn()[sc_idx + 4 + pilots_sgn_offset].im,
+                cfg->PilotsSgn()[sc_idx + 4 + pilots_sgn_offset].re);
             fft_result1 = CommsLib::__m256_complex_cf32_mult(fft_result1,
                                                              pilot_tx1, true);
             _mm256_stream_ps(reinterpret_cast<float*>(dst), fft_result0);
@@ -334,3 +338,5 @@ class DoSubcarrier : public Doer {
   // Shared status with Decode threads
   DemulStatus* demul_status_;
 };
+
+#endif  // DOSUBCARRIER_H_

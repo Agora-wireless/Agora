@@ -11,8 +11,8 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-
-#pragma once
+#ifndef UDP_CLIENT_H_
+#define UDP_CLIENT_H_
 
 #include <netdb.h>
 #include <sys/socket.h>
@@ -37,7 +37,7 @@ class UDPClient {
   UDPClient(const UDPClient&) = delete;
 
   ~UDPClient() {
-    for (auto kv : addrinfo_map_) {
+    for (const auto& kv : addrinfo_map_) {
       freeaddrinfo(kv.second);
     }
     if (sock_fd_ != -1) {
@@ -56,7 +56,7 @@ class UDPClient {
    * @param msg Pointer to the message to send
    * @param len Length in bytes of the message to send
    */
-  void Send(const std::string rem_hostname, uint16_t rem_port,
+  void Send(const std::string& rem_hostname, uint16_t rem_port,
             const uint8_t* msg, size_t len) {
     std::string remote_uri = rem_hostname + ":" + std::to_string(rem_port);
     struct addrinfo* rem_addrinfo = nullptr;
@@ -93,7 +93,7 @@ class UDPClient {
     }
 
     if (enable_recording_flag_) {
-      sent_vec_.push_back(std::vector<uint8_t>(msg, msg + len));
+      sent_vec_.emplace_back(msg, msg + len);
     }
   }
 
@@ -111,3 +111,5 @@ class UDPClient {
 
   bool enable_recording_flag_ = false;  // If true, we record all sent packets
 };
+
+#endif  // UDP_CLIENT_H_

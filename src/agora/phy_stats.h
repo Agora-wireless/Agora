@@ -1,5 +1,9 @@
-#ifndef PHY_STATS
-#define PHY_STATS
+/**
+ * @file phy_stats.h
+ * @brief Declaration file for the PhyStats class.
+ */
+#ifndef PHY_STATS_H_
+#define PHY_STATS_H_
 
 #include <armadillo>
 
@@ -10,7 +14,7 @@
 using namespace arma;
 class PhyStats {
  public:
-  PhyStats(Config* cfg);
+  explicit PhyStats(Config* cfg);
   ~PhyStats();
   void PrintPhyStats();
   void UpdateBitErrors(size_t /*ue_id*/, size_t /*offset*/, uint8_t /*tx_byte*/,
@@ -25,7 +29,8 @@ class PhyStats {
                               uint8_t /*rx_byte*/);
   void UpdateUncodedBits(size_t /*ue_id*/, size_t /*offset*/,
                          size_t /*new_bits_num*/);
-  void UpdateEvmStats(size_t /*frame_id*/, size_t /*sc_id*/, cx_fmat /*eq*/);
+  void UpdateEvmStats(size_t /*frame_id*/, size_t /*sc_id*/,
+                      const cx_fmat& /*eq*/);
   void PrintEvmStats(size_t /*frame_id*/);
   void UpdatePilotSnr(size_t /*frame_id*/, size_t /*ue_id*/,
                       complex_float* /*fft_data*/);
@@ -46,4 +51,4 @@ class PhyStats {
   cx_fmat ul_gt_mat_;
 };
 
-#endif
+#endif  // PHY_STATS_H_

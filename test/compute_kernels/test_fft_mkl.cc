@@ -1,9 +1,14 @@
+/**
+ * @file test_fft_mkl.cc
+ * @brief Testing functions for fft using the mkl library
+ */
+
 #include <immintrin.h>
 
 #include <cmath>
 #include <iostream>
 
-#include "cpu_attach.hpp"
+#include "cpu_attach.h"
 #include "mkl_dfti.h"
 
 static double fft_get_time(void) {

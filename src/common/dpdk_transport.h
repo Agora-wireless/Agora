@@ -1,4 +1,10 @@
-#pragma once
+/**
+ * @file dpdk_transport.h
+ * @brief Declaration file for the DpdkTransport class.
+ */
+
+#ifndef DPDK_TRANSPORT_H_
+#define DPDK_TRANSPORT_H_
 
 #include <inttypes.h>
 #include <rte_byteorder.h>
@@ -20,13 +26,13 @@
 
 #include "utils.h"
 
-#define RX_RING_SIZE 2048
-#define TX_RING_SIZE 2048
+#define RX_RING_SIZE (2048)
+#define TX_RING_SIZE (2048)
 
 #define NUM_MBUFS ((32 * 1024) - 1)
-#define MBUF_CACHE_SIZE 128
+#define MBUF_CACHE_SIZE (128)
 
-#define JUMBO_FRAME_MAX_SIZE 0x2600  // allow max jumbo frame 9.5 KB
+#define JUMBO_FRAME_MAX_SIZE (0x2600)  // allow max jumbo frame 9.5 KB
 /// Maximum number of packets received in rx_burst
 static constexpr size_t kRxBatchSize = 16;
 static constexpr size_t kTxBatchSize = 1;
@@ -71,3 +77,5 @@ class DpdkTransport {
   static rte_mempool* create_mempool(
       size_t packet_length = JUMBO_FRAME_MAX_SIZE);
 };
+
+#endif  // DPDK_TRANSPORT_H_

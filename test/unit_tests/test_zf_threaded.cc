@@ -20,19 +20,18 @@ std::atomic<size_t> num_workers_ready_atomic;
 void MasterToWorkerDynamicMaster(
     Config* cfg, moodycamel::ConcurrentQueue<EventData>& event_queue,
     moodycamel::ConcurrentQueue<EventData>& complete_task_queue) {
-  PinToCoreWithOffset(ThreadType::kMaster, cfg->core_offset_, 0);
+  PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0);
   // Wait for all worker threads to be ready
   while (num_workers_ready_atomic != kNumWorkers) {
     // Wait
   }
 
   for (size_t bs_ant_idx = 0; bs_ant_idx < kAntTestNum; bs_ant_idx++) {
-    cfg->bs_ant_num_ = kBsAntNums[bs_ant_idx];
+    cfg->BsAntNum(kBsAntNums[bs_ant_idx]);
     for (size_t i = 0; i < kMaxTestNum; i++) {
       uint32_t frame_id =
-          i / cfg->zf_events_per_symbol_ + kFrameOffsets[bs_ant_idx];
-      size_t base_sc_id =
-          (i % cfg->zf_events_per_symbol_) * cfg->zf_block_size_;
+          i / cfg->ZfEventsPerSymbol() + kFrameOffsets[bs_ant_idx];
+      size_t base_sc_id = (i % cfg->ZfEventsPerSymbol()) * cfg->ZfBlockSize();
       event_queue.enqueue(EventData(
           EventType::kZF, gen_tag_t::FrmSc(frame_id, base_sc_id).tag_));
     }
@@ -60,7 +59,7 @@ void MasterToWorkerDynamicWorker(
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     Stats* stats) {
-  PinToCoreWithOffset(ThreadType::kWorker, cfg->core_offset_ + 1, worker_id);
+  PinToCoreWithOffset(ThreadType::kWorker, cfg->CoreOffset() + 1, worker_id);
 
   // Wait for all threads (including master) to start runnung
   num_workers_ready_atomic++;
@@ -76,7 +75,7 @@ void MasterToWorkerDynamicWorker(
   size_t num_tasks = 0;
   EventData req_event;
   size_t max_frame_id_wo_offset =
-      (kMaxTestNum - 1) / (cfg->ofdm_data_num_ / cfg->zf_block_size_);
+      (kMaxTestNum - 1) / (cfg->OfdmDataNum() / cfg->ZfBlockSize());
   for (size_t i = 0; i < kMaxItrNum; i++) {
     if (event_queue.try_dequeue(req_event)) {
       num_tasks++;
@@ -89,12 +88,12 @@ void MasterToWorkerDynamicWorker(
                  cur_frame_id - kFrameOffsets[2] <= max_frame_id_wo_offset) {
         frame_offset_id = 2;
       }
-      ASSERT_EQ(cfg->bs_ant_num_, kBsAntNums[frame_offset_id]);
+      ASSERT_EQ(cfg->BsAntNum(), kBsAntNums[frame_offset_id]);
       EventData resp_event = compute_zf->Launch(req_event.tags_[0]);
       TryEnqueueFallback(&complete_task_queue, ptok, resp_event);
     }
   }
-  double ms = CyclesToMs(Rdtsc() - start_tsc, cfg->freq_ghz_);
+  double ms = CyclesToMs(Rdtsc() - start_tsc, cfg->FreqGhz());
 
   std::printf("Worker %zu: %zu tasks, time per task = %.4f ms\n", worker_id,
               num_tasks, ms / num_tasks);
@@ -111,8 +110,8 @@ TEST(TestZF, VaryingConfig) {
   moodycamel::ProducerToken* ptoks[kNumWorkers];
   auto complete_task_queue =
       moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
-  for (size_t i = 0; i < kNumWorkers; i++) {
-    ptoks[i] = new moodycamel::ProducerToken(complete_task_queue);
+  for (auto& ptok : ptoks) {
+    ptok = new moodycamel::ProducerToken(complete_task_queue);
   }
 
   Table<complex_float> calib_dl_buffer;
@@ -127,9 +126,9 @@ TEST(TestZF, VaryingConfig) {
                                                                 kMaxAntennas);
 
   calib_dl_buffer.RandAllocCxFloat(kFrameWnd, kMaxDataSCs * kMaxAntennas,
-                                   Agora_memory::Alignment_t::kK64Align);
+                                   Agora_memory::Alignment_t::kAlign64);
   calib_ul_buffer.RandAllocCxFloat(kFrameWnd, kMaxDataSCs * kMaxAntennas,
-                                   Agora_memory::Alignment_t::kK64Align);
+                                   Agora_memory::Alignment_t::kAlign64);
 
   auto* stats = new Stats(cfg);
 

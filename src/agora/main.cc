@@ -1,3 +1,7 @@
+/**
+ * @file main.cc
+ * @brief Main file for the agora server
+ */
 #include "agora.h"
 
 int main(int argc, char* argv[]) {

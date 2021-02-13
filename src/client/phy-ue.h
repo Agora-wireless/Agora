@@ -1,5 +1,11 @@
-#ifndef COMP_HEAD
-#define COMP_HEAD
+/**
+ * @file phy-ue.h
+ * @brief Declaration file for the phy ue class
+ */
+
+#ifndef PHY_UE_H_
+#define PHY_UE_H_
+
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <immintrin.h>
@@ -32,9 +38,9 @@
 #include "signal_handler.h"
 #include "txrx_client.h"
 
-typedef std::vector<complex_float,
-                    boost::alignment::aligned_allocator<complex_float, 64>>
-    myVec;
+using myVec =
+    std::vector<complex_float,
+                boost::alignment::aligned_allocator<complex_float, 64>>;
 
 using namespace arma;
 
@@ -44,7 +50,7 @@ class PhyUe {
   // thread
   static const int kDequeueBulkSizeTXRX = 8;
 
-  PhyUe(Config* config);
+  explicit PhyUe(Config* config);
   ~PhyUe();
 
   void Start();
@@ -148,12 +154,11 @@ class PhyUe {
                     moodycamel::ConcurrentQueue<EventData>* in_queue,
                     moodycamel::ProducerToken const& ptok);
 
-  void InitializeVarsFromCfg(void);
+  void InitializeVarsFromCfg();
 
  private:
   Config* config_;
-  size_t symbol_perframe_;
-  size_t ul_pilot_symbol_perframe_;
+  // size_t symbol_perframe_;
   size_t dl_pilot_symbol_perframe_;
   size_t ul_data_symbol_perframe_;
   size_t dl_data_symbol_perframe_;
@@ -167,7 +172,7 @@ class PhyUe {
   size_t n_u_es_;
   size_t antenna_num_;
   size_t hdr_size_;
-  size_t n_cp_us_;
+  size_t num_cp_us_;
   size_t core_offset_;
   size_t worker_thread_num_;
   size_t rx_thread_num_;
@@ -243,7 +248,7 @@ class PhyUe {
    * Downlink
    *****************************************************/
 
-  std::unique_ptr<RadioTXRX> ru_;
+  std::unique_ptr<RadioTxRx> ru_;
 
   /**
    * Received data
@@ -357,4 +362,4 @@ class PhyUe {
   // float* equal_output;
   size_t record_frame_ = SIZE_MAX;
 };
-#endif
+#endif  // PHY_UE_H_

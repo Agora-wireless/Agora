@@ -1,5 +1,9 @@
-#ifndef RADIO_LIB
-#define RADIO_LIB
+/**
+ * @file radio_lib.h
+ * @brief Declaration file for the RadioConfig class.
+ */
+#ifndef RADIO_LIB_H_
+#define RADIO_LIB_H_
 
 #include <SoapySDR/Device.hpp>
 #include <SoapySDR/Errors.hpp>
@@ -18,7 +22,7 @@
 
 class RadioConfig {
  public:
-  RadioConfig(Config* cfg);
+  explicit RadioConfig(Config* cfg);
   bool RadioStart();
   void RadioStop();
   void ReadSensors();
@@ -76,4 +80,4 @@ class RadioConfig {
   bool calib_;
   size_t calib_meas_num_;
 };
-#endif
+#endif  // RADIO_LIB_H_

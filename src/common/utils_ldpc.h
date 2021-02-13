@@ -1,5 +1,5 @@
-#ifndef UTILS_LDPC
-#define UTILS_LDPC
+#ifndef UTILS_LDPC_H_
+#define UTILS_LDPC_H_
 
 #include <cstdlib> /* for std::aligned_alloc */
 
@@ -8,6 +8,11 @@
 #include "phy_ldpc_encoder_5gnr.h"
 #include "symbols.h"
 #include "utils.h"
+
+// Since the LDPC helper function input parameter undergoes 32byte read/write it
+// is necessary to pad the input buffers 32 bytes max (ie 32 will work for all
+// configurations)
+constexpr size_t kLdpcHelperFunctionInputBufferSizePaddingBytes = 32;
 
 LDPC_ADAPTER_P LdpcSelectAdapterFunc(uint16_t zcSize, uint8_t num_ways);
 
@@ -266,4 +271,4 @@ static inline void LdpcEncodeHelper(size_t base_graph, size_t zc, size_t nRows,
   }
 }
 
-#endif
+#endif  // UTILS_LDPC_H_

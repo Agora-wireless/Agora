@@ -1,4 +1,10 @@
+/**
+ * @file simulator.cc
+ * @brief Implementation file for the simulator class
+ */
 #include "simulator.h"
+
+#include <memory>
 
 Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
                      size_t in_core_offset, size_t sender_delay)
@@ -25,26 +31,27 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
   InitializeUplinkBuffers();
 
   std::printf("new Sender\n");
-  sender_.reset(new Sender(config_, socket_tx_thread_num_, core_offset_ + 1,
-                           sender_delay, 1u));
+  sender_ = std::make_unique<Sender>(config_, socket_tx_thread_num_,
+                                     core_offset_ + 1, sender_delay, 1u);
 
   std::printf("new Receiver\n");
-  receiver_.reset(new Receiver(config_, socket_rx_thread_num_, core_offset_,
-                               &message_queue_, rx_ptoks_ptr_));
+  receiver_ =
+      std::make_unique<Receiver>(config_, socket_rx_thread_num_, core_offset_,
+                                 &message_queue_, rx_ptoks_ptr_);
 }
 
 Simulator::~Simulator() { FreeUplinkBuffers(); }
 
 void Simulator::Stop() {
   std::cout << "stopping threads " << std::endl;
-  config_->running_ = false;
+  config_->Running(false);
   usleep(1000);
   receiver_.reset();
   sender_.reset();
 }
 
 void Simulator::Start() {
-  config_->running_ = true;
+  config_->Running(true);
   /* start receiver */
   std::vector<pthread_t> rx_threads = receiver_->StartRecv(
       socket_buffer_, socket_buffer_status_, socket_buffer_status_size_,
@@ -65,7 +72,7 @@ void Simulator::Start() {
 
   /* start transmitter */
   sender_->StartTXfromMain(frame_start_tx_, frame_end_tx_);
-  while (config_->running_ && !SignalHandler::GotExitSignal()) {
+  while (config_->Running() && !SignalHandler::GotExitSignal()) {
     /* get a bulk of events */
     ret = 0;
     ret = message_queue_.try_dequeue_bulk(ctok, events_list,
@@ -110,7 +117,7 @@ void Simulator::Start() {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = cur_directory + "/data/timeresult_simulator.txt";
   FILE* fp = fopen(filename.c_str(), "w");
-  if (fp == NULL) {
+  if (fp == nullptr) {
     std::printf("open file faild\n");
     std::cerr << "Error: " << strerror(errno) << std::endl;
     std::exit(0);
@@ -172,19 +179,19 @@ void Simulator::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
 }
 
 void Simulator::InitializeVarsFromCfg(Config* cfg) {
-  bs_ant_num_ = cfg->bs_ant_num_;
-  ue_num_ = cfg->ue_num_;
-  ofdm_ca_num_ = cfg->ofdm_ca_num_;
-  ofdm_data_num_ = cfg->ofdm_data_num_;
-  symbol_num_perframe_ = cfg->symbol_num_perframe_;
-  data_symbol_num_perframe_ = cfg->data_symbol_num_perframe_;
-  ul_data_symbol_num_perframe_ = cfg->ul_data_symbol_num_perframe_;
-  dl_data_symbol_num_perframe_ = cfg->dl_data_symbol_num_perframe_;
-  dl_data_symbol_start_ = cfg->dl_data_symbol_start_;
-  dl_data_symbol_end_ = cfg->dl_data_symbol_end_;
-  packet_length_ = cfg->packet_length_;
+  bs_ant_num_ = cfg->BsAntNum();
+  ue_num_ = cfg->UeNum();
+  ofdm_ca_num_ = cfg->OfdmCaNum();
+  ofdm_data_num_ = cfg->OfdmDataNum();
+  symbol_num_perframe_ = cfg->Frame().NumTotalSyms();
+  data_symbol_num_perframe_ = cfg->Frame().NumDataSyms();
+  ul_data_symbol_num_perframe_ = cfg->Frame().NumULSyms();
+  dl_data_symbol_num_perframe_ = cfg->Frame().NumDLSyms();
+  dl_data_symbol_start_ = cfg->Frame().GetDLSymbol(0);
+  dl_data_symbol_end_ = cfg->Frame().GetDLSymbolLast();
+  packet_length_ = cfg->PacketLength();
 
-  demul_block_size_ = cfg->demul_block_size_;
+  demul_block_size_ = cfg->DemulBlockSize();
   demul_block_num_ = ofdm_data_num_ / demul_block_size_ +
                      (ofdm_data_num_ % demul_block_size_ == 0 ? 0 : 1);
 }
@@ -210,38 +217,36 @@ void Simulator::InitializeQueues() {
 
 void Simulator::InitializeUplinkBuffers() {
   AllocBuffer1d(&task_threads_, task_thread_num_,
-                Agora_memory::Alignment_t::kK64Align, 0);
+                Agora_memory::Alignment_t::kAlign64, 0);
   AllocBuffer1d(&context_, task_thread_num_,
-                Agora_memory::Alignment_t::kK64Align, 0);
+                Agora_memory::Alignment_t::kAlign64, 0);
 
   socket_buffer_size_ = (long long)packet_length_ * symbol_num_perframe_ *
                         bs_ant_num_ * kFrameWnd;
   socket_buffer_status_size_ = symbol_num_perframe_ * bs_ant_num_ * kFrameWnd;
   socket_buffer_.Malloc(socket_rx_thread_num_, socket_buffer_size_,
-                        Agora_memory::Alignment_t::kK64Align);
+                        Agora_memory::Alignment_t::kAlign64);
   socket_buffer_status_.Calloc(socket_rx_thread_num_,
                                socket_buffer_status_size_,
-                               Agora_memory::Alignment_t::kK64Align);
+                               Agora_memory::Alignment_t::kAlign64);
 
   /* initilize all uplink status checkers */
   AllocBuffer1d(&rx_counter_packets_, kFrameWnd,
-                Agora_memory::Alignment_t::kK64Align, 1);
+                Agora_memory::Alignment_t::kAlign64, 1);
 
   frame_start_.Calloc(socket_rx_thread_num_, kNumStatsFrames,
-                      Agora_memory::Alignment_t::kK4096Align);
+                      Agora_memory::Alignment_t::kAlign4096);
   AllocBuffer1d(&frame_start_receive_, kNumStatsFrames,
-                Agora_memory::Alignment_t::kK4096Align, 1);
+                Agora_memory::Alignment_t::kAlign4096, 1);
   AllocBuffer1d(&frame_end_receive_, kNumStatsFrames,
-                Agora_memory::Alignment_t::kK4096Align, 1);
+                Agora_memory::Alignment_t::kAlign4096, 1);
   AllocBuffer1d(&frame_start_tx_, kNumStatsFrames,
-                Agora_memory::Alignment_t::kK4096Align, 1);
+                Agora_memory::Alignment_t::kAlign4096, 1);
   AllocBuffer1d(&frame_end_tx_, kNumStatsFrames,
-                Agora_memory::Alignment_t::kK4096Align, 1);
+                Agora_memory::Alignment_t::kAlign4096, 1);
 }
 
 void Simulator::FreeUplinkBuffers() {
-  // free_buffer_1d(&pilots_);
-
   socket_buffer_.Free();
   socket_buffer_status_.Free();
 

@@ -1,5 +1,9 @@
-#ifndef SENDER
-#define SENDER
+/**
+ * @file sender.h
+ * @brief Declaration file for the sender class
+ */
+#ifndef SENDER_H_
+#define SENDER_H_
 
 #include <arpa/inet.h>
 #include <emmintrin.h>
@@ -57,7 +61,7 @@ class Sender {
    */
   Sender(Config* cfg, size_t socket_thread_num, size_t core_offset = 30,
          size_t frame_duration = 1000, size_t enable_slow_start = 1,
-         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
+         const std::string& server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
          bool create_thread_for_master = false);
 
   ~Sender();
@@ -79,7 +83,7 @@ class Sender {
    * [filename] must contain data for one frame. For every symbol and antenna,
    * the file must provide (CP_LEN + OFDM_CA_NUM) IQ samples.
    */
-  void InitIqFromFile(std::string filename);
+  void InitIqFromFile(const std::string& filename);
 
   // Get number of CPU ticks for a symbol given a frame index
   uint64_t GetTicksForFrame(size_t frame_id) const;
@@ -148,4 +152,4 @@ class Sender {
 #endif
 };
 
-#endif
+#endif  // SENDER_H_
