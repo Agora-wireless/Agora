@@ -1,11 +1,11 @@
 #include "agora.h"
 
-void ReadFromFileUl(std::string filename, Table<uint8_t>& data,
+void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
                     int num_bytes_per_ue, Config* cfg) {
-  int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe_;
-  size_t ue_num = cfg->ue_num_;
+  int data_symbol_num_perframe = cfg->Frame().NumULSyms();
+  size_t ue_num = cfg->UeNum();
   FILE* fp = fopen(filename.c_str(), "rb");
-  if (fp == NULL) {
+  if (fp == nullptr) {
     std::printf("open file failed: %s\n", filename.c_str());
     std::cerr << "Error: " << strerror(errno) << std::endl;
   } else {
@@ -32,12 +32,12 @@ void ReadFromFileUl(std::string filename, Table<uint8_t>& data,
   }
 }
 
-void ReadFromFileDl(std::string filename, Table<short>& data, int ofdm_size,
-                    Config* cfg) {
-  int data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe_;
-  size_t bs_ant_num = cfg->bs_ant_num_;
+void ReadFromFileDl(const std::string& filename, Table<short>& data,
+                    int ofdm_size, Config* cfg) {
+  int data_symbol_num_perframe = cfg->Frame().NumDLSyms();
+  size_t bs_ant_num = cfg->BsAntNum();
   FILE* fp = fopen(filename.c_str(), "rb");
-  if (fp == NULL) {
+  if (fp == nullptr) {
     std::printf("open file failed: %s\n", filename.c_str());
     std::cerr << "Error: " << strerror(errno) << std::endl;
   }
@@ -51,26 +51,26 @@ void ReadFromFileDl(std::string filename, Table<short>& data, int ofdm_size,
 }
 
 void CheckCorrectnessUl(Config* cfg) {
-  int ue_num = cfg->ue_num_;
-  int data_symbol_num_perframe = cfg->ul_data_symbol_num_perframe_;
-  int ofdm_data_num = cfg->ofdm_data_num_;
-  int ul_pilot_syms = cfg->ul_pilot_syms_;
+  int ue_num = cfg->UeNum();
+  int data_symbol_num_perframe = cfg->Frame().NumULSyms();
+  int ofdm_data_num = cfg->OfdmDataNum();
+  int ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string raw_data_filename = cur_directory + "/data/LDPC_orig_ul_data_" +
-                                  std::to_string(cfg->ofdm_ca_num_) + "_ant" +
-                                  std::to_string(cfg->ue_num_) + ".bin";
+                                  std::to_string(cfg->OfdmCaNum()) + "_ant" +
+                                  std::to_string(cfg->UeNum()) + ".bin";
   std::string output_data_filename = cur_directory + "/data/decode_data.bin";
 
   Table<uint8_t> raw_data;
   Table<uint8_t> output_data;
   raw_data.Calloc(data_symbol_num_perframe, ofdm_data_num * ue_num,
-                  Agora_memory::Alignment_t::kK64Align);
+                  Agora_memory::Alignment_t::kAlign64);
   output_data.Calloc(data_symbol_num_perframe, ofdm_data_num * ue_num,
-                     Agora_memory::Alignment_t::kK64Align);
+                     Agora_memory::Alignment_t::kAlign64);
 
-  int num_bytes_per_ue = (cfg->ldpc_config_.cb_len_ + 7) >>
-                         3 * cfg->ldpc_config_.nblocks_in_symbol_;
+  int num_bytes_per_ue = (cfg->LdpcConfig().NumCbLen() + 7) >>
+                         3 * cfg->LdpcConfig().NumBlocksInSymbol();
   ReadFromFileUl(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
   ReadFromFileUl(output_data_filename, output_data, num_bytes_per_ue, cfg);
 
@@ -108,10 +108,10 @@ void CheckCorrectnessUl(Config* cfg) {
 }
 
 void CheckCorrectnessDl(Config* cfg) {
-  int bs_ant_num = cfg->bs_ant_num_;
-  int data_symbol_num_perframe = cfg->dl_data_symbol_num_perframe_;
-  int ofdm_ca_num = cfg->ofdm_ca_num_;
-  int samps_per_symbol = cfg->samps_per_symbol_;
+  int bs_ant_num = cfg->BsAntNum();
+  int data_symbol_num_perframe = cfg->Frame().NumDLSyms();
+  int ofdm_ca_num = cfg->OfdmCaNum();
+  int samps_per_symbol = cfg->SampsPerSymbol();
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string raw_data_filename = cur_directory + "/data/LDPC_dl_tx_data_" +
@@ -121,9 +121,9 @@ void CheckCorrectnessDl(Config* cfg) {
   Table<short> raw_data;
   Table<short> tx_data;
   raw_data.Calloc(data_symbol_num_perframe * bs_ant_num, samps_per_symbol * 2,
-                  Agora_memory::Alignment_t::kK64Align);
+                  Agora_memory::Alignment_t::kAlign64);
   tx_data.Calloc(data_symbol_num_perframe * bs_ant_num, samps_per_symbol * 2,
-                 Agora_memory::Alignment_t::kK64Align);
+                 Agora_memory::Alignment_t::kAlign64);
 
   ReadFromFileDl(raw_data_filename, raw_data, samps_per_symbol, cfg);
   ReadFromFileDl(tx_data_filename, tx_data, samps_per_symbol, cfg);
@@ -187,7 +187,7 @@ int main(int argc, char* argv[]) {
     agora_cli->Start();
 
     std::printf("Start correctness check\n");
-    if (cfg->downlink_mode_) {
+    if (cfg->DownlinkMode()) {
       CheckCorrectnessDl(cfg);
     } else {
       CheckCorrectnessUl(cfg);

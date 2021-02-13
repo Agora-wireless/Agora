@@ -21,7 +21,7 @@ std::atomic<size_t> num_workers_ready_atomic;
 void MasterToWorkerDynamicMaster(
     Config* cfg, moodycamel::ConcurrentQueue<EventData>& event_queue,
     moodycamel::ConcurrentQueue<EventData>& complete_task_queue) {
-  PinToCoreWithOffset(ThreadType::kMaster, cfg->core_offset_, 0);
+  PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0);
   // Wait for all worker threads to be ready
   while (num_workers_ready_atomic != kNumWorkers) {
     // Wait
@@ -30,13 +30,13 @@ void MasterToWorkerDynamicMaster(
   for (size_t bs_ant_idx = 0; bs_ant_idx < kModTestNum; bs_ant_idx++) {
     cfg->UpdateModCfgs(kModBitsNums[bs_ant_idx]);
     for (size_t i = 0; i < kMaxTestNum; i++) {
-      uint32_t frame_id = i / (cfg->demul_events_per_symbol_ *
-                               cfg->ul_data_symbol_num_perframe_) +
-                          kFrameOffsets[bs_ant_idx];
-      uint32_t symbol_id = (i / cfg->demul_events_per_symbol_) %
-                           cfg->ul_data_symbol_num_perframe_;
+      uint32_t frame_id =
+          i / (cfg->DemulEventsPerSymbol() * cfg->Frame().NumULSyms()) +
+          kFrameOffsets[bs_ant_idx];
+      uint32_t symbol_id =
+          (i / cfg->DemulEventsPerSymbol()) % cfg->Frame().NumULSyms();
       size_t base_sc_id =
-          (i % cfg->demul_events_per_symbol_) * cfg->zf_block_size_;
+          (i % cfg->DemulEventsPerSymbol()) * cfg->ZfBlockSize();
       event_queue.enqueue(
           EventData(EventType::kZF,
                     gen_tag_t::FrmSymSc(frame_id, symbol_id, base_sc_id).tag_));
@@ -64,7 +64,7 @@ void MasterToWorkerDynamicWorker(
     Table<complex_float>& equal_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
     PhyStats* phy_stats, Stats* stats) {
-  PinToCoreWithOffset(ThreadType::kWorker, cfg->core_offset_ + 1, worker_id);
+  PinToCoreWithOffset(ThreadType::kWorker, cfg->CoreOffset() + 1, worker_id);
 
   // Wait for all threads (including master) to start runnung
   num_workers_ready_atomic++;
@@ -80,7 +80,7 @@ void MasterToWorkerDynamicWorker(
   size_t num_tasks = 0;
   EventData req_event;
   size_t max_frame_id_wo_offset =
-      (kMaxTestNum - 1) / (cfg->ofdm_data_num_ / cfg->zf_block_size_);
+      (kMaxTestNum - 1) / (cfg->OfdmDataNum() / cfg->ZfBlockSize());
   for (size_t i = 0; i < kMaxItrNum; i++) {
     if (event_queue.try_dequeue(req_event)) {
       num_tasks++;
@@ -93,12 +93,12 @@ void MasterToWorkerDynamicWorker(
                  cur_frame_id - kFrameOffsets[2] <= max_frame_id_wo_offset) {
         frame_offset_id = 2;
       }
-      ASSERT_EQ(cfg->mod_order_bits_, kModBitsNums[frame_offset_id]);
+      ASSERT_EQ(cfg->ModOrderBits(), kModBitsNums[frame_offset_id]);
       EventData resp_event = compute_demul->Launch(req_event.tags_[0]);
       TryEnqueueFallback(&complete_task_queue, ptok, resp_event);
     }
   }
-  double ms = CyclesToMs(Rdtsc() - start_tsc, cfg->freq_ghz_);
+  double ms = CyclesToMs(Rdtsc() - start_tsc, cfg->FreqGhz());
 
   std::printf("Worker %zu: %zu tasks, time per task = %.4f ms\n", worker_id,
               num_tasks, ms / num_tasks);
@@ -115,38 +115,40 @@ TEST(TestDemul, VaryingConfig) {
   moodycamel::ProducerToken* ptoks[kNumWorkers];
   auto complete_task_queue =
       moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
-  for (size_t i = 0; i < kNumWorkers; i++) {
-    ptoks[i] = new moodycamel::ProducerToken(complete_task_queue);
+  for (auto& ptok : ptoks) {
+    ptok = new moodycamel::ProducerToken(complete_task_queue);
   }
 
   Table<complex_float> data_buffer;
   Table<complex_float> ue_spec_pilot_buffer;
   Table<complex_float> equal_buffer;
-  data_buffer.RandAllocCxFloat(cfg->ul_data_symbol_num_perframe_ * kFrameWnd,
+  data_buffer.RandAllocCxFloat(cfg->Frame().NumULSyms() * kFrameWnd,
                                kMaxAntennas * kMaxDataSCs,
-                               Agora_memory::Alignment_t::kK64Align);
+                               Agora_memory::Alignment_t::kAlign64);
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(kMaxAntennas *
                                                                 kMaxUEs);
-  equal_buffer.Calloc(cfg->ul_data_symbol_num_perframe_ * kFrameWnd,
+  equal_buffer.Calloc(cfg->Frame().NumULSyms() * kFrameWnd,
                       kMaxDataSCs * kMaxUEs,
-                      Agora_memory::Alignment_t::kK64Align);
-  ue_spec_pilot_buffer.Calloc(kFrameWnd, cfg->ul_pilot_syms_ * kMaxUEs,
-                              Agora_memory::Alignment_t::kK64Align);
+                      Agora_memory::Alignment_t::kAlign64);
+  ue_spec_pilot_buffer.Calloc(kFrameWnd,
+                              cfg->Frame().ClientUlPilotSymbols() * kMaxUEs,
+                              Agora_memory::Alignment_t::kAlign64);
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers(
-      kFrameWnd, cfg->symbol_num_perframe_, cfg->ue_num_,
-      kMaxModType * cfg->ofdm_data_num_);
+      kFrameWnd, cfg->Frame().NumTotalSyms(), cfg->UeNum(),
+      kMaxModType * cfg->OfdmDataNum());
   std::printf(
       "Size of [data_buffer, ul_zf_matrices, equal_buffer, "
       "ue_spec_pilot_buffer, demod_soft_buffer]: [%.1f %.1f %.1f %.1f %.1f] "
       "MB\n",
-      cfg->ul_data_symbol_num_perframe_ * kFrameWnd * kMaxAntennas *
-          kMaxDataSCs * 4 * 1.0f / 1024 / 1024,
+      cfg->Frame().NumULSyms() * kFrameWnd * kMaxAntennas * kMaxDataSCs * 4 *
+          1.0f / 1024 / 1024,
       kMaxDataSCs * kFrameWnd * kMaxUEs * kMaxAntennas * 4 * 1.0f / 1024 / 1024,
-      cfg->ul_data_symbol_num_perframe_ * kFrameWnd * kMaxDataSCs * kMaxUEs *
-          4 * 1.0f / 1024 / 1024,
-      kFrameWnd * cfg->ul_pilot_syms_ * kMaxUEs * 4 * 1.0f / 1024 / 1024,
-      cfg->ul_data_symbol_num_perframe_ * kFrameWnd * kMaxModType *
-          kMaxDataSCs * kMaxUEs * 1.0f / 1024 / 1024);
+      cfg->Frame().NumULSyms() * kFrameWnd * kMaxDataSCs * kMaxUEs * 4 * 1.0f /
+          1024 / 1024,
+      kFrameWnd * cfg->Frame().ClientUlPilotSymbols() * kMaxUEs * 4 * 1.0f /
+          1024 / 1024,
+      cfg->Frame().NumULSyms() * kFrameWnd * kMaxModType * kMaxDataSCs *
+          kMaxUEs * 1.0f / 1024 / 1024);
 
   auto* stats = new Stats(cfg);
   auto* phy_stats = new PhyStats(cfg);

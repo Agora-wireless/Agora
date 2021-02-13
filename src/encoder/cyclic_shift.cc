@@ -1,9 +1,8 @@
 /**
- * @file cyclic_shift.cpp
+ * @file cyclic_shift.cc
  * @brief Cyclic right bit shift. The shift values are defined by the 5gnr
  * ldpc standard in TS38212 5.3.2
  */
-
 #include "cyclic_shift.h"
 
 #include <cstring> /* std::strerror, std::memset, std::memcpy */

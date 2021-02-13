@@ -7,11 +7,11 @@
  * @author Rahman Doost-Mohamamdy: doost@rice.edu
  */
 
-#ifndef UTILS_HEADER
-#define UTILS_HEADER
+#ifndef UTILS_H_
+#define UTILS_H_
 
 #define UNUSED __attribute__((unused))
-#define _unused(x) ((void)(x))
+#define unused(x) ((void)(x))
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
@@ -71,8 +71,8 @@ void* PthreadFunWrapper(void* context) {
 template <class C, void (C::*run_thread)(int)>
 void PthreadFunWrapper(void* context) {
   EventHandlerContext<C>* eh_context = (EventHandlerContext<C>*)context;
-  C* obj = reinterpret_cast<C*>(eh_context->obj_ptr);
-  int id = eh_context->id;
+  C* obj = reinterpret_cast<C*>(eh_context->obj_ptr_);
+  int id = eh_context->id_;
   delete eh_context;
   return (obj->*run_thread)(id);
 }
@@ -90,9 +90,10 @@ class Utils {
   static std::vector<std::complex<float>> Uint32tocfloat(
       std::vector<uint32_t> in, const std::string& order);
   static std::vector<uint32_t> Cint16ToUint32(
-      std::vector<std::complex<int16_t>> in, bool conj, std::string order);
+      std::vector<std::complex<int16_t>> in, bool conj,
+      const std::string& order);
   static std::vector<uint32_t> Cfloat32ToUint32(
-      std::vector<std::complex<float>> in, bool conj, std::string order);
+      std::vector<std::complex<float>> in, bool conj, const std::string& order);
   static std::vector<std::vector<size_t>> LoadSymbols(
       std::vector<std::string> frames, char sym);
   static void LoadDevices(std::string filename, std::vector<std::string>& data);
@@ -100,13 +101,13 @@ class Utils {
                        std::vector<std::complex<int16_t>>& data, int samples);
   static void LoadData(const char* filename, std::vector<unsigned>& data,
                        int samples);
-  static void LoadTddConfig(const std::string filename, std::string& jconfig);
+  static void LoadTddConfig(const std::string& filename, std::string& jconfig);
   static std::vector<std::string> Split(const std::string& s, char delimiter);
   static void PrintVector(std::vector<std::complex<int16_t>>& data);
-  static void WriteBinaryFile(std::string name, size_t elem_size,
+  static void WriteBinaryFile(const std::string& name, size_t elem_size,
                               size_t buffer_size, void* buff);
-  static void PrintVec(arma::cx_fvec /*c*/, std::string /*ss*/);
-  static void PrintMat(arma::cx_fmat /*c*/, std::string /*ss*/);
+  static void PrintVec(arma::cx_fvec /*c*/, const std::string& /*ss*/);
+  static void PrintMat(arma::cx_fmat /*c*/, const std::string& /*ss*/);
 };
 
 /// roundup<N>(x) returns x rounded up to the next multiple of N. N must be
@@ -137,14 +138,15 @@ static inline void RtAssert(bool condition) {
 }
 
 /// Check a condition at runtime. If the condition is false, throw exception.
-static inline void RtAssert(bool condition, std::string throw_str) {
+static inline void RtAssert(bool condition, const std::string& throw_str) {
   if (unlikely(!condition)) {
     throw std::runtime_error(throw_str);
   }
 }
 
 /// Check a condition at runtime. If the condition is false, throw exception.
-static inline void RtAssert(bool condition, std::string throw_str, char* s) {
+static inline void RtAssert(bool condition, const std::string& throw_str,
+                            char* s) {
   if (unlikely(!condition)) {
     throw std::runtime_error(throw_str + std::string(s));
   }
@@ -210,4 +212,4 @@ class FastRand {
     return static_cast<uint32_t>(seed_ >> 32);
   }
 };
-#endif
+#endif  // UTILS_H_

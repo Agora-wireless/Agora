@@ -1,4 +1,9 @@
-#pragma once
+/**
+ * @file mac_thread.h
+ * @brief Declaration file for the MacThread class
+ */
+#ifndef MAC_THREAD_H_
+#define MAC_THREAD_H_
 
 #include <queue>
 
@@ -64,7 +69,7 @@ class MacThread {
             Table<uint8_t>* dl_bits_buffer_status,
             moodycamel::ConcurrentQueue<EventData>* rx_queue,
             moodycamel::ConcurrentQueue<EventData>* tx_queue,
-            std::string log_filename = "");
+            const std::string& log_filename = "");
 
   ~MacThread();
 
@@ -188,3 +193,5 @@ class MacThread {
   // CRC
   DoCRC* crc_obj_;
 };
+
+#endif  // MAC_THREAD_H_

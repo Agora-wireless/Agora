@@ -1,5 +1,10 @@
-#ifndef STATS
-#define STATS
+/**
+ * @file stats.h
+ * @brief Declaration file for the Stats class. Includes definations for
+ * DurationStat and FrameSummery types.
+ */
+#ifndef STATS_H_
+#define STATS_H_
 
 #include <iostream>
 
@@ -51,8 +56,8 @@ static constexpr size_t kNumTimestampTypes =
 
 class Stats {
  public:
-  Stats(Config* cfg);
-  ~Stats();
+  explicit Stats(Config* cfg);
+  ~Stats() = default;
 
   /// If worker stats collection is enabled, combine and update per-worker
   /// stats for all uplink Doer types. Else return immediately.
@@ -265,4 +270,4 @@ class Stats {
   double decode_breakdown_us_[kMaxStatBreakdown][kNumStatsFrames];
 };
 
-#endif
+#endif  // STATS_H_

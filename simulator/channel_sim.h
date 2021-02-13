@@ -1,5 +1,9 @@
-#ifndef SIMULATOR_HEADER
-#define SIMULATOR_HEADER
+/**
+ * @file channel_sim.h
+ * @brief Declaration file for the channel simulator class
+ */
+#ifndef CHANNEL_SIM_H_
+#define CHANNEL_SIM_H_
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -114,13 +118,13 @@ class ChannelSim {
   size_t bs_tx_counter_[kFrameWnd];
   size_t user_tx_counter_[kFrameWnd];
 
-  inline size_t GetDlSymbolIdx(size_t frame_id, size_t symbol_id) const {
+  inline size_t GetDlSymbolIdx(size_t /*frame_id*/, size_t symbol_id) const {
     if (symbol_id == 0) {
       return 0;
     } else {
-      return bscfg_->GetDlSymbolIdx(frame_id, symbol_id) + 1;
+      return bscfg_->Frame().GetDLSymbolIdx(symbol_id) + 1;
     }
   }
 };
 
-#endif
+#endif  // CHANNEL_SIM_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SHARED_COUNTERS_INC_
+#define SHARED_COUNTERS_INC_
 
 #include <mutex>
 #include <sstream>
@@ -14,11 +15,11 @@
 class RxStatus {
  public:
   RxStatus(Config* cfg)
-      : num_pilot_pkts_per_frame_(cfg->pilot_symbol_num_perframe *
-                                  cfg->BS_ANT_NUM),
-        num_pilot_symbols_per_frame_(cfg->pilot_symbol_num_perframe),
-        num_data_symbol_per_frame_(cfg->data_symbol_num_perframe),
-        num_pkts_per_symbol_(cfg->BS_ANT_NUM),
+      : num_pilot_pkts_per_frame_(cfg->Frame().NumPilotSyms() *
+                                  cfg->BsAntNum()),
+        num_pilot_symbols_per_frame_(cfg->Frame().NumPilotSyms()),
+        num_data_symbol_per_frame_(cfg->Frame().NumDataSyms()),
+        num_pkts_per_symbol_(cfg->BsAntNum()),
         num_decode_tasks_per_frame_(cfg->get_num_ues_to_process()) {}
 
   // When receive a new packet, record it here
@@ -142,7 +143,7 @@ class DemulStatus {
  public:
   DemulStatus(Config* cfg)
       : num_demul_tasks_required_(cfg->get_num_sc_per_server() /
-                                  cfg->demul_block_size) {
+                                  cfg->DemulBlockSize()) {
     for (size_t i = 0; i < kFrameWnd; i++) {
       for (size_t j = 0; j < kMaxSymbols; j++) {
         num_demul_tasks_completed_[i][j] = 0;
@@ -234,3 +235,5 @@ class DecodeStatus {
   std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>*
       num_demod_data_received_;
 };
+
+#endif  // SHARED_COUNTERS_INC_

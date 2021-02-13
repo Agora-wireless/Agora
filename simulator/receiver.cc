@@ -1,3 +1,7 @@
+/**
+ * @file receiver.cc
+ * @brief Implementation file for the receiver class
+ */
 #include "receiver.h"
 
 Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset)
@@ -32,7 +36,7 @@ std::vector<pthread_t> Receiver::StartRecv(Table<char>& in_buffer,
     auto* context = new EventHandlerContext<Receiver>;
     context->obj_ptr_ = this;
     context->id_ = i;
-    if (pthread_create(&recv_thread, NULL,
+    if (pthread_create(&recv_thread, nullptr,
                        PthreadFunWrapper<Receiver, &Receiver::LoopRecv>,
                        context) != 0) {
       perror("Socket recv thread create failed");
@@ -50,9 +54,9 @@ void* Receiver::LoopRecv(int tid) {
   int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
   struct sockaddr_in remote_addr;
   int socket_local =
-      SetupSocketIpv4(cfg_->bs_rru_port_ + tid, true, sock_buf_size);
-  SetupSockaddrRemoteIpv4(&remote_addr, cfg_->bs_server_port_ + tid,
-                          cfg_->bs_server_addr_.c_str());
+      SetupSocketIpv4(cfg_->BsRruPort() + tid, true, sock_buf_size);
+  SetupSockaddrRemoteIpv4(&remote_addr, cfg_->BsServerPort() + tid,
+                          cfg_->BsServerAddr().c_str());
 
   /* use token to speed up */
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
@@ -86,7 +90,7 @@ void* Receiver::LoopRecv(int tid) {
     // if ((recvlen = recv(socket_local, (char*)cur_buffer_ptr,
     // packet_length, 0))<0) {
     if ((recvlen =
-             recvfrom(socket_local, (char*)cur_buffer_ptr, cfg_->packet_length_,
+             recvfrom(socket_local, (char*)cur_buffer_ptr, cfg_->PacketLength(),
                       0, (struct sockaddr*)&remote_addr, &addrlen)) < 0) {
       perror("recv failed");
       std::exit(0);
@@ -113,7 +117,7 @@ void* Receiver::LoopRecv(int tid) {
     cur_buffer_status_ptr = buffer_status_ptr + (offset + 1) % buffer_frame_num;
     cur_buffer_ptr =
         buffer_ptr +
-        (cur_buffer_ptr - buffer_ptr + cfg_->packet_length_) % buffer_length;
+        (cur_buffer_ptr - buffer_ptr + cfg_->PacketLength()) % buffer_length;
 
     /* Push packet received event into the queue */
     EventData packet_message(EventType::kPacketRX, rx_tag_t(tid, offset).tag_);
