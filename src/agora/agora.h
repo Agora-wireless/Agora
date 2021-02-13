@@ -1,5 +1,10 @@
-#ifndef AGORA_HEAD
-#define AGORA_HEAD
+/**
+ * @file agora.h
+ * @brief Declaration file for the main agora class
+ */
+
+#ifndef AGORA_H_
+#define AGORA_H_
 
 #include <pthread.h>
 #include <unistd.h>
@@ -36,7 +41,7 @@ class Agora {
 
   static const int kMaxWorkerNum = 50;  // Max number of worker threads allowed
 
-  Agora(
+  explicit Agora(
       Config* /*cfg*/);  /// Create an Agora object and start the worker threads
   ~Agora();
 
@@ -288,4 +293,4 @@ class Agora {
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
 };
 
-#endif
+#endif  // AGORA_H_

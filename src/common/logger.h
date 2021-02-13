@@ -1,5 +1,3 @@
-#pragma once
-
 /***************************************************************************
  *   Copyright (C) 2008 by H-Store Project                                 *
  *   Brown University                                                      *
@@ -14,10 +12,13 @@
  ***************************************************************************/
 
 /**
- * @file logger.h
+ * @file logger.inc
  * @brief Logging macros that can be optimized out by the compiler
  * @author Hideaki, modified by Anuj
  */
+
+#ifndef LOGGER_INC_
+#define LOGGER_INC_
 
 #include <ctime>
 #include <string>
@@ -50,7 +51,7 @@
 #define MLPD_ERROR(...)                                               \
   MlpdOutputLogHeader(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_ERROR); \
   std::fprintf(MLPD_LOG_DEFAULT_STREAM, __VA_ARGS__);                 \
-  fflush(MLPD_LOG_DEFAULT_STREAM)
+  std::fflush(MLPD_LOG_DEFAULT_STREAM)
 #else
 #define MLPD_ERROR(...) ((void)0)
 #endif
@@ -59,7 +60,7 @@
 #define MLPD_WARN(...)                                               \
   MlpdOutputLogHeader(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_WARN); \
   std::fprintf(MLPD_LOG_DEFAULT_STREAM, __VA_ARGS__);                \
-  fflush(MLPD_LOG_DEFAULT_STREAM)
+  std::fflush(MLPD_LOG_DEFAULT_STREAM)
 #else
 #define MLPD_WARN(...) ((void)0)
 #endif
@@ -68,7 +69,7 @@
 #define MLPD_INFO(...)                                               \
   MlpdOutputLogHeader(MLPD_LOG_DEFAULT_STREAM, MLPD_LOG_LEVEL_INFO); \
   std::fprintf(MLPD_LOG_DEFAULT_STREAM, __VA_ARGS__);                \
-  fflush(MLPD_LOG_DEFAULT_STREAM)
+  std::fflush(MLPD_LOG_DEFAULT_STREAM)
 #else
 #define MLPD_INFO(...) ((void)0)
 #endif
@@ -78,7 +79,7 @@
   MlpdOutputLogHeader(mlpd_trace_file_or_default_stream,        \
                       MLPD_LOG_LEVEL_FRAME);                    \
   std::fprintf(mlpd_trace_file_or_default_stream, __VA_ARGS__); \
-  fflush(mlpd_trace_file_or_default_stream)
+  std::fflush(mlpd_trace_file_or_default_stream)
 #else
 #define MLPD_FRAME(...) ((void)0)
 #endif
@@ -88,7 +89,7 @@
   MlpdOutputLogHeader(mlpd_trace_file_or_default_stream,        \
                       MLPD_LOG_LEVEL_SYMBOL);                   \
   std::fprintf(mlpd_trace_file_or_default_stream, __VA_ARGS__); \
-  fflush(mlpd_trace_file_or_default_stream)
+  std::fflush(mlpd_trace_file_or_default_stream)
 #else
 #define MLPD_SYMBOL(...) ((void)0)
 #endif
@@ -98,7 +99,7 @@
   MlpdOutputLogHeader(mlpd_trace_file_or_default_stream,        \
                       MLPD_LOG_LEVEL_TRACE);                    \
   std::fprintf(mlpd_trace_file_or_default_stream, __VA_ARGS__); \
-  fflush(mlpd_trace_file_or_default_stream)
+  std::fflush(mlpd_trace_file_or_default_stream)
 #else
 #define MLPD_TRACE(...) ((void)0)
 #endif
@@ -151,3 +152,5 @@ static inline void MlpdOutputLogHeader(FILE* stream, int level) {
 static inline bool IsLogLevelReasonable() {
   return MLPD_LOG_LEVEL <= MLPD_LOG_LEVEL_INFO;
 }
+
+#endif  // LOGGER_INC_

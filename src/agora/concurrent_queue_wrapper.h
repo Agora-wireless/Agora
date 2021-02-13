@@ -1,5 +1,10 @@
-#ifndef CONCURRENT_QUEUE_WRAPPER
-#define CONCURRENT_QUEUE_WRAPPER
+/**
+ * @file concurrent_queue_wrapper.inc
+ * @brief Wrapper class for the moodycamel concurrent queue
+ */
+
+#ifndef CONCURRENT_QUEUE_WRAPPER_H_
+#define CONCURRENT_QUEUE_WRAPPER_H_
 
 #include "buffer.h"
 #include "concurrentqueue.h"
@@ -40,4 +45,4 @@ static inline void TryEnqueueBulkFallback(
   }
 }
 
-#endif /* CONCURRENT_QUEUE_WRAPPER */
+#endif  // CONCURRENT_QUEUE_WRAPPER_H_

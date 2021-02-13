@@ -1,10 +1,14 @@
+/**
+ * @file encoder_test.cc
+ * @brief Test functions for the ldpc encoding routines
+ */
 #include "encoder.h"
 
 #include <algorithm>
 #include <fstream>
 #include <vector>
 
-#include "../common/utils_ldpc.hpp"
+#include "../common/utils_ldpc.h"
 #include "gcc_phy_ldpc_encoder_5gnr_internal.h"
 
 static constexpr size_t kNumCodeBlocks = 1;

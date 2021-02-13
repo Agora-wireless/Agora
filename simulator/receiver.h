@@ -1,5 +1,9 @@
-#ifndef RECEIVER
-#define RECEIVER
+/**
+ * @file receiver.h
+ * @brief Declaration file for the receiver class
+ */
+#ifndef RECEIVER_H_
+#define RECEIVER_H_
 
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -26,10 +30,11 @@
 #include "net.h"
 #include "symbols.h"
 
-typedef unsigned short ushort;
+using ushort = unsigned short;
 class Receiver {
  public:
-  Receiver(Config* cfg, size_t rx_thread_num = 1, size_t core_offset = 1);
+  explicit Receiver(Config* cfg, size_t rx_thread_num = 1,
+                    size_t core_offset = 1);
 
   /**
    * rx_thread_num: RX thread number
@@ -86,4 +91,4 @@ class Receiver {
   // int radios_per_thread;
 };
 
-#endif
+#endif  // RECEIVER_H_

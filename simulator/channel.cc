@@ -1,4 +1,10 @@
+/**
+ * @file channel.h
+ * @brief Implementation file for the channel class
+ */
 #include "channel.h"
+
+#include <utility>
 
 static constexpr bool kPrintChannelOutput = false;
 using namespace arma;
@@ -7,11 +13,11 @@ Channel::Channel(Config* config_bs, Config* config_ue,
                  std::string in_channel_type, double in_channel_snr)
     : bscfg_(config_bs),
       uecfg_(config_ue),
-      sim_chan_model_(in_channel_type),
+      sim_chan_model_(std::move(in_channel_type)),
       channel_snr_db_(in_channel_snr) {
-  bs_ant_ = bscfg_->bs_ant_num_;
-  ue_ant_ = uecfg_->ue_ant_num_;
-  n_samps_ = bscfg_->samps_per_symbol_;
+  bs_ant_ = bscfg_->BsAntNum();
+  ue_ant_ = uecfg_->UeAntNum();
+  n_samps_ = bscfg_->SampsPerSymbol();
 
   if (sim_chan_model_ == "AWGN") {
     chan_model_ = kAwgn;
@@ -26,7 +32,7 @@ Channel::Channel(Config* config_bs, Config* config_ue,
   }
 }
 
-Channel::~Channel() {}
+Channel::~Channel() = default;
 
 void Channel::ApplyChan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
                         const bool is_downlink, const bool is_newChan) {
@@ -58,7 +64,7 @@ void Channel::ApplyChan(const cx_fmat& fmat_src, cx_fmat& fmat_dst,
     }
   }
   if (is_downlink) {
-    fmat_h = fmat_src * h_.st() / std::sqrt(bscfg_->bs_ant_num_);
+    fmat_h = fmat_src * h_.st() / std::sqrt(bscfg_->BsAntNum());
   } else {
     fmat_h = fmat_src * h_;
   }
@@ -108,8 +114,8 @@ void Channel::Awgn(const cx_fmat& src, cx_fmat& dst) const {
 
 void Channel::Lte3gpp(const cx_fmat& fmat_src, cx_fmat& fmat_dst) {
   // TODO - In progress (Use Rayleigh for now...)
-  cx_fmat h(randn<fmat>(uecfg_->ue_ant_num_, bscfg_->bs_ant_num_),
-            randn<fmat>(uecfg_->ue_ant_num_, bscfg_->bs_ant_num_));
+  cx_fmat h(randn<fmat>(uecfg_->UeAntNum(), bscfg_->BsAntNum()),
+            randn<fmat>(uecfg_->UeAntNum(), bscfg_->BsAntNum()));
   h = (1 / sqrt(2)) * h;
   fmat_dst = fmat_src * h;
 }
