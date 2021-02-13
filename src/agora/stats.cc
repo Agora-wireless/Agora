@@ -1,21 +1,23 @@
+/**
+ * @file stats.cc
+ * @brief Implmentation file for the Stats class.
+ */
 #include "stats.h"
 
 #include <typeinfo>
 
 Stats::Stats(Config* cfg)
     : config_(cfg),
-      task_thread_num_(cfg->worker_thread_num_),
-      fft_thread_num_(cfg->fft_thread_num_),
-      zf_thread_num_(cfg->zf_thread_num_),
-      demul_thread_num_(cfg->demul_thread_num_),
-      decode_thread_num_(cfg->decode_thread_num_),
-      freq_ghz_(cfg->freq_ghz_),
+      task_thread_num_(cfg->WorkerThreadNum()),
+      fft_thread_num_(cfg->FftThreadNum()),
+      zf_thread_num_(cfg->ZfThreadNum()),
+      demul_thread_num_(cfg->DemulThreadNum()),
+      decode_thread_num_(cfg->DecodeThreadNum()),
+      freq_ghz_(cfg->FreqGhz()),
       creation_tsc_(Rdtsc()) {
-  frame_start_.Calloc(config_->socket_thread_num_, kNumStatsFrames,
-                      Agora_memory::Alignment_t::kK64Align);
+  frame_start_.Calloc(config_->SocketThreadNum(), kNumStatsFrames,
+                      Agora_memory::Alignment_t::kAlign64);
 }
-
-Stats::~Stats() {}
 
 void Stats::PopulateSummary(FrameSummary* frame_summary, size_t thread_id,
                             DoerType doer_type) {
@@ -71,7 +73,7 @@ void Stats::UpdateStatsInFunctionsUplink(size_t frame_id) {
   FrameSummary demul_frame_summary;
   FrameSummary decode_frame_summary;
 
-  if (config_->bigstation_mode_) {
+  if (config_->BigstationMode()) {
     UpdateStatsInFunctionsUplinkBigstation(
         frame_slot, &fft_frame_summary, &csi_frame_summary, &zf_frame_summary,
         &demul_frame_summary, &decode_frame_summary);
@@ -125,7 +127,7 @@ void Stats::UpdateStatsInFunctionsDownlink(size_t frame_id) {
   FrameSummary precode_frame_summary;
   FrameSummary encode_frame_summary;
 
-  if (config_->bigstation_mode_) {
+  if (config_->BigstationMode()) {
     UpdateStatsInFunctionsDownlinkBigstation(
         frame_slot, &ifft_frame_summary, &csi_frame_summary, &zf_frame_summary,
         &precode_frame_summary, &encode_frame_summary);
@@ -417,7 +419,7 @@ void Stats::SaveToFile() {
   RtAssert(fp_debug != nullptr,
            std::string("Open file failed ") + std::to_string(errno));
 
-  if (config_->downlink_mode_) {
+  if (config_->DownlinkMode()) {
     std::fprintf(fp_debug,
                  "Pilot RX by socket threads (= reference time), "
                  "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
@@ -425,7 +427,7 @@ void Stats::SaveToFile() {
 
     for (size_t i = 0; i < last_frame_id_; i++) {
       size_t ref_tsc = SIZE_MAX;
-      for (size_t j = 0; j < config_->socket_thread_num_; j++) {
+      for (size_t j = 0; j < config_->SocketThreadNum(); j++) {
         ref_tsc = std::min(ref_tsc, frame_start_[j][i]);
       }
       std::fprintf(fp_debug,
@@ -451,7 +453,7 @@ void Stats::SaveToFile() {
         "FFT, time in ZF, time in Demul, time in Decode\n");
     for (size_t i = 0; i < last_frame_id_; i++) {
       size_t ref_tsc = SIZE_MAX;
-      for (size_t j = 0; j < config_->socket_thread_num_; j++) {
+      for (size_t j = 0; j < config_->SocketThreadNum(); j++) {
         ref_tsc = std::min(ref_tsc, frame_start_[j][i]);
       }
 
@@ -535,17 +537,17 @@ void Stats::PrintSummary() {
   size_t num_precode_tasks =
       GetTotalTaskCount(DoerType::kPrecode, task_thread_num_);
   double csi_frames =
-      (double)num_csi_tasks / c->bs_ant_num_ / c->pilot_symbol_num_perframe_;
-  double zf_frames = (double)num_zf_tasks / c->zf_events_per_symbol_;
+      (double)num_csi_tasks / c->BsAntNum() / c->Frame().NumPilotSyms();
+  double zf_frames = (double)num_zf_tasks / c->ZfEventsPerSymbol();
 
-  if (c->downlink_mode_) {
-    double precode_frames = (double)num_precode_tasks / c->ofdm_data_num_ /
-                            c->dl_data_symbol_num_perframe_;
-    double ifft_frames = (double)num_ifft_tasks / c->bs_ant_num_ /
-                         c->dl_data_symbol_num_perframe_;
+  if (c->DownlinkMode()) {
+    double precode_frames =
+        (double)num_precode_tasks / c->OfdmDataNum() / c->Frame().NumDLSyms();
+    double ifft_frames =
+        (double)num_ifft_tasks / c->BsAntNum() / c->Frame().NumDLSyms();
     double encode_frames = (double)num_encode_tasks /
-                           c->ldpc_config_.nblocks_in_symbol_ / c->ue_num_ /
-                           c->dl_data_symbol_num_perframe_;
+                           c->LdpcConfig().NumBlocksInSymbol() / c->UeNum() /
+                           c->Frame().NumDLSyms();
     std::printf("Downlink totals (tasks, frames): ");
     std::printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
     std::printf("ZF (%zu, %.2f), ", num_zf_tasks, zf_frames);
@@ -575,13 +577,13 @@ void Stats::PrintSummary() {
       std::printf("\n");
     }
   } else {
-    double fft_frames = (double)num_fft_tasks / c->bs_ant_num_ /
-                        c->ul_data_symbol_num_perframe_;
-    double demul_frames = (double)num_demul_tasks / c->ofdm_data_num_ /
-                          c->ul_data_symbol_num_perframe_;
+    double fft_frames =
+        (double)num_fft_tasks / c->BsAntNum() / c->Frame().NumULSyms();
+    double demul_frames =
+        (double)num_demul_tasks / c->OfdmDataNum() / c->Frame().NumULSyms();
     double decode_frames = (double)num_decode_tasks /
-                           c->ldpc_config_.nblocks_in_symbol_ / c->ue_num_ /
-                           c->ul_data_symbol_num_perframe_;
+                           c->LdpcConfig().NumBlocksInSymbol() / c->UeNum() /
+                           c->Frame().NumULSyms();
     std::printf("Uplink totals (tasks, frames): ");
     std::printf("CSI (%zu, %.2f), ", num_csi_tasks, csi_frames);
     std::printf("ZF (%zu, %.2f), ", num_zf_tasks, zf_frames);

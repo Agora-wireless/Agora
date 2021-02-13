@@ -1,5 +1,5 @@
 /**
- * @file test_ldpc.cpp
+ * @file test_ldpc.cc
  *
  * @brief Accuracy and performance test for LDPC. The encoder is Agora's
  * avx2enc - unlike FlexRAN's encoder, avx2enc works with AVX2 (i.e., unlike
@@ -62,10 +62,10 @@ int main() {
     }
 
     // Randomly generate input
-    srand(time(NULL));
-    for (size_t n = 0; n < kNumCodeBlocks; n++) {
+    srand(time(nullptr));
+    for (auto& n : input) {
       for (size_t i = 0; i < BitsToBytes(num_input_bits); i++) {
-        input[n][i] = (int8_t)rand();
+        n[i] = (int8_t)rand();
       }
     }
 
@@ -82,7 +82,7 @@ int main() {
     int8_t* llrs[kNumCodeBlocks];
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
       llrs[n] = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kK32Align, num_encoded_bits));
+          Agora_memory::Alignment_t::kAlign32, num_encoded_bits));
       for (size_t i = 0; i < num_encoded_bits; i++) {
         uint8_t bit_i = (encoded[n][i / 8] >> (i % 8)) & 1;
         llrs[n][i] = (bit_i == 1 ? -127 : 127);
@@ -103,9 +103,9 @@ int main() {
     const size_t buffer_len = 1024 * 1024;
     const size_t num_msg_bits = num_input_bits - kNumFillerBits;
     ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
-    ldpc_decoder_5gnr_response.varNodes = static_cast<int16_t*>(
-        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kK32Align,
-                                         buffer_len * sizeof(int16_t)));
+    ldpc_decoder_5gnr_response.varNodes =
+        static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
+            Agora_memory::Alignment_t::kAlign32, buffer_len * sizeof(int16_t)));
 
     // Decoding
     const size_t decoding_start_tsc = Rdtsc();

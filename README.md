@@ -1,4 +1,4 @@
-[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Fpr-google-format)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/pr-google-format/)
+[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Fpr-tidy-checks)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/pr-tidy-checks/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
@@ -18,13 +18,13 @@ Some highlights:
    * [Running performance test](#running-performance-test)
  * [Contributing to Agora](#contributing-to-agora)
  * [Acknowledgment](#acknowledgment)
- * [Dodumentation](#documentation)
+ * [Documentation](#documentation)
  * [Contact](#contact)
  
  
 # Building Agora
-  Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04 and 18.04. 
-  Agora requires CMake 2.8+ and works with both GNU and Intel compilers with C++11 support. 
+  Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04, 18.04, and 20.04. 
+  Agora requires CMake 2.8+ and works with both GNU and Intel compilers with C++17 support. 
 ## Setting up the build environment
   * Setup CI: run `./config_ci.sh`
      * Note for developers: You must run this command before checking out your new feature brach. Do not use `_` in your branch name. Use `-` instead.  
@@ -77,7 +77,7 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
     make -j
     ```
 
- * Run end-to-end test to check correctness (uplink and downlik tests should both pass if everything is set up correctly).
+ * Run end-to-end test to check correctness (uplink, downlink and combined tests should all pass if everything is set up correctly).
     ```
     ./test/test_agora/test_agora.sh 10 out % Runs test for 10 iterations
     ```
@@ -91,9 +91,7 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
      files.
    * In one terminal, run `./build/agora data/tddconfig-sim-ul.json` to
      start Agora with uplink configuration.
-   * In another terminal, run  `./build/sender --num_threads=2 --core_offset=0
-     --frame_duration=5000 --enable_slow_start=1 
-     --conf_file=data/tddconfig-sim-ul.json` to start the emulated RRU 
+   * In another terminal, run  `./build/sender --num_threads=2 --core_offset=1 --frame_duration=5000 --enable_slow_start=1 --conf_file=data/tddconfig-sim-ul.json` to start the emulated RRU 
      with uplink configuration.
    * The above steps use Linux networking stack for packet I/O. Agora also supports using DPDK
    to bypass the kernel for packet I/O. To enable DPDK, run `cmake -DUSE_DPDK=1 ..; make -j` to 
@@ -106,13 +104,11 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
 
  * Run Agora with channel simulator and clients
    * First, return to the base directory (`cd ..`), then run
-     `./build/data_generator --conf_file data/bs-ul-sim.json` to generate data files.
-   * In one terminal, run `./build/user data/ue-ul-sim.json` to start clients with
+     `./build/data_generator --conf_file data/bs-sim.json` to generate data files.
+   * In one terminal, run `./build/user data/ue-sim.json` to start clients with
      uplink configuration.
-   * In another terminal, run  `./build/chsim --bs_threads 1 --ue_threads 1
-     --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-ul-sim.json
-     --ue_conf_file data/ue-ul-sim.json`
-   * In another terminal, run `./build/agora data/bs-ul-sim.json` to start
+   * In another terminal, run  `./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim.json --ue_conf_file data/ue-sim.json`
+   * In another terminal, run `./build/agora data/bs-sim.json` to start
      Agora with uplink configuration.
    * Note: make sure Agora and sender are using different set of cores,
      otherwise there will be performance slow down.

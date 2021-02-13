@@ -1,5 +1,5 @@
 /*
- * @file crc.hpp
+ * @file crc.h
  * @brief Cyclic Redundancy Check (CRC)
  *
  * NOTE:
@@ -10,8 +10,8 @@
  * https://spdx.org/licenses/BSD-2-Clause.html
  */
 
-#ifndef CRC_H
-#define CRC_H
+#ifndef CRC_H_
+#define CRC_H_
 
 #include <unistd.h>
 
@@ -113,4 +113,4 @@ class DoCRC {
   bool CheckCrc24(unsigned char* data, int len, uint32_t ref_crc);
 };
 
-#endif
+#endif  // CRC_H_

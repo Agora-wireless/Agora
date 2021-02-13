@@ -1,5 +1,9 @@
-#ifndef DODEMUL
-#define DODEMUL
+/**
+ * @file dodemul.h
+ * @brief Declaration file for the DoDemul class.
+ */
+#ifndef DODEMUL_H_
+#define DODEMUL_H_
 
 #include <armadillo>
 #include <iostream>
@@ -15,7 +19,6 @@
 #include "stats.h"
 #include "symbols.h"
 
-using namespace arma;
 class DoDemul : public Doer {
  public:
   DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
@@ -24,7 +27,7 @@ class DoDemul : public Doer {
           Table<complex_float>& equal_buffer,
           PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
           PhyStats* in_phy_stats, Stats* in_stats_manager);
-  ~DoDemul();
+  ~DoDemul() override;
 
   /**
    * Do demodulation task for a block of subcarriers (demul_block_size)
@@ -52,7 +55,7 @@ class DoDemul : public Doer {
    *     4. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  EventData Launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
  private:
   Table<complex_float>& data_buffer_;
@@ -79,4 +82,4 @@ class DoDemul : public Doer {
 #endif
 };
 
-#endif
+#endif  // DODEMUL_H_

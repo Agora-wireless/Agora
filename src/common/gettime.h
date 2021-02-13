@@ -1,10 +1,15 @@
-#ifndef GETTIME_H
-#define GETTIME_H
+/**
+ * @file gettime.inc
+ * @brief Self defined file for the gettime helper functions.
+ */
+
+#ifndef GETTIME_INC_
+#define GETTIME_INC_
 
 #include "symbols.h"
 
 // Get current time in microseconds
-static inline double GetTimeUs(void) {
+static inline double GetTimeUs() {
   struct timespec tv;
   clock_gettime(CLOCK_MONOTONIC, &tv);
   return tv.tv_sec * 1000000 + tv.tv_nsec / 1000.0;
@@ -12,7 +17,7 @@ static inline double GetTimeUs(void) {
 
 // Get current time in microseconds. This can be deleted after we replace
 // all occurences of get_time() with get_time_us()
-static inline double GetTime(void) { return GetTimeUs(); }
+static inline double GetTime() { return GetTimeUs(); }
 
 /// Return the TSC
 static inline size_t Rdtsc() {
@@ -123,4 +128,4 @@ static inline double NsSince(const struct timespec& t0) {
   return (t1.tv_sec - t0.tv_sec) * 1000000000.0 + (t1.tv_nsec - t0.tv_nsec);
 }
 
-#endif
+#endif  // GETTIME_INC_

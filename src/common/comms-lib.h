@@ -10,8 +10,8 @@
  *         Oscar Bejarano: obejarano@rice.edu
  */
 
-#ifndef COMMSLIB_HEADER
-#define COMMSLIB_HEADER
+#ifndef COMMSLIB_H_
+#define COMMSLIB_H_
 
 #include <immintrin.h>
 #include <unistd.h>
@@ -39,7 +39,7 @@ class CommsLib {
 
   enum ModulationOrder { kQpsk = 2, kQaM16 = 4, kQaM64 = 6 };
 
-  CommsLib(std::string);
+  explicit CommsLib(std::string);
   ~CommsLib();
 
   static std::vector<std::vector<double>> GetSequence(int N, int type);
@@ -132,4 +132,4 @@ class CommsLib {
   static __m256 M256ComplexCf32Mult(__m256 data1, __m256 data2, bool conj);
 };
 
-#endif
+#endif  // COMMSLIB_H_

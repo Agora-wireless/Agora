@@ -1,5 +1,9 @@
-#ifndef RadioTXRX_HEADER
-#define RadioTXRX_HEADER
+/**
+ * @file txrx_client.h
+ * @brief Declaration file for the radio txrx class
+ */
+#ifndef RADIOTXRX_H_
+#define RADIOTXRX_H_
 
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -16,9 +20,8 @@
 #include "client_radio.h"
 #include "concurrentqueue.h"
 #include "net.h"
+#include "radio_lib.h"
 #include "utils.h"
-
-class RadioConfig;
 
 /**
  * @brief Implementations of this class provide packet I/O for Agora clients
@@ -39,25 +42,25 @@ class RadioConfig;
  * time-keeping w.r.t. BS happens in this function as well as downlink and
  * uplink receive and transmit functions.
  */
-class RadioTXRX {
+class RadioTxRx {
  public:
-  struct RadioTXRXContext {
-    RadioTXRX* ptr_;
+  struct RadioTxRxContext {
+    RadioTxRx* ptr_;
     int tid_;
   };
 
-  RadioTXRX(Config* cfg, int n_threads, int in_core_id);
+  RadioTxRx(Config* cfg, int n_threads, int in_core_id);
   /**
    * N_THREAD: socket thread number
    * mode: tx=1 or rx=0 operation
    * in_queue: message queue to communicate with main thread
    */
-  RadioTXRX(Config* config, int n_threads, int in_core_id,
+  RadioTxRx(Config* config, int n_threads, int in_core_id,
             moodycamel::ConcurrentQueue<EventData>* in_message_queue,
             moodycamel::ConcurrentQueue<EventData>* in_task_queue,
             moodycamel::ProducerToken** in_rx_ptoks,
             moodycamel::ProducerToken** in_tx_ptoks);
-  ~RadioTXRX();
+  ~RadioTxRx();
 
   /**
    * @brief called in main threads to start the socket threads
@@ -80,8 +83,8 @@ class RadioTXRX {
    *
    * @param in_buffer_length: size of ring buffer in bytes
    */
-  bool StartTxrx(Table<char>& in_buffer, Table<int>& in_buffer_status,
-                 int in_buffer_frame_num, int in_buffer_length,
+  bool StartTxRx(Table<char>& in_buffer, Table<int>& in_buffer_status,
+                 size_t in_buffer_frame_num, size_t in_buffer_length,
                  char* in_tx_buffer, int* in_tx_buffer_status,
                  int in_tx_buffer_frame_num, int in_tx_buffer_length);
 
@@ -148,8 +151,9 @@ class RadioTXRX {
 
   Table<char>* buffer_;
   Table<int>* buffer_status_;
-  int buffer_length_;
-  int buffer_frame_num_;
+
+  size_t buffer_length_; /* Unused */
+  size_t buffer_frame_num_;
 
   char* tx_buffer_;
   int* tx_buffer_status_;
@@ -170,4 +174,4 @@ class RadioTXRX {
   std::vector<void*> pilot_buff0_;
   std::vector<void*> pilot_buff1_;
 };
-#endif
+#endif  // RADIOTXRX_H_
