@@ -477,17 +477,23 @@ void Agora::Start() {
             PrintPerTaskDone(PrintType::kIFFT, frame_id, symbol_idx_dl, ant_id);
 
             if (ifft_counters_.LastTask(frame_id, symbol_idx_dl)) {
+              ifft_cur_frame_for_symbol_[symbol_idx_dl] = frame_id;
               if (symbol_idx_dl == ifft_next_symbol_) {
-                ScheduleAntennasTX(frame_id, symbol_id);
-                ifft_next_symbol_++;
+                // Check the available symbols starting from the current symbol
+                // Only schedule symbols that are continuously avaialbe
+                for (size_t sym_id = symbol_idx_dl;
+                     sym_id <= ifft_counters_.GetSymbolCount(frame_id);
+                     sym_id++)
+                  if (ifft_cur_frame_for_symbol_[sym_id] == frame_id) {
+                    ScheduleAntennasTX(frame_id,
+                                       cfg->Frame().GetDLSymbol(sym_id));
+                    ifft_next_symbol_++;
+                  } else {
+                    break;
+                  }
               }
               PrintPerSymbolDone(PrintType::kIFFT, frame_id, symbol_idx_dl);
               if (ifft_counters_.LastSymbol(frame_id)) {
-                // Schedule the remaining symbols
-                for (size_t sym_id = ifft_next_symbol_;
-                     sym_id < cfg->Frame().NumDLSyms(); sym_id++)
-                  ScheduleAntennasTX(frame_id,
-                                     cfg->Frame().GetDLSymbol(sym_id));
                 ifft_next_symbol_ = 0;
                 stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
                 PrintPerFrameDone(PrintType::kIFFT, frame_id);
@@ -1229,6 +1235,8 @@ void Agora::InitializeDownlinkBuffers() {
       cfg->Frame().NumDLSyms(),
       config_->LdpcConfig().NumBlocksInSymbol() * cfg->UeNum());
   encode_cur_frame_for_symbol_ =
+      std::vector<size_t>(cfg->Frame().NumDLSyms(), SIZE_MAX);
+  ifft_cur_frame_for_symbol_ =
       std::vector<size_t>(cfg->Frame().NumDLSyms(), SIZE_MAX);
   precode_counters_.Init(cfg->Frame().NumDLSyms(),
                          config_->DemulEventsPerSymbol());
