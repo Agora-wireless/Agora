@@ -105,7 +105,8 @@ class RadioTxRx {
    * and writes to an offset (rx_offset) in the receive buffer (buffer_)
    */
   struct Packet* RecvEnqueueArgos(int tid, size_t radio_id, size_t& frame_id,
-                                  size_t& symbol_id, size_t rx_offset);
+                                  size_t& symbol_id, size_t rx_offset,
+                                  bool dummy_enqueue);
 
   /**
    * @brief transmits a tx samples packet that is ready from PHY through client

@@ -132,71 +132,75 @@ int RadioTxRx::DequeueSend(int tid) {
     return -1;
   }
 
+  RtAssert(event.event_type_ == EventType::kPacketTX ||
+               event.event_type_ == EventType::kPacketPilotTX,
+           "RadioTxRx: Wrong Event Type in TX Queue!");
+
   // std::printf("tx queue length: %d\n", task_queue_->size_approx());
   size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
   size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-  if (event.event_type_ == EventType::kPacketTX) {
-    for (size_t symbol_id = 0; symbol_id < c->Frame().NumULSyms();
-         symbol_id++) {
-      size_t offset =
-          (c->GetTotalDataSymbolIdxUl(frame_id, symbol_id) * c->UeAntNum()) +
-          ant_id;
+  std::vector<char> zeros(c->PacketLength(), 0);
+  std::vector<char> pilot(c->PacketLength(), 0);
+  std::memcpy(&pilot[Packet::kOffsetOfData], c->PilotCi16().data(),
+              c->PacketLength() - Packet::kOffsetOfData);
 
-      if (kDebugPrintInTask) {
-        std::printf(
-            "In TX thread %d: Transmitted frame %zu, data symbol %zu, "
-            "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-            tid, frame_id, c->Frame().GetULSymbol(symbol_id), ant_id,
-            gen_tag_t(event.tags_[0]).tag_, offset,
-            message_queue_->size_approx());
-      }
-
-      auto* pkt = (struct Packet*)(tx_buffer_ + offset * c->PacketLength());
-      new (pkt) Packet(frame_id, c->Frame().GetULSymbol(symbol_id),
-                       0 /* cell_id */, ant_id);
-
-      // Send data (one OFDM symbol)
-      ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->PacketLength(), 0,
-                           (struct sockaddr*)&servaddr_[ant_id],
-                           sizeof(servaddr_[ant_id]));
-      RtAssert(ret > 0, "sendto() failed");
+  // Transmit uplink pilot
+  for (size_t symbol_idx = 0; symbol_idx < c->Frame().NumPilotSyms();
+       symbol_idx++) {
+    if (kDebugPrintInTask) {
+      std::printf(
+          "In TX thread %d: Transmitted pilot in frame %zu, "
+          "symbol %zu, "
+          "ant %zu\n",
+          tid, frame_id, c->Frame().GetPilotSymbol(symbol_idx), ant_id);
     }
-    RtAssert(
-        message_queue_->enqueue(
-            *rx_ptoks_[tid], EventData(EventType::kPacketTX, event.tags_[0])),
-        "Socket message enqueue failed\n");
-  } else if (event.event_type_ == EventType::kPacketPilotTX) {
-    std::vector<char> zeros(c->PacketLength(), 0);
-    std::vector<char> pilot(c->PacketLength(), 0);
-    std::memcpy(&pilot[Packet::kOffsetOfData], c->PilotCi16().data(),
-                c->PacketLength() - Packet::kOffsetOfData);
-    for (size_t symbol_idx = 0; symbol_idx < c->Frame().NumPilotSyms();
-         symbol_idx++) {
-      if (kDebugPrintInTask) {
-        std::printf(
-            "In TX thread %d: Transmitted pilot in frame %zu, "
-            "symbol %zu, "
-            "ant %zu\n",
-            tid, frame_id, c->Frame().GetPilotSymbol(symbol_idx), ant_id);
-      }
 
-      auto* pkt = (symbol_idx == ant_id) ? (struct Packet*)pilot.data()
-                                         : (struct Packet*)zeros.data();
-      new (pkt) Packet(frame_id, c->Frame().GetPilotSymbol(symbol_idx),
-                       0 /* cell_id */, ant_id);
-      // Send pilots
-      ssize_t ret = sendto(socket_[ant_id], (char*)pkt, c->PacketLength(), 0,
-                           (struct sockaddr*)&servaddr_[ant_id],
-                           sizeof(servaddr_[ant_id]));
-      RtAssert(ret > 0, "sendto() failed");
-    }
+    auto* pkt = (symbol_idx == ant_id) ? (struct Packet*)pilot.data()
+                                       : (struct Packet*)zeros.data();
+    new (pkt) Packet(frame_id, c->Frame().GetPilotSymbol(symbol_idx),
+                     0 /* cell_id */, ant_id);
+    ssize_t ret =
+        sendto(socket_[ant_id], (char*)pkt, c->PacketLength(), 0,
+               (struct sockaddr*)&servaddr_[ant_id], sizeof(servaddr_[ant_id]));
+    RtAssert(ret > 0, "sendto() failed");
+  }
+  if (event.event_type_ == EventType::kPacketPilotTX) {
     RtAssert(message_queue_->enqueue(
                  *rx_ptoks_[tid],
                  EventData(EventType::kPacketPilotTX, event.tags_[0])),
              "Socket message enqueue failed\n");
-  } else {
-    std::printf("Wrong event type in tx queue!");
-    throw std::runtime_error("RadioTxRx: Wrong event type in tx queue!");
+  }
+
+  // Transmit uplink Data
+  for (size_t symbol_id = 0; symbol_id < c->Frame().NumULSyms(); symbol_id++) {
+    size_t offset =
+        (c->GetTotalDataSymbolIdxUl(frame_id, symbol_id) * c->UeAntNum()) +
+        ant_id;
+
+    if (kDebugPrintInTask) {
+      std::printf(
+          "In TX thread %d: Transmitted frame %zu, data symbol %zu, "
+          "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+          tid, frame_id, c->Frame().GetULSymbol(symbol_id), ant_id,
+          gen_tag_t(event.tags_[0]).tag_, offset,
+          message_queue_->size_approx());
+    }
+
+    auto* pkt = (struct Packet*)(tx_buffer_ + offset * c->PacketLength());
+    new (pkt) Packet(frame_id, c->Frame().GetULSymbol(symbol_id),
+                     0 /* cell_id */, ant_id);
+
+    // Send data (one OFDM symbol)
+    ssize_t ret =
+        sendto(socket_[ant_id], (char*)pkt, c->PacketLength(), 0,
+               (struct sockaddr*)&servaddr_[ant_id], sizeof(servaddr_[ant_id]));
+    RtAssert(ret > 0, "sendto() failed");
+  }
+  if (event.event_type_ == EventType::kPacketTX) {
+    RtAssert(
+        message_queue_->enqueue(
+            *rx_ptoks_[tid], EventData(EventType::kPacketTX, event.tags_[0])),
+        "Socket message enqueue failed\n");
   }
   return event.tags_[0];
 }
@@ -259,7 +263,9 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
     return -1;
   }
 
-  assert(event.event_type_ == EventType::kPacketTX);
+  RtAssert(event.event_type_ == EventType::kPacketTX ||
+               event.event_type_ == EventType::kPacketPilotTX,
+           "Wrong Event Type in TX Queue!");
 
   size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
   size_t ue_id = gen_tag_t(event.tags_[0]).ant_id_;
@@ -328,14 +334,14 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
 
 struct Packet* RadioTxRx::RecvEnqueueArgos(int tid, size_t radio_id,
                                            size_t& frame_id, size_t& symbol_id,
-                                           size_t rx_offset) {
+                                           size_t rx_offset,
+                                           bool dummy_enqueue) {
   auto& c = config_;
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
   char* rx_buffer = (*buffer_)[tid];
   int* rx_buffer_status = (*buffer_status_)[tid];
   int num_samps = c->SampsPerSymbol();
   int packet_length = c->PacketLength();
-  ClientRadioConfig* radio = radioconfig_.get();
 
   // if buffer is full, exit
   if (rx_buffer_status[rx_offset] == 1) {
@@ -353,23 +359,26 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(int tid, size_t radio_id,
                                    packet_length];
     samp[ch] = pkt[ch]->data_;
   }
-  int r = radio->RadioRx(radio_id, samp, num_samps, rx_time);
-  if (r < num_samps) {
-    std::cerr << "BAD Receive(" << r << "/" << num_samps << ") at Time "
-              << rx_time << std::endl;
-  }
-  if (r < 0) {
-    std::cerr << "Receive error! Stopping... " << std::endl;
-    c->Running(false);
-    return nullptr;
-  }
-  if (c->HwFramer()) {
-    frame_id = (size_t)(rx_time >> 32);
-    symbol_id = (size_t)((rx_time >> 16) & 0xFFFF);
-  } else {
-    // assert(c->HwFramer()
-    //    || (((rxTime - time0) / (num_samps * c->frame().NumTotalSyms()))
-    //           == frame_id));
+  if (dummy_enqueue == false) {
+    ClientRadioConfig* radio = radioconfig_.get();
+    int r = radio->RadioRx(radio_id, samp, num_samps, rx_time);
+    if (r < num_samps) {
+      std::cerr << "BAD Receive(" << r << "/" << num_samps << ") at Time "
+                << rx_time << std::endl;
+    }
+    if (r < 0) {
+      std::cerr << "Receive error! Stopping... " << std::endl;
+      c->Running(false);
+      return nullptr;
+    }
+    if (c->HwFramer()) {
+      frame_id = (size_t)(rx_time >> 32);
+      symbol_id = (size_t)((rx_time >> 16) & 0xFFFF);
+    } else {
+      // assert(c->HwFramer()
+      //    || (((rxTime - time0) / (num_samps * c->frame().NumTotalSyms()))
+      //           == frame_id));
+    }
   }
   if (kDebugPrintInTask) {
     std::printf(
@@ -442,7 +451,7 @@ void* RadioTxRx::LoopTxRxArgos(int tid) {
     }
 
     struct Packet* pkt =
-        RecvEnqueueArgos(tid, radio_id, frame_id, symbol_id, rx_offset);
+        RecvEnqueueArgos(tid, radio_id, frame_id, symbol_id, rx_offset, false);
     if (pkt == nullptr) {
       continue;
     }
@@ -530,6 +539,7 @@ void* RadioTxRx::LoopTxRxArgosSync(int tid) {
 
   long long time0(0);
   size_t frame_id(0);
+  size_t symbol_id(0);
 
   bool resync = false;
   size_t resync_retry_cnt(0);
@@ -557,6 +567,16 @@ void* RadioTxRx::LoopTxRxArgosSync(int tid) {
     if (frame_id == 0) {
       time0 = rx_time;
     }
+
+    // Dummy enqueue for received beacon to use in scheduler
+    auto* pkt =
+        RecvEnqueueArgos(tid, radio_id, frame_id, symbol_id, cursor, true);
+    if (pkt == nullptr) {
+      break;
+    }
+    symbol_id++;
+    cursor += c->NumChannels();
+    cursor %= buffer_frame_num_;
 
     // resync every X=1000 frames:
     // TODO: X should be a function of sample rate and max CFO
@@ -603,8 +623,7 @@ void* RadioTxRx::LoopTxRxArgosSync(int tid) {
     }
 
     // receive the remaining of the frame
-    for (size_t symbol_id = 1; symbol_id < c->Frame().NumTotalSyms();
-         symbol_id++) {
+    for (; symbol_id < c->Frame().NumTotalSyms(); symbol_id++) {
       if (!config_->IsPilot(frame_id, symbol_id) &&
           !(config_->IsDownlink(frame_id, symbol_id))) {
         radio->RadioRx(radio_id, frm_rx_buff.data(), num_samps, rx_time);
@@ -626,7 +645,7 @@ void* RadioTxRx::LoopTxRxArgosSync(int tid) {
         }
       } else {
         struct Packet* pkt =
-            RecvEnqueueArgos(tid, radio_id, frame_id, symbol_id, cursor);
+            RecvEnqueueArgos(tid, radio_id, frame_id, symbol_id, cursor, false);
         if (pkt == nullptr) {
           break;
         }
@@ -636,6 +655,7 @@ void* RadioTxRx::LoopTxRxArgosSync(int tid) {
       }
     }
     frame_id++;
+    symbol_id = 0;
   }
   return nullptr;
 }

@@ -245,30 +245,6 @@ bool ClientRadioConfig::RadioStart() {
 
   std::vector<uint32_t> pilot = cfg_->Pilot();
 
-  std::vector<std::string> tdd_sched;
-  tdd_sched.resize(this->radio_num_);
-  for (size_t r = 0; r < radio_num_; r++) {
-    tdd_sched[r] = cfg_->Frame().FrameIdentifier();
-    for (size_t s = 0; s < cfg_->Frame().FrameIdentifier().length(); s++) {
-      char c = cfg_->Frame().FrameIdentifier().at(s);
-      if (c == 'P' and ((cfg_->NumChannels() == 1 and
-                         cfg_->Frame().GetPilotSymbol(r) != s) or
-                        (cfg_->NumChannels() == 2 and
-                         (cfg_->Frame().GetPilotSymbol(2 * r) != s and
-                          cfg_->Frame().GetPilotSymbol(r * 2 + 1) !=
-                              s)))) {  // TODO: change this for
-        // orthogonal pilots
-        tdd_sched[r].replace(s, 1, "G");
-      } else if (c == 'U') {
-        tdd_sched[r].replace(s, 1, "T");
-      } else if (c == 'D') {
-        tdd_sched[r].replace(s, 1, "R");
-      } else if (c != 'P') {
-        tdd_sched[r].replace(s, 1, "G");
-      }
-    }
-    std::cout << tdd_sched[r] << std::endl;
-  }
   // beaconSize + 82 (BS FE delay) + 68 (path delay) + 17 (correlator delay) +
   // 82 (Client FE Delay)
   int cl_trig_offset = cfg_->BeaconLen() + 249;
@@ -284,8 +260,30 @@ bool ClientRadioConfig::RadioStart() {
                        cfg_->Rate()));
       conf["max_frame"] = max_frame;
       conf["dual_pilot"] = (cfg_->NumChannels() == 2);
+      auto tdd_sched = cfg_->Frame().FrameIdentifier();
+      for (size_t s = 0; s < cfg_->Frame().FrameIdentifier().length(); s++) {
+        char c = cfg_->Frame().FrameIdentifier().at(s);
+        if (c == 'B') {
+          tdd_sched.replace(s, 1, "R");  // Dummy RX used in PHY scheduler
+        } else if (c == 'P' and ((cfg_->NumChannels() == 1 and
+                                  cfg_->Frame().GetPilotSymbol(i) != s) or
+                                 (cfg_->NumChannels() == 2 and
+                                  (cfg_->Frame().GetPilotSymbol(2 * i) != s and
+                                   cfg_->Frame().GetPilotSymbol(i * 2 + 1) !=
+                                       s)))) {  // TODO: change this for
+          // orthogonal pilots
+          tdd_sched.replace(s, 1, "G");
+        } else if (c == 'U') {
+          tdd_sched.replace(s, 1, "T");
+        } else if (c == 'D') {
+          tdd_sched.replace(s, 1, "R");
+        } else if (c != 'P') {
+          tdd_sched.replace(s, 1, "G");
+        }
+      }
+      std::cout << "Client " << i << " Frame: " << tdd_sched << std::endl;
       std::vector<std::string> jframes;
-      jframes.push_back(tdd_sched[i]);
+      jframes.push_back(tdd_sched);
       conf["frames"] = jframes;
       conf["symbol_size"] = cfg_->SampsPerSymbol();
       std::string conf_string = conf.dump();
