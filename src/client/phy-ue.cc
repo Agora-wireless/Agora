@@ -256,49 +256,41 @@ void PhyUe::Start() {
                    "window. This can happen if PHY is running "
                    "slowly, e.g., in debug mode");
 
-          size_t dl_symbol_id = 0;
-          if (config_->Frame().NumDLSyms() > 0) {
-            dl_symbol_id = config_->Frame().GetDLSymbol(0);
+          // Schedule uplink pilots transmission and uplink processing
+          if (symbol_id == config_->Frame().GetBeaconSymbolLast()) {
+            if (ul_data_symbol_perframe_ == 0) {
+              // Send Pilot after receiving last beacon
+              // Only when in Downlink Only mode
+              EventData do_tx_pilot_task(
+                  EventType::kPacketPilotTX,
+                  gen_tag_t::FrmSymUe(
+                      frame_id, config_->Frame().GetPilotSymbol(ue_id), ue_id)
+                      .tag_);
+              ScheduleTask(do_tx_pilot_task, &tx_queue_,
+                           *tx_ptoks_ptr_[ant_id % rx_thread_num_]);
+            } else {
+              if (ant_id % config_->NumChannels() == 0) {
+                EventData do_encode_task(
+                    EventType::kEncode,
+                    gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
+                ScheduleTask(do_encode_task, &encode_queue_, ptok_encode);
+              }
+            }
+            rx_buffer_status_[rx_thread_id][offset_in_current_buffer] =
+                0;  // now empty
           }
 
-          // \todo convert to this->config_->Frame().GetBeaconSymbolLast()
-          if ((symbol_id == 0)  // Beacon in Sim mode!
-              ||
-              ((config_->HwFramer() == false) &&
-               (ul_data_symbol_perframe_ == 0) && (symbol_id == dl_symbol_id) &&
-               (ant_id % config_->NumChannels() ==
-                0))  // first DL symbols in downlink-only mode
-          ) {        // Send uplink pilots
-            EventData do_tx_pilot_task(
-                EventType::kPacketPilotTX,
-                gen_tag_t::FrmSymUe(
-                    frame_id, config_->Frame().GetPilotSymbol(ue_id), ue_id)
-                    .tag_);
-            ScheduleTask(do_tx_pilot_task, &tx_queue_,
-                         *tx_ptoks_ptr_[ant_id % rx_thread_num_]);
-          }
-
-          if ((ul_data_symbol_perframe_ > 0) &&
-              (symbol_id == 0 || symbol_id == dl_symbol_id) &&
-              (ant_id % config_->NumChannels() == 0)) {
-            EventData do_encode_task(
-                EventType::kEncode,
-                gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
-            ScheduleTask(do_encode_task, &encode_queue_, ptok_encode);
-          }
-
-          if ((dl_data_symbol_perframe_ > 0) &&
-              (config_->IsPilot(frame_id, symbol_id) ||
+          // Schedule downlink processing
+          bool first_dl_symbol = (config_->Frame().NumDLSyms() > 0) &&
+                                 (symbol_id = config_->Frame().GetDLSymbol(0));
+          if ((config_->IsPilot(frame_id, symbol_id) ||
                config_->IsDownlink(frame_id, symbol_id))) {
-            if (dl_symbol_id == config_->Frame().GetDLSymbol(0)) {
+            if (first_dl_symbol == true) {
               frame_dl_process_time_[(frame_id % kFrameWnd) * kMaxUEs +
                                      ant_id] = GetTime::GetTimeUs();
             }
             EventData do_fft_task(EventType::kFFT, event.tags_[0]);
             ScheduleTask(do_fft_task, &fft_queue_, ptok_fft);
-          } else {  // if we are not entering doFFT, reset buffer here
-            rx_buffer_status_[rx_thread_id][offset_in_current_buffer] =
-                0;  // now empty
           }
         } break;
 
