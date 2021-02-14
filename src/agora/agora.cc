@@ -132,6 +132,27 @@ void Agora::ScheduleAntennas(EventType event_type, size_t frame_id,
   }
 }
 
+void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
+  auto base_tag = gen_tag_t::FrmSymAnt(frame_id, symbol_id, 0);
+
+  size_t num_blocks = config_->BsAntNum() / config_->NumChannels();
+  EventData events_list[4];  // Max # of channels: 4
+  for (size_t i = 0; i < config_->NumChannels(); i++) {
+    events_list[i].num_tags_ = 1;
+    events_list[i].event_type_ = EventType::kPacketTX;
+  }
+
+  for (size_t i = 0; i < num_blocks; i++) {
+    for (size_t j = 0; j < config_->NumChannels(); j++) {
+      events_list[j].tags_[0] = base_tag.tag_;
+      base_tag.ant_id_++;
+    }
+    TryEnqueueBulkFallback(GetConq(EventType::kPacketTX, 0),
+                           tx_ptoks_ptr_[i % config_->SocketThreadNum()],
+                           events_list, config_->NumChannels());
+  }
+}
+
 void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
                                 size_t symbol_id) {
   auto base_tag = gen_tag_t::FrmSymSc(frame_id, symbol_id, 0);
@@ -453,14 +474,27 @@ void Agora::Start() {
             size_t frame_id = gen_tag_t(event.tags_[i]).frame_id_;
             size_t symbol_id = gen_tag_t(event.tags_[i]).symbol_id_;
             size_t symbol_idx_dl = cfg->Frame().GetDLSymbolIdx(symbol_id);
-            TryEnqueueFallback(GetConq(EventType::kPacketTX, 0),
-                               tx_ptoks_ptr_[ant_id % cfg->SocketThreadNum()],
-                               EventData(EventType::kPacketTX, event.tags_[0]));
             PrintPerTaskDone(PrintType::kIFFT, frame_id, symbol_idx_dl, ant_id);
 
             if (ifft_counters_.LastTask(frame_id, symbol_idx_dl)) {
+              ifft_cur_frame_for_symbol_[symbol_idx_dl] = frame_id;
+              if (symbol_idx_dl == ifft_next_symbol_) {
+                // Check the available symbols starting from the current symbol
+                // Only schedule symbols that are continuously avaialbe
+                for (size_t sym_id = symbol_idx_dl;
+                     sym_id <= ifft_counters_.GetSymbolCount(frame_id);
+                     sym_id++)
+                  if (ifft_cur_frame_for_symbol_[sym_id] == frame_id) {
+                    ScheduleAntennasTX(frame_id,
+                                       cfg->Frame().GetDLSymbol(sym_id));
+                    ifft_next_symbol_++;
+                  } else {
+                    break;
+                  }
+              }
               PrintPerSymbolDone(PrintType::kIFFT, frame_id, symbol_idx_dl);
               if (ifft_counters_.LastSymbol(frame_id)) {
+                ifft_next_symbol_ = 0;
                 stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
                 PrintPerFrameDone(PrintType::kIFFT, frame_id);
                 assert(frame_id == cur_proc_frame_id_);
@@ -1201,6 +1235,8 @@ void Agora::InitializeDownlinkBuffers() {
       cfg->Frame().NumDLSyms(),
       config_->LdpcConfig().NumBlocksInSymbol() * cfg->UeNum());
   encode_cur_frame_for_symbol_ =
+      std::vector<size_t>(cfg->Frame().NumDLSyms(), SIZE_MAX);
+  ifft_cur_frame_for_symbol_ =
       std::vector<size_t>(cfg->Frame().NumDLSyms(), SIZE_MAX);
   precode_counters_.Init(cfg->Frame().NumDLSyms(),
                          config_->DemulEventsPerSymbol());

@@ -354,6 +354,7 @@ Config::Config(const std::string& jsonfile)
   zf_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / zf_block_size_;
 
   fft_block_size_ = tdd_conf.value("fft_block_size", 1);
+  fft_block_size_ = std::max(fft_block_size_, num_channels_);
   encode_block_size_ = tdd_conf.value("encode_block_size", 1);
 
   noise_level_ = tdd_conf.value("noise_level", 0.03);  // default: 30 dB
