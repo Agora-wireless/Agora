@@ -86,12 +86,18 @@ Config::Config(const std::string& jsonfile)
   if (gain_adj_json_a.empty()) {
     client_gain_adj_a_.resize(num_radios_, 0);
   } else {
+    RtAssert(
+        gain_adj_json_a.size() == num_radios_,
+        "client_gain_adjust_a size must be same as the number of clients!");
     client_gain_adj_a_.assign(gain_adj_json_a.begin(), gain_adj_json_a.end());
   }
   auto gain_adj_json_b = tdd_conf.value("client_gain_adjust_b", json::array());
   if (gain_adj_json_b.empty()) {
     client_gain_adj_b_.resize(num_radios_, 0);
   } else {
+    RtAssert(
+        gain_adj_json_a.size() == num_radios_,
+        "client_gain_adjust_a size must be same as the number of clients!");
     client_gain_adj_b_.assign(gain_adj_json_b.begin(), gain_adj_json_b.end());
   }
   rate_ = tdd_conf.value("rate", 5e6);
@@ -151,6 +157,8 @@ Config::Config(const std::string& jsonfile)
   if (tx_advance.empty()) {
     cl_tx_advance_.resize(num_radios_, 0);
   } else {
+    RtAssert(tx_advance.size() == num_radios_,
+             "tx_advance size must be same as the number of clients!");
     cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
   }
   hw_framer_ = tdd_conf.value("hw_framer", true);

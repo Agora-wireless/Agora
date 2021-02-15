@@ -1,8 +1,8 @@
 {
  "irises" : "data/user-iris-serials.txt",
  "cells" : 1,
- "channel" : "AB",
- "frequency" : 3.56e9,
+ "channel" : "A",
+ "frequency" : 3.6e9,
  "single_gain": false,
  "rx_gain_a" : 21,
  "tx_gain_a" : 40,
@@ -17,13 +17,12 @@
  "ofdm_tx_zero_prefix" : 160,
  "ofdm_tx_zero_postfix" : 160,
  "frames" : [
-     "GGDDGGPPGGUUUG"
+     "BGGGGGPPGGUUUG"
  ],
  "hw_framer": false,
- "tx_advance" : [140],
+ "tx_advance" : [140, 140],
  "UE" : true,
  "client_ul_pilot_syms" : 2,
- "client_dl_pilot_syms" : 2,
  "worker_thread_num" : 2,
  "demul_block_size" : 48
 }
