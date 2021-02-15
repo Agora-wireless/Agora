@@ -152,10 +152,13 @@ unsigned int CheckCorrectnessDl(Config const* const cfg) {
 }
 
 static unsigned int CheckCorrectness(Config const* const cfg) {
-  unsigned int error_count = 0;
-  error_count = CheckCorrectnessUl(cfg);
-  error_count += CheckCorrectnessDl(cfg);
-  return error_count;
+  unsigned int ul_error_count = 0;
+  unsigned int dl_error_count = 0;
+  ul_error_count = CheckCorrectnessUl(cfg);
+  std::printf("Uplink error count: %d\n", ul_error_count);
+  dl_error_count = CheckCorrectnessDl(cfg);
+  std::printf("Downlink error count: %d\n", dl_error_count);
+  return ul_error_count + dl_error_count;
 }
 
 int main(int argc, char* argv[]) {

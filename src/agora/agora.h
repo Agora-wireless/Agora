@@ -237,6 +237,8 @@ class Agora {
   std::vector<size_t> fft_cur_frame_for_symbol_;
   // The frame index for a symbol whose encode is done
   std::vector<size_t> encode_cur_frame_for_symbol_;
+  // The frame index for a symbol whose IFFT is done
+  std::vector<size_t> ifft_cur_frame_for_symbol_;
 
   // The frame index for a symbol whose precode is done
   std::vector<size_t> precode_cur_frame_for_symbol_;
