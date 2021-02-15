@@ -4,15 +4,18 @@
 
 
 #ifdef __AVX512F__
+#define NUM_RUNS 1000000 // number of runs, for benchmarking
 
 
 TEST(TestComplexMul, Multiply) 
 {
     float values[32] __attribute((aligned(64)));
-    float out256[32] __attribute((aligned(64)));
-    float out512[32] __attribute((aligned(64)));
+    float out256[16] __attribute((aligned(64)));
+    float out512[16] __attribute((aligned(64)));
+    __m256 result_256_lower __attribute((aligned(64)));
+    __m256 result_256_upper __attribute((aligned(64)));
+    __m512 result_512 __attribute((aligned(64)));
     clock_t time;
-    double cpu_time;
     for (int i = 0; i < 32; i++) {
         // Set each float to a random value between -1 and 1
         values[i] 
@@ -33,22 +36,24 @@ TEST(TestComplexMul, Multiply)
         = _mm512_load_ps(reinterpret_cast<const float*>(values + 16));
     /* Do the multiplication */
     time = clock();
-    __m256 result_256_lower = CommsLib::__m256_complex_cf32_mult(
-        values0_lower_256, values1_lower_256, false);
-    __m256 result_256_upper = CommsLib::__m256_complex_cf32_mult(
-        values0_upper_256, values1_upper_256, false);
+    for (int i = 0; i < NUM_RUNS; i++) {
+        result_256_lower = CommsLib::M256ComplexCf32Mult(
+            values0_lower_256, values1_lower_256, false);
+        result_256_upper = CommsLib::M256ComplexCf32Mult(
+            values0_upper_256, values1_upper_256, false);
+    }
     time = clock() - time;
-    cpu_time = ((double)time) / CLOCKS_PER_SEC;
-    std::cout << "AVX256 Multiplication took " << cpu_time << "seconds";
+    std::cout << "AVX256 Multiplication took " << time << "\n";
     time = clock();
-    __m512 result_512 
-        = CommsLib::__m512_complex_cf32_mult(values0_512, values1_512, false);
+    for (int i = 0; i < NUM_RUNS; i++) {
+        result_512 
+            = CommsLib::M512ComplexCf32Mult(values0_512, values1_512, false);
+    }
     time = clock() - time;
-    cpu_time = ((double)time) / CLOCKS_PER_SEC;
-    std::cout << "AVX512 Multiplication took " << cpu_time << "seconds";
+    std::cout << "AVX512 Multiplication took " << time << "\n";
     /* Extract the results into output buffers */
     _mm256_stream_ps(reinterpret_cast<float*>(out256), result_256_lower);
-    _mm256_stream_ps(reinterpret_cast<float*>(out256 + 16), result_256_upper);
+    _mm256_stream_ps(reinterpret_cast<float*>(out256 + 8), result_256_upper);
     _mm512_stream_ps(reinterpret_cast<float*>(out512), result_512);
     ASSERT_EQ(memcmp(out512, out256, sizeof(out512)), 0) 
         << "AVX512 and AVX256 multiplication differ";
@@ -57,10 +62,12 @@ TEST(TestComplexMul, Multiply)
 TEST(TestComplexMul, ConjMultiply)
 {
     float values[32] __attribute((aligned(64)));
-    float out256[32] __attribute((aligned(64)));
-    float out512[32] __attribute((aligned(64)));
+    float out256[16] __attribute((aligned(64)));
+    float out512[16] __attribute((aligned(64)));
+    __m256 result_256_lower __attribute((aligned(64)));
+    __m256 result_256_upper __attribute((aligned(64)));
+    __m512 result_512 __attribute((aligned(64)));
     clock_t time;
-    double cpu_time;
     for (int i = 0; i < 32; i++) {
         // Set each float to a random value between -1 and 1
         values[i] 
@@ -81,22 +88,24 @@ TEST(TestComplexMul, ConjMultiply)
         = _mm512_load_ps(reinterpret_cast<const float*>(values + 16));
     /* Do the multiplication */
     time = clock();
-    __m256 result_256_lower = CommsLib::__m256_complex_cf32_mult(
-        values0_lower_256, values1_lower_256, true);
-    __m256 result_256_upper = CommsLib::__m256_complex_cf32_mult(
-        values0_upper_256, values1_upper_256, true);
+    for (int i = 0; i < NUM_RUNS; i++) {
+        result_256_lower = CommsLib::M256ComplexCf32Mult(
+            values0_lower_256, values1_lower_256, true);
+        result_256_upper = CommsLib::M256ComplexCf32Mult(
+            values0_upper_256, values1_upper_256, true);
+    }
     time = clock() - time;
-    cpu_time = ((double)time) / CLOCKS_PER_SEC;
-    std::cout << "AVX256 Conj Multiplication took " << cpu_time << "seconds";
+    std::cout << "AVX256 Conj Multiplication took " << time << "\n";
     time = clock();
-    __m512 result_512 
-        = CommsLib::__m512_complex_cf32_mult(values0_512, values1_512, true);
+    for (int i = 0; i < NUM_RUNS; i++) {
+        result_512 
+            = CommsLib::M512ComplexCf32Mult(values0_512, values1_512, true);
+    }
     time = clock() - time;
-    cpu_time = ((double)time) / CLOCKS_PER_SEC;
-    std::cout << "AVX512 Conj Multiplication took " << cpu_time << "seconds";
+    std::cout << "AVX512 Conj Multiplication took " << time << "\n";
     /* Extract the results into output buffers */
     _mm256_stream_ps(reinterpret_cast<float*>(out256), result_256_lower);
-    _mm256_stream_ps(reinterpret_cast<float*>(out256 + 16), result_256_upper);
+    _mm256_stream_ps(reinterpret_cast<float*>(out256 + 8), result_256_upper);
     _mm512_stream_ps(reinterpret_cast<float*>(out512), result_512);
     ASSERT_EQ(memcmp(out512, out256, sizeof(out512)), 0) 
         << "AVX512 and AVX256 conjugate multiplication differ";
