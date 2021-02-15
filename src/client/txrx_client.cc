@@ -169,6 +169,7 @@ int RadioTxRx::DequeueSend(int tid) {
                  *rx_ptoks_[tid],
                  EventData(EventType::kPacketPilotTX, event.tags_[0])),
              "Socket message enqueue failed\n");
+    return event.tags_[0];
   }
 
   // Transmit uplink Data
@@ -295,6 +296,15 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
                   << std::endl;
       }
     }
+  }
+  if (event.event_type_ == EventType::kPacketPilotTX) {
+    RtAssert(message_queue_->enqueue(
+                 *rx_ptoks_[tid],
+                 EventData(EventType::kPacketPilotTX, event.tags_[0])),
+             "Socket message enqueue failed\n");
+    // kPacketPilotTX is scheduled when no Uplink data is present,
+    // so return here!
+    return event.tags_[0];
   }
 
   // Transmit data
