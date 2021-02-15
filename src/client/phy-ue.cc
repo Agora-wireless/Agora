@@ -21,7 +21,8 @@ static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr size_t kRecordFrameIndex = 1000;
 static const size_t kDefaultQueueSize = 36;
 
-PhyUe::PhyUe(Config* config) {
+PhyUe::PhyUe(Config* config)
+    : scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   srand(time(nullptr));
 
   this->config_ = config;
