@@ -1100,7 +1100,7 @@ void PhyUe::DoIfft(int tid, size_t tag) {
                   sizeof(complex_float) * config_->OfdmDataStart());
       if (ul_symbol_id < config_->Frame().ClientUlPilotSymbols()) {
         std::memcpy(ifft_buff + config_->OfdmDataStart(),
-                    config_->UeSpecificPilot()[0],
+                    config_->UeSpecificPilot()[ant_id],
                     config_->OfdmDataNum() * sizeof(complex_float));
       } else {
         size_t total_ul_data_symbol_id =
