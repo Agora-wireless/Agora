@@ -130,6 +130,10 @@ class CommsLib {
       std::vector<std::complex<int16_t>> const& g);
 
   static __m256 M256ComplexCf32Mult(__m256 data1, __m256 data2, bool conj);
+#ifdef __AVX512F__
+  static __m512 M512ComplexCf32Mult(__m512 data1, __m512 data2, bool conj);
+#endif
+
 };
 
 #endif

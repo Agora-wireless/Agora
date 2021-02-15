@@ -197,6 +197,77 @@ __m256 CommsLib::M256ComplexCf32Mult(__m256 data1, __m256 data2, bool conj) {
   return res;
 }
 
+#ifdef __AVX512F__
+/**
+ * Perform complex multiplication of a vector of single precision (32 bit)
+ * floats using AVX-512.
+ * @param data1: first vector to multiply
+ * @param data2: second vector to multiply
+ * @param conj: should the multiplication be conjugate?
+ *  If conjugate multiplication is enabled, the result will be of the form
+ *  (i1,q1) * (i2,q2) = (i1*i2 + q1*q2, q1*i2 - i1*q2)
+ */
+__m512 CommsLib::M512ComplexCf32Mult(__m512 data1, __m512 data2, bool conj)
+{
+    // Require that all data is aligned to 64 byte boundaries
+    __m512 prod0 __attribute__((aligned(64)));
+    __m512 prod1 __attribute__((aligned(64)));
+    __m512 res __attribute__((aligned(64)));
+
+    const __m512 neg0 
+        = _mm512_setr_ps(1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0,
+                         1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0);
+    const __m512 neg1
+        = _mm512_set_ps(1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0,
+                        1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0);
+    /* Step 1: multiply the real and imaginary components of each vector */
+    prod0 = _mm512_mul_ps(data1, data2); // (i1*i2, q1*q2)
+
+    /* Step 2: Negate the imaginary elements of data2 */
+    data2 = _mm512_mul_ps(data2, conj ? neg0 : neg1);
+
+    /* Step 3: Switch the real and imaginary elements of data 2*/
+    data2 = _mm512_permute_ps(data2, 0xb1);
+
+    /* 
+     * Step 4: Multiply vector 1 and the modified vector 2 
+     * conj=0 -> i1*q2, -i2*q1
+     * conj=1 -> -i1*q2, i2*q1
+     */
+    prod1 = _mm512_mul_ps(data1, data2); 
+
+    
+    /*
+     * AVX-512 has no horizontal addition, so we will utilize AVX256 addition
+     * source: https://stackoverflow.com/questions/26896432
+     */
+    __m256 low0 = _mm512_castps512_ps256(prod0);
+    __m256 low1 = _mm512_castps512_ps256(prod1);
+    __m256 high0 = _mm512_extractf32x8_ps(prod0, 1);
+    __m256 high1 = _mm512_extractf32x8_ps(prod1, 1);
+    /* 
+     * Step 5: Horizontally add elements in each vector 
+     * conj=0 -> (i1*i2 - q1*q2, ... , i1*q2 + i2*q1)
+     * conj=1 -> (i1*i2 + q1*q2, ... , i1*q2 - i2*q1)
+     */
+    __m256 lowres = conj
+        ? _mm256_hadd_ps(low0, low1)
+        : _mm256_hsub_ps(low0, low1);
+    __m256 highres = conj
+        ? _mm256_hadd_ps(high0, high1)
+        : _mm256_hsub_ps(high0, high1);
+    /*
+     * Pack the results back into a AVX512 vector
+     * Source: https://stackoverflow.com/questions/11116769
+     */
+    res = _mm512_castps256_ps512(lowres);
+    res = _mm512_insertf32x8(res, highres, 1);
+    /* Permute the results so each output is on the correct location */
+    res = _mm512_permute_ps(res, 0xd8);
+    return res;
+}
+#endif 
+
 std::vector<std::complex<float>> CommsLib::ComplexMultAvx(
     std::vector<std::complex<float>> const& f,
     std::vector<std::complex<float>> const& g, const bool conj) {
