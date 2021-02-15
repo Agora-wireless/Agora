@@ -576,8 +576,9 @@ void Agora::Start() {
             if (last_tx_symbol == true) {
               this->stats_->MasterSetTsc(TsType::kTXDone, frame_id);
               PrintPerFrameDone(PrintType::kPacketTX, frame_id);
-              this->tx_counters_.Reset(frame_id);
-              if (frame_id == (this->config_->FramesToTest() - 1)) {
+
+              bool work_finished = this->CheckWorkComplete(frame_id);
+              if (work_finished == true) {
                 goto finish;
               }
             }
@@ -1473,28 +1474,27 @@ bool Agora::CheckWorkComplete(size_t frame_id) {
   bool finished = false;
 
   MLPD_TRACE(
-      "Checking work complete %zu, ifft %d, tx %d, decode %d, tomac %d, "
-      "finished %d\n",
+      "Checking work complete %zu, ifft %d, tx %d, decode %d, tomac %d, tx "
+      "%d\n",
       frame_id, static_cast<int>(this->ifft_counters_.IsLastSymbol(frame_id)),
       static_cast<int>(this->tx_counters_.IsLastSymbol(frame_id)),
       static_cast<int>(this->decode_counters_.IsLastSymbol(frame_id)),
       static_cast<int>(this->tomac_counters_.IsLastSymbol(frame_id)),
-      static_cast<int>(
-          (this->decode_counters_.IsLastSymbol(frame_id) == true) &&
-          (this->ifft_counters_.IsLastSymbol(frame_id) == true) &&
-          (true == this->tomac_counters_.IsLastSymbol(frame_id))));
+      static_cast<int>(this->tx_counters_.IsLastSymbol(frame_id)));
 
   // Complete if last frame and ifft / decode complete
   if ((true == this->ifft_counters_.IsLastSymbol(frame_id)) &&
-      (((kEnableMac == false) &&
+      (true == this->tx_counters_.IsLastSymbol(frame_id)) &&
+      (((false == kEnableMac) &&
         (true == this->decode_counters_.IsLastSymbol(frame_id))) ||
-       ((kEnableMac == true) &&
+       ((false == kEnableMac) &&
         (true == this->tomac_counters_.IsLastSymbol(frame_id))))) {
     this->stats_->UpdateStats(frame_id);
     assert(frame_id == this->cur_proc_frame_id_);
     this->decode_counters_.Reset(frame_id);
     this->tomac_counters_.Reset(frame_id);
     this->ifft_counters_.Reset(frame_id);
+    this->tx_counters_.Reset(frame_id);
     this->cur_proc_frame_id_++;
 
     if (frame_id == (this->config_->FramesToTest() - 1)) {
