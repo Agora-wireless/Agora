@@ -217,6 +217,8 @@ void PhyUe::Start() {
   int ret = 0;
   max_equaled_frame_ = 0;
   size_t cur_frame_id = 0;
+  std::vector<size_t> ifft_next_frame(config_->UeNum());
+  std::vector<size_t> ifft_frame_status(config_->UeNum() * kFrameWnd, SIZE_MAX);
   while ((config_->Running() == true) &&
          (SignalHandler::GotExitSignal() == false)) {
     // get a bulk of events
@@ -477,9 +479,22 @@ void PhyUe::Start() {
         case EventType::kIFFT: {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
-          EventData do_tx_task(EventType::kPacketTX, event.tags_[0]);
-          ScheduleTask(do_tx_task, &tx_queue_,
-                       *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
+          ifft_frame_status[ue_id * kFrameWnd + frame_id % kFrameWnd] =
+              frame_id;
+          for (size_t i = 0; i < kFrameWnd; i++) {
+            size_t ifft_stat_id =
+                ue_id * kFrameWnd + (i + frame_id) % kFrameWnd;
+            if (ifft_frame_status[ifft_stat_id] == ifft_next_frame[ue_id]) {
+              EventData do_tx_task(
+                  EventType::kPacketTX,
+                  gen_tag_t::FrmSymUe(ifft_next_frame[ue_id], 0, ue_id).tag_);
+              ScheduleTask(do_tx_task, &tx_queue_,
+                           *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
+              ifft_next_frame[ue_id]++;
+            } else {
+              break;
+            }
+          }
           if (kDebugPrintPerTaskDone) {
             std::printf(
                 "Main thread: frame: %zu, finished IFFT of "
