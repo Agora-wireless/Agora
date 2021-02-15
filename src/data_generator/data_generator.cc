@@ -37,6 +37,7 @@ static float RandFloatFromShort(float min, float max) {
 
 void DataGenerator::DoDataGeneration(const std::string& directory) {
   srand(time(nullptr));
+  auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
 
   // Step 1: Generate the information buffers and LDPC-encoded buffers for
   // uplink
@@ -60,7 +61,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::memcpy(scrambler_buffer, ul_information.at(i).data(), input_size);
 
     if (this->cfg_->ScrambleEnabled()) {
-      Scrambler::WlanScramble(scrambler_buffer, input_size);
+      scrambler->Scramble(scrambler_buffer, input_size);
     }
     this->GenCodeblock(scrambler_buffer, ul_encoded_codewords.at(i));
   }
@@ -191,8 +192,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   for (size_t i = 0; i < (this->cfg_->UeAntNum() * this->cfg_->BsAntNum());
        i++) {
     complex_float csi = {RandFloatFromShort(-1, 1), RandFloatFromShort(-1, 1)};
-    // std::printf("noise of ant %d, ue %d\n", i % this->cfg_->bs_ant_num(), i /
-    // this->cfg_->bs_ant_num() );
+    // std::printf("noise of ant %d, ue %d\n", i % this->cfg_->bs_ant_num(), i
+    // / this->cfg_->bs_ant_num() );
     for (size_t j = 0; j < this->cfg_->OfdmCaNum(); j++) {
       complex_float noise = {
           RandFloatFromShort(-1, 1) * this->cfg_->NoiseLevel(),
@@ -272,7 +273,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::memcpy(scrambler_buffer, dl_information.at(i).data(), input_size);
 
     if (this->cfg_->ScrambleEnabled()) {
-      Scrambler::WlanScramble(scrambler_buffer, input_size);
+      scrambler->Scramble(scrambler_buffer, input_size);
     }
     this->GenCodeblock(scrambler_buffer, dl_encoded_codewords.at(i));
   }
@@ -424,7 +425,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
 
       // std::printf("symbol %d, sc: %d\n", i, j -
-      // this->cfg_->ofdm_data_start()); cout << "Precoder: \n" << mat_precoder
+      // this->cfg_->ofdm_data_start()); cout << "Precoder: \n" <<
+      // mat_precoder
       // << endl; cout << "Data: \n" << mat_input_data.row(j) << endl; cout <<
       // "Precoded data: \n" << mat_output.row(j) << endl;
     }

@@ -903,7 +903,7 @@ void PhyUe::DoDecode(int tid, size_t tag) {
                             &ldpc_decoder_5gnr_response);
 
     if (config_->ScrambleEnabled()) {
-      Scrambler::WlanDescramble(decoded_buffer_ptr, config_->NumBytesPerCb());
+      scrambler_->Descramble(decoded_buffer_ptr, config_->NumBytesPerCb());
     }
 
     if (kCollectPhyStats) {
@@ -1026,7 +1026,7 @@ void PhyUe::DoEncode(int tid, size_t tag) {
       }
 
       if (config_->ScrambleEnabled()) {
-        Scrambler::WlanScramble(input_ptr, bytes_per_block);
+        scrambler_->Scramble(input_ptr, bytes_per_block);
       }
 
       LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
