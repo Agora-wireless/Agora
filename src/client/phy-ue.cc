@@ -21,7 +21,8 @@ static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr size_t kRecordFrameIndex = 1000;
 static const size_t kDefaultQueueSize = 36;
 
-PhyUe::PhyUe(Config* config) {
+PhyUe::PhyUe(Config* config)
+    : scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   srand(time(nullptr));
 
   this->config_ = config;
@@ -918,7 +919,7 @@ void PhyUe::DoDecode(int tid, size_t tag) {
                             &ldpc_decoder_5gnr_response);
 
     if (config_->ScrambleEnabled()) {
-      Scrambler::WlanDescramble(decoded_buffer_ptr, config_->NumBytesPerCb());
+      scrambler_->Descramble(decoded_buffer_ptr, config_->NumBytesPerCb());
     }
 
     if (kCollectPhyStats) {
@@ -1041,7 +1042,7 @@ void PhyUe::DoEncode(int tid, size_t tag) {
       }
 
       if (config_->ScrambleEnabled()) {
-        Scrambler::WlanScramble(input_ptr, bytes_per_block);
+        scrambler_->Scramble(input_ptr, bytes_per_block);
       }
 
       LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),

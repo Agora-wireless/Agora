@@ -35,6 +35,7 @@
 #include "mkl_dfti.h"
 #include "modulation.h"
 #include "net.h"
+#include "scrambler.h"
 #include "signal_handler.h"
 #include "txrx_client.h"
 
@@ -349,6 +350,7 @@ class PhyUe {
 
   std::array<double, kFrameWnd * kMaxUEs> frame_dl_process_time_;
   std::queue<std::tuple<int, int>> task_wait_list_;
+  std::unique_ptr<AgoraScrambler::Scrambler> scrambler_;
 
   // for python
   /**

@@ -19,7 +19,8 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
                    Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager)
     : Doer(in_config, in_tid),
       raw_data_buffer_(in_raw_data_buffer),
-      encoded_buffer_(in_encoded_buffer) {
+      encoded_buffer_(in_encoded_buffer),
+      scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kEncode, in_tid);
   parity_buffer_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
@@ -66,7 +67,7 @@ EventData DoEncode::Launch(size_t tag) {
         scrambler_buffer_,
         cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id),
         cfg_->NumBytesPerCb());
-    Scrambler::WlanScramble(scrambler_buffer_, cfg_->NumBytesPerCb());
+    scrambler_->Scramble(scrambler_buffer_, cfg_->NumBytesPerCb());
     ldpc_input = scrambler_buffer_;
   } else {
     ldpc_input =
@@ -110,7 +111,8 @@ DoDecode::DoDecode(
     : Doer(in_config, in_tid),
       demod_buffers_(demod_buffers),
       decoded_buffers_(decoded_buffers),
-      phy_stats_(in_phy_stats) {
+      phy_stats_(in_phy_stats),
+      scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kDecode, in_tid);
   resp_var_nodes_ = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64, 1024 * 1024 * sizeof(int16_t)));
@@ -176,7 +178,7 @@ EventData DoDecode::Launch(size_t tag) {
                           &ldpc_decoder_5gnr_response);
 
   if (cfg_->ScrambleEnabled()) {
-    Scrambler::WlanDescramble(decoded_buffer_ptr, cfg_->NumBytesPerCb());
+    scrambler_->Descramble(decoded_buffer_ptr, cfg_->NumBytesPerCb());
   }
 
   size_t start_tsc2 = GetTime::WorkerRdtsc();
