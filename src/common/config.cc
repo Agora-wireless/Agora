@@ -654,6 +654,8 @@ void Config::GenData() {
   std::fclose(fd);
 #endif
 
+  auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
+
   const size_t encoded_bytes_per_block =
       BitsToBytes(this->ldpc_config_.NumCbCodewLen());
   const size_t num_blocks_per_symbol =
@@ -685,7 +687,7 @@ void Config::GenData() {
         if (scramble_enabled_) {
           std::memcpy(scramble_buffer, GetInfoBits(ul_bits_, i, j, k),
                       num_bytes_per_cb_);
-          Scrambler::WlanScramble(scramble_buffer, num_bytes_per_cb_);
+          scrambler->Scramble(scramble_buffer, num_bytes_per_cb_);
           ldpc_input = scramble_buffer;
         } else {
           ldpc_input = GetInfoBits(ul_bits_, i, j, k);
@@ -740,7 +742,7 @@ void Config::GenData() {
         if (scramble_enabled_) {
           std::memcpy(scramble_buffer, GetInfoBits(dl_bits_, i, j, k),
                       num_bytes_per_cb_);
-          Scrambler::WlanScramble(scramble_buffer, num_bytes_per_cb_);
+          scrambler->Scramble(scramble_buffer, num_bytes_per_cb_);
           ldpc_input = scramble_buffer;
         } else {
           ldpc_input = GetInfoBits(dl_bits_, i, j, k);
