@@ -178,9 +178,9 @@ EventData DoDemul::Launch(size_t tag) {
       mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_zf_ptr, (MKL_Complex8*)data_ptr,
                      (MKL_Complex8*)equal_ptr);
 #else
-      cx_fmat mat_data(data_ptr, cfg->BsAntNum(), 1, false);
+      cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
 
-      cx_fmat mat_ul_zf(ul_zf_ptr, cfg->UeNum, cfg->BsAntNum(), false);
+      cx_fmat mat_ul_zf(ul_zf_ptr, cfg_->UeNum(), cfg_->BsAntNum(), false);
       mat_equaled = mat_ul_zf * mat_data;
 #endif
 

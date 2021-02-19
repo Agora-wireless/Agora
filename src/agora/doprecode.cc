@@ -197,9 +197,9 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
   my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
             (MKL_Complex8*)precoded_ptr);
 #else
-  cx_fmat mat_precoder(precoder_ptr, cfg->BsAntNum(), cfg->UeNum(), false);
-  cx_fmat mat_data(data_ptr, cfg->UeNum(), 1, false);
-  cx_fmat mat_precoded(precoded_ptr, cfg->BsAntNum(), 1, false);
+  cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->UeNum(), false);
+  cx_fmat mat_data(data_ptr, cfg_->UeNum(), 1, false);
+  cx_fmat mat_precoded(precoded_ptr, cfg_->BsAntNum(), 1, false);
   mat_precoded = mat_precoder * mat_data;
   // cout << "Precoder: \n" << mat_precoder << endl;
   // cout << "Data: \n" << mat_data << endl;

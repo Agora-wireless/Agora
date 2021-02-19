@@ -654,9 +654,9 @@ void* RadioTxRx::LoopTxRxArgosSync(int tid) {
               tid, frame_id, symbol_id, radio_id, rx_time);
         }
       } else {
-        struct Packet* pkt =
+        struct Packet* rx_pkt =
             RecvEnqueueArgos(tid, radio_id, frame_id, symbol_id, cursor, false);
-        if (pkt == nullptr) {
+        if (rx_pkt == nullptr) {
           break;
         }
 
