@@ -10,8 +10,6 @@
 #include "scrambler.h"
 #include "utils_ldpc.h"
 
-using namespace arma;
-
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
 static constexpr bool kPrintLLRData = false;
@@ -698,9 +696,9 @@ void PhyUe::DoFft(int tid, size_t tag) {
 
   size_t csi_offset = frame_slot * config_->UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
-      reinterpret_cast<cx_float*>(csi_buffer_[csi_offset].data());
+      reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset].data());
   auto* fft_buffer_ptr =
-      reinterpret_cast<cx_float*>(fft_buffer_[fft_buffer_target_id]);
+      reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
 
   EventData fft_finish_event;
 
@@ -718,7 +716,7 @@ void PhyUe::DoFft(int tid, size_t tag) {
       // in the downlink receiver
       complex_float p = config_->UeSpecificPilot()[0][j];
       size_t sc_id = non_null_sc_ind_[j];
-      csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / cx_float(p.re, p.im));
+      csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / arma::cx_float(p.re, p.im));
       if (dl_symbol_id == dl_pilot_symbol_perframe_ - 1) {
         csi_buffer_ptr[j] /= dl_pilot_symbol_perframe_;
       }
@@ -729,12 +727,12 @@ void PhyUe::DoFft(int tid, size_t tag) {
     size_t eq_buffer_offset =
         total_dl_data_symbol_id * config_->UeAntNum() + ant_id;
 
-    auto* equ_buffer_ptr =
-        reinterpret_cast<cx_float*>(equal_buffer_[eq_buffer_offset].data());
+    auto* equ_buffer_ptr = reinterpret_cast<arma::cx_float*>(
+        equal_buffer_[eq_buffer_offset].data());
 
     // use pilot subcarriers for phase tracking and correction
     float theta = 0;
-    cx_float csi(1, 0);
+    arma::cx_float csi(1, 0);
     for (size_t j = 0; j < config_->OfdmDataNum(); j++) {
       if (j % config_->OfdmPilotSpacing() == 0) {
         equ_buffer_ptr[j] = 0;
@@ -742,18 +740,18 @@ void PhyUe::DoFft(int tid, size_t tag) {
           csi = csi_buffer_ptr[j];
         }
         size_t sc_id = non_null_sc_ind_[j];
-        cx_float y = fft_buffer_ptr[sc_id];
+        arma::cx_float y = fft_buffer_ptr[sc_id];
         auto pilot_eq = y / csi;
         // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
         // in the downlink receiver
         auto p = config_->UeSpecificPilot()[0][j];
-        theta += arg(pilot_eq * cx_float(p.re, -p.im));
+        theta += arg(pilot_eq * arma::cx_float(p.re, -p.im));
       }
     }
     if (config_->GetOFDMPilotNum() > 0) {
       theta /= config_->GetOFDMPilotNum();
     }
-    auto phc = exp(cx_float(0, -theta));
+    auto phc = exp(arma::cx_float(0, -theta));
     float evm = 0;
     for (size_t j = 0; j < config_->OfdmDataNum(); j++) {
       if (j % config_->OfdmPilotSpacing() != 0) {
@@ -762,19 +760,19 @@ void PhyUe::DoFft(int tid, size_t tag) {
         if (dl_pilot_symbol_perframe_ > 0) {
           csi = csi_buffer_ptr[j];
         }
-        cx_float y = fft_buffer_ptr[sc_id];
+        arma::cx_float y = fft_buffer_ptr[sc_id];
         equ_buffer_ptr[j] = (y / csi) * phc;
         complex_float tx =
             config_->DlIqF()[dl_symbol_id][ant_id * config_->OfdmCaNum() +
                                            config_->OfdmDataStart() + j];
-        evm += std::norm(equ_buffer_ptr[j] - cx_float(tx.re, tx.im));
+        evm += std::norm(equ_buffer_ptr[j] - arma::cx_float(tx.re, tx.im));
       }
     }
     if (kPrintEqualizedSymbols) {
       complex_float* tx =
           &config_->DlIqF()[dl_symbol_id][ant_id * config_->OfdmCaNum() +
                                           config_->OfdmDataStart()];
-      arma::cx_fvec x_vec(reinterpret_cast<cx_float*>(tx),
+      arma::cx_fvec x_vec(reinterpret_cast<arma::cx_float*>(tx),
                           config_->OfdmDataNum(), false);
       Utils::PrintVec(x_vec, std::string("x") +
                                  std::to_string(total_dl_symbol_id) +

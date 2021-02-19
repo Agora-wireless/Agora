@@ -8,8 +8,6 @@
 
 #include "datatype_conversion.h"
 
-using namespace arma;
-
 static std::atomic<bool> running = true;
 static constexpr bool kPrintChannelOutput = false;
 static const size_t kDefaultQueueSize = 36;
@@ -443,7 +441,7 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
                       std::vector<char>& tx_buffer, size_t buffer_offset,
                       std::vector<int>& send_socket,
                       std::vector<struct sockaddr_in>& servaddr,
-                      cx_fmat& format_dest) {
+                      arma::cx_fmat& format_dest) {
   auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer.at(buffer_offset));
   SimdConvertFloatToShort(reinterpret_cast<float*>(format_dest.memptr()),
                           dst_ptr, 2 * bscfg_->SampsPerSymbol() * max_ant);
@@ -487,13 +485,13 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
 
   // convert received data to complex float,
   // apply channel, convert back to complex short to TX
-  cx_fmat fmat_src =
-      zeros<cx_fmat>(bscfg_->SampsPerSymbol(), uecfg_->UeAntNum());
+  arma::cx_fmat fmat_src =
+      arma::zeros<arma::cx_fmat>(bscfg_->SampsPerSymbol(), uecfg_->UeAntNum());
   SimdConvertShortToFloat(src_ptr, reinterpret_cast<float*>(fmat_src.memptr()),
                           2 * bscfg_->SampsPerSymbol() * uecfg_->UeAntNum());
 
   // Apply Channel
-  cx_fmat fmat_dst;
+  arma::cx_fmat fmat_dst;
   bool is_downlink = false;
   bool is_new_frame = false;
 
@@ -535,13 +533,13 @@ void ChannelSim::DoTxUser(int tid, size_t tag) {
 
   // convert received data to complex float,
   // apply channel, convert back to complex short to TX
-  cx_fmat fmat_src =
-      zeros<cx_fmat>(bscfg_->SampsPerSymbol(), bscfg_->BsAntNum());
+  arma::cx_fmat fmat_src =
+      arma::zeros<arma::cx_fmat>(bscfg_->SampsPerSymbol(), bscfg_->BsAntNum());
   SimdConvertShortToFloat(src_ptr, reinterpret_cast<float*>(fmat_src.memptr()),
                           2 * bscfg_->SampsPerSymbol() * bscfg_->BsAntNum());
 
   // Apply Channel
-  cx_fmat fmat_dst;
+  arma::cx_fmat fmat_dst;
   bool is_downlink = true;
   bool is_new_frame = false;
 

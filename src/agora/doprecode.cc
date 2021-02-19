@@ -6,7 +6,6 @@
 
 #include "concurrent_queue_wrapper.h"
 
-using namespace arma;
 static constexpr bool kUseSpatialLocality = true;
 
 DoPrecode::DoPrecode(
@@ -185,21 +184,22 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
 
 void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
                                size_t sc_id_in_block) {
-  auto* precoder_ptr = reinterpret_cast<cx_float*>(
+  auto* precoder_ptr = reinterpret_cast<arma::cx_float*>(
       dl_zf_matrices_[frame_slot][cfg_->GetZfScId(sc_id)]);
-  auto* data_ptr = reinterpret_cast<cx_float*>(
+  auto* data_ptr = reinterpret_cast<arma::cx_float*>(
       modulated_buffer_temp_ +
       (kUseSpatialLocality ? (sc_id_in_block % kSCsPerCacheline * cfg_->UeNum())
                            : 0));
-  auto* precoded_ptr = reinterpret_cast<cx_float*>(
+  auto* precoded_ptr = reinterpret_cast<arma::cx_float*>(
       precoded_buffer_temp_ + sc_id_in_block * cfg_->BsAntNum());
 #if USE_MKL_JIT
   my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
             (MKL_Complex8*)precoded_ptr);
 #else
-  cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->UeNum(), false);
-  cx_fmat mat_data(data_ptr, cfg_->UeNum(), 1, false);
-  cx_fmat mat_precoded(precoded_ptr, cfg_->BsAntNum(), 1, false);
+  arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->UeNum(),
+                             false);
+  arma::cx_fmat mat_data(data_ptr, cfg_->UeNum(), 1, false);
+  arma::cx_fmat mat_precoded(precoded_ptr, cfg_->BsAntNum(), 1, false);
   mat_precoded = mat_precoder * mat_data;
   // cout << "Precoder: \n" << mat_precoder << endl;
   // cout << "Data: \n" << mat_data << endl;

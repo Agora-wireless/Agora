@@ -7,8 +7,6 @@
 #include "concurrent_queue_wrapper.h"
 #include "datatype_conversion.h"
 
-using namespace arma;
-
 static constexpr bool kPrintFFTInput = false;
 static constexpr bool kPrintIFFTOutput = false;
 static constexpr bool kPrintSocketOutput = false;

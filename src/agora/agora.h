@@ -64,7 +64,17 @@ class Agora {
     kDownlinkComplete = 0x2,
     kProcessingComplete = (kUplinkComplete + kDownlinkComplete)
   };
-  bool CheckWorkComplete(size_t frame_id);
+
+  /// Determines if all the work has been completed on the frame_id
+  /// Completion is determined based on the ifft, tx, decode, and tomac
+  /// counters. If frame processing is complete.  All of the work counters are
+  /// reset and the cur_proc_frame_id_ is incremented.  Returns true if all
+  /// processing is complete AND the frame_id is the last frame to test. False
+  /// otherwise.
+  bool CheckFrameComplete(size_t frame_id);
+
+  /// Increments the cur_sche_frame_id when all ScheduleProcessingFlags have
+  /// been acheived.
   void CheckIncrementScheduleFrame(size_t frame_id,
                                    ScheduleProcessingFlags completed);
 

@@ -6,8 +6,6 @@
 
 #include <cmath>
 
-using namespace arma;
-
 PhyStats::PhyStats(Config* const cfg) : config_(cfg) {
   const size_t task_buffer_symbol_num_ul = cfg->Frame().NumULSyms() * kFrameWnd;
   decoded_bits_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
@@ -29,9 +27,10 @@ PhyStats::PhyStats(Config* const cfg) : config_(cfg) {
                      Agora_memory::Alignment_t::kAlign64);
 
   if (cfg->Frame().NumULSyms() > 0) {
-    auto* ul_iq_f_ptr = reinterpret_cast<cx_float*>(
+    auto* ul_iq_f_ptr = reinterpret_cast<arma::cx_float*>(
         cfg->UlIqF()[cfg->Frame().ClientUlPilotSymbols()]);
-    cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(), false);
+    arma::cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(),
+                              false);
     ul_gt_mat_ = ul_iq_f_mat.st();
     ul_gt_mat_ =
         ul_gt_mat_.cols(cfg->OfdmDataStart(), (cfg->OfdmDataStop() - 1));
@@ -83,7 +82,8 @@ void PhyStats::PrintPhyStats() {
 }
 
 void PhyStats::PrintEvmStats(size_t frame_id) {
-  fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeNum(), 1, false);
+  arma::fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeNum(), 1,
+                     false);
   evm_mat = sqrt(evm_mat) / config_->OfdmDataNum();
   std::stringstream ss;
   ss << "Frame " << frame_id << " Constellation:\n"
@@ -109,9 +109,10 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
 
 void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id,
                               complex_float* fft_data) {
-  cx_fmat fft_mat((cx_float*)fft_data, config_->OfdmCaNum(), 1, false);
-  fmat fft_abs_mat = abs(fft_mat);
-  fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
+  arma::cx_fmat fft_mat((arma::cx_float*)fft_data, config_->OfdmCaNum(), 1,
+                        false);
+  arma::fmat fft_abs_mat = abs(fft_mat);
+  arma::fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
   float rssi = as_scalar(sum(fft_abs_mag));
   float noise_per_sc1 =
       as_scalar(mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
@@ -123,11 +124,11 @@ void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id,
 }
 
 void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
-                              const cx_fmat& eq) {
+                              const arma::cx_fmat& eq) {
   if (this->config_->Frame().NumULSyms() > 0) {
-    fmat evm = abs(eq - ul_gt_mat_.col(sc_id));
-    fmat cur_evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeNum(), 1,
-                     false);
+    arma::fmat evm = abs(eq - ul_gt_mat_.col(sc_id));
+    arma::fmat cur_evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeNum(),
+                           1, false);
     cur_evm_mat += evm % evm;
   }
 }
