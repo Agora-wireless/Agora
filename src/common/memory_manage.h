@@ -44,7 +44,8 @@ class Table {
   void Calloc(size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment) {
     // RtAssert(((dim1 > 0) && (dim2 == 0)), "Table: Calloc one dimension = 0");
     this->Malloc(dim1, dim2, alignment);
-    std::memset(this->data_, 0, (this->dim1_ * this->dim2_ * sizeof(T)));
+    std::memset(static_cast<void*>(this->data_), 0,
+                (this->dim1_ * this->dim2_ * sizeof(T)));
   }
 
   // Allocate the table and fill it with random floating point values between
@@ -103,7 +104,7 @@ static void AllocBuffer1d(T** buffer, U dim,
   // RtAssert(((dim > 0)), "AllocBuffer1d: size = 0");
   *buffer = static_cast<T*>(Agora_memory::PaddedAlignedAlloc(alignment, size));
   if (init_zero) {
-    std::memset(*buffer, 0u, size);
+    std::memset(static_cast<void*>(*buffer), 0u, size);
   }
 };
 
