@@ -415,7 +415,7 @@ void Agora::Start() {
               PrintPerFrameDone(PrintType::kDecode, frame_id);
               if (kEnableMac == false) {
                 assert(this->cur_proc_frame_id_ == frame_id);
-                bool work_finished = this->CheckWorkComplete(frame_id);
+                bool work_finished = this->CheckFrameComplete(frame_id);
                 if (work_finished == true) {
                   goto finish;
                 }
@@ -447,7 +447,7 @@ void Agora::Start() {
               assert(this->cur_proc_frame_id_ == frame_id);
               // this->stats_->MasterSetTsc(TsType::kMacTXDone, frame_id);
               PrintPerFrameDone(PrintType::kPacketToMac, frame_id);
-              bool work_finished = this->CheckWorkComplete(frame_id);
+              bool work_finished = this->CheckFrameComplete(frame_id);
               if (work_finished == true) {
                 goto finish;
               }
@@ -546,7 +546,7 @@ void Agora::Start() {
                 PrintPerFrameDone(PrintType::kIFFT, frame_id);
                 assert(frame_id == this->cur_proc_frame_id_);
                 this->CheckIncrementScheduleFrame(frame_id, kDownlinkComplete);
-                bool work_finished = this->CheckWorkComplete(frame_id);
+                bool work_finished = this->CheckFrameComplete(frame_id);
                 if (work_finished == true) {
                   goto finish;
                 }
@@ -577,7 +577,7 @@ void Agora::Start() {
               this->stats_->MasterSetTsc(TsType::kTXDone, frame_id);
               PrintPerFrameDone(PrintType::kPacketTX, frame_id);
 
-              bool work_finished = this->CheckWorkComplete(frame_id);
+              bool work_finished = this->CheckFrameComplete(frame_id);
               if (work_finished == true) {
                 goto finish;
               }
@@ -1452,9 +1452,10 @@ void Agora::GetEqualData(float** ptr, int* size) {
   *ptr = (float*)&equal_buffer_[offset][0];
   *size = cfg->UeNum() * cfg->OfdmDataNum() * 2;
 }
-void Agora::CheckIncrementScheduleFrame(size_t /*frame_id*/,
+void Agora::CheckIncrementScheduleFrame(size_t frame_id,
                                         ScheduleProcessingFlags completed) {
   this->schedule_process_flags_ += completed;
+  assert(this->cur_sche_frame_id_ == frame_id);
 
   if (this->schedule_process_flags_ ==
       static_cast<uint8_t>(ScheduleProcessingFlags::kProcessingComplete)) {
@@ -1470,7 +1471,7 @@ void Agora::CheckIncrementScheduleFrame(size_t /*frame_id*/,
   }
 }
 
-bool Agora::CheckWorkComplete(size_t frame_id) {
+bool Agora::CheckFrameComplete(size_t frame_id) {
   bool finished = false;
 
   MLPD_TRACE(

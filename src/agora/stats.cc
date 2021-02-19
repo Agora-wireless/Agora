@@ -14,9 +14,7 @@ Stats::Stats(const Config* const cfg)
       demul_thread_num_(cfg->DemulThreadNum()),
       decode_thread_num_(cfg->DecodeThreadNum()),
       freq_ghz_(cfg->FreqGhz()),
-      creation_tsc_(GetTime::Rdtsc()),
-      doer_us_(),
-      doer_breakdown_us_() {
+      creation_tsc_(GetTime::Rdtsc()) {
   frame_start_.Calloc(config_->SocketThreadNum(), kNumStatsFrames,
                       Agora_memory::Alignment_t::kAlign64);
 }
