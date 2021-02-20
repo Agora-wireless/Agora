@@ -8,6 +8,8 @@
 
 #include "symbols.h"
 
+namespace GetTime {
+
 // Get current time in microseconds
 static inline double GetTimeUs() {
   struct timespec tv;
@@ -37,7 +39,7 @@ static inline size_t WorkerRdtsc() {
 static inline void NanoSleep(size_t ns, double freq_ghz) {
   size_t start = Rdtsc();
   size_t end = start;
-  size_t upp = static_cast<size_t>(freq_ghz * ns);
+  auto upp = static_cast<size_t>(freq_ghz * ns);
   while (end - start < upp) {
     end = Rdtsc();
   }
@@ -60,21 +62,21 @@ static inline double MeasureRdtscFreq() {
   }
   if (sum != 13580802877818827968ull) {
     std::printf("Error in RDTSC freq measurement");
-    std::exit(-1);
+    throw std::runtime_error("Error in RDTSC freq measurement");
   }
 
   clock_gettime(CLOCK_REALTIME, &end);
   uint64_t clock_ns =
       static_cast<uint64_t>(end.tv_sec - start.tv_sec) * 1000000000 +
       static_cast<uint64_t>(end.tv_nsec - start.tv_nsec);
-  uint64_t rdtsc_cycles = Rdtsc() - rdtsc_start;
+  uint64_t rdtsc_cycles = GetTime::Rdtsc() - rdtsc_start;
 
   double freq_ghz = rdtsc_cycles * 1.0 / clock_ns;
 
   // RDTSC frequencies outside these ranges are rare
   if (freq_ghz < 1.0 && freq_ghz > 4.0) {
     std::printf("Invalid RDTSC frequency %.2f\n", freq_ghz);
-    std::exit(-1);
+    throw std::runtime_error("Invalid RDTSC frequency");
   }
   return freq_ghz;
 }
@@ -127,5 +129,7 @@ static inline double NsSince(const struct timespec& t0) {
   clock_gettime(CLOCK_REALTIME, &t1);
   return (t1.tv_sec - t0.tv_sec) * 1000000000.0 + (t1.tv_nsec - t0.tv_nsec);
 }
+
+};  // end namespace GetTime
 
 #endif  // GETTIME_INC_

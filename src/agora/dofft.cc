@@ -7,8 +7,6 @@
 #include "concurrent_queue_wrapper.h"
 #include "datatype_conversion.h"
 
-using namespace arma;
-
 static constexpr bool kPrintFFTInput = false;
 static constexpr bool kPrintIFFTOutput = false;
 static constexpr bool kPrintSocketOutput = false;
@@ -53,8 +51,7 @@ DoFFT::~DoFFT() {
   DftiFreeDescriptor(&mkl_handle_);
   std::free(fft_inout_);
   std::free(rx_samps_tmp_);
-  calib_ul_buffer_.Free();
-  calib_dl_buffer_.Free();
+  std::free(temp_16bits_iq_);
 }
 
 // @brief
@@ -93,7 +90,7 @@ static inline void CalibRegressionEstimate(const arma::cx_fvec& in_vec,
 EventData DoFFT::Launch(size_t tag) {
   size_t socket_thread_id = fft_req_tag_t(tag).tid_;
   size_t buf_offset = fft_req_tag_t(tag).offset_;
-  size_t start_tsc = WorkerRdtsc();
+  size_t start_tsc = GetTime::WorkerRdtsc();
   auto* pkt = (Packet*)(socket_buffer_[socket_thread_id] +
                         buf_offset * cfg_->PacketLength());
   size_t frame_id = pkt->frame_id_;
@@ -102,7 +99,7 @@ EventData DoFFT::Launch(size_t tag) {
   size_t ant_id = pkt->ant_id_;
   SymbolType sym_type = cfg_->GetSymbolType(symbol_id);
 
-  if (cfg_->FftInRru()) {
+  if (cfg_->FftInRru() == true) {
     SimdConvertFloat16ToFloat32(
         reinterpret_cast<float*>(fft_inout_),
         reinterpret_cast<float*>(&pkt->data_[2 * cfg_->OfdmRxZeroPrefixBs()]),
@@ -170,24 +167,24 @@ EventData DoFFT::Launch(size_t tag) {
     duration_stat = &dummy_duration_stat;  // For calibration symbols
   }
 
-  size_t start_tsc1 = WorkerRdtsc();
+  size_t start_tsc1 = GetTime::WorkerRdtsc();
   duration_stat->task_duration_[1] += start_tsc1 - start_tsc;
 
-  if (!cfg_->FftInRru()) {
+  if (!cfg_->FftInRru() == true) {
     DftiComputeForward(
         mkl_handle_,
         reinterpret_cast<float*>(fft_inout_));  // Compute FFT in-place
   }
 
-  size_t start_tsc2 = WorkerRdtsc();
+  size_t start_tsc2 = GetTime::WorkerRdtsc();
   duration_stat->task_duration_[2] += start_tsc2 - start_tsc1;
 
   if (sym_type == SymbolType::kPilot) {
+    size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
     if (kCollectPhyStats) {
-      phy_stats_->UpdatePilotSnr(
-          frame_id, cfg_->Frame().GetPilotSymbolIdx(symbol_id), fft_inout_);
+      phy_stats_->UpdatePilotSnr(frame_id, pilot_symbol_id, fft_inout_);
     }
-    const size_t ue_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
+    const size_t ue_id = pilot_symbol_id;
     PartialTranspose(csi_buffers_[frame_slot][ue_id], ant_id,
                      SymbolType::kPilot);
   } else if (sym_type == SymbolType::kUL) {
@@ -215,13 +212,16 @@ EventData DoFFT::Launch(size_t tag) {
       PartialTranspose(calib_dl_ptr, ant_id, sym_type);
     }
   } else {
-    RtAssert(false, "Unknown or unsupported symbol type");
+    std::string error_message = "Unknown or unsupported symbol type " +
+                                std::to_string(static_cast<int>(sym_type)) +
+                                "\n";
+    RtAssert(false, error_message);
   }
 
-  duration_stat->task_duration_[3] += WorkerRdtsc() - start_tsc2;
+  duration_stat->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc2;
   socket_buffer_status_[socket_thread_id][buf_offset] = 0;  // Reset sock buf
   duration_stat->task_count_++;
-  duration_stat->task_duration_[0] += WorkerRdtsc() - start_tsc;
+  duration_stat->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
   return EventData(EventType::kFFT,
                    gen_tag_t::FrmSym(pkt->frame_id_, pkt->symbol_id_).tag_);
 }
@@ -241,8 +241,8 @@ void DoFFT::PartialTranspose(complex_float* out_buf, size_t ant_id,
       const complex_float* src = &fft_inout_[sc_idx + cfg_->OfdmDataStart()];
 
       complex_float* dst = nullptr;
-      if (symbol_type == SymbolType::kCalDL ||
-          symbol_type == SymbolType::kCalUL) {
+      if ((symbol_type == SymbolType::kCalDL) ||
+          (symbol_type == SymbolType::kCalUL)) {
         dst = &out_buf[sc_idx];
       } else {
         dst = kUsePartialTrans
@@ -328,10 +328,13 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
   ifft_scale_factor_ = cfg_->OfdmCaNum() / std::sqrt(cfg_->BfAntNum() * 1.f);
 }
 
-DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle_); }
+DoIFFT::~DoIFFT() {
+  DftiFreeDescriptor(&mkl_handle_);
+  std::free(ifft_out_);
+}
 
 EventData DoIFFT::Launch(size_t tag) {
-  size_t start_tsc = WorkerRdtsc();
+  size_t start_tsc = GetTime::WorkerRdtsc();
   size_t ant_id = gen_tag_t(tag).ant_id_;
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
@@ -346,7 +349,7 @@ EventData DoIFFT::Launch(size_t tag) {
                    cfg_->BsAntNum()) +
                   ant_id;
 
-  size_t start_tsc1 = WorkerRdtsc();
+  size_t start_tsc1 = GetTime::WorkerRdtsc();
   duration_stat_->task_duration_[1] += start_tsc1 - start_tsc;
 
   auto* ifft_in_ptr = reinterpret_cast<float*>(dl_ifft_buffer_[offset]);
@@ -387,19 +390,19 @@ EventData DoIFFT::Launch(size_t tag) {
     std::cout << ss.str();
   }
 
-  size_t start_tsc2 = WorkerRdtsc();
+  size_t start_tsc2 = GetTime::WorkerRdtsc();
   duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
 
-  struct Packet* pkt =
-      (struct Packet*)&dl_socket_buffer_[offset * cfg_->DlPacketLength()];
+  auto* pkt = reinterpret_cast<struct Packet*>(
+      &dl_socket_buffer_[offset * cfg_->DlPacketLength()]);
   short* socket_ptr = &pkt->data_[2 * cfg_->OfdmTxZeroPrefix()];
 
-  // IFFT scaled results by OFDM_CA_NUM, we scale down IFFT results
+  // IFFT scaled results by OfdmCaNum(), we scale down IFFT results
   // during data type coversion
   SimdConvertFloatToShort(ifft_out_ptr, socket_ptr, cfg_->OfdmCaNum(),
                           cfg_->CpLen(), ifft_scale_factor_);
 
-  duration_stat_->task_duration_[3] += WorkerRdtsc() - start_tsc2;
+  duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc2;
 
   if (kPrintSocketOutput) {
     std::stringstream ss;
@@ -412,6 +415,6 @@ EventData DoIFFT::Launch(size_t tag) {
   }
 
   duration_stat_->task_count_++;
-  duration_stat_->task_duration_[0] += WorkerRdtsc() - start_tsc;
+  duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
   return EventData(EventType::kIFFT, tag);
 }

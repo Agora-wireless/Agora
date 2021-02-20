@@ -3,7 +3,6 @@
  * @brief Read the input files into z-bit segments; regroup the output from
  * z-bit segments to bytes
  */
-
 #include "iobuffer.h"
 
 #include <cassert>

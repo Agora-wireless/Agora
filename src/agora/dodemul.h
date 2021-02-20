@@ -73,7 +73,7 @@ class DoDemul : public Doer {
   // Intermediate buffers for equalized data
   complex_float* equaled_buffer_temp_;
   complex_float* equaled_buffer_temp_transposed_;
-  cx_fmat ue_pilot_data_;
+  arma::cx_fmat ue_pilot_data_;
   int ue_num_simd256_;
 
 #if USE_MKL_JIT

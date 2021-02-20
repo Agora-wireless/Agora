@@ -34,25 +34,18 @@ class DataGenerator {
     }
   }
 
-  /**
-   * @brief Generate one information bit sequence and the corresponding
-   * encoded bit sequence for one code block for the active LDPC configuration
-   *
-   * @param information The generated input bit sequence
-   * @param encoded_codeword The generated encoded codeword bit sequence
-   * @param ue_id ID of the UE that this codeblock belongs to
-   */
-  void GenCodeblock(std::vector<int8_t>& information,
-                    std::vector<int8_t>& encoded_codeword, size_t ue_id) {
-    const LDPCconfig& lc = cfg_->LdpcConfig();
-    std::vector<int8_t> parity;
-    parity.resize(
-        LdpcEncodingParityBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
+  void DoDataGeneration(const std::string& directory);
 
+  /**
+   * @brief                        Generate one raw information bit sequence
+   *
+   * @param  information           The generated input bit sequence
+   * @param  ue_id                 ID of the UE that this codeblock belongs to
+   */
+  void GenRawData(std::vector<int8_t>& information, size_t ue_id) {
+    const LDPCconfig& lc = cfg_->LdpcConfig();
     information.resize(
         LdpcEncodingInputBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
-    encoded_codeword.resize(
-        LdpcEncodingEncodedBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
 
     for (size_t i = 0; i < lc.NumInputBytes(); i++) {
       if (profile_ == Profile::kRandom) {
@@ -61,13 +54,30 @@ class DataGenerator {
         information.at(i) = 1 + (ue_id * 3) + (i % 3);
       }
     }
+  }
+
+  /**
+   * @brief                        Generate the encoded bit sequence for one
+   * code block for the active LDPC configuration from the input bit sequence
+   *
+   * @param  input_ptr             The input bit sequence to be encoded
+   * @param  encoded_codeword      The generated encoded codeword bit sequence
+   */
+  void GenCodeblock(const int8_t* input_ptr,
+                    std::vector<int8_t>& encoded_codeword) {
+    const LDPCconfig& lc = cfg_->LdpcConfig();
+    std::vector<int8_t> parity;
+    parity.resize(
+        LdpcEncodingParityBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
+
+    encoded_codeword.resize(
+        LdpcEncodingEncodedBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
 
     LdpcEncodeHelper(cfg_->LdpcConfig().BaseGraph(),
                      cfg_->LdpcConfig().ExpansionFactor(),
                      cfg_->LdpcConfig().NumRows(), &encoded_codeword.at(0),
-                     &parity.at(0), &information.at(0));
+                     &parity.at(0), input_ptr);
 
-    information.resize(lc.NumInputBytes());
     encoded_codeword.resize(lc.NumEncodedBytes());
   }
 

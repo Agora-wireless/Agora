@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "phy_ldpc_decoder_5gnr.h"
+#include "scrambler.h"
 #include "utils_ldpc.h"
 
 static constexpr bool kDebugPrintPacketsFromMac = false;
@@ -16,8 +17,10 @@ static constexpr bool kPrintDecodedData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr size_t kRecordFrameIndex = 1000;
+static const size_t kDefaultQueueSize = 36;
 
-PhyUe::PhyUe(Config* config) {
+PhyUe::PhyUe(Config* config)
+    : scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   srand(time(nullptr));
 
   this->config_ = config;
@@ -38,36 +41,37 @@ PhyUe::PhyUe(Config* config) {
     for (size_t j = config->OfdmTxZeroPrefix();
          j < config_->SampsPerSymbol() - config->OfdmTxZeroPostfix(); j++) {
       ue_pilot_vec_[i].push_back(std::complex<float>(
-          config_->UeSpecificPilotT()[i][j].real() / 32768.0,
-          config_->UeSpecificPilotT()[i][j].imag() / 32768.0));
+          config_->UeSpecificPilotT()[i][j].real() / 32768.0f,
+          config_->UeSpecificPilotT()[i][j].imag() / 32768.0f));
     }
   }
 
   fft_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * dl_symbol_perframe_ * config_->UeAntNum() * 36);
+      kFrameWnd * dl_symbol_perframe_ * config_->UeAntNum() *
+      kDefaultQueueSize);
   demul_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * dl_data_symbol_perframe_ * config_->UeAntNum() * 36);
+      kFrameWnd * dl_data_symbol_perframe_ * config_->UeAntNum() *
+      kDefaultQueueSize);
   decode_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * dl_data_symbol_perframe_ * config_->UeAntNum() * 36);
+      kFrameWnd * dl_data_symbol_perframe_ * config_->UeAntNum() *
+      kDefaultQueueSize);
   message_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() * 36);
-  encode_queue_ =
-      moodycamel::ConcurrentQueue<EventData>(kFrameWnd * config_->UeNum() * 36);
-  modul_queue_ =
-      moodycamel::ConcurrentQueue<EventData>(kFrameWnd * config_->UeNum() * 36);
-  ifft_queue_ =
-      moodycamel::ConcurrentQueue<EventData>(kFrameWnd * config_->UeNum() * 36);
-  tx_queue_ =
-      moodycamel::ConcurrentQueue<EventData>(kFrameWnd * config_->UeNum() * 36);
-  to_mac_queue_ =
-      moodycamel::ConcurrentQueue<EventData>(kFrameWnd * config_->UeNum() * 36);
+      kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
+      kDefaultQueueSize);
+  encode_queue_ = moodycamel::ConcurrentQueue<EventData>(
+      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
+  modul_queue_ = moodycamel::ConcurrentQueue<EventData>(
+      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
+  ifft_queue_ = moodycamel::ConcurrentQueue<EventData>(
+      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
+  tx_queue_ = moodycamel::ConcurrentQueue<EventData>(
+      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
+  to_mac_queue_ = moodycamel::ConcurrentQueue<EventData>(
+      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
     rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(message_queue_);
     tx_ptoks_ptr_[i] = new moodycamel::ProducerToken(tx_queue_);
-  }
-
-  for (size_t i = 0; i < rx_thread_num_; i++) {
     mac_rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(message_queue_);
     mac_tx_ptoks_ptr_[i] = new moodycamel::ProducerToken(to_mac_queue_);
   }
@@ -86,15 +90,13 @@ PhyUe::PhyUe(Config* config) {
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> dummy_decoded_buffer;
 
     const size_t mac_cpu_core = config_->CoreOffset() + 1 + rx_thread_num_;
-    mac_thread_ = new MacThread(
+    mac_thread_ = std::make_unique<MacThread>(
         MacThread::Mode::kClient, config_, mac_cpu_core, dummy_decoded_buffer,
-        &ul_bits_buffer_, &ul_bits_buffer_status_, nullptr /* dl bits buffer */,
+        &ul_bits_buffer_, &ul_bits_buffer_status_, nullptr, /* dl bits buffer */
         nullptr /* dl bits buffer status */, &to_mac_queue_, &message_queue_);
 
-    mac_std_thread_ = std::thread(&MacThread::RunEventLoop, mac_thread_);
+    mac_std_thread_ = std::thread(&MacThread::RunEventLoop, mac_thread_.get());
   }
-
-  std::printf("initializing buffers...\n");
 
   // uplink buffers init (tx)
   InitializeUplinkBuffers();
@@ -106,55 +108,54 @@ PhyUe::PhyUe(Config* config) {
   (void)DftiCommitDescriptor(mkl_handle_);
 
   // initilize all kinds of checkers
-  std::memset(fft_status_, 0, sizeof(size_t) * kFrameWnd);
+  fft_status_.fill(0);
   for (auto& i : fft_checker_) {
-    i = new size_t[config_->UeAntNum()];
-    std::memset(i, 0, sizeof(size_t) * (config_->UeAntNum()));
+    // 0 init
+    i = std::vector<size_t>(config_->UeAntNum());
   }
 
-  std::memset(demul_status_, 0, sizeof(size_t) * kFrameWnd);
+  demul_status_.fill(0);
+  decode_status_.fill(0);
+  frame_dl_process_time_.fill(0);
+
   if (dl_data_symbol_perframe_ > 0) {
     for (auto& i : demul_checker_) {
-      i = new size_t[config_->UeAntNum()];
-      std::memset(i, 0, sizeof(size_t) * (config_->UeAntNum()));
+      i = std::vector<size_t>(config_->UeAntNum());
     }
-  }
 
-  std::memset(decode_status_, 0, sizeof(size_t) * kFrameWnd);
-  if (dl_data_symbol_perframe_ > 0) {
     for (auto& i : decode_checker_) {
-      i = new size_t[config_->UeAntNum()];
-      std::memset(i, 0, sizeof(size_t) * (config_->UeAntNum()));
+      i = std::vector<size_t>(config_->UeAntNum());
     }
   }
 
-  std::memset(frame_dl_process_time_, 0, sizeof(size_t) * kFrameWnd * kMaxUEs);
-
-  // create task thread
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
-    auto* context = new EventHandlerContext();
-    context->obj_ptr_ = this;
-    context->id_ = i;
-
-    // std::printf("create thread %d\n", i);
-    if (pthread_create(&task_threads_[i], nullptr, TaskThreadLaunch, context) !=
-        0) {
-      perror("task thread create failed");
-      std::exit(0);
-    }
+    task_threads_.at(i) = std::thread(&PhyUe::TaskThread, this, i);
   }
 }
 
 PhyUe::~PhyUe() {
-  DftiFreeDescriptor(&mkl_handle_);
-  // release FFT_buffer
-  fft_buffer_.Free();
-  ifft_buffer_.Free();
-  std::free(rx_samps_tmp_);
-  if (kEnableMac) {
+  for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
+    std::printf("Joining Phy worker: %zu : %zu\n", i,
+                config_->WorkerThreadNum());
+    task_threads_.at(i).join();
+    delete task_ptok_[i];
+  }
+
+  if (kEnableMac == true) {
     mac_std_thread_.join();
   }
-  delete mac_thread_;
+
+  for (size_t i = 0; i < rx_thread_num_; i++) {
+    delete rx_ptoks_ptr_[i];
+    delete tx_ptoks_ptr_[i];
+    delete mac_rx_ptoks_ptr_[i];
+    delete mac_tx_ptoks_ptr_[i];
+  }
+
+  FreeUplinkBuffers();
+  FreeDownlinkBuffers();
+
+  DftiFreeDescriptor(&mkl_handle_);
 }
 
 void PhyUe::ScheduleTask(EventData do_task,
@@ -164,7 +165,7 @@ void PhyUe::ScheduleTask(EventData do_task,
     std::printf("need more memory\n");
     if (!in_queue->enqueue(ptok, do_task)) {
       std::printf("task enqueue failed\n");
-      std::exit(0);
+      throw std::runtime_error("PhyUe: task enqueue failed");
     }
   }
 }
@@ -173,7 +174,7 @@ void PhyUe::ScheduleTask(EventData do_task,
 //                   UPLINK Operations                  //
 //////////////////////////////////////////////////////////
 void PhyUe::Stop() {
-  std::cout << "stopping threads " << std::endl;
+  std::cout << "PhyUe: Stopping threads " << std::endl;
   config_->Running(false);
   usleep(1000);
   ru_.reset();
@@ -182,9 +183,9 @@ void PhyUe::Stop() {
 void PhyUe::Start() {
   PinToCoreWithOffset(ThreadType::kMaster, config_->CoreOffset(), 0);
 
-  if (!ru_->StartTxRx(rx_buffer_, rx_buffer_status_, rx_buffer_status_size_,
-                      rx_buffer_size_, tx_buffer_, tx_buffer_status_,
-                      tx_buffer_status_size_, tx_buffer_size_)) {
+  if (ru_->StartTxRx(rx_buffer_, rx_buffer_status_, rx_buffer_status_size_,
+                     rx_buffer_size_, tx_buffer_, tx_buffer_status_,
+                     tx_buffer_status_size_, tx_buffer_size_) == false) {
     this->Stop();
     return;
   }
@@ -214,11 +215,11 @@ void PhyUe::Start() {
   EventData events_list[kDequeueBulkSizeTXRX];
   int ret = 0;
   max_equaled_frame_ = 0;
-  size_t frame_id;
-  size_t symbol_id;
-  size_t ant_id;
   size_t cur_frame_id = 0;
-  while (config_->Running() && !SignalHandler::GotExitSignal()) {
+  std::vector<size_t> ifft_next_frame(config_->UeNum());
+  std::vector<size_t> ifft_frame_status(config_->UeNum() * kFrameWnd, SIZE_MAX);
+  while ((config_->Running() == true) &&
+         (SignalHandler::GotExitSignal() == false)) {
     // get a bulk of events
     ret = message_queue_.try_dequeue_bulk(ctok, events_list,
                                           kDequeueBulkSizeTXRX);
@@ -244,60 +245,53 @@ void PhyUe::Start() {
           size_t rx_thread_id = rx_tag_t(event.tags_[0]).tid_;
           size_t offset_in_current_buffer = rx_tag_t(event.tags_[0]).offset_;
 
-          struct Packet* pkt = (struct Packet*)(rx_buffer_[rx_thread_id] +
-                                                offset_in_current_buffer *
-                                                    config_->PacketLength());
-          frame_id = pkt->frame_id_;
-          symbol_id = pkt->symbol_id_;
-          ant_id = pkt->ant_id_;
+          auto* pkt = reinterpret_cast<struct Packet*>(
+              rx_buffer_[rx_thread_id] +
+              offset_in_current_buffer * config_->PacketLength());
+          size_t frame_id = pkt->frame_id_;
+          size_t symbol_id = pkt->symbol_id_;
+          size_t ant_id = pkt->ant_id_;
           size_t ue_id = ant_id / config_->NumChannels();
           RtAssert(pkt->frame_id_ < cur_frame_id + kFrameWnd,
                    "Error: Received packet for future frame beyond frame "
                    "window. This can happen if PHY is running "
                    "slowly, e.g., in debug mode");
 
-          size_t dl_symbol_id = 0;
-          if (config_->Frame().NumDLSyms() > 0) {
-            dl_symbol_id = config_->Frame().GetDLSymbol(0);
+          // Schedule uplink pilots transmission and uplink processing
+          if (symbol_id == config_->Frame().GetBeaconSymbolLast()) {
+            if (ul_data_symbol_perframe_ == 0) {
+              // Send Pilot after receiving last beacon
+              // Only when in Downlink Only mode
+              EventData do_tx_pilot_task(
+                  EventType::kPacketPilotTX,
+                  gen_tag_t::FrmSymUe(
+                      frame_id, config_->Frame().GetPilotSymbol(ue_id), ue_id)
+                      .tag_);
+              ScheduleTask(do_tx_pilot_task, &tx_queue_,
+                           *tx_ptoks_ptr_[ant_id % rx_thread_num_]);
+            } else {
+              if (ant_id % config_->NumChannels() == 0) {
+                EventData do_encode_task(
+                    EventType::kEncode,
+                    gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
+                ScheduleTask(do_encode_task, &encode_queue_, ptok_encode);
+              }
+            }
+            rx_buffer_status_[rx_thread_id][offset_in_current_buffer] =
+                0;  // now empty
           }
 
-          if ((symbol_id == 0)  // Beacon in Sim mode!
-              ||
-              ((config_->HwFramer() == false) &&
-               (ul_data_symbol_perframe_ == 0) && (symbol_id == dl_symbol_id) &&
-               (ant_id % config_->NumChannels() ==
-                0))  // first DL symbols in downlink-only mode
-          ) {        // Send uplink pilots
-            EventData do_tx_pilot_task(
-                EventType::kPacketPilotTX,
-                gen_tag_t::FrmSymUe(
-                    frame_id, config_->Frame().GetPilotSymbol(ue_id), ue_id)
-                    .tag_);
-            ScheduleTask(do_tx_pilot_task, &tx_queue_,
-                         *tx_ptoks_ptr_[ant_id % rx_thread_num_]);
-          }
-
-          if ((ul_data_symbol_perframe_ > 0) &&
-              (symbol_id == 0 || symbol_id == dl_symbol_id) &&
-              (ant_id % config_->NumChannels() == 0)) {
-            EventData do_encode_task(
-                EventType::kEncode,
-                gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
-            ScheduleTask(do_encode_task, &encode_queue_, ptok_encode);
-          }
-
-          if ((dl_data_symbol_perframe_ > 0) &&
-              (config_->IsPilot(frame_id, symbol_id) ||
+          // Schedule downlink processing
+          bool first_dl_symbol = (config_->Frame().NumDLSyms() > 0) &&
+                                 (symbol_id = config_->Frame().GetDLSymbol(0));
+          if ((config_->IsPilot(frame_id, symbol_id) ||
                config_->IsDownlink(frame_id, symbol_id))) {
-            if (dl_symbol_id == config_->Frame().GetDLSymbol(0)) {
+            if (first_dl_symbol == true) {
               frame_dl_process_time_[(frame_id % kFrameWnd) * kMaxUEs +
-                                     ant_id] = GetTimeUs();
+                                     ant_id] = GetTime::GetTimeUs();
             }
             EventData do_fft_task(EventType::kFFT, event.tags_[0]);
             ScheduleTask(do_fft_task, &fft_queue_, ptok_fft);
-          } else {  // if we are not entering doFFT, reset buffer here
-            rx_buffer_status_[rx_thread_id][offset_in_current_buffer] =
-                0;  // now empty
           }
         } break;
 
@@ -336,12 +330,9 @@ void PhyUe::Start() {
 
         case EventType::kDemul: {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          // size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
           size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
           size_t frame_slot = frame_id % kFrameWnd;
-          // size_t dl_symbol_idx
-          //    = config_->get_dl_symbol_idx(frame_id, symbol_id)
-          //    - dl_pilot_symbol_perframe;
+
           EventData do_decode_task(EventType::kDecode, event.tags_[0]);
           ScheduleTask(do_decode_task, &decode_queue_, ptok_decode);
           demul_checker_[frame_slot][ant_id]++;
@@ -369,12 +360,8 @@ void PhyUe::Start() {
 
         case EventType::kDecode: {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          // size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
           size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
           size_t frame_slot = frame_id % kFrameWnd;
-          // size_t dl_symbol_idx
-          //    = config_->get_dl_symbol_idx(frame_id, symbol_id)
-          //    - dl_pilot_symbol_perframe;
           if (kEnableMac) {
             ScheduleTask(EventData(EventType::kPacketToMac, event.tags_[0]),
                          &to_mac_queue_, ptok_mac);
@@ -390,7 +377,7 @@ void PhyUe::Start() {
             decode_checker_[frame_slot][ant_id] = 0;
             decode_status_[frame_slot]++;
             frame_dl_process_time_[frame_slot * kMaxUEs + ant_id] =
-                GetTimeUs() -
+                GetTime::GetTimeUs() -
                 frame_dl_process_time_[frame_slot * kMaxUEs + ant_id];
             if (decode_status_[frame_slot] == config_->UeAntNum()) {
               double frame_time_total = 0;
@@ -406,7 +393,7 @@ void PhyUe::Start() {
                     frame_id, frame_time_total);
               }
               decode_status_[frame_slot] = 0;
-              if (!kEnableMac) {
+              if (kEnableMac == false) {
                 cur_frame_id = frame_id;
               }
             }
@@ -433,7 +420,7 @@ void PhyUe::Start() {
           size_t radio_buf_id = rx_tag_t(event.tags_[0]).offset_;
           RtAssert(radio_buf_id == expected_frame_id_from_mac_ % kFrameWnd);
 
-          MacPacket* pkt = reinterpret_cast<MacPacket*>(
+          auto* pkt = reinterpret_cast<MacPacket*>(
               &ul_bits_buffer_[ue_id]
                               [radio_buf_id * config_->MacBytesNumPerframe()]);
           RtAssert(pkt->frame_id_ == expected_frame_id_from_mac_,
@@ -486,15 +473,27 @@ void PhyUe::Start() {
                 "uplink data for user %zu\n",
                 frame_id, symbol_id, ue_id);
           }
-          //}
         } break;
 
         case EventType::kIFFT: {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
-          EventData do_tx_task(EventType::kPacketTX, event.tags_[0]);
-          ScheduleTask(do_tx_task, &tx_queue_,
-                       *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
+          ifft_frame_status[ue_id * kFrameWnd + frame_id % kFrameWnd] =
+              frame_id;
+          for (size_t i = 0; i < kFrameWnd; i++) {
+            size_t ifft_stat_id =
+                ue_id * kFrameWnd + (i + frame_id) % kFrameWnd;
+            if (ifft_frame_status[ifft_stat_id] == ifft_next_frame[ue_id]) {
+              EventData do_tx_task(
+                  EventType::kPacketTX,
+                  gen_tag_t::FrmSymUe(ifft_next_frame[ue_id], 0, ue_id).tag_);
+              ScheduleTask(do_tx_task, &tx_queue_,
+                           *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
+              ifft_next_frame[ue_id]++;
+            } else {
+              break;
+            }
+          }
           if (kDebugPrintPerTaskDone) {
             std::printf(
                 "Main thread: frame: %zu, finished IFFT of "
@@ -541,7 +540,7 @@ void PhyUe::Start() {
 
         default:
           std::cout << "Invalid Event Type!" << std::endl;
-          std::exit(0);
+          throw std::runtime_error("PhyUe: Invalid Event Type");
       }
     }
   }
@@ -565,27 +564,18 @@ void PhyUe::Start() {
                 << "), block errors (BLER) " << total_block_errors << "/"
                 << total_decoded_blocks << " ("
                 << 1.0 * total_block_errors / total_decoded_blocks
-                << "), symbol errors " << symbol_error_count_[ue_id] << "/"
-                << decoded_symbol_count_[ue_id] << " ("
-                << 1.0 * symbol_error_count_[ue_id] /
-                       decoded_symbol_count_[ue_id]
+                << "), symbol errors " << symbol_error_count_.at(ue_id) << "/"
+                << decoded_symbol_count_.at(ue_id) << " ("
+                << 1.0 * symbol_error_count_.at(ue_id) /
+                       decoded_symbol_count_.at(ue_id)
                 << ")" << std::endl;
     }
   }
   this->Stop();
 }
 
-void* PhyUe::TaskThreadLaunch(void* in_context) {
-  EventHandlerContext* context = (EventHandlerContext*)in_context;
-  PhyUe* me = context->obj_ptr_;
-  int tid = context->id_;
-  delete context;
-  me->TaskThread(tid);
-  return nullptr;
-}
-
 void PhyUe::TaskThread(int tid) {
-  // std::printf("task thread %d starts\n", tid);
+  std::printf("PhyUE: task thread %d starts\n", tid);
   PinToCoreWithOffset(ThreadType::kWorker,
                       config_->CoreOffset() + rx_thread_num_ + 1 +
                           (kEnableMac ? rx_thread_num_ : 0),
@@ -594,7 +584,7 @@ void PhyUe::TaskThread(int tid) {
   // task_ptok[tid].reset(new moodycamel::ProducerToken(message_queue_));
 
   EventData event;
-  while (config_->Running()) {
+  while (config_->Running() == true) {
     if (decode_queue_.try_dequeue(event)) {
       DoDecode(tid, event.tags_[0]);
     } else if (demul_queue_.try_dequeue(event)) {
@@ -618,12 +608,12 @@ void PhyUe::TaskThread(int tid) {
 void PhyUe::DoFft(int tid, size_t tag) {
   size_t rx_thread_id = fft_req_tag_t(tag).tid_;
   size_t offset_in_current_buffer = fft_req_tag_t(tag).offset_;
-  size_t start_tsc = Rdtsc();
+  size_t start_tsc = GetTime::Rdtsc();
 
   // read info of one frame
-  struct Packet* pkt =
-      (struct Packet*)(rx_buffer_[rx_thread_id] +
-                       offset_in_current_buffer * config_->PacketLength());
+  auto* pkt = reinterpret_cast<struct Packet*>(rx_buffer_[rx_thread_id] +
+                                               offset_in_current_buffer *
+                                                   config_->PacketLength());
   size_t frame_id = pkt->frame_id_;
   size_t symbol_id = pkt->symbol_id_;
   // int cell_id = pkt->cell_id;
@@ -670,18 +660,20 @@ void PhyUe::DoFft(int tid, size_t tag) {
       if (frame_id == kRecordFrameIndex) {
         std::string fname = "rxpilot" + std::to_string(symbol_id) + "_" +
                             std::to_string(ant_id) + ".bin";
-        FILE* f = fopen(fname.c_str(), "wb");
-        fwrite(pkt->data_, 2 * sizeof(int16_t), config_->SampsPerSymbol(), f);
-        fclose(f);
+        FILE* f = std::fopen(fname.c_str(), "wb");
+        std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_->SampsPerSymbol(),
+                    f);
+        std::fclose(f);
       }
 
     } else {
       if (frame_id == kRecordFrameIndex) {
         std::string fname = "rxdata" + std::to_string(symbol_id) + "_" +
                             std::to_string(ant_id) + ".bin";
-        FILE* f = fopen(fname.c_str(), "wb");
-        fwrite(pkt->data_, 2 * sizeof(int16_t), config_->SampsPerSymbol(), f);
-        fclose(f);
+        FILE* f = std::fopen(fname.c_str(), "wb");
+        std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_->SampsPerSymbol(),
+                    f);
+        std::fclose(f);
       }
     }
   }
@@ -694,7 +686,7 @@ void PhyUe::DoFft(int tid, size_t tag) {
 
   // transfer ushort to float
   size_t delay_offset = (sig_offset + config_->CpLen()) * 2;
-  float* fft_buff = (float*)fft_buffer_[fft_buffer_target_id];
+  auto* fft_buff = reinterpret_cast<float*>(fft_buffer_[fft_buffer_target_id]);
 
   SimdConvertShortToFloat(&pkt->data_[delay_offset], fft_buff,
                           config_->OfdmCaNum() * 2);
@@ -703,8 +695,10 @@ void PhyUe::DoFft(int tid, size_t tag) {
   DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
   size_t csi_offset = frame_slot * config_->UeAntNum() + ant_id;
-  cx_float* csi_buffer_ptr = (cx_float*)(csi_buffer_[csi_offset].data());
-  cx_float* fft_buffer_ptr = (cx_float*)fft_buffer_[fft_buffer_target_id];
+  auto* csi_buffer_ptr =
+      reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset].data());
+  auto* fft_buffer_ptr =
+      reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
 
   EventData fft_finish_event;
 
@@ -722,22 +716,23 @@ void PhyUe::DoFft(int tid, size_t tag) {
       // in the downlink receiver
       complex_float p = config_->UeSpecificPilot()[0][j];
       size_t sc_id = non_null_sc_ind_[j];
-      csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / cx_float(p.re, p.im));
+      csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / arma::cx_float(p.re, p.im));
       if (dl_symbol_id == dl_pilot_symbol_perframe_ - 1) {
         csi_buffer_ptr[j] /= dl_pilot_symbol_perframe_;
       }
     }
   } else {
-    size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe_ +
-                                dl_symbol_id - dl_pilot_symbol_perframe_;
-    size_t eq_buffer_offset = total_dl_symbol_id * config_->UeAntNum() + ant_id;
+    size_t total_dl_data_symbol_id = frame_slot * dl_data_symbol_perframe_ +
+                                     dl_symbol_id - dl_pilot_symbol_perframe_;
+    size_t eq_buffer_offset =
+        total_dl_data_symbol_id * config_->UeAntNum() + ant_id;
 
-    cx_float* equ_buffer_ptr =
-        (cx_float*)(equal_buffer_[eq_buffer_offset].data());
+    auto* equ_buffer_ptr = reinterpret_cast<arma::cx_float*>(
+        equal_buffer_[eq_buffer_offset].data());
 
     // use pilot subcarriers for phase tracking and correction
     float theta = 0;
-    cx_float csi(1, 0);
+    arma::cx_float csi(1, 0);
     for (size_t j = 0; j < config_->OfdmDataNum(); j++) {
       if (j % config_->OfdmPilotSpacing() == 0) {
         equ_buffer_ptr[j] = 0;
@@ -745,18 +740,18 @@ void PhyUe::DoFft(int tid, size_t tag) {
           csi = csi_buffer_ptr[j];
         }
         size_t sc_id = non_null_sc_ind_[j];
-        cx_float y = fft_buffer_ptr[sc_id];
+        arma::cx_float y = fft_buffer_ptr[sc_id];
         auto pilot_eq = y / csi;
         // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
         // in the downlink receiver
         auto p = config_->UeSpecificPilot()[0][j];
-        theta += arg(pilot_eq * cx_float(p.re, -p.im));
+        theta += arg(pilot_eq * arma::cx_float(p.re, -p.im));
       }
     }
     if (config_->GetOFDMPilotNum() > 0) {
       theta /= config_->GetOFDMPilotNum();
     }
-    auto phc = exp(cx_float(0, -theta));
+    auto phc = exp(arma::cx_float(0, -theta));
     float evm = 0;
     for (size_t j = 0; j < config_->OfdmDataNum(); j++) {
       if (j % config_->OfdmPilotSpacing() != 0) {
@@ -765,19 +760,19 @@ void PhyUe::DoFft(int tid, size_t tag) {
         if (dl_pilot_symbol_perframe_ > 0) {
           csi = csi_buffer_ptr[j];
         }
-        cx_float y = fft_buffer_ptr[sc_id];
+        arma::cx_float y = fft_buffer_ptr[sc_id];
         equ_buffer_ptr[j] = (y / csi) * phc;
         complex_float tx =
             config_->DlIqF()[dl_symbol_id][ant_id * config_->OfdmCaNum() +
                                            config_->OfdmDataStart() + j];
-        evm += std::norm(equ_buffer_ptr[j] - cx_float(tx.re, tx.im));
+        evm += std::norm(equ_buffer_ptr[j] - arma::cx_float(tx.re, tx.im));
       }
     }
     if (kPrintEqualizedSymbols) {
       complex_float* tx =
           &config_->DlIqF()[dl_symbol_id][ant_id * config_->OfdmCaNum() +
                                           config_->OfdmDataStart()];
-      arma::cx_fvec x_vec(reinterpret_cast<cx_float*>(tx),
+      arma::cx_fvec x_vec(reinterpret_cast<arma::cx_float*>(tx),
                           config_->OfdmDataNum(), false);
       Utils::PrintVec(x_vec, std::string("x") +
                                  std::to_string(total_dl_symbol_id) +
@@ -798,10 +793,11 @@ void PhyUe::DoFft(int tid, size_t tag) {
     }
   }
 
-  size_t fft_duration_stat = Rdtsc() - start_tsc;
+  size_t fft_duration_stat = GetTime::Rdtsc() - start_tsc;
   if (kDebugPrintPerTaskDone) {
-    std::printf("FFT Duration (%zu, %zu, %zu): %2.4f us\n", frame_id, symbol_id,
-                ant_id, CyclesToUs(fft_duration_stat, MeasureRdtscFreq()));
+    std::printf(
+        "FFT Duration (%zu, %zu, %zu): %2.4f us\n", frame_id, symbol_id, ant_id,
+        GetTime::CyclesToUs(fft_duration_stat, GetTime::MeasureRdtscFreq()));
   }
 
   rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0;  // now empty
@@ -819,18 +815,18 @@ void PhyUe::DoDemul(int tid, size_t tag) {
     std::printf("In doDemul TID %d: frame %zu, symbol %zu, ant_id %zu\n", tid,
                 frame_id, symbol_id, ant_id);
   }
-  size_t start_tsc = Rdtsc();
+  size_t start_tsc = GetTime::Rdtsc();
 
   const size_t frame_slot = frame_id % kFrameWnd;
   size_t dl_symbol_id = config_->Frame().GetDLSymbolIdx(symbol_id);
   size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe_ +
                               dl_symbol_id - dl_pilot_symbol_perframe_;
   size_t offset = total_dl_symbol_id * config_->UeAntNum() + ant_id;
-  float* equal_ptr = (float*)&equal_buffer_[offset][0];
+  auto* equal_ptr = reinterpret_cast<float*>(&equal_buffer_[offset][0]);
   auto* demul_ptr = dl_demod_buffer_[offset];
 
   // demod_16qam_hard_loop(
-  //    equal_ptr, (uint8_t*)demul_ptr, config_->UE_ANT_NUM);
+  //    equal_ptr, (uint8_t*)demul_ptr, config_->UeAntNum());
 
   switch (config_->ModOrderBits()) {
     case (CommsLib::kQpsk):
@@ -847,11 +843,12 @@ void PhyUe::DoDemul(int tid, size_t tag) {
                   config_->Modulation().c_str());
   }
 
-  size_t dem_duration_stat = Rdtsc() - start_tsc;
+  size_t dem_duration_stat = GetTime::Rdtsc() - start_tsc;
   if (kDebugPrintPerTaskDone) {
-    std::printf("Demodul Duration (%zu, %zu, %zu): %2.4f us\n", frame_id,
-                symbol_id, ant_id,
-                CyclesToUs(dem_duration_stat, MeasureRdtscFreq()));
+    std::printf(
+        "Demodul Duration (%zu, %zu, %zu): %2.4f us\n", frame_id, symbol_id,
+        ant_id,
+        GetTime::CyclesToUs(dem_duration_stat, GetTime::MeasureRdtscFreq()));
   }
 
   if (kPrintLLRData) {
@@ -868,7 +865,7 @@ void PhyUe::DoDemul(int tid, size_t tag) {
 }
 
 void PhyUe::DoDecode(int tid, size_t tag) {
-  LDPCconfig ldpc_config = config_->LdpcConfig();
+  const LDPCconfig& ldpc_config = config_->LdpcConfig();
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
   size_t ant_id = gen_tag_t(tag).ant_id_;
@@ -876,7 +873,7 @@ void PhyUe::DoDecode(int tid, size_t tag) {
     std::printf("In doDecode TID %d: frame %zu, symbol %zu, ant_id %zu\n", tid,
                 frame_id, symbol_id, ant_id);
   }
-  size_t start_tsc = Rdtsc();
+  size_t start_tsc = GetTime::Rdtsc();
 
   const size_t frame_slot = frame_id % kFrameWnd;
   size_t dl_symbol_id = config_->Frame().GetDLSymbolIdx(symbol_id);
@@ -919,6 +916,10 @@ void PhyUe::DoDecode(int tid, size_t tag) {
     bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                             &ldpc_decoder_5gnr_response);
 
+    if (config_->ScrambleEnabled()) {
+      scrambler_->Descramble(decoded_buffer_ptr, config_->NumBytesPerCb());
+    }
+
     if (kCollectPhyStats) {
       decoded_bits_count_[ant_id][total_dl_symbol_id] +=
           8 * config_->NumBytesPerCb();
@@ -926,8 +927,8 @@ void PhyUe::DoDecode(int tid, size_t tag) {
       size_t byte_error(0);
       for (size_t i = 0; i < config_->NumBytesPerCb(); i++) {
         uint8_t rx_byte = decoded_buffer_ptr[i];
-        uint8_t tx_byte = (uint8_t)config_->GetInfoBits(
-            config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i];
+        auto tx_byte = static_cast<uint8_t>(config_->GetInfoBits(
+            config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i]);
         uint8_t xor_byte(tx_byte ^ rx_byte);
         size_t bit_errors = 0;
         for (size_t j = 0; j < 8; j++) {
@@ -952,8 +953,8 @@ void PhyUe::DoDecode(int tid, size_t tag) {
          << std::hex << std::setfill('0');
       for (size_t i = 0; i < config_->NumBytesPerCb(); i++) {
         uint8_t rx_byte = decoded_buffer_ptr[i];
-        uint8_t tx_byte = (uint8_t)config_->GetInfoBits(
-            config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i];
+        auto tx_byte = static_cast<uint8_t>(config_->GetInfoBits(
+            config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i]);
         ss << std::hex << std::setw(2) << static_cast<int>(rx_byte) << "("
            << static_cast<int>(tx_byte) << ") ";
       }
@@ -966,11 +967,12 @@ void PhyUe::DoDecode(int tid, size_t tag) {
     symbol_error_count_[ant_id] += static_cast<unsigned long>(block_error > 0);
   }
 
-  size_t dec_duration_stat = Rdtsc() - start_tsc;
+  size_t dec_duration_stat = GetTime::Rdtsc() - start_tsc;
   if (kDebugPrintPerTaskDone) {
-    std::printf("Decode Duration (%zu, %zu, %zu): %2.4f us\n", frame_id,
-                symbol_id, ant_id,
-                CyclesToUs(dec_duration_stat, MeasureRdtscFreq()));
+    std::printf(
+        "Decode Duration (%zu, %zu, %zu): %2.4f us\n", frame_id, symbol_id,
+        ant_id,
+        GetTime::CyclesToUs(dec_duration_stat, GetTime::MeasureRdtscFreq()));
   }
 
   RtAssert(message_queue_.enqueue(*task_ptok_[tid],
@@ -983,7 +985,7 @@ void PhyUe::DoDecode(int tid, size_t tag) {
 //////////////////////////////////////////////////////////
 
 void PhyUe::DoEncode(int tid, size_t tag) {
-  LDPCconfig ldpc_config = config_->LdpcConfig();
+  const LDPCconfig& ldpc_config = config_->LdpcConfig();
   // size_t ue_id = rx_tag_t(tag).tid;
   // size_t offset = rx_tag_t(tag).offset;
   const size_t frame_id = gen_tag_t(tag).frame_id_;
@@ -992,12 +994,12 @@ void PhyUe::DoEncode(int tid, size_t tag) {
   auto& cfg = config_;
   // size_t start_tsc = worker_rdtsc();
 
-  int8_t* encoded_buffer_temp =
+  auto* encoded_buffer_temp =
       static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
           LdpcEncodingEncodedBufSize(cfg->LdpcConfig().BaseGraph(),
                                      cfg->LdpcConfig().ExpansionFactor())));
-  int8_t* parity_buffer = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
+  auto* parity_buffer = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
       LdpcEncodingParityBufSize(cfg->LdpcConfig().BaseGraph(),
                                 cfg->LdpcConfig().ExpansionFactor())));
@@ -1006,6 +1008,8 @@ void PhyUe::DoEncode(int tid, size_t tag) {
       kEnableMac ? (ldpc_config.NumCbLen()) >> 3
                  : Roundup<64>(BitsToBytes(ldpc_config.NumCbLen()));
   size_t encoded_bytes_per_block = (ldpc_config.NumCbCodewLen() + 7) >> 3;
+  auto* input_ptr = new int8_t[bytes_per_block +
+                               kLdpcHelperFunctionInputBufferSizePaddingBytes];
 
   for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe_;
        ul_symbol_id++) {
@@ -1013,7 +1017,6 @@ void PhyUe::DoEncode(int tid, size_t tag) {
         frame_slot * ul_data_symbol_perframe_ + ul_symbol_id;
     for (size_t cb_id = 0; cb_id < config_->LdpcConfig().NumBlocksInSymbol();
          cb_id++) {
-      int8_t* input_ptr;
       if (kEnableMac) {
         uint8_t* ul_bits = ul_bits_buffer_[ue_id] +
                            frame_slot * config_->MacBytesNumPerframe();
@@ -1022,14 +1025,22 @@ void PhyUe::DoEncode(int tid, size_t tag) {
                                cfg->LdpcConfig().NumBlocksInSymbol() *
                                ul_symbol_id +
                            bytes_per_block * cb_id;
-        input_ptr = (int8_t*)ul_bits + input_offset;
+        std::memcpy(input_ptr,
+                    reinterpret_cast<int8_t*>(ul_bits + input_offset),
+                    bytes_per_block);
       } else {
         size_t cb_offset =
             (ue_id * cfg->LdpcConfig().NumBlocksInSymbol() + cb_id) *
             bytes_per_block;
-        input_ptr =
+        std::memcpy(
+            input_ptr,
             &cfg->UlBits()[ul_symbol_id +
-                           config_->Frame().ClientUlPilotSymbols()][cb_offset];
+                           config_->Frame().ClientUlPilotSymbols()][cb_offset],
+            bytes_per_block);
+      }
+
+      if (config_->ScrambleEnabled()) {
+        scrambler_->Scramble(input_ptr, bytes_per_block);
       }
 
       LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
@@ -1051,6 +1062,10 @@ void PhyUe::DoEncode(int tid, size_t tag) {
   //        cycles_to_us(duration, freq_ghz));
   //}
 
+  std::free(encoded_buffer_temp);
+  std::free(parity_buffer);
+  delete[] input_ptr;
+
   RtAssert(message_queue_.enqueue(*task_ptok_[tid],
                                   EventData(EventType::kEncode, tag)),
            "Encoding message enqueue failed");
@@ -1068,9 +1083,9 @@ void PhyUe::DoModul(int tid, size_t tag) {
           frame_slot * ul_data_symbol_perframe_ + ul_symbol_id;
       complex_float* modul_buf =
           &modul_buffer_[total_ul_symbol_id][ant_id * config_->OfdmDataNum()];
-      int8_t* ul_bits =
-          (int8_t*)&ul_syms_buffer_[ant_id][total_ul_symbol_id *
-                                            config_->OfdmDataNum()];
+      auto* ul_bits = reinterpret_cast<int8_t*>(
+          &ul_syms_buffer_[ant_id]
+                          [total_ul_symbol_id * config_->OfdmDataNum()]);
       for (size_t sc = 0; sc < config_->OfdmDataNum(); sc++) {
         modul_buf[sc] =
             ModSingleUint8((uint8_t)ul_bits[sc], config_->ModTable());
@@ -1099,7 +1114,7 @@ void PhyUe::DoIfft(int tid, size_t tag) {
                   sizeof(complex_float) * config_->OfdmDataStart());
       if (ul_symbol_id < config_->Frame().ClientUlPilotSymbols()) {
         std::memcpy(ifft_buff + config_->OfdmDataStart(),
-                    config_->UeSpecificPilot()[0],
+                    config_->UeSpecificPilot()[ant_id],
                     config_->OfdmDataNum() * sizeof(complex_float));
       } else {
         size_t total_ul_data_symbol_id =
@@ -1118,8 +1133,8 @@ void PhyUe::DoIfft(int tid, size_t tag) {
 
       size_t tx_offset = buff_offset * config_->PacketLength();
       char* cur_tx_buffer = &tx_buffer_[tx_offset];
-      struct Packet* pkt = (struct Packet*)cur_tx_buffer;
-      std::complex<short>* tx_data_ptr = (std::complex<short>*)pkt->data_;
+      auto* pkt = reinterpret_cast<struct Packet*>(cur_tx_buffer);
+      auto* tx_data_ptr = reinterpret_cast<std::complex<short>*>(pkt->data_);
       CommsLib::Ifft2tx(ifft_buff, tx_data_ptr, config_->OfdmCaNum(),
                         config_->OfdmTxZeroPrefix(), config_->CpLen(),
                         config_->Scale());
@@ -1142,7 +1157,7 @@ void PhyUe::InitializeVarsFromCfg() {
   assert(dl_pilot_symbol_perframe_ <= dl_symbol_perframe_);
   assert(ul_pilot_symbol_perframe <= ul_symbol_perframe_);
   num_cp_us_ = std::thread::hardware_concurrency();
-  rx_thread_num_ = (kUseArgos && !config_->HwFramer())
+  rx_thread_num_ = ((kUseArgos == true) && (config_->HwFramer() == false))
                        ? config_->UeNum()
                        : std::min(config_->UeNum(), config_->SocketThreadNum());
 
@@ -1184,6 +1199,17 @@ void PhyUe::InitializeUplinkBuffers() {
                 Agora_memory::Alignment_t::kAlign64, 1);
 }
 
+void PhyUe::FreeUplinkBuffers() {
+  ul_bits_buffer_.Free();
+  ul_bits_buffer_status_.Free();
+  ul_syms_buffer_.Free();
+  modul_buffer_.Free();
+  ifft_buffer_.Free();
+
+  FreeBuffer1d(&tx_buffer_);
+  FreeBuffer1d(&tx_buffer_status_);
+}
+
 void PhyUe::InitializeDownlinkBuffers() {
   // initialize rx buffer
   rx_buffer_.Malloc(rx_thread_num_, rx_buffer_size_,
@@ -1204,6 +1230,9 @@ void PhyUe::InitializeDownlinkBuffers() {
   for (auto& i : csi_buffer_) {
     i.resize(config_->OfdmDataNum());
   }
+
+  decoded_symbol_count_ = std::vector<size_t>(config_->UeAntNum());
+  symbol_error_count_ = std::vector<size_t>(config_->UeAntNum());
 
   if (dl_data_symbol_perframe_ > 0) {
     // initialize equalized data buffer
@@ -1237,10 +1266,24 @@ void PhyUe::InitializeDownlinkBuffers() {
                                  Agora_memory::Alignment_t::kAlign64);
     block_error_count_.Calloc(config_->UeAntNum(), task_buffer_symbol_num_dl,
                               Agora_memory::Alignment_t::kAlign64);
-    decoded_symbol_count_ = new size_t[config_->UeAntNum()];
-    symbol_error_count_ = new size_t[config_->UeAntNum()];
-    std::memset(decoded_symbol_count_, 0, sizeof(size_t) * config_->UeAntNum());
-    std::memset(symbol_error_count_, 0, sizeof(size_t) * config_->UeAntNum());
+  }
+}
+
+void PhyUe::FreeDownlinkBuffers() {
+  rx_buffer_.Free();
+  rx_buffer_status_.Free();
+  FreeBuffer1d(&rx_samps_tmp_);
+  fft_buffer_.Free();
+
+  if (dl_data_symbol_perframe_ > 0) {
+    dl_demod_buffer_.Free();
+    std::free(resp_var_nodes_);
+
+    decoded_bits_count_.Free();
+    bit_error_count_.Free();
+
+    decoded_blocks_count_.Free();
+    block_error_count_.Free();
   }
 }
 

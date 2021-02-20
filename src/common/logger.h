@@ -12,13 +12,13 @@
  ***************************************************************************/
 
 /**
- * @file logger.inc
+ * @file logger.h
  * @brief Logging macros that can be optimized out by the compiler
  * @author Hideaki, modified by Anuj
  */
 
-#ifndef LOGGER_INC_
-#define LOGGER_INC_
+#ifndef LOGGER_H_
+#define LOGGER_H_
 
 #include <ctime>
 #include <string>

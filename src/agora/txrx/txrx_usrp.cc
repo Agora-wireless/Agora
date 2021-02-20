@@ -60,7 +60,7 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
 
   int prev_frame_id = -1;
   int radio_id = radio_lo;
-  while (cfg_->Running()) {
+  while (cfg_->Running() == true) {
     // transmit data
     // if (-1 != dequeue_send_usrp(tid))
     //   continue;
@@ -101,7 +101,7 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
       int frame_id = pkt->frame_id_;
       // int symbol_id = pkt->symbol_id;
       if (frame_id > prev_frame_id) {
-        rx_frame_start[frame_id % kNumStatsFrames] = Rdtsc();
+        rx_frame_start[frame_id % kNumStatsFrames] = GetTime::Rdtsc();
         prev_frame_id = frame_id;
       }
     }
@@ -151,7 +151,7 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
     tmp_ret = radioconfig_->RadioRx(radio_id, samp_buffer.data(), rx_time_bs_);
   }
 
-  if (!cfg_->Running() || tmp_ret <= 0 ||
+  if ((cfg_->Running() == false) || tmp_ret <= 0 ||
       (!cfg_->IsPilot(frame_id, symbol_id) &&
        !cfg_->IsUplink(frame_id, symbol_id))) {
     return nullptr;
@@ -172,7 +172,7 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
 
       if (!message_queue_->enqueue(*local_ptok, rx_message)) {
         std::printf("socket message enqueue failed\n");
-        std::exit(0);
+        throw std::runtime_error("PacketTXRX: socket message enqueue failed");
       }
     }
   }
@@ -204,21 +204,21 @@ int PacketTXRX::DequeueSendUsrp(int tid) {
   int n_channels = c->NumChannels();
   int ch = ant_id % n_channels;
 
-  if (kDebugDownlink) {
+  if (kDebugDownlink == true) {
     std::vector<std::complex<int16_t>> zeros(c->SampsPerSymbol());
     size_t dl_symbol_idx = c->Frame().GetDLSymbolIdx(symbol_id);
     if (ant_id != c->RefAnt()) {
       txbuf[ch] = zeros.data();
     } else if (dl_symbol_idx < c->Frame().ClientDlPilotSymbols()) {
-      txbuf[ch] = (void*)c->UeSpecificPilotT()[0];
+      txbuf[ch] = reinterpret_cast<void*>(c->UeSpecificPilotT()[0]);
     } else {
-      txbuf[ch] =
-          (void*)c->DlIqT()[dl_symbol_idx - c->Frame().ClientDlPilotSymbols()];
+      txbuf[ch] = reinterpret_cast<void*>(
+          c->DlIqT()[dl_symbol_idx - c->Frame().ClientDlPilotSymbols()]);
     }
   } else {
     char* cur_buffer_ptr = tx_buffer_ + offset * c->PacketLength();
-    struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-    txbuf[ch] = (void*)pkt->data_;
+    auto* pkt = reinterpret_cast<struct Packet*>(cur_buffer_ptr);
+    txbuf[ch] = reinterpret_cast<void*>(pkt->data_);
   }
 
   size_t last = c->Frame().GetDLSymbolLast();
@@ -227,7 +227,7 @@ int PacketTXRX::DequeueSendUsrp(int tid) {
   long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
   radioconfig_->RadioTx(ant_id / n_channels, txbuf, flags, frame_time);
 
-  if (kDebugPrintInTask) {
+  if (kDebugPrintInTask == true) {
     std::printf(
         "In TX thread %d: Transmitted frame %zu, symbol %zu, "
         "ant %zu, offset: %zu, msg_queue_length: %zu\n",
@@ -277,20 +277,21 @@ int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id) {
     if (ant_id != c->RefAnt()) {
       txbuf[ch] = zeros.data();
     } else if (dl_symbol_idx < c->Frame().ClientDlPilotSymbols()) {
-      txbuf[ch] = (void*)c->UeSpecificPilotT()[0];
+      txbuf[ch] = reinterpret_cast<void*>(c->UeSpecificPilotT()[0]);
     } else {
-      txbuf[ch] =
-          (void*)c->DlIqT()[dl_symbol_idx - c->Frame().ClientDlPilotSymbols()];
+      txbuf[ch] = reinterpret_cast<void*>(
+          c->DlIqT()[dl_symbol_idx - c->Frame().ClientDlPilotSymbols()]);
     }
   } else {
     char* cur_buffer_ptr = tx_buffer_ + offset * c->PacketLength();
-    struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-    txbuf[ch] = (void*)pkt->data_;
+    auto* pkt = reinterpret_cast<struct Packet*>(cur_buffer_ptr);
+    txbuf[ch] = reinterpret_cast<void*>(pkt->data_);
   }
 
   size_t last = c->Frame().GetDLSymbolLast();
-  int flags = (symbol_id != (int)last) ? 1   // HAS_TIME
-                                       : 2;  // HAS_TIME & END_BURST, fixme
+  int flags = (symbol_id != static_cast<int>(last))
+                  ? 1   // HAS_TIME
+                  : 2;  // HAS_TIME & END_BURST, fixme
   long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
   radioconfig_->RadioTx(ant_id / n_channels, txbuf, flags, frame_time);
 

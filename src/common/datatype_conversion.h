@@ -121,8 +121,8 @@ static inline void ConvertFloatTo12bitIq(const float* in_buf, uint8_t* out_buf,
                                          size_t n_elems) {
   size_t index_short = 0;
   for (size_t i = 0; i < n_elems; i = i + 2) {
-    ushort temp_i = (unsigned short)(in_buf[i] * 32768 * 4);
-    ushort temp_q = (unsigned short)(in_buf[i + 1] * 32768 * 4);
+    auto temp_i = static_cast<unsigned short>(in_buf[i] * 32768 * 4);
+    auto temp_q = static_cast<unsigned short>(in_buf[i + 1] * 32768 * 4);
     // Take the higher 12 bits and ignore the lower 4 bits
     out_buf[index_short] = (uint8_t)(temp_i >> 4);
     out_buf[index_short + 1] =

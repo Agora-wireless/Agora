@@ -1,5 +1,5 @@
 /**
- * @file txrx.cpp
+ * @file txrx.cc
  * @brief Implementation of PacketTXRX initialization functions, and datapath
  * functions for communicating with simulators.
  */
@@ -13,7 +13,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
       core_offset_(core_offset),
       ant_per_cell_(cfg->BsAntNum() / cfg->NumCells()),
       socket_thread_num_(cfg->SocketThreadNum()) {
-  if (!kUseArgos && !kUseUHD) {
+  if ((kUseArgos == false) && (kUseUHD == false)) {
     socket_.resize(cfg->NumRadios());
     bs_rru_sockaddr_.resize(cfg->NumRadios());
   } else {
@@ -39,7 +39,7 @@ PacketTXRX::~PacketTXRX() {
     delete radioconfig_;
   }
   for (size_t i = 0; i < cfg_->SocketThreadNum(); i++) {
-    socket_std_threads_[i].join();
+    socket_std_threads_.at(i).join();
   }
 }
 
@@ -55,13 +55,13 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
   packet_num_in_buffer_ = packet_num_in_buffer;
   tx_buffer_ = tx_buffer;
 
-  if (kUseArgos || kUseUHD) {
-    if (!radioconfig_->RadioStart()) {
+  if ((kUseArgos == true) || (kUseUHD == true)) {
+    if (radioconfig_->RadioStart() == false) {
       std::fprintf(stderr, "Failed to start radio\n");
       return false;
     }
 
-    if (cfg_->DownlinkMode()) {
+    if (cfg_->Frame().NumDLSyms() > 0) {
       std::memcpy(
           calib_dl_buffer[kFrameWnd - 1], radioconfig_->GetCalibDl(),
           cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float));
@@ -72,16 +72,19 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
   }
 
   for (size_t i = 0; i < socket_thread_num_; i++) {
-    if (kUseArgos) {
-      socket_std_threads_[i] = std::thread(&PacketTXRX::LoopTxRxArgos, this, i);
-    } else if (kUseUHD) {
-      socket_std_threads_[i] = std::thread(&PacketTXRX::LoopTxRxUsrp, this, i);
+    if (kUseArgos == true) {
+      socket_std_threads_.at(i) =
+          std::thread(&PacketTXRX::LoopTxRxArgos, this, i);
+    } else if (kUseUHD == true) {
+      socket_std_threads_.at(i) =
+          std::thread(&PacketTXRX::LoopTxRxUsrp, this, i);
     } else {
-      socket_std_threads_[i] = std::thread(&PacketTXRX::LoopTxRx, this, i);
+      MLPD_SYMBOL("LoopTXRX: Starting thread %zu\n", i);
+      socket_std_threads_.at(i) = std::thread(&PacketTXRX::LoopTxRx, this, i);
     }
   }
 
-  if (kUseArgos || kUseUHD) {
+  if ((kUseArgos == true) || (kUseUHD == true)) {
     radioconfig_->Go();
   }
   return true;
@@ -96,49 +99,50 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
   auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
   for (int ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
     new (pkt) Packet(frame_id, 0, 0 /* cell_id */, ant_id);
-    ssize_t r =
-        sendto(socket_[ant_id], (char*)udp_pkt_buf.data(), cfg_->PacketLength(),
-               0, (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
-               sizeof(bs_rru_sockaddr_[ant_id]));
+    ssize_t r = sendto(
+        socket_.at(ant_id), reinterpret_cast<const char*>(udp_pkt_buf.data()),
+        cfg_->PacketLength(), 0,
+        reinterpret_cast<const struct sockaddr*>(&bs_rru_sockaddr_.at(ant_id)),
+        sizeof(bs_rru_sockaddr_.at(ant_id)));
     RtAssert(r > 0, "sendto() failed");
   }
 }
 
 void PacketTXRX::LoopTxRx(int tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid,
-                      false /* quiet */);
+  PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid);
   size_t* rx_frame_start = (*frame_start_)[tid];
   size_t rx_offset = 0;
   int radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
   int radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
 
-  int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+  int sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
   for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
     int local_port_id = cfg_->BsServerPort() + radio_id;
-    socket_[radio_id] = SetupSocketIpv4(local_port_id, true, sock_buf_size);
+    socket_.at(radio_id) = SetupSocketIpv4(local_port_id, true, sock_buf_size);
     SetupSockaddrRemoteIpv4(&bs_rru_sockaddr_[radio_id],
                             cfg_->BsRruPort() + radio_id,
                             cfg_->BsRruAddr().c_str());
-    MLPD_INFO(
+    MLPD_FRAME(
         "TXRX thread %d: set up UDP socket server listening to port %d"
         " with remote address %s:%d \n",
         tid, local_port_id, cfg_->BsRruAddr().c_str(),
         cfg_->BsRruPort() + radio_id);
-    fcntl(socket_[radio_id], F_SETFL, O_NONBLOCK);
+    fcntl(socket_.at(radio_id), F_SETFL, O_NONBLOCK);
   }
 
   size_t frame_tsc_delta(cfg_->GetFrameDurationSec() * 1e9 *
-                         MeasureRdtscFreq());
+                         GetTime::MeasureRdtscFreq());
   int prev_frame_id = -1;
   int radio_id = radio_lo;
-  size_t tx_frame_start = Rdtsc();
+  size_t tx_frame_start = GetTime::Rdtsc();
   size_t tx_frame_id = 0;
   size_t slow_start_factor = 10;
   SendBeacon(tid,
              tx_frame_id++);  // Send Beacons for the first time to kick off sim
-  while (cfg_->Running()) {
-    if (Rdtsc() - tx_frame_start > frame_tsc_delta * slow_start_factor) {
-      tx_frame_start = Rdtsc();
+  while (cfg_->Running() == true) {
+    if (GetTime::Rdtsc() - tx_frame_start >
+        frame_tsc_delta * slow_start_factor) {
+      tx_frame_start = GetTime::Rdtsc();
       SendBeacon(tid, tx_frame_id++);
       if (tx_frame_id > 5) {
         slow_start_factor = 5;
@@ -163,7 +167,7 @@ void PacketTXRX::LoopTxRx(int tid) {
     if (kIsWorkerTimingEnabled) {
       int frame_id = pkt->frame_id_;
       if (frame_id > prev_frame_id) {
-        rx_frame_start[frame_id % kNumStatsFrames] = Rdtsc();
+        rx_frame_start[frame_id % kNumStatsFrames] = GetTime::Rdtsc();
         prev_frame_id = frame_id;
       }
     }
@@ -182,15 +186,16 @@ struct Packet* PacketTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
 
   // if rx_buffer is full, exit
   if (rx_buffer_status[rx_offset] == 1) {
-    std::printf("TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
+    MLPD_ERROR("TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
     cfg_->Running(false);
     return (nullptr);
   }
-  struct Packet* pkt = (struct Packet*)&rx_buffer[rx_offset * packet_length];
+  auto* pkt =
+      reinterpret_cast<struct Packet*>(&rx_buffer[rx_offset * packet_length]);
   if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
-    if (errno != EAGAIN && cfg_->Running()) {
-      perror("recv failed");
-      std::exit(0);
+    if ((errno != EAGAIN) && (cfg_->Running() == true)) {
+      MLPD_ERROR("Recv failed");
+      throw std::runtime_error("PacketTXRX: recv failed");
     }
     return (nullptr);
   }
@@ -218,9 +223,9 @@ struct Packet* PacketTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
 
   // Push kPacketRX event into the queue.
   EventData rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset).tag_);
-  if (!message_queue_->enqueue(*local_ptok, rx_message)) {
-    std::printf("socket message enqueue failed\n");
-    std::exit(0);
+  if (message_queue_->enqueue(*local_ptok, rx_message) == false) {
+    MLPD_ERROR("socket message enqueue failed\n");
+    throw std::runtime_error("PacketTXRX: socket message enqueue failed");
   }
   return pkt;
 }
@@ -253,7 +258,7 @@ int PacketTXRX::DequeueSend(int tid) {
   }
 
   char* cur_buffer_ptr = tx_buffer_ + offset * c->DlPacketLength();
-  auto* pkt = (Packet*)cur_buffer_ptr;
+  auto* pkt = reinterpret_cast<Packet*>(cur_buffer_ptr);
   new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
   // Send data (one OFDM symbol)

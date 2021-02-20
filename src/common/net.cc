@@ -4,6 +4,7 @@
 #include <cstdio>  /* std::printf */
 #include <cstdlib> /* std::exit */
 #include <cstring> /* std::strerror, std::memset, std::memcpy */
+#include <stdexcept>
 
 void SetSocketBufSize(int socket_local, int sock_buf_size) {
   // use SO_REUSEPORT option, so that multiple sockets could receive packets
@@ -15,7 +16,7 @@ void SetSocketBufSize(int socket_local, int sock_buf_size) {
   if (setsockopt(socket_local, SOL_SOCKET, SO_RCVBUF, &sock_buf_size,
                  sizeof(sock_buf_size)) < 0) {
     std::printf("Error setting buffer size to %d\n", sock_buf_size);
-    std::exit(-1);
+    throw std::runtime_error("Net: Error setting buffer size");
   }
 }
 
@@ -28,7 +29,7 @@ int SetupSocketIpv4(int port_id, bool set_sock_size, int sock_buf_size) {
   int socket_local;
   if ((socket_local = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {  // UDP socket
     std::printf("ERROR: cannot create IPV4 socket\n");
-    std::exit(0);
+    throw std::runtime_error("ERROR: cannot create IPV4 socket");
   }
 
   if (set_sock_size) {
@@ -38,7 +39,7 @@ int SetupSocketIpv4(int port_id, bool set_sock_size, int sock_buf_size) {
   if (bind(socket_local, (struct sockaddr*)&local_addr, sizeof(local_addr)) !=
       0) {
     std::fprintf(stderr, "Socket bind failed: %s", std::strerror(errno));
-    std::exit(0);
+    throw std::runtime_error("Net: Error setting buffer size");
   }
   return socket_local;
 }
@@ -52,7 +53,7 @@ int SetupSocketIpv6(int port_id, bool set_sock_size, int sock_buf_size) {
   int socket_local;
   if ((socket_local = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {  // UDP socket
     std::printf("ERROR: cannot create IPV6 socket\n");
-    std::exit(0);
+    throw std::runtime_error("Net: cannot create IPV6 socket");
   } else {
     std::printf("Created IPV6 socket on port %d\n", port_id);
   }
@@ -63,7 +64,7 @@ int SetupSocketIpv6(int port_id, bool set_sock_size, int sock_buf_size) {
   if (bind(socket_local, (struct sockaddr*)&local_addr, sizeof(local_addr)) !=
       0) {
     std::fprintf(stderr, "Socket bind failed: %s", std::strerror(errno));
-    std::exit(0);
+    throw std::runtime_error("Net: Socket bind failed");
   }
   return socket_local;
 }

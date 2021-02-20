@@ -6,7 +6,6 @@
 
 #include "concurrent_queue_wrapper.h"
 
-using namespace arma;
 static constexpr bool kUseSpatialLocality = true;
 
 DoPrecode::DoPrecode(
@@ -43,7 +42,8 @@ DoPrecode::DoPrecode(
     std::fprintf(
         stderr,
         "Error: insufficient memory to JIT and store the DGEMM kernel\n");
-    std::exit(1);
+    throw std::runtime_error(
+        "DoPrecode: insufficient memory to JIT and store the DGEMM kernel");
   }
   my_cgemm_ = mkl_jit_get_cgemm_ptr(jitter_);
 #endif
@@ -52,10 +52,17 @@ DoPrecode::DoPrecode(
 DoPrecode::~DoPrecode() {
   FreeBuffer1d(&modulated_buffer_temp_);
   FreeBuffer1d(&precoded_buffer_temp_);
+
+#if USE_MKL_JIT
+  mkl_jit_status_t status = mkl_jit_destroy(jitter_);
+  if (MKL_JIT_ERROR == status) {
+    std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
+  }
+#endif
 }
 
 EventData DoPrecode::Launch(size_t tag) {
-  size_t start_tsc = WorkerRdtsc();
+  size_t start_tsc = GetTime::WorkerRdtsc();
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
@@ -93,7 +100,7 @@ EventData DoPrecode::Launch(size_t tag) {
 
   if (kUseSpatialLocality) {
     for (size_t i = 0; i < max_sc_ite; i = i + kSCsPerCacheline) {
-      size_t start_tsc1 = WorkerRdtsc();
+      size_t start_tsc1 = GetTime::WorkerRdtsc();
       for (size_t user_id = 0; user_id < cfg_->UeNum(); user_id++) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
           LoadInputData(symbol_idx_dl, total_data_symbol_idx, user_id,
@@ -101,52 +108,52 @@ EventData DoPrecode::Launch(size_t tag) {
         }
       }
 
-      size_t start_tsc2 = WorkerRdtsc();
+      size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
       for (size_t j = 0; j < kSCsPerCacheline; j++) {
         PrecodingPerSc(frame_slot, base_sc_id + i + j, i + j);
       }
       duration_stat_->task_count_ =
           duration_stat_->task_count_ + kSCsPerCacheline;
-      duration_stat_->task_duration_[2] += WorkerRdtsc() - start_tsc2;
+      duration_stat_->task_duration_[2] += GetTime::WorkerRdtsc() - start_tsc2;
     }
   } else {
     for (size_t i = 0; i < max_sc_ite; i++) {
-      size_t start_tsc1 = WorkerRdtsc();
+      size_t start_tsc1 = GetTime::WorkerRdtsc();
       int cur_sc_id = base_sc_id + i;
       for (size_t user_id = 0; user_id < cfg_->UeNum(); user_id++) {
         LoadInputData(symbol_idx_dl, total_data_symbol_idx, user_id, cur_sc_id,
                       0);
       }
-      size_t start_tsc2 = WorkerRdtsc();
+      size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
       PrecodingPerSc(frame_slot, cur_sc_id, i);
       duration_stat_->task_count_++;
-      duration_stat_->task_duration_[2] += WorkerRdtsc() - start_tsc2;
+      duration_stat_->task_duration_[2] += GetTime::WorkerRdtsc() - start_tsc2;
     }
   }
 
-  size_t start_tsc3 = WorkerRdtsc();
+  size_t start_tsc3 = GetTime::WorkerRdtsc();
 
   __m256i index = _mm256_setr_epi64x(0, cfg_->BsAntNum(), cfg_->BsAntNum() * 2,
                                      cfg_->BsAntNum() * 3);
-  float* precoded_ptr = (float*)precoded_buffer_temp_;
+  auto* precoded_ptr = reinterpret_cast<float*>(precoded_buffer_temp_);
   for (size_t ant_id = 0; ant_id < cfg_->BsAntNum(); ant_id++) {
     int ifft_buffer_offset = ant_id + cfg_->BsAntNum() * total_data_symbol_idx;
-    float* ifft_ptr =
-        (float*)&dl_ifft_buffer_[ifft_buffer_offset]
-                                [base_sc_id + cfg_->OfdmDataStart()];
+    auto* ifft_ptr = reinterpret_cast<float*>(
+        &dl_ifft_buffer_[ifft_buffer_offset]
+                        [base_sc_id + cfg_->OfdmDataStart()]);
     for (size_t i = 0; i < cfg_->DemulBlockSize() / 4; i++) {
       float* input_shifted_ptr =
           precoded_ptr + 4 * i * 2 * cfg_->BsAntNum() + ant_id * 2;
-      __m256d t_data =
-          _mm256_i64gather_pd((double*)input_shifted_ptr, index, 8);
-      _mm256_stream_pd((double*)(ifft_ptr + i * 8), t_data);
+      __m256d t_data = _mm256_i64gather_pd(
+          reinterpret_cast<double*>(input_shifted_ptr), index, 8);
+      _mm256_stream_pd(reinterpret_cast<double*>(ifft_ptr + i * 8), t_data);
     }
   }
-  duration_stat_->task_duration_[3] += WorkerRdtsc() - start_tsc3;
-  duration_stat_->task_duration_[0] += WorkerRdtsc() - start_tsc;
+  duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
+  duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
   if (kDebugPrintInTask) {
     std::printf(
         "In doPrecode thread %d: finished frame: %zu, symbol: %zu, "
@@ -177,21 +184,22 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
 
 void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
                                size_t sc_id_in_block) {
-  auto* precoder_ptr = reinterpret_cast<cx_float*>(
+  auto* precoder_ptr = reinterpret_cast<arma::cx_float*>(
       dl_zf_matrices_[frame_slot][cfg_->GetZfScId(sc_id)]);
-  auto* data_ptr = reinterpret_cast<cx_float*>(
+  auto* data_ptr = reinterpret_cast<arma::cx_float*>(
       modulated_buffer_temp_ +
       (kUseSpatialLocality ? (sc_id_in_block % kSCsPerCacheline * cfg_->UeNum())
                            : 0));
-  auto* precoded_ptr = reinterpret_cast<cx_float*>(
+  auto* precoded_ptr = reinterpret_cast<arma::cx_float*>(
       precoded_buffer_temp_ + sc_id_in_block * cfg_->BsAntNum());
 #if USE_MKL_JIT
   my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
             (MKL_Complex8*)precoded_ptr);
 #else
-  cx_fmat mat_precoder(precoder_ptr, cfg->BsAntNum(), cfg->UeNum(), false);
-  cx_fmat mat_data(data_ptr, cfg->UeNum(), 1, false);
-  cx_fmat mat_precoded(precoded_ptr, cfg->BsAntNum(), 1, false);
+  arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->UeNum(),
+                             false);
+  arma::cx_fmat mat_data(data_ptr, cfg_->UeNum(), 1, false);
+  arma::cx_fmat mat_precoded(precoded_ptr, cfg_->BsAntNum(), 1, false);
   mat_precoded = mat_precoder * mat_data;
   // cout << "Precoder: \n" << mat_precoder << endl;
   // cout << "Data: \n" << mat_data << endl;

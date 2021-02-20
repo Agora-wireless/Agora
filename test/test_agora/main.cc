@@ -1,58 +1,46 @@
 #include "agora.h"
 
-void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
-                    int num_bytes_per_ue, Config* cfg) {
-  int data_symbol_num_perframe = cfg->Frame().NumULSyms();
-  size_t ue_num = cfg->UeNum();
-  FILE* fp = fopen(filename.c_str(), "rb");
+static const bool kDebugPrintUlCorr = false;
+static const bool kDebugPrintDlCorr = false;
+
+template <class TableType>
+static void ReadFromFile(const std::string& filename, Table<TableType>& data,
+                         size_t num_reads, size_t read_elements,
+                         size_t element_size) {
+  FILE* fp = std::fopen(filename.c_str(), "rb");
   if (fp == nullptr) {
-    std::printf("open file failed: %s\n", filename.c_str());
-    std::cerr << "Error: " << strerror(errno) << std::endl;
+    MLPD_ERROR("Open file failed: %s, error %s\n", filename.c_str(),
+               strerror(errno));
   } else {
-    std::printf("opening file %s\n", filename.c_str());
+    MLPD_INFO("Opening file %s\n", filename.c_str());
   }
-  int expect_num_bytes = num_bytes_per_ue * ue_num;
-  // std::printf("read data of %d byptes\n", expect_num_bytes);
-  for (int i = 0; i < data_symbol_num_perframe; i++) {
-    int num_bytes = fread(data[i], sizeof(uint8_t), expect_num_bytes, fp);
-    // if (i == 0) {
-    // std::printf("i: %d\n", i);
-    // for (int j = 0; j < num_bytes; j++) {
-    //     std::printf("%u ", data[i][j]);
-    // }
-    // std::printf("\n");
-    // }
-    if (expect_num_bytes != num_bytes) {
-      std::printf(
-          "read file failed: %s, symbol %d, expect: %d, actual: %d "
-          "bytes\n",
-          filename.c_str(), i, expect_num_bytes, num_bytes);
-      std::cerr << "Error: " << strerror(errno) << std::endl;
+
+  for (size_t i = 0; i < num_reads; i++) {
+    size_t elements = std::fread(data[i], element_size, read_elements, fp);
+    if (read_elements != elements) {
+      MLPD_ERROR(
+          "Read file failed: %s, symbol %zu, expect: %zu, actual: %zu "
+          "bytes, error %s\n",
+          filename.c_str(), i, read_elements, elements, strerror(errno));
     }
   }
 }
 
-void ReadFromFileDl(const std::string& filename, Table<short>& data,
-                    int ofdm_size, Config* cfg) {
-  int data_symbol_num_perframe = cfg->Frame().NumDLSyms();
-  size_t bs_ant_num = cfg->BsAntNum();
-  FILE* fp = fopen(filename.c_str(), "rb");
-  if (fp == nullptr) {
-    std::printf("open file failed: %s\n", filename.c_str());
-    std::cerr << "Error: " << strerror(errno) << std::endl;
-  }
-  for (size_t i = 0; i < data_symbol_num_perframe * bs_ant_num; i++) {
-    if ((unsigned)ofdm_size * 2 !=
-        fread(data[i], sizeof(short), ofdm_size * 2, fp)) {
-      std::printf("read file failed: %s\n", filename.c_str());
-      std::cerr << "Error: " << strerror(errno) << std::endl;
-    }
-  }
+static void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
+                           int num_bytes_per_ue, Config const* const cfg) {
+  ReadFromFile(filename, data, cfg->Frame().NumULSyms(),
+               (num_bytes_per_ue * cfg->UeNum()), sizeof(uint8_t));
 }
 
-void CheckCorrectnessUl(Config* cfg) {
+static void ReadFromFileDl(const std::string& filename, Table<short>& data,
+                           int ofdm_size, Config const* const cfg) {
+  ReadFromFile(filename, data, cfg->Frame().NumDLSyms() * cfg->BsAntNum(),
+               (ofdm_size * 2), sizeof(short));
+}
+
+static unsigned int CheckCorrectnessUl(Config const* const cfg) {
   int ue_num = cfg->UeNum();
-  int data_symbol_num_perframe = cfg->Frame().NumULSyms();
+  int num_uplink_syms = cfg->Frame().NumULSyms();
   int ofdm_data_num = cfg->OfdmDataNum();
   int ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
 
@@ -64,9 +52,9 @@ void CheckCorrectnessUl(Config* cfg) {
 
   Table<uint8_t> raw_data;
   Table<uint8_t> output_data;
-  raw_data.Calloc(data_symbol_num_perframe, ofdm_data_num * ue_num,
+  raw_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
                   Agora_memory::Alignment_t::kAlign64);
-  output_data.Calloc(data_symbol_num_perframe, ofdm_data_num * ue_num,
+  output_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
                      Agora_memory::Alignment_t::kAlign64);
 
   int num_bytes_per_ue = (cfg->LdpcConfig().NumCbLen() + 7) >>
@@ -74,42 +62,42 @@ void CheckCorrectnessUl(Config* cfg) {
   ReadFromFileUl(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
   ReadFromFileUl(output_data_filename, output_data, num_bytes_per_ue, cfg);
 
-  int error_cnt = 0;
-  int total_count = 0;
-  for (int i = 0; i < data_symbol_num_perframe; i++) {
-    if (i < ul_pilot_syms) {
-      continue;
-    }
-    for (int ue = 0; ue < ue_num; ue++) {
-      for (int j = 0; j < num_bytes_per_ue; j++) {
-        total_count++;
-        int offset_in_raw = num_bytes_per_ue * ue + j;
-        int offset_in_output = num_bytes_per_ue * ue + j;
-        if (raw_data[i][offset_in_raw] != output_data[i][offset_in_output]) {
-          error_cnt++;
-          // std::printf("(%d, %d, %u, %u)\n", i, j,
-          //     raw_data[i][offset_in_raw],
-          //     output_data[i][offset_in_output]);
+  std::printf(
+      "check_correctness_ul: ue %d, ul syms %d, ofdm %d, ul pilots %d, bytes "
+      "per UE %d.\n",
+      ue_num, num_uplink_syms, ofdm_data_num, ul_pilot_syms, num_bytes_per_ue);
+
+  unsigned int error_cnt = 0;
+  unsigned int total_count = 0;
+  for (int i = 0; i < num_uplink_syms; i++) {
+    if (i >= ul_pilot_syms) {
+      for (int ue = 0; ue < ue_num; ue++) {
+        for (int j = 0; j < num_bytes_per_ue; j++) {
+          total_count++;
+          int offset_in_raw = num_bytes_per_ue * ue + j;
+          int offset_in_output = num_bytes_per_ue * ue + j;
+          if (raw_data[i][offset_in_raw] != output_data[i][offset_in_output]) {
+            error_cnt++;
+            if (kDebugPrintUlCorr) {
+              std::printf("(%d, %d, %u, %u)\n", i, j,
+                          raw_data[i][offset_in_raw],
+                          output_data[i][offset_in_output]);
+            }
+          }
         }
-      }
-    }
-  }
-  std::printf("======================\n");
-  std::printf("Uplink test: \n\n");
-  if (error_cnt == 0) {
-    std::printf("Passed uplink test!\n");
-  } else {
-    std::printf("Failed uplink test! Error rate: %d/%d\n", error_cnt,
-                total_count);
-  }
-  std::printf("======================\n\n");
+      }  //  for (int ue = 0; ue < ue_num; ue++)
+    }    // if (i >= ul_pilot_syms)
+  }      // for (int i = 0; i < num_uplink_syms; i++)
+
   raw_data.Free();
   output_data.Free();
+
+  return error_cnt;
 }
 
-void CheckCorrectnessDl(Config* cfg) {
+unsigned int CheckCorrectnessDl(Config const* const cfg) {
   int bs_ant_num = cfg->BsAntNum();
-  int data_symbol_num_perframe = cfg->Frame().NumDLSyms();
+  int num_data_syms = cfg->Frame().NumDLSyms();
   int ofdm_ca_num = cfg->OfdmCaNum();
   int samps_per_symbol = cfg->SampsPerSymbol();
 
@@ -120,50 +108,57 @@ void CheckCorrectnessDl(Config* cfg) {
   std::string tx_data_filename = cur_directory + "/data/tx_data.bin";
   Table<short> raw_data;
   Table<short> tx_data;
-  raw_data.Calloc(data_symbol_num_perframe * bs_ant_num, samps_per_symbol * 2,
+  raw_data.Calloc(num_data_syms * bs_ant_num, samps_per_symbol * 2,
                   Agora_memory::Alignment_t::kAlign64);
-  tx_data.Calloc(data_symbol_num_perframe * bs_ant_num, samps_per_symbol * 2,
+  tx_data.Calloc(num_data_syms * bs_ant_num, samps_per_symbol * 2,
                  Agora_memory::Alignment_t::kAlign64);
 
   ReadFromFileDl(raw_data_filename, raw_data, samps_per_symbol, cfg);
   ReadFromFileDl(tx_data_filename, tx_data, samps_per_symbol, cfg);
+  std::printf(
+      "check_correctness_dl: bs ant %d, dl syms %d, ofdm %d, samps per %d. \n",
+      bs_ant_num, num_data_syms, ofdm_ca_num, samps_per_symbol);
 
-  int error_cnt = 0;
-  int total_count = 0;
+  unsigned int error_cnt = 0;
   float sum_diff = 0;
-  for (int i = 0; i < data_symbol_num_perframe; i++) {
+  for (int i = 0; i < num_data_syms; i++) {
     for (int ant = 0; ant < bs_ant_num; ant++) {
-      // std::printf("symbol %d, antenna %d\n", i, ant);
       sum_diff = 0;
-      total_count++;
-      for (int sc = 0; sc < samps_per_symbol * 2; sc++) {
-        int offset = bs_ant_num * i + ant;
+      for (int sc = 0; sc < (samps_per_symbol * 2); sc++) {
+        int offset = (bs_ant_num * i) + ant;
         float diff =
             fabs((raw_data[offset][sc] - tx_data[offset][sc]) / 32768.0);
         sum_diff += diff;
-        // if (i == 0)
-        // std::printf("symbol %d ant %d sc %d, (%d, %d) diff: %.3f\n", i, ant,
-        //     sc / 2, raw_data[offset][sc], tx_data[offset][sc], diff);
+        if (kDebugPrintDlCorr) {
+          if (i == 0) {
+            std::printf("dl symbol %d ant %d sc %d, (%d, %d) diff: %.3f\n", i,
+                        ant, sc / 2, raw_data[offset][sc], tx_data[offset][sc],
+                        diff);
+          }
+        }
       }
       float avg_diff = sum_diff / samps_per_symbol;
-      std::printf("symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant,
+      std::printf("dl symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant,
                   avg_diff);
       if (avg_diff > 0.03) {
         error_cnt++;
       }
     }
   }
-  std::printf("======================\n");
-  std::printf("Downlink test: \n\n");
-  if (error_cnt == 0) {
-    std::printf("Passed downlink test!\n");
-  } else {
-    std::printf("Failed downlink test! Error rate: %d/%d\n", error_cnt,
-                total_count);
-  }
-  std::printf("======================\n\n");
   raw_data.Free();
   tx_data.Free();
+
+  return error_cnt;
+}
+
+static unsigned int CheckCorrectness(Config const* const cfg) {
+  unsigned int ul_error_count = 0;
+  unsigned int dl_error_count = 0;
+  ul_error_count = CheckCorrectnessUl(cfg);
+  std::printf("Uplink error count: %d\n", ul_error_count);
+  dl_error_count = CheckCorrectnessDl(cfg);
+  std::printf("Downlink error count: %d\n", dl_error_count);
+  return ul_error_count + dl_error_count;
 }
 
 int main(int argc, char* argv[]) {
@@ -174,24 +169,45 @@ int main(int argc, char* argv[]) {
     conf_file = std::string(argv[1]);
   }
 
-  auto* cfg = new Config(conf_file.c_str());
+  auto cfg = std::make_unique<Config>(conf_file.c_str());
   cfg->GenData();
 
   int ret;
   try {
     SignalHandler signal_handler;
     signal_handler.SetupSignalHandlers();
-    auto* agora_cli = new Agora(cfg);
+    auto agora_cli = std::make_unique<Agora>(cfg.get());
     agora_cli->flags_.enable_save_decode_data_to_file_ = true;
     agora_cli->flags_.enable_save_tx_data_to_file_ = true;
     agora_cli->Start();
 
     std::printf("Start correctness check\n");
-    if (cfg->DownlinkMode()) {
-      CheckCorrectnessDl(cfg);
+    unsigned int error_count = 0;
+    std::string test_name;
+
+    if ((cfg->Frame().NumDLSyms() > 0) && (cfg->Frame().NumULSyms() > 0)) {
+      test_name = "combined";
+      error_count = CheckCorrectness(cfg.get());
+    } else if (cfg->Frame().NumDLSyms() > 0) {
+      test_name = "downlink";
+      error_count = CheckCorrectnessDl(cfg.get());
+    } else if (cfg->Frame().NumULSyms() > 0) {
+      test_name = "uplink";
+      error_count = CheckCorrectnessUl(cfg.get());
     } else {
-      CheckCorrectnessUl(cfg);
+      // Should never happen
+      assert(false);
     }
+
+    std::printf("======================\n");
+    std::printf("%s test: \n", test_name.c_str());
+    if (error_count == 0) {
+      std::printf("Passed %s test!\n", test_name.c_str());
+    } else {
+      std::printf("Failed %s test! Error count: %d\n", test_name.c_str(),
+                  error_count);
+    }
+    std::printf("======================\n\n");
 
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {

@@ -7,7 +7,6 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include <pthread.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
@@ -29,8 +28,6 @@
 #include "udp_client.h"
 #include "udp_server.h"
 
-using namespace arma;
-
 /**
  * @brief Simualtor for many-antenna MU-MIMO channel to work with
  * Agora BS and UE applications. It generates channel matrice(s)
@@ -40,9 +37,10 @@ using namespace arma;
  */
 class ChannelSim {
  public:
-  ChannelSim(Config* config_bs, Config* config_ue, size_t bs_thread_num,
-             size_t user_thread_num, size_t worker_thread_num,
-             size_t in_core_offset = 30, std::string in_chan_type = "RAYLEIGH",
+  ChannelSim(const Config* const config_bs, const Config* const config_ue,
+             size_t bs_thread_num, size_t user_thread_num,
+             size_t worker_thread_num, size_t in_core_offset = 30,
+             std::string in_chan_type = std::string("RAYLEIGH"),
              double in_chan_snr = 20);
   ~ChannelSim();
 
@@ -66,14 +64,21 @@ class ChannelSim {
   void* TaskThread(int tid);
 
  private:
-  std::vector<struct sockaddr_in> servaddr_bs_;  // BS-facing server addresses
+  void DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
+            std::vector<char>& tx_buffer, size_t buffer_offset,
+            std::vector<int>& send_socket,
+            std::vector<struct sockaddr_in>& servaddr,
+            arma::cx_fmat& format_dest);
+
+  std::vector<struct sockaddr_in> servaddr_bs_;  // BS-facing server
+                                                 // addresses
   std::vector<int> socket_bs_;                   // BS-facing sockets
   std::vector<struct sockaddr_in> servaddr_ue_;  // UE-facing server addresses
   std::vector<int> socket_ue_;                   // UE-facing sockets
 
-  Config* bscfg_;
-  Config* uecfg_;
-  Channel* channel_;
+  const Config* const bscfg_;
+  const Config* const uecfg_;
+  std::unique_ptr<Channel> channel_;
 
   // Data buffer for symbols to be transmitted to BS antennas (uplink)
   std::vector<char> tx_buffer_bs_;
@@ -97,7 +102,7 @@ class ChannelSim {
   moodycamel::ConcurrentQueue<EventData> message_queue_;
   moodycamel::ProducerToken* task_ptok_[kMaxThreads];
 
-  pthread_t* task_threads_;
+  std::vector<std::thread> task_threads_;
 
   size_t ul_data_plus_pilot_symbols_;
   size_t dl_data_plus_beacon_symbols_;
@@ -115,8 +120,8 @@ class ChannelSim {
 
   size_t* bs_rx_counter_;
   size_t* user_rx_counter_;
-  size_t bs_tx_counter_[kFrameWnd];
-  size_t user_tx_counter_[kFrameWnd];
+  std::array<size_t, kFrameWnd> bs_tx_counter_;
+  std::array<size_t, kFrameWnd> user_tx_counter_;
 
   inline size_t GetDlSymbolIdx(size_t /*frame_id*/, size_t symbol_id) const {
     if (symbol_id == 0) {

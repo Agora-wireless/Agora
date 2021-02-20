@@ -136,7 +136,7 @@ static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
   if (ant_start < bs_ant_num) {
     const size_t pt_base_offset =
         (cur_sc_id / kTransposeBlockSize) * (kTransposeBlockSize * bs_ant_num);
-    complex_float* cx_src = (complex_float*)src;
+    auto* cx_src = reinterpret_cast<complex_float*>(src);
     complex_float* cx_dst = (complex_float*)dst + ant_start;
     for (size_t ant_i = ant_start; ant_i < bs_ant_num; ant_i++) {
       *cx_dst = cx_src[pt_base_offset + (ant_i * kTransposeBlockSize) +
@@ -150,8 +150,8 @@ static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
 // produced by dofft
 static inline void TransposeGather(size_t cur_sc_id, float* src, float*& dst,
                                    size_t bs_ant_num, size_t ofdm_data_num) {
-  complex_float* cx_src = (complex_float*)src;
-  complex_float* cx_dst = (complex_float*)dst;
+  auto* cx_src = reinterpret_cast<complex_float*>(src);
+  auto* cx_dst = reinterpret_cast<complex_float*>(dst);
   for (size_t ant_i = 0; ant_i < bs_ant_num; ant_i++) {
     *cx_dst = cx_src[ant_i * ofdm_data_num + cur_sc_id];
     cx_dst++;
@@ -171,13 +171,13 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
 
   // Handle each subcarrier one by one
   for (size_t i = 0; i < num_subcarriers; i++) {
-    size_t start_tsc1 = WorkerRdtsc();
+    size_t start_tsc1 = GetTime::WorkerRdtsc();
     const size_t cur_sc_id = base_sc_id + i;
 
     // Gather CSI matrices of each pilot from partially-transposed CSIs.
     for (size_t ue_idx = 0; ue_idx < cfg_->UeNum(); ue_idx++) {
-      float* dst_csi_ptr =
-          (float*)(csi_gather_buffer_ + cfg_->BsAntNum() * ue_idx);
+      auto* dst_csi_ptr = reinterpret_cast<float*>(csi_gather_buffer_ +
+                                                   cfg_->BsAntNum() * ue_idx);
       if (kUsePartialTrans) {
         PartialTransposeGather(cur_sc_id,
                                (float*)csi_buffers_[frame_slot][ue_idx],
@@ -188,7 +188,7 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
       }
     }
 
-    size_t start_tsc2 = WorkerRdtsc();
+    size_t start_tsc2 = GetTime::WorkerRdtsc();
     duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
     arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_, cfg_->BsAntNum(),
@@ -235,16 +235,16 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
       }
     }
 
-    double start_tsc3 = WorkerRdtsc();
+    double start_tsc3 = GetTime::WorkerRdtsc();
     duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
     ComputePrecoder(mat_csi, calib_gather_buffer_,
                     ul_zf_matrices_[frame_slot][cur_sc_id],
                     dl_zf_matrices_[frame_slot][cur_sc_id]);
 
-    duration_stat_->task_duration_[3] += WorkerRdtsc() - start_tsc3;
+    duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
     duration_stat_->task_count_++;
-    duration_stat_->task_duration_[0] += WorkerRdtsc() - start_tsc1;
+    duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
     // if (duration > 500) {
     //     std::printf("Thread %d ZF takes %.2f\n", tid, duration);
     // }
@@ -263,17 +263,18 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
         cfg_->BsAntNum());
   }
 
-  double start_tsc1 = WorkerRdtsc();
+  double start_tsc1 = GetTime::WorkerRdtsc();
 
   // Gather CSIs from partially-transposed CSIs
   for (size_t i = 0; i < cfg_->UeNum(); i++) {
     const size_t cur_sc_id = base_sc_id + i;
-    float* dst_csi_ptr = (float*)(csi_gather_buffer_ + cfg_->BsAntNum() * i);
+    auto* dst_csi_ptr =
+        reinterpret_cast<float*>(csi_gather_buffer_ + cfg_->BsAntNum() * i);
     PartialTransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
                            dst_csi_ptr, cfg_->BsAntNum());
   }
 
-  size_t start_tsc2 = WorkerRdtsc();
+  size_t start_tsc2 = GetTime::WorkerRdtsc();
   duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
   if (cfg_->Frame().NumDLSyms() > 0) {
@@ -282,7 +283,7 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
         cfg_->BfAntNum(), false);
     size_t frame_cal_slot = kFrameWnd - 1;
     size_t frame_cal_slot_prev = kFrameWnd - 1;
-    if (cfg_->Frame().IsRecCalEnabled() && frame_id >= TX_FRAME_DELTA) {
+    if (cfg_->Frame().IsRecCalEnabled() && (frame_id >= TX_FRAME_DELTA)) {
       size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
 
       // use the previous window which has a full set of calibration results
@@ -312,7 +313,7 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
     calib_vec = calib_dl_vec / calib_ul_vec;
   }
 
-  double start_tsc3 = WorkerRdtsc();
+  double start_tsc3 = GetTime::WorkerRdtsc();
   duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
   arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
@@ -322,9 +323,9 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
                   ul_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)],
                   dl_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)]);
 
-  duration_stat_->task_duration_[3] += WorkerRdtsc() - start_tsc3;
+  duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
   duration_stat_->task_count_++;
-  duration_stat_->task_duration_[0] += WorkerRdtsc() - start_tsc1;
+  duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc1;
 
   // if (duration > 500) {
   //     std::printf("Thread %d ZF takes %.2f\n", tid, duration);

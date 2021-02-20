@@ -1,5 +1,5 @@
 /**
- * @file txrx_DPDK.cpp
+ * @file txrx_DPDK.cc
  * @brief Implementation of PacketTXRX datapath functions for communicating
  * with DPDK
  */
@@ -175,7 +175,8 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
 
     if (kIsWorkerTimingEnabled) {
       if (prev_frame_id == SIZE_MAX or pkt->frame_id_ > prev_frame_id) {
-        (*frame_start_)[tid][pkt->frame_id_ % kNumStatsFrames] = Rdtsc();
+        (*frame_start_)[tid][pkt->frame_id_ % kNumStatsFrames] =
+            GetTime::Rdtsc();
         prev_frame_id = pkt->frame_id_;
       }
     }
@@ -184,7 +185,7 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
             *rx_ptoks_[tid],
             EventData(EventType::kPacketRX, rx_tag_t(tid, rx_offset).tag_))) {
       std::printf("Failed to enqueue socket message\n");
-      std::exit(-1);
+      throw std::runtime_error("PacketTXRX: Failed to enqueue socket message");
     }
 
     rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
@@ -250,7 +251,7 @@ int PacketTXRX::DequeueSend(int tid) {
   size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
   if (unlikely(nb_tx_new != 1)) {
     std::printf("rte_eth_tx_burst() failed\n");
-    std::exit(0);
+    throw std::runtime_error("PacketTXRX: rte_eth_tx_burst() failed");
   }
   RtAssert(
       message_queue_->enqueue(*rx_ptoks_[tid],
