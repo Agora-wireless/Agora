@@ -379,7 +379,7 @@ bool RadioConfig::RadioStart() {
 
   size_t ndx = 0;
   for (size_t i = 0; i < this->radio_num_; i++) {
-    bool is_ref_ant = (i == cfg_->RefAnt());
+    bool is_ref_ant = (i == cfg_->RefAnt() / cfg_->NumChannels());
     ba_stn_[i]->writeSetting(
         "TX_SW_DELAY", "30");  // experimentally good value for dev front-end
     ba_stn_[i]->writeSetting("TDD_MODE", "true");
