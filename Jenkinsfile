@@ -92,10 +92,10 @@ pipeline {
 						command = $/tail -1500 ${logFile} | grep -i 'Passed downlink test!'/$
 						dl_pf_flag = sh(script: command, returnStdout: true)
 						dl_pf_flag = dl_pf_flag.trim()
-						command = $/tail -1500 ${logFile} | grep -i 'Failed combined test!'/$
+						command = $/tail -1500 ${logFile} | grep -i 'Passed combined test!'/$
 						comb_pf_flag = sh(script: command, returnStdout: true)
 						comb_pf_flag = comb_pf_flag.trim()
-						if (ul_pf_flag == "Passed uplink test!" && dl_pf_flag == "Passed downlink test!" && comb_pf_flag == "Failed combined test!") {
+						if (ul_pf_flag == "Passed uplink test!" && dl_pf_flag == "Passed downlink test!" && comb_pf_flag == "Passed combined test!") {
 							echo "Passing due to " + ul_pf_flag + " and " + dl_pf_flag + " and " + comb_pf_flag
 							currentBuild.result = "SUCCESS"
 						} else {

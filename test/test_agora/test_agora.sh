@@ -99,10 +99,6 @@ for i in `seq 1 $num_iters`; do
     sleep 1; ./build/sender --num_threads 1 --core_offset 10 --frame_duration 5000 --conf_file "data/tddconfig-correctness-test-both.json"
     echo -e "-------------------------------------------------------\n\n\n"
     wait
-    echo "==========================================="
-    echo "combined test: "
-    echo "Failed combined test!"
-    echo -e "===========================================\n"
   } >> $out_file
 
   # If the user supplied an output file, print pass/fail summary analysis
