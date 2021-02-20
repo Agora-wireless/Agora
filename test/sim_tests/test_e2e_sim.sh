@@ -59,8 +59,8 @@ if [ "$THRESH" == "" ]; then
 fi
 echo "BER test threshold is ${THRESH}"
 while read -r line ; do
-  read num1 num2 num3 num4 num5 <<<${line//[^0-9.]/ }
-  if [ "`echo "${num4} > ${THRESH}" | bc`" -eq 1 ]; then
+  ue_BER=$(printf %.15f $(echo $line | awk -F '[()]' '{FOO=$4; print $4}'))
+  if [ "`echo "${ue_BER} > ${THRESH}" | bc`" -eq 1 ]; then
     echo "Failed the end-to-end test with channel simulator!"
     echo "=================================================="
     rm test_output.txt
