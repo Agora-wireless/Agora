@@ -131,7 +131,7 @@ pipeline {
 				dir("${WORKSPACE}") {
 					sh '''
 						export LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2020.3.279/linux/mkl/lib/intel64/:$LD_LIBRARY_PATH
-						./test/sim_tests/test_e2e_sim.sh 0.03
+						./test/sim_tests/test_e2e_sim.sh 0.05
 					'''
 					script {
 						logFile = findLogFile()
