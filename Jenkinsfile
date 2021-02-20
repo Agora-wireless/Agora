@@ -53,9 +53,9 @@ pipeline {
 			}
 		}
 		
-		stage("End-to-end Test") {
+		stage("Test Agora") {
 			steps {
-				echo "CI end-to-end testing ..."
+				echo "CI Emulated Agora testing ..."
 				dir("${WORKSPACE}") {
 					sh '''
 						export LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2020.3.279/linux/mkl/lib/intel64/:$LD_LIBRARY_PATH
@@ -78,6 +78,18 @@ pipeline {
 					sh '''
 						export LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2020.3.279/linux/mkl/lib/intel64/:$LD_LIBRARY_PATH
 						ctest
+					'''
+				}
+			}
+		}
+		
+		stage("End-to-end Test with Channel Simulator") {
+			steps {
+				echo "CI e2e testing ..."
+				dir("${WORKSPACE}") {
+					sh '''
+						export LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2020.3.279/linux/mkl/lib/intel64/:$LD_LIBRARY_PATH
+						./test/sim_tests/test_e2e_sim.sh 0.001
 					'''
 				}
 			}
