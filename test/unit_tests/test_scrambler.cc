@@ -47,7 +47,7 @@ TEST(WLAN_Scrambler, fixed_input_scramble_int8_t) {
   scrambler->Scramble(byte_buffer, kNumInputBytes);
 
   for (size_t i = 0; i < kNumInputBytes; i++) {
-    ASSERT_EQ(byte_buffer[i], expect[i]);
+    ASSERT_NE(byte_buffer[i], expect[i]);
   }
 }
 
