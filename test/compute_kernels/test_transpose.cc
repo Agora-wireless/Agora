@@ -28,8 +28,8 @@ struct complex_float {
 typedef std::vector<complex_float,
                     boost::alignment::aligned_allocator<complex_float, 128>>
     myVec;
-using namespace arma;
-typedef cx_float COMPLEX;
+
+typedef arma::cx_float COMPLEX;
 
 int flushCache() {
   const size_t bigger_than_cachesize = 100 * 1024 * 1024;
@@ -151,8 +151,8 @@ int main(int argc, char** argv) {
       std::memcpy(buffer_trans.data() + j * OFDM, buffer.data() + j * OFDM,
                   sizeof(complex_float) * OFDM);
     }
-    cx_float* mat_ptr = (cx_float*)buffer_trans.data();
-    cx_fmat mat_data(mat_ptr, BS_ANT, OFDM, false);
+    arma::cx_float* mat_ptr = (arma::cx_float*)buffer_trans.data();
+    arma::cx_fmat mat_data(mat_ptr, BS_ANT, OFDM, false);
     inplace_trans(mat_data);
   }
   end = std::chrono::system_clock::now();
@@ -163,14 +163,14 @@ int main(int argc, char** argv) {
   begin = std::chrono::system_clock::now();
   for (int i = 0; i < LOOP_NUM; ++i) {
     for (int c1 = 0; c1 < OFDM; c1++) {
-      cx_float* data_ptr = (cx_float*)(&buffer[c1 * BS_ANT]);
-      cx_fmat mat_data(data_ptr, BS_ANT, 1, false);
+      arma::cx_float* data_ptr = (arma::cx_float*)(&buffer[c1 * BS_ANT]);
+      arma::cx_fmat mat_data(data_ptr, BS_ANT, 1, false);
 
-      cx_float* precoder_ptr = (cx_float*)precoder.data();
-      cx_fmat mat_precoder(precoder_ptr, K, BS_ANT, false);
+      arma::cx_float* precoder_ptr = (arma::cx_float*)precoder.data();
+      arma::cx_fmat mat_precoder(precoder_ptr, K, BS_ANT, false);
 
-      cx_float* result_ptr = (cx_float*)result.data();
-      cx_fmat mat_result(result_ptr, K, 1, false);
+      arma::cx_float* result_ptr = (arma::cx_float*)result.data();
+      arma::cx_fmat mat_result(result_ptr, K, 1, false);
 
       mat_result = mat_precoder * mat_data;
     }
@@ -189,14 +189,14 @@ int main(int argc, char** argv) {
       }
     }
     for (int c1 = 0; c1 < OFDM; c1++) {
-      cx_float* data_ptr = (cx_float*)(&buffer_trans[c1 * BS_ANT]);
-      cx_fmat mat_data(data_ptr, BS_ANT, 1, false);
+      arma::cx_float* data_ptr = (arma::cx_float*)(&buffer_trans[c1 * BS_ANT]);
+      arma::cx_fmat mat_data(data_ptr, BS_ANT, 1, false);
 
-      cx_float* precoder_ptr = (cx_float*)precoder.data();
-      cx_fmat mat_precoder(precoder_ptr, K, BS_ANT, false);
+      arma::cx_float* precoder_ptr = (arma::cx_float*)precoder.data();
+      arma::cx_fmat mat_precoder(precoder_ptr, K, BS_ANT, false);
 
-      cx_float* result_ptr = (cx_float*)result.data();
-      cx_fmat mat_result(result_ptr, K, 1, false);
+      arma::cx_float* result_ptr = (arma::cx_float*)result.data();
+      arma::cx_fmat mat_result(result_ptr, K, 1, false);
 
       mat_result = mat_precoder * mat_data;
       /*
@@ -224,14 +224,14 @@ int main(int argc, char** argv) {
       for (int c2 = 0; c2 < BS_ANT; c2++)
         temp_buffer[c2] = buffer[c2 * OFDM + c1];
 
-      cx_float* data_ptr = (cx_float*)(&temp_buffer[0]);
-      cx_fmat mat_data(data_ptr, BS_ANT, 1, false);
+      arma::cx_float* data_ptr = (arma::cx_float*)(&temp_buffer[0]);
+      arma::cx_fmat mat_data(data_ptr, BS_ANT, 1, false);
 
-      cx_float* precoder_ptr = (cx_float*)precoder.data();
-      cx_fmat mat_precoder(precoder_ptr, K, BS_ANT, false);
+      arma::cx_float* precoder_ptr = (arma::cx_float*)precoder.data();
+      arma::cx_fmat mat_precoder(precoder_ptr, K, BS_ANT, false);
 
-      cx_float* result_ptr = (cx_float*)result.data();
-      cx_fmat mat_result(result_ptr, K, 1, false);
+      arma::cx_float* result_ptr = (arma::cx_float*)result.data();
+      arma::cx_fmat mat_result(result_ptr, K, 1, false);
 
       mat_result = mat_precoder * mat_data;
     }
@@ -256,14 +256,14 @@ int main(int argc, char** argv) {
         // 8); _mm256_store_pd((double*)temp_buffer_ptr, t_data);
       }
 
-      cx_float* data_ptr = (cx_float*)(&temp_buffer[0]);
-      cx_fmat mat_data(data_ptr, BS_ANT, 1, false);
+      arma::cx_float* data_ptr = (arma::cx_float*)(&temp_buffer[0]);
+      arma::cx_fmat mat_data(data_ptr, BS_ANT, 1, false);
 
-      cx_float* precoder_ptr = (cx_float*)precoder.data();
-      cx_fmat mat_precoder(precoder_ptr, K, BS_ANT, false);
+      arma::cx_float* precoder_ptr = (arma::cx_float*)precoder.data();
+      arma::cx_fmat mat_precoder(precoder_ptr, K, BS_ANT, false);
 
-      cx_float* result_ptr = (cx_float*)result.data();
-      cx_fmat mat_result(result_ptr, K, 1, false);
+      arma::cx_float* result_ptr = (arma::cx_float*)result.data();
+      arma::cx_fmat mat_result(result_ptr, K, 1, false);
 
       mat_result = mat_precoder * mat_data;
     }
@@ -330,14 +330,14 @@ int main(int argc, char** argv) {
         // 8); _mm256_store_pd((double*)temp_buffer_ptr, t_data);
       }
 
-      cx_float* data_ptr = (cx_float*)(&temp_buffer[0]);
-      cx_fmat mat_data(data_ptr, BS_ANT, 1, false);
+      arma::cx_float* data_ptr = (arma::cx_float*)(&temp_buffer[0]);
+      arma::cx_fmat mat_data(data_ptr, BS_ANT, 1, false);
 
-      cx_float* precoder_ptr = (cx_float*)precoder.data();
-      cx_fmat mat_precoder(precoder_ptr, K, BS_ANT, false);
+      arma::cx_float* precoder_ptr = (arma::cx_float*)precoder.data();
+      arma::cx_fmat mat_precoder(precoder_ptr, K, BS_ANT, false);
 
-      cx_float* result_ptr = (cx_float*)result.data();
-      cx_fmat mat_result(result_ptr, K, 1, false);
+      arma::cx_float* result_ptr = (arma::cx_float*)result.data();
+      arma::cx_fmat mat_result(result_ptr, K, 1, false);
 
       mat_result = mat_precoder * mat_data;
       /*

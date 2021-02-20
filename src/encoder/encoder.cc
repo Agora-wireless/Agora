@@ -245,7 +245,7 @@ int32_t BblibLdpcEncoder5gnr(
   if (zc > ZC_MAX) {
     std::fprintf(stderr, "Error: This AVX2 encoder supports only Zc <= %d\n",
                  ZC_MAX);
-    std::exit(-1);
+    throw std::runtime_error("Encoder: This AVX2 encoder supports only Zc");
   }
 
   int number_codeblocks = request->numberCodeblocks;

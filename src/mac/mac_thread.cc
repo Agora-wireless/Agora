@@ -17,7 +17,7 @@ MacThread::MacThread(
     const std::string& log_filename)
     : mode_(mode),
       cfg_(cfg),
-      freq_ghz_(MeasureRdtscFreq()),
+      freq_ghz_(GetTime::MeasureRdtscFreq()),
       tsc_delta_((cfg_->GetFrameDurationSec() * 1e9) / freq_ghz_),
       core_offset_(core_offset),
       decoded_buffer_(decoded_buffer),
@@ -113,7 +113,8 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
   assert(event.event_type_ == EventType::kPacketToMac);
 
   const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-  const size_t symbol_idx_ul = gen_tag_t(event.tags_[0]).symbol_id_;
+  const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+  const size_t symbol_idx_ul = this->cfg_->Frame().GetULSymbolIdx(symbol_id);
   const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
   const uint8_t* ul_data_ptr =
       decoded_buffer_[frame_id % kFrameWnd][symbol_idx_ul][ue_id];
@@ -134,10 +135,10 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
     server_.n_filled_in_frame_[ue_id] += cfg_->MacPayloadLength();
 
     // Check CRC
-    uint16_t crc =
-        (uint16_t)(crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
-                                            cfg_->MacPayloadLength()) &
-                   0xFFFF);
+    auto crc = static_cast<uint16_t>(
+        crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
+                                 cfg_->MacPayloadLength()) &
+        0xFFFF);
     if (crc == pkt->crc_) {
       // Print information about the received symbol
       if (kLogMacPackets) {
@@ -331,13 +332,13 @@ void MacThread::RunEventLoop() {
   PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_,
                       0 /* thread ID */);
 
-  while (cfg_->Running()) {
+  while (cfg_->Running() == true) {
     ProcessRxFromMaster();
 
     if (mode_ == Mode::kServer) {
-      if (Rdtsc() - last_frame_tx_tsc_ > tsc_delta_) {
+      if (GetTime::Rdtsc() - last_frame_tx_tsc_ > tsc_delta_) {
         SendControlInformation();
-        last_frame_tx_tsc_ = Rdtsc();
+        last_frame_tx_tsc_ = GetTime::Rdtsc();
       }
     } else {
       ProcessControlInformation();

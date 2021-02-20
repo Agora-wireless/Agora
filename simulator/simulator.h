@@ -8,7 +8,6 @@
 #include <emmintrin.h>
 #include <fcntl.h>
 #include <immintrin.h>
-#include <pthread.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -48,7 +47,6 @@ class Simulator {
   void Stop();
   // while loop of task thread
   static void* TaskThread(void* context);
-
   struct EventHandlerContext {
     Simulator* obj_ptr_;
     size_t id_;
@@ -60,16 +58,12 @@ class Simulator {
                         size_t symbol_id, size_t ant_id);
   void PrintPerFrameDone(PrintType print_type, size_t frame_id);
 
-  void InitializeVarsFromCfg(Config* cfg);
-  void InitializeQueues();
-  void InitializeUplinkBuffers();
-  void FreeUplinkBuffers();
-
  private:
   size_t bs_ant_num_;
   size_t ue_num_;
   size_t ofdm_ca_num_;
   size_t ofdm_data_num_;
+
   size_t symbol_num_perframe_, data_symbol_num_perframe_;
   size_t ul_data_symbol_num_perframe_, dl_data_symbol_num_perframe_;
   size_t dl_data_symbol_start_, dl_data_symbol_end_;
@@ -89,8 +83,6 @@ class Simulator {
   size_t max_packet_num_per_frame_;
   std::unique_ptr<Receiver> receiver_;
   std::unique_ptr<Sender> sender_;
-  pthread_t* task_threads_;
-  EventHandlerContext* context_;
 
   // Uplink buffers
 
@@ -137,6 +129,12 @@ class Simulator {
   double* frame_end_receive_;
   double* frame_start_tx_;
   double* frame_end_tx_;
+
+  void InitializeVarsFromCfg(Config* cfg);
+  void InitializeQueues();
+  void InitializeUplinkBuffers();
+  void FreeUplinkBuffers();
+  void FreeQueues();
 };
 
 #endif  // SIMULATOR_H_

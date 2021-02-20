@@ -28,9 +28,9 @@ static constexpr size_t kK5GnrNumPunctured = 2;
 static constexpr size_t kNumRows = 46;
 
 int main() {
-  double freq_ghz = MeasureRdtscFreq();
+  double freq_ghz = GetTime::MeasureRdtscFreq();
   std::printf("Spinning for one second for Turbo Boost\n");
-  NanoSleep(1000 * 1000 * 1000, freq_ghz);
+  GetTime::NanoSleep(1000 * 1000 * 1000, freq_ghz);
   int8_t* input[kNumCodeBlocks];
   int8_t* parity[kNumCodeBlocks];
   int8_t* encoded[kNumCodeBlocks];
@@ -65,18 +65,18 @@ int main() {
     srand(time(nullptr));
     for (auto& n : input) {
       for (size_t i = 0; i < BitsToBytes(num_input_bits); i++) {
-        n[i] = (int8_t)rand();
+        n[i] = static_cast<int8_t>(rand());
       }
     }
 
-    const size_t encoding_start_tsc = Rdtsc();
+    const size_t encoding_start_tsc = GetTime::Rdtsc();
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
       LdpcEncodeHelper(kBaseGraph, zc, kNumRows, encoded[n], parity[n],
                        input[n]);
     }
 
     const double encoding_us =
-        CyclesToUs(Rdtsc() - encoding_start_tsc, freq_ghz);
+        GetTime::CyclesToUs(GetTime::Rdtsc() - encoding_start_tsc, freq_ghz);
 
     // For decoding, generate log-likelihood ratios, one byte per input bit
     int8_t* llrs[kNumCodeBlocks];
@@ -108,7 +108,7 @@ int main() {
             Agora_memory::Alignment_t::kAlign32, buffer_len * sizeof(int16_t)));
 
     // Decoding
-    const size_t decoding_start_tsc = Rdtsc();
+    const size_t decoding_start_tsc = GetTime::Rdtsc();
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
       ldpc_decoder_5gnr_request.varNodes = llrs[n];
       ldpc_decoder_5gnr_response.compactedMessageBytes = decoded[n];
@@ -117,12 +117,12 @@ int main() {
     }
 
     const double decoding_us =
-        CyclesToUs(Rdtsc() - decoding_start_tsc, freq_ghz);
+        GetTime::CyclesToUs(GetTime::Rdtsc() - decoding_start_tsc, freq_ghz);
 
     // Check for errors
     size_t err_cnt = 0;
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
-      uint8_t* input_buffer = (uint8_t*)input[n];
+      auto* input_buffer = reinterpret_cast<uint8_t*>(input[n]);
       uint8_t* output_buffer = decoded[n];
       for (size_t i = 0; i < BitsToBytes(num_input_bits); i++) {
         // std::printf("input: %i, output: %i\n", input_buffer[i],

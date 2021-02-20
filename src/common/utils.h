@@ -61,7 +61,7 @@ struct EventHandlerContext {
 
 template <class C, void* (C::*run_thread)(int)>
 void* PthreadFunWrapper(void* context) {
-  EventHandlerContext<C>* eh_context = (EventHandlerContext<C>*)context;
+  auto* eh_context = static_cast<EventHandlerContext<C>*>(context);
   C* obj = reinterpret_cast<C*>(eh_context->obj_ptr_);
   int id = eh_context->id_;
   delete eh_context;
@@ -70,7 +70,7 @@ void* PthreadFunWrapper(void* context) {
 
 template <class C, void (C::*run_thread)(int)>
 void PthreadFunWrapper(void* context) {
-  EventHandlerContext<C>* eh_context = (EventHandlerContext<C>*)context;
+  auto* eh_context = static_cast<EventHandlerContext<C>*>(context);
   C* obj = reinterpret_cast<C*>(eh_context->obj_ptr_);
   int id = eh_context->id_;
   delete eh_context;
@@ -95,7 +95,7 @@ class Utils {
   static std::vector<uint32_t> Cfloat32ToUint32(
       std::vector<std::complex<float>> in, bool conj, const std::string& order);
   static std::vector<std::vector<size_t>> LoadSymbols(
-      std::vector<std::string> frames, char sym);
+      std::vector<std::string> const& frames, char sym);
   static void LoadDevices(std::string filename, std::vector<std::string>& data);
   static void LoadData(const char* filename,
                        std::vector<std::complex<int16_t>>& data, int samples);

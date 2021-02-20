@@ -30,7 +30,7 @@ void ClientFunc() {
 
 // Spin until kNumPackets are received
 void ServerFunc() {
-  double freq_ghz = MeasureRdtscFreq();
+  double freq_ghz = GetTime::MeasureRdtscFreq();
   FastRand fast_rand;
 
   // Without buffer resizing, the server will sometimes drop packets and
@@ -40,7 +40,7 @@ void ServerFunc() {
 
   server_ready = 1;
   size_t largest_pkt_index = 0;
-  size_t start_time = Rdtsc();
+  size_t start_time = GetTime::Rdtsc();
   size_t num_pkts_received = 0;
   size_t num_pkts_reordered = 0;
   while (true) {
@@ -62,7 +62,7 @@ void ServerFunc() {
 
   std::printf("Bandwidth = %.2f Gbps/s, number of reordered packets = %zu\n",
               (kNumPackets * kMessageSize * 8) /
-                  CyclesToNs(Rdtsc() - start_time, freq_ghz),
+                  GetTime::CyclesToNs(GetTime::Rdtsc() - start_time, freq_ghz),
               num_pkts_reordered);
 }
 

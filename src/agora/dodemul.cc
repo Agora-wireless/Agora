@@ -38,9 +38,10 @@ DoDemul::DoDemul(
           cfg_->DemulBlockSize() * kMaxUEs * sizeof(complex_float)));
 
   // phase offset calibration data
-  cx_float* ue_pilot_ptr = (cx_float*)cfg_->UeSpecificPilot()[0];
-  cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(), cfg_->UeAntNum(),
-                         false);
+  auto* ue_pilot_ptr =
+      reinterpret_cast<arma::cx_float*>(cfg_->UeSpecificPilot()[0]);
+  arma::cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(),
+                               cfg_->UeAntNum(), false);
   ue_pilot_data_ = mat_pilot_data.st();
 
 #if USE_MKL_JIT
@@ -55,7 +56,8 @@ DoDemul::DoDemul(
     std::fprintf(
         stderr,
         "Error: insufficient memory to JIT and store the DGEMM kernel\n");
-    std::exit(1);
+    throw std::runtime_error(
+        "DoDemul: insufficient memory to JIT and store the DGEMM kernel");
   }
   mkl_jit_cgemm_ = mkl_jit_get_cgemm_ptr(jitter_);
 #endif
@@ -65,23 +67,34 @@ DoDemul::~DoDemul() {
   std::free(data_gather_buffer_);
   std::free(equaled_buffer_temp_);
   std::free(equaled_buffer_temp_transposed_);
+
+#if USE_MKL_JIT
+  mkl_jit_status_t status = mkl_jit_destroy(jitter_);
+  if (MKL_JIT_ERROR == status) {
+    std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
+  }
+#endif
 }
 
 EventData DoDemul::Launch(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id_;
+  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t base_sc_id = gen_tag_t(tag).sc_id_;
+
+  const size_t symbol_idx_ul = this->cfg_->Frame().GetULSymbolIdx(symbol_id);
   const size_t total_data_symbol_idx_ul =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
   const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
 
   const size_t frame_slot = frame_id % kFrameWnd;
-  size_t start_tsc = WorkerRdtsc();
+  size_t start_tsc = GetTime::WorkerRdtsc();
 
-  if (kDebugPrintInTask) {
+  if (kDebugPrintInTask == true) {
     std::printf(
-        "In doDemul tid %d: frame: %zu, symbol: %zu, subcarrier: %zu \n", tid_,
-        frame_id, symbol_idx_ul, base_sc_id);
+        "In doDemul tid %d: frame: %zu, symbol idx: %zu, symbol idx ul: %zu, "
+        "subcarrier: %zu, databuffer idx %zu \n",
+        tid_, frame_id, symbol_id, symbol_idx_ul, base_sc_id,
+        total_data_symbol_idx_ul);
   }
 
   size_t max_sc_ite =
@@ -89,10 +102,10 @@ EventData DoDemul::Launch(size_t tag) {
   assert(max_sc_ite % kSCsPerCacheline == 0);
   // Iterate through cache lines
   for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
-    size_t start_tsc0 = WorkerRdtsc();
+    size_t start_tsc0 = GetTime::WorkerRdtsc();
 
     // Step 1: Populate data_gather_buffer as a row-major matrix with
-    // kSCsPerCacheline rows and BS_ANT_NUM columns
+    // kSCsPerCacheline rows and BsAntNum() columns
 
     // Since kSCsPerCacheline divides demul_block_size and
     // kTransposeBlockSize, all subcarriers (base_sc_id + i) lie in the
@@ -136,37 +149,40 @@ EventData DoDemul::Launch(size_t tag) {
         }
       }
     }
-    duration_stat_->task_duration_[1] += WorkerRdtsc() - start_tsc0;
+    duration_stat_->task_duration_[1] += GetTime::WorkerRdtsc() - start_tsc0;
 
     // Step 2: For each subcarrier, perform equalization by multiplying the
     // subcarrier's data from each antenna with the subcarrier's precoder
     for (size_t j = 0; j < kSCsPerCacheline; j++) {
       const size_t cur_sc_id = base_sc_id + i + j;
 
-      cx_float* equal_ptr = nullptr;
+      arma::cx_float* equal_ptr = nullptr;
       if (kExportConstellation) {
-        equal_ptr = (cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                              [cur_sc_id * cfg_->UeNum()]);
+        equal_ptr =
+            (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
+                                            [cur_sc_id * cfg_->UeNum()]);
       } else {
-        equal_ptr = (cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
-                                                      cfg_->UeNum()]);
+        equal_ptr =
+            (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
+                                                    cfg_->UeNum()]);
       }
-      cx_fmat mat_equaled(equal_ptr, cfg_->UeNum(), 1, false);
+      arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeNum(), 1, false);
 
-      auto* data_ptr = reinterpret_cast<cx_float*>(
+      auto* data_ptr = reinterpret_cast<arma::cx_float*>(
           &data_gather_buffer_[j * cfg_->BsAntNum()]);
       // size_t start_tsc2 = worker_rdtsc();
-      auto* ul_zf_ptr = reinterpret_cast<cx_float*>(
+      auto* ul_zf_ptr = reinterpret_cast<arma::cx_float*>(
           ul_zf_matrices_[frame_slot][cfg_->GetZfScId(cur_sc_id)]);
 
-      size_t start_tsc2 = WorkerRdtsc();
+      size_t start_tsc2 = GetTime::WorkerRdtsc();
 #if USE_MKL_JIT
       mkl_jit_cgemm_(jitter_, (MKL_Complex8*)ul_zf_ptr, (MKL_Complex8*)data_ptr,
                      (MKL_Complex8*)equal_ptr);
 #else
-      cx_fmat mat_data(data_ptr, cfg->BsAntNum(), 1, false);
+      arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
 
-      cx_fmat mat_ul_zf(ul_zf_ptr, cfg->UE_NUM, cfg->BsAntNum(), false);
+      arma::cx_fmat mat_ul_zf(ul_zf_ptr, cfg_->UeNum(), cfg_->BsAntNum(),
+                              false);
       mat_equaled = mat_ul_zf * mat_data;
 #endif
 
@@ -174,35 +190,39 @@ EventData DoDemul::Launch(size_t tag) {
           cfg_->Frame().ClientUlPilotSymbols()) {  // Calc new phase shift
         if (symbol_idx_ul == 0 && cur_sc_id == 0) {
           // Reset previous frame
-          cx_float* phase_shift_ptr =
-              (cx_float*)ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd];
-          cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeNum(),
-                                  cfg_->Frame().ClientUlPilotSymbols(), false);
+          auto* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
+              ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
+          arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeNum(),
+                                        cfg_->Frame().ClientUlPilotSymbols(),
+                                        false);
           mat_phase_shift.fill(0);
         }
-        cx_float* phase_shift_ptr =
-            (cx_float*)&ue_spec_pilot_buffer_[frame_id % kFrameWnd]
-                                             [symbol_idx_ul * cfg_->UeNum()];
-        cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeNum(), 1, false);
-        cx_fmat shift_sc =
+        auto* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
+            &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
+                                  [symbol_idx_ul * cfg_->UeNum()]);
+        arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeNum(), 1, false);
+        arma::cx_fmat shift_sc =
             sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
         mat_phase_shift += shift_sc;
-      } else if (cfg_->Frame().ClientUlPilotSymbols() >
-                 0) {  // apply previously calc'ed phase shift to data
-        cx_float* pilot_corr_ptr =
-            (cx_float*)ue_spec_pilot_buffer_[frame_id % kFrameWnd];
-        cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeNum(),
-                               cfg_->Frame().ClientUlPilotSymbols(), false);
-        fmat theta_mat = arg(pilot_corr_mat);
-        fmat theta_inc = zeros<fmat>(cfg_->UeNum(), 1);
+      }
+      // apply previously calc'ed phase shift to data
+      else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
+        auto* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
+            ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
+        arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeNum(),
+                                     cfg_->Frame().ClientUlPilotSymbols(),
+                                     false);
+        arma::fmat theta_mat = arg(pilot_corr_mat);
+        arma::fmat theta_inc = arma::zeros<arma::fmat>(cfg_->UeNum(), 1);
         for (size_t s = 1; s < cfg_->Frame().ClientUlPilotSymbols(); s++) {
-          fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
+          arma::fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
           theta_inc += theta_diff;
         }
-        theta_inc /=
-            (float)std::max(1, (int)cfg_->Frame().ClientUlPilotSymbols() - 1);
-        fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
-        cx_fmat mat_phase_correct = zeros<cx_fmat>(size(cur_theta));
+        theta_inc /= (float)std::max(
+            1, static_cast<int>(cfg_->Frame().ClientUlPilotSymbols() - 1));
+        arma::fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
+        arma::cx_fmat mat_phase_correct =
+            arma::zeros<arma::cx_fmat>(size(cur_theta));
         mat_phase_correct.set_real(cos(-cur_theta));
         mat_phase_correct.set_imag(sin(-cur_theta));
         mat_equaled %= mat_phase_correct;
@@ -215,25 +235,25 @@ EventData DoDemul::Launch(size_t tag) {
           }
         }
       }
-
-      size_t start_tsc3 = WorkerRdtsc();
+      size_t start_tsc3 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
       duration_stat_->task_count_++;
     }
   }
 
-  size_t start_tsc3 = WorkerRdtsc();
+  size_t start_tsc3 = GetTime::WorkerRdtsc();
   __m256i index2 = _mm256_setr_epi32(
       0, 1, cfg_->UeNum() * 2, cfg_->UeNum() * 2 + 1, cfg_->UeNum() * 4,
       cfg_->UeNum() * 4 + 1, cfg_->UeNum() * 6, cfg_->UeNum() * 6 + 1);
-  float* equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
+  auto* equal_t_ptr = reinterpret_cast<float*>(equaled_buffer_temp_transposed_);
   for (size_t i = 0; i < cfg_->UeNum(); i++) {
     float* equal_ptr = nullptr;
     if (kExportConstellation) {
-      equal_ptr = (float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                         [base_sc_id * cfg_->UeNum() + i]);
+      equal_ptr = reinterpret_cast<float*>(
+          &equal_buffer_[total_data_symbol_idx_ul]
+                        [base_sc_id * cfg_->UeNum() + i]);
     } else {
-      equal_ptr = (float*)(equaled_buffer_temp_ + i);
+      equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + i);
     }
     size_t k_num_double_in_sim_d256 = sizeof(__m256) / sizeof(double);  // == 4
     for (size_t j = 0; j < max_sc_ite / k_num_double_in_sim_d256; j++) {
@@ -264,12 +284,12 @@ EventData DoDemul::Launch(size_t tag) {
     //     tid, frame_id, symbol_idx_ul, base_sc_id);
     // cout << "Demuled data : \n ";
     // cout << " UE " << i << ": ";
-    // for (int k = 0; k < max_sc_ite * cfg->mod_order_bits; k++)
+    // for (int k = 0; k < max_sc_ite * cfg->ModOrderBits(); k++)
     //     std::printf("%i ", demul_ptr[k]);
     // cout << endl;
   }
 
-  duration_stat_->task_duration_[3] += WorkerRdtsc() - start_tsc3;
-  duration_stat_->task_duration_[0] += WorkerRdtsc() - start_tsc;
+  duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
+  duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
   return EventData(EventType::kDemul, tag);
 }

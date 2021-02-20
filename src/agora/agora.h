@@ -6,7 +6,6 @@
 #ifndef AGORA_H_
 #define AGORA_H_
 
-#include <pthread.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -38,7 +37,6 @@ class Agora {
   // Dequeue batch size, used to reduce the overhead of dequeue in main thread
   static const int kDequeueBulkSizeTXRX = 8;
   static const int kDequeueBulkSizeWorker = 4;
-
   static const int kMaxWorkerNum = 50;  // Max number of worker threads allowed
 
   explicit Agora(
@@ -47,6 +45,38 @@ class Agora {
 
   void Start();  /// The main Agora event loop
   void Stop();
+  void GetEqualData(float** ptr, int* size);
+
+  // Flags that allow developer control over Agora internals
+  struct {
+    //     void getEqualData(float** ptr, int* size);Before exiting, save
+    //     LDPC-decoded or demodulated data to a file
+    bool enable_save_decode_data_to_file_ = false;
+
+    // Before exiting, save data sent on downlink to a file
+    bool enable_save_tx_data_to_file_ = false;
+  } flags_;
+
+ private:
+  enum ScheduleProcessingFlags : uint8_t {
+    kNone = 0,
+    kUplinkComplete = 0x1,
+    kDownlinkComplete = 0x2,
+    kProcessingComplete = (kUplinkComplete + kDownlinkComplete)
+  };
+
+  /// Determines if all the work has been completed on the frame_id
+  /// Completion is determined based on the ifft, tx, decode, and tomac
+  /// counters. If frame processing is complete.  All of the work counters are
+  /// reset and the cur_proc_frame_id_ is incremented.  Returns true if all
+  /// processing is complete AND the frame_id is the last frame to test. False
+  /// otherwise.
+  bool CheckFrameComplete(size_t frame_id);
+
+  /// Increments the cur_sche_frame_id when all ScheduleProcessingFlags have
+  /// been acheived.
+  void CheckIncrementScheduleFrame(size_t frame_id,
+                                   ScheduleProcessingFlags completed);
 
   void WorkerFft(int tid);
   void WorkerZf(int tid);
@@ -55,6 +85,16 @@ class Agora {
   void Worker(int tid);
 
   void CreateThreads();  /// Launch worker threads
+
+  void InitializeQueues();
+  void InitializeUplinkBuffers();
+  void InitializeDownlinkBuffers();
+  void FreeQueues();
+  void FreeUplinkBuffers();
+  void FreeDownlinkBuffers();
+
+  void SaveDecodeDataToFile(int frame_id);
+  void SaveTxDataToFile(int frame_id);
 
   void HandleEventFft(size_t tag);
   void UpdateRxCounters(size_t frame_id, size_t symbol_id);
@@ -88,26 +128,6 @@ class Agora {
   // Send current frame's SNR measurements from PHY to MAC
   void SendSnrReport(EventType event_type, size_t frame_id, size_t symbol_id);
 
-  void InitializeQueues();
-  void InitializeUplinkBuffers();
-  void InitializeDownlinkBuffers();
-  void FreeUplinkBuffers();
-  void FreeDownlinkBuffers();
-
-  void SaveDecodeDataToFile(int frame_id);
-  void SaveTxDataToFile(int frame_id);
-  void GetEqualData(float** ptr, int* size);
-
-  // Flags that allow developer control over Agora internals
-  struct {
-    // Before exiting, save LDPC-decoded or demodulated data to a file
-    bool enable_save_decode_data_to_file_ = false;
-
-    // Before exiting, save data sent on downlink to a file
-    bool enable_save_tx_data_to_file_ = false;
-  } flags_;
-
- private:
   /// Fetch the concurrent queue for this event type
   moodycamel::ConcurrentQueue<EventData>* GetConq(EventType event_type,
                                                   size_t qid) {
@@ -115,7 +135,7 @@ class Agora {
   }
 
   /// Fetch the producer token for this event type
-  moodycamel::ProducerToken* GetPtok(EventType event_type, size_t qid) {
+  moodycamel::ProducerToken* GetPtok(EventType event_type, size_t qid) const {
     return sched_info_arr_[qid][static_cast<size_t>(event_type)].ptok_;
   }
 
@@ -133,18 +153,19 @@ class Agora {
   // Worker thread i runs on core base_worker_core_offset + i
   const size_t base_worker_core_offset_;
 
-  Config* config_;
+  Config* const config_;
   size_t fft_created_count_;
   size_t max_equaled_frame_ = SIZE_MAX;
   std::unique_ptr<PacketTXRX> packet_tx_rx_;
 
-  MacThread* mac_thread_;       // The thread running MAC layer functions
-  std::thread mac_std_thread_;  // Handle for the MAC thread
-  std::thread worker_std_threads_[kMaxWorkerNum];  // Handle for worker threads
+  // The thread running MAC layer functions
+  std::unique_ptr<MacThread> mac_thread_;
+  // Handle for the MAC thread
+  std::thread mac_std_thread_;
+  std::vector<std::thread> workers_;
 
-  Stats* stats_;
-  PhyStats* phy_stats_;
-  pthread_t* task_threads_;
+  std::unique_ptr<Stats> stats_;
+  std::unique_ptr<PhyStats> phy_stats_;
 
   /*****************************************************
    * Buffers
@@ -198,7 +219,8 @@ class Agora {
   Table<complex_float> ue_spec_pilot_buffer_;
 
   // Counters related to various modules
-  FrameCounters fft_counters_;
+  FrameCounters pilot_fft_counters_;
+  FrameCounters uplink_fft_counters_;
   FrameCounters zf_counters_;
   FrameCounters demul_counters_;
   FrameCounters decode_counters_;
@@ -207,7 +229,6 @@ class Agora {
   FrameCounters ifft_counters_;
   FrameCounters tx_counters_;
   FrameCounters tomac_counters_;
-  FrameCounters frommac_counters_;
   FrameCounters rc_counters_;
   RxCounters rx_counters_;
   size_t zf_last_frame_ = SIZE_MAX;
@@ -228,6 +249,9 @@ class Agora {
   std::vector<size_t> encode_cur_frame_for_symbol_;
   // The frame index for a symbol whose IFFT is done
   std::vector<size_t> ifft_cur_frame_for_symbol_;
+
+  // The frame index for a symbol whose precode is done
+  std::vector<size_t> precode_cur_frame_for_symbol_;
 
   // Per-frame queues of delayed FFT tasks. The queue contains offsets into
   // TX/RX buffers.
@@ -295,6 +319,8 @@ class Agora {
 
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
+
+  uint8_t schedule_process_flags_;
 };
 
 #endif  // AGORA_H_

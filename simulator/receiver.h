@@ -8,7 +8,6 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
-#include <pthread.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -43,7 +42,7 @@ class Receiver {
   Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
            moodycamel::ConcurrentQueue<EventData>* in_queue_message,
            moodycamel::ProducerToken** in_rx_ptoks);
-  ~Receiver();
+  ~Receiver() = default;
 
   /**
    * Called in main threads to start the socket threads
@@ -54,11 +53,11 @@ class Receiver {
    * in_core_id: attach socket threads to {in_core_id, ..., in_core_id +
    * RX_THREAD_NUM - 1}
    */
-  std::vector<pthread_t> StartRecv(Table<char>& in_buffer,
-                                   Table<int>& in_buffer_status,
-                                   size_t in_buffer_frame_num,
-                                   size_t in_buffer_length,
-                                   Table<double>& in_frame_start);
+  std::vector<std::thread> StartRecv(Table<char>& in_buffer,
+                                     Table<int>& in_buffer_status,
+                                     size_t in_buffer_frame_num,
+                                     size_t in_buffer_length,
+                                     Table<double>& in_frame_start);
 
   /**
    * receive thread
@@ -67,9 +66,6 @@ class Receiver {
   void* LoopRecv(int tid);
 
  private:
-  pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
-  pthread_cond_t cond_ = PTHREAD_COND_INITIALIZER;
-
   Table<char>* buffer_;
   Table<int>* buffer_status_;
   long long buffer_length_;

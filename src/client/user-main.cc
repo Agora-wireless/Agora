@@ -8,7 +8,7 @@ int main(int argc, char const* argv[]) {
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     filename = cur_directory + "/data/userconfig_512.json";
   }
-  auto* config = new Config(filename.c_str());
+  auto config = std::make_unique<Config>(filename.c_str());
   config->GenData();
   int ret;
   try {
@@ -16,13 +16,12 @@ int main(int argc, char const* argv[]) {
 
     // Register signal handler to handle kill signal
     signal_handler.SetupSignalHandlers();
-    auto* phy = new PhyUe(config);
+    auto phy = std::make_unique<PhyUe>(config.get());
     phy->Start();
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;
     ret = EXIT_FAILURE;
   }
-
   return ret;
 }

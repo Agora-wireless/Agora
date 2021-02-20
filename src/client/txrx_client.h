@@ -8,19 +8,18 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
-#include <pthread.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
 #include <complex>
 #include <fstream>
+#include <thread>
 #include <vector>
 
 #include "client_radio.h"
 #include "concurrentqueue.h"
 #include "net.h"
-#include "radio_lib.h"
 #include "utils.h"
 
 /**
@@ -49,13 +48,13 @@ class RadioTxRx {
     int tid_;
   };
 
-  RadioTxRx(Config* cfg, int n_threads, int in_core_id);
+  RadioTxRx(Config* const cfg, int n_threads, int in_core_id);
   /**
    * N_THREAD: socket thread number
    * mode: tx=1 or rx=0 operation
    * in_queue: message queue to communicate with main thread
    */
-  RadioTxRx(Config* config, int n_threads, int in_core_id,
+  RadioTxRx(Config* const config, int n_threads, int in_core_id,
             moodycamel::ConcurrentQueue<EventData>* in_message_queue,
             moodycamel::ConcurrentQueue<EventData>* in_task_queue,
             moodycamel::ProducerToken** in_rx_ptoks,
@@ -106,7 +105,8 @@ class RadioTxRx {
    * and writes to an offset (rx_offset) in the receive buffer (buffer_)
    */
   struct Packet* RecvEnqueueArgos(int tid, size_t radio_id, size_t& frame_id,
-                                  size_t& symbol_id, size_t rx_offset);
+                                  size_t& symbol_id, size_t rx_offset,
+                                  bool dummy_enqueue);
 
   /**
    * @brief transmits a tx samples packet that is ready from PHY through client
@@ -142,11 +142,15 @@ class RadioTxRx {
   void* LoopTxRxUsrpSync(int tid);
 
  private:
-  pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
-  pthread_cond_t cond_ = PTHREAD_COND_INITIALIZER;
-  Config* config_;
-  ClientRadioConfig* radioconfig_;           // Used only in Argos mode
-  std::vector<struct sockaddr_in> servaddr_; /* server address */
+  std::mutex mutex_;
+  std::condition_variable cond_;
+  bool thread_sync_;
+
+  std::vector<std::thread> txrx_threads_;
+
+  Config* const config_;
+  std::unique_ptr<ClientRadioConfig> radioconfig_;  // Used only in Argos mode
+  std::vector<struct sockaddr_in> servaddr_;        // server address
   std::vector<int> socket_;
 
   Table<char>* buffer_;

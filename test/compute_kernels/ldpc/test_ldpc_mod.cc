@@ -42,8 +42,11 @@ float RandFloat(float min, float max) {
 }
 
 float RandFloatFromShort(float min, float max) {
-  float rand_val = ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
-  short rand_val_ushort = (short)(rand_val * 32768);
+  float rand_val =
+      ((static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) *
+       (max - min)) +
+      min;
+  auto rand_val_ushort = static_cast<short>(rand_val * 32768);
   rand_val = (float)rand_val_ushort / 32768;
   return rand_val;
 }
@@ -55,12 +58,12 @@ int main(int argc, char* argv[]) {
 
   const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  auto* cfg = new Config(FLAGS_conf_file.c_str());
+  auto cfg = std::make_unique<Config>(FLAGS_conf_file.c_str());
 
   const DataGenerator::Profile profile =
       FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123
                              : DataGenerator::Profile::kRandom;
-  DataGenerator data_generator(cfg, 0 /* RNG seed */, profile);
+  DataGenerator data_generator(cfg.get(), 0 /* RNG seed */, profile);
 
   std::printf(
       "DataGenerator: Config file: %s, data profile = %s\n",
@@ -88,12 +91,18 @@ int main(int argc, char* argv[]) {
 
   const size_t num_codeblocks = num_cbs_per_ue * cfg->UeAntNum();
   std::printf("Total number of blocks: %zu\n", num_codeblocks);
+  size_t input_size = LdpcEncodingInputBufSize(
+      cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor());
+  auto* input_ptr =
+      new int8_t[input_size + kLdpcHelperFunctionInputBufferSizePaddingBytes];
   for (size_t noise_id = 0; noise_id < 15; noise_id++) {
     std::vector<std::vector<int8_t>> information(num_codeblocks);
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
-      data_generator.GenCodeblock(information[i], encoded_codewords[i],
-                                  i % cfg->UeNum() /* UE ID */);
+      data_generator.GenRawData(information.at(i),
+                                i % cfg->UeNum() /* UE ID */);
+      std::memcpy(input_ptr, information.at(i).data(), input_size);
+      data_generator.GenCodeblock(input_ptr, encoded_codewords.at(i));
     }
 
     // Save uplink information bytes to file
@@ -155,7 +164,7 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    LDPCconfig ldpc_config = cfg->LdpcConfig();
+    const LDPCconfig& ldpc_config = cfg->LdpcConfig();
 
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
     struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
@@ -179,18 +188,19 @@ int main(int argc, char* argv[]) {
     decoded_codewords.Calloc(num_codeblocks, cfg->OfdmDataNum(),
                              Agora_memory::Alignment_t::kAlign64);
 
-    double freq_ghz = MeasureRdtscFreq();
-    size_t start_tsc = WorkerRdtsc();
+    double freq_ghz = GetTime::MeasureRdtscFreq();
+    size_t start_tsc = GetTime::WorkerRdtsc();
     for (size_t i = 0; i < num_codeblocks; i++) {
       ldpc_decoder_5gnr_request.varNodes = demod_data_all_symbols[i];
       ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_codewords[i];
       bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
                               &ldpc_decoder_5gnr_response);
     }
-    size_t duration = WorkerRdtsc() - start_tsc;
+
+    size_t duration = GetTime::WorkerRdtsc() - start_tsc;
     std::printf("Decoding of %zu blocks takes %.2f us per block\n",
                 num_codeblocks,
-                CyclesToUs(duration, freq_ghz) / num_codeblocks);
+                GetTime::CyclesToUs(duration, freq_ghz) / num_codeblocks);
 
     // Correctness check
     size_t error_num = 0;
@@ -200,11 +210,11 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < num_codeblocks; i++) {
       size_t error_in_block = 0;
       for (size_t j = 0; j < ldpc_config.NumCbLen() / 8; j++) {
-        uint8_t input = (uint8_t)information[i][j];
+        auto input = static_cast<uint8_t>(information.at(i).at(j));
         uint8_t output = decoded_codewords[i][j];
         if (input != output) {
-          for (size_t i = 0; i < 8; i++) {
-            uint8_t mask = 1 << i;
+          for (size_t k = 0; k < 8; k++) {
+            uint8_t mask = 1 << k;
             if ((input & mask) != (output & mask)) {
               error_num++;
               error_in_block++;
@@ -228,13 +238,11 @@ int main(int argc, char* argv[]) {
         1.f * error_num / total, block_error_num, num_codeblocks,
         1.f * block_error_num / num_codeblocks);
 
+    std::free(resp_var_nodes);
     modulated_codewords.Free();
     demod_data_all_symbols.Free();
     decoded_codewords.Free();
-    std::free(resp_var_nodes);
   }
-
-  delete cfg;
-
+  delete[] input_ptr;
   return 0;
 }

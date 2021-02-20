@@ -23,6 +23,7 @@
 #include "memory_manage.h"
 #include "modulation.h"
 #include "phy_stats.h"
+#include "scrambler.h"
 #include "stats.h"
 #include "symbols.h"
 #include "utils_ldpc.h"
@@ -43,6 +44,9 @@ class DoEncode : public Doer {
   int8_t* encoded_buffer_temp_;
   Table<int8_t>& encoded_buffer_;
   DurationStat* duration_stat_;
+  int8_t* scrambler_buffer_;
+
+  std::unique_ptr<AgoraScrambler::Scrambler> scrambler_;
 };
 
 class DoDecode : public Doer {
@@ -61,6 +65,7 @@ class DoDecode : public Doer {
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers_;
   PhyStats* phy_stats_;
   DurationStat* duration_stat_;
+  std::unique_ptr<AgoraScrambler::Scrambler> scrambler_;
 };
 
 #endif  // DOCODING_H_

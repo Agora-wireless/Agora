@@ -8,10 +8,8 @@
 
 static constexpr bool kPrintCalibrationMats = false;
 
-std::atomic<size_t> num_radios_initialized;
-std::atomic<size_t> num_radios_configured;
-
-RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
+RadioConfig::RadioConfig(Config* cfg)
+    : cfg_(cfg), num_radios_initialized_(0), num_radios_configured_(0) {
   SoapySDR::Kwargs args;
   SoapySDR::Kwargs sargs;
   // load channels
@@ -24,7 +22,7 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
   if (cfg_->IsUe() == true) {
     throw std::invalid_argument("Bad config! Not a UE!");
   }
-  if (!kUseUHD && cfg_->HubIds().empty() == false) {
+  if ((kUseUHD == false) && (cfg_->HubIds().empty() == false)) {
     args["driver"] = "remote";
     args["timeout"] = "1000000";
     args["serial"] = cfg_->HubIds().at(0);
@@ -35,35 +33,33 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
   tx_streams_.resize(radio_num_);
   rx_streams_.resize(radio_num_);
 
-  std::vector<RadioConfigContext> radio_config_ctx_vec(this->radio_num_);
+  std::vector<std::thread> init_bs_threads;
+
   for (size_t i = 0; i < this->radio_num_; i++) {
-    auto* context = &radio_config_ctx_vec[i];
-    context->brs_ = this;
-    context->tid_ = i;
 #ifdef THREADED_INIT
-    pthread_t init_thread;
-    if (pthread_create(&init_thread, nullptr, InitBsRadioLaunch, context) !=
-        0) {
-      perror("init thread create failed");
-      std::exit(0);
-    }
+    init_bs_threads.emplace_back(&RadioConfig::InitBsRadio, this, i);
 #else
-    InitBsRadio(context);
+    InitBsRadio(i);
 #endif
   }
 
   // Block until all radios are initialized
   size_t num_checks = 0;
-  while (num_radios_initialized != this->radio_num_) {
-    size_t num_radios_initialized = num_radios_initialized;
+  size_t num_radios_init = num_radios_initialized_.load();
+  while (num_radios_init != this->radio_num_) {
     num_checks++;
     if (num_checks > 1e9) {
       std::printf(
           "RadioConfig: Waiting for radio initialization, %zu of %zu "
           "ready\n",
-          num_radios_initialized, this->radio_num_);
+          num_radios_init, this->radio_num_);
       num_checks = 0;
     }
+    num_radios_init = num_radios_initialized_.load();
+  }
+
+  for (auto& join_thread : init_bs_threads) {
+    join_thread.join();
   }
 
   // Perform DC Offset & IQ Imbalance Calibration
@@ -76,33 +72,32 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
     }
   }
 
+  std::vector<std::thread> config_bs_threads;
   for (size_t i = 0; i < this->radio_num_; i++) {
-    auto* context = &radio_config_ctx_vec[i];
-    context->brs_ = this;
-    context->tid_ = i;
 #ifdef THREADED_INIT
-    pthread_t configure_thread;
-    if (pthread_create(&configure_thread, nullptr,
-                       RadioConfig::ConfigureBsRadioLaunch, context) != 0) {
-      perror("init thread create failed");
-      std::exit(0);
-    }
+    config_bs_threads.emplace_back(&RadioConfig::ConfigureBsRadio, this, i);
 #else
-    ConfigureBSRadio(context);
+    ConfigureBsRadio(i);
 #endif
   }
 
+  num_checks = 0;
   // Block until all radios are configured
-  while (num_radios_configured != this->radio_num_) {
-    size_t num_radios_configured = num_radios_configured;
+  size_t num_radios_config = num_radios_configured_.load();
+  while (num_radios_config != this->radio_num_) {
     num_checks++;
     if (num_checks > 1e9) {
       std::printf(
           "RadioConfig: Waiting for radio initialization, %zu of %zu "
           "ready\n",
-          num_radios_configured, this->radio_num_);
+          num_radios_config, this->radio_num_);
       num_checks = 0;
     }
+    num_radios_config = num_radios_configured_.load();
+  }
+
+  for (auto& join_thread : config_bs_threads) {
+    join_thread.join();
   }
 
   for (size_t i = 0; i < this->radio_num_; i++) {
@@ -183,14 +178,8 @@ RadioConfig::RadioConfig(Config* cfg) : cfg_(cfg) {
   std::cout << "radio init done!" << std::endl;
 }
 
-void* RadioConfig::InitBsRadioLaunch(void* in_context) {
-  auto* context = (RadioConfigContext*)in_context;
-  context->brs_->InitBsRadio(context);
-  return nullptr;
-}
-
-void RadioConfig::InitBsRadio(RadioConfigContext* context) {
-  size_t i = context->tid_;
+void RadioConfig::InitBsRadio(size_t tid) {
+  size_t i = tid;
   auto channels = Utils::StrToChannels(cfg_->Channel());
   SoapySDR::Kwargs args;
   SoapySDR::Kwargs sargs;
@@ -211,99 +200,91 @@ void RadioConfig::InitBsRadio(RadioConfigContext* context) {
       ba_stn_[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
   tx_streams_[i] =
       ba_stn_[i]->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
-  num_radios_initialized++;
+  this->num_radios_initialized_.fetch_add(1);
 }
 
-void* RadioConfig::ConfigureBsRadioLaunch(void* in_context) {
-  RadioConfigContext* context = ((RadioConfigContext*)in_context);
-  RadioConfig* brs = context->brs_;
-  brs->ConfigureBsRadio(context);
-  return nullptr;
-}
-
-void RadioConfig::ConfigureBsRadio(RadioConfigContext* context) {
-  size_t i = context->tid_;
-
+void RadioConfig::ConfigureBsRadio(size_t tid) {
   // load channels
   auto channels = Utils::StrToChannels(cfg_->Channel());
 
   // resets the DATA_clk domain logic.
-  ba_stn_[i]->writeSetting("RESET_DATA_LOGIC", "");
+  ba_stn_[tid]->writeSetting("RESET_DATA_LOGIC", "");
 
   // use the TRX antenna port for both tx and rx
   for (auto ch : channels) {
-    if (!kUseUHD) {
-      ba_stn_[i]->setAntenna(SOAPY_SDR_RX, ch, "TRX");
+    if (kUseUHD == false) {
+      ba_stn_[tid]->setAntenna(SOAPY_SDR_RX, ch, "TRX");
     } else {
-      ba_stn_[i]->setAntenna(SOAPY_SDR_RX, ch, "RX2");
-      ba_stn_[i]->setAntenna(SOAPY_SDR_TX, ch, "TX/RX");
+      ba_stn_[tid]->setAntenna(SOAPY_SDR_RX, ch, "RX2");
+      ba_stn_[tid]->setAntenna(SOAPY_SDR_TX, ch, "TX/RX");
     }
   }
 
-  SoapySDR::Kwargs info = ba_stn_[i]->getHardwareInfo();
+  SoapySDR::Kwargs info = ba_stn_[tid]->getHardwareInfo();
   for (auto ch : channels) {
-    if (!kUseUHD) {
-      ba_stn_[i]->setBandwidth(SOAPY_SDR_RX, ch, cfg_->BwFilter());
-      ba_stn_[i]->setBandwidth(SOAPY_SDR_TX, ch, cfg_->BwFilter());
+    if (kUseUHD == false) {
+      ba_stn_[tid]->setBandwidth(SOAPY_SDR_RX, ch, cfg_->BwFilter());
+      ba_stn_[tid]->setBandwidth(SOAPY_SDR_TX, ch, cfg_->BwFilter());
     }
 
-    // baStn[i]->setSampleRate(SOAPY_SDR_RX, ch, cfg->rate);
-    // baStn[i]->setSampleRate(SOAPY_SDR_TX, ch, cfg->rate);
+    // ba_stn_[tid]->setSampleRate(SOAPY_SDR_RX, ch, cfg->Rate());
+    // ba_stn_[tid]->setSampleRate(SOAPY_SDR_TX, ch, cfg->Rate());
 
-    ba_stn_[i]->setFrequency(SOAPY_SDR_RX, ch, "RF", cfg_->RadioRfFreq());
-    ba_stn_[i]->setFrequency(SOAPY_SDR_RX, ch, "BB", kUseUHD ? 0 : cfg_->Nco());
-    ba_stn_[i]->setFrequency(SOAPY_SDR_TX, ch, "RF", cfg_->RadioRfFreq());
-    ba_stn_[i]->setFrequency(SOAPY_SDR_TX, ch, "BB", kUseUHD ? 0 : cfg_->Nco());
+    ba_stn_[tid]->setFrequency(SOAPY_SDR_RX, ch, "RF", cfg_->RadioRfFreq());
+    ba_stn_[tid]->setFrequency(SOAPY_SDR_RX, ch, "BB",
+                               kUseUHD ? 0 : cfg_->Nco());
+    ba_stn_[tid]->setFrequency(SOAPY_SDR_TX, ch, "RF", cfg_->RadioRfFreq());
+    ba_stn_[tid]->setFrequency(SOAPY_SDR_TX, ch, "BB",
+                               kUseUHD ? 0 : cfg_->Nco());
 
-    if (!kUseUHD) {
+    if (kUseUHD == false) {
       // Unified gains for both lime and frontend
       if (cfg_->SingleGain()) {
         // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
-        ba_stn_[i]->setGain(SOAPY_SDR_RX, ch,
-                            ch != 0u ? cfg_->RxGainB() : cfg_->RxGainA());
+        ba_stn_[tid]->setGain(SOAPY_SDR_RX, ch,
+                              ch != 0u ? cfg_->RxGainB() : cfg_->RxGainA());
         // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
-        ba_stn_[i]->setGain(SOAPY_SDR_TX, ch,
-                            ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());
+        ba_stn_[tid]->setGain(SOAPY_SDR_TX, ch,
+                              ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());
       } else {
         if (info["frontend"].find("CBRS") != std::string::npos) {
           if (cfg_->Freq() > 3e9) {
-            ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -6);  //[-18,0]
-          } else if (cfg_->Freq() > 2e9 && cfg_->Freq() < 3e9) {
-            ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -18);  //[-18,0]
+            ba_stn_[tid]->setGain(SOAPY_SDR_RX, ch, "ATTN", -6);  //[-18,0]
+          } else if ((cfg_->Freq() > 2e9) && (cfg_->Freq() < 3e9)) {
+            ba_stn_[tid]->setGain(SOAPY_SDR_RX, ch, "ATTN", -18);  //[-18,0]
           } else {
-            ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "ATTN", -12);  //[-18,0]
+            ba_stn_[tid]->setGain(SOAPY_SDR_RX, ch, "ATTN", -12);  //[-18,0]
           }
-          ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "LNA2", 17);  //[0,17]
+          ba_stn_[tid]->setGain(SOAPY_SDR_RX, ch, "LNA2", 17);  //[0,17]
         }
 
-        ba_stn_[i]->setGain(
+        ba_stn_[tid]->setGain(
             SOAPY_SDR_RX, ch, "LNA",
             ch != 0u ? cfg_->RxGainB() : cfg_->RxGainA());  //[0,30]
-        ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "TIA", 0);    //[0,12]
-        ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "PGA", 0);    //[-12,19]
+        ba_stn_[tid]->setGain(SOAPY_SDR_RX, ch, "TIA", 0);  //[0,12]
+        ba_stn_[tid]->setGain(SOAPY_SDR_RX, ch, "PGA", 0);  //[-12,19]
 
         if (info["frontend"].find("CBRS") != std::string::npos) {
-          ba_stn_[i]->setGain(SOAPY_SDR_TX, ch, "ATTN", -6);  //[-18,0] by 3
-          ba_stn_[i]->setGain(SOAPY_SDR_TX, ch, "PA2", 0);    //[0|15]
+          ba_stn_[tid]->setGain(SOAPY_SDR_TX, ch, "ATTN", -6);  //[-18,0] by 3
+          ba_stn_[tid]->setGain(SOAPY_SDR_TX, ch, "PA2", 0);    //[0|15]
         }
-        ba_stn_[i]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);  //[-12,12]
-        ba_stn_[i]->setGain(
+        ba_stn_[tid]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);  //[-12,12]
+        ba_stn_[tid]->setGain(
             SOAPY_SDR_TX, ch, "PAD",
             ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());  //[0,30]
       }
     } else {
-      ba_stn_[i]->setGain(SOAPY_SDR_RX, ch, "PGA0",
-                          ch != 0u ? cfg_->RxGainB() : cfg_->RxGainA());
-      ba_stn_[i]->setGain(SOAPY_SDR_TX, ch, "PGA0",
-                          ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());
+      ba_stn_[tid]->setGain(SOAPY_SDR_RX, ch, "PGA0",
+                            ch != 0u ? cfg_->RxGainB() : cfg_->RxGainA());
+      ba_stn_[tid]->setGain(SOAPY_SDR_TX, ch, "PGA0",
+                            ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());
     }
   }
 
   for (auto ch : channels) {
-    ba_stn_[i]->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
+    ba_stn_[tid]->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
   }
-
-  num_radios_configured++;
+  this->num_radios_configured_.fetch_add(1);
 }
 
 bool RadioConfig::RadioStart() {
@@ -328,25 +309,24 @@ bool RadioConfig::RadioStart() {
     init_calib_dl_.Calloc(calib_meas_num_,
                           cfg_->OfdmDataNum() * cfg_->BfAntNum(),
                           Agora_memory::Alignment_t::kAlign64);
-    if (cfg_->DownlinkMode()) {
+    if (cfg_->Frame().NumDLSyms() > 0) {
       int iter = 0;
       int max_iter = 3;
       std::cout << "Start initial reciprocity calibration..." << std::endl;
-      while (!good_calib) {
+      while (good_calib == false) {
         good_calib = InitialCalib(cfg_->SampleCalEn());
         iter++;
-        if (iter == max_iter && !good_calib) {
+        if ((iter == max_iter) && (good_calib == false)) {
           std::cout << "attempted " << max_iter
                     << " unsucessful calibration, stopping ..." << std::endl;
           break;
         }
       }
-      if (!good_calib) {
+      if (good_calib == false) {
         return good_calib;
       } else {
         std::cout << "initial calibration successful!" << std::endl;
       }
-
       // process initial measurements
       arma::cx_fcube calib_dl_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
                                    calib_meas_num_, arma::fill::zeros);
@@ -386,11 +366,8 @@ bool RadioConfig::RadioStart() {
 
   std::vector<unsigned> zeros(cfg_->SampsPerSymbol(), 0);
   std::vector<uint32_t> beacon = cfg_->Beacon();
-  std::vector<unsigned> beacon_weights(cfg_->NumAntennas());
-
   std::vector<uint32_t> pilot = cfg_->Pilot();
 
-  std::vector<std::string> tdd_sched;
   DrainBuffers();
   json conf;
   conf["tdd_enabled"] = true;

@@ -12,10 +12,11 @@
 #include <boost/range/algorithm/count.hpp>
 
 #include "logger.h"
+#include "scrambler.h"
 #include "utils_ldpc.h"
 
 Config::Config(const std::string& jsonfile)
-    : freq_ghz_(MeasureRdtscFreq()),
+    : freq_ghz_(GetTime::MeasureRdtscFreq()),
       ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_("") {
   pilots_ = nullptr;
@@ -85,12 +86,18 @@ Config::Config(const std::string& jsonfile)
   if (gain_adj_json_a.empty()) {
     client_gain_adj_a_.resize(num_radios_, 0);
   } else {
+    RtAssert(
+        gain_adj_json_a.size() == num_radios_,
+        "client_gain_adjust_a size must be same as the number of clients!");
     client_gain_adj_a_.assign(gain_adj_json_a.begin(), gain_adj_json_a.end());
   }
   auto gain_adj_json_b = tdd_conf.value("client_gain_adjust_b", json::array());
   if (gain_adj_json_b.empty()) {
     client_gain_adj_b_.resize(num_radios_, 0);
   } else {
+    RtAssert(
+        gain_adj_json_a.size() == num_radios_,
+        "client_gain_adjust_a size must be same as the number of clients!");
     client_gain_adj_b_.assign(gain_adj_json_b.begin(), gain_adj_json_b.end());
   }
   rate_ = tdd_conf.value("rate", 5e6);
@@ -141,7 +148,7 @@ Config::Config(const std::string& jsonfile)
   ofdm_data_start_ =
       tdd_conf.value("ofdm_data_start", (ofdm_ca_num_ - ofdm_data_num_) / 2);
   ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
-  downlink_mode_ = tdd_conf.value("downlink_mode", false);
+
   bigstation_mode_ = tdd_conf.value("bigstation_mode", false);
   freq_orthogonal_pilot_ = tdd_conf.value("freq_orthogonal_pilot", false);
   correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
@@ -150,6 +157,8 @@ Config::Config(const std::string& jsonfile)
   if (tx_advance.empty()) {
     cl_tx_advance_.resize(num_radios_, 0);
   } else {
+    RtAssert(tx_advance.size() == num_radios_,
+             "tx_advance size must be same as the number of clients!");
     cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
   }
   hw_framer_ = tdd_conf.value("hw_framer", true);
@@ -326,9 +335,8 @@ Config::Config(const std::string& jsonfile)
   }
   ue_ant_offset_ = tdd_conf.value("ue_ant_offset", 0);
   total_ue_ant_num_ = tdd_conf.value("total_ue_ant_num", ue_ant_num_);
-  downlink_mode_ = frame_.NumDLSyms() > 0;
 
-  /* Agora configurations */
+  // Agora configurations
   frames_to_test_ = tdd_conf.value("frames_to_test", 9600);
   core_offset_ = tdd_conf.value("core_offset", 0);
   worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
@@ -372,7 +380,10 @@ Config::Config(const std::string& jsonfile)
   ldpc_config_ = LDPCconfig(base_graph, zc, max_decoder_iter, early_term,
                             num_cb_len, num_cb_codew_len, num_rows, 0);
 
-  /* Modulation configurations */
+  // Scrambler and descrambler configurations
+  scramble_enabled_ = tdd_conf.value("wlan_scrambler", true);
+
+  // Modulation configurations
   mod_order_bits_ =
       modulation_ == "64QAM"
           ? CommsLib::kQaM64
@@ -436,7 +447,7 @@ void Config::GenData() {
     std::vector<std::complex<int16_t>> gold_ifft_ci16 =
         Utils::DoubleToCint16(gold_ifft);
     for (size_t i = 0; i < 128; i++) {
-      gold_cf32_.emplace_back(gold_ifft[0][i], gold_ifft[1][i]);
+      this->gold_cf32_.emplace_back(gold_ifft[0][i], gold_ifft[1][i]);
     }
 
     std::vector<std::vector<double>> sts_seq =
@@ -583,7 +594,7 @@ void Config::GenData() {
   if (fd == nullptr) {
     MLPD_ERROR("Failed to open antenna file %s. Error %s.\n",
                ul_data_file.c_str(), strerror(errno));
-    std::exit(-1);
+    throw std::runtime_error("Config: Failed to open antenna file");
   }
 
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
@@ -626,7 +637,7 @@ void Config::GenData() {
   if (fd == nullptr) {
     MLPD_ERROR("Failed to open antenna file %s. Error %s.\n",
                dl_data_file.c_str(), strerror(errno));
-    std::exit(-1);
+    throw std::runtime_error("Config: Failed to open dl antenna file");
   }
 
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
@@ -643,10 +654,18 @@ void Config::GenData() {
   std::fclose(fd);
 #endif
 
+  auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
+
   const size_t encoded_bytes_per_block =
       BitsToBytes(this->ldpc_config_.NumCbCodewLen());
   const size_t num_blocks_per_symbol =
       this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
+
+  // Used as an input ptr to
+  auto* scramble_buffer =
+      new int8_t[num_bytes_per_cb_ +
+                 kLdpcHelperFunctionInputBufferSizePaddingBytes]();
+  int8_t* ldpc_input = nullptr;
 
   // Encode uplink bits
   ul_encoded_bits_.Malloc(this->frame_.NumULSyms() * num_blocks_per_symbol,
@@ -661,13 +680,22 @@ void Config::GenData() {
   for (size_t i = 0; i < frame_.NumULSyms(); i++) {
     for (size_t j = 0; j < ue_ant_num_; j++) {
       for (size_t k = 0; k < ldpc_config_.NumBlocksInSymbol(); k++) {
-        int8_t* bits_ptr = GetInfoBits(ul_bits_, i, j, k);
         int8_t* coded_bits_ptr =
             ul_encoded_bits_[i * num_blocks_per_symbol +
                              j * ldpc_config_.NumBlocksInSymbol() + k];
+
+        if (scramble_enabled_) {
+          std::memcpy(scramble_buffer, GetInfoBits(ul_bits_, i, j, k),
+                      num_bytes_per_cb_);
+          scrambler->Scramble(scramble_buffer, num_bytes_per_cb_);
+          ldpc_input = scramble_buffer;
+        } else {
+          ldpc_input = GetInfoBits(ul_bits_, i, j, k);
+        }
+
         LdpcEncodeHelper(ldpc_config_.BaseGraph(),
                          ldpc_config_.ExpansionFactor(), ldpc_config_.NumRows(),
-                         coded_bits_ptr, temp_parity_buffer, bits_ptr);
+                         coded_bits_ptr, temp_parity_buffer, ldpc_input);
         AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
                         ul_mod_input_[i] + j * ofdm_data_num_ +
                             k * encoded_bytes_per_block / mod_order_bits_,
@@ -692,7 +720,6 @@ void Config::GenData() {
         ul_iq_f_[i][q + j] = ModSingleUint8(ul_mod_input_[i][s], mod_table_);
         ul_iq_ifft[i][q + j] = ul_iq_f_[i][q + j];
       }
-
       CommsLib::IFFT(&ul_iq_ifft[i][q], ofdm_ca_num_, false);
     }
   }
@@ -708,13 +735,22 @@ void Config::GenData() {
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
     for (size_t j = 0; j < this->ue_ant_num_; j++) {
       for (size_t k = 0; k < ldpc_config_.NumBlocksInSymbol(); k++) {
-        int8_t* bits_ptr = GetInfoBits(dl_bits_, i, j, k);
         int8_t* coded_bits_ptr =
             dl_encoded_bits[i * num_blocks_per_symbol +
                             j * ldpc_config_.NumBlocksInSymbol() + k];
+
+        if (scramble_enabled_) {
+          std::memcpy(scramble_buffer, GetInfoBits(dl_bits_, i, j, k),
+                      num_bytes_per_cb_);
+          scrambler->Scramble(scramble_buffer, num_bytes_per_cb_);
+          ldpc_input = scramble_buffer;
+        } else {
+          ldpc_input = GetInfoBits(dl_bits_, i, j, k);
+        }
+
         LdpcEncodeHelper(ldpc_config_.BaseGraph(),
                          ldpc_config_.ExpansionFactor(), ldpc_config_.NumRows(),
-                         coded_bits_ptr, temp_parity_buffer, bits_ptr);
+                         coded_bits_ptr, temp_parity_buffer, ldpc_input);
         AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
                         dl_mod_input_[i] + j * ofdm_data_num_ +
                             k * encoded_bytes_per_block / mod_order_bits_,
@@ -810,8 +846,8 @@ void Config::GenData() {
                     ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
 
   for (size_t i = 0; i < ofdm_ca_num_; i++) {
-    pilot_cf32_.emplace_back(pilot_ifft[i].re / scale_,
-                             pilot_ifft[i].im / scale_);
+    this->pilot_cf32_.emplace_back(pilot_ifft[i].re / scale_,
+                                   pilot_ifft[i].im / scale_);
   }
   this->pilot_cf32_.insert(this->pilot_cf32_.begin(),
                            this->pilot_cf32_.end() - this->cp_len_,
@@ -853,6 +889,7 @@ void Config::GenData() {
   ul_encoded_bits_.Free();
   dl_mod_input_.Free();
   FreeBuffer1d(&pilot_ifft);
+  delete[] scramble_buffer;
 }
 
 Config::~Config() {

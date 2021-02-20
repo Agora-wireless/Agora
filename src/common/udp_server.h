@@ -46,8 +46,8 @@ class UDPServer {
 
     // Set buffer size
     if (rx_buffer_size != 0) {
-      int ret = setsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &rx_buffer_size,
-                           sizeof(rx_buffer_size));
+      ret = setsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &rx_buffer_size,
+                       sizeof(rx_buffer_size));
       if (ret != 0) {
         throw std::runtime_error("UDPServer: Failed to set RX buffer size.");
       }

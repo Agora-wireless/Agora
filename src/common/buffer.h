@@ -1,9 +1,9 @@
 /**
- * @file buffer.inc
+ * @file buffer.h
  * @brief Self defined functions for message storage and passing
  */
-#ifndef BUFFER_INC_
-#define BUFFER_INC_
+#ifndef BUFFER_H_
+#define BUFFER_H_
 
 #include <sstream>
 #include <vector>
@@ -256,46 +256,68 @@ class RxCounters {
  */
 class FrameCounters {
  public:
-  // Maximum number of symbols in a frame
-  size_t max_symbol_count_;
-  // Maximum number of tasks in a symbol
-  size_t max_task_count_;
+  FrameCounters() : task_count_(), symbol_count_() {}
 
   void Init(size_t max_symbol_count, size_t max_task_count = 0) {
     this->max_symbol_count_ = max_symbol_count;
     this->max_task_count_ = max_task_count;
-    symbol_count_.fill(0);
+    this->symbol_count_.fill(0);
+    for (auto &frame : task_count_) {
+      frame.fill(0);
+    }
   }
+
+  void Reset(size_t frame_id) {
+    const size_t frame_slot = (frame_id % kFrameWnd);
+    this->symbol_count_.at(frame_slot) = 0;
+    this->task_count_.at(frame_slot).fill(0);
+  }
+
+  /**
+   * @brief Increments and checks the symbol count for input frame
+   * @param frame_id The frame id of the symbol to increment
+   */
+  bool CompleteSymbol(size_t frame_id) {
+    const size_t frame_slot = (frame_id % kFrameWnd);
+    this->symbol_count_.at(frame_slot)++;
+    return this->IsLastSymbol(frame_slot);
+  }
+
+  /**
+   * @brief Increments the task count for input frame and symbol
+   * @param frame_slot The frame index to increment
+   * @param symbol_id The symbol id of the task to increment
+   */
+  bool CompleteTask(size_t frame_id, size_t symbol_id) {
+    const size_t frame_slot = (frame_id % kFrameWnd);
+    this->task_count_.at(frame_slot).at(symbol_id)++;
+    return this->IsLastTask(frame_id, symbol_id);
+  }
+
+  /**
+   * @brief Increments the symbol count for input frame
+   * @param symbol_id The symbol id to increment
+   */
+  bool CompleteTask(size_t frame_id) { return this->CompleteSymbol(frame_id); }
 
   /**
    * @brief Check whether the symbol is the last symbol for a given frame
-   * while simultaneously incrementing the symbol count.
-   * @param frame id The frame id to check
+   * @param frame id The frame id of the symbol to check
    */
-  bool LastSymbol(size_t frame_id) {
-    const size_t frame_slot = frame_id % kFrameWnd;
-    if (++symbol_count_[frame_slot] == max_symbol_count_) {
-      // If the symbol is the last symbol, reset count to 0
-      symbol_count_[frame_slot] = 0;
-      return true;
+  bool IsLastSymbol(size_t frame_id) const {
+    const size_t frame_slot = (frame_id % kFrameWnd);
+    bool is_last;
+    size_t symbol_count = this->symbol_count_.at(frame_slot);
+    if (symbol_count == this->max_symbol_count_) {
+      is_last = true;
+    } else if (symbol_count < this->max_symbol_count_) {
+      is_last = false;
+    } else {
+      is_last = true;
+      /* This should never happen */
+      assert(false);
     }
-    return false;
-  }
-
-  /**
-   * @brief Check whether the task is the last task for a given frame and
-   * symbol while simultaneously incrementing the task count.
-   * @param frame_id The frame id to check
-   * @param symbol_id The symbol id to check
-   */
-  bool LastTask(size_t frame_id, size_t symbol_id) {
-    const size_t frame_slot = frame_id % kFrameWnd;
-    if (++task_count_[frame_slot][symbol_id] == max_task_count_) {
-      // If the task is the last task, reset count is to 0
-      task_count_[frame_slot][symbol_id] = 0;
-      return true;
-    }
-    return false;
+    return is_last;
   }
 
   /**
@@ -304,28 +326,46 @@ class FrameCounters {
    * This is used for tasks performed once per frame (e.g., ZF)
    * @param frame_id The frame id to check
    */
-  bool LastTask(size_t frame_id) {
+  bool IsLastTask(size_t frame_id) const { return IsLastSymbol(frame_id); }
+
+  /**
+   * @brief Check whether the task is the last task for a given frame and
+   * @param frame_id The frame id to check
+   * @param symbol_id The symbol id to check
+   */
+  bool IsLastTask(size_t frame_id, size_t symbol_id) const {
     const size_t frame_slot = frame_id % kFrameWnd;
-    // Number of tasks is stored as number of symbols
-    if (++symbol_count_[frame_slot] == max_symbol_count_) {
-      // If the task is the last task, reset count to 0
-      symbol_count_[frame_slot] = 0;
-      return true;
+    bool is_last;
+    size_t task_count = this->task_count_.at(frame_slot).at(symbol_id);
+    if (task_count == this->max_task_count_) {
+      is_last = true;
+    } else if (task_count < this->max_task_count_) {
+      is_last = false;
+    } else {
+      is_last = true;
+      std::printf("Task Count %zu,  Max Count %zu, Symbol %zu\n", task_count,
+                  this->max_task_count_, symbol_id);
+      std::fflush(stdout);
+      // This should never happen
+      assert(false);
     }
-    return false;
+    return is_last;
   }
 
-  size_t GetSymbolCount(size_t frame_id) {
-    return symbol_count_[frame_id % kFrameWnd];
+  size_t GetSymbolCount(size_t frame_id) const {
+    return this->symbol_count_.at(frame_id % kFrameWnd);
   }
 
-  size_t GetTaskCount(size_t frame_id, size_t symbol_id) {
-    return task_count_[frame_id % kFrameWnd][symbol_id];
+  size_t GetTaskCount(size_t frame_id) const {
+    return this->GetSymbolCount(frame_id);
   }
 
-  size_t GetTaskCount(size_t frame_id) {
-    return symbol_count_[frame_id % kFrameWnd];
+  size_t GetTaskCount(size_t frame_id, size_t symbol_id) const {
+    return this->task_count_.at(frame_id % kFrameWnd).at(symbol_id);
   }
+
+  inline size_t MaxSymbolCount() const { return this->max_symbol_count_; }
+  inline size_t MaxTaskCount() const { return this->max_task_count_; }
 
  private:
   // task_count[i][j] is the number of tasks completed for
@@ -334,6 +374,11 @@ class FrameCounters {
   // symbol_count[i] is the number of symbols completed for
   // frame (i % kFrameWnd)
   std::array<size_t, kFrameWnd> symbol_count_;
+
+  // Maximum number of symbols in a frame
+  size_t max_symbol_count_;
+  // Maximum number of tasks in a symbol
+  size_t max_task_count_;
 };
 
-#endif  // BUFFER_INC_
+#endif  // BUFFER_H_

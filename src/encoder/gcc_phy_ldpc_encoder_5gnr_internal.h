@@ -69,7 +69,8 @@ extern "C" {
 void AdapterFrom288to384(int8_t** pBuff0, int8_t* pBuff1, uint16_t zcSize,
                          uint32_t cbLen, int8_t direct);  // 1ways
 void Adapter2waysFrom144to256(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
-                              uint32_t cbLen, int8_t direct);  // 2ways
+                              uint32_t cbLen,
+                              int8_t direct);  // 2ways
 void Adapter4waysFrom72to128(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
                              uint32_t cbLen, int8_t direct);  // 4ways
 void Adapter8waysFrom36to64(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
@@ -448,4 +449,4 @@ __attribute__((
 }
 #endif
 
-#endif
+#endif  // PHY_LDPC_ENCODER_5GNR_INTERNAL_H_
