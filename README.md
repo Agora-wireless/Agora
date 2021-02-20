@@ -1,4 +1,4 @@
-[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Fe2e-test)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/e2e-test/)
+[![Build Status](https://735fe9f5e8ac.ngrok.io/buildStatus/icon?job=github_public_agora%2Fe2e-test)](https://735fe9f5e8ac.ngrok.io/job/github_public_agora/job/e2e-test/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
