@@ -318,6 +318,9 @@ Config::Config(const std::string& jsonfile)
   frame_.SetClientPilotSyms(client_ul_pilot_syms, client_dl_pilot_syms);
 
   ant_per_group_ = frame_.NumDLCalSyms();
+  RtAssert(ant_per_group_ % num_channels_ == 0,
+           "Number of Downlink calibration symbols per frame must be "
+           "multiplier of number of channels!");
   ant_group_num_ =
       frame_.IsRecCalEnabled() ? (bf_ant_num_ / ant_per_group_) : 0;
 

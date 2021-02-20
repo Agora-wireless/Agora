@@ -557,7 +557,7 @@ void RadioConfig::AdjustDelays(std::vector<int> offset) {
 }
 
 bool RadioConfig::InitialCalib(bool sample_adjust) {
-  size_t seq_len = cfg_->PilotCf32().size();
+  size_t seq_len = cfg_->PilotCf32().size();  // excludes zero padding
   size_t read_len = cfg_->PilotCi16().size();
 
   // Transmitting from only one chain, create a null vector for chainB
@@ -616,8 +616,8 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
       for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
         int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
         int ret = ba_stn_[i]->writeStream(
-            this->tx_streams_[i], ch == 1 ? txbuff1.data() : txbuff0.data(),
-            cfg_->PilotCi16().size(), tx_flags, tx_time, 1000000);
+            this->tx_streams_[i], ch > 0 ? txbuff1.data() : txbuff0.data(),
+            read_len, tx_flags, tx_time, 1000000);
         if (ret < (int)read_len) {
           std::cout << "bad write\n";
         }
@@ -646,9 +646,9 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
     // Transmit from Ref Antenna to Beamforming Antennas (Up)
     {
       int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-      int ret = ba_stn_[ref]->writeStream(
-          this->tx_streams_[ref], txbuff0.data(), cfg_->PilotCi16().size(),
-          tx_flags, tx_time, 1000000);
+      int ret =
+          ba_stn_[ref]->writeStream(this->tx_streams_[ref], txbuff0.data(),
+                                    read_len, tx_flags, tx_time, 1000000);
       if (ret < (int)read_len) {
         std::cout << "bad write\n";
       }
@@ -664,6 +664,9 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
 
       int flags = 0;
       for (size_t i = 0; i < r; i++) {
+        if (good_csi == false) {
+          break;
+        }
         if (i == ref) continue;
         std::vector<void*> rxbuff(2);
         rxbuff[0] = buff[m + cfg_->NumChannels() * i].data();
