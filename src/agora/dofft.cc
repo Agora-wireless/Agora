@@ -202,8 +202,9 @@ EventData DoFFT::Launch(size_t tag) {
           &calib_ul_buffer_[frame_grp_slot][ant_id * cfg_->OfdmDataNum()],
           ant_id, sym_type);
     }
-  } else if (sym_type == SymbolType::kCalDL and ant_id == cfg_->RefAnt()) {
-    if (frame_id >= TX_FRAME_DELTA) {
+  } else if (sym_type == SymbolType::kCalDL &&
+             ant_id / cfg_->NumChannels() == cfg_->RefRadio()) {
+    if (frame_id >= TX_FRAME_DELTA && ant_id == cfg_->RefAnt()) {
       size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
       size_t frame_grp_slot = frame_grp_id % kFrameWnd;
       size_t cur_ant = frame_id - (frame_grp_id * cfg_->AntGroupNum());

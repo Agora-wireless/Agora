@@ -75,10 +75,6 @@ struct Packet* PacketTXRX::RecvEnqueueArgos(int tid, int radio_id,
   int symbol_id = (int)((frame_time >> 16) & 0xFFFF);
   int ant_id = radio_id * n_channels;
   for (int ch = 0; ch < n_channels; ++ch) {
-    if (radio_id == (int)cfg_->RefAnt() / n_channels &&
-        ant_id + ch !=
-            (int)cfg_->RefAnt())  // ignore second channel in ref radio
-      continue;
     new (pkt[ch]) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
     // move ptr & set status to full
     rx_buffer_status[rx_offset + ch] =
@@ -97,10 +93,9 @@ struct Packet* PacketTXRX::RecvEnqueueArgos(int tid, int radio_id,
 }
 
 int PacketTXRX::DequeueSendArgos(int tid) {
-  auto& c = cfg_;
   std::array<EventData, 4> event;
   if (task_queue_->try_dequeue_bulk_from_producer(*tx_ptoks_[tid], event.data(),
-                                                  c->NumChannels()) == 0) {
+                                                  cfg_->NumChannels()) == 0) {
     return -1;
   }
 
@@ -110,59 +105,63 @@ int PacketTXRX::DequeueSendArgos(int tid) {
   size_t frame_id = gen_tag_t(event.at(0).tags_[0]).frame_id_;
   size_t symbol_id = gen_tag_t(event.at(0).tags_[0]).symbol_id_;
   size_t ant_id = gen_tag_t(event.at(0).tags_[0]).ant_id_;
+  size_t radio_id = ant_id / cfg_->NumChannels();
 
   size_t dl_symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
-  size_t offset =
-      (c->GetTotalDataSymbolIdxDl(frame_id, dl_symbol_idx) * c->BsAntNum()) +
-      ant_id;
+  size_t offset = (cfg_->GetTotalDataSymbolIdxDl(frame_id, dl_symbol_idx) *
+                   cfg_->BsAntNum()) +
+                  ant_id;
 
-  // TODO: support nChannels > 1
+  // Transmit downlink calibration (array to ref) pilot
   void* caltxbuf[2];
-  auto channels = Utils::StrToChannels(c->Channel());
-
-  if ((c->Frame().IsRecCalEnabled() == true) &&
-      (symbol_id == c->Frame().GetDLSymbol(0)) && (ant_id != c->RefAnt())) {
-    std::vector<std::complex<int16_t>> zeros(c->SampsPerSymbol(),
+  if ((cfg_->Frame().IsRecCalEnabled() == true) &&
+      (symbol_id == cfg_->Frame().GetDLSymbol(0)) &&
+      (radio_id != cfg_->RefRadio())) {
+    std::vector<std::complex<int16_t>> zeros(cfg_->SampsPerSymbol(),
                                              std::complex<int16_t>(0, 0));
-    for (size_t s = 0; s < c->AntPerGroup(); s++) {
-      size_t ch = channels[s % c->NumChannels()];
-      caltxbuf[ch] =
-          (frame_id % c->AntGroupNum() == ant_id / c->AntPerGroup() &&
-           s == ant_id % c->AntPerGroup())
-              ? c->PilotCi16().data()
-              : zeros.data();
-      if (channels.size() > 1) caltxbuf[1 - ch] = zeros.data();
-      long long frame_time = ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
-                             (c->Frame().GetDLCalSymbol(s) << 16);
-      radioconfig_->RadioTx(ant_id / c->NumChannels(), caltxbuf, 1, frame_time);
+    for (size_t s = 0; s < cfg_->RadioPerGroup(); s++) {
+      bool calib_turn = (frame_id % cfg_->RadioGroupNum() ==
+                             radio_id / cfg_->RadioPerGroup() &&
+                         s == radio_id % cfg_->RadioPerGroup());
+      for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
+        caltxbuf[ch] = calib_turn ? cfg_->PilotCi16().data() : zeros.data();
+        if (cfg_->NumChannels() > 1) caltxbuf[1 - ch] = zeros.data();
+        long long frame_time =
+            ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
+            (cfg_->Frame().GetDLCalSymbol(s * cfg_->NumChannels() + ch) << 16);
+        radioconfig_->RadioTx(radio_id, caltxbuf, 1, frame_time);
+      }
     }
   }
 
   void* txbuf[2];
   if (kDebugDownlink == true) {
-    std::vector<std::complex<int16_t>> zeros(c->SampsPerSymbol());
-    size_t ch = channels[0];
-    if (ant_id != 0) {
-      txbuf[ch] = zeros.data();
-    } else if (dl_symbol_idx < c->Frame().ClientDlPilotSymbols()) {
-      txbuf[ch] = reinterpret_cast<void*>(c->UeSpecificPilotT()[0]);
-    } else {
-      txbuf[ch] = reinterpret_cast<void*>(c->DlIqT()[dl_symbol_idx]);
+    std::vector<std::complex<int16_t>> zeros(cfg_->SampsPerSymbol());
+    for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
+      if (ant_id != 0) {
+        txbuf[ch] = zeros.data();
+      } else if (dl_symbol_idx < cfg_->Frame().ClientDlPilotSymbols()) {
+        txbuf[ch] = reinterpret_cast<void*>(cfg_->UeSpecificPilotT()[0]);
+      } else {
+        txbuf[ch] = reinterpret_cast<void*>(cfg_->DlIqT()[dl_symbol_idx]);
+      }
+      if (cfg_->NumChannels() > 1) txbuf[1 - ch] = zeros.data();
     }
   } else {
-    for (size_t ch = 0; ch < c->NumChannels(); ch++) {
-      char* cur_buffer_ptr = tx_buffer_ + (offset + ch) * c->DlPacketLength();
+    for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
+      char* cur_buffer_ptr =
+          tx_buffer_ + (offset + ch) * cfg_->DlPacketLength();
       auto* pkt = reinterpret_cast<struct Packet*>(cur_buffer_ptr);
       txbuf[ch] = (void*)pkt->data_;
     }
   }
 
-  size_t last = c->Frame().GetDLSymbolLast();
+  size_t last = cfg_->Frame().GetDLSymbolLast();
   int flags = (symbol_id != last) ? 1   // HAS_TIME
                                   : 2;  // HAS_TIME & END_BURST, fixme
   frame_id += TX_FRAME_DELTA;
   long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
-  radioconfig_->RadioTx(ant_id / c->NumChannels(), txbuf, flags, frame_time);
+  radioconfig_->RadioTx(radio_id, txbuf, flags, frame_time);
 
   if (kDebugPrintInTask == true) {
     std::printf(
@@ -172,7 +171,7 @@ int PacketTXRX::DequeueSendArgos(int tid) {
         message_queue_->size_approx());
   }
 
-  for (size_t i = 0; i < c->NumChannels(); i++) {
+  for (size_t i = 0; i < cfg_->NumChannels(); i++) {
     RtAssert(message_queue_->enqueue(
                  *rx_ptoks_[tid],
                  EventData(EventType::kPacketTX, event.at(i).tags_[0])),
