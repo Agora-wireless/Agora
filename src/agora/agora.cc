@@ -1310,10 +1310,9 @@ void Agora::InitializeUplinkBuffers() {
 
   rc_counters_.Init(cfg->BsAntNum());
 
-  zf_counters_.Init(config_->ZfEventsPerSymbol());
+  zf_counters_.Init(cfg->ZfEventsPerSymbol());
 
-  demul_counters_.Init(cfg->Frame().NumULSyms(),
-                       config_->DemulEventsPerSymbol());
+  demul_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
 
   decode_counters_.Init(
       cfg->Frame().NumULSyms(),
