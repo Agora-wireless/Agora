@@ -23,38 +23,38 @@ void PacketTXRX::LoopTxRxArgos(int tid) {
       continue;
     }
     // receive data
-    struct Packet* pkt = RecvEnqueueArgos(tid, radio_id, rx_offset);
-    if (pkt == nullptr) {
+    auto pkt = RecvEnqueueArgos(tid, radio_id, rx_offset);
+    if (pkt.size() == 0) {
       continue;
     }
-    rx_offset = (rx_offset + cfg_->NumChannels()) % packet_num_in_buffer_;
+    rx_offset = (rx_offset + pkt.size()) % packet_num_in_buffer_;
 
     if (kIsWorkerTimingEnabled) {
-      int frame_id = pkt->frame_id_;
+      int frame_id = pkt.front()->frame_id_;
       if (frame_id > prev_frame_id) {
         rx_frame_start[frame_id % kNumStatsFrames] = GetTime::Rdtsc();
         prev_frame_id = frame_id;
       }
     }
-
     if (++radio_id == radio_hi) {
       radio_id = radio_lo;
     }
   }
 }
 
-struct Packet* PacketTXRX::RecvEnqueueArgos(int tid, int radio_id,
-                                            int rx_offset) {
+std::vector<struct Packet*> PacketTXRX::RecvEnqueueArgos(int tid, int radio_id,
+                                                         int rx_offset) {
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
   char* rx_buffer = (*buffer_)[tid];
   int* rx_buffer_status = (*buffer_status_)[tid];
   int packet_length = cfg_->PacketLength();
 
   // if rx_buffer is full, exit
-  int n_channels = cfg_->NumChannels();
-  struct Packet* pkt[n_channels];
-  void* samp[n_channels];
-  for (int ch = 0; ch < n_channels; ++ch) {
+  std::vector<struct Packet*> pkt(cfg_->NumChannels());
+  int ant_id = radio_id * cfg_->NumChannels();
+  std::vector<int> ant_ids(cfg_->NumChannels());
+  void* samp[cfg_->NumChannels()];
+  for (size_t ch = 0; ch < cfg_->NumChannels(); ++ch) {
     // if rx_buffer is full, exit
     if (rx_buffer_status[rx_offset + ch] == 1) {
       MLPD_ERROR("TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
@@ -63,19 +63,48 @@ struct Packet* PacketTXRX::RecvEnqueueArgos(int tid, int radio_id,
     }
     pkt[ch] = (struct Packet*)&rx_buffer[(rx_offset + ch) * packet_length];
     samp[ch] = pkt[ch]->data_;
+    ant_ids[ch] = ant_id + ch;
   }
 
   long long frame_time;
   if ((cfg_->Running() == false) ||
       radioconfig_->RadioRx(radio_id, samp, frame_time) <= 0) {
-    return nullptr;
+    std::vector<struct Packet*> empty_pkt;
+    return empty_pkt;
   }
 
   int frame_id = (int)(frame_time >> 32);
   int symbol_id = (int)((frame_time >> 16) & 0xFFFF);
-  int ant_id = radio_id * n_channels;
-  for (int ch = 0; ch < n_channels; ++ch) {
-    new (pkt[ch]) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
+  std::vector<int> symbol_ids(cfg_->NumChannels(), symbol_id);
+
+  // TODO: What if ref_ant is set to the second channel?
+  if ((cfg_->Frame().IsRecCalEnabled() == true) &&
+      (cfg_->IsCalDlPilot(frame_id, symbol_id) == true) &&
+      (radio_id == (int)cfg_->RefRadio()) && (cfg_->AntPerGroup() > 1)) {
+    if (cfg_->AntPerGroup() > cfg_->NumChannels()) {
+      pkt.resize(cfg_->AntPerGroup());
+      symbol_ids.resize(cfg_->AntPerGroup());
+      ant_ids.resize(cfg_->AntPerGroup());
+    }
+    for (size_t s = 1; s < cfg_->AntPerGroup(); s++) {
+      pkt[s] = (struct Packet*)&rx_buffer[(rx_offset + s) * packet_length];
+      void* samp2[cfg_->NumChannels()];
+      std::vector<char> dummy_buff(packet_length);
+      samp2[0] = pkt[s]->data_;
+      samp2[1] = dummy_buff.data();
+      if ((cfg_->Running() == false) ||
+          radioconfig_->RadioRx(radio_id, samp2, frame_time) <= 0) {
+        std::vector<struct Packet*> empty_pkt;
+        return empty_pkt;
+      }
+      symbol_ids[s] = cfg_->Frame().GetDLCalSymbol(s);
+      ant_ids[s] = ant_id;
+    }
+  }
+
+  for (size_t ch = 0; ch < pkt.size(); ++ch) {
+    new (pkt[ch])
+        Packet(frame_id, symbol_ids[ch], 0 /* cell_id */, ant_ids[ch]);
     // move ptr & set status to full
     rx_buffer_status[rx_offset + ch] =
         1;  // has data, after it is read, it is set to 0
@@ -89,7 +118,7 @@ struct Packet* PacketTXRX::RecvEnqueueArgos(int tid, int radio_id,
       throw std::runtime_error("PacketTXRX: socket message enqueue failed");
     }
   }
-  return pkt[0];
+  return pkt;
 }
 
 int PacketTXRX::DequeueSendArgos(int tid) {
