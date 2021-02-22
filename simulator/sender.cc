@@ -76,16 +76,19 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
 
 #ifdef USE_DPDK
   DpdkTransport::dpdk_init(core_offset, socket_thread_num_);
-  this->mbuf_pool_ = DpdkTransport::create_mempool(cfg->PacketLength());
+  printf("Number of ports: %d used (offset: %d), %d available, socket: %d\n",
+         cfg->DpdkNumPorts(), cfg->DpdkPortOffset(), rte_eth_dev_count_avail(),
+         rte_socket_id());
+  RtAssert(cfg->DpdkNumPorts() <= rte_eth_dev_count_avail(),
+           "Invalid number of DPDK ports");
+  this->mbuf_pool_ =
+      DpdkTransport::create_mempool(cfg->DpdkNumPorts(), cfg->PacketLength());
 
   // Parse IP addresses
   int ret = inet_pton(AF_INET, cfg->BsRruAddr().c_str(), &bs_rru_addr_);
   RtAssert(ret == 1, "Invalid sender IP address");
   ret = inet_pton(AF_INET, cfg->BsServerAddr().c_str(), &bs_server_addr_);
   RtAssert(ret == 1, "Invalid server IP address");
-
-  RtAssert(cfg->DpdkNumPorts() <= rte_eth_dev_count_avail(),
-           "Invalid number of DPDK ports");
 
   RtAssert(server_mac_addr_str.length() ==
                (cfg->DpdkNumPorts() * (kMacAddrBtyes + 1) - 1),
@@ -94,9 +97,10 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   server_mac_addr_.resize(cfg->DpdkNumPorts());
 
   for (uint16_t port_id = 0; port_id < cfg->DpdkNumPorts(); port_id++) {
-    if (DpdkTransport::nic_init(port_id, mbuf_pool_, socket_thread_num_,
-                                cfg->PacketLength()) != 0)
-      rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
+    if (DpdkTransport::nic_init(port_id + cfg->DpdkPortOffset(), mbuf_pool_,
+                                socket_thread_num_, cfg->PacketLength()) != 0)
+      rte_exit(EXIT_FAILURE, "Cannot init port %u\n",
+               port_id + cfg->DpdkPortOffset());
     // Parse MAC addresses
     ether_addr* parsed_mac = ether_aton(
         server_mac_addr_str.substr(port_id * (kMacAddrBtyes + 1), kMacAddrBtyes)
@@ -104,7 +108,8 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     RtAssert(parsed_mac != NULL, "Invalid server mac address");
     std::memcpy(&server_mac_addr_[port_id], parsed_mac, sizeof(ether_addr));
 
-    ret = rte_eth_macaddr_get(port_id, &sender_mac_addr_[port_id]);
+    ret = rte_eth_macaddr_get(port_id + cfg->DpdkPortOffset(),
+                              &sender_mac_addr_[port_id]);
     RtAssert(ret == 0, "Cannot get MAC address of the port");
     std::printf("Number of DPDK cores: %d\n", rte_lcore_count());
   }
@@ -409,8 +414,8 @@ void* Sender::WorkerThread(int tid) {
       }
 
 #ifdef USE_DPDK
-      size_t nb_tx_new =
-          rte_eth_tx_burst(port_id, queue_id, tx_mbufs, num_tags);
+      size_t nb_tx_new = rte_eth_tx_burst(port_id + cfg_->DpdkPortOffset(),
+                                          queue_id, tx_mbufs, num_tags);
       if (unlikely(nb_tx_new != num_tags)) {
         std::printf(
             "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, "

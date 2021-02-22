@@ -14,19 +14,23 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
       ant_per_cell_(cfg->BsAntNum() / cfg->NumCells()),
       socket_thread_num_(cfg->SocketThreadNum()) {
   DpdkTransport::dpdk_init(core_offset_ - 1, socket_thread_num_);
-  mbuf_pool = DpdkTransport::create_mempool();
+  printf("Number of ports: %d used (offset: %d), %d available, socket: %d\n",
+         cfg_->DpdkNumPorts(), cfg_->DpdkPortOffset(),
+         rte_eth_dev_count_avail(), rte_socket_id());
+  RtAssert(cfg_->DpdkNumPorts() <= rte_eth_dev_count_avail(),
+           "Invalid number of DPDK ports");
+  mbuf_pool = DpdkTransport::create_mempool(cfg->DpdkNumPorts());
 
   int ret = inet_pton(AF_INET, cfg_->BsRruAddr().c_str(), &bs_rru_addr);
   RtAssert(ret == 1, "Invalid sender IP address");
   ret = inet_pton(AF_INET, cfg_->BsServerAddr().c_str(), &bs_server_addr);
   RtAssert(ret == 1, "Invalid server IP address");
 
-  RtAssert(cfg_->DpdkNumPorts() <= rte_eth_dev_count_avail(),
-           "Invalid number of DPDK ports");
-
   for (uint16_t port_id = 0; port_id < cfg_->DpdkNumPorts(); port_id++)
-    if (DpdkTransport::nic_init(port_id, mbuf_pool, socket_thread_num_) != 0)
-      rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
+    if (DpdkTransport::nic_init(port_id + cfg->DpdkPortOffset(), mbuf_pool,
+                                socket_thread_num_) != 0)
+      rte_exit(EXIT_FAILURE, "Cannot init port %u\n",
+               port_id + cfg->DpdkPortOffset());
 
   for (size_t i = 0; i < socket_thread_num_; i++) {
     uint16_t src_port = rte_cpu_to_be_16(cfg_->BsRruPort() + i);
@@ -37,10 +41,12 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
         "dst port: %zu, DPDK port %zu, queue: %zu\n",
         this->cfg_->BsRruAddr().c_str(), this->cfg_->BsServerAddr().c_str(),
         this->cfg_->BsRruPort() + i, this->cfg_->BsServerPort() + i,
-        i % this->cfg_->DpdkNumPorts(), i / this->cfg_->DpdkNumPorts());
+        i % this->cfg_->DpdkNumPorts() + cfg->DpdkPortOffset(),
+        i / this->cfg_->DpdkNumPorts());
     DpdkTransport::install_flow_rule(
-        i % this->cfg_->DpdkNumPorts(), i / this->cfg_->DpdkNumPorts(),
-        bs_rru_addr, bs_server_addr, src_port, dst_port);
+        i % this->cfg_->DpdkNumPorts() + cfg->DpdkPortOffset(),
+        i / this->cfg_->DpdkNumPorts(), bs_rru_addr, bs_server_addr, src_port,
+        dst_port);
   }
 
   std::printf("Number of DPDK cores: %d\n", rte_lcore_count());
@@ -104,7 +110,7 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
 void PacketTXRX::LoopTxRx(int tid) {
   size_t rx_offset = 0;
   size_t prev_frame_id = SIZE_MAX;
-  const uint16_t port_id = tid % cfg_->DpdkNumPorts();
+  const uint16_t port_id = tid % cfg_->DpdkNumPorts() + cfg_->DpdkPortOffset();
   const uint16_t queue_id = tid / cfg_->DpdkNumPorts();
 
   while (this->cfg_->Running()) {

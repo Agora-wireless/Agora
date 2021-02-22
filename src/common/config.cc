@@ -122,6 +122,7 @@ Config::Config(const std::string& jsonfile)
   ue_server_port_ = tdd_conf.value("ue_sever_port", 6000);
 
   dpdk_num_ports_ = tdd_conf.value("dpdk_num_ports", 1);
+  dpdk_port_offset_ = tdd_conf.value("dpdk_port_offset", 0);
 
   mac_rx_port_ = tdd_conf.value("mac_rx_port", 5000);
   mac_tx_port_ = tdd_conf.value("mac_tx_port", 4000);

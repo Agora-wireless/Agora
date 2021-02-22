@@ -169,6 +169,7 @@ class Config {
   inline bool FftInRru() const { return this->fft_in_rru_; }
 
   inline uint16_t DpdkNumPorts() const { return this->dpdk_num_ports_; }
+  inline uint16_t DpdkPortOffset() const { return this->dpdk_port_offset_; }
 
   // inline size_t mod_order( void )       const { return this->mod_order_; }
   // inline double calib_tx_gain_b( void ) const { return
@@ -583,6 +584,9 @@ class Config {
 
   // Number of NIC ports used for DPDK
   uint16_t dpdk_num_ports_;
+
+  // Offset of the first NIC port used by Agora's DPDK mode
+  uint16_t dpdk_port_offset_;
 
   // Port ID at MAC layer side
   int mac_rx_port_;
