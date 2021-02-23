@@ -89,7 +89,7 @@ class DoCRC {
             0xF5F6D10Cu, 0xF6FA48FAu, 0xF77C0401u, 0xF842FA2Fu, 0xF9C4B6D4u,
             0xFAC82F22u, 0xFB4E63D9u, 0xFCD11CCEu, 0xFD575035u, 0xFE5BC9C3u,
             0xFFDD8538u} {}
-  ~DoCRC();
+  ~DoCRC() = default;
 
   /* Initialize CRC:
    * Not used at the moment. We decided to pre-generate the tables and
