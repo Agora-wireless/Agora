@@ -257,6 +257,23 @@ static constexpr size_t kMaxThreads = 128;
 // Number of subcarriers in one cache line, when represented as complex floats
 static constexpr size_t kSCsPerCacheline = 64 / (2 * sizeof(float));
 
+// Agora Mac Thread listens for UDP packets from applications (downlink packets
+// at the server, uplink packets at the client) on kMacRxPort
+static constexpr size_t kMacRxPort = 8070;
+
+// After receiving decoded codeblocks from the PHY (uplink at the
+// server, downlink at the client), we send UDP packets to kRemoteHostname
+static constexpr char kMacRemoteHostname[] = "127.0.0.1";
+
+// Agora sends UDP packets for UE #i (uplink packets at the server,
+// downlink packets at the client) with destination port kBaseRemotePort + i
+static constexpr size_t kMacBaseRemotePort = 8080;
+
+// Agora sends control information over an out-of-band control channel
+// to each UE #i, at port kBaseClientPort + i
+// TODO: need to generalize for hostname, port pairs for each client
+static constexpr size_t kMacBaseClientPort = 7070;
+
 // Number of subcarriers in a partial transpose block
 static constexpr size_t kTransposeBlockSize = 8;
 static_assert(IsPowerOfTwo(kTransposeBlockSize));  // For cheap modulo
