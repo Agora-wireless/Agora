@@ -202,12 +202,15 @@ EventData DoFFT::Launch(size_t tag) {
           &calib_ul_buffer_[frame_grp_slot][ant_id * cfg_->OfdmDataNum()],
           ant_id, sym_type);
     }
-  } else if (sym_type == SymbolType::kCalDL &&
-             ant_id / cfg_->NumChannels() == cfg_->RefRadio()) {
-    if (frame_id >= TX_FRAME_DELTA && ant_id == cfg_->RefAnt()) {
+  } else if (sym_type == SymbolType::kCalDL && ant_id == cfg_->RefAnt()) {
+    if (frame_id >= TX_FRAME_DELTA) {
       size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
       size_t frame_grp_slot = frame_grp_id % kFrameWnd;
-      size_t cur_ant = frame_id - (frame_grp_id * cfg_->AntGroupNum());
+      // size_t cur_ant = frame_id - (frame_grp_id * cfg_->AntGroupNum());
+      size_t cal_dl_symbol_id = symbol_id - cfg_->Frame().GetDLCalSymbol(0);
+      size_t cur_ant = ((frame_id - TX_FRAME_DELTA) % cfg_->AntGroupNum()) *
+                           cfg_->AntPerGroup() +
+                       cal_dl_symbol_id;
       complex_float* calib_dl_ptr =
           &calib_dl_buffer_[frame_grp_slot][cur_ant * cfg_->OfdmDataNum()];
       PartialTranspose(calib_dl_ptr, ant_id, sym_type);
