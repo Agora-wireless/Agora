@@ -57,6 +57,7 @@ class UDPServer {
     serveraddr.sin_family = AF_INET;
     serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
     serveraddr.sin_port = htons(static_cast<unsigned short>(port));
+    std::memset(serveraddr.sin_zero, 0, sizeof(serveraddr.sin_zero));
 
     ret = bind(sock_fd_, reinterpret_cast<struct sockaddr*>(&serveraddr),
                sizeof(serveraddr));
@@ -73,7 +74,9 @@ class UDPServer {
   ~UDPServer() {
     if (sock_fd_ != -1) {
       close(sock_fd_);
+      sock_fd_ = -1;
     }
+    std::printf("Destroying UDPServer\n");
   }
 
   /**

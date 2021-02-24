@@ -40,9 +40,12 @@ class UDPClient {
     for (const auto& kv : addrinfo_map_) {
       freeaddrinfo(kv.second);
     }
+    addrinfo_map_.clear();
     if (sock_fd_ != -1) {
       close(sock_fd_);
+      sock_fd_ = -1;
     }
+    std::printf("Destroying UDPClient\n");
   }
 
   /**
