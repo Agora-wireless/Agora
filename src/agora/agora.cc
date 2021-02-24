@@ -1487,7 +1487,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
       (true == this->tx_counters_.IsLastSymbol(frame_id)) &&
       (((false == kEnableMac) &&
         (true == this->decode_counters_.IsLastSymbol(frame_id))) ||
-       ((false == kEnableMac) &&
+       ((true == kEnableMac) &&
         (true == this->tomac_counters_.IsLastSymbol(frame_id))))) {
     this->stats_->UpdateStats(frame_id);
     assert(frame_id == this->cur_proc_frame_id_);

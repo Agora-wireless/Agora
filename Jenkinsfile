@@ -1,3 +1,26 @@
+
+def findLogFile() {
+	jobName = "${env.JOB_NAME}"
+	tokens = jobName.split('/')
+	jobDir = tokens[0]
+	filePath = "${env.JENKINS_HOME}/jobs/${jobDir}/branches/${env.JOB_BASE_NAME}/builds/${env.BUILD_NUMBER}/log"
+	
+	return filePath
+}
+
+def unitTest(log, utPF) {
+	command = $/tail -10 ${log} | grep -i 'PASSED'/$
+	pf_flag = sh(script: command, returnStdout: true)
+	pf_flag = pf_flag.trim()
+	if (pf_flag == utPF) {
+		echo "Passing due to " + pf_flag
+		currentBuild.result = "SUCCESS"
+	} else {
+		echo "Failing due to " + pf_flag
+		currentBuild.result = "FAILURE"
+	}
+}
+
 pipeline {
 	agent any
 	
@@ -53,14 +76,33 @@ pipeline {
 			}
 		}
 		
-		stage("End-to-end Test") {
+		stage("Test Agora") {
 			steps {
-				echo "CI end-to-end testing ..."
+				echo "CI Emulated Agora testing ..."
 				dir("${WORKSPACE}") {
 					sh '''
 						export LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2020.3.279/linux/mkl/lib/intel64/:$LD_LIBRARY_PATH
 						./test/test_agora/test_agora.sh
 					'''
+					script {
+						logFile = findLogFile()
+						command = $/tail -1500 ${logFile} | grep -i 'Passed uplink test!'/$
+						ul_pf_flag = sh(script: command, returnStdout: true)
+						ul_pf_flag = ul_pf_flag.trim()
+						command = $/tail -1500 ${logFile} | grep -i 'Passed downlink test!'/$
+						dl_pf_flag = sh(script: command, returnStdout: true)
+						dl_pf_flag = dl_pf_flag.trim()
+						command = $/tail -1500 ${logFile} | grep -i 'Passed combined test!'/$
+						comb_pf_flag = sh(script: command, returnStdout: true)
+						comb_pf_flag = comb_pf_flag.trim()
+						if (ul_pf_flag == "Passed uplink test!" && dl_pf_flag == "Passed downlink test!" && comb_pf_flag == "Passed combined test!") {
+							echo "Passing due to " + ul_pf_flag + " and " + dl_pf_flag + " and " + comb_pf_flag
+							currentBuild.result = "SUCCESS"
+						} else {
+							echo "Failing due to " + ul_pf_flag + " and " + dl_pf_flag + " and " + comb_pf_flag
+							currentBuild.result = "FAILURE"
+						}
+					}
 				}
 			}
 		}
@@ -79,6 +121,31 @@ pipeline {
 						export LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2020.3.279/linux/mkl/lib/intel64/:$LD_LIBRARY_PATH
 						ctest
 					'''
+				}
+			}
+		}
+		
+		stage("End-to-end Test with Channel Simulator") {
+			steps {
+				echo "CI E2E testing ..."
+				dir("${WORKSPACE}") {
+					sh '''
+						export LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2020.3.279/linux/mkl/lib/intel64/:$LD_LIBRARY_PATH
+						./test/sim_tests/test_e2e_sim.sh 0.05
+					'''
+					script {
+						logFile = findLogFile()
+						command = $/tail -300 ${logFile} | grep -i 'Passed the end-to-end test with channel simulator!'/$
+						e2e_pf_flag = sh(script: command, returnStdout: true)
+						e2e_pf_flag = e2e_pf_flag.trim()
+						if (e2e_pf_flag == "Passed the end-to-end test with channel simulator!") {
+							echo "Passing due to " + e2e_pf_flag
+							currentBuild.result = "SUCCESS"
+						} else {
+							echo "Failing due to " + e2e_pf_flag
+							currentBuild.result = "FAILURE"
+						}
+					}
 				}
 			}
 		}

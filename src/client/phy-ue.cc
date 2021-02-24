@@ -84,7 +84,12 @@ PhyUe::PhyUe(Config* config)
                                     config_->CoreOffset() + 1, &message_queue_,
                                     &tx_queue_, rx_ptoks_ptr_, tx_ptoks_ptr_);
 
-  if (kEnableMac) {
+  // uplink buffers init (tx)
+  InitializeUplinkBuffers();
+  // downlink buffers init (rx)
+  InitializeDownlinkBuffers();
+
+  if (kEnableMac == true) {
     // TODO [ankalia]: dummy_decoded_buffer is used at the base station
     // server only, but MacThread for now requires it for the UE client too
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> dummy_decoded_buffer;
@@ -97,11 +102,6 @@ PhyUe::PhyUe(Config* config)
 
     mac_std_thread_ = std::thread(&MacThread::RunEventLoop, mac_thread_.get());
   }
-
-  // uplink buffers init (tx)
-  InitializeUplinkBuffers();
-  // downlink buffers init (rx)
-  InitializeDownlinkBuffers();
 
   (void)DftiCreateDescriptor(&mkl_handle_, DFTI_SINGLE, DFTI_COMPLEX, 1,
                              config_->OfdmCaNum());
