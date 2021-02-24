@@ -26,8 +26,11 @@ MacThread::MacThread(
       rx_queue_(rx_queue),
       tx_queue_(tx_queue) {
   // Set up MAC log file
-  if (!log_filename.empty()) {
+  if (log_filename.empty() == false) {
     log_filename_ = log_filename;  // Use a non-default log filename
+  } else {
+    std::string mode_string = (mode_ == Mode::kClient) ? "_client" : "_server";
+    log_filename_ = kDefaultLogFilename + mode_string;
   }
   log_file_ = std::fopen(log_filename_.c_str(), "w");
   RtAssert(log_file_ != nullptr, "Failed to open MAC log file");
@@ -48,16 +51,26 @@ MacThread::MacThread(
 
   const size_t udp_pkt_len = cfg_->MacDataBytesNumPerframe();
   udp_pkt_buf_.resize(udp_pkt_len);
-  udp_server_ =
-      new UDPServer(kLocalPort, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+
+  size_t udp_server_port = cfg_->MacRxPort();
+  MLPD_TRACE("MacThread: setting up udp server at port %zu\n",
+              udp_server_port);
+  udp_server_ = std::make_unique<UDPServer>(
+      udp_server_port, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
 
   const size_t udp_control_len = sizeof(RBIndicator);
   udp_control_buf_.resize(udp_control_len);
-  udp_control_channel_ =
-      new UDPServer(kBaseClientPort, udp_control_len * kMaxUEs * kMaxPktsPerUE);
 
-  udp_client_ = new UDPClient();
-  crc_obj_ = new DoCRC();
+  // Only needed for the client
+  if (mode_ == Mode::kClient) {
+    MLPD_TRACE("MacThread: setting up udp server at port %zu\n",
+                kMacBaseClientPort);
+    udp_control_channel_ = std::make_unique<UDPServer>(
+        kMacBaseClientPort, udp_control_len * kMaxUEs * kMaxPktsPerUE);
+  }
+
+  udp_client_ = std::make_unique<UDPClient>();
+  crc_obj_ = std::make_unique<DoCRC>();
 }
 
 MacThread::~MacThread() {
@@ -67,13 +80,15 @@ MacThread::~MacThread() {
 
 void MacThread::ProcessRxFromMaster() {
   EventData event;
-  if (!rx_queue_->try_dequeue(event)) {
+  if (rx_queue_->try_dequeue(event) == false) {
     return;
   }
 
   if (event.event_type_ == EventType::kPacketToMac) {
+    MLPD_TRACE("MAC thread event kPacketToMac\n");
     ProcessCodeblocksFromMaster(event);
   } else if (event.event_type_ == EventType::kSNRReport) {
+    MLPD_TRACE("MAC thread event kSNRReport\n");
     ProcessSnrReportFromMaster(event);
   }
 }
@@ -167,7 +182,7 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
   if (server_.n_filled_in_frame_[ue_id] == cfg_->MacDataBytesNumPerframe()) {
     server_.n_filled_in_frame_[ue_id] = 0;
 
-    udp_client_->Send(k_remote_hostname_, kBaseRemotePort + ue_id,
+    udp_client_->Send(kMacRemoteHostname, cfg_->MacTxPort() + ue_id,
                       &server_.frame_data_[ue_id][0],
                       cfg_->MacDataBytesNumPerframe());
     std::fprintf(log_file_,
@@ -190,7 +205,7 @@ void MacThread::SendControlInformation() {
   RBIndicator ri;
   ri.ue_id_ = next_radio_id_;
   ri.mod_order_bits_ = CommsLib::kQaM16;
-  udp_client_->Send(cfg_->UeServerAddr(), kBaseClientPort + ri.ue_id_,
+  udp_client_->Send(cfg_->UeServerAddr(), kMacBaseClientPort + ri.ue_id_,
                     (uint8_t*)&ri, sizeof(RBIndicator));
 
   // update RAN config within Agora
@@ -226,7 +241,9 @@ void MacThread::ProcessUdpPacketsFromApps(RBIndicator ri) {
     cfg_->Running(false);
     return;
   }
-  RtAssert(static_cast<size_t>(ret) == cfg_->MacDataBytesNumPerframe());
+  RtAssert(static_cast<size_t>(ret) == cfg_->MacDataBytesNumPerframe(),
+           "MacThread::ProcessUdpPacketsFromApps incorrect number of bytes "
+           "received.");
 
   const auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
   mode_ == Mode::kServer ? ProcessUdpPacketsFromAppsServer(pkt, ri)
@@ -291,10 +308,11 @@ void MacThread::ProcessUdpPacketsFromAppsClient(const char* payload,
   }
 
   for (size_t pkt_id = 0; pkt_id < cfg_->MacPacketsPerframe(); pkt_id++) {
-    size_t data_offset = radio_buf_id * cfg_->MacBytesNumPerframe() +
-                         pkt_id * cfg_->MacPacketLength();
-    auto* pkt =
-        (MacPacket*)(&(*client_.ul_bits_buffer_)[next_radio_id_][data_offset]);
+    size_t pkt_offset = radio_buf_id * cfg_->MacBytesNumPerframe() +
+                        pkt_id * cfg_->MacPacketLength();
+    auto* pkt = reinterpret_cast<MacPacket*>(
+        &(*client_.ul_bits_buffer_)[next_radio_id_][pkt_offset]);
+
     pkt->frame_id_ = next_frame_id_;
     pkt->symbol_id_ = pkt_id;
     pkt->ue_id_ = next_radio_id_;
@@ -340,8 +358,10 @@ void MacThread::RunEventLoop() {
         SendControlInformation();
         last_frame_tx_tsc_ = GetTime::Rdtsc();
       }
-    } else {
+    } else if (mode_ == Mode::kClient) {
       ProcessControlInformation();
+    } else {
+      RtAssert(false, "MacThread: RunEventLoop invalid mode");
     }
 
     if (next_frame_id_ == cfg_->FramesToTest()) {
