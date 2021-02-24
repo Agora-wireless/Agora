@@ -1,4 +1,4 @@
-[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Fpr-memory-cleanup)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/pr-memory-cleanup/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fdevelop)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/develop/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
@@ -113,6 +113,22 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
    * Note: make sure Agora and sender are using different set of cores,
      otherwise there will be performance slow down.
 
+ * Run Agora with channel simulator, clients, and mac enabled. 
+   * Compile the code with `-DENABLE_MAC=true`
+   * Terminal 1:
+     `./build/data_generator --conf_file data/ue-mac-sim.json` to generate data files.
+     `./build/user data/ue-mac-sim.json` to start clients with uplink configuration.
+   * Terminal 2:
+     `./python/client_app.py --delay 0.029 --packet-size 664` to run to user client app
+   * Terminal 3:
+     `./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --bs_conf_file data/bs-mac-sim.json --ue_conf_file data/ue-mac-sim.json` to run the channel simulator
+   * Terminal 4:
+     `./python/bs_app.py --packet-size 664 --stream-num 1` to run to base station udp app.  Set the stream number to the number of clients.
+   * Terminal 5:
+     `./build/agora data/bs-mac-sim.json` to run the agora server.  Always start this last.
+   * Note: make sure Agora and sender are using different set of cores,
+     otherwise there will be performance slow down.
+
  * To run with real wireless traffic from Faros/Iris hardware UEs, see the
    [Agora with real RRU](#agora-with-real-rru) section below.
 
@@ -208,7 +224,7 @@ Agora was funded in part by NSF Grant #1518916 and by the NSF PAWR project.
 Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for 
 Agora's design overview and flow diagram that maps massive MIMO baseband processing 
 to the actual code structure. Technical details and performance results can be found in
- * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Software-based real-time massive MIMO baseband," to appear in Proc. of ACM CoNEXT, December 2020.
+ * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Real-time massive MIMO baseband processing in software," in Proc. of ACM CoNEXT, December 2020 ([PDF](https://www.yecl.org/publications/ding2020conext.pdf), [video](https://dl.acm.org/doi/abs/10.1145/3386367.3431296)).
  
 ## Contact
 Jian Ding (jian.ding@yale.edu)

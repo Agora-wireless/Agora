@@ -34,24 +34,7 @@ class MacThread {
   };
 
   // Default log file for MAC layer outputs
-  const char* k_default_log_filename_ = "/tmp/mac_log";
-
-  // After receiving decoded codeblocks from the PHY (uplink at the
-  // server, downlink at the client), we send UDP packets to kRemoteHostname
-  const char* k_remote_hostname_ = "127.0.0.1";
-
-  // Agora sends UDP packets for UE #i (uplink packets at the server,
-  // downlink packets at the client) with destination port kBaseRemotePort + i
-  static constexpr size_t kBaseRemotePort = 8080;
-
-  // Agora listens for UDP packets from applications (downlink packets at
-  // the server, uplink packets at the client) on kLocalPort
-  static constexpr size_t kLocalPort = 8070;
-
-  // Agora sends control information over an out-of-band control channel
-  // to each UE #i, at port kBaseClientPort + i
-  // TODO: need to generalize for hostname, port pairs for each client
-  static constexpr size_t kBaseClientPort = 7070;
+  static constexpr char kDefaultLogFilename[] = "/tmp/mac_log";
 
   // Maximum number of outstanding UDP packets per UE that we allocate recv()
   // buffer space for
@@ -61,7 +44,7 @@ class MacThread {
   // TODO: map this to time?
   static constexpr size_t kSNRWindowSize = 100;
 
-  MacThread(Mode mode, Config* cfg, size_t core_offset,
+  MacThread(Mode mode, Config* const cfg, size_t core_offset,
             PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer,
             Table<uint8_t>* ul_bits_buffer,
             Table<uint8_t>* ul_bits_buffer_status,
@@ -112,7 +95,7 @@ class MacThread {
   // If Mode::kServer, this thread is running at the Agora server. Else at
   // the client.
   const Mode mode_;
-  Config* cfg_;
+  Config* const cfg_;
 
   const double freq_ghz_;  // RDTSC frequency in GHz
   // We check for new MAC packets from applications every [tsc_delta_]
@@ -122,17 +105,19 @@ class MacThread {
   const size_t core_offset_;  // The CPU core on which this thread runs
 
   FILE* log_file_;  // Log file used to store MAC layer outputs
-  std::string log_filename_ = k_default_log_filename_;  // Name of the log file
+  std::string log_filename_;
 
-  UDPClient* udp_client_;  // UDP endpoint used for sending messages
-  UDPServer* udp_server_;  // UDP endpoint used for receiving messages
+  // UDP endpoint used for sending messages
+  std::unique_ptr<UDPClient> udp_client_;
+  // UDP endpoint used for receiving messages
+  std::unique_ptr<UDPServer> udp_server_;
+
+  // UDP endpoint for receiving control channel messages
+  std::unique_ptr<UDPServer> udp_control_channel_;
 
   // TODO: decoded_buffer_ is used by only the server, so it should be moved
   // to server_ for clarity.
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer_;
-
-  // UDP endpoint for receiving control channel messages
-  UDPServer* udp_control_channel_;
 
   Table<uint8_t>* dl_bits_buffer_;
   Table<uint8_t>* dl_bits_buffer_status_;
@@ -191,7 +176,7 @@ class MacThread {
   moodycamel::ConcurrentQueue<EventData>* tx_queue_;
 
   // CRC
-  DoCRC* crc_obj_;
+  std::unique_ptr<DoCRC> crc_obj_;
 };
 
 #endif  // MAC_THREAD_H_

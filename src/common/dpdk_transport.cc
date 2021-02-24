@@ -283,13 +283,11 @@ void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num) {
   RtAssert(ret >= 0, "Failed to initialize DPDK");
 }
 
-rte_mempool* DpdkTransport::create_mempool(size_t packet_length) {
-  unsigned int nb_ports = rte_eth_dev_count_avail();
-  std::printf("Number of ports: %d, socket: %d\n", nb_ports, rte_socket_id());
-
+rte_mempool* DpdkTransport::create_mempool(size_t num_ports,
+                                           size_t packet_length) {
   size_t mbuf_size = packet_length + MBUF_CACHE_SIZE;
   rte_mempool* mbuf_pool =
-      rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
+      rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * num_ports,
                               MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
 
   RtAssert(mbuf_pool != NULL, "Cannot create mbuf pool");

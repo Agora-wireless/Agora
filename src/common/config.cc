@@ -15,6 +15,8 @@
 #include "scrambler.h"
 #include "utils_ldpc.h"
 
+static const size_t kMacAlignmentBytes = 64u;
+
 Config::Config(const std::string& jsonfile)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
       ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
@@ -122,10 +124,10 @@ Config::Config(const std::string& jsonfile)
   ue_server_port_ = tdd_conf.value("ue_sever_port", 6000);
 
   dpdk_num_ports_ = tdd_conf.value("dpdk_num_ports", 1);
+  dpdk_port_offset_ = tdd_conf.value("dpdk_port_offset", 0);
 
-  mac_rx_port_ = tdd_conf.value("mac_rx_port", 5000);
-  mac_tx_port_ = tdd_conf.value("mac_tx_port", 4000);
-  init_mac_running_ = tdd_conf.value("init_mac_running", false);
+  mac_rx_port_ = tdd_conf.value("mac_rx_port", kMacRxPort);
+  mac_tx_port_ = tdd_conf.value("mac_tx_port", kMacBaseRemotePort);
 
   /* frame configurations */
   cp_len_ = tdd_conf.value("cp_len", 0);
@@ -424,11 +426,21 @@ Config::Config(const std::string& jsonfile)
       ldpc_config_.NumCbLen() / 8;  // TODO: Use bits_to_bytes()?
   data_bytes_num_persymbol_ =
       num_bytes_per_cb_ * ldpc_config_.NumBlocksInSymbol();
-  mac_packet_length_ = data_bytes_num_persymbol_;
-  mac_payload_length_ = mac_packet_length_ - MacPacket::kOffsetOfData;
+
+  //  Pad the mac packets so that they can be stuffed into the same buffer
+  //  Align to kMacAlignmentBytes (64) byte boundaries
+  size_t padding =
+      kMacAlignmentBytes - (data_bytes_num_persymbol_ % kMacAlignmentBytes);
+  mac_packet_length_ = data_bytes_num_persymbol_ + padding;
+  mac_payload_length_ =
+      mac_packet_length_ - (padding + MacPacket::kOffsetOfData);
+  assert(mac_packet_length_ > (padding + MacPacket::kOffsetOfData));
+
   mac_packets_perframe_ = this->frame_.NumULSyms() - client_ul_pilot_syms;
   mac_data_bytes_num_perframe_ = mac_payload_length_ * mac_packets_perframe_;
   mac_bytes_num_perframe_ = mac_packet_length_ * mac_packets_perframe_;
+
+  float frame_time = (frame_.NumTotalSyms() * samps_per_symbol_) / rate_;
 
   this->running_.store(true);
   MLPD_INFO(
@@ -437,10 +449,11 @@ Config::Config(const std::string& jsonfile)
       "%zu uplink data symbols per frame, %zu downlink data "
       "symbols per frame,\n\t"
       "%zu OFDM subcarriers (%zu data subcarriers), modulation %s,\n\t"
-      "%zu MAC data bytes per frame, %zu MAC bytes per frame\n",
+      "%zu MAC data bytes per frame, %zu MAC bytes per frame, frame time %.3f "
+      "sec\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
-      mac_data_bytes_num_perframe_, mac_bytes_num_perframe_);
+      mac_data_bytes_num_perframe_, mac_bytes_num_perframe_, frame_time);
 }
 
 void Config::GenData() {
