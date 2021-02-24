@@ -1,4 +1,4 @@
-[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Fpr-enable-mac-ul-test)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/pr-enable-mac-ul-test/)
+[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Fdevelop)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/develop/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
