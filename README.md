@@ -1,4 +1,4 @@
-[![Build Status](https://735fe9f5e8ac.ngrok.io/buildStatus/icon?job=github_public_agora%2Fdevelop)](https://735fe9f5e8ac.ngrok.io/job/github_public_agora/job/develop/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fdevelop)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/develop/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
