@@ -171,20 +171,8 @@ class Config {
   inline uint16_t DpdkNumPorts() const { return this->dpdk_num_ports_; }
   inline uint16_t DpdkPortOffset() const { return this->dpdk_port_offset_; }
 
-  // inline size_t mod_order( void )       const { return this->mod_order_; }
-  // inline double calib_tx_gain_b( void ) const { return
-  // this->calib_tx_gain_b_; } inline size_t total_ue_ant_num( void ) const {
-  // return this->total_ue_ant_num_; } inline size_t ue_ant_offset( void ) const
-  // { return this->ue_ant_offset_; } inline bool  correct_phase_shift( void )
-  // const { return this->correct_phase_shift_; } inline size_t
-  // data_bytes_num_persymbol( void ) const { return
-  // this->data_bytes_num_persymbol_; } inline std::string mac_remote_addr( void
-  // ) const { return this->mac_remote_addr_; } inline uint16_t dpdk_num_ports(
-  // void ) const { return this->dpdk_num_ports_; } inline int mac_rx_port( void
-  // ) const { return this->mac_rx_port_; } inline int mac_tx_port( void ) const
-  // { return this->mac_tx_port_; } inline bool init_mac_running( void ) const {
-  // return this->init_mac_running_; } inline size_t transport_block_size( void
-  // ) const { return this->transport_block_size_; }
+  inline size_t MacRxPort() const { return this->mac_rx_port_; }
+  inline size_t MacTxPort() const { return this->mac_tx_port_; }
 
   /* Inline accessors (complex types) */
   inline const std::vector<int>& ClTxAdvance() const {
@@ -589,9 +577,8 @@ class Config {
   uint16_t dpdk_port_offset_;
 
   // Port ID at MAC layer side
-  int mac_rx_port_;
-  int mac_tx_port_;
-  bool init_mac_running_;
+  size_t mac_rx_port_;
+  size_t mac_tx_port_;
 
   // Number of frames_ sent by sender during testing = number of frames_
   // processed by Agora before exiting.

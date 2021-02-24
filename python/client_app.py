@@ -42,7 +42,7 @@ def main():
     parser.add_option("--stream-num", type="int", dest="stream_num",
                       help="number of user spatial streams", default=1)
     parser.add_option("--base-port", type="int", dest="base_port",
-                      help="server base listening port number to transmit data", default=8070)
+                      help="server base listening port number to transmit data", default=9070)
     (options, args) = parser.parse_args()
 
     client_datagen_app(options.delay, options.packet_size,
