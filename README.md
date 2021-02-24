@@ -1,4 +1,4 @@
-[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2Fnetworking-update)](https://4489496cb62a.ngrok.io/job/github_public_agora/job/networking-update/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fnetworking-update)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/networking-update/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
@@ -110,6 +110,22 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
    * In another terminal, run  `./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim.json --ue_conf_file data/ue-sim.json`
    * In another terminal, run `./build/agora data/bs-sim.json` to start
      Agora with uplink configuration.
+   * Note: make sure Agora and sender are using different set of cores,
+     otherwise there will be performance slow down.
+
+ * Run Agora with channel simulator, clients, and mac enabled. 
+   * Compile the code with `-DENABLE_MAC=true`
+   * Terminal 1:
+     `./build/data_generator --conf_file data/ue-mac-sim.json` to generate data files.
+     `./build/user data/ue-mac-sim.json` to start clients with uplink configuration.
+   * Terminal 2:
+     `./python/client_app.py --delay 0.029 --packet-size 664` to run to user client app
+   * Terminal 3:
+     `./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --bs_conf_file data/bs-mac-sim.json --ue_conf_file data/ue-mac-sim.json` to run the channel simulator
+   * Terminal 4:
+     `./python/bs_app.py --packet-size 664 --stream-num 1` to run to base station udp app.  Set the stream number to the number of clients.
+   * Terminal 5:
+     `./build/agora data/bs-mac-sim.json` to run the agora server.  Always start this last.
    * Note: make sure Agora and sender are using different set of cores,
      otherwise there will be performance slow down.
 
