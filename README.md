@@ -114,7 +114,7 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
      otherwise there will be performance slow down.
 
  * Run Agora with channel simulator, clients, and mac enabled. 
-   * Compile the code with -DENABLE_MAC=true
+   * Compile the code with `-DENABLE_MAC=true`
    * Terminal 1:
      `./build/data_generator --conf_file data/ue-mac-sim.json` to generate data files.
      `./build/user data/ue-mac-sim.json` to start clients with uplink configuration.
