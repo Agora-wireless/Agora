@@ -29,7 +29,7 @@ echo "==========================================="
 echo "Running emulated RRU end-to-end test with channel simulator ......"
 echo -e "===========================================\n"
 ./build/user data/ue-sim.json > test_output.txt &
-sleep 1; ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim-tmp.json --ue_conf_file data/ue-ul-sim.json &
+sleep 1; ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim-tmp.json --ue_conf_file data/ue-sim.json &
 sleep 1; ./build/agora data/bs-sim-tmp.json > test_output.txt
 
 
