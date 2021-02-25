@@ -6,7 +6,6 @@
 #ifndef PHY_UE_H_
 #define PHY_UE_H_
 
-#include <arpa/inet.h>
 #include <fcntl.h>
 #include <immintrin.h>
 #include <sys/epoll.h>
@@ -34,7 +33,6 @@
 #include "mac_thread.h"
 #include "mkl_dfti.h"
 #include "modulation.h"
-#include "net.h"
 #include "scrambler.h"
 #include "signal_handler.h"
 #include "txrx_client.h"

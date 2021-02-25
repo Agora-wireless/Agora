@@ -5,7 +5,6 @@
 #ifndef RADIOTXRX_H_
 #define RADIOTXRX_H_
 
-#include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/ioctl.h>
@@ -19,7 +18,8 @@
 
 #include "client_radio.h"
 #include "concurrentqueue.h"
-#include "net.h"
+#include "udp_client.h"
+#include "udp_server.h"
 #include "utils.h"
 
 /**
@@ -77,8 +77,8 @@ class RadioTxRx {
    * @param in_tx_buffer: tx ring buffer of samples processed by PHY for
    * transmission
    *
-   * @param in_buffer_frame_num: number of samples packets (one symbol per
-   * packet) the tx ring buffer could hold
+   * @param in_buffer_frame_nUDPSeverum: number of samples packets (one symbol
+   * per packet) the tx ring buffer could hold
    *
    * @param in_buffer_length: size of ring buffer in bytes
    */
@@ -87,7 +87,7 @@ class RadioTxRx {
                  char* in_tx_buffer, int* in_tx_buffer_status,
                  int in_tx_buffer_frame_num, int in_tx_buffer_length);
 
-  /**
+  /**UDPSever
    * @brief receives a packet from channel simulator through socket index
    * (radio_id) and writes to an offset (rx_offset) in the receive buffer
    * (buffer_)
@@ -95,8 +95,8 @@ class RadioTxRx {
   struct Packet* RecvEnqueue(int tid, int radio_id, int rx_offset);
 
   /**
-   * @brief transmits a tx packet that is ready from PHY through socket to
-   * channel simualtor
+   * @brief transmits a tx pacUDPSeverket that is ready from PHY through socket
+   * to channel simualtor
    */
   int DequeueSend(int tid);
 
@@ -149,9 +149,12 @@ class RadioTxRx {
   std::vector<std::thread> txrx_threads_;
 
   Config* const config_;
-  std::unique_ptr<ClientRadioConfig> radioconfig_;  // Used only in Argos mode
-  std::vector<struct sockaddr_in> servaddr_;        // server address
-  std::vector<int> socket_;
+
+  // Used only in Argos mode
+  std::unique_ptr<ClientRadioConfig> radioconfig_;
+
+  std::vector<std::unique_ptr<UDPClient>> udp_clients_;
+  std::vector<std::unique_ptr<UDPServer>> udp_servers_;
 
   Table<char>* buffer_;
   Table<int>* buffer_status_;
