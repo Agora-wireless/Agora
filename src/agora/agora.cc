@@ -959,11 +959,11 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
   // Receive first packet in a frame
   if (rx_counters_.num_pkts_[frame_slot] == 0) {
     // schedule this frame's encoding
-    std::string error_message =
-        "Rx frame: " + std::to_string(frame_id) +
-        " is too far ahead of the current scheduled frame " +
-        std::to_string(this->cur_sche_frame_id_) + "\n";
-    RtAssert(frame_id < (this->cur_sche_frame_id_ + 2), error_message.c_str());
+    //std::string error_message =
+    //    "Rx frame: " + std::to_string(frame_id) +
+    //    " is too far ahead of the current scheduled frame " +
+    //    std::to_string(this->cur_sche_frame_id_) + "\n";
+    //RtAssert(frame_id < (this->cur_sche_frame_id_ + 2), error_message.c_str());
 
     for (size_t i = 0; i < config_->Frame().NumDLSyms(); i++) {
       ScheduleCodeblocks(EventType::kEncode, frame_id,
