@@ -5,8 +5,6 @@
 #ifndef CHANNEL_SIM_H_
 #define CHANNEL_SIM_H_
 
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 
 #include <algorithm>

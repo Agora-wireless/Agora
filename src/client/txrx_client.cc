@@ -105,7 +105,7 @@ struct Packet* RadioTxRx::RecvEnqueue(int tid, int radio_id, int rx_offset) {
   auto* pkt =
       reinterpret_cast<struct Packet*>(&rx_buffer[rx_offset * packet_length]);
 
-  int rx_bytes = udp_servers_.at(radio_id)->RecvNonblocking(
+  int rx_bytes = udp_servers_.at(radio_id)->Recv(
       reinterpret_cast<uint8_t*>(pkt), packet_length);
 
   if (0 > rx_bytes) {
@@ -226,10 +226,7 @@ void* RadioTxRx::LoopTxRx(int tid) {
     size_t local_port_id = config_->UeServerPort() + radio_id;
     udp_servers_.at(radio_id) =
         std::make_unique<UDPServer>(local_port_id, sock_buf_size);
-    // client_bs_.at(radio_id) = std::make_unique<UDPClient>();
-    // SetupSockaddrRemoteIpv4(&servaddr_[radio_id],
-    //                        config_->UeRruPort() + radio_id,
-    //                        config_->BsRruAddr().c_str());
+    udp_clients_.at(radio_id) = std::make_unique<UDPClient>();
     MLPD_FRAME(
         "TXRX thread %d: set up UDP socket server listening to port %d"
         " with remote address %s:%d \n",
