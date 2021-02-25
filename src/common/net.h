@@ -1,5 +1,5 @@
-#ifndef __NET_H
-#define __NET_H
+#ifndef NET_H_
+#define NET_H_
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -15,4 +15,4 @@ void SetupSockaddrRemoteIpv4(struct sockaddr_in* remote_addr, int port_id,
 void SetupSockaddrRemoteIpv6(struct sockaddr_in6* remote_addr, int port_id,
                              const char* remote_inet_addr);
 
-#endif
+#endif  // NET_H_

@@ -1,5 +1,5 @@
 /**
- * @file test_ldpc.cpp
+ * @file test_ldpc.cc
  *
  * @brief Accuracy and performance test for LDPC. The encoder is Agora's
  * avx2enc - unlike FlexRAN's encoder, avx2enc works with AVX2 (i.e., unlike
@@ -28,9 +28,9 @@ static constexpr size_t kK5GnrNumPunctured = 2;
 static constexpr size_t kNumRows = 46;
 
 int main() {
-  double freq_ghz = MeasureRdtscFreq();
+  double freq_ghz = GetTime::MeasureRdtscFreq();
   std::printf("Spinning for one second for Turbo Boost\n");
-  NanoSleep(1000 * 1000 * 1000, freq_ghz);
+  GetTime::NanoSleep(1000 * 1000 * 1000, freq_ghz);
   int8_t* input[kNumCodeBlocks];
   int8_t* parity[kNumCodeBlocks];
   int8_t* encoded[kNumCodeBlocks];
@@ -62,27 +62,27 @@ int main() {
     }
 
     // Randomly generate input
-    srand(time(NULL));
-    for (size_t n = 0; n < kNumCodeBlocks; n++) {
+    srand(time(nullptr));
+    for (auto& n : input) {
       for (size_t i = 0; i < BitsToBytes(num_input_bits); i++) {
-        input[n][i] = (int8_t)rand();
+        n[i] = static_cast<int8_t>(rand());
       }
     }
 
-    const size_t encoding_start_tsc = Rdtsc();
+    const size_t encoding_start_tsc = GetTime::Rdtsc();
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
       LdpcEncodeHelper(kBaseGraph, zc, kNumRows, encoded[n], parity[n],
                        input[n]);
     }
 
     const double encoding_us =
-        CyclesToUs(Rdtsc() - encoding_start_tsc, freq_ghz);
+        GetTime::CyclesToUs(GetTime::Rdtsc() - encoding_start_tsc, freq_ghz);
 
     // For decoding, generate log-likelihood ratios, one byte per input bit
     int8_t* llrs[kNumCodeBlocks];
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
       llrs[n] = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kK32Align, num_encoded_bits));
+          Agora_memory::Alignment_t::kAlign32, num_encoded_bits));
       for (size_t i = 0; i < num_encoded_bits; i++) {
         uint8_t bit_i = (encoded[n][i / 8] >> (i % 8)) & 1;
         llrs[n][i] = (bit_i == 1 ? -127 : 127);
@@ -103,12 +103,12 @@ int main() {
     const size_t buffer_len = 1024 * 1024;
     const size_t num_msg_bits = num_input_bits - kNumFillerBits;
     ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
-    ldpc_decoder_5gnr_response.varNodes = static_cast<int16_t*>(
-        Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kK32Align,
-                                         buffer_len * sizeof(int16_t)));
+    ldpc_decoder_5gnr_response.varNodes =
+        static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
+            Agora_memory::Alignment_t::kAlign32, buffer_len * sizeof(int16_t)));
 
     // Decoding
-    const size_t decoding_start_tsc = Rdtsc();
+    const size_t decoding_start_tsc = GetTime::Rdtsc();
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
       ldpc_decoder_5gnr_request.varNodes = llrs[n];
       ldpc_decoder_5gnr_response.compactedMessageBytes = decoded[n];
@@ -117,12 +117,12 @@ int main() {
     }
 
     const double decoding_us =
-        CyclesToUs(Rdtsc() - decoding_start_tsc, freq_ghz);
+        GetTime::CyclesToUs(GetTime::Rdtsc() - decoding_start_tsc, freq_ghz);
 
     // Check for errors
     size_t err_cnt = 0;
     for (size_t n = 0; n < kNumCodeBlocks; n++) {
-      uint8_t* input_buffer = (uint8_t*)input[n];
+      auto* input_buffer = reinterpret_cast<uint8_t*>(input[n]);
       uint8_t* output_buffer = decoded[n];
       for (size_t i = 0; i < BitsToBytes(num_input_bits); i++) {
         // std::printf("input: %i, output: %i\n", input_buffer[i],

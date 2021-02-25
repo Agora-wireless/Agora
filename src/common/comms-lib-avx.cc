@@ -2,7 +2,7 @@
 // RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
 /**
- * @file comms-lib-avx.cpp
+ * @file comms-lib-avx.cc
  * @brief Select signal processing and communications blocks implemented using
  *  Intel AVX2
  * @author Rahman Doost-Mohamamdy: doost@rice.edu
@@ -83,20 +83,20 @@ int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
   std::cout << "Peak Detect AVX took " << diff4 << " usec" << std::endl;
   std::printf("Saving Corr data\n");
   std::string filename = "corr_simd.bin";
-  FILE* fc = fopen(filename.c_str(), "wb");
+  FILE* fc = std::fopen(filename.c_str(), "wb");
   float* cdata_ptr = (float*)gold_corr_avx_2.data();
-  fwrite(cdata_ptr, gold_corr_avx_2.size(), sizeof(float), fc);
-  fclose(fc);
+  std::fwrite(cdata_ptr, gold_corr_avx_2.size(), sizeof(float), fc);
+  std::fclose(fc);
   filename = "thresh_simd.bin";
-  FILE* fp = fopen(filename.c_str(), "wb");
+  FILE* fp = std::fopen(filename.c_str(), "wb");
   float* tdata_ptr = (float*)thresh_avx.data();
-  fwrite(tdata_ptr, thresh_avx.size(), sizeof(float), fp);
-  fclose(fp);
+  std::fwrite(tdata_ptr, thresh_avx.size(), sizeof(float), fp);
+  std::fclose(fp);
   filename = "indata.bin";
-  FILE* fi = fopen(filename.c_str(), "wb");
+  FILE* fi = std::fopen(filename.c_str(), "wb");
   float* idata_ptr = (float*)iq.data();
-  fwrite(idata_ptr, iq.size() * 2, sizeof(float), fi);
-  fclose(fi);
+  std::fwrite(idata_ptr, iq.size() * 2, sizeof(float), fi);
+  std::fclose(fi);
 #endif
 
   if (valid_peaks.empty()) {
@@ -138,10 +138,10 @@ std::vector<std::complex<int16_t>> CommsLib::ComplexMultAvx(
   size_t length0 = f.size();
   size_t res_len = std::min(length0, length1);
 
-  __m256i* in0 = (__m256i*)(f.data());
-  __m256i* in1 = (__m256i*)(g.data());
+  const auto* in0 = reinterpret_cast<const __m256i*>(f.data());
+  const auto* in1 = reinterpret_cast<const __m256i*>(g.data());
   std::vector<std::complex<int16_t>> out(res_len, 0);
-  __m256i* outf = (__m256i*)out.data();
+  auto* outf = reinterpret_cast<__m256i*>(out.data());
 
   __m256i data0 __attribute__((aligned(ALIGNMENT)));
   __m256i data1 __attribute__((aligned(ALIGNMENT)));
@@ -161,8 +161,10 @@ std::vector<std::complex<int16_t>> CommsLib::ComplexMultAvx(
     int16_t i1 = g[i].real();
     int16_t q0 = f[i].imag();
     int16_t q1 = g[i].imag();
-    int16_t ires = (int16_t)((i0 * i1 + (conj ? 1 : -1) * q0 * q1) >> 15);
-    int16_t qres = (int16_t)((i1 * q0 + (conj ? -1 : 1) * i0 * q1) >> 15);
+    auto ires =
+        static_cast<int16_t>((i0 * i1 + (conj ? 1 : -1) * q0 * q1) >> 15);
+    auto qres =
+        static_cast<int16_t>((i1 * q0 + (conj ? -1 : 1) * i0 * q1) >> 15);
     out[i] = std::complex<int16_t>(ires, qres);
   }
 
@@ -275,10 +277,10 @@ std::vector<std::complex<float>> CommsLib::ComplexMultAvx(
   size_t length0 = 2 * f.size();
   size_t res_len = std::min(length0, length1);
 
-  float* in0 = (float*)(f.data());
-  float* in1 = (float*)(g.data());
+  const auto* in0 = reinterpret_cast<const float*>(f.data());
+  const auto* in1 = reinterpret_cast<const float*>(g.data());
   std::vector<std::complex<float>> out(res_len / 2, 0);
-  float* outf = (float*)out.data();
+  auto* outf = reinterpret_cast<float*>(out.data());
 
   __m256 data0 __attribute__((aligned(ALIGNMENT)));
   __m256 data1 __attribute__((aligned(ALIGNMENT)));
@@ -345,9 +347,9 @@ std::vector<std::complex<int16_t>> CommsLib::AutoCorrMultAvx(
 std::vector<float> CommsLib::Abs2Avx(
     std::vector<std::complex<float>> const& f) {
   size_t length = 2 * f.size();
-  float* in = (float*)(f.data());
+  const auto* in = reinterpret_cast<const float*>(f.data());
   std::vector<float> out(length / 2, 0);
-  float* outf = (float*)(out.data());
+  auto* outf = static_cast<float*>(out.data());
 
   __m256 data1 __attribute__((aligned(ALIGNMENT)));
   __m256 data2 __attribute__((aligned(ALIGNMENT)));
@@ -369,7 +371,7 @@ std::vector<float> CommsLib::Abs2Avx(
 
       res = _mm256_hadd_ps(prod0, prod1);
       res = _mm256_permutevar8x32_ps(res, perm0);
-      _mm256_storeu_ps(outf + i / 2, res);
+      _mm256_storeu_ps(outf + (i / 2), res);
     }
   }
 
@@ -383,9 +385,9 @@ std::vector<int32_t> CommsLib::Abs2Avx(
     std::vector<std::complex<int16_t>> const& f) {
   size_t len = f.size();
 
-  __m256i* in0 = (__m256i*)(f.data());
+  const auto* in0 = reinterpret_cast<const __m256i*>(f.data());
   std::vector<int32_t> out(len, 0);
-  __m256i* outf = (__m256i*)out.data();
+  auto* outf = reinterpret_cast<__m256i*>(out.data());
 
   size_t vec_size = len / AVX_PACKED_CS;
   for (size_t i = 0; i < vec_size; i++) {
@@ -413,7 +415,7 @@ std::vector<std::complex<int16_t>> CommsLib::CorrelateAvx(
   in.insert(in.end(), f.begin(), f.end());
   size_t length = in.size();
 
-  int16_t* in1 = (int16_t*)(g.data());
+  const auto* in1 = reinterpret_cast<const int16_t*>(g.data());
   std::vector<std::complex<int16_t>> out(length, 0);
 
   size_t sz = sizeof(std::complex<int16_t>);
@@ -429,12 +431,12 @@ std::vector<std::complex<int16_t>> CommsLib::CorrelateAvx(
   for (size_t i = 0; i < (length - length1); i += AVX_PACKED_SI) {
     __m256i accm = _mm256_set1_epi16(0x0);
     for (size_t j = 0; j < length1; j++) {
-      __m256i* in_temp = (__m256i*)(in.data() + (i + j) * sz);
+      auto* in_temp = reinterpret_cast<__m256i*>(in.data() + (i + j) * sz);
       __m256i data = _mm256_loadu_si256(in_temp);
       __m256i prod = M256ComplexCs16Mult(data, seq_samp[j], true);
       accm = _mm256_add_epi16(prod, accm);
     }
-    __m256i* out_temp = (__m256i*)(out.data() + i * sz);
+    auto* out_temp = reinterpret_cast<__m256i*>(out.data() + i * sz);
     _mm256_storeu_si256(out_temp, accm);
   }
 
@@ -457,10 +459,10 @@ std::vector<std::complex<float>> CommsLib::CorrelateAvx(
   }
   size_t length = in.size();
 
-  float* in0 = (float*)(in.data());
-  float* in1 = (float*)(g.data());
+  const auto* in0 = reinterpret_cast<const float*>(in.data());
+  const auto* in1 = reinterpret_cast<const float*>(g.data());
   std::vector<std::complex<float>> out(length, 0);
-  float* outf = (float*)out.data();
+  auto* outf = reinterpret_cast<float*>(out.data());
 
   __m256 seq_samp[length1] __attribute__((aligned(ALIGNMENT)));
 
@@ -485,42 +487,51 @@ std::vector<std::complex<float>> CommsLib::CorrelateAvx(
 
 std::vector<float> CommsLib::CorrelateAvxS(std::vector<float> const& f,
                                            std::vector<float> const& g) {
-  // assuming length0 is larger or equal to length1
-  size_t length0 = f.size();
-  size_t length1 = g.size();
+  size_t length_f = f.size();
+  size_t length_g = g.size();
+  assert(length_f > length_g);
 
-  std::vector<float> in(length0 + length1 - 1, 0);
-  // in.insert(in.end(), f.begin(), f.end());
-  for (size_t i = length1 - 1; i < in.size(); i++) {
-    size_t j = i - length1 + 1;
-    in[i] = f[j];
-  }
+  std::vector<float> in(length_f + length_g, 0);
   size_t length = in.size();
 
-  float* in0 = (float*)(in.data());
-  float* in1 = (float*)(g.data());
-  std::vector<float> out(length, 0);
-  float* outf = (float*)out.data();
+  // MLPD_TRACE("correlate_avx_s len_f: %zu, len_g: %zu, length: %zu\n",
+  // length_f, length_g, length); in[length_g:length] = f[0:length_f]
+  for (size_t i = length_g; i < length; i++) {
+    size_t j = i - length_g;
+    in.at(i) = f.at(j);
+  }
+
+  float* in_data_ptr = in.data();
+  const float* in_g = g.data();
 
   __m256 data __attribute__((aligned(ALIGNMENT)));
   __m256 prod __attribute__((aligned(ALIGNMENT)));
   __m256 accm __attribute__((aligned(ALIGNMENT)));
-
-  __m256 seq_samp[length1] __attribute__((aligned(ALIGNMENT)));
+  __m256 seq_samp[length_g] __attribute__((aligned(ALIGNMENT)));
 
   // Repeat the kernel across the vector
-  for (size_t i = 0; i < length1; i++) {
-    seq_samp[i] = _mm256_broadcast_ss(&in1[i]);
+  for (size_t i = 0; i < length_g; i++) {
+    seq_samp[i] = _mm256_broadcast_ss(&in_g[i]);
   }
 
-  for (size_t i = 0; i < (length - length1); i += AVX_PACKED_SP) {
+  static const size_t kKAddressIncrement = ALIGNMENT / sizeof(float);
+  static_assert((ALIGNMENT % sizeof(float)) == 0,
+                "Address alignment not correct");
+
+  size_t padding = kKAddressIncrement - (length_f % kKAddressIncrement);
+  std::vector<float> out(length_f + padding);
+
+  // Verify no memory overruns
+  assert((out.size() % kKAddressIncrement) == 0);
+  for (size_t i = 0; i < (out.size() - 1); i += kKAddressIncrement) {
     accm = _mm256_setzero_ps();
-    for (size_t j = 0; j < length1; j++) {
-      data = _mm256_loadu_ps(in0 + i + j);
+    for (size_t j = 0; j < length_g; j++) {
+      data = _mm256_loadu_ps(in_data_ptr + i + j);
       prod = _mm256_mul_ps(data, seq_samp[j]);
       accm = _mm256_add_ps(prod, accm);
     }
-    _mm256_storeu_ps(outf + i, accm);
+    _mm256_storeu_ps(out.data() + i, accm);
   }
+  out.resize(length_f);
   return out;
 }

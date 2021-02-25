@@ -1,9 +1,8 @@
 /**
- * @file cyclic_shift.cpp
+ * @file cyclic_shift.cc
  * @brief Cyclic right bit shift. The shift values are defined by the 5gnr
  * ldpc standard in TS38212 5.3.2
  */
-
 #include "cyclic_shift.h"
 
 #include <cstring> /* std::strerror, std::memset, std::memcpy */
@@ -65,7 +64,7 @@ inline __m256i CycleBitShift72to128(__m256i data, int16_t cyc_shift,
   __m256i shift_mask0;
   int64_t e0;
   int zc_in_bytes = zc >> 3;
-  uint8_t* p_out = (uint8_t*)&x2;
+  auto* p_out = reinterpret_cast<uint8_t*>(&x2);
 
   int right_shift = cyc_shift % zc;
   int byte_shift = right_shift >> 3;
@@ -79,7 +78,7 @@ inline __m256i CycleBitShift72to128(__m256i data, int16_t cyc_shift,
   x0 = _mm256_shuffle_epi8(data, shift_mask0);
 
   // shift remaining memcpybits
-  uint8_t* p_data = (uint8_t*)&x0;
+  auto* p_data = reinterpret_cast<uint8_t*>(&x0);
   p_out[zc_in_bytes - 1] =
       (p_data[zc_in_bytes - 1] >> bit_shift) | (p_data[0] << (8 - bit_shift));
   for (int i = 0; i < zc_in_bytes - 1; i++) {
@@ -114,9 +113,9 @@ inline __m256i CycleBitShift144to256(__m256i data, int16_t cyc_shift,
   int bit_shift = cyc_shift & 0xf;
   int zc_in_shorts = zc >> 4;
 
-  uint16_t* p_out_0 = (uint16_t*)&x0;
-  uint16_t* p_out_1 = (uint16_t*)&x1;
-  uint16_t* p_in = (uint16_t*)&data;
+  auto* p_out_0 = reinterpret_cast<uint16_t*>(&x0);
+  auto* p_out_1 = reinterpret_cast<uint16_t*>(&x1);
+  auto* p_in = reinterpret_cast<uint16_t*>(&data);
 
   // manual shift in units of 2 bytes
   // for(int i=0; i<(zc_in_shorts-packed_shift); i++){

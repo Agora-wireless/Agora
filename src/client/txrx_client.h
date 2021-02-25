@@ -1,24 +1,26 @@
-#ifndef RadioTXRX_HEADER
-#define RadioTXRX_HEADER
+/**
+ * @file txrx_client.h
+ * @brief Declaration file for the radio txrx class
+ */
+#ifndef RADIOTXRX_H_
+#define RADIOTXRX_H_
 
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
-#include <pthread.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
 #include <complex>
 #include <fstream>
+#include <thread>
 #include <vector>
 
 #include "client_radio.h"
 #include "concurrentqueue.h"
 #include "net.h"
 #include "utils.h"
-
-class RadioConfig;
 
 /**
  * @brief Implementations of this class provide packet I/O for Agora clients
@@ -39,25 +41,25 @@ class RadioConfig;
  * time-keeping w.r.t. BS happens in this function as well as downlink and
  * uplink receive and transmit functions.
  */
-class RadioTXRX {
+class RadioTxRx {
  public:
-  struct RadioTXRXContext {
-    RadioTXRX* ptr_;
+  struct RadioTxRxContext {
+    RadioTxRx* ptr_;
     int tid_;
   };
 
-  RadioTXRX(Config* cfg, int n_threads, int in_core_id);
+  RadioTxRx(Config* const cfg, int n_threads, int in_core_id);
   /**
    * N_THREAD: socket thread number
    * mode: tx=1 or rx=0 operation
    * in_queue: message queue to communicate with main thread
    */
-  RadioTXRX(Config* config, int n_threads, int in_core_id,
+  RadioTxRx(Config* const config, int n_threads, int in_core_id,
             moodycamel::ConcurrentQueue<EventData>* in_message_queue,
             moodycamel::ConcurrentQueue<EventData>* in_task_queue,
             moodycamel::ProducerToken** in_rx_ptoks,
             moodycamel::ProducerToken** in_tx_ptoks);
-  ~RadioTXRX();
+  ~RadioTxRx();
 
   /**
    * @brief called in main threads to start the socket threads
@@ -80,8 +82,8 @@ class RadioTXRX {
    *
    * @param in_buffer_length: size of ring buffer in bytes
    */
-  bool StartTxrx(Table<char>& in_buffer, Table<int>& in_buffer_status,
-                 int in_buffer_frame_num, int in_buffer_length,
+  bool StartTxRx(Table<char>& in_buffer, Table<int>& in_buffer_status,
+                 size_t in_buffer_frame_num, size_t in_buffer_length,
                  char* in_tx_buffer, int* in_tx_buffer_status,
                  int in_tx_buffer_frame_num, int in_tx_buffer_length);
 
@@ -103,7 +105,8 @@ class RadioTXRX {
    * and writes to an offset (rx_offset) in the receive buffer (buffer_)
    */
   struct Packet* RecvEnqueueArgos(int tid, size_t radio_id, size_t& frame_id,
-                                  size_t& symbol_id, size_t rx_offset);
+                                  size_t& symbol_id, size_t rx_offset,
+                                  bool dummy_enqueue);
 
   /**
    * @brief transmits a tx samples packet that is ready from PHY through client
@@ -139,17 +142,22 @@ class RadioTXRX {
   void* LoopTxRxUsrpSync(int tid);
 
  private:
-  pthread_mutex_t mutex_ = PTHREAD_MUTEX_INITIALIZER;
-  pthread_cond_t cond_ = PTHREAD_COND_INITIALIZER;
-  Config* config_;
-  ClientRadioConfig* radioconfig_;           // Used only in Argos mode
-  std::vector<struct sockaddr_in> servaddr_; /* server address */
+  std::mutex mutex_;
+  std::condition_variable cond_;
+  bool thread_sync_;
+
+  std::vector<std::thread> txrx_threads_;
+
+  Config* const config_;
+  std::unique_ptr<ClientRadioConfig> radioconfig_;  // Used only in Argos mode
+  std::vector<struct sockaddr_in> servaddr_;        // server address
   std::vector<int> socket_;
 
   Table<char>* buffer_;
   Table<int>* buffer_status_;
-  int buffer_length_;
-  int buffer_frame_num_;
+
+  size_t buffer_length_; /* Unused */
+  size_t buffer_frame_num_;
 
   char* tx_buffer_;
   int* tx_buffer_status_;
@@ -170,4 +178,4 @@ class RadioTXRX {
   std::vector<void*> pilot_buff0_;
   std::vector<void*> pilot_buff1_;
 };
-#endif
+#endif  // RADIOTXRX_H_

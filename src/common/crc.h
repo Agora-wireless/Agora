@@ -1,5 +1,5 @@
 /*
- * @file crc.hpp
+ * @file crc.h
  * @brief Cyclic Redundancy Check (CRC)
  *
  * NOTE:
@@ -10,8 +10,8 @@
  * https://spdx.org/licenses/BSD-2-Clause.html
  */
 
-#ifndef CRC_H
-#define CRC_H
+#ifndef CRC_H_
+#define CRC_H_
 
 #include <unistd.h>
 
@@ -89,7 +89,7 @@ class DoCRC {
             0xF5F6D10Cu, 0xF6FA48FAu, 0xF77C0401u, 0xF842FA2Fu, 0xF9C4B6D4u,
             0xFAC82F22u, 0xFB4E63D9u, 0xFCD11CCEu, 0xFD575035u, 0xFE5BC9C3u,
             0xFFDD8538u} {}
-  ~DoCRC();
+  ~DoCRC() = default;
 
   /* Initialize CRC:
    * Not used at the moment. We decided to pre-generate the tables and
@@ -113,4 +113,4 @@ class DoCRC {
   bool CheckCrc24(unsigned char* data, int len, uint32_t ref_crc);
 };
 
-#endif
+#endif  // CRC_H_

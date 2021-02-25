@@ -1,5 +1,10 @@
-#ifndef MEMORY_MANAGE
-#define MEMORY_MANAGE
+/**
+ * @file dpdk_transport.h
+ * @brief Declaration file for the Memory related storage classes.
+ * Table / PtrGrid / PtrCube / 1D buffer allocation & free
+ */
+#ifndef MEMORY_MANAGE_H_
+#define MEMORY_MANAGE_H_
 #include <array>
 #include <cassert>
 #include <complex>
@@ -10,9 +15,9 @@
 
 namespace Agora_memory {
 enum class Alignment_t : size_t {
-  kK32Align = 32,
-  kK64Align = 64,
-  kK4096Align = 4096
+  kAlign32 = 32,
+  kAlign64 = 64,
+  kAlign4096 = 4096
 };
 
 void* PaddedAlignedAlloc(Alignment_t alignment, size_t size);
@@ -21,24 +26,26 @@ void* PaddedAlignedAlloc(Alignment_t alignment, size_t size);
 template <typename T>
 class Table {
  private:
-  size_t dim2_;
-  size_t dim1_;
+  size_t dim2_{0};
+  size_t dim1_{0};
   T* data_;
 
  public:
-  Table(void) : dim2_(0), dim1_(0), data_(nullptr) {}
+  Table() : data_(nullptr) {}
 
   void Malloc(size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment) {
     this->dim2_ = dim2;
     this->dim1_ = dim1;
+    // RtAssert(((dim1 > 0) && (dim2 == 0)), "Table: Malloc one dimension = 0");
     size_t alloc_size = (this->dim1_ * this->dim2_ * sizeof(T));
     this->data_ = static_cast<T*>(
         Agora_memory::PaddedAlignedAlloc(alignment, alloc_size));
   }
   void Calloc(size_t dim1, size_t dim2, Agora_memory::Alignment_t alignment) {
-    // assert(!((dim1 == 0) || (dim2 == 0)));
+    // RtAssert(((dim1 > 0) && (dim2 == 0)), "Table: Calloc one dimension = 0");
     this->Malloc(dim1, dim2, alignment);
-    std::memset(this->data_, 0, (this->dim1_ * this->dim2_ * sizeof(T)));
+    std::memset(static_cast<void*>(this->data_), 0,
+                (this->dim1_ * this->dim2_ * sizeof(T)));
   }
 
   // Allocate the table and fill it with random floating point values between
@@ -71,9 +78,9 @@ class Table {
     }
   }
 
-  bool IsAllocated(void) { return (this->data_ != nullptr); }
+  bool IsAllocated() { return (this->data_ != nullptr); }
 
-  void Free(void) {
+  void Free() {
     if (this->data_ != nullptr) {
       std::free(this->data_);
     }
@@ -81,6 +88,8 @@ class Table {
     this->dim1_ = 0;
     this->data_ = nullptr;
   }
+
+  T* At(size_t dim1) const { return (*this)[dim1]; }
 
   T* operator[](size_t dim1) {
     assert(this->dim1_ > dim1);
@@ -92,9 +101,10 @@ template <typename T, typename U>
 static void AllocBuffer1d(T** buffer, U dim,
                           Agora_memory::Alignment_t alignment, int init_zero) {
   size_t size = dim * sizeof(T);
+  // RtAssert(((dim > 0)), "AllocBuffer1d: size = 0");
   *buffer = static_cast<T*>(Agora_memory::PaddedAlignedAlloc(alignment, size));
   if (init_zero) {
-    std::memset(*buffer, 0u, size);
+    std::memset(static_cast<void*>(*buffer), 0u, size);
   }
 };
 
@@ -108,11 +118,11 @@ static void FreeBuffer1d(T** buffer) {
 template <size_t ROWS, size_t COLS, class T>
 class PtrGrid {
  public:
-  PtrGrid(void) : backing_buf_(nullptr) {}
+  PtrGrid() : backing_buf_(nullptr) {}
 
   /// Create a grid of pointers where each grid cell points to an array of
   /// [n_entries]
-  PtrGrid(size_t n_entries) { this->Alloc(ROWS, COLS, n_entries); }
+  explicit PtrGrid(size_t num_entries) { this->Alloc(ROWS, COLS, num_entries); }
 
   /// Create a grid of pointers with dimensions [ROWS, COLS], where
   /// only the grid with dimensions [n_rows, n_cols] has cells pointing to an
@@ -123,7 +133,7 @@ class PtrGrid {
     this->Alloc(n_rows, n_cols, n_entries);
   }
 
-  ~PtrGrid(void) {
+  ~PtrGrid() {
     if (this->backing_buf_ != nullptr) {
       std::free(this->backing_buf_);
       this->backing_buf_ = nullptr;
@@ -134,7 +144,7 @@ class PtrGrid {
   void Alloc(size_t n_rows, size_t n_cols, size_t n_entries) {
     const size_t alloc_sz = n_rows * n_cols * n_entries * sizeof(T);
     this->backing_buf_ = static_cast<T*>(Agora_memory::PaddedAlignedAlloc(
-        Agora_memory::Alignment_t::kK64Align, alloc_sz));
+        Agora_memory::Alignment_t::kAlign64, alloc_sz));
     std::memset(static_cast<void*>(this->backing_buf_), 0, alloc_sz);
 
     // Fill-in the grid with pointers into backing_buf
@@ -187,11 +197,13 @@ class PtrGrid {
 template <size_t DIM1, size_t DIM2, size_t DIM3, class T>
 class PtrCube {
  public:
-  PtrCube(void) : backing_buf_(nullptr) {}
+  PtrCube() : backing_buf_(nullptr) {}
 
   /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where each
   /// cube cell points to an array of [n_entries]
-  PtrCube(size_t n_entries) { this->Alloc(DIM1, DIM2, DIM3, n_entries); }
+  explicit PtrCube(size_t num_entries) {
+    this->Alloc(DIM1, DIM2, DIM3, num_entries);
+  }
 
   /// Create a cube of pointers with dimensions [DIM1, DIM2, DIM3], where
   /// only the cube with dimensions [dim_1, dim_2, dim_3] has cells
@@ -202,7 +214,7 @@ class PtrCube {
     this->Alloc(dim_1, dim_2, dim_3, n_entries);
   }
 
-  ~PtrCube(void) {
+  ~PtrCube() {
     if (this->backing_buf_ != nullptr) {
       std::free(this->backing_buf_);
       this->backing_buf_ = nullptr;
@@ -213,7 +225,7 @@ class PtrCube {
   void Alloc(size_t dim_1, size_t dim_2, size_t dim_3, size_t n_entries) {
     const size_t alloc_sz = dim_1 * dim_2 * dim_3 * n_entries * sizeof(T);
     this->backing_buf_ = static_cast<T*>(Agora_memory::PaddedAlignedAlloc(
-        Agora_memory::Alignment_t::kK64Align, alloc_sz));
+        Agora_memory::Alignment_t::kAlign64, alloc_sz));
     std::memset(static_cast<void*>(this->backing_buf_), 0, alloc_sz);
 
     // Fill-in the grid with pointers into backing_buf
@@ -253,4 +265,4 @@ class PtrCube {
   T* backing_buf_;
 };
 
-#endif
+#endif  // MEMORY_MANAGE_H_

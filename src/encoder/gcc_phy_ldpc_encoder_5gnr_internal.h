@@ -48,8 +48,8 @@
     The algorithm is implemented as defined in TS38212 5.3.2.
 */
 
-#ifndef _PHY_LDPC_ENCODER_5GNR_INTERNAL_H_
-#define _PHY_LDPC_ENCODER_5GNR_INTERNAL_H_
+#ifndef PHY_LDPC_ENCODER_5GNR_INTERNAL_H_
+#define PHY_LDPC_ENCODER_5GNR_INTERNAL_H_
 
 #include <immintrin.h>  // AVX
 
@@ -69,7 +69,8 @@ extern "C" {
 void AdapterFrom288to384(int8_t** pBuff0, int8_t* pBuff1, uint16_t zcSize,
                          uint32_t cbLen, int8_t direct);  // 1ways
 void Adapter2waysFrom144to256(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
-                              uint32_t cbLen, int8_t direct);  // 2ways
+                              uint32_t cbLen,
+                              int8_t direct);  // 2ways
 void Adapter4waysFrom72to128(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
                              uint32_t cbLen, int8_t direct);  // 4ways
 void Adapter8waysFrom36to64(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
@@ -79,7 +80,7 @@ void Adapter16waysFrom18to32(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
 void Adapter16waysFrom2to16(int8_t** pbuff0, int8_t* pbuff1, uint16_t zcSize,
                             uint32_t cbLen, int8_t direct);  // 16ways
 
-typedef void (*LDPC_ADAPTER_P)(int8_t**, int8_t*, uint16_t, uint32_t, int8_t);
+using LDPC_ADAPTER_P = void (*)(int8_t**, int8_t*, uint16_t, uint32_t, int8_t);
 LDPC_ADAPTER_P LdpcSelectAdapterFunc(uint16_t zcSize);
 
 #define PROC_BYTES 64
@@ -448,4 +449,4 @@ __attribute__((
 }
 #endif
 
-#endif
+#endif  // PHY_LDPC_ENCODER_5GNR_INTERNAL_H_

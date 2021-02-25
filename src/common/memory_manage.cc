@@ -2,7 +2,7 @@
 
 namespace Agora_memory {
 inline size_t PaddedAllocSize(Alignment_t alignment, size_t size) {
-  size_t align = static_cast<size_t>(alignment);
+  auto align = static_cast<size_t>(alignment);
   size_t padded_size = size;
   size_t padding = align - (size % align);
 

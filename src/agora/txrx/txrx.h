@@ -1,10 +1,15 @@
-#ifndef PACKETTXRX
-#define PACKETTXRX
+/**
+ * @file txrx.h
+ * @brief Common definations for PacketTXRX. Including datapath
+ * functions for communicating with simulators.
+ */
+
+#ifndef PACKETTXRX_H_
+#define PACKETTXRX_H_
 
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
-#include <pthread.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -46,7 +51,7 @@ class PacketTXRX {
  public:
   static const int kMaxSocketNum = 10;  // Max number of socket threads allowed
 
-  PacketTXRX(Config* cfg, size_t in_core_offset = 1);
+  explicit PacketTXRX(Config* cfg, size_t in_core_offset = 1);
 
   PacketTXRX(Config* cfg, size_t core_offset,
              moodycamel::ConcurrentQueue<EventData>* queue_message,
@@ -58,8 +63,8 @@ class PacketTXRX {
 #ifdef USE_DPDK
   // At thread [tid], receive packets from the NIC and enqueue them to the
   // master thread
-  uint16_t dpdk_recv(int tid, uint16_t port_id, uint16_t queue_id,
-                     size_t& prev_frame_id, size_t& rx_offset);
+  uint16_t DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
+                    size_t& prev_frame_id, size_t& rx_offset);
 #endif
 
   /**
@@ -72,7 +77,7 @@ class PacketTXRX {
    * @return True on successfully starting the network I/O threads, false
    * otherwise
    */
-  bool StartTxrx(Table<char>& buffer, Table<int>& buffer_status,
+  bool StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
                  size_t packet_num_in_buffer, Table<size_t>& frame_start,
                  char* tx_buffer, Table<complex_float>& calib_dl_buffer_,
                  Table<complex_float>& calib_ul_buffer_);
@@ -101,13 +106,11 @@ class PacketTXRX {
   // The network I/O threads run on cores
   // {core_offset, ..., core_offset + socket_thread_num - 1}
   const size_t core_offset_;
-
   const size_t ant_per_cell_;
-
   const size_t socket_thread_num_;
 
   // Handle for socket threads
-  std::thread socket_std_threads_[kMaxSocketNum];
+  std::array<std::thread, kMaxSocketNum> socket_std_threads_;
   Table<char>* buffer_;
   Table<int>* buffer_status_;
   size_t packet_num_in_buffer_;
@@ -130,4 +133,4 @@ class PacketTXRX {
   RadioConfig* radioconfig_;  // Used only in Argos mode
 };
 
-#endif
+#endif  // PACKETTXRX_H_

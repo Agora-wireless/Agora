@@ -1,5 +1,5 @@
 /**
- * @file txrx_usrp.cpp
+ * @file txrx_usrp.cc
  * @brief Implementation of PacketTXRX datapath functions for communicating
  * with USRP hardware
  */
@@ -12,21 +12,21 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid);
   size_t* rx_frame_start = (*frame_start_)[tid];
   int rx_offset = 0;
-  int radio_lo = tid * cfg_->n_radios_ / socket_thread_num_;
-  int radio_hi = (tid + 1) * cfg_->n_radios_ / socket_thread_num_;
+  int radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
+  int radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
   std::printf("receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
 
   // prepare BS beacon in host buffer
   std::vector<void*> beaconbuff(2);
   std::vector<void*> zeros(2);
-  zeros[0] = calloc(cfg_->samps_per_symbol_, sizeof(int16_t) * 2);
-  zeros[1] = calloc(cfg_->samps_per_symbol_, sizeof(int16_t) * 2);
-  beaconbuff[0] = cfg_->beacon_ci16_.data();
+  zeros[0] = calloc(cfg_->SampsPerSymbol(), sizeof(int16_t) * 2);
+  zeros[1] = calloc(cfg_->SampsPerSymbol(), sizeof(int16_t) * 2);
+  beaconbuff[0] = cfg_->BeaconCi16().data();
   beaconbuff[1] = zeros[0];
 
-  std::vector<std::complex<int16_t>> samp_buffer0(cfg_->samps_per_symbol_ * 14,
+  std::vector<std::complex<int16_t>> samp_buffer0(cfg_->SampsPerSymbol() * 14,
                                                   0);
-  std::vector<std::complex<int16_t>> samp_buffer1(cfg_->samps_per_symbol_ * 14,
+  std::vector<std::complex<int16_t>> samp_buffer1(cfg_->SampsPerSymbol() * 14,
                                                   0);
   std::vector<void*> samp_buffer(2);
   samp_buffer[0] = samp_buffer0.data();
@@ -43,10 +43,10 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
   radioconfig_->RadioRx(0, samp_buffer.data(), rx_time_bs_);
   // Schedule the first beacon in the future
   tx_time_bs_ =
-      rx_time_bs_ + cfg_->samps_per_symbol_ * cfg_->symbol_num_perframe_ * 40;
+      rx_time_bs_ + cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms() * 40;
   radioconfig_->RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
   long long bs_init_rx_offset = tx_time_bs_ - rx_time_bs_;
-  for (int it = 0; it < std::floor(bs_init_rx_offset / cfg_->samps_per_symbol_);
+  for (int it = 0; it < std::floor(bs_init_rx_offset / cfg_->SampsPerSymbol());
        it++) {
     radioconfig_->RadioRx(0, samp_buffer.data(), rx_time_bs_);
   }
@@ -60,7 +60,7 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
 
   int prev_frame_id = -1;
   int radio_id = radio_lo;
-  while (cfg_->running_) {
+  while (cfg_->Running() == true) {
     // transmit data
     // if (-1 != dequeue_send_usrp(tid))
     //   continue;
@@ -72,10 +72,10 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
     // Schedule beacon in the future
     if (global_symbol_id == 0) {
       tx_time_bs_ = rx_time_bs_ +
-                    cfg_->samps_per_symbol_ * cfg_->symbol_num_perframe_ * 20;
+                    cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms() * 20;
       int tx_ret = radioconfig_->RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
-      if (tx_ret != (int)cfg_->samps_per_symbol_) {
-        std::cerr << "BAD Transmit(" << tx_ret << "/" << cfg_->samps_per_symbol_
+      if (tx_ret != (int)cfg_->SampsPerSymbol()) {
+        std::cerr << "BAD Transmit(" << tx_ret << "/" << cfg_->SampsPerSymbol()
                   << ") at Time " << tx_time_bs_ << ", frame count "
                   << global_frame_id << std::endl;
       }
@@ -87,21 +87,21 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
 
     // Update global frame_id and symbol_id
     global_symbol_id++;
-    if (global_symbol_id == (int)cfg_->symbol_num_perframe_) {
+    if (global_symbol_id == (int)cfg_->Frame().NumTotalSyms()) {
       global_symbol_id = 0;
       global_frame_id++;
     }
 
-    if (pkt == NULL) {
+    if (pkt == nullptr) {
       continue;
     }
-    rx_offset = (rx_offset + cfg_->n_channels_) % packet_num_in_buffer_;
+    rx_offset = (rx_offset + cfg_->NumChannels()) % packet_num_in_buffer_;
 
     if (kIsWorkerTimingEnabled) {
       int frame_id = pkt->frame_id_;
       // int symbol_id = pkt->symbol_id;
       if (frame_id > prev_frame_id) {
-        rx_frame_start[frame_id % kNumStatsFrames] = Rdtsc();
+        rx_frame_start[frame_id % kNumStatsFrames] = GetTime::Rdtsc();
         prev_frame_id = frame_id;
       }
     }
@@ -113,21 +113,21 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
   char* rx_buffer = (*buffer_)[tid];
   int* rx_buffer_status = (*buffer_status_)[tid];
-  int packet_length = cfg_->packet_length_;
+  int packet_length = cfg_->PacketLength();
 
   // init samp_buffer for dummy read
   std::vector<std::complex<int16_t>> samp_buffer0(
-      cfg_->samps_per_symbol_ * cfg_->symbol_num_perframe_, 0);
+      cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms(), 0);
   std::vector<std::complex<int16_t>> samp_buffer1(
-      cfg_->samps_per_symbol_ * cfg_->symbol_num_perframe_, 0);
+      cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms(), 0);
   std::vector<void*> samp_buffer(2);
   samp_buffer[0] = samp_buffer0.data();
-  if (cfg_->n_channels_ == 2) {
+  if (cfg_->NumChannels() == 2) {
     samp_buffer[1] = samp_buffer1.data();
   }
 
   // if rx_buffer is full, exit
-  int n_channels = cfg_->n_channels_;
+  int n_channels = cfg_->NumChannels();
   struct Packet* pkt[n_channels];
   void* samp[n_channels];
   for (int ch = 0; ch < n_channels; ++ch) {
@@ -135,7 +135,7 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
     if (rx_buffer_status[rx_offset + ch] == 1) {
       std::printf("Receive thread %d rx_buffer full, offset: %d\n", tid,
                   rx_offset);
-      cfg_->running_ = false;
+      cfg_->Running(false);
       break;
     }
     pkt[ch] = (struct Packet*)&rx_buffer[(rx_offset + ch) * packet_length];
@@ -151,10 +151,10 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
     tmp_ret = radioconfig_->RadioRx(radio_id, samp_buffer.data(), rx_time_bs_);
   }
 
-  if (!cfg_->running_ || tmp_ret <= 0 ||
+  if ((cfg_->Running() == false) || tmp_ret <= 0 ||
       (!cfg_->IsPilot(frame_id, symbol_id) &&
        !cfg_->IsUplink(frame_id, symbol_id))) {
-    return NULL;
+    return nullptr;
   }
 
   int ant_id = radio_id * n_channels;
@@ -172,7 +172,7 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
 
       if (!message_queue_->enqueue(*local_ptok, rx_message)) {
         std::printf("socket message enqueue failed\n");
-        std::exit(0);
+        throw std::runtime_error("PacketTXRX: socket message enqueue failed");
       }
     }
   }
@@ -195,38 +195,39 @@ int PacketTXRX::DequeueSendUsrp(int tid) {
   size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
 
   size_t offset =
-      (c->GetTotalDataSymbolIdx(frame_id, symbol_id) * c->bs_ant_num_) + ant_id;
+      (c->GetTotalDataSymbolIdx(frame_id, symbol_id) * c->BsAntNum()) + ant_id;
 
-  symbol_id += c->ue_ant_num_;
+  symbol_id += c->UeAntNum();
   frame_id += TX_FRAME_DELTA;
 
   void* txbuf[2];
-  int n_channels = c->n_channels_;
+  int n_channels = c->NumChannels();
   int ch = ant_id % n_channels;
 
-  if (kDebugDownlink) {
-    std::vector<std::complex<int16_t>> zeros(c->samps_per_symbol_);
-    size_t dl_symbol_idx = c->GetDlSymbolIdx(frame_id, symbol_id);
-    if (ant_id != c->ref_ant_) {
+  if (kDebugDownlink == true) {
+    std::vector<std::complex<int16_t>> zeros(c->SampsPerSymbol());
+    size_t dl_symbol_idx = c->Frame().GetDLSymbolIdx(symbol_id);
+    if (ant_id != c->RefAnt()) {
       txbuf[ch] = zeros.data();
-    } else if (dl_symbol_idx < c->dl_pilot_syms_) {
-      txbuf[ch] = (void*)c->ue_specific_pilot_t_[0];
+    } else if (dl_symbol_idx < c->Frame().ClientDlPilotSymbols()) {
+      txbuf[ch] = reinterpret_cast<void*>(c->UeSpecificPilotT()[0]);
     } else {
-      txbuf[ch] = (void*)c->dl_iq_t_[dl_symbol_idx - c->dl_pilot_syms_];
+      txbuf[ch] = reinterpret_cast<void*>(
+          c->DlIqT()[dl_symbol_idx - c->Frame().ClientDlPilotSymbols()]);
     }
   } else {
-    char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length_;
-    struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-    txbuf[ch] = (void*)pkt->data_;
+    char* cur_buffer_ptr = tx_buffer_ + offset * c->PacketLength();
+    auto* pkt = reinterpret_cast<struct Packet*>(cur_buffer_ptr);
+    txbuf[ch] = reinterpret_cast<void*>(pkt->data_);
   }
 
-  size_t last = c->dl_symbols_[0].back();
+  size_t last = c->Frame().GetDLSymbolLast();
   int flags = (symbol_id != last) ? 1   // HAS_TIME
                                   : 2;  // HAS_TIME & END_BURST, fixme
   long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
   radioconfig_->RadioTx(ant_id / n_channels, txbuf, flags, frame_time);
 
-  if (kDebugPrintInTask) {
+  if (kDebugPrintInTask == true) {
     std::printf(
         "In TX thread %d: Transmitted frame %zu, symbol %zu, "
         "ant %zu, offset: %zu, msg_queue_length: %zu\n",
@@ -257,9 +258,9 @@ int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id) {
   // size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
   size_t offset =
-      (c->GetTotalDataSymbolIdx(frame_id, symbol_id) * c->bs_ant_num_) + ant_id;
+      (c->GetTotalDataSymbolIdx(frame_id, symbol_id) * c->BsAntNum()) + ant_id;
 
-  // symbol_id += c->UE_ANT_NUM;
+  // symbol_id += c->UeAntNum();
   // frame_id += TX_FRAME_DELTA;
 
   std::cout << "ant_id: " << ant_id << ", frame_id: " << frame_id
@@ -267,28 +268,30 @@ int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id) {
   std::cout << "offset: " << offset << std::endl;
 
   void* txbuf[2];
-  int n_channels = c->n_channels_;
+  int n_channels = c->NumChannels();
   int ch = ant_id % n_channels;
 
   if (kDebugDownlink) {
-    std::vector<std::complex<int16_t>> zeros(c->samps_per_symbol_);
-    size_t dl_symbol_idx = c->GetDlSymbolIdx(frame_id, symbol_id);
-    if (ant_id != c->ref_ant_) {
+    std::vector<std::complex<int16_t>> zeros(c->SampsPerSymbol());
+    size_t dl_symbol_idx = c->Frame().GetDLSymbolIdx(symbol_id);
+    if (ant_id != c->RefAnt()) {
       txbuf[ch] = zeros.data();
-    } else if (dl_symbol_idx < c->dl_pilot_syms_) {
-      txbuf[ch] = (void*)c->ue_specific_pilot_t_[0];
+    } else if (dl_symbol_idx < c->Frame().ClientDlPilotSymbols()) {
+      txbuf[ch] = reinterpret_cast<void*>(c->UeSpecificPilotT()[0]);
     } else {
-      txbuf[ch] = (void*)c->dl_iq_t_[dl_symbol_idx - c->dl_pilot_syms_];
+      txbuf[ch] = reinterpret_cast<void*>(
+          c->DlIqT()[dl_symbol_idx - c->Frame().ClientDlPilotSymbols()]);
     }
   } else {
-    char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length_;
-    struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-    txbuf[ch] = (void*)pkt->data_;
+    char* cur_buffer_ptr = tx_buffer_ + offset * c->PacketLength();
+    auto* pkt = reinterpret_cast<struct Packet*>(cur_buffer_ptr);
+    txbuf[ch] = reinterpret_cast<void*>(pkt->data_);
   }
 
-  size_t last = c->dl_symbols_[0].back();
-  int flags = (symbol_id != (int)last) ? 1   // HAS_TIME
-                                       : 2;  // HAS_TIME & END_BURST, fixme
+  size_t last = c->Frame().GetDLSymbolLast();
+  int flags = (symbol_id != static_cast<int>(last))
+                  ? 1   // HAS_TIME
+                  : 2;  // HAS_TIME & END_BURST, fixme
   long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
   radioconfig_->RadioTx(ant_id / n_channels, txbuf, flags, frame_time);
 

@@ -1,13 +1,13 @@
 #include "modulation.h"
 
 void Print256Epi32(__m256i var) {
-  int32_t* val = (int32_t*)&var;
+  auto* val = reinterpret_cast<int32_t*>(&var);
   std::printf("Numerical: %i %i %i %i %i %i %i %i \n", val[0], val[1], val[2],
               val[3], val[4], val[5], val[6], val[7]);
 }
 
 void Print256Epi16(__m256i var) {
-  int16_t* val = (int16_t*)&var;
+  auto* val = reinterpret_cast<int16_t*>(&var);
   std::printf("Numerical: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i\n",
               val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7],
               val[8], val[9], val[10], val[11], val[12], val[13], val[14],
@@ -15,7 +15,7 @@ void Print256Epi16(__m256i var) {
 }
 
 void Print256Epi8(__m256i var) {
-  int8_t* val = (int8_t*)&var;
+  auto* val = reinterpret_cast<int8_t*>(&var);
   std::printf(
       "Numerical int8_t: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i "
       "%i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i \n",
@@ -26,7 +26,7 @@ void Print256Epi8(__m256i var) {
 }
 
 void Print128Epi8(__m128i var) {
-  int8_t* val = (int8_t*)&var;
+  auto* val = reinterpret_cast<int8_t*>(&var);
   std::printf(
       "Numerical int8_t: %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i \n",
       val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7], val[8],
@@ -42,7 +42,7 @@ void Print128Epi8(__m128i var) {
 void InitModulationTable(Table<complex_float>& mod_table, size_t mod_order) {
   if (!mod_table.IsAllocated()) {
     mod_table.Malloc(1, pow(2, kMaxModType),
-                     Agora_memory::Alignment_t::kK32Align);
+                     Agora_memory::Alignment_t::kAlign32);
   }
   // mod_table.malloc(pow(2, kMaxModType), 2, 32);
   switch (mod_order) {
@@ -269,7 +269,7 @@ void Demod16qamHardLoop(const float* vec_in, uint8_t* vec_out, int num) {
 
 void Demod16qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
-  __m64* result_ptr = (__m64*)vec_out;
+  auto* result_ptr = reinterpret_cast<__m64*>(vec_out);
   __m128 symbol1;
   __m128 symbol2;
   __m128 symbol3;
@@ -396,7 +396,7 @@ void Demod16qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
 
 void Demod16qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
-  __m128i* result_ptr = (__m128i*)vec_out;
+  auto* result_ptr = reinterpret_cast<__m128i*>(vec_out);
   __m256 symbol1;
   __m256 symbol2;
   __m256 symbol3;
@@ -525,7 +525,7 @@ void Demod16qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
 
 void Demod16qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
   float* symbols_ptr = vec_in;
-  __m256i* result_ptr = (__m256i*)llr;
+  auto* result_ptr = reinterpret_cast<__m256i*>(llr);
   __m256 symbol1;
   __m256 symbol2;
   __m256 symbol3;
@@ -656,7 +656,7 @@ void Demod64qamHardLoop(const float* vec_in, uint8_t* vec_out, int num) {
 
 void Demod64qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
-  __m64* result_ptr = (__m64*)vec_out;
+  auto* result_ptr = reinterpret_cast<__m64*>(vec_out);
   __m128 symbol1;
   __m128 symbol2;
   __m128 symbol3;
@@ -845,7 +845,7 @@ void Demod64qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
 
 void Demod64qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
-  __m128i* result_ptr = (__m128i*)vec_out;
+  auto* result_ptr = reinterpret_cast<__m128i*>(vec_out);
   __m256 symbol1;
   __m256 symbol2;
   __m256 symbol3;
@@ -1026,8 +1026,8 @@ void Demod64qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
 }
 
 void Demod64qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
-  float* symbols_ptr = (float*)vec_in;
-  __m256i* result_ptr = (__m256i*)llr;
+  auto* symbols_ptr = static_cast<float*>(vec_in);
+  auto* result_ptr = reinterpret_cast<__m256i*>(llr);
   __m256 symbol1;
   __m256 symbol2;
   __m256 symbol3;

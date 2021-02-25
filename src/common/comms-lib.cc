@@ -22,6 +22,8 @@
 
 #include "comms-lib.h"
 
+#include <utility>
+
 size_t CommsLib::FindPilotSeq(std::vector<std::complex<float>> iq,
                               std::vector<std::complex<float>> pilot,
                               size_t seq_len) {
@@ -33,7 +35,7 @@ size_t CommsLib::FindPilotSeq(std::vector<std::complex<float>> iq,
   }
 
   // Equivalent to numpy's sign function
-  auto iq_sign = CommsLib::Csign(iq);
+  auto iq_sign = CommsLib::Csign(std::move(iq));
 
   // Convolution
   auto pilot_corr = CommsLib::Convolve(iq_sign, pilot_conj);
@@ -67,14 +69,14 @@ int CommsLib::FindLts(std::vector<std::complex<double>> iq, int seqLen) {
   for (int i = 0; i < 64; i++) {
     // lts_seq is a 2x160 matrix (real/imag by seqLen=160 elements)
     // grab one symbol and flip around
-    lts_sym.push_back(std::complex<double>(lts_seq[0][seqLen - 1 - i],
-                                           lts_seq[1][seqLen - 1 - i]));
+    lts_sym.emplace_back(lts_seq[0][seqLen - 1 - i],
+                         lts_seq[1][seqLen - 1 - i]);
     // conjugate
     lts_sym_conj.push_back(std::conj(lts_sym[i]));
   }
 
   // Equivalent to numpy's sign function
-  auto iq_sign = CommsLib::Csign(iq);
+  auto iq_sign = CommsLib::Csign(std::move(iq));
 
   // Convolution
   auto lts_corr = CommsLib::Convolve(iq_sign, lts_sym_conj);
@@ -256,12 +258,12 @@ std::vector<float> CommsLib::HannWindowFunction(size_t fftSize) {
 
 double CommsLib::WindowFunctionPower(std::vector<float> const& win) {
   double window_power = (0);
-  size_t n = win.size();
-  for (size_t n = 0; n < win.size(); n++) {
-    window_power += std::norm(win[n]);
+  size_t window_size = win.size();
+  for (float i : win) {
+    window_power += std::norm(i);
   }
-  window_power = std::sqrt(window_power / n);
-  return 20 * std::log10(n * window_power);
+  window_power = std::sqrt(window_power / window_size);
+  return 20 * std::log10(window_size * window_power);
 }
 
 float CommsLib::FindTone(std::vector<float> const& magnitude, double winGain,
@@ -378,12 +380,29 @@ std::vector<std::complex<float>> CommsLib::FFT(
 
 void CommsLib::IFFT(complex_float* in, int fftsize, bool normalize) {
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
-  (void)DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1,
-                             fftsize);
-  (void)DftiCommitDescriptor(mkl_handle);
-  DftiComputeBackward(mkl_handle, in);
-  DftiFreeDescriptor(&mkl_handle);
-  if (normalize) {
+  MKL_LONG status =
+      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
+    std::printf("Error in DftiCreateDescriptor: %s\n",
+                DftiErrorMessage(status));
+    assert(status != 0);
+  }
+  status = DftiCommitDescriptor(mkl_handle);
+  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
+    std::printf("Error in DftiErrorClass: %s\n", DftiErrorMessage(status));
+    assert(status != 0);
+  }
+  status = DftiComputeBackward(mkl_handle, in);
+  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
+    std::printf("Error in DftiComputeBackward: %s\n", DftiErrorMessage(status));
+    assert(status != 0);
+  }
+  status = DftiFreeDescriptor(&mkl_handle);
+  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
+    std::printf("Error in DftiFreeDescriptor: %s\n", DftiErrorMessage(status));
+    assert(status != 0);
+  }
+  if (normalize == true) {
     float max_val = 0;
     // int max_ind = 0;
     float scale = 0.5;
@@ -409,12 +428,13 @@ void CommsLib::IFFT(complex_float* in, int fftsize, bool normalize) {
 
 void CommsLib::FFT(complex_float* in, int fftsize) {
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
-  (void)DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1,
-                             fftsize);
-  (void)DftiCommitDescriptor(mkl_handle);
+  MKL_LONG status =
+      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+  status = DftiCommitDescriptor(mkl_handle);
   /* compute FFT */
-  DftiComputeForward(mkl_handle, in);
-  DftiFreeDescriptor(&mkl_handle);
+  status = DftiComputeForward(mkl_handle, in);
+  status = DftiFreeDescriptor(&mkl_handle);
+  (void)(status);
 }
 
 std::vector<std::complex<float>> CommsLib::ComposePartialPilotSym(
@@ -429,8 +449,8 @@ std::vector<std::complex<float>> CommsLib::ComposePartialPilotSym(
   }
   if (timeDomain) {
     auto pilot_cf32 = CommsLib::IFFT(fft_in, fftSize);
-    for (size_t i = 0; i < pilot_cf32.size(); i++) {
-      pilot_cf32[i] /= std::sqrt(period);
+    for (auto& i : pilot_cf32) {
+      i /= std::sqrt(period);
     }
     pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
                       pilot_cf32.end());  // add CP
@@ -944,9 +964,9 @@ std::vector<std::vector<double>> CommsLib::GetSequence(int N, int type) {
     double q = std::floor(qh + 0.5) + v * std::pow(-1, std::floor(2 * qh));
     std::vector<double> a;
     for (int i = 0; i < N; i++) {
-      int m_local = i % m;
-      double a_re = std::cos(-M_PI * q * m_local * (m_local + 1) / m);
-      double a_im = std::sin(-M_PI * q * m_local * (m_local + 1) / m);
+      int m_loop = i % m;
+      double a_re = std::cos(-M_PI * q * m_loop * (m_loop + 1) / m);
+      double a_im = std::sin(-M_PI * q * m_loop * (m_loop + 1) / m);
       matrix[0].push_back(a_re);
       matrix[1].push_back(a_im);
     }

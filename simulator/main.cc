@@ -1,3 +1,7 @@
+/**
+ * @file main.cc
+ * @brief Main file for the simulator executable
+ */
 #include "simulator.h"
 
 int main(int argc, char const* argv[]) {
@@ -7,9 +11,9 @@ int main(int argc, char const* argv[]) {
   int core_offset;
   int delay;
   if (argc == 5) {
-    thread_num = strtol(argv[1], NULL, 10);
-    core_offset = strtol(argv[2], NULL, 10);
-    delay = strtol(argv[3], NULL, 10);
+    thread_num = strtol(argv[1], nullptr, 10);
+    core_offset = strtol(argv[2], nullptr, 10);
+    delay = strtol(argv[3], nullptr, 10);
     conf_file = std::string(argv[4]);
   } else {
     conf_file = cur_directory + "/data/tddconfig-sim-dl.json";
