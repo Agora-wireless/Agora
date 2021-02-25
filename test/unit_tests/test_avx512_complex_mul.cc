@@ -31,20 +31,20 @@ TEST(TestComplexMul, Multiply) {
   __m512 values1_512 =
       _mm512_load_ps(reinterpret_cast<const float*>(values + 16));
   /* Do the multiplication */
-  ticks = Rdtsc();
+  ticks = GetTime::Rdtsc();
   for (int i = 0; i < NUM_RUNS; i++) {
     result_256_lower = CommsLib::M256ComplexCf32Mult(values0_lower_256,
                                                      values1_lower_256, false);
     result_256_upper = CommsLib::M256ComplexCf32Mult(values0_upper_256,
                                                      values1_upper_256, false);
   }
-  ticks = Rdtsc() - ticks;
+  ticks = GetTime::Rdtsc() - ticks;
   std::cout << "AVX256 Multiplication took " << ticks << "\n";
-  ticks = Rdtsc();
+  ticks = GetTime::Rdtsc();
   for (int i = 0; i < NUM_RUNS; i++) {
     result_512 = CommsLib::M512ComplexCf32Mult(values0_512, values1_512, false);
   }
-  ticks = Rdtsc()- ticks;
+  ticks = GetTime::Rdtsc()- ticks;
   std::cout << "AVX512 Multiplication took " << ticks << "\n";
   /* Extract the results into output buffers */
   _mm256_stream_ps(reinterpret_cast<float*>(out256), result_256_lower);
@@ -79,20 +79,20 @@ TEST(TestComplexMul, ConjMultiply) {
   __m512 values1_512 =
       _mm512_load_ps(reinterpret_cast<const float*>(values + 16));
   /* Do the multiplication */
-  ticks = Rdtsc();
+  ticks = GetTime::Rdtsc();
   for (int i = 0; i < NUM_RUNS; i++) {
     result_256_lower = CommsLib::M256ComplexCf32Mult(values0_lower_256,
                                                      values1_lower_256, true);
     result_256_upper = CommsLib::M256ComplexCf32Mult(values0_upper_256,
                                                      values1_upper_256, true);
   }
-  ticks = Rdtsc() - ticks;
+  ticks = GetTime::Rdtsc() - ticks;
   std::cout << "AVX256 Conj Multiplication took " << ticks << "\n";
-  ticks = Rdtsc();
+  ticks = GetTime::Rdtsc();
   for (int i = 0; i < NUM_RUNS; i++) {
     result_512 = CommsLib::M512ComplexCf32Mult(values0_512, values1_512, true);
   }
-  ticks = Rdtsc() - ticks;
+  ticks = GetTime::Rdtsc() - ticks;
   std::cout << "AVX512 Conj Multiplication took " << ticks << "\n";
   /* Extract the results into output buffers */
   _mm256_stream_ps(reinterpret_cast<float*>(out256), result_256_lower);
