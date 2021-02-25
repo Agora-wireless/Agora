@@ -27,7 +27,7 @@
 /// Basic UDP server class based on OS sockets that supports receiving messages
 class UDPServer {
  public:
-  static const bool kDebugPrintUdpServerInit = false;
+  static const bool kDebugPrintUdpServerInit = true;
 
   // Initialize a UDP server listening on this UDP port with socket buffer
   // size = rx_buffer_size
@@ -78,6 +78,11 @@ class UDPServer {
   UDPServer(const UDPServer&) = delete;
 
   ~UDPServer() {
+    for (const auto& kv : addrinfo_map_) {
+      freeaddrinfo(kv.second);
+    }
+    addrinfo_map_.clear();
+
     if (sock_fd_ != -1) {
       close(sock_fd_);
       sock_fd_ = -1;
@@ -174,7 +179,7 @@ class UDPServer {
    * @brief Configures the socket in blocking mode.  Any calls to recv / send
    * will now block
    */
-  void MakeBlocking() {
+  void MakeBlocking(size_t timeout_sec = 0) {
     int flags = fcntl(sock_fd_, F_GETFL);
     if (flags == -1) {
       throw std::runtime_error("UDPServer: fcntl failed to get flags");
@@ -183,6 +188,17 @@ class UDPServer {
     int ret = fcntl(sock_fd_, F_SETFL, flags);
     if (ret == -1) {
       throw std::runtime_error("UDPServer: fcntl failed to set blocking");
+    }
+
+    // Set timeout
+    if (timeout_sec != 0) {
+      struct timeval tv;
+      tv.tv_sec = timeout_sec;
+      tv.tv_usec = 0;
+      ret = setsockopt(sock_fd_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+      if (ret != 0) {
+        throw std::runtime_error("UDPServer: Failed to set timeout.");
+      }
     }
   }
 

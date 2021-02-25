@@ -41,9 +41,9 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
       frame_duration_(frame_duration),
       ticks_all_(frame_duration_ * ticks_per_usec_ /
                  cfg->Frame().NumTotalSyms()),
-      ticks_wnd1_(200000 /* 200 ms */ * ticks_per_usec_ /
+      ticks_wnd1_((40 * frame_duration_ * ticks_per_usec_) /
                   cfg->Frame().NumTotalSyms()),
-      ticks_wnd2_(15 * frame_duration_ * ticks_per_usec_ /
+      ticks_wnd2_((15 * frame_duration_ * ticks_per_usec_) /
                   cfg->Frame().NumTotalSyms()) {
   MLPD_INFO(
       "Initializing sender, sending to base station server at %s, frame "

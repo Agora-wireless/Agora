@@ -1,8 +1,9 @@
 {
-    "antenna_num": 8,
-    "ue_num": 8,
-    "core_offset": 4,
-    "worker_thread_num": 22,
+    "antenna_num": 1,
+    "ue_num": 1,
+    "core_offset": 3,
+    "rate": 1e6,
+    "worker_thread_num": 4,
     "socket_thread_num": 1,
     "frames": [
         "PDDDDDDDDDDDDD"
@@ -14,6 +15,6 @@
     "ofdm_ca_num": 2048,
     "ofdm_data_num": 1200,
     "demul_block_size": 64,
-    "freq_orthogonal_pilot": true,
+    "freq_orthogonal_pilot": false,
     "fft_block_size": 2
 }

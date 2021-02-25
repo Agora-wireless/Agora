@@ -27,7 +27,7 @@
 // and caches remote addrinfo mappings
 class UDPClient {
  public:
-  static const bool kDebugPrintUdpClientInit = false;
+  static const bool kDebugPrintUdpClientInit = true;
   UDPClient() {
     if (kDebugPrintUdpClientInit) {
       std::printf("Creating UDP Client socket\n");
@@ -70,6 +70,9 @@ class UDPClient {
             const uint8_t* msg, size_t len) {
     std::string remote_uri = rem_hostname + ":" + std::to_string(rem_port);
     struct addrinfo* rem_addrinfo = nullptr;
+
+    // std::printf("UDPClient sending message to %s to port %d\n",
+    //            rem_hostname.c_str(), rem_port);
 
     if (addrinfo_map_.count(remote_uri) != 0) {
       rem_addrinfo = addrinfo_map_.at(remote_uri);

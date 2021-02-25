@@ -102,6 +102,8 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
     udp_clients_.at(ant_id)->Send(cfg_->BsRruAddr(), cfg_->BsRruPort() + ant_id,
                                   udp_pkt_buf.data(), cfg_->PacketLength());
   }
+  std::printf("Sending Beacon frame %zu to antennas %zu : %zu\n", frame_id,
+              radio_lo, radio_hi);
 }
 
 void PacketTXRX::LoopTxRx(int tid) {
@@ -132,8 +134,8 @@ void PacketTXRX::LoopTxRx(int tid) {
   size_t tx_frame_start = GetTime::Rdtsc();
   size_t tx_frame_id = 0;
   size_t slow_start_factor = 10;
-  SendBeacon(tid,
-             tx_frame_id++);  // Send Beacons for the first time to kick off sim
+  // Send Beacons for the first time to kick off sim
+  SendBeacon(tid, tx_frame_id++);
   while (cfg_->Running() == true) {
     if (GetTime::Rdtsc() - tx_frame_start >
         frame_tsc_delta * slow_start_factor) {
@@ -252,7 +254,7 @@ int PacketTXRX::DequeueSend(int tid) {
                    c->BsAntNum()) +
                   ant_id;
 
-  if (kDebugPrintInTask) {
+  if (kDebugPrintInTask == false) {
     std::printf(
         "In TXRX thread %d: Transmitted frame %zu, symbol %zu, "
         "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",

@@ -49,7 +49,7 @@ void* Receiver::LoopRecv(int tid) {
   auto udp_server =
       std::make_unique<UDPServer>(cfg_->BsRruPort() + tid, sock_buf_size);
 
-  udp_server->MakeBlocking();
+  udp_server->MakeBlocking(1);
 
   /* use token to speed up */
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
@@ -78,6 +78,8 @@ void* Receiver::LoopRecv(int tid) {
       throw std::runtime_error("Receiver: Receive thread buffer full");
     }
 
+    std::printf("Attempt rx from %s at port %d\n", cfg_->BsServerAddr().c_str(),
+                cfg_->BsServerPort() + tid);
     ssize_t recvlen = udp_server->RecvFrom(
         reinterpret_cast<uint8_t*>(cur_buffer_ptr), cfg_->PacketLength(),
         cfg_->BsServerAddr(), cfg_->BsServerPort() + tid);

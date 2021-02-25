@@ -46,11 +46,9 @@ Simulator::~Simulator() {
 }
 
 void Simulator::Stop() {
-  std::cout << "stopping threads " << std::endl;
+  std::cout << "Simulator: stopping threads " << std::endl;
   config_->Running(false);
   usleep(1000);
-  receiver_.reset();
-  sender_.reset();
   std::printf("Simulator: stopped\n");
 }
 
@@ -104,10 +102,9 @@ void Simulator::Start() {
           int frame_id_in_buffer = (frame_id % kFrameWnd);
           socket_buffer_status_[socket_thread_id][buf_offset] = 0;
 
-          // std::printf(
-          //     "In main: received from frame %d %d, symbol %d, ant
-          //     %d\n", frame_id, frame_id_in_buffer, symbol_id,
-          //     ant_id);
+          std::printf(
+              "In main: received from frame %d %d, symbol %d, ant %d\n ",
+              frame_id, frame_id_in_buffer, symbol_id, ant_id);
 
           UpdateRxCounters(frame_id, frame_id_in_buffer, symbol_id, ant_id);
         } break;
@@ -120,6 +117,7 @@ void Simulator::Start() {
     }   /* end of for */
   }     /* end of while */
   this->Stop();
+  sender_.reset();
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = cur_directory + "/data/timeresult_simulator.txt";
   FILE* fp = std::fopen(filename.c_str(), "w");
@@ -140,6 +138,7 @@ void Simulator::Start() {
   for (auto& join_thread : rx_threads) {
     join_thread.join();
   }
+  receiver_.reset();
   std::printf("Rx threads joined......\n");
 }
 
