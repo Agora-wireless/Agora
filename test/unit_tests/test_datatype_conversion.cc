@@ -30,8 +30,8 @@ TEST(Modulation, adapt_bits_for_mod_one) {
     std::printf("%s ", std::bitset<8>(input[i]).to_string().c_str());
   }
   std::printf("\noutput (%zu B): ", output.size());
-  for (size_t i = 0; i < output.size(); i++) {
-    std::printf("%s ", std::bitset<8>(output[i]).to_string().c_str());
+  for (unsigned char i : output) {
+    std::printf("%s ", std::bitset<8>(i).to_string().c_str());
   }
 
   std::vector<uint8_t> regen_input(kInputBytes);
@@ -88,18 +88,18 @@ TEST(Modulation, adapt_bits_for_mod_stress) {
 
 TEST(SIMD, float_32_to_16) {
   constexpr float kAllowedError = 1e-3;
-  float* in_buf = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::kK64Align, kSIMDTestNum * sizeof(float)));
+  auto* in_buf = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(
+      Agora_memory::Alignment_t::kAlign64, kSIMDTestNum * sizeof(float)));
   for (size_t i = 0; i < kSIMDTestNum; i++) {
     in_buf[i] = static_cast<float>(rand()) / (RAND_MAX * 1.0);
   }
 
-  float* medium = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::kK64Align, kSIMDTestNum / 2 * sizeof(float)));
+  auto* medium = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(
+      Agora_memory::Alignment_t::kAlign64, kSIMDTestNum / 2 * sizeof(float)));
   SimdConvertFloat32ToFloat16(medium, in_buf, kSIMDTestNum);
 
-  float* out_buf = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(
-      Agora_memory::Alignment_t::kK64Align, kSIMDTestNum * sizeof(float)));
+  auto* out_buf = static_cast<float*>(Agora_memory::PaddedAlignedAlloc(
+      Agora_memory::Alignment_t::kAlign64, kSIMDTestNum * sizeof(float)));
   SimdConvertFloat16ToFloat32(out_buf, medium, kSIMDTestNum);
 
   for (size_t i = 0; i < kSIMDTestNum; i++) {

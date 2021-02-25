@@ -1,5 +1,9 @@
-#ifndef RADIO_LIB
-#define RADIO_LIB
+/**
+ * @file radio_lib.h
+ * @brief Declaration file for the RadioConfig class.
+ */
+#ifndef RADIO_LIB_H_
+#define RADIO_LIB_H_
 
 #include <SoapySDR/Device.hpp>
 #include <SoapySDR/Errors.hpp>
@@ -18,7 +22,7 @@
 
 class RadioConfig {
  public:
-  RadioConfig(Config* cfg);
+  explicit RadioConfig(Config* cfg);
   bool RadioStart();
   void RadioStop();
   void ReadSensors();
@@ -32,15 +36,11 @@ class RadioConfig {
   arma::cx_float* GetCalibDl() { return init_calib_dl_processed_; }
   ~RadioConfig();
 
+  // Thread functions
+  void InitBsRadio(size_t tid);
+  void ConfigureBsRadio(size_t tid);
+
  private:
-  struct RadioConfigContext {
-    RadioConfig* brs_;
-    size_t tid_;
-  };
-  static void* InitBsRadioLaunch(void* in_context);
-  static void* ConfigureBsRadioLaunch(void* in_context);
-  void InitBsRadio(RadioConfigContext* context);
-  void ConfigureBsRadio(RadioConfigContext* context);
   bool InitialCalib(bool /*sample_adjust*/);
   static void DrainRxBuffer(SoapySDR::Device* ibsSdrs,
                             SoapySDR::Stream* istream, std::vector<void*> buffs,
@@ -75,5 +75,8 @@ class RadioConfig {
   bool is_ue_;
   bool calib_;
   size_t calib_meas_num_;
+
+  std::atomic<size_t> num_radios_initialized_;
+  std::atomic<size_t> num_radios_configured_;
 };
-#endif
+#endif  // RADIO_LIB_H_

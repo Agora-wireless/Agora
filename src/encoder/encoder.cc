@@ -1,3 +1,10 @@
+/**
+ * @file encoder.cc
+ * @brief Implementations for Agora's AVX2-based LDPC encoder.
+ *
+ * We need an AVX2-based LDPC encoder because FlexRAN's LDPC encoder requires
+ * AVX-512.
+ */
 #include "encoder.h"
 
 #include "common_typedef_sdk.h"
@@ -238,7 +245,7 @@ int32_t BblibLdpcEncoder5gnr(
   if (zc > ZC_MAX) {
     std::fprintf(stderr, "Error: This AVX2 encoder supports only Zc <= %d\n",
                  ZC_MAX);
-    std::exit(-1);
+    throw std::runtime_error("Encoder: This AVX2 encoder supports only Zc");
   }
 
   int number_codeblocks = request->numberCodeblocks;

@@ -1,8 +1,9 @@
-#ifndef SYMBOLS
-#define SYMBOLS
+#ifndef SYMBOLS_H_
+#define SYMBOLS_H_
 
 #include <mkl.h>
 
+#include <map>
 #include <string>
 
 #define EXPORT __attribute__((visibility("default")))
@@ -67,7 +68,22 @@ enum class DoerType : size_t {
   kPrecode,
   kRC
 };
-static constexpr size_t kNumDoerTypes = static_cast<size_t>(DoerType::kRC) + 1;
+static constexpr std::array<DoerType, (static_cast<size_t>(DoerType::kRC) + 1)>
+    kAllDoerTypes = {DoerType::kFFT,   DoerType::kCSI,     DoerType::kZF,
+                     DoerType::kDemul, DoerType::kDecode,  DoerType::kEncode,
+                     DoerType::kIFFT,  DoerType::kPrecode, DoerType::kRC};
+static constexpr size_t kNumDoerTypes = kAllDoerTypes.size();
+
+static const std::map<DoerType, std::string> kDoerNames = {
+    {DoerType::kFFT, std::string("FFT")},
+    {DoerType::kCSI, std::string("CSI")},
+    {DoerType::kZF, std::string("ZF")},
+    {DoerType::kDemul, std::string("Demul")},
+    {DoerType::kDecode, std::string("Decode")},
+    {DoerType::kEncode, std::string("Encode")},
+    {DoerType::kIFFT, std::string("iFFT")},
+    {DoerType::kPrecode, std::string("Precode")},
+    {DoerType::kRC, std::string("RC")}};
 
 enum class PrintType : int {
   kPacketRXPilots,
@@ -91,7 +107,7 @@ enum class PrintType : int {
 // Enable thread pinning and exit if thread pinning fails. Thread pinning is
 // crucial for good performance. For testing or developing Agora on machines
 // with insufficient cores, disable this flag.
-static constexpr size_t kEnableThreadPinning = 1u;
+static constexpr bool kEnableThreadPinning = true;
 
 #define BIGSTATION 0
 #ifdef USE_DPDK
@@ -200,6 +216,11 @@ enum class SymbolType {
   kGuard,
   kUnknown
 };
+static const std::map<char, SymbolType> kSymbolMap = {
+    {'B', SymbolType::kBeacon}, {'C', SymbolType::kCalDL},
+    {'D', SymbolType::kDL},     {'G', SymbolType::kGuard},
+    {'L', SymbolType::kCalUL},  {'P', SymbolType::kPilot},
+    {'U', SymbolType::kUL}};
 
 // Intervals for beacon detection at the client (in frames)
 static constexpr size_t kBeaconDetectInterval = 10;
@@ -236,13 +257,30 @@ static constexpr size_t kMaxThreads = 128;
 // Number of subcarriers in one cache line, when represented as complex floats
 static constexpr size_t kSCsPerCacheline = 64 / (2 * sizeof(float));
 
+// Agora Mac Thread listens for UDP packets from applications (downlink packets
+// at the server, uplink packets at the client) on kMacRxPort
+static constexpr size_t kMacRxPort = 8070;
+
+// After receiving decoded codeblocks from the PHY (uplink at the
+// server, downlink at the client), we send UDP packets to kRemoteHostname
+static constexpr char kMacRemoteHostname[] = "127.0.0.1";
+
+// Agora sends UDP packets for UE #i (uplink packets at the server,
+// downlink packets at the client) with destination port kBaseRemotePort + i
+static constexpr size_t kMacBaseRemotePort = 8080;
+
+// Agora sends control information over an out-of-band control channel
+// to each UE #i, at port kBaseClientPort + i
+// TODO: need to generalize for hostname, port pairs for each client
+static constexpr size_t kMacBaseClientPort = 7070;
+
 // Number of subcarriers in a partial transpose block
 static constexpr size_t kTransposeBlockSize = 8;
-static_assert(IsPowerOfTwo(kTransposeBlockSize), "");  // For cheap modulo
-static_assert(kTransposeBlockSize % kSCsPerCacheline == 0, "");
+static_assert(IsPowerOfTwo(kTransposeBlockSize));  // For cheap modulo
+static_assert(kTransposeBlockSize % kSCsPerCacheline == 0);
 
 static constexpr size_t kCalibScGroupSize = 8;
-static_assert(kCalibScGroupSize % kSCsPerCacheline == 0, "");
+static_assert(kCalibScGroupSize % kSCsPerCacheline == 0);
 
 #ifdef USE_AVX2_ENCODER
 static constexpr bool kUseAVX2Encoder = true;
@@ -252,4 +290,4 @@ static constexpr bool kUseAVX2Encoder = false;
 
 // Enable debugging for sender and receiver applications
 static constexpr bool kDebugSenderReceiver = false;
-#endif
+#endif  // SYMBOLS_H_

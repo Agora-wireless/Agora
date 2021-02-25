@@ -1,3 +1,7 @@
+/**
+ * @file chsim_main.cc
+ * @brief Main file for the chsim executable
+ */
 #include <gflags/gflags.h>
 
 #include "channel_sim.h"
@@ -22,12 +26,16 @@ DEFINE_double(chan_snr, 20.0, "Signal-to-Noise Ratio");
 
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  auto* bs_config = new Config(FLAGS_bs_conf_file);
-  auto* ue_config = new Config(FLAGS_ue_conf_file);
-  auto* sim =
-      new ChannelSim(bs_config, ue_config, FLAGS_bs_threads, FLAGS_ue_threads,
-                     FLAGS_worker_threads, FLAGS_core_offset, FLAGS_chan_model,
-                     FLAGS_chan_snr);
-  sim->Start();
+  std::printf("Base Station configuration\n");
+  auto bs_config = std::make_unique<Config>(FLAGS_bs_conf_file);
+  std::printf("User configuration\n");
+  auto ue_config = std::make_unique<Config>(FLAGS_ue_conf_file);
+  {
+    auto sim = std::make_unique<ChannelSim>(
+        bs_config.get(), ue_config.get(), FLAGS_bs_threads, FLAGS_ue_threads,
+        FLAGS_worker_threads, FLAGS_core_offset, FLAGS_chan_model,
+        FLAGS_chan_snr);
+    sim->Start();
+  }
   return 0;
 }

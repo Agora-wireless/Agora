@@ -1,5 +1,9 @@
-#ifndef PHY_STATS
-#define PHY_STATS
+/**
+ * @file phy_stats.h
+ * @brief Declaration file for the PhyStats class.
+ */
+#ifndef PHY_STATS_H_
+#define PHY_STATS_H_
 
 #include <armadillo>
 
@@ -7,10 +11,9 @@
 #include "memory_manage.h"
 #include "symbols.h"
 
-using namespace arma;
 class PhyStats {
  public:
-  PhyStats(Config* cfg);
+  explicit PhyStats(Config* const cfg);
   ~PhyStats();
   void PrintPhyStats();
   void UpdateBitErrors(size_t /*ue_id*/, size_t /*offset*/, uint8_t /*tx_byte*/,
@@ -25,7 +28,8 @@ class PhyStats {
                               uint8_t /*rx_byte*/);
   void UpdateUncodedBits(size_t /*ue_id*/, size_t /*offset*/,
                          size_t /*new_bits_num*/);
-  void UpdateEvmStats(size_t /*frame_id*/, size_t /*sc_id*/, cx_fmat /*eq*/);
+  void UpdateEvmStats(size_t /*frame_id*/, size_t /*sc_id*/,
+                      const arma::cx_fmat& /*eq*/);
   void PrintEvmStats(size_t /*frame_id*/);
   void UpdatePilotSnr(size_t /*frame_id*/, size_t /*ue_id*/,
                       complex_float* /*fft_data*/);
@@ -33,7 +37,7 @@ class PhyStats {
   void PrintSnrStats(size_t /*frame_id*/);
 
  private:
-  Config* config_;
+  Config const* const config_;
   Table<size_t> decoded_bits_count_;
   Table<size_t> bit_error_count_;
   Table<size_t> decoded_blocks_count_;
@@ -43,7 +47,7 @@ class PhyStats {
   Table<float> evm_buffer_;
   Table<float> pilot_snr_;
 
-  cx_fmat ul_gt_mat_;
+  arma::cx_fmat ul_gt_mat_;
 };
 
-#endif
+#endif  // PHY_STATS_H_

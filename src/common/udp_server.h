@@ -12,7 +12,8 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-#pragma once
+#ifndef UDP_SERVER_H_
+#define UDP_SERVER_H_
 
 #include <fcntl.h>
 #include <netdb.h>
@@ -27,7 +28,7 @@ class UDPServer {
  public:
   // Initialize a UDP server listening on this UDP port with socket buffer
   // size = rx_buffer_size
-  UDPServer(uint16_t port, size_t rx_buffer_size = 0) : port_(port) {
+  explicit UDPServer(uint16_t port, size_t rx_buffer_size = 0) : port_(port) {
     sock_fd_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock_fd_ == -1) {
       throw std::runtime_error("UDPServer: Failed to create local socket.");
@@ -45,8 +46,8 @@ class UDPServer {
 
     // Set buffer size
     if (rx_buffer_size != 0) {
-      int ret = setsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &rx_buffer_size,
-                           sizeof(rx_buffer_size));
+      ret = setsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &rx_buffer_size,
+                       sizeof(rx_buffer_size));
       if (ret != 0) {
         throw std::runtime_error("UDPServer: Failed to set RX buffer size.");
       }
@@ -104,3 +105,5 @@ class UDPServer {
   uint16_t port_;  // The UDP port to listen on
   int sock_fd_ = -1;
 };
+
+#endif  // UDP_SERVER_H_

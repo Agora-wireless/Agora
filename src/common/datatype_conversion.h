@@ -1,10 +1,10 @@
 /**
- * @file datatype-conversion.h
+ * @file datatype-conversion.inc
  * @brief SIMD functions for converting between data types
  */
 
-#ifndef DATATYPE_CONVERSION
-#define DATATYPE_CONVERSION
+#ifndef DATATYPE_CONVERSION_INC_
+#define DATATYPE_CONVERSION_INC_
 
 #include <emmintrin.h>
 #include <immintrin.h>
@@ -121,8 +121,8 @@ static inline void ConvertFloatTo12bitIq(const float* in_buf, uint8_t* out_buf,
                                          size_t n_elems) {
   size_t index_short = 0;
   for (size_t i = 0; i < n_elems; i = i + 2) {
-    ushort temp_i = (unsigned short)(in_buf[i] * 32768 * 4);
-    ushort temp_q = (unsigned short)(in_buf[i + 1] * 32768 * 4);
+    auto temp_i = static_cast<unsigned short>(in_buf[i] * 32768 * 4);
+    auto temp_q = static_cast<unsigned short>(in_buf[i + 1] * 32768 * 4);
     // Take the higher 12 bits and ignore the lower 4 bits
     out_buf[index_short] = (uint8_t)(temp_i >> 4);
     out_buf[index_short + 1] =
@@ -216,7 +216,7 @@ static inline void SimdConvert12bitIqToFloat(const uint8_t* in_buf,
                                              float* out_buf,
                                              uint16_t* in_16bits_buf,
                                              size_t n_elems) {
-  _unused(in_16bits_buf);
+  unused(in_16bits_buf);
 #ifdef __AVX512F__
   const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 131072.f);
   const __m512i magic_i = _mm512_castps_si512(magic);
@@ -337,4 +337,4 @@ static inline void SimdConvertFloat32ToFloat16(float* out_buf,
 #endif
 }
 
-#endif
+#endif  // DATATYPE_CONVERSION_INC_

@@ -1,5 +1,9 @@
-#ifndef DOPRECODE
-#define DOPRECODE
+/**
+ * @file doprecode.h
+ * @brief Declaration file for the DoPrecode class.
+ */
+#ifndef DOPRECODE_H_
+#define DOPRECODE_H_
 
 #include <armadillo>
 #include <iostream>
@@ -21,7 +25,7 @@ class DoPrecode : public Doer {
             PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
             Table<complex_float>& in_dl_ifft_buffer,
             Table<int8_t>& dl_encoded_or_raw_data, Stats* in_stats_manager);
-  ~DoPrecode();
+  ~DoPrecode() override;
 
   /**
    * Do demodulation task for a block of subcarriers (demul_block_size)
@@ -49,7 +53,7 @@ class DoPrecode : public Doer {
    *     4. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  EventData Launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
   // Load input data for a single UE and a single subcarrier
   void LoadInputData(size_t symbol_idx_dl, size_t total_data_symbol_idx,
@@ -70,4 +74,4 @@ class DoPrecode : public Doer {
 #endif
 };
 
-#endif
+#endif  // DOPRECODE_H_

@@ -52,8 +52,7 @@ else()
   set( CMAKE_VERBOSE_MAKEFILE on )
   message(STATUS "Debugging is enabled. Performance will be low")
   set(CMAKE_BUILD_TYPE Debug)
-  #set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wshadow -ggdb3 -fstack-protector-all -fsanitize=undefined -fsanitize=address -fsanitize=null")
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ggdb3 -fstack-protector-all -fsanitize=undefined -fsanitize=address -fsanitize=null")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wshadow -ggdb3 -fstack-protector-all -fsanitize=undefined -fsanitize=address -fsanitize=null")
   #-fsanitize=thread- fstack-protector-all -fsanitize=address -fstack-check
   #-fsanitize=address -fsanitize=pointer-compare
   #-fsanitize=address -fsanitize=pointer-subtract
@@ -207,6 +206,7 @@ include_directories(
 include_directories(SYSTEM src/third_party)
 
 set(COMMON_SOURCES
+  src/common/framestats.cc
   src/common/config.cc
   src/common/utils.cc
   src/common/comms-lib.cc
@@ -217,6 +217,7 @@ set(COMMON_SOURCES
   src/common/net.cc
   src/common/crc.cc
   src/common/memory_manage.cc
+  src/common/scrambler.cc
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc
   src/encoder/iobuffer.cc)
@@ -279,6 +280,7 @@ add_executable(agora
 target_link_libraries(agora ${COMMON_LIBS})
 
 add_executable(data_generator
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator_main.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(data_generator ${COMMON_LIBS})
@@ -338,7 +340,7 @@ endforeach()
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
-  test_ptr_grid test_recipcal test_avx512_complex_mul)
+  test_ptr_grid test_recipcal test_avx512_complex_mul test_scrambler)
 
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}

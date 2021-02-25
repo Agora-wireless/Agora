@@ -1,13 +1,14 @@
 // http://www.yolinux.com/TUTORIALS/C++Signals.html
 
-#ifndef __SIGNALHANDLER_H__
-#define __SIGNALHANDLER_H__
+#ifndef SIGNALHANDLER_H_
+#define SIGNALHANDLER_H_
 #include <stdexcept>
 using std::runtime_error;
 
 class SignalException : public runtime_error {
  public:
-  SignalException(const std::string& _message) : std::runtime_error(_message) {}
+  explicit SignalException(const std::string& _message)
+      : std::runtime_error(_message) {}
 };
 
 class SignalHandler {
@@ -16,7 +17,7 @@ class SignalHandler {
 
  public:
   SignalHandler();
-  ~SignalHandler();
+  ~SignalHandler() = default;
 
   static bool GotExitSignal();
   static void SetExitSignal(bool _bExitSignal);
@@ -24,4 +25,4 @@ class SignalHandler {
   void SetupSignalHandlers();
   static void ExitSignalHandler(int _ignored);
 };
-#endif
+#endif  // SIGNALHANDLER_H_

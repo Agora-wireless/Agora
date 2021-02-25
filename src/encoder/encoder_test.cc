@@ -1,10 +1,14 @@
+/**
+ * @file encoder_test.cc
+ * @brief Test functions for the ldpc encoding routines
+ */
 #include "encoder.h"
 
 #include <algorithm>
 #include <fstream>
 #include <vector>
 
-#include "../common/utils_ldpc.hpp"
+#include "../common/utils_ldpc.h"
 #include "gcc_phy_ldpc_encoder_5gnr_internal.h"
 
 static constexpr size_t kNumCodeBlocks = 1;
@@ -15,7 +19,7 @@ char* read_binfile(std::string filename, int buffer_size) {
 
   if (!infile.is_open()) {
     std::fprintf(stderr, "Failed to open file %s\n", filename.c_str());
-    std::exit(-1);
+    throw std::runtime_error("Failed to open file");
   }
 
   auto* x = new char[buffer_size]();

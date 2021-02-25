@@ -1,5 +1,9 @@
-#ifndef DOZF
-#define DOZF
+/**
+ * @file dozf.h
+ * @brief Declaration file for the DoZf class.  Zero forcing for one subcarrier.
+ */
+#ifndef DOZF_H_
+#define DOZF_H_
 
 #include <armadillo>
 #include <iostream>
@@ -22,7 +26,7 @@ class DoZF : public Doer {
        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_,
        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
        Stats* stats_manager);
-  ~DoZF();
+  ~DoZF() override;
 
   /**
    * Do ZF task for one subcarrier with all pilots in a frame
@@ -40,7 +44,7 @@ class DoZF : public Doer {
    *     2. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  EventData Launch(size_t tag);
+  EventData Launch(size_t tag) override;
 
  private:
   void ZfTimeOrthogonal(size_t tag);
@@ -89,4 +93,4 @@ class DoZF : public Doer {
   complex_float* calib_gather_buffer_;
 };
 
-#endif
+#endif  // DOZF_H_

@@ -1,12 +1,15 @@
-#include "cpu_attach.hpp"
+/**
+ * @file test_matrix.cc
+ * @brief Testing functions for zf matrix computations
+ */
+
+#include "cpu_attach.h"
 // #include "ittnotify.h"
 #include <sys/resource.h>
 #include <sys/time.h>
 
 #include <armadillo>
 // #include <hpctoolkit.h>
-
-using namespace arma;
 
 static double test_get_time(void) {
   struct timespec tv;
@@ -27,10 +30,10 @@ void flushCache() {
 
 static double bench_ZF_warmup(unsigned Nx, unsigned Ny, unsigned iterations) {
   srand(time(NULL));
-  fmat real_H = randn<fmat>(Nx, Ny);
-  fmat imag_H = randn<fmat>(Nx, Ny);
-  cx_fmat mat_input(real_H, imag_H);
-  cx_fmat mat_output(Ny, Nx);
+  arma::fmat real_H = randn<arma::fmat>(Nx, Ny);
+  arma::fmat imag_H = randn<arma::fmat>(Nx, Ny);
+  arma::cx_fmat mat_input(real_H, imag_H);
+  arma::cx_fmat mat_output(Ny, Nx);
 
   // __itt_resume();
   double start_time = test_get_time();
@@ -45,10 +48,10 @@ static double bench_ZF_warmup(unsigned Nx, unsigned Ny, unsigned iterations) {
 
 static double bench_ZF(unsigned Nx, unsigned Ny, unsigned iterations) {
   srand(time(NULL));
-  fmat real_H = randn<fmat>(Nx, Ny);
-  fmat imag_H = randn<fmat>(Nx, Ny);
-  cx_fmat mat_input(real_H, imag_H);
-  cx_fmat mat_output(Ny, Nx);
+  arma::fmat real_H = randn<arma::fmat>(Nx, Ny);
+  arma::fmat imag_H = randn<arma::fmat>(Nx, Ny);
+  arma::cx_fmat mat_input(real_H, imag_H);
+  arma::cx_fmat mat_output(Ny, Nx);
 
   // std::cout<<mat_input<<std::endl;
 
@@ -66,13 +69,13 @@ static double bench_ZF(unsigned Nx, unsigned Ny, unsigned iterations) {
 static double bench_multiply_dim1(unsigned Nx, unsigned Ny,
                                   unsigned iterations) {
   srand(0);
-  fmat real_right = randn<fmat>(Nx, Ny);
-  fmat imag_right = randn<fmat>(Nx, Ny);
-  fmat real_left = randn<fmat>(1, Nx);
-  fmat imag_left = randn<fmat>(1, Nx);
-  cx_fmat mat_right(real_right, imag_right);
-  cx_fmat mat_left(real_left, imag_left);
-  cx_fmat result(1, Ny);
+  arma::fmat real_right = randn<arma::fmat>(Nx, Ny);
+  arma::fmat imag_right = randn<arma::fmat>(Nx, Ny);
+  arma::fmat real_left = randn<arma::fmat>(1, Nx);
+  arma::fmat imag_left = randn<arma::fmat>(1, Nx);
+  arma::cx_fmat mat_right(real_right, imag_right);
+  arma::cx_fmat mat_left(real_left, imag_left);
+  arma::cx_fmat result(1, Ny);
 
   double start_time = test_get_time();
   // __itt_resume();
@@ -88,13 +91,13 @@ static double bench_multiply_dim1(unsigned Nx, unsigned Ny,
 static double bench_multiply_dim2(unsigned Nx, unsigned Ny,
                                   unsigned iterations) {
   srand(0);
-  fmat real_left = randn<fmat>(Nx, Ny);
-  fmat imag_left = randn<fmat>(Nx, Ny);
-  fmat real_right = randn<fmat>(Ny, 1);
-  fmat imag_right = randn<fmat>(Ny, 1);
-  cx_fmat mat_right(real_right, imag_right);
-  cx_fmat mat_left(real_left, imag_left);
-  cx_fmat result(Nx, 1);
+  arma::fmat real_left = randn<arma::fmat>(Nx, Ny);
+  arma::fmat imag_left = randn<arma::fmat>(Nx, Ny);
+  arma::fmat real_right = randn<arma::fmat>(Ny, 1);
+  arma::fmat imag_right = randn<arma::fmat>(Ny, 1);
+  arma::cx_fmat mat_right(real_right, imag_right);
+  arma::cx_fmat mat_left(real_left, imag_left);
+  arma::cx_fmat result(Nx, 1);
 
   double start_time = test_get_time();
   // __itt_resume();
@@ -110,13 +113,13 @@ static double bench_multiply_dim2(unsigned Nx, unsigned Ny,
 static double bench_multiply_transpose(unsigned Nx, unsigned Ny,
                                        unsigned iterations) {
   srand(0);
-  fmat real_left = randn<fmat>(Nx, Ny);
-  fmat imag_left = randn<fmat>(Nx, Ny);
-  fmat real_right = randn<fmat>(Nx, 1);
-  fmat imag_right = randn<fmat>(Nx, 1);
-  cx_fmat mat_right(real_right, imag_right);
-  cx_fmat mat_left(real_left, imag_left);
-  cx_fmat result(Nx, 1);
+  arma::fmat real_left = randn<arma::fmat>(Nx, Ny);
+  arma::fmat imag_left = randn<arma::fmat>(Nx, Ny);
+  arma::fmat real_right = randn<arma::fmat>(Nx, 1);
+  arma::fmat imag_right = randn<arma::fmat>(Nx, 1);
+  arma::cx_fmat mat_right(real_right, imag_right);
+  arma::cx_fmat mat_left(real_left, imag_left);
+  arma::cx_fmat result(Nx, 1);
 
   double start_time = test_get_time();
   for (unsigned i = 0; i < iterations; i++) {
@@ -239,7 +242,8 @@ int main(int argc, char* argv[]) {
   if (stick_this_thread_to_core(main_core_id) != 0) {
     std::printf("Main thread: stitch main thread to core %d failed\n",
                 main_core_id);
-    std::exit(0);
+    throw std::runtime_error(
+        "Test Matrix: Main thread: stitch main thread to core ");
   } else {
     std::printf("Main thread: stitch main thread to core %d succeeded\n",
                 main_core_id);

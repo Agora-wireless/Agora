@@ -5,6 +5,11 @@
 		}
 	],
 	"settings": {
+		"doxdocgen.generic.paramTemplate": "@param{indent:8}{param}{indent:30}",
+		"doxdocgen.generic.briefTemplate": "@brief{indent:8}{text}{indent:30}",
+		"doxdocgen.generic.returnTemplate": "@return{indent:8}{type}{indent:30}",
+		"editor.formatOnSave": true,
+		"editor.formatOnPaste": true,
 		"files.associations": {
 			"array": "cpp",
 			"string": "cpp",
@@ -76,7 +81,11 @@
 			"variant": "cpp",
 			"*.ipp": "cpp",
 			"cassert": "cpp",
-			"armadillo": "cpp"
-		}
+			"armadillo": "cpp",
+			"*.inc": "cpp",
+			"netfwd": "cpp"
+		},
+		"testMate.cpp.test.workingDirectory": "${workspaceFolder}",
+		"testExplorer.showOnRun": true
 	}
 }

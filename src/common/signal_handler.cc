@@ -10,12 +10,11 @@ bool SignalHandler::mb_got_exit_signal = false;
 /**
  * Default Contructor.
  */
-SignalHandler::SignalHandler() {}
+SignalHandler::SignalHandler() = default;
 
 /**
  * Destructor.
  */
-SignalHandler::~SignalHandler() {}
 
 /**
  * Returns the bool flag indicating whether we received an exit signal
