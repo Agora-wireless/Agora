@@ -27,7 +27,11 @@
 // and caches remote addrinfo mappings
 class UDPClient {
  public:
+  static const bool kDebugPrintUdpClientInit = false;
   UDPClient() {
+    if (kDebugPrintUdpClientInit) {
+      std::printf("Creating UDP Client socket\n");
+    }
     sock_fd_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock_fd_ == -1) {
       throw std::runtime_error("UDPClient: Failed to create local socket.");
@@ -45,7 +49,10 @@ class UDPClient {
       close(sock_fd_);
       sock_fd_ = -1;
     }
-    std::printf("Destroying UDPClient\n");
+
+    if (kDebugPrintUdpClientInit) {
+      std::printf("Destroying UDPClient\n");
+    }
   }
 
   /**
@@ -108,7 +115,6 @@ class UDPClient {
 
   // A cache mapping hostname:udp_port to addrinfo
   std::map<std::string, struct addrinfo*> addrinfo_map_;
-
   // The list of all packets sent, maintained if recording is enabled
   std::vector<std::vector<uint8_t>> sent_vec_;
 

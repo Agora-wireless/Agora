@@ -96,9 +96,9 @@ void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
       throw std::runtime_error("Utils: failed to pin to core");
     } else {
       if (verbose == true) {
-        std::printf("%s thread %d: pinned to core %zu\n",
+        std::printf("%s thread %d: pinned to core %zu, but requested %d \n",
                     ThreadTypeStr(thread_type).c_str(), thread_id,
-                    physical_core_id);
+                    physical_core_id, core_offset + thread_id);
       }
     }  // EnableThreadPinning == true
   }
