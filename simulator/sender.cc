@@ -135,6 +135,7 @@ Sender::~Sender() {
     delete (task_ptok_[i]);
   }
   std::free(task_ptok_);
+  MLPD_INFO("Sender: Complete\n");
 }
 
 void Sender::StartTx() {
@@ -142,6 +143,7 @@ void Sender::StartTx() {
   this->frame_end_ = new double[kNumStatsFrames]();
 
   CreateWorkerThreads(socket_thread_num_);
+  signal(SIGINT, InterruptHandler);
   MasterThread(0);  // Start the master thread
 
   delete[](this->frame_start_);
@@ -179,7 +181,6 @@ void Sender::ScheduleSymbol(size_t frame, size_t symbol_id) {
 }
 
 void* Sender::MasterThread(int /*unused*/) {
-  signal(SIGINT, InterruptHandler);
   PinToCoreWithOffset(ThreadType::kMasterTX, core_offset_, 0);
 
   // Wait for all worker threads to be ready (+1 for Master)
@@ -247,6 +248,7 @@ void* Sender::MasterThread(int /*unused*/) {
           }
           next_frame_id++;
           if (next_frame_id == cfg_->FramesToTest()) {
+            keep_running.store(false);
             break; /* Finished */
           }
           this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] =
@@ -273,6 +275,7 @@ void* Sender::MasterThread(int /*unused*/) {
       }
     }  // end (ret > 0)
   }
+  std::printf("Sender main thread exit\n");
   WriteStatsToFile(cfg_->FramesToTest());
   return nullptr;
 }
@@ -435,6 +438,7 @@ void* Sender::WorkerThread(int tid) {
   std::free(static_cast<void*>(socks_pkt_buf));
   std::free(static_cast<void*>(fft_inout));
   MLPD_FRAME("Sender: worker thread %d exit\n", tid);
+  std::printf("Sender: worker thread %d exit\n", tid);
   return nullptr;
 }
 
