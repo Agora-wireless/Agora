@@ -53,8 +53,7 @@ MacThread::MacThread(
   udp_pkt_buf_.resize(udp_pkt_len);
 
   size_t udp_server_port = cfg_->MacRxPort();
-  MLPD_TRACE("MacThread: setting up udp server at port %zu\n",
-              udp_server_port);
+  MLPD_TRACE("MacThread: setting up udp server at port %zu\n", udp_server_port);
   udp_server_ = std::make_unique<UDPServer>(
       udp_server_port, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
 
@@ -64,7 +63,7 @@ MacThread::MacThread(
   // Only needed for the client
   if (mode_ == Mode::kClient) {
     MLPD_TRACE("MacThread: setting up udp server at port %zu\n",
-                kMacBaseClientPort);
+               kMacBaseClientPort);
     udp_control_channel_ = std::make_unique<UDPServer>(
         kMacBaseClientPort, udp_control_len * kMaxUEs * kMaxPktsPerUE);
   }
@@ -214,8 +213,8 @@ void MacThread::SendControlInformation() {
 
 void MacThread::ProcessControlInformation() {
   std::memset(&udp_control_buf_[0], 0, udp_control_buf_.size());
-  ssize_t ret = udp_control_channel_->Recv(&udp_control_buf_[0],
-                                                      udp_control_buf_.size());
+  ssize_t ret =
+      udp_control_channel_->Recv(&udp_control_buf_[0], udp_control_buf_.size());
   if (ret == 0) {
     return;  // No data received
   } else if (ret == -1) {
@@ -232,8 +231,7 @@ void MacThread::ProcessControlInformation() {
 
 void MacThread::ProcessUdpPacketsFromApps(RBIndicator ri) {
   std::memset(&udp_pkt_buf_[0], 0, udp_pkt_buf_.size());
-  ssize_t ret =
-      udp_server_->Recv(&udp_pkt_buf_[0], udp_pkt_buf_.size());
+  ssize_t ret = udp_server_->Recv(&udp_pkt_buf_[0], udp_pkt_buf_.size());
   if (ret == 0) {
     return;  // No data received
   } else if (ret == -1) {

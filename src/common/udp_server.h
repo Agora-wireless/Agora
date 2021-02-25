@@ -27,9 +27,14 @@
 /// Basic UDP server class based on OS sockets that supports receiving messages
 class UDPServer {
  public:
+  static const bool kDebugPrintUdpServerInit = false;
+
   // Initialize a UDP server listening on this UDP port with socket buffer
   // size = rx_buffer_size
   explicit UDPServer(uint16_t port, size_t rx_buffer_size = 0) : port_(port) {
+    if (kDebugPrintUdpServerInit) {
+      std::printf("Creating UDP server listening at port %d\n", port);
+    }
     sock_fd_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock_fd_ == -1) {
       throw std::runtime_error("UDPServer: Failed to create local socket.");
@@ -77,7 +82,10 @@ class UDPServer {
       close(sock_fd_);
       sock_fd_ = -1;
     }
-    std::printf("Destroying UDPServer\n");
+
+    if (kDebugPrintUdpServerInit) {
+      std::printf("Destroying UDPServer\n");
+    }
   }
 
   /**
