@@ -6,7 +6,6 @@
 #define SIMULATOR_H_
 
 #include <emmintrin.h>
-#include <fcntl.h>
 #include <immintrin.h>
 #include <unistd.h>
 

@@ -6,12 +6,8 @@
 #ifndef PHY_UE_H_
 #define PHY_UE_H_
 
-#include <fcntl.h>
 #include <immintrin.h>
 #include <sys/epoll.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 #include <algorithm>

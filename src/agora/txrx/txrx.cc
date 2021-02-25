@@ -14,10 +14,10 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
       ant_per_cell_(cfg->BsAntNum() / cfg->NumCells()),
       socket_thread_num_(cfg->SocketThreadNum()) {
   if ((kUseArgos == false) && (kUseUHD == false)) {
-    socket_.resize(cfg->NumRadios());
-    bs_rru_sockaddr_.resize(cfg->NumRadios());
+    udp_servers_.resize(cfg->NumRadios());
+    udp_clients_.resize(cfg->NumRadios());
   } else {
-    radioconfig_ = new RadioConfig(cfg);
+    radioconfig_ = std::make_unique<RadioConfig>(cfg);
   }
 }
 
@@ -36,7 +36,6 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
 PacketTXRX::~PacketTXRX() {
   if (kUseArgos || kUseUHD) {
     radioconfig_->RadioStop();
-    delete radioconfig_;
   }
   for (size_t i = 0; i < cfg_->SocketThreadNum(); i++) {
     socket_std_threads_.at(i).join();
@@ -91,20 +90,17 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
 }
 
 void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
-  int radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
-  int radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
+  size_t radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
+  size_t radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
 
   // Send a beacon packet in the downlink to trigger user pilot
   std::vector<uint8_t> udp_pkt_buf(cfg_->PacketLength(), 0);
   auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
-  for (int ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
+  for (size_t ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
     new (pkt) Packet(frame_id, 0, 0 /* cell_id */, ant_id);
-    ssize_t r = sendto(
-        socket_.at(ant_id), reinterpret_cast<const char*>(udp_pkt_buf.data()),
-        cfg_->PacketLength(), 0,
-        reinterpret_cast<const struct sockaddr*>(&bs_rru_sockaddr_.at(ant_id)),
-        sizeof(bs_rru_sockaddr_.at(ant_id)));
-    RtAssert(r > 0, "sendto() failed");
+
+    udp_clients_.at(ant_id)->Send(cfg_->BsRruAddr(), cfg_->BsRruPort() + ant_id,
+                                  udp_pkt_buf.data(), cfg_->PacketLength());
   }
 }
 
@@ -112,28 +108,27 @@ void PacketTXRX::LoopTxRx(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid);
   size_t* rx_frame_start = (*frame_start_)[tid];
   size_t rx_offset = 0;
-  int radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
-  int radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
+  size_t radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
+  size_t radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
 
-  int sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
-  for (int radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
-    int local_port_id = cfg_->BsServerPort() + radio_id;
-    socket_.at(radio_id) = SetupSocketIpv4(local_port_id, true, sock_buf_size);
-    SetupSockaddrRemoteIpv4(&bs_rru_sockaddr_[radio_id],
-                            cfg_->BsRruPort() + radio_id,
-                            cfg_->BsRruAddr().c_str());
+  size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
+  for (size_t radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
+    size_t local_port_id = cfg_->BsServerPort() + radio_id;
+
+    udp_servers_.at(radio_id) =
+        std::make_unique<UDPServer>(local_port_id, sock_buf_size);
+    udp_clients_.at(radio_id) = std::make_unique<UDPClient>();
     MLPD_FRAME(
         "TXRX thread %d: set up UDP socket server listening to port %d"
         " with remote address %s:%d \n",
         tid, local_port_id, cfg_->BsRruAddr().c_str(),
         cfg_->BsRruPort() + radio_id);
-    fcntl(socket_.at(radio_id), F_SETFL, O_NONBLOCK);
   }
 
   size_t frame_tsc_delta(cfg_->GetFrameDurationSec() * 1e9 *
                          GetTime::MeasureRdtscFreq());
   int prev_frame_id = -1;
-  int radio_id = radio_lo;
+  size_t radio_id = radio_lo;
   size_t tx_frame_start = GetTime::Rdtsc();
   size_t tx_frame_id = 0;
   size_t slow_start_factor = 10;
@@ -182,7 +177,7 @@ struct Packet* PacketTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
   char* rx_buffer = (*buffer_)[tid];
   int* rx_buffer_status = (*buffer_status_)[tid];
-  int packet_length = cfg_->PacketLength();
+  size_t packet_length = cfg_->PacketLength();
 
   // if rx_buffer is full, exit
   if (rx_buffer_status[rx_offset] == 1) {
@@ -192,40 +187,48 @@ struct Packet* PacketTXRX::RecvEnqueue(int tid, int radio_id, int rx_offset) {
   }
   auto* pkt =
       reinterpret_cast<struct Packet*>(&rx_buffer[rx_offset * packet_length]);
-  if (-1 == recv(socket_[radio_id], (char*)pkt, packet_length, 0)) {
-    if ((errno != EAGAIN) && (cfg_->Running() == true)) {
-      MLPD_ERROR("Recv failed");
-      throw std::runtime_error("PacketTXRX: recv failed");
+
+  ssize_t rx_bytes = udp_servers_.at(radio_id)->Recv(
+      reinterpret_cast<uint8_t*>(pkt), packet_length);
+  if (0 > rx_bytes) {
+    MLPD_ERROR("RecvEnqueue: Udp Recv failed with error");
+    throw std::runtime_error("PacketTXRX: recv failed");
+  } else if (rx_bytes == 0) {
+    pkt = nullptr;
+  } else if (static_cast<size_t>(rx_bytes) == packet_length) {
+    if (kDebugPrintInTask) {
+      std::printf("In TXRX thread %d: Received frame %d, symbol %d, ant %d\n",
+                  tid, pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
     }
-    return (nullptr);
-  }
-  if (kDebugPrintInTask) {
-    std::printf("In TXRX thread %d: Received frame %d, symbol %d, ant %d\n",
-                tid, pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
-  }
-  if (kDebugMulticell) {
-    std::printf(
-        "Before packet combining: receiving data stream from the "
-        "antenna %d in cell %d,\n",
-        pkt->ant_id_, pkt->cell_id_);
-  }
-  pkt->ant_id_ += pkt->cell_id_ * ant_per_cell_;
-  if (kDebugMulticell) {
-    std::printf(
-        "After packet combining: the combined antenna ID is %d, it "
-        "comes from the cell %d\n",
-        pkt->ant_id_, pkt->cell_id_);
-  }
+    if (kDebugMulticell) {
+      std::printf(
+          "Before packet combining: receiving data stream from the "
+          "antenna %d in cell %d,\n",
+          pkt->ant_id_, pkt->cell_id_);
+    }
+    pkt->ant_id_ += pkt->cell_id_ * ant_per_cell_;
+    if (kDebugMulticell) {
+      std::printf(
+          "After packet combining: the combined antenna ID is %d, it "
+          "comes from the cell %d\n",
+          pkt->ant_id_, pkt->cell_id_);
+    }
 
-  // get the position in rx_buffer
-  // move ptr & set status to full
-  rx_buffer_status[rx_offset] = 1;
+    // get the position in rx_buffer
+    // move ptr & set status to full
+    rx_buffer_status[rx_offset] = 1;
 
-  // Push kPacketRX event into the queue.
-  EventData rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset).tag_);
-  if (message_queue_->enqueue(*local_ptok, rx_message) == false) {
-    MLPD_ERROR("socket message enqueue failed\n");
-    throw std::runtime_error("PacketTXRX: socket message enqueue failed");
+    // Push kPacketRX event into the queue.
+    EventData rx_message(EventType::kPacketRX, rx_tag_t(tid, rx_offset).tag_);
+    if (message_queue_->enqueue(*local_ptok, rx_message) == false) {
+      MLPD_ERROR("socket message enqueue failed\n");
+      throw std::runtime_error("PacketTXRX: socket message enqueue failed");
+    }
+  } else {
+    MLPD_ERROR("RecvEnqueue: Udp Recv failed to receive all expected bytes");
+    throw std::runtime_error(
+        "PacketTXRX::RecvEnqueue: Udp Recv failed to receive all expected "
+        "bytes");
   }
   return pkt;
 }
@@ -262,10 +265,9 @@ int PacketTXRX::DequeueSend(int tid) {
   new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
   // Send data (one OFDM symbol)
-  ssize_t ret = sendto(socket_[ant_id], cur_buffer_ptr, c->DlPacketLength(), 0,
-                       (struct sockaddr*)&bs_rru_sockaddr_[ant_id],
-                       sizeof(bs_rru_sockaddr_[ant_id]));
-  RtAssert(ret > 0, "sendto() failed");
+  udp_clients_.at(ant_id)->Send(cfg_->BsRruAddr(), cfg_->BsRruPort() + ant_id,
+                                reinterpret_cast<uint8_t*>(cur_buffer_ptr),
+                                c->DlPacketLength());
 
   RtAssert(
       message_queue_->enqueue(*rx_ptoks_[tid],

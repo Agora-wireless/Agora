@@ -313,15 +313,12 @@ void* ChannelSim::BsRxLoop(int tid) {
   // initialize bs-facing sockets
   size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
   for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
-    int local_port_id = bscfg_->BsRruPort() + socket_id;
+    size_t local_port_id = bscfg_->BsRruPort() + socket_id;
     server_bs_.at(socket_id) =
         std::make_unique<UDPServer>(local_port_id, sock_buf_size);
     client_bs_.at(socket_id) = std::make_unique<UDPClient>();
-    // SetupSockaddrRemoteIpv4(&servaddr_bs_[socket_id],
-    //                        bscfg_->BsServerPort() + socket_id,
-    //                        bscfg_->BsServerAddr().c_str());
     std::printf(
-        "BS RX thread %d: set up UDP socket server listening to port %d"
+        "BS RX thread %d: set up UDP socket server listening to port %zu"
         " with remote address %s:%zu\n",
         tid, local_port_id, bscfg_->BsServerAddr().c_str(),
         bscfg_->BsServerPort() + socket_id);
@@ -330,8 +327,8 @@ void* ChannelSim::BsRxLoop(int tid) {
   std::vector<uint8_t> udp_pkt_buf(bscfg_->PacketLength(), 0);
   size_t socket_id = socket_lo;
   while (running) {
-    int rx_bytes = server_bs_.at(socket_id)->RecvNonblocking(
-        udp_pkt_buf.data(), udp_pkt_buf.size());
+    int rx_bytes =
+        server_bs_.at(socket_id)->Recv(udp_pkt_buf.data(), udp_pkt_buf.size());
     if (0 > rx_bytes) {
       std::printf("BS socket %zu receive failed\n", socket_id);
       throw std::runtime_error("ChannelSim: BS socket receive failed");
@@ -384,15 +381,13 @@ void* ChannelSim::UeRxLoop(int tid) {
   // initialize client-facing sockets
   size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
   for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
-    int local_port_id = uecfg_->UeRruPort() + socket_id;
+    size_t local_port_id = uecfg_->UeRruPort() + socket_id;
     server_ue_.at(socket_id) =
         std::make_unique<UDPServer>(local_port_id, sock_buf_size);
     client_ue_.at(socket_id) = std::make_unique<UDPClient>();
-    // SetupSockaddrRemoteIpv4(&servaddr_ue_[socket_id],
-    //                        uecfg_->UeServerPort() + socket_id,
-    //                        uecfg_->UeServerAddr().c_str());
+
     std::printf(
-        "UE RX thread %d: set up UDP socket server listening to port %d"
+        "UE RX thread %d: set up UDP socket server listening to port %zu"
         " with remote address %s:%zu\n",
         tid, local_port_id, uecfg_->UeServerAddr().c_str(),
         uecfg_->UeServerPort() + socket_id);
@@ -401,8 +396,8 @@ void* ChannelSim::UeRxLoop(int tid) {
   std::vector<uint8_t> udp_pkt_buf(bscfg_->PacketLength(), 0);
   size_t socket_id = socket_lo;
   while (running) {
-    int rx_bytes = server_ue_.at(socket_id)->RecvNonblocking(
-        udp_pkt_buf.data(), udp_pkt_buf.size());
+    int rx_bytes =
+        server_ue_.at(socket_id)->Recv(udp_pkt_buf.data(), udp_pkt_buf.size());
     if (0 > rx_bytes) {
       std::printf("UE socket %zu receive failed\n", socket_id);
       throw std::runtime_error("ChannelSim: UE socket receive failed");

@@ -5,10 +5,6 @@
 #ifndef RADIOTXRX_H_
 #define RADIOTXRX_H_
 
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 
 #include <complex>
