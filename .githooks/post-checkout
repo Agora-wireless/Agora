@@ -3,7 +3,7 @@
 
 echo "Starting post-checkout hook ..."
 BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
-CI_BUILD_STATUS_BADGE="[![Build Status](https://4489496cb62a.ngrok.io/buildStatus/icon?job=github_public_agora%2F${BRANCH_NAME})](https://4489496cb62a.ngrok.io/job/github_public_agora/job/${BRANCH_NAME}/)"
+CI_BUILD_STATUS_BADGE="[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2F${BRANCH_NAME})](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/${BRANCH_NAME}/)"
 echo $BRANCH_NAME
 echo $CI_BUILD_STATUS_BADGE
 
