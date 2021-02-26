@@ -255,28 +255,28 @@ void DoFFT::PartialTranspose(complex_float* out_buf, size_t ant_id,
       // With either of AVX-512 or AVX2, load one cacheline =
       // 16 float values = 8 subcarriers = kSCsPerCacheline
 
-#if 0
-            // AVX-512. Disabled for now because we don't have a working
-            // complex multiply for __m512 type.
+#ifdef __AVX512F__
+            // AVX-512.
             __m512 fft_result
                 = _mm512_load_ps(reinterpret_cast<const float*>(src));
             if (symbol_type == SymbolType::kPilot) {
-                __m512 pilot_tx = _mm512_set_ps(cfg->PilotsSgn()[sc_idx + 7].im,
-                    cfg->PilotsSgn()[sc_idx + 7].re,
-                    cfg->PilotsSgn()[sc_idx + 6].im,
-                    cfg->PilotsSgn()[sc_idx + 6].re,
-                    cfg->PilotsSgn()[sc_idx + 5].im,
-                    cfg->PilotsSgn()[sc_idx + 5].re,
-                    cfg->PilotsSgn()[sc_idx + 4].im,
-                    cfg->PilotsSgn()[sc_idx + 4].re,
-                    cfg->PilotsSgn()[sc_idx + 3].im,
-                    cfg->PilotsSgn()[sc_idx + 3].re,
-                    cfg->PilotsSgn()[sc_idx + 2].im,
-                    cfg->PilotsSgn()[sc_idx + 2].re,
-                    cfg->PilotsSgn()[sc_idx + 1].im,
-                    cfg->PilotsSgn()[sc_idx + 1].re,
-                    cfg->PilotsSgn()[sc_idx].im, cfg->PilotsSgn()[sc_idx].re);
-                fft_result = _mm512_mul_ps(fft_result, pilot_tx);
+                __m512 pilot_tx = _mm512_set_ps(cfg_->PilotsSgn()[sc_idx + 7].im,
+                    cfg_->PilotsSgn()[sc_idx + 7].re,
+                    cfg_->PilotsSgn()[sc_idx + 6].im,
+                    cfg_->PilotsSgn()[sc_idx + 6].re,
+                    cfg_->PilotsSgn()[sc_idx + 5].im,
+                    cfg_->PilotsSgn()[sc_idx + 5].re,
+                    cfg_->PilotsSgn()[sc_idx + 4].im,
+                    cfg_->PilotsSgn()[sc_idx + 4].re,
+                    cfg_->PilotsSgn()[sc_idx + 3].im,
+                    cfg_->PilotsSgn()[sc_idx + 3].re,
+                    cfg_->PilotsSgn()[sc_idx + 2].im,
+                    cfg_->PilotsSgn()[sc_idx + 2].re,
+                    cfg_->PilotsSgn()[sc_idx + 1].im,
+                    cfg_->PilotsSgn()[sc_idx + 1].re,
+                    cfg_->PilotsSgn()[sc_idx].im, cfg_->PilotsSgn()[sc_idx].re);
+                fft_result = CommsLib::M512ComplexCf32Mult(
+                    fft_result, pilot_tx, true);
             }
             _mm512_stream_ps(reinterpret_cast<float*>(dst), fft_result);
 #else
