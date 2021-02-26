@@ -276,7 +276,7 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
   int r;
 
   // Transmit pilot
-  if (!c->HwFramer()) {
+  if (c->HwFramer() == false) {
     size_t pilot_symbol_id = c->Frame().GetPilotSymbol(ant_id);
 
     tx_time = time0 + tx_frame_id * frm_num_samps +
