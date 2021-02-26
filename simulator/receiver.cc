@@ -43,9 +43,6 @@ void* Receiver::LoopRecv(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerRX, core_offset, tid);
 
   size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
-  // int socket_local =
-  //    SetupSocketIpv4(cfg_->BsRruPort() + tid, true, sock_buf_size);
-
   auto udp_server =
       std::make_unique<UDPServer>(cfg_->BsRruPort() + tid, sock_buf_size);
 
@@ -60,12 +57,6 @@ void* Receiver::LoopRecv(int tid) {
   int buffer_frame_num = buffer_frame_num_;
   double* frame_start = (*frame_start_)[tid];
 
-  // // walk through all the pages
-  // double temp;
-  // for (int i = 0; i < 20; i++) {
-  //     temp = frame_start[i * 512];
-  // }
-
   char* cur_buffer_ptr = buffer_ptr;
   int* cur_buffer_status_ptr = buffer_status_ptr;
 
@@ -78,8 +69,6 @@ void* Receiver::LoopRecv(int tid) {
       throw std::runtime_error("Receiver: Receive thread buffer full");
     }
 
-    std::printf("Attempt rx from %s at port %d\n", cfg_->BsServerAddr().c_str(),
-                cfg_->BsServerPort() + tid);
     ssize_t recvlen = udp_server->RecvFrom(
         reinterpret_cast<uint8_t*>(cur_buffer_ptr), cfg_->PacketLength(),
         cfg_->BsServerAddr(), cfg_->BsServerPort() + tid);

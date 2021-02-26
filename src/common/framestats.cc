@@ -121,10 +121,15 @@ size_t FrameStats::GetPilotSymbol(size_t location) const {
   return this->pilot_symbols_.at(location);
 }
 
+size_t FrameStats::GetBeaconSymbol(size_t location) const {
+  return this->beacon_symbols_.at(location);
+}
+
 size_t FrameStats::GetSymbolIdx(const std::vector<size_t>& search_vector,
                                 size_t symbol_number) {
   /* Todo Optimize this, probably with a precomputed table -- assumes sorted
-   * list*/
+   * list
+   */
   const auto [start, finish] = std::equal_range(
       search_vector.begin(), search_vector.end(), symbol_number);
 

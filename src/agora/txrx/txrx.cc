@@ -96,14 +96,18 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
   // Send a beacon packet in the downlink to trigger user pilot
   std::vector<uint8_t> udp_pkt_buf(cfg_->PacketLength(), 0);
   auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
-  for (size_t ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
-    new (pkt) Packet(frame_id, 0, 0 /* cell_id */, ant_id);
 
-    udp_clients_.at(ant_id)->Send(cfg_->BsRruAddr(), cfg_->BsRruPort() + ant_id,
-                                  udp_pkt_buf.data(), cfg_->PacketLength());
+  for (size_t beacon_sym = 0; beacon_sym < cfg_->Frame().NumBeaconSyms();
+       beacon_sym++) {
+    for (size_t ant_id = radio_lo; ant_id < radio_hi; ant_id++) {
+      new (pkt) Packet(frame_id, cfg_->Frame().GetBeaconSymbol(beacon_sym),
+                       0 /* cell_id */, ant_id);
+
+      udp_clients_.at(ant_id)->Send(cfg_->BsRruAddr(),
+                                    cfg_->BsRruPort() + ant_id,
+                                    udp_pkt_buf.data(), cfg_->PacketLength());
+    }
   }
-  std::printf("Sending Beacon frame %zu to antennas %zu : %zu\n", frame_id,
-              radio_lo, radio_hi);
 }
 
 void PacketTXRX::LoopTxRx(int tid) {
@@ -254,7 +258,7 @@ int PacketTXRX::DequeueSend(int tid) {
                    c->BsAntNum()) +
                   ant_id;
 
-  if (kDebugPrintInTask == false) {
+  if (kDebugPrintInTask) {
     std::printf(
         "In TXRX thread %d: Transmitted frame %zu, symbol %zu, "
         "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",

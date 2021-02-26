@@ -44,46 +44,23 @@ class Simulator {
 
   void Start();
   void Stop();
-  // while loop of task thread
-  static void* TaskThread(void* context);
-  struct EventHandlerContext {
-    Simulator* obj_ptr_;
-    size_t id_;
-  };
 
   inline void UpdateFrameCount(int* frame_count);
-
   void UpdateRxCounters(size_t frame_id, size_t frame_id_in_buffer,
                         size_t symbol_id, size_t ant_id);
   void PrintPerFrameDone(PrintType print_type, size_t frame_id);
 
  private:
-  size_t bs_ant_num_;
-  size_t ue_num_;
-  size_t ofdm_ca_num_;
-  size_t ofdm_data_num_;
-
-  size_t symbol_num_perframe_, data_symbol_num_perframe_;
-  size_t ul_data_symbol_num_perframe_, dl_data_symbol_num_perframe_;
-  size_t dl_data_symbol_start_, dl_data_symbol_end_;
-  size_t packet_length_;
-
-  size_t task_thread_num_, socket_rx_thread_num_, socket_tx_thread_num_;
+  size_t task_thread_num_;
+  size_t socket_rx_thread_num_;
+  size_t socket_tx_thread_num_;
   size_t core_offset_;
-  size_t demul_block_size_, demul_block_num_;
 
   /* lookup table for 16 QAM, real and imag */
-  Table<float> qam16_table_;
-  // float *pilots_;
+
   Config* config_;
-  size_t max_equaled_frame_ = 0;
-  float csi_format_offset_;
-  size_t buffer_frame_num_;
-  size_t max_packet_num_per_frame_;
   std::unique_ptr<Receiver> receiver_;
   std::unique_ptr<Sender> sender_;
-
-  // Uplink buffers
 
   /**
    * Received data
@@ -102,9 +79,9 @@ class Simulator {
   size_t socket_buffer_size_;
   size_t socket_buffer_status_size_;
 
-  /* Uplink status checkers used by master thread */
+  /* status checkers used by master thread */
   /* used to check if RX for all antennas and all symbols in a frame is done
-   * (max: BS_ANT_NUM * symbol_num_perframe) */
+   * (max: BS_ANT_NUM * dl symbols) */
   size_t* rx_counter_packets_;
 
   /*****************************************************
@@ -117,8 +94,6 @@ class Simulator {
 
   /* Tokens */
   moodycamel::ProducerToken** rx_ptoks_ptr_;
-  moodycamel::ProducerToken** tx_ptoks_ptr_;
-  moodycamel::ProducerToken** task_ptoks_ptr_;
 
   /*****************************************************
    * Timestamps and counters used in worker threads
@@ -129,10 +104,9 @@ class Simulator {
   double* frame_start_tx_;
   double* frame_end_tx_;
 
-  void InitializeVarsFromCfg(Config* cfg);
   void InitializeQueues();
-  void InitializeUplinkBuffers();
-  void FreeUplinkBuffers();
+  void InitializeBuffers();
+  void FreeBuffers();
   void FreeQueues();
 };
 
