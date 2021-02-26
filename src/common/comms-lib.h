@@ -133,7 +133,6 @@ class CommsLib {
 #ifdef __AVX512F__
   static __m512 M512ComplexCf32Mult(__m512 data1, __m512 data2, bool conj);
 #endif
-
 };
 
 #endif  // COMMSLIB_H_

@@ -1322,9 +1322,8 @@ void Agora::InitializeUplinkBuffers() {
 
   demul_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
 
-  decode_counters_.Init(
-      cfg->Frame().NumULSyms(),
-      config_->LdpcConfig().NumBlocksInSymbol() * cfg->UeNum());
+  decode_counters_.Init(cfg->Frame().NumULSyms(),
+                        cfg->LdpcConfig().NumBlocksInSymbol() * cfg->UeNum());
 
   tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->UeNum());
 }

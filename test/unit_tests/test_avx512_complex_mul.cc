@@ -44,7 +44,7 @@ TEST(TestComplexMul, Multiply) {
   for (int i = 0; i < NUM_RUNS; i++) {
     result_512 = CommsLib::M512ComplexCf32Mult(values0_512, values1_512, false);
   }
-  ticks = GetTime::Rdtsc()- ticks;
+  ticks = GetTime::Rdtsc() - ticks;
   std::cout << "AVX512 Multiplication took " << ticks << "\n";
   /* Extract the results into output buffers */
   _mm256_stream_ps(reinterpret_cast<float*>(out256), result_256_lower);
