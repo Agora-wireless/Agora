@@ -129,7 +129,7 @@ int PacketTXRX::DequeueSendArgos(int tid) {
   }
 
   // std::printf("tx queue length: %d\n", task_queue_->size_approx());
-  assert(event.event_type_ == EventType::kPacketTX);
+  assert(event.at(0).event_type_ == EventType::kPacketTX);
 
   size_t frame_id = gen_tag_t(event.at(0).tags_[0]).frame_id_;
   size_t symbol_id = gen_tag_t(event.at(0).tags_[0]).symbol_id_;
