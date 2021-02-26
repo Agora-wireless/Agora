@@ -410,7 +410,7 @@ EventData DoIFFT::Launch(size_t tag) {
 
   if (kPrintSocketOutput) {
     std::stringstream ss;
-    ss << "socket_tx_data" << ant_id << "=[";
+    ss << "socket_tx_data" << ant_id << "_" << symbol_idx_dl << "=[";
     for (size_t i = 0; i < cfg_->SampsPerSymbol(); i++) {
       ss << socket_ptr[i * 2] << "+1j*" << socket_ptr[i * 2 + 1] << " ";
     }
