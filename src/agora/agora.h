@@ -35,9 +35,11 @@
 class Agora {
  public:
   // Dequeue batch size, used to reduce the overhead of dequeue in main thread
-  static const int kDequeueBulkSizeTXRX = 8;
-  static const int kDequeueBulkSizeWorker = 4;
-  static const int kMaxWorkerNum = 50;  // Max number of worker threads allowed
+  static const size_t kDequeueBulkSizeTXRX = 8;
+  static const size_t kDequeueBulkSizeWorker = 4;
+  // Max number of worker threads allowed
+  static const size_t kMaxWorkerNum = 50;
+  static const size_t kScheduleQueues = 2;
 
   explicit Agora(
       Config* /*cfg*/);  /// Create an Agora object and start the worker threads
@@ -302,7 +304,7 @@ class Agora {
     moodycamel::ConcurrentQueue<EventData> concurrent_q_;
     moodycamel::ProducerToken* ptok_;
   };
-  SchedInfoT sched_info_arr_[2][kNumEventTypes];
+  SchedInfoT sched_info_arr_[kScheduleQueues][kNumEventTypes];
 
   // Master thread's message queue for receiving packets
   moodycamel::ConcurrentQueue<EventData> message_queue_;
@@ -314,13 +316,15 @@ class Agora {
   moodycamel::ConcurrentQueue<EventData> mac_response_queue_;
 
   // Master thread's message queue for event completion from Doers;
-  moodycamel::ConcurrentQueue<EventData> complete_task_queue_[2];
-  moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads][2];
+  moodycamel::ConcurrentQueue<EventData> complete_task_queue_[kScheduleQueues];
+  moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads][kScheduleQueues];
 
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
 
   uint8_t schedule_process_flags_;
+
+  std::queue<size_t> encode_deferral_;
 };
 
 #endif  // AGORA_H_
