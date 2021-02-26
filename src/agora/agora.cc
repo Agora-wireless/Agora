@@ -8,6 +8,7 @@
 #include <cmath>
 #include <memory>
 
+static const bool kDebugDeferral = false;
 static const size_t kDefaultMessageQueueSize = 512;
 static const size_t kDefaultWorkerQueueSize = 256;
 
@@ -357,9 +358,10 @@ void Agora::Start() {
               }
               // Schedule precoding for downlink symbols
               for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
-                // Are we encoded for the current frame? What if we encoded for
-                // future frames?
-                if (this->encode_cur_frame_for_symbol_.at(i) == frame_id) {
+                size_t last_encoded_frame =
+                    this->encode_cur_frame_for_symbol_.at(i);
+                if ((last_encoded_frame != SIZE_MAX) &&
+                    (last_encoded_frame >= frame_id)) {
                   ScheduleSubcarriers(EventType::kPrecode, frame_id,
                                       cfg->Frame().GetDLSymbol(i));
                 }
@@ -527,7 +529,9 @@ void Agora::Start() {
                 for (size_t sym_id = symbol_idx_dl;
                      sym_id <= ifft_counters_.GetSymbolCount(frame_id);
                      sym_id++) {
-                  if (ifft_cur_frame_for_symbol_.at(sym_id) == frame_id) {
+                  size_t symbol_ifft_frame =
+                      ifft_cur_frame_for_symbol_.at(sym_id);
+                  if (symbol_ifft_frame == frame_id) {
                     ScheduleAntennasTX(frame_id,
                                        cfg->Frame().GetDLSymbol(sym_id));
                     ifft_next_symbol_++;
@@ -536,7 +540,7 @@ void Agora::Start() {
                   }
                 }
               }
-              PrintPerSymbolDone(PrintType::kIFFT, frame_id, symbol_idx_dl);
+              PrintPerSymbolDone(PrintType::kIFFT, frame_id, symbol_id);
 
               bool last_ifft_symbol =
                   this->ifft_counters_.CompleteSymbol(frame_id);
@@ -727,38 +731,38 @@ void Agora::Worker(int tid) {
   PinToCoreWithOffset(ThreadType::kWorker, base_worker_core_offset_, tid);
 
   /* Initialize operators */
-  std::unique_ptr<DoZF> compute_zf(
-      new DoZF(this->config_, tid, this->csi_buffers_, this->calib_dl_buffer_,
-               this->calib_ul_buffer_, this->ul_zf_matrices_,
-               this->dl_zf_matrices_, this->stats_.get()));
+  auto compute_zf = std::make_unique<DoZF>(
+      this->config_, tid, this->csi_buffers_, this->calib_dl_buffer_,
+      this->calib_ul_buffer_, this->ul_zf_matrices_, this->dl_zf_matrices_,
+      this->stats_.get());
 
-  std::unique_ptr<DoFFT> compute_fft(new DoFFT(
+  auto compute_fft = std::make_unique<DoFFT>(
       this->config_, tid, this->socket_buffer_, this->socket_buffer_status_,
       this->data_buffer_, this->csi_buffers_, this->calib_dl_buffer_,
-      this->calib_ul_buffer_, this->phy_stats_.get(), this->stats_.get()));
+      this->calib_ul_buffer_, this->phy_stats_.get(), this->stats_.get());
 
   // Downlink workers
-  std::unique_ptr<DoIFFT> compute_ifft(
-      new DoIFFT(this->config_, tid, this->dl_ifft_buffer_,
-                 this->dl_socket_buffer_, this->stats_.get()));
+  auto compute_ifft =
+      std::make_unique<DoIFFT>(this->config_, tid, this->dl_ifft_buffer_,
+                               this->dl_socket_buffer_, this->stats_.get());
 
-  std::unique_ptr<DoPrecode> compute_precode(new DoPrecode(
+  auto compute_precode = std::make_unique<DoPrecode>(
       this->config_, tid, this->dl_zf_matrices_, this->dl_ifft_buffer_,
-      this->dl_encoded_buffer_, this->stats_.get()));
+      this->dl_encoded_buffer_, this->stats_.get());
 
-  std::unique_ptr<DoEncode> compute_encoding(
-      new DoEncode(this->config_, tid, this->config_->DlBits(),
-                   this->dl_encoded_buffer_, this->stats_.get()));
+  auto compute_encoding =
+      std::make_unique<DoEncode>(this->config_, tid, this->config_->DlBits(),
+                                 this->dl_encoded_buffer_, this->stats_.get());
 
   // Uplink workers
-  std::unique_ptr<DoDecode> compute_decoding(new DoDecode(
+  auto compute_decoding = std::make_unique<DoDecode>(
       this->config_, tid, this->demod_buffers_, this->decoded_buffer_,
-      this->phy_stats_.get(), this->stats_.get()));
+      this->phy_stats_.get(), this->stats_.get());
 
-  std::unique_ptr<DoDemul> compute_demul(new DoDemul(
+  auto compute_demul = std::make_unique<DoDemul>(
       this->config_, tid, this->data_buffer_, this->ul_zf_matrices_,
       this->ue_spec_pilot_buffer_, this->equal_buffer_, this->demod_buffers_,
-      this->phy_stats_.get(), this->stats_.get()));
+      this->phy_stats_.get(), this->stats_.get());
 
   std::vector<Doer*> computers_vec;
   std::vector<EventType> events_vec;
@@ -785,7 +789,7 @@ void Agora::Worker(int tid) {
   }
 
   size_t cur_qid = 0;
-  size_t empty_qeueu_itrs = 0;
+  size_t empty_queue_itrs = 0;
   bool empty_queue = true;
   while (this->config_->Running() == true) {
     for (size_t i = 0; i < computers_vec.size(); i++) {
@@ -797,16 +801,16 @@ void Agora::Worker(int tid) {
       }
     }
     // If all queues in this set are empty for 5 iterations,
-    // check the other set of qeueus
+    // check the other set of queues
     if (empty_queue == true) {
-      empty_qeueu_itrs++;
-      if (empty_qeueu_itrs == 5) {
+      empty_queue_itrs++;
+      if (empty_queue_itrs == 5) {
         if (this->cur_sche_frame_id_ != this->cur_proc_frame_id_) {
           cur_qid ^= 0x1;
         } else {
           cur_qid = (this->cur_sche_frame_id_ & 0x1);
         }
-        empty_qeueu_itrs = 0;
+        empty_queue_itrs = 0;
       }
     } else {
       empty_queue = true;
@@ -959,15 +963,19 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
   // Receive first packet in a frame
   if (rx_counters_.num_pkts_[frame_slot] == 0) {
     // schedule this frame's encoding
-    std::string error_message =
-        "Rx frame: " + std::to_string(frame_id) +
-        " is too far ahead of the current scheduled frame " +
-        std::to_string(this->cur_sche_frame_id_) + "\n";
-    RtAssert(frame_id < (this->cur_sche_frame_id_ + 2), error_message.c_str());
-
-    for (size_t i = 0; i < config_->Frame().NumDLSyms(); i++) {
-      ScheduleCodeblocks(EventType::kEncode, frame_id,
-                         config_->Frame().GetDLSymbol(i));
+    // Defer the schedule.  If frames are already deferred or the current
+    // received frame is too far off
+    if ((this->encode_deferral_.empty() == false) ||
+        (frame_id >= (this->cur_proc_frame_id_ + kScheduleQueues))) {
+      if (kDebugDeferral) {
+        std::printf("   +++ Deferring encoding of frame %zu\n", frame_id);
+      }
+      this->encode_deferral_.push(frame_id);
+    } else {
+      for (size_t i = 0; i < config_->Frame().NumDLSyms(); i++) {
+        ScheduleCodeblocks(EventType::kEncode, frame_id,
+                           config_->Frame().GetDLSymbol(i));
+      }
     }
     this->stats_->MasterSetTsc(TsType::kPilotRX, frame_id);
     if (kDebugPrintPerFrameStart) {
@@ -1242,7 +1250,7 @@ void Agora::InitializeQueues() {
   }
 
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
-    for (size_t j = 0; j < 2; j++) {
+    for (size_t j = 0; j < kScheduleQueues; j++) {
       worker_ptoks_ptr_[i][j] =
           new moodycamel::ProducerToken(complete_task_queue_[j]);
     }
@@ -1263,7 +1271,7 @@ void Agora::FreeQueues() {
   }
 
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
-    for (size_t j = 0; j < 2; j++) {
+    for (size_t j = 0; j < kScheduleQueues; j++) {
       delete worker_ptoks_ptr_[i][j];
     }
   }
@@ -1497,6 +1505,29 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
     this->ifft_counters_.Reset(frame_id);
     this->tx_counters_.Reset(frame_id);
     this->cur_proc_frame_id_++;
+
+    if (this->encode_deferral_.empty() == false) {
+      for (size_t encode = 0; encode < kScheduleQueues; encode++) {
+        size_t deferred_frame = this->encode_deferral_.front();
+        if (deferred_frame < (this->cur_proc_frame_id_ + kScheduleQueues)) {
+          if (kDebugDeferral) {
+            std::printf("   +++ Scheduling deferred frame %zu : %zu \n",
+                        deferred_frame, cur_proc_frame_id_);
+          }
+          RtAssert(deferred_frame >= this->cur_proc_frame_id_,
+                   "Error scheduling encoding because deferral frame is less "
+                   "than current frame");
+          for (size_t i = 0; i < config_->Frame().NumDLSyms(); i++) {
+            ScheduleCodeblocks(EventType::kEncode, deferred_frame,
+                               config_->Frame().GetDLSymbol(i));
+          }
+          this->encode_deferral_.pop();
+        } else {
+          // No need to check the next frame because it is too large
+          break;
+        }
+      }
+    }
 
     if (frame_id == (this->config_->FramesToTest() - 1)) {
       finished = true;
