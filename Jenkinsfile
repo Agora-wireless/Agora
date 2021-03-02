@@ -27,6 +27,7 @@ pipeline {
 	options {
 		skipDefaultCheckout true
 		buildDiscarder(logRotator(numToKeepStr:'9'))
+		lock resource: 'shared_resource_lock'
 	}
 	
 	
