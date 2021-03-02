@@ -64,7 +64,7 @@ class ChannelSim {
             std::vector<char>& tx_buffer, size_t buffer_offset,
             std::vector<std::unique_ptr<UDPClient>>& udp_clients,
             const std::string& dest_address, size_t dest_port,
-            arma::cx_fmat& format_dest, size_t tid);
+            arma::cx_fmat& format_dest);
 
   // BS-facing sending clients
   std::vector<std::unique_ptr<UDPClient>> client_bs_;

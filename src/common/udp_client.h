@@ -97,8 +97,11 @@ class UDPClient {
                 remote_uri.c_str(), gai_strerror(r));
         throw std::runtime_error(issue_msg);
       }
-      std::printf("%d Resolving: %s map size %zu\n", sock_fd_,
-                  remote_uri.c_str(), addrinfo_map_.size());
+
+      if (kDebugPrintUdpClientInit) {
+        std::printf("%d Resolving: %s map size %zu\n", sock_fd_,
+                    remote_uri.c_str(), addrinfo_map_.size());
+      }
 
       std::pair<std::map<std::string, struct addrinfo*>::iterator, bool>
           map_insert_result;
@@ -110,7 +113,6 @@ class UDPClient {
       }
 
       if (map_insert_result.second == false) {
-        std::printf("Element %s already existed in map\n", remote_uri.c_str());
         freeaddrinfo(rem_addrinfo);
         rem_addrinfo = map_insert_result.first->second;
       }
