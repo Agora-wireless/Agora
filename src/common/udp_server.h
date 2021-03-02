@@ -128,9 +128,8 @@ class UDPServer {
     std::string remote_uri = src_address + ":" + std::to_string(src_port);
     struct addrinfo* rem_addrinfo = nullptr;
 
-    if (addrinfo_map_.count(remote_uri) != 0) {
-      rem_addrinfo = addrinfo_map_.at(remote_uri);
-    } else {
+    const auto remote_itr = addrinfo_map_.find(remote_uri);
+    if (remote_itr == addrinfo_map_.end()) {
       char port_str[16u];
       snprintf(port_str, sizeof(port_str), "%u", src_port);
 
@@ -141,13 +140,22 @@ class UDPServer {
       hints.ai_protocol = IPPROTO_UDP;
 
       int r = getaddrinfo(src_address.c_str(), port_str, &hints, &rem_addrinfo);
-      if (r != 0 || rem_addrinfo == nullptr) {
-        char issue_msg[1000];
+      if ((r != 0) || (rem_addrinfo == nullptr)) {
+        char issue_msg[1000u];
         sprintf(issue_msg, "Failed to resolve %s. getaddrinfo error = %s.",
                 remote_uri.c_str(), gai_strerror(r));
         throw std::runtime_error(issue_msg);
       }
-      addrinfo_map_[remote_uri] = rem_addrinfo;
+
+      std::pair<std::map<std::string, struct addrinfo*>::iterator, bool>
+          map_insert_result;
+      {  // Synchronize access to insert for thread safety
+        std::scoped_lock map_access(map_insert_access_);
+        map_insert_result = addrinfo_map_.insert(
+            std::pair<std::string, struct addrinfo*>(remote_uri, rem_addrinfo));
+      }
+    } else {
+      rem_addrinfo = remote_itr->second;
     }
 
     // struct sockaddr_in remote_addr;
@@ -203,12 +211,24 @@ class UDPServer {
   }
 
  private:
-  // The UDP port to listen on
+  /**
+   * @brief The UDP port to server is listening on
+   */
   uint16_t port_;
+  /**
+   * @brief The raw socket file descriptor
+   */
   int sock_fd_ = -1;
 
-  // A cache mapping hostname:udp_port to addrinfo
+  /**
+   * @brief A cache mapping hostname:udp_port to addrinfo
+   */
   std::map<std::string, struct addrinfo*> addrinfo_map_;
+  /**
+   * @brief Variable to control write access to the non-thread safe data
+   * structures
+   */
+  std::mutex map_insert_access_;
 };
 
 #endif  // UDP_SERVER_H_
