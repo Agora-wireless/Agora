@@ -557,7 +557,8 @@ void RadioConfig::AdjustDelays(std::vector<int> offset) {
 }
 
 bool RadioConfig::InitialCalib(bool sample_adjust) {
-  size_t seq_len = cfg_->PilotCf32().size();  // excludes zero padding
+  // excludes zero padding
+  size_t seq_len = cfg_->PilotCf32().size();
   size_t read_len = cfg_->PilotCi16().size();
 
   // Transmitting from only one chain, create a null vector for chainB
@@ -579,9 +580,10 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
   size_t m = cfg_->BsAntNum();
   size_t r = cfg_->NumRadios();
   size_t ref = cfg_->RefAnt() / cfg_->NumChannels();
-  buff.resize(2 * m);  // allocate for uplink and downlink directions
+  // allocate for uplink and downlink directions
+  buff.resize(2 * m);
   for (size_t i = 0; i < 2 * m; i++) {
-    buff[i].resize(read_len);
+    buff.at(i).resize(read_len);
   }
 
   std::vector<std::complex<int16_t>> dummybuff(read_len);
@@ -589,13 +591,13 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
 
   for (size_t i = 0; i < r; i++) {
     for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
-      ba_stn_[i]->setGain(
+      ba_stn_.at(i)->setGain(
           SOAPY_SDR_TX, ch, "PAD",
           ch != 0u ? cfg_->CalibTxGainB() : cfg_->CalibTxGainA());
     }
-    ba_stn_[i]->writeSetting("TDD_CONFIG", "{\"tdd_enabled\":false}");
-    ba_stn_[i]->writeSetting("TDD_MODE", "false");
-    ba_stn_[i]->activateStream(this->tx_streams_[i]);
+    ba_stn_.at(i)->writeSetting("TDD_CONFIG", "{\"tdd_enabled\":false}");
+    ba_stn_.at(i)->writeSetting("TDD_MODE", "false");
+    ba_stn_.at(i)->activateStream(this->tx_streams_.at(i));
   }
 
   size_t good_csi_cnt = 0;
@@ -615,27 +617,28 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
       // Send a separate pilot from each antenna
       for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
         int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-        int ret = ba_stn_[i]->writeStream(
-            this->tx_streams_[i], ch > 0 ? txbuff1.data() : txbuff0.data(),
+        int ret = ba_stn_.at(i)->writeStream(
+            this->tx_streams_.at(i), ch > 0 ? txbuff1.data() : txbuff0.data(),
             read_len, tx_flags, tx_time, 1000000);
         if (ret < (int)read_len) {
           std::cout << "bad write\n";
         }
 
         int rx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-        ret = ba_stn_[ref]->activateStream(this->rx_streams_[ref], rx_flags,
-                                           rx_time, read_len);
+        ret = ba_stn_.at(ref)->activateStream(this->rx_streams_.at(ref),
+                                              rx_flags, rx_time, read_len);
 
         Go();
 
         int flags = 0;
         std::vector<void*> rxbuff0(2);
-        rxbuff0[0] = buff[cfg_->NumChannels() * i + ch].data();
+        rxbuff0.at(0) = buff.at(cfg_->NumChannels() * i + ch).data();
         if (cfg_->NumChannels() == 2) {
-          rxbuff0[1] = dummybuff.data();
+          rxbuff0.at(1) = dummybuff.data();
         }
-        ret = ba_stn_[ref]->readStream(this->rx_streams_[ref], rxbuff0.data(),
-                                       read_len, flags, rx_time, 1000000);
+        ret = ba_stn_.at(ref)->readStream(this->rx_streams_.at(ref),
+                                          rxbuff0.data(), read_len, flags,
+                                          rx_time, 1000000);
         if (ret < (int)read_len) {
           good_csi = false;
           std::cout << "bad read (" << ret << ") at node " << ref
@@ -646,18 +649,19 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
     // Transmit from Ref Antenna to Beamforming Antennas (Up)
     {
       int tx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-      int ret =
-          ba_stn_[ref]->writeStream(this->tx_streams_[ref], txbuff0.data(),
-                                    read_len, tx_flags, tx_time, 1000000);
+      int ret = ba_stn_.at(ref)->writeStream(this->tx_streams_.at(ref),
+                                             txbuff0.data(), read_len, tx_flags,
+                                             tx_time, 1000000);
       if (ret < (int)read_len) {
         std::cout << "bad write\n";
       }
 
       for (size_t i = 0; i < r; i++) {
-        if (i == ref) continue;
-        int rx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
-        ret = ba_stn_[i]->activateStream(this->rx_streams_[i], rx_flags,
-                                         rx_time, read_len);
+        if (i != ref) {
+          int rx_flags = SOAPY_SDR_WAIT_TRIGGER | SOAPY_SDR_END_BURST;
+          ret = ba_stn_.at(i)->activateStream(this->rx_streams_.at(i), rx_flags,
+                                              rx_time, read_len);
+        }
       }
 
       Go();
@@ -669,11 +673,12 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
         }
         if (i == ref) continue;
         std::vector<void*> rxbuff(2);
-        rxbuff[0] = buff[m + cfg_->NumChannels() * i].data();
-        if (cfg_->NumChannels() == 2)
-          rxbuff[1] = buff[m + cfg_->NumChannels() * i + 1].data();
-        ret = ba_stn_[i]->readStream(this->rx_streams_[i], rxbuff.data(),
-                                     read_len, flags, rx_time, 1000000);
+        rxbuff.at(0) = buff.at(m + cfg_->NumChannels() * i).data();
+        if (cfg_->NumChannels() == 2) {
+          rxbuff.at(1) = buff.at(m + cfg_->NumChannels() * i + 1).data();
+        }
+        ret = ba_stn_.at(i)->readStream(this->rx_streams_.at(i), rxbuff.data(),
+                                        read_len, flags, rx_time, 1000000);
         if (ret < (int)read_len) {
           good_csi = false;
           std::cout << "bad read (" << ret << ") at node " << i << " from node "
@@ -687,31 +692,31 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
     for (size_t i = 0; i < r; i++) {
       int rx_flags = SOAPY_SDR_END_BURST;
       int flags = 0;
-      int ret = ba_stn_[i]->activateStream(this->rx_streams_[i], rx_flags,
-                                           rx_time, read_len);
+      int ret = ba_stn_.at(i)->activateStream(this->rx_streams_.at(i), rx_flags,
+                                              rx_time, read_len);
       std::vector<void*> rxbuff(2);
-      noise_buff[cfg_->NumChannels() * i].resize(read_len);
-      rxbuff[0] = noise_buff[cfg_->NumChannels() * i].data();
+      noise_buff.at(cfg_->NumChannels() * i).resize(read_len);
+      rxbuff[0] = noise_buff.at(cfg_->NumChannels() * i).data();
 
       if (cfg_->NumChannels() == 2) {
-        noise_buff[cfg_->NumChannels() * i + 1].resize(read_len);
-        rxbuff[1] = noise_buff[cfg_->NumChannels() * i + 1].data();
+        noise_buff.at(cfg_->NumChannels() * i + 1).resize(read_len);
+        rxbuff.at(1) = noise_buff.at(cfg_->NumChannels() * i + 1).data();
       }
-      ret = ba_stn_[i]->readStream(this->rx_streams_[i], rxbuff.data(),
-                                   read_len, flags, rx_time, 1000000);
+      ret = ba_stn_.at(i)->readStream(this->rx_streams_.at(i), rxbuff.data(),
+                                      read_len, flags, rx_time, 1000000);
       if (ret < (int)read_len) {
         good_csi = false;
         std::cout << "bad noise read (" << ret << ") at node " << i
                   << std::endl;
       }
-      ba_stn_[i]->deactivateStream(this->rx_streams_[i]);
+      ba_stn_.at(i)->deactivateStream(this->rx_streams_.at(i));
     }
 
     std::vector<std::vector<std::complex<float>>> noise(m);
     for (size_t i = 0; i < m; i++) {
       noise[i].resize(read_len);
-      std::transform(noise_buff[i].begin(), noise_buff[i].end(),
-                     noise[i].begin(), [](std::complex<int16_t> ci) {
+      std::transform(noise_buff.at(i).begin(), noise_buff.at(i).end(),
+                     noise.at(i).begin(), [](std::complex<int16_t> ci) {
                        return std::complex<float>(ci.real() / 32768.0,
                                                   ci.imag() / 32768.0);
                      });
@@ -726,12 +731,12 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
 
       up[i].resize(read_len);
       dn[i].resize(read_len);
-      std::transform(buff[m + i].begin(), buff[m + i].end(), up[i].begin(),
-                     [](std::complex<int16_t> ci) {
+      std::transform(buff.at(m + i).begin(), buff.at(m + i).end(),
+                     up.at(i).begin(), [](std::complex<int16_t> ci) {
                        return std::complex<float>(ci.real() / 32768.0,
                                                   ci.imag() / 32768.0);
                      });
-      std::transform(buff[i].begin(), buff[i].end(), dn[i].begin(),
+      std::transform(buff.at(i).begin(), buff.at(i).end(), dn.at(i).begin(),
                      [](std::complex<int16_t> ci) {
                        return std::complex<float>(ci.real() / 32768.0,
                                                   ci.imag() / 32768.0);
@@ -754,9 +759,9 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
       }
       if (i % cfg_->NumChannels() == 0) {
         size_t peak_up =
-            CommsLib::FindPilotSeq(up[i], cfg_->PilotCf32(), seq_len);
+            CommsLib::FindPilotSeq(up.at(i), cfg_->PilotCf32(), seq_len);
         size_t peak_dn =
-            CommsLib::FindPilotSeq(dn[i], cfg_->PilotCf32(), seq_len);
+            CommsLib::FindPilotSeq(dn.at(i), cfg_->PilotCf32(), seq_len);
         start_up[i] = peak_up < seq_len ? 0 : peak_up - seq_len + cfg_->CpLen();
         start_dn[i] = peak_dn < seq_len ? 0 : peak_dn - seq_len + cfg_->CpLen();
         if (kVerboseCalibration) {
@@ -765,33 +770,41 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
                     << peak_dn << std::endl;
         }
       } else {
-        start_up[i] = start_up[i - 1];
-        start_dn[i] = start_dn[i - 1];
+        start_up.at(i) = start_up.at(i - 1);
+        start_dn.at(i) = start_dn.at(i - 1);
       }
 
       float sig_up = 0;
       float noise_up = 0;
       for (size_t q = 0; q < cfg_->OfdmCaNum(); q++) {
-        sig_up += std::pow(std::abs(up[i][q + start_up[i]]), 2);
-        noise_up += std::pow(std::abs(noise[i][q + start_up[i]]), 2);
+        if (q + start_up.at(i) >= up.at(i).size()) {
+          good_csi = false;
+          break;
+        }
+        sig_up += std::pow(std::abs(up.at(i).at(q + start_up.at(i))), 2);
+        noise_up += std::pow(std::abs(noise.at(i).at(q + start_up.at(i))), 2);
       }
       ss1 << 10 * std::log10(sig_up / noise_up) << " ";
 
       float sig_dn = 0;
       float noise_dn = 0;
       for (size_t q = 0; q < cfg_->OfdmCaNum(); q++) {
-        sig_dn += std::pow(std::abs(dn[i][q + start_dn[i]]), 2);
-        noise_dn +=
-            std::pow(std::abs(noise[cfg_->RefAnt()][q + start_dn[i]]), 2);
+        if (q + start_dn.at(i) >= dn.at(i).size()) {
+          good_csi = false;
+          break;
+        }
+        sig_dn += std::pow(std::abs(dn.at(i).at(q + start_dn.at(i))), 2);
+        noise_dn += std::pow(
+            std::abs(noise.at(cfg_->RefAnt()).at(q + start_dn.at(i))), 2);
       }
       ss0 << 10 * std::log10(sig_dn / noise_dn) << " ";
       if (kReciprocalCalibPlot) {
         std::vector<double> up_i(read_len);
-        std::transform(up[i].begin(), up[i].end(), up_i.begin(),
+        std::transform(up.at(i).begin(), up.at(i).end(), up_i.begin(),
                        [](std::complex<double> cd) { return cd.real(); });
 
         std::vector<double> dn_i(read_len);
-        std::transform(dn[i].begin(), dn[i].end(), dn_i.begin(),
+        std::transform(dn.at(i).begin(), dn.at(i).end(), dn_i.begin(),
                        [](std::complex<double> cd) { return cd.real(); });
 
         plt::figure_size(1200, 780);
@@ -812,24 +825,24 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
         plt::legend();
         plt::save("dn_" + std::to_string(i) + ".png");
       }
-      if ((start_up[i] == 0) || (start_dn[i] == 0)) {
+      if ((start_up.at(i) == 0) || (start_dn.at(i) == 0)) {
         good_csi = false;
         break;
       }
       if (i % cfg_->NumChannels() == 0) {
         if ((i > 0) &&
-            ((std::abs((int)start_up[i] -
-                       (int)start_up[i - cfg_->NumChannels()]) >
+            ((std::abs((int)start_up.at(i) -
+                       (int)start_up.at(i - cfg_->NumChannels())) >
               static_cast<int>(kMaxArraySampleOffset)) ||
-             (std::abs((int)start_dn[i] -
-                       (int)start_dn[i - cfg_->NumChannels()]) >
+             (std::abs((int)start_dn.at(i) -
+                       (int)start_dn.at(i - cfg_->NumChannels())) >
               static_cast<int>(
                   kMaxArraySampleOffset)))) {  // make sure offsets are not too
                                                // different from each other
           good_csi = false;
           break;
         }
-        offset[i / cfg_->NumChannels()] = start_up[i];
+        offset.at(i / cfg_->NumChannels()) = start_up.at(i);
       }
     }
     ss0 << "];\n";
@@ -855,24 +868,25 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
       if (kVerboseCalibration) {  // print time-domain data
         std::cout << "up_t" << id << " = [";
         for (size_t j = 0; j < read_len; j++) {
-          std::cout << buff[m + i][j].real() << "+1j*" << buff[m + i][j].imag()
-                    << " ";
+          std::cout << buff.at(m + i).at(j).real() << "+1j*"
+                    << buff.at(m + i).at(j).imag() << " ";
         }
         std::cout << "];" << std::endl;
         std::cout << "dn_t" << id << " = [";
         for (size_t j = 0; j < read_len; j++) {
-          std::cout << buff[i][j].real() << "+1j*" << buff[i][j].imag() << " ";
+          std::cout << buff.at(i).at(j).real() << "+1j*"
+                    << buff.at(i).at(j).imag() << " ";
         }
         std::cout << "];" << std::endl;
       }
       // computing reciprocity calibration matrix
-      auto first_up = up[i].begin() + start_up[i];
-      auto last_up = up[i].begin() + start_up[i] + cfg_->OfdmCaNum();
+      auto first_up = up.at(i).begin() + start_up.at(i);
+      auto last_up = up.at(i).begin() + start_up.at(i) + cfg_->OfdmCaNum();
       std::vector<std::complex<float>> up_ofdm(first_up, last_up);
       assert(up_ofdm.size() == cfg_->OfdmCaNum());
 
-      auto first_dn = dn[i].begin() + start_dn[i];
-      auto last_dn = dn[i].begin() + start_dn[i] + cfg_->OfdmCaNum();
+      auto first_dn = dn.at(i).begin() + start_dn.at(i);
+      auto last_dn = dn.at(i).begin() + start_dn.at(i) + cfg_->OfdmCaNum();
       std::vector<std::complex<float>> dn_ofdm(first_dn, last_dn);
       assert(dn_ofdm.size() == cfg_->OfdmCaNum());
 
@@ -912,11 +926,11 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
     good_csi_cnt++;
   }
   for (size_t i = 0; i < r; i++) {
-    ba_stn_[i]->deactivateStream(this->tx_streams_[i]);
-    ba_stn_[i]->deactivateStream(this->rx_streams_[i]);
+    ba_stn_.at(i)->deactivateStream(this->tx_streams_.at(i));
+    ba_stn_.at(i)->deactivateStream(this->rx_streams_.at(i));
     for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
-      ba_stn_[i]->setGain(SOAPY_SDR_TX, ch, "PAD",
-                          ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());
+      ba_stn_.at(i)->setGain(SOAPY_SDR_TX, ch, "PAD",
+                             ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());
     }
   }
   return good_csi_cnt == calib_meas_num_;
