@@ -10,8 +10,8 @@
 #include "scrambler.h"
 #include "utils_ldpc.h"
 
-static constexpr bool kDebugPrintPacketsFromMac = true;
-static constexpr bool kDebugPrintPacketsToMac = true;
+static constexpr bool kDebugPrintPacketsFromMac = false;
+static constexpr bool kDebugPrintPacketsToMac = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;

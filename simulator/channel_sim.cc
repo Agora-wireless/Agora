@@ -451,7 +451,7 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
                       std::vector<char>& tx_buffer, size_t buffer_offset,
                       std::vector<std::unique_ptr<UDPClient>>& udp_clients,
                       const std::string& dest_address, size_t dest_port,
-                      arma::cx_fmat& format_dest, size_t tid) {
+                      arma::cx_fmat& format_dest) {
   auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer.at(buffer_offset));
   SimdConvertFloatToShort(reinterpret_cast<float*>(format_dest.memptr()),
                           dst_ptr, 2 * bscfg_->SampsPerSymbol() * max_ant);
@@ -466,9 +466,6 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
     std::memcpy(pkt->data_,
                 &tx_buffer[buffer_offset + ant_id * payload_length_],
                 payload_length_);
-    std::printf(
-        "Thread %zu, sending frame %zu, symbol %zu, ant %zu, to port %zu\n",
-        tid, frame_id, symbol_id, ant_id, dest_port + ant_id);
     udp_clients.at(ant_id)->Send(dest_address, dest_port + ant_id,
                                  udp_pkt_buf.data(), udp_pkt_buf.size());
   }
@@ -514,8 +511,7 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
   }
 
   DoTx(frame_id, symbol_id, bscfg_->BsAntNum(), tx_buffer_bs_, total_offset_bs,
-       client_bs_, bscfg_->BsServerAddr(), bscfg_->BsServerPort(), fmat_dst,
-       tid);
+       client_bs_, bscfg_->BsServerAddr(), bscfg_->BsServerPort(), fmat_dst);
 
   RtAssert(message_queue_.enqueue(
                *task_ptok_[tid],
@@ -530,9 +526,8 @@ void ChannelSim::DoTxUser(int tid, size_t tag) {
   size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);
 
   if (kPrintDebugTxUser) {
-    std::printf(
-        "Channel Sim [%d]: DoTxUser processing symbol %zu, dl symbol %zu\n",
-        tid, symbol_id, dl_symbol_id);
+    std::printf("Channel Sim: DoTxUser processing symbol %zu, dl symbol %zu\n",
+                symbol_id, dl_symbol_id);
   }
 
   size_t symbol_offset =
@@ -564,8 +559,7 @@ void ChannelSim::DoTxUser(int tid, size_t tag) {
   }
 
   DoTx(frame_id, symbol_id, uecfg_->UeAntNum(), tx_buffer_ue_, total_offset_ue,
-       client_ue_, uecfg_->UeServerAddr(), uecfg_->UeServerPort(), fmat_dst,
-       tid);
+       client_ue_, uecfg_->UeServerAddr(), uecfg_->UeServerPort(), fmat_dst);
 
   RtAssert(message_queue_.enqueue(
                *task_ptok_[tid],
