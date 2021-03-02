@@ -10,8 +10,8 @@
 #include "scrambler.h"
 #include "utils_ldpc.h"
 
-static constexpr bool kDebugPrintPacketsFromMac = false;
-static constexpr bool kDebugPrintPacketsToMac = false;
+static constexpr bool kDebugPrintPacketsFromMac = true;
+static constexpr bool kDebugPrintPacketsToMac = true;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
@@ -1005,7 +1005,7 @@ void PhyUe::DoEncode(int tid, size_t tag) {
                                 cfg->LdpcConfig().ExpansionFactor())));
 
   size_t bytes_per_block =
-      kEnableMac ? (ldpc_config.NumCbLen()) >> 3
+      kEnableMac ? BitsToBytes(ldpc_config.NumCbLen())
                  : Roundup<64>(BitsToBytes(ldpc_config.NumCbLen()));
   size_t encoded_bytes_per_block = (ldpc_config.NumCbCodewLen() + 7) >> 3;
   auto* input_ptr = new int8_t[bytes_per_block +
@@ -1018,15 +1018,16 @@ void PhyUe::DoEncode(int tid, size_t tag) {
     for (size_t cb_id = 0; cb_id < config_->LdpcConfig().NumBlocksInSymbol();
          cb_id++) {
       if (kEnableMac) {
-        uint8_t* ul_bits = ul_bits_buffer_[ue_id] +
-                           frame_slot * config_->MacBytesNumPerframe();
+        // All cb's per symbol are included in 1 mac packet
+        uint8_t* ul_bits_frame = ul_bits_buffer_[ue_id] +
+                                 frame_slot * config_->MacBytesNumPerframe();
 
-        int input_offset = bytes_per_block *
-                               cfg->LdpcConfig().NumBlocksInSymbol() *
-                               ul_symbol_id +
-                           bytes_per_block * cb_id;
+        size_t mac_packet_offset = config_->MacPacketLength() * ul_symbol_id;
+        size_t cb_offset = cb_id * bytes_per_block;
+
         std::memcpy(input_ptr,
-                    reinterpret_cast<int8_t*>(ul_bits + input_offset),
+                    reinterpret_cast<int8_t*>(
+                        &ul_bits_frame[mac_packet_offset + cb_offset]),
                     bytes_per_block);
       } else {
         size_t cb_offset =
