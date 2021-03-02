@@ -1,4 +1,4 @@
-[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fpr-mac-data-fix)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/pr-mac-data-fix/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fdevelop)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/develop/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
