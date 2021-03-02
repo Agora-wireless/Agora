@@ -85,6 +85,9 @@ class Config {
   inline size_t NumAntennas() const { return this->num_antennas_; }
   inline size_t NumChannels() const { return this->num_channels_; }
   inline size_t RefAnt() const { return this->ref_ant_; }
+  inline size_t RefRadio() const {
+    return this->ref_ant_ / this->num_channels_;
+  }
   inline size_t BeaconAnt() const { return this->beacon_ant_; }
   inline size_t BeaconLen() const { return this->beacon_len_; }
 
@@ -96,6 +99,12 @@ class Config {
 
   inline size_t AntGroupNum() const { return this->ant_group_num_; }
   inline size_t AntPerGroup() const { return this->ant_per_group_; }
+  inline size_t RadioGroupNum() const {
+    return this->ant_group_num_ / this->num_channels_;
+  }
+  inline size_t RadioPerGroup() const {
+    return this->ant_per_group_ / this->num_channels_;
+  }
   inline size_t CoreOffset() const { return this->core_offset_; }
   inline size_t WorkerThreadNum() const { return this->worker_thread_num_; }
   inline size_t SocketThreadNum() const { return this->socket_thread_num_; }
