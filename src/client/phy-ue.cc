@@ -262,13 +262,15 @@ void PhyUe::Start() {
             if (ul_data_symbol_perframe_ == 0) {
               // Send Pilot after receiving last beacon
               // Only when in Downlink Only mode
-              EventData do_tx_pilot_task(
-                  EventType::kPacketPilotTX,
-                  gen_tag_t::FrmSymUe(
-                      frame_id, config_->Frame().GetPilotSymbol(ue_id), ue_id)
-                      .tag_);
-              ScheduleTask(do_tx_pilot_task, &tx_queue_,
-                           *tx_ptoks_ptr_[ant_id % rx_thread_num_]);
+              if (ant_id % config_->NumChannels() == 0) {
+                EventData do_tx_pilot_task(
+                    EventType::kPacketPilotTX,
+                    gen_tag_t::FrmSymUe(
+                        frame_id, config_->Frame().GetPilotSymbol(ue_id), ue_id)
+                        .tag_);
+                ScheduleTask(do_tx_pilot_task, &tx_queue_,
+                             *tx_ptoks_ptr_[ant_id % rx_thread_num_]);
+              }
             } else {
               if (ant_id % config_->NumChannels() == 0) {
                 EventData do_encode_task(
