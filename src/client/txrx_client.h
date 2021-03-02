@@ -73,7 +73,7 @@ class RadioTxRx {
    * @param in_tx_buffer: tx ring buffer of samples processed by PHY for
    * transmission
    *
-   * @param in_buffer_frame_nUDPSeverum: number of samples packets (one symbol
+   * @param in_buffer_frame_num: number of samples packets (one symbol
    * per packet) the tx ring buffer could hold
    *
    * @param in_buffer_length: size of ring buffer in bytes
@@ -83,7 +83,7 @@ class RadioTxRx {
                  char* in_tx_buffer, int* in_tx_buffer_status,
                  int in_tx_buffer_frame_num, int in_tx_buffer_length);
 
-  /**UDPSever
+  /**
    * @brief receives a packet from channel simulator through socket index
    * (radio_id) and writes to an offset (rx_offset) in the receive buffer
    * (buffer_)
@@ -91,7 +91,7 @@ class RadioTxRx {
   struct Packet* RecvEnqueue(int tid, int radio_id, int rx_offset);
 
   /**
-   * @brief transmits a tx pacUDPSeverket that is ready from PHY through socket
+   * @brief transmits a tx packet that is ready from PHY through socket
    * to channel simualtor
    */
   int DequeueSend(int tid);
