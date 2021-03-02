@@ -91,7 +91,7 @@ class UDPClient {
 
       int r =
           getaddrinfo(rem_hostname.c_str(), port_str, &hints, &rem_addrinfo);
-      if (r != 0 || rem_addrinfo == nullptr) {
+      if ((r != 0) || (rem_addrinfo == nullptr)) {
         char issue_msg[1000u];
         sprintf(issue_msg, "Failed to resolve %s. getaddrinfo error = %s.",
                 remote_uri.c_str(), gai_strerror(r));
@@ -137,15 +137,30 @@ class UDPClient {
   void EnableRecording() { enable_recording_flag_ = true; }
 
  private:
+  /**
+   * @brief The raw socket file descriptor
+   */
   int sock_fd_ = -1;
 
-  // A cache mapping hostname:udp_port to addrinfo
+  /**
+   * @brief A cache mapping hostname:udp_port to addrinfo
+   */
   std::map<std::string, struct addrinfo*> addrinfo_map_;
+  /**
+   * @brief Variable to control write access to the non-thread safe data
+   * structures
+   */
   std::mutex map_insert_access_;
-  // The list of all packets sent, maintained if recording is enabled
+
+  /**
+   * @brief All packets sent, maintained if recording is enabled
+   */
   std::vector<std::vector<uint8_t>> sent_vec_;
 
-  bool enable_recording_flag_ = false;  // If true, we record all sent packets
+  /**
+   * @brief If set to ture, we record all sent packets, otherwise we dont
+   */
+  bool enable_recording_flag_ = false;
 };
 
 #endif  // UDP_CLIENT_H_
