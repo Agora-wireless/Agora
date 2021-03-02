@@ -7,13 +7,6 @@
 #ifndef PACKETTXRX_H_
 #define PACKETTXRX_H_
 
-//#include <arpa/inet.h>
-//#include <fcntl.h>
-//#include <netinet/in.h>
-#include <sys/ioctl.h>
-//#include <sys/socket.h>
-#include <sys/types.h>
-
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -123,7 +116,6 @@ class PacketTXRX {
   moodycamel::ProducerToken** rx_ptoks_;
   moodycamel::ProducerToken** tx_ptoks_;
 
-  // std::vector<struct sockaddr_in> bs_rru_sockaddr_;
   std::vector<std::unique_ptr<UDPServer>> udp_servers_;
   std::vector<std::unique_ptr<UDPClient>> udp_clients_;
 
