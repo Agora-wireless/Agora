@@ -206,7 +206,6 @@ EventData DoFFT::Launch(size_t tag) {
     if (frame_id >= TX_FRAME_DELTA) {
       size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
       size_t frame_grp_slot = frame_grp_id % kFrameWnd;
-      // size_t cur_ant = frame_id - (frame_grp_id * cfg_->AntGroupNum());
       size_t cal_dl_symbol_id = symbol_id - cfg_->Frame().GetDLCalSymbol(0);
       size_t cur_ant = ((frame_id - TX_FRAME_DELTA) % cfg_->AntGroupNum()) *
                            cfg_->AntPerGroup() +
