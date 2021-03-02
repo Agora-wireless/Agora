@@ -53,8 +53,7 @@ MacThread::MacThread(
   udp_pkt_buf_.resize(udp_pkt_len);
 
   size_t udp_server_port = cfg_->MacRxPort();
-  MLPD_TRACE("MacThread: setting up udp server at port %zu\n",
-              udp_server_port);
+  MLPD_TRACE("MacThread: setting up udp server at port %zu\n", udp_server_port);
   udp_server_ = std::make_unique<UDPServer>(
       udp_server_port, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
 
@@ -64,7 +63,7 @@ MacThread::MacThread(
   // Only needed for the client
   if (mode_ == Mode::kClient) {
     MLPD_TRACE("MacThread: setting up udp server at port %zu\n",
-                kMacBaseClientPort);
+               kMacBaseClientPort);
     udp_control_channel_ = std::make_unique<UDPServer>(
         kMacBaseClientPort, udp_control_len * kMaxUEs * kMaxPktsPerUE);
   }
