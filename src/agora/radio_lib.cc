@@ -379,7 +379,7 @@ bool RadioConfig::RadioStart() {
 
   size_t ndx = 0;
   for (size_t i = 0; i < this->radio_num_; i++) {
-    bool is_ref_ant = (i == cfg_->RefAnt());
+    bool is_ref_radio = (i == cfg_->RefRadio());
     ba_stn_[i]->writeSetting(
         "TX_SW_DELAY", "30");  // experimentally good value for dev front-end
     ba_stn_[i]->writeSetting("TDD_MODE", "true");
@@ -390,9 +390,9 @@ bool RadioConfig::RadioStart() {
     for (size_t s = 0; s < sched_size; s++) {
       char c = cfg_->Frame().FrameIdentifier().at(s);
       if (c == 'C') {
-        sched.replace(s, 1, is_ref_ant ? "R" : "T");
+        sched.replace(s, 1, is_ref_radio ? "R" : "T");
       } else if (c == 'L') {
-        sched.replace(s, 1, is_ref_ant ? "P" : "R");
+        sched.replace(s, 1, is_ref_radio ? "P" : "R");
       } else if (c == 'P') {
         sched.replace(s, 1, "R");
       } else if (c == 'U') {
@@ -426,45 +426,46 @@ bool RadioConfig::RadioStart() {
     }
     ba_stn_[i]->writeSetting("BEACON_START", std::to_string(radio_num_));
     if (cfg_->Frame().IsRecCalEnabled()) {
-      if (is_ref_ant) {
-        ba_stn_[i]->writeRegisters("TX_RAM_A", 0, pilot);
-        // looks like the best solution is to just use one
-        // antenna at the reference node and leave the 2nd
-        // antenna unused. We either have to use one anntena
-        // per board, or if we use both channels we need to
-        // exclude reference board from beamforming
-      } else {
-        std::vector<std::complex<float>> recip_cal_dl_pilot;
-        std::vector<std::complex<float>> pre(cfg_->OfdmTxZeroPrefix(), 0);
-        std::vector<std::complex<float>> post(cfg_->OfdmTxZeroPostfix(), 0);
-        recip_cal_dl_pilot = CommsLib::ComposePartialPilotSym(
-            cfg_->CommonPilot(), cfg_->NumChannels() * i * kCalibScGroupSize,
-            kCalibScGroupSize, cfg_->OfdmCaNum(), cfg_->OfdmDataNum(),
-            cfg_->OfdmDataStart(), cfg_->CpLen(), false /*block type*/);
-        if (kDebugPrintPilot) {
-          std::cout << "recipCalPilot[" << i << "]: ";
-          for (auto const& cal_p : recip_cal_dl_pilot) {
-            std::cout << real(cal_p) << ", ";
-          }
-          std::cout << std::endl;
-        }
-        recip_cal_dl_pilot.insert(recip_cal_dl_pilot.begin(), pre.begin(),
-                                  pre.end());
-        recip_cal_dl_pilot.insert(recip_cal_dl_pilot.end(), post.begin(),
-                                  post.end());
+      if (is_ref_radio) {
+        // Write to the first channel TX_RAM on the calibration node for
+        // ref-to-array transmission
         ba_stn_[i]->writeRegisters(
-            "TX_RAM_A", 0,
-            Utils::Cfloat32ToUint32(recip_cal_dl_pilot, false, "QI"));
-        if (cfg_->NumChannels() == 2) {
-          recip_cal_dl_pilot = CommsLib::ComposePartialPilotSym(
-              cfg_->CommonPilot(), (2 * i + 1) * kCalibScGroupSize,
-              kCalibScGroupSize, cfg_->OfdmCaNum(), cfg_->OfdmDataNum(),
-              cfg_->OfdmDataStart(), cfg_->CpLen(), false);
-          ba_stn_[i]->writeRegisters(
-              "TX_RAM_B", 0,
-              Utils::Cfloat32ToUint32(recip_cal_dl_pilot, false, "QI"));
-        }
+            std::string("TX_RAM_") + cfg_->Channel().at(0), 0, pilot);
       }
+      // We currently stream array-to-ref transmission in txrx_argos but let's
+      // keep this block of code for future needs
+      // } else {
+      //  std::vector<std::complex<float>> recip_cal_dl_pilot;
+      //  std::vector<std::complex<float>> pre(cfg_->OfdmTxZeroPrefix(), 0);
+      //  std::vector<std::complex<float>> post(cfg_->OfdmTxZeroPostfix(), 0);
+      //  recip_cal_dl_pilot = CommsLib::ComposePartialPilotSym(
+      //      cfg_->CommonPilot(), cfg_->NumChannels() * i * kCalibScGroupSize,
+      //      kCalibScGroupSize, cfg_->OfdmCaNum(), cfg_->OfdmDataNum(),
+      //      cfg_->OfdmDataStart(), cfg_->CpLen(), false /*block type*/);
+      //  if (kDebugPrintPilot) {
+      //    std::cout << "recipCalPilot[" << i << "]: ";
+      //    for (auto const& cal_p : recip_cal_dl_pilot) {
+      //      std::cout << real(cal_p) << ", ";
+      //    }
+      //    std::cout << std::endl;
+      //  }
+      //  recip_cal_dl_pilot.insert(recip_cal_dl_pilot.begin(), pre.begin(),
+      //                            pre.end());
+      //  recip_cal_dl_pilot.insert(recip_cal_dl_pilot.end(), post.begin(),
+      //                            post.end());
+      //  ba_stn_[i]->writeRegisters(
+      //      "TX_RAM_A", 0,
+      //      Utils::Cfloat32ToUint32(recip_cal_dl_pilot, false, "QI"));
+      //  if (cfg_->NumChannels() == 2) {
+      //    recip_cal_dl_pilot = CommsLib::ComposePartialPilotSym(
+      //        cfg_->CommonPilot(), (2 * i + 1) * kCalibScGroupSize,
+      //        kCalibScGroupSize, cfg_->OfdmCaNum(), cfg_->OfdmDataNum(),
+      //        cfg_->OfdmDataStart(), cfg_->CpLen(), false);
+      //    ba_stn_[i]->writeRegisters(
+      //        "TX_RAM_B", 0,
+      //        Utils::Cfloat32ToUint32(recip_cal_dl_pilot, false, "QI"));
+      //  }
+      //}
     }
 
     if (!kUseUHD) {

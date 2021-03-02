@@ -143,7 +143,7 @@ void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
   auto base_tag = gen_tag_t::FrmSymAnt(frame_id, symbol_id, 0);
 
   size_t num_blocks = config_->BsAntNum() / config_->NumChannels();
-  std::array<EventData, 4> events_list;  // Max # of channels: 4
+  std::array<EventData, kMaxChannels> events_list;
   for (size_t i = 0; i < config_->NumChannels(); i++) {
     events_list.at(i).num_tags_ = 1;
     events_list.at(i).event_type_ = EventType::kPacketTX;
@@ -1318,14 +1318,12 @@ void Agora::InitializeUplinkBuffers() {
 
   rc_counters_.Init(cfg->BsAntNum());
 
-  zf_counters_.Init(config_->ZfEventsPerSymbol());
+  zf_counters_.Init(cfg->ZfEventsPerSymbol());
 
-  demul_counters_.Init(cfg->Frame().NumULSyms(),
-                       config_->DemulEventsPerSymbol());
+  demul_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
 
-  decode_counters_.Init(
-      cfg->Frame().NumULSyms(),
-      config_->LdpcConfig().NumBlocksInSymbol() * cfg->UeNum());
+  decode_counters_.Init(cfg->Frame().NumULSyms(),
+                        cfg->LdpcConfig().NumBlocksInSymbol() * cfg->UeNum());
 
   tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->UeNum());
 }

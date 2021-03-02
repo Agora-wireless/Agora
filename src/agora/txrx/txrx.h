@@ -92,7 +92,8 @@ class PacketTXRX {
 
   void LoopTxRxArgos(int tid);
   int DequeueSendArgos(int tid);
-  struct Packet* RecvEnqueueArgos(int tid, int radio_id, int rx_offset);
+  std::vector<struct Packet*> RecvEnqueueArgos(int tid, int radio_id,
+                                               int rx_offset);
 
   long long rx_time_bs_;
   long long tx_time_bs_;
