@@ -1007,7 +1007,7 @@ void PhyUe::DoEncode(int tid, size_t tag) {
                                 cfg->LdpcConfig().ExpansionFactor())));
 
   size_t bytes_per_block =
-      kEnableMac ? BitsToBytes(ldpc_config.NumCbLen())
+      kEnableMac ? ((ldpc_config.NumCbLen()) >> 3)
                  : Roundup<64>(BitsToBytes(ldpc_config.NumCbLen()));
   size_t encoded_bytes_per_block = (ldpc_config.NumCbCodewLen() + 7) >> 3;
   auto* input_ptr = new int8_t[bytes_per_block +
