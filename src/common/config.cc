@@ -422,8 +422,7 @@ Config::Config(const std::string& jsonfile)
   RtAssert(packet_length_ < 9000,
            "Packet size must be smaller than jumbo frame");
 
-  num_bytes_per_cb_ =
-      ldpc_config_.NumCbLen() / 8;  // TODO: Use bits_to_bytes()?
+  num_bytes_per_cb_ = ldpc_config_.NumCbLen() / 8;
   data_bytes_num_persymbol_ =
       num_bytes_per_cb_ * ldpc_config_.NumBlocksInSymbol();
 
