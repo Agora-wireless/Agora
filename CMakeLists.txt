@@ -203,7 +203,7 @@ include_directories(
   /usr/include/mkl/
   src/data_generator)
 
-include_directories(SYSTEM src/third_party)
+include_directories(SYSTEM src/third_party src/third_party/nlohmann/include)
 
 set(COMMON_SOURCES
   src/common/framestats.cc
