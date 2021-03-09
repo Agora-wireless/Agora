@@ -432,6 +432,7 @@ void PhyUe::Start() {
           if (current_frame_user_num_ == 0) {
             expected_frame_id_from_mac_++;
           }
+          config_->UpdateModCfgs(pkt->rb_indicator_.mod_order_bits_);
 
           if (kDebugPrintPacketsFromMac) {
             std::printf(
