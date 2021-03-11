@@ -17,7 +17,6 @@
 #include <boost/range/algorithm/count.hpp>
 #include <fstream>  // std::ifstream
 #include <iostream>
-#include <nlohmann/json.hpp>
 #include <vector>
 
 #include "buffer.h"
@@ -30,8 +29,6 @@
 #include "symbols.h"
 #include "utils.h"
 #include "utils_ldpc.h"
-
-using json = nlohmann::json;
 
 class Config {
  public:

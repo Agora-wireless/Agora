@@ -12,8 +12,11 @@
 #include <boost/range/algorithm/count.hpp>
 
 #include "logger.h"
+#include "nlohmann/json.hpp"
 #include "scrambler.h"
 #include "utils_ldpc.h"
+
+using json = nlohmann::json;
 
 static const size_t kMacAlignmentBytes = 64u;
 
@@ -26,7 +29,8 @@ Config::Config(const std::string& jsonfile)
   SetCpuLayoutOnNumaNodes();
   std::string conf;
   Utils::LoadTddConfig(jsonfile, conf);
-  const auto tdd_conf = json::parse(conf);
+  // Allow json comments
+  const auto tdd_conf = json::parse(conf, nullptr, true, true);
 
   /* antenna configurations */
   if (kUseUHD == false) {

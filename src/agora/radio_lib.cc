@@ -5,6 +5,7 @@
 #include "radio_lib.h"
 
 #include "comms-lib.h"
+#include "nlohmann/json.hpp"
 
 static constexpr bool kPrintCalibrationMats = false;
 
@@ -369,7 +370,7 @@ bool RadioConfig::RadioStart() {
   std::vector<uint32_t> pilot = cfg_->Pilot();
 
   DrainBuffers();
-  json conf;
+  nlohmann::json conf;
   conf["tdd_enabled"] = true;
   conf["frame_mode"] = "free_running";
   conf["max_frame"] = 0;
