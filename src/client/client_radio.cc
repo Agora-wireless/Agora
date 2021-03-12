@@ -6,6 +6,7 @@
 #include "client_radio.h"
 
 #include "comms-lib.h"
+#include "nlohmann/json.hpp"
 
 ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   SoapySDR::Kwargs args;
@@ -252,7 +253,7 @@ bool ClientRadioConfig::RadioStart() {
   int sp_start = cl_trig_offset % cfg_->SampsPerSymbol();
   for (size_t i = 0; i < this->radio_num_; i++) {
     if (cfg_->HwFramer()) {
-      json conf;
+      nlohmann::json conf;
       conf["tdd_enabled"] = true;
       conf["frame_mode"] = "continuous_resync";
       int max_frame =
