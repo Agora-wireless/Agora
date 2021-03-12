@@ -29,8 +29,8 @@ void DelayTicks(uint64_t start, uint64_t ticks) {
 }
 
 Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
-               size_t frame_duration, size_t enable_slow_start,
-               const std::string& server_mac_addr_str,
+               size_t frame_duration, size_t inter_frame_delay,
+               size_t enable_slow_start, const std::string& server_mac_addr_str,
                bool create_thread_for_master)
     : cfg_(cfg),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -39,12 +39,14 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
       enable_slow_start_(enable_slow_start),
       core_offset_(core_offset),
       frame_duration_(frame_duration),
+      inter_frame_delay_(inter_frame_delay),
       ticks_all_(frame_duration_ * ticks_per_usec_ /
                  cfg->Frame().NumTotalSyms()),
       ticks_wnd1_(200000 /* 200 ms */ * ticks_per_usec_ /
                   cfg->Frame().NumTotalSyms()),
       ticks_wnd2_(15 * frame_duration_ * ticks_per_usec_ /
-                  cfg->Frame().NumTotalSyms()) {
+                  cfg->Frame().NumTotalSyms()),
+      ticks_inter_frame_(inter_frame_delay_ * ticks_per_usec_) {
   MLPD_INFO(
       "Initializing sender, sending to base station server at %s, frame "
       "duration = %.2f ms, slow start = %s\n",
@@ -215,8 +217,6 @@ void* Sender::MasterThread(int /*unused*/) {
                     comp_frame_slot,
                     packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_]);
       }
-      // std::printf("Sender -- checking symbol %d : %zu : %zu\n",
-      // ctag.symbol_id,
       // Check to see if the current symbol is finished
       if (packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_] ==
           cfg_->BsAntNum()) {
@@ -232,7 +232,6 @@ void* Sender::MasterThread(int /*unused*/) {
         }
         // Add inter-symbol delay
         DelayTicks(tick_start, GetTicksForFrame(ctag.frame_id_) * symbol_delay);
-        tick_start = GetTime::Rdtsc();
 
         size_t next_frame_id = ctag.frame_id_;
         // Check to see if the current frame is finished
@@ -240,20 +239,21 @@ void* Sender::MasterThread(int /*unused*/) {
         if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
           if ((kDebugSenderReceiver == true) ||
               (kDebugPrintPerFrameDone == true)) {
-            std::printf("Sender: Transmitted frame %u in %.1f ms\n",
+            std::printf("Sender: Transmitted frame %u in %.2f ms\n",
                         ctag.frame_id_,
                         (GetTime::GetTime() - start_time) / 1000.0);
             start_time = GetTime::GetTime();
           }
           next_frame_id++;
           if (next_frame_id == cfg_->FramesToTest()) {
-            break; /* Finished */
+            break;  // Finished
           }
           this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] =
               GetTime::GetTime();
+          // Add inter-frame delay
+          DelayTicks(GetTime::Rdtsc(), ticks_inter_frame_);
           this->frame_start_[(next_frame_id % kNumStatsFrames)] =
               GetTime::GetTime();
-          tick_start = GetTime::Rdtsc();
 
           // Find start symbol of next frame and add proper delay
           next_symbol_id = FindNextSymbol(0);
@@ -264,10 +264,9 @@ void* Sender::MasterThread(int /*unused*/) {
                 "delaying\n",
                 ctag.frame_id_, next_frame_id, next_symbol_id);
           }
-          DelayTicks(tick_start,
+          DelayTicks(GetTime::Rdtsc(),
                      GetTicksForFrame(ctag.frame_id_) * next_symbol_id);
-          // std::printf("Sender -- finished frame %d, next frame %zu, start
-        }  // if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
+        }
         tick_start = GetTime::Rdtsc();
         ScheduleSymbol(next_frame_id, next_symbol_id);
       }
@@ -362,7 +361,6 @@ void* Sender::WorkerThread(int tid) {
         }
 
         // Update the TX buffer
-        // std::printf("Sender : worker processing symbol %d, %d\n",
         pkt->frame_id_ = tag.frame_id_;
         pkt->symbol_id_ = tag.symbol_id_;
         pkt->cell_id_ = tag.ant_id_ / ant_num_per_cell;

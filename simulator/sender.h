@@ -59,7 +59,8 @@ class Sender {
    * @param server_mac_addr_str The MAC address of the server's NIC
    */
   Sender(Config* cfg, size_t socket_thread_num, size_t core_offset = 30,
-         size_t frame_duration = 1000, size_t enable_slow_start = 1,
+         size_t frame_duration = 1000, size_t inter_frame_delay = 0,
+         size_t enable_slow_start = 1,
          const std::string& server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
          bool create_thread_for_master = false);
 
@@ -114,6 +115,7 @@ class Sender {
   // {core_offset + 1, ..., core_offset + thread_num - 1}
   const size_t core_offset_;
   const size_t frame_duration_;
+  const size_t inter_frame_delay_;
 
   // RDTSC clock ticks between the start of transmission of two symbols in
   // the steady state
@@ -123,6 +125,10 @@ class Sender {
   // of transmission of two symbols for the first several frames
   const uint64_t ticks_wnd1_;
   const uint64_t ticks_wnd2_;
+
+  // RDTSC clock ticks between the end of a frame and the start of the next
+  // frame
+  const uint64_t ticks_inter_frame_;
 
   moodycamel::ConcurrentQueue<size_t> send_queue_ =
       moodycamel::ConcurrentQueue<size_t>(1024);
