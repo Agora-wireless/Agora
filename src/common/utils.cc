@@ -267,7 +267,7 @@ void Utils::LoadTddConfig(const std::string& filename, std::string& jconfig) {
   std::string line;
   std::ifstream config_file(filename);
   if (config_file.is_open()) {
-    while (getline(config_file, line)) {
+    while (std::getline(config_file, line)) {
       jconfig += line;
     }
     config_file.close();

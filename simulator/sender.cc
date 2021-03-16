@@ -29,8 +29,8 @@ void DelayTicks(uint64_t start, uint64_t ticks) {
 }
 
 Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
-               size_t frame_duration, size_t enable_slow_start,
-               const std::string& server_mac_addr_str,
+               size_t frame_duration, size_t inter_frame_delay,
+               size_t enable_slow_start, const std::string& server_mac_addr_str,
                bool create_thread_for_master)
     : cfg_(cfg),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -39,12 +39,14 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
       enable_slow_start_(enable_slow_start),
       core_offset_(core_offset),
       frame_duration_(frame_duration),
+      inter_frame_delay_(inter_frame_delay),
       ticks_all_(frame_duration_ * ticks_per_usec_ /
                  cfg->Frame().NumTotalSyms()),
       ticks_wnd1_((40 * frame_duration_ * ticks_per_usec_) /
                   cfg->Frame().NumTotalSyms()),
       ticks_wnd2_((15 * frame_duration_ * ticks_per_usec_) /
-                  cfg->Frame().NumTotalSyms()) {
+                  cfg->Frame().NumTotalSyms()),
+      ticks_inter_frame_(inter_frame_delay_ * ticks_per_usec_) {
   MLPD_INFO(
       "Initializing sender, sending to base station server at %s, frame "
       "duration = %.2f ms, slow start = %s\n",
@@ -240,7 +242,6 @@ void* Sender::MasterThread(int /*unused*/) {
         }
         // Add inter-symbol delay
         DelayTicks(tick_start, GetTicksForFrame(ctag.frame_id_) * symbol_delay);
-        tick_start = GetTime::Rdtsc();
 
         size_t next_frame_id = ctag.frame_id_;
         // Check to see if the current frame is finished
@@ -254,7 +255,7 @@ void* Sender::MasterThread(int /*unused*/) {
               (kDebugPrintPerFrameDone == true)) {
             double timeus_now = GetTime::GetTimeUs();
             std::printf(
-                "Sender: Tx frame %d in %.1f ms, next frame %zu, start symbol "
+                "Sender: Tx frame %d in %.2f ms, next frame %zu, start symbol "
                 "%zu\n",
                 ctag.frame_id_, (timeus_now - start_time) / 1000.0,
                 next_frame_id, next_symbol_id);
@@ -265,9 +266,10 @@ void* Sender::MasterThread(int /*unused*/) {
             keep_running.store(false);
             break; /* Finished */
           } else {
-            // Wait until the next symbol time
+            // Wait until the next symbol time, then next frame time
             DelayTicks(tick_start,
-                       GetTicksForFrame(ctag.frame_id_) * next_symbol_id);
+                       (GetTicksForFrame(ctag.frame_id_) * next_symbol_id) +
+                           ticks_inter_frame_);
             // Set the frame start time to the time of the first tx symbol
             // schedule (now)
             this->frame_start_[(next_frame_id % kNumStatsFrames)] =
