@@ -28,10 +28,12 @@ void DelayTicks(uint64_t start, uint64_t ticks) {
   }
 }
 
+// Only send Uplink (non-pilot data)
+// size_t tx_port = cfg_->MacRxPort();
+
 UlMacSender::UlMacSender(Config* cfg, size_t socket_thread_num,
                          size_t core_offset, size_t frame_duration,
-                         size_t enable_slow_start,
-                         const std::string& server_mac_addr_str,
+                         size_t inter_frame_delay, size_t enable_slow_start,
                          bool create_thread_for_master)
     : cfg_(cfg),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -40,19 +42,20 @@ UlMacSender::UlMacSender(Config* cfg, size_t socket_thread_num,
       enable_slow_start_(enable_slow_start),
       core_offset_(core_offset),
       frame_duration_(frame_duration),
+      inter_frame_delay_(inter_frame_delay),
       ticks_all_(frame_duration_ * ticks_per_usec_ /
                  cfg->Frame().NumTotalSyms()),
       ticks_wnd1_((40 * frame_duration_ * ticks_per_usec_) /
                   cfg->Frame().NumTotalSyms()),
       ticks_wnd2_((15 * frame_duration_ * ticks_per_usec_) /
-                  cfg->Frame().NumTotalSyms()) {
+                  cfg->Frame().NumTotalSyms()),
+      ticks_inter_frame_(inter_frame_delay_ * ticks_per_usec_) {
   MLPD_INFO(
       "Initializing sender, sending to base station server at %s, frame "
       "duration = %.2f ms, slow start = %s\n",
       cfg->BsServerAddr().c_str(), frame_duration / 1000.0,
       enable_slow_start == 1 ? "yes" : "no");
 
-  unused(server_mac_addr_str);
   for (auto& i : packet_count_per_symbol_) {
     i = new size_t[cfg->Frame().NumTotalSyms()]();
   }
@@ -169,18 +172,19 @@ void* UlMacSender::MasterThread(int /*unused*/) {
     int ret = static_cast<int>(completion_queue_.try_dequeue(ctag.tag_));
     if (ret > 0) {
       const size_t comp_frame_slot = (ctag.frame_id_ % kFrameWnd);
-      packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_]++;
+      packet_count_per_symbol_.at(comp_frame_slot)[ctag.symbol_id_]++;
 
       if (kDebugPrintSender == true) {
-        std::printf("Sender: Checking symbol %d : %zu : %zu\n", ctag.symbol_id_,
-                    comp_frame_slot,
-                    packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_]);
+        std::printf(
+            "Sender: Checking symbol %d : %zu : %zu\n", ctag.symbol_id_,
+            comp_frame_slot,
+            packet_count_per_symbol_.at(comp_frame_slot)[ctag.symbol_id_]);
       }
       // Check to see if the current symbol is finished
-      if (packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_] ==
+      if (packet_count_per_symbol_.at(comp_frame_slot)[ctag.symbol_id_] ==
           cfg_->BsAntNum()) {
         // Finished with the current symbol
-        packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_] = 0;
+        packet_count_per_symbol_.at(comp_frame_slot)[ctag.symbol_id_] = 0;
 
         size_t next_symbol_id = FindNextSymbol((ctag.symbol_id_ + 1));
         // Set end of frame time to the time the last symbol was transmitted
@@ -214,7 +218,7 @@ void* UlMacSender::MasterThread(int /*unused*/) {
               (kDebugPrintPerFrameDone == true)) {
             double timeus_now = GetTime::GetTimeUs();
             std::printf(
-                "Sender: Tx frame %d in %.1f ms, next frame %zu, start symbol "
+                "Sender: Tx frame %d in %.2f ms, next frame %zu, start symbol "
                 "%zu\n",
                 ctag.frame_id_, (timeus_now - start_time) / 1000.0,
                 next_frame_id, next_symbol_id);
@@ -225,9 +229,10 @@ void* UlMacSender::MasterThread(int /*unused*/) {
             keep_running.store(false);
             break; /* Finished */
           } else {
-            // Wait until the next symbol time
+            // Wait until the next symbol time, then next frame time
             DelayTicks(tick_start,
-                       GetTicksForFrame(ctag.frame_id_) * next_symbol_id);
+                       (GetTicksForFrame(ctag.frame_id_) * next_symbol_id) +
+                           ticks_inter_frame_);
             // Set the frame start time to the time of the first tx symbol
             // schedule (now)
             this->frame_start_[(next_frame_id % kNumStatsFrames)] =
@@ -269,13 +274,7 @@ void* UlMacSender::WorkerThread(int tid) {
       cfg_->BsAntNum() / socket_thread_num_ +
       (static_cast<size_t>(tid) < cfg_->BsAntNum() % socket_thread_num_ ? 1
                                                                         : 0);
-#ifdef USE_DPDK
-  const size_t port_id = tid % cfg_->DpdkNumPorts();
-  const size_t queue_id = tid / cfg_->DpdkNumPorts();
-  rte_mbuf* tx_mbufs[kDequeueBulkSize];
-#else
   UDPClient udp_client;
-#endif
 
   auto* fft_inout =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
@@ -333,11 +332,9 @@ void* UlMacSender::WorkerThread(int tid) {
           RunFft(pkt, fft_inout, mkl_handle);
         }
 
-#ifndef USE_DPDK
         udp_client.Send(cfg_->BsServerAddr(), cfg_->BsServerPort() + cur_radio,
                         reinterpret_cast<uint8_t*>(socks_pkt_buf),
                         cfg_->PacketLength());
-#endif
 
         if (kDebugSenderReceiver == true) {
           std::printf(

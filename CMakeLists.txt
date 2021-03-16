@@ -139,6 +139,13 @@ if(${ENABLE_MAC})
   add_definitions(-DENABLE_MAC)
 endif()
 
+set(MAC_CLIENT_SOURCES
+  src/mac/ul_mac_sender.cc
+  src/mac/mac_client.cc)
+#set(MAC_BS_SOURCES
+#  src/mac/simple_mac_bs.cpp
+#  src/mac/mac_bs_main.cpp)
+
 # Argos support
 if(${USE_ARGOS})
   add_definitions(-DUSE_ARGOS)
@@ -314,6 +321,11 @@ add_executable(chsim
   simulator/channel.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(chsim ${COMMON_LIBS})
+
+add_executable(macuser
+     ${MAC_CLIENT_SOURCES}
+     ${COMMON_SOURCES})
+target_link_libraries(macuser ${COMMON_LIBS})
 
 
 # End-to-end test
