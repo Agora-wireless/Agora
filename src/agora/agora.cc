@@ -590,6 +590,7 @@ void Agora::Start() {
             tx_count++;
             if (tx_count == tx_counters_.MaxSymbolCount() * 9000) {
               tx_count = 0;
+
               double diff = GetTime::GetTimeUs() - tx_begin;
               int samples_num_per_ue =
                   cfg->OfdmDataNum() * tx_counters_.MaxSymbolCount() * 1000;
@@ -601,6 +602,8 @@ void Agora::Start() {
                   samples_num_per_ue, cfg->UeNum(), diff,
                   samples_num_per_ue * std::log2(16.0f) / diff,
                   GetConq(EventType::kPacketTX, 0)->size_approx());
+              unused(diff);
+              unused(samples_num_per_ue);
               tx_begin = GetTime::GetTimeUs();
             }
           }

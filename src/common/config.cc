@@ -443,8 +443,6 @@ Config::Config(const std::string& jsonfile)
   mac_data_bytes_num_perframe_ = mac_payload_length_ * mac_packets_perframe_;
   mac_bytes_num_perframe_ = mac_packet_length_ * mac_packets_perframe_;
 
-  float frame_time = (frame_.NumTotalSyms() * samps_per_symbol_) / rate_;
-
   this->running_.store(true);
   MLPD_INFO(
       "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
@@ -456,7 +454,8 @@ Config::Config(const std::string& jsonfile)
       "sec\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
-      mac_data_bytes_num_perframe_, mac_bytes_num_perframe_, frame_time);
+      mac_data_bytes_num_perframe_, mac_bytes_num_perframe_,
+      ((frame_.NumTotalSyms() * samps_per_symbol_) / rate_));
 }
 
 void Config::GenData() {
