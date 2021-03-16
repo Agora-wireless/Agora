@@ -36,10 +36,12 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
     std::printf("Simulator: Initialize buffers\n");
   }
   InitializeBuffers();
+  size_t enable_slow_start = 1;
+  size_t frame_delay = 0;
 
-  sender_ =
-      std::make_unique<Sender>(config_, socket_tx_thread_num_, core_offset_ + 1,
-                               sender_delay, 1, "ff:ff:ff:ff:ff:ff", true);
+  sender_ = std::make_unique<Sender>(
+      config_, socket_tx_thread_num_, core_offset_ + 1, sender_delay,
+      frame_delay, enable_slow_start, "ff:ff:ff:ff:ff:ff", true);
   receiver_ =
       std::make_unique<Receiver>(config_, socket_rx_thread_num_, core_offset_,
                                  &message_queue_, rx_ptoks_ptr_);

@@ -12,8 +12,11 @@
 #include <boost/range/algorithm/count.hpp>
 
 #include "logger.h"
+#include "nlohmann/json.hpp"
 #include "scrambler.h"
 #include "utils_ldpc.h"
+
+using json = nlohmann::json;
 
 static const size_t kMacAlignmentBytes = 64u;
 
@@ -26,7 +29,8 @@ Config::Config(const std::string& jsonfile)
   SetCpuLayoutOnNumaNodes();
   std::string conf;
   Utils::LoadTddConfig(jsonfile, conf);
-  const auto tdd_conf = json::parse(conf);
+  // Allow json comments
+  const auto tdd_conf = json::parse(conf, nullptr, true, true);
 
   /* antenna configurations */
   if (kUseUHD == false) {
@@ -439,8 +443,6 @@ Config::Config(const std::string& jsonfile)
   mac_data_bytes_num_perframe_ = mac_payload_length_ * mac_packets_perframe_;
   mac_bytes_num_perframe_ = mac_packet_length_ * mac_packets_perframe_;
 
-  float frame_time = (frame_.NumTotalSyms() * samps_per_symbol_) / rate_;
-
   this->running_.store(true);
   MLPD_INFO(
       "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
@@ -452,7 +454,8 @@ Config::Config(const std::string& jsonfile)
       "sec\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
-      mac_data_bytes_num_perframe_, mac_bytes_num_perframe_, frame_time);
+      mac_data_bytes_num_perframe_, mac_bytes_num_perframe_,
+      ((frame_.NumTotalSyms() * samps_per_symbol_) / rate_));
 }
 
 void Config::GenData() {
