@@ -242,6 +242,7 @@ void* Sender::MasterThread(int /*unused*/) {
         }
         // Add inter-symbol delay
         DelayTicks(tick_start, GetTicksForFrame(ctag.frame_id_) * symbol_delay);
+        tick_start = GetTime::Rdtsc();
 
         size_t next_frame_id = ctag.frame_id_;
         // Check to see if the current frame is finished
