@@ -11,7 +11,6 @@
 #include "udp_client.h"
 
 static constexpr bool kDebugPrintSender = false;
-static constexpr size_t kMacAddrBtyes = 17;
 
 static std::atomic<bool> keep_running = true;
 // A spinning barrier to synchronize the start of worker threads
@@ -28,11 +27,16 @@ void DelayTicks(uint64_t start, uint64_t ticks) {
   }
 }
 
+inline size_t UlMacSender::TagToTxBuffersIndex(gen_tag_t tag) const {
+  const size_t frame_slot = tag.frame_id_ % kFrameWnd;
+  return (frame_slot * cfg_->UeAntNum()) + tag.ue_id_;
+}
+
 // Only send Uplink (non-pilot data)
 // size_t tx_port = cfg_->MacRxPort();
 
 UlMacSender::UlMacSender(Config* cfg, size_t socket_thread_num,
-                         size_t core_offset, size_t frame_duration,
+                         size_t core_offset, size_t frame_duration_us,
                          size_t inter_frame_delay, size_t enable_slow_start,
                          bool create_thread_for_master)
     : cfg_(cfg),
@@ -41,28 +45,37 @@ UlMacSender::UlMacSender(Config* cfg, size_t socket_thread_num,
       socket_thread_num_(socket_thread_num),
       enable_slow_start_(enable_slow_start),
       core_offset_(core_offset),
-      frame_duration_(frame_duration),
       inter_frame_delay_(inter_frame_delay),
-      ticks_all_(frame_duration_ * ticks_per_usec_ /
-                 cfg->Frame().NumTotalSyms()),
-      ticks_wnd1_((40 * frame_duration_ * ticks_per_usec_) /
-                  cfg->Frame().NumTotalSyms()),
-      ticks_wnd2_((15 * frame_duration_ * ticks_per_usec_) /
-                  cfg->Frame().NumTotalSyms()),
       ticks_inter_frame_(inter_frame_delay_ * ticks_per_usec_) {
+  if (frame_duration_us == 0) {
+    frame_duration_us_ =
+        (cfg->Frame().NumTotalSyms() * cfg->SampsPerSymbol() * 1000000ul) /
+        cfg->Rate();
+  } else {
+    frame_duration_us_ = frame_duration_us;
+  }
+
+  ticks_all_ =
+      ((frame_duration_us * ticks_per_usec_) / cfg->Frame().NumTotalSyms());
+  ticks_wnd1_ = ticks_all_ * 40;
+  ticks_wnd2_ = ticks_all_ * 15;
+
+  tx_buffers_.Malloc(kFrameWnd * cfg_->UeAntNum(), cfg_->MacPacketLength(),
+                     Agora_memory::Alignment_t::kAlign64);
+
   MLPD_INFO(
-      "Initializing sender, sending to base station server at %s, frame "
+      "Initializing sender, sending to mac thread at %s, frame "
       "duration = %.2f ms, slow start = %s\n",
-      cfg->BsServerAddr().c_str(), frame_duration / 1000.0,
+      cfg->BsServerAddr().c_str(), frame_duration_us / 1000.0,
       enable_slow_start == 1 ? "yes" : "no");
 
   for (auto& i : packet_count_per_symbol_) {
     i = new size_t[cfg->Frame().NumTotalSyms()]();
   }
 
-  InitIqFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)) +
-                 "/data/LDPC_rx_data_" + std::to_string(cfg->OfdmCaNum()) +
-                 "_ant" + std::to_string(cfg->BsAntNum()) + ".bin");
+  // InitIqFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)) +
+  //               "/data/LDPC_rx_data_" + std::to_string(cfg->OfdmCaNum()) +
+  //               "_ant" + std::to_string(cfg->BsAntNum()) + ".bin");
 
   task_ptok_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
@@ -88,7 +101,6 @@ UlMacSender::~UlMacSender() {
     thread.join();
   }
 
-  iq_data_short_.Free();
   for (auto& i : packet_count_per_symbol_) {
     delete[] i;
   }
@@ -125,8 +137,10 @@ size_t UlMacSender::FindNextSymbol(size_t start_symbol) {
   for (next_symbol_id = start_symbol;
        (next_symbol_id < cfg_->Frame().NumTotalSyms()); next_symbol_id++) {
     SymbolType symbol_type = cfg_->GetSymbolType(next_symbol_id);
-    if ((symbol_type == SymbolType::kPilot) ||
-        (symbol_type == SymbolType::kUL)) {
+    // Must be uplink data symbol
+    if ((symbol_type == SymbolType::kUL) &&
+        (this->cfg_->Frame().GetULSymbolIdx(next_symbol_id) >=
+         this->cfg_->Frame().ClientUlPilotSymbols())) {
       break;
     }
   }
@@ -134,7 +148,7 @@ size_t UlMacSender::FindNextSymbol(size_t start_symbol) {
 }
 
 void UlMacSender::ScheduleSymbol(size_t frame, size_t symbol_id) {
-  for (size_t i = 0; i < cfg_->BsAntNum(); i++) {
+  for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
     auto req_tag = gen_tag_t::FrmSymAnt(frame, symbol_id, i);
     // Split up the antennas amoung the worker threads
     RtAssert(
@@ -143,7 +157,7 @@ void UlMacSender::ScheduleSymbol(size_t frame, size_t symbol_id) {
   }
 }
 
-void* UlMacSender::MasterThread(int /*unused*/) {
+void* UlMacSender::MasterThread(size_t /*unused*/) {
   PinToCoreWithOffset(ThreadType::kMasterTX, core_offset_, 0);
 
   // Wait for all worker threads to be ready (+1 for Master)
@@ -157,7 +171,7 @@ void* UlMacSender::MasterThread(int /*unused*/) {
   uint64_t tick_start = GetTime::Rdtsc();
 
   size_t start_symbol = FindNextSymbol(0);
-  // Delay until the start of the first symbol (pilot)
+  // Delay until the start of the first symbol
   if (start_symbol > 0) {
     MLPD_INFO("Sender: Starting symbol %zu delaying\n", start_symbol);
     DelayTicks(tick_start, GetTicksForFrame(0) * start_symbol);
@@ -180,9 +194,9 @@ void* UlMacSender::MasterThread(int /*unused*/) {
             comp_frame_slot,
             packet_count_per_symbol_.at(comp_frame_slot)[ctag.symbol_id_]);
       }
-      // Check to see if the current symbol is finished
+      // Check to see if the current symbol is finished (UeNum / UeAntNum)
       if (packet_count_per_symbol_.at(comp_frame_slot)[ctag.symbol_id_] ==
-          cfg_->BsAntNum()) {
+          cfg_->UeAntNum()) {
         // Finished with the current symbol
         packet_count_per_symbol_.at(comp_frame_slot)[ctag.symbol_id_] = 0;
 
@@ -250,7 +264,7 @@ void* UlMacSender::MasterThread(int /*unused*/) {
 }
 
 /* Worker expects only valid transmit symbol_ids 'U' 'P' */
-void* UlMacSender::WorkerThread(int tid) {
+void* UlMacSender::WorkerThread(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTX, (core_offset_ + 1), tid);
 
   // Wait for all Sender threads (including master) to start runnung
@@ -260,26 +274,16 @@ void* UlMacSender::WorkerThread(int tid) {
   }
   MLPD_FRAME("Sender: worker thread %d running\n", tid);
 
-  DFTI_DESCRIPTOR_HANDLE mkl_handle;
-  DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1,
-                       cfg_->OfdmCaNum());
-  DftiCommitDescriptor(mkl_handle);
-
   const size_t max_symbol_id =
-      cfg_->Frame().NumPilotSyms() +
-      cfg_->Frame().NumULSyms();  // TEMP not sure if this is ok
+      cfg_->Frame().NumULSyms() - cfg_->Frame().ClientUlPilotSymbols();
   const size_t radio_lo = (tid * cfg_->NumRadios()) / socket_thread_num_;
   const size_t radio_hi = ((tid + 1) * cfg_->NumRadios()) / socket_thread_num_;
   const size_t ant_num_this_thread =
-      cfg_->BsAntNum() / socket_thread_num_ +
-      (static_cast<size_t>(tid) < cfg_->BsAntNum() % socket_thread_num_ ? 1
-                                                                        : 0);
+      cfg_->NumRadios() / socket_thread_num_ +
+      (static_cast<size_t>(tid) < cfg_->NumRadios() % socket_thread_num_ ? 1
+                                                                         : 0);
   UDPClient udp_client;
 
-  auto* fft_inout =
-      static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64,
-          cfg_->OfdmCaNum() * sizeof(complex_float)));
   auto* socks_pkt_buf = static_cast<Packet*>(PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign32, cfg_->PacketLength()));
 
@@ -288,8 +292,8 @@ void* UlMacSender::WorkerThread(int tid) {
   size_t total_tx_packets_rolling = 0;
   size_t cur_radio = radio_lo;
 
-  MLPD_INFO("Sender: In thread %d, %zu antennas, total bs antennas: %zu\n", tid,
-            ant_num_this_thread, cfg_->BsAntNum());
+  MLPD_INFO("Sender: In thread %d, %zu antennas, total antennas: %zu\n", tid,
+            ant_num_this_thread, cfg_->NumRadios());
 
   // We currently don't support zero-padding OFDM prefix and postfix
   RtAssert(cfg_->PacketLength() ==
@@ -306,42 +310,24 @@ void* UlMacSender::WorkerThread(int tid) {
         size_t start_tsc_send = GetTime::Rdtsc();
 
         auto tag = gen_tag_t(tags.at(tag_id));
-        assert((cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kPilot) ||
-               (cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kUL));
-
-        // Send a message to the server. We assume that the server is running.
-        Packet* pkt = socks_pkt_buf;
+        assert(cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kUL);
 
         if ((kDebugPrintSender == true)) {
           std::printf(
-              "Sender : worker %d processing frame %d symbol %d, type %d\n",
+              "Sender : worker %zu processing frame %d symbol %d, type %d\n",
               tid, tag.frame_id_, tag.symbol_id_,
               static_cast<int>(cfg_->GetSymbolType(tag.symbol_id_)));
         }
+        const size_t tx_bufs_idx = TagToTxBuffersIndex(tag);
 
-        // Update the TX buffer
-        pkt->frame_id_ = tag.frame_id_;
-        pkt->symbol_id_ = tag.symbol_id_;
-        pkt->cell_id_ = tag.ant_id_ / ant_num_per_cell;
-        pkt->ant_id_ = tag.ant_id_ - ant_num_per_cell * (pkt->cell_id_);
-        std::memcpy(
-            pkt->data_,
-            iq_data_short_[(pkt->symbol_id_ * cfg_->BsAntNum()) + tag.ant_id_],
-            (cfg_->CpLen() + cfg_->OfdmCaNum()) * (kUse12BitIQ ? 3 : 4));
-        if (cfg_->FftInRru() == true) {
-          RunFft(pkt, fft_inout, mkl_handle);
-        }
-
-        udp_client.Send(cfg_->BsServerAddr(), cfg_->BsServerPort() + cur_radio,
-                        reinterpret_cast<uint8_t*>(socks_pkt_buf),
-                        cfg_->PacketLength());
+        udp_client.Send(cfg_->UeServerAddr(), cfg_->MacRxPort() + cur_radio,
+                        tx_buffers_[tx_bufs_idx], cfg_->PacketLength());
 
         if (kDebugSenderReceiver == true) {
           std::printf(
-              "Thread %d (tag = %s) transmit frame %d, symbol %d, ant "
+              "Thread %zu (tag = %s) transmit frame %d, radio "
               "%d, TX time: %.3f us\n",
-              tid, gen_tag_t(tag).ToString().c_str(), pkt->frame_id_,
-              pkt->symbol_id_, pkt->ant_id_,
+              tid, gen_tag_t(tag).ToString().c_str(), tag.frame_id_, cur_radio,
               GetTime::CyclesToUs(GetTime::Rdtsc() - start_tsc_send,
                                   freq_ghz_));
         }
@@ -371,12 +357,8 @@ void* UlMacSender::WorkerThread(int tid) {
     }  // if (num_tags > 0)
   }    // while (keep_running.load() == true)
 
-  DftiFreeDescriptor(&mkl_handle);
-
   std::free(static_cast<void*>(socks_pkt_buf));
-  std::free(static_cast<void*>(fft_inout));
-  MLPD_FRAME("Sender: worker thread %d exit\n", tid);
-  std::printf("Sender: worker thread %d exit\n", tid);
+  MLPD_FRAME("Sender: worker thread %zu exit\n", tid);
   return nullptr;
 }
 
@@ -392,6 +374,7 @@ uint64_t UlMacSender::GetTicksForFrame(size_t frame_id) const {
   }
 }
 
+/*
 void UlMacSender::InitIqFromFile(const std::string& filename) {
   const size_t packets_per_frame =
       cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum();
@@ -433,12 +416,69 @@ void UlMacSender::InitIqFromFile(const std::string& filename) {
   }
   std::fclose(fp);
   iq_data_float.Free();
-}
+} */
 
 void UlMacSender::CreateWorkerThreads(size_t num_workers) {
   for (size_t i = 0u; i < num_workers; i++) {
     this->threads_.emplace_back(&UlMacSender::WorkerThread, this, i);
   }
+}
+
+void* UlMacSender::DataUpdateThread(size_t tid) {
+  // Sender get better performance when this thread is not pinned to core
+  // PinToCoreWithOffset(ThreadType::kWorker, 13, 0);
+  printf("Data update thread running on core %d\n", sched_getcpu());
+
+  while (true) {
+    size_t tag = 0;
+    if (data_update_queue_.try_dequeue(tag) == true) {
+      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+        auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
+                                              ((gen_tag_t)tag).symbol_id_, i);
+        UpdateTxBuffer(tag_for_ue);
+      }
+    }
+  }
+}
+
+void UlMacSender::UpdateTxBuffer(gen_tag_t tag) {
+  auto* pkt = (MacPacket*)(tx_buffers_[TagToTxBuffersIndex(tag)]);
+  pkt->frame_id_ = tag.frame_id_;
+  pkt->symbol_id_ = tag.symbol_id_;
+  pkt->ue_id_ = tag.ue_id_;
+
+  // Read data from file.
+  socklen_t addrlen = sizeof(data_addr_[tag.ue_id_]);
+  int ret = recvfrom(data_sockets_[tag.ue_id_], (char*)pkt->data_,
+                     cfg_->MacDataBytesNumPerframe(), 0,
+                     (struct sockaddr*)&data_addr_[tag.ue_id_], &addrlen);
+  if (ret == -1) {
+    if (errno != EAGAIN) {
+      perror("video recv failed");
+      exit(0);
+    }
+  }
+
+  ////
+  /// https://stackoverflow.com/questions/12149593/how-can-i-create-an-array-of-random-numbers-in-c
+  // std::random_device r;
+  ////std::seed_seq seed{ r(), r(), r(), r(), r(), r(), r(), r() };
+  // std::seed_seq seed{ 11, 12, 13, 14, 15, 16, 17, 18 };
+  // std::mt19937 eng(seed); // a source of random data
+
+  // std::uniform_int_distribution<char> dist;
+  // std::vector<char> v(cfg_->mac_data_bytes_num_perframe);
+
+  // generate(begin(v), end(v), bind(dist, eng));
+  // memcpy(pkt->data, (char*)v.data(), cfg_->mac_data_bytes_num_perframe);
+
+  // Print MAC packet summary
+  printf("sending packet for frame %d, symbol %d, ue %d, bytes %d\n",
+         pkt->frame_id_, pkt->symbol_id_, pkt->ue_id_,
+         cfg_->mac_data_bytes_num_perframe);
+  for (size_t i = 0; i < cfg_->mac_data_bytes_num_perframe; i++)
+    printf("%i ", *((uint8_t*)pkt->data_ + i));
+  printf("\n");
 }
 
 void UlMacSender::WriteStatsToFile(size_t tx_frame_count) const {
@@ -450,19 +490,4 @@ void UlMacSender::WriteStatsToFile(size_t tx_frame_count) const {
   for (size_t i = 0; i < tx_frame_count; i++) {
     std::fprintf(fp_debug, "%.5f\n", frame_end_[i % kNumStatsFrames]);
   }
-}
-
-void UlMacSender::RunFft(Packet* pkt, complex_float* fft_inout,
-                         DFTI_DESCRIPTOR_HANDLE mkl_handle) const {
-  // pkt->data has (cp_len + ofdm_ca_num) unsigned short samples. After FFT,
-  // we'll remove the cyclic prefix and have ofdm_ca_num() short samples left.
-  SimdConvertShortToFloat(&pkt->data_[2 * cfg_->CpLen()],
-                          reinterpret_cast<float*>(fft_inout),
-                          cfg_->OfdmCaNum() * 2);
-
-  DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
-
-  SimdConvertFloat32ToFloat16(reinterpret_cast<float*>(pkt->data_),
-                              reinterpret_cast<float*>(fft_inout),
-                              cfg_->OfdmCaNum() * 2);
 }

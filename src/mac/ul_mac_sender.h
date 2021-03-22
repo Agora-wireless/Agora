@@ -29,13 +29,13 @@ class UlMacSender {
    * @param core_offset The master thread runs on core [core_offset]. Worker
    * thread #i runs on core [core_offset + i]
    *
-   * @param frame_duration The TTI slot duration
+   * @param frame_duration_us The TTI slot duration in us
    *
    * @param enable_slow_start If 1, the sender initially sends frames in a
    * duration larger than the TTI
    */
   UlMacSender(Config* cfg, size_t socket_thread_num, size_t core_offset = 30,
-              size_t frame_duration = 1000, size_t inter_frame_delay = 0,
+              size_t frame_duration_us = 0, size_t inter_frame_delay = 0,
               size_t enable_slow_start = 1,
               bool create_thread_for_master = false);
 
@@ -48,17 +48,9 @@ class UlMacSender {
   void StartTXfromMain(double* in_frame_start, double* in_frame_end);
 
  private:
-  void* MasterThread(int tid);
-  void* WorkerThread(int tid);
-
-  /**
-   * @brief Read time-domain 32-bit floating-point IQ samples from [filename]
-   * and populate iq_data_short_ by converting to 16-bit fixed-point samples
-   *
-   * [filename] must contain data for one frame. For every symbol and antenna,
-   * the file must provide (CP_LEN + OFDM_CA_NUM) IQ samples.
-   */
-  void InitIqFromFile(const std::string& filename);
+  void* MasterThread(size_t tid);
+  void* WorkerThread(size_t tid);
+  void* DataUpdateThread(size_t tid);
 
   // Get number of CPU ticks for a symbol given a frame index
   uint64_t GetTicksForFrame(size_t frame_id) const;
@@ -67,6 +59,7 @@ class UlMacSender {
   // Launch threads to run worker with thread IDs from tid_start to tid_end
   void CreateWorkerThreads(size_t num_workers);
 
+  void UpdateTxBuffer(gen_tag_t tag);
   void DelayForSymbol(size_t tx_frame_count, uint64_t tick_start);
   void DelayForFrame(size_t tx_frame_count, uint64_t tick_start);
 
@@ -74,11 +67,7 @@ class UlMacSender {
 
   size_t FindNextSymbol(size_t start_symbol);
   void ScheduleSymbol(size_t frame, size_t symbol_id);
-
-  // Run FFT on the data field in pkt, output to fft_inout
-  // Recombine pkt header data and fft output data into payload
-  void RunFft(Packet* pkt, complex_float* fft_inout,
-              DFTI_DESCRIPTOR_HANDLE mkl_handle) const;
+  size_t TagToTxBuffersIndex(gen_tag_t tag) const;
 
   Config* cfg_;
   const double freq_ghz_;           // RDTSC frequency in GHz
@@ -89,17 +78,17 @@ class UlMacSender {
   // The master thread runs on core core_offset. Worker threads use cores
   // {core_offset + 1, ..., core_offset + thread_num - 1}
   const size_t core_offset_;
-  const size_t frame_duration_;
+  size_t frame_duration_us_;
   const size_t inter_frame_delay_;
 
   // RDTSC clock ticks between the start of transmission of two symbols in
   // the steady state
-  const uint64_t ticks_all_;
+  uint64_t ticks_all_;
 
   // ticks_wnd_1 and ticks_wnd_2 are the RDTSC clock ticks between the start
   // of transmission of two symbols for the first several frames
-  const uint64_t ticks_wnd1_;
-  const uint64_t ticks_wnd2_;
+  uint64_t ticks_wnd1_;
+  uint64_t ticks_wnd2_;
 
   // RDTSC clock ticks between the end of a frame and the start of the next
   // frame
@@ -111,10 +100,6 @@ class UlMacSender {
       moodycamel::ConcurrentQueue<size_t>(kMessageQueueSize);
   moodycamel::ProducerToken** task_ptok_;
 
-  // First dimension: symbol_num_perframe * BS_ANT_NUM
-  // Second dimension: (CP_LEN + OFDM_CA_NUM) * 2
-  Table<unsigned short> iq_data_short_;
-
   // Number of packets transmitted for each symbol in a frame
   std::array<size_t*, kFrameWnd> packet_count_per_symbol_;
 
@@ -123,6 +108,8 @@ class UlMacSender {
 
   std::vector<std::thread> threads_;
   /* Send to Address */
+
+  Table<uint8_t> tx_buffers_;
 };
 
 #endif  // UL_MAC_SENDER_H_
