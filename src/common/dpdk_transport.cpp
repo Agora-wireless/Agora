@@ -19,7 +19,7 @@ int DpdkTransport::nic_init(
     uint16_t port, struct rte_mempool* mbuf_pool, int thread_num)
 {
     struct rte_eth_conf port_conf = port_conf_default();
-    const uint16_t rxRings = thread_num, txRings = 2 * thread_num;
+    const uint16_t rxRings = thread_num, txRings = thread_num;
     int retval;
     uint16_t q;
     uint16_t nb_rxd = RX_RING_SIZE;
@@ -234,6 +234,10 @@ rte_mbuf* DpdkTransport::alloc_udp(rte_mempool* mbuf_pool,
 {
     rte_mbuf* tx_buf __attribute__((aligned(64)));
     tx_buf = rte_pktmbuf_alloc(mbuf_pool);
+    if (unlikely(tx_buf == NULL)) {
+        fprintf(stderr, "Cannot alloc udp packet due to out of memory!\n");
+        exit(1);
+    }
 
     rte_ether_hdr* eth_hdr = rte_pktmbuf_mtod(tx_buf, rte_ether_hdr*);
     eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
@@ -292,7 +296,10 @@ rte_mempool* DpdkTransport::create_mempool()
     rte_mempool* mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL",
         NUM_MBUFS * nb_ports, MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
 
-    rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
+    // rt_assert(mbuf_pool != NULL, "Cannot create mbuf pool");
+    if (mbuf_pool == NULL) {
+        fprintf(stderr, "Cannot create mbuf pool errno: %d (%s)\n", rte_errno, rte_strerror(rte_errno));
+    }
 
     return mbuf_pool;
 }

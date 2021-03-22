@@ -8,6 +8,7 @@ bool keep_running = true;
 
 // A spinning barrier to synchronize the start of worker threads
 std::atomic<size_t> num_workers_ready_atomic;
+std::atomic<size_t> num_masters_ready_atomic;
 
 void interrupt_handler(int)
 {
@@ -21,13 +22,14 @@ void delay_ticks(uint64_t start, uint64_t ticks)
         _mm_pause();
 }
 
-Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
-    size_t frame_duration, size_t enable_slow_start,
+Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_threads_, 
+    size_t core_offset, size_t frame_duration, size_t enable_slow_start,
     std::string server_mac_addr_str, bool create_thread_for_master,
     void* mbuf_pool)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
+    , num_master_threads_(num_master_threads_)
     , num_worker_threads_(num_worker_threads_)
     , enable_slow_start(enable_slow_start)
     , core_offset(core_offset)
@@ -55,12 +57,31 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
         + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
         + ".bin");
 
-    task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
-        64, num_worker_threads_ * sizeof(moodycamel::ProducerToken*));
-    for (size_t i = 0; i < num_worker_threads_; i++)
-        task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
+    send_queues_ = (moodycamel::ConcurrentQueue<size_t>**)aligned_alloc(
+        64, num_worker_threads_ * sizeof(moodycamel::ConcurrentQueue<size_t>*));
+    for (size_t i = 0; i < num_worker_threads_; i ++) {
+        send_queues_[i] = new moodycamel::ConcurrentQueue<size_t>(8192);
+    }
+
+    // task_ptok = (moodycamel::ProducerToken**)aligned_alloc(
+    //     64, num_worker_threads_ * sizeof(moodycamel::ProducerToken*));
+    // for (size_t i = 0; i < num_worker_threads_; i++)
+    //     task_ptok[i] = new moodycamel::ProducerToken(send_queue_);
+
+    completion_queues_ = (moodycamel::ConcurrentQueue<size_t>**)aligned_alloc(
+        64, num_master_threads_ * sizeof(moodycamel::ConcurrentQueue<size_t>*));
+    for (size_t i = 0; i < num_master_threads_; i ++) {
+        completion_queues_[i] = new moodycamel::ConcurrentQueue<size_t>(8192);
+    }
+
+    // comp_ptok = (moodycamel::ProducerToken**)aligned_alloc(
+    //     64, num_master_threads_ * sizeof(moodycamel::ProducerToken*));
+    // for (size_t i = 0; i < num_master_threads_; i ++) {
+    //     comp_ptok[i] = new moodycamel::ProducerToken(completion_queue_);
+    // }
 
     num_workers_ready_atomic = 0;
+    num_masters_ready_atomic = 0;
 
     // Create a master thread when started from simulator
     // if (create_thread_for_master)
@@ -71,13 +92,17 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     // }
 
 #ifdef USE_DPDK
+    printf("Start to init DPDK states\n");
     uint16_t portid = 0; // For now, hard-code to port zero
     if (mbuf_pool == nullptr) {
         DpdkTransport::dpdk_init(core_offset, num_worker_threads_);
         this->mbuf_pool = DpdkTransport::create_mempool();
         
-        if (DpdkTransport::nic_init(portid, this->mbuf_pool, num_worker_threads_) != 0)
+        int res;
+        if ((res = DpdkTransport::nic_init(portid, this->mbuf_pool, num_worker_threads_)) != 0) {
+            printf("Cannot init port %u: error %d\n", portid, res);
             rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
+        }
     } else {
         this->mbuf_pool = reinterpret_cast<rte_mempool*>(mbuf_pool);
     }
@@ -104,6 +129,7 @@ Sender::Sender(Config* cfg, size_t num_worker_threads_, size_t core_offset,
     rt_assert(ret == 0, "Cannot get MAC address of the port");
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 #endif
+    printf("Sender init done\n");
 }
 
 Sender::~Sender()
@@ -131,40 +157,88 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
 
     // create_threads(pthread_fun_wrapper<Sender, &Sender::worker_thread>, 0,
     //     num_worker_threads_);
-    master_thread_ = std::thread(&Sender::master_thread, this, num_worker_threads_);
+    // master_threads_[0] = std::thread(&Sender::master_thread, this, 0);
+    for (size_t i = 0; i < num_master_threads_; i ++) {
+        master_threads_[i] = std::thread(&Sender::master_thread, this, i);
+    }
     for (size_t i = 0; i < num_worker_threads_; i ++) {
         worker_threads_[i] = std::thread(&Sender::worker_thread, this, i);
     }
 }
 
+void Sender::startTXfromMainAuto(double* in_frame_start, double* in_frame_end)
+{
+    frame_start = in_frame_start;
+    frame_end = in_frame_end;
+
+    for (size_t i = 0; i < num_worker_threads_; i ++) {
+        worker_threads_[i] = std::thread(&Sender::worker_thread_auto, this, i);
+    }
+}
+
 void Sender::join_thread() {
-    master_thread_.join();
+    // master_threads_[0].join();
+    for (size_t i = 0; i < num_master_threads_; i ++) {
+        master_threads_[i].join();
+    }
     for (size_t i = 0; i < num_worker_threads_; i ++) {
         worker_threads_[i].join();
     }
 }
 
-void* Sender::master_thread(int)
+void Sender::join_thread_auto() {
+    for (size_t i = 0; i < num_worker_threads_; i ++) {
+        worker_threads_[i].join();
+    }
+}
+
+void* Sender::master_thread(int tid)
 {
+    size_t* packet_count_per_symbol_loc[SOCKET_BUFFER_FRAME_NUM];
+    size_t packet_count_per_frame_loc[SOCKET_BUFFER_FRAME_NUM];
+    for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i ++) {
+        packet_count_per_symbol_loc[i] = new size_t[get_max_symbol_id()]();
+        memset(packet_count_per_symbol_loc[i], 0, get_max_symbol_id() * sizeof(size_t));
+    }
+    memset(packet_count_per_frame_loc, 0, SOCKET_BUFFER_FRAME_NUM * sizeof(size_t));
+    double* frame_start_loc = new double[kNumStatsFrames]();
+    double* frame_end_loc = new double[kNumStatsFrames]();
+
     signal(SIGINT, interrupt_handler);
-    pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, 0);
+    pin_to_core_with_offset(ThreadType::kMasterTX, core_offset, tid);
+
+    // Wait for all master threads to be ready
+    num_masters_ready_atomic ++;
+    while (num_masters_ready_atomic != num_master_threads_) {
+        // Wait
+    }
 
     // Wait for all worker threads to be ready
     while (num_workers_ready_atomic != num_worker_threads_) {
         // Wait
     }
 
+    size_t ant_block_size = cfg->BS_ANT_NUM / num_master_threads_;
+    size_t ant_block_off = cfg->BS_ANT_NUM % num_master_threads_;
+    size_t antenna_start = tid < ant_block_off ? (ant_block_size + 1) * tid : ant_block_size * tid + ant_block_off;
+    size_t antenna_end = tid < ant_block_off ? antenna_start + ant_block_size + 1 : antenna_start + ant_block_size;
+    if (tid < ant_block_off) {
+        ant_block_size ++;
+    }
+
     const size_t max_symbol_id = get_max_symbol_id();
 
     // Push tasks of the first symbol into task queue
-    for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
+    for (size_t i = antenna_start; i < antenna_end; i++) {
         auto req_tag = gen_tag_t::frm_sym_ant(0, 0, i);
-        rt_assert(send_queue_.enqueue(
-                      *task_ptok[i % num_worker_threads_], req_tag._tag),
+        // rt_assert(send_queue_.enqueue(
+        //               *task_ptok[i % num_worker_threads_], req_tag._tag),
+        //     "Send task enqueue failed");
+        rt_assert(send_queues_[i % num_worker_threads_]->enqueue(req_tag._tag),
             "Send task enqueue failed");
     }
 
-    frame_start[0] = get_time();
+    frame_start_loc[0] = get_time();
     uint64_t tick_start = rdtsc();
     double start_time = get_time();
     // Add delay for beacon at the beginning of a frame
@@ -173,18 +247,25 @@ void* Sender::master_thread(int)
     tick_start = rdtsc();
     while (keep_running) {
         gen_tag_t ctag(0); // The completion tag
-        int ret = completion_queue_.try_dequeue(ctag._tag);
+        // int ret = completion_queue_.try_dequeue_from_producer(*(comp_ptok[tid]), ctag._tag);
+        int ret = completion_queues_[tid]->try_dequeue(ctag._tag);
         if (!ret)
             continue;
 
+        // printf("Receive a comp tag %d\n", ctag.ant_id);
         const size_t comp_frame_slot = ctag.frame_id % SOCKET_BUFFER_FRAME_NUM;
 
-        packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]++;
-        if (packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]
-            == cfg->BS_ANT_NUM) {
+        // packet_count_mutex_.lock();
+        // packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]++;
+        // if (packet_count_per_symbol[comp_frame_slot][ctag.symbol_id]
+        //     == cfg->BS_ANT_NUM) {
+        packet_count_per_symbol_loc[comp_frame_slot][ctag.symbol_id]++;
+        if (packet_count_per_symbol_loc[comp_frame_slot][ctag.symbol_id]
+            == ant_block_size) {
+            // packet_count_mutex_.unlock();
 
-            packet_count_per_symbol[comp_frame_slot][ctag.symbol_id] = 0;
-            packet_count_per_frame[comp_frame_slot]++;
+            packet_count_per_symbol_loc[comp_frame_slot][ctag.symbol_id] = 0;
+            packet_count_per_frame_loc[comp_frame_slot]++;
 
             // Add inter-symbol delay
             delay_ticks(tick_start,
@@ -195,17 +276,17 @@ void* Sender::master_thread(int)
 
             const size_t next_symbol_id = (ctag.symbol_id + 1) % max_symbol_id;
             size_t next_frame_id;
-            if (packet_count_per_frame[comp_frame_slot] == max_symbol_id) {
+            if (packet_count_per_frame_loc[comp_frame_slot] == max_symbol_id) {
                 if (kDebugSenderReceiver || kDebugPrintPerFrameDone) {
-                    printf("Sender: Transmitted frame %u in %.1f ms\n",
-                        ctag.frame_id, (get_time() - start_time) / 1000.0);
+                    printf("Sender (master %u): Transmitted frame %u in %.1f ms\n",
+                        tid, ctag.frame_id, (get_time() - start_time) / 1000.0);
                     start_time = get_time();
                 }
                 next_frame_id = ctag.frame_id + 1;
                 if (next_frame_id == cfg->frames_to_test)
                     break;
-                frame_end[ctag.frame_id % kNumStatsFrames] = get_time();
-                packet_count_per_frame[comp_frame_slot] = 0;
+                frame_end_loc[ctag.frame_id % kNumStatsFrames] = get_time();
+                packet_count_per_frame_loc[comp_frame_slot] = 0;
 
                 // Add end-of-frame delay
                 if (cfg->downlink_mode) {
@@ -218,7 +299,7 @@ void* Sender::master_thread(int)
                     }
                 }
 
-                frame_start[next_frame_id % kNumStatsFrames] = get_time();
+                frame_start_loc[next_frame_id % kNumStatsFrames] = get_time();
 
                 tick_start = rdtsc();
                 // Add delay for beacon at the beginning of a frame
@@ -230,14 +311,19 @@ void* Sender::master_thread(int)
                 next_frame_id = ctag.frame_id;
             }
 
-            for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
+            for (size_t i = antenna_start; i < antenna_end; i++) {
                 auto req_tag
                     = gen_tag_t::frm_sym_ant(next_frame_id, next_symbol_id, i);
+                // rt_assert(
+                //     send_queue_.enqueue(
+                //         *task_ptok[i % num_worker_threads_], req_tag._tag),
+                //     "Send task enqueue failed");
                 rt_assert(
-                    send_queue_.enqueue(
-                        *task_ptok[i % num_worker_threads_], req_tag._tag),
+                    send_queues_[i % num_worker_threads_]->enqueue(req_tag._tag),
                     "Send task enqueue failed");
             }
+        } else {
+            // packet_count_mutex_.unlock();
         }
     }
     keep_running = false;
@@ -250,7 +336,7 @@ void* Sender::master_thread(int)
 
 void* Sender::worker_thread(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + 1, tid);
+    pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset + num_master_threads_, tid);
 
     // Wait for all Sender threads (including master) to start runnung
     num_workers_ready_atomic++;
@@ -292,7 +378,8 @@ void* Sender::worker_thread(int tid)
 
     while (true) {
         gen_tag_t tag = 0;
-        if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag._tag)) {
+        // if (!send_queue_.try_dequeue_from_producer(*(task_ptok[tid]), tag._tag)) {
+        if (!send_queues_[tid]->try_dequeue(tag._tag)) {
             if (!keep_running) {
                 break;
             }
@@ -349,8 +436,16 @@ void* Sender::worker_thread(int tid)
                 cfg->bs_server_addr_list[i].c_str(),
                 cfg->bs_server_port + cur_radio);
         }
-        rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, cfg->bs_server_addr_list.size()) == cfg->bs_server_addr_list.size(),
-            "rte_eth_tx_burst() failed");
+        // rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, cfg->bs_server_addr_list.size()) == cfg->bs_server_addr_list.size(),
+        //     "rte_eth_tx_burst() failed");
+        size_t pkt_sent = 0;
+        size_t loop_count = 0;
+        while (pkt_sent < cfg->bs_server_addr_list.size()) {
+            size_t pkt_sent_cur = rte_eth_tx_burst(0, tid, tx_mbufs + pkt_sent, cfg->bs_server_addr_list.size() - pkt_sent);
+            pkt_sent += pkt_sent_cur;
+            rt_assert(loop_count < 10000, "rte_eth_tx_burst() failed");
+            loop_count ++;
+        }
 #else
         const size_t sc_block_size
             = cfg->OFDM_DATA_NUM / cfg->bs_server_addr_list.size();
@@ -379,8 +474,10 @@ void* Sender::worker_thread(int tid)
                 cycles_to_us(rdtsc() - start_tsc_send, freq_ghz));
         }
 
+        // rt_assert(
+        //     completion_queue_.enqueue(*comp_ptok[tag.ant_id % num_master_threads_], tag._tag), "Completion enqueue failed");
         rt_assert(
-            completion_queue_.enqueue(tag._tag), "Completion enqueue failed");
+            completion_queues_[tag.ant_id % num_master_threads_]->enqueue(tag._tag), "Completion enqueue failed");
 
         total_tx_packets_rolling++;
         total_tx_packets++;
@@ -400,6 +497,134 @@ void* Sender::worker_thread(int tid)
 
         if (++cur_radio == radio_hi)
             cur_radio = radio_lo;
+    }
+    printf("Worker thread ends\n");
+    return NULL;
+}
+
+void* Sender::worker_thread_auto(int tid)
+{
+    pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset, tid);
+
+    // Wait for all Sender threads (including master) to start runnung
+    num_workers_ready_atomic++;
+    while (num_workers_ready_atomic != num_worker_threads_) {
+        // Wait
+    }
+
+    DFTI_DESCRIPTOR_HANDLE mkl_handle;
+    DftiCreateDescriptor(
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
+    DftiCommitDescriptor(mkl_handle);
+
+    const size_t max_symbol_id = get_max_symbol_id();
+    const size_t radio_block_size = cfg->nRadios / num_worker_threads_;
+    const size_t radio_block_off = cfg->nRadios % num_worker_threads_;
+    const size_t radio_lo = tid < radio_block_off ? tid * (radio_block_size + 1) : tid * radio_block_size + radio_block_off;
+    const size_t radio_hi = tid < radio_block_off ? radio_lo + radio_block_size + 1 : radio_lo + radio_block_size;
+    const size_t ant_num_this_thread = cfg->BS_ANT_NUM / num_worker_threads_
+        + ((size_t)tid < cfg->BS_ANT_NUM % num_worker_threads_ ? 1 : 0);
+
+    auto fft_inout = reinterpret_cast<complex_float*>(
+        memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
+    auto* socks_pkt_buf
+        = reinterpret_cast<Packet*>(memalign(64, cfg->packet_length));
+    auto* data_buf
+        = reinterpret_cast<Packet*>(memalign(64, cfg->packet_length));
+
+    double begin = get_time();
+    size_t cur_radio = radio_lo;
+    size_t cur_frame = 0;
+    size_t cur_symbol = 0;
+
+    printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, num threads %zu:\n",
+        (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, num_worker_threads_);
+
+    // We currently don't support zero-padding OFDM prefix and postfix
+    rt_assert(cfg->packet_length
+        == Packet::kOffsetOfData
+            + 2 * sizeof(unsigned short) * (cfg->CP_LEN + cfg->OFDM_CA_NUM));
+
+    double start_time = get_time();
+
+    size_t start_tsc_send = rdtsc();
+
+#ifdef USE_DPDK
+    rte_mbuf** tx_mbufs = new rte_mbuf*[cfg->bs_server_addr_list.size()];
+    rte_eth_stats tx_stats;
+#endif
+
+    while (true) {
+        gen_tag_t tag = 0;
+
+#ifdef USE_DPDK
+        for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
+            tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pool, sender_mac_addr,
+                server_mac_addr_list[i], bs_rru_addr, bs_server_addr_list[i],
+                cfg->bs_rru_port + tid, cfg->bs_server_port + tid,
+                Packet::kOffsetOfData + cfg->get_num_sc_per_server() * sizeof(unsigned short) * 2);
+        }
+#endif
+
+        memcpy(data_buf->data,
+            iq_data_short_[(cur_symbol * cfg->BS_ANT_NUM) + cur_radio],
+            (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
+        run_fft(data_buf->data, fft_inout, mkl_handle);
+
+#ifdef USE_DPDK
+        const size_t sc_block_size = cfg->get_num_sc_per_server();
+        for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i++) {
+            auto* pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t*) + kPayloadOffset);
+            pkt->pkt_type = Packet::PktType::kIQFromRRU;
+            pkt->frame_id = cur_frame;
+            pkt->symbol_id = cfg->getSymbolId(cur_symbol);
+            pkt->cell_id = 0;
+            pkt->ant_id = cur_radio;
+            memcpy(pkt->data,
+                data_buf->data
+                    + (i * sc_block_size + cfg->OFDM_DATA_START) * 2,
+                sc_block_size * sizeof(unsigned short) * 2);
+            MLPD_TRACE("Sender: Sending packet %s (%zu of %zu) to %s:%ld\n",
+                pkt->to_string().c_str(), i, cfg->bs_server_addr_list.size(),
+                cfg->bs_server_addr_list[i].c_str(),
+                cfg->bs_server_port + tid);
+        }
+        // rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, cfg->bs_server_addr_list.size()) == cfg->bs_server_addr_list.size(),
+        //     "rte_eth_tx_burst() failed");
+        size_t pkt_sent = 0;
+        size_t loop_count = 0;
+        while (pkt_sent < cfg->bs_server_addr_list.size()) {
+            size_t pkt_sent_cur = rte_eth_tx_burst(0, tid, tx_mbufs + pkt_sent, cfg->bs_server_addr_list.size() - pkt_sent);
+            pkt_sent += pkt_sent_cur;
+            rt_assert(loop_count < 10000, "rte_eth_tx_burst() failed");
+            loop_count ++;
+        }
+#else
+        #error Should not be compiled
+#endif
+
+        if (unlikely(++cur_radio == radio_hi)) {
+            cur_radio = radio_lo;
+            cur_symbol ++;
+            if (unlikely(cur_symbol == max_symbol_id)) {
+                cur_symbol = 0;
+                cur_frame ++;
+                if (unlikely(cur_frame == cfg->frames_to_test)) {
+                    break;
+                }
+                delay_ticks(start_tsc_send, cur_frame * max_symbol_id * ticks_all);
+                printf("Thread %u send frame %u in %.1f ms\n", tid, cur_frame - 1, (get_time() - start_time) / 1000.0f);
+#ifdef USE_DPDK
+                if (tid == 0) {
+                    rte_eth_stats stats;
+                    rte_eth_stats_get(0, &stats);
+                    printf("Traffic rate is %lf\n", (double)(stats.obytes - tx_stats.obytes) * 8 / ((get_time() - start_time) * 1000.0f));
+                    memcpy(&tx_stats, &stats, sizeof(rte_eth_stats));
+                }
+#endif
+                start_time = get_time();
+            }
+        }
     }
     printf("Worker thread ends\n");
     return NULL;

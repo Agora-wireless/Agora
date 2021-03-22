@@ -1,11 +1,13 @@
 {
   "socket_thread_num": 1,
   "worker_thread_num": 1,
-  "subcarrier_block_size": 1200,
+  "decode_thread_num_per_ue": 3,
+  "subcarrier_block_size": 40,
   "demul_block_size": 40,
-  "antenna_num": 16,
-  "ue_num": 4,
+  "antenna_num": 32,
+  "ue_num": 8,
   "bs_rru_addr": "192.168.21.181",
+  "bs_rru_mac_addr": "0c:42:a1:50:c8:5a",
   "core_offset": 2,
   "bs_server_addr_list": [
     "192.168.21.182"
@@ -14,7 +16,7 @@
     "0c:42:a1:50:c7:ee"
   ],
   "frames": [
-    "PPPPU"
+    "PPPPPPPPUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU"
   ],
   "bs_server_addr_idx": 0,
   "bs_port": 11000,
@@ -22,7 +24,7 @@
   "ue_tx_port": 9000,
   "demod_tx_port": 8100,
   "demod_rx_port": 8600,
-  "frames_to_test": 100,
+  "frames_to_test": 1000,
   "Zc": 104,
   "modulation": "64QAM"
 }

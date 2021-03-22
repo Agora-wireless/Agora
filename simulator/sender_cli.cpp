@@ -2,6 +2,7 @@
 #include <gflags/gflags.h>
 
 DEFINE_uint64(num_threads, 4, "Number of sender threads");
+DEFINE_uint64(num_masters, 1, "Number of master threads");
 DEFINE_uint64(core_offset, 0, "Core ID of the first sender thread");
 DEFINE_uint64(frame_duration, 5000, "Frame duration in microseconds");
 DEFINE_string(server_mac_addr, "ff:ff:ff:ff:ff:ff",
@@ -20,8 +21,14 @@ int main(int argc, char* argv[])
     auto* cfg = new Config(filename.c_str());
     cfg->genData();
 
-    auto* sender = new Sender(cfg, FLAGS_num_threads, FLAGS_core_offset,
+    auto* sender = new Sender(cfg, FLAGS_num_masters, FLAGS_num_threads, FLAGS_core_offset,
         FLAGS_frame_duration, FLAGS_enable_slow_start, FLAGS_server_mac_addr);
-    sender->startTX();
+    // sender->startTX();
+    double* frame_start = new double[kNumStatsFrames]();
+    double* frame_end = new double[kNumStatsFrames]();
+    // sender->startTXfromMain(frame_start, frame_end);
+    // sender->join_thread();
+    sender->startTXfromMainAuto(frame_start, frame_end);
+    sender->join_thread_auto();
     return 0;
 }

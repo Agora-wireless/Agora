@@ -35,7 +35,8 @@
 #include <netinet/ether.h>
 #endif
 
-static constexpr size_t kMaxWorkerNum = 8;
+static constexpr size_t kMaxMasterNum = 8;
+static constexpr size_t kMaxWorkerNum = 32;
 
 class Sender {
 
@@ -57,7 +58,7 @@ public:
      *
      * @param server_mac_addr_str The MAC address of the server's NIC
      */
-    Sender(Config* config, size_t num_worker_threads, size_t core_offset = 30,
+    Sender(Config* config, size_t num_master_threads, size_t num_worker_threads, size_t core_offset = 30,
         size_t frame_duration = 1000, size_t enable_slow_start = 1,
         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
         bool create_thread_for_master = false, void* mbuf_pool = nullptr);
@@ -69,14 +70,17 @@ public:
     // in_frame_start and in_frame_end must have space for at least
     // kNumStatsFrames entries
     void startTXfromMain(double* in_frame_start, double* in_frame_end);
+    void startTXfromMainAuto(double* in_frame_start, double* in_frame_end);
 
     void join_thread();
+    void join_thread_auto();
 
     bool running_;
 
 private:
     void* master_thread(int tid);
     void* worker_thread(int tid);
+    void* worker_thread_auto(int tid);
 
     /**
      * @brief Read time-domain 32-bit floating-point IQ samples from [filename]
@@ -109,6 +113,7 @@ private:
     const double ticks_per_usec; // RDTSC frequency in GHz
     const size_t num_worker_threads_; // Number of worker threads sending pkts
     const size_t enable_slow_start; // If 1, send frames slowly at first
+    const size_t num_master_threads_; // Number of master threads controlling sending rate
 
     // The master thread runs on core core_offset. Worker threads use cores
     // {core_offset + 1, ..., core_offset + thread_num - 1}
@@ -124,11 +129,14 @@ private:
     const uint64_t ticks_wnd_1;
     const uint64_t ticks_wnd_2;
 
-    moodycamel::ConcurrentQueue<size_t> send_queue_
-        = moodycamel::ConcurrentQueue<size_t>(1024);
-    moodycamel::ConcurrentQueue<size_t> completion_queue_
-        = moodycamel::ConcurrentQueue<size_t>(1024);
-    moodycamel::ProducerToken** task_ptok;
+    // moodycamel::ConcurrentQueue<size_t> send_queue_
+    //     = moodycamel::ConcurrentQueue<size_t>(8192);
+    moodycamel::ConcurrentQueue<size_t> **send_queues_;
+    // moodycamel::ConcurrentQueue<size_t> completion_queue_
+    //     = moodycamel::ConcurrentQueue<size_t>(8192);
+    moodycamel::ConcurrentQueue<size_t> **completion_queues_;
+    // moodycamel::ProducerToken** task_ptok;
+    // moodycamel::ProducerToken** comp_ptok;
 
     // First dimension: symbol_num_perframe * BS_ANT_NUM
     // Second dimension: (CP_LEN + OFDM_CA_NUM) * 2
@@ -137,11 +145,12 @@ private:
     // Number of packets transmitted for each symbol in a frame
     size_t* packet_count_per_symbol[SOCKET_BUFFER_FRAME_NUM];
     size_t packet_count_per_frame[SOCKET_BUFFER_FRAME_NUM];
+    std::mutex packet_count_mutex_;
 
     double* frame_start;
     double* frame_end;
 
-    std::thread master_thread_;
+    std::thread master_threads_[kMaxMasterNum];
     std::thread worker_threads_[kMaxWorkerNum];
 
 #ifdef USE_DPDK

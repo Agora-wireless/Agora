@@ -35,7 +35,7 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
 
     printf("new Sender\n");
     sender_ = new Sender(
-        config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true, "ff:ff:ff:ff:ff:ff", true, mbuf_pool);
+        config_, 1, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true, "ff:ff:ff:ff:ff:ff", true, mbuf_pool);
 
     printf("new Receiver\n");
     receiver_ = new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET + 2 + SOCKET_RX_THREAD_NUM,
@@ -43,7 +43,7 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
 #else
     printf("new Sender\n");
     sender_ = new Sender(
-        config_, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true, "ff:ff:ff:ff:ff:ff", true);
+        config_, 1, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true, "ff:ff:ff:ff:ff:ff", true);
 
     printf("new Receiver\n");
     receiver_ = new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET,
