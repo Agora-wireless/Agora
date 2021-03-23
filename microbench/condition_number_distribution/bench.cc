@@ -14,7 +14,7 @@ static void condition_number_distribution(size_t n_rows, size_t n_cols) {
     cond_vec.push_back(arma::cond(arma::randn<arma::cx_fmat>(n_rows, n_cols)));
   }
   std::sort(cond_vec.begin(), cond_vec.end());
-  printf("%zux%zu %.1f %.1f %.1f\n", n_rows, n_cols, mean(cond_vec),
+  std::printf("%zux%zu %.1f %.1f %.1f\n", n_rows, n_cols, mean(cond_vec),
          cond_vec[cond_vec.size() * 0.50], cond_vec.back());
 }
 
@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
   arma::arma_rng::set_seed_random();
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  printf("Size average median max\n");  // Print the header
+  std::printf("Size average median max\n");  // Print the header
   for (size_t n_rows = 8; n_rows <= 64; n_rows += 8) {
     for (size_t n_cols = 8; n_cols <= n_rows; n_cols += 8) {
       condition_number_distribution(n_rows, n_cols);

@@ -6,6 +6,7 @@ set -e
 ### or as a remote container (e.g., part of a kubernetes cluster).
 ### 
 ### Pass "clean" as a command-line argument to this script to remove docker build files.
+### Otherwise, all arguments will be passed into the `cmake` invocation.
 
 
 # Obtain the absolute directory where this script exists, which is the `./docker` directory.
@@ -32,7 +33,11 @@ fi
 
 # Perform a regular build, and do so in a new `build` directory
 echo "Performing regular build ..."
-( mkdir -p build;  cd build;  cmake -DFORCE_BUILD_PATH=off ${AGORA_BASE_DIR};  make -j12 )
+( mkdir -p build;  \
+  cd build;  \
+  cmake -DFORCE_BUILD_PATH=off ${AGORA_BASE_DIR}  $@;  \
+  make -j12 \
+)
 
 # The build directory is now present, but we also need `data` and (optionally) `test`
 echo -n "Copying ./data into docker context ... "

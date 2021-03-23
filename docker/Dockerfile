@@ -20,9 +20,9 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-ins
 # RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
 # Just for convenience purposes
-RUN apt-get install -y vim
+RUN apt-get install -y vim gdb
 
-# Required for downloading and building the source packages belowo
+# Required for downloading and building the source packages below
 RUN apt-get -y install -y g++ cmake make wget git
 
 # Needed to build and run Agora. 
@@ -78,15 +78,31 @@ RUN ( \
     ldconfig; \
 )
 
+# Install Mellanox OFED Infiniband driver (unnecessary due to upstreamed drivers)
+# RUN ( \
+#     apt-get install -y linux-headers-4.15.0-111-generic; \
+#     cd /tmp; \
+#     wget http://content.mellanox.com/ofed/MLNX_OFED-5.1-0.6.6.0/MLNX_OFED_LINUX-5.1-0.6.6.0-ubuntu18.04-x86_64.tgz; \
+#     tar zxvf MLNX_OFED_LINUX-5.1-0.6.6.0-ubuntu18.04-x86_64.tgz; \
+#     echo "deb file:/tmp/MLNX_OFED_LINUX-5.1-0.6.6.0-ubuntu18.04-x86_64/DEBS ./" > /etc/apt/sources.list.d/mlnx_ofed.list; \
+#     wget -qO - http://www.mellanox.com/downloads/ofed/RPM-GPG-KEY-Mellanox | apt-key add - ; \
+#     apt-get update; \
+#     apt-get install -y mlnx-ofed-all; \
+#     apt-get install -y mlnx-ofed-dpdk-upstream-libs; \
+# )
+# Add support for Infiniband, Mellanox verbs, rdma, etc
+RUN apt-get install -y libibverbs-dev libibverbs1 rdma-core ibverbs-utils libibumad3 libibumad-dev libibmad-dev libibmad5 libibnetdisc5
+
+
 # Undo the noninteractive DEBIAN_FRONTEND from the beginning of this file
 ENV DEBIAN_FRONTEND teletype
 
 
 # Copy in our relevant build files. ("test" is optional)
-COPY build/  Agora/build/
-COPY data/   Agora/data/
-COPY test/   Agora/test/
-COPY run_agora.sh Agora/
+COPY build/   Agora/build/
+COPY data/    Agora/data/
+COPY test/    Agora/test/
+COPY run_*.sh Agora/
 
 # Copy the FlexRAN files
 COPY FlexRAN-FEC-SDK-19-04/ /opt/

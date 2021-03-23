@@ -8,7 +8,7 @@
   * Format the source code using `clang-format`. Running `clang-format -i *.cc
     *.h` will format source and header files in the current directory to match
     Agora's code style. There are also editor plugins for `clang-format`
-    ([example](https://github.com/google/vim_codefmt)).
+    ([example](https://github.com/google/vim_codefmt)). We recommend using clang-format version 11 or above.
 
 ## Code style
 
@@ -21,7 +21,7 @@
   * [Naming](https://google.github.io/styleguide/cppguide.html#Naming):
     * `lower_camel_case` for variable names.
     * `UpperCamelCase` for class, struct, and function names.
-    * `kConstant` for constants.
+    * `kConstant` for static storage duration constants. Otherwise the usual variable nameing rules apply.
     * Source file names should end in `.cc`, header file names in `.h`.
 
   * Classes:
@@ -33,7 +33,6 @@
     [necessary](https://google.github.io/styleguide/cppguide.html#Preprocessor_Macros).
     For example, macros are acceptable to disable compilation of files that
     depend on proprietary libraries. So instead of:
-
 
     ```
     #ifdef USE_LDPC
@@ -78,11 +77,11 @@
 
   * Comments
     ([link](https://google.github.io/styleguide/cppguide.html#Comments)):
-    * Use proper grammar.
+    * Use proper grammar and capitalization in comment text.
+    * Comments should fit in 80 columns.
     * Add comments for non-obvious blocks of code.
-    * Avoid commented-out block of code in committed files. For example, if the
-      block of code is needed for debugging, wrap it inside a boolean flag
-      (e.g., `kVerbose`).
+    * Avoid commented-out blocks of code. For example, if a block of code is
+      needed for debugging, wrap it inside a boolean flag (e.g., `kVerbose`).
 
   * Use `size_t` as the integer type unless negative integers are needed.
 

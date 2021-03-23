@@ -19,7 +19,7 @@ sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen \
 # Install Armadillo from source
 wget http://sourceforge.net/projects/arma/files/armadillo-9.300.2.tar.xz .
 tar xf armadillo-9.300.2.tar.xz
-(cd armadillo-9.300.2; cmake .; make -j4; sudo make install)
+(cd armadillo-9.300.2; cmake .; make -j; sudo make install)
 rm -rf armadillo*
 
 # Install nlohmann json-dev from the GitHub repo
@@ -29,7 +29,7 @@ cd json
 mkdir build
 cd build
 cmake ..
-make -j8
+make -j
 sudo make install
 sudo ldconfig
 
@@ -40,7 +40,7 @@ cd SoapySDR
 mkdir build
 cd build
 cmake ..
-make -j8
+make -j
 sudo make install
 sudo ldconfig
 
