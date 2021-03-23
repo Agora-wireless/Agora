@@ -29,14 +29,14 @@
 #include "udp_client.h"
 #include "utils_ldpc.h"
 
-#ifdef USE_DPDK
+#if defined(USE_DPDK)
 #include <arpa/inet.h>
 #include <netinet/ether.h>
 
 #include "dpdk_transport.h"
 #endif
 /// A loop that handles decode responses from all remote LDPC workers.
-void decode_response_loop(Config* cfg);
+void DecodeResponseLoop(Config* cfg);
 
 /// A connection to a remote LDPC worker, including request/receive buffers
 /// and counters.

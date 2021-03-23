@@ -22,6 +22,9 @@ clang-format-11 -i src/encoder/*.inc
 clang-format-11 -i src/mac/*.cc
 clang-format-11 -i src/mac/*.h
 
+clang-format-11 -i src/remote/*.cc
+clang-format-11 -i src/remote/*.h
+
 clang-format-11 -i simulator/*.cc
 clang-format-11 -i simulator/*.h
 clang-format-11 -i simulator/*.inc

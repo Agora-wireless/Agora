@@ -180,12 +180,22 @@ class Config {
   inline size_t MacRxPort() const { return this->mac_rx_port_; }
   inline size_t MacTxPort() const { return this->mac_tx_port_; }
 
-  inline int RemoteLdpcBasePort_() const {
-    return this->remote_ldpc_base_port_;
-  }
+  inline int RemoteLdpcBasePort() const { return this->remote_ldpc_base_port_; }
 
   inline std::string RemoteLdpcIpAddr() const {
     return this->remote_ldpc_ip_addr_;
+  }
+
+  inline int RemoteLdpcCompletionPort() const {
+    return this->remote_ldpc_completion_port_;
+  }
+
+  inline size_t RemoteLdpcCoreOffset() const {
+    return this->remote_ldpc_core_offset_;
+  }
+
+  inline size_t RemoteLdpcNumThreads() const {
+    return this->remote_ldpc_num_threads_;
   }
 
   /* Inline accessors (complex types) */

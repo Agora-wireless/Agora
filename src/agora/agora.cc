@@ -64,7 +64,7 @@ Agora::Agora(Config* const cfg)
 
   if (kUseRemote) {
     // Start the thread that receives decode responses from LDPC workers.
-    remote_ldpc_response_receiver_ = std::thread(decode_response_loop, config_);
+    remote_ldpc_response_receiver_ = std::thread(DecodeResponseLoop, config_);
   }
 
   // Create worker threads
@@ -766,6 +766,10 @@ void Agora::Worker(int tid) {
       this->config_, tid, this->demod_buffers_, this->decoded_buffer_,
       this->phy_stats_.get(), this->stats_.get());
 
+  auto compute_decoding_last = std::make_unique<DoDecode>(
+      this->config_, tid, this->demod_buffers_, this->decoded_buffer_,
+      this->phy_stats_.get(), this->stats_.get());
+
   auto compute_demul = std::make_unique<DoDemul>(
       this->config_, tid, this->data_buffer_, this->ul_zf_matrices_,
       this->ue_spec_pilot_buffer_, this->equal_buffer_, this->demod_buffers_,
@@ -782,12 +786,14 @@ void Agora::Worker(int tid) {
   if (kUseRemote) {
     RemoteLdpcStub* stub = compute_decoding->InitializeRemoteLdpcStub(
         base_worker_core_offset_ + tid);
-    computeDecodingLast->SetInitializedRemoteLdpcStub(stub);
+    compute_decoding_last->SetInitializedRemoteLdpcStub(stub);
   }
 
   if (config_->Frame().NumULSyms() > 0) {
+    computers_vec.push_back(compute_decoding_last.get());
     computers_vec.push_back(compute_decoding.get());
     computers_vec.push_back(compute_demul.get());
+    events_vec.push_back(EventType::kDecodeLast);
     events_vec.push_back(EventType::kDecode);
     events_vec.push_back(EventType::kDemul);
   }

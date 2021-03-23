@@ -7,6 +7,7 @@
 
 #include "concurrent_queue_wrapper.h"
 #include "encoder.h"
+#include "phy_ldpc_decoder_5gnr.h"
 #include "scrambler.h"
 #include "udp_server.h"
 #include "utils_ldpc.h"
@@ -290,91 +291,93 @@ EventData DoDecode::Launch(size_t tag) {
       }
       phy_stats_->UpdateBlockErrors(ue_id, symbol_offset, block_error);
     }
+  }
+  size_t duration = GetTime::WorkerRdtsc() - start_tsc;
+  duration_stat_->task_duration_[0] += duration;
+  duration_stat_->task_count_++;
+  if (GetTime::CyclesToUs(duration, cfg_->FreqGhz()) > 500) {
+    std::printf("Thread %d Decode takes %.2f\n", tid_,
+                GetTime::CyclesToUs(duration, cfg_->FreqGhz()));
+  }
 
-    size_t duration = GetTime::WorkerRdtsc() - start_tsc;
-    duration_stat_->task_duration_[0] += duration;
-    duration_stat_->task_count_++;
-    if (GetTime::CyclesToUs(duration, cfg_->FreqGhz()) > 500) {
-      std::printf("Thread %d Decode takes %.2f\n", tid_,
-                  GetTime::CyclesToUs(duration, cfg_->FreqGhz()));
+  // When using remote LDPC, we ship the decoding task asynchronously to a
+  // remote server and return immediately
+  if (kUseRemote) {
+    return EventData(EventType::kPendingToRemote, tag);
+  } else {
+    return EventData(EventType::kDecode, tag);
+  }
+}
+
+/// This function should be run on its own thread to endlessly receive
+/// decode responses from remote LDPC workers and trigger the proper
+/// completion events expected by the rest of Agora. There should only be one
+/// thread instance of this function for the entire Agora process.
+void DecodeResponseLoop(Config* cfg) {
+  UDPServer udp_server(cfg->RemoteLdpcCompletionPort(), kRxBufSize);
+  size_t decoded_bits = LdpcEncodingInputBufSize(
+      cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor());
+  // The number of bytes that we receive at one time from the LDPC worker
+  // is defined by the `DecodeMsg` struct.
+  size_t rx_buf_len = DecodeMsg::SizeWithoutData() + decoded_bits;
+  uint8_t* rx_buf = new uint8_t[rx_buf_len];
+  DecodeMsg* msg = reinterpret_cast<DecodeMsg*>(rx_buf);
+
+  while (cfg->Running()) {
+    ssize_t bytes_rcvd = udp_server.RecvNonblocking(rx_buf, rx_buf_len);
+    if (bytes_rcvd == 0) {
+      // no data received
+      continue;
+    } else if (bytes_rcvd == -1) {
+      // There was a socket receive error
+      cfg->Running(false);
+      break;
     }
 
-    // When using remote LDPC, we ship the decoding task asynchronously to a
-    // remote server and return immediately
-    if (kUseRemote) {
-      return EventData(EventType::kPendingToRemote, tag);
-    } else {
-      return EventData(EventType::kDecode, tag);
+    RtAssert(bytes_rcvd == (ssize_t)rx_buf_len,
+             "Rcvd wrong decode response len");
+    DecodeContext* context = msg->context;
+    DoDecode* compute_decoding = context->doer_;
+    RtAssert(context->tid_ == (size_t)compute_decoding->tid_,
+             "DoDecode tid mismatch");
+
+    // Copy the decoded buffer received from the remote LDPC worker
+    // into the appropriate location in the decode doer's decoded buffer.
+    std::memcpy(context->output_ptr_, msg->data, decoded_bits);
+
+    EventData resp_event;
+    resp_event.num_tags_ = 1;
+    resp_event.tags_[0] = context->tag_;
+    resp_event.event_type_ = EventType::kDecode;
+
+    // TODO: FIX
+    // TryEnqueueFallback(&compute_decoding->complete_task_queue,
+    //                   compute_decoding->worker_producer_token, resp_event);
+
+    // TODO: here, return msg buffers to the pool
+
+    // `rx_buf` will be reused to receive the next message,
+    // so we only delete the DecodeContext that was allocated
+    // by the DoDecode doer when the request was sent.
+    delete context;
+
+    printf("Docoding: Received response %zu\n", msg->msg_id);
+    compute_decoding->remote_ldpc_stub_->num_responses_received_++;
+
+    // Optional: here we can check if we have received far fewer responses
+    // than requests issued, and then issue a health warning.
+    if ((compute_decoding->remote_ldpc_stub_->num_requests_issued_ -
+         compute_decoding->remote_ldpc_stub_->num_responses_received_) >
+        (thresholdPendingRequestsFactor * cfg->UeAntNum())) {
+      MLPD_WARN(
+          "Some remote LDPC requests were lost or got no response. "
+          "Requests: %zu, Responses: %zu, batch size: %zu\n",
+          compute_decoding->remote_ldpc_stub_->num_requests_issued_,
+          compute_decoding->remote_ldpc_stub_->num_responses_received_,
+          cfg->UeAntNum());
     }
   }
 
-  /// This function should be run on its own thread to endlessly receive
-  /// decode responses from remote LDPC workers and trigger the proper
-  /// completion events expected by the rest of Agora. There should only be one
-  /// thread instance of this function for the entire Agora process.
-  void DecodeResponseLoop(Config * cfg) {
-    UDPServer udp_server(cfg->remote_ldpc_completion_port, kRxBufSize);
-    size_t decoded_bits =
-        ldpc_encoding_input_buf_size(cfg->LDPC_config.Bg, cfg->LDPC_config.Zc);
-    // The number of bytes that we receive at one time from the LDPC worker
-    // is defined by the `DecodeMsg` struct.
-    size_t rx_buf_len = DecodeMsg::size_without_data() + decoded_bits;
-    uint8_t* rx_buf = new uint8_t[rx_buf_len];
-    DecodeMsg* msg = reinterpret_cast<DecodeMsg*>(rx_buf);
-
-    while (cfg->running) {
-      ssize_t bytes_rcvd = udp_server.recv_nonblocking(rx_buf, rx_buf_len);
-      if (bytes_rcvd == 0) {
-        // no data received
-        continue;
-      } else if (bytes_rcvd == -1) {
-        // There was a socket receive error
-        cfg->running = false;
-        break;
-      }
-
-      rt_assert(bytes_rcvd == (ssize_t)rx_buf_len,
-                "Rcvd wrong decode response len");
-      DecodeContext* context = msg->context;
-      DoDecode* compute_decoding = context->doer;
-      RtAssert(context->tid == compute_decoding->tid, "DoDecode tid mismatch");
-
-      // Copy the decoded buffer received from the remote LDPC worker
-      // into the appropriate location in the decode doer's decoded buffer.
-      std::memcpy(context->output_ptr, msg->data, decoded_bits);
-
-      EventData resp_event;
-      resp_event.num_tags = 1;
-      resp_event.tags[0] = context->tag;
-      resp_event.event_type = EventType::kDecode;
-
-      try_enqueue_fallback(&compute_decoding->complete_task_queue,
-                           compute_decoding->worker_producer_token, resp_event);
-
-      // TODO: here, return msg buffers to the pool
-
-      // `rx_buf` will be reused to receive the next message,
-      // so we only delete the DecodeContext that was allocated
-      // by the DoDecode doer when the request was sent.
-      delete context;
-
-      printf("Docoding: Received response %zu\n", msg->msg_id);
-      compute_decoding->remote_ldpc_stub_->num_responses_received++;
-
-      // Optional: here we can check if we have received far fewer responses
-      // than requests issued, and then issue a health warning.
-      if ((compute_decoding->remote_ldpc_stub_->num_requests_issued -
-           compute_decoding->remote_ldpc_stub_->num_responses_received) >
-          (thresholdPendingRequestsFactor * cfg->UE_ANT_NUM)) {
-        MLPD_WARN(
-            "Some remote LDPC requests were lost or got no response. "
-            "Requests: %zu, Responses: %zu, batch size: %zu\n",
-            compute_decoding->remote_ldpc_stub_->num_requests_issued,
-            compute_decoding->remote_ldpc_stub_->num_responses_received,
-            cfg->UE_ANT_NUM);
-      }
-    }
-
-    std::printf("Exiting decode_response_loop()\n");
-    delete rx_buf;
-  }
+  std::printf("Exiting decode_response_loop()\n");
+  delete rx_buf;
+}

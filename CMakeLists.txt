@@ -318,17 +318,17 @@ target_link_libraries(sim ${COMMON_LIBS})
 # Add the remote LDPC executable
 if(${USE_REMOTE})
   add_executable(remote_ldpc
-    src/remote/remote_ldpc.cpp
+    src/remote/remote_ldpc.cc
     $<TARGET_OBJECTS:common_sources_lib>)
   target_link_libraries(remote_ldpc ${COMMON_LIBS})
 
   # NOTE: currently the test_remote_ldpc still uses eRPC, so it doesn't work.
   # add_executable(test_remote_ldpc 
   #   test/unit_tests/test_remote_ldpc.cc
-  #   src/remote/remote_ldpc.cpp
-  #   src/agora/stats.cpp
-  #   src/agora/docoding.cpp
-  #   src/agora/phy_stats.cpp
+  #   src/remote/remote_ldpc.cc
+  #   src/agora/stats.cc
+  #   src/agora/docoding.cc
+  #   src/agora/phy_stats.cc
   #   $<TARGET_OBJECTS:common_sources_lib>)
   #   target_link_libraries(test_remote_ldpc ${COMMON_LIBS})
   # add_test(NAME test_remote_ldpc COMMAND test_remote_ldpc)
