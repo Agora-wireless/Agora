@@ -529,8 +529,20 @@ void* Sender::worker_thread_auto(int tid)
         memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
     auto* socks_pkt_buf
         = reinterpret_cast<Packet*>(memalign(64, cfg->packet_length));
-    auto* data_buf
-        = reinterpret_cast<Packet*>(memalign(64, cfg->packet_length));
+    // auto* data_buf
+    //     = reinterpret_cast<Packet*>(memalign(64, cfg->packet_length));
+    short *data_buf
+        = reinterpret_cast<short*>(memalign(64, max_symbol_id * ant_num_this_thread * cfg->OFDM_CA_NUM * sizeof(short) * 2));
+
+    // Prepare the data
+    for (size_t i = 0; i < max_symbol_id; i ++) {
+        for (size_t j = radio_lo; j < radio_hi; j ++) {
+            memcpy(data_buf + (i * ant_num_this_thread + j - radio_lo) * (2 * cfg->OFDM_CA_NUM),
+                iq_data_short_[(i * cfg->BS_ANT_NUM) + j],
+                (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
+            run_fft(data_buf + (i * ant_num_this_thread + j - radio_lo) * (2 * cfg->OFDM_CA_NUM), fft_inout, mkl_handle);
+        }
+    }
 
     double begin = get_time();
     size_t cur_radio = radio_lo;
@@ -549,6 +561,8 @@ void* Sender::worker_thread_auto(int tid)
 
     size_t start_tsc_send = rdtsc();
 
+    size_t loop_counter[10001] = {};
+
 #ifdef USE_DPDK
     rte_mbuf** tx_mbufs = new rte_mbuf*[cfg->bs_server_addr_list.size()];
     rte_eth_stats tx_stats;
@@ -566,10 +580,10 @@ void* Sender::worker_thread_auto(int tid)
         }
 #endif
 
-        memcpy(data_buf->data,
-            iq_data_short_[(cur_symbol * cfg->BS_ANT_NUM) + cur_radio],
-            (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
-        run_fft(data_buf->data, fft_inout, mkl_handle);
+        // memcpy(data_buf->data,
+        //     iq_data_short_[(cur_symbol * cfg->BS_ANT_NUM) + cur_radio],
+        //     (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
+        // run_fft(data_buf->data, fft_inout, mkl_handle);
 
 #ifdef USE_DPDK
         const size_t sc_block_size = cfg->get_num_sc_per_server();
@@ -581,7 +595,7 @@ void* Sender::worker_thread_auto(int tid)
             pkt->cell_id = 0;
             pkt->ant_id = cur_radio;
             memcpy(pkt->data,
-                data_buf->data
+                data_buf + (cur_symbol * ant_num_this_thread + cur_radio - radio_lo) * (2 * cfg->OFDM_CA_NUM)
                     + (i * sc_block_size + cfg->OFDM_DATA_START) * 2,
                 sc_block_size * sizeof(unsigned short) * 2);
             MLPD_TRACE("Sender: Sending packet %s (%zu of %zu) to %s:%ld\n",
@@ -598,6 +612,7 @@ void* Sender::worker_thread_auto(int tid)
             pkt_sent += pkt_sent_cur;
             rt_assert(loop_count < 10000, "rte_eth_tx_burst() failed");
             loop_count ++;
+            loop_counter[loop_count] ++;
         }
 #else
         #error Should not be compiled
@@ -612,20 +627,29 @@ void* Sender::worker_thread_auto(int tid)
                 if (unlikely(cur_frame == cfg->frames_to_test)) {
                     break;
                 }
-                delay_ticks(start_tsc_send, cur_frame * max_symbol_id * ticks_all);
+                // delay_ticks(start_tsc_send, cur_frame * max_symbol_id * ticks_all);
                 printf("Thread %u send frame %u in %.1f ms\n", tid, cur_frame - 1, (get_time() - start_time) / 1000.0f);
 #ifdef USE_DPDK
                 if (tid == 0) {
                     rte_eth_stats stats;
                     rte_eth_stats_get(0, &stats);
-                    printf("Traffic rate is %lf\n", (double)(stats.obytes - tx_stats.obytes) * 8 / ((get_time() - start_time) * 1000.0f));
+                    printf("Traffic rate is %lf, packet rate is %lf\n", (double)(stats.obytes - tx_stats.obytes) * 8 / ((get_time() - start_time) * 1000.0f),
+                        (double)(stats.opackets - tx_stats.opackets) / ((get_time() - start_time)));
                     memcpy(&tx_stats, &stats, sizeof(rte_eth_stats));
                 }
 #endif
                 start_time = get_time();
             }
+            delay_ticks(start_tsc_send, (cur_frame * max_symbol_id + cur_symbol) * ticks_all);
         }
     }
+    printf("Thread %u: Print loop counters:\n", tid);
+    for (size_t i = 1; i < 10000; i ++) {
+        if (loop_counter[i] > 0) {
+            printf("%u:%u ", i, loop_counter[i]);
+        }
+    }
+    printf("\n");
     printf("Worker thread ends\n");
     return NULL;
 }

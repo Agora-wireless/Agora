@@ -183,7 +183,7 @@ static constexpr size_t kMaxSymbols = 70;
 static constexpr size_t kMaxDataSCs = 3300;
 
 // Maximum number of antennas supported by Agora
-static constexpr size_t kMaxAntennas = 64;
+static constexpr size_t kMaxAntennas = 128;
 
 // Maximum number of UEs supported by Agora
 static constexpr size_t kMaxUEs = 64;
