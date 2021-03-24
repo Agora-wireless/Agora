@@ -22,11 +22,19 @@
 #define QAM64_THRESHOLD_1 (2 / sqrt(42))
 #define QAM64_THRESHOLD_2 (4 / sqrt(42))
 #define QAM64_THRESHOLD_3 (6 / sqrt(42))
+#define QAM256_THRESHOLD_1 (2 / sqrt(170))
+#define QAM256_THRESHOLD_2 (4 / sqrt(170))
+#define QAM256_THRESHOLD_3 (6 / sqrt(170))
+#define QAM256_THRESHOLD_4 (8 / sqrt(170))
+#define QAM256_THRESHOLD_5 (10 / sqrt(170))
+#define QAM256_THRESHOLD_6 (12 / sqrt(170))
+#define QAM256_THRESHOLD_7 (14 / sqrt(170))
 
 void InitModulationTable(Table<complex_float>& table, size_t mod_order);
 void InitQpskTable(Table<complex_float>& table);
 void InitQam16Table(Table<complex_float>& table);
 void InitQam64Table(Table<complex_float>& table);
+void InitQam256Table(Table<complex_float>& table);
 
 complex_float ModSingle(int x, Table<complex_float>& mod_table);
 complex_float ModSingleUint8(uint8_t x, Table<complex_float>& mod_table);
