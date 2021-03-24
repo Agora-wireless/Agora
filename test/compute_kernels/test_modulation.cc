@@ -18,6 +18,10 @@ void flushCache() {
   delete[] p;
 }
 
+static double get_time() {
+  return ((double)clock()) / CLOCKS_PER_SEC;
+}
+
 static double bench_mod_16qam(unsigned iterations, unsigned mode) {
   int* input;
   complex_float* output_mod;
@@ -28,16 +32,16 @@ static double bench_mod_16qam(unsigned iterations, unsigned mode) {
   uint8_t* output_demod_avx2;
 
   unsigned int num = 40;
-  AllocBuffer1d(&input, num, 32, 1);
-  AllocBuffer1d(&output_mod, num, 32, 1);
+  AllocBuffer1d(&input, num, Agora_memory::Alignment_t::kAlign32, 1);
+  AllocBuffer1d(&output_mod, num, Agora_memory::Alignment_t::kAlign32, 1);
   if (mode == 0) {
-    AllocBuffer1d(&output_demod_loop, num, 32, 1);
-    AllocBuffer1d(&output_demod_sse, num, 32, 1);
-    AllocBuffer1d(&output_demod_avx2, num, 32, 1);
+    AllocBuffer1d(&output_demod_loop, num, Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_sse, num, Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_avx2, num, Agora_memory::Alignment_t::kAlign32, 1);
   } else {
-    AllocBuffer1d(&output_demod_loop, num * 4, 32, 1);
-    AllocBuffer1d(&output_demod_sse, num * 4, 32, 1);
-    AllocBuffer1d(&output_demod_avx2, num * 4, 32, 1);
+    AllocBuffer1d(&output_demod_loop, num * 4, Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_sse, num * 4, Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_avx2, num * 4, Agora_memory::Alignment_t::kAlign32, 1);
   }
 
   srand(0);
@@ -132,17 +136,17 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode) {
   uint8_t* output_demod_sse;
   uint8_t* output_demod_avx2;
 
-  AllocBuffer1d(&input, num, 32, 1);
-  AllocBuffer1d(&output_mod, num, 32, 1);
+  AllocBuffer1d(&input, num, Agora_memory::Alignment_t::kAlign32, 1);
+  AllocBuffer1d(&output_mod, num, Agora_memory::Alignment_t::kAlign32, 1);
   if (mode == 0) {
-    Demod64qamHardsse((float*)output_mod, output_demod_sse, num);
-    AllocBuffer1d(&output_demod_loop, num, 32, 1);
-    AllocBuffer1d(&output_demod_sse, num, 32, 1);
-    AllocBuffer1d(&output_demod_avx2, num, 32, 1);
+    Demod64qamHardSse((float*)output_mod, output_demod_sse, num);
+    AllocBuffer1d(&output_demod_loop, num, Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_sse, num, Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_avx2, num, Agora_memory::Alignment_t::kAlign32, 1);
   } else {
-    AllocBuffer1d(&output_demod_loop, num * 6, 32, 1);
-    AllocBuffer1d(&output_demod_sse, num * 6, 32, 1);
-    AllocBuffer1d(&output_demod_avx2, num * 6, 32, 1);
+    AllocBuffer1d(&output_demod_loop, num * 6, Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_sse, num * 6, Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_avx2, num * 6, Agora_memory::Alignment_t::kAlign32, 1);
   }
 
   srand(0);
@@ -158,7 +162,7 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode) {
   double start_time = get_time();
   for (unsigned i = 0; i < iterations; i++) {
     for (unsigned j = 0; j < num; j++)
-      output_mod[j] = mod_single(input[j], mod_table);
+      output_mod[j] = ModSingle(input[j], mod_table);
 
     // for (unsigned i = 0; i < num; i++) {
     //     std::printf("(%.3f, %.3f) ", output_mod[i].re, output_mod[i].im);
@@ -228,6 +232,82 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode) {
   return end_time - start_time;
 }
 
+
+int hammingdist(uint8_t x, uint8_t y) {
+  uint8_t mask = 0x80, rshift = 7, hammingdist = 0;
+  while (mask) {
+    // Calculate hamming dist
+    hammingdist += abs(((x & mask) >> rshift) - ((y & mask) >> rshift));
+    rshift--;
+    mask >>= 1;
+  }
+  return hammingdist;  
+}
+
+void printbits(uint8_t x) {
+  // Print MSB first
+  uint8_t mask = 0x80, rshift = 7;
+  while (mask) {
+    printf("%d", (x & mask) >> rshift);
+    rshift--;
+    mask >>= 1;
+  }
+  printf(" ");
+}
+
+static double bench_mod_256qam(unsigned iterations, unsigned mode) {
+  Table<complex_float> mod_table;
+  InitModulationTable(mod_table, 256);
+  int gray_mapping[16][16];
+  for (int i = 0; i < 256; i++) {
+    int re = (int)(mod_table[0][i].re * sqrt(170)/2 + 8);
+    int im = (int)(mod_table[0][i].im * sqrt(170)/2 + 8);
+    gray_mapping[re][im] = i;
+  }
+  for (int i = 15; i >= 0; i--) {
+    if (i == 7)
+      printf("-----------------------------------------------------------------"
+        "------------"
+        "------------------------------------------------------------------\n");
+    for (int j = 0; j < 16; j++) {
+      printbits(gray_mapping[i][j]);
+      /*
+       * Validate the hamming distance of adjacent entries
+       */
+      if (i > 0) {
+        // Check left
+        if (hammingdist(gray_mapping[i - 1][j], gray_mapping[i][j]) != 1) {
+          printf("Bad west hamming dist at (%d,%d)\n", i, j);
+        }
+      } 
+      if (i < 15) {
+        // Check right
+        if (hammingdist(gray_mapping[i + 1][j], gray_mapping[i][j]) != 1) {
+          printf("Bad east hamming dist at (%d,%d)\n", i, j);
+        }
+      }
+      if (j > 0) {
+        // Check above
+        if (hammingdist(gray_mapping[i][j - 1], gray_mapping[i][j]) != 1) {
+          printf("Bad north hamming dist at (%d,%d)\n", i, j);
+        }
+      }
+      if (j < 15) {
+        // Check below
+        if (hammingdist(gray_mapping[i][j + 1], gray_mapping[i][j]) != 1) {
+          printf("Bad south hamming dist at (%d,%d)\n", i, j);
+        }
+      }
+      if (j == 7) {
+        // Print divider
+        printf("| ");
+      }
+    }
+    printf("\n");
+  }
+  return 1.0;
+}
+
 static void run_benchmark_16qam(unsigned iterations, unsigned mode) {
   double time = bench_mod_16qam(iterations, mode);
   std::printf("time: %.2f us per iteration\n", time / iterations);
@@ -238,10 +318,15 @@ static void run_benchmark_64qam(unsigned iterations, unsigned mode) {
   std::printf("time: %.2f us per iteration\n", time / iterations);
 }
 
+static void run_benchmark_256qam(unsigned iterations, unsigned mode) {
+  double time = bench_mod_256qam(iterations, mode);
+  str:printf("time: %.2f us per iteration\n", time / iterations);
+}
+
 int main(int argc, char* argv[]) {
   if (argc != 4) {
     std::fprintf(stderr,
-                 "Usage: %s [modulation order 4/16/64] [mode hard(0)/soft(1)] "
+                 "Usage: %s [modulation order 4/16/64/256] [mode hard(0)/soft(1)] "
                  "[iterations]\n",
                  argv[0]);
     return 1;
@@ -267,6 +352,8 @@ int main(int argc, char* argv[]) {
       run_benchmark_16qam(iterations, mode);
     else if (mod_order == 64)
       run_benchmark_64qam(iterations, mode);
+    else if (mod_order == 256)
+      run_benchmark_256qam(iterations, mode); 
     else
       std::printf("Error: modulation order not supported!\n");
   }
