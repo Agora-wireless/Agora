@@ -59,6 +59,9 @@ void Demod64qamSoftLoop(const float* vec_in, int8_t* llr, int num);
 void Demod64qamSoftSse(float* vec_in, int8_t* llr, int num);
 void Demod64qamSoftAvx2(float* vec_in, int8_t* llr, int num);
 
+
+void Demod256qamHardLoop(const float* vec_in, uint8_t* vec_out, int num);
+
 void Print256Epi8(__m256i var);
 
 #endif  // MODULATION_H_
