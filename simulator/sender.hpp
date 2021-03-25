@@ -154,7 +154,7 @@ private:
     std::thread worker_threads_[kMaxWorkerNum];
 
 #ifdef USE_DPDK
-    struct rte_mempool* mbuf_pool;
+    struct rte_mempool* mbuf_pools_[kMaxWorkerNum];
     uint32_t bs_rru_addr; // IPv4 address of this data sender
     uint32_t bs_server_addr; // IPv4 address of the remote target Agora server
     std::vector<uint32_t> bs_server_addr_list; // IPv4 address list of all Agora servers

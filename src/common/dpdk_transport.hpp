@@ -20,7 +20,7 @@
 #define RX_RING_SIZE 8192
 #define TX_RING_SIZE 8192
 
-#define NUM_MBUFS ((512 * 1024) - 1)
+#define NUM_MBUFS ((64 * 1024) - 1)
 #define MBUF_CACHE_SIZE 128
 
 #define JUMBO_FRAME_MAX_SIZE 0x2600 // allow max jumbo frame 9.5 KB
@@ -63,5 +63,5 @@ public:
 
     /// Init dpdk on core [core_offset:core_offset+thread_num]
     static void dpdk_init(uint16_t core_offset, size_t thread_num);
-    static rte_mempool* create_mempool();
+    static rte_mempool* create_mempool(size_t mid = 0);
 };

@@ -23,12 +23,9 @@ int main(int argc, char* argv[])
 
     auto* sender = new Sender(cfg, FLAGS_num_masters, FLAGS_num_threads, FLAGS_core_offset,
         FLAGS_frame_duration, FLAGS_enable_slow_start, FLAGS_server_mac_addr);
-    // sender->startTX();
     double* frame_start = new double[kNumStatsFrames]();
     double* frame_end = new double[kNumStatsFrames]();
-    // sender->startTXfromMain(frame_start, frame_end);
-    // sender->join_thread();
-    sender->startTXfromMainAuto(frame_start, frame_end);
-    sender->join_thread_auto();
+    sender->startTXfromMain(frame_start, frame_end);
+    sender->join_thread();
     return 0;
 }
