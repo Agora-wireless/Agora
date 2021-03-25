@@ -2,11 +2,15 @@
  * @file test_modulation.cc
  * @brief Testing functions for benchmarking modulation routines
  */
+
+#include <iostream>
+
 #include "buffer.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.h"
 #include "utils.h"
+
 
 void flushCache() {
   const size_t bigger_than_cachesize = 2 * 1024;  // 100 * 1024 * 1024;
@@ -257,12 +261,18 @@ void printbits(uint8_t x) {
 
 static double bench_mod_256qam(unsigned iterations, unsigned mode) {
   Table<complex_float> mod_table;
-  InitModulationTable(mod_table, 256);
+  complex_float *output_mod;
+  double start_time, total_time;
+  unsigned int num = 100;
+  uint8_t *input;
+  uint8_t *output_demod_loop;
   int gray_mapping[16][16];
+
+  InitModulationTable(mod_table, 256);
   for (int i = 0; i < 256; i++) {
     int re = (int)(mod_table[0][i].re * sqrt(170)/2 + 8);
     int im = (int)(mod_table[0][i].im * sqrt(170)/2 + 8);
-    gray_mapping[re][im] = i;
+    gray_mapping[im][re] = i;
   }
   for (int i = 15; i >= 0; i--) {
     if (i == 7)
@@ -305,7 +315,49 @@ static double bench_mod_256qam(unsigned iterations, unsigned mode) {
     }
     printf("\n");
   }
-  return 1.0;
+  AllocBuffer1d(&input, num, Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&output_mod, num, Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&output_demod_loop, num, Agora_memory::Alignment_t::kAlign64, 1);
+  // Build the input data from random bytes
+  std::printf("Input: ");
+  for (int i = 0; i < num; i++) {
+    input[i] = rand() % 256;
+    std::printf("%d ", input[i]);
+  }
+  std::printf("\n");
+
+  start_time = get_time();
+  for (unsigned i = 0; i < iterations; i++) {
+    for (unsigned j = 0; j < num; j++) {
+      output_mod[j] = ModSingle(input[j], mod_table);
+    }
+    // Demodulate input
+    Demod256qamHardLoop((float*)output_mod, output_demod_loop, num);
+  }
+  total_time = get_time() - start_time;
+
+  if (mode == 0) {
+    // Check results. Will influence output timing
+    unsigned i;
+    std::cout << "Results checking enabled\n";
+    for (i = 0; i < num; i++) {
+      if (input[i] != output_demod_loop[i]) {
+        std::cout << "Results differed at index " << i << "\n";
+        std::printf("Expected %d Actual %d\n", input[i], output_demod_loop[i]);
+        break;
+      }
+    }
+    if (i != num) {
+      std::cout << "Correctness check failed\n";
+    } else {
+      std::cout << "Correctness check passed\n Output: ";
+      for (i = 0; i < num; i++) {
+        std::printf("%d ", output_demod_loop[i]);
+      }
+      std::printf("\n");
+    }
+  }
+  return total_time;
 }
 
 static void run_benchmark_16qam(unsigned iterations, unsigned mode) {
