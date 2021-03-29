@@ -34,9 +34,9 @@ class UlMacSender {
    * @param enable_slow_start If 1, the sender initially sends frames in a
    * duration larger than the TTI
    */
-  UlMacSender(Config* cfg, size_t socket_thread_num, size_t core_offset = 30,
-              size_t frame_duration_us = 0, size_t inter_frame_delay = 0,
-              size_t enable_slow_start = 1,
+  UlMacSender(Config* cfg, std::string& data_filename, size_t socket_thread_num,
+              size_t core_offset = 30, size_t frame_duration_us = 0,
+              size_t inter_frame_delay = 0, size_t enable_slow_start = 1,
               bool create_thread_for_master = false);
 
   ~UlMacSender();
@@ -59,14 +59,11 @@ class UlMacSender {
   // Launch threads to run worker with thread IDs from tid_start to tid_end
   void CreateWorkerThreads(size_t num_workers);
 
-  void UpdateTxBuffer(gen_tag_t tag);
-  void DelayForSymbol(size_t tx_frame_count, uint64_t tick_start);
-  void DelayForFrame(size_t tx_frame_count, uint64_t tick_start);
-
+  void UpdateTxBuffer(std::ifstream& read, gen_tag_t tag);
   void WriteStatsToFile(size_t tx_frame_count) const;
 
-  size_t FindNextSymbol(size_t start_symbol);
-  void ScheduleSymbol(size_t frame, size_t symbol_id);
+  void ScheduleFrame(size_t frame);
+  void LoadFrame(size_t frame);
   size_t TagToTxBuffersIndex(gen_tag_t tag) const;
 
   Config* cfg_;
@@ -99,9 +96,8 @@ class UlMacSender {
   moodycamel::ConcurrentQueue<size_t> completion_queue_ =
       moodycamel::ConcurrentQueue<size_t>(kMessageQueueSize);
   moodycamel::ProducerToken** task_ptok_;
-
-  // Number of packets transmitted for each symbol in a frame
-  std::array<size_t*, kFrameWnd> packet_count_per_symbol_;
+  moodycamel::ConcurrentQueue<size_t> data_update_queue_ =
+      moodycamel::ConcurrentQueue<size_t>(kMessageQueueSize);
 
   double* frame_start_;
   double* frame_end_;
@@ -110,6 +106,7 @@ class UlMacSender {
   /* Send to Address */
 
   Table<uint8_t> tx_buffers_;
+  std::string data_filename_;
 };
 
 #endif  // UL_MAC_SENDER_H_
