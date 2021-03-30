@@ -149,88 +149,100 @@ public:
         size_t state_operation_duration = 0;
 
         while (cfg->running && !SignalHandler::gotExitSignal()) {
-            if (rx_status_->received_all_pilots(csi_cur_frame_)) {
-                size_t work_start_tsc = rdtsc();
+
+            size_t work_start_tsc = rdtsc();
+            size_t state_start_tsc = rdtsc();
+            bool ret = rx_status_->received_all_pilots(csi_cur_frame_);
+            state_operation_duration += rdtsc() - state_start_tsc;
+            work_tsc_duration += rdtsc() - work_start_tsc;
+
+            if (ret) {
+                work_start_tsc = rdtsc();
+
                 size_t csi_start_tsc = rdtsc();
                 run_csi(csi_cur_frame_, sc_range_.start);
                 csi_tsc_duration += rdtsc() - csi_start_tsc;
+
                 csi_start_tsc = rdtsc();
                 printf(
                     "Main thread: pilot frame: %lu, finished CSI for all pilot "
                     "symbols\n",
                     csi_cur_frame_);
                 print_tsc_duration += rdtsc() - csi_start_tsc;
+
                 csi_cur_frame_++;
                 work_tsc_duration += rdtsc() - work_start_tsc;
             }
 
             if (csi_cur_frame_ > zf_cur_frame_) {
-                size_t work_start_tsc = rdtsc();
+                work_start_tsc = rdtsc();
+
                 size_t zf_start_tsc = rdtsc();
                 do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
                     sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
                                    ._tag);
                 zf_tsc_duration += rdtsc() - zf_start_tsc;
+
                 n_zf_tasks_done_++;
                 if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
                     n_zf_tasks_done_ = 0;
+
                     zf_start_tsc = rdtsc();
                     printf("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
                     print_tsc_duration += rdtsc() - zf_start_tsc;
+
                     zf_cur_frame_++;
                 }
+
                 work_tsc_duration += rdtsc() - work_start_tsc;
             }
 
-            if (zf_cur_frame_ > demul_cur_frame_
-                && rx_status_->is_demod_ready(
-                       demul_cur_frame_, demul_cur_sym_ul_)) {
-                size_t work_start_tsc = rdtsc();
-                size_t demod_start_tsc = rdtsc();
-                do_demul_->launch(demul_cur_frame_,
-                    demul_cur_sym_ul_,
-                    sc_range_.start
-                        + (n_demul_tasks_done_ * cfg->demul_block_size));
-                demod_tsc_duration += rdtsc() - demod_start_tsc;
+            if (zf_cur_frame_ > demul_cur_frame_) {
 
-                n_demul_tasks_done_++;
-                if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
-                    /*
-                    // Debug printing: TODO, should use MLPD_TRACE
-                    for (size_t i = 0; i < 4; i++) {
-                        usleep(tid * 3000);
-                        int8_t* demul_ptr = demod_buffers_[demul_cur_frame_
-                            % kFrameWnd][demul_cur_sym_
-                            - cfg->pilot_symbol_num_perframe][i];
-                        printf("UE %zu: ", i);
-                        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i++) {
-                            if (i % 20 == 0) {
-                                printf(
-                                    "%d ", demul_ptr[i * cfg->mod_order_bits]);
-                            }
-                        }
-                        printf("\n");
-                    }
-                    */
-
-                    n_demul_tasks_done_ = 0;
-                    demod_start_tsc = rdtsc();
-                    demul_status_->demul_complete(
-                        demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_reqd);
-                    state_operation_duration += rdtsc() - demod_start_tsc;
-                    demul_cur_sym_ul_++;
-                    if (demul_cur_sym_ul_ == cfg->ul_data_symbol_num_perframe) {
-                        demul_cur_sym_ul_ = 0;
-                        demod_start_tsc = rdtsc();
-                        printf("Main thread: Demodulation done frame: %lu "
-                               "(%lu UL symbols)\n",
-                            demul_cur_frame_,
-                            cfg->ul_data_symbol_num_perframe);
-                        print_tsc_duration += rdtsc() - demod_start_tsc;
-                        demul_cur_frame_++;
-                    }
-                }
+                work_start_tsc = rdtsc();
+                state_start_tsc = rdtsc();
+                bool ret = rx_status_->is_demod_ready(
+                       demul_cur_frame_, demul_cur_sym_ul_);
+                state_operation_duration += rdtsc() - state_start_tsc;
                 work_tsc_duration += rdtsc() - work_start_tsc;
+
+                if (ret) {
+                    work_start_tsc = rdtsc();
+
+                    size_t demod_start_tsc = rdtsc();
+                    do_demul_->launch(demul_cur_frame_,
+                        demul_cur_sym_ul_,
+                        sc_range_.start
+                            + (n_demul_tasks_done_ * cfg->demul_block_size));
+                    demod_tsc_duration += rdtsc() - demod_start_tsc;
+
+                    n_demul_tasks_done_++;
+                    if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
+                        n_demul_tasks_done_ = 0;
+
+                        state_start_tsc = rdtsc();
+                        demul_status_->demul_complete(
+                            demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_reqd);
+                        state_operation_duration += rdtsc() - state_start_tsc;
+
+                        demul_cur_sym_ul_++;
+                        if (demul_cur_sym_ul_ == cfg->ul_data_symbol_num_perframe) {
+                            demul_cur_sym_ul_ = 0;
+
+                            demod_start_tsc = rdtsc();
+                            printf("Main thread: Demodulation done frame: %lu "
+                                "(%lu UL symbols)\n",
+                                demul_cur_frame_,
+                                cfg->ul_data_symbol_num_perframe);
+                            print_tsc_duration += rdtsc() - demod_start_tsc;
+                            
+                            demul_cur_frame_++;
+                        }
+                    }
+
+                    work_tsc_duration += rdtsc() - work_start_tsc;
+                }
+                
             }
 
             if (precode_status_->received_all_encoded_data(precode_cur_frame_, precode_cur_sym_dl_) 

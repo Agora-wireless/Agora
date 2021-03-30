@@ -268,31 +268,81 @@ void DoDecode::start_work()
     size_t state_operation_duration = 0;
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
-        if (cur_cb_ > 0
-            || decode_status_->received_all_demod_data(
-                   ue_id_, cur_frame_, cur_symbol_)) {
+
+        if (cur_cb_ > 0) {
+
             size_t work_start_tsc = rdtsc();
+            
             // printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id_, cur_frame_, cur_symbol_);
+
             size_t decode_start_tsc = rdtsc();
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                 cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
             decode_tsc_duration += rdtsc() - decode_start_tsc;
+
             // printf("Start to decode user %lu frame %lu symbol %lu end\n", ue_id_, cur_frame_, cur_symbol_);
+
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                 cur_cb_ = 0;
                 cur_symbol_ += cfg->decode_thread_num_per_ue;
                 if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
                     cur_symbol_ = tid_in_ue_;
+
                     decode_start_tsc = rdtsc();
                     rx_status_->decode_done(cur_frame_);
                     state_operation_duration += rdtsc() - decode_start_tsc;
+                    
                     cur_frame_++;
                 }
             }
+
             work_tsc_duration += rdtsc() - work_start_tsc;
+
+        } else {
+
+            size_t work_start_tsc = rdtsc();
+            size_t state_start_tsc = rdtsc();
+            bool ret = decode_status_->received_all_demod_data(
+                   ue_id_, cur_frame_, cur_symbol_);
+            state_operation_duration += rdtsc() - state_start_tsc;
+            work_tsc_duration += rdtsc() - work_start_tsc;
+
+            if (ret) {
+
+                work_start_tsc = rdtsc();
+            
+                // printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id_, cur_frame_, cur_symbol_);
+
+                size_t decode_start_tsc = rdtsc();
+                launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
+                    cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
+                        ._tag);
+                decode_tsc_duration += rdtsc() - decode_start_tsc;
+
+                // printf("Start to decode user %lu frame %lu symbol %lu end\n", ue_id_, cur_frame_, cur_symbol_);
+                cur_cb_++;
+                if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
+                    cur_cb_ = 0;
+                    cur_symbol_ += cfg->decode_thread_num_per_ue;
+                    if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
+                        cur_symbol_ = tid_in_ue_;
+
+                        state_start_tsc = rdtsc();
+                        rx_status_->decode_done(cur_frame_);
+                        state_operation_duration += rdtsc() - state_start_tsc;
+
+                        cur_frame_++;
+                    }
+                }
+                
+                work_tsc_duration += rdtsc() - work_start_tsc;
+
+            }
+            
         }
+
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
