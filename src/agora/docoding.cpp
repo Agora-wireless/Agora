@@ -266,12 +266,17 @@ void DoDecode::start_work()
     size_t work_tsc_duration = 0;
     size_t decode_tsc_duration = 0;
     size_t state_operation_duration = 0;
+    size_t loop_count = 0;
+    size_t work_count = 0;
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
+
+        loop_count ++;
 
         if (cur_cb_ > 0) {
 
             size_t work_start_tsc = rdtsc();
+            work_count ++;
             
             // printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id_, cur_frame_, cur_symbol_);
 
@@ -293,7 +298,7 @@ void DoDecode::start_work()
                     decode_start_tsc = rdtsc();
                     rx_status_->decode_done(cur_frame_);
                     state_operation_duration += rdtsc() - decode_start_tsc;
-                    
+
                     cur_frame_++;
                 }
             }
@@ -312,6 +317,7 @@ void DoDecode::start_work()
             if (ret) {
 
                 work_start_tsc = rdtsc();
+                work_count ++;
             
                 // printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id_, cur_frame_, cur_symbol_);
 
@@ -348,9 +354,11 @@ void DoDecode::start_work()
     size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("DoDecode Thread %u duration stats: total time used %.2lfms, "
-        "decode %.2lfms (%.2lf\%), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%)\n",
+        "decode %.2lfms (%.2lf\%), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
+        "working proportions (%u/%u: %.2lf\%)\n",
         tid, cycles_to_ms(whole_duration, freq_ghz),
         cycles_to_ms(decode_tsc_duration, freq_ghz), decode_tsc_duration * 100.0f / whole_duration,
         cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
-        cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration);
+        cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
+        work_count, loop_count, work_count * 100.0f / loop_count);
 }

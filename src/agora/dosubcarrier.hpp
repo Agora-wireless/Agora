@@ -147,8 +147,12 @@ public:
         size_t precode_tsc_duration = 0;
         size_t print_tsc_duration = 0;
         size_t state_operation_duration = 0;
+        size_t loop_count = 0;
+        size_t work_count = 0;
 
         while (cfg->running && !SignalHandler::gotExitSignal()) {
+            loop_count ++;
+            size_t worked = 0;
 
             size_t work_start_tsc = rdtsc();
             size_t state_start_tsc = rdtsc();
@@ -158,6 +162,7 @@ public:
 
             if (ret) {
                 work_start_tsc = rdtsc();
+                worked = 1;
 
                 size_t csi_start_tsc = rdtsc();
                 run_csi(csi_cur_frame_, sc_range_.start);
@@ -176,6 +181,7 @@ public:
 
             if (csi_cur_frame_ > zf_cur_frame_) {
                 work_start_tsc = rdtsc();
+                worked = 1;
 
                 size_t zf_start_tsc = rdtsc();
                 do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
@@ -208,6 +214,7 @@ public:
 
                 if (ret) {
                     work_start_tsc = rdtsc();
+                    worked = 1;
 
                     size_t demod_start_tsc = rdtsc();
                     do_demul_->launch(demul_cur_frame_,
@@ -248,6 +255,7 @@ public:
             if (precode_status_->received_all_encoded_data(precode_cur_frame_, precode_cur_sym_dl_) 
                 && zf_cur_frame_ > precode_cur_frame_) {
                 size_t work_start_tsc = rdtsc();
+                worked = 1;
                 size_t base_sc_id = n_precode_tasks_done_ * cfg->demul_block_size + sc_range_.start;
                 // printf("Precode frame %u symbol %u subcarrier %u\n", precode_cur_frame_, 
                     // precode_cur_sym_dl_, base_sc_id);
@@ -279,14 +287,16 @@ public:
         printf("DoSubcarrier Thread %u duration stats: total time used %.2lfms, "
             "csi %.2lfms (%.2lf\%), zf %.2lfms (%.2lf\%), demod %.2lfms (%.2lf\%), "
             "precode %.2lfms (%.2lf\%), print %.2lfms (%.2lf\%), stating "
-            "%.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%)\n", tid, cycles_to_ms(whole_duration, freq_ghz),
+            "%.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), working rate (%u/%u: %.2lf\%)\n", 
+            tid, cycles_to_ms(whole_duration, freq_ghz),
             cycles_to_ms(csi_tsc_duration, freq_ghz), csi_tsc_duration * 100.0f / whole_duration,
             cycles_to_ms(zf_tsc_duration, freq_ghz), zf_tsc_duration * 100.0f / whole_duration,
             cycles_to_ms(demod_tsc_duration, freq_ghz), demod_tsc_duration * 100.0f / whole_duration, 
             cycles_to_ms(precode_tsc_duration, freq_ghz), precode_tsc_duration * 100.0f / whole_duration,
             cycles_to_ms(print_tsc_duration, freq_ghz), print_tsc_duration * 100.0f / whole_duration,
             cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
-            cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration);
+            cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
+            work_count, loop_count, work_count * 100.0f / loop_count);
     }
 
 private:
