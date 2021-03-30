@@ -296,7 +296,7 @@ void DoDecode::start_work()
     size_t idle_duration = whole_duration - decode_tsc_duration - state_operation_duration;
     printf("DoSubcarrier Thread %u duration stats: total time used %.2lfms, \
         decode %.2lfms (%.2lf\%), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%)\n",
-        cycles_to_ms(whole_duration, freq_ghz),
+        tid, cycles_to_ms(whole_duration, freq_ghz),
         cycles_to_ms(decode_tsc_duration, freq_ghz), decode_tsc_duration * 100.0f / whole_duration,
         cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration);

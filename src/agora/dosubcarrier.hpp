@@ -260,7 +260,7 @@ public:
         printf("DoSubcarrier Thread %u duration stats: total time used %.2lfms, \
             csi %.2lfms (%.2lf\%), zf %.2lfms (%.2lf\%), demod %.2lfms (%.2lf\%), \
             precode %.2lfms (%.2lf\%), print %.2lfms (%.2lf\%), stating \
-            %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%)\n", cycles_to_ms(whole_duration, freq_ghz),
+            %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%)\n", tid, cycles_to_ms(whole_duration, freq_ghz),
             cycles_to_ms(csi_tsc_duration, freq_ghz), csi_tsc_duration * 100.0f / whole_duration,
             cycles_to_ms(zf_tsc_duration, freq_ghz), zf_tsc_duration * 100.0f / whole_duration,
             cycles_to_ms(demod_tsc_duration, freq_ghz), demod_tsc_duration * 100.0f / whole_duration, 
