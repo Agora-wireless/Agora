@@ -4,6 +4,7 @@
  */
 #include "sender.h"
 
+#include <algorithm>
 #include <thread>
 
 #include "datatype_conversion.h"
@@ -42,7 +43,9 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
       inter_frame_delay_(inter_frame_delay),
       ticks_all_(frame_duration_ * ticks_per_usec_ /
                  cfg->Frame().NumTotalSyms()),
-      ticks_wnd1_((40 * frame_duration_ * ticks_per_usec_) /
+      ticks_wnd1_((std::max(static_cast<double>(40.0 * frame_duration_),
+                            static_cast<double>(200000.0) /* 200ms */) *
+                   ticks_per_usec_) /
                   cfg->Frame().NumTotalSyms()),
       ticks_wnd2_((15 * frame_duration_ * ticks_per_usec_) /
                   cfg->Frame().NumTotalSyms()),
@@ -225,13 +228,6 @@ void* Sender::MasterThread(int /*unused*/) {
         packet_count_per_symbol_[comp_frame_slot][ctag.symbol_id_] = 0;
 
         size_t next_symbol_id = FindNextSymbol((ctag.symbol_id_ + 1));
-        // Set end of frame time to the time the last symbol was transmitted
-        // (now) do this before the delay until the end of the frame
-        if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
-          double timeus_now = GetTime::GetTimeUs();
-          this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = timeus_now;
-        }
-
         unsigned symbol_delay = next_symbol_id - ctag.symbol_id_;
         if (kDebugPrintSender) {
           std::printf(
@@ -267,14 +263,21 @@ void* Sender::MasterThread(int /*unused*/) {
             keep_running.store(false);
             break; /* Finished */
           } else {
-            // Wait until the next symbol time, then next frame time
+            // Set end of frame time to the time after the last symbol
+            this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = tick_start;
+
+            // Wait for the inter-frame delay
+            DelayTicks(tick_start, ticks_inter_frame_);
+
+            tick_start = GetTime::GetTimeUs();
+
+            // Set the frame start time to the start time of the frame
+            // (independant of symbol type)
+            this->frame_start_[(next_frame_id % kNumStatsFrames)] = tick_start;
+
+            // Wait until the first tx symbol
             DelayTicks(tick_start,
-                       (GetTicksForFrame(ctag.frame_id_) * next_symbol_id) +
-                           ticks_inter_frame_);
-            // Set the frame start time to the time of the first tx symbol
-            // schedule (now)
-            this->frame_start_[(next_frame_id % kNumStatsFrames)] =
-                GetTime::GetTimeUs();
+                       (GetTicksForFrame(ctag.frame_id_) * next_symbol_id));
           }
         }  // if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
         tick_start = GetTime::Rdtsc();
