@@ -266,7 +266,7 @@ void* Sender::MasterThread(int /*unused*/) {
             // Set end of frame time to the time after the last symbol
             this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = tick_start;
 
-            // Wait until for the interframe delay
+            // Wait for the inter-frame delay
             DelayTicks(tick_start, ticks_inter_frame_);
 
             tick_start = GetTime::GetTimeUs();
