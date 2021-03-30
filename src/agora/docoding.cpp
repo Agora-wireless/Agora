@@ -291,7 +291,7 @@ void DoDecode::start_work()
                     cur_frame_++;
                 }
             }
-            work_tsc_duration += rdtsc() - work_start_tsc();
+            work_tsc_duration += rdtsc() - work_start_tsc;
         }
     }
 
