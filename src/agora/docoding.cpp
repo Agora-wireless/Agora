@@ -262,7 +262,7 @@ void DoDecode::start_work()
     printf("Decode for ue %u tid %u starts to work!\n", ue_id_, tid_in_ue_);
     cur_symbol_ = tid_in_ue_;
 
-    size_t start_tsc = rdtsc();
+    size_t start_tsc = 0;
     size_t work_tsc_duration = 0;
     size_t decode_tsc_duration = 0;
     size_t state_operation_duration = 0;
@@ -271,11 +271,18 @@ void DoDecode::start_work()
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
 
-        loop_count ++;
+        if (likely(start_tsc > 0)) {
+            loop_count ++;
+        }
+        size_t work_start_tsc, state_start_tsc;
 
         if (cur_cb_ > 0) {
 
-            size_t work_start_tsc = rdtsc();
+            if (unlikely(start_tsc == 0)) {
+                start_tsc = rdtsc();
+            }
+
+            work_start_tsc = rdtsc();
             work_count ++;
             
             // printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id_, cur_frame_, cur_symbol_);
@@ -287,7 +294,7 @@ void DoDecode::start_work()
             decode_tsc_duration += rdtsc() - decode_start_tsc;
 
             // printf("Start to decode user %lu frame %lu symbol %lu end\n", ue_id_, cur_frame_, cur_symbol_);
-
+            decode_start_tsc = rdtsc();
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                 cur_cb_ = 0;
@@ -295,26 +302,40 @@ void DoDecode::start_work()
                 if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
                     cur_symbol_ = tid_in_ue_;
 
-                    decode_start_tsc = rdtsc();
+                    // decode_start_tsc = rdtsc();
                     rx_status_->decode_done(cur_frame_);
-                    state_operation_duration += rdtsc() - decode_start_tsc;
+                    // state_operation_duration += rdtsc() - decode_start_tsc;
 
                     cur_frame_++;
+                    if (unlikely(cur_frame_ == cfg->frames_to_test)) {
+                        state_operation_duration += rdtsc() - decode_start_tsc;
+                        work_tsc_duration += rdtsc() - work_start_tsc;
+                        break;
+                    }
                 }
             }
-
+            state_operation_duration += rdtsc() - decode_start_tsc;
             work_tsc_duration += rdtsc() - work_start_tsc;
 
         } else {
 
-            size_t work_start_tsc = rdtsc();
-            size_t state_start_tsc = rdtsc();
+            if (likely(start_tsc > 0)) {
+                work_start_tsc = rdtsc();
+                state_start_tsc = rdtsc();
+            }
             bool ret = decode_status_->received_all_demod_data(
                    ue_id_, cur_frame_, cur_symbol_);
-            state_operation_duration += rdtsc() - state_start_tsc;
-            work_tsc_duration += rdtsc() - work_start_tsc;
+            if (likely(start_tsc > 0)) {
+                state_operation_duration += rdtsc() - state_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
 
             if (ret) {
+
+                if (unlikely(start_tsc == 0)) {
+                    loop_count ++;
+                    start_tsc = rdtsc();
+                }
 
                 work_start_tsc = rdtsc();
                 work_count ++;
@@ -328,6 +349,7 @@ void DoDecode::start_work()
                 decode_tsc_duration += rdtsc() - decode_start_tsc;
 
                 // printf("Start to decode user %lu frame %lu symbol %lu end\n", ue_id_, cur_frame_, cur_symbol_);
+                state_start_tsc = rdtsc();
                 cur_cb_++;
                 if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                     cur_cb_ = 0;
@@ -335,13 +357,19 @@ void DoDecode::start_work()
                     if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
                         cur_symbol_ = tid_in_ue_;
 
-                        state_start_tsc = rdtsc();
+                        // state_start_tsc = rdtsc();
                         rx_status_->decode_done(cur_frame_);
-                        state_operation_duration += rdtsc() - state_start_tsc;
+                        // state_operation_duration += rdtsc() - state_start_tsc;
 
                         cur_frame_++;
+                        if (unlikely(cur_frame_ == cfg->frames_to_test)) {
+                            state_operation_duration += rdtsc() - state_start_tsc;
+                            work_tsc_duration += rdtsc() - work_start_tsc;
+                            break;
+                        }
                     }
                 }
+                state_operation_duration += rdtsc() - state_start_tsc;
                 
                 work_tsc_duration += rdtsc() - work_start_tsc;
 

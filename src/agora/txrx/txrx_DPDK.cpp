@@ -191,30 +191,9 @@ void* PacketTXRX::demod_thread(int tid)
                         ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-                    // tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool_);
-                    // struct rte_ether_hdr* eth_hdr
-                    //     = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
-                    // eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
-                    // memcpy(eth_hdr->s_addr.addr_bytes, bs_server_mac_addrs_[cfg->bs_server_addr_idx].addr_bytes,
-                    //     RTE_ETHER_ADDR_LEN);
-                    // memcpy(eth_hdr->d_addr.addr_bytes, bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)].addr_bytes,
-                    //     RTE_ETHER_ADDR_LEN);
-
-                    // struct rte_ipv4_hdr* ip_h
-                    //     = (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
-                    // ip_h->src_addr = bs_server_addrs_[cfg->bs_server_addr_idx];
-                    // ip_h->dst_addr = bs_server_addrs_[cfg->get_server_idx_by_ue(ue_id)];
-                    // ip_h->next_proto_id = IPPROTO_UDP;
-
-                    // struct rte_udp_hdr* udp_h
-                    //     = (struct rte_udp_hdr*)((char*)ip_h + sizeof(struct rte_ipv4_hdr));
-                    // udp_h->src_port = rte_cpu_to_be_16(cfg->demod_tx_port);
-                    // udp_h->dst_port = rte_cpu_to_be_16(cfg->demod_rx_port);
-
-                    // tx_bufs[0]->pkt_len = cfg->packet_length + kPayloadOffset;
-                    // tx_bufs[0]->data_len = cfg->packet_length + kPayloadOffset;
                     tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_, bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)],
-                        bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[cfg->get_server_idx_by_ue(ue_id)], cfg->demod_tx_port, cfg->demod_rx_port, cfg->packet_length);
+                        bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[cfg->get_server_idx_by_ue(ue_id)], cfg->demod_tx_port, cfg->demod_rx_port, 
+                        Packet::kOffsetOfData + cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                     struct rte_ether_hdr* eth_hdr
                         = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
 

@@ -139,7 +139,7 @@ public:
         
         printf("Range [%u:%u] starts to work\n", sc_range_.start, sc_range_.end);
 
-        size_t start_tsc = rdtsc();
+        size_t start_tsc = 0;
         size_t work_tsc_duration = 0;
         size_t csi_tsc_duration = 0;
         size_t zf_tsc_duration = 0;
@@ -150,17 +150,27 @@ public:
         size_t loop_count = 0;
         size_t work_count = 0;
 
+        size_t work_start_tsc, state_start_tsc;
+
         while (cfg->running && !SignalHandler::gotExitSignal()) {
-            loop_count ++;
             size_t worked = 0;
 
-            size_t work_start_tsc = rdtsc();
-            size_t state_start_tsc = rdtsc();
+            if (likely(start_tsc > 0)) {
+                loop_count ++;
+                work_start_tsc = rdtsc();
+                state_start_tsc = rdtsc();
+            }
             bool ret = rx_status_->received_all_pilots(csi_cur_frame_);
-            state_operation_duration += rdtsc() - state_start_tsc;
-            work_tsc_duration += rdtsc() - work_start_tsc;
+            if (likely(start_tsc > 0)) {
+                state_operation_duration += rdtsc() - state_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
 
             if (ret) {
+                if (unlikely(start_tsc == 0)) {
+                    start_tsc = rdtsc();
+                }
+
                 work_start_tsc = rdtsc();
                 worked = 1;
 
@@ -244,6 +254,10 @@ public:
                             print_tsc_duration += rdtsc() - demod_start_tsc;
                             
                             demul_cur_frame_++;
+                            if (unlikely(demul_cur_frame_ == cfg->frames_to_test)) {
+                                work_tsc_duration += rdtsc() - work_start_tsc;
+                                break;
+                            }
                         }
                     }
 
@@ -276,6 +290,10 @@ public:
                         rx_status_->precode_done(precode_cur_frame_);
                         state_operation_duration += rdtsc() - precode_start_tsc;
                         precode_cur_frame_ ++;
+                        if (unlikely(precode_cur_frame_ == cfg->frames_to_test)) {
+                            work_tsc_duration += rdtsc() - work_start_tsc;
+                            break;
+                        }
                     }
                 }
                 work_tsc_duration += rdtsc() - work_start_tsc;
