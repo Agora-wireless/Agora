@@ -127,7 +127,7 @@ size_t FrameStats::GetBeaconSymbol(size_t location) const {
 
 size_t FrameStats::GetSymbolIdx(const std::vector<size_t>& search_vector,
                                 size_t symbol_number) {
-  /* Todo Optimize this, probably with a precomputed table -- assumes sorted
+  /* TODO: Optimize this, probably with a precomputed table -- assumes sorted
    * list
    */
   const auto [start, finish] = std::equal_range(
