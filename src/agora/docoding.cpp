@@ -263,6 +263,7 @@ void DoDecode::start_work()
     cur_symbol_ = tid_in_ue_;
 
     size_t start_tsc = rdtsc();
+    size_t work_tsc_duration = 0;
     size_t decode_tsc_duration = 0;
     size_t state_operation_duration = 0;
 
@@ -270,6 +271,7 @@ void DoDecode::start_work()
         if (cur_cb_ > 0
             || decode_status_->received_all_demod_data(
                    ue_id_, cur_frame_, cur_symbol_)) {
+            size_t work_start_tsc = rdtsc();
             // printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id_, cur_frame_, cur_symbol_);
             size_t decode_start_tsc = rdtsc();
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
@@ -289,13 +291,14 @@ void DoDecode::start_work()
                     cur_frame_++;
                 }
             }
+            work_tsc_duration += rdtsc() - work_start_tsc();
         }
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
-    size_t idle_duration = whole_duration - decode_tsc_duration - state_operation_duration;
-    printf("DoSubcarrier Thread %u duration stats: total time used %.2lfms, \
-        decode %.2lfms (%.2lf\%), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%)\n",
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("DoDecode Thread %u duration stats: total time used %.2lfms, "
+        "decode %.2lfms (%.2lf\%), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%)\n",
         tid, cycles_to_ms(whole_duration, freq_ghz),
         cycles_to_ms(decode_tsc_duration, freq_ghz), decode_tsc_duration * 100.0f / whole_duration,
         cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
