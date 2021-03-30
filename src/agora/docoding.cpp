@@ -261,14 +261,21 @@ void DoDecode::start_work()
 {
     printf("Decode for ue %u tid %u starts to work!\n", ue_id_, tid_in_ue_);
     cur_symbol_ = tid_in_ue_;
+
+    size_t start_tsc = rdtsc();
+    size_t decode_tsc_duration = 0;
+    size_t state_operation_duration = 0;
+
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_cb_ > 0
             || decode_status_->received_all_demod_data(
                    ue_id_, cur_frame_, cur_symbol_)) {
             // printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id_, cur_frame_, cur_symbol_);
+            size_t decode_start_tsc = rdtsc();
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                 cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
+            decode_tsc_duration += rdtsc() - decode_start_tsc;
             // printf("Start to decode user %lu frame %lu symbol %lu end\n", ue_id_, cur_frame_, cur_symbol_);
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
@@ -276,10 +283,21 @@ void DoDecode::start_work()
                 cur_symbol_ += cfg->decode_thread_num_per_ue;
                 if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
                     cur_symbol_ = tid_in_ue_;
+                    decode_start_tsc = rdtsc();
                     rx_status_->decode_done(cur_frame_);
+                    state_operation_duration += rdtsc() - decode_start_tsc;
                     cur_frame_++;
                 }
             }
         }
     }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - decode_tsc_duration - state_operation_duration;
+    printf("DoSubcarrier Thread %u duration stats: total time used %.2lfms, \
+        decode %.2lfms (%.2lf\%), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%)\n",
+        cycles_to_ms(whole_duration, freq_ghz),
+        cycles_to_ms(decode_tsc_duration, freq_ghz), decode_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration);
 }

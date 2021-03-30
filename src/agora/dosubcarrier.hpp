@@ -139,24 +139,40 @@ public:
         
         printf("Range [%u:%u] starts to work\n", sc_range_.start, sc_range_.end);
 
+        size_t start_tsc = rdtsc();
+        size_t csi_tsc_duration = 0;
+        size_t zf_tsc_duration = 0;
+        size_t demod_tsc_duration = 0;
+        size_t precode_tsc_duration = 0;
+        size_t print_tsc_duration = 0;
+        size_t state_operation_duration = 0;
+
         while (cfg->running && !SignalHandler::gotExitSignal()) {
             if (rx_status_->received_all_pilots(csi_cur_frame_)) {
+                size_t csi_start_tsc = rdtsc();
                 run_csi(csi_cur_frame_, sc_range_.start);
+                csi_tsc_duration += rdtsc() - csi_start_tsc;
+                csi_start_tsc = rdtsc();
                 printf(
                     "Main thread: pilot frame: %lu, finished CSI for all pilot "
                     "symbols\n",
                     csi_cur_frame_);
+                print_tsc_duration += rdtsc() - csi_start_tsc;
                 csi_cur_frame_++;
             }
 
             if (csi_cur_frame_ > zf_cur_frame_) {
+                size_t zf_start_tsc = rdtsc();
                 do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
                     sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
                                    ._tag);
+                zf_tsc_duration += rdtsc() - zf_start_tsc;
                 n_zf_tasks_done_++;
                 if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
                     n_zf_tasks_done_ = 0;
+                    zf_start_tsc = rdtsc();
                     printf("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
+                    print_tsc_duration += rdtsc() - zf_start_tsc;
                     zf_cur_frame_++;
                 }
             }
@@ -164,10 +180,12 @@ public:
             if (zf_cur_frame_ > demul_cur_frame_
                 && rx_status_->is_demod_ready(
                        demul_cur_frame_, demul_cur_sym_ul_)) {
+                size_t demod_start_tsc = rdtsc();
                 do_demul_->launch(demul_cur_frame_,
                     demul_cur_sym_ul_,
                     sc_range_.start
                         + (n_demul_tasks_done_ * cfg->demul_block_size));
+                demod_tsc_duration += rdtsc() - demod_start_tsc;
 
                 n_demul_tasks_done_++;
                 if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
@@ -190,15 +208,19 @@ public:
                     */
 
                     n_demul_tasks_done_ = 0;
+                    demod_start_tsc = rdtsc();
                     demul_status_->demul_complete(
                         demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_reqd);
+                    state_operation_duration += rdtsc() - demod_start_tsc;
                     demul_cur_sym_ul_++;
                     if (demul_cur_sym_ul_ == cfg->ul_data_symbol_num_perframe) {
                         demul_cur_sym_ul_ = 0;
+                        demod_start_tsc = rdtsc();
                         printf("Main thread: Demodulation done frame: %lu "
                                "(%lu UL symbols)\n",
                             demul_cur_frame_,
                             cfg->ul_data_symbol_num_perframe);
+                        print_tsc_duration += rdtsc() - demod_start_tsc;
                         demul_cur_frame_++;
                     }
                 }
@@ -209,7 +231,9 @@ public:
                 size_t base_sc_id = n_precode_tasks_done_ * cfg->demul_block_size + sc_range_.start;
                 // printf("Precode frame %u symbol %u subcarrier %u\n", precode_cur_frame_, 
                     // precode_cur_sym_dl_, base_sc_id);
+                size_t precode_start_tsc = rdtsc();
                 do_precode_->launch(gen_tag_t::frm_sym_sc(precode_cur_frame_, precode_cur_sym_dl_, base_sc_id)._tag);
+                precode_tsc_duration += rdtsc() - precode_start_tsc;
                 n_precode_tasks_done_ ++;
                 if (n_precode_tasks_done_ == n_precode_tasks_reqd) {
                     n_precode_tasks_done_ = 0;
@@ -220,12 +244,30 @@ public:
                         //        "(%lu UL symbols)\n",
                         //     precode_cur_frame_,
                         //     cfg->dl_data_symbol_num_perframe);
+                        precode_start_tsc = rdtsc();
                         rx_status_->precode_done(precode_cur_frame_);
+                        state_operation_duration += rdtsc() - precode_start_tsc;
                         precode_cur_frame_ ++;
                     }
                 }
             }
         }
+
+        size_t whole_duration = rdtsc() - start_tsc;
+        size_t idle_duration = whole_duration - csi_tsc_duration - zf_tsc_duration -
+            demod_tsc_duration - precode_tsc_duration - print_tsc_duration -
+            state_operation_duration;
+        printf("DoSubcarrier Thread %u duration stats: total time used %.2lfms, \
+            csi %.2lfms (%.2lf\%), zf %.2lfms (%.2lf\%), demod %.2lfms (%.2lf\%), \
+            precode %.2lfms (%.2lf\%), print %.2lfms (%.2lf\%), stating \
+            %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%)\n", cycles_to_ms(whole_duration, freq_ghz),
+            cycles_to_ms(csi_tsc_duration, freq_ghz), csi_tsc_duration * 100.0f / whole_duration,
+            cycles_to_ms(zf_tsc_duration, freq_ghz), zf_tsc_duration * 100.0f / whole_duration,
+            cycles_to_ms(demod_tsc_duration, freq_ghz), demod_tsc_duration * 100.0f / whole_duration, 
+            cycles_to_ms(precode_tsc_duration, freq_ghz), precode_tsc_duration * 100.0f / whole_duration,
+            cycles_to_ms(print_tsc_duration, freq_ghz), print_tsc_duration * 100.0f / whole_duration,
+            cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
+            cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration);
     }
 
 private:
