@@ -4,6 +4,7 @@
  */
 #include "sender.h"
 
+#include <algorithm>
 #include <thread>
 
 #include "datatype_conversion.h"
@@ -42,9 +43,11 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
       inter_frame_delay_(inter_frame_delay),
       ticks_all_(frame_duration_ * ticks_per_usec_ /
                  cfg->Frame().NumTotalSyms()),
-      ticks_wnd1_(200000 /* 200 ms */ * ticks_per_usec_ /
+      ticks_wnd1_((std::max(static_cast<double>(40.0 * frame_duration_),
+                            static_cast<double>(200000.0) /* 200ms */) *
+                   ticks_per_usec_) /
                   cfg->Frame().NumTotalSyms()),
-      ticks_wnd2_(15 * frame_duration_ * ticks_per_usec_ /
+      ticks_wnd2_((15 * frame_duration_ * ticks_per_usec_) /
                   cfg->Frame().NumTotalSyms()),
       ticks_inter_frame_(inter_frame_delay_ * ticks_per_usec_) {
   MLPD_INFO(
@@ -137,6 +140,7 @@ Sender::~Sender() {
     delete (task_ptok_[i]);
   }
   std::free(task_ptok_);
+  MLPD_INFO("Sender: Complete\n");
 }
 
 void Sender::StartTx() {
@@ -144,6 +148,7 @@ void Sender::StartTx() {
   this->frame_end_ = new double[kNumStatsFrames]();
 
   CreateWorkerThreads(socket_thread_num_);
+  signal(SIGINT, InterruptHandler);
   MasterThread(0);  // Start the master thread
 
   delete[](this->frame_start_);
@@ -181,7 +186,6 @@ void Sender::ScheduleSymbol(size_t frame, size_t symbol_id) {
 }
 
 void* Sender::MasterThread(int /*unused*/) {
-  signal(SIGINT, InterruptHandler);
   PinToCoreWithOffset(ThreadType::kMasterTX, core_offset_, 0);
 
   // Wait for all worker threads to be ready (+1 for Master)
@@ -190,8 +194,8 @@ void* Sender::MasterThread(int /*unused*/) {
     // Wait
   }
 
-  this->frame_start_[0] = GetTime::GetTime();
-  double start_time = GetTime::GetTime();
+  double start_time = GetTime::GetTimeUs();
+  this->frame_start_[0] = start_time;
   uint64_t tick_start = GetTime::Rdtsc();
 
   size_t start_symbol = FindNextSymbol(0);
@@ -225,53 +229,63 @@ void* Sender::MasterThread(int /*unused*/) {
 
         size_t next_symbol_id = FindNextSymbol((ctag.symbol_id_ + 1));
         unsigned symbol_delay = next_symbol_id - ctag.symbol_id_;
-        if (kDebugPrintSender == true) {
-          std::printf("Sender: Finishing symbol %d : %zu : %zu delayed %d\n",
-                      ctag.symbol_id_, cfg_->Frame().NumTotalSyms(),
-                      next_symbol_id, symbol_delay);
+        if (kDebugPrintSender) {
+          std::printf(
+              "Sender: Finishing symbol %d, Next Symbol: %zu, Total Symbols: "
+              "%zu, delaying %d\n",
+              ctag.symbol_id_, next_symbol_id, cfg_->Frame().NumTotalSyms(),
+              symbol_delay);
         }
         // Add inter-symbol delay
         DelayTicks(tick_start, GetTicksForFrame(ctag.frame_id_) * symbol_delay);
+        tick_start = GetTime::Rdtsc();
 
         size_t next_frame_id = ctag.frame_id_;
         // Check to see if the current frame is finished
         assert(next_symbol_id <= cfg_->Frame().NumTotalSyms());
         if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
-          if ((kDebugSenderReceiver == true) ||
-              (kDebugPrintPerFrameDone == true)) {
-            std::printf("Sender: Transmitted frame %u in %.2f ms\n",
-                        ctag.frame_id_,
-                        (GetTime::GetTime() - start_time) / 1000.0);
-            start_time = GetTime::GetTime();
-          }
           next_frame_id++;
-          if (next_frame_id == cfg_->FramesToTest()) {
-            break;  // Finished
-          }
-          this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] =
-              GetTime::GetTime();
-          // Add inter-frame delay
-          DelayTicks(GetTime::Rdtsc(), ticks_inter_frame_);
-          this->frame_start_[(next_frame_id % kNumStatsFrames)] =
-              GetTime::GetTime();
 
           // Find start symbol of next frame and add proper delay
           next_symbol_id = FindNextSymbol(0);
-          if (kDebugPrintSender == true) {
+          if ((kDebugSenderReceiver == true) ||
+              (kDebugPrintPerFrameDone == true)) {
+            double timeus_now = GetTime::GetTimeUs();
             std::printf(
-                "Sender -- finished frame %d, next frame %zu, start symbol "
-                "%zu, "
-                "delaying\n",
-                ctag.frame_id_, next_frame_id, next_symbol_id);
+                "Sender: Tx frame %d in %.2f ms, next frame %zu, start symbol "
+                "%zu\n",
+                ctag.frame_id_, (timeus_now - start_time) / 1000.0,
+                next_frame_id, next_symbol_id);
+            start_time = timeus_now;
           }
-          DelayTicks(GetTime::Rdtsc(),
-                     GetTicksForFrame(ctag.frame_id_) * next_symbol_id);
-        }
+
+          if (next_frame_id == cfg_->FramesToTest()) {
+            keep_running.store(false);
+            break; /* Finished */
+          } else {
+            // Set end of frame time to the time after the last symbol
+            this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = tick_start;
+
+            // Wait for the inter-frame delay
+            DelayTicks(tick_start, ticks_inter_frame_);
+
+            tick_start = GetTime::GetTimeUs();
+
+            // Set the frame start time to the start time of the frame
+            // (independant of symbol type)
+            this->frame_start_[(next_frame_id % kNumStatsFrames)] = tick_start;
+
+            // Wait until the first tx symbol
+            DelayTicks(tick_start,
+                       (GetTicksForFrame(ctag.frame_id_) * next_symbol_id));
+          }
+        }  // if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
         tick_start = GetTime::Rdtsc();
         ScheduleSymbol(next_frame_id, next_symbol_id);
       }
     }  // end (ret > 0)
   }
+  std::printf("Sender main thread exit\n");
   WriteStatsToFile(cfg_->FramesToTest());
   return nullptr;
 }
@@ -316,7 +330,7 @@ void* Sender::WorkerThread(int tid) {
   auto* socks_pkt_buf = static_cast<Packet*>(PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign32, cfg_->PacketLength()));
 
-  double begin = GetTime::GetTime();
+  double begin = GetTime::GetTimeUs();
   size_t total_tx_packets = 0;
   size_t total_tx_packets_rolling = 0;
   size_t cur_radio = radio_lo;
@@ -353,7 +367,7 @@ void* Sender::WorkerThread(int tid) {
             rte_pktmbuf_mtod(tx_mbufs[tag_id], uint8_t*) + kPayloadOffset);
 #endif
 
-        if ((kDebugPrintSender == true) || (kDebugSenderReceiver == true)) {
+        if ((kDebugPrintSender == true)) {
           std::printf(
               "Sender : worker %d processing frame %d symbol %d, type %d\n",
               tid, tag.frame_id_, tag.symbol_id_,
@@ -382,8 +396,7 @@ void* Sender::WorkerThread(int tid) {
         if (kDebugSenderReceiver == true) {
           std::printf(
               "Thread %d (tag = %s) transmit frame %d, symbol %d, ant "
-              "%d, "
-              "TX time: %.3f us\n",
+              "%d, TX time: %.3f us\n",
               tid, gen_tag_t(tag).ToString().c_str(), pkt->frame_id_,
               pkt->symbol_id_, pkt->ant_id_,
               GetTime::CyclesToUs(GetTime::Rdtsc() - start_tsc_send,
@@ -394,7 +407,7 @@ void* Sender::WorkerThread(int tid) {
         total_tx_packets++;
         if (total_tx_packets_rolling ==
             ant_num_this_thread * max_symbol_id * 1000) {
-          double end = GetTime::GetTime();
+          double end = GetTime::GetTimeUs();
           double byte_len = cfg_->PacketLength() * ant_num_this_thread *
                             max_symbol_id * 1000.f;
           double diff = end - begin;
@@ -402,7 +415,7 @@ void* Sender::WorkerThread(int tid) {
                       (size_t)tid,
                       total_tx_packets / (ant_num_this_thread * max_symbol_id),
                       diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
-          begin = GetTime::GetTime();
+          begin = GetTime::GetTimeUs();
           total_tx_packets_rolling = 0;
         }
 
@@ -433,6 +446,7 @@ void* Sender::WorkerThread(int tid) {
   std::free(static_cast<void*>(socks_pkt_buf));
   std::free(static_cast<void*>(fft_inout));
   MLPD_FRAME("Sender: worker thread %d exit\n", tid);
+  std::printf("Sender: worker thread %d exit\n", tid);
   return nullptr;
 }
 

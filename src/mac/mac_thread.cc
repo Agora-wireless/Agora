@@ -213,8 +213,8 @@ void MacThread::SendControlInformation() {
 
 void MacThread::ProcessControlInformation() {
   std::memset(&udp_control_buf_[0], 0, udp_control_buf_.size());
-  ssize_t ret = udp_control_channel_->RecvNonblocking(&udp_control_buf_[0],
-                                                      udp_control_buf_.size());
+  ssize_t ret =
+      udp_control_channel_->Recv(&udp_control_buf_[0], udp_control_buf_.size());
   if (ret == 0) {
     return;  // No data received
   } else if (ret == -1) {
@@ -231,8 +231,7 @@ void MacThread::ProcessControlInformation() {
 
 void MacThread::ProcessUdpPacketsFromApps(RBIndicator ri) {
   std::memset(&udp_pkt_buf_[0], 0, udp_pkt_buf_.size());
-  ssize_t ret =
-      udp_server_->RecvNonblocking(&udp_pkt_buf_[0], udp_pkt_buf_.size());
+  ssize_t ret = udp_server_->Recv(&udp_pkt_buf_[0], udp_pkt_buf_.size());
   if (ret == 0) {
     return;  // No data received
   } else if (ret == -1) {
