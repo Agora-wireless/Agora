@@ -27,16 +27,16 @@ int main(int argc, char const* argv[]) {
     std::printf("Arguments set to default: 4, 22, 5000, %s\n",
                 conf_file.c_str());
   }
-  auto* cfg = new Config(conf_file.c_str());
+  auto cfg = std::make_unique<Config>(conf_file.c_str());
   cfg->GenData();
-  Simulator* simulator;
   int ret;
   try {
     SignalHandler signal_handler;
 
     // Register signal handler to handle kill signal
     signal_handler.SetupSignalHandlers();
-    simulator = new Simulator(cfg, thread_num, core_offset, delay);
+    auto simulator =
+        std::make_unique<Simulator>(cfg.get(), thread_num, core_offset, delay);
     simulator->Start();
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {

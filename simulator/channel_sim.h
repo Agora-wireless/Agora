@@ -5,9 +5,6 @@
 #ifndef CHANNEL_SIM_H_
 #define CHANNEL_SIM_H_
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 
 #include <algorithm>
@@ -22,7 +19,6 @@
 #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
-#include "net.h"
 #include "signal_handler.h"
 #include "symbols.h"
 #include "udp_client.h"
@@ -66,15 +62,19 @@ class ChannelSim {
  private:
   void DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
             std::vector<char>& tx_buffer, size_t buffer_offset,
-            std::vector<int>& send_socket,
-            std::vector<struct sockaddr_in>& servaddr,
+            std::vector<std::unique_ptr<UDPClient>>& udp_clients,
+            const std::string& dest_address, size_t dest_port,
             arma::cx_fmat& format_dest);
 
-  std::vector<struct sockaddr_in> servaddr_bs_;  // BS-facing server
-                                                 // addresses
-  std::vector<int> socket_bs_;                   // BS-facing sockets
-  std::vector<struct sockaddr_in> servaddr_ue_;  // UE-facing server addresses
-  std::vector<int> socket_ue_;                   // UE-facing sockets
+  // BS-facing sending clients
+  std::vector<std::unique_ptr<UDPClient>> client_bs_;
+  // BS-facing sockets
+  std::vector<std::unique_ptr<UDPServer>> server_bs_;
+
+  // UE-facing sending clients
+  std::vector<std::unique_ptr<UDPClient>> client_ue_;
+  // UE-facing sockets
+  std::vector<std::unique_ptr<UDPServer>> server_ue_;
 
   const Config* const bscfg_;
   const Config* const uecfg_;
@@ -123,7 +123,7 @@ class ChannelSim {
   std::array<size_t, kFrameWnd> bs_tx_counter_;
   std::array<size_t, kFrameWnd> user_tx_counter_;
 
-  inline size_t GetDlSymbolIdx(size_t /*frame_id*/, size_t symbol_id) const {
+  inline size_t GetDlSymbolIdx(size_t symbol_id) const {
     if (symbol_id == 0) {
       return 0;
     } else {

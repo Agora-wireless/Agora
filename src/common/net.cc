@@ -22,9 +22,7 @@ void SetSocketBufSize(int socket_local, int sock_buf_size) {
 
 int SetupSocketIpv4(int port_id, bool set_sock_size, int sock_buf_size) {
   struct sockaddr_in local_addr;
-  local_addr.sin_family = AF_INET;
-  local_addr.sin_port = htons(port_id);
-  local_addr.sin_addr.s_addr = INADDR_ANY;
+  SetupSockaddrLocalIpv4(&local_addr, port_id);
 
   int socket_local;
   if ((socket_local = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {  // UDP socket
