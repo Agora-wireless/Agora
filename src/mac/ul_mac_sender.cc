@@ -15,6 +15,7 @@
 
 static constexpr bool kDebugPrintSender = true;
 static constexpr size_t kFrameLoadAdvance = 10;
+static constexpr size_t kBufferInit = 10;
 
 static std::atomic<bool> keep_running = true;
 // A spinning barrier to synchronize the start of worker threads
@@ -216,11 +217,13 @@ void* UlMacSender::MasterThread(size_t /*unused*/) {
           keep_running.store(false);
           break; /* Finished */
         } else {
+          this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = tick_start;
           // Wait frame ticks to send the next frame
+          DelayTicks(tick_start, ticks_inter_frame_);
+          tick_start = GetTime::GetTimeUs();
           DelayTicks(tick_start, (GetTicksForFrame(ctag.frame_id_) *
-                                  cfg_->Frame().NumTotalSyms()) +
-                                     ticks_inter_frame_);
-          // Set the frame start time to the time of the first tx schedule (now)
+                                  cfg_->Frame().NumTotalSyms()));
+          // Set the frame start time to the start of next frame (now)
           this->frame_start_[(next_frame_id % kNumStatsFrames)] =
               GetTime::GetTimeUs();
         }
@@ -353,15 +356,31 @@ void UlMacSender::CreateWorkerThreads(size_t num_workers) {
 
 /* Single threaded file reader to load a shared data structure */
 void* UlMacSender::DataUpdateThread(size_t tid) {
+  size_t buffer_updates = 0;
+
   // Sender gets better performance when this thread is not pinned to core
   // PinToCoreWithOffset(ThreadType::kWorker, 13, 0);
-  std::printf("Data update thread running on core %d\n", sched_getcpu());
-  MLPD_INFO("UlMacSender: Data update thread %zu\n", tid);
+  MLPD_INFO("UlMacSender: Data update thread %zu running on core %d\n", tid,
+            sched_getcpu());
   std::ifstream tx_file;
   tx_file.open(data_filename_, (std::ifstream::in | std::ifstream::binary));
   assert(tx_file.is_open() == true);
-  num_workers_ready_atomic.fetch_add(1);
 
+  // Init the data buffers
+  while ((keep_running.load() == true) && (buffer_updates <= kBufferInit)) {
+    size_t tag = 0;
+    if (data_update_queue_.try_dequeue(tag) == true) {
+      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+        auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
+                                              ((gen_tag_t)tag).symbol_id_, i);
+        UpdateTxBuffer(tx_file, tag_for_ue);
+        buffer_updates++;
+      }
+    }
+  }
+  // Unlock the rest of the workers
+  num_workers_ready_atomic.fetch_add(1);
+  // Normal run loop
   while (keep_running.load() == true) {
     size_t tag = 0;
     if (data_update_queue_.try_dequeue(tag) == true) {
