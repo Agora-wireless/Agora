@@ -280,6 +280,8 @@ public:
                 }
                 work_tsc_duration += rdtsc() - work_start_tsc;
             }
+
+            work_count += worked;
         }
 
         size_t whole_duration = rdtsc() - start_tsc;
