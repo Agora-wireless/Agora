@@ -526,14 +526,8 @@ void Sender::WriteStatsToFile(size_t tx_frame_count) const {
   std::printf("Printing sender results to file \"%s\"...\n", filename.c_str());
   FILE* fp_debug = std::fopen(filename.c_str(), "w");
   RtAssert(fp_debug != nullptr, "Failed to open stats file");
-  for (size_t i = 1; i < tx_frame_count; i++) {
-    std::fprintf(
-        fp_debug, "%.5f, %.5f, %.5f\n",
-        frame_end_[(i - 1) % kNumStatsFrames] -
-            frame_start_[(i - 1) % kNumStatsFrames],
-        frame_end_[i % kNumStatsFrames] - frame_end_[(i - 1) % kNumStatsFrames],
-        frame_start_[i % kNumStatsFrames] -
-            frame_start_[(i - 1) % kNumStatsFrames]);
+  for (size_t i = 0; i < tx_frame_count; i++) {
+    std::fprintf(fp_debug, "%.5f\n", frame_end_[i % kNumStatsFrames]);
   }
 }
 
