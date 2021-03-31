@@ -5,10 +5,8 @@
 #ifndef SENDER_H_
 #define SENDER_H_
 
-#include <arpa/inet.h>
 #include <emmintrin.h>
 #include <immintrin.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -26,7 +24,6 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include "mkl_dfti.h"
-#include "net.h"
 #include "symbols.h"
 #include "utils.h"
 

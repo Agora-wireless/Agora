@@ -12,7 +12,6 @@
 #include "config.h"
 #include "crc.h"
 #include "gettime.h"
-#include "net.h"
 #include "ran_config.h"
 #include "symbols.h"
 #include "udp_client.h"

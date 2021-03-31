@@ -5,11 +5,6 @@
 #ifndef RECEIVER_H_
 #define RECEIVER_H_
 
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -26,7 +21,6 @@
 #include "concurrentqueue.h"
 #include "config.h"
 #include "gettime.h"
-#include "net.h"
 #include "symbols.h"
 
 using ushort = unsigned short;
@@ -84,7 +78,6 @@ class Receiver {
   moodycamel::ProducerToken** rx_ptoks_;
   size_t core_id_;
   Config* cfg_;
-  // int radios_per_thread;
 };
 
 #endif  // RECEIVER_H_
