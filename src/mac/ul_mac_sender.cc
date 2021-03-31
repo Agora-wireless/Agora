@@ -73,7 +73,7 @@ UlMacSender::UlMacSender(Config* cfg, std::string& data_filename,
                      (cfg_->MacPacketsPerframe() *
                       (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
                      Agora_memory::Alignment_t::kAlign64);
-  std::printf(
+  MLPD_TRACE(
       "Tx buffer size: dim1 %zu, dim2 %zu, total %zu, start %zu, end: %zu\n",
       (kFrameWnd * cfg_->UeAntNum()),
       (cfg_->MacPacketsPerframe() *
@@ -179,9 +179,13 @@ void* UlMacSender::MasterThread(size_t /*unused*/) {
       (cfg_->Frame().NumULSyms() - cfg_->Frame().ClientUlPilotSymbols()) > 0,
       "UlMacSender: No valid symbols to transmit");
 
-  double start_time = GetTime::GetTimeUs();
-  this->frame_start_[0] = start_time;
+  double timestamp_us = GetTime::GetTimeUs();
   uint64_t tick_start = GetTime::Rdtsc();
+  double frame_start_us = timestamp_us;
+  double frame_end_us = 0;
+  this->frame_start_[0] =
+      timestamp_us -
+      ((cfg_->Frame().NumTotalSyms() * GetTicksForFrame(0)) / ticks_per_usec_);
 
   ScheduleFrame(0);
   LoadFrame(0 + kFrameLoadAdvance);
@@ -200,41 +204,45 @@ void* UlMacSender::MasterThread(size_t /*unused*/) {
       }
       // Check to see if the current frame is finished (UeNum / UeAntNum)
       if (frame_data_count.at(comp_frame_slot) == cfg_->UeAntNum()) {
+        frame_end_us = timestamp_us;
         // Finished with the current frame data
         frame_data_count.at(comp_frame_slot) = 0;
 
         size_t next_frame_id = ctag.frame_id_ + 1;
         if ((kDebugSenderReceiver == true) ||
             (kDebugPrintPerFrameDone == true)) {
-          double timeus_now = GetTime::GetTimeUs();
           std::printf("UlMacSender: Tx frame %d in %.2f ms, next frame %zu\n",
-                      ctag.frame_id_, (timeus_now - start_time) / 1000.0,
+                      ctag.frame_id_, (frame_end_us - frame_start_us) / 1000.0,
                       next_frame_id);
-          start_time = timeus_now;
         }
+        this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = frame_end_us;
 
         if (next_frame_id == cfg_->FramesToTest()) {
           keep_running.store(false);
           break; /* Finished */
         } else {
-          this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = tick_start;
-          // Wait frame ticks to send the next frame
+          // Wait the interframe tick time
           DelayTicks(tick_start, ticks_inter_frame_);
-          tick_start = GetTime::GetTimeUs();
-          DelayTicks(tick_start, (GetTicksForFrame(ctag.frame_id_) *
-                                  cfg_->Frame().NumTotalSyms()));
+          tick_start += ticks_inter_frame_;
+          frame_start_us = GetTime::GetTimeUs();
           // Set the frame start time to the start of next frame (now)
           this->frame_start_[(next_frame_id % kNumStatsFrames)] =
-              GetTime::GetTimeUs();
+              frame_start_us;
+          // Wait frame ticks to send the next frame
+          DelayTicks(tick_start, GetTicksForFrame(ctag.frame_id_) *
+                                     cfg_->Frame().NumTotalSyms());
+          tick_start +=
+              (GetTicksForFrame(ctag.frame_id_) * cfg_->Frame().NumTotalSyms());
+          // Save the scheduled time to apply for the end of the frame
+          timestamp_us = GetTime::GetTimeUs();
+          ScheduleFrame(next_frame_id);
+          LoadFrame(next_frame_id + kFrameLoadAdvance);
         }
-        tick_start = GetTime::Rdtsc();
-        ScheduleFrame(next_frame_id);
-        LoadFrame(next_frame_id + kFrameLoadAdvance);
       }
     }  // end (ret > 0)
   }
   std::printf("UlMacSender: main thread exit\n");
-  // WriteStatsToFile(cfg_->FramesToTest());
+  WriteStatsToFile(cfg_->FramesToTest());
   return nullptr;
 }
 
@@ -436,10 +444,15 @@ void UlMacSender::WriteStatsToFile(size_t tx_frame_count) const {
   std::ofstream debug_file;
   debug_file.open(filename, std::ifstream::out);
   debug_file.setf(std::ios::fixed, std::ios::floatfield);
-  debug_file.precision(5);
+  debug_file.precision(2);
 
   RtAssert(debug_file.is_open() == true, "Failed to open stats file");
   for (size_t i = 0; i < tx_frame_count; i++) {
-    debug_file << frame_end_[i % kNumStatsFrames] << std::endl;
+    debug_file << "Frame " << i
+               << " Start: " << frame_start_[i % kNumStatsFrames]
+               << " End: " << frame_end_[i % kNumStatsFrames] << " Time: "
+               << (frame_end_[i % kNumStatsFrames] -
+                   frame_start_[i % kNumStatsFrames])
+               << std::endl;
   }
 }
