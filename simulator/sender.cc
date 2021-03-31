@@ -194,17 +194,20 @@ void* Sender::MasterThread(int /*unused*/) {
     // Wait
   }
 
-  double start_time = GetTime::GetTimeUs();
-  this->frame_start_[0] = start_time;
+  double timestamp_us = GetTime::GetTimeUs();
   uint64_t tick_start = GetTime::Rdtsc();
 
+  double frame_start_us = timestamp_us;
+  double frame_end_us = 0;
+  this->frame_start_[0] = frame_start_us;
+
   size_t start_symbol = FindNextSymbol(0);
-  // Delay until the start of the first symbol (pilot)
+  // Delay until the start of the first symbol
   if (start_symbol > 0) {
     MLPD_INFO("Sender: Starting symbol %zu delaying\n", start_symbol);
     DelayTicks(tick_start, GetTicksForFrame(0) * start_symbol);
+    tick_start = tick_start + (GetTicksForFrame(0) * start_symbol);
   }
-  tick_start = GetTime::Rdtsc();
   RtAssert(start_symbol != cfg_->Frame().NumTotalSyms(),
            "Sender: No valid symbols to transmit");
   ScheduleSymbol(0, start_symbol);
@@ -238,49 +241,55 @@ void* Sender::MasterThread(int /*unused*/) {
         }
         // Add inter-symbol delay
         DelayTicks(tick_start, GetTicksForFrame(ctag.frame_id_) * symbol_delay);
-        tick_start = GetTime::Rdtsc();
+        tick_start += (GetTicksForFrame(ctag.frame_id_) * symbol_delay);
 
         size_t next_frame_id = ctag.frame_id_;
         // Check to see if the current frame is finished
         assert(next_symbol_id <= cfg_->Frame().NumTotalSyms());
         if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
+          // Set the end time to time the last symbol was scheduled
+          // to get entire frame length it will be necessary to add another
+          // symbol time or take start(frame+1) - start(frame)
+          frame_end_us = timestamp_us;
           next_frame_id++;
 
           // Find start symbol of next frame and add proper delay
           next_symbol_id = FindNextSymbol(0);
           if ((kDebugSenderReceiver == true) ||
               (kDebugPrintPerFrameDone == true)) {
-            double timeus_now = GetTime::GetTimeUs();
             std::printf(
                 "Sender: Tx frame %d in %.2f ms, next frame %zu, start symbol "
                 "%zu\n",
-                ctag.frame_id_, (timeus_now - start_time) / 1000.0,
+                ctag.frame_id_, (frame_end_us - frame_start_us) / 1000.0,
                 next_frame_id, next_symbol_id);
-            start_time = timeus_now;
           }
+          // Set end of frame time to the time after the last symbol
+          this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = frame_end_us;
 
           if (next_frame_id == cfg_->FramesToTest()) {
             keep_running.store(false);
             break; /* Finished */
           } else {
-            // Set end of frame time to the time after the last symbol
-            this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = tick_start;
-
             // Wait for the inter-frame delay
             DelayTicks(tick_start, ticks_inter_frame_);
-
-            tick_start = GetTime::GetTimeUs();
+            tick_start += ticks_inter_frame_;
+            frame_start_us = GetTime::GetTimeUs();
 
             // Set the frame start time to the start time of the frame
             // (independant of symbol type)
-            this->frame_start_[(next_frame_id % kNumStatsFrames)] = tick_start;
+            this->frame_start_[(next_frame_id % kNumStatsFrames)] =
+                frame_start_us;
 
             // Wait until the first tx symbol
             DelayTicks(tick_start,
                        (GetTicksForFrame(ctag.frame_id_) * next_symbol_id));
+            tick_start += (GetTicksForFrame(ctag.frame_id_) * next_symbol_id);
           }
         }  // if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
-        tick_start = GetTime::Rdtsc();
+        else {
+          // Save schedule time of this symbol
+          timestamp_us = GetTime::GetTimeUs();
+        }
         ScheduleSymbol(next_frame_id, next_symbol_id);
       }
     }  // end (ret > 0)
@@ -517,8 +526,14 @@ void Sender::WriteStatsToFile(size_t tx_frame_count) const {
   std::printf("Printing sender results to file \"%s\"...\n", filename.c_str());
   FILE* fp_debug = std::fopen(filename.c_str(), "w");
   RtAssert(fp_debug != nullptr, "Failed to open stats file");
-  for (size_t i = 0; i < tx_frame_count; i++) {
-    std::fprintf(fp_debug, "%.5f\n", frame_end_[i % kNumStatsFrames]);
+  for (size_t i = 1; i < tx_frame_count; i++) {
+    std::fprintf(
+        fp_debug, "%.5f, %.5f, %.5f\n",
+        frame_end_[(i - 1) % kNumStatsFrames] -
+            frame_start_[(i - 1) % kNumStatsFrames],
+        frame_end_[i % kNumStatsFrames] - frame_end_[(i - 1) % kNumStatsFrames],
+        frame_start_[i % kNumStatsFrames] -
+            frame_start_[(i - 1) % kNumStatsFrames]);
   }
 }
 
