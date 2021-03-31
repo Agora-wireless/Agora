@@ -194,10 +194,8 @@ void* Sender::MasterThread(int /*unused*/) {
     // Wait
   }
 
-  double timestamp_us = GetTime::GetTimeUs();
   uint64_t tick_start = GetTime::Rdtsc();
-
-  double frame_start_us = timestamp_us;
+  double frame_start_us = GetTime::GetTimeUs();
   double frame_end_us = 0;
   this->frame_start_[0] = frame_start_us;
 
@@ -247,10 +245,9 @@ void* Sender::MasterThread(int /*unused*/) {
         // Check to see if the current frame is finished
         assert(next_symbol_id <= cfg_->Frame().NumTotalSyms());
         if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
-          // Set the end time to time the last symbol was scheduled
-          // to get entire frame length it will be necessary to add another
-          // symbol time or take start(frame+1) - start(frame)
-          frame_end_us = timestamp_us;
+          // Set the end time to time to when the last symbol was completed by
+          // the workers (now)
+          frame_end_us = GetTime::GetTimeUs();
           next_frame_id++;
 
           // Find start symbol of next frame and add proper delay
@@ -286,10 +283,6 @@ void* Sender::MasterThread(int /*unused*/) {
             tick_start += (GetTicksForFrame(ctag.frame_id_) * next_symbol_id);
           }
         }  // if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
-        else {
-          // Save schedule time of this symbol
-          timestamp_us = GetTime::GetTimeUs();
-        }
         ScheduleSymbol(next_frame_id, next_symbol_id);
       }
     }  // end (ret > 0)
