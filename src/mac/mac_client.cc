@@ -1,6 +1,7 @@
 /**
- * @file sender_cli.cc
- * @brief Main file for the sender executable
+ * @file mac_client.cc
+ * @brief Main file for the mac client executable. This will send data to the
+ * mac thread of the UE.
  */
 #include <gflags/gflags.h>
 

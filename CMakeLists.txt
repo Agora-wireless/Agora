@@ -142,9 +142,9 @@ endif()
 set(MAC_CLIENT_SOURCES
   src/mac/ul_mac_sender.cc
   src/mac/mac_client.cc)
-#set(MAC_BS_SOURCES
-#  src/mac/simple_mac_bs.cpp
-#  src/mac/mac_bs_main.cpp)
+set(MAC_BS_SOURCES
+  src/mac/ul_mac_receiver.cc
+  src/mac/mac_basestation.cc)
 
 # Argos support
 if(${USE_ARGOS})
@@ -326,6 +326,11 @@ add_executable(macuser
      ${MAC_CLIENT_SOURCES}
      ${COMMON_SOURCES})
 target_link_libraries(macuser ${COMMON_LIBS})
+
+add_executable(macbs
+     ${MAC_BS_SOURCES}
+     ${COMMON_SOURCES})
+target_link_libraries(macbs ${COMMON_LIBS})
 
 
 # End-to-end test
