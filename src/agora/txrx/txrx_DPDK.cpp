@@ -169,14 +169,42 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
 void* PacketTXRX::demod_thread(int tid) 
 {
     std::vector<uint8_t> recv_buf(cfg->packet_length);
+    size_t freq_ghz = measure_rdtsc_freq();
 
     printf("Demodulation TX/RX thread\n");
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
 
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t send_tsc_duration = 0;
+    size_t recv_tsc_duration = 0;
+    size_t loop_count = 0;
+    size_t work_count = 0;
+    
+    size_t work_start_tsc, send_start_tsc, recv_start_tsc, 
+        send_end_tsc, recv_end_tsc;
+    size_t worked;
+
     while (cfg->running) {
+
+        if (likely(start_tsc > 0)) {
+            loop_count ++;
+        }
+
+        worked = 0;
+
         // 1. Try to send demodulated data to decoders
         if (demul_status_->ready_to_decode(
                 demod_frame_to_send_, demod_symbol_ul_to_send_)) {
+
+            if (unlikely(start_tsc == 0)) {
+                start_tsc = rdtsc();
+            }
+            
+            work_start_tsc = rdtsc();
+            send_start_tsc = work_start_tsc;
+            worked = 1;
+
             for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
                 int8_t* demod_ptr = &(*demod_buffers_)[demod_frame_to_send_
                     % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->bs_server_addr_idx * cfg->get_num_sc_per_server()];
@@ -223,13 +251,28 @@ void* PacketTXRX::demod_thread(int tid)
                 demod_symbol_ul_to_send_ = 0;
                 demod_frame_to_send_++;
             }
+
+            send_end_tsc = rdtsc();
+            send_tsc_duration += send_end_tsc - send_start_tsc;
+            work_tsc_duration += send_end_tsc - work_start_tsc;
         }
 
         // 2. Try to receive demodulated data for decoding
         rte_mbuf* rx_bufs[kRxBatchSize];
         uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
-        if (unlikely(nb_rx == 0))
+        if (unlikely(nb_rx == 0)) {
+            work_count += worked;
             continue;
+        }
+
+        if (unlikely(start_tsc == 0)) {
+            start_tsc = rdtsc();
+        }
+
+        work_start_tsc = rdtsc();
+        recv_start_tsc = work_start_tsc;
+
+        work_count ++;
 
         for (size_t i = 0; i < nb_rx; i++) {
             // printf("Received packet!\n");
@@ -284,7 +327,22 @@ void* PacketTXRX::demod_thread(int tid)
 
             rte_pktmbuf_free(rx_bufs[i]);
         }
+
+        recv_end_tsc = rdtsc();
+        recv_tsc_duration += recv_end_tsc - recv_start_tsc;
+        work_tsc_duration += recv_end_tsc - work_start_tsc;
     }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("Demod Thread duration stats: total time used %.2lfms, "
+        "send %.2lfms (%.2lf\%), recv %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
+        "working proportions (%u/%u: %.2lf\%)\n",
+        cycles_to_ms(whole_duration, freq_ghz),
+        cycles_to_ms(send_tsc_duration, freq_ghz), send_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(recv_tsc_duration, freq_ghz), recv_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
+        work_count, loop_count, work_count * 100.0f / loop_count);
 
     return 0;
 }
