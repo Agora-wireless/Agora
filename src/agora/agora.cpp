@@ -52,7 +52,7 @@ Agora::Agora(Config* cfg)
 
     /* Create worker threads */
     do_subcarrier_threads_.resize(
-        cfg->get_num_sc_per_server() / cfg->subcarrier_block_size);
+        (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
 
     for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
         do_subcarrier_threads_[i]
@@ -170,9 +170,14 @@ void* Agora::subcarrier_worker(int tid)
     pin_to_core_with_offset(
         ThreadType::kWorkerSubcarrier, base_worker_core_offset + 1, tid);
 
+    Range sc_range(tid * config_->subcarrier_block_size + 
+        config_->bs_server_addr_idx * config_->get_num_sc_per_server(),
+        min((tid + 1) * config_->subcarrier_block_size + 
+        config_->bs_server_addr_idx * config_->get_num_sc_per_server(), 
+        (config_->bs_server_addr_idx + 1) * config_->get_num_sc_per_server()));
+
     auto computeSubcarrier = new DoSubcarrier(config_, tid, freq_ghz,
-        Range(tid * config_->subcarrier_block_size + config_->bs_server_addr_idx * config_->get_num_sc_per_server(),
-            (tid + 1) * config_->subcarrier_block_size + config_->bs_server_addr_idx * config_->get_num_sc_per_server()),
+        sc_range,
         socket_buffer_, csi_buffers_, calib_buffer_,
         dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
         ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
@@ -185,10 +190,15 @@ void* Agora::subcarrier_worker(int tid)
 
 void* Agora::decode_worker(int tid)
 {
+<<<<<<< HEAD
     pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset + 1,
         tid
             + config_->get_num_sc_per_server()
                 / config_->subcarrier_block_size);
+=======
+    pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset + 1,
+        tid + do_subcarrier_threads_.size());
+>>>>>>> bc7ee9dd9a270a16258083733b17ae9b93b486ff
 
     auto computeDecoding = new DoDecode(config_, tid, freq_ghz,
         demod_buffers_, demod_soft_buffer_to_decode_,
@@ -202,9 +212,7 @@ void* Agora::decode_worker(int tid)
 void* Agora::encode_worker(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset + 1,
-        tid
-            + config_->get_num_sc_per_server()
-                / config_->subcarrier_block_size);
+        tid + do_subcarrier_threads_.size());
 
     auto computeEncoding = new DoEncode(config_, tid, freq_ghz,
         config_->dl_bits, dl_encoded_buffer_, stats, &rx_status_, &encode_status_);

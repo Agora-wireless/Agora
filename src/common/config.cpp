@@ -231,8 +231,8 @@ Config::Config(std::string jsonfile)
         = OFDM_DATA_START + bs_server_addr_idx * get_num_sc_per_server();
     subcarrier_end
         = OFDM_DATA_START + (bs_server_addr_idx + 1) * get_num_sc_per_server();
-    rt_assert(get_num_sc_per_server() % subcarrier_block_size == 0,
-        "Invalid subcarrier range and subcarrier block size!");
+    // rt_assert(get_num_sc_per_server() % subcarrier_block_size == 0,
+    //     "Invalid subcarrier range and subcarrier block size!");
     ue_start = bs_server_addr_idx < UE_NUM % bs_server_addr_list.size()
         ? bs_server_addr_idx * (UE_NUM / bs_server_addr_list.size() + 1)
         : UE_NUM
