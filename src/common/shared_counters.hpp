@@ -32,10 +32,10 @@ public:
         if (pkt->frame_id >= cur_frame_ + kFrameWnd) {
             MLPD_ERROR(
                 "SharedCounters RxStatus error: Received packet for future "
-                "frame %u beyond frame window (%zu + %zu). This can "
+                "frame %u beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u). This can "
                 "happen if Agora is running slowly, e.g., in debug mode. "
                 "Full packet = %s.\n",
-                pkt->frame_id, cur_frame_, kFrameWnd, pkt->to_string().c_str());
+                pkt->frame_id, cur_frame_, kFrameWnd, cur_frame_, num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), pkt->to_string().c_str());
             return false;
         }
 
