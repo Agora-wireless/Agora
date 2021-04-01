@@ -190,15 +190,8 @@ void* Agora::subcarrier_worker(int tid)
 
 void* Agora::decode_worker(int tid)
 {
-<<<<<<< HEAD
-    pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset + 1,
-        tid
-            + config_->get_num_sc_per_server()
-                / config_->subcarrier_block_size);
-=======
     pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset + 1,
         tid + do_subcarrier_threads_.size());
->>>>>>> bc7ee9dd9a270a16258083733b17ae9b93b486ff
 
     auto computeDecoding = new DoDecode(config_, tid, freq_ghz,
         demod_buffers_, demod_soft_buffer_to_decode_,
