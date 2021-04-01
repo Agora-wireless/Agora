@@ -20,7 +20,7 @@ public:
         , num_ul_data_symbol_per_frame_(cfg->ul_data_symbol_num_perframe)
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
         , num_decode_tasks_per_frame_(cfg->get_num_ues_to_process() * cfg->decode_thread_num_per_ue)
-        , num_precode_tasks_per_frame_(cfg->get_num_sc_per_server() / cfg->subcarrier_block_size)
+        , num_precode_tasks_per_frame_((cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
         , last_frame_cycles_(worker_rdtsc())
         , freq_ghz_(measure_rdtsc_freq())
     {
