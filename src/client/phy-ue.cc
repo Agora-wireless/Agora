@@ -536,8 +536,8 @@ void PhyUe::Start() {
           if (kDebugPrintPerFrameDone) {
             std::printf(
                 "Main thread: finished TX for frame %zu, "
-                "user %zu\n",
-                frame_id, ue_id);
+                "user %zu at %f\n",
+                frame_id, ue_id, (GetTime::GetTimeUs() / 1000.0f));
           }
         } break;
 

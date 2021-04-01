@@ -243,12 +243,11 @@ void MacThread::ProcessUdpPacketsFromApps(RBIndicator ri) {
       return;  // No data received
     } else if (ret < 0) {
       // There was an error in receiving
-      std::printf("MacThread: Error in receiption %zu\n", ret);
+      MLPD_ERROR("MacThread: Error in receiption %zu\n", ret);
       cfg_->Running(false);
       return;
     } else {
-      std::printf("MacThread: Received %zu : %zu bytes\n", ret,
-                  rx_request_size);
+      MLPD_FRAME("MacThread: Received %zu : %zu bytes\n", ret, rx_request_size);
       rx_bytes += ret;
       if (rx_bytes == udp_pkt_buf_.size()) {
         break;
@@ -258,8 +257,10 @@ void MacThread::ProcessUdpPacketsFromApps(RBIndicator ri) {
     }
   }
   if (rx_bytes != cfg_->MacDataBytesNumPerframe()) {
-    std::printf("MacThread: Received %zu : %zu bytes\n", rx_bytes,
-                cfg_->MacDataBytesNumPerframe());
+    MLPD_ERROR("MacThread: Received %zu : %zu bytes\n", rx_bytes,
+               cfg_->MacDataBytesNumPerframe());
+  } else {
+    MLPD_INFO("MacThread: Received Mac Frame Data");
   }
   RtAssert(rx_bytes == cfg_->MacDataBytesNumPerframe(),
            "MacThread:ProcessUdpPacketsFromApps incorrect number of bytes "
