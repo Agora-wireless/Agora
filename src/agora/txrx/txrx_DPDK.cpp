@@ -139,6 +139,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
             auto context = new EventHandlerContext<PacketTXRX>;
             context->obj_ptr = this;
             context->id = worker_id;
+            printf("Launch TXRX thread %u on core %u\n", worker_id, lcore_id);
             rte_eal_remote_launch(
                 (lcore_function_t*)
                     pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx>,
@@ -147,6 +148,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
             auto context = new EventHandlerContext<PacketTXRX>;
             context->obj_ptr = this;
             context->id = worker_id;
+            printf("Launch demod thread on core %u\n", lcore_id);
             if (cfg->downlink_mode) {
                 rte_eal_remote_launch((lcore_function_t*)
                         pthread_fun_wrapper<PacketTXRX, &PacketTXRX::encode_thread>,
