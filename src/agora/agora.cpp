@@ -168,7 +168,7 @@ finish:
 void* Agora::subcarrier_worker(int tid)
 {
     pin_to_core_with_offset(
-        ThreadType::kWorker, base_worker_core_offset + 1, tid);
+        ThreadType::kWorkerSubcarrier, base_worker_core_offset + 1, tid);
 
     auto computeSubcarrier = new DoSubcarrier(config_, tid, freq_ghz,
         Range(tid * config_->subcarrier_block_size + config_->bs_server_addr_idx * config_->get_num_sc_per_server(),
@@ -185,7 +185,7 @@ void* Agora::subcarrier_worker(int tid)
 
 void* Agora::decode_worker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset + 1,
+    pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset + 1,
         tid
             + config_->get_num_sc_per_server()
                 / config_->subcarrier_block_size);
