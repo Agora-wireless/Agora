@@ -9,8 +9,8 @@
 #include "ul_mac_receiver.h"
 
 DEFINE_uint64(num_threads, 1, "Number of mac receiver threads");
-DEFINE_uint64(core_offset, 0, "Core ID of the first sender thread");
-DEFINE_string(conf_file, TOSTRING(PROJECT_DIRECTORY) "/data/bs-ul-sim.json",
+DEFINE_uint64(core_offset, 3, "Core ID of the first sender thread");
+DEFINE_string(conf_file, TOSTRING(PROJECT_DIRECTORY) "/data/bs-mac-sim.json",
               "Config filename");
 
 int main(int argc, char* argv[]) {
