@@ -32,7 +32,7 @@ void* UlMacReceiver::LoopRecv(size_t tid) {
   size_t core_offset = core_id_ + rx_thread_num_;
   PinToCoreWithOffset(ThreadType::kWorkerRX, core_offset, tid);
 
-  size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
+  const size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
   auto udp_server =
       std::make_unique<UDPServer>(cfg_->MacTxPort() + ue_id, sock_buf_size);
 
@@ -58,10 +58,12 @@ void* UlMacReceiver::LoopRecv(size_t tid) {
       throw std::runtime_error("Receiver: recv failed");
     } else if (static_cast<size_t>(recvlen) == packet_length) {
       // Write the data packet to a file or push to file writter queue
-
       if (kDebugMacReceiver) {
-        // Read information from received packet
-        printf("RX thread %zu received data size %zu\n ", tid, packet_length);
+        std::printf("BS Mac Rx Thread %zu,  Received Data:", tid);
+        for (size_t i = 0; i < packet_length; i++) {
+          std::printf(" %x", rx_buffer[0]);
+        }
+        std::printf("\n");
       }
     } else if (recvlen != 0) {
       std::perror("recv failed with less than requested bytes");

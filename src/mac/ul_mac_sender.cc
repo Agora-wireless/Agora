@@ -13,13 +13,15 @@
 #include "logger.h"
 #include "udp_client.h"
 
-static constexpr bool kDebugPrintSender = true;
+static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kFrameLoadAdvance = 10;
 static constexpr size_t kBufferInit = 10;
 
-static std::atomic<bool> keep_running = true;
+static_assert(kFrameLoadAdvance >= kBufferInit);
+
+static std::atomic<bool> keep_running(true);
 // A spinning barrier to synchronize the start of worker threads
-static std::atomic<size_t> num_workers_ready_atomic = 0;
+static std::atomic<size_t> num_workers_ready_atomic(0);
 
 void InterruptHandler(int /*unused*/) {
   std::cout << "Will exit..." << std::endl;
@@ -64,7 +66,7 @@ UlMacSender::UlMacSender(Config* cfg, std::string& data_filename,
   }
 
   ticks_all_ =
-      ((frame_duration_us * ticks_per_usec_) / cfg->Frame().NumTotalSyms());
+      ((frame_duration_us_ * ticks_per_usec_) / cfg->Frame().NumTotalSyms());
   ticks_wnd1_ = ticks_all_ * 40;
   ticks_wnd2_ = ticks_all_ * 15;
 
@@ -85,10 +87,10 @@ UlMacSender::UlMacSender(Config* cfg, std::string& data_filename,
       (size_t)tx_buffers_[(kFrameWnd * cfg_->UeAntNum()) - 1]);
 
   MLPD_INFO(
-      "Initializing UlMacSender, sending to mac thread at %s, frame "
+      "Initializing UlMacSender, sending to mac thread at %s:%zu, frame "
       "duration = %.2f ms, slow start = %s\n",
-      cfg->BsServerAddr().c_str(), frame_duration_us / 1000.0,
-      enable_slow_start == 1 ? "yes" : "no");
+      cfg_->UeServerAddr().c_str(), cfg_->MacRxPort(),
+      frame_duration_us_ / 1000.0, enable_slow_start == 1 ? "yes" : "no");
 
   task_ptok_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
@@ -197,7 +199,7 @@ void* UlMacSender::MasterThread(size_t /*unused*/) {
       const size_t comp_frame_slot = (ctag.frame_id_ % kFrameWnd);
       frame_data_count.at(comp_frame_slot)++;
 
-      if (kDebugPrintSender == true) {
+      if (kDebugPrintSender) {
         std::printf("UlMacSender: Checking frame %d : %zu : %zu\n",
                     ctag.frame_id_, comp_frame_slot,
                     frame_data_count.at(comp_frame_slot));
@@ -287,7 +289,7 @@ void* UlMacSender::WorkerThread(size_t tid) {
 
         auto tag = gen_tag_t(tags.at(tag_id));
 
-        if ((kDebugPrintSender == true)) {
+        if ((kDebugPrintSender)) {
           std::printf("UlMacSender : worker %zu processing frame %d : %d \n",
                       tid, tag.frame_id_, tag.ant_id_);
         }
@@ -298,7 +300,7 @@ void* UlMacSender::WorkerThread(size_t tid) {
         // since we read in mac packets, we need to skip over the headers
         for (size_t packet = 0; packet < cfg_->MacPacketsPerframe(); packet++) {
           auto* tx_packet = reinterpret_cast<MacPacket*>(mac_packet_location);
-          // TODO: Port + cur_radio?
+          // TODO: Port + ue_radio?
           udp_client.Send(cfg_->UeServerAddr(), cfg_->MacRxPort(),
                           reinterpret_cast<uint8_t*>(&tx_packet->data_[0u]),
                           cfg_->MacPayloadLength());
@@ -307,7 +309,7 @@ void* UlMacSender::WorkerThread(size_t tid) {
               (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
         }
 
-        if (kDebugSenderReceiver == true) {
+        if (kDebugSenderReceiver) {
           std::printf(
               "Thread %zu (tag = %s) transmit frame %d, radio %zu, TX time: "
               "%.3f us\n",
@@ -340,7 +342,7 @@ void* UlMacSender::WorkerThread(size_t tid) {
                "Completion enqueue failed");
     }  // if (num_tags > 0)
   }    // while (keep_running.load() == true)
-  MLPD_FRAME("Sender: worker thread %zu exit\n", tid);
+  MLPD_FRAME("UlMacSender: worker thread %zu exit\n", tid);
   return nullptr;
 }
 
@@ -375,17 +377,19 @@ void* UlMacSender::DataUpdateThread(size_t tid) {
   assert(tx_file.is_open() == true);
 
   // Init the data buffers
-  while ((keep_running.load() == true) && (buffer_updates <= kBufferInit)) {
+  while ((keep_running.load() == true) && (buffer_updates < kBufferInit)) {
     size_t tag = 0;
     if (data_update_queue_.try_dequeue(tag) == true) {
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
         UpdateTxBuffer(tx_file, tag_for_ue);
-        buffer_updates++;
       }
+      buffer_updates++;
     }
   }
+
+  std::printf("UlMacSender: Data update initialized\n");
   // Unlock the rest of the workers
   num_workers_ready_atomic.fetch_add(1);
   // Normal run loop
@@ -421,7 +425,8 @@ void UlMacSender::UpdateTxBuffer(std::ifstream& read, gen_tag_t tag) {
     // Check for eof
     if (read.eof()) {
       std::printf(
-          "***EndofFileStream - Frame %d, symbol %d, ue %d, bytes %zu\n",
+          "UlMacSender: ***EndofFileStream - Frame %d, symbol %d, ue %d, bytes "
+          "%zu\n",
           pkt->frame_id_, pkt->symbol_id_, pkt->ue_id_, read.gcount());
       read.close();
       read.open(data_filename_, std::ifstream::in | std::ifstream::binary);
@@ -430,9 +435,10 @@ void UlMacSender::UpdateTxBuffer(std::ifstream& read, gen_tag_t tag) {
     mac_packet_location = mac_packet_location +
                           (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
   }
-  std::printf("Loading packet for frame %d, ue %d, bytes %zu : %zu\n",
-              tag.frame_id_, tag.ant_id_, cfg_->MacDataBytesNumPerframe(),
-              cfg_->MacPayloadLength() * cfg_->MacPacketsPerframe());
+  std::printf(
+      "UlMacSender: Loading packet for frame %d, ue %d, bytes %zu : %zu\n",
+      tag.frame_id_, tag.ant_id_, cfg_->MacDataBytesNumPerframe(),
+      cfg_->MacPayloadLength() * cfg_->MacPacketsPerframe());
 }
 
 void UlMacSender::WriteStatsToFile(size_t tx_frame_count) const {

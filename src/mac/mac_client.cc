@@ -8,15 +8,14 @@
 #include "ul_mac_sender.h"
 
 DEFINE_uint64(num_threads, 1, "Number of mac client sender threads");
-DEFINE_uint64(core_offset, 0, "Core ID of the first sender thread");
+DEFINE_uint64(core_offset, 1, "Core ID of the first sender thread");
 DEFINE_uint64(frame_duration, 0, "Frame duration in microseconds");
-DEFINE_string(conf_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
+DEFINE_string(conf_file, TOSTRING(PROJECT_DIRECTORY) "/data/ue-mac-sim.json",
               "Config filename");
 DEFINE_string(data_file, TOSTRING(PROJECT_DIRECTORY) "/data/test_file.bin",
               "Uplink transmit filename");
 DEFINE_uint64(
-    enable_slow_start, 1,
+    enable_slow_start, 0,
     "Send frames slower than the specified frame duration during warmup");
 
 int main(int argc, char* argv[]) {
