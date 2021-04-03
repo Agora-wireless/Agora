@@ -18,6 +18,7 @@
 #define SCALE_BYTE_CONV_QPSK 20
 #define SCALE_BYTE_CONV_QAM16 100
 #define SCALE_BYTE_CONV_QAM64 100
+#define SCALE_BYTE_CONV_QAM256 100
 #define QAM16_THRESHOLD (2 / sqrt(10))
 #define QAM64_THRESHOLD_1 (2 / sqrt(42))
 #define QAM64_THRESHOLD_2 (4 / sqrt(42))
@@ -61,6 +62,7 @@ void Demod64qamSoftAvx2(float* vec_in, int8_t* llr, int num);
 
 
 void Demod256qamHardLoop(const float* vec_in, uint8_t* vec_out, int num);
+void Demod256qamHardSse(float *vec_in, uint8_t* vec_out, int num);
 
 void Print256Epi8(__m256i var);
 

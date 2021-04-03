@@ -265,7 +265,7 @@ static double bench_mod_256qam(unsigned iterations, unsigned mode) {
   double start_time, total_time;
   unsigned int num = 100;
   uint8_t *input;
-  uint8_t *output_demod_loop;
+  uint8_t *output_demod_loop, *output_demod_sse;
   int gray_mapping[16][16];
 
   InitModulationTable(mod_table, 256);
@@ -318,6 +318,7 @@ static double bench_mod_256qam(unsigned iterations, unsigned mode) {
   AllocBuffer1d(&input, num, Agora_memory::Alignment_t::kAlign64, 1);
   AllocBuffer1d(&output_mod, num, Agora_memory::Alignment_t::kAlign64, 1);
   AllocBuffer1d(&output_demod_loop, num, Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&output_demod_sse, num, Agora_memory::Alignment_t::kAlign64, 1);
   // Build the input data from random bytes
   std::printf("Input: ");
   for (int i = 0; i < num; i++) {
@@ -333,22 +334,28 @@ static double bench_mod_256qam(unsigned iterations, unsigned mode) {
     }
     // Demodulate input
     Demod256qamHardLoop((float*)output_mod, output_demod_loop, num);
+    Demod256qamHardSse((float*)output_mod, output_demod_sse, num);
   }
   total_time = get_time() - start_time;
 
   if (mode == 0) {
-    // Check results. Will influence output timing
+    // Check results. 
     unsigned i;
     std::cout << "Results checking enabled\n";
     for (i = 0; i < num; i++) {
       if (input[i] != output_demod_loop[i]) {
-        std::cout << "Results differed at index " << i << "\n";
+        std::cout << "Loop Results differed at index " << i << "\n";
         std::printf("Expected %d Actual %d\n", input[i], output_demod_loop[i]);
+        break;
+      }
+      if (input[i] != output_demod_sse[i]) {
+        std::cout << "SSE Results differed at index " << i << "\n";
+        std::printf("Expected %d Actual %d\n", input[i], output_demod_sse[i]);
         break;
       }
     }
     if (i != num) {
-      std::cout << "Correctness check failed\n";
+      std::cout << "Correctness check failed";
     } else {
       std::cout << "Correctness check passed\n Output: ";
       for (i = 0; i < num; i++) {
@@ -357,7 +364,7 @@ static double bench_mod_256qam(unsigned iterations, unsigned mode) {
       std::printf("\n");
     }
   }
-  return total_time;
+  return total_time * (1000000 / iterations);
 }
 
 static void run_benchmark_16qam(unsigned iterations, unsigned mode) {
