@@ -16,10 +16,10 @@ inline const struct rte_eth_conf port_conf_default()
 }
 
 int DpdkTransport::nic_init(
-    uint16_t port, struct rte_mempool* mbuf_pool, int thread_num)
+    uint16_t port, struct rte_mempool* mbuf_pool, int n_rxq, int n_txq)
 {
     struct rte_eth_conf port_conf = port_conf_default();
-    const uint16_t rxRings = thread_num, txRings = thread_num;
+    const uint16_t rxRings = n_rxq, txRings = n_txq;
     int retval;
     uint16_t q;
     uint16_t nb_rxd = RX_RING_SIZE;

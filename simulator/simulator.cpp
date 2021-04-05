@@ -30,7 +30,7 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
     rte_mempool* mbuf_pool = DpdkTransport::create_mempool();
 
     uint16_t portid = 0; // For now, hard-code to port zero
-    if (DpdkTransport::nic_init(portid, mbuf_pool, in_task_thread_num) != 0)
+    if (DpdkTransport::nic_init(portid, mbuf_pool, in_task_thread_num, in_task_thread_num) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
 
     printf("new Sender\n");

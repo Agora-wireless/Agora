@@ -307,7 +307,7 @@ public:
             num_demod_data_received_[ue_id]
                                     [frame_id % kFrameWnd][symbol_id_ul]
                 = 0;
-            // printf("Received all demod data for user %lu frame %lu symbol %lu\n", ue_id, frame_id, symbol_id_ul);
+            printf("Received all demod data for user %lu frame %lu symbol %lu\n", ue_id, frame_id, symbol_id_ul);
             return true;
         }
         return false;

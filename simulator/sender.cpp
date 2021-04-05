@@ -68,7 +68,7 @@ Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_thread
         }
         
         int res;
-        if ((res = DpdkTransport::nic_init(portid, this->mbuf_pools_[0], num_worker_threads_)) != 0) {
+        if ((res = DpdkTransport::nic_init(portid, this->mbuf_pools_[0], 1, num_worker_threads_)) != 0) {
             printf("Cannot init port %u: error %d\n", portid, res);
             rte_exit(EXIT_FAILURE, "Cannot init port %u\n", portid);
         }

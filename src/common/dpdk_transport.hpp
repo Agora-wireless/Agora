@@ -39,7 +39,7 @@ public:
     ~DpdkTransport();
 
     static int nic_init(
-        uint16_t port, struct rte_mempool* mbuf_pool, int thread_num);
+        uint16_t port, struct rte_mempool* mbuf_pool, int n_rxq, int n_txq);
 
     // Steer the flow [src_ip, dest_ip, src_port, dst_port] arriving on
     // [port_id] to RX queue [rx_q]
