@@ -110,7 +110,7 @@ enum class PrintType : int {
 static constexpr bool kEnableThreadPinning = true;
 
 #define BIGSTATION 0
-#ifdef USE_DPDK
+#if defined(USE_DPDK)
 static constexpr bool kUseDPDK = true;
 #else
 static constexpr bool kUseDPDK = false;
