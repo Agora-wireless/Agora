@@ -240,7 +240,7 @@ void* PacketTXRX::demod_thread(int tid)
                         cfg->get_num_sc_per_server() * cfg->mod_order_bits);
 
                     // Send data (one OFDM symbol)
-                    size_t nb_tx_new = rte_eth_tx_burst(0, tid - 1, tx_bufs, 1);
+                    size_t nb_tx_new = rte_eth_tx_burst(0, 0, tx_bufs, 1);
                     if (unlikely(nb_tx_new != 1)) {
                         printf("rte_eth_tx_burst() failed\n");
                         exit(0);
