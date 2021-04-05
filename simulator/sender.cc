@@ -11,6 +11,10 @@
 #include "logger.h"
 #include "udp_client.h"
 
+#if defined(USE_DPDK)
+#include <arpa/inet.h>
+#endif
+
 static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kMacAddrBtyes = 17;
 
@@ -79,15 +83,15 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
                                 socket_thread_num_);
   }
 
-#ifdef USE_DPDK
-  DpdkTransport::dpdk_init(core_offset, socket_thread_num_);
+#if defined(USE_DPDK)
+  DpdkTransport::DpdkInit(core_offset, socket_thread_num_);
   printf("Number of ports: %d used (offset: %d), %d available, socket: %d\n",
          cfg->DpdkNumPorts(), cfg->DpdkPortOffset(), rte_eth_dev_count_avail(),
          rte_socket_id());
   RtAssert(cfg->DpdkNumPorts() <= rte_eth_dev_count_avail(),
            "Invalid number of DPDK ports");
   this->mbuf_pool_ =
-      DpdkTransport::create_mempool(cfg->DpdkNumPorts(), cfg->PacketLength());
+      DpdkTransport::CreateMempool(cfg->DpdkNumPorts(), cfg->PacketLength());
 
   // Parse IP addresses
   int ret = inet_pton(AF_INET, cfg->BsRruAddr().c_str(), &bs_rru_addr_);
@@ -102,8 +106,8 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   server_mac_addr_.resize(cfg->DpdkNumPorts());
 
   for (uint16_t port_id = 0; port_id < cfg->DpdkNumPorts(); port_id++) {
-    if (DpdkTransport::nic_init(port_id + cfg->DpdkPortOffset(), mbuf_pool_,
-                                socket_thread_num_, cfg->PacketLength()) != 0)
+    if (DpdkTransport::NicInit(port_id + cfg->DpdkPortOffset(), mbuf_pool_,
+                               socket_thread_num_, cfg->PacketLength()) != 0)
       rte_exit(EXIT_FAILURE, "Cannot init port %u\n",
                port_id + cfg->DpdkPortOffset());
     // Parse MAC addresses
@@ -317,7 +321,7 @@ void* Sender::WorkerThread(int tid) {
       cfg_->BsAntNum() / socket_thread_num_ +
       (static_cast<size_t>(tid) < cfg_->BsAntNum() % socket_thread_num_ ? 1
                                                                         : 0);
-#ifdef USE_DPDK
+#if defined(USE_DPDK)
   const size_t port_id = tid % cfg_->DpdkNumPorts();
   const size_t queue_id = tid / cfg_->DpdkNumPorts();
   rte_mbuf* tx_mbufs[kDequeueBulkSize];
@@ -360,8 +364,8 @@ void* Sender::WorkerThread(int tid) {
 
         // Send a message to the server. We assume that the server is running.
         Packet* pkt = socks_pkt_buf;
-#ifdef USE_DPDK
-        tx_mbufs[tag_id] = DpdkTransport::alloc_udp(
+#if defined(USE_DPDK)
+        tx_mbufs[tag_id] = DpdkTransport::AllocUdp(
             mbuf_pool_, sender_mac_addr_[port_id], server_mac_addr_[port_id],
             bs_rru_addr_, bs_server_addr_, this->cfg_->BsRruPort() + tid,
             this->cfg_->BsServerPort() + tid, this->cfg_->PacketLength());
@@ -426,7 +430,7 @@ void* Sender::WorkerThread(int tid) {
         }
       }
 
-#ifdef USE_DPDK
+#if defined(USE_DPDK)
       size_t nb_tx_new = rte_eth_tx_burst(port_id + cfg_->DpdkPortOffset(),
                                           queue_id, tx_mbufs, num_tags);
       if (unlikely(nb_tx_new != num_tags)) {

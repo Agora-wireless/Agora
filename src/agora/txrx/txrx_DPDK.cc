@@ -13,13 +13,13 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
       core_offset_(core_offset),
       ant_per_cell_(cfg->BsAntNum() / cfg->NumCells()),
       socket_thread_num_(cfg->SocketThreadNum()) {
-  DpdkTransport::dpdk_init(core_offset_ - 1, socket_thread_num_);
+  DpdkTransport::DpdkInit(core_offset_ - 1, socket_thread_num_);
   printf("Number of ports: %d used (offset: %d), %d available, socket: %d\n",
          cfg_->DpdkNumPorts(), cfg_->DpdkPortOffset(),
          rte_eth_dev_count_avail(), rte_socket_id());
   RtAssert(cfg_->DpdkNumPorts() <= rte_eth_dev_count_avail(),
            "Invalid number of DPDK ports");
-  mbuf_pool = DpdkTransport::create_mempool(cfg->DpdkNumPorts());
+  mbuf_pool = DpdkTransport::CreateMempool(cfg->DpdkNumPorts());
 
   int ret = inet_pton(AF_INET, cfg_->BsRruAddr().c_str(), &bs_rru_addr);
   RtAssert(ret == 1, "Invalid sender IP address");
@@ -27,8 +27,8 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
   RtAssert(ret == 1, "Invalid server IP address");
 
   for (uint16_t port_id = 0; port_id < cfg_->DpdkNumPorts(); port_id++)
-    if (DpdkTransport::nic_init(port_id + cfg->DpdkPortOffset(), mbuf_pool,
-                                socket_thread_num_) != 0)
+    if (DpdkTransport::NicInit(port_id + cfg->DpdkPortOffset(), mbuf_pool,
+                               socket_thread_num_) != 0)
       rte_exit(EXIT_FAILURE, "Cannot init port %u\n",
                port_id + cfg->DpdkPortOffset());
 
@@ -43,7 +43,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
         this->cfg_->BsRruPort() + i, this->cfg_->BsServerPort() + i,
         i % this->cfg_->DpdkNumPorts() + cfg->DpdkPortOffset(),
         i / this->cfg_->DpdkNumPorts());
-    DpdkTransport::install_flow_rule(
+    DpdkTransport::InstallFlowRule(
         i % this->cfg_->DpdkNumPorts() + cfg->DpdkPortOffset(),
         i / this->cfg_->DpdkNumPorts(), bs_rru_addr, bs_server_addr, src_port,
         dst_port);
@@ -145,9 +145,9 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
     if (kDebugDPDK) {
       auto* udp_h = reinterpret_cast<rte_udp_hdr*>(
           reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
-      DpdkTransport::print_pkt(ip_hdr->src_addr, ip_hdr->dst_addr,
-                               udp_h->src_port, udp_h->dst_port,
-                               dpdk_pkt->data_len, tid);
+      DpdkTransport::PrintPkt(ip_hdr->src_addr, ip_hdr->dst_addr,
+                              udp_h->src_port, udp_h->dst_port,
+                              dpdk_pkt->data_len, tid);
       std::printf("pkt_len: %d, nb_segs: %d, Header type: %d, IPV4: %d\n",
                   dpdk_pkt->pkt_len, dpdk_pkt->nb_segs, eth_type,
                   RTE_ETHER_TYPE_IPV4);
@@ -174,7 +174,7 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
     auto* payload = reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset;
     auto* pkt = reinterpret_cast<Packet*>(
         &(*buffer_)[tid][rx_offset * cfg_->PacketLength()]);
-    DpdkTransport::fastMemcpy(reinterpret_cast<uint8_t*>(pkt), payload,
+    DpdkTransport::FastMemcpy(reinterpret_cast<uint8_t*>(pkt), payload,
                               cfg_->PacketLength());
 
     rte_pktmbuf_free(rx_bufs[i]);
@@ -251,7 +251,7 @@ int PacketTXRX::DequeueSend(int tid) {
   tx_bufs[0]->pkt_len = this->cfg_->DlPacketLength() + kPayloadOffset;
   tx_bufs[0]->data_len = this->cfg_->DlPacketLength() + kPayloadOffset;
   char* payload = (char*)eth_hdr + kPayloadOffset;
-  DpdkTransport::fastMemcpy(payload, (char*)pkt, this->cfg_->DlPacketLength());
+  DpdkTransport::FastMemcpy(payload, (char*)pkt, this->cfg_->DlPacketLength());
 
   // Send data (one OFDM symbol)
   size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
