@@ -1,4 +1,4 @@
-[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fdpdk-develop)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/dpdk-develop/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fpr-dpdk-compilefix)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/pr-dpdk-compilefix/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
