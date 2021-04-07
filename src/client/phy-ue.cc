@@ -161,10 +161,10 @@ PhyUe::~PhyUe() {
 void PhyUe::ScheduleTask(EventData do_task,
                          moodycamel::ConcurrentQueue<EventData>* in_queue,
                          moodycamel::ProducerToken const& ptok) {
-  if (!in_queue->try_enqueue(ptok, do_task)) {
-    std::printf("need more memory\n");
-    if (!in_queue->enqueue(ptok, do_task)) {
-      std::printf("task enqueue failed\n");
+  if (in_queue->try_enqueue(ptok, do_task) == false) {
+    std::printf("PhyUe: Cannot enqueue task, need more memory");
+    if (in_queue->enqueue(ptok, do_task) == false) {
+      std::printf("PhyUe: task enqueue failed\n");
       throw std::runtime_error("PhyUe: task enqueue failed");
     }
   }
@@ -212,7 +212,7 @@ void PhyUe::Start() {
   int miss_count = 0;
   int total_count = 0;
 
-  EventData events_list[kDequeueBulkSizeTXRX];
+  std::array<EventData, kDequeueBulkSizeTXRX> events_list;
   int ret = 0;
   max_equaled_frame_ = 0;
   size_t cur_frame_id = 0;
@@ -221,7 +221,7 @@ void PhyUe::Start() {
   while ((config_->Running() == true) &&
          (SignalHandler::GotExitSignal() == false)) {
     // get a bulk of events
-    ret = message_queue_.try_dequeue_bulk(ctok, events_list,
+    ret = message_queue_.try_dequeue_bulk(ctok, events_list.data(),
                                           kDequeueBulkSizeTXRX);
     total_count++;
     if (total_count == 1e7) {
@@ -236,12 +236,11 @@ void PhyUe::Start() {
       continue;
     }
     // handle each event
-    for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
-      EventData& event = events_list[bulk_count];
+    for (size_t bulk_count = 0; bulk_count < ret; bulk_count++) {
+      EventData& event = events_list.at(bulk_count);
 
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          // int offset = event.tags[0];
           size_t rx_thread_id = rx_tag_t(event.tags_[0]).tid_;
           size_t offset_in_current_buffer = rx_tag_t(event.tags_[0]).offset_;
 
@@ -273,6 +272,8 @@ void PhyUe::Start() {
               }
             } else {
               if (ant_id % config_->NumChannels() == 0) {
+                std::printf("PhyUE: Schedule encode at %f\n",
+                            GetTime::GetTimeUs());
                 EventData do_encode_task(
                     EventType::kEncode,
                     gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
@@ -417,7 +418,6 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kPacketFromMac: {
-          // size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
           size_t ue_id = rx_tag_t(event.tags_[0]).tid_;
           size_t radio_buf_id = rx_tag_t(event.tags_[0]).offset_;
           RtAssert(radio_buf_id == expected_frame_id_from_mac_ % kFrameWnd);
@@ -452,9 +452,6 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kEncode: {
-          // size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-          // size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
-          // size_t ue_id = gen_tag_t(event.tags[0]).ant_id;
           EventData do_modul_task(EventType::kModul, event.tags_[0]);
           ScheduleTask(do_modul_task, &modul_queue_, ptok_modul);
 
@@ -605,7 +602,7 @@ void PhyUe::TaskThread(int tid) {
 }
 
 //////////////////////////////////////////////////////////
-//                   DOWNLINK Operations                  //
+//                   DOWNLINK Operations                //
 //////////////////////////////////////////////////////////
 
 void PhyUe::DoFft(int tid, size_t tag) {
@@ -619,12 +616,11 @@ void PhyUe::DoFft(int tid, size_t tag) {
                                                    config_->PacketLength());
   size_t frame_id = pkt->frame_id_;
   size_t symbol_id = pkt->symbol_id_;
-  // int cell_id = pkt->cell_id;
   size_t ant_id = pkt->ant_id_;
   size_t frame_slot = frame_id % kFrameWnd;
 
-  if (!config_->IsPilot(frame_id, symbol_id) &&
-      !(config_->IsDownlink(frame_id, symbol_id))) {
+  if ((config_->IsPilot(frame_id, symbol_id) == false) &&
+      (config_->IsDownlink(frame_id, symbol_id) == false)) {
     return;
   }
 
@@ -989,13 +985,10 @@ void PhyUe::DoDecode(int tid, size_t tag) {
 
 void PhyUe::DoEncode(int tid, size_t tag) {
   const LDPCconfig& ldpc_config = config_->LdpcConfig();
-  // size_t ue_id = rx_tag_t(tag).tid;
-  // size_t offset = rx_tag_t(tag).offset;
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t ue_id = gen_tag_t(tag).ue_id_;
   size_t frame_slot = frame_id % kFrameWnd;
   auto& cfg = config_;
-  // size_t start_tsc = worker_rdtsc();
 
   auto* encoded_buffer_temp =
       static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(

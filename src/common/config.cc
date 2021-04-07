@@ -451,11 +451,12 @@ Config::Config(const std::string& jsonfile)
       "symbols per frame,\n\t"
       "%zu OFDM subcarriers (%zu data subcarriers), modulation %s,\n\t"
       "%zu MAC data bytes per frame, %zu MAC bytes per frame, frame time %.3f "
-      "sec\n",
+      ": %.3f sec\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
       mac_data_bytes_num_perframe_, mac_bytes_num_perframe_,
-      ((frame_.NumTotalSyms() * samps_per_symbol_) / rate_));
+      ((frame_.NumTotalSyms() * samps_per_symbol_) / rate_),
+      this->GetFrameDurationSec());
 }
 
 void Config::GenData() {
