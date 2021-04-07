@@ -260,7 +260,7 @@ void MacThread::ProcessUdpPacketsFromApps(RBIndicator ri) {
     MLPD_ERROR("MacThread: Received %zu : %zu bytes\n", rx_bytes,
                cfg_->MacDataBytesNumPerframe());
   } else {
-    MLPD_INFO("MacThread: Received Mac Frame Data");
+    MLPD_INFO("MacThread: Received Mac Frame Data\n");
   }
   RtAssert(rx_bytes == cfg_->MacDataBytesNumPerframe(),
            "MacThread:ProcessUdpPacketsFromApps incorrect number of bytes "
