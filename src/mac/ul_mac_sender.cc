@@ -50,7 +50,7 @@ UlMacSender::UlMacSender(Config* cfg, std::string& data_filename,
                          bool create_thread_for_master)
     : cfg_(cfg),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
-      ticks_per_usec_(freq_ghz_ * 1e3),
+      ticks_per_usec_(freq_ghz_ * 1e3f),
       socket_thread_num_(socket_thread_num),
       enable_slow_start_(enable_slow_start),
       core_offset_(core_offset),

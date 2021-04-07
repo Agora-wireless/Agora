@@ -11,7 +11,7 @@
 static std::atomic<bool> running = true;
 static constexpr bool kPrintChannelOutput = false;
 static const size_t kDefaultQueueSize = 36;
-static const bool kPrintDebugTxUser = false;
+static const bool kPrintDebugTxUser = true;
 
 static void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
                                     size_t length) {
@@ -523,11 +523,13 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
 void ChannelSim::DoTxUser(int tid, size_t tag) {
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);
+  size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);  // If id = 0, then return 0;
 
   if (kPrintDebugTxUser) {
-    std::printf("Channel Sim: DoTxUser processing symbol %zu, dl symbol %zu\n",
-                symbol_id, dl_symbol_id);
+    std::printf(
+        "Channel Sim: DoTxUser processing frame %zu, symbol %zu, dl symbol "
+        "%zu, at %f ms\n",
+        frame_id, symbol_id, dl_symbol_id, GetTime::GetTimeUs() / 1000);
   }
 
   size_t symbol_offset =
