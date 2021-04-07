@@ -119,11 +119,11 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
      `./build/data_generator --conf_file data/ue-mac-sim.json` to generate data files.
      `./build/user data/ue-mac-sim.json` to start clients with uplink configuration.
    * Terminal 2:
-     `./build/macuser` to run to user client app.  Specify -data_file , -conf_file options as necessary.
+     `./build/macuser -enable_slow_start 1` to run to user client app.  Specify -data_file , -conf_file options as necessary.
    * Terminal 3:
      `./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --bs_conf_file data/bs-mac-sim.json --ue_conf_file data/ue-mac-sim.json` to run the channel simulator
    * Terminal 4:
-     `./python/macbs` to run to base station udp rx app. 
+     `./build/macbs` to run to base station udp rx app. 
    * Terminal 5:
      `./build/agora data/bs-mac-sim.json` to run the agora server.  Always start this last.
    * Note: make sure Agora and sender are using different set of cores,
