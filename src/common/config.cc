@@ -308,7 +308,7 @@ Config::Config(const std::string& jsonfile)
   // Check for frame validity.
   // We should remove the restriction of the beacon symbol placement when tested
   // more thoroughly
-  if (((frame_.NumBeaconSyms() < 0) && (frame_.NumBeaconSyms() > 1)) ||
+  if (((frame_.NumBeaconSyms() > 1)) ||
       ((frame_.NumBeaconSyms() == 1) && (frame_.GetBeaconSymbolLast() > 1))) {
     MLPD_ERROR("Invalid beacon symbol placement\n");
     throw std::runtime_error("Invalid beacon symbol placement");
