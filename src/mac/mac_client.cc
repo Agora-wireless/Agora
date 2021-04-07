@@ -12,7 +12,7 @@ DEFINE_uint64(core_offset, 1, "Core ID of the first sender thread");
 DEFINE_uint64(frame_duration, 0, "Frame duration in microseconds");
 DEFINE_string(conf_file, TOSTRING(PROJECT_DIRECTORY) "/data/ue-mac-sim.json",
               "Config filename");
-DEFINE_string(data_file, TOSTRING(PROJECT_DIRECTORY) "/data/test_file.bin",
+DEFINE_string(data_file, TOSTRING(PROJECT_DIRECTORY) "/data/increment_file.bin",
               "Uplink transmit filename");
 DEFINE_uint64(
     enable_slow_start, 0,
