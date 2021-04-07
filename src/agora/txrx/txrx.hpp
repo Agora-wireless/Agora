@@ -93,6 +93,8 @@ private:
 
     // A thread that sends and receives post-demodulation data
     void* demod_thread(int tid);
+    void* demod_rx_thread(int tid);
+    void* demod_tx_thread(int tid);
     void* encode_thread(int tid);
 
     int dequeue_send(int tid, size_t symbol_to_send, size_t ant_to_send);
