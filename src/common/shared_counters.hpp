@@ -77,7 +77,7 @@ public:
                     for (size_t j = 0; j < kMaxSymbols; j++) {
                         num_data_pkts_[cur_frame_ % kFrameWnd][j] = 0;
                     }
-                    num_pilot_pkts[cur_frame_ % kFrameWnd] = 0;
+                    num_pilot_pkts_[cur_frame_ % kFrameWnd] = 0;
                     num_pkts_[cur_frame_ % kFrameWnd] = 0;
                     cur_frame_ ++;
                 }

@@ -81,6 +81,7 @@ Agora::Agora(Config* cfg)
         }
     }
 
+creation_end:
     printf("Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
            "cores %zu--%zu\n",
         cfg->core_offset, cfg->core_offset + 1,
@@ -88,7 +89,6 @@ Agora::Agora(Config* cfg)
         base_worker_core_offset,
         base_worker_core_offset + do_subcarrier_threads_.size() + cfg->get_num_ues_to_process() - 1);
 
-creation_end:
 }
 
 Agora::~Agora()
