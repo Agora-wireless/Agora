@@ -283,6 +283,8 @@ Config::Config(std::string jsonfile)
             / (ldpc_num_input_cols(LDPC_config.Bg) - 2 + LDPC_config.nRows),
         LDPC_config.nRows);
 
+    test_mode = tddConf.value("test_mode", 0);
+
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;
     packet_length

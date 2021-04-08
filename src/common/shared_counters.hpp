@@ -19,10 +19,12 @@ public:
         , num_pilot_symbols_per_frame_(cfg->pilot_symbol_num_perframe)
         , num_ul_data_symbol_per_frame_(cfg->ul_data_symbol_num_perframe)
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
-        , num_decode_tasks_per_frame_(cfg->get_num_ues_to_process() * cfg->decode_thread_num_per_ue)
+        , num_decode_tasks_per_frame_(cfg->test_mode == 1 ? (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size : 
+            cfg->get_num_ues_to_process() * cfg->decode_thread_num_per_ue)
         , num_precode_tasks_per_frame_((cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
         , last_frame_cycles_(worker_rdtsc())
         , freq_ghz_(measure_rdtsc_freq())
+        , test_mode_(cfg->test_mode)
     {
     }
 
@@ -40,6 +42,7 @@ public:
         }
 
         const size_t frame_slot = pkt->frame_id % kFrameWnd;
+        bool full = false;
         num_pkts_[frame_slot]++;
         encode_ready_[frame_slot] = true;
         if (num_pkts_[frame_slot]
@@ -49,6 +52,7 @@ public:
                    "Pilot pkts = %zu of %zu\n",
                 pkt->frame_id, num_pilot_pkts_[frame_slot].load(),
                 num_pilot_pkts_per_frame_);
+            full = true;
         }
 
         if (pkt->symbol_id < num_pilot_symbols_per_frame_) {
@@ -63,6 +67,21 @@ public:
         if (pkt->frame_id > latest_frame_) {
             // TODO: race condition could happen here but the impact is small
             latest_frame_ = pkt->frame_id;
+        }
+        
+        if (test_mode_ >= 2) {
+            if (full && pkt->frame_id == cur_frame_) {
+                while (num_pkts_[cur_frame_ % kFrameWnd]
+                    == num_pkts_per_symbol_
+                        * (num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_)) {
+                    for (size_t j = 0; j < kMaxSymbols; j++) {
+                        num_data_pkts_[cur_frame_ % kFrameWnd][j] = 0;
+                    }
+                    num_pilot_pkts[cur_frame_ % kFrameWnd] = 0;
+                    num_pkts_[cur_frame_ % kFrameWnd] = 0;
+                    cur_frame_ ++;
+                }
+            }
         }
         return true;
     }
@@ -200,6 +219,9 @@ public:
     
     // The CPU frequency (in GHz), used to convert cycles to time
     size_t freq_ghz_;
+
+    // Test mode
+    size_t test_mode_;
 
     // Copies of Config variables
     const size_t num_pilot_pkts_per_frame_;

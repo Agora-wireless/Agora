@@ -238,8 +238,10 @@ public:
                         n_demul_tasks_done_ = 0;
 
                         state_start_tsc = rdtsc();
-                        demul_status_->demul_complete(
-                            demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_reqd);
+                        if (cfg->test_mode != 1) {
+                            demul_status_->demul_complete(
+                                demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_reqd);
+                        }
                         state_operation_duration += rdtsc() - state_start_tsc;
 
                         demul_cur_sym_ul_++;
@@ -253,6 +255,10 @@ public:
                                 cfg->ul_data_symbol_num_perframe);
                             print_tsc_duration += rdtsc() - demod_start_tsc;
                             
+                            if (cfg->test_mode == 1) {
+                                rx_status_->decode_done(demul_cur_frame_);
+                            }
+
                             demul_cur_frame_++;
                             if (unlikely(demul_cur_frame_ == cfg->frames_to_test)) {
                                 work_tsc_duration += rdtsc() - work_start_tsc;

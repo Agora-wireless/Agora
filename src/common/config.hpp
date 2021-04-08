@@ -338,6 +338,9 @@ public:
     std::vector<std::string> bs_server_mac_list;
     std::string bs_rru_mac_addr;
 
+    // Test mode configurations
+    size_t test_mode;
+
     bool isUE;
     const size_t maxFrame = 1 << 30;
     const size_t data_offset = sizeof(int) * 16;
