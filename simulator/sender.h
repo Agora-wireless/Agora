@@ -27,7 +27,7 @@
 #include "symbols.h"
 #include "utils.h"
 
-#ifdef USE_DPDK
+#if defined(USE_DPDK)
 #include <netinet/ether.h>
 
 #include "dpdk_transport.h"
@@ -145,7 +145,7 @@ class Sender {
 
   std::vector<std::thread> threads_;
 
-#ifdef USE_DPDK
+#if defined(USE_DPDK)
   struct rte_mempool* mbuf_pool_;
   uint32_t bs_rru_addr_;     // IPv4 address of this data sender
   uint32_t bs_server_addr_;  // IPv4 address of the remote target Agora server
