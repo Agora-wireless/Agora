@@ -95,7 +95,7 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
      with uplink configuration.
    * The above steps use Linux networking stack for packet I/O. Agora also supports using DPDK
    to bypass the kernel for packet I/O. To enable DPDK, run `cmake -DUSE_DPDK=1 ..; make -j` to 
-   rebuild code for Mellanox NICs; for Intel NICs, run `cmake .. -DUSE_DPDK=1 -DUSE_MLX_NIC=0; make -j` 
+   rebuild code for Mellanox NICs; for Intel NICs, run `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j` 
    to exclude Mellanox libraries in the build.
    When running the emulated RRU with DPDK, it is required to set the MAC address
      of the NIC used by Agora. To do this, pass `--server_mac_addr=` to
