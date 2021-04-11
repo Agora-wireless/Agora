@@ -17,8 +17,8 @@
 #include <string>
 #include <unistd.h>
 
-#define RX_RING_SIZE 4096
-#define TX_RING_SIZE 4096
+#define RX_RING_SIZE 8192
+#define TX_RING_SIZE 8192
 
 #define NUM_MBUFS ((64 * 1024) - 1)
 #define MBUF_CACHE_SIZE 128
@@ -40,6 +40,8 @@ public:
 
     static int nic_init(
         uint16_t port, struct rte_mempool* mbuf_pool, int n_rxq, int n_txq);
+    static int nic_init(
+        uint16_t port, struct rte_mempool** mbuf_pool, int n_rxq, int n_txq);
 
     // Steer the flow [src_ip, dest_ip, src_port, dst_port] arriving on
     // [port_id] to RX queue [rx_q]

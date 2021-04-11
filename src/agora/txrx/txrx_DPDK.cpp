@@ -23,7 +23,10 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     , precode_status_(precode_status)
 {
     DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num + 2);
-    mbuf_pool_ = DpdkTransport::create_mempool();
+    for (size_t i = 0; i < socket_thread_num + 1; i ++) {
+        mbuf_pool_[i] = DpdkTransport::create_mempool(i);
+    }
+    // mbuf_pool_ = DpdkTransport::create_mempool();
     demod_symbol_ul_to_send_ = 0;
     encode_ue_to_send_ = cfg->ue_start;
 
@@ -48,7 +51,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     rt_assert(parsed_mac != NULL, "Invalid rru mac address");
     memcpy(&bs_rru_mac_addr_, parsed_mac, sizeof(ether_addr));
 
-    for (size_t i = 0; i < socket_thread_num; i++) {
+    for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
         uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port + i);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
 
@@ -57,7 +60,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
             cfg->bs_rru_addr.c_str(), bs_rru_addr_, cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(), bs_server_addrs_[cfg->bs_server_addr_idx],
             rte_cpu_to_be_16(src_port), rte_cpu_to_be_16(dst_port), i);
         DpdkTransport::install_flow_rule(
-            port_id, i, bs_rru_addr_, bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
+            port_id, i % socket_thread_num, bs_rru_addr_, bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
     }
 
     if (cfg->downlink_mode) {
@@ -103,7 +106,12 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 }
 
-PacketTXRX::~PacketTXRX() { rte_mempool_free(mbuf_pool_); }
+PacketTXRX::~PacketTXRX() { 
+    for (size_t i = 0; i < socket_thread_num + 1; i ++) {
+        rte_mempool_free(mbuf_pool_[i]); 
+    }
+    // rte_mempool_free(mbuf_pool_);
+}
 
 bool PacketTXRX::startTXRX(Table<char>& buffer,
     Table<size_t>& frame_start, Table<complex_float>* dl_ifft_buffer,
@@ -238,7 +246,7 @@ void* PacketTXRX::demod_tx_thread(int tid)
                         ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-                    tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_, bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)],
+                    tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)],
                         bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[cfg->get_server_idx_by_ue(ue_id)], cfg->demod_tx_port, cfg->demod_rx_port, 
                         Packet::kOffsetOfData + cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                     struct rte_ether_hdr* eth_hdr
@@ -456,7 +464,7 @@ void* PacketTXRX::demod_thread(int tid)
                         ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-                    tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_, bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)],
+                    tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)],
                         bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[cfg->get_server_idx_by_ue(ue_id)], cfg->demod_tx_port, cfg->demod_rx_port, 
                         Packet::kOffsetOfData + cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                     struct rte_ether_hdr* eth_hdr
@@ -608,7 +616,7 @@ void* PacketTXRX::encode_thread(int tid)
                     precode_status_->receive_encoded_data(encode_frame_to_send_, encode_symbol_dl_to_send_);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-                    tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_, bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[server_idx],
+                    tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[server_idx],
                         bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[server_idx], cfg->encode_tx_port, cfg->encode_rx_port, cfg->packet_length);
                     struct rte_ether_hdr* eth_hdr
                         = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
@@ -734,6 +742,8 @@ void* PacketTXRX::loop_tx_rx(int tid)
     size_t symbol_to_send = 0;
     size_t ant_to_send = tid * (cfg->nRadios / socket_thread_num);
 
+    size_t recv_pkts = 0;
+
     while (cfg->running) {
         // Receive data
         if (cfg->downlink_mode && dequeue_send(tid, symbol_to_send, ant_to_send) == 1) {
@@ -753,10 +763,13 @@ void* PacketTXRX::loop_tx_rx(int tid)
         if (res == 0)
             continue;
 
+        recv_pkts += res;
+
         if (++radio_id == radio_hi)
             radio_id = radio_lo;
         
     }
+    printf("Thread %u receive %lu packets.\n", tid, recv_pkts);
     return 0;
 }
 
@@ -766,6 +779,8 @@ int PacketTXRX::recv_relocate(int tid)
     uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
     if (unlikely(nb_rx == 0))
         return 0;
+
+    size_t valid_pkts = 0;
 
     for (size_t i = 0; i < nb_rx; i++) {
         rte_mbuf* dpdk_pkt = rx_bufs[i];
@@ -785,18 +800,18 @@ int PacketTXRX::recv_relocate(int tid)
             printf("UDP: %d, %d\n", ip_hdr->next_proto_id, IPPROTO_UDP);
         }
 
-        if (eth_type != RTE_ETHER_TYPE_IPV4
-            or ip_hdr->next_proto_id != IPPROTO_UDP) {
+        if (unlikely(eth_type != RTE_ETHER_TYPE_IPV4
+            or ip_hdr->next_proto_id != IPPROTO_UDP)) {
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
 
-        if (ip_hdr->src_addr != bs_rru_addr_) {
+        if (unlikely(ip_hdr->src_addr != bs_rru_addr_)) {
             fprintf(stderr, "DPDK relocate(%u): Source addr does not match (%x:%u->%x:%u)\n", tid, ip_hdr->src_addr, rte_be_to_cpu_16(udp_hdr->src_port), ip_hdr->dst_addr, rte_be_to_cpu_16(udp_hdr->dst_port));
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
-        if (ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx]) {
+        if (unlikely(ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx])) {
             fprintf(stderr, "DPDK relocate(%u): Destination addr does not match (%x %x)\n", tid, ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
@@ -823,6 +838,8 @@ int PacketTXRX::recv_relocate(int tid)
                 (uint8_t*)pkt + Packet::kOffsetOfData,
                 cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
 
+            valid_pkts ++;
+
             // get the position in rx_buffer
             if (!rx_status_->add_new_packet(pkt)) {
                 cfg->running = false;
@@ -841,7 +858,7 @@ int PacketTXRX::recv_relocate(int tid)
         //     }
         // }
     }
-    return nb_rx;
+    return valid_pkts;
 }
 
 int PacketTXRX::recv(int tid)
@@ -948,7 +965,7 @@ int PacketTXRX::dequeue_send(int tid, size_t symbol_dl_to_send, size_t ant_to_se
     if (rx_status_->cur_frame_ > frame_to_send_[tid]) {
 
         struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-        tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool_);
+        tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool_[tid]);
         struct rte_ether_hdr* eth_hdr
             = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
         eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);

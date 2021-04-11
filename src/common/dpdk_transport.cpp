@@ -106,6 +106,97 @@ int DpdkTransport::nic_init(
     return 0;
 }
 
+int DpdkTransport::nic_init(
+    uint16_t port, struct rte_mempool** mbuf_pool, int n_rxq, int n_txq)
+{
+    struct rte_eth_conf port_conf = port_conf_default();
+    const uint16_t rxRings = n_rxq, txRings = n_txq;
+    int retval;
+    uint16_t q;
+    uint16_t nb_rxd = RX_RING_SIZE;
+    uint16_t nb_txd = TX_RING_SIZE;
+
+    struct rte_eth_dev_info dev_info;
+    struct rte_eth_rxconf rxconf;
+    struct rte_eth_txconf txconf;
+
+    if (rte_eth_dev_count_avail() < port)
+        rte_exit(EXIT_FAILURE, "Not Enough NICs\n");
+
+    if (!rte_eth_dev_is_valid_port(port))
+        rte_exit(EXIT_FAILURE, "NIC ID is invalid\n");
+
+    rte_eth_dev_set_mtu(port, 9000);
+    uint16_t mtu_size = 0;
+    rte_eth_dev_get_mtu(port, &mtu_size);
+    rt_assert(mtu_size == 9000, "Invalid MTU (must be 9000 bytes)");
+
+    int promiscuous_en = rte_eth_promiscuous_get(port);
+    rte_eth_promiscuous_enable(port);
+    promiscuous_en = rte_eth_promiscuous_get(port);
+    rt_assert(promiscuous_en == 1, "Unable to set promiscuous mode");
+
+    rte_eth_dev_info_get(port, &dev_info);
+    if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
+        port_conf.txmode.offloads |= DEV_TX_OFFLOAD_MBUF_FAST_FREE;
+
+    port_conf.rxmode.max_rx_pkt_len
+        = RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len);
+    // port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
+
+    retval = rte_eth_dev_configure(port, rxRings, txRings, &port_conf);
+    if (retval != 0)
+        return retval;
+    retval = rte_eth_dev_adjust_nb_rx_tx_desc(port, &nb_rxd, &nb_txd);
+    if (retval != 0)
+        return retval;
+
+    rxconf = dev_info.default_rxconf;
+    rxconf.offloads = port_conf.rxmode.offloads;
+
+    for (q = 0; q < rxRings; q++) {
+        retval = rte_eth_rx_queue_setup(
+            port, q, nb_rxd, rte_eth_dev_socket_id(port), &rxconf, mbuf_pool[q]);
+        if (retval < 0)
+            return retval;
+    }
+
+    txconf = dev_info.default_txconf;
+    txconf.offloads = port_conf.txmode.offloads;
+
+    for (q = 0; q < txRings; q++) {
+        retval = rte_eth_tx_queue_setup(
+            port, q, nb_txd, rte_eth_dev_socket_id(port), &txconf);
+        if (retval < 0)
+            return retval;
+    }
+
+    retval = rte_eth_dev_start(port);
+    if (retval < 0)
+        return retval;
+
+    struct rte_ether_addr addr;
+    rte_eth_macaddr_get(port, &addr);
+    printf("NIC %u MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " %02" PRIx8
+           " %02" PRIx8 " %02" PRIx8 " \n",
+        port, addr.addr_bytes[0], addr.addr_bytes[1], addr.addr_bytes[2],
+        addr.addr_bytes[3], addr.addr_bytes[4], addr.addr_bytes[5]);
+
+    struct rte_eth_link link;
+    rte_eth_link_get_nowait(port, &link);
+    while (!link.link_status) {
+        printf("Waiting for link up on NIC %" PRIu16 "\n", port);
+        sleep(1);
+        rte_eth_link_get_nowait(port, &link);
+    }
+    if (!link.link_status) {
+        printf("Link down on NIC %" PRIx16 "\n", port);
+        return 0;
+    }
+
+    return 0;
+}
+
 void DpdkTransport::fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes)
 {
     // printf("pvDest: 0x%lx, pvSrc: 0x%lx, Dest: %lx, Src,

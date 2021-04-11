@@ -137,7 +137,8 @@ private:
 
 #ifdef USE_DPDK
     uint32_t bs_rru_addr_; // IPv4 address of the simulator sender
-    struct rte_mempool* mbuf_pool_;
+    struct rte_mempool* mbuf_pool_[kMaxThreads];
+    // struct rte_mempool* mbuf_pool_;
     std::vector<uint32_t> bs_server_addrs_;
     std::vector<rte_ether_addr> bs_server_mac_addrs_;
     rte_ether_addr bs_rru_mac_addr_;

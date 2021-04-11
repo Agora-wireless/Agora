@@ -152,6 +152,8 @@ void Agora::start()
     keep_sleep:
         sleep(1);
     }
+    cfg->running = false;
+    goto finish;
     return;
 
 finish:
