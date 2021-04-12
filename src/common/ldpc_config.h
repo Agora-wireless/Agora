@@ -126,7 +126,7 @@ class LDPCconfig {
 
   // Return the offset of subcarrier for the start of a code block's
   // current chunk within a symbol
-  size_t get_chunk_start_sc(size_t cb_id, size_t chunk_id) const {
+  size_t GetChunkStartSc(size_t cb_id, size_t chunk_id) const {
     size_t symbol_id = lut_cb_to_symbol_[cb_id][chunk_id];
     const auto it = std::find(lut_symbol_to_cb_[symbol_id].begin(),
                               lut_symbol_to_cb_[symbol_id].end(), cb_id);
