@@ -329,7 +329,7 @@ int main(int argc, char* argv[]) {
     ldpc_decoder_5gnr_request.Zc = ldpc_config.ExpansionFactor();
     ldpc_decoder_5gnr_request.baseGraph = ldpc_config.BaseGraph();
     ldpc_decoder_5gnr_request.nRows = ldpc_config.NumRows();
-    ldpc_decoder_5gnr_response.numMsgBits = ldpc_config.NumCbLen();
+    ldpc_decoder_5gnr_response.numMsgBits = ldpc_config.CbLen();
     auto* resp_var_nodes = static_cast<int16_t*>(
         Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                          1024 * 1024 * sizeof(int16_t)));
@@ -359,12 +359,12 @@ int main(int argc, char* argv[]) {
 
     // Correctness check
     size_t error_num = 0;
-    size_t total = num_codeblocks * ldpc_config.NumCbLen();
+    size_t total = num_codeblocks * ldpc_config.CbLen();
     size_t block_error_num = 0;
 
     for (size_t i = 0; i < num_codeblocks; i++) {
       size_t error_in_block = 0;
-      for (size_t j = 0; j < ldpc_config.NumCbLen() / 8; j++) {
+      for (size_t j = 0; j < ldpc_config.CbLen() / 8; j++) {
         auto input = static_cast<uint8_t>(information.at(i).at(j));
         uint8_t output = decoded_codewords[i][j];
         if (input != output) {

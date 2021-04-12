@@ -262,9 +262,39 @@ class Config {
     this->mod_order_bits_ = new_mod_order_bits;
     this->mod_order_ = static_cast<size_t>(pow(2, this->mod_order_bits_));
     InitModulationTable(this->mod_table_, this->mod_order_);
-    this->ldpc_config_.NumBlocksInSymbol(
+    this->ldpc_config_.SetNumBlocksInSymbol(
         (this->ofdm_data_num_ * this->mod_order_bits_) /
         this->ldpc_config_.NumCbCodewLen());
+  }
+
+  inline void updateCfgsFromMcs(LDPCconfig& ldpc_config, size_t n_symbol,
+                                size_t mcs) {
+    UpdateModCfgs(McsToModOrderBits[mcs]);
+    float target_code_rate = McsToCodeRate[mcs];
+    // Number of information bits available in a frame for each UE
+    size_t n_info_per_ue = std::floor(n_symbol * this->ofdm_data_num_ *
+                                      this->mod_order_bits_ * target_code_rate);
+    ldpc_config.SetBaseGraph(SelectBaseGraph(n_info_per_ue, target_code_rate));
+    ldpc_config.SetNumRows(
+        ComputeNumRows(target_code_rate, ldpc_config.BaseGraph()));
+    ldpc_config.SetCodeRate(
+        ComputeCodeRate(ldpc_config.NumRows(), ldpc_config.BaseGraph()));
+
+    // Recompute n_info based on the computed code rate.
+    n_info_per_ue = std::floor(n_symbol * this->ofdm_data_num_ *
+                               this->mod_order_bits_ * ldpc_config.CodeRate());
+    size_t tb_size = ComputeTbSize(n_info_per_ue, ldpc_config.CodeRate());
+    size_t n_cb;
+    uint32_t n_info_per_cb;
+    uint16_t zc;
+    CodeBlockSegmentation(tb_size, ldpc_config.BaseGraph(), n_cb, n_info_per_cb,
+                          zc);
+    ldpc_config.SetNumCbs(n_cb);
+    ldpc_config.SetCbLen(n_info_per_cb);
+    ldpc_config.SetZc(zc);
+    ldpc_config.MapSymbolsToCbs(n_symbol, this->ofdm_data_num_,
+                                this->mod_order_bits_);
+    num_bytes_per_cb_ = ldpc_config.CbLen() / 8;
   }
 
   /// Return total number of data symbols of all frames in a buffer

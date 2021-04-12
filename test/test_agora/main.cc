@@ -57,7 +57,7 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
   output_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
                      Agora_memory::Alignment_t::kAlign64);
 
-  int num_bytes_per_ue = (cfg->LdpcConfig().NumCbLen() + 7) >>
+  int num_bytes_per_ue = (cfg->LdpcConfig().CbLen() + 7) >>
                          3 * cfg->LdpcConfig().NumBlocksInSymbol();
   ReadFromFileUl(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
   ReadFromFileUl(output_data_filename, output_data, num_bytes_per_ue, cfg);

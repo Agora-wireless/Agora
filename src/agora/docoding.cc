@@ -156,7 +156,7 @@ EventData DoDecode::Launch(size_t tag) {
   ldpc_decoder_5gnr_request.baseGraph = ldpc_config.BaseGraph();
   ldpc_decoder_5gnr_request.nRows = ldpc_config.NumRows();
 
-  int num_msg_bits = ldpc_config.NumCbLen() - num_filler_bits;
+  int num_msg_bits = ldpc_config.CbLen() - num_filler_bits;
   ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
   ldpc_decoder_5gnr_response.varNodes = resp_var_nodes_;
 
@@ -194,7 +194,7 @@ EventData DoDecode::Launch(size_t tag) {
 
   if (kPrintDecodedData) {
     std::printf("Decoded data\n");
-    for (size_t i = 0; i < (ldpc_config.NumCbLen() >> 3); i++) {
+    for (size_t i = 0; i < (ldpc_config.CbLen() >> 3); i++) {
       std::printf("%u ", *(decoded_buffer_ptr + i));
     }
     std::printf("\n");

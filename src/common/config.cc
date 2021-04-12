@@ -22,7 +22,7 @@ static const size_t kMacAlignmentBytes = 64u;
 
 Config::Config(const std::string& jsonfile)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
-      ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
+      ldpc_config_(0, 0, 0, false, 0, 0, 0, 0, 0, 0),
       frame_("") {
   pilots_ = nullptr;
   pilots_sgn_ = nullptr;
@@ -385,9 +385,13 @@ Config::Config(const std::string& jsonfile)
   size_t num_rows = tdd_conf.value("nRows", (base_graph == 1) ? 46 : 42);
   uint32_t num_cb_len = LdpcNumInputBits(base_graph, zc);
   uint32_t num_cb_codew_len = LdpcNumEncodedBits(base_graph, zc, num_rows);
+  float code_rate =
+      1.f * LdpcNumInputCols(ldpc_config_.BaseGraph()) /
+      (LdpcNumInputCols(ldpc_config_.BaseGraph()) - 2 + ldpc_config_.NumRows());
 
-  ldpc_config_ = LDPCconfig(base_graph, zc, max_decoder_iter, early_term,
-                            num_cb_len, num_cb_codew_len, num_rows, 0);
+  ldpc_config_ =
+      LDPCconfig(base_graph, zc, max_decoder_iter, early_term, num_cb_len,
+                 num_cb_codew_len, num_rows, 0, code_rate, 0);
 
   // Scrambler and descrambler configurations
   scramble_enabled_ = tdd_conf.value("wlan_scrambler", true);
@@ -409,12 +413,8 @@ Config::Config(const std::string& jsonfile)
       "bits per encoding, %d bits per encoded code word, decoder "
       "iterations: %d, code rate %.3f (nRows = %zu)\n",
       ldpc_config_.ExpansionFactor(), ldpc_config_.NumBlocksInSymbol(),
-      ldpc_config_.NumCbLen(), ldpc_config_.NumCbCodewLen(),
-      ldpc_config_.MaxDecoderIter(),
-      1.f * LdpcNumInputCols(ldpc_config_.BaseGraph()) /
-          (LdpcNumInputCols(ldpc_config_.BaseGraph()) - 2 +
-           ldpc_config_.NumRows()),
-      ldpc_config_.NumRows());
+      ldpc_config_.CbLen(), ldpc_config_.NumCbCodewLen(),
+      ldpc_config_.MaxDecoderIter(), code_rate, ldpc_config_.NumRows());
 
   fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
 
@@ -426,7 +426,7 @@ Config::Config(const std::string& jsonfile)
   RtAssert(packet_length_ < 9000,
            "Packet size must be smaller than jumbo frame");
 
-  num_bytes_per_cb_ = ldpc_config_.NumCbLen() / 8;
+  num_bytes_per_cb_ = ldpc_config_.CbLen() / 8;
   data_bytes_num_persymbol_ =
       num_bytes_per_cb_ * ldpc_config_.NumBlocksInSymbol();
 

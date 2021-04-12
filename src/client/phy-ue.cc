@@ -900,7 +900,7 @@ void PhyUe::DoDecode(int tid, size_t tag) {
   ldpc_decoder_5gnr_request.baseGraph = ldpc_config.BaseGraph();
   ldpc_decoder_5gnr_request.nRows = ldpc_config.NumRows();
 
-  int num_msg_bits = ldpc_config.NumCbLen() - num_filler_bits;
+  int num_msg_bits = ldpc_config.CbLen() - num_filler_bits;
   ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
   ldpc_decoder_5gnr_response.varNodes = resp_var_nodes_;
 
@@ -1007,9 +1007,9 @@ void PhyUe::DoEncode(int tid, size_t tag) {
       LdpcEncodingParityBufSize(cfg->LdpcConfig().BaseGraph(),
                                 cfg->LdpcConfig().ExpansionFactor())));
 
-  size_t bytes_per_block =
-      kEnableMac ? ((ldpc_config.NumCbLen()) >> 3)
-                 : Roundup<64>(BitsToBytes(ldpc_config.NumCbLen()));
+  size_t bytes_per_block = kEnableMac
+                               ? ((ldpc_config.CbLen()) >> 3)
+                               : Roundup<64>(BitsToBytes(ldpc_config.CbLen()));
   size_t encoded_bytes_per_block = (ldpc_config.NumCbCodewLen() + 7) >> 3;
   auto* input_ptr = new int8_t[bytes_per_block +
                                kLdpcHelperFunctionInputBufferSizePaddingBytes];

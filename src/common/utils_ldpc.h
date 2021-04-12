@@ -400,12 +400,14 @@ static inline size_t ComputeTbSize(size_t n_info, float code_rate) {
   return transport_block_size;
 }
 
-static inline size_t ComputeNRows(float target_code_rate, uint16_t base_graph) {
+static inline size_t ComputeNumRows(float target_code_rate,
+                                    uint16_t base_graph) {
   size_t n_info_cols = LdpcNumInputCols(base_graph);
   size_t n_rows = std::max(
-      (size_t)4, std::min(LdpcMaxNumRows(base_graph),
-                          static_cast<size_t>(
-                              std::round(1.f * n_info_cols / target_code_rate) -
+      static_cast<size_t>(4),
+      std::min(
+          LdpcMaxNumRows(base_graph),
+          static_cast<size_t>(std::round(1.f * n_info_cols / target_code_rate) -
                               n_info_cols)));
   return n_rows;
 }
