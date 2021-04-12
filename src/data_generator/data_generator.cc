@@ -186,23 +186,17 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
   // Generate CSI matrix
   Table<complex_float> csi_matrices;
+  float sqrt2_norm = 1 / std::sqrt(2);
   csi_matrices.Calloc(this->cfg_->OfdmCaNum(),
                       this->cfg_->UeAntNum() * this->cfg_->BsAntNum(),
                       Agora_memory::Alignment_t::kAlign32);
   for (size_t i = 0; i < (this->cfg_->UeAntNum() * this->cfg_->BsAntNum());
        i++) {
     complex_float csi = {RandFloatFromShort(-1, 1), RandFloatFromShort(-1, 1)};
-    // std::printf("noise of ant %d, ue %d\n", i % this->cfg_->bs_ant_num(), i
-    // / this->cfg_->bs_ant_num() );
     for (size_t j = 0; j < this->cfg_->OfdmCaNum(); j++) {
-      complex_float noise = {
-          RandFloatFromShort(-1, 1) * this->cfg_->NoiseLevel(),
-          RandFloatFromShort(-1, 1) * this->cfg_->NoiseLevel()};
-      // std::printf("%.4f+%.4fi ", noise.re, noise.im);
-      csi_matrices[j][i].re = csi.re + noise.re;
-      csi_matrices[j][i].im = csi.im + noise.im;
+      csi_matrices[j][i].re = csi.re * sqrt2_norm;
+      csi_matrices[j][i].im = csi.im * sqrt2_norm;
     }
-    // std::printf("\n");
   }
 
   // Generate RX data received by base station after going through channels
@@ -222,6 +216,12 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
                             this->cfg_->BsAntNum(), this->cfg_->UeAntNum());
       mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
+      for (size_t k = 0; k < this->cfg_->BsAntNum(); k++) {
+        arma::cx_float noise(RandFloatFromShort(-1, 1),
+                             RandFloatFromShort(-1, 1));
+        noise *= this->cfg_->NoiseLevel() * sqrt2_norm;
+        mat_output.at(j, k) += noise;
+      }
     }
     for (size_t j = 0; j < this->cfg_->BsAntNum(); j++) {
       CommsLib::IFFT(rx_data_all_symbols[i] + j * this->cfg_->OfdmCaNum(),
