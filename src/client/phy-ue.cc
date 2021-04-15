@@ -11,6 +11,11 @@
 #include "signal_handler.h"
 #include "utils_ldpc.h"
 
+/* Print debug work */
+static constexpr bool kDebugPrintFft = true;
+static constexpr bool kDebugPrintDemul = true;
+static constexpr bool kDebugPrintDecode = true;
+
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
 static constexpr bool kPrintLLRData = false;
@@ -47,42 +52,32 @@ PhyUe::PhyUe(Config* config)
     }
   }
 
-  fft_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * dl_symbol_perframe_ * config_->UeAntNum() *
-      kDefaultQueueSize);
-  demul_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * dl_data_symbol_perframe_ * config_->UeAntNum() *
-      kDefaultQueueSize);
-  decode_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * dl_data_symbol_perframe_ * config_->UeAntNum() *
-      kDefaultQueueSize);
-  message_queue_ = moodycamel::ConcurrentQueue<EventData>(
+  complete_queue_ = moodycamel::ConcurrentQueue<EventData>(
       kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
       kDefaultQueueSize);
-  encode_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
-  modul_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
-  ifft_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
+  work_queue_ = moodycamel::ConcurrentQueue<EventData>(
+      kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
+      kDefaultQueueSize);
   tx_queue_ = moodycamel::ConcurrentQueue<EventData>(
       kFrameWnd * config_->UeNum() * kDefaultQueueSize);
   to_mac_queue_ = moodycamel::ConcurrentQueue<EventData>(
       kFrameWnd * config_->UeNum() * kDefaultQueueSize);
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
-    rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(message_queue_);
+    rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(complete_queue_);
     tx_ptoks_ptr_[i] = new moodycamel::ProducerToken(tx_queue_);
-    mac_rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(message_queue_);
+    mac_rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(complete_queue_);
     mac_tx_ptoks_ptr_[i] = new moodycamel::ProducerToken(to_mac_queue_);
   }
 
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
-    task_ptok_[i] = new moodycamel::ProducerToken(message_queue_);
+    task_ptok_[i] = new moodycamel::ProducerToken(complete_queue_);
   }
+  work_producer_token_ =
+      std::make_unique<moodycamel::ProducerToken>(work_queue_);
 
   ru_ = std::make_unique<RadioTxRx>(config_, rx_thread_num_,
-                                    config_->CoreOffset() + 1, &message_queue_,
+                                    config_->CoreOffset() + 1, &complete_queue_,
                                     &tx_queue_, rx_ptoks_ptr_, tx_ptoks_ptr_);
 
   // uplink buffers init (tx)
@@ -99,7 +94,7 @@ PhyUe::PhyUe(Config* config)
     mac_thread_ = std::make_unique<MacThread>(
         MacThread::Mode::kClient, config_, mac_cpu_core, dummy_decoded_buffer,
         &ul_bits_buffer_, &ul_bits_buffer_status_, nullptr, /* dl bits buffer */
-        nullptr /* dl bits buffer status */, &to_mac_queue_, &message_queue_);
+        nullptr /* dl bits buffer status */, &to_mac_queue_, &complete_queue_);
 
     mac_std_thread_ = std::thread(&MacThread::RunEventLoop, mac_thread_.get());
   }
@@ -173,9 +168,17 @@ void PhyUe::ScheduleTask(EventData do_task,
   }
 }
 
-//////////////////////////////////////////////////////////
-//                   UPLINK Operations                  //
-//////////////////////////////////////////////////////////
+void PhyUe::ScheduleWork(EventData do_task) {
+  if (work_queue_.try_enqueue(*(work_producer_token_.get()), do_task) ==
+      false) {
+    std::printf("PhyUe: Cannot enqueue work task, need more memory");
+    if (work_queue_.enqueue(*(work_producer_token_.get()), do_task) == false) {
+      std::printf("PhyUe: work task enqueue failed\n");
+      throw std::runtime_error("PhyUe: work task enqueue failed");
+    }
+  }
+}
+
 void PhyUe::Stop() {
   std::cout << "PhyUe: Stopping threads " << std::endl;
   config_->Running(false);
@@ -199,17 +202,11 @@ void PhyUe::Start() {
   // TODO: make the producertokens global and try
   // "try_dequeue_from_producer(token,item)"
   //       combine the task queues into one queue
-  moodycamel::ProducerToken ptok_fft(fft_queue_);
-  moodycamel::ProducerToken ptok_modul(modul_queue_);
-  moodycamel::ProducerToken ptok_demul(demul_queue_);
-  moodycamel::ProducerToken ptok_decode(decode_queue_);
   moodycamel::ProducerToken ptok_mac(to_mac_queue_);
-  moodycamel::ProducerToken ptok_ifft(ifft_queue_);
-  moodycamel::ProducerToken ptok_encode(encode_queue_);
 
   // for message_queue, main thread is a consumer, it is multiple producers
   // & single consumer for message_queue
-  moodycamel::ConsumerToken ctok(message_queue_);
+  moodycamel::ConsumerToken ctok(complete_queue_);
 
   // counter for print log
   int miss_count = 0;
@@ -224,11 +221,11 @@ void PhyUe::Start() {
   while ((config_->Running() == true) &&
          (SignalHandler::GotExitSignal() == false)) {
     // get a bulk of events
-    ret = message_queue_.try_dequeue_bulk(ctok, events_list.data(),
-                                          kDequeueBulkSizeTXRX);
+    ret = complete_queue_.try_dequeue_bulk(ctok, events_list.data(),
+                                           kDequeueBulkSizeTXRX);
     total_count++;
     if (total_count == 1e7) {
-      // print the message_queue_ miss rate is needed
+      // print the complete_queue_ miss rate is needed
       // std::printf("message dequeue miss rate %f\n", (float)miss_count /
       // total_count);
       total_count = 0;
@@ -260,14 +257,14 @@ void PhyUe::Start() {
                    "slowly, e.g., in debug mode");
           std::printf(
               "PhyUE: kPacketRX - Frame %zu Symbol %zu Ant %zu, at "
-              "%.3f\n",
+              "%.3f ms\n",
               frame_id, symbol_id, ue_id, GetTime::GetTimeUs() / 1000.0f);
 
           // TODO: Defer the scheduling
-          if (frame_id > cur_frame_id) {
-            // Defer the scheduling
-            continue;
-          }
+          // if (frame_id > cur_frame_id) {
+          // Defer the scheduling
+          //  continue;
+          //}
 
           // Schedule uplink pilots transmission and uplink processing
           if (symbol_id == config_->Frame().GetBeaconSymbolLast()) {
@@ -296,11 +293,9 @@ void PhyUe::Start() {
                 EventData do_encode_task(
                     EventType::kEncode,
                     gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
-                ScheduleTask(do_encode_task, &encode_queue_, ptok_encode);
+                ScheduleWork(do_encode_task);
               }
             }
-            // now empty
-            rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0;
           }
 
           // ** BUG with symbol_id =
@@ -315,7 +310,9 @@ void PhyUe::Start() {
                 "PhyUE: Schedule FFT - Frame %zu Symbol %zu Ant %zu, at %.3f\n",
                 frame_id, symbol_id, ue_id, GetTime::GetTimeUs() / 1000.0f);
             EventData do_fft_task(EventType::kFFT, event.tags_[0]);
-            ScheduleTask(do_fft_task, &fft_queue_, ptok_fft);
+            ScheduleWork(do_fft_task);
+          } else {
+            rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0;
           }
         } break;
 
@@ -330,7 +327,7 @@ void PhyUe::Start() {
           /* Schedule DEMUL for dl data symbols */
           if (dl_symbol_idx >= dl_pilot_symbol_perframe_) {
             EventData do_demul_task(EventType::kDemul, event.tags_[0]);
-            ScheduleTask(do_demul_task, &demul_queue_, ptok_demul);
+            ScheduleWork(do_demul_task);
           }
           fft_checker_[frame_slot][ant_id]++;
           if (fft_checker_[frame_slot][ant_id] == dl_symbol_perframe_) {
@@ -360,7 +357,7 @@ void PhyUe::Start() {
           size_t frame_slot = frame_id % kFrameWnd;
 
           EventData do_decode_task(EventType::kDecode, event.tags_[0]);
-          ScheduleTask(do_decode_task, &decode_queue_, ptok_decode);
+          ScheduleWork(do_decode_task);
           demul_checker_[frame_slot][ant_id]++;
           if (demul_checker_[frame_slot][ant_id] == dl_data_symbol_perframe_) {
             if (kDebugPrintPerTaskDone == false) {
@@ -508,7 +505,7 @@ void PhyUe::Start() {
                 GetTime::GetTimeUs() / 1000.0f);
           }
           EventData do_modul_task(EventType::kModul, event.tags_[0]);
-          ScheduleTask(do_modul_task, &modul_queue_, ptok_modul);
+          ScheduleWork(do_modul_task);
         } break;
 
         case EventType::kModul: {
@@ -519,7 +516,8 @@ void PhyUe::Start() {
           EventData do_ifft_task(
               EventType::kIFFT,
               gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
-          ScheduleTask(do_ifft_task, &ifft_queue_, ptok_ifft);
+          ScheduleWork(do_ifft_task);
+
           if (kDebugPrintPerTaskDone == false) {
             std::printf(
                 "PhyUE: Frame %zu, symbol %zu, finished modulating of data "
@@ -668,23 +666,34 @@ void PhyUe::TaskThread(int tid) {
                           (kEnableMac ? rx_thread_num_ : 0),
                       tid);
 
-  // task_ptok[tid].reset(new moodycamel::ProducerToken(message_queue_));
-
   EventData event;
   while (config_->Running() == true) {
-    if (decode_queue_.try_dequeue(event)) {
-      DoDecode(tid, event.tags_[0]);
-    } else if (demul_queue_.try_dequeue(event)) {
-      DoDemul(tid, event.tags_[0]);
-    } else if (ifft_queue_.try_dequeue(event)) {
-      DoIfft(tid, event.tags_[0]);
-    } else if (modul_queue_.try_dequeue(event)) {
-      DoModul(tid, event.tags_[0]);
-    } else if (encode_queue_.try_dequeue(event)) {
-      DoEncode(tid, event.tags_[0]);
-    } else if (fft_queue_.try_dequeue(event)) {
-      DoFft(tid, event.tags_[0]);
-    }
+    if (work_queue_.try_dequeue_from_producer(*work_producer_token_.get(),
+                                              event) == true) {
+      switch (event.event_type_) {
+        case EventType::kDecode: {
+          DoDecode(tid, event.tags_[0]);
+        } break;
+        case EventType::kDemul: {
+          DoDemul(tid, event.tags_[0]);
+        } break;
+        case EventType::kIFFT: {
+          DoIfft(tid, event.tags_[0]);
+        } break;
+        case EventType::kModul: {
+          DoModul(tid, event.tags_[0]);
+        } break;
+        case EventType::kEncode: {
+          DoEncode(tid, event.tags_[0]);
+        } break;
+        case EventType::kFFT: {
+          DoFft(tid, event.tags_[0]);
+        } break;
+        default: {
+          std::printf("Invalid Event Type in Work Queue");
+        }
+      }
+    }  // end dequeue
   }
 }
 
@@ -706,15 +715,9 @@ void PhyUe::DoFft(int tid, size_t tag) {
   size_t ant_id = pkt->ant_id_;
   size_t frame_slot = frame_id % kFrameWnd;
 
-  if ((config_->IsPilot(frame_id, symbol_id) == false) &&
-      (config_->IsDownlink(frame_id, symbol_id) == false)) {
-    return;
-  }
-
-  if (kDebugPrintInTask) {
-    std::printf(
-        "User Task: In doFFT TID %d: frame %zu, symbol %zu, ant_id %zu\n", tid,
-        frame_id, symbol_id, ant_id);
+  if (kDebugPrintInTask || kDebugPrintFft) {
+    std::printf("User Task[%d]: Fft    (frame %zu, symbol %zu, ant %zu)\n", tid,
+                frame_id, symbol_id, ant_id);
   }
 
   size_t sig_offset = config_->OfdmRxZeroPrefixClient();
@@ -883,17 +886,20 @@ void PhyUe::DoFft(int tid, size_t tag) {
   }
 
   size_t fft_duration_stat = GetTime::Rdtsc() - start_tsc;
-  if (kDebugPrintPerTaskDone == false) {
+
+  if (kDebugPrintPerTaskDone || kDebugPrintFft) {
     std::printf(
-        "User Task: FFT Duration (%zu, %zu, %zu): %2.4f us\n", frame_id,
-        symbol_id, ant_id,
-        GetTime::CyclesToUs(fft_duration_stat, GetTime::MeasureRdtscFreq()));
+        "User Task[%d]: Fft    (frame %zu, symbol %zu, ant %zu) Duration %2.4f "
+        "ms\n",
+        tid, frame_id, symbol_id, ant_id,
+        GetTime::CyclesToMs(fft_duration_stat, GetTime::MeasureRdtscFreq()));
   }
 
-  rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0;  // now empty
+  // now empty
+  rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0;
   fft_finish_event = EventData(
       EventType::kFFT, gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_);
-  RtAssert(message_queue_.enqueue(*task_ptok_[tid], fft_finish_event),
+  RtAssert(complete_queue_.enqueue(*task_ptok_[tid], fft_finish_event),
            "User Task: FFT message enqueue failed");
 }
 
@@ -901,10 +907,10 @@ void PhyUe::DoDemul(int tid, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ant_id_;
-  if (kDebugPrintInTask) {
-    std::printf(
-        "User Task: In doDemul TID %d: frame %zu, symbol %zu, ant_id %zu\n",
-        tid, frame_id, symbol_id, ant_id);
+
+  if (kDebugPrintInTask || kDebugPrintDemul) {
+    std::printf("User Task[%d]: Demul  (frame %zu, symbol %zu, ant %zu)\n", tid,
+                frame_id, symbol_id, ant_id);
   }
   size_t start_tsc = GetTime::Rdtsc();
 
@@ -915,9 +921,6 @@ void PhyUe::DoDemul(int tid, size_t tag) {
   size_t offset = total_dl_symbol_id * config_->UeAntNum() + ant_id;
   auto* equal_ptr = reinterpret_cast<float*>(&equal_buffer_[offset][0]);
   auto* demul_ptr = dl_demod_buffer_[offset];
-
-  // demod_16qam_hard_loop(
-  //    equal_ptr, (uint8_t*)demul_ptr, config_->UeAntNum());
 
   switch (config_->ModOrderBits()) {
     case (CommsLib::kQpsk):
@@ -930,19 +933,18 @@ void PhyUe::DoDemul(int tid, size_t tag) {
       Demod64qamSoftAvx2(equal_ptr, demul_ptr, config_->OfdmDataNum());
       break;
     default:
-      std::printf(
-          "User Task: Demodulation - modulation type %s not supported!\n",
-          config_->Modulation().c_str());
+      std::printf("User Task[%d]: Demul - modulation type %s not supported!\n",
+                  tid, config_->Modulation().c_str());
   }
 
   size_t dem_duration_stat = GetTime::Rdtsc() - start_tsc;
-  if (kDebugPrintPerTaskDone == false) {
+  if ((kDebugPrintPerTaskDone == true) || (kDebugPrintDemul == true)) {
     std::printf(
-        "User Task: Demodul Duration (%zu, %zu, %zu): %2.4f us\n", frame_id,
-        symbol_id, ant_id,
-        GetTime::CyclesToUs(dem_duration_stat, GetTime::MeasureRdtscFreq()));
+        "User Task[%d]: Demul  (frame %zu, symbol %zu, ant %zu) Duration "
+        "%2.4f ms\n",
+        tid, frame_id, symbol_id, ant_id,
+        GetTime::CyclesToMs(dem_duration_stat, GetTime::MeasureRdtscFreq()));
   }
-
   if (kPrintLLRData) {
     std::printf("LLR data, symbol_offset: %zu\n", offset);
     for (size_t i = 0; i < config_->OfdmDataNum(); i++) {
@@ -951,8 +953,8 @@ void PhyUe::DoDemul(int tid, size_t tag) {
     std::printf("\n");
   }
 
-  RtAssert(message_queue_.enqueue(*task_ptok_[tid],
-                                  EventData(EventType::kDemul, tag)),
+  RtAssert(complete_queue_.enqueue(*task_ptok_[tid],
+                                   EventData(EventType::kDemul, tag)),
            "Demodulation message enqueue failed");
 }
 
@@ -961,10 +963,9 @@ void PhyUe::DoDecode(int tid, size_t tag) {
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
   size_t ant_id = gen_tag_t(tag).ant_id_;
-  if (kDebugPrintInTask) {
-    std::printf(
-        "User Task: In doDecode TID %d: frame %zu, symbol %zu, ant_id %zu\n",
-        tid, frame_id, symbol_id, ant_id);
+  if (kDebugPrintInTask || kDebugPrintDecode) {
+    std::printf("User Task[%d]: Decode (frame %zu, symbol %zu, ant %zu)\n", tid,
+                frame_id, symbol_id, ant_id);
   }
   size_t start_tsc = GetTime::Rdtsc();
 
@@ -1061,15 +1062,16 @@ void PhyUe::DoDecode(int tid, size_t tag) {
   }
 
   size_t dec_duration_stat = GetTime::Rdtsc() - start_tsc;
-  if (kDebugPrintPerTaskDone == false) {
+  if ((kDebugPrintPerTaskDone == true) || (kDebugPrintDecode == true)) {
     std::printf(
-        "Decode Duration (%zu, %zu, %zu): %2.4f us\n", frame_id, symbol_id,
-        ant_id,
-        GetTime::CyclesToUs(dec_duration_stat, GetTime::MeasureRdtscFreq()));
+        "User Task[%d]: Decode (frame %zu, symbol %zu, ant %zu) Duration %2.4f "
+        "ms\n",
+        tid, frame_id, symbol_id, ant_id,
+        GetTime::CyclesToMs(dec_duration_stat, GetTime::MeasureRdtscFreq()));
   }
 
-  RtAssert(message_queue_.enqueue(*task_ptok_[tid],
-                                  EventData(EventType::kDecode, tag)),
+  RtAssert(complete_queue_.enqueue(*task_ptok_[tid],
+                                   EventData(EventType::kDecode, tag)),
            "Decoding message enqueue failed");
 }
 
@@ -1162,8 +1164,8 @@ void PhyUe::DoEncode(int tid, size_t tag) {
   std::free(parity_buffer);
   delete[] input_ptr;
 
-  RtAssert(message_queue_.enqueue(*task_ptok_[tid],
-                                  EventData(EventType::kEncode, tag)),
+  RtAssert(complete_queue_.enqueue(*task_ptok_[tid],
+                                   EventData(EventType::kEncode, tag)),
            "Encoding message enqueue failed");
 }
 
@@ -1188,9 +1190,9 @@ void PhyUe::DoModul(int tid, size_t tag) {
       }
     }
   }
-  RtAssert(message_queue_.enqueue(*task_ptok_[tid],
-                                  EventData(EventType::kModul, tag)),
-           "Muliplexing message enqueue failed");
+  RtAssert(complete_queue_.enqueue(*task_ptok_[tid],
+                                   EventData(EventType::kModul, tag)),
+           "Modulation complete message enqueue failed");
 }
 
 void PhyUe::DoIfft(int tid, size_t tag) {
@@ -1237,8 +1239,8 @@ void PhyUe::DoIfft(int tid, size_t tag) {
     }
   }
 
-  RtAssert(message_queue_.enqueue(*task_ptok_[tid],
-                                  EventData(EventType::kIFFT, tag)),
+  RtAssert(complete_queue_.enqueue(*task_ptok_[tid],
+                                   EventData(EventType::kIFFT, tag)),
            "Muliplexing message enqueue failed");
 }
 
@@ -1406,7 +1408,6 @@ void PhyUe::FrameInit(size_t frame) {
   if (kEnableMac == false) {
     initial |= static_cast<std::uint8_t>(FrameTasksFlags::kMacTxComplete);
   }
-
   frame_tasks_.at(frame % kFrameWnd) = initial;
 }
 
