@@ -1012,8 +1012,6 @@ bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const {
 }
 
 SymbolType Config::GetSymbolType(size_t symbol_id) const {
-  assert((this->is_ue_ ==
-          false));  // Currently implemented for only the Agora server
   return kSymbolMap.at(this->frame_.FrameIdentifier().at(symbol_id));
 }
 

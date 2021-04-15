@@ -48,6 +48,10 @@ class PhyUe {
   void Start();
   void Stop();
 
+  void GetEqualData(float** ptr, int* size, int /*ue_id*/);
+  void GetDemulData(long long** ptr, int* size);
+
+ private:
   /*****************************************************
    * Downlink
    *****************************************************/
@@ -125,16 +129,15 @@ class PhyUe {
   void DoDemul(int /*tid*/, size_t /*tag*/);
   void DoDecode(int /*tid*/, size_t /*tag*/);
 
-  void GetDemulData(long long** ptr, int* size);
-  void GetEqualPcData(float** ptr, int* size, int);
-  void GetEqualData(float** ptr, int* size, int /*ue_id*/);
-
   void TaskThread(int tid);
 
   /* Add tasks into task queue based on event type */
   void ScheduleTask(EventData do_task,
                     moodycamel::ConcurrentQueue<EventData>* in_queue,
                     moodycamel::ProducerToken const& ptok);
+  void ScheduleWork(EventData do_task);
+
+  std::unique_ptr<moodycamel::ProducerToken> work_producer_token_;
 
   void InitializeVarsFromCfg();
 
@@ -142,7 +145,6 @@ class PhyUe {
   // Tracks the tasks completed for the frame
   bool FrameComplete(size_t frame, FrameTasksFlags complete);
 
- private:
   void FreeUplinkBuffers();
   void FreeDownlinkBuffers();
 
@@ -212,10 +214,7 @@ class PhyUe {
    */
   Table<complex_float> modul_buffer_;
 
-  /*****************************************************
-   * Downlink
-   *****************************************************/
-
+  // Remote unit
   std::unique_ptr<RadioTxRx> ru_;
 
   /**
@@ -263,9 +262,6 @@ class PhyUe {
    */
   Table<int8_t> dl_demod_buffer_;
 
-  /**
-   *
-   */
   std::vector<std::vector<uint8_t>> dl_decode_buffer_;
   std::complex<float>* rx_samps_tmp_;  // Temp buffer for received samples
 
@@ -281,19 +277,12 @@ class PhyUe {
   std::vector<size_t> symbol_error_count_;
 
   /* Concurrent queues */
-  /* task queue for downlink FFT */
-  moodycamel::ConcurrentQueue<EventData> fft_queue_;
-  /* task queue for downlink demodulation */
-  moodycamel::ConcurrentQueue<EventData> demul_queue_;
-  /* task queue for downlink decoding */
-  moodycamel::ConcurrentQueue<EventData> decode_queue_;
-  /* main thread message queue */
-  moodycamel::ConcurrentQueue<EventData> message_queue_;
-  moodycamel::ConcurrentQueue<EventData> ifft_queue_;
+
+  moodycamel::ConcurrentQueue<EventData> complete_queue_;
+  moodycamel::ConcurrentQueue<EventData> work_queue_;
+
   moodycamel::ConcurrentQueue<EventData> tx_queue_;
   moodycamel::ConcurrentQueue<EventData> to_mac_queue_;
-  moodycamel::ConcurrentQueue<EventData> encode_queue_;
-  moodycamel::ConcurrentQueue<EventData> modul_queue_;
 
   std::array<std::thread, kMaxThreads> task_threads_;
 
@@ -314,20 +303,10 @@ class PhyUe {
   std::array<std::vector<size_t>, kFrameWnd> demul_checker_;
   std::array<size_t, kFrameWnd> demul_status_;
 
-  // std::array<std::vector<size_t>, kFrameWnd> decode_checker_;
-  // std::array<size_t, kFrameWnd> decode_status_;
-
   std::array<double, kFrameWnd * kMaxUEs> frame_dl_process_time_;
   std::queue<std::tuple<int, int>> task_wait_list_;
   std::unique_ptr<AgoraScrambler::Scrambler> scrambler_;
 
-  // for python
-  /**
-   * dimension: OFDM*UE_NUM
-   */
-  int max_equaled_frame_ = 0;
-  // long long* demul_output;
-  // float* equal_output;
-  size_t record_frame_ = SIZE_MAX;
+  size_t max_equaled_frame_ = 0;
 };
 #endif  // PHY_UE_H_
