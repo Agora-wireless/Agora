@@ -20,6 +20,7 @@
 #include "mkl_dfti.h"
 #include "modulation.h"
 #include "scrambler.h"
+#include "stats.h"
 #include "txrx_client.h"
 
 static const size_t kVectorAlignment = 64;
@@ -52,6 +53,14 @@ class PhyUe {
   void GetDemulData(long long** ptr, int* size);
 
  private:
+  void PrintPerTaskDone(PrintType print_type, size_t frame_id, size_t symbol_id,
+                        size_t ant);
+  void PrintPerSymbolDone(PrintType print_type, size_t frame_id,
+                          size_t symbol_id);
+  void PrintPerFrameDone(PrintType print_type, size_t frame_id);
+  std::unique_ptr<Stats> stats_;
+  RxCounters rx_counters_;
+
   /*****************************************************
    * Downlink
    *****************************************************/
@@ -293,13 +302,16 @@ class PhyUe {
 
   // all checkers
   FrameCounters tx_counters_;
+  // Downlink (Rx)
   FrameCounters decode_counters_;
   FrameCounters demul_counters_;
   FrameCounters fft_counters_;
+  // Uplink (Tx)
+  FrameCounters encode_counter_;
+  FrameCounters modulation_counters_;
+  FrameCounters ifft_counters_;
 
-  std::array<double, kFrameWnd * kMaxUEs> frame_dl_process_time_;
   std::unique_ptr<AgoraScrambler::Scrambler> scrambler_;
-
   size_t max_equaled_frame_ = 0;
 };
 #endif  // PHY_UE_H_
