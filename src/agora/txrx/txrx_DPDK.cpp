@@ -162,31 +162,32 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
                         pthread_fun_wrapper<PacketTXRX, &PacketTXRX::encode_thread>,
                     context, lcore_id);
             } else {
+                rte_eal_remote_launch((lcore_function_t*)
+                        pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_thread>,
+                    context, lcore_id);
                 // rte_eal_remote_launch((lcore_function_t*)
-                //         pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_thread>,
+                //         pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_rx_thread>,
                 //     context, lcore_id);
-                rte_eal_remote_launch((lcore_function_t*)
-                        pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_rx_thread>,
-                    context, lcore_id);
             }
-        } else if (worker_id == socket_thread_num + 1) {
-            auto context = new EventHandlerContext<PacketTXRX>;
-            context->obj_ptr = this;
-            context->id = worker_id;
-            printf("Launch demod tx thread on core %u\n", lcore_id);
-            if (cfg->downlink_mode) {
-                rte_eal_remote_launch((lcore_function_t*)
-                        pthread_fun_wrapper<PacketTXRX, &PacketTXRX::encode_thread>,
-                    context, lcore_id);
-            } else {
-                // rte_eal_remote_launch((lcore_function_t*)
-                //         pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_thread>,
-                //     context, lcore_id);
-                rte_eal_remote_launch((lcore_function_t*)
-                        pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_tx_thread>,
-                    context, lcore_id);
-            }
-        }
+        } 
+        // else if (worker_id == socket_thread_num + 1) {
+        //     auto context = new EventHandlerContext<PacketTXRX>;
+        //     context->obj_ptr = this;
+        //     context->id = worker_id;
+        //     printf("Launch demod tx thread on core %u\n", lcore_id);
+        //     if (cfg->downlink_mode) {
+        //         rte_eal_remote_launch((lcore_function_t*)
+        //                 pthread_fun_wrapper<PacketTXRX, &PacketTXRX::encode_thread>,
+        //             context, lcore_id);
+        //     } else {
+        //         // rte_eal_remote_launch((lcore_function_t*)
+        //         //         pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_thread>,
+        //         //     context, lcore_id);
+        //         rte_eal_remote_launch((lcore_function_t*)
+        //                 pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_tx_thread>,
+        //             context, lcore_id);
+        //     }
+        // }
         worker_id++;
     }
 
