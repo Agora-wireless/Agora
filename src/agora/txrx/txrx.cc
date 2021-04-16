@@ -9,6 +9,7 @@
 #include "logger.h"
 
 static constexpr bool kEnableSlowStart = true;
+static constexpr bool kEnableSlowSending = true;
 
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg_(cfg),
@@ -163,9 +164,10 @@ void PacketTXRX::LoopTxRx(int tid) {
   size_t tx_frame_id = 0;
   size_t send_time = delay_tsc + tx_frame_start;
   // Send Beacons for the first time to kick off sim
-  SendBeacon(tid, tx_frame_id++);
+  // SendBeacon(tid, tx_frame_id++);
   while (cfg_->Running() == true) {
     size_t rdtsc_now = GetTime::Rdtsc();
+
     if (rdtsc_now > send_time) {
       SendBeacon(tid, tx_frame_id++);
 
@@ -174,6 +176,10 @@ void PacketTXRX::LoopTxRx(int tid) {
           delay_tsc = slow_start_tsc2;
         } else if (tx_frame_id == slow_start_thresh2) {
           delay_tsc = frame_tsc_delta;
+          if (kEnableSlowSending) {
+            // Temp for historic reasons
+            delay_tsc = frame_tsc_delta * 4;
+          }
         }
       }
       tx_frame_start = send_time;
