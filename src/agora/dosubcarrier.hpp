@@ -155,64 +155,6 @@ public:
         while (cfg->running && !SignalHandler::gotExitSignal()) {
             size_t worked = 0;
 
-            if (likely(start_tsc > 0)) {
-                loop_count ++;
-                work_start_tsc = rdtsc();
-                state_start_tsc = rdtsc();
-            }
-            bool ret = rx_status_->received_all_pilots(csi_cur_frame_);
-            if (likely(start_tsc > 0)) {
-                state_operation_duration += rdtsc() - state_start_tsc;
-                work_tsc_duration += rdtsc() - work_start_tsc;
-            }
-
-            if (ret) {
-                if (unlikely(start_tsc == 0)) {
-                    start_tsc = rdtsc();
-                }
-
-                work_start_tsc = rdtsc();
-                worked = 1;
-
-                size_t csi_start_tsc = rdtsc();
-                run_csi(csi_cur_frame_, sc_range_.start);
-                csi_tsc_duration += rdtsc() - csi_start_tsc;
-
-                csi_start_tsc = rdtsc();
-                printf(
-                    "Main thread: pilot frame: %lu, finished CSI for all pilot "
-                    "symbols\n",
-                    csi_cur_frame_);
-                print_tsc_duration += rdtsc() - csi_start_tsc;
-
-                csi_cur_frame_++;
-                work_tsc_duration += rdtsc() - work_start_tsc;
-            }
-
-            if (csi_cur_frame_ > zf_cur_frame_) {
-                work_start_tsc = rdtsc();
-                worked = 1;
-
-                size_t zf_start_tsc = rdtsc();
-                do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
-                    sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
-                                   ._tag);
-                zf_tsc_duration += rdtsc() - zf_start_tsc;
-
-                n_zf_tasks_done_++;
-                if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
-                    n_zf_tasks_done_ = 0;
-
-                    zf_start_tsc = rdtsc();
-                    printf("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
-                    print_tsc_duration += rdtsc() - zf_start_tsc;
-
-                    zf_cur_frame_++;
-                }
-
-                work_tsc_duration += rdtsc() - work_start_tsc;
-            }
-
             if (zf_cur_frame_ > demul_cur_frame_) {
 
                 work_start_tsc = rdtsc();
@@ -268,6 +210,7 @@ public:
                     }
 
                     work_tsc_duration += rdtsc() - work_start_tsc;
+                    continue;
                 }
                 
             }
@@ -302,6 +245,66 @@ public:
                         }
                     }
                 }
+                work_tsc_duration += rdtsc() - work_start_tsc;
+                continue;
+            }
+
+            if (csi_cur_frame_ > zf_cur_frame_) {
+                work_start_tsc = rdtsc();
+                worked = 1;
+
+                size_t zf_start_tsc = rdtsc();
+                do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
+                    sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
+                                   ._tag);
+                zf_tsc_duration += rdtsc() - zf_start_tsc;
+
+                n_zf_tasks_done_++;
+                if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
+                    n_zf_tasks_done_ = 0;
+
+                    zf_start_tsc = rdtsc();
+                    printf("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
+                    print_tsc_duration += rdtsc() - zf_start_tsc;
+
+                    zf_cur_frame_++;
+                }
+
+                work_tsc_duration += rdtsc() - work_start_tsc;
+                continue;
+            }
+
+            if (likely(start_tsc > 0)) {
+                loop_count ++;
+                work_start_tsc = rdtsc();
+                state_start_tsc = rdtsc();
+            }
+            bool ret = rx_status_->received_all_pilots(csi_cur_frame_);
+            if (likely(start_tsc > 0)) {
+                state_operation_duration += rdtsc() - state_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
+
+            if (ret) {
+                if (unlikely(start_tsc == 0)) {
+                    start_tsc = rdtsc();
+                }
+
+                work_start_tsc = rdtsc();
+                worked = 1;
+
+                size_t csi_start_tsc = rdtsc();
+                run_csi(csi_cur_frame_, sc_range_.start);
+                csi_tsc_duration += rdtsc() - csi_start_tsc;
+
+                csi_start_tsc = rdtsc();
+                printf(
+                    "Main thread: pilot frame: %lu, finished CSI for all pilot "
+                    "symbols\n",
+                    csi_cur_frame_);
+                print_tsc_duration += rdtsc() - csi_start_tsc;
+
+                csi_cur_frame_++;
                 work_tsc_duration += rdtsc() - work_start_tsc;
             }
 
