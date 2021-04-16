@@ -101,7 +101,8 @@ enum class PrintType : int {
   kEncode,
   kRC,
   kPacketFromMac,
-  kPacketToMac
+  kPacketToMac,
+  kModul
 };
 
 // Enable thread pinning and exit if thread pinning fails. Thread pinning is

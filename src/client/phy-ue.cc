@@ -19,8 +19,6 @@ static constexpr bool kDebugPrintEncode = false;
 static constexpr bool kDebugPrintModul = false;
 static constexpr bool kDebugPrintIFFT = false;
 
-static constexpr bool kDebugPrintPacketRX = false;
-
 static constexpr bool kDebugPrintPacketsFromMac = false;
 static constexpr bool kDebugPrintPacketsToMac = false;
 static constexpr bool kPrintLLRData = false;
@@ -31,7 +29,8 @@ static constexpr size_t kRecordFrameIndex = 1000;
 static const size_t kDefaultQueueSize = 36;
 
 PhyUe::PhyUe(Config* config)
-    : scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
+    : stats_(std::make_unique<Stats>(config)),
+      scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   srand(time(nullptr));
 
   this->config_ = config;
@@ -109,8 +108,6 @@ PhyUe::PhyUe(Config* config)
   (void)DftiCommitDescriptor(mkl_handle_);
 
   // initilize all kinds of checkers
-
-  frame_dl_process_time_.fill(0);
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
     task_threads_.at(i) = std::thread(&PhyUe::TaskThread, this, i);
   }
@@ -123,6 +120,17 @@ PhyUe::PhyUe(Config* config)
   decode_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
   demul_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
   fft_counters_.Init(dl_symbol_perframe_, config_->UeAntNum());
+
+  encode_counter_.Init(config_->UeAntNum());
+  modulation_counters_.Init(config_->UeAntNum());
+  ifft_counters_.Init(config_->UeAntNum());
+
+  rx_counters_.num_pkts_per_frame_ =
+      config_->UeAntNum() *
+      (config_->Frame().NumDLSyms() + config_->Frame().NumBeaconSyms());
+  rx_counters_.num_pilot_pkts_per_frame_ =
+      config_->UeAntNum() * config_->Frame().ClientDlPilotSymbols();
+  // This field doesn't effect the user num_reciprocity_pkts_per_frame_;
 }
 
 PhyUe::~PhyUe() {
@@ -244,29 +252,54 @@ void PhyUe::Start() {
           size_t symbol_id = pkt->symbol_id_;
           size_t ant_id = pkt->ant_id_;
           size_t ue_id = ant_id / config_->NumChannels();
+          size_t frame_slot = frame_id % kFrameWnd;
           RtAssert(pkt->frame_id_ < (cur_frame_id + kFrameWnd),
                    "Error: Received packet for future frame beyond frame "
                    "window. This can happen if PHY is running "
                    "slowly, e.g., in debug mode");
 
-          if (kDebugPrintPacketRX) {
-            std::printf(
-                "PhyUE: kPacketRX (frame %zu, symbol %zu, ant %zu) at %.3f "
-                "ms\n",
-                frame_id, symbol_id, ue_id, GetTime::GetTimeUs() / 1000.0f);
+          PrintPerTaskDone(PrintType::kPacketRX, frame_id, symbol_id, ant_id);
+          // TODO: Defer the scheduling
+          // Receive first packet in a frame
+
+          if (rx_counters_.num_pkts_.at(frame_slot) == 0) {
+            this->stats_->MasterSetTsc(TsType::kFirstSymbolRX, frame_id);
+            if (kDebugPrintPerFrameStart) {
+              const size_t prev_frame_slot =
+                  (frame_slot + kFrameWnd - 1) % kFrameWnd;
+              std::printf(
+                  "PhyUe [frame %zu + %.2f ms since last frame]: Received "
+                  "first packet. Remaining packets in prev frame: %zu\n",
+                  frame_id,
+                  this->stats_->MasterGetDeltaMs(TsType::kFirstSymbolRX,
+                                                 frame_id, frame_id - 1),
+                  rx_counters_.num_pkts_.at(prev_frame_slot));
+            }
           }
 
-          // TODO: Defer the scheduling
-          // if (frame_id > cur_frame_id) {
-          // Defer the scheduling
-          //  continue;
-          //}
+          if (config_->IsPilot(frame_id, symbol_id)) {
+            rx_counters_.num_pilot_pkts_.at(frame_slot)++;
+            if (rx_counters_.num_pilot_pkts_.at(frame_slot) ==
+                rx_counters_.num_pilot_pkts_per_frame_) {
+              rx_counters_.num_pilot_pkts_.at(frame_slot) = 0;
+              this->stats_->MasterSetTsc(TsType::kPilotAllRX, frame_id);
+              PrintPerFrameDone(PrintType::kPacketRXPilots, frame_id);
+            }
+          }
+          rx_counters_.num_pkts_.at(frame_slot)++;
+          if (rx_counters_.num_pkts_.at(frame_slot) ==
+              rx_counters_.num_pkts_per_frame_) {
+            this->stats_->MasterSetTsc(TsType::kRXDone, frame_id);
+            PrintPerFrameDone(PrintType::kPacketRX, frame_id);
+            rx_counters_.num_pkts_.at(frame_slot) = 0;
+          }
 
           // Schedule uplink pilots transmission and uplink processing
           if (symbol_id == config_->Frame().GetBeaconSymbolLast()) {
             if (ul_data_symbol_perframe_ == 0) {
               // Schedule Pilot after receiving last beacon
-              // Only when in Downlink Only mode
+              // (Only when in Downlink Only mode, otherwise the pilots will be
+              // transmitted with the uplink data)
               if (ant_id % config_->NumChannels() == 0) {
                 EventData do_tx_pilot_task(
                     EventType::kPacketPilotTX,
@@ -290,10 +323,6 @@ void PhyUe::Start() {
           SymbolType symbol_type = config_->GetSymbolType(symbol_id);
           if (symbol_type == SymbolType::kDL) {
             // Schedule downlink processing
-            if (symbol_id == config_->Frame().GetDLSymbol(0)) {
-              frame_dl_process_time_[(frame_id % kFrameWnd) * kMaxUEs +
-                                     ant_id] = GetTime::GetTimeUs();
-            }
             EventData do_fft_task(EventType::kFFT, event.tags_[0]);
             ScheduleWork(do_fft_task);
           } else {
@@ -308,30 +337,20 @@ void PhyUe::Start() {
           size_t dl_symbol_idx = config_->Frame().GetDLSymbolIdx(symbol_id);
           assert(dl_symbol_idx != SIZE_MAX);
 
-          std::printf("PhyUE: FFT done (frame %zu, symbol %zu, ant %zu)\n",
-                      frame_id, symbol_id, ant_id);
-
           // If dl data symbol then schedule the Demul
           if (dl_symbol_idx >= dl_pilot_symbol_perframe_) {
             EventData do_demul_task(EventType::kDemul, event.tags_[0]);
             ScheduleWork(do_demul_task);
           }
+
+          PrintPerTaskDone(PrintType::kFFTData, frame_id, symbol_id, ant_id);
           bool tasks_complete = fft_counters_.CompleteTask(frame_id, symbol_id);
           if (tasks_complete == true) {
-            if (kDebugPrintPerTaskDone == false) {
-              std::printf(
-                  "PhyUE: FFT Equalization done (frame %zu, symbol %zu)\n",
-                  frame_id, symbol_id);
-            }
-
+            PrintPerSymbolDone(PrintType::kFFTData, frame_id, symbol_id);
             bool fft_complete = fft_counters_.CompleteSymbol(frame_id);
             if (fft_complete == true) {
-              if (kDebugPrintPerFrameDone) {
-                std::printf(
-                    "PhyUE: FFT Equalization done on all antennas (frame %zu) "
-                    "at %.3f\n",
-                    frame_id, GetTime::GetTimeUs() / 1000.0f);
-              }
+              this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
+              PrintPerFrameDone(PrintType::kFFTData, frame_id);
               fft_counters_.Reset(frame_id);
             }
           }
@@ -340,25 +359,21 @@ void PhyUe::Start() {
         case EventType::kDemul: {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
 
           EventData do_decode_task(EventType::kDecode, event.tags_[0]);
           ScheduleWork(do_decode_task);
+
+          PrintPerTaskDone(PrintType::kDemul, frame_id, symbol_id, ant_id);
           bool symbol_complete =
               demul_counters_.CompleteTask(frame_id, symbol_id);
           if (symbol_complete == true) {
-            if (kDebugPrintPerTaskDone == false) {
-              std::printf("PhyUE: Demodulation done (frame: %zu, symbol %zu)\n",
-                          frame_id, symbol_id);
-            }
+            PrintPerSymbolDone(PrintType::kDemul, frame_id, symbol_id);
             max_equaled_frame_ = frame_id;
             bool demul_complete = demul_counters_.CompleteSymbol(frame_id);
             if (demul_complete == true) {
-              if (kDebugPrintPerFrameDone) {
-                std::printf(
-                    "PhyUE: Demodulation done on all antennas for (frame %zu) "
-                    "at %.3f\n",
-                    frame_id, GetTime::GetTimeUs() / 1000.0f);
-              }
+              this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
+              PrintPerFrameDone(PrintType::kDemul, frame_id);
               demul_counters_.Reset(frame_id);
             }
           }
@@ -368,42 +383,22 @@ void PhyUe::Start() {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          size_t frame_slot = frame_id % kFrameWnd;
+
           if (kEnableMac) {
             ScheduleTask(EventData(EventType::kPacketToMac, event.tags_[0]),
                          &to_mac_queue_, ptok_mac);
           }
-
-          std::printf("PhyUE: Decoding done (frame %zu, symbol %zu, ant %zu)\n",
-                      frame_id, symbol_id, ant_id);
+          PrintPerTaskDone(PrintType::kDecode, frame_id, symbol_id, ant_id);
 
           bool symbol_complete =
               decode_counters_.CompleteTask(frame_id, symbol_id);
           if (symbol_complete == true) {
-            if (kDebugPrintPerTaskDone == false) {
-              std::printf(
-                  "PhyUE: Decoding done for all antennas (frame %zu, symbol "
-                  "%zu)\n",
-                  frame_id, symbol_id);
-            }
+            PrintPerSymbolDone(PrintType::kDecode, frame_id, symbol_id);
+
             bool decode_complete = decode_counters_.CompleteSymbol(frame_id);
             if (decode_complete == true) {
-              double max_downlink_processing_time = 0;
-
-              for (size_t i = 0; i < config_->UeAntNum(); i++) {
-                double time_spent =
-                    GetTime::GetTimeUs() -
-                    frame_dl_process_time_[frame_slot * kMaxUEs + i];
-                frame_dl_process_time_[frame_slot * kMaxUEs + i] = time_spent;
-                max_downlink_processing_time =
-                    std::max(max_downlink_processing_time, time_spent);
-              }
-              if (kDebugPrintPerFrameDone) {
-                std::printf(
-                    "PhyUE: Decoding & Downlink processing complete (frame "
-                    "%zu) in %.2f ms\n",
-                    frame_id, max_downlink_processing_time / 1000.0f);
-              }
+              this->stats_->MasterSetTsc(TsType::kDecodeDone, frame_id);
+              PrintPerFrameDone(PrintType::kDecode, frame_id);
               decode_counters_.Reset(frame_id);
 
               bool finished =
@@ -477,63 +472,78 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kEncode: {
-          if (kDebugPrintPerTaskDone == false) {
-            std::printf(
-                "PhyUE: Finished encoding (Frame %u, symbol %u, ant %u) for %s "
-                "at %.3f\n",
-                gen_tag_t(event.tags_[0]).frame_id_,
-                gen_tag_t(event.tags_[0]).symbol_id_,
-                gen_tag_t(event.tags_[0]).ue_id_,
-                gen_tag_t(event.tags_[0]).ToString().c_str(),
-                GetTime::GetTimeUs() / 1000.0f);
-          }
+          /* Currently the user encodes all symbols in one completion event */
+          size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+
+          PrintPerTaskDone(PrintType::kEncode, frame_id, symbol_id, ant_id);
+
+          // Schedule the modul
           EventData do_modul_task(EventType::kModul, event.tags_[0]);
           ScheduleWork(do_modul_task);
+
+          bool last_encode = encode_counter_.CompleteTask(frame_id);
+          if (last_encode == true) {
+            this->stats_->MasterSetTsc(TsType::kEncodeDone, frame_id);
+            PrintPerFrameDone(PrintType::kEncode, frame_id);
+            encode_counter_.Reset(frame_id);
+          }
         } break;
 
         case EventType::kModul: {
+          /* Currently the user modulates all symbols in one completion event */
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
+
+          PrintPerTaskDone(PrintType::kModul, frame_id, symbol_id, ue_id);
 
           EventData do_ifft_task(
               EventType::kIFFT,
               gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
           ScheduleWork(do_ifft_task);
 
-          if (kDebugPrintPerTaskDone == false) {
-            std::printf(
-                "PhyUE: Finished modulating (frame %zu, symbol %zu, ant %zu) "
-                "at %.3f\n",
-                frame_id, symbol_id, ue_id, GetTime::GetTimeUs() / 1000.0f);
+          bool last_encode = modulation_counters_.CompleteTask(frame_id);
+          if (last_encode == true) {
+            this->stats_->MasterSetTsc(TsType::kModulDone, frame_id);
+            PrintPerFrameDone(PrintType::kModul, frame_id);
+            modulation_counters_.Reset(frame_id);
           }
         } break;
 
         case EventType::kIFFT: {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
-          ifft_frame_status[(ue_id * kFrameWnd) + (frame_id % kFrameWnd)] =
+
+          PrintPerTaskDone(PrintType::kIFFT, frame_id, symbol_id, ue_id);
+          bool ifft_complete = ifft_counters_.CompleteTask(frame_id);
+
+          if (ifft_complete == true) {
+            this->stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
+            PrintPerFrameDone(PrintType::kIFFT, frame_id);
+            ifft_counters_.Reset(frame_id);
+          }
+
+          // Schedule Transmit in frame order
+          ifft_frame_status.at((ue_id * kFrameWnd) + (frame_id % kFrameWnd)) =
               frame_id;
-          for (size_t i = 0; i < kFrameWnd; i++) {
+          for (size_t i = 0; (i < kFrameWnd); i++) {
             size_t ifft_stat_id =
-                ue_id * kFrameWnd + (i + frame_id) % kFrameWnd;
-            if (ifft_frame_status[ifft_stat_id] == ifft_next_frame[ue_id]) {
+                (ue_id * kFrameWnd) + ((i + frame_id) % kFrameWnd);
+            if (ifft_frame_status.at(ifft_stat_id) ==
+                ifft_next_frame.at(ue_id)) {
               EventData do_tx_task(
                   EventType::kPacketTX,
-                  gen_tag_t::FrmSymUe(ifft_next_frame[ue_id], 0, ue_id).tag_);
+                  gen_tag_t::FrmSymUe(ifft_next_frame.at(ue_id), 0, ue_id)
+                      .tag_);
               ScheduleTask(do_tx_task, &tx_queue_,
                            *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
-              ifft_next_frame[ue_id]++;
-            } else {
-              std::printf(
-                  "PhyUE: kIFFT breaking loop %zu, Frame %zu, user %zu \n", i,
-                  frame_id, ue_id);
+              ifft_next_frame.at(ue_id)++;
+            } else { /* Done */
               break;
             }
-          }
-          if (kDebugPrintPerTaskDone == false) {
-            std::printf("PhyUE: Finished iFFT (Frame %zu, user %zu) at %.3f\n",
-                        frame_id, ue_id, GetTime::GetTimeUs() / 1000.0f);
           }
         } break;
 
@@ -544,17 +554,14 @@ void PhyUe::Start() {
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
 
-          if (kDebugPrintPerSymbolDone) {
-            std::printf(
-                "PhyUE: Finished Pilot TX (frame %zu, symbol %zu, user %zu)\n",
-                frame_id, symbol_id, ue_id);
-          }
+          PrintPerTaskDone(PrintType::kPacketTX, frame_id, symbol_id, ue_id);
 
           bool last_tx_task = this->tx_counters_.CompleteTask(frame_id);
           if (last_tx_task) {
-            std::printf(
-                "PhyUE: Finished Pilot TX for (frame %zu, user %zu) at %f\n",
-                frame_id, ue_id, (GetTime::GetTimeUs() / 1000.0f));
+            this->stats_->MasterSetTsc(TsType::kTXDone, frame_id);
+            PrintPerFrameDone(PrintType::kPacketTX, frame_id);
+            this->tx_counters_.Reset(frame_id);
+
             bool finished =
                 FrameComplete(frame_id, FrameTasksFlags::kUplinkTxComplete);
             if (finished == true) {
@@ -578,18 +585,13 @@ void PhyUe::Start() {
                                 [next_frame_processed_[ue_id] % kFrameWnd] = 0;
           next_frame_processed_[ue_id]++;
 
-          if (kDebugPrintPerFrameDone) {
-            std::printf("PhyUE: Finished TX (frame %zu, user %zu) at %f\n",
-                        frame_id, ue_id, (GetTime::GetTimeUs() / 1000.0f));
-          }
-
+          PrintPerTaskDone(PrintType::kPacketTX, frame_id, 0, ue_id);
           bool last_tx_task = this->tx_counters_.CompleteTask(frame_id);
           if (last_tx_task) {
-            std::printf(
-                "PhyUE: Finished TX on all antennas for (frame %zu) at %f\n",
-                frame_id, (GetTime::GetTimeUs() / 1000.0f));
-
+            this->stats_->MasterSetTsc(TsType::kTXDone, frame_id);
+            PrintPerFrameDone(PrintType::kPacketTX, frame_id);
             this->tx_counters_.Reset(frame_id);
+
             bool finished =
                 FrameComplete(frame_id, FrameTasksFlags::kUplinkTxComplete);
             if (finished == true) {
@@ -1406,6 +1408,188 @@ void PhyUe::FreeDownlinkBuffers() {
   }
 }
 
+void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
+                             size_t symbol_id, size_t ant) {
+  if (kDebugPrintPerTaskDone == true) {
+    // if (true) {
+    switch (print_type) {
+      case (PrintType::kPacketRX):
+        std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Rx packet\n",
+                    frame_id, symbol_id, ant);
+        break;
+
+      case (PrintType::kPacketTX):
+        std::printf(
+            "PhyUE [frame %zu symbol %zu ant %zu]: %zu User Tx finished\n",
+            frame_id, symbol_id, ant, tx_counters_.GetTaskCount(frame_id) + 1);
+        break;
+
+      case (PrintType::kFFTData):
+        std::printf(
+            "PhyUE [frame %zu symbol %zu ant %zu]: FFT Equalization done\n",
+            frame_id, symbol_id, ant);
+        break;
+
+      case (PrintType::kDemul):
+        std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Demul done\n",
+                    frame_id, symbol_id, ant);
+        break;
+
+      case (PrintType::kDecode):
+        std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Decoding done\n",
+                    frame_id, symbol_id, ant);
+        break;
+
+      case (PrintType::kEncode):
+        std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Encoding done\n",
+                    frame_id, symbol_id, ant);
+        break;
+
+      case (PrintType::kModul):
+        std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Modulation done\n",
+                    frame_id, symbol_id, ant);
+        break;
+
+      case (PrintType::kIFFT):
+        std::printf("PhyUE [frame %zu symbol %zu ant %zu]: iFFT done\n",
+                    frame_id, symbol_id, ant);
+        break;
+
+      default:
+        std::printf("Wrong task type in task done print!");
+    }
+  }
+}
+
+void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
+                               size_t symbol_id) {
+  if (kDebugPrintPerSymbolDone == true) {
+    // if (true) {
+    switch (print_type) {
+      case (PrintType::kFFTData):
+        std::printf(
+            "PhyUe [frame %zu symbol %zu + %.3f ms]: FFT complete for %zu "
+            "antennas\n",
+            frame_id, symbol_id,
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
+            fft_counters_.GetTaskCount(frame_id, symbol_id));
+        break;
+
+      case (PrintType::kDemul):
+        std::printf(
+            "PhyUe [frame %zu symbol %zu + %.3f ms]: Demul completed for %zu "
+            "antennas\n",
+            frame_id, symbol_id,
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
+            demul_counters_.GetTaskCount(frame_id, symbol_id));
+        break;
+
+      case (PrintType::kDecode):
+        std::printf(
+            "PhyUe [frame %zu symbol %zu + %.3f ms]: Decoding completed for "
+            "%zu antennas\n",
+            frame_id, symbol_id,
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
+            decode_counters_.GetTaskCount(frame_id, symbol_id));
+        break; /*
+      case (PrintType::kPacketToMac):
+        std::printf(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
+            tomac_counters_.GetSymbolCount(frame_id) + 1);
+        break;
+        */
+      default:
+        std::printf("Wrong task type in symbol done print!");
+    }
+  }
+}
+
+void PhyUe::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
+  if (kDebugPrintPerFrameDone == true) {
+    // if (true) {
+    switch (print_type) {
+      case (PrintType::kPacketRX):
+        std::printf("PhyUE [frame %zu + %.2f ms]: Received all packets\n",
+                    frame_id,
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kRXDone, TsType::kFirstSymbolRX, frame_id));
+        break;
+
+      case (PrintType::kPacketRXPilots):
+        std::printf("PhyUE [frame %zu + %.2f ms]: Received all pilots\n",
+                    frame_id,
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kPilotAllRX, TsType::kFirstSymbolRX, frame_id));
+        break;
+
+      case (PrintType::kPacketTX):
+        std::printf("PhyUE [frame %zu + %.2f ms]: Completed TX\n", frame_id,
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kTXDone, TsType::kFirstSymbolRX, frame_id));
+        break;
+
+      case (PrintType::kFFTData):
+        std::printf(
+            "PhyUE [frame %zu + %.2f ms]: FFT finished\n", frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kFFTPilotsDone,
+                                           TsType::kFirstSymbolRX, frame_id));
+        break;
+
+      case (PrintType::kDemul):
+        std::printf("PhyUE [frame %zu + %.2f ms]: Completed demodulation\n",
+                    frame_id,
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kDemulDone, TsType::kFirstSymbolRX, frame_id));
+        break;
+
+      case (PrintType::kDecode):
+        std::printf("PhyUE [frame %zu + %.2f ms]: Completed decoding\n",
+                    frame_id,
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kDecodeDone, TsType::kFirstSymbolRX, frame_id));
+        break;
+
+      case (PrintType::kEncode):
+        std::printf("PhyUE [frame %zu + %.2f ms]: Completed encoding\n",
+                    frame_id,
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kEncodeDone, TsType::kFirstSymbolRX, frame_id));
+        break;
+
+      case (PrintType::kModul):
+        std::printf("PhyUE [frame %zu + %.2f ms]: Completed modulation\n",
+                    frame_id,
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kModulDone, TsType::kFirstSymbolRX, frame_id));
+        break;
+
+      case (PrintType::kIFFT):
+        std::printf("PhyUE [frame %zu + %.2f ms]: Completed iFFT\n", frame_id,
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kIFFTDone, TsType::kFirstSymbolRX, frame_id));
+        break;
+
+      /*
+      case (PrintType::kPacketTXFirst): std::printf(
+            "PhyUE [frame %zu + %.2f ms]: Completed TX of first symbol\n",
+            frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kTXProcessedFirst,
+                                           TsType::kFirstSymbolRX,
+      frame_id)); break;
+
+      case (PrintType::kPacketToMac): std::printf(
+            "PhyUE [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX,
+      frame_id)); break; */
+      default:
+        std::printf("PhyUE: Wrong task type in frame done print!\n");
+    }
+  }
+}
+
 void PhyUe::GetDemulData(long long** ptr, int* size) {
   *ptr = (long long*)&equal_buffer_[max_equaled_frame_ *
                                     dl_data_symbol_perframe_][0];
@@ -1439,10 +1623,10 @@ bool PhyUe::FrameComplete(size_t frame, FrameTasksFlags complete) {
       (frame_tasks_.at(frame % kFrameWnd) ==
        static_cast<std::uint8_t>(FrameTasksFlags::kFrameComplete));
 
-  if (is_complete == true) {
-    std::printf("**** Frame %zu complete with task %d\n", frame,
-                static_cast<std::uint8_t>(complete));
-  }
+  // if (is_complete == true) {
+  //  std::printf("**** Frame %zu complete with task %d\n", frame,
+  //              static_cast<std::uint8_t>(complete));
+  //}
   return is_complete;
 }
 
