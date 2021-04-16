@@ -1542,7 +1542,7 @@ void Demod256qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
                       10, 8, 6, 4, 2, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                       0xff, 0xff, 14, 12, 10, 8, 6, 4, 2, 0);
 
-  for (int i; i < num / 16; i++) {
+  for (int i = 0; i < num / 16; i++) {
     // Load symbols, 8 per vector
     symbol1 = _mm256_load_ps(symbols_ptr);
     symbols_ptr += 8;
@@ -1738,3 +1738,270 @@ void Demod256qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
   Demod256qamHardSse(vec_in + 2 * next_start, vec_out + next_start, 
     num - next_start);
 }
+
+
+#ifdef __AVX512F__
+
+void Demod256qamHardAvx512(float* vec_in, uint8_t* vec_out, int num) {
+  float* symbols_ptr = vec_in;
+  auto* result_ptr = reinterpret_cast<__m256i*>(vec_out);
+  __m512 symbol1, symbol2, symbol3, symbol4;
+  __m512i intsymbol1, intsymbol2, intsymbol3, intsymbol4, symbol12, symbol34,
+    symbol_abs, symbol_gt_0, symbol_gt_threshold1, symbol_gt_threshold2, 
+    symbol_lt_threshold3, symbol_lt_threshold4, symbol_gt_threshold5, 
+    symbol_lt_threshold6, symbol_lt_threshold7, symbol12_bit0, symbol12_bit1, 
+    symbol12_bit2, symbol12_bit3, symbol12_bit4, symbol12_bit5, symbol12_bit6,
+    symbol12_bit7, symbol34_bit0, symbol34_bit1, symbol34_bit2, symbol34_bit3,
+    symbol34_bit4, symbol34_bit5, symbol34_bit6, symbol34_bit7, bit7, bit6, 
+    bit5, bit4, bit3, bit2, bit1, bit0, result, symbol_bit01, symbol_bit23, 
+    symbol_bit45, symbol_bit67;
+  int next_start;
+
+  /*
+   * Note: SCALE_BYTE_CONV_QAM16 factor here is simply a way to force all 
+   * symbols to be in integer range so they can be packed into 16 bit integers
+   */
+  __m512 scale_factor = _mm512_set1_ps(SCALE_BYTE_CONV_QAM256);
+  __m512i vec_zero = _mm512_set1_epi16(0);
+  __m512i threshold1 = 
+    _mm512_set1_epi16(QAM256_THRESHOLD_1 * SCALE_BYTE_CONV_QAM256);
+  __m512i threshold2 = 
+    _mm512_set1_epi16(QAM256_THRESHOLD_2 * SCALE_BYTE_CONV_QAM256);
+  __m512i threshold3 = 
+    _mm512_set1_epi16(QAM256_THRESHOLD_3 * SCALE_BYTE_CONV_QAM256);
+  __m512i threshold4 = 
+    _mm512_set1_epi16(QAM256_THRESHOLD_4 * SCALE_BYTE_CONV_QAM256);
+  __m512i threshold5 = 
+    _mm512_set1_epi16(QAM256_THRESHOLD_5 * SCALE_BYTE_CONV_QAM256);
+  __m512i threshold6 = 
+    _mm512_set1_epi16(QAM256_THRESHOLD_6 * SCALE_BYTE_CONV_QAM256);
+  __m512i threshold7 = 
+    _mm512_set1_epi16(QAM256_THRESHOLD_7 * SCALE_BYTE_CONV_QAM256);
+  __m512i true_mask = _mm512_set1_epi16(0x1);
+
+  /*
+  __m512i shuffle_real = _mm512_set_epi16(
+    30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0,
+    30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0);
+
+  __m512i shuffle_imag = _mm512_set_epi16(
+    31, 29, 27, 25, 23, 21, 19, 17, 15, 14, 11, 10, 7, 6, 3, 2,
+    31, 29, 27, 25, 23, 21, 19, 17, 15, 14, 11, 10, 7, 6, 3, 2);
+
+  __m512i combine_v = _mm512_set_epi16(
+    47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32,
+    15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
+
+  __m512i shuffle_16_to_8 = _mm512_set_epi8(
+    62, 60, 58, 56, 54, 52, 50, 48, 46, 44, 42, 40, 38, 36, 34, 32,
+    30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0,
+    62, 60, 58, 56, 54, 52, 50, 48, 46, 44, 42, 40, 38, 36, 34, 32,
+    30, 28, 26, 24, 22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0);
+  */
+
+  /*
+   * _mm512_set_epi16 and _mm512_set_epi8 are not available, so use this as
+   * an alternative
+   */
+  __m512i shuffle_real = _mm512_set_epi32(
+    (30<<16)+28, (26<<16)+24, (22<<16)+20, (18<<16)+16, (14<<16)+12, (10<<16)+8, 
+    (6<<16)+4, (2<<16)+0, (30<<16)+ 28, (26<<16)+24, (22<<16)+20, (18<<16)+16, 
+    (14<<16)+12, (10<<16)+8, (6<<16)+4, (2<<16)+0);
+
+  __m512i shuffle_imag = _mm512_set_epi32(
+    (31<<16)+29, (27<<16)+25, (23<<16)+21, (19<<16)+17, (15<<16)+13, (11<<16)+9, 
+    (7<<16)+5, (3<<16)+1, (31<<16)+29, (27<<16)+25, (23<<16)+21, (19<<16)+17, 
+    (15<<16)+13, (11<<16)+9, (7<<16)+5, (3<<16)+1);
+
+  __m512i combine_v = _mm512_set_epi32(
+    (47<<16)+46, (45<<16)+44, (43<<16)+42, (41<<16)+40, (39<<16)+38, (37<<16)+36, 
+    (35<<16)+34, (33<<16)+32, (15<<16)+14, (13<<16)+12, (11<<16)+10, (9<<16)+8, 
+    (7<<16)+6, (5<<16)+4, (3<<16)+2, (1<<16)+0);
+
+  __m512i shuffle_16_to_8 = _mm512_set_epi32(
+    0xffffffff, 0xffffffff,
+    (14<<24)+(12<<16)+(10<<8)+8, (6<<24)+(4<<16)+(2<<8)+0,
+    0xffffffff, 0xffffffff,
+    (14<<24)+(12<<16)+(10<<8)+8, (6<<24)+(4<<16)+(2<<8)+0,
+    0xffffffff, 0xffffffff,
+    (14<<24)+(12<<16)+(10<<8)+8, (6<<24)+(4<<16)+(2<<8)+0, 
+    0xffffffff, 0xffffffff,
+    (14<<24)+(12<<16)+(10<<8)+8, (6<<24)+(4<<16)+(2<<8)+0);
+
+  __m512i fix_pack = _mm512_set_epi64(7, 5, 3, 1, 6, 4, 2, 0);
+
+  for (int i = 0; i < num / 32; i++) {
+    // Load symbols, 8 per vector
+    symbol1 = _mm512_load_ps(symbols_ptr);
+    symbols_ptr += 16;
+    symbol2 = _mm512_load_ps(symbols_ptr);
+    symbols_ptr += 16;
+    symbol3 = _mm512_load_ps(symbols_ptr);
+    symbols_ptr += 16;
+    symbol4 = _mm512_load_ps(symbols_ptr);
+    symbols_ptr += 16;
+  
+
+    // Scale symbols by fixed value, and truncate into 32 bit integers
+    intsymbol1 = _mm512_cvtps_epi32(_mm512_mul_ps(symbol1, scale_factor));
+    intsymbol2 = _mm512_cvtps_epi32(_mm512_mul_ps(symbol2, scale_factor));
+    intsymbol3 = _mm512_cvtps_epi32(_mm512_mul_ps(symbol3, scale_factor));
+    intsymbol4 = _mm512_cvtps_epi32(_mm512_mul_ps(symbol4, scale_factor));
+
+    // Pack symbols into 2 blocks of 16 bit integers
+    symbol12 = _mm512_packs_epi32(intsymbol1, intsymbol2);
+    /*
+     * _mm512_packs_epi32 interleaves the values of both symbols, 
+     * so permute them back to be in order
+     */
+    symbol12 = _mm512_permutexvar_epi64(fix_pack, symbol12);
+    symbol34 = _mm512_packs_epi32(intsymbol3, intsymbol4);
+    symbol34 = _mm512_permutexvar_epi64(fix_pack, symbol34);
+
+    /*
+     * Process symbol vectors. We need to take the absolute value of the
+     * symbols, then compare them to each threshold (including zero)
+     * If the threshold value comparision is true, the 16 bit value will hold 
+     * 0x1
+     */
+    symbol_abs = _mm512_abs_epi16(symbol12);
+    symbol_gt_0 = _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(symbol12, vec_zero), true_mask);
+    symbol_gt_threshold1 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(symbol_abs, threshold1), true_mask);
+    symbol_gt_threshold2 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(symbol_abs, threshold2), true_mask);
+    symbol_lt_threshold3 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(threshold3, symbol_abs), true_mask);
+    symbol_lt_threshold4 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(threshold4, symbol_abs), true_mask);
+    symbol_gt_threshold5 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(symbol_abs, threshold5), true_mask);
+    symbol_lt_threshold6 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(threshold6, symbol_abs), true_mask);
+    symbol_lt_threshold7 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(threshold7, symbol_abs), true_mask);
+    /*
+     * Now determine the value of each bit. The value of each bit is based off
+     * the values stored in each comparision output, and how those relate to
+     * the actual QAM table, given in the docstring for Demod256qamHardLoop.
+     * see that function for additional explanation of how each threshold
+     * influences which bits should be set.
+     */
+    /*
+     * First, we determine the value of bits together, since the imaginary and
+     * real symbols have similar conditions
+     */
+    symbol_bit01 = _mm512_or_si512(
+      _mm512_and_si512(symbol_lt_threshold7, symbol_gt_threshold5),
+      _mm512_and_si512(symbol_lt_threshold3, symbol_gt_threshold1));
+    symbol_bit23 = 
+      _mm512_and_si512(symbol_lt_threshold6, symbol_gt_threshold2);
+    symbol_bit45 = symbol_lt_threshold4;
+    symbol_bit67 = symbol_gt_0;
+    /*
+     * Now, unpack these values into individual bits
+     * Note that the upper 256 bits of these vectors will be a copy of the 
+     * values in the lower 256 bits 
+     */
+    symbol12_bit7 = _mm512_permutexvar_epi16(shuffle_real, symbol_bit67);
+    symbol12_bit6 = _mm512_permutexvar_epi16(shuffle_imag, symbol_bit67);
+    symbol12_bit5 = _mm512_permutexvar_epi16(shuffle_real, symbol_bit45);
+    symbol12_bit4 = _mm512_permutexvar_epi16(shuffle_imag, symbol_bit45);
+    symbol12_bit3 = _mm512_permutexvar_epi16(shuffle_real, symbol_bit23);
+    symbol12_bit2 = _mm512_permutexvar_epi16(shuffle_imag, symbol_bit23);
+    symbol12_bit1 = _mm512_permutexvar_epi16(shuffle_real, symbol_bit01);
+    symbol12_bit0 = _mm512_permutexvar_epi16(shuffle_imag, symbol_bit01);
+
+    /*
+     * We now repeat the above process for the symbol vectors 3 and 4. The bits
+     * from these symbols will be shuffled with the bits from symbols 1 and 2 to
+     * create one 512 bit vector per each bit
+     */
+
+    // Process symbol vectors  
+    symbol_abs = _mm512_abs_epi16(symbol34);
+    symbol_gt_0 = _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(symbol34, vec_zero), true_mask);
+    symbol_gt_threshold1 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(symbol_abs, threshold1), true_mask);
+    symbol_gt_threshold2 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(symbol_abs, threshold2), true_mask);
+    symbol_lt_threshold3 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(threshold3, symbol_abs), true_mask);
+    symbol_lt_threshold4 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(threshold4, symbol_abs), true_mask);
+    symbol_gt_threshold5 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(symbol_abs, threshold5), true_mask);
+    symbol_lt_threshold6 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(threshold6, symbol_abs), true_mask);
+    symbol_lt_threshold7 = 
+      _mm512_maskz_abs_epi16(_mm512_cmpgt_epi16_mask(threshold7, symbol_abs), true_mask);
+  
+  
+    // Compare thresholds to set bit values
+    symbol_bit01 = _mm512_or_si512(
+      _mm512_and_si512(symbol_lt_threshold7, symbol_gt_threshold5),
+      _mm512_and_si512(symbol_lt_threshold3, symbol_gt_threshold1));
+    symbol_bit23 = 
+      _mm512_and_si512(symbol_lt_threshold6, symbol_gt_threshold2);
+    symbol_bit45 = symbol_lt_threshold4;
+    symbol_bit67 = symbol_gt_0;
+    // Now, unpack these values into individual bits
+    symbol34_bit7 = _mm512_permutexvar_epi16(shuffle_real, symbol_bit67);
+    symbol34_bit6 = _mm512_permutexvar_epi16(shuffle_imag, symbol_bit67);
+    symbol34_bit5 = _mm512_permutexvar_epi16(shuffle_real, symbol_bit45);
+    symbol34_bit4 = _mm512_permutexvar_epi16(shuffle_imag, symbol_bit45);
+    symbol34_bit3 = _mm512_permutexvar_epi16(shuffle_real, symbol_bit23);
+    symbol34_bit2 = _mm512_permutexvar_epi16(shuffle_imag, symbol_bit23);
+    symbol34_bit1 = _mm512_permutexvar_epi16(shuffle_real, symbol_bit01);
+    symbol34_bit0 = _mm512_permutexvar_epi16(shuffle_imag, symbol_bit01);
+
+    /*
+     * Finally, we need to repack the result vectors together to create one
+     * 256 bit result. We pack the first and second symbol into the lower half
+     * of the vector, and third and fourth into upper half
+     */
+    bit0 = _mm512_permutex2var_epi16(symbol12_bit0, combine_v, symbol34_bit0);
+    bit1 = _mm512_permutex2var_epi16(symbol12_bit1, combine_v, symbol34_bit1);
+    bit2 = _mm512_permutex2var_epi16(symbol12_bit2, combine_v, symbol34_bit2);
+    bit3 = _mm512_permutex2var_epi16(symbol12_bit3, combine_v, symbol34_bit3);
+    bit4 = _mm512_permutex2var_epi16(symbol12_bit4, combine_v, symbol34_bit4);
+    bit5 = _mm512_permutex2var_epi16(symbol12_bit5, combine_v, symbol34_bit5);
+    bit6 = _mm512_permutex2var_epi16(symbol12_bit6, combine_v, symbol34_bit6);
+    bit7 = _mm512_permutex2var_epi16(symbol12_bit7, combine_v, symbol34_bit7);
+
+    // Left shift each bit so we can combine them
+    bit1 = _mm512_slli_epi16(bit1, 1);
+    bit2 = _mm512_slli_epi16(bit2, 2);
+    bit3 = _mm512_slli_epi16(bit3, 3);
+    bit4 = _mm512_slli_epi16(bit4, 4);
+    bit5 = _mm512_slli_epi16(bit5, 5);
+    bit6 = _mm512_slli_epi16(bit6, 6);
+    bit7 = _mm512_slli_epi16(bit7, 7);
+
+    // Add each vector to combine them into a single result vector
+    result = _mm512_add_epi16(bit0, bit1);
+    result = _mm512_add_epi16(result, bit2);
+    result = _mm512_add_epi16(result, bit3);
+    result = _mm512_add_epi16(result, bit4);
+    result = _mm512_add_epi16(result, bit5);
+    result = _mm512_add_epi16(result, bit6);
+    result = _mm512_add_epi16(result, bit7);
+  
+    /// Shuffle the result to pack the 16 bit values into 8 bit ones
+    result = _mm512_shuffle_epi8(result, shuffle_16_to_8);
+    // Pack the result of the shuffle into the lower 256 bits
+    result = _mm512_permutexvar_epi64(fix_pack, result);
+    // Store the final result as a vector of length 128 into the output
+    _mm256_storeu_si256(result_ptr, _mm512_extracti32x8_epi32(result, 0));
+    result_ptr++;
+  } 
+  /*
+   * Demodulate symbols that did not fit into multiple of 16 using SSE 
+   * demodulation function
+   */
+  next_start = 32 * (num / 32);
+  Demod256qamHardAvx2(vec_in + 2 * next_start, vec_out + next_start, 
+    num - next_start);
+}
+
+#endif
