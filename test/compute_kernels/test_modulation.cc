@@ -58,6 +58,7 @@ static double bench_mod_16qam(unsigned iterations, unsigned mode) {
   std::printf("\n");
 
   double start_time = get_time();
+
   for (unsigned i = 0; i < iterations; i++) {
     for (unsigned j = 0; j < num; j++)
       output_mod[j] = ModSingle(input[j], mod_table);
@@ -262,10 +263,13 @@ void printbits(uint8_t x) {
 static double bench_mod_256qam(unsigned iterations, unsigned mode) {
   Table<complex_float> mod_table;
   complex_float *output_mod;
-  double start_time, total_time;
-  unsigned int num = 100;
+  double start_time, total_time, elapsed_time;
+  unsigned int num = 1000;
   uint8_t *input;
   uint8_t *output_demod_loop, *output_demod_sse, *output_demod_avx2;
+#ifdef __AVX512F__
+  uint8_t *output_demod_avx512;
+#endif
   int gray_mapping[16][16];
 
   InitModulationTable(mod_table, 256);
@@ -320,6 +324,9 @@ static double bench_mod_256qam(unsigned iterations, unsigned mode) {
   AllocBuffer1d(&output_demod_loop, num, Agora_memory::Alignment_t::kAlign64, 1);
   AllocBuffer1d(&output_demod_sse, num, Agora_memory::Alignment_t::kAlign64, 1);
   AllocBuffer1d(&output_demod_avx2, num, Agora_memory::Alignment_t::kAlign64, 1);
+#ifdef __AVX512F__
+  AllocBuffer1d(&output_demod_avx512, num, Agora_memory::Alignment_t::kAlign64, 1);
+#endif
   // Build the input data from random bytes
   std::printf("Input: ");
   for (int i = 0; i < num; i++) {
@@ -328,18 +335,52 @@ static double bench_mod_256qam(unsigned iterations, unsigned mode) {
   }
   std::printf("\n");
 
-  start_time = get_time();
+  start_time = GetTime::GetTime();
+  elapsed_time = GetTime::GetTime();
   for (unsigned i = 0; i < iterations; i++) {
     for (unsigned j = 0; j < num; j++) {
       output_mod[j] = ModSingle(input[j], mod_table);
     }
     // Demodulate input
     Demod256qamHardLoop((float*)output_mod, output_demod_loop, num);
+  }
+  elapsed_time = GetTime::GetTime() - elapsed_time;
+  std::printf("Avg Loop time: %f us\n", (elapsed_time / iterations));
+  elapsed_time = GetTime::GetTime();
+  for (unsigned i = 0; i < iterations; i++) {
+    // Build the input data from random bytes
+    for (unsigned j = 0; j < num; j++) {
+      output_mod[j] = ModSingle(input[j], mod_table);
+    }
+    // Demodulate input
     Demod256qamHardSse((float*)output_mod, output_demod_sse, num);
+  }
+  elapsed_time = GetTime::GetTime() - elapsed_time;
+  std::printf("Avg SSE time: %f us\n", (elapsed_time / iterations));
+  elapsed_time = GetTime::GetTime();
+  for (unsigned i = 0; i < iterations; i++) {
+    // Build the input data from random bytes
+    for (unsigned j = 0; j < num; j++) {
+      output_mod[j] = ModSingle(input[j], mod_table);
+    }
+    // Demodulate input
     Demod256qamHardAvx2((float*)output_mod, output_demod_avx2, num);
   }
-  total_time = get_time() - start_time;
-
+  elapsed_time = GetTime::GetTime() - elapsed_time;
+  std::printf("Avg AVX2 time: %f us\n", (elapsed_time / iterations));
+#ifdef __AVX512F__
+  elapsed_time = GetTime::GetTime();
+  for (unsigned i = 0; i < iterations; i++) {
+    for (unsigned j = 0; j < num; j++) {
+      output_mod[j] = ModSingle(input[j], mod_table);
+    }
+    // Demodulate input
+    Demod256qamHardAvx512((float*)output_mod, output_demod_avx512, num);
+  }
+  elapsed_time = GetTime::GetTime() - elapsed_time;
+  std::printf("Avg AVX512 time: %f us\n", (elapsed_time / iterations));
+#endif
+  total_time = GetTime::GetTime() - start_time;
   if (mode == 0) {
     // Check results. 
     unsigned i;
@@ -360,6 +401,13 @@ static double bench_mod_256qam(unsigned iterations, unsigned mode) {
         std::printf("Expected %d Actual %d\n", input[i], output_demod_avx2[i]);
         break;
       }
+#ifdef __AVX512F__
+      if (input[i] != output_demod_avx512[i]) {
+        std::cout << "AXV512 Results differed at index " << i << "\n";
+        std::printf("Expected %d Actual %d\n", input[i], output_demod_avx512[i]);
+        break;
+      }
+#endif
     }
     if (i != num) {
       std::cout << "Correctness check failed\n";
