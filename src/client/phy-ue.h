@@ -276,8 +276,7 @@ class PhyUe {
   std::vector<size_t> decoded_symbol_count_;
   std::vector<size_t> symbol_error_count_;
 
-  /* Concurrent queues */
-
+  // Communication queues
   moodycamel::ConcurrentQueue<EventData> complete_queue_;
   moodycamel::ConcurrentQueue<EventData> work_queue_;
 
@@ -295,16 +294,10 @@ class PhyUe {
   // all checkers
   FrameCounters tx_counters_;
   FrameCounters decode_counters_;
-
-  std::array<std::vector<size_t>, kFrameWnd> fft_checker_;
-  std::array<size_t, kFrameWnd> fft_status_;
-
-  // can possibly remove this checker
-  std::array<std::vector<size_t>, kFrameWnd> demul_checker_;
-  std::array<size_t, kFrameWnd> demul_status_;
+  FrameCounters demul_counters_;
+  FrameCounters fft_counters_;
 
   std::array<double, kFrameWnd * kMaxUEs> frame_dl_process_time_;
-  std::queue<std::tuple<int, int>> task_wait_list_;
   std::unique_ptr<AgoraScrambler::Scrambler> scrambler_;
 
   size_t max_equaled_frame_ = 0;
