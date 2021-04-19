@@ -12,6 +12,7 @@ static std::atomic<bool> running = true;
 static constexpr bool kPrintChannelOutput = false;
 static const size_t kDefaultQueueSize = 36;
 static const bool kPrintDebugTxUser = true;
+static const bool kPrintDebugTxBs = true;
 
 static void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
                                     size_t length) {
@@ -204,9 +205,8 @@ void ChannelSim::Start() {
               user_rx_counter_[frame_offset] = 0;
               if (kDebugPrintPerSymbolDone) {
                 std::printf(
-                    "Scheduling uplink transmission of frame %zu, "
-                    "symbol %zu, from %zu "
-                    "user to %zu BS antennas\n",
+                    "Scheduling uplink transmission of frame %zu, symbol %zu, "
+                    "from %zu user to %zu BS antennas\n",
                     frame_id, symbol_id, uecfg_->UeAntNum(),
                     bscfg_->BsAntNum());
               }
@@ -227,10 +227,8 @@ void ChannelSim::Start() {
               bs_rx_counter_[frame_offset] = 0;
               if (kDebugPrintPerSymbolDone) {
                 std::printf(
-                    "Scheduling downlink transmission in frame "
-                    "%zu, "
-                    "symbol %zu, from %zu "
-                    "BS to %zu user antennas\n",
+                    "Scheduling downlink transmission in frame %zu, symbol "
+                    "%zu, from %zu BS to %zu user antennas\n",
                     frame_id, symbol_id, bscfg_->BsAntNum(),
                     uecfg_->UeAntNum());
               }
@@ -480,6 +478,13 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
   size_t total_symbol_id = pilot_symbol_id;
   if (pilot_symbol_id == SIZE_MAX) {
     total_symbol_id = ul_symbol_id + bscfg_->Frame().NumPilotSyms();
+  }
+
+  if (kPrintDebugTxBs) {
+    std::printf(
+        "Channel Sim: DoTxBs processing frame %zu, symbol %zu, ul symbol "
+        "%zu, at %f ms\n",
+        frame_id, symbol_id, ul_symbol_id, GetTime::GetTimeUs() / 1000);
   }
 
   size_t symbol_offset =
