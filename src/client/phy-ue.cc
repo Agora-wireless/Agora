@@ -770,11 +770,9 @@ void PhyUe::DoFft(int tid, size_t tag) {
 
   size_t csi_offset = frame_slot * config_->UeAntNum() + ant_id;
   auto* csi_buffer_ptr =
-      reinterpret_cast<arma::cx_float*>(csi_buffer_[csi_offset].data());
+      reinterpret_cast<arma::cx_float*>(csi_buffer_.at(csi_offset).data());
   auto* fft_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
-
-  EventData fft_finish_event;
 
   // In TDD massive MIMO, a pilot symbol needs to be sent
   // in the downlink for the user to estimate the channel
@@ -783,6 +781,7 @@ void PhyUe::DoFft(int tid, size_t tag) {
   if (dl_symbol_id < dl_pilot_symbol_perframe_) {
     for (size_t j = 0; j < config_->OfdmDataNum(); j++) {
       // divide fft output by pilot data to get CSI estimation
+      // If this is the first symbol DL pilot symbol.....
       if (dl_symbol_id == 0) {
         csi_buffer_ptr[j] = 0;
       }
@@ -791,18 +790,20 @@ void PhyUe::DoFft(int tid, size_t tag) {
       complex_float p = config_->UeSpecificPilot()[0][j];
       size_t sc_id = non_null_sc_ind_[j];
       csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / arma::cx_float(p.re, p.im));
+
+      // If this is the last symbol DL pilot symbol.....
       if (dl_symbol_id == dl_pilot_symbol_perframe_ - 1) {
         csi_buffer_ptr[j] /= dl_pilot_symbol_perframe_;
       }
     }
   } else {
-    size_t total_dl_data_symbol_id = frame_slot * dl_data_symbol_perframe_ +
-                                     dl_symbol_id - dl_pilot_symbol_perframe_;
+    size_t total_dl_data_symbol_id = (frame_slot * dl_data_symbol_perframe_) +
+                                     (dl_symbol_id - dl_pilot_symbol_perframe_);
     size_t eq_buffer_offset =
         total_dl_data_symbol_id * config_->UeAntNum() + ant_id;
 
     auto* equ_buffer_ptr = reinterpret_cast<arma::cx_float*>(
-        equal_buffer_[eq_buffer_offset].data());
+        equal_buffer_.at(eq_buffer_offset).data());
 
     // use pilot subcarriers for phase tracking and correction
     float theta = 0;
@@ -878,7 +879,7 @@ void PhyUe::DoFft(int tid, size_t tag) {
 
   // now empty
   rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0;
-  fft_finish_event = EventData(
+  EventData fft_finish_event = EventData(
       EventType::kFFT, gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_);
   RtAssert(complete_queue_.enqueue(*task_ptok_[tid], fft_finish_event),
            "User Task: FFT message enqueue failed");
