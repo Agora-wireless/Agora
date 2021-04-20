@@ -1559,8 +1559,8 @@ void PhyUe::FreeDownlinkBuffers() {
 
 void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
                              size_t symbol_id, size_t ant) {
-  // if (kDebugPrintPerTaskDone == true) {
-  if (true) {
+  if (kDebugPrintPerTaskDone == true) {
+    // if (true) {
     switch (print_type) {
       case (PrintType::kPacketRX):
         std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Rx packet\n",
@@ -1621,8 +1621,8 @@ void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
 
 void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
                                size_t symbol_id) {
-  // if (kDebugPrintPerSymbolDone == true) {
-  if (true) {
+  if (kDebugPrintPerSymbolDone == true) {
+    // if (true) {
     switch (print_type) {
       case (PrintType::kFFTPilots):
         std::printf(
