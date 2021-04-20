@@ -18,7 +18,9 @@ done
 
 # Setup the config with the number of frames to test
 cp data/bs-sim.json data/bs-sim-tmp.json
+cp data/ue-sim.json data/ue-sim-tmp.json
 sed -i '2i\ \ "frames_to_test": 1000,' data/bs-sim-tmp.json
+sed -i '2i\ \ "frames_to_test": 1000,' data/ue-sim-tmp.json
 
 echo "==========================================="
 echo "Generating data for emulated RRU end-to-end test with channel simulator ......"
@@ -28,14 +30,13 @@ echo -e "===========================================\n"
 echo "==========================================="
 echo "Running emulated RRU end-to-end test with channel simulator ......"
 echo -e "===========================================\n"
-./build/user data/ue-sim.json > test_output.txt &
-sleep 1; ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim-tmp.json --ue_conf_file data/ue-sim.json &
+./build/user data/ue-sim-tmp.json > test_output.txt &
+sleep 1; ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim-tmp.json --ue_conf_file data/ue-sim-tmp.json &
 sleep 1; ./build/agora data/bs-sim-tmp.json > test_output.txt
 
 
 # Agora is terminated automatically. Manually terminate user and chsim
 rm data/bs-sim-tmp.json
-pkill -INT user >> test_output.txt
 pkill chsim
 sleep 1
 grep "UE .*:" test_output.txt
