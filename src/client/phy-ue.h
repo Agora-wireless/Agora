@@ -7,6 +7,7 @@
 #define PHY_UE_H_
 
 #include <array>
+#include <queue>
 #include <thread>
 #include <vector>
 
@@ -58,6 +59,11 @@ class PhyUe {
   void PrintPerSymbolDone(PrintType print_type, size_t frame_id,
                           size_t symbol_id);
   void PrintPerFrameDone(PrintType print_type, size_t frame_id);
+
+  void ReceiveDownlinkSymbol(struct Packet* rx_packet, size_t tag);
+  void ScheduleDefferedDownlinkSymbols(size_t frame_id);
+  void ClearCsi(size_t frame_id);
+  std::vector<std::queue<EventData>> rx_downlink_deferral_;
   std::unique_ptr<Stats> stats_;
   RxCounters rx_counters_;
 
@@ -110,7 +116,8 @@ class PhyUe {
    *     4. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  void DoFft(int /*tid*/, size_t /*tag*/);
+  void DoFftPilot(int /*tid*/, size_t /*tag*/);
+  void DoFftData(int /*tid*/, size_t /*tag*/);
 
   /**
    * Do demodulation task for a block of subcarriers (demul_block_size)
@@ -121,13 +128,14 @@ class PhyUe {
    * equal_buffer_, demul_buffer_ Input buffer: ul_data_buffer_,
    * precoder_buffer_ Output buffer: demul_buffer_ Intermediate buffer:
    * spm_buffer, equal_buffer_ Off#include <tuple>sets:
-   * ul_data_buDownlinkCffer_: dim1: frame index * # of data symbols per frame +
-   * data symbol index dim2: transpose block index * block size * # of antennas
+   * ul_data_buDownlinkCffer_: dim1: frame index * # of data symbols per frame
+   * + data symbol index dim2: transpose block index * block size * # of
+   * antennas
    * + antenna index * block size spm_buffer: dim1: task thread index dim2:
    * antenna index precoder_buffer_: dim1: frame index * FFT size + subcarrier
-   * index in the current frame equal_buffer_, demul_buffer: dim1: frame index *
-   * # of data symbols per frame + data symbol index dim2: subcarrier index * #
-   * of users Event offset: offset Description:
+   * index in the current frame equal_buffer_, demul_buffer: dim1: frame index
+   * * # of data symbols per frame + data symbol index dim2: subcarrier index
+   * * # of users Event offset: offset Description:
    *     1. for each subcarrier in the block, block-wisely copy data from
    * ul_data_buffer_ to spm_buffer_
    *     2. perform equalization with data and percoder matrixes
@@ -305,7 +313,8 @@ class PhyUe {
   // Downlink (Rx)
   FrameCounters decode_counters_;
   FrameCounters demul_counters_;
-  FrameCounters fft_counters_;
+  FrameCounters fft_dldata_counters_;
+  FrameCounters fft_dlpilot_counters_;
   // Uplink (Tx)
   FrameCounters encode_counter_;
   FrameCounters modulation_counters_;

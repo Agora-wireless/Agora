@@ -51,6 +51,7 @@ enum class TsType : size_t {
   kTXProcessedFirst,
   kTXDone,
   kModulDone,
+  kFFTDone,
   kTsTypeEnd
 };
 static constexpr size_t kNumTimestampTypes =
