@@ -216,12 +216,12 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
                             this->cfg_->BsAntNum(), this->cfg_->UeAntNum());
       mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
-      for (size_t k = 0; k < this->cfg_->BsAntNum(); k++) {
+      /*for (size_t k = 0; k < this->cfg_->BsAntNum(); k++) {
         arma::cx_float noise(RandFloatFromShort(-1, 1),
                              RandFloatFromShort(-1, 1));
         noise *= this->cfg_->NoiseLevel() * sqrt2_norm;
         mat_output.at(j, k) += noise;
-      }
+      }*/
     }
     for (size_t j = 0; j < this->cfg_->BsAntNum(); j++) {
       CommsLib::IFFT(rx_data_all_symbols[i] + j * this->cfg_->OfdmCaNum(),
