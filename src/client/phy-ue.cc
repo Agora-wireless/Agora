@@ -121,7 +121,7 @@ PhyUe::PhyUe(Config* config)
   demul_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
   fft_dlpilot_counters_.Init(config->Frame().ClientDlPilotSymbols(),
                              config_->UeAntNum());
-  fft_dldata_counters_.Init(dl_symbol_perframe_, config_->UeAntNum());
+  fft_dldata_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
 
   encode_counter_.Init(config_->UeAntNum());
   modulation_counters_.Init(config_->UeAntNum());
@@ -207,7 +207,8 @@ void PhyUe::ScheduleDefferedDownlinkSymbols(size_t frame_id) {
   size_t frame_slot = frame_id % kFrameWnd;
   // Complete the csi offset
   size_t csi_offset = frame_slot * config_->UeAntNum();
-  for (size_t user = 0; user > config_->UeAntNum(); user++) {
+
+  for (size_t user = 0; user < config_->UeAntNum(); user++) {
     csi_offset = csi_offset + user;
     for (size_t ofdm_data = 0; ofdm_data < config_->OfdmDataNum();
          ofdm_data++) {
@@ -227,9 +228,10 @@ void PhyUe::ScheduleDefferedDownlinkSymbols(size_t frame_id) {
 
 void PhyUe::ClearCsi(size_t frame_id) {
   size_t frame_slot = frame_id % kFrameWnd;
+
   if (config_->Frame().ClientDlPilotSymbols() > 0) {
     size_t csi_offset = frame_slot * config_->UeAntNum();
-    for (size_t user = 0; user > config_->UeAntNum(); user++) {
+    for (size_t user = 0; user < config_->UeAntNum(); user++) {
       csi_offset = csi_offset + user;
       for (size_t ofdm_data = 0; ofdm_data < config_->OfdmDataNum();
            ofdm_data++) {
@@ -1003,8 +1005,7 @@ void PhyUe::DoFftPilot(int tid, size_t tag) {
     size_t fft_duration_stat = GetTime::Rdtsc() - start_tsc;
     std::printf(
         "User Task[%d]: Fft Pilot(frame %zu, symbol %zu, ant %zu) Duration "
-        "%2.4f "
-        "ms\n",
+        "%2.4f ms\n",
         tid, frame_id, symbol_id, ant_id,
         GetTime::CyclesToMs(fft_duration_stat, GetTime::MeasureRdtscFreq()));
   }
@@ -1634,8 +1635,8 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
 
       case (PrintType::kFFTData):
         std::printf(
-            "PhyUe [frame %zu symbol %zu + %.3f ms]: Data FFT complete for %zu "
-            "antennas\n",
+            "PhyUe [frame %zu symbol %zu + %.3f ms]: Data FFT complete for "
+            "%zu antennas\n",
             frame_id, symbol_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             fft_dldata_counters_.GetTaskCount(frame_id, symbol_id));
