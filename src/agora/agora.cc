@@ -947,10 +947,6 @@ void Agora::UpdateRanConfig(RanConfig rc) {
 
 void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
-
-  std::printf("Agora: [Frame %zu, symbol %zu]: Received\n", frame_id,
-              symbol_id);
-
   if (config_->IsPilot(frame_id, symbol_id)) {
     rx_counters_.num_pilot_pkts_[frame_slot]++;
     if (rx_counters_.num_pilot_pkts_[frame_slot] ==

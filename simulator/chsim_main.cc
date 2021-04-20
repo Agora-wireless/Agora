@@ -6,8 +6,6 @@
 
 #include "channel_sim.h"
 
-static constexpr double kNoSelectChanSnr = 1000.0f;
-
 DEFINE_uint64(bs_threads, 1,
               "Number of threads for handling reception of BS packets");
 DEFINE_uint64(ue_threads, 1,
@@ -24,7 +22,7 @@ DEFINE_string(ue_conf_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ue.json",
               "UE Config filename");
 DEFINE_string(chan_model, "RAYLEIGH", "Simulator Channel Type: RAYLEIGH/AWGN");
-DEFINE_double(chan_snr, kNoSelectChanSnr, "Signal-to-Noise Ratio dB");
+DEFINE_double(chan_snr, 20.0, "Signal-to-Noise Ratio");
 
 int main(int argc, char* argv[]) {
   int ret = EXIT_FAILURE;
@@ -39,16 +37,10 @@ int main(int argc, char* argv[]) {
 
       // Register signal handler to handle kill signal
       signal_handler.SetupSignalHandlers();
-      double snr_db = FLAGS_chan_snr;
-      // TODO, setup channel Noise (to and from)
-      if (FLAGS_chan_snr == kNoSelectChanSnr) {
-        snr_db = bs_config->NoiseLevel() * 1000.0f;
-      }
-      std::printf("chsim: noise value: %f\n", snr_db);
-
       auto sim = std::make_unique<ChannelSim>(
           bs_config.get(), ue_config.get(), FLAGS_bs_threads, FLAGS_ue_threads,
-          FLAGS_worker_threads, FLAGS_core_offset, FLAGS_chan_model, snr_db);
+          FLAGS_worker_threads, FLAGS_core_offset, FLAGS_chan_model,
+          FLAGS_chan_snr);
       sim->Start();
       ret = EXIT_SUCCESS;
     } catch (SignalException& e) {
