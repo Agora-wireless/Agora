@@ -100,7 +100,7 @@ void Channel::Awgn(const arma::cx_fmat& src, arma::cx_fmat& dst) const {
   // Element-wise multiplication
   noise = noise % n_mat;
   // Add noise to signal
-  dst = src + noise;
+  dst = src;  // + noise;
 
   // Check SNR
   /*
