@@ -669,6 +669,11 @@ void Phy_UE::doFFT(int tid, size_t tag)
     simd_convert_short_to_float(
         &pkt->data[delay_offset], fft_buff, config_->OFDM_CA_NUM * 2);
 
+    // CFO correction
+    bool is_downlink = true;
+    ru_->cfo_correction(
+        is_downlink, (complex_float*)fft_buff, config_->OFDM_CA_NUM);
+
     // perform fft
     DftiComputeForward(mkl_handle, fft_buffer_[FFT_buffer_target_id]);
 

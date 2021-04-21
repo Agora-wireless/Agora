@@ -3,9 +3,11 @@
 
 #include "client_radio.hpp"
 #include "concurrentqueue.h"
+#include "datatype_conversion.h"
 #include "net.hpp"
 #include "utils.h"
 #include <arpa/inet.h>
+#include <cmath>
 #include <complex>
 #include <fcntl.h>
 #include <fstream>
@@ -129,6 +131,14 @@ public:
     void* loop_tx_rx_argos_sync(int tid);
     void* loop_tx_rx_usrp_sync(int tid);
 
+    /**
+     *
+     *
+     */
+    void cfo_estimation(const int sync_index,
+        const std::vector<std::complex<float>>& beacon_buff);
+    void cfo_correction(bool downlink, complex_float* samples_vec, size_t len);
+
 private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
@@ -160,5 +170,8 @@ private:
     // helper buffers
     std::vector<void*> pilot_buff0;
     std::vector<void*> pilot_buff1;
+
+    // CFO
+    double cfo_;
 };
 #endif

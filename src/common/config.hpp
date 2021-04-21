@@ -105,6 +105,7 @@ public:
     std::vector<uint32_t> coeffs;
     std::vector<std::complex<int16_t>> pilot_ci16;
     std::vector<std::complex<float>> pilot_cf32;
+    complex_float* pilot_ifft;
     std::vector<uint32_t> pilot;
     std::vector<uint32_t> beacon;
     complex_float* pilots_;
@@ -140,6 +141,8 @@ public:
     size_t ref_ant;
     size_t beacon_ant;
     size_t beacon_len;
+    size_t beacon_longsym_len;
+    size_t beacon_longsym_reps;
     bool beamsweep;
     bool sampleCalEn;
     bool imbalanceCalEn;

@@ -103,7 +103,7 @@ Config::Config(std::string jsonfile)
     DL_PILOT_SYMS = tddConf.value("client_dl_pilot_syms", 0);
     UL_PILOT_SYMS = tddConf.value("client_ul_pilot_syms", 0);
     cl_tx_advance = tddConf.value("tx_advance", 100);
-    hw_framer = tddConf.value("hw_framer", true);
+    hw_framer = tddConf.value("hw_framer", false);
     if (tddConf.find("frames") == tddConf.end()) {
         symbol_num_perframe = tddConf.value("symbol_num_perframe", 70);
         pilot_symbol_num_perframe = tddConf.value(
@@ -297,6 +297,7 @@ void Config::genData()
         }
 
         // Populate gold sequence (two reps, 128 each)
+        // Note: Need a minimum of 2 reps for CFO and other sync/estimation
         int goldReps = 2;
         for (int i = 0; i < goldReps; i++) {
             beacon_ci16.insert(beacon_ci16.end(), gold_ifft_ci16.begin(),
@@ -304,6 +305,8 @@ void Config::genData()
         }
 
         beacon_len = beacon_ci16.size();
+        beacon_longsym_len = gold_ifft_ci16.size();
+        beacon_longsym_reps = goldReps;
 
         if (sampsPerSymbol
             < beacon_len + ofdm_tx_zero_prefix_ + ofdm_tx_zero_postfix_) {
@@ -343,7 +346,7 @@ void Config::genData()
             = common_pilot[i] / (float)std::pow(std::abs(common_pilot[i]), 2);
         pilots_sgn_[i] = { pilot_sgn.real(), pilot_sgn.imag() };
     }
-    complex_float* pilot_ifft;
+    // complex_float* pilot_ifft;
     alloc_buffer_1d(&pilot_ifft, OFDM_CA_NUM, 64, 1);
     for (size_t j = 0; j < OFDM_DATA_NUM; j++)
         pilot_ifft[j + OFDM_DATA_START] = pilots_[j];
@@ -624,13 +627,14 @@ void Config::genData()
     ul_iq_ifft.free();
     dl_iq_ifft.free();
     ue_pilot_ifft.free();
-    free_buffer_1d(&pilot_ifft);
+    //free_buffer_1d(&pilot_ifft);
 }
 
 Config::~Config()
 {
     free_buffer_1d(&pilots_);
     free_buffer_1d(&pilots_sgn_);
+    free_buffer_1d(&pilot_ifft);
     mod_table.free();
     dl_bits.free();
     ul_bits.free();
