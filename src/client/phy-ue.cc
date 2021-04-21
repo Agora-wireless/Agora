@@ -333,8 +333,7 @@ void PhyUe::Start() {
               const size_t prev_frame_slot =
                   (frame_slot + kFrameWnd - 1) % kFrameWnd;
               std::printf(
-                  "PhyUe [frame %zu + %.2f ms since last frame]: "
-                  "Received "
+                  "PhyUe [frame %zu + %.2f ms since last frame]: Received "
                   "first packet. Remaining packets in prev frame: %zu\n",
                   frame_id,
                   this->stats_->MasterGetDeltaMs(TsType::kFirstSymbolRX,
