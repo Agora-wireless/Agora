@@ -250,6 +250,7 @@ endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
+  src/agora/stats.cc
   src/client/client_radio.cc
   src/client/phy-ue.cc
   src/client/txrx_client.cc

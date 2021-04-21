@@ -980,14 +980,14 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
                            config_->Frame().GetDLSymbol(i));
       }
     }
-    this->stats_->MasterSetTsc(TsType::kPilotRX, frame_id);
+    this->stats_->MasterSetTsc(TsType::kFirstSymbolRX, frame_id);
     if (kDebugPrintPerFrameStart) {
       const size_t prev_frame_slot = (frame_slot + kFrameWnd - 1) % kFrameWnd;
       std::printf(
           "Main [frame %zu + %.2f ms since last frame]: Received "
           "first packet. Remaining packets in prev frame: %zu\n",
           frame_id,
-          this->stats_->MasterGetDeltaMs(TsType::kPilotRX, frame_id,
+          this->stats_->MasterGetDeltaMs(TsType::kFirstSymbolRX, frame_id,
                                          frame_id - 1),
           rx_counters_.num_pkts_[prev_frame_slot]);
     }
@@ -1007,19 +1007,20 @@ void Agora::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
       case (PrintType::kPacketRXPilots):
         std::printf("Main [frame %zu + %.2f ms]: Received all pilots\n",
                     frame_id,
-                    this->stats_->MasterGetDeltaMs(TsType::kPilotAllRX,
-                                                   TsType::kPilotRX, frame_id));
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kPilotAllRX, TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kPacketRX):
         std::printf("Main [frame %zu + %.2f ms]: Received all packets\n",
                     frame_id,
-                    this->stats_->MasterGetDeltaMs(TsType::kRXDone,
-                                                   TsType::kPilotRX, frame_id));
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kRXDone, TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kFFTPilots):
-        std::printf("Main [frame %zu + %.2f ms]: FFT-ed all pilots\n", frame_id,
-                    this->stats_->MasterGetDeltaMs(TsType::kFFTPilotsDone,
-                                                   TsType::kPilotRX, frame_id));
+        std::printf(
+            "Main [frame %zu + %.2f ms]: FFT-ed all pilots\n", frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kFFTPilotsDone,
+                                           TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kFFTCal):
         std::printf(
@@ -1031,14 +1032,14 @@ void Agora::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
       case (PrintType::kZF):
         std::printf("Main [frame %zu + %.2f ms]: Completed zero-forcing\n",
                     frame_id,
-                    this->stats_->MasterGetDeltaMs(TsType::kZFDone,
-                                                   TsType::kPilotRX, frame_id));
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kZFDone, TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kDemul):
         std::printf("Main [frame %zu + %.2f ms]: Completed demodulation\n",
                     frame_id,
-                    this->stats_->MasterGetDeltaMs(TsType::kDemulDone,
-                                                   TsType::kPilotRX, frame_id));
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kDemulDone, TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kDecode):
         std::printf(
@@ -1046,44 +1047,45 @@ void Agora::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
             "symbols)\n",
             frame_id,
             this->stats_->MasterGetDeltaMs(TsType::kDecodeDone,
-                                           TsType::kPilotRX, frame_id),
+                                           TsType::kFirstSymbolRX, frame_id),
             config_->Frame().NumULSyms());
         break;
       case (PrintType::kEncode):
         std::printf("Main [frame %zu + %.2f ms]: Completed LDPC encoding\n",
                     frame_id,
-                    this->stats_->MasterGetDeltaMs(TsType::kEncodeDone,
-                                                   TsType::kPilotRX, frame_id));
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kEncodeDone, TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kPrecode):
-        std::printf("Main [frame %zu + %.2f ms]: Completed precoding\n",
-                    frame_id,
-                    this->stats_->MasterGetDeltaMs(TsType::kPrecodeDone,
-                                                   TsType::kPilotRX, frame_id));
+        std::printf(
+            "Main [frame %zu + %.2f ms]: Completed precoding\n", frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kPrecodeDone,
+                                           TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kIFFT):
         std::printf("Main [frame %zu + %.2f ms]: Completed IFFT\n", frame_id,
-                    this->stats_->MasterGetDeltaMs(TsType::kIFFTDone,
-                                                   TsType::kPilotRX, frame_id));
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kIFFTDone, TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kPacketTXFirst):
         std::printf(
             "Main [frame %zu + %.2f ms]: Completed TX of first symbol\n",
             frame_id,
             this->stats_->MasterGetDeltaMs(TsType::kTXProcessedFirst,
-                                           TsType::kPilotRX, frame_id));
+                                           TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kPacketTX):
         std::printf(
             "Main [frame %zu + %.2f ms]: Completed TX (%zu DL symbols)\n",
             frame_id,
-            this->stats_->MasterGetDeltaMs(TsType::kTXDone, TsType::kPilotRX,
-                                           frame_id),
+            this->stats_->MasterGetDeltaMs(TsType::kTXDone,
+                                           TsType::kFirstSymbolRX, frame_id),
             config_->Frame().NumDLSyms());
         break;
       case (PrintType::kPacketToMac):
-        std::printf("Main [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
-                    this->stats_->MasterGetMsSince(TsType::kPilotRX, frame_id));
+        std::printf(
+            "Main [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
         break;
       default:
         std::printf("Wrong task type in frame done print!");
@@ -1100,7 +1102,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed pilot symbol, "
             "%zu symbols done\n",
             frame_id, symbol_id,
-            this->stats_->MasterGetMsSince(TsType::kPilotRX, frame_id),
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             pilot_fft_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kFFTData):
@@ -1108,7 +1110,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed data symbol, "
             "%zu precoder status: %d\n",
             frame_id, symbol_id,
-            this->stats_->MasterGetMsSince(TsType::kPilotRX, frame_id),
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             uplink_fft_counters_.GetSymbolCount(frame_id) + 1,
             static_cast<int>(zf_last_frame_ == frame_id));
         break;
@@ -1118,7 +1120,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             "demodulation, "
             "%zu symbols done\n",
             frame_id, symbol_id,
-            this->stats_->MasterGetMsSince(TsType::kPilotRX, frame_id),
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             demul_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kDecode):
@@ -1126,7 +1128,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             "Main [frame %zu symbol %zu + %.3f ms]: Completed decoding, "
             "%zu symbols done\n",
             frame_id, symbol_id,
-            this->stats_->MasterGetMsSince(TsType::kPilotRX, frame_id),
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             decode_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kEncode):
@@ -1134,7 +1136,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             "Main [frame %zu symbol %zu + %.3f ms]: Completed encoding, "
             "%zu symbols done\n",
             frame_id, symbol_id,
-            this->stats_->MasterGetMsSince(TsType::kPilotRX, frame_id),
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             encode_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kPrecode):
@@ -1142,7 +1144,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             "Main [frame %zu symbol %zu + %.3f ms]: Completed precoding, "
             "%zu symbols done\n",
             frame_id, symbol_id,
-            this->stats_->MasterGetMsSince(TsType::kPilotRX, frame_id),
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             precode_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kIFFT):
@@ -1150,7 +1152,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             "Main [frame %zu symbol %zu + %.3f ms]: Completed IFFT, "
             "%zu symbols done\n",
             frame_id, symbol_id,
-            this->stats_->MasterGetMsSince(TsType::kPilotRX, frame_id),
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             ifft_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kPacketTX):
@@ -1158,7 +1160,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             "Main [frame %zu symbol %zu + %.3f ms]: Completed TX, "
             "%zu symbols done\n",
             frame_id, symbol_id,
-            this->stats_->MasterGetMsSince(TsType::kPilotRX, frame_id),
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             tx_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kPacketToMac):
@@ -1166,7 +1168,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             "Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
             "%zu symbols done\n",
             frame_id, symbol_id,
-            this->stats_->MasterGetMsSince(TsType::kPilotRX, frame_id),
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             tomac_counters_.GetSymbolCount(frame_id) + 1);
         break;
       default:
