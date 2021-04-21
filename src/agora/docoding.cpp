@@ -31,7 +31,7 @@ DoEncode::DoEncode(Config* in_config, int in_tid,
     rmatched_buffer_ = static_cast<uint8_t*>(
         Agora_memory::padded_aligned_alloc(Agora_memory::Alignment_t::k64Align,
             ldpc_encoding_encoded_buf_size(
-                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc))); // OBCH FIXME - last parameter, check size!!
+                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc))); // OBCH FIXME - last parameter, TURNED OUT TO BE 922 bytes 
     assert(rmatched_buffer_ != nullptr);
 
 }
@@ -69,16 +69,9 @@ Event_data DoEncode::launch(size_t tag)
         encoded_buffer_, frame_id, symbol_idx_dl, ue_id, cur_cb_id);
 
     // Rate Matching OBCH TODO
-    // (1) size of rmatched_buffer_??
-    // (2) Need to change size of final_output_ptr ?? depends on size of encoded_buffer_
-    // (3) Size passed to adapt_bits_for_mod( ?? 
     rMatching();
 
-    /* /// OBCH ENABLE THIS
-    adapt_bits_for_mod(reinterpret_cast<uint8_t*>(rmatched_buffer_),
-        reinterpret_cast<uint8_t*>(final_output_ptr),
-        bits_to_bytes(LDPC_config.cbCodewLen), cfg->mod_order_bits);*/
-    adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
+    adapt_bits_for_mod(reinterpret_cast<uint8_t*>(rmatched_buffer_),   // reinterpret_cast<uint8_t*>(encoded_buffer_temp)
         reinterpret_cast<uint8_t*>(final_output_ptr),
         bits_to_bytes(LDPC_config.cbCodewLen), cfg->mod_order_bits);
 
@@ -229,17 +222,30 @@ void DoEncode::rMatching()
     bblib_LDPC_ratematch_5gnr_request req;
     bblib_LDPC_ratematch_5gnr_response resp;
 
+    // Rate matching output sequence length (Er)
+    int32_t NL = 1;                         // Number of transmissions layers that the transport block is mapped onto
+    int32_t Qm = cfg->mod_order_bits;   // Modulation order
+    int32_t G = LDPC_config.cbCodewLen; // Total number of coded bits available for transmissions of transport block
+    int32_t C = 1;                          // Number of code blocks in one transport block
+
+    Er = NL * Qm * floor( G / (NL * Qm * C) );
+ 
+    // Code Block Group (CBG)
+    // Code Block Group Transmission Information (CBGTI)
+
     // Request Params... OBCH TODO - Verify all
-    req.Ncb = LDPC_config.cbCodewLen;  // max 8448*8 ?;
+    req.Ncb = LDPC_config.cbCodewLen;
     req.Zc = LDPC_config.Zc;
-    req.E = LDPC_config.cbCodewLen;
-    req.Qm = cfg->mod_order_bits;
+    req.E = E;
+    req.Qm = Qm;
     req.rvidx = 0;
     req.baseGraph = LDPC_config.Bg;
-    req.nullIndex = -1;
-    req.nLen = 0;
+    // In bits - After of encoded bits (systematic + parity)
+    req.nullIndex = LDPC_config.cbCodewLen;
+    // In bits
+    req.nLen = ldpc_encoding_encoded_buf_size(
+                cfg->LDPC_config.Bg, cfg->LDPC_config.Zc) * 8 - LDPC_config.cbCodewLen;
     req.input = (uint8_t*)encoded_buffer_temp;
-    printf("XXXXXXXXXXXZ Ncb: %d, Zc: %d, E: %d, Qm: %d \n", req.Ncb, req.Zc, req.E, req.Qm);
 
     // Response Params
     resp.output = rmatched_buffer_;
@@ -250,14 +256,8 @@ void DoEncode::rMatching()
                     : bblib_LDPC_ratematch_5gnr(&req, &resp);
     */
     int32_t success = bblib_LDPC_ratematch_5gnr_c(&req, &resp);
-    printf("Rate Matching Success? %d \n", success);
+    printf("Rate Matching Success? %d \n", success+1);
 
-    /*
-    std::memcpy(encoded_buffer, input_buffer + num_punctured_bytes,
-            num_input_bytes_to_copy);
-    std::memcpy(encoded_buffer + num_input_bytes_to_copy, parity_buffer,
-            bits_to_bytes(num_parity_bits));
-     */
 }
 
 void DoDecode::dMatching()

@@ -110,7 +110,7 @@ inline void bitSelect(const struct bblib_LDPC_ratematch_5gnr_request *request, u
     int32_t ni = request->nullIndex;
     int32_t nl = request->nLen;
     uint8_t *in = request->input;
-
+    
     int32_t k0;
     if (graph == 1)
     {
@@ -263,7 +263,7 @@ inline void bitSelect(const struct bblib_LDPC_ratematch_5gnr_request *request, u
         /* If we start at the end of null bits, and the remaining bits is enough */
         else if (startBit+bitLeft<=cb)
         {
-            printf("==== OBCH 3 ==== srcB: %d, srcb: %d, dstB: %d, dstb: %d, bitLeft: %d, len: %d \n ", srcByte, srcBits, desByte, desBits, bitLeft, bitLeft);
+            // printf("==== OBCH 3 ==== srcB: %d, srcb: %d, dstB: %d, dstb: %d, bitLeft: %d, len: %d \n ", srcByte, srcBits, desByte, desBits, bitLeft, bitLeft);
             ippsCopyBE_1u( (Ipp8u*)(in+srcByte), srcBits, (Ipp8u*)(e+desByte), desBits, bitLeft );
 	        // memcpy_bitOffset( (in + srcByte), srcBits, (e + desByte), desBits, bitLeft );
             srcOffBit += bitLeft;
