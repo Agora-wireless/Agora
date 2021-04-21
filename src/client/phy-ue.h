@@ -6,19 +6,10 @@
 #ifndef PHY_UE_H_
 #define PHY_UE_H_
 
-#include <immintrin.h>
-#include <sys/epoll.h>
-#include <unistd.h>
-
-#include <algorithm>
-#include <armadillo>
-#include <ctime>
-#include <iostream>
-#include <memory>
+#include <array>
 #include <queue>
-#include <system_error>
 #include <thread>
-#include <tuple>
+#include <vector>
 
 #include "buffer.h"
 #include "comms-lib.h"
@@ -30,15 +21,25 @@
 #include "mkl_dfti.h"
 #include "modulation.h"
 #include "scrambler.h"
-#include "signal_handler.h"
+#include "stats.h"
 #include "txrx_client.h"
 
-using myVec =
-    std::vector<complex_float,
-                boost::alignment::aligned_allocator<complex_float, 64>>;
+static const size_t kVectorAlignment = 64;
+
+using myVec = std::vector<complex_float, boost::alignment::aligned_allocator<
+                                             complex_float, kVectorAlignment>>;
 
 class PhyUe {
  public:
+  enum class FrameTasksFlags : std::uint8_t {
+    kNoWorkComplete = 0x00,
+    kDownlinkComplete = 0x01,
+    // kUplinkComplete = 0x02,
+    kUplinkTxComplete = 0x02,
+    kMacTxComplete = 0x04,
+    kFrameComplete = (kDownlinkComplete | kMacTxComplete | kUplinkTxComplete)
+  };
+
   // dequeue bulk size, used to reduce the overhead of dequeue in main
   // thread
   static const int kDequeueBulkSizeTXRX = 8;
@@ -48,6 +49,23 @@ class PhyUe {
 
   void Start();
   void Stop();
+
+  void GetEqualData(float** ptr, int* size, int /*ue_id*/);
+  void GetDemulData(long long** ptr, int* size);
+
+ private:
+  void PrintPerTaskDone(PrintType print_type, size_t frame_id, size_t symbol_id,
+                        size_t ant);
+  void PrintPerSymbolDone(PrintType print_type, size_t frame_id,
+                          size_t symbol_id);
+  void PrintPerFrameDone(PrintType print_type, size_t frame_id);
+
+  void ReceiveDownlinkSymbol(struct Packet* rx_packet, size_t tag);
+  void ScheduleDefferedDownlinkSymbols(size_t frame_id);
+  void ClearCsi(size_t frame_id);
+  std::vector<std::queue<EventData>> rx_downlink_deferral_;
+  std::unique_ptr<Stats> stats_;
+  RxCounters rx_counters_;
 
   /*****************************************************
    * Downlink
@@ -98,7 +116,8 @@ class PhyUe {
    *     4. add an event to the message queue to infrom main thread the
    * completion of this task
    */
-  void DoFft(int /*tid*/, size_t /*tag*/);
+  void DoFftPilot(int /*tid*/, size_t /*tag*/);
+  void DoFftData(int /*tid*/, size_t /*tag*/);
 
   /**
    * Do demodulation task for a block of subcarriers (demul_block_size)
@@ -129,25 +148,22 @@ class PhyUe {
   void DoDemul(int /*tid*/, size_t /*tag*/);
   void DoDecode(int /*tid*/, size_t /*tag*/);
 
-  void GetDemulData(long long** ptr, int* size);
-  void GetEqualPcData(float** ptr, int* size, int);
-  void GetEqualData(float** ptr, int* size, int /*ue_id*/);
-
-  struct EventHandlerContext {
-    PhyUe* obj_ptr_;
-    int id_;
-  };
-
   void TaskThread(int tid);
 
   /* Add tasks into task queue based on event type */
   void ScheduleTask(EventData do_task,
                     moodycamel::ConcurrentQueue<EventData>* in_queue,
                     moodycamel::ProducerToken const& ptok);
+  void ScheduleWork(EventData do_task);
+
+  std::unique_ptr<moodycamel::ProducerToken> work_producer_token_;
 
   void InitializeVarsFromCfg();
 
- private:
+  void FrameInit(size_t frame);
+  // Tracks the tasks completed for the frame
+  bool FrameComplete(size_t frame, FrameTasksFlags complete);
+
   void FreeUplinkBuffers();
   void FreeDownlinkBuffers();
 
@@ -157,31 +173,9 @@ class PhyUe {
   size_t dl_data_symbol_perframe_;
   size_t ul_symbol_perframe_;
   size_t dl_symbol_perframe_;
-  size_t tx_symbol_perframe_;
-  size_t symbol_len_;  // samples in sym without prefix and postfix
-  size_t ofdm_syms_;   // number of OFDM symbols in general symbol (i.e. symbol)
-  size_t fft_len_;
-  size_t cp_len_;
-  size_t n_u_es_;
-  size_t antenna_num_;
-  size_t hdr_size_;
-  size_t num_cp_us_;
-  size_t core_offset_;
-  size_t worker_thread_num_;
   size_t rx_thread_num_;
-  size_t tx_thread_num_;
-  size_t packet_length_;
-  size_t tx_packet_length_;
-  FILE* fp_;
-  FILE* fd_;
 
-  size_t pilot_sc_len_;
-  size_t data_sc_len_;
-  size_t data_sc_start_;
-  size_t non_null_sc_len_;
-
-  size_t rx_buffer_frame_num_;
-  size_t tx_buffer_frame_num_;
+  std::array<std::uint8_t, kFrameWnd> frame_tasks_;
 
   // The thread running MAC layer functions
   std::unique_ptr<MacThread> mac_thread_;
@@ -195,12 +189,11 @@ class PhyUe {
 
   // next_processed_frame_[i] is the next frame index on the uplink
   // to be processed and transmitted by the PHY for UE #i
-  size_t next_frame_processed_[kMaxUEs] = {};
+  std::array<size_t, kMaxUEs> next_frame_processed_ = {};
 
   /*****************************************************
    * Uplink
    *****************************************************/
-
   /**
    * Transmit data
    *
@@ -210,7 +203,7 @@ class PhyUe {
   char* tx_buffer_;
   int* tx_buffer_status_;
 
-  int tx_buffer_size_;
+  size_t tx_buffer_size_;
   int tx_buffer_status_size_;
 
   /**
@@ -229,10 +222,10 @@ class PhyUe {
    */
   Table<uint8_t> ul_bits_buffer_;
   Table<uint8_t> ul_bits_buffer_status_;
-  int ul_bits_buffer_size_;
+  size_t ul_bits_buffer_size_;
 
   Table<uint8_t> ul_syms_buffer_;
-  int ul_syms_buffer_size_;
+  size_t ul_syms_buffer_size_;
   /**
    * Data after modulation
    * First dimension: data_symbol_num_perframe * kFrameWnd
@@ -240,10 +233,7 @@ class PhyUe {
    */
   Table<complex_float> modul_buffer_;
 
-  /*****************************************************
-   * Downlink
-   *****************************************************/
-
+  // Remote unit
   std::unique_ptr<RadioTxRx> ru_;
 
   /**
@@ -256,7 +246,7 @@ class PhyUe {
   Table<char> rx_buffer_;
   Table<int> rx_buffer_status_;
 
-  int rx_buffer_size_;
+  size_t rx_buffer_size_;
   int rx_buffer_status_size_;
 
   /**
@@ -291,9 +281,6 @@ class PhyUe {
    */
   Table<int8_t> dl_demod_buffer_;
 
-  /**
-   *
-   */
   std::vector<std::vector<uint8_t>> dl_decode_buffer_;
   std::complex<float>* rx_samps_tmp_;  // Temp buffer for received samples
 
@@ -308,20 +295,12 @@ class PhyUe {
   std::vector<size_t> decoded_symbol_count_;
   std::vector<size_t> symbol_error_count_;
 
-  /* Concurrent queues */
-  /* task queue for downlink FFT */
-  moodycamel::ConcurrentQueue<EventData> fft_queue_;
-  /* task queue for downlink demodulation */
-  moodycamel::ConcurrentQueue<EventData> demul_queue_;
-  /* task queue for downlink decoding */
-  moodycamel::ConcurrentQueue<EventData> decode_queue_;
-  /* main thread message queue */
-  moodycamel::ConcurrentQueue<EventData> message_queue_;
-  moodycamel::ConcurrentQueue<EventData> ifft_queue_;
+  // Communication queues
+  moodycamel::ConcurrentQueue<EventData> complete_queue_;
+  moodycamel::ConcurrentQueue<EventData> work_queue_;
+
   moodycamel::ConcurrentQueue<EventData> tx_queue_;
   moodycamel::ConcurrentQueue<EventData> to_mac_queue_;
-  moodycamel::ConcurrentQueue<EventData> encode_queue_;
-  moodycamel::ConcurrentQueue<EventData> modul_queue_;
 
   std::array<std::thread, kMaxThreads> task_threads_;
 
@@ -332,27 +311,18 @@ class PhyUe {
   moodycamel::ProducerToken* task_ptok_[kMaxThreads];
 
   // all checkers
-  std::array<std::vector<size_t>, kFrameWnd> fft_checker_;
-  std::array<size_t, kFrameWnd> fft_status_;
+  FrameCounters tx_counters_;
+  // Downlink (Rx)
+  FrameCounters decode_counters_;
+  FrameCounters demul_counters_;
+  FrameCounters fft_dldata_counters_;
+  FrameCounters fft_dlpilot_counters_;
+  // Uplink (Tx)
+  FrameCounters encode_counter_;
+  FrameCounters modulation_counters_;
+  FrameCounters ifft_counters_;
 
-  // can possibly remove this checker
-  std::array<std::vector<size_t>, kFrameWnd> demul_checker_;
-  std::array<size_t, kFrameWnd> demul_status_;
-
-  std::array<std::vector<size_t>, kFrameWnd> decode_checker_;
-  std::array<size_t, kFrameWnd> decode_status_;
-
-  std::array<double, kFrameWnd * kMaxUEs> frame_dl_process_time_;
-  std::queue<std::tuple<int, int>> task_wait_list_;
   std::unique_ptr<AgoraScrambler::Scrambler> scrambler_;
-
-  // for python
-  /**
-   * dimension: OFDM*UE_NUM
-   */
-  int max_equaled_frame_ = 0;
-  // long long* demul_output;
-  // float* equal_output;
-  size_t record_frame_ = SIZE_MAX;
+  size_t max_equaled_frame_ = 0;
 };
 #endif  // PHY_UE_H_

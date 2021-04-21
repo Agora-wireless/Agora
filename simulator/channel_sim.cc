@@ -11,7 +11,8 @@
 static std::atomic<bool> running = true;
 static constexpr bool kPrintChannelOutput = false;
 static const size_t kDefaultQueueSize = 36;
-static const bool kPrintDebugTxUser = false;
+static const bool kPrintDebugTxUser = true;
+static const bool kPrintDebugTxBs = true;
 
 static void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
                                     size_t length) {
@@ -204,9 +205,8 @@ void ChannelSim::Start() {
               user_rx_counter_[frame_offset] = 0;
               if (kDebugPrintPerSymbolDone) {
                 std::printf(
-                    "Scheduling uplink transmission of frame %zu, "
-                    "symbol %zu, from %zu "
-                    "user to %zu BS antennas\n",
+                    "Scheduling uplink transmission of frame %zu, symbol %zu, "
+                    "from %zu user to %zu BS antennas\n",
                     frame_id, symbol_id, uecfg_->UeAntNum(),
                     bscfg_->BsAntNum());
               }
@@ -227,10 +227,8 @@ void ChannelSim::Start() {
               bs_rx_counter_[frame_offset] = 0;
               if (kDebugPrintPerSymbolDone) {
                 std::printf(
-                    "Scheduling downlink transmission in frame "
-                    "%zu, "
-                    "symbol %zu, from %zu "
-                    "BS to %zu user antennas\n",
+                    "Scheduling downlink transmission in frame %zu, symbol "
+                    "%zu, from %zu BS to %zu user antennas\n",
                     frame_id, symbol_id, bscfg_->BsAntNum(),
                     uecfg_->UeAntNum());
               }
@@ -482,6 +480,13 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
     total_symbol_id = ul_symbol_id + bscfg_->Frame().NumPilotSyms();
   }
 
+  if (kPrintDebugTxBs) {
+    std::printf(
+        "Channel Sim: DoTxBs processing frame %zu, symbol %zu, ul symbol "
+        "%zu, at %f ms\n",
+        frame_id, symbol_id, ul_symbol_id, GetTime::GetTimeUs() / 1000);
+  }
+
   size_t symbol_offset =
       (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ + total_symbol_id;
   size_t total_offset_ue = symbol_offset * payload_length_ * uecfg_->UeAntNum();
@@ -523,11 +528,13 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
 void ChannelSim::DoTxUser(int tid, size_t tag) {
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);
+  size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);  // If id = 0, then return 0;
 
   if (kPrintDebugTxUser) {
-    std::printf("Channel Sim: DoTxUser processing symbol %zu, dl symbol %zu\n",
-                symbol_id, dl_symbol_id);
+    std::printf(
+        "Channel Sim: DoTxUser processing frame %zu, symbol %zu, dl symbol "
+        "%zu, at %f ms\n",
+        frame_id, symbol_id, dl_symbol_id, GetTime::GetTimeUs() / 1000);
   }
 
   size_t symbol_offset =
