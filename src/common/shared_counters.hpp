@@ -26,6 +26,10 @@ public:
         , freq_ghz_(measure_rdtsc_freq())
         , test_mode_(cfg->test_mode)
     {
+        frame_start_time_ = new uint64_t[cfg->frames_to_test];
+        frame_end_time_ = new uint64_t[cfg->frames_to_test];
+        memset(frame_start_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+        memset(frame_end_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
     }
 
     // When receive a new packet, record it here
@@ -40,6 +44,10 @@ public:
                 pkt->frame_id, cur_frame_, kFrameWnd, cur_frame_, num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
                 num_pkts_[cur_frame_ % kFrameWnd].load(), pkt->to_string().c_str());
             return false;
+        }
+
+        if (unlikely(frame_start_time_[pkt->frame_id] == 0)) {
+            frame_start_time_[pkt->frame_id] = rdtsc();
         }
 
         const size_t frame_slot = pkt->frame_id % kFrameWnd;
@@ -136,6 +144,7 @@ public:
         if (unlikely(cont)) {
             cur_frame_mutex_.lock();
             while (num_decode_tasks_completed_[cur_frame_ % kFrameWnd] == num_decode_tasks_per_frame_) {
+                frame_end_time_[cur_frame_] = rdtsc();
                 cur_frame_ ++;
                 encode_ready_[(cur_frame_ - 1) % kFrameWnd] = false;
                 size_t cur_cycle = worker_rdtsc();
@@ -214,6 +223,10 @@ public:
     // cur_frame_ will be incremented in all tasks are completed
     size_t num_precode_tasks_completed_;
     std::mutex precode_mutex_;
+
+    // Latency measurement counters for each frame
+    uint64_t *frame_start_time_;
+    uint64_t *frame_end_time_;
 
     // The timestamp when last frame was processed (in cycles)
     size_t last_frame_cycles_;

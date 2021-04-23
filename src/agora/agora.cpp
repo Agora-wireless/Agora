@@ -170,6 +170,9 @@ finish:
         save_tx_data_to_file(0);
     }
 
+    // Printing latency stats
+    save_latency_data_to_file();
+
     // Calculate and print per-user BER
     if (!kEnableMac && kPrintPhyStats) {
         phy_stats->print_phy_stats();
@@ -650,6 +653,22 @@ void Agora::save_tx_data_to_file(UNUSED int frame_id)
             short* socket_ptr = pkt->data;
             fwrite(socket_ptr, cfg->sampsPerSymbol * 2, sizeof(short), fp);
         }
+    }
+    fclose(fp);
+}
+
+void Agora::save_latency_data_to_file()
+{
+    auto& cfg = config_;
+
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string filename = cur_directory + "/data/frame_latency.txt";
+    printf("Saving frame latency data to %s, ghz=%lf\n", filename.c_str(), freq_ghz);
+    FILE* fp = fopen(filename.c_str(), "w");
+
+    for (size_t i = 0; i < cfg->frames_to_test; i ++) {
+        fprintf(fp, "%u %lf\n", i, cycles_to_ms(rx_status_.frame_end_time_[i] -
+            rx_status_.frame_start_time_[i], freq_ghz));
     }
     fclose(fp);
 }

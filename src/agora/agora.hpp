@@ -99,6 +99,7 @@ public:
 
     void save_decode_data_to_file(int frame_id);
     void save_tx_data_to_file(int frame_id);
+    void save_latency_data_to_file();
     void getEqualData(float** ptr, int* size);
 
     // Flags that allow developer control over Agora internals

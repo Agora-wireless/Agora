@@ -70,6 +70,15 @@ public:
     void launch(
         size_t frame_id, size_t symbol_idx_ul, size_t base_sc_id);
 
+    void print_overhead() {
+        printf("DoDemul thread %u overhead: total time: %.2lfms, "
+            "preprocess: %.2lfms (%.2lf\%), equal: %.2lfms (%.2lf\%), "
+            "demod: %.2lfms (%.2lf\%)\n", tid, cycles_to_ms(total_cycles_, freq_ghz),
+            cycles_to_ms(preprocess_cycles_, freq_ghz), preprocess_cycles_ * 100.0f / total_cycles_,
+            cycles_to_ms(equal_cycles_, freq_ghz), equal_cycles_ * 100.0f / total_cycles_,
+            cycles_to_ms(demod_cycles_, freq_ghz), demod_cycles_ * 100.0f / total_cycles_);
+    }
+
 private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
     Table<complex_float>& ue_spec_pilot_buffer_;
@@ -93,6 +102,11 @@ private:
     void* jitter;
     cgemm_jit_kernel_t mkl_jit_cgemm;
 #endif
+
+    size_t total_cycles_ = 0;
+    size_t preprocess_cycles_ = 0;
+    size_t equal_cycles_ = 0;
+    size_t demod_cycles_ = 0;
 };
 
 #endif

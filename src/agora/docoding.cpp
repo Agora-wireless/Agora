@@ -268,33 +268,44 @@ void DoDecode::start_work()
     size_t state_operation_duration = 0;
     size_t loop_count = 0;
     size_t work_count = 0;
+    size_t decode_start_tsc;
+    bool state_trigger = false;
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
 
-        if (likely(start_tsc > 0)) {
+        if (likely(state_trigger)) {
             loop_count ++;
         }
         size_t work_start_tsc, state_start_tsc;
 
         if (cur_cb_ > 0) {
 
-            if (unlikely(start_tsc == 0)) {
+            if (unlikely(!state_trigger && cur_frame_ >= 400)) {
                 start_tsc = rdtsc();
+                state_trigger = true;
             }
 
-            work_start_tsc = rdtsc();
-            work_count ++;
+            if (likely(state_trigger)) {
+                work_start_tsc = rdtsc();
+                work_count ++;
+            }
             
             // printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id_, cur_frame_, cur_symbol_);
 
-            size_t decode_start_tsc = rdtsc();
+            if (likely(state_trigger)) {
+                decode_start_tsc = rdtsc();
+            }
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                 cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
-            decode_tsc_duration += rdtsc() - decode_start_tsc;
+            if (likely(state_trigger)) {
+                decode_tsc_duration += rdtsc() - decode_start_tsc;
+            }
 
             // printf("Start to decode user %lu frame %lu symbol %lu end\n", ue_id_, cur_frame_, cur_symbol_);
-            decode_start_tsc = rdtsc();
+            if (likely(state_trigger)) {
+                decode_start_tsc = rdtsc();
+            }
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                 cur_cb_ = 0;
@@ -308,48 +319,61 @@ void DoDecode::start_work()
 
                     cur_frame_++;
                     if (unlikely(cur_frame_ == cfg->frames_to_test)) {
-                        state_operation_duration += rdtsc() - decode_start_tsc;
-                        work_tsc_duration += rdtsc() - work_start_tsc;
+                        if (likely(state_trigger)) {
+                            state_operation_duration += rdtsc() - decode_start_tsc;
+                            work_tsc_duration += rdtsc() - work_start_tsc;
+                        }
                         break;
                     }
                 }
             }
-            state_operation_duration += rdtsc() - decode_start_tsc;
-            work_tsc_duration += rdtsc() - work_start_tsc;
+            if (likely(state_trigger)) {
+                state_operation_duration += rdtsc() - decode_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
 
         } else {
 
-            if (likely(start_tsc > 0)) {
+            if (likely(state_trigger)) {
                 work_start_tsc = rdtsc();
                 state_start_tsc = rdtsc();
             }
             bool ret = decode_status_->received_all_demod_data(
                    ue_id_, cur_frame_, cur_symbol_);
-            if (likely(start_tsc > 0)) {
+            if (likely(state_trigger)) {
                 state_operation_duration += rdtsc() - state_start_tsc;
                 work_tsc_duration += rdtsc() - work_start_tsc;
             }
 
             if (ret) {
 
-                if (unlikely(start_tsc == 0)) {
+                if (unlikely(!state_trigger && cur_frame_ >= 400)) {
                     loop_count ++;
                     start_tsc = rdtsc();
+                    state_trigger = true;
                 }
 
-                work_start_tsc = rdtsc();
-                work_count ++;
+                if (likely(state_trigger)) {
+                    work_start_tsc = rdtsc();
+                    work_count ++;
+                }
             
                 // printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id_, cur_frame_, cur_symbol_);
 
-                size_t decode_start_tsc = rdtsc();
+                if (likely(state_trigger)) {
+                    decode_start_tsc = rdtsc();
+                }
                 launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                     cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
                         ._tag);
-                decode_tsc_duration += rdtsc() - decode_start_tsc;
+                if (likely(state_trigger)) {
+                    decode_tsc_duration += rdtsc() - decode_start_tsc;
+                }
 
                 // printf("Start to decode user %lu frame %lu symbol %lu end\n", ue_id_, cur_frame_, cur_symbol_);
-                state_start_tsc = rdtsc();
+                if (likely(state_trigger)) {
+                    state_start_tsc = rdtsc();
+                }
                 cur_cb_++;
                 if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                     cur_cb_ = 0;
@@ -363,15 +387,19 @@ void DoDecode::start_work()
 
                         cur_frame_++;
                         if (unlikely(cur_frame_ == cfg->frames_to_test)) {
-                            state_operation_duration += rdtsc() - state_start_tsc;
-                            work_tsc_duration += rdtsc() - work_start_tsc;
+                            if (likely(state_trigger)) {
+                                state_operation_duration += rdtsc() - state_start_tsc;
+                                work_tsc_duration += rdtsc() - work_start_tsc;
+                            }
                             break;
                         }
                     }
                 }
-                state_operation_duration += rdtsc() - state_start_tsc;
+                if (likely(state_trigger)) {
+                    state_operation_duration += rdtsc() - state_start_tsc;
                 
-                work_tsc_duration += rdtsc() - work_start_tsc;
+                    work_tsc_duration += rdtsc() - work_start_tsc;
+                }
 
             }
             

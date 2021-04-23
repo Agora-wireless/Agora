@@ -100,6 +100,8 @@ void DoDemul::launch(
         }
     }
 
+    preprocess_cycles_ += worker_rdtsc() - start_tsc;
+
     for (size_t i = 0; i < max_sc_ite; i++) {
         size_t cur_sc_id = base_sc_id + i;
 
@@ -171,6 +173,7 @@ void DoDemul::launch(
         size_t start_tsc3 = worker_rdtsc();
         duration_stat->task_duration[2] += start_tsc3 - start_tsc2;
         duration_stat->task_count++;
+        equal_cycles_ += start_tsc3 - start_tsc2;
     }
 
     size_t start_tsc3 = worker_rdtsc();
@@ -213,5 +216,7 @@ void DoDemul::launch(
 
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
+    demod_cycles_ += worker_rdtsc() - start_tsc3;
+    total_cycles_ += worker_rdtsc() - start_tsc;
     return;
 }
