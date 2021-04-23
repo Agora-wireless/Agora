@@ -306,6 +306,7 @@ void Config::genData()
 
         beacon_len = beacon_ci16.size();
         beacon_longsym_len = gold_ifft_ci16.size();
+        std::cout << "OBCH: " << beacon_longsym_len << std::endl;
         beacon_longsym_reps = goldReps;
 
         if (sampsPerSymbol
@@ -327,6 +328,40 @@ void Config::genData()
             beacon_ci16.begin(), preBeacon.begin(), preBeacon.end());
         beacon_ci16.insert(
             beacon_ci16.end(), postBeacon.begin(), postBeacon.end());
+    } else {
+        std::vector<std::vector<double>> gold_ifft
+            = CommsLib::getSequence(128, CommsLib::GOLD_IFFT);
+        std::vector<std::complex<int16_t>> gold_ifft_ci16
+            = Utils::double_to_cint16(gold_ifft);
+        for (size_t i = 0; i < 128; i++) {
+            gold_cf32.push_back(
+                std::complex<float>(gold_ifft[0][i], gold_ifft[1][i]));
+        }
+
+        std::vector<std::vector<double>> sts_seq
+            = CommsLib::getSequence(0, CommsLib::STS_SEQ);
+        std::vector<std::complex<int16_t>> sts_seq_ci16
+            = Utils::double_to_cint16(sts_seq);
+
+        // Populate STS (stsReps repetitions)
+        int stsReps = 15;
+        for (int i = 0; i < stsReps; i++) {
+            beacon_ci16.insert(
+                beacon_ci16.end(), sts_seq_ci16.begin(), sts_seq_ci16.end());
+        }
+
+        // Populate gold sequence (two reps, 128 each)
+        // Note: Need a minimum of 2 reps for CFO and other sync/estimation
+        int goldReps = 2;
+        for (int i = 0; i < goldReps; i++) {
+            beacon_ci16.insert(beacon_ci16.end(), gold_ifft_ci16.begin(),
+                gold_ifft_ci16.end());
+        }
+
+        beacon_len = beacon_ci16.size();
+        beacon_longsym_len = gold_ifft_ci16.size();
+        std::cout << "OBCH: " << beacon_longsym_len << std::endl;
+        beacon_longsym_reps = goldReps;
     }
 
     // Generate common pilots based on Zadoff-Chu sequence for channel estimation

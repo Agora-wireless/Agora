@@ -682,11 +682,17 @@ void RadioTXRX::cfo_estimation(
      */
 
     for (size_t i = 0; i < c->beacon_longsym_len; i++) {
+        
         std::complex<float> s1 = beacon_buff[cfo_start_idx + i];
         std::complex<float> s2
             = beacon_buff[cfo_start_idx + c->beacon_longsym_len + i];
         std::complex<float> s12 = s1 * std::conj(s2);
         phase_vec[i] = std::atan2(s12.imag(), s12.real());
+
+        std::cout << "FUNC "<< i << " s1 (" << real(s1) << ", " << imag(s1) << ")  | "
+                                 << " s2 (" << real(s2) << ", " << imag(s2) << ")  | "
+                                 << "s12 (" << real(s12) << ", " << imag(s12) << ") | "
+                                 << "phase: " << phase_vec[i] << std::endl;
 
         // Unwrap phase
         if (i == 0) {
@@ -704,7 +710,7 @@ void RadioTXRX::cfo_estimation(
 
     float average = accumulate(phase_uwrap.begin(), phase_uwrap.end(), 0.0)
         / phase_uwrap.size();
-    cfo_ = average / (2 * M_PI * c->beacon_longsym_len);
+    cfo_ = average / (2 * M_PI); // * c->beacon_longsym_len);
     double cfo_est_khz = cfo_ * c->rate * 1e-3;
     printf("XXXXX  CFO Estimate: %f kHz  XXXXX", cfo_est_khz);
 }
