@@ -6,7 +6,6 @@
 
 #include <memory>
 
-#include "doencode_client.h"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "scrambler.h"
 #include "signal_handler.h"
@@ -737,9 +736,9 @@ void PhyUe::TaskThread(int tid) {
                           (kEnableMac ? rx_thread_num_ : 0),
                       tid);
 
-  // TODO make compatible with Mac!!
-  auto encoder = std::make_unique<DoEncodeClient>(
-      config_, (size_t)tid, config_->UlBits(), ul_syms_buffer_, stats_.get());
+  // TODO make compatible with Mac!! (ul_bits_buffer_)
+  auto encoder = std::make_unique<DoEncode>(config_, tid, config_->UlBits(),
+                                            ul_syms_buffer_, stats_.get());
 
   EventData event;
   while (config_->Running() == true) {
@@ -759,7 +758,7 @@ void PhyUe::TaskThread(int tid) {
           DoModul(tid, event.tags_[0]);
         } break;
         case EventType::kEncode: {
-          DoEncode(encoder.get(), task_ptok_[tid], event.tags_[0]);
+          DoEncodeUe(encoder.get(), task_ptok_[tid], event.tags_[0]);
           // DoEncode(tid, event.tags_[0]);
         } break;
         case EventType::kFFTPilot: {
@@ -1199,8 +1198,8 @@ void PhyUe::DoDecode(int tid, size_t tag) {
 //////////////////////////////////////////////////////////
 //                   UPLINK Operations                //
 //////////////////////////////////////////////////////////
-void PhyUe::DoEncode(DoEncodeClient* encoder, moodycamel::ProducerToken* ptok,
-                     size_t tag) {
+void PhyUe::DoEncodeUe(DoEncode* encoder, moodycamel::ProducerToken* ptok,
+                       size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t user_id = gen_tag_t(tag).ue_id_;
 
@@ -1267,8 +1266,7 @@ void PhyUe::DoModul(int tid, size_t tag) {
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintModul == true)) {
     size_t mod_duration_stat = GetTime::Rdtsc() - start_tsc;
     std::printf(
-        "User Task[%d]: Modul  (frame %zu,       , user %zu) Duration "
-        "%2.4f "
+        "User Task[%d]: Modul  (frame %zu,       , user %zu) Duration %2.4f "
         "ms\n",
         tid, frame_id, ue_id,
         GetTime::CyclesToMs(mod_duration_stat, GetTime::MeasureRdtscFreq()));
