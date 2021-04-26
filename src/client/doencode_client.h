@@ -1,11 +1,10 @@
 /**
- * @file doencode.h
- * @brief Declaration file for the Docoding class.  Includes the DoEncode and
- * DoDecode classes.
+ * @file doencode_client.h
+ * @brief Declaration file for the DoEncodeClient class.
  */
 
-#ifndef DOENCODE_H_
-#define DOENCODE_H_
+#ifndef DOENCODE_CLIENT_H_
+#define DOENCODE_CLIENT_H_
 
 #include <memory>
 
@@ -16,11 +15,12 @@
 #include "scrambler.h"
 #include "stats.h"
 
-class DoEncode : public Doer {
+class DoEncodeClient : public Doer {
  public:
-  DoEncode(Config* in_config, int in_tid, Table<int8_t>& in_raw_data_buffer,
-           Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager);
-  ~DoEncode() override;
+  DoEncodeClient(Config* in_config, size_t in_tid,
+                 Table<int8_t>& in_raw_data_buffer,
+                 Table<int8_t>& out_encoded_buffer, Stats* in_stats_manager);
+  ~DoEncodeClient() override;
 
   EventData Launch(size_t tag) override;
 
@@ -42,4 +42,4 @@ class DoEncode : public Doer {
   std::unique_ptr<AgoraScrambler::Scrambler> scrambler_;
 };
 
-#endif  // DOENCODE_H_
+#endif  // DOENCODE_CLIENT_H_
