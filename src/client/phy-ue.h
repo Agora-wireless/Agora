@@ -17,6 +17,7 @@
 #include "concurrentqueue.h"
 #include "config.h"
 #include "datatype_conversion.h"
+#include "doencode_client.h"
 #include "mac_thread.h"
 #include "mkl_dfti.h"
 #include "modulation.h"
@@ -76,6 +77,8 @@ class PhyUe {
    * modulate data from nUEs and does spatial multiplexing by applying
    * beamweights
    */
+  void DoEncode(DoEncodeClient* encoder, moodycamel::ProducerToken* ptok,
+                size_t tag);
   void DoEncode(int /*tid*/, size_t /*tag*/);
   void DoModul(int /*tid*/, size_t /*tag*/);
   void DoIfft(int /*tid*/, size_t /*tag*/);
@@ -224,7 +227,7 @@ class PhyUe {
   Table<uint8_t> ul_bits_buffer_status_;
   size_t ul_bits_buffer_size_;
 
-  Table<uint8_t> ul_syms_buffer_;
+  Table<int8_t> ul_syms_buffer_;
   size_t ul_syms_buffer_size_;
   /**
    * Data after modulation

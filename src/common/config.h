@@ -328,9 +328,23 @@ class Config {
   inline int8_t* GetEncodedBuf(Table<int8_t>& encoded_buffer, size_t frame_id,
                                size_t symbol_id, size_t ue_id,
                                size_t cb_id) const {
-    size_t total_data_symbol_id = GetTotalDataSymbolIdxDl(frame_id, symbol_id);
+    size_t total_data_symbol_id;
+
+    if (is_ue_ == false) {
+      total_data_symbol_id = GetTotalDataSymbolIdxDl(frame_id, symbol_id);
+    } else {
+      total_data_symbol_id = GetTotalDataSymbolIdxUl(frame_id, symbol_id);
+    }
+
     size_t num_encoded_bytes_per_cb =
         ldpc_config_.NumCbCodewLen() / this->mod_order_bits_;
+
+    std::printf(
+        "GetEncodedBuf: dim1 %zu, dim2 %zu  ofdm %zu, num encoded bytes per cb "
+        "%zu\n",
+        total_data_symbol_id,
+        Roundup<64>(ofdm_data_num_) * ue_id + num_encoded_bytes_per_cb * cb_id,
+        Roundup<64>(ofdm_data_num_), num_encoded_bytes_per_cb);
     return &encoded_buffer[total_data_symbol_id]
                           [Roundup<64>(ofdm_data_num_) * ue_id +
                            num_encoded_bytes_per_cb * cb_id];

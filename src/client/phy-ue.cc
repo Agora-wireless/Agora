@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "doencode_client.h"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "scrambler.h"
 #include "signal_handler.h"
@@ -736,6 +737,10 @@ void PhyUe::TaskThread(int tid) {
                           (kEnableMac ? rx_thread_num_ : 0),
                       tid);
 
+  // TODO make compatible with Mac!!
+  auto encoder = std::make_unique<DoEncodeClient>(
+      config_, (size_t)tid, config_->UlBits(), ul_syms_buffer_, stats_.get());
+
   EventData event;
   while (config_->Running() == true) {
     if (work_queue_.try_dequeue_from_producer(*work_producer_token_.get(),
@@ -754,7 +759,8 @@ void PhyUe::TaskThread(int tid) {
           DoModul(tid, event.tags_[0]);
         } break;
         case EventType::kEncode: {
-          DoEncode(tid, event.tags_[0]);
+          DoEncode(encoder.get(), task_ptok_[tid], event.tags_[0]);
+          // DoEncode(tid, event.tags_[0]);
         } break;
         case EventType::kFFTPilot: {
           DoFftPilot(tid, event.tags_[0]);
@@ -1179,8 +1185,7 @@ void PhyUe::DoDecode(int tid, size_t tag) {
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintDecode == true)) {
     size_t dec_duration_stat = GetTime::Rdtsc() - start_tsc;
     std::printf(
-        "User Task[%d]: Decode (frame %zu, symbol %zu, ant %zu) Duration "
-        "%2.4f "
+        "User Task[%d]: Decode (frame %zu, symbol %zu, ant %zu) Duration %2.4f "
         "ms\n",
         tid, frame_id, symbol_id, ant_id,
         GetTime::CyclesToMs(dec_duration_stat, GetTime::MeasureRdtscFreq()));
@@ -1194,6 +1199,35 @@ void PhyUe::DoDecode(int tid, size_t tag) {
 //////////////////////////////////////////////////////////
 //                   UPLINK Operations                //
 //////////////////////////////////////////////////////////
+void PhyUe::DoEncode(DoEncodeClient* encoder, moodycamel::ProducerToken* ptok,
+                     size_t tag) {
+  const size_t frame_id = gen_tag_t(tag).frame_id_;
+  const size_t user_id = gen_tag_t(tag).ue_id_;
+
+  for (size_t ul_symbol_idx = config_->Frame().ClientUlPilotSymbols();
+       ul_symbol_idx < config_->Frame().NumULSyms(); ul_symbol_idx++) {
+    size_t ul_symbol = config_->Frame().GetULSymbol(ul_symbol_idx);
+    for (size_t cb_id = 0; cb_id < config_->LdpcConfig().NumBlocksInSymbol();
+         cb_id++) {
+      // For now, call for each cb
+      std::printf(
+          "Encoding [Frame %zu, Symbol %zu, User %zu, Code Block %zu : %zu]\n",
+          frame_id, ul_symbol, user_id, cb_id,
+          config_->LdpcConfig().NumBlocksInSymbol());
+      encoder->Launch(
+          gen_tag_t::FrmSymCb(
+              frame_id, ul_symbol,
+              cb_id + (user_id * config_->LdpcConfig().NumBlocksInSymbol()))
+              .tag_);
+    }
+  }
+
+  // Post the completion event (frame)
+  size_t completion_tag = gen_tag_t::FrmSymUe(frame_id, 0, user_id).tag_;
+  RtAssert(complete_queue_.enqueue(
+               *ptok, EventData(EventType::kEncode, completion_tag)),
+           "Encoding message enqueue failed");
+}
 
 /* Encodes the entire frame for a given user
  * TODO Remove memory allocations
@@ -1204,6 +1238,7 @@ void PhyUe::DoEncode(int tid, size_t tag) {
   const size_t ue_id = gen_tag_t(tag).ue_id_;
   size_t frame_slot = frame_id % kFrameWnd;
   auto& cfg = config_;
+  auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
 
   if (kDebugPrintInTask || kDebugPrintEncode) {
     std::printf("User Task[%d]: Encode (frame %zu,       , user %zu)\n", tid,
@@ -1257,22 +1292,37 @@ void PhyUe::DoEncode(int tid, size_t tag) {
             &cfg->UlBits()[ul_symbol_id +
                            config_->Frame().ClientUlPilotSymbols()][cb_offset],
             bytes_per_block);
+        std::printf("UlBits index: %zu %zu bytes per block %zu\n",
+                    ul_symbol_id + config_->Frame().ClientUlPilotSymbols(),
+                    cb_offset, bytes_per_block);
       }
 
       if (config_->ScrambleEnabled()) {
-        scrambler_->Scramble(input_ptr, bytes_per_block);
+        scrambler->Scramble(input_ptr, bytes_per_block);
       }
 
       LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                        ldpc_config.NumRows(), encoded_buffer_temp,
                        parity_buffer, input_ptr);
 
-      size_t cb_coded_bytes = ldpc_config.NumCbCodewLen() / cfg->ModOrderBits();
-      size_t output_offset = (total_ul_symbol_id * config_->OfdmDataNum()) +
-                             (cb_coded_bytes * cb_id);
+      // size_t cb_coded_bytes = ldpc_config.NumCbCodewLen() /
+      // cfg->ModOrderBits();
+      // size_t output_offset = (total_ul_symbol_id *
+      // config_->OfdmDataNum()) +(cb_coded_bytes * cb_id);
+
+      // auto* ul_bits = reinterpret_cast<int8_t*>(
+      //    &ul_syms_buffer_[total_ul_symbol_id]
+      //                    [ant_id * config_->OfdmDataNum()]);
+      // auto* ul_bits =
+      //    reinterpret_cast<int8_t*>(&ul_syms_buffer_[ue_id][output_offset]);
+      auto* ul_bits = reinterpret_cast<int8_t*>(
+          &ul_syms_buffer_[total_ul_symbol_id][ue_id * config_->OfdmDataNum()]);
+
+      std::printf("Ul bits total ul %zu, ue id %zu, ofdm %zu\n",
+                  total_ul_symbol_id, ue_id, config_->OfdmDataNum());
 
       AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
-                      &ul_syms_buffer_[ue_id][output_offset],
+                      reinterpret_cast<uint8_t*>(ul_bits),
                       encoded_bytes_per_block, cfg->ModOrderBits());
     }
   }
@@ -1284,8 +1334,7 @@ void PhyUe::DoEncode(int tid, size_t tag) {
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintEncode == true)) {
     size_t enc_duration_stat = GetTime::Rdtsc() - start_tsc;
     std::printf(
-        "User Task[%d]: Encode (frame %zu,       , user %zu) Duration "
-        "%2.4f "
+        "User Task[%d]: Encode (frame %zu,       , user %zu) Duration %2.4f "
         "ms\n",
         tid, frame_id, ue_id,
         GetTime::CyclesToMs(enc_duration_stat, GetTime::MeasureRdtscFreq()));
@@ -1311,13 +1360,33 @@ void PhyUe::DoModul(int tid, size_t tag) {
     size_t ant_id = ue_id * config_->NumChannels() + ch;
     for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe_;
          ul_symbol_id++) {
-      size_t total_ul_symbol_id =
+      size_t total_ul_data_symbol_id =
           frame_slot * ul_data_symbol_perframe_ + ul_symbol_id;
+      size_t total_ul_symbol_id =
+          (frame_slot * ul_symbol_perframe_) + ul_symbol_id;
       complex_float* modul_buf =
-          &modul_buffer_[total_ul_symbol_id][ant_id * config_->OfdmDataNum()];
+          &modul_buffer_[total_ul_data_symbol_id]
+                        [ant_id * config_->OfdmDataNum()];
+      //      auto* ul_bits = reinterpret_cast<int8_t*>(
+      //          &ul_syms_buffer_[ant_id]
+      //                          [total_ul_symbol_id *
+      //                          config_->OfdmDataNum()]);
+
       auto* ul_bits = reinterpret_cast<int8_t*>(
-          &ul_syms_buffer_[ant_id]
-                          [total_ul_symbol_id * config_->OfdmDataNum()]);
+          &ul_syms_buffer_[total_ul_symbol_id +
+                           config_->Frame().ClientUlPilotSymbols()]
+                          [ant_id * Roundup<64>(config_->OfdmDataNum())]);
+      std::printf("DoDemul dim1 %zu dim2 %zu ant/odfm %zu/%zu\n",
+                  total_ul_symbol_id + config_->Frame().ClientUlPilotSymbols(),
+                  ant_id, Roundup<64>(config_->OfdmDataNum()),
+                  ant_id * Roundup<64>(config_->OfdmDataNum()));
+
+      // auto* ul_bits = config_->GetEncodedBuf(
+      //    ul_syms_buffer_, frame_id,
+      //    ul_symbol_id + config_->Frame().ClientUlPilotSymbols(), ue_id,
+      //    config_->OfdmDataNum());
+      // ofdm_data_num_ (Round up??)
+
       for (size_t sc = 0; sc < config_->OfdmDataNum(); sc++) {
         modul_buf[sc] =
             ModSingleUint8((uint8_t)ul_bits[sc], config_->ModTable());
@@ -1436,9 +1505,19 @@ void PhyUe::InitializeUplinkBuffers() {
                          Agora_memory::Alignment_t::kAlign64);
   ul_bits_buffer_status_.Calloc(config_->UeAntNum(), kFrameWnd,
                                 Agora_memory::Alignment_t::kAlign64);
-  ul_syms_buffer_size_ =
-      kFrameWnd * ul_data_symbol_perframe_ * config_->OfdmDataNum();
-  ul_syms_buffer_.Calloc(config_->UeAntNum(), ul_syms_buffer_size_,
+
+  // Temp -- Using more memory than necessary to comply with the DoEncode
+  // function which uses the total number of ul symbols offset (instead of just
+  // the data specific ones)
+  // ul_syms_buffer_size_ =
+  //    kFrameWnd * ul_symbol_perframe_ * config_->OfdmDataNum();
+  // ul_syms_buffer_.Calloc(config_->UeAntNum(), ul_syms_buffer_size_,
+  //                       Agora_memory::Alignment_t::kAlign64);
+  const size_t ul_syms_buffer_dim1 = config_->Frame().NumULSyms() * kFrameWnd;
+  const size_t ul_syms_buffer_dim2 =
+      Roundup<64>(config_->OfdmDataNum()) * config_->UeAntNum();
+
+  ul_syms_buffer_.Calloc(ul_syms_buffer_dim1, ul_syms_buffer_dim2,
                          Agora_memory::Alignment_t::kAlign64);
 
   // initialize modulation buffer
@@ -1558,8 +1637,8 @@ void PhyUe::FreeDownlinkBuffers() {
 
 void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
                              size_t symbol_id, size_t ant) {
-  if (kDebugPrintPerTaskDone == true) {
-    // if (true) {
+  // if (kDebugPrintPerTaskDone == true) {
+  if (true) {
     switch (print_type) {
       case (PrintType::kPacketRX):
         std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Rx packet\n",
@@ -1620,8 +1699,8 @@ void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
 
 void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
                                size_t symbol_id) {
-  if (kDebugPrintPerSymbolDone == true) {
-    // if (true) {
+  // if (kDebugPrintPerSymbolDone == true) {
+  if (true) {
     switch (print_type) {
       case (PrintType::kFFTPilots):
         std::printf(
@@ -1675,8 +1754,8 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
 }
 
 void PhyUe::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
-  if (kDebugPrintPerFrameDone == true) {
-    // if (true) {
+  // if (kDebugPrintPerFrameDone == true) {
+  if (true) {
     switch (print_type) {
       case (PrintType::kPacketRX):
         std::printf("PhyUE [frame %zu + %.2f ms]: Received all packets\n",
