@@ -231,7 +231,8 @@ set(AGORA_SOURCES
   src/agora/dozf.cc
   src/agora/dodemul.cc
   src/agora/doprecode.cc
-  src/agora/docoding.cc
+  src/agora/doencode.cc
+  src/agora/dodecode.cc
   src/agora/radio_lib.cc
   src/agora/radio_calibrate.cc
   src/mac/mac_thread.cc)
