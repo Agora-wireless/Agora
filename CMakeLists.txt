@@ -336,3 +336,15 @@ endforeach()
 # else()
 #   message(STATUS "Warning: DPDK is not supported for creating shared libraries!")
 # endif()
+
+add_executable(test_clock_sender
+  tool/test_clock_sender.cpp
+  src/common/dpdk_transport.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_clock_sender ${COMMON_LIBS})
+
+add_executable(test_clock_receiver
+  tool/test_clock_receiver.cpp
+  src/common/dpdk_transport.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_clock_receiver ${COMMON_LIBS})
