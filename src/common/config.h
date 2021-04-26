@@ -339,12 +339,6 @@ class Config {
     size_t num_encoded_bytes_per_cb =
         ldpc_config_.NumCbCodewLen() / this->mod_order_bits_;
 
-    std::printf(
-        "GetEncodedBuf: dim1 %zu, dim2 %zu  ofdm %zu, num encoded bytes per cb "
-        "%zu\n",
-        total_data_symbol_id,
-        Roundup<64>(ofdm_data_num_) * ue_id + num_encoded_bytes_per_cb * cb_id,
-        Roundup<64>(ofdm_data_num_), num_encoded_bytes_per_cb);
     return &encoded_buffer[total_data_symbol_id]
                           [Roundup<64>(ofdm_data_num_) * ue_id +
                            num_encoded_bytes_per_cb * cb_id];
