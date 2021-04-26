@@ -1,6 +1,7 @@
 /**
  * @file dodecode.cc
- * @brief Implmentation file for the DoDecode class.
+ * @brief Implmentation file for the DoDecode class. Currently, just supports
+ * basestation
  */
 #include "dodecode.h"
 
