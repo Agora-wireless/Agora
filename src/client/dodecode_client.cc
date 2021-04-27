@@ -1,9 +1,8 @@
 /**
- * @file dodecode.cc
- * @brief Implmentation file for the DoDecode class. Currently, just supports
- * basestation
+ * @file dodecode_client.cc
+ * @brief Implmentation file for the DoDecodeClient class.
  */
-#include "dodecode.h"
+#include "dodecode_client.h"
 
 #include "concurrent_queue_wrapper.h"
 #include "phy_ldpc_decoder_5gnr.h"
@@ -13,7 +12,7 @@ static constexpr bool kPrintDecodedData = false;
 
 static constexpr size_t kVarNodesSize = 1024 * 1024 * sizeof(int16_t);
 
-DoDecode::DoDecode(
+DoDecodeClient::DoDecodeClient(
     Config* in_config, int in_tid,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
@@ -28,19 +27,21 @@ DoDecode::DoDecode(
       Agora_memory::Alignment_t::kAlign64, kVarNodesSize));
 }
 
-DoDecode::~DoDecode() { std::free(resp_var_nodes_); }
+DoDecodeClient::~DoDecodeClient() { std::free(resp_var_nodes_); }
 
-EventData DoDecode::Launch(size_t tag) {
+EventData DoDecodeClient::Launch(size_t tag) {
   const LDPCconfig& ldpc_config = cfg_->LdpcConfig();
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t symbol_idx_ul = cfg_->Frame().GetULSymbolIdx(symbol_id);
   const size_t cb_id = gen_tag_t(tag).cb_id_;
+
+  const size_t symbol_idx_dl = cfg_->Frame().GetDLSymbolIdx(symbol_id);
   const size_t symbol_offset =
-      cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
+      cfg_->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl);
   const size_t cur_cb_id = (cb_id % cfg_->LdpcConfig().NumBlocksInSymbol());
   const size_t ue_id = (cb_id / cfg_->LdpcConfig().NumBlocksInSymbol());
   const size_t frame_slot = (frame_id % kFrameWnd);
+
   if (kDebugPrintInTask == true) {
     std::printf(
         "In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
@@ -71,11 +72,11 @@ EventData DoDecode::Launch(size_t tag) {
   ldpc_decoder_5gnr_response.varNodes = resp_var_nodes_;
 
   int8_t* llr_buffer_ptr =
-      demod_buffers_[frame_slot][symbol_idx_ul][ue_id] +
+      demod_buffers_[frame_slot][symbol_idx_dl][ue_id] +
       (cfg_->ModOrderBits() * (ldpc_config.NumCbCodewLen() * cur_cb_id));
 
   uint8_t* decoded_buffer_ptr =
-      decoded_buffers_[frame_slot][symbol_idx_ul][ue_id] +
+      decoded_buffers_[frame_slot][symbol_idx_dl][ue_id] +
       (cur_cb_id * Roundup<64>(cfg_->NumBytesPerCb()));
 
   ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
@@ -111,7 +112,7 @@ EventData DoDecode::Launch(size_t tag) {
   }
 
   if ((kEnableMac == false) && (kPrintPhyStats == true) &&
-      (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
+      (symbol_idx_dl >= cfg_->Frame().ClientDlPilotSymbols())) {
     phy_stats_->UpdateDecodedBits(ue_id, symbol_offset,
                                   cfg_->NumBytesPerCb() * 8);
     phy_stats_->IncrementDecodedBlocks(ue_id, symbol_offset);
@@ -119,7 +120,7 @@ EventData DoDecode::Launch(size_t tag) {
     for (size_t i = 0; i < cfg_->NumBytesPerCb(); i++) {
       uint8_t rx_byte = decoded_buffer_ptr[i];
       auto tx_byte = static_cast<uint8_t>(cfg_->GetInfoBits(
-          cfg_->UlBits(), symbol_idx_ul, ue_id, cur_cb_id)[i]);
+          cfg_->DlBits(), symbol_idx_dl, ue_id, cur_cb_id)[i]);
       phy_stats_->UpdateBitErrors(ue_id, symbol_offset, tx_byte, rx_byte);
       if (rx_byte != tx_byte) {
         block_error++;
