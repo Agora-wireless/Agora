@@ -22,7 +22,7 @@ DEFINE_string(ue_conf_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ue.json",
               "UE Config filename");
 DEFINE_string(chan_model, "RAYLEIGH", "Simulator Channel Type: RAYLEIGH/AWGN");
-DEFINE_double(chan_snr, 100.0, "Signal-to-Noise Ratio");
+DEFINE_double(chan_snr, 20.0, "Signal-to-Noise Ratio");
 
 int main(int argc, char* argv[]) {
   int ret = EXIT_FAILURE;
