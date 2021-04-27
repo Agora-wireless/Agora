@@ -21,7 +21,6 @@
 #include "mac_thread.h"
 #include "mkl_dfti.h"
 #include "modulation.h"
-#include "scrambler.h"
 #include "stats.h"
 #include "txrx_client.h"
 
@@ -324,7 +323,6 @@ class PhyUe {
   FrameCounters modulation_counters_;
   FrameCounters ifft_counters_;
 
-  std::unique_ptr<AgoraScrambler::Scrambler> scrambler_;
   size_t max_equaled_frame_ = 0;
 };
 #endif  // PHY_UE_H_
