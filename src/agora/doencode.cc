@@ -51,7 +51,7 @@ EventData DoEncode::Launch(size_t tag) {
   size_t cb_id = gen_tag_t(tag).cb_id_;
   size_t cur_cb_id = cb_id % cfg_->LdpcConfig().NumBlocksInSymbol();
   size_t ue_id = cb_id / cfg_->LdpcConfig().NumBlocksInSymbol();
-  if (kDebugPrintInTask) {
+  if (kDebugPrintInTask == false) {
     std::printf(
         "In doEncode thread %d: frame: %zu, symbol: %zu, code block %zu, "
         "ue_id: %zu\n",
