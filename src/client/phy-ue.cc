@@ -1263,13 +1263,12 @@ void PhyUe::DoModul(int tid, size_t tag) {
     const size_t total_ul_data_symbol_id =
         (frame_slot * ul_data_symbol_perframe_) +
         (ul_symbol_idx - config_->Frame().ClientUlPilotSymbols());
-    const size_t total_ul_symbol_id =
-        (frame_slot * ul_symbol_perframe_) + ul_symbol_idx;
+
     complex_float* modul_buf = &modul_buffer_[total_ul_data_symbol_id]
                                              [ant_id * config_->OfdmDataNum()];
 
     auto* ul_bits = config_->GetEncodedBuf(ul_syms_buffer_, frame_id,
-                                           total_ul_symbol_id, ant_id, 0);
+                                           ul_symbol_idx, ant_id, 0);
 
     for (size_t sc = 0; sc < config_->OfdmDataNum(); sc++) {
       modul_buf[sc] = ModSingleUint8(static_cast<uint8_t>(ul_bits[sc]),
