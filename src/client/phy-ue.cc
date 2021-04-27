@@ -27,9 +27,7 @@ static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr size_t kRecordFrameIndex = 1000;
 static const size_t kDefaultQueueSize = 36;
 
-PhyUe::PhyUe(Config* config)
-    : stats_(std::make_unique<Stats>(config)),
-      scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
+PhyUe::PhyUe(Config* config) : stats_(std::make_unique<Stats>(config)) {
   srand(time(nullptr));
 
   this->config_ = config;
@@ -1100,6 +1098,9 @@ void PhyUe::DoDecode(int tid, size_t tag) {
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
   size_t ant_id = gen_tag_t(tag).ant_id_;
+
+  auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
+
   if (kDebugPrintInTask || kDebugPrintDecode) {
     std::printf("User Task[%d]: Decode (frame %zu, symbol %zu, ant %zu)\n", tid,
                 frame_id, symbol_id, ant_id);
@@ -1148,7 +1149,7 @@ void PhyUe::DoDecode(int tid, size_t tag) {
                             &ldpc_decoder_5gnr_response);
 
     if (config_->ScrambleEnabled()) {
-      scrambler_->Descramble(decoded_buffer_ptr, config_->NumBytesPerCb());
+      scrambler->Descramble(decoded_buffer_ptr, config_->NumBytesPerCb());
     }
 
     if (kCollectPhyStats) {
