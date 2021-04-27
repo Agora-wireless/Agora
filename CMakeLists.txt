@@ -207,6 +207,7 @@ include_directories(SYSTEM src/third_party src/third_party/nlohmann/single_inclu
 
 set(COMMON_SOURCES
   src/agora/stats.cc
+  src/agora/phy_stats.cc
   src/common/framestats.cc
   src/common/config.cc
   src/common/utils.cc
@@ -226,7 +227,6 @@ add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(AGORA_SOURCES 
   src/agora/agora.cc
-  src/agora/phy_stats.cc
   src/agora/dofft.cc
   src/agora/dozf.cc
   src/agora/dodemul.cc
@@ -252,6 +252,8 @@ add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
   src/agora/doencode.cc
+  src/client/doifft_client.cc
+  src/client/dodecode_client.cc
   src/client/client_radio.cc
   src/client/phy-ue.cc
   src/client/txrx_client.cc
