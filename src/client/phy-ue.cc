@@ -15,7 +15,6 @@
 static constexpr bool kDebugPrintFft = false;
 static constexpr bool kDebugPrintDemul = false;
 static constexpr bool kDebugPrintDecode = false;
-static constexpr bool kDebugPrintEncode = false;
 static constexpr bool kDebugPrintModul = false;
 static constexpr bool kDebugPrintIFFT = false;
 
@@ -123,8 +122,8 @@ PhyUe::PhyUe(Config* config)
                              config_->UeAntNum());
   fft_dldata_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
 
-  encode_counter_.Init(config_->UeAntNum());
-  modulation_counters_.Init(config_->UeAntNum());
+  encode_counter_.Init(ul_data_symbol_perframe_, config_->UeAntNum());
+  modulation_counters_.Init(ul_data_symbol_perframe_, config_->UeAntNum());
   ifft_counters_.Init(config_->UeAntNum());
 
   rx_counters_.num_pkts_per_frame_ =
@@ -376,15 +375,22 @@ void PhyUe::Start() {
               }
             } else {
               if (ant_id % config_->NumChannels() == 0) {
-                EventData do_encode_task(
-                    EventType::kEncode,
-                    gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
-                ScheduleWork(do_encode_task);
+                for (size_t symbol_idx =
+                         config_->Frame().ClientUlPilotSymbols();
+                     symbol_idx < config_->Frame().NumULSyms(); symbol_idx++) {
+                  config_->Frame().GetULSymbol(0);
+                  EventData do_encode_task(
+                      EventType::kEncode,
+                      gen_tag_t::FrmSymUe(
+                          frame_id, config_->Frame().GetULSymbol(symbol_idx),
+                          ue_id)
+                          .tag_);
+                  ScheduleWork(do_encode_task);
+                }  // Schedule all UL data symbols for encoding
               }
             }
           }
 
-          // ** BUG with symbol_id =
           SymbolType symbol_type = config_->GetSymbolType(symbol_id);
           if (symbol_type == SymbolType::kDL) {
             // Defer downlink processing (all pilot symbols must be fft'd
@@ -506,8 +512,7 @@ void PhyUe::Start() {
           if (kDebugPrintPacketsToMac) {
             std::printf(
                 "PhyUE: sent decoded packet for (frame %zu, symbol %zu) "
-                "to "
-                "MAC\n",
+                "to MAC\n",
                 frame_id, symbol_id);
           }
 
@@ -558,8 +563,6 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kEncode: {
-          /* Currently the user encodes all symbols in one completion
-           * event */
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
@@ -570,33 +573,47 @@ void PhyUe::Start() {
           EventData do_modul_task(EventType::kModul, event.tags_[0]);
           ScheduleWork(do_modul_task);
 
-          bool last_encode = encode_counter_.CompleteTask(frame_id);
-          if (last_encode == true) {
-            this->stats_->MasterSetTsc(TsType::kEncodeDone, frame_id);
-            PrintPerFrameDone(PrintType::kEncode, frame_id);
-            encode_counter_.Reset(frame_id);
+          bool symbol_complete =
+              encode_counter_.CompleteTask(frame_id, symbol_id);
+          if (symbol_complete == true) {
+            PrintPerSymbolDone(PrintType::kEncode, frame_id, symbol_id);
+
+            bool encode_complete = encode_counter_.CompleteSymbol(frame_id);
+            if (encode_complete == true) {
+              this->stats_->MasterSetTsc(TsType::kEncodeDone, frame_id);
+              PrintPerFrameDone(PrintType::kEncode, frame_id);
+              encode_counter_.Reset(frame_id);
+            }
           }
         } break;
 
         case EventType::kModul: {
-          /* Currently the user modulates all symbols in one completion
-           * event */
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
 
           PrintPerTaskDone(PrintType::kModul, frame_id, symbol_id, ue_id);
 
-          EventData do_ifft_task(
-              EventType::kIFFT,
-              gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
-          ScheduleWork(do_ifft_task);
+          bool symbol_complete =
+              modulation_counters_.CompleteTask(frame_id, symbol_id);
+          if (symbol_complete == true) {
+            PrintPerSymbolDone(PrintType::kModul, frame_id, symbol_id);
 
-          bool last_encode = modulation_counters_.CompleteTask(frame_id);
-          if (last_encode == true) {
-            this->stats_->MasterSetTsc(TsType::kModulDone, frame_id);
-            PrintPerFrameDone(PrintType::kModul, frame_id);
-            modulation_counters_.Reset(frame_id);
+            bool mod_complete = modulation_counters_.CompleteSymbol(frame_id);
+            if (mod_complete == true) {
+              // Schedule the iFFT for the entire frame for each user. This
+              // should be fixed per symbol for better performance
+              for (size_t user = 0; user < config_->UeAntNum(); user++) {
+                EventData do_ifft_task(
+                    EventType::kIFFT,
+                    gen_tag_t::FrmSymUe(frame_id, 0, user).tag_);
+                ScheduleWork(do_ifft_task);
+              }
+
+              this->stats_->MasterSetTsc(TsType::kModulDone, frame_id);
+              PrintPerFrameDone(PrintType::kModul, frame_id);
+              modulation_counters_.Reset(frame_id);
+            }
           }
         } break;
 
@@ -754,12 +771,12 @@ void PhyUe::TaskThread(int tid) {
         case EventType::kIFFT: {
           DoIfft(tid, event.tags_[0]);
         } break;
-        case EventType::kModul: {
-          DoModul(tid, event.tags_[0]);
-        } break;
         case EventType::kEncode: {
           DoEncodeUe(encoder.get(), task_ptok_[tid], event.tags_[0]);
           // DoEncode(tid, event.tags_[0]);
+        } break;
+        case EventType::kModul: {
+          DoModul(tid, event.tags_[0]);
         } break;
         case EventType::kFFTPilot: {
           DoFftPilot(tid, event.tags_[0]);
@@ -1184,8 +1201,8 @@ void PhyUe::DoDecode(int tid, size_t tag) {
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintDecode == true)) {
     size_t dec_duration_stat = GetTime::Rdtsc() - start_tsc;
     std::printf(
-        "User Task[%d]: Decode (frame %zu, symbol %zu, ant %zu) Duration %2.4f "
-        "ms\n",
+        "User Task[%d]: Decode (frame %zu, symbol %zu, ant %zu) Duration "
+        "%2.4f ms\n",
         tid, frame_id, symbol_id, ant_id,
         GetTime::CyclesToMs(dec_duration_stat, GetTime::MeasureRdtscFreq()));
   }
@@ -1201,74 +1218,71 @@ void PhyUe::DoDecode(int tid, size_t tag) {
 void PhyUe::DoEncodeUe(DoEncode* encoder, moodycamel::ProducerToken* ptok,
                        size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
+  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t user_id = gen_tag_t(tag).ue_id_;
-
-  for (size_t ul_symbol_idx = config_->Frame().ClientUlPilotSymbols();
-       ul_symbol_idx < config_->Frame().NumULSyms(); ul_symbol_idx++) {
-    size_t ul_symbol = config_->Frame().GetULSymbol(ul_symbol_idx);
-    for (size_t cb_id = 0; cb_id < config_->LdpcConfig().NumBlocksInSymbol();
-         cb_id++) {
-      // For now, call for each cb
-      std::printf(
-          "Encoding [Frame %zu, Symbol %zu, User %zu, Code Block %zu : %zu]\n",
-          frame_id, ul_symbol, user_id, cb_id,
-          config_->LdpcConfig().NumBlocksInSymbol());
-      encoder->Launch(
-          gen_tag_t::FrmSymCb(
-              frame_id, ul_symbol,
-              cb_id + (user_id * config_->LdpcConfig().NumBlocksInSymbol()))
-              .tag_);
-    }
+  // For now, call for each cb
+  for (size_t cb_id = 0; cb_id < config_->LdpcConfig().NumBlocksInSymbol();
+       cb_id++) {
+    // For now, call for each cb
+    std::printf(
+        "Encoding [Frame %zu, Symbol %zu, User %zu, Code Block %zu : %zu]\n",
+        frame_id, symbol_id, user_id, cb_id,
+        config_->LdpcConfig().NumBlocksInSymbol());
+    encoder->Launch(
+        gen_tag_t::FrmSymCb(
+            frame_id, symbol_id,
+            cb_id + (user_id * config_->LdpcConfig().NumBlocksInSymbol()))
+            .tag_);
   }
 
-  // Post the completion event (frame)
-  size_t completion_tag = gen_tag_t::FrmSymUe(frame_id, 0, user_id).tag_;
+  // Post the completion event (symbol)
+  size_t completion_tag =
+      gen_tag_t::FrmSymUe(frame_id, symbol_id, user_id).tag_;
   RtAssert(complete_queue_.enqueue(
                *ptok, EventData(EventType::kEncode, completion_tag)),
-           "Encoding message enqueue failed");
+           "Encoded Symbol message enqueue failed");
 }
 
 void PhyUe::DoModul(int tid, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
+  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ue_id = gen_tag_t(tag).ue_id_;
   const size_t frame_slot = frame_id % kFrameWnd;
 
   if (kDebugPrintInTask || kDebugPrintModul) {
-    std::printf("User Task[%d]: Modul  (frame %zu,       , user %zu)\n", tid,
-                frame_id, ue_id);
+    std::printf("User Task[%d]: Modul  (frame %zu, symbol %zu, user %zu)\n",
+                tid, frame_id, symbol_id, ue_id);
   }
   size_t start_tsc = GetTime::Rdtsc();
 
   for (size_t ch = 0; ch < config_->NumChannels(); ch++) {
-    size_t ant_id = ue_id * config_->NumChannels() + ch;
-    for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe_;
-         ul_symbol_id++) {
-      size_t total_ul_data_symbol_id =
-          frame_slot * ul_data_symbol_perframe_ + ul_symbol_id;
-      size_t total_ul_symbol_id =
-          (frame_slot * ul_symbol_perframe_) + ul_symbol_id;
-      complex_float* modul_buf =
-          &modul_buffer_[total_ul_data_symbol_id]
-                        [ant_id * config_->OfdmDataNum()];
+    const size_t ant_id = (ue_id * config_->NumChannels()) + ch;
 
-      auto* ul_bits = config_->GetEncodedBuf(
-          ul_syms_buffer_, frame_id,
-          total_ul_symbol_id + config_->Frame().ClientUlPilotSymbols(), ant_id,
-          0);
+    const size_t ul_symbol_idx = config_->Frame().GetULSymbolIdx(symbol_id);
 
-      for (size_t sc = 0; sc < config_->OfdmDataNum(); sc++) {
-        modul_buf[sc] = ModSingleUint8(static_cast<uint8_t>(ul_bits[sc]),
-                                       config_->ModTable());
-      }
+    const size_t total_ul_data_symbol_id =
+        (frame_slot * ul_data_symbol_perframe_) +
+        (ul_symbol_idx - config_->Frame().ClientUlPilotSymbols());
+    const size_t total_ul_symbol_id =
+        (frame_slot * ul_symbol_perframe_) + ul_symbol_idx;
+    complex_float* modul_buf = &modul_buffer_[total_ul_data_symbol_id]
+                                             [ant_id * config_->OfdmDataNum()];
+
+    auto* ul_bits = config_->GetEncodedBuf(ul_syms_buffer_, frame_id,
+                                           total_ul_symbol_id, ant_id, 0);
+
+    for (size_t sc = 0; sc < config_->OfdmDataNum(); sc++) {
+      modul_buf[sc] = ModSingleUint8(static_cast<uint8_t>(ul_bits[sc]),
+                                     config_->ModTable());
     }
   }
 
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintModul == true)) {
     size_t mod_duration_stat = GetTime::Rdtsc() - start_tsc;
     std::printf(
-        "User Task[%d]: Modul  (frame %zu,       , user %zu) Duration %2.4f "
-        "ms\n",
-        tid, frame_id, ue_id,
+        "User Task[%d]: Modul  (frame %zu, symbol %zu, user %zu) Duration "
+        "%2.4f ms\n",
+        tid, frame_id, symbol_id, ue_id,
         GetTime::CyclesToMs(mod_duration_stat, GetTime::MeasureRdtscFreq()));
   }
 
@@ -1375,9 +1389,8 @@ void PhyUe::InitializeUplinkBuffers() {
                                 Agora_memory::Alignment_t::kAlign64);
 
   // Temp -- Using more memory than necessary to comply with the DoEncode
-  // function which uses the total number of ul symbols offset (instead of just
-  // the data specific ones)
-  // ul_syms_buffer_size_ =
+  // function which uses the total number of ul symbols offset (instead of
+  // just the data specific ones) ul_syms_buffer_size_ =
   //    kFrameWnd * ul_symbol_perframe_ * config_->OfdmDataNum();
   // ul_syms_buffer_.Calloc(config_->UeAntNum(), ul_syms_buffer_size_,
   //                       Agora_memory::Alignment_t::kAlign64);
@@ -1591,8 +1604,7 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
       case (PrintType::kDemul):
         std::printf(
             "PhyUe [frame %zu symbol %zu + %.3f ms]: Demul completed for "
-            "%zu "
-            "antennas\n",
+            "%zu antennas\n",
             frame_id, symbol_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             demul_counters_.GetTaskCount(frame_id, symbol_id));
@@ -1601,20 +1613,38 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
       case (PrintType::kDecode):
         std::printf(
             "PhyUe [frame %zu symbol %zu + %.3f ms]: Decoding completed "
-            "for "
-            "%zu antennas\n",
+            "for %zu antennas\n",
             frame_id, symbol_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             decode_counters_.GetTaskCount(frame_id, symbol_id));
-        break; /*
-      case (PrintType::kPacketToMac):
+        break;
+      case (PrintType::kEncode):
         std::printf(
-            "Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
-            "%zu symbols done\n",
+            "PhyUe [frame %zu symbol %zu + %.3f ms]: Data Encode complete for "
+            "%zu antennas\n",
             frame_id, symbol_id,
-            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX,
-      frame_id), tomac_counters_.GetSymbolCount(frame_id) + 1); break;
-        */
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
+            encode_counter_.GetTaskCount(frame_id, symbol_id));
+        break;
+
+      case (PrintType::kModul):
+        std::printf(
+            "PhyUe [frame %zu symbol %zu + %.3f ms]: Modul completed for "
+            "symbol %zu antennas\n",
+            frame_id, symbol_id,
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
+            modulation_counters_.GetTaskCount(frame_id, symbol_id));
+        break;
+
+        /*
+     case (PrintType::kPacketToMac):
+       std::printf(
+           "Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
+           "%zu symbols done\n",
+           frame_id, symbol_id,
+           this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX,
+     frame_id), tomac_counters_.GetSymbolCount(frame_id) + 1); break;
+       */
       default:
         std::printf("Wrong task type in symbol done print!");
     }
