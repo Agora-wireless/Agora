@@ -6,7 +6,9 @@
 
 #include <memory>
 
+#include "dodecode_client.h"
 #include "phy_ldpc_decoder_5gnr.h"
+#include "phy_stats.h"
 #include "scrambler.h"
 #include "signal_handler.h"
 #include "utils_ldpc.h"
@@ -27,7 +29,19 @@ static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr size_t kRecordFrameIndex = 1000;
 static const size_t kDefaultQueueSize = 36;
 
-PhyUe::PhyUe(Config* config) : stats_(std::make_unique<Stats>(config)) {
+PhyUe::PhyUe(Config* config)
+    : stats_(std::make_unique<Stats>(config)),
+      phy_stats_(std::make_unique<PhyStats>(config))
+#if !defined(OLD_BUFFERS)
+      ,
+      demod_buffer_(kFrameWnd, config->Frame().NumDLSyms(), config->UeAntNum(),
+                    kMaxModType * config->OfdmDataNum()),
+      decoded_buffer_(kFrameWnd, config->Frame().NumDLSyms(),
+                      config->UeAntNum(),
+                      config->LdpcConfig().NumBlocksInSymbol() *
+                          Roundup<64>(config->NumBytesPerCb()))
+#endif
+{
   srand(time(nullptr));
 
   this->config_ = config;
@@ -750,6 +764,7 @@ void PhyUe::Start() {
                        decoded_symbol_count_.at(ue_id)
                 << ")" << std::endl;
     }
+    phy_stats_->PrintPhyStats();
   }
   this->Stop();
 }
@@ -764,6 +779,11 @@ void PhyUe::TaskThread(int tid) {
   // TODO make compatible with Mac!! (ul_bits_buffer_)
   auto encoder = std::make_unique<DoEncode>(config_, tid, config_->UlBits(),
                                             ul_syms_buffer_, stats_.get());
+#if !defined(OLD_BUFFERS)
+  auto decoder = std::make_unique<DoDecodeClient>(
+      config_, tid, demod_buffer_, decoded_buffer_, phy_stats_.get(),
+      this->stats_.get());
+#endif
 
   EventData event;
   while (config_->Running() == true) {
@@ -771,7 +791,8 @@ void PhyUe::TaskThread(int tid) {
                                               event) == true) {
       switch (event.event_type_) {
         case EventType::kDecode: {
-          DoDecode(tid, event.tags_[0]);
+          DoDecodeUe(decoder.get(), task_ptok_[tid], event.tags_[0]);
+          // DoDecode(tid, event.tags_[0]);
         } break;
         case EventType::kDemul: {
           DoDemul(tid, event.tags_[0]);
@@ -875,7 +896,7 @@ void PhyUe::DoFftData(int tid, size_t tag) {
       auto pilot_eq = y / csi_buffer_ptr[j];
       // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
       // in the downlink receiver
-      auto p = config_->UeSpecificPilot()[0][j];
+      auto p = config_->UeSpecificPilot()[ant_id][j];
       theta += arg(pilot_eq * arma::cx_float(p.re, -p.im));
     }
   }
@@ -1024,7 +1045,7 @@ void PhyUe::DoFftPilot(int tid, size_t tag) {
     for (size_t j = 0; j < config_->OfdmDataNum(); j++) {
       // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
       // in the downlink receiver
-      complex_float p = config_->UeSpecificPilot()[0][j];
+      complex_float p = config_->UeSpecificPilot()[ant_id][j];
       size_t sc_id = non_null_sc_ind_[j];
       csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / arma::cx_float(p.re, p.im));
     }
@@ -1065,17 +1086,25 @@ void PhyUe::DoDemul(int tid, size_t tag) {
                               dl_symbol_id - dl_pilot_symbol_perframe_;
   size_t offset = total_dl_symbol_id * config_->UeAntNum() + ant_id;
   auto* equal_ptr = reinterpret_cast<float*>(&equal_buffer_[offset][0]);
-  auto* demul_ptr = dl_demod_buffer_[offset];
+
+#if defined(OLD_BUFFERS)
+  int8_t* demod_ptr = demod_buffer_[offset];
+#else
+  const size_t base_sc_id = 0;
+
+  int8_t* demod_ptr = demod_buffer_[frame_slot][dl_symbol_id][ant_id] +
+                      (config_->ModOrderBits() * base_sc_id);
+#endif
 
   switch (config_->ModOrderBits()) {
     case (CommsLib::kQpsk):
-      DemodQpskSoftSse(equal_ptr, demul_ptr, config_->OfdmDataNum());
+      DemodQpskSoftSse(equal_ptr, demod_ptr, config_->OfdmDataNum());
       break;
     case (CommsLib::kQaM16):
-      Demod16qamSoftAvx2(equal_ptr, demul_ptr, config_->OfdmDataNum());
+      Demod16qamSoftAvx2(equal_ptr, demod_ptr, config_->OfdmDataNum());
       break;
     case (CommsLib::kQaM64):
-      Demod64qamSoftAvx2(equal_ptr, demul_ptr, config_->OfdmDataNum());
+      Demod64qamSoftAvx2(equal_ptr, demod_ptr, config_->OfdmDataNum());
       break;
     default:
       std::printf("User Task[%d]: Demul - modulation type %s not supported!\n",
@@ -1093,7 +1122,7 @@ void PhyUe::DoDemul(int tid, size_t tag) {
   if (kPrintLLRData) {
     std::printf("LLR data, symbol_offset: %zu\n", offset);
     for (size_t i = 0; i < config_->OfdmDataNum(); i++) {
-      std::printf("%x ", (uint8_t) * (demul_ptr + i));
+      std::printf("%x ", (uint8_t) * (demod_ptr + i));
     }
     std::printf("\n");
   }
@@ -1103,11 +1132,48 @@ void PhyUe::DoDemul(int tid, size_t tag) {
            "Demodulation message enqueue failed");
 }
 
+void PhyUe::DoDecodeUe(DoDecodeClient* decoder, moodycamel::ProducerToken* ptok,
+                       size_t tag) {
+  const size_t frame_id = gen_tag_t(tag).frame_id_;
+  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
+  const size_t ant_id = gen_tag_t(tag).ant_id_;
+
+  if (true) {
+    std::printf("User Task: Decode (frame %zu, symbol %zu, ant %zu)\n",
+                frame_id, symbol_id, ant_id);
+  }
+
+  for (size_t cb_id = 0; cb_id < config_->LdpcConfig().NumBlocksInSymbol();
+       cb_id++) {
+    // For now, call for each cb
+    std::printf(
+        "Decoding [Frame %zu, Symbol %zu, User %zu, Code Block %zu : %zu]\n",
+        frame_id, symbol_id, ant_id, cb_id,
+        config_->LdpcConfig().NumBlocksInSymbol());
+    decoder->Launch(
+        gen_tag_t::FrmSymCb(
+            frame_id, symbol_id,
+            cb_id + (ant_id * config_->LdpcConfig().NumBlocksInSymbol()))
+            .tag_);
+  }
+
+  // Post the completion event (symbol)
+  size_t completion_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, ant_id).tag_;
+
+  RtAssert(complete_queue_.enqueue(
+               *ptok, EventData(EventType::kDecode, completion_tag)),
+           "Decode Symbol message enqueue failed");
+}
+
 void PhyUe::DoDecode(int tid, size_t tag) {
   const LDPCconfig& ldpc_config = config_->LdpcConfig();
-  size_t frame_id = gen_tag_t(tag).frame_id_;
-  size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  size_t ant_id = gen_tag_t(tag).ant_id_;
+  const size_t frame_id = gen_tag_t(tag).frame_id_;
+  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
+  const size_t ant_id = gen_tag_t(tag).ant_id_;
+
+  int16_t* resp_var_nodes =
+      static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
+          Agora_memory::Alignment_t::kAlign64, 1024 * 1024 * sizeof(int16_t)));
 
   auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
 
@@ -1118,10 +1184,9 @@ void PhyUe::DoDecode(int tid, size_t tag) {
   size_t start_tsc = GetTime::Rdtsc();
 
   const size_t frame_slot = frame_id % kFrameWnd;
-  size_t dl_symbol_id = config_->Frame().GetDLSymbolIdx(symbol_id);
-  size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe_ +
-                              dl_symbol_id - dl_pilot_symbol_perframe_;
-  size_t symbol_ant_offset = total_dl_symbol_id * config_->UeAntNum() + ant_id;
+  const size_t dl_symbol_idx = config_->Frame().GetDLSymbolIdx(symbol_id);
+  size_t total_dl_symbol_idx = frame_slot * dl_data_symbol_perframe_ +
+                               dl_symbol_idx - dl_pilot_symbol_perframe_;
 
   struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
   struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
@@ -1141,18 +1206,30 @@ void PhyUe::DoDecode(int tid, size_t tag) {
 
   int num_msg_bits = ldpc_config.NumCbLen() - num_filler_bits;
   ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
-  ldpc_decoder_5gnr_response.varNodes = resp_var_nodes_;
+  ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
   size_t block_error(0);
   for (size_t cb_id = 0; cb_id < config_->LdpcConfig().NumBlocksInSymbol();
        cb_id++) {
+#if defined(OLD_BUFFERS)
+    size_t symbol_ant_offset =
+        total_dl_symbol_idx * config_->UeAntNum() + ant_id;
     size_t demod_buffer_offset =
         cb_id * ldpc_config.NumCbCodewLen() * config_->ModOrderBits();
     size_t decode_buffer_offset = cb_id * Roundup<64>(config_->NumBytesPerCb());
     auto* llr_buffer_ptr =
-        &dl_demod_buffer_[symbol_ant_offset][demod_buffer_offset];
+        &demod_buffer_[symbol_ant_offset][demod_buffer_offset];
     auto* decoded_buffer_ptr =
-        &dl_decode_buffer_[symbol_ant_offset][decode_buffer_offset];
+        &decoded_buffer_[symbol_ant_offset][decode_buffer_offset];
+#else
+    int8_t* llr_buffer_ptr =
+        demod_buffer_[frame_slot][dl_symbol_idx][ant_id] +
+        (config_->ModOrderBits() * (ldpc_config.NumCbCodewLen() * cb_id));
+
+    uint8_t* decoded_buffer_ptr =
+        decoded_buffer_[frame_slot][dl_symbol_idx][ant_id] +
+        (cb_id * Roundup<64>(config_->NumBytesPerCb()));
+#endif
     ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
     ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
     bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
@@ -1163,14 +1240,14 @@ void PhyUe::DoDecode(int tid, size_t tag) {
     }
 
     if (kCollectPhyStats) {
-      decoded_bits_count_[ant_id][total_dl_symbol_id] +=
+      decoded_bits_count_[ant_id][total_dl_symbol_idx] +=
           8 * config_->NumBytesPerCb();
-      decoded_blocks_count_[ant_id][total_dl_symbol_id]++;
+      decoded_blocks_count_[ant_id][total_dl_symbol_idx]++;
       size_t byte_error(0);
       for (size_t i = 0; i < config_->NumBytesPerCb(); i++) {
         uint8_t rx_byte = decoded_buffer_ptr[i];
         auto tx_byte = static_cast<uint8_t>(config_->GetInfoBits(
-            config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i]);
+            config_->DlBits(), dl_symbol_idx, ant_id, cb_id)[i]);
         uint8_t xor_byte(tx_byte ^ rx_byte);
         size_t bit_errors = 0;
         for (size_t j = 0; j < 8; j++) {
@@ -1181,9 +1258,9 @@ void PhyUe::DoDecode(int tid, size_t tag) {
           byte_error++;
         }
 
-        bit_error_count_[ant_id][total_dl_symbol_id] += bit_errors;
+        bit_error_count_[ant_id][total_dl_symbol_idx] += bit_errors;
       }
-      block_error_count_[ant_id][total_dl_symbol_id] +=
+      block_error_count_[ant_id][total_dl_symbol_idx] +=
           static_cast<unsigned long>(byte_error > 0);
       block_error += static_cast<unsigned long>(byte_error > 0);
     }
@@ -1196,7 +1273,7 @@ void PhyUe::DoDecode(int tid, size_t tag) {
       for (size_t i = 0; i < config_->NumBytesPerCb(); i++) {
         uint8_t rx_byte = decoded_buffer_ptr[i];
         auto tx_byte = static_cast<uint8_t>(config_->GetInfoBits(
-            config_->DlBits(), dl_symbol_id, ant_id, cb_id)[i]);
+            config_->DlBits(), dl_symbol_idx, ant_id, cb_id)[i]);
         ss << std::hex << std::setw(2) << static_cast<int>(rx_byte) << "("
            << static_cast<int>(tx_byte) << ") ";
       }
@@ -1486,18 +1563,18 @@ void PhyUe::InitializeDownlinkBuffers() {
       i.resize(config_->OfdmDataNum());
     }
 
+#if defined(OLD_BUFFERS)
     // initialize demod buffer
-    dl_demod_buffer_.Calloc(buffer_size, config_->OfdmDataNum() * kMaxModType,
-                            Agora_memory::Alignment_t::kAlign64);
+    demod_buffer_.Calloc(buffer_size, config_->OfdmDataNum() * kMaxModType,
+                         Agora_memory::Alignment_t::kAlign64);
 
     // initialize decode buffer
-    dl_decode_buffer_.resize(buffer_size);
-    for (auto& i : dl_decode_buffer_) {
+    decoded_buffer_.resize(buffer_size);
+    for (auto& i : decoded_buffer_) {
       i.resize(Roundup<64>(config_->NumBytesPerCb()) *
                config_->LdpcConfig().NumBlocksInSymbol());
     }
-    resp_var_nodes_ = static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
-        Agora_memory::Alignment_t::kAlign64, 1024 * 1024 * sizeof(int16_t)));
+#endif
 
     decoded_bits_count_.Calloc(config_->UeAntNum(), task_buffer_symbol_num_dl,
                                Agora_memory::Alignment_t::kAlign64);
@@ -1518,9 +1595,6 @@ void PhyUe::FreeDownlinkBuffers() {
   fft_buffer_.Free();
 
   if (dl_data_symbol_perframe_ > 0) {
-    dl_demod_buffer_.Free();
-    std::free(resp_var_nodes_);
-
     decoded_bits_count_.Free();
     bit_error_count_.Free();
 
@@ -1531,8 +1605,8 @@ void PhyUe::FreeDownlinkBuffers() {
 
 void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
                              size_t symbol_id, size_t ant) {
-  if (kDebugPrintPerTaskDone == true) {
-    // if (true) {
+  // if (kDebugPrintPerTaskDone == true) {
+  if (true) {
     switch (print_type) {
       case (PrintType::kPacketRX):
         std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Rx packet\n",
@@ -1593,8 +1667,8 @@ void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
 
 void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
                                size_t symbol_id) {
-  if (kDebugPrintPerSymbolDone == true) {
-    // if (true) {
+  // if (kDebugPrintPerSymbolDone == true) {
+  if (true) {
     switch (print_type) {
       case (PrintType::kFFTPilots):
         std::printf(
@@ -1675,8 +1749,8 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
 }
 
 void PhyUe::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
-  if (kDebugPrintPerFrameDone == true) {
-    // if (true) {
+  // if (kDebugPrintPerFrameDone == true) {
+  if (true) {
     switch (print_type) {
       case (PrintType::kPacketRX):
         std::printf("PhyUE [frame %zu + %.2f ms]: Received all packets\n",
