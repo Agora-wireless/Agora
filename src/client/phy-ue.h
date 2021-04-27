@@ -17,12 +17,16 @@
 #include "concurrentqueue.h"
 #include "config.h"
 #include "datatype_conversion.h"
+#include "dodecode_client.h"
 #include "doencode.h"
 #include "mac_thread.h"
 #include "mkl_dfti.h"
 #include "modulation.h"
+#include "phy_stats.h"
 #include "stats.h"
 #include "txrx_client.h"
+
+//#define OLD_BUFFERS
 
 static const size_t kVectorAlignment = 64;
 
@@ -65,6 +69,7 @@ class PhyUe {
   void ClearCsi(size_t frame_id);
   std::vector<std::queue<EventData>> rx_downlink_deferral_;
   std::unique_ptr<Stats> stats_;
+  std::unique_ptr<PhyStats> phy_stats_;
   RxCounters rx_counters_;
 
   /*****************************************************
@@ -148,6 +153,8 @@ class PhyUe {
    */
   void DoDemul(int /*tid*/, size_t /*tag*/);
   void DoDecode(int /*tid*/, size_t /*tag*/);
+  void DoDecodeUe(DoDecodeClient* decoder, moodycamel::ProducerToken* ptok,
+                  size_t tag);
 
   void TaskThread(int tid);
 
@@ -272,20 +279,20 @@ class PhyUe {
    */
   std::vector<myVec> equal_buffer_;
 
-  /**
-   * Data symbols after IFFT
-   * First dimension: total symbol number in the buffer:
-   * data_symbol_num_perframe * kFrameWnd second dimension:
-   * BS_ANT_NUM * OFDM_CA_NUM second dimension data order: SC1-32 of ants,
-   * SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32
-   * subcarriers)
-   */
-  Table<int8_t> dl_demod_buffer_;
+#if defined(OLD_BUFFERS)
+  Table<int8_t> demod_buffer_;
 
-  std::vector<std::vector<uint8_t>> dl_decode_buffer_;
+  std::vector<std::vector<uint8_t>> decoded_buffer_;
+#else
+  // Data after demodulation. Each buffer has kMaxModType * number of OFDM
+  // data subcarriers
+  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffer_;
+
+  // Data after LDPC decoding. Each buffer [decoded bytes per UE] bytes.
+  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> decoded_buffer_;
+#endif
   std::complex<float>* rx_samps_tmp_;  // Temp buffer for received samples
 
-  int16_t* resp_var_nodes_;
   std::vector<std::complex<float>> pilot_sc_val_;
   std::vector<size_t> non_null_sc_ind_;
   std::vector<std::vector<std::complex<float>>> ue_pilot_vec_;
