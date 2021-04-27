@@ -122,14 +122,14 @@ PhyUe::PhyUe(Config* config) : stats_(std::make_unique<Stats>(config)) {
 
   encode_counter_.Init(ul_data_symbol_perframe_, config_->UeAntNum());
   modulation_counters_.Init(ul_data_symbol_perframe_, config_->UeAntNum());
-  ifft_counters_.Init(config_->UeAntNum());
+  ifft_counters_.Init(ul_symbol_perframe_, config_->UeAntNum());
 
+  // This usage doesn't effect the user num_reciprocity_pkts_per_frame_;
   rx_counters_.num_pkts_per_frame_ =
       config_->UeAntNum() *
       (config_->Frame().NumDLSyms() + config_->Frame().NumBeaconSyms());
   rx_counters_.num_pilot_pkts_per_frame_ =
       config_->UeAntNum() * config_->Frame().ClientDlPilotSymbols();
-  // This field doesn't effect the user num_reciprocity_pkts_per_frame_;
 
   rx_downlink_deferral_.resize(kFrameWnd);
 }
@@ -279,8 +279,8 @@ void PhyUe::Start() {
   size_t ret = 0;
   max_equaled_frame_ = 0;
   size_t cur_frame_id = 0;
-  std::vector<size_t> ifft_next_frame(config_->UeNum());
-  std::vector<size_t> ifft_frame_status(config_->UeNum() * kFrameWnd, SIZE_MAX);
+  size_t ifft_next_frame = 0;
+  std::vector<size_t> ifft_frame_status(kFrameWnd, SIZE_MAX);
   while ((config_->Running() == true) &&
          (SignalHandler::GotExitSignal() == false)) {
     // get a bulk of events
@@ -373,18 +373,27 @@ void PhyUe::Start() {
               }
             } else {
               if (ant_id % config_->NumChannels() == 0) {
-                for (size_t symbol_idx =
-                         config_->Frame().ClientUlPilotSymbols();
+                // Schedule the Uplink tasks
+                for (size_t symbol_idx = 0;
                      symbol_idx < config_->Frame().NumULSyms(); symbol_idx++) {
-                  config_->Frame().GetULSymbol(0);
-                  EventData do_encode_task(
-                      EventType::kEncode,
-                      gen_tag_t::FrmSymUe(
-                          frame_id, config_->Frame().GetULSymbol(symbol_idx),
-                          ue_id)
-                          .tag_);
-                  ScheduleWork(do_encode_task);
-                }  // Schedule all UL data symbols for encoding
+                  if (symbol_idx < config_->Frame().ClientUlPilotSymbols()) {
+                    EventData do_ifft_task(
+                        EventType::kIFFT,
+                        gen_tag_t::FrmSymUe(
+                            frame_id, config_->Frame().GetULSymbol(symbol_idx),
+                            ue_id)
+                            .tag_);
+                    ScheduleWork(do_ifft_task);
+                  } else {
+                    EventData do_encode_task(
+                        EventType::kEncode,
+                        gen_tag_t::FrmSymUe(
+                            frame_id, config_->Frame().GetULSymbol(symbol_idx),
+                            ue_id)
+                            .tag_);
+                    ScheduleWork(do_encode_task);
+                  }
+                }
               }
             }
           }
@@ -592,6 +601,11 @@ void PhyUe::Start() {
 
           PrintPerTaskDone(PrintType::kModul, frame_id, symbol_id, ue_id);
 
+          EventData do_ifft_task(
+              EventType::kIFFT,
+              gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_);
+          ScheduleWork(do_ifft_task);
+
           bool symbol_complete =
               modulation_counters_.CompleteTask(frame_id, symbol_id);
           if (symbol_complete == true) {
@@ -599,15 +613,6 @@ void PhyUe::Start() {
 
             bool mod_complete = modulation_counters_.CompleteSymbol(frame_id);
             if (mod_complete == true) {
-              // Schedule the iFFT for the entire frame for each user. This
-              // should be fixed per symbol for better performance
-              for (size_t user = 0; user < config_->UeAntNum(); user++) {
-                EventData do_ifft_task(
-                    EventType::kIFFT,
-                    gen_tag_t::FrmSymUe(frame_id, 0, user).tag_);
-                ScheduleWork(do_ifft_task);
-              }
-
               this->stats_->MasterSetTsc(TsType::kModulDone, frame_id);
               PrintPerFrameDone(PrintType::kModul, frame_id);
               modulation_counters_.Reset(frame_id);
@@ -621,31 +626,36 @@ void PhyUe::Start() {
           size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
 
           PrintPerTaskDone(PrintType::kIFFT, frame_id, symbol_id, ue_id);
-          bool ifft_complete = ifft_counters_.CompleteTask(frame_id);
 
-          if (ifft_complete == true) {
-            this->stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
-            PrintPerFrameDone(PrintType::kIFFT, frame_id);
-            ifft_counters_.Reset(frame_id);
-          }
+          bool symbol_complete =
+              ifft_counters_.CompleteTask(frame_id, symbol_id);
+          if (symbol_complete == true) {
+            PrintPerSymbolDone(PrintType::kIFFT, frame_id, symbol_id);
 
-          // Schedule Transmit in frame order
-          ifft_frame_status.at((ue_id * kFrameWnd) + (frame_id % kFrameWnd)) =
-              frame_id;
-          for (size_t i = 0; (i < kFrameWnd); i++) {
-            size_t ifft_stat_id =
-                (ue_id * kFrameWnd) + ((i + frame_id) % kFrameWnd);
-            if (ifft_frame_status.at(ifft_stat_id) ==
-                ifft_next_frame.at(ue_id)) {
-              EventData do_tx_task(
-                  EventType::kPacketTX,
-                  gen_tag_t::FrmSymUe(ifft_next_frame.at(ue_id), 0, ue_id)
-                      .tag_);
-              ScheduleTask(do_tx_task, &tx_queue_,
-                           *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
-              ifft_next_frame.at(ue_id)++;
-            } else { /* Done */
-              break;
+            bool ifft_complete = ifft_counters_.CompleteSymbol(frame_id);
+            if (ifft_complete == true) {
+              this->stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
+              PrintPerFrameDone(PrintType::kIFFT, frame_id);
+              ifft_counters_.Reset(frame_id);
+
+              // Schedule Transmit in frame order
+              ifft_frame_status.at(frame_id % kFrameWnd) = frame_id;
+              for (size_t i = 0u; (i < kFrameWnd); i++) {
+                size_t ifft_stat_id = (ifft_next_frame % kFrameWnd);
+                if (ifft_frame_status.at(ifft_stat_id) == ifft_next_frame) {
+                  // Schedule TX for all users (by packet)
+                  for (size_t user = 0u; user < config_->UeAntNum(); user++) {
+                    EventData do_tx_task(
+                        EventType::kPacketTX,
+                        gen_tag_t::FrmSymUe(ifft_next_frame, 0, user).tag_);
+                    ScheduleTask(do_tx_task, &tx_queue_,
+                                 *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
+                  }
+                  ifft_next_frame++;
+                } else { /* Done */
+                  break;
+                }
+              }  // End for next transmit frame
             }
           }
         } break;
@@ -1225,10 +1235,10 @@ void PhyUe::DoEncodeUe(DoEncode* encoder, moodycamel::ProducerToken* ptok,
   for (size_t cb_id = 0; cb_id < config_->LdpcConfig().NumBlocksInSymbol();
        cb_id++) {
     // For now, call for each cb
-    std::printf(
-        "Encoding [Frame %zu, Symbol %zu, User %zu, Code Block %zu : %zu]\n",
-        frame_id, symbol_id, user_id, cb_id,
-        config_->LdpcConfig().NumBlocksInSymbol());
+    // std::printf(
+    //    "Encoding [Frame %zu, Symbol %zu, User %zu, Code Block %zu : %zu]\n",
+    //    frame_id, symbol_id, user_id, cb_id,
+    //    config_->LdpcConfig().NumBlocksInSymbol());
     encoder->Launch(
         gen_tag_t::FrmSymCb(
             frame_id, symbol_id,
@@ -1248,7 +1258,7 @@ void PhyUe::DoModul(int tid, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ue_id = gen_tag_t(tag).ue_id_;
-  const size_t frame_slot = frame_id % kFrameWnd;
+  const size_t frame_slot = (frame_id % kFrameWnd);
 
   if (kDebugPrintInTask || kDebugPrintModul) {
     std::printf("User Task[%d]: Modul  (frame %zu, symbol %zu, user %zu)\n",
@@ -1293,68 +1303,71 @@ void PhyUe::DoModul(int tid, size_t tag) {
 
 void PhyUe::DoIfft(int tid, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t frame_slot = frame_id % kFrameWnd;
+  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ue_id = gen_tag_t(tag).ue_id_;
 
+  const size_t frame_slot = frame_id % kFrameWnd;
+  const size_t ul_symbol_idx = config_->Frame().GetULSymbolIdx(symbol_id);
+
   if (kDebugPrintInTask || kDebugPrintIFFT) {
-    std::printf("User Task[%d]: iFFT   (frame %zu,       , user %zu)\n", tid,
-                frame_id, ue_id);
+    std::printf(
+        "User Task[%d]: iFFT   (frame %zu, symbol %zu, user %zu) ul symbol "
+        "index %zu\n",
+        tid, frame_id, symbol_id, ue_id, ul_symbol_idx);
   }
   size_t start_tsc = GetTime::Rdtsc();
 
   for (size_t ch = 0; ch < config_->NumChannels(); ch++) {
-    size_t ant_id = ue_id * config_->NumChannels() + ch;
-    for (size_t ul_symbol_id = 0; ul_symbol_id < ul_symbol_perframe_;
-         ul_symbol_id++) {
-      size_t total_ul_symbol_id =
-          frame_slot * ul_symbol_perframe_ + ul_symbol_id;
-      size_t buff_offset = total_ul_symbol_id * config_->UeAntNum() + ant_id;
-      complex_float* ifft_buff = ifft_buffer_[buff_offset];
+    size_t ant_id = (ue_id * config_->NumChannels()) + ch;
 
-      std::memset(ifft_buff, 0,
-                  sizeof(complex_float) * config_->OfdmDataStart());
-      if (ul_symbol_id < config_->Frame().ClientUlPilotSymbols()) {
-        std::memcpy(ifft_buff + config_->OfdmDataStart(),
-                    config_->UeSpecificPilot()[ant_id],
-                    config_->OfdmDataNum() * sizeof(complex_float));
-      } else {
-        size_t total_ul_data_symbol_id =
-            frame_slot * ul_data_symbol_perframe_ + ul_symbol_id -
-            config_->Frame().ClientUlPilotSymbols();
-        complex_float* modul_buff =
-            &modul_buffer_[total_ul_data_symbol_id]
-                          [ant_id * config_->OfdmDataNum()];
-        std::memcpy(ifft_buff + config_->OfdmDataStart(), modul_buff,
-                    config_->OfdmDataNum() * sizeof(complex_float));
-      }
-      std::memset(ifft_buff + config_->OfdmDataStop(), 0,
-                  sizeof(complex_float) * config_->OfdmDataStart());
+    size_t total_ul_symbol_id =
+        (frame_slot * ul_symbol_perframe_) + ul_symbol_idx;
+    size_t buff_offset = (total_ul_symbol_id * config_->UeAntNum()) + ant_id;
+    complex_float* ifft_buff = ifft_buffer_[buff_offset];
 
-      CommsLib::IFFT(ifft_buff, config_->OfdmCaNum(), false);
+    complex_float* source_data = nullptr;
 
-      size_t tx_offset = buff_offset * config_->PacketLength();
-      char* cur_tx_buffer = &tx_buffer_[tx_offset];
-      auto* pkt = reinterpret_cast<struct Packet*>(cur_tx_buffer);
-      auto* tx_data_ptr = reinterpret_cast<std::complex<short>*>(pkt->data_);
-      CommsLib::Ifft2tx(ifft_buff, tx_data_ptr, config_->OfdmCaNum(),
-                        config_->OfdmTxZeroPrefix(), config_->CpLen(),
-                        config_->Scale());
+    // Handle pilots
+    if (ul_symbol_idx < config_->Frame().ClientUlPilotSymbols()) {
+      source_data = config_->UeSpecificPilot()[ant_id];
+    } else {
+      size_t total_ul_data_symbol_id =
+          (frame_slot * ul_data_symbol_perframe_) +
+          (ul_symbol_idx - config_->Frame().ClientUlPilotSymbols());
+      source_data = &modul_buffer_[total_ul_data_symbol_id]
+                                  [ant_id * config_->OfdmDataNum()];
     }
+    // Fill out the ifft structure
+    std::memset(ifft_buff, 0u,
+                sizeof(complex_float) * config_->OfdmDataStart());
+    std::memcpy(ifft_buff + config_->OfdmDataStart(), source_data,
+                config_->OfdmDataNum() * sizeof(complex_float));
+    std::memset(ifft_buff + config_->OfdmDataStop(), 0u,
+                sizeof(complex_float) * config_->OfdmDataStart());
+
+    CommsLib::IFFT(ifft_buff, config_->OfdmCaNum(), false);
+
+    size_t tx_offset = buff_offset * config_->PacketLength();
+    char* cur_tx_buffer = &tx_buffer_[tx_offset];
+    auto* pkt = reinterpret_cast<struct Packet*>(cur_tx_buffer);
+    auto* tx_data_ptr = reinterpret_cast<std::complex<short>*>(pkt->data_);
+    CommsLib::Ifft2tx(ifft_buff, tx_data_ptr, config_->OfdmCaNum(),
+                      config_->OfdmTxZeroPrefix(), config_->CpLen(),
+                      config_->Scale());
   }
 
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintIFFT == true)) {
     size_t ifft_duration_stat = GetTime::Rdtsc() - start_tsc;
     std::printf(
-        "User Task[%d]: iFFT   (frame %zu,       , user %zu) Duration "
-        "%2.4f "
-        "ms\n",
-        tid, frame_id, ue_id,
+        "User Task[%d]: iFFT   (frame %zu, symbol %zu, user %zu) Duration "
+        "%2.4f ms\n",
+        tid, frame_id, symbol_id, ue_id,
         GetTime::CyclesToMs(ifft_duration_stat, GetTime::MeasureRdtscFreq()));
   }
 
   RtAssert(complete_queue_.enqueue(*task_ptok_[tid],
                                    EventData(EventType::kIFFT, tag)),
-           "Muliplexing message enqueue failed");
+           "iFFT message enqueue failed");
 }
 
 void PhyUe::InitializeVarsFromCfg() {
@@ -1518,8 +1531,8 @@ void PhyUe::FreeDownlinkBuffers() {
 
 void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
                              size_t symbol_id, size_t ant) {
-  // if (kDebugPrintPerTaskDone == true) {
-  if (true) {
+  if (kDebugPrintPerTaskDone == true) {
+    // if (true) {
     switch (print_type) {
       case (PrintType::kPacketRX):
         std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Rx packet\n",
@@ -1580,8 +1593,8 @@ void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
 
 void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
                                size_t symbol_id) {
-  // if (kDebugPrintPerSymbolDone == true) {
-  if (true) {
+  if (kDebugPrintPerSymbolDone == true) {
+    // if (true) {
     switch (print_type) {
       case (PrintType::kFFTPilots):
         std::printf(
@@ -1620,7 +1633,8 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
         break;
       case (PrintType::kEncode):
         std::printf(
-            "PhyUe [frame %zu symbol %zu + %.3f ms]: Data Encode complete for "
+            "PhyUe [frame %zu symbol %zu + %.3f ms]: Data Encode complete "
+            "for "
             "%zu antennas\n",
             frame_id, symbol_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
@@ -1634,6 +1648,15 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             frame_id, symbol_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             modulation_counters_.GetTaskCount(frame_id, symbol_id));
+        break;
+
+      case (PrintType::kIFFT):
+        std::printf(
+            "PhyUe [frame %zu symbol %zu + %.3f ms]: iFFT completed for "
+            "symbol %zu antennas\n",
+            frame_id, symbol_id,
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
+            ifft_counters_.GetTaskCount(frame_id, symbol_id));
         break;
 
         /*
@@ -1652,8 +1675,8 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
 }
 
 void PhyUe::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
-  // if (kDebugPrintPerFrameDone == true) {
-  if (true) {
+  if (kDebugPrintPerFrameDone == true) {
+    // if (true) {
     switch (print_type) {
       case (PrintType::kPacketRX):
         std::printf("PhyUE [frame %zu + %.2f ms]: Received all packets\n",
