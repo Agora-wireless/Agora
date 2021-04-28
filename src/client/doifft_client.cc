@@ -33,6 +33,7 @@ DoIFFTClient::DoIFFTClient(Config* in_config, int in_tid,
   ifft_out_ = static_cast<float*>(
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        2 * cfg_->OfdmCaNum() * sizeof(float)));
+  // ifft_scale_factor_ = cfg_->Scale();
   ifft_scale_factor_ = cfg_->OfdmCaNum() / std::sqrt(cfg_->BfAntNum() * 1.f);
 }
 
@@ -43,10 +44,12 @@ DoIFFTClient::~DoIFFTClient() {
 
 EventData DoIFFTClient::Launch(size_t tag) {
   size_t start_tsc = GetTime::WorkerRdtsc();
-  size_t ant_id = gen_tag_t(tag).ant_id_;
-  size_t frame_id = gen_tag_t(tag).frame_id_;
-  size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  size_t symbol_idx_ul = cfg_->Frame().GetULSymbolIdx(symbol_id);
+
+  const size_t frame_id = gen_tag_t(tag).frame_id_;
+  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
+  const size_t ant_id = gen_tag_t(tag).ant_id_;
+
+  const size_t symbol_idx_ul = cfg_->Frame().GetULSymbolIdx(symbol_id);
 
   if (kDebugPrintInTask) {
     std::printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
