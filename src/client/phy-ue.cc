@@ -6,7 +6,6 @@
 
 #include <memory>
 
-#include "dodecode_client.h"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "phy_stats.h"
 #include "scrambler.h"
@@ -750,6 +749,10 @@ void PhyUe::TaskThread(int tid) {
   // TODO make compatible with Mac!! (ul_bits_buffer_)
   auto encoder = std::make_unique<DoEncode>(config_, tid, config_->UlBits(),
                                             ul_syms_buffer_, stats_.get());
+
+  auto iffter = std::make_unique<DoIFFTClient>(config_, tid, ifft_buffer_,
+                                               tx_buffer_, stats_.get());
+
   auto decoder = std::make_unique<DoDecodeClient>(
       config_, tid, demod_buffer_, decoded_buffer_, phy_stats_.get(),
       this->stats_.get());
@@ -766,7 +769,7 @@ void PhyUe::TaskThread(int tid) {
           DoDemul(tid, event.tags_[0]);
         } break;
         case EventType::kIFFT: {
-          DoIfft(tid, event.tags_[0]);
+          DoIfftUe(iffter.get(), task_ptok_[tid], event.tags_[0]);
         } break;
         case EventType::kEncode: {
           DoEncodeUe(encoder.get(), task_ptok_[tid], event.tags_[0]);
@@ -1155,6 +1158,7 @@ void PhyUe::DoEncodeUe(DoEncode* encoder, moodycamel::ProducerToken* ptok,
            "Encoded Symbol message enqueue failed");
 }
 
+// This functions accepts non pilot - UL symbols
 void PhyUe::DoModul(int tid, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
@@ -1202,73 +1206,52 @@ void PhyUe::DoModul(int tid, size_t tag) {
            "Modulation complete message enqueue failed");
 }
 
-void PhyUe::DoIfft(int tid, size_t tag) {
+void PhyUe::DoIfftUe(DoIFFTClient* iffter, moodycamel::ProducerToken* ptok,
+                     size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t ue_id = gen_tag_t(tag).ue_id_;
+  const size_t user_id = gen_tag_t(tag).ue_id_;
 
-  const size_t frame_slot = frame_id % kFrameWnd;
-  const size_t ul_symbol_idx = config_->Frame().GetULSymbolIdx(symbol_id);
-
-  if (kDebugPrintInTask || kDebugPrintIFFT) {
-    std::printf(
-        "User Task[%d]: iFFT   (frame %zu, symbol %zu, user %zu) ul symbol "
-        "index %zu\n",
-        tid, frame_id, symbol_id, ue_id, ul_symbol_idx);
-  }
-  size_t start_tsc = GetTime::Rdtsc();
-
+  // For now, call for each channel
   for (size_t ch = 0; ch < config_->NumChannels(); ch++) {
-    size_t ant_id = (ue_id * config_->NumChannels()) + ch;
+    size_t ant_id = (user_id * config_->NumChannels()) + ch;
+    std::printf("Ifft [Frame %zu, Symbol %zu, User %zu, Channel %zu : %zu]\n",
+                frame_id, symbol_id, user_id, ch, config_->NumChannels());
 
-    size_t total_ul_symbol_id =
-        (frame_slot * ul_symbol_perframe_) + ul_symbol_idx;
-    size_t buff_offset = (total_ul_symbol_id * config_->UeAntNum()) + ant_id;
-    complex_float* ifft_buff = ifft_buffer_[buff_offset];
-
-    complex_float* source_data = nullptr;
-
-    // Handle pilots
-    if (ul_symbol_idx < config_->Frame().ClientUlPilotSymbols()) {
-      source_data = config_->UeSpecificPilot()[ant_id];
-    } else {
-      size_t total_ul_data_symbol_id =
-          (frame_slot * ul_data_symbol_perframe_) +
-          (ul_symbol_idx - config_->Frame().ClientUlPilotSymbols());
-      source_data = &modul_buffer_[total_ul_data_symbol_id]
-                                  [ant_id * config_->OfdmDataNum()];
+    // TODO Remove this copy
+    {
+      complex_float const* source_data = nullptr;
+      size_t ul_symbol_idx = config_->Frame().GetULSymbolIdx(symbol_id);
+      if (ul_symbol_idx < config_->Frame().ClientUlPilotSymbols()) {
+        source_data = config_->UeSpecificPilot()[ant_id];
+      } else {
+        size_t frame_slot = frame_id % kFrameWnd;
+        size_t total_ul_data_symbol_id =
+            (frame_slot * ul_data_symbol_perframe_) +
+            (ul_symbol_idx - config_->Frame().ClientUlPilotSymbols());
+        source_data = &modul_buffer_[total_ul_data_symbol_id]
+                                    [ant_id * config_->OfdmDataNum()];
+      }
+      size_t total_ul_symbol_id =
+          config_->GetTotalDataSymbolIdxUl(frame_id, ul_symbol_idx);
+      size_t buff_offset = (total_ul_symbol_id * config_->UeAntNum()) + ant_id;
+      complex_float* dest_loc =
+          ifft_buffer_[buff_offset] + (config_->OfdmDataStart() * 1);
+      std::memcpy(dest_loc, source_data,
+                  sizeof(complex_float) * config_->OfdmDataNum());
     }
-    // Fill out the ifft structure
-    std::memset(ifft_buff, 0u,
-                sizeof(complex_float) * config_->OfdmDataStart());
-    std::memcpy(ifft_buff + config_->OfdmDataStart(), source_data,
-                config_->OfdmDataNum() * sizeof(complex_float));
-    std::memset(ifft_buff + config_->OfdmDataStop(), 0u,
-                sizeof(complex_float) * config_->OfdmDataStart());
 
-    CommsLib::IFFT(ifft_buff, config_->OfdmCaNum(), false);
-
-    size_t tx_offset = buff_offset * config_->PacketLength();
-    char* cur_tx_buffer = &tx_buffer_[tx_offset];
-    auto* pkt = reinterpret_cast<struct Packet*>(cur_tx_buffer);
-    auto* tx_data_ptr = reinterpret_cast<std::complex<short>*>(pkt->data_);
-    CommsLib::Ifft2tx(ifft_buff, tx_data_ptr, config_->OfdmCaNum(),
-                      config_->OfdmTxZeroPrefix(), config_->CpLen(),
-                      config_->Scale());
+    iffter->Launch(gen_tag_t::FrmSymCb(frame_id, symbol_id,
+                                       ch + (user_id * config_->NumChannels()))
+                       .tag_);
   }
 
-  if ((kDebugPrintPerTaskDone == true) || (kDebugPrintIFFT == true)) {
-    size_t ifft_duration_stat = GetTime::Rdtsc() - start_tsc;
-    std::printf(
-        "User Task[%d]: iFFT   (frame %zu, symbol %zu, user %zu) Duration "
-        "%2.4f ms\n",
-        tid, frame_id, symbol_id, ue_id,
-        GetTime::CyclesToMs(ifft_duration_stat, GetTime::MeasureRdtscFreq()));
-  }
-
-  RtAssert(complete_queue_.enqueue(*task_ptok_[tid],
-                                   EventData(EventType::kIFFT, tag)),
-           "iFFT message enqueue failed");
+  // Post the completion event (symbol)
+  size_t completion_tag =
+      gen_tag_t::FrmSymUe(frame_id, symbol_id, user_id).tag_;
+  RtAssert(complete_queue_.enqueue(*ptok,
+                                   EventData(EventType::kIFFT, completion_tag)),
+           "IFFT symbol complete message enqueue failed");
 }
 
 void PhyUe::InitializeVarsFromCfg() {

@@ -81,7 +81,7 @@ while read -r line ; do
     echo "Failed the end-to-end test with channel simulator!"
     echo "=================================================="
     rm test_agora_output.txt
-	rm test_user_output.txt
+    rm test_user_output.txt
     rm test_output.txt
     rm test_chsim_output.txt
     exit
