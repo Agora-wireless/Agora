@@ -88,7 +88,7 @@ void PhyStats::PrintPhyStats() {
         total_decoded_blocks += decoded_blocks_count_[ue_id][i];
         total_block_errors += block_error_count_[ue_id][i];
       }
-      std::cout << "UE " << ue_id << ": " << tx_type << " bit errors(BER) "
+      std::cout << "UE " << ue_id << ": " << tx_type << " bit errors (BER) "
                 << total_bit_errors << "/" << total_decoded_bits << "("
                 << 1.0 * total_bit_errors / total_decoded_bits
                 << "), block errors (BLER) " << total_block_errors << "/"
