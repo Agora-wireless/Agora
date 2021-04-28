@@ -2,6 +2,8 @@
 #include <netinet/ether.h>
 #include <arpa/inet.h>
 #include <stdexcept>
+#include "gettime.h"
+#include <sys/time.h>
 
 static inline void rt_assert(bool condition, const char* throw_str) {
   if (!condition) throw std::runtime_error(throw_str);
@@ -35,20 +37,28 @@ int main(int argc, char **argv)
 
     src_port = dst_port = 12000;
 
-    rte_mbuf *mbuf;
+    rte_mbuf *mbuf[32];
     
     while (true) {
-        int recv = rte_eth_rx_burst(0, 0, &mbuf, 1);
-        if (recv == 1) {
-            auto* eth_hdr = rte_pktmbuf_mtod(mbuf, rte_ether_hdr*);
-            auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
-                reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
-            auto* udp_hdr = reinterpret_cast<rte_udp_hdr*>(
-                reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
-            auto* payload = reinterpret_cast<char*>(eth_hdr) + kPayloadOffset;
-            if (*((uint32_t*)payload) == 4244) {
-                printf("Received!\n");
-                break;
+        int recv = rte_eth_rx_burst(0, 0, mbuf, 32);
+        if (recv > 0) {
+            for (size_t i = 0; i < recv; i ++) {
+                auto* eth_hdr = rte_pktmbuf_mtod(mbuf[i], rte_ether_hdr*);
+                auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+                    reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+                auto* udp_hdr = reinterpret_cast<rte_udp_hdr*>(
+                    reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
+                auto* payload = reinterpret_cast<char*>(eth_hdr) + kPayloadOffset;
+                if (*((uint32_t*)payload) == 4244) {
+                    rte_ether_addr tmp = eth_hdr->s_addr;
+                    eth_hdr->s_addr = eth_hdr->d_addr;
+                    eth_hdr->d_addr = tmp;
+                    struct timeval current_time;
+                    gettimeofday(&current_time, NULL);
+                    *((uint64_t*)(payload + 4)) = current_time.tv_sec * 1000000000L + current_time.tv_usec;
+                    int sent = rte_eth_tx_burst(0, 0, mbuf + i, 1);
+                    return 0;
+                }
             }
         }
     }
