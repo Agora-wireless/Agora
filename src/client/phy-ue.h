@@ -26,8 +26,6 @@
 #include "stats.h"
 #include "txrx_client.h"
 
-//#define OLD_BUFFERS
-
 static const size_t kVectorAlignment = 64;
 
 using myVec = std::vector<complex_float, boost::alignment::aligned_allocator<
@@ -152,7 +150,6 @@ class PhyUe {
    * completion of this task
    */
   void DoDemul(int /*tid*/, size_t /*tag*/);
-  void DoDecode(int /*tid*/, size_t /*tag*/);
   void DoDecodeUe(DoDecodeClient* decoder, moodycamel::ProducerToken* ptok,
                   size_t tag);
 
@@ -279,29 +276,18 @@ class PhyUe {
    */
   std::vector<myVec> equal_buffer_;
 
-#if defined(OLD_BUFFERS)
-  Table<int8_t> demod_buffer_;
-
-  std::vector<std::vector<uint8_t>> decoded_buffer_;
-#else
   // Data after demodulation. Each buffer has kMaxModType * number of OFDM
   // data subcarriers
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffer_;
 
   // Data after LDPC decoding. Each buffer [decoded bytes per UE] bytes.
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> decoded_buffer_;
-#endif
+
   std::complex<float>* rx_samps_tmp_;  // Temp buffer for received samples
 
   std::vector<std::complex<float>> pilot_sc_val_;
   std::vector<size_t> non_null_sc_ind_;
   std::vector<std::vector<std::complex<float>>> ue_pilot_vec_;
-  Table<size_t> decoded_bits_count_;
-  Table<size_t> bit_error_count_;
-  Table<size_t> decoded_blocks_count_;
-  Table<size_t> block_error_count_;
-  std::vector<size_t> decoded_symbol_count_;
-  std::vector<size_t> symbol_error_count_;
 
   // Communication queues
   moodycamel::ConcurrentQueue<EventData> complete_queue_;
