@@ -31,17 +31,13 @@ static const size_t kDefaultQueueSize = 36;
 
 PhyUe::PhyUe(Config* config)
     : stats_(std::make_unique<Stats>(config)),
-      phy_stats_(std::make_unique<PhyStats>(config))
-#if !defined(OLD_BUFFERS)
-      ,
+      phy_stats_(std::make_unique<PhyStats>(config)),
       demod_buffer_(kFrameWnd, config->Frame().NumDLSyms(), config->UeAntNum(),
                     kMaxModType * config->OfdmDataNum()),
       decoded_buffer_(kFrameWnd, config->Frame().NumDLSyms(),
                       config->UeAntNum(),
                       config->LdpcConfig().NumBlocksInSymbol() *
-                          Roundup<64>(config->NumBytesPerCb()))
-#endif
-{
+                          Roundup<64>(config->NumBytesPerCb())) {
   srand(time(nullptr));
 
   this->config_ = config;
@@ -754,11 +750,9 @@ void PhyUe::TaskThread(int tid) {
   // TODO make compatible with Mac!! (ul_bits_buffer_)
   auto encoder = std::make_unique<DoEncode>(config_, tid, config_->UlBits(),
                                             ul_syms_buffer_, stats_.get());
-#if !defined(OLD_BUFFERS)
   auto decoder = std::make_unique<DoDecodeClient>(
       config_, tid, demod_buffer_, decoded_buffer_, phy_stats_.get(),
       this->stats_.get());
-#endif
 
   EventData event;
   while (config_->Running() == true) {
