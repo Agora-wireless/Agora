@@ -96,16 +96,17 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
 }
 
 unsigned int CheckCorrectnessDl(Config const* const cfg) {
-  int bs_ant_num = cfg->BsAntNum();
-  int num_data_syms = cfg->Frame().NumDLSyms();
-  int ofdm_ca_num = cfg->OfdmCaNum();
-  int samps_per_symbol = cfg->SampsPerSymbol();
+  const size_t bs_ant_num = cfg->BsAntNum();
+  const size_t num_data_syms = cfg->Frame().NumDLSyms();
+  const size_t ofdm_ca_num = cfg->OfdmCaNum();
+  const size_t samps_per_symbol = cfg->SampsPerSymbol();
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string raw_data_filename = cur_directory + "/data/LDPC_dl_tx_data_" +
                                   std::to_string(ofdm_ca_num) + "_ant" +
                                   std::to_string(bs_ant_num) + ".bin";
   std::string tx_data_filename = cur_directory + "/data/tx_data.bin";
+
   Table<short> raw_data;
   Table<short> tx_data;
   raw_data.Calloc(num_data_syms * bs_ant_num, samps_per_symbol * 2,
@@ -116,29 +117,30 @@ unsigned int CheckCorrectnessDl(Config const* const cfg) {
   ReadFromFileDl(raw_data_filename, raw_data, samps_per_symbol, cfg);
   ReadFromFileDl(tx_data_filename, tx_data, samps_per_symbol, cfg);
   std::printf(
-      "check_correctness_dl: bs ant %d, dl syms %d, ofdm %d, samps per %d. \n",
+      "check_correctness_dl: bs ant %zu, dl syms %zu, ofdm %zu, samps per %zu. "
+      "\n",
       bs_ant_num, num_data_syms, ofdm_ca_num, samps_per_symbol);
 
   unsigned int error_cnt = 0;
   float sum_diff = 0;
-  for (int i = 0; i < num_data_syms; i++) {
-    for (int ant = 0; ant < bs_ant_num; ant++) {
+  for (size_t i = 0; i < num_data_syms; i++) {
+    for (size_t ant = 0; ant < bs_ant_num; ant++) {
       sum_diff = 0;
-      for (int sc = 0; sc < (samps_per_symbol * 2); sc++) {
-        int offset = (bs_ant_num * i) + ant;
+      for (size_t sc = 0; sc < (samps_per_symbol * 2); sc++) {
+        size_t offset = (bs_ant_num * i) + ant;
         float diff =
             fabs((raw_data[offset][sc] - tx_data[offset][sc]) / 32768.0);
         sum_diff += diff;
         if (kDebugPrintDlCorr) {
           if (i == 0) {
-            std::printf("dl symbol %d ant %d sc %d, (%d, %d) diff: %.3f\n", i,
-                        ant, sc / 2, raw_data[offset][sc], tx_data[offset][sc],
-                        diff);
+            std::printf("dl symbol %zu ant %zu sc %zu, (%d, %d) diff: %.3f\n",
+                        i, ant, sc / 2, raw_data[offset][sc],
+                        tx_data[offset][sc], diff);
           }
         }
       }
       float avg_diff = sum_diff / samps_per_symbol;
-      std::printf("dl symbol %d, ant %d, mean per-sample diff %.3f\n", i, ant,
+      std::printf("dl symbol %zu, ant %zu, mean per-sample diff %.3f\n", i, ant,
                   avg_diff);
       if (avg_diff > 0.03) {
         error_cnt++;

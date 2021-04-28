@@ -867,8 +867,6 @@ void PhyUe::DoFftData(int tid, size_t tag) {
       size_t sc_id = non_null_sc_ind_[j];
       arma::cx_float y = fft_buffer_ptr[sc_id];
       auto pilot_eq = y / csi_buffer_ptr[j];
-      // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
-      // in the downlink receiver
       auto p = config_->UeSpecificPilot()[ant_id][j];
       theta += arg(pilot_eq * arma::cx_float(p.re, -p.im));
     }
@@ -1016,8 +1014,6 @@ void PhyUe::DoFftPilot(int tid, size_t tag) {
   // see Argos paper (Mobicom'12)
   if (dl_symbol_id < dl_pilot_symbol_perframe_) {
     for (size_t j = 0; j < config_->OfdmDataNum(); j++) {
-      // FIXME: cfg->ue_specific_pilot[user_id] index creates errors
-      // in the downlink receiver
       complex_float p = config_->UeSpecificPilot()[ant_id][j];
       size_t sc_id = non_null_sc_ind_[j];
       csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / arma::cx_float(p.re, p.im));
