@@ -137,7 +137,8 @@ public:
      */
     void cfo_estimation(const int sync_index,
         const std::vector<std::complex<float>>& beacon_buff);
-    void cfo_correction(bool downlink, complex_float* samples_vec, size_t len);
+    complex_float* cfo_correction(bool downlink, complex_float* samples_vec, size_t len);
+    double get_cfo(){ return cfo_; };
 
 private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;

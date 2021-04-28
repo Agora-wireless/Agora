@@ -206,7 +206,8 @@ set(COMMON_SOURCES
   src/common/crc.cpp
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
-  src/encoder/iobuffer.cpp)
+  src/encoder/iobuffer.cpp
+  src/mac/mac_thread.cpp)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(AGORA_SOURCES 
@@ -219,8 +220,7 @@ set(AGORA_SOURCES
   src/agora/doprecode.cpp
   src/agora/docoding.cpp
   src/agora/radio_lib.cpp
-  src/agora/radio_calibrate.cpp
-  src/mac/mac_thread.cpp)
+  src/agora/radio_calibrate.cpp)
 
 if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
@@ -238,8 +238,7 @@ add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 set(CLIENT_SOURCES
   src/client/client_radio.cpp
   src/client/phy-ue.cpp
-  src/client/txrx_client.cpp
-  src/mac/mac_thread.cpp)
+  src/client/txrx_client.cpp)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
 
 include_directories(
@@ -323,13 +322,14 @@ endforeach()
 
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
-  test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
+  test_concurrent_queue test_zf test_zf_threaded test_demul_threaded
   test_ptr_grid test_recipcal test_cfo)
 
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}
     test/unit_tests/${test_name}.cc
     $<TARGET_OBJECTS:agora_sources_lib>
+    $<TARGET_OBJECTS:client_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)
 
   # Unit tests should pass without memory errors

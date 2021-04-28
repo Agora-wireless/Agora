@@ -400,9 +400,6 @@ struct Packet* RadioTXRX::recv_enqueue_argos(int tid, size_t radio_id,
             "socket message enqueue failed");
     }
 
-    // bool downlink = true;
-    // cfo_correction(downlink);
-
     return pkt[0];
 }
 
@@ -491,11 +488,11 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
     pilot_buff1.resize(2);
     Table<std::complex<int16_t>> zeros;
     zeros.calloc(2, c->sampsPerSymbol, 64);
-    //pilot_buff0[0] = c->pilot_ci16.data();
+    pilot_buff0[0] = c->pilot_ci16.data();
     if (c->nChannels == 2) {
         pilot_buff0[1] = zeros[0];
         pilot_buff1[0] = zeros[1];
-        //pilot_buff1[1] = c->pilot_ci16.data();
+        pilot_buff1[1] = c->pilot_ci16.data();
         frm_rx_buff[1] = frm_buff1.data();
     }
 
@@ -537,21 +534,25 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
         rx_offset = sync_index - c->beacon_len - c->ofdm_tx_zero_prefix_;
 
         // Carrier Frequency Offset estimation and correction
-        cfo_estimation(sync_index, sync_buff);
+        if (c->cfoCorrectionEn) {
+            cfo_estimation(sync_index, sync_buff);
+        }
     }
 
     // CFO "pre-distortion" on uplink pilots
-    std::vector<std::complex<int16_t>> pilot_ci16_local;
-    pilot_ci16_local.resize(c->sampsPerSymbol, 0);
-    bool is_downlink = false;
-    cfo_correction(is_downlink, c->pilot_ifft, c->OFDM_CA_NUM);
-    CommsLib::ifft2tx(c->pilot_ifft,
-        (std::complex<int16_t>*)pilot_ci16_local.data(), c->OFDM_CA_NUM,
-        c->ofdm_tx_zero_prefix_, c->CP_LEN, c->scale);
+    if (c->cfoCorrectionEn) {
+        std::vector<std::complex<int16_t>> pilot_ci16_local;
+        pilot_ci16_local.resize(c->sampsPerSymbol, 0);
+        bool is_downlink = false;
+        cfo_correction(is_downlink, c->pilot_ifft, c->OFDM_CA_NUM);
+        CommsLib::ifft2tx(c->pilot_ifft,
+            (std::complex<int16_t>*)pilot_ci16_local.data(), c->OFDM_CA_NUM,
+            c->ofdm_tx_zero_prefix_, c->CP_LEN, c->scale);
 
-    pilot_buff0[0] = pilot_ci16_local.data();
-    if (c->nChannels == 2) {
-        pilot_buff1[1] = pilot_ci16_local.data();
+        pilot_buff0[0] = pilot_ci16_local.data();
+        if (c->nChannels == 2) {
+            pilot_buff1[1] = pilot_ci16_local.data();
+        }
     }
 
     // Read rx_offset to align with the begining of a frame
@@ -663,7 +664,6 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
 void RadioTXRX::cfo_estimation(
     const int sync_index, const std::vector<std::complex<float>>& beacon_buff)
 {
-
     auto& c = config_;
 
     // Compute phase error across same-sample index from two consecutive training sequences
@@ -672,27 +672,12 @@ void RadioTXRX::cfo_estimation(
     std::vector<float> phase_vec(c->beacon_longsym_len, 0);
     std::vector<float> phase_uwrap(c->beacon_longsym_len, 0);
 
-    /*  SEE IF WE CAN MAKE IT FASTER...
-    std::vector<std::complex<float>> s1(beacon_buff.begin() + cfo_start_idx,
-        beacon_buff.begin() + cfo_start_idx + c->beacon_longsym_len - 1);
-    std::vector<std::complex<float>> s2(
-        beacon_buff.begin() + cfo_start_idx + c->beacon_longsym_len,
-        beacon_buff.begin() + cfo_start_idx + c->beacon_longsym_len
-            + c->beacon_longsym_len - 1);
-     */
-
     for (size_t i = 0; i < c->beacon_longsym_len; i++) {
-        
         std::complex<float> s1 = beacon_buff[cfo_start_idx + i];
         std::complex<float> s2
             = beacon_buff[cfo_start_idx + c->beacon_longsym_len + i];
         std::complex<float> s12 = s1 * std::conj(s2);
         phase_vec[i] = std::atan2(s12.imag(), s12.real());
-
-        std::cout << "FUNC "<< i << " s1 (" << real(s1) << ", " << imag(s1) << ")  | "
-                                 << " s2 (" << real(s2) << ", " << imag(s2) << ")  | "
-                                 << "s12 (" << real(s12) << ", " << imag(s12) << ") | "
-                                 << "phase: " << phase_vec[i] << std::endl;
 
         // Unwrap phase
         if (i == 0) {
@@ -711,24 +696,27 @@ void RadioTXRX::cfo_estimation(
     float average = accumulate(phase_uwrap.begin(), phase_uwrap.end(), 0.0)
         / phase_uwrap.size();
     cfo_ = average / (2 * M_PI); // * c->beacon_longsym_len);
-    double cfo_est_khz = cfo_ * c->rate * 1e-3;
-    printf("XXXXX  CFO Estimate: %f kHz  XXXXX", cfo_est_khz);
+    // double cfo_est_khz = cfo_ * c->rate * 1e-3;
+    // printf("XXXXX  CFO Estimate2: %f kHz  XXXXX \n", cfo_est_khz);
 }
 
-void RadioTXRX::cfo_correction(
+complex_float* RadioTXRX::cfo_correction(
     bool is_downlink, complex_float* samps, size_t len)
 {
     const std::complex<double> i(0.0, 1.0);
     std::complex<float> samps_cf;
 
-    double cfo = is_downlink ? cfo_ : -1 * cfo_;
-
+    double cfo = is_downlink ? -1 * cfo_ : cfo_;
     for (size_t idx = 0; idx < len; idx++) {
-        double tmp = 2 * M_PI * cfo * idx;
+
+        //double tmp = 2 * M_PI * cfo * idx;
+        double tmp = 2 * M_PI * cfo * idx / config_->beacon_longsym_len;
         std::complex<double> cfo_tmp = exp(tmp * -i);
         samps_cf = std::complex<float>(samps[idx].re, samps[idx].im)
             * (std::complex<float>)cfo_tmp;
+
         samps[idx].re = samps_cf.real();
         samps[idx].im = samps_cf.imag();
     }
+    return samps;
 }

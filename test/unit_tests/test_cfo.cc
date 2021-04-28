@@ -6,12 +6,11 @@
 #include "utils.h"
 #include <armadillo>
 
-static constexpr size_t kMaxFrameNum = 1;
+static constexpr size_t kMaxFrameNum = 1;   // Only for checking timing
 
 /// Test correctness of CFO estimation and correction
 TEST(TestCFO, EstCorr)
 {
-
     auto* cfg = new Config("data/tddconfig-sim-ul.json");
     cfg->genData();
 
@@ -22,7 +21,7 @@ TEST(TestCFO, EstCorr)
     RadioTXRX* ru_ = new RadioTXRX(cfg, n_threads, in_core_id);
 
     const std::complex<double> j(0.0, 1.0);
-    const double cfo_khz = 55;
+    const double cfo_khz = 100;
     const double cfo_sim = cfo_khz / (cfg->rate * 1e-3);
     std::cout << "Applying CFO of " << cfo_khz << " kHz" << " or " << cfo_sim << std::endl;
 
@@ -49,10 +48,12 @@ TEST(TestCFO, EstCorr)
     for (size_t fidx = 0; fidx < kMaxFrameNum; fidx++) {
         ru_->cfo_estimation(sync_index, gold_cf32_cfo);
     }
-/*
     double ms0 = cycles_to_ms(rdtsc() - start_tsc, freq_ghz);
 
+    double cfo_before_corr = ru_->get_cfo();
+
     complex_float* fft_buff;
+    alloc_buffer_1d(&fft_buff, gold_cf32_cfo.size(), 64, 1);
     for (size_t i = 0; i < gold_cf32_cfo.size(); i++) {
         fft_buff[i].re = gold_cf32_cfo[i].real();
         fft_buff[i].im = gold_cf32_cfo[i].imag();
@@ -60,28 +61,32 @@ TEST(TestCFO, EstCorr)
 
     // CFO correction
     start_tsc = rdtsc();
+    complex_float* corrected_vec;
     for (size_t fidx = 0; fidx < kMaxFrameNum; fidx++) {
         bool is_downlink = true;
-        ru_->cfo_correction(
-            is_downlink, (complex_float*)fft_buff, cfg->OFDM_CA_NUM);
+        corrected_vec = ru_->cfo_correction(
+            is_downlink, (complex_float*)fft_buff, gold_cf32_cfo.size());
     }
-    double ms1 = cycles_to_ms(rdtsc() - start_tsc, freq_ghz);
 
+    double ms1 = cycles_to_ms(rdtsc() - start_tsc, freq_ghz);
     printf("Time per frame (estimation, correction) = (%.4f, %.4f) ms\n",
         ms0 / kMaxFrameNum, ms1 / kMaxFrameNum);
-*/
-    EXPECT_EQ(4, 4) << "Two plus two must equal four";
-    // Check correctness
-    /*
-    constexpr float allowed_error = 1e-3;
-    for (size_t i = 0; i < kMaxFrameNum; i++) {
-        float* buf0 = (float*)recip_buffer_0[i % kFrameWnd];
-        float* buf1 = (float*)recip_buffer_1[i % kFrameWnd];
-        for (size_t j = 0; j < cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM; j++) {
-            ASSERT_LE(abs(buf0[j] - buf1[j]), allowed_error);
-        }
+
+    // Check if correction worked
+    std::vector<std::complex<float>> verify_vec;
+    for (size_t i = 0; i < gold_cf32_cfo.size(); i++) {
+        std::complex<float> tmp(corrected_vec[i].re, corrected_vec[i].im);
+        verify_vec.push_back(tmp);
     }
-    */
+    ru_->cfo_estimation(sync_index, verify_vec);
+    double cfo_after_corr = ru_->get_cfo();
+
+    // Check correctness
+    constexpr float allowed_error = 0.01;            // 10 Hz max error
+    std::cout << "CFO BEFORE CORR: " << (cfo_before_corr * cfg->rate * 1e-3) << " CFO APPLIED: " << cfo_khz << std::endl;
+    std::cout << "CFO AFTER CORR: " << (cfo_after_corr * cfg->rate * 1e-3) << " IDEAL: " << 0.0 << std::endl;
+    ASSERT_LE(abs((cfo_before_corr * cfg->rate * 1e-3) - cfo_khz), allowed_error);
+    ASSERT_LE(abs((cfo_after_corr * cfg->rate * 1e-3) - 0.0), allowed_error);
 }
 
 int main(int argc, char** argv)

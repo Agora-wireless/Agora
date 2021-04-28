@@ -146,6 +146,7 @@ public:
     bool beamsweep;
     bool sampleCalEn;
     bool imbalanceCalEn;
+    bool cfoCorrectionEn;
     bool recipCalEn;
     std::string channel;
 

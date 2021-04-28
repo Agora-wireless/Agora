@@ -61,6 +61,7 @@ Config::Config(std::string jsonfile)
     beamsweep = tddConf.value("beamsweep", false);
     sampleCalEn = tddConf.value("sample_calibrate", false);
     imbalanceCalEn = tddConf.value("imbalance_calibrate", false);
+    cfoCorrectionEn = tddConf.value("cfo_correction", false);
     modulation = tddConf.value("modulation", "16QAM");
 
     bs_server_addr = tddConf.value("bs_server_addr", "127.0.0.1");
@@ -306,7 +307,6 @@ void Config::genData()
 
         beacon_len = beacon_ci16.size();
         beacon_longsym_len = gold_ifft_ci16.size();
-        std::cout << "OBCH: " << beacon_longsym_len << std::endl;
         beacon_longsym_reps = goldReps;
 
         if (sampsPerSymbol
@@ -360,7 +360,6 @@ void Config::genData()
 
         beacon_len = beacon_ci16.size();
         beacon_longsym_len = gold_ifft_ci16.size();
-        std::cout << "OBCH: " << beacon_longsym_len << std::endl;
         beacon_longsym_reps = goldReps;
     }
 
