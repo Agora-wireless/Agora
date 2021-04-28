@@ -739,6 +739,7 @@ void PhyUe::Start() {
     }
   }
   if (kPrintPhyStats) {
+    /*
     const size_t task_buffer_symbol_num_dl =
         dl_data_symbol_perframe_ * kFrameWnd;
     for (size_t ue_id = 0; ue_id < config_->UeAntNum(); ue_id++) {
@@ -763,7 +764,7 @@ void PhyUe::Start() {
                 << 1.0 * symbol_error_count_.at(ue_id) /
                        decoded_symbol_count_.at(ue_id)
                 << ")" << std::endl;
-    }
+    }*/
     phy_stats_->PrintPhyStats();
   }
   this->Stop();
