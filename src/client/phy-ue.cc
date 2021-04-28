@@ -739,32 +739,6 @@ void PhyUe::Start() {
     }
   }
   if (kPrintPhyStats) {
-    /*
-    const size_t task_buffer_symbol_num_dl =
-        dl_data_symbol_perframe_ * kFrameWnd;
-    for (size_t ue_id = 0; ue_id < config_->UeAntNum(); ue_id++) {
-      size_t total_decoded_bits(0);
-      size_t total_bit_errors(0);
-      size_t total_decoded_blocks(0);
-      size_t total_block_errors(0);
-      for (size_t i = 0; i < task_buffer_symbol_num_dl; i++) {
-        total_decoded_bits += decoded_bits_count_[ue_id][i];
-        total_bit_errors += bit_error_count_[ue_id][i];
-        total_decoded_blocks += decoded_blocks_count_[ue_id][i];
-        total_block_errors += block_error_count_[ue_id][i];
-      }
-      std::cout << "UE " << ue_id << ": bit errors (BER) " << total_bit_errors
-                << "/" << total_decoded_bits << "("
-                << 1.0 * total_bit_errors / total_decoded_bits
-                << "), block errors (BLER) " << total_block_errors << "/"
-                << total_decoded_blocks << " ("
-                << 1.0 * total_block_errors / total_decoded_blocks
-                << "), symbol errors " << symbol_error_count_.at(ue_id) << "/"
-                << decoded_symbol_count_.at(ue_id) << " ("
-                << 1.0 * symbol_error_count_.at(ue_id) /
-                       decoded_symbol_count_.at(ue_id)
-                << ")" << std::endl;
-    }*/
     phy_stats_->PrintPhyStats();
   }
   this->Stop();
@@ -793,7 +767,6 @@ void PhyUe::TaskThread(int tid) {
       switch (event.event_type_) {
         case EventType::kDecode: {
           DoDecodeUe(decoder.get(), task_ptok_[tid], event.tags_[0]);
-          // DoDecode(tid, event.tags_[0]);
         } break;
         case EventType::kDemul: {
           DoDemul(tid, event.tags_[0]);
@@ -803,7 +776,6 @@ void PhyUe::TaskThread(int tid) {
         } break;
         case EventType::kEncode: {
           DoEncodeUe(encoder.get(), task_ptok_[tid], event.tags_[0]);
-          // DoEncode(tid, event.tags_[0]);
         } break;
         case EventType::kModul: {
           DoModul(tid, event.tags_[0]);
@@ -1088,14 +1060,10 @@ void PhyUe::DoDemul(int tid, size_t tag) {
   size_t offset = total_dl_symbol_id * config_->UeAntNum() + ant_id;
   auto* equal_ptr = reinterpret_cast<float*>(&equal_buffer_[offset][0]);
 
-#if defined(OLD_BUFFERS)
-  int8_t* demod_ptr = demod_buffer_[offset];
-#else
   const size_t base_sc_id = 0;
 
   int8_t* demod_ptr = demod_buffer_[frame_slot][dl_symbol_id][ant_id] +
                       (config_->ModOrderBits() * base_sc_id);
-#endif
 
   switch (config_->ModOrderBits()) {
     case (CommsLib::kQpsk):
@@ -1164,141 +1132,6 @@ void PhyUe::DoDecodeUe(DoDecodeClient* decoder, moodycamel::ProducerToken* ptok,
   RtAssert(complete_queue_.enqueue(
                *ptok, EventData(EventType::kDecode, completion_tag)),
            "Decode Symbol message enqueue failed");
-}
-
-void PhyUe::DoDecode(int tid, size_t tag) {
-  const LDPCconfig& ldpc_config = config_->LdpcConfig();
-  const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t ant_id = gen_tag_t(tag).ant_id_;
-
-  int16_t* resp_var_nodes =
-      static_cast<int16_t*>(Agora_memory::PaddedAlignedAlloc(
-          Agora_memory::Alignment_t::kAlign64, 1024 * 1024 * sizeof(int16_t)));
-
-  auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
-
-  if (kDebugPrintInTask || kDebugPrintDecode) {
-    std::printf("User Task[%d]: Decode (frame %zu, symbol %zu, ant %zu)\n", tid,
-                frame_id, symbol_id, ant_id);
-  }
-  size_t start_tsc = GetTime::Rdtsc();
-
-  const size_t frame_slot = frame_id % kFrameWnd;
-  const size_t dl_symbol_idx = config_->Frame().GetDLSymbolIdx(symbol_id);
-  size_t total_dl_symbol_idx = frame_slot * dl_data_symbol_perframe_ +
-                               dl_symbol_idx - dl_pilot_symbol_perframe_;
-
-  struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {};
-  struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {};
-
-  // Decoder setup
-  int16_t num_filler_bits = 0;
-  int16_t num_channel_llrs = ldpc_config.NumCbCodewLen();
-
-  ldpc_decoder_5gnr_request.numChannelLlrs = num_channel_llrs;
-  ldpc_decoder_5gnr_request.numFillerBits = num_filler_bits;
-  ldpc_decoder_5gnr_request.maxIterations = ldpc_config.MaxDecoderIter();
-  ldpc_decoder_5gnr_request.enableEarlyTermination =
-      ldpc_config.EarlyTermination();
-  ldpc_decoder_5gnr_request.Zc = ldpc_config.ExpansionFactor();
-  ldpc_decoder_5gnr_request.baseGraph = ldpc_config.BaseGraph();
-  ldpc_decoder_5gnr_request.nRows = ldpc_config.NumRows();
-
-  int num_msg_bits = ldpc_config.NumCbLen() - num_filler_bits;
-  ldpc_decoder_5gnr_response.numMsgBits = num_msg_bits;
-  ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
-
-  size_t block_error(0);
-  for (size_t cb_id = 0; cb_id < config_->LdpcConfig().NumBlocksInSymbol();
-       cb_id++) {
-#if defined(OLD_BUFFERS)
-    size_t symbol_ant_offset =
-        total_dl_symbol_idx * config_->UeAntNum() + ant_id;
-    size_t demod_buffer_offset =
-        cb_id * ldpc_config.NumCbCodewLen() * config_->ModOrderBits();
-    size_t decode_buffer_offset = cb_id * Roundup<64>(config_->NumBytesPerCb());
-    auto* llr_buffer_ptr =
-        &demod_buffer_[symbol_ant_offset][demod_buffer_offset];
-    auto* decoded_buffer_ptr =
-        &decoded_buffer_[symbol_ant_offset][decode_buffer_offset];
-#else
-    int8_t* llr_buffer_ptr =
-        demod_buffer_[frame_slot][dl_symbol_idx][ant_id] +
-        (config_->ModOrderBits() * (ldpc_config.NumCbCodewLen() * cb_id));
-
-    uint8_t* decoded_buffer_ptr =
-        decoded_buffer_[frame_slot][dl_symbol_idx][ant_id] +
-        (cb_id * Roundup<64>(config_->NumBytesPerCb()));
-#endif
-    ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
-    ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
-    bblib_ldpc_decoder_5gnr(&ldpc_decoder_5gnr_request,
-                            &ldpc_decoder_5gnr_response);
-
-    if (config_->ScrambleEnabled()) {
-      scrambler->Descramble(decoded_buffer_ptr, config_->NumBytesPerCb());
-    }
-
-    if (kCollectPhyStats) {
-      decoded_bits_count_[ant_id][total_dl_symbol_idx] +=
-          8 * config_->NumBytesPerCb();
-      decoded_blocks_count_[ant_id][total_dl_symbol_idx]++;
-      size_t byte_error(0);
-      for (size_t i = 0; i < config_->NumBytesPerCb(); i++) {
-        uint8_t rx_byte = decoded_buffer_ptr[i];
-        auto tx_byte = static_cast<uint8_t>(config_->GetInfoBits(
-            config_->DlBits(), dl_symbol_idx, ant_id, cb_id)[i]);
-        uint8_t xor_byte(tx_byte ^ rx_byte);
-        size_t bit_errors = 0;
-        for (size_t j = 0; j < 8; j++) {
-          bit_errors += xor_byte & 1;
-          xor_byte >>= 1;
-        }
-        if (rx_byte != tx_byte) {
-          byte_error++;
-        }
-
-        bit_error_count_[ant_id][total_dl_symbol_idx] += bit_errors;
-      }
-      block_error_count_[ant_id][total_dl_symbol_idx] +=
-          static_cast<unsigned long>(byte_error > 0);
-      block_error += static_cast<unsigned long>(byte_error > 0);
-    }
-
-    if (kPrintDecodedData) {
-      std::stringstream ss;
-      ss << "Decoded data (original byte) in frame " << frame_id << " symbol "
-         << symbol_id << " ant " << ant_id << ":\n"
-         << std::hex << std::setfill('0');
-      for (size_t i = 0; i < config_->NumBytesPerCb(); i++) {
-        uint8_t rx_byte = decoded_buffer_ptr[i];
-        auto tx_byte = static_cast<uint8_t>(config_->GetInfoBits(
-            config_->DlBits(), dl_symbol_idx, ant_id, cb_id)[i]);
-        ss << std::hex << std::setw(2) << static_cast<int>(rx_byte) << "("
-           << static_cast<int>(tx_byte) << ") ";
-      }
-      ss << std::dec << std::endl;
-      std::cout << ss.str();
-    }
-  }
-  if (kCollectPhyStats) {
-    decoded_symbol_count_[ant_id]++;
-    symbol_error_count_[ant_id] += static_cast<unsigned long>(block_error > 0);
-  }
-
-  if ((kDebugPrintPerTaskDone == true) || (kDebugPrintDecode == true)) {
-    size_t dec_duration_stat = GetTime::Rdtsc() - start_tsc;
-    std::printf(
-        "User Task[%d]: Decode (frame %zu, symbol %zu, ant %zu) Duration "
-        "%2.4f ms\n",
-        tid, frame_id, symbol_id, ant_id,
-        GetTime::CyclesToMs(dec_duration_stat, GetTime::MeasureRdtscFreq()));
-  }
-
-  RtAssert(complete_queue_.enqueue(*task_ptok_[tid],
-                                   EventData(EventType::kDecode, tag)),
-           "Decoding message enqueue failed");
 }
 
 //////////////////////////////////////////////////////////
@@ -1551,9 +1384,6 @@ void PhyUe::InitializeDownlinkBuffers() {
     }
   }
 
-  decoded_symbol_count_ = std::vector<size_t>(config_->UeAntNum());
-  symbol_error_count_ = std::vector<size_t>(config_->UeAntNum());
-
   if (dl_data_symbol_perframe_ > 0) {
     // initialize equalized data buffer
     const size_t task_buffer_symbol_num_dl =
@@ -1563,29 +1393,6 @@ void PhyUe::InitializeDownlinkBuffers() {
     for (auto& i : equal_buffer_) {
       i.resize(config_->OfdmDataNum());
     }
-
-#if defined(OLD_BUFFERS)
-    // initialize demod buffer
-    demod_buffer_.Calloc(buffer_size, config_->OfdmDataNum() * kMaxModType,
-                         Agora_memory::Alignment_t::kAlign64);
-
-    // initialize decode buffer
-    decoded_buffer_.resize(buffer_size);
-    for (auto& i : decoded_buffer_) {
-      i.resize(Roundup<64>(config_->NumBytesPerCb()) *
-               config_->LdpcConfig().NumBlocksInSymbol());
-    }
-#endif
-
-    decoded_bits_count_.Calloc(config_->UeAntNum(), task_buffer_symbol_num_dl,
-                               Agora_memory::Alignment_t::kAlign64);
-    bit_error_count_.Calloc(config_->UeAntNum(), task_buffer_symbol_num_dl,
-                            Agora_memory::Alignment_t::kAlign64);
-
-    decoded_blocks_count_.Calloc(config_->UeAntNum(), task_buffer_symbol_num_dl,
-                                 Agora_memory::Alignment_t::kAlign64);
-    block_error_count_.Calloc(config_->UeAntNum(), task_buffer_symbol_num_dl,
-                              Agora_memory::Alignment_t::kAlign64);
   }
 }
 
@@ -1594,20 +1401,12 @@ void PhyUe::FreeDownlinkBuffers() {
   rx_buffer_status_.Free();
   FreeBuffer1d(&rx_samps_tmp_);
   fft_buffer_.Free();
-
-  if (dl_data_symbol_perframe_ > 0) {
-    decoded_bits_count_.Free();
-    bit_error_count_.Free();
-
-    decoded_blocks_count_.Free();
-    block_error_count_.Free();
-  }
 }
 
 void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
                              size_t symbol_id, size_t ant) {
-  // if (kDebugPrintPerTaskDone == true) {
-  if (true) {
+  if (kDebugPrintPerTaskDone == true) {
+    // if (true) {
     switch (print_type) {
       case (PrintType::kPacketRX):
         std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Rx packet\n",
@@ -1668,8 +1467,8 @@ void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
 
 void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
                                size_t symbol_id) {
-  // if (kDebugPrintPerSymbolDone == true) {
-  if (true) {
+  if (kDebugPrintPerSymbolDone == true) {
+    // if (true) {
     switch (print_type) {
       case (PrintType::kFFTPilots):
         std::printf(
@@ -1750,8 +1549,8 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
 }
 
 void PhyUe::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
-  // if (kDebugPrintPerFrameDone == true) {
-  if (true) {
+  if (kDebugPrintPerFrameDone == true) {
+    // if (true) {
     switch (print_type) {
       case (PrintType::kPacketRX):
         std::printf("PhyUE [frame %zu + %.2f ms]: Received all packets\n",
@@ -1871,11 +1670,6 @@ bool PhyUe::FrameComplete(size_t frame, FrameTasksFlags complete) {
   bool is_complete =
       (frame_tasks_.at(frame % kFrameWnd) ==
        static_cast<std::uint8_t>(FrameTasksFlags::kFrameComplete));
-
-  // if (is_complete == true) {
-  //  std::printf("**** Frame %zu complete with task %d\n", frame,
-  //              static_cast<std::uint8_t>(complete));
-  //}
   return is_complete;
 }
 
