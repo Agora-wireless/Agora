@@ -518,7 +518,7 @@ void PhyUe::Start() {
 
           if (kDebugPrintPacketsToMac) {
             std::printf(
-                "PhyUE: sent decoded packet for (frame %zu, symbol %zu) "
+                "PhyUe: sent decoded packet for (frame %zu, symbol %zu) "
                 "to MAC\n",
                 frame_id, symbol_id);
           }
@@ -544,7 +544,7 @@ void PhyUe::Start() {
               &ul_bits_buffer_[ue_id]
                               [radio_buf_id * config_->MacBytesNumPerframe()]);
           RtAssert(pkt->frame_id_ == expected_frame_id_from_mac_,
-                   "PhyUE: Incorrect frame ID from MAC");
+                   "PhyUe: Incorrect frame ID from MAC");
           current_frame_user_num_ =
               (current_frame_user_num_ + 1) % config_->UeAntNum();
           if (current_frame_user_num_ == 0) {
@@ -554,11 +554,11 @@ void PhyUe::Start() {
 
           if (kDebugPrintPacketsFromMac) {
             std::printf(
-                "PhyUE: received packet for frame %u with modulation "
+                "PhyUe: received packet for frame %u with modulation "
                 "%zu\n",
                 pkt->frame_id_, pkt->rb_indicator_.mod_order_bits_);
             std::stringstream ss;
-            ss << "PhyUE: kPacketFromMac, frame ID " << pkt->frame_id_
+            ss << "PhyUe: kPacketFromMac, frame ID " << pkt->frame_id_
                << ", bytes: ";
             for (size_t i = 0; i < 4; i++) {
               ss << std::to_string((reinterpret_cast<uint8_t*>(pkt->data_)[i]))
@@ -692,7 +692,7 @@ void PhyUe::Start() {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
           RtAssert(frame_id == next_frame_processed_[ue_id],
-                   "PhyUE: Unexpected frame was transmitted!");
+                   "PhyUe: Unexpected frame was transmitted!");
 
           ul_bits_buffer_status_[ue_id]
                                 [next_frame_processed_[ue_id] % kFrameWnd] = 0;
@@ -855,53 +855,53 @@ void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
     // if (true) {
     switch (print_type) {
       case (PrintType::kPacketRX):
-        std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Rx packet\n",
+        std::printf("PhyUe [frame %zu symbol %zu ant %zu]: Rx packet\n",
                     frame_id, symbol_id, ant);
         break;
 
       case (PrintType::kPacketTX):
         std::printf(
-            "PhyUE [frame %zu symbol %zu ant %zu]: %zu User Tx "
+            "PhyUe [frame %zu symbol %zu ant %zu]: %zu User Tx "
             "finished\n",
             frame_id, symbol_id, ant, tx_counters_.GetTaskCount(frame_id) + 1);
         break;
 
       case (PrintType::kFFTPilots):
         std::printf(
-            "PhyUE [frame %zu symbol %zu ant %zu]: Pilot FFT Equalization "
+            "PhyUe [frame %zu symbol %zu ant %zu]: Pilot FFT Equalization "
             "done\n",
             frame_id, symbol_id, ant);
         break;
 
       case (PrintType::kFFTData):
         std::printf(
-            "PhyUE [frame %zu symbol %zu ant %zu]: Data FFT Equalization "
+            "PhyUe [frame %zu symbol %zu ant %zu]: Data FFT Equalization "
             "done\n",
             frame_id, symbol_id, ant);
         break;
 
       case (PrintType::kDemul):
-        std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Demul done\n",
+        std::printf("PhyUe [frame %zu symbol %zu ant %zu]: Demul done\n",
                     frame_id, symbol_id, ant);
         break;
 
       case (PrintType::kDecode):
-        std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Decoding done\n",
+        std::printf("PhyUe [frame %zu symbol %zu ant %zu]: Decoding done\n",
                     frame_id, symbol_id, ant);
         break;
 
       case (PrintType::kEncode):
-        std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Encoding done\n",
+        std::printf("PhyUe [frame %zu symbol %zu ant %zu]: Encoding done\n",
                     frame_id, symbol_id, ant);
         break;
 
       case (PrintType::kModul):
-        std::printf("PhyUE [frame %zu symbol %zu ant %zu]: Modulation done\n",
+        std::printf("PhyUe [frame %zu symbol %zu ant %zu]: Modulation done\n",
                     frame_id, symbol_id, ant);
         break;
 
       case (PrintType::kIFFT):
-        std::printf("PhyUE [frame %zu symbol %zu ant %zu]: iFFT done\n",
+        std::printf("PhyUe [frame %zu symbol %zu ant %zu]: iFFT done\n",
                     frame_id, symbol_id, ant);
         break;
 
@@ -999,87 +999,87 @@ void PhyUe::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
     // if (true) {
     switch (print_type) {
       case (PrintType::kPacketRX):
-        std::printf("PhyUE [frame %zu + %.2f ms]: Received all packets\n",
+        std::printf("PhyUe [frame %zu + %.2f ms]: Received all packets\n",
                     frame_id,
                     this->stats_->MasterGetDeltaMs(
                         TsType::kRXDone, TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kPacketRXPilots):
-        std::printf("PhyUE [frame %zu + %.2f ms]: Received all pilots\n",
+        std::printf("PhyUe [frame %zu + %.2f ms]: Received all pilots\n",
                     frame_id,
                     this->stats_->MasterGetDeltaMs(
                         TsType::kPilotAllRX, TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kPacketTX):
-        std::printf("PhyUE [frame %zu + %.2f ms]: Completed TX\n", frame_id,
+        std::printf("PhyUe [frame %zu + %.2f ms]: Completed TX\n", frame_id,
                     this->stats_->MasterGetDeltaMs(
                         TsType::kTXDone, TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kFFTPilots):
         std::printf(
-            "PhyUE [frame %zu + %.2f ms]: Pilot FFT finished\n", frame_id,
+            "PhyUe [frame %zu + %.2f ms]: Pilot FFT finished\n", frame_id,
             this->stats_->MasterGetDeltaMs(TsType::kFFTPilotsDone,
                                            TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kFFTData):
-        std::printf("PhyUE [frame %zu + %.2f ms]: Data FFT finished\n",
+        std::printf("PhyUe [frame %zu + %.2f ms]: Data FFT finished\n",
                     frame_id,
                     this->stats_->MasterGetDeltaMs(
                         TsType::kFFTDone, TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kDemul):
-        std::printf("PhyUE [frame %zu + %.2f ms]: Completed demodulation\n",
+        std::printf("PhyUe [frame %zu + %.2f ms]: Completed demodulation\n",
                     frame_id,
                     this->stats_->MasterGetDeltaMs(
                         TsType::kDemulDone, TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kDecode):
-        std::printf("PhyUE [frame %zu + %.2f ms]: Completed decoding\n",
+        std::printf("PhyUe [frame %zu + %.2f ms]: Completed decoding\n",
                     frame_id,
                     this->stats_->MasterGetDeltaMs(
                         TsType::kDecodeDone, TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kEncode):
-        std::printf("PhyUE [frame %zu + %.2f ms]: Completed encoding\n",
+        std::printf("PhyUe [frame %zu + %.2f ms]: Completed encoding\n",
                     frame_id,
                     this->stats_->MasterGetDeltaMs(
                         TsType::kEncodeDone, TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kModul):
-        std::printf("PhyUE [frame %zu + %.2f ms]: Completed modulation\n",
+        std::printf("PhyUe [frame %zu + %.2f ms]: Completed modulation\n",
                     frame_id,
                     this->stats_->MasterGetDeltaMs(
                         TsType::kModulDone, TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kIFFT):
-        std::printf("PhyUE [frame %zu + %.2f ms]: Completed iFFT\n", frame_id,
+        std::printf("PhyUe [frame %zu + %.2f ms]: Completed iFFT\n", frame_id,
                     this->stats_->MasterGetDeltaMs(
                         TsType::kIFFTDone, TsType::kFirstSymbolRX, frame_id));
         break;
 
       /*
       case (PrintType::kPacketTXFirst): std::printf(
-            "PhyUE [frame %zu + %.2f ms]: Completed TX of first symbol\n",
+            "PhyUe [frame %zu + %.2f ms]: Completed TX of first symbol\n",
             frame_id,
             this->stats_->MasterGetDeltaMs(TsType::kTXProcessedFirst,
                                            TsType::kFirstSymbolRX,
       frame_id)); break;
 
       case (PrintType::kPacketToMac): std::printf(
-            "PhyUE [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
+            "PhyUe [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX,
       frame_id)); break; */
       default:
-        std::printf("PhyUE: Wrong task type in frame done print!\n");
+        std::printf("PhyUe: Wrong task type in frame done print!\n");
     }
   }
 }

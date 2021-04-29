@@ -69,6 +69,7 @@ UeWorker::UeWorker(
 UeWorker::~UeWorker() {
   DftiFreeDescriptor(&mkl_handle_);
   FreeBuffer1d(&rx_samps_tmp_);
+  std::printf("UeWorker[%zu] Terminated\n", tid_);
 }
 
 void UeWorker::Start(size_t core_offset) {
@@ -562,8 +563,9 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
   // For now, call for each channel
   for (size_t ch = 0; ch < config_.NumChannels(); ch++) {
     size_t ant_id = (user_id * config_.NumChannels()) + ch;
-    std::printf("Ifft [Frame %zu, Symbol %zu, User %zu, Channel %zu : %zu]\n",
-                frame_id, symbol_id, user_id, ch, config_.NumChannels());
+
+    // std::printf("Ifft [Frame %zu, Symbol %zu, User %zu, Channel %zu :
+    // %zu]\n", frame_id, symbol_id, user_id, ch, config_.NumChannels());
 
     // TODO Remove this copy
     {
