@@ -1131,3 +1131,104 @@ EXPORT void PhyUeGetDemulData(PhyUe* usr, long long** ptr, int* size) {
   return usr->GetDemulData(ptr, size);
 }
 }
+
+/* Encodes the entire frame for a given user
+ * TODO Remove memory allocations
+ *
+void PhyUe::DoEncode(int tid, size_t tag) {
+  const LDPCconfig& ldpc_config = config_->LdpcConfig();
+  const size_t frame_id = gen_tag_t(tag).frame_id_;
+  const size_t ue_id = gen_tag_t(tag).ue_id_;
+  size_t frame_slot = frame_id % kFrameWnd;
+  auto& cfg = config_;
+
+  if (kDebugPrintInTask || kDebugPrintEncode) {
+    std::printf("User Task[%d]: Encode (frame %zu,       , user %zu)\n", tid,
+                frame_id, ue_id);
+  }
+  size_t start_tsc = GetTime::Rdtsc();
+
+  auto* encoded_buffer_temp =
+      static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
+          Agora_memory::Alignment_t::kAlign64,
+          LdpcEncodingEncodedBufSize(cfg->LdpcConfig().BaseGraph(),
+                                     cfg->LdpcConfig().ExpansionFactor())));
+  auto* parity_buffer = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
+      Agora_memory::Alignment_t::kAlign64,
+      LdpcEncodingParityBufSize(cfg->LdpcConfig().BaseGraph(),
+                                cfg->LdpcConfig().ExpansionFactor())));
+
+  size_t bytes_per_block =
+      kEnableMac ? ((ldpc_config.NumCbLen()) >> 3)
+                 : Roundup<64>(BitsToBytes(ldpc_config.NumCbLen()));
+  size_t encoded_bytes_per_block = (ldpc_config.NumCbCodewLen() + 7) >> 3;
+  auto* input_ptr = new int8_t[bytes_per_block +
+                               kLdpcHelperFunctionInputBufferSizePaddingBytes];
+
+  // Encode each UL Symbol (Data only)
+  for (size_t ul_symbol_id = 0; ul_symbol_id < ul_data_symbol_perframe_;
+       ul_symbol_id++) {
+    size_t total_ul_symbol_id =
+        (frame_slot * ul_data_symbol_perframe_) + ul_symbol_id;
+    // Handle each block
+    for (size_t cb_id = 0; cb_id < config_->LdpcConfig().NumBlocksInSymbol();
+         cb_id++) {
+      if (kEnableMac) {
+        // All cb's per symbol are included in 1 mac packet
+        uint8_t* ul_bits_frame = ul_bits_buffer_[ue_id] +
+                                 frame_slot * config_->MacBytesNumPerframe();
+
+        size_t mac_packet_offset = config_->MacPacketLength() * ul_symbol_id;
+        size_t cb_offset = cb_id * bytes_per_block;
+
+        std::memcpy(input_ptr,
+                    reinterpret_cast<int8_t*>(
+                        &ul_bits_frame[mac_packet_offset + cb_offset]),
+                    bytes_per_block);
+      } else {
+        size_t cb_offset =
+            (ue_id * cfg->LdpcConfig().NumBlocksInSymbol() + cb_id) *
+            bytes_per_block;
+        std::memcpy(
+            input_ptr,
+            &cfg->UlBits()[ul_symbol_id +
+                           config_->Frame().ClientUlPilotSymbols()][cb_offset],
+            bytes_per_block);
+      }
+
+      if (config_->ScrambleEnabled()) {
+        scrambler_->Scramble(input_ptr, bytes_per_block);
+      }
+
+      LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
+                       ldpc_config.NumRows(), encoded_buffer_temp,
+                       parity_buffer, input_ptr);
+
+      size_t cb_coded_bytes = ldpc_config.NumCbCodewLen() / cfg->ModOrderBits();
+      size_t output_offset = (total_ul_symbol_id * config_->OfdmDataNum()) +
+                             (cb_coded_bytes * cb_id);
+
+      AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
+                      &ul_syms_buffer_[ue_id][output_offset],
+                      encoded_bytes_per_block, cfg->ModOrderBits());
+    }
+  }
+
+  std::free(encoded_buffer_temp);
+  std::free(parity_buffer);
+  delete[] input_ptr;
+
+  if ((kDebugPrintPerTaskDone == true) || (kDebugPrintEncode == true)) {
+    size_t enc_duration_stat = GetTime::Rdtsc() - start_tsc;
+    std::printf(
+        "User Task[%d]: Encode (frame %zu,       , user %zu) Duration "
+        "%2.4f "
+        "ms\n",
+        tid, frame_id, ue_id,
+        GetTime::CyclesToMs(enc_duration_stat, GetTime::MeasureRdtscFreq()));
+  }
+
+  RtAssert(complete_queue_.enqueue(*task_ptok_[tid],
+                                   EventData(EventType::kEncode, tag)),
+           "Encoding message enqueue failed");
+} */
