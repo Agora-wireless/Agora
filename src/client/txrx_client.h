@@ -11,9 +11,11 @@
 #include <fstream>
 #include <thread>
 #include <vector>
+#include <cmath>
 
 #include "client_radio.h"
 #include "concurrentqueue.h"
+#include "datatype_conversion.h"
 #include "udp_client.h"
 #include "udp_server.h"
 #include "utils.h"
@@ -137,6 +139,14 @@ class RadioTxRx {
   void* LoopTxRxArgosSync(int tid);
   void* LoopTxRxUsrpSync(int tid);
 
+  /**
+   * @brief test
+   *
+   */
+  void CFOEstimation(const int sync_index, const std::vector<std::complex<float>>& beacon_buff);
+  complex_float* CFOCorrection(bool downlink, complex_float* samples_vec, size_t len);
+  double GetCFO(){ return cfo_; };
+
  private:
   std::mutex mutex_;
   std::condition_variable cond_;
@@ -176,5 +186,8 @@ class RadioTxRx {
   // helper buffers
   std::vector<void*> pilot_buff0_;
   std::vector<void*> pilot_buff1_;
+
+  // CFO
+  double cfo_;
 };
 #endif  // RADIOTXRX_H_

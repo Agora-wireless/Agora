@@ -87,10 +87,13 @@ class Config {
   }
   inline size_t BeaconAnt() const { return this->beacon_ant_; }
   inline size_t BeaconLen() const { return this->beacon_len_; }
+  inline size_t BeaconLongSymReps() const { return this->beacon_longsym_reps_; }
+  inline size_t BeaconLongSymLen() const { return this->beacon_longsym_len_; }
 
   inline bool Beamsweep() const { return this->beamsweep_; }
   inline bool SampleCalEn() const { return this->sample_cal_en_; }
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
+  inline bool CFOCorrectionEn() const { return this->cfo_correction_en_; }
   inline bool ExternalRefNode() const { return this->external_ref_node_; }
   inline std::string Channel() const { return this->channel_; }
 
@@ -228,6 +231,9 @@ class Config {
   };
   inline std::vector<std::complex<int16_t>>& BeaconCi16() {
     return this->beacon_ci16_;
+  };
+  inline complex_float* pilotIfft() {
+    return this->pilot_ifft_;
   };
 
   inline Table<int8_t>& DlBits() { return this->dl_bits_; }
@@ -406,6 +412,7 @@ class Config {
   std::vector<uint32_t> coeffs_;
   std::vector<std::complex<int16_t>> pilot_ci16_;
   std::vector<std::complex<float>> pilot_cf32_;
+  complex_float* pilot_ifft_;
   std::vector<uint32_t> pilot_;
   std::vector<uint32_t> beacon_;
   complex_float* pilots_;
@@ -453,10 +460,13 @@ class Config {
   size_t ref_ant_;
   size_t beacon_ant_;
   size_t beacon_len_;
+  size_t beacon_longsym_reps_;
+  size_t beacon_longsym_len_;
   size_t init_calib_repeat_;
   bool beamsweep_;
   bool sample_cal_en_;
   bool imbalance_cal_en_;
+  bool cfo_correction_en_;
   bool external_ref_node_;
   std::string channel_;
   size_t ant_group_num_;

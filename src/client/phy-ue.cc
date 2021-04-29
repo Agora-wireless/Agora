@@ -694,6 +694,15 @@ void PhyUe::DoFft(int tid, size_t tag) {
   SimdConvertShortToFloat(&pkt->data_[delay_offset], fft_buff,
                           config_->OfdmCaNum() * 2);
 
+  // CFO correction
+  complex_float* corrected_vec;
+  if (config_->CFOCorrectionEn()) {
+      bool is_downlink = true;
+      corrected_vec = ru_->CFOCorrection(
+          is_downlink, (complex_float*)fft_buff, config_->OfdmCaNum());
+  }
+  // OBCH FIXME - TODO check corrected_vec... fft_buffer_??
+
   // perform fft
   DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 

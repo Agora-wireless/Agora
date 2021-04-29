@@ -545,7 +545,29 @@ void* RadioTxRx::LoopTxRxArgosSync(int tid) {
       MLPD_INFO("Client %d: Beacon detected at Time %lld, sync_index: %d\n",
                 radio_id, rx_time, sync_index);
       rx_offset = sync_index - c->BeaconLen() - c->OfdmTxZeroPrefix();
+
+      // Carrier Frequency Offset estimation and correction
+      if (c->CFOCorrectionEn()) {
+        CFOEstimation(sync_index, sync_buff);
+      }
     }
+  }
+
+  // OBCH - FIXME - CFO "pre-distortion" on uplink pilots
+  if (c->CFOCorrectionEn()) {
+      complex_float* corrected_vec;
+      std::vector<std::complex<int16_t>> pilot_ci16_local;
+      pilot_ci16_local.resize(c->SampsPerSymbol(), 0);
+      bool is_downlink = false;
+      corrected_vec = CFOCorrection(is_downlink, c->pilotIfft(), c->OfdmCaNum());
+      CommsLib::Ifft2tx(c->pilotIfft(),
+          (std::complex<int16_t>*)pilot_ci16_local.data(), c->OfdmCaNum(),
+          c->OfdmTxZeroPrefix(), c->CpLen(), c->Scale());
+
+      pilot_buff0_.at(0) = pilot_ci16_local.data();
+      if (c->NumChannels() == 2) {
+          pilot_buff1_.at(1) = pilot_ci16_local.data();
+      }
   }
 
   // Read rx_offset to align with the begining of a frame
@@ -674,4 +696,61 @@ void* RadioTxRx::LoopTxRxArgosSync(int tid) {
     symbol_id = 0;
   }
   return nullptr;
+}
+
+void RadioTxRx::CFOEstimation(const int sync_index, const std::vector<std::complex<float>>& beacon_buff)
+{
+  auto& c = config_;
+
+  // Compute phase error across same-sample index from two consecutive training sequences
+  size_t cfo_start_idx = sync_index - (c->BeaconLongSymLen() * c->BeaconLongSymReps());
+  std::vector<float> phase_vec(c->BeaconLongSymLen(), 0);
+  std::vector<float> phase_uwrap(c->BeaconLongSymLen(), 0);
+
+  for (size_t i = 0; i < c->BeaconLongSymLen(); i++) {
+    std::complex<float> s1 = beacon_buff[cfo_start_idx + i];
+    std::complex<float> s2 = beacon_buff[cfo_start_idx + c->BeaconLongSymLen() + i];
+    std::complex<float> s12 = s1 * std::conj(s2);
+    phase_vec[i] = std::atan2(s12.imag(), s12.real());
+
+    // Unwrap phase
+    if (i == 0) {
+      phase_uwrap[0] = phase_vec[0];
+    } else {
+      float diff = phase_vec[i] - phase_vec[i - 1];
+      if (diff > M_PI)
+          diff = diff - 2 * M_PI;
+      else if (diff < -M_PI)
+          diff = diff + 2 * M_PI;
+
+      phase_uwrap[i] = phase_vec[i - 1] + diff;
+    }
+  }
+
+  float average = accumulate(phase_uwrap.begin(), phase_uwrap.end(), 0.0)
+      / phase_uwrap.size();
+  cfo_ = average / (2 * M_PI); // * c->beacon_longsym_len);
+  // double cfo_est_khz = cfo_ * c->rate * 1e-3;
+  // printf("XXXXX  CFO Estimate2: %f kHz  XXXXX \n", cfo_est_khz);
+}
+
+complex_float* RadioTxRx::CFOCorrection(bool is_downlink, complex_float* samps, size_t len)
+{
+  auto& c = config_;
+  const std::complex<double> i(0.0, 1.0);
+  std::complex<float> samps_cf;
+
+  double cfo = is_downlink ? -1 * cfo_ : cfo_;
+  for (size_t idx = 0; idx < len; idx++) {
+
+    //double tmp = 2 * M_PI * cfo * idx;
+    double tmp = 2 * M_PI * cfo * idx / c->BeaconLongSymLen();
+    std::complex<double> cfo_tmp = exp(tmp * -i);
+    samps_cf = std::complex<float>(samps[idx].re, samps[idx].im)
+        * (std::complex<float>)cfo_tmp;
+
+    samps[idx].re = samps_cf.real();
+    samps[idx].im = samps_cf.imag();
+  }
+  return samps;
 }

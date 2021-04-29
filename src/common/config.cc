@@ -114,6 +114,8 @@ Config::Config(const std::string& jsonfile)
   beamsweep_ = tdd_conf.value("beamsweep", false);
   sample_cal_en_ = tdd_conf.value("sample_calibrate", false);
   imbalance_cal_en_ = tdd_conf.value("imbalance_calibrate", false);
+  cfo_correction_en_ = tdd_conf.value("cfo_correction", false);
+  std::cout << "XXX OBCH XXX: " << cfo_correction_en_ << std::endl;
   init_calib_repeat_ = tdd_conf.value("init_calib_repeat", 1);
 
   modulation_ = tdd_conf.value("modulation", "16QAM");
@@ -167,7 +169,7 @@ Config::Config(const std::string& jsonfile)
              "tx_advance size must be same as the number of clients!");
     cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
   }
-  hw_framer_ = tdd_conf.value("hw_framer", true);
+  hw_framer_ = tdd_conf.value("hw_framer", false);
 
   // If frames not specified explicitly, construct default based on frame_type /
   // symbol_num_perframe / pilot_num / ul_symbol_num_perframe /
@@ -481,6 +483,7 @@ void Config::GenData() {
     }
 
     // Populate gold sequence (two reps, 128 each)
+    // Note: Need a minimum of 2 reps for CFO and other sync/estimation
     int gold_reps = 2;
     for (int i = 0; i < gold_reps; i++) {
       this->beacon_ci16_.insert(this->beacon_ci16_.end(),
@@ -488,6 +491,8 @@ void Config::GenData() {
     }
 
     this->beacon_len_ = this->beacon_ci16_.size();
+    this->beacon_longsym_len_ = gold_ifft_ci16.size();
+    this->beacon_longsym_reps_ = gold_reps;
 
     if (this->samps_per_symbol_ <
         (this->beacon_len_ + this->ofdm_tx_zero_prefix_ +
@@ -510,6 +515,37 @@ void Config::GenData() {
                               pre_beacon.end());
     this->beacon_ci16_.insert(this->beacon_ci16_.end(), post_beacon.begin(),
                               post_beacon.end());
+  } else {
+    std::vector<std::vector<double>> gold_ifft =
+        CommsLib::GetSequence(128, CommsLib::kGoldIfft);
+    std::vector<std::complex<int16_t>> gold_ifft_ci16 =
+        Utils::DoubleToCint16(gold_ifft);
+    for (size_t i = 0; i < 128; i++) {
+      this->gold_cf32_.emplace_back(gold_ifft[0][i], gold_ifft[1][i]);
+    }
+    std::vector<std::vector<double>> sts_seq =
+        CommsLib::GetSequence(0, CommsLib::kStsSeq);
+    std::vector<std::complex<int16_t>> sts_seq_ci16 =
+        Utils::DoubleToCint16(sts_seq);
+
+    // Populate STS (stsReps repetitions)
+    int sts_reps = 15;
+    for (int i = 0; i < sts_reps; i++) {
+      this->beacon_ci16_.insert(this->beacon_ci16_.end(), sts_seq_ci16.begin(),
+                                sts_seq_ci16.end());
+    }
+
+    // Populate gold sequence (two reps, 128 each)
+    // Note: Need a minimum of 2 reps for CFO and other sync/estimation
+    int gold_reps = 2;
+    for (int i = 0; i < gold_reps; i++) {
+      this->beacon_ci16_.insert(this->beacon_ci16_.end(),
+                                gold_ifft_ci16.begin(), gold_ifft_ci16.end());
+    }
+
+    this->beacon_len_ = this->beacon_ci16_.size();
+    this->beacon_longsym_len_ = gold_ifft_ci16.size();
+    this->beacon_longsym_reps_ = gold_reps;    
   }
 
   // Generate common pilots based on Zadoff-Chu sequence for channel estimation
@@ -534,13 +570,13 @@ void Config::GenData() {
                      (float)std::pow(std::abs(this->common_pilot_[i]), 2);
     this->pilots_sgn_[i] = {pilot_sgn.real(), pilot_sgn.imag()};
   }
-  complex_float* pilot_ifft;
-  AllocBuffer1d(&pilot_ifft, this->ofdm_ca_num_,
+  // complex_float* pilot_ifft;
+  AllocBuffer1d(&this->pilot_ifft_, this->ofdm_ca_num_,
                 Agora_memory::Alignment_t::kAlign64, 1);
   for (size_t j = 0; j < ofdm_data_num_; j++) {
-    pilot_ifft[j + this->ofdm_data_start_] = this->pilots_[j];
+    this->pilot_ifft_[j + this->ofdm_data_start_] = this->pilots_[j];
   }
-  CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
+  CommsLib::IFFT(this->pilot_ifft_, this->ofdm_ca_num_, false);
 
   // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
   this->ue_specific_pilot_.Malloc(this->ue_ant_num_, this->ofdm_data_num_,
@@ -814,7 +850,7 @@ void Config::GenData() {
   if (cur_max_val > max_val) {
     max_val = cur_max_val;
   }
-  cur_max_val = CommsLib::FindMaxAbs(pilot_ifft, this->ofdm_ca_num_);
+  cur_max_val = CommsLib::FindMaxAbs(this->pilot_ifft_, this->ofdm_ca_num_);
   if (cur_max_val > max_val) {
     max_val = cur_max_val;
   }
@@ -859,13 +895,13 @@ void Config::GenData() {
   }
 
   this->pilot_ci16_.resize(samps_per_symbol_, 0);
-  CommsLib::Ifft2tx(pilot_ifft,
+  CommsLib::Ifft2tx(this->pilot_ifft_,
                     (std::complex<int16_t>*)this->pilot_ci16_.data(),
                     ofdm_ca_num_, ofdm_tx_zero_prefix_, cp_len_, scale_);
 
   for (size_t i = 0; i < ofdm_ca_num_; i++) {
-    this->pilot_cf32_.emplace_back(pilot_ifft[i].re / scale_,
-                                   pilot_ifft[i].im / scale_);
+    this->pilot_cf32_.emplace_back(this->pilot_ifft_[i].re / scale_,
+                                   this->pilot_ifft_[i].im / scale_);
   }
   this->pilot_cf32_.insert(this->pilot_cf32_.begin(),
                            this->pilot_cf32_.end() - this->cp_len_,
@@ -906,7 +942,7 @@ void Config::GenData() {
   ul_mod_input_.Free();
   ul_encoded_bits_.Free();
   dl_mod_input_.Free();
-  FreeBuffer1d(&pilot_ifft);
+  // FreeBuffer1d(&pilot_ifft);
   delete[] scramble_buffer;
 }
 
@@ -927,6 +963,7 @@ Config::~Config() {
   ul_iq_f_.Free();
   ul_iq_t_.Free();
 
+  FreeBuffer1d(&this->pilot_ifft_);
   ue_specific_pilot_t_.Free();
   ue_specific_pilot_.Free();
 }
