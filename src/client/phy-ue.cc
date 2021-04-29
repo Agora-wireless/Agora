@@ -29,6 +29,8 @@ PhyUe::PhyUe(Config* config)
                           Roundup<64>(config->NumBytesPerCb())) {
   srand(time(nullptr));
 
+  // TODO take into account the UeAntOffset to allow for multiple PhyUe
+  // instances
   this->config_ = config;
   InitializeVarsFromCfg();
 
@@ -183,8 +185,9 @@ void PhyUe::ScheduleWork(EventData do_task) {
 }
 
 void PhyUe::ReceiveDownlinkSymbol(struct Packet* rx_packet, size_t tag) {
-  size_t frame_slot = rx_packet->frame_id_ % kFrameWnd;
-  size_t dl_symbol_idx = config_->Frame().GetDLSymbolIdx(rx_packet->symbol_id_);
+  const size_t frame_slot = rx_packet->frame_id_ % kFrameWnd;
+  const size_t dl_symbol_idx =
+      config_->Frame().GetDLSymbolIdx(rx_packet->symbol_id_);
 
   // if symbol is a pilot or we are finished with all pilot ffts for the given
   // frame
@@ -201,7 +204,7 @@ void PhyUe::ReceiveDownlinkSymbol(struct Packet* rx_packet, size_t tag) {
 }
 
 void PhyUe::ScheduleDefferedDownlinkSymbols(size_t frame_id) {
-  size_t frame_slot = frame_id % kFrameWnd;
+  const size_t frame_slot = frame_id % kFrameWnd;
   // Complete the csi offset
   size_t csi_offset = frame_slot * config_->UeAntNum();
 
@@ -224,7 +227,7 @@ void PhyUe::ScheduleDefferedDownlinkSymbols(size_t frame_id) {
 }
 
 void PhyUe::ClearCsi(size_t frame_id) {
-  size_t frame_slot = frame_id % kFrameWnd;
+  const size_t frame_slot = frame_id % kFrameWnd;
 
   if (config_->Frame().ClientDlPilotSymbols() > 0) {
     size_t csi_offset = frame_slot * config_->UeAntNum();
@@ -262,9 +265,6 @@ void PhyUe::Start() {
 
   // for task_queue, main thread is producer, it is single-producer &
   // multiple consumer for task queue uplink
-
-  // TODO: make the producertokens global and try
-  // "try_dequeue_from_producer(token,item)"
   moodycamel::ProducerToken ptok_mac(to_mac_queue_);
 
   // for message_queue, main thread is a consumer, it is multiple
@@ -288,9 +288,6 @@ void PhyUe::Start() {
                                            kDequeueBulkSizeTXRX);
     total_count++;
     if (total_count == 1e7) {
-      // print the complete_queue_ miss rate is needed
-      // std::printf("message dequeue miss rate %f\n", (float)miss_count /
-      // total_count);
       total_count = 0;
       miss_count = 0;
     }
@@ -321,8 +318,6 @@ void PhyUe::Start() {
                    "slowly, e.g., in debug mode");
 
           PrintPerTaskDone(PrintType::kPacketRX, frame_id, symbol_id, ant_id);
-          // TODO: Defer the scheduling
-          // Receive first packet in a frame
 
           if (rx_counters_.num_pkts_.at(frame_slot) == 0) {
             this->stats_->MasterSetTsc(TsType::kFirstSymbolRX, frame_id);
@@ -513,8 +508,8 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kPacketToMac: {
-          size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
 
           if (kDebugPrintPacketsToMac) {
             std::printf(
@@ -523,7 +518,7 @@ void PhyUe::Start() {
                 frame_id, symbol_id);
           }
 
-          bool finished =
+          const bool finished =
               FrameComplete(frame_id, FrameTasksFlags::kMacTxComplete);
           if (finished == true) {
             if ((cur_frame_id + 1) >= config_->FramesToTest()) {
