@@ -18,16 +18,11 @@
 #include "config.h"
 #include "datatype_conversion.h"
 #include "mac_thread.h"
-#include "mkl_dfti.h"
 #include "modulation.h"
-#include "scrambler.h"
+#include "phy_stats.h"
 #include "stats.h"
 #include "txrx_client.h"
-
-static const size_t kVectorAlignment = 64;
-
-using myVec = std::vector<complex_float, boost::alignment::aligned_allocator<
-                                             complex_float, kVectorAlignment>>;
+#include "ue_worker.h"
 
 class PhyUe {
  public:
@@ -63,8 +58,10 @@ class PhyUe {
   void ReceiveDownlinkSymbol(struct Packet* rx_packet, size_t tag);
   void ScheduleDefferedDownlinkSymbols(size_t frame_id);
   void ClearCsi(size_t frame_id);
+
   std::vector<std::queue<EventData>> rx_downlink_deferral_;
   std::unique_ptr<Stats> stats_;
+  std::unique_ptr<PhyStats> phy_stats_;
   RxCounters rx_counters_;
 
   /*****************************************************
@@ -72,81 +69,10 @@ class PhyUe {
    *****************************************************/
   void InitializeDownlinkBuffers();
 
-  /**
-   * modulate data from nUEs and does spatial multiplexing by applying
-   * beamweights
-   */
-  void DoEncode(int /*tid*/, size_t /*tag*/);
-  void DoModul(int /*tid*/, size_t /*tag*/);
-  void DoIfft(int /*tid*/, size_t /*tag*/);
-
   /*****************************************************
    * Uplink
    *****************************************************/
   void InitializeUplinkBuffers();
-
-  /**
-   * Do FFT task for one OFDM symbol
-   * @param tid: task thread index, used for selecting muplans and task ptok
-   * @param offset: offset of the OFDM symbol in rx_buffer_
-   * Buffers: rx_buffer_, fft_buffer_, csi_buffer_, ul_data_buffer_
-   *     Input buffer: rx_buffer_
-   *     Output buffer: csi_buffer_ if symbol is pilot
-   *                    ul_data_buffer_ if symbol is data
-   *     Intermediate buffer: fft_buffer_ (FFT_inputs, FFT_outputs)
-   * Offsets:
-   *     rx_buffer_:
-   *         dim1: socket thread index: (offset / # of OFDM symbols per
-   * thread) dim2: OFDM symbol index in this socket thread (offset - # of
-   * symbols in previous threads) FFT_inputs, FFT_outputs: dim1: frame index
-   * * # of OFDM symbols per frame + symbol index * # of atennas + antenna
-   * index dim2: subcarrier index csi_buffer_: dim1: frame index * FFT size +
-   * subcarrier index in the current frame dim2: user index * # of antennas +
-   * antenna index ul_data_buffer_: dim1: frame index * # of data symbols
-   * per frame + data symbol index dim2: transpose block index * block size
-   * * # of antennas + antenna index * block size Event offset: frame index *
-   * # of symbol per frame + symbol index Description:
-   *     1. copy received data (one OFDM symbol) from rx_buffer to
-   * fft_buffer_.FFT_inputs (remove CP)
-   *     2. perform FFT on fft_buffer_.FFT_inputs and store results in
-   * fft_buffer_.FFT_outputs
-   *     3. if symbol is pilot, do channel estimation from
-   * fft_buffer_.FFT_outputs to csi_buffer_ if symbol is data, copy data
-   * from fft_buffer_.FFT_outputs to ul_data_buffer_ and do block transpose
-   *     4. add an event to the message queue to infrom main thread the
-   * completion of this task
-   */
-  void DoFftPilot(int /*tid*/, size_t /*tag*/);
-  void DoFftData(int /*tid*/, size_t /*tag*/);
-
-  /**
-   * Do demodulation task for a block of subcarriers (demul_block_size)
-   * @param tid: task thread index, used for selecting spm_buffer and task
-   * ptok
-   * @param offset: offset of the first subcarrier in the block in
-   * ul_data_buffer_ Buffers: ul_data_buffer_, spm_buffer_, precoder_buffer_,
-   * equal_buffer_, demul_buffer_ Input buffer: ul_data_buffer_,
-   * precoder_buffer_ Output buffer: demul_buffer_ Intermediate buffer:
-   * spm_buffer, equal_buffer_ Off#include <tuple>sets:
-   * ul_data_buDownlinkCffer_: dim1: frame index * # of data symbols per frame
-   * + data symbol index dim2: transpose block index * block size * # of
-   * antennas
-   * + antenna index * block size spm_buffer: dim1: task thread index dim2:
-   * antenna index precoder_buffer_: dim1: frame index * FFT size + subcarrier
-   * index in the current frame equal_buffer_, demul_buffer: dim1: frame index
-   * * # of data symbols per frame + data symbol index dim2: subcarrier index
-   * * # of users Event offset: offset Description:
-   *     1. for each subcarrier in the block, block-wisely copy data from
-   * ul_data_buffer_ to spm_buffer_
-   *     2. perform equalization with data and percoder matrixes
-   *     3. perform demodulation on equalized data matrix
-   *     4. add an event to the message queue to infrom main thread the
-   * completion of this task
-   */
-  void DoDemul(int /*tid*/, size_t /*tag*/);
-  void DoDecode(int /*tid*/, size_t /*tag*/);
-
-  void TaskThread(int tid);
 
   /* Add tasks into task queue based on event type */
   void ScheduleTask(EventData do_task,
@@ -211,7 +137,6 @@ class PhyUe {
    * Second dimension: OFDM_CA_NUM
    */
   Table<complex_float> ifft_buffer_;
-  DFTI_DESCRIPTOR_HANDLE mkl_handle_;
 
   /**
    * Data before modulation
@@ -222,7 +147,7 @@ class PhyUe {
   Table<uint8_t> ul_bits_buffer_status_;
   size_t ul_bits_buffer_size_;
 
-  Table<uint8_t> ul_syms_buffer_;
+  Table<int8_t> ul_syms_buffer_;
   size_t ul_syms_buffer_size_;
   /**
    * Data after modulation
@@ -269,29 +194,15 @@ class PhyUe {
    */
   std::vector<myVec> equal_buffer_;
 
-  /**
-   * Data symbols after IFFT
-   * First dimension: total symbol number in the buffer:
-   * data_symbol_num_perframe * kFrameWnd second dimension:
-   * BS_ANT_NUM * OFDM_CA_NUM second dimension data order: SC1-32 of ants,
-   * SC33-64 of ants, ..., SC993-1024 of ants (32 blocks each with 32
-   * subcarriers)
-   */
-  Table<int8_t> dl_demod_buffer_;
+  // Data after demodulation. Each buffer has kMaxModType * number of OFDM
+  // data subcarriers
+  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffer_;
 
-  std::vector<std::vector<uint8_t>> dl_decode_buffer_;
-  std::complex<float>* rx_samps_tmp_;  // Temp buffer for received samples
+  // Data after LDPC decoding. Each buffer [decoded bytes per UE] bytes.
+  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> decoded_buffer_;
 
-  int16_t* resp_var_nodes_;
-  std::vector<std::complex<float>> pilot_sc_val_;
   std::vector<size_t> non_null_sc_ind_;
   std::vector<std::vector<std::complex<float>>> ue_pilot_vec_;
-  Table<size_t> decoded_bits_count_;
-  Table<size_t> bit_error_count_;
-  Table<size_t> decoded_blocks_count_;
-  Table<size_t> block_error_count_;
-  std::vector<size_t> decoded_symbol_count_;
-  std::vector<size_t> symbol_error_count_;
 
   // Communication queues
   moodycamel::ConcurrentQueue<EventData> complete_queue_;
@@ -300,13 +211,13 @@ class PhyUe {
   moodycamel::ConcurrentQueue<EventData> tx_queue_;
   moodycamel::ConcurrentQueue<EventData> to_mac_queue_;
 
-  std::array<std::thread, kMaxThreads> task_threads_;
+  // std::vector<std::thread> worker_threads_;
+  std::vector<std::unique_ptr<UeWorker>> workers_;
 
   moodycamel::ProducerToken* rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* tx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* mac_rx_ptoks_ptr_[kMaxThreads];
   moodycamel::ProducerToken* mac_tx_ptoks_ptr_[kMaxThreads];
-  moodycamel::ProducerToken* task_ptok_[kMaxThreads];
 
   // all checkers
   FrameCounters tx_counters_;
@@ -320,7 +231,6 @@ class PhyUe {
   FrameCounters modulation_counters_;
   FrameCounters ifft_counters_;
 
-  std::unique_ptr<AgoraScrambler::Scrambler> scrambler_;
   size_t max_equaled_frame_ = 0;
 };
 #endif  // PHY_UE_H_

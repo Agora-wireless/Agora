@@ -342,8 +342,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                   csi_matrices[this->cfg_->OfdmDataStart()][j].re,
                   csi_matrices[this->cfg_->OfdmDataStart()][j].im);
     }
-    std::printf("\n");
-    std::printf("precoder \n");
+    std::printf("\nprecoder \n");
     // for (size_t i = 0; i < this->cfg_->ofdm_ca_num(); i++)
     for (size_t j = 0; j < this->cfg_->UeAntNum() * this->cfg_->BsAntNum();
          j++) {
@@ -362,18 +361,16 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     for (size_t j = 0; j < this->cfg_->UeAntNum(); j++) {
       if ((i >= this->cfg_->Frame().ClientDlPilotSymbols())) {
         for (size_t sc_id = 0; sc_id < this->cfg_->OfdmDataNum(); sc_id++) {
+          complex_float sc_data;
+          if ((i < this->cfg_->Frame().ClientDlPilotSymbols()) ||
+              (sc_id % this->cfg_->OfdmPilotSpacing() == 0)) {
+            sc_data = ue_specific_pilot[j][sc_id];
+          } else {
+            sc_data = dl_modulated_codewords.at(i * this->cfg_->UeAntNum() + j)
+                          .at(sc_id);
+          }
           dl_mod_data[i][j * this->cfg_->OfdmCaNum() + sc_id +
-                         this->cfg_->OfdmDataStart()] =
-              (sc_id % this->cfg_->OfdmPilotSpacing() == 0)
-                  ? ue_specific_pilot[0][sc_id]  // TODO FIX ME
-                  : dl_modulated_codewords.at(i * this->cfg_->UeAntNum() + j)
-                        .at(sc_id);
-        }
-      } else {
-        for (size_t sc_id = 0; sc_id < this->cfg_->OfdmDataNum(); sc_id++) {
-          dl_mod_data[i][j * this->cfg_->OfdmCaNum() + sc_id +
-                         this->cfg_->OfdmDataStart()] =
-              ue_specific_pilot[0][sc_id];  // TODO FIX ME
+                         this->cfg_->OfdmDataStart()] = sc_data;
         }
       }
     }
@@ -407,6 +404,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   dl_tx_data.Calloc(this->cfg_->Frame().NumDLSyms(),
                     2 * this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum(),
                     Agora_memory::Alignment_t::kAlign64);
+
   for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
     arma::cx_fmat mat_input_data(
         reinterpret_cast<arma::cx_float*>(dl_mod_data[i]),
