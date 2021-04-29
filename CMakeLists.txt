@@ -255,6 +255,7 @@ set(CLIENT_SOURCES
   src/client/doifft_client.cc
   src/client/dodecode_client.cc
   src/client/client_radio.cc
+  src/client/ue_worker.cc
   src/client/phy-ue.cc
   src/client/txrx_client.cc
   src/mac/mac_thread.cc)
