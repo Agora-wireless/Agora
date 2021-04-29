@@ -487,10 +487,6 @@ void UeWorker::DoEncodeUe(DoEncode* encoder, size_t tag) {
   for (size_t cb_id = 0; cb_id < config_.LdpcConfig().NumBlocksInSymbol();
        cb_id++) {
     // For now, call for each cb
-    // std::printf(
-    //    "Encoding [Frame %zu, Symbol %zu, User %zu, Code Block %zu : %zu]\n",
-    //    frame_id, symbol_id, user_id, cb_id,
-    //    config_.LdpcConfig().NumBlocksInSymbol());
     encoder->Launch(
         gen_tag_t::FrmSymCb(
             frame_id, symbol_id,
@@ -535,6 +531,7 @@ void UeWorker::DoModul(size_t tag) {
     auto* ul_bits = config_.GetEncodedBuf(encoded_buffer_, frame_id,
                                           ul_symbol_idx, ant_id, 0);
 
+    // TODO place directly into the correct location of the fft buffer
     for (size_t sc = 0; sc < config_.OfdmDataNum(); sc++) {
       modul_buf[sc] =
           ModSingleUint8(static_cast<uint8_t>(ul_bits[sc]), config_.ModTable());
@@ -563,9 +560,6 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
   // For now, call for each channel
   for (size_t ch = 0; ch < config_.NumChannels(); ch++) {
     size_t ant_id = (user_id * config_.NumChannels()) + ch;
-
-    // std::printf("Ifft [Frame %zu, Symbol %zu, User %zu, Channel %zu :
-    // %zu]\n", frame_id, symbol_id, user_id, ch, config_.NumChannels());
 
     // TODO Remove this copy
     {

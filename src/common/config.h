@@ -45,8 +45,10 @@ class Config {
   inline bool IsUe() const { return this->is_ue_; }
   inline size_t BfAntNum() const { return this->bf_ant_num_; }
   inline size_t UeNum() const { return this->ue_num_; }
-
   inline size_t UeAntNum() const { return this->ue_ant_num_; }
+  inline size_t UeAntOffset() const { return this->ue_ant_offset_; }
+  inline size_t UeAntTotal() const { return this->ue_ant_total_; }
+
   inline size_t OfdmCaNum() const { return this->ofdm_ca_num_; }
   inline size_t CpLen() const { return this->cp_len_; }
   inline size_t OfdmDataNum() const { return this->ofdm_data_num_; }
@@ -365,8 +367,18 @@ class Config {
 
   size_t bs_ant_num_;  // Total number of BS antennas
   size_t bf_ant_num_;  // Number of antennas used in beamforming
+
+  // The count of ues an instance is responsable for
   size_t ue_num_;
+  // The count of ue antennas an instance is responsable for
   size_t ue_ant_num_;
+
+  // Total number of us antennas in this experiment including the ones
+  // instantiated on other runs/machines.
+  size_t ue_ant_total_;
+  // The offset into the number total ue antennas this instantiation is
+  // responsible for.
+  size_t ue_ant_offset_;
 
   // The total number of OFDM subcarriers, which is a power of two
   size_t ofdm_ca_num_;
@@ -532,12 +544,7 @@ class Config {
   size_t packet_length_;
 
   std::vector<int> cl_tx_advance_;
-  // Indicates all UEs that are in this experiment,
-  // including the ones instantiated on other runs/machines.
-  size_t total_ue_ant_num_;
-  // Indicates the (pilot) offset of the UEs in this instance,
-  // with respect to all UEs used in the same experiment
-  size_t ue_ant_offset_;
+
   float scale_;  // Scaling factor for all transmit symbols
 
   bool bigstation_mode_;      // If true, use pipeline-parallel scheduling
