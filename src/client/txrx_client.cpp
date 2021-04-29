@@ -541,10 +541,11 @@ void* RadioTXRX::loop_tx_rx_argos_sync(int tid)
 
     // CFO "pre-distortion" on uplink pilots
     if (c->cfoCorrectionEn) {
+        complex_float* corrected_vec;
         std::vector<std::complex<int16_t>> pilot_ci16_local;
         pilot_ci16_local.resize(c->sampsPerSymbol, 0);
         bool is_downlink = false;
-        cfo_correction(is_downlink, c->pilot_ifft, c->OFDM_CA_NUM);
+        corrected_vec = cfo_correction(is_downlink, c->pilot_ifft, c->OFDM_CA_NUM);
         CommsLib::ifft2tx(c->pilot_ifft,
             (std::complex<int16_t>*)pilot_ci16_local.data(), c->OFDM_CA_NUM,
             c->ofdm_tx_zero_prefix_, c->CP_LEN, c->scale);
