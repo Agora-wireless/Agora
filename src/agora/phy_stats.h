@@ -47,7 +47,8 @@ class PhyStats {
   Table<float> evm_buffer_;
   Table<float> pilot_snr_;
 
-  arma::cx_fmat ul_gt_mat_;
+  arma::cx_fmat gt_mat_;
+  size_t num_rx_symbols_;
 };
 
 #endif  // PHY_STATS_H_
