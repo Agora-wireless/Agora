@@ -4,6 +4,7 @@
 #include "Symbols.hpp"
 #include <stdint.h>
 #include <time.h>
+#include <sys/time.h>
 
 // Get current time in microseconds
 static inline double get_time_us(void)
@@ -24,6 +25,14 @@ static inline size_t rdtsc()
     uint64_t rdx;
     asm volatile("rdtsc" : "=a"(rax), "=d"(rdx));
     return static_cast<size_t>((rdx << 32) | rax);
+}
+
+/// Return the system timestamp
+static inline size_t get_ns()
+{
+    struct timeval current_time;
+    gettimeofday(&current_time, NULL);
+    return current_time.tv_sec * 1000000000L + current_time.tv_usec;
 }
 
 /// Return the TSC or zero, depending on whether timing of workers is

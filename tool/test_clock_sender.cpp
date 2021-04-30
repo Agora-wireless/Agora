@@ -28,13 +28,13 @@ int main(int argc, char **argv)
     int ret = rte_eth_macaddr_get(0, &src_mac_addr);
     rt_assert(ret == 0, "Cannot get MAC address of the port");
 
-    ether_addr* parsed_mac = ether_aton("0c:42:a1:50:c7:ee");
+    ether_addr* parsed_mac = ether_aton("0c:42:a1:50:c8:06");
     rt_assert(parsed_mac != NULL, "Invalid server mac address");
     memcpy(&dst_mac_addr, parsed_mac, sizeof(ether_addr));
 
     ret = inet_pton(AF_INET, "192.168.21.181", &src_ip);
     rt_assert(ret == 1, "Invalid src IP address");
-    ret = inet_pton(AF_INET, "192.168.21.182", &dst_ip);
+    ret = inet_pton(AF_INET, "192.168.21.184", &dst_ip);
     rt_assert(ret == 1, "Invalid dst IP address");
 
     src_port = dst_port = 12000;

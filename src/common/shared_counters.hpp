@@ -27,8 +27,10 @@ public:
         , test_mode_(cfg->test_mode)
     {
         frame_start_time_ = new uint64_t[cfg->frames_to_test];
+        frame_iq_time_ = new uint64_t[cfg->frames_to_test];
         frame_end_time_ = new uint64_t[cfg->frames_to_test];
         memset(frame_start_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+        memset(frame_iq_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
         memset(frame_end_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
     }
 
@@ -47,7 +49,7 @@ public:
         }
 
         if (unlikely(frame_start_time_[pkt->frame_id] == 0)) {
-            frame_start_time_[pkt->frame_id] = rdtsc();
+            frame_start_time_[pkt->frame_id] = get_ns();
         }
 
         const size_t frame_slot = pkt->frame_id % kFrameWnd;
@@ -62,6 +64,7 @@ public:
                 pkt->frame_id, num_pilot_pkts_[frame_slot].load(),
                 num_pilot_pkts_per_frame_);
             full = true;
+            frame_iq_time_[pkt->frame_id] = get_ns();
         }
 
         if (pkt->symbol_id < num_pilot_symbols_per_frame_) {
@@ -144,7 +147,7 @@ public:
         if (unlikely(cont)) {
             cur_frame_mutex_.lock();
             while (num_decode_tasks_completed_[cur_frame_ % kFrameWnd] == num_decode_tasks_per_frame_) {
-                frame_end_time_[cur_frame_] = rdtsc();
+                frame_end_time_[cur_frame_] = get_ns();
                 cur_frame_ ++;
                 encode_ready_[(cur_frame_ - 1) % kFrameWnd] = false;
                 size_t cur_cycle = worker_rdtsc();
@@ -226,6 +229,7 @@ public:
 
     // Latency measurement counters for each frame
     uint64_t *frame_start_time_;
+    uint64_t *frame_iq_time_;
     uint64_t *frame_end_time_;
 
     // The timestamp when last frame was processed (in cycles)
@@ -260,6 +264,8 @@ public:
             }
         }
         max_frame_ = 0;
+        frame_sc_time_ = new uint64_t[cfg->frames_to_test];
+        memset(frame_sc_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
     }
 
     // Mark [num_tasks] demodulation tasks for this frame and symbol as complete
@@ -287,8 +293,14 @@ public:
         if (frame_id > max_frame_) {
             return false;
         }
-        return num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
-            == num_demul_tasks_required_;
+        // return num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
+        //     == num_demul_tasks_required_;
+        if (num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
+            == num_demul_tasks_required_) {
+            frame_sc_time_[frame_id] = get_ns();
+            return true;
+        } 
+        return false;
     }
 
     // num_demul_tasks_completed[i % kFrameWnd][j] is
@@ -299,6 +311,8 @@ public:
 
     // Number of subcarriers required to demodulate for each symbol
     const size_t num_demul_tasks_required_;
+
+    uint64_t *frame_sc_time_;
 
     size_t max_frame_;
     std::mutex max_frame_mutex_;
@@ -326,6 +340,9 @@ public:
                 // num_demod_data_received_[i][j].fill(0);
             }
         }
+
+        frame_decode_time_ = new uint64_t[cfg->frames_to_test]; 
+        memset(frame_decode_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
     }
 
     void receive_demod_data(size_t ue_id, size_t frame_id, size_t symbol_id_ul)
@@ -344,16 +361,21 @@ public:
                                     [frame_id % kFrameWnd][symbol_id_ul]
                 = 0;
             // printf("Received all demod data for user %lu frame %lu symbol %lu\n", ue_id, frame_id, symbol_id_ul);
+            if (symbol_id_ul == 0) {
+                frame_decode_time_[frame_id] = get_ns();
+            }
             return true;
         }
         return false;
     }
 
-private:
+// private:
     Config* cfg_;
     // size_t* cur_frame_;
     // size_t* cur_symbol_ul_; // symbol ID for UL data
     const size_t num_demod_data_required_;
+
+    uint64_t *frame_decode_time_;
 
     std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>*
         num_demod_data_received_;
