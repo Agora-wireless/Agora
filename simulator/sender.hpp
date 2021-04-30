@@ -81,6 +81,7 @@ private:
     void* master_thread(int tid);
     void* worker_thread(int tid);
     void* worker_thread_auto(int tid);
+    size_t get_sync_tsc(int tid);
 
     /**
      * @brief Read time-domain 32-bit floating-point IQ samples from [filename]
@@ -152,6 +153,10 @@ private:
 
     std::thread master_threads_[kMaxMasterNum];
     std::thread worker_threads_[kMaxWorkerNum];
+
+    int num_invoked_threads_ = 0;
+    size_t start_sync_tsc_ = 0;
+    std::mutex start_tsc_mutex_;
 
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pools_[kMaxWorkerNum];

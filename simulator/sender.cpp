@@ -35,9 +35,9 @@ Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_thread
     , frame_duration_(frame_duration)
     , ticks_all(frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_wnd_1(
-          200000 /* 200 ms */ * ticks_per_usec / cfg->symbol_num_perframe)
+          4 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_wnd_2(
-          15 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
+          2 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
 {
     printf("Initializing sender, sending to base station server at %s, frame "
            "duration = %.2f ms, slow start = %s\n",
@@ -125,6 +125,20 @@ void Sender::join_thread() {
     }
 }
 
+size_t Sender::get_sync_tsc(int tid) {
+    start_tsc_mutex_.lock();
+    num_invoked_threads_ ++;
+    if (num_invoked_threads_ == num_worker_threads_) {
+        start_sync_tsc_ = rdtsc();
+    }
+    start_tsc_mutex_.unlock();
+    while (likely(num_invoked_threads_ != num_worker_threads_)) {
+        usleep(1);
+        // printf("Wait thread %u: %d %d\n", tid, num_invoked_threads_, num_worker_threads_);
+    }
+    return start_sync_tsc_;
+}
+
 void* Sender::worker_thread(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerTX, core_offset, tid);
@@ -182,7 +196,8 @@ void* Sender::worker_thread(int tid)
 
     double start_time = get_time();
 
-    size_t start_tsc_send = rdtsc();
+    // size_t start_tsc_send = rdtsc();
+    size_t start_tsc_send = get_sync_tsc(tid);
 
     size_t loop_counter[10001] = {};
 
@@ -195,7 +210,7 @@ void* Sender::worker_thread(int tid)
         for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
             tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pools_[tid], sender_mac_addr,
                 server_mac_addr_list[i], bs_rru_addr, bs_server_addr_list[i],
-                cfg->bs_rru_port + tid, cfg->bs_server_port + tid,
+                cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
                 Packet::kOffsetOfData + cfg->get_num_sc_per_server() * sizeof(unsigned short) * 2);
         }
 
@@ -237,17 +252,26 @@ void* Sender::worker_thread(int tid)
                 // delay_ticks(start_tsc_send, cur_frame * max_symbol_id * ticks_all);
                 printf("Thread %u send frame %u in %.1f ms\n", tid, cur_frame - 1, (get_time() - start_time) / 1000.0f);
 
-                if (tid == 0) {
-                    rte_eth_stats stats;
-                    rte_eth_stats_get(0, &stats);
-                    printf("Traffic rate is %lf, packet rate is %lf\n", (double)(stats.obytes - tx_stats.obytes) * 8 / ((get_time() - start_time) * 1000.0f),
-                        (double)(stats.opackets - tx_stats.opackets) / ((get_time() - start_time)));
-                    memcpy(&tx_stats, &stats, sizeof(rte_eth_stats));
-                }
+                // if (tid == 0) {
+                //     rte_eth_stats stats;
+                //     rte_eth_stats_get(0, &stats);
+                //     printf("Traffic rate is %lf, packet rate is %lf\n", (double)(stats.obytes - tx_stats.obytes) * 8 / ((get_time() - start_time) * 1000.0f),
+                //         (double)(stats.opackets - tx_stats.opackets) / ((get_time() - start_time)));
+                //     memcpy(&tx_stats, &stats, sizeof(rte_eth_stats));
+                // }
 
                 start_time = get_time();
             }
-            delay_ticks(start_tsc_send, (cur_frame * max_symbol_id + cur_symbol) * ticks_all);
+            if (cur_frame < 80) {
+                delay_ticks(start_tsc_send, (cur_frame * max_symbol_id + cur_symbol) * ticks_wnd_1);
+            } else if (cur_frame < 200) {
+                delay_ticks(start_tsc_send, (80 * max_symbol_id * ticks_wnd_1) + 
+                    ((cur_frame - 80) * max_symbol_id + cur_symbol) * ticks_wnd_2);
+            } else {
+                delay_ticks(start_tsc_send, (80 * max_symbol_id * ticks_wnd_1) +
+                    (120 * max_symbol_id * ticks_wnd_2) +
+                    ((cur_frame - 200) * max_symbol_id + cur_symbol) * ticks_all);
+            }
         }
     }
     // printf("Thread %u: Print loop counters:\n", tid);
