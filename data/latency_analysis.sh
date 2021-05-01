@@ -29,19 +29,19 @@ do
         t3=$(sed "${i}q;d" $DIR/frame_latency_$j.txt | awk '{ print $4 }')
         t4=$(sed "${i}q;d" $DIR/frame_latency_$j.txt | awk '{ print $5 }')
         t5=$(sed "${i}q;d" $DIR/frame_latency_$j.txt | awk '{ print $6 }')
-        if [ "$min_t1" -gt "$t1" ]; then
+        if (( $(echo "$min_t1 > $t1" | bc -l) )); then
             min_t1=$t1
         fi
-        if [ "$max_t2" -lt "$t2" ]; then
+        if (( $(echo "$max_t2 < $t2" | bc -l) )); then
             max_t2=$t2
         fi
-        if [ "$max_t3" -lt "$t3" ]; then
+        if (( $(echo "$max_t3 < $t3" | bc -l) )); then
             max_t3=$t3
         fi
-        if [ "$min_t4" -gt "$t4" ]; then
+        if (( $(echo "$min_t4 > $t4" | bc -l) )); then
             min_t4=$t4
         fi
-        if [ "$max_t5" -lt "$t5" ]; then
+        if (( $(echo "$max_t5 < $t5" | bc -l) )); then
             max_t5=$t5
         fi
     done
