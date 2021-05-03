@@ -7,33 +7,46 @@
 #include <cmath>
 
 PhyStats::PhyStats(Config* const cfg) : config_(cfg) {
-  const size_t task_buffer_symbol_num_ul = cfg->Frame().NumULSyms() * kFrameWnd;
-  decoded_bits_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
+  if (config_->IsUe() == true) {
+    num_rx_symbols_ = cfg->Frame().NumDLSyms();
+  } else {
+    num_rx_symbols_ = cfg->Frame().NumULSyms();
+  }
+  const size_t task_buffer_symbol_num = num_rx_symbols_ * kFrameWnd;
+
+  decoded_bits_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
                              Agora_memory::Alignment_t::kAlign64);
-  bit_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
+  bit_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
                           Agora_memory::Alignment_t::kAlign64);
 
-  decoded_blocks_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
+  decoded_blocks_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
                                Agora_memory::Alignment_t::kAlign64);
-  block_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
+  block_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
                             Agora_memory::Alignment_t::kAlign64);
 
-  uncoded_bits_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
+  uncoded_bits_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
                              Agora_memory::Alignment_t::kAlign64);
-  uncoded_bit_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num_ul,
+  uncoded_bit_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
                                   Agora_memory::Alignment_t::kAlign64);
 
   evm_buffer_.Calloc(kFrameWnd, cfg->UeAntNum(),
                      Agora_memory::Alignment_t::kAlign64);
 
-  if (cfg->Frame().NumULSyms() > 0) {
-    auto* ul_iq_f_ptr = reinterpret_cast<arma::cx_float*>(
-        cfg->UlIqF()[cfg->Frame().ClientUlPilotSymbols()]);
-    arma::cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(),
-                              false);
-    ul_gt_mat_ = ul_iq_f_mat.st();
-    ul_gt_mat_ =
-        ul_gt_mat_.cols(cfg->OfdmDataStart(), (cfg->OfdmDataStop() - 1));
+  if (num_rx_symbols_ > 0) {
+    if (config_->IsUe() == true) {
+      auto* dl_iq_f_ptr = reinterpret_cast<arma::cx_float*>(
+          cfg->DlIqF()[cfg->Frame().ClientDlPilotSymbols()]);
+      arma::cx_fmat dl_iq_f_mat(dl_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(),
+                                false);
+      gt_mat_ = dl_iq_f_mat.st();
+    } else {
+      auto* ul_iq_f_ptr = reinterpret_cast<arma::cx_float*>(
+          cfg->UlIqF()[cfg->Frame().ClientUlPilotSymbols()]);
+      arma::cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(),
+                                false);
+      gt_mat_ = ul_iq_f_mat.st();
+    }
+    gt_mat_ = gt_mat_.cols(cfg->OfdmDataStart(), (cfg->OfdmDataStop() - 1));
   }
   pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum(),
                     Agora_memory::Alignment_t::kAlign64);
@@ -54,24 +67,29 @@ PhyStats::~PhyStats() {
 }
 
 void PhyStats::PrintPhyStats() {
-  const size_t task_buffer_symbol_num_ul =
-      this->config_->Frame().NumULSyms() * kFrameWnd;
+  const size_t task_buffer_symbol_num = num_rx_symbols_ * kFrameWnd;
+  std::string tx_type;
+  if (config_->IsUe()) {
+    tx_type = "Downlink";
+  } else {
+    tx_type = "Uplink";
+  }
 
-  if (this->config_->Frame().NumULSyms() > 0) {
+  if (num_rx_symbols_ > 0) {
     for (size_t ue_id = 0; ue_id < this->config_->UeNum(); ue_id++) {
       size_t total_decoded_bits(0);
       size_t total_bit_errors(0);
       size_t total_decoded_blocks(0);
       size_t total_block_errors(0);
 
-      for (size_t i = 0u; i < task_buffer_symbol_num_ul; i++) {
+      for (size_t i = 0u; i < task_buffer_symbol_num; i++) {
         total_decoded_bits += decoded_bits_count_[ue_id][i];
         total_bit_errors += bit_error_count_[ue_id][i];
         total_decoded_blocks += decoded_blocks_count_[ue_id][i];
         total_block_errors += block_error_count_[ue_id][i];
       }
-      std::cout << "UE " << ue_id << ": bit errors (BER) " << total_bit_errors
-                << "/" << total_decoded_bits << "("
+      std::cout << "UE " << ue_id << ": " << tx_type << " bit errors (BER) "
+                << total_bit_errors << "/" << total_decoded_bits << "("
                 << 1.0 * total_bit_errors / total_decoded_bits
                 << "), block errors (BLER) " << total_block_errors << "/"
                 << total_decoded_blocks << " ("
@@ -125,8 +143,8 @@ void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id,
 
 void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
                               const arma::cx_fmat& eq) {
-  if (this->config_->Frame().NumULSyms() > 0) {
-    arma::fmat evm = abs(eq - ul_gt_mat_.col(sc_id));
+  if (num_rx_symbols_ > 0) {
+    arma::fmat evm = abs(eq - gt_mat_.col(sc_id));
     arma::fmat cur_evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeNum(),
                            1, false);
     cur_evm_mat += evm % evm;

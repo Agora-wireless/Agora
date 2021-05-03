@@ -137,12 +137,12 @@ struct Packet* RadioTxRx::RecvEnqueue(int tid, int radio_id, int rx_offset) {
 int RadioTxRx::DequeueSend(int tid) {
   auto& c = config_;
   EventData event;
-  if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
+  if (task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event) == false) {
     return -1;
   }
 
-  RtAssert(event.event_type_ == EventType::kPacketTX ||
-               event.event_type_ == EventType::kPacketPilotTX,
+  RtAssert((event.event_type_ == EventType::kPacketTX) ||
+               (event.event_type_ == EventType::kPacketPilotTX),
            "RadioTxRx: Wrong Event Type in TX Queue!");
 
   // std::printf("tx queue length: %d\n", task_queue_->size_approx());
@@ -153,14 +153,13 @@ int RadioTxRx::DequeueSend(int tid) {
   std::memcpy(&pilot[Packet::kOffsetOfData], c->PilotCi16().data(),
               c->PacketLength() - Packet::kOffsetOfData);
 
-  // Transmit uplink pilot
+  // Transmit pilot symbols
   for (size_t symbol_idx = 0; symbol_idx < c->Frame().NumPilotSyms();
        symbol_idx++) {
     if (kDebugPrintInTask) {
       std::printf(
           "In TX thread %d: Transmitted pilot in frame %zu, "
-          "symbol %zu, "
-          "ant %zu\n",
+          "symbol %zu, ant %zu\n",
           tid, frame_id, c->Frame().GetPilotSymbol(symbol_idx), ant_id);
     }
 
@@ -181,7 +180,7 @@ int RadioTxRx::DequeueSend(int tid) {
     return event.tags_[0];
   }
 
-  // Transmit uplink Data
+  // Transmit uplink pilots and data
   for (size_t symbol_id = 0; symbol_id < c->Frame().NumULSyms(); symbol_id++) {
     size_t offset =
         (c->GetTotalDataSymbolIdxUl(frame_id, symbol_id) * c->UeAntNum()) +
