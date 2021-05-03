@@ -35,7 +35,7 @@ struct FrameSummary {
 // Type of timestamps recorded at the master for a framePhyStats
 // TODO: Add definitions of what each event means
 enum class TsType : size_t {
-  kPilotRX,            // First pilot packet received
+  kFirstSymbolRX,      // First symbol in packet received
   kProcessingStarted,  // Signal processing started on a pilot symbol
   kPilotAllRX,         // All pilot packets received
   kRCAllRX,            // All Reciprocity Calibration Symbols received
@@ -50,9 +50,12 @@ enum class TsType : size_t {
   kIFFTDone,
   kTXProcessedFirst,
   kTXDone,
+  kModulDone,
+  kFFTDone,
+  kTsTypeEnd
 };
 static constexpr size_t kNumTimestampTypes =
-    static_cast<size_t>(TsType::kTXDone) + 1;
+    static_cast<size_t>(TsType::kTsTypeEnd);
 
 class Stats {
  public:

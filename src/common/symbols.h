@@ -49,6 +49,7 @@ enum class EventType : int {
   kModul,
   kPacketFromMac,
   kPacketToMac,
+  kFFTPilot,
   kSNRReport,   // Signal new SNR measurement from PHY to MAC
   kRANUpdate,   // Signal new RAN config to Agora
   kRBIndicator  // Signal RB schedule to UEs
@@ -101,7 +102,8 @@ enum class PrintType : int {
   kEncode,
   kRC,
   kPacketFromMac,
-  kPacketToMac
+  kPacketToMac,
+  kModul
 };
 
 // Enable thread pinning and exit if thread pinning fails. Thread pinning is
