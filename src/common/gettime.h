@@ -32,7 +32,7 @@ static inline size_t get_ns()
 {
     struct timeval current_time;
     gettimeofday(&current_time, NULL);
-    return current_time.tv_sec * 1000000000L + current_time.tv_usec;
+    return current_time.tv_sec * 1000000L + current_time.tv_usec;
 }
 
 /// Return the TSC or zero, depending on whether timing of workers is
