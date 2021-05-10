@@ -28,12 +28,12 @@ Recorder::Recorder(Config* in_cfg, unsigned int core_start)
       kRecvCore(kRecorderCore + in_cfg->task_thread_num()) {
   size_t rx_thread_num = cfg_->rx_thread_num();
   size_t ant_per_rx_thread = cfg_->bs_present() && rx_thread_num > 0
-                                 ? cfg_->getTotNumAntennas() / rx_thread_num
+                                 ? cfg_->GetNumAntennas() / rx_thread_num
                                  : 1;
   rx_thread_buff_size_ =
       kSampleBufferFrameNum * cfg_->symbols_per_frame() * ant_per_rx_thread;
 
-  message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+  message_queue_ = moodycamel::ConcurrentQueue<EventData>(
       rx_thread_buff_size_ * kQueueSize);
 
   MLPD_TRACE(
@@ -46,7 +46,7 @@ Recorder::Recorder(Config* in_cfg, unsigned int core_start)
     rx_buffer_ = new SampleBuffer[rx_thread_num];
     size_t intsize = sizeof(std::atomic_int);
     size_t arraysize = (rx_thread_buff_size_ + intsize - 1) / intsize;
-    size_t packageLength = sizeof(Package) + cfg_->getPackageDataLength();
+    size_t packageLength = sizeof(Packet) + cfg_->getPackageDataLength();
     for (size_t i = 0; i < rx_thread_num; i++) {
       rx_buffer_[i].buffer.resize(rx_thread_buff_size_ * packageLength);
       rx_buffer_[i].pkg_buf_inuse = new std::atomic_int[arraysize];
@@ -57,7 +57,7 @@ Recorder::Recorder(Config* in_cfg, unsigned int core_start)
 
 Recorder::~Recorder() { this->gc(); }
 
-void Recorder::Gc(void) {
+void Recorder::Gc() {
   MLPD_TRACE("Garbage collect\n");
   if (this->cfg_->rx_thread_num() > 0) {
     for (size_t i = 0; i < this->cfg_->rx_thread_num(); i++) {
@@ -69,7 +69,7 @@ void Recorder::Gc(void) {
 
 void Recorder::DoIt() {
   size_t recorder_threads = this->cfg_->task_thread_num();
-  size_t total_antennas = cfg_->getTotNumAntennas();
+  size_t total_antennas = cfg_->GetNumAntennas();
   size_t thread_antennas = 0;
 
   MLPD_TRACE("Recorder work thread\n");
@@ -109,11 +109,11 @@ void Recorder::DoIt() {
 
   moodycamel::ConsumerToken ctok(this->message_queue_);
 
-  std::array<Event_data, KDequeueBulkSize> events_list;
+  std::array<EventData, KDequeueBulkSize> events_list;
   size_t ret = 0;
 
-  while ((this->cfg_->running() == true) &&
-         (SignalHandler::gotExitSignal() == false)) {
+  while ((this->cfg_->Running() == true) &&
+         (SignalHandler::GotExitSignal() == false)) {
     // get a bulk of events from the receivers
     ret = this->message_queue_.try_dequeue_bulk(ctok, events_list.data(),
                                                 KDequeueBulkSize);
@@ -123,7 +123,7 @@ void Recorder::DoIt() {
     //}
     // handle each event
     for (size_t bulk_count = 0; bulk_count < ret; bulk_count++) {
-      Event_data& event = events_list.at(bulk_count);
+      EventData& event = events_list.at(bulk_count);
 
       // if kEventRxSymbol, dispatch to proper worker
       if (event.event_type == kEventRxSymbol) {

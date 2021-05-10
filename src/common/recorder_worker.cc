@@ -7,11 +7,10 @@
 ---------------------------------------------------------------------
 */
 
-#include "include/recorder_worker.h"
+#include "recorder_worker.h"
 
-#include "include/logger.h"
-#include "include/macros.h"
-#include "include/utils.h"
+#include "logger.h"
+#include "utils.h"
 
 namespace Agora_recorder {
 // pilot dataset size increment
@@ -36,7 +35,7 @@ RecorderWorker::RecorderWorker(Config* in_cfg, size_t antenna_offset,
 
 RecorderWorker::~RecorderWorker() { gc(); }
 
-void RecorderWorker::gc(void) {
+void RecorderWorker::gc() {
   MLPD_TRACE("Worker Garbage collect\n");
 
   if (this->pilot_dataset_ != nullptr) {
@@ -68,7 +67,7 @@ void RecorderWorker::gc(void) {
   }
 }
 
-void RecorderWorker::init(void) {
+void RecorderWorker::init() {
   unsigned int end_antenna = (this->antenna_offset_ + this->num_antennas_) - 1;
 
   this->hdf5_name_ = this->cfg_->trace_file();
@@ -83,7 +82,7 @@ void RecorderWorker::init(void) {
   this->openHDF5();
 }
 
-void RecorderWorker::finalize(void) {
+void RecorderWorker::finalize() {
   this->closeHDF5();
   this->finishHDF5();
 }
@@ -152,8 +151,8 @@ static void write_attribute(H5::Group& g, const char name[],
   H5::DataSpace attr_ds = H5::DataSpace(1, dims);
   H5::Attribute att = g.createAttribute(name, H5::PredType::STD_U32BE, attr_ds);
   std::vector<uint32_t> val_uint;
-  for (size_t i = 0; i < val.size(); i++)
-    val_uint.push_back((uint32_t)val.at(i));
+  for (unsigned long i : val)
+    val_uint.push_back((uint32_t)i);
   att.write(H5::PredType::NATIVE_UINT, &val_uint[0]);
 }
 
@@ -196,31 +195,31 @@ herr_t RecorderWorker::initHDF5() {
   MLPD_INFO("Creating output HD5F file: %s\n", this->hdf5_name_.c_str());
 
   // dataset dimension
-  hsize_t IQ = 2 * this->cfg_->samps_per_symbol();
+  hsize_t IQ = 2 * this->cfg_->SampsPerSymbol();
   DataspaceIndex cdims = {1, 1, 1, 1,
                           IQ};  // pilot chunk size, TODO: optimize size
   this->frame_number_pilot_ = MAX_FRAME_INC;
   // pilots
   DataspaceIndex dims_pilot = {
-      this->frame_number_pilot_, this->cfg_->num_cells(),
+      this->frame_number_pilot_, this->cfg_->NumCells(),
       this->cfg_->pilot_syms_per_frame(), this->num_antennas_, IQ};
-  DataspaceIndex max_dims_pilot = {H5S_UNLIMITED, this->cfg_->num_cells(),
+  DataspaceIndex max_dims_pilot = {H5S_UNLIMITED, this->cfg_->NumCells(),
                                    this->cfg_->pilot_syms_per_frame(),
                                    this->num_antennas_, IQ};
   // noise
   this->frame_number_noise_ = MAX_FRAME_INC;
   DataspaceIndex dims_noise = {
-      this->frame_number_noise_, this->cfg_->num_cells(),
+      this->frame_number_noise_, this->cfg_->NumCells(),
       this->cfg_->noise_syms_per_frame(), this->num_antennas_, IQ};
-  DataspaceIndex max_dims_noise = {H5S_UNLIMITED, this->cfg_->num_cells(),
+  DataspaceIndex max_dims_noise = {H5S_UNLIMITED, this->cfg_->NumCells(),
                                    this->cfg_->noise_syms_per_frame(),
                                    this->num_antennas_, IQ};
   // data
   this->frame_number_data_ = MAX_FRAME_INC;
-  DataspaceIndex dims_data = {this->frame_number_data_, this->cfg_->num_cells(),
+  DataspaceIndex dims_data = {this->frame_number_data_, this->cfg_->NumCells(),
                               this->cfg_->ul_syms_per_frame(),
                               this->num_antennas_, IQ};
-  DataspaceIndex max_dims_data = {H5S_UNLIMITED, this->cfg_->num_cells(),
+  DataspaceIndex max_dims_data = {H5S_UNLIMITED, this->cfg_->NumCells(),
                                   this->cfg_->ul_syms_per_frame(),
                                   this->num_antennas_, IQ};
 
@@ -237,10 +236,10 @@ herr_t RecorderWorker::initHDF5() {
 
     // ******* COMMON ******** //
     // TX/RX Frequencyfile
-    write_attribute(mainGroup, "FREQ", this->cfg_->freq());
+    write_attribute(mainGroup, "FREQ", this->cfg_->Freq());
 
     // BW
-    write_attribute(mainGroup, "RATE", this->cfg_->rate());
+    write_attribute(mainGroup, "RATE", this->cfg_->Rate());
 
     // Number of samples on each symbol (excluding prefix/postfix)
     write_attribute(mainGroup, "SYMBOL_LEN_NO_PAD",
@@ -253,7 +252,7 @@ herr_t RecorderWorker::initHDF5() {
     write_attribute(mainGroup, "POSTFIX_LEN", this->cfg_->postfix());
 
     // Number of samples on each symbol including prefix and postfix
-    write_attribute(mainGroup, "SYMBOL_LEN", this->cfg_->samps_per_symbol());
+    write_attribute(mainGroup, "SYMBOL_LEN", this->cfg_->SampsPerSymbol());
 
     // Size of FFT
     write_attribute(mainGroup, "FFT_SIZE", this->cfg_->fft_size());
@@ -266,14 +265,14 @@ herr_t RecorderWorker::initHDF5() {
     write_attribute(mainGroup, "CP_LEN", this->cfg_->cp_size());
 
     // Beacon sequence type (string)
-    write_attribute(mainGroup, "BEACON_SEQ_TYPE", this->cfg_->beacon_seq());
+    write_attribute(mainGroup, "BEACON_SEQ_TYPE", this->cfg_->BeaconLen());
 
     // Pilot sequence type (string)
     write_attribute(mainGroup, "PILOT_SEQ_TYPE", this->cfg_->pilot_seq());
 
     // ******* Base Station ******** //
     // Hub IDs (vec of strings)
-    write_attribute(mainGroup, "BS_HUB_ID", this->cfg_->hub_ids());
+    write_attribute(mainGroup, "BS_HUB_ID", this->cfg_->HubIds());
 
     // BS SDR IDs
     // *** first, how many boards in each cell? ***
@@ -619,7 +618,7 @@ void RecorderWorker::closeHDF5() {
   }
 }
 
-herr_t RecorderWorker::record(int tid, Package* pkg) {
+herr_t RecorderWorker::record(int tid, Packet* pkg) {
   (void)tid;
   /* TODO: remove TEMP check */
   size_t end_antenna = (this->antenna_offset_ + this->num_antennas_) - 1;
@@ -693,7 +692,7 @@ herr_t RecorderWorker::record(int tid, Package* pkg) {
         DataspaceIndex count = {1, 1, 1, 1, IQ};
         pilot_filespace.selectHyperslab(H5S_SELECT_SET, count, hdfoffset);
         // define memory space
-        H5::DataSpace pilot_memspace(kDsDim, count, NULL);
+        H5::DataSpace pilot_memspace(kDsDim, count, nullptr);
         this->pilot_dataset_->write(pkg->data, H5::PredType::NATIVE_INT16,
                                     pilot_memspace, pilot_filespace);
         pilot_filespace.close();
@@ -721,7 +720,7 @@ herr_t RecorderWorker::record(int tid, Package* pkg) {
         DataspaceIndex count = {1, 1, 1, 1, IQ};
         data_filespace.selectHyperslab(H5S_SELECT_SET, count, hdfoffset);
         // define memory space
-        H5::DataSpace data_memspace(kDsDim, count, NULL);
+        H5::DataSpace data_memspace(kDsDim, count, nullptr);
         this->data_dataset_->write(pkg->data, H5::PredType::NATIVE_INT16,
                                    data_memspace, data_filespace);
         data_filespace.close();
@@ -750,7 +749,7 @@ herr_t RecorderWorker::record(int tid, Package* pkg) {
         DataspaceIndex count = {1, 1, 1, 1, IQ};
         noise_filespace.selectHyperslab(H5S_SELECT_SET, count, hdfoffset);
         // define memory space
-        H5::DataSpace noise_memspace(kDsDim, count, NULL);
+        H5::DataSpace noise_memspace(kDsDim, count, nullptr);
         this->noise_dataset_->write(pkg->data, H5::PredType::NATIVE_INT16,
                                     noise_memspace, noise_filespace);
         noise_filespace.close();

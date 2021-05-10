@@ -23,7 +23,7 @@ RecorderThread::RecorderThread(Config* in_cfg, size_t thread_id, int core,
       id_(thread_id),
       core_alloc_(core),
       wait_signal_(wait_signal) {
-  package_data_length_ = in_cfg->getPackageDataLength();
+  packet_length_ = in_cfg->PacketLength();
   worker_.init();
   running_ = false;
 }
@@ -32,7 +32,7 @@ RecorderThread::~RecorderThread() { Finalize(); }
 
 // Launching thread in seperate function to guarantee that the object is fully
 // constructed before calling member function
-void RecorderThread::Start(void) {
+void RecorderThread::Start() {
   MLPD_INFO("Launching recorder task thread with id: %zu and core %d\n",
             this->id_, this->core_alloc_);
   {
@@ -44,13 +44,13 @@ void RecorderThread::Start(void) {
 }
 
 /* Cleanly allows the thread to exit */
-void RecorderThread::Stop(void) {
+void RecorderThread::Stop() {
   RecordEventData event;
   event.event_type = kThreadTermination;
   this->DispatchWork(event);
 }
 
-void RecorderThread::Finalize(void) {
+void RecorderThread::Finalize() {
   // Wait for thread to cleanly finish the messages in the queue
   if (this->thread_.joinable() == true) {
     MLPD_TRACE("Joining Recorder Thread on CPU %d \n", sched_getcpu());
@@ -82,7 +82,7 @@ bool RecorderThread::DispatchWork(RecordEventData event) {
   return ret;
 }
 
-void RecorderThread::DoRecording(void) {
+void RecorderThread::DoRecording() {
   // Sync the start
   {
     std::unique_lock<std::mutex> thread_wait(this->sync_);
@@ -92,12 +92,8 @@ void RecorderThread::DoRecording(void) {
   if (this->core_alloc_ >= 0) {
     MLPD_INFO("Pinning recording thread %zu to core %d\n", this->id_,
               this->core_alloc_);
-    pthread_t this_thread = this->thread_.native_handle();
-    if (pin_thread_to_core(this->core_alloc_, this_thread) != 0) {
-      MLPD_ERROR("Pin recording thread %zu to core %d failed\n", this->id_,
-                 this->core_alloc_);
-      throw std::runtime_error("Pin recording thread to core failed");
-    }
+    PinToCoreWithOffset(ThreadType::kMaster, this->core_alloc_, this->id_,
+                        true);
   }
 
   moodycamel::ConsumerToken ctok(this->event_queue_);
@@ -139,12 +135,11 @@ void RecorderThread::HandleEvent(RecordEventData event) {
     size_t buffer_offset = offset - (buffer_id * event.rx_buff_size);
     if (event.event_type == kTaskRecord) {
       // read info
-      size_t package_length = sizeof(Package) + this->package_data_length_;
       char* cur_ptr_buffer = event.rx_buffer[buffer_id].buffer.data() +
-                             (buffer_offset * package_length);
+                             (buffer_offset * packet_length_);
 
       this->worker_.record(this->id_,
-                           reinterpret_cast<Package*>(cur_ptr_buffer));
+                           reinterpret_cast<Packet*>(cur_ptr_buffer));
     }
 
     /* Free up the buffer memory */

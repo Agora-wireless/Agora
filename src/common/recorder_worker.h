@@ -20,16 +20,6 @@ struct SampleBuffer {
   std::atomic_int* pkg_buf_inuse;
 };
 
-struct Package {
-  uint32_t frame_id;
-  uint32_t symbol_id;
-  uint32_t cell_id;
-  uint32_t ant_id;
-  short data[];
-  Package(int f, int s, int c, int a)
-      : frame_id(f), symbol_id(s), cell_id(c), ant_id(a) {}
-};
-
 class RecorderWorker {
  public:
   RecorderWorker(Config* in_cfg, size_t antenna_offset, size_t num_antennas);
@@ -37,7 +27,7 @@ class RecorderWorker {
 
   void init();
   void finalize();
-  herr_t record(int tid, Package* pkg);
+  herr_t record(int tid, Packet* pkg);
 
   inline size_t num_antennas() { return num_antennas_; }
   inline size_t antenna_offset() { return antenna_offset_; }
