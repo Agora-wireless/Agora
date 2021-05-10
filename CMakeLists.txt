@@ -149,6 +149,13 @@ if(${USE_UHD})
   add_definitions(-DUSE_UHD)
 endif()
 
+#External Libraries
+find_package(HDF5 1.10 REQUIRED)
+if (NOT HDF5_FOUND)
+    message(FATAL_ERROR "HDF5 development files not found")
+    return()
+endif ()
+
 find_package(SoapySDR "0.7" CONFIG)
 if(NOT SoapySDR_FOUND)
   message(FATAL_ERROR "SoapySDR development files not found")
@@ -158,7 +165,9 @@ find_package(PythonLibs REQUIRED)
 message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
 message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
 message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
-include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
+message(STATUS "HDF5_INCLUDE_DIRS: ${HDF5_INCLUDE_DIRS}")
+message(STATUS "HDF5_LIBRARIES: ${HDF5_LIBRARIES}")
+include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS} ${HDF5_INCLUDE_DIRS})
 set(SOAPY_LIB ${SoapySDR_LIBRARIES})
 set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
 add_definitions(-DTHREADED_INIT)
@@ -218,9 +227,13 @@ set(COMMON_SOURCES
   src/common/crc.cc
   src/common/memory_manage.cc
   src/common/scrambler.cc
+  src/common/recorder.cc
+  src/common/recorder_thread.cc
+  src/common/recorder_worker.cc
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc
-  src/encoder/iobuffer.cc)
+  src/encoder/iobuffer.cc
+  )
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(AGORA_SOURCES 
@@ -267,7 +280,7 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-set(COMMON_LIBS armadillo -lnuma ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
+set(COMMON_LIBS armadillo -lnuma -lhdf5_cpp ${HDF5_LIBRARIES} ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
   ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
 # TODO: The main agora executable is performance-critical, so we need to
