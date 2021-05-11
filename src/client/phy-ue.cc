@@ -88,7 +88,7 @@ PhyUe::PhyUe(Config* config)
   if (kEnableMac == true) {
     // TODO [ankalia]: dummy_decoded_buffer is used at the base station
     // server only, but MacThread for now requires it for the UE client too
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> dummy_decoded_buffer;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> dummy_decoded_buffer;
 
     mac_thread_ = std::make_unique<MacThread>(
         MacThread::Mode::kClient, config_, core_offset_worker,
@@ -103,10 +103,10 @@ PhyUe::PhyUe(Config* config)
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
     auto new_worker = std::make_unique<UeWorker>(
         i, *config_, *stats_, *phy_stats_, complete_queue_, work_queue_,
-        *work_producer_token_.get(), ul_syms_buffer_, modul_buffer_,
-        ifft_buffer_, tx_buffer_, rx_buffer_, rx_buffer_status_, csi_buffer_,
-        equal_buffer_, non_null_sc_ind_, fft_buffer_, demod_buffer_,
-        decoded_buffer_, ue_pilot_vec_);
+        *work_producer_token_.get(), ul_bits_buffer_, ul_syms_buffer_,
+        modul_buffer_, ifft_buffer_, tx_buffer_, rx_buffer_, rx_buffer_status_,
+        csi_buffer_, equal_buffer_, non_null_sc_ind_, fft_buffer_,
+        demod_buffer_, decoded_buffer_, ue_pilot_vec_);
 
     new_worker->Start(core_offset_worker);
     workers_.push_back(std::move(new_worker));

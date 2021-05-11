@@ -9,9 +9,9 @@
 
 MacThread::MacThread(
     Mode mode, Config* cfg, size_t core_offset,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer,
-    Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
-    Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
+    Table<int8_t>* ul_bits_buffer, Table<int8_t>* ul_bits_buffer_status,
+    Table<int8_t>* dl_bits_buffer, Table<int8_t>* dl_bits_buffer_status,
     moodycamel::ConcurrentQueue<EventData>* rx_queue,
     moodycamel::ConcurrentQueue<EventData>* tx_queue,
     const std::string& log_filename)
@@ -132,7 +132,7 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
   const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
   const size_t symbol_idx_ul = this->cfg_->Frame().GetULSymbolIdx(symbol_id);
   const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
-  const uint8_t* ul_data_ptr =
+  const int8_t* ul_data_ptr =
       decoded_buffer_[frame_id % kFrameWnd][symbol_idx_ul][ue_id];
 
   std::stringstream ss;  // Debug-only
