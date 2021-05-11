@@ -1427,7 +1427,7 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
 
   for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
     for (size_t j = 0; j < cfg->UeNum(); j++) {
-      uint8_t* ptr = decoded_buffer_[(frame_id % kFrameWnd)][i][j];
+      int8_t* ptr = decoded_buffer_[(frame_id % kFrameWnd)][i][j];
       std::fwrite(ptr, num_decoded_bytes, sizeof(uint8_t), fp);
     }
   }

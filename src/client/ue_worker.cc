@@ -27,13 +27,14 @@ UeWorker::UeWorker(
     size_t tid, Config& config, Stats& shared_stats, PhyStats& shared_phy_stats,
     moodycamel::ConcurrentQueue<EventData>& notify_queue,
     moodycamel::ConcurrentQueue<EventData>& work_queue,
-    moodycamel::ProducerToken& work_producer, Table<int8_t>& encoded_buffer,
-    Table<complex_float>& modul_buffer, Table<complex_float>& ifft_buffer,
-    char* const tx_buffer, Table<char>& rx_buffer, Table<int>& rx_buffer_status,
+    moodycamel::ProducerToken& work_producer, Table<int8_t>& ul_bits_buffer,
+    Table<int8_t>& encoded_buffer, Table<complex_float>& modul_buffer,
+    Table<complex_float>& ifft_buffer, char* const tx_buffer,
+    Table<char>& rx_buffer, Table<int>& rx_buffer_status,
     std::vector<myVec>& csi_buffer, std::vector<myVec>& equal_buffer,
     std::vector<size_t>& non_null_sc_ind, Table<complex_float>& fft_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
     std::vector<std::vector<std::complex<float>>>& ue_pilot_vec)
     : tid_(tid),
       thread_(),
@@ -43,6 +44,7 @@ UeWorker::UeWorker(
       config_(config),
       stats_(shared_stats),
       phy_stats_(shared_phy_stats),
+      ul_bits_buffer_(ul_bits_buffer),
       encoded_buffer_(encoded_buffer),
       modul_buffer_(modul_buffer),
       ifft_buffer_(ifft_buffer),
@@ -92,7 +94,9 @@ void UeWorker::TaskThread(size_t core_offset) {
 
   // TODO make compatible with Mac!! (ul_bits_buffer_)
   auto encoder = std::make_unique<DoEncode>(
-      &config_, (int)tid_, config_.UlBits(), encoded_buffer_, &stats_);
+      &config_, (int)tid_,
+      (kEnableMac == true) ? ul_bits_buffer_ : config_.UlBits(),
+      encoded_buffer_, &stats_);
 
   auto iffter = std::make_unique<DoIFFTClient>(
       &config_, (int)tid_, ifft_buffer_, tx_buffer_, &stats_);
