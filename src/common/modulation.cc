@@ -1148,6 +1148,7 @@ void Demod64qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
                       13, 12, 0xff, 0xff, 0xff, 0xff, 11, 10, 0xff, 0xff);
 
   for (int i = 0; i < num / 16; i++) {
+    // Load symbols, 4 real and 4 imaginary values at a time
     symbol1 = _mm256_load_ps(symbols_ptr);
     symbols_ptr += 8;
     symbol2 = _mm256_load_ps(symbols_ptr);
@@ -1156,21 +1157,36 @@ void Demod64qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
     symbols_ptr += 8;
     symbol4 = _mm256_load_ps(symbols_ptr);
     symbols_ptr += 8;
+    // Cast symbols into integers
     symbol_i1 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol1, scale_v));
     symbol_i2 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol2, scale_v));
     symbol_i3 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol3, scale_v));
     symbol_i4 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol4, scale_v));
+    // Pack symbols into 16 bit integers
     symbol_12 = _mm256_packs_epi32(symbol_i1, symbol_i2);
     symbol_12 = _mm256_permute4x64_epi64(symbol_12, 0xd8);
     symbol_34 = _mm256_packs_epi32(symbol_i3, symbol_i4);
     symbol_34 = _mm256_permute4x64_epi64(symbol_34, 0xd8);
+    // Pack symbols into 8 bit integers (one 256 bit vector)
     symbol_i = _mm256_packs_epi16(symbol_12, symbol_34);
     symbol_i = _mm256_permute4x64_epi64(symbol_i, 0xd8);
-
+    // first LLR is simply the symbol
+    // this LLR corresponds to bit 5 and 4 (both flip over the I and Q axis)
+    // LLR(b5,b4) = |x|
     symbol_abs = _mm256_abs_epi8(symbol_i);
+    // Take distance between offset1 and symbols for second LLR
+    // offset1 here divides the point where bit 3 and 2 flip (over 4d)
+    // LLR(b3,b2) = 4d - |x|
     symbol_abs = _mm256_sub_epi8(offset1, symbol_abs);
+    // third LLR is difference between offset2 and first distance
+    // offset2 is 2d (lower point where bit 1 and 0 flip)
+    // LLR(b1,b0) = 2d - |4d - |x||
     symbol_abs2 = _mm256_sub_epi8(offset2, _mm256_abs_epi8(symbol_abs));
 
+    
+    // Pack so that the LLRs for real and imaginary part of each modulated value
+    // are distributed as follows:
+    // real msb: imag msb: real: imag: real lsb: imag lsb
     result11 = _mm256_shuffle_epi8(symbol_i, shuffle_negated_1);
     result12 = _mm256_shuffle_epi8(symbol_abs, shuffle_abs_1);
     result13 = _mm256_shuffle_epi8(symbol_abs2, shuffle_abs2_1);
@@ -1183,13 +1199,14 @@ void Demod64qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
     result32 = _mm256_shuffle_epi8(symbol_abs, shuffle_abs_3);
     result33 = _mm256_shuffle_epi8(symbol_abs2, shuffle_abs2_3);
 
+    // OR all results together
     result_final1 =
         _mm256_or_si256(_mm256_or_si256(result11, result12), result13);
     result_final2 =
         _mm256_or_si256(_mm256_or_si256(result21, result22), result23);
     result_final3 =
         _mm256_or_si256(_mm256_or_si256(result31, result32), result33);
-
+    // Permute to string all results together
     _mm256_storeu_si256(result_ptr, _mm256_permute2x128_si256(
                                         result_final1, result_final2, 0x20));
     result_ptr++;
@@ -2005,3 +2022,47 @@ void Demod256qamHardAvx512(float* vec_in, uint8_t* vec_out, int num) {
 }
 
 #endif
+
+void Demod256qamSoftLoop(const float *vec_in, int8_t *llr, int num) {
+  /**
+   * LLR algorithm derived from paper:
+   * Q. Sun and W. Qi, 
+   * "Soft-demodulation algorithm for 64QAM and it's application in HSPA+," 
+   * 2012 IEEE 11th International Conference on Signal Processing, 2012, 
+   * pp. 2309-2312, doi: 10.1109/ICoSP.2012.6492042.
+   * 
+   * Equations 7, 8, and 9
+   */
+  int i;
+  float re, im;
+  for (i = 0; i < num; i++) {
+    re = (int8_t)(SCALE_BYTE_CONV_QAM256 * (vec_in[2 * i]));
+    im = (int8_t)(SCALE_BYTE_CONV_QAM256 * (vec_in[2 * i + 1]));
+
+    // Upper two bits simply use real and imaginary values
+    llr[8 * i + 0] = re;
+    llr[8 * i + 1] = im;
+    // Next two bits use the absolute value of the prior 2 and a threshold
+    llr[8 * i + 2] = QAM256_THRESHOLD_4 * SCALE_BYTE_CONV_QAM256 - abs(re);
+    llr[8 * i + 3] = QAM256_THRESHOLD_4 * SCALE_BYTE_CONV_QAM256 - abs(im);
+    // Once again, calculate the LLR recursively using boundary judgement method
+    llr[8 * i + 4] = 
+      QAM256_THRESHOLD_2 * SCALE_BYTE_CONV_QAM256 - abs(llr[8 * i + 2]);
+    llr[8 * i + 5] = 
+      QAM256_THRESHOLD_2 * SCALE_BYTE_CONV_QAM256 - abs(llr[8 * i + 3]);
+    /**
+     * Same pattern for the final bits. Note that the threshold that is
+     * subtracted from is based on the threshold across which the bits revelant
+     * to the current LLR flip in the constellation
+     * 
+     * In addition, the prior LLR that is used essentially gives the distance
+     * from a given threshold. For example abs(llr[8 * i + 4]) gives the 
+     * distance the symbol is from either QAM256_THRESHOLD_2 or 
+     * QAM256_THRESHOLD_6, whichever is closest.
+     */
+    llr[8 * i + 6] = 
+      QAM256_THRESHOLD_1 * SCALE_BYTE_CONV_QAM256 - abs(llr[8 * i + 4]);
+    llr[8 * i + 7] = 
+      QAM256_THRESHOLD_1 * SCALE_BYTE_CONV_QAM256 - abs(llr[8 * i + 5]);
+  }
+}
