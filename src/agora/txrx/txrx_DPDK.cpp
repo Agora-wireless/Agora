@@ -770,7 +770,8 @@ void* PacketTXRX::loop_tx_rx(int tid)
             radio_id = radio_lo;
         
     }
-    printf("Thread %u receive %lu packets.\n", tid, recv_pkts);
+    printf("Thread %u receive %lu packets, max gap is %lu, frame %u\n", tid, 
+        recv_pkts, max_inter_packet_gap_[tid], max_inter_packet_gap_frame_[tid]);
     return 0;
 }
 
@@ -840,6 +841,19 @@ int PacketTXRX::recv_relocate(int tid)
                 cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
 
             valid_pkts ++;
+            size_t cur_cycle = rdtsc();
+            if (unlikely(last_packet_cycle_[tid] == 0) && pkt->frame_id > 2000) {
+                last_packet_cycle_[tid] = cur_cycle;
+            }
+
+            if (likely(last_packet_cycle_[tid] > 0) && unlikely(max_inter_packet_gap_[tid] < cur_cycle - last_packet_cycle_[tid]) && pkt->frame_id < 8000) {
+                max_inter_packet_gap_[tid] = cur_cycle - last_packet_cycle_[tid];
+                max_inter_packet_gap_frame_[tid] = pkt->frame_id;
+            }
+
+            if (likely(last_packet_cycle_[tid] > 0)) {
+                last_packet_cycle_[tid] = cur_cycle;
+            }
 
             // get the position in rx_buffer
             if (!rx_status_->add_new_packet(pkt)) {

@@ -162,6 +162,10 @@ private:
     // Not used
     size_t dl_frame_to_send_ = 0;
     size_t dl_symbol_to_send_ = 0;
+
+    size_t last_packet_cycle_[kMaxThreads] = {0};
+    size_t max_inter_packet_gap_[kMaxThreads] = {0};
+    size_t max_inter_packet_gap_frame_[kMaxThreads] = {0};
 };
 
 #endif
