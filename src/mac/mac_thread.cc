@@ -243,7 +243,7 @@ void MacThread::ProcessUdpPacketsFromApps(RBIndicator ri) {
       return;  // No data received
     } else if (ret < 0) {
       // There was an error in receiving
-      MLPD_ERROR("MacThread: Error in receiption %zu\n", ret);
+      MLPD_ERROR("MacThread: Error in reception %zu\n", ret);
       cfg_->Running(false);
       return;
     } else {
