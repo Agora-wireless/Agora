@@ -2034,7 +2034,10 @@ void Demod256qamSoftLoop(const float *vec_in, int8_t *llr, int num) {
    * Equations 7, 8, and 9
    */
   int i;
-  float re, im;
+  int8_t re, im;
+  const uint8_t t1 = QAM256_THRESHOLD_4 * SCALE_BYTE_CONV_QAM256;
+  const uint8_t t2 = QAM256_THRESHOLD_2 * SCALE_BYTE_CONV_QAM256;
+  const uint8_t t3 = QAM256_THRESHOLD_1 * SCALE_BYTE_CONV_QAM256;
   for (i = 0; i < num; i++) {
     re = (int8_t)(SCALE_BYTE_CONV_QAM256 * (vec_in[2 * i]));
     im = (int8_t)(SCALE_BYTE_CONV_QAM256 * (vec_in[2 * i + 1]));
@@ -2043,13 +2046,11 @@ void Demod256qamSoftLoop(const float *vec_in, int8_t *llr, int num) {
     llr[8 * i + 0] = re;
     llr[8 * i + 1] = im;
     // Next two bits use the absolute value of the prior 2 and a threshold
-    llr[8 * i + 2] = QAM256_THRESHOLD_4 * SCALE_BYTE_CONV_QAM256 - abs(re);
-    llr[8 * i + 3] = QAM256_THRESHOLD_4 * SCALE_BYTE_CONV_QAM256 - abs(im);
+    llr[8 * i + 2] = t1 - abs(re);
+    llr[8 * i + 3] = t1 - abs(im);
     // Once again, calculate the LLR recursively using boundary judgement method
-    llr[8 * i + 4] = 
-      QAM256_THRESHOLD_2 * SCALE_BYTE_CONV_QAM256 - abs(llr[8 * i + 2]);
-    llr[8 * i + 5] = 
-      QAM256_THRESHOLD_2 * SCALE_BYTE_CONV_QAM256 - abs(llr[8 * i + 3]);
+    llr[8 * i + 4] = t2 - abs(llr[8 * i + 2]);
+    llr[8 * i + 5] = t2 - abs(llr[8 * i + 3]);
     /**
      * Same pattern for the final bits. Note that the threshold that is
      * subtracted from is based on the threshold across which the bits revelant
@@ -2060,10 +2061,8 @@ void Demod256qamSoftLoop(const float *vec_in, int8_t *llr, int num) {
      * distance the symbol is from either QAM256_THRESHOLD_2 or 
      * QAM256_THRESHOLD_6, whichever is closest.
      */
-    llr[8 * i + 6] = 
-      QAM256_THRESHOLD_1 * SCALE_BYTE_CONV_QAM256 - abs(llr[8 * i + 4]);
-    llr[8 * i + 7] = 
-      QAM256_THRESHOLD_1 * SCALE_BYTE_CONV_QAM256 - abs(llr[8 * i + 5]);
+    llr[8 * i + 6] = t3 - abs(llr[8 * i + 4]);
+    llr[8 * i + 7] = t3 - abs(llr[8 * i + 5]);
   }
 }
 
@@ -2082,14 +2081,14 @@ void Demod256qamSoftSse(const float *vec_in, int8_t *llr, int num) {
   __m128i symbol_i;
   __m128i symbol_bit54;
   __m128i symbol_bit32;
-  __m128i symbol_bit01;
+  __m128i symbol_bit10;
   __m128i symbol_12;
   __m128i symbol_34;
   __m128i offset1 = _mm_set1_epi8(QAM256_THRESHOLD_1 * SCALE_BYTE_CONV_QAM256);
   __m128i offset2 = _mm_set1_epi8(QAM256_THRESHOLD_2 * SCALE_BYTE_CONV_QAM256);
   __m128i offset3 = _mm_set1_epi8(QAM256_THRESHOLD_4 * SCALE_BYTE_CONV_QAM256);
   __m128 scale_v = _mm_set1_ps(SCALE_BYTE_CONV_QAM256);
-  __m128i result01;
+  __m128i result10;
   __m128i result32;
   __m128i result54;
   __m128i result76;
@@ -2139,19 +2138,19 @@ void Demod256qamSoftSse(const float *vec_in, int8_t *llr, int num) {
       _mm_set_epi8(0xff, 0xff, 15, 14, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 13, 
                    12, 0xff, 0xff, 0xff, 0xff);
   
-  __m128i shuffle_bit01_1 = 
+  __m128i shuffle_bit10_1 = 
       _mm_set_epi8(3, 2, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 1, 0, 0xff, 0xff,
                    0xff, 0xff, 0xff, 0xff);  
   
-  __m128i shuffle_bit01_2 = 
+  __m128i shuffle_bit10_2 = 
       _mm_set_epi8(7, 6, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 5, 4, 0xff, 0xff,
                    0xff, 0xff, 0xff, 0xff);  
   
-  __m128i shuffle_bit01_3 = 
+  __m128i shuffle_bit10_3 = 
       _mm_set_epi8(11, 10, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 9, 8, 0xff, 0xff,
                    0xff, 0xff, 0xff, 0xff);  
 
-  __m128i shuffle_bit01_4 = 
+  __m128i shuffle_bit10_4 = 
       _mm_set_epi8(15, 14, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 13, 12, 0xff, 
                    0xff, 0xff, 0xff, 0xff, 0xff);  
 
@@ -2180,51 +2179,257 @@ void Demod256qamSoftSse(const float *vec_in, int8_t *llr, int num) {
      */ 
     symbol_bit54 = _mm_sub_epi8(offset3, _mm_abs_epi8(symbol_i));
     symbol_bit32 = _mm_sub_epi8(offset2, _mm_abs_epi8(symbol_bit54));
-    symbol_bit01 = _mm_sub_epi8(offset1, _mm_abs_epi8(symbol_bit32));
+    symbol_bit10 = _mm_sub_epi8(offset1, _mm_abs_epi8(symbol_bit32));
 
     /*
      * Now extract the result and store it. We must do this 4 times due
      * to the capacity of a 128 bit vector
      */
-    result01 = _mm_shuffle_epi8(symbol_bit01, shuffle_bit01_1);
+    result10 = _mm_shuffle_epi8(symbol_bit10, shuffle_bit10_1);
     result32 = _mm_shuffle_epi8(symbol_bit32, shuffle_bit32_1);
     result54 = _mm_shuffle_epi8(symbol_bit54, shuffle_bit54_1);
     result76 = _mm_shuffle_epi8(symbol_i, shuffle_bit76_1);
     // Store the first set of results.
     _mm_store_si128(result_ptr,
                     _mm_or_si128(_mm_or_si128(_mm_or_si128(
-                      result01, result32), result54), result76));
+                      result10, result32), result54), result76));
     result_ptr++;
     // Extract and store the second set of results.
-    result01 = _mm_shuffle_epi8(symbol_bit01, shuffle_bit01_2);
+    result10 = _mm_shuffle_epi8(symbol_bit10, shuffle_bit10_2);
     result32 = _mm_shuffle_epi8(symbol_bit32, shuffle_bit32_2);
     result54 = _mm_shuffle_epi8(symbol_bit54, shuffle_bit54_2);
     result76 = _mm_shuffle_epi8(symbol_i, shuffle_bit76_2);
     _mm_store_si128(result_ptr,
                     _mm_or_si128(_mm_or_si128(_mm_or_si128(
-                      result01, result32), result54), result76));
+                      result10, result32), result54), result76));
     result_ptr++;
     // Third set
-    result01 = _mm_shuffle_epi8(symbol_bit01, shuffle_bit01_3);
+    result10 = _mm_shuffle_epi8(symbol_bit10, shuffle_bit10_3);
     result32 = _mm_shuffle_epi8(symbol_bit32, shuffle_bit32_3);
     result54 = _mm_shuffle_epi8(symbol_bit54, shuffle_bit54_3);
     result76 = _mm_shuffle_epi8(symbol_i, shuffle_bit76_3);
     _mm_store_si128(result_ptr,
                     _mm_or_si128(_mm_or_si128(_mm_or_si128(
-                      result01, result32), result54), result76));
+                      result10, result32), result54), result76));
     result_ptr++;
     // Fourth and final set.
-    result01 = _mm_shuffle_epi8(symbol_bit01, shuffle_bit01_4);
+    result10 = _mm_shuffle_epi8(symbol_bit10, shuffle_bit10_4);
     result32 = _mm_shuffle_epi8(symbol_bit32, shuffle_bit32_4);
     result54 = _mm_shuffle_epi8(symbol_bit54, shuffle_bit54_4);
     result76 = _mm_shuffle_epi8(symbol_i, shuffle_bit76_4);
     _mm_store_si128(result_ptr,
                     _mm_or_si128(_mm_or_si128(_mm_or_si128(
-                      result01, result32), result54), result76));
+                      result10, result32), result54), result76));
     result_ptr++;
   }
   // Demodulate the last symbols
   int next_start = 8 * (num / 8);
   Demod256qamSoftLoop(vec_in + 2 * next_start, llr + next_start * 8, 
+                      num - next_start);
+}
+
+
+
+void Demod256qamSoftAvx2(const float *vec_in, int8_t *llr, int num) {
+  float* symbols_ptr = (float*)vec_in;
+  auto* result_ptr = reinterpret_cast<__m256i*>(llr);
+  __m256 symbol1;
+  __m256 symbol2;
+  __m256 symbol3;
+  __m256 symbol4;
+  __m256i symbol_i1;
+  __m256i symbol_i2;
+  __m256i symbol_i3;
+  __m256i symbol_i4;
+  __m256i symbol_i;
+  __m256i symbol_bit54;
+  __m256i symbol_bit32;
+  __m256i symbol_bit10;
+  __m256i symbol_12;
+  __m256i symbol_34;
+  __m256i offset1 = _mm256_set1_epi8(QAM256_THRESHOLD_1 * SCALE_BYTE_CONV_QAM256);
+  __m256i offset2 = _mm256_set1_epi8(QAM256_THRESHOLD_2 * SCALE_BYTE_CONV_QAM256);
+  __m256i offset3 = _mm256_set1_epi8(QAM256_THRESHOLD_4 * SCALE_BYTE_CONV_QAM256);
+  __m256 scale_v = _mm256_set1_ps(SCALE_BYTE_CONV_QAM256);
+  __m256i result10;
+  __m256i result32;
+  __m256i result54;
+  __m256i result76;
+  __m256i result_final1;
+  __m256i result_final2;
+  __m256i result_final3;
+  __m256i result_final4;
+
+  __m256i shuffle_bit76_1 =
+      _mm256_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 3, 2, 
+                      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 1, 0,
+                      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 3, 2,
+                      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 1, 0);
+  __m256i shuffle_bit76_2 =
+      _mm256_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 7, 6, 
+                      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 5, 4,
+                      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 7, 6,
+                      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 5, 4);
+  __m256i shuffle_bit76_3 =
+      _mm256_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 11, 10, 
+                      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 9, 8,
+                      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 11, 10,
+                      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 9, 8);
+  __m256i shuffle_bit76_4 =
+      _mm256_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 15, 14, 
+                      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 13, 12,
+                      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 15, 14,
+                      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 13, 12);
+
+  __m256i shuffle_bit54_1 =
+      _mm256_set_epi8(0xff, 0xff, 0xff, 0xff, 3, 2, 0xff, 0xff,
+                      0xff, 0xff, 0xff, 0xff, 1, 0, 0xff, 0xff,
+                      0xff, 0xff, 0xff, 0xff, 3, 2, 0xff, 0xff,
+                      0xff, 0xff, 0xff, 0xff, 1, 0, 0xff, 0xff);
+  __m256i shuffle_bit54_2 =
+      _mm256_set_epi8(0xff, 0xff, 0xff, 0xff, 7, 6, 0xff, 0xff,  
+                      0xff, 0xff, 0xff, 0xff, 5, 4, 0xff, 0xff, 
+                      0xff, 0xff, 0xff, 0xff, 7, 6, 0xff, 0xff, 
+                      0xff, 0xff, 0xff, 0xff, 5, 4, 0xff, 0xff);
+  __m256i shuffle_bit54_3 =
+      _mm256_set_epi8(0xff, 0xff, 0xff, 0xff, 11, 10, 0xff, 0xff,
+                      0xff, 0xff, 0xff, 0xff, 9, 8, 0xff, 0xff,
+                      0xff, 0xff, 0xff, 0xff, 11, 10, 0xff, 0xff,
+                      0xff, 0xff, 0xff, 0xff, 9, 8, 0xff, 0xff);
+  __m256i shuffle_bit54_4 =
+      _mm256_set_epi8(0xff, 0xff, 0xff, 0xff, 15, 14, 0xff, 0xff,
+                      0xff, 0xff, 0xff, 0xff, 13, 12, 0xff, 0xff,
+                      0xff, 0xff, 0xff, 0xff, 15, 14, 0xff, 0xff,
+                      0xff, 0xff, 0xff, 0xff, 13, 12, 0xff, 0xff);
+
+  __m256i shuffle_bit32_1 =
+      _mm256_set_epi8(0xff, 0xff, 3, 2, 0xff, 0xff, 0xff, 0xff,
+                      0xff, 0xff, 1, 0, 0xff, 0xff, 0xff, 0xff,
+                      0xff, 0xff, 3, 2, 0xff, 0xff, 0xff, 0xff,
+                      0xff, 0xff, 1, 0, 0xff, 0xff, 0xff, 0xff);
+  __m256i shuffle_bit32_2 =
+      _mm256_set_epi8(0xff, 0xff, 7, 6, 0xff, 0xff, 0xff, 0xff,  
+                      0xff, 0xff, 5, 4, 0xff, 0xff, 0xff, 0xff, 
+                      0xff, 0xff, 7, 6, 0xff, 0xff, 0xff, 0xff, 
+                      0xff, 0xff, 5, 4, 0xff, 0xff, 0xff, 0xff);
+  __m256i shuffle_bit32_3 =
+      _mm256_set_epi8(0xff, 0xff, 11, 10, 0xff, 0xff, 0xff, 0xff,
+                      0xff, 0xff, 9, 8, 0xff, 0xff, 0xff, 0xff,
+                      0xff, 0xff, 11, 10, 0xff, 0xff, 0xff, 0xff,
+                      0xff, 0xff, 9, 8, 0xff, 0xff, 0xff, 0xff);
+  __m256i shuffle_bit32_4 =
+      _mm256_set_epi8(0xff, 0xff, 15, 14, 0xff, 0xff, 0xff, 0xff,
+                      0xff, 0xff, 13, 12, 0xff, 0xff, 0xff, 0xff,
+                      0xff, 0xff, 15, 14, 0xff, 0xff, 0xff, 0xff,
+                      0xff, 0xff, 13, 12, 0xff, 0xff, 0xff, 0xff);
+  
+  __m256i shuffle_bit10_1 =
+      _mm256_set_epi8(3, 2, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                      1, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                      3, 2, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                      1, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+  __m256i shuffle_bit10_2 =
+      _mm256_set_epi8(7, 6, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,  
+                      5, 4, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+                      7, 6, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+                      5, 4, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+  __m256i shuffle_bit10_3 =
+      _mm256_set_epi8(11, 10, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                      9, 8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                      11, 10, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                      9, 8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+  __m256i shuffle_bit10_4 =
+      _mm256_set_epi8(15, 14, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                      13, 12, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                      15, 14, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+                      13, 12, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+  
+  for (int i = 0; i < num / 16; i++) {
+    symbol1 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol2 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol3 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol4 = _mm256_load_ps(symbols_ptr);
+    symbols_ptr += 8;
+    symbol_i1 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol1, scale_v));
+    symbol_i2 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol2, scale_v));
+    symbol_i3 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol3, scale_v));
+    symbol_i4 = _mm256_cvtps_epi32(_mm256_mul_ps(symbol4, scale_v));
+    // Pack symbols into 16 bit integers
+    symbol_12 = _mm256_packs_epi32(symbol_i1, symbol_i2);
+    // _packs intrinsic interleaves the two vectors, _permute fixes that
+    symbol_12 = _mm256_permute4x64_epi64(symbol_12, 0xd8);
+    symbol_34 = _mm256_packs_epi32(symbol_i3, symbol_i4);
+    symbol_34 = _mm256_permute4x64_epi64(symbol_34, 0xd8);
+    // Pack symbols into 8 bit integers (one 256 bit vector)
+    symbol_i = _mm256_packs_epi16(symbol_12, symbol_34);
+    symbol_i = _mm256_permute4x64_epi64(symbol_i, 0xd8);
+
+    /*
+     * This math is where the LLR occurs. Note that we use the 
+     * absolute value of the prior vector for the next subtraction,
+     * like in the traditional LLR
+     */ 
+    symbol_bit54 = _mm256_sub_epi8(offset3, _mm256_abs_epi8(symbol_i));
+    symbol_bit32 = _mm256_sub_epi8(offset2, _mm256_abs_epi8(symbol_bit54));
+    symbol_bit10 = _mm256_sub_epi8(offset1, _mm256_abs_epi8(symbol_bit32));
+
+    /*
+     * Now extract the result and store it. We must do this 4 times due
+     * to the capacity of a 256 bit vector
+     */
+    result10 = _mm256_shuffle_epi8(symbol_bit10, shuffle_bit10_1);
+    result32 = _mm256_shuffle_epi8(symbol_bit32, shuffle_bit32_1);
+    result54 = _mm256_shuffle_epi8(symbol_bit54, shuffle_bit54_1);
+    result76 = _mm256_shuffle_epi8(symbol_i, shuffle_bit76_1);
+    // Store the result 
+    result_final1 = _mm256_or_si256(_mm256_or_si256(_mm256_or_si256(
+            result76, result54), result32), result10);
+      
+    // Extract and store the second set of results.
+    result10 = _mm256_shuffle_epi8(symbol_bit10, shuffle_bit10_2);
+    result32 = _mm256_shuffle_epi8(symbol_bit32, shuffle_bit32_2);
+    result54 = _mm256_shuffle_epi8(symbol_bit54, shuffle_bit54_2);
+    result76 = _mm256_shuffle_epi8(symbol_i, shuffle_bit76_2);
+    // Store the result 
+    result_final2 = _mm256_or_si256(_mm256_or_si256(_mm256_or_si256(
+            result76, result54), result32), result10);
+    // Third set
+    result10 = _mm256_shuffle_epi8(symbol_bit10, shuffle_bit10_3);
+    result32 = _mm256_shuffle_epi8(symbol_bit32, shuffle_bit32_3);
+    result54 = _mm256_shuffle_epi8(symbol_bit54, shuffle_bit54_3);
+    result76 = _mm256_shuffle_epi8(symbol_i, shuffle_bit76_3);
+    // Store the result 
+    result_final3 = _mm256_or_si256(_mm256_or_si256(_mm256_or_si256(
+            result76, result54), result32), result10);
+    // Fourth and final set.
+    result10 = _mm256_shuffle_epi8(symbol_bit10, shuffle_bit10_4);
+    result32 = _mm256_shuffle_epi8(symbol_bit32, shuffle_bit32_4);
+    result54 = _mm256_shuffle_epi8(symbol_bit54, shuffle_bit54_4);
+    result76 = _mm256_shuffle_epi8(symbol_i, shuffle_bit76_4);
+    // Store the result 
+    result_final4 = _mm256_or_si256(_mm256_or_si256(_mm256_or_si256(
+            result76, result54), result32), result10);
+    /*
+     * Now, unshuffle the result vectors, and store them to memory
+     */
+    _mm256_storeu_si256(result_ptr, _mm256_permute2x128_si256(
+                        result_final1, result_final2, 0x20));
+    result_ptr++;
+    _mm256_storeu_si256(result_ptr, _mm256_permute2x128_si256(
+                        result_final3, result_final4, 0x20));
+    result_ptr++;
+    _mm256_storeu_si256(result_ptr, _mm256_permute2x128_si256(
+                        result_final1, result_final2, 0x31));
+    result_ptr++;
+    _mm256_storeu_si256(result_ptr, _mm256_permute2x128_si256(
+                        result_final3, result_final4, 0x31));
+    result_ptr++;
+  }
+  // Demodulate the last symbols
+  int next_start = 16 * (num / 16);
+  Demod256qamSoftSse(vec_in + 2 * next_start, llr + next_start * 8, 
                       num - next_start);
 }
