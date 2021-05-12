@@ -273,6 +273,10 @@ void DoDecode::start_work()
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
 
+        if (cfg->test_mode > 0) {
+            continue;
+        }
+
         if (likely(state_trigger)) {
             loop_count ++;
         }

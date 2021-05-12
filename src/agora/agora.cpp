@@ -50,9 +50,9 @@ Agora::Agora(Config* cfg)
     //     mac_std_thread_ = std::thread(&MacThread::run_event_loop, mac_thread_);
     // }
 
-    if (config_->test_mode >= 2) {
-        goto creation_end;
-    }
+    // if (config_->test_mode >= 2) {
+    //     goto creation_end;
+    // }
     
     /* Create worker threads */
     do_subcarrier_threads_.resize(
@@ -63,9 +63,9 @@ Agora::Agora(Config* cfg)
             = std::thread(&Agora::subcarrier_worker, this, i);
     }
 
-    if (config_->test_mode >= 1) {
-        goto creation_end;
-    }
+    // if (config_->test_mode >= 1) {
+    //     goto creation_end;
+    // }
 
     if (cfg->downlink_mode) {
         do_encode_threads_.resize(cfg->get_num_ues_to_process());

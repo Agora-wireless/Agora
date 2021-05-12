@@ -155,6 +155,10 @@ public:
         while (cfg->running && !SignalHandler::gotExitSignal()) {
             size_t worked = 0;
 
+            if (cfg->test_mode > 1) {
+                continue;
+            }
+
             if (zf_cur_frame_ > demul_cur_frame_) {
 
                 work_start_tsc = rdtsc();
