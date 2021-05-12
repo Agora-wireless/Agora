@@ -7,8 +7,8 @@
 #include "memory_manage.h"
 #include "modulation.h"
 
-#define NUM_SYMBOLS 1000   // number of symbols to modulate and demodulate
-#define NUM_ITERATIONS 50 // number of iterations to run tests
+#define NUM_SYMBOLS 300  // number of symbols to modulate and demodulate
+#define NUM_ITERATIONS 1 // number of iterations to run tests
 
 /**
  * Adds additive white gaussian noise to the supplied signal
@@ -51,19 +51,19 @@ static void run_256QAM_soft_demod(void (*demod_func)(const float*, int8_t*, int)
   complex_float *channel_input;
   Table<complex_float> mod_table;
   complex_float *channel_output;
-  int8_t *output_demod_loop;
+  int8_t *output_demod;
   int shift_offset = 7;
   unsigned int i, j, snr_idx;
   unsigned int num = NUM_SYMBOLS;
   double runtime, start_time;
-  float SNR_vals[] = {10.0, 25.0, 50.0};
+  float SNR_vals[] = {10.0, 25.0, 50.0, 100.0};
   float SNR, err_rate;
 
   // Allocate storage buffers
   AllocBuffer1d(&input_symbols, num, Agora_memory::Alignment_t::kAlign32, 1);
   AllocBuffer1d(&channel_input, num, Agora_memory::Alignment_t::kAlign32, 1);
   AllocBuffer1d(&channel_output, num, Agora_memory::Alignment_t::kAlign32, 1);
-  AllocBuffer1d(&output_demod_loop, num * 8,
+  AllocBuffer1d(&output_demod, num * 8,
                 Agora_memory::Alignment_t::kAlign32, 1);
   AllocBuffer1d(&output_symbols, num, Agora_memory::Alignment_t::kAlign32, 1);
   InitModulationTable(mod_table, 256);
@@ -90,7 +90,7 @@ static void run_256QAM_soft_demod(void (*demod_func)(const float*, int8_t*, int)
       apply_awgn(channel_input, channel_output, num, SNR);
       // Demodulate Symbols
       start_time = GetTime::GetTimeUs();
-      demod_func((float*)channel_output, output_demod_loop, num);
+      demod_func((float*)channel_output, output_demod, num);
       runtime += (GetTime::GetTimeUs() - start_time);
       // Decode Symbols
       for (j = 0; j < num * 8; j++) {
@@ -98,7 +98,7 @@ static void run_256QAM_soft_demod(void (*demod_func)(const float*, int8_t*, int)
         * If llr value is negative, bit will be zero. 
         * If it is positive, bit will be 1
         */
-        if (output_demod_loop[j] > 0) {
+        if (output_demod[j] > 0) {
           output_symbols[j / 8] |= 0x1 << shift_offset;
         } else {
           output_symbols[j / 8] &= ~(0x1 << shift_offset);
@@ -142,6 +142,53 @@ TEST(TestDemod256QAM, SoftLoop) {
 
 TEST(TestDemod256QAM, SoftSSE) {
   run_256QAM_soft_demod(Demod256qamSoftSse, "Demod256qamSoftSse");
+}
+
+TEST(TestDemod256QAM, SoftAVX2) {
+  run_256QAM_soft_demod(Demod256qamSoftAvx2, "Demod256qamSoftAvx2");
+}
+
+/**
+ * Unlike the rest of the testing suite, this test verifies that
+ * all AVX implementations of 256 QAM demodulation produce the EXACT
+ * same LLR results. It treats the SSE implementation as a ground truth.
+ * 
+ * Note: the SSE implementation was verified against the loop one during 
+ * testing. The loop implementation rounds floats differently, resulting in
+ * a slightly different LLR. This is why the SSE implementation is used as a
+ * ground truth.
+ * 
+ */
+TEST(TestDemod256QAM, VerifyCorrectness) {
+  uint8_t *input_symbols;
+  complex_float *channel_input;
+  Table<complex_float> mod_table;
+  int8_t *output_demod_truth;
+  int8_t *output_demod_check;
+  unsigned int i;
+  unsigned int num = NUM_SYMBOLS;
+
+  // Allocate storage buffers
+  AllocBuffer1d(&input_symbols, num, Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&channel_input, num, Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&output_demod_truth, num * 8,
+                Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&output_demod_check, num * 8,
+                Agora_memory::Alignment_t::kAlign64, 1);
+  InitModulationTable(mod_table, 256);
+  srand(0);
+  for (i = 0; i < num; i++) {
+    input_symbols[i] = rand() % 256;
+  }
+  // Modulate symbols
+  for (i = 0; i < num; i++) {
+    channel_input[i] = ModSingle(input_symbols[i], mod_table);
+  }
+  // Generate ground truth
+  Demod256qamSoftSse((float*)channel_input, output_demod_truth, num);
+  // Test AVX2 implementation
+  Demod256qamSoftAvx2((float*)channel_input, output_demod_check, num);
+  ASSERT_EQ(memcmp(output_demod_check, output_demod_truth, num), 0);
 }
 
 int main(int argc, char **argv) {
