@@ -38,7 +38,15 @@ static void apply_awgn(complex_float *signal, complex_float *output, int len, fl
     }
 }
 
-TEST(TestDemod256QAM, SoftLoop) {
+/**
+ * Runs 256 QAM soft demodulation across several SNR values,
+ * using the provided function for demodulation.
+ * Provided to simplify testing.
+ * @param demod_func: Function to use for demodulation
+ * @param func_desc: string describing function
+ */
+static void run_256QAM_soft_demod(void (*demod_func)(const float*, int8_t*, int),
+                                  const char *func_desc) {
   uint8_t *input_symbols, *output_symbols;
   complex_float *channel_input;
   Table<complex_float> mod_table;
@@ -82,7 +90,7 @@ TEST(TestDemod256QAM, SoftLoop) {
       apply_awgn(channel_input, channel_output, num, SNR);
       // Demodulate Symbols
       start_time = GetTime::GetTimeUs();
-      Demod256qamSoftLoop((float*)channel_output, output_demod_loop, num);
+      demod_func((float*)channel_output, output_demod_loop, num);
       runtime += (GetTime::GetTimeUs() - start_time);
       // Decode Symbols
       for (j = 0; j < num * 8; j++) {
@@ -112,9 +120,28 @@ TEST(TestDemod256QAM, SoftLoop) {
     std::printf("256 QAM soft demod of %i symbols completed with average "
       "runtime of %f us over %i iterations\n", num,
       runtime / NUM_ITERATIONS, NUM_ITERATIONS);
+    err_rate = (err_rate * 100) / (NUM_SYMBOLS * NUM_ITERATIONS);
     std::printf("Soft Demod Error Rate for 256 QAM was %.2f%% at %f db SNR\n",
-      (err_rate * 100) / (NUM_SYMBOLS * NUM_ITERATIONS), SNR);
+      err_rate, SNR);
   }
+  /*
+   * For the last SNR, assert that the error rate is zero. Although a
+   * 100 db SNR does not guarantee no errors, they should be less likely
+   */
+  if (err_rate > FLT_MIN) {
+    std::fprintf(stderr, 
+      "Highest SNR error rate was nonzero, raise SNR or fix implementation\n");
+    ASSERT_EQ(err_rate, 0.0);
+  }
+  std::printf("Function utilized was %s\n", func_desc);
+}
+
+TEST(TestDemod256QAM, SoftLoop) {
+  run_256QAM_soft_demod(Demod256qamSoftLoop, "Demod256qamSoftLoop"); 
+}
+
+TEST(TestDemod256QAM, SoftSSE) {
+  run_256QAM_soft_demod(Demod256qamSoftSse, "Demod256qamSoftSse");
 }
 
 int main(int argc, char **argv) {

@@ -68,6 +68,7 @@ void Demod256qamHardAvx2(float* vec_in, uint8_t* vec_out, int num);
 void Demod256qamHardAvx512(float* vec_in, uint8_t* vec_out, int num);
 #endif
 void Demod256qamSoftLoop(const float *vec_in, int8_t *llr, int num);
+void Demod256qamSoftSse(const float *vec_in, int8_t *llr, int num);
 
 void Print256Epi8(__m256i var);
 
