@@ -2066,3 +2066,165 @@ void Demod256qamSoftLoop(const float *vec_in, int8_t *llr, int num) {
       QAM256_THRESHOLD_1 * SCALE_BYTE_CONV_QAM256 - abs(llr[8 * i + 5]);
   }
 }
+
+
+void Demod256qamSoftSse(const float *vec_in, int8_t *llr, int num) {
+  float* symbols_ptr = (float*)vec_in;
+  auto* result_ptr = reinterpret_cast<__m128i*>(llr);
+  __m128 symbol1;
+  __m128 symbol2;
+  __m128 symbol3;
+  __m128 symbol4;
+  __m128i symbol_i1;
+  __m128i symbol_i2;
+  __m128i symbol_i3;
+  __m128i symbol_i4;
+  __m128i symbol_i;
+  __m128i symbol_bit54;
+  __m128i symbol_bit32;
+  __m128i symbol_bit01;
+  __m128i symbol_12;
+  __m128i symbol_34;
+  __m128i offset1 = _mm_set1_epi8(QAM256_THRESHOLD_1 * SCALE_BYTE_CONV_QAM256);
+  __m128i offset2 = _mm_set1_epi8(QAM256_THRESHOLD_2 * SCALE_BYTE_CONV_QAM256);
+  __m128i offset3 = _mm_set1_epi8(QAM256_THRESHOLD_4 * SCALE_BYTE_CONV_QAM256);
+  __m128 scale_v = _mm_set1_ps(SCALE_BYTE_CONV_QAM256);
+  __m128i result01;
+  __m128i result32;
+  __m128i result54;
+  __m128i result76;
+
+  __m128i shuffle_bit76_1 =
+      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 3, 2, 0xff, 0xff, 0xff, 
+                   0xff, 0xff, 0xff, 1, 0);
+  __m128i shuffle_bit76_2 =
+      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 7, 6, 0xff, 0xff, 0xff,
+                   0xff, 0xff, 0xff, 5, 4);
+  __m128i shuffle_bit76_3 =
+      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 11, 10, 0xff, 0xff, 0xff,
+                   0xff, 0xff, 0xff, 9, 8);
+  __m128i shuffle_bit76_4 =
+      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 15, 14, 0xff, 0xff, 0xff,
+                   0xff, 0xff, 0xff, 13, 12);
+
+  __m128i shuffle_bit54_1 =
+      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 3, 2, 0xff, 0xff, 0xff, 0xff, 0xff, 
+                   0xff, 1, 0, 0xff, 0xff);
+
+  __m128i shuffle_bit54_2 =
+      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 7, 6, 0xff, 0xff, 0xff, 0xff, 0xff, 
+                   0xff, 5, 4, 0xff, 0xff);
+
+  __m128i shuffle_bit54_3 =
+      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 11, 10, 0xff, 0xff, 0xff, 0xff, 0xff, 
+                   0xff, 9, 8, 0xff, 0xff);
+
+  __m128i shuffle_bit54_4 =
+      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 15, 14, 0xff, 0xff, 0xff, 0xff, 0xff, 
+                   0xff, 13, 12, 0xff, 0xff);
+
+  __m128i shuffle_bit32_1 =
+      _mm_set_epi8(0xff, 0xff, 3, 2, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 1, 
+                   0, 0xff, 0xff, 0xff, 0xff);
+
+  __m128i shuffle_bit32_2 =
+      _mm_set_epi8(0xff, 0xff, 7, 6, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 5, 
+                   4, 0xff, 0xff, 0xff, 0xff);
+  
+  __m128i shuffle_bit32_3 =
+      _mm_set_epi8(0xff, 0xff, 11, 10, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 9, 
+                   8, 0xff, 0xff, 0xff, 0xff);
+  
+  __m128i shuffle_bit32_4 =
+      _mm_set_epi8(0xff, 0xff, 15, 14, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 13, 
+                   12, 0xff, 0xff, 0xff, 0xff);
+  
+  __m128i shuffle_bit01_1 = 
+      _mm_set_epi8(3, 2, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 1, 0, 0xff, 0xff,
+                   0xff, 0xff, 0xff, 0xff);  
+  
+  __m128i shuffle_bit01_2 = 
+      _mm_set_epi8(7, 6, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 5, 4, 0xff, 0xff,
+                   0xff, 0xff, 0xff, 0xff);  
+  
+  __m128i shuffle_bit01_3 = 
+      _mm_set_epi8(11, 10, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 9, 8, 0xff, 0xff,
+                   0xff, 0xff, 0xff, 0xff);  
+
+  __m128i shuffle_bit01_4 = 
+      _mm_set_epi8(15, 14, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 13, 12, 0xff, 
+                   0xff, 0xff, 0xff, 0xff, 0xff);  
+
+
+  for (int i = 0; i < num / 8; i++) {
+    symbol1 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol2 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol3 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol4 = _mm_load_ps(symbols_ptr);
+    symbols_ptr += 4;
+    symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
+    symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
+    symbol_i3 = _mm_cvtps_epi32(_mm_mul_ps(symbol3, scale_v));
+    symbol_i4 = _mm_cvtps_epi32(_mm_mul_ps(symbol4, scale_v));
+    symbol_12 = _mm_packs_epi32(symbol_i1, symbol_i2);
+    symbol_34 = _mm_packs_epi32(symbol_i3, symbol_i4);
+    symbol_i = _mm_packs_epi16(symbol_12, symbol_34);
+
+    /*
+     * This math is where the LLR occurs. Note that we use the 
+     * absolute value of the prior vector for the next subtraction,
+     * like in the traditional LLR
+     */ 
+    symbol_bit54 = _mm_sub_epi8(offset3, _mm_abs_epi8(symbol_i));
+    symbol_bit32 = _mm_sub_epi8(offset2, _mm_abs_epi8(symbol_bit54));
+    symbol_bit01 = _mm_sub_epi8(offset1, _mm_abs_epi8(symbol_bit32));
+
+    /*
+     * Now extract the result and store it. We must do this 4 times due
+     * to the capacity of a 128 bit vector
+     */
+    result01 = _mm_shuffle_epi8(symbol_bit01, shuffle_bit01_1);
+    result32 = _mm_shuffle_epi8(symbol_bit32, shuffle_bit32_1);
+    result54 = _mm_shuffle_epi8(symbol_bit54, shuffle_bit54_1);
+    result76 = _mm_shuffle_epi8(symbol_i, shuffle_bit76_1);
+    // Store the first set of results.
+    _mm_store_si128(result_ptr,
+                    _mm_or_si128(_mm_or_si128(_mm_or_si128(
+                      result01, result32), result54), result76));
+    result_ptr++;
+    // Extract and store the second set of results.
+    result01 = _mm_shuffle_epi8(symbol_bit01, shuffle_bit01_2);
+    result32 = _mm_shuffle_epi8(symbol_bit32, shuffle_bit32_2);
+    result54 = _mm_shuffle_epi8(symbol_bit54, shuffle_bit54_2);
+    result76 = _mm_shuffle_epi8(symbol_i, shuffle_bit76_2);
+    _mm_store_si128(result_ptr,
+                    _mm_or_si128(_mm_or_si128(_mm_or_si128(
+                      result01, result32), result54), result76));
+    result_ptr++;
+    // Third set
+    result01 = _mm_shuffle_epi8(symbol_bit01, shuffle_bit01_3);
+    result32 = _mm_shuffle_epi8(symbol_bit32, shuffle_bit32_3);
+    result54 = _mm_shuffle_epi8(symbol_bit54, shuffle_bit54_3);
+    result76 = _mm_shuffle_epi8(symbol_i, shuffle_bit76_3);
+    _mm_store_si128(result_ptr,
+                    _mm_or_si128(_mm_or_si128(_mm_or_si128(
+                      result01, result32), result54), result76));
+    result_ptr++;
+    // Fourth and final set.
+    result01 = _mm_shuffle_epi8(symbol_bit01, shuffle_bit01_4);
+    result32 = _mm_shuffle_epi8(symbol_bit32, shuffle_bit32_4);
+    result54 = _mm_shuffle_epi8(symbol_bit54, shuffle_bit54_4);
+    result76 = _mm_shuffle_epi8(symbol_i, shuffle_bit76_4);
+    _mm_store_si128(result_ptr,
+                    _mm_or_si128(_mm_or_si128(_mm_or_si128(
+                      result01, result32), result54), result76));
+    result_ptr++;
+  }
+  // Demodulate the last symbols
+  int next_start = 8 * (num / 8);
+  Demod256qamSoftLoop(vec_in + 2 * next_start, llr + next_start * 8, 
+                      num - next_start);
+}
