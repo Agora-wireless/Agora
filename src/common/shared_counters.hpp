@@ -35,9 +35,9 @@ public:
     }
 
     // When receive a new packet, record it here
-    bool add_new_packet(const Packet* pkt)
+    bool add_new_packet(const Packet* pkt, int tid = 0)
     {
-        if (pkt->frame_id >= cur_frame_ + kFrameWnd) {
+        if (unlikely(pkt->frame_id >= cur_frame_ + kFrameWnd)) {
             MLPD_ERROR(
                 "SharedCounters RxStatus error: Received packet for future "
                 "frame %u beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
@@ -52,35 +52,62 @@ public:
             frame_start_time_[pkt->frame_id] = get_ns();
         }
 
+        size_t tsc1 = rdtsc();
         const size_t frame_slot = pkt->frame_id % kFrameWnd;
         bool full = false;
         num_pkts_[frame_slot]++;
+        size_t tsc2 = rdtsc();
         encode_ready_[frame_slot] = true;
+        size_t tsc3 = rdtsc();
         if (num_pkts_[frame_slot]
             == num_pkts_per_symbol_
                 * (num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_)) {
-            printf("SharedCounters: received all packets in frame: %u. "
-                   "Pilot pkts = %zu of %zu\n",
-                pkt->frame_id, num_pilot_pkts_[frame_slot].load(),
-                num_pilot_pkts_per_frame_);
+            // printf("SharedCounters: received all packets in frame: %u. "
+            //        "Pilot pkts = %zu of %zu\n",
+            //     pkt->frame_id, num_pilot_pkts_[frame_slot].load(),
+            //     num_pilot_pkts_per_frame_);
             full = true;
             frame_iq_time_[pkt->frame_id] = get_ns();
         }
 
+        size_t tsc4 = rdtsc();
         if (pkt->symbol_id < num_pilot_symbols_per_frame_) {
             num_pilot_pkts_[frame_slot]++;
-            if (num_pilot_pkts_[frame_slot] == num_pilot_pkts_per_frame_) {
-                printf("SharedCounters: received all pilots in frame: %u\n",
-                    pkt->frame_id);
-            }
+            // if (num_pilot_pkts_[frame_slot] == num_pilot_pkts_per_frame_) {
+            //     printf("SharedCounters: received all pilots in frame: %u\n",
+            //         pkt->frame_id);
+            // }
         } else {
             num_data_pkts_[frame_slot][pkt->symbol_id - num_pilot_symbols_per_frame_]++;
         }
+
+        size_t tsc5 = rdtsc();
         if (pkt->frame_id > latest_frame_) {
             // TODO: race condition could happen here but the impact is small
             latest_frame_ = pkt->frame_id;
         }
+        size_t tsc6 = rdtsc();
         
+        if (unlikely(tsc2 - tsc1 > max_tsc1_[tid])) {
+            max_tsc1_[tid] = tsc2 - tsc1;
+            max_tsc1_frame_[tid] = pkt->frame_id;
+        }
+        if (unlikely(tsc3 - tsc2 > max_tsc2_[tid])) {
+            max_tsc2_[tid] = tsc3 - tsc2;
+            max_tsc2_frame_[tid] = pkt->frame_id;
+        }
+        if (unlikely(tsc4 - tsc3 > max_tsc3_[tid])) {
+            max_tsc3_[tid] = tsc4 - tsc3;
+            max_tsc3_frame_[tid] = pkt->frame_id;
+        }
+        if (unlikely(tsc5 - tsc4 > max_tsc4_[tid])) {
+            max_tsc4_[tid] = tsc5 - tsc4;
+            max_tsc4_frame_[tid] = pkt->frame_id;
+        }
+        if (unlikely(tsc6 - tsc5 > max_tsc5_[tid])) {
+            max_tsc5_[tid] = tsc6 - tsc5;
+            max_tsc5_frame_[tid] = pkt->frame_id;
+        }
         if (test_mode_ >= 2) {
             if (full && pkt->frame_id == cur_frame_) {
                 while (num_pkts_[cur_frame_ % kFrameWnd]
@@ -240,6 +267,18 @@ public:
 
     // Test mode
     size_t test_mode_;
+
+    // Cycle measurements
+    size_t max_tsc1_[kMaxThreads] = {0};
+    size_t max_tsc2_[kMaxThreads] = {0};
+    size_t max_tsc3_[kMaxThreads] = {0};
+    size_t max_tsc4_[kMaxThreads] = {0};
+    size_t max_tsc5_[kMaxThreads] = {0};
+    size_t max_tsc1_frame_[kMaxThreads] = {0};
+    size_t max_tsc2_frame_[kMaxThreads] = {0};
+    size_t max_tsc3_frame_[kMaxThreads] = {0};
+    size_t max_tsc4_frame_[kMaxThreads] = {0};
+    size_t max_tsc5_frame_[kMaxThreads] = {0};
 
     // Copies of Config variables
     const size_t num_pilot_pkts_per_frame_;

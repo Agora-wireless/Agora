@@ -166,6 +166,9 @@ private:
     size_t last_packet_cycle_[kMaxThreads] = {0};
     size_t max_inter_packet_gap_[kMaxThreads] = {0};
     size_t max_inter_packet_gap_frame_[kMaxThreads] = {0};
+
+    size_t max_packet_record_time_[kMaxThreads] = {0};
+    size_t max_packet_record_time_frame_[kMaxThreads] = {0};
 };
 
 #endif

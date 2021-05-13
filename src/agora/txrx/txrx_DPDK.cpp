@@ -770,8 +770,15 @@ void* PacketTXRX::loop_tx_rx(int tid)
             radio_id = radio_lo;
         
     }
-    printf("Thread %u receive %lu packets, max gap is %lu, frame %u\n", tid, 
-        recv_pkts, max_inter_packet_gap_[tid], max_inter_packet_gap_frame_[tid]);
+    printf("Thread %u receive %lu packets, max gap is %lu, frame %u, max record %lu, frame %lu\n", tid, 
+        recv_pkts, max_inter_packet_gap_[tid], max_inter_packet_gap_frame_[tid],
+        max_packet_record_time_[tid], max_packet_record_time_frame_[tid]);
+    printf("Thread %u record breakdown: 1:%lu,%u 2:%lu,%u 3:%lu,%u 4:%lu,%u 5:%lu,%u\n", tid,
+        rx_status_->max_tsc1_[tid], rx_status_->max_tsc1_frame_[tid],
+        rx_status_->max_tsc2_[tid], rx_status_->max_tsc2_frame_[tid],
+        rx_status_->max_tsc3_[tid], rx_status_->max_tsc3_frame_[tid],
+        rx_status_->max_tsc4_[tid], rx_status_->max_tsc4_frame_[tid],
+        rx_status_->max_tsc5_[tid], rx_status_->max_tsc5_frame_[tid]);
     return 0;
 }
 
@@ -846,7 +853,7 @@ int PacketTXRX::recv_relocate(int tid)
                 last_packet_cycle_[tid] = cur_cycle;
             }
 
-            if (likely(last_packet_cycle_[tid] > 0) && unlikely(max_inter_packet_gap_[tid] < cur_cycle - last_packet_cycle_[tid]) && pkt->frame_id < 8000) {
+            if (likely(last_packet_cycle_[tid] > 0) && unlikely(max_inter_packet_gap_[tid] < cur_cycle - last_packet_cycle_[tid])) {
                 max_inter_packet_gap_[tid] = cur_cycle - last_packet_cycle_[tid];
                 max_inter_packet_gap_frame_[tid] = pkt->frame_id;
             }
@@ -856,9 +863,16 @@ int PacketTXRX::recv_relocate(int tid)
             }
 
             // get the position in rx_buffer
-            if (!rx_status_->add_new_packet(pkt)) {
+            cur_cycle = rdtsc();
+            if (!rx_status_->add_new_packet(pkt, tid)) {
                 cfg->running = false;
             }
+            size_t record_cycle = rdtsc() - cur_cycle;
+            if (record_cycle > max_packet_record_time_[tid]) {
+                max_packet_record_time_[tid] = record_cycle;
+                max_packet_record_time_frame_[tid] = pkt->frame_id;
+            }
+
         } else {
             printf("Received unknown packet from rru\n");
             exit(1);
