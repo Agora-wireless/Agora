@@ -81,7 +81,8 @@ class PacketTXRX {
  private:
   void LoopTxRx(int tid);  // The thread function for thread [tid]
   int DequeueSend(int tid);
-  struct Packet* RecvEnqueue(int tid, int radio_id, int rx_offset);
+  struct Packet* RecvEnqueue(size_t tid, size_t radio_id, size_t rx_offset);
+  RxPacket* GetRxPacket(size_t tid, size_t rx_count);
 
   void LoopTxRxArgos(int tid);
   int DequeueSendArgos(int tid);
@@ -106,8 +107,14 @@ class PacketTXRX {
 
   // Handle for socket threads
   std::array<std::thread, kMaxSocketNum> socket_std_threads_;
-  Table<char>* buffer_;
-  Table<int>* buffer_status_;
+  // Table<char>* buffer_;
+  // Table<int>* buffer_status_;
+
+  // Dimension 1: socket_thread
+  // Dimension 2: rx_packet
+  std::vector<std::vector<RxPacket>> rx_packets_;
+  size_t buffers_per_socket_;
+
   size_t packet_num_in_buffer_;
   char* tx_buffer_;
   Table<size_t>* frame_start_;

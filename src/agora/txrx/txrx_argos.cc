@@ -61,9 +61,9 @@ std::vector<struct Packet*> PacketTXRX::RecvEnqueueArgos(int tid, int radio_id,
       cfg_->Running(false);
       break;
     }
-    pkt[ch] = (struct Packet*)&rx_buffer[(rx_offset + ch) * packet_length];
+    pkt.at(ch) = (struct Packet*)&rx_buffer[(rx_offset + ch) * packet_length];
+    ant_ids.at(ch) = ant_id + ch;
     samp[ch] = pkt[ch]->data_;
-    ant_ids[ch] = ant_id + ch;
   }
 
   long long frame_time;
