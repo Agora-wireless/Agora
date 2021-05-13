@@ -312,10 +312,7 @@ void Agora::Start() {
       // FFT processing is scheduled after falling through the switch
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          size_t socket_thread_id = rx_tag_t(event.tags_[0]).tid_;
-          size_t sock_buf_offset = rx_tag_t(event.tags_[0]).offset_;
-          auto* pkt = (Packet*)(socket_buffer_[socket_thread_id] +
-                                (sock_buf_offset * cfg->PacketLength()));
+          Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->packet_;
 
           if (pkt->frame_id_ >= ((this->cur_sche_frame_id_ + kFrameWnd))) {
             MLPD_ERROR(
@@ -825,7 +822,7 @@ void Agora::Worker(int tid) {
 void Agora::WorkerFft(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerFFT, base_worker_core_offset_, tid);
 
-  /* Initialize IFFT operator */
+  /* Initialize FFT operator */
   std::unique_ptr<DoFFT> compute_fft(
       new DoFFT(config_, tid, socket_buffer_, socket_buffer_status_,
                 data_buffer_, csi_buffers_, calib_dl_buffer_, calib_ul_buffer_,

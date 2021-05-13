@@ -5,6 +5,7 @@
 #ifndef BUFFER_H_
 #define BUFFER_H_
 
+#include <atomic>
 #include <sstream>
 #include <vector>
 
@@ -18,6 +19,7 @@
 #include "common_typedef_sdk.h"
 
 // Event data tag for RX events
+/*
 union rx_tag_t {
   struct {
     size_t tid_ : 8;      // ID of the socket thread that received the packet
@@ -28,10 +30,7 @@ union rx_tag_t {
   rx_tag_t(size_t tid, size_t offset) : tid_(tid), offset_(offset) {}
 
   explicit rx_tag_t(size_t _tag) : tag_(_tag) {}
-};
-
-// Event data tag for FFT task requests
-using fft_req_tag_t = rx_tag_t;
+}; */
 
 // A generic tag type for Agora tasks. The tag for a particular task will
 // have only a subset of the fields initialized.
@@ -195,6 +194,48 @@ struct Packet {
     return ret.str();
   }
 };
+
+class RxPacket {
+ private:
+  std::atomic<int> references_;
+
+ public:
+  RxPacket() : references_(0) { packet_ = nullptr; }
+  explicit RxPacket(Packet *in) : references_(0) { Set(in); }
+  explicit RxPacket(const RxPacket &copy) : packet_(copy.packet_) {
+    references_.store(copy.references_.load());
+  }
+
+  Packet *packet_;
+  inline bool Set(Packet *in_pkt) {
+    if (references_.load() == 0) {
+      packet_ = in_pkt;
+      return true;
+    } else {
+      // Add runtime error?
+      return false;
+    }
+  }
+  inline bool Empty() const { return references_.load() == 0; }
+  inline void Use() { references_.fetch_add(1); }
+  inline void Free() { references_.fetch_sub(1); }
+};
+
+// Event data tag for RX events
+union rx_tag_t {
+  RxPacket *rx_packet_;
+  size_t tag_;
+
+  static_assert(sizeof(RxPacket *) >= sizeof(size_t),
+                "RxPacket pounter must fit inside a size_t value");
+
+  explicit rx_tag_t(RxPacket &rx_packet) : rx_packet_(&rx_packet) {}
+  explicit rx_tag_t(size_t tag) : tag_(tag) {}
+};
+///\todo Make sure RxPacket* is not bigher than size_t
+
+// Event data tag for FFT task requests
+using fft_req_tag_t = rx_tag_t;
 
 struct MacPacket {
   // The packet's data starts at kOffsetOfData bytes from the start
