@@ -195,10 +195,10 @@ public:
                             demul_cur_sym_ul_ = 0;
 
                             demod_start_tsc = rdtsc();
-                            printf("Main thread: Demodulation done frame: %lu "
-                                "(%lu UL symbols)\n",
-                                demul_cur_frame_,
-                                cfg->ul_data_symbol_num_perframe);
+                            // printf("Main thread: Demodulation done frame: %lu "
+                            //     "(%lu UL symbols)\n",
+                            //     demul_cur_frame_,
+                            //     cfg->ul_data_symbol_num_perframe);
                             print_tsc_duration += rdtsc() - demod_start_tsc;
                             
                             if (cfg->test_mode == 1) {
@@ -268,7 +268,7 @@ public:
                     n_zf_tasks_done_ = 0;
 
                     zf_start_tsc = rdtsc();
-                    printf("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
+                    // printf("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
                     print_tsc_duration += rdtsc() - zf_start_tsc;
 
                     zf_cur_frame_++;
@@ -302,10 +302,10 @@ public:
                 csi_tsc_duration += rdtsc() - csi_start_tsc;
 
                 csi_start_tsc = rdtsc();
-                printf(
-                    "Main thread: pilot frame: %lu, finished CSI for all pilot "
-                    "symbols\n",
-                    csi_cur_frame_);
+                // printf(
+                //     "Main thread: pilot frame: %lu, finished CSI for all pilot "
+                //     "symbols\n",
+                //     csi_cur_frame_);
                 print_tsc_duration += rdtsc() - csi_start_tsc;
 
                 csi_cur_frame_++;
