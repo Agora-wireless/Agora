@@ -2433,3 +2433,299 @@ void Demod256qamSoftAvx2(const float *vec_in, int8_t *llr, int num) {
   Demod256qamSoftSse(vec_in + 2 * next_start, llr + next_start * 8, 
                       num - next_start);
 }
+
+#ifdef __AVX512F__
+void Demod256qamSoftAvx512(const float *vec_in, int8_t *llr, int num) {
+  float* symbols_ptr = (float*)vec_in;
+  auto* result_ptr = reinterpret_cast<__m512i*>(llr);
+  __m512 symbol1;
+  __m512 symbol2;
+  __m512 symbol3;
+  __m512 symbol4;
+  __m512i symbol_i1;
+  __m512i symbol_i2;
+  __m512i symbol_i3;
+  __m512i symbol_i4;
+  __m512i symbol_i;
+  __m512i symbol_bit54;
+  __m512i symbol_bit32;
+  __m512i symbol_bit10;
+  __m512i symbol_12;
+  __m512i symbol_34;
+  __m512i offset1 = _mm512_set1_epi8(QAM256_THRESHOLD_1 * SCALE_BYTE_CONV_QAM256);
+  __m512i offset2 = _mm512_set1_epi8(QAM256_THRESHOLD_2 * SCALE_BYTE_CONV_QAM256);
+  __m512i offset3 = _mm512_set1_epi8(QAM256_THRESHOLD_4 * SCALE_BYTE_CONV_QAM256);
+  __m512 scale_v = _mm512_set1_ps(SCALE_BYTE_CONV_QAM256);
+  __m512i result10;
+  __m512i result32;
+  __m512i result54;
+  __m512i result76;
+  __m512i result_final;
+  __mmask32 bit76_mask = _mm512_movepi16_mask(_mm512_set_epi32(
+			  0x00000000, 0x0000FFFF,
+			  0x00000000, 0x0000FFFF,
+			  0x00000000, 0x0000FFFF,
+			  0x00000000, 0x0000FFFF,
+			  0x00000000, 0x0000FFFF,
+			  0x00000000, 0x0000FFFF,
+			  0x00000000, 0x0000FFFF,
+			  0x00000000, 0x0000FFFF));
+  __mmask32 bit54_mask = _mm512_movepi16_mask(_mm512_set_epi32(
+			  0x00000000, 0xFFFF0000,
+			  0x00000000, 0xFFFF0000,
+			  0x00000000, 0xFFFF0000,
+			  0x00000000, 0xFFFF0000,
+			  0x00000000, 0xFFFF0000,
+			  0x00000000, 0xFFFF0000,
+			  0x00000000, 0xFFFF0000,
+			  0x00000000, 0xFFFF0000));
+  __mmask32 bit32_mask = _mm512_movepi16_mask(_mm512_set_epi32(
+			  0x0000FFFF, 0x00000000,
+			  0x0000FFFF, 0x00000000,
+			  0x0000FFFF, 0x00000000,
+			  0x0000FFFF, 0x00000000,
+			  0x0000FFFF, 0x00000000,
+			  0x0000FFFF, 0x00000000,
+			  0x0000FFFF, 0x00000000,
+			  0x0000FFFF, 0x00000000));
+  __mmask32 bit10_mask = _mm512_movepi16_mask(_mm512_set_epi32(
+			  0xFFFF0000, 0x00000000,
+			  0xFFFF0000, 0x00000000,
+			  0xFFFF0000, 0x00000000,
+			  0xFFFF0000, 0x00000000,
+			  0xFFFF0000, 0x00000000,
+			  0xFFFF0000, 0x00000000,
+			  0xFFFF0000, 0x00000000,
+			  0xFFFF0000, 0x00000000));
+  
+
+  __m512i shuffle_bit76_1 = 
+         _mm512_setr_epi64(0,
+			  1,
+			  2,
+			  3,
+			  4,
+			  5,
+			  6,
+			  7);
+  __m512i shuffle_bit76_2 = 
+         _mm512_setr_epi64(8,
+			  9,
+			  10,
+			  11,
+			  12,
+			  13,
+			  14,
+			  15);
+  __m512i shuffle_bit76_3 = 
+         _mm512_setr_epi64(16,
+			  17,
+			  18,
+			  19,
+			  20,
+			  21,
+			  22,
+			  23);
+    __m512i shuffle_bit76_4 = 
+         _mm512_setr_epi64(24,
+			  25,
+			  26,
+			  27,
+			  28,
+			  29,
+			  30,
+			  31);
+  __m512i shuffle_bit54_1 = 
+         _mm512_setr_epi64(0 << 16,
+			  1 << 16,
+			  2 << 16,
+			  3 << 16,
+			  4 << 16,
+			  5 << 16,
+			  6 << 16,
+			  7 << 16);
+  __m512i shuffle_bit54_2 = 
+         _mm512_setr_epi64(8 << 16,
+			  9 << 16,
+			  10 << 16,
+			  11 << 16,
+			  12 << 16,
+			  13 << 16,
+			  14 << 16,
+			  15 << 16);
+  __m512i shuffle_bit54_3 = 
+         _mm512_setr_epi64(16 << 16,
+			  17 << 16,
+			  18 << 16,
+			  19 << 16,
+			  20 << 16,
+			  21 << 16,
+			  22 << 16,
+			  23 << 16);
+  __m512i shuffle_bit54_4 = 
+         _mm512_setr_epi64(24 << 16,
+			  25 << 16,
+			  26 << 16,
+			  27 << 16,
+			  28 << 16,
+			  29 << 16,
+			  30 << 16,
+			  31 << 16);
+  __m512i shuffle_bit32_1 = 
+         _mm512_setr_epi64(0L << 32,
+			  1L << 32,
+			  2L << 32,
+			  3L << 32,
+			  4L << 32,
+			  5L << 32,
+			  6L << 32,
+			  7L << 32);
+  __m512i shuffle_bit32_2 = 
+         _mm512_setr_epi64(8L << 32,
+			  9L << 32,
+			  10L << 32,
+			  11L << 32,
+			  12L << 32,
+			  13L << 32,
+			  14L << 32,
+			  15L << 32);
+  __m512i shuffle_bit32_3 = 
+         _mm512_setr_epi64(16L << 32,
+			  17L << 32,
+			  18L << 32,
+			  19L << 32,
+			  20L << 32,
+			  21L << 32,
+			  22L << 32,
+			  23L << 32);
+  __m512i shuffle_bit32_4 = 
+         _mm512_setr_epi64(24L << 32,
+			  25L << 32,
+			  26L << 32,
+			  27L << 32,
+			  28L << 32,
+			  29L << 32,
+			  30L << 32,
+			  31L << 32);
+  __m512i shuffle_bit10_1 = 
+         _mm512_setr_epi64(0L << 48,
+			  1L << 48,
+			  2L << 48,
+			  3L << 48,
+			  4L << 48,
+			  5L << 48,
+			  6L << 48,
+			  7L << 48);
+  __m512i shuffle_bit10_2 = 
+         _mm512_setr_epi64(8L << 48,
+			  9L << 48,
+			  10L << 48,
+			  11L << 48,
+			  12L << 48,
+			  13L << 48,
+			  14L << 48,
+			  15L << 48);
+  __m512i shuffle_bit10_3 = 
+         _mm512_setr_epi64(16L << 48,
+			  17L << 48,
+			  18L << 48,
+			  19L << 48,
+			  20L << 48,
+			  21L << 48,
+			  22L << 48,
+			  23L << 48);
+  __m512i shuffle_bit10_4 = 
+         _mm512_setr_epi64(24L << 48,
+			  25L << 48,
+			  26L << 48,
+			  27L << 48,
+			  28L << 48,
+			  29L << 48,
+			  30L << 48,
+			  31L << 48);
+  __m512i fix_pack = _mm512_set_epi64(7, 5, 3, 1, 6, 4, 2, 0);
+  __m512i zero_vec = _mm512_set_epi64(0, 0, 0, 0, 0, 0, 0, 0);
+    
+  for (int i = 0; i < num / 32; i++) {
+    symbol1 = _mm512_load_ps(symbols_ptr);
+    symbols_ptr += 16;
+    symbol2 = _mm512_load_ps(symbols_ptr);
+    symbols_ptr += 16;
+    symbol3 = _mm512_load_ps(symbols_ptr);
+    symbols_ptr += 16;
+    symbol4 = _mm512_load_ps(symbols_ptr);
+    symbols_ptr += 16;
+    symbol_i1 = _mm512_cvtps_epi32(_mm512_mul_ps(symbol1, scale_v));
+    symbol_i2 = _mm512_cvtps_epi32(_mm512_mul_ps(symbol2, scale_v));
+    symbol_i3 = _mm512_cvtps_epi32(_mm512_mul_ps(symbol3, scale_v));
+    symbol_i4 = _mm512_cvtps_epi32(_mm512_mul_ps(symbol4, scale_v));
+    // Pack symbols into 16 bit integers
+    symbol_12 = _mm512_packs_epi32(symbol_i1, symbol_i2);
+    // _packs intrinsic interleaves the two vectors, _permute fixes that
+    symbol_12 = _mm512_permutexvar_epi64(fix_pack, symbol_12);
+    symbol_34 = _mm512_packs_epi32(symbol_i3, symbol_i4);
+    symbol_34 = _mm512_permutexvar_epi64(fix_pack, symbol_34);
+    // Pack symbols into 8 bit integers (one 512 bit vector)
+    symbol_i = _mm512_packs_epi16(symbol_12, symbol_34);
+    symbol_i = _mm512_permutexvar_epi64(fix_pack, symbol_i);
+
+    /*
+     * This math is where the LLR occurs. Note that we use the 
+     * absolute value of the prior vector for the next subtraction,
+     * like in the traditional LLR
+     */ 
+    symbol_bit54 = _mm512_sub_epi8(offset3, _mm512_abs_epi8(symbol_i));
+    symbol_bit32 = _mm512_sub_epi8(offset2, _mm512_abs_epi8(symbol_bit54));
+    symbol_bit10 = _mm512_sub_epi8(offset1, _mm512_abs_epi8(symbol_bit32));
+
+    /*
+     * Now extract the result and store it. We must do this 4 times due
+     * to the capacity of a 512 bit vector
+     */
+    result10 = _mm512_mask_permutexvar_epi16(zero_vec, bit10_mask, shuffle_bit10_1, symbol_bit10);
+    result32 = _mm512_mask_permutexvar_epi16(zero_vec, bit32_mask, shuffle_bit32_1, symbol_bit32);
+    result54 = _mm512_mask_permutexvar_epi16(zero_vec, bit54_mask, shuffle_bit54_1, symbol_bit54);
+    result76 = _mm512_mask_permutexvar_epi16(zero_vec, bit76_mask, shuffle_bit76_1, symbol_i);
+    // Store the result 
+    result_final = _mm512_or_si512(_mm512_or_si512(_mm512_or_si512(
+            result76, result54), result32), result10);
+    _mm512_storeu_si512(result_ptr, result_final);
+    result_ptr++;
+   
+    // Extract and store the second set of results.
+    result10 = _mm512_mask_permutexvar_epi16(zero_vec, bit10_mask, shuffle_bit10_2, symbol_bit10);
+    result32 = _mm512_mask_permutexvar_epi16(zero_vec, bit32_mask, shuffle_bit32_2, symbol_bit32);
+    result54 = _mm512_mask_permutexvar_epi16(zero_vec, bit54_mask, shuffle_bit54_2, symbol_bit54);
+    result76 = _mm512_mask_permutexvar_epi16(zero_vec, bit76_mask, shuffle_bit76_2, symbol_i);
+    // Store the result 
+    result_final = _mm512_or_si512(_mm512_or_si512(_mm512_or_si512(
+            result76, result54), result32), result10);
+    _mm512_storeu_si512(result_ptr, result_final);
+    result_ptr++;    
+    // Third set
+    result10 = _mm512_mask_permutexvar_epi16(zero_vec, bit10_mask, shuffle_bit10_3, symbol_bit10);
+    result32 = _mm512_mask_permutexvar_epi16(zero_vec, bit32_mask, shuffle_bit32_3, symbol_bit32);
+    result54 = _mm512_mask_permutexvar_epi16(zero_vec, bit54_mask, shuffle_bit54_3, symbol_bit54);
+    result76 = _mm512_mask_permutexvar_epi16(zero_vec, bit76_mask, shuffle_bit76_3, symbol_i);
+    // Store the result 
+    result_final = _mm512_or_si512(_mm512_or_si512(_mm512_or_si512(
+            result76, result54), result32), result10);
+    _mm512_storeu_si512(result_ptr, result_final);
+    result_ptr++;    
+    //// Fourth and final set.
+    result10 = _mm512_mask_permutexvar_epi16(zero_vec, bit10_mask, shuffle_bit10_4, symbol_bit10);
+    result32 = _mm512_mask_permutexvar_epi16(zero_vec, bit32_mask, shuffle_bit32_4, symbol_bit32);
+    result54 = _mm512_mask_permutexvar_epi16(zero_vec, bit54_mask, shuffle_bit54_4, symbol_bit54);
+    result76 = _mm512_mask_permutexvar_epi16(zero_vec, bit76_mask, shuffle_bit76_4, symbol_i);
+    // Store the result 
+    result_final = _mm512_or_si512(_mm512_or_si512(_mm512_or_si512(
+            result76, result54), result32), result10);
+    _mm512_storeu_si512(result_ptr, result_final);
+    result_ptr++;    
+  }
+  // Demodulate the last symbols
+  int next_start = 32 * (num / 32);
+  Demod256qamSoftAvx2(vec_in + 2 * next_start, llr + next_start * 8, 
+                       num - next_start);
+}
+#endif
