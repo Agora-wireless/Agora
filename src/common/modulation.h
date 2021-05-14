@@ -71,6 +71,9 @@ void Demod256qamSoftLoop(const float *vec_in, int8_t *llr, int num);
 void Demod256qamSoftSse(const float *vec_in, int8_t *llr, int num);
 void Demod256qamSoftAvx2(const float *vec_in, int8_t *llr, int num);
 
+#ifdef __AVX512F__
+void Demod256qamSoftAvx512(const float *vec_in, int8_t *llr, int num);
+#endif
 void Print256Epi8(__m256i var);
 
 #endif  // MODULATION_H_

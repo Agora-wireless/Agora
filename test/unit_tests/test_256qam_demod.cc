@@ -7,8 +7,8 @@
 #include "memory_manage.h"
 #include "modulation.h"
 
-#define NUM_SYMBOLS 300  // number of symbols to modulate and demodulate
-#define NUM_ITERATIONS 1 // number of iterations to run tests
+#define NUM_SYMBOLS 1000  // number of symbols to modulate and demodulate
+#define NUM_ITERATIONS 50 // number of iterations to run tests
 
 /**
  * Adds additive white gaussian noise to the supplied signal
@@ -60,12 +60,12 @@ static void run_256QAM_soft_demod(void (*demod_func)(const float*, int8_t*, int)
   float SNR, err_rate;
 
   // Allocate storage buffers
-  AllocBuffer1d(&input_symbols, num, Agora_memory::Alignment_t::kAlign32, 1);
-  AllocBuffer1d(&channel_input, num, Agora_memory::Alignment_t::kAlign32, 1);
-  AllocBuffer1d(&channel_output, num, Agora_memory::Alignment_t::kAlign32, 1);
+  AllocBuffer1d(&input_symbols, num, Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&channel_input, num, Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&channel_output, num, Agora_memory::Alignment_t::kAlign64, 1);
   AllocBuffer1d(&output_demod, num * 8,
-                Agora_memory::Alignment_t::kAlign32, 1);
-  AllocBuffer1d(&output_symbols, num, Agora_memory::Alignment_t::kAlign32, 1);
+                Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&output_symbols, num, Agora_memory::Alignment_t::kAlign64, 1);
   InitModulationTable(mod_table, 256);
   srand(0);
   runtime = 0.0;
@@ -148,6 +148,12 @@ TEST(TestDemod256QAM, SoftAVX2) {
   run_256QAM_soft_demod(Demod256qamSoftAvx2, "Demod256qamSoftAvx2");
 }
 
+#ifdef __AVX512F__
+TEST(TestDemod256QAM, SoftAVX512) {
+  run_256QAM_soft_demod(Demod256qamSoftAvx512, "Demod256qamSoftAvx512");
+}
+#endif
+
 /**
  * Unlike the rest of the testing suite, this test verifies that
  * all AVX implementations of 256 QAM demodulation produce the EXACT
@@ -188,7 +194,13 @@ TEST(TestDemod256QAM, VerifyCorrectness) {
   Demod256qamSoftSse((float*)channel_input, output_demod_truth, num);
   // Test AVX2 implementation
   Demod256qamSoftAvx2((float*)channel_input, output_demod_check, num);
-  ASSERT_EQ(memcmp(output_demod_check, output_demod_truth, num), 0);
+  ASSERT_EQ(memcmp(output_demod_check, output_demod_truth, num * 8), 0);
+
+#ifdef __AVX512F__
+  // Test AVX512 implementation
+  Demod256qamSoftAvx512((float*)channel_input, output_demod_check, num);
+  ASSERT_EQ(memcmp(output_demod_check, output_demod_truth, num * 8), 0);
+#endif
 }
 
 int main(int argc, char **argv) {
