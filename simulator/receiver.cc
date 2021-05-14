@@ -58,9 +58,6 @@ void* Receiver::LoopRecv(size_t tid) {
   size_t rx_slot = 0;
   RxPacket* current_packet = &rx_packets_.at(tid).at(rx_slot);
 
-  // char* cur_buffer_ptr = buffer_ptr;
-  // int* cur_buffer_status_ptr = buffer_status_ptr;
-  // size_t offset = 0;
   ssize_t prev_frame_id = -1;
   while (this->cfg_->Running() == true) {
     /* if buffer is full, exit */
@@ -94,7 +91,7 @@ void* Receiver::LoopRecv(size_t tid) {
       }
 
       current_packet->Use();
-      /* Push packet received event into the queue */
+      // Push packet received event into the queue
       EventData packet_message(EventType::kPacketRX,
                                rx_tag_t(current_packet).tag_);
 

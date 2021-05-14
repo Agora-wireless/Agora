@@ -192,6 +192,9 @@ class RxPacket {
     references_.store(copy.references_.load());
   }
 
+  // Disallow copy
+  RxPacket &operator=(const RxPacket &) = delete;
+
   Packet *packet_;
   inline bool Set(Packet *in_pkt) {
     if (references_.load() == 0) {
