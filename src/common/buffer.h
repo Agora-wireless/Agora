@@ -18,20 +18,6 @@
 
 #include "common_typedef_sdk.h"
 
-// Event data tag for RX events
-/*
-union rx_tag_t {
-  struct {
-    size_t tid_ : 8;      // ID of the socket thread that received the packet
-    size_t offset_ : 56;  // Offset in the socket thread's RX buffer
-  };
-  size_t tag_;
-
-  rx_tag_t(size_t tid, size_t offset) : tid_(tid), offset_(offset) {}
-
-  explicit rx_tag_t(size_t _tag) : tag_(_tag) {}
-}; */
-
 // A generic tag type for Agora tasks. The tag for a particular task will
 // have only a subset of the fields initialized.
 union gen_tag_t {
