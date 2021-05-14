@@ -70,8 +70,9 @@ class PacketTXRX {
    * @return True on successfully starting the network I/O threads, false
    * otherwise
    */
-  bool StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer, Table<size_t>& frame_start,
-                 char* tx_buffer, Table<complex_float>& calib_dl_buffer_,
+  bool StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
+                 Table<size_t>& frame_start, char* tx_buffer,
+                 Table<complex_float>& calib_dl_buffer_,
                  Table<complex_float>& calib_ul_buffer_);
 
   void SendBeacon(int tid, size_t frame_id);
@@ -104,8 +105,6 @@ class PacketTXRX {
 
   // Handle for socket threads
   std::array<std::thread, kMaxSocketNum> socket_std_threads_;
-  // Table<char>* buffer_;
-  // Table<int>* buffer_status_;
 
   // Dimension 1: socket_thread
   // Dimension 2: rx_packet
