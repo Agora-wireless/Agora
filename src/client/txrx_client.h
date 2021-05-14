@@ -39,11 +39,6 @@
  */
 class RadioTxRx {
  public:
-  struct RadioTxRxContext {
-    RadioTxRx* ptr_;
-    int tid_;
-  };
-
   RadioTxRx(Config* const cfg, int n_threads, int in_core_id);
   /**
    * N_THREAD: socket thread number
@@ -78,8 +73,7 @@ class RadioTxRx {
    *
    * @param in_buffer_length: size of ring buffer in bytes
    */
-  bool StartTxRx(Table<char>& in_buffer, Table<int>& in_buffer_status,
-                 size_t in_buffer_frame_num, size_t in_buffer_length,
+  bool StartTxRx(Table<char>& in_buffer, size_t in_buffer_length,
                  char* in_tx_buffer, int* in_tx_buffer_status,
                  int in_tx_buffer_frame_num, int in_tx_buffer_length);
 
@@ -88,7 +82,7 @@ class RadioTxRx {
    * (radio_id) and writes to an offset (rx_offset) in the receive buffer
    * (buffer_)
    */
-  struct Packet* RecvEnqueue(int tid, int radio_id, int rx_offset);
+  struct Packet* RecvEnqueue(size_t tid, size_t radio_id, size_t rx_slot);
 
   /**
    * @brief transmits a tx packet that is ready from PHY through socket
@@ -100,8 +94,8 @@ class RadioTxRx {
    * @brief receives a packet from hardware through radio index (radio_id)
    * and writes to an offset (rx_offset) in the receive buffer (buffer_)
    */
-  struct Packet* RecvEnqueueArgos(int tid, size_t radio_id, size_t& frame_id,
-                                  size_t& symbol_id, size_t rx_offset,
+  struct Packet* RecvEnqueueArgos(size_t tid, size_t radio_id, size_t& frame_id,
+                                  size_t& symbol_id, size_t rx_slot,
                                   bool dummy_enqueue);
 
   /**
@@ -114,7 +108,7 @@ class RadioTxRx {
    * @brief loop thread function that performs sample Packet I/O in simulation
    * mode.
    */
-  void* LoopTxRx(int tid);
+  void* LoopTxRx(size_t tid);
 
   /**
    * @brief loop thread function that performs sample TX/RX to/from client
@@ -123,7 +117,7 @@ class RadioTxRx {
    * timestamps to schedules transmit of processed uplink symbols with some
    * offset in the future from client wireless hardware.
    */
-  void* LoopTxRxArgos(int tid);
+  void* LoopTxRxArgos(size_t tid);
 
   /**
    * @brief loop thread function that performs sample TX/RX to/from client
@@ -134,8 +128,8 @@ class RadioTxRx {
    * the beacon time reference, it writes downlink symbols to rx buffers and
    * schedules uplink symbols for transmission from the hardware.
    */
-  void* LoopTxRxArgosSync(int tid);
-  void* LoopTxRxUsrpSync(int tid);
+  void* LoopTxRxArgosSync(size_t tid);
+  void* LoopTxRxUsrpSync(size_t tid);
 
  private:
   std::mutex mutex_;
@@ -152,18 +146,17 @@ class RadioTxRx {
   std::vector<std::unique_ptr<UDPClient>> udp_clients_;
   std::vector<std::unique_ptr<UDPServer>> udp_servers_;
 
-  Table<char>* buffer_;
-  Table<int>* buffer_status_;
-
-  size_t buffer_length_; /* Unused */
-  size_t buffer_frame_num_;
+  // Dimension 1: socket_thread
+  // Dimension 2: rx_packet
+  std::vector<std::vector<RxPacket>> rx_packets_;
+  size_t buffers_per_thread_;
 
   char* tx_buffer_;
   int* tx_buffer_status_;
   int tx_buffer_frame_num_;
   int tx_buffer_length_;
 
-  int thread_num_;
+  size_t thread_num_;
   int tx_thread_num_;
   // pointer of message_queue_
   moodycamel::ConcurrentQueue<EventData>* message_queue_;

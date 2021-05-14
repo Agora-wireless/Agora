@@ -48,8 +48,6 @@ class Receiver {
    * RX_THREAD_NUM - 1}
    */
   std::vector<std::thread> StartRecv(Table<char>& in_buffer,
-                                     Table<int>& in_buffer_status,
-                                     size_t in_buffer_frame_num,
                                      size_t in_buffer_length,
                                      Table<double>& in_frame_start);
 
@@ -57,21 +55,15 @@ class Receiver {
    * receive thread
    * context: ReceiverContext type
    */
-  void* LoopRecv(int tid);
+  void* LoopRecv(size_t tid);
 
  private:
-  Table<char>* buffer_;
-  Table<int>* buffer_status_;
-  long long buffer_length_;
-  size_t buffer_frame_num_;
-
-  char* tx_buffer_;
-  int* tx_buffer_status_;
-  long long tx_buffer_length_;
-  int tx_buffer_frame_num_;
+  // Dimension 1: socket_thread
+  // Dimension 2: rx_packet
+  std::vector<std::vector<RxPacket>> rx_packets_;
+  size_t buffers_per_thread_;
 
   size_t rx_thread_num_;
-  size_t tx_thread_num_;
 
   Table<double>* frame_start_;
   moodycamel::ConcurrentQueue<EventData>* message_queue_;
