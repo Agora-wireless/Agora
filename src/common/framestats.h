@@ -48,6 +48,7 @@ class FrameStats {
   size_t GetDLCalSymbol(size_t location) const;
   size_t GetULCalSymbol(size_t location) const;
 
+  size_t GetBeaconSymbol(size_t location) const;
   inline size_t GetBeaconSymbolLast() const {
     return ((this->beacon_symbols_.empty()) ? SIZE_MAX
                                             : this->beacon_symbols_.back());

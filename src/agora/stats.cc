@@ -160,7 +160,7 @@ void Stats::SaveToFile() {
           "%.3f %.3f %.3f "
           "%.3f %.3f\n",
           GetTime::CyclesToUs(ref_tsc - this->creation_tsc_, this->freq_ghz_),
-          MasterGetUsFromRef(TsType::kPilotRX, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kFirstSymbolRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kFFTPilotsDone, i, ref_tsc),
@@ -190,7 +190,7 @@ void Stats::SaveToFile() {
       std::fprintf(
           fp_debug, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f \n",
           GetTime::CyclesToUs(ref_tsc - this->creation_tsc_, this->freq_ghz_),
-          MasterGetUsFromRef(TsType::kPilotRX, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kFirstSymbolRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kFFTPilotsDone, i, ref_tsc),
@@ -218,7 +218,7 @@ void Stats::SaveToFile() {
           "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.3f %.3f %.3f "
           "%.3f %.3f\n",
           GetTime::CyclesToUs(ref_tsc - this->creation_tsc_, this->freq_ghz_),
-          MasterGetUsFromRef(TsType::kPilotRX, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kFirstSymbolRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
           MasterGetUsFromRef(TsType::kPilotAllRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kFFTPilotsDone, i, ref_tsc),

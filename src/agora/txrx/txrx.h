@@ -7,13 +7,6 @@
 #ifndef PACKETTXRX_H_
 #define PACKETTXRX_H_
 
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -27,11 +20,12 @@
 #include "concurrentqueue.h"
 #include "config.h"
 #include "gettime.h"
-#include "net.h"
 #include "radio_lib.h"
 #include "symbols.h"
+#include "udp_client.h"
+#include "udp_server.h"
 
-#ifdef USE_DPDK
+#if defined(USE_DPDK)
 #include "dpdk_transport.h"
 #endif
 
@@ -60,7 +54,7 @@ class PacketTXRX {
              moodycamel::ProducerToken** tx_ptoks);
   ~PacketTXRX();
 
-#ifdef USE_DPDK
+#if defined(USE_DPDK)
   // At thread [tid], receive packets from the NIC and enqueue them to the
   // master thread
   uint16_t DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
@@ -122,16 +116,16 @@ class PacketTXRX {
   moodycamel::ProducerToken** rx_ptoks_;
   moodycamel::ProducerToken** tx_ptoks_;
 
-  std::vector<struct sockaddr_in> bs_rru_sockaddr_;
-  std::vector<int> socket_;
+  std::vector<std::unique_ptr<UDPServer>> udp_servers_;
+  std::vector<std::unique_ptr<UDPClient>> udp_clients_;
 
-#ifdef USE_DPDK
+#if defined(USE_DPDK)
   uint32_t bs_rru_addr;     // IPv4 address of the simulator sender
   uint32_t bs_server_addr;  // IPv4 address of the Agora server
   struct rte_mempool* mbuf_pool;
 #endif
 
-  RadioConfig* radioconfig_;  // Used only in Argos mode
+  std::unique_ptr<RadioConfig> radioconfig_;  // Used only in Argos mode
 };
 
 #endif  // PACKETTXRX_H_

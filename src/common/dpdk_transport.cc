@@ -1,4 +1,4 @@
-#ifdef USE_DPDK
+#if defined(USE_DPDK)
 
 #include "dpdk_transport.h"
 
@@ -12,19 +12,19 @@
 
 inline const struct rte_eth_conf port_conf_default() {
   struct rte_eth_conf port_conf = rte_eth_conf();
-  port_conf.rxmode.max_rx_pkt_len = JUMBO_FRAME_MAX_SIZE;
+  port_conf.rxmode.max_rx_pkt_len = kJumboFrameMaxSize;
   port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
   return port_conf;
 }
 
-int DpdkTransport::nic_init(uint16_t port, struct rte_mempool* mbuf_pool,
-                            int thread_num, size_t pkt_len) {
+int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
+                           int thread_num, size_t pkt_len) {
   struct rte_eth_conf port_conf = port_conf_default();
   const uint16_t rxRings = thread_num, txRings = 2 * thread_num;
   int retval;
   uint16_t q;
-  uint16_t nb_rxd = RX_RING_SIZE;
-  uint16_t nb_txd = TX_RING_SIZE;
+  uint16_t nb_rxd = kRxRingSize;
+  uint16_t nb_txd = kTxRingSize;
 
   struct rte_eth_dev_info dev_info;
   struct rte_eth_rxconf rxconf;
@@ -105,7 +105,7 @@ int DpdkTransport::nic_init(uint16_t port, struct rte_mempool* mbuf_pool,
 }
 
 // Reference: https://stackoverflow.com/a/44948720
-void DpdkTransport::fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes) {
+void DpdkTransport::FastMemcpy(void* pvDest, void* pvSrc, size_t nBytes) {
   // std::printf("pvDest: 0x%lx, pvSrc: 0x%lx, Dest: %lx, Src,
   // %lx\n",intptr_t(pvDest), intptr_t(pvSrc), (intptr_t(pvDest) & 31),
   // (intptr_t(pvSrc) & 31) ); assert(nBytes % 32 == 0);
@@ -121,7 +121,7 @@ void DpdkTransport::fastMemcpy(void* pvDest, void* pvSrc, size_t nBytes) {
   _mm_sfence();
 }
 
-std::string DpdkTransport::pkt_to_string(const rte_mbuf* pkt) {
+std::string DpdkTransport::PktToString(const rte_mbuf* pkt) {
   const uint8_t* buf = rte_pktmbuf_mtod(pkt, uint8_t*);
 
   std::ostringstream ret;
@@ -134,8 +134,8 @@ std::string DpdkTransport::pkt_to_string(const rte_mbuf* pkt) {
   return ret.str();
 }
 
-void DpdkTransport::print_pkt(int src_ip, int dst_ip, uint16_t src_port,
-                              uint16_t dst_port, int len, int tid) {
+void DpdkTransport::PrintPkt(int src_ip, int dst_ip, uint16_t src_port,
+                             uint16_t dst_port, int len, int tid) {
   uint8_t b[12];
   uint16_t sp, dp;
 
@@ -158,9 +158,9 @@ void DpdkTransport::print_pkt(int src_ip, int dst_ip, uint16_t src_port,
       b[0], b[1], b[2], b[3], sp, b[6], b[7], b[8], b[9], dp, len);
 }
 
-void DpdkTransport::install_flow_rule(uint16_t port_id, uint16_t rx_q,
-                                      uint32_t src_ip, uint32_t dest_ip,
-                                      uint16_t src_port, uint16_t dst_port) {
+void DpdkTransport::InstallFlowRule(uint16_t port_id, uint16_t rx_q,
+                                    uint32_t src_ip, uint32_t dest_ip,
+                                    uint16_t src_port, uint16_t dst_port) {
   struct rte_flow_attr attr;
   struct rte_flow_item pattern[4];
   struct rte_flow_action action[2];
@@ -224,12 +224,12 @@ void DpdkTransport::install_flow_rule(uint16_t port_id, uint16_t rx_q,
   RtAssert(flow != nullptr, "DPDK: Failed to install flow rule");
 }
 
-rte_mbuf* DpdkTransport::alloc_udp(rte_mempool* mbuf_pool,
-                                   rte_ether_addr src_mac_addr,
-                                   rte_ether_addr dst_mac_addr,
-                                   uint32_t src_ip_addr, uint32_t dst_ip_addr,
-                                   uint16_t src_udp_port, uint16_t dst_udp_port,
-                                   size_t buffer_length) {
+rte_mbuf* DpdkTransport::AllocUdp(rte_mempool* mbuf_pool,
+                                  rte_ether_addr src_mac_addr,
+                                  rte_ether_addr dst_mac_addr,
+                                  uint32_t src_ip_addr, uint32_t dst_ip_addr,
+                                  uint16_t src_udp_port, uint16_t dst_udp_port,
+                                  size_t buffer_length) {
   rte_mbuf* tx_buf __attribute__((aligned(64)));
   tx_buf = rte_pktmbuf_alloc(mbuf_pool);
 
@@ -267,7 +267,7 @@ rte_mbuf* DpdkTransport::alloc_udp(rte_mempool* mbuf_pool,
   return tx_buf;
 }
 
-void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num) {
+void DpdkTransport::DpdkInit(uint16_t core_offset, size_t thread_num) {
   // DPDK setup
   std::string core_list = std::to_string(GetPhysicalCoreId(core_offset));
   for (size_t i = 1; i < thread_num + 1; i++)
@@ -283,16 +283,16 @@ void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num) {
   RtAssert(ret >= 0, "Failed to initialize DPDK");
 }
 
-rte_mempool* DpdkTransport::create_mempool(size_t num_ports,
-                                           size_t packet_length) {
-  size_t mbuf_size = packet_length + MBUF_CACHE_SIZE;
+rte_mempool* DpdkTransport::CreateMempool(size_t num_ports,
+                                          size_t packet_length) {
+  size_t mbuf_size = packet_length + kMBufCacheSize;
   rte_mempool* mbuf_pool =
-      rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * num_ports,
-                              MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
+      rte_pktmbuf_pool_create("MBUF_POOL", kNumMBufs * num_ports,
+                              kMBufCacheSize, 0, mbuf_size, rte_socket_id());
 
   RtAssert(mbuf_pool != NULL, "Cannot create mbuf pool");
 
   return mbuf_pool;
 }
 
-#endif
+#endif  // USE_DPDK
