@@ -104,9 +104,9 @@ PhyUe::PhyUe(Config* config)
     auto new_worker = std::make_unique<UeWorker>(
         i, *config_, *stats_, *phy_stats_, complete_queue_, work_queue_,
         *work_producer_token_.get(), ul_syms_buffer_, modul_buffer_,
-        ifft_buffer_, tx_buffer_, rx_buffer_, rx_buffer_status_, csi_buffer_,
-        equal_buffer_, non_null_sc_ind_, fft_buffer_, demod_buffer_,
-        decoded_buffer_, ue_pilot_vec_);
+        ifft_buffer_, tx_buffer_, rx_buffer_, csi_buffer_, equal_buffer_,
+        non_null_sc_ind_, fft_buffer_, demod_buffer_, decoded_buffer_,
+        ue_pilot_vec_);
 
     new_worker->Start(core_offset_worker);
     workers_.push_back(std::move(new_worker));
@@ -256,9 +256,9 @@ void PhyUe::Stop() {
 void PhyUe::Start() {
   PinToCoreWithOffset(ThreadType::kMaster, config_->CoreOffset(), 0);
 
-  if (ru_->StartTxRx(rx_buffer_, rx_buffer_status_, rx_buffer_status_size_,
-                     rx_buffer_size_, tx_buffer_, tx_buffer_status_,
-                     tx_buffer_status_size_, tx_buffer_size_) == false) {
+  if (ru_->StartTxRx(rx_buffer_, rx_buffer_size_ / config_->PacketLength(),
+                     tx_buffer_, tx_buffer_status_, tx_buffer_status_size_,
+                     tx_buffer_size_) == false) {
     this->Stop();
     return;
   }
@@ -301,12 +301,9 @@ void PhyUe::Start() {
 
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          size_t rx_thread_id = rx_tag_t(event.tags_[0]).tid_;
-          size_t offset_in_current_buffer = rx_tag_t(event.tags_[0]).offset_;
+          RxPacket* rx = rx_tag_t(event.tags_[0]).rx_packet_;
+          Packet* pkt = rx->packet_;
 
-          auto* pkt = reinterpret_cast<struct Packet*>(
-              rx_buffer_[rx_thread_id] +
-              offset_in_current_buffer * config_->PacketLength());
           size_t frame_id = pkt->frame_id_;
           size_t symbol_id = pkt->symbol_id_;
           size_t ant_id = pkt->ant_id_;
@@ -399,7 +396,7 @@ void PhyUe::Start() {
             // first)
             ReceiveDownlinkSymbol(pkt, event.tags_[0]);
           } else {
-            rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0;
+            rx->Free();
           }
         } break;
 
@@ -531,8 +528,8 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kPacketFromMac: {
-          size_t ue_id = rx_tag_t(event.tags_[0]).tid_;
-          size_t radio_buf_id = rx_tag_t(event.tags_[0]).offset_;
+          size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
+          size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
           RtAssert(radio_buf_id == expected_frame_id_from_mac_ % kFrameWnd);
 
           auto* pkt = reinterpret_cast<MacPacket*>(
@@ -742,10 +739,10 @@ void PhyUe::InitializeVarsFromCfg() {
   tx_buffer_status_size_ =
       (ul_symbol_perframe_ * config_->UeAntNum() * kFrameWnd);
   tx_buffer_size_ = config_->PacketLength() * tx_buffer_status_size_;
-  rx_buffer_status_size_ =
-      (dl_symbol_perframe_ + config_->Frame().NumBeaconSyms()) *
-      config_->UeAntNum() * kFrameWnd;
-  rx_buffer_size_ = config_->PacketLength() * rx_buffer_status_size_;
+
+  rx_buffer_size_ = config_->PacketLength() *
+                    (dl_symbol_perframe_ + config_->Frame().NumBeaconSyms()) *
+                    config_->UeAntNum() * kFrameWnd;
 }
 
 void PhyUe::InitializeUplinkBuffers() {
@@ -801,8 +798,6 @@ void PhyUe::InitializeDownlinkBuffers() {
   // initialize rx buffer
   rx_buffer_.Malloc(rx_thread_num_, rx_buffer_size_,
                     Agora_memory::Alignment_t::kAlign64);
-  rx_buffer_status_.Calloc(rx_thread_num_, rx_buffer_status_size_,
-                           Agora_memory::Alignment_t::kAlign64);
 
   // initialize FFT buffer
   size_t fft_buffer_block_num =
@@ -840,7 +835,6 @@ void PhyUe::InitializeDownlinkBuffers() {
 
 void PhyUe::FreeDownlinkBuffers() {
   rx_buffer_.Free();
-  rx_buffer_status_.Free();
   fft_buffer_.Free();
 }
 

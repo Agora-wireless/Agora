@@ -65,37 +65,34 @@ class PacketTXRX {
    * @brief Start the network I/O threads
    *
    * @param buffer Ring buffer to save packets
-   * @param buffer_status Status of each packet buffer (0: empty, 1: full)
-   * @packet_num_in_buffer Total number of buffers in an RX ring
+   * @param packet_num_in_buffer Total number of buffers in an RX ring
    *
    * @return True on successfully starting the network I/O threads, false
    * otherwise
    */
-  bool StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
-                 size_t packet_num_in_buffer, Table<size_t>& frame_start,
+  bool StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer, Table<size_t>& frame_start,
                  char* tx_buffer, Table<complex_float>& calib_dl_buffer_,
                  Table<complex_float>& calib_ul_buffer_);
 
   void SendBeacon(int tid, size_t frame_id);
 
  private:
-  void LoopTxRx(int tid);  // The thread function for thread [tid]
+  void LoopTxRx(size_t tid);  // The thread function for thread [tid]
   int DequeueSend(int tid);
   struct Packet* RecvEnqueue(size_t tid, size_t radio_id, size_t rx_offset);
-  RxPacket* GetRxPacket(size_t tid, size_t rx_count);
 
-  void LoopTxRxArgos(int tid);
+  void LoopTxRxArgos(size_t tid);
   int DequeueSendArgos(int tid);
-  std::vector<struct Packet*> RecvEnqueueArgos(int tid, int radio_id,
-                                               int rx_offset);
+  std::vector<struct Packet*> RecvEnqueueArgos(size_t tid, size_t radio_id,
+                                               size_t rx_slot);
 
   long long rx_time_bs_;
   long long tx_time_bs_;
-  void LoopTxRxUsrp(int tid);
+  void LoopTxRxUsrp(size_t tid);
   int DequeueSendUsrp(int tid);
   int DequeueSendUsrp(int tid, int frame_id, int symbol_id);
-  struct Packet* RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
-                                 int frame_id, int symbol_id);
+  struct Packet* RecvEnqueueUsrp(size_t tid, size_t radio_id, size_t rx_slot,
+                                 size_t frame_id, size_t symbol_id);
 
   Config* cfg_;
 
@@ -115,7 +112,6 @@ class PacketTXRX {
   std::vector<std::vector<RxPacket>> rx_packets_;
   size_t buffers_per_socket_;
 
-  size_t packet_num_in_buffer_;
   char* tx_buffer_;
   Table<size_t>* frame_start_;
   moodycamel::ConcurrentQueue<EventData>* message_queue_;

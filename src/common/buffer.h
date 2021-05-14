@@ -230,9 +230,10 @@ union rx_tag_t {
                 "RxPacket pounter must fit inside a size_t value");
 
   explicit rx_tag_t(RxPacket &rx_packet) : rx_packet_(&rx_packet) {}
+  explicit rx_tag_t(RxPacket *rx_packet) : rx_packet_(rx_packet) {}
   explicit rx_tag_t(size_t tag) : tag_(tag) {}
 };
-///\todo Make sure RxPacket* is not bigher than size_t
+static_assert(sizeof(rx_tag_t) == sizeof(size_t));
 
 // Event data tag for FFT task requests
 using fft_req_tag_t = rx_tag_t;
@@ -260,6 +261,19 @@ struct MacPacket {
     return ret.str();
   }
 };
+
+// Event data tag for Mac RX events
+union rx_mac_tag_t {
+  struct {
+    size_t tid_ : 8;      // ID of the socket thread that received the packet
+    size_t offset_ : 56;  // Offset in the socket thread's RX buffer
+  };
+  size_t tag_;
+
+  rx_mac_tag_t(size_t tid, size_t offset) : tid_(tid), offset_(offset) {}
+  explicit rx_mac_tag_t(size_t _tag) : tag_(_tag) {}
+};
+static_assert(sizeof(rx_mac_tag_t) == sizeof(size_t));
 
 class RxCounters {
  public:

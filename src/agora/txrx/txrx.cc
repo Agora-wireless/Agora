@@ -42,17 +42,11 @@ PacketTXRX::~PacketTXRX() {
   }
 }
 
-bool PacketTXRX::StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
-                           size_t packet_num_in_buffer,
+bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
                            Table<size_t>& frame_start, char* tx_buffer,
                            Table<complex_float>& calib_dl_buffer,
                            Table<complex_float>& calib_ul_buffer) {
-  // buffer_ = &buffer;
-  // buffer_status_ = &buffer_status;
-  // rx_packets_.resize(packet_num_in_buffer);
   frame_start_ = &frame_start;
-
-  packet_num_in_buffer_ = packet_num_in_buffer;
   tx_buffer_ = tx_buffer;
 
   if ((kUseArgos == true) || (kUseUHD == true)) {
@@ -125,7 +119,7 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
   }
 }
 
-void PacketTXRX::LoopTxRx(int tid) {
+void PacketTXRX::LoopTxRx(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid);
   size_t* rx_frame_start = (*frame_start_)[tid];
   size_t rx_slot = 0;
