@@ -701,16 +701,18 @@ void* RadioTxRx::LoopTxRxArgosSync(int tid) {
 void RadioTxRx::CFOEstimation(const int sync_index, const std::vector<std::complex<float>>& beacon_buff)
 {
   auto& c = config_;
+  size_t beaconLen = c->BeaconLongSymLen();
+  double rate = c->Rate();
 
   // Compute phase error across same-sample index from two consecutive training sequences
-  size_t cfo_start_idx = sync_index - (c->BeaconLongSymLen() * c->BeaconLongSymReps());
-  std::vector<float> phase_vec(c->BeaconLongSymLen(), 0);
-  std::vector<float> phase_uwrap(c->BeaconLongSymLen(), 0);
+  size_t cfo_start_idx = sync_index - (beaconLen * c->BeaconLongSymReps());
+  std::vector<float> phase_vec(beaconLen, 0);
+  std::vector<float> phase_uwrap(beaconLen, 0);
 
-  for (size_t i = 0; i < c->BeaconLongSymLen(); i++) {
+  for (size_t i = 0; i < beaconLen; i++) {
     std::complex<float> s1 = beacon_buff[cfo_start_idx + i];
-    std::complex<float> s2 = beacon_buff[cfo_start_idx + c->BeaconLongSymLen() + i];
-    std::complex<float> s12 = s1 * std::conj(s2);
+    std::complex<float> s2 = beacon_buff[cfo_start_idx + beaconLen + i];
+    std::complex<float> s12 = s2 * std::conj(s1);
     phase_vec[i] = std::atan2(s12.imag(), s12.real());
 
     // Unwrap phase
@@ -729,9 +731,9 @@ void RadioTxRx::CFOEstimation(const int sync_index, const std::vector<std::compl
 
   float average = accumulate(phase_uwrap.begin(), phase_uwrap.end(), 0.0)
       / phase_uwrap.size();
-  cfo_ = average / (2 * M_PI); // * c->beacon_longsym_len);
-  // double cfo_est_khz = cfo_ * c->rate * 1e-3;
-  // printf("XXXXX  CFO Estimate2: %f kHz  XXXXX \n", cfo_est_khz);
+  cfo_ = average / (2 * M_PI); // * beaconLen);
+  //double cfo_est_khz = cfo_ * rate * 1e-3;
+  //printf("YYYY  Avg: %f, cfo_: %f, cfo_khz: %f  ZZZZ \n", average, cfo_, cfo_est_khz);
 }
 
 complex_float* RadioTxRx::CFOCorrection(bool is_downlink, complex_float* samps, size_t len)
@@ -740,7 +742,7 @@ complex_float* RadioTxRx::CFOCorrection(bool is_downlink, complex_float* samps, 
   const std::complex<double> i(0.0, 1.0);
   std::complex<float> samps_cf;
 
-  double cfo = is_downlink ? -1 * cfo_ : cfo_;
+  double cfo = is_downlink ? cfo_ : -1 * cfo_;
   for (size_t idx = 0; idx < len; idx++) {
 
     //double tmp = 2 * M_PI * cfo * idx;
