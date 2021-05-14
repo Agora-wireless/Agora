@@ -29,14 +29,12 @@ std::vector<std::thread> Receiver::StartRecv(Table<char>& in_buffer,
   rx_packets_.resize(rx_thread_num_);
   created_threads.resize(rx_thread_num_);
   for (size_t i = 0; i < rx_thread_num_; i++) {
+    rx_packets_.at(i).reserve(buffers_per_thread_);
     for (size_t number_packets = 0; number_packets < buffers_per_thread_;
          number_packets++) {
-      ///\todo replace with emplace
-      RxPacket new_packet;
       auto* pkt_loc = reinterpret_cast<Packet*>(
           in_buffer[i] + (number_packets * cfg_->PacketLength()));
-      new_packet.Set(pkt_loc);
-      rx_packets_.at(i).push_back(new_packet);
+      rx_packets_.at(i).emplace_back(pkt_loc);
     }
     created_threads.at(i) = std::thread(&Receiver::LoopRecv, this, i);
   }
