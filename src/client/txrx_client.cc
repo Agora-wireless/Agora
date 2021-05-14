@@ -65,14 +65,12 @@ bool RadioTxRx::StartTxRx(Table<char>& in_buffer, size_t in_buffer_length,
   assert(buffers_per_thread_ % config_->NumChannels() == 0);
   rx_packets_.resize(thread_num_);
   for (size_t i = 0; i < thread_num_; i++) {
+    rx_packets_.at(i).reserve(buffers_per_thread_);
     for (size_t number_packets = 0; number_packets < buffers_per_thread_;
          number_packets++) {
-      ///\todo replace with emplace
-      RxPacket new_packet;
       auto* pkt_loc = reinterpret_cast<Packet*>(
           in_buffer[i] + (number_packets * config_->PacketLength()));
-      new_packet.Set(pkt_loc);
-      rx_packets_.at(i).push_back(new_packet);
+      rx_packets_.at(i).emplace_back(pkt_loc);
     }
 
     // start socket thread
