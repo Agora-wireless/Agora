@@ -69,9 +69,9 @@ bool RadioTxRx::StartTxRx(Table<char>& in_buffer, size_t in_buffer_length,
          number_packets++) {
       ///\todo replace with emplace
       RxPacket new_packet;
-      new_packet.Set(reinterpret_cast<Packet*>(
-          in_buffer[number_packets * config_->PacketLength()]));
-
+      auto* pkt_loc = reinterpret_cast<Packet*>(
+          in_buffer[i] + (number_packets * config_->PacketLength()));
+      new_packet.Set(pkt_loc);
       rx_packets_.at(i).push_back(new_packet);
     }
 

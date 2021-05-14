@@ -67,6 +67,8 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
     }
   }
 
+  std::printf("PacketTXRX: rx threads %zu, packet buffers %zu\n",
+              socket_thread_num_, packet_num_in_buffer);
   buffers_per_socket_ = packet_num_in_buffer / socket_thread_num_;
   rx_packets_.resize(socket_thread_num_);
   for (size_t i = 0; i < socket_thread_num_; i++) {
@@ -74,9 +76,11 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
          number_packets++) {
       ///\todo replace with emplace
       RxPacket new_packet;
-      new_packet.Set(reinterpret_cast<Packet*>(
-          buffer[number_packets * cfg_->PacketLength()]));
-
+      auto* pkt_loc = reinterpret_cast<Packet*>(
+          buffer[i] + (number_packets * cfg_->PacketLength()));
+      new_packet.Set(pkt_loc);
+      // std::printf("TxRx[%zu]: rx packet %zu at loc %zu\n", i, number_packets,
+      //            (size_t)pkt_loc);
       rx_packets_.at(i).push_back(new_packet);
     }
 
@@ -193,8 +197,6 @@ void PacketTXRX::LoopTxRx(size_t tid) {
 struct Packet* PacketTXRX::RecvEnqueue(size_t tid, size_t radio_id,
                                        size_t rx_slot) {
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-  // char* rx_buffer = (*buffer_)[tid];
-  // int* rx_buffer_status = (*buffer_status_)[tid];
   size_t packet_length = cfg_->PacketLength();
   RxPacket& rx = rx_packets_.at(tid).at(rx_slot);
 
@@ -205,11 +207,13 @@ struct Packet* PacketTXRX::RecvEnqueue(size_t tid, size_t radio_id,
     return (nullptr);
   }
   Packet* pkt = rx.packet_;
+  // std::printf("PacketTXRX[%zu]: rx packet %zu at memory location %zu\n", tid,
+  //            rx_slot, (size_t)pkt);
 
   ssize_t rx_bytes = udp_servers_.at(radio_id)->Recv(
       reinterpret_cast<uint8_t*>(pkt), packet_length);
   if (0 > rx_bytes) {
-    MLPD_ERROR("RecvEnqueue: Udp Recv failed with error");
+    MLPD_ERROR("RecvEnqueue: Udp Recv failed with error\n");
     throw std::runtime_error("PacketTXRX: recv failed");
   } else if (rx_bytes == 0) {
     pkt = nullptr;

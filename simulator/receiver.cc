@@ -33,9 +33,9 @@ std::vector<std::thread> Receiver::StartRecv(Table<char>& in_buffer,
          number_packets++) {
       ///\todo replace with emplace
       RxPacket new_packet;
-      new_packet.Set(reinterpret_cast<Packet*>(
-          in_buffer[number_packets * cfg_->PacketLength()]));
-
+      auto* pkt_loc = reinterpret_cast<Packet*>(
+          in_buffer[i] + (number_packets * cfg_->PacketLength()));
+      new_packet.Set(pkt_loc);
       rx_packets_.at(i).push_back(new_packet);
     }
     created_threads.at(i) = std::thread(&Receiver::LoopRecv, this, i);
