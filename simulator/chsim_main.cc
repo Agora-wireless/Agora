@@ -25,17 +25,29 @@ DEFINE_string(chan_model, "RAYLEIGH", "Simulator Channel Type: RAYLEIGH/AWGN");
 DEFINE_double(chan_snr, 20.0, "Signal-to-Noise Ratio");
 
 int main(int argc, char* argv[]) {
+  int ret = EXIT_FAILURE;
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   std::printf("Base Station configuration\n");
   auto bs_config = std::make_unique<Config>(FLAGS_bs_conf_file);
   std::printf("User configuration\n");
   auto ue_config = std::make_unique<Config>(FLAGS_ue_conf_file);
   {
-    auto sim = std::make_unique<ChannelSim>(
-        bs_config.get(), ue_config.get(), FLAGS_bs_threads, FLAGS_ue_threads,
-        FLAGS_worker_threads, FLAGS_core_offset, FLAGS_chan_model,
-        FLAGS_chan_snr);
-    sim->Start();
+    try {
+      SignalHandler signal_handler;
+
+      // Register signal handler to handle kill signal
+      signal_handler.SetupSignalHandlers();
+      auto sim = std::make_unique<ChannelSim>(
+          bs_config.get(), ue_config.get(), FLAGS_bs_threads, FLAGS_ue_threads,
+          FLAGS_worker_threads, FLAGS_core_offset, FLAGS_chan_model,
+          FLAGS_chan_snr);
+      sim->Start();
+      ret = EXIT_SUCCESS;
+    } catch (SignalException& e) {
+      std::cerr << "chsim: SignalException: " << e.what() << std::endl;
+      ret = EXIT_FAILURE;
+    }
   }
-  return 0;
+  std::printf("Channel Simulator Exit\n");
+  return ret;
 }

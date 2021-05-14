@@ -4,11 +4,16 @@
  */
 #include "sender.h"
 
+#include <algorithm>
 #include <thread>
 
 #include "datatype_conversion.h"
 #include "logger.h"
 #include "udp_client.h"
+
+#if defined(USE_DPDK)
+#include <arpa/inet.h>
+#endif
 
 static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kMacAddrBtyes = 17;
@@ -42,9 +47,11 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
       inter_frame_delay_(inter_frame_delay),
       ticks_all_(frame_duration_ * ticks_per_usec_ /
                  cfg->Frame().NumTotalSyms()),
-      ticks_wnd1_(200000 /* 200 ms */ * ticks_per_usec_ /
+      ticks_wnd1_((std::max(static_cast<double>(40.0 * frame_duration_),
+                            static_cast<double>(200000.0) /* 200ms */) *
+                   ticks_per_usec_) /
                   cfg->Frame().NumTotalSyms()),
-      ticks_wnd2_(15 * frame_duration_ * ticks_per_usec_ /
+      ticks_wnd2_((15 * frame_duration_ * ticks_per_usec_) /
                   cfg->Frame().NumTotalSyms()),
       ticks_inter_frame_(inter_frame_delay_ * ticks_per_usec_) {
   MLPD_INFO(
@@ -76,15 +83,15 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
                                 socket_thread_num_);
   }
 
-#ifdef USE_DPDK
-  DpdkTransport::dpdk_init(core_offset, socket_thread_num_);
+#if defined(USE_DPDK)
+  DpdkTransport::DpdkInit(core_offset, socket_thread_num_);
   printf("Number of ports: %d used (offset: %d), %d available, socket: %d\n",
          cfg->DpdkNumPorts(), cfg->DpdkPortOffset(), rte_eth_dev_count_avail(),
          rte_socket_id());
   RtAssert(cfg->DpdkNumPorts() <= rte_eth_dev_count_avail(),
            "Invalid number of DPDK ports");
   this->mbuf_pool_ =
-      DpdkTransport::create_mempool(cfg->DpdkNumPorts(), cfg->PacketLength());
+      DpdkTransport::CreateMempool(cfg->DpdkNumPorts(), cfg->PacketLength());
 
   // Parse IP addresses
   int ret = inet_pton(AF_INET, cfg->BsRruAddr().c_str(), &bs_rru_addr_);
@@ -99,8 +106,8 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   server_mac_addr_.resize(cfg->DpdkNumPorts());
 
   for (uint16_t port_id = 0; port_id < cfg->DpdkNumPorts(); port_id++) {
-    if (DpdkTransport::nic_init(port_id + cfg->DpdkPortOffset(), mbuf_pool_,
-                                socket_thread_num_, cfg->PacketLength()) != 0)
+    if (DpdkTransport::NicInit(port_id + cfg->DpdkPortOffset(), mbuf_pool_,
+                               socket_thread_num_, cfg->PacketLength()) != 0)
       rte_exit(EXIT_FAILURE, "Cannot init port %u\n",
                port_id + cfg->DpdkPortOffset());
     // Parse MAC addresses
@@ -137,6 +144,7 @@ Sender::~Sender() {
     delete (task_ptok_[i]);
   }
   std::free(task_ptok_);
+  MLPD_INFO("Sender: Complete\n");
 }
 
 void Sender::StartTx() {
@@ -144,6 +152,7 @@ void Sender::StartTx() {
   this->frame_end_ = new double[kNumStatsFrames]();
 
   CreateWorkerThreads(socket_thread_num_);
+  signal(SIGINT, InterruptHandler);
   MasterThread(0);  // Start the master thread
 
   delete[](this->frame_start_);
@@ -181,7 +190,6 @@ void Sender::ScheduleSymbol(size_t frame, size_t symbol_id) {
 }
 
 void* Sender::MasterThread(int /*unused*/) {
-  signal(SIGINT, InterruptHandler);
   PinToCoreWithOffset(ThreadType::kMasterTX, core_offset_, 0);
 
   // Wait for all worker threads to be ready (+1 for Master)
@@ -190,17 +198,18 @@ void* Sender::MasterThread(int /*unused*/) {
     // Wait
   }
 
-  this->frame_start_[0] = GetTime::GetTime();
-  double start_time = GetTime::GetTime();
   uint64_t tick_start = GetTime::Rdtsc();
+  double frame_start_us = GetTime::GetTimeUs();
+  double frame_end_us = 0;
+  this->frame_start_[0] = frame_start_us;
 
   size_t start_symbol = FindNextSymbol(0);
-  // Delay until the start of the first symbol (pilot)
+  // Delay until the start of the first symbol
   if (start_symbol > 0) {
     MLPD_INFO("Sender: Starting symbol %zu delaying\n", start_symbol);
     DelayTicks(tick_start, GetTicksForFrame(0) * start_symbol);
+    tick_start = tick_start + (GetTicksForFrame(0) * start_symbol);
   }
-  tick_start = GetTime::Rdtsc();
   RtAssert(start_symbol != cfg_->Frame().NumTotalSyms(),
            "Sender: No valid symbols to transmit");
   ScheduleSymbol(0, start_symbol);
@@ -225,53 +234,64 @@ void* Sender::MasterThread(int /*unused*/) {
 
         size_t next_symbol_id = FindNextSymbol((ctag.symbol_id_ + 1));
         unsigned symbol_delay = next_symbol_id - ctag.symbol_id_;
-        if (kDebugPrintSender == true) {
-          std::printf("Sender: Finishing symbol %d : %zu : %zu delayed %d\n",
-                      ctag.symbol_id_, cfg_->Frame().NumTotalSyms(),
-                      next_symbol_id, symbol_delay);
+        if (kDebugPrintSender) {
+          std::printf(
+              "Sender: Finishing symbol %d, Next Symbol: %zu, Total Symbols: "
+              "%zu, delaying %d\n",
+              ctag.symbol_id_, next_symbol_id, cfg_->Frame().NumTotalSyms(),
+              symbol_delay);
         }
         // Add inter-symbol delay
         DelayTicks(tick_start, GetTicksForFrame(ctag.frame_id_) * symbol_delay);
+        tick_start += (GetTicksForFrame(ctag.frame_id_) * symbol_delay);
 
         size_t next_frame_id = ctag.frame_id_;
         // Check to see if the current frame is finished
         assert(next_symbol_id <= cfg_->Frame().NumTotalSyms());
         if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
-          if ((kDebugSenderReceiver == true) ||
-              (kDebugPrintPerFrameDone == true)) {
-            std::printf("Sender: Transmitted frame %u in %.2f ms\n",
-                        ctag.frame_id_,
-                        (GetTime::GetTime() - start_time) / 1000.0);
-            start_time = GetTime::GetTime();
-          }
+          // Set the end time to time to when the last symbol was completed by
+          // the workers (now)
+          frame_end_us = GetTime::GetTimeUs();
           next_frame_id++;
-          if (next_frame_id == cfg_->FramesToTest()) {
-            break;  // Finished
-          }
-          this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] =
-              GetTime::GetTime();
-          // Add inter-frame delay
-          DelayTicks(GetTime::Rdtsc(), ticks_inter_frame_);
-          this->frame_start_[(next_frame_id % kNumStatsFrames)] =
-              GetTime::GetTime();
 
           // Find start symbol of next frame and add proper delay
           next_symbol_id = FindNextSymbol(0);
-          if (kDebugPrintSender == true) {
+          if ((kDebugSenderReceiver == true) ||
+              (kDebugPrintPerFrameDone == true)) {
             std::printf(
-                "Sender -- finished frame %d, next frame %zu, start symbol "
-                "%zu, "
-                "delaying\n",
-                ctag.frame_id_, next_frame_id, next_symbol_id);
+                "Sender: Tx frame %d in %.2f ms, next frame %zu, start symbol "
+                "%zu\n",
+                ctag.frame_id_, (frame_end_us - frame_start_us) / 1000.0,
+                next_frame_id, next_symbol_id);
           }
-          DelayTicks(GetTime::Rdtsc(),
-                     GetTicksForFrame(ctag.frame_id_) * next_symbol_id);
-        }
-        tick_start = GetTime::Rdtsc();
+          // Set end of frame time to the time after the last symbol
+          this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = frame_end_us;
+
+          if (next_frame_id == cfg_->FramesToTest()) {
+            keep_running.store(false);
+            break; /* Finished */
+          } else {
+            // Wait for the inter-frame delay
+            DelayTicks(tick_start, ticks_inter_frame_);
+            tick_start += ticks_inter_frame_;
+            frame_start_us = GetTime::GetTimeUs();
+
+            // Set the frame start time to the start time of the frame
+            // (independant of symbol type)
+            this->frame_start_[(next_frame_id % kNumStatsFrames)] =
+                frame_start_us;
+
+            // Wait until the first tx symbol
+            DelayTicks(tick_start,
+                       (GetTicksForFrame(ctag.frame_id_) * next_symbol_id));
+            tick_start += (GetTicksForFrame(ctag.frame_id_) * next_symbol_id);
+          }
+        }  // if (next_symbol_id == cfg_->Frame().NumTotalSyms()) {
         ScheduleSymbol(next_frame_id, next_symbol_id);
       }
     }  // end (ret > 0)
   }
+  std::printf("Sender main thread exit\n");
   WriteStatsToFile(cfg_->FramesToTest());
   return nullptr;
 }
@@ -301,7 +321,7 @@ void* Sender::WorkerThread(int tid) {
       cfg_->BsAntNum() / socket_thread_num_ +
       (static_cast<size_t>(tid) < cfg_->BsAntNum() % socket_thread_num_ ? 1
                                                                         : 0);
-#ifdef USE_DPDK
+#if defined(USE_DPDK)
   const size_t port_id = tid % cfg_->DpdkNumPorts();
   const size_t queue_id = tid / cfg_->DpdkNumPorts();
   rte_mbuf* tx_mbufs[kDequeueBulkSize];
@@ -316,7 +336,7 @@ void* Sender::WorkerThread(int tid) {
   auto* socks_pkt_buf = static_cast<Packet*>(PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign32, cfg_->PacketLength()));
 
-  double begin = GetTime::GetTime();
+  double begin = GetTime::GetTimeUs();
   size_t total_tx_packets = 0;
   size_t total_tx_packets_rolling = 0;
   size_t cur_radio = radio_lo;
@@ -344,8 +364,8 @@ void* Sender::WorkerThread(int tid) {
 
         // Send a message to the server. We assume that the server is running.
         Packet* pkt = socks_pkt_buf;
-#ifdef USE_DPDK
-        tx_mbufs[tag_id] = DpdkTransport::alloc_udp(
+#if defined(USE_DPDK)
+        tx_mbufs[tag_id] = DpdkTransport::AllocUdp(
             mbuf_pool_, sender_mac_addr_[port_id], server_mac_addr_[port_id],
             bs_rru_addr_, bs_server_addr_, this->cfg_->BsRruPort() + tid,
             this->cfg_->BsServerPort() + tid, this->cfg_->PacketLength());
@@ -353,7 +373,7 @@ void* Sender::WorkerThread(int tid) {
             rte_pktmbuf_mtod(tx_mbufs[tag_id], uint8_t*) + kPayloadOffset);
 #endif
 
-        if ((kDebugPrintSender == true) || (kDebugSenderReceiver == true)) {
+        if ((kDebugPrintSender == true)) {
           std::printf(
               "Sender : worker %d processing frame %d symbol %d, type %d\n",
               tid, tag.frame_id_, tag.symbol_id_,
@@ -382,8 +402,7 @@ void* Sender::WorkerThread(int tid) {
         if (kDebugSenderReceiver == true) {
           std::printf(
               "Thread %d (tag = %s) transmit frame %d, symbol %d, ant "
-              "%d, "
-              "TX time: %.3f us\n",
+              "%d, TX time: %.3f us\n",
               tid, gen_tag_t(tag).ToString().c_str(), pkt->frame_id_,
               pkt->symbol_id_, pkt->ant_id_,
               GetTime::CyclesToUs(GetTime::Rdtsc() - start_tsc_send,
@@ -394,7 +413,7 @@ void* Sender::WorkerThread(int tid) {
         total_tx_packets++;
         if (total_tx_packets_rolling ==
             ant_num_this_thread * max_symbol_id * 1000) {
-          double end = GetTime::GetTime();
+          double end = GetTime::GetTimeUs();
           double byte_len = cfg_->PacketLength() * ant_num_this_thread *
                             max_symbol_id * 1000.f;
           double diff = end - begin;
@@ -402,7 +421,7 @@ void* Sender::WorkerThread(int tid) {
                       (size_t)tid,
                       total_tx_packets / (ant_num_this_thread * max_symbol_id),
                       diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
-          begin = GetTime::GetTime();
+          begin = GetTime::GetTimeUs();
           total_tx_packets_rolling = 0;
         }
 
@@ -411,7 +430,7 @@ void* Sender::WorkerThread(int tid) {
         }
       }
 
-#ifdef USE_DPDK
+#if defined(USE_DPDK)
       size_t nb_tx_new = rte_eth_tx_burst(port_id + cfg_->DpdkPortOffset(),
                                           queue_id, tx_mbufs, num_tags);
       if (unlikely(nb_tx_new != num_tags)) {
@@ -433,6 +452,7 @@ void* Sender::WorkerThread(int tid) {
   std::free(static_cast<void*>(socks_pkt_buf));
   std::free(static_cast<void*>(fft_inout));
   MLPD_FRAME("Sender: worker thread %d exit\n", tid);
+  std::printf("Sender: worker thread %d exit\n", tid);
   return nullptr;
 }
 

@@ -170,9 +170,7 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
       modulated_buffer_temp_ + sc_id_in_block * cfg_->UeNum();
   if ((symbol_idx_dl < cfg_->Frame().ClientDlPilotSymbols()) ||
       ((sc_id % cfg_->OfdmPilotSpacing()) == 0)) {
-    // FIXME: cfg_->UeSpecificPilot()[user_id] index creates errors
-    // in the downlink receiver
-    data_ptr[user_id] = cfg_->UeSpecificPilot()[0][sc_id];
+    data_ptr[user_id] = cfg_->UeSpecificPilot()[user_id][sc_id];
   } else {
     int8_t* raw_data_ptr =
         &dl_raw_data_[total_data_symbol_idx]

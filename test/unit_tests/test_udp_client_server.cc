@@ -44,7 +44,7 @@ void ServerFunc() {
   size_t num_pkts_received = 0;
   size_t num_pkts_reordered = 0;
   while (true) {
-    ssize_t ret = udp_server.RecvNonblocking(&pkt_buf[0], kMessageSize);
+    ssize_t ret = udp_server.Recv(&pkt_buf[0], kMessageSize);
     ASSERT_GE(ret, 0);
     if (ret != 0) {
       auto pkt_index = *reinterpret_cast<size_t*>(&pkt_buf[0]);
@@ -83,7 +83,7 @@ TEST(UDPClientServer, ServerIsNonBlocking) {
 
   // If the UDP server is blocking, this call never completes because there is
   // no data to receive
-  ssize_t ret = udp_server.RecvNonblocking(&packet[0], kMessageSize);
+  ssize_t ret = udp_server.Recv(&packet[0], kMessageSize);
   ASSERT_EQ(ret, 0);
 }
 

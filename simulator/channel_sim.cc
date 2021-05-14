@@ -11,7 +11,8 @@
 static std::atomic<bool> running = true;
 static constexpr bool kPrintChannelOutput = false;
 static const size_t kDefaultQueueSize = 36;
-static const bool kPrintDebugTxUser = false;
+static const bool kPrintDebugTxUser = true;
+static const bool kPrintDebugTxBs = true;
 
 static void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
                                     size_t length) {
@@ -57,10 +58,10 @@ ChannelSim::ChannelSim(const Config* const config_bs,
   ul_data_plus_pilot_symbols_ =
       bscfg_->Frame().NumULSyms() + bscfg_->Frame().NumPilotSyms();
 
-  socket_bs_.resize(bs_socket_num_);
-  servaddr_bs_.resize(bs_socket_num_);
-  socket_ue_.resize(user_socket_num_);
-  servaddr_ue_.resize(user_socket_num_);
+  server_bs_.resize(bs_socket_num_);
+  client_bs_.resize(bs_socket_num_);
+  server_ue_.resize(user_socket_num_);
+  client_ue_.resize(user_socket_num_);
 
   task_queue_bs_ = moodycamel::ConcurrentQueue<EventData>(
       kFrameWnd * dl_data_plus_beacon_symbols_ * bscfg_->BsAntNum() *
@@ -121,6 +122,7 @@ ChannelSim::ChannelSim(const Config* const config_bs,
 }
 
 ChannelSim::~ChannelSim() {
+  std::printf("Destroying channel simulator\n");
   running.store(false);
   for (auto& join_thread : task_threads_) {
     join_thread.join();
@@ -173,7 +175,8 @@ void ChannelSim::Start() {
 
   static constexpr size_t kDequeueBulkSize = 5;
   EventData events_list[kDequeueBulkSize];
-  while (running.load() == true) {
+  while ((running.load() == true) &&
+         (SignalHandler::GotExitSignal() == false)) {
     ret = message_queue_.try_dequeue_bulk(ctok, events_list, kDequeueBulkSize);
 
     for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
@@ -202,9 +205,8 @@ void ChannelSim::Start() {
               user_rx_counter_[frame_offset] = 0;
               if (kDebugPrintPerSymbolDone) {
                 std::printf(
-                    "Scheduling uplink transmission of frame %zu, "
-                    "symbol %zu, from %zu "
-                    "user to %zu BS antennas\n",
+                    "Scheduling uplink transmission of frame %zu, symbol %zu, "
+                    "from %zu user to %zu BS antennas\n",
                     frame_id, symbol_id, uecfg_->UeAntNum(),
                     bscfg_->BsAntNum());
               }
@@ -214,7 +216,7 @@ void ChannelSim::Start() {
             // received a packet from a BS antenna
           } else if (gen_tag_t(event.tags_[0]).tag_type_ ==
                      gen_tag_t::TagType::kAntennas) {
-            size_t dl_symbol_id = GetDlSymbolIdx(frame_id, symbol_id);
+            size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);
             size_t frame_offset =
                 (frame_id % kFrameWnd) * dl_data_plus_beacon_symbols_ +
                 dl_symbol_id;
@@ -225,10 +227,8 @@ void ChannelSim::Start() {
               bs_rx_counter_[frame_offset] = 0;
               if (kDebugPrintPerSymbolDone) {
                 std::printf(
-                    "Scheduling downlink transmission in frame "
-                    "%zu, "
-                    "symbol %zu, from %zu "
-                    "BS to %zu user antennas\n",
+                    "Scheduling downlink transmission in frame %zu, symbol "
+                    "%zu, from %zu BS to %zu user antennas\n",
                     frame_id, symbol_id, bscfg_->BsAntNum(),
                     uecfg_->UeAntNum());
               }
@@ -274,6 +274,8 @@ void ChannelSim::Start() {
     }
   }
 
+  running.store(false);
+
   // Join the joinable threads
   for (auto& join_thread : base_station_rec_threads) {
     join_thread.join();
@@ -307,58 +309,60 @@ void* ChannelSim::BsRxLoop(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_ + 1, tid);
 
   // initialize bs-facing sockets
-  int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+  size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
   for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
-    int local_port_id = bscfg_->BsRruPort() + socket_id;
-    socket_bs_[socket_id] = SetupSocketIpv4(local_port_id, true, sock_buf_size);
-    SetupSockaddrRemoteIpv4(&servaddr_bs_[socket_id],
-                            bscfg_->BsServerPort() + socket_id,
-                            bscfg_->BsServerAddr().c_str());
+    size_t local_port_id = bscfg_->BsRruPort() + socket_id;
+    server_bs_.at(socket_id) =
+        std::make_unique<UDPServer>(local_port_id, sock_buf_size);
+    client_bs_.at(socket_id) = std::make_unique<UDPClient>();
     std::printf(
-        "BS RX thread %d: set up UDP socket server listening to port %d"
+        "BS RX thread %d: set up UDP socket server listening to port %zu"
         " with remote address %s:%zu\n",
         tid, local_port_id, bscfg_->BsServerAddr().c_str(),
         bscfg_->BsServerPort() + socket_id);
-    fcntl(socket_bs_[socket_id], F_SETFL, O_NONBLOCK);
   }
 
   std::vector<uint8_t> udp_pkt_buf(bscfg_->PacketLength(), 0);
   size_t socket_id = socket_lo;
   while (running) {
-    if (-1 == recv(socket_bs_[socket_id], (char*)udp_pkt_buf.data(),
-                   udp_pkt_buf.size(), 0)) {
-      if (errno != EAGAIN && running) {
-        std::printf("BS socket %zu receive failed\n", socket_id);
-        throw std::runtime_error("ChannelSim: BS socket receive failed");
+    int rx_bytes =
+        server_bs_.at(socket_id)->Recv(udp_pkt_buf.data(), udp_pkt_buf.size());
+    if (0 > rx_bytes) {
+      std::printf("BS socket %zu receive failed\n", socket_id);
+      throw std::runtime_error("ChannelSim: BS socket receive failed");
+    } else if (static_cast<size_t>(rx_bytes) == udp_pkt_buf.size()) {
+      const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
+
+      size_t frame_id = pkt->frame_id_;
+      size_t symbol_id = pkt->symbol_id_;
+      size_t ant_id = pkt->ant_id_;
+      if (kDebugPrintInTask) {
+        std::printf(
+            "Received BS packet for frame %zu, symbol %zu, ant %zu from "
+            "socket %zu\n",
+            frame_id, symbol_id, ant_id, socket_id);
       }
-      continue;
-    }
-    const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
+      size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);
+      size_t symbol_offset =
+          (frame_id % kFrameWnd) * dl_data_plus_beacon_symbols_ + dl_symbol_id;
+      size_t offset = symbol_offset * bscfg_->BsAntNum() + ant_id;
+      std::memcpy(&rx_buffer_bs_[offset * payload_length_], pkt->data_,
+                  payload_length_);
 
-    size_t frame_id = pkt->frame_id_;
-    size_t symbol_id = pkt->symbol_id_;
-    size_t ant_id = pkt->ant_id_;
-    if (kDebugPrintInTask) {
+      RtAssert(message_queue_.enqueue(
+                   local_ptok,
+                   EventData(
+                       EventType::kPacketRX,
+                       gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_)),
+               "BS socket message enqueue failed!");
+      if (++socket_id == socket_hi) {
+        socket_id = socket_lo;
+      }
+    } else if (0 != rx_bytes) {
       std::printf(
-          "Received BS packet for frame %zu, symbol %zu, ant %zu from "
-          "socket %zu\n",
-          frame_id, symbol_id, ant_id, socket_id);
-    }
-    size_t dl_symbol_id = GetDlSymbolIdx(frame_id, symbol_id);
-    size_t symbol_offset =
-        (frame_id % kFrameWnd) * dl_data_plus_beacon_symbols_ + dl_symbol_id;
-    size_t offset = symbol_offset * bscfg_->BsAntNum() + ant_id;
-    std::memcpy(&rx_buffer_bs_[offset * payload_length_], pkt->data_,
-                payload_length_);
-
-    RtAssert(
-        message_queue_.enqueue(
-            local_ptok,
-            EventData(EventType::kPacketRX,
-                      gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_)),
-        "BS socket message enqueue failed!");
-    if (++socket_id == socket_hi) {
-      socket_id = socket_lo;
+          "BS socket %zu receive failed with less than full packet %d : %zu\n",
+          socket_id, rx_bytes, udp_pkt_buf.size());
+      throw std::runtime_error("ChannelSim: BS socket receive failed");
     }
   }
   return nullptr;
@@ -373,74 +377,78 @@ void* ChannelSim::UeRxLoop(int tid) {
                       core_offset_ + 1 + bs_thread_num_, tid);
 
   // initialize client-facing sockets
-  int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+  size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
   for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
-    int local_port_id = uecfg_->UeRruPort() + socket_id;
-    socket_ue_[socket_id] = SetupSocketIpv4(local_port_id, true, sock_buf_size);
-    SetupSockaddrRemoteIpv4(&servaddr_ue_[socket_id],
-                            uecfg_->UeServerPort() + socket_id,
-                            uecfg_->UeServerAddr().c_str());
+    size_t local_port_id = uecfg_->UeRruPort() + socket_id;
+    server_ue_.at(socket_id) =
+        std::make_unique<UDPServer>(local_port_id, sock_buf_size);
+    client_ue_.at(socket_id) = std::make_unique<UDPClient>();
+
     std::printf(
-        "UE RX thread %d: set up UDP socket server listening to port %d"
+        "UE RX thread %d: set up UDP socket server listening to port %zu"
         " with remote address %s:%zu\n",
         tid, local_port_id, uecfg_->UeServerAddr().c_str(),
         uecfg_->UeServerPort() + socket_id);
-    fcntl(socket_ue_[socket_id], F_SETFL, O_NONBLOCK);
   }
 
   std::vector<uint8_t> udp_pkt_buf(bscfg_->PacketLength(), 0);
   size_t socket_id = socket_lo;
   while (running) {
-    if (-1 == recv(socket_ue_[socket_id], (char*)&udp_pkt_buf[0],
-                   udp_pkt_buf.size(), 0)) {
-      if (errno != EAGAIN && running) {
-        std::printf("UE socket %zu receive failed\n", socket_id);
-        throw std::runtime_error("ChannelSim: UE socket receive failed");
+    int rx_bytes =
+        server_ue_.at(socket_id)->Recv(udp_pkt_buf.data(), udp_pkt_buf.size());
+    if (0 > rx_bytes) {
+      std::printf("UE socket %zu receive failed\n", socket_id);
+      throw std::runtime_error("ChannelSim: UE socket receive failed");
+    } else if (static_cast<size_t>(rx_bytes) == udp_pkt_buf.size()) {
+      const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
+
+      size_t frame_id = pkt->frame_id_;
+      size_t symbol_id = pkt->symbol_id_;
+      size_t ant_id = pkt->ant_id_;
+
+      size_t pilot_symbol_id = uecfg_->Frame().GetPilotSymbolIdx(symbol_id);
+      size_t ul_symbol_id = uecfg_->Frame().GetULSymbolIdx(symbol_id);
+      size_t total_symbol_id = pilot_symbol_id;
+      if (pilot_symbol_id == SIZE_MAX) {
+        total_symbol_id = ul_symbol_id + bscfg_->Frame().NumPilotSyms();
       }
-      continue;
-    }
+      if (kDebugPrintInTask) {
+        std::printf(
+            "Received UE packet for frame %zu, symbol %zu, ant %zu from "
+            "socket %zu\n",
+            frame_id, symbol_id, ant_id, socket_id);
+      }
+      size_t symbol_offset =
+          (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ +
+          total_symbol_id;
+      size_t offset = symbol_offset * uecfg_->UeAntNum() + ant_id;
+      std::memcpy(&rx_buffer_ue_[offset * payload_length_], pkt->data_,
+                  payload_length_);
 
-    const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
-
-    size_t frame_id = pkt->frame_id_;
-    size_t symbol_id = pkt->symbol_id_;
-    size_t ant_id = pkt->ant_id_;
-
-    size_t pilot_symbol_id = uecfg_->Frame().GetPilotSymbolIdx(symbol_id);
-    size_t ul_symbol_id = uecfg_->Frame().GetULSymbolIdx(symbol_id);
-    size_t total_symbol_id = pilot_symbol_id;
-    if (pilot_symbol_id == SIZE_MAX) {
-      total_symbol_id = ul_symbol_id + bscfg_->Frame().NumPilotSyms();
-    }
-    if (kDebugPrintInTask) {
+      RtAssert(
+          message_queue_.enqueue(
+              local_ptok,
+              EventData(EventType::kPacketRX,
+                        gen_tag_t::FrmSymUe(frame_id, symbol_id, ant_id).tag_)),
+          "UE Socket message enqueue failed!");
+      if (++socket_id == socket_hi) {
+        socket_id = socket_lo;
+      }
+    } else if (0 != rx_bytes) {
       std::printf(
-          "Received UE packet for frame %zu, symbol %zu, ant %zu from "
-          "socket %zu\n",
-          frame_id, symbol_id, ant_id, socket_id);
-    }
-    size_t symbol_offset =
-        (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ + total_symbol_id;
-    size_t offset = symbol_offset * uecfg_->UeAntNum() + ant_id;
-    std::memcpy(&rx_buffer_ue_[offset * payload_length_], pkt->data_,
-                payload_length_);
-
-    RtAssert(
-        message_queue_.enqueue(
-            local_ptok,
-            EventData(EventType::kPacketRX,
-                      gen_tag_t::FrmSymUe(frame_id, symbol_id, ant_id).tag_)),
-        "UE Socket message enqueue failed!");
-    if (++socket_id == socket_hi) {
-      socket_id = socket_lo;
+          "UE socket %zu receive failed with less than full packet %d : %zu\n",
+          socket_id, rx_bytes, udp_pkt_buf.size());
+      throw std::runtime_error("ChannelSim: UE socket receive failed");
     }
   }
   return nullptr;
 }
 
+/// Warning: Threads are sharing these sender sockets.
 void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
                       std::vector<char>& tx_buffer, size_t buffer_offset,
-                      std::vector<int>& send_socket,
-                      std::vector<struct sockaddr_in>& servaddr,
+                      std::vector<std::unique_ptr<UDPClient>>& udp_clients,
+                      const std::string& dest_address, size_t dest_port,
                       arma::cx_fmat& format_dest) {
   auto* dst_ptr = reinterpret_cast<short*>(&tx_buffer.at(buffer_offset));
   SimdConvertFloatToShort(reinterpret_cast<float*>(format_dest.memptr()),
@@ -456,12 +464,8 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
     std::memcpy(pkt->data_,
                 &tx_buffer[buffer_offset + ant_id * payload_length_],
                 payload_length_);
-    ssize_t ret =
-        sendto(send_socket.at(ant_id),
-               reinterpret_cast<char*>(udp_pkt_buf.data()), udp_pkt_buf.size(),
-               0, reinterpret_cast<struct sockaddr*>(&servaddr.at(ant_id)),
-               sizeof(servaddr.at(ant_id)));
-    RtAssert(ret > 0, "Sendto() failed");
+    udp_clients.at(ant_id)->Send(dest_address, dest_port + ant_id,
+                                 udp_pkt_buf.data(), udp_pkt_buf.size());
   }
 }
 
@@ -474,6 +478,13 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
   size_t total_symbol_id = pilot_symbol_id;
   if (pilot_symbol_id == SIZE_MAX) {
     total_symbol_id = ul_symbol_id + bscfg_->Frame().NumPilotSyms();
+  }
+
+  if (kPrintDebugTxBs) {
+    std::printf(
+        "Channel Sim: DoTxBs processing frame %zu, symbol %zu, ul symbol "
+        "%zu, at %f ms\n",
+        frame_id, symbol_id, ul_symbol_id, GetTime::GetTimeUs() / 1000);
   }
 
   size_t symbol_offset =
@@ -505,7 +516,7 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
   }
 
   DoTx(frame_id, symbol_id, bscfg_->BsAntNum(), tx_buffer_bs_, total_offset_bs,
-       socket_bs_, servaddr_bs_, fmat_dst);
+       client_bs_, bscfg_->BsServerAddr(), bscfg_->BsServerPort(), fmat_dst);
 
   RtAssert(message_queue_.enqueue(
                *task_ptok_[tid],
@@ -517,11 +528,13 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
 void ChannelSim::DoTxUser(int tid, size_t tag) {
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  size_t dl_symbol_id = GetDlSymbolIdx(frame_id, symbol_id);
+  size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);  // If id = 0, then return 0;
 
   if (kPrintDebugTxUser) {
-    std::printf("Channel Sim: DoTxUser processing symbol %zu, dl symbol %zu\n",
-                symbol_id, dl_symbol_id);
+    std::printf(
+        "Channel Sim: DoTxUser processing frame %zu, symbol %zu, dl symbol "
+        "%zu, at %f ms\n",
+        frame_id, symbol_id, dl_symbol_id, GetTime::GetTimeUs() / 1000);
   }
 
   size_t symbol_offset =
@@ -553,7 +566,7 @@ void ChannelSim::DoTxUser(int tid, size_t tag) {
   }
 
   DoTx(frame_id, symbol_id, uecfg_->UeAntNum(), tx_buffer_ue_, total_offset_ue,
-       socket_ue_, servaddr_ue_, fmat_dst);
+       client_ue_, uecfg_->UeServerAddr(), uecfg_->UeServerPort(), fmat_dst);
 
   RtAssert(message_queue_.enqueue(
                *task_ptok_[tid],
