@@ -19,14 +19,17 @@
 class DoEncode : public Doer {
  public:
   DoEncode(Config* in_config, int in_tid, Table<int8_t>& in_raw_data_buffer,
-           Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager);
+           Table<int8_t>& in_encoded_buffer, size_t in_mac_frame_wnd,
+           size_t in_mac_bytes_perframe, Stats* in_stats_manager);
   ~DoEncode() override;
 
   EventData Launch(size_t tag) override;
 
  private:
+  size_t mac_frame_wnd_;
+  size_t mac_bytes_perframe_;
   // References to buffers allocated pre-construction
-  Table<int8_t>& raw_data_buffer_;
+  Table<int8_t>& mac_data_buffer_;
   Table<int8_t>& encoded_buffer_;
 
   // Intermediate buffer to hold LDPC encoding parity

@@ -44,12 +44,12 @@ MacThread::MacThread(
 
   server_.n_filled_in_frame_.fill(0);
   for (auto& v : server_.frame_data_) {
-    v.resize(cfg_->MacDataBytesNumPerframe());
+    v.resize(cfg_->UlMacDataBytesNumPerframe());
   }
 
   client_.ul_bits_buffer_id_.fill(0);
 
-  const size_t udp_pkt_len = cfg_->MacDataBytesNumPerframe();
+  const size_t udp_pkt_len = cfg_->UlMacDataBytesNumPerframe();
   udp_pkt_buf_.resize(udp_pkt_len);
 
   // TODO: See if it makes more sense to split up the UE's by port here for
@@ -180,16 +180,16 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
   }
 
   // When the frame is full, send it to the application
-  if (server_.n_filled_in_frame_[ue_id] == cfg_->MacDataBytesNumPerframe()) {
+  if (server_.n_filled_in_frame_[ue_id] == cfg_->UlMacDataBytesNumPerframe()) {
     server_.n_filled_in_frame_[ue_id] = 0;
 
     udp_client_->Send(kMacRemoteHostname, cfg_->MacTxPort() + ue_id,
                       &server_.frame_data_[ue_id][0],
-                      cfg_->MacDataBytesNumPerframe());
+                      cfg_->UlMacDataBytesNumPerframe());
     std::fprintf(log_file_,
                  "MAC thread: Sent data for frame %zu, ue %zu, size %zu\n",
-                 frame_id, ue_id, cfg_->MacDataBytesNumPerframe());
-    for (size_t i = 0; i < cfg_->MacDataBytesNumPerframe(); i++) {
+                 frame_id, ue_id, cfg_->UlMacDataBytesNumPerframe());
+    for (size_t i = 0; i < cfg_->UlMacDataBytesNumPerframe(); i++) {
       ss << std::to_string(server_.frame_data_[ue_id][i]) << " ";
     }
     std::fprintf(log_file_, "%s\n", ss.str().c_str());
@@ -237,7 +237,8 @@ void MacThread::ProcessUdpPacketsFromApps(RBIndicator ri) {
   size_t rx_bytes = 0;
   size_t rx_request_size = udp_pkt_buf_.size();
   uint8_t* rx_location = &udp_pkt_buf_[0];
-  for (size_t rx_tries = 0; rx_tries < cfg_->MacPacketsPerframe(); rx_tries++) {
+  for (size_t rx_tries = 0; rx_tries < cfg_->UlMacPacketsPerframe();
+       rx_tries++) {
     ssize_t ret = udp_server_->Recv(rx_location, rx_request_size);
     if (ret == 0) {
       return;  // No data received
@@ -256,13 +257,13 @@ void MacThread::ProcessUdpPacketsFromApps(RBIndicator ri) {
       rx_location += ret;
     }
   }
-  if (rx_bytes != cfg_->MacDataBytesNumPerframe()) {
+  if (rx_bytes != cfg_->UlMacDataBytesNumPerframe()) {
     MLPD_ERROR("MacThread: Received %zu : %zu bytes\n", rx_bytes,
-               cfg_->MacDataBytesNumPerframe());
+               cfg_->UlMacDataBytesNumPerframe());
   } else {
     MLPD_INFO("MacThread: Received Mac Frame Data\n");
   }
-  RtAssert(rx_bytes == cfg_->MacDataBytesNumPerframe(),
+  RtAssert(rx_bytes == cfg_->UlMacDataBytesNumPerframe(),
            "MacThread:ProcessUdpPacketsFromApps incorrect number of bytes "
            "received.");
 
@@ -320,16 +321,16 @@ void MacThread::ProcessUdpPacketsFromAppsClient(const char* payload,
         log_file_,
         "MAC thread: Received data from app for frame %zu, ue %zu, size "
         "%zu:\n",
-        next_frame_id_, next_radio_id_, cfg_->MacDataBytesNumPerframe());
+        next_frame_id_, next_radio_id_, cfg_->UlMacDataBytesNumPerframe());
 
-    for (size_t i = 0; i < cfg_->MacDataBytesNumPerframe(); i++) {
+    for (size_t i = 0; i < cfg_->UlMacDataBytesNumPerframe(); i++) {
       ss << std::to_string((uint8_t)(payload[i])) << " ";
     }
     std::fprintf(log_file_, "%s\n", ss.str().c_str());
   }
 
-  for (size_t pkt_id = 0; pkt_id < cfg_->MacPacketsPerframe(); pkt_id++) {
-    size_t pkt_offset = radio_buf_id * cfg_->MacBytesNumPerframe() +
+  for (size_t pkt_id = 0; pkt_id < cfg_->UlMacPacketsPerframe(); pkt_id++) {
+    size_t pkt_offset = radio_buf_id * cfg_->UlMacBytesNumPerframe() +
                         pkt_id * cfg_->MacPacketLength();
     auto* pkt = reinterpret_cast<MacPacket*>(
         &(*client_.ul_bits_buffer_)[next_radio_id_][pkt_offset]);

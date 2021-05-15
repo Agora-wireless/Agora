@@ -13,10 +13,13 @@
 static constexpr bool kPrintEncodedData = false;
 
 DoEncode::DoEncode(Config* in_config, int in_tid,
-                   Table<int8_t>& in_raw_data_buffer,
-                   Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager)
+                   Table<int8_t>& in_mac_data_buffer,
+                   Table<int8_t>& in_encoded_buffer, size_t in_mac_frame_wnd,
+                   size_t in_mac_bytes_perframe, Stats* in_stats_manager)
     : Doer(in_config, in_tid),
-      raw_data_buffer_(in_raw_data_buffer),
+      mac_frame_wnd_(in_mac_frame_wnd),
+      mac_bytes_perframe_(in_mac_bytes_perframe),
+      mac_data_buffer_(in_mac_data_buffer),
       encoded_buffer_(in_encoded_buffer),
       scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kEncode, in_tid);
@@ -67,19 +70,21 @@ EventData DoEncode::Launch(size_t tag) {
     symbol_idx_data = cfg_->Frame().GetULSymbolIdx(symbol_id);
   }
 
-  int8_t* ldpc_input = nullptr;
-
-  if (this->cfg_->ScrambleEnabled()) {
-    std::memcpy(
-        scrambler_buffer_,
-        cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_data, ue_id, cur_cb_id),
-        cfg_->NumBytesPerCb());
-    scrambler_->Scramble(scrambler_buffer_, cfg_->NumBytesPerCb());
-    ldpc_input = scrambler_buffer_;
+  int8_t* mac_output = nullptr;
+  if (kEnableMac == true) {
+    mac_output =
+        cfg_->GetMacBits(mac_data_buffer_, frame_id, symbol_idx_data, ue_id,
+                         cur_cb_id, mac_frame_wnd_, mac_bytes_perframe_);
   } else {
-    ldpc_input =
-        cfg_->GetInfoBits(raw_data_buffer_, symbol_idx_data, ue_id, cur_cb_id);
+    mac_output =
+        cfg_->GetInfoBits(mac_data_buffer_, symbol_idx_data, ue_id, cur_cb_id);
   }
+  int8_t* ldpc_input = nullptr;
+  std::memcpy(scrambler_buffer_, mac_output, cfg_->NumBytesPerCb());
+  if (this->cfg_->ScrambleEnabled()) {
+    scrambler_->Scramble(scrambler_buffer_, cfg_->NumBytesPerCb());
+  }
+  ldpc_input = scrambler_buffer_;
 
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                    ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
