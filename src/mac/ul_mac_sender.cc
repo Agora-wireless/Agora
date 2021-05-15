@@ -72,7 +72,7 @@ UlMacSender::UlMacSender(Config* cfg, std::string& data_filename,
 
   // tx buffers will be an array of MacPackets
   tx_buffers_.Malloc(kFrameWnd * cfg_->UeAntNum(),
-                     (cfg_->MacPacketsPerframe() *
+                     (cfg_->UlMacPacketsPerframe() *
                       (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
                      Agora_memory::Alignment_t::kAlign64);
   MLPD_TRACE(
@@ -296,9 +296,10 @@ void* UlMacSender::WorkerThread(size_t tid) {
         // const size_t tx_bufs_idx = TagToTxBuffersIndex(tag);
         uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
 
-        // Mac Thread is currently looking for MacDataBytesNumPerframe bytes
+        // Mac Thread is currently looking for UlMacDataBytesNumPerframe bytes
         // since we read in mac packets, we need to skip over the headers
-        for (size_t packet = 0; packet < cfg_->MacPacketsPerframe(); packet++) {
+        for (size_t packet = 0; packet < cfg_->UlMacPacketsPerframe();
+             packet++) {
           auto* tx_packet = reinterpret_cast<MacPacket*>(mac_packet_location);
           // TODO: Port + ue_radio?
           udp_client.Send(cfg_->UeServerAddr(), cfg_->MacRxPort(),
@@ -413,7 +414,7 @@ void UlMacSender::UpdateTxBuffer(std::ifstream& read, gen_tag_t tag) {
 
   assert(read.is_open() == true);
 
-  for (size_t i = 0; i < cfg_->MacPacketsPerframe(); i++) {
+  for (size_t i = 0; i < cfg_->UlMacPacketsPerframe(); i++) {
     auto* pkt = reinterpret_cast<MacPacket*>(mac_packet_location);
     pkt->frame_id_ = tag.frame_id_;
     pkt->symbol_id_ = this->cfg_->Frame().GetULSymbol(
@@ -437,8 +438,8 @@ void UlMacSender::UpdateTxBuffer(std::ifstream& read, gen_tag_t tag) {
   }
   std::printf(
       "UlMacSender: Loading packet for frame %d, ue %d, bytes %zu : %zu\n",
-      tag.frame_id_, tag.ant_id_, cfg_->MacDataBytesNumPerframe(),
-      cfg_->MacPayloadLength() * cfg_->MacPacketsPerframe());
+      tag.frame_id_, tag.ant_id_, cfg_->UlMacDataBytesNumPerframe(),
+      cfg_->MacPayloadLength() * cfg_->UlMacPacketsPerframe());
 }
 
 void UlMacSender::WriteStatsToFile(size_t tx_frame_count) const {

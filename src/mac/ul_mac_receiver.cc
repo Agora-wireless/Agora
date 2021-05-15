@@ -43,7 +43,7 @@ void* UlMacReceiver::LoopRecv(size_t tid) {
               cfg_->MacTxPort() + ue_id);
 
   // Malloc a rx buffer
-  const size_t packet_length = cfg_->MacDataBytesNumPerframe();
+  const size_t packet_length = cfg_->UlMacDataBytesNumPerframe();
   uint8_t rx_buffer[packet_length];
 
   while ((SignalHandler::GotExitSignal() == false) &&

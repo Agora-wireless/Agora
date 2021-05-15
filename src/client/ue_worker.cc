@@ -96,7 +96,8 @@ void UeWorker::TaskThread(size_t core_offset) {
   auto encoder = std::make_unique<DoEncode>(
       &config_, (int)tid_,
       (kEnableMac == true) ? ul_bits_buffer_ : config_.UlBits(),
-      encoded_buffer_, &stats_);
+      encoded_buffer_, (kEnableMac == true) ? kFrameWnd : 1,
+      config_.UlMacBytesNumPerframe(), &stats_);
 
   auto iffter = std::make_unique<DoIFFTClient>(
       &config_, (int)tid_, ifft_buffer_, tx_buffer_, &stats_);
@@ -197,8 +198,7 @@ void UeWorker::DoFftData(size_t tag) {
   auto* fft_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
 
-  size_t dl_data_symbol_perframe =
-      config_.Frame().NumDLSyms() - config_.Frame().ClientDlPilotSymbols();
+  size_t dl_data_symbol_perframe = config_.Frame().NumDlDataSyms();
   size_t total_dl_data_symbol_id =
       (frame_slot * dl_data_symbol_perframe) +
       (dl_symbol_id - config_.Frame().ClientDlPilotSymbols());
@@ -399,8 +399,7 @@ void UeWorker::DoDemul(size_t tag) {
 
   const size_t frame_slot = frame_id % kFrameWnd;
   size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
-  size_t dl_data_symbol_perframe =
-      config_.Frame().NumDLSyms() - config_.Frame().ClientDlPilotSymbols();
+  size_t dl_data_symbol_perframe = config_.Frame().NumDlDataSyms();
   size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe +
                               dl_symbol_id -
                               config_.Frame().ClientDlPilotSymbols();
@@ -523,8 +522,7 @@ void UeWorker::DoModul(size_t tag) {
     const size_t ant_id = (ue_id * config_.NumChannels()) + ch;
 
     const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
-    const size_t ul_data_symbol_perframe =
-        config_.Frame().NumULSyms() - config_.Frame().ClientUlPilotSymbols();
+    const size_t ul_data_symbol_perframe = config_.Frame().NumUlDataSyms();
     const size_t total_ul_data_symbol_id =
         (frame_slot * ul_data_symbol_perframe) +
         (ul_symbol_idx - config_.Frame().ClientUlPilotSymbols());
@@ -573,9 +571,7 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
         source_data = config_.UeSpecificPilot()[ant_id];
       } else {
         const size_t frame_slot = frame_id % kFrameWnd;
-        const size_t ul_data_symbol_perframe =
-            config_.Frame().NumULSyms() -
-            config_.Frame().ClientUlPilotSymbols();
+        const size_t ul_data_symbol_perframe = config_.Frame().NumUlDataSyms();
         const size_t total_ul_data_symbol_id =
             (frame_slot * ul_data_symbol_perframe) +
             (ul_symbol_idx - config_.Frame().ClientUlPilotSymbols());

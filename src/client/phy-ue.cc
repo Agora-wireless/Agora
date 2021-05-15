@@ -536,8 +536,8 @@ void PhyUe::Start() {
           RtAssert(radio_buf_id == expected_frame_id_from_mac_ % kFrameWnd);
 
           auto* pkt = reinterpret_cast<MacPacket*>(
-              &ul_bits_buffer_[ue_id]
-                              [radio_buf_id * config_->MacBytesNumPerframe()]);
+              &ul_bits_buffer_[ue_id][radio_buf_id *
+                                      config_->UlMacBytesNumPerframe()]);
           RtAssert(pkt->frame_id_ == expected_frame_id_from_mac_,
                    "PhyUe: Incorrect frame ID from MAC");
           current_frame_user_num_ =
@@ -750,7 +750,7 @@ void PhyUe::InitializeVarsFromCfg() {
 
 void PhyUe::InitializeUplinkBuffers() {
   // initialize ul data buffer
-  ul_bits_buffer_size_ = kFrameWnd * config_->MacBytesNumPerframe();
+  ul_bits_buffer_size_ = kFrameWnd * config_->UlMacBytesNumPerframe();
   ul_bits_buffer_.Malloc(config_->UeAntNum(), ul_bits_buffer_size_,
                          Agora_memory::Alignment_t::kAlign64);
   ul_bits_buffer_status_.Calloc(config_->UeAntNum(), kFrameWnd,
