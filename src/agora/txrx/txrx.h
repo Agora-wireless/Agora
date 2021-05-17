@@ -105,10 +105,6 @@ class PacketTXRX {
 
   // Handle for socket threads
   std::array<std::thread, kMaxSocketNum> socket_std_threads_;
-
-  // Dimension 1: socket_thread
-  // Dimension 2: rx_packet
-  std::vector<std::vector<RxPacket>> rx_packets_;
   size_t buffers_per_socket_;
 
   char* tx_buffer_;
@@ -125,6 +121,14 @@ class PacketTXRX {
   uint32_t bs_rru_addr_;     // IPv4 address of the simulator sender
   uint32_t bs_server_addr_;  // IPv4 address of the Agora server
   struct rte_mempool* mbuf_pool_;
+  
+  // Dimension 1: socket_thread
+  // Dimension 2: rx_packet
+  std::vector<std::vector<DPDKRxPacket>> rx_packets_;
+#else
+  // Dimension 1: socket_thread
+  // Dimension 2: rx_packet
+  std::vector<std::vector<RxPacket>> rx_packets_;
 #endif
 
   std::unique_ptr<RadioConfig> radioconfig_;  // Used only in Argos mode
