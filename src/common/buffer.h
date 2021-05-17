@@ -144,15 +144,18 @@ struct EventData {
   static constexpr size_t kMaxTags = 7;
   EventType event_type_;
   uint32_t num_tags_{0};
-  size_t tags_[7];
+  std::array<size_t, kMaxTags> tags_;
 
-  // Initialize and event with only the event type field set
-  explicit EventData(EventType event_type) : event_type_(event_type) {}
+  // Initialize an event with only the event type field set
+  explicit EventData(EventType event_type) : event_type_(event_type) {
+    tags_.fill(0);
+  }
 
   // Create an event with one tag
   EventData(EventType event_type, size_t tag)
       : event_type_(event_type), num_tags_(1) {
-    tags_[0] = tag;
+    tags_.fill(0);
+    tags_.at(0) = tag;
   }
 
   EventData() = default;
