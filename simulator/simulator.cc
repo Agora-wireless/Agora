@@ -89,7 +89,7 @@ void Simulator::Start() {
         switch (event.event_type_) {
           case EventType::kPacketRX: {
             RxPacket* rx_packet = rx_tag_t(event.tags_[0]).rx_packet_;
-            Packet* pkt = rx_packet->packet_;
+            Packet* pkt = rx_packet->RawPacket();
 
             size_t frame_id = pkt->frame_id_ % kNumStatsFrames;
             size_t symbol_id = pkt->symbol_id_;

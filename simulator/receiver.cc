@@ -68,19 +68,19 @@ void* Receiver::LoopRecv(size_t tid) {
     }
 
     ssize_t recvlen = udp_server->RecvFrom(
-        reinterpret_cast<uint8_t*>(current_packet->packet_),
+        reinterpret_cast<uint8_t*>(current_packet->RawPacket()),
         cfg_->PacketLength(), cfg_->BsServerAddr(), cfg_->BsServerPort() + tid);
     if (recvlen < 0) {
       std::perror("recv failed");
       throw std::runtime_error("Receiver: recv failed");
     } else if (static_cast<size_t>(recvlen) == cfg_->PacketLength()) {
       // Read information from received packet
-      size_t frame_id = current_packet->packet_->frame_id_;
+      size_t frame_id = current_packet->RawPacket()->frame_id_;
 
       if (kDebugSenderReceiver) {
         std::printf("RX thread %zu received frame %zu symbol %d, ant %d\n ",
-                    tid, frame_id, current_packet->packet_->symbol_id_,
-                    current_packet->packet_->ant_id_);
+                    tid, frame_id, current_packet->RawPacket()->symbol_id_,
+                    current_packet->RawPacket()->ant_id_);
       }
 
       if (kIsWorkerTimingEnabled) {

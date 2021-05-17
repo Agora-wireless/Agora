@@ -106,7 +106,7 @@ struct Packet* RadioTxRx::RecvEnqueue(size_t tid, size_t radio_id,
     config_->Running(false);
     return (nullptr);
   }
-  Packet* pkt = rx.packet_;
+  Packet* pkt = rx.RawPacket();
 
   ssize_t rx_bytes = udp_servers_.at(radio_id)->Recv(
       reinterpret_cast<uint8_t*>(pkt), packet_length);
@@ -365,7 +365,7 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
       c->Running(false);
       return nullptr;
     }
-    samp.at(ch) = rx.packet_->data_;
+    samp.at(ch) = rx.RawPacket()->data_;
   }
 
   if (dummy_enqueue == false) {
@@ -399,7 +399,8 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
   size_t ant_id = radio_id * c->NumChannels();
   for (size_t ch = 0; ch < c->NumChannels(); ++ch) {
     RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
-    new (rx.packet_) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
+    new (rx.RawPacket())
+        Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
 
     rx.Use();
     EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
@@ -407,7 +408,7 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
     RtAssert(message_queue_->enqueue(*local_ptok, rx_message),
              "socket message enqueue failed");
   }
-  return rx_packets_.at(tid).at(rx_slot).packet_;
+  return rx_packets_.at(tid).at(rx_slot).RawPacket();
 }
 
 void* RadioTxRx::LoopTxRxArgos(size_t tid) {

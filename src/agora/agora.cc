@@ -312,7 +312,7 @@ void Agora::Start() {
       // FFT processing is scheduled after falling through the switch
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->packet_;
+          Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
 
           if (pkt->frame_id_ >= ((this->cur_sche_frame_id_ + kFrameWnd))) {
             MLPD_ERROR(

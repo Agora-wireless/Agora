@@ -142,7 +142,7 @@ void UeWorker::DoFftData(size_t tag) {
   size_t start_tsc = GetTime::Rdtsc();
 
   // read info of one frame
-  Packet* pkt = fft_req_tag_t(tag).rx_packet_->packet_;
+  Packet* pkt = fft_req_tag_t(tag).rx_packet_->RawPacket();
 
   size_t frame_id = pkt->frame_id_;
   size_t symbol_id = pkt->symbol_id_;
@@ -275,7 +275,7 @@ void UeWorker::DoFftPilot(size_t tag) {
   size_t start_tsc = GetTime::Rdtsc();
 
   // read info of one frame
-  Packet* pkt = fft_req_tag_t(tag).rx_packet_->packet_;
+  Packet* pkt = fft_req_tag_t(tag).rx_packet_->RawPacket();
 
   size_t frame_id = pkt->frame_id_;
   size_t symbol_id = pkt->symbol_id_;

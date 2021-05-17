@@ -63,7 +63,7 @@ std::vector<struct Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid,
       break;
     }
     ant_ids.at(ch) = ant_id + ch;
-    samp.at(ch) = rx.packet_->data_;
+    samp.at(ch) = rx.RawPacket()->data_;
   }
 
   long long frame_time;
@@ -90,7 +90,7 @@ std::vector<struct Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid,
 
       std::vector<void*> tmp_samp(cfg_->NumChannels());
       std::vector<char> dummy_buff(packet_length);
-      tmp_samp.at(0) = rx.packet_->data_;
+      tmp_samp.at(0) = rx.RawPacket()->data_;
       tmp_samp.at(1) = dummy_buff.data();
       if ((cfg_->Running() == false) ||
           radioconfig_->RadioRx(radio_id, tmp_samp.data(), frame_time) <= 0) {
@@ -105,8 +105,8 @@ std::vector<struct Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid,
   std::vector<struct Packet*> pkt;
   for (size_t ch = 0; ch < symbol_ids.size(); ++ch) {
     RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
-    pkt.push_back(rx.packet_);
-    new (rx.packet_)
+    pkt.push_back(rx.RawPacket());
+    new (rx.RawPacket())
         Packet(frame_id, symbol_ids.at(ch), 0 /* cell_id */, ant_ids.at(ch));
 
     rx.Use();

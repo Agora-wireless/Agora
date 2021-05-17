@@ -184,6 +184,7 @@ struct Packet {
 class RxPacket {
  private:
   std::atomic<int> references_;
+  Packet *packet_;
 
  public:
   RxPacket() : references_(0) { packet_ = nullptr; }
@@ -195,7 +196,6 @@ class RxPacket {
   // Disallow copy
   RxPacket &operator=(const RxPacket &) = delete;
 
-  Packet *packet_;
   inline bool Set(Packet *in_pkt) {
     if (references_.load() == 0) {
       packet_ = in_pkt;
@@ -205,6 +205,8 @@ class RxPacket {
       return false;
     }
   }
+
+  inline Packet *RawPacket() { return packet_; }
   inline bool Empty() const { return references_.load() == 0; }
   inline void Use() { references_.fetch_add(1); }
   inline void Free() { references_.fetch_sub(1); }
