@@ -186,8 +186,10 @@ struct Packet {
 
 class RxPacket {
  private:
-  std::atomic<int> references_;
+  std::atomic<unsigned> references_;
   Packet *packet_;
+
+  inline virtual void GcPacket(void) {}
 
  public:
   RxPacket() : references_(0) { packet_ = nullptr; }
@@ -195,6 +197,7 @@ class RxPacket {
   explicit RxPacket(const RxPacket &copy) : packet_(copy.packet_) {
     references_.store(copy.references_.load());
   }
+  ~RxPacket() = default;
 
   // Disallow copy
   RxPacket &operator=(const RxPacket &) = delete;
@@ -212,8 +215,32 @@ class RxPacket {
   inline Packet *RawPacket() { return packet_; }
   inline bool Empty() const { return references_.load() == 0; }
   inline void Use() { references_.fetch_add(1); }
-  inline void Free() { references_.fetch_sub(1); }
+  inline void Free() {
+    unsigned value = references_.fetch_sub(1);
+    if (value == 0) {
+      throw std::runtime_error("RxPacket has negative references");
+    } else if (value == 1) {
+      GcPacket();
+      packet_ = nullptr;
+    }
+  }
 };
+
+#if defined(USE_DPDK)
+class DPDKRxPacket : public RxPacket {
+  // Make the RxPacket constructors availble
+  using RxPacket::RxPacket;
+
+ public:
+  ~DPDKRxPacket() = default;
+
+ private:
+  inline void GcPacket() override {
+    std::printf("Garbage collecting the memory for DPDKRxPacket\n");
+    // rte_pktmbuf_free(reinterpret_cast<struct rte_mbuf *>(packet_));
+  }
+};
+#endif  // USE_DPDK
 
 // Event data tag for RX events
 union rx_tag_t {
