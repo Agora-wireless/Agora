@@ -206,9 +206,7 @@ struct Packet* PacketTXRX::RecvEnqueue(size_t tid, size_t radio_id,
     cfg_->Running(false);
     return (nullptr);
   }
-  Packet* pkt = rx.packet_;
-  // std::printf("PacketTXRX[%zu]: rx packet %zu at memory location %zu\n", tid,
-  //            rx_slot, (size_t)pkt);
+  Packet* pkt = rx.RawPacket();
 
   ssize_t rx_bytes = udp_servers_.at(radio_id)->Recv(
       reinterpret_cast<uint8_t*>(pkt), packet_length);

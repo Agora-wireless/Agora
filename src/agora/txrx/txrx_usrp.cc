@@ -134,7 +134,7 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(size_t tid, size_t radio_id,
       cfg_->Running(false);
       break;
     }
-    samp.at(ch) = rx.packet_;
+    samp.at(ch) = rx.RawPacket();
   }
 
   int tmp_ret;
@@ -156,7 +156,7 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(size_t tid, size_t radio_id,
       cfg_->IsUplink(frame_id, symbol_id)) {
     for (size_t ch = 0; ch < n_channels; ++ch) {
       RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
-      new (rx.packet_) Packet(frame_id, symbol_id, 0, ant_id + ch);
+      new (rx.RawPacket()) Packet(frame_id, symbol_id, 0, ant_id + ch);
       rx.Use();
       // Push kPacketRX event into the queue
       EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
@@ -167,7 +167,7 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(size_t tid, size_t radio_id,
       }
     }
   }
-  return rx_packets_.at(tid).at(rx_slot).packet_;
+  return rx_packets_.at(tid).at(rx_slot).RawPacket();
 }
 
 int PacketTXRX::DequeueSendUsrp(int tid) {
