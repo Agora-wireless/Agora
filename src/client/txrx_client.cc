@@ -702,7 +702,6 @@ void RadioTxRx::CFOEstimation(const int sync_index, const std::vector<std::compl
 {
   auto& c = config_;
   size_t beaconLen = c->BeaconLongSymLen();
-  double rate = c->Rate();
 
   // Compute phase error across same-sample index from two consecutive training sequences
   size_t cfo_start_idx = sync_index - (beaconLen * c->BeaconLongSymReps());
@@ -732,7 +731,7 @@ void RadioTxRx::CFOEstimation(const int sync_index, const std::vector<std::compl
   float average = accumulate(phase_uwrap.begin(), phase_uwrap.end(), 0.0)
       / phase_uwrap.size();
   cfo_ = average / (2 * M_PI); // * beaconLen);
-  //double cfo_est_khz = cfo_ * rate * 1e-3;
+  //double cfo_est_khz = cfo_ * c->Rate() * 1e-3;
   //printf("YYYY  Avg: %f, cfo_: %f, cfo_khz: %f  ZZZZ \n", average, cfo_, cfo_est_khz);
 }
 
