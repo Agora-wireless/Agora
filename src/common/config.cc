@@ -308,7 +308,7 @@ Config::Config(const std::string& jsonfile)
   // Check for frame validity.
   // We should remove the restriction of the beacon symbol placement when tested
   // more thoroughly
-  if (((frame_.NumBeaconSyms() < 0) && (frame_.NumBeaconSyms() > 1)) ||
+  if (((frame_.NumBeaconSyms() > 1)) ||
       ((frame_.NumBeaconSyms() == 1) && (frame_.GetBeaconSymbolLast() > 1))) {
     MLPD_ERROR("Invalid beacon symbol placement\n");
     throw std::runtime_error("Invalid beacon symbol placement");
@@ -343,7 +343,7 @@ Config::Config(const std::string& jsonfile)
     ue_ant_num_ = ue_num_;
   }
   ue_ant_offset_ = tdd_conf.value("ue_ant_offset", 0);
-  total_ue_ant_num_ = tdd_conf.value("total_ue_ant_num", ue_ant_num_);
+  ue_ant_total_ = tdd_conf.value("ue_ant_total", ue_ant_num_);
 
   // Agora configurations
   frames_to_test_ = tdd_conf.value("frames_to_test", 9600);
@@ -446,16 +446,15 @@ Config::Config(const std::string& jsonfile)
   this->running_.store(true);
   MLPD_INFO(
       "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
-      "frame,\n\t"
-      "%zu uplink data symbols per frame, %zu downlink data "
-      "symbols per frame,\n\t"
-      "%zu OFDM subcarriers (%zu data subcarriers), modulation %s,\n\t"
-      "%zu MAC data bytes per frame, %zu MAC bytes per frame, frame time %.3f "
-      "sec\n",
+      "frame,\n\t%zu uplink data symbols per frame, %zu downlink data symbols "
+      "per frame,\n\t%zu OFDM subcarriers (%zu data subcarriers), modulation "
+      "%s,\n\t%zu MAC data bytes per frame, %zu MAC bytes per frame, frame "
+      "time %.3f : %.3f sec\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
       mac_data_bytes_num_perframe_, mac_bytes_num_perframe_,
-      ((frame_.NumTotalSyms() * samps_per_symbol_) / rate_));
+      ((frame_.NumTotalSyms() * samps_per_symbol_) / rate_),
+      this->GetFrameDurationSec());
 }
 
 void Config::GenData() {
@@ -606,7 +605,7 @@ void Config::GenData() {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string ul_data_file = cur_directory + "/data/LDPC_orig_ul_data_" +
                              std::to_string(this->ofdm_ca_num_) + "_ant" +
-                             std::to_string(this->total_ue_ant_num_) + ".bin";
+                             std::to_string(this->ue_ant_total_) + ".bin";
   MLPD_SYMBOL("Config: Reading raw ul data from %s\n", ul_data_file.c_str());
   FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
   if (fd == nullptr) {
@@ -635,7 +634,7 @@ void Config::GenData() {
     }
     if (std::fseek(
             fd,
-            num_bytes_per_ue * (this->total_ue_ant_num_ - this->ue_ant_offset_ -
+            num_bytes_per_ue * (this->ue_ant_total_ - this->ue_ant_offset_ -
                                 this->ue_ant_num_),
             SEEK_CUR) != 0) {
       MLPD_ERROR(" *** Error: failed to seek propertly (post) into %s file\n",
@@ -648,7 +647,7 @@ void Config::GenData() {
 
   std::string dl_data_file = cur_directory + "/data/LDPC_orig_dl_data_" +
                              std::to_string(this->ofdm_ca_num_) + "_ant" +
-                             std::to_string(this->total_ue_ant_num_) + ".bin";
+                             std::to_string(this->ue_ant_total_) + ".bin";
 
   MLPD_SYMBOL("Config: Reading raw dl data from %s\n", dl_data_file.c_str());
   fd = std::fopen(dl_data_file.c_str(), "rb");
@@ -1011,8 +1010,6 @@ bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const {
 }
 
 SymbolType Config::GetSymbolType(size_t symbol_id) const {
-  assert((this->is_ue_ ==
-          false));  // Currently implemented for only the Agora server
   return kSymbolMap.at(this->frame_.FrameIdentifier().at(symbol_id));
 }
 

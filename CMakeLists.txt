@@ -215,6 +215,8 @@ include_directories(
 include_directories(SYSTEM src/third_party src/third_party/nlohmann/single_include)
 
 set(COMMON_SOURCES
+  src/agora/stats.cc
+  src/agora/phy_stats.cc
   src/common/framestats.cc
   src/common/config.cc
   src/common/utils.cc
@@ -238,13 +240,12 @@ add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(AGORA_SOURCES 
   src/agora/agora.cc
-  src/agora/stats.cc
-  src/agora/phy_stats.cc
   src/agora/dofft.cc
   src/agora/dozf.cc
   src/agora/dodemul.cc
   src/agora/doprecode.cc
-  src/agora/docoding.cc
+  src/agora/doencode.cc
+  src/agora/dodecode.cc
   src/agora/radio_lib.cc
   src/agora/radio_calibrate.cc
   src/mac/mac_thread.cc)
@@ -263,7 +264,11 @@ endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
+  src/agora/doencode.cc
+  src/client/doifft_client.cc
+  src/client/dodecode_client.cc
   src/client/client_radio.cc
+  src/client/ue_worker.cc
   src/client/phy-ue.cc
   src/client/txrx_client.cc
   src/mac/mac_thread.cc)
@@ -353,7 +358,8 @@ endforeach()
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
-  test_ptr_grid test_recipcal test_avx512_complex_mul test_scrambler)
+  test_ptr_grid test_recipcal test_avx512_complex_mul test_scrambler
+  test_256qam_demod)
 
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}
