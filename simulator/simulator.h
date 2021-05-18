@@ -74,10 +74,7 @@ class Simulator {
    * symbol_num_perframe
    */
   Table<char> socket_buffer_;
-  Table<int> socket_buffer_status_;
-
   size_t socket_buffer_size_;
-  size_t socket_buffer_status_size_;
 
   /* status checkers used by master thread */
   /* used to check if RX for all antennas and all symbols in a frame is done

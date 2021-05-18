@@ -62,9 +62,8 @@ void Simulator::Stop() {
 void Simulator::Start() {
   config_->Running(true);
   /* start receiver */
-  std::vector<std::thread> rx_threads = receiver_->StartRecv(
-      socket_buffer_, socket_buffer_status_, socket_buffer_status_size_,
-      socket_buffer_size_, frame_start_);
+  std::vector<std::thread> rx_threads =
+      receiver_->StartRecv(socket_buffer_, socket_buffer_size_, frame_start_);
 
   /* tokens used for dequeue */
   moodycamel::ConsumerToken ctok(message_queue_);
@@ -89,18 +88,14 @@ void Simulator::Start() {
         EventData& event = events_list.at(bulk_count);
         switch (event.event_type_) {
           case EventType::kPacketRX: {
-            size_t socket_thread_id = rx_tag_t(event.tags_[0]).tid_;
-            size_t buf_offset = rx_tag_t(event.tags_[0]).offset_;
+            RxPacket* rx_packet = rx_tag_t(event.tags_[0]).rx_packet_;
+            Packet* pkt = rx_packet->RawPacket();
 
-            char* socket_buffer_ptr =
-                socket_buffer_[socket_thread_id] +
-                (long long)buf_offset * config_->PacketLength();
-            auto* pkt = reinterpret_cast<struct Packet*>(socket_buffer_ptr);
             size_t frame_id = pkt->frame_id_ % kNumStatsFrames;
             size_t symbol_id = pkt->symbol_id_;
             size_t ant_id = pkt->ant_id_;
             size_t frame_id_in_buffer = (frame_id % kFrameWnd);
-            socket_buffer_status_[socket_thread_id][buf_offset] = 0;
+            rx_packet->Free();
 
             // Only process the dl symbols & ignore beacon frames
             SymbolType symbol_type = config_->GetSymbolType(symbol_id);
@@ -234,13 +229,6 @@ void Simulator::InitializeBuffers() {
   socket_buffer_size_ = (long long)config_->PacketLength() *
                         config_->Frame().NumTotalSyms() * config_->BsAntNum() *
                         kFrameWnd;
-  socket_buffer_status_size_ =
-      config_->Frame().NumTotalSyms() * config_->BsAntNum() * kFrameWnd;
-  socket_buffer_.Malloc(socket_rx_thread_num_, socket_buffer_size_,
-                        Agora_memory::Alignment_t::kAlign64);
-  socket_buffer_status_.Calloc(socket_rx_thread_num_,
-                               socket_buffer_status_size_,
-                               Agora_memory::Alignment_t::kAlign64);
 
   /* initilize all uplink status checkers */
   AllocBuffer1d(&rx_counter_packets_, kFrameWnd,
@@ -260,7 +248,6 @@ void Simulator::InitializeBuffers() {
 
 void Simulator::FreeBuffers() {
   socket_buffer_.Free();
-  socket_buffer_status_.Free();
 
   FreeBuffer1d(&rx_counter_packets_);
 

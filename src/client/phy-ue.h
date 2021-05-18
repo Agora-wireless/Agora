@@ -167,10 +167,7 @@ class PhyUe {
    * symbol_num_perframe
    */
   Table<char> rx_buffer_;
-  Table<int> rx_buffer_status_;
-
   size_t rx_buffer_size_;
-  int rx_buffer_status_size_;
 
   /**
    * Data for FFT, after time sync (prefix removed)
