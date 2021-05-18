@@ -82,7 +82,18 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
 
   rx_packets_.resize(socket_thread_num_);
   for (size_t i = 0; i < socket_thread_num_; i++) {
+    rx_packets_.at(i).reserve(buffers_per_socket_);
+#if defined(USE_DPDK_MEMORY)
+    unused(buffer);
     rx_packets_.at(i).resize(buffers_per_socket_);
+#else
+    for (size_t number_packets = 0; number_packets < buffers_per_socket_;
+         number_packets++) {
+      auto* pkt_loc = reinterpret_cast<Packet*>(
+          buffer[i] + (number_packets * cfg_->PacketLength()));
+      rx_packets_.at(i).emplace_back(pkt_loc);
+    }
+#endif  // defined(USE_DPDK_MEMORY)
   }
 
   unsigned int lcore_id;
@@ -137,7 +148,8 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
 
     // If the RX buffer is full, it means that the base station processing
     // hasn't kept up, so exit.
-    DPDKRxPacket& rx = rx_packets_.at(tid).at(rx_slot);
+    auto& rx = rx_packets_.at(tid).at(rx_slot);
+
     if (rx.Empty() == false) {
       std::printf("TXRX thread [%d] DpdkRecv rx_buffer full, slot: %zu\n", tid,
                   rx_slot);
@@ -178,9 +190,14 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
       continue;
     }
 
-    // DpdkTransport::FastMemcpy(reinterpret_cast<uint8_t*>(rx.RawPacket()),
-    //                          payload, cfg_->PacketLength());
-    // rte_pktmbuf_free(dpdk_pkt);
+    auto* payload = reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset;
+#if defined(USE_DPDK_MEMORY)
+    rx.Set(dpdk_pkt, reinterpret_cast<Packet*>(payload));
+#else
+    DpdkTransport::FastMemcpy(reinterpret_cast<uint8_t*>(rx.RawPacket()),
+                              payload, cfg_->PacketLength());
+    rte_pktmbuf_free(dpdk_pkt);
+#endif
 
     if (kIsWorkerTimingEnabled) {
       if (prev_frame_id == SIZE_MAX or
@@ -191,8 +208,6 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
       }
     }
 
-    auto* payload = reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset;
-    rx.Set(dpdk_pkt, reinterpret_cast<Packet*>(payload));
     rx.Use();
     if (message_queue_->enqueue(
             *rx_ptoks_[tid],

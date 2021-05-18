@@ -207,7 +207,6 @@ class RxPacket {
       packet_ = in_pkt;
       return true;
     } else {
-      // Add runtime error?
       return false;
     }
   }
@@ -218,10 +217,9 @@ class RxPacket {
   inline void Free() {
     unsigned value = references_.fetch_sub(1);
     if (value == 0) {
-      throw std::runtime_error("RxPacket has negative references");
+      throw std::runtime_error("RxPacket free called when memory was empty");
     } else if (value == 1) {
       GcPacket();
-      // packet_ = nullptr;
     }
   }
 };
