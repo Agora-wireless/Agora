@@ -28,6 +28,9 @@
 #if defined(USE_DPDK)
 #include "dpdk_transport.h"
 
+#define USE_DPDK_MEMORY
+
+#if defined(USE_DPDK_MEMORY)
 class DPDKRxPacket : public RxPacket {
  public:
   DPDKRxPacket() : RxPacket() { mem_ = nullptr; }
@@ -45,10 +48,11 @@ class DPDKRxPacket : public RxPacket {
   inline void GcPacket() override {
     std::printf("Garbage collecting the memory for DPDKRxPacket\n");
     rte_pktmbuf_free(mem_);
-    mem_ = nullptr;
+    this->Set(nullptr, nullptr);
   }
 };
-#endif
+#endif  // defined(USE_DPDK_MEMORY)
+#endif  //  defined(USE_DPDK)
 
 /**
  * @brief Implementations of this class provide packet I/O for Agora.
@@ -145,12 +149,16 @@ class PacketTXRX {
 
   // Dimension 1: socket_thread
   // Dimension 2: rx_packet
+#if defined(USE_DPDK_MEMORY)
   std::vector<std::vector<DPDKRxPacket>> rx_packets_;
+#else
+  std::vector<std::vector<RxPacket>> rx_packets_;
+#endif  // defined(USE_DPDK_MEMORY)
 #else
   // Dimension 1: socket_thread
   // Dimension 2: rx_packet
   std::vector<std::vector<RxPacket>> rx_packets_;
-#endif
+#endif // defined(USE_DPDK)
 
   std::unique_ptr<RadioConfig> radioconfig_;  // Used only in Argos mode
 };
