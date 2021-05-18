@@ -112,6 +112,8 @@ struct Packet* RadioTxRx::RecvEnqueue(size_t tid, size_t radio_id,
       reinterpret_cast<uint8_t*>(pkt), packet_length);
 
   if (0 > rx_bytes) {
+    std::printf("Receive thread %zu rx_buffer %zu, location: %zu \n", tid,
+                rx_slot, (size_t)pkt);
     std::printf("RadioTxRx: receive failed\n");
     throw std::runtime_error("RadioTxRx: receive failed");
   } else if (static_cast<size_t>(rx_bytes) == packet_length) {

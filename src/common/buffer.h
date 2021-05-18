@@ -221,33 +221,10 @@ class RxPacket {
       throw std::runtime_error("RxPacket has negative references");
     } else if (value == 1) {
       GcPacket();
-      packet_ = nullptr;
+      // packet_ = nullptr;
     }
   }
 };
-
-#if defined(USE_DPDK)
-class DPDKRxPacket : public RxPacket {
- public:
-  DPDKRxPacket() : RxPacket() { mem_ = nullptr; }
-  explicit DPDKRxPacket(const DPDKRxPacket &copy) : RxPacket(copy.packet_) {
-    mem_ = copy.mem_;
-  }
-  ~DPDKRxPacket() = default;
-  inline bool Set(rte_mbuf *mem, Packet *in_pkt) {
-    mem_ = mem;
-    return RxPacket::Set(in_pkt);
-  }
-
- private:
-  rte_mbuf *mem_;
-  inline void GcPacket() override {
-    std::printf("Garbage collecting the memory for DPDKRxPacket\n");
-    rte_pktmbuf_free(mem_);
-    mem_ = nullptr;
-  }
-};
-#endif  // USE_DPDK
 
 // Event data tag for RX events
 union rx_tag_t {
