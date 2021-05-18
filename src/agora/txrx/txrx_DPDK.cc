@@ -137,7 +137,7 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
 
     // If the RX buffer is full, it means that the base station processing
     // hasn't kept up, so exit.
-    RxPacket& rx = rx_packets_.at(tid).at(rx_slot);
+    DPDKRxPacket& rx = rx_packets_.at(tid).at(rx_slot);
     if (rx.Empty() == false) {
       std::printf("TXRX thread [%d] DpdkRecv rx_buffer full, slot: %zu\n", tid,
                   rx_slot);

@@ -27,6 +27,27 @@
 
 #if defined(USE_DPDK)
 #include "dpdk_transport.h"
+
+class DPDKRxPacket : public RxPacket {
+ public:
+  DPDKRxPacket() : RxPacket() { mem_ = nullptr; }
+  explicit DPDKRxPacket(const DPDKRxPacket& copy) : RxPacket(copy) {
+    mem_ = copy.mem_;
+  }
+  ~DPDKRxPacket() = default;
+  inline bool Set(rte_mbuf* mem, Packet* in_pkt) {
+    mem_ = mem;
+    return RxPacket::Set(in_pkt);
+  }
+
+ private:
+  rte_mbuf* mem_;
+  inline void GcPacket() override {
+    std::printf("Garbage collecting the memory for DPDKRxPacket\n");
+    rte_pktmbuf_free(mem_);
+    mem_ = nullptr;
+  }
+};
 #endif
 
 /**
@@ -121,7 +142,7 @@ class PacketTXRX {
   uint32_t bs_rru_addr_;     // IPv4 address of the simulator sender
   uint32_t bs_server_addr_;  // IPv4 address of the Agora server
   struct rte_mempool* mbuf_pool_;
-  
+
   // Dimension 1: socket_thread
   // Dimension 2: rx_packet
   std::vector<std::vector<DPDKRxPacket>> rx_packets_;
