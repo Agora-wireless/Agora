@@ -228,16 +228,23 @@ class RxPacket {
 
 #if defined(USE_DPDK)
 class DPDKRxPacket : public RxPacket {
-  // Make the RxPacket constructors availble
-  using RxPacket::RxPacket;
-
  public:
+  DPDKRxPacket() : RxPacket() { mem_ = nullptr; }
+  explicit DPDKRxPacket(const DPDKRxPacket &copy) : RxPacket(copy.packet_) {
+    mem_ = copy.mem_;
+  }
   ~DPDKRxPacket() = default;
+  inline bool Set(rte_mbuf *mem, Packet *in_pkt) {
+    mem_ = mem;
+    return RxPacket::Set(in_pkt);
+  }
 
  private:
+  rte_mbuf *mem_;
   inline void GcPacket() override {
     std::printf("Garbage collecting the memory for DPDKRxPacket\n");
-    // rte_pktmbuf_free(reinterpret_cast<struct rte_mbuf *>(packet_));
+    rte_pktmbuf_free(mem_);
+    mem_ = nullptr;
   }
 };
 #endif  // USE_DPDK
