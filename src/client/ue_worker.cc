@@ -92,12 +92,10 @@ void UeWorker::TaskThread(size_t core_offset) {
   std::printf("UeWorker[%zu]: started\n", tid_);
   PinToCoreWithOffset(ThreadType::kWorker, core_offset, tid_);
 
-  // TODO make compatible with Mac!! (ul_bits_buffer_)
   auto encoder = std::make_unique<DoEncode>(
       &config_, (int)tid_,
       (kEnableMac == true) ? ul_bits_buffer_ : config_.UlBits(),
-      encoded_buffer_, (kEnableMac == true) ? kFrameWnd : 1,
-      config_.UlMacBytesNumPerframe(), &stats_);
+      (kEnableMac == true) ? kFrameWnd : 1, encoded_buffer_, &stats_);
 
   auto iffter = std::make_unique<DoIFFTClient>(
       &config_, (int)tid_, ifft_buffer_, tx_buffer_, &stats_);
@@ -118,7 +116,8 @@ void UeWorker::TaskThread(size_t core_offset) {
           DoDemul(event.tags_[0]);
         } break;
         case EventType::kIFFT: {
-          DoIfftUe(iffter.get(), event.tags_[0]);
+          // DoIfftUe(iffter.get(), event.tags_[0]);
+          DoIfft(event.tags_[0]);
         } break;
         case EventType::kEncode: {
           DoEncodeUe(encoder.get(), event.tags_[0]);
@@ -533,6 +532,17 @@ void UeWorker::DoModul(size_t tag) {
     auto* ul_bits = config_.GetEncodedBuf(encoded_buffer_, frame_id,
                                           ul_symbol_idx, ant_id, 0);
 
+    if (kDebugPrintModul) {
+      std::printf(
+          "UeWorker[%zu]: Modul  (frame %zu, symbol %zu, user %zu) - getting "
+          "from location (%zu %zu %zu) %zu and putting into location (%zu, "
+          "%zu) %zu\n\n",
+          tid_, frame_id, symbol_id, ue_id, frame_id,
+          ul_symbol_idx - config_.Frame().ClientUlPilotSymbols(), ant_id,
+          (size_t)ul_bits, total_ul_data_symbol_id,
+          ant_id * config_.OfdmDataNum(), (size_t)modul_buf);
+    }
+
     // TODO place directly into the correct location of the fft buffer
     for (size_t sc = 0; sc < config_.OfdmDataNum(); sc++) {
       modul_buf[sc] =
@@ -590,6 +600,76 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
     iffter->Launch(gen_tag_t::FrmSymCb(frame_id, symbol_id,
                                        ch + (user_id * config_.NumChannels()))
                        .tag_);
+  }
+
+  // Post the completion event (symbol)
+  size_t completion_tag =
+      gen_tag_t::FrmSymUe(frame_id, symbol_id, user_id).tag_;
+  RtAssert(notify_queue_.enqueue(*ptok_.get(),
+                                 EventData(EventType::kIFFT, completion_tag)),
+           "IFFT symbol complete message enqueue failed");
+}
+
+void UeWorker::DoIfft(size_t tag) {
+  const size_t frame_id = gen_tag_t(tag).frame_id_;
+  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
+  const size_t user_id = gen_tag_t(tag).ue_id_;
+
+  const size_t frame_slot = frame_id % kFrameWnd;
+
+  if (kDebugPrintInTask) {
+    std::printf("User Task[%zu]: iFFT   (frame %zu, symbol %zu, user %zu)\n",
+                tid_, frame_id, symbol_id, user_id);
+  }
+  size_t start_tsc = GetTime::Rdtsc();
+
+  for (size_t ch = 0; ch < config_.NumChannels(); ch++) {
+    const size_t ul_symbol_perframe = config_.Frame().NumULSyms();
+    const size_t ul_data_symbol_perframe =
+        ul_symbol_perframe - config_.Frame().ClientUlPilotSymbols();
+
+    size_t ul_symbol_id = config_.Frame().GetULSymbolIdx(symbol_id);
+    size_t ant_id = user_id * config_.NumChannels() + ch;
+    size_t total_ul_symbol_id = frame_slot * ul_symbol_perframe + ul_symbol_id;
+    size_t buff_offset = total_ul_symbol_id * config_.UeAntNum() + ant_id;
+    complex_float* ifft_buff = ifft_buffer_[buff_offset];
+
+    std::memset(ifft_buff, 0, sizeof(complex_float) * config_.OfdmDataStart());
+    if (ul_symbol_id < config_.Frame().ClientUlPilotSymbols()) {
+      std::memcpy(ifft_buff + config_.OfdmDataStart(),
+                  config_.UeSpecificPilot()[ant_id],
+                  config_.OfdmDataNum() * sizeof(complex_float));
+    } else {
+      size_t total_ul_data_symbol_id = frame_slot * ul_data_symbol_perframe +
+                                       ul_symbol_id -
+                                       config_.Frame().ClientUlPilotSymbols();
+      complex_float* modul_buff =
+          &modul_buffer_[total_ul_data_symbol_id]
+                        [ant_id * config_.OfdmDataNum()];
+      std::memcpy(ifft_buff + config_.OfdmDataStart(), modul_buff,
+                  config_.OfdmDataNum() * sizeof(complex_float));
+    }
+    std::memset(ifft_buff + config_.OfdmDataStop(), 0,
+                sizeof(complex_float) * config_.OfdmDataStart());
+
+    CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
+
+    size_t tx_offset = buff_offset * config_.PacketLength();
+    char* cur_tx_buffer = &tx_buffer_[tx_offset];
+    auto* pkt = reinterpret_cast<struct Packet*>(cur_tx_buffer);
+    auto* tx_data_ptr = reinterpret_cast<std::complex<short>*>(pkt->data_);
+    CommsLib::Ifft2tx(ifft_buff, tx_data_ptr, config_.OfdmCaNum(),
+                      config_.OfdmTxZeroPrefix(), config_.CpLen(),
+                      config_.Scale());
+  }
+
+  if ((kDebugPrintPerTaskDone == true)) {
+    size_t ifft_duration_stat = GetTime::Rdtsc() - start_tsc;
+    std::printf(
+        "User Task[%zu]: iFFT   (frame %zu,       , user %zu) Duration "
+        "%2.4f ms\n",
+        tid_, frame_id, user_id,
+        GetTime::CyclesToMs(ifft_duration_stat, GetTime::MeasureRdtscFreq()));
   }
 
   // Post the completion event (symbol)

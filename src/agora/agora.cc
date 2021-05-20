@@ -753,10 +753,10 @@ void Agora::Worker(int tid) {
       this->config_, tid, this->dl_zf_matrices_, this->dl_ifft_buffer_,
       this->dl_encoded_buffer_, this->stats_.get());
 
-  auto compute_encoding = std::make_unique<DoEncode>(
-      this->config_, tid, this->config_->DlBits(), this->dl_encoded_buffer_,
-      1 /*only one frame in DlBits*/, config_->DlMacBytesNumPerframe(),
-      this->stats_.get());
+  auto compute_encoding =
+      std::make_unique<DoEncode>(this->config_, tid, this->config_->DlBits(),
+                                 1 /*only one frame in DlBits*/,
+                                 this->dl_encoded_buffer_, this->stats_.get());
 
   // Uplink workers
   auto compute_decoding = std::make_unique<DoDecode>(
@@ -894,10 +894,9 @@ void Agora::WorkerDemul(int tid) {
 void Agora::WorkerDecode(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerDecode, base_worker_core_offset_, tid);
 
-  std::unique_ptr<DoEncode> compute_encoding(
-      new DoEncode(config_, tid, config_->DlBits(), dl_encoded_buffer_,
-                   1 /*only one frame in DlBits*/,
-                   config_->DlMacBytesNumPerframe(), this->stats_.get()));
+  std::unique_ptr<DoEncode> compute_encoding(new DoEncode(
+      config_, tid, config_->DlBits(), 1 /*only one frame in DlBits*/,
+      dl_encoded_buffer_, this->stats_.get()));
 
   std::unique_ptr<DoDecode> compute_decoding(
       new DoDecode(config_, tid, demod_buffers_, decoded_buffer_,

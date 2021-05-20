@@ -169,7 +169,7 @@ void MacThread::ProcessCodeblocksFromMaster(EventData event) {
            << "\nSYMBOL_ID: " << pkt->symbol_id_ << "\nUE_ID: " << pkt->ue_id_
            << "\nDATLEN: " << pkt->datalen_ << "\nPAYLOAD:\n";
         for (size_t i = 0; i < cfg_->MacPayloadLength(); i++) {
-          ss << std::to_string(ul_data_ptr[i]) << " ";
+          ss << std::to_string(pkt->data_[i]) << " ";
         }
         std::fprintf(log_file_, "%s\n", ss.str().c_str());
         ss.str("");
