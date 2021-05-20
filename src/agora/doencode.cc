@@ -63,34 +63,47 @@ EventData DoEncode::Launch(size_t tag) {
 
   size_t start_tsc = GetTime::WorkerRdtsc();
 
-  size_t symbol_idx_data;
+  size_t symbol_idx;
   if (cfg_->IsUe() == false) {
-    symbol_idx_data = cfg_->Frame().GetDLSymbolIdx(symbol_id);
+    symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
   } else {
-    symbol_idx_data = cfg_->Frame().GetULSymbolIdx(symbol_id);
+    symbol_idx = cfg_->Frame().GetULSymbolIdx(symbol_id);
   }
 
   int8_t* mac_output = nullptr;
   if (kEnableMac == true) {
-    mac_output =
-        cfg_->GetMacBits(mac_data_buffer_, frame_id, symbol_idx_data, ue_id,
-                         cur_cb_id, mac_frame_wnd_, mac_bytes_perframe_);
+    size_t symbol_idx_data;
+    if (cfg_->IsUe() == false) {
+      if (symbol_idx >= cfg_->Frame().ClientDlPilotSymbols()) {
+        symbol_idx_data = symbol_idx - cfg_->Frame().ClientDlPilotSymbols();
+      } else {
+        return EventData(EventType::kEncode, tag);
+      }
+    } else {
+      if (symbol_idx >= cfg_->Frame().ClientUlPilotSymbols()) {
+        symbol_idx_data = symbol_idx - cfg_->Frame().ClientUlPilotSymbols();
+      } else {
+        return EventData(EventType::kEncode, tag);
+      }
+    }
+    mac_output = cfg_->GetMacBits(mac_data_buffer_, frame_id, symbol_idx_data,
+                                  ue_id, cur_cb_id);
   } else {
     mac_output =
-        cfg_->GetInfoBits(mac_data_buffer_, symbol_idx_data, ue_id, cur_cb_id);
+        cfg_->GetInfoBits(mac_data_buffer_, symbol_idx, ue_id, cur_cb_id);
   }
-  int8_t* ldpc_input = nullptr;
   std::memcpy(scrambler_buffer_, mac_output, cfg_->NumBytesPerCb());
+
   if (this->cfg_->ScrambleEnabled()) {
     scrambler_->Scramble(scrambler_buffer_, cfg_->NumBytesPerCb());
   }
-  ldpc_input = scrambler_buffer_;
+  int8_t* ldpc_input = scrambler_buffer_;
 
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                    ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
                    ldpc_input);
-  int8_t* final_output_ptr = cfg_->GetEncodedBuf(
-      encoded_buffer_, frame_id, symbol_idx_data, ue_id, cur_cb_id);
+  int8_t* final_output_ptr = cfg_->GetEncodedBuf(encoded_buffer_, frame_id,
+                                                 symbol_idx, ue_id, cur_cb_id);
   AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp_),
                   reinterpret_cast<uint8_t*>(final_output_ptr),
                   BitsToBytes(ldpc_config.NumCbCodewLen()),
