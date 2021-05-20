@@ -485,21 +485,22 @@ void UeWorker::DoDecodeUe(DoDecodeClient* decoder, size_t tag) {
 void UeWorker::DoEncodeUe(DoEncode* encoder, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t user_id = gen_tag_t(tag).ue_id_;
-  // For now, call for each cb
-  for (size_t cb_id = 0; cb_id < config_.LdpcConfig().NumBlocksInSymbol();
-       cb_id++) {
+  const size_t ue_id = gen_tag_t(tag).ue_id_;
+  for (size_t ch = 0; ch < config_.NumChannels(); ch++) {
+    const size_t ant_id = (ue_id * config_.NumChannels()) + ch;
     // For now, call for each cb
-    encoder->Launch(
-        gen_tag_t::FrmSymCb(
-            frame_id, symbol_id,
-            cb_id + (user_id * config_.LdpcConfig().NumBlocksInSymbol()))
-            .tag_);
+    for (size_t cb_id = 0; cb_id < config_.LdpcConfig().NumBlocksInSymbol();
+         cb_id++) {
+      // For now, call for each cb
+      encoder->Launch(
+          gen_tag_t::FrmSymCb(
+              frame_id, symbol_id,
+              cb_id + (ant_id * config_.LdpcConfig().NumBlocksInSymbol()))
+              .tag_);
+    }
   }
-
   // Post the completion event (symbol)
-  size_t completion_tag =
-      gen_tag_t::FrmSymUe(frame_id, symbol_id, user_id).tag_;
+  size_t completion_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_;
   RtAssert(notify_queue_.enqueue(*ptok_.get(),
                                  EventData(EventType::kEncode, completion_tag)),
            "Encoded Symbol message enqueue failed");
@@ -510,7 +511,6 @@ void UeWorker::DoModul(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ue_id = gen_tag_t(tag).ue_id_;
-  const size_t frame_slot = (frame_id % kFrameWnd);
 
   if (kDebugPrintInTask || kDebugPrintModul) {
     std::printf("UeWorker[%zu]: Modul  (frame %zu, symbol %zu, user %zu)\n",
@@ -522,10 +522,8 @@ void UeWorker::DoModul(size_t tag) {
     const size_t ant_id = (ue_id * config_.NumChannels()) + ch;
 
     const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
-    const size_t ul_data_symbol_perframe = config_.Frame().NumUlDataSyms();
     const size_t total_ul_data_symbol_id =
-        (frame_slot * ul_data_symbol_perframe) +
-        (ul_symbol_idx - config_.Frame().ClientUlPilotSymbols());
+        config_.GetTotalDataSymbolIdxUl(frame_id, ul_symbol_idx);
 
     complex_float* modul_buf =
         &modul_buffer_[total_ul_data_symbol_id][ant_id * config_.OfdmDataNum()];
@@ -567,19 +565,14 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
     {
       complex_float const* source_data = nullptr;
       const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
+      size_t total_ul_symbol_id =
+          config_.GetTotalDataSymbolIdxUl(frame_id, ul_symbol_idx);
       if (ul_symbol_idx < config_.Frame().ClientUlPilotSymbols()) {
         source_data = config_.UeSpecificPilot()[ant_id];
       } else {
-        const size_t frame_slot = frame_id % kFrameWnd;
-        const size_t ul_data_symbol_perframe = config_.Frame().NumUlDataSyms();
-        const size_t total_ul_data_symbol_id =
-            (frame_slot * ul_data_symbol_perframe) +
-            (ul_symbol_idx - config_.Frame().ClientUlPilotSymbols());
-        source_data = &modul_buffer_[total_ul_data_symbol_id]
-                                    [ant_id * config_.OfdmDataNum()];
+        source_data =
+            &modul_buffer_[total_ul_symbol_id][ant_id * config_.OfdmDataNum()];
       }
-      size_t total_ul_symbol_id =
-          config_.GetTotalDataSymbolIdxUl(frame_id, ul_symbol_idx);
       size_t buff_offset = (total_ul_symbol_id * config_.UeAntNum()) + ant_id;
       complex_float* dest_loc =
           ifft_buffer_[buff_offset] + (config_.OfdmDataStart() * 1);
@@ -587,9 +580,7 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
                   sizeof(complex_float) * config_.OfdmDataNum());
     }
 
-    iffter->Launch(gen_tag_t::FrmSymCb(frame_id, symbol_id,
-                                       ch + (user_id * config_.NumChannels()))
-                       .tag_);
+    iffter->Launch(gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_);
   }
 
   // Post the completion event (symbol)

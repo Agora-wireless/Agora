@@ -567,9 +567,9 @@ void PhyUe::Start() {
         case EventType::kEncode: {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+          size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
 
-          PrintPerTaskDone(PrintType::kEncode, frame_id, symbol_id, ant_id);
+          PrintPerTaskDone(PrintType::kEncode, frame_id, symbol_id, ue_id);
 
           // Schedule the modul
           EventData do_modul_task(EventType::kModul, event.tags_[0]);
@@ -770,7 +770,7 @@ void PhyUe::InitializeUplinkBuffers() {
                          Agora_memory::Alignment_t::kAlign64);
 
   // initialize modulation buffer
-  modul_buffer_.Calloc(ul_data_symbol_perframe_ * kFrameWnd,
+  modul_buffer_.Calloc(ul_syms_buffer_dim1,
                        config_->OfdmDataNum() * config_->UeAntNum(),
                        Agora_memory::Alignment_t::kAlign64);
 
