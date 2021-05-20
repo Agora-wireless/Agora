@@ -439,12 +439,12 @@ Config::Config(const std::string& jsonfile)
       mac_packet_length_ - (padding + MacPacket::kOffsetOfData);
   assert(mac_packet_length_ > (padding + MacPacket::kOffsetOfData));
 
-  ul_mac_packets_perframe_ = this->frame_.NumULSyms() - client_ul_pilot_syms;
+  ul_mac_packets_perframe_ = this->frame_.NumUlDataSyms();
   ul_mac_data_bytes_num_perframe_ =
       mac_payload_length_ * ul_mac_packets_perframe_;
   ul_mac_bytes_num_perframe_ = mac_packet_length_ * ul_mac_packets_perframe_;
 
-  dl_mac_packets_perframe_ = this->frame_.NumDLSyms() - client_dl_pilot_syms;
+  dl_mac_packets_perframe_ = this->frame_.NumDlDataSyms();
   dl_mac_data_bytes_num_perframe_ =
       mac_payload_length_ * dl_mac_packets_perframe_;
   dl_mac_bytes_num_perframe_ = mac_packet_length_ * dl_mac_packets_perframe_;
@@ -454,12 +454,14 @@ Config::Config(const std::string& jsonfile)
       "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
       "frame,\n\t%zu uplink data symbols per frame, %zu downlink data symbols "
       "per frame,\n\t%zu OFDM subcarriers (%zu data subcarriers), modulation "
-      "%s,\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
+      "%s,\n\t%zu codeblocks per symbol, %zu bytes per code block,"
+      "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
       "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
       "frame "
       "time %.3f usec\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
+      ldpc_config_.NumBlocksInSymbol(), num_bytes_per_cb_,
       ul_mac_data_bytes_num_perframe_, ul_mac_bytes_num_perframe_,
       dl_mac_data_bytes_num_perframe_, dl_mac_bytes_num_perframe_,
       this->GetFrameDurationSec() * 1e6);
