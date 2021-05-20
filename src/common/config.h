@@ -329,10 +329,17 @@ class Config {
 
   /// Get mac bits for this frame, symbol, user and code block ID
   inline int8_t* GetMacBits(Table<int8_t>& info_bits, size_t frame_id,
-                            size_t symbol_id, size_t ue_id, size_t cb_id,
-                            size_t frame_mod, size_t mac_bits_perframe) const {
-    return info_bits[ue_id] + (frame_id % frame_mod) * mac_bits_perframe +
-           symbol_id * mac_packet_length_ + cb_id * this->num_bytes_per_cb_;
+                            size_t symbol_id, size_t ue_id,
+                            size_t cb_id) const {
+    size_t mac_bytes_perframe;
+    if (is_ue_ == false) {
+      mac_bytes_perframe = dl_mac_bytes_num_perframe_;
+    } else {
+      mac_bytes_perframe = ul_mac_bytes_num_perframe_;
+    }
+    return &info_bits[ue_id][(frame_id % kFrameWnd) * mac_bytes_perframe +
+                             symbol_id * mac_packet_length_ +
+                             cb_id * this->num_bytes_per_cb_];
   }
 
   /// Get info bits for this symbol, user and code block ID
