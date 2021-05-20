@@ -54,6 +54,7 @@ class UeWorker {
   void DoEncodeUe(DoEncode* encoder, size_t tag);
   void DoModul(size_t tag);
   void DoIfftUe(DoIFFTClient* iffter, size_t tag);
+  void DoIfft(size_t tag);
 
   /**
    * Do FFT task for one OFDM symbol
@@ -70,12 +71,13 @@ class UeWorker {
    * thread) dim2: OFDM symbol index in this socket thread (offset - # of
    * symbols in previous threads) FFT_inputs, FFT_outputs: dim1: frame index
    * * # of OFDM symbols per frame + symbol index * # of atennas + antenna
-   * index dim2: subcarrier index csi_buffer_: dim1: frame index * FFT size +
-   * subcarrier index in the current frame dim2: user index * # of antennas +
-   * antenna index ul_data_buffer_: dim1: frame index * # of data symbols
-   * per frame + data symbol index dim2: transpose block index * block size
-   * * # of antennas + antenna index * block size Event offset: frame index *
-   * # of symbol per frame + symbol index Description:
+   * index dim2: subcarrier index csi_buffer_: dim1: frame index * FFT size
+   * + subcarrier index in the current frame dim2: user index * # of
+   * antennas + antenna index ul_data_buffer_: dim1: frame index * # of data
+   * symbols per frame + data symbol index dim2: transpose block index *
+   * block size
+   * * # of antennas + antenna index * block size Event offset: frame index
+   * * # of symbol per frame + symbol index Description:
    *     1. copy received data (one OFDM symbol) from rx_buffer to
    * fft_buffer_.FFT_inputs (remove CP)
    *     2. perform FFT on fft_buffer_.FFT_inputs and store results in
