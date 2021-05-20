@@ -29,7 +29,6 @@ class PhyUe {
   enum class FrameTasksFlags : std::uint8_t {
     kNoWorkComplete = 0x00,
     kDownlinkComplete = 0x01,
-    // kUplinkComplete = 0x02,
     kUplinkTxComplete = 0x02,
     kMacTxComplete = 0x04,
     kFrameComplete = (kDownlinkComplete | kMacTxComplete | kUplinkTxComplete)
