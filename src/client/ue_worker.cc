@@ -616,8 +616,6 @@ void UeWorker::DoIfft(size_t tag) {
 
   for (size_t ch = 0; ch < config_.NumChannels(); ch++) {
     const size_t ul_symbol_perframe = config_.Frame().NumULSyms();
-    const size_t ul_data_symbol_perframe =
-        ul_symbol_perframe - config_.Frame().ClientUlPilotSymbols();
 
     size_t ul_symbol_id = config_.Frame().GetULSymbolIdx(symbol_id);
     size_t ant_id = user_id * config_.NumChannels() + ch;
@@ -631,12 +629,8 @@ void UeWorker::DoIfft(size_t tag) {
                   config_.UeSpecificPilot()[ant_id],
                   config_.OfdmDataNum() * sizeof(complex_float));
     } else {
-      size_t total_ul_data_symbol_id = frame_slot * ul_data_symbol_perframe +
-                                       ul_symbol_id -
-                                       config_.Frame().ClientUlPilotSymbols();
       complex_float* modul_buff =
-          &modul_buffer_[total_ul_data_symbol_id]
-                        [ant_id * config_.OfdmDataNum()];
+          &modul_buffer_[total_ul_symbol_id][ant_id * config_.OfdmDataNum()];
       std::memcpy(ifft_buff + config_.OfdmDataStart(), modul_buff,
                   config_.OfdmDataNum() * sizeof(complex_float));
     }
