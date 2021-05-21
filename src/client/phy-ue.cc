@@ -87,17 +87,18 @@ PhyUe::PhyUe(Config* config)
   size_t core_offset_worker = config_->CoreOffset() + 1 + rx_thread_num_;
   if (kEnableMac == true) {
     // TODO [ankalia]: dummy_decoded_buffer is used at the base station
-    // server only, but MacThread for now requires it for the UE client too
+    // server only, but MacThreadClient for now requires it for the UE client
+    // too
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> dummy_decoded_buffer;
 
-    mac_thread_ = std::make_unique<MacThread>(
-        MacThread::Mode::kClient, config_, core_offset_worker,
-        dummy_decoded_buffer, &ul_bits_buffer_, &ul_bits_buffer_status_,
-        nullptr, /* dl bits buffer */
+    mac_thread_ = std::make_unique<MacThreadClient>(
+        config_, core_offset_worker, dummy_decoded_buffer, &ul_bits_buffer_,
+        &ul_bits_buffer_status_, nullptr, /* dl bits buffer */
         nullptr /* dl bits buffer status */, &to_mac_queue_, &complete_queue_);
 
     core_offset_worker++;
-    mac_std_thread_ = std::thread(&MacThread::RunEventLoop, mac_thread_.get());
+    mac_std_thread_ =
+        std::thread(&MacThreadClient::RunEventLoop, mac_thread_.get());
   }
 
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
@@ -772,7 +773,7 @@ void PhyUe::InitializeUplinkBuffers() {
   //    kFrameWnd * ul_symbol_perframe_ * config_->OfdmDataNum();
   // ul_syms_buffer_.Calloc(config_->UeAntNum(), ul_syms_buffer_size_,
   //                       Agora_memory::Alignment_t::kAlign64);
-  const size_t ul_syms_buffer_dim1 = config_->Frame().NumULSyms() * kFrameWnd;
+  const size_t ul_syms_buffer_dim1 = ul_symbol_perframe_ * kFrameWnd;
   const size_t ul_syms_buffer_dim2 =
       Roundup<64>(config_->OfdmDataNum()) * config_->UeAntNum();
 
