@@ -351,6 +351,25 @@ void MacThread::ProcessUdpPacketsFromAppsClient(const char* payload,
     pkt->crc_ = (uint16_t)(crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
                                                     cfg_->MacPayloadLength()) &
                            0xFFFF);
+
+    if (kLogMacPackets) {
+      std::stringstream ss;
+      std::printf(
+          "MAC thread created packet frame %zu, pkt %zu, size %zu, copied to "
+          "location %zu\n",
+          next_frame_id_, pkt_id, cfg_->MacPayloadLength(), (size_t)pkt);
+
+      ss << "Header Info:\n"
+         << "FRAME_ID: " << pkt->frame_id_ << "\nSYMBOL_ID: " << pkt->symbol_id_
+         << "\nUE_ID: " << pkt->ue_id_ << "\nDATLEN: " << pkt->datalen_
+         << "\nPAYLOAD:\n";
+      for (size_t i = 0; i < cfg_->MacPayloadLength(); i++) {
+        ss << std::to_string(pkt->data_[i]) << " ";
+      }
+      std::fprintf(log_file_, "%s\n", ss.str().c_str());
+      std::printf("%s\n", ss.str().c_str());
+      ss.str("");
+    }
   }
 
   (*client_.ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
@@ -436,8 +455,8 @@ Packet(frame_id, data_symbol_idx, 0, ant_id);
     // Send data (one OFDM symbol)
     ssize_t ret = sendto(socket_[ant_id % config_->SocketThreadNum()],
         cur_buffer_ptr, c->PacketLength(), 0, (struct
-sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid])); rt_assert(ret > 0, "sendto()
-failed");
+sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid])); rt_assert(ret > 0,
+"sendto() failed");
 
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
                   Event_data(EventType::kPacketTX, event.tags[0])),

@@ -43,9 +43,11 @@ int main(int argc, char* argv[]) {
       assert(create_file.is_open() == true);
 
       std::vector<char> mac_data;
-      mac_data.resize(cfg->UlMacDataBytesNumPerframe());
+      // mac_data.resize(cfg->UlMacDataBytesNumPerframe());
+      mac_data.resize(cfg->MacPayloadLength());
 
-      for (size_t i = 0; i < cfg->FramesToTest(); i++) {
+      for (size_t i = 0;
+           i < (cfg->FramesToTest() * cfg->UlMacPacketsPerframe()); i++) {
         std::fill(mac_data.begin(), mac_data.end(), (char)i);
         create_file.write(mac_data.data(), mac_data.size());
       }

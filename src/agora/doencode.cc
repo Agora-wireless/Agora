@@ -65,28 +65,16 @@ EventData DoEncode::Launch(size_t tag) {
   size_t symbol_idx, symbol_idx_data;
   if (cfg_->IsUe() == false) {
     symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
-    symbol_idx_data =
-        symbol_idx - symbol_idx >= cfg_->Frame().ClientDlPilotSymbols();
+    symbol_idx_data = symbol_idx - cfg_->Frame().ClientDlPilotSymbols();
   } else {
     symbol_idx = cfg_->Frame().GetULSymbolIdx(symbol_id);
-    symbol_idx_data =
-        symbol_idx - symbol_idx >= cfg_->Frame().ClientUlPilotSymbols();
+    symbol_idx_data = symbol_idx - cfg_->Frame().ClientUlPilotSymbols();
   }
 
   int8_t* tx_data_ptr = nullptr;
-  ///\todo Remove the IsUe condition and clean up commented out code
+  ///\todo Remove the IsUe condition and make GetMacBits and GetInfoBits
+  /// universal with raw_buffer_rollover_ the parameter.
   if (kEnableMac && cfg_->IsUe()) {
-    // size_t bytes_per_block = ((ldpc_config.NumCbLen()) >> 3);
-    // size_t bytes_per_block =
-    // Roundup<64>(BitsToBytes(ldpc_config.NumCbLen()));
-
-    // int8_t* ul_bits_frame =
-    //    &raw_data_buffer_[ue_id][(frame_id % raw_buffer_rollover_) *
-    //                             cfg_->UlMacBytesNumPerframe()];
-    // size_t mac_packet_offset = cfg_->MacPacketLength() * mac_data_idx;
-    // size_t cb_offset = cb_id * bytes_per_block;
-    // tx_data_ptr = &ul_bits_frame[mac_packet_offset + cb_offset];
-
     // All cb's per symbol are included in 1 mac packet
     tx_data_ptr =
         cfg_->GetMacBits(raw_data_buffer_, (frame_id % raw_buffer_rollover_),

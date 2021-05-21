@@ -531,6 +531,7 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kPacketFromMac: {
+          // This is an entrie frame (multiple mac packets)
           size_t ue_id = rx_tag_t(event.tags_[0]).tid_;
           size_t radio_buf_id = rx_tag_t(event.tags_[0]).offset_;
           RtAssert(radio_buf_id == expected_frame_id_from_mac_ % kFrameWnd);
@@ -549,15 +550,24 @@ void PhyUe::Start() {
 
           if (kDebugPrintPacketsFromMac) {
             std::printf(
-                "PhyUe: received packet for frame %u with modulation "
-                "%zu\n",
+                "PhyUe: received packet for frame %u with modulation %zu\n",
                 pkt->frame_id_, pkt->rb_indicator_.mod_order_bits_);
             std::stringstream ss;
-            ss << "PhyUe: kPacketFromMac, frame ID " << pkt->frame_id_
-               << ", bytes: ";
-            for (size_t i = 0; i < 4; i++) {
-              ss << std::to_string((reinterpret_cast<uint8_t*>(pkt->data_)[i]))
-                 << ", ";
+
+            for (size_t ul_data_symbol = 0;
+                 ul_data_symbol < config_->Frame().NumUlDataSyms();
+                 ul_data_symbol++) {
+              ss << "PhyUe: kPacketFromMac, frame " << pkt->frame_id_
+                 << ", symbol " << std::to_string(pkt->symbol_id_) << " crc "
+                 << std::to_string(pkt->crc_) << " bytes: ";
+              for (size_t i = 0; i < pkt->datalen_; i++) {
+                ss << std::to_string(
+                          (reinterpret_cast<uint8_t*>(pkt->data_)[i]))
+                   << ", ";
+              }
+              ss << std::endl;
+              pkt = reinterpret_cast<MacPacket*>(
+                  reinterpret_cast<uint8_t*>(pkt) + config_->MacPacketLength());
             }
             std::printf("%s\n", ss.str().c_str());
           }
