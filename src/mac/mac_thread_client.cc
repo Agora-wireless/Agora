@@ -11,7 +11,6 @@ MacThreadClient::MacThreadClient(
     Config* cfg, size_t core_offset,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
     Table<int8_t>* ul_bits_buffer, Table<int8_t>* ul_bits_buffer_status,
-    Table<int8_t>* dl_bits_buffer, Table<int8_t>* dl_bits_buffer_status,
     moodycamel::ConcurrentQueue<EventData>* rx_queue,
     moodycamel::ConcurrentQueue<EventData>* tx_queue,
     const std::string& log_filename)
@@ -20,8 +19,6 @@ MacThreadClient::MacThreadClient(
       tsc_delta_((cfg_->GetFrameDurationSec() * 1e9) / freq_ghz_),
       core_offset_(core_offset),
       decoded_buffer_(decoded_buffer),
-      dl_bits_buffer_(dl_bits_buffer),
-      dl_bits_buffer_status_(dl_bits_buffer_status),
       rx_queue_(rx_queue),
       tx_queue_(tx_queue) {
   // Set up MAC log file
