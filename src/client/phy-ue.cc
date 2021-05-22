@@ -93,8 +93,7 @@ PhyUe::PhyUe(Config* config)
 
     mac_thread_ = std::make_unique<MacThreadClient>(
         config_, core_offset_worker, dummy_decoded_buffer, &ul_bits_buffer_,
-        &ul_bits_buffer_status_, nullptr, /* dl bits buffer */
-        nullptr /* dl bits buffer status */, &to_mac_queue_, &complete_queue_);
+        &ul_bits_buffer_status_, &to_mac_queue_, &complete_queue_);
 
     core_offset_worker++;
     mac_std_thread_ =

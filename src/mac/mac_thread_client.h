@@ -47,7 +47,6 @@ class MacThreadClient {
       Config* const cfg, size_t core_offset,
       PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
       Table<int8_t>* ul_bits_buffer, Table<int8_t>* ul_bits_buffer_status,
-      Table<int8_t>* dl_bits_buffer, Table<int8_t>* dl_bits_buffer_status,
       moodycamel::ConcurrentQueue<EventData>* rx_queue,
       moodycamel::ConcurrentQueue<EventData>* tx_queue,
       const std::string& log_filename = "");
@@ -116,9 +115,6 @@ class MacThreadClient {
   // TODO: decoded_buffer_ is used by only the server, so it should be moved
   // to server_ for clarity.
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer_;
-
-  Table<int8_t>* dl_bits_buffer_;
-  Table<int8_t>* dl_bits_buffer_status_;
 
   // A preallocated buffer to store UDP packets received via recv()
   std::vector<uint8_t> udp_pkt_buf_;

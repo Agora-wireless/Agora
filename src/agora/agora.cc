@@ -54,12 +54,12 @@ Agora::Agora(Config* const cfg)
   if (kEnableMac == true) {
     const size_t mac_cpu_core =
         cfg->CoreOffset() + cfg->SocketThreadNum() + cfg->WorkerThreadNum() + 1;
-    mac_thread_ = std::make_unique<MacThread>(
-        MacThread::Mode::kServer, cfg, mac_cpu_core, decoded_buffer_,
-        nullptr /* ul bits */, nullptr /* ul bits status */, &dl_bits_buffer_,
+    mac_thread_ = std::make_unique<MacThreadBaseStation>(
+        cfg, mac_cpu_core, decoded_buffer_, &dl_bits_buffer_,
         &dl_bits_buffer_status_, &mac_request_queue_, &mac_response_queue_);
 
-    mac_std_thread_ = std::thread(&MacThread::RunEventLoop, mac_thread_.get());
+    mac_std_thread_ =
+        std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
   }
 
   // Create worker threads

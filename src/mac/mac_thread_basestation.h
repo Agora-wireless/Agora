@@ -1,6 +1,6 @@
 /**
  * @file mac_thread.h
- * @brief Declaration file for the MacThread class
+ * @brief Declaration file for the MacThreadBaseStation class
  */
 #ifndef MAC_THREAD_H_
 #define MAC_THREAD_H_
@@ -25,7 +25,7 @@
  * Agora. It receives decoded symbols from Agora and forwards UDP data
  * packets to applications.
  */
-class MacThread {
+class MacThreadBaseStation {
  public:
   enum class Mode {
     kServer,  // The MAC thread is running the the Agora server
@@ -43,15 +43,15 @@ class MacThread {
   // TODO: map this to time?
   static constexpr size_t kSNRWindowSize = 100;
 
-  MacThread(Mode mode, Config* const cfg, size_t core_offset,
-            PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
-            Table<int8_t>* ul_bits_buffer, Table<int8_t>* ul_bits_buffer_status,
-            Table<int8_t>* dl_bits_buffer, Table<int8_t>* dl_bits_buffer_status,
-            moodycamel::ConcurrentQueue<EventData>* rx_queue,
-            moodycamel::ConcurrentQueue<EventData>* tx_queue,
-            const std::string& log_filename = "");
+  MacThreadBaseStation(
+      Config* const cfg, size_t core_offset,
+      PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
+      Table<int8_t>* dl_bits_buffer, Table<int8_t>* dl_bits_buffer_status,
+      moodycamel::ConcurrentQueue<EventData>* rx_queue,
+      moodycamel::ConcurrentQueue<EventData>* tx_queue,
+      const std::string& log_filename = "");
 
-  ~MacThread();
+  ~MacThreadBaseStation();
 
   // The main MAC thread event loop. It receives uplink data bits from the
   // master thread and sends them to remote applications.
@@ -60,15 +60,15 @@ class MacThread {
  private:
   // Receive events from Agora PHY master thread. Forwards
   // to appropriate function in MAC.
-  void ProcessRxFromMaster();
+  void ProcessRxFromPhy();
 
   // Receive decoded codeblocks from the PHY master thread. Send
   // fully-received frames for UE #i to kRemoteHostname::(kBaseRemotePort + i)
-  void ProcessCodeblocksFromMaster(EventData event);
+  void ProcessCodeblocksFromPhy(EventData event);
 
   // Receive SNR report from PHY master thread. Use for RB scheduling.
   // TODO: process CQI report here as well.
-  void ProcessSnrReportFromMaster(EventData event);
+  void ProcessSnrReportFromPhy(EventData event);
 
   // Push RAN config update to PHY master thread.
   void SendRanConfigUpdate(EventData event);
@@ -77,21 +77,11 @@ class MacThread {
   // from server to client
   void SendControlInformation();
 
-  // At client, process control information received from control
-  // channel and forward to PHY UE, so it transmits data in the scheduled
-  // time slots.
-  void ProcessControlInformation();
-
   // Receive user data bits (downlink bits at the MAC thread running at the
   // server, uplink bits at the MAC thread running at the client) and forward
   // them to the PHY.
-  void ProcessUdpPacketsFromApps(RBIndicator ri);
-  void ProcessUdpPacketsFromAppsServer(const MacPacket* pkt, RBIndicator ri);
-  void ProcessUdpPacketsFromAppsClient(const char* payload, RBIndicator ri);
+  void ProcessUdpPacketsFromApps();
 
-  // If Mode::kServer, this thread is running at the Agora server. Else at
-  // the client.
-  const Mode mode_;
   Config* const cfg_;
 
   const double freq_ghz_;  // RDTSC frequency in GHz
@@ -118,6 +108,7 @@ class MacThread {
 
   Table<int8_t>* dl_bits_buffer_;
   Table<int8_t>* dl_bits_buffer_status_;
+  std::array<size_t, kMaxUEs> dl_bits_buffer_id_;
 
   // A preallocated buffer to store UDP packets received via recv()
   std::vector<uint8_t> udp_pkt_buf_;
@@ -155,16 +146,6 @@ class MacThread {
     // snr_[i] contains a moving window of SNR measurement for UE #i
     std::array<std::queue<float>, kMaxUEs> snr_;
   } server_;
-
-  // Client-only members
-  struct {
-    // ul_bits_buffer_id_[i] is the index of the uplink data bits buffer to
-    // next use for radio #i
-    std::array<size_t, kMaxUEs> ul_bits_buffer_id_;
-
-    Table<int8_t>* ul_bits_buffer_;
-    Table<int8_t>* ul_bits_buffer_status_;
-  } client_;
 
   // FIFO queue for receiving messages from the master thread
   moodycamel::ConcurrentQueue<EventData>* rx_queue_;

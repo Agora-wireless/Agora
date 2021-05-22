@@ -25,7 +25,7 @@
 #include "dofft.h"
 #include "doprecode.h"
 #include "dozf.h"
-#include "mac_thread.h"
+#include "mac_thread_basestation.h"
 #include "memory_manage.h"
 #include "phy_stats.h"
 #include "signal_handler.h"
@@ -162,7 +162,7 @@ class Agora {
   std::unique_ptr<PacketTXRX> packet_tx_rx_;
 
   // The thread running MAC layer functions
-  std::unique_ptr<MacThread> mac_thread_;
+  std::unique_ptr<MacThreadBaseStation> mac_thread_;
   // Handle for the MAC thread
   std::thread mac_std_thread_;
   std::vector<std::thread> workers_;
