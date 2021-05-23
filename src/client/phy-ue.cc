@@ -86,13 +86,8 @@ PhyUe::PhyUe(Config* config)
 
   size_t core_offset_worker = config_->CoreOffset() + 1 + rx_thread_num_;
   if (kEnableMac == true) {
-    // TODO [ankalia]: dummy_decoded_buffer is used at the base station
-    // server only, but MacThreadClient for now requires it for the UE client
-    // too
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> dummy_decoded_buffer;
-
     mac_thread_ = std::make_unique<MacThreadClient>(
-        config_, core_offset_worker, dummy_decoded_buffer, &ul_bits_buffer_,
+        config_, core_offset_worker, decoded_buffer_, &ul_bits_buffer_,
         &ul_bits_buffer_status_, &to_mac_queue_, &complete_queue_);
 
     core_offset_worker++;

@@ -49,7 +49,7 @@ MacThreadBaseStation::MacThreadBaseStation(
 
   // TODO: See if it makes more sense to split up the UE's by port here for
   // client mode.
-  size_t udp_server_port = cfg_->MacRxPort();
+  size_t udp_server_port = cfg_->BsMacRxPort();
   MLPD_TRACE("MacThreadBaseStation: setting up udp server at port %zu\n",
              udp_server_port);
   udp_server_ = std::make_unique<UDPServer>(
@@ -171,7 +171,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
   if (server_.n_filled_in_frame_[ue_id] == cfg_->UlMacDataBytesNumPerframe()) {
     server_.n_filled_in_frame_[ue_id] = 0;
 
-    udp_client_->Send(kMacRemoteHostname, cfg_->MacTxPort() + ue_id,
+    udp_client_->Send(kMacRemoteHostname, cfg_->BsMacTxPort() + ue_id,
                       &server_.frame_data_[ue_id][0],
                       cfg_->UlMacDataBytesNumPerframe());
     std::fprintf(log_file_,
@@ -202,6 +202,8 @@ void MacThreadBaseStation::SendControlInformation() {
 }
 
 void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
+  if (0 == cfg_->DlMacDataBytesNumPerframe()) return;
+
   std::memset(&udp_pkt_buf_[0], 0, udp_pkt_buf_.size());
 
   size_t rx_bytes = 0;

@@ -40,7 +40,7 @@ MacThreadClient::MacThreadClient(
 
   server_.n_filled_in_frame_.fill(0);
   for (auto& v : server_.frame_data_) {
-    v.resize(cfg_->UlMacDataBytesNumPerframe());
+    v.resize(cfg_->DlMacDataBytesNumPerframe());
   }
 
   client_.ul_bits_buffer_id_.fill(0);
@@ -50,7 +50,7 @@ MacThreadClient::MacThreadClient(
 
   // TODO: See if it makes more sense to split up the UE's by port here for
   // client mode.
-  size_t udp_server_port = cfg_->MacRxPort();
+  size_t udp_server_port = cfg_->UeMacRxPort();
   MLPD_TRACE("MacThreadClient: setting up udp server at port %zu\n",
              udp_server_port);
   udp_server_ = std::make_unique<UDPServer>(
@@ -132,7 +132,7 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
   std::stringstream ss;  // Debug-only
 
   // Only non-pilot uplink symbols have application data.
-  if (symbol_idx_dl >= cfg_->Frame().ClientUlPilotSymbols()) {
+  if (symbol_idx_dl >= cfg_->Frame().ClientDlPilotSymbols()) {
     auto* pkt = (struct MacPacket*)ul_data_ptr;
 
     // We send data to app irrespective of CRC condition
@@ -178,7 +178,7 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
   if (server_.n_filled_in_frame_[ue_id] == cfg_->DlMacDataBytesNumPerframe()) {
     server_.n_filled_in_frame_[ue_id] = 0;
 
-    udp_client_->Send(kMacRemoteHostname, cfg_->MacTxPort() + ue_id,
+    udp_client_->Send(kMacRemoteHostname, cfg_->UeMacTxPort() + ue_id,
                       &server_.frame_data_[ue_id][0],
                       cfg_->DlMacDataBytesNumPerframe());
     std::fprintf(log_file_,
@@ -270,6 +270,7 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
 
 void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
                                                       RBIndicator ri) {
+  if (cfg_->UlMacDataBytesNumPerframe() == 0) return;
   // We've received bits for the uplink. The received MAC packet does not
   // specify a radio ID, send to radios in round-robin order
   size_t& radio_buf_id = client_.ul_bits_buffer_id_[next_radio_id_];

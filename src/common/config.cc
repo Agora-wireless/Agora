@@ -130,8 +130,10 @@ Config::Config(const std::string& jsonfile)
   dpdk_num_ports_ = tdd_conf.value("dpdk_num_ports", 1);
   dpdk_port_offset_ = tdd_conf.value("dpdk_port_offset", 0);
 
-  mac_rx_port_ = tdd_conf.value("mac_rx_port", kMacRxPort);
-  mac_tx_port_ = tdd_conf.value("mac_tx_port", kMacBaseRemotePort);
+  ue_mac_tx_port_ = tdd_conf.value("ue_mac_tx_port", kMacUserRemotePort);
+  ue_mac_rx_port_ = tdd_conf.value("ue_mac_rx_port", kMacUserLocalPort);
+  bs_mac_tx_port_ = tdd_conf.value("bs_mac_tx_port", kMacBaseRemotePort);
+  bs_mac_rx_port_ = tdd_conf.value("bs_mac_rx_port", kMacBaseLocalPort);
 
   /* frame configurations */
   cp_len_ = tdd_conf.value("cp_len", 0);

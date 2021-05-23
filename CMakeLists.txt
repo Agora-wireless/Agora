@@ -141,8 +141,10 @@ endif()
 
 set(MAC_CLIENT_SOURCES
   src/mac/ul_mac_sender.cc
+  src/mac/dl_mac_receiver.cc
   src/mac/mac_client.cc)
 set(MAC_BS_SOURCES
+  src/mac/dl_mac_sender.cc
   src/mac/ul_mac_receiver.cc
   src/mac/mac_basestation.cc)
 
