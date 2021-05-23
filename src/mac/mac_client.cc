@@ -1,13 +1,15 @@
 /**
  * @file mac_client.cc
- * @brief Main file for the mac client executable. This will send data to the
- * mac thread of the UE.
+ * @brief Main file for the mac client executable.
  */
 #include <gflags/gflags.h>
 
+#include "dl_mac_receiver.h"
+#include "signal_handler.h"
 #include "ul_mac_sender.h"
 
-DEFINE_uint64(num_threads, 1, "Number of mac client sender threads");
+DEFINE_uint64(num_sender_threads, 1, "Number of mac client sender threads");
+DEFINE_uint64(num_receiver_threads, 1, "Number of mac client receiver threads");
 DEFINE_uint64(core_offset, 1, "Core ID of the first sender thread");
 DEFINE_uint64(frame_duration, 0, "Frame duration in microseconds");
 DEFINE_string(conf_file, TOSTRING(PROJECT_DIRECTORY) "/data/ue-mac-sim.json",
@@ -20,12 +22,14 @@ DEFINE_uint64(
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage(
-      "num_threads, core_offset, frame_duration, conf_file, "
+      "num_sender_threads, num_receiver_threads, core_offset, frame_duration, "
+      "conf_file, "
       "data_file, enable_slow_start");
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = FLAGS_conf_file;
   std::string data_filename = FLAGS_data_file;
+  int ret = EXIT_FAILURE;
   {
     auto cfg = std::make_unique<Config>(filename.c_str());
     cfg->GenData();
@@ -54,13 +58,29 @@ int main(int argc, char* argv[]) {
       create_file.close();
     }
 
-    {
+    try {
+      SignalHandler signal_handler;
+
+      // Register signal handler to handle kill signal
+      signal_handler.SetupSignalHandlers();
+      auto receiver_ = std::make_unique<DlMacReceiver>(
+          cfg.get(), FLAGS_num_receiver_threads + FLAGS_num_sender_threads,
+          FLAGS_core_offset);
+      std::vector<std::thread> rx_threads = receiver_->StartRecv();
+      for (auto& thread : rx_threads) {
+        thread.join();
+      }
       auto sender = std::make_unique<UlMacSender>(
-          cfg.get(), data_filename, FLAGS_num_threads, FLAGS_core_offset,
+          cfg.get(), data_filename, FLAGS_num_sender_threads, FLAGS_core_offset,
           FLAGS_frame_duration, 0, FLAGS_enable_slow_start);
       sender->StartTx();
-    }  // end context sender
-  }    // end context Config
+      ret = EXIT_SUCCESS;
+    } catch (SignalException& e) {
+      std::cerr << "SignalException: " << e.what() << std::endl;
+      ret = EXIT_FAILURE;
+    }
+  }  // end context Config
+  std::printf("Shutdown Client App!\n");
   gflags::ShutDownCommandLineFlags();
-  return 0;
+  return ret;
 }

@@ -895,8 +895,9 @@ void Agora::WorkerDecode(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerDecode, base_worker_core_offset_, tid);
 
   std::unique_ptr<DoEncode> compute_encoding(new DoEncode(
-      config_, tid, config_->DlBits(), 1 /*only one frame in DlBits*/,
-      dl_encoded_buffer_, this->stats_.get()));
+      config_, tid, (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
+      (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
+      this->stats_.get()));
 
   std::unique_ptr<DoDecode> compute_decoding(
       new DoDecode(config_, tid, demod_buffers_, decoded_buffer_,
@@ -1343,7 +1344,7 @@ void Agora::InitializeDownlinkBuffers() {
         config_->Frame().NumDLSyms() * kFrameWnd;
 
     size_t dl_socket_buffer_status_size =
-        config_->BsAntNum() * kFrameWnd * config_->Frame().NumDLSyms();
+        config_->BsAntNum() * task_buffer_symbol_num;
     size_t dl_socket_buffer_size =
         config_->DlPacketLength() * dl_socket_buffer_status_size;
     AllocBuffer1d(&dl_socket_buffer_, dl_socket_buffer_size,
@@ -1351,13 +1352,10 @@ void Agora::InitializeDownlinkBuffers() {
     AllocBuffer1d(&dl_socket_buffer_status_, dl_socket_buffer_status_size,
                   Agora_memory::Alignment_t::kAlign64, 1);
 
-    this->dl_bits_buffer_.Calloc(task_buffer_symbol_num,
-                                 config_->OfdmDataNum() * config_->UeNum(),
+    size_t dl_bits_buffer_size = kFrameWnd * config_->DlMacBytesNumPerframe();
+    this->dl_bits_buffer_.Calloc(config_->UeNum(), dl_bits_buffer_size,
                                  Agora_memory::Alignment_t::kAlign64);
-    size_t dl_bits_buffer_status_size =
-        task_buffer_symbol_num * config_->LdpcConfig().NumBlocksInSymbol();
-    this->dl_bits_buffer_status_.Calloc(config_->UeNum(),
-                                        dl_bits_buffer_status_size,
+    this->dl_bits_buffer_status_.Calloc(config_->UeNum(), kFrameWnd,
                                         Agora_memory::Alignment_t::kAlign64);
 
     dl_ifft_buffer_.Calloc(config_->BsAntNum() * task_buffer_symbol_num,
