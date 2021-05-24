@@ -203,10 +203,9 @@ void PacketTXRX::LoopTxRx(size_t tid) {
     if (-1 == send_result) {
       // receive data
 
-    struct Packet* pkt = RecvEnqueue(tid, radio_id, rx_slot);
+      struct Packet* pkt = RecvEnqueue(tid, radio_id, rx_slot);
       if (pkt != nullptr) {
-
-    rx_slot = (rx_slot + 1) % buffers_per_socket_;
+        rx_slot = (rx_slot + 1) % buffers_per_socket_;
 
         if (kIsWorkerTimingEnabled) {
           int frame_id = pkt->frame_id_;

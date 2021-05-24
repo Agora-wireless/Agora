@@ -103,10 +103,10 @@ PhyUe::PhyUe(Config* config)
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
     auto new_worker = std::make_unique<UeWorker>(
         i, *config_, *stats_, *phy_stats_, complete_queue_, work_queue_,
-        *work_producer_token_.get(), ul_bits_buffer_, ul_syms_buffer_, modul_buffer_,
-        ifft_buffer_, tx_buffer_, rx_buffer_, csi_buffer_, equal_buffer_,
-        non_null_sc_ind_, fft_buffer_, demod_buffer_, decoded_buffer_,
-        ue_pilot_vec_);
+        *work_producer_token_.get(), ul_bits_buffer_, ul_syms_buffer_,
+        modul_buffer_, ifft_buffer_, tx_buffer_, rx_buffer_, csi_buffer_,
+        equal_buffer_, non_null_sc_ind_, fft_buffer_, demod_buffer_,
+        decoded_buffer_, ue_pilot_vec_);
 
     new_worker->Start(core_offset_worker);
     workers_.push_back(std::move(new_worker));
