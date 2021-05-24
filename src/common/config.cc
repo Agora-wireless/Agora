@@ -439,22 +439,32 @@ Config::Config(const std::string& jsonfile)
       mac_packet_length_ - (padding + MacPacket::kOffsetOfData);
   assert(mac_packet_length_ > (padding + MacPacket::kOffsetOfData));
 
-  mac_packets_perframe_ = this->frame_.NumULSyms() - client_ul_pilot_syms;
-  mac_data_bytes_num_perframe_ = mac_payload_length_ * mac_packets_perframe_;
-  mac_bytes_num_perframe_ = mac_packet_length_ * mac_packets_perframe_;
+  ul_mac_packets_perframe_ = this->frame_.NumUlDataSyms();
+  ul_mac_data_bytes_num_perframe_ =
+      mac_payload_length_ * ul_mac_packets_perframe_;
+  ul_mac_bytes_num_perframe_ = mac_packet_length_ * ul_mac_packets_perframe_;
+
+  dl_mac_packets_perframe_ = this->frame_.NumDlDataSyms();
+  dl_mac_data_bytes_num_perframe_ =
+      mac_payload_length_ * dl_mac_packets_perframe_;
+  dl_mac_bytes_num_perframe_ = mac_packet_length_ * dl_mac_packets_perframe_;
 
   this->running_.store(true);
   MLPD_INFO(
       "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
       "frame,\n\t%zu uplink data symbols per frame, %zu downlink data symbols "
       "per frame,\n\t%zu OFDM subcarriers (%zu data subcarriers), modulation "
-      "%s,\n\t%zu MAC data bytes per frame, %zu MAC bytes per frame, frame "
-      "time %.3f : %.3f sec\n",
+      "%s,\n\t%zu codeblocks per symbol, %zu bytes per code block,"
+      "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
+      "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
+      "frame "
+      "time %.3f usec\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
-      mac_data_bytes_num_perframe_, mac_bytes_num_perframe_,
-      ((frame_.NumTotalSyms() * samps_per_symbol_) / rate_),
-      this->GetFrameDurationSec());
+      ldpc_config_.NumBlocksInSymbol(), num_bytes_per_cb_,
+      ul_mac_data_bytes_num_perframe_, ul_mac_bytes_num_perframe_,
+      dl_mac_data_bytes_num_perframe_, dl_mac_bytes_num_perframe_,
+      this->GetFrameDurationSec() * 1e6);
 }
 
 void Config::GenData() {
@@ -566,8 +576,6 @@ void Config::GenData() {
   }
 
   // Get uplink and downlink raw bits either from file or random numbers
-  size_t num_bytes_per_ue =
-      this->num_bytes_per_cb_ * this->ldpc_config_.NumBlocksInSymbol();
   size_t num_bytes_per_ue_pad = Roundup<64>(this->num_bytes_per_cb_) *
                                 this->ldpc_config_.NumBlocksInSymbol();
   dl_bits_.Malloc(this->frame_.NumDLSyms(),
@@ -603,72 +611,77 @@ void Config::GenData() {
   }
 #else
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string ul_data_file = cur_directory + "/data/LDPC_orig_ul_data_" +
-                             std::to_string(this->ofdm_ca_num_) + "_ant" +
-                             std::to_string(this->ue_ant_total_) + ".bin";
-  MLPD_SYMBOL("Config: Reading raw ul data from %s\n", ul_data_file.c_str());
-  FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
-  if (fd == nullptr) {
-    MLPD_ERROR("Failed to open antenna file %s. Error %s.\n",
-               ul_data_file.c_str(), strerror(errno));
-    throw std::runtime_error("Config: Failed to open antenna file");
-  }
-
-  for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-    if (std::fseek(fd, (num_bytes_per_ue * this->ue_ant_offset_), SEEK_CUR) !=
-        0) {
-      MLPD_ERROR(" *** Error: failed to seek propertly (pre) into %s file\n",
-                 ul_data_file.c_str());
-      RtAssert(false,
-               "Failed to seek propertly into " + ul_data_file + "file\n");
+  if (this->frame_.NumULSyms() > 0) {
+    std::string ul_data_file = cur_directory + "/data/LDPC_orig_ul_data_" +
+                               std::to_string(this->ofdm_ca_num_) + "_ant" +
+                               std::to_string(this->ue_ant_total_) + ".bin";
+    MLPD_SYMBOL("Config: Reading raw ul data from %s\n", ul_data_file.c_str());
+    FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
+    if (fd == nullptr) {
+      MLPD_ERROR("Failed to open antenna file %s. Error %s.\n",
+                 ul_data_file.c_str(), strerror(errno));
+      throw std::runtime_error("Config: Failed to open antenna file");
     }
-    for (size_t j = 0; j < this->ue_ant_num_; j++) {
-      size_t r = std::fread(this->ul_bits_[i] + (j * num_bytes_per_ue_pad),
-                            sizeof(int8_t), num_bytes_per_ue, fd);
-      if (r < num_bytes_per_ue) {
-        MLPD_ERROR(
-            " *** Error: Uplink bad read from file %s (batch %zu : %zu) %zu : "
-            "%zu\n",
-            ul_data_file.c_str(), i, j, r, num_bytes_per_ue);
+
+    for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
+      if (std::fseek(fd, (data_bytes_num_persymbol_ * this->ue_ant_offset_),
+                     SEEK_CUR) != 0) {
+        MLPD_ERROR(" *** Error: failed to seek propertly (pre) into %s file\n",
+                   ul_data_file.c_str());
+        RtAssert(false,
+                 "Failed to seek propertly into " + ul_data_file + "file\n");
+      }
+      for (size_t j = 0; j < this->ue_ant_num_; j++) {
+        size_t r = std::fread(this->ul_bits_[i] + (j * num_bytes_per_ue_pad),
+                              sizeof(int8_t), data_bytes_num_persymbol_, fd);
+        if (r < data_bytes_num_persymbol_) {
+          MLPD_ERROR(
+              " *** Error: Uplink bad read from file %s (batch %zu : %zu) %zu "
+              ": "
+              "%zu\n",
+              ul_data_file.c_str(), i, j, r, data_bytes_num_persymbol_);
+        }
+      }
+      if (std::fseek(fd,
+                     data_bytes_num_persymbol_ *
+                         (this->ue_ant_total_ - this->ue_ant_offset_ -
+                          this->ue_ant_num_),
+                     SEEK_CUR) != 0) {
+        MLPD_ERROR(" *** Error: failed to seek propertly (post) into %s file\n",
+                   ul_data_file.c_str());
+        RtAssert(false,
+                 "Failed to seek propertly into " + ul_data_file + "file\n");
       }
     }
-    if (std::fseek(
-            fd,
-            num_bytes_per_ue * (this->ue_ant_total_ - this->ue_ant_offset_ -
-                                this->ue_ant_num_),
-            SEEK_CUR) != 0) {
-      MLPD_ERROR(" *** Error: failed to seek propertly (post) into %s file\n",
-                 ul_data_file.c_str());
-      RtAssert(false,
-               "Failed to seek propertly into " + ul_data_file + "file\n");
+    std::fclose(fd);
+  }
+
+  if (this->frame_.NumDLSyms() > 0) {
+    std::string dl_data_file = cur_directory + "/data/LDPC_orig_dl_data_" +
+                               std::to_string(this->ofdm_ca_num_) + "_ant" +
+                               std::to_string(this->ue_ant_total_) + ".bin";
+
+    MLPD_SYMBOL("Config: Reading raw dl data from %s\n", dl_data_file.c_str());
+    FILE* fd = std::fopen(dl_data_file.c_str(), "rb");
+    if (fd == nullptr) {
+      MLPD_ERROR("Failed to open antenna file %s. Error %s.\n",
+                 dl_data_file.c_str(), strerror(errno));
+      throw std::runtime_error("Config: Failed to open dl antenna file");
     }
-  }
-  std::fclose(fd);
 
-  std::string dl_data_file = cur_directory + "/data/LDPC_orig_dl_data_" +
-                             std::to_string(this->ofdm_ca_num_) + "_ant" +
-                             std::to_string(this->ue_ant_total_) + ".bin";
-
-  MLPD_SYMBOL("Config: Reading raw dl data from %s\n", dl_data_file.c_str());
-  fd = std::fopen(dl_data_file.c_str(), "rb");
-  if (fd == nullptr) {
-    MLPD_ERROR("Failed to open antenna file %s. Error %s.\n",
-               dl_data_file.c_str(), strerror(errno));
-    throw std::runtime_error("Config: Failed to open dl antenna file");
-  }
-
-  for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-    for (size_t j = 0; j < this->ue_ant_num_; j++) {
-      size_t r = std::fread(this->dl_bits_[i] + j * num_bytes_per_ue_pad,
-                            sizeof(int8_t), num_bytes_per_ue, fd);
-      if (r < num_bytes_per_ue) {
-        MLPD_ERROR(
-            "***Error: Downlink bad read from file %s (batch %zu : %zu) \n",
-            dl_data_file.c_str(), i, j);
+    for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
+      for (size_t j = 0; j < this->ue_ant_num_; j++) {
+        size_t r = std::fread(this->dl_bits_[i] + j * num_bytes_per_ue_pad,
+                              sizeof(int8_t), data_bytes_num_persymbol_, fd);
+        if (r < data_bytes_num_persymbol_) {
+          MLPD_ERROR(
+              "***Error: Downlink bad read from file %s (batch %zu : %zu) \n",
+              dl_data_file.c_str(), i, j);
+        }
       }
     }
+    std::fclose(fd);
   }
-  std::fclose(fd);
 #endif
 
   auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();

@@ -484,7 +484,7 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
     std::printf(
         "Channel Sim: DoTxBs processing frame %zu, symbol %zu, ul symbol "
         "%zu, at %f ms\n",
-        frame_id, symbol_id, ul_symbol_id, GetTime::GetTimeUs() / 1000);
+        frame_id, symbol_id, total_symbol_id, GetTime::GetTimeUs() / 1000);
   }
 
   size_t symbol_offset =
