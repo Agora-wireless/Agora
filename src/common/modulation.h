@@ -60,19 +60,18 @@ void Demod64qamSoftLoop(const float* vec_in, int8_t* llr, int num);
 void Demod64qamSoftSse(float* vec_in, int8_t* llr, int num);
 void Demod64qamSoftAvx2(float* vec_in, int8_t* llr, int num);
 
-
 void Demod256qamHardLoop(const float* vec_in, uint8_t* vec_out, int num);
-void Demod256qamHardSse(float *vec_in, uint8_t* vec_out, int num);
+void Demod256qamHardSse(float* vec_in, uint8_t* vec_out, int num);
 void Demod256qamHardAvx2(float* vec_in, uint8_t* vec_out, int num);
 #ifdef __AVX512F__
 void Demod256qamHardAvx512(float* vec_in, uint8_t* vec_out, int num);
 #endif
-void Demod256qamSoftLoop(const float *vec_in, int8_t *llr, int num);
-void Demod256qamSoftSse(const float *vec_in, int8_t *llr, int num);
-void Demod256qamSoftAvx2(const float *vec_in, int8_t *llr, int num);
+void Demod256qamSoftLoop(const float* vec_in, int8_t* llr, int num);
+void Demod256qamSoftSse(const float* vec_in, int8_t* llr, int num);
+void Demod256qamSoftAvx2(const float* vec_in, int8_t* llr, int num);
 
 #ifdef __AVX512F__
-void Demod256qamSoftAvx512(const float *vec_in, int8_t *llr, int num);
+void Demod256qamSoftAvx512(const float* vec_in, int8_t* llr, int num);
 #endif
 void Print256Epi8(__m256i var);
 
