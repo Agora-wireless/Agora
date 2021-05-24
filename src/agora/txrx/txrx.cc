@@ -8,6 +8,9 @@
 
 #include "logger.h"
 
+static constexpr bool kEnableSlowStart = true;
+static constexpr bool kEnableSlowSending = true;
+
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg_(cfg),
       core_offset_(core_offset),
@@ -103,12 +106,18 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
 }
 
 void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
+  static double send_time = 0;
+  double time_now = GetTime::GetTimeUs() / 1000;
   size_t radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
   size_t radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
 
   // Send a beacon packet in the downlink to trigger user pilot
   std::vector<uint8_t> udp_pkt_buf(cfg_->PacketLength(), 0);
   auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
+
+  std::printf("TXRX [%d]: Sending beacon for frame %zu tx delta %f ms\n", tid,
+              frame_id, time_now - send_time);
+  send_time = time_now;
 
   for (size_t beacon_sym = 0; beacon_sym < cfg_->Frame().NumBeaconSyms();
        beacon_sym++) {
@@ -125,6 +134,24 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
 
 void PacketTXRX::LoopTxRx(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid);
+
+  const double rdtsc_freq = GetTime::MeasureRdtscFreq();
+  const size_t frame_tsc_delta =
+      cfg_->GetFrameDurationSec() * 1e9f * rdtsc_freq;
+  const size_t two_hundred_ms_ticks = (0.2f /* 200 ms */ * 1e9f * rdtsc_freq);
+
+  // Slow start variables (Start with no less than 200 ms)
+  const size_t slow_start_tsc1 =
+      std::max(40 * frame_tsc_delta, two_hundred_ms_ticks);
+  const size_t slow_start_thresh1 = kFrameWnd;
+  const size_t slow_start_tsc2 = 15 * frame_tsc_delta;
+  const size_t slow_start_thresh2 = kFrameWnd * 4;
+  size_t delay_tsc = frame_tsc_delta;
+
+  if (kEnableSlowStart) {
+    delay_tsc = slow_start_tsc1;
+  }
+
   size_t* rx_frame_start = (*frame_start_)[tid];
   size_t rx_slot = 0;
   size_t radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
@@ -144,54 +171,56 @@ void PacketTXRX::LoopTxRx(size_t tid) {
         cfg_->BsRruPort() + radio_id);
   }
 
-  size_t frame_tsc_delta(cfg_->GetFrameDurationSec() * 1e9 *
-                         GetTime::MeasureRdtscFreq());
   int prev_frame_id = -1;
   size_t radio_id = radio_lo;
   size_t tx_frame_start = GetTime::Rdtsc();
   size_t tx_frame_id = 0;
-  size_t slow_start_factor = 10;
+  size_t send_time = delay_tsc + tx_frame_start;
   // Send Beacons for the first time to kick off sim
-  SendBeacon(tid, tx_frame_id++);
+  // SendBeacon(tid, tx_frame_id++);
   while (cfg_->Running() == true) {
-    if (GetTime::Rdtsc() - tx_frame_start >
-        frame_tsc_delta * slow_start_factor) {
-      tx_frame_start = GetTime::Rdtsc();
+    size_t rdtsc_now = GetTime::Rdtsc();
+
+    if (rdtsc_now > send_time) {
       SendBeacon(tid, tx_frame_id++);
-      if (tx_frame_id > 5) {
-        slow_start_factor = 5;
-      } else if (tx_frame_id > 100) {
-        slow_start_factor = 4;
-      } else if (tx_frame_id > 200) {
-        slow_start_factor = 2;
-      } else if (tx_frame_id > 500) {
-        slow_start_factor = 1;
+
+      if (kEnableSlowStart) {
+        if (tx_frame_id == slow_start_thresh1) {
+          delay_tsc = slow_start_tsc2;
+        } else if (tx_frame_id == slow_start_thresh2) {
+          delay_tsc = frame_tsc_delta;
+          if (kEnableSlowSending) {
+            // Temp for historic reasons
+            delay_tsc = frame_tsc_delta * 4;
+          }
+        }
       }
-    }
-    if (-1 != DequeueSend(tid)) {
-      continue;
-    }
-    // receive data
-
-    struct Packet* pkt = RecvEnqueue(tid, radio_id, rx_slot);
-    if (pkt == nullptr) {
-      continue;
+      tx_frame_start = send_time;
+      send_time += delay_tsc;
     }
 
-    rx_slot = (rx_slot + 1) % buffers_per_socket_;
+    int send_result = DequeueSend(tid);
+    if (-1 == send_result) {
+      // receive data
 
-    if (kIsWorkerTimingEnabled) {
-      int frame_id = pkt->frame_id_;
-      if (frame_id > prev_frame_id) {
-        rx_frame_start[frame_id % kNumStatsFrames] = GetTime::Rdtsc();
-        prev_frame_id = frame_id;
+      struct Packet* pkt = RecvEnqueue(tid, radio_id, rx_slot);
+      if (pkt != nullptr) {
+        rx_slot = (rx_slot + 1) % buffers_per_socket_;
+
+        if (kIsWorkerTimingEnabled) {
+          int frame_id = pkt->frame_id_;
+          if (frame_id > prev_frame_id) {
+            rx_frame_start[frame_id % kNumStatsFrames] = GetTime::Rdtsc();
+            prev_frame_id = frame_id;
+          }
+        }
+
+        if (++radio_id == radio_hi) {
+          radio_id = radio_lo;
+        }
       }
-    }
-
-    if (++radio_id == radio_hi) {
-      radio_id = radio_lo;
-    }
-  }
+    }  // end if -1 == send_result
+  }    // end while
 }
 
 struct Packet* PacketTXRX::RecvEnqueue(size_t tid, size_t radio_id,
@@ -253,7 +282,7 @@ struct Packet* PacketTXRX::RecvEnqueue(size_t tid, size_t radio_id,
 int PacketTXRX::DequeueSend(int tid) {
   auto& c = cfg_;
   EventData event;
-  if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event)) {
+  if (task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event) == false) {
     return -1;
   }
 

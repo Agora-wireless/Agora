@@ -158,7 +158,7 @@ class PacketTXRX {
   // Dimension 1: socket_thread
   // Dimension 2: rx_packet
   std::vector<std::vector<RxPacket>> rx_packets_;
-#endif // defined(USE_DPDK)
+#endif  // defined(USE_DPDK)
 
   std::unique_ptr<RadioConfig> radioconfig_;  // Used only in Argos mode
 };

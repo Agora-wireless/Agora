@@ -68,6 +68,13 @@ class FrameStats {
     return client_dl_pilot_symbols_;
   }
 
+  inline size_t NumUlDataSyms() const {
+    return this->NumULSyms() - this->ClientUlPilotSymbols();
+  }
+  inline size_t NumDlDataSyms() const {
+    return this->NumDLSyms() - this->ClientDlPilotSymbols();
+  }
+
  private:
   std::string frame_identifier_;
 
@@ -80,6 +87,8 @@ class FrameStats {
 
   size_t client_ul_pilot_symbols_;
   size_t client_dl_pilot_symbols_;
+  size_t client_ul_data_symbols_;
+  size_t client_dl_data_symbols_;
 
   /* Helper function */
   static size_t GetSymbolIdx(const std::vector<size_t>& search_vector,

@@ -1,14 +1,14 @@
-#include <random>
-
 #include <gtest/gtest.h>
+
+#include <random>
 
 #include "buffer.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.h"
 
-#define NUM_SYMBOLS 1000  // number of symbols to modulate and demodulate
-#define NUM_ITERATIONS 50 // number of iterations to run tests
+#define NUM_SYMBOLS 1000   // number of symbols to modulate and demodulate
+#define NUM_ITERATIONS 50  // number of iterations to run tests
 
 /**
  * Adds additive white gaussian noise to the supplied signal
@@ -17,25 +17,26 @@
  * @param len: length of input and output signal (number of symbols)
  * @param snr: desired SNR in dB
  */
-static void apply_awgn(complex_float *signal, complex_float *output, int len, float snr) {
-    float gamma, power, N0;
-    int i;
-    std::default_random_engine generator;
-    // Normal distribution
-    std::normal_distribution<float> distribution(0.0, 1.0);
-    // Convert SNR to linear scale
-    gamma = powf(10, (snr / 10.0));
-    // Calculate power in signal
-    power = 0.0;
-    for (i = 0; i < len; i++) {
-        power += (signal[i].re * signal[i].re) + (signal[i].im * signal[i].im);
-    }
-    power = power / ((float)len);
-    N0 = power / gamma; // Noise spectral density
-    for (i = 0; i < len; i++) {
-      output[i].re = signal[i].re + sqrtf(N0/2) * distribution(generator);
-      output[i].im = signal[i].im + sqrtf(N0/2) * distribution(generator);
-    }
+static void apply_awgn(complex_float *signal, complex_float *output, int len,
+                       float snr) {
+  float gamma, power, N0;
+  int i;
+  std::default_random_engine generator;
+  // Normal distribution
+  std::normal_distribution<float> distribution(0.0, 1.0);
+  // Convert SNR to linear scale
+  gamma = powf(10, (snr / 10.0));
+  // Calculate power in signal
+  power = 0.0;
+  for (i = 0; i < len; i++) {
+    power += (signal[i].re * signal[i].re) + (signal[i].im * signal[i].im);
+  }
+  power = power / ((float)len);
+  N0 = power / gamma;  // Noise spectral density
+  for (i = 0; i < len; i++) {
+    output[i].re = signal[i].re + sqrtf(N0 / 2) * distribution(generator);
+    output[i].im = signal[i].im + sqrtf(N0 / 2) * distribution(generator);
+  }
 }
 
 /**
@@ -45,7 +46,8 @@ static void apply_awgn(complex_float *signal, complex_float *output, int len, fl
  * @param demod_func: Function to use for demodulation
  * @param func_desc: string describing function
  */
-static void run_256QAM_soft_demod(void (*demod_func)(const float*, int8_t*, int),
+static void run_256QAM_soft_demod(void (*demod_func)(const float *, int8_t *,
+                                                     int),
                                   const char *func_desc) {
   uint8_t *input_symbols, *output_symbols;
   complex_float *channel_input;
@@ -63,8 +65,7 @@ static void run_256QAM_soft_demod(void (*demod_func)(const float*, int8_t*, int)
   AllocBuffer1d(&input_symbols, num, Agora_memory::Alignment_t::kAlign64, 1);
   AllocBuffer1d(&channel_input, num, Agora_memory::Alignment_t::kAlign64, 1);
   AllocBuffer1d(&channel_output, num, Agora_memory::Alignment_t::kAlign64, 1);
-  AllocBuffer1d(&output_demod, num * 8,
-                Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&output_demod, num * 8, Agora_memory::Alignment_t::kAlign64, 1);
   AllocBuffer1d(&output_symbols, num, Agora_memory::Alignment_t::kAlign64, 1);
   InitModulationTable(mod_table, 256);
   srand(0);
@@ -90,14 +91,14 @@ static void run_256QAM_soft_demod(void (*demod_func)(const float*, int8_t*, int)
       apply_awgn(channel_input, channel_output, num, SNR);
       // Demodulate Symbols
       start_time = GetTime::GetTimeUs();
-      demod_func((float*)channel_output, output_demod, num);
+      demod_func((float *)channel_output, output_demod, num);
       runtime += (GetTime::GetTimeUs() - start_time);
       // Decode Symbols
       for (j = 0; j < num * 8; j++) {
         /*
-        * If llr value is negative, bit will be zero. 
-        * If it is positive, bit will be 1
-        */
+         * If llr value is negative, bit will be zero.
+         * If it is positive, bit will be 1
+         */
         if (output_demod[j] > 0) {
           output_symbols[j / 8] |= 0x1 << shift_offset;
         } else {
@@ -117,27 +118,29 @@ static void run_256QAM_soft_demod(void (*demod_func)(const float*, int8_t*, int)
         }
       }
     }
-    std::printf("256 QAM soft demod of %i symbols completed with average "
-      "runtime of %f us over %i iterations\n", num,
-      runtime / NUM_ITERATIONS, NUM_ITERATIONS);
+    std::printf(
+        "256 QAM soft demod of %i symbols completed with average "
+        "runtime of %f us over %i iterations\n",
+        num, runtime / NUM_ITERATIONS, NUM_ITERATIONS);
     err_rate = (err_rate * 100) / (NUM_SYMBOLS * NUM_ITERATIONS);
     std::printf("Soft Demod Error Rate for 256 QAM was %.2f%% at %f db SNR\n",
-      err_rate, SNR);
+                err_rate, SNR);
   }
   /*
    * For the last SNR, assert that the error rate is zero. Although a
    * 100 db SNR does not guarantee no errors, they should be less likely
    */
   if (err_rate > FLT_MIN) {
-    std::fprintf(stderr, 
-      "Highest SNR error rate was nonzero, raise SNR or fix implementation\n");
+    std::fprintf(stderr,
+                 "Highest SNR error rate was nonzero, raise SNR or fix "
+                 "implementation\n");
     ASSERT_EQ(err_rate, 0.0);
   }
   std::printf("Function utilized was %s\n", func_desc);
 }
 
 TEST(TestDemod256QAM, SoftLoop) {
-  run_256QAM_soft_demod(Demod256qamSoftLoop, "Demod256qamSoftLoop"); 
+  run_256QAM_soft_demod(Demod256qamSoftLoop, "Demod256qamSoftLoop");
 }
 
 TEST(TestDemod256QAM, SoftSSE) {
@@ -158,12 +161,12 @@ TEST(TestDemod256QAM, SoftAVX512) {
  * Unlike the rest of the testing suite, this test verifies that
  * all AVX implementations of 256 QAM demodulation produce the EXACT
  * same LLR results. It treats the SSE implementation as a ground truth.
- * 
- * Note: the SSE implementation was verified against the loop one during 
+ *
+ * Note: the SSE implementation was verified against the loop one during
  * testing. The loop implementation rounds floats differently, resulting in
  * a slightly different LLR. This is why the SSE implementation is used as a
  * ground truth.
- * 
+ *
  */
 TEST(TestDemod256QAM, VerifyCorrectness) {
   uint8_t *input_symbols;
@@ -191,14 +194,14 @@ TEST(TestDemod256QAM, VerifyCorrectness) {
     channel_input[i] = ModSingle(input_symbols[i], mod_table);
   }
   // Generate ground truth
-  Demod256qamSoftSse((float*)channel_input, output_demod_truth, num);
+  Demod256qamSoftSse((float *)channel_input, output_demod_truth, num);
   // Test AVX2 implementation
-  Demod256qamSoftAvx2((float*)channel_input, output_demod_check, num);
+  Demod256qamSoftAvx2((float *)channel_input, output_demod_check, num);
   ASSERT_EQ(memcmp(output_demod_check, output_demod_truth, num * 8), 0);
 
 #ifdef __AVX512F__
   // Test AVX512 implementation
-  Demod256qamSoftAvx512((float*)channel_input, output_demod_check, num);
+  Demod256qamSoftAvx512((float *)channel_input, output_demod_check, num);
   ASSERT_EQ(memcmp(output_demod_check, output_demod_truth, num * 8), 0);
 #endif
 }

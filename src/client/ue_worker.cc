@@ -27,13 +27,14 @@ UeWorker::UeWorker(
     size_t tid, Config& config, Stats& shared_stats, PhyStats& shared_phy_stats,
     moodycamel::ConcurrentQueue<EventData>& notify_queue,
     moodycamel::ConcurrentQueue<EventData>& work_queue,
-    moodycamel::ProducerToken& work_producer, Table<int8_t>& encoded_buffer,
-    Table<complex_float>& modul_buffer, Table<complex_float>& ifft_buffer,
-    char* const tx_buffer, Table<char>& rx_buffer,
-    std::vector<myVec>& csi_buffer, std::vector<myVec>& equal_buffer,
-    std::vector<size_t>& non_null_sc_ind, Table<complex_float>& fft_buffer,
+    moodycamel::ProducerToken& work_producer, Table<int8_t>& ul_bits_buffer,
+    Table<int8_t>& encoded_buffer, Table<complex_float>& modul_buffer,
+    Table<complex_float>& ifft_buffer, char* const tx_buffer,
+    Table<char>& rx_buffer, std::vector<myVec>& csi_buffer,
+    std::vector<myVec>& equal_buffer, std::vector<size_t>& non_null_sc_ind,
+    Table<complex_float>& fft_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
     std::vector<std::vector<std::complex<float>>>& ue_pilot_vec)
     : tid_(tid),
       thread_(),
@@ -43,6 +44,7 @@ UeWorker::UeWorker(
       config_(config),
       stats_(shared_stats),
       phy_stats_(shared_phy_stats),
+      ul_bits_buffer_(ul_bits_buffer),
       encoded_buffer_(encoded_buffer),
       modul_buffer_(modul_buffer),
       ifft_buffer_(ifft_buffer),
@@ -89,9 +91,10 @@ void UeWorker::TaskThread(size_t core_offset) {
   std::printf("UeWorker[%zu]: started\n", tid_);
   PinToCoreWithOffset(ThreadType::kWorker, core_offset, tid_);
 
-  // TODO make compatible with Mac!! (ul_bits_buffer_)
   auto encoder = std::make_unique<DoEncode>(
-      &config_, (int)tid_, config_.UlBits(), encoded_buffer_, &stats_);
+      &config_, (int)tid_,
+      (kEnableMac == true) ? ul_bits_buffer_ : config_.UlBits(),
+      (kEnableMac == true) ? kFrameWnd : 1, encoded_buffer_, &stats_);
 
   auto iffter = std::make_unique<DoIFFTClient>(
       &config_, (int)tid_, ifft_buffer_, tx_buffer_, &stats_);
@@ -112,7 +115,8 @@ void UeWorker::TaskThread(size_t core_offset) {
           DoDemul(event.tags_[0]);
         } break;
         case EventType::kIFFT: {
-          DoIfftUe(iffter.get(), event.tags_[0]);
+          // DoIfftUe(iffter.get(), event.tags_[0]);
+          DoIfft(event.tags_[0]);
         } break;
         case EventType::kEncode: {
           DoEncodeUe(encoder.get(), event.tags_[0]);
@@ -189,8 +193,7 @@ void UeWorker::DoFftData(size_t tag) {
   auto* fft_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
 
-  size_t dl_data_symbol_perframe =
-      config_.Frame().NumDLSyms() - config_.Frame().ClientDlPilotSymbols();
+  size_t dl_data_symbol_perframe = config_.Frame().NumDlDataSyms();
   size_t total_dl_data_symbol_id =
       (frame_slot * dl_data_symbol_perframe) +
       (dl_symbol_id - config_.Frame().ClientDlPilotSymbols());
@@ -389,8 +392,7 @@ void UeWorker::DoDemul(size_t tag) {
 
   const size_t frame_slot = frame_id % kFrameWnd;
   size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
-  size_t dl_data_symbol_perframe =
-      config_.Frame().NumDLSyms() - config_.Frame().ClientDlPilotSymbols();
+  size_t dl_data_symbol_perframe = config_.Frame().NumDlDataSyms();
   size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe +
                               dl_symbol_id -
                               config_.Frame().ClientDlPilotSymbols();
@@ -476,21 +478,22 @@ void UeWorker::DoDecodeUe(DoDecodeClient* decoder, size_t tag) {
 void UeWorker::DoEncodeUe(DoEncode* encoder, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t user_id = gen_tag_t(tag).ue_id_;
-  // For now, call for each cb
-  for (size_t cb_id = 0; cb_id < config_.LdpcConfig().NumBlocksInSymbol();
-       cb_id++) {
+  const size_t ue_id = gen_tag_t(tag).ue_id_;
+  for (size_t ch = 0; ch < config_.NumChannels(); ch++) {
+    const size_t ant_id = (ue_id * config_.NumChannels()) + ch;
     // For now, call for each cb
-    encoder->Launch(
-        gen_tag_t::FrmSymCb(
-            frame_id, symbol_id,
-            cb_id + (user_id * config_.LdpcConfig().NumBlocksInSymbol()))
-            .tag_);
+    for (size_t cb_id = 0; cb_id < config_.LdpcConfig().NumBlocksInSymbol();
+         cb_id++) {
+      // For now, call for each cb
+      encoder->Launch(
+          gen_tag_t::FrmSymCb(
+              frame_id, symbol_id,
+              cb_id + (ant_id * config_.LdpcConfig().NumBlocksInSymbol()))
+              .tag_);
+    }
   }
-
   // Post the completion event (symbol)
-  size_t completion_tag =
-      gen_tag_t::FrmSymUe(frame_id, symbol_id, user_id).tag_;
+  size_t completion_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, ue_id).tag_;
   RtAssert(notify_queue_.enqueue(*ptok_.get(),
                                  EventData(EventType::kEncode, completion_tag)),
            "Encoded Symbol message enqueue failed");
@@ -501,7 +504,6 @@ void UeWorker::DoModul(size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ue_id = gen_tag_t(tag).ue_id_;
-  const size_t frame_slot = (frame_id % kFrameWnd);
 
   if (kDebugPrintInTask || kDebugPrintModul) {
     std::printf("UeWorker[%zu]: Modul  (frame %zu, symbol %zu, user %zu)\n",
@@ -513,17 +515,25 @@ void UeWorker::DoModul(size_t tag) {
     const size_t ant_id = (ue_id * config_.NumChannels()) + ch;
 
     const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
-    const size_t ul_data_symbol_perframe =
-        config_.Frame().NumULSyms() - config_.Frame().ClientUlPilotSymbols();
     const size_t total_ul_data_symbol_id =
-        (frame_slot * ul_data_symbol_perframe) +
-        (ul_symbol_idx - config_.Frame().ClientUlPilotSymbols());
+        config_.GetTotalDataSymbolIdxUl(frame_id, ul_symbol_idx);
 
     complex_float* modul_buf =
         &modul_buffer_[total_ul_data_symbol_id][ant_id * config_.OfdmDataNum()];
 
     auto* ul_bits = config_.GetEncodedBuf(encoded_buffer_, frame_id,
                                           ul_symbol_idx, ant_id, 0);
+
+    if (kDebugPrintModul) {
+      std::printf(
+          "UeWorker[%zu]: Modul  (frame %zu, symbol %zu, user %zu) - getting "
+          "from location (%zu %zu %zu) %zu and putting into location (%zu, "
+          "%zu) %zu\n\n",
+          tid_, frame_id, symbol_id, ue_id, frame_id,
+          ul_symbol_idx - config_.Frame().ClientUlPilotSymbols(), ant_id,
+          (size_t)ul_bits, total_ul_data_symbol_id,
+          ant_id * config_.OfdmDataNum(), (size_t)modul_buf);
+    }
 
     // TODO place directly into the correct location of the fft buffer
     for (size_t sc = 0; sc < config_.OfdmDataNum(); sc++) {
@@ -559,21 +569,14 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
     {
       complex_float const* source_data = nullptr;
       const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
+      size_t total_ul_symbol_id =
+          config_.GetTotalDataSymbolIdxUl(frame_id, ul_symbol_idx);
       if (ul_symbol_idx < config_.Frame().ClientUlPilotSymbols()) {
         source_data = config_.UeSpecificPilot()[ant_id];
       } else {
-        const size_t frame_slot = frame_id % kFrameWnd;
-        const size_t ul_data_symbol_perframe =
-            config_.Frame().NumULSyms() -
-            config_.Frame().ClientUlPilotSymbols();
-        const size_t total_ul_data_symbol_id =
-            (frame_slot * ul_data_symbol_perframe) +
-            (ul_symbol_idx - config_.Frame().ClientUlPilotSymbols());
-        source_data = &modul_buffer_[total_ul_data_symbol_id]
-                                    [ant_id * config_.OfdmDataNum()];
+        source_data =
+            &modul_buffer_[total_ul_symbol_id][ant_id * config_.OfdmDataNum()];
       }
-      size_t total_ul_symbol_id =
-          config_.GetTotalDataSymbolIdxUl(frame_id, ul_symbol_idx);
       size_t buff_offset = (total_ul_symbol_id * config_.UeAntNum()) + ant_id;
       complex_float* dest_loc =
           ifft_buffer_[buff_offset] + (config_.OfdmDataStart() * 1);
@@ -581,9 +584,71 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
                   sizeof(complex_float) * config_.OfdmDataNum());
     }
 
-    iffter->Launch(gen_tag_t::FrmSymCb(frame_id, symbol_id,
-                                       ch + (user_id * config_.NumChannels()))
-                       .tag_);
+    iffter->Launch(gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_);
+  }
+
+  // Post the completion event (symbol)
+  size_t completion_tag =
+      gen_tag_t::FrmSymUe(frame_id, symbol_id, user_id).tag_;
+  RtAssert(notify_queue_.enqueue(*ptok_.get(),
+                                 EventData(EventType::kIFFT, completion_tag)),
+           "IFFT symbol complete message enqueue failed");
+}
+
+void UeWorker::DoIfft(size_t tag) {
+  const size_t frame_id = gen_tag_t(tag).frame_id_;
+  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
+  const size_t user_id = gen_tag_t(tag).ue_id_;
+
+  const size_t frame_slot = frame_id % kFrameWnd;
+
+  if (kDebugPrintInTask) {
+    std::printf("User Task[%zu]: iFFT   (frame %zu, symbol %zu, user %zu)\n",
+                tid_, frame_id, symbol_id, user_id);
+  }
+  size_t start_tsc = GetTime::Rdtsc();
+
+  for (size_t ch = 0; ch < config_.NumChannels(); ch++) {
+    const size_t ul_symbol_perframe = config_.Frame().NumULSyms();
+
+    size_t ul_symbol_id = config_.Frame().GetULSymbolIdx(symbol_id);
+    size_t ant_id = user_id * config_.NumChannels() + ch;
+    size_t total_ul_symbol_id = frame_slot * ul_symbol_perframe + ul_symbol_id;
+    size_t buff_offset = total_ul_symbol_id * config_.UeAntNum() + ant_id;
+    complex_float* ifft_buff = ifft_buffer_[buff_offset];
+
+    std::memset(ifft_buff, 0, sizeof(complex_float) * config_.OfdmDataStart());
+    if (ul_symbol_id < config_.Frame().ClientUlPilotSymbols()) {
+      std::memcpy(ifft_buff + config_.OfdmDataStart(),
+                  config_.UeSpecificPilot()[ant_id],
+                  config_.OfdmDataNum() * sizeof(complex_float));
+    } else {
+      complex_float* modul_buff =
+          &modul_buffer_[total_ul_symbol_id][ant_id * config_.OfdmDataNum()];
+      std::memcpy(ifft_buff + config_.OfdmDataStart(), modul_buff,
+                  config_.OfdmDataNum() * sizeof(complex_float));
+    }
+    std::memset(ifft_buff + config_.OfdmDataStop(), 0,
+                sizeof(complex_float) * config_.OfdmDataStart());
+
+    CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
+
+    size_t tx_offset = buff_offset * config_.PacketLength();
+    char* cur_tx_buffer = &tx_buffer_[tx_offset];
+    auto* pkt = reinterpret_cast<struct Packet*>(cur_tx_buffer);
+    auto* tx_data_ptr = reinterpret_cast<std::complex<short>*>(pkt->data_);
+    CommsLib::Ifft2tx(ifft_buff, tx_data_ptr, config_.OfdmCaNum(),
+                      config_.OfdmTxZeroPrefix(), config_.CpLen(),
+                      config_.Scale());
+  }
+
+  if ((kDebugPrintPerTaskDone == true)) {
+    size_t ifft_duration_stat = GetTime::Rdtsc() - start_tsc;
+    std::printf(
+        "User Task[%zu]: iFFT   (frame %zu,       , user %zu) Duration "
+        "%2.4f ms\n",
+        tid_, frame_id, user_id,
+        GetTime::CyclesToMs(ifft_duration_stat, GetTime::MeasureRdtscFreq()));
   }
 
   // Post the completion event (symbol)

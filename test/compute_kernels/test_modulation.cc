@@ -11,7 +11,6 @@
 #include "modulation.h"
 #include "utils.h"
 
-
 void flushCache() {
   const size_t bigger_than_cachesize = 2 * 1024;  // 100 * 1024 * 1024;
   auto* p = new long[bigger_than_cachesize];
@@ -22,9 +21,7 @@ void flushCache() {
   delete[] p;
 }
 
-static double get_time() {
-  return ((double)clock()) / CLOCKS_PER_SEC;
-}
+static double get_time() { return ((double)clock()) / CLOCKS_PER_SEC; }
 
 static double bench_mod_16qam(unsigned iterations, unsigned mode) {
   int* input;
@@ -39,13 +36,19 @@ static double bench_mod_16qam(unsigned iterations, unsigned mode) {
   AllocBuffer1d(&input, num, Agora_memory::Alignment_t::kAlign32, 1);
   AllocBuffer1d(&output_mod, num, Agora_memory::Alignment_t::kAlign32, 1);
   if (mode == 0) {
-    AllocBuffer1d(&output_demod_loop, num, Agora_memory::Alignment_t::kAlign32, 1);
-    AllocBuffer1d(&output_demod_sse, num, Agora_memory::Alignment_t::kAlign32, 1);
-    AllocBuffer1d(&output_demod_avx2, num, Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_loop, num, Agora_memory::Alignment_t::kAlign32,
+                  1);
+    AllocBuffer1d(&output_demod_sse, num, Agora_memory::Alignment_t::kAlign32,
+                  1);
+    AllocBuffer1d(&output_demod_avx2, num, Agora_memory::Alignment_t::kAlign32,
+                  1);
   } else {
-    AllocBuffer1d(&output_demod_loop, num * 4, Agora_memory::Alignment_t::kAlign32, 1);
-    AllocBuffer1d(&output_demod_sse, num * 4, Agora_memory::Alignment_t::kAlign32, 1);
-    AllocBuffer1d(&output_demod_avx2, num * 4, Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_loop, num * 4,
+                  Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_sse, num * 4,
+                  Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_avx2, num * 4,
+                  Agora_memory::Alignment_t::kAlign32, 1);
   }
 
   srand(0);
@@ -145,13 +148,19 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode) {
   AllocBuffer1d(&output_mod, num, Agora_memory::Alignment_t::kAlign32, 1);
   if (mode == 0) {
     Demod64qamHardSse((float*)output_mod, output_demod_sse, num);
-    AllocBuffer1d(&output_demod_loop, num, Agora_memory::Alignment_t::kAlign32, 1);
-    AllocBuffer1d(&output_demod_sse, num, Agora_memory::Alignment_t::kAlign32, 1);
-    AllocBuffer1d(&output_demod_avx2, num, Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_loop, num, Agora_memory::Alignment_t::kAlign32,
+                  1);
+    AllocBuffer1d(&output_demod_sse, num, Agora_memory::Alignment_t::kAlign32,
+                  1);
+    AllocBuffer1d(&output_demod_avx2, num, Agora_memory::Alignment_t::kAlign32,
+                  1);
   } else {
-    AllocBuffer1d(&output_demod_loop, num * 6, Agora_memory::Alignment_t::kAlign32, 1);
-    AllocBuffer1d(&output_demod_sse, num * 6, Agora_memory::Alignment_t::kAlign32, 1);
-    AllocBuffer1d(&output_demod_avx2, num * 6, Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_loop, num * 6,
+                  Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_sse, num * 6,
+                  Agora_memory::Alignment_t::kAlign32, 1);
+    AllocBuffer1d(&output_demod_avx2, num * 6,
+                  Agora_memory::Alignment_t::kAlign32, 1);
   }
 
   srand(0);
@@ -237,7 +246,6 @@ static double bench_mod_64qam(unsigned iterations, unsigned mode) {
   return end_time - start_time;
 }
 
-
 int hammingdist(uint8_t x, uint8_t y) {
   uint8_t mask = 0x80, rshift = 7, hammingdist = 0;
   while (mask) {
@@ -246,7 +254,7 @@ int hammingdist(uint8_t x, uint8_t y) {
     rshift--;
     mask >>= 1;
   }
-  return hammingdist;  
+  return hammingdist;
 }
 
 void printbits(uint8_t x) {
@@ -262,27 +270,29 @@ void printbits(uint8_t x) {
 
 static double bench_mod_256qam(unsigned iterations, unsigned mode) {
   Table<complex_float> mod_table;
-  complex_float *output_mod;
+  complex_float* output_mod;
   double start_time, total_time, elapsed_time;
   unsigned int num = 1000;
-  uint8_t *input;
+  uint8_t* input;
   uint8_t *output_demod_loop, *output_demod_sse, *output_demod_avx2;
 #ifdef __AVX512F__
-  uint8_t *output_demod_avx512;
+  uint8_t* output_demod_avx512;
 #endif
   int gray_mapping[16][16];
 
   InitModulationTable(mod_table, 256);
   for (int i = 0; i < 256; i++) {
-    int re = (int)(mod_table[0][i].re * sqrt(170)/2 + 8);
-    int im = (int)(mod_table[0][i].im * sqrt(170)/2 + 8);
+    int re = (int)(mod_table[0][i].re * sqrt(170) / 2 + 8);
+    int im = (int)(mod_table[0][i].im * sqrt(170) / 2 + 8);
     gray_mapping[im][re] = i;
   }
   for (int i = 15; i >= 0; i--) {
     if (i == 7)
-      printf("-----------------------------------------------------------------"
-        "------------"
-        "------------------------------------------------------------------\n");
+      printf(
+          "-----------------------------------------------------------------"
+          "------------"
+          "------------------------------------------------------------------"
+          "\n");
     for (int j = 0; j < 16; j++) {
       printbits(gray_mapping[i][j]);
       /*
@@ -293,7 +303,7 @@ static double bench_mod_256qam(unsigned iterations, unsigned mode) {
         if (hammingdist(gray_mapping[i - 1][j], gray_mapping[i][j]) != 1) {
           printf("Bad west hamming dist at (%d,%d)\n", i, j);
         }
-      } 
+      }
       if (i < 15) {
         // Check right
         if (hammingdist(gray_mapping[i + 1][j], gray_mapping[i][j]) != 1) {
@@ -321,11 +331,14 @@ static double bench_mod_256qam(unsigned iterations, unsigned mode) {
   }
   AllocBuffer1d(&input, num, Agora_memory::Alignment_t::kAlign64, 1);
   AllocBuffer1d(&output_mod, num, Agora_memory::Alignment_t::kAlign64, 1);
-  AllocBuffer1d(&output_demod_loop, num, Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&output_demod_loop, num, Agora_memory::Alignment_t::kAlign64,
+                1);
   AllocBuffer1d(&output_demod_sse, num, Agora_memory::Alignment_t::kAlign64, 1);
-  AllocBuffer1d(&output_demod_avx2, num, Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&output_demod_avx2, num, Agora_memory::Alignment_t::kAlign64,
+                1);
 #ifdef __AVX512F__
-  AllocBuffer1d(&output_demod_avx512, num, Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&output_demod_avx512, num, Agora_memory::Alignment_t::kAlign64,
+                1);
 #endif
   // Build the input data from random bytes
   std::printf("Input: ");
@@ -382,7 +395,7 @@ static double bench_mod_256qam(unsigned iterations, unsigned mode) {
 #endif
   total_time = GetTime::GetTime() - start_time;
   if (mode == 0) {
-    // Check results. 
+    // Check results.
     unsigned i;
     std::cout << "Results checking enabled\n";
     for (i = 0; i < num; i++) {
@@ -404,7 +417,8 @@ static double bench_mod_256qam(unsigned iterations, unsigned mode) {
 #ifdef __AVX512F__
       if (input[i] != output_demod_avx512[i]) {
         std::cout << "AXV512 Results differed at index " << i << "\n";
-        std::printf("Expected %d Actual %d\n", input[i], output_demod_avx512[i]);
+        std::printf("Expected %d Actual %d\n", input[i],
+                    output_demod_avx512[i]);
         break;
       }
 #endif
@@ -434,15 +448,17 @@ static void run_benchmark_64qam(unsigned iterations, unsigned mode) {
 
 static void run_benchmark_256qam(unsigned iterations, unsigned mode) {
   double time = bench_mod_256qam(iterations, mode);
-  str:printf("time: %.2f us per iteration\n", time / iterations);
+str:
+  printf("time: %.2f us per iteration\n", time / iterations);
 }
 
 int main(int argc, char* argv[]) {
   if (argc != 4) {
-    std::fprintf(stderr,
-                 "Usage: %s [modulation order 4/16/64/256] [mode hard(0)/soft(1)] "
-                 "[iterations]\n",
-                 argv[0]);
+    std::fprintf(
+        stderr,
+        "Usage: %s [modulation order 4/16/64/256] [mode hard(0)/soft(1)] "
+        "[iterations]\n",
+        argv[0]);
     return 1;
   }
 
@@ -467,7 +483,7 @@ int main(int argc, char* argv[]) {
     else if (mod_order == 64)
       run_benchmark_64qam(iterations, mode);
     else if (mod_order == 256)
-      run_benchmark_256qam(iterations, mode); 
+      run_benchmark_256qam(iterations, mode);
     else
       std::printf("Error: modulation order not supported!\n");
   }

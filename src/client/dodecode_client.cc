@@ -15,7 +15,7 @@ static constexpr size_t kVarNodesSize = 1024 * 1024 * sizeof(int16_t);
 DoDecodeClient::DoDecodeClient(
     Config* in_config, int in_tid,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffers,
     PhyStats* in_phy_stats, Stats* in_stats_manager)
     : Doer(in_config, in_tid),
       demod_buffers_(demod_buffers),
@@ -76,7 +76,7 @@ EventData DoDecodeClient::Launch(size_t tag) {
       (cfg_->ModOrderBits() * (ldpc_config.NumCbCodewLen() * cur_cb_id));
 
   uint8_t* decoded_buffer_ptr =
-      decoded_buffers_[frame_slot][symbol_idx_dl][ue_id] +
+      (uint8_t*)decoded_buffers_[frame_slot][symbol_idx_dl][ue_id] +
       (cur_cb_id * Roundup<64>(cfg_->NumBytesPerCb()));
 
   ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
