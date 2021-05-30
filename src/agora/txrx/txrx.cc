@@ -75,7 +75,7 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
 
   buffers_per_socket_ = packet_num_in_buffer / socket_thread_num_;
   /// Make sure we can fit each channel in the tread buffer without rollover
-  assert(buffers_per_thread_ % config_->NumChannels() == 0);
+  assert(buffers_per_socket_ % cfg_->NumChannels() == 0);
 
   rx_packets_.resize(socket_thread_num_);
   for (size_t i = 0; i < socket_thread_num_; i++) {
