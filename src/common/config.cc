@@ -677,6 +677,7 @@ void Config::GenData() {
           MLPD_ERROR(
               "***Error: Downlink bad read from file %s (batch %zu : %zu) \n",
               dl_data_file.c_str(), i, j);
+          throw std::runtime_error("Bad read from file");
         }
       }
     }
