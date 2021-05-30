@@ -230,7 +230,7 @@ union rx_tag_t {
   size_t tag_;
 
   static_assert(sizeof(RxPacket *) >= sizeof(size_t),
-                "RxPacket pounter must fit inside a size_t value");
+                "RxPacket pointer must fit inside a size_t value");
 
   explicit rx_tag_t(RxPacket &rx_packet) : rx_packet_(&rx_packet) {}
   explicit rx_tag_t(RxPacket *rx_packet) : rx_packet_(rx_packet) {}
