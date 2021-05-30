@@ -20,11 +20,11 @@ int main(int argc, char* argv[]) {
   std::string filename = FLAGS_conf_file;
 
   auto cfg = std::make_unique<Config>(filename.c_str());
-  cfg->GenData();
   int ret = EXIT_FAILURE;
   try {
-    SignalHandler signal_handler;
+    cfg->GenData();
 
+    SignalHandler signal_handler;
     // Register signal handler to handle kill signal
     signal_handler.SetupSignalHandlers();
     auto receiver_ = std::make_unique<UlMacReceiver>(
@@ -36,6 +36,12 @@ int main(int argc, char* argv[]) {
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;
+    ret = EXIT_FAILURE;
+  } catch (std::runtime_error &e) {
+    std::cerr << "RuntimeErrorException: " << e.what() << std::endl;
+    ret = EXIT_FAILURE;
+  } catch (std::invalid_argument &e) {
+    std::cerr << "InvalidArgumentException: " << e.what() << std::endl;
     ret = EXIT_FAILURE;
   }
   std::printf("Shutdown\n");

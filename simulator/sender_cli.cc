@@ -5,6 +5,7 @@
 #include <gflags/gflags.h>
 
 #include "sender.h"
+#include "signal_handler.h"
 
 DEFINE_uint64(num_threads, 4, "Number of sender threads");
 DEFINE_uint64(core_offset, 0, "Core ID of the first sender thread");
@@ -24,16 +25,30 @@ int main(int argc, char* argv[]) {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = FLAGS_conf_file;
 
+  int ret = EXIT_SUCCESS;
   {
     auto cfg = std::make_unique<Config>(filename.c_str());
-    cfg->GenData();
-    {
-      auto sender = std::make_unique<Sender>(
-          cfg.get(), FLAGS_num_threads, FLAGS_core_offset, FLAGS_frame_duration,
-          FLAGS_inter_frame_delay, FLAGS_enable_slow_start,
-          FLAGS_server_mac_addr);
-      sender->StartTx();
-    }  // end context sender
+
+    try {
+      cfg->GenData();
+      {
+        auto sender = std::make_unique<Sender>(
+            cfg.get(), FLAGS_num_threads, FLAGS_core_offset, FLAGS_frame_duration,
+            FLAGS_inter_frame_delay, FLAGS_enable_slow_start,
+            FLAGS_server_mac_addr);
+        sender->StartTx();
+      }  // end context sender
+    } catch (SignalException &e) {
+      std::cerr << "SignalException: " << e.what() << std::endl;
+      ret = EXIT_FAILURE;
+    } catch (std::runtime_error &e) {
+      std::cerr << "RuntimeErrorException: " << e.what() << std::endl;
+      ret = EXIT_FAILURE;
+    } catch (std::invalid_argument &e) {
+      std::cerr << "InvalidArgumentException: " << e.what() << std::endl;
+      ret = EXIT_FAILURE;
+    }
   }    // end context Config
-  return 0;
+
+  return ret;
 }

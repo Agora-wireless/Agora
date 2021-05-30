@@ -27,11 +27,11 @@ int main(int argc, char* argv[]) {
     filename = FLAGS_conf_file;
   }
   auto config = std::make_unique<Config>(filename.c_str());
-  config->GenData();
   int ret;
   try {
-    SignalHandler signal_handler;
+    config->GenData();
 
+    SignalHandler signal_handler;
     // Register signal handler to handle kill signal
     signal_handler.SetupSignalHandlers();
     auto phy = std::make_unique<PhyUe>(config.get());
@@ -39,6 +39,12 @@ int main(int argc, char* argv[]) {
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;
+    ret = EXIT_FAILURE;
+  } catch (std::runtime_error &e) {
+    std::cerr << "RuntimeErrorException: " << e.what() << std::endl;
+    ret = EXIT_FAILURE;
+  } catch (std::invalid_argument &e) {
+    std::cerr << "InvalidArgumentException: " << e.what() << std::endl;
     ret = EXIT_FAILURE;
   }
   gflags::ShutDownCommandLineFlags();

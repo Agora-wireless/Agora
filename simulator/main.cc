@@ -27,12 +27,13 @@ int main(int argc, char const* argv[]) {
     std::printf("Arguments set to default: 4, 22, 5000, %s\n",
                 conf_file.c_str());
   }
+
   auto cfg = std::make_unique<Config>(conf_file.c_str());
-  cfg->GenData();
   int ret;
   try {
-    SignalHandler signal_handler;
+    cfg->GenData();
 
+    SignalHandler signal_handler;
     // Register signal handler to handle kill signal
     signal_handler.SetupSignalHandlers();
     auto simulator =
@@ -41,6 +42,12 @@ int main(int argc, char const* argv[]) {
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;
+    ret = EXIT_FAILURE;
+  } catch (std::runtime_error &e) {
+    std::cerr << "RuntimeErrorException: " << e.what() << std::endl;
+    ret = EXIT_FAILURE;
+  } catch (std::invalid_argument &e) {
+    std::cerr << "InvalidArgumentException: " << e.what() << std::endl;
     ret = EXIT_FAILURE;
   }
 

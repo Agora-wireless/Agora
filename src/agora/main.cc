@@ -4,6 +4,8 @@
  */
 #include "agora.h"
 
+#include <stdexcept>
+
 int main(int argc, char* argv[]) {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string conf_file = cur_directory + "/data/tddconfig-sim-ul.json";
@@ -12,12 +14,12 @@ int main(int argc, char* argv[]) {
   }
 
   std::unique_ptr<Config> cfg = std::make_unique<Config>(conf_file.c_str());
-  cfg->GenData();
 
   int ret;
   try {
-    SignalHandler signal_handler;
+    cfg->GenData();
 
+    SignalHandler signal_handler;
     // Register signal handler to handle kill signal
     signal_handler.SetupSignalHandlers();
     std::unique_ptr<Agora> agora_cli = std::make_unique<Agora>(cfg.get());
@@ -25,6 +27,12 @@ int main(int argc, char* argv[]) {
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;
+    ret = EXIT_FAILURE;
+  } catch (std::runtime_error &e) {
+    std::cerr << "RuntimeErrorException: " << e.what() << std::endl;
+    ret = EXIT_FAILURE;
+  } catch (std::invalid_argument &e) {
+    std::cerr << "InvalidArgumentException: " << e.what() << std::endl;
     ret = EXIT_FAILURE;
   }
   return ret;

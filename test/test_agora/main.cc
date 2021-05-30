@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include "agora.h"
 
 static const bool kDebugPrintUlCorr = false;
@@ -171,11 +172,11 @@ int main(int argc, char* argv[]) {
     conf_file = std::string(argv[1]);
   }
 
-  auto cfg = std::make_unique<Config>(conf_file.c_str());
-  cfg->GenData();
-
   int ret;
+  auto cfg = std::make_unique<Config>(conf_file.c_str());
   try {
+    cfg->GenData();
+
     SignalHandler signal_handler;
     signal_handler.SetupSignalHandlers();
     auto agora_cli = std::make_unique<Agora>(cfg.get());
@@ -215,6 +216,13 @@ int main(int argc, char* argv[]) {
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;
     ret = EXIT_FAILURE;
+  } catch (std::runtime_error &e) {
+    std::cerr << "RuntimeErrorException: " << e.what() << std::endl;
+    ret = EXIT_FAILURE;
+  } catch (std::invalid_argument &e) {
+    std::cerr << "InvalidArgumentException: " << e.what() << std::endl;
+    ret = EXIT_FAILURE;
   }
+
   return ret;
 }
