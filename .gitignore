@@ -64,3 +64,5 @@ CTestTestfile.cmake
 # ##################
 .vscode
 sftp-config.json
+compile_commands.json
+.cache/*
