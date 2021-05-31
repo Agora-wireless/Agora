@@ -682,11 +682,11 @@ void* PacketTXRX::encode_thread(int tid)
                 }
             }
             if (!found) {
-                for (size_t j = 0; j < bs_server_addrs_.size(); j ++) {
-                    fprintf(stderr, "%x ", bs_server_addrs_[j]);
-                }
-                fprintf(stderr, "\n");
-                fprintf(stderr, "DPDK relocate(%u): Source addr does not match (%x:%u->%x:%u)\n", tid, ip_hdr->src_addr, rte_be_to_cpu_16(udp_hdr->src_port), ip_hdr->dst_addr, rte_be_to_cpu_16(udp_hdr->dst_port));
+                // for (size_t j = 0; j < bs_server_addrs_.size(); j ++) {
+                //     fprintf(stderr, "%x ", bs_server_addrs_[j]);
+                // }
+                // fprintf(stderr, "\n");
+                // fprintf(stderr, "DPDK relocate(%u): Source addr does not match (%x:%u->%x:%u)\n", tid, ip_hdr->src_addr, rte_be_to_cpu_16(udp_hdr->src_port), ip_hdr->dst_addr, rte_be_to_cpu_16(udp_hdr->dst_port));
                 rte_pktmbuf_free(rx_bufs[i]);
                 continue;
             }
@@ -816,12 +816,12 @@ int PacketTXRX::recv_relocate(int tid)
         }
 
         if (unlikely(ip_hdr->src_addr != bs_rru_addr_)) {
-            fprintf(stderr, "DPDK relocate(%u): Source addr does not match (%x:%u->%x:%u)\n", tid, ip_hdr->src_addr, rte_be_to_cpu_16(udp_hdr->src_port), ip_hdr->dst_addr, rte_be_to_cpu_16(udp_hdr->dst_port));
+            // fprintf(stderr, "DPDK relocate(%u): Source addr does not match (%x:%u->%x:%u)\n", tid, ip_hdr->src_addr, rte_be_to_cpu_16(udp_hdr->src_port), ip_hdr->dst_addr, rte_be_to_cpu_16(udp_hdr->dst_port));
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
         if (unlikely(ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx])) {
-            fprintf(stderr, "DPDK relocate(%u): Destination addr does not match (%x %x)\n", tid, ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
+            // fprintf(stderr, "DPDK relocate(%u): Destination addr does not match (%x %x)\n", tid, ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
@@ -921,11 +921,11 @@ int PacketTXRX::recv(int tid)
         }
 
         if (ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx]) {
-            char src_mac[32], dst_mac[32];
-            rte_ether_format_addr(src_mac, 32, &eth_hdr->s_addr);
-            rte_ether_format_addr(dst_mac, 32, &eth_hdr->d_addr);
-            fprintf(stderr, "DPDK relocate: Destination addr does not match (%x %x) (%s %s)\n", 
-                ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx], src_mac, dst_mac);
+            // char src_mac[32], dst_mac[32];
+            // rte_ether_format_addr(src_mac, 32, &eth_hdr->s_addr);
+            // rte_ether_format_addr(dst_mac, 32, &eth_hdr->d_addr);
+            // fprintf(stderr, "DPDK relocate: Destination addr does not match (%x %x) (%s %s)\n", 
+            //     ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx], src_mac, dst_mac);
             rte_pktmbuf_free(rx_bufs[i]);
             continue;
         }
