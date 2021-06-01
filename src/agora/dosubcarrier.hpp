@@ -165,10 +165,12 @@ public:
                 state_start_tsc = rdtsc();
                 bool ret = rx_status_->is_demod_ready(
                        demul_cur_frame_, demul_cur_sym_ul_);
-                state_operation_duration += rdtsc() - state_start_tsc;
+                size_t state_tsc_usage = rdtsc() - state_start_tsc;
+                state_operation_duration += state_tsc_usage;
                 // work_tsc_duration += rdtsc() - work_start_tsc;
 
                 if (ret) {
+                    work_tsc_duration += state_tsc_usage;
                     work_start_tsc = rdtsc();
                     worked = 1;
 
@@ -278,6 +280,7 @@ public:
                 continue;
             }
 
+            size_t state_tsc_usage = 0;
             if (likely(start_tsc > 0)) {
                 loop_count ++;
                 // work_start_tsc = rdtsc();
@@ -285,7 +288,8 @@ public:
             }
             bool ret = rx_status_->received_all_pilots(csi_cur_frame_);
             if (likely(start_tsc > 0)) {
-                state_operation_duration += rdtsc() - state_start_tsc;
+                state_tsc_usage = rdtsc() - state_start_tsc;
+                state_operation_duration += state_tsc_usage;
                 // work_tsc_duration += rdtsc() - work_start_tsc;
             }
 
@@ -294,6 +298,7 @@ public:
                     start_tsc = rdtsc();
                 }
 
+                work_tsc_duration += state_tsc_usage;
                 work_start_tsc = rdtsc();
                 worked = 1;
 
