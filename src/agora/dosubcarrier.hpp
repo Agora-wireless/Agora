@@ -331,6 +331,17 @@ public:
             cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
             work_count, loop_count, work_count * 100.0f / loop_count);
         do_demul_->print_overhead();
+
+        std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+        std::string filename = cur_directory + "/data/performance_dosubcarrier.txt";
+        FILE* fp = fopen(filename.c_str(), "a");
+        fprintf(fp, "%u %u %u %u %u %.2lf %.2lf %.2lf %.2lf %.2lf %.2lf %.2lf\n", cfg->BS_ANT_NUM, cfg->UE_NUM,
+            sc_range_.end - sc_range_.start, cfg->demul_block_size, cfg->mod_order_bits,
+            csi_tsc_duration * 100.0f / whole_duration, zf_tsc_duration * 100.0f / whole_duration,
+            demod_tsc_duration * 100.0f / whole_duration, precode_tsc_duration * 100.0f / whole_duration,
+            print_tsc_duration * 100.0f / whole_duration, state_operation_duration * 100.0f / whole_duration,
+            idle_duration * 100.0f / whole_duration);
+        fclose(fp);
     }
 
 private:
