@@ -161,12 +161,12 @@ public:
 
             if (zf_cur_frame_ > demul_cur_frame_) {
 
-                work_start_tsc = rdtsc();
+                // work_start_tsc = rdtsc();
                 state_start_tsc = rdtsc();
                 bool ret = rx_status_->is_demod_ready(
                        demul_cur_frame_, demul_cur_sym_ul_);
                 state_operation_duration += rdtsc() - state_start_tsc;
-                work_tsc_duration += rdtsc() - work_start_tsc;
+                // work_tsc_duration += rdtsc() - work_start_tsc;
 
                 if (ret) {
                     work_start_tsc = rdtsc();
@@ -183,12 +183,12 @@ public:
                     if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
                         n_demul_tasks_done_ = 0;
 
-                        state_start_tsc = rdtsc();
+                        // state_start_tsc = rdtsc();
                         if (cfg->test_mode != 1) {
                             demul_status_->demul_complete(
                                 demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_reqd);
                         }
-                        state_operation_duration += rdtsc() - state_start_tsc;
+                        // state_operation_duration += rdtsc() - state_start_tsc;
 
                         demul_cur_sym_ul_++;
                         if (demul_cur_sym_ul_ == cfg->ul_data_symbol_num_perframe) {
@@ -219,39 +219,39 @@ public:
                 
             }
 
-            if (precode_status_->received_all_encoded_data(precode_cur_frame_, precode_cur_sym_dl_) 
-                && zf_cur_frame_ > precode_cur_frame_) {
-                size_t work_start_tsc = rdtsc();
-                worked = 1;
-                size_t base_sc_id = n_precode_tasks_done_ * cfg->demul_block_size + sc_range_.start;
-                // printf("Precode frame %u symbol %u subcarrier %u\n", precode_cur_frame_, 
-                    // precode_cur_sym_dl_, base_sc_id);
-                size_t precode_start_tsc = rdtsc();
-                do_precode_->launch(gen_tag_t::frm_sym_sc(precode_cur_frame_, precode_cur_sym_dl_, base_sc_id)._tag);
-                precode_tsc_duration += rdtsc() - precode_start_tsc;
-                n_precode_tasks_done_ ++;
-                if (n_precode_tasks_done_ == n_precode_tasks_reqd) {
-                    n_precode_tasks_done_ = 0;
-                    precode_cur_sym_dl_ ++;
-                    if (precode_cur_sym_dl_ == cfg->dl_data_symbol_num_perframe) {
-                        precode_cur_sym_dl_ = 0;
-                        // printf("Main thread: Precode done frame: %lu "
-                        //        "(%lu UL symbols)\n",
-                        //     precode_cur_frame_,
-                        //     cfg->dl_data_symbol_num_perframe);
-                        precode_start_tsc = rdtsc();
-                        rx_status_->precode_done(precode_cur_frame_);
-                        state_operation_duration += rdtsc() - precode_start_tsc;
-                        precode_cur_frame_ ++;
-                        if (unlikely(precode_cur_frame_ == cfg->frames_to_test)) {
-                            work_tsc_duration += rdtsc() - work_start_tsc;
-                            break;
-                        }
-                    }
-                }
-                work_tsc_duration += rdtsc() - work_start_tsc;
-                continue;
-            }
+            // if (precode_status_->received_all_encoded_data(precode_cur_frame_, precode_cur_sym_dl_) 
+            //     && zf_cur_frame_ > precode_cur_frame_) {
+            //     size_t work_start_tsc = rdtsc();
+            //     worked = 1;
+            //     size_t base_sc_id = n_precode_tasks_done_ * cfg->demul_block_size + sc_range_.start;
+            //     // printf("Precode frame %u symbol %u subcarrier %u\n", precode_cur_frame_, 
+            //         // precode_cur_sym_dl_, base_sc_id);
+            //     size_t precode_start_tsc = rdtsc();
+            //     do_precode_->launch(gen_tag_t::frm_sym_sc(precode_cur_frame_, precode_cur_sym_dl_, base_sc_id)._tag);
+            //     precode_tsc_duration += rdtsc() - precode_start_tsc;
+            //     n_precode_tasks_done_ ++;
+            //     if (n_precode_tasks_done_ == n_precode_tasks_reqd) {
+            //         n_precode_tasks_done_ = 0;
+            //         precode_cur_sym_dl_ ++;
+            //         if (precode_cur_sym_dl_ == cfg->dl_data_symbol_num_perframe) {
+            //             precode_cur_sym_dl_ = 0;
+            //             // printf("Main thread: Precode done frame: %lu "
+            //             //        "(%lu UL symbols)\n",
+            //             //     precode_cur_frame_,
+            //             //     cfg->dl_data_symbol_num_perframe);
+            //             precode_start_tsc = rdtsc();
+            //             rx_status_->precode_done(precode_cur_frame_);
+            //             state_operation_duration += rdtsc() - precode_start_tsc;
+            //             precode_cur_frame_ ++;
+            //             if (unlikely(precode_cur_frame_ == cfg->frames_to_test)) {
+            //                 work_tsc_duration += rdtsc() - work_start_tsc;
+            //                 break;
+            //             }
+            //         }
+            //     }
+            //     work_tsc_duration += rdtsc() - work_start_tsc;
+            //     continue;
+            // }
 
             if (csi_cur_frame_ > zf_cur_frame_) {
                 work_start_tsc = rdtsc();
@@ -280,13 +280,13 @@ public:
 
             if (likely(start_tsc > 0)) {
                 loop_count ++;
-                work_start_tsc = rdtsc();
+                // work_start_tsc = rdtsc();
                 state_start_tsc = rdtsc();
             }
             bool ret = rx_status_->received_all_pilots(csi_cur_frame_);
             if (likely(start_tsc > 0)) {
                 state_operation_duration += rdtsc() - state_start_tsc;
-                work_tsc_duration += rdtsc() - work_start_tsc;
+                // work_tsc_duration += rdtsc() - work_start_tsc;
             }
 
             if (ret) {
