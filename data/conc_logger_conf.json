@@ -1,0 +1,16 @@
+{
+    "kPrintPhyStats": true,
+    "kCollectPhyStats" : true,
+    "kStatsPrintFrameSummary" : true,
+    "kDebugPrintPerFrameDone" : true,
+    "kDebugPrintPerFrameStart" : true,
+    "kDebugPrintPerSymbolDone" : false,
+    "kDebugPrintPerTaskDone" : false,
+    "kDebugPrintStatsPerThread" : false,
+    "kDebugPrintInTask" : false,
+    "kDebugMulticell" : false,
+    "kDebugPrintPilot" : false,
+    "kDebugRadioTX" : false,
+    "kDebugRadioRX" : false,
+    "kLogMacPackets" : true
+}
