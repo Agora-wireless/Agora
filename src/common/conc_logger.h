@@ -1,12 +1,11 @@
 #ifndef CONC_LOGGER_H
 #define CONC_LOGGER_H
 
+#include <iostream>
+#include <unordered_set>
 #include <errno.h>
 #include <string.h>
-#include <unordered_set>
 #include <unistd.h>
-
-#include <iostream>
 
 #include "concurrentqueue.h"
 #include "nlohmann/json.hpp"
@@ -42,8 +41,8 @@ class Logger {
   // The worker thread
   std::thread worker_;
 
-  // The logger output stream
-  int fd_;
+  // The logger output streams
+  std::unordered_set<int> fds_;
 
   // Save configuration flags
   std::unordered_set<std::string> debug_level_;

@@ -1,5 +1,7 @@
 #include "conc_logger.h"
 
+typedef struct addrinfo AddrInfo;
+
 void Logger::InitInstance(std::string fname) {
   if (instance_ != nullptr) return;
   // Call the constructor of the static instance
@@ -36,10 +38,15 @@ bool Logger::IsViableLog_(std::string buf) const {
 }
 
 void Logger::ParseConfFile_(const json &json_config) {
-  // Read multiple flags
   for (auto conf : json_config.items()) {
-    if (conf.key() == "kDebugOutstream") {
-      // TODO: Instantiate the fd_
+    if (conf.key() == "DebugOutstream") {
+      for(auto streams : conf.value()) {
+        if(streams == "stdout" && fds_.find(1) == fds_.end()) {
+          fds_.insert(1);
+        } else if(streams == "stderr" && fds_.find(2) == fds_.end()) {
+          fds_.insert(2);
+        }
+      }
     } else if (conf.value()) {
       debug_level_.insert(conf.key());
     }
@@ -51,14 +58,18 @@ void Logger::WorkerFunc_() {
   while (!done_) {
     if (!log_buffer_.try_dequeue(buf) || !IsViableLog_(buf)) continue;
 
-    if (write(fd_, buf.c_str(), buf.length()) < 0) {
-      fprintf(stderr, "[Logger] Error in writing to fd: %s\n", strerror(errno));
-      _exit(1);
+    for(auto fd : fds_) {
+      if (write(fd, buf.c_str(), buf.length()) < 0) {
+        fprintf(stderr, "[Logger] Error in writing to fd: %s\n", strerror(errno));
+        _exit(1);
+      }
     }
   }
 
-  if (close(fd_) < 0) {
-    fprintf(stderr, "[Logger] Error in closing fd: %s\n", strerror(errno));
-    _exit(1);
+  for(auto fd : fds_) {
+    if (close(fd) < 0) {
+      fprintf(stderr, "[Logger] Error in closing fd: %s\n", strerror(errno));
+      _exit(1);
+    }
   }
 }
