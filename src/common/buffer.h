@@ -172,7 +172,7 @@ struct Packet {
   uint32_t ant_id_;
   uint32_t fill_[12];  // Padding for 64-byte alignment needed for SIMD
   short data_[];       // Elements sent by antennae are two bytes (I/Q samples)
-  Packet(int f, int s, int c, int a)  // TODO: Should be unsigned integers
+  Packet(uint32_t f, uint32_t s, uint32_t c, uint32_t a)
       : frame_id_(f), symbol_id_(s), cell_id_(c), ant_id_(a) {}
 
   std::string ToString() const {
