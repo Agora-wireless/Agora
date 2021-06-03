@@ -191,6 +191,8 @@ class Config {
   inline size_t MacRxPort() const { return this->mac_rx_port_; }
   inline size_t MacTxPort() const { return this->mac_tx_port_; }
 
+  inline const std::string& TraceFile() const { return this->trace_filename_; }
+
   /* Inline accessors (complex types) */
   inline const std::vector<int>& ClTxAdvance() const {
     return this->cl_tx_advance_;
@@ -647,5 +649,8 @@ class Config {
   size_t num_bytes_per_cb_;
 
   bool fft_in_rru_;  // If true, the RRU does FFT instead of Agora
+
+  /// File name for the trace file output
+  std::string trace_filename_;
 };
 #endif /* CONFIG_HPP_ */

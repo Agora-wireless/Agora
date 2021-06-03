@@ -21,7 +21,7 @@ class Recorder {
   }
 
   size_t GetRecordedFrameNum();
-  // std::string GetTraceFileName() { return this->cfg_->trace_file(); }
+  const std::string& GetTraceFileName() { return this->cfg_->TraceFile(); }
 
  private:
   void Gc();
@@ -32,7 +32,6 @@ class Recorder {
   static const int KDequeueBulkSize;
 
   Config* cfg_;
-  SampleBuffer* rx_buffer_;
   size_t rx_thread_buff_size_;
 
   std::vector<Agora_recorder::RecorderThread*> recorders_;
@@ -44,6 +43,8 @@ class Recorder {
   const unsigned int kMainDispatchCore;
   const unsigned int kRecorderCore;
   const unsigned int kRecvCore;
+
+  size_t num_writter_threads_;
 };     /* class Recorder */
 };     // namespace Agora_recorder
 #endif /* AGORA_RECORDER_H_ */
