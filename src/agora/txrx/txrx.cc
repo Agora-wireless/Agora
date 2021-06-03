@@ -46,11 +46,10 @@ PacketTXRX::~PacketTXRX() {
 }
 
 bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
-                           Table<size_t>& frame_start, char* tx_buffer,
+                           Table<size_t>& frame_start,
                            Table<complex_float>& calib_dl_buffer,
                            Table<complex_float>& calib_ul_buffer) {
   frame_start_ = &frame_start;
-  tx_buffer_ = tx_buffer;
 
   if ((kUseArgos == true) || (kUseUHD == true)) {
     if (radioconfig_->RadioStart() == false) {
@@ -75,7 +74,7 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
 
   buffers_per_socket_ = packet_num_in_buffer / socket_thread_num_;
   /// Make sure we can fit each channel in the tread buffer without rollover
-  assert(buffers_per_thread_ % config_->NumChannels() == 0);
+  assert(buffers_per_socket_ % cfg_->NumChannels() == 0);
 
   rx_packets_.resize(socket_thread_num_);
   for (size_t i = 0; i < socket_thread_num_; i++) {
@@ -289,9 +288,11 @@ int PacketTXRX::DequeueSend(int tid) {
   // std::printf("tx queue length: %d\n", task_queue_->size_approx());
   assert(event.event_type_ == EventType::kPacketTX);
 
-  size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
-  size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-  size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+  TxPacket *tx_pkt = tx_tag_t(event.tags_[0]).tx_packet_;
+  Packet *pkt = tx_pkt->RawPacket();
+  size_t ant_id = pkt->ant_id_;
+  size_t frame_id = pkt->frame_id_;
+  size_t symbol_id = pkt->symbol_id_;
 
   size_t data_symbol_idx_dl = cfg_->Frame().GetDLSymbolIdx(symbol_id);
   size_t offset = (c->GetTotalDataSymbolIdxDl(frame_id, data_symbol_idx_dl) *
@@ -306,18 +307,18 @@ int PacketTXRX::DequeueSend(int tid) {
         offset, message_queue_->size_approx());
   }
 
-  char* cur_buffer_ptr = tx_buffer_ + offset * c->DlPacketLength();
-  auto* pkt = reinterpret_cast<Packet*>(cur_buffer_ptr);
-  new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
-
   // Send data (one OFDM symbol)
   udp_clients_.at(ant_id)->Send(cfg_->BsRruAddr(), cfg_->BsRruPort() + ant_id,
-                                reinterpret_cast<uint8_t*>(cur_buffer_ptr),
+                                reinterpret_cast<uint8_t*>(pkt),
                                 c->DlPacketLength());
 
   RtAssert(
       message_queue_->enqueue(*rx_ptoks_[tid],
                               EventData(EventType::kPacketTX, event.tags_[0])),
       "Socket message enqueue failed\n");
+
+  tx_pkt->Free();
+  free(tx_pkt);
+
   return event.tags_[0];
 }

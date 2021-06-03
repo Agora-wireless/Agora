@@ -241,6 +241,60 @@ static_assert(sizeof(rx_tag_t) == sizeof(size_t));
 // Event data tag for FFT task requests
 using fft_req_tag_t = rx_tag_t;
 
+class TxPacket {
+ private:
+  std::atomic<unsigned> references_;
+  Packet *packet_;
+
+  inline virtual void GcPacket(void) {}
+
+ public:
+  TxPacket() : references_(0) { packet_ = nullptr; }
+  explicit TxPacket(Packet *in) : references_(0) { Set(in); }
+  explicit TxPacket(const TxPacket &copy) : packet_(copy.packet_) {
+    references_.store(copy.references_.load());
+  }
+  ~TxPacket() = default;
+
+  // Disallow copy
+  TxPacket &operator=(const TxPacket &) = delete;
+
+  inline bool Set(Packet *in_pkt) {
+    if (references_.load() == 0) {
+      packet_ = in_pkt;
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  inline Packet *RawPacket() { return packet_; }
+  inline bool Empty() const { return references_.load() == 0; }
+  inline void Use() { references_.fetch_add(1); }
+  inline void Free() {
+    unsigned value = references_.fetch_sub(1);
+    if (value == 0) {
+      throw std::runtime_error("TxPacket free called when memory was empty");
+    } else if (value == 1) {
+      GcPacket();
+    }
+  }
+};
+
+// Event data tag for TX events
+union tx_tag_t {
+  TxPacket *tx_packet_;
+  size_t tag_;
+
+  static_assert(sizeof(TxPacket *) >= sizeof(size_t),
+                "TxPacket pointer must fit inside a size_t value");
+
+  explicit tx_tag_t(TxPacket &tx_packet) : tx_packet_(&tx_packet) {}
+  explicit tx_tag_t(TxPacket *tx_packet) : tx_packet_(tx_packet) {}
+  explicit tx_tag_t(size_t tag) : tag_(tag) {}
+};
+static_assert(sizeof(tx_tag_t) == sizeof(size_t));
+
 struct MacPacket {
   // The packet's data starts at kOffsetOfData bytes from the start
   static constexpr size_t kOffsetOfData = 16 + sizeof(RBIndicator);

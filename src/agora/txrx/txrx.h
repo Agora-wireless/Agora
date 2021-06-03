@@ -96,7 +96,7 @@ class PacketTXRX {
    * otherwise
    */
   bool StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
-                 Table<size_t>& frame_start, char* tx_buffer,
+                 Table<size_t>& frame_start,
                  Table<complex_float>& calib_dl_buffer_,
                  Table<complex_float>& calib_ul_buffer_);
 

@@ -115,7 +115,7 @@ class DoFFT : public Doer {
 class DoIFFT : public Doer {
  public:
   DoIFFT(Config* in_config, int in_tid, Table<complex_float>& in_dl_ifft_buffer,
-         char* in_dl_socket_buffer, Stats* in_stats_manager);
+         Stats* in_stats_manager);
   ~DoIFFT() override;
 
   /**

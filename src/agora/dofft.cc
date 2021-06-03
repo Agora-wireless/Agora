@@ -298,10 +298,9 @@ void DoFFT::PartialTranspose(complex_float* out_buf, size_t ant_id,
 
 DoIFFT::DoIFFT(Config* in_config, int in_tid,
                Table<complex_float>& in_dl_ifft_buffer,
-               char* in_dl_socket_buffer, Stats* in_stats_manager)
+               Stats* in_stats_manager)
     : Doer(in_config, in_tid),
-      dl_ifft_buffer_(in_dl_ifft_buffer),
-      dl_socket_buffer_(in_dl_socket_buffer) {
+      dl_ifft_buffer_(in_dl_ifft_buffer) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kIFFT, in_tid);
   DftiCreateDescriptor(&mkl_handle_, DFTI_SINGLE, DFTI_COMPLEX, 1,
                        cfg_->OfdmCaNum());
@@ -382,8 +381,7 @@ EventData DoIFFT::Launch(size_t tag) {
   size_t start_tsc2 = GetTime::WorkerRdtsc();
   duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
 
-  auto* pkt = reinterpret_cast<struct Packet*>(
-      &dl_socket_buffer_[offset * cfg_->DlPacketLength()]);
+  Packet *pkt = new Packet(frame_id, symbol_id, 0, ant_id);
   short* socket_ptr = &pkt->data_[2 * cfg_->OfdmTxZeroPrefix()];
 
   // IFFT scaled results by OfdmCaNum(), we scale down IFFT results
@@ -403,7 +401,12 @@ EventData DoIFFT::Launch(size_t tag) {
     std::cout << ss.str();
   }
 
+  TxPacket *tx_pkt = new TxPacket(pkt);
+  size_t new_tag = tx_tag_t(tx_pkt).tag_;
+
+  tx_pkt->Use();
+
   duration_stat_->task_count_++;
   duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
-  return EventData(EventType::kIFFT, tag);
+  return EventData(EventType::kIFFT, new_tag);
 }

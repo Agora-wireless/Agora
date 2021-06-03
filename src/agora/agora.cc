@@ -265,7 +265,7 @@ void Agora::Start() {
   // Start packet I/O
   if (packet_tx_rx_->StartTxRx(socket_buffer_,
                                socket_buffer_size_ / cfg->PacketLength(),
-                               this->stats_->FrameStart(), dl_socket_buffer_,
+                               this->stats_->FrameStart(),
                                calib_dl_buffer_, calib_ul_buffer_) == false) {
     this->Stop();
     return;
@@ -744,7 +744,7 @@ void Agora::Worker(int tid) {
   // Downlink workers
   auto compute_ifft =
       std::make_unique<DoIFFT>(this->config_, tid, this->dl_ifft_buffer_,
-                               this->dl_socket_buffer_, this->stats_.get());
+                               this->stats_.get());
 
   auto compute_precode = std::make_unique<DoPrecode>(
       this->config_, tid, this->dl_zf_matrices_, this->dl_ifft_buffer_,
@@ -828,7 +828,7 @@ void Agora::WorkerFft(int tid) {
       new DoFFT(config_, tid, data_buffer_, csi_buffers_, calib_dl_buffer_,
                 calib_ul_buffer_, this->phy_stats_.get(), this->stats_.get()));
   std::unique_ptr<DoIFFT> compute_ifft(new DoIFFT(
-      config_, tid, dl_ifft_buffer_, dl_socket_buffer_, this->stats_.get()));
+      config_, tid, dl_ifft_buffer_, this->stats_.get()));
 
   while (this->config_->Running() == true) {
     // TODO refactor the if / else
@@ -1334,14 +1334,14 @@ void Agora::InitializeDownlinkBuffers() {
     const size_t task_buffer_symbol_num =
         config_->Frame().NumDLSyms() * kFrameWnd;
 
-    size_t dl_socket_buffer_status_size =
-        config_->BsAntNum() * kFrameWnd * config_->Frame().NumDLSyms();
-    size_t dl_socket_buffer_size =
-        config_->DlPacketLength() * dl_socket_buffer_status_size;
-    AllocBuffer1d(&dl_socket_buffer_, dl_socket_buffer_size,
-                  Agora_memory::Alignment_t::kAlign64, 0);
-    AllocBuffer1d(&dl_socket_buffer_status_, dl_socket_buffer_status_size,
-                  Agora_memory::Alignment_t::kAlign64, 1);
+    //size_t dl_socket_buffer_status_size =
+        //config_->BsAntNum() * kFrameWnd * config_->Frame().NumDLSyms();
+    //size_t dl_socket_buffer_size =
+        //config_->DlPacketLength() * dl_socket_buffer_status_size;
+    //AllocBuffer1d(&dl_socket_buffer_, dl_socket_buffer_size,
+                  //Agora_memory::Alignment_t::kAlign64, 0);
+    //AllocBuffer1d(&dl_socket_buffer_status_, dl_socket_buffer_status_size,
+                  //Agora_memory::Alignment_t::kAlign64, 1);
 
     this->dl_bits_buffer_.Calloc(task_buffer_symbol_num,
                                  config_->OfdmDataNum() * config_->UeNum(),
