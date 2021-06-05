@@ -88,7 +88,7 @@ PhyUe::PhyUe(Config* config)
   if (kEnableMac == true) {
     // TODO [ankalia]: dummy_decoded_buffer is used at the base station
     // server only, but MacThread for now requires it for the UE client too
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> dummy_decoded_buffer;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> dummy_decoded_buffer;
 
     mac_thread_ = std::make_unique<MacThread>(
         MacThread::Mode::kClient, config_, core_offset_worker,
@@ -103,10 +103,10 @@ PhyUe::PhyUe(Config* config)
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
     auto new_worker = std::make_unique<UeWorker>(
         i, *config_, *stats_, *phy_stats_, complete_queue_, work_queue_,
-        *work_producer_token_.get(), ul_syms_buffer_, modul_buffer_,
-        ifft_buffer_, tx_buffer_, rx_buffer_, rx_buffer_status_, csi_buffer_,
-        equal_buffer_, non_null_sc_ind_, fft_buffer_, demod_buffer_,
-        decoded_buffer_, ue_pilot_vec_);
+        *work_producer_token_.get(), ul_bits_buffer_, ul_syms_buffer_,
+        modul_buffer_, ifft_buffer_, tx_buffer_, rx_buffer_, rx_buffer_status_,
+        csi_buffer_, equal_buffer_, non_null_sc_ind_, fft_buffer_,
+        demod_buffer_, decoded_buffer_, ue_pilot_vec_);
 
     new_worker->Start(core_offset_worker);
     workers_.push_back(std::move(new_worker));
@@ -531,13 +531,14 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kPacketFromMac: {
+          // This is an entrie frame (multiple mac packets)
           size_t ue_id = rx_tag_t(event.tags_[0]).tid_;
           size_t radio_buf_id = rx_tag_t(event.tags_[0]).offset_;
           RtAssert(radio_buf_id == expected_frame_id_from_mac_ % kFrameWnd);
 
           auto* pkt = reinterpret_cast<MacPacket*>(
-              &ul_bits_buffer_[ue_id]
-                              [radio_buf_id * config_->MacBytesNumPerframe()]);
+              &ul_bits_buffer_[ue_id][radio_buf_id *
+                                      config_->UlMacBytesNumPerframe()]);
           RtAssert(pkt->frame_id_ == expected_frame_id_from_mac_,
                    "PhyUe: Incorrect frame ID from MAC");
           current_frame_user_num_ =
@@ -549,15 +550,24 @@ void PhyUe::Start() {
 
           if (kDebugPrintPacketsFromMac) {
             std::printf(
-                "PhyUe: received packet for frame %u with modulation "
-                "%zu\n",
+                "PhyUe: received packet for frame %u with modulation %zu\n",
                 pkt->frame_id_, pkt->rb_indicator_.mod_order_bits_);
             std::stringstream ss;
-            ss << "PhyUe: kPacketFromMac, frame ID " << pkt->frame_id_
-               << ", bytes: ";
-            for (size_t i = 0; i < 4; i++) {
-              ss << std::to_string((reinterpret_cast<uint8_t*>(pkt->data_)[i]))
-                 << ", ";
+
+            for (size_t ul_data_symbol = 0;
+                 ul_data_symbol < config_->Frame().NumUlDataSyms();
+                 ul_data_symbol++) {
+              ss << "PhyUe: kPacketFromMac, frame " << pkt->frame_id_
+                 << ", symbol " << std::to_string(pkt->symbol_id_) << " crc "
+                 << std::to_string(pkt->crc_) << " bytes: ";
+              for (size_t i = 0; i < pkt->datalen_; i++) {
+                ss << std::to_string(
+                          (reinterpret_cast<uint8_t*>(pkt->data_)[i]))
+                   << ", ";
+              }
+              ss << std::endl;
+              pkt = reinterpret_cast<MacPacket*>(
+                  reinterpret_cast<uint8_t*>(pkt) + config_->MacPacketLength());
             }
             std::printf("%s\n", ss.str().c_str());
           }
@@ -567,9 +577,9 @@ void PhyUe::Start() {
         case EventType::kEncode: {
           size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+          size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
 
-          PrintPerTaskDone(PrintType::kEncode, frame_id, symbol_id, ant_id);
+          PrintPerTaskDone(PrintType::kEncode, frame_id, symbol_id, ue_id);
 
           // Schedule the modul
           EventData do_modul_task(EventType::kModul, event.tags_[0]);
@@ -750,7 +760,7 @@ void PhyUe::InitializeVarsFromCfg() {
 
 void PhyUe::InitializeUplinkBuffers() {
   // initialize ul data buffer
-  ul_bits_buffer_size_ = kFrameWnd * config_->MacBytesNumPerframe();
+  ul_bits_buffer_size_ = kFrameWnd * config_->UlMacBytesNumPerframe();
   ul_bits_buffer_.Malloc(config_->UeAntNum(), ul_bits_buffer_size_,
                          Agora_memory::Alignment_t::kAlign64);
   ul_bits_buffer_status_.Calloc(config_->UeAntNum(), kFrameWnd,
@@ -770,7 +780,7 @@ void PhyUe::InitializeUplinkBuffers() {
                          Agora_memory::Alignment_t::kAlign64);
 
   // initialize modulation buffer
-  modul_buffer_.Calloc(ul_data_symbol_perframe_ * kFrameWnd,
+  modul_buffer_.Calloc(ul_syms_buffer_dim1,
                        config_->OfdmDataNum() * config_->UeAntNum(),
                        Agora_memory::Alignment_t::kAlign64);
 
@@ -1100,7 +1110,7 @@ void PhyUe::FrameInit(size_t frame) {
     initial |= static_cast<std::uint8_t>(FrameTasksFlags::kDownlinkComplete);
   }
 
-  if (kEnableMac == false) {
+  if ((kEnableMac == false) || (config_->Frame().NumDLSyms() == 0)) {
     initial |= static_cast<std::uint8_t>(FrameTasksFlags::kMacTxComplete);
   }
   frame_tasks_.at(frame % kFrameWnd) = initial;

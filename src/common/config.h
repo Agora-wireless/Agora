@@ -150,17 +150,26 @@ class Config {
 
   inline float Scale() const { return this->scale_; }
   inline bool BigstationMode() const { return this->bigstation_mode_; }
-  inline size_t MacDataBytesNumPerframe() const {
-    return this->mac_data_bytes_num_perframe_;
+  inline size_t UlMacDataBytesNumPerframe() const {
+    return this->ul_mac_data_bytes_num_perframe_;
   }
-  inline size_t MacBytesNumPerframe() const {
-    return this->mac_bytes_num_perframe_;
+  inline size_t UlMacBytesNumPerframe() const {
+    return this->ul_mac_bytes_num_perframe_;
+  }
+  inline size_t DlMacDataBytesNumPerframe() const {
+    return this->dl_mac_data_bytes_num_perframe_;
+  }
+  inline size_t DlMacBytesNumPerframe() const {
+    return this->dl_mac_bytes_num_perframe_;
   }
 
   inline size_t MacPacketLength() const { return this->mac_packet_length_; }
   inline size_t MacPayloadLength() const { return this->mac_payload_length_; }
-  inline size_t MacPacketsPerframe() const {
-    return this->mac_packets_perframe_;
+  inline size_t UlMacPacketsPerframe() const {
+    return this->ul_mac_packets_perframe_;
+  }
+  inline size_t DlMacPacketsPerframe() const {
+    return this->dl_mac_packets_perframe_;
   }
   inline std::string UeServerAddr() const { return this->ue_server_addr_; }
   inline std::string BsServerAddr() const { return this->bs_server_addr_; }
@@ -318,7 +327,22 @@ class Config {
     return &calib_buffer[frame_slot][sc_id * bs_ant_num_];
   }
 
-  /// Get ul_bits for this symbol, user and code block ID
+  /// Get mac bits for this frame, symbol, user and code block ID
+  inline int8_t* GetMacBits(Table<int8_t>& info_bits, size_t frame_id,
+                            size_t symbol_id, size_t ue_id,
+                            size_t cb_id) const {
+    size_t mac_bytes_perframe;
+    if (is_ue_ == false) {
+      mac_bytes_perframe = dl_mac_bytes_num_perframe_;
+    } else {
+      mac_bytes_perframe = ul_mac_bytes_num_perframe_;
+    }
+    return &info_bits[ue_id][(frame_id % kFrameWnd) * mac_bytes_perframe +
+                             symbol_id * mac_packet_length_ +
+                             cb_id * this->num_bytes_per_cb_];
+  }
+
+  /// Get info bits for this symbol, user and code block ID
   inline int8_t* GetInfoBits(Table<int8_t>& info_bits, size_t symbol_id,
                              size_t ue_id, size_t cb_id) const {
     return &info_bits[symbol_id]
@@ -553,11 +577,17 @@ class Config {
   // The total number of uncoded data bytes in each OFDM symbol
   size_t data_bytes_num_persymbol_;
 
-  // The total number of MAC payload data bytes in each Frame
-  size_t mac_data_bytes_num_perframe_;
+  // The total number of uplink MAC payload data bytes in each Frame
+  size_t ul_mac_data_bytes_num_perframe_;
 
-  // The total number of MAC packet bytes in each Frame
-  size_t mac_bytes_num_perframe_;
+  // The total number of uplink MAC packet bytes in each Frame
+  size_t ul_mac_bytes_num_perframe_;
+
+  // The total number of downlink MAC payload data bytes in each Frame
+  size_t dl_mac_data_bytes_num_perframe_;
+
+  // The total number of downlink MAC packet bytes in each Frame
+  size_t dl_mac_bytes_num_perframe_;
 
   // The length (in bytes) of a MAC packet including the header
   size_t mac_packet_length_;
@@ -565,8 +595,11 @@ class Config {
   // The length (in bytes) of a MAC packet payload
   size_t mac_payload_length_;
 
-  // The total number of mac packets sent/received in each frame
-  size_t mac_packets_perframe_;
+  // The total number of downlink mac packets sent/received in each frame
+  size_t dl_mac_packets_perframe_;
+
+  // The total number of uplink mac packets sent/received in each frame
+  size_t ul_mac_packets_perframe_;
 
   // IP address of the machine running the baseband processing for UE
   std::string ue_server_addr_;

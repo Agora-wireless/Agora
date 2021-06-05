@@ -30,14 +30,14 @@ class UeWorker {
       PhyStats& shared_phy_stats,
       moodycamel::ConcurrentQueue<EventData>& notify_queue,
       moodycamel::ConcurrentQueue<EventData>& work_queue,
-      moodycamel::ProducerToken& work_producer, Table<int8_t>& encoded_buffer,
-      Table<complex_float>& modul_buffer, Table<complex_float>& ifft_buffer,
-      char* const tx_buffer, Table<char>& rx_buffer,
-      Table<int>& rx_buffer_status, std::vector<myVec>& csi_buffer,
-      std::vector<myVec>& equal_buffer, std::vector<size_t>& non_null_sc_ind,
-      Table<complex_float>& fft_buffer,
+      moodycamel::ProducerToken& work_producer, Table<int8_t>& ul_bits_buffer,
+      Table<int8_t>& encoded_buffer, Table<complex_float>& modul_buffer,
+      Table<complex_float>& ifft_buffer, char* const tx_buffer,
+      Table<char>& rx_buffer, Table<int>& rx_buffer_status,
+      std::vector<myVec>& csi_buffer, std::vector<myVec>& equal_buffer,
+      std::vector<size_t>& non_null_sc_ind, Table<complex_float>& fft_buffer,
       PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer,
-      PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer,
+      PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
       std::vector<std::vector<std::complex<float>>>& ue_pilot_vec);
   ~UeWorker();
 
@@ -54,6 +54,7 @@ class UeWorker {
   void DoEncodeUe(DoEncode* encoder, size_t tag);
   void DoModul(size_t tag);
   void DoIfftUe(DoIFFTClient* iffter, size_t tag);
+  void DoIfft(size_t tag);
 
   /**
    * Do FFT task for one OFDM symbol
@@ -70,12 +71,13 @@ class UeWorker {
    * thread) dim2: OFDM symbol index in this socket thread (offset - # of
    * symbols in previous threads) FFT_inputs, FFT_outputs: dim1: frame index
    * * # of OFDM symbols per frame + symbol index * # of atennas + antenna
-   * index dim2: subcarrier index csi_buffer_: dim1: frame index * FFT size +
-   * subcarrier index in the current frame dim2: user index * # of antennas +
-   * antenna index ul_data_buffer_: dim1: frame index * # of data symbols
-   * per frame + data symbol index dim2: transpose block index * block size
-   * * # of antennas + antenna index * block size Event offset: frame index *
-   * # of symbol per frame + symbol index Description:
+   * index dim2: subcarrier index csi_buffer_: dim1: frame index * FFT size
+   * + subcarrier index in the current frame dim2: user index * # of
+   * antennas + antenna index ul_data_buffer_: dim1: frame index * # of data
+   * symbols per frame + data symbol index dim2: transpose block index *
+   * block size
+   * * # of antennas + antenna index * block size Event offset: frame index
+   * * # of symbol per frame + symbol index Description:
    *     1. copy received data (one OFDM symbol) from rx_buffer to
    * fft_buffer_.FFT_inputs (remove CP)
    *     2. perform FFT on fft_buffer_.FFT_inputs and store results in
@@ -135,6 +137,7 @@ class UeWorker {
 
   // Shared Buffers
   // Uplink
+  Table<int8_t>& ul_bits_buffer_;
   Table<int8_t>& encoded_buffer_;
   Table<complex_float>& modul_buffer_;
   Table<complex_float>& ifft_buffer_;
@@ -148,7 +151,7 @@ class UeWorker {
   std::vector<size_t>& non_null_sc_ind_;
   Table<complex_float>& fft_buffer_;
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_;
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer_;
+  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer_;
 
   std::vector<std::vector<std::complex<float>>>& ue_pilot_vec_;
 };

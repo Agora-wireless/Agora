@@ -29,7 +29,6 @@ class PhyUe {
   enum class FrameTasksFlags : std::uint8_t {
     kNoWorkComplete = 0x00,
     kDownlinkComplete = 0x01,
-    // kUplinkComplete = 0x02,
     kUplinkTxComplete = 0x02,
     kMacTxComplete = 0x04,
     kFrameComplete = (kDownlinkComplete | kMacTxComplete | kUplinkTxComplete)
@@ -143,8 +142,8 @@ class PhyUe {
    * First dimension: data_symbol_num_perframe * kFrameWnd
    * Second dimension: OFDM_CA_NUM * UE_NUM
    */
-  Table<uint8_t> ul_bits_buffer_;
-  Table<uint8_t> ul_bits_buffer_status_;
+  Table<int8_t> ul_bits_buffer_;
+  Table<int8_t> ul_bits_buffer_status_;
   size_t ul_bits_buffer_size_;
 
   Table<int8_t> ul_syms_buffer_;
@@ -199,7 +198,7 @@ class PhyUe {
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffer_;
 
   // Data after LDPC decoding. Each buffer [decoded bytes per UE] bytes.
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> decoded_buffer_;
+  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> decoded_buffer_;
 
   std::vector<size_t> non_null_sc_ind_;
   std::vector<std::vector<std::complex<float>>> ue_pilot_vec_;
