@@ -755,6 +755,7 @@ void Agora::Worker(int tid) {
 
   auto compute_encoding =
       std::make_unique<DoEncode>(this->config_, tid, this->config_->DlBits(),
+                                 1 /*only one frame in DlBits*/,
                                  this->dl_encoded_buffer_, this->stats_.get());
 
   // Uplink workers
@@ -894,7 +895,8 @@ void Agora::WorkerDecode(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerDecode, base_worker_core_offset_, tid);
 
   std::unique_ptr<DoEncode> compute_encoding(new DoEncode(
-      config_, tid, config_->DlBits(), dl_encoded_buffer_, this->stats_.get()));
+      config_, tid, config_->DlBits(), 1 /*only one frame in DlBits*/,
+      dl_encoded_buffer_, this->stats_.get()));
 
   std::unique_ptr<DoDecode> compute_decoding(
       new DoDecode(config_, tid, demod_buffers_, decoded_buffer_,
@@ -1427,7 +1429,7 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
 
   for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
     for (size_t j = 0; j < cfg->UeNum(); j++) {
-      uint8_t* ptr = decoded_buffer_[(frame_id % kFrameWnd)][i][j];
+      int8_t* ptr = decoded_buffer_[(frame_id % kFrameWnd)][i][j];
       std::fwrite(ptr, num_decoded_bytes, sizeof(uint8_t), fp);
     }
   }

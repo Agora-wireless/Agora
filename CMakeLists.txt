@@ -139,6 +139,13 @@ if(${ENABLE_MAC})
   add_definitions(-DENABLE_MAC)
 endif()
 
+set(MAC_CLIENT_SOURCES
+  src/mac/ul_mac_sender.cc
+  src/mac/mac_client.cc)
+set(MAC_BS_SOURCES
+  src/mac/ul_mac_receiver.cc
+  src/mac/mac_basestation.cc)
+
 # Argos support
 if(${USE_ARGOS})
   add_definitions(-DUSE_ARGOS)
@@ -209,6 +216,7 @@ set(COMMON_SOURCES
   src/agora/stats.cc
   src/agora/phy_stats.cc
   src/common/framestats.cc
+  src/agora/doencode.cc
   src/common/config.cc
   src/common/utils.cc
   src/common/comms-lib.cc
@@ -231,7 +239,6 @@ set(AGORA_SOURCES
   src/agora/dozf.cc
   src/agora/dodemul.cc
   src/agora/doprecode.cc
-  src/agora/doencode.cc
   src/agora/dodecode.cc
   src/agora/radio_lib.cc
   src/agora/radio_calibrate.cc
@@ -251,7 +258,6 @@ endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
-  src/agora/doencode.cc
   src/client/doifft_client.cc
   src/client/dodecode_client.cc
   src/client/client_radio.cc
@@ -319,6 +325,16 @@ add_executable(chsim
   simulator/channel.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(chsim ${COMMON_LIBS})
+
+add_executable(macuser
+     ${MAC_CLIENT_SOURCES}
+     ${COMMON_SOURCES})
+target_link_libraries(macuser ${COMMON_LIBS})
+
+add_executable(macbs
+     ${MAC_BS_SOURCES}
+     ${COMMON_SOURCES})
+target_link_libraries(macbs ${COMMON_LIBS})
 
 
 # End-to-end test
