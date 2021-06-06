@@ -159,7 +159,7 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(size_t tid, size_t radio_id,
       new (rx.RawPacket()) Packet(frame_id, symbol_id, 0, ant_id + ch);
       rx.Use();
       // Push kPacketRX event into the queue
-      EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
+      EventData rx_message(EventType::kPacketRX, mem_tag_t<RxPacket>(rx).tag_);
 
       if (message_queue_->enqueue(*local_ptok, rx_message) == false) {
         std::printf("socket message enqueue failed\n");

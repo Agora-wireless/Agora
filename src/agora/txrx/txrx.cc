@@ -75,7 +75,7 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
 
   buffers_per_socket_ = packet_num_in_buffer / socket_thread_num_;
   /// Make sure we can fit each channel in the tread buffer without rollover
-  assert(buffers_per_thread_ % config_->NumChannels() == 0);
+  assert(buffers_per_socket_ % cfg_->NumChannels() == 0);
 
   rx_packets_.resize(socket_thread_num_);
   for (size_t i = 0; i < socket_thread_num_; i++) {
@@ -265,7 +265,7 @@ struct Packet* PacketTXRX::RecvEnqueue(size_t tid, size_t radio_id,
 
     // Push kPacketRX event into the queue.
     rx.Use();
-    EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
+    EventData rx_message(EventType::kPacketRX, mem_tag_t<RxPacket>(rx).tag_);
     if (message_queue_->enqueue(*local_ptok, rx_message) == false) {
       MLPD_ERROR("socket message enqueue failed\n");
       throw std::runtime_error("PacketTXRX: socket message enqueue failed");

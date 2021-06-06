@@ -301,7 +301,7 @@ void PhyUe::Start() {
 
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          RxPacket* rx = rx_tag_t(event.tags_[0]).rx_packet_;
+          RxPacket* rx = mem_tag_t<RxPacket>(event.tags_[0]).memory_;
           Packet* pkt = rx->RawPacket();
 
           size_t frame_id = pkt->frame_id_;

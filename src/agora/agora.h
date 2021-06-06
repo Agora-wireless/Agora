@@ -251,7 +251,7 @@ class Agora {
 
   // Per-frame queues of delayed FFT tasks. The queue contains offsets into
   // TX/RX buffers.
-  std::array<std::queue<fft_req_tag_t>, kFrameWnd> fft_queue_arr_;
+  std::array<std::queue<mem_tag_t<RxPacket>>, kFrameWnd> fft_queue_arr_;
 
   // Data for IFFT
   // 1st dimension: kFrameWnd * number of antennas * number of

@@ -119,7 +119,7 @@ struct Packet* RadioTxRx::RecvEnqueue(size_t tid, size_t radio_id,
   } else if (static_cast<size_t>(rx_bytes) == packet_length) {
     // Push kPacketRX event into the queue.
     rx.Use();
-    EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
+    EventData rx_message(EventType::kPacketRX, mem_tag_t<RxPacket>(rx).tag_);
     if (message_queue_->enqueue(*local_ptok, rx_message) == false) {
       std::printf("socket message enqueue failed\n");
       throw std::runtime_error("RadioTxRx: socket message enqueue failed");
@@ -405,7 +405,7 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
         Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
 
     rx.Use();
-    EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
+    EventData rx_message(EventType::kPacketRX, mem_tag_t<RxPacket>(rx).tag_);
 
     RtAssert(message_queue_->enqueue(*local_ptok, rx_message),
              "socket message enqueue failed");

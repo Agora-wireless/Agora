@@ -85,7 +85,7 @@ static inline void CalibRegressionEstimate(const arma::cx_fvec& in_vec,
 
 EventData DoFFT::Launch(size_t tag) {
   size_t start_tsc = GetTime::WorkerRdtsc();
-  Packet* pkt = fft_req_tag_t(tag).rx_packet_->RawPacket();
+  Packet* pkt = mem_tag_t<RxPacket>(tag).memory_->RawPacket();
   size_t frame_id = pkt->frame_id_;
   size_t frame_slot = frame_id % kFrameWnd;
   size_t symbol_id = pkt->symbol_id_;
@@ -216,7 +216,7 @@ EventData DoFFT::Launch(size_t tag) {
 
   duration_stat->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc2;
 
-  fft_req_tag_t(tag).rx_packet_->Free();
+  mem_tag_t<RxPacket>(tag).memory_->Free();
   duration_stat->task_count_++;
   duration_stat->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
   return EventData(EventType::kFFT,

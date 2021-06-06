@@ -93,7 +93,7 @@ void* Receiver::LoopRecv(size_t tid) {
       current_packet->Use();
       // Push packet received event into the queue
       EventData packet_message(EventType::kPacketRX,
-                               rx_tag_t(current_packet).tag_);
+                               mem_tag_t<RxPacket>(current_packet).tag_);
 
       if (message_queue_->enqueue(*local_ptok, packet_message) == false) {
         std::printf("socket message enqueue failed\n");

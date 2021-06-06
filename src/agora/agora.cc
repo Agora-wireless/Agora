@@ -312,7 +312,7 @@ void Agora::Start() {
       // FFT processing is scheduled after falling through the switch
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
+          Packet* pkt = mem_tag_t<RxPacket>(event.tags_[0]).memory_->RawPacket();
 
           if (pkt->frame_id_ >= ((this->cur_sche_frame_id_ + kFrameWnd))) {
             MLPD_ERROR(
@@ -326,7 +326,7 @@ void Agora::Start() {
 
           UpdateRxCounters(pkt->frame_id_, pkt->symbol_id_);
           fft_queue_arr_[pkt->frame_id_ % kFrameWnd].push(
-              fft_req_tag_t(event.tags_[0]));
+              mem_tag_t<RxPacket>(event.tags_[0]));
         } break;
 
         case EventType::kFFT: {
@@ -613,7 +613,7 @@ void Agora::Start() {
       // We schedule FFT processing if the event handling above results in
       // either (a) sufficient packets received for the current frame,
       // or (b) the current frame being updated.
-      std::queue<fft_req_tag_t>& cur_fftq =
+      std::queue<mem_tag_t<RxPacket>>& cur_fftq =
           fft_queue_arr_[(this->cur_sche_frame_id_ % kFrameWnd)];
       size_t qid = this->cur_sche_frame_id_ & 0x1;
       if (cur_fftq.size() >= config_->FftBlockSize()) {
