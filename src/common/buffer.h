@@ -162,6 +162,16 @@ struct EventData {
 };
 static_assert(sizeof(EventData) == 64);
 
+template<class T>
+union mem_tag_t {
+  T *memory_;
+  size_t tag_;
+
+  explicit mem_tag_t(T *in) : memory_(in) {}
+  explicit mem_tag_t(T &in) : memory_(&in) {}
+  explicit mem_tag_t(size_t tag) : tag_(tag) {}
+};
+
 struct Packet {
   // The packet's data starts at kOffsetOfData bytes from the start
   static constexpr size_t kOffsetOfData = 64;
@@ -223,23 +233,7 @@ class RxPacket {
     }
   }
 };
-
-// Event data tag for RX events
-union rx_tag_t {
-  RxPacket *rx_packet_;
-  size_t tag_;
-
-  static_assert(sizeof(RxPacket *) >= sizeof(size_t),
-                "RxPacket pounter must fit inside a size_t value");
-
-  explicit rx_tag_t(RxPacket &rx_packet) : rx_packet_(&rx_packet) {}
-  explicit rx_tag_t(RxPacket *rx_packet) : rx_packet_(rx_packet) {}
-  explicit rx_tag_t(size_t tag) : tag_(tag) {}
-};
-static_assert(sizeof(rx_tag_t) == sizeof(size_t));
-
-// Event data tag for FFT task requests
-using fft_req_tag_t = rx_tag_t;
+static_assert(sizeof(mem_tag_t<RxPacket>) <= sizeof(size_t));
 
 struct MacPacket {
   // The packet's data starts at kOffsetOfData bytes from the start
