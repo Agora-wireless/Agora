@@ -3,7 +3,9 @@
  * @brief Implementation file for the DoFFT class.
  */
 #include "dofft.h"
+#include <vector>
 
+#include "buffer.h"
 #include "concurrent_queue_wrapper.h"
 #include "datatype_conversion.h"
 
@@ -41,6 +43,11 @@ DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
       static_cast<std::complex<float>*>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
           cfg_->SampsPerSymbol() * sizeof(std::complex<float>)));
+
+  fft_res_csi_buf_ = std::vector<FFTResult>(csi_buffers_.Size());
+  fft_res_calib_ul_buf_ = std::vector<FFTResult>(calib_ul_buffer_.Size()/cfg_->OfdmDataNum());
+  fft_res_calib_dl_buf_ = std::vector<FFTResult>(calib_ul_buffer_.Size()/cfg_->OfdmDataNum());
+  fft_res_data_buf_ = std::vector<FFTResult>(data_buffer_.Size());
 }
 
 DoFFT::~DoFFT() {
@@ -172,6 +179,7 @@ EventData DoFFT::Launch(size_t tag) {
   size_t start_tsc2 = GetTime::WorkerRdtsc();
   duration_stat->task_duration_[2] += start_tsc2 - start_tsc1;
 
+  size_t res_tag = tag;
   if (sym_type == SymbolType::kPilot) {
     size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
     if (kCollectPhyStats) {
@@ -180,9 +188,16 @@ EventData DoFFT::Launch(size_t tag) {
     const size_t ue_id = pilot_symbol_id;
     PartialTranspose(csi_buffers_[frame_slot][ue_id], ant_id,
                      SymbolType::kPilot);
+    
+    auto &itr = fft_res_csi_buf_.emplace_back(frame_id, symbol_id, ant_id, nullptr);
+    res_tag = mem_tag_t<FFTResult>(itr).tag_;
   } else if (sym_type == SymbolType::kUL) {
-    PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
-                     ant_id, SymbolType::kUL);
+    size_t data_buf_idx = cfg_->GetDataBufIdx(frame_id, symbol_id);
+    complex_float *data_buf_ptr = data_buffer_[data_buf_idx];
+    PartialTranspose(data_buf_ptr, ant_id, SymbolType::kUL);
+
+    auto &itr = fft_res_data_buf_.emplace_back(frame_id, symbol_id, ant_id, data_buf_ptr);
+    res_tag = mem_tag_t<FFTResult>(itr).tag_;
   } else if (sym_type == SymbolType::kCalUL and ant_id != cfg_->RefAnt()) {
     // Only process uplink for antennas that also do downlink in this frame
     // for consistency with calib downlink processing.
@@ -194,6 +209,9 @@ EventData DoFFT::Launch(size_t tag) {
       PartialTranspose(
           &calib_ul_buffer_[frame_grp_slot][ant_id * cfg_->OfdmDataNum()],
           ant_id, sym_type);
+
+      auto &itr = fft_res_calib_ul_buf_.emplace_back(frame_id, symbol_id, ant_id, nullptr);
+      res_tag = mem_tag_t<FFTResult>(itr).tag_;
     }
   } else if (sym_type == SymbolType::kCalDL && ant_id == cfg_->RefAnt()) {
     if (frame_id >= TX_FRAME_DELTA) {
@@ -206,6 +224,9 @@ EventData DoFFT::Launch(size_t tag) {
       complex_float* calib_dl_ptr =
           &calib_dl_buffer_[frame_grp_slot][cur_ant * cfg_->OfdmDataNum()];
       PartialTranspose(calib_dl_ptr, ant_id, sym_type);
+
+      auto &itr = fft_res_calib_dl_buf_.emplace_back(frame_id, symbol_id, ant_id, nullptr);
+      res_tag = mem_tag_t<FFTResult>(itr).tag_;
     }
   } else {
     std::string error_message = "Unknown or unsupported symbol type " +
@@ -219,8 +240,7 @@ EventData DoFFT::Launch(size_t tag) {
   mem_tag_t<RxPacket>(tag).memory_->Free();
   duration_stat->task_count_++;
   duration_stat->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
-  return EventData(EventType::kFFT,
-                   gen_tag_t::FrmSym(pkt->frame_id_, pkt->symbol_id_).tag_);
+  return EventData(EventType::kFFT, res_tag);
 }
 
 void DoFFT::PartialTranspose(complex_float* out_buf, size_t ant_id,

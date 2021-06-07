@@ -4,6 +4,7 @@
  */
 #include "dodemul.h"
 
+#include "buffer.h"
 #include "concurrent_queue_wrapper.h"
 
 static constexpr bool kUseSIMDGather = true;
@@ -77,14 +78,15 @@ DoDemul::~DoDemul() {
 }
 
 EventData DoDemul::Launch(size_t tag) {
-  const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t base_sc_id = gen_tag_t(tag).sc_id_;
+  FFTResult *fft_res = mem_tag_t<FFTResult>(tag).memory_;
+  const size_t frame_id = fft_res->frame_id_;
+  const size_t symbol_id = fft_res->symbol_id_;
+  const size_t base_sc_id = fft_res->ant_id_;
 
   const size_t symbol_idx_ul = this->cfg_->Frame().GetULSymbolIdx(symbol_id);
   const size_t total_data_symbol_idx_ul =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
-  const complex_float* data_buf = data_buffer_[total_data_symbol_idx_ul];
+  const complex_float* data_buf = fft_res->RawData();
 
   const size_t frame_slot = frame_id % kFrameWnd;
   size_t start_tsc = GetTime::WorkerRdtsc();

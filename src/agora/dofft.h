@@ -110,6 +110,11 @@ class DoFFT : public Doer {
   DurationStat* duration_stat_fft_;
   DurationStat* duration_stat_csi_;
   PhyStats* phy_stats_;
+
+  std::vector<FFTResult> fft_res_csi_buf_;
+  std::vector<FFTResult> fft_res_calib_ul_buf_;
+  std::vector<FFTResult> fft_res_calib_dl_buf_;
+  std::vector<FFTResult> fft_res_data_buf_;
 };
 
 class DoIFFT : public Doer {

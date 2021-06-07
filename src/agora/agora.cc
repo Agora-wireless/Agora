@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <memory>
+#include "buffer.h"
 
 static const bool kDebugDeferral = false;
 static const size_t kDefaultMessageQueueSize = 512;
@@ -337,7 +338,8 @@ void Agora::Start() {
 
         case EventType::kZF: {
           for (size_t tag_id = 0; (tag_id < event.num_tags_); tag_id++) {
-            size_t frame_id = gen_tag_t(event.tags_[tag_id]).frame_id_;
+            FFTResult *fft_res = mem_tag_t<FFTResult>(event.tags_[tag_id]).memory_;
+            size_t frame_id = fft_res->frame_id_;
             PrintPerTaskDone(PrintType::kZF, frame_id, 0,
                              zf_counters_.GetTaskCount(frame_id));
             bool last_zf_task = this->zf_counters_.CompleteTask(frame_id);
@@ -666,8 +668,9 @@ finish:
 }
 
 void Agora::HandleEventFft(size_t tag) {
-  size_t frame_id = gen_tag_t(tag).frame_id_;
-  size_t symbol_id = gen_tag_t(tag).symbol_id_;
+  FFTResult *fft_res = mem_tag_t<FFTResult>(tag).memory_;
+  size_t frame_id = fft_res->frame_id_;
+  size_t symbol_id = fft_res->symbol_id_;
   SymbolType sym_type = config_->GetSymbolType(symbol_id);
 
   if (sym_type == SymbolType::kPilot) {
