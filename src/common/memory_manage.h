@@ -78,7 +78,13 @@ class Table {
     }
   }
 
-  bool IsAllocated() { return (this->data_ != nullptr); }
+  bool IsAllocated() const { return (this->data_ != nullptr); }
+
+  inline size_t Size() const {
+    if(IsAllocated()) return (dim1_ * dim2_);
+
+    return 0;
+  }
 
   void Free() {
     if (this->data_ != nullptr) {
@@ -174,6 +180,12 @@ class PtrGrid {
         }
       }
     }
+  }
+
+  inline size_t Size() const {
+    if(backing_buf_ != nullptr) return (ROWS * COLS);
+
+    return 0;
   }
 
   std::array<T*, COLS>& operator[](size_t row_idx) {
