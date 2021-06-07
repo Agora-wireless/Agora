@@ -46,7 +46,7 @@ void RecorderThread::Start() {
 /* Cleanly allows the thread to exit */
 void RecorderThread::Stop() {
   RecordEventData event;
-  event.event_type = kThreadTermination;
+  event.event_type_ = kThreadTermination;
   this->DispatchWork(event);
 }
 
@@ -61,7 +61,7 @@ void RecorderThread::Finalize() {
 
 /* TODO:  handle producer token better */
 // Returns true for success, false otherwise
-bool RecorderThread::DispatchWork(RecordEventData event) {
+bool RecorderThread::DispatchWork(const RecordEventData& event) {
   // MLPD_TRACE("Dispatching work\n");
   bool ret = true;
   if (this->event_queue_.try_enqueue(this->producer_token_, event) == 0) {
@@ -126,27 +126,18 @@ void RecorderThread::DoRecording() {
   this->worker_.finalize();
 }
 
-void RecorderThread::HandleEvent(RecordEventData event) {
-  if (event.event_type == kThreadTermination) {
+void RecorderThread::HandleEvent(const RecordEventData& event) {
+  if (event.event_type_ == kThreadTermination) {
     this->running_ = false;
   } else {
-    size_t offset = event.data;
-    size_t buffer_id = (offset / event.rx_buff_size);
-    size_t buffer_offset = offset - (buffer_id * event.rx_buff_size);
-    if (event.event_type == kTaskRecord) {
-      // read info
-      char* cur_ptr_buffer = event.rx_buffer[buffer_id].buffer.data() +
-                             (buffer_offset * packet_length_);
-
-      this->worker_.record(this->id_,
-                           reinterpret_cast<Packet*>(cur_ptr_buffer));
+    if (event.event_type_ == kTaskRecordRx) {
+      this->worker_.record(
+          this->id_,
+          rx_tag_t(event.record_event_.tags_[0]).rx_packet_->RawPacket());
     }
 
     /* Free up the buffer memory */
-    int bit = 1 << (buffer_offset % sizeof(std::atomic_int));
-    int offs = (buffer_offset / sizeof(std::atomic_int));
-    std::atomic_fetch_and(&event.rx_buffer[buffer_id].pkg_buf_inuse[offs],
-                          ~bit);  // now empty
+    rx_tag_t(event.record_event_.tags_[0]).rx_packet_->Free();
   }
 }
 };  // End namespace Agora_recorder

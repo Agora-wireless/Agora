@@ -35,7 +35,7 @@ static constexpr inline bool IsPowerOfTwo(T x) {
 }
 
 // TODO: Merge EventType and DoerType into WorkType
-enum class EventType : int {
+enum class EventType : uint8_t {
   kPacketRX,
   kFFT,
   kZF,
@@ -55,10 +55,10 @@ enum class EventType : int {
   kRBIndicator  // Signal RB schedule to UEs
 };
 static constexpr size_t kNumEventTypes =
-    static_cast<size_t>(EventType::kPacketToMac) + 1;
+    static_cast<size_t>(EventType::kFFTPilot) + 1;
 
 // Types of Agora Doers
-enum class DoerType : size_t {
+enum class DoerType : uint8_t {
   kFFT,
   kCSI,
   kZF,

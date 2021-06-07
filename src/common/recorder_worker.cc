@@ -18,6 +18,9 @@ const int RecorderWorker::kConfigPilotExtentStep = 400;
 // data dataset size increment
 const int RecorderWorker::kConfigDataExtentStep = 400;
 
+///\todo remove
+#define MAX_FRAME_INC (2000u)
+
 #if (DEBUG_PRINT)
 const int kDsSim = 5;
 #endif
@@ -70,7 +73,7 @@ void RecorderWorker::gc() {
 void RecorderWorker::init() {
   unsigned int end_antenna = (this->antenna_offset_ + this->num_antennas_) - 1;
 
-  this->hdf5_name_ = this->cfg_->trace_file();
+  this->hdf5_name_ = this->cfg_->TraceFile();
   size_t found_index = this->hdf5_name_.find_last_of('.');
   std::string append = "_" + std::to_string(this->antenna_offset_) + "_" +
                        std::to_string(end_antenna);
@@ -151,8 +154,7 @@ static void write_attribute(H5::Group& g, const char name[],
   H5::DataSpace attr_ds = H5::DataSpace(1, dims);
   H5::Attribute att = g.createAttribute(name, H5::PredType::STD_U32BE, attr_ds);
   std::vector<uint32_t> val_uint;
-  for (unsigned long i : val)
-    val_uint.push_back((uint32_t)i);
+  for (unsigned long i : val) val_uint.push_back((uint32_t)i);
   att.write(H5::PredType::NATIVE_UINT, &val_uint[0]);
 }
 
@@ -202,25 +204,26 @@ herr_t RecorderWorker::initHDF5() {
   // pilots
   DataspaceIndex dims_pilot = {
       this->frame_number_pilot_, this->cfg_->NumCells(),
-      this->cfg_->pilot_syms_per_frame(), this->num_antennas_, IQ};
+      this->cfg_->Frame().NumPilotSyms(), this->num_antennas_, IQ};
   DataspaceIndex max_dims_pilot = {H5S_UNLIMITED, this->cfg_->NumCells(),
-                                   this->cfg_->pilot_syms_per_frame(),
+                                   this->cfg_->Frame().NumPilotSyms(),
                                    this->num_antennas_, IQ};
   // noise
-  this->frame_number_noise_ = MAX_FRAME_INC;
-  DataspaceIndex dims_noise = {
-      this->frame_number_noise_, this->cfg_->NumCells(),
-      this->cfg_->noise_syms_per_frame(), this->num_antennas_, IQ};
-  DataspaceIndex max_dims_noise = {H5S_UNLIMITED, this->cfg_->NumCells(),
-                                   this->cfg_->noise_syms_per_frame(),
-                                   this->num_antennas_, IQ};
+  //this->frame_number_noise_ = MAX_FRAME_INC;
+  //DataspaceIndex dims_noise = {
+  //    this->frame_number_noise_, this->cfg_->NumCells(),
+  //    this->cfg_->noise_syms_per_frame(), this->num_antennas_, IQ};
+  //DataspaceIndex max_dims_noise = {H5S_UNLIMITED, this->cfg_->NumCells(),
+  //                                 this->cfg_->noise_syms_per_frame(),
+  //
+  //                                 this->num_antennas_, IQ};
   // data
   this->frame_number_data_ = MAX_FRAME_INC;
   DataspaceIndex dims_data = {this->frame_number_data_, this->cfg_->NumCells(),
-                              this->cfg_->ul_syms_per_frame(),
+                              this->cfg_->Frame().NumULSyms(),
                               this->num_antennas_, IQ};
   DataspaceIndex max_dims_data = {H5S_UNLIMITED, this->cfg_->NumCells(),
-                                  this->cfg_->ul_syms_per_frame(),
+                                  this->cfg_->Frame().NumULSyms(),
                                   this->num_antennas_, IQ};
 
   try {
@@ -242,33 +245,33 @@ herr_t RecorderWorker::initHDF5() {
     write_attribute(mainGroup, "RATE", this->cfg_->Rate());
 
     // Number of samples on each symbol (excluding prefix/postfix)
-    write_attribute(mainGroup, "SYMBOL_LEN_NO_PAD",
-                    this->cfg_->subframe_size());
+    //write_attribute(mainGroup, "SYMBOL_LEN_NO_PAD",
+    //                this->cfg_->subframe_size());
 
     // Number of samples for prefix (padding)
-    write_attribute(mainGroup, "PREFIX_LEN", this->cfg_->prefix());
+    write_attribute(mainGroup, "PREFIX_LEN", this->cfg_->OfdmTxZeroPrefix());
 
     // Number of samples for postfix (padding)
-    write_attribute(mainGroup, "POSTFIX_LEN", this->cfg_->postfix());
+    write_attribute(mainGroup, "POSTFIX_LEN", this->cfg_->OfdmTxZeroPostfix());
 
     // Number of samples on each symbol including prefix and postfix
     write_attribute(mainGroup, "SYMBOL_LEN", this->cfg_->SampsPerSymbol());
 
     // Size of FFT
-    write_attribute(mainGroup, "FFT_SIZE", this->cfg_->fft_size());
+    write_attribute(mainGroup, "FFT_SIZE", this->cfg_->OfdmCaNum());
 
     // Number of data subcarriers in ofdm symbols
-    write_attribute(mainGroup, "DATA_SUBCARRIER_NUM",
-                    this->cfg_->symbol_data_subcarrier_num());
+    //write_attribute(mainGroup, "DATA_SUBCARRIER_NUM",
+    //                this->cfg_->symbol_data_subcarrier_num());
 
     // Length of cyclic prefix
-    write_attribute(mainGroup, "CP_LEN", this->cfg_->cp_size());
+    write_attribute(mainGroup, "CP_LEN", this->cfg_->CpLen());
 
     // Beacon sequence type (string)
     write_attribute(mainGroup, "BEACON_SEQ_TYPE", this->cfg_->BeaconLen());
 
     // Pilot sequence type (string)
-    write_attribute(mainGroup, "PILOT_SEQ_TYPE", this->cfg_->pilot_seq());
+    //write_attribute(mainGroup, "PILOT_SEQ_TYPE", this->cfg_->pilot_seq());
 
     // ******* Base Station ******** //
     // Hub IDs (vec of strings)
@@ -300,26 +303,26 @@ herr_t RecorderWorker::initHDF5() {
 
     // Frame schedule (vec of strings for now, this should change to matrix when
     // we go to multi-cell)
-    write_attribute(mainGroup, "BS_FRAME_SCHED", this->cfg_->frames());
+    write_attribute(mainGroup, "BS_FRAME_SCHED",
+                    this->cfg_->Frame().FrameIdentifier());
 
     // RX Gain RF channel A
-    write_attribute(mainGroup, "BS_RX_GAIN_A", this->cfg_->rx_gain().at(0));
+    write_attribute(mainGroup, "BS_RX_GAIN_A", this->cfg_->RxGainA());
 
     // TX Gain RF channel A
-    write_attribute(mainGroup, "BS_TX_GAIN_A", this->cfg_->tx_gain().at(0));
+    write_attribute(mainGroup, "BS_TX_GAIN_A", this->cfg_->TxGainA());
 
     // RX Gain RF channel B
-    write_attribute(mainGroup, "BS_RX_GAIN_B", this->cfg_->rx_gain().at(1));
+    write_attribute(mainGroup, "BS_RX_GAIN_B", this->cfg_->RxGainB());
 
     // TX Gain RF channel B
-    write_attribute(mainGroup, "BS_TX_GAIN_B", this->cfg_->tx_gain().at(1));
+    write_attribute(mainGroup, "BS_TX_GAIN_B", this->cfg_->TxGainB());
 
     // Beamsweep (true or false)
-    write_attribute(mainGroup, "BS_BEAMSWEEP",
-                    this->cfg_->beam_sweep() ? 1 : 0);
+    write_attribute(mainGroup, "BS_BEAMSWEEP", this->cfg_->Beamsweep() ? 1 : 0);
 
     // Beacon Antenna
-    write_attribute(mainGroup, "BS_BEACON_ANT", this->cfg_->beacon_ant());
+    write_attribute(mainGroup, "BS_BEACON_ANT", this->cfg_->BeaconAnt());
 
     // Number of antennas on Base Station (per cell)
     std::vector<std::string> bs_ant_num_per_cell(
@@ -334,17 +337,18 @@ herr_t RecorderWorker::initHDF5() {
     // If the antennas are non consective this will be an issue.
     write_attribute(mainGroup, "ANT_OFFSET", this->antenna_offset_);
     write_attribute(mainGroup, "ANT_NUM", this->num_antennas_);
-    write_attribute(mainGroup, "ANT_TOTAL", this->cfg_->getTotNumAntennas());
+    write_attribute(mainGroup, "ANT_TOTAL", this->cfg_->GetNumAntennas());
 
     // Number of symbols in a frame
-    write_attribute(mainGroup, "BS_FRAME_LEN", this->cfg_->symbols_per_frame());
+    write_attribute(mainGroup, "BS_FRAME_LEN",
+                    this->cfg_->Frame().NumTotalSyms());
 
     // Number of uplink symbols per frame
-    write_attribute(mainGroup, "UL_SYMS", this->cfg_->ul_syms_per_frame());
+    write_attribute(mainGroup, "UL_SYMS", this->cfg_->Frame().NumULSyms());
 
     // Reciprocal Calibration Mode
     write_attribute(mainGroup, "RECIPROCAL_CALIB",
-                    this->cfg_->reciprocal_calib() ? 1 : 0);
+                    this->cfg_->Frame().IsRecCalEnabled() ? 1 : 0);
 
     // ******* Clients ******** //
     // Freq. Domain Pilot symbols
@@ -366,7 +370,7 @@ herr_t RecorderWorker::initHDF5() {
     write_attribute(mainGroup, "OFDM_PILOT", split_vec_pilot);
 
     // Number of Pilots
-    write_attribute(mainGroup, "PILOT_NUM", this->cfg_->pilot_syms_per_frame());
+    write_attribute(mainGroup, "PILOT_NUM", this->cfg_->Frame().NumPilotSyms());
 
     // Number of Client Antennas
     write_attribute(mainGroup, "CL_NUM", this->cfg_->num_cl_antennas());
@@ -451,7 +455,7 @@ herr_t RecorderWorker::initHDF5() {
       this->noise_prop_.close();
     }
 
-    if (this->cfg_->ul_syms_per_frame() > 0) {
+    if (this->cfg_->Frame().NumULSyms() > 0) {
       H5::DataSpace data_dataspace(kDsDim, dims_data, max_dims_data);
       this->data_prop_.setChunk(kDsDim, cdims);
       this->file_->createDataSet("/Data/UplinkData", H5::PredType::STD_I16BE,
@@ -494,12 +498,12 @@ void RecorderWorker::openHDF5() {
   this->pilot_prop_.copy(this->pilot_dataset_->getCreatePlist());
 
 #if DEBUG_PRINT
-  hsize_t IQ = 2 * this->cfg_->samps_per_symbol();
+  hsize_t IQ = 2 * this->cfg_->SampsPerSymbol();
   int cndims_pilot = 0;
   int ndims = pilot_filespace.getSimpleExtentNdims();
   DataspaceIndex dims_pilot = {
       this->frame_number_pilot_, this->cfg_->num_cells(),
-      this->cfg_->pilot_syms_per_frame(), this->num_antennas(), IQ};
+      this->cfg_->Frame().NumPilotSyms(), this->num_antennas(), IQ};
   if (H5D_CHUNKED == this->pilot_prop_.getLayout())
     cndims_pilot = this->pilot_prop_.getChunk(ndims, dims_pilot);
   using std::cout;
@@ -510,7 +514,7 @@ void RecorderWorker::openHDF5() {
 #endif
   pilot_filespace.close();
   // Get Dataset for DATA (If Enabled) and check the shape of it
-  if (this->cfg_->ul_syms_per_frame() > 0) {
+  if (this->cfg_->Frame().NumULSyms() > 0) {
     this->data_dataset_ =
         new H5::DataSet(this->file_->openDataSet("/Data/UplinkData"));
 
@@ -528,7 +532,7 @@ void RecorderWorker::openHDF5() {
     cout << "dim data chunk = " << cndims_data << std::endl;
     DataspaceIndex dims_data = {
         this->frame_number_data_, this->cfg_->num_cells(),
-        this->cfg_->ul_syms_per_frame(), this->num_antennas(), IQ};
+        this->cfg_->Frame().NumULSyms(), this->num_antennas(), IQ};
     cout << "New Data Dataset Dimension " << ndims << ",";
     for (auto i = 0; i < kDsSim - 1; ++i) cout << dims_data[i] << ",";
     cout << dims_data[kDsSim - 1] << std::endl;
@@ -570,14 +574,14 @@ void RecorderWorker::closeHDF5() {
               this->hdf5_name_.c_str());
   } else {
     unsigned frame_number = this->max_frame_number_;
-    hsize_t IQ = 2 * this->cfg_->samps_per_symbol();
+    hsize_t IQ = 2 * this->cfg_->SampsPerSymbol();
 
     assert(this->pilot_dataset_ != nullptr);
     // Resize Pilot Dataset
     this->frame_number_pilot_ = frame_number;
     DataspaceIndex dims_pilot = {
         this->frame_number_pilot_, this->cfg_->num_cells(),
-        this->cfg_->pilot_syms_per_frame(), this->num_antennas_, IQ};
+        this->cfg_->Frame().NumPilotSyms(), this->num_antennas_, IQ};
     this->pilot_dataset_->extend(dims_pilot);
     this->pilot_prop_.close();
     this->pilot_dataset_->close();
@@ -585,12 +589,12 @@ void RecorderWorker::closeHDF5() {
     this->pilot_dataset_ = nullptr;
 
     // Resize Data Dataset (If Needed)
-    if (this->cfg_->ul_syms_per_frame() > 0) {
+    if (this->cfg_->Frame().NumULSyms() > 0) {
       assert(this->data_dataset_ != nullptr);
       this->frame_number_data_ = frame_number;
       DataspaceIndex dims_data = {
           this->frame_number_data_, this->cfg_->num_cells(),
-          this->cfg_->ul_syms_per_frame(), this->num_antennas_, IQ};
+          this->cfg_->Frame().NumULSyms(), this->num_antennas_, IQ};
       this->data_dataset_->extend(dims_data);
       this->data_prop_.close();
       this->data_dataset_->close();
@@ -623,53 +627,53 @@ herr_t RecorderWorker::record(int tid, Packet* pkg) {
   /* TODO: remove TEMP check */
   size_t end_antenna = (this->antenna_offset_ + this->num_antennas_) - 1;
 
-  if ((pkg->ant_id < this->antenna_offset_) || (pkg->ant_id > end_antenna)) {
+  if ((pkg->ant_id_ < this->antenna_offset_) || (pkg->ant_id_ > end_antenna)) {
     MLPD_ERROR("Antenna id is not within range of this recorder %d, %zu:%zu",
-               pkg->ant_id, this->antenna_offset_, end_antenna);
+               pkg->ant_id_, this->antenna_offset_, end_antenna);
   }
-  assert((pkg->ant_id >= this->antenna_offset_) &&
-         (pkg->ant_id <= end_antenna));
+  assert((pkg->ant_id_ >= this->antenna_offset_) &&
+         (pkg->ant_id_ <= end_antenna));
 
   herr_t ret = 0;
 
   // Generates a ton of messages
-  // MLPD_TRACE( "Tid: %d -- frame_id %u, antenna: %u\n", tid, pkg->frame_id,
-  // pkg->ant_id);
+  // MLPD_TRACE( "Tid: %d -- frame_id %u, antenna: %u\n", tid, pkg->frame_id_,
+  // pkg->ant_id_);
 
 #if DEBUG_PRINT
   printf(
       "record            frame %d, symbol %d, cell %d, ant %d samples: %d "
       "%d %d %d %d %d %d %d ....\n",
-      pkg->frame_id, pkg->symbol_id, pkg->cell_id, pkg->ant_id, pkg->data[1],
+      pkg->frame_id_, pkg->symbol_id_, pkg->cell_id, pkg->ant_id_, pkg->data[1],
       pkg->data[2], pkg->data[3], pkg->data[4], pkg->data[5], pkg->data[6],
       pkg->data[7], pkg->data[8]);
 #endif
-  hsize_t IQ = 2 * this->cfg_->samps_per_symbol();
+  hsize_t IQ = 2 * this->cfg_->SampsPerSymbol();
   if ((this->cfg_->max_frame()) != 0 &&
-      (pkg->frame_id > this->cfg_->max_frame())) {
+      (pkg->frame_id_ > this->cfg_->max_frame())) {
     closeHDF5();
-    MLPD_TRACE("Closing file due to frame id %d : %zu max\n", pkg->frame_id,
+    MLPD_TRACE("Closing file due to frame id %d : %zu max\n", pkg->frame_id_,
                this->cfg_->max_frame());
   } else {
     try {
       H5::Exception::dontPrint();
       // Update the max frame number.
       // Note that the 'frame_id' might be out of order.
-      if (pkg->frame_id >= this->max_frame_number_) {
+      if (pkg->frame_id_ >= this->max_frame_number_) {
         // Open the hdf5 file if we haven't.
         closeHDF5();
         openHDF5();
         this->max_frame_number_ = this->max_frame_number_ + MAX_FRAME_INC;
       }
 
-      uint32_t antenna_index = pkg->ant_id - this->antenna_offset_;
-      DataspaceIndex hdfoffset = {pkg->frame_id, pkg->cell_id, 0, antenna_index,
-                                  0};
-      if ((this->cfg_->reciprocal_calib() == true) ||
-          (this->cfg_->isPilot(pkg->frame_id, pkg->symbol_id) == true)) {
+      uint32_t antenna_index = pkg->ant_id_ - this->antenna_offset_;
+      DataspaceIndex hdfoffset = {pkg->frame_id_, pkg->cell_id, 0,
+                                  antenna_index, 0};
+      if ((this->cfg_->Frame().IsRecCalEnabled() == true) ||
+          (this->cfg_->IsPilot(pkg->frame_id_, pkg->symbol_id_) == true)) {
         assert(this->pilot_dataset_ != nullptr);
         // Are we going to extend the dataset?
-        if (pkg->frame_id >= this->frame_number_pilot_) {
+        if (pkg->frame_id_ >= this->frame_number_pilot_) {
           this->frame_number_pilot_ += kConfigPilotExtentStep;
           if (this->cfg_->max_frame() != 0) {
             this->frame_number_pilot_ = std::min(this->frame_number_pilot_,
@@ -677,15 +681,15 @@ herr_t RecorderWorker::record(int tid, Packet* pkg) {
           }
           DataspaceIndex dims_pilot = {
               this->frame_number_pilot_, this->cfg_->num_cells(),
-              this->cfg_->pilot_syms_per_frame(), this->num_antennas_, IQ};
+              this->cfg_->Frame().NumPilotSyms(), this->num_antennas_, IQ};
           this->pilot_dataset_->extend(dims_pilot);
 #if DEBUG_PRINT
-          std::cout << "FrameId " << pkg->frame_id << ", (Pilot) Extent to "
+          std::cout << "FrameId " << pkg->frame_id_ << ", (Pilot) Extent to "
                     << this->frame_number_pilot_ << " Frames" << std::endl;
 #endif
         }
         hdfoffset[kDsSymsPerFrame] =
-            this->cfg_->getClientId(pkg->frame_id, pkg->symbol_id);
+            this->cfg_->getClientId(pkg->frame_id_, pkg->symbol_id_);
 
         // Select a hyperslab in extended portion of the dataset
         H5::DataSpace pilot_filespace(this->pilot_dataset_->getSpace());
@@ -696,25 +700,25 @@ herr_t RecorderWorker::record(int tid, Packet* pkg) {
         this->pilot_dataset_->write(pkg->data, H5::PredType::NATIVE_INT16,
                                     pilot_memspace, pilot_filespace);
         pilot_filespace.close();
-      } else if (this->cfg_->isData(pkg->frame_id, pkg->symbol_id) == true) {
+      } else if (this->cfg_->IsData(pkg->frame_id_, pkg->symbol_id_) == true) {
         assert(this->data_dataset_ != nullptr);
         // Are we going to extend the dataset?
-        if (pkg->frame_id >= this->frame_number_data_) {
+        if (pkg->frame_id_ >= this->frame_number_data_) {
           this->frame_number_data_ += kConfigDataExtentStep;
           if (this->cfg_->max_frame() != 0)
             this->frame_number_data_ =
                 std::min(this->frame_number_data_, this->cfg_->max_frame() + 1);
           DataspaceIndex dims_data = {
               this->frame_number_data_, this->cfg_->num_cells(),
-              this->cfg_->ul_syms_per_frame(), this->num_antennas_, IQ};
+              this->cfg_->Frame().NumULSyms(), this->num_antennas_, IQ};
           this->data_dataset_->extend(dims_data);
 #if DEBUG_PRINT
-          std::cout << "FrameId " << pkg->frame_id << ", (Data) Extent to "
+          std::cout << "FrameId " << pkg->frame_id_ << ", (Data) Extent to "
                     << this->frame_number_data_ << " Frames" << std::endl;
 #endif
         }
         hdfoffset[kDsSymsPerFrame] =
-            this->cfg_->getUlSFIndex(pkg->frame_id, pkg->symbol_id);
+            this->cfg_->getUlSFIndex(pkg->frame_id_, pkg->symbol_id_);
         // Select a hyperslab in extended portion of the dataset
         H5::DataSpace data_filespace(this->data_dataset_->getSpace());
         DataspaceIndex count = {1, 1, 1, 1, IQ};
@@ -724,11 +728,10 @@ herr_t RecorderWorker::record(int tid, Packet* pkg) {
         this->data_dataset_->write(pkg->data, H5::PredType::NATIVE_INT16,
                                    data_memspace, data_filespace);
         data_filespace.close();
-
-      } else if (this->cfg_->isNoise(pkg->frame_id, pkg->symbol_id) == true) {
+      } /* else if (this->cfg_->isNoise(pkg->frame_id_, pkg->symbol_id_) == true) {
         assert(this->noise_dataset_ != nullptr);
         // Are we going to extend the dataset?
-        if (pkg->frame_id >= this->frame_number_noise_) {
+        if (pkg->frame_id_ >= this->frame_number_noise_) {
           this->frame_number_noise_ += kConfigDataExtentStep;
           if (this->cfg_->max_frame() != 0)
             this->frame_number_noise_ = std::min(this->frame_number_noise_,
@@ -738,12 +741,12 @@ herr_t RecorderWorker::record(int tid, Packet* pkg) {
               this->cfg_->noise_syms_per_frame(), this->num_antennas_, IQ};
           this->noise_dataset_->extend(dims_noise);
 #if DEBUG_PRINT
-          std::cout << "FrameId " << pkg->frame_id << ", (Noise) Extent to "
+          std::cout << "FrameId " << pkg->frame_id_ << ", (Noise) Extent to "
                     << this->frame_number_noise_ << " Frames" << std::endl;
 #endif
         }
         hdfoffset[kDsSymsPerFrame] =
-            this->cfg_->getNoiseSFIndex(pkg->frame_id, pkg->symbol_id);
+            this->cfg_->getNoiseSFIndex(pkg->frame_id_, pkg->symbol_id_);
         // Select a hyperslab in extended portion of the dataset
         H5::DataSpace noise_filespace(this->noise_dataset_->getSpace());
         DataspaceIndex count = {1, 1, 1, 1, IQ};
@@ -753,7 +756,7 @@ herr_t RecorderWorker::record(int tid, Packet* pkg) {
         this->noise_dataset_->write(pkg->data, H5::PredType::NATIVE_INT16,
                                     noise_memspace, noise_filespace);
         noise_filespace.close();
-      }
+      } */
     }
     // catch failure caused by the H5File operations
     catch (H5::FileIException& error) {
@@ -768,12 +771,13 @@ herr_t RecorderWorker::record(int tid, Packet* pkg) {
       MLPD_WARN(
           "DataSet: Failed to record pilots from frame: %d , UE %d "
           "antenna %d IQ %llu\n",
-          pkg->frame_id, this->cfg_->getClientId(pkg->frame_id, pkg->symbol_id),
-          pkg->ant_id, IQ);
+          pkg->frame_id_,
+          this->cfg_->getClientId(pkg->frame_id_, pkg->symbol_id_),
+          pkg->ant_id_, IQ);
 
       DataspaceIndex dims_pilot = {
           this->frame_number_pilot_, this->cfg_->num_cells(),
-          this->cfg_->pilot_syms_per_frame(), this->num_antennas_, IQ};
+          this->cfg_->Frame().NumPilotSyms(), this->num_antennas_, IQ};
       int ndims = this->data_dataset_->getSpace().getSimpleExtentNdims();
 
       std::stringstream ss;

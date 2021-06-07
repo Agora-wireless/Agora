@@ -109,18 +109,14 @@ void Recorder::DoIt() {
       if (event.event_type_ == EventType::kPacketRX) {
         Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
 
+        //Recording Thread Router
         size_t thread_index = pkt->ant_id_ / thread_antennas;
-        // int offset = event.data;
         Agora_recorder::RecorderThread::RecordEventData do_record_task;
-        do_record_task.event_type =
-            Agora_recorder::RecorderThread::RecordEventType::kTaskRecord;
-        do_record_task.data = offset;
-        do_record_task.rx_buffer = this->rx_buffer_;
-        do_record_task.rx_buff_size = this->rx_thread_buff_size_;
-        // Pass the work off to the applicable worker
-        // Worker must free the buffer, future work would involve making this
-        // cleaner
+        do_record_task.event_type_ =
+            Agora_recorder::RecorderThread::RecordEventType::kTaskRecordRx;
+        do_record_task.record_event_ = event;
 
+        // Pass the work off to the applicable worker
         // If no worker threads, it is possible to handle the event directly.
         // this->worker_.handleEvent(do_record_task, 0);
         if (this->recorders_.at(thread_index)->DispatchWork(do_record_task) ==

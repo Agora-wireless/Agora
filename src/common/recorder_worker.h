@@ -58,7 +58,6 @@ class RecorderWorker {
   H5::DataSet* data_dataset_;
 
   size_t frame_number_pilot_;
-  size_t frame_number_noise_;
   size_t frame_number_data_;
 
   size_t max_frame_number_;

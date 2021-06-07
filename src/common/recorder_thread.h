@@ -19,28 +19,25 @@ namespace Agora_recorder {
 
 class RecorderThread {
  public:
-  enum RecordEventType { kThreadTermination, kTaskRecord };
+  enum RecordEventType { kThreadTermination, kTaskRecordRx };
 
   struct RecordEventData {
-    RecordEventType event_type;
-    int data;
-    SampleBuffer* rx_buffer;
-    size_t rx_buff_size;
+    RecordEventType event_type_;
+    EventData       record_event_;
   };
-
-  RecorderThread(Config* in_cfg, size_t thread_id, int core, size_t queue_size,
+  RecorderThread(Config *in_cfg, size_t thread_id, int core, size_t queue_size,
                  size_t antenna_offset, size_t num_antennas,
                  bool wait_signal = true);
   ~RecorderThread();
 
   void Start();
   void Stop();
-  bool DispatchWork(RecordEventData event);
+  bool DispatchWork(const RecordEventData &event);
 
  private:
   /*Main threading loop */
   void DoRecording();
-  void HandleEvent(RecordEventData event);
+  void HandleEvent(const RecordEventData &event);
   void Finalize();
 
   // 1 - Producer (dispatcher), 1 - Consumer
