@@ -235,6 +235,31 @@ class RxPacket {
 };
 static_assert(sizeof(mem_tag_t<RxPacket>) <= sizeof(size_t));
 
+class FFTResult {
+  private:
+  complex_float *data_;
+
+  public:
+  FFTResult() {
+    data_ = nullptr;
+  }
+
+  FFTResult(uint32_t frame_id, uint32_t symbol_id, uint32_t ant_id, complex_float *data):
+    data_(data),
+    frame_id_(frame_id),
+    symbol_id_(symbol_id),
+    ant_id_(ant_id) {}
+
+  inline complex_float *RawData() {
+    return data_;
+  }
+
+  uint32_t frame_id_;
+  uint32_t symbol_id_;
+  uint32_t ant_id_;
+};
+static_assert(sizeof(mem_tag_t<FFTResult>) <= sizeof(size_t));
+
 struct MacPacket {
   // The packet's data starts at kOffsetOfData bytes from the start
   static constexpr size_t kOffsetOfData = 16 + sizeof(RBIndicator);
