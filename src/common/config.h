@@ -306,12 +306,11 @@ class Config {
 
   /// Fetch the data buffer for this frame and symbol ID. The symbol must
   /// be an uplink symbol.
-  inline complex_float* GetDataBuf(Table<complex_float>& data_buffers,
-                                   size_t frame_id, size_t symbol_id) const {
+  inline size_t GetDataBufIdx(size_t frame_id, size_t symbol_id) const {
     size_t frame_slot = frame_id % kFrameWnd;
     size_t symbol_offset = (frame_slot * this->frame_.NumULSyms()) +
                            this->frame_.GetULSymbolIdx(symbol_id);
-    return data_buffers[symbol_offset];
+    return symbol_offset;
   }
 
   /// Return the subcarrier ID to which we should refer to for the zeroforcing
