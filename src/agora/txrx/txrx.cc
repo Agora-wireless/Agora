@@ -10,6 +10,7 @@
 
 static constexpr bool kEnableSlowStart = true;
 static constexpr bool kEnableSlowSending = true;
+static constexpr bool kDebugPrintBeacon = false;
 
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg_(cfg),
@@ -102,8 +103,10 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
   std::vector<uint8_t> udp_pkt_buf(cfg_->PacketLength(), 0);
   auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
 
-  std::printf("TXRX [%d]: Sending beacon for frame %zu tx delta %f ms\n", tid,
-              frame_id, time_now - send_time);
+  if (kDebugPrintBeacon) {
+    std::printf("TXRX [%d]: Sending beacon for frame %zu tx delta %f ms\n", tid,
+                frame_id, time_now - send_time);
+  }
   send_time = time_now;
 
   for (size_t beacon_sym = 0; beacon_sym < cfg_->Frame().NumBeaconSyms();
