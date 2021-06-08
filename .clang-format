@@ -2,8 +2,9 @@
 # Based on clang-format 11.0.0
 Language:        Cpp
 BasedOnStyle:    google
-# Standard:        c++17
-Standard:        Auto
+Standard:        c++17
+#Standard:        Auto
 UseTab:          Never
 ColumnLimit:     80
+ReflowComments:  false
 ...
