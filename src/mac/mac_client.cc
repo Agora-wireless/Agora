@@ -14,7 +14,8 @@ DEFINE_uint64(core_offset, 1, "Core ID of the first sender thread");
 DEFINE_uint64(frame_duration, 0, "Frame duration in microseconds");
 DEFINE_string(conf_file, TOSTRING(PROJECT_DIRECTORY) "/data/ue-mac-sim.json",
               "Config filename");
-DEFINE_string(data_file, TOSTRING(PROJECT_DIRECTORY) "/data/increment_file.bin",
+DEFINE_string(data_file,
+              TOSTRING(PROJECT_DIRECTORY) "/data/ul_increment_file.bin",
               "Uplink transmit filename");
 DEFINE_uint64(
     enable_slow_start, 0,
@@ -37,8 +38,8 @@ int main(int argc, char* argv[]) {
     // Generate pattern file for testing
     if (data_filename == "") {
       std::ofstream create_file;
-      data_filename =
-          TOSTRING(PROJECT_DIRECTORY) + std::string("/data/increment_file.bin");
+      data_filename = TOSTRING(PROJECT_DIRECTORY) +
+                      std::string("/data/ul_increment_file.bin");
       std::printf("Generating test binary file %s\n", data_filename.c_str());
 
       create_file.open(
@@ -63,17 +64,22 @@ int main(int argc, char* argv[]) {
 
       // Register signal handler to handle kill signal
       signal_handler.SetupSignalHandlers();
-      auto receiver_ = std::make_unique<DlMacReceiver>(
-          cfg.get(), FLAGS_num_receiver_threads + FLAGS_num_sender_threads,
-          FLAGS_core_offset);
-      std::vector<std::thread> rx_threads = receiver_->StartRecv();
-      for (auto& thread : rx_threads) {
-        thread.join();
+      if (cfg->Frame().NumUlDataSyms() > 0) {
+        auto sender = std::make_unique<UlMacSender>(
+            cfg.get(), data_filename, FLAGS_num_sender_threads,
+            FLAGS_core_offset, FLAGS_frame_duration, 0,
+            FLAGS_enable_slow_start);
+        sender->StartTx();
       }
-      auto sender = std::make_unique<UlMacSender>(
-          cfg.get(), data_filename, FLAGS_num_sender_threads, FLAGS_core_offset,
-          FLAGS_frame_duration, 0, FLAGS_enable_slow_start);
-      sender->StartTx();
+      if (cfg->Frame().NumDlDataSyms() > 0) {
+        auto receiver_ = std::make_unique<DlMacReceiver>(
+            cfg.get(), FLAGS_num_receiver_threads,
+            FLAGS_core_offset + FLAGS_num_sender_threads);
+        std::vector<std::thread> rx_threads = receiver_->StartRecv();
+        for (auto& thread : rx_threads) {
+          thread.join();
+        }
+      }
       ret = EXIT_SUCCESS;
     } catch (SignalException& e) {
       std::cerr << "SignalException: " << e.what() << std::endl;

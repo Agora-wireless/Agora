@@ -292,20 +292,6 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
     return;
   }
 
-  if (kLogMacPackets) {
-    std::stringstream ss;
-    std::fprintf(
-        log_file_,
-        "MAC thread: Received data from app for frame %zu, ue %zu, size "
-        "%zu:\n",
-        next_frame_id_, next_radio_id_, cfg_->DlMacDataBytesNumPerframe());
-
-    for (size_t i = 0; i < cfg_->DlMacDataBytesNumPerframe(); i++) {
-      ss << std::to_string((uint8_t)(payload[i])) << " ";
-    }
-    std::fprintf(log_file_, "%s\n", ss.str().c_str());
-  }
-
   RBIndicator ri;
   ri.ue_id_ = next_radio_id_;
   ri.mod_order_bits_ = CommsLib::kQaM16;
@@ -354,7 +340,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
 
   (*dl_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
   EventData msg(EventType::kPacketFromMac,
-                rx_tag_t(next_radio_id_, radio_buf_id).tag_);
+                rx_tag_t(next_radio_id_, next_frame_id_).tag_);
   RtAssert(tx_queue_->enqueue(msg),
            "MAC thread: Failed to enqueue uplink packet");
 
@@ -389,53 +375,3 @@ void MacThreadBaseStation::RunEventLoop() {
     }
   }
 }
-
-// TODO: Integrate process_codeblocks_from_master_client() for downlink at the
-// client, based on this excerpt from txrx_mac.cpp
-
-/*
-int PacketTXRX::dequeue_send(int tid)
-{
-    auto& c = config_;
-    Event_data event;
-    if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
-        return -1;
-
-    // std::printf("tx queue length: %d\n", task_queue_->size_approx());
-    assert(event.event_type == EventType::kPacketTX);
-
-    size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
-    size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-    size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
-
-    size_t offset = (c->GetTotalDataSymbolIdx(frame_id, data_symbol_idx)
-                        * c->BsAntNum())
-        + ant_id;
-
-    if (kDebugPrintInTask) {
-        std::printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
-               "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-            tid, frame_id, data_symbol_idx, ant_id,
-            gen_tag_t(event.tags[0])._tag, offset,
-            message_queue_->size_approx());
-    }
-
-    size_t socket_symbol_offset = offset
-        % (kFrameWnd * c->Frame().NumDataSyms()
-              * c->BsAntNum());
-    char* cur_buffer_ptr = tx_buffer_ + socket_symbol_offset *
-c->PacketLength(); auto* pkt = (Packet*)cur_buffer_ptr; new (pkt)
-Packet(frame_id, data_symbol_idx, 0, ant_id);
-
-    // Send data (one OFDM symbol)
-    ssize_t ret = sendto(socket_[ant_id % config_->SocketThreadNum()],
-        cur_buffer_ptr, c->PacketLength(), 0, (struct
-sockaddr*)&servaddr_[tid], sizeof(servaddr_[tid])); rt_assert(ret > 0,
-"sendto() failed");
-
-    rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
-                  Event_data(EventType::kPacketTX, event.tags[0])),
-        "Socket message enqueue failed\n");
-    return event.tags[0];
-}
-*/

@@ -1542,8 +1542,10 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
     this->tomac_counters_.Reset(frame_id);
     this->ifft_counters_.Reset(frame_id);
     this->tx_counters_.Reset(frame_id);
-    for (size_t ue_id = 0; ue_id < config_->UeNum(); ue_id++)
-      this->dl_bits_buffer_status_[ue_id][frame_id % kFrameWnd] = 0;
+    if (config_->Frame().NumDLSyms() > 0) {
+      for (size_t ue_id = 0; ue_id < config_->UeNum(); ue_id++)
+        this->dl_bits_buffer_status_[ue_id][frame_id % kFrameWnd] = 0;
+    }
     this->cur_proc_frame_id_++;
 
     if (this->encode_deferral_.empty() == false) {
