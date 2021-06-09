@@ -17,7 +17,7 @@ UlMacReceiver::UlMacReceiver(Config* const cfg, size_t rx_thread_num,
 std::vector<std::thread> UlMacReceiver::StartRecv() {
   std::vector<std::thread> created_threads;
 
-  std::printf("UlMacReceiver:  Start Recv threads %zu\n", rx_thread_num_);
+  std::printf("UlMacReceiver: Start Recv threads %zu\n", rx_thread_num_);
   created_threads.resize(rx_thread_num_);
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
