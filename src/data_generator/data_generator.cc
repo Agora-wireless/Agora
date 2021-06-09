@@ -42,6 +42,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
   std::unique_ptr<DoCRC> crc_obj_ = std::make_unique<DoCRC>();
   size_t input_size = cfg_->NumBytesPerCb();
+  //size_t input_size =
   //    LdpcEncodingInputBufSize(this->cfg_->LdpcConfig().BaseGraph(),
   //                             this->cfg_->LdpcConfig().ExpansionFactor());
 
@@ -54,7 +55,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   const size_t num_ul_mac_bytes = this->cfg_->UlMacBytesNumPerframe();
   if (num_ul_mac_bytes > 0) {
     std::vector<std::vector<int8_t>> ul_mac_info(cfg_->UeAntNum());
-    MLPD_SYMBOL("Total number of uplink MAC bytes: %zu\n", num_ul_mac_bytes);
+    MLPD_INFO("Total number of uplink MAC bytes: %zu\n", num_ul_mac_bytes);
     for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
       ul_mac_info.at(ue_id).resize(num_ul_mac_bytes);
       for (size_t pkt_id = 0; pkt_id < cfg_->UlMacPacketsPerframe(); pkt_id++) {
@@ -106,7 +107,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     const size_t symbol_blocks =
         this->cfg_->LdpcConfig().NumBlocksInSymbol() * this->cfg_->UeAntNum();
     const size_t num_ul_codeblocks =
-        this->cfg_->Frame().NumULSyms() * symbol_blocks;
+        this->cfg_->Frame().NumUlDataSyms() * symbol_blocks;
     MLPD_SYMBOL("Total number of ul blocks: %zu\n", num_ul_codeblocks);
 
     std::vector<std::vector<int8_t>> ul_information(num_ul_codeblocks);
@@ -125,8 +126,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
       MLPD_TRACE(
           "cb %zu -- user %zu -- user block %zu -- user cb id %zu -- input "
-          "size %zu\n",
-          cb, ue_id, ue_cb_id, ue_cb_cnt, input_size);
+          "size %zu, index %zu, total size %zu\n",
+          cb, ue_id, ue_cb_id, ue_cb_cnt, input_size, ue_cb_cnt * input_size,
+          ul_mac_info.at(ue_id).size());
       int8_t* cb_start = &ul_mac_info.at(ue_id).at(ue_cb_cnt * input_size);
       ul_information.at(cb) =
           std::vector<int8_t>(cb_start, cb_start + input_size);
@@ -179,7 +181,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     RtAssert(this->cfg_->LdpcConfig().NumBlocksInSymbol() ==
              1);  // TODO: Assumption
     pre_ifft_data_syms.resize(this->cfg_->UeAntNum() *
-                              this->cfg_->Frame().NumULSyms());
+                              this->cfg_->Frame().NumUlDataSyms());
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
       pre_ifft_data_syms.at(i) = this->BinForIfft(ul_modulated_codewords.at(i));
     }
@@ -386,8 +388,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     const size_t symbol_blocks =
         this->cfg_->LdpcConfig().NumBlocksInSymbol() * this->cfg_->UeAntNum();
     const size_t num_dl_codeblocks =
-        this->cfg_->Frame().NumDLSyms() * symbol_blocks;
-    MLPD_SYMBOL("Total number of dl blocks: %zu\n", num_dl_codeblocks);
+        this->cfg_->Frame().NumDlDataSyms() * symbol_blocks;
+    MLPD_SYMBOL("Total number of dl data blocks: %zu\n", num_dl_codeblocks);
 
     std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
     std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
@@ -497,8 +499,12 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
               (sc_id % this->cfg_->OfdmPilotSpacing() == 0)) {
             sc_data = ue_specific_pilot[j][sc_id];
           } else {
-            sc_data = dl_modulated_codewords.at(i * this->cfg_->UeAntNum() + j)
-                          .at(sc_id);
+            sc_data =
+                dl_modulated_codewords
+                    .at(((i - this->cfg_->Frame().ClientDlPilotSymbols()) *
+                         this->cfg_->UeAntNum()) +
+                        j)
+                    .at(sc_id);
           }
           dl_mod_data[i][j * this->cfg_->OfdmCaNum() + sc_id +
                          this->cfg_->OfdmDataStart()] = sc_data;
