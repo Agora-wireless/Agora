@@ -33,8 +33,8 @@ MacThreadBaseStation::MacThreadBaseStation(
   log_file_ = std::fopen(log_filename_.c_str(), "w");
   RtAssert(log_file_ != nullptr, "Failed to open MAC log file");
 
-  std::printf("MAC thread: Frame duration %.2f ms, tsc_delta %zu\n",
-              cfg_->GetFrameDurationSec() * 1000, tsc_delta_);
+  MLPD_INFO("MacThreadBaseStation: Frame duration %.2f ms, tsc_delta %zu\n",
+            cfg_->GetFrameDurationSec() * 1000, tsc_delta_);
 
   // Set up buffers
   dl_bits_buffer_id_.fill(0);
@@ -50,10 +50,11 @@ MacThreadBaseStation::MacThreadBaseStation(
   // TODO: See if it makes more sense to split up the UE's by port here for
   // client mode.
   size_t udp_server_port = cfg_->BsMacRxPort();
-  MLPD_TRACE("MacThreadBaseStation: setting up udp server at port %zu\n",
-             udp_server_port);
+  MLPD_INFO("MacThreadBaseStation: setting up udp server at port %zu\n",
+            udp_server_port);
   udp_server_ = std::make_unique<UDPServer>(
       udp_server_port, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
+  //udp_server_->MakeBlocking(10);
 
   const size_t udp_control_len = sizeof(RBIndicator);
   udp_control_buf_.resize(udp_control_len);
@@ -125,6 +126,11 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
 
   std::stringstream ss;  // Debug-only
 
+  //std::printf(
+  //    "ProcessCodeblocksFromPhy processing frame %zu symbol %zu:%zu ue_id "
+  //    "%zu\n",
+  //    frame_id, symbol_id, symbol_idx_ul, ue_id);
+
   // Only non-pilot uplink symbols have application data.
   if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
     auto* pkt = (struct MacPacket*)ul_data_ptr;
@@ -146,11 +152,12 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
     if (crc == pkt->crc_) {
       // Print information about the received symbol
       if (kLogMacPackets) {
-        std::fprintf(log_file_,
-                     "MAC thread received frame %zu, uplink symbol index %zu, "
-                     "size %zu, copied to frame data offset %zu\n",
-                     frame_id, symbol_idx_ul, cfg_->MacPayloadLength(),
-                     frame_data_offset);
+        std::fprintf(
+            log_file_,
+            "Base Station MAC thread received frame %zu, uplink "
+            "symbol index %zu, size %zu, copied to frame data offset %zu\n",
+            frame_id, symbol_idx_ul, cfg_->MacPayloadLength(),
+            frame_data_offset);
 
         ss << "Header Info:\n"
            << "FRAME_ID: " << pkt->frame_id_
@@ -213,6 +220,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
        rx_tries++) {
     ssize_t ret = udp_server_->Recv(rx_location, rx_request_size);
     if (ret == 0) {
+      //std::printf("ProcessUdpPacketsFromApps: No data received\n");
       return;  // No data received
     } else if (ret < 0) {
       // There was an error in receiving
@@ -238,8 +246,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
   }
   RtAssert(rx_bytes == cfg_->DlMacDataBytesNumPerframe(),
            "MacThreadBaseStation:ProcessUdpPacketsFromApps incorrect number of "
-           "bytes "
-           "received.");
+           "bytes received.");
 
   const char* payload = reinterpret_cast<char*>(&udp_pkt_buf_[0]);
 
@@ -321,8 +328,8 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
     if (kLogMacPackets) {
       std::stringstream ss;
       std::printf(
-          "MAC thread created packet frame %zu, pkt %zu, size %zu, copied to "
-          "location %zu\n",
+          "Base Station MAC thread created packet frame %zu, pkt %zu, size "
+          "%zu, copied to location %zu\n",
           next_frame_id_, pkt_id, cfg_->MacPayloadLength(), (size_t)pkt);
 
       ss << "Header Info:\n"
