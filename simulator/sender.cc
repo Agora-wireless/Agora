@@ -43,17 +43,23 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
       socket_thread_num_(socket_thread_num),
       enable_slow_start_(enable_slow_start),
       core_offset_(core_offset),
-      frame_duration_(frame_duration),
       inter_frame_delay_(inter_frame_delay),
-      ticks_all_(frame_duration_ * ticks_per_usec_ /
-                 cfg->Frame().NumTotalSyms()),
-      ticks_wnd1_((std::max(static_cast<double>(40.0 * frame_duration_),
-                            static_cast<double>(200000.0) /* 200ms */) *
-                   ticks_per_usec_) /
-                  cfg->Frame().NumTotalSyms()),
-      ticks_wnd2_((15 * frame_duration_ * ticks_per_usec_) /
-                  cfg->Frame().NumTotalSyms()),
       ticks_inter_frame_(inter_frame_delay_ * ticks_per_usec_) {
+  if (frame_duration == 0) {
+    frame_duration_ =
+        (cfg->Frame().NumTotalSyms() * cfg->SampsPerSymbol() * 1000000ul) /
+        cfg->Rate();
+  } else {
+    frame_duration_ = frame_duration;
+  }
+
+  ticks_all_ =
+      ((frame_duration_ * ticks_per_usec_) / cfg->Frame().NumTotalSyms());
+  ticks_wnd1_ = std::max(ticks_all_ * 40ul,
+                         static_cast<uint64_t>((200000.0 * ticks_per_usec_) /
+                                               cfg->Frame().NumTotalSyms()));
+  ticks_wnd2_ = ticks_all_ * 15;
+
   MLPD_INFO(
       "Initializing sender, sending to base station server at %s, frame "
       "duration = %.2f ms, slow start = %s\n",

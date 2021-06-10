@@ -154,7 +154,7 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
       if (kLogMacPackets) {
         std::fprintf(
             log_file_,
-            "MAC thread received frame %zu, downlink symbol index %zu, "
+            "User MAC thread received frame %zu, downlink symbol index %zu, "
             "size %zu, copied to frame data offset %zu\n",
             frame_id, symbol_idx_dl, cfg_->MacPayloadLength(),
             frame_data_offset);
@@ -287,11 +287,11 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
 
   if (kLogMacPackets) {
     std::stringstream ss;
-    std::fprintf(
-        log_file_,
-        "MAC thread: Received data from app for frame %zu, ue %zu, size "
-        "%zu:\n",
-        next_frame_id_, next_radio_id_, cfg_->UlMacDataBytesNumPerframe());
+    std::fprintf(log_file_,
+                 "User MAC thread: Received data from app for frame %zu, ue "
+                 "%zu, size %zu:\n",
+                 next_frame_id_, next_radio_id_,
+                 cfg_->UlMacDataBytesNumPerframe());
 
     for (size_t i = 0; i < cfg_->UlMacDataBytesNumPerframe(); i++) {
       ss << std::to_string((uint8_t)(payload[i])) << " ";
@@ -325,8 +325,8 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
     if (kLogMacPackets) {
       std::stringstream ss;
       std::printf(
-          "MAC thread created packet frame %zu, pkt %zu, size %zu, copied to "
-          "location %zu\n",
+          "User MAC thread created packet frame %zu, pkt %zu, size %zu, copied "
+          "to location %zu\n",
           next_frame_id_, pkt_id, cfg_->MacPayloadLength(), (size_t)pkt);
 
       ss << "Header Info:\n"

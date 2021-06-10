@@ -460,6 +460,9 @@ void Agora::Start() {
 
         case EventType::kPacketFromMac: {
           size_t frame_id = rx_tag_t(event.tags_[0]).offset_;
+
+          std::printf("EventType::kPacketFromMac: frame %zu\n", frame_id);
+
           bool last_ue = this->mac_to_phy_counters_.CompleteTask(frame_id, 0);
           if (last_ue == true) {
             // schedule this frame's encoding
@@ -779,10 +782,10 @@ void Agora::Worker(int tid) {
       this->config_, tid, this->dl_zf_matrices_, this->dl_ifft_buffer_,
       this->dl_encoded_buffer_, this->stats_.get());
 
-  auto compute_encoding =
-      std::make_unique<DoEncode>(this->config_, tid, this->config_->DlBits(),
-                                 1 /*only one frame in DlBits*/,
-                                 this->dl_encoded_buffer_, this->stats_.get());
+  auto compute_encoding = std::make_unique<DoEncode>(
+      config_, tid, (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
+      (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
+      this->stats_.get());
 
   // Uplink workers
   auto compute_decoding = std::make_unique<DoDecode>(
@@ -1423,7 +1426,7 @@ void Agora::InitializeDownlinkBuffers() {
     //    std::vector<size_t>(config_->Frame().NumDLSyms(), SIZE_MAX);
     ifft_counters_.Init(config_->Frame().NumDLSyms(), config_->BsAntNum());
     tx_counters_.Init(config_->Frame().NumDLSyms(), config_->BsAntNum());
-    // mac data is sent per fram, so we set max symbol to 1
+    // mac data is sent per frame, so we set max symbol to 1
     mac_to_phy_counters_.Init(1, config_->UeNum());
   }
 }

@@ -26,8 +26,7 @@ DEFINE_uint64(
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage(
       "num_sender_threads, num_receiver_threads, core_offset, frame_duration, "
-      "conf_file, "
-      "data_file, enable_slow_start");
+      "conf_file, data_file, enable_slow_start");
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = FLAGS_conf_file;
