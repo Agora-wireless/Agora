@@ -11,6 +11,7 @@
 #include "scrambler.h"
 #include "signal_handler.h"
 #include "utils_ldpc.h"
+#include "worker_buffers.h"
 
 /* Print debug work */
 static constexpr bool kDebugPrintPacketsFromMac = false;
@@ -421,9 +422,10 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kFFT: {
-          size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+          ResultMemory *res_mem = mem_tag_t<ResultMemory>(event.tags_[0]).memory_;
+          size_t frame_id = res_mem->frame_id_;
+          size_t symbol_id = res_mem->symbol_id_;
+          size_t ant_id = res_mem->ant_id_;
 
           // Schedule the Demul
           EventData do_demul_task(EventType::kDemul, event.tags_[0]);

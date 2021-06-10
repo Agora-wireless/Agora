@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "buffer.h"
+#include "worker_buffers.h"
 #include "concurrentqueue.h"
 #include "config.h"
 #include "dodecode_client.h"
@@ -153,5 +154,7 @@ class UeWorker {
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer_;
 
   std::vector<std::vector<std::complex<float>>>& ue_pilot_vec_;
+
+  std::vector<FFTResult> res_memory_;
 };
 #endif  // UE_WORKER_H_

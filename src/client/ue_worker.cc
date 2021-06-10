@@ -65,6 +65,9 @@ UeWorker::UeWorker(
   (void)DftiCreateDescriptor(&mkl_handle_, DFTI_SINGLE, DFTI_COMPLEX, 1,
                              config_.OfdmCaNum());
   (void)DftiCommitDescriptor(mkl_handle_);
+
+  for(size_t i=0; i<equal_buffer_.size(); i++)
+    res_memory_.emplace_back();
 }
 
 UeWorker::~UeWorker() {
@@ -267,9 +270,13 @@ void UeWorker::DoFftData(size_t tag) {
 
   // Free the rx buffer
   fft_req_tag_t(tag).rx_packet_->Free();
+  
+  auto &itr = res_memory_[eq_buffer_offset];
+  itr.Set(frame_id, symbol_id, ant_id, reinterpret_cast<void *>(&equal_buffer_[eq_buffer_offset][0]));
+  size_t res_tag = mem_tag_t<ResultMemory>(itr).tag_;
 
   EventData fft_finish_event = EventData(
-      EventType::kFFT, gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_);
+      EventType::kFFT, res_tag);
   RtAssert(notify_queue_.enqueue(*ptok_.get(), fft_finish_event),
            "UeWorker: FFT message enqueue failed");
 }
@@ -380,9 +387,10 @@ void UeWorker::DoFftPilot(size_t tag) {
 }
 
 void UeWorker::DoDemul(size_t tag) {
-  const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t ant_id = gen_tag_t(tag).ant_id_;
+  ResultMemory *res_mem = mem_tag_t<ResultMemory>(tag).memory_;
+  const size_t frame_id = res_mem->frame_id_;
+  const size_t symbol_id = res_mem->symbol_id_;
+  const size_t ant_id = res_mem->ant_id_;
 
   if (kDebugPrintInTask || kDebugPrintDemul) {
     std::printf("UeWorker[%zu]: Demul  (frame %zu, symbol %zu, ant %zu)\n",
@@ -397,7 +405,7 @@ void UeWorker::DoDemul(size_t tag) {
                               dl_symbol_id -
                               config_.Frame().ClientDlPilotSymbols();
   size_t offset = total_dl_symbol_id * config_.UeAntNum() + ant_id;
-  auto* equal_ptr = reinterpret_cast<float*>(&equal_buffer_[offset][0]);
+  float *equal_ptr = reinterpret_cast<float *>(res_mem->RawData());
 
   const size_t base_sc_id = 0;
 
@@ -436,7 +444,8 @@ void UeWorker::DoDemul(size_t tag) {
   }
 
   RtAssert(
-      notify_queue_.enqueue(*ptok_.get(), EventData(EventType::kDemul, tag)),
+      notify_queue_.enqueue(*ptok_.get(),
+        EventData(EventType::kDemul, gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_)),
       "Demodulation message enqueue failed");
 }
 
