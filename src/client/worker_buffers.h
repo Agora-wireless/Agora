@@ -25,14 +25,12 @@ class ResultMemory {
     symbol_id_(symbol_id),
     ant_id_(ant_id) {}
 
+  virtual ~ResultMemory() = default;
+
   void Set(uint32_t frame_id, uint32_t symbol_id, uint32_t ant_id) {
     frame_id_ = frame_id;
     symbol_id_ = symbol_id;
     ant_id_ = ant_id;
-  }
-
-  virtual void *RawData() {
-    throw std::runtime_error("ResultMemory RawResult should not be called");
   }
 
   uint32_t frame_id_;
