@@ -230,6 +230,8 @@ class PhyUe {
   FrameCounters modulation_counters_;
   FrameCounters ifft_counters_;
 
+  FrameCounters tomac_counters_;
+
   size_t max_equaled_frame_ = 0;
 };
 #endif  // PHY_UE_H_

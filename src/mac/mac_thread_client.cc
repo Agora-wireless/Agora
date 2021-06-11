@@ -126,14 +126,19 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
   const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
   const size_t symbol_idx_dl = this->cfg_->Frame().GetDLSymbolIdx(symbol_id);
   const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
-  const int8_t* ul_data_ptr =
-      decoded_buffer_[frame_id % kFrameWnd][symbol_idx_dl][ue_id];
+
+  //std::printf(
+  //    "ProcessCodeblocksFromPhy (frame %zu, symbol %zu:%zu, user %zu)\n",
+  //    frame_id, symbol_id, symbol_idx_dl, ue_id);
+
+  const int8_t* dl_data_ptr =
+      decoded_buffer_[(frame_id % kFrameWnd)][symbol_idx_dl][ue_id];
 
   std::stringstream ss;  // Debug-only
 
-  // Only non-pilot uplink symbols have application data.
+  // Only non-pilot downlink symbols have application data.
   if (symbol_idx_dl >= cfg_->Frame().ClientDlPilotSymbols()) {
-    auto* pkt = (struct MacPacket*)ul_data_ptr;
+    auto* pkt = reinterpret_cast<struct MacPacket const*>(dl_data_ptr);
 
     // We send data to app irrespective of CRC condition
     // TODO: enable ARQ and ensure reliable data goes to app
