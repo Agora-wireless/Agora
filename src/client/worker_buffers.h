@@ -25,14 +25,12 @@ class ResultMemory {
     symbol_id_(symbol_id),
     ant_id_(ant_id) {}
 
+  virtual ~ResultMemory() = default;
+
   void Set(uint32_t frame_id, uint32_t symbol_id, uint32_t ant_id) {
     frame_id_ = frame_id;
     symbol_id_ = symbol_id;
     ant_id_ = ant_id;
-  }
-
-  virtual void *RawData() {
-    throw std::runtime_error("ResultMemory RawResult should not be called");
   }
 
   uint32_t frame_id_;
@@ -43,7 +41,7 @@ static_assert(sizeof(mem_tag_t<ResultMemory>) == sizeof(size_t));
 
 class FFTResult : public ResultMemory {
   private:
-  void *data_;
+  float *data_;
 
   public:
   explicit FFTResult():
@@ -54,12 +52,12 @@ class FFTResult : public ResultMemory {
     ResultMemory(frame_id, symbol_id, ant_id),
     data_(nullptr) {}
 
-  void Set(uint32_t frame_id, uint32_t symbol_id, uint32_t ant_id, void *data) {
+  void Set(uint32_t frame_id, uint32_t symbol_id, uint32_t ant_id, float *data) {
     ResultMemory::Set(frame_id, symbol_id, ant_id);
     data_ = data;
   }
 
-  void *RawData() override {
+  float *RawData() {
     return data_;
   }
 };

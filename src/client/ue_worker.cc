@@ -6,6 +6,7 @@
 #include "ue_worker.h"
 
 #include <memory>
+#include <stdexcept>
 
 #include "datatype_conversion.h"
 #include "phy_ldpc_decoder_5gnr.h"
@@ -272,7 +273,7 @@ void UeWorker::DoFftData(size_t tag) {
   fft_req_tag_t(tag).rx_packet_->Free();
   
   auto &itr = res_memory_[eq_buffer_offset];
-  itr.Set(frame_id, symbol_id, ant_id, reinterpret_cast<void *>(&equal_buffer_[eq_buffer_offset][0]));
+  itr.Set(frame_id, symbol_id, ant_id, reinterpret_cast<float *>(&equal_buffer_[eq_buffer_offset][0]));
   size_t res_tag = mem_tag_t<ResultMemory>(itr).tag_;
 
   EventData fft_finish_event = EventData(
@@ -387,10 +388,13 @@ void UeWorker::DoFftPilot(size_t tag) {
 }
 
 void UeWorker::DoDemul(size_t tag) {
-  ResultMemory *res_mem = mem_tag_t<ResultMemory>(tag).memory_;
-  const size_t frame_id = res_mem->frame_id_;
-  const size_t symbol_id = res_mem->symbol_id_;
-  const size_t ant_id = res_mem->ant_id_;
+  FFTResult *fft_res = dynamic_cast<FFTResult *>(mem_tag_t<ResultMemory>(tag).memory_);
+  if(fft_res == nullptr)
+    throw std::runtime_error("Pointer to bad FFTResult received!");
+
+  const size_t frame_id = fft_res->frame_id_;
+  const size_t symbol_id = fft_res->symbol_id_;
+  const size_t ant_id = fft_res->ant_id_;
 
   if (kDebugPrintInTask || kDebugPrintDemul) {
     std::printf("UeWorker[%zu]: Demul  (frame %zu, symbol %zu, ant %zu)\n",
@@ -405,7 +409,7 @@ void UeWorker::DoDemul(size_t tag) {
                               dl_symbol_id -
                               config_.Frame().ClientDlPilotSymbols();
   size_t offset = total_dl_symbol_id * config_.UeAntNum() + ant_id;
-  float *equal_ptr = reinterpret_cast<float *>(res_mem->RawData());
+  float *equal_ptr = fft_res->RawData();
 
   const size_t base_sc_id = 0;
 
