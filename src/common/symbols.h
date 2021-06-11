@@ -161,7 +161,7 @@ static constexpr bool kDebugPrintPilot = false;
 static constexpr bool kDebugRadioTX = false;
 static constexpr bool kDebugRadioRX = false;
 
-static constexpr bool kLogMacPackets = true;
+static constexpr bool kLogMacPackets = false;
 
 enum class ThreadType {
   kMaster,
