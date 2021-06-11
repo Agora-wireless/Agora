@@ -1023,9 +1023,7 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
         }
         this->encode_deferral_.push(frame_id);
       } else {
-        for (size_t i = 0; i < config_->Frame().NumDLSyms(); i++) {
-          ScheduleDownlinkProcessing(frame_id);
-        }
+        ScheduleDownlinkProcessing(frame_id);
       }
     }
     this->stats_->MasterSetTsc(TsType::kFirstSymbolRX, frame_id);
