@@ -115,6 +115,7 @@ class Agora {
   void ScheduleAntennas(EventType event_type, size_t frame_id,
                         size_t symbol_id);
   void ScheduleAntennasTX(size_t frame_id, size_t symbol_id);
+  void ScheduleDownlinkProcessing(size_t frame_id);
 
   /**
    * @brief Schedule LDPC decoding or encoding over code blocks

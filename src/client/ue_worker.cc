@@ -462,7 +462,7 @@ void UeWorker::DoDecodeUe(DoDecodeClient* decoder, size_t tag) {
     std::printf(
         "Decoding [Frame %zu, Symbol %zu, User %zu, Code Block %zu : %zu]\n",
         frame_id, symbol_id, ant_id, cb_id,
-        config_.LdpcConfig().NumBlocksInSymbol());
+        config_.LdpcConfig().NumBlocksInSymbol() - 1);
     decoder->Launch(
         gen_tag_t::FrmSymCb(
             frame_id, symbol_id,

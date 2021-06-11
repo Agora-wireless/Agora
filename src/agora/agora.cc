@@ -112,6 +112,24 @@ void Agora::SendSnrReport(EventType event_type, size_t frame_id,
   }
 }
 
+void Agora::ScheduleDownlinkProcessing(size_t frame_id) {
+  size_t num_pilot_symbols = config_->Frame().ClientDlPilotSymbols();
+
+  for (size_t i = 0; i < num_pilot_symbols; i++) {
+    if (zf_last_frame_ == frame_id) {
+      ScheduleSubcarriers(EventType::kPrecode, frame_id,
+                          config_->Frame().GetDLSymbol(i));
+    } else {
+      encode_cur_frame_for_symbol_.at(i) = frame_id;
+    }
+  }
+
+  for (size_t i = num_pilot_symbols; i < config_->Frame().NumDLSyms(); i++) {
+    ScheduleCodeblocks(EventType::kEncode, frame_id,
+                       config_->Frame().GetDLSymbol(i));
+  }
+}
+
 void Agora::ScheduleAntennas(EventType event_type, size_t frame_id,
                              size_t symbol_id) {
   assert(event_type == EventType::kFFT or event_type == EventType::kIFFT);
@@ -476,10 +494,7 @@ void Agora::Start() {
               }
               this->encode_deferral_.push(frame_id);
             } else {
-              for (size_t i = 0; i < config_->Frame().NumDLSyms(); i++) {
-                ScheduleCodeblocks(EventType::kEncode, frame_id,
-                                   config_->Frame().GetDLSymbol(i));
-              }
+              ScheduleDownlinkProcessing(frame_id);
             }
             this->mac_to_phy_counters_.Reset(frame_id);
             PrintPerFrameDone(PrintType::kPacketFromMac, frame_id);
@@ -1009,8 +1024,7 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
         this->encode_deferral_.push(frame_id);
       } else {
         for (size_t i = 0; i < config_->Frame().NumDLSyms(); i++) {
-          ScheduleCodeblocks(EventType::kEncode, frame_id,
-                             config_->Frame().GetDLSymbol(i));
+          ScheduleDownlinkProcessing(frame_id);
         }
       }
     }
@@ -1414,7 +1428,7 @@ void Agora::InitializeDownlinkBuffers() {
         Agora_memory::Alignment_t::kAlign64);
 
     encode_counters_.Init(
-        config_->Frame().NumDLSyms(),
+        config_->Frame().NumDlDataSyms(),
         config_->LdpcConfig().NumBlocksInSymbol() * config_->UeNum());
     encode_cur_frame_for_symbol_ =
         std::vector<size_t>(config_->Frame().NumDLSyms(), SIZE_MAX);
@@ -1562,10 +1576,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
           RtAssert(deferred_frame >= this->cur_proc_frame_id_,
                    "Error scheduling encoding because deferral frame is less "
                    "than current frame");
-          for (size_t i = 0; i < config_->Frame().NumDLSyms(); i++) {
-            ScheduleCodeblocks(EventType::kEncode, deferred_frame,
-                               config_->Frame().GetDLSymbol(i));
-          }
+          ScheduleDownlinkProcessing(frame_id);
           this->encode_deferral_.pop();
         } else {
           // No need to check the next frame because it is too large
