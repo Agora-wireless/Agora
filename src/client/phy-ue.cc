@@ -423,9 +423,9 @@ void PhyUe::Start() {
 
         case EventType::kFFT: {
           ResultMemory *res_mem = mem_tag_t<ResultMemory>(event.tags_[0]).memory_;
-          size_t frame_id = res_mem->frame_id_;
-          size_t symbol_id = res_mem->symbol_id_;
-          size_t ant_id = res_mem->ant_id_;
+          size_t frame_id = res_mem->GetFrameID();
+          size_t symbol_id = res_mem->GetSymbolId();
+          size_t ant_id = res_mem->GetAntId();
 
           // Schedule the Demul
           EventData do_demul_task(EventType::kDemul, event.tags_[0]);

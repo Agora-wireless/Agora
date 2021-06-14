@@ -392,9 +392,9 @@ void UeWorker::DoDemul(size_t tag) {
   if(fft_res == nullptr)
     throw std::runtime_error("Pointer to bad FFTResult received!");
 
-  const size_t frame_id = fft_res->frame_id_;
-  const size_t symbol_id = fft_res->symbol_id_;
-  const size_t ant_id = fft_res->ant_id_;
+  const size_t frame_id = fft_res->GetFrameID();
+  const size_t symbol_id = fft_res->GetSymbolId();
+  const size_t ant_id = fft_res->GetAntId();
 
   if (kDebugPrintInTask || kDebugPrintDemul) {
     std::printf("UeWorker[%zu]: Demul  (frame %zu, symbol %zu, ant %zu)\n",
