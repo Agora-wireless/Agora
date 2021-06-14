@@ -5,8 +5,8 @@
 #include <gflags/gflags.h>
 
 #include "dl_mac_receiver.h"
+#include "mac_sender.h"
 #include "signal_handler.h"
-#include "ul_mac_sender.h"
 
 DEFINE_uint64(num_sender_threads, 1, "Number of mac client sender threads");
 DEFINE_uint64(num_receiver_threads, 1, "Number of mac client receiver threads");
@@ -48,7 +48,6 @@ int main(int argc, char* argv[]) {
       assert(create_file.is_open() == true);
 
       std::vector<char> mac_data;
-      // mac_data.resize(cfg->UlMacDataBytesNumPerframe());
       mac_data.resize(cfg->MacPayloadLength());
 
       for (size_t i = 0;
@@ -64,14 +63,17 @@ int main(int argc, char* argv[]) {
 
       // Register signal handler to handle kill signal
       signal_handler.SetupSignalHandlers();
-      if (cfg->Frame().NumUlDataSyms() > 0) {
-        auto sender = std::make_unique<UlMacSender>(
+      if (cfg->Frame().NumULSyms() > 0) {
+        auto sender = std::make_unique<MacSender>(
             cfg.get(), data_filename, FLAGS_num_sender_threads,
-            FLAGS_core_offset, FLAGS_frame_duration, 0,
-            FLAGS_enable_slow_start);
+            cfg->UlMacPacketsPerframe(), cfg->UeServerAddr(),
+            cfg->UeMacRxPort(),
+            std::bind(&FrameStats::GetULDataSymbol, cfg->Frame(),
+                      std::placeholders::_1),
+            FLAGS_frame_duration, 0, FLAGS_enable_slow_start);
         sender->StartTx();
       }
-      if (cfg->Frame().NumDlDataSyms() > 0) {
+      if (cfg->Frame().NumDLSyms() > 0) {
         auto receiver_ = std::make_unique<DlMacReceiver>(
             cfg.get(), FLAGS_num_receiver_threads,
             FLAGS_core_offset + FLAGS_num_sender_threads);

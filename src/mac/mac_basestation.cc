@@ -4,7 +4,7 @@
  */
 #include <gflags/gflags.h>
 
-#include "dl_mac_sender.h"
+#include "mac_sender.h"
 #include "signal_handler.h"
 #include "ul_mac_receiver.h"
 
@@ -64,14 +64,17 @@ int main(int argc, char* argv[]) {
 
       // Register signal handler to handle kill signal
       signal_handler.SetupSignalHandlers();
-      if (cfg->Frame().NumDlDataSyms() > 0) {
-        auto sender = std::make_unique<DlMacSender>(
+      if (cfg->Frame().NumDLSyms() > 0) {
+        auto sender = std::make_unique<MacSender>(
             cfg.get(), data_filename, FLAGS_num_sender_threads,
-            FLAGS_core_offset, FLAGS_frame_duration, 0,
-            FLAGS_enable_slow_start);
+            cfg->DlMacPacketsPerframe(), cfg->BsServerAddr(),
+            cfg->BsMacRxPort(),
+            std::bind(&FrameStats::GetDLDataSymbol, cfg->Frame(),
+                      std::placeholders::_1),
+            FLAGS_frame_duration, 0, FLAGS_enable_slow_start);
         sender->StartTx();
       }
-      if (cfg->Frame().NumUlDataSyms() > 0) {
+      if (cfg->Frame().NumULSyms() > 0) {
         auto receiver_ = std::make_unique<UlMacReceiver>(
             cfg.get(), FLAGS_num_receiver_threads,
             FLAGS_core_offset + FLAGS_num_sender_threads);
