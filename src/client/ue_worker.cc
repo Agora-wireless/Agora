@@ -388,8 +388,9 @@ void UeWorker::DoFftPilot(size_t tag) {
 
 void UeWorker::DoDemul(size_t tag) {
   FFTResult *fft_res = dynamic_cast<FFTResult *>(mem_tag_t<ResultMemory>(tag).memory_);
-  if(fft_res == nullptr)
+  if(fft_res == nullptr) {
     throw std::runtime_error("Pointer to bad FFTResult received!");
+  }
 
   const size_t frame_id = fft_res->GetFrameID();
   const size_t symbol_id = fft_res->GetSymbolId();
