@@ -33,6 +33,19 @@ class ResultMemory {
     ant_id_ = ant_id;
   }
 
+  inline size_t GetFrameID() const {
+    return frame_id_;
+  }
+
+  inline size_t GetSymbolId() const {
+    return symbol_id_;
+  }
+
+  inline size_t GetAntId() const {
+    return ant_id_;
+  }
+
+  private:
   uint32_t frame_id_;
   uint32_t symbol_id_;
   uint32_t ant_id_;
