@@ -155,6 +155,6 @@ class UeWorker {
 
   std::vector<std::vector<std::complex<float>>>& ue_pilot_vec_;
 
-  std::vector<FFTResult> res_memory_;
+  std::vector<FFTResult> fft_res_memory_;
 };
 #endif  // UE_WORKER_H_

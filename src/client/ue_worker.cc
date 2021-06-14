@@ -67,8 +67,7 @@ UeWorker::UeWorker(
                              config_.OfdmCaNum());
   (void)DftiCommitDescriptor(mkl_handle_);
 
-  for(size_t i=0; i<equal_buffer_.size(); i++)
-    res_memory_.emplace_back();
+  fft_res_memory_.resize(equal_buffer_.size());
 }
 
 UeWorker::~UeWorker() {
@@ -272,7 +271,7 @@ void UeWorker::DoFftData(size_t tag) {
   // Free the rx buffer
   fft_req_tag_t(tag).rx_packet_->Free();
   
-  auto &itr = res_memory_[eq_buffer_offset];
+  auto &itr = fft_res_memory_[eq_buffer_offset];
   itr.Set(frame_id, symbol_id, ant_id, reinterpret_cast<float *>(&equal_buffer_[eq_buffer_offset][0]));
   size_t res_tag = mem_tag_t<ResultMemory>(itr).tag_;
 
