@@ -41,12 +41,12 @@ class MacSender {
    * @param enable_slow_start If 1, the sender initially sends frames in a
    * duration larger than the TTI
    */
-  MacSender(Config* cfg, std::string& data_filename, size_t socket_thread_num,
-            size_t packets_per_frame, std::string server_address,
-            size_t server_rx_port,
+  MacSender(Config* cfg, std::string& data_filename, size_t packets_per_frame,
+            std::string server_address, size_t server_rx_port,
             std::function<size_t(size_t)> get_data_symbol_id,
-            size_t core_offset = 30, size_t frame_duration_us = 0,
-            size_t inter_frame_delay = 0, size_t enable_slow_start = 1,
+            size_t socket_thread_num = 1, size_t core_offset = 30,
+            size_t frame_duration_us = 0, size_t inter_frame_delay = 0,
+            size_t enable_slow_start = 1,
             bool create_thread_for_master = false);
 
   ~MacSender();

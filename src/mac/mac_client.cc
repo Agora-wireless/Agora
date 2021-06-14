@@ -64,12 +64,12 @@ int main(int argc, char* argv[]) {
       signal_handler.SetupSignalHandlers();
       if (cfg->Frame().NumUlDataSyms() > 0) {
         auto sender = std::make_unique<MacSender>(
-            cfg.get(), data_filename, FLAGS_num_sender_threads,
-            cfg->UlMacPacketsPerframe(), cfg->UeServerAddr(),
-            cfg->UeMacRxPort(),
+            cfg.get(), data_filename, cfg->UlMacPacketsPerframe(),
+            cfg->UeServerAddr(), cfg->UeMacRxPort(),
             std::bind(&FrameStats::GetULDataSymbol, cfg->Frame(),
                       std::placeholders::_1),
-            FLAGS_frame_duration, 0, FLAGS_enable_slow_start);
+            FLAGS_num_sender_threads, FLAGS_core_offset, FLAGS_frame_duration,
+            0, FLAGS_enable_slow_start);
         sender->StartTx();
       }
       if (cfg->Frame().NumDlDataSyms() > 0) {

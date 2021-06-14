@@ -43,12 +43,12 @@ inline size_t MacSender::TagToTxBuffersIndex(gen_tag_t tag) const {
 // size_t tx_port = server_rx_port_;
 
 MacSender::MacSender(Config* cfg, std::string& data_filename,
-                     size_t socket_thread_num, size_t packets_per_frame,
-                     std::string server_address, size_t server_rx_port,
+                     size_t packets_per_frame, std::string server_address,
+                     size_t server_rx_port,
                      std::function<size_t(size_t)> get_data_symbol_id,
-                     size_t core_offset, size_t frame_duration_us,
-                     size_t inter_frame_delay, size_t enable_slow_start,
-                     bool create_thread_for_master)
+                     size_t socket_thread_num, size_t core_offset,
+                     size_t frame_duration_us, size_t inter_frame_delay,
+                     size_t enable_slow_start, bool create_thread_for_master)
     : cfg_(cfg),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
       ticks_per_usec_(freq_ghz_ * 1e3f),
