@@ -29,6 +29,9 @@ class FrameStats {
   size_t NumTotalSyms() const;
 
   size_t GetDLSymbol(size_t location) const;
+  inline size_t GetDLDataSymbol(size_t location) const {
+    return GetDLSymbol(location + client_dl_pilot_symbols_);
+  }
   inline size_t GetDLSymbolLast() const {
     return ((this->dl_symbols_.empty()) ? SIZE_MAX : this->dl_symbols_.back());
   }
@@ -36,6 +39,9 @@ class FrameStats {
   size_t GetDLSymbolIdx(size_t symbol_number) const;
 
   size_t GetULSymbol(size_t location) const;
+  inline size_t GetULDataSymbol(size_t location) const {
+    return GetULSymbol(location + client_ul_pilot_symbols_);
+  }
   inline size_t GetULSymbolLast() const {
     return ((this->ul_symbols_.empty()) ? SIZE_MAX : this->ul_symbols_.back());
   }

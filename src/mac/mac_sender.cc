@@ -1,8 +1,8 @@
 /**
- * @file dl_mac_sender.cc
- * @brief Implementation file for the simple downlink mac sender class
+ * @file mac_sender.cc
+ * @brief Implementation file for the simple mac sender class
  */
-#include "dl_mac_sender.h"
+#include "mac_sender.h"
 
 #include <fstream>
 #include <ios>
@@ -18,7 +18,6 @@ static constexpr size_t kFrameLoadAdvance = 10;
 static constexpr size_t kBufferInit = 10;
 
 static_assert(kFrameLoadAdvance >= kBufferInit);
-
 static std::atomic<bool> keep_running(true);
 // A spinning barrier to synchronize the start of worker threads
 static std::atomic<size_t> num_workers_ready_atomic(0);
@@ -34,20 +33,22 @@ void DelayTicks(uint64_t start, uint64_t ticks) {
   }
 }
 
-inline size_t DlMacSender::TagToTxBuffersIndex(gen_tag_t tag) const {
+inline size_t MacSender::TagToTxBuffersIndex(gen_tag_t tag) const {
   const size_t frame_slot = (tag.frame_id_ % kFrameWnd);
 
   return (frame_slot * cfg_->UeAntNum()) + tag.ue_id_;
 }
 
 // Only send Uplink (non-pilot data)
-// size_t tx_port = cfg_->BsMacRxPort();
+// size_t tx_port = server_rx_port_;
 
-DlMacSender::DlMacSender(Config* cfg, std::string& data_filename,
-                         size_t socket_thread_num, size_t core_offset,
-                         size_t frame_duration_us, size_t inter_frame_delay,
-                         size_t enable_slow_start,
-                         bool create_thread_for_master)
+MacSender::MacSender(Config* cfg, std::string& data_filename,
+                     size_t socket_thread_num, size_t packets_per_frame,
+                     std::string server_address, size_t server_rx_port,
+                     std::function<size_t(size_t)> get_data_symbol_id,
+                     size_t core_offset, size_t frame_duration_us,
+                     size_t inter_frame_delay, size_t enable_slow_start,
+                     bool create_thread_for_master)
     : cfg_(cfg),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
       ticks_per_usec_(freq_ghz_ * 1e3f),
@@ -56,7 +57,14 @@ DlMacSender::DlMacSender(Config* cfg, std::string& data_filename,
       core_offset_(core_offset),
       inter_frame_delay_(inter_frame_delay),
       ticks_inter_frame_(inter_frame_delay_ * ticks_per_usec_),
-      data_filename_(data_filename) {
+      data_filename_(data_filename),
+      // end -- Ul / Dl     UE / BS
+      packets_per_frame_(packets_per_frame),
+      server_address_(server_address),
+      server_rx_port_(server_rx_port),
+      get_data_symbol_id_(get_data_symbol_id)
+// end -- Ul / Dl     UE / BS
+{
   if (frame_duration_us == 0) {
     frame_duration_us_ =
         (cfg->Frame().NumTotalSyms() * cfg->SampsPerSymbol() * 1000000ul) /
@@ -72,25 +80,25 @@ DlMacSender::DlMacSender(Config* cfg, std::string& data_filename,
 
   // tx buffers will be an array of MacPackets
   tx_buffers_.Malloc(kFrameWnd * cfg_->UeAntNum(),
-                     (cfg_->DlMacPacketsPerframe() *
+                     (packets_per_frame_ *
                       (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
                      Agora_memory::Alignment_t::kAlign64);
   MLPD_TRACE(
       "Tx buffer size: dim1 %zu, dim2 %zu, total %zu, start %zu, end: %zu\n",
       (kFrameWnd * cfg_->UeAntNum()),
-      (cfg_->DlMacPacketsPerframe() *
+      (packets_per_frame_ *
        (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
       (kFrameWnd * cfg_->UeAntNum()) *
-          (cfg_->DlMacPacketsPerframe() *
+          (packets_per_frame_ *
            (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
       (size_t)tx_buffers_[0],
       (size_t)tx_buffers_[(kFrameWnd * cfg_->UeAntNum()) - 1]);
 
   MLPD_INFO(
-      "Initializing DlMacSender, sending to mac thread at %s:%zu, frame "
+      "Initializing MacSender, sending to mac thread at %s:%zu, frame "
       "duration = %.2f ms, slow start = %s\n",
-      cfg_->UeServerAddr().c_str(), cfg_->BsMacRxPort(),
-      frame_duration_us_ / 1000.0, enable_slow_start == 1 ? "yes" : "no");
+      server_address_.c_str(), server_rx_port_, frame_duration_us_ / 1000.0,
+      enable_slow_start == 1 ? "yes" : "no");
 
   task_ptok_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
@@ -102,20 +110,20 @@ DlMacSender::DlMacSender(Config* cfg, std::string& data_filename,
 
   // Create a master thread when started from simulator
   if (create_thread_for_master == true) {
-    this->threads_.emplace_back(&DlMacSender::MasterThread, this,
+    this->threads_.emplace_back(&MacSender::MasterThread, this,
                                 socket_thread_num_);
   }
 
   // Add the data update thread (background data reader)
-  this->threads_.emplace_back(&DlMacSender::DataUpdateThread, this, 0);
+  this->threads_.emplace_back(&MacSender::DataUpdateThread, this, 0);
   num_workers_ready_atomic.store(0);
 }
 
-DlMacSender::~DlMacSender() {
+MacSender::~MacSender() {
   keep_running.store(false);
 
   for (auto& thread : this->threads_) {
-    MLPD_INFO("DlMacSender: Joining threads\n");
+    MLPD_INFO("MacSender: Joining threads\n");
     thread.join();
   }
 
@@ -124,10 +132,10 @@ DlMacSender::~DlMacSender() {
   }
   std::free(task_ptok_);
   tx_buffers_.Free();
-  MLPD_INFO("DlMacSender: Complete\n");
+  MLPD_INFO("MacSender: Complete\n");
 }
 
-void DlMacSender::StartTx() {
+void MacSender::StartTx() {
   this->frame_start_ = new double[kNumStatsFrames]();
   this->frame_end_ = new double[kNumStatsFrames]();
 
@@ -139,20 +147,19 @@ void DlMacSender::StartTx() {
   delete[](this->frame_end_);
 }
 
-void DlMacSender::StartTXfromMain(double* in_frame_start,
-                                  double* in_frame_end) {
+void MacSender::StartTXfromMain(double* in_frame_start, double* in_frame_end) {
   frame_start_ = in_frame_start;
   frame_end_ = in_frame_end;
 
   CreateWorkerThreads(socket_thread_num_);
 }
 
-void DlMacSender::LoadFrame(size_t frame) {
+void MacSender::LoadFrame(size_t frame) {
   auto req_tag_for_data = gen_tag_t::FrmSym(frame, 0);
   data_update_queue_.try_enqueue(req_tag_for_data.tag_);
 }
 
-void DlMacSender::ScheduleFrame(size_t frame) {
+void MacSender::ScheduleFrame(size_t frame) {
   for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
     auto req_tag = gen_tag_t::FrmSymAnt(frame, 0, i);
     // Split up the antennas amoung the worker threads
@@ -162,7 +169,7 @@ void DlMacSender::ScheduleFrame(size_t frame) {
   }
 }
 
-void* DlMacSender::MasterThread(size_t /*unused*/) {
+void* MacSender::MasterThread(size_t /*unused*/) {
   PinToCoreWithOffset(ThreadType::kMasterTX, core_offset_, 0);
   std::array<size_t, kFrameWnd> frame_data_count;
   frame_data_count.fill(0);
@@ -177,8 +184,7 @@ void* DlMacSender::MasterThread(size_t /*unused*/) {
     // Wait
   }
 
-  RtAssert((cfg_->Frame().NumDlDataSyms()) > 0,
-           "DlMacSender: No valid symbols to transmit");
+  RtAssert(packets_per_frame_ > 0, "MacSender: No valid symbols to transmit");
 
   double timestamp_us = GetTime::GetTimeUs();
   uint64_t tick_start = GetTime::Rdtsc();
@@ -199,7 +205,7 @@ void* DlMacSender::MasterThread(size_t /*unused*/) {
       frame_data_count.at(comp_frame_slot)++;
 
       if (kDebugPrintSender) {
-        std::printf("DlMacSender: Checking frame %d : %zu : %zu\n",
+        std::printf("MacSender: Checking frame %d : %zu : %zu\n",
                     ctag.frame_id_, comp_frame_slot,
                     frame_data_count.at(comp_frame_slot));
       }
@@ -212,7 +218,7 @@ void* DlMacSender::MasterThread(size_t /*unused*/) {
         size_t next_frame_id = ctag.frame_id_ + 1;
         if ((kDebugSenderReceiver == true) ||
             (kDebugPrintPerFrameDone == true)) {
-          std::printf("DlMacSender: Tx frame %d in %.2f ms, next frame %zu\n",
+          std::printf("MacSender: Tx frame %d in %.2f ms, next frame %zu\n",
                       ctag.frame_id_, (frame_end_us - frame_start_us) / 1000.0,
                       next_frame_id);
         }
@@ -242,7 +248,7 @@ void* DlMacSender::MasterThread(size_t /*unused*/) {
       }
     }  // end (ret > 0)
   }
-  std::printf("DlMacSender: main thread exit\n");
+  std::printf("MacSender: main thread exit\n");
   WriteStatsToFile(cfg_->FramesToTest());
   return nullptr;
 }
@@ -251,7 +257,7 @@ void* DlMacSender::MasterThread(size_t /*unused*/) {
  * since we are using UDP between the antennas and in the multiple antenna case
  * the packet data could get mixed at the mac_thread receiver
  */
-void* DlMacSender::WorkerThread(size_t tid) {
+void* MacSender::WorkerThread(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTX, (core_offset_ + 1), tid);
 
   // Wait for all Sender threads (including master) to start runnung
@@ -259,7 +265,7 @@ void* DlMacSender::WorkerThread(size_t tid) {
   while (num_workers_ready_atomic.load() < (socket_thread_num_ + 2)) {
     // Wait
   }
-  MLPD_FRAME("DlMacSender: worker thread %d running\n", tid);
+  MLPD_FRAME("MacSender: worker thread %d running\n", tid);
 
   const size_t max_symbol_id = 1;
   const size_t radio_lo = (tid * cfg_->NumRadios()) / socket_thread_num_;
@@ -275,7 +281,7 @@ void* DlMacSender::WorkerThread(size_t tid) {
   size_t total_tx_packets_rolling = 0;
   size_t cur_radio = radio_lo;
 
-  MLPD_INFO("DlMacSender: In thread %zu, %zu antennas, total antennas: %zu\n",
+  MLPD_INFO("MacSender: In thread %zu, %zu antennas, total antennas: %zu\n",
             tid, ant_num_this_thread, cfg_->NumRadios());
 
   std::array<size_t, kDequeueBulkSize> tags;
@@ -289,19 +295,18 @@ void* DlMacSender::WorkerThread(size_t tid) {
         auto tag = gen_tag_t(tags.at(tag_id));
 
         if ((kDebugPrintSender)) {
-          std::printf("DlMacSender : worker %zu processing frame %d : %d \n",
-                      tid, tag.frame_id_, tag.ant_id_);
+          std::printf("MacSender : worker %zu processing frame %d : %d \n", tid,
+                      tag.frame_id_, tag.ant_id_);
         }
         // const size_t tx_bufs_idx = TagToTxBuffersIndex(tag);
         uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
 
-        // Mac Thread is currently looking for DlMacDataBytesNumPerframe bytes
+        // Mac Thread is currently looking for packets_per_frame_ bytes
         // since we read in mac packets, we need to skip over the headers
-        for (size_t packet = 0; packet < cfg_->DlMacPacketsPerframe();
-             packet++) {
+        for (size_t packet = 0; packet < packets_per_frame_; packet++) {
           auto* tx_packet = reinterpret_cast<MacPacket*>(mac_packet_location);
           // TODO: Port + ue_radio?
-          udp_client.Send(cfg_->BsServerAddr(), cfg_->BsMacRxPort(),
+          udp_client.Send(server_address_, server_rx_port_,
                           reinterpret_cast<uint8_t*>(&tx_packet->data_[0u]),
                           cfg_->MacPayloadLength());
           mac_packet_location =
@@ -342,11 +347,11 @@ void* DlMacSender::WorkerThread(size_t tid) {
                "Completion enqueue failed");
     }  // if (num_tags > 0)
   }    // while (keep_running.load() == true)
-  MLPD_FRAME("DlMacSender: worker thread %zu exit\n", tid);
+  MLPD_FRAME("MacSender: worker thread %zu exit\n", tid);
   return nullptr;
 }
 
-uint64_t DlMacSender::GetTicksForFrame(size_t frame_id) const {
+uint64_t MacSender::GetTicksForFrame(size_t frame_id) const {
   if (enable_slow_start_ == 0) {
     return ticks_all_;
   } else if (frame_id < kFrameWnd) {
@@ -358,19 +363,19 @@ uint64_t DlMacSender::GetTicksForFrame(size_t frame_id) const {
   }
 }
 
-void DlMacSender::CreateWorkerThreads(size_t num_workers) {
+void MacSender::CreateWorkerThreads(size_t num_workers) {
   for (size_t i = 0u; i < num_workers; i++) {
-    this->threads_.emplace_back(&DlMacSender::WorkerThread, this, i);
+    this->threads_.emplace_back(&MacSender::WorkerThread, this, i);
   }
 }
 
 /* Single threaded file reader to load a shared data structure */
-void* DlMacSender::DataUpdateThread(size_t tid) {
+void* MacSender::DataUpdateThread(size_t tid) {
   size_t buffer_updates = 0;
 
   // Sender gets better performance when this thread is not pinned to core
   // PinToCoreWithOffset(ThreadType::kWorker, 13, 0);
-  MLPD_INFO("DlMacSender: Data update thread %zu running on core %d\n", tid,
+  MLPD_INFO("MacSender: Data update thread %zu running on core %d\n", tid,
             sched_getcpu());
   std::ifstream tx_file;
   tx_file.open(data_filename_, (std::ifstream::in | std::ifstream::binary));
@@ -389,7 +394,7 @@ void* DlMacSender::DataUpdateThread(size_t tid) {
     }
   }
 
-  std::printf("DlMacSender: Data update initialized\n");
+  std::printf("MacSender: Data update initialized\n");
   // Unlock the rest of the workers
   num_workers_ready_atomic.fetch_add(1);
   // Normal run loop
@@ -407,17 +412,16 @@ void* DlMacSender::DataUpdateThread(size_t tid) {
   return nullptr;
 }
 
-void DlMacSender::UpdateTxBuffer(std::ifstream& read, gen_tag_t tag) {
+void MacSender::UpdateTxBuffer(std::ifstream& read, gen_tag_t tag) {
   // Load a frames worth of data
   uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
 
   assert(read.is_open() == true);
 
-  for (size_t i = 0; i < cfg_->DlMacPacketsPerframe(); i++) {
+  for (size_t i = 0; i < packets_per_frame_; i++) {
     auto* pkt = reinterpret_cast<MacPacket*>(mac_packet_location);
     pkt->frame_id_ = tag.frame_id_;
-    pkt->symbol_id_ = this->cfg_->Frame().GetDLSymbol(
-        i + cfg_->Frame().ClientDlPilotSymbols());
+    pkt->symbol_id_ = get_data_symbol_id_(i);
     pkt->ue_id_ = tag.ue_id_;
 
     // Read a MacPayload into the data section
@@ -425,7 +429,7 @@ void DlMacSender::UpdateTxBuffer(std::ifstream& read, gen_tag_t tag) {
     // Check for eof
     if (read.eof()) {
       std::printf(
-          "DlMacSender: ***EndofFileStream - Frame %d, symbol %d, ue %d, bytes "
+          "MacSender: ***EndofFileStream - Frame %d, symbol %d, ue %d, bytes "
           "%zu\n",
           pkt->frame_id_, pkt->symbol_id_, pkt->ue_id_, read.gcount());
       read.close();
@@ -435,17 +439,15 @@ void DlMacSender::UpdateTxBuffer(std::ifstream& read, gen_tag_t tag) {
     mac_packet_location = mac_packet_location +
                           (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
   }
-  std::printf(
-      "DlMacSender: Loading packet for frame %d, ue %d, bytes %zu : %zu\n",
-      tag.frame_id_, tag.ant_id_, cfg_->DlMacDataBytesNumPerframe(),
-      cfg_->MacPayloadLength() * cfg_->DlMacPacketsPerframe());
+  std::printf("MacSender: Loading packet for frame %d, ue %d, bytes %zu\n",
+              tag.frame_id_, tag.ant_id_,
+              cfg_->MacPayloadLength() * packets_per_frame_);
 }
 
-void DlMacSender::WriteStatsToFile(size_t tx_frame_count) const {
+void MacSender::WriteStatsToFile(size_t tx_frame_count) const {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string filename = cur_directory + "/data/mac_tx_result.txt";
-  std::printf("Printing ul mac sender results to file \"%s\"...\n",
-              filename.c_str());
+  std::string filename = cur_directory + "/data/tx_result.txt";
+  std::printf("Printing sender results to file \"%s\"...\n", filename.c_str());
 
   std::ofstream debug_file;
   debug_file.open(filename, std::ifstream::out);
