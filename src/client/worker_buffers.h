@@ -76,4 +76,28 @@ class FFTResult : public ResultMemory {
 };
 static_assert(sizeof(mem_tag_t<FFTResult>) == sizeof(size_t));
 
+class DeMulResult : public ResultMemory {
+  private:
+  int8_t *data_;
+
+  public:
+  explicit DeMulResult():
+    ResultMemory(),
+    data_(nullptr) {}
+
+  explicit DeMulResult(uint32_t frame_id, uint32_t symbol_id, uint32_t ant_id):
+    ResultMemory(frame_id, symbol_id, ant_id),
+    data_(nullptr) {}
+
+  void Set(uint32_t frame_id, uint32_t symbol_id, uint32_t ant_id, int8_t *data) {
+    ResultMemory::Set(frame_id, symbol_id, ant_id);
+    data_ = data;
+  }
+
+  int8_t *RawData() {
+    return data_;
+  }
+};
+static_assert(sizeof(mem_tag_t<DeMulResult>) == sizeof(size_t));
+
 #endif
