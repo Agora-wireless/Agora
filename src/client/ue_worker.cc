@@ -419,10 +419,7 @@ void UeWorker::DoDemul(size_t tag) {
   size_t offset = total_dl_symbol_id * config_.UeAntNum() + ant_id;
   float *equal_ptr = fft_res->RawData();
 
-  const size_t base_sc_id = 0;
-
-  int8_t* demod_ptr = demod_buffer_[frame_slot][dl_symbol_id][ant_id] +
-                      (config_.ModOrderBits() * base_sc_id);
+  int8_t* demod_ptr = demod_buffer_[frame_slot][dl_symbol_id][ant_id];
 
   switch (config_.ModOrderBits()) {
     case (CommsLib::kQpsk):
@@ -455,16 +452,24 @@ void UeWorker::DoDemul(size_t tag) {
     std::printf("\n");
   }
 
+  auto &itr = demul_res_memory_[frame_slot][dl_symbol_id][ant_id];
+  itr.Set(frame_id, symbol_id, ant_id, demod_ptr);
+  size_t res_tag = mem_tag_t<DeMulResult>(itr).tag_;
+
   RtAssert(
-      notify_queue_.enqueue(*ptok_.get(),
-        EventData(EventType::kDemul, gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_)),
+      notify_queue_.enqueue(*ptok_.get(), EventData(EventType::kDemul, res_tag)),
       "Demodulation message enqueue failed");
 }
 
 void UeWorker::DoDecodeUe(DoDecodeClient* decoder, size_t tag) {
-  const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t ant_id = gen_tag_t(tag).ant_id_;
+  DeMulResult *demul_res = dynamic_cast<DeMulResult *>(mem_tag_t<DeMulResult>(tag).memory_);
+  if(demul_res == nullptr) {
+    throw std::runtime_error("Pointer to bad DeMulResult received!");
+  }
+
+  const size_t frame_id = demul_res->GetFrameID();
+  const size_t symbol_id = demul_res->GetSymbolId();
+  const size_t ant_id = demul_res->GetAntId();
 
   if (true) {
     std::printf("UeWorker: Decode (frame %zu, symbol %zu, ant %zu)\n", frame_id,

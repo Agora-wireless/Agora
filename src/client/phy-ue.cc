@@ -448,9 +448,10 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kDemul: {
-          size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+          ResultMemory *res_mem = mem_tag_t<ResultMemory>(event.tags_[0]).memory_;
+          size_t frame_id = res_mem->GetFrameID();
+          size_t symbol_id = res_mem->GetSymbolId();
+          size_t ant_id = res_mem->GetAntId();
 
           EventData do_decode_task(EventType::kDecode, event.tags_[0]);
           ScheduleWork(do_decode_task);
