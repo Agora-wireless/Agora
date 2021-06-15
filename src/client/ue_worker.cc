@@ -68,6 +68,14 @@ UeWorker::UeWorker(
   (void)DftiCommitDescriptor(mkl_handle_);
 
   fft_res_memory_.resize(equal_buffer_.size());
+
+  demul_res_memory_.resize(kFrameWnd);
+  for(size_t i=0; i<kFrameWnd; i++) {
+    demul_res_memory_[i].resize(kMaxSymbols);
+    for(size_t j=0; j<kMaxSymbols; j++) {
+      demul_res_memory_[i][j].resize(kMaxUEs);
+    }
+  }
 }
 
 UeWorker::~UeWorker() {
