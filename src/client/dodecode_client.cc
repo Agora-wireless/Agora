@@ -29,11 +29,11 @@ DoDecodeClient::DoDecodeClient(
 
 DoDecodeClient::~DoDecodeClient() { std::free(resp_var_nodes_); }
 
-EventData DoDecodeClient::Launch(size_t tag) {
+void DoDecodeClient::Launch(DeMulResult demul_res) {
   const LDPCconfig& ldpc_config = cfg_->LdpcConfig();
-  const size_t frame_id = gen_tag_t(tag).frame_id_;
-  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t cb_id = gen_tag_t(tag).cb_id_;
+  const size_t frame_id = demul_res.GetFrameID();
+  const size_t symbol_id = demul_res.GetSymbolId();
+  const size_t cb_id = demul_res.GetAntId();
 
   const size_t symbol_idx_dl = cfg_->Frame().GetDLSymbolIdx(symbol_id);
   const size_t symbol_offset =
@@ -72,7 +72,7 @@ EventData DoDecodeClient::Launch(size_t tag) {
   ldpc_decoder_5gnr_response.varNodes = resp_var_nodes_;
 
   int8_t* llr_buffer_ptr =
-      demod_buffers_[frame_slot][symbol_idx_dl][ue_id] +
+      demul_res.RawData() +
       (cfg_->ModOrderBits() * (ldpc_config.NumCbCodewLen() * cur_cb_id));
 
   uint8_t* decoded_buffer_ptr =
@@ -136,6 +136,4 @@ EventData DoDecodeClient::Launch(size_t tag) {
     std::printf("Thread %d Decode takes %.2f\n", tid_,
                 GetTime::CyclesToUs(duration, cfg_->FreqGhz()));
   }
-
-  return EventData(EventType::kDecode, tag);
 }

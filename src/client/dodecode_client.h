@@ -14,6 +14,7 @@
 #include "phy_stats.h"
 #include "scrambler.h"
 #include "stats.h"
+#include "worker_buffers.h"
 
 class DoDecodeClient : public Doer {
  public:
@@ -24,7 +25,7 @@ class DoDecodeClient : public Doer {
       PhyStats* in_phy_stats, Stats* in_stats_manager);
   ~DoDecodeClient() override;
 
-  EventData Launch(size_t tag) override;
+  void Launch(DeMulResult);
 
  private:
   int16_t* resp_var_nodes_;
