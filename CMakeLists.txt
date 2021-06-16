@@ -43,20 +43,24 @@ enable_testing()
 find_package(GTest REQUIRED)
 
 option(DEBUG "Enable debugging" OFF)
-if(NOT DEBUG)
-  message(STATUS "Debugging is disabled")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG")
-else()
+option(SANITIZE "Enable Sanitizers" ON)
+if(DEBUG)
   message(STATUS "Verbose Makefile")
   set( CMAKE_VERBOSE_MAKEFILE on )
   message(STATUS "Debugging is enabled. Performance will be low")
   set(CMAKE_BUILD_TYPE Debug)
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wshadow -ggdb3 -fstack-protector-all -fsanitize=undefined -fsanitize=address -fsanitize=null")
-  #-fsanitize=thread- fstack-protector-all -fsanitize=address -fstack-check
-  #-fsanitize=address -fsanitize=pointer-compare
-  #-fsanitize=address -fsanitize=pointer-subtract
-  #-fsanitize=leak -fsanitize=undefined -fsanitize=null
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wshadow -ggdb3")
+  if(SANITIZE)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fstack-protector-all -fsanitize=undefined -fsanitize=address -fsanitize=null")
+    #-fsanitize=thread- fstack-protector-all -fsanitize=address -fstack-check
+    #-fsanitize=address -fsanitize=pointer-compare
+    #-fsanitize=address -fsanitize=pointer-subtract
+    #-fsanitize=leak -fsanitize=undefined -fsanitize=null
+  endif()
+else()
+  message(STATUS "Debugging is disabled")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG")
 endif()
 
 #if(CMAKE_BUILD_TYPE MATCHES Debug)
