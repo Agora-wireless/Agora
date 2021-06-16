@@ -44,7 +44,7 @@ find_package(GTest REQUIRED)
 
 option(DEBUG "Enable debugging" OFF)
 option(SANITIZE "Enable Sanitizers" ON)
-option(OPTIMIZE "Enable Sanitizers" OFF)
+option(OPTIMIZE "Enable Optimization" OFF)
 if(DEBUG)
   message(STATUS "Verbose Makefile")
   set( CMAKE_VERBOSE_MAKEFILE on )
