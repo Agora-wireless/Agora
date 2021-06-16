@@ -89,6 +89,16 @@ class DeMulResult : public ResultMemory {
     ResultMemory(frame_id, symbol_id, ant_id),
     data_(nullptr) {}
 
+  // Move constructor
+  DeMulResult(DeMulResult &&in) noexcept:
+    ResultMemory(in.GetFrameID(), in.GetSymbolId(), in.GetAntId()),
+    data_(in.data_) {
+      in.data_ = nullptr;
+  }
+
+  // delete copy constructor
+  DeMulResult(const DeMulResult &) = delete;
+
   void Set(uint32_t frame_id, uint32_t symbol_id, uint32_t ant_id, int8_t *data) {
     ResultMemory::Set(frame_id, symbol_id, ant_id);
     data_ = data;

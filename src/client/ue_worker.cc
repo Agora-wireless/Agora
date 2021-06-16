@@ -476,6 +476,7 @@ void UeWorker::DoDecodeUe(DoDecodeClient* decoder, size_t tag) {
                 symbol_id, ant_id);
   }
 
+  DeMulResult tmp_demul_res;
   for (size_t cb_id = 0; cb_id < config_.LdpcConfig().NumBlocksInSymbol();
        cb_id++) {
     // For now, call for each cb
@@ -483,13 +484,14 @@ void UeWorker::DoDecodeUe(DoDecodeClient* decoder, size_t tag) {
         "Decoding [Frame %zu, Symbol %zu, User %zu, Code Block %zu : %zu]\n",
         frame_id, symbol_id, ant_id, cb_id,
         config_.LdpcConfig().NumBlocksInSymbol());
-    decoder->Launch(
-        gen_tag_t::FrmSymCb(
-            frame_id, symbol_id,
-            cb_id + (ant_id * config_.LdpcConfig().NumBlocksInSymbol()))
-            .tag_);
+    tmp_demul_res.Set(
+                  demul_res->GetFrameID(),
+                  demul_res->GetSymbolId(),
+                  cb_id + (demul_res->GetAntId() * config_.LdpcConfig().NumBlocksInSymbol()),
+                  demul_res->RawData()
+    );
+    decoder->Launch(std::move(tmp_demul_res));
   }
-
   // Post the completion event (symbol)
   size_t completion_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, ant_id).tag_;
 
