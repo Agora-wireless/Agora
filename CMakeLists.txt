@@ -44,6 +44,7 @@ find_package(GTest REQUIRED)
 
 option(DEBUG "Enable debugging" OFF)
 option(SANITIZE "Enable Sanitizers" ON)
+option(OPTIMIZE "Enable Sanitizers" OFF)
 if(DEBUG)
   message(STATUS "Verbose Makefile")
   set( CMAKE_VERBOSE_MAKEFILE on )
@@ -56,6 +57,9 @@ if(DEBUG)
     #-fsanitize=address -fsanitize=pointer-compare
     #-fsanitize=address -fsanitize=pointer-subtract
     #-fsanitize=leak -fsanitize=undefined -fsanitize=null
+  endif()
+  if(OPTIMIZE)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O3")
   endif()
 else()
   message(STATUS "Debugging is disabled")
