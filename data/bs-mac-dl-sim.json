@@ -15,7 +15,7 @@
   "beacon_position": 0,
   "mac_rx_port": 8070,
   "mac_tx_port": 8080,
-  "core_offset": 1,
+  "core_offset": 16,
   "worker_thread_num": 8,
   "socket_thread_num": 1,
   "frames_to_test": 5

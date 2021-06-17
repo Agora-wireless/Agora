@@ -108,15 +108,16 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
     task_ptok_[i] = new moodycamel::ProducerToken(send_queue_);
   }
 
+  num_workers_ready_atomic.store(0);
   // Create a master thread when started from simulator
   if (create_thread_for_master == true) {
+    MLPD_INFO("MacSender: creating master thread\n");
     this->threads_.emplace_back(&MacSender::MasterThread, this,
                                 socket_thread_num_);
   }
 
   // Add the data update thread (background data reader)
   this->threads_.emplace_back(&MacSender::DataUpdateThread, this, 0);
-  num_workers_ready_atomic.store(0);
 }
 
 MacSender::~MacSender() {
@@ -183,6 +184,7 @@ void* MacSender::MasterThread(size_t /*unused*/) {
   while (num_workers_ready_atomic.load() < (socket_thread_num_ + 2)) {
     // Wait
   }
+  MLPD_FRAME("MacSender: Master thread running\n");
 
   RtAssert(packets_per_frame_ > 0, "MacSender: No valid symbols to transmit");
 
@@ -248,7 +250,7 @@ void* MacSender::MasterThread(size_t /*unused*/) {
       }
     }  // end (ret > 0)
   }
-  std::printf("MacSender: main thread exit\n");
+  MLPD_INFO("MacSender: main thread exit\n");
   WriteStatsToFile(cfg_->FramesToTest());
   return nullptr;
 }
@@ -258,7 +260,7 @@ void* MacSender::MasterThread(size_t /*unused*/) {
  * the packet data could get mixed at the mac_thread receiver
  */
 void* MacSender::WorkerThread(size_t tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerTX, (core_offset_ + 1), tid);
+  PinToCoreWithOffset(ThreadType::kWorkerTX, (core_offset_ + 2), tid);
 
   // Wait for all Sender threads (including master) to start runnung
   num_workers_ready_atomic.fetch_add(1);
@@ -372,6 +374,7 @@ void MacSender::CreateWorkerThreads(size_t num_workers) {
 /* Single threaded file reader to load a shared data structure */
 void* MacSender::DataUpdateThread(size_t tid) {
   size_t buffer_updates = 0;
+  PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_ + 1, 0);
 
   // Sender gets better performance when this thread is not pinned to core
   // PinToCoreWithOffset(ThreadType::kWorker, 13, 0);
@@ -394,7 +397,7 @@ void* MacSender::DataUpdateThread(size_t tid) {
     }
   }
 
-  std::printf("MacSender: Data update initialized\n");
+  MLPD_INFO("MacSender: Data update initialized\n");
   // Unlock the rest of the workers
   num_workers_ready_atomic.fetch_add(1);
   // Normal run loop
