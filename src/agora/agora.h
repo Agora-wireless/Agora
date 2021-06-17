@@ -23,6 +23,7 @@
 #include "dodemul.h"
 #include "doencode.h"
 #include "dofft.h"
+#include "doifft.h"
 #include "doprecode.h"
 #include "dozf.h"
 #include "mac_thread_basestation.h"

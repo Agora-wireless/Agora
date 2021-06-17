@@ -238,6 +238,7 @@ add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 set(AGORA_SOURCES 
   src/agora/agora.cc
   src/agora/dofft.cc
+  src/agora/doifft.cc
   src/agora/dozf.cc
   src/agora/dodemul.cc
   src/agora/doprecode.cc
