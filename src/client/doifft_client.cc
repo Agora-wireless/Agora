@@ -69,10 +69,10 @@ EventData DoIFFTClient::Launch(size_t tag) {
 
   if (kMemcpyBeforeIFFT) {
     std::memset(ifft_out_ptr, 0, sizeof(float) * cfg_->OfdmDataStart() * 2);
-    std::memset(ifft_out_ptr + (cfg_->OfdmDataStop()) * 2, 0,
+    std::memset(ifft_out_ptr + (cfg_->OfdmDataStop() * 2), 0,
                 sizeof(float) * cfg_->OfdmDataStart() * 2);
-    std::memcpy(ifft_out_ptr + (cfg_->OfdmDataStart()) * 2,
-                ifft_in_ptr + (cfg_->OfdmDataStart()) * 2,
+    std::memcpy(ifft_out_ptr + (cfg_->OfdmDataStart() * 2),
+                ifft_in_ptr + (cfg_->OfdmDataStart() * 2),
                 sizeof(float) * cfg_->OfdmDataNum() * 2);
     DftiComputeBackward(mkl_handle_, ifft_out_ptr);
   } else {
