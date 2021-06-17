@@ -126,11 +126,6 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
 
   std::stringstream ss;  // Debug-only
 
-  //std::printf(
-  //    "ProcessCodeblocksFromPhy processing frame %zu symbol %zu:%zu ue_id "
-  //    "%zu\n",
-  //    frame_id, symbol_id, symbol_idx_ul, ue_id);
-
   // Only non-pilot uplink symbols have application data.
   if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
     auto* pkt = (struct MacPacket*)ul_data_ptr;
@@ -220,7 +215,6 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
        rx_tries++) {
     ssize_t ret = udp_server_->Recv(rx_location, rx_request_size);
     if (ret == 0) {
-      //std::printf("ProcessUdpPacketsFromApps: No data received\n");
       return;  // No data received
     } else if (ret < 0) {
       // There was an error in receiving
@@ -250,43 +244,6 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
 
   const char* payload = reinterpret_cast<char*>(&udp_pkt_buf_[0]);
 
-  // void MacThreadBaseStation::ProcessUdpPacketsFromAppsServer(const MacPacket*
-  // pkt,
-  //                                                           RBIndicator
-  //                                                           /*ri*/)
-  //                                                           {
-  //  // We've received bits for the downlink
-  //  const size_t total_symbol_idx =
-  //      cfg_->GetTotalDataSymbolIdxDl(pkt->frame_id_, pkt->symbol_id_);
-  //  const size_t rx_offset =
-  //      total_symbol_idx * cfg_->LdpcConfig().NumBlocksInSymbol();
-  //
-  //  if ((*dl_bits_buffer_status_)[pkt->ue_id_][rx_offset] == 1) {
-  //    MLPD_ERROR("MAC thread: dl_bits_buffer full, offset %zu. Exiting.\n",
-  //               rx_offset);
-  //    cfg_->Running(false);
-  //    return;
-  //  }
-  //
-  //  for (size_t i = 0; i < cfg_->LdpcConfig().NumBlocksInSymbol(); i++) {
-  //    (*dl_bits_buffer_status_)[pkt->ue_id_][rx_offset + i] = 1;
-  //  }
-  //  std::memcpy(
-  //      &(*dl_bits_buffer_)[total_symbol_idx][pkt->ue_id_ *
-  //      cfg_->OfdmDataNum()], pkt->data_, udp_pkt_buf_.size());
-  //
-  //  EventData msg(
-  //      EventType::kPacketFromMac,
-  //      gen_tag_t::FrmSymUe(pkt->frame_id_, pkt->symbol_id_,
-  //      pkt->ue_id_).tag_);
-  //  RtAssert(tx_queue_->enqueue(msg),
-  //           "MAC thread: Failed to enqueue downlink packet");
-  //}
-
-  // void MacThreadBaseStation::ProcessUdpPacketsFromAppsClient(const char*
-  // payload,
-  //                                                            RBIndicator ri)
-  //                                                            {
   // We've received bits for the uplink. The received MAC packet does not
   // specify a radio ID, send to radios in round-robin order
   size_t& radio_buf_id = dl_bits_buffer_id_[next_radio_id_];

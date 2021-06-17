@@ -127,10 +127,6 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
   const size_t symbol_idx_dl = this->cfg_->Frame().GetDLSymbolIdx(symbol_id);
   const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
 
-  //std::printf(
-  //    "ProcessCodeblocksFromPhy (frame %zu, symbol %zu:%zu, user %zu)\n",
-  //    frame_id, symbol_id, symbol_idx_dl, ue_id);
-
   const int8_t* dl_data_ptr =
       decoded_buffer_[(frame_id % kFrameWnd)][symbol_idx_dl][ue_id];
 
@@ -243,7 +239,6 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
        rx_tries++) {
     ssize_t ret = udp_server_->Recv(rx_location, rx_request_size);
     if (ret == 0) {
-      // printf("No data received\n");
       return;  // No data received
     } else if (ret < 0) {
       // There was an error in receiving
