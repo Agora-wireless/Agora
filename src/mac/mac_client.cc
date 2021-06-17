@@ -39,7 +39,8 @@ int main(int argc, char* argv[]) {
       std::ofstream create_file;
       data_filename = TOSTRING(PROJECT_DIRECTORY) +
                       std::string("/data/ul_increment_file.bin");
-      std::printf("Generating test binary file %s\n", data_filename.c_str());
+      std::printf("Generating test binary file for user uplink%s\n",
+                  data_filename.c_str());
 
       create_file.open(
           data_filename,
