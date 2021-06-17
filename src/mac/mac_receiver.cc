@@ -76,7 +76,7 @@ void* MacReceiver::LoopRecv(size_t tid) {
           "MacReceiver: recv failed with less than requested bytes");
     }
   }
-  delete rx_buffer;
+  delete[] rx_buffer;
   std::printf("MacReceiver: Finished\n");
   return nullptr;
 }
