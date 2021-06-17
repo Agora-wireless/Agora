@@ -583,7 +583,7 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
       }
       size_t buff_offset = (total_ul_symbol_id * config_.UeAntNum()) + ant_id;
       complex_float* dest_loc =
-          ifft_buffer_[buff_offset] + (config_.OfdmDataStart() * 1);
+          ifft_buffer_[buff_offset] + (config_.OfdmDataStart());
       std::memcpy(dest_loc, source_data,
                   sizeof(complex_float) * config_.OfdmDataNum());
     }
