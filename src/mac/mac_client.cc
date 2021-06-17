@@ -8,7 +8,8 @@
 #include "mac_sender.h"
 #include "signal_handler.h"
 
-DEFINE_uint64(num_sender_threads, 1, "Number of mac client sender threads");
+DEFINE_uint64(num_sender_worker_threads, 1,
+              "Number of mac client sender worker threads");
 DEFINE_uint64(num_receiver_threads, 1, "Number of mac client receiver threads");
 DEFINE_uint64(core_offset, 1, "Core ID of the first sender thread");
 DEFINE_uint64(frame_duration, 0, "Frame duration in microseconds");
@@ -22,6 +23,8 @@ DEFINE_uint64(
     "Send frames slower than the specified frame duration during warmup");
 
 int main(int argc, char* argv[]) {
+  PinToCoreWithOffset(ThreadType::kMaster, FLAGS_core_offset, 0);
+
   gflags::SetUsageMessage(
       "num_sender_threads, num_receiver_threads, core_offset, frame_duration, "
       "conf_file, data_file, enable_slow_start");
@@ -29,6 +32,10 @@ int main(int argc, char* argv[]) {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = FLAGS_conf_file;
   std::string data_filename = FLAGS_data_file;
+
+  auto frame_start = new double[kNumStatsFrames];
+  auto frame_end = new double[kNumStatsFrames];
+
   int ret = EXIT_FAILURE;
   {
     auto cfg = std::make_unique<Config>(filename.c_str());
@@ -60,36 +67,55 @@ int main(int argc, char* argv[]) {
 
     try {
       SignalHandler signal_handler;
+      std::unique_ptr<MacSender> sender;
+      std::unique_ptr<MacReceiver> receiver;
+      std::vector<std::thread> rx_threads;
+      //+2 1 for main thread and 1 for data update thread
+      const size_t kNumTotalSenderThreads = FLAGS_num_sender_worker_threads + 2;
 
       // Register signal handler to handle kill signal
       signal_handler.SetupSignalHandlers();
       if (cfg->Frame().NumUlDataSyms() > 0) {
-        auto sender = std::make_unique<MacSender>(
+        sender = std::make_unique<MacSender>(
             cfg.get(), data_filename, cfg->UlMacPacketsPerframe(),
             cfg->UeServerAddr(), cfg->UeMacRxPort(),
             std::bind(&FrameStats::GetULDataSymbol, cfg->Frame(),
                       std::placeholders::_1),
-            FLAGS_num_sender_threads, FLAGS_core_offset, FLAGS_frame_duration,
-            0, FLAGS_enable_slow_start);
-        sender->StartTx();
+            FLAGS_num_sender_worker_threads, FLAGS_core_offset + 1,
+            FLAGS_frame_duration, 0, FLAGS_enable_slow_start, true);
+        sender->StartTXfromMain(frame_start, frame_end);
       }
       if (cfg->Frame().NumDlDataSyms() > 0) {
-        auto receiver_ = std::make_unique<MacReceiver>(
+        receiver = std::make_unique<MacReceiver>(
             cfg.get(), cfg->DlMacDataBytesNumPerframe(), cfg->UeServerAddr(),
             cfg->UeMacTxPort(), FLAGS_num_receiver_threads,
-            FLAGS_core_offset + FLAGS_num_sender_threads);
-        std::vector<std::thread> rx_threads = receiver_->StartRecv();
-        for (auto& thread : rx_threads) {
-          thread.join();
-        }
+            FLAGS_core_offset + kNumTotalSenderThreads);
+        rx_threads = receiver->StartRecv();
       }
+
+      std::printf("Running mac client application\n");
+      while ((cfg->Running() == true) &&
+             (SignalHandler::GotExitSignal() == false)) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+      }
+
+      /* May want to move this exit section to after the exception */
+      cfg->Running(false);
+      std::printf("Terminating mac client application\n");
+      sender.reset();
+      for (auto& thread : rx_threads) {
+        thread.join();
+      }
+      receiver.reset();
       ret = EXIT_SUCCESS;
     } catch (SignalException& e) {
       std::cerr << "SignalException: " << e.what() << std::endl;
       ret = EXIT_FAILURE;
     }
   }  // end context Config
-  std::printf("Shutdown Client App!\n");
+  delete[](frame_start);
+  delete[](frame_end);
+  std::printf("Mac user application terminated!\n");
   gflags::ShutDownCommandLineFlags();
   return ret;
 }
