@@ -133,7 +133,7 @@ PhyUe::PhyUe(Config* config)
   rx_downlink_deferral_.resize(kFrameWnd);
 
   //Mac counters for downlink data
-  tomac_counters_.Init(config_->Frame().NumDLSyms(), config_->UeAntNum());
+  tomac_counters_.Init(config_->Frame().NumDlDataSyms(), config_->UeAntNum());
 }
 
 PhyUe::~PhyUe() {
