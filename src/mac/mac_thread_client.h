@@ -86,7 +86,6 @@ class MacThreadClient {
   // server, uplink bits at the MAC thread running at the client) and forward
   // them to the PHY.
   void ProcessUdpPacketsFromApps(RBIndicator ri);
-  void ProcessUdpPacketsFromAppsServer(const MacPacket* pkt, RBIndicator ri);
   void ProcessUdpPacketsFromAppsClient(const char* payload, RBIndicator ri);
 
   // If Mode::kServer, this thread is running at the Agora server. Else at
