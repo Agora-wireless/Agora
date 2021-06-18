@@ -25,8 +25,7 @@ MacThreadClient::MacThreadClient(
   if (log_filename.empty() == false) {
     log_filename_ = log_filename;  // Use a non-default log filename
   } else {
-    std::string mode_string = "_client";
-    log_filename_ = kDefaultLogFilename + mode_string;
+    log_filename_ = kDefaultLogFilename;
   }
   log_file_ = std::fopen(log_filename_.c_str(), "w");
   RtAssert(log_file_ != nullptr, "Failed to open MAC log file");
@@ -290,7 +289,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
     std::fprintf(log_file_,
                  "User MAC thread: Received data from app for frame %zu, ue "
                  "%zu, size %zu:\n",
-                 next_frame_id_, next_radio_id_,
+                 next_tx_frame_id_, next_radio_id_,
                  cfg_->UlMacDataBytesNumPerframe());
 
     for (size_t i = 0; i < cfg_->UlMacDataBytesNumPerframe(); i++) {
@@ -305,7 +304,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
     auto* pkt = reinterpret_cast<MacPacket*>(
         &(*client_.ul_bits_buffer_)[next_radio_id_][pkt_offset]);
 
-    pkt->frame_id_ = next_frame_id_;
+    pkt->frame_id_ = next_tx_frame_id_;
     pkt->symbol_id_ = pkt_id;
     pkt->ue_id_ = next_radio_id_;
     pkt->datalen_ = cfg_->MacPayloadLength();
@@ -327,7 +326,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
       std::printf(
           "User MAC thread created packet frame %zu, pkt %zu, size %zu, copied "
           "to location %zu\n",
-          next_frame_id_, pkt_id, cfg_->MacPayloadLength(), (size_t)pkt);
+          next_tx_frame_id_, pkt_id, cfg_->MacPayloadLength(), (size_t)pkt);
 
       ss << "Header Info:\n"
          << "FRAME_ID: " << pkt->frame_id_ << "\nSYMBOL_ID: " << pkt->symbol_id_
@@ -351,7 +350,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
   radio_buf_id = (radio_buf_id + 1) % kFrameWnd;
   next_radio_id_ = (next_radio_id_ + 1) % cfg_->UeAntNum();
   if (next_radio_id_ == 0) {
-    next_frame_id_++;
+    next_tx_frame_id_++;
   }
 }
 
@@ -364,14 +363,9 @@ void MacThreadClient::RunEventLoop() {
   while (cfg_->Running() == true) {
     ProcessRxFromPhy();
 
-    ProcessControlInformation();
-
-    if (next_frame_id_ == cfg_->FramesToTest()) {
-      MLPD_WARN(
-          "MAC thread stopping. Next frame ID = %zu, configured "
-          "frames to test = %zu\n",
-          next_frame_id_, cfg_->FramesToTest());
-      break;
+    // No need to process incomming packets if we are finished
+    if (next_tx_frame_id_ != cfg_->FramesToTest()) {
+      ProcessControlInformation();
     }
   }
 }

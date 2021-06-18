@@ -27,13 +27,8 @@
  */
 class MacThreadBaseStation {
  public:
-  enum class Mode {
-    kServer,  // The MAC thread is running the the Agora server
-    kClient   // The MAC thread is running at the Agora client
-  };
-
   // Default log file for MAC layer outputs
-  static constexpr char kDefaultLogFilename[] = "/tmp/mac_log";
+  static constexpr char kDefaultLogFilename[] = "/tmp/mac_log_server";
 
   // Maximum number of outstanding UDP packets per UE that we allocate recv()
   // buffer space for
@@ -121,7 +116,7 @@ class MacThreadBaseStation {
   size_t last_mac_pkt_rx_tsc_ = 0;
 
   // The frame ID of the next MAC packet we'll hand over to the PHY
-  size_t next_frame_id_ = 0;
+  size_t next_tx_frame_id_ = 0;
 
   // The radio ID of the next MAC packet we'll hand over to the PHY
   size_t next_radio_id_ = 0;
