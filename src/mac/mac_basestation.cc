@@ -5,7 +5,6 @@
 #include <gflags/gflags.h>
 
 #include <chrono>
-#include <iostream>
 #include <thread>
 
 #include "mac_receiver.h"
@@ -111,6 +110,7 @@ int main(int argc, char* argv[]) {
         thread.join();
       }
       receiver.reset();
+	  ret = EXIT_SUCCESS;
     } catch (SignalException& e) {
       std::cerr << "SignalException: " << e.what() << std::endl;
       cfg->Running(false);
