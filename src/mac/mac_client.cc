@@ -4,6 +4,9 @@
  */
 #include <gflags/gflags.h>
 
+#include <chrono>
+#include <thread>
+
 #include "mac_receiver.h"
 #include "mac_sender.h"
 #include "signal_handler.h"
@@ -110,6 +113,7 @@ int main(int argc, char* argv[]) {
       ret = EXIT_SUCCESS;
     } catch (SignalException& e) {
       std::cerr << "SignalException: " << e.what() << std::endl;
+      cfg->Running(false);
       ret = EXIT_FAILURE;
     }
   }  // end context Config
