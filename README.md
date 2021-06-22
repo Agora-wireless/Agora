@@ -1,4 +1,4 @@
-[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fpr-downlink-mac)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/pr-downlink-mac/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fmac-term-wip)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/mac-term-wip/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
@@ -119,15 +119,14 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
        `./build/data_generator --conf_file data/ue-mac-sim.json` to generate data files.
        `./build/user -conf_file data/ue-mac-sim.json` to start users.
      * Terminal 2:
-       `./build/macuser --enable_slow_start 1 --conf_file data/ue-mac-sim.json` to run to user mac app.  Specify --data_file "" to generate patterned data and --conf_file options as necessary.
-     * Terminal 3:
        `./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --bs_conf_file data/bs-mac-sim.json --ue_conf_file data/ue-mac-sim.json` to run the channel simulator
+     * Terminal 3:
+       `./build/macuser --enable_slow_start 1 --conf_file data/ue-mac-sim.json` to run to user mac app.  Specify --data_file "" to generate patterned data and --conf_file options as necessary.
      * Terminal 4:
-       `./build/macbs --enable_slow_start 1 --conf_file data/bs-mac-sim.json ` to run to base station mac app. pecify --data_file "" to generate patterned data and --conf_file options as necessary.
+       `./build/agora --conf_file data/bs-mac-sim.json` run agora before running macbs.  Run macuser -> agora -> macbs in quick succession. 
      * Terminal 5:
-       `./build/agora --conf_file data/bs-mac-sim.json`
-   * Note: make sure Agora and sender are using different set of cores,
-     otherwise there will be performance slow down.
+       `./build/macbs --enable_slow_start 1 --conf_file data/bs-mac-sim.json ` to run to base station mac app. pecify --data_file "" to generate patterned data and --conf_file options as necessary.
+   * Note: make sure agora / user / chsim / macuser / macbs are using different set of cores,otherwise there will be performance slow down.
 
  * To run with real wireless traffic from Faros/Iris hardware UEs, see the
    [Agora with real RRU](#agora-with-real-rru) section below.
