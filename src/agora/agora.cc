@@ -54,12 +54,12 @@ Agora::Agora(Config* const cfg)
   if (kEnableMac == true) {
     const size_t mac_cpu_core =
         cfg->CoreOffset() + cfg->SocketThreadNum() + cfg->WorkerThreadNum() + 1;
-    mac_thread_ = std::make_unique<MacThread>(
-        MacThread::Mode::kServer, cfg, mac_cpu_core, decoded_buffer_,
-        nullptr /* ul bits */, nullptr /* ul bits status */, &dl_bits_buffer_,
+    mac_thread_ = std::make_unique<MacThreadBaseStation>(
+        cfg, mac_cpu_core, decoded_buffer_, &dl_bits_buffer_,
         &dl_bits_buffer_status_, &mac_request_queue_, &mac_response_queue_);
 
-    mac_std_thread_ = std::thread(&MacThread::RunEventLoop, mac_thread_.get());
+    mac_std_thread_ =
+        std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
   }
 
   // Create worker threads
@@ -109,6 +109,24 @@ void Agora::SendSnrReport(EventType event_type, size_t frame_id,
     std::memcpy(&snr_report.tags_[1], &snr, sizeof(float));
     TryEnqueueFallback(&mac_request_queue_, snr_report);
     base_tag.ue_id_++;
+  }
+}
+
+void Agora::ScheduleDownlinkProcessing(size_t frame_id) {
+  size_t num_pilot_symbols = config_->Frame().ClientDlPilotSymbols();
+
+  for (size_t i = 0; i < num_pilot_symbols; i++) {
+    if (zf_last_frame_ == frame_id) {
+      ScheduleSubcarriers(EventType::kPrecode, frame_id,
+                          config_->Frame().GetDLSymbol(i));
+    } else {
+      encode_cur_frame_for_symbol_.at(i) = frame_id;
+    }
+  }
+
+  for (size_t i = num_pilot_symbols; i < config_->Frame().NumDLSyms(); i++) {
+    ScheduleCodeblocks(EventType::kEncode, frame_id,
+                       config_->Frame().GetDLSymbol(i));
   }
 }
 
@@ -455,6 +473,32 @@ void Agora::Start() {
 
         } break;
 
+        case EventType::kPacketFromMac: {
+          size_t frame_id = rx_tag_t(event.tags_[0]).offset_;
+
+          std::printf("EventType::kPacketFromMac: frame %zu\n", frame_id);
+
+          bool last_ue = this->mac_to_phy_counters_.CompleteTask(frame_id, 0);
+          if (last_ue == true) {
+            // schedule this frame's encoding
+            // Defer the schedule.  If frames are already deferred or the
+            // current received frame is too far off
+            if ((this->encode_deferral_.empty() == false) ||
+                (frame_id >= (this->cur_proc_frame_id_ + kScheduleQueues))) {
+              if (kDebugDeferral) {
+                std::printf("   +++ Deferring encoding of frame %zu\n",
+                            frame_id);
+              }
+              this->encode_deferral_.push(frame_id);
+            } else {
+              ScheduleDownlinkProcessing(frame_id);
+            }
+            this->mac_to_phy_counters_.Reset(frame_id);
+            PrintPerFrameDone(PrintType::kPacketFromMac, frame_id);
+          }
+
+        } break;
+
         case EventType::kEncode: {
           for (size_t i = 0; i < event.num_tags_; i++) {
             size_t frame_id = gen_tag_t(event.tags_[i]).frame_id_;
@@ -750,10 +794,10 @@ void Agora::Worker(int tid) {
       this->config_, tid, this->dl_zf_matrices_, this->dl_ifft_buffer_,
       this->dl_encoded_buffer_, this->stats_.get());
 
-  auto compute_encoding =
-      std::make_unique<DoEncode>(this->config_, tid, this->config_->DlBits(),
-                                 1 /*only one frame in DlBits*/,
-                                 this->dl_encoded_buffer_, this->stats_.get());
+  auto compute_encoding = std::make_unique<DoEncode>(
+      config_, tid, (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
+      (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
+      this->stats_.get());
 
   // Uplink workers
   auto compute_decoding = std::make_unique<DoDecode>(
@@ -891,8 +935,9 @@ void Agora::WorkerDecode(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerDecode, base_worker_core_offset_, tid);
 
   std::unique_ptr<DoEncode> compute_encoding(new DoEncode(
-      config_, tid, config_->DlBits(), 1 /*only one frame in DlBits*/,
-      dl_encoded_buffer_, this->stats_.get()));
+      config_, tid, (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
+      (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
+      this->stats_.get()));
 
   std::unique_ptr<DoDecode> compute_decoding(
       new DoDecode(config_, tid, demod_buffers_, decoded_buffer_,
@@ -963,19 +1008,18 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
   }
   // Receive first packet in a frame
   if (rx_counters_.num_pkts_[frame_slot] == 0) {
-    // schedule this frame's encoding
-    // Defer the schedule.  If frames are already deferred or the current
-    // received frame is too far off
-    if ((this->encode_deferral_.empty() == false) ||
-        (frame_id >= (this->cur_proc_frame_id_ + kScheduleQueues))) {
-      if (kDebugDeferral) {
-        std::printf("   +++ Deferring encoding of frame %zu\n", frame_id);
-      }
-      this->encode_deferral_.push(frame_id);
-    } else {
-      for (size_t i = 0; i < config_->Frame().NumDLSyms(); i++) {
-        ScheduleCodeblocks(EventType::kEncode, frame_id,
-                           config_->Frame().GetDLSymbol(i));
+    if (kEnableMac == false) {
+      // schedule this frame's encoding
+      // Defer the schedule.  If frames are already deferred or the current
+      // received frame is too far off
+      if ((this->encode_deferral_.empty() == false) ||
+          (frame_id >= (this->cur_proc_frame_id_ + kScheduleQueues))) {
+        if (kDebugDeferral) {
+          std::printf("   +++ Deferring encoding of frame %zu\n", frame_id);
+        }
+        this->encode_deferral_.push(frame_id);
+      } else {
+        ScheduleDownlinkProcessing(frame_id);
       }
     }
     this->stats_->MasterSetTsc(TsType::kFirstSymbolRX, frame_id);
@@ -1047,6 +1091,11 @@ void Agora::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
             this->stats_->MasterGetDeltaMs(TsType::kDecodeDone,
                                            TsType::kFirstSymbolRX, frame_id),
             config_->Frame().NumULSyms());
+        break;
+      case (PrintType::kPacketFromMac):
+        std::printf(
+            "Main [frame %zu + %.2f ms]: Completed MAC RX \n", frame_id,
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kEncode):
         std::printf("Main [frame %zu + %.2f ms]: Completed LDPC encoding\n",
@@ -1335,7 +1384,7 @@ void Agora::InitializeDownlinkBuffers() {
         config_->Frame().NumDLSyms() * kFrameWnd;
 
     size_t dl_socket_buffer_status_size =
-        config_->BsAntNum() * kFrameWnd * config_->Frame().NumDLSyms();
+        config_->BsAntNum() * task_buffer_symbol_num;
     size_t dl_socket_buffer_size =
         config_->DlPacketLength() * dl_socket_buffer_status_size;
     AllocBuffer1d(&dl_socket_buffer_, dl_socket_buffer_size,
@@ -1343,13 +1392,10 @@ void Agora::InitializeDownlinkBuffers() {
     AllocBuffer1d(&dl_socket_buffer_status_, dl_socket_buffer_status_size,
                   Agora_memory::Alignment_t::kAlign64, 1);
 
-    this->dl_bits_buffer_.Calloc(task_buffer_symbol_num,
-                                 config_->OfdmDataNum() * config_->UeNum(),
+    size_t dl_bits_buffer_size = kFrameWnd * config_->DlMacBytesNumPerframe();
+    this->dl_bits_buffer_.Calloc(config_->UeNum(), dl_bits_buffer_size,
                                  Agora_memory::Alignment_t::kAlign64);
-    size_t dl_bits_buffer_status_size =
-        task_buffer_symbol_num * config_->LdpcConfig().NumBlocksInSymbol();
-    this->dl_bits_buffer_status_.Calloc(config_->UeNum(),
-                                        dl_bits_buffer_status_size,
+    this->dl_bits_buffer_status_.Calloc(config_->UeNum(), kFrameWnd,
                                         Agora_memory::Alignment_t::kAlign64);
 
     dl_ifft_buffer_.Calloc(config_->BsAntNum() * task_buffer_symbol_num,
@@ -1372,7 +1418,7 @@ void Agora::InitializeDownlinkBuffers() {
         Agora_memory::Alignment_t::kAlign64);
 
     encode_counters_.Init(
-        config_->Frame().NumDLSyms(),
+        config_->Frame().NumDlDataSyms(),
         config_->LdpcConfig().NumBlocksInSymbol() * config_->UeNum());
     encode_cur_frame_for_symbol_ =
         std::vector<size_t>(config_->Frame().NumDLSyms(), SIZE_MAX);
@@ -1384,6 +1430,8 @@ void Agora::InitializeDownlinkBuffers() {
     //    std::vector<size_t>(config_->Frame().NumDLSyms(), SIZE_MAX);
     ifft_counters_.Init(config_->Frame().NumDLSyms(), config_->BsAntNum());
     tx_counters_.Init(config_->Frame().NumDLSyms(), config_->BsAntNum());
+    // mac data is sent per frame, so we set max symbol to 1
+    mac_to_phy_counters_.Init(1, config_->UeNum());
   }
 }
 
@@ -1500,6 +1548,10 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
     this->tomac_counters_.Reset(frame_id);
     this->ifft_counters_.Reset(frame_id);
     this->tx_counters_.Reset(frame_id);
+    if (config_->Frame().NumDLSyms() > 0) {
+      for (size_t ue_id = 0; ue_id < config_->UeNum(); ue_id++)
+        this->dl_bits_buffer_status_[ue_id][frame_id % kFrameWnd] = 0;
+    }
     this->cur_proc_frame_id_++;
 
     if (this->encode_deferral_.empty() == false) {
@@ -1513,10 +1565,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
           RtAssert(deferred_frame >= this->cur_proc_frame_id_,
                    "Error scheduling encoding because deferral frame is less "
                    "than current frame");
-          for (size_t i = 0; i < config_->Frame().NumDLSyms(); i++) {
-            ScheduleCodeblocks(EventType::kEncode, deferred_frame,
-                               config_->Frame().GetDLSymbol(i));
-          }
+          ScheduleDownlinkProcessing(frame_id);
           this->encode_deferral_.pop();
         } else {
           // No need to check the next frame because it is too large

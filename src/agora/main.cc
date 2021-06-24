@@ -5,13 +5,23 @@
 #include "agora.h"
 #include "config.h"
 #include "recorder.h"
-#include "signal_handler.h"
+
+DEFINE_string(conf_file,
+              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
+              "Config filename");
 
 int main(int argc, char* argv[]) {
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string conf_file = cur_directory + "/data/tddconfig-sim-ul.json";
+  gflags::SetUsageMessage("conf_file : set the configuration filename");
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  std::string conf_file;
+
+  // For backwards compatibility
   if (argc == 2) {
     conf_file = std::string(argv[1]);
+    std::printf("User: Setting configuration filename to %s\n",
+                conf_file.c_str());
+  } else {
+    conf_file = FLAGS_conf_file;
   }
 
   std::unique_ptr<Config> cfg = std::make_unique<Config>(conf_file.c_str());
@@ -33,5 +43,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "SignalException: " << e.what() << std::endl;
     ret = EXIT_FAILURE;
   }
+
+  gflags::ShutDownCommandLineFlags();
   return ret;
 }

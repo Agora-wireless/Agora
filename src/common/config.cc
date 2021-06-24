@@ -130,8 +130,10 @@ Config::Config(const std::string& jsonfile)
   dpdk_num_ports_ = tdd_conf.value("dpdk_num_ports", 1);
   dpdk_port_offset_ = tdd_conf.value("dpdk_port_offset", 0);
 
-  mac_rx_port_ = tdd_conf.value("mac_rx_port", kMacRxPort);
-  mac_tx_port_ = tdd_conf.value("mac_tx_port", kMacBaseRemotePort);
+  ue_mac_tx_port_ = tdd_conf.value("ue_mac_tx_port", kMacUserRemotePort);
+  ue_mac_rx_port_ = tdd_conf.value("ue_mac_rx_port", kMacUserLocalPort);
+  bs_mac_tx_port_ = tdd_conf.value("bs_mac_tx_port", kMacBaseRemotePort);
+  bs_mac_rx_port_ = tdd_conf.value("bs_mac_rx_port", kMacBaseLocalPort);
 
   /* frame configurations */
   cp_len_ = tdd_conf.value("cp_len", 0);
@@ -457,8 +459,7 @@ Config::Config(const std::string& jsonfile)
       "%s,\n\t%zu codeblocks per symbol, %zu bytes per code block,"
       "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
       "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
-      "frame "
-      "time %.3f usec\n",
+      "frame time %.3f usec\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
       ldpc_config_.NumBlocksInSymbol(), num_bytes_per_cb_,
@@ -611,7 +612,7 @@ void Config::GenData() {
   }
 #else
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  if (this->frame_.NumULSyms() > 0) {
+  if (this->frame_.NumUlDataSyms() > 0) {
     std::string ul_data_file = cur_directory + "/data/LDPC_orig_ul_data_" +
                                std::to_string(this->ofdm_ca_num_) + "_ant" +
                                std::to_string(this->ue_ant_total_) + ".bin";
@@ -623,7 +624,8 @@ void Config::GenData() {
       throw std::runtime_error("Config: Failed to open antenna file");
     }
 
-    for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
+    for (size_t i = this->frame_.ClientUlPilotSymbols(); i < this->frame_.NumULSyms();
+         i++) {
       if (std::fseek(fd, (data_bytes_num_persymbol_ * this->ue_ant_offset_),
                      SEEK_CUR) != 0) {
         MLPD_ERROR(" *** Error: failed to seek propertly (pre) into %s file\n",
@@ -637,8 +639,7 @@ void Config::GenData() {
         if (r < data_bytes_num_persymbol_) {
           MLPD_ERROR(
               " *** Error: Uplink bad read from file %s (batch %zu : %zu) %zu "
-              ": "
-              "%zu\n",
+              ": %zu\n",
               ul_data_file.c_str(), i, j, r, data_bytes_num_persymbol_);
         }
       }
@@ -656,7 +657,7 @@ void Config::GenData() {
     std::fclose(fd);
   }
 
-  if (this->frame_.NumDLSyms() > 0) {
+  if (this->frame_.NumDlDataSyms() > 0) {
     std::string dl_data_file = cur_directory + "/data/LDPC_orig_dl_data_" +
                                std::to_string(this->ofdm_ca_num_) + "_ant" +
                                std::to_string(this->ue_ant_total_) + ".bin";
@@ -669,7 +670,8 @@ void Config::GenData() {
       throw std::runtime_error("Config: Failed to open dl antenna file");
     }
 
-    for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
+    for (size_t i = this->frame_.ClientDlPilotSymbols(); i < this->frame_.NumDLSyms();
+         i++) {
       for (size_t j = 0; j < this->ue_ant_num_; j++) {
         size_t r = std::fread(this->dl_bits_[i] + j * num_bytes_per_ue_pad,
                               sizeof(int8_t), data_bytes_num_persymbol_, fd);
