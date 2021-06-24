@@ -53,28 +53,32 @@ EventData DoEncode::Launch(size_t tag) {
   size_t cb_id = gen_tag_t(tag).cb_id_;
   size_t cur_cb_id = cb_id % cfg_->LdpcConfig().NumBlocksInSymbol();
   size_t ue_id = cb_id / cfg_->LdpcConfig().NumBlocksInSymbol();
-  if (kDebugPrintInTask) {
-    std::printf(
-        "In doEncode thread %d: frame: %zu, symbol: %zu, code block %zu, "
-        "ue_id: %zu\n",
-        tid_, frame_id, symbol_id, cur_cb_id, ue_id);
-  }
 
   size_t start_tsc = GetTime::WorkerRdtsc();
 
   size_t symbol_idx, symbol_idx_data;
   if (cfg_->IsUe() == false) {
     symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
+    assert(symbol_idx >= cfg_->Frame().ClientDlPilotSymbols());
     symbol_idx_data = symbol_idx - cfg_->Frame().ClientDlPilotSymbols();
   } else {
     symbol_idx = cfg_->Frame().GetULSymbolIdx(symbol_id);
+    assert(symbol_idx >= cfg_->Frame().ClientUlPilotSymbols());
     symbol_idx_data = symbol_idx - cfg_->Frame().ClientUlPilotSymbols();
+  }
+
+  if (kDebugPrintInTask) {
+    std::printf(
+        "In doEncode thread %d: frame: %zu, symbol: %zu:%zu:%zu, code block "
+        "%zu, ue_id: %zu\n",
+        tid_, frame_id, symbol_id, symbol_idx, symbol_idx_data, cur_cb_id,
+        ue_id);
   }
 
   int8_t* tx_data_ptr = nullptr;
   ///\todo Remove the IsUe condition and make GetMacBits and GetInfoBits
   /// universal with raw_buffer_rollover_ the parameter.
-  if (kEnableMac && cfg_->IsUe()) {
+  if (kEnableMac) {
     // All cb's per symbol are included in 1 mac packet
     tx_data_ptr =
         cfg_->GetMacBits(raw_data_buffer_, (frame_id % raw_buffer_rollover_),

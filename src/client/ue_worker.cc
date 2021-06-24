@@ -17,6 +17,7 @@
 static constexpr bool kDebugPrintFft = false;
 static constexpr bool kDebugPrintDemul = false;
 static constexpr bool kDebugPrintModul = false;
+static constexpr bool kDebugPrintDecode = false;
 
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
@@ -445,18 +446,15 @@ void UeWorker::DoDecodeUe(DoDecodeClient* decoder, size_t tag) {
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ant_id_;
 
-  if (true) {
-    std::printf("UeWorker: Decode (frame %zu, symbol %zu, ant %zu)\n", frame_id,
-                symbol_id, ant_id);
-  }
-
   for (size_t cb_id = 0; cb_id < config_.LdpcConfig().NumBlocksInSymbol();
        cb_id++) {
     // For now, call for each cb
-    std::printf(
-        "Decoding [Frame %zu, Symbol %zu, User %zu, Code Block %zu : %zu]\n",
-        frame_id, symbol_id, ant_id, cb_id,
-        config_.LdpcConfig().NumBlocksInSymbol());
+    if (kDebugPrintDecode) {
+      std::printf(
+          "Decoding [Frame %zu, Symbol %zu, User %zu, Code Block %zu : %zu]\n",
+          frame_id, symbol_id, ant_id, cb_id,
+          config_.LdpcConfig().NumBlocksInSymbol() - 1);
+    }
     decoder->Launch(
         gen_tag_t::FrmSymCb(
             frame_id, symbol_id,
@@ -579,7 +577,7 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
       }
       size_t buff_offset = (total_ul_symbol_id * config_.UeAntNum()) + ant_id;
       complex_float* dest_loc =
-          ifft_buffer_[buff_offset] + (config_.OfdmDataStart() * 1);
+          ifft_buffer_[buff_offset] + (config_.OfdmDataStart());
       std::memcpy(dest_loc, source_data,
                   sizeof(complex_float) * config_.OfdmDataNum());
     }
