@@ -341,6 +341,9 @@ public:
     // Test mode configurations
     size_t test_mode;
 
+    // NIC PCIe address (for DPDK)
+    std::string pci_addr;
+
     bool isUE;
     const size_t maxFrame = 1 << 30;
     const size_t data_offset = sizeof(int) * 16;

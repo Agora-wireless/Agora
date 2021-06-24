@@ -285,6 +285,8 @@ Config::Config(std::string jsonfile)
 
     test_mode = tddConf.value("test_mode", 0);
 
+    pci_addr = tddConf.value("pci_addr", "37:00.0");
+
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;
     packet_length
