@@ -1,4 +1,4 @@
-[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fmac-term-wip)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/mac-term-wip/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fpr-downlink-mac)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/pr-downlink-mac/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
