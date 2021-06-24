@@ -474,7 +474,7 @@ void Agora::Start() {
         } break;
 
         case EventType::kPacketFromMac: {
-          size_t frame_id = rx_tag_t(event.tags_[0]).offset_;
+          size_t frame_id = rx_mac_tag_t(event.tags_[0]).offset_;
 
           std::printf("EventType::kPacketFromMac: frame %zu\n", frame_id);
 
