@@ -132,6 +132,8 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     Table<int8_t> demod_soft_buffer_to_decode,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
+    std::vector<std::vector<ControlInfo>>& control_info_table,
+    std::vector<size_t>& control_idx_list,
     PhyStats* in_phy_stats, Stats* in_stats_manager, RxStatus* rx_status,
     DecodeStatus* decode_status)
     : Doer(in_config, in_tid, freq_ghz, dummy_conq_, complete_task_queue,
@@ -139,6 +141,8 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     , demod_buffers_(demod_buffers)
     , demod_soft_buffer_to_decode_(demod_soft_buffer_to_decode)
     , decoded_buffers_(decoded_buffers)
+    , control_info_table_(control_info_table)
+    , control_idx_list_(control_idx_list)
     , phy_stats(in_phy_stats)
     , rx_status_(rx_status)
     , decode_status_(decode_status)
@@ -169,6 +173,12 @@ Event_data DoDecode::launch(size_t tag)
             tid, frame_id, symbol_idx_ul, cur_cb_id, ue_id);
     }
 
+    std::vector<ControlInfo>& info_list = control_info_table_[control_idx_list_[frame_id]];
+    if (ue_id >= info_list.size()) {
+        return Event_data(EventType::kDecode, tag);
+    }
+    ControlInfo& info = info_list[ue_id];
+
     size_t start_tsc = worker_rdtsc();
 
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
@@ -178,28 +188,41 @@ Event_data DoDecode::launch(size_t tag)
 
     // Decoder setup
     int16_t numFillerBits = 0;
-    int16_t numChannelLlrs = LDPC_config.cbCodewLen;
+    size_t nRows = info.Bg == 1 ? 46 : 42;
+    uint32_t cbCodewLen = ldpc_num_encoded_bits(info.Bg, info.Zc, nRows);
+    uint32_t cbLen = ldpc_num_input_bits(info.Bg, info.Zc);
+    // int16_t numChannelLlrs = LDPC_config.cbCodewLen;
+    int16_t numChannelLlrs = cbCodewLen;
 
     ldpc_decoder_5gnr_request.numChannelLlrs = numChannelLlrs;
     ldpc_decoder_5gnr_request.numFillerBits = numFillerBits;
     ldpc_decoder_5gnr_request.maxIterations = LDPC_config.decoderIter;
     ldpc_decoder_5gnr_request.enableEarlyTermination
         = LDPC_config.earlyTermination;
-    ldpc_decoder_5gnr_request.Zc = LDPC_config.Zc;
-    ldpc_decoder_5gnr_request.baseGraph = LDPC_config.Bg;
-    ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
+    // ldpc_decoder_5gnr_request.Zc = LDPC_config.Zc;
+    ldpc_decoder_5gnr_request.Zc = info.Zc;
+    // ldpc_decoder_5gnr_request.baseGraph = LDPC_config.Bg;
+    ldpc_decoder_5gnr_request.baseGraph = info.Bg;
+    // ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
+    ldpc_decoder_5gnr_request.nRows = nRows;
 
-    int numMsgBits = LDPC_config.cbLen - numFillerBits;
+    // int numMsgBits = LDPC_config.cbLen - numFillerBits;
+    int numMsgBits = cbLen - numFillerBits;
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
+    // auto* llr_buffer_ptr
+    //     = cfg->get_demod_buf_to_decode(demod_soft_buffer_to_decode_, frame_id,
+    //         symbol_idx_ul, ue_id, LDPC_config.cbCodewLen * cur_cb_id);
     auto* llr_buffer_ptr
         = cfg->get_demod_buf_to_decode(demod_soft_buffer_to_decode_, frame_id,
-            symbol_idx_ul, ue_id, LDPC_config.cbCodewLen * cur_cb_id);
+            symbol_idx_ul, ue_id, info.sc_start);
 
+    // uint8_t* decoded_buffer_ptr
+    //     = decoded_buffers_[frame_slot][symbol_idx_ul][ue_id]
+    //     + (cur_cb_id * roundup<64>(cfg->num_bytes_per_cb));
     uint8_t* decoded_buffer_ptr
-        = decoded_buffers_[frame_slot][symbol_idx_ul][ue_id]
-        + (cur_cb_id * roundup<64>(cfg->num_bytes_per_cb));
+        = decoded_buffers_[frame_slot][symbol_idx_ul][ue_id];
 
     ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
     ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;

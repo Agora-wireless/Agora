@@ -5,6 +5,7 @@
 #include "concurrent_queue_wrapper.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "control.hpp"
 #include "docoding.hpp"
 #include "dodemul.hpp"
 #include "dofft.hpp"
@@ -101,6 +102,8 @@ public:
     void save_tx_data_to_file(int frame_id);
     void save_latency_data_to_file();
     void getEqualData(float** ptr, int* size);
+
+    void init_control_info();
 
     // Flags that allow developer control over Agora internals
     struct {
@@ -284,6 +287,10 @@ private:
 
     // Shared states between dosubcarriers and socket threads
     PrecodeStatus precode_status_;
+
+    // Control info list
+    std::vector<std::vector<ControlInfo>> control_info_table_;
+    std::vector<size_t> control_idx_list_;
 };
 
 #endif

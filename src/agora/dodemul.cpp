@@ -13,6 +13,8 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
+    std::vector<std::vector<ControlInfo>>& control_info_table,
+    std::vector<size_t>& control_idx_list,
     PhyStats* in_phy_stats, Stats* stats_manager, Table<char>* socket_buffer)
     : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
           worker_producer_token)
@@ -21,6 +23,8 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     , equal_buffer_(equal_buffer)
     , demod_buffers_(demod_buffers)
     , socket_buffer_(socket_buffer)
+    , control_info_table_(control_info_table)
+    , control_idx_list_(control_idx_list)
     , phy_stats(in_phy_stats)
 {
     duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
@@ -42,15 +46,17 @@ DoDemul::DoDemul(Config* config, int tid, double freq_ghz,
     MKL_Complex8 alpha = { 1, 0 };
     MKL_Complex8 beta = { 0, 0 };
 
-    mkl_jit_status_t status = mkl_jit_create_cgemm(&jitter, MKL_COL_MAJOR,
-        MKL_NOTRANS, MKL_NOTRANS, cfg->UE_NUM, 1, cfg->BS_ANT_NUM, &alpha,
-        cfg->UE_NUM, cfg->BS_ANT_NUM, &beta, cfg->UE_NUM);
-    if (MKL_JIT_ERROR == status) {
-        fprintf(stderr,
-            "Error: insufficient memory to JIT and store the DGEMM kernel\n");
-        exit(1);
+    for (size_t i = 1; i <= cfg->UE_NUM; i ++) {
+        mkl_jit_status_t status = mkl_jit_create_cgemm(&jitter[i], MKL_COL_MAJOR,
+            MKL_NOTRANS, MKL_NOTRANS, i, 1, cfg->BS_ANT_NUM, &alpha,
+            i, cfg->BS_ANT_NUM, &beta, i);
+        if (MKL_JIT_ERROR == status) {
+            fprintf(stderr,
+                "Error: insufficient memory to JIT and store the DGEMM kernel\n");
+            exit(1);
+        }
+        mkl_jit_cgemm[i] = mkl_jit_get_cgemm_ptr(jitter[i]);
     }
-    mkl_jit_cgemm = mkl_jit_get_cgemm_ptr(jitter);
 #endif
 }
 
@@ -105,10 +111,23 @@ void DoDemul::launch(
     for (size_t i = 0; i < max_sc_ite; i++) {
         size_t cur_sc_id = base_sc_id + i;
 
+        std::vector<size_t> ue_list;
+        std::vector<ControlInfo>& control_list = control_info_table_[frame_id];
+        for (size_t j = 0; j < control_list.size(); j ++) {
+            if (control_list[j].sc_start <= cur_sc_id && control_list[j].sc_end > cur_sc_id) {
+                ue_list.push_back(control_list[j].ue_id);
+            }
+        }
+        
+        if (ue_list.size() == 0) {
+            continue;
+        }
+
         cx_float* equal_ptr = nullptr;
         equal_ptr = (cx_float*)(&equaled_buffer_temp[(cur_sc_id - base_sc_id)
             * cfg->UE_NUM]);
-        cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
+        // cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
+        cx_fmat mat_equaled(equal_ptr, ue_list.size(), 1, false);
 
         cx_float* data_ptr = reinterpret_cast<cx_float*>(
             &data_gather_buffer[cur_sc_id * cfg->BS_ANT_NUM]);
@@ -117,11 +136,12 @@ void DoDemul::launch(
 
         size_t start_tsc2 = worker_rdtsc();
 #if USE_MKL_JIT
-        mkl_jit_cgemm(jitter, (MKL_Complex8*)ul_zf_ptr, (MKL_Complex8*)data_ptr,
+        mkl_jit_cgemm[ue_list.size()](jitter[ue_list.size()], (MKL_Complex8*)ul_zf_ptr, (MKL_Complex8*)data_ptr,
             (MKL_Complex8*)equal_ptr);
 #else
         const cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
-        const cx_fmat mat_ul_zf(ul_zf_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+        // const cx_fmat mat_ul_zf(ul_zf_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+        const cx_fmat mat_ul_zf(ul_zf_ptr, ue_list.size(), cfg->BS_ANT_NUM, false);
         mat_equaled = mat_ul_zf * mat_data;
 #endif
 
@@ -181,7 +201,11 @@ void DoDemul::launch(
         cfg->UE_NUM * 2 + 1, cfg->UE_NUM * 4, cfg->UE_NUM * 4 + 1,
         cfg->UE_NUM * 6, cfg->UE_NUM * 6 + 1);
     float* equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
-    for (size_t i = 0; i < cfg->UE_NUM; i++) {
+
+    std::vector<ControlInfo>& info_list = control_info_table_[control_idx_list_[frame_id]];
+    // for (size_t i = 0; i < cfg->UE_NUM; i++) {
+    for (size_t i = 0; i < info_list.size(); i ++) {
+        ControlInfo& info = info_list[i];
         float* equal_ptr = nullptr;
         if (kExportConstellation) {
             equal_ptr = (float*)(&equal_buffer_[total_data_symbol_idx_ul]
@@ -191,8 +215,10 @@ void DoDemul::launch(
         }
         size_t kNumDoubleInSIMD256 = sizeof(__m256) / sizeof(double); // == 4
         for (size_t j = 0; j < max_sc_ite / kNumDoubleInSIMD256; j++) {
-            __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
-            _mm256_store_ps(equal_T_ptr, equal_T_temp);
+            if (info.sc_start <= j + base_sc_id && info.sc_end > j + base_sc_id) {
+                __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
+                _mm256_store_ps(equal_T_ptr, equal_T_temp);
+            }
             equal_T_ptr += 8;
             equal_ptr += cfg->UE_NUM * kNumDoubleInSIMD256 * 2;
         }

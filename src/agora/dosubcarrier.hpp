@@ -83,6 +83,8 @@ public:
         Table<complex_float>& equal_buffer,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
+        std::vector<std::vector<ControlInfo>>& control_info_table,
+        std::vector<size_t>& control_idx_list,
         PhyStats* phy_stats, Stats* stats, RxStatus* rx_status = nullptr,
         DemulStatus* demul_status = nullptr, PrecodeStatus* precode_status = nullptr)
         : Doer(config, tid, freq_ghz, dummy_conq_, dummy_conq_,
@@ -98,6 +100,8 @@ public:
         , equal_buffer_(equal_buffer)
         , ul_zf_matrices_(ul_zf_matrices)
         , dl_zf_matrices_(dl_zf_matrices)
+        , control_info_table_(control_info_table)
+        , control_idx_list_(control_idx_list)
         , rx_status_(rx_status)
         , demul_status_(demul_status)
         , precode_status_(precode_status)
@@ -105,11 +109,12 @@ public:
         // Create the requisite Doers
         do_zf_ = new DoZF(this->cfg, tid, freq_ghz, dummy_conq_, dummy_conq_,
             nullptr /* ptok */, csi_buffers_, calib_buffer, ul_zf_matrices_,
-            dl_zf_matrices_, stats);
+            dl_zf_matrices_, control_info_table_, control_idx_list_, stats);
 
         do_demul_ = new DoDemul(this->cfg, tid, freq_ghz, dummy_conq_,
             dummy_conq_, nullptr /* ptok */, ul_zf_matrices_,
-            ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, phy_stats,
+            ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, 
+            control_info_table_, control_idx_list_, phy_stats,
             stats, &socket_buffer_);
 
         do_precode_ = new DoPrecode(this->cfg, tid, freq_ghz, dummy_conq_,
@@ -482,4 +487,8 @@ private:
     PrecodeStatus* precode_status_;
 
     moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
+
+    // Control info
+    std::vector<std::vector<ControlInfo>>& control_info_table_;
+    std::vector<size_t>& control_idx_list_;
 };

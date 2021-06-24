@@ -35,6 +35,8 @@ Agora::Agora(Config* cfg)
     stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
     phy_stats = new PhyStats(cfg);
 
+    init_control_info();
+
     /* Initialize TXRX threads */
     packet_tx_rx_.reset(new PacketTXRX(cfg, cfg->core_offset + 1,
         &rx_status_, &demul_status_, &demod_status_, &encode_status_, &precode_status_));
@@ -196,6 +198,7 @@ void* Agora::subcarrier_worker(int tid)
         socket_buffer_, csi_buffers_, calib_buffer_,
         dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
         ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
+        control_info_table_, control_idx_list_,
         phy_stats, stats, &rx_status_, &demul_status_, &precode_status_);
 
     computeSubcarrier->start_work();
@@ -210,7 +213,8 @@ void* Agora::decode_worker(int tid)
 
     auto computeDecoding = new DoDecode(config_, tid, freq_ghz,
         demod_buffers_, demod_soft_buffer_to_decode_,
-        decoded_buffer_, phy_stats, stats, &rx_status_, &demod_status_);
+        decoded_buffer_, control_info_table_, control_idx_list_, 
+        phy_stats, stats, &rx_status_, &demod_status_);
 
     computeDecoding->start_work();
     delete computeDecoding;
@@ -689,6 +693,35 @@ void Agora::getEqualData(float** ptr, int* size)
         max_equaled_frame, cfg->UL_PILOT_SYMS);
     *ptr = (float*)&equal_buffer_[offset][0];
     *size = cfg->UE_NUM * cfg->OFDM_DATA_NUM * 2;
+}
+
+void Agora::init_control_info()
+{
+    auto& cfg = config_;
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+
+    std::string filename_input = cur_directory
+        + "/data/control_ue_template.bin";
+    FILE* fp_input = fopen(filename_input.c_str(), "rb");
+    for (size_t i = 0; i < kNumSlot; i ++) {
+        size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+        std::vector<ControlInfo> info_list;
+        ControlInfo tmp;
+        for (size_t j = 0; j < num_ue; j ++) {
+            fread(&tmp, sizeof(ControlInfo), 1, fp_input);
+            info_list.push_back(tmp);
+        }
+        control_info_table_.push_back(info_list);
+    }
+    fclose(fp_input);
+
+    control_idx_list_.resize(cfg->frames_to_test);
+    filename_input = cur_directory + "/data/control_ue.bin";
+    fp_input = fopen(filename_input.c_str(), "rb");
+    for (size_t i = 0; i < cfg->frames_to_test; i ++) {
+        fread(&control_idx_list_[i], sizeof(size_t), 1, fp_input);
+    }
+    fclose(fp_input);
 }
 
 extern "C" {

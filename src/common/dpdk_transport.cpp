@@ -370,7 +370,7 @@ void DpdkTransport::dpdk_init(uint16_t core_offset, size_t thread_num)
         + std::to_string(core_offset + thread_num);
     // n: channels, m: maximum memory in megabytes
     const char* rte_argv[]
-        = { "txrx", "-l", core_list.c_str(), "--log-level", "0", "-w", "37:00.0", nullptr };
+        = { "txrx", "-l", core_list.c_str(), "--log-level", "0", "-w", "37:00.1", nullptr };
     int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
 
     // Initialize DPDK environment

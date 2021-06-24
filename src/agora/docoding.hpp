@@ -5,6 +5,7 @@
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "control.hpp"
 #include "doer.hpp"
 #include "gettime.h"
 #include "memory_manage.h"
@@ -60,6 +61,8 @@ public:
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
         Table<int8_t> demod_soft_buffer_to_decode,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
+        std::vector<std::vector<ControlInfo>>& control_info_table_,
+        std::vector<size_t>& control_idx_list_,
         PhyStats* in_phy_stats, Stats* in_stats_manager,
         RxStatus* rx_status = nullptr, DecodeStatus* decode_status = nullptr);
 
@@ -87,6 +90,10 @@ private:
     size_t cur_symbol_ = 0; // Current symbol to decode
     size_t cur_cb_ = 0; // Current code block id to decode
     moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
+
+    // Control info
+    std::vector<std::vector<ControlInfo>>& control_info_table_;
+    std::vector<size_t>& control_idx_list_;
 };
 
 #endif
