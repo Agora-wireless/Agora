@@ -161,7 +161,7 @@ static constexpr bool kDebugPrintPilot = false;
 static constexpr bool kDebugRadioTX = false;
 static constexpr bool kDebugRadioRX = false;
 
-static constexpr bool kLogMacPackets = true;
+static constexpr bool kLogMacPackets = false;
 
 enum class ThreadType {
   kMaster,
@@ -262,17 +262,25 @@ static constexpr size_t kMaxThreads = 128;
 // Number of subcarriers in one cache line, when represented as complex floats
 static constexpr size_t kSCsPerCacheline = 64 / (2 * sizeof(float));
 
-// Agora Mac Thread listens for UDP packets from applications (downlink packets
-// at the server, uplink packets at the client) on kMacRxPort
-static constexpr size_t kMacRxPort = 8070;
+// Agora Client sends UDP packets for UE #i (downlink packets at the client) to
+// destination port kMacUserRemotePort + i
+static constexpr size_t kMacUserRemotePort = 9070;
+
+// Agora Client Mac Thread listens for UDP packets from applications (uplink
+// packets at the client)
+static constexpr size_t kMacUserLocalPort = 9170;
 
 // After receiving decoded codeblocks from the PHY (uplink at the
 // server, downlink at the client), we send UDP packets to kRemoteHostname
 static constexpr char kMacRemoteHostname[] = "127.0.0.1";
 
-// Agora sends UDP packets for UE #i (uplink packets at the server,
-// downlink packets at the client) with destination port kBaseRemotePort + i
+// Agora sends UDP packets for UE #i (uplink packets at the server) to
+// destination port kMacBaseRemotePort + i
 static constexpr size_t kMacBaseRemotePort = 8080;
+
+// Agora listens for UDP packets (downlink data packets at the server) at
+// port kBaseLocalPort
+static constexpr size_t kMacBaseLocalPort = 8180;
 
 // Agora sends control information over an out-of-band control channel
 // to each UE #i, at port kBaseClientPort + i

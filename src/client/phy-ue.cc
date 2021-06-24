@@ -86,18 +86,13 @@ PhyUe::PhyUe(Config* config)
 
   size_t core_offset_worker = config_->CoreOffset() + 1 + rx_thread_num_;
   if (kEnableMac == true) {
-    // TODO [ankalia]: dummy_decoded_buffer is used at the base station
-    // server only, but MacThread for now requires it for the UE client too
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> dummy_decoded_buffer;
-
-    mac_thread_ = std::make_unique<MacThread>(
-        MacThread::Mode::kClient, config_, core_offset_worker,
-        dummy_decoded_buffer, &ul_bits_buffer_, &ul_bits_buffer_status_,
-        nullptr, /* dl bits buffer */
-        nullptr /* dl bits buffer status */, &to_mac_queue_, &complete_queue_);
+    mac_thread_ = std::make_unique<MacThreadClient>(
+        config_, core_offset_worker, decoded_buffer_, &ul_bits_buffer_,
+        &ul_bits_buffer_status_, &to_mac_queue_, &complete_queue_);
 
     core_offset_worker++;
-    mac_std_thread_ = std::thread(&MacThread::RunEventLoop, mac_thread_.get());
+    mac_std_thread_ =
+        std::thread(&MacThreadClient::RunEventLoop, mac_thread_.get());
   }
 
   for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
@@ -136,6 +131,9 @@ PhyUe::PhyUe(Config* config)
       config_->UeAntNum() * config_->Frame().ClientDlPilotSymbols();
 
   rx_downlink_deferral_.resize(kFrameWnd);
+
+  //Mac counters for downlink data
+  tomac_counters_.Init(config_->Frame().NumDlDataSyms(), config_->UeAntNum());
 }
 
 PhyUe::~PhyUe() {
@@ -469,19 +467,25 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kDecode: {
-          size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
-          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          const size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
 
-          if (kEnableMac) {
-            ScheduleTask(EventData(EventType::kPacketToMac, event.tags_[0]),
-                         &to_mac_queue_, ptok_mac);
-          }
           PrintPerTaskDone(PrintType::kDecode, frame_id, symbol_id, ant_id);
 
           bool symbol_complete =
               decode_counters_.CompleteTask(frame_id, symbol_id);
           if (symbol_complete == true) {
+            if (kEnableMac) {
+              auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
+
+              for (size_t i = 0; i < config_->UeAntNum(); i++) {
+                ScheduleTask(EventData(EventType::kPacketToMac, base_tag.tag_),
+                             &to_mac_queue_, ptok_mac);
+
+                base_tag.ue_id_++;
+              }
+            }
             PrintPerSymbolDone(PrintType::kDecode, frame_id, symbol_id);
 
             bool decode_complete = decode_counters_.CompleteSymbol(frame_id);
@@ -507,22 +511,37 @@ void PhyUe::Start() {
         case EventType::kPacketToMac: {
           const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
           const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          const size_t dl_symbol_idx =
+              config_->Frame().GetDLSymbolIdx(symbol_id);
 
           if (kDebugPrintPacketsToMac) {
             std::printf(
-                "PhyUe: sent decoded packet for (frame %zu, symbol %zu) "
-                "to MAC\n",
-                frame_id, symbol_id);
+                "PhyUe: sent decoded packet for (frame %zu, symbol %zu:%zu) to "
+                "MAC\n",
+                frame_id, symbol_id, dl_symbol_idx);
           }
+          bool last_tomac_task =
+              this->tomac_counters_.CompleteTask(frame_id, dl_symbol_idx);
 
-          const bool finished =
-              FrameComplete(frame_id, FrameTasksFlags::kMacTxComplete);
-          if (finished == true) {
-            if ((cur_frame_id + 1) >= config_->FramesToTest()) {
-              config_->Running(false);
-            } else {
-              FrameInit(frame_id);
-              cur_frame_id = frame_id + 1;
+          if (last_tomac_task == true) {
+            PrintPerSymbolDone(PrintType::kPacketToMac, frame_id, symbol_id);
+
+            bool last_tomac_symbol =
+                this->tomac_counters_.CompleteSymbol(frame_id);
+
+            if (last_tomac_symbol == true) {
+              PrintPerFrameDone(PrintType::kPacketToMac, frame_id);
+
+              const bool finished =
+                  FrameComplete(frame_id, FrameTasksFlags::kMacTxComplete);
+              if (finished == true) {
+                if ((cur_frame_id + 1) >= config_->FramesToTest()) {
+                  config_->Running(false);
+                } else {
+                  FrameInit(frame_id);
+                  cur_frame_id = frame_id + 1;
+                }
+              }
             }
           }
         } break;
@@ -769,7 +788,7 @@ void PhyUe::InitializeUplinkBuffers() {
   //    kFrameWnd * ul_symbol_perframe_ * config_->OfdmDataNum();
   // ul_syms_buffer_.Calloc(config_->UeAntNum(), ul_syms_buffer_size_,
   //                       Agora_memory::Alignment_t::kAlign64);
-  const size_t ul_syms_buffer_dim1 = config_->Frame().NumULSyms() * kFrameWnd;
+  const size_t ul_syms_buffer_dim1 = ul_symbol_perframe_ * kFrameWnd;
   const size_t ul_syms_buffer_dim2 =
       Roundup<64>(config_->OfdmDataNum()) * config_->UeAntNum();
 
@@ -978,15 +997,15 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             ifft_counters_.GetTaskCount(frame_id, symbol_id));
         break;
 
-        /*
-     case (PrintType::kPacketToMac):
-       std::printf(
-           "Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
-           "%zu symbols done\n",
-           frame_id, symbol_id,
-           this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX,
-     frame_id), tomac_counters_.GetSymbolCount(frame_id) + 1); break;
-       */
+      case (PrintType::kPacketToMac):
+        std::printf(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
+            tomac_counters_.GetSymbolCount(frame_id) + 1);
+        break;
+
       default:
         std::printf("Wrong task type in symbol done print!");
     }
@@ -1065,6 +1084,12 @@ void PhyUe::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
                         TsType::kIFFTDone, TsType::kFirstSymbolRX, frame_id));
         break;
 
+      case (PrintType::kPacketToMac):
+        std::printf(
+            "PhyUe [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
+        break;
+
       /*
       case (PrintType::kPacketTXFirst): std::printf(
             "PhyUe [frame %zu + %.2f ms]: Completed TX of first symbol\n",
@@ -1072,11 +1097,7 @@ void PhyUe::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
             this->stats_->MasterGetDeltaMs(TsType::kTXProcessedFirst,
                                            TsType::kFirstSymbolRX,
       frame_id)); break;
-
-      case (PrintType::kPacketToMac): std::printf(
-            "PhyUe [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
-            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX,
-      frame_id)); break; */
+      */
       default:
         std::printf("PhyUe: Wrong task type in frame done print!\n");
     }
