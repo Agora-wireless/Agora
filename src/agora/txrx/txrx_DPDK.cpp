@@ -22,7 +22,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     , encode_status_(encode_status)
     , precode_status_(precode_status)
 {
-    DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num + 2);
+    DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num + 2, cfg->pci_addr);
     for (size_t i = 0; i < socket_thread_num + 1; i ++) {
         mbuf_pool_[i] = DpdkTransport::create_mempool(i);
     }
