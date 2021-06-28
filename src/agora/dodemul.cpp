@@ -112,7 +112,7 @@ void DoDemul::launch(
         size_t cur_sc_id = base_sc_id + i;
 
         std::vector<size_t> ue_list;
-        std::vector<ControlInfo>& control_list = control_info_table_[frame_id];
+        std::vector<ControlInfo>& control_list = control_info_table_[control_idx_list_[frame_id]];
         for (size_t j = 0; j < control_list.size(); j ++) {
             if (control_list[j].sc_start <= cur_sc_id && control_list[j].sc_end > cur_sc_id) {
                 ue_list.push_back(control_list[j].ue_id);
