@@ -2,7 +2,7 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-servers=(roce81 roce82 roce83)
+servers=(roce83 roce81 roce82)
 
 if [ $# -eq 1 ]
 then

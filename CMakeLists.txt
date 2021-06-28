@@ -348,3 +348,21 @@ add_executable(test_clock_receiver
   src/common/dpdk_transport.cpp
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_clock_receiver ${COMMON_LIBS})
+
+add_executable(control_generator
+  data/control_generator/control_generator.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(control_generator ${COMMON_LIBS})
+
+add_executable(dynamic_generator
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/dynamic_generator/dynamic_generator.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(dynamic_generator ${COMMON_LIBS})
+target_compile_definitions(dynamic_generator PRIVATE GENERATE_DATA)
+
+add_executable(dynamic_sender
+  simulator/dynamic_sender_cli.cpp
+  simulator/dynamic_sender.cpp
+  src/common/dpdk_transport.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(dynamic_sender ${COMMON_LIBS})

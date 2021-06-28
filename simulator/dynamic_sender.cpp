@@ -238,9 +238,11 @@ void* Sender::worker_thread(int tid)
         rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, cfg->bs_server_addr_list.size()) == cfg->bs_server_addr_list.size(),
             "rte_eth_tx_burst() failed");
         // size_t pkt_sent = 0;
+        // size_t loop_count = 0;
         // while (pkt_sent < cfg->bs_server_addr_list.size()) {
         //     size_t pkt_sent_cur = rte_eth_tx_burst(0, tid, tx_mbufs + pkt_sent, cfg->bs_server_addr_list.size() - pkt_sent);
         //     pkt_sent += pkt_sent_cur;
+        //     loop_count ++;
         //     rt_assert(loop_count < 10000, "rte_eth_tx_burst() failed");
         // }
 
