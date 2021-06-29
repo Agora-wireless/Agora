@@ -17,7 +17,7 @@
 #include "concurrentqueue.h"
 #include "config.h"
 #include "datatype_conversion.h"
-#include "mac_thread.h"
+#include "mac_thread_client.h"
 #include "modulation.h"
 #include "phy_stats.h"
 #include "stats.h"
@@ -101,7 +101,7 @@ class PhyUe {
   std::array<std::uint8_t, kFrameWnd> frame_tasks_;
 
   // The thread running MAC layer functions
-  std::unique_ptr<MacThread> mac_thread_;
+  std::unique_ptr<MacThreadClient> mac_thread_;
   // Handle for the MAC thread
   std::thread mac_std_thread_;
 
@@ -229,6 +229,8 @@ class PhyUe {
   FrameCounters encode_counter_;
   FrameCounters modulation_counters_;
   FrameCounters ifft_counters_;
+
+  FrameCounters tomac_counters_;
 
   size_t max_equaled_frame_ = 0;
 };

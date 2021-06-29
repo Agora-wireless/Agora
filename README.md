@@ -89,7 +89,7 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
    * First, return to the base directory (`cd ..`), then run
      `./build/data_generator --conf_file data/tddconfig-sim-ul.json` to generate data
      files.
-   * In one terminal, run `./build/agora data/tddconfig-sim-ul.json` to
+   * In one terminal, run `./build/agora --conf_file data/tddconfig-sim-ul.json` to
      start Agora with uplink configuration.
    * In another terminal, run  `./build/sender --num_threads=2 --core_offset=1 --frame_duration=5000 --enable_slow_start=1 --conf_file=data/tddconfig-sim-ul.json` to start the emulated RRU 
      with uplink configuration.
@@ -98,36 +98,35 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
    rebuild code for Mellanox NICs; for Intel NICs, run `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j` 
    to exclude Mellanox libraries in the build.
    When running the emulated RRU with DPDK, it is required to set the MAC address
-     of the NIC used by Agora. To do this, pass `--server_mac_addr=` to
-     `./build/sender`.
+     of the NIC used by Agora. To do this, pass `--server_mac_addr=` to `sender`.
    * To test the real-time performance of Agora, see the [Running performance test](#running-performance-test) section below.
 
  * Run Agora with channel simulator and clients
    * First, return to the base directory (`cd ..`), then run
      `./build/data_generator --conf_file data/bs-sim.json` to generate data files.
-   * In one terminal, run `./build/user data/ue-sim.json` to start clients with
-     uplink configuration.
+   * In one terminal, run `./build/user --conf_file data/ue-sim.json` to start clients with
+     combined uplink & downlink configuration.
    * In another terminal, run  `./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim.json --ue_conf_file data/ue-sim.json`
-   * In another terminal, run `./build/agora data/bs-sim.json` to start
-     Agora with uplink configuration.
-   * Note: make sure Agora and sender are using different set of cores,
-     otherwise there will be performance slow down.
+   * In another terminal, run `./build/agora data/bs-sim.json` to start Agora with the combined configuration.
+   * Note: make sure Agora and sender are using different set of cores, otherwise there will be performance slow down.
 
- * Run Agora with channel simulator, clients, and mac enabled (Currently only Uplink supported).
-   * Compile the code with `-DENABLE_MAC=true`
-   * Terminal 1:
-     `./build/data_generator --conf_file data/ue-mac-sim.json` to generate data files.
-     `./build/user data/ue-mac-sim.json` to start clients with uplink configuration.
-   * Terminal 2:
-     `./build/macuser -enable_slow_start 1` to run to user client app.  Specify -data_file , -conf_file options as necessary.
-   * Terminal 3:
-     `./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --bs_conf_file data/bs-mac-sim.json --ue_conf_file data/ue-mac-sim.json` to run the channel simulator
-   * Terminal 4:
-     `./build/macbs` to run to base station udp rx app. 
-   * Terminal 5:
-     `./build/agora data/bs-mac-sim.json` to run the agora server.  Always start this last.
-   * Note: make sure Agora and sender are using different set of cores,
-     otherwise there will be performance slow down.
+ * Run Agora with channel simulator, clients, and mac enabled.
+   * Compile the code with `cmake .. -DENABLE_MAC=true`
+   * Uplink Testing (`--conf_file ue-mac-ul-sim.json / bs-mac-ul-sim.json`)
+   * Downlink Testing  (`--conf_file ue-mac-dl-sim.json / bs-mac-dl-sim.json`)
+   * Combined Testing  (`--conf_file ue-mac-sim.json / bs-mac-sim.json`)
+     * Terminal 1:
+       `./build/data_generator --conf_file data/ue-mac-sim.json` to generate data files.
+       `./build/user -conf_file data/ue-mac-sim.json` to start users.
+     * Terminal 2:
+       `./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --bs_conf_file data/bs-mac-sim.json --ue_conf_file data/ue-mac-sim.json` to run the channel simulator
+     * Terminal 3:
+       `./build/macuser --enable_slow_start 1 --conf_file data/ue-mac-sim.json` to run to user mac app.  Specify --data_file "" to generate patterned data and --conf_file options as necessary.
+     * Terminal 4:
+       `./build/agora --conf_file data/bs-mac-sim.json` run agora before running macbs.  Run macuser -> agora -> macbs in quick succession. 
+     * Terminal 5:
+       `./build/macbs --enable_slow_start 1 --conf_file data/bs-mac-sim.json ` to run to base station mac app. pecify --data_file "" to generate patterned data and --conf_file options as necessary.
+   * Note: make sure agora / user / chsim / macuser / macbs are using different set of cores,otherwise there will be performance slow down.
 
  * To run with real wireless traffic from Faros/Iris hardware UEs, see the
    [Agora with real RRU](#agora-with-real-rru) section below.
@@ -153,7 +152,7 @@ Below we describe how to get the uplink demo work.
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
      from your setup.
    * Run `./build/data_generator --conf_file data/ue-ul-hw.json` to generate required data files.
-   * Run `./build/user data/ue-ul-hw.json`.
+   * Run `./build/user --conf_file data/ue-ul-hw.json`.
  * Run Agora on the server connected to the Faros RRU
    * scp over the generated file `data/orig_data_512_ant2.bin` from the client
      machine to the server's `data` directory.
@@ -162,7 +161,7 @@ Below we describe how to get the uplink demo work.
      * Run `make -j` to recompile the code.
    * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding
      serials of your RRU Irises and hub, respectively.
-   * Run `./build/agora data/bs-ul-hw.json`.
+   * Run `./build/agora --conf_file data/bs-ul-hw.json`.
 
 ## Running performance test
 To test the real-time performance of Agora for processing 64x16 MU-MIMO with 20 MHz bandwidth and 64QAM modulation,
@@ -206,10 +205,10 @@ The steps to collect and analyze timestamp traces are as follows:
   * Gerenrate source data files by running
      `./build/data_generator --conf_file data/tddconfig-sim-ul.json`.
   * Run Agora as a real-time process (to prevent OS from doing context swithes) using 
-    `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} chrt -rr 99 ./build/agora data/tddconfig-sim-ul.json`. 
+    `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} chrt -rr 99 ./build/agora --conf_file data/tddconfig-sim-ul.json`. 
     (**NOTE**: Using a process priority 99 is dangerous. Before running it, 
     make sure you have directed OS interrupts away from cores used by Agora. If you have not done so,
-    run `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/agora data/tddconfig-sim-ul.json` instead to run Agora as a normal process.)
+    run `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/agora --conf_file data/tddconfig-sim-ul.json` instead to run Agora as a normal process.)
   * Run the emulated RRU using `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --server_mac_addr=00:00:00:00:00:00 --num_threads=2 --core_offset=0 --conf_file=data/tddconfig-sim-ul.json --delay=1000 --enable_slow_start=$2`. 
   * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
   * We also provide MATLAB scripts for [uplink](matlab/parse_multi_file_ul) and [downlink](matlab/parse_multi_file_dl) that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
