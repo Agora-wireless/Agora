@@ -111,17 +111,17 @@ class Sender {
   // The master thread runs on core core_offset. Worker threads use cores
   // {core_offset + 1, ..., core_offset + thread_num - 1}
   const size_t core_offset_;
-  const size_t frame_duration_;
+  size_t frame_duration_;
   const size_t inter_frame_delay_;
 
   // RDTSC clock ticks between the start of transmission of two symbols in
   // the steady state
-  const uint64_t ticks_all_;
+  uint64_t ticks_all_;
 
   // ticks_wnd_1 and ticks_wnd_2 are the RDTSC clock ticks between the start
   // of transmission of two symbols for the first several frames
-  const uint64_t ticks_wnd1_;
-  const uint64_t ticks_wnd2_;
+  uint64_t ticks_wnd1_;
+  uint64_t ticks_wnd2_;
 
   // RDTSC clock ticks between the end of a frame and the start of the next
   // frame

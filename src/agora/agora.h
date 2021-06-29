@@ -23,9 +23,10 @@
 #include "dodemul.h"
 #include "doencode.h"
 #include "dofft.h"
+#include "doifft.h"
 #include "doprecode.h"
 #include "dozf.h"
-#include "mac_thread.h"
+#include "mac_thread_basestation.h"
 #include "memory_manage.h"
 #include "phy_stats.h"
 #include "signal_handler.h"
@@ -115,6 +116,7 @@ class Agora {
   void ScheduleAntennas(EventType event_type, size_t frame_id,
                         size_t symbol_id);
   void ScheduleAntennasTX(size_t frame_id, size_t symbol_id);
+  void ScheduleDownlinkProcessing(size_t frame_id);
 
   /**
    * @brief Schedule LDPC decoding or encoding over code blocks
@@ -162,7 +164,7 @@ class Agora {
   std::unique_ptr<PacketTXRX> packet_tx_rx_;
 
   // The thread running MAC layer functions
-  std::unique_ptr<MacThread> mac_thread_;
+  std::unique_ptr<MacThreadBaseStation> mac_thread_;
   // Handle for the MAC thread
   std::thread mac_std_thread_;
   std::vector<std::thread> workers_;
@@ -232,6 +234,7 @@ class Agora {
   FrameCounters ifft_counters_;
   FrameCounters tx_counters_;
   FrameCounters tomac_counters_;
+  FrameCounters mac_to_phy_counters_;
   FrameCounters rc_counters_;
   RxCounters rx_counters_;
   size_t zf_last_frame_ = SIZE_MAX;
