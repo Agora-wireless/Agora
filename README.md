@@ -1,4 +1,4 @@
-[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fdevelop)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/develop/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fpr-reldocs)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/pr-reldocs/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
@@ -117,7 +117,7 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
    * Combined Testing  (`--conf_file ue-mac-sim.json / bs-mac-sim.json`)
      * Terminal 1:
        `./build/data_generator --conf_file data/ue-mac-sim.json` to generate data files.
-       `./build/user -conf_file data/ue-mac-sim.json` to start users.
+       `./build/user --conf_file data/ue-mac-sim.json` to start users.
      * Terminal 2:
        `./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --bs_conf_file data/bs-mac-sim.json --ue_conf_file data/ue-mac-sim.json` to run the channel simulator
      * Terminal 3:
@@ -224,6 +224,12 @@ Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for
 Agora's design overview and flow diagram that maps massive MIMO baseband processing 
 to the actual code structure. Technical details and performance results can be found in
  * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Real-time massive MIMO baseband processing in software," in Proc. of ACM CoNEXT, December 2020 ([PDF](https://www.yecl.org/publications/ding2020conext.pdf), [video](https://dl.acm.org/doi/abs/10.1145/3386367.3431296)).
- 
+
+To Generate the doxygen documentation for Agora run the following command from the repository root directory:
+`doxygen Agora_doxygen.conf`
+The latest hosted output is located at [Agora Doxygen](https://renew-wireless.org/agora-doxy/html/index.html) 
+
+Other community resources can be found at the [RENEW Wireless Wiki](https://wiki.renew-wireless.org/)
+
 ## Contact
 Jian Ding (jian.ding@yale.edu)
