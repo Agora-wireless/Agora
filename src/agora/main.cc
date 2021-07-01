@@ -5,6 +5,7 @@
 #include "agora.h"
 #include "config.h"
 #include "recorder.h"
+#include "gflags/gflags.h"
 
 DEFINE_string(conf_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
