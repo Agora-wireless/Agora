@@ -1,13 +1,16 @@
 cmake_minimum_required(VERSION 2.8.8)
 include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
-project(Agora)
+#Allow project version
+cmake_policy(SET CMP0048 NEW)
+project(Agora VERSION 1.0.0)
 
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   set(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
 endif()
 
 set(SOURCE_DIR ".")
+configure_file(${CMAKE_SOURCE_DIR}/src/common/version_config.h.in ${CMAKE_SOURCE_DIR}/src/common/version_config.h)
 
 option(FORCE_BUILD_PATH "Hardcode the build directory path to be 'Agora/build/'" ON)
 if(FORCE_BUILD_PATH)
