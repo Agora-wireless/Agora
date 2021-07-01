@@ -20,51 +20,41 @@ struct SampleBuffer {
   std::atomic_int* pkg_buf_inuse;
 };
 
+/*
+  An Interface on how to implement concrete recorders
+*/
+template<class T>
 class RecorderWorker {
- public:
-  RecorderWorker(Config* in_cfg, size_t antenna_offset, size_t num_antennas);
-  ~RecorderWorker();
+  public:
+  RecorderWorker(Config* in_cfg, H5::H5File *h5_file)
+  : file_(h5_file),
+    cfg_(in_cfg) { }
 
-  void init();
-  void finalize();
-  herr_t record(int tid, Packet* pkg);
+  ~RecorderWorker() = default;
 
-  inline size_t num_antennas() { return num_antennas_; }
-  inline size_t antenna_offset() { return antenna_offset_; }
+  virtual herr_t Record(int, T *) = 0;
 
- private:
-  // pilot dataset size increment
-  static const int kConfigPilotExtentStep;
-  // data dataset size increment
-  static const int kConfigDataExtentStep;
-
-  void gc();
-  herr_t initHDF5();
-  void openHDF5();
-  void closeHDF5();
-  void finishHDF5();
+  private:
+  H5::H5File *file_;
 
   Config* cfg_;
-  H5std_string hdf5_name_;
-
-  H5::H5File* file_;
-  // Group* group;
-  H5::DSetCreatPropList pilot_prop_;
-  H5::DSetCreatPropList noise_prop_;
-  H5::DSetCreatPropList data_prop_;
-
-  H5::DataSet* pilot_dataset_;
-  H5::DataSet* noise_dataset_;
-  H5::DataSet* data_dataset_;
-
-  size_t frame_number_pilot_;
-  size_t frame_number_data_;
-
-  size_t max_frame_number_;
-
-  size_t antenna_offset_;
-  size_t num_antennas_;
 };
+
+/*
+  Concrete recorder implementation
+*/
+class RxPacketRecorder : public RecorderWorker<Packet> {
+  public:
+  RxPacketRecorder(Config *in_cfg, H5::H5File *h5_file):
+    RecorderWorker(in_cfg, h5_file) {}
+
+  ~RxPacketRecorder() = default;
+
+  herr_t Record(int thread_id, Packet *data) override {
+    throw std::runtime_error("Unimplemented!");
+  }
+};
+
 }; /* End namespace Agora_recorder */
 
 #endif /* AGORA_RECORDER_WORKER_H_ */
