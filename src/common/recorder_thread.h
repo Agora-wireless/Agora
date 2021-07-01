@@ -68,10 +68,9 @@ class RecorderThread {
    * However, when the message processing time ~= queue posting time the mutex
    * could become unnecessary work
    */
-  bool wait_signal_;
-  std::mutex sync_;
-  std::condition_variable condition_;
-  bool running_;
+  volatile bool wait_signal_; // Could be operated in multi-core environment
+  volatile bool running_; // The recorder thread might not be pinned to a single core
+
   size_t antenna_offset_;
   size_t num_antennas_;
 };

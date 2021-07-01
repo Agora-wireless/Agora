@@ -24,7 +24,7 @@ RecorderThread::RecorderThread(Config* in_cfg, H5::H5File *h5_file,
       rx_record_(in_cfg, h5_file),
       id_(thread_id),
       core_alloc_(core),
-      wait_signal_(wait_signal) {
+      wait_signal_(wait_signal),
   packet_length_ = in_cfg->PacketLength();
   running_ = false;
 }
