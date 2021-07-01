@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
     // Register signal handler to handle kill signal
     signal_handler.SetupSignalHandlers();
 
-    auto data_recoder = std::make_unique<Agora_recorder::Recorder>(cfg.get());
+    auto &data_recoder = Agora_recorder::Recorder::GetInstance(cfg.get());
 
     std::unique_ptr<Agora> agora_cli = std::make_unique<Agora>(cfg.get());
     agora_cli->Start();
