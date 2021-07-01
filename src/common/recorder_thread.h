@@ -17,17 +17,15 @@ Event based message queue thread class for the recorder worker
 
 namespace Agora_recorder {
 
+enum RecordEventType { kThreadTermination, kTaskRecordRx };
+
+struct RecordEventData {
+  RecordEventType event_type_;
+  EventData       record_event_;
+};
+
 class RecorderThread {
  public:
-  enum RecordEventType { kThreadTermination, kTaskRecordRx };
-
-  struct RecordEventData {
-    RecordEventType event_type_;
-    EventData       record_event_;
-  };
-  RecorderThread(Config *in_cfg, size_t thread_id, int core, size_t queue_size,
-                 size_t antenna_offset, size_t num_antennas,
-                 bool wait_signal = true);
   ~RecorderThread();
 
   void Start();
