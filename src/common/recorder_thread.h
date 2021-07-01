@@ -35,6 +35,9 @@ class RecorderThread {
   void Stop();
   bool DispatchWork(const RecordEventData &event);
 
+  inline size_t GetNumAntennas() { return num_antennas_; }
+  inline size_t GetAntennaOffset() { return antenna_offset_; }
+
  private:
   /*Main threading loop */
   void DoRecording();
