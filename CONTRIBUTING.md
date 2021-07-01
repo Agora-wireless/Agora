@@ -34,43 +34,43 @@
     For example, macros are acceptable to disable compilation of files that
     depend on proprietary libraries. So instead of:
 
-    ```
+    <pre>
     #ifdef USE_LDPC
         std::string raw_data_filename = x;
     #else
         std::string raw_data_filename = y;
     #endif
-    ```
+    </pre>
 
     prefer:
-    ```
+    <pre>
     std::string raw_data_filename = kUseLDPC ? x : y;
-    ```
+    </pre>
 
   * Avoid magic numbers. Instead of:
-    ```
+    <pre>
     n_rows = (ldpc_config.bg == 1) ? 46 : 42;
-    ```
+    </pre>
 
     prefer:
-    ```
+    <pre>
     n_rows = (ldpc_config.bg == 1) ? kBg1RowTotal : kBg2RowTotal;
-    ```
+    </pre>
 
   * Avoid variable copies. Instead of `size_t fft_thread_num =
     cfg->fft_thread_num;`, prefer using `cfg->fft_thread_num` directly.
 
   * Use enum classes instead of enums or macros. So instead of:
 
-    ```
+    <pre>
     #define PRINT_RX_PILOTS 0
     #define PRINT_RX 1
-    ```
+    </pre>
  
     prefer:
-		```
-		enum class PrintType {kRXPilots, kRX};
-		```
+    <pre>
+    enum class PrintType {kRXPilots, kRX};
+    </pre>
 
   * Add newlines between distinct blocks of code. See the vertical whitespace
     [section](https://google.github.io/styleguide/cppguide.html#Vertical_Whitespace).
@@ -91,14 +91,14 @@
     C-style casts.
 
   * Use auto type deduction when the type is clear. So instead of:
-    ```
+    <pre>
     struct Packet *pkt = new struct Packet[kNumPackets];
-    ```
+    </pre>
 
     prefer:
-    ```
+    <pre>
     auto *pkt = new Packet[kNumPackets];
-    ```
+    </pre>
 
 ## Documentation requirements
   * Each file must have a comment at the top explaining what the file's purpose.
