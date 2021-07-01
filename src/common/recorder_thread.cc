@@ -11,11 +11,13 @@
 
 #include "logger.h"
 #include "utils.h"
+#include "H5Cpp.h"
 
 namespace Agora_recorder {
-RecorderThread::RecorderThread(Config* in_cfg, size_t thread_id, int core,
-                               size_t queue_size, size_t antenna_offset,
-                               size_t num_antennas, bool wait_signal)
+RecorderThread::RecorderThread(Config* in_cfg, H5::H5File *h5_file,
+                              size_t thread_id, int core,
+                              size_t queue_size, size_t antenna_offset,
+                              size_t num_antennas, bool wait_signal)
     : event_queue_(queue_size),
       producer_token_(event_queue_),
       worker_(in_cfg, antenna_offset, num_antennas),
@@ -30,7 +32,7 @@ RecorderThread::RecorderThread(Config* in_cfg, size_t thread_id, int core,
 
 RecorderThread::~RecorderThread() { Finalize(); }
 
-// Launching thread in seperate function to guarantee that the object is fully
+// Launching thread in separate function to guarantee that the object is fully
 // constructed before calling member function
 void RecorderThread::Start() {
   MLPD_INFO("Launching recorder task thread with id: %zu and core %d\n",

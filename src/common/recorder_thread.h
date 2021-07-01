@@ -26,6 +26,9 @@ struct RecordEventData {
 
 class RecorderThread {
  public:
+  RecorderThread(Config *in_cfg, H5::H5File *h5_file, size_t thread_id,
+                  int core, size_t queue_size, size_t antenna_offset,
+                  size_t num_antennas, bool wait_signal = true);
   ~RecorderThread();
 
   void Start();
@@ -51,6 +54,9 @@ class RecorderThread {
    * <0   to disable thread core assignment */
   int core_alloc_;
 
+  std::mutex sync_;
+  std::condition_variable condition_;
+
   /* Synchronization for startup and sleeping */
   /* Setting wait signal to false will disable the thread waiting on new message
    * may cause excessive CPU load for infrequent messages.
@@ -61,6 +67,8 @@ class RecorderThread {
   std::mutex sync_;
   std::condition_variable condition_;
   bool running_;
+  size_t antenna_offset_;
+  size_t num_antennas_;
 };
 };  // namespace Agora_recorder
 
