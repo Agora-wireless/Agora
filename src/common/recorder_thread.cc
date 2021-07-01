@@ -20,13 +20,12 @@ RecorderThread::RecorderThread(Config* in_cfg, H5::H5File *h5_file,
                               size_t num_antennas, bool wait_signal)
     : event_queue_(queue_size),
       producer_token_(event_queue_),
-      worker_(in_cfg, antenna_offset, num_antennas),
       thread_(),
+      rx_record_(in_cfg, h5_file),
       id_(thread_id),
       core_alloc_(core),
       wait_signal_(wait_signal) {
   packet_length_ = in_cfg->PacketLength();
-  worker_.init();
   running_ = false;
 }
 
@@ -112,7 +111,8 @@ void RecorderThread::DoRecording() {
     {
       if (this->wait_signal_ == true) {
         std::unique_lock<std::mutex> thread_wait(this->sync_);
-        /* Wait until a new message exists, should eliminate the CPU polling */
+        // Wait until a new message exists.
+        // TODO: should eliminate the CPU polling
         this->condition_.wait(thread_wait, [this, &ctok, &event] {
           return this->event_queue_.try_dequeue(ctok, event);
         });
@@ -125,7 +125,6 @@ void RecorderThread::DoRecording() {
       this->HandleEvent(event);
     }
   }
-  this->worker_.finalize();
 }
 
 void RecorderThread::HandleEvent(const RecordEventData& event) {
@@ -133,7 +132,7 @@ void RecorderThread::HandleEvent(const RecordEventData& event) {
     this->running_ = false;
   } else {
     if (event.event_type_ == kTaskRecordRx) {
-      this->worker_.record(
+      this->rx_record_.Record(
           this->id_,
           rx_tag_t(event.record_event_.tags_[0]).rx_packet_->RawPacket());
     }
