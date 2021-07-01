@@ -25,6 +25,8 @@ RecorderThread::RecorderThread(Config* in_cfg, H5::H5File *h5_file,
       id_(thread_id),
       core_alloc_(core),
       wait_signal_(wait_signal),
+      antenna_offset_(antenna_offset),
+      num_antennas_(num_antennas) {
   packet_length_ = in_cfg->PacketLength();
   running_ = false;
 }
@@ -99,8 +101,8 @@ void RecorderThread::DoRecording() {
 
   moodycamel::ConsumerToken ctok(this->event_queue_);
   MLPD_INFO("Recording thread %zu has %zu antennas starting at %zu\n",
-            this->id_, this->worker_.num_antennas(),
-            this->worker_.antenna_offset());
+            this->id_, this->num_antennas_,
+            this->antenna_offset_);
 
   RecordEventData event;
   bool ret = false;
