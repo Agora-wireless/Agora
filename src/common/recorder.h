@@ -11,31 +11,61 @@
 
 namespace Agora_recorder {
 class Recorder {
- public:
-  explicit Recorder(Config* in_cfg, unsigned int core_start = 0u);
+  public:
+  Recorder() = delete;
   ~Recorder();
 
-  void DoIt();
-  inline moodycamel::ConcurrentQueue<EventData>& GetRecorderQueue() {
-    return message_queue_;
+  inline static Recorder &GetInstance(Config *cfg = nullptr, unsigned int core_start = 0) {
+    static Recorder instance(cfg, core_start);
+    return instance;
   }
 
-  size_t GetRecordedFrameNum();
-  const std::string& GetTraceFileName() { return this->cfg_->TraceFile(); }
+  inline static void Record() {
+    GetInstance().Record_();
+  }
 
- private:
-  void Gc();
+  inline static void DoIt();
+
+  inline static const std::string &GetTraceFileName() {
+    return GetInstance().cfg_->TraceFile();
+  }
 
   // buffer length of each rx thread
   static const int kSampleBufferFrameNum;
   // dequeue bulk size, used to reduce the overhead of dequeue in main thread
   static const int KDequeueBulkSize;
 
-  Config* cfg_;
+  private:
+  explicit Recorder(Config *in_cfg, unsigned int core_start);
+
+  // Internal non-static impl
+  void Record_();
+  void DoIt_();
+
+  // Garbage Collect
+  void Gc();
+
+  // Manage HDF5 File
+  herr_t InitHDF5();
+  void OpenHDF5();
+  void CloseHDF5();
+  void FinishHDF5();
+
+  // Constructor Args
+  Config *cfg_;
+  unsigned int core_start_;
+
   size_t rx_thread_buff_size_;
 
-  std::vector<Agora_recorder::RecorderThread*> recorders_;
+  std::vector<Agora_recorder::RecorderThread *> recorders_;
+
+  /*
+    TODO: Check analog of MAX_FRAME_INC
   size_t max_frame_number_;
+  inline static size_t GetRecordedFrameNum() {
+    return GetInstance().max_frame_number_;
+  }
+  */
 
   moodycamel::ConcurrentQueue<EventData> message_queue_;
 
@@ -45,6 +75,10 @@ class Recorder {
   const unsigned int kRecvCore;
 
   size_t num_writter_threads_;
-};     /* class Recorder */
+
+  H5::H5File *file_;
+  H5std_string hdf5_name_;
+};
+
 };     // namespace Agora_recorder
 #endif /* AGORA_RECORDER_H_ */
