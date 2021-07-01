@@ -8,7 +8,7 @@
   * Format the source code using `clang-format`. Running `clang-format -i *.cc
     *.h` will format source and header files in the current directory to match
     Agora's code style. There are also editor plugins for `clang-format`
-    ([example](https://github.com/google/vim_codefmt)). We recommend using clang-format version 11 or above.
+    ([example](https://marketplace.visualstudio.com/items?itemName=xaver.clang-format)). We recommend using clang-format version 11 or above.
 
 ## Code style
 
