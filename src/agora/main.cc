@@ -4,7 +4,7 @@
  */
 #include "agora.h"
 #include "config.h"
-#include "recorder.h"
+#include "recorder/recorder.h"
 #include "gflags/gflags.h"
 
 DEFINE_string(conf_file,
