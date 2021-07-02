@@ -13,6 +13,7 @@
 
 #include "data_generator.h"
 #include "logger.h"
+#include "version_config.h"
 
 static constexpr bool kVerbose = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
@@ -27,6 +28,7 @@ DEFINE_string(conf_file,
 int main(int argc, char* argv[]) {
   const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+  gflags::SetVersionString(GetAgoraProjectVersion());
   auto cfg = std::make_unique<Config>(FLAGS_conf_file.c_str());
 
   const DataGenerator::Profile profile =

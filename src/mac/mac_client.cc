@@ -10,6 +10,7 @@
 #include "mac_receiver.h"
 #include "mac_sender.h"
 #include "signal_handler.h"
+#include "version_config.h"
 
 DEFINE_uint64(num_sender_worker_threads, 1,
               "Number of mac client sender worker threads");
@@ -27,6 +28,7 @@ DEFINE_uint64(
 
 int main(int argc, char* argv[]) {
   PinToCoreWithOffset(ThreadType::kMaster, FLAGS_core_offset, 0);
+  gflags::SetVersionString(GetAgoraProjectVersion());
 
   gflags::SetUsageMessage(
       "num_sender_threads, num_receiver_threads, core_offset, frame_duration, "
