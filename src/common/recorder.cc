@@ -180,19 +180,4 @@ void Recorder::DoIt_() {
   }
   recorders_.clear();
 }
-
-//extern "C" {
-//Recorder* Recorder_new(Config* in_cfg) {
-//  Recorder* rec = new Recorder(in_cfg);
-//  return rec;
-//}
-//
-//void Recorder_start(Recorder* rec) { rec->DoIt(); }
-//int Recorder_getRecordedFrameNum(Recorder* rec) {
-//  return rec->GetRecordedFrameNum();
-//}
-//const char* Recorder_getTraceFileName(Recorder* rec) {
-//  return rec->GetTraceFileName().c_str();
-//}
-//}
 };  // end namespace Agora_recorder
