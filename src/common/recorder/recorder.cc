@@ -15,11 +15,15 @@ const int Recorder::KDequeueBulkSize = 5;
 
 static const int kQueueSize = 36;
 
-Recorder::Recorder(Config *in_cfg, unsigned int core_start)
-    : cfg_(in_cfg),
-      kMainDispatchCore(core_start),
-      kRecorderCore(kMainDispatchCore + 1),
-      kRecvCore(kRecorderCore + 1) {
+Recorder::Recorder(Config *in_cfg, unsigned int core_start) :
+  kMainDispatchCore(core_start),
+  kRecorderCore(kMainDispatchCore + 1),
+  kRecvCore(kRecorderCore + 1) {
+
+  if(in_cfg == nullptr) {
+    throw std::runtime_error("Cannot initialize with null config!");
+  }
+  cfg_ = in_cfg;
   num_writter_threads_ = 1;
 
   size_t ant_per_rx_thread = cfg_->GetNumAntennas() / num_writter_threads_;
