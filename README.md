@@ -5,7 +5,7 @@ Agora is a complete software realization of real-time massive MIMO baseband proc
 Some highlights:
 
 * Agora currently supports 64x16 MU-MIMO (64 RRU antennas and 16 UEs) with 20 MHz bandwidth and 64QAM modulation, on a 36-core server with AVX512 support. 
-* Agora is configurable in terms of numbers of RRU antennas and UEs, bandwidth, moduation orders, LDPC code rates.
+* Agora is configurable in terms of numbers of RRU antennas and UEs, bandwidth, modulation orders, LDPC code rates.
 * Agora supports an emulated RRU and UEs with a high-performance packet generator.
 * Agora has been tested with real RRUs with up to 64 antennas and up to 8 UEs. The RRU and UE devices are available from 
 [Skylark Wireless](https://skylarkwireless.com). 
@@ -26,10 +26,13 @@ Some highlights:
   Agora currently only builds and runs on Linux, and has been tested on Ubuntu 16.04, 18.04, and 20.04. 
   Agora requires CMake 2.8+ and works with both GNU and Intel compilers with C++17 support. 
 ## Setting up the build environment
-  * Setup CI: run `./config_ci.sh`
-     * Note for developers: You must run this command before checking out your new feature brach. Do not use `_` in your branch name. Use `-` instead.  
+  * Setup CI: run
+    <pre>
+    $ ./config_ci.sh
+    </pre>
+     * Note for developers: You must run this command before checking out your new feature branch. Do not use `_` in your branch name. Use `-` instead.  
     
-  * See `scripts/ubuntu.sh` for required packages, including Linux packages, gtest, Armadillo, nlohmann json-dev and SoapySDR, and the corresponding versions. Run `./scripts/ubuntu.sh` to install these packages.
+  * See `scripts/ubuntu.sh` for required packages, including Linux packages, gtest, Armadillo, and SoapySDR, and the corresponding versions. Run `./scripts/ubuntu.sh` to install these packages.
   * Download and install Intel libraries:
      * Install Intel FlexRAN's FEC SDK for LDPC encoding and decoding
         * Download [Intel FlexRAN's FEC
@@ -45,22 +48,22 @@ Some highlights:
           For example, if Intel compiler is in `/opt`, run `source $(find
           2>/dev/null /opt -name compilervars.sh) intel64`. After running this
           command, ensure that `icc --version` reports 19.0.4.
-        * After instaling `icc 19.04`, compile FlexRAN as follows:
-        ```
-        sudo chmod -R a+rwX FlexRAN-FEC-SDK-19-04/ # Allow all users read-write access 
-        cd /opt/FlexRAN-FEC-SDK-19-04/sdk/ 
-        sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-ffreestanding")' cmake/intel-compile-options.cmake 
-        ./create-makefiles-linux.sh 
-        cd build-avx512-icc # or build-avx2-icc 
-        make -j
-        ```
+        * After installing `icc 19.04`, compile FlexRAN as follows:
+        <pre>
+        $ sudo chmod -R a+rwX FlexRAN-FEC-SDK-19-04/ # Allow all users read-write access 
+        $ cd /opt/FlexRAN-FEC-SDK-19-04/sdk/ 
+        $ sed -i '/add_compile_options("-Wall")/a \ \ add_compile_options("-ffreestanding")' cmake/intel-compile-options.cmake 
+        $ ./create-makefiles-linux.sh 
+        $ cd build-avx512-icc # or build-avx2-icc 
+        $ make -j
+        </pre>
     * Install Intel MKL - See
        [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html).
        * MKL can also be installed from Intel Parallel Studio XE. Agora has been tested with 2019 and 2020 versions. 
        * **NOTE**: To enable JIT acceleration applied for matrix multiplication in the code, MKL version after 2019 update 3 is required.
 
     * Optional: DPDK
-       * [DPDK](http://core.dpdk.org/download/) verison 20.02.1 is tested with
+       * [DPDK](http://core.dpdk.org/download/) version 20.02.1 is tested with
         Intel 40 GbE and Mellanox 100 GbE NICs in Agora.
        * To install it, run `sudo make install T=x86_64-native-linuxapp-gcc
         DESTDIR=/usr -j`
@@ -68,72 +71,119 @@ Some highlights:
 ## Building and running with emulated RRU
 We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator.
 
- * Build Agora. This step also builds the sender, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink, and several unit tests for testing either performance or correctness of invididual functions.
-    ```
-    cd Agora
-    mkdir build
-    cd build
-    cmake ..
-    make -j
-    ```
+ * Build Agora. This step also builds the sender, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink, and several unit tests for testing either performance or correctness of individual functions.
+    <pre>
+    $ cd Agora
+    $ mkdir build
+    $ cd build
+    $ cmake ..
+    $ make -j
+    </pre>
 
  * Run end-to-end test to check correctness (uplink, downlink and combined tests should all pass if everything is set up correctly).
-    ```
-    ./test/test_agora/test_agora.sh 10 out % Runs test for 10 iterations
-    ```
+    <pre>
+    $ ./test/test_agora/test_agora.sh 10 out # Runs test for 10 iterations
+    </pre>
 
  * Run Agora with emulated RRU traffic
    * **NOTE**: We recommend running Agora and the emulated RRU on two different machines. 
    If you are running them on the same machine, make sure Agora and the emulated RRU are using different set of cores, 
      otherwise there will be performance slow down.
    * First, return to the base directory (`cd ..`), then run
-     `./build/data_generator --conf_file data/tddconfig-sim-ul.json` to generate data
-     files.
-   * In one terminal, run `./build/agora --conf_file data/tddconfig-sim-ul.json` to
-     start Agora with uplink configuration.
-   * In another terminal, run  `./build/sender --num_threads=2 --core_offset=1 --frame_duration=5000 --enable_slow_start=1 --conf_file=data/tddconfig-sim-ul.json` to start the emulated RRU 
-     with uplink configuration.
+   <pre>
+   $ ./build/data_generator --conf_file data/tddconfig-sim-ul.json
+   </pre>
+     to generate data files.
+   * In one terminal, run 
+   <pre>
+   $ ./build/agora --conf_file data/tddconfig-sim-ul.json
+   </pre>
+    to start Agora with uplink configuration.
+   * In another terminal, run
+   <pre>
+   $ ./build/sender --num_threads=2 --core_offset=1 --frame_duration=5000 --enable_slow_start=1 --conf_file=data/tddconfig-sim-ul.json
+   </pre>
+   to start the emulated RRU with uplink configuration.
    * The above steps use Linux networking stack for packet I/O. Agora also supports using DPDK
-   to bypass the kernel for packet I/O. To enable DPDK, run `cmake -DUSE_DPDK=1 ..; make -j` to 
-   rebuild code for Mellanox NICs; for Intel NICs, run `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j` 
+   to bypass the kernel for packet I/O. To enable DPDK, run
+   <pre>
+   $ cmake -DUSE_DPDK=1 ..; make -j
+   </pre>
+   to rebuild code for Mellanox NICs; for Intel NICs, run
+   <pre>
+   $ cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j
+   </pre>
    to exclude Mellanox libraries in the build.
-   When running the emulated RRU with DPDK, it is required to set the MAC address
-     of the NIC used by Agora. To do this, pass `--server_mac_addr=` to `sender`.
+   When running the emulated RRU with DPDK, it is required to set the MAC address of the NIC used by Agora. To do this, pass `--server_mac_addr=` to `sender`.
    * To test the real-time performance of Agora, see the [Running performance test](#running-performance-test) section below.
 
  * Run Agora with channel simulator and clients
    * First, return to the base directory (`cd ..`), then run
-     `./build/data_generator --conf_file data/bs-sim.json` to generate data files.
-   * In one terminal, run `./build/user --conf_file data/ue-sim.json` to start clients with
+   <pre>
+   $ ./build/data_generator --conf_file data/bs-sim.json
+   </pre>
+    to generate data files.
+   * In one terminal, run
+   <pre>
+   $ ./build/user --conf_file data/ue-sim.json
+   </pre>
+     to start clients with
      combined uplink & downlink configuration.
-   * In another terminal, run  `./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim.json --ue_conf_file data/ue-sim.json`
-   * In another terminal, run `./build/agora data/bs-sim.json` to start Agora with the combined configuration.
+   * In another terminal, run
+   <pre>
+   $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim.json --ue_conf_file data/ue-sim.json
+   </pre>
+   * In another terminal, run
+   <pre>
+   $ ./build/agora data/bs-sim.json
+   </pre>
+   to start Agora with the combined configuration.
    * Note: make sure Agora and sender are using different set of cores, otherwise there will be performance slow down.
 
  * Run Agora with channel simulator, clients, and mac enabled.
-   * Compile the code with `cmake .. -DENABLE_MAC=true`
+   * Compile the code with
+   <pre>
+   $ cmake .. -DENABLE_MAC=true
+   </pre>
    * Uplink Testing (`--conf_file ue-mac-ul-sim.json / bs-mac-ul-sim.json`)
    * Downlink Testing  (`--conf_file ue-mac-dl-sim.json / bs-mac-dl-sim.json`)
    * Combined Testing  (`--conf_file ue-mac-sim.json / bs-mac-sim.json`)
      * Terminal 1:
-       `./build/data_generator --conf_file data/ue-mac-sim.json` to generate data files.
-       `./build/user -conf_file data/ue-mac-sim.json` to start users.
+     <pre>
+       $./build/data_generator --conf_file data/ue-mac-sim.json
+     </pre>
+       to generate data files.
+     <pre>
+       $./build/user --conf_file data/ue-mac-sim.json
+     </pre>
+       to start users.
      * Terminal 2:
-       `./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --bs_conf_file data/bs-mac-sim.json --ue_conf_file data/ue-mac-sim.json` to run the channel simulator
+     <pre>
+     $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --bs_conf_file data/bs-mac-sim.json --ue_conf_file data/ue-mac-sim.json
+     </pre>
+       to run the channel simulator
      * Terminal 3:
-       `./build/macuser --enable_slow_start 1 --conf_file data/ue-mac-sim.json` to run to user mac app.  Specify --data_file "" to generate patterned data and --conf_file options as necessary.
+     <pre>
+       $ ./build/macuser --enable_slow_start 1 --conf_file data/ue-mac-sim.json
+     </pre>
+      to run to user mac app.  Specify `--data_file ""` to generate patterned data and `--conf_file` options as necessary.
      * Terminal 4:
-       `./build/agora --conf_file data/bs-mac-sim.json` run agora before running macbs.  Run macuser -> agora -> macbs in quick succession. 
+     <pre>
+     $ ./build/agora --conf_file data/bs-mac-sim.json
+     </pre>
+      run agora before running macbs.  Run macuser -> agora -> macbs in quick succession. 
      * Terminal 5:
-       `./build/macbs --enable_slow_start 1 --conf_file data/bs-mac-sim.json ` to run to base station mac app. pecify --data_file "" to generate patterned data and --conf_file options as necessary.
-   * Note: make sure agora / user / chsim / macuser / macbs are using different set of cores,otherwise there will be performance slow down.
+     <pre>
+     $ ./build/macbs --enable_slow_start 1 --conf_file data/bs-mac-sim.json
+     </pre>
+     to run to base station mac app. specify `--data_file ""` to generate patterned data and `--conf_file` options as necessary.
+   * Note: make sure agora / user / chsim / macuser / macbs are using different set of cores, otherwise there will be performance slow down.
 
  * To run with real wireless traffic from Faros/Iris hardware UEs, see the
    [Agora with real RRU](#agora-with-real-rru) section below.
 
 ## Building and running with real RRU
-Agora suports a 64-antenna 
-Faros base station as RRU and Iris UE devices. Both are commercially available from 
+Agora supports a 64-antenna Faros base station as RRU and Iris UE devices. Both are commercially available from 
 [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).
 Both Faros and Iris have their roots in the [Argos massive MIMO base station](https://www.yecl.org/argos/), especially [ArgosV3](https://www.yecl.org/argos/pubs/Shepard-MobiCom17-Demo.pdf). Agora also supports USRP-based RRU and UEs.
 
@@ -184,11 +234,17 @@ to get enough throughput for the traffic of 64 antennas.
 To reduce performance variations, we did the following configurations for the server that runs Agora:
   * **NOTE**: These steps are not strictly required if you just wanted to try out Agora and do not care about performance variations.
   * Disable Turbo Boost to reduce performance variation by running 
-   `echo "0" | sudo tee /sys/devices/system/cpu/cpufreq/boost`
+    <pre>
+    $ echo "0" | sudo tee /sys/devices/system/cpu/cpufreq/boost
+    </pre>
   * Set CPU scaling to performance by running 
-    `sudo cpupower frequency-set -g performance`, 
+    <pre>
+    $ sudo cpupower frequency-set -g performance
+    </pre>
     where cpupower can be installed through
-    `sudo apt-get install -y linux-tools-$(uname -r)`
+    <pre>
+    $ sudo apt-get install -y linux-tools-$(uname -r)
+    </pre>
   * Turn off hyper-threading. We provide an example bash script 
 	 (scripts/tune_hyperthread.sh), where the core indices are machine dependent.
   * Set IRQ affinity to direct OS interrupts away from Agora's cores. 
@@ -202,14 +258,26 @@ The steps to collect and analyze timestamp traces are as follows:
   * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments. 
     In our [paper](#documentation), we change “antenna_num”,  “ue_num” and “symbol_num_perframe” 
     to different values to collect different data points in the figures. 
-  * Gerenrate source data files by running
-     `./build/data_generator --conf_file data/tddconfig-sim-ul.json`.
-  * Run Agora as a real-time process (to prevent OS from doing context swithes) using 
-    `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} chrt -rr 99 ./build/agora --conf_file data/tddconfig-sim-ul.json`. 
+  * Generate source data files by running
+    <pre>
+    $ ./build/data_generator --conf_file data/tddconfig-sim-ul.json`.
+    </pre>
+  * Run Agora as a real-time process (to prevent OS from doing context switches) using 
+    <pre>
+    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} chrt -rr 99 ./build/agora --conf_file data/tddconfig-sim-ul.json
+    </pre>
+
     (**NOTE**: Using a process priority 99 is dangerous. Before running it, 
-    make sure you have directed OS interrupts away from cores used by Agora. If you have not done so,
-    run `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/agora --conf_file data/tddconfig-sim-ul.json` instead to run Agora as a normal process.)
-  * Run the emulated RRU using `sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --server_mac_addr=00:00:00:00:00:00 --num_threads=2 --core_offset=0 --conf_file=data/tddconfig-sim-ul.json --delay=1000 --enable_slow_start=$2`. 
+    make sure you have directed OS interrupts away from cores used by Agora. If you have not done so, run
+    <pre>
+    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/agora --conf_file data/tddconfig-sim-ul.json
+    </pre>
+    instead to run Agora as a normal process.)
+  * Run the emulated RRU using
+    <pre>
+    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --server_mac_addr=00:00:00:00:00:00 --num_threads=2 --core_offset=0 \
+      --conf_file=data/tddconfig-sim-ul.json --delay=1000 --enable_slow_start=$2
+    </pre>
   * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
   * We also provide MATLAB scripts for [uplink](matlab/parse_multi_file_ul) and [downlink](matlab/parse_multi_file_dl) that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
 
@@ -224,6 +292,12 @@ Check out [Agora Wiki](https://github.com/jianding17/Agora/wiki) for
 Agora's design overview and flow diagram that maps massive MIMO baseband processing 
 to the actual code structure. Technical details and performance results can be found in
  * Jian Ding, Rahman Doost-Mohammady, Anuj Kalia, and Lin Zhong, "Agora: Real-time massive MIMO baseband processing in software," in Proc. of ACM CoNEXT, December 2020 ([PDF](https://www.yecl.org/publications/ding2020conext.pdf), [video](https://dl.acm.org/doi/abs/10.1145/3386367.3431296)).
- 
+
+Doxygen documentation generation for Agora can be initiated by running the following command from the repository root directory:
+`doxygen Agora_doxygen.conf`
+The latest hosted output is located at [Agora Doxygen](https://renew-wireless.org/agora-doxy/html/index.html) 
+
+Other community resources can be found at the [RENEW Wireless Wiki](https://wiki.renew-wireless.org/)
+
 ## Contact
 Jian Ding (jian.ding@yale.edu)
