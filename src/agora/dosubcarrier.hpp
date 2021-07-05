@@ -202,10 +202,10 @@ public:
                             demul_cur_sym_ul_ = 0;
 
                             demod_start_tsc = rdtsc();
-                            // printf("Main thread: Demodulation done frame: %lu "
-                            //     "(%lu UL symbols)\n",
-                            //     demul_cur_frame_,
-                            //     cfg->ul_data_symbol_num_perframe);
+                            MLPD_INFO("Main thread: Demodulation done frame: %lu "
+                                "(%lu UL symbols)\n",
+                                demul_cur_frame_,
+                                cfg->ul_data_symbol_num_perframe);
                             print_tsc_duration += rdtsc() - demod_start_tsc;
                             
                             if (cfg->test_mode == 1) {
@@ -275,7 +275,7 @@ public:
                     n_zf_tasks_done_ = 0;
 
                     zf_start_tsc = rdtsc();
-                    // printf("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
+                    MLPD_INFO("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
                     print_tsc_duration += rdtsc() - zf_start_tsc;
 
                     zf_cur_frame_++;
@@ -312,10 +312,10 @@ public:
                 csi_tsc_duration += rdtsc() - csi_start_tsc;
 
                 csi_start_tsc = rdtsc();
-                // printf(
-                //     "Main thread: pilot frame: %lu, finished CSI for all pilot "
-                //     "symbols\n",
-                //     csi_cur_frame_);
+                MLPD_INFO(
+                    "Main thread: pilot frame: %lu, finished CSI for all pilot "
+                    "symbols\n",
+                    csi_cur_frame_);
                 print_tsc_duration += rdtsc() - csi_start_tsc;
 
                 csi_cur_frame_++;
@@ -340,7 +340,7 @@ public:
             cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
             cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
             work_count, loop_count, work_count * 100.0f / loop_count);
-        do_demul_->print_overhead();
+        // do_demul_->print_overhead();
 
         std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
         std::string filename = cur_directory + "/data/performance_dosubcarrier.txt";

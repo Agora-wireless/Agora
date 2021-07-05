@@ -185,7 +185,7 @@ public:
                 for (size_t j = 0; j < kMaxSymbols; j++) {
                     num_data_pkts_[frame_slot][j] = 0;
                 }
-                // printf("Main thread: Decode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
+                MLPD_INFO("Main thread: Decode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
                 last_frame_cycles_ = cur_cycle;
             }
             cur_frame_mutex_.unlock();
@@ -211,7 +211,7 @@ public:
             for (size_t j = 0; j < kMaxSymbols; j++) {
                 num_data_pkts_[frame_slot][j] = 0;
             }
-            printf("Main thread: Precode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
+            MLPD_INFO("Main thread: Precode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
             last_frame_cycles_ = cur_cycle;
         }
         precode_mutex_.unlock();
