@@ -35,7 +35,9 @@ Agora::Agora(Config* cfg)
     stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
     phy_stats = new PhyStats(cfg);
 
-    init_control_info();
+    if (config_->dynamic_workload) {
+        init_control_info();
+    }
 
     /* Initialize TXRX threads */
     packet_tx_rx_.reset(new PacketTXRX(cfg, cfg->core_offset + 1,
@@ -193,16 +195,29 @@ void* Agora::subcarrier_worker(int tid)
         config_->bs_server_addr_idx * config_->get_num_sc_per_server(), 
         (config_->bs_server_addr_idx + 1) * config_->get_num_sc_per_server()));
 
-    auto computeSubcarrier = new DoSubcarrier(config_, tid, freq_ghz,
-        sc_range,
-        socket_buffer_, csi_buffers_, calib_buffer_,
-        dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
-        ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
-        control_info_table_, control_idx_list_,
-        phy_stats, stats, &rx_status_, &demul_status_, &precode_status_);
+    if (config_->dynamic_workload) {
+        auto computeSubcarrier = new DySubcarrier(config_, tid, freq_ghz,
+            sc_range,
+            socket_buffer_, csi_buffers_, calib_buffer_,
+            dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
+            ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
+            control_info_table_, control_idx_list_,
+            phy_stats, stats, &rx_status_, &demul_status_, &precode_status_);
 
-    computeSubcarrier->start_work();
-    delete computeSubcarrier;
+        computeSubcarrier->start_work();
+        delete computeSubcarrier;
+    } else {
+        auto computeSubcarrier = new DoSubcarrier(config_, tid, freq_ghz,
+            sc_range,
+            socket_buffer_, csi_buffers_, calib_buffer_,
+            dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
+            ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
+            phy_stats, stats, &rx_status_, &demul_status_, &precode_status_);
+
+        computeSubcarrier->start_work();
+        delete computeSubcarrier;
+    }
+
     return nullptr;
 }
 
@@ -211,13 +226,23 @@ void* Agora::decode_worker(int tid)
     pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset + 1,
         tid + do_subcarrier_threads_.size());
 
-    auto computeDecoding = new DoDecode(config_, tid, freq_ghz,
-        demod_buffers_, demod_soft_buffer_to_decode_,
-        decoded_buffer_, control_info_table_, control_idx_list_, 
-        phy_stats, stats, &rx_status_, &demod_status_);
+    if (config_->dynamic_workload) {
+        auto computeDecoding = new DyDecode(config_, tid, freq_ghz,
+            demod_buffers_, demod_soft_buffer_to_decode_,
+            decoded_buffer_, control_info_table_, control_idx_list_, 
+            phy_stats, stats, &rx_status_, &demod_status_);
 
-    computeDecoding->start_work();
-    delete computeDecoding;
+        computeDecoding->start_work();
+        delete computeDecoding;
+    } else {
+        auto computeDecoding = new DoDecode(config_, tid, freq_ghz,
+            demod_buffers_, demod_soft_buffer_to_decode_,
+            decoded_buffer_, phy_stats, stats, &rx_status_, &demod_status_);
+
+        computeDecoding->start_work();
+        delete computeDecoding;
+    }
+    
     return nullptr;
 }
 

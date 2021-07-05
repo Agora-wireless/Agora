@@ -344,6 +344,9 @@ public:
     // NIC PCIe address (for DPDK)
     std::string pci_addr;
 
+    // Dynamic workload
+    bool dynamic_workload;
+
     bool isUE;
     const size_t maxFrame = 1 << 30;
     const size_t data_offset = sizeof(int) * 16;

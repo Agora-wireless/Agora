@@ -1,10 +1,11 @@
-#ifndef DOZF
-#define DOZF
+#ifndef DYZF
+#define DYZF
 
 #include "Symbols.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "control.hpp"
 #include "doer.hpp"
 #include "gettime.h"
 #include "stats.hpp"
@@ -14,9 +15,9 @@
 #include <stdio.h>
 #include <string.h>
 
-class DoZF : public Doer {
+class DyZF : public Doer {
 public:
-    DoZF(Config* in_config, int tid, double freq_ghz,
+    DyZF(Config* in_config, int tid, double freq_ghz,
         moodycamel::ConcurrentQueue<Event_data>& task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
@@ -24,8 +25,10 @@ public:
         Table<complex_float>& calib_buffer,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
+        std::vector<std::vector<ControlInfo>>& control_info_table_,
+        std::vector<size_t>& control_idx_list_,
         Stats* stats_manager);
-    ~DoZF();
+    ~DyZF();
 
     /**
      * Do ZF task for one subcarrier with all pilots in a frame
@@ -52,9 +55,10 @@ private:
     /// zeroforcing precoder using this CSI matrix and calibration buffer
     void compute_precoder(const arma::cx_fmat& mat_csi,
         complex_float* calib_buf, complex_float* mat_ul_zf,
-        complex_float* mat_dl_zf);
+        complex_float* mat_dl_zf, size_t ue_num = 0);
 
     void ZF_freq_orthogonal(size_t tag);
+    void ZF_freq_orthogonal_dynamic(size_t tag);
 
     /**
      * Do prediction task for one subcarrier
@@ -90,6 +94,10 @@ private:
     complex_float* csi_gather_buffer; // Intermediate buffer to gather CSI
     // Intermediate buffer to gather reciprical calibration data vector
     complex_float* calib_gather_buffer;
+
+    // Control info
+    std::vector<std::vector<ControlInfo>>& control_info_table_;
+    std::vector<size_t>& control_idx_list_;
 };
 
 #endif

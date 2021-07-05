@@ -1,10 +1,11 @@
-#ifndef DODEMUL
-#define DODEMUL
+#ifndef DYDEMUL
+#define DYDEMUL
 
 #include "Symbols.hpp"
 #include "buffer.hpp"
 #include "concurrentqueue.h"
 #include "config.hpp"
+#include "control.hpp"
 #include "doer.hpp"
 #include "gettime.h"
 #include "modulation.hpp"
@@ -26,9 +27,9 @@
 #endif
 
 using namespace arma;
-class DoDemul : public Doer {
+class DyDemul : public Doer {
 public:
-    DoDemul(Config* config, int tid, double freq_ghz,
+    DyDemul(Config* config, int tid, double freq_ghz,
         moodycamel::ConcurrentQueue<Event_data>& task_queue,
         moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
@@ -36,9 +37,11 @@ public:
         Table<complex_float>& ue_spec_pilot_buffer,
         Table<complex_float>& equal_buffer,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
+        std::vector<std::vector<ControlInfo>>& control_info_table,
+        std::vector<size_t>& control_idx_list,
         PhyStats* in_phy_stats, Stats* in_stats_manager,
         Table<char>* socket_buffer_ = nullptr);
-    ~DoDemul();
+    ~DyDemul();
 
     /**
      * Do demodulation task for a block of subcarriers (demul_block_size)
@@ -99,14 +102,18 @@ private:
     int ue_num_simd256;
 
 #if USE_MKL_JIT
-    void* jitter;
-    cgemm_jit_kernel_t mkl_jit_cgemm;
+    void* jitter[kMaxUEs];
+    cgemm_jit_kernel_t mkl_jit_cgemm[kMaxUEs];
 #endif
 
     size_t total_cycles_ = 0;
     size_t preprocess_cycles_ = 0;
     size_t equal_cycles_ = 0;
     size_t demod_cycles_ = 0;
+
+    // Control info
+    std::vector<std::vector<ControlInfo>>& control_info_table_;
+    std::vector<size_t>& control_idx_list_;
 };
 
 #endif

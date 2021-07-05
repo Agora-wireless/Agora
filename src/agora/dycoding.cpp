@@ -1,4 +1,4 @@
-#include "docoding.hpp"
+#include "dycoding.hpp"
 #include "concurrent_queue_wrapper.hpp"
 #include "encoder.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
@@ -9,7 +9,7 @@ static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 
-DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
+DyEncode::DyEncode(Config* in_config, int in_tid, double freq_ghz,
     Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
     Stats* in_stats_manager, RxStatus* rx_status,
     EncodeStatus* encode_status)
@@ -31,13 +31,13 @@ DoEncode::DoEncode(Config* in_config, int in_tid, double freq_ghz,
             cfg->LDPC_config.Bg, cfg->LDPC_config.Zc));
 }
 
-DoEncode::~DoEncode()
+DyEncode::~DyEncode()
 {
     free(parity_buffer);
     free(encoded_buffer_temp);
 }
 
-Event_data DoEncode::launch(size_t tag)
+Event_data DyEncode::launch(size_t tag)
 {
     LDPCconfig LDPC_config = cfg->LDPC_config;
     size_t frame_id = gen_tag_t(tag).frame_id;
@@ -104,7 +104,7 @@ Event_data DoEncode::launch(size_t tag)
     return Event_data(EventType::kEncode, tag);
 }
 
-void DoEncode::start_work() 
+void DyEncode::start_work() 
 {
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_cb_ > 0
@@ -128,10 +128,12 @@ void DoEncode::start_work()
     }
 }
 
-DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
+DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     Table<int8_t> demod_soft_buffer_to_decode,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
+    std::vector<std::vector<ControlInfo>>& control_info_table,
+    std::vector<size_t>& control_idx_list,
     PhyStats* in_phy_stats, Stats* in_stats_manager, RxStatus* rx_status,
     DecodeStatus* decode_status)
     : Doer(in_config, in_tid, freq_ghz, dummy_conq_, complete_task_queue,
@@ -139,6 +141,8 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     , demod_buffers_(demod_buffers)
     , demod_soft_buffer_to_decode_(demod_soft_buffer_to_decode)
     , decoded_buffers_(decoded_buffers)
+    , control_info_table_(control_info_table)
+    , control_idx_list_(control_idx_list)
     , phy_stats(in_phy_stats)
     , rx_status_(rx_status)
     , decode_status_(decode_status)
@@ -150,9 +154,9 @@ DoDecode::DoDecode(Config* in_config, int in_tid, double freq_ghz,
     resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
 }
 
-DoDecode::~DoDecode() { free(resp_var_nodes); }
+DyDecode::~DyDecode() { free(resp_var_nodes); }
 
-Event_data DoDecode::launch(size_t tag)
+Event_data DyDecode::launch(size_t tag)
 {
     LDPCconfig LDPC_config = cfg->LDPC_config;
     const size_t frame_id = gen_tag_t(tag).frame_id;
@@ -169,6 +173,12 @@ Event_data DoDecode::launch(size_t tag)
             tid, frame_id, symbol_idx_ul, cur_cb_id, ue_id);
     }
 
+    std::vector<ControlInfo>& info_list = control_info_table_[control_idx_list_[frame_id]];
+    if (ue_id >= info_list.size()) {
+        return Event_data(EventType::kDecode, tag);
+    }
+    ControlInfo& info = info_list[ue_id];
+
     size_t start_tsc = worker_rdtsc();
 
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
@@ -178,28 +188,41 @@ Event_data DoDecode::launch(size_t tag)
 
     // Decoder setup
     int16_t numFillerBits = 0;
-    int16_t numChannelLlrs = LDPC_config.cbCodewLen;
+    size_t nRows = info.Bg == 1 ? 46 : 42;
+    uint32_t cbCodewLen = ldpc_num_encoded_bits(info.Bg, info.Zc, nRows);
+    uint32_t cbLen = ldpc_num_input_bits(info.Bg, info.Zc);
+    // int16_t numChannelLlrs = LDPC_config.cbCodewLen;
+    int16_t numChannelLlrs = cbCodewLen;
 
     ldpc_decoder_5gnr_request.numChannelLlrs = numChannelLlrs;
     ldpc_decoder_5gnr_request.numFillerBits = numFillerBits;
     ldpc_decoder_5gnr_request.maxIterations = LDPC_config.decoderIter;
     ldpc_decoder_5gnr_request.enableEarlyTermination
         = LDPC_config.earlyTermination;
-    ldpc_decoder_5gnr_request.Zc = LDPC_config.Zc;
-    ldpc_decoder_5gnr_request.baseGraph = LDPC_config.Bg;
-    ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
+    // ldpc_decoder_5gnr_request.Zc = LDPC_config.Zc;
+    ldpc_decoder_5gnr_request.Zc = info.Zc;
+    // ldpc_decoder_5gnr_request.baseGraph = LDPC_config.Bg;
+    ldpc_decoder_5gnr_request.baseGraph = info.Bg;
+    // ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
+    ldpc_decoder_5gnr_request.nRows = nRows;
 
-    int numMsgBits = LDPC_config.cbLen - numFillerBits;
+    // int numMsgBits = LDPC_config.cbLen - numFillerBits;
+    int numMsgBits = cbLen - numFillerBits;
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
+    // auto* llr_buffer_ptr
+    //     = cfg->get_demod_buf_to_decode(demod_soft_buffer_to_decode_, frame_id,
+    //         symbol_idx_ul, ue_id, LDPC_config.cbCodewLen * cur_cb_id);
     auto* llr_buffer_ptr
         = cfg->get_demod_buf_to_decode(demod_soft_buffer_to_decode_, frame_id,
-            symbol_idx_ul, ue_id, LDPC_config.cbCodewLen * cur_cb_id);
+            symbol_idx_ul, ue_id, info.sc_start);
 
+    // uint8_t* decoded_buffer_ptr
+    //     = decoded_buffers_[frame_slot][symbol_idx_ul][ue_id]
+    //     + (cur_cb_id * roundup<64>(cfg->num_bytes_per_cb));
     uint8_t* decoded_buffer_ptr
-        = decoded_buffers_[frame_slot][symbol_idx_ul][ue_id]
-        + (cur_cb_id * roundup<64>(cfg->num_bytes_per_cb));
+        = decoded_buffers_[frame_slot][symbol_idx_ul][ue_id];
 
     ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
     ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
@@ -257,7 +280,7 @@ Event_data DoDecode::launch(size_t tag)
     return Event_data(EventType::kDecode, tag);
 }
 
-void DoDecode::start_work()
+void DyDecode::start_work()
 {
     printf("Decode for ue %u tid %u starts to work!\n", ue_id_, tid_in_ue_);
     cur_symbol_ = tid_in_ue_;

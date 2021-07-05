@@ -6,10 +6,10 @@
 #include "concurrentqueue.h"
 #include "config.hpp"
 #include "datatype_conversion.h"
-#include "dodemul.hpp"
+#include "dydemul.hpp"
 #include "doer.hpp"
 #include "doprecode.hpp"
-#include "dozf.hpp"
+#include "dyzf.hpp"
 #include "gettime.h"
 #include "modulation.hpp"
 #include "phy_stats.hpp"
@@ -49,10 +49,10 @@ using namespace arma;
  *
  * FIXME: The biggest issue is how buffers are going to be allocated, shared,
  * and accessed. Currently, the rest of Agora expects single instance of all
- * buffers, but with this redesign, we are allocating per-DoSubcarrier buffers.
+ * buffers, but with this redesign, we are allocating per-DySubcarrier buffers.
  * While this probably is okay for intermediate internal buffers, perhaps we
  * should require (at least initially) that all input and output buffers are
- * shared across all `DoSubcarrier` instances.
+ * shared across all `DySubcarrier` instances.
  *
  * ## Buffer ownership and management ##
  * The general buffer ownership policy is to accept *references* to input
@@ -65,10 +65,10 @@ using namespace arma;
  * FIXME: Currently, the output buffers are still owned by the core `Agora`
  * instance. We should eventually move them into here.
  */
-class DoSubcarrier : public Doer {
+class DySubcarrier : public Doer {
 public:
     /// Construct a new Do Subcarrier object
-    DoSubcarrier(Config* config, int tid, double freq_ghz,
+    DySubcarrier(Config* config, int tid, double freq_ghz,
         /// The range of subcarriers handled by this subcarrier doer.
         Range sc_range,
         // input buffers
@@ -83,6 +83,8 @@ public:
         Table<complex_float>& equal_buffer,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
+        std::vector<std::vector<ControlInfo>>& control_info_table,
+        std::vector<size_t>& control_idx_list,
         PhyStats* phy_stats, Stats* stats, RxStatus* rx_status = nullptr,
         DemulStatus* demul_status = nullptr, PrecodeStatus* precode_status = nullptr)
         : Doer(config, tid, freq_ghz, dummy_conq_, dummy_conq_,
@@ -98,18 +100,21 @@ public:
         , equal_buffer_(equal_buffer)
         , ul_zf_matrices_(ul_zf_matrices)
         , dl_zf_matrices_(dl_zf_matrices)
+        , control_info_table_(control_info_table)
+        , control_idx_list_(control_idx_list)
         , rx_status_(rx_status)
         , demul_status_(demul_status)
         , precode_status_(precode_status)
     {
         // Create the requisite Doers
-        do_zf_ = new DoZF(this->cfg, tid, freq_ghz, dummy_conq_, dummy_conq_,
+        do_zf_ = new DyZF(this->cfg, tid, freq_ghz, dummy_conq_, dummy_conq_,
             nullptr /* ptok */, csi_buffers_, calib_buffer, ul_zf_matrices_,
-            dl_zf_matrices_, stats);
+            dl_zf_matrices_, control_info_table_, control_idx_list_, stats);
 
-        do_demul_ = new DoDemul(this->cfg, tid, freq_ghz, dummy_conq_,
+        do_demul_ = new DyDemul(this->cfg, tid, freq_ghz, dummy_conq_,
             dummy_conq_, nullptr /* ptok */, ul_zf_matrices_,
-            ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, phy_stats,
+            ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, 
+            control_info_table_, control_idx_list_, phy_stats,
             stats, &socket_buffer_);
 
         do_precode_ = new DoPrecode(this->cfg, tid, freq_ghz, dummy_conq_,
@@ -120,7 +125,7 @@ public:
         demul_cur_sym_ul_ = 0;
     }
 
-    ~DoSubcarrier()
+    ~DySubcarrier()
     {
         delete do_zf_;
         delete do_demul_;
@@ -322,7 +327,7 @@ public:
 
         size_t whole_duration = rdtsc() - start_tsc;
         size_t idle_duration = whole_duration - work_tsc_duration;
-        printf("DoSubcarrier Thread %u duration stats: total time used %.2lfms, "
+        printf("DySubcarrier Thread %u duration stats: total time used %.2lfms, "
             "csi %.2lfms (%.2lf\%), zf %.2lfms (%.2lf\%), demod %.2lfms (%.2lf\%), "
             "precode %.2lfms (%.2lf\%), print %.2lfms (%.2lf\%), stating "
             "%.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), working rate (%u/%u: %.2lf\%)\n", 
@@ -338,7 +343,7 @@ public:
         // do_demul_->print_overhead();
 
         std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-        std::string filename = cur_directory + "/data/performance_dosubcarrier.txt";
+        std::string filename = cur_directory + "/data/performance_dysubcarrier.txt";
         FILE* fp = fopen(filename.c_str(), "a");
         fprintf(fp, "%u %u %u %u %u %.2lf %.2lf %.2lf %.2lf %.2lf %.2lf %.2lf\n", cfg->BS_ANT_NUM, cfg->UE_NUM,
             sc_range_.end - sc_range_.start, cfg->demul_block_size, cfg->mod_order_bits,
@@ -436,8 +441,8 @@ private:
     /// The subcarrier range handled by this subcarrier doer.
     struct Range sc_range_;
 
-    DoZF* do_zf_;
-    DoDemul* do_demul_;
+    DyZF* do_zf_;
+    DyDemul* do_demul_;
     DoPrecode* do_precode_;
 
     // Input buffers
@@ -487,4 +492,8 @@ private:
     PrecodeStatus* precode_status_;
 
     moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
+
+    // Control info
+    std::vector<std::vector<ControlInfo>>& control_info_table_;
+    std::vector<size_t>& control_idx_list_;
 };

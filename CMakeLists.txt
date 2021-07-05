@@ -210,6 +210,9 @@ set(AGORA_SOURCES
   src/agora/dodemul.cpp
   src/agora/doprecode.cpp
   src/agora/docoding.cpp
+  src/agora/dyzf.cpp
+  src/agora/dydemul.cpp
+  src/agora/dycoding.cpp
   src/agora/radio_lib.cpp
   src/agora/radio_calibrate.cpp
   src/mac/mac_thread.cpp)
