@@ -62,10 +62,10 @@ public:
         if (num_pkts_[frame_slot]
             == num_pkts_per_symbol_
                 * (num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_)) {
-            // printf("SharedCounters: received all packets in frame: %u. "
-            //        "Pilot pkts = %zu of %zu\n",
-            //     pkt->frame_id, num_pilot_pkts_[frame_slot].load(),
-            //     num_pilot_pkts_per_frame_);
+            MLPD_INFO("SharedCounters: received all packets in frame: %u. "
+                   "Pilot pkts = %zu of %zu\n",
+                pkt->frame_id, num_pilot_pkts_[frame_slot].load(),
+                num_pilot_pkts_per_frame_);
             full = true;
             frame_iq_time_[pkt->frame_id] = get_ns();
         }
@@ -73,10 +73,10 @@ public:
         size_t tsc4 = rdtsc();
         if (pkt->symbol_id < num_pilot_symbols_per_frame_) {
             num_pilot_pkts_[frame_slot]++;
-            // if (num_pilot_pkts_[frame_slot] == num_pilot_pkts_per_frame_) {
-            //     printf("SharedCounters: received all pilots in frame: %u\n",
-            //         pkt->frame_id);
-            // }
+            if (num_pilot_pkts_[frame_slot] == num_pilot_pkts_per_frame_) {
+                MLPD_INFO("SharedCounters: received all pilots in frame: %u\n",
+                    pkt->frame_id);
+            }
         } else {
             num_data_pkts_[frame_slot][pkt->symbol_id - num_pilot_symbols_per_frame_]++;
         }

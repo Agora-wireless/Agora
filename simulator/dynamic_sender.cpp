@@ -63,7 +63,7 @@ Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_thread
     printf("Start to init DPDK states\n");
     uint16_t portid = 0; // For now, hard-code to port zero
     if (mbuf_pool == nullptr) {
-        DpdkTransport::dpdk_init(core_offset, num_worker_threads_);
+        DpdkTransport::dpdk_init(core_offset, num_worker_threads_, cfg->pci_addr);
         // this->mbuf_pool = DpdkTransport::create_mempool();
         for (size_t i = 0; i < num_worker_threads_; i ++) {
             mbuf_pools_[i] = DpdkTransport::create_mempool(i);

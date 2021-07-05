@@ -2,7 +2,8 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-servers=(roce83 roce81 roce82)
+servers=(roce84 roce81 roce82)
+pci=('"37:00.1"' '"37:00.0"' '"37:00.0"')
 
 if [ $# -eq 1 ]
 then
@@ -15,7 +16,7 @@ $DIR/build/data_generator --conf_file $DIR/data/tddconfig-sim-ul-distributed.jso
 num_servers=$(cat $DIR/data/tddconfig-sim-ul-distributed.json | jq '.bs_server_addr_list | length')
 for (( i=0; i<$num_servers; i++ ))
 do
-    cat $DIR/data/tddconfig-sim-ul-distributed.json | jq --argjson i $i '.bs_server_addr_idx=$i' > $DIR/data/tddconfig-sim-ul-distributed_$i.json
+    cat $DIR/data/tddconfig-sim-ul-distributed.json | jq --argjson i $i '.bs_server_addr_idx=$i' | jq --argjson pci_addr ${pci[$i]} '.pci_addr=$pci_addr' > $DIR/data/tddconfig-sim-ul-distributed_$i.json
     scp $DIR/data/tddconfig-sim-ul-distributed_$i.json ${servers[$i]}:$DIR/data/tddconfig-sim-ul-distributed.json
     ssh ${servers[$i]} cd Agora; ./build/data_generator --conf_file ./data/tddconfig-sim-ul-distributed.json
 done
