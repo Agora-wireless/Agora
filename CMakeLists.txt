@@ -239,9 +239,8 @@ set(COMMON_SOURCES
   src/common/crc.cc
   src/common/memory_manage.cc
   src/common/scrambler.cc
-  src/common/recorder.cc
-  src/common/recorder_thread.cc
-  src/common/recorder_worker.cc
+  src/common/recorder/recorder.cc
+  src/common/recorder/recorder_thread.cc
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc
   src/encoder/iobuffer.cc
