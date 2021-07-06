@@ -94,11 +94,11 @@ void Recorder::FinishHDF5() {
   }
 }
 
-void Recorder::DoIt() {
-  GetInstance().DoIt_();
+void Recorder::DoIt(std::vector<RecorderWorkerFactory *> &factories) {
+  GetInstance().DoIt_(factories);
 }
 
-void Recorder::DoIt_() {
+void Recorder::DoIt_(std::vector<RecorderWorkerFactory *> &factories) {
   size_t total_antennas = cfg_->GetNumAntennas();
   size_t thread_antennas = 0;
 
@@ -123,7 +123,7 @@ void Recorder::DoIt_() {
           thread_antennas);
       Agora_recorder::RecorderThread* new_recorder =
           new Agora_recorder::RecorderThread(
-              cfg_, file_, i, thread_core,
+              cfg_, factories, file_name_, i, thread_core,
               (rx_thread_buff_size_ * kQueueSize), (i * thread_antennas),
               thread_antennas, true);
       new_recorder->Start();

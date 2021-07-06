@@ -5,6 +5,8 @@
 #ifndef AGORA_RECORDER_H_
 #define AGORA_RECORDER_H_
 
+#include <vector>
+
 #include "concurrentqueue.h"
 #include "config.h"
 #include "recorder_thread.h"
@@ -24,7 +26,7 @@ class Recorder {
     GetInstance().Record_();
   }
 
-  inline static void DoIt();
+  inline static void DoIt(std::vector<RecorderWorkerFactory *> &);
 
   inline static const std::string &GetTraceFileName() {
     return GetInstance().cfg_->TraceFile();
@@ -40,7 +42,7 @@ class Recorder {
 
   // Internal non-static impl
   void Record_();
-  void DoIt_();
+  void DoIt_(std::vector<RecorderWorkerFactory *> &);
 
   // Garbage Collect
   void Gc();

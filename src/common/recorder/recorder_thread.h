@@ -9,6 +9,8 @@ Event based message queue thread class for the recorder worker
 #ifndef AGORA_RECORDER_THREAD_H_
 #define AGORA_RECORDER_THREAD_H_
 
+#include <vector>
+#include <unordered_map>
 #include <condition_variable>
 #include <mutex>
 
@@ -19,9 +21,10 @@ namespace Agora_recorder {
 
 class RecorderThread {
  public:
-  RecorderThread(Config *in_cfg, H5::H5File *h5_file, size_t thread_id,
-                  int core, size_t queue_size, size_t antenna_offset,
-                  size_t num_antennas, bool wait_signal = true);
+  RecorderThread(Config *in_cfg, std::vector<RecorderWorkerFactory *> &factories,
+                  std::string file_name, size_t thread_id, int core,
+                  size_t queue_size, size_t antenna_offset, size_t num_antennas,
+                  bool wait_signal = true);
   ~RecorderThread();
 
   void Start();
@@ -41,9 +44,6 @@ class RecorderThread {
   moodycamel::ConcurrentQueue<EventData> event_queue_;
   moodycamel::ProducerToken producer_token_;
   std::thread thread_;
-
-  // Composition of all kinds of concrete recorders
-  RxPacketRecorder rx_record_;
 
   size_t id_;
   size_t packet_length_;
@@ -66,6 +66,9 @@ class RecorderThread {
 
   size_t antenna_offset_;
   size_t num_antennas_;
+
+  /* Mapping of concrete recorders to events */
+  std::unordered_map<EventType, RecorderWorker *> worker_mapping_;
 };
 };  // namespace Agora_recorder
 

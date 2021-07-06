@@ -14,14 +14,13 @@
 #include "H5Cpp.h"
 
 namespace Agora_recorder {
-RecorderThread::RecorderThread(Config* in_cfg, H5::H5File *h5_file,
+RecorderThread::RecorderThread(Config* in_cfg, std::vector<RecorderWorkerFactory *> &factories, std::string file_name,
                               size_t thread_id, int core,
                               size_t queue_size, size_t antenna_offset,
                               size_t num_antennas, bool wait_signal)
     : event_queue_(queue_size),
       producer_token_(event_queue_),
       thread_(),
-      rx_record_(in_cfg, h5_file),
       id_(thread_id),
       core_alloc_(core),
       wait_signal_(wait_signal),
@@ -29,6 +28,12 @@ RecorderThread::RecorderThread(Config* in_cfg, H5::H5File *h5_file,
       num_antennas_(num_antennas) {
   packet_length_ = in_cfg->PacketLength();
   running_ = false;
+
+  for(auto &rec_fact: factories) {
+    RecorderWorker *worker = rec_fact->GenWorker(in_cfg, file_name);
+    worker_mapping_.insert(std::pair<EventType, RecorderWorker *>
+                          (worker->GetEventType(), worker));
+  }
 }
 
 RecorderThread::~RecorderThread() { Finalize(); }
@@ -129,18 +134,16 @@ void RecorderThread::DoRecording() {
   }
 }
 
-void RecorderThread::HandleEvent(const RecordEventData& event) {
-  if (event.event_type_ == kThreadTermination) {
+void RecorderThread::HandleEvent(const EventData& event) {
+  auto itr = worker_mapping_.find(event.event_type_);
+  if(itr == worker_mapping_.end()) {
     this->running_ = false;
   } else {
-    if (event.event_type_ == kTaskRecordRx) {
-      this->rx_record_.Record(
-          this->id_,
-          rx_tag_t(event.record_event_.tags_[0]).rx_packet_->RawPacket());
-    }
+    itr->second->Record(
+        this->id_,
+        static_cast<void *>(rx_tag_t(event.tags_[0]).rx_packet_->RawPacket()));
 
-    /* Free up the buffer memory */
-    rx_tag_t(event.record_event_.tags_[0]).rx_packet_->Free();
+    rx_tag_t(event.tags_[0]).rx_packet_->Free();
   }
 }
 };  // End namespace Agora_recorder
