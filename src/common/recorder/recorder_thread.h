@@ -17,13 +17,6 @@ Event based message queue thread class for the recorder worker
 
 namespace Agora_recorder {
 
-enum RecordEventType { kThreadTermination, kTaskRecordRx };
-
-struct RecordEventData {
-  RecordEventType event_type_;
-  EventData       record_event_;
-};
-
 class RecorderThread {
  public:
   RecorderThread(Config *in_cfg, H5::H5File *h5_file, size_t thread_id,
@@ -33,7 +26,7 @@ class RecorderThread {
 
   void Start();
   void Stop();
-  bool DispatchWork(const RecordEventData &event);
+  bool DispatchWork(const EventData &event);
 
   inline size_t GetNumAntennas() { return num_antennas_; }
   inline size_t GetAntennaOffset() { return antenna_offset_; }
@@ -41,11 +34,11 @@ class RecorderThread {
  private:
   /*Main threading loop */
   void DoRecording();
-  void HandleEvent(const RecordEventData &event);
+  void HandleEvent(const EventData &event);
   void Finalize();
 
   // 1 - Producer (dispatcher), 1 - Consumer
-  moodycamel::ConcurrentQueue<RecordEventData> event_queue_;
+  moodycamel::ConcurrentQueue<EventData> event_queue_;
   moodycamel::ProducerToken producer_token_;
   std::thread thread_;
 

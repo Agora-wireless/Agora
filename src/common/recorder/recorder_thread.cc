@@ -48,8 +48,8 @@ void RecorderThread::Start() {
 
 /* Cleanly allows the thread to exit */
 void RecorderThread::Stop() {
-  RecordEventData event;
-  event.event_type_ = kThreadTermination;
+  EventData event;
+  /* Empty event will fail key lookup in worker_mapping_ */
   this->DispatchWork(event);
 }
 
@@ -64,7 +64,7 @@ void RecorderThread::Finalize() {
 
 /* TODO:  handle producer token better */
 // Returns true for success, false otherwise
-bool RecorderThread::DispatchWork(const RecordEventData& event) {
+bool RecorderThread::DispatchWork(const EventData& event) {
   // MLPD_TRACE("Dispatching work\n");
   bool ret = true;
   if (this->event_queue_.try_enqueue(this->producer_token_, event) == 0) {
@@ -104,7 +104,7 @@ void RecorderThread::DoRecording() {
             this->id_, this->num_antennas_,
             this->antenna_offset_);
 
-  RecordEventData event;
+  EventData event;
   bool ret = false;
   while (this->running_ == true) {
     ret = this->event_queue_.try_dequeue(ctok, event);

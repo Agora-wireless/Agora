@@ -141,11 +141,6 @@ void Recorder::DoIt_() {
     // get a bulk of events from the receivers
     ret = message_queue_.try_dequeue_bulk(ctok, events_list.data(),
                                                 KDequeueBulkSize);
-    // if (ret > 0)
-    //{
-    //    MLPD_TRACE("Message(s) received: %d\n", ret );
-    //}
-    // handle each event
     for (size_t bulk_count = 0; bulk_count < ret; bulk_count++) {
       EventData& event = events_list.at(bulk_count);
 
@@ -155,15 +150,10 @@ void Recorder::DoIt_() {
 
         //Recording Thread Router
         size_t thread_index = pkt->ant_id_ / thread_antennas;
-        Agora_recorder::RecordEventData do_record_task;
-        do_record_task.event_type_ =
-            Agora_recorder::kTaskRecordRx;
-        do_record_task.record_event_ = event;
-
         // Pass the work off to the applicable worker
         // If no worker threads, it is possible to handle the event directly.
         // this->worker_.handleEvent(do_record_task, 0);
-        if (recorders_.at(thread_index)->DispatchWork(do_record_task) ==
+        if (recorders_.at(thread_index)->DispatchWork(event) ==
             false) {
           MLPD_ERROR("Record task enqueue failed\n");
           throw std::runtime_error("Record task enqueue failed");
