@@ -5,6 +5,7 @@
 #include <gflags/gflags.h>
 
 #include "sender.h"
+#include "version_config.h"
 
 DEFINE_uint64(num_threads, 4, "Number of sender threads");
 DEFINE_uint64(core_offset, 0, "Core ID of the first sender thread");
@@ -21,6 +22,7 @@ DEFINE_uint64(
 
 int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+  gflags::SetVersionString(GetAgoraProjectVersion());
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = FLAGS_conf_file;
 
