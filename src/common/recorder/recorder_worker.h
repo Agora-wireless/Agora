@@ -13,48 +13,42 @@
 #include "config.h"
 
 namespace Agora_recorder {
-
-// each thread has a SampleBuffer
-struct SampleBuffer {
-  std::vector<char> buffer;
-  std::atomic_int* pkg_buf_inuse;
-};
-
+const H5std_string dataset_root_prefix = "/Data";
 /*
-  An Interface on how to implement concrete recorders
+  An Interface for recorders
 */
-template<class T>
 class RecorderWorker {
   public:
-  RecorderWorker(Config* in_cfg, H5::H5File *h5_file)
-  : file_(h5_file),
+  RecorderWorker() = delete;
+  RecorderWorker(EventType type, Config *in_cfg, std::string file_name)
+  : file_name_(file_name),
+    dataset_name_(H5std_string(dataset_root_prefix + "/" + EventTypeString(type))),
     cfg_(in_cfg) { }
+  virtual ~RecorderWorker() = default;
 
-  ~RecorderWorker() = default;
+  virtual herr_t Record(int, void *) = 0;
 
-  virtual herr_t Record(int, T *) = 0;
+  EventType GetEventType() {
+    return event_type_;
+  }
 
   private:
-  H5::H5File *file_;
+  const H5std_string file_name_;
+  const H5std_string dataset_name_;
 
-  Config* cfg_;
+  Config *cfg_;
+  EventType event_type_;
 };
 
 /*
-  Concrete recorder implementation
+  An Interface for worker factory
 */
-class RxPacketRecorder : public RecorderWorker<Packet> {
+class RecorderWorkerFactory {
   public:
-  RxPacketRecorder(Config *in_cfg, H5::H5File *h5_file):
-    RecorderWorker(in_cfg, h5_file) {}
+  virtual ~RecorderWorkerFactory() = default;
 
-  ~RxPacketRecorder() = default;
-
-  herr_t Record(int thread_id, Packet *data) override {
-    throw std::runtime_error("Unimplemented!");
-  }
+  virtual RecorderWorker *GenWorker(Config *, std::string) = 0;
 };
-
 }; /* End namespace Agora_recorder */
 
 #endif /* AGORA_RECORDER_WORKER_H_ */
