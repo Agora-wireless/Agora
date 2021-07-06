@@ -78,8 +78,8 @@ class Recorder {
 
   size_t num_writter_threads_;
 
+  H5std_string file_name_;
   H5::H5File *file_;
-  H5std_string hdf5_name_;
 };
 
 };     // namespace Agora_recorder

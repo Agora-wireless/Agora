@@ -28,7 +28,7 @@ Recorder::Recorder(Config *in_cfg, unsigned int core_start) :
 
   size_t ant_per_rx_thread = cfg_->GetNumAntennas() / num_writter_threads_;
 
-  hdf5_name_ = cfg_->TraceFile();
+  file_name_ = cfg_->TraceFile();
 
   rx_thread_buff_size_ =
       kSampleBufferFrameNum * cfg_->Frame().NumTotalSyms() * ant_per_rx_thread;
@@ -62,7 +62,7 @@ herr_t Recorder::InitHDF5() {
   try {
     H5::Exception::dontPrint();
 
-    file_ = new H5::H5File(hdf5_name_, H5F_ACC_TRUNC);
+    file_ = new H5::H5File(file_name_, H5F_ACC_TRUNC);
   } catch(H5::FileIException &error) {
     error.printErrorStack();
     ret = -1;
@@ -73,24 +73,24 @@ herr_t Recorder::InitHDF5() {
 
 void Recorder::OpenHDF5() {
   MLPD_TRACE("Open HDF5 file: %s\n", this->hdf5_name_.c_str());
-  this->file_->openFile(this->hdf5_name_, H5F_ACC_RDWR);
+  file_->openFile(file_name_, H5F_ACC_RDWR);
 }
 
 void Recorder::CloseHDF5() {
   if (this->file_ == nullptr) {
     MLPD_WARN("File does not exist while calling close: %s\n",
-        this->hdf5_name_.c_str());
+        file_name_.c_str());
   } else {
-    this->file_->close();
+    file_->close();
   }
 }
 
 void Recorder::FinishHDF5() {
   MLPD_TRACE("Finish HD5F file\n");
   if (this->file_ != nullptr) {
-      MLPD_TRACE("Deleting the file ptr for: %s\n", hdf5_name_.c_str());
-      delete this->file_;
-      this->file_ = nullptr;
+      MLPD_TRACE("Deleting the file ptr for: %s\n", file_name_.c_str());
+      delete file_;
+      file_ = nullptr;
   }
 }
 
