@@ -1,58 +1,61 @@
 #include <gtest/gtest.h>
 // For some reason, gtest include order matters
 #include "concurrentqueue.h"
-#include "config.hpp"
-#include "dozf.hpp"
+#include "config.h"
+#include "dozf.h"
 #include "gettime.h"
 #include "utils.h"
 
 /// Measure performance of zeroforcing
-TEST(TestZF, Perf)
-{
-    static constexpr size_t kNumIters = 10000;
-    auto* cfg = new Config("data/tddconfig-sim-ul.json");
-    cfg->genData();
+TEST(TestZF, Perf) {
+  static constexpr size_t kNumIters = 10000;
+  auto cfg = std::make_unique<Config>("data/tddconfig-sim-ul.json");
+  cfg->GenData();
 
-    int tid = 0;
-    double freq_ghz = measure_rdtsc_freq();
+  int tid = 0;
 
-    auto event_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
-    auto comp_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
-    auto ptok = new moodycamel::ProducerToken(comp_queue);
+  PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
+  csi_buffers.RandAllocCxFloat(cfg->BsAntNum() * cfg->OfdmDataNum());
 
-    PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
-    csi_buffers.rand_alloc_cx_float(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM);
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
+      cfg->BsAntNum() * cfg->UeNum());
+  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
+      cfg->UeNum() * cfg->BsAntNum());
 
-    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
-        cfg->BS_ANT_NUM * cfg->UE_NUM);
-    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
-        cfg->UE_NUM * cfg->BS_ANT_NUM);
+  Table<complex_float> calib_dl_buffer;
+  calib_dl_buffer.RandAllocCxFloat(kFrameWnd,
+                                   cfg->OfdmDataNum() * cfg->BsAntNum(),
+                                   Agora_memory::Alignment_t::kAlign64);
 
-    Table<complex_float> calib_buffer;
-    calib_buffer.rand_alloc_cx_float(
-        kFrameWnd, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
+  Table<complex_float> calib_ul_buffer;
+  calib_ul_buffer.RandAllocCxFloat(kFrameWnd,
+                                   cfg->OfdmDataNum() * cfg->BsAntNum(),
+                                   Agora_memory::Alignment_t::kAlign64);
 
-    auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
+  auto stats = std::make_unique<Stats>(cfg.get());
 
-    auto computeZF = new DoZF(cfg, tid, freq_ghz, event_queue, comp_queue, ptok,
-        csi_buffers, calib_buffer, ul_zf_matrices, dl_zf_matrices, stats);
+  auto compute_zf = std::make_unique<DoZF>(
+      cfg.get(), tid, csi_buffers, calib_dl_buffer, calib_ul_buffer,
+      ul_zf_matrices, dl_zf_matrices, stats.get());
 
-    FastRand fast_rand;
-    size_t start_tsc = rdtsc();
-    for (size_t i = 0; i < kNumIters; i++) {
-        uint32_t frame_id = fast_rand.next_u32();
-        size_t base_sc_id
-            = (fast_rand.next_u32() % (cfg->OFDM_DATA_NUM / cfg->zf_block_size))
-            * cfg->zf_block_size;
-        computeZF->launch(gen_tag_t::frm_sc(frame_id, base_sc_id)._tag);
-    }
-    double ms = cycles_to_ms(rdtsc() - start_tsc, freq_ghz);
+  FastRand fast_rand;
+  size_t start_tsc = GetTime::Rdtsc();
+  for (size_t i = 0; i < kNumIters; i++) {
+    uint32_t frame_id = fast_rand.NextU32();
+    size_t base_sc_id =
+        (fast_rand.NextU32() % (cfg->OfdmDataNum() / cfg->ZfBlockSize())) *
+        cfg->ZfBlockSize();
+    compute_zf->Launch(gen_tag_t::FrmSc(frame_id, base_sc_id).tag_);
+  }
+  double ms = GetTime::CyclesToMs(GetTime::Rdtsc() - start_tsc, cfg->FreqGhz());
 
-    printf("Time per zeroforcing iteration = %.4f ms\n", ms / kNumIters);
+  std::printf("Time per zeroforcing iteration = %.4f ms\n", ms / kNumIters);
+
+  calib_dl_buffer.Free();
+  calib_ul_buffer.Free();
 }
 
-int main(int argc, char** argv)
-{
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+int main(int argc, char** argv) {
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

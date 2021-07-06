@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
   const arma::cx_fmat A = gen_matrix_with_condition(FLAGS_condition);
   arma::cx_fmat A_lpinv;  // Left pseudo-inverse of A
 
-  printf("Input matrix {%lldx%lld}: cond number = %.3f\n", A.n_rows, A.n_cols,
+  std::printf("Input matrix {%lldx%lld}: cond number = %.3f\n", A.n_rows, A.n_cols,
          arma::cond(A));
 
   auto id_mat = arma::cx_fmat(FLAGS_n_users, FLAGS_n_users, arma::fill::zeros);
@@ -63,23 +63,23 @@ int main(int argc, char** argv) {
     id_mat(i, i) = arma::cx_float(1, 0);
 
   A_lpinv = arma::inv(A.t() * A) * A.t();
-  printf(
+  std::printf(
       "Formula (without inv_sympd): Sum of absolute differences of "
       "(A_lpinv * A - I): %.6f\n",
       arma::accu(arma::abs(A_lpinv * A - id_mat)));
 
   A_lpinv = arma::inv_sympd(A.t() * A) * A.t();
-  printf(
+  std::printf(
       "Formula (with inv_sympd): Sum of absolute differences of "
       "(A_lpinv * A - I): %.6f\n",
       arma::accu(arma::abs(A_lpinv * A - id_mat)));
 
-  printf(
+  std::printf(
       "Formula (without inv_sympd): Sum of absolute differences of "
       "(A_pinv * A - I): %.6f\n",
       arma::accu(arma::abs(A_lpinv * A - id_mat)));
 
   A_lpinv = pinv(A);
-  printf("SVD: Sum of absolute differences of (A_lpinv * A - I): %.6f\n",
+  std::printf("SVD: Sum of absolute differences of (A_lpinv * A - I): %.6f\n",
          arma::accu(arma::abs(A_lpinv * A - id_mat)));
 }

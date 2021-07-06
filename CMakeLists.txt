@@ -1,13 +1,16 @@
 cmake_minimum_required(VERSION 2.8.8)
 include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
-project(Agora)
+#Allow project version
+cmake_policy(SET CMP0048 NEW)
+project(Agora VERSION 1.0.0)
 
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   set(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
 endif()
 
 set(SOURCE_DIR ".")
+configure_file(${CMAKE_SOURCE_DIR}/src/common/version_config.h.in ${CMAKE_SOURCE_DIR}/src/common/version_config.h)
 
 option(FORCE_BUILD_PATH "Hardcode the build directory path to be 'Agora/build/'" ON)
 if(FORCE_BUILD_PATH)
@@ -24,18 +27,18 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie")
 if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   message(STATUS "Using GNU compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
-  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -m64")
+  set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -march=native -m64")
   set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl)
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
   message(STATUS "Using Intel compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/intel-compile-options.cmake)
   set(MKL_LIBS -lpthread -lm -ldl)
-  set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -march=native -mkl=sequential")
+  set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -march=native -mkl=sequential")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
   message(STATUS "Using Clang compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
-  set(CMAKE_CXX_STANDARD 14)
+  set(CMAKE_CXX_STANDARD 17)
 else()
-  set(CMAKE_CXX_STANDARD 11)
+  set(CMAKE_CXX_STANDARD 17)
 endif()
 
 # Unit tests
@@ -48,8 +51,18 @@ if(NOT DEBUG)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG")
 else()
+  message(STATUS "Verbose Makefile")
+  set( CMAKE_VERBOSE_MAKEFILE on )
   message(STATUS "Debugging is enabled. Performance will be low")
+  set(CMAKE_BUILD_TYPE Debug)
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wshadow -ggdb3 -fstack-protector-all -fsanitize=undefined -fsanitize=address -fsanitize=null")
+  #-fsanitize=thread- fstack-protector-all -fsanitize=address -fstack-check
+  #-fsanitize=address -fsanitize=pointer-compare
+  #-fsanitize=address -fsanitize=pointer-subtract
+  #-fsanitize=leak -fsanitize=undefined -fsanitize=null
 endif()
+
+#if(CMAKE_BUILD_TYPE MATCHES Debug)
 
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
@@ -61,7 +74,7 @@ find_package(Armadillo)
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
-set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
+set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 set(USE_AVX2_ENCODER False CACHE STRING "Use Agora's AVX2 encoder instead of FlexRAN's AVX512 encoder")
 # TODO: add SoapyUHD check
@@ -129,6 +142,15 @@ if(${ENABLE_MAC})
   add_definitions(-DENABLE_MAC)
 endif()
 
+set(MAC_CLIENT_SOURCES
+  src/mac/mac_sender.cc
+  src/mac/mac_receiver.cc
+  src/mac/mac_client.cc)
+set(MAC_BS_SOURCES
+  src/mac/mac_sender.cc
+  src/mac/mac_receiver.cc
+  src/mac/mac_basestation.cc)
+
 # Argos support
 if(${USE_ARGOS})
   add_definitions(-DUSE_ARGOS)
@@ -185,63 +207,72 @@ else()
 endif()
 
 include_directories(
-	src/common/
-	src/mac/
+  src/common/
+  src/mac/
   src/agora/
   src/agora/txrx/
   src/client/
-  data/data_generator)
+  /usr/include/mkl/
+  src/data_generator)
 
-include_directories(SYSTEM src/third_party)
+include_directories(SYSTEM src/third_party src/third_party/nlohmann/single_include)
 
 set(COMMON_SOURCES
-  src/common/config.cpp
-  src/common/utils.cpp
-  src/common/comms-lib.cpp
-  src/common/comms-lib-avx.cpp
-  src/common/signalHandler.cpp
-  src/common/modulation.cpp
-  src/common/modulation_srslte.cpp
-  src/common/net.cpp
-  src/common/crc.cpp
-  src/encoder/cyclic_shift.cpp
-  src/encoder/encoder.cpp
-  src/encoder/iobuffer.cpp)
+  src/agora/stats.cc
+  src/agora/phy_stats.cc
+  src/common/framestats.cc
+  src/agora/doencode.cc
+  src/common/config.cc
+  src/common/utils.cc
+  src/common/comms-lib.cc
+  src/common/comms-lib-avx.cc
+  src/common/signal_handler.cc
+  src/common/modulation.cc
+  src/common/modulation_srslte.cc
+  src/common/net.cc
+  src/common/crc.cc
+  src/common/memory_manage.cc
+  src/common/scrambler.cc
+  src/encoder/cyclic_shift.cc
+  src/encoder/encoder.cc
+  src/encoder/iobuffer.cc)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(AGORA_SOURCES 
-  src/agora/agora.cpp
-  src/agora/stats.cpp 
-  src/agora/phy_stats.cpp 
-  src/agora/dofft.cpp
-  src/agora/dozf.cpp
-  src/agora/dodemul.cpp
-  src/agora/doprecode.cpp
-  src/agora/docoding.cpp
-  src/agora/radio_lib.cpp
-  src/agora/radio_calibrate.cpp
-  src/mac/mac_thread.cpp)
+  src/agora/agora.cc
+  src/agora/dofft.cc
+  src/agora/doifft.cc
+  src/agora/dozf.cc
+  src/agora/dodemul.cc
+  src/agora/doprecode.cc
+  src/agora/dodecode.cc
+  src/agora/radio_lib.cc
+  src/agora/radio_calibrate.cc
+  src/mac/mac_thread_basestation.cc)
 
 if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
   set(AGORA_SOURCES ${AGORA_SOURCES} 
-    src/agora/txrx/txrx_DPDK.cpp
-    src/common/dpdk_transport.cpp)
+    src/agora/txrx/txrx_DPDK.cc
+    src/common/dpdk_transport.cc)
 else()
   set(AGORA_SOURCES ${AGORA_SOURCES} 
-    src/agora/txrx/txrx.cpp
-    src/agora/txrx/txrx_argos.cpp
-    src/agora/txrx/txrx_usrp.cpp)
+    src/agora/txrx/txrx.cc
+    src/agora/txrx/txrx_argos.cc
+    src/agora/txrx/txrx_usrp.cc)
 endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
-  src/client/client_radio.cpp
-  src/client/phy-ue.cpp
-  src/client/txrx_client.cpp
-  src/mac/mac_thread.cpp)
+  src/client/doifft_client.cc
+  src/client/dodecode_client.cc
+  src/client/client_radio.cc
+  src/client/ue_worker.cc
+  src/client/phy-ue.cc
+  src/client/txrx_client.cc
+  src/mac/mac_thread_client.cc)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
-
+  
 include_directories(
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
@@ -260,49 +291,61 @@ set(COMMON_LIBS armadillo -lnuma ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
 # test if compiling against precompiled objects instead of compiling directly
 # against sources reduces performance.
 add_executable(agora
-  src/agora/main.cpp
+  src/agora/main.cc
   $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(agora ${COMMON_LIBS})
 
 add_executable(data_generator
-  ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator_main.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/data_generator/data_generator.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(data_generator ${COMMON_LIBS})
 target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 
 add_executable(user
-  src/client/user-main.cpp
+  src/client/user-main.cc
   $<TARGET_OBJECTS:client_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(user ${COMMON_LIBS})
 
 add_executable(sender
-  simulator/sender_cli.cpp
-  simulator/sender.cpp
-  src/common/dpdk_transport.cpp
+  simulator/sender_cli.cc
+  simulator/sender.cc
+  src/common/dpdk_transport.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sender ${COMMON_LIBS})
 
 add_executable(sim
-  simulator/main.cpp
-  simulator/simulator.cpp
-  simulator/sender.cpp
-  simulator/receiver.cpp
-  src/common/dpdk_transport.cpp
+  simulator/main.cc
+  simulator/simulator.cc
+  simulator/sender.cc
+  simulator/receiver.cc
+  src/common/dpdk_transport.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
 
 add_executable(chsim
-  simulator/chsim_main.cpp
-  simulator/channel_sim.cpp
+  simulator/chsim_main.cc
+  simulator/channel_sim.cc
+  simulator/channel.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(chsim ${COMMON_LIBS})
+
+add_executable(macuser
+     ${MAC_CLIENT_SOURCES}
+     ${COMMON_SOURCES})
+target_link_libraries(macuser ${COMMON_LIBS})
+
+add_executable(macbs
+     ${MAC_BS_SOURCES}
+     ${COMMON_SOURCES})
+target_link_libraries(macbs ${COMMON_LIBS})
 
 
 # End-to-end test
 add_executable(test_agora
-  test/test_agora/main.cpp
+  test/test_agora/main.cc
   $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_agora ${COMMON_LIBS})
@@ -311,7 +354,7 @@ target_link_libraries(test_agora ${COMMON_LIBS})
 set(LDPC_TESTS test_ldpc test_ldpc_mod test_ldpc_baseband)
 foreach(test_name IN LISTS LDPC_TESTS)
   add_executable(${test_name}
-    test/compute_kernels/ldpc/${test_name}.cpp
+    test/compute_kernels/ldpc/${test_name}.cc
     $<TARGET_OBJECTS:common_sources_lib>)
   # Unit tests should pass without memory errors
   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
@@ -324,7 +367,8 @@ endforeach()
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
-  test_ptr_grid test_recipcal)
+  test_ptr_grid test_recipcal test_avx512_complex_mul test_scrambler
+  test_256qam_demod)
 
 foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}
@@ -354,3 +398,4 @@ endforeach()
 # else()
 #   message(STATUS "Warning: DPDK is not supported for creating shared libraries!")
 # endif()
+
