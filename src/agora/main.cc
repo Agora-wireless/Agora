@@ -6,6 +6,7 @@
 #include "config.h"
 #include "recorder/recorder.h"
 #include "gflags/gflags.h"
+#include "version_config.h.in"
 
 DEFINE_string(conf_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
@@ -13,6 +14,7 @@ DEFINE_string(conf_file,
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");
+  gflags::SetVersionString(GetAgoraProjectVersion());
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   std::string conf_file;
 

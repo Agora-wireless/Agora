@@ -5,6 +5,7 @@
 #include <gflags/gflags.h>
 
 #include "channel_sim.h"
+#include "version_config.h"
 
 DEFINE_uint64(bs_threads, 1,
               "Number of threads for handling reception of BS packets");
@@ -27,6 +28,7 @@ DEFINE_double(chan_snr, 20.0, "Signal-to-Noise Ratio");
 int main(int argc, char* argv[]) {
   int ret = EXIT_FAILURE;
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+  gflags::SetVersionString(GetAgoraProjectVersion());
   std::printf("Base Station configuration\n");
   auto bs_config = std::make_unique<Config>(FLAGS_bs_conf_file);
   std::printf("User configuration\n");
