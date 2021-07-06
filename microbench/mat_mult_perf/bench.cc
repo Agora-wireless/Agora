@@ -24,7 +24,7 @@ float mat_mult_perf(std::vector<arma::cx_fmat>& test_matrices,
     ret += out[0].real();
   }
   size_t end_tsc = rdtsc();
-  printf(
+  std::printf(
       "[No JIT] Average time to multiple [%llu x %llu] matrix by [%llu x %llu] "
       "vector = %.0f ns\n",
       test_matrices[0].n_rows, test_matrices[0].n_cols,
@@ -45,8 +45,8 @@ float mat_mult_perf_jit(std::vector<arma::cx_fmat>& test_matrices,
       &mkl_jitter, MKL_COL_MAJOR, MKL_NOTRANS, MKL_NOTRANS, FLAGS_n_rows, 1,
       FLAGS_n_cols, &alpha, FLAGS_n_rows, FLAGS_n_cols, &beta, FLAGS_n_rows);
   if (status == MKL_JIT_ERROR) {
-    fprintf(stderr, "Error: Failed to init MKL JIT");
-    exit(-1);
+    std::fprintf(stderr, "Error: Failed to init MKL JIT");
+    std::exit(-1);
   }
   mkl_jit_cgemm = mkl_jit_get_cgemm_ptr(mkl_jitter);
 
@@ -63,7 +63,7 @@ float mat_mult_perf_jit(std::vector<arma::cx_fmat>& test_matrices,
     ret += out[0].real();
   }
   size_t end_tsc = rdtsc();
-  printf(
+  std::printf(
       "[JIT]: Average time to multiple [%llu x %llu] matrix by [%llu x %llu] "
       "vector = %.0f ns\n",
       test_matrices[0].n_rows, test_matrices[0].n_cols,
@@ -112,29 +112,29 @@ int main(int argc, char** argv) {
     test_col_vectors.push_back(arma::randn<arma::cx_fmat>(FLAGS_n_cols, 1));
   }
 
-  printf("No cache line flushing, JIT\n");
+  std::printf("No cache line flushing, JIT\n");
   for (size_t i = 0; i < 4; i++) {
     float ret = mat_mult_perf_jit(test_matrices, test_col_vectors);
-    fprintf(stderr, "Computation proof = %.2f\n", ret);
+    std::fprintf(stderr, "Computation proof = %.2f\n", ret);
   }
 
-  printf("\nNo cache line flushing, no JIT\n");
+  std::printf("\nNo cache line flushing, no JIT\n");
   for (size_t i = 0; i < 4; i++) {
     float ret = mat_mult_perf(test_matrices, test_col_vectors);
-    fprintf(stderr, "Computation proof = %.2f\n", ret);
+    std::fprintf(stderr, "Computation proof = %.2f\n", ret);
   }
 
-  printf("\nCache line flushing, JIT\n");
+  std::printf("\nCache line flushing, JIT\n");
   for (size_t i = 0; i < 4; i++) {
     flush_cache_lines(test_matrices, test_col_vectors);
     float ret = mat_mult_perf_jit(test_matrices, test_col_vectors);
-    fprintf(stderr, "Computation proof = %.2f\n", ret);
+    std::fprintf(stderr, "Computation proof = %.2f\n", ret);
   }
 
-  printf("\nCache line flushing, no JIT\n");
+  std::printf("\nCache line flushing, no JIT\n");
   for (size_t i = 0; i < 4; i++) {
     flush_cache_lines(test_matrices, test_col_vectors);
     float ret = mat_mult_perf(test_matrices, test_col_vectors);
-    fprintf(stderr, "Computation proof = %.2f\n", ret);
+    std::fprintf(stderr, "Computation proof = %.2f\n", ret);
   }
 }
