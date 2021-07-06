@@ -4,6 +4,7 @@
 #include <mkl.h>
 
 #include <map>
+#include <stdexcept>
 #include <string>
 
 #define EXPORT __attribute__((visibility("default")))
@@ -56,6 +57,68 @@ enum class EventType : uint8_t {
 };
 static constexpr size_t kNumEventTypes =
     static_cast<size_t>(EventType::kFFTPilot) + 1;
+
+/* Convention: "<operation>+<operand>" */
+inline std::string EventTypeString(EventType type) {
+  std::string ret;
+  switch(type) {
+    case(EventType::kPacketRX):
+      ret = "ReceivePacket";
+      break;
+    case(EventType::kFFT):
+      ret = "FFTData";
+      break;
+    case(EventType::kZF):
+      ret = "ZFData";
+      break;
+    case(EventType::kDemul):
+      ret = "DemulData";
+      break;
+    case(EventType::kIFFT):
+      ret = "IFFTData";
+      break;
+    case(EventType::kPrecode):
+      ret = "PrecodeData";
+      break;
+    case(EventType::kPacketTX):
+      ret = "SendPacket";
+      break;
+    case(EventType::kPacketPilotTX):
+      ret = "SendPilotData";
+      break;
+    case(EventType::kDecode):
+      ret = "DecodeData";
+      break;
+    case(EventType::kEncode):
+      ret = "EncodeData";
+      break;
+    case(EventType::kModul):
+      ret = "ModulateData";
+      break;
+    case(EventType::kPacketFromMac):
+      ret = "ReceiveMacPacket";
+      break;
+    case(EventType::kPacketToMac):
+      ret = "SendMacPacket";
+      break;
+    case(EventType::kFFTPilot):
+      ret = "FFTPilotData";
+      break;
+    //case(EventType::kSNRReport):
+    //  ret = "ReportSNR"; /* TODO: Fix if bad enumeration */
+    //  break;
+    //case(EventType::kRANUpdate):
+    //  ret = "UpdateRAN"; /* TODO: Fix if bad enumeration */
+    //  break;
+    //case(EventType::kRBIndicator):
+    //  ret = "IndicateRBI"; /* TODO: Fix if bad enumeration */
+    //  break;
+    default:
+      throw std::runtime_error("Unknown Event type");
+  }
+
+  return ret;
+}
 
 // Types of Agora Doers
 enum class DoerType : uint8_t {
