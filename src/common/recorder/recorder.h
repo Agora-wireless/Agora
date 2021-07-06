@@ -49,9 +49,6 @@ class Recorder {
 
   // Manage HDF5 File
   herr_t InitHDF5();
-  void OpenHDF5();
-  void CloseHDF5();
-  void FinishHDF5();
 
   // Constructor Args
   Config *cfg_;
@@ -79,7 +76,6 @@ class Recorder {
   size_t num_writter_threads_;
 
   H5std_string file_name_;
-  H5::H5File *file_;
 };
 
 };     // namespace Agora_recorder

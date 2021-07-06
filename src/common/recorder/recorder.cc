@@ -39,7 +39,6 @@ Recorder::Recorder(Config *in_cfg, unsigned int core_start) :
   if (this->InitHDF5() < 0) {
       throw std::runtime_error("Could not init the output file");
   }
-  this->OpenHDF5();
 
   MLPD_TRACE(
       "Recorder construction: rx threads: %zu, recorder threads: %u, "
@@ -51,47 +50,22 @@ Recorder::~Recorder() {
   GetInstance().Gc();
 }
 
-void Recorder::Gc() {
-  CloseHDF5();
-  FinishHDF5();
-  MLPD_TRACE("Garbage collect\n");
-}
+void Recorder::Gc() { }
 
 herr_t Recorder::InitHDF5() {
   herr_t ret = 0;
   try {
     H5::Exception::dontPrint();
 
-    file_ = new H5::H5File(file_name_, H5F_ACC_TRUNC);
+    /* Open HDF5 file and create a root group */
+    auto h5_file = std::unique_ptr<H5::H5File>(new H5::H5File(file_name_, H5F_ACC_TRUNC));
+    h5_file->createGroup(dataset_root_prefix);
   } catch(H5::FileIException &error) {
     error.printErrorStack();
     ret = -1;
   }
 
   return ret;
-}
-
-void Recorder::OpenHDF5() {
-  MLPD_TRACE("Open HDF5 file: %s\n", this->hdf5_name_.c_str());
-  file_->openFile(file_name_, H5F_ACC_RDWR);
-}
-
-void Recorder::CloseHDF5() {
-  if (this->file_ == nullptr) {
-    MLPD_WARN("File does not exist while calling close: %s\n",
-        file_name_.c_str());
-  } else {
-    file_->close();
-  }
-}
-
-void Recorder::FinishHDF5() {
-  MLPD_TRACE("Finish HD5F file\n");
-  if (this->file_ != nullptr) {
-      MLPD_TRACE("Deleting the file ptr for: %s\n", file_name_.c_str());
-      delete file_;
-      file_ = nullptr;
-  }
 }
 
 void Recorder::DoIt(std::vector<RecorderWorkerFactory *> &factories) {
