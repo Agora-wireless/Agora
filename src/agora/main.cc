@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
     signal_handler.SetupSignalHandlers();
 
     if(cfg->TraceFile() != "") {
-      auto &data_recoder = Agora_recorder::Recorder::GetInstance(cfg.get());
+      auto &data_recoder = Recorder::Recorder::GetInstance(cfg.get());
     }
 
     std::unique_ptr<Agora> agora_cli = std::make_unique<Agora>(cfg.get());

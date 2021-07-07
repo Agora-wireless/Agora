@@ -11,7 +11,7 @@
 #include "config.h"
 #include "recorder_thread.h"
 
-namespace Agora_recorder {
+namespace Recorder {
 class Recorder {
   public:
   Recorder() = delete;
@@ -56,7 +56,7 @@ class Recorder {
 
   size_t rx_thread_buff_size_;
 
-  std::vector<Agora_recorder::RecorderThread *> recorders_;
+  std::vector<RecorderThread *> recorders_;
 
   /*
     TODO: Check analog of MAX_FRAME_INC
@@ -78,5 +78,5 @@ class Recorder {
   H5std_string file_name_;
 };
 
-};     // namespace Agora_recorder
+};     // namespace Recorder
 #endif /* AGORA_RECORDER_H_ */

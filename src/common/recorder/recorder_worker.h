@@ -12,7 +12,7 @@
 #include "H5Cpp.h"
 #include "config.h"
 
-namespace Agora_recorder {
+namespace Recorder {
 const H5std_string dataset_root_prefix = "/Data";
 /*
   An Interface for recorders
@@ -49,6 +49,6 @@ class RecorderWorkerFactory {
 
   virtual RecorderWorker *GenWorker(Config *, std::string) = 0;
 };
-}; /* End namespace Agora_recorder */
+}; /* End namespace Recorder */
 
 #endif /* AGORA_RECORDER_WORKER_H_ */

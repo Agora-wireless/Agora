@@ -7,7 +7,7 @@
 #include "signal_handler.h"
 #include "symbols.h"
 
-namespace Agora_recorder {
+namespace Recorder {
 // buffer length of each rx thread
 const int Recorder::kSampleBufferFrameNum = 80;
 // dequeue bulk size, used to reduce the overhead of dequeue in main thread
@@ -95,8 +95,8 @@ void Recorder::DoItInternal(std::vector<RecorderWorkerFactory *> &factories) {
           "total %zu\n",
           i, (i * thread_antennas), ((i + 1) * thread_antennas) - 1,
           thread_antennas);
-      Agora_recorder::RecorderThread* new_recorder =
-          new Agora_recorder::RecorderThread(
+          RecorderThread* new_recorder =
+          new RecorderThread(
               cfg_, factories, file_name_, i, thread_core,
               (rx_thread_buff_size_ * kQueueSize), (i * thread_antennas),
               thread_antennas, true);
@@ -148,4 +148,4 @@ void Recorder::DoItInternal(std::vector<RecorderWorkerFactory *> &factories) {
   }
   recorders_.clear();
 }
-};  // end namespace Agora_recorder
+};  // end namespace Recorder

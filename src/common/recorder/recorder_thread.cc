@@ -13,7 +13,7 @@
 #include "utils.h"
 #include "H5Cpp.h"
 
-namespace Agora_recorder {
+namespace Recorder {
 RecorderThread::RecorderThread(Config* in_cfg, std::vector<RecorderWorkerFactory *> &factories, std::string file_name,
                               size_t thread_id, int core,
                               size_t queue_size, size_t antenna_offset,
@@ -140,10 +140,9 @@ void RecorderThread::HandleEvent(const EventData& event) {
     this->running_ = false;
   } else {
     itr->second->Record(
-        this->id_,
         static_cast<void *>(rx_tag_t(event.tags_[0]).rx_packet_->RawPacket()));
 
     rx_tag_t(event.tags_[0]).rx_packet_->Free();
   }
 }
-};  // End namespace Agora_recorder
+};  // End namespace Recorder

@@ -17,8 +17,7 @@ Event based message queue thread class for the recorder worker
 #include "concurrentqueue.h"
 #include "recorder_worker.h"
 
-namespace Agora_recorder {
-
+namespace Recorder {
 class RecorderThread {
  public:
   RecorderThread(Config *in_cfg, std::vector<RecorderWorkerFactory *> &factories,
@@ -70,6 +69,6 @@ class RecorderThread {
   /* Mapping of concrete recorders to events */
   std::unordered_map<EventType, RecorderWorker *> worker_mapping_;
 };
-};  // namespace Agora_recorder
+};  // namespace Recorder
 
 #endif /* AGORA_RECORDER_THREAD_H_ */
