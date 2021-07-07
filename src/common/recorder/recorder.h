@@ -23,7 +23,7 @@ class Recorder {
   }
 
   inline static void Record() {
-    GetInstance().Record_();
+    GetInstance().RecordInternal();
   }
 
   inline static void DoIt(std::vector<RecorderWorkerFactory *> &);
@@ -41,8 +41,8 @@ class Recorder {
   explicit Recorder(Config *in_cfg, unsigned int core_start);
 
   // Internal non-static impl
-  void Record_();
-  void DoIt_(std::vector<RecorderWorkerFactory *> &);
+  void RecordInternal();
+  void DoItInternal(std::vector<RecorderWorkerFactory *> &);
 
   // Garbage Collect
   void Gc();

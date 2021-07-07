@@ -69,10 +69,10 @@ herr_t Recorder::InitHDF5() {
 }
 
 void Recorder::DoIt(std::vector<RecorderWorkerFactory *> &factories) {
-  GetInstance().DoIt_(factories);
+  GetInstance().DoItInternal(factories);
 }
 
-void Recorder::DoIt_(std::vector<RecorderWorkerFactory *> &factories) {
+void Recorder::DoItInternal(std::vector<RecorderWorkerFactory *> &factories) {
   size_t total_antennas = cfg_->GetNumAntennas();
   size_t thread_antennas = 0;
 
