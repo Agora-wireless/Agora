@@ -28,7 +28,7 @@ Recorder::Recorder(Config *in_cfg, unsigned int core_start) :
 
   size_t ant_per_rx_thread = cfg_->GetNumAntennas() / num_writter_threads_;
 
-  file_name_ = cfg_->TraceFile();
+  H5std_string file_name_ = cfg_->TraceFile();
 
   rx_thread_buff_size_ =
       kSampleBufferFrameNum * cfg_->Frame().NumTotalSyms() * ant_per_rx_thread;
@@ -36,7 +36,7 @@ Recorder::Recorder(Config *in_cfg, unsigned int core_start) :
   message_queue_ =
       moodycamel::ConcurrentQueue<EventData>(rx_thread_buff_size_ * kQueueSize);
 
-  if (this->InitHDF5() < 0) {
+  if (this->InitHDF5(file_name_) < 0) {
       throw std::runtime_error("Could not init the output file");
   }
 
@@ -52,14 +52,14 @@ Recorder::~Recorder() {
 
 void Recorder::Gc() { }
 
-herr_t Recorder::InitHDF5() {
+herr_t Recorder::InitHDF5(H5std_string file_name) {
   herr_t ret = 0;
   try {
     H5::Exception::dontPrint();
 
     /* Open HDF5 file and create a root group */
-    auto h5_file = std::unique_ptr<H5::H5File>(new H5::H5File(file_name_, H5F_ACC_TRUNC));
-    h5_file->createGroup(dataset_root_prefix);
+    h5_file_ = new H5::H5File(file_name, H5F_ACC_TRUNC);
+    h5_file_->createGroup(dataset_root_prefix);
   } catch(H5::FileIException &error) {
     error.printErrorStack();
     ret = -1;
@@ -90,18 +90,10 @@ void Recorder::DoItInternal(std::vector<RecorderWorkerFactory *> &factories) {
     for (unsigned int i = 0u; i < num_writter_threads_; i++) {
       int thread_core = kRecorderCore + i;
 
-      MLPD_INFO(
-          "Creating recorder thread: %u, with antennas %zu:%zu "
-          "total %zu\n",
-          i, (i * thread_antennas), ((i + 1) * thread_antennas) - 1,
-          thread_antennas);
-          RecorderThread* new_recorder =
-          new RecorderThread(
-              cfg_, factories, file_name_, i, thread_core,
-              (rx_thread_buff_size_ * kQueueSize), (i * thread_antennas),
-              thread_antennas, true);
-      new_recorder->Start();
-      recorders_.push_back(new_recorder);
+      recorders_.push_back(std::make_unique<RecorderThread>(
+          cfg_, factories, h5_file_, i, thread_core,
+          (rx_thread_buff_size_ * kQueueSize), (i * thread_antennas),
+          thread_antennas, true));
     }
   }
 

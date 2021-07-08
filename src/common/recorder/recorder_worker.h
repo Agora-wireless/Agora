@@ -20,8 +20,8 @@ const H5std_string dataset_root_prefix = "/Data";
 class RecorderWorker {
   public:
   RecorderWorker() = delete;
-  RecorderWorker(EventType type, Config *in_cfg, std::string file_name)
-  : file_name_(file_name),
+  RecorderWorker(EventType type, Config *in_cfg, H5::H5File *h5_file)
+  : h5_file_(h5_file),
     dataset_name_(H5std_string(dataset_root_prefix + "/" + EventTypeString(type))),
     cfg_(in_cfg) { }
   virtual ~RecorderWorker() = default;
@@ -33,8 +33,9 @@ class RecorderWorker {
   }
 
   private:
-  const H5std_string file_name_;
   const H5std_string dataset_name_;
+
+  H5::H5File *h5_file_;
 
   Config *cfg_;
   EventType event_type_;
@@ -47,7 +48,7 @@ class RecorderWorkerFactory {
   public:
   virtual ~RecorderWorkerFactory() = default;
 
-  virtual RecorderWorker *GenWorker(Config *, std::string) = 0;
+  virtual RecorderWorker *GenWorker(Config *, H5::H5File *) = 0;
 };
 }; /* End namespace Recorder */
 

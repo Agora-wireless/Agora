@@ -48,7 +48,7 @@ class Recorder {
   void Gc();
 
   // Manage HDF5 File
-  herr_t InitHDF5();
+  herr_t InitHDF5(H5std_string);
 
   // Constructor Args
   Config *cfg_;
@@ -56,7 +56,7 @@ class Recorder {
 
   size_t rx_thread_buff_size_;
 
-  std::vector<RecorderThread *> recorders_;
+  std::vector<std::unique_ptr<RecorderThread>> recorders_;
 
   /*
     TODO: Check analog of MAX_FRAME_INC
@@ -75,7 +75,7 @@ class Recorder {
 
   size_t num_writter_threads_;
 
-  H5std_string file_name_;
+  H5::H5File *h5_file_;
 };
 
 };     // namespace Recorder

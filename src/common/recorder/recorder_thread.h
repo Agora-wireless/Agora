@@ -21,7 +21,7 @@ namespace Recorder {
 class RecorderThread {
  public:
   RecorderThread(Config *in_cfg, std::vector<RecorderWorkerFactory *> &factories,
-                  std::string file_name, size_t thread_id, int core,
+                  H5::H5File *h5_file, size_t thread_id, int core,
                   size_t queue_size, size_t antenna_offset, size_t num_antennas,
                   bool wait_signal = true);
   ~RecorderThread();

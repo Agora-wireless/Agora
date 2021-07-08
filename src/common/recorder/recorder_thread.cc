@@ -8,16 +8,17 @@
 */
 
 #include "recorder_thread.h"
-
 #include "logger.h"
 #include "utils.h"
 #include "H5Cpp.h"
 
 namespace Recorder {
-RecorderThread::RecorderThread(Config* in_cfg, std::vector<RecorderWorkerFactory *> &factories, std::string file_name,
-                              size_t thread_id, int core,
-                              size_t queue_size, size_t antenna_offset,
-                              size_t num_antennas, bool wait_signal)
+RecorderThread::RecorderThread(Config* in_cfg,
+                                std::vector<RecorderWorkerFactory *> &factories,
+                                H5::H5File *h5_file,
+                                size_t thread_id, int core,
+                                size_t queue_size, size_t antenna_offset,
+                                size_t num_antennas, bool wait_signal)
     : event_queue_(queue_size),
       producer_token_(event_queue_),
       thread_(),
