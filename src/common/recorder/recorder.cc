@@ -47,6 +47,10 @@ Recorder::Recorder(Config *in_cfg, unsigned int core_start) :
 }
 
 Recorder::~Recorder() {
+  Gc();
+}
+
+void Recorder::Gc() {
   running_.store(false);
   // Call Destructor on all recorders
   recorders_.clear();
@@ -125,6 +129,11 @@ void Recorder::DoItInternal(std::vector<RecorderWorkerFactory *> &factories) {
         }
       }
     }
+  }
+
+  if(running_.load() == true) {
+    // In case of exit signal, cleanup
+    Gc();
   }
 }
 };  // end namespace Recorder
