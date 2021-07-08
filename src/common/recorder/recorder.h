@@ -44,15 +44,14 @@ class Recorder {
   void RecordInternal();
   void DoItInternal(std::vector<RecorderWorkerFactory *> &);
 
-  // Garbage Collect
-  void Gc();
-
   // Manage HDF5 File
   herr_t InitHDF5(H5std_string);
 
   // Constructor Args
   Config *cfg_;
   unsigned int core_start_;
+
+  std::atomic<bool> running_;
 
   size_t rx_thread_buff_size_;
 

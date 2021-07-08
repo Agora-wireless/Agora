@@ -47,6 +47,7 @@ Recorder::Recorder(Config *in_cfg, unsigned int core_start) :
 }
 
 Recorder::~Recorder() {
+  running_.store(false);
   // Call Destructor on all recorders
   recorders_.clear();
   delete h5_file_;
@@ -100,7 +101,7 @@ void Recorder::DoItInternal(std::vector<RecorderWorkerFactory *> &factories) {
   std::array<EventData, KDequeueBulkSize> events_list;
   size_t ret = 0;
 
-  while ((cfg_->Running() == true) &&
+  while ((running_.load() == true) &&
          (SignalHandler::GotExitSignal() == false)) {
     // get a bulk of events from the receivers
     ret = message_queue_.try_dequeue_bulk(ctok, events_list.data(),
@@ -125,6 +126,5 @@ void Recorder::DoItInternal(std::vector<RecorderWorkerFactory *> &factories) {
       }
     }
   }
-  cfg_->Running(false);
 }
 };  // end namespace Recorder
