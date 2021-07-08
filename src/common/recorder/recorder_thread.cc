@@ -47,6 +47,11 @@ RecorderThread::~RecorderThread() {
     this->DispatchWork(event);
     this->thread_.join();
   }
+
+  // Free all workers
+  for(auto itr: worker_mapping_) {
+    delete itr.second;
+  }
 }
 
 /* TODO:  handle producer token better */
