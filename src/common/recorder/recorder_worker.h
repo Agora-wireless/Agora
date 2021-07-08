@@ -28,8 +28,12 @@ class RecorderWorker {
 
   virtual herr_t Record(int, void *) = 0;
 
-  EventType GetEventType() {
+  EventType GetEventType() const {
     return event_type_;
+  }
+
+  std::string GetDataSetName() const {
+    return dataset_name_;
   }
 
   private:
