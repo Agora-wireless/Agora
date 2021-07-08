@@ -26,7 +26,7 @@ class RecorderWorker {
     cfg_(in_cfg) { }
   virtual ~RecorderWorker() = default;
 
-  virtual herr_t Record(int, void *) = 0;
+  virtual herr_t Record(void *) = 0;
 
   EventType GetEventType() const {
     return event_type_;
