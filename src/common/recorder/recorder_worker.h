@@ -21,8 +21,8 @@ class RecorderWorker {
   public:
   RecorderWorker() = delete;
   RecorderWorker(EventType type, Config *in_cfg, H5::H5File *h5_file)
-  : h5_file_(h5_file),
-    dataset_name_(H5std_string(dataset_root_prefix + "/" + EventTypeString(type))),
+  : dataset_name_(H5std_string(dataset_root_prefix + "/" + EventTypeString(type))),
+    h5_file_(h5_file),
     cfg_(in_cfg) { }
   virtual ~RecorderWorker() = default;
 
