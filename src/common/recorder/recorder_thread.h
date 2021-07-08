@@ -26,8 +26,6 @@ class RecorderThread {
                   bool wait_signal = true);
   ~RecorderThread();
 
-  void Start();
-  void Stop();
   bool DispatchWork(const EventData &event);
 
   inline size_t GetNumAntennas() { return num_antennas_; }
@@ -37,7 +35,6 @@ class RecorderThread {
   /*Main threading loop */
   void DoRecording();
   void HandleEvent(const EventData &event);
-  void Finalize();
 
   // 1 - Producer (dispatcher), 1 - Consumer
   moodycamel::ConcurrentQueue<EventData> event_queue_;
@@ -60,8 +57,8 @@ class RecorderThread {
    * However, when the message processing time ~= queue posting time the mutex
    * could become unnecessary work
    */
-  volatile bool wait_signal_; // Could be operated in multi-core environment
-  volatile bool running_; // The recorder thread might not be pinned to a single core
+  std::atomic<bool> running_;
+  bool wait_signal_;
 
   size_t antenna_offset_;
   size_t num_antennas_;

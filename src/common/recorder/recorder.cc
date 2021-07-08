@@ -47,10 +47,10 @@ Recorder::Recorder(Config *in_cfg, unsigned int core_start) :
 }
 
 Recorder::~Recorder() {
-  GetInstance().Gc();
+  // Call Destructor on all recorders
+  recorders_.clear();
+  delete h5_file_;
 }
-
-void Recorder::Gc() { }
 
 herr_t Recorder::InitHDF5(H5std_string file_name) {
   herr_t ret = 0;
@@ -75,8 +75,6 @@ void Recorder::DoIt(std::vector<RecorderWorkerFactory *> &factories) {
 void Recorder::DoItInternal(std::vector<RecorderWorkerFactory *> &factories) {
   size_t total_antennas = cfg_->GetNumAntennas();
   size_t thread_antennas = 0;
-
-  MLPD_TRACE("Recorder work thread\n");
 
   if (num_writter_threads_ > 0) {
     thread_antennas = (total_antennas / num_writter_threads_);
@@ -128,16 +126,5 @@ void Recorder::DoItInternal(std::vector<RecorderWorkerFactory *> &factories) {
     }
   }
   cfg_->Running(false);
-
-  /* Force the recorders to process all of the data they have left and exit
-   * cleanly Send a stop to all the recorders to allow the finalization to be
-   * done in parrallel */
-  for (auto recorder : this->recorders_) {
-    recorder->Stop();
-  }
-  for (auto recorder : this->recorders_) {
-    delete recorder;
-  }
-  recorders_.clear();
 }
 };  // end namespace Recorder

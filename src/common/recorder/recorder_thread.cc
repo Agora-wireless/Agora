@@ -28,42 +28,23 @@ RecorderThread::RecorderThread(Config* in_cfg,
       antenna_offset_(antenna_offset),
       num_antennas_(num_antennas) {
   packet_length_ = in_cfg->PacketLength();
-  running_ = false;
 
   for(auto &rec_fact: factories) {
-    RecorderWorker *worker = rec_fact->GenWorker(in_cfg, file_name);
+    RecorderWorker *worker = rec_fact->GenWorker(in_cfg, h5_file);
     worker_mapping_.insert(std::pair<EventType, RecorderWorker *>
                           (worker->GetEventType(), worker));
   }
+
+  running_.store(true);
+  thread_ = std::thread(&RecorderThread::DoRecording, this);
 }
 
-RecorderThread::~RecorderThread() { Finalize(); }
-
-// Launching thread in separate function to guarantee that the object is fully
-// constructed before calling member function
-void RecorderThread::Start() {
-  MLPD_INFO("Launching recorder task thread with id: %zu and core %d\n",
-            this->id_, this->core_alloc_);
-  {
-    std::lock_guard<std::mutex> thread_lock(this->sync_);
-    this->thread_ = std::thread(&RecorderThread::DoRecording, this);
-    this->running_ = true;
-  }
-  this->condition_.notify_all();
-}
-
-/* Cleanly allows the thread to exit */
-void RecorderThread::Stop() {
-  EventData event;
-  /* Empty event will fail key lookup in worker_mapping_ */
-  this->DispatchWork(event);
-}
-
-void RecorderThread::Finalize() {
+RecorderThread::~RecorderThread() {
   // Wait for thread to cleanly finish the messages in the queue
-  if (this->thread_.joinable() == true) {
-    MLPD_TRACE("Joining Recorder Thread on CPU %d \n", sched_getcpu());
-    this->Stop();
+  if (thread_.joinable() == true) {
+    EventData event;
+    /* Empty event will fail key lookup in worker_mapping_ */
+    this->DispatchWork(event);
     this->thread_.join();
   }
 }
@@ -73,55 +54,41 @@ void RecorderThread::Finalize() {
 bool RecorderThread::DispatchWork(const EventData& event) {
   // MLPD_TRACE("Dispatching work\n");
   bool ret = true;
-  if (this->event_queue_.try_enqueue(this->producer_token_, event) == 0) {
+  if (event_queue_.try_enqueue(producer_token_, event) == 0) {
     MLPD_WARN("Queue limit has reached! try to increase queue size.\n");
-    if (this->event_queue_.enqueue(this->producer_token_, event) == 0) {
+    if (event_queue_.enqueue(producer_token_, event) == 0) {
       MLPD_ERROR("Record task enqueue failed\n");
-      throw std::runtime_error("Record task enqueue failed");
+      // throw std::runtime_error("Record task enqueue failed");
       ret = false;
     }
   }
 
-  if (this->wait_signal_ == true) {
-    if (ret == true) {
-      std::lock_guard<std::mutex> thread_lock(this->sync_);
-    }
+  if(this->wait_signal_ == true) {
+    std::lock_guard guard(sync_);
     this->condition_.notify_all();
   }
   return ret;
 }
 
 void RecorderThread::DoRecording() {
-  // Sync the start
-  {
-    std::unique_lock<std::mutex> thread_wait(this->sync_);
-    this->condition_.wait(thread_wait, [this] { return this->running_; });
+  if (core_alloc_ >= 0) {
+    MLPD_INFO("Pinning recording thread %zu to core %d\n", id_, core_alloc_);
+    PinToCoreWithOffset(ThreadType::kMaster, core_alloc_, id_, true);
   }
 
-  if (this->core_alloc_ >= 0) {
-    MLPD_INFO("Pinning recording thread %zu to core %d\n", this->id_,
-              this->core_alloc_);
-    PinToCoreWithOffset(ThreadType::kMaster, this->core_alloc_, this->id_,
-                        true);
-  }
-
-  moodycamel::ConsumerToken ctok(this->event_queue_);
-  MLPD_INFO("Recording thread %zu has %zu antennas starting at %zu\n",
-            this->id_, this->num_antennas_,
-            this->antenna_offset_);
+  moodycamel::ConsumerToken ctok(event_queue_);
 
   EventData event;
   bool ret = false;
-  while (this->running_ == true) {
-    ret = this->event_queue_.try_dequeue(ctok, event);
+  while (running_.load() == true) {
+    ret = event_queue_.try_dequeue(ctok, event);
 
-    if (ret == false) /* Queue empty */
-    {
-      if (this->wait_signal_ == true) {
-        std::unique_lock<std::mutex> thread_wait(this->sync_);
+    if (ret == false) /* Queue empty */ {
+      if(wait_signal_ == true) {
+        std::unique_lock<std::mutex> thread_wait(sync_);
         // Wait until a new message exists.
         // TODO: should eliminate the CPU polling
-        this->condition_.wait(thread_wait, [this, &ctok, &event] {
+        condition_.wait(thread_wait, [this, &ctok, &event] {
           return this->event_queue_.try_dequeue(ctok, event);
         });
         /* return from here with a valid event to process */
@@ -130,7 +97,7 @@ void RecorderThread::DoRecording() {
     }
 
     if (ret == true) {
-      this->HandleEvent(event);
+      HandleEvent(event);
     }
   }
 }
@@ -138,7 +105,7 @@ void RecorderThread::DoRecording() {
 void RecorderThread::HandleEvent(const EventData& event) {
   auto itr = worker_mapping_.find(event.event_type_);
   if(itr == worker_mapping_.end()) {
-    this->running_ = false;
+    running_.store(false);
   } else {
     itr->second->Record(
         static_cast<void *>(rx_tag_t(event.tags_[0]).rx_packet_->RawPacket()));
