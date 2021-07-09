@@ -52,7 +52,7 @@ class RecorderWorkerFactory {
   public:
   virtual ~RecorderWorkerFactory() = default;
 
-  virtual RecorderWorker *GenWorker(Config *, H5::H5File *) = 0;
+  virtual std::unique_ptr<RecorderWorker> GenWorker(Config *, H5::H5File *) = 0;
 };
 }; /* End namespace Recorder */
 

@@ -30,9 +30,10 @@ RecorderThread::RecorderThread(Config* in_cfg,
   packet_length_ = in_cfg->PacketLength();
 
   for(auto &rec_fact: factories) {
-    RecorderWorker *worker = rec_fact->GenWorker(in_cfg, h5_file);
-    worker_mapping_.insert(std::pair<EventType, RecorderWorker *>
-                          (worker->GetEventType(), worker));
+    std::unique_ptr<RecorderWorker> worker = rec_fact->GenWorker(in_cfg, h5_file);
+    EventType event_type = worker->GetEventType();
+    worker_mapping_.insert(std::pair<EventType, std::unique_ptr<RecorderWorker>>
+                          (event_type, std::move(worker)));
   }
 
   running_.store(true);
@@ -49,9 +50,7 @@ RecorderThread::~RecorderThread() {
   }
 
   // Free all workers
-  for(auto itr: worker_mapping_) {
-    delete itr.second;
-  }
+  worker_mapping_.clear();
 }
 
 /* TODO:  handle producer token better */

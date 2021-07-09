@@ -64,7 +64,7 @@ class RecorderThread {
   size_t num_antennas_;
 
   /* Mapping of concrete recorders to events */
-  std::unordered_map<EventType, RecorderWorker *> worker_mapping_;
+  std::unordered_map<EventType, std::unique_ptr<RecorderWorker>> worker_mapping_;
 };
 };  // namespace Recorder
 
