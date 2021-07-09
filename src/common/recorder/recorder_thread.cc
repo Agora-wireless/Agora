@@ -14,7 +14,7 @@
 
 namespace Recorder {
 RecorderThread::RecorderThread(Config* in_cfg,
-                                std::vector<RecorderWorkerFactory *> &factories,
+                                std::vector<std::unique_ptr<RecorderWorkerFactory>> &factories,
                                 H5::H5File *h5_file,
                                 size_t thread_id, int core,
                                 size_t queue_size, size_t antenna_offset,

@@ -20,7 +20,7 @@ Event based message queue thread class for the recorder worker
 namespace Recorder {
 class RecorderThread {
  public:
-  RecorderThread(Config *in_cfg, std::vector<RecorderWorkerFactory *> &factories,
+  RecorderThread(Config *in_cfg, std::vector<std::unique_ptr<RecorderWorkerFactory>> &factories,
                   H5::H5File *h5_file, size_t thread_id, int core,
                   size_t queue_size, size_t antenna_offset, size_t num_antennas,
                   bool wait_signal = true);

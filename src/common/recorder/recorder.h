@@ -26,7 +26,7 @@ class Recorder {
     GetInstance().RecordInternal();
   }
 
-  inline static void DoIt(std::vector<RecorderWorkerFactory *> &);
+  inline static void DoIt(std::vector<std::unique_ptr<RecorderWorkerFactory>> &);
 
   inline static const std::string &GetTraceFileName() {
     return GetInstance().cfg_->TraceFile();
@@ -42,7 +42,7 @@ class Recorder {
 
   // Internal non-static impl
   void RecordInternal();
-  void DoItInternal(std::vector<RecorderWorkerFactory *> &);
+  void DoItInternal(std::vector<std::unique_ptr<RecorderWorkerFactory>> &);
 
   // Manage HDF5 File
   herr_t InitHDF5(H5std_string);

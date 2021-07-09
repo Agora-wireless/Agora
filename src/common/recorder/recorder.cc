@@ -73,11 +73,11 @@ herr_t Recorder::InitHDF5(H5std_string file_name) {
   return ret;
 }
 
-void Recorder::DoIt(std::vector<RecorderWorkerFactory *> &factories) {
+void Recorder::DoIt(std::vector<std::unique_ptr<RecorderWorkerFactory>> &factories) {
   GetInstance().DoItInternal(factories);
 }
 
-void Recorder::DoItInternal(std::vector<RecorderWorkerFactory *> &factories) {
+void Recorder::DoItInternal(std::vector<std::unique_ptr<RecorderWorkerFactory>> &factories) {
   size_t total_antennas = cfg_->GetNumAntennas();
   size_t thread_antennas = 0;
 
