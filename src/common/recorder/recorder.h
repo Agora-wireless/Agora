@@ -76,7 +76,7 @@ class Recorder {
 
   size_t num_writter_threads_;
 
-  H5::H5File *h5_file_;
+  std::unique_ptr<H5::H5File> h5_file_;
 };
 
 };     // namespace Recorder

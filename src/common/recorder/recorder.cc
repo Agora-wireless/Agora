@@ -54,7 +54,6 @@ void Recorder::Gc() {
   running_.store(false);
   // Call Destructor on all recorders
   recorders_.clear();
-  delete h5_file_;
 }
 
 herr_t Recorder::InitHDF5(H5std_string file_name) {
@@ -63,7 +62,7 @@ herr_t Recorder::InitHDF5(H5std_string file_name) {
     H5::Exception::dontPrint();
 
     /* Open HDF5 file and create a root group */
-    h5_file_ = new H5::H5File(file_name, H5F_ACC_TRUNC);
+    h5_file_ = std::make_unique<H5::H5File>(file_name, H5F_ACC_TRUNC);
     h5_file_->createGroup(dataset_root_prefix);
   } catch(H5::FileIException &error) {
     error.printErrorStack();
@@ -94,7 +93,7 @@ void Recorder::DoItInternal(std::vector<std::unique_ptr<RecorderWorkerFactory>> 
       int thread_core = kRecorderCore + i;
 
       recorders_.push_back(std::make_unique<RecorderThread>(
-          cfg_, factories, h5_file_, i, thread_core,
+          cfg_, factories, h5_file_.get(), i, thread_core,
           (rx_thread_buff_size_ * kQueueSize), (i * thread_antennas),
           thread_antennas, true));
     }
