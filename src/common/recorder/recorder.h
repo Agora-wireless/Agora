@@ -52,8 +52,6 @@ class Recorder {
   // Manage HDF5 File
   herr_t InitHDF5(H5std_string);
 
-  void Gc();
-
   // Constructor Args
   Config *cfg_;
   unsigned int core_start_;
