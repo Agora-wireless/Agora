@@ -17,13 +17,15 @@ class Recorder {
   Recorder() = delete;
   ~Recorder();
 
-  inline static Recorder &GetInstance(Config *cfg = nullptr, unsigned int core_start = 0) {
-    static Recorder instance(cfg, core_start);
+  inline static Recorder &GetInstance(Config *cfg = nullptr,
+                                      unsigned int core_start = 0,
+                                      size_t num_writer_threads = 1) {
+    static Recorder instance(cfg, core_start, num_writer_threads);
     return instance;
   }
 
-  inline static void Record() {
-    GetInstance().RecordInternal();
+  inline static bool Record(size_t tag) {
+    return GetInstance().RecordInternal(tag);
   }
 
   inline static void DoIt(std::vector<std::unique_ptr<RecorderWorkerFactory>> &);
@@ -38,11 +40,14 @@ class Recorder {
   static const int KDequeueBulkSize;
 
   private:
-  explicit Recorder(Config *in_cfg, unsigned int core_start);
+  explicit Recorder(Config *in_cfg, unsigned int core_start, size_t num_writer_threads);
 
   // Internal non-static impl
-  void RecordInternal();
+  bool RecordInternal(size_t tag);
   void DoItInternal(std::vector<std::unique_ptr<RecorderWorkerFactory>> &);
+
+  void UpdateAntennaMapping(size_t num_writer_threads);
+  size_t RouteToThread(size_t tag);
 
   // Manage HDF5 File
   herr_t InitHDF5(H5std_string);
@@ -67,14 +72,15 @@ class Recorder {
   }
   */
 
-  moodycamel::ConcurrentQueue<EventData> message_queue_;
+  moodycamel::ConcurrentQueue<size_t> message_queue_;
 
   /* Core assignment start variables */
   const unsigned int kMainDispatchCore;
   const unsigned int kRecorderCore;
   const unsigned int kRecvCore;
 
-  size_t num_writter_threads_;
+  size_t num_writer_threads_;
+  size_t thread_antennas_;
 
   std::unique_ptr<H5::H5File> h5_file_;
 };
