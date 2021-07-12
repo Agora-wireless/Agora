@@ -12,6 +12,7 @@
 #include "memory_manage.h"
 #include "ran_config.h"
 #include "symbols.h"
+#include "recorder/recorder_packet.h"
 
 /* boost is required for aligned memory allocation (for SIMD instructions) */
 #include <boost/align/aligned_allocator.hpp>
@@ -184,26 +185,33 @@ struct Packet {
   }
 };
 
-class RxPacket {
+class RxPacket : public Recorder::RecorderPacket {
  private:
   std::atomic<unsigned> references_;
   Packet *packet_;
 
-  inline virtual void GcPacket(void) {}
+  inline void GcPacket(void) {}
 
  public:
-  RxPacket() : references_(0) { packet_ = nullptr; }
-  explicit RxPacket(Packet *in) : references_(0) { Set(in); }
-  explicit RxPacket(const RxPacket &copy) : packet_(copy.packet_) {
-    references_.store(copy.references_.load());
+  RxPacket()
+  : RecorderPacket(),
+    references_(0) {
+    packet_ = nullptr;
   }
+  explicit RxPacket(Packet *in)
+  : RecorderPacket(in->frame_id_, in->symbol_id_, in->cell_id_, in->ant_id_),
+    references_(0) {
+    Set(in);
+  }
+  explicit RxPacket(const RxPacket &input)
+  : Recorder::RecorderPacket(input) {
+    references_.store(input.references_.load());
+  }
+
   ~RxPacket() = default;
 
-  // Disallow copy
-  RxPacket &operator=(const RxPacket &) = delete;
-
   inline bool Set(Packet *in_pkt) {
-    if (references_.load() == 0) {
+    if(references_.load() == 0) {
       packet_ = in_pkt;
       return true;
     } else {
@@ -212,15 +220,26 @@ class RxPacket {
   }
 
   inline Packet *RawPacket() { return packet_; }
-  inline bool Empty() const { return references_.load() == 0; }
-  inline void Use() { references_.fetch_add(1); }
-  inline void Free() {
+
+  inline bool Empty() const override {
+    return references_.load() == 0;
+  }
+
+  inline void Use() override {
+    references_.fetch_add(1);
+  }
+
+  inline void Free() override {
     unsigned value = references_.fetch_sub(1);
     if (value == 0) {
       throw std::runtime_error("RxPacket free called when memory was empty");
     } else if (value == 1) {
       GcPacket();
     }
+  }
+
+  inline EventType GetEventType() const override {
+    return EventType::kPacketRX;
   }
 };
 
