@@ -35,20 +35,9 @@ Recorder::Recorder(Config *in_cfg, unsigned int core_start, size_t num_writer_th
   size_t ant_per_rx_thread = cfg_->GetNumAntennas() / num_writer_threads;
   rx_thread_buff_size_ =
       kSampleBufferFrameNum * cfg_->Frame().NumTotalSyms() * ant_per_rx_thread;
-  message_queue_ =
-      moodycamel::ConcurrentQueue<size_t>(rx_thread_buff_size_ * kQueueSize);
 }
 
 Recorder::~Recorder() {
-  /*
-    TODO: Merge destructor and Gc only if call to ~Recorder() is viable in case
-    of a SIGINT based exit
-  */
-  Gc();
-}
-
-void Recorder::Gc() {
-  running_.store(false);
   // Call Destructor on all recorders
   recorders_.clear();
 }
@@ -110,44 +99,16 @@ void Recorder::DoItInternal(std::vector<std::unique_ptr<RecorderWorkerFactory>> 
           thread_antennas_, true));
     }
   }
-
-  moodycamel::ConsumerToken ctok(this->message_queue_);
-
-  std::array<size_t, KDequeueBulkSize> tag_list;
-  size_t ret = 0;
-
-  while ((running_.load() == true) &&
-         (SignalHandler::GotExitSignal() == false)) {
-    // get a bulk of events from the receivers
-    ret = message_queue_.try_dequeue_bulk(ctok, tag_list.data(),
-                                                KDequeueBulkSize);
-    for (size_t bulk_count = 0; bulk_count < ret; bulk_count++) {
-      size_t tag = tag_list[bulk_count];
-      size_t thread_index = RouteToThread(tag);
-      EventData event(recorder_tag_t(tag).recorder_packet_->GetEventType(), tag);
-      if (recorders_.at(thread_index)->DispatchWork(event) ==
-          false) {
-        MLPD_ERROR("Record task enqueue failed\n");
-        throw std::runtime_error("Record task enqueue failed");
-      }
-    }
-  }
-
-  if(running_.load() == true) {
-    // In case of exit signal, cleanup
-    Gc();
-  }
 }
 
-bool Recorder::RecordInternal(size_t tag) {
-  bool ret = true;
-  if (message_queue_.try_enqueue(tag) == 0) {
-    if (message_queue_.enqueue(tag) == 0) {
-      ret = false;
-    }
+void Recorder::RecordInternal(size_t tag) {
+  size_t thread_index = RouteToThread(tag);
+  EventData event(recorder_tag_t(tag).recorder_packet_->GetEventType(), tag);
+  if (recorders_.at(thread_index)->DispatchWork(event) ==
+      false) {
+    MLPD_ERROR("Record task enqueue failed\n");
+    throw std::runtime_error("Record task enqueue failed");
   }
-
-  return ret;
 }
 
 };  // end namespace Recorder

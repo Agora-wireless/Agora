@@ -24,8 +24,8 @@ class Recorder {
     return instance;
   }
 
-  inline static bool Record(size_t tag) {
-    return GetInstance().RecordInternal(tag);
+  inline static void Record(size_t tag) {
+    GetInstance().RecordInternal(tag);
   }
 
   inline static void DoIt(std::vector<std::unique_ptr<RecorderWorkerFactory>> &);
@@ -43,7 +43,7 @@ class Recorder {
   explicit Recorder(Config *in_cfg, unsigned int core_start, size_t num_writer_threads);
 
   // Internal non-static impl
-  bool RecordInternal(size_t tag);
+  void RecordInternal(size_t tag);
   void DoItInternal(std::vector<std::unique_ptr<RecorderWorkerFactory>> &);
 
   void UpdateAntennaMapping(size_t num_writer_threads);
@@ -58,8 +58,6 @@ class Recorder {
   Config *cfg_;
   unsigned int core_start_;
 
-  std::atomic<bool> running_;
-
   size_t rx_thread_buff_size_;
 
   std::vector<std::unique_ptr<RecorderThread>> recorders_;
@@ -71,8 +69,6 @@ class Recorder {
     return GetInstance().max_frame_number_;
   }
   */
-
-  moodycamel::ConcurrentQueue<size_t> message_queue_;
 
   /* Core assignment start variables */
   const unsigned int kMainDispatchCore;
