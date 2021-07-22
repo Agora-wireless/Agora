@@ -346,6 +346,7 @@ public:
 
     // Dynamic workload
     bool dynamic_workload;
+    int fixed_control;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;

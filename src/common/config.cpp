@@ -288,6 +288,7 @@ Config::Config(std::string jsonfile)
     pci_addr = tddConf.value("pci_addr", "37:00.0");
     
     dynamic_workload = tddConf.value("dynamic_workload", false);
+    fixed_control = tddConf.value("fixed_control", -1);
 
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;

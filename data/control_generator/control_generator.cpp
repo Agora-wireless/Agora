@@ -103,7 +103,14 @@ int main(int argc, char **argv)
     file = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->frames_to_test; i ++) {
-        size_t control_idx = rand() % num_slots;
+        // size_t control_idx = rand() % num_slots;
+        // size_t control_idx = 1;
+        size_t control_idx;
+        if (cfg->fixed_control == -1) {
+            control_idx = rand() % num_slots;
+        } else {
+            control_idx = cfg->fixed_control;
+        }
         fwrite(&control_idx, sizeof(size_t), 1, file);
     }
 
