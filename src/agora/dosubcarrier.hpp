@@ -197,8 +197,9 @@ public:
                             demul_cur_sym_ul_ = 0;
 
                             demod_start_tsc = rdtsc();
-                            MLPD_INFO("Main thread: Demodulation done frame: %lu "
+                            MLPD_INFO("Main thread (%u): Demodulation done frame: %lu "
                                 "(%lu UL symbols)\n",
+                                tid,
                                 demul_cur_frame_,
                                 cfg->ul_data_symbol_num_perframe);
                             print_tsc_duration += rdtsc() - demod_start_tsc;
@@ -270,7 +271,7 @@ public:
                     n_zf_tasks_done_ = 0;
 
                     zf_start_tsc = rdtsc();
-                    MLPD_INFO("Main thread: ZF done frame: %lu\n", zf_cur_frame_);
+                    MLPD_INFO("Main thread (%u): ZF done frame: %lu\n", tid, zf_cur_frame_);
                     print_tsc_duration += rdtsc() - zf_start_tsc;
 
                     zf_cur_frame_++;
@@ -308,8 +309,8 @@ public:
 
                 csi_start_tsc = rdtsc();
                 MLPD_INFO(
-                    "Main thread: pilot frame: %lu, finished CSI for all pilot "
-                    "symbols\n",
+                    "Main thread (%u): pilot frame: %lu, finished CSI for all pilot "
+                    "symbols\n", tid,
                     csi_cur_frame_);
                 print_tsc_duration += rdtsc() - csi_start_tsc;
 
