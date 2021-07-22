@@ -73,6 +73,7 @@ public:
     void start_work();
 
 private:
+    inline bool should_sleep(size_t ue_num) {return false;}
     int16_t* resp_var_nodes;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
     Table<int8_t> demod_soft_buffer_to_decode_;

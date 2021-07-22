@@ -319,6 +319,10 @@ public:
                 print_tsc_duration += rdtsc() - csi_start_tsc;
 
                 csi_cur_frame_++;
+                while (should_sleep(control_info_table_[control_idx_list_[csi_cur_frame_]])) {
+                    csi_cur_frame_ ++;
+                    usleep(800); // TODO: decide the sleeping length
+                }
                 work_tsc_duration += rdtsc() - work_start_tsc;
             }
 
@@ -436,6 +440,10 @@ private:
                 }
             }
         }
+    }
+
+    inline bool should_sleep(std::vector<ControlInfo>& control_list) {
+        return false;
     }
 
     /// The subcarrier range handled by this subcarrier doer.

@@ -420,6 +420,18 @@ void DyDecode::start_work()
                             }
                             break;
                         }
+
+                        while (should_sleep(control_info_table_[control_idx_list_[cur_frame_]].size())) {
+                            cur_frame_ ++;
+                            if (unlikely(cur_frame_ == cfg->frames_to_test)) {
+                                if (likely(state_trigger)) {
+                                    state_operation_duration += rdtsc() - state_start_tsc;
+                                    work_tsc_duration += rdtsc() - work_start_tsc;
+                                }
+                                break;
+                            }
+                            usleep(800); // TODO: Adjust this number
+                        }
                     }
                 }
                 if (likely(state_trigger)) {
