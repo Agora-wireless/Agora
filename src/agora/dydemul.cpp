@@ -111,23 +111,22 @@ void DyDemul::launch(
     for (size_t i = 0; i < max_sc_ite; i++) {
         size_t cur_sc_id = base_sc_id + i;
 
-        std::vector<size_t> ue_list;
+        size_t ue_num = 0;
         std::vector<ControlInfo>& control_list = control_info_table_[control_idx_list_[frame_id]];
         for (size_t j = 0; j < control_list.size(); j ++) {
             if (control_list[j].sc_start <= cur_sc_id && control_list[j].sc_end > cur_sc_id) {
-                ue_list.push_back(control_list[j].ue_id);
+                ue_num ++;
             }
         }
         
-        if (ue_list.size() == 0) {
+        if (ue_num == 0) {
             continue;
         }
 
         cx_float* equal_ptr = nullptr;
         equal_ptr = (cx_float*)(&equaled_buffer_temp[(cur_sc_id - base_sc_id)
             * cfg->UE_NUM]);
-        // cx_fmat mat_equaled(equal_ptr, cfg->UE_NUM, 1, false);
-        cx_fmat mat_equaled(equal_ptr, ue_list.size(), 1, false);
+        cx_fmat mat_equaled(equal_ptr, ue_num, 1, false);
 
         cx_float* data_ptr = reinterpret_cast<cx_float*>(
             &data_gather_buffer[cur_sc_id * cfg->BS_ANT_NUM]);
@@ -136,12 +135,11 @@ void DyDemul::launch(
 
         size_t start_tsc2 = worker_rdtsc();
 #if USE_MKL_JIT
-        mkl_jit_cgemm[ue_list.size()](jitter[ue_list.size()], (MKL_Complex8*)ul_zf_ptr, (MKL_Complex8*)data_ptr,
+        mkl_jit_cgemm[ue_num](jitter[ue_num], (MKL_Complex8*)ul_zf_ptr, (MKL_Complex8*)data_ptr,
             (MKL_Complex8*)equal_ptr);
 #else
         const cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
-        // const cx_fmat mat_ul_zf(ul_zf_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
-        const cx_fmat mat_ul_zf(ul_zf_ptr, ue_list.size(), cfg->BS_ANT_NUM, false);
+        const cx_fmat mat_ul_zf(ul_zf_ptr, ue_num, cfg->BS_ANT_NUM, false);
         mat_equaled = mat_ul_zf * mat_data;
 #endif
 
