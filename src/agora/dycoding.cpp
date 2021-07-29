@@ -294,6 +294,8 @@ void DyDecode::start_work()
     size_t decode_start_tsc;
     bool state_trigger = false;
 
+    size_t decode_max = 0;
+
     while (cfg->running && !SignalHandler::gotExitSignal()) {
 
         if (cfg->test_mode > 0) {
@@ -326,7 +328,9 @@ void DyDecode::start_work()
                 cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
             if (likely(state_trigger)) {
-                decode_tsc_duration += rdtsc() - decode_start_tsc;
+                size_t decode_tmp_tsc = rdtsc() - decode_start_tsc;
+                decode_tsc_duration += decode_tmp_tsc;
+                decode_max = decode_max < decode_tmp_tsc ? decode_tmp_tsc : decode_max;
             }
 
             // printf("Start to decode user %lu frame %lu symbol %lu end\n", ue_id_, cur_frame_, cur_symbol_);
@@ -374,7 +378,7 @@ void DyDecode::start_work()
 
             if (ret) {
 
-                if (unlikely(!state_trigger && cur_frame_ >= 400)) {
+                if (unlikely(!state_trigger && cur_frame_ >= 200)) {
                     loop_count ++;
                     start_tsc = rdtsc();
                     state_trigger = true;
@@ -421,17 +425,17 @@ void DyDecode::start_work()
                             break;
                         }
 
-                        while (should_sleep(control_info_table_[control_idx_list_[cur_frame_]].size())) {
-                            cur_frame_ ++;
-                            if (unlikely(cur_frame_ == cfg->frames_to_test)) {
-                                if (likely(state_trigger)) {
-                                    state_operation_duration += rdtsc() - state_start_tsc;
-                                    work_tsc_duration += rdtsc() - work_start_tsc;
-                                }
-                                break;
-                            }
-                            usleep(800); // TODO: Adjust this number
-                        }
+                        // while (should_sleep(control_info_table_[control_idx_list_[cur_frame_]].size())) {
+                        //     cur_frame_ ++;
+                        //     if (unlikely(cur_frame_ == cfg->frames_to_test)) {
+                        //         if (likely(state_trigger)) {
+                        //             state_operation_duration += rdtsc() - state_start_tsc;
+                        //             work_tsc_duration += rdtsc() - work_start_tsc;
+                        //         }
+                        //         break;
+                        //     }
+                        //     usleep(800); // TODO: Adjust this number
+                        // }
                     }
                 }
                 if (likely(state_trigger)) {
@@ -449,10 +453,10 @@ void DyDecode::start_work()
     size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("DoDecode Thread %u duration stats: total time used %.2lfms, "
-        "decode %.2lfms (%.2lf\%), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
+        "decode %.2lfms (%.2lf\%, %.2lfus), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
         "working proportions (%u/%u: %.2lf\%)\n",
         tid, cycles_to_ms(whole_duration, freq_ghz),
-        cycles_to_ms(decode_tsc_duration, freq_ghz), decode_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(decode_tsc_duration, freq_ghz), decode_tsc_duration * 100.0f / whole_duration, cycles_to_us(decode_max, freq_ghz),
         cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, work_count * 100.0f / loop_count);

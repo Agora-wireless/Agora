@@ -155,10 +155,21 @@ public:
         size_t loop_count = 0;
         size_t work_count = 0;
 
+        size_t csi_count = 0;
+        size_t zf_count = 0;
+        size_t demod_count = 0;
+
+        size_t demod_max = 0;
+        size_t zf_max = 0;
+        size_t csi_max = 0;
+
         size_t work_start_tsc, state_start_tsc;
 
         while (cfg->running && !SignalHandler::gotExitSignal()) {
             size_t worked = 0;
+            if (likely(start_tsc > 0)) {
+                loop_count ++;
+            }
 
             if (cfg->test_mode > 1) {
                 continue;
@@ -171,11 +182,15 @@ public:
                 bool ret = rx_status_->is_demod_ready(
                        demul_cur_frame_, demul_cur_sym_ul_);
                 size_t state_tsc_usage = rdtsc() - state_start_tsc;
-                state_operation_duration += state_tsc_usage;
+                if (likely(start_tsc > 0)) {
+                    state_operation_duration += state_tsc_usage;
+                }
                 // work_tsc_duration += rdtsc() - work_start_tsc;
 
                 if (ret) {
-                    work_tsc_duration += state_tsc_usage;
+                    if (likely(start_tsc > 0)) {
+                        work_tsc_duration += state_tsc_usage;
+                    }
                     work_start_tsc = rdtsc();
                     worked = 1;
 
@@ -184,7 +199,12 @@ public:
                         demul_cur_sym_ul_,
                         sc_range_.start
                             + (n_demul_tasks_done_ * cfg->demul_block_size));
-                    demod_tsc_duration += rdtsc() - demod_start_tsc;
+                    if (likely(start_tsc > 0)) {
+                        size_t demod_tmp_tsc = rdtsc() - demod_start_tsc;
+                        demod_tsc_duration += demod_tmp_tsc;
+                        demod_max = demod_max < demod_tmp_tsc ? demod_tmp_tsc : demod_max;
+                        demod_count ++;
+                    }
 
                     n_demul_tasks_done_++;
                     if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
@@ -207,7 +227,9 @@ public:
                                 tid,
                                 demul_cur_frame_,
                                 cfg->ul_data_symbol_num_perframe);
-                            print_tsc_duration += rdtsc() - demod_start_tsc;
+                            if (likely(start_tsc > 0)) {
+                                print_tsc_duration += rdtsc() - demod_start_tsc;
+                            }
                             
                             if (cfg->test_mode == 1) {
                                 rx_status_->decode_done(demul_cur_frame_);
@@ -215,13 +237,17 @@ public:
 
                             demul_cur_frame_++;
                             if (unlikely(demul_cur_frame_ == cfg->frames_to_test)) {
-                                work_tsc_duration += rdtsc() - work_start_tsc;
+                                if (likely(start_tsc > 0)) {
+                                    work_tsc_duration += rdtsc() - work_start_tsc;
+                                }
                                 break;
                             }
                         }
                     }
 
-                    work_tsc_duration += rdtsc() - work_start_tsc;
+                    if (likely(start_tsc > 0)) {
+                        work_tsc_duration += rdtsc() - work_start_tsc;
+                    }
                     continue;
                 }
                 
@@ -269,7 +295,12 @@ public:
                 do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
                     sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
                                    ._tag);
-                zf_tsc_duration += rdtsc() - zf_start_tsc;
+                if (likely(start_tsc > 0)) {
+                    size_t zf_tmp_tsc = rdtsc() - zf_start_tsc;
+                    zf_tsc_duration += zf_tmp_tsc;
+                    zf_max = zf_max < zf_tmp_tsc ? zf_tmp_tsc : zf_max;
+                    zf_count ++;
+                }
 
                 n_zf_tasks_done_++;
                 if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
@@ -277,18 +308,21 @@ public:
 
                     zf_start_tsc = rdtsc();
                     MLPD_INFO("Main thread (%u): ZF done frame: %lu\n", tid, zf_cur_frame_);
-                    print_tsc_duration += rdtsc() - zf_start_tsc;
+                    if (likely(start_tsc > 0)) {
+                        print_tsc_duration += rdtsc() - zf_start_tsc;
+                    }
 
                     zf_cur_frame_++;
                 }
 
-                work_tsc_duration += rdtsc() - work_start_tsc;
+                if (likely(start_tsc > 0)) {
+                    work_tsc_duration += rdtsc() - work_start_tsc;
+                }
                 continue;
             }
 
             size_t state_tsc_usage = 0;
             if (likely(start_tsc > 0)) {
-                loop_count ++;
                 // work_start_tsc = rdtsc();
                 state_start_tsc = rdtsc();
             }
@@ -300,46 +334,59 @@ public:
             }
 
             if (ret) {
-                if (unlikely(start_tsc == 0)) {
+                if (unlikely(start_tsc == 0 && csi_cur_frame_ >= 200)) {
                     start_tsc = rdtsc();
                 }
 
-                work_tsc_duration += state_tsc_usage;
+                if (likely(start_tsc > 0)) {
+                    work_tsc_duration += state_tsc_usage;
+                }
                 work_start_tsc = rdtsc();
                 worked = 1;
 
                 size_t csi_start_tsc = rdtsc();
                 run_csi(csi_cur_frame_, sc_range_.start);
-                csi_tsc_duration += rdtsc() - csi_start_tsc;
+                if (likely(start_tsc > 0)) {
+                    size_t csi_tmp_tsc = rdtsc() - csi_start_tsc;
+                    csi_tsc_duration += csi_tmp_tsc;
+                    csi_max = csi_max < csi_tmp_tsc ? csi_tmp_tsc : csi_max;
+                    csi_count ++;
+                }
 
                 csi_start_tsc = rdtsc();
                 MLPD_INFO(
                     "Main thread (%u): pilot frame: %lu, finished CSI for all pilot "
                     "symbols\n", tid,
                     csi_cur_frame_);
-                print_tsc_duration += rdtsc() - csi_start_tsc;
+                if (likely(start_tsc > 0)) {
+                    print_tsc_duration += rdtsc() - csi_start_tsc;
+                }
 
                 csi_cur_frame_++;
-                while (should_sleep(control_info_table_[control_idx_list_[csi_cur_frame_]])) {
-                    csi_cur_frame_ ++;
-                    usleep(800); // TODO: decide the sleeping length
+                // while (should_sleep(control_info_table_[control_idx_list_[csi_cur_frame_]])) {
+                //     csi_cur_frame_ ++;
+                //     usleep(800); // TODO: decide the sleeping length
+                // }
+                if (likely(start_tsc > 0)) {
+                    work_tsc_duration += rdtsc() - work_start_tsc;
                 }
-                work_tsc_duration += rdtsc() - work_start_tsc;
             }
 
-            work_count += worked;
+            if (likely(start_tsc > 0)) {
+                work_count += worked;
+            }
         }
 
         size_t whole_duration = rdtsc() - start_tsc;
         size_t idle_duration = whole_duration - work_tsc_duration;
         printf("DySubcarrier Thread %u duration stats: total time used %.2lfms, "
-            "csi %.2lfms (%.2lf\%), zf %.2lfms (%.2lf\%), demod %.2lfms (%.2lf\%), "
+            "csi %.2lfms (%.2lf\%, %u), zf %.2lfms (%.2lf\%, %u), demod %.2lfms (%.2lf\%, %u, %.2lfus), "
             "precode %.2lfms (%.2lf\%), print %.2lfms (%.2lf\%), stating "
             "%.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), working rate (%u/%u: %.2lf\%)\n", 
             tid, cycles_to_ms(whole_duration, freq_ghz),
-            cycles_to_ms(csi_tsc_duration, freq_ghz), csi_tsc_duration * 100.0f / whole_duration,
-            cycles_to_ms(zf_tsc_duration, freq_ghz), zf_tsc_duration * 100.0f / whole_duration,
-            cycles_to_ms(demod_tsc_duration, freq_ghz), demod_tsc_duration * 100.0f / whole_duration, 
+            cycles_to_ms(csi_tsc_duration, freq_ghz), csi_tsc_duration * 100.0f / whole_duration, csi_count,
+            cycles_to_ms(zf_tsc_duration, freq_ghz), zf_tsc_duration * 100.0f / whole_duration, zf_count,
+            cycles_to_ms(demod_tsc_duration, freq_ghz), demod_tsc_duration * 100.0f / whole_duration, demod_count, cycles_to_us(demod_max, freq_ghz),
             cycles_to_ms(precode_tsc_duration, freq_ghz), precode_tsc_duration * 100.0f / whole_duration,
             cycles_to_ms(print_tsc_duration, freq_ghz), print_tsc_duration * 100.0f / whole_duration,
             cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,

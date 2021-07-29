@@ -150,6 +150,10 @@ public:
         size_t loop_count = 0;
         size_t work_count = 0;
 
+        size_t csi_count = 0;
+        size_t zf_count = 0;
+        size_t demod_count = 0;
+
         size_t work_start_tsc, state_start_tsc;
 
         while (cfg->running && !SignalHandler::gotExitSignal()) {
@@ -180,6 +184,7 @@ public:
                         sc_range_.start
                             + (n_demul_tasks_done_ * cfg->demul_block_size));
                     demod_tsc_duration += rdtsc() - demod_start_tsc;
+                    demod_count ++;
 
                     n_demul_tasks_done_++;
                     if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
@@ -265,6 +270,7 @@ public:
                     sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
                                    ._tag);
                 zf_tsc_duration += rdtsc() - zf_start_tsc;
+                zf_count ++;
 
                 n_zf_tasks_done_++;
                 if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
@@ -306,6 +312,7 @@ public:
                 size_t csi_start_tsc = rdtsc();
                 run_csi(csi_cur_frame_, sc_range_.start);
                 csi_tsc_duration += rdtsc() - csi_start_tsc;
+                csi_count ++;
 
                 csi_start_tsc = rdtsc();
                 MLPD_INFO(
@@ -324,13 +331,13 @@ public:
         size_t whole_duration = rdtsc() - start_tsc;
         size_t idle_duration = whole_duration - work_tsc_duration;
         printf("DoSubcarrier Thread %u duration stats: total time used %.2lfms, "
-            "csi %.2lfms (%.2lf\%), zf %.2lfms (%.2lf\%), demod %.2lfms (%.2lf\%), "
+            "csi %.2lfms (%.2lf\%, %u), zf %.2lfms (%.2lf\%, %u), demod %.2lfms (%.2lf\%, %u), "
             "precode %.2lfms (%.2lf\%), print %.2lfms (%.2lf\%), stating "
             "%.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), working rate (%u/%u: %.2lf\%)\n", 
             tid, cycles_to_ms(whole_duration, freq_ghz),
-            cycles_to_ms(csi_tsc_duration, freq_ghz), csi_tsc_duration * 100.0f / whole_duration,
-            cycles_to_ms(zf_tsc_duration, freq_ghz), zf_tsc_duration * 100.0f / whole_duration,
-            cycles_to_ms(demod_tsc_duration, freq_ghz), demod_tsc_duration * 100.0f / whole_duration, 
+            cycles_to_ms(csi_tsc_duration, freq_ghz), csi_tsc_duration * 100.0f / whole_duration, csi_count,
+            cycles_to_ms(zf_tsc_duration, freq_ghz), zf_tsc_duration * 100.0f / whole_duration, zf_count,
+            cycles_to_ms(demod_tsc_duration, freq_ghz), demod_tsc_duration * 100.0f / whole_duration, demod_count,
             cycles_to_ms(precode_tsc_duration, freq_ghz), precode_tsc_duration * 100.0f / whole_duration,
             cycles_to_ms(print_tsc_duration, freq_ghz), print_tsc_duration * 100.0f / whole_duration,
             cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
