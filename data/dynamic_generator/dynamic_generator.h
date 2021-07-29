@@ -43,12 +43,12 @@ public:
         const LDPCconfig& lc = cfg->LDPC_config;
         size_t nRows = Bg == 1 ? 46 : 42;
         std::vector<int8_t> parity;
-        printf("parity size=%u, Bg=%u Zc=%u\n", ldpc_encoding_parity_buf_size(Bg, Zc), Bg, Zc);
+        // printf("parity size=%u, Bg=%u Zc=%u\n", ldpc_encoding_parity_buf_size(Bg, Zc), Bg, Zc);
         parity.resize(ldpc_encoding_parity_buf_size(Bg, Zc));
 
-        printf("information size=%u, Bg=%u Zc=%u\n", ldpc_encoding_input_buf_size(Bg, Zc), Bg, Zc);
+        // printf("information size=%u, Bg=%u Zc=%u\n", ldpc_encoding_input_buf_size(Bg, Zc), Bg, Zc);
         information.resize(ldpc_encoding_input_buf_size(Bg, Zc));
-        printf("encoded size=%u, Bg=%u Zc=%u\n", ldpc_encoding_encoded_buf_size(Bg, Zc), Bg, Zc);
+        // printf("encoded size=%u, Bg=%u Zc=%u\n", ldpc_encoding_encoded_buf_size(Bg, Zc), Bg, Zc);
         encoded_codeword.resize(ldpc_encoding_encoded_buf_size(Bg, Zc));
 
         size_t num_input_bytes = bits_to_bytes(ldpc_num_input_bits(Bg, Zc));
@@ -64,9 +64,9 @@ public:
         ldpc_encode_helper(Bg, Zc, nRows, &encoded_codeword[0], 
             &parity[0], &information[0]);
 
-        printf("information size=%u, Bg=%u Zc=%u\n", ldpc_num_input_bits(Bg, Zc), Bg, Zc);
+        // printf("information size=%u, Bg=%u Zc=%u\n", ldpc_num_input_bits(Bg, Zc), Bg, Zc);
         information.resize(bits_to_bytes(ldpc_num_input_bits(Bg, Zc)));
-        printf("encoded size=%u, Bg=%u Zc=%u nRows=%u\n", ldpc_num_encoded_bits(Bg, Zc, nRows), Bg, Zc, nRows);
+        // printf("encoded size=%u, Bg=%u Zc=%u nRows=%u\n", ldpc_num_encoded_bits(Bg, Zc, nRows), Bg, Zc, nRows);
         encoded_codeword.resize(bits_to_bytes(ldpc_num_encoded_bits(Bg, Zc, nRows)));
     }
 

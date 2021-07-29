@@ -37,8 +37,12 @@ int main(int argc, char **argv)
     bool verbose = true;
 
     // 5G RAN configurations
-    const size_t num_ue = 16;
-    const size_t num_slots = 4 * 10;
+    // const size_t num_ue = 16;
+    const size_t num_ue = cfg->UE_NUM;
+    // const size_t num_slots = 4 * 10;
+    const size_t num_user_levels = cfg->user_level_list.size();
+    const size_t num_load_levels = cfg->num_load_levels;
+    const size_t num_slots = cfg->user_level_list.size() * cfg->num_load_levels;
     const size_t num_sc_per_rb = 16;
     const size_t num_rb = cfg->OFDM_DATA_NUM / num_sc_per_rb;
     const size_t max_ue_per_sc = 16;
@@ -51,15 +55,20 @@ int main(int argc, char **argv)
     std::string filename = cur_directory + "/data/control_ue_template.bin";
     file = fopen(filename.c_str(), "wb");
 
+    // std::set<size_t> zc_list = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+    //     15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48, 52, 56, 
+    //     60, 64, 72, 80, 88, 96, 104};
     std::set<size_t> zc_list = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
         15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48, 52, 56, 
-        60, 64, 72, 80, 88, 96, 104};
+        60, 64, 72};
 
     // Assign control struct to all UEs
     for (size_t i = 0; i < num_slots; i ++) {
         // Basic settings
-        size_t num_ue_slot = (i / 10 + 1) * 4;
-        double load = 0.1 * (i % 10 + 1);
+        // size_t num_ue_slot = (i / 10 + 1) * 4;
+        size_t num_ue_slot = cfg->user_level_list[i / num_load_levels];
+        // double load = 0.1 * (i % 10 + 1);
+        double load = 1.0 / num_load_levels * (i % num_load_levels + 1);
 
         // Count UE num for each resource block
         size_t ue_counter[num_rb] = {0};
@@ -67,7 +76,8 @@ int main(int argc, char **argv)
 
         for (size_t j = 0; j < num_ue_slot; j ++) {
             // Generate the rb num for this ue
-            size_t n_rb = num_rb_gen(load, num_rb);
+            // size_t n_rb = num_rb_gen(load, num_rb);
+            size_t n_rb = load * num_rb;
             n_rb = MIN(n_rb, num_rb - rb_start);
 
             // Generate the MCS index and LDPC coding scheme
@@ -78,7 +88,7 @@ int main(int argc, char **argv)
             size_t zc = num_bits_per_symbol / (ldpc_num_input_cols(bg) + n_rows - 2);
             zc = *(--zc_list.upper_bound(zc));
 
-            ControlInfo info = {i, j, rb_start, rb_start + n_rb, mod_order_bits, bg, zc};
+            ControlInfo info = {i, j, rb_start * num_sc_per_rb, (rb_start + n_rb) * num_sc_per_rb, mod_order_bits, bg, zc};
             fwrite(&info, sizeof(ControlInfo), 1, file);
 
             if (verbose) {

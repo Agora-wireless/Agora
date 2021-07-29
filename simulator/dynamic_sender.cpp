@@ -171,10 +171,10 @@ void* Sender::worker_thread(int tid)
     // auto* data_buf
     //     = reinterpret_cast<Packet*>(memalign(64, cfg->packet_length));
     short *data_buf
-        = reinterpret_cast<short*>(memalign(64, 2 * kNumSlot * ant_num_this_thread * cfg->OFDM_CA_NUM * sizeof(short) * 2));
+        = reinterpret_cast<short*>(memalign(64, 2 * cfg->user_level_list.size() * cfg->num_load_levels * ant_num_this_thread * cfg->OFDM_CA_NUM * sizeof(short) * 2));
 
     // Prepare the data
-    for (size_t i = 0; i < 2 * kNumSlot; i ++) {
+    for (size_t i = 0; i < 2 * cfg->user_level_list.size() * cfg->num_load_levels; i ++) {
         for (size_t j = radio_lo; j < radio_hi; j ++) {
             memcpy(data_buf + (i * ant_num_this_thread + j - radio_lo) * (2 * cfg->OFDM_CA_NUM),
                 iq_data_short_[(i * cfg->BS_ANT_NUM) + j],
@@ -313,7 +313,7 @@ size_t Sender::get_max_symbol_id() const
 void Sender::init_iq_from_file(std::string filename)
 {
     printf("Filename: %s\n", filename.c_str());
-    const size_t num_packet = 2 * kNumSlot * cfg->BS_ANT_NUM;
+    const size_t num_packet = 2 * cfg->user_level_list.size() * cfg->num_load_levels * cfg->BS_ANT_NUM;
     iq_data_short_.calloc(
         num_packet, (cfg->CP_LEN + cfg->OFDM_CA_NUM) * 2, 64);
 

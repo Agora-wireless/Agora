@@ -79,8 +79,10 @@ int main(int argc, char* argv[])
         const std::string filename_input = cur_directory
             + "/data/control_ue_template.bin";
         FILE* fp_input = fopen(filename_input.c_str(), "rb");
-        for (size_t i = 0; i < kNumSlot; i ++) {
-            size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+        // for (size_t i = 0; i < kNumSlot; i ++) {
+        for (size_t i = 0; i < cfg->user_level_list.size() * cfg->num_load_levels; i ++) {
+            // size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+            size_t num_ue = cfg->user_level_list[i / cfg->num_load_levels];
             std::vector<ControlInfo> info_list;
             ControlInfo tmp;
             for (size_t j = 0; j < num_ue; j ++) {
@@ -94,13 +96,16 @@ int main(int argc, char* argv[])
 
     // Step 1: Generate the information buffers and LDPC-encoded buffers for
     // uplink
-    const size_t num_codeblocks = cfg->UE_NUM * kNumSlot;
+    // const size_t num_codeblocks = cfg->UE_NUM * kNumSlot;
+    const size_t num_codeblocks = cfg->UE_NUM * cfg->user_level_list.size() * cfg->num_load_levels;
     printf("Total number of blocks: %zu\n", num_codeblocks);
 
     std::vector<std::vector<int8_t>> information(num_codeblocks);
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
-    for (size_t i = 0; i < kNumSlot; i++) {
-        size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+    // for (size_t i = 0; i < kNumSlot; i++) {
+    for (size_t i = 0; i < cfg->user_level_list.size() * cfg->num_load_levels; i ++) {
+        // size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+        size_t num_ue = cfg->user_level_list[i / cfg->num_load_levels];
         for (size_t j = 0; j < num_ue; j ++) {
             size_t Bg = control_info_table[i][j].Bg;
             size_t Zc = control_info_table[i][j].Zc;
@@ -120,8 +125,10 @@ int main(int argc, char* argv[])
         printf("Saving raw data (using LDPC) to %s\n", filename_input.c_str());
         FILE* fp_input = fopen(filename_input.c_str(), "wb");
 
-        for (size_t i = 0; i < kNumSlot; i++) {
-            size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+        // for (size_t i = 0; i < kNumSlot; i++) {
+        for (size_t i = 0; i < cfg->user_level_list.size() * cfg->num_load_levels; i ++) {
+            // size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+            size_t num_ue = cfg->user_level_list[i / cfg->num_load_levels];
             for (size_t j = 0; j < num_ue; j ++) {
                 size_t Bg = control_info_table[i][j].Bg;
                 size_t Zc = control_info_table[i][j].Zc;
@@ -136,8 +143,10 @@ int main(int argc, char* argv[])
 
     // Modulate the encoded codewords
     std::vector<std::vector<complex_float>> modulated_codewords(num_codeblocks);
-    for (size_t i = 0; i < kNumSlot; i++) {
-        size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+    // for (size_t i = 0; i < kNumSlot; i++) {
+    for (size_t i = 0; i < cfg->user_level_list.size() * cfg->num_load_levels; i ++) {
+        // size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+        size_t num_ue = cfg->user_level_list[i / cfg->num_load_levels];
         for (size_t j = 0; j < num_ue; j ++) {
             size_t Bg = control_info_table[i][j].Bg;
             size_t Zc = control_info_table[i][j].Zc;
@@ -149,10 +158,14 @@ int main(int argc, char* argv[])
 
     // Place modulated uplink data codewords into central IFFT bins
     rt_assert(cfg->LDPC_config.nblocksInSymbol == 1); // TODO: Assumption
+    // std::vector<std::vector<complex_float>> pre_ifft_data_syms(
+    //     cfg->UE_ANT_NUM * kNumSlot);
     std::vector<std::vector<complex_float>> pre_ifft_data_syms(
-        cfg->UE_ANT_NUM * kNumSlot);
-    for (size_t i = 0; i < kNumSlot; i++) {
-        size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+        cfg->UE_ANT_NUM * cfg->user_level_list.size() * cfg->num_load_levels);
+    // for (size_t i = 0; i < kNumSlot; i++) {
+    for (size_t i = 0; i < cfg->user_level_list.size() * cfg->num_load_levels; i ++) {
+        // size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+        size_t num_ue = cfg->user_level_list[i / cfg->num_load_levels];
         for (size_t j = 0; j < num_ue; j ++) {
             size_t sc_start = control_info_table[i][j].sc_start;
             size_t sc_end = control_info_table[i][j].sc_end;
@@ -183,12 +196,16 @@ int main(int argc, char* argv[])
 
     // Put pilot and data symbols together
     Table<complex_float> tx_data_all_symbols;
+    // tx_data_all_symbols.calloc(
+    //     2 * kNumSlot, cfg->UE_ANT_NUM * cfg->OFDM_CA_NUM, 64);
     tx_data_all_symbols.calloc(
-        2 * kNumSlot, cfg->UE_ANT_NUM * cfg->OFDM_CA_NUM, 64);
+        2 * cfg->user_level_list.size() * cfg->num_load_levels, cfg->UE_ANT_NUM * cfg->OFDM_CA_NUM, 64);
 
     if (cfg->freq_orthogonal_pilot) {
-        for (size_t i = 0; i < kNumSlot; i++) {
-            size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+        // for (size_t i = 0; i < kNumSlot; i++) {
+        for (size_t i = 0; i < cfg->user_level_list.size() * cfg->num_load_levels; i ++) {
+            // size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+            size_t num_ue = cfg->user_level_list[i / cfg->num_load_levels];
             for (size_t j = 0; j < num_ue; j ++) {
                 std::vector<complex_float> pilots_t_ue(cfg->OFDM_CA_NUM); // Zeroed
                 size_t sc_start = control_info_table[i][j].sc_start;
@@ -211,8 +228,10 @@ int main(int argc, char* argv[])
                 &pilot_td[0], cfg->OFDM_CA_NUM * sizeof(complex_float));
     }
 
-    for (size_t i = 0; i < kNumSlot; i++) {
-        size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+    // for (size_t i = 0; i < kNumSlot; i++) {
+    for (size_t i = 0; i < cfg->user_level_list.size() * cfg->num_load_levels; i ++) {
+        // size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+        size_t num_ue = cfg->user_level_list[i / cfg->num_load_levels];
         for (size_t j = 0; j < num_ue; j++) {
             memcpy(tx_data_all_symbols[2 * i + 1] + j * cfg->OFDM_CA_NUM,
                 &pre_ifft_data_syms[i * cfg->UE_ANT_NUM + j][0],
@@ -240,9 +259,11 @@ int main(int argc, char* argv[])
 
     // Generate RX data received by base station after going through channels
     Table<complex_float> rx_data_all_symbols;
+    // rx_data_all_symbols.calloc(
+    //     2 * kNumSlot, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, 64);
     rx_data_all_symbols.calloc(
-        2 * kNumSlot, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, 64);
-    for (size_t i = 0; i < 2 * kNumSlot; i++) {
+        2 * cfg->user_level_list.size() * cfg->num_load_levels, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, 64);
+    for (size_t i = 0; i < 2 * cfg->user_level_list.size() * cfg->num_load_levels; i++) {
         arma::cx_fmat mat_input_data(
             reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
             cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
@@ -267,7 +288,7 @@ int main(int argc, char* argv[])
         + std::to_string(cfg->BS_ANT_NUM) + ".bin";
     printf("Saving rx data to %s\n", filename_rx.c_str());
     FILE* fp_rx = fopen(filename_rx.c_str(), "wb");
-    for (size_t i = 0; i < 2 * kNumSlot; i++) {
+    for (size_t i = 0; i < 2 * cfg->user_level_list.size() * cfg->num_load_levels; i++) {
         auto* ptr = (float*)rx_data_all_symbols[i];
         fwrite(
             ptr, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM * 2, sizeof(float), fp_rx);

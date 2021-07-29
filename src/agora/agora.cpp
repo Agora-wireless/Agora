@@ -728,8 +728,10 @@ void Agora::init_control_info()
     std::string filename_input = cur_directory
         + "/data/control_ue_template.bin";
     FILE* fp_input = fopen(filename_input.c_str(), "rb");
-    for (size_t i = 0; i < kNumSlot; i ++) {
-        size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+    // for (size_t i = 0; i < kNumSlot; i++) {
+    for (size_t i = 0; i < cfg->user_level_list.size() * cfg->num_load_levels; i ++) {
+        // size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
+        size_t num_ue = cfg->user_level_list[i / cfg->num_load_levels];
         std::vector<ControlInfo> info_list;
         ControlInfo tmp;
         for (size_t j = 0; j < num_ue; j ++) {
