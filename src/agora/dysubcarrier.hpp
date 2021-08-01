@@ -243,15 +243,8 @@ public:
                                 break;
                             }
 
-                            if (should_sleep(control_info_table_[control_idx_list_[demul_cur_frame_]])) {
-                                // demul_status_->demul_complete(
-                                //     demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_reqd);
-                                // demul_cur_frame_ ++;
-                                // csi_cur_frame_ = zf_cur_frame_ = demul_cur_frame_;
-                                size_t sleep_start_tsc = rdtsc();
+                            if (cfg->sleep_mode && should_sleep(control_info_table_[control_idx_list_[demul_cur_frame_]])) {
                                 std::this_thread::sleep_for(std::chrono::microseconds(600));
-                                size_t sleep_duration = rdtsc() - sleep_start_tsc;
-                                // printf("Sleep length = %.2lfus\n", cycles_to_us(sleep_duration, freq_ghz));
                             }
                         }
                     }

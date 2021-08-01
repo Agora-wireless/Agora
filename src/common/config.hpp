@@ -349,6 +349,7 @@ public:
     int fixed_control;
     std::vector<size_t> user_level_list;
     size_t num_load_levels;
+    bool sleep_mode;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;
