@@ -242,6 +242,17 @@ public:
                                 }
                                 break;
                             }
+
+                            if (should_sleep(control_info_table_[control_idx_list_[demul_cur_frame_]])) {
+                                // demul_status_->demul_complete(
+                                //     demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_reqd);
+                                // demul_cur_frame_ ++;
+                                // csi_cur_frame_ = zf_cur_frame_ = demul_cur_frame_;
+                                size_t sleep_start_tsc = rdtsc();
+                                std::this_thread::sleep_for(std::chrono::microseconds(600));
+                                size_t sleep_duration = rdtsc() - sleep_start_tsc;
+                                // printf("Sleep length = %.2lfus\n", cycles_to_us(sleep_duration, freq_ghz));
+                            }
                         }
                     }
 
@@ -493,7 +504,12 @@ private:
     }
 
     inline bool should_sleep(std::vector<ControlInfo>& control_list) {
-        return false;
+        for (size_t i = 0; i < control_list.size(); i ++) {
+            if (!(control_list[i].sc_end < sc_range_.start || control_list[i].sc_start >= sc_range_.end)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// The subcarrier range handled by this subcarrier doer.
