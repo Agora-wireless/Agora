@@ -425,7 +425,7 @@ void DyDecode::start_work()
                             break;
                         }
 
-                        // while (should_sleep(control_info_table_[control_idx_list_[cur_frame_]].size())) {
+                        if (should_sleep(control_info_table_[control_idx_list_[cur_frame_]].size())) {
                         //     cur_frame_ ++;
                         //     if (unlikely(cur_frame_ == cfg->frames_to_test)) {
                         //         if (likely(state_trigger)) {
@@ -435,7 +435,8 @@ void DyDecode::start_work()
                         //         break;
                         //     }
                         //     usleep(800); // TODO: Adjust this number
-                        // }
+                            std::this_thread::sleep_for(std::chrono::microseconds(900));
+                        }
                     }
                 }
                 if (likely(state_trigger)) {
