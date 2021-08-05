@@ -5,6 +5,8 @@
 
 #include "video_receiver.h"
 
+#include <cstring>
+
 VideoReceiver::VideoReceiver(size_t port)
     : udp_video_receiver_(port, VideoReceiver::kVideoStreamSocketRxBufSize),
       data_availble_(0),

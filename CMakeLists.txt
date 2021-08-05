@@ -146,11 +146,13 @@ set(MAC_CLIENT_SOURCES
   src/mac/mac_sender.cc
   src/mac/mac_receiver.cc
   src/mac/video_receiver.cc
+  src/mac/file_receiver.cc
   src/mac/mac_client.cc)
 set(MAC_BS_SOURCES
   src/mac/mac_sender.cc
   src/mac/mac_receiver.cc
   src/mac/video_receiver.cc
+  src/mac/file_receiver.cc
   src/mac/mac_basestation.cc)
 
 # Argos support

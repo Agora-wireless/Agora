@@ -7,13 +7,14 @@
 
 #include <array>
 
+#include "mac_data_receiver.h"
 #include "udp_server.h"
 
 /**
  * @brief The Video Receiver class creates a UDP server to receive a video stream
  * tested with VLC streaming application
  */
-class VideoReceiver {
+class VideoReceiver : public MacDataReceiver {
  public:
   //Video stream specific variables
   static constexpr size_t kVideoStreamRxPort = 1350u;
@@ -29,7 +30,7 @@ class VideoReceiver {
   VideoReceiver(size_t port);
   ~VideoReceiver() = default;
 
-  void Load(char *destination, size_t num_load_bytes);
+  void Load(char *destination, size_t num_load_bytes) override final;
 
  private:
   UDPServer udp_video_receiver_;
@@ -40,4 +41,4 @@ class VideoReceiver {
   size_t data_start_offset_;
 };
 
-#endif  // MAC_THREAD_H_
+#endif  // VIDEO_RECEIVER_H_

@@ -4,14 +4,12 @@
  */
 #include "mac_sender.h"
 
-#include <fstream>
-#include <ios>
-#include <iostream>
 #include <thread>
 
 #include "datatype_conversion.h"
 #include "logger.h"
 #include "udp_client.h"
+#include "video_receiver.h"
 
 static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kFrameLoadAdvance = 10;
@@ -414,7 +412,7 @@ void* MacSender::DataUpdateThread(size_t tid) {
   return nullptr;
 }
 
-void MacSender::UpdateTxBuffer(VideoReceiver* video, gen_tag_t tag) {
+void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
   // Load a frames worth of data
   uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
 
@@ -425,7 +423,7 @@ void MacSender::UpdateTxBuffer(VideoReceiver* video, gen_tag_t tag) {
     pkt->ue_id_ = tag.ue_id_;
 
     // Read a MacPayload into the data section
-    video->Load(pkt->data_, cfg_->MacPayloadLength());
+    data_source->Load(pkt->data_, cfg_->MacPayloadLength());
     // TODO MacPacketLength should be the size of the mac packet but is not.
     mac_packet_location = mac_packet_location +
                           (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
