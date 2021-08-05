@@ -12,7 +12,7 @@
 #include "udp_client.h"
 #include "video_receiver.h"
 
-//#define USE_UDP_DATA_SOURCE
+#define USE_UDP_DATA_SOURCE
 
 static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kFrameLoadAdvance = 10;
@@ -383,10 +383,10 @@ void* MacSender::DataUpdateThread(size_t tid) {
             sched_getcpu());
 
 #if defined(USE_UDP_DATA_SOURCE)
-  auto data_source = std::make_unique<FileReceiver>(data_filename_);
-#else
   auto data_source =
       std::make_unique<VideoReceiver>(VideoReceiver::kVideoStreamRxPort);
+#else
+  auto data_source = std::make_unique<FileReceiver>(data_filename_);
 #endif
 
   // Init the data buffers
