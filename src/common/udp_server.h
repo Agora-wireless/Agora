@@ -22,6 +22,8 @@
 #include <unistd.h>
 
 #include <cstring> /* std::strerror, std::memset, std::memcpy */
+#include <map>
+#include <mutex>
 #include <stdexcept>
 
 /// Basic UDP server class based on OS sockets that supports receiving messages
