@@ -380,9 +380,9 @@ void* MacSender::DataUpdateThread(size_t tid) {
   // PinToCoreWithOffset(ThreadType::kWorker, 13, 0);
   MLPD_INFO("MacSender: Data update thread %zu running on core %d\n", tid,
             sched_getcpu());
-  std::ifstream tx_file;
-  tx_file.open(data_filename_, (std::ifstream::in | std::ifstream::binary));
-  assert(tx_file.is_open() == true);
+
+  auto video_receiver =
+      std::make_unique<VideoReceiver>(VideoReceiver::kVideoStreamRxPort);
 
   // Init the data buffers
   while ((keep_running.load() == true) && (buffer_updates < kBufferInit)) {
@@ -391,7 +391,7 @@ void* MacSender::DataUpdateThread(size_t tid) {
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
-        UpdateTxBuffer(tx_file, tag_for_ue);
+        UpdateTxBuffer(video_receiver.get(), tag_for_ue);
       }
       buffer_updates++;
     }
@@ -407,19 +407,16 @@ void* MacSender::DataUpdateThread(size_t tid) {
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
-        UpdateTxBuffer(tx_file, tag_for_ue);
+        UpdateTxBuffer(video_receiver.get(), tag_for_ue);
       }
     }
   }
-  tx_file.close();
   return nullptr;
 }
 
-void MacSender::UpdateTxBuffer(std::ifstream& read, gen_tag_t tag) {
+void MacSender::UpdateTxBuffer(VideoReceiver* video, gen_tag_t tag) {
   // Load a frames worth of data
   uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
-
-  assert(read.is_open() == true);
 
   for (size_t i = 0; i < packets_per_frame_; i++) {
     auto* pkt = reinterpret_cast<MacPacket*>(mac_packet_location);
@@ -428,16 +425,7 @@ void MacSender::UpdateTxBuffer(std::ifstream& read, gen_tag_t tag) {
     pkt->ue_id_ = tag.ue_id_;
 
     // Read a MacPayload into the data section
-    read.read(pkt->data_, cfg_->MacPayloadLength());
-    // Check for eof
-    if (read.eof()) {
-      std::printf(
-          "MacSender: ***EndofFileStream - Frame %d, symbol %d, ue %d, bytes "
-          "%zu\n",
-          pkt->frame_id_, pkt->symbol_id_, pkt->ue_id_, read.gcount());
-      read.close();
-      read.open(data_filename_, std::ifstream::in | std::ifstream::binary);
-    }
+    video->Load(pkt->data_, cfg_->MacPayloadLength());
     // TODO MacPacketLength should be the size of the mac packet but is not.
     mac_packet_location = mac_packet_location +
                           (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
