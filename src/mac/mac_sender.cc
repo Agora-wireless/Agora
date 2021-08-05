@@ -7,9 +7,12 @@
 #include <thread>
 
 #include "datatype_conversion.h"
+#include "file_receiver.h"
 #include "logger.h"
 #include "udp_client.h"
 #include "video_receiver.h"
+
+//#define USE_UDP_DATA_SOURCE
 
 static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kFrameLoadAdvance = 10;
@@ -379,8 +382,12 @@ void* MacSender::DataUpdateThread(size_t tid) {
   MLPD_INFO("MacSender: Data update thread %zu running on core %d\n", tid,
             sched_getcpu());
 
-  auto video_receiver =
+#if defined(USE_UDP_DATA_SOURCE)
+  auto data_source = std::make_unique<FileReceiver>(data_filename_);
+#else
+  auto data_source =
       std::make_unique<VideoReceiver>(VideoReceiver::kVideoStreamRxPort);
+#endif
 
   // Init the data buffers
   while ((keep_running.load() == true) && (buffer_updates < kBufferInit)) {
@@ -389,7 +396,7 @@ void* MacSender::DataUpdateThread(size_t tid) {
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
-        UpdateTxBuffer(video_receiver.get(), tag_for_ue);
+        UpdateTxBuffer(data_source.get(), tag_for_ue);
       }
       buffer_updates++;
     }
@@ -405,7 +412,7 @@ void* MacSender::DataUpdateThread(size_t tid) {
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
-        UpdateTxBuffer(video_receiver.get(), tag_for_ue);
+        UpdateTxBuffer(data_source.get(), tag_for_ue);
       }
     }
   }
