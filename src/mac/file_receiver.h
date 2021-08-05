@@ -31,7 +31,7 @@ class FileReceiver : public MacDataReceiver {
   std::ifstream data_stream_;
   std::array<uint8_t, FileReceiver::kFileStreamLocalRxBufSize> local_rx_buffer_;
 
-  size_t data_availble_;
+  size_t data_available_;
   size_t data_start_offset_;
 };
 
