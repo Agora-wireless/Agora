@@ -58,6 +58,9 @@ Agora::Agora(Config* cfg)
     //     goto creation_end;
     // }
     
+    do_fft_threads_.resize(1);
+    do_fft_threads_[0] = std::thread(&Agora::fft_worker, this, 0);
+
     /* Create worker threads */
     do_subcarrier_threads_.resize(
         (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
@@ -187,7 +190,7 @@ finish:
 void* Agora::subcarrier_worker(int tid)
 {
     pin_to_core_with_offset(
-        ThreadType::kWorkerSubcarrier, base_worker_core_offset + 1, tid);
+        ThreadType::kWorkerSubcarrier, base_worker_core_offset + 1, tid + do_fft_threads_.size());
 
     Range sc_range(tid * config_->subcarrier_block_size + 
         config_->bs_server_addr_idx * config_->get_num_sc_per_server(),
@@ -224,7 +227,7 @@ void* Agora::subcarrier_worker(int tid)
 void* Agora::decode_worker(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset + 1,
-        tid + do_subcarrier_threads_.size());
+        tid + do_fft_threads_.size() + do_subcarrier_threads_.size());
 
     if (config_->dynamic_workload) {
         auto computeDecoding = new DyDecode(config_, tid, freq_ghz,
@@ -244,6 +247,12 @@ void* Agora::decode_worker(int tid)
     }
     
     return nullptr;
+}
+
+void* Agora::fft_worker(int tid)
+{
+    pin_to_core_with_offset(ThreadType::kWorkerFFT, base_worker_core_offset + 1,
+        tid);
 }
 
 void* Agora::encode_worker(int tid)
@@ -532,6 +541,9 @@ void Agora::initialize_uplink_buffers()
 
     socket_buffer_.malloc(cfg->BS_ANT_NUM,
         socket_buffer_size_, 64);
+
+    after_fft_buffer_.malloc(cfg->BS_ANT_NUM, socket_buffer_size_, 64);
+    after_fft_buffer_to_subcarrier_.malloc(cfg->BS_ANT_NUM, socket_buffer_size_, 64);
 
     csi_buffers_.alloc(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM);
     ul_zf_matrices_.alloc(kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM);

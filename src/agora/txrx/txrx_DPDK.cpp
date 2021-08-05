@@ -117,7 +117,8 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
     Table<size_t>& frame_start, Table<complex_float>* dl_ifft_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers,
     Table<int8_t>* demod_soft_buffer_to_decode, Table<int8_t>* encoded_buffer,
-    Table<int8_t>* encoded_buffer_to_precode)
+    Table<int8_t>* encoded_buffer_to_precode, Table<char>* after_fft_buffer,
+    Table<char>* after_fft_buffer_to_subcarrier)
 {
     buffer_ = &buffer;
     frame_start_ = &frame_start;
@@ -129,6 +130,9 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
 
     encoded_buffer_ = encoded_buffer;
     encoded_buffer_to_precode_ = encoded_buffer_to_precode;
+
+    after_fft_buffer_ = after_fft_buffer;
+    after_fft_buffer_to_subcarrier_ = after_fft_buffer_to_subcarrier;
 
     if (kUseArgos) {
         if (!radioconfig_->radioStart()) {
@@ -723,6 +727,187 @@ void* PacketTXRX::encode_thread(int tid)
             rte_pktmbuf_free(rx_bufs[i]);
         }
     }
+    return 0;
+}
+
+void* PacketTXRX::fft_thread(int tid) 
+{
+    std::vector<uint8_t> recv_buf(cfg->packet_length);
+    size_t freq_ghz = measure_rdtsc_freq();
+
+    printf("FFT TX/RX thread\n");
+    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t send_tsc_duration = 0;
+    size_t recv_tsc_duration = 0;
+    size_t loop_count = 0;
+    size_t work_count = 0;
+    
+    size_t work_start_tsc, send_start_tsc, recv_start_tsc, 
+        send_end_tsc, recv_end_tsc;
+    size_t worked;
+
+    while (cfg->running) {
+
+        if (likely(start_tsc > 0)) {
+            loop_count ++;
+        }
+
+        worked = 0;
+
+        // 1. Try to send demodulated data to decoders
+        if (rx_status_->fft_to_subcarrier(
+                fft_frame_to_send_, fft_symbol_to_send_)) {
+
+            if (unlikely(start_tsc == 0)) {
+                start_tsc = rdtsc();
+            }
+            
+            work_start_tsc = rdtsc();
+            send_start_tsc = work_start_tsc;
+            worked = 1;
+
+            for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
+                int8_t* demod_ptr = &(*demod_buffers_)[demod_frame_to_send_
+                    % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->bs_server_addr_idx * cfg->get_num_sc_per_server()];
+
+                size_t target_server_idx = cfg->get_server_idx_by_ue(ue_id);
+                if (target_server_idx == cfg->bs_server_addr_idx) {
+                    int8_t* target_demod_ptr
+                        = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
+                            demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg->bs_server_addr_idx * cfg->get_num_sc_per_server());
+                    memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                    decode_status_->receive_demod_data(
+                        ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_);
+                } else {
+                    struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
+                    tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)],
+                        bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[cfg->get_server_idx_by_ue(ue_id)], cfg->demod_tx_port, cfg->demod_rx_port, 
+                        Packet::kOffsetOfData + cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                    struct rte_ether_hdr* eth_hdr
+                        = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
+
+                    char* payload = (char*)eth_hdr + kPayloadOffset;
+                    auto* pkt = reinterpret_cast<Packet*>(payload);
+                    pkt->pkt_type = Packet::PktType::kDemod;
+                    pkt->frame_id = demod_frame_to_send_;
+                    pkt->symbol_id = demod_symbol_ul_to_send_;
+                    pkt->ue_id = ue_id;
+                    pkt->server_id = cfg->bs_server_addr_idx;
+                    // DpdkTransport::fastMemcpy(pkt->data, demod_ptr,
+                    //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                    memcpy(pkt->data, demod_ptr,
+                        cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+
+                    // Send data (one OFDM symbol)
+                    size_t nb_tx_new = rte_eth_tx_burst(0, 0, tx_bufs, 1);
+                    if (unlikely(nb_tx_new != 1)) {
+                        printf("rte_eth_tx_burst() failed\n");
+                        exit(0);
+                    }
+                }
+            }
+            demod_symbol_ul_to_send_++;
+            if (demod_symbol_ul_to_send_
+                == cfg->ul_data_symbol_num_perframe) {
+                demod_symbol_ul_to_send_ = 0;
+                demod_frame_to_send_++;
+            }
+
+            send_end_tsc = rdtsc();
+            send_tsc_duration += send_end_tsc - send_start_tsc;
+            work_tsc_duration += send_end_tsc - work_start_tsc;
+        }
+
+        // 2. Try to receive demodulated data for decoding
+        rte_mbuf* rx_bufs[kRxBatchSize];
+        uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
+        if (unlikely(nb_rx == 0)) {
+            work_count += worked;
+            continue;
+        }
+
+        if (unlikely(start_tsc == 0)) {
+            start_tsc = rdtsc();
+        }
+
+        work_start_tsc = rdtsc();
+        recv_start_tsc = work_start_tsc;
+
+        work_count ++;
+
+        for (size_t i = 0; i < nb_rx; i++) {
+            // printf("Received packet!\n");
+            rte_mbuf* dpdk_pkt = rx_bufs[i];
+            auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+            auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+                reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+            uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+
+            if (eth_type != RTE_ETHER_TYPE_IPV4
+                or ip_hdr->next_proto_id != IPPROTO_UDP) {
+                rte_pktmbuf_free(rx_bufs[i]);
+                continue;
+            }
+
+            bool found = false;
+            for (size_t j = 0; j < bs_server_addrs_.size(); j ++) {
+                if (ip_hdr->src_addr == bs_server_addrs_[j]) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                fprintf(stderr, "DPDK: Source addr does not match\n");
+                rte_pktmbuf_free(rx_bufs[i]);
+                continue;
+            }
+            if (ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx]) {
+                fprintf(stderr, "DPDK: Destination addr does not match (%x %x)\n", ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
+                rte_pktmbuf_free(rx_bufs[i]);
+                continue;
+            }
+
+            auto* pkt = reinterpret_cast<Packet*>((char*)(eth_hdr) + kPayloadOffset);
+            if (pkt->pkt_type == Packet::PktType::kDemod) {
+                const size_t symbol_idx_ul = pkt->symbol_id;
+                const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
+
+                int8_t* demod_ptr
+                    = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
+                        pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
+                // DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
+                //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                memcpy(demod_ptr, pkt->data,
+                    cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                decode_status_->receive_demod_data(
+                    pkt->ue_id, pkt->frame_id, symbol_idx_ul);
+            } else {
+                printf("Received unknown packet type in demod TX/RX thread\n");
+                exit(1);
+            }
+
+            rte_pktmbuf_free(rx_bufs[i]);
+        }
+
+        recv_end_tsc = rdtsc();
+        recv_tsc_duration += recv_end_tsc - recv_start_tsc;
+        work_tsc_duration += recv_end_tsc - work_start_tsc;
+    }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("Demod Thread duration stats: total time used %.2lfms, "
+        "send %.2lfms (%.2lf\%), recv %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
+        "working proportions (%u/%u: %.2lf\%)\n",
+        cycles_to_ms(whole_duration, freq_ghz),
+        cycles_to_ms(send_tsc_duration, freq_ghz), send_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(recv_tsc_duration, freq_ghz), recv_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
+        work_count, loop_count, work_count * 100.0f / loop_count);
+
     return 0;
 }
 

@@ -58,6 +58,7 @@ public:
     void* subcarrier_worker(int tid);
     void* decode_worker(int tid);
     void* encode_worker(int tid);
+    void* fft_worker(int tid);
 
     void handle_event_fft(size_t tag);
     void update_rx_counters(size_t frame_id, size_t symbol_id); // Not used
@@ -169,6 +170,9 @@ private:
     // 2nd dimension: socket buffer size
     Table<char> socket_buffer_;
 
+    Table<char> after_fft_buffer_;
+    Table<char> after_fft_buffer_to_subcarrier_;
+
     // Preliminary CSI buffers. Each buffer has [number of antennas] rows and
     // [number of OFDM data subcarriers] columns.
     PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers_;
@@ -274,6 +278,8 @@ private:
 
     // Threads running the encoders
     std::vector<std::thread> do_encode_threads_;
+
+    std::vector<std::thread> do_fft_threads_;
 
     // Shared states between socket threads and dosubcarriers
     RxStatus rx_status_;

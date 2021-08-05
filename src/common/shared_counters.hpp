@@ -22,6 +22,8 @@ public:
         , num_decode_tasks_per_frame_(cfg->test_mode == 1 ? (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size : 
             cfg->get_num_ues_to_process() * cfg->decode_thread_num_per_ue)
         , num_precode_tasks_per_frame_((cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
+        , num_fft_tasks_required_(cfg->get_num_ant_to_process())
+        , num_fft_data_required_(cfg->bs_server_addr_list.size())
         , last_frame_cycles_(worker_rdtsc())
         , freq_ghz_(measure_rdtsc_freq())
         , test_mode_(cfg->test_mode)
@@ -185,6 +187,12 @@ public:
                 for (size_t j = 0; j < kMaxSymbols; j++) {
                     num_data_pkts_[frame_slot][j] = 0;
                 }
+                for (size_t j = 0; j < kMaxSymbols; j++) {
+                    num_fft_tasks_completed_[frame_slot][j] = 0;
+                }
+                for (size_t j = 0; j < kMaxSymbols; j++) {
+                    num_fft_data_received_[frame_slot][j] = 0;
+                }
                 MLPD_INFO("Main thread: Decode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
                 last_frame_cycles_ = cur_cycle;
             }
@@ -211,10 +219,37 @@ public:
             for (size_t j = 0; j < kMaxSymbols; j++) {
                 num_data_pkts_[frame_slot][j] = 0;
             }
+            for (size_t j = 0; j < kMaxSymbols; j++) {
+                num_fft_tasks_completed_[frame_slot][j] = 0;
+            }
+            for (size_t j = 0; j < kMaxSymbols; j++) {
+                num_fft_data_received_[frame_slot][j] = 0;
+            }
             MLPD_INFO("Main thread: Precode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
             last_frame_cycles_ = cur_cycle;
         }
         precode_mutex_.unlock();
+    }
+
+    // FFT done
+    void fft_done(size_t frame_id, size_t symbol_id, size_t task_num)
+    {
+        num_fft_tasks_completed_[frame_id % kFrameWnd][symbol_id] += task_num;
+    }
+
+    bool fft_to_subcarrier(size_t frame_id, size_t symbol_id)
+    {
+        return num_fft_tasks_completed_[frame_id % kFrameWnd][symbol_id] == num_fft_tasks_required_;
+    }
+
+    void fft_data_receive(size_t frame_id, size_t symbol_id)
+    {
+        num_fft_data_received_[frame_id % kFrameWnd][symbol_id] ++;
+    }
+
+    bool fft_data_ready(size_t frame_id, size_t symbol_id)
+    {
+        return num_fft_data_received_[frame_id % kFrameWnd][symbol_id] == num_fft_data_required_；
     }
 
     // TODO: Instead of having all-atomic counter arrays, can we just make
@@ -253,6 +288,14 @@ public:
     // cur_frame_ will be incremented in all tasks are completed
     size_t num_precode_tasks_completed_;
     std::mutex precode_mutex_;
+
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
+        num_fft_tasks_completed_;
+    const size_t num_fft_tasks_required_;
+
+    std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>
+        num_fft_data_received_;
+    const size_t num_fft_data_required_;
 
     // Latency measurement counters for each frame
     uint64_t *frame_start_time_;

@@ -75,8 +75,10 @@ public:
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers_
         = nullptr,
         Table<int8_t>* demod_soft_buffer_to_decode = nullptr,
-        Table<int8_t>* encoded_buffer_ = nullptr,
-        Table<int8_t>* encoded_buffer_to_decode = nullptr);
+        Table<int8_t>* encoded_buffer = nullptr,
+        Table<int8_t>* encoded_buffer_to_decode = nullptr,
+        Table<char>* after_fft_buffer = nullptr,
+        Table<char>* after_fft_buffer_to_subcarrier = nullptr);
 
     // TODO: Add documentation
     void send_beacon(int tid, size_t frame_id);
@@ -96,6 +98,7 @@ private:
     void* demod_rx_thread(int tid);
     void* demod_tx_thread(int tid);
     void* encode_thread(int tid);
+    void* fft_thread(int tid);
 
     int dequeue_send(int tid, size_t symbol_to_send, size_t ant_to_send);
     int recv_enqueue(int tid, int radio_id, size_t rx_offset);
@@ -126,6 +129,10 @@ private:
     // Downlink buffers
     Table<int8_t>* encoded_buffer_;
     Table<int8_t>* encoded_buffer_to_precode_;
+
+    // FFT buffers
+    Table<char>* after_fft_buffer_;
+    Table<char>* after_fft_buffer_to_subcarrier_;
 
     std::vector<struct sockaddr_in> bs_rru_sockaddr_;
     std::vector<int> socket_;
@@ -162,6 +169,9 @@ private:
     // Not used
     size_t dl_frame_to_send_ = 0;
     size_t dl_symbol_to_send_ = 0;
+
+    size_t fft_frame_to_send_ = 0;
+    size_t fft_symbol_to_send_ = 0;
 
     size_t last_packet_cycle_[kMaxThreads] = {0};
     size_t max_inter_packet_gap_[kMaxThreads] = {0};

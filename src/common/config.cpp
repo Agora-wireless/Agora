@@ -241,6 +241,15 @@ Config::Config(std::string jsonfile)
     ue_end = bs_server_addr_idx < UE_NUM % bs_server_addr_list.size()
         ? ue_start + UE_NUM / bs_server_addr_list.size() + 1
         : ue_start + UE_NUM / bs_server_addr_list.size();
+    
+    ant_start = bs_server_addr_idx < BS_ANT_NUM % bs_server_addr_list.size()
+        ? bs_server_addr_idx * (BS_ANT_NUM / bs_server_addr_list.size() + 1)
+        : BS_ANT_NUM
+            - (bs_server_addr_list.size() - bs_server_addr_idx)
+                * (BS_ANT_NUM / bs_server_addr_list.size());
+    ant_end = bs_server_addr_idx < BS_ANT_NUM % bs_server_addr_list.size()
+        ? ue_start + BS_ANT_NUM / bs_server_addr_list.size() + 1
+        : ue_start + BS_ANT_NUM / bs_server_addr_list.size();
 
     demul_events_per_symbol
         = 1 + (get_num_sc_per_server() - 1) / demul_block_size;

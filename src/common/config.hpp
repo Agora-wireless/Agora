@@ -327,6 +327,8 @@ public:
     // This Agora server takes charge of ue range [ue_start, ue_end]
     size_t ue_start, ue_end;
 
+    size_t ant_start, ant_end;
+
     uint16_t demod_tx_port; // UDP port used to receive post-demodulation data
     uint16_t demod_rx_port; // UDP port used to send post-demodulation data
 
@@ -388,6 +390,11 @@ public:
     inline size_t get_num_ues_to_process() const
     {
         return ue_end - ue_start;
+    }
+
+    inline size_t get_num_ant_to_process() const
+    {
+        return ant_end - ant_start;
     }
 
     // Get the Agora server index given an UE ID

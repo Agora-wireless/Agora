@@ -72,7 +72,8 @@ public:
         /// The range of subcarriers handled by this subcarrier doer.
         Range sc_range,
         // input buffers
-        Table<char>& socket_buffer,
+        // Table<char>& socket_buffer,
+        Table<char>& after_fft_to_subcarrier_buffer,
         PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
         Table<complex_float>& calib_buffer, Table<int8_t>& dl_encoded_buffer,
         // output buffers
@@ -90,7 +91,8 @@ public:
         : Doer(config, tid, freq_ghz, dummy_conq_, dummy_conq_,
               nullptr /* tok */)
         , sc_range_(sc_range)
-        , socket_buffer_(socket_buffer)
+        // , socket_buffer_(socket_buffer)
+        , after_fft_to_subcarrier_buffer_(after_fft_to_subcarrier_buffer)
         , csi_buffers_(csi_buffers)
         , calib_buffer_(calib_buffer)
         , dl_encoded_buffer_(dl_encoded_buffer)
@@ -115,7 +117,8 @@ public:
             dummy_conq_, nullptr /* ptok */, ul_zf_matrices_,
             ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, 
             control_info_table_, control_idx_list_, phy_stats,
-            stats, &socket_buffer_);
+            // stats, &socket_buffer_);
+            stats, &after_fft_to_subcarrier_buffer_);
 
         do_precode_ = new DoPrecode(this->cfg, tid, freq_ghz, dummy_conq_,
             dummy_conq_, nullptr /* ptok */, dl_zf_matrices_, dl_ifft_buffer_,
@@ -179,8 +182,10 @@ public:
 
                 // work_start_tsc = rdtsc();
                 state_start_tsc = rdtsc();
-                bool ret = rx_status_->is_demod_ready(
-                       demul_cur_frame_, demul_cur_sym_ul_);
+                // bool ret = rx_status_->is_demod_ready(
+                //        demul_cur_frame_, demul_cur_sym_ul_);
+                bool ret = rx_status_->fft_data_ready(
+                       demul_cur_frame_, demul_cur_sym_ul_ + 1);
                 size_t state_tsc_usage = rdtsc() - state_start_tsc;
                 if (likely(start_tsc > 0)) {
                     state_operation_duration += state_tsc_usage;
@@ -330,7 +335,8 @@ public:
                 // work_start_tsc = rdtsc();
                 state_start_tsc = rdtsc();
             }
-            bool ret = rx_status_->received_all_pilots(csi_cur_frame_);
+            // bool ret = rx_status_->received_all_pilots(csi_cur_frame_);
+            bool ret = rx_status_->fft_data_ready(csi_cur_frame_, 0);
             if (likely(start_tsc > 0)) {
                 state_tsc_usage = rdtsc() - state_start_tsc;
                 state_operation_duration += state_tsc_usage;
@@ -422,7 +428,8 @@ private:
 
         for (size_t i = 0; i < cfg->pilot_symbol_num_perframe; i++) {
             for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
-                auto* pkt = reinterpret_cast<Packet*>(socket_buffer_[j]
+                // auto* pkt = reinterpret_cast<Packet*>(socket_buffer_[j]
+                auto* pkt = reinterpret_cast<Packet*>(after_fft_to_subcarrier_buffer_[j]
                     + (frame_slot * cfg->symbol_num_perframe
                           * cfg->packet_length)
                     + i * cfg->packet_length);
@@ -514,7 +521,8 @@ private:
 
     // Input buffers
 
-    Table<char>& socket_buffer_;
+    // Table<char>& socket_buffer_;
+    Table<char>& after_fft_to_subcarrier_buffer_;
 
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
     Table<complex_float>& calib_buffer_;
