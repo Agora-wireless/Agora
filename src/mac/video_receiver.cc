@@ -7,24 +7,31 @@
 
 #include <cstring>
 
+#include "logger.h"
+
+static constexpr size_t kMaxRxAttempts = 25u;
+
 VideoReceiver::VideoReceiver(size_t port)
     : udp_video_receiver_(port, VideoReceiver::kVideoStreamSocketRxBufSize),
       data_available_(0),
-      data_start_offset_(0) {
-  udp_video_receiver_.MakeBlocking(1);
-}
+      data_start_offset_(0) {}
 
-void VideoReceiver::Load(char *destination, size_t num_load_bytes) {
+size_t VideoReceiver::Load(char *destination, size_t num_load_bytes) {
+  size_t loaded_bytes = 0u;
+  size_t rx_attempts = 0u;
+
   if (num_load_bytes > data_available_) {
     //Check for potential local buffer wrap-around
     if ((data_available_ + data_start_offset_ +
          VideoReceiver::kVideoStreamMaxRxSize) > local_rx_buffer_.size()) {
-      memcpy(&local_rx_buffer_.at(0), &local_rx_buffer_.at(data_start_offset_),
-             data_available_);
-      data_start_offset_ = 0;
+      std::memcpy(&local_rx_buffer_.at(0u),
+                  &local_rx_buffer_.at(data_start_offset_), data_available_);
+      data_start_offset_ = 0u;
     }
 
-    while (data_available_ < num_load_bytes) {
+    while ((data_available_ < num_load_bytes) &&
+           (rx_attempts < kMaxRxAttempts)) {
+      rx_attempts++;
       ssize_t rcv_ret = udp_video_receiver_.Recv(
           &local_rx_buffer_.at(data_start_offset_ + data_available_),
           VideoReceiver::kVideoStreamMaxRxSize);
@@ -37,16 +44,26 @@ void VideoReceiver::Load(char *destination, size_t num_load_bytes) {
             "[VideoReceiver] Received packet larger than max receive size -- "
             "inspect");
       } else if (rcv_ret > 0) {
-        std::printf("[VideoReceiver] data received: %zd\n", rcv_ret);
+        MLPD_INFO("[VideoReceiver] data received: %zd\n", rcv_ret);
       }
       data_available_ += rcv_ret;
     }
   }
 
-  //Copy data from local buffer to requested memory location
-  memcpy(destination, &local_rx_buffer_.at(data_start_offset_), num_load_bytes);
-  std::printf("[VideoReceiver] Data loaded: %zu %zu %zu\n", num_load_bytes,
+  if (data_available_ >= num_load_bytes) {
+    //Copy data from local buffer to requested memory location
+    std::memcpy(destination, &local_rx_buffer_.at(data_start_offset_),
+                num_load_bytes);
+    MLPD_INFO("[VideoReceiver] data loaded: %zu %zu %zu\n", num_load_bytes,
               data_available_, data_start_offset_);
-  data_start_offset_ += num_load_bytes;
-  data_available_ -= num_load_bytes;
+    data_start_offset_ += num_load_bytes;
+    data_available_ -= num_load_bytes;
+    loaded_bytes = num_load_bytes;
+  } else {
+    MLPD_ERROR(
+        "[VideoReceiver] not enough data to service request %zu:%zu in %zu "
+        "attempts\n",
+        data_available_, num_load_bytes, rx_attempts);
+  }
+  return loaded_bytes;
 }

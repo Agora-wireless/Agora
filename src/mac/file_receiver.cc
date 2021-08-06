@@ -8,7 +8,9 @@
 #include <cassert>
 #include <cstring>
 
-static constexpr size_t kMaxReadAttempts = 2;
+#include "logger.h"
+
+static constexpr size_t kMaxReadAttempts = 2u;
 
 FileReceiver::FileReceiver(std::string &file_name)
     : file_name_(file_name), data_available_(0), data_start_offset_(0) {
@@ -23,7 +25,8 @@ FileReceiver::~FileReceiver() {
   }
 }
 
-void FileReceiver::Load(char *destination, size_t num_load_bytes) {
+size_t FileReceiver::Load(char *destination, size_t num_load_bytes) {
+  size_t loaded_bytes = 0;
   const size_t file_read_size =
       std::max(FileReceiver::kFileStreamRxSize, num_load_bytes);
   //Make sure the local buffer is large enough to perform the correct read
@@ -33,8 +36,8 @@ void FileReceiver::Load(char *destination, size_t num_load_bytes) {
     //Check for potential local buffer wrap-around
     if ((data_available_ + data_start_offset_ + file_read_size) >
         local_rx_buffer_.size()) {
-      memcpy(&local_rx_buffer_.at(0), &local_rx_buffer_.at(data_start_offset_),
-             data_available_);
+      std::memcpy(&local_rx_buffer_.at(0),
+                  &local_rx_buffer_.at(data_start_offset_), data_available_);
       data_start_offset_ = 0;
     }
 
@@ -47,12 +50,12 @@ void FileReceiver::Load(char *destination, size_t num_load_bytes) {
                         file_read_size - data_read);
 
       data_read += data_stream_.gcount();
-      std::printf("[FileReceiver] data received: %zu:%zu \n", data_read,
-                  file_read_size);
+      MLPD_FRAME("[FileReceiver] data received: %zu:%zu \n", data_read,
+                 file_read_size);
 
       // Check for eof after read
       if (data_stream_.eof()) {
-        std::printf(
+        MLPD_INFO(
             "[FileReceiver]: ***EndofFileStream - requested %zu read count "
             "%zu\n",
             file_read_size, data_read);
@@ -74,10 +77,12 @@ void FileReceiver::Load(char *destination, size_t num_load_bytes) {
     throw std::runtime_error("[FileReceiver] failed to load enough data\n");
   } else {
     //Copy data from local buffer to requested memory location
-    memcpy(destination, &local_rx_buffer_.at(data_start_offset_),
-           num_load_bytes);
-    std::printf("[Receive Server] Data loaded: %zu\n", num_load_bytes);
+    std::memcpy(destination, &local_rx_buffer_.at(data_start_offset_),
+                num_load_bytes);
+    MLPD_FRAME("[FileReceiver] data loaded: %zu\n", num_load_bytes);
     data_start_offset_ += num_load_bytes;
     data_available_ -= num_load_bytes;
+    loaded_bytes = num_load_bytes;
   }
+  return loaded_bytes;
 }

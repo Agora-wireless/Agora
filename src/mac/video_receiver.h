@@ -30,7 +30,7 @@ class VideoReceiver : public MacDataReceiver {
   VideoReceiver(size_t port);
   ~VideoReceiver() = default;
 
-  void Load(char *destination, size_t num_load_bytes) override final;
+  size_t Load(char *destination, size_t num_load_bytes) override final;
 
  private:
   UDPServer udp_video_receiver_;

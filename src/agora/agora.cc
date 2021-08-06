@@ -479,8 +479,6 @@ void Agora::Start() {
         case EventType::kPacketFromMac: {
           size_t frame_id = rx_tag_t(event.tags_[0]).offset_;
 
-          std::printf("EventType::kPacketFromMac: frame %zu\n", frame_id);
-
           bool last_ue = this->mac_to_phy_counters_.CompleteTask(frame_id, 0);
           if (last_ue == true) {
             // schedule this frame's encoding
@@ -499,7 +497,6 @@ void Agora::Start() {
             this->mac_to_phy_counters_.Reset(frame_id);
             PrintPerFrameDone(PrintType::kPacketFromMac, frame_id);
           }
-
         } break;
 
         case EventType::kEncode: {
