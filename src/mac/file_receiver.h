@@ -24,7 +24,7 @@ class FileReceiver : public MacDataReceiver {
   FileReceiver(std::string &file_name);
   ~FileReceiver();
 
-  void Load(char *destination, size_t num_load_bytes) override final;
+  size_t Load(char *destination, size_t num_load_bytes) override final;
 
  private:
   std::string file_name_;
