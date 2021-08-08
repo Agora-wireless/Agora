@@ -78,7 +78,8 @@ Agora::Agora(Config* cfg)
                 = std::thread(&Agora::encode_worker, this, i);
         }
     } else {
-        do_decode_threads_.resize(cfg->get_num_ues_to_process() * cfg->decode_thread_num_per_ue);
+        // do_decode_threads_.resize(cfg->get_num_ues_to_process() * cfg->decode_thread_num_per_ue);
+        do_decode_threads_.resize(cfg->decode_thread_num);
         for (size_t i = 0; i < do_decode_threads_.size(); i++) {
             do_decode_threads_[i]
                 = std::thread(&Agora::decode_worker, this, i);
