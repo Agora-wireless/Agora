@@ -289,7 +289,7 @@ void DyDecode::start_work()
     // cur_symbol_ = tid_in_ue_;
     cur_idx_ = tid;
     cur_symbol_ = cur_idx_ / total_ue_num_;
-    cur_ue_ = cur_idx_ % total_ue_num_;
+    cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
 
     size_t start_tsc = 0;
     size_t work_tsc_duration = 0;
@@ -349,12 +349,12 @@ void DyDecode::start_work()
                 // cur_symbol_ += cfg->decode_thread_num_per_ue;
                 cur_idx_ += total_dycode_num_;
                 cur_symbol_ = cur_idx_ / total_ue_num_;
-                cur_ue_ = cur_idx_ % total_ue_num_;
+                cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
                 if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
                     // cur_symbol_ = tid_in_ue_;
                     cur_idx_ = tid;
                     cur_symbol_ = cur_idx_ / total_ue_num_;
-                    cur_ue_ = cur_idx_ % total_ue_num_;
+                    cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
 
                     // decode_start_tsc = rdtsc();
                     rx_status_->decode_done(cur_frame_);
@@ -423,12 +423,12 @@ void DyDecode::start_work()
                     // cur_symbol_ += cfg->decode_thread_num_per_ue;
                     cur_idx_ += total_dycode_num_;
                     cur_symbol_ = cur_idx_ / total_ue_num_;
-                    cur_ue_ = cur_idx_ % total_ue_num_;
+                    cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
                     if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
                         // cur_symbol_ = tid_in_ue_;
                         cur_idx_ = tid;
                         cur_symbol_ = cur_idx_ / total_ue_num_;
-                        cur_ue_ = cur_idx_ % total_ue_num_;
+                        cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
 
                         // state_start_tsc = rdtsc();
                         rx_status_->decode_done(cur_frame_);
