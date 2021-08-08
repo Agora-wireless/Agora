@@ -423,6 +423,7 @@ void Config::genData()
     ul_iq_t.calloc(
         ul_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
 
+/*
 #ifdef GENERATE_DATA
     for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
         for (size_t j = 0; j < num_bytes_per_ue_pad; j++) {
@@ -473,6 +474,7 @@ void Config::genData()
     }
     fclose(fd);
 #endif
+*/
 
     const size_t bytes_per_block = bits_to_bytes(LDPC_config.cbLen);
     const size_t encoded_bytes_per_block
