@@ -109,28 +109,36 @@ endif()
 # DPDK
 if(${USE_DPDK})
   message(STATUS "DPDK is enabled for Agora")
-
   find_library(DPDK_LIB dpdk)
-  message(STATUS "DPDK_LIB: ${DPDK_LIB}")
   if(NOT DPDK_LIB)
+    #If cmake doesn't find DPDK than have pkg-config attempt the same
+    find_package(PkgConfig REQUIRED)
+    pkg_search_module(DPDK REQUIRED libdpdk>=20.11.1)
+
+    set(DPDK_LIBRARIES ${DPDK_LINK_LIBRARIES})
+    message(STATUS "DPDK_LIB: ${DPDK_LIBRARIES}")
+  else()
+    message(STATUS "DPDK_LIB: ${DPDK_LIB}")
+    if(${USE_MLX_NIC})
+      set(MLX_LIBRARIES -libverbs -lmlx5)
+    endif()
+    set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk ${MLX_LIBRARIES} -Wl,--no-whole-archive dl)
+    # DPDK include directory. Locating rte_config.h does not work on some systems.
+    # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
+    # from the real DPDK include directory (/usr/include/dpdk/).
+    find_path(DPDK_INCLUDE_DIRS NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
+  endif()
+
+  if(NOT DPDK_LIBRARIES)
     message(FATAL_ERROR "DPDK library not found")
   endif()
 
-  if(${USE_MLX_NIC})
-    set(MLX_LIBRARIES -libverbs -lmlx5)
-  endif()
-  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk ${MLX_LIBRARIES} -Wl,--no-whole-archive dl)
-
-  # DPDK include directory. Locating rte_config.h does not work on some systems.
-  # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
-  # from the real DPDK include directory (/usr/include/dpdk/).
-  find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
-  if (DPDK_INCLUDE_DIR)
-    message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
+  if (DPDK_INCLUDE_DIRS)
+    message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIRS}")
   else()
     message(FATAL_ERROR "DPDK include directory not found")
   endif()
-  include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
+  include_directories(SYSTEM ${DPDK_INCLUDE_DIRS})
 
   add_definitions(-DUSE_DPDK)
 endif()
@@ -284,7 +292,7 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-set(COMMON_LIBS armadillo -lnuma ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
+set(COMMON_LIBS armadillo -lnuma ${DPDK_LIBRARIES} ${MKL_LIBS} ${SOAPY_LIB}
   ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
 # TODO: The main agora executable is performance-critical, so we need to
@@ -363,7 +371,6 @@ foreach(test_name IN LISTS LDPC_TESTS)
   add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
 
-
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
@@ -378,7 +385,7 @@ foreach(test_name IN LISTS UNIT_TESTS)
 
   # Unit tests should pass without memory errors
   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
-
+  #target_link_directories(${test_name} ${DPDK_LIBRARY_DIRS})
   target_link_libraries(${test_name} ${COMMON_LIBS})
   add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
