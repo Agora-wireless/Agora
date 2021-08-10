@@ -69,7 +69,13 @@ Some highlights:
        * Mellanox dpdk support depends on libibverbs / libmlx5 / ibverbs-utils 
        * To install version 20.02.1 of dpdk, run `sudo make install T=x86_64-native-linuxapp-gcc
         DESTDIR=/usr -j` (CONFIG_RTE_LIBRTE_MLX5_PMD=y in config/common_base to enabled MLX5 poll mode driver)
-       * To install version 20.11.1 `meson build && cd build && ninja`  `sudo ninja install`  `sudo ldconfig` the MLX poll mode driver will be autodetected and installed if required
+       * To install version 20.11.1 
+        <pre>
+        $ meson build && cd build && ninja
+        $ sudo ninja install
+        $ sudo ldconfig
+        </pre>
+        the MLX poll mode driver will be autodetected and installed if required
 
 ## Building and running with emulated RRU
 We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator.

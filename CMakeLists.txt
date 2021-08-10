@@ -107,18 +107,19 @@ else()
 endif()
 
 # DPDK
+message(STATUS "Use DPDK for agora: ${USE_DPDK}")
+
 if(${USE_DPDK})
-  message(STATUS "DPDK is enabled for Agora")
   find_library(DPDK_LIB dpdk)
   if(NOT DPDK_LIB)
     #If cmake doesn't find DPDK than have pkg-config attempt the same
     find_package(PkgConfig REQUIRED)
     pkg_search_module(DPDK REQUIRED libdpdk>=20.11.1)
+    message(STATUS "  DPDK version ${DPDK_VERSION} is enabled for Agora")
 
     set(DPDK_LIBRARIES ${DPDK_LINK_LIBRARIES})
-    message(STATUS "DPDK_LIB: ${DPDK_LIBRARIES}")
   else()
-    message(STATUS "DPDK_LIB: ${DPDK_LIB}")
+    message(STATUS "  DPDK is enabled for Agora")
     if(${USE_MLX_NIC})
       set(MLX_LIBRARIES -libverbs -lmlx5)
     endif()
@@ -134,7 +135,8 @@ if(${USE_DPDK})
   endif()
 
   if (DPDK_INCLUDE_DIRS)
-    message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIRS}")
+    message(STATUS "  DPDK include directory = ${DPDK_INCLUDE_DIRS}")
+    message(STATUS "  DPDK_LIBRARIES: ${DPDK_LIBRARIES}")
   else()
     message(FATAL_ERROR "DPDK include directory not found")
   endif()
@@ -142,8 +144,6 @@ if(${USE_DPDK})
 
   add_definitions(-DUSE_DPDK)
 endif()
-
-message(STATUS "Use DPDK for agora: ${USE_DPDK}")
 
 # MAC
 if(${ENABLE_MAC})

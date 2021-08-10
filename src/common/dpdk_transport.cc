@@ -282,7 +282,7 @@ void DpdkTransport::DpdkInit(uint16_t core_offset, size_t thread_num) {
   // Initialize DPDK environment
   int ret = rte_eal_init(rte_argc, const_cast<char**>(rte_argv));
   RtAssert(ret >= 0, "Failed to initialize DPDK");
-  std::printf("DPDK version %s initialized\n", rte_version());
+  std::printf("%s initialized\n", rte_version());
 }
 
 rte_mempool* DpdkTransport::CreateMempool(size_t num_ports,
