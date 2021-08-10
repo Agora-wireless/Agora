@@ -7,6 +7,8 @@
 #include "logger.h"
 #include "utils_ldpc.h"
 
+static constexpr size_t kUdpRxBufferPadding = 2048u;
+
 MacThreadClient::MacThreadClient(
     Config* cfg, size_t core_offset,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
@@ -45,7 +47,7 @@ MacThreadClient::MacThreadClient(
   client_.ul_bits_buffer_id_.fill(0);
 
   const size_t udp_pkt_len = cfg_->UlMacDataBytesNumPerframe();
-  udp_pkt_buf_.resize(udp_pkt_len);
+  udp_pkt_buf_.resize(udp_pkt_len + kUdpRxBufferPadding);
 
   // TODO: See if it makes more sense to split up the UE's by port here for
   // client mode.
@@ -229,37 +231,44 @@ void MacThreadClient::ProcessControlInformation() {
 void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
   if (0 == cfg_->UlMacDataBytesNumPerframe()) return;
 
-  std::memset(&udp_pkt_buf_[0], 0, udp_pkt_buf_.size());
-
   size_t rx_bytes = 0;
-  size_t rx_request_size = udp_pkt_buf_.size();
-  uint8_t* rx_location = &udp_pkt_buf_[0];
-  for (size_t rx_tries = 0; rx_tries < cfg_->UlMacPacketsPerframe();
-       rx_tries++) {
-    ssize_t ret = udp_server_->Recv(rx_location, rx_request_size);
+  size_t rx_bytes_required = cfg_->UlMacDataBytesNumPerframe();
+  const size_t max_recv_attempts = (cfg_->UlMacPacketsPerframe() * 10u);
+  size_t rx_attempts;
+  for (rx_attempts = 0u; rx_attempts < max_recv_attempts; rx_attempts++) {
+    ssize_t ret = udp_server_->Recv(&udp_pkt_buf_.at(rx_bytes),
+                                    udp_pkt_buf_.size() - rx_bytes);
     if (ret == 0) {
-      return;  // No data received
+      MLPD_FRAME("MacThreadClient: No data received\n");
+      if (rx_bytes == 0) {
+        return;  // No data received
+      } else {
+        MLPD_FRAME(
+            "MacThreadClient: No data received but there was data in "
+            "buffer pending %zu : try %zu out of %zu\n",
+            rx_bytes, rx_attempts, max_recv_attempts);
+      }
     } else if (ret < 0) {
       // There was an error in receiving
       MLPD_ERROR("MacThreadClient: Error in reception %zu\n", ret);
       cfg_->Running(false);
       return;
     } else {
-      MLPD_FRAME("MacThreadClient: Received %zu : %zu bytes\n", ret,
-                 rx_request_size);
       rx_bytes += ret;
-      if (rx_bytes == udp_pkt_buf_.size()) {
+      MLPD_TRACE("MacThreadClient: Received %zu : %zu bytes\n", ret,
+                 rx_bytes_required);
+      if (rx_bytes >= rx_bytes_required) {
+        MLPD_FRAME("MacThreadClient rx full frame data %zu\n", rx_bytes);
         break;
       }
-      rx_request_size -= ret;
-      rx_location += ret;
     }
   }
+
   if (rx_bytes != cfg_->UlMacDataBytesNumPerframe()) {
-    MLPD_ERROR("MacThreadClient: Received %zu : %zu bytes\n", rx_bytes,
-               cfg_->UlMacDataBytesNumPerframe());
+    MLPD_ERROR("MacThreadClient: Received %zu : %zu bytes in %zu attempts\n",
+               rx_bytes, cfg_->UlMacDataBytesNumPerframe(), rx_attempts);
   } else {
-    MLPD_INFO("MacThreadClient: Received Mac Frame Data\n");
+    MLPD_FRAME("MacThreadClient: Received Mac Frame Data\n");
   }
   RtAssert(
       rx_bytes == cfg_->UlMacDataBytesNumPerframe(),
