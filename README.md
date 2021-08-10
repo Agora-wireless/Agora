@@ -59,14 +59,17 @@ Some highlights:
         </pre>
     * Install Intel MKL - See
        [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html).
-       * MKL can also be installed from Intel Parallel Studio XE. Agora has been tested with 2019 and 2020 versions. 
+       * MKL can also be installed from Intel Parallel Studio XE. Agora has been tested with 2019, 2020, and 2021 versions. 
        * **NOTE**: To enable JIT acceleration applied for matrix multiplication in the code, MKL version after 2019 update 3 is required.
 
     * Optional: DPDK
-       * [DPDK](http://core.dpdk.org/download/) version 20.02.1 is tested with
+       * [DPDK](http://core.dpdk.org/download/) version 20.02.1 and 20.11.1 has been tested with
         Intel 40 GbE and Mellanox 100 GbE NICs in Agora.
-       * To install it, run `sudo make install T=x86_64-native-linuxapp-gcc
-        DESTDIR=/usr -j`
+       * It is required you enable hugepage support and run agora under sudo permissions (LD_LIBRARY_PATH=${LD_LIBRARY_PATH}).
+       * Mellanox dpdk support depends on libibverbs / libmlx5 / ibverbs-utils 
+       * To install version 20.02.1 of dpdk, run `sudo make install T=x86_64-native-linuxapp-gcc
+        DESTDIR=/usr -j` (CONFIG_RTE_LIBRTE_MLX5_PMD=y in config/common_base to enabled MLX5 poll mode driver)
+       * To install version 20.11.1 `meson build && cd build && ninja`  `sudo ninja install`  `sudo ldconfig` the MLX poll mode driver will be autodetected and installed if required
 
 ## Building and running with emulated RRU
 We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator.
@@ -204,7 +207,7 @@ Below we describe how to get the uplink demo work.
    * Run `./build/data_generator --conf_file data/ue-ul-hw.json` to generate required data files.
    * Run `./build/user --conf_file data/ue-ul-hw.json`.
  * Run Agora on the server connected to the Faros RRU
-   * scp over the generated file `data/orig_data_512_ant2.bin` from the client
+   * scp over the generated file `data/LDPC_orig_data_512_ant2.bin` from the client
      machine to the server's `data` directory.
    * Rebuild the code
      * Set `kPrintPhyStats = true` in `src/common/Symbols.hpp`, if you wish to see uplink BER results.
@@ -254,13 +257,13 @@ To reduce performance variations, we did the following configurations for the se
     
 The steps to collect and analyze timestamp traces are as follows:
   * For Intel NICs, recompile code with `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j`; 
-  For Mallenox NICs, recompile code with `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=1 ..; make -j`.
+  For Mellenox NICs, recompile code with `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=1 ..; make -j`.
   * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments. 
     In our [paper](#documentation), we change “antenna_num”,  “ue_num” and “symbol_num_perframe” 
     to different values to collect different data points in the figures. 
   * Generate source data files by running
     <pre>
-    $ ./build/data_generator --conf_file data/tddconfig-sim-ul.json`.
+    $ ./build/data_generator --conf_file data/tddconfig-sim-ul.json
     </pre>
   * Run Agora as a real-time process (to prevent OS from doing context switches) using 
     <pre>
@@ -275,8 +278,8 @@ The steps to collect and analyze timestamp traces are as follows:
     instead to run Agora as a normal process.)
   * Run the emulated RRU using
     <pre>
-    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --server_mac_addr=00:00:00:00:00:00 --num_threads=2 --core_offset=0 \
-      --conf_file=data/tddconfig-sim-ul.json --delay=1000 --enable_slow_start=$2
+    $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --num_threads=2 --core_offset=0 \
+      --conf_file=data/tddconfig-sim-ul.json --frame_duration=5000 --enable_slow_start=1
     </pre>
   * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
   * We also provide MATLAB scripts for [uplink](matlab/parse_multi_file_ul) and [downlink](matlab/parse_multi_file_dl) that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
