@@ -5,7 +5,12 @@
 #include "mac_receiver.h"
 
 #include "signal_handler.h"
+#include "udp_client.h"
 #include "udp_server.h"
+
+//#define STREAM_UDP_DATA
+static constexpr char kVideoStreamingAddr[] = "10.238.200.112";
+static constexpr uint16_t kVideoStreamingPort = 1235u;
 
 static const bool kDebugMacReceiver = true;
 
@@ -41,6 +46,10 @@ void* MacReceiver::LoopRecv(size_t tid) {
   auto udp_server =
       std::make_unique<UDPServer>(server_tx_port_ + ue_id, sock_buf_size);
 
+#if defined(STREAM_UDP_DATA)
+  auto udp_video_streamer = std::make_unique<UDPClient>();
+#endif
+
   udp_server->MakeBlocking(1);
 
   // TODO: Should each UE have a rx port?
@@ -61,6 +70,12 @@ void* MacReceiver::LoopRecv(size_t tid) {
       throw std::runtime_error("Receiver: recv failed");
     } else if (static_cast<size_t>(recvlen) == packet_length) {
       // Write the data packet to a file or push to file writter queue
+#if defined(STREAM_UDP_DATA)
+      udp_video_streamer->Send(std::string(kVideoStreamingAddr),
+                               kVideoStreamingPort, &rx_buffer[0u],
+                               packet_length);
+#endif
+
       if (kDebugMacReceiver) {
         std::printf("MacReceiver: Thread %zu,  Received Data:", tid);
         for (size_t i = 0; i < packet_length; i++) {
