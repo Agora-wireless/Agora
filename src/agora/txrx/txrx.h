@@ -46,7 +46,7 @@ class DPDKRxPacket : public RxPacket {
  private:
   rte_mbuf* mem_;
   inline void GcPacket() override {
-    std::printf("Garbage collecting the memory for DPDKRxPacket\n");
+    //std::printf("Garbage collecting the memory for DPDKRxPacket\n");
     rte_pktmbuf_free(mem_);
     this->Set(nullptr, nullptr);
   }

@@ -4,14 +4,15 @@
  */
 #include "mac_sender.h"
 
-#include <fstream>
-#include <ios>
-#include <iostream>
 #include <thread>
 
 #include "datatype_conversion.h"
+#include "file_receiver.h"
 #include "logger.h"
 #include "udp_client.h"
+#include "video_receiver.h"
+
+//#define USE_UDP_DATA_SOURCE
 
 static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kFrameLoadAdvance = 10;
@@ -207,9 +208,8 @@ void* MacSender::MasterThread(size_t /*unused*/) {
       frame_data_count.at(comp_frame_slot)++;
 
       if (kDebugPrintSender) {
-        std::printf("MacSender: Checking frame %d : %zu : %zu\n",
-                    ctag.frame_id_, comp_frame_slot,
-                    frame_data_count.at(comp_frame_slot));
+        MLPD_INFO("MacSender: Checking frame %d : %zu : %zu\n", ctag.frame_id_,
+                  comp_frame_slot, frame_data_count.at(comp_frame_slot));
       }
       // Check to see if the current frame is finished (UeNum / UeAntNum)
       if (frame_data_count.at(comp_frame_slot) == cfg_->UeAntNum()) {
@@ -220,9 +220,9 @@ void* MacSender::MasterThread(size_t /*unused*/) {
         size_t next_frame_id = ctag.frame_id_ + 1;
         if ((kDebugSenderReceiver == true) ||
             (kDebugPrintPerFrameDone == true)) {
-          std::printf("MacSender: Tx frame %d in %.2f ms, next frame %zu\n",
-                      ctag.frame_id_, (frame_end_us - frame_start_us) / 1000.0,
-                      next_frame_id);
+          MLPD_INFO("MacSender: Tx frame %d in %.2f ms, next frame %zu\n",
+                    ctag.frame_id_, (frame_end_us - frame_start_us) / 1000.0,
+                    next_frame_id);
         }
         this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = frame_end_us;
 
@@ -318,7 +318,9 @@ void* MacSender::WorkerThread(size_t tid) {
 
         if (kDebugSenderReceiver) {
           std::printf(
-              "Thread %zu (tag = %s) transmit frame %d, radio %zu, TX time: "
+              "MacSender: Thread %zu (tag = %s) transmit frame %d, radio %zu, "
+              "TX "
+              "time: "
               "%.3f us\n",
               tid, gen_tag_t(tag).ToString().c_str(), tag.frame_id_, cur_radio,
               GetTime::CyclesToUs(GetTime::Rdtsc() - start_tsc_send,
@@ -333,10 +335,12 @@ void* MacSender::WorkerThread(size_t tid) {
           double byte_len = cfg_->PacketLength() * ant_num_this_thread *
                             max_symbol_id * 1000.f;
           double diff = end - begin;
-          std::printf("Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
-                      (size_t)tid,
-                      total_tx_packets / (ant_num_this_thread * max_symbol_id),
-                      diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
+          std::printf(
+              "MacSender: Thread %zu send %zu frames in %f secs, tput %f "
+              "Mbps\n",
+              (size_t)tid,
+              total_tx_packets / (ant_num_this_thread * max_symbol_id),
+              diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
           begin = GetTime::GetTimeUs();
           total_tx_packets_rolling = 0;
         }
@@ -380,9 +384,13 @@ void* MacSender::DataUpdateThread(size_t tid) {
   // PinToCoreWithOffset(ThreadType::kWorker, 13, 0);
   MLPD_INFO("MacSender: Data update thread %zu running on core %d\n", tid,
             sched_getcpu());
-  std::ifstream tx_file;
-  tx_file.open(data_filename_, (std::ifstream::in | std::ifstream::binary));
-  assert(tx_file.is_open() == true);
+
+#if defined(USE_UDP_DATA_SOURCE)
+  auto data_source =
+      std::make_unique<VideoReceiver>(VideoReceiver::kVideoStreamRxPort);
+#else
+  auto data_source = std::make_unique<FileReceiver>(data_filename_);
+#endif
 
   // Init the data buffers
   while ((keep_running.load() == true) && (buffer_updates < kBufferInit)) {
@@ -391,7 +399,7 @@ void* MacSender::DataUpdateThread(size_t tid) {
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
-        UpdateTxBuffer(tx_file, tag_for_ue);
+        UpdateTxBuffer(data_source.get(), tag_for_ue);
       }
       buffer_updates++;
     }
@@ -407,19 +415,16 @@ void* MacSender::DataUpdateThread(size_t tid) {
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
-        UpdateTxBuffer(tx_file, tag_for_ue);
+        UpdateTxBuffer(data_source.get(), tag_for_ue);
       }
     }
   }
-  tx_file.close();
   return nullptr;
 }
 
-void MacSender::UpdateTxBuffer(std::ifstream& read, gen_tag_t tag) {
+void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
   // Load a frames worth of data
   uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
-
-  assert(read.is_open() == true);
 
   for (size_t i = 0; i < packets_per_frame_; i++) {
     auto* pkt = reinterpret_cast<MacPacket*>(mac_packet_location);
@@ -428,29 +433,26 @@ void MacSender::UpdateTxBuffer(std::ifstream& read, gen_tag_t tag) {
     pkt->ue_id_ = tag.ue_id_;
 
     // Read a MacPayload into the data section
-    read.read(pkt->data_, cfg_->MacPayloadLength());
-    // Check for eof
-    if (read.eof()) {
-      std::printf(
-          "MacSender: ***EndofFileStream - Frame %d, symbol %d, ue %d, bytes "
-          "%zu\n",
-          pkt->frame_id_, pkt->symbol_id_, pkt->ue_id_, read.gcount());
-      read.close();
-      read.open(data_filename_, std::ifstream::in | std::ifstream::binary);
+    size_t loaded_bytes =
+        data_source->Load(pkt->data_, cfg_->MacPayloadLength());
+    if (loaded_bytes != cfg_->MacPayloadLength()) {
+      MLPD_ERROR(
+          "MacSender [frame %d, ue %d]: Data not available to be loaded\n",
+          tag.frame_id_, tag.ant_id_);
     }
     // TODO MacPacketLength should be the size of the mac packet but is not.
     mac_packet_location = mac_packet_location +
                           (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
   }
-  std::printf("MacSender: Loading packet for frame %d, ue %d, bytes %zu\n",
-              tag.frame_id_, tag.ant_id_,
-              cfg_->MacPayloadLength() * packets_per_frame_);
+  MLPD_INFO("MacSender [frame %d, ue %d]: Loaded packet for bytes %zu\n",
+            tag.frame_id_, tag.ant_id_,
+            cfg_->MacPayloadLength() * packets_per_frame_);
 }
 
 void MacSender::WriteStatsToFile(size_t tx_frame_count) const {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = cur_directory + "/data/tx_result.txt";
-  std::printf("Printing sender results to file \"%s\"...\n", filename.c_str());
+  MLPD_INFO("Printing sender results to file \"%s\"...\n", filename.c_str());
 
   std::ofstream debug_file;
   debug_file.open(filename, std::ifstream::out);

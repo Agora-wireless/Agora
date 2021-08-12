@@ -8,6 +8,7 @@
 
 #include "buffer.h"
 #include "eth_common.h"
+#include "rte_version.h"
 #include "utils.h"
 
 inline const struct rte_eth_conf port_conf_default() {
@@ -281,6 +282,7 @@ void DpdkTransport::DpdkInit(uint16_t core_offset, size_t thread_num) {
   // Initialize DPDK environment
   int ret = rte_eal_init(rte_argc, const_cast<char**>(rte_argv));
   RtAssert(ret >= 0, "Failed to initialize DPDK");
+  std::printf("%s initialized\n", rte_version());
 }
 
 rte_mempool* DpdkTransport::CreateMempool(size_t num_ports,
