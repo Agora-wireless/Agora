@@ -291,6 +291,11 @@ void DyZF::ZF_freq_orthogonal_dynamic(size_t tag)
         return;
     }
 
+    // for (size_t i = 0; i < 8; i ++) {
+    //     printf("(%lf %lf) ", csi_gather_buffer[i].re, csi_gather_buffer[i].im);
+    // }
+    // printf("\n");
+
     duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
     arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer),
         cfg->BS_ANT_NUM, total_ue_sc, false);

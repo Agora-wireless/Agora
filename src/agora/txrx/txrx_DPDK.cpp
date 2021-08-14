@@ -892,11 +892,16 @@ void* PacketTXRX::fft_thread(int tid)
                 const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
 
                 char* fft_ptr = &(*after_fft_buffer_to_subcarrier_)[pkt->ant_id]
-                    [((frame_id % kFrameWnd) * cfg->symbol_num_perframe + symbol_id) * cfg->packet_length];
+                    [((frame_id % kFrameWnd) * cfg->symbol_num_perframe + symbol_id) * cfg->packet_length + 
+                    (cfg->OFDM_DATA_START + cfg->get_num_sc_per_server() * cfg->bs_server_addr_idx) * sizeof(short) * 2];
                 // DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
                 //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                 memcpy(fft_ptr, pkt->data,
                     cfg->get_num_sc_per_server() * sizeof(short) * 2);
+                // for (size_t i = 0; i < 8; i ++) {
+                //     printf("(%d %d) ", pkt->data[i*2], pkt->data[i*2+1]);
+                // }
+                // printf("\n");
                 rx_status_->fft_data_receive(frame_id, symbol_id);
             } else {
                 printf("Received unknown packet type in FFT TX/RX thread\n");

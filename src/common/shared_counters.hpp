@@ -23,7 +23,7 @@ public:
             cfg->get_num_ues_to_process() * cfg->decode_thread_num_per_ue)
         , num_precode_tasks_per_frame_((cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
         , num_fft_tasks_required_(cfg->get_num_ant_to_process())
-        , num_fft_data_required_(cfg->bs_server_addr_list.size())
+        , num_fft_data_required_(cfg->BS_ANT_NUM)
         , last_frame_cycles_(worker_rdtsc())
         , freq_ghz_(measure_rdtsc_freq())
         , test_mode_(cfg->test_mode)
