@@ -805,7 +805,7 @@ void* PacketTXRX::fft_thread(int tid)
 
                         char* payload = (char*)eth_hdr + kPayloadOffset;
                         auto* pkt = reinterpret_cast<Packet*>(payload);
-                        pkt->pkt_type = Packet::PktType::kDemod;
+                        pkt->pkt_type = Packet::PktType::kFFT;
                         pkt->frame_id = fft_frame_to_send_;
                         pkt->symbol_id = fft_symbol_to_send_;
                         pkt->ant_id = ant_id;
@@ -899,7 +899,7 @@ void* PacketTXRX::fft_thread(int tid)
                     cfg->get_num_sc_per_server() * sizeof(short) * 2);
                 rx_status_->fft_data_receive(frame_id, symbol_id);
             } else {
-                printf("Received unknown packet type in demod TX/RX thread\n");
+                printf("Received unknown packet type in FFT TX/RX thread\n");
                 exit(1);
             }
 
