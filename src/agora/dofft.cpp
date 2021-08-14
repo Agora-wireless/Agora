@@ -110,16 +110,11 @@ void DoFFT::launch(size_t frame_id, size_t symbol_id, size_t ant_id)
         + symbol_id * cfg->packet_length) + Packet::kOffsetOfData, 
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
-    DurationStat dummy_duration_stat; // TODO: timing for calibration symbols
-    DurationStat* duration_stat = nullptr;
-
     size_t start_tsc1 = worker_rdtsc();
-    duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
     DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
 
     size_t start_tsc2 = worker_rdtsc();
-    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     // Move to the new place
     simd_convert_float32_to_float16(reinterpret_cast<float*>(after_fft_buffer_[ant_id] +
@@ -127,10 +122,7 @@ void DoFFT::launch(size_t frame_id, size_t symbol_id, size_t ant_id)
         + symbol_id * cfg->packet_length),
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
-    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
     // socket_buffer_status_[socket_thread_id][buf_offset] = 0; // Reset sock buf
-    duration_stat->task_count++;
-    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
     return;
 }
 
