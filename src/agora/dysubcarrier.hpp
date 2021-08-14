@@ -429,7 +429,7 @@ private:
         for (size_t i = 0; i < cfg->pilot_symbol_num_perframe; i++) {
             for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
                 // auto* pkt = reinterpret_cast<Packet*>(socket_buffer_[j]
-                auto* pkt = reinterpret_cast<Packet*>(after_fft_to_subcarrier_buffer_[j]
+                auto* pkt = reinterpret_cast<char*>(after_fft_to_subcarrier_buffer_[j]
                     + (frame_slot * cfg->symbol_num_perframe
                           * cfg->packet_length)
                     + i * cfg->packet_length);
@@ -449,7 +449,7 @@ private:
 
                         simd_convert_float16_to_float32(
                             reinterpret_cast<float*>(converted_sc),
-                            reinterpret_cast<float*>(pkt->data
+                            reinterpret_cast<float*>(pkt
                                 + (cfg->OFDM_DATA_START + sc_idx) * 2),
                             kSCsPerCacheline * 2);
 

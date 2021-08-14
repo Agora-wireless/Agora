@@ -261,6 +261,9 @@ Config::Config(std::string jsonfile)
     encode_tx_port = tddConf.value("encode_tx_port", 7100);
     encode_rx_port = tddConf.value("encode_rx_port", 7600);
 
+    fft_tx_port = tddConf.value("fft_tx_port", 12100);
+    fft_rx_port = tddConf.value("fft_rx_port", 12600);
+
     fft_block_size = tddConf.value("fft_block_size", 1);
 
     /* LDPC Coding configurations */

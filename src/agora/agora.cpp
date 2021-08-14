@@ -253,6 +253,15 @@ void* Agora::fft_worker(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerFFT, base_worker_core_offset + 1,
         tid);
+
+    auto computeFFT = new DoFFT(config_, tid, freq_ghz, Range(config_->ant_start, config_->ant_end),
+        socket_buffer_, after_fft_buffer_,
+        phy_stats, stats, &rx_status_);
+
+    computeFFT->start_work();
+    delete computeFFT;
+
+    return nullptr;
 }
 
 void* Agora::encode_worker(int tid)

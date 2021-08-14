@@ -2,6 +2,7 @@
 #include "concurrent_queue_wrapper.hpp"
 #include "datatype_conversion.h"
 #include "shared_counters.hpp"
+#include "signalHandler.hpp"
 #include <malloc.h>
 
 using namespace arma;
@@ -61,19 +62,16 @@ static void convert_short_to_float_simd(
 #endif
 }
 
-DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
-    moodycamel::ConcurrentQueue<Event_data>& task_queue,
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-    moodycamel::ProducerToken* worker_producer_token,
-    Table<char>& socket_buffer, Table<int>& socket_buffer_status,
+DoFFT::DoFFT(Config* config, int tid, double freq_ghz, Range ant_range,
+    Table<char>& socket_buffer, 
     Table<char>& after_fft_buffer,
     PhyStats* in_phy_stats,
     Stats* stats_manager,
     RxStatus* rx_status)
-    : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
+    : Doer(config, tid, freq_ghz, dummy_conq_, complete_task_queue,
           worker_producer_token)
+    , ant_range_(ant_range)
     , socket_buffer_(socket_buffer)
-    , socket_buffer_status_(socket_buffer_status)
     , after_fft_buffer_(after_fft_buffer)
     , phy_stats(in_phy_stats)
     , rx_status_(rx_status)
@@ -109,7 +107,8 @@ void DoFFT::launch(size_t frame_id, size_t symbol_id, size_t ant_id)
 
     simd_convert_short_to_float(reinterpret_cast<short*>(socket_buffer_[ant_id] +
         (frame_slot * cfg->symbol_num_perframe * cfg->packet_length)
-        + symbol_id * cfg->packet_length), reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+        + symbol_id * cfg->packet_length) + Packet::kOffsetOfData, 
+        reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
     DurationStat dummy_duration_stat; // TODO: timing for calibration symbols
     DurationStat* duration_stat = nullptr;
@@ -123,7 +122,7 @@ void DoFFT::launch(size_t frame_id, size_t symbol_id, size_t ant_id)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     // Move to the new place
-    simd_convert_float32_to_float16(reinterpret_cast<float*>(after_fft_buffer[ant_id] +
+    simd_convert_float32_to_float16(reinterpret_cast<float*>(after_fft_buffer_[ant_id] +
         (frame_slot * cfg->symbol_num_perframe * cfg->packet_length)
         + symbol_id * cfg->packet_length),
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);

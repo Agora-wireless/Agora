@@ -94,7 +94,6 @@ void DyDemul::launch(
                 + frame_slot * (cfg->symbol_num_perframe * cfg->packet_length)
                 + (symbol_idx_ul + cfg->pilot_symbol_num_perframe)
                     * cfg->packet_length
-                + Packet::kOffsetOfData
                 + 2 * sizeof(short) * (i + base_sc_id + cfg->OFDM_DATA_START));
             simd_convert_float16_to_float32(
                 reinterpret_cast<float*>(tmp), src, kSCsPerCacheline * 2);

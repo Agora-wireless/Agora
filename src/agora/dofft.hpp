@@ -19,14 +19,10 @@
 
 class DoFFT : public Doer {
 public:
-    DoFFT(Config* config, int tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& task_queue,
-        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-        moodycamel::ProducerToken* worker_producer_token,
-        Table<char>& socket_buffer, Table<int>& socket_buffer_status,
-        Table<complex_float>& data_buffer,
-        PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers,
-        Table<complex_float>& calib_buffer, PhyStats* in_phy_stats,
+    DoFFT(Config* config, int tid, double freq_ghz, Range ant_range,
+        Table<char>& socket_buffer, 
+        Table<char>& after_fft_buffer,
+        PhyStats* in_phy_stats,
         Stats* stats_manager, RxStatus* rx_status);
     ~DoFFT();
 
@@ -69,8 +65,7 @@ public:
 
 private:
     Table<char>& socket_buffer_;
-    Table<int>& socket_buffer_status_;
-    Table<char>& after_fft_buffter_;
+    Table<char>& after_fft_buffer_;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     complex_float* fft_inout; // Buffer for both FFT input and output
     DurationStat* duration_stat_fft;

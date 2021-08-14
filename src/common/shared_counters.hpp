@@ -249,7 +249,7 @@ public:
 
     bool fft_data_ready(size_t frame_id, size_t symbol_id)
     {
-        return num_fft_data_received_[frame_id % kFrameWnd][symbol_id] == num_fft_data_required_；
+        return num_fft_data_received_[frame_id % kFrameWnd][symbol_id] == num_fft_data_required_;
     }
 
     // TODO: Instead of having all-atomic counter arrays, can we just make

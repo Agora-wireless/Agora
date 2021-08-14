@@ -222,7 +222,8 @@ struct Packet {
         kIQFromRRU, // A packet containing IQ samples from the RRU
         kIQFromServer, // A packet containing IQ samples from the server
         kDemod, // A packet generated after the demodulation stage
-        kEncode // A packet generated after the encode stage
+        kEncode, // A packet generated after the encode stage
+        kFFT
     };
 
     static const char* pkt_type_str(PktType pkt_type)
