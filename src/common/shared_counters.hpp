@@ -15,10 +15,10 @@ class RxStatus {
 public:
     RxStatus(Config* cfg)
         : num_pilot_pkts_per_frame_(
-              cfg->pilot_symbol_num_perframe * cfg->BS_ANT_NUM)
+              cfg->pilot_symbol_num_perframe * cfg->get_num_ant_to_process())
         , num_pilot_symbols_per_frame_(cfg->pilot_symbol_num_perframe)
         , num_ul_data_symbol_per_frame_(cfg->ul_data_symbol_num_perframe)
-        , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
+        , num_pkts_per_symbol_(cfg->get_num_ant_to_process())
         , num_decode_tasks_per_frame_(cfg->test_mode == 1 ? (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size : 
             cfg->get_num_ues_to_process() * cfg->decode_thread_num_per_ue)
         , num_precode_tasks_per_frame_((cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
