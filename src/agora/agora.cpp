@@ -136,7 +136,7 @@ void Agora::start()
     if (!packet_tx_rx_->startTXRX(socket_buffer_,
             stats->frame_start, &dl_ifft_buffer_,
             &demod_buffers_, &demod_soft_buffer_to_decode_, &dl_encoded_buffer_,
-            &dl_encoded_buffer_to_precode_)) {
+            &dl_encoded_buffer_to_precode_, &after_fft_buffer_, &after_fft_buffer_to_subcarrier_)) {
         this->stop();
         return;
     }
