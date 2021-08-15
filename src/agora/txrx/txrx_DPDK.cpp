@@ -792,7 +792,8 @@ void* PacketTXRX::fft_thread(int tid)
                 for (size_t target_server_idx = 0; target_server_idx < cfg->bs_server_addr_list.size(); target_server_idx ++) {
                     if (target_server_idx == cfg->bs_server_addr_idx) {
                         char* target_fft_ptr = &(*after_fft_buffer_to_subcarrier_)[ant_id]
-                            [((fft_frame_to_send_ % kFrameWnd) * cfg->symbol_num_perframe + fft_symbol_to_send_) * cfg->packet_length];
+                            [((fft_frame_to_send_ % kFrameWnd) * cfg->symbol_num_perframe + fft_symbol_to_send_) * cfg->packet_length + 
+                            (cfg->OFDM_DATA_START + cfg->get_num_sc_per_server() * cfg->bs_server_addr_idx) * sizeof(short) * 2];
                         memcpy(target_fft_ptr, fft_ptr, cfg->get_num_sc_per_server() * sizeof(short) * 2);
                         rx_status_->fft_data_receive(fft_frame_to_send_, fft_symbol_to_send_);
                     } else {

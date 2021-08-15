@@ -245,11 +245,16 @@ public:
     void fft_data_receive(size_t frame_id, size_t symbol_id)
     {
         num_fft_data_received_[frame_id % kFrameWnd][symbol_id] ++;
+        // printf("FFT data receive (%u,%u) %u:%u\n", frame_id, symbol_id, num_fft_data_received_[frame_id % kFrameWnd][symbol_id].load(), num_fft_data_required_);
     }
 
     bool fft_data_ready(size_t frame_id, size_t symbol_id)
     {
-        return num_fft_data_received_[frame_id % kFrameWnd][symbol_id] == num_fft_data_required_;
+        if (num_fft_data_received_[frame_id % kFrameWnd][symbol_id] == num_fft_data_required_) {
+            // printf("Complete FFT data receiving for (%u,%u)\n", frame_id, symbol_id);
+            return true;
+        }
+        return false;
     }
 
     // TODO: Instead of having all-atomic counter arrays, can we just make
@@ -293,7 +298,7 @@ public:
         num_fft_tasks_completed_;
     const size_t num_fft_tasks_required_;
 
-    std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_fft_data_received_;
     const size_t num_fft_data_required_;
 

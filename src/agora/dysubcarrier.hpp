@@ -355,6 +355,7 @@ public:
                 worked = 1;
 
                 size_t csi_start_tsc = rdtsc();
+                // printf("Run CSI for frame %u\n", csi_cur_frame_);
                 run_csi(csi_cur_frame_, sc_range_.start);
                 if (likely(start_tsc > 0)) {
                     size_t csi_tmp_tsc = rdtsc() - csi_start_tsc;

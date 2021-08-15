@@ -201,7 +201,7 @@ void* Agora::subcarrier_worker(int tid)
     if (config_->dynamic_workload) {
         auto computeSubcarrier = new DySubcarrier(config_, tid, freq_ghz,
             sc_range,
-            socket_buffer_, csi_buffers_, calib_buffer_,
+            after_fft_buffer_to_subcarrier_, csi_buffers_, calib_buffer_,
             dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
             ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
             control_info_table_, control_idx_list_,
@@ -212,7 +212,7 @@ void* Agora::subcarrier_worker(int tid)
     } else {
         auto computeSubcarrier = new DoSubcarrier(config_, tid, freq_ghz,
             sc_range,
-            socket_buffer_, csi_buffers_, calib_buffer_,
+            after_fft_buffer_to_subcarrier_, csi_buffers_, calib_buffer_,
             dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
             ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
             phy_stats, stats, &rx_status_, &demul_status_, &precode_status_);
