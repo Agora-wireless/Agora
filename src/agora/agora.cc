@@ -56,7 +56,7 @@ Agora::Agora(Config* const cfg)
         cfg->CoreOffset() + cfg->SocketThreadNum() + cfg->WorkerThreadNum() + 1;
     mac_thread_ = std::make_unique<MacThreadBaseStation>(
         cfg, mac_cpu_core, decoded_buffer_, &dl_bits_buffer_,
-        &mac_request_queue_, &mac_response_queue_);
+        &dl_bits_buffer_status_, &mac_request_queue_, &mac_response_queue_);
 
     mac_std_thread_ =
         std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
@@ -455,12 +455,12 @@ void Agora::Start() {
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
 
           bool last_tomac_task =
-              this->phy_to_mac_counter_.CompleteTask(frame_id, symbol_id);
+              this->phy_to_mac_counters_.CompleteTask(frame_id, symbol_id);
           if (last_tomac_task == true) {
             PrintPerSymbolDone(PrintType::kPacketToMac, frame_id, symbol_id);
 
             bool last_tomac_symbol =
-                this->phy_to_mac_counter_.CompleteSymbol(frame_id);
+                this->phy_to_mac_counters_.CompleteSymbol(frame_id);
             if (last_tomac_symbol == true) {
               assert(this->cur_proc_frame_id_ == frame_id);
               // this->stats_->MasterSetTsc(TsType::kMacTXDone, frame_id);
@@ -475,7 +475,7 @@ void Agora::Start() {
         } break;
 
         case EventType::kPacketFromMac: {
-          size_t frame_id = rx_mac_tag_t(event.tags_[0]).offset_;
+          size_t frame_id = AgoraNetwork::rx_mac_tag_t(event.tags_[0]).offset_;
 
           bool last_ue = this->mac_to_phy_counters_.CompleteTask(frame_id, 0);
           if (last_ue == true) {
@@ -1214,7 +1214,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             "%zu symbols done\n",
             frame_id, symbol_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
-            phy_to_mac_counter_.GetSymbolCount(frame_id) + 1);
+            phy_to_mac_counters_.GetSymbolCount(frame_id) + 1);
         break;
       default:
         std::printf("Wrong task type in symbol done print!");
@@ -1371,7 +1371,7 @@ void Agora::InitializeUplinkBuffers() {
   decode_counters_.Init(cfg->Frame().NumULSyms(),
                         cfg->LdpcConfig().NumBlocksInSymbol() * cfg->UeNum());
 
-  phy_to_mac_counter_.Init(cfg->Frame().NumULSyms(), cfg->UeNum());
+  phy_to_mac_counters_.Init(cfg->Frame().NumULSyms(), cfg->UeNum());
 }
 
 void Agora::InitializeDownlinkBuffers() {
@@ -1530,7 +1530,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
       frame_id, static_cast<int>(this->ifft_counters_.IsLastSymbol(frame_id)),
       static_cast<int>(this->tx_counters_.IsLastSymbol(frame_id)),
       static_cast<int>(this->decode_counters_.IsLastSymbol(frame_id)),
-      static_cast<int>(this->phy_to_mac_counter_.IsLastSymbol(frame_id)),
+      static_cast<int>(this->phy_to_mac_counters_.IsLastSymbol(frame_id)),
       static_cast<int>(this->tx_counters_.IsLastSymbol(frame_id)));
 
   // Complete if last frame and ifft / decode complete
@@ -1539,11 +1539,11 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
       (((false == kEnableMac) &&
         (true == this->decode_counters_.IsLastSymbol(frame_id))) ||
        ((true == kEnableMac) &&
-        (true == this->phy_to_mac_counter_.IsLastSymbol(frame_id))))) {
+        (true == this->phy_to_mac_counters_.IsLastSymbol(frame_id))))) {
     this->stats_->UpdateStats(frame_id);
     assert(frame_id == this->cur_proc_frame_id_);
     this->decode_counters_.Reset(frame_id);
-    this->phy_to_mac_counter_.Reset(frame_id);
+    this->phy_to_mac_counters_.Reset(frame_id);
     this->ifft_counters_.Reset(frame_id);
     this->tx_counters_.Reset(frame_id);
     if (config_->Frame().NumDLSyms() > 0) {

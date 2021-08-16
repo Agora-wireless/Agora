@@ -271,7 +271,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
   for (size_t pkt_id = 0; pkt_id < cfg_->DlMacPacketsPerframe(); pkt_id++) {
     size_t pkt_offset = radio_buf_id * cfg_->DlMacBytesNumPerframe() +
                         pkt_id * cfg_->MacPacketLength();
-    auto* pkt = reinterpret_cast<MacPacket*>(
+    auto* pkt = reinterpret_cast<AgoraNetwork::MacPacket*>(
         &(*dl_bits_buffer_)[next_radio_id_][pkt_offset]);
 
     pkt->frame_id_ = next_tx_frame_id_;
@@ -312,8 +312,9 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
   }
 
   (*dl_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
-  EventData msg(EventType::kPacketFromMac,
-                rx_mac_tag_t(next_radio_id_, next_tx_frame_id_).tag_);
+  EventData msg(
+      EventType::kPacketFromMac,
+      AgoraNetwork::rx_mac_tag_t(next_radio_id_, next_tx_frame_id_).tag_);
   RtAssert(tx_queue_->enqueue(msg),
            "MAC thread: Failed to enqueue uplink packet");
 

@@ -227,8 +227,8 @@ class Agora {
   FrameCounters precode_counters_;
   FrameCounters ifft_counters_;
   FrameCounters tx_counters_;
-  FrameCounters phy_to_mac_counter_;
-  FrameCounters mac_to_phy_counter_;
+  FrameCounters phy_to_mac_counters_;
+  FrameCounters mac_to_phy_counters_;
   FrameCounters rc_counters_;
   RxCounters rx_counters_;
   size_t zf_last_frame_ = SIZE_MAX;

@@ -37,19 +37,16 @@ struct MacPacket {
   }
 };
 
-using RxMacPacket = RxMemory<MacPacket>;
-
 // Event data tag for Mac RX events
 union rx_mac_tag_t {
-  RxMacPacket *rx_packet_;
+  struct {
+    size_t tid_ : 8;      // ID of the socket thread that received the packet
+    size_t offset_ : 56;  // Offset in the socket thread's RX buffer
+  };
   size_t tag_;
 
-  static_assert(sizeof(RxMacPacket *) >= sizeof(size_t),
-                "RxPacket pounter must fit inside a size_t value");
-
-  explicit rx_mac_tag_t(RxMacPacket &rx_packet) : rx_packet_(&rx_packet) {}
-  explicit rx_mac_tag_t(RxMacPacket *rx_packet) : rx_packet_(rx_packet) {}
-  explicit rx_mac_tag_t(size_t tag) : tag_(tag) {}
+  rx_mac_tag_t(size_t tid, size_t offset) : tid_(tid), offset_(offset) {}
+  explicit rx_mac_tag_t(size_t _tag) : tag_(_tag) {}
 };
 static_assert(sizeof(rx_mac_tag_t) == sizeof(size_t));
 

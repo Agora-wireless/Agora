@@ -313,7 +313,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
   for (size_t pkt_id = 0; pkt_id < cfg_->UlMacPacketsPerframe(); pkt_id++) {
     size_t pkt_offset = radio_buf_id * cfg_->UlMacBytesNumPerframe() +
                         pkt_id * cfg_->MacPacketLength();
-    auto* pkt = reinterpret_cast<MacPacket*>(
+    auto* pkt = reinterpret_cast<AgoraNetwork::MacPacket*>(
         &(*client_.ul_bits_buffer_)[next_radio_id_][pkt_offset]);
 
     pkt->frame_id_ = next_tx_frame_id_;
