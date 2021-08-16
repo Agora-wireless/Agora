@@ -5,6 +5,7 @@
 #include "mac_thread_basestation.h"
 
 #include "logger.h"
+#include "mac_packet.h"
 #include "utils_ldpc.h"
 
 static constexpr size_t kUdpRxBufferPadding = 2048u;
@@ -128,7 +129,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
 
   // Only non-pilot uplink symbols have application data.
   if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
-    auto* pkt = (struct MacPacket*)ul_data_ptr;
+    auto* pkt = (struct AgoraNetwork::MacPacket*)ul_data_ptr;
 
     // We send data to app irrespective of CRC condition
     // TODO: enable ARQ and ensure reliable data goes to app
@@ -270,20 +271,20 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
   for (size_t pkt_id = 0; pkt_id < cfg_->DlMacPacketsPerframe(); pkt_id++) {
     size_t pkt_offset = radio_buf_id * cfg_->DlMacBytesNumPerframe() +
                         pkt_id * cfg_->MacPacketLength();
-    auto* pkt = reinterpret_cast<MacPacket*>(
+    auto* pkt = reinterpret_cast<AgoraNetwork::MacPacket*>(
         &(*dl_bits_buffer_)[next_radio_id_][pkt_offset]);
 
     pkt->frame_id_ = next_tx_frame_id_;
     pkt->symbol_id_ = pkt_id;
     pkt->ue_id_ = next_radio_id_;
     pkt->datalen_ = cfg_->MacPayloadLength();
-    pkt->rsvd_[0] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-    pkt->rsvd_[1] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-    pkt->rsvd_[2] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
+    pkt->rsvd_[0u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
+    pkt->rsvd_[1u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
+    pkt->rsvd_[2u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
     pkt->crc_ = 0;
     pkt->rb_indicator_ = ri;
 
-    std::memcpy(pkt->data_, payload + pkt_id * cfg_->MacPayloadLength(),
+    std::memcpy(pkt->data_, payload + (pkt_id * cfg_->MacPayloadLength()),
                 cfg_->MacPayloadLength());
     // Insert CRC
     pkt->crc_ = (uint16_t)(crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
@@ -311,8 +312,9 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
   }
 
   (*dl_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
-  EventData msg(EventType::kPacketFromMac,
-                rx_mac_tag_t(next_radio_id_, next_tx_frame_id_).tag_);
+  EventData msg(
+      EventType::kPacketFromMac,
+      AgoraNetwork::rx_mac_tag_t(next_radio_id_, next_tx_frame_id_).tag_);
   RtAssert(tx_queue_->enqueue(msg),
            "MAC thread: Failed to enqueue uplink packet");
 

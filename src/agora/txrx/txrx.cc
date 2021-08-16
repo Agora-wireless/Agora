@@ -230,7 +230,7 @@ struct Packet* PacketTXRX::RecvEnqueue(size_t tid, size_t radio_id,
                                        size_t rx_slot) {
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
   size_t packet_length = cfg_->PacketLength();
-  RxPacket& rx = rx_packets_.at(tid).at(rx_slot);
+  AgoraNetwork::RxPacket& rx = rx_packets_.at(tid).at(rx_slot);
 
   // if rx_buffer is full, exit
   if (rx.Empty() == false) {
@@ -267,8 +267,8 @@ struct Packet* PacketTXRX::RecvEnqueue(size_t tid, size_t radio_id,
     }
 
     // Push kPacketRX event into the queue.
-    rx.Use();
-    EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
+    rx.Alloc();
+    EventData rx_message(EventType::kPacketRX, AgoraNetwork::rx_tag_t(rx).tag_);
     if (message_queue_->enqueue(*local_ptok, rx_message) == false) {
       MLPD_ERROR("socket message enqueue failed\n");
       throw std::runtime_error("PacketTXRX: socket message enqueue failed");

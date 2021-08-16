@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "mac_packet.h"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "phy_stats.h"
 #include "scrambler.h"
@@ -133,7 +134,8 @@ PhyUe::PhyUe(Config* config)
   rx_downlink_deferral_.resize(kFrameWnd);
 
   //Mac counters for downlink data
-  tomac_counters_.Init(config_->Frame().NumDlDataSyms(), config_->UeAntNum());
+  phy_to_mac_counters_.Init(config_->Frame().NumDlDataSyms(),
+                            config_->UeAntNum());
 }
 
 PhyUe::~PhyUe() {
@@ -299,7 +301,8 @@ void PhyUe::Start() {
 
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          RxPacket* rx = rx_tag_t(event.tags_[0]).rx_packet_;
+          AgoraNetwork::RxPacket* rx =
+              AgoraNetwork::rx_tag_t(event.tags_[0]).rx_packet_;
           Packet* pkt = rx->RawPacket();
 
           size_t frame_id = pkt->frame_id_;
@@ -521,13 +524,13 @@ void PhyUe::Start() {
                 frame_id, symbol_id, dl_symbol_idx);
           }
           bool last_tomac_task =
-              this->tomac_counters_.CompleteTask(frame_id, dl_symbol_idx);
+              this->phy_to_mac_counters_.CompleteTask(frame_id, dl_symbol_idx);
 
           if (last_tomac_task == true) {
             PrintPerSymbolDone(PrintType::kPacketToMac, frame_id, symbol_id);
 
             bool last_tomac_symbol =
-                this->tomac_counters_.CompleteSymbol(frame_id);
+                this->phy_to_mac_counters_.CompleteSymbol(frame_id);
 
             if (last_tomac_symbol == true) {
               PrintPerFrameDone(PrintType::kPacketToMac, frame_id);
@@ -548,11 +551,12 @@ void PhyUe::Start() {
 
         case EventType::kPacketFromMac: {
           // This is an entrie frame (multiple mac packets)
-          size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
-          size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
+          size_t ue_id = AgoraNetwork::rx_mac_tag_t(event.tags_[0]).tid_;
+          size_t radio_buf_id =
+              AgoraNetwork::rx_mac_tag_t(event.tags_[0]).offset_;
           RtAssert(radio_buf_id == expected_frame_id_from_mac_ % kFrameWnd);
 
-          auto* pkt = reinterpret_cast<MacPacket*>(
+          auto* pkt = reinterpret_cast<AgoraNetwork::MacPacket*>(
               &ul_bits_buffer_[ue_id][radio_buf_id *
                                       config_->UlMacBytesNumPerframe()]);
           RtAssert(pkt->frame_id_ == expected_frame_id_from_mac_,
@@ -582,7 +586,7 @@ void PhyUe::Start() {
                    << ", ";
               }
               ss << std::endl;
-              pkt = reinterpret_cast<MacPacket*>(
+              pkt = reinterpret_cast<AgoraNetwork::MacPacket*>(
                   reinterpret_cast<uint8_t*>(pkt) + config_->MacPacketLength());
             }
             std::printf("%s\n", ss.str().c_str());
@@ -715,6 +719,7 @@ void PhyUe::Start() {
           RtAssert(frame_id == next_frame_processed_[ue_id],
                    "PhyUe: Unexpected frame was transmitted!");
 
+          //Free the uplink memory
           ul_bits_buffer_status_[ue_id]
                                 [next_frame_processed_[ue_id] % kFrameWnd] = 0;
           next_frame_processed_[ue_id]++;
@@ -923,6 +928,12 @@ void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
                     frame_id, symbol_id, ant);
         break;
 
+      case (PrintType::kPacketFromMac):
+        std::printf(
+            "PhyUe [frame %zu symbol %zu ant %zu]: Rx packet from mac\n",
+            frame_id, symbol_id, ant);
+        break;
+
       default:
         std::printf("Wrong task type in task done print!");
     }
@@ -1003,7 +1014,7 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             "%zu symbols done\n",
             frame_id, symbol_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
-            tomac_counters_.GetSymbolCount(frame_id) + 1);
+            phy_to_mac_counters_.GetSymbolCount(frame_id) + 1);
         break;
 
       default:
@@ -1087,6 +1098,12 @@ void PhyUe::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
       case (PrintType::kPacketToMac):
         std::printf(
             "PhyUe [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
+        break;
+
+      case (PrintType::kPacketFromMac):
+        std::printf(
+            "PhyUe [frame %zu + %.2f ms]: Completed MAC RX \n", frame_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
         break;
 

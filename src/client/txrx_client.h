@@ -14,6 +14,7 @@
 
 #include "client_radio.h"
 #include "concurrentqueue.h"
+#include "rx_memory.h"
 #include "udp_client.h"
 #include "udp_server.h"
 #include "utils.h"
@@ -148,7 +149,7 @@ class RadioTxRx {
 
   // Dimension 1: socket_thread
   // Dimension 2: rx_packet
-  std::vector<std::vector<RxPacket>> rx_packets_;
+  std::vector<std::vector<AgoraNetwork::RxPacket>> rx_packets_;
   size_t buffers_per_thread_;
 
   char* tx_buffer_;

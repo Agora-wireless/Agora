@@ -68,7 +68,7 @@ int main() {
 }
 #endif
 
-void DoCRC::AddCrc24(struct MacPacket* p) {
+void DoCRC::AddCrc24(struct AgoraNetwork::MacPacket* p) {
   /* Init
    * TODO: Size of CRC should depend on Transport Block length and should
    * consider both header and data, not just data

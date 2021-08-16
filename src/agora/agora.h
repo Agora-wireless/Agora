@@ -29,6 +29,7 @@
 #include "mac_thread_basestation.h"
 #include "memory_manage.h"
 #include "phy_stats.h"
+#include "rx_memory.h"
 #include "signal_handler.h"
 #include "stats.h"
 #include "txrx.h"
@@ -226,7 +227,7 @@ class Agora {
   FrameCounters precode_counters_;
   FrameCounters ifft_counters_;
   FrameCounters tx_counters_;
-  FrameCounters tomac_counters_;
+  FrameCounters phy_to_mac_counters_;
   FrameCounters mac_to_phy_counters_;
   FrameCounters rc_counters_;
   RxCounters rx_counters_;
@@ -254,7 +255,7 @@ class Agora {
 
   // Per-frame queues of delayed FFT tasks. The queue contains offsets into
   // TX/RX buffers.
-  std::array<std::queue<fft_req_tag_t>, kFrameWnd> fft_queue_arr_;
+  std::array<std::queue<AgoraNetwork::fft_req_tag_t>, kFrameWnd> fft_queue_arr_;
 
   // Data for IFFT
   // 1st dimension: kFrameWnd * number of antennas * number of

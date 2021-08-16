@@ -185,7 +185,18 @@ struct Packet {
   }
 };
 
-class RxPacket : public Recorder::RecorderPacket {
+namespace AgoraNetwork {
+namespace MemoryAPI {
+class Memory {
+ public:
+  virtual unsigned Alloc() = 0;
+  virtual unsigned Free() = 0;
+  virtual bool Empty() const = 0;
+};  // class Memory
+}  // namespace MemoryAPI
+}  // namespace AgoraNetwork
+
+lass RxPacket : public Recorder::RecorderPacket {
  private:
   std::atomic<unsigned> references_;
   Packet *packet_;
@@ -243,59 +254,6 @@ class RxPacket : public Recorder::RecorderPacket {
   }
 };
 
-// Event data tag for RX events
-union rx_tag_t {
-  RxPacket *rx_packet_;
-  size_t tag_;
-
-  static_assert(sizeof(RxPacket *) >= sizeof(size_t),
-                "RxPacket pounter must fit inside a size_t value");
-
-  explicit rx_tag_t(RxPacket &rx_packet) : rx_packet_(&rx_packet) {}
-  explicit rx_tag_t(RxPacket *rx_packet) : rx_packet_(rx_packet) {}
-  explicit rx_tag_t(size_t tag) : tag_(tag) {}
-};
-static_assert(sizeof(rx_tag_t) == sizeof(size_t));
-
-// Event data tag for FFT task requests
-using fft_req_tag_t = rx_tag_t;
-
-struct MacPacket {
-  // The packet's data starts at kOffsetOfData bytes from the start
-  static constexpr size_t kOffsetOfData = 16 + sizeof(RBIndicator);
-
-  uint16_t frame_id_;
-  uint16_t symbol_id_;
-  uint16_t ue_id_;
-  uint16_t datalen_;  // length of payload in bytes or array data[]
-  uint16_t crc_;      // 16 bits CRC over calculated for the data[] array
-  uint16_t rsvd_[3];  // reserved for future use
-  RBIndicator rb_indicator_;  // RAN scheduling details for PHY
-  char data_[];               // Mac packet payload data
-  MacPacket(int f, int s, int u, int d,
-            int cc)  // TODO: Should be unsigned integers
-      : frame_id_(f), symbol_id_(s), ue_id_(u), datalen_(d), crc_(cc) {}
-
-  std::string ToString() const {
-    std::ostringstream ret;
-    ret << "[Frame seq num " << frame_id_ << ", symbol ID " << symbol_id_
-        << ", user ID " << ue_id_ << "]";
-    return ret.str();
-  }
-};
-
-// Event data tag for Mac RX events
-union rx_mac_tag_t {
-  struct {
-    size_t tid_ : 8;      // ID of the socket thread that received the packet
-    size_t offset_ : 56;  // Offset in the socket thread's RX buffer
-  };
-  size_t tag_;
-
-  rx_mac_tag_t(size_t tid, size_t offset) : tid_(tid), offset_(offset) {}
-  explicit rx_mac_tag_t(size_t _tag) : tag_(_tag) {}
-};
-static_assert(sizeof(rx_mac_tag_t) == sizeof(size_t));
 
 class RxCounters {
  public:

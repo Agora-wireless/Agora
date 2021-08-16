@@ -53,7 +53,7 @@ std::vector<struct Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid,
   std::vector<void*> samp(cfg_->NumChannels());
 
   for (size_t ch = 0; ch < cfg_->NumChannels(); ++ch) {
-    RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
+    AgoraNetwork::RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
 
     // if rx_buffer is full, exit
     if (rx.Empty() == false) {
@@ -86,7 +86,7 @@ std::vector<struct Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid,
       ant_ids.resize(cfg_->AntPerGroup());
     }
     for (size_t s = 1; s < cfg_->AntPerGroup(); s++) {
-      RxPacket& rx = rx_packets_.at(tid).at(rx_slot + s);
+      AgoraNetwork::RxPacket& rx = rx_packets_.at(tid).at(rx_slot + s);
 
       std::vector<void*> tmp_samp(cfg_->NumChannels());
       std::vector<char> dummy_buff(packet_length);
@@ -104,14 +104,14 @@ std::vector<struct Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid,
 
   std::vector<struct Packet*> pkt;
   for (size_t ch = 0; ch < symbol_ids.size(); ++ch) {
-    RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
+    AgoraNetwork::RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
     pkt.push_back(rx.RawPacket());
     new (rx.RawPacket())
         Packet(frame_id, symbol_ids.at(ch), 0 /* cell_id */, ant_ids.at(ch));
 
-    rx.Use();
+    rx.Alloc();
     // Push kPacketRX event into the queue.
-    EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
+    EventData rx_message(EventType::kPacketRX, AgoraNetwork::rx_tag_t(rx).tag_);
 
     if (message_queue_->enqueue(*local_ptok, rx_message) == false) {
       std::printf("socket message enqueue failed\n");

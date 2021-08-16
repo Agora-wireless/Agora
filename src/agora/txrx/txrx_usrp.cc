@@ -126,7 +126,7 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(size_t tid, size_t radio_id,
   size_t n_channels = cfg_->NumChannels();
   std::vector<void*> samp(n_channels);
   for (size_t ch = 0; ch < n_channels; ++ch) {
-    RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
+    AgoraNetwork::RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
     // if rx_buffer is full, exit
     if (rx.Empty() == false) {
       std::printf("Receive thread %zu rx_buffer full, offset: %zu\n", tid,
@@ -155,11 +155,12 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(size_t tid, size_t radio_id,
   if (cfg_->IsPilot(frame_id, symbol_id) ||
       cfg_->IsUplink(frame_id, symbol_id)) {
     for (size_t ch = 0; ch < n_channels; ++ch) {
-      RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
+      AgoraNetwork::RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
       new (rx.RawPacket()) Packet(frame_id, symbol_id, 0, ant_id + ch);
-      rx.Use();
+      rx.Alloc();
       // Push kPacketRX event into the queue
-      EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
+      EventData rx_message(EventType::kPacketRX,
+                           AgoraNetwork::rx_tag_t(rx).tag_);
 
       if (message_queue_->enqueue(*local_ptok, rx_message) == false) {
         std::printf("socket message enqueue failed\n");
