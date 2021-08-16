@@ -8,17 +8,18 @@
 */
 
 #include "recorder_thread.h"
-#include "logger.h"
-#include "utils.h"
+
 #include "H5Cpp.h"
+#include "logger.h"
+#include "rx_memory.h"
+#include "utils.h"
 
 namespace Recorder {
-RecorderThread::RecorderThread(Config* in_cfg,
-                                std::vector<std::unique_ptr<RecorderWorkerFactory>> &factories,
-                                H5::H5File *h5_file,
-                                size_t thread_id, int core,
-                                size_t queue_size, size_t antenna_offset,
-                                size_t num_antennas, bool wait_signal)
+RecorderThread::RecorderThread(
+    Config *in_cfg,
+    std::vector<std::unique_ptr<RecorderWorkerFactory>> &factories,
+    H5::H5File *h5_file, size_t thread_id, int core, size_t queue_size,
+    size_t antenna_offset, size_t num_antennas, bool wait_signal)
     : event_queue_(queue_size),
       producer_token_(event_queue_),
       thread_(),
@@ -29,11 +30,13 @@ RecorderThread::RecorderThread(Config* in_cfg,
       num_antennas_(num_antennas) {
   packet_length_ = in_cfg->PacketLength();
 
-  for(auto &rec_fact: factories) {
-    std::unique_ptr<RecorderWorker> worker = rec_fact->GenWorker(in_cfg, h5_file);
+  for (auto &rec_fact : factories) {
+    std::unique_ptr<RecorderWorker> worker =
+        rec_fact->GenWorker(in_cfg, h5_file);
     EventType event_type = worker->GetEventType();
-    worker_mapping_.insert(std::pair<EventType, std::unique_ptr<RecorderWorker>>
-                          (event_type, std::move(worker)));
+    worker_mapping_.insert(
+        std::pair<EventType, std::unique_ptr<RecorderWorker>>(
+            event_type, std::move(worker)));
   }
 
   running_.store(true);
@@ -55,7 +58,7 @@ RecorderThread::~RecorderThread() {
 
 /* TODO:  handle producer token better */
 // Returns true for success, false otherwise
-bool RecorderThread::DispatchWork(const EventData& event) {
+bool RecorderThread::DispatchWork(const EventData &event) {
   // MLPD_TRACE("Dispatching work\n");
   bool ret = true;
   if (event_queue_.try_enqueue(producer_token_, event) == 0) {
@@ -67,7 +70,7 @@ bool RecorderThread::DispatchWork(const EventData& event) {
     }
   }
 
-  if(this->wait_signal_ == true) {
+  if (this->wait_signal_ == true) {
     std::lock_guard guard(sync_);
     this->condition_.notify_all();
   }
@@ -88,7 +91,7 @@ void RecorderThread::DoRecording() {
     ret = event_queue_.try_dequeue(ctok, event);
 
     if (ret == false) /* Queue empty */ {
-      if(wait_signal_ == true) {
+      if (wait_signal_ == true) {
         std::unique_lock<std::mutex> thread_wait(sync_);
         // Wait until a new message exists.
         // TODO: should eliminate the CPU polling
@@ -106,15 +109,15 @@ void RecorderThread::DoRecording() {
   }
 }
 
-void RecorderThread::HandleEvent(const EventData& event) {
+void RecorderThread::HandleEvent(const EventData &event) {
   auto itr = worker_mapping_.find(event.event_type_);
-  if(itr == worker_mapping_.end()) {
+  if (itr == worker_mapping_.end()) {
     running_.store(false);
   } else {
-    itr->second->Record(
-        static_cast<void *>(rx_tag_t(event.tags_[0]).rx_packet_->RawPacket()));
+    itr->second->Record(static_cast<void *>(
+        AgoraNetwork::rx_tag_t(event.tags_[0]).rx_packet_->RawPacket()));
 
-    rx_tag_t(event.tags_[0]).rx_packet_->Free();
+    AgoraNetwork::rx_tag_t(event.tags_[0]).rx_packet_->Free();
   }
 }
 };  // End namespace Recorder

@@ -3,7 +3,9 @@
  * @brief Record received frames from massive-mimo base station in HDF5 format
  */
 #include "recorder.h"
+
 #include "logger.h"
+#include "recorder/recorder_packet.h"
 #include "signal_handler.h"
 #include "symbols.h"
 
@@ -15,19 +17,20 @@ const int Recorder::KDequeueBulkSize = 5;
 
 static const int kQueueSize = 36;
 
-Recorder::Recorder(Config *in_cfg, unsigned int core_start, size_t num_writer_threads):
-  kMainDispatchCore(core_start),
-  kRecorderCore(kMainDispatchCore + 1),
-  kRecvCore(kRecorderCore + 1),
-  num_writer_threads_(num_writer_threads) {
-  if(in_cfg == nullptr) {
+Recorder::Recorder(Config *in_cfg, unsigned int core_start,
+                   size_t num_writer_threads)
+    : kMainDispatchCore(core_start),
+      kRecorderCore(kMainDispatchCore + 1),
+      kRecvCore(kRecorderCore + 1),
+      num_writer_threads_(num_writer_threads) {
+  if (in_cfg == nullptr) {
     throw std::runtime_error("Cannot initialize with null config!");
   }
   cfg_ = in_cfg;
 
   H5std_string file_name_ = cfg_->TraceFile();
   if (InitHDF5(file_name_) < 0) {
-      throw std::runtime_error("Could not init the output file");
+    throw std::runtime_error("Could not init the output file");
   }
 
   UpdateAntennaMapping(num_writer_threads);
@@ -50,7 +53,7 @@ herr_t Recorder::InitHDF5(H5std_string file_name) {
     /* Open HDF5 file and create a root group */
     h5_file_ = std::make_unique<H5::H5File>(file_name, H5F_ACC_TRUNC);
     h5_file_->createGroup(dataset_root_prefix);
-  } catch(H5::FileIException &error) {
+  } catch (H5::FileIException &error) {
     error.printErrorStack();
     ret = -1;
   }
@@ -84,11 +87,13 @@ size_t Recorder::RouteToThread(size_t tag) {
   return thread_index;
 }
 
-void Recorder::DoIt(std::vector<std::unique_ptr<RecorderWorkerFactory>> &factories) {
+void Recorder::DoIt(
+    std::vector<std::unique_ptr<RecorderWorkerFactory>> &factories) {
   GetInstance().DoItInternal(factories);
 }
 
-void Recorder::DoItInternal(std::vector<std::unique_ptr<RecorderWorkerFactory>> &factories) {
+void Recorder::DoItInternal(
+    std::vector<std::unique_ptr<RecorderWorkerFactory>> &factories) {
   if (num_writer_threads_ > 0) {
     for (unsigned int i = 0u; i < num_writer_threads_; i++) {
       int thread_core = kRecorderCore + i;
@@ -104,8 +109,7 @@ void Recorder::DoItInternal(std::vector<std::unique_ptr<RecorderWorkerFactory>> 
 void Recorder::RecordInternal(size_t tag) {
   size_t thread_index = RouteToThread(tag);
   EventData event(recorder_tag_t(tag).recorder_packet_->GetEventType(), tag);
-  if (recorders_.at(thread_index)->DispatchWork(event) ==
-      false) {
+  if (recorders_.at(thread_index)->DispatchWork(event) == false) {
     MLPD_ERROR("Record task enqueue failed\n");
     throw std::runtime_error("Record task enqueue failed");
   }

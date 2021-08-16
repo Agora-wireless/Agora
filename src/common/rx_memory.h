@@ -32,6 +32,7 @@ class RxMemory : public MemoryAPI::Memory {
     }
   }
 
+  inline PacketType const *RawPacket() const { return packet_; }
   inline PacketType *RawPacket() { return packet_; }
 
   //Public API implementation
