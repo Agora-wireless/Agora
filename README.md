@@ -63,19 +63,7 @@ Some highlights:
        * **NOTE**: To enable JIT acceleration applied for matrix multiplication in the code, MKL version after 2019 update 3 is required.
 
     * Optional: DPDK
-       * [DPDK](http://core.dpdk.org/download/) version 20.02.1 and 20.11.1 has been tested with
-        Intel 40 GbE and Mellanox 100 GbE NICs in Agora.
-       * It is required you enable hugepage support and run agora under sudo permissions (LD_LIBRARY_PATH=${LD_LIBRARY_PATH}).
-       * Mellanox dpdk support depends on libibverbs / libmlx5 / ibverbs-utils 
-       * To install version 20.02.1 of dpdk, run `sudo make install T=x86_64-native-linuxapp-gcc
-        DESTDIR=/usr -j` (CONFIG_RTE_LIBRTE_MLX5_PMD=y in config/common_base to enabled MLX5 poll mode driver)
-       * To install version 20.11.1 
-        <pre>
-        $ meson build && cd build && ninja
-        $ sudo ninja install
-        $ sudo ldconfig
-        </pre>
-        the MLX poll mode driver will be autodetected and installed if required
+       * Refer to DPDK_README.md for additional configuration and installation support.
 
 ## Building and running with emulated RRU
 We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator.
@@ -118,11 +106,6 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
    <pre>
    $ cmake -DUSE_DPDK=1 ..; make -j
    </pre>
-   to rebuild code for Mellanox NICs; for Intel NICs, run
-   <pre>
-   $ cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j
-   </pre>
-   to exclude Mellanox libraries in the build.
    When running the emulated RRU with DPDK, it is required to set the MAC address of the NIC used by Agora. To do this, pass `--server_mac_addr=` to `sender`.
    * To test the real-time performance of Agora, see the [Running performance test](#running-performance-test) section below.
 
@@ -236,7 +219,7 @@ If you do not have a powerful server or high throughput NICs,
 we recommend increasing the value of `--frame_duration` when you run `./build/sender`, 
 which will increase frame duration and reduce throughput.
 
-To process 64x16 MU-MIMO in real-time, we use both ports of 40 GbE Intel XL710 NIC with DPDK
+To process 64x16 MU-MIMO in real-time, we use both ports of 40 GbE Intel XL710 NIC with DPDK (See DPDK_README.md)
 to get enough throughput for the traffic of 64 antennas. 
 (**NOTE**: For 100 GbE NIC, we just need to use one port to get enough thoughput.)
 
@@ -262,8 +245,7 @@ To reduce performance variations, we did the following configurations for the se
     where the IRQ indices are machine dependent.
     
 The steps to collect and analyze timestamp traces are as follows:
-  * For Intel NICs, recompile code with `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j`; 
-  For Mellenox NICs, recompile code with `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=1 ..; make -j`.
+  * Enable DPDK in Agora.  Make sure it is compiled / configured for supporting your specific hardware NICs
   * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments. 
     In our [paper](#documentation), we change “antenna_num”,  “ue_num” and “symbol_num_perframe” 
     to different values to collect different data points in the figures. 
