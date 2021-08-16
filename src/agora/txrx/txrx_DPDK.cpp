@@ -32,7 +32,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     encode_ue_to_send_ = cfg->ue_start;
 
     const uint16_t port_id = 0; // The DPDK port ID
-    if (DpdkTransport::nic_init(port_id, mbuf_pool_, fft_socket_thread_num + socket_thread_num + 1, 1) != 0)
+    if (DpdkTransport::nic_init(port_id, mbuf_pool_, fft_socket_thread_num + socket_thread_num + 1, 1 + fft_socket_thread_num) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
 
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr_);
@@ -804,7 +804,7 @@ void* PacketTXRX::fft_thread(int tid)
                         rx_status_->fft_data_receive(fft_frame_to_send_, fft_symbol_to_send_);
                     } else {
                         struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-                        tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[target_server_idx],
+                        tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[target_server_idx],
                             bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[target_server_idx], cfg->fft_tx_port + ant_id, cfg->fft_rx_port + ant_id, 
                             Packet::kOffsetOfData + cfg->get_num_sc_per_server() * sizeof(short) * 2);
                         struct rte_ether_hdr* eth_hdr
@@ -823,7 +823,7 @@ void* PacketTXRX::fft_thread(int tid)
                             cfg->get_num_sc_per_server() * sizeof(short) * 2);
 
                         // Send data (one OFDM symbol)
-                        size_t nb_tx_new = rte_eth_tx_burst(0, 0, tx_bufs, 1);
+                        size_t nb_tx_new = rte_eth_tx_burst(0, 1 + fft_thread_tid, tx_bufs, 1);
                         if (unlikely(nb_tx_new != 1)) {
                             printf("FFT thread rte_eth_tx_burst() failed\n");
                             exit(0);
