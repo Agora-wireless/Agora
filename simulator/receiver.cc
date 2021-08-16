@@ -56,7 +56,7 @@ void* Receiver::LoopRecv(size_t tid) {
   double* frame_start = (*frame_start_)[tid];
 
   size_t rx_slot = 0;
-  RxPacket* current_packet = &rx_packets_.at(tid).at(rx_slot);
+  AgoraNetwork::RxPacket* current_packet = &rx_packets_.at(tid).at(rx_slot);
 
   ssize_t prev_frame_id = -1;
   while (this->cfg_->Running() == true) {
@@ -90,10 +90,10 @@ void* Receiver::LoopRecv(size_t tid) {
         }
       }
 
-      current_packet->Use();
+      current_packet->Alloc();
       // Push packet received event into the queue
       EventData packet_message(EventType::kPacketRX,
-                               rx_tag_t(current_packet).tag_);
+                               AgoraNetwork::rx_tag_t(current_packet).tag_);
 
       if (message_queue_->enqueue(*local_ptok, packet_message) == false) {
         std::printf("socket message enqueue failed\n");

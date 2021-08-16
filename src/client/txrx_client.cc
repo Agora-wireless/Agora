@@ -97,7 +97,7 @@ struct Packet* RadioTxRx::RecvEnqueue(size_t tid, size_t radio_id,
                                       size_t rx_slot) {
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
   size_t packet_length = config_->PacketLength();
-  RxPacket& rx = rx_packets_.at(tid).at(rx_slot);
+  AgoraNetwork::RxPacket& rx = rx_packets_.at(tid).at(rx_slot);
 
   // if rx_buffer is full, exit
   if (rx.Empty() == false) {
@@ -118,8 +118,8 @@ struct Packet* RadioTxRx::RecvEnqueue(size_t tid, size_t radio_id,
     throw std::runtime_error("RadioTxRx: receive failed");
   } else if (static_cast<size_t>(rx_bytes) == packet_length) {
     // Push kPacketRX event into the queue.
-    rx.Use();
-    EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
+    rx.Alloc();
+    EventData rx_message(EventType::kPacketRX, AgoraNetwork::rx_tag_t(rx).tag_);
     if (message_queue_->enqueue(*local_ptok, rx_message) == false) {
       std::printf("socket message enqueue failed\n");
       throw std::runtime_error("RadioTxRx: socket message enqueue failed");
@@ -361,7 +361,7 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
 
   std::vector<void*> samp(c->NumChannels());
   for (size_t ch = 0; ch < c->NumChannels(); ++ch) {
-    RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
+    AgoraNetwork::RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
     if (rx.Empty() == false) {
       std::printf("RX thread %zu at rx_offset %zu buffer full\n", tid, rx_slot);
       c->Running(false);
@@ -400,12 +400,12 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
   }
   size_t ant_id = radio_id * c->NumChannels();
   for (size_t ch = 0; ch < c->NumChannels(); ++ch) {
-    RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
+    AgoraNetwork::RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
     new (rx.RawPacket())
         Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
 
-    rx.Use();
-    EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
+    rx.Alloc();
+    EventData rx_message(EventType::kPacketRX, AgoraNetwork::rx_tag_t(rx).tag_);
 
     RtAssert(message_queue_->enqueue(*local_ptok, rx_message),
              "socket message enqueue failed");

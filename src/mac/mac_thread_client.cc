@@ -5,6 +5,7 @@
 #include "mac_thread_client.h"
 
 #include "logger.h"
+#include "mac_packet.h"
 #include "utils_ldpc.h"
 
 static constexpr size_t kUdpRxBufferPadding = 2048u;
@@ -135,7 +136,8 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
 
   // Only non-pilot downlink symbols have application data.
   if (symbol_idx_dl >= cfg_->Frame().ClientDlPilotSymbols()) {
-    auto* pkt = reinterpret_cast<struct MacPacket const*>(dl_data_ptr);
+    auto* pkt =
+        reinterpret_cast<struct AgoraNetwork::MacPacket const*>(dl_data_ptr);
 
     // We send data to app irrespective of CRC condition
     // TODO: enable ARQ and ensure reliable data goes to app
@@ -275,7 +277,8 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
       "MacThreadClient:ProcessUdpPacketsFromApps incorrect number of bytes "
       "received.");
 
-  const auto* pkt = reinterpret_cast<MacPacket*>(&udp_pkt_buf_[0]);
+  const auto* pkt =
+      reinterpret_cast<AgoraNetwork::MacPacket*>(&udp_pkt_buf_[0]);
   ProcessUdpPacketsFromAppsClient((char*)pkt, ri);
 }
 
@@ -296,7 +299,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
   if (kLogMacPackets) {
     std::stringstream ss;
     std::fprintf(log_file_,
-                 "User MAC thread: Received data from app for frame %zu, ue "
+                 "MacThreadClient: Received data from app for frame %zu, ue "
                  "%zu, size %zu:\n",
                  next_tx_frame_id_, next_radio_id_,
                  cfg_->UlMacDataBytesNumPerframe());
@@ -317,13 +320,13 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
     pkt->symbol_id_ = pkt_id;
     pkt->ue_id_ = next_radio_id_;
     pkt->datalen_ = cfg_->MacPayloadLength();
-    pkt->rsvd_[0] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-    pkt->rsvd_[1] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-    pkt->rsvd_[2] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
+    pkt->rsvd_[0u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
+    pkt->rsvd_[1u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
+    pkt->rsvd_[2u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
     pkt->crc_ = 0;
     pkt->rb_indicator_ = ri;
 
-    std::memcpy(pkt->data_, payload + pkt_id * cfg_->MacPayloadLength(),
+    std::memcpy(pkt->data_, payload + (pkt_id * cfg_->MacPayloadLength()),
                 cfg_->MacPayloadLength());
     // Insert CRC
     pkt->crc_ = (uint16_t)(crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
@@ -333,8 +336,8 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
     if (kLogMacPackets) {
       std::stringstream ss;
       std::printf(
-          "User MAC thread created packet frame %zu, pkt %zu, size %zu, copied "
-          "to location %zu\n",
+          "User MAC thread created packet frame %zu, pkt %zu, size %zu, "
+          "copied to location %zu\n",
           next_tx_frame_id_, pkt_id, cfg_->MacPayloadLength(), (size_t)pkt);
 
       ss << "Header Info:\n"
@@ -352,9 +355,9 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
 
   (*client_.ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
   EventData msg(EventType::kPacketFromMac,
-                rx_mac_tag_t(next_radio_id_, radio_buf_id).tag_);
+                AgoraNetwork::rx_mac_tag_t(next_radio_id_, radio_buf_id).tag_);
   RtAssert(tx_queue_->enqueue(msg),
-           "MAC thread: Failed to enqueue uplink packet");
+           "MacThreadClient: Failed to enqueue uplink packet");
 
   radio_buf_id = (radio_buf_id + 1) % kFrameWnd;
   next_radio_id_ = (next_radio_id_ + 1) % cfg_->UeAntNum();
@@ -364,7 +367,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
 }
 
 void MacThreadClient::RunEventLoop() {
-  MLPD_INFO("Running MAC thread event loop, logging to file %s\n",
+  MLPD_INFO("Running MacThreadClient event loop, logging to file %s\n",
             log_filename_.c_str());
   PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_,
                       0 /* thread ID */);

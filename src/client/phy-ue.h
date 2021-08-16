@@ -108,7 +108,6 @@ class PhyUe {
   // The frame ID of the next MAC packet we expect to receive from the MAC
   // thread
   size_t expected_frame_id_from_mac_ = 0;
-  size_t current_frame_user_num_ = 0;
 
   // next_processed_frame_[i] is the next frame index on the uplink
   // to be processed and transmitted by the PHY for UE #i
@@ -227,7 +226,8 @@ class PhyUe {
   FrameCounters modulation_counters_;
   FrameCounters ifft_counters_;
 
-  FrameCounters tomac_counters_;
+  FrameCounters phy_to_mac_counter_;
+  FrameCounters mac_to_phy_counter_;
 
   size_t max_equaled_frame_ = 0;
 };

@@ -21,6 +21,7 @@
 #include "concurrentqueue.h"
 #include "config.h"
 #include "gettime.h"
+#include "rx_memory.h"
 #include "symbols.h"
 
 using ushort = unsigned short;
@@ -60,7 +61,7 @@ class Receiver {
  private:
   // Dimension 1: socket_thread
   // Dimension 2: rx_packet
-  std::vector<std::vector<RxPacket>> rx_packets_;
+  std::vector<std::vector<AgoraNetwork::RxPacket>> rx_packets_;
   size_t buffers_per_thread_;
 
   size_t rx_thread_num_;

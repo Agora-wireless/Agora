@@ -9,6 +9,7 @@
 #include "datatype_conversion.h"
 #include "file_receiver.h"
 #include "logger.h"
+#include "mac_packet.h"
 #include "udp_client.h"
 #include "video_receiver.h"
 
@@ -80,18 +81,19 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
   ticks_wnd2_ = ticks_all_ * 15;
 
   // tx buffers will be an array of MacPackets
-  tx_buffers_.Malloc(kFrameWnd * cfg_->UeAntNum(),
-                     (packets_per_frame_ *
-                      (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
-                     Agora_memory::Alignment_t::kAlign64);
+  tx_buffers_.Malloc(
+      kFrameWnd * cfg_->UeAntNum(),
+      (packets_per_frame_ *
+       (cfg_->MacPacketLength() + AgoraNetwork::MacPacket::kOffsetOfData)),
+      Agora_memory::Alignment_t::kAlign64);
   MLPD_TRACE(
       "Tx buffer size: dim1 %zu, dim2 %zu, total %zu, start %zu, end: %zu\n",
       (kFrameWnd * cfg_->UeAntNum()),
       (packets_per_frame_ *
-       (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
+       (cfg_->MacPacketLength() + AgoraNetwork::MacPacket::kOffsetOfData)),
       (kFrameWnd * cfg_->UeAntNum()) *
           (packets_per_frame_ *
-           (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
+           (cfg_->MacPacketLength() + AgoraNetwork::MacPacket::kOffsetOfData)),
       (size_t)tx_buffers_[0],
       (size_t)tx_buffers_[(kFrameWnd * cfg_->UeAntNum()) - 1]);
 
@@ -255,7 +257,7 @@ void* MacSender::MasterThread(size_t /*unused*/) {
   return nullptr;
 }
 
-/* Worker will send 1 MacPacket data size to the radio)
+/* Worker will send 1 AgoraNetwork::MacPacket data size to the radio)
  * since we are using UDP between the antennas and in the multiple antenna case
  * the packet data could get mixed at the mac_thread receiver
  */
@@ -306,14 +308,15 @@ void* MacSender::WorkerThread(size_t tid) {
         // Mac Thread is currently looking for packets_per_frame_ bytes
         // since we read in mac packets, we need to skip over the headers
         for (size_t packet = 0; packet < packets_per_frame_; packet++) {
-          auto* tx_packet = reinterpret_cast<MacPacket*>(mac_packet_location);
+          auto* tx_packet =
+              reinterpret_cast<AgoraNetwork::MacPacket*>(mac_packet_location);
           // TODO: Port + ue_radio?
           udp_client.Send(server_address_, server_rx_port_,
                           reinterpret_cast<uint8_t*>(&tx_packet->data_[0u]),
                           cfg_->MacPayloadLength());
           mac_packet_location =
-              mac_packet_location +
-              (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
+              mac_packet_location + (cfg_->MacPacketLength() +
+                                     AgoraNetwork::MacPacket::kOffsetOfData);
         }
 
         if (kDebugSenderReceiver) {
@@ -427,7 +430,7 @@ void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
   uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
 
   for (size_t i = 0; i < packets_per_frame_; i++) {
-    auto* pkt = reinterpret_cast<MacPacket*>(mac_packet_location);
+    auto* pkt = reinterpret_cast<AgoraNetwork::MacPacket*>(mac_packet_location);
     pkt->frame_id_ = tag.frame_id_;
     pkt->symbol_id_ = get_data_symbol_id_(i);
     pkt->ue_id_ = tag.ue_id_;
@@ -441,8 +444,9 @@ void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
           tag.frame_id_, tag.ant_id_);
     }
     // TODO MacPacketLength should be the size of the mac packet but is not.
-    mac_packet_location = mac_packet_location +
-                          (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
+    mac_packet_location =
+        mac_packet_location +
+        (cfg_->MacPacketLength() + AgoraNetwork::MacPacket::kOffsetOfData);
   }
   MLPD_INFO("MacSender [frame %d, ue %d]: Loaded packet for bytes %zu\n",
             tag.frame_id_, tag.ant_id_,

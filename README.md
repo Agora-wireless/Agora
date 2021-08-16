@@ -1,4 +1,4 @@
-[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Freceive-memory)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/receive-memory/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Ftx-memory)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/tx-memory/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 

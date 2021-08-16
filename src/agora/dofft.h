@@ -31,7 +31,7 @@ class DoFFT : public Doer {
   /**
    * Do FFT task for one OFDM symbol
    *
-   * @param tag is an event data tag of type fft_req_tag_t
+   * @param tag is an event data tag of type AgoraNetwork::fft_req_tag_t
    *
    * Buffers: socket_buffer_, fft_buffer_, csi_buffer_, data_buffer_
    *     Input buffer: socket_buffer_

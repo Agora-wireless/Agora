@@ -60,17 +60,17 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       ul_mac_info.at(ue_id).resize(num_ul_mac_bytes);
       for (size_t pkt_id = 0; pkt_id < cfg_->UlMacPacketsPerframe(); pkt_id++) {
         size_t pkt_offset = pkt_id * cfg_->MacPacketLength();
-        auto* pkt =
-            reinterpret_cast<MacPacket*>(&ul_mac_info.at(ue_id).at(pkt_offset));
+        auto* pkt = reinterpret_cast<AgoraNetwork::MacPacket*>(
+            &ul_mac_info.at(ue_id).at(pkt_offset));
 
         pkt->frame_id_ = 0;
         pkt->symbol_id_ = pkt_id;
         pkt->ue_id_ = ue_id;
         pkt->datalen_ = cfg_->MacPayloadLength();
-        pkt->rsvd_[0] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-        pkt->rsvd_[1] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
+        pkt->rsvd_[0u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
+        pkt->rsvd_[1u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
         pkt->rsvd_[2] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-        pkt->crc_ = 0;
+        pkt->crc_ = 0u;
         this->GenMacData(pkt, ue_id);
         pkt->crc_ =
             (uint16_t)(crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
@@ -341,8 +341,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       dl_mac_info[ue_id].resize(num_dl_mac_bytes);
       for (size_t pkt_id = 0; pkt_id < cfg_->DlMacPacketsPerframe(); pkt_id++) {
         size_t pkt_offset = pkt_id * cfg_->MacPacketLength();
-        auto* pkt =
-            reinterpret_cast<MacPacket*>(&dl_mac_info.at(ue_id).at(pkt_offset));
+        auto* pkt = reinterpret_cast<AgoraNetwork::MacPacket*>(
+            &dl_mac_info.at(ue_id).at(pkt_offset));
 
         pkt->frame_id_ = 0;
         pkt->symbol_id_ = pkt_id;

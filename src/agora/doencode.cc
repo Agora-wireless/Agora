@@ -8,6 +8,7 @@
 
 #include "concurrent_queue_wrapper.h"
 #include "encoder.h"
+#include "mac_packet.h"
 #include "phy_ldpc_decoder_5gnr.h"
 
 static constexpr bool kPrintEncodedData = false;
@@ -85,7 +86,7 @@ EventData DoEncode::Launch(size_t tag) {
                          symbol_idx_data, ue_id, cur_cb_id);
 
     if (kPrintRawMacData) {
-      auto* pkt = reinterpret_cast<MacPacket*>(tx_data_ptr);
+      auto* pkt = reinterpret_cast<AgoraNetwork::MacPacket*>(tx_data_ptr);
       std::printf(
           "In doEncode [%d] mac packet frame: %d, symbol: %zu:%d, ue_id: %d, "
           "data length %d, crc %d size %zu:%zu\n",

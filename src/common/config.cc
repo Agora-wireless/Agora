@@ -12,6 +12,7 @@
 #include <boost/range/algorithm/count.hpp>
 
 #include "logger.h"
+#include "mac_packet.h"
 #include "nlohmann/json.hpp"
 #include "scrambler.h"
 #include "utils_ldpc.h"
@@ -438,8 +439,9 @@ Config::Config(const std::string& jsonfile)
       kMacAlignmentBytes - (data_bytes_num_persymbol_ % kMacAlignmentBytes);
   mac_packet_length_ = data_bytes_num_persymbol_ + padding;
   mac_payload_length_ =
-      mac_packet_length_ - (padding + MacPacket::kOffsetOfData);
-  assert(mac_packet_length_ > (padding + MacPacket::kOffsetOfData));
+      mac_packet_length_ - (padding + AgoraNetwork::MacPacket::kOffsetOfData);
+  assert(mac_packet_length_ >
+         (padding + AgoraNetwork::MacPacket::kOffsetOfData));
 
   ul_mac_packets_perframe_ = this->frame_.NumUlDataSyms();
   ul_mac_data_bytes_num_perframe_ =
