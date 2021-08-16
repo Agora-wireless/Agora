@@ -58,8 +58,10 @@ Agora::Agora(Config* cfg)
     //     goto creation_end;
     // }
     
-    do_fft_threads_.resize(1);
-    do_fft_threads_[0] = std::thread(&Agora::fft_worker, this, 0);
+    do_fft_threads_.resize(cfg->fft_thread_num);
+    for (size_t i = 0; i < do_fft_threads_.size(); i ++) {
+        do_fft_threads_[i] = std::thread(&Agora::fft_worker, this, i);
+    }
 
     /* Create worker threads */
     do_subcarrier_threads_.resize(
@@ -254,7 +256,13 @@ void* Agora::fft_worker(int tid)
     pin_to_core_with_offset(ThreadType::kWorkerFFT, base_worker_core_offset + 1,
         tid);
 
-    auto computeFFT = new DoFFT(config_, tid, freq_ghz, Range(config_->ant_start, config_->ant_end),
+    size_t ant_block = config_->get_num_ant_to_process() / config_->fft_thread_num;
+    size_t ant_off = config_->get_num_ant_to_process() % config_->fft_thread_num;
+    size_t ant_start = tid < ant_off ? tid * (ant_block + 1) : 
+        ant_off * (ant_block + 1) + (tid - ant_off) * ant_block;
+    size_t ant_end = tid < ant_off ? ant_start + ant_block + 1 : ant_start + ant_block;
+
+    auto computeFFT = new DoFFT(config_, tid, freq_ghz, Range(config_->ant_start + ant_start, config_->ant_start + ant_end),
         socket_buffer_, after_fft_buffer_,
         phy_stats, stats, &rx_status_);
 

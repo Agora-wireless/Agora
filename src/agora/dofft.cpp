@@ -129,19 +129,106 @@ void DoFFT::launch(size_t frame_id, size_t symbol_id, size_t ant_id)
 void DoFFT::start_work() {
     printf("DoFFT for antenna [%u:%u] tid %u starts to work!\n", ant_range_.start, ant_range_.end, tid);
 
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t fft_tsc_duration = 0;
+    size_t state_operation_duration = 0;
+    size_t loop_count = 0;
+    size_t work_count = 0;
+    size_t fft_start_tsc;
+    bool state_trigger = false;
+
     while (cfg->running && !SignalHandler::gotExitSignal()) {
+
+        if (likely(state_trigger)) {
+            loop_count ++;
+        }
+        size_t work_start_tsc, state_start_tsc;
+
         if (cur_symbol_ == 0) {
-            if (rx_status_->received_all_pilots(cur_frame_)) {
+
+            if (likely(state_trigger)) {
+                work_start_tsc = rdtsc();
+                state_start_tsc = rdtsc();
+            }
+            bool ret = rx_status_->received_all_pilots(cur_frame_);
+            if (likely(state_trigger)) {
+                state_operation_duration += rdtsc() - state_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
+
+            if (ret) {
+
+                if (unlikely(!state_trigger && cur_frame_ >= 200)) {
+                    loop_count ++;
+                    start_tsc = rdtsc();
+                    state_trigger = true;
+                }
+
+                if (likely(state_trigger)) {
+                    work_start_tsc = rdtsc();
+                    work_count ++;
+                }
+
+                if (likely(state_trigger)) {
+                    fft_start_tsc = rdtsc();
+                }
                 for (size_t i = ant_range_.start; i < ant_range_.end; i ++) {
                     launch(cur_frame_, cur_symbol_, i);
                 }
+                if (likely(state_trigger)) {
+                    fft_tsc_duration += rdtsc() - fft_start_tsc;
+                }
+
+                if (likely(state_trigger)) {
+                    state_start_tsc = rdtsc();
+                }
                 rx_status_->fft_done(cur_frame_, cur_symbol_, ant_range_.end - ant_range_.start);
+                if (likely(state_trigger)) {
+                    state_operation_duration += rdtsc() - state_start_tsc;
+                
+                    work_tsc_duration += rdtsc() - work_start_tsc;
+                }
+
                 cur_symbol_ ++;
             }
         } else {
-            if (rx_status_->is_demod_ready(cur_frame_, cur_symbol_ - 1)) {
+
+            if (likely(state_trigger)) {
+                work_start_tsc = rdtsc();
+                state_start_tsc = rdtsc();
+            }
+            bool ret = rx_status_->is_demod_ready(cur_frame_, cur_symbol_ - 1);
+            if (likely(state_trigger)) {
+                state_operation_duration += rdtsc() - state_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
+
+            if (ret) {
+
+                if (unlikely(!state_trigger && cur_frame_ >= 200)) {
+                    loop_count ++;
+                    start_tsc = rdtsc();
+                    state_trigger = true;
+                }
+
+                if (likely(state_trigger)) {
+                    work_start_tsc = rdtsc();
+                    work_count ++;
+                }
+
+                if (likely(state_trigger)) {
+                    fft_start_tsc = rdtsc();
+                }
                 for (size_t i = ant_range_.start; i < ant_range_.end; i ++) {
                     launch(cur_frame_, cur_symbol_, i);
+                }
+                if (likely(state_trigger)) {
+                    fft_tsc_duration += rdtsc() - fft_start_tsc;
+                }
+
+                if (likely(state_trigger)) {
+                    state_start_tsc = rdtsc();
                 }
                 rx_status_->fft_done(cur_frame_, cur_symbol_, ant_range_.end - ant_range_.start);
                 cur_symbol_ ++;
@@ -152,9 +239,25 @@ void DoFFT::start_work() {
                         break;
                     }
                 }
+                if (likely(state_trigger)) {
+                    state_operation_duration += rdtsc() - state_start_tsc;
+                
+                    work_tsc_duration += rdtsc() - work_start_tsc;
+                }
             }
         }
     }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("DoFFT Thread %u duration stats: total time used %.2lfms, "
+        "fft %.2lfms (%.2lf\%), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
+        "working proportions (%u/%u: %.2lf\%)\n",
+        tid, cycles_to_ms(whole_duration, freq_ghz),
+        cycles_to_ms(fft_tsc_duration, freq_ghz), fft_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
+        work_count, loop_count, work_count * 100.0f / loop_count);
 }
 
 DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,

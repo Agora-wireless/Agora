@@ -309,7 +309,7 @@ void DyDecode::start_work()
 
         if (cur_cb_ > 0) {
 
-            if (unlikely(!state_trigger && cur_frame_ >= 400)) {
+            if (unlikely(!state_trigger && cur_frame_ >= 200)) {
                 start_tsc = rdtsc();
                 state_trigger = true;
             }
