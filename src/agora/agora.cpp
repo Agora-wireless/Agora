@@ -3,7 +3,7 @@ using namespace std;
 
 Agora::Agora(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
-    , base_worker_core_offset(cfg->core_offset + 2 + cfg->socket_thread_num)
+    , base_worker_core_offset(cfg->core_offset + 1 + 2 * cfg->socket_thread_num)
     , rx_status_(cfg)
     , demul_status_(cfg)
     , demod_status_(cfg)

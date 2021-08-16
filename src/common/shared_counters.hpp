@@ -245,13 +245,19 @@ public:
     void fft_data_receive(size_t frame_id, size_t symbol_id)
     {
         num_fft_data_received_[frame_id % kFrameWnd][symbol_id] ++;
+        if (frame_id == 0 && num_fft_data_received_[frame_id % kFrameWnd][symbol_id] == num_fft_data_required_) {
+            MLPD_INFO("Main thread: Complete FFT data receiving for (%u,%u)\n", frame_id, symbol_id);
+        }
+        // if (frame_id == 0)
         // printf("FFT data receive (%u,%u) %u:%u\n", frame_id, symbol_id, num_fft_data_received_[frame_id % kFrameWnd][symbol_id].load(), num_fft_data_required_);
     }
 
     bool fft_data_ready(size_t frame_id, size_t symbol_id)
     {
         if (num_fft_data_received_[frame_id % kFrameWnd][symbol_id] == num_fft_data_required_) {
-            // printf("Complete FFT data receiving for (%u,%u)\n", frame_id, symbol_id);
+            // if (frame_id == 0 && symbol_id == 1) {
+            //     printf("Complete FFT data receiving for (%u,%u)\n", frame_id, symbol_id);
+            // }
             return true;
         }
         return false;

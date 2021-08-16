@@ -118,6 +118,7 @@ private:
     const size_t core_offset;
 
     const size_t socket_thread_num;
+    const size_t fft_socket_thread_num;
     Table<char>* buffer_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers_;
     Table<int8_t>* demod_soft_buffer_to_decode_;

@@ -204,6 +204,7 @@ public:
                         demul_cur_sym_ul_,
                         sc_range_.start
                             + (n_demul_tasks_done_ * cfg->demul_block_size));
+                    // printf("(%u) Launcg demod (%u,%u) complete!\n", tid, demul_cur_frame_, demul_cur_sym_ul_);
                     if (likely(start_tsc > 0)) {
                         size_t demod_tmp_tsc = rdtsc() - demod_start_tsc;
                         demod_tsc_duration += demod_tmp_tsc;
