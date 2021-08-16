@@ -1088,7 +1088,7 @@ int PacketTXRX::recv_relocate(int tid)
         } else if (pkt->pkt_type == Packet::PktType::kFFT) {
             const size_t frame_id = pkt->frame_id;
             const size_t symbol_id = pkt->symbol_id;
-            const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
+            const size_t ant_id = pkt->ant_id;
 
             char* fft_ptr = &(*after_fft_buffer_to_subcarrier_)[pkt->ant_id]
                 [((frame_id % kFrameWnd) * cfg->symbol_num_perframe + symbol_id) * cfg->packet_length + 
@@ -1101,6 +1101,8 @@ int PacketTXRX::recv_relocate(int tid)
             //     printf("(%d %d) ", pkt->data[i*2], pkt->data[i*2+1]);
             // }
             // printf("\n");
+            // if (frame_id == 0)
+            // printf("Receive FFT packet (%u,%u) for ant %u from server %u\n", frame_id, symbol_id, ant_id, pkt->server_id);
             rx_status_->fft_data_receive(frame_id, symbol_id);
         } else {
             printf("Received unknown packet from rru\n");
