@@ -21,6 +21,7 @@
 #include "config.h"
 #include "gettime.h"
 #include "radio_lib.h"
+#include "rx_memory.h"
 #include "symbols.h"
 #include "udp_client.h"
 #include "udp_server.h"
@@ -31,16 +32,17 @@
 #define USE_DPDK_MEMORY
 
 #if defined(USE_DPDK_MEMORY)
-class DPDKRxPacket : public RxPacket {
+class DPDKRxPacket : public AgoraNetwork::RxPacket {
  public:
-  DPDKRxPacket() : RxPacket() { mem_ = nullptr; }
-  explicit DPDKRxPacket(const DPDKRxPacket& copy) : RxPacket(copy) {
+  DPDKRxPacket() : AgoraNetwork::RxPacket() { mem_ = nullptr; }
+  explicit DPDKRxPacket(const DPDKRxPacket& copy)
+      : AgoraNetwork::RxPacket(copy) {
     mem_ = copy.mem_;
   }
   ~DPDKRxPacket() = default;
   inline bool Set(rte_mbuf* mem, Packet* in_pkt) {
     mem_ = mem;
-    return RxPacket::Set(in_pkt);
+    return AgoraNetwork::RxPacket::Set(in_pkt);
   }
 
  private:
@@ -152,12 +154,12 @@ class PacketTXRX {
 #if defined(USE_DPDK_MEMORY)
   std::vector<std::vector<DPDKRxPacket>> rx_packets_;
 #else
-  std::vector<std::vector<RxPacket>> rx_packets_;
+  std::vector<std::vector<AgoraNetwork::RxPacket>> rx_packets_;
 #endif  // defined(USE_DPDK_MEMORY)
 #else
   // Dimension 1: socket_thread
   // Dimension 2: rx_packet
-  std::vector<std::vector<RxPacket>> rx_packets_;
+  std::vector<std::vector<AgoraNetwork::RxPacket>> rx_packets_;
 #endif  // defined(USE_DPDK)
 
   std::unique_ptr<RadioConfig> radioconfig_;  // Used only in Argos mode

@@ -208,10 +208,11 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
       }
     }
 
-    rx.Use();
+    rx.Alloc();
     if (message_queue_->enqueue(
             *rx_ptoks_[tid],
-            EventData(EventType::kPacketRX, rx_tag_t(rx).tag_)) == false) {
+            EventData(EventType::kPacketRX, AgoraNetwork::rx_tag_t(rx).tag_)) ==
+        false) {
       std::printf("Failed to enqueue socket message\n");
       throw std::runtime_error("PacketTXRX: Failed to enqueue socket message");
     }

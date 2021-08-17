@@ -41,11 +41,13 @@ else()
   set(CMAKE_CXX_STANDARD 17)
 endif()
 
-# Unit tests
-enable_testing()
-find_package(GTest REQUIRED)
-
 option(DEBUG "Enable debugging" OFF)
+
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+  message(STATUS "Enabling debug mode due to build type")
+  set(DEBUG ON)
+endif()
+
 if(NOT DEBUG)
   message(STATUS "Debugging is disabled")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
@@ -62,14 +64,11 @@ else()
   #-fsanitize=leak -fsanitize=undefined -fsanitize=null
 endif()
 
-#if(CMAKE_BUILD_TYPE MATCHES Debug)
+
 
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
-
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
-
-find_package(Armadillo)
 
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
@@ -173,7 +172,9 @@ if(${USE_UHD})
   add_definitions(-DUSE_UHD)
 endif()
 
-#External Libraries
+#Package dependancies
+find_package(Armadillo)
+
 find_package(HDF5 1.10 REQUIRED)
 if (NOT HDF5_FOUND)
     message(FATAL_ERROR "HDF5 development files not found")
@@ -199,6 +200,13 @@ add_definitions(-DTHREADED_INIT)
 # Intel MKL
 set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS)
+
+find_package(gflags REQUIRED)
+message(STATUS "gflags include directory found: ${GFLAGS_INCLUDE_DIR}")
+
+# Unit tests
+enable_testing()
+find_package(GTest REQUIRED)
 
 # Console logging level
 if(LOG_LEVEL STREQUAL "none")
