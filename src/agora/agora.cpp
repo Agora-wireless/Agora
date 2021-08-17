@@ -3,7 +3,7 @@ using namespace std;
 
 Agora::Agora(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
-    , base_worker_core_offset(cfg->core_offset + 2 + cfg->socket_thread_num)
+    , base_worker_core_offset(cfg->core_offset + 1 + cfg->fft_socket_thread_num + cfg->socket_thread_num)
     , rx_status_(cfg)
     , demul_status_(cfg)
     , demod_status_(cfg)
@@ -58,8 +58,10 @@ Agora::Agora(Config* cfg)
     //     goto creation_end;
     // }
     
-    do_fft_threads_.resize(1);
-    do_fft_threads_[0] = std::thread(&Agora::fft_worker, this, 0);
+    do_fft_threads_.resize(cfg->fft_thread_num);
+    for (size_t i = 0; i < do_fft_threads_.size(); i ++) {
+        do_fft_threads_[i] = std::thread(&Agora::fft_worker, this, i);
+    }
 
     /* Create worker threads */
     do_subcarrier_threads_.resize(
@@ -202,7 +204,7 @@ void* Agora::subcarrier_worker(int tid)
     if (config_->dynamic_workload) {
         auto computeSubcarrier = new DySubcarrier(config_, tid, freq_ghz,
             sc_range,
-            socket_buffer_, csi_buffers_, calib_buffer_,
+            after_fft_buffer_to_subcarrier_, csi_buffers_, calib_buffer_,
             dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
             ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
             control_info_table_, control_idx_list_,
@@ -213,7 +215,7 @@ void* Agora::subcarrier_worker(int tid)
     } else {
         auto computeSubcarrier = new DoSubcarrier(config_, tid, freq_ghz,
             sc_range,
-            socket_buffer_, csi_buffers_, calib_buffer_,
+            after_fft_buffer_to_subcarrier_, csi_buffers_, calib_buffer_,
             dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
             ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
             phy_stats, stats, &rx_status_, &demul_status_, &precode_status_);
@@ -255,7 +257,13 @@ void* Agora::fft_worker(int tid)
     pin_to_core_with_offset(ThreadType::kWorkerFFT, base_worker_core_offset + 1,
         tid);
 
-    auto computeFFT = new DoFFT(config_, tid, freq_ghz, Range(config_->ant_start, config_->ant_end),
+    size_t ant_block = config_->get_num_ant_to_process() / config_->fft_thread_num;
+    size_t ant_off = config_->get_num_ant_to_process() % config_->fft_thread_num;
+    size_t ant_start = tid < ant_off ? tid * (ant_block + 1) : 
+        ant_off * (ant_block + 1) + (tid - ant_off) * ant_block;
+    size_t ant_end = tid < ant_off ? ant_start + ant_block + 1 : ant_start + ant_block;
+
+    auto computeFFT = new DoFFT(config_, tid, freq_ghz, Range(config_->ant_start + ant_start, config_->ant_start + ant_end),
         socket_buffer_, after_fft_buffer_,
         phy_stats, stats, &rx_status_);
 

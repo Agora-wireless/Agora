@@ -23,7 +23,7 @@ public:
             cfg->decode_thread_num)
         , num_precode_tasks_per_frame_((cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
         , num_fft_tasks_required_(cfg->get_num_ant_to_process())
-        , num_fft_data_required_(cfg->bs_server_addr_list.size())
+        , num_fft_data_required_(cfg->BS_ANT_NUM)
         , last_frame_cycles_(worker_rdtsc())
         , freq_ghz_(measure_rdtsc_freq())
         , test_mode_(cfg->test_mode)
@@ -245,11 +245,22 @@ public:
     void fft_data_receive(size_t frame_id, size_t symbol_id)
     {
         num_fft_data_received_[frame_id % kFrameWnd][symbol_id] ++;
+        if (frame_id == 0 && num_fft_data_received_[frame_id % kFrameWnd][symbol_id] == num_fft_data_required_) {
+            MLPD_INFO("Main thread: Complete FFT data receiving for (%u,%u)\n", frame_id, symbol_id);
+        }
+        // if (frame_id == 0)
+        // printf("FFT data receive (%u,%u) %u:%u\n", frame_id, symbol_id, num_fft_data_received_[frame_id % kFrameWnd][symbol_id].load(), num_fft_data_required_);
     }
 
     bool fft_data_ready(size_t frame_id, size_t symbol_id)
     {
-        return num_fft_data_received_[frame_id % kFrameWnd][symbol_id] == num_fft_data_required_;
+        if (num_fft_data_received_[frame_id % kFrameWnd][symbol_id] == num_fft_data_required_) {
+            // if (frame_id == 0 && symbol_id == 1) {
+            //     printf("Complete FFT data receiving for (%u,%u)\n", frame_id, symbol_id);
+            // }
+            return true;
+        }
+        return false;
     }
 
     // TODO: Instead of having all-atomic counter arrays, can we just make
@@ -293,7 +304,7 @@ public:
         num_fft_tasks_completed_;
     const size_t num_fft_tasks_required_;
 
-    std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_fft_data_received_;
     const size_t num_fft_data_required_;
 

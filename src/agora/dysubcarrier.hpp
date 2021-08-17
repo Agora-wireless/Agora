@@ -204,6 +204,7 @@ public:
                         demul_cur_sym_ul_,
                         sc_range_.start
                             + (n_demul_tasks_done_ * cfg->demul_block_size));
+                    // printf("(%u) Launcg demod (%u,%u) complete!\n", tid, demul_cur_frame_, demul_cur_sym_ul_);
                     if (likely(start_tsc > 0)) {
                         size_t demod_tmp_tsc = rdtsc() - demod_start_tsc;
                         demod_tsc_duration += demod_tmp_tsc;
@@ -355,6 +356,7 @@ public:
                 worked = 1;
 
                 size_t csi_start_tsc = rdtsc();
+                // printf("Run CSI for frame %u\n", csi_cur_frame_);
                 run_csi(csi_cur_frame_, sc_range_.start);
                 if (likely(start_tsc > 0)) {
                     size_t csi_tmp_tsc = rdtsc() - csi_start_tsc;
@@ -447,11 +449,23 @@ private:
                         const size_t sc_idx
                             = (block_idx * kTransposeBlockSize) + sc_j;
 
+                        // short* tmp_p = reinterpret_cast<short*>(pkt
+                        //         + (cfg->OFDM_DATA_START + sc_idx) * 2 * sizeof(short));
+                        // for (size_t i = 0; i < 8; i ++) {
+                        //     printf("(%d %d) ", tmp_p[i*2], tmp_p[i*2+1]);
+                        // }
+                        // printf("\n");
+
                         simd_convert_float16_to_float32(
                             reinterpret_cast<float*>(converted_sc),
                             reinterpret_cast<float*>(pkt
-                                + (cfg->OFDM_DATA_START + sc_idx) * 2),
+                                + (cfg->OFDM_DATA_START + sc_idx) * 2 * sizeof(short)),
                             kSCsPerCacheline * 2);
+
+                        // for (size_t i = 0; i < 8; i ++) {
+                        //     printf("(%lf %lf) ", converted_sc[i].re, converted_sc[i].im);
+                        // }
+                        // printf("\n");
 
                         const complex_float* src = converted_sc;
                         complex_float* dst = csi_buffers_[frame_slot][i]

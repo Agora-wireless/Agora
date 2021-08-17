@@ -149,6 +149,7 @@ public:
     size_t core_offset;
     size_t worker_thread_num;
     size_t socket_thread_num;
+    size_t fft_socket_thread_num;
     size_t fft_thread_num;
     size_t demul_thread_num;
     size_t decode_thread_num;

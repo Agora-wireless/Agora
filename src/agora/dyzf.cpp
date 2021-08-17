@@ -70,7 +70,7 @@ void DyZF::compute_precoder(const arma::cx_fmat& mat_csi,
         } catch (std::runtime_error) {
             MLPD_WARN(
                 "Failed to invert channel matrix, falling back to pinv()\n");
-            std::cout << mat_csi << std::endl;
+            // std::cout << mat_csi << std::endl;
             rt_assert(false);
             arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
         }
@@ -290,6 +290,11 @@ void DyZF::ZF_freq_orthogonal_dynamic(size_t tag)
     if (total_ue_sc == 0) {
         return;
     }
+
+    // for (size_t i = 0; i < 8; i ++) {
+    //     printf("(%lf %lf) ", csi_gather_buffer[i].re, csi_gather_buffer[i].im);
+    // }
+    // printf("\n");
 
     duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
     arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer),

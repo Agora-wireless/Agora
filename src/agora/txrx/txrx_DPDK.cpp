@@ -16,14 +16,15 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     : cfg(cfg)
     , core_offset(core_offset)
     , socket_thread_num(cfg->socket_thread_num)
+    , fft_socket_thread_num(cfg->fft_socket_thread_num)
     , rx_status_(rx_status)
     , demul_status_(demul_status)
     , decode_status_(decode_status)
     , encode_status_(encode_status)
     , precode_status_(precode_status)
 {
-    DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num + 2, cfg->pci_addr);
-    for (size_t i = 0; i < socket_thread_num + 2; i ++) {
+    DpdkTransport::dpdk_init(core_offset - 1, fft_socket_thread_num + socket_thread_num + 1, cfg->pci_addr);
+    for (size_t i = 0; i < fft_socket_thread_num + socket_thread_num + 1; i ++) {
         mbuf_pool_[i] = DpdkTransport::create_mempool(i);
     }
     // mbuf_pool_ = DpdkTransport::create_mempool();
@@ -31,7 +32,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     encode_ue_to_send_ = cfg->ue_start;
 
     const uint16_t port_id = 0; // The DPDK port ID
-    if (DpdkTransport::nic_init(port_id, mbuf_pool_, socket_thread_num + 2, 1) != 0)
+    if (DpdkTransport::nic_init(port_id, mbuf_pool_, fft_socket_thread_num + socket_thread_num + 1, 1 + fft_socket_thread_num) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
 
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr_);
@@ -100,14 +101,17 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
                 cfg->demod_tx_port, cfg->demod_rx_port, socket_thread_num);
             DpdkTransport::install_flow_rule(
                 port_id, socket_thread_num, bs_server_addrs_[i], bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
-            src_port = rte_cpu_to_be_16(cfg->fft_tx_port);
-            dst_port = rte_cpu_to_be_16(cfg->fft_rx_port);
-            printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
-                "dst port: %zu, queue: %zu\n",
-                cfg->bs_server_addr_list[i].c_str(), cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(),
-                cfg->fft_tx_port, cfg->fft_rx_port, socket_thread_num + 1);
-            DpdkTransport::install_flow_rule(
-                port_id, socket_thread_num + 1, bs_server_addrs_[i], bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
+            
+            for (size_t j = 0; j < cfg->BS_ANT_NUM; j ++) {
+                src_port = rte_cpu_to_be_16(cfg->fft_tx_port + j);
+                dst_port = rte_cpu_to_be_16(cfg->fft_rx_port + j);
+                printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
+                    "dst port: %zu, queue: %zu\n",
+                    cfg->bs_server_addr_list[i].c_str(), cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(),
+                    cfg->fft_tx_port + j, cfg->fft_rx_port + j, j % socket_thread_num);
+                DpdkTransport::install_flow_rule(
+                    port_id, j % socket_thread_num, bs_server_addrs_[i], bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
+            }
         }
     }
 
@@ -115,7 +119,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
 }
 
 PacketTXRX::~PacketTXRX() { 
-    for (size_t i = 0; i < socket_thread_num + 2; i ++) {
+    for (size_t i = 0; i < fft_socket_thread_num + socket_thread_num + 1; i ++) {
         rte_mempool_free(mbuf_pool_[i]); 
     }
     // rte_mempool_free(mbuf_pool_);
@@ -168,7 +172,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
             auto context = new EventHandlerContext<PacketTXRX>;
             context->obj_ptr = this;
             context->id = worker_id;
-            printf("Launch demod rx thread on core %u\n", lcore_id);
+            printf("Launch demod tx/rx thread on core %u\n", lcore_id);
             if (cfg->downlink_mode) {
                 rte_eal_remote_launch((lcore_function_t*)
                         pthread_fun_wrapper<PacketTXRX, &PacketTXRX::encode_thread>,
@@ -181,11 +185,11 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
                 //         pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_rx_thread>,
                 //     context, lcore_id);
             }
-        } else if (worker_id == socket_thread_num + 1) {
+        } else if (worker_id > socket_thread_num && worker_id < socket_thread_num + fft_socket_thread_num + 1) {
             auto context = new EventHandlerContext<PacketTXRX>;
             context->obj_ptr = this;
             context->id = worker_id;
-            printf("Launch fft rx thread on core %u\n", lcore_id);
+            printf("Launch fft tx thread on core %u\n", lcore_id);
             rte_eal_remote_launch((lcore_function_t*)
                     pthread_fun_wrapper<PacketTXRX, &PacketTXRX::fft_thread>,
                 context, lcore_id);
@@ -751,8 +755,10 @@ void* PacketTXRX::fft_thread(int tid)
     std::vector<uint8_t> recv_buf(cfg->packet_length);
     size_t freq_ghz = measure_rdtsc_freq();
 
-    printf("FFT TX/RX thread\n");
+    printf("FFT TX thread %u\n", tid);
     int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+
+    size_t fft_thread_tid = tid - cfg->socket_thread_num - 1;
 
     size_t start_tsc = 0;
     size_t work_tsc_duration = 0;
@@ -785,20 +791,21 @@ void* PacketTXRX::fft_thread(int tid)
             send_start_tsc = work_start_tsc;
             worked = 1;
 
-            for (size_t ant_id = cfg->ant_start; ant_id < cfg->ant_end; ant_id++) {
+            for (size_t ant_id = cfg->ant_start + fft_thread_tid; ant_id < cfg->ant_end; ant_id += fft_socket_thread_num) {
                 char* fft_ptr = &(*after_fft_buffer_)[ant_id]
                     [((fft_frame_to_send_ % kFrameWnd) * cfg->symbol_num_perframe + fft_symbol_to_send_) * cfg->packet_length];
 
                 for (size_t target_server_idx = 0; target_server_idx < cfg->bs_server_addr_list.size(); target_server_idx ++) {
                     if (target_server_idx == cfg->bs_server_addr_idx) {
                         char* target_fft_ptr = &(*after_fft_buffer_to_subcarrier_)[ant_id]
-                            [((fft_frame_to_send_ % kFrameWnd) * cfg->symbol_num_perframe + fft_symbol_to_send_) * cfg->packet_length];
+                            [((fft_frame_to_send_ % kFrameWnd) * cfg->symbol_num_perframe + fft_symbol_to_send_) * cfg->packet_length + 
+                            (cfg->OFDM_DATA_START + cfg->get_num_sc_per_server() * cfg->bs_server_addr_idx) * sizeof(short) * 2];
                         memcpy(target_fft_ptr, fft_ptr, cfg->get_num_sc_per_server() * sizeof(short) * 2);
                         rx_status_->fft_data_receive(fft_frame_to_send_, fft_symbol_to_send_);
                     } else {
                         struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-                        tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[1], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[target_server_idx],
-                            bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[target_server_idx], cfg->fft_tx_port, cfg->fft_rx_port, 
+                        tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[target_server_idx],
+                            bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[target_server_idx], cfg->fft_tx_port + ant_id, cfg->fft_rx_port + ant_id, 
                             Packet::kOffsetOfData + cfg->get_num_sc_per_server() * sizeof(short) * 2);
                         struct rte_ether_hdr* eth_hdr
                             = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
@@ -816,9 +823,9 @@ void* PacketTXRX::fft_thread(int tid)
                             cfg->get_num_sc_per_server() * sizeof(short) * 2);
 
                         // Send data (one OFDM symbol)
-                        size_t nb_tx_new = rte_eth_tx_burst(0, 0, tx_bufs, 1);
+                        size_t nb_tx_new = rte_eth_tx_burst(0, 1 + fft_thread_tid, tx_bufs, 1);
                         if (unlikely(nb_tx_new != 1)) {
-                            printf("rte_eth_tx_burst() failed\n");
+                            printf("FFT thread rte_eth_tx_burst() failed\n");
                             exit(0);
                         }
                     }
@@ -837,78 +844,83 @@ void* PacketTXRX::fft_thread(int tid)
         }
 
         // 2. Try to receive after fft data for decoding
-        rte_mbuf* rx_bufs[kRxBatchSize];
-        uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
-        if (unlikely(nb_rx == 0)) {
-            work_count += worked;
-            continue;
-        }
+        // rte_mbuf* rx_bufs[kRxBatchSize];
+        // uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
+        // if (unlikely(nb_rx == 0)) {
+        //     work_count += worked;
+        //     continue;
+        // }
 
-        if (unlikely(start_tsc == 0)) {
-            start_tsc = rdtsc();
-        }
+        // if (unlikely(start_tsc == 0)) {
+        //     start_tsc = rdtsc();
+        // }
 
-        work_start_tsc = rdtsc();
-        recv_start_tsc = work_start_tsc;
+        // work_start_tsc = rdtsc();
+        // recv_start_tsc = work_start_tsc;
 
-        work_count ++;
+        // work_count ++;
 
-        for (size_t i = 0; i < nb_rx; i++) {
-            // printf("Received packet!\n");
-            rte_mbuf* dpdk_pkt = rx_bufs[i];
-            auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
-            auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
-                reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
-            uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+        // for (size_t i = 0; i < nb_rx; i++) {
+        //     // printf("Received packet!\n");
+        //     rte_mbuf* dpdk_pkt = rx_bufs[i];
+        //     auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+        //     auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+        //         reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+        //     uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
 
-            if (eth_type != RTE_ETHER_TYPE_IPV4
-                or ip_hdr->next_proto_id != IPPROTO_UDP) {
-                rte_pktmbuf_free(rx_bufs[i]);
-                continue;
-            }
+        //     if (eth_type != RTE_ETHER_TYPE_IPV4
+        //         or ip_hdr->next_proto_id != IPPROTO_UDP) {
+        //         rte_pktmbuf_free(rx_bufs[i]);
+        //         continue;
+        //     }
 
-            bool found = false;
-            for (size_t j = 0; j < bs_server_addrs_.size(); j ++) {
-                if (ip_hdr->src_addr == bs_server_addrs_[j]) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                fprintf(stderr, "DPDK: Source addr does not match\n");
-                rte_pktmbuf_free(rx_bufs[i]);
-                continue;
-            }
-            if (ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx]) {
-                fprintf(stderr, "DPDK: Destination addr does not match (%x %x)\n", ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
-                rte_pktmbuf_free(rx_bufs[i]);
-                continue;
-            }
+        //     bool found = false;
+        //     for (size_t j = 0; j < bs_server_addrs_.size(); j ++) {
+        //         if (ip_hdr->src_addr == bs_server_addrs_[j]) {
+        //             found = true;
+        //             break;
+        //         }
+        //     }
+        //     if (!found) {
+        //         fprintf(stderr, "DPDK: Source addr does not match\n");
+        //         rte_pktmbuf_free(rx_bufs[i]);
+        //         continue;
+        //     }
+        //     if (ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx]) {
+        //         fprintf(stderr, "DPDK: Destination addr does not match (%x %x)\n", ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
+        //         rte_pktmbuf_free(rx_bufs[i]);
+        //         continue;
+        //     }
 
-            auto* pkt = reinterpret_cast<Packet*>((char*)(eth_hdr) + kPayloadOffset);
-            if (pkt->pkt_type == Packet::PktType::kFFT) {
-                const size_t frame_id = pkt->frame_id;
-                const size_t symbol_id = pkt->symbol_id;
-                const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
+        //     auto* pkt = reinterpret_cast<Packet*>((char*)(eth_hdr) + kPayloadOffset);
+        //     if (pkt->pkt_type == Packet::PktType::kFFT) {
+        //         const size_t frame_id = pkt->frame_id;
+        //         const size_t symbol_id = pkt->symbol_id;
+        //         const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
 
-                char* fft_ptr = &(*after_fft_buffer_to_subcarrier_)[pkt->ant_id]
-                    [((frame_id % kFrameWnd) * cfg->symbol_num_perframe + symbol_id) * cfg->packet_length];
-                // DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
-                //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
-                memcpy(fft_ptr, pkt->data,
-                    cfg->get_num_sc_per_server() * sizeof(short) * 2);
-                rx_status_->fft_data_receive(frame_id, symbol_id);
-            } else {
-                printf("Received unknown packet type in FFT TX/RX thread\n");
-                exit(1);
-            }
+        //         char* fft_ptr = &(*after_fft_buffer_to_subcarrier_)[pkt->ant_id]
+        //             [((frame_id % kFrameWnd) * cfg->symbol_num_perframe + symbol_id) * cfg->packet_length + 
+        //             (cfg->OFDM_DATA_START + cfg->get_num_sc_per_server() * cfg->bs_server_addr_idx) * sizeof(short) * 2];
+        //         // DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
+        //         //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+        //         memcpy(fft_ptr, pkt->data,
+        //             cfg->get_num_sc_per_server() * sizeof(short) * 2);
+        //         // for (size_t i = 0; i < 8; i ++) {
+        //         //     printf("(%d %d) ", pkt->data[i*2], pkt->data[i*2+1]);
+        //         // }
+        //         // printf("\n");
+        //         rx_status_->fft_data_receive(frame_id, symbol_id);
+        //     } else {
+        //         printf("Received unknown packet type in FFT TX/RX thread\n");
+        //         exit(1);
+        //     }
 
-            rte_pktmbuf_free(rx_bufs[i]);
-        }
+        //     rte_pktmbuf_free(rx_bufs[i]);
+        // }
 
-        recv_end_tsc = rdtsc();
-        recv_tsc_duration += recv_end_tsc - recv_start_tsc;
-        work_tsc_duration += recv_end_tsc - work_start_tsc;
+        // recv_end_tsc = rdtsc();
+        // recv_tsc_duration += recv_end_tsc - recv_start_tsc;
+        // work_tsc_duration += recv_end_tsc - work_start_tsc;
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -1014,11 +1026,11 @@ int PacketTXRX::recv_relocate(int tid)
             continue;
         }
 
-        if (unlikely(ip_hdr->src_addr != bs_rru_addr_)) {
-            // fprintf(stderr, "DPDK relocate(%u): Source addr does not match (%x:%u->%x:%u)\n", tid, ip_hdr->src_addr, rte_be_to_cpu_16(udp_hdr->src_port), ip_hdr->dst_addr, rte_be_to_cpu_16(udp_hdr->dst_port));
-            rte_pktmbuf_free(rx_bufs[i]);
-            continue;
-        }
+        // if (unlikely(ip_hdr->src_addr != bs_rru_addr_)) {
+        //     // fprintf(stderr, "DPDK relocate(%u): Source addr does not match (%x:%u->%x:%u)\n", tid, ip_hdr->src_addr, rte_be_to_cpu_16(udp_hdr->src_port), ip_hdr->dst_addr, rte_be_to_cpu_16(udp_hdr->dst_port));
+        //     rte_pktmbuf_free(rx_bufs[i]);
+        //     continue;
+        // }
         if (unlikely(ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx])) {
             // fprintf(stderr, "DPDK relocate(%u): Destination addr does not match (%x %x)\n", tid, ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
             rte_pktmbuf_free(rx_bufs[i]);
@@ -1073,6 +1085,25 @@ int PacketTXRX::recv_relocate(int tid)
                 max_packet_record_time_frame_[tid] = pkt->frame_id;
             }
 
+        } else if (pkt->pkt_type == Packet::PktType::kFFT) {
+            const size_t frame_id = pkt->frame_id;
+            const size_t symbol_id = pkt->symbol_id;
+            const size_t ant_id = pkt->ant_id;
+
+            char* fft_ptr = &(*after_fft_buffer_to_subcarrier_)[pkt->ant_id]
+                [((frame_id % kFrameWnd) * cfg->symbol_num_perframe + symbol_id) * cfg->packet_length + 
+                (cfg->OFDM_DATA_START + cfg->get_num_sc_per_server() * cfg->bs_server_addr_idx) * sizeof(short) * 2];
+            // DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
+            //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+            memcpy(fft_ptr, pkt->data,
+                cfg->get_num_sc_per_server() * sizeof(short) * 2);
+            // for (size_t i = 0; i < 8; i ++) {
+            //     printf("(%d %d) ", pkt->data[i*2], pkt->data[i*2+1]);
+            // }
+            // printf("\n");
+            // if (frame_id == 0)
+            // printf("Receive FFT packet (%u,%u) for ant %u from server %u\n", frame_id, symbol_id, ant_id, pkt->server_id);
+            rx_status_->fft_data_receive(frame_id, symbol_id);
         } else {
             printf("Received unknown packet from rru\n");
             exit(1);

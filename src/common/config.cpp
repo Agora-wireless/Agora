@@ -182,6 +182,7 @@ Config::Config(std::string jsonfile)
     core_offset = tddConf.value("core_offset", 0);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
     socket_thread_num = tddConf.value("socket_thread_num", 4);
+    fft_socket_thread_num = tddConf.value("fft_socket_thread_num", 1);
     fft_thread_num = tddConf.value("fft_thread_num", 5);
     demul_thread_num = tddConf.value("demul_thread_num", 5);
     // decode_thread_num = tddConf.value("decode_thread_num", 10);
