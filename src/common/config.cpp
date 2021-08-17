@@ -184,9 +184,9 @@ Config::Config(std::string jsonfile)
     socket_thread_num = tddConf.value("socket_thread_num", 4);
     fft_thread_num = tddConf.value("fft_thread_num", 5);
     demul_thread_num = tddConf.value("demul_thread_num", 5);
-    decode_thread_num = tddConf.value("decode_thread_num", 10);
-    zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num
-        - decode_thread_num;
+    // decode_thread_num = tddConf.value("decode_thread_num", 10);
+    // zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num
+    //     - decode_thread_num;
 
     demul_block_size = tddConf.value("demul_block_size", 48);
     rt_assert(demul_block_size % kSCsPerCacheline == 0,
@@ -305,6 +305,8 @@ Config::Config(std::string jsonfile)
     user_level_list = tddConf.value("user_level_list", std::vector<size_t>(UE_NUM));
     num_load_levels = tddConf.value("num_load_levels", 10);
     sleep_mode = tddConf.value("sleep_mode", true);
+
+    decode_thread_num = tddConf.value("decode_thread_num", ue_end - ue_start);
 
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;
@@ -436,6 +438,7 @@ void Config::genData()
     ul_iq_t.calloc(
         ul_data_symbol_num_perframe, sampsPerSymbol * UE_ANT_NUM, 64);
 
+/*
 #ifdef GENERATE_DATA
     for (size_t ue_id = 0; ue_id < UE_ANT_NUM; ue_id++) {
         for (size_t j = 0; j < num_bytes_per_ue_pad; j++) {
@@ -486,6 +489,7 @@ void Config::genData()
     }
     fclose(fd);
 #endif
+*/
 
     const size_t bytes_per_block = bits_to_bytes(LDPC_config.cbLen);
     const size_t encoded_bytes_per_block

@@ -74,7 +74,8 @@ public:
 
 private:
     inline bool should_sleep(size_t ue_num) { 
-        return ue_num <= ue_id_;
+        // return ue_num <= ue_id_;
+        return false;
     }
     int16_t* resp_var_nodes;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
@@ -85,13 +86,17 @@ private:
     RxStatus* rx_status_;
     DecodeStatus* decode_status_;
 
-    size_t ue_id_;
-    size_t tid_in_ue_;
+    // size_t ue_id_;
+    // size_t tid_in_ue_;
+    size_t total_ue_num_;
+    size_t total_dycode_num_;
 
     // decoder process one code block at a time
     size_t cur_frame_ = 0; // Current frame to decode
     size_t cur_symbol_ = 0; // Current symbol to decode
+    size_t cur_ue_ = 0;
     size_t cur_cb_ = 0; // Current code block id to decode
+    size_t cur_idx_ = 0;
     moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
 
     // Control info

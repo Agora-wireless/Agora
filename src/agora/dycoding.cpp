@@ -146,8 +146,10 @@ DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,
     , phy_stats(in_phy_stats)
     , rx_status_(rx_status)
     , decode_status_(decode_status)
-    , ue_id_(in_tid / cfg->decode_thread_num_per_ue + in_config->ue_start)
-    , tid_in_ue_(in_tid % cfg->decode_thread_num_per_ue)
+    // , ue_id_(in_tid / cfg->decode_thread_num_per_ue + in_config->ue_start)
+    // , tid_in_ue_(in_tid % cfg->decode_thread_num_per_ue)
+    , total_dycode_num_(cfg->decode_thread_num)
+    , total_ue_num_(cfg->ue_end - cfg->ue_start)
 {
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
@@ -282,8 +284,12 @@ Event_data DyDecode::launch(size_t tag)
 
 void DyDecode::start_work()
 {
-    printf("Decode for ue %u tid %u starts to work!\n", ue_id_, tid_in_ue_);
-    cur_symbol_ = tid_in_ue_;
+    // printf("Decode for ue %u tid %u starts to work!\n", ue_id_, tid_in_ue_);
+    printf("Decode tid %u starts to work!\n", tid);
+    // cur_symbol_ = tid_in_ue_;
+    cur_idx_ = tid;
+    cur_symbol_ = cur_idx_ / total_ue_num_;
+    cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
 
     size_t start_tsc = 0;
     size_t work_tsc_duration = 0;
@@ -309,7 +315,7 @@ void DyDecode::start_work()
 
         if (cur_cb_ > 0) {
 
-            if (unlikely(!state_trigger && cur_frame_ >= 400)) {
+            if (unlikely(!state_trigger && cur_frame_ >= 200)) {
                 start_tsc = rdtsc();
                 state_trigger = true;
             }
@@ -325,7 +331,7 @@ void DyDecode::start_work()
                 decode_start_tsc = rdtsc();
             }
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
-                cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
+                cur_cb_ + cur_ue_ * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
             if (likely(state_trigger)) {
                 size_t decode_tmp_tsc = rdtsc() - decode_start_tsc;
@@ -340,9 +346,15 @@ void DyDecode::start_work()
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                 cur_cb_ = 0;
-                cur_symbol_ += cfg->decode_thread_num_per_ue;
+                // cur_symbol_ += cfg->decode_thread_num_per_ue;
+                cur_idx_ += total_dycode_num_;
+                cur_symbol_ = cur_idx_ / total_ue_num_;
+                cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
                 if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
-                    cur_symbol_ = tid_in_ue_;
+                    // cur_symbol_ = tid_in_ue_;
+                    cur_idx_ = tid;
+                    cur_symbol_ = cur_idx_ / total_ue_num_;
+                    cur_ue_ = cur_idx_ % total_ue_num_;
 
                     // decode_start_tsc = rdtsc();
                     rx_status_->decode_done(cur_frame_);
@@ -370,7 +382,7 @@ void DyDecode::start_work()
                 state_start_tsc = rdtsc();
             }
             bool ret = decode_status_->received_all_demod_data(
-                   ue_id_, cur_frame_, cur_symbol_);
+                   cur_ue_, cur_frame_, cur_symbol_);
             if (likely(state_trigger)) {
                 state_operation_duration += rdtsc() - state_start_tsc;
                 work_tsc_duration += rdtsc() - work_start_tsc;
@@ -395,7 +407,7 @@ void DyDecode::start_work()
                     decode_start_tsc = rdtsc();
                 }
                 launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
-                    cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
+                    cur_cb_ + cur_ue_ * cfg->LDPC_config.nblocksInSymbol)
                         ._tag);
                 if (likely(state_trigger)) {
                     decode_tsc_duration += rdtsc() - decode_start_tsc;
@@ -408,9 +420,15 @@ void DyDecode::start_work()
                 cur_cb_++;
                 if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                     cur_cb_ = 0;
-                    cur_symbol_ += cfg->decode_thread_num_per_ue;
+                    // cur_symbol_ += cfg->decode_thread_num_per_ue;
+                    cur_idx_ += total_dycode_num_;
+                    cur_symbol_ = cur_idx_ / total_ue_num_;
+                    cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
                     if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
-                        cur_symbol_ = tid_in_ue_;
+                        // cur_symbol_ = tid_in_ue_;
+                        cur_idx_ = tid;
+                        cur_symbol_ = cur_idx_ / total_ue_num_;
+                        cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
 
                         // state_start_tsc = rdtsc();
                         rx_status_->decode_done(cur_frame_);

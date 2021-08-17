@@ -20,7 +20,7 @@ public:
         , num_ul_data_symbol_per_frame_(cfg->ul_data_symbol_num_perframe)
         , num_pkts_per_symbol_(cfg->get_num_ant_to_process())
         , num_decode_tasks_per_frame_(cfg->test_mode == 1 ? (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size : 
-            cfg->get_num_ues_to_process() * cfg->decode_thread_num_per_ue)
+            cfg->decode_thread_num)
         , num_precode_tasks_per_frame_((cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
         , num_fft_tasks_required_(cfg->get_num_ant_to_process())
         , num_fft_data_required_(cfg->bs_server_addr_list.size())
