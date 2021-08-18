@@ -63,12 +63,12 @@ Some highlights:
        * **NOTE**: To enable JIT acceleration applied for matrix multiplication in the code, MKL version after 2019 update 3 is required.
 
     * Optional: DPDK
-       * Refer to DPDK_README.md for additional configuration and installation support.
+       * Refer to [DPDK_README.md](DPDK_README.md) for configuration and installation instructions.
 
 ## Building and running with emulated RRU
 We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator.
 
- * Build Agora. This step also builds the sender, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink, and several unit tests for testing either performance or correctness of individual functions.
+ * Build Agora. This step also builds the emulated RRU, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink, and several unit tests for testing either performance or correctness of individual functions.
     <pre>
     $ cd Agora
     $ mkdir build
@@ -85,7 +85,12 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
  * Run Agora with emulated RRU traffic
    * **NOTE**: We recommend running Agora and the emulated RRU on two different machines. 
    If you are running them on the same machine, make sure Agora and the emulated RRU are using different set of cores, 
-     otherwise there will be performance slow down.
+     otherwise there will be performance slow down. 
+   When running Agora and the emulated RRU on two different machines, the following steps 
+     use Linux networking stack for packet I/O. 
+     Agora also supports using DPDK to bypass the kernel for packet I/O. 
+     See [DPDK_README.md](DPDK_README.md) for instructions of running emulated RRU and Agora with DPDK. 
+   
    * First, return to the base directory (`cd ..`), then run
    <pre>
    $ ./build/data_generator --conf_file data/tddconfig-sim-ul.json
@@ -101,12 +106,6 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
    $ ./build/sender --num_threads=2 --core_offset=1 --frame_duration=5000 --enable_slow_start=1 --conf_file=data/tddconfig-sim-ul.json
    </pre>
    to start the emulated RRU with uplink configuration.
-   * The above steps use Linux networking stack for packet I/O. Agora also supports using DPDK
-   to bypass the kernel for packet I/O. To enable DPDK, run
-   <pre>
-   $ cmake -DUSE_DPDK=1 ..; make -j
-   </pre>
-   When running the emulated RRU with DPDK, it is required to set the MAC address of the NIC used by Agora. To do this, pass `--server_mac_addr=` to `sender`.
    * To test the real-time performance of Agora, see the [Running performance test](#running-performance-test) section below.
 
  * Run Agora with channel simulator and clients
@@ -219,7 +218,7 @@ If you do not have a powerful server or high throughput NICs,
 we recommend increasing the value of `--frame_duration` when you run `./build/sender`, 
 which will increase frame duration and reduce throughput.
 
-To process 64x16 MU-MIMO in real-time, we use both ports of 40 GbE Intel XL710 NIC with DPDK (See DPDK_README.md)
+To process 64x16 MU-MIMO in real-time, we use one ports of 40 GbE Intel XL710 NIC with DPDK (see [DPDK_README.md](DPDK_README.md))
 to get enough throughput for the traffic of 64 antennas. 
 (**NOTE**: For 100 GbE NIC, we just need to use one port to get enough thoughput.)
 
@@ -245,7 +244,7 @@ To reduce performance variations, we did the following configurations for the se
     where the IRQ indices are machine dependent.
     
 The steps to collect and analyze timestamp traces are as follows:
-  * Enable DPDK in Agora.  Make sure it is compiled / configured for supporting your specific hardware NICs
+  * Enable DPDK in Agora.  Make sure it is compiled / configured for supporting your specific hardware NICs (see [DPDK_README.md](DPDK_README.md)).
   * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments. 
     In our [paper](#documentation), we change “antenna_num”,  “ue_num” and “symbol_num_perframe” 
     to different values to collect different data points in the figures. 
@@ -269,6 +268,7 @@ The steps to collect and analyze timestamp traces are as follows:
     $ sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ./build/sender --num_threads=2 --core_offset=0 \
       --conf_file=data/tddconfig-sim-ul.json --frame_duration=5000 --enable_slow_start=1
     </pre>
+    For DPDK, add `--server_mac_addr=` and set it to the MAC address of the NIC used by Agora. 
   * The timestamps will be saved in data/timeresult.txt after Agora finishes processing. We can then use a [MATLAB script](matlab/parsedata_ul.m) to process the timestamp trace. 
   * We also provide MATLAB scripts for [uplink](matlab/parse_multi_file_ul) and [downlink](matlab/parse_multi_file_dl) that are able to process multiple timestamp files and generate figures reported in our [paper](#documentation).
 
