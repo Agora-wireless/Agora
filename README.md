@@ -218,7 +218,7 @@ If you do not have a powerful server or high throughput NICs,
 we recommend increasing the value of `--frame_duration` when you run `./build/sender`, 
 which will increase frame duration and reduce throughput.
 
-To process 64x16 MU-MIMO in real-time, we use one ports of 40 GbE Intel XL710 NIC with DPDK (see [DPDK_README.md](DPDK_README.md))
+To process 64x16 MU-MIMO in real-time, we use both ports of 40 GbE Intel XL710 NIC with DPDK (see [DPDK_README.md](DPDK_README.md))
 to get enough throughput for the traffic of 64 antennas. 
 (**NOTE**: For 100 GbE NIC, we just need to use one port to get enough thoughput.)
 
