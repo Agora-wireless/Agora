@@ -10,6 +10,7 @@
 #include "recorder_thread.h"
 
 #include "logger.h"
+#include "rx_memory.h"
 #include "utils.h"
 
 namespace Agora_recorder {
@@ -131,13 +132,13 @@ void RecorderThread::HandleEvent(const RecordEventData& event) {
     this->running_ = false;
   } else {
     if (event.event_type_ == kTaskRecordRx) {
-      this->worker_.record(
-          this->id_,
-          rx_tag_t(event.record_event_.tags_[0]).rx_packet_->RawPacket());
+      this->worker_.record(this->id_,
+                           AgoraNetwork::rx_tag_t(event.record_event_.tags_[0])
+                               .rx_packet_->RawPacket());
     }
 
     /* Free up the buffer memory */
-    rx_tag_t(event.record_event_.tags_[0]).rx_packet_->Free();
+    AgoraNetwork::rx_tag_t(event.record_event_.tags_[0]).rx_packet_->Free();
   }
 }
 };  // End namespace Agora_recorder

@@ -6,6 +6,7 @@
 
 #include "logger.h"
 //#include "macros.h"
+#include "rx_memory.h"
 #include "signal_handler.h"
 //#include "utils.h"
 
@@ -107,7 +108,8 @@ void Recorder::DoIt() {
 
       // if kEventRxSymbol, dispatch to proper worker
       if (event.event_type_ == EventType::kPacketRX) {
-        Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
+        Packet* pkt =
+            AgoraNetwork::rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
 
         //Recording Thread Router
         size_t thread_index = pkt->ant_id_ / thread_antennas;

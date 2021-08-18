@@ -278,11 +278,10 @@ herr_t RecorderWorker::initHDF5() {
     write_attribute(mainGroup, "BS_HUB_ID", this->cfg_->HubIds());
 
     // BS SDR IDs
-    // *** first, how many boards in each cell? ***
     std::vector<std::string> bs_sdr_num_per_cell(
         this->cfg_->bs_sdr_ids().size());
     for (size_t i = 0; i < bs_sdr_num_per_cell.size(); ++i) {
-      bs_sdr_num_per_cell[i] =
+      bs_sdr_num_per_cell.at(i) =
           std::to_string(this->cfg_->bs_sdr_ids().at(i).size());
     }
     write_attribute(mainGroup, "BS_SDR_NUM_PER_CELL", bs_sdr_num_per_cell);
@@ -295,7 +294,7 @@ herr_t RecorderWorker::initHDF5() {
     write_attribute(mainGroup, "BS_SDR_ID", bs_sdr_id);
 
     // Number of Base Station Cells
-    write_attribute(mainGroup, "BS_NUM_CELLS", this->cfg_->num_cells());
+    write_attribute(mainGroup, "BS_NUM_CELLS", this->cfg_->NumCells());
 
     // How many RF channels per Iris board are enabled ("single" or "dual")
     write_attribute(mainGroup, "BS_CH_PER_RADIO",
@@ -328,9 +327,8 @@ herr_t RecorderWorker::initHDF5() {
     std::vector<std::string> bs_ant_num_per_cell(
         this->cfg_->bs_sdr_ids().size());
     for (size_t i = 0; i < bs_ant_num_per_cell.size(); ++i) {
-      bs_ant_num_per_cell[i] =
-          std::to_string(this->cfg_->bs_sdr_ids().at(i).size() *
-                         this->cfg_->bs_channel().length());
+      bs_ant_num_per_cell[i] = std::to_string(
+          this->cfg_->bs_sdr_ids().at(i).size() * this->cfg_->NumChannels());
     }
     write_attribute(mainGroup, "BS_ANT_NUM_PER_CELL", bs_ant_num_per_cell);
 

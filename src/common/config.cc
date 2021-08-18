@@ -44,6 +44,8 @@ Config::Config(const std::string& jsonfile)
   ref_ant_ = tdd_conf.value("ref_ant", 0);
   external_ref_node_ = tdd_conf.value("external_ref_node", false);
   num_cells_ = tdd_conf.value("cells", 1);
+  //\todo understand the case where the != 1
+
   channel_ = tdd_conf.value("channel", "A");
   num_channels_ = std::min(channel_.size(), (size_t)2);
   bs_ant_num_ = tdd_conf.value("antenna_num", 8);
