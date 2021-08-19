@@ -163,13 +163,13 @@ set(MAC_BS_SOURCES
   src/mac/file_receiver.cc
   src/mac/mac_basestation.cc)
 
+# Don't allow both Argos and UHD support
+if(${USE_ARGOS} AND ${USE_UHD})
+  message(FATAL_ERROR "Both USE_ARGOS and USE_UHD cannot be defined.  Please correct arguments and rerun cmake")
 # Argos support
-if(${USE_ARGOS})
+elseif(${USE_ARGOS})
   add_definitions(-DUSE_ARGOS)
-endif()
-
-if(${USE_UHD})
-  message(STATUS "Enabled USE_UHD: ${USE_UHD}")
+elseif(${USE_UHD})
   add_definitions(-DUSE_UHD)
 endif()
 
