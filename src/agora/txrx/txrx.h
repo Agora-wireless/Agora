@@ -28,7 +28,8 @@
 #if defined(USE_DPDK)
 #include "dpdk_transport.h"
 
-#define USE_DPDK_MEMORY
+//Removed support for copy free dpdk memory due to slowdown issue.
+//#define USE_DPDK_MEMORY
 
 #if defined(USE_DPDK_MEMORY)
 class DPDKRxPacket : public RxPacket {
