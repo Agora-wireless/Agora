@@ -27,7 +27,33 @@
 
 #if defined(USE_DPDK)
 #include "dpdk_transport.h"
-#endif
+
+//Removed support for copy free dpdk memory due to slowdown issue.
+//#define USE_DPDK_MEMORY
+
+#if defined(USE_DPDK_MEMORY)
+class DPDKRxPacket : public RxPacket {
+ public:
+  DPDKRxPacket() : RxPacket() { mem_ = nullptr; }
+  explicit DPDKRxPacket(const DPDKRxPacket& copy) : RxPacket(copy) {
+    mem_ = copy.mem_;
+  }
+  ~DPDKRxPacket() = default;
+  inline bool Set(rte_mbuf* mem, Packet* in_pkt) {
+    mem_ = mem;
+    return RxPacket::Set(in_pkt);
+  }
+
+ private:
+  rte_mbuf* mem_;
+  inline void GcPacket() override {
+    //std::printf("Garbage collecting the memory for DPDKRxPacket\n");
+    rte_pktmbuf_free(mem_);
+    this->Set(nullptr, nullptr);
+  }
+};
+#endif  // defined(USE_DPDK_MEMORY)
+#endif  //  defined(USE_DPDK)
 
 /**
  * @brief Implementations of this class provide packet I/O for Agora.
@@ -58,43 +84,42 @@ class PacketTXRX {
   // At thread [tid], receive packets from the NIC and enqueue them to the
   // master thread
   uint16_t DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
-                    size_t& prev_frame_id, size_t& rx_offset);
+                    size_t& prev_frame_id, size_t& rx_slot);
 #endif
 
   /**
    * @brief Start the network I/O threads
    *
    * @param buffer Ring buffer to save packets
-   * @param buffer_status Status of each packet buffer (0: empty, 1: full)
-   * @packet_num_in_buffer Total number of buffers in an RX ring
+   * @param packet_num_in_buffer Total number of buffers in an RX ring
    *
    * @return True on successfully starting the network I/O threads, false
    * otherwise
    */
-  bool StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
-                 size_t packet_num_in_buffer, Table<size_t>& frame_start,
-                 char* tx_buffer, Table<complex_float>& calib_dl_buffer_,
+  bool StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
+                 Table<size_t>& frame_start, char* tx_buffer,
+                 Table<complex_float>& calib_dl_buffer_,
                  Table<complex_float>& calib_ul_buffer_);
 
   void SendBeacon(int tid, size_t frame_id);
 
  private:
-  void LoopTxRx(int tid);  // The thread function for thread [tid]
+  void LoopTxRx(size_t tid);  // The thread function for thread [tid]
   int DequeueSend(int tid);
-  struct Packet* RecvEnqueue(int tid, int radio_id, int rx_offset);
+  struct Packet* RecvEnqueue(size_t tid, size_t radio_id, size_t rx_offset);
 
-  void LoopTxRxArgos(int tid);
+  void LoopTxRxArgos(size_t tid);
   int DequeueSendArgos(int tid);
-  std::vector<struct Packet*> RecvEnqueueArgos(int tid, int radio_id,
-                                               int rx_offset);
+  std::vector<struct Packet*> RecvEnqueueArgos(size_t tid, size_t radio_id,
+                                               size_t rx_slot);
 
   long long rx_time_bs_;
   long long tx_time_bs_;
-  void LoopTxRxUsrp(int tid);
+  void LoopTxRxUsrp(size_t tid);
   int DequeueSendUsrp(int tid);
   int DequeueSendUsrp(int tid, int frame_id, int symbol_id);
-  struct Packet* RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
-                                 int frame_id, int symbol_id);
+  struct Packet* RecvEnqueueUsrp(size_t tid, size_t radio_id, size_t rx_slot,
+                                 size_t frame_id, size_t symbol_id);
 
   Config* cfg_;
 
@@ -106,9 +131,8 @@ class PacketTXRX {
 
   // Handle for socket threads
   std::array<std::thread, kMaxSocketNum> socket_std_threads_;
-  Table<char>* buffer_;
-  Table<int>* buffer_status_;
-  size_t packet_num_in_buffer_;
+  size_t buffers_per_socket_;
+
   char* tx_buffer_;
   Table<size_t>* frame_start_;
   moodycamel::ConcurrentQueue<EventData>* message_queue_;
@@ -120,10 +144,22 @@ class PacketTXRX {
   std::vector<std::unique_ptr<UDPClient>> udp_clients_;
 
 #if defined(USE_DPDK)
-  uint32_t bs_rru_addr;     // IPv4 address of the simulator sender
-  uint32_t bs_server_addr;  // IPv4 address of the Agora server
-  struct rte_mempool* mbuf_pool;
-#endif
+  uint32_t bs_rru_addr_;     // IPv4 address of the simulator sender
+  uint32_t bs_server_addr_;  // IPv4 address of the Agora server
+  struct rte_mempool* mbuf_pool_;
+
+  // Dimension 1: socket_thread
+  // Dimension 2: rx_packet
+#if defined(USE_DPDK_MEMORY)
+  std::vector<std::vector<DPDKRxPacket>> rx_packets_;
+#else
+  std::vector<std::vector<RxPacket>> rx_packets_;
+#endif  // defined(USE_DPDK_MEMORY)
+#else
+  // Dimension 1: socket_thread
+  // Dimension 2: rx_packet
+  std::vector<std::vector<RxPacket>> rx_packets_;
+#endif  // defined(USE_DPDK)
 
   std::unique_ptr<RadioConfig> radioconfig_;  // Used only in Argos mode
 };

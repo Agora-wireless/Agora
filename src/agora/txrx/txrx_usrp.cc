@@ -8,13 +8,14 @@
 
 static constexpr bool kDebugDownlink = false;
 
-void PacketTXRX::LoopTxRxUsrp(int tid) {
+void PacketTXRX::LoopTxRxUsrp(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid);
   size_t* rx_frame_start = (*frame_start_)[tid];
-  int rx_offset = 0;
-  int radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
-  int radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
-  std::printf("receiver thread %d has %d radios\n", tid, radio_hi - radio_lo);
+  size_t rx_slot = 0;
+  size_t radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
+  size_t radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
+  std::printf("LoopTxRxUsrp: TxRx thread %zu has %zu radios\n", tid,
+              radio_hi - radio_lo);
 
   // prepare BS beacon in host buffer
   std::vector<void*> beaconbuff(2);
@@ -55,18 +56,17 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
   std::cout << "Init BS sync done..." << std::endl;
   std::cout << "Start BS main recv loop..." << std::endl;
 
-  int global_frame_id = 0;
-  int global_symbol_id = 0;
+  size_t global_frame_id = 0;
+  size_t global_symbol_id = 0;
 
   int prev_frame_id = -1;
-  int radio_id = radio_lo;
+  size_t radio_id = radio_lo;
   while (cfg_->Running() == true) {
     // transmit data
     // if (-1 != dequeue_send_usrp(tid))
     //   continue;
     // receive data
-    // struct Packet* pkt = recv_enqueue_usrp(tid, radio_id, rx_offset);
-    struct Packet* pkt = RecvEnqueueUsrp(tid, radio_id, rx_offset,
+    struct Packet* pkt = RecvEnqueueUsrp(tid, radio_id, rx_slot,
                                          global_frame_id, global_symbol_id);
 
     // Schedule beacon in the future
@@ -87,7 +87,7 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
 
     // Update global frame_id and symbol_id
     global_symbol_id++;
-    if (global_symbol_id == (int)cfg_->Frame().NumTotalSyms()) {
+    if (global_symbol_id == cfg_->Frame().NumTotalSyms()) {
       global_symbol_id = 0;
       global_frame_id++;
     }
@@ -95,11 +95,10 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
     if (pkt == nullptr) {
       continue;
     }
-    rx_offset = (rx_offset + cfg_->NumChannels()) % packet_num_in_buffer_;
+    rx_slot = (rx_slot + cfg_->NumChannels()) % buffers_per_socket_;
 
     if (kIsWorkerTimingEnabled) {
       int frame_id = pkt->frame_id_;
-      // int symbol_id = pkt->symbol_id;
       if (frame_id > prev_frame_id) {
         rx_frame_start[frame_id % kNumStatsFrames] = GetTime::Rdtsc();
         prev_frame_id = frame_id;
@@ -108,12 +107,10 @@ void PacketTXRX::LoopTxRxUsrp(int tid) {
   }
 }
 
-struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
-                                           int frame_id, int symbol_id) {
+struct Packet* PacketTXRX::RecvEnqueueUsrp(size_t tid, size_t radio_id,
+                                           size_t rx_slot, size_t frame_id,
+                                           size_t symbol_id) {
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-  char* rx_buffer = (*buffer_)[tid];
-  int* rx_buffer_status = (*buffer_status_)[tid];
-  int packet_length = cfg_->PacketLength();
 
   // init samp_buffer for dummy read
   std::vector<std::complex<int16_t>> samp_buffer0(
@@ -126,27 +123,24 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
     samp_buffer[1] = samp_buffer1.data();
   }
 
-  // if rx_buffer is full, exit
-  int n_channels = cfg_->NumChannels();
-  struct Packet* pkt[n_channels];
-  void* samp[n_channels];
-  for (int ch = 0; ch < n_channels; ++ch) {
+  size_t n_channels = cfg_->NumChannels();
+  std::vector<void*> samp(n_channels);
+  for (size_t ch = 0; ch < n_channels; ++ch) {
+    RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
     // if rx_buffer is full, exit
-    if (rx_buffer_status[rx_offset + ch] == 1) {
-      std::printf("Receive thread %d rx_buffer full, offset: %d\n", tid,
-                  rx_offset);
+    if (rx.Empty() == false) {
+      std::printf("Receive thread %zu rx_buffer full, offset: %zu\n", tid,
+                  rx_slot);
       cfg_->Running(false);
       break;
     }
-    pkt[ch] = (struct Packet*)&rx_buffer[(rx_offset + ch) * packet_length];
-    samp[ch] = pkt[ch]->data_;
+    samp.at(ch) = rx.RawPacket();
   }
 
   int tmp_ret;
-
   if (cfg_->IsPilot(frame_id, symbol_id) ||
       cfg_->IsUplink(frame_id, symbol_id)) {
-    tmp_ret = radioconfig_->RadioRx(radio_id, samp, rx_time_bs_);
+    tmp_ret = radioconfig_->RadioRx(radio_id, samp.data(), rx_time_bs_);
   } else {
     tmp_ret = radioconfig_->RadioRx(radio_id, samp_buffer.data(), rx_time_bs_);
   }
@@ -157,27 +151,23 @@ struct Packet* PacketTXRX::RecvEnqueueUsrp(int tid, int radio_id, int rx_offset,
     return nullptr;
   }
 
-  int ant_id = radio_id * n_channels;
+  size_t ant_id = radio_id * n_channels;
   if (cfg_->IsPilot(frame_id, symbol_id) ||
       cfg_->IsUplink(frame_id, symbol_id)) {
-    for (int ch = 0; ch < n_channels; ++ch) {
-      new (pkt[ch]) Packet(frame_id, symbol_id, 0, ant_id + ch);
-      // move ptr & set status to full
-      rx_buffer_status[rx_offset + ch] =
-          1;  // has data, after it is read, it is set to 0
-
+    for (size_t ch = 0; ch < n_channels; ++ch) {
+      RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
+      new (rx.RawPacket()) Packet(frame_id, symbol_id, 0, ant_id + ch);
+      rx.Use();
       // Push kPacketRX event into the queue
-      EventData rx_message(EventType::kPacketRX,
-                           rx_tag_t(tid, rx_offset + ch).tag_);
+      EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
 
-      if (!message_queue_->enqueue(*local_ptok, rx_message)) {
+      if (message_queue_->enqueue(*local_ptok, rx_message) == false) {
         std::printf("socket message enqueue failed\n");
         throw std::runtime_error("PacketTXRX: socket message enqueue failed");
       }
     }
   }
-
-  return pkt[0];
+  return rx_packets_.at(tid).at(rx_slot).RawPacket();
 }
 
 int PacketTXRX::DequeueSendUsrp(int tid) {

@@ -177,20 +177,13 @@ class Agora {
    *****************************************************/
 
   /* Uplink */
-  size_t socket_buffer_size_;  // RX buffer size per socket RX thread
-
-  // Max number of packets that can be buffered in one RX thread
-  size_t socket_buffer_status_size_;
+  // RX buffer size per socket RX thread
+  size_t socket_buffer_size_;
 
   // Received data buffers
   // 1st dimension: number of socket RX threads
   // 2nd dimension: socket buffer size
   Table<char> socket_buffer_;
-
-  // Status of received data buffers
-  // 1st dimension: number of socket RX threads
-  // 2nd dimension: socket buffer status size
-  Table<int> socket_buffer_status_;
 
   // Preliminary CSI buffers. Each buffer has [number of antennas] rows and
   // [number of OFDM data subcarriers] columns.
