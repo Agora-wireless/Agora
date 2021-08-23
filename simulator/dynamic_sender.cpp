@@ -242,16 +242,16 @@ void* Sender::worker_thread(int tid)
             cfg->bs_server_addr_list[server_idx].c_str(),
             cfg->bs_server_port + tid);
 
-        rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, 1) == 1,
-            "rte_eth_tx_burst() failed");
-        // size_t pkt_sent = 0;
-        // size_t loop_count = 0;
-        // while (pkt_sent < cfg->bs_server_addr_list.size()) {
-        //     size_t pkt_sent_cur = rte_eth_tx_burst(0, tid, tx_mbufs + pkt_sent, cfg->bs_server_addr_list.size() - pkt_sent);
-        //     pkt_sent += pkt_sent_cur;
-        //     loop_count ++;
-        //     rt_assert(loop_count < 10000, "rte_eth_tx_burst() failed");
-        // }
+        // rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, 1) == 1,
+        //     "rte_eth_tx_burst() failed");
+        size_t pkt_sent = 0;
+        size_t loop_count = 0;
+        while (pkt_sent < 1) {
+            size_t pkt_sent_cur = rte_eth_tx_burst(0, tid, tx_mbufs, 1);
+            pkt_sent += pkt_sent_cur;
+            loop_count ++;
+            rt_assert(loop_count < 10000, "rte_eth_tx_burst() failed");
+        }
 
         if (unlikely(++cur_radio == radio_hi)) {
             cur_radio = radio_lo;
@@ -266,13 +266,13 @@ void* Sender::worker_thread(int tid)
                 // delay_ticks(start_tsc_send, cur_frame * max_symbol_id * ticks_all);
                 printf("Thread %u send frame %u in %.1f ms\n", tid, cur_frame - 1, (get_time() - start_time) / 1000.0f);
 
-                // if (tid == 0) {
-                //     rte_eth_stats stats;
-                //     rte_eth_stats_get(0, &stats);
-                //     printf("Traffic rate is %lf, packet rate is %lf\n", (double)(stats.obytes - tx_stats.obytes) * 8 / ((get_time() - start_time) * 1000.0f),
-                //         (double)(stats.opackets - tx_stats.opackets) / ((get_time() - start_time)));
-                //     memcpy(&tx_stats, &stats, sizeof(rte_eth_stats));
-                // }
+                if (tid == 0) {
+                    rte_eth_stats stats;
+                    rte_eth_stats_get(0, &stats);
+                    printf("Traffic rate is %lf, packet rate is %lf\n", (double)(stats.obytes - tx_stats.obytes) * 8 / ((get_time() - start_time) * 1000.0f),
+                        (double)(stats.opackets - tx_stats.opackets) / ((get_time() - start_time)));
+                    memcpy(&tx_stats, &stats, sizeof(rte_eth_stats));
+                }
 
                 start_time = get_time();
             }
