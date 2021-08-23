@@ -8,26 +8,26 @@
 
 static constexpr bool kDebugDownlink = false;
 
-void PacketTXRX::LoopTxRxArgos(int tid) {
+void PacketTXRX::LoopTxRxArgos(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid);
   size_t* rx_frame_start = (*frame_start_)[tid];
-  int rx_offset = 0;
-  int radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
-  int radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
-  MLPD_INFO("TXRX thread %d has %d radios\n", tid, radio_hi - radio_lo);
+  size_t rx_slot = 0;
+  size_t radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
+  size_t radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
+  MLPD_INFO("TXRX thread %zu has %zu radios\n", tid, radio_hi - radio_lo);
 
-  int prev_frame_id = -1;
-  int radio_id = radio_lo;
+  ssize_t prev_frame_id = -1;
+  size_t radio_id = radio_lo;
   while (cfg_->Running() == true) {
     if (-1 != DequeueSendArgos(tid)) {
       continue;
     }
     // receive data
-    auto pkt = RecvEnqueueArgos(tid, radio_id, rx_offset);
+    auto pkt = RecvEnqueueArgos(tid, radio_id, rx_slot);
     if (pkt.size() == 0) {
       continue;
     }
-    rx_offset = (rx_offset + pkt.size()) % packet_num_in_buffer_;
+    rx_slot = (rx_slot + pkt.size()) % buffers_per_socket_;
 
     if (kIsWorkerTimingEnabled) {
       int frame_id = pkt.front()->frame_id_;
@@ -42,76 +42,76 @@ void PacketTXRX::LoopTxRxArgos(int tid) {
   }
 }
 
-std::vector<struct Packet*> PacketTXRX::RecvEnqueueArgos(int tid, int radio_id,
-                                                         int rx_offset) {
+std::vector<struct Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid,
+                                                         size_t radio_id,
+                                                         size_t rx_slot) {
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-  char* rx_buffer = (*buffer_)[tid];
-  int* rx_buffer_status = (*buffer_status_)[tid];
-  int packet_length = cfg_->PacketLength();
+  size_t packet_length = cfg_->PacketLength();
 
-  // if rx_buffer is full, exit
-  std::vector<struct Packet*> pkt(cfg_->NumChannels());
-  int ant_id = radio_id * cfg_->NumChannels();
-  std::vector<int> ant_ids(cfg_->NumChannels());
-  void* samp[cfg_->NumChannels()];
+  size_t ant_id = radio_id * cfg_->NumChannels();
+  std::vector<size_t> ant_ids(cfg_->NumChannels());
+  std::vector<void*> samp(cfg_->NumChannels());
+
   for (size_t ch = 0; ch < cfg_->NumChannels(); ++ch) {
+    RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
+
     // if rx_buffer is full, exit
-    if (rx_buffer_status[rx_offset + ch] == 1) {
-      MLPD_ERROR("TXRX thread %d rx_buffer full, offset: %d\n", tid, rx_offset);
+    if (rx.Empty() == false) {
+      MLPD_ERROR("TXRX thread %zu rx_buffer full, rx slot: %zu\n", tid,
+                 rx_slot);
       cfg_->Running(false);
       break;
     }
-    pkt[ch] = (struct Packet*)&rx_buffer[(rx_offset + ch) * packet_length];
-    samp[ch] = pkt[ch]->data_;
-    ant_ids[ch] = ant_id + ch;
+    ant_ids.at(ch) = ant_id + ch;
+    samp.at(ch) = rx.RawPacket()->data_;
   }
 
   long long frame_time;
   if ((cfg_->Running() == false) ||
-      radioconfig_->RadioRx(radio_id, samp, frame_time) <= 0) {
+      radioconfig_->RadioRx(radio_id, samp.data(), frame_time) <= 0) {
     std::vector<struct Packet*> empty_pkt;
     return empty_pkt;
   }
 
-  int frame_id = (int)(frame_time >> 32);
-  int symbol_id = (int)((frame_time >> 16) & 0xFFFF);
-  std::vector<int> symbol_ids(cfg_->NumChannels(), symbol_id);
+  size_t frame_id = (size_t)(frame_time >> 32);
+  size_t symbol_id = (size_t)((frame_time >> 16) & 0xFFFF);
+  std::vector<size_t> symbol_ids(cfg_->NumChannels(), symbol_id);
 
-  // TODO: What if ref_ant is set to the second channel?
+  /// \TODO: What if ref_ant is set to the second channel?
   if ((cfg_->Frame().IsRecCalEnabled() == true) &&
       (cfg_->IsCalDlPilot(frame_id, symbol_id) == true) &&
-      (radio_id == (int)cfg_->RefRadio()) && (cfg_->AntPerGroup() > 1)) {
+      (radio_id == cfg_->RefRadio()) && (cfg_->AntPerGroup() > 1)) {
     if (cfg_->AntPerGroup() > cfg_->NumChannels()) {
-      pkt.resize(cfg_->AntPerGroup());
       symbol_ids.resize(cfg_->AntPerGroup());
       ant_ids.resize(cfg_->AntPerGroup());
     }
     for (size_t s = 1; s < cfg_->AntPerGroup(); s++) {
-      pkt[s] = (struct Packet*)&rx_buffer[(rx_offset + s) * packet_length];
-      void* samp2[cfg_->NumChannels()];
+      RxPacket& rx = rx_packets_.at(tid).at(rx_slot + s);
+
+      std::vector<void*> tmp_samp(cfg_->NumChannels());
       std::vector<char> dummy_buff(packet_length);
-      samp2[0] = pkt[s]->data_;
-      samp2[1] = dummy_buff.data();
+      tmp_samp.at(0) = rx.RawPacket()->data_;
+      tmp_samp.at(1) = dummy_buff.data();
       if ((cfg_->Running() == false) ||
-          radioconfig_->RadioRx(radio_id, samp2, frame_time) <= 0) {
+          radioconfig_->RadioRx(radio_id, tmp_samp.data(), frame_time) <= 0) {
         std::vector<struct Packet*> empty_pkt;
         return empty_pkt;
       }
-      symbol_ids[s] = cfg_->Frame().GetDLCalSymbol(s);
-      ant_ids[s] = ant_id;
+      symbol_ids.at(s) = cfg_->Frame().GetDLCalSymbol(s);
+      ant_ids.at(s) = ant_id;
     }
   }
 
-  for (size_t ch = 0; ch < pkt.size(); ++ch) {
-    new (pkt[ch])
-        Packet(frame_id, symbol_ids[ch], 0 /* cell_id */, ant_ids[ch]);
-    // move ptr & set status to full
-    rx_buffer_status[rx_offset + ch] =
-        1;  // has data, after it is read, it is set to 0
+  std::vector<struct Packet*> pkt;
+  for (size_t ch = 0; ch < symbol_ids.size(); ++ch) {
+    RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
+    pkt.push_back(rx.RawPacket());
+    new (rx.RawPacket())
+        Packet(frame_id, symbol_ids.at(ch), 0 /* cell_id */, ant_ids.at(ch));
 
+    rx.Use();
     // Push kPacketRX event into the queue.
-    EventData rx_message(EventType::kPacketRX,
-                         rx_tag_t(tid, rx_offset + ch).tag_);
+    EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
 
     if (message_queue_->enqueue(*local_ptok, rx_message) == false) {
       std::printf("socket message enqueue failed\n");

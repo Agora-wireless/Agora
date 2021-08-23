@@ -31,9 +31,9 @@ UeWorker::UeWorker(
     moodycamel::ProducerToken& work_producer, Table<int8_t>& ul_bits_buffer,
     Table<int8_t>& encoded_buffer, Table<complex_float>& modul_buffer,
     Table<complex_float>& ifft_buffer, char* const tx_buffer,
-    Table<char>& rx_buffer, Table<int>& rx_buffer_status,
-    std::vector<myVec>& csi_buffer, std::vector<myVec>& equal_buffer,
-    std::vector<size_t>& non_null_sc_ind, Table<complex_float>& fft_buffer,
+    Table<char>& rx_buffer, std::vector<myVec>& csi_buffer,
+    std::vector<myVec>& equal_buffer, std::vector<size_t>& non_null_sc_ind,
+    Table<complex_float>& fft_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
     std::vector<std::vector<std::complex<float>>>& ue_pilot_vec)
@@ -51,7 +51,6 @@ UeWorker::UeWorker(
       ifft_buffer_(ifft_buffer),
       tx_buffer_(tx_buffer),
       rx_buffer_(rx_buffer),
-      rx_buffer_status_(rx_buffer_status),
       csi_buffer_(csi_buffer),
       equal_buffer_(equal_buffer),
       non_null_sc_ind_(non_null_sc_ind),
@@ -145,14 +144,11 @@ void UeWorker::TaskThread(size_t core_offset) {
 //                   DOWNLINK Operations                //
 //////////////////////////////////////////////////////////
 void UeWorker::DoFftData(size_t tag) {
-  size_t rx_thread_id = fft_req_tag_t(tag).tid_;
-  size_t offset_in_current_buffer = fft_req_tag_t(tag).offset_;
   size_t start_tsc = GetTime::Rdtsc();
 
   // read info of one frame
-  auto* pkt = reinterpret_cast<struct Packet*>(rx_buffer_[rx_thread_id] +
-                                               offset_in_current_buffer *
-                                                   config_.PacketLength());
+  Packet* pkt = fft_req_tag_t(tag).rx_packet_->RawPacket();
+
   size_t frame_id = pkt->frame_id_;
   size_t symbol_id = pkt->symbol_id_;
   size_t ant_id = pkt->ant_id_;
@@ -271,7 +267,8 @@ void UeWorker::DoFftData(size_t tag) {
   }
 
   // Free the rx buffer
-  rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0;
+  fft_req_tag_t(tag).rx_packet_->Free();
+
   EventData fft_finish_event = EventData(
       EventType::kFFT, gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_);
   RtAssert(notify_queue_.enqueue(*ptok_.get(), fft_finish_event),
@@ -279,14 +276,11 @@ void UeWorker::DoFftData(size_t tag) {
 }
 
 void UeWorker::DoFftPilot(size_t tag) {
-  size_t rx_thread_id = fft_req_tag_t(tag).tid_;
-  size_t offset_in_current_buffer = fft_req_tag_t(tag).offset_;
   size_t start_tsc = GetTime::Rdtsc();
 
   // read info of one frame
-  auto* pkt = reinterpret_cast<struct Packet*>(
-      rx_buffer_[rx_thread_id] +
-      (offset_in_current_buffer * config_.PacketLength()));
+  Packet* pkt = fft_req_tag_t(tag).rx_packet_->RawPacket();
+
   size_t frame_id = pkt->frame_id_;
   size_t symbol_id = pkt->symbol_id_;
   size_t ant_id = pkt->ant_id_;
@@ -378,7 +372,7 @@ void UeWorker::DoFftPilot(size_t tag) {
   }
 
   // Free the rx buffer
-  rx_buffer_status_[rx_thread_id][offset_in_current_buffer] = 0;
+  fft_req_tag_t(tag).rx_packet_->Free();
   EventData fft_finish_event =
       EventData(EventType::kFFTPilot,
                 gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_);

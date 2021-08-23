@@ -352,7 +352,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
 
   (*client_.ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
   EventData msg(EventType::kPacketFromMac,
-                rx_tag_t(next_radio_id_, radio_buf_id).tag_);
+                rx_mac_tag_t(next_radio_id_, radio_buf_id).tag_);
   RtAssert(tx_queue_->enqueue(msg),
            "MAC thread: Failed to enqueue uplink packet");
 

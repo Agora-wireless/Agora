@@ -14,23 +14,26 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
       ant_per_cell_(cfg->BsAntNum() / cfg->NumCells()),
       socket_thread_num_(cfg->SocketThreadNum()) {
   DpdkTransport::DpdkInit(core_offset_ - 1, socket_thread_num_);
-  printf("Number of ports: %d used (offset: %d), %d available, socket: %d\n",
-         cfg_->DpdkNumPorts(), cfg_->DpdkPortOffset(),
-         rte_eth_dev_count_avail(), rte_socket_id());
+  std::printf(
+      "Number of ports: %d used (offset: %d), %d available, socket: %d\n",
+      cfg_->DpdkNumPorts(), cfg_->DpdkPortOffset(), rte_eth_dev_count_avail(),
+      rte_socket_id());
   RtAssert(cfg_->DpdkNumPorts() <= rte_eth_dev_count_avail(),
            "Invalid number of DPDK ports");
-  mbuf_pool = DpdkTransport::CreateMempool(cfg->DpdkNumPorts());
+  mbuf_pool_ = DpdkTransport::CreateMempool(cfg->DpdkNumPorts());
 
-  int ret = inet_pton(AF_INET, cfg_->BsRruAddr().c_str(), &bs_rru_addr);
+  int ret = inet_pton(AF_INET, cfg_->BsRruAddr().c_str(), &bs_rru_addr_);
   RtAssert(ret == 1, "Invalid sender IP address");
-  ret = inet_pton(AF_INET, cfg_->BsServerAddr().c_str(), &bs_server_addr);
+  ret = inet_pton(AF_INET, cfg_->BsServerAddr().c_str(), &bs_server_addr_);
   RtAssert(ret == 1, "Invalid server IP address");
 
-  for (uint16_t port_id = 0; port_id < cfg_->DpdkNumPorts(); port_id++)
-    if (DpdkTransport::NicInit(port_id + cfg->DpdkPortOffset(), mbuf_pool,
-                               socket_thread_num_) != 0)
+  for (uint16_t port_id = 0; port_id < cfg_->DpdkNumPorts(); port_id++) {
+    if (DpdkTransport::NicInit(port_id + cfg->DpdkPortOffset(), mbuf_pool_,
+                               socket_thread_num_) != 0) {
       rte_exit(EXIT_FAILURE, "Cannot init port %u\n",
                port_id + cfg->DpdkPortOffset());
+    }
+  }
 
   for (size_t i = 0; i < socket_thread_num_; i++) {
     uint16_t src_port = rte_cpu_to_be_16(cfg_->BsRruPort() + i);
@@ -45,7 +48,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
         i / this->cfg_->DpdkNumPorts());
     DpdkTransport::InstallFlowRule(
         i % this->cfg_->DpdkNumPorts() + cfg->DpdkPortOffset(),
-        i / this->cfg_->DpdkNumPorts(), bs_rru_addr, bs_server_addr, src_port,
+        i / this->cfg_->DpdkNumPorts(), bs_rru_addr_, bs_server_addr_, src_port,
         dst_port);
   }
 
@@ -64,25 +67,39 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
   tx_ptoks_ = tx_ptoks;
 }
 
-PacketTXRX::~PacketTXRX() { rte_mempool_free(mbuf_pool); }
+PacketTXRX::~PacketTXRX() { rte_mempool_free(mbuf_pool_); }
 
-bool PacketTXRX::StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
-                           size_t packet_num_in_buffer,
+bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
                            Table<size_t>& frame_start, char* tx_buffer,
                            Table<complex_float>& calib_dl_buffer,
                            Table<complex_float>& calib_ul_buffer) {
   unused(calib_dl_buffer);
   unused(calib_ul_buffer);
-  buffer_ = &buffer;
-  buffer_status_ = &buffer_status;
-  frame_start_ = &frame_start;
 
-  packet_num_in_buffer_ = packet_num_in_buffer;
+  frame_start_ = &frame_start;
+  buffers_per_socket_ = packet_num_in_buffer / socket_thread_num_;
   tx_buffer_ = tx_buffer;
+
+  rx_packets_.resize(socket_thread_num_);
+  for (size_t i = 0; i < socket_thread_num_; i++) {
+    rx_packets_.at(i).reserve(buffers_per_socket_);
+#if defined(USE_DPDK_MEMORY)
+    unused(buffer);
+    rx_packets_.at(i).resize(buffers_per_socket_);
+#else
+    for (size_t number_packets = 0; number_packets < buffers_per_socket_;
+         number_packets++) {
+      auto* pkt_loc = reinterpret_cast<Packet*>(
+          buffer[i] + (number_packets * cfg_->PacketLength()));
+      rx_packets_.at(i).emplace_back(pkt_loc);
+    }
+#endif  // defined(USE_DPDK_MEMORY)
+  }
 
   unsigned int lcore_id;
   size_t worker_id = 0;
   // Launch specific task to cores
+  // For dpdk version >= 20.11.1 use RTE_LCORE_FOREACH_WORKER
   RTE_LCORE_FOREACH_SLAVE(lcore_id) {
     // launch communication and task thread onto specific core
     if (worker_id < socket_thread_num_) {
@@ -102,13 +119,13 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, Table<int>& buffer_status,
 }
 
 void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
-  // TODO: implement beacon transmission for DPDK mode
+  /// \TODO: implement beacon transmission for DPDK mode
   unused(tid);
   unused(frame_id);
 }
 
-void PacketTXRX::LoopTxRx(int tid) {
-  size_t rx_offset = 0;
+void PacketTXRX::LoopTxRx(size_t tid) {
+  size_t rx_slot = 0;
   size_t prev_frame_id = SIZE_MAX;
   const uint16_t port_id = tid % cfg_->DpdkNumPorts() + cfg_->DpdkPortOffset();
   const uint16_t queue_id = tid / cfg_->DpdkNumPorts();
@@ -117,27 +134,30 @@ void PacketTXRX::LoopTxRx(int tid) {
     if (-1 != DequeueSend(tid)) {
       continue;
     }
-    DpdkRecv(tid, port_id, queue_id, prev_frame_id, rx_offset);
+    DpdkRecv((int)tid, port_id, queue_id, prev_frame_id, rx_slot);
   }
 }
 
 uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
-                              size_t& prev_frame_id, size_t& rx_offset) {
+                              size_t& prev_frame_id, size_t& rx_slot) {
   rte_mbuf* rx_bufs[kRxBatchSize];
   uint16_t nb_rx = rte_eth_rx_burst(port_id, queue_id, rx_bufs, kRxBatchSize);
   if (unlikely(nb_rx == 0)) return 0;
 
   for (size_t i = 0; i < nb_rx; i++) {
+    rte_mbuf* dpdk_pkt = rx_bufs[i];
+
     // If the RX buffer is full, it means that the base station processing
     // hasn't kept up, so exit.
-    if ((*buffer_status_)[tid][rx_offset] == 1) {
-      std::printf("TXRX thread %d rx_buffer full, offset: %zu\n", tid,
-                  rx_offset);
+    auto& rx = rx_packets_.at(tid).at(rx_slot);
+
+    if (rx.Empty() == false) {
+      std::printf("TXRX thread [%d] DpdkRecv rx_buffer full, slot: %zu\n", tid,
+                  rx_slot);
       cfg_->Running(false);
       return 0;
     }
 
-    rte_mbuf* dpdk_pkt = rx_bufs[i];
     auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
     auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
         reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
@@ -156,45 +176,47 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
 
     if (eth_type != RTE_ETHER_TYPE_IPV4 or
         ip_hdr->next_proto_id != IPPROTO_UDP) {
-      rte_pktmbuf_free(rx_bufs[i]);
+      rte_pktmbuf_free(dpdk_pkt);
       continue;
     }
 
-    if (ip_hdr->src_addr != bs_rru_addr) {
+    if (ip_hdr->src_addr != bs_rru_addr_) {
       std::fprintf(stderr, "DPDK: Source addr does not match\n");
-      rte_pktmbuf_free(rx_bufs[i]);
+      rte_pktmbuf_free(dpdk_pkt);
       continue;
     }
-    if (ip_hdr->dst_addr != bs_server_addr) {
+    if (ip_hdr->dst_addr != bs_server_addr_) {
       std::fprintf(stderr, "DPDK: Destination addr does not match\n");
-      rte_pktmbuf_free(rx_bufs[i]);
+      rte_pktmbuf_free(dpdk_pkt);
       continue;
     }
 
     auto* payload = reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset;
-    auto* pkt = reinterpret_cast<Packet*>(
-        &(*buffer_)[tid][rx_offset * cfg_->PacketLength()]);
-    DpdkTransport::FastMemcpy(reinterpret_cast<uint8_t*>(pkt), payload,
-                              cfg_->PacketLength());
-
-    rte_pktmbuf_free(rx_bufs[i]);
+#if defined(USE_DPDK_MEMORY)
+    rx.Set(dpdk_pkt, reinterpret_cast<Packet*>(payload));
+#else
+    DpdkTransport::FastMemcpy(reinterpret_cast<uint8_t*>(rx.RawPacket()),
+                              payload, cfg_->PacketLength());
+    rte_pktmbuf_free(dpdk_pkt);
+#endif
 
     if (kIsWorkerTimingEnabled) {
-      if (prev_frame_id == SIZE_MAX or pkt->frame_id_ > prev_frame_id) {
-        (*frame_start_)[tid][pkt->frame_id_ % kNumStatsFrames] =
+      if (prev_frame_id == SIZE_MAX or
+          rx.RawPacket()->frame_id_ > prev_frame_id) {
+        (*frame_start_)[tid][rx.RawPacket()->frame_id_ % kNumStatsFrames] =
             GetTime::Rdtsc();
-        prev_frame_id = pkt->frame_id_;
+        prev_frame_id = rx.RawPacket()->frame_id_;
       }
     }
 
-    if (!message_queue_->enqueue(
+    rx.Use();
+    if (message_queue_->enqueue(
             *rx_ptoks_[tid],
-            EventData(EventType::kPacketRX, rx_tag_t(tid, rx_offset).tag_))) {
+            EventData(EventType::kPacketRX, rx_tag_t(rx).tag_)) == false) {
       std::printf("Failed to enqueue socket message\n");
       throw std::runtime_error("PacketTXRX: Failed to enqueue socket message");
     }
-
-    rx_offset = (rx_offset + 1) % packet_num_in_buffer_;
+    rx_slot = (rx_slot + 1) % buffers_per_socket_;
   }
   return nb_rx;
 }
@@ -232,15 +254,15 @@ int PacketTXRX::DequeueSend(int tid) {
   new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
   struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-  tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool);
+  tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool_);
   struct rte_ether_hdr* eth_hdr =
       rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
   eth_hdr->ether_type = rte_be_to_cpu_16(RTE_ETHER_TYPE_IPV4);
 
   struct rte_ipv4_hdr* ip_h =
       (struct rte_ipv4_hdr*)((char*)eth_hdr + sizeof(struct rte_ether_hdr));
-  ip_h->src_addr = bs_server_addr;
-  ip_h->dst_addr = bs_rru_addr;
+  ip_h->src_addr = bs_server_addr_;
+  ip_h->dst_addr = bs_rru_addr_;
   ip_h->next_proto_id = IPPROTO_UDP;
 
   struct rte_udp_hdr* udp_h =
