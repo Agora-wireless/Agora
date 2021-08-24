@@ -92,14 +92,16 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
             ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[i].c_str());
             rt_assert(parsed_mac != NULL, "Invalid server mac address");
             memcpy(&bs_server_mac_addrs_[i], parsed_mac, sizeof(ether_addr));
-            uint16_t src_port = rte_cpu_to_be_16(cfg->demod_tx_port);
-            uint16_t dst_port = rte_cpu_to_be_16(cfg->demod_rx_port);
-            printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
-                "dst port: %zu, queue: %zu\n",
-                cfg->bs_server_addr_list[i].c_str(), cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(),
-                cfg->demod_tx_port, cfg->demod_rx_port, socket_thread_num);
-            DpdkTransport::install_flow_rule(
-                port_id, socket_thread_num, bs_server_addrs_[i], bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
+            for (size_t j = 0; j < cfg->symbol_num_perframe; j ++) {
+                uint16_t src_port = rte_cpu_to_be_16(cfg->demod_tx_port + j);
+                uint16_t dst_port = rte_cpu_to_be_16(cfg->demod_rx_port + j);
+                printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
+                    "dst port: %zu, queue: %zu\n",
+                    cfg->bs_server_addr_list[i].c_str(), cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(),
+                    cfg->demod_tx_port + j, cfg->demod_rx_port + j, j % socket_thread_num);
+                DpdkTransport::install_flow_rule(
+                    port_id, j % socket_thread_num, bs_server_addrs_[i], bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
+            }
         }
     }
 
@@ -156,14 +158,14 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
             auto context = new EventHandlerContext<PacketTXRX>;
             context->obj_ptr = this;
             context->id = worker_id;
-            printf("Launch demod rx thread on core %u\n", lcore_id);
+            printf("Launch demod tx thread on core %u\n", lcore_id);
             if (cfg->downlink_mode) {
                 rte_eal_remote_launch((lcore_function_t*)
                         pthread_fun_wrapper<PacketTXRX, &PacketTXRX::encode_thread>,
                     context, lcore_id);
             } else {
                 rte_eal_remote_launch((lcore_function_t*)
-                        pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_thread>,
+                        pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_tx_thread>,
                     context, lcore_id);
                 // rte_eal_remote_launch((lcore_function_t*)
                 //         pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_rx_thread>,
@@ -248,7 +250,7 @@ void* PacketTXRX::demod_tx_thread(int tid)
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
                     tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)],
-                        bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[cfg->get_server_idx_by_ue(ue_id)], cfg->demod_tx_port, cfg->demod_rx_port, 
+                        bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[cfg->get_server_idx_by_ue(ue_id)], cfg->demod_tx_port + demod_symbol_ul_to_send_, cfg->demod_rx_port + demod_symbol_ul_to_send_, 
                         Packet::kOffsetOfData + cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                     struct rte_ether_hdr* eth_hdr
                         = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
@@ -815,11 +817,11 @@ int PacketTXRX::recv_relocate(int tid)
             continue;
         }
 
-        if (unlikely(ip_hdr->src_addr != bs_rru_addr_)) {
-            // fprintf(stderr, "DPDK relocate(%u): Source addr does not match (%x:%u->%x:%u)\n", tid, ip_hdr->src_addr, rte_be_to_cpu_16(udp_hdr->src_port), ip_hdr->dst_addr, rte_be_to_cpu_16(udp_hdr->dst_port));
-            rte_pktmbuf_free(rx_bufs[i]);
-            continue;
-        }
+        // if (unlikely(ip_hdr->src_addr != bs_rru_addr_)) {
+        //     // fprintf(stderr, "DPDK relocate(%u): Source addr does not match (%x:%u->%x:%u)\n", tid, ip_hdr->src_addr, rte_be_to_cpu_16(udp_hdr->src_port), ip_hdr->dst_addr, rte_be_to_cpu_16(udp_hdr->dst_port));
+        //     rte_pktmbuf_free(rx_bufs[i]);
+        //     continue;
+        // }
         if (unlikely(ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx])) {
             // fprintf(stderr, "DPDK relocate(%u): Destination addr does not match (%x %x)\n", tid, ip_hdr->dst_addr, bs_server_addrs_[cfg->bs_server_addr_idx]);
             rte_pktmbuf_free(rx_bufs[i]);
@@ -873,6 +875,19 @@ int PacketTXRX::recv_relocate(int tid)
                 max_packet_record_time_frame_[tid] = pkt->frame_id;
             }
 
+        } else if (pkt->pkt_type == Packet::PktType::kDemod) {
+            const size_t symbol_idx_ul = pkt->symbol_id;
+            const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
+
+            int8_t* demod_ptr
+                = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
+                    pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
+            // DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
+            //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+            memcpy(demod_ptr, pkt->data,
+                cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+            decode_status_->receive_demod_data(
+                pkt->ue_id, pkt->frame_id, symbol_idx_ul);
         } else {
             printf("Received unknown packet from rru\n");
             exit(1);
