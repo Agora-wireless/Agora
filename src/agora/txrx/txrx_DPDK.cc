@@ -99,7 +99,8 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
   unsigned int lcore_id;
   size_t worker_id = 0;
   // Launch specific task to cores
-  RTE_LCORE_FOREACH_WORKER(lcore_id) {
+  // For dpdk version >= 20.11.1 use RTE_LCORE_FOREACH_WORKER
+  RTE_LCORE_FOREACH_SLAVE(lcore_id) {
     // launch communication and task thread onto specific core
     if (worker_id < socket_thread_num_) {
       auto context = new EventHandlerContext<PacketTXRX>;
