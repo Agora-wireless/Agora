@@ -369,7 +369,7 @@ public:
         // memset(cur_symbol_ul_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
 
         num_demod_data_received_
-            = new std::array<std::array<size_t, kMaxSymbols>,
+            = new std::array<std::array<std::atomic<size_t>, kMaxSymbols>,
                 kFrameWnd>[cfg->UE_NUM];
         for (size_t i = 0; i < cfg->UE_NUM; i++) {
             for (size_t j = 0; j < kFrameWnd; j++) {
@@ -416,7 +416,7 @@ public:
 
     uint64_t *frame_decode_time_;
 
-    std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>*
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>*
         num_demod_data_received_;
 };
 
