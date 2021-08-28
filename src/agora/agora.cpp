@@ -1,4 +1,5 @@
 #include "agora.hpp"
+#include <rte_ethdev.h>
 using namespace std;
 
 Agora::Agora(Config* cfg)
@@ -130,6 +131,9 @@ void Agora::start()
 {
     auto& cfg = config_;
 
+    rte_eth_stats start_stats;
+    rte_eth_stats_get(0, &start_stats);
+
     // Start packet I/O
     if (!packet_tx_rx_->startTXRX(socket_buffer_,
             stats->frame_start, &dl_ifft_buffer_,
@@ -174,6 +178,11 @@ finish:
         // TODO: fix it
         save_tx_data_to_file(0);
     }
+
+    rte_eth_stats end_stats;
+    rte_eth_stats_get(0, &end_stats);
+
+    printf("Input traffic rate is %lf\n", (double)(end_stats.ibytes - start_stats.ibytes) * 8 / (cfg->frames_to_test * 0.001));
 
     // Printing latency stats
     save_latency_data_to_file();
