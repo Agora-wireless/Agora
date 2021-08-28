@@ -293,7 +293,12 @@ Config::Config(std::string jsonfile)
     num_load_levels = tddConf.value("num_load_levels", 10);
     sleep_mode = tddConf.value("sleep_mode", true);
 
-    decode_thread_num = tddConf.value("decode_thread_num", ue_end - ue_start);
+    std::vector<size_t> tmp_vec = tddConf.value("decode_thread_num", std::vector<size_t>());
+    if (tmp_vec.size() <= bs_server_addr_idx) {
+        decode_thread_num = ue_end - ue_start;
+    } else {
+        decode_thread_num = tmp_vec[bs_server_addr_idx];
+    }
 
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;
