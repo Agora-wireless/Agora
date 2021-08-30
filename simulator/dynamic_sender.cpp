@@ -259,13 +259,13 @@ void* Sender::worker_thread(int tid)
                 // delay_ticks(start_tsc_send, cur_frame * max_symbol_id * ticks_all);
                 printf("Thread %u send frame %u in %.1f ms\n", tid, cur_frame - 1, (get_time() - start_time) / 1000.0f);
 
-                // if (tid == 0) {
-                //     rte_eth_stats stats;
-                //     rte_eth_stats_get(0, &stats);
-                //     printf("Traffic rate is %lf, packet rate is %lf\n", (double)(stats.obytes - tx_stats.obytes) * 8 / ((get_time() - start_time) * 1000.0f),
-                //         (double)(stats.opackets - tx_stats.opackets) / ((get_time() - start_time)));
-                //     memcpy(&tx_stats, &stats, sizeof(rte_eth_stats));
-                // }
+                if (tid == 0) {
+                    rte_eth_stats stats;
+                    rte_eth_stats_get(0, &stats);
+                    printf("Traffic rate is %lf, packet rate is %lf\n", (double)(stats.obytes - tx_stats.obytes) * 8 / ((get_time() - start_time) * 1000.0f),
+                        (double)(stats.opackets - tx_stats.opackets) / ((get_time() - start_time)));
+                    memcpy(&tx_stats, &stats, sizeof(rte_eth_stats));
+                }
 
                 start_time = get_time();
             }
