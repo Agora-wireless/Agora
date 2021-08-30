@@ -16,6 +16,7 @@ class MacDataReceiver {
 
  protected:
   inline MacDataReceiver(){};
+  virtual ~MacDataReceiver() = default;
 };
 
 #endif  // MAC_DATA_RECEIVER_H_
