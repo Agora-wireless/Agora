@@ -21,8 +21,8 @@ class FileReceiver : public MacDataReceiver {
   static constexpr size_t kFileStreamRxSize = (2048u);
   static constexpr size_t kFileStreamLocalRxBufSize = (kFileStreamRxSize * 10u);
 
-  FileReceiver(std::string &file_name);
-  ~FileReceiver();
+  explicit FileReceiver(std::string &file_name);
+  virtual ~FileReceiver();
 
   size_t Load(char *destination, size_t num_load_bytes) override final;
 
