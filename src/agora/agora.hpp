@@ -120,13 +120,13 @@ private:
     /// Fetch the concurrent queue for this event type
     moodycamel::ConcurrentQueue<Event_data>* get_conq(EventType event_type)
     {
-        return &sched_info_arr[static_cast<size_t>(event_type)].concurrent_q;
+        return &sched_info_arr_[static_cast<size_t>(event_type)].concurrent_q_;
     }
 
     /// Fetch the producer token for this event type
     moodycamel::ProducerToken* get_ptok(EventType event_type)
     {
-        return sched_info_arr[static_cast<size_t>(event_type)].ptok;
+        return sched_info_arr_[static_cast<size_t>(event_type)].ptok_;
     }
 
     /// Return a string containing the sizes of the FFT queues
@@ -264,7 +264,10 @@ private:
     char* dl_socket_buffer_;
     int* dl_socket_buffer_status_;
 
-    sched_info_t sched_info_arr[kMaxThreads];
+    sched_info_t sched_info_arr_[kMaxThreads];
+
+    moodycamel::ConcurrentQueue<Event_data> complete_task_queue_;
+    moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads];
 
     // Threads running the subcarrier-parallel processing
     std::vector<std::thread> do_subcarrier_threads_;

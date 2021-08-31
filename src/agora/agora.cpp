@@ -26,6 +26,7 @@ Agora::Agora(Config* cfg)
 
     pin_to_core_with_offset(
         ThreadType::kMaster, cfg->core_offset, 0, false /* quiet */);
+    initialize_queues();
     initialize_uplink_buffers();
 
     if (config_->dl_data_symbol_num_perframe > 0) {
@@ -143,6 +144,21 @@ void Agora::start()
         return;
     }
 
+    // States
+    size_t cur_slot = 0;
+    size_t cur_symbol = 0;
+    size_t csi_task_completed = 0;
+    size_t zf_task_completed = 0;
+    size_t demod_task_completed = 0;
+    size_t decode_task_completed = 0;
+    size_t csi_launched = 0;
+    size_t demod_launched = 0;
+    size_t decode_launched[kMaxUEs] = {0};
+
+    size_t num_events = 0;
+    size_t max_events_needed = do_subcarrier_threads_.size() + do_decode_threads_.size();
+    Event_data events_list[max_events_needed];
+
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cfg->downlink_mode) {
             for (size_t i = 0; i < cfg->socket_thread_num; i ++) {
@@ -159,7 +175,88 @@ void Agora::start()
             }
         }
     keep_sleep:
-        sleep(1);
+        // Worker events
+        num_events = complete_task_queue_.try_dequeue_bulk(events_list, max_events_needed);
+        for (size_t i = 0; i < num_events; i ++) {
+            Event_data& event = events_list[i];
+            
+            switch(event.event_type) {
+            case EventType::kCSI:
+                csi_task_completed ++;
+                if (csi_task_completed == do_subcarrier_threads_.size()) {
+                    for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
+                        Event_data event(EventType::kZF, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
+                        try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                    }
+                }
+                break;
+            case EventType::kZF:
+                zf_task_completed ++;
+                if (zf_task_completed == do_subcarrier_threads_.size()) {
+                    zf_task_completed = 0;
+                    csi_task_completed = 0;
+                    csi_launched = 0;
+                    cur_symbol ++;
+                }
+                break;
+            case EventType::kDemul:
+                demod_task_completed ++;
+                if (demod_task_completed == cfg->get_num_sc_per_server() / cfg->demul_block_size) {
+                    demul_status_.demul_complete(cur_slot, cur_symbol - 1, cfg->get_num_sc_per_server() / cfg->demul_block_size);
+                }
+                break;
+            case EventType::kDecode:
+                decode_task_completed ++;
+                if (decode_task_completed == cfg->get_num_ues_to_process()) {
+                    decode_task_completed = 0;
+                    demod_task_completed = 0;
+                    demod_launched = 0;
+                    for (size_t j = 0; j < kMaxUEs; j ++) {
+                        decode_launched[j] = 0;
+                    }
+                    cur_symbol ++;
+                    if (cur_symbol == cfg->symbol_num_perframe) {
+                        cur_symbol = 0;
+                        for (size_t j = 0; j < do_decode_threads_.size(); j ++) {
+                            rx_status_.decode_done(cur_slot);
+                        }
+                        cur_slot ++;
+                    }
+                }
+                break;
+            }
+        }
+
+        // Socket thread events
+        if (cur_symbol == 0 && csi_launched == 0) {
+            if (rx_status_.received_all_pilots(cur_slot)) {
+                csi_launched = 1;
+                for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
+                    Event_data event(EventType::kCSI, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
+                    try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                }
+            }
+        } else if (cur_symbol > 0 && demod_launched == 0) {
+            if (rx_status_.is_demod_ready(cur_slot, cur_symbol - 1)) {
+                demod_launched = 1;
+                for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
+                    for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
+                        Event_data event(EventType::kDemul, gen_tag_t::frm_sym_sc(cur_slot, cur_symbol - 1, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
+                        try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                    }
+                }
+            }
+        } else if (cur_symbol > 0 && demod_task_completed == do_subcarrier_threads_.size()) {
+            for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
+                if (decode_launched[i] == 0) {
+                    decode_launched[i] == 1;
+                    size_t decode_idx = (cur_symbol - 1) * cfg->get_num_ues_to_process() + i - cfg->ue_start;
+                    size_t thread_idx = decode_idx % do_decode_threads_.size() + do_subcarrier_threads_.size();
+                    Event_data event(EventType::kDecode, gen_tag_t::frm_sym_ue(cur_slot, cur_symbol - 1, i)._tag);
+                    try_enqueue_fallback(&sched_info_arr_[thread_idx].concurrent_q_, sched_info_arr_[thread_idx].ptok_, event);
+                }
+            }
+        }
     }
     cfg->running = false;
     goto finish;
@@ -208,6 +305,9 @@ void* Agora::subcarrier_worker(int tid)
 
     if (config_->dynamic_workload) {
         auto computeSubcarrier = new DySubcarrier(config_, tid, freq_ghz,
+            sched_info_arr_[tid].concurrent_q_,
+            complete_task_queue_,
+            worker_ptoks_ptr_[tid],
             sc_range,
             socket_buffer_, csi_buffers_, calib_buffer_,
             dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
@@ -239,6 +339,9 @@ void* Agora::decode_worker(int tid)
 
     if (config_->dynamic_workload) {
         auto computeDecoding = new DyDecode(config_, tid, freq_ghz,
+            sched_info_arr_[tid + do_subcarrier_threads_.size()].concurrent_q_,
+            complete_task_queue_,
+            worker_ptoks_ptr_[tid + do_subcarrier_threads_.size()],
             demod_buffers_, demod_soft_buffer_to_decode_,
             decoded_buffer_, control_info_table_, control_idx_list_, 
             phy_stats, stats, &rx_status_, &demod_status_);
@@ -760,6 +863,29 @@ void Agora::init_control_info()
         fread(&control_idx_list_[i], sizeof(size_t), 1, fp_input);
     }
     fclose(fp_input);
+}
+
+static const size_t kDefaultMessageQueueSize = 512;
+static const size_t kDefaultWorkerQueueSize = 256;
+
+void Agora::initialize_queues()
+{
+    using mt_queue_t = moodycamel::ConcurrentQueue<Event_data>;
+
+    int data_symbol_num_perframe = config_->ul_data_symbol_num_perframe;
+    complete_task_queue_ = mt_queue_t(kDefaultWorkerQueueSize * data_symbol_num_perframe);
+
+    // Create concurrent queues for each Doer
+    for (auto& s : sched_info_arr_) {
+        s.concurrent_q_ =
+            mt_queue_t(kDefaultWorkerQueueSize * data_symbol_num_perframe);
+        s.ptok_ = new moodycamel::ProducerToken(s.concurrent_q_);
+    }
+
+    for (size_t i = 0; i < do_subcarrier_threads_.size() + do_decode_threads_.size(); i++) {
+        worker_ptoks_ptr_[i] =
+            new moodycamel::ProducerToken(complete_task_queue_);
+    }
 }
 
 extern "C" {

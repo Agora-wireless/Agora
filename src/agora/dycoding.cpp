@@ -129,6 +129,9 @@ void DyEncode::start_work()
 }
 
 DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,
+    moodycamel::ConcurrentQueue<Event_data>& task_queue,
+    moodycamel::ConcurrentQueue<Event_data>& complete_queue,
+    moodycamel::ProducerToken* complete_queue_token,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
     Table<int8_t> demod_soft_buffer_to_decode,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
@@ -138,6 +141,9 @@ DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,
     DecodeStatus* decode_status)
     : Doer(in_config, in_tid, freq_ghz, dummy_conq_, complete_task_queue,
           worker_producer_token)
+    , task_queue_(task_queue)
+    , complete_queue_(complete_queue)
+    , complete_queue_token_(complete_queue_token)
     , demod_buffers_(demod_buffers)
     , demod_soft_buffer_to_decode_(demod_soft_buffer_to_decode)
     , decoded_buffers_(decoded_buffers)
@@ -282,6 +288,7 @@ Event_data DyDecode::launch(size_t tag)
     return Event_data(EventType::kDecode, tag);
 }
 
+/*
 void DyDecode::start_work()
 {
     // printf("Decode for ue %u tid %u starts to work!\n", ue_id_, tid_in_ue_);
@@ -479,4 +486,26 @@ void DyDecode::start_work()
         cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, work_count * 100.0f / loop_count);
+}
+*/
+
+void DyDecode::start_work() 
+{
+    while (cfg->running && !SignalHandler::gotExitSignal()) {
+        Event_data event;
+        if (task_queue_.try_dequeue(event)) {
+            switch (event.event_type) {
+            case EventType::kDecode:
+                size_t tag = event.tags[0];
+                size_t slot_id = gen_tag_t(tag).frame_id;
+                size_t symbol_id = gen_tag_t(tag).symbol_id;
+                size_t ue_id = gen_tag_t(tag).ue_id;
+                launch(gen_tag_t::frm_sym_cb(slot_id, symbol_id,
+                    ue_id * cfg->LDPC_config.nblocksInSymbol)._tag);
+                Event_data resp(EventType::kDecode);
+                try_enqueue_fallback(&complete_queue_, complete_queue_token_, resp);
+                break;
+            }
+        }
+    }
 }

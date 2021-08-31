@@ -201,15 +201,15 @@ static_assert(sizeof(Event_data) == 64, "");
 /// A struct pair containing a concurrent event queue
 /// and a pointer to that queue's producer token.
 struct sched_info_t {
-    moodycamel::ConcurrentQueue<Event_data> concurrent_q;
-    moodycamel::ProducerToken* ptok;
+    moodycamel::ConcurrentQueue<Event_data> concurrent_q_;
+    moodycamel::ProducerToken* ptok_;
 
     sched_info_t() = default;
 
     sched_info_t(moodycamel::ConcurrentQueue<Event_data> conq)
-        : concurrent_q(std::move(conq)) // moodycamel queue can't be copied
+        : concurrent_q_(std::move(conq)) // moodycamel queue can't be copied
     {
-        ptok = new moodycamel::ProducerToken(concurrent_q);
+        ptok_ = new moodycamel::ProducerToken(concurrent_q_);
     }
 };
 

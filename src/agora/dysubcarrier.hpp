@@ -69,6 +69,9 @@ class DySubcarrier : public Doer {
 public:
     /// Construct a new Do Subcarrier object
     DySubcarrier(Config* config, int tid, double freq_ghz,
+        moodycamel::ConcurrentQueue<Event_data>& task_queue,
+        moodycamel::ConcurrentQueue<Event_data>& complete_queue,
+        moodycamel::ProducerToken* complete_queue_token,
         /// The range of subcarriers handled by this subcarrier doer.
         Range sc_range,
         // input buffers
@@ -89,6 +92,9 @@ public:
         DemulStatus* demul_status = nullptr, PrecodeStatus* precode_status = nullptr)
         : Doer(config, tid, freq_ghz, dummy_conq_, dummy_conq_,
               nullptr /* tok */)
+        , task_queue_(task_queue)
+        , complete_queue_(complete_queue)
+        , complete_queue_token_(complete_queue_token)
         , sc_range_(sc_range)
         , socket_buffer_(socket_buffer)
         , csi_buffers_(csi_buffers)
@@ -133,6 +139,7 @@ public:
         // delete computeReciprocity_;
     }
 
+/*
     void start_work()
     {
         const size_t n_zf_tasks_reqd
@@ -411,6 +418,47 @@ public:
             cycles_to_us(csi_max, freq_ghz), cycles_to_us(zf_max, freq_ghz), cycles_to_us(demod_max, freq_ghz));
         fclose(fp);
     }
+    */
+
+    void start_work() {
+        while (cfg->running && !SignalHandler::gotExitSignal()) {
+            Event_data event, resp;
+            size_t tag;
+            size_t slot_id;
+            size_t sc_id;
+            size_t symbol_id_ul;
+            if (task_queue_.try_dequeue(event)) {
+                switch (event.event_type) {
+                case EventType::kCSI:
+                    tag = event.tags[0];
+                    slot_id = gen_tag_t(tag).frame_id;
+                    sc_id = gen_tag_t(tag).sc_id;
+                    run_csi(slot_id, sc_id);
+                    resp = Event_data(EventType::kCSI);
+                    try_enqueue_fallback(&complete_queue_, complete_queue_token_, resp);
+                    break;
+                case EventType::kZF:
+                    tag = event.tags[0];
+                    slot_id = gen_tag_t(tag).frame_id;
+                    for (sc_id = sc_range_.start; sc_id < sc_range_.end; sc_id += cfg->zf_block_size) {
+                        do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0, sc_id)._tag);
+                    }
+                    resp = Event_data(EventType::kZF);
+                    try_enqueue_fallback(&complete_queue_, complete_queue_token_, resp);
+                    break;
+                case EventType::kDemul:
+                    tag = event.tags[0];
+                    slot_id = gen_tag_t(tag).frame_id;
+                    symbol_id_ul = gen_tag_t(tag).symbol_id;
+                    sc_id = gen_tag_t(tag).sc_id;
+                    do_demul_->launch(slot_id, symbol_id_ul, sc_id);
+                    resp = Event_data(EventType::kDemul);
+                    try_enqueue_fallback(&complete_queue_, complete_queue_token_, resp);
+                    break;
+                }
+            }
+        }
+    }
 
 private:
     void run_csi(size_t frame_id, size_t base_sc_id)
@@ -559,6 +607,10 @@ private:
     PrecodeStatus* precode_status_;
 
     moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
+
+    moodycamel::ConcurrentQueue<Event_data>& task_queue_;
+    moodycamel::ConcurrentQueue<Event_data>& complete_queue_;
+    moodycamel::ProducerToken* complete_queue_token_;
 
     // Control info
     std::vector<std::vector<ControlInfo>>& control_info_table_;

@@ -58,6 +58,9 @@ private:
 class DyDecode : public Doer {
 public:
     DyDecode(Config* in_config, int in_tid, double freq_ghz,
+        moodycamel::ConcurrentQueue<Event_data>& task_queue,
+        moodycamel::ConcurrentQueue<Event_data>& complete_queue,
+        moodycamel::ProducerToken* complete_queue_token,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
         Table<int8_t> demod_soft_buffer_to_decode,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
@@ -98,6 +101,10 @@ private:
     size_t cur_cb_ = 0; // Current code block id to decode
     size_t cur_idx_ = 0;
     moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
+
+    moodycamel::ConcurrentQueue<Event_data>& task_queue_;
+    moodycamel::ConcurrentQueue<Event_data>& complete_queue_;
+    moodycamel::ProducerToken* complete_queue_token_;
 
     // Control info
     std::vector<std::vector<ControlInfo>>& control_info_table_;
