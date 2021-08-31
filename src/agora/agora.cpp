@@ -185,7 +185,7 @@ void Agora::start()
                 csi_task_completed ++;
                 if (csi_task_completed == do_subcarrier_threads_.size()) {
                     for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
-                        Event_data event(EventType::kZF, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
+                        Event_data event(EventType::kZF, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size - cfg->OFDM_DATA_START)._tag);
                         try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                     }
                 }
@@ -232,7 +232,7 @@ void Agora::start()
             if (rx_status_.received_all_pilots(cur_slot)) {
                 csi_launched = 1;
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
-                    Event_data event(EventType::kCSI, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
+                    Event_data event(EventType::kCSI, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size - cfg->OFDM_DATA_START)._tag);
                     try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                 }
             }
@@ -241,7 +241,7 @@ void Agora::start()
                 demod_launched = 1;
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
-                        Event_data event(EventType::kDemul, gen_tag_t::frm_sym_sc(cur_slot, cur_symbol - 1, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
+                        Event_data event(EventType::kDemul, gen_tag_t::frm_sym_sc(cur_slot, cur_symbol - 1, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size - cfg->OFDM_DATA_START)._tag);
                         try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                     }
                 }
