@@ -435,6 +435,7 @@ public:
                     sc_id = gen_tag_t(tag).sc_id;
                     run_csi(slot_id, sc_id);
                     resp = Event_data(EventType::kCSI);
+                    // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
                     try_enqueue_fallback(&complete_queue_, complete_queue_token_, resp);
                     break;
                 case EventType::kZF:
@@ -444,6 +445,7 @@ public:
                         do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0, sc_id)._tag);
                     }
                     resp = Event_data(EventType::kZF);
+                    // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
                     try_enqueue_fallback(&complete_queue_, complete_queue_token_, resp);
                     break;
                 case EventType::kDemul:
@@ -453,6 +455,7 @@ public:
                     sc_id = gen_tag_t(tag).sc_id;
                     do_demul_->launch(slot_id, symbol_id_ul, sc_id);
                     resp = Event_data(EventType::kDemul);
+                    // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
                     try_enqueue_fallback(&complete_queue_, complete_queue_token_, resp);
                     break;
                 }

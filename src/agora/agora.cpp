@@ -882,7 +882,7 @@ void Agora::initialize_queues()
         s.ptok_ = new moodycamel::ProducerToken(s.concurrent_q_);
     }
 
-    for (size_t i = 0; i < do_subcarrier_threads_.size() + do_decode_threads_.size(); i++) {
+    for (size_t i = 0; i < kMaxThreads; i++) {
         worker_ptoks_ptr_[i] =
             new moodycamel::ProducerToken(complete_task_queue_);
     }
