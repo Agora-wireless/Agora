@@ -76,10 +76,10 @@ public:
     void print_overhead() {
         printf("DoDemul thread %u overhead: total time: %.2lfms, "
             "preprocess: %.2lfms (%.2lf\%), equal: %.2lfms (%u, %.2lf\%), "
-            "demod: %.2lfms (%.2lf\%)\n", tid, cycles_to_ms(total_cycles_, freq_ghz),
+            "demod: %.2lfms (%u, %.2lf\%)\n", tid, cycles_to_ms(total_cycles_, freq_ghz),
             cycles_to_ms(preprocess_cycles_, freq_ghz), preprocess_cycles_ * 100.0f / total_cycles_,
             cycles_to_ms(equal_cycles_, freq_ghz), equal_count_, equal_cycles_ * 100.0f / total_cycles_,
-            cycles_to_ms(demod_cycles_, freq_ghz), demod_cycles_ * 100.0f / total_cycles_);
+            cycles_to_ms(demod_cycles_, freq_ghz), demod_count_, demod_cycles_ * 100.0f / total_cycles_);
     }
 
     size_t get_equal_cycles() { return equal_cycles_; }
@@ -114,6 +114,7 @@ private:
     size_t equal_cycles_ = 0;
     size_t demod_cycles_ = 0;
     size_t equal_count_ = 0;
+    size_t demod_count_ = 0;
 
     // Control info
     std::vector<std::vector<ControlInfo>>& control_info_table_;

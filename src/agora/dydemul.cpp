@@ -242,6 +242,7 @@ void DyDemul::launch(
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
     demod_cycles_ += worker_rdtsc() - start_tsc3;
+    demod_count_ += max_sc_ite;
     total_cycles_ += worker_rdtsc() - start_tsc;
     return;
 }
