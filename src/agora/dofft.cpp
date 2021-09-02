@@ -135,6 +135,7 @@ void DoFFT::start_work() {
     size_t state_operation_duration = 0;
     size_t loop_count = 0;
     size_t work_count = 0;
+    size_t fft_task_count = 0;
     size_t fft_start_tsc;
     bool state_trigger = false;
 
@@ -178,6 +179,7 @@ void DoFFT::start_work() {
                 }
                 if (likely(state_trigger)) {
                     fft_tsc_duration += rdtsc() - fft_start_tsc;
+                    fft_task_count += ant_range_.end - ant_range_.start;
                 }
 
                 if (likely(state_trigger)) {
@@ -225,6 +227,7 @@ void DoFFT::start_work() {
                 }
                 if (likely(state_trigger)) {
                     fft_tsc_duration += rdtsc() - fft_start_tsc;
+                    fft_task_count += ant_range_.end - ant_range_.start;
                 }
 
                 if (likely(state_trigger)) {
@@ -251,10 +254,10 @@ void DoFFT::start_work() {
     size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("DoFFT Thread %u duration stats: total time used %.2lfms, "
-        "fft %.2lfms (%.2lf\%), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
+        "fft %.2lfms (%u, %.2lf\%), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
         "working proportions (%u/%u: %.2lf\%)\n",
         tid, cycles_to_ms(whole_duration, freq_ghz),
-        cycles_to_ms(fft_tsc_duration, freq_ghz), fft_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(fft_tsc_duration, freq_ghz), fft_task_count, fft_tsc_duration * 100.0f / whole_duration,
         cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, work_count * 100.0f / loop_count);
