@@ -10,7 +10,7 @@
 TEST(TestZF, Perf)
 {
     static constexpr size_t kNumIters = 10000;
-    auto* cfg = new Config("data/tddconfig-sim-ul.json");
+    auto* cfg = new Config("data/tddconfig-sim-ul-distributed.json");
     cfg->genData();
 
     int tid = 0;
