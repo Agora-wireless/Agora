@@ -192,6 +192,7 @@ void DyDemul::launch(
         duration_stat->task_duration[2] += start_tsc3 - start_tsc2;
         duration_stat->task_count++;
         equal_cycles_ += start_tsc3 - start_tsc2;
+        equal_count_ ++;
     }
 
     size_t start_tsc3 = worker_rdtsc();

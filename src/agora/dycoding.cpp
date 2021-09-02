@@ -297,6 +297,7 @@ void DyDecode::start_work()
     size_t state_operation_duration = 0;
     size_t loop_count = 0;
     size_t work_count = 0;
+    size_t decode_count = 0;
     size_t decode_start_tsc;
     bool state_trigger = false;
 
@@ -337,6 +338,7 @@ void DyDecode::start_work()
                 size_t decode_tmp_tsc = rdtsc() - decode_start_tsc;
                 decode_tsc_duration += decode_tmp_tsc;
                 decode_max = decode_max < decode_tmp_tsc ? decode_tmp_tsc : decode_max;
+                decode_count ++;
             }
 
             // printf("Start to decode user %lu frame %lu symbol %lu end\n", ue_id_, cur_frame_, cur_symbol_);
@@ -411,6 +413,7 @@ void DyDecode::start_work()
                         ._tag);
                 if (likely(state_trigger)) {
                     decode_tsc_duration += rdtsc() - decode_start_tsc;
+                    decode_count ++;
                 }
 
                 // printf("Start to decode user %lu frame %lu symbol %lu end\n", ue_id_, cur_frame_, cur_symbol_);
@@ -472,10 +475,10 @@ void DyDecode::start_work()
     size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("DoDecode Thread %u duration stats: total time used %.2lfms, "
-        "decode %.2lfms (%.2lf\%, %.2lfus), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
+        "decode %.2lfms (%u, %.2lf\%, %.2lfus), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
         "working proportions (%u/%u: %.2lf\%)\n",
         tid, cycles_to_ms(whole_duration, freq_ghz),
-        cycles_to_ms(decode_tsc_duration, freq_ghz), decode_tsc_duration * 100.0f / whole_duration, cycles_to_us(decode_max, freq_ghz),
+        cycles_to_ms(decode_tsc_duration, freq_ghz), decode_count, decode_tsc_duration * 100.0f / whole_duration, cycles_to_us(decode_max, freq_ghz),
         cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, work_count * 100.0f / loop_count);
