@@ -378,6 +378,30 @@ void* Agora::encode_worker(int tid)
     return nullptr;
 }
 
+void* Agora::worker(int tid)
+{
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
+
+    auto computeSubcarrier = new DySubcarrier(config_, tid, freq_ghz,
+            sched_info_arr_[tid].concurrent_q_,
+            complete_task_queue_,
+            worker_ptoks_ptr_[tid],
+            Range(0, 1),
+            socket_buffer_, csi_buffers_, calib_buffer_,
+            dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
+            ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
+            control_info_table_, control_idx_list_,
+            phy_stats, stats, &rx_status_, &demul_status_, &precode_status_);
+    
+    auto computeDecoding = new DyDecode(config_, tid, freq_ghz,
+            sched_info_arr_[tid + do_subcarrier_threads_.size()].concurrent_q_,
+            complete_task_queue_,
+            worker_ptoks_ptr_[tid + do_subcarrier_threads_.size()],
+            demod_buffers_, demod_soft_buffer_to_decode_,
+            decoded_buffer_, control_info_table_, control_idx_list_, 
+            phy_stats, stats, &rx_status_, &demod_status_);
+}
+
 void Agora::update_ran_config(RanConfig rc)
 {
     config_->update_mod_cfgs(rc.mod_order_bits);
