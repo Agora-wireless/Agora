@@ -43,9 +43,9 @@ int main(int argc, char **argv)
     const size_t num_user_levels = cfg->user_level_list.size();
     const size_t num_load_levels = cfg->num_load_levels;
     const size_t num_slots = cfg->user_level_list.size() * cfg->num_load_levels;
-    const size_t num_sc_per_rb = 16;
+    const size_t num_sc_per_rb = cfg->UE_NUM;
     const size_t num_rb = cfg->OFDM_DATA_NUM / num_sc_per_rb;
-    const size_t max_ue_per_sc = 16;
+    const size_t max_ue_per_sc = cfg->UE_NUM;
     const double avg_load = 0.5;
     srand(time(NULL));
 
