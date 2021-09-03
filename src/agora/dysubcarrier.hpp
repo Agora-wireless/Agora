@@ -463,11 +463,13 @@ public:
         }
     }
 
-private:
     void run_csi(size_t frame_id, size_t base_sc_id)
     {
         const size_t frame_slot = frame_id % kFrameWnd;
-        rt_assert(base_sc_id == sc_range_.start, "Invalid SC in run_csi!");
+        // rt_assert(base_sc_id == sc_range_.start, "Invalid SC in run_csi!");
+        size_t sc_start = base_sc_id;
+        size_t sc_end = base_sc_id + cfg->subcarrier_block_size;
+        sc_end = sc_end > cfg->subcarrier_end - cfg->OFDM_DATA_START ? cfg->subcarrier_end - cfg->OFDM_DATA_START : sc_end;
 
         complex_float converted_sc[kSCsPerCacheline];
 
@@ -479,8 +481,8 @@ private:
                     + i * cfg->packet_length);
 
                 // Subcarrier ranges should be aligned with kTransposeBlockSize
-                for (size_t block_idx = sc_range_.start / kTransposeBlockSize;
-                     block_idx < sc_range_.end / kTransposeBlockSize;
+                for (size_t block_idx = sc_start / kTransposeBlockSize;
+                     block_idx < sc_end / kTransposeBlockSize;
                      block_idx++) {
 
                     const size_t block_base_offset
