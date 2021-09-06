@@ -76,8 +76,10 @@ void DoDemul::launch(
     }
 
     size_t max_sc_ite;
+    // max_sc_ite = std::min(
+    //     cfg->demul_block_size, (cfg->bs_server_addr_idx + 1) * cfg->get_num_sc_per_server() - base_sc_id);
     max_sc_ite = std::min(
-        cfg->demul_block_size, (cfg->bs_server_addr_idx + 1) * cfg->get_num_sc_per_server() - base_sc_id);
+        cfg->demul_block_size, cfg->subcarrier_end - base_sc_id);
     assert(max_sc_ite % kSCsPerCacheline == 0);
 
     complex_float tmp[kSCsPerCacheline];

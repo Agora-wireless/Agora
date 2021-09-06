@@ -60,8 +60,10 @@ Agora::Agora(Config* cfg)
     // }
     
     /* Create worker threads */
+    // do_subcarrier_threads_.resize(
+    //     (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
     do_subcarrier_threads_.resize(
-        (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
+        (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
 
     for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
         do_subcarrier_threads_[i]
@@ -200,11 +202,15 @@ void* Agora::subcarrier_worker(int tid)
     pin_to_core_with_offset(
         ThreadType::kWorkerSubcarrier, base_worker_core_offset, tid);
 
-    Range sc_range(tid * config_->subcarrier_block_size + 
-        config_->bs_server_addr_idx * config_->get_num_sc_per_server(),
-        min((tid + 1) * config_->subcarrier_block_size + 
-        config_->bs_server_addr_idx * config_->get_num_sc_per_server(), 
-        (config_->bs_server_addr_idx + 1) * config_->get_num_sc_per_server()));
+    // Range sc_range(tid * config_->subcarrier_block_size + 
+    //     config_->bs_server_addr_idx * config_->get_num_sc_per_server(),
+    //     min((tid + 1) * config_->subcarrier_block_size + 
+    //     config_->bs_server_addr_idx * config_->get_num_sc_per_server(), 
+    //     (config_->bs_server_addr_idx + 1) * config_->get_num_sc_per_server()));
+
+    Range sc_range(tid * config_->subcarrier_block_size + config_->subcarrier_start,
+        min((tid + 1) * config_->subcarrier_block_size + config_->subcarrier_start,
+        config_->subcarrier_end));
 
     if (config_->dynamic_workload) {
         auto computeSubcarrier = new DySubcarrier(config_, tid, freq_ghz,

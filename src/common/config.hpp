@@ -322,6 +322,8 @@ public:
 
     // This Agora server takes charge of subcarrier range
     // [subcarrier_start, subcarrier_end]
+    std::vector<size_t> subcarrier_num_list;
+    std::vector<size_t> subcarrier_num_start;
     size_t subcarrier_start, subcarrier_end;
 
     // This Agora server takes charge of ue range [ue_start, ue_end]
@@ -382,6 +384,11 @@ public:
     inline size_t get_num_sc_per_server() const
     {
         return OFDM_DATA_NUM / bs_server_addr_list.size();
+    }
+
+    inline size_t get_num_sc_to_process() const
+    {
+        return subcarrier_end - subcarrier_start;
     }
 
     // Get the number of UEs this server takes charge of

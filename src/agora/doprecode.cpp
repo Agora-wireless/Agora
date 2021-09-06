@@ -49,8 +49,10 @@ Event_data DoPrecode::launch(size_t tag)
 
     __m256i index = _mm256_setr_epi64x(
         0, cfg->BS_ANT_NUM, cfg->BS_ANT_NUM * 2, cfg->BS_ANT_NUM * 3);
+    // int max_sc_ite
+    //     = std::min(cfg->demul_block_size, (cfg->bs_server_addr_idx + 1) * cfg->get_num_sc_per_server() - base_sc_id);
     int max_sc_ite
-        = std::min(cfg->demul_block_size, (cfg->bs_server_addr_idx + 1) * cfg->get_num_sc_per_server() - base_sc_id);
+        = std::min(cfg->demul_block_size, cfg->subcarrier_end - base_sc_id);
 
     // Begin Debug
     // printf("DL mod data base sc %u:\n", base_sc_id);
