@@ -239,7 +239,7 @@ void* PacketTXRX::demod_tx_thread(int tid)
                 // int8_t* demod_ptr = &(*demod_buffers_)[demod_frame_to_send_
                 //     % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->bs_server_addr_idx * cfg->get_num_sc_per_server()];
                 int8_t* demod_ptr = &(*demod_buffers_)[demod_frame_to_send_
-                    % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->subcarrier_start];
+                    % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->subcarrier_start * cfg->mod_order_bits];
 
                 size_t target_server_idx = cfg->get_server_idx_by_ue(ue_id);
                 if (target_server_idx == cfg->bs_server_addr_idx) {
