@@ -215,8 +215,8 @@ Config::Config(std::string jsonfile)
         = tddConf.value("bs_server_addr_list", std::vector<std::string>());
     rt_assert(bs_server_addr_list.size() > 0, "Address list is 0!");
     bs_server_addr_idx = tddConf.value("bs_server_addr_idx", 0);
-    rt_assert(OFDM_DATA_NUM % bs_server_addr_list.size() == 0,
-        "OFDM_DATA_NUM % # servers should be 0!");
+    // rt_assert(OFDM_DATA_NUM % bs_server_addr_list.size() == 0,
+    //     "OFDM_DATA_NUM % # servers should be 0!");
     if (kUseDPDK) {
         bs_server_mac_list
             = tddConf.value("bs_server_mac_list", std::vector<std::string>());
