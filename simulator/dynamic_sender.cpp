@@ -211,13 +211,17 @@ void* Sender::worker_thread(int tid)
         gen_tag_t tag = 0;
 
         for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
+            // tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pools_[tid], sender_mac_addr,
+            //     server_mac_addr_list[i], bs_rru_addr, bs_server_addr_list[i],
+            //     cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
+            //     Packet::kOffsetOfData + cfg->get_num_sc_per_server() * sizeof(unsigned short) * 2);
             tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pools_[tid], sender_mac_addr,
                 server_mac_addr_list[i], bs_rru_addr, bs_server_addr_list[i],
                 cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
-                Packet::kOffsetOfData + cfg->get_num_sc_per_server() * sizeof(unsigned short) * 2);
+                Packet::kOffsetOfData + cfg->subcarrier_num_list[i] * sizeof(unsigned short) * 2);
         }
 
-        const size_t sc_block_size = cfg->get_num_sc_per_server();
+        // const size_t sc_block_size = cfg->get_num_sc_per_server();
         for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i++) {
             auto* pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t*) + kPayloadOffset);
             pkt->pkt_type = Packet::PktType::kIQFromRRU;
@@ -226,10 +230,14 @@ void* Sender::worker_thread(int tid)
             pkt->cell_id = 0;
             pkt->ant_id = cur_radio;
             size_t buf_offset = cur_slot_idx * 2 + (cur_symbol == 0 ? 0 : 1);
+            // memcpy(pkt->data,
+            //     data_buf + (buf_offset * ant_num_this_thread + cur_radio - radio_lo) * (2 * cfg->OFDM_CA_NUM)
+            //         + (i * sc_block_size + cfg->OFDM_DATA_START) * 2,
+            //     sc_block_size * sizeof(unsigned short) * 2);
             memcpy(pkt->data,
                 data_buf + (buf_offset * ant_num_this_thread + cur_radio - radio_lo) * (2 * cfg->OFDM_CA_NUM)
-                    + (i * sc_block_size + cfg->OFDM_DATA_START) * 2,
-                sc_block_size * sizeof(unsigned short) * 2);
+                    + (cfg->subcarrier_num_start[i] + cfg->OFDM_DATA_START) * 2,
+                cfg->subcarrier_num_list[i] * sizeof(unsigned short) * 2);
             MLPD_TRACE("Sender: Sending packet %s (%zu of %zu) to %s:%ld\n",
                 pkt->to_string().c_str(), i, cfg->bs_server_addr_list.size(),
                 cfg->bs_server_addr_list[i].c_str(),

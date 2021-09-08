@@ -3,7 +3,7 @@ import sys
 n_servers = 3
 
 if len(sys.argv) == 2:
-    n_frames = int(sys.argv[1])
+    n_servers = int(sys.argv[1])
 
 latency_data = []
 

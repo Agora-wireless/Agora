@@ -12,7 +12,7 @@ static inline void rt_assert(bool condition, const char* throw_str) {
 int main(int argc, char **argv) 
 {
     rte_mempool *mbuf_pool;
-    DpdkTransport::dpdk_init(0, 1);
+    DpdkTransport::dpdk_init(0, 1, "37:00.1");
     mbuf_pool = DpdkTransport::create_mempool();
     if (DpdkTransport::nic_init(0, mbuf_pool, 1, 1) != 0) {
         printf("NIC init error!\n");
