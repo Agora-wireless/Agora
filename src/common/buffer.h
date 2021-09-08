@@ -197,7 +197,7 @@ class RxPacket {
   explicit RxPacket(const RxPacket &copy) : packet_(copy.packet_) {
     references_.store(copy.references_.load());
   }
-  ~RxPacket() = default;
+  virtual ~RxPacket() = default;
 
   // Disallow copy
   RxPacket &operator=(const RxPacket &) = delete;
