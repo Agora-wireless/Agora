@@ -796,6 +796,9 @@ void* PacketTXRX::fft_thread(int tid)
     size_t recv_tsc_duration = 0;
     size_t loop_count = 0;
     size_t work_count = 0;
+
+    size_t fft_frame_to_send = 0;
+    size_t fft_symbol_to_send = 0;
     
     size_t work_start_tsc, send_start_tsc, recv_start_tsc, 
         send_end_tsc, recv_end_tsc;
@@ -811,7 +814,7 @@ void* PacketTXRX::fft_thread(int tid)
 
         // 1. Try to send after fft data to dosubcarriers
         if (rx_status_->fft_to_subcarrier(
-                fft_frame_to_send_, fft_symbol_to_send_)) {
+                fft_frame_to_send, fft_symbol_to_send)) {
 
             if (unlikely(start_tsc == 0)) {
                 start_tsc = rdtsc();
@@ -823,7 +826,7 @@ void* PacketTXRX::fft_thread(int tid)
 
             for (size_t ant_id = cfg->ant_start + fft_thread_tid; ant_id < cfg->ant_end; ant_id += fft_socket_thread_num) {
                 char* fft_ptr_symbol = &(*after_fft_buffer_)[ant_id]
-                    [((fft_frame_to_send_ % kFrameWnd) * cfg->symbol_num_perframe + fft_symbol_to_send_) * cfg->packet_length];
+                    [((fft_frame_to_send % kFrameWnd) * cfg->symbol_num_perframe + fft_symbol_to_send) * cfg->packet_length];
 
                 for (size_t target_server_idx = 0; target_server_idx < cfg->bs_server_addr_list.size(); target_server_idx ++) {
                     char* fft_ptr = fft_ptr_symbol + (cfg->OFDM_DATA_START + cfg->subcarrier_num_start[target_server_idx]) * sizeof(short) * 2;
@@ -832,11 +835,11 @@ void* PacketTXRX::fft_thread(int tid)
                         //     [((fft_frame_to_send_ % kFrameWnd) * cfg->symbol_num_perframe + fft_symbol_to_send_) * cfg->packet_length + 
                         //     (cfg->OFDM_DATA_START + cfg->get_num_sc_per_server() * cfg->bs_server_addr_idx) * sizeof(short) * 2];
                         char* target_fft_ptr = &(*after_fft_buffer_to_subcarrier_)[ant_id]
-                            [((fft_frame_to_send_ % kFrameWnd) * cfg->symbol_num_perframe + fft_symbol_to_send_) * cfg->packet_length + 
+                            [((fft_frame_to_send % kFrameWnd) * cfg->symbol_num_perframe + fft_symbol_to_send) * cfg->packet_length + 
                             (cfg->OFDM_DATA_START + cfg->subcarrier_num_start[target_server_idx]) * sizeof(short) * 2];
                         // memcpy(target_fft_ptr, fft_ptr, cfg->get_num_sc_per_server() * sizeof(short) * 2);
                         memcpy(target_fft_ptr, fft_ptr, cfg->subcarrier_num_list[target_server_idx] * sizeof(short) * 2);
-                        rx_status_->fft_data_receive(fft_frame_to_send_, fft_symbol_to_send_);
+                        rx_status_->fft_data_receive(fft_frame_to_send, fft_symbol_to_send);
                     } else {
                         struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
                         // tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[target_server_idx],
@@ -851,8 +854,8 @@ void* PacketTXRX::fft_thread(int tid)
                         char* payload = (char*)eth_hdr + kPayloadOffset;
                         auto* pkt = reinterpret_cast<Packet*>(payload);
                         pkt->pkt_type = Packet::PktType::kFFT;
-                        pkt->frame_id = fft_frame_to_send_;
-                        pkt->symbol_id = fft_symbol_to_send_;
+                        pkt->frame_id = fft_frame_to_send;
+                        pkt->symbol_id = fft_symbol_to_send;
                         pkt->ant_id = ant_id;
                         pkt->server_id = cfg->bs_server_addr_idx;
                         // DpdkTransport::fastMemcpy(pkt->data, demod_ptr,
@@ -869,11 +872,11 @@ void* PacketTXRX::fft_thread(int tid)
                     }
                 }
             }
-            fft_symbol_to_send_++;
-            if (fft_symbol_to_send_
+            fft_symbol_to_send++;
+            if (fft_symbol_to_send
                 == cfg->symbol_num_perframe) {
-                fft_symbol_to_send_ = 0;
-                fft_frame_to_send_++;
+                fft_symbol_to_send = 0;
+                fft_frame_to_send++;
             }
 
             send_end_tsc = rdtsc();
