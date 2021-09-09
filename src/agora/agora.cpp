@@ -4,7 +4,7 @@ using namespace std;
 
 Agora::Agora(Config* cfg)
     : freq_ghz(measure_rdtsc_freq())
-    , base_worker_core_offset(cfg->core_offset + 1 + cfg->fft_socket_thread_num + cfg->socket_thread_num)
+    , base_worker_core_offset(cfg->core_offset + 2 + cfg->fft_socket_thread_num + cfg->socket_thread_num)
     , rx_status_(cfg)
     , demul_status_(cfg)
     , demod_status_(cfg)
@@ -65,8 +65,10 @@ Agora::Agora(Config* cfg)
     }
 
     /* Create worker threads */
+    // do_subcarrier_threads_.resize(
+    //     (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
     do_subcarrier_threads_.resize(
-        (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
+        (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
 
     for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
         do_subcarrier_threads_[i]
@@ -203,7 +205,7 @@ finish:
 void* Agora::subcarrier_worker(int tid)
 {
     pin_to_core_with_offset(
-        ThreadType::kWorkerSubcarrier, base_worker_core_offset + 1, tid + do_fft_threads_.size());
+        ThreadType::kWorkerSubcarrier, base_worker_core_offset, tid + do_fft_threads_.size());
 
     Range sc_range(tid * config_->subcarrier_block_size + 
         config_->bs_server_addr_idx * config_->get_num_sc_per_server(),
@@ -239,7 +241,7 @@ void* Agora::subcarrier_worker(int tid)
 
 void* Agora::decode_worker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset + 1,
+    pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset,
         tid + do_fft_threads_.size() + do_subcarrier_threads_.size());
 
     if (config_->dynamic_workload) {
@@ -264,7 +266,7 @@ void* Agora::decode_worker(int tid)
 
 void* Agora::fft_worker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorkerFFT, base_worker_core_offset + 1,
+    pin_to_core_with_offset(ThreadType::kWorkerFFT, base_worker_core_offset,
         tid);
 
     size_t ant_block = config_->get_num_ant_to_process() / config_->fft_thread_num;

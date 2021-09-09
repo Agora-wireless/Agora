@@ -404,7 +404,7 @@ public:
             cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
             cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
             work_count, loop_count, work_count * 100.0f / loop_count);
-        // do_demul_->print_overhead();
+        do_demul_->print_overhead();
 
         std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
         std::string filename = cur_directory + "/data/performance_dysubcarrier.txt";

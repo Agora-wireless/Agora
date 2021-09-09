@@ -19,9 +19,9 @@ public:
         , num_pilot_symbols_per_frame_(cfg->pilot_symbol_num_perframe)
         , num_ul_data_symbol_per_frame_(cfg->ul_data_symbol_num_perframe)
         , num_pkts_per_symbol_(cfg->get_num_ant_to_process())
-        , num_decode_tasks_per_frame_(cfg->test_mode == 1 ? (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size : 
+        , num_decode_tasks_per_frame_(cfg->test_mode == 1 ? (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size : 
             cfg->decode_thread_num)
-        , num_precode_tasks_per_frame_((cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
+        , num_precode_tasks_per_frame_((cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
         , num_fft_tasks_required_(cfg->get_num_ant_to_process())
         , num_fft_data_required_(cfg->BS_ANT_NUM)
         , last_frame_cycles_(worker_rdtsc())
@@ -349,7 +349,7 @@ class DemulStatus {
 public:
     DemulStatus(Config* cfg)
         : num_demul_tasks_required_(
-              cfg->get_num_sc_per_server() / cfg->demul_block_size)
+              cfg->get_num_sc_to_process() / cfg->demul_block_size)
     {
         for (size_t i = 0; i < kFrameWnd; i++) {
             for (size_t j = 0; j < kMaxSymbols; j++) {
@@ -423,7 +423,7 @@ public:
         // memset(cur_symbol_ul_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
 
         num_demod_data_received_
-            = new std::array<std::array<size_t, kMaxSymbols>,
+            = new std::array<std::array<std::atomic<size_t>, kMaxSymbols>,
                 kFrameWnd>[cfg->UE_NUM];
         for (size_t i = 0; i < cfg->UE_NUM; i++) {
             for (size_t j = 0; j < kFrameWnd; j++) {
@@ -470,7 +470,7 @@ public:
 
     uint64_t *frame_decode_time_;
 
-    std::array<std::array<size_t, kMaxSymbols>, kFrameWnd>*
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>*
         num_demod_data_received_;
 };
 

@@ -32,6 +32,8 @@ idx_99999 = int(size_data * 0.99999)
 y_val.append(data[idx_99999])
 y_val.append(data[-1])
 
+print data[idx_mediam], data[idx_90], data[idx_99], data[idx_999], data[idx_9999], data[idx_99999], data[-1]
+
 plt.bar(x_pos, y_val, color='green')
 plt.xlabel("Percentile")
 plt.ylabel("Latency (ms)")

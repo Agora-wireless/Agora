@@ -82,7 +82,7 @@ int main(int argc, char **argv)
 
     for (size_t i = 0; i < cdf.size(); i ++) {
         cdf[i] /= n_data;
-        printf("%lf %lf\n", minv + i * size_bin, cdf[i]);
+        printf("%lf %lf\n", minv + i * size_bin, 1.0 - cdf[i]);
     }
 
     return 0;
