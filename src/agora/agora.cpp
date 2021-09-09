@@ -207,11 +207,15 @@ void* Agora::subcarrier_worker(int tid)
     pin_to_core_with_offset(
         ThreadType::kWorkerSubcarrier, base_worker_core_offset, tid + do_fft_threads_.size());
 
-    Range sc_range(tid * config_->subcarrier_block_size + 
-        config_->bs_server_addr_idx * config_->get_num_sc_per_server(),
-        min((tid + 1) * config_->subcarrier_block_size + 
-        config_->bs_server_addr_idx * config_->get_num_sc_per_server(), 
-        (config_->bs_server_addr_idx + 1) * config_->get_num_sc_per_server()));
+    // Range sc_range(tid * config_->subcarrier_block_size + 
+    //     config_->bs_server_addr_idx * config_->get_num_sc_per_server(),
+    //     min((tid + 1) * config_->subcarrier_block_size + 
+    //     config_->bs_server_addr_idx * config_->get_num_sc_per_server(), 
+    //     (config_->bs_server_addr_idx + 1) * config_->get_num_sc_per_server()));
+
+    Range sc_range(tid * config_->subcarrier_block_size + config_->subcarrier_start,
+        min((tid + 1) * config_->subcarrier_block_size + config_->subcarrier_start,
+        config_->subcarrier_end));
 
     if (config_->dynamic_workload) {
         auto computeSubcarrier = new DySubcarrier(config_, tid, freq_ghz,
