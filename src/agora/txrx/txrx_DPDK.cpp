@@ -226,6 +226,7 @@ void* PacketTXRX::demod_tx_thread(int tid)
         // 1. Try to send demodulated data to decoders
         if (demul_status_->ready_to_decode(
                 demod_frame_to_send_, demod_symbol_ul_to_send_)) {
+            printf("Demod TX thread: send demod data frame %d symbol %d\n", demod_frame_to_send_, demod_symbol_ul_to_send_ + 1);
 
             if (unlikely(start_tsc == 0)) {
                 start_tsc = rdtsc();
@@ -911,7 +912,8 @@ int PacketTXRX::recv_relocate(int tid)
 
         } else if (pkt->pkt_type == Packet::PktType::kDemod) {
             const size_t symbol_idx_ul = pkt->symbol_id;
-            const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
+            // const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
+            const size_t sc_id = cfg->subcarrier_num_start[pkt->server_id];
 
             int8_t* demod_ptr
                 = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
