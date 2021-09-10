@@ -179,6 +179,16 @@ void* Sender::worker_thread(int tid)
             memcpy(data_buf + (i * ant_num_this_thread + j - radio_lo) * (2 * cfg->OFDM_CA_NUM),
                 iq_data_short_[(i * cfg->BS_ANT_NUM) + j],
                 (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
+            if (i == 0 && j == 0) {
+                short* ptr = (short*)iq_data_short_[(i * cfg->BS_ANT_NUM) + j];
+                printf("Before FFT short: ");
+                for (size_t k = 0; k < cfg->OFDM_CA_NUM; k ++) {
+                    printf("(%d %d) ", ptr[k*2], ptr[k*2+1]);
+                }
+                printf("\n");
+                run_fft(data_buf + (i * ant_num_this_thread + j - radio_lo) * (2 * cfg->OFDM_CA_NUM), fft_inout, mkl_handle, true);
+            }
+            else
             run_fft(data_buf + (i * ant_num_this_thread + j - radio_lo) * (2 * cfg->OFDM_CA_NUM), fft_inout, mkl_handle);
         }
     }
@@ -238,6 +248,12 @@ void* Sender::worker_thread(int tid)
                 data_buf + (buf_offset * ant_num_this_thread + cur_radio - radio_lo) * (2 * cfg->OFDM_CA_NUM)
                     + (cfg->subcarrier_num_start[i] + cfg->OFDM_DATA_START) * 2,
                 cfg->subcarrier_num_list[i] * sizeof(unsigned short) * 2);
+            if (cur_frame == 0 && cur_symbol == 0 && cur_radio == 0 && i == 0) {
+                for (size_t j = 0; j < cfg->subcarrier_num_list[i]; j ++) {
+                    printf("(%d %d) ", pkt->data[j*2], pkt->data[j*2+1]);
+                }
+                printf("\n");
+            }
             MLPD_TRACE("Sender: Sending packet %s (%zu of %zu) to %s:%ld\n",
                 pkt->to_string().c_str(), i, cfg->bs_server_addr_list.size(),
                 cfg->bs_server_addr_list[i].c_str(),
@@ -393,14 +409,30 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
 }
 
 void Sender::run_fft(short* src, complex_float* fft_inout,
-    DFTI_DESCRIPTOR_HANDLE mkl_handle) const
+    DFTI_DESCRIPTOR_HANDLE mkl_handle, bool debug) const
 {
     // pkt->data has (CP_LEN + OFDM_CA_NUM) unsigned short samples. After FFT,
     // we'll remove the cyclic prefix and have OFDM_CA_NUM short samples left.
     simd_convert_short_to_float(&src[2 * cfg->CP_LEN],
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
+    if (debug) {
+        printf("Before FFT: ");
+        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
+            printf("(%f %f) ", fft_inout[i].re, fft_inout[i].im);
+        }
+        printf("\n");
+    }
+
     DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
+
+    if (debug) {
+        printf("After FFT: ");
+        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
+            printf("(%f %f) ", fft_inout[i].re, fft_inout[i].im);
+        }
+        printf("\n");
+    }
 
     simd_convert_float32_to_float16(reinterpret_cast<float*>(src),
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
