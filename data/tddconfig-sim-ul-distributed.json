@@ -1,6 +1,6 @@
 {
   "socket_thread_num": 4,
-  "fft_socket_thread_num": 1,
+  "fft_socket_thread_num": 2,
   "worker_thread_num": 1,
   "decode_thread_num": [6, 5, 5],
   "fft_thread_num": 2,
@@ -43,5 +43,5 @@
   "num_load_levels": 1,
   "sleep_mode": false,
   "ofdm_data_num": 1200,
-  "ofdm_ca_num": 1200
+  "ofdm_ca_num": 2048
 }
