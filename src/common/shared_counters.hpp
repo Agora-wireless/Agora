@@ -442,6 +442,11 @@ public:
     {
         num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul]++;
         // printf("Receive demod data for frame %lu ue %lu symbol %lu (%u:%u)\n", frame_id, ue_id, symbol_id_ul, num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul], num_demod_data_required_);
+        num_demod_data_received_all_[frame_id % kFrameWnd] ++;
+        if (num_demod_data_received_all_[frame_id % kFrameWnd].load() == cfg_->get_num_ues_to_process() * num_demod_data_required_ * cfg_->ul_data_symbol_num_perframe) {
+            num_demod_data_received_all_[frame_id % kFrameWnd] = 0;
+            frame_decode_time_[frame_id] = get_ns();
+        }
     }
 
     bool received_all_demod_data(
@@ -454,9 +459,9 @@ public:
                                     [frame_id % kFrameWnd][symbol_id_ul]
                 = 0;
             // printf("Received all demod data for user %lu frame %lu symbol %lu\n", ue_id, frame_id, symbol_id_ul);
-            if (symbol_id_ul == 0) {
-                frame_decode_time_[frame_id] = get_ns();
-            }
+            // if (symbol_id_ul == 0) {
+            //     frame_decode_time_[frame_id] = get_ns();
+            // }
             return true;
         }
         return false;
@@ -472,6 +477,7 @@ public:
 
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>*
         num_demod_data_received_;
+    std::array<std::atomic<size_t>, kFrameWnd> num_demod_data_received_all_;
 };
 
 class EncodeStatus

@@ -251,13 +251,15 @@ void* PacketTXRX::demod_tx_thread(int tid)
         if (demul_status_->ready_to_decode(
                 demod_frame_to_send_, demod_symbol_ul_to_send_)) {
 
-            if (unlikely(start_tsc == 0)) {
+            if (unlikely(start_tsc == 0 && demod_frame_to_send_ >= 200)) {
                 start_tsc = rdtsc();
             }
             
             work_start_tsc = rdtsc();
             send_start_tsc = work_start_tsc;
-            worked = 1;
+            if (likely(start_tsc > 0)) {
+                worked = 1;
+            }
 
             for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
                 // int8_t* demod_ptr = &(*demod_buffers_)[demod_frame_to_send_
@@ -318,8 +320,10 @@ void* PacketTXRX::demod_tx_thread(int tid)
             }
 
             send_end_tsc = rdtsc();
-            send_tsc_duration += send_end_tsc - send_start_tsc;
-            work_tsc_duration += send_end_tsc - work_start_tsc;
+            if (likely(start_tsc > 0)) {
+                send_tsc_duration += send_end_tsc - send_start_tsc;
+                work_tsc_duration += send_end_tsc - work_start_tsc;
+            }
         }
 
         work_count += worked;
@@ -816,13 +820,15 @@ void* PacketTXRX::fft_thread(int tid)
         if (rx_status_->fft_to_subcarrier(
                 fft_frame_to_send, fft_symbol_to_send)) {
 
-            if (unlikely(start_tsc == 0)) {
+            if (unlikely(start_tsc == 0 && fft_frame_to_send >= 200)) {
                 start_tsc = rdtsc();
             }
             
             work_start_tsc = rdtsc();
             send_start_tsc = work_start_tsc;
-            worked = 1;
+            if (start_tsc > 0) {
+                worked = 1;
+            }
 
             for (size_t ant_id = cfg->ant_start + fft_thread_tid; ant_id < cfg->ant_end; ant_id += fft_socket_thread_num) {
                 char* fft_ptr_symbol = &(*after_fft_buffer_)[ant_id]
@@ -881,8 +887,10 @@ void* PacketTXRX::fft_thread(int tid)
             }
 
             send_end_tsc = rdtsc();
-            send_tsc_duration += send_end_tsc - send_start_tsc;
-            work_tsc_duration += send_end_tsc - work_start_tsc;
+            if (start_tsc > 0) {
+                send_tsc_duration += send_end_tsc - send_start_tsc;
+                work_tsc_duration += send_end_tsc - work_start_tsc;
+            }
         }
 
         // 2. Try to receive after fft data for decoding
@@ -967,7 +975,7 @@ void* PacketTXRX::fft_thread(int tid)
 
     size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
-    printf("Demod Thread duration stats: total time used %.2lfms, "
+    printf("FFT Thread duration stats: total time used %.2lfms, "
         "send %.2lfms (%.2lf\%), recv %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
         "working proportions (%u/%u: %.2lf\%)\n",
         cycles_to_ms(whole_duration, freq_ghz),
