@@ -490,7 +490,7 @@ void DyDecode::start_work()
         work_count, loop_count, work_count * 100.0f / loop_count);
 
     if (tid == 0) {
-        printf("Test decode time: ")
+        printf("Test decode time: ");
         for (size_t i = 0; i < 128; i ++) {
             printf("(%d: %d) ", i, decode_stage_1_latency_[i]);
         }
