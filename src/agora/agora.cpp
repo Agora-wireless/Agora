@@ -161,7 +161,12 @@ void Agora::start()
     size_t max_events_needed = do_subcarrier_threads_.size() + do_decode_threads_.size();
     Event_data events_list[max_events_needed];
 
+    size_t loop_count = 0, work_count = 0;
+
     while (cfg->running && !SignalHandler::gotExitSignal()) {
+        if (cur_slot >= 200) {
+            loop_count ++;
+        }
         if (cfg->downlink_mode) {
             for (size_t i = 0; i < cfg->socket_thread_num; i ++) {
                 if (packet_tx_rx_->frame_to_send_[i] < cfg->frames_to_test) {
@@ -178,10 +183,11 @@ void Agora::start()
         }
     keep_sleep:
         // Worker events
+        worked = 0;
         num_events = complete_task_queue_.try_dequeue_bulk(events_list, max_events_needed);
         for (size_t i = 0; i < num_events; i ++) {
             Event_data& event = events_list[i];
-            
+            worked = 1;
             switch(event.event_type) {
             case EventType::kCSI:
                 csi_task_completed ++;
@@ -233,6 +239,7 @@ void Agora::start()
         // Socket thread events
         if (cur_symbol == 0 && csi_launched == 0) {
             if (rx_status_.received_all_pilots(cur_slot)) {
+                worked = 1;
                 csi_launched = 1;
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     // printf("Main thread: launch CSI (slot %u) thread %u\n", cur_slot, j);
@@ -242,6 +249,7 @@ void Agora::start()
             }
         } else if (cur_symbol > 0 && demod_launched == 0) {
             if (rx_status_.is_demod_ready(cur_slot, cur_symbol - 1)) {
+                worked = 1;
                 demod_launched = 1;
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
@@ -254,6 +262,7 @@ void Agora::start()
         } else if (cur_symbol > 0 && demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
             for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
                 if (decode_launched[i] == 0 && demod_status_.received_all_demod_data(i, cur_slot, cur_symbol - 1)) {
+                    worked = 1;
                     decode_launched[i] == 1;
                     size_t decode_idx = (cur_symbol - 1) * cfg->get_num_ues_to_process() + i - cfg->ue_start;
                     size_t thread_idx = decode_idx % do_decode_threads_.size() + do_subcarrier_threads_.size();
@@ -263,6 +272,7 @@ void Agora::start()
                 }
             }
         }
+        work_count += worked;
     }
     cfg->running = false;
     goto finish;
@@ -289,6 +299,7 @@ finish:
     printf("Agora: Input traffic rate is %.2lfGbps, output traffic rate is %.2lfGbps\n", (double)(end_stats.ibytes - start_stats.ibytes) * 8 / (cfg->frames_to_test * 0.001) / 1000000000.0,
         (double)(end_stats.obytes - start_stats.obytes) * 8 / (cfg->frames_to_test * 0.001) / 1000000000.0);
 
+    printf("Master thread work (%d:%d)\n", work_count, loop_count);
     // Printing latency stats
     save_latency_data_to_file();
 
