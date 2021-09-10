@@ -13,14 +13,14 @@ slot_size=1
 num_runs=10
 
 if (( $# >= 1 )); then
-    if (( $# != 3 )); then
+    if (( $# != 2 )); then
         echo Illegal number of arguments!
-        echo $# $1 $2 $3
+        echo $# $1 $2
         exit
     fi
     batch_mode=1
     num_runs=$1
-    slot_size=$3
+    slot_size=$2
 fi
 
 if [ $# -eq 1 ]
@@ -54,7 +54,7 @@ if (( $batch_mode == 0 )); then
 fi
 
 for (( T=0; T<$num_runs; T++ ))
-# for T in 9
+# for T in 6 9
 do
     echo Start to run servers $T
     for (( i=0; i<$num_servers; i++ ))
