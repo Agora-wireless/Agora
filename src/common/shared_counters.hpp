@@ -387,7 +387,7 @@ public:
     void receive_demod_data(size_t ue_id, size_t frame_id, size_t symbol_id_ul)
     {
         num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul]++;
-        // printf("Receive demod data for frame %lu ue %lu symbol %lu (%u:%u)\n", frame_id, ue_id, symbol_id_ul, num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul], num_demod_data_required_);
+        printf("Receive demod data for frame %lu ue %lu symbol %lu (%u:%u)\n", frame_id, ue_id, symbol_id_ul, num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul].load(), num_demod_data_required_);
     }
 
     bool received_all_demod_data(
