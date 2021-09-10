@@ -239,6 +239,8 @@ Event_data DyDecode::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
     decode_count_ ++;
     decode_max_ = decode_max_ < start_tsc2 - start_tsc1 ? start_tsc2 - start_tsc1 : decode_max_;
+    size_t tmp_tsc = cycles_to_us(start_tsc2 - start_tsc1, freq_ghz);
+    decode_stage_1_latency_[tmp_tsc] ++;
 
     if (kPrintLLRData) {
         printf("LLR data, symbol_offset: %zu\n", symbol_offset);
@@ -486,4 +488,12 @@ void DyDecode::start_work()
         cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, work_count * 100.0f / loop_count);
+
+    if (tid == 0) {
+        printf("Test decode time: ")
+        for (size_t i = 0; i < 128; i ++) {
+            printf("(%d: %d) ", i, decode_stage_1_latency_[i]);
+        }
+        printf("\n");
+    }
 }
