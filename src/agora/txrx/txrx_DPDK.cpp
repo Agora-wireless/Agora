@@ -226,7 +226,7 @@ void* PacketTXRX::demod_tx_thread(int tid)
         // 1. Try to send demodulated data to decoders
         if (demul_status_->ready_to_decode(
                 demod_frame_to_send_, demod_symbol_ul_to_send_)) {
-            printf("Demod TX thread: send demod data frame %d symbol %d\n", demod_frame_to_send_, demod_symbol_ul_to_send_ + 1);
+            // printf("Demod TX thread: send demod data frame %d symbol %d\n", demod_frame_to_send_, demod_symbol_ul_to_send_ + 1);
 
             if (unlikely(start_tsc == 0)) {
                 start_tsc = rdtsc();
@@ -252,7 +252,7 @@ void* PacketTXRX::demod_tx_thread(int tid)
                             demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg->subcarrier_start);
                     // memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                     memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_to_process() * cfg->mod_order_bits);
-                    printf("Receive demod packet (%d %d %d %d)\n", demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, target_server_idx);
+                    // printf("Receive demod packet (%d %d %d %d)\n", demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, target_server_idx);
                     decode_status_->receive_demod_data(
                         ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_);
                 } else {
@@ -925,7 +925,7 @@ int PacketTXRX::recv_relocate(int tid)
             //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
             memcpy(demod_ptr, pkt->data,
                 cfg->subcarrier_num_list[pkt->server_id] * cfg->mod_order_bits);
-            printf("Receive demod packet (%d %d %d %d)\n", pkt->frame_id, symbol_idx_ul, pkt->ue_id, pkt->server_id);
+            // printf("Receive demod packet (%d %d %d %d)\n", pkt->frame_id, symbol_idx_ul, pkt->ue_id, pkt->server_id);
             decode_status_->receive_demod_data(
                 pkt->ue_id, pkt->frame_id, symbol_idx_ul);
         } else {
