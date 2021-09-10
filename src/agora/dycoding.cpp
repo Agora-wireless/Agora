@@ -491,11 +491,10 @@ void DyDecode::start_work()
         cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, work_count * 100.0f / loop_count);
 
-    if (tid == 0) {
-        printf("Test decode time: ");
-        for (size_t i = 0; i < 128; i ++) {
-            printf("(%d: %d) ", i, decode_stage_1_latency_[i]);
-        }
-        printf("\n");
+    char fn[128];
+    sprintf(fn, "data/detail_latency/decode_latency_%d.txt", tid);
+    FILE* file = fopen(fn, "w");
+    for (size_t i = 0; i < 128; i ++) {
+        fprintf(file, "%d %d\n", i, decode_stage_1_latency_[i]);
     }
 }
