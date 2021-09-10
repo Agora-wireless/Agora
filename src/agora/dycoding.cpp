@@ -237,7 +237,7 @@ Event_data DyDecode::launch(size_t tag)
     memcpy(decoding_data_, llr_buffer_ptr, cbCodewLen);
     size_t scale = cbCodewLen * 8 / cbLen;
     for (size_t i = 0; i < cbLen / 8; i ++) {
-        size_t idx = i * scale;
+        size_t idx = (i * scale * 20) % cbCodewLen;
         decoded_buffer_ptr[i] = decoding_data_[idx];
     }
 
