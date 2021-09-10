@@ -838,12 +838,6 @@ void* PacketTXRX::fft_thread(int tid)
                             [((fft_frame_to_send % kFrameWnd) * cfg->symbol_num_perframe + fft_symbol_to_send) * cfg->packet_length + 
                             (cfg->OFDM_DATA_START + cfg->subcarrier_num_start[target_server_idx]) * sizeof(short) * 2];
 
-                        if (fft_frame_to_send == 0 && fft_symbol_to_send == 0 && ant_id == 0) {
-                            for (size_t i = 0; i < cfg->get_num_sc_to_process(); i ++) {
-                                printf("(%d %d) ", ((short*)fft_ptr)[i*2], ((short*)fft_ptr)[i*2+1]);
-                            }
-                            printf("\n");
-                        }
                         // memcpy(target_fft_ptr, fft_ptr, cfg->get_num_sc_per_server() * sizeof(short) * 2);
                         memcpy(target_fft_ptr, fft_ptr, cfg->subcarrier_num_list[target_server_idx] * sizeof(short) * 2);
                         rx_status_->fft_data_receive(fft_frame_to_send, fft_symbol_to_send);
@@ -1106,14 +1100,6 @@ int PacketTXRX::recv_relocate(int tid)
                 &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
                 (uint8_t*)pkt + Packet::kOffsetOfData,
                 cfg->OFDM_CA_NUM * 2 * sizeof(unsigned short));
-
-            if (pkt->frame_id == 0 && pkt->symbol_id == 0 && pkt->ant_id == 0) {
-                printf("Before FFT short: ");
-                for (size_t j = 0; j < cfg->OFDM_CA_NUM; j ++) {
-                    printf("(%d %d) ", pkt->data[j*2], pkt->data[j*2+1]);
-                }
-                printf("\n");
-            }
 
             valid_pkts ++;
             size_t cur_cycle = rdtsc();
