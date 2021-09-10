@@ -55,8 +55,8 @@ if (( $batch_mode == 0 )); then
     exit
 fi
 
-# for (( T=0; T<$num_runs; T++ ))
-for T in 9
+for (( T=0; T<$num_runs; T++ ))
+# for T in 9
 do
     echo Start to run servers $T
     for (( i=0; i<$num_servers; i++ ))
