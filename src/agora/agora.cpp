@@ -192,8 +192,8 @@ void Agora::start()
             case EventType::kCSI:
                 csi_task_completed ++;
                 if (csi_task_completed == do_subcarrier_threads_.size()) {
+                    // printf("Main thread: launch ZF (slot %u)\n", cur_slot);
                     for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
-                        // printf("Main thread: launch ZF (slot %u) thread %u\n", cur_slot, j);
                         Event_data event(EventType::kZF, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
                         try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                     }
@@ -211,6 +211,7 @@ void Agora::start()
             case EventType::kDemul:
                 demod_task_completed ++;
                 if (demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+                    // printf("Demod complete for frame %d symbol %d\n", cur_slot, cur_symbol - 1);
                     demul_status_.demul_complete(cur_slot, cur_symbol - 1, cfg->get_num_sc_to_process() / cfg->demul_block_size);
                 }
                 break;
@@ -241,8 +242,8 @@ void Agora::start()
             if (rx_status_.received_all_pilots(cur_slot)) {
                 worked = 1;
                 csi_launched = 1;
+                // printf("Main thread: launch CSI (slot %u)\n", cur_slot);
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
-                    // printf("Main thread: launch CSI (slot %u) thread %u\n", cur_slot, j);
                     Event_data event(EventType::kCSI, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
                     try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                 }
@@ -251,15 +252,17 @@ void Agora::start()
             if (rx_status_.is_demod_ready(cur_slot, cur_symbol - 1)) {
                 worked = 1;
                 demod_launched = 1;
+                // printf("Main thread: launch Demod (slot %u, symbol %u)\n", cur_slot, cur_symbol);
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
-                        // printf("Main thread: launch Demod (slot %u, symbol %u, block %u) thread %u\n", cur_slot, cur_symbol, k, j);
+                        if (cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size >= cfg->subcarrier_end) continue;
                         Event_data event(EventType::kDemul, gen_tag_t::frm_sym_sc(cur_slot, cur_symbol - 1, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
                         try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                     }
                 }
             }
         } else if (cur_symbol > 0 && demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+            // printf("Wait for receiving demod data (%d %d)\n", cur_slot, cur_symbol - 1);
             for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
                 if (decode_launched[i] == 0 && demod_status_.received_all_demod_data(i, cur_slot, cur_symbol - 1)) {
                     worked = 1;
@@ -271,6 +274,7 @@ void Agora::start()
                     try_enqueue_fallback(&sched_info_arr_[thread_idx].concurrent_q_, sched_info_arr_[thread_idx].ptok_, event);
                 }
             }
+            // printf("Wait for receiving demod data (%d %d) end\n", cur_slot, cur_symbol - 1);
         }
         work_count += worked;
     }
