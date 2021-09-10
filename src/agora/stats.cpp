@@ -497,7 +497,7 @@ void Stats::save_to_file()
             "fft_0, fft_1, fft_2, zf_0, zf_1, zf_2, demul_0, demul_1, demul_2, "
             "decode_0, decode_1, decode_2\n");
 
-        for (size_t i = 0; i < last_frame_id; i++) {
+        for (size_t i = 0; i < config_->frames_to_test; i++) {
             fprintf(fp_debug_detailed,
                 "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n",
                 fft_breakdown_us[0][i], fft_breakdown_us[1][i],

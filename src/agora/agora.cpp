@@ -61,8 +61,10 @@ Agora::Agora(Config* cfg)
     // }
     
     /* Create worker threads */
+    // do_subcarrier_threads_.resize(
+    //     (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
     do_subcarrier_threads_.resize(
-        (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
+        (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
 
     for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
         do_subcarrier_threads_[i]
@@ -186,7 +188,7 @@ void Agora::start()
                 if (csi_task_completed == do_subcarrier_threads_.size()) {
                     for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                         // printf("Main thread: launch ZF (slot %u) thread %u\n", cur_slot, j);
-                        Event_data event(EventType::kZF, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size - cfg->OFDM_DATA_START)._tag);
+                        Event_data event(EventType::kZF, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
                         try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                     }
                 }
@@ -202,8 +204,8 @@ void Agora::start()
                 break;
             case EventType::kDemul:
                 demod_task_completed ++;
-                if (demod_task_completed == cfg->get_num_sc_per_server() / cfg->demul_block_size) {
-                    demul_status_.demul_complete(cur_slot, cur_symbol - 1, cfg->get_num_sc_per_server() / cfg->demul_block_size);
+                if (demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+                    demul_status_.demul_complete(cur_slot, cur_symbol - 1, cfg->get_num_sc_to_process() / cfg->demul_block_size);
                 }
                 break;
             case EventType::kDecode:
@@ -234,7 +236,7 @@ void Agora::start()
                 csi_launched = 1;
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     // printf("Main thread: launch CSI (slot %u) thread %u\n", cur_slot, j);
-                    Event_data event(EventType::kCSI, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size - cfg->OFDM_DATA_START)._tag);
+                    Event_data event(EventType::kCSI, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
                     try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                 }
             }
@@ -244,12 +246,12 @@ void Agora::start()
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
                         // printf("Main thread: launch Demod (slot %u, symbol %u, block %u) thread %u\n", cur_slot, cur_symbol, k, j);
-                        Event_data event(EventType::kDemul, gen_tag_t::frm_sym_sc(cur_slot, cur_symbol - 1, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size - cfg->OFDM_DATA_START)._tag);
+                        Event_data event(EventType::kDemul, gen_tag_t::frm_sym_sc(cur_slot, cur_symbol - 1, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
                         try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                     }
                 }
             }
-        } else if (cur_symbol > 0 && demod_task_completed == cfg->get_num_sc_per_server() / cfg->demul_block_size) {
+        } else if (cur_symbol > 0 && demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
             for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
                 if (decode_launched[i] == 0 && demod_status_.received_all_demod_data(i, cur_slot, cur_symbol - 1)) {
                     decode_launched[i] == 1;
@@ -302,11 +304,14 @@ void* Agora::subcarrier_worker(int tid)
     pin_to_core_with_offset(
         ThreadType::kWorkerSubcarrier, base_worker_core_offset, tid);
 
-    Range sc_range(tid * config_->subcarrier_block_size + 
-        config_->bs_server_addr_idx * config_->get_num_sc_per_server(),
-        min((tid + 1) * config_->subcarrier_block_size + 
-        config_->bs_server_addr_idx * config_->get_num_sc_per_server(), 
-        (config_->bs_server_addr_idx + 1) * config_->get_num_sc_per_server()));
+    // Range sc_range(tid * config_->subcarrier_block_size + 
+    //     config_->bs_server_addr_idx * config_->get_num_sc_per_server(),
+    //     min((tid + 1) * config_->subcarrier_block_size + 
+    //     config_->bs_server_addr_idx * config_->get_num_sc_per_server(), 
+    //     (config_->bs_server_addr_idx + 1) * config_->get_num_sc_per_server()));
+    Range sc_range(tid * config_->subcarrier_block_size + config_->subcarrier_start,
+        min((tid + 1) * config_->subcarrier_block_size + config_->subcarrier_start,
+        config_->subcarrier_end));
 
     if (config_->dynamic_workload) {
         auto computeSubcarrier = new DySubcarrier(config_, tid, freq_ghz,

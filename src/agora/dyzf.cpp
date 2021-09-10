@@ -152,7 +152,7 @@ void DyZF::ZF_time_orthogonal(size_t tag)
             frame_id, base_sc_id);
     }
     const size_t num_subcarriers = std::min(
-        cfg->zf_block_size, (cfg->bs_server_addr_idx + 1) * cfg->get_num_sc_per_server() - base_sc_id);
+        cfg->zf_block_size, cfg->subcarrier_end - base_sc_id);
 
     // Handle each subcarrier one by one
     for (size_t i = 0; i < num_subcarriers; i++) {

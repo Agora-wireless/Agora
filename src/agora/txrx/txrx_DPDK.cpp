@@ -236,22 +236,31 @@ void* PacketTXRX::demod_tx_thread(int tid)
             worked = 1;
 
             for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
+                // int8_t* demod_ptr = &(*demod_buffers_)[demod_frame_to_send_
+                //     % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->bs_server_addr_idx * cfg->get_num_sc_per_server()];
                 int8_t* demod_ptr = &(*demod_buffers_)[demod_frame_to_send_
-                    % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->bs_server_addr_idx * cfg->get_num_sc_per_server()];
+                    % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->subcarrier_start * cfg->mod_order_bits];
 
                 size_t target_server_idx = cfg->get_server_idx_by_ue(ue_id);
                 if (target_server_idx == cfg->bs_server_addr_idx) {
+                    // int8_t* target_demod_ptr
+                    //     = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
+                    //         demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg->bs_server_addr_idx * cfg->get_num_sc_per_server());
                     int8_t* target_demod_ptr
                         = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
-                            demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg->bs_server_addr_idx * cfg->get_num_sc_per_server());
-                    memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                            demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg->subcarrier_start);
+                    // memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                    memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_to_process() * cfg->mod_order_bits);
                     decode_status_->receive_demod_data(
                         ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
+                    // tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)],
+                    //     bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[cfg->get_server_idx_by_ue(ue_id)], cfg->demod_tx_port + demod_symbol_ul_to_send_, cfg->demod_rx_port + demod_symbol_ul_to_send_, 
+                    //     Packet::kOffsetOfData + cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                     tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)],
                         bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[cfg->get_server_idx_by_ue(ue_id)], cfg->demod_tx_port + demod_symbol_ul_to_send_, cfg->demod_rx_port + demod_symbol_ul_to_send_, 
-                        Packet::kOffsetOfData + cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                        Packet::kOffsetOfData + cfg->get_num_sc_to_process() * cfg->mod_order_bits);
                     struct rte_ether_hdr* eth_hdr
                         = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
 
@@ -264,8 +273,10 @@ void* PacketTXRX::demod_tx_thread(int tid)
                     pkt->server_id = cfg->bs_server_addr_idx;
                     // DpdkTransport::fastMemcpy(pkt->data, demod_ptr,
                     //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                    // memcpy(pkt->data, demod_ptr,
+                    //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                     memcpy(pkt->data, demod_ptr,
-                        cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                        cfg->get_num_sc_to_process() * cfg->mod_order_bits);
 
                     // Send data (one OFDM symbol)
                     size_t nb_tx_new = rte_eth_tx_burst(0, 0, tx_bufs, 1);
@@ -384,8 +395,10 @@ void* PacketTXRX::demod_rx_thread(int tid)
                         pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
                 // DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
                 //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                // memcpy(demod_ptr, pkt->data,
+                //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                 memcpy(demod_ptr, pkt->data,
-                    cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                    cfg->subcarrier_num_list[pkt->server_id] * cfg->mod_order_bits);
                 decode_status_->receive_demod_data(
                     pkt->ue_id, pkt->frame_id, symbol_idx_ul);
             } else {
@@ -454,22 +467,31 @@ void* PacketTXRX::demod_thread(int tid)
             worked = 1;
 
             for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
+                // int8_t* demod_ptr = &(*demod_buffers_)[demod_frame_to_send_
+                //     % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->bs_server_addr_idx * cfg->get_num_sc_per_server()];
                 int8_t* demod_ptr = &(*demod_buffers_)[demod_frame_to_send_
-                    % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->bs_server_addr_idx * cfg->get_num_sc_per_server()];
+                    % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->subcarrier_start * cfg->mod_order_bits];
 
                 size_t target_server_idx = cfg->get_server_idx_by_ue(ue_id);
                 if (target_server_idx == cfg->bs_server_addr_idx) {
+                    // int8_t* target_demod_ptr
+                    //     = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
+                    //         demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg->bs_server_addr_idx * cfg->get_num_sc_per_server());
                     int8_t* target_demod_ptr
                         = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
-                            demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg->bs_server_addr_idx * cfg->get_num_sc_per_server());
-                    memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                            demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg->subcarrier_start);
+                    // memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                    memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_to_process() * cfg->mod_order_bits);
                     decode_status_->receive_demod_data(
                         ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
+                    // tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)],
+                    //     bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[cfg->get_server_idx_by_ue(ue_id)], cfg->demod_tx_port, cfg->demod_rx_port, 
+                    //     Packet::kOffsetOfData + cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                     tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)],
                         bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[cfg->get_server_idx_by_ue(ue_id)], cfg->demod_tx_port, cfg->demod_rx_port, 
-                        Packet::kOffsetOfData + cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                        Packet::kOffsetOfData + cfg->get_num_sc_to_process() * cfg->mod_order_bits);
                     struct rte_ether_hdr* eth_hdr
                         = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
 
@@ -482,8 +504,10 @@ void* PacketTXRX::demod_thread(int tid)
                     pkt->server_id = cfg->bs_server_addr_idx;
                     // DpdkTransport::fastMemcpy(pkt->data, demod_ptr,
                     //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                    // memcpy(pkt->data, demod_ptr,
+                    //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                     memcpy(pkt->data, demod_ptr,
-                        cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                        cfg->get_num_sc_to_process() * cfg->mod_order_bits);
 
                     // Send data (one OFDM symbol)
                     size_t nb_tx_new = rte_eth_tx_burst(0, 0, tx_bufs, 1);
@@ -557,15 +581,18 @@ void* PacketTXRX::demod_thread(int tid)
             auto* pkt = reinterpret_cast<Packet*>((char*)(eth_hdr) + kPayloadOffset);
             if (pkt->pkt_type == Packet::PktType::kDemod) {
                 const size_t symbol_idx_ul = pkt->symbol_id;
-                const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
+                // const size_t sc_id = pkt->server_id * cfg->get_num_sc_per_server();
+                const size_t sc_id = cfg->subcarrier_num_start[pkt->server_id]; 
 
                 int8_t* demod_ptr
                     = cfg->get_demod_buf_to_decode(*demod_soft_buffer_to_decode_,
                         pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
                 // DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
                 //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                // memcpy(demod_ptr, pkt->data,
+                //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
                 memcpy(demod_ptr, pkt->data,
-                    cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                    cfg->subcarrier_num_list[pkt->server_id] * cfg->mod_order_bits);
                 decode_status_->receive_demod_data(
                     pkt->ue_id, pkt->frame_id, symbol_idx_ul);
             } else {
@@ -838,16 +865,23 @@ int PacketTXRX::recv_relocate(int tid)
                     * cfg->symbol_num_perframe
                 + pkt->symbol_id;
 
+            // size_t sc_offset = Packet::kOffsetOfData
+            //     + 2 * sizeof(unsigned short)
+            //         * (cfg->OFDM_DATA_START
+            //             + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server());
             size_t sc_offset = Packet::kOffsetOfData
                 + 2 * sizeof(unsigned short)
-                    * (cfg->OFDM_DATA_START
-                        + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server());
+                    * (cfg->OFDM_DATA_START + cfg->subcarrier_start);
             DpdkTransport::fastMemcpy(
                 &rx_buffer[rx_offset_ * cfg->packet_length], pkt, Packet::kOffsetOfData);
+            // DpdkTransport::fastMemcpy(
+            //     &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
+            //     (uint8_t*)pkt + Packet::kOffsetOfData,
+            //     cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
             DpdkTransport::fastMemcpy(
                 &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
                 (uint8_t*)pkt + Packet::kOffsetOfData,
-                cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
+                cfg->get_num_sc_to_process() * 2 * sizeof(unsigned short));
 
             valid_pkts ++;
             size_t cur_cycle = rdtsc();
@@ -884,8 +918,10 @@ int PacketTXRX::recv_relocate(int tid)
                     pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
             // DpdkTransport::fastMemcpy(demod_ptr, pkt->data,
             //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+            // memcpy(demod_ptr, pkt->data,
+            //     cfg->get_num_sc_per_server() * cfg->mod_order_bits);
             memcpy(demod_ptr, pkt->data,
-                cfg->get_num_sc_per_server() * cfg->mod_order_bits);
+                cfg->subcarrier_num_list[pkt->server_id] * cfg->mod_order_bits);
             decode_status_->receive_demod_data(
                 pkt->ue_id, pkt->frame_id, symbol_idx_ul);
         } else {
@@ -1044,7 +1080,7 @@ int PacketTXRX::dequeue_send(int tid, size_t symbol_dl_to_send, size_t ant_to_se
 
         simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data), 
             reinterpret_cast<float*>(&(*dl_ifft_buffer_)[offset][0]), 
-            cfg->get_num_sc_per_server() * 2);
+            cfg->get_num_sc_to_process() * 2);
        
         // printf("Send a packet out server:%u\n", pkt->server_id);
 

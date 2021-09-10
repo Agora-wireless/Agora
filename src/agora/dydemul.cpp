@@ -82,8 +82,10 @@ void DyDemul::launch(
     }
 
     size_t max_sc_ite;
+    // max_sc_ite = std::min(
+    //     cfg->demul_block_size, (cfg->bs_server_addr_idx + 1) * cfg->get_num_sc_per_server() - base_sc_id);
     max_sc_ite = std::min(
-        cfg->demul_block_size, (cfg->bs_server_addr_idx + 1) * cfg->get_num_sc_per_server() - base_sc_id);
+        cfg->demul_block_size, cfg->subcarrier_end - base_sc_id);
     assert(max_sc_ite % kSCsPerCacheline == 0);
 
     complex_float tmp[kSCsPerCacheline];
@@ -192,6 +194,7 @@ void DyDemul::launch(
         duration_stat->task_duration[2] += start_tsc3 - start_tsc2;
         duration_stat->task_count++;
         equal_cycles_ += start_tsc3 - start_tsc2;
+        equal_count_ ++;
     }
 
     size_t start_tsc3 = worker_rdtsc();
@@ -241,6 +244,7 @@ void DyDemul::launch(
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
     demod_cycles_ += worker_rdtsc() - start_tsc3;
+    demod_count_ += max_sc_ite;
     total_cycles_ += worker_rdtsc() - start_tsc;
     return;
 }

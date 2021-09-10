@@ -215,8 +215,8 @@ Config::Config(std::string jsonfile)
         = tddConf.value("bs_server_addr_list", std::vector<std::string>());
     rt_assert(bs_server_addr_list.size() > 0, "Address list is 0!");
     bs_server_addr_idx = tddConf.value("bs_server_addr_idx", 0);
-    rt_assert(OFDM_DATA_NUM % bs_server_addr_list.size() == 0,
-        "OFDM_DATA_NUM % # servers should be 0!");
+    // rt_assert(OFDM_DATA_NUM % bs_server_addr_list.size() == 0,
+    //     "OFDM_DATA_NUM % # servers should be 0!");
     if (kUseDPDK) {
         bs_server_mac_list
             = tddConf.value("bs_server_mac_list", std::vector<std::string>());
@@ -226,11 +226,27 @@ Config::Config(std::string jsonfile)
             = tddConf.value("bs_rru_mac_addr", "");
     }
 
+    subcarrier_num_list = tddConf.value("subcarrier_num_list", std::vector<size_t>());
+    rt_assert(bs_server_addr_list.size() == subcarrier_num_list.size(), "Subcarrier num list has a different size!");
+    size_t sum_subcarriers = 0;
+    for (const size_t subc : subcarrier_num_list) {
+        subcarrier_num_start.push_back(sum_subcarriers);
+        sum_subcarriers += subc;
+    }
+    rt_assert(sum_subcarriers == OFDM_DATA_NUM, "Subcarrier sum is different from OFDM DATA NUM!");
+    sum_subcarriers = 0;
+    for (size_t i = 0; i < bs_server_addr_idx; i ++) {
+        sum_subcarriers += subcarrier_num_list[i];
+    }
+
     // TODO: Should we be using OFDM_DATA_START here?
-    subcarrier_start
-        = OFDM_DATA_START + bs_server_addr_idx * get_num_sc_per_server();
-    subcarrier_end
-        = OFDM_DATA_START + (bs_server_addr_idx + 1) * get_num_sc_per_server();
+    // subcarrier_start
+    //     = OFDM_DATA_START + bs_server_addr_idx * get_num_sc_per_server();
+    // subcarrier_end
+    //     = OFDM_DATA_START + (bs_server_addr_idx + 1) * get_num_sc_per_server();
+    subcarrier_start = sum_subcarriers;
+    subcarrier_end = subcarrier_start + subcarrier_num_list[bs_server_addr_idx];
+
     // rt_assert(get_num_sc_per_server() % subcarrier_block_size == 0,
     //     "Invalid subcarrier range and subcarrier block size!");
     ue_start = bs_server_addr_idx < UE_NUM % bs_server_addr_list.size()
@@ -242,9 +258,12 @@ Config::Config(std::string jsonfile)
         ? ue_start + UE_NUM / bs_server_addr_list.size() + 1
         : ue_start + UE_NUM / bs_server_addr_list.size();
 
+    // demul_events_per_symbol
+    //     = 1 + (get_num_sc_per_server() - 1) / demul_block_size;
     demul_events_per_symbol
-        = 1 + (get_num_sc_per_server() - 1) / demul_block_size;
-    zf_events_per_symbol = 1 + (get_num_sc_per_server() - 1) / zf_block_size;
+        = 1 + (get_num_sc_to_process() - 1) / demul_block_size;
+    // zf_events_per_symbol = 1 + (get_num_sc_per_server() - 1) / zf_block_size;
+    zf_events_per_symbol = 1 + (get_num_sc_to_process() - 1) / zf_block_size;
 
     demod_tx_port = tddConf.value("demod_tx_port", 8100);
     demod_rx_port = tddConf.value("demod_rx_port", 8600);

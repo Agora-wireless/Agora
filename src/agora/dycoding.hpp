@@ -109,6 +109,9 @@ private:
     // Control info
     std::vector<std::vector<ControlInfo>>& control_info_table_;
     std::vector<size_t>& control_idx_list_;
+    
+    size_t decode_count_ = 0;
+    size_t decode_max_ = 0;
 };
 
 #endif

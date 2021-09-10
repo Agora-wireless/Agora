@@ -421,6 +421,28 @@ public:
     */
 
     void start_work() {
+        size_t start_tsc = 0;
+        size_t work_tsc_duration = 0;
+        size_t csi_tsc_duration = 0;
+        size_t zf_tsc_duration = 0;
+        size_t demod_tsc_duration = 0;
+        size_t precode_tsc_duration = 0;
+        size_t print_tsc_duration = 0;
+        size_t state_operation_duration = 0;
+        size_t loop_count = 0;
+        size_t work_count = 0;
+
+        size_t csi_count = 0;
+        size_t zf_count = 0;
+        size_t demod_count = 0;
+
+        size_t demod_max = 0;
+        size_t zf_max = 0;
+        size_t csi_max = 0;
+
+        size_t work_start_tsc, state_start_tsc;
+        size_t csi_start_tsc, zf_start_tsc, demod_start_tsc;
+
         while (cfg->running && !SignalHandler::gotExitSignal()) {
             Event_data event, resp;
             size_t tag;
@@ -428,39 +450,101 @@ public:
             size_t sc_id;
             size_t symbol_id_ul;
             if (task_queue_.try_dequeue(event)) {
+                work_start_tsc = rdtsc();
                 switch (event.event_type) {
                 case EventType::kCSI:
                     tag = event.tags[0];
                     slot_id = gen_tag_t(tag).frame_id;
                     sc_id = gen_tag_t(tag).sc_id;
+                    if (unlikely(start_tsc == 0 && slot_id >= 200)) {
+                        start_tsc = rdtsc();
+                    }
+                    csi_start_tsc = rdtsc();
                     run_csi(slot_id, sc_id);
+                    if (likely(start_tsc > 0)) {
+                        size_t csi_tmp_tsc = rdtsc() - csi_start_tsc;
+                        csi_tsc_duration += csi_tmp_tsc;
+                        csi_max = csi_max < csi_tmp_tsc ? csi_tmp_tsc : csi_max;
+                        csi_count ++;
+                    }
                     resp = Event_data(EventType::kCSI);
                     // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
+                    if (likely(start_tsc > 0)) {
+                        state_start_tsc = rdtsc();
+                    }
                     try_enqueue_fallback(&complete_queue_, complete_queue_token_, resp);
+                    if (likely(start_tsc > 0)) {
+                        state_operation_duration += rdtsc() - state_start_tsc;
+                    }
                     break;
                 case EventType::kZF:
                     tag = event.tags[0];
                     slot_id = gen_tag_t(tag).frame_id;
+                    zf_start_tsc = rdtsc();
                     for (sc_id = sc_range_.start; sc_id < sc_range_.end; sc_id += cfg->zf_block_size) {
                         do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0, sc_id)._tag);
                     }
+                    if (likely(start_tsc > 0)) {
+                        size_t zf_tmp_tsc = rdtsc() - zf_start_tsc;
+                        zf_tsc_duration += zf_tmp_tsc;
+                        zf_max = zf_max < zf_tmp_tsc ? zf_tmp_tsc : zf_max;
+                        zf_count ++;
+                    }
                     resp = Event_data(EventType::kZF);
                     // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
+                    if (likely(start_tsc > 0)) {
+                        state_start_tsc = rdtsc();
+                    }
                     try_enqueue_fallback(&complete_queue_, complete_queue_token_, resp);
+                    if (likely(start_tsc > 0)) {
+                        state_operation_duration += rdtsc() - state_start_tsc;
+                    }
                     break;
                 case EventType::kDemul:
                     tag = event.tags[0];
                     slot_id = gen_tag_t(tag).frame_id;
                     symbol_id_ul = gen_tag_t(tag).symbol_id;
                     sc_id = gen_tag_t(tag).sc_id;
+                    demod_start_tsc = rdtsc();
                     do_demul_->launch(slot_id, symbol_id_ul, sc_id);
+                    if (likely(start_tsc > 0)) {
+                        size_t demod_tmp_tsc = rdtsc() - demod_start_tsc;
+                        demod_tsc_duration += demod_tmp_tsc;
+                        demod_max = demod_max < demod_tmp_tsc ? demod_tmp_tsc : demod_max;
+                        demod_count ++;
+                    }
                     resp = Event_data(EventType::kDemul);
                     // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
+                    if (likely(start_tsc > 0)) {
+                        state_start_tsc = rdtsc();
+                    }
                     try_enqueue_fallback(&complete_queue_, complete_queue_token_, resp);
+                    if (likely(start_tsc > 0)) {
+                        state_operation_duration += rdtsc() - state_start_tsc;
+                    }
                     break;
+                }
+                if (likely(start_tsc > 0)) {
+                    work_tsc_duration += rdtsc() - work_start_tsc;
                 }
             }
         }
+
+        size_t whole_duration = rdtsc() - start_tsc;
+        size_t idle_duration = whole_duration - work_tsc_duration;
+        printf("DySubcarrier Thread %u duration stats: total time used %.2lfms, "
+            "csi %.2lfms (%.2lf\%, %u, %.2lfus), zf %.2lfms (%.2lf\%, %u, %.2lfus), demod %.2lfms (%.2lf\%, %u, %.2lfus), "
+            "precode %.2lfms (%.2lf\%), print %.2lfms (%.2lf\%), stating "
+            "%.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), working rate (%u/%u: %.2lf\%)\n", 
+            tid, cycles_to_ms(whole_duration, freq_ghz),
+            cycles_to_ms(csi_tsc_duration, freq_ghz), csi_tsc_duration * 100.0f / whole_duration, csi_count, cycles_to_us(csi_max, freq_ghz),
+            cycles_to_ms(zf_tsc_duration, freq_ghz), zf_tsc_duration * 100.0f / whole_duration, zf_count, cycles_to_us(zf_max, freq_ghz),
+            cycles_to_ms(demod_tsc_duration, freq_ghz), demod_tsc_duration * 100.0f / whole_duration, demod_count, cycles_to_us(demod_max, freq_ghz),
+            cycles_to_ms(precode_tsc_duration, freq_ghz), precode_tsc_duration * 100.0f / whole_duration,
+            cycles_to_ms(print_tsc_duration, freq_ghz), print_tsc_duration * 100.0f / whole_duration,
+            cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
+            cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
+            work_count, loop_count, work_count * 100.0f / loop_count);
     }
 
 private:

@@ -243,6 +243,8 @@ Event_data DyDecode::launch(size_t tag)
 
     size_t start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
+    decode_count_ ++;
+    decode_max_ = decode_max_ < start_tsc2 - start_tsc1 ? start_tsc2 - start_tsc1 : decode_max_;
 
     if (kPrintLLRData) {
         printf("LLR data, symbol_offset: %zu\n", symbol_offset);
@@ -491,7 +493,20 @@ void DyDecode::start_work()
 
 void DyDecode::start_work() 
 {
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t decode_tsc_duration = 0;
+    size_t state_operation_duration = 0;
+    size_t loop_count = 0;
+    size_t work_count = 0;
+    size_t decode_start_tsc;
+    bool state_trigger = false;
+
     while (cfg->running && !SignalHandler::gotExitSignal()) {
+        if (likely(state_trigger)) {
+            loop_count ++;
+        }
+        size_t work_start_tsc, state_start_tsc;
         Event_data event;
         if (task_queue_.try_dequeue(event)) {
             switch (event.event_type) {
@@ -500,12 +515,44 @@ void DyDecode::start_work()
                 size_t slot_id = gen_tag_t(tag).frame_id;
                 size_t symbol_id = gen_tag_t(tag).symbol_id;
                 size_t ue_id = gen_tag_t(tag).ue_id;
+                if (unlikely(!state_trigger && slot_id >= 200)) {
+                    start_tsc = rdtsc();
+                    state_trigger = true;
+                }
+                if (likely(state_trigger)) {
+                    work_start_tsc = rdtsc();
+                    work_count ++;
+                }
+                if (likely(state_trigger)) {
+                    decode_start_tsc = rdtsc();
+                }
                 launch(gen_tag_t::frm_sym_cb(slot_id, symbol_id,
                     ue_id * cfg->LDPC_config.nblocksInSymbol)._tag);
+                if (likely(state_trigger)) {
+                    decode_tsc_duration += rdtsc() - decode_start_tsc;
+                }
+                if (likely(state_trigger)) {
+                    state_start_tsc = rdtsc();
+                }
                 Event_data resp(EventType::kDecode);
                 try_enqueue_fallback(&complete_queue_, complete_queue_token_, resp);
+                if (likely(state_trigger)) {
+                    state_operation_duration += rdtsc() - state_start_tsc;
+                    work_tsc_duration += rdtsc() - work_start_tsc;
+                }
                 break;
             }
         }
     }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("DoDecode Thread %u duration stats: total time used %.2lfms, "
+        "decode %.2lfms (%.2lf\%), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
+        "working proportions (%u/%u: %.2lf\%)\n",
+        tid, cycles_to_ms(whole_duration, freq_ghz),
+        cycles_to_ms(decode_tsc_duration, freq_ghz), decode_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
+        work_count, loop_count, work_count * 100.0f / loop_count);
 }

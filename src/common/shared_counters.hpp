@@ -19,9 +19,9 @@ public:
         , num_pilot_symbols_per_frame_(cfg->pilot_symbol_num_perframe)
         , num_ul_data_symbol_per_frame_(cfg->ul_data_symbol_num_perframe)
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
-        , num_decode_tasks_per_frame_(cfg->test_mode == 1 ? (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size : 
+        , num_decode_tasks_per_frame_(cfg->test_mode == 1 ? (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size : 
             cfg->decode_thread_num)
-        , num_precode_tasks_per_frame_((cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
+        , num_precode_tasks_per_frame_((cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
         , last_frame_cycles_(worker_rdtsc())
         , freq_ghz_(measure_rdtsc_freq())
         , test_mode_(cfg->test_mode)
@@ -295,7 +295,7 @@ class DemulStatus {
 public:
     DemulStatus(Config* cfg)
         : num_demul_tasks_required_(
-              cfg->get_num_sc_per_server() / cfg->demul_block_size)
+              cfg->get_num_sc_to_process() / cfg->demul_block_size)
     {
         for (size_t i = 0; i < kFrameWnd; i++) {
             for (size_t j = 0; j < kMaxSymbols; j++) {
