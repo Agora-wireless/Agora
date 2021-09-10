@@ -162,6 +162,7 @@ void Agora::start()
     Event_data events_list[max_events_needed];
 
     size_t loop_count = 0, work_count = 0;
+    size_t worked = 0;
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_slot >= 200) {
