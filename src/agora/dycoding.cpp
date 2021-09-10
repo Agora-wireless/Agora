@@ -232,8 +232,10 @@ Event_data DyDecode::launch(size_t tag)
     size_t start_tsc1 = worker_rdtsc();
     duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
-    bblib_ldpc_decoder_5gnr(
-        &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
+    // bblib_ldpc_decoder_5gnr(
+    //     &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
+    memcpy(decoding_data_, llr_buffer_ptr, cbCodewLen);
+    memcpy(decoded_buffer_ptr, decoding_data_, cbLen);
 
     size_t start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;

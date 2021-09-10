@@ -107,6 +107,7 @@ private:
     size_t decode_max_ = 0;
 
     uint32_t decode_stage_1_latency_[128];
+    uint8_t decoding_data_[10000];
     // uint32_t decode_stage_2_latency_[64];
     // uint32_t decode_stage_3_latency_[64];
 };
