@@ -53,7 +53,7 @@ Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_thread
     memset(packet_count_per_frame, 0, SOCKET_BUFFER_FRAME_NUM * sizeof(size_t));
 
     init_iq_from_file(std::string(TOSTRING(PROJECT_DIRECTORY))
-        + "/data/LDPC_rx_data_2048_ant" + std::to_string(cfg->BS_ANT_NUM)
+        + "/data/LDPC_rx_data_" + std::to_string(cfg->OFDM_CA_NUM) + "_ant" + std::to_string(cfg->BS_ANT_NUM)
         + ".bin");
     init_control_from_file(std::string(TOSTRING(PROJECT_DIRECTORY))
         + "/data/control_ue.bin");
