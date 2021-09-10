@@ -370,3 +370,8 @@ add_executable(dynamic_sender
   src/common/dpdk_transport.cpp
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(dynamic_sender ${COMMON_LIBS})
+
+add_executable(test_decode_spec
+  test/compute_kernels/ldpc/test_decode_spec.cpp
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(test_decode_spec ${COMMON_LIBS})

@@ -229,6 +229,19 @@ Event_data DyDecode::launch(size_t tag)
     ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
     ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
 
+    if (frame_id == 0 && symbol_idx_ul == 0 && ue_id == 0) {
+        FILE* file = fopen("data/tmp_decode.bin", "wb");
+        fwrite(llr_buffer_ptr, 1, cbCodewLen, file);
+        fclose(file);
+
+        file = fopen("data/first_decode.txt", "w");
+        for (size_t i = 0; i < cbCodewLen; i ++) {
+            fprintf(file, "%d ", llr_buffer_ptr[i]);
+        }
+        fprintf(file, "\n");
+        fclose(file);
+    }
+
     size_t start_tsc1 = worker_rdtsc();
     duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
