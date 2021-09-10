@@ -908,13 +908,6 @@ int PacketTXRX::recv_relocate(int tid)
                 last_packet_cycle_[tid] = cur_cycle;
             }
 
-            if (pkt->frame_id == 0 && pkt->symbol_id == 0 && pkt->ant_id == 0) {
-                for (size_t i = 0; i < cfg->get_num_sc_to_process(); i ++) {
-                    printf("(%d %d) ", pkt->data[i*2], pkt->data[i*2+1]);
-                }
-                printf("\n");
-            }
-
             // get the position in rx_buffer
             cur_cycle = rdtsc();
             if (!rx_status_->add_new_packet(pkt, tid)) {
