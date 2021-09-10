@@ -201,7 +201,7 @@ void Agora::start()
         if (likely(start_tsc > 0)) {
             size_t tmp_duration = rdtsc() - state_start_tsc;
             state_operation_duration += tmp_duration;
-            work_tsc_duration += tmp_duration;
+            // work_tsc_duration += tmp_duration;
         }
         for (size_t i = 0; i < num_events; i ++) {
             if (likely(start_tsc > 0)) {
