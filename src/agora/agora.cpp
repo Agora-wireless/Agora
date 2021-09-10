@@ -748,8 +748,9 @@ void Agora::save_latency_data_to_file()
         //     ((int64_t)demul_status_.frame_sc_time_[i] - (int64_t)rx_status_.frame_iq_time_[i]) / 1000.0,
         //     ((int64_t)demod_status_.frame_decode_time_[i] - (int64_t)demul_status_.frame_sc_time_[i]) / 1000.0,
         //     ((int64_t)rx_status_.frame_end_time_[i] - (int64_t)demod_status_.frame_decode_time_[i]) / 1000.0);
-        fprintf(fp, "%u %lu %lu %lu %lu %lu\n", i, rx_status_.frame_start_time_[i],
+        fprintf(fp, "%u %lu %lu %lu %lu %lu %lu\n", i, rx_status_.frame_start_time_[i],
             rx_status_.frame_iq_time_[i],
+            rx_status_.fft_done_time_[i],
             demul_status_.frame_sc_time_[i],
             demod_status_.frame_decode_time_[i],
             rx_status_.frame_end_time_[i]);

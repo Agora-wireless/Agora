@@ -180,14 +180,6 @@ void* Sender::worker_thread(int tid)
                 iq_data_short_[(i * cfg->BS_ANT_NUM) + j],
                 (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
             // run_fft(data_buf + (i * ant_num_this_thread + j - radio_lo) * (2 * cfg->OFDM_CA_NUM), fft_inout, mkl_handle);
-            if (i == 0 && j == 0) {
-                short* ptr = (short*)iq_data_short_[(i * cfg->BS_ANT_NUM) + j];
-                printf("Before FFT short: ");
-                for (size_t k = 0; k < cfg->OFDM_CA_NUM; k ++) {
-                    printf("(%d %d) ", ptr[k*2], ptr[k*2+1]);
-                }
-                printf("\n");
-            }
         }
     }
 

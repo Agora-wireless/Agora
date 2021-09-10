@@ -23,6 +23,7 @@ public:
             cfg->decode_thread_num)
         , num_precode_tasks_per_frame_((cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
         , num_fft_tasks_required_(cfg->get_num_ant_to_process())
+        , num_fft_tasks_required_all_(cfg->get_num_ant_to_process() * cfg->symbol_num_perframe)
         , num_fft_data_required_(cfg->BS_ANT_NUM)
         , last_frame_cycles_(worker_rdtsc())
         , freq_ghz_(measure_rdtsc_freq())
@@ -30,9 +31,11 @@ public:
     {
         frame_start_time_ = new uint64_t[cfg->frames_to_test];
         frame_iq_time_ = new uint64_t[cfg->frames_to_test];
+        fft_done_time_ = new uint64_t[cfg->frames_to_test];
         frame_end_time_ = new uint64_t[cfg->frames_to_test];
         memset(frame_start_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
         memset(frame_iq_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+        memset(fft_done_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
         memset(frame_end_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
     }
 
@@ -235,6 +238,10 @@ public:
     void fft_done(size_t frame_id, size_t symbol_id, size_t task_num)
     {
         num_fft_tasks_completed_[frame_id % kFrameWnd][symbol_id] += task_num;
+        num_fft_tasks_completed_all_[frame_id % kFrameWnd] += task_num;
+        if (num_fft_tasks_completed_all_[frame_id % kFrameWnd].load() == num_fft_tasks_required_all_) {
+            fft_done_time_[frame_id] = get_ns();
+        }
     }
 
     bool fft_to_subcarrier(size_t frame_id, size_t symbol_id)
@@ -302,7 +309,9 @@ public:
 
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_fft_tasks_completed_;
+    std::array<std::atomic<size_t>, kFrameWnd> num_fft_tasks_completed_all_;
     const size_t num_fft_tasks_required_;
+    const size_t num_fft_tasks_required_all_;
 
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_fft_data_received_;
@@ -311,6 +320,7 @@ public:
     // Latency measurement counters for each frame
     uint64_t *frame_start_time_;
     uint64_t *frame_iq_time_;
+    uint64_t *fft_done_time_;
     uint64_t *frame_end_time_;
 
     // The timestamp when last frame was processed (in cycles)

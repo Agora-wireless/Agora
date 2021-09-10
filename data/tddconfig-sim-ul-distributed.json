@@ -1,13 +1,13 @@
 {
-  "socket_thread_num": 4,
-  "fft_socket_thread_num": 2,
+  "socket_thread_num": 3,
+  "fft_socket_thread_num": 1,
   "worker_thread_num": 1,
-  "decode_thread_num": [6, 5, 5],
-  "fft_thread_num": 2,
-  "subcarrier_num_list": [384, 416, 400],
-  "subcarrier_block_size": 96,
+  "decode_thread_num": [4, 3, 3],
+  "fft_thread_num": 3,
+  "subcarrier_num_list": [384, 384, 432],
+  "subcarrier_block_size": 48,
   "demul_block_size": 16,
-  "antenna_num": 64,
+  "antenna_num": 128,
   "ue_num": 16,
   "bs_rru_addr": "192.168.21.184",
   "bs_rru_mac_addr": "b8:59:9f:f0:85:e1",
@@ -43,5 +43,5 @@
   "num_load_levels": 1,
   "sleep_mode": false,
   "ofdm_data_num": 1200,
-  "ofdm_ca_num": 2048
+  "ofdm_ca_num": 1200
 }

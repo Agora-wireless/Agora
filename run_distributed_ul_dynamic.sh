@@ -10,7 +10,6 @@ batch_mode=0
 num_antennas=$(cat $DIR/data/tddconfig-sim-ul-distributed.json | jq '.antenna_num')
 num_ue=$(cat $DIR/data/tddconfig-sim-ul-distributed.json | jq '.ue_num')
 slot_size=1
-num_cores=80
 num_runs=10
 
 if (( $# >= 1 )); then
@@ -21,7 +20,6 @@ if (( $# >= 1 )); then
     fi
     batch_mode=1
     num_runs=$1
-    num_cores=$2
     slot_size=$3
 fi
 
@@ -68,6 +66,6 @@ do
     sleep 10
     cd data
     bash latency_analysis.sh
-    cp frame_latency_all.txt frame_latency/frame_latency_all_${num_antennas}_${num_ue}_${slot_size}ms_${num_cores}c_$T.txt
+    cp frame_latency_all.txt frame_latency/frame_latency_all_${num_antennas}_${num_ue}_${slot_size}ms_fft_${T}.txt
     cd ..
 done
