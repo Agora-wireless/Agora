@@ -1107,6 +1107,14 @@ int PacketTXRX::recv_relocate(int tid)
                 (uint8_t*)pkt + Packet::kOffsetOfData,
                 cfg->OFDM_CA_NUM * 2 * sizeof(unsigned short));
 
+            if (pkt->frame_id == 0 && pkt->symbol_id == 0 && pkt->ant_id == 0) {
+                printf("Before FFT short: ");
+                for (size_t j = 0; j < cfg->OFDM_CA_NUM; j ++) {
+                    printf("(%d %d) ", pkt->data[j*2], pkt->data[j*2+1]);
+                }
+                printf("\n");
+            }
+
             valid_pkts ++;
             size_t cur_cycle = rdtsc();
             if (unlikely(last_packet_cycle_[tid] == 0) && pkt->frame_id > 2000) {

@@ -105,9 +105,18 @@ void DoFFT::launch(size_t frame_id, size_t symbol_id, size_t ant_id)
     // size_t symbol_id = pkt->symbol_id;
     // size_t ant_id = pkt->ant_id;
 
+    // if (frame_id == 0 && symbol_id == 0 && ant_id == 0) {
+    //     short* ptr = 
+    //     printf("Before FFT short inside: ");
+    //     for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
+    //         printf("(%d %d) ", fft_inout[i].re, fft_inout[i].im);
+    //     }
+    //     printf("\n");
+    // }
+
     simd_convert_short_to_float(reinterpret_cast<short*>(socket_buffer_[ant_id] +
         (frame_slot * cfg->symbol_num_perframe * cfg->packet_length)
-        + symbol_id * cfg->packet_length) + Packet::kOffsetOfData, 
+        + symbol_id * cfg->packet_length + Packet::kOffsetOfData), 
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
     if (frame_id == 0 && symbol_id == 0 && ant_id == 0) {
