@@ -436,4 +436,12 @@ void Sender::run_fft(short* src, complex_float* fft_inout,
 
     simd_convert_float32_to_float16(reinterpret_cast<float*>(src),
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+
+    if (debug) {
+        printf("After FFT short: ");
+        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
+            printf("(%d %d) ", src[i*2], src[i*2+1]);
+        }
+        printf("\n");
+    }
 }
