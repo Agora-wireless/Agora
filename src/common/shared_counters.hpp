@@ -193,6 +193,7 @@ public:
                 for (size_t j = 0; j < kMaxSymbols; j++) {
                     num_fft_tasks_completed_[frame_slot][j] = 0;
                 }
+                num_fft_tasks_completed_all_[frame_slot] = 0;
                 for (size_t j = 0; j < kMaxSymbols; j++) {
                     num_fft_data_received_[frame_slot][j] = 0;
                 }
