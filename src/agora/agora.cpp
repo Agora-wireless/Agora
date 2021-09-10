@@ -205,7 +205,11 @@ void Agora::start()
             case EventType::kDemul:
                 demod_task_completed ++;
                 if (demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+                    printf("Demod complete for frame %d symbol %d\n", cur_slot, cur_symbol - 1);
                     demul_status_.demul_complete(cur_slot, cur_symbol - 1, cfg->get_num_sc_to_process() / cfg->demul_block_size);
+                } else if (demod_task_completed > cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+                    printf("Error!!!!\n");
+                    exit(0);
                 }
                 break;
             case EventType::kDecode:
@@ -246,12 +250,14 @@ void Agora::start()
                 printf("Main thread: launch Demod (slot %u, symbol %u)\n", cur_slot, cur_symbol);
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
+                        if (cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size >= cfg->subcarrier_end) continue;
                         Event_data event(EventType::kDemul, gen_tag_t::frm_sym_sc(cur_slot, cur_symbol - 1, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
                         try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                     }
                 }
             }
         } else if (cur_symbol > 0 && demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+            // printf("Wait for receiving demod data (%d %d)\n", cur_slot, cur_symbol - 1);
             for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
                 if (decode_launched[i] == 0 && demod_status_.received_all_demod_data(i, cur_slot, cur_symbol - 1)) {
                     decode_launched[i] == 1;
@@ -262,6 +268,7 @@ void Agora::start()
                     try_enqueue_fallback(&sched_info_arr_[thread_idx].concurrent_q_, sched_info_arr_[thread_idx].ptok_, event);
                 }
             }
+            // printf("Wait for receiving demod data (%d %d) end\n", cur_slot, cur_symbol - 1);
         }
     }
     cfg->running = false;
