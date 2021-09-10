@@ -164,9 +164,18 @@ void Agora::start()
     size_t loop_count = 0, work_count = 0;
     size_t worked = 0;
 
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t state_operation_duration = 0;
+
+    size_t work_start_tsc, state_start_tsc;
+
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_slot >= 200) {
             loop_count ++;
+            if (unlikely(start_tsc == 0)) {
+                start_tsc = rdtsc();
+            }
         }
         if (cfg->downlink_mode) {
             for (size_t i = 0; i < cfg->socket_thread_num; i ++) {
@@ -185,8 +194,19 @@ void Agora::start()
     keep_sleep:
         // Worker events
         worked = 0;
+        if (likely(start_tsc > 0)) {
+            state_start_tsc = rdtsc();
+        }
         num_events = complete_task_queue_.try_dequeue_bulk(events_list, max_events_needed);
+        if (likely(start_tsc > 0)) {
+            size_t tmp_duration = rdtsc() - state_start_tsc;
+            state_operation_duration += tmp_duration;
+            work_tsc_duration += tmp_duration;
+        }
         for (size_t i = 0; i < num_events; i ++) {
+            if (likely(start_tsc > 0)) {
+                work_start_tsc = rdtsc();
+            }
             Event_data& event = events_list[i];
             worked = 1;
             switch(event.event_type) {
@@ -196,7 +216,14 @@ void Agora::start()
                     // printf("Main thread: launch ZF (slot %u)\n", cur_slot);
                     for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                         Event_data event(EventType::kZF, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
+                        if (likely(start_tsc > 0)) {
+                            state_start_tsc = rdtsc();
+                        }
                         try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                        if (likely(start_tsc > 0)) {
+                            size_t tmp_duration = rdtsc() - state_start_tsc;
+                            work_tsc_duration += tmp_duration;
+                        }
                     }
                 }
                 break;
@@ -213,7 +240,14 @@ void Agora::start()
                 demod_task_completed ++;
                 if (demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
                     // printf("Demod complete for frame %d symbol %d\n", cur_slot, cur_symbol - 1);
+                    if (likely(start_tsc > 0)) {
+                        state_start_tsc = rdtsc();
+                    }
                     demul_status_.demul_complete(cur_slot, cur_symbol - 1, cfg->get_num_sc_to_process() / cfg->demul_block_size);
+                    if (likely(start_tsc > 0)) {
+                        size_t tmp_duration = rdtsc() - state_start_tsc;
+                        work_tsc_duration += tmp_duration;
+                    }
                 }
                 break;
             case EventType::kDecode:
@@ -228,29 +262,55 @@ void Agora::start()
                     cur_symbol ++;
                     if (cur_symbol == cfg->symbol_num_perframe) {
                         cur_symbol = 0;
+                        if (likely(start_tsc > 0)) {
+                            state_start_tsc = rdtsc();
+                        }
                         for (size_t j = 0; j < do_decode_threads_.size(); j ++) {
                             rx_status_.decode_done(cur_slot);
+                        }
+                        if (likely(start_tsc > 0)) {
+                            size_t tmp_duration = rdtsc() - state_start_tsc;
+                            work_tsc_duration += tmp_duration;
                         }
                         cur_slot ++;
                     }
                 }
                 break;
             }
+            if (likely(start_tsc > 0)) {
+                work_tsc_duration = rdtsc() - work_start_tsc;
+            }
         }
 
         // Socket thread events
         if (cur_symbol == 0 && csi_launched == 0) {
             if (rx_status_.received_all_pilots(cur_slot)) {
+                if (likely(start_tsc > 0)) {
+                    work_start_tsc = rdtsc();
+                }
                 worked = 1;
                 csi_launched = 1;
                 // printf("Main thread: launch CSI (slot %u)\n", cur_slot);
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     Event_data event(EventType::kCSI, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
+                    if (likely(start_tsc > 0)) {
+                        state_start_tsc = rdtsc();
+                    }
                     try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                    if (likely(start_tsc > 0)) {
+                        size_t tmp_duration = rdtsc() - state_start_tsc;
+                        work_tsc_duration += tmp_duration;
+                    }
+                }
+                if (likely(start_tsc > 0)) {
+                    work_tsc_duration = rdtsc() - work_start_tsc;
                 }
             }
         } else if (cur_symbol > 0 && demod_launched == 0) {
             if (rx_status_.is_demod_ready(cur_slot, cur_symbol - 1)) {
+                if (likely(start_tsc > 0)) {
+                    work_start_tsc = rdtsc();
+                }
                 worked = 1;
                 demod_launched = 1;
                 // printf("Main thread: launch Demod (slot %u, symbol %u)\n", cur_slot, cur_symbol);
@@ -258,21 +318,44 @@ void Agora::start()
                     for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
                         if (cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size >= cfg->subcarrier_end) continue;
                         Event_data event(EventType::kDemul, gen_tag_t::frm_sym_sc(cur_slot, cur_symbol - 1, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
+                        if (likely(start_tsc > 0)) {
+                            state_start_tsc = rdtsc();
+                        }
                         try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                        if (likely(start_tsc > 0)) {
+                            size_t tmp_duration = rdtsc() - state_start_tsc;
+                            work_tsc_duration += tmp_duration;
+                        }
                     }
+                }
+                if (likely(start_tsc > 0)) {
+                    work_tsc_duration = rdtsc() - work_start_tsc;
                 }
             }
         } else if (cur_symbol > 0 && demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
             // printf("Wait for receiving demod data (%d %d)\n", cur_slot, cur_symbol - 1);
             for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
                 if (decode_launched[i] == 0 && demod_status_.received_all_demod_data(i, cur_slot, cur_symbol - 1)) {
+                    if (likely(start_tsc > 0)) {
+                        work_start_tsc = rdtsc();
+                    }
                     worked = 1;
                     decode_launched[i] == 1;
                     size_t decode_idx = (cur_symbol - 1) * cfg->get_num_ues_to_process() + i - cfg->ue_start;
                     size_t thread_idx = decode_idx % do_decode_threads_.size() + do_subcarrier_threads_.size();
                     // printf("Main thread: launch Decode (slot %u, symbol %u, ue %u) thread %u\n", cur_slot, cur_symbol, i, thread_idx - do_subcarrier_threads_.size());
                     Event_data event(EventType::kDecode, gen_tag_t::frm_sym_ue(cur_slot, cur_symbol - 1, i)._tag);
+                    if (likely(start_tsc > 0)) {
+                        state_start_tsc = rdtsc();
+                    }
                     try_enqueue_fallback(&sched_info_arr_[thread_idx].concurrent_q_, sched_info_arr_[thread_idx].ptok_, event);
+                    if (likely(start_tsc > 0)) {
+                        size_t tmp_duration = rdtsc() - state_start_tsc;
+                        work_tsc_duration += tmp_duration;
+                    }
+                    if (likely(start_tsc > 0)) {
+                        work_tsc_duration = rdtsc() - work_start_tsc;
+                    }
                 }
             }
             // printf("Wait for receiving demod data (%d %d) end\n", cur_slot, cur_symbol - 1);
