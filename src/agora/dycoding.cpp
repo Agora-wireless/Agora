@@ -240,7 +240,9 @@ Event_data DyDecode::launch(size_t tag)
     decode_count_ ++;
     decode_max_ = decode_max_ < start_tsc2 - start_tsc1 ? start_tsc2 - start_tsc1 : decode_max_;
     size_t tmp_tsc = cycles_to_us(start_tsc2 - start_tsc1, freq_ghz);
-    decode_stage_1_latency_[tmp_tsc] ++;
+    if (tmp_tsc < 128) {
+        decode_stage_1_latency_[tmp_tsc] ++;
+    }
 
     if (kPrintLLRData) {
         printf("LLR data, symbol_offset: %zu\n", symbol_offset);
