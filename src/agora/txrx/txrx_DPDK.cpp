@@ -837,6 +837,13 @@ void* PacketTXRX::fft_thread(int tid)
                         char* target_fft_ptr = &(*after_fft_buffer_to_subcarrier_)[ant_id]
                             [((fft_frame_to_send % kFrameWnd) * cfg->symbol_num_perframe + fft_symbol_to_send) * cfg->packet_length + 
                             (cfg->OFDM_DATA_START + cfg->subcarrier_num_start[target_server_idx]) * sizeof(short) * 2];
+
+                        if (fft_frame_to_send == 0 && fft_symbol_to_send == 0 && ant_id == 0) {
+                            for (size_t i = 0; i < cfg->get_num_sc_to_process(); i ++) {
+                                printf("(%d %d) ", ((short*)fft_ptr)[i*2], ((short*)fft_ptr)[i*2+1]);
+                            }
+                            printf("\n");
+                        }
                         // memcpy(target_fft_ptr, fft_ptr, cfg->get_num_sc_per_server() * sizeof(short) * 2);
                         memcpy(target_fft_ptr, fft_ptr, cfg->subcarrier_num_list[target_server_idx] * sizeof(short) * 2);
                         rx_status_->fft_data_receive(fft_frame_to_send, fft_symbol_to_send);

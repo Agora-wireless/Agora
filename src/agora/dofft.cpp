@@ -110,17 +110,45 @@ void DoFFT::launch(size_t frame_id, size_t symbol_id, size_t ant_id)
         + symbol_id * cfg->packet_length) + Packet::kOffsetOfData, 
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
+    if (frame_id == 0 && symbol_id == 0 && ant_id == 0) {
+        printf("Before FFT: ");
+        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
+            printf("(%f %f) ", fft_inout[i].re, fft_inout[i].im);
+        }
+        printf("\n");
+    }
+
     size_t start_tsc1 = worker_rdtsc();
 
     DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
 
     size_t start_tsc2 = worker_rdtsc();
 
+    if (frame_id == 0 && symbol_id == 0 && ant_id == 0) {
+        printf("After FFT: ");
+        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
+            printf("(%f %f) ", fft_inout[i].re, fft_inout[i].im);
+        }
+        printf("\n");
+    }
+
     // Move to the new place
     simd_convert_float32_to_float16(reinterpret_cast<float*>(after_fft_buffer_[ant_id] +
         (frame_slot * cfg->symbol_num_perframe * cfg->packet_length)
         + symbol_id * cfg->packet_length),
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+
+    if (frame_id == 0 && symbol_id == 0 && ant_id == 0) {
+        char *ptr = after_fft_buffer_[ant_id] +
+            (frame_slot * cfg->symbol_num_perframe * cfg->packet_length)
+            + symbol_id * cfg->packet_length;
+        short* p = (short*) ptr;
+        printf("After FFT short: ");
+        for (size_t i = cfg->OFDM_DATA_START; i < cfg->OFDM_DATA_START + cfg->subcarrier_end; i ++) {
+            printf("(%d %d) ", p[i*2], p[i*2+1]);
+        }
+        printf("\n");
+    }
 
     // socket_buffer_status_[socket_thread_id][buf_offset] = 0; // Reset sock buf
     return;
