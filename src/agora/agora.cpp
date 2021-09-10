@@ -278,7 +278,7 @@ void Agora::start()
                 break;
             }
             if (likely(start_tsc > 0)) {
-                work_tsc_duration = rdtsc() - work_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
             }
         }
 
@@ -303,7 +303,7 @@ void Agora::start()
                     }
                 }
                 if (likely(start_tsc > 0)) {
-                    work_tsc_duration = rdtsc() - work_start_tsc;
+                    work_tsc_duration += rdtsc() - work_start_tsc;
                 }
             }
         } else if (cur_symbol > 0 && demod_launched == 0) {
@@ -329,7 +329,7 @@ void Agora::start()
                     }
                 }
                 if (likely(start_tsc > 0)) {
-                    work_tsc_duration = rdtsc() - work_start_tsc;
+                    work_tsc_duration += rdtsc() - work_start_tsc;
                 }
             }
         } else if (cur_symbol > 0 && demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
@@ -354,7 +354,7 @@ void Agora::start()
                         state_operation_duration += tmp_duration;
                     }
                     if (likely(start_tsc > 0)) {
-                        work_tsc_duration = rdtsc() - work_start_tsc;
+                        work_tsc_duration += rdtsc() - work_start_tsc;
                     }
                 }
             }
@@ -367,6 +367,8 @@ void Agora::start()
     return;
 
 finish:
+
+    size_t whole_duration = rdtsc() - start_tsc;
 
     printf("Agora: printing stats and saving to file\n");
     printf("Agora: slot %u symbol %u\n", cur_slot, cur_symbol);
@@ -387,7 +389,6 @@ finish:
     printf("Agora: Input traffic rate is %.2lfGbps, output traffic rate is %.2lfGbps\n", (double)(end_stats.ibytes - start_stats.ibytes) * 8 / (cfg->frames_to_test * 0.001) / 1000000000.0,
         (double)(end_stats.obytes - start_stats.obytes) * 8 / (cfg->frames_to_test * 0.001) / 1000000000.0);
 
-    size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("Master Thread duration stats: total time used %.2lfms, "
         "stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), working rate (%u/%u: %.2lf\%)\n", 
