@@ -222,7 +222,7 @@ void Agora::start()
                         try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                         if (likely(start_tsc > 0)) {
                             size_t tmp_duration = rdtsc() - state_start_tsc;
-                            work_tsc_duration += tmp_duration;
+                            state_operation_duration += tmp_duration;
                         }
                     }
                 }
@@ -246,7 +246,7 @@ void Agora::start()
                     demul_status_.demul_complete(cur_slot, cur_symbol - 1, cfg->get_num_sc_to_process() / cfg->demul_block_size);
                     if (likely(start_tsc > 0)) {
                         size_t tmp_duration = rdtsc() - state_start_tsc;
-                        work_tsc_duration += tmp_duration;
+                        state_operation_duration += tmp_duration;
                     }
                 }
                 break;
@@ -270,7 +270,7 @@ void Agora::start()
                         }
                         if (likely(start_tsc > 0)) {
                             size_t tmp_duration = rdtsc() - state_start_tsc;
-                            work_tsc_duration += tmp_duration;
+                            state_operation_duration += tmp_duration;
                         }
                         cur_slot ++;
                     }
@@ -299,7 +299,7 @@ void Agora::start()
                     try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                     if (likely(start_tsc > 0)) {
                         size_t tmp_duration = rdtsc() - state_start_tsc;
-                        work_tsc_duration += tmp_duration;
+                        state_operation_duration += tmp_duration;
                     }
                 }
                 if (likely(start_tsc > 0)) {
@@ -324,7 +324,7 @@ void Agora::start()
                         try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                         if (likely(start_tsc > 0)) {
                             size_t tmp_duration = rdtsc() - state_start_tsc;
-                            work_tsc_duration += tmp_duration;
+                            state_operation_duration += tmp_duration;
                         }
                     }
                 }
@@ -351,7 +351,7 @@ void Agora::start()
                     try_enqueue_fallback(&sched_info_arr_[thread_idx].concurrent_q_, sched_info_arr_[thread_idx].ptok_, event);
                     if (likely(start_tsc > 0)) {
                         size_t tmp_duration = rdtsc() - state_start_tsc;
-                        work_tsc_duration += tmp_duration;
+                        state_operation_duration += tmp_duration;
                     }
                     if (likely(start_tsc > 0)) {
                         work_tsc_duration = rdtsc() - work_start_tsc;
