@@ -26,9 +26,9 @@ public:
         , freq_ghz_(measure_rdtsc_freq())
         , test_mode_(cfg->test_mode)
     {
-        frame_start_time_ = new uint64_t[cfg->frames_to_test];
-        frame_iq_time_ = new uint64_t[cfg->frames_to_test];
-        frame_end_time_ = new uint64_t[cfg->frames_to_test];
+        frame_start_time_ = new uint64_t[cfg->frames_to_test + 1];
+        frame_iq_time_ = new uint64_t[cfg->frames_to_test + 1];
+        frame_end_time_ = new uint64_t[cfg->frames_to_test + 1];
         memset(frame_start_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
         memset(frame_iq_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
         memset(frame_end_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
@@ -67,7 +67,7 @@ public:
                 pkt->frame_id, num_pilot_pkts_[frame_slot].load(),
                 num_pilot_pkts_per_frame_);
             full = true;
-            frame_iq_time_[pkt->frame_id] = get_ns();
+            // frame_iq_time_[pkt->frame_id] = get_ns();
         }
 
         size_t tsc4 = rdtsc();
@@ -175,6 +175,7 @@ public:
             cur_frame_mutex_.lock();
             while (num_decode_tasks_completed_[cur_frame_ % kFrameWnd] == num_decode_tasks_per_frame_) {
                 frame_end_time_[cur_frame_] = get_ns();
+                frame_iq_time_[cur_frame_ + 1] = get_ns();
                 cur_frame_ ++;
                 encode_ready_[(cur_frame_ - 1) % kFrameWnd] = false;
                 size_t cur_cycle = worker_rdtsc();
