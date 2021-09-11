@@ -48,9 +48,9 @@ public:
             return false;
         }
 
-        if (unlikely(frame_start_time_[pkt->frame_id] == 0)) {
-            frame_start_time_[pkt->frame_id] = get_ns();
-        }
+        // if (unlikely(frame_start_time_[pkt->frame_id] == 0)) {
+        //     frame_start_time_[pkt->frame_id] = get_ns();
+        // }
 
         size_t tsc1 = rdtsc();
         const size_t frame_slot = pkt->frame_id % kFrameWnd;
@@ -67,7 +67,7 @@ public:
                 pkt->frame_id, num_pilot_pkts_[frame_slot].load(),
                 num_pilot_pkts_per_frame_);
             full = true;
-            // frame_iq_time_[pkt->frame_id] = get_ns();
+            frame_iq_time_[pkt->frame_id] = get_ns();
         }
 
         size_t tsc4 = rdtsc();
@@ -175,7 +175,7 @@ public:
             cur_frame_mutex_.lock();
             while (num_decode_tasks_completed_[cur_frame_ % kFrameWnd] == num_decode_tasks_per_frame_) {
                 frame_end_time_[cur_frame_] = get_ns();
-                frame_iq_time_[cur_frame_ + 1] = get_ns();
+                frame_start_time_[cur_frame_ + 1] = get_ns();
                 cur_frame_ ++;
                 encode_ready_[(cur_frame_ - 1) % kFrameWnd] = false;
                 size_t cur_cycle = worker_rdtsc();
