@@ -167,7 +167,7 @@ void Agora::start()
     size_t decode_launch_symbol = 0;
 
     size_t num_events = 0;
-    size_t max_events_needed = do_subcarrier_threads_.size() + do_decode_threads_.size();
+    size_t max_events_needed = worker_threads_.size();
     Event_data events_list[max_events_needed];
 
     size_t loop_count = 0, work_count = 0;
@@ -222,6 +222,7 @@ void Agora::start()
             }
             Event_data& event = events_list[i];
             worked = 1;
+            printf("Get resp event type: %u\n", event.event_type);
             switch(event.event_type) {
             case EventType::kCSI:
                 csi_task_completed ++;
@@ -581,6 +582,7 @@ void* Agora::worker(int tid)
             tag = event.tags[0];
             slot_id = gen_tag_t(tag).frame_id;
             sc_id = gen_tag_t(tag).sc_id;
+            // printf("Get CSI event %u %u!\n", slot_id, sc_id);
             computeSubcarrier->run_csi(slot_id, sc_id);
             resp = Event_data(EventType::kCSI);
             // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
