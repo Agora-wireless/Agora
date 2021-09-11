@@ -380,7 +380,7 @@ void Agora::start()
                     // size_t decode_idx = (cur_symbol - 1) * cfg->get_num_ues_to_process() + i - cfg->ue_start;
                     size_t decode_idx = decode_launch_symbol * cfg->get_num_ues_to_process() + i - cfg->ue_start;
                     size_t thread_idx = decode_idx % do_decode_threads_.size() + do_subcarrier_threads_.size();
-                    // printf("Main thread: launch Decode (slot %u, symbol %u, ue %u) thread %u\n", cur_slot, cur_symbol, i, thread_idx - do_subcarrier_threads_.size());
+                    MLPD_INFO("Main thread: launch Decode (slot %u, symbol %u, ue %u) thread %u\n", cur_slot, decode_launch_symbol, i, thread_idx - do_subcarrier_threads_.size());
                     // Event_data event(EventType::kDecode, gen_tag_t::frm_sym_ue(cur_slot, cur_symbol - 1, i)._tag);
                     Event_data event(EventType::kDecode, gen_tag_t::frm_sym_ue(cur_slot, decode_launch_symbol, i)._tag);
                     if (likely(start_tsc > 0)) {
