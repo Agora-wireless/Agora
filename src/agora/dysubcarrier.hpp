@@ -513,7 +513,7 @@ public:
                         demod_max = demod_max < demod_tmp_tsc ? demod_tmp_tsc : demod_max;
                         demod_count ++;
                     }
-                    resp = Event_data(EventType::kDemul, gen_tag_t::frm_sym_sc(slot_id, symbol_id_ul, sc_id));
+                    resp = Event_data(EventType::kDemul, gen_tag_t::frm_sym_sc(slot_id, symbol_id_ul, sc_id)._tag);
                     // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
                     if (likely(start_tsc > 0)) {
                         state_start_tsc = rdtsc();
