@@ -571,6 +571,29 @@ void* Agora::worker(int tid)
             decoded_buffer_, control_info_table_, control_idx_list_, 
             phy_stats, stats, &rx_status_, &demod_status_);
 
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t csi_tsc_duration = 0;
+    size_t zf_tsc_duration = 0;
+    size_t demod_tsc_duration = 0;
+    size_t decode_tsc_duration = 0;
+    size_t state_operation_duration = 0;
+    size_t loop_count = 0;
+    size_t work_count = 0;
+
+    size_t csi_count = 0;
+    size_t zf_count = 0;
+    size_t demod_count = 0;
+
+    size_t demod_max = 0;
+    size_t zf_max = 0;
+    size_t csi_max = 0;
+
+    size_t work_start_tsc, state_start_tsc;
+    size_t csi_start_tsc, zf_start_tsc, demod_start_tsc, decode_start_tsc;
+
+    bool state_trigger = false;
+
     while (config_->running && !SignalHandler::gotExitSignal()) {
         Event_data event, resp;
         size_t tag;
@@ -583,21 +606,41 @@ void* Agora::worker(int tid)
             tag = event.tags[0];
             slot_id = gen_tag_t(tag).frame_id;
             sc_id = gen_tag_t(tag).sc_id;
+            if (unlikely(!state_trigger && slot_id >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
+            if (state_trigger) {
+                work_start_tsc = rdtsc();
+            }
             // printf("Get CSI event %u %u!\n", slot_id, sc_id);
             computeSubcarrier->run_csi(slot_id, sc_id);
             resp = Event_data(EventType::kCSI);
             // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
             try_enqueue_fallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
+            if (state_trigger) {
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
         }
 
         if (sched_info_arr_[static_cast<size_t>(EventType::kZF)].concurrent_q_.try_dequeue(event)) {
             tag = event.tags[0];
             slot_id = gen_tag_t(tag).frame_id;
             sc_id = gen_tag_t(tag).sc_id;
+            if (unlikely(!state_trigger && slot_id >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
+            if (state_trigger) {
+                work_start_tsc = rdtsc();
+            }
             computeSubcarrier->do_zf_->launch(gen_tag_t::frm_sym_sc(slot_id, 0, sc_id)._tag);
             resp = Event_data(EventType::kZF);
             // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
             try_enqueue_fallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
+            if (state_trigger) {
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
         }
 
         if (sched_info_arr_[static_cast<size_t>(EventType::kDemul)].concurrent_q_.try_dequeue(event)) {
@@ -605,10 +648,20 @@ void* Agora::worker(int tid)
             slot_id = gen_tag_t(tag).frame_id;
             symbol_id_ul = gen_tag_t(tag).symbol_id;
             sc_id = gen_tag_t(tag).sc_id;
+            if (unlikely(!state_trigger && slot_id >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
+            if (state_trigger) {
+                work_start_tsc = rdtsc();
+            }
             computeSubcarrier->do_demul_->launch(slot_id, symbol_id_ul, sc_id);
             resp = Event_data(EventType::kDemul, gen_tag_t::frm_sym_sc(slot_id, symbol_id_ul, sc_id)._tag);
             // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
             try_enqueue_fallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
+            if (state_trigger) {
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
         }
 
         if (sched_info_arr_[static_cast<size_t>(EventType::kDecode)].concurrent_q_.try_dequeue(event)) {
@@ -616,13 +669,30 @@ void* Agora::worker(int tid)
             slot_id = gen_tag_t(tag).frame_id;
             symbol_id_ul = gen_tag_t(tag).symbol_id;
             ue_id = gen_tag_t(tag).ue_id;
+            if (unlikely(!state_trigger && slot_id >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
+            if (state_trigger) {
+                work_start_tsc = rdtsc();
+            }
             computeDecoding->launch(gen_tag_t::frm_sym_cb(slot_id, symbol_id_ul,
                 ue_id * config_->LDPC_config.nblocksInSymbol)._tag);
             resp = Event_data(EventType::kDecode);
             // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
             try_enqueue_fallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
+            if (state_trigger) {
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
         }
     }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("Worker Thread %u duration stats: total time used %.2lfms, "
+        "idle %.2lfms (%.2lf\%)\n",
+        tid, cycles_to_ms(whole_duration, freq_ghz),
+        cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration);
 }
 
 void Agora::update_ran_config(RanConfig rc)
