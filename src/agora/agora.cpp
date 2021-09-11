@@ -693,6 +693,8 @@ void* Agora::worker(int tid)
         "idle %.2lfms (%.2lf\%)\n",
         tid, cycles_to_ms(whole_duration, freq_ghz),
         cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration);
+
+    return nullptr;
 }
 
 void Agora::update_ran_config(RanConfig rc)
