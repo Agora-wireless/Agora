@@ -151,11 +151,13 @@ void Agora::start()
     size_t cur_symbol = 0;
     size_t csi_task_completed = 0;
     size_t zf_task_completed = 0;
-    size_t demod_task_completed = 0;
-    size_t decode_task_completed = 0;
+    size_t demod_task_completed[kMaxSymbols] = {0};
+    size_t decode_task_completed[kMaxSymbols] = {0};
     size_t csi_launched = 0;
     size_t demod_launched = 0;
     size_t decode_launched[kMaxUEs] = {0};
+
+    size_t demod_launch_symbol = 0;
 
     size_t num_events = 0;
     size_t max_events_needed = do_subcarrier_threads_.size() + do_decode_threads_.size();
@@ -229,12 +231,12 @@ void Agora::start()
                 break;
             case EventType::kZF:
                 zf_task_completed ++;
-                if (zf_task_completed == do_subcarrier_threads_.size()) {
-                    zf_task_completed = 0;
-                    csi_task_completed = 0;
-                    csi_launched = 0;
-                    cur_symbol ++;
-                }
+                // if (zf_task_completed == do_subcarrier_threads_.size()) {
+                    // zf_task_completed = 0;
+                    // csi_task_completed = 0;
+                    // csi_launched = 0;
+                    // cur_symbol ++;
+                // }
                 break;
             case EventType::kDemul:
                 demod_task_completed ++;
@@ -283,7 +285,8 @@ void Agora::start()
         }
 
         // Socket thread events
-        if (cur_symbol == 0 && csi_launched == 0) {
+        // if (cur_symbol == 0 && csi_launched == 0) {
+        if (csi_launched == 0) {
             if (rx_status_.received_all_pilots(cur_slot)) {
                 if (likely(start_tsc > 0)) {
                     work_start_tsc = rdtsc();
@@ -306,13 +309,15 @@ void Agora::start()
                     work_tsc_duration = rdtsc() - work_start_tsc;
                 }
             }
-        } else if (cur_symbol > 0 && demod_launched == 0) {
-            if (rx_status_.is_demod_ready(cur_slot, cur_symbol - 1)) {
+        // } else if (cur_symbol > 0 && demod_launched == 0) {
+        } else if (zf_task_completed == do_subcarrier_threads_.size() && demod_launch_symbol < cfg->ul_data_symbol_num_perframe) {
+            // if (rx_status_.is_demod_ready(cur_slot, cur_symbol - 1)) {
+            if (rx_status_.is_demod_ready(cur_slot, demod_launch_symbol)) {
                 if (likely(start_tsc > 0)) {
                     work_start_tsc = rdtsc();
                 }
                 worked = 1;
-                demod_launched = 1;
+                // demod_launched = 1;
                 // printf("Main thread: launch Demod (slot %u, symbol %u)\n", cur_slot, cur_symbol);
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
