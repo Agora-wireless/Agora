@@ -278,6 +278,8 @@ private:
     // Threads running the encoders
     std::vector<std::thread> do_encode_threads_;
 
+    std::vector<std::thread> worker_threads_;
+
     // Shared states between socket threads and dosubcarriers
     RxStatus rx_status_;
 

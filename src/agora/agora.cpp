@@ -63,31 +63,36 @@ Agora::Agora(Config* cfg)
     /* Create worker threads */
     // do_subcarrier_threads_.resize(
     //     (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
-    do_subcarrier_threads_.resize(
-        (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
+    // do_subcarrier_threads_.resize(
+    //     (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
 
-    for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
-        do_subcarrier_threads_[i]
-            = std::thread(&Agora::subcarrier_worker, this, i);
-    }
+    // for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
+    //     do_subcarrier_threads_[i]
+    //         = std::thread(&Agora::subcarrier_worker, this, i);
+    // }
 
     // if (config_->test_mode >= 1) {
     //     goto creation_end;
     // }
 
-    if (cfg->downlink_mode) {
-        do_encode_threads_.resize(cfg->get_num_ues_to_process());
-        for (size_t i = 0; i < do_encode_threads_.size(); i ++) {
-            do_encode_threads_[i]
-                = std::thread(&Agora::encode_worker, this, i);
-        }
-    } else {
-        // do_decode_threads_.resize(cfg->get_num_ues_to_process() * cfg->decode_thread_num_per_ue);
-        do_decode_threads_.resize(cfg->decode_thread_num);
-        for (size_t i = 0; i < do_decode_threads_.size(); i++) {
-            do_decode_threads_[i]
-                = std::thread(&Agora::decode_worker, this, i);
-        }
+    // if (cfg->downlink_mode) {
+    //     do_encode_threads_.resize(cfg->get_num_ues_to_process());
+    //     for (size_t i = 0; i < do_encode_threads_.size(); i ++) {
+    //         do_encode_threads_[i]
+    //             = std::thread(&Agora::encode_worker, this, i);
+    //     }
+    // } else {
+    //     // do_decode_threads_.resize(cfg->get_num_ues_to_process() * cfg->decode_thread_num_per_ue);
+    //     do_decode_threads_.resize(cfg->decode_thread_num);
+    //     for (size_t i = 0; i < do_decode_threads_.size(); i++) {
+    //         do_decode_threads_[i]
+    //             = std::thread(&Agora::decode_worker, this, i);
+    //     }
+    // }
+
+    worker_threads_.resize(cfg->worker_thread_num);
+    for (size_t i = 0; i < cfg->worker_thread_num; i ++) {
+        worker_threads_[i] = std::thread(&Agora::worker, this, i);
     }
 
 creation_end:
@@ -220,14 +225,18 @@ void Agora::start()
             switch(event.event_type) {
             case EventType::kCSI:
                 csi_task_completed ++;
-                if (csi_task_completed == do_subcarrier_threads_.size()) {
+                // if (csi_task_completed == do_subcarrier_threads_.size()) {
+                if (csi_task_completed == cfg->get_num_sc_to_process() / cfg->zf_block_size) {
                     MLPD_INFO("Main thread: launch ZF (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
-                    for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
-                        Event_data event(EventType::kZF, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
+                    // for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
+                    for (size_t j = cfg->subcarrier_start; j < cfg->subcarrier_end; j += cfg->zf_block_size) {
+                        // Event_data event(EventType::kZF, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
+                        Event_data event(EventType::kZF, gen_tag_t::frm_sc(cur_slot, j)._tag);
                         if (likely(start_tsc > 0)) {
                             state_start_tsc = rdtsc();
                         }
-                        try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                        // try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                        try_enqueue_fallback(&sched_info_arr_[static_cast<size_t>(EventType::kZF)].concurrent_q_, sched_info_arr_[static_cast<size_t>(EventType::kZF)].ptok_, event);
                         if (likely(start_tsc > 0)) {
                             size_t tmp_duration = rdtsc() - state_start_tsc;
                             state_operation_duration += tmp_duration;
@@ -261,9 +270,6 @@ void Agora::start()
                         size_t tmp_duration = rdtsc() - state_start_tsc;
                         state_operation_duration += tmp_duration;
                     }
-                } else if (demod_task_completed[symbol_id_ul] > cfg->get_num_sc_to_process() / cfg->demul_block_size) {
-                    printf("Error1!!!!\n");
-                    exit(0);
                 }
                 break;
             case EventType::kDecode:
@@ -319,12 +325,15 @@ void Agora::start()
                 worked = 1;
                 csi_launched = 1;
                 MLPD_INFO("Main thread: launch CSI (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
-                for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
-                    Event_data event(EventType::kCSI, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
+                // for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
+                for (size_t j = cfg->subcarrier_start; j < cfg->subcarrier_end; j += cfg->zf_block_size) {
+                    // Event_data event(EventType::kCSI, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
+                    Event_data event(EventType::kCSI, gen_tag_t::frm_sc(cur_slot, j)._tag);
                     if (likely(start_tsc > 0)) {
                         state_start_tsc = rdtsc();
                     }
-                    try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                    // try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                    try_enqueue_fallback(&sched_info_arr_[static_cast<size_t>(EventType::kCSI)].concurrent_q_, sched_info_arr_[static_cast<size_t>(EventType::kCSI)].ptok_, event);
                     if (likely(start_tsc > 0)) {
                         size_t tmp_duration = rdtsc() - state_start_tsc;
                         state_operation_duration += tmp_duration;
@@ -334,9 +343,9 @@ void Agora::start()
                     work_tsc_duration += rdtsc() - work_start_tsc;
                 }
             }
-        // } else if (cur_symbol > 0 && demod_launched == 0) {
         } 
-        if (zf_task_completed == do_subcarrier_threads_.size() && demod_launch_symbol < cfg->ul_data_symbol_num_perframe) {
+        // if (zf_task_completed == do_subcarrier_threads_.size() && demod_launch_symbol < cfg->ul_data_symbol_num_perframe) {
+        if (zf_task_completed == cfg->get_num_sc_to_process() / cfg->zf_block_size && demod_launch_symbol < cfg->ul_data_symbol_num_perframe) {
             // if (rx_status_.is_demod_ready(cur_slot, cur_symbol - 1)) {
             if (rx_status_.is_demod_ready(cur_slot, demod_launch_symbol)) {
                 if (likely(start_tsc > 0)) {
@@ -345,18 +354,17 @@ void Agora::start()
                 worked = 1;
                 // demod_launched = 1;
                 MLPD_INFO("Main thread: launch Demod (slot %u, symbol %u) at %.2lfms\n", cur_slot, demod_launch_symbol, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
-                for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
-                    for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
-                        if (cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size >= cfg->subcarrier_end) continue;
-                        Event_data event(EventType::kDemul, gen_tag_t::frm_sym_sc(cur_slot, demod_launch_symbol, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
-                        if (likely(start_tsc > 0)) {
-                            state_start_tsc = rdtsc();
-                        }
-                        try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
-                        if (likely(start_tsc > 0)) {
-                            size_t tmp_duration = rdtsc() - state_start_tsc;
-                            state_operation_duration += tmp_duration;
-                        }
+                for (size_t k = cfg->subcarrier_start; k < cfg->subcarrier_end; k += cfg->demul_block_size) {
+                    // Event_data event(EventType::kDemul, gen_tag_t::frm_sym_sc(cur_slot, demod_launch_symbol, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
+                    Event_data event(EventType::kDemul, gen_tag_t::frm_sym_sc(cur_slot, demod_launch_symbol, k)._tag);
+                    if (likely(start_tsc > 0)) {
+                        state_start_tsc = rdtsc();
+                    }
+                    // try_enqueue_fallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                    try_enqueue_fallback(&sched_info_arr_[static_cast<size_t>(EventType::kDemul)].concurrent_q_, sched_info_arr_[static_cast<size_t>(EventType::kDemul)].ptok_, event);
+                    if (likely(start_tsc > 0)) {
+                        size_t tmp_duration = rdtsc() - state_start_tsc;
+                        state_operation_duration += tmp_duration;
                     }
                 }
                 demod_launch_symbol ++;
@@ -364,7 +372,6 @@ void Agora::start()
                     work_tsc_duration += rdtsc() - work_start_tsc;
                 }
             }
-        // } else if (cur_symbol > 0 && demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
         }
         if (decode_launch_symbol < cfg->ul_data_symbol_num_perframe && demod_task_completed[decode_launch_symbol] == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
             bool received = true;
@@ -387,15 +394,14 @@ void Agora::start()
                     worked = 1;
                     // decode_launched[i] == 1;
                     // size_t decode_idx = (cur_symbol - 1) * cfg->get_num_ues_to_process() + i - cfg->ue_start;
-                    size_t decode_idx = decode_launch_symbol * cfg->get_num_ues_to_process() + i - cfg->ue_start;
-                    size_t thread_idx = decode_idx % do_decode_threads_.size() + do_subcarrier_threads_.size();
                     // MLPD_INFO("Main thread: launch Decode (slot %u, symbol %u, ue %u) thread %u\n", cur_slot, decode_launch_symbol, i, thread_idx - do_subcarrier_threads_.size());
                     // Event_data event(EventType::kDecode, gen_tag_t::frm_sym_ue(cur_slot, cur_symbol - 1, i)._tag);
                     Event_data event(EventType::kDecode, gen_tag_t::frm_sym_ue(cur_slot, decode_launch_symbol, i)._tag);
                     if (likely(start_tsc > 0)) {
                         state_start_tsc = rdtsc();
                     }
-                    try_enqueue_fallback(&sched_info_arr_[thread_idx].concurrent_q_, sched_info_arr_[thread_idx].ptok_, event);
+                    // try_enqueue_fallback(&sched_info_arr_[thread_idx].concurrent_q_, sched_info_arr_[thread_idx].ptok_, event);
+                    try_enqueue_fallback(&sched_info_arr_[static_cast<size_t>(EventType::kDecode)].concurrent_q_, sched_info_arr_[static_cast<size_t>(EventType::kDecode)].ptok_, event);
                     if (likely(start_tsc > 0)) {
                         size_t tmp_duration = rdtsc() - state_start_tsc;
                         state_operation_duration += tmp_duration;
@@ -538,6 +544,82 @@ void* Agora::encode_worker(int tid)
     computeEncoding->start_work();
     delete computeEncoding;
     return nullptr;
+}
+
+void* Agora::worker(int tid)
+{
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset, tid);
+
+    auto computeSubcarrier = new DySubcarrier(config_, tid, freq_ghz,
+            sched_info_arr_[tid].concurrent_q_,
+            complete_task_queue_,
+            worker_ptoks_ptr_[tid],
+            Range(0, 1),
+            socket_buffer_, csi_buffers_, calib_buffer_,
+            dl_encoded_buffer_to_precode_, demod_buffers_, dl_ifft_buffer_,
+            ue_spec_pilot_buffer_, equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
+            control_info_table_, control_idx_list_,
+            phy_stats, stats, &rx_status_, &demul_status_, &precode_status_);
+
+    auto computeDecoding = new DyDecode(config_, tid, freq_ghz,
+            sched_info_arr_[tid].concurrent_q_,
+            complete_task_queue_,
+            worker_ptoks_ptr_[tid],
+            demod_buffers_, demod_soft_buffer_to_decode_,
+            decoded_buffer_, control_info_table_, control_idx_list_, 
+            phy_stats, stats, &rx_status_, &demod_status_);
+
+    while (config_->running && !SignalHandler::gotExitSignal()) {
+        Event_data event, resp;
+        size_t tag;
+        size_t slot_id;
+        size_t sc_id;
+        size_t symbol_id_ul;
+        size_t ue_id;
+
+        if (sched_info_arr_[static_cast<size_t>(EventType::kCSI)].concurrent_q_.try_dequeue(event)) {
+            tag = event.tags[0];
+            slot_id = gen_tag_t(tag).frame_id;
+            sc_id = gen_tag_t(tag).sc_id;
+            computeSubcarrier->run_csi(slot_id, sc_id);
+            resp = Event_data(EventType::kCSI);
+            // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
+            try_enqueue_fallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
+        }
+
+        if (sched_info_arr_[static_cast<size_t>(EventType::kZF)].concurrent_q_.try_dequeue(event)) {
+            tag = event.tags[0];
+            slot_id = gen_tag_t(tag).frame_id;
+            sc_id = gen_tag_t(tag).sc_id;
+            computeSubcarrier->do_zf_->launch(gen_tag_t::frm_sym_sc(slot_id, 0, sc_id)._tag);
+            resp = Event_data(EventType::kZF);
+            // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
+            try_enqueue_fallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
+        }
+
+        if (sched_info_arr_[static_cast<size_t>(EventType::kDemul)].concurrent_q_.try_dequeue(event)) {
+            tag = event.tags[0];
+            slot_id = gen_tag_t(tag).frame_id;
+            symbol_id_ul = gen_tag_t(tag).symbol_id;
+            sc_id = gen_tag_t(tag).sc_id;
+            computeSubcarrier->do_demul_->launch(slot_id, symbol_id_ul, sc_id);
+            resp = Event_data(EventType::kDemul, gen_tag_t::frm_sym_sc(slot_id, symbol_id_ul, sc_id)._tag);
+            // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
+            try_enqueue_fallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
+        }
+
+        if (sched_info_arr_[static_cast<size_t>(EventType::kDecode)].concurrent_q_.try_dequeue(event)) {
+            tag = event.tags[0];
+            slot_id = gen_tag_t(tag).frame_id;
+            symbol_id_ul = gen_tag_t(tag).symbol_id;
+            ue_id = gen_tag_t(tag).ue_id;
+            computeDecoding->launch(gen_tag_t::frm_sym_cb(slot_id, symbol_id_ul,
+                ue_id * config_->LDPC_config.nblocksInSymbol)._tag);
+            resp = Event_data(EventType::kDecode);
+            // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
+            try_enqueue_fallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
+        }
+    }
 }
 
 void Agora::update_ran_config(RanConfig rc)
