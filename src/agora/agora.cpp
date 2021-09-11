@@ -148,16 +148,18 @@ void Agora::start()
 
     // States
     size_t cur_slot = 0;
-    size_t cur_symbol = 0;
+    // size_t cur_symbol = 0;
     size_t csi_task_completed = 0;
     size_t zf_task_completed = 0;
     size_t demod_task_completed[kMaxSymbols] = {0};
-    size_t decode_task_completed[kMaxSymbols] = {0};
+    // size_t demod_task_symbol_completed = 0;
+    size_t decode_task_completed = 0;
     size_t csi_launched = 0;
-    size_t demod_launched = 0;
-    size_t decode_launched[kMaxUEs] = {0};
+    // size_t demod_launched = 0;
+    // size_t decode_launched[kMaxUEs] = {0};
 
     size_t demod_launch_symbol = 0;
+    size_t decode_launch_symbol = 0;
 
     size_t num_events = 0;
     size_t max_events_needed = do_subcarrier_threads_.size() + do_decode_threads_.size();
@@ -171,6 +173,9 @@ void Agora::start()
     size_t state_operation_duration = 0;
 
     size_t work_start_tsc, state_start_tsc;
+
+    size_t symbol_id_ul;
+    size_t tag;
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_slot >= 200) {
@@ -215,7 +220,7 @@ void Agora::start()
             case EventType::kCSI:
                 csi_task_completed ++;
                 if (csi_task_completed == do_subcarrier_threads_.size()) {
-                    // printf("Main thread: launch ZF (slot %u)\n", cur_slot);
+                    MLPD_INFO("Main thread: launch ZF (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
                     for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                         Event_data event(EventType::kZF, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
                         if (likely(start_tsc > 0)) {
@@ -239,13 +244,18 @@ void Agora::start()
                 // }
                 break;
             case EventType::kDemul:
-                demod_task_completed ++;
-                if (demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
-                    // printf("Demod complete for frame %d symbol %d\n", cur_slot, cur_symbol - 1);
+                tag = event.tags[0];
+                symbol_id_ul = gen_tag_t(tag).symbol_id;
+                // demod_task_completed ++;
+                demod_task_completed[symbol_id_ul] ++;
+                // if (demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+                if (demod_task_completed[symbol_id_ul] == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+                    // demod_task_symbol_completed ++;
+                    MLPD_INFO("Demod complete for (slot %d symbol %d) at %.2lfms\n", cur_slot, symbol_id_ul, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
                     if (likely(start_tsc > 0)) {
                         state_start_tsc = rdtsc();
                     }
-                    demul_status_.demul_complete(cur_slot, cur_symbol - 1, cfg->get_num_sc_to_process() / cfg->demul_block_size);
+                    demul_status_.demul_complete(cur_slot, symbol_id_ul, cfg->get_num_sc_to_process() / cfg->demul_block_size);
                     if (likely(start_tsc > 0)) {
                         size_t tmp_duration = rdtsc() - state_start_tsc;
                         state_operation_duration += tmp_duration;
@@ -254,28 +264,39 @@ void Agora::start()
                 break;
             case EventType::kDecode:
                 decode_task_completed ++;
-                if (decode_task_completed == cfg->get_num_ues_to_process()) {
+                // if (decode_task_completed == cfg->get_num_ues_to_process()) {
+                if (decode_task_completed == cfg->get_num_ues_to_process() * cfg->ul_data_symbol_num_perframe) {
                     decode_task_completed = 0;
-                    demod_task_completed = 0;
-                    demod_launched = 0;
-                    for (size_t j = 0; j < kMaxUEs; j ++) {
-                        decode_launched[j] = 0;
+                    for (size_t i = 0; i < cfg->ul_data_symbol_num_perframe; i ++) {
+                        demod_task_completed[i] = 0;
                     }
-                    cur_symbol ++;
-                    if (cur_symbol == cfg->symbol_num_perframe) {
-                        cur_symbol = 0;
-                        if (likely(start_tsc > 0)) {
-                            state_start_tsc = rdtsc();
-                        }
-                        for (size_t j = 0; j < do_decode_threads_.size(); j ++) {
-                            rx_status_.decode_done(cur_slot);
-                        }
-                        if (likely(start_tsc > 0)) {
-                            size_t tmp_duration = rdtsc() - state_start_tsc;
-                            state_operation_duration += tmp_duration;
-                        }
-                        cur_slot ++;
+                    decode_task_completed = 0;
+                    csi_launched = 0;
+                    csi_task_completed = 0;
+                    zf_task_completed = 0;
+                    demod_launch_symbol = 0;
+                    decode_launch_symbol = 0;
+                    // demod_launched = 0;
+                    // for (size_t j = 0; j < kMaxUEs; j ++) {
+                    //     decode_launched[j] = 0;
+                    // }
+                    // MLPD_INFO("Main thread: Decode done (slot %u, symbol %u) at %.2lfms\n", cur_slot, cur_symbol, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
+                    MLPD_INFO("Main thread: Decode done (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
+                    // cur_symbol ++;
+                    // if (cur_symbol == cfg->symbol_num_perframe) {
+                    // cur_symbol = 0;
+                    if (likely(start_tsc > 0)) {
+                        state_start_tsc = rdtsc();
                     }
+                    for (size_t j = 0; j < do_decode_threads_.size(); j ++) {
+                        rx_status_.decode_done(cur_slot);
+                    }
+                    if (likely(start_tsc > 0)) {
+                        size_t tmp_duration = rdtsc() - state_start_tsc;
+                        state_operation_duration += tmp_duration;
+                    }
+                    cur_slot ++;
+                    // }
                 }
                 break;
             }
@@ -293,7 +314,7 @@ void Agora::start()
                 }
                 worked = 1;
                 csi_launched = 1;
-                // printf("Main thread: launch CSI (slot %u)\n", cur_slot);
+                MLPD_INFO("Main thread: launch CSI (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     Event_data event(EventType::kCSI, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
                     if (likely(start_tsc > 0)) {
@@ -318,11 +339,11 @@ void Agora::start()
                 }
                 worked = 1;
                 // demod_launched = 1;
-                // printf("Main thread: launch Demod (slot %u, symbol %u)\n", cur_slot, cur_symbol);
+                MLPD_INFO("Main thread: launch Demod (slot %u, symbol %u) at %.2lfms\n", cur_slot, demod_launch_symbol, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
                         if (cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size >= cfg->subcarrier_end) continue;
-                        Event_data event(EventType::kDemul, gen_tag_t::frm_sym_sc(cur_slot, cur_symbol - 1, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
+                        Event_data event(EventType::kDemul, gen_tag_t::frm_sym_sc(cur_slot, demod_launch_symbol, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
                         if (likely(start_tsc > 0)) {
                             state_start_tsc = rdtsc();
                         }
@@ -333,23 +354,35 @@ void Agora::start()
                         }
                     }
                 }
+                demod_launch_symbol ++;
                 if (likely(start_tsc > 0)) {
                     work_tsc_duration += rdtsc() - work_start_tsc;
                 }
             }
-        } else if (cur_symbol > 0 && demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
-            // printf("Wait for receiving demod data (%d %d)\n", cur_slot, cur_symbol - 1);
+        // } else if (cur_symbol > 0 && demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+        } else if (decode_launch_symbol < cfg->ul_data_symbol_num_perframe && demod_task_completed[decode_launch_symbol] == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+            bool received = true;
             for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
-                if (decode_launched[i] == 0 && demod_status_.received_all_demod_data(i, cur_slot, cur_symbol - 1)) {
+                if (!demod_status_.received_all_demod_data(i, cur_slot, decode_launch_symbol)) {
+                    received = false;
+                    break;
+                }
+            }
+            if (received) {
+                for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
+                    // if (decode_launched[i] == 0 && demod_status_.received_all_demod_data(i, cur_slot, cur_symbol - 1)) {
+                    // if (demod_status_.received_all_demod_data(i, cur_slot, cur_symbol - 1)) {
                     if (likely(start_tsc > 0)) {
                         work_start_tsc = rdtsc();
                     }
                     worked = 1;
-                    decode_launched[i] == 1;
-                    size_t decode_idx = (cur_symbol - 1) * cfg->get_num_ues_to_process() + i - cfg->ue_start;
+                    // decode_launched[i] == 1;
+                    // size_t decode_idx = (cur_symbol - 1) * cfg->get_num_ues_to_process() + i - cfg->ue_start;
+                    size_t decode_idx = decode_launch_symbol * cfg->get_num_ues_to_process() + i - cfg->ue_start;
                     size_t thread_idx = decode_idx % do_decode_threads_.size() + do_subcarrier_threads_.size();
                     // printf("Main thread: launch Decode (slot %u, symbol %u, ue %u) thread %u\n", cur_slot, cur_symbol, i, thread_idx - do_subcarrier_threads_.size());
-                    Event_data event(EventType::kDecode, gen_tag_t::frm_sym_ue(cur_slot, cur_symbol - 1, i)._tag);
+                    // Event_data event(EventType::kDecode, gen_tag_t::frm_sym_ue(cur_slot, cur_symbol - 1, i)._tag);
+                    Event_data event(EventType::kDecode, gen_tag_t::frm_sym_ue(cur_slot, decode_launch_symbol, i)._tag);
                     if (likely(start_tsc > 0)) {
                         state_start_tsc = rdtsc();
                     }
@@ -361,7 +394,9 @@ void Agora::start()
                     if (likely(start_tsc > 0)) {
                         work_tsc_duration += rdtsc() - work_start_tsc;
                     }
+                    // }
                 }
+                decode_launch_symbol ++;
             }
             // printf("Wait for receiving demod data (%d %d) end\n", cur_slot, cur_symbol - 1);
         }
@@ -376,7 +411,7 @@ finish:
     size_t whole_duration = rdtsc() - start_tsc;
 
     printf("Agora: printing stats and saving to file\n");
-    printf("Agora: slot %u symbol %u\n", cur_slot, cur_symbol);
+    // printf("Agora: slot %u symbol %u\n", cur_slot, cur_symbol);
     stats->print_summary();
     stats->save_to_file();
     if (flags.enable_save_decode_data_to_file) {
