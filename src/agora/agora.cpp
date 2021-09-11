@@ -404,12 +404,6 @@ void Agora::start()
                     // }
                 }
                 decode_launch_symbol ++;
-            } else {
-                size_t tsc = rdtsc();
-                if (tsc - timer > 10000000) {
-                    printf("Wait for receiving demod data (%d %d) end\n", cur_slot, decode_launch_symbol);
-                    timer = tsc;
-                }
             }
             // printf("Wait for receiving demod data (%d %d) end\n", cur_slot, cur_symbol - 1);
         }
