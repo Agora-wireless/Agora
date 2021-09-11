@@ -387,7 +387,13 @@ public:
     void receive_demod_data(size_t ue_id, size_t frame_id, size_t symbol_id_ul)
     {
         num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul]++;
-        printf("Receive demod data for frame %lu ue %lu symbol %lu (%u:%u)\n", frame_id, ue_id, symbol_id_ul, num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul].load(), num_demod_data_required_);
+        // printf("Receive demod data for frame %lu ue %lu symbol %lu (%u:%u)\n", frame_id, ue_id, symbol_id_ul, num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul].load(), num_demod_data_required_);
+        // if (num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul].load() == num_demod_data_required_) {
+        //     printf("Received all demod data for frame %u symbol %u ue %u\n", frame_id, symbol_id_ul, ue_id);
+        // } else if (num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul].load() > num_demod_data_required_) {
+        //     printf("Error!!!\n");
+        //     exit(0);
+        // }
     }
 
     bool received_all_demod_data(
@@ -396,9 +402,9 @@ public:
         if (num_demod_data_received_[ue_id]
                                     [frame_id % kFrameWnd][symbol_id_ul]
             == num_demod_data_required_) {
-            num_demod_data_received_[ue_id]
-                                    [frame_id % kFrameWnd][symbol_id_ul]
-                = 0;
+            // num_demod_data_received_[ue_id]
+            //                         [frame_id % kFrameWnd][symbol_id_ul]
+            //     = 0;
             // printf("Received all demod data for user %lu frame %lu symbol %lu\n", ue_id, frame_id, symbol_id_ul);
             if (symbol_id_ul == 0) {
                 frame_decode_time_[frame_id] = get_ns();
@@ -406,6 +412,10 @@ public:
             return true;
         }
         return false;
+    }
+
+    void clear_demod_data(size_t ue_id, size_t frame_id, size_t symbol_id_ul) {
+        num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul] = 0;
     }
 
 // private:

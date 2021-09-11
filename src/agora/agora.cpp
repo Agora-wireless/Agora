@@ -176,6 +176,7 @@ void Agora::start()
 
     size_t symbol_id_ul;
     size_t tag;
+    size_t timer = 0;
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_slot >= 200) {
@@ -260,6 +261,9 @@ void Agora::start()
                         size_t tmp_duration = rdtsc() - state_start_tsc;
                         state_operation_duration += tmp_duration;
                     }
+                } else if (demod_task_completed[symbol_id_ul] > cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+                    printf("Error1!!!!\n");
+                    exit(0);
                 }
                 break;
             case EventType::kDecode:
@@ -370,6 +374,9 @@ void Agora::start()
             }
             if (received) {
                 for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
+                    demod_status_.clear_demod_data(i, cur_slot, decode_launch_symbol);
+                }
+                for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
                     // if (decode_launched[i] == 0 && demod_status_.received_all_demod_data(i, cur_slot, cur_symbol - 1)) {
                     // if (demod_status_.received_all_demod_data(i, cur_slot, cur_symbol - 1)) {
                     if (likely(start_tsc > 0)) {
@@ -397,6 +404,12 @@ void Agora::start()
                     // }
                 }
                 decode_launch_symbol ++;
+            } else {
+                size_t tsc = rdtsc();
+                if (tsc - timer > 10000000) {
+                    printf("Wait for receiving demod data (%d %d) end\n", cur_slot, decode_launch_symbol);
+                    timer = tsc;
+                }
             }
             // printf("Wait for receiving demod data (%d %d) end\n", cur_slot, cur_symbol - 1);
         }
