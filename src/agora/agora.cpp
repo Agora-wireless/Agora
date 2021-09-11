@@ -213,7 +213,7 @@ void Agora::start()
             case EventType::kCSI:
                 csi_task_completed ++;
                 if (csi_task_completed == do_subcarrier_threads_.size()) {
-                    // printf("Main thread: launch ZF (slot %u)\n", cur_slot);
+                    printf("Main thread: launch ZF (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
                     for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                         Event_data event(EventType::kZF, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
                         if (likely(start_tsc > 0)) {
@@ -239,7 +239,7 @@ void Agora::start()
             case EventType::kDemul:
                 demod_task_completed ++;
                 if (demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
-                    // printf("Demod complete for frame %d symbol %d\n", cur_slot, cur_symbol - 1);
+                    printf("Demod complete for (slot %d symbol %d) at %.2lfms\n", cur_slot, cur_symbol - 1, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
                     if (likely(start_tsc > 0)) {
                         state_start_tsc = rdtsc();
                     }
@@ -259,6 +259,7 @@ void Agora::start()
                     for (size_t j = 0; j < kMaxUEs; j ++) {
                         decode_launched[j] = 0;
                     }
+                    printf("Main thread: Decode done (slot %u, symbol %u) at %.2lfms\n", cur_slot, cur_symbol, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
                     cur_symbol ++;
                     if (cur_symbol == cfg->symbol_num_perframe) {
                         cur_symbol = 0;
@@ -290,7 +291,7 @@ void Agora::start()
                 }
                 worked = 1;
                 csi_launched = 1;
-                // printf("Main thread: launch CSI (slot %u)\n", cur_slot);
+                printf("Main thread: launch CSI (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     Event_data event(EventType::kCSI, gen_tag_t::frm_sc(cur_slot, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
                     if (likely(start_tsc > 0)) {
@@ -313,7 +314,7 @@ void Agora::start()
                 }
                 worked = 1;
                 demod_launched = 1;
-                // printf("Main thread: launch Demod (slot %u, symbol %u)\n", cur_slot, cur_symbol);
+                printf("Main thread: launch Demod (slot %u, symbol %u) at %.2lfms\n", cur_slot, cur_symbol, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
                         if (cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size >= cfg->subcarrier_end) continue;
