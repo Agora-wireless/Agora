@@ -335,7 +335,8 @@ void Agora::start()
                 }
             }
         // } else if (cur_symbol > 0 && demod_launched == 0) {
-        } else if (zf_task_completed == do_subcarrier_threads_.size() && demod_launch_symbol < cfg->ul_data_symbol_num_perframe) {
+        } 
+        if (zf_task_completed == do_subcarrier_threads_.size() && demod_launch_symbol < cfg->ul_data_symbol_num_perframe) {
             // if (rx_status_.is_demod_ready(cur_slot, cur_symbol - 1)) {
             if (rx_status_.is_demod_ready(cur_slot, demod_launch_symbol)) {
                 if (likely(start_tsc > 0)) {
@@ -364,7 +365,8 @@ void Agora::start()
                 }
             }
         // } else if (cur_symbol > 0 && demod_task_completed == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
-        } else if (decode_launch_symbol < cfg->ul_data_symbol_num_perframe && demod_task_completed[decode_launch_symbol] == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+        }
+        if (decode_launch_symbol < cfg->ul_data_symbol_num_perframe && demod_task_completed[decode_launch_symbol] == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
             bool received = true;
             for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
                 if (!demod_status_.received_all_demod_data(i, cur_slot, decode_launch_symbol)) {
@@ -387,7 +389,7 @@ void Agora::start()
                     // size_t decode_idx = (cur_symbol - 1) * cfg->get_num_ues_to_process() + i - cfg->ue_start;
                     size_t decode_idx = decode_launch_symbol * cfg->get_num_ues_to_process() + i - cfg->ue_start;
                     size_t thread_idx = decode_idx % do_decode_threads_.size() + do_subcarrier_threads_.size();
-                    MLPD_INFO("Main thread: launch Decode (slot %u, symbol %u, ue %u) thread %u\n", cur_slot, decode_launch_symbol, i, thread_idx - do_subcarrier_threads_.size());
+                    // MLPD_INFO("Main thread: launch Decode (slot %u, symbol %u, ue %u) thread %u\n", cur_slot, decode_launch_symbol, i, thread_idx - do_subcarrier_threads_.size());
                     // Event_data event(EventType::kDecode, gen_tag_t::frm_sym_ue(cur_slot, cur_symbol - 1, i)._tag);
                     Event_data event(EventType::kDecode, gen_tag_t::frm_sym_ue(cur_slot, decode_launch_symbol, i)._tag);
                     if (likely(start_tsc > 0)) {
