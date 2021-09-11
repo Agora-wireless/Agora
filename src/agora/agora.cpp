@@ -222,7 +222,7 @@ void Agora::start()
             }
             Event_data& event = events_list[i];
             worked = 1;
-            printf("Get resp event type: %u\n", event.event_type);
+            // printf("Get resp event type: %u\n", event.event_type);
             switch(event.event_type) {
             case EventType::kCSI:
                 csi_task_completed ++;
@@ -299,9 +299,10 @@ void Agora::start()
                     if (likely(start_tsc > 0)) {
                         state_start_tsc = rdtsc();
                     }
-                    for (size_t j = 0; j < do_decode_threads_.size(); j ++) {
-                        rx_status_.decode_done(cur_slot);
-                    }
+                    // for (size_t j = 0; j < do_decode_threads_.size(); j ++) {
+                    //     rx_status_.decode_done(cur_slot);
+                    // }
+                    rx_status_.decode_done(1);
                     if (likely(start_tsc > 0)) {
                         size_t tmp_duration = rdtsc() - state_start_tsc;
                         state_operation_duration += tmp_duration;

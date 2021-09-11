@@ -20,7 +20,7 @@ public:
         , num_ul_data_symbol_per_frame_(cfg->ul_data_symbol_num_perframe)
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
         , num_decode_tasks_per_frame_(cfg->test_mode == 1 ? (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size : 
-            cfg->decode_thread_num)
+            1)
         , num_precode_tasks_per_frame_((cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
         , last_frame_cycles_(worker_rdtsc())
         , freq_ghz_(measure_rdtsc_freq())
