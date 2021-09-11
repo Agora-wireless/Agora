@@ -302,7 +302,7 @@ void Agora::start()
                     // for (size_t j = 0; j < do_decode_threads_.size(); j ++) {
                     //     rx_status_.decode_done(cur_slot);
                     // }
-                    rx_status_.decode_done(1);
+                    rx_status_.decode_done(cur_slot);
                     if (likely(start_tsc > 0)) {
                         size_t tmp_duration = rdtsc() - state_start_tsc;
                         state_operation_duration += tmp_duration;
