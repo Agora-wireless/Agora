@@ -9,7 +9,7 @@ batch_mode=0
 
 num_antennas=$(cat $DIR/data/tddconfig-sim-ul-distributed.json | jq '.antenna_num')
 num_ue=$(cat $DIR/data/tddconfig-sim-ul-distributed.json | jq '.ue_num')
-slot_size=1
+slot_size="0.5"
 num_cores=80
 num_runs=10
 
@@ -48,7 +48,7 @@ done
 slot_us=$( cat $DIR/data/tddconfig-sim-ul-distributed.json | jq '.slot_size' )
 if [ "$slot_us" = "null" ]
 then
-    slot_us=1000
+    slot_us=500
 fi
 
 if (( $batch_mode == 0 )); then
@@ -68,6 +68,6 @@ do
     sleep 10
     cd data
     bash latency_analysis.sh
-    cp frame_latency_all.txt frame_latency/frame_latency_all_${num_antennas}_${num_ue}_${slot_size}ms_${num_cores}c_$T.txt
+    cp frame_latency_all.txt frame_latency/frame_latency_all_${num_antennas}_${num_ue}_${slot_size}ms_${num_cores}c_${T}_hydra.txt
     cd ..
 done
