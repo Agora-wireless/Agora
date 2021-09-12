@@ -298,10 +298,15 @@ public:
                 worked = 1;
 
                 size_t zf_start_tsc = rdtsc();
-                if (sc_range_.start % cfg->zf_block_size == 0)
+                if (sc_range_.start % cfg->zf_block_size == 0 && zf_cur_frame_ % 2 == 0) {
                     do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
                         sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
                                     ._tag);
+                } else if (sc_range_.start % cfg->zf_block_size > 0 && zf_cur_frame_ % 2 == 1) {
+                    do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
+                        cfg->get_zf_sc_id(sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size))
+                                    ._tag);
+                }
                 if (likely(start_tsc > 0)) {
                     size_t zf_tmp_tsc = rdtsc() - zf_start_tsc;
                     zf_tsc_duration += zf_tmp_tsc;
@@ -352,8 +357,11 @@ public:
                 worked = 1;
 
                 size_t csi_start_tsc = rdtsc();
-                if (sc_range_.start % cfg->zf_block_size == 0)
+                if (sc_range_.start % cfg->zf_block_size == 0 && csi_cur_frame_ % 2 == 0) {
                     run_csi(csi_cur_frame_, sc_range_.start);
+                } else if (sc_range_.start % cfg->zf_block_size > 0 && csi_cur_frame_ % 2 == 1) {
+                    run_csi(csi_cur_frame_, cfg->get_zf_sc_id(sc_range_.start));
+                }
                 if (likely(start_tsc > 0)) {
                     size_t csi_tmp_tsc = rdtsc() - csi_start_tsc;
                     csi_tsc_duration += csi_tmp_tsc;
@@ -420,14 +428,12 @@ private:
     void run_csi(size_t frame_id, size_t base_sc_id)
     {
         const size_t frame_slot = frame_id % kFrameWnd;
-        rt_assert(base_sc_id == sc_range_.start, "Invalid SC in run_csi!");
+        // rt_assert(base_sc_id == sc_range_.start, "Invalid SC in run_csi!");
 
         complex_float converted_sc[kSCsPerCacheline];
 
-        size_t sc_end = sc_range_.end;
-        if (sc_end - sc_range_.start < cfg->UE_NUM) {
-            sc_end = sc_range_.start + cfg->UE_NUM;
-        }
+        size_t sc_start = base_sc_id;
+        size_t sc_end = base_sc_id + cfg->zf_block_size;
 
         for (size_t i = 0; i < cfg->pilot_symbol_num_perframe; i++) {
             for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
@@ -437,7 +443,7 @@ private:
                     + i * cfg->packet_length);
 
                 // Subcarrier ranges should be aligned with kTransposeBlockSize
-                for (size_t block_idx = sc_range_.start / kTransposeBlockSize;
+                for (size_t block_idx = sc_start / kTransposeBlockSize;
                     //  block_idx < sc_range_.end / kTransposeBlockSize;
                     block_idx < sc_end / kTransposeBlockSize;
                      block_idx++) {
