@@ -888,7 +888,8 @@ int PacketTXRX::recv_relocate(int tid)
             //     &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
             //     (uint8_t*)pkt + Packet::kOffsetOfData,
             //     cfg->get_num_sc_per_server() * 2 * sizeof(unsigned short));
-            DpdkTransport::fastMemcpy(
+            // DpdkTransport::fastMemcpy(
+            memcpy(
                 &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
                 (uint8_t*)pkt + Packet::kOffsetOfData,
                 cfg->get_num_sc_to_process() * 2 * sizeof(unsigned short));
