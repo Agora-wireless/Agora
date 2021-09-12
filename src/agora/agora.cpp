@@ -694,6 +694,10 @@ void* Agora::worker(int tid)
         tid, cycles_to_ms(whole_duration, freq_ghz),
         cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration);
 
+    FILE* output = fopen("data/work_time.txt", "a");
+    fprintf(output, "%lf\n", cycles_to_ms(work_tsc_duration, freq_ghz));
+    fclose(output);
+
     return nullptr;
 }
 
