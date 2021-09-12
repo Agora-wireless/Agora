@@ -135,8 +135,10 @@ public:
 
     void start_work()
     {
+        // const size_t n_zf_tasks_reqd
+        //     = (sc_range_.end - sc_range_.start) / cfg->zf_block_size;
         const size_t n_zf_tasks_reqd
-            = (sc_range_.end - sc_range_.start) / cfg->zf_block_size;
+            = (sc_range_.end - sc_range_.start + cfg->zf_block_size - 1) / cfg->zf_block_size;
         const size_t n_demul_tasks_reqd
             = (sc_range_.end - sc_range_.start) / cfg->demul_block_size;
         const size_t n_precode_tasks_reqd
@@ -296,9 +298,10 @@ public:
                 worked = 1;
 
                 size_t zf_start_tsc = rdtsc();
-                do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
-                    sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
-                                   ._tag);
+                if (sc_range_.start % cfg->zf_block_size == 0)
+                    do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
+                        sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
+                                    ._tag);
                 if (likely(start_tsc > 0)) {
                     size_t zf_tmp_tsc = rdtsc() - zf_start_tsc;
                     zf_tsc_duration += zf_tmp_tsc;
@@ -349,7 +352,8 @@ public:
                 worked = 1;
 
                 size_t csi_start_tsc = rdtsc();
-                run_csi(csi_cur_frame_, sc_range_.start);
+                if (sc_range_.start % cfg->zf_block_size == 0)
+                    run_csi(csi_cur_frame_, sc_range_.start);
                 if (likely(start_tsc > 0)) {
                     size_t csi_tmp_tsc = rdtsc() - csi_start_tsc;
                     csi_tsc_duration += csi_tmp_tsc;
@@ -420,6 +424,11 @@ private:
 
         complex_float converted_sc[kSCsPerCacheline];
 
+        size_t sc_end = sc_range_.end;
+        if (sc_end - sc_range_.start < cfg->UE_NUM) {
+            sc_end = sc_range_.start + cfg->UE_NUM;
+        }
+
         for (size_t i = 0; i < cfg->pilot_symbol_num_perframe; i++) {
             for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
                 auto* pkt = reinterpret_cast<Packet*>(socket_buffer_[j]
@@ -429,7 +438,8 @@ private:
 
                 // Subcarrier ranges should be aligned with kTransposeBlockSize
                 for (size_t block_idx = sc_range_.start / kTransposeBlockSize;
-                     block_idx < sc_range_.end / kTransposeBlockSize;
+                    //  block_idx < sc_range_.end / kTransposeBlockSize;
+                    block_idx < sc_end / kTransposeBlockSize;
                      block_idx++) {
 
                     const size_t block_base_offset
