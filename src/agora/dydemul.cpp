@@ -136,58 +136,8 @@ void DyDemul::launch(
             ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(cur_sc_id)]);
 
         size_t start_tsc2 = worker_rdtsc();
-#if USE_MKL_JIT
-        mkl_jit_cgemm[ue_num](jitter[ue_num], (MKL_Complex8*)ul_zf_ptr, (MKL_Complex8*)data_ptr,
-            (MKL_Complex8*)equal_ptr);
-#else
-        const cx_fmat mat_data(data_ptr, cfg->BS_ANT_NUM, 1, false);
-        const cx_fmat mat_ul_zf(ul_zf_ptr, ue_num, cfg->BS_ANT_NUM, false);
-        mat_equaled = mat_ul_zf * mat_data;
-#endif
-
-        if (symbol_idx_ul < cfg->UL_PILOT_SYMS) { // Calc new phase shift
-            if (symbol_idx_ul == 0 && cur_sc_id == 0) {
-                // Reset previous frame
-                cx_float* phase_shift_ptr
-                    = (cx_float*)ue_spec_pilot_buffer_[(frame_id - 1)
-                        % TASK_BUFFER_FRAME_NUM];
-                cx_fmat mat_phase_shift(
-                    phase_shift_ptr, cfg->UE_NUM, cfg->UL_PILOT_SYMS, false);
-                mat_phase_shift.fill(0);
-            }
-            cx_float* phase_shift_ptr
-                = (cx_float*)&ue_spec_pilot_buffer_[frame_id
-                    % TASK_BUFFER_FRAME_NUM][symbol_idx_ul * cfg->UE_NUM];
-            cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
-            cx_fmat shift_sc
-                = sign(mat_equaled % conj(ue_pilot_data.col(cur_sc_id)));
-            mat_phase_shift += shift_sc;
-        } else if (cfg->UL_PILOT_SYMS
-            > 0) { // apply previously calc'ed phase shift to data
-            cx_float* pilot_corr_ptr = (cx_float*)
-                ue_spec_pilot_buffer_[frame_id % TASK_BUFFER_FRAME_NUM];
-            cx_fmat pilot_corr_mat(
-                pilot_corr_ptr, cfg->UE_NUM, cfg->UL_PILOT_SYMS, false);
-            fmat theta_mat = arg(pilot_corr_mat);
-            fmat theta_inc = zeros<fmat>(cfg->UE_NUM, 1);
-            for (size_t s = 1; s < cfg->UL_PILOT_SYMS; s++) {
-                fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
-                theta_inc += theta_diff;
-            }
-            theta_inc /= (float)std::max(1, (int)cfg->UL_PILOT_SYMS - 1);
-            fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
-            cx_fmat mat_phase_correct = zeros<cx_fmat>(size(cur_theta));
-            mat_phase_correct.set_real(cos(-cur_theta));
-            mat_phase_correct.set_imag(sin(-cur_theta));
-            mat_equaled %= mat_phase_correct;
-
-            // Measure EVM from ground truth
-            if (symbol_idx_ul == cfg->UL_PILOT_SYMS) {
-                phy_stats->update_evm_stats(frame_id, cur_sc_id, mat_equaled);
-                if (kPrintPhyStats && cur_sc_id == 0) {
-                    phy_stats->print_evm_stats(frame_id - 1);
-                }
-            }
+        for (size_t i = 0; i < ue_num; i ++) {
+            equal_ptr[i] = ul_zf_ptr[i * i] + data_ptr[i];
         }
 
         size_t start_tsc3 = worker_rdtsc();
@@ -228,17 +178,7 @@ void DyDemul::launch(
         int8_t* demul_ptr = demod_buffers_[frame_slot][symbol_idx_ul][i]
             + (cfg->mod_order_bits * base_sc_id);
 
-        switch (cfg->mod_order_bits) {
-        case (CommsLib::QAM16):
-            demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
-            break;
-        case (CommsLib::QAM64):
-            demod_64qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
-            break;
-        default:
-            printf("Demodulation: modulation type %s not supported!\n",
-                cfg->modulation.c_str());
-        }
+        memcpy(demul_ptr, equal_T_ptr, max_sc_ite * cfg->mod_order_bits);
     }
 
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;

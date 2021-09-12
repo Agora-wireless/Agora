@@ -582,56 +582,23 @@ public:
                         const size_t sc_idx
                             = (block_idx * kTransposeBlockSize) + sc_j;
 
-                        simd_convert_float16_to_float32(
-                            reinterpret_cast<float*>(converted_sc),
-                            reinterpret_cast<float*>(pkt->data
-                                + (cfg->OFDM_DATA_START + sc_idx) * 2),
-                            kSCsPerCacheline * 2);
+                        memcpy(converted_sc, pkt->data
+                                + (cfg->OFDM_DATA_START + sc_idx) * 2,
+                            kSCsPerCacheline * 2 * sizeof(short));
+                        memcpy(converted_sc + kSCsPerCacheline / 2,
+                            pkt->data + (cfg->OFDM_DATA_START + sc_idx) * 2,
+                            kSCsPerCacheline * 2 * sizeof(short));
+                        for (size_t i = 0; i < kSCsPerCacheline; i ++) {
+                            converted_sc[i].re ++;
+                            converted_sc[i].im ++;
+                        }
 
                         const complex_float* src = converted_sc;
                         complex_float* dst = csi_buffers_[frame_slot][i]
                             + block_base_offset + (j * kTransposeBlockSize)
                             + sc_j;
 
-                        // With either of AVX-512 or AVX2, load one cacheline =
-                        // 16 float values = 8 subcarriers = kSCsPerCacheline
-                        // TODO: AVX512 complex multiply support below
-                        // size_t pilots_sgn_offset = cfg->bs_server_addr_idx
-                        //     * cfg->get_num_sc_per_server();
-                        size_t pilots_sgn_offset = 0;
-
-                        __m256 fft_result0 = _mm256_load_ps(
-                            reinterpret_cast<const float*>(src));
-                        __m256 fft_result1 = _mm256_load_ps(
-                            reinterpret_cast<const float*>(src + 4));
-                        __m256 pilot_tx0 = _mm256_set_ps(
-                            cfg->pilots_sgn_[sc_idx + 3 + pilots_sgn_offset].im,
-                            cfg->pilots_sgn_[sc_idx + 3 + pilots_sgn_offset].re,
-                            cfg->pilots_sgn_[sc_idx + 2 + pilots_sgn_offset].im,
-                            cfg->pilots_sgn_[sc_idx + 2 + pilots_sgn_offset].re,
-                            cfg->pilots_sgn_[sc_idx + 1 + pilots_sgn_offset].im,
-                            cfg->pilots_sgn_[sc_idx + 1 + pilots_sgn_offset].re,
-                            cfg->pilots_sgn_[sc_idx + pilots_sgn_offset].im,
-                            cfg->pilots_sgn_[sc_idx + pilots_sgn_offset].re);
-                        fft_result0 = CommsLib::__m256_complex_cf32_mult(
-                            fft_result0, pilot_tx0, true);
-
-                        __m256 pilot_tx1 = _mm256_set_ps(
-                            cfg->pilots_sgn_[sc_idx + 7 + pilots_sgn_offset].im,
-                            cfg->pilots_sgn_[sc_idx + 7 + pilots_sgn_offset].re,
-                            cfg->pilots_sgn_[sc_idx + 6 + pilots_sgn_offset].im,
-                            cfg->pilots_sgn_[sc_idx + 6 + pilots_sgn_offset].re,
-                            cfg->pilots_sgn_[sc_idx + 5 + pilots_sgn_offset].im,
-                            cfg->pilots_sgn_[sc_idx + 5 + pilots_sgn_offset].re,
-                            cfg->pilots_sgn_[sc_idx + 4 + pilots_sgn_offset].im,
-                            cfg->pilots_sgn_[sc_idx + 4 + pilots_sgn_offset]
-                                .re);
-                        fft_result1 = CommsLib::__m256_complex_cf32_mult(
-                            fft_result1, pilot_tx1, true);
-                        _mm256_stream_ps(
-                            reinterpret_cast<float*>(dst), fft_result0);
-                        _mm256_stream_ps(
-                            reinterpret_cast<float*>(dst + 4), fft_result1);
+                        memcpy(dst, converted_sc, kSCsPerCacheline * sizeof(complex_float));
                     }
                 }
             }
