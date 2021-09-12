@@ -297,10 +297,8 @@ void DyZF::ZF_freq_orthogonal_dynamic(size_t tag)
     arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer),
         cfg->BS_ANT_NUM, total_ue_sc, false);
 
-    compute_precoder(mat_csi, calib_gather_buffer,
-        ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)],
-        dl_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)],
-        total_ue_sc);
+    memcpy(ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)], csi_gather_buffer, cfg->BS_ANT_NUM * total_ue_sc * sizeof(complex_float));
+    memcpy(dl_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)], csi_gather_buffer, cfg->BS_ANT_NUM * total_ue_sc * sizeof(complex_float));
 
     double start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
