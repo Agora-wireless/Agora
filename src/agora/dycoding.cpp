@@ -490,4 +490,8 @@ void DyDecode::start_work()
         cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, work_count * 100.0f / loop_count);
+
+    FILE* output = fopen("data/work_time.txt", "a");
+    fprintf(output, "%lf\n", cycles_to_ms(decode_tsc_duration, freq_ghz));
+    fclose(output);
 }

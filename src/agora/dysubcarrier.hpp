@@ -412,7 +412,7 @@ public:
         fclose(fp);
 
         FILE* output = fopen("data/work_time.txt", "a");
-        fprintf(output, "%lf\n", cycles_to_ms(work_tsc_duration, freq_ghz));
+        fprintf(output, "%lf\n", cycles_to_ms(csi_tsc_duration, freq_ghz) + cycles_to_ms(zf_tsc_duration, freq_ghz) + cycles_to_ms(demod_tsc_duration, freq_ghz));
         fclose(output);
     }
 
