@@ -63,8 +63,6 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
       std::memcpy(
           calib_dl_buffer[kFrameWnd - 1], radioconfig_->GetCalibDl(),
           cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float));
-    }
-    if (cfg_->Frame().NumULSyms() > 0) {
       std::memcpy(
           calib_ul_buffer[kFrameWnd - 1], radioconfig_->GetCalibUl(),
           cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float));
