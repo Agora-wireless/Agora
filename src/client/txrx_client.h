@@ -82,7 +82,7 @@ class RadioTxRx {
    * (radio_id) and writes to an offset (rx_offset) in the receive buffer
    * (buffer_)
    */
-  struct Packet* RecvEnqueue(size_t tid, size_t radio_id, size_t rx_slot);
+  struct Packet* RecvEnqueue(size_t tid, size_t ant_id, size_t rx_slot);
 
   /**
    * @brief transmits a tx packet that is ready from PHY through socket
