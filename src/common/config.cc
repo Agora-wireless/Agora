@@ -49,6 +49,7 @@ Config::Config(const std::string& jsonfile)
   is_ue_ = tdd_conf.value("UE", false);
   ue_num_ = tdd_conf.value("ue_num", 8);
   ue_ant_num_ = ue_num_;
+
   if (serial_file.empty() == false) {
     Utils::LoadDevices(serial_file, radio_ids_);
   }
@@ -67,8 +68,15 @@ Config::Config(const std::string& jsonfile)
       }
     }
   } else {
-    num_radios_ =
-        tdd_conf.value("radio_num", is_ue_ ? ue_ant_num_ : bs_ant_num_);
+    if (is_ue_) {
+      size_t ue_radios = ue_num_ / num_channels_;
+      num_radios_ = tdd_conf.value("radio_num", ue_radios);
+      ue_num_ = num_radios_;
+      ue_ant_num_ = ue_num_ * num_channels_;
+    } else {
+      num_radios_ = tdd_conf.value("radio_num", bs_ant_num_);
+      ue_ant_num_ = ue_num_;
+    }
   }
   bf_ant_num_ = bs_ant_num_;
   if (external_ref_node_ == true) {
