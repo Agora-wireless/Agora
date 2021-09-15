@@ -304,6 +304,8 @@ void DyZF::ZF_freq_orthogonal_dynamic(size_t tag)
 
     double start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
+    zf_tsc_ += start_tsc2 - start_tsc1;
+    zf_count_ ++;
 
     // cout<<"Precoder:" <<mat_output<<endl;
     duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;

@@ -384,12 +384,12 @@ public:
         size_t whole_duration = rdtsc() - start_tsc;
         size_t idle_duration = whole_duration - work_tsc_duration;
         printf("DySubcarrier Thread %u duration stats: total time used %.2lfms, "
-            "csi %.2lfms (%.2lf\%, %u, %.2lfus), zf %.2lfms (%.2lf\%, %u, %.2lfus), demod %.2lfms (%.2lf\%, %u, %.2lfus), "
+            "csi %.2lfms (%.2lf\%, %u, %.2lfus), zf %.2lfms (%.2lf\%, %u, %.2lfus, %.2lfus), demod %.2lfms (%.2lf\%, %u, %.2lfus), "
             "precode %.2lfms (%.2lf\%), print %.2lfms (%.2lf\%), stating "
             "%.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), working rate (%u/%u: %.2lf\%)\n", 
             tid, cycles_to_ms(whole_duration, freq_ghz),
             cycles_to_ms(csi_tsc_duration, freq_ghz), csi_tsc_duration * 100.0f / whole_duration, csi_count, cycles_to_us(csi_max, freq_ghz),
-            cycles_to_ms(zf_tsc_duration, freq_ghz), zf_tsc_duration * 100.0f / whole_duration, zf_count, cycles_to_us(zf_max, freq_ghz),
+            cycles_to_ms(zf_tsc_duration, freq_ghz), zf_tsc_duration * 100.0f / whole_duration, zf_count, cycles_to_us(zf_max, freq_ghz), do_zf_->get_zf_tsc_per_task(),
             cycles_to_ms(demod_tsc_duration, freq_ghz), demod_tsc_duration * 100.0f / whole_duration, demod_count, cycles_to_us(demod_max, freq_ghz),
             cycles_to_ms(precode_tsc_duration, freq_ghz), precode_tsc_duration * 100.0f / whole_duration,
             cycles_to_ms(print_tsc_duration, freq_ghz), print_tsc_duration * 100.0f / whole_duration,

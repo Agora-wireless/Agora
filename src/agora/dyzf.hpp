@@ -48,6 +48,8 @@ public:
      */
     Event_data launch(size_t tag);
 
+    double get_zf_tsc_per_task() {return cycles_to_us(zf_tsc_ / zf_count_, freq_ghz);}
+
 private:
     void ZF_time_orthogonal(size_t tag);
 
@@ -98,6 +100,9 @@ private:
     // Control info
     std::vector<std::vector<ControlInfo>>& control_info_table_;
     std::vector<size_t>& control_idx_list_;
+
+    size_t zf_tsc_ = 0;
+    size_t zf_count_ = 0;
 };
 
 #endif

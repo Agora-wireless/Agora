@@ -252,6 +252,7 @@ Event_data DyDecode::launch(size_t tag)
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
     decode_count_ ++;
     decode_max_ = decode_max_ < start_tsc2 - start_tsc1 ? start_tsc2 - start_tsc1 : decode_max_;
+    decode_tsc_ += start_tsc2 - start_tsc1;
 
     if (kPrintLLRData) {
         printf("LLR data, symbol_offset: %zu\n", symbol_offset);
@@ -492,10 +493,10 @@ void DyDecode::start_work()
     size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("DoDecode Thread %u duration stats: total time used %.2lfms, "
-        "decode %.2lfms (%u, %.2lf\%, %.2lfus, %u, %.2lfus), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
+        "decode %.2lfms (%u, %.2lf\%, %.2lfus, %u, %.2lfus, %.2lfus), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
         "working proportions (%u/%u: %.2lf\%)\n",
         tid, cycles_to_ms(whole_duration, freq_ghz),
-        cycles_to_ms(decode_tsc_duration, freq_ghz), decode_count, decode_tsc_duration * 100.0f / whole_duration, cycles_to_us(decode_max, freq_ghz), decode_count_, cycles_to_us(decode_max_, freq_ghz),
+        cycles_to_ms(decode_tsc_duration, freq_ghz), decode_count, decode_tsc_duration * 100.0f / whole_duration, cycles_to_us(decode_max, freq_ghz), decode_count_, cycles_to_us(decode_max_, freq_ghz), cycles_to_us(decode_tsc_ / decode_count_, freq_ghz),
         cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, work_count * 100.0f / loop_count);

@@ -105,6 +105,7 @@ private:
 
     size_t decode_count_ = 0;
     size_t decode_max_ = 0;
+    size_t decode_tsc_ = 0;
 };
 
 #endif
