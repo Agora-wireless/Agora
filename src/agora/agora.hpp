@@ -168,6 +168,7 @@ private:
     // 1st dimension: number of socket RX threads
     // 2nd dimension: socket buffer size
     Table<char> socket_buffer_;
+    Table<char> tmp_socket_buffer_;
 
     // Preliminary CSI buffers. Each buffer has [number of antennas] rows and
     // [number of OFDM data subcarriers] columns.

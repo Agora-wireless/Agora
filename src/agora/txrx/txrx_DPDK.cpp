@@ -22,7 +22,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     , encode_status_(encode_status)
     , precode_status_(precode_status)
 {
-    DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num + 2, cfg->pci_addr);
+    DpdkTransport::dpdk_init(core_offset - 1, socket_thread_num + 2 + cfg->tmp_tx_thread, cfg->pci_addr);
     for (size_t i = 0; i < socket_thread_num + 1; i ++) {
         mbuf_pool_[i] = DpdkTransport::create_mempool(i);
     }
@@ -31,7 +31,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     encode_ue_to_send_ = cfg->ue_start;
 
     const uint16_t port_id = 0; // The DPDK port ID
-    if (DpdkTransport::nic_init(port_id, mbuf_pool_, socket_thread_num + 1, socket_thread_num + 1) != 0)
+    if (DpdkTransport::nic_init(port_id, mbuf_pool_, socket_thread_num + 1, cfg->tmp_tx_thread + 1) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
 
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr_);
@@ -135,13 +135,14 @@ PacketTXRX::~PacketTXRX() {
     // rte_mempool_free(mbuf_pool_);
 }
 
-bool PacketTXRX::startTXRX(Table<char>& buffer,
+bool PacketTXRX::startTXRX(Table<char>& buffer, Table<char>& tmp_buffer,
     Table<size_t>& frame_start, Table<complex_float>* dl_ifft_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers,
     Table<int8_t>* demod_soft_buffer_to_decode, Table<int8_t>* encoded_buffer,
     Table<int8_t>* encoded_buffer_to_precode)
 {
     buffer_ = &buffer;
+    tmp_buffer_ = &tmp_buffer;
     frame_start_ = &frame_start;
 
     dl_ifft_buffer_ = dl_ifft_buffer;
@@ -191,7 +192,15 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
                 //         pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_rx_thread>,
                 //     context, lcore_id);
             }
-        } 
+        }  else if (worker_id > socket_thread_num) {
+            auto context = new EventHandlerContext<PacketTXRX>;
+            context->obj_ptr = this;
+            context->id = worker_id - socket_thread_num - 1;
+            printf("Launch tmp tx thread %u on core %u\n", worker_id - socket_thread_num - 1, lcore_id);
+            rte_eal_remote_launch((lcore_function_t*)
+                    pthread_fun_wrapper<PacketTXRX, &PacketTXRX::tmp_tx_thread>,
+                context, lcore_id);
+        }
         // else if (worker_id == socket_thread_num + 1) {
         //     auto context = new EventHandlerContext<PacketTXRX>;
         //     context->obj_ptr = this;
@@ -217,6 +226,137 @@ bool PacketTXRX::startTXRX(Table<char>& buffer,
         radioconfig_->go();
 
     return true;
+}
+
+void* PacketTXRX::tmp_tx_thread(int tid)
+{
+    size_t freq_ghz = measure_rdtsc_freq();
+
+    printf("TMP TX thread\n");
+    int sock_buf_size = 1024 * 1024 * 64 * 8 - 1;
+
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t send_tsc_duration = 0;
+    size_t loop_count = 0;
+    size_t work_count = 0;
+    
+    size_t work_start_tsc, send_start_tsc, send_end_tsc;
+    size_t worked;
+
+    size_t tmp_frame_to_send = 0;
+    size_t tmp_symbol_to_send = 0;
+
+    size_t ant_block_size = cfg->BS_ANT_NUM / cfg->bs_server_addr_list.size();
+    size_t ant_block_off = cfg->BS_ANT_NUM % cfg->bs_server_addr_list.size();
+    size_t ant_start = cfg->bs_server_addr_idx < ant_block_off ? cfg->bs_server_addr_idx * (ant_block_size + 1) :
+        ant_block_off * (ant_block_size + 1) + (cfg->bs_server_addr_idx - ant_block_off) * ant_block_size;
+    size_t ant_end = cfg->bs_server_addr_idx < ant_block_off ? ant_start + ant_block_size + 1 :
+        ant_start + ant_block_size;
+
+    while (cfg->running) {
+
+        if (likely(start_tsc > 0)) {
+            loop_count ++;
+        }
+
+        worked = 0;
+
+        // 1. Try to send demodulated data to decoders
+        if (rx_status_->receive_all_tmp_packet(
+                tmp_frame_to_send, tmp_symbol_to_send)) {
+
+            if (unlikely(start_tsc == 0)) {
+                start_tsc = rdtsc();
+            }
+            
+            work_start_tsc = rdtsc();
+            send_start_tsc = work_start_tsc;
+            worked = 1;
+
+            for (size_t ant_id = ant_start + tid; ant_id < ant_end; ant_id += cfg->tmp_tx_thread) {
+                struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
+                size_t mbuf_idx = 0;
+                for (size_t server_id = 0; server_id < cfg->bs_server_addr_list.size(); server_id ++) {
+                    if (server_id == cfg->bs_server_addr_idx) {
+                        char* rx_buffer = (*buffer_)[ant_id];
+                        char* tx_buffer = (*tmp_buffer_)[ant_id];
+                        const size_t rx_offset_ = (tmp_frame_to_send % SOCKET_BUFFER_FRAME_NUM)
+                                * cfg->symbol_num_perframe
+                            + tmp_symbol_to_send;
+                        const size_t tx_offset_ = (tmp_frame_to_send % SOCKET_BUFFER_FRAME_NUM)
+                                * cfg->symbol_num_perframe
+                            + tmp_symbol_to_send;
+                        size_t sc_offset = Packet::kOffsetOfData
+                            + 2 * sizeof(unsigned short)
+                                * (cfg->OFDM_DATA_START + cfg->subcarrier_start);
+                        Packet* pkt = (Packet*)(&tx_buffer[tx_offset_ * cfg->packet_length]);
+                        DpdkTransport::fastMemcpy(
+                            &rx_buffer[rx_offset_ * cfg->packet_length], pkt, Packet::kOffsetOfData);
+                        memcpy(
+                            &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
+                            (uint8_t*)pkt + Packet::kOffsetOfData + 2 * sizeof(unsigned short) * (cfg->OFDM_DATA_START + cfg->subcarrier_start),
+                            cfg->get_num_sc_to_process() * 2 * sizeof(unsigned short));
+                        if (!rx_status_->add_new_packet(pkt, tid)) {
+                            cfg->running = false;
+                        }
+                    } else {
+                        tx_bufs[mbuf_idx] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[server_id],
+                            bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[server_id], cfg->partition_tx_port, cfg->partition_rx_port, 
+                            Packet::kOffsetOfData + cfg->subcarrier_num_list[server_id] * 2 * sizeof(unsigned short));
+                        
+                        char* tx_buffer = (*tmp_buffer_)[ant_id];
+                        const size_t tx_offset_ = (tmp_frame_to_send % SOCKET_BUFFER_FRAME_NUM)
+                                * cfg->symbol_num_perframe
+                            + tmp_symbol_to_send;
+                        Packet* pkt = (Packet*)(&tx_buffer[tx_offset_ * cfg->packet_length]);
+                        struct rte_ether_hdr* eth_hdr
+                            = rte_pktmbuf_mtod(tx_bufs[mbuf_idx], struct rte_ether_hdr*);
+
+                        char* payload = (char*)eth_hdr + kPayloadOffset;
+                        auto* new_pkt = reinterpret_cast<Packet*>(payload);
+                        new_pkt->pkt_type = Packet::PktType::kIQFromServer;
+                        new_pkt->frame_id = tmp_frame_to_send;
+                        new_pkt->symbol_id = tmp_symbol_to_send;
+                        new_pkt->ant_id = ant_id;
+                        new_pkt->server_id = cfg->bs_server_addr_idx;
+                        memcpy(new_pkt->data, (uint8_t*)pkt + Packet::kOffsetOfData + 2 * sizeof(unsigned short) * (cfg->OFDM_DATA_START + cfg->subcarrier_num_start[server_id]),
+                            cfg->subcarrier_num_list[server_id] * 2 * sizeof(unsigned short));
+                        mbuf_idx ++;
+                    }
+                }
+                size_t nb_tx_new = rte_eth_tx_burst(0, 1 + tid, tx_bufs, mbuf_idx);
+                if (unlikely(nb_tx_new != mbuf_idx)) {
+                    printf("rte_eth_tx_burst() failed\n");
+                    exit(0);
+                }
+            }
+            tmp_symbol_to_send++;
+            if (tmp_symbol_to_send
+                == cfg->symbol_num_perframe) {
+                tmp_symbol_to_send = 0;
+                tmp_frame_to_send++;
+            }
+
+            send_end_tsc = rdtsc();
+            send_tsc_duration += send_end_tsc - send_start_tsc;
+            work_tsc_duration += send_end_tsc - work_start_tsc;
+        }
+
+        work_count += worked;
+    }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("Demod TX Thread duration stats: total time used %.2lfms, "
+        "send %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
+        "working proportions (%u/%u: %.2lf\%)\n",
+        cycles_to_ms(whole_duration, freq_ghz),
+        cycles_to_ms(send_tsc_duration, freq_ghz), send_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
+        work_count, loop_count, work_count * 100.0f / loop_count);
+
+    return 0;
 }
 
 void* PacketTXRX::demod_tx_thread(int tid)
@@ -888,51 +1028,21 @@ int PacketTXRX::recv_relocate(int tid)
         auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset);
 
         if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
-            struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-            size_t mbuf_idx = 0;
-            for (size_t server_id = 0; server_id < cfg->bs_server_addr_list.size(); server_id ++) {
-                if (server_id == cfg->bs_server_addr_idx) {
-                    char* rx_buffer = (*buffer_)[pkt->ant_id];
-                    const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)
-                            * cfg->symbol_num_perframe
-                        + pkt->symbol_id;
-                    size_t sc_offset = Packet::kOffsetOfData
-                        + 2 * sizeof(unsigned short)
-                            * (cfg->OFDM_DATA_START + cfg->subcarrier_start);
-                    DpdkTransport::fastMemcpy(
-                        &rx_buffer[rx_offset_ * cfg->packet_length], pkt, Packet::kOffsetOfData);
-                    memcpy(
-                        &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
-                        (uint8_t*)pkt + Packet::kOffsetOfData + 2 * sizeof(unsigned short) * (cfg->subcarrier_start),
-                        cfg->get_num_sc_to_process() * 2 * sizeof(unsigned short));
-                    if (!rx_status_->add_new_packet(pkt, tid)) {
-                        cfg->running = false;
-                    }
-                } else {
-                    tx_bufs[mbuf_idx] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[server_id],
-                        bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[server_id], cfg->partition_tx_port, cfg->partition_rx_port, 
-                        Packet::kOffsetOfData + cfg->subcarrier_num_list[server_id] * 2 * sizeof(unsigned short));
-                    
-                    struct rte_ether_hdr* eth_hdr
-                        = rte_pktmbuf_mtod(tx_bufs[mbuf_idx], struct rte_ether_hdr*);
+            char* rx_buffer = (*tmp_buffer_)[pkt->ant_id];
+            const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)
+                    * cfg->symbol_num_perframe
+                + pkt->symbol_id;
 
-                    char* payload = (char*)eth_hdr + kPayloadOffset;
-                    auto* new_pkt = reinterpret_cast<Packet*>(payload);
-                    new_pkt->pkt_type = Packet::PktType::kIQFromServer;
-                    new_pkt->frame_id = pkt->frame_id;
-                    new_pkt->symbol_id = pkt->symbol_id;
-                    new_pkt->ant_id = pkt->ant_id;
-                    new_pkt->server_id = cfg->bs_server_addr_idx;
-                    memcpy(new_pkt->data, (uint8_t*)pkt + Packet::kOffsetOfData + 2 * sizeof(unsigned short) * (cfg->subcarrier_num_start[server_id]),
-                        cfg->subcarrier_num_list[server_id] * 2 * sizeof(unsigned short));
-                    mbuf_idx ++;
-                }
-            }
-            size_t nb_tx_new = rte_eth_tx_burst(0, 1 + tid, tx_bufs, mbuf_idx);
-            if (unlikely(nb_tx_new != mbuf_idx)) {
-                printf("rte_eth_tx_burst() failed\n");
-                exit(0);
-            }
+            size_t sc_offset = Packet::kOffsetOfData
+                + 2 * sizeof(unsigned short)
+                    * (cfg->OFDM_DATA_START);
+            DpdkTransport::fastMemcpy(
+                &rx_buffer[rx_offset_ * cfg->packet_length], pkt, Packet::kOffsetOfData);
+            memcpy(
+                &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
+                (uint8_t*)pkt + Packet::kOffsetOfData,
+                cfg->OFDM_DATA_NUM * 2 * sizeof(unsigned short));
+            rx_status_->rx_tmp_packet(pkt->frame_id, pkt->symbol_id);
         } else if (pkt->pkt_type == Packet::PktType::kIQFromServer) {
             char* rx_buffer = (*buffer_)[pkt->ant_id];
             const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)

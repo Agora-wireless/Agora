@@ -35,6 +35,13 @@ public:
         memset(frame_start_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
         memset(frame_iq_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
         memset(frame_end_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+        size_t ant_block_size = cfg->BS_ANT_NUM / cfg->bs_server_addr_list.size();
+        size_t ant_block_off = cfg->BS_ANT_NUM % cfg->bs_server_addr_list.size();
+        if (cfg->bs_server_addr_idx < ant_block_off) {
+            num_tmp_pkts_per_symbol_ = ant_block_size + 1;
+        } else {
+            num_tmp_pkts_per_symbol_ = ant_block_size;
+        }
     }
 
     // When receive a new packet, record it here
@@ -187,6 +194,7 @@ public:
                 num_pilot_pkts_[frame_slot] = 0;
                 for (size_t j = 0; j < kMaxSymbols; j++) {
                     num_data_pkts_[frame_slot][j] = 0;
+                    num_tmp_pkts_[frame_slot][j] = 0;
                 }
                 MLPD_INFO("Main thread: Decode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
                 last_frame_cycles_ = cur_cycle;
@@ -220,6 +228,26 @@ public:
         precode_mutex_.unlock();
     }
 
+    void rx_tmp_packet(size_t frame_id, size_t symbol_id) {
+        if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
+            MLPD_ERROR(
+                "SharedCounters RxStatus error: Received packet for future "
+                "frame %u beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
+                "happen if Agora is running slowly, e.g., in debug mode. \n",
+                frame_id, cur_frame_, kFrameWnd, cur_frame_, num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
+                num_pkts_[cur_frame_ % kFrameWnd].load());
+            exit(1);
+        }
+        num_tmp_pkts_[frame_id % kFrameWnd][symbol_id] ++;
+    }
+
+    bool receive_all_tmp_packet(size_t frame_id, size_t symbol_id) {
+        if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
+            return false;
+        }
+        return num_tmp_pkts_[frame_id % kFrameWnd][symbol_id] == num_tmp_pkts_per_symbol_;
+    }
+
     // TODO: Instead of having all-atomic counter arrays, can we just make
     // the entire class atomic?
 
@@ -230,6 +258,9 @@ public:
     // num_pilot_pkts[i % kFrameWnd] is the total number of pilot
     // packets received for frame i
     std::array<std::atomic<size_t>, kFrameWnd> num_pilot_pkts_ = {};
+
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
+        num_tmp_pkts_ = {};
 
     // num_data_pkts[i % kFrameWnd][j] is the total number of data
     // packets received for frame i and symbol j
@@ -290,6 +321,7 @@ public:
     const size_t num_pkts_per_symbol_;
     const size_t num_decode_tasks_per_frame_;
     const size_t num_precode_tasks_per_frame_;
+    size_t num_tmp_pkts_per_symbol_;
 };
 
 // We use DemulStatus to track # completed demul tasks for each symbol

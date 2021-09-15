@@ -17,10 +17,10 @@
 #include <string>
 #include <unistd.h>
 
-#define RX_RING_SIZE 8192
-#define TX_RING_SIZE 8192
+#define RX_RING_SIZE 4096
+#define TX_RING_SIZE 4096
 
-#define NUM_MBUFS ((64 * 1024) - 1)
+#define NUM_MBUFS ((32 * 1024) - 1)
 #define MBUF_CACHE_SIZE 128
 
 #define JUMBO_FRAME_MAX_SIZE 0x2600 // allow max jumbo frame 9.5 KB

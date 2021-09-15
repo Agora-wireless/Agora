@@ -70,7 +70,7 @@ public:
      * @return True on successfully starting the network I/O threads, false
      * otherwise
      */
-    bool startTXRX(Table<char>& buffer, Table<size_t>& frame_start,
+    bool startTXRX(Table<char>& buffer, Table<char>& tmp_buffer, Table<size_t>& frame_start,
         Table<complex_float>* tx_buffer,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers_
         = nullptr,
@@ -96,6 +96,7 @@ private:
     void* demod_rx_thread(int tid);
     void* demod_tx_thread(int tid);
     void* encode_thread(int tid);
+    void* tmp_tx_thread(int tid);
 
     int dequeue_send(int tid, size_t symbol_to_send, size_t ant_to_send);
     int recv_enqueue(int tid, int radio_id, size_t rx_offset);
@@ -116,6 +117,7 @@ private:
 
     const size_t socket_thread_num;
     Table<char>* buffer_;
+    Table<char>* tmp_buffer_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers_;
     Table<int8_t>* demod_soft_buffer_to_decode_;
     size_t packet_num_in_buffer_;

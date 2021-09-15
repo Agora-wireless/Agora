@@ -137,7 +137,7 @@ void Agora::start()
     rte_eth_stats_get(0, &start_stats);
 
     // Start packet I/O
-    if (!packet_tx_rx_->startTXRX(socket_buffer_,
+    if (!packet_tx_rx_->startTXRX(socket_buffer_, tmp_socket_buffer_,
             stats->frame_start, &dl_ifft_buffer_,
             &demod_buffers_, &demod_soft_buffer_to_decode_, &dl_encoded_buffer_,
             &dl_encoded_buffer_to_precode_)) {
@@ -549,6 +549,7 @@ void Agora::initialize_uplink_buffers()
 
     socket_buffer_.malloc(cfg->BS_ANT_NUM,
         socket_buffer_size_, 64);
+    tmp_socket_buffer_.malloc(cfg->BS_ANT_NUM, socket_buffer_size_, 64);
 
     csi_buffers_.alloc(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM);
     ul_zf_matrices_.alloc(kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM);

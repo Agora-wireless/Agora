@@ -272,6 +272,7 @@ Config::Config(std::string jsonfile)
 
     partition_tx_port = tddConf.value("partition_tx_port", 12100);
     partition_rx_port = tddConf.value("partition_rx_port", 12600);
+    tmp_tx_thread = tddConf.value("tmp_tx_thread", 3);
 
     fft_block_size = tddConf.value("fft_block_size", 1);
 

@@ -338,6 +338,8 @@ public:
     uint16_t partition_tx_port;
     uint16_t partition_rx_port;
 
+    size_t tmp_tx_thread;
+
     // The list of MAC addresses of all Agora servers 
     // Only used in distributed&DPDK version
     std::vector<std::string> bs_server_mac_list;
