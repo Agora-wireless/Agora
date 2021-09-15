@@ -229,15 +229,15 @@ public:
     }
 
     void rx_tmp_packet(size_t frame_id, size_t symbol_id) {
-        if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
-            MLPD_ERROR(
-                "SharedCounters RxStatus error: Received packet for future "
-                "frame %u beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
-                "happen if Agora is running slowly, e.g., in debug mode. \n",
-                frame_id, cur_frame_, kFrameWnd, cur_frame_, num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
-                num_pkts_[cur_frame_ % kFrameWnd].load());
-            exit(1);
-        }
+        // if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
+        //     MLPD_ERROR(
+        //         "SharedCounters RxStatus error: Received packet for future "
+        //         "frame %u beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
+        //         "happen if Agora is running slowly, e.g., in debug mode. \n",
+        //         frame_id, cur_frame_, kFrameWnd, cur_frame_, num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
+        //         num_pkts_[cur_frame_ % kFrameWnd].load());
+        //     exit(1);
+        // }
         num_tmp_pkts_[frame_id % kFrameWnd][symbol_id] ++;
     }
 
