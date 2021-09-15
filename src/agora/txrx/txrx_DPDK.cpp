@@ -903,7 +903,7 @@ int PacketTXRX::recv_relocate(int tid)
                         &rx_buffer[rx_offset_ * cfg->packet_length], pkt, Packet::kOffsetOfData);
                     memcpy(
                         &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
-                        (uint8_t*)pkt + Packet::kOffsetOfData + 2 * sizeof(unsigned short) * (cfg->OFDM_DATA_START + cfg->subcarrier_start),
+                        (uint8_t*)pkt + Packet::kOffsetOfData + 2 * sizeof(unsigned short) * (cfg->subcarrier_start),
                         cfg->get_num_sc_to_process() * 2 * sizeof(unsigned short));
                     if (!rx_status_->add_new_packet(pkt, tid)) {
                         cfg->running = false;
@@ -923,7 +923,7 @@ int PacketTXRX::recv_relocate(int tid)
                     new_pkt->symbol_id = pkt->symbol_id;
                     new_pkt->ant_id = pkt->ant_id;
                     new_pkt->server_id = cfg->bs_server_addr_idx;
-                    memcpy(new_pkt->data, (uint8_t*)pkt + Packet::kOffsetOfData + 2 * sizeof(unsigned short) * (cfg->OFDM_DATA_START + cfg->subcarrier_num_start[server_id]),
+                    memcpy(new_pkt->data, (uint8_t*)pkt + Packet::kOffsetOfData + 2 * sizeof(unsigned short) * (cfg->subcarrier_num_start[server_id]),
                         cfg->subcarrier_num_list[server_id] * 2 * sizeof(unsigned short));
                     mbuf_idx ++;
                 }

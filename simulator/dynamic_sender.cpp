@@ -210,49 +210,64 @@ void* Sender::worker_thread(int tid)
     while (true) {
         gen_tag_t tag = 0;
 
-        for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
-            // tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pools_[tid], sender_mac_addr,
-            //     server_mac_addr_list[i], bs_rru_addr, bs_server_addr_list[i],
-            //     cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
-            //     Packet::kOffsetOfData + cfg->get_num_sc_per_server() * sizeof(unsigned short) * 2);
-            tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pools_[tid], sender_mac_addr,
-                server_mac_addr_list[i], bs_rru_addr, bs_server_addr_list[i],
-                cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
-                Packet::kOffsetOfData + cfg->subcarrier_num_list[i] * sizeof(unsigned short) * 2);
-        }
-
-        // const size_t sc_block_size = cfg->get_num_sc_per_server();
-        for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i++) {
-            auto* pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t*) + kPayloadOffset);
-            pkt->pkt_type = Packet::PktType::kIQFromRRU;
-            pkt->frame_id = cur_frame;
-            pkt->symbol_id = cfg->getSymbolId(cur_symbol);
-            pkt->cell_id = 0;
-            pkt->ant_id = cur_radio;
-            size_t buf_offset = cur_slot_idx * 2 + (cur_symbol == 0 ? 0 : 1);
-            // memcpy(pkt->data,
-            //     data_buf + (buf_offset * ant_num_this_thread + cur_radio - radio_lo) * (2 * cfg->OFDM_CA_NUM)
-            //         + (i * sc_block_size + cfg->OFDM_DATA_START) * 2,
-            //     sc_block_size * sizeof(unsigned short) * 2);
-            memcpy(pkt->data,
-                data_buf + (buf_offset * ant_num_this_thread + cur_radio - radio_lo) * (2 * cfg->OFDM_CA_NUM)
-                    + (cfg->subcarrier_num_start[i] + cfg->OFDM_DATA_START) * 2,
-                cfg->subcarrier_num_list[i] * sizeof(unsigned short) * 2);
-            MLPD_TRACE("Sender: Sending packet %s (%zu of %zu) to %s:%ld\n",
-                pkt->to_string().c_str(), i, cfg->bs_server_addr_list.size(),
-                cfg->bs_server_addr_list[i].c_str(),
-                cfg->bs_server_port + tid);
-        }
-        rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, cfg->bs_server_addr_list.size()) == cfg->bs_server_addr_list.size(),
-            "rte_eth_tx_burst() failed");
-        // size_t pkt_sent = 0;
-        // size_t loop_count = 0;
-        // while (pkt_sent < cfg->bs_server_addr_list.size()) {
-        //     size_t pkt_sent_cur = rte_eth_tx_burst(0, tid, tx_mbufs + pkt_sent, cfg->bs_server_addr_list.size() - pkt_sent);
-        //     pkt_sent += pkt_sent_cur;
-        //     loop_count ++;
-        //     rt_assert(loop_count < 10000, "rte_eth_tx_burst() failed");
+        // for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
+        //     // tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pools_[tid], sender_mac_addr,
+        //     //     server_mac_addr_list[i], bs_rru_addr, bs_server_addr_list[i],
+        //     //     cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
+        //     //     Packet::kOffsetOfData + cfg->get_num_sc_per_server() * sizeof(unsigned short) * 2);
+        //     tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pools_[tid], sender_mac_addr,
+        //         server_mac_addr_list[i], bs_rru_addr, bs_server_addr_list[i],
+        //         cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
+        //         Packet::kOffsetOfData + cfg->subcarrier_num_list[i] * sizeof(unsigned short) * 2);
         // }
+
+        // // const size_t sc_block_size = cfg->get_num_sc_per_server();
+        // for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i++) {
+        //     auto* pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t*) + kPayloadOffset);
+        //     pkt->pkt_type = Packet::PktType::kIQFromRRU;
+        //     pkt->frame_id = cur_frame;
+        //     pkt->symbol_id = cfg->getSymbolId(cur_symbol);
+        //     pkt->cell_id = 0;
+        //     pkt->ant_id = cur_radio;
+        //     size_t buf_offset = cur_slot_idx * 2 + (cur_symbol == 0 ? 0 : 1);
+        //     // memcpy(pkt->data,
+        //     //     data_buf + (buf_offset * ant_num_this_thread + cur_radio - radio_lo) * (2 * cfg->OFDM_CA_NUM)
+        //     //         + (i * sc_block_size + cfg->OFDM_DATA_START) * 2,
+        //     //     sc_block_size * sizeof(unsigned short) * 2);
+        //     memcpy(pkt->data,
+        //         data_buf + (buf_offset * ant_num_this_thread + cur_radio - radio_lo) * (2 * cfg->OFDM_CA_NUM)
+        //             + (cfg->subcarrier_num_start[i] + cfg->OFDM_DATA_START) * 2,
+        //         cfg->subcarrier_num_list[i] * sizeof(unsigned short) * 2);
+        //     MLPD_TRACE("Sender: Sending packet %s (%zu of %zu) to %s:%ld\n",
+        //         pkt->to_string().c_str(), i, cfg->bs_server_addr_list.size(),
+        //         cfg->bs_server_addr_list[i].c_str(),
+        //         cfg->bs_server_port + tid);
+        // }
+        // rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, cfg->bs_server_addr_list.size()) == cfg->bs_server_addr_list.size(),
+        //     "rte_eth_tx_burst() failed");
+
+        size_t ant_block_size = cfg->nRadios / cfg->bs_server_addr_list.size();
+        size_t ant_block_off = cfg->nRadios % cfg->bs_server_addr_list.size();
+        size_t server_id = cur_radio < ant_block_off * (ant_block_size + 1) ?
+            cur_radio / (ant_block_size + 1) :
+            ant_block_off + (cur_radio - ant_block_off * (ant_block_size + 1)) / ant_block_size;
+        tx_mbufs[0] = DpdkTransport::alloc_udp(mbuf_pools_[tid], sender_mac_addr,
+                server_mac_addr_list[server_id], bs_rru_addr, bs_server_addr_list[server_id],
+                cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
+                Packet::kOffsetOfData + cfg->OFDM_DATA_NUM * sizeof(unsigned short) * 2);
+        auto* pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[0], uint8_t*) + kPayloadOffset);
+        pkt->pkt_type = Packet::PktType::kIQFromRRU;
+        pkt->frame_id = cur_frame;
+        pkt->symbol_id = cfg->getSymbolId(cur_symbol);
+        pkt->cell_id = 0;
+        pkt->ant_id = cur_radio;
+        size_t buf_offset = cur_slot_idx * 2 + (cur_symbol == 0 ? 0 : 1);
+        memcpy(pkt->data,
+            data_buf + (buf_offset * ant_num_this_thread + cur_radio - radio_lo) * (2 * cfg->OFDM_CA_NUM)
+                + cfg->OFDM_DATA_START * 2,
+            cfg->OFDM_DATA_NUM * sizeof(unsigned short) * 2);
+        rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, 1) == 1,
+            "rte_eth_tx_burst() failed");
 
         if (unlikely(++cur_radio == radio_hi)) {
             cur_radio = radio_lo;
