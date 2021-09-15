@@ -911,7 +911,7 @@ int PacketTXRX::recv_relocate(int tid)
                 } else {
                     tx_bufs[mbuf_idx] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[server_id],
                         bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[server_id], cfg->partition_tx_port, cfg->partition_rx_port, 
-                        Packet::kOffsetOfData + cfg->get_num_sc_to_process() * 2 * sizeof(unsigned short));
+                        Packet::kOffsetOfData + cfg->subcarrier_num_list[server_id] * 2 * sizeof(unsigned short));
                     
                     struct rte_ether_hdr* eth_hdr
                         = rte_pktmbuf_mtod(tx_bufs[mbuf_idx], struct rte_ether_hdr*);
