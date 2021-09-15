@@ -192,7 +192,7 @@ bool PacketTXRX::startTXRX(Table<char>& buffer, Table<char>& tmp_buffer,
                 //         pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_rx_thread>,
                 //     context, lcore_id);
             }
-        }  else if (worker_id > socket_thread_num) {
+        }  else if (worker_id < socket_thread_num + 1 + cfg->tmp_tx_thread) {
             auto context = new EventHandlerContext<PacketTXRX>;
             context->obj_ptr = this;
             context->id = worker_id - socket_thread_num - 1;
