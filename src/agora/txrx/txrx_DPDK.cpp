@@ -31,7 +31,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
     encode_ue_to_send_ = cfg->ue_start;
 
     const uint16_t port_id = 0; // The DPDK port ID
-    if (DpdkTransport::nic_init(port_id, mbuf_pool_, socket_thread_num + 1, 1) != 0)
+    if (DpdkTransport::nic_init(port_id, mbuf_pool_, socket_thread_num + 1, socket_thread_num + 1) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
 
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr_);
@@ -99,6 +99,26 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
                     "dst port: %zu, queue: %zu\n",
                     cfg->bs_server_addr_list[i].c_str(), cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(),
                     cfg->demod_tx_port + j, cfg->demod_rx_port + j, j % socket_thread_num);
+                DpdkTransport::install_flow_rule(
+                    port_id, j % socket_thread_num, bs_server_addrs_[i], bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
+            }
+        }
+        for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
+            if (i == cfg->bs_server_addr_idx) {
+                continue;
+            }
+            int ret = inet_pton(AF_INET, cfg->bs_server_addr_list[i].c_str(), &bs_server_addrs_[i]);
+            rt_assert(ret == 1, "Invalid sender IP address");
+            ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[i].c_str());
+            rt_assert(parsed_mac != NULL, "Invalid server mac address");
+            memcpy(&bs_server_mac_addrs_[i], parsed_mac, sizeof(ether_addr));
+            for (size_t j = 0; j < cfg->BS_ANT_NUM; j ++) {
+                uint16_t src_port = rte_cpu_to_be_16(cfg->partition_tx_port + j);
+                uint16_t dst_port = rte_cpu_to_be_16(cfg->partition_rx_port + j);
+                printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
+                    "dst port: %zu, queue: %zu\n",
+                    cfg->bs_server_addr_list[i].c_str(), cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(),
+                    cfg->partition_tx_port + j, cfg->partition_rx_port + j, j % socket_thread_num);
                 DpdkTransport::install_flow_rule(
                     port_id, j % socket_thread_num, bs_server_addrs_[i], bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
             }
@@ -866,10 +886,54 @@ int PacketTXRX::recv_relocate(int tid)
         }
 
         auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset);
-        // if (tid == 0 || tid == 1) {
-        //     printf("Received packets tid(%u)! (%x:%u->%x:%u)\n", tid, ip_hdr->src_addr, rte_be_to_cpu_16(udp_hdr->src_port), ip_hdr->dst_addr, rte_be_to_cpu_16(udp_hdr->dst_port));
-        // }
+
         if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
+            struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
+            size_t mbuf_idx = 0;
+            for (size_t server_id = 0; server_id < cfg->bs_server_addr_list.size(); server_id ++) {
+                if (server_id == cfg->bs_server_addr_idx) {
+                    char* rx_buffer = (*buffer_)[pkt->ant_id];
+                    const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)
+                            * cfg->symbol_num_perframe
+                        + pkt->symbol_id;
+                    size_t sc_offset = Packet::kOffsetOfData
+                        + 2 * sizeof(unsigned short)
+                            * (cfg->OFDM_DATA_START + cfg->subcarrier_start);
+                    DpdkTransport::fastMemcpy(
+                        &rx_buffer[rx_offset_ * cfg->packet_length], pkt, Packet::kOffsetOfData);
+                    memcpy(
+                        &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
+                        (uint8_t*)pkt + Packet::kOffsetOfData + 2 * sizeof(unsigned short) * (cfg->OFDM_DATA_START + cfg->subcarrier_start),
+                        cfg->get_num_sc_to_process() * 2 * sizeof(unsigned short));
+                    if (!rx_status_->add_new_packet(pkt, tid)) {
+                        cfg->running = false;
+                    }
+                } else {
+                    tx_bufs[mbuf_idx] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[server_id],
+                        bs_server_addrs_[cfg->bs_server_addr_idx], bs_server_addrs_[server_id], cfg->partition_tx_port, cfg->partition_rx_port, 
+                        Packet::kOffsetOfData + cfg->get_num_sc_to_process() * 2 * sizeof(unsigned short));
+                    
+                    struct rte_ether_hdr* eth_hdr
+                        = rte_pktmbuf_mtod(tx_bufs[mbuf_idx], struct rte_ether_hdr*);
+
+                    char* payload = (char*)eth_hdr + kPayloadOffset;
+                    auto* new_pkt = reinterpret_cast<Packet*>(payload);
+                    new_pkt->pkt_type = Packet::PktType::kIQFromServer;
+                    new_pkt->frame_id = pkt->frame_id;
+                    new_pkt->symbol_id = pkt->symbol_id;
+                    new_pkt->ant_id = pkt->ant_id;
+                    new_pkt->server_id = cfg->bs_server_addr_idx;
+                    memcpy(new_pkt->data, (uint8_t*)pkt + Packet::kOffsetOfData + 2 * sizeof(unsigned short) * (cfg->OFDM_DATA_START + cfg->subcarrier_num_start[server_id]),
+                        cfg->subcarrier_num_list[server_id] * 2 * sizeof(unsigned short));
+                    mbuf_idx ++;
+                }
+            }
+            size_t nb_tx_new = rte_eth_tx_burst(0, 1 + tid, tx_bufs, mbuf_idx);
+            if (unlikely(nb_tx_new != mbuf_idx)) {
+                printf("rte_eth_tx_burst() failed\n");
+                exit(0);
+            }
+        } else if (pkt->pkt_type == Packet::PktType::kIQFromServer) {
             char* rx_buffer = (*buffer_)[pkt->ant_id];
             const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)
                     * cfg->symbol_num_perframe
