@@ -156,6 +156,8 @@ Config::Config(const std::string& jsonfile)
     size_t cells = tdd_conf.value("cells", kDefaultBSCells);
     // bs_ant_num_ (previous)
     size_t bs_antennas = tdd_conf.value("antenna_num", kDefaultBSAntennas);
+    //Remove the reference antenna
+    bs_antennas -= ref_node_.sdr_.num_channels_;
     size_t antennas_per_cell =
         (bs_antennas / cells) + ((bs_antennas % cells) != 0);
     size_t sdrs_per_cell = (antennas_per_cell / num_channels_) +
@@ -178,10 +180,9 @@ Config::Config(const std::string& jsonfile)
         added_antennas += num_channels_;
       }
     }
-
-    RtAssert(
-        added_antennas == bs_antennas,
-        "Added incorrect number of antennas added to basestation definition\n");
+    RtAssert(added_antennas == bs_antennas,
+             "Added incorrect number of antennas added to basestation "
+             "definition\n");
   }
 
   //Process the UE serial list
@@ -220,8 +221,8 @@ Config::Config(const std::string& jsonfile)
   }
 
   //Calculate Basestation totals cells_
-  size_t bs_total_antennas_ = 0;
-  size_t bs_total_radios_ = 0;
+  bs_total_antennas_ = 0;
+  bs_total_radios_ = 0;
 
   for (AgoraRadio::CellParameters& cell : cells_) {
     cell.cell_antennas_ = 0;
@@ -231,7 +232,7 @@ Config::Config(const std::string& jsonfile)
         cell.cell_antennas_ += sdr.num_channels_;
         cell.cell_radios_++;
         if (kDebugPrintBs) {
-          std::printf("Cell: %s, hub %s, sdr %s has %zu antennas\n",
+          std::printf("Cell: %s, hub %s, sdr %s has %zu antenna(s)\n",
                       cell.id_.c_str(), hub.id_.c_str(), sdr.id_.c_str(),
                       sdr.num_channels_);
         }
@@ -241,6 +242,12 @@ Config::Config(const std::string& jsonfile)
     bs_total_radios_ += cell.cell_radios_;
   }
 
+  if (kDebugPrintBs) {
+    std::printf("RefNode hub %s, sdr %s has %zu antenna(s) type %d\n",
+                ref_node_.hub_id_.c_str(), ref_node_.sdr_.id_.c_str(),
+                ref_node_.sdr_.num_channels_, (int)ref_node_.type_);
+  }
+
   //Add the reference node to the total antenna count
   bs_total_antennas_ += ref_node_.sdr_.num_channels_;
   bs_total_radios_++;
@@ -248,7 +255,7 @@ Config::Config(const std::string& jsonfile)
 
   if (kDebugPrintBs) {
     std::printf(
-        "Total Basestation cells: %zu, hubs %zu, sdr %zu, antennas %zu\n",
+        "Total Basestation cells: %zu, hubs %zu, radios %zu, antennas %zu\n",
         cells_.size(), cells_.size(), bs_total_radios_, bs_total_antennas_);
   }
 
@@ -275,7 +282,7 @@ Config::Config(const std::string& jsonfile)
     }
   }
   if (kDebugPrintUe) {
-    std::printf("Total Ue radios: %zu | antennas: %zu\n", ue_radios,
+    std::printf("Total Ue radios %zu with antennas: %zu\n", ue_radios,
                 ue_antennas);
   }
 
