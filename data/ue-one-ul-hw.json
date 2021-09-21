@@ -1,6 +1,6 @@
 {
     "UE": true,
-    "irises": "data/user-iris-serials.txt",
+    "ue_serials_file": "data/ue_topology.json",
     "cells": 1,
     "channel": "A",
     "frequency": 3.56e9,

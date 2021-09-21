@@ -1,5 +1,6 @@
 {
-    "serials_file": "data/topology.json",
+    "bs_serials_file": "data/bs_topology.json",
+    "ue_serials_file": "data/ue_topology.json",
     "channel": "A",
     "frequency": 3.56e9,
     "single_gain": false,
@@ -25,5 +26,5 @@
     ],
     "client_ul_pilot_syms": 2,
     /* Compute configuration */
-    "worker_thread_num": 20,
+    "worker_thread_num": 20
 }

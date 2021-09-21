@@ -532,20 +532,10 @@ class Config {
   size_t bs_ref_ant_;
   size_t bs_total_antennas_;
 
-  //Ue Mode
-
-  //Depends on value of isUe
-  //size_t num_radios_;
-
   size_t beacon_ant_;
 
   size_t num_channels_;
   std::string channel_list_;
-
-  //Index'd by cell
-  //std::vector<std::vector<std::string>> radio_ids_;
-  //std::vector<std::string> reference_nodes_;
-  //std::vector<std::string> hub_ids_;
 
   // Controls whether the synchronization and frame time keeping is done
   // in hardware or software
@@ -565,11 +555,6 @@ class Config {
   double rx_gain_b_;
   double calib_tx_gain_a_;
   double calib_tx_gain_b_;
-
-  //size_t num_cells_;
-  //Index'd by cell
-  //std::vector<size_t> num_radios_;
-  //std::vector<size_t> num_antennas_;
 
   size_t beacon_len_;
   size_t init_calib_repeat_;

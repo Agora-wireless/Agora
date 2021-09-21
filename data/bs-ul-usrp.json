@@ -1,6 +1,5 @@
 {
-    "irises": "data/bs-usrp-addr.txt",
-    "cells": 1,
+    "bs_serials_file": "data/bs_topology.json",
     "channel": "AB",
     "frequency": 3.6e9,
     "rx_gain_a": 20,

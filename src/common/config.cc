@@ -20,7 +20,7 @@ using json = nlohmann::json;
 
 static const bool kDebugPrintBs = true;
 static const bool kDebugPrintUe = true;
-
+static const bool kDebugPrintBsSerialParse = false;
 static const size_t kMacAlignmentBytes = 64u;
 
 static constexpr size_t kDefaultBSCells = 1u;
@@ -64,6 +64,7 @@ Config::Config(const std::string& jsonfile)
     ref_node_.sdr_.id_ = "SimRefInt";
   }
   ref_node_.sdr_.num_channels_ = num_channels_;
+  ref_node_.hub_id_ = "SimRefHub";
 
   if (bs_serials_file.empty() == false) {
     std::string serials_str;
@@ -83,31 +84,37 @@ Config::Config(const std::string& jsonfile)
     }
 
     while (cell_found == true) {
-      std::printf("Cell Layout: %s\n", cell_layout.dump().c_str());
+      if (kDebugPrintBsSerialParse) {
+        std::printf("Cell Layout: %s\n", cell_layout.dump().c_str());
+      }
 
       AgoraRadio::CellParameters& new_cell = cells_.emplace_back();
       new_cell.id_ = cell_search;
       AgoraRadio::HubParameters& new_hub = new_cell.hubs_.emplace_back();
       new_hub.id_ = json_hwconfig.at(cell_search).at("hub");
 
-      std::printf("Hub id: %s\n", new_hub.id_.c_str());
+      if (kDebugPrintBsSerialParse) {
+        std::printf("Hub id: %s\n", new_hub.id_.c_str());
+      }
 
       std::vector<std::string> radio_ids =
           json_hwconfig.at(cell_search).at("sdr");
 
-      std::cout << "Radio Ids for cell " << cell_number;
+      if (kDebugPrintBsSerialParse) {
+        std::cout << "Radio Ids for cell " << cell_number;
+      }
       for (auto& radio : radio_ids) {
         AgoraRadio::SdrParameters new_sdr;
         new_sdr.id_ = radio;
         new_sdr.num_channels_ = num_channels_;
         new_hub.sdr_.push_back(new_sdr);
-        std::cout << ' ' << radio;
+        if (kDebugPrintBsSerialParse) {
+          std::cout << ' ' << radio;
+        }
       }
-      std::cout << std::endl;
-
-      //num_radios_.push_back(radio_ids.size());
-      //num_antennas_.push_back(num_channels_ * radio_ids.size());
-      //radio_ids_.push_back(radio_ids);
+      if (kDebugPrintBsSerialParse) {
+        std::cout << std::endl;
+      }
 
       // Append calibration node
       //if (internal_measurement_ && ref_node_enable_) {
@@ -143,14 +150,15 @@ Config::Config(const std::string& jsonfile)
                     current_cell_string;
 
       //Look for next cell
-      std::printf("Searching for cell: %s\n", cell_search.c_str());
+      if (kDebugPrintBsSerialParse) {
+        std::printf("Searching for cell: %s\n", cell_search.c_str());
+      }
       try {
         cell_layout = json_hwconfig.at(cell_search);
       } catch (json::basic_json::out_of_range& e) {
         cell_found = false;
       }
     }  // while (cell_found == true)
-    assert(0);
   } else /* No radio def file (sim mode) */ {
     // Generate BS data structure
     size_t cells = tdd_conf.value("cells", kDefaultBSCells);
@@ -683,7 +691,8 @@ Config::Config(const std::string& jsonfile)
   this->running_.store(true);
   MLPD_INFO(
       "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
-      "frame,\n\t%zu uplink data symbols per frame, %zu downlink data symbols "
+      "frame,\n\t%zu uplink data symbols per frame, %zu downlink data "
+      "symbols "
       "per frame,\n\t%zu OFDM subcarriers (%zu data subcarriers), modulation "
       "%s,\n\t%zu codeblocks per symbol, %zu bytes per code block,"
       "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "

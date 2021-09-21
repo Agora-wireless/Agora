@@ -1,7 +1,5 @@
 {
-    "hubs": "data/bs-hub-serial.txt",
-    "irises": "data/bs-iris-serials.txt",
-    "cells": 1,
+    "bs_serials_file": "data/bs_topology.json",
     "channel": "AB",
     "frequency": 3.56e9,
     "single_gain": false,
