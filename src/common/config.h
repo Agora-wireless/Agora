@@ -30,6 +30,35 @@
 #include "utils.h"
 #include "utils_ldpc.h"
 
+// Helper classes / structs
+namespace AgoraRadio {
+struct SdrParameters {
+  size_t num_channels_;
+  std::string id_;
+};
+
+struct HubParameters {
+  std::vector<SdrParameters> sdr_;  // 1 or >
+  std::string id_;
+};
+
+enum class RefNodeType : uint8_t { invalid, internal, external };
+
+struct ReferenceNodeParameters {
+  SdrParameters sdr_;
+  RefNodeType type_ = RefNodeType::invalid;
+  std::string hub_id_;
+};
+
+struct CellParameters {
+  std::vector<HubParameters> hubs_;
+  std::string id_;
+  //Tracking variable so we don't have to traverse the SDR list
+  size_t cell_antennas_ = 0;
+  size_t cell_radios_ = 0;
+};
+};  // namespace AgoraRadio
+
 class Config {
  public:
   // Constructor
@@ -38,16 +67,22 @@ class Config {
 
   inline void Running(bool value) { this->running_.store(value); }
   inline bool Running() const { return this->running_.load(); }
-  inline size_t BsAntNum() const { return this->bs_ant_num_; }
-  inline void BsAntNum(size_t n_bs_ant) { this->bs_ant_num_ = n_bs_ant; }
+  inline size_t BsAntNum() const { return this->bs_total_antennas_; }
+  inline void BsAntNum(size_t n_bs_ant) { this->bs_total_antennas_ = n_bs_ant; }
 
   // Inline accessors (basic types)
   inline bool IsUe() const { return this->is_ue_; }
-  inline size_t BfAntNum() const { return this->bf_ant_num_; }
-  inline size_t UeNum() const { return this->ue_num_; }
-  inline size_t UeAntNum() const { return this->ue_ant_num_; }
-  inline size_t UeAntOffset() const { return this->ue_ant_offset_; }
-  inline size_t UeAntTotal() const { return this->ue_ant_total_; }
+  inline size_t BfAntNum() const { return this->bs_beamforming_ants_; }
+
+  //inline size_t UeNum() const { return this->ue_num_; }
+  inline size_t UeAntInstancCnt() const { return this->ue_ant_instance_cnt_; }
+  inline size_t UeAntInsanceOffset() const {
+    return this->ue_ant_instance_offset_;
+  }
+
+  ///\todo Verify the usage of UeNum here (radios?)
+  inline size_t UeNum() const { return this->ue_total_antennas_; }
+  inline size_t UeAntTotal() const { return this->ue_total_antennas_; }
 
   inline size_t OfdmCaNum() const { return this->ofdm_ca_num_; }
   inline size_t CpLen() const { return this->cp_len_; }
@@ -77,15 +112,29 @@ class Config {
   inline double RxGainB() const { return this->rx_gain_b_; }
   inline double CalibTxGainA() const { return this->calib_tx_gain_a_; }
   inline double CalibTxGainB() const { return this->calib_tx_gain_b_; }
-  inline size_t NumCells() const { return this->num_cells_; }
-  inline size_t NumRadios() const { return this->num_radios_; }
+  inline size_t NumCells() const { return this->cells_.size(); }
   inline size_t InitCalibRepeat() const { return this->init_calib_repeat_; }
 
-  inline size_t NumAntennas() const { return this->num_antennas_; }
+  inline size_t NumRadios() const {
+    if (this->is_ue_) {
+      return this->ue_total_radios_;
+    } else {
+      return this->bs_total_radios_;
+    }
+  }
+
+  inline size_t NumAntennas() const {
+    if (this->is_ue_) {
+      return this->ue_total_antennas_;
+    } else {
+      return this->bs_total_antennas_;
+    }
+  }
+
   inline size_t NumChannels() const { return this->num_channels_; }
-  inline size_t RefAnt() const { return this->ref_ant_; }
+  inline size_t RefAnt() const { return this->bs_ref_ant_; }
   inline size_t RefRadio() const {
-    return this->ref_ant_ / this->num_channels_;
+    return this->bs_ref_ant_ / this->num_channels_;
   }
   inline size_t BeaconAnt() const { return this->beacon_ant_; }
   inline size_t BeaconLen() const { return this->beacon_len_; }
@@ -93,8 +142,10 @@ class Config {
   inline bool Beamsweep() const { return this->beamsweep_; }
   inline bool SampleCalEn() const { return this->sample_cal_en_; }
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
-  inline bool ExternalRefNode() const { return this->external_ref_node_; }
-  inline std::string Channel() const { return this->channel_; }
+  inline bool ExternalRefNode() const {
+    return this->ref_node_.type_ == AgoraRadio::RefNodeType::external;
+  }
+  inline std::string Channel() const { return this->channel_list_; }
 
   inline size_t AntGroupNum() const { return this->ant_group_num_; }
   inline size_t AntPerGroup() const { return this->ant_per_group_; }
@@ -223,11 +274,13 @@ class Config {
   inline const std::vector<double>& ClientGainAdjB() const {
     return this->client_gain_adj_b_;
   };
-  inline const std::vector<std::string>& RadioIds() const {
-    return this->radio_ids_;
+
+  inline const std::vector<AgoraRadio::CellParameters>& CellDefs() const {
+    return this->cells_;
   };
-  inline const std::vector<std::string>& HubIds() const {
-    return this->hub_ids_;
+
+  inline const std::vector<AgoraRadio::SdrParameters>& UserDefs() const {
+    return this->users_;
   };
 
   // non-const (can modify)
@@ -268,10 +321,6 @@ class Config {
   SymbolType GetSymbolType(size_t symbol_id) const;
 
   /* Inline functions */
-  inline size_t GetNumAntennas() const {
-    return (this->num_radios_ * this->num_channels_);
-  }
-
   inline void UpdateModCfgs(size_t new_mod_order_bits) {
     this->mod_order_bits_ = new_mod_order_bits;
     this->mod_order_ = static_cast<size_t>(pow(2, this->mod_order_bits_));
@@ -320,14 +369,15 @@ class Config {
   /// Return the subcarrier ID to which we should refer to for the zeroforcing
   /// matrices of subcarrier [sc_id].
   inline size_t GetZfScId(size_t sc_id) const {
-    return this->freq_orthogonal_pilot_ ? sc_id - (sc_id % ue_num_) : sc_id;
+    return this->freq_orthogonal_pilot_ ? sc_id - (sc_id % ue_total_antennas_)
+                                        : sc_id;
   }
 
   /// Get the calibration buffer for this frame and subcarrier ID
   inline complex_float* GetCalibBuffer(Table<complex_float>& calib_buffer,
                                        size_t frame_id, size_t sc_id) const {
     size_t frame_slot = frame_id % kFrameWnd;
-    return &calib_buffer[frame_slot][sc_id * bs_ant_num_];
+    return &calib_buffer[frame_slot][sc_id * bs_total_antennas_];
   }
 
   /// Get mac bits for this frame, symbol, user and code block ID
@@ -392,20 +442,18 @@ class Config {
   const double freq_ghz_;  // RDTSC frequency in GHz
   bool is_ue_;
 
-  size_t bs_ant_num_;  // Total number of BS antennas
-  size_t bf_ant_num_;  // Number of antennas used in beamforming
-
   // The count of ues an instance is responsable for
-  size_t ue_num_;
+  //size_t ue_num_;
   // The count of ue antennas an instance is responsable for
-  size_t ue_ant_num_;
+  size_t ue_ant_instance_cnt_;
+  // The offset into the number total ue antennas this instantiation is
+  // responsible for.
+  size_t ue_ant_instance_offset_;
 
   // Total number of us antennas in this experiment including the ones
   // instantiated on other runs/machines.
-  size_t ue_ant_total_;
-  // The offset into the number total ue antennas this instantiation is
-  // responsible for.
-  size_t ue_ant_offset_;
+  size_t ue_total_antennas_;
+  size_t ue_total_radios_;
 
   // The total number of OFDM subcarriers, which is a power of two
   size_t ofdm_ca_num_;
@@ -471,8 +519,33 @@ class Config {
   // Modulation lookup table for mapping binary bits to constellation points
   Table<complex_float> mod_table_;
 
-  std::vector<std::string> radio_ids_;
-  std::vector<std::string> hub_ids_;
+  //BaseStation Mode
+  std::vector<AgoraRadio::CellParameters> cells_;
+  //The Reference node will live outside the cell defination (1 reference node)
+  AgoraRadio::ReferenceNodeParameters ref_node_;
+  // UE mode
+  std::vector<AgoraRadio::SdrParameters> users_;
+
+  //Includes all bs SDRs and reference node
+  size_t bs_total_radios_;
+  size_t bs_beamforming_ants_;
+  size_t bs_ref_ant_;
+  size_t bs_total_antennas_;
+
+  //Ue Mode
+
+  //Depends on value of isUe
+  //size_t num_radios_;
+
+  size_t beacon_ant_;
+
+  size_t num_channels_;
+  std::string channel_list_;
+
+  //Index'd by cell
+  //std::vector<std::vector<std::string>> radio_ids_;
+  //std::vector<std::string> reference_nodes_;
+  //std::vector<std::string> hub_ids_;
 
   // Controls whether the synchronization and frame time keeping is done
   // in hardware or software
@@ -493,19 +566,16 @@ class Config {
   double calib_tx_gain_a_;
   double calib_tx_gain_b_;
 
-  size_t num_cells_;
-  size_t num_radios_;
-  size_t num_antennas_;
-  size_t num_channels_;
-  size_t ref_ant_;
-  size_t beacon_ant_;
+  //size_t num_cells_;
+  //Index'd by cell
+  //std::vector<size_t> num_radios_;
+  //std::vector<size_t> num_antennas_;
+
   size_t beacon_len_;
   size_t init_calib_repeat_;
   bool beamsweep_;
   bool sample_cal_en_;
   bool imbalance_cal_en_;
-  bool external_ref_node_;
-  std::string channel_;
   size_t ant_group_num_;
   size_t ant_per_group_;
 

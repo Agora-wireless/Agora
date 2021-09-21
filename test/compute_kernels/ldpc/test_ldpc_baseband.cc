@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
   std::printf("Number of symbols per block: %zu, blocks per frame: %zu\n",
               num_symbols_per_cb, num_cbs_per_ue);
 
-  const size_t num_codeblocks = num_cbs_per_ue * cfg->UeAntNum();
+  const size_t num_codeblocks = num_cbs_per_ue * cfg->UeAntTotal();
   std::printf("Total number of blocks: %zu\n", num_codeblocks);
   size_t input_size = LdpcEncodingInputBufSize(
       cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor());
@@ -96,8 +96,8 @@ int main(int argc, char* argv[]) {
     if (kPrintUplinkInformationBytes) {
       std::printf("Uplink information bytes\n");
       for (size_t n = 0; n < num_codeblocks; n++) {
-        std::printf("Symbol %zu, UE %zu\n", n / cfg->UeAntNum(),
-                    n % cfg->UeAntNum());
+        std::printf("Symbol %zu, UE %zu\n", n / cfg->UeAntTotal(),
+                    n % cfg->UeAntTotal());
         for (size_t i = 0; i < input_bytes_per_cb; i++) {
           std::printf("%u ", (uint8_t)information[n][i]);
         }
@@ -107,10 +107,10 @@ int main(int argc, char* argv[]) {
 
     // Modulate the encoded codewords
     std::vector<std::vector<complex_float>> modulated_codewords(
-        cfg->UeAntNum() * cfg->Frame().NumDataSyms());
+        cfg->UeAntTotal() * cfg->Frame().NumDataSyms());
     size_t num_used_symbol = num_cbs_per_ue * num_symbols_per_cb;
     size_t num_unused_symbol = cfg->Frame().NumDataSyms() - num_used_symbol;
-    for (size_t ue_id = 0; ue_id < cfg->UeAntNum(); ue_id++) {
+    for (size_t ue_id = 0; ue_id < cfg->UeAntTotal(); ue_id++) {
       for (size_t i = 0; i < num_cbs_per_ue; i++) {
         size_t remaining_bits = cfg->LdpcConfig().NumCbCodewLen();
         size_t offset = 0;
@@ -135,7 +135,7 @@ int main(int argc, char* argv[]) {
 
     // Place modulated uplink data codewords into central IFFT bins
     std::vector<std::vector<complex_float>> pre_ifft_data_syms(
-        cfg->UeAntNum() * cfg->Frame().NumDataSyms());
+        cfg->UeAntTotal() * cfg->Frame().NumDataSyms());
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
       pre_ifft_data_syms[i] = data_generator.BinForIfft(modulated_codewords[i]);
     }
@@ -146,15 +146,15 @@ int main(int argc, char* argv[]) {
     // Put pilot and data symbols together
     Table<complex_float> tx_data_all_symbols;
     tx_data_all_symbols.Calloc(cfg->Frame().NumTotalSyms(),
-                               cfg->UeAntNum() * cfg->OfdmCaNum(),
+                               cfg->UeAntTotal() * cfg->OfdmCaNum(),
                                Agora_memory::Alignment_t::kAlign64);
 
     if (cfg->FreqOrthogonalPilot() == true) {
-      for (size_t i = 0; i < cfg->UeAntNum(); i++) {
+      for (size_t i = 0; i < cfg->UeAntTotal(); i++) {
         std::vector<complex_float> pilots_t_ue(cfg->OfdmCaNum());  // Zeroed
         for (size_t j = cfg->OfdmDataStart();
              j < cfg->OfdmDataStart() + cfg->OfdmDataNum();
-             j += cfg->UeAntNum()) {
+             j += cfg->UeAntTotal()) {
           pilots_t_ue[i + j] = pilot_td[i + j];
         }
         // Load pilot
@@ -163,7 +163,7 @@ int main(int argc, char* argv[]) {
                     &pilots_t_ue[0], cfg->OfdmCaNum() * sizeof(complex_float));
       }
     } else {
-      for (size_t i = 0; i < cfg->UeAntNum(); i++) {
+      for (size_t i = 0; i < cfg->UeAntTotal(); i++) {
         std::memcpy(tx_data_all_symbols[i + cfg->Frame().NumBeaconSyms()] +
                         i * cfg->OfdmCaNum(),
                     &pilot_td[0], cfg->OfdmCaNum() * sizeof(complex_float));
@@ -174,7 +174,7 @@ int main(int argc, char* argv[]) {
         cfg->Frame().NumPilotSyms() + cfg->Frame().NumBeaconSyms();
     for (size_t i = data_sym_start; i < cfg->Frame().NumTotalSyms(); i++) {
       const size_t data_sym_id = (i - data_sym_start);
-      for (size_t j = 0; j < cfg->UeAntNum(); j++) {
+      for (size_t j = 0; j < cfg->UeAntTotal(); j++) {
         std::memcpy(tx_data_all_symbols[i] + j * cfg->OfdmCaNum(),
                     &pre_ifft_data_syms[j * cfg->Frame().NumDataSyms() +
                                         data_sym_id][0],
@@ -185,9 +185,9 @@ int main(int argc, char* argv[]) {
     // Generate CSI matrix without noise
     Table<complex_float> csi_matrices_no_noise;
     csi_matrices_no_noise.Calloc(cfg->OfdmCaNum(),
-                                 cfg->UeAntNum() * cfg->BsAntNum(),
+                                 cfg->UeAntTotal() * cfg->BsAntNum(),
                                  Agora_memory::Alignment_t::kAlign32);
-    for (size_t i = 0; i < cfg->UeAntNum() * cfg->BsAntNum(); i++) {
+    for (size_t i = 0; i < cfg->UeAntTotal() * cfg->BsAntNum(); i++) {
       complex_float csi = {static_cast<float>(distribution(generator)),
                            static_cast<float>(distribution(generator))};
       for (size_t j = 0; j < cfg->OfdmCaNum(); j++) {
@@ -199,9 +199,9 @@ int main(int argc, char* argv[]) {
     // Generate CSI matrix with noise for pilot symbols
     Table<complex_float> csi_matrices_pilot;
     csi_matrices_pilot.Calloc(cfg->OfdmCaNum(),
-                              cfg->UeAntNum() * cfg->BsAntNum(),
+                              cfg->UeAntTotal() * cfg->BsAntNum(),
                               Agora_memory::Alignment_t::kAlign32);
-    for (size_t i = 0; i < cfg->UeAntNum() * cfg->BsAntNum(); i++) {
+    for (size_t i = 0; i < cfg->UeAntTotal() * cfg->BsAntNum(); i++) {
       for (size_t j = 0; j < cfg->OfdmCaNum(); j++) {
         complex_float noise = {static_cast<float>(distribution(generator)) *
                                    kNoiseLevels[noise_id],
@@ -215,9 +215,9 @@ int main(int argc, char* argv[]) {
     // Generate CSI matrix with noise for data symbols
     Table<complex_float> csi_matrices_data;
     csi_matrices_data.Calloc(cfg->OfdmCaNum(),
-                             cfg->UeAntNum() * cfg->BsAntNum(),
+                             cfg->UeAntTotal() * cfg->BsAntNum(),
                              Agora_memory::Alignment_t::kAlign32);
-    for (size_t i = 0; i < cfg->UeAntNum() * cfg->BsAntNum(); i++) {
+    for (size_t i = 0; i < cfg->UeAntTotal() * cfg->BsAntNum(); i++) {
       for (size_t j = 0; j < cfg->OfdmCaNum(); j++) {
         complex_float noise = {static_cast<float>(distribution(generator)) *
                                    kNoiseLevels[noise_id],
@@ -236,7 +236,7 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < cfg->Frame().NumTotalSyms(); i++) {
       arma::cx_fmat mat_input_data(
           reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
-          cfg->OfdmCaNum(), cfg->UeAntNum(), false);
+          cfg->OfdmCaNum(), cfg->UeAntTotal(), false);
       arma::cx_fmat mat_output(
           reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
           cfg->OfdmCaNum(), cfg->BsAntNum(), false);
@@ -244,31 +244,31 @@ int main(int argc, char* argv[]) {
       for (size_t j = 0; j < cfg->OfdmCaNum(); j++) {
         arma::cx_fmat mat_csi(
             reinterpret_cast<arma::cx_float*>(csi_matrices_data[j]),
-            cfg->BsAntNum(), cfg->UeAntNum());
+            cfg->BsAntNum(), cfg->UeAntTotal());
         mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
       }
     }
 
     // Compute precoder
     Table<complex_float> precoder;
-    precoder.Calloc(cfg->OfdmCaNum(), cfg->UeAntNum() * cfg->BsAntNum(),
+    precoder.Calloc(cfg->OfdmCaNum(), cfg->UeAntTotal() * cfg->BsAntNum(),
                     Agora_memory::Alignment_t::kAlign32);
     for (size_t i = 0; i < cfg->OfdmCaNum(); i++) {
       arma::cx_fmat mat_input(
           reinterpret_cast<arma::cx_float*>(csi_matrices_pilot[i]),
-          cfg->BsAntNum(), cfg->UeAntNum(), false);
+          cfg->BsAntNum(), cfg->UeAntTotal(), false);
       arma::cx_fmat mat_output(reinterpret_cast<arma::cx_float*>(precoder[i]),
-                               cfg->UeAntNum(), cfg->BsAntNum(), false);
+                               cfg->UeAntTotal(), cfg->BsAntNum(), false);
       pinv(mat_output, mat_input, 1e-2, "dc");
     }
 
     Table<complex_float> equalized_data_all_symbols;
     equalized_data_all_symbols.Calloc(cfg->Frame().NumTotalSyms(),
-                                      cfg->OfdmDataNum() * cfg->UeAntNum(),
+                                      cfg->OfdmDataNum() * cfg->UeAntTotal(),
                                       Agora_memory::Alignment_t::kAlign64);
     Table<int8_t> demod_data_all_symbols;
     demod_data_all_symbols.Calloc(
-        cfg->UeAntNum(), cfg->OfdmDataNum() * cfg->Frame().NumDataSyms() * 8,
+        cfg->UeAntTotal(), cfg->OfdmDataNum() * cfg->Frame().NumDataSyms() * 8,
         Agora_memory::Alignment_t::kAlign64);
     for (size_t i = data_sym_start; i < cfg->Frame().NumTotalSyms(); i++) {
       arma::cx_fmat mat_rx_data(
@@ -277,13 +277,13 @@ int main(int argc, char* argv[]) {
       arma::cx_fmat mat_equalized_data(
           reinterpret_cast<arma::cx_float*>(
               equalized_data_all_symbols[i - data_sym_start]),
-          cfg->OfdmDataNum(), cfg->UeAntNum(), false);
+          cfg->OfdmDataNum(), cfg->UeAntTotal(), false);
       for (size_t j = 0; j < cfg->OfdmDataNum(); j++) {
         arma::cx_fmat mat_precoder(
             reinterpret_cast<arma::cx_float*>(
-                precoder[cfg->FreqOrthogonalPilot() ? (j % cfg->UeAntNum())
+                precoder[cfg->FreqOrthogonalPilot() ? (j % cfg->UeAntTotal())
                                                     : j]),
-            cfg->UeAntNum(), cfg->BsAntNum(), false);
+            cfg->UeAntTotal(), cfg->BsAntNum(), false);
         mat_equalized_data.row(j) =
             (mat_precoder * mat_rx_data.row(j + cfg->OfdmDataStart()).st())
                 .st();
@@ -291,7 +291,7 @@ int main(int argc, char* argv[]) {
 
       mat_equalized_data = mat_equalized_data.st();
 
-      for (size_t j = 0; j < cfg->UeAntNum(); j++) {
+      for (size_t j = 0; j < cfg->UeAntTotal(); j++) {
         size_t cb_id = (i - data_sym_start) / num_symbols_per_cb;
         size_t symbol_id_in_cb = (i - data_sym_start) % num_symbols_per_cb;
         auto* demod_ptr = demod_data_all_symbols[j] +
@@ -340,7 +340,7 @@ int main(int argc, char* argv[]) {
                              Agora_memory::Alignment_t::kAlign64);
     double freq_ghz = GetTime::MeasureRdtscFreq();
     size_t start_tsc = GetTime::WorkerRdtsc();
-    for (size_t i = 0; i < cfg->UeAntNum(); i++) {
+    for (size_t i = 0; i < cfg->UeAntTotal(); i++) {
       for (size_t j = 0; j < num_cbs_per_ue; j++) {
         ldpc_decoder_5gnr_request.varNodes =
             demod_data_all_symbols[i] +

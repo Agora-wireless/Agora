@@ -187,7 +187,7 @@ int PacketTXRX::DequeueSendUsrp(int tid) {
   size_t offset =
       (c->GetTotalDataSymbolIdx(frame_id, symbol_id) * c->BsAntNum()) + ant_id;
 
-  symbol_id += c->UeAntNum();
+  symbol_id += c->UeAntTotal();
   frame_id += TX_FRAME_DELTA;
 
   void* txbuf[2];

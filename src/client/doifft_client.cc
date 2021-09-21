@@ -57,7 +57,7 @@ EventData DoIFFTClient::Launch(size_t tag) {
   }
 
   size_t offset = (cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul) *
-                   cfg_->UeAntNum()) +
+                   cfg_->UeAntInstancCnt()) +
                   ant_id;
 
   size_t start_tsc1 = GetTime::WorkerRdtsc();

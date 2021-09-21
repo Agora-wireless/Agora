@@ -58,6 +58,7 @@ class ClientRadioConfig {
   std::vector<SoapySDR::Stream*> rx_streams_;
   size_t radio_num_;
   size_t antenna_num_;
+  std::vector<std::string> radio_ids_;
 
   std::atomic<size_t> num_client_radios_initialized_;
 };

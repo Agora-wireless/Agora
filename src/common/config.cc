@@ -18,7 +18,20 @@
 
 using json = nlohmann::json;
 
+static const bool kDebugPrintBs = true;
+static const bool kDebugPrintUe = true;
+
 static const size_t kMacAlignmentBytes = 64u;
+
+static constexpr size_t kDefaultBSCells = 1u;
+static constexpr size_t kDefaultBSAntennas = 8u;
+static constexpr size_t kDefaultUEAntennas = 8u;
+static constexpr size_t kDefaultIsUe = false;
+static constexpr size_t kExternalRefNode = false;
+static constexpr size_t kDefaultRefAntenna = 0u;
+static const std::string kDefaultRefNodeId = "SimRefExt";
+static const std::string kDefaultChannel = "A";
+static const std::string kDefaultSerialFilename = "";
 
 Config::Config(const std::string& jsonfile)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -32,54 +45,262 @@ Config::Config(const std::string& jsonfile)
   // Allow json comments
   const auto tdd_conf = json::parse(conf, nullptr, true, true);
 
-  /* antenna configurations */
-  if (kUseUHD == false) {
-    std::string hub_file = tdd_conf.value("hubs", "");
-    if (!hub_file.empty()) {
-      Utils::LoadDevices(hub_file, hub_ids_);
+  // Input the hardware configuration
+  // Load serials file (loads hub, sdr, and rrh serials)
+  auto bs_serials_file =
+      tdd_conf.value("bs_serials_file", kDefaultSerialFilename);
+  channel_list_ = tdd_conf.value("channel", kDefaultChannel);
+  num_channels_ = channel_list_.length();
+
+  bool external_ref_node =
+      tdd_conf.value("external_ref_node", kExternalRefNode);
+  if (external_ref_node == true) {
+    std::string external_ref_node_id =
+        tdd_conf.value("external_ref_node", kDefaultRefNodeId);
+    ref_node_.type_ = AgoraRadio::RefNodeType::external;
+    ref_node_.sdr_.id_ = external_ref_node_id;
+  } else {
+    ref_node_.type_ = AgoraRadio::RefNodeType::internal;
+    ref_node_.sdr_.id_ = "SimRefInt";
+  }
+  ref_node_.sdr_.num_channels_ = num_channels_;
+
+  if (bs_serials_file.empty() == false) {
+    std::string serials_str;
+    Utils::LoadTddConfig(bs_serials_file, serials_str);
+    const auto json_hwconfig = json::parse(serials_str, nullptr, true, true);
+
+    bool cell_found = true;
+    //\todo change this to but indexed output
+    std::string cell_search = "Cell0";
+    size_t cell_number = 0;
+
+    json cell_layout;
+    try {
+      cell_layout = json_hwconfig.at(cell_search);
+    } catch (json::basic_json::out_of_range& e) {
+      cell_found = false;
     }
-  }
-  std::string serial_file = tdd_conf.value("irises", "");
-  ref_ant_ = tdd_conf.value("ref_ant", 0);
-  external_ref_node_ = tdd_conf.value("external_ref_node", false);
-  num_cells_ = tdd_conf.value("cells", 1);
-  channel_ = tdd_conf.value("channel", "A");
-  num_channels_ = std::min(channel_.size(), (size_t)2);
-  bs_ant_num_ = tdd_conf.value("antenna_num", 8);
-  is_ue_ = tdd_conf.value("UE", false);
-  ue_num_ = tdd_conf.value("ue_num", 8);
-  ue_ant_num_ = ue_num_;
-  if (serial_file.empty() == false) {
-    Utils::LoadDevices(serial_file, radio_ids_);
-  }
-  if (radio_ids_.empty() == false) {
-    num_radios_ = radio_ids_.size();
-    num_antennas_ = num_channels_ * num_radios_;
-    if (is_ue_) {
-      ue_ant_num_ = num_antennas_;
-      ue_num_ = num_radios_;
-    } else {
-      if (ref_ant_ >= num_antennas_) {
-        ref_ant_ = 0;
+
+    while (cell_found == true) {
+      std::printf("Cell Layout: %s\n", cell_layout.dump().c_str());
+
+      AgoraRadio::CellParameters& new_cell = cells_.emplace_back();
+      new_cell.id_ = cell_search;
+      AgoraRadio::HubParameters& new_hub = new_cell.hubs_.emplace_back();
+      new_hub.id_ = json_hwconfig.at(cell_search).at("hub");
+
+      std::printf("Hub id: %s\n", new_hub.id_.c_str());
+
+      std::vector<std::string> radio_ids =
+          json_hwconfig.at(cell_search).at("sdr");
+
+      std::cout << "Radio Ids for cell " << cell_number;
+      for (auto& radio : radio_ids) {
+        AgoraRadio::SdrParameters new_sdr;
+        new_sdr.id_ = radio;
+        new_sdr.num_channels_ = num_channels_;
+        new_hub.sdr_.push_back(new_sdr);
+        std::cout << ' ' << radio;
       }
-      if (bs_ant_num_ != num_antennas_) {
-        bs_ant_num_ = num_antennas_;
+      std::cout << std::endl;
+
+      //num_radios_.push_back(radio_ids.size());
+      //num_antennas_.push_back(num_channels_ * radio_ids.size());
+      //radio_ids_.push_back(radio_ids);
+
+      // Append calibration node
+      //if (internal_measurement_ && ref_node_enable_) {
+
+      //if the reference node is internal get it from the .json file
+      // since there is only 1, this code will use the Last one found (overwrite)
+      if (ref_node_.type_ == AgoraRadio::RefNodeType::internal) {
+        std::string reference_node;
+        bool reference_node_found = true;
+        try {
+          reference_node = json_hwconfig.at(cell_search).at("reference_node");
+        } catch (json::basic_json::out_of_range& e) {
+          reference_node_found = false;
+        }
+
+        if (reference_node_found) {
+          std::printf("Found internal reference node %s in cell %zu\n",
+                      reference_node.c_str(), cell_number);
+
+          ref_node_.hub_id_ = new_hub.id_;
+          ref_node_.sdr_.id_ = reference_node;
+        }
       }
+      //\todo verify the reference node is present when enabled / required
+      // for now, there should be only 1.
+
+      //Increment the search cell
+      std::string previous_cell_string = std::to_string(cell_number);
+      cell_number++;
+      std::string current_cell_string = std::to_string(cell_number);
+      cell_search = cell_search.substr(0, cell_search.length() -
+                                              previous_cell_string.length()) +
+                    current_cell_string;
+
+      //Look for next cell
+      std::printf("Searching for cell: %s\n", cell_search.c_str());
+      try {
+        cell_layout = json_hwconfig.at(cell_search);
+      } catch (json::basic_json::out_of_range& e) {
+        cell_found = false;
+      }
+    }  // while (cell_found == true)
+    assert(0);
+  } else /* No radio def file (sim mode) */ {
+    // Generate BS data structure
+    size_t cells = tdd_conf.value("cells", kDefaultBSCells);
+    // bs_ant_num_ (previous)
+    size_t bs_antennas = tdd_conf.value("antenna_num", kDefaultBSAntennas);
+    size_t antennas_per_cell =
+        (bs_antennas / cells) + ((bs_antennas % cells) != 0);
+    size_t sdrs_per_cell = (antennas_per_cell / num_channels_) +
+                           ((antennas_per_cell % num_channels_) != 0);
+
+    size_t added_antennas = 0;
+    for (size_t i = 0u; i < cells; i++) {
+      AgoraRadio::CellParameters& new_cell = cells_.emplace_back();
+      new_cell.id_ = "SimBsCell#" + std::to_string(i);
+      AgoraRadio::HubParameters& new_hub = new_cell.hubs_.emplace_back();
+      new_hub.id_ = "SimBsHub#" + std::to_string(i);
+
+      size_t sdrs_this_cell =
+          std::min(sdrs_per_cell, bs_antennas - added_antennas);
+
+      for (size_t j = 0u; (j < sdrs_this_cell); j++) {
+        AgoraRadio::SdrParameters& new_sdr = new_hub.sdr_.emplace_back();
+        new_sdr.id_ = "SimBsSDR#" + std::to_string(added_antennas);
+        new_sdr.num_channels_ = num_channels_;
+        added_antennas += num_channels_;
+      }
+    }
+
+    RtAssert(
+        added_antennas == bs_antennas,
+        "Added incorrect number of antennas added to basestation definition\n");
+  }
+
+  //Process the UE serial list
+  auto ue_serials_file =
+      tdd_conf.value("ue_serials_file", kDefaultSerialFilename);
+  //use the same channel value as the bs is using
+
+  if (ue_serials_file.empty() == false) {
+    std::string serials_str;
+    Utils::LoadTddConfig(ue_serials_file, serials_str);
+    const auto json_hwconfig = json::parse(serials_str, nullptr, true, true);
+
+    const auto& ue_sdrs = json_hwconfig.at("sdr");
+    for (const auto& ue : ue_sdrs) {
+      AgoraRadio::SdrParameters& new_sdr = users_.emplace_back();
+      new_sdr.id_ = ue;
+      new_sdr.num_channels_ = num_channels_;
     }
   } else {
-    num_radios_ =
-        tdd_conf.value("radio_num", is_ue_ ? ue_ant_num_ : bs_ant_num_);
-  }
-  bf_ant_num_ = bs_ant_num_;
-  if (external_ref_node_ == true) {
-    bf_ant_num_ = bs_ant_num_ - num_channels_;
+    ///\todo Change to ue_total_radios
+    size_t ue_antennas = tdd_conf.value("ue_num", kDefaultUEAntennas);
+    size_t ue_sdrs =
+        (ue_antennas / num_channels_) + ((ue_antennas % num_channels_) != 0);
+
+    size_t added_antennas = 0;
+    for (size_t i = 0u; i < ue_sdrs; i++) {
+      AgoraRadio::SdrParameters& new_sdr = users_.emplace_back();
+      new_sdr.id_ = "SimUeSDR#" + std::to_string(added_antennas);
+      new_sdr.num_channels_ = num_channels_;
+      added_antennas += num_channels_;
+    }
+
+    RtAssert(added_antennas == ue_antennas,
+             "Added incorrect number of antennas added to user equiptment "
+             "definition\n");
   }
 
-  if ((kUseArgos == true) || (kUseUHD == true)) {
-    RtAssert(num_radios_ != 0, "Error: No radios exist in Argos mode");
+  //Calculate Basestation totals cells_
+  size_t bs_total_antennas_ = 0;
+  size_t bs_total_radios_ = 0;
+
+  for (AgoraRadio::CellParameters& cell : cells_) {
+    cell.cell_antennas_ = 0;
+    cell.cell_radios_ = 0;
+    for (const AgoraRadio::HubParameters& hub : cell.hubs_) {
+      for (const AgoraRadio::SdrParameters& sdr : hub.sdr_) {
+        cell.cell_antennas_ += sdr.num_channels_;
+        cell.cell_radios_++;
+        if (kDebugPrintBs) {
+          std::printf("Cell: %s, hub %s, sdr %s has %zu antennas\n",
+                      cell.id_.c_str(), hub.id_.c_str(), sdr.id_.c_str(),
+                      sdr.num_channels_);
+        }
+      }
+    }
+    bs_total_antennas_ += cell.cell_antennas_;
+    bs_total_radios_ += cell.cell_radios_;
   }
 
-  /* radio configurations */
+  //Add the reference node to the total antenna count
+  bs_total_antennas_ += ref_node_.sdr_.num_channels_;
+  bs_total_radios_++;
+  bs_ref_ant_ = tdd_conf.value("ref_ant", kDefaultRefAntenna);
+
+  if (kDebugPrintBs) {
+    std::printf(
+        "Total Basestation cells: %zu, hubs %zu, sdr %zu, antennas %zu\n",
+        cells_.size(), cells_.size(), bs_total_radios_, bs_total_antennas_);
+  }
+
+  RtAssert(bs_total_radios_ != 0,
+           "Error: No bs radios defined, please fix your configuration file");
+
+  //If external reference then set total_bf_antennas_ to last (-1 radio ants)
+  if (ref_node_.type_ == AgoraRadio::RefNodeType::external) {
+    bs_beamforming_ants_ = bs_total_antennas_ - num_channels_;
+  } else {
+    bs_beamforming_ants_ = bs_total_antennas_;
+  }
+
+  //Calculate UE totals based on users_
+  size_t ue_radios = 0;
+  size_t ue_antennas = 0;
+  for (const auto& ue : users_) {
+    ue_antennas += ue.num_channels_;
+    ue_radios++;
+
+    if (kDebugPrintUe) {
+      std::printf("UE[%zu] id %s has %zu antennas\n", ue_radios, ue.id_.c_str(),
+                  ue.num_channels_);
+    }
+  }
+  if (kDebugPrintUe) {
+    std::printf("Total Ue radios: %zu | antennas: %zu\n", ue_radios,
+                ue_antennas);
+  }
+
+  /// Removing configuration parameter radio_num
+  is_ue_ = tdd_conf.value("UE", kDefaultIsUe);
+
+  ue_total_antennas_ = ue_antennas;
+  ue_total_radios_ = ue_radios;
+
+  //If only handling a subset of the total UE antennas,if not set default to 0
+  ue_ant_instance_offset_ = tdd_conf.value("ue_ant_instance_offset", 0);
+  //By default handle all antennas
+  ue_ant_instance_cnt_ =
+      tdd_conf.value("ue_ant_instance_cnt", ue_total_antennas_);
+
+  size_t num_radios = 0;
+  ///\todo Remove these as time allows
+  if (is_ue_ == false) {
+    num_radios = ue_radios;
+  } else {
+    num_radios = bs_total_radios_;
+  }
+
+  // radio configurations
+  //Should we change these per sdr?
   freq_ = tdd_conf.value("frequency", 3.6e9);
   single_gain_ = tdd_conf.value("single_gain", true);
   tx_gain_a_ = tdd_conf.value("tx_gain_a", 20);
@@ -90,19 +311,19 @@ Config::Config(const std::string& jsonfile)
   calib_tx_gain_b_ = tdd_conf.value("calib_tx_gain_b", tx_gain_b_);
   auto gain_adj_json_a = tdd_conf.value("client_gain_adjust_a", json::array());
   if (gain_adj_json_a.empty()) {
-    client_gain_adj_a_.resize(num_radios_, 0);
+    client_gain_adj_a_.resize(num_radios, 0);
   } else {
     RtAssert(
-        gain_adj_json_a.size() == num_radios_,
+        gain_adj_json_a.size() == num_radios,
         "client_gain_adjust_a size must be same as the number of clients!");
     client_gain_adj_a_.assign(gain_adj_json_a.begin(), gain_adj_json_a.end());
   }
   auto gain_adj_json_b = tdd_conf.value("client_gain_adjust_b", json::array());
   if (gain_adj_json_b.empty()) {
-    client_gain_adj_b_.resize(num_radios_, 0);
+    client_gain_adj_b_.resize(num_radios, 0);
   } else {
     RtAssert(
-        gain_adj_json_a.size() == num_radios_,
+        gain_adj_json_a.size() == num_radios,
         "client_gain_adjust_a size must be same as the number of clients!");
     client_gain_adj_b_.assign(gain_adj_json_b.begin(), gain_adj_json_b.end());
   }
@@ -110,6 +331,7 @@ Config::Config(const std::string& jsonfile)
   nco_ = tdd_conf.value("nco_frequency", 0.75 * rate_);
   bw_filter_ = rate_ + 2 * nco_;
   radio_rf_freq_ = freq_ - nco_;
+  //Only for hw mode, verify usage
   beacon_ant_ = tdd_conf.value("beacon_antenna", 0);
   beamsweep_ = tdd_conf.value("beamsweep", false);
   sample_cal_en_ = tdd_conf.value("sample_calibrate", false);
@@ -163,9 +385,9 @@ Config::Config(const std::string& jsonfile)
 
   auto tx_advance = tdd_conf.value("tx_advance", json::array());
   if (tx_advance.empty()) {
-    cl_tx_advance_.resize(num_radios_, 0);
+    cl_tx_advance_.resize(num_radios, 0);
   } else {
-    RtAssert(tx_advance.size() == num_radios_,
+    RtAssert(tx_advance.size() == num_radios,
              "tx_advance size must be same as the number of clients!");
     cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
   }
@@ -184,7 +406,7 @@ Config::Config(const std::string& jsonfile)
         tdd_conf.value("symbol_num_perframe", kDefaultSymbolNumPerFrame);
     size_t pilot_symbol_num_perframe = tdd_conf.value(
         "pilot_num",
-        freq_orthogonal_pilot_ ? kDefaultPilotSymPerFrame : ue_ant_num_);
+        freq_orthogonal_pilot_ ? kDefaultPilotSymPerFrame : ue_total_antennas_);
 
     size_t beacon_symbol_position = tdd_conf.value("beacon_position", SIZE_MAX);
 
@@ -330,22 +552,22 @@ Config::Config(const std::string& jsonfile)
            "Number of Downlink calibration symbols per frame must be "
            "multiplier of number of channels!");
   ant_group_num_ =
-      frame_.IsRecCalEnabled() ? (bf_ant_num_ / ant_per_group_) : 0;
+      frame_.IsRecCalEnabled() ? (bs_beamforming_ants_ / ant_per_group_) : 0;
 
   if ((is_ue_ == true) && (freq_orthogonal_pilot_ == false) &&
-      (ue_ant_num_ != frame_.NumPilotSyms())) {
-    RtAssert(
-        false,
-        "Number of pilot symbols: " + std::to_string(frame_.NumPilotSyms()) +
-            " does not match number of UEs: " + std::to_string(ue_ant_num_));
+      (ue_total_antennas_ != frame_.NumPilotSyms())) {
+    RtAssert(false, "Number of pilot symbols: " +
+                        std::to_string(frame_.NumPilotSyms()) +
+                        " does not match number of UEs: " +
+                        std::to_string(ue_total_antennas_));
   }
-  if ((is_ue_ == false) && (freq_orthogonal_pilot_ == false) &&
-      (tdd_conf.find("ue_num") == tdd_conf.end())) {
-    ue_num_ = frame_.NumPilotSyms();
-    ue_ant_num_ = ue_num_;
-  }
-  ue_ant_offset_ = tdd_conf.value("ue_ant_offset", 0);
-  ue_ant_total_ = tdd_conf.value("ue_ant_total", ue_ant_num_);
+
+  //Infer the UE number based on the frame construction
+  //if ((is_ue_ == false) && (freq_orthogonal_pilot_ == false) &&
+  //    (tdd_conf.find("ue_num") == tdd_conf.end())) {
+  //  ue_num_ = frame_.NumPilotSyms();
+  //  ue_total_antennas_ = ue_num_;
+  //}
 
   // Agora configurations
   frames_to_test_ = tdd_conf.value("frames_to_test", 9600);
@@ -368,8 +590,8 @@ Config::Config(const std::string& jsonfile)
   demul_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / demul_block_size_;
 
   zf_batch_size_ = tdd_conf.value("zf_batch_size", 1);
-  zf_block_size_ =
-      freq_orthogonal_pilot_ ? ue_ant_num_ : tdd_conf.value("zf_block_size", 1);
+  zf_block_size_ = freq_orthogonal_pilot_ ? ue_total_antennas_
+                                          : tdd_conf.value("zf_block_size", 1);
   zf_events_per_symbol_ = 1 + (ofdm_data_num_ - 1) / zf_block_size_;
 
   fft_block_size_ = tdd_conf.value("fft_block_size", 1);
@@ -460,9 +682,9 @@ Config::Config(const std::string& jsonfile)
       "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
       "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
       "frame time %.3f usec\n",
-      bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
-      frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
-      ldpc_config_.NumBlocksInSymbol(), num_bytes_per_cb_,
+      bs_total_antennas_, ue_total_antennas_, frame_.NumPilotSyms(),
+      frame_.NumULSyms(), frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_,
+      modulation_.c_str(), ldpc_config_.NumBlocksInSymbol(), num_bytes_per_cb_,
       ul_mac_data_bytes_num_perframe_, ul_mac_bytes_num_perframe_,
       dl_mac_data_bytes_num_perframe_, dl_mac_bytes_num_perframe_,
       this->GetFrameDurationSec() * 1e6);
@@ -553,20 +775,24 @@ void Config::GenData() {
   CommsLib::IFFT(pilot_ifft, this->ofdm_ca_num_, false);
 
   // Generate UE-specific pilots based on Zadoff-Chu sequence for phase tracking
-  this->ue_specific_pilot_.Malloc(this->ue_ant_num_, this->ofdm_data_num_,
+  this->ue_specific_pilot_.Malloc(this->ue_total_antennas_,
+                                  this->ofdm_data_num_,
                                   Agora_memory::Alignment_t::kAlign64);
-  this->ue_specific_pilot_t_.Calloc(this->ue_ant_num_, this->samps_per_symbol_,
+  this->ue_specific_pilot_t_.Calloc(this->ue_total_antennas_,
+                                    this->samps_per_symbol_,
                                     Agora_memory::Alignment_t::kAlign64);
 
   Table<complex_float> ue_pilot_ifft;
-  ue_pilot_ifft.Calloc(this->ue_ant_num_, this->ofdm_ca_num_,
+  ue_pilot_ifft.Calloc(this->ue_total_antennas_, this->ofdm_ca_num_,
                        Agora_memory::Alignment_t::kAlign64);
   auto zc_ue_pilot_double =
       CommsLib::GetSequence(this->ofdm_data_num_, CommsLib::kLteZadoffChu);
   auto zc_ue_pilot = Utils::DoubleToCfloat(zc_ue_pilot_double);
-  for (size_t i = 0; i < ue_ant_num_; i++) {
+  ///\todo inspect, uses instance offset and not instanct cnt
+  for (size_t i = 0; i < ue_total_antennas_; i++) {
     auto zc_ue_pilot_i = CommsLib::SeqCyclicShift(
-        zc_ue_pilot, (i + this->ue_ant_offset_) * (float)M_PI / 6);  // LTE DMRS
+        zc_ue_pilot,
+        (i + this->ue_ant_instance_offset_) * (float)M_PI / 6);  // LTE DMRS
     for (size_t j = 0; j < this->ofdm_data_num_; j++) {
       this->ue_specific_pilot_[i][j] = {zc_ue_pilot_i[j].real(),
                                         zc_ue_pilot_i[j].imag()};
@@ -580,28 +806,28 @@ void Config::GenData() {
   size_t num_bytes_per_ue_pad = Roundup<64>(this->num_bytes_per_cb_) *
                                 this->ldpc_config_.NumBlocksInSymbol();
   dl_bits_.Malloc(this->frame_.NumDLSyms(),
-                  num_bytes_per_ue_pad * this->ue_ant_num_,
+                  num_bytes_per_ue_pad * this->ue_total_antennas_,
                   Agora_memory::Alignment_t::kAlign64);
-  dl_iq_f_.Calloc(this->frame_.NumDLSyms(), ofdm_ca_num_ * ue_ant_num_,
+  dl_iq_f_.Calloc(this->frame_.NumDLSyms(), ofdm_ca_num_ * ue_total_antennas_,
                   Agora_memory::Alignment_t::kAlign64);
   dl_iq_t_.Calloc(this->frame_.NumDLSyms(),
-                  this->samps_per_symbol_ * this->ue_ant_num_,
+                  this->samps_per_symbol_ * this->ue_total_antennas_,
                   Agora_memory::Alignment_t::kAlign64);
 
   ul_bits_.Malloc(this->frame_.NumULSyms(),
-                  num_bytes_per_ue_pad * this->ue_ant_num_,
+                  num_bytes_per_ue_pad * this->ue_total_antennas_,
                   Agora_memory::Alignment_t::kAlign64);
   ul_iq_f_.Calloc(this->frame_.NumULSyms(),
-                  this->ofdm_ca_num_ * this->ue_ant_num_,
+                  this->ofdm_ca_num_ * this->ue_total_antennas_,
                   Agora_memory::Alignment_t::kAlign64);
   ul_iq_t_.Calloc(this->frame_.NumULSyms(),
-                  this->samps_per_symbol_ * this->ue_ant_num_,
+                  this->samps_per_symbol_ * this->ue_total_antennas_,
                   Agora_memory::Alignment_t::kAlign64);
 
 #ifdef GENERATE_DATA
-  for (size_t ue_id = 0; ue_id < this->ue_ant_num_; ue_id++) {
+  for (size_t ue_id = 0; ue_id < this->ue_total_antennas_; ue_id++) {
     for (size_t j = 0; j < num_bytes_per_ue_pad; j++) {
-      int cur_offset = j * ue_ant_num_ + ue_id;
+      int cur_offset = j * ue_total_antennas_ + ue_id;
       for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
         this->ul_bits_[i][cur_offset] = rand() % mod_order;
       }
@@ -615,7 +841,8 @@ void Config::GenData() {
   if (this->frame_.NumUlDataSyms() > 0) {
     std::string ul_data_file = cur_directory + "/data/LDPC_orig_ul_data_" +
                                std::to_string(this->ofdm_ca_num_) + "_ant" +
-                               std::to_string(this->ue_ant_total_) + ".bin";
+                               std::to_string(this->ue_total_antennas_) +
+                               ".bin";
     MLPD_SYMBOL("Config: Reading raw ul data from %s\n", ul_data_file.c_str());
     FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
     if (fd == nullptr) {
@@ -626,14 +853,15 @@ void Config::GenData() {
 
     for (size_t i = this->frame_.ClientUlPilotSymbols();
          i < this->frame_.NumULSyms(); i++) {
-      if (std::fseek(fd, (data_bytes_num_persymbol_ * this->ue_ant_offset_),
-                     SEEK_CUR) != 0) {
+      if (std::fseek(
+              fd, (data_bytes_num_persymbol_ * this->ue_ant_instance_offset_),
+              SEEK_CUR) != 0) {
         MLPD_ERROR(" *** Error: failed to seek propertly (pre) into %s file\n",
                    ul_data_file.c_str());
         RtAssert(false,
                  "Failed to seek propertly into " + ul_data_file + "file\n");
       }
-      for (size_t j = 0; j < this->ue_ant_num_; j++) {
+      for (size_t j = 0; j < this->ue_total_antennas_; j++) {
         size_t r = std::fread(this->ul_bits_[i] + (j * num_bytes_per_ue_pad),
                               sizeof(int8_t), data_bytes_num_persymbol_, fd);
         if (r < data_bytes_num_persymbol_) {
@@ -643,11 +871,12 @@ void Config::GenData() {
               ul_data_file.c_str(), i, j, r, data_bytes_num_persymbol_);
         }
       }
-      if (std::fseek(fd,
-                     data_bytes_num_persymbol_ *
-                         (this->ue_ant_total_ - this->ue_ant_offset_ -
-                          this->ue_ant_num_),
-                     SEEK_CUR) != 0) {
+      if (std::fseek(
+              fd,
+              data_bytes_num_persymbol_ *
+                  (this->ue_total_antennas_ - this->ue_ant_instance_offset_ -
+                   this->ue_ant_instance_cnt_),
+              SEEK_CUR) != 0) {
         MLPD_ERROR(" *** Error: failed to seek propertly (post) into %s file\n",
                    ul_data_file.c_str());
         RtAssert(false,
@@ -660,7 +889,8 @@ void Config::GenData() {
   if (this->frame_.NumDlDataSyms() > 0) {
     std::string dl_data_file = cur_directory + "/data/LDPC_orig_dl_data_" +
                                std::to_string(this->ofdm_ca_num_) + "_ant" +
-                               std::to_string(this->ue_ant_total_) + ".bin";
+                               std::to_string(this->ue_total_antennas_) +
+                               ".bin";
 
     MLPD_SYMBOL("Config: Reading raw dl data from %s\n", dl_data_file.c_str());
     FILE* fd = std::fopen(dl_data_file.c_str(), "rb");
@@ -672,7 +902,7 @@ void Config::GenData() {
 
     for (size_t i = this->frame_.ClientDlPilotSymbols();
          i < this->frame_.NumDLSyms(); i++) {
-      for (size_t j = 0; j < this->ue_ant_num_; j++) {
+      for (size_t j = 0; j < this->ue_total_antennas_; j++) {
         size_t r = std::fread(this->dl_bits_[i] + j * num_bytes_per_ue_pad,
                               sizeof(int8_t), data_bytes_num_persymbol_, fd);
         if (r < data_bytes_num_persymbol_) {
@@ -691,7 +921,7 @@ void Config::GenData() {
   const size_t encoded_bytes_per_block =
       BitsToBytes(this->ldpc_config_.NumCbCodewLen());
   const size_t num_blocks_per_symbol =
-      this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
+      this->ldpc_config_.NumBlocksInSymbol() * this->ue_total_antennas_;
 
   // Used as an input ptr to
   auto* scramble_buffer =
@@ -704,13 +934,13 @@ void Config::GenData() {
                           encoded_bytes_per_block,
                           Agora_memory::Alignment_t::kAlign64);
   ul_mod_input_.Calloc(this->frame_.NumULSyms(),
-                       this->ofdm_data_num_ * this->ue_ant_num_,
+                       this->ofdm_data_num_ * this->ue_total_antennas_,
                        Agora_memory::Alignment_t::kAlign32);
   auto* temp_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
       this->ldpc_config_.BaseGraph(), this->ldpc_config_.ExpansionFactor())];
 
   for (size_t i = 0; i < frame_.NumULSyms(); i++) {
-    for (size_t j = 0; j < ue_ant_num_; j++) {
+    for (size_t j = 0; j < ue_total_antennas_; j++) {
       for (size_t k = 0; k < ldpc_config_.NumBlocksInSymbol(); k++) {
         int8_t* coded_bits_ptr =
             ul_encoded_bits_[i * num_blocks_per_symbol +
@@ -739,10 +969,10 @@ void Config::GenData() {
   // Generate freq-domain uplink symbols
   Table<complex_float> ul_iq_ifft;
   ul_iq_ifft.Calloc(this->frame_.NumULSyms(),
-                    this->ofdm_ca_num_ * this->ue_ant_num_,
+                    this->ofdm_ca_num_ * this->ue_total_antennas_,
                     Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-    for (size_t u = 0; u < this->ue_ant_num_; u++) {
+    for (size_t u = 0; u < this->ue_total_antennas_; u++) {
       size_t p = u * this->ofdm_data_num_;
       size_t q = u * this->ofdm_ca_num_;
 
@@ -761,11 +991,12 @@ void Config::GenData() {
   dl_encoded_bits.Malloc(this->frame_.NumDLSyms() * num_blocks_per_symbol,
                          encoded_bytes_per_block,
                          Agora_memory::Alignment_t::kAlign64);
-  dl_mod_input_.Calloc(this->frame_.NumDLSyms(), ofdm_data_num_ * ue_ant_num_,
+  dl_mod_input_.Calloc(this->frame_.NumDLSyms(),
+                       ofdm_data_num_ * ue_total_antennas_,
                        Agora_memory::Alignment_t::kAlign32);
 
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-    for (size_t j = 0; j < this->ue_ant_num_; j++) {
+    for (size_t j = 0; j < this->ue_total_antennas_; j++) {
       for (size_t k = 0; k < ldpc_config_.NumBlocksInSymbol(); k++) {
         int8_t* coded_bits_ptr =
             dl_encoded_bits[i * num_blocks_per_symbol +
@@ -793,10 +1024,10 @@ void Config::GenData() {
 
   // Generate freq-domain downlink symbols
   Table<complex_float> dl_iq_ifft;
-  dl_iq_ifft.Calloc(this->frame_.NumDLSyms(), ofdm_ca_num_ * ue_ant_num_,
+  dl_iq_ifft.Calloc(this->frame_.NumDLSyms(), ofdm_ca_num_ * ue_total_antennas_,
                     Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-    for (size_t u = 0; u < ue_ant_num_; u++) {
+    for (size_t u = 0; u < ue_total_antennas_; u++) {
       size_t p = u * ofdm_data_num_;
       size_t q = u * ofdm_ca_num_;
 
@@ -815,15 +1046,16 @@ void Config::GenData() {
   }
 
   // Find normalization factor through searching for max value in IFFT results
-  float max_val = CommsLib::FindMaxAbs(ul_iq_ifft, this->frame_.NumULSyms(),
-                                       this->ue_ant_num_ * this->ofdm_ca_num_);
+  float max_val =
+      CommsLib::FindMaxAbs(ul_iq_ifft, this->frame_.NumULSyms(),
+                           this->ue_total_antennas_ * this->ofdm_ca_num_);
   float cur_max_val =
       CommsLib::FindMaxAbs(dl_iq_ifft, this->frame_.NumDLSyms(),
-                           this->ue_ant_num_ * this->ofdm_ca_num_);
+                           this->ue_total_antennas_ * this->ofdm_ca_num_);
   if (cur_max_val > max_val) {
     max_val = cur_max_val;
   }
-  cur_max_val = CommsLib::FindMaxAbs(ue_pilot_ifft, this->ue_ant_num_,
+  cur_max_val = CommsLib::FindMaxAbs(ue_pilot_ifft, this->ue_total_antennas_,
                                      this->ofdm_ca_num_);
   if (cur_max_val > max_val) {
     max_val = cur_max_val;
@@ -837,7 +1069,7 @@ void Config::GenData() {
 
   // Generate time domain symbols for downlink
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
-    for (size_t u = 0; u < this->ue_ant_num_; u++) {
+    for (size_t u = 0; u < this->ue_total_antennas_; u++) {
       size_t q = u * this->ofdm_ca_num_;
       size_t r = u * this->samps_per_symbol_;
       CommsLib::Ifft2tx(&dl_iq_ifft[i][q], &this->dl_iq_t_[i][r],
@@ -848,7 +1080,7 @@ void Config::GenData() {
 
   // Generate time domain uplink symbols
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
-    for (size_t u = 0; u < this->ue_ant_num_; u++) {
+    for (size_t u = 0; u < this->ue_total_antennas_; u++) {
       size_t q = u * this->ofdm_ca_num_;
       size_t r = u * this->samps_per_symbol_;
       CommsLib::Ifft2tx(&ul_iq_ifft[i][q], &ul_iq_t_[i][r], this->ofdm_ca_num_,
@@ -858,7 +1090,7 @@ void Config::GenData() {
   }
 
   // Generate time domain ue-specific pilot symbols
-  for (size_t i = 0; i < this->ue_ant_num_; i++) {
+  for (size_t i = 0; i < this->ue_total_antennas_; i++) {
     CommsLib::Ifft2tx(ue_pilot_ifft[i], this->ue_specific_pilot_t_[i],
                       this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
                       this->cp_len_, this->scale_);
@@ -902,7 +1134,7 @@ void Config::GenData() {
   }
 
   if (kDebugPrintPilot) {
-    for (size_t ue_id = 0; ue_id < ue_ant_num_; ue_id++) {
+    for (size_t ue_id = 0; ue_id < ue_total_antennas_; ue_id++) {
       std::cout << "UE" << ue_id << "_pilot_data =[" << std::endl;
       for (size_t i = 0; i < ofdm_data_num_; i++) {
         std::cout << ue_specific_pilot_[ue_id][i].re << "+1i*"

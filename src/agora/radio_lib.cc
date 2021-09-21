@@ -17,17 +17,30 @@ RadioConfig::RadioConfig(Config* cfg)
   auto channels = Utils::StrToChannels(cfg_->Channel());
 
   this->radio_num_ = cfg_->NumRadios();
-  this->antenna_num_ = radio_num_ * cfg_->NumChannels();
+  this->antenna_num_ = cfg_->NumAntennas();
   std::cout << "Radio num is " << this->radio_num_
             << " Antenna num: " << antenna_num_ << std::endl;
   if (cfg_->IsUe() == true) {
     throw std::invalid_argument("Bad config! Not a UE!");
   }
-  if ((kUseUHD == false) && (cfg_->HubIds().empty() == false)) {
-    args["driver"] = "remote";
-    args["timeout"] = "1000000";
-    args["serial"] = cfg_->HubIds().at(0);
-    hubs_.push_back(SoapySDR::Device::make(args));
+
+  //For each valid hub id, add to list
+  const auto& hw_def = cfg_->CellDefs();
+
+  for (const auto& cell : hw_def) {
+    for (const auto& hub : cell.hubs_) {
+      if (kUseArgos) {
+        args["driver"] = "remote";
+        args["timeout"] = "1000000";
+        args["serial"] = hub.id_;
+        hubs_.push_back(SoapySDR::Device::make(args));
+      }
+
+      //Build radio id array for existing logic to work
+      for (const auto& sdr : hub.sdr_) {
+        radio_ids_.emplace_back(sdr.id_);
+      }
+    }
   }
 
   ba_stn_.resize(radio_num_);
@@ -102,7 +115,7 @@ RadioConfig::RadioConfig(Config* cfg)
   }
 
   for (size_t i = 0; i < this->radio_num_; i++) {
-    std::cout << cfg_->RadioIds().at(i) << ": Front end "
+    std::cout << radio_ids_.at(i) << ": Front end "
               << ba_stn_[i]->getHardwareInfo()["frontend"] << std::endl;
     for (auto c : channels) {
       if (c < ba_stn_[i]->getNumChannels(SOAPY_SDR_RX)) {
@@ -113,7 +126,7 @@ RadioConfig::RadioConfig(Config* cfg)
                     (ba_stn_[i]->getFrequency(SOAPY_SDR_RX, c) / 1e9));
         std::printf("Actual RX gain: %f...\n",
                     (ba_stn_[i]->getGain(SOAPY_SDR_RX, c)));
-        if (!kUseUHD) {
+        if (kUseArgos) {
           std::printf("Actual RX LNA gain: %f...\n",
                       (ba_stn_[i]->getGain(SOAPY_SDR_RX, c, "LNA")));
           std::printf("Actual RX PGA gain: %f...\n",
@@ -168,14 +181,15 @@ RadioConfig::RadioConfig(Config* cfg)
     std::cout << std::endl;
   }
 
-  if (!kUseUHD) {
+  if (kUseArgos) {
     if (hubs_.empty()) {
       ba_stn_[0]->writeSetting("SYNC_DELAYS", "");
     } else {
-      hubs_[0]->writeSetting("SYNC_DELAYS", "");
+      for (const auto& hub : hubs_) {
+        hub->writeSetting("SYNC_DELAYS", "");
+      }
     }
   }
-
   std::cout << "radio init done!" << std::endl;
 }
 
@@ -185,12 +199,12 @@ void RadioConfig::InitBsRadio(size_t tid) {
   SoapySDR::Kwargs args;
   SoapySDR::Kwargs sargs;
   args["timeout"] = "1000000";
-  if (!kUseUHD) {
+  if (kUseArgos) {
     args["driver"] = "iris";
-    args["serial"] = cfg_->RadioIds().at(i);
+    args["serial"] = radio_ids_.at(i);
   } else {
     args["driver"] = "uhd";
-    args["addr"] = cfg_->RadioIds().at(i);
+    args["addr"] = radio_ids_.at(i);
   }
   ba_stn_[i] = SoapySDR::Device::make(args);
   for (auto ch : {0, 1}) {
@@ -487,13 +501,15 @@ bool RadioConfig::RadioStart() {
 }
 
 void RadioConfig::Go() {
-  if (!kUseUHD) {
+  if (kUseArgos) {
     if (hubs_.empty()) {
       // std::cout << "triggering first Iris ..." << std::endl;
       ba_stn_[0]->writeSetting("TRIGGER_GEN", "");
     } else {
       // std::cout << "triggering Hub ..." << std::endl;
-      hubs_[0]->writeSetting("TRIGGER_GEN", "");
+      for (const auto& hub : hubs_) {
+        hub->writeSetting("TRIGGER_GEN", "");
+      }
     }
   }
 }

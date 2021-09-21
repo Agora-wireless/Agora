@@ -176,7 +176,7 @@ void UeWorker::DoFftData(size_t tag) {
   size_t total_dl_symbol_id =
       (frame_slot * config_.Frame().NumDLSyms()) + dl_symbol_id;
   size_t fft_buffer_target_id =
-      (total_dl_symbol_id * config_.UeAntNum()) + ant_id;
+      (total_dl_symbol_id * config_.UeAntInstancCnt()) + ant_id;
 
   // transfer ushort to float
   size_t delay_offset = (sig_offset + config_.CpLen()) * 2;
@@ -188,7 +188,7 @@ void UeWorker::DoFftData(size_t tag) {
   // perform fft
   DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
-  size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
+  size_t csi_offset = frame_slot * config_.UeAntInstancCnt() + ant_id;
   auto* csi_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(csi_buffer_.at(csi_offset).data());
   auto* fft_buffer_ptr =
@@ -199,7 +199,7 @@ void UeWorker::DoFftData(size_t tag) {
       (frame_slot * dl_data_symbol_perframe) +
       (dl_symbol_id - config_.Frame().ClientDlPilotSymbols());
   size_t eq_buffer_offset =
-      total_dl_data_symbol_id * config_.UeAntNum() + ant_id;
+      total_dl_data_symbol_id * config_.UeAntInstancCnt() + ant_id;
 
   auto* equ_buffer_ptr = reinterpret_cast<arma::cx_float*>(
       equal_buffer_.at(eq_buffer_offset).data());
@@ -332,7 +332,7 @@ void UeWorker::DoFftPilot(size_t tag) {
   size_t total_dl_symbol_id =
       (frame_slot * config_.Frame().NumDLSyms()) + dl_symbol_id;
   size_t fft_buffer_target_id =
-      (total_dl_symbol_id * config_.UeAntNum()) + ant_id;
+      (total_dl_symbol_id * config_.UeAntInstancCnt()) + ant_id;
 
   // transfer ushort to float
   size_t delay_offset = (sig_offset + config_.CpLen()) * 2;
@@ -344,7 +344,7 @@ void UeWorker::DoFftPilot(size_t tag) {
   // perform fft
   DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
 
-  size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
+  size_t csi_offset = frame_slot * config_.UeAntInstancCnt() + ant_id;
   auto* csi_buffer_ptr =
       reinterpret_cast<arma::cx_float*>(csi_buffer_.at(csi_offset).data());
   auto* fft_buffer_ptr =
@@ -397,7 +397,7 @@ void UeWorker::DoDemul(size_t tag) {
   size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe +
                               dl_symbol_id -
                               config_.Frame().ClientDlPilotSymbols();
-  size_t offset = total_dl_symbol_id * config_.UeAntNum() + ant_id;
+  size_t offset = total_dl_symbol_id * config_.UeAntInstancCnt() + ant_id;
   auto* equal_ptr = reinterpret_cast<float*>(&equal_buffer_[offset][0]);
 
   const size_t base_sc_id = 0;
@@ -575,7 +575,8 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
         source_data =
             &modul_buffer_[total_ul_symbol_id][ant_id * config_.OfdmDataNum()];
       }
-      size_t buff_offset = (total_ul_symbol_id * config_.UeAntNum()) + ant_id;
+      size_t buff_offset =
+          (total_ul_symbol_id * config_.UeAntInstancCnt()) + ant_id;
       complex_float* dest_loc =
           ifft_buffer_[buff_offset] + (config_.OfdmDataStart());
       std::memcpy(dest_loc, source_data,
@@ -612,7 +613,8 @@ void UeWorker::DoIfft(size_t tag) {
     size_t ul_symbol_id = config_.Frame().GetULSymbolIdx(symbol_id);
     size_t ant_id = user_id * config_.NumChannels() + ch;
     size_t total_ul_symbol_id = frame_slot * ul_symbol_perframe + ul_symbol_id;
-    size_t buff_offset = total_ul_symbol_id * config_.UeAntNum() + ant_id;
+    size_t buff_offset =
+        total_ul_symbol_id * config_.UeAntInstancCnt() + ant_id;
     complex_float* ifft_buff = ifft_buffer_[buff_offset];
 
     std::memset(ifft_buff, 0, sizeof(complex_float) * config_.OfdmDataStart());

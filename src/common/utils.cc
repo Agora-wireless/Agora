@@ -217,13 +217,10 @@ void Utils::LoadDevices(std::string filename, std::vector<std::string>& data) {
   std::ifstream myfile(filename, std::ifstream::in);
   if (myfile.is_open()) {
     while (getline(myfile, line)) {
-      // line.erase( std::remove (line.begin(), line.end(), ' '),
-      // line.end());
-      if (line.at(0) == '#') {
-        continue;
+      if (line.at(0) != '#') {
+        data.push_back(line);
+        std::cout << line << '\n';
       }
-      data.push_back(line);
-      std::cout << line << '\n';
     }
     myfile.close();
   }

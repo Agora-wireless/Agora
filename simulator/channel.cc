@@ -15,7 +15,7 @@ Channel::Channel(const Config* const config_bs, const Config* const config_ue,
       sim_chan_model_(std::move(in_channel_type)),
       channel_snr_db_(in_channel_snr) {
   bs_ant_ = bscfg_->BsAntNum();
-  ue_ant_ = uecfg_->UeAntNum();
+  ue_ant_ = uecfg_->UeAntTotal();
   n_samps_ = bscfg_->SampsPerSymbol();
 
   if (sim_chan_model_ == "AWGN") {
@@ -115,8 +115,8 @@ void Channel::Awgn(const arma::cx_fmat& src, arma::cx_fmat& dst) const {
 void Channel::Lte3gpp(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst) {
   // TODO - In progress (Use Rayleigh for now...)
   arma::cx_fmat h(
-      arma::randn<arma::fmat>(uecfg_->UeAntNum(), bscfg_->BsAntNum()),
-      arma::randn<arma::fmat>(uecfg_->UeAntNum(), bscfg_->BsAntNum()));
+      arma::randn<arma::fmat>(uecfg_->UeAntTotal(), bscfg_->BsAntNum()),
+      arma::randn<arma::fmat>(uecfg_->UeAntTotal(), bscfg_->BsAntNum()));
   h = (1 / sqrt(2)) * h;
   fmat_dst = fmat_src * h;
 }

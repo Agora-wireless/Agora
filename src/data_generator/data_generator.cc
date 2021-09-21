@@ -54,9 +54,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   std::vector<std::vector<complex_float>> pre_ifft_data_syms;
   const size_t num_ul_mac_bytes = this->cfg_->UlMacBytesNumPerframe();
   if (num_ul_mac_bytes > 0) {
-    std::vector<std::vector<int8_t>> ul_mac_info(cfg_->UeAntNum());
+    std::vector<std::vector<int8_t>> ul_mac_info(cfg_->UeAntTotal());
     MLPD_INFO("Total number of uplink MAC bytes: %zu\n", num_ul_mac_bytes);
-    for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
+    for (size_t ue_id = 0; ue_id < cfg_->UeAntTotal(); ue_id++) {
       ul_mac_info.at(ue_id).resize(num_ul_mac_bytes);
       for (size_t pkt_id = 0; pkt_id < cfg_->UlMacPacketsPerframe(); pkt_id++) {
         size_t pkt_offset = pkt_id * cfg_->MacPacketLength();
@@ -83,10 +83,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       const std::string filename_input =
           directory + "/data/orig_ul_data_" +
           std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
-          std::to_string(this->cfg_->UeAntNum()) + ".bin";
+          std::to_string(this->cfg_->UeAntTotal()) + ".bin";
       MLPD_INFO("Saving uplink MAC data to %s\n", filename_input.c_str());
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
-      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+      for (size_t i = 0; i < cfg_->UeAntTotal(); i++) {
         std::fwrite(reinterpret_cast<uint8_t*>(ul_mac_info.at(i).data()),
                     num_ul_mac_bytes, sizeof(uint8_t), fp_input);
       }
@@ -94,8 +94,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
       if (kPrintUplinkInformationBytes) {
         std::printf("Uplink information bytes\n");
-        for (size_t n = 0; n < cfg_->UeAntNum(); n++) {
-          std::printf("UE %zu\n", n % this->cfg_->UeAntNum());
+        for (size_t n = 0; n < cfg_->UeAntTotal(); n++) {
+          std::printf("UE %zu\n", n % this->cfg_->UeAntTotal());
           for (size_t i = 0; i < num_ul_mac_bytes; i++) {
             std::printf("%u ", static_cast<uint8_t>(ul_mac_info.at(n).at(i)));
           }
@@ -105,7 +105,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     }
 
     const size_t symbol_blocks =
-        this->cfg_->LdpcConfig().NumBlocksInSymbol() * this->cfg_->UeAntNum();
+        this->cfg_->LdpcConfig().NumBlocksInSymbol() * this->cfg_->UeAntTotal();
     const size_t num_ul_codeblocks =
         this->cfg_->Frame().NumUlDataSyms() * symbol_blocks;
     MLPD_SYMBOL("Total number of ul blocks: %zu\n", num_ul_codeblocks);
@@ -145,7 +145,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       const std::string filename_input =
           directory + "/data/LDPC_orig_ul_data_" +
           std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
-          std::to_string(this->cfg_->UeAntNum()) + ".bin";
+          std::to_string(this->cfg_->UeAntTotal()) + ".bin";
       MLPD_INFO("Saving raw uplink data (using LDPC) to %s\n",
                 filename_input.c_str());
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
@@ -158,8 +158,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       if (kPrintUplinkInformationBytes) {
         std::printf("Uplink information bytes\n");
         for (size_t n = 0; n < num_ul_codeblocks; n++) {
-          std::printf("Symbol %zu, UE %zu\n", n / this->cfg_->UeAntNum(),
-                      n % this->cfg_->UeAntNum());
+          std::printf("Symbol %zu, UE %zu\n", n / this->cfg_->UeAntTotal(),
+                      n % this->cfg_->UeAntTotal());
           for (size_t i = 0; i < input_size; i++) {
             std::printf("%u ",
                         static_cast<uint8_t>(ul_information.at(n).at(i)));
@@ -180,7 +180,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     // Place modulated uplink data codewords into central IFFT bins
     RtAssert(this->cfg_->LdpcConfig().NumBlocksInSymbol() ==
              1);  // TODO: Assumption
-    pre_ifft_data_syms.resize(this->cfg_->UeAntNum() *
+    pre_ifft_data_syms.resize(this->cfg_->UeAntTotal() *
                               this->cfg_->Frame().NumUlDataSyms());
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
       pre_ifft_data_syms.at(i) = this->BinForIfft(ul_modulated_codewords.at(i));
@@ -194,9 +194,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                                                   CommsLib::kLteZadoffChu));
   const std::vector<std::complex<float>> zc_common_pilot =
       CommsLib::SeqCyclicShift(zc_seq, M_PI / 4.0);  // Used in LTE SRS
-  ue_specific_pilot.Malloc(this->cfg_->UeAntNum(), this->cfg_->OfdmDataNum(),
+  ue_specific_pilot.Malloc(this->cfg_->UeAntTotal(), this->cfg_->OfdmDataNum(),
                            Agora_memory::Alignment_t::kAlign64);
-  for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
+  for (size_t i = 0; i < this->cfg_->UeAntTotal(); i++) {
     auto zc_ue_pilot_i =
         CommsLib::SeqCyclicShift(zc_seq, i * M_PI / 6.0);  // LTE DMRS
     for (size_t j = 0; j < this->cfg_->OfdmDataNum(); j++) {
@@ -211,16 +211,16 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   // Put pilot and data symbols together
   Table<complex_float> tx_data_all_symbols;
   tx_data_all_symbols.Calloc(this->cfg_->Frame().NumTotalSyms(),
-                             this->cfg_->UeAntNum() * this->cfg_->OfdmCaNum(),
+                             this->cfg_->UeAntTotal() * this->cfg_->OfdmCaNum(),
                              Agora_memory::Alignment_t::kAlign64);
 
   if (this->cfg_->FreqOrthogonalPilot() == true) {
-    for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
+    for (size_t i = 0; i < this->cfg_->UeAntTotal(); i++) {
       std::vector<complex_float> pilots_t_ue(
           this->cfg_->OfdmCaNum());  // Zeroed
       for (size_t j = this->cfg_->OfdmDataStart();
            j < this->cfg_->OfdmDataStart() + this->cfg_->OfdmDataNum();
-           j += this->cfg_->UeAntNum()) {
+           j += this->cfg_->UeAntTotal()) {
         pilots_t_ue.at(i + j) = pilot_td.at(i + j);
       }
       // Load pilots
@@ -230,7 +230,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                   (this->cfg_->OfdmCaNum() * sizeof(complex_float)));
     }
   } else {
-    for (size_t i = 0; i < this->cfg_->UeAntNum(); i++) {
+    for (size_t i = 0; i < this->cfg_->UeAntTotal(); i++) {
       std::memcpy(tx_data_all_symbols[i + this->cfg_->Frame().NumBeaconSyms()] +
                       i * this->cfg_->OfdmCaNum(),
                   &pilot_td.at(0),
@@ -241,7 +241,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   // Populate the UL symbols
   for (size_t i = 0; i < this->cfg_->Frame().NumULSyms(); i++) {
     const size_t data_sym_id = this->cfg_->Frame().GetULSymbol(i);
-    for (size_t j = 0; j < this->cfg_->UeAntNum(); j++) {
+    for (size_t j = 0; j < this->cfg_->UeAntTotal(); j++) {
       if (i < this->cfg_->Frame().ClientUlPilotSymbols()) {
         std::memcpy(tx_data_all_symbols[data_sym_id] +
                         (j * this->cfg_->OfdmCaNum()) +
@@ -252,7 +252,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         size_t k = i - this->cfg_->Frame().ClientUlPilotSymbols();
         std::memcpy(
             tx_data_all_symbols[data_sym_id] + (j * this->cfg_->OfdmCaNum()),
-            &pre_ifft_data_syms.at(k * this->cfg_->UeAntNum() + j).at(0),
+            &pre_ifft_data_syms.at(k * this->cfg_->UeAntTotal() + j).at(0),
             this->cfg_->OfdmCaNum() * sizeof(complex_float));
       }
     }
@@ -262,9 +262,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   Table<complex_float> csi_matrices;
   float sqrt2_norm = 1 / std::sqrt(2);
   csi_matrices.Calloc(this->cfg_->OfdmCaNum(),
-                      this->cfg_->UeAntNum() * this->cfg_->BsAntNum(),
+                      this->cfg_->UeAntTotal() * this->cfg_->BsAntNum(),
                       Agora_memory::Alignment_t::kAlign32);
-  for (size_t i = 0; i < (this->cfg_->UeAntNum() * this->cfg_->BsAntNum());
+  for (size_t i = 0; i < (this->cfg_->UeAntTotal() * this->cfg_->BsAntNum());
        i++) {
     complex_float csi = {RandFloatFromShort(-1, 1), RandFloatFromShort(-1, 1)};
     for (size_t j = 0; j < this->cfg_->OfdmCaNum(); j++) {
@@ -281,14 +281,14 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
     arma::cx_fmat mat_input_data(
         reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
-        this->cfg_->OfdmCaNum(), this->cfg_->UeAntNum(), false);
+        this->cfg_->OfdmCaNum(), this->cfg_->UeAntTotal(), false);
     arma::cx_fmat mat_output(
         reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
         this->cfg_->OfdmCaNum(), this->cfg_->BsAntNum(), false);
 
     for (size_t j = 0; j < this->cfg_->OfdmCaNum(); j++) {
       arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
-                            this->cfg_->BsAntNum(), this->cfg_->UeAntNum());
+                            this->cfg_->BsAntNum(), this->cfg_->UeAntTotal());
       mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
       for (size_t k = 0; k < this->cfg_->BsAntNum(); k++) {
         arma::cx_float noise(RandFloatFromShort(-1, 1),
@@ -335,9 +335,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
    * ------------------------------------------------ */
   if (this->cfg_->Frame().NumDLSyms() > 0) {
     const size_t num_dl_mac_bytes = this->cfg_->DlMacBytesNumPerframe();
-    std::vector<std::vector<int8_t>> dl_mac_info(cfg_->UeAntNum());
+    std::vector<std::vector<int8_t>> dl_mac_info(cfg_->UeAntTotal());
     MLPD_SYMBOL("Total number of downlink MAC bytes: %zu\n", num_dl_mac_bytes);
-    for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
+    for (size_t ue_id = 0; ue_id < cfg_->UeAntTotal(); ue_id++) {
       dl_mac_info[ue_id].resize(num_dl_mac_bytes);
       for (size_t pkt_id = 0; pkt_id < cfg_->DlMacPacketsPerframe(); pkt_id++) {
         size_t pkt_offset = pkt_id * cfg_->MacPacketLength();
@@ -364,10 +364,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       const std::string filename_input =
           directory + "/data/orig_dl_data_" +
           std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
-          std::to_string(this->cfg_->UeAntNum()) + ".bin";
+          std::to_string(this->cfg_->UeAntTotal()) + ".bin";
       MLPD_INFO("Saving downlink MAC data to %s\n", filename_input.c_str());
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
-      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+      for (size_t i = 0; i < cfg_->UeAntTotal(); i++) {
         std::fwrite(reinterpret_cast<uint8_t*>(dl_mac_info.at(i).data()),
                     num_dl_mac_bytes, sizeof(uint8_t), fp_input);
       }
@@ -375,8 +375,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
       if (kPrintDownlinkInformationBytes) {
         std::printf("Downlink information bytes\n");
-        for (size_t n = 0; n < cfg_->UeAntNum(); n++) {
-          std::printf("UE %zu\n", n % this->cfg_->UeAntNum());
+        for (size_t n = 0; n < cfg_->UeAntTotal(); n++) {
+          std::printf("UE %zu\n", n % this->cfg_->UeAntTotal());
           for (size_t i = 0; i < num_dl_mac_bytes; i++) {
             std::printf("%u ", static_cast<uint8_t>(dl_mac_info.at(n).at(i)));
           }
@@ -386,7 +386,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     }
 
     const size_t symbol_blocks =
-        this->cfg_->LdpcConfig().NumBlocksInSymbol() * this->cfg_->UeAntNum();
+        this->cfg_->LdpcConfig().NumBlocksInSymbol() * this->cfg_->UeAntTotal();
     const size_t num_dl_codeblocks =
         this->cfg_->Frame().NumDlDataSyms() * symbol_blocks;
     MLPD_SYMBOL("Total number of dl data blocks: %zu\n", num_dl_codeblocks);
@@ -428,7 +428,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       const std::string filename_input =
           directory + "/data/LDPC_orig_dl_data_" +
           std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
-          std::to_string(this->cfg_->UeAntNum()) + ".bin";
+          std::to_string(this->cfg_->UeAntTotal()) + ".bin";
       MLPD_INFO("Saving raw dl data (using LDPC) to %s\n",
                 filename_input.c_str());
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
@@ -441,8 +441,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       if (kPrintDownlinkInformationBytes == true) {
         std::printf("Downlink information bytes\n");
         for (size_t n = 0; n < num_dl_codeblocks; n++) {
-          std::printf("Symbol %zu, UE %zu\n", n / this->cfg_->UeAntNum(),
-                      n % this->cfg_->UeAntNum());
+          std::printf("Symbol %zu, UE %zu\n", n / this->cfg_->UeAntTotal(),
+                      n % this->cfg_->UeAntTotal());
           for (size_t i = 0; i < input_size; i++) {
             std::printf("%u ",
                         static_cast<unsigned>(dl_information.at(n).at(i)));
@@ -455,14 +455,14 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     // Compute precoder
     Table<complex_float> precoder;
     precoder.Calloc(this->cfg_->OfdmCaNum(),
-                    this->cfg_->UeAntNum() * this->cfg_->BsAntNum(),
+                    this->cfg_->UeAntTotal() * this->cfg_->BsAntNum(),
                     Agora_memory::Alignment_t::kAlign32);
     for (size_t i = 0; i < this->cfg_->OfdmCaNum(); i++) {
       arma::cx_fmat mat_input(
           reinterpret_cast<arma::cx_float*>(csi_matrices[i]),
-          this->cfg_->BsAntNum(), this->cfg_->UeAntNum(), false);
+          this->cfg_->BsAntNum(), this->cfg_->UeAntTotal(), false);
       arma::cx_fmat mat_output(reinterpret_cast<arma::cx_float*>(precoder[i]),
-                               this->cfg_->UeAntNum(), this->cfg_->BsAntNum(),
+                               this->cfg_->UeAntTotal(), this->cfg_->BsAntNum(),
                                false);
       pinv(mat_output, mat_input, 1e-2, "dc");
     }
@@ -470,7 +470,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     if (kPrintDebugCSI) {
       std::printf("CSI \n");
       // for (size_t i = 0; i < this->cfg_->ofdm_ca_num(); i++)
-      for (size_t j = 0; j < this->cfg_->UeAntNum() * this->cfg_->BsAntNum();
+      for (size_t j = 0; j < this->cfg_->UeAntTotal() * this->cfg_->BsAntNum();
            j++) {
         std::printf("%.3f+%.3fi ",
                     csi_matrices[this->cfg_->OfdmDataStart()][j].re,
@@ -478,7 +478,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       }
       std::printf("\nprecoder \n");
       // for (size_t i = 0; i < this->cfg_->ofdm_ca_num(); i++)
-      for (size_t j = 0; j < this->cfg_->UeAntNum() * this->cfg_->BsAntNum();
+      for (size_t j = 0; j < this->cfg_->UeAntTotal() * this->cfg_->BsAntNum();
            j++) {
         std::printf("%.3f+%.3fi ", precoder[this->cfg_->OfdmDataStart()][j].re,
                     precoder[this->cfg_->OfdmDataStart()][j].im);
@@ -489,10 +489,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     // Prepare downlink data from mod_output
     Table<complex_float> dl_mod_data;
     dl_mod_data.Calloc(this->cfg_->Frame().NumDLSyms(),
-                       this->cfg_->OfdmCaNum() * this->cfg_->UeAntNum(),
+                       this->cfg_->OfdmCaNum() * this->cfg_->UeAntTotal(),
                        Agora_memory::Alignment_t::kAlign64);
     for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
-      for (size_t j = 0; j < this->cfg_->UeAntNum(); j++) {
+      for (size_t j = 0; j < this->cfg_->UeAntTotal(); j++) {
         for (size_t sc_id = 0; sc_id < this->cfg_->OfdmDataNum(); sc_id++) {
           complex_float sc_data;
           if ((i < this->cfg_->Frame().ClientDlPilotSymbols()) ||
@@ -502,7 +502,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
             sc_data =
                 dl_modulated_codewords
                     .at(((i - this->cfg_->Frame().ClientDlPilotSymbols()) *
-                         this->cfg_->UeAntNum()) +
+                         this->cfg_->UeAntTotal()) +
                         j)
                     .at(sc_id);
           }
@@ -518,7 +518,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         for (size_t k = this->cfg_->OfdmDataStart();
              k < this->cfg_->OfdmDataStart() + this->cfg_->OfdmDataNum(); k++) {
           std::printf("symbol %zu, subcarrier %zu\n", i, k);
-          for (size_t j = 0; j < this->cfg_->UeAntNum(); j++) {
+          for (size_t j = 0; j < this->cfg_->UeAntTotal(); j++) {
             // for (int k = this->cfg_->OfdmDataStart(); k <
             // this->cfg_->OfdmDataStart() + this->cfg_->OfdmDataNum();
             //      k++) {
@@ -544,7 +544,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
       arma::cx_fmat mat_input_data(
           reinterpret_cast<arma::cx_float*>(dl_mod_data[i]),
-          this->cfg_->OfdmCaNum(), this->cfg_->UeAntNum(), false);
+          this->cfg_->OfdmCaNum(), this->cfg_->UeAntTotal(), false);
 
       arma::cx_fmat mat_output(
           reinterpret_cast<arma::cx_float*>(dl_ifft_data[i]),
@@ -554,7 +554,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
            j < this->cfg_->OfdmDataNum() + this->cfg_->OfdmDataStart(); j++) {
         arma::cx_fmat mat_precoder(
             reinterpret_cast<arma::cx_float*>(precoder[j]),
-            this->cfg_->UeAntNum(), this->cfg_->BsAntNum(), false);
+            this->cfg_->UeAntTotal(), this->cfg_->BsAntNum(), false);
         mat_precoder /= abs(mat_precoder).max();
         mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
 

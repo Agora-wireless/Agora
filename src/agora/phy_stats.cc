@@ -29,26 +29,26 @@ PhyStats::PhyStats(Config* const cfg) : config_(cfg) {
   uncoded_bit_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
                                   Agora_memory::Alignment_t::kAlign64);
 
-  evm_buffer_.Calloc(kFrameWnd, cfg->UeAntNum(),
+  evm_buffer_.Calloc(kFrameWnd, cfg->UeAntTotal(),
                      Agora_memory::Alignment_t::kAlign64);
 
   if (num_rx_symbols_ > 0) {
     if (config_->IsUe() == true) {
       auto* dl_iq_f_ptr = reinterpret_cast<arma::cx_float*>(
           cfg->DlIqF()[cfg->Frame().ClientDlPilotSymbols()]);
-      arma::cx_fmat dl_iq_f_mat(dl_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(),
-                                false);
+      arma::cx_fmat dl_iq_f_mat(dl_iq_f_ptr, cfg->OfdmCaNum(),
+                                cfg->UeAntTotal(), false);
       gt_mat_ = dl_iq_f_mat.st();
     } else {
       auto* ul_iq_f_ptr = reinterpret_cast<arma::cx_float*>(
           cfg->UlIqF()[cfg->Frame().ClientUlPilotSymbols()]);
-      arma::cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(),
-                                false);
+      arma::cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OfdmCaNum(),
+                                cfg->UeAntTotal(), false);
       gt_mat_ = ul_iq_f_mat.st();
     }
     gt_mat_ = gt_mat_.cols(cfg->OfdmDataStart(), (cfg->OfdmDataStop() - 1));
   }
-  pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum(),
+  pilot_snr_.Calloc(kFrameWnd, cfg->UeAntTotal(),
                     Agora_memory::Alignment_t::kAlign64);
 }
 

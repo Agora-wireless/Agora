@@ -89,7 +89,7 @@ int main(int argc, char* argv[]) {
   std::printf("Number of symbols per block: %zu, blocks per frame: %zu\n",
               num_symbols_per_cb, num_cbs_per_ue);
 
-  const size_t num_codeblocks = num_cbs_per_ue * cfg->UeAntNum();
+  const size_t num_codeblocks = num_cbs_per_ue * cfg->UeAntTotal();
   std::printf("Total number of blocks: %zu\n", num_codeblocks);
   size_t input_size = LdpcEncodingInputBufSize(
       cfg->LdpcConfig().BaseGraph(), cfg->LdpcConfig().ExpansionFactor());
@@ -111,8 +111,8 @@ int main(int argc, char* argv[]) {
     if (kPrintUplinkInformationBytes) {
       std::printf("Uplink information bytes\n");
       for (size_t n = 0; n < num_codeblocks; n++) {
-        std::printf("Symbol %zu, UE %zu\n", n / cfg->UeAntNum(),
-                    n % cfg->UeAntNum());
+        std::printf("Symbol %zu, UE %zu\n", n / cfg->UeAntTotal(),
+                    n % cfg->UeAntTotal());
         for (size_t i = 0; i < input_bytes_per_cb; i++) {
           std::printf("%u ", (uint8_t)information[n][i]);
         }

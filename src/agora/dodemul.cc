@@ -41,7 +41,7 @@ DoDemul::DoDemul(
   auto* ue_pilot_ptr =
       reinterpret_cast<arma::cx_float*>(cfg_->UeSpecificPilot()[0]);
   arma::cx_fmat mat_pilot_data(ue_pilot_ptr, cfg_->OfdmDataNum(),
-                               cfg_->UeAntNum(), false);
+                               cfg_->UeAntTotal(), false);
   ue_pilot_data_ = mat_pilot_data.st();
 
 #if USE_MKL_JIT

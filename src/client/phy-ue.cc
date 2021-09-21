@@ -21,10 +21,11 @@ static const size_t kDefaultQueueSize = 36;
 PhyUe::PhyUe(Config* config)
     : stats_(std::make_unique<Stats>(config)),
       phy_stats_(std::make_unique<PhyStats>(config)),
-      demod_buffer_(kFrameWnd, config->Frame().NumDLSyms(), config->UeAntNum(),
+      demod_buffer_(kFrameWnd, config->Frame().NumDLSyms(),
+                    config->UeAntInstancCnt(),
                     kMaxModType * config->OfdmDataNum()),
       decoded_buffer_(kFrameWnd, config->Frame().NumDLSyms(),
-                      config->UeAntNum(),
+                      config->UeAntInstancCnt(),
                       config->LdpcConfig().NumBlocksInSymbol() *
                           Roundup<64>(config->NumBytesPerCb())) {
   srand(time(nullptr));
@@ -44,8 +45,8 @@ PhyUe::PhyUe(Config* config)
                           data_sc_ind.end());
   std::sort(non_null_sc_ind_.begin(), non_null_sc_ind_.end());
 
-  ue_pilot_vec_.resize(config_->UeAntNum());
-  for (size_t i = 0; i < config_->UeAntNum(); i++) {
+  ue_pilot_vec_.resize(config_->UeAntInstancCnt());
+  for (size_t i = 0; i < config_->UeAntInstancCnt(); i++) {
     for (size_t j = config->OfdmTxZeroPrefix();
          j < config_->SampsPerSymbol() - config->OfdmTxZeroPostfix(); j++) {
       ue_pilot_vec_[i].push_back(std::complex<float>(
@@ -55,10 +56,10 @@ PhyUe::PhyUe(Config* config)
   }
 
   complete_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
+      kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntInstancCnt() *
       kDefaultQueueSize);
   work_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
+      kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntInstancCnt() *
       kDefaultQueueSize);
   tx_queue_ = moodycamel::ConcurrentQueue<EventData>(
       kFrameWnd * config_->UeNum() * kDefaultQueueSize);
@@ -112,28 +113,31 @@ PhyUe::PhyUe(Config* config)
   for (size_t frame = 0; frame < this->frame_tasks_.size(); frame++) {
     FrameInit(frame);
   }
-  tx_counters_.Init(config_->UeAntNum());
-  decode_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
-  demul_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
+  tx_counters_.Init(config_->UeAntInstancCnt());
+  decode_counters_.Init(dl_data_symbol_perframe_, config_->UeAntInstancCnt());
+  demul_counters_.Init(dl_data_symbol_perframe_, config_->UeAntInstancCnt());
   fft_dlpilot_counters_.Init(config->Frame().ClientDlPilotSymbols(),
-                             config_->UeAntNum());
-  fft_dldata_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
+                             config_->UeAntInstancCnt());
+  fft_dldata_counters_.Init(dl_data_symbol_perframe_,
+                            config_->UeAntInstancCnt());
 
-  encode_counter_.Init(ul_data_symbol_perframe_, config_->UeAntNum());
-  modulation_counters_.Init(ul_data_symbol_perframe_, config_->UeAntNum());
-  ifft_counters_.Init(ul_symbol_perframe_, config_->UeAntNum());
+  encode_counter_.Init(ul_data_symbol_perframe_, config_->UeAntInstancCnt());
+  modulation_counters_.Init(ul_data_symbol_perframe_,
+                            config_->UeAntInstancCnt());
+  ifft_counters_.Init(ul_symbol_perframe_, config_->UeAntInstancCnt());
 
   // This usage doesn't effect the user num_reciprocity_pkts_per_frame_;
   rx_counters_.num_pkts_per_frame_ =
-      config_->UeAntNum() *
+      config_->UeAntInstancCnt() *
       (config_->Frame().NumDLSyms() + config_->Frame().NumBeaconSyms());
   rx_counters_.num_pilot_pkts_per_frame_ =
-      config_->UeAntNum() * config_->Frame().ClientDlPilotSymbols();
+      config_->UeAntInstancCnt() * config_->Frame().ClientDlPilotSymbols();
 
   rx_downlink_deferral_.resize(kFrameWnd);
 
   //Mac counters for downlink data
-  tomac_counters_.Init(config_->Frame().NumDlDataSyms(), config_->UeAntNum());
+  tomac_counters_.Init(config_->Frame().NumDlDataSyms(),
+                       config_->UeAntInstancCnt());
 }
 
 PhyUe::~PhyUe() {
@@ -204,9 +208,9 @@ void PhyUe::ReceiveDownlinkSymbol(struct Packet* rx_packet, size_t tag) {
 void PhyUe::ScheduleDefferedDownlinkSymbols(size_t frame_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
   // Complete the csi offset
-  size_t csi_offset = frame_slot * config_->UeAntNum();
+  size_t csi_offset = frame_slot * config_->UeAntInstancCnt();
 
-  for (size_t user = 0; user < config_->UeAntNum(); user++) {
+  for (size_t user = 0; user < config_->UeAntInstancCnt(); user++) {
     csi_offset = csi_offset + user;
     for (size_t ofdm_data = 0; ofdm_data < config_->OfdmDataNum();
          ofdm_data++) {
@@ -228,8 +232,8 @@ void PhyUe::ClearCsi(size_t frame_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
 
   if (config_->Frame().ClientDlPilotSymbols() > 0) {
-    size_t csi_offset = frame_slot * config_->UeAntNum();
-    for (size_t user = 0; user < config_->UeAntNum(); user++) {
+    size_t csi_offset = frame_slot * config_->UeAntInstancCnt();
+    for (size_t user = 0; user < config_->UeAntInstancCnt(); user++) {
       csi_offset = csi_offset + user;
       for (size_t ofdm_data = 0; ofdm_data < config_->OfdmDataNum();
            ofdm_data++) {
@@ -479,7 +483,7 @@ void PhyUe::Start() {
             if (kEnableMac) {
               auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
 
-              for (size_t i = 0; i < config_->UeAntNum(); i++) {
+              for (size_t i = 0; i < config_->UeAntInstancCnt(); i++) {
                 ScheduleTask(EventData(EventType::kPacketToMac, base_tag.tag_),
                              &to_mac_queue_, ptok_mac);
 
@@ -558,7 +562,7 @@ void PhyUe::Start() {
           RtAssert(pkt->frame_id_ == expected_frame_id_from_mac_,
                    "PhyUe: Incorrect frame ID from MAC");
           current_frame_user_num_ =
-              (current_frame_user_num_ + 1) % config_->UeAntNum();
+              (current_frame_user_num_ + 1) % config_->UeAntInstancCnt();
           if (current_frame_user_num_ == 0) {
             expected_frame_id_from_mac_++;
           }
@@ -665,7 +669,8 @@ void PhyUe::Start() {
                 size_t ifft_stat_id = (ifft_next_frame % kFrameWnd);
                 if (ifft_frame_status.at(ifft_stat_id) == ifft_next_frame) {
                   // Schedule TX for all users (by packet)
-                  for (size_t user = 0u; user < config_->UeAntNum(); user++) {
+                  for (size_t user = 0u; user < config_->UeAntInstancCnt();
+                       user++) {
                     EventData do_tx_task(
                         EventType::kPacketTX,
                         gen_tag_t::FrmSymUe(ifft_next_frame, 0, user).tag_);
@@ -766,43 +771,43 @@ void PhyUe::InitializeVarsFromCfg() {
                        : std::min(config_->UeNum(), config_->SocketThreadNum());
 
   tx_buffer_status_size_ =
-      (ul_symbol_perframe_ * config_->UeAntNum() * kFrameWnd);
+      (ul_symbol_perframe_ * config_->UeAntInstancCnt() * kFrameWnd);
   tx_buffer_size_ = config_->PacketLength() * tx_buffer_status_size_;
 
   rx_buffer_size_ = config_->PacketLength() *
                     (dl_symbol_perframe_ + config_->Frame().NumBeaconSyms()) *
-                    config_->UeAntNum() * kFrameWnd;
+                    config_->UeAntInstancCnt() * kFrameWnd;
 }
 
 void PhyUe::InitializeUplinkBuffers() {
   // initialize ul data buffer
   ul_bits_buffer_size_ = kFrameWnd * config_->UlMacBytesNumPerframe();
-  ul_bits_buffer_.Malloc(config_->UeAntNum(), ul_bits_buffer_size_,
+  ul_bits_buffer_.Malloc(config_->UeAntInstancCnt(), ul_bits_buffer_size_,
                          Agora_memory::Alignment_t::kAlign64);
-  ul_bits_buffer_status_.Calloc(config_->UeAntNum(), kFrameWnd,
+  ul_bits_buffer_status_.Calloc(config_->UeAntInstancCnt(), kFrameWnd,
                                 Agora_memory::Alignment_t::kAlign64);
 
   // Temp -- Using more memory than necessary to comply with the DoEncode
   // function which uses the total number of ul symbols offset (instead of
   // just the data specific ones) ul_syms_buffer_size_ =
   //    kFrameWnd * ul_symbol_perframe_ * config_->OfdmDataNum();
-  // ul_syms_buffer_.Calloc(config_->UeAntNum(), ul_syms_buffer_size_,
+  // ul_syms_buffer_.Calloc(config_->UeAntInstancCnt(), ul_syms_buffer_size_,
   //                       Agora_memory::Alignment_t::kAlign64);
   const size_t ul_syms_buffer_dim1 = ul_symbol_perframe_ * kFrameWnd;
   const size_t ul_syms_buffer_dim2 =
-      Roundup<64>(config_->OfdmDataNum()) * config_->UeAntNum();
+      Roundup<64>(config_->OfdmDataNum()) * config_->UeAntInstancCnt();
 
   ul_syms_buffer_.Calloc(ul_syms_buffer_dim1, ul_syms_buffer_dim2,
                          Agora_memory::Alignment_t::kAlign64);
 
   // initialize modulation buffer
   modul_buffer_.Calloc(ul_syms_buffer_dim1,
-                       config_->OfdmDataNum() * config_->UeAntNum(),
+                       config_->OfdmDataNum() * config_->UeAntInstancCnt(),
                        Agora_memory::Alignment_t::kAlign64);
 
   // initialize IFFT buffer
   size_t ifft_buffer_block_num =
-      config_->UeAntNum() * ul_symbol_perframe_ * kFrameWnd;
+      config_->UeAntInstancCnt() * ul_symbol_perframe_ * kFrameWnd;
   ifft_buffer_.Calloc(ifft_buffer_block_num, config_->OfdmCaNum(),
                       Agora_memory::Alignment_t::kAlign64);
 
@@ -830,12 +835,12 @@ void PhyUe::InitializeDownlinkBuffers() {
 
   // initialize FFT buffer
   size_t fft_buffer_block_num =
-      config_->UeAntNum() * dl_symbol_perframe_ * kFrameWnd;
+      config_->UeAntInstancCnt() * dl_symbol_perframe_ * kFrameWnd;
   fft_buffer_.Calloc(fft_buffer_block_num, config_->OfdmCaNum(),
                      Agora_memory::Alignment_t::kAlign64);
 
   // initialize CSI buffer
-  csi_buffer_.resize(config_->UeAntNum() * kFrameWnd);
+  csi_buffer_.resize(config_->UeAntInstancCnt() * kFrameWnd);
   for (auto& i : csi_buffer_) {
     i.resize(config_->OfdmDataNum());
 
@@ -854,7 +859,7 @@ void PhyUe::InitializeDownlinkBuffers() {
     // initialize equalized data buffer
     const size_t task_buffer_symbol_num_dl =
         dl_data_symbol_perframe_ * kFrameWnd;
-    size_t buffer_size = config_->UeAntNum() * task_buffer_symbol_num_dl;
+    size_t buffer_size = config_->UeAntInstancCnt() * task_buffer_symbol_num_dl;
     equal_buffer_.resize(buffer_size);
     for (auto& i : equal_buffer_) {
       i.resize(config_->OfdmDataNum());
@@ -1107,14 +1112,14 @@ void PhyUe::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
 void PhyUe::GetDemulData(long long** ptr, int* size) {
   *ptr = (long long*)&equal_buffer_[max_equaled_frame_ *
                                     dl_data_symbol_perframe_][0];
-  *size = config_->UeAntNum() * config_->OfdmCaNum();
+  *size = config_->UeAntInstancCnt() * config_->OfdmCaNum();
 }
 
 void PhyUe::GetEqualData(float** ptr, int* size, int ue_id) {
   *ptr = (float*)&equal_buffer_[max_equaled_frame_ * dl_data_symbol_perframe_ *
-                                    config_->UeAntNum() +
+                                    config_->UeAntInstancCnt() +
                                 ue_id][0];
-  *size = config_->UeAntNum() * config_->OfdmDataNum() * 2;
+  *size = config_->UeAntInstancCnt() * config_->OfdmDataNum() * 2;
 }
 
 void PhyUe::FrameInit(size_t frame) {

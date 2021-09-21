@@ -184,9 +184,9 @@ int RadioTxRx::DequeueSend(int tid) {
 
   // Transmit uplink pilots and data
   for (size_t symbol_id = 0; symbol_id < c->Frame().NumULSyms(); symbol_id++) {
-    size_t offset =
-        (c->GetTotalDataSymbolIdxUl(frame_id, symbol_id) * c->UeAntNum()) +
-        ant_id;
+    size_t offset = (c->GetTotalDataSymbolIdxUl(frame_id, symbol_id) *
+                     c->UeAntInstancCnt()) +
+                    ant_id;
 
     if (kDebugPrintInTask) {
       std::printf(
@@ -317,9 +317,9 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
   // Transmit data
   for (size_t symbol_id = 0; symbol_id < c->Frame().NumULSyms(); symbol_id++) {
     size_t tx_symbol_id = c->Frame().GetULSymbol(symbol_id);
-    size_t offset =
-        (c->GetTotalDataSymbolIdxUl(frame_id, symbol_id) * c->UeAntNum()) +
-        ant_id;
+    size_t offset = (c->GetTotalDataSymbolIdxUl(frame_id, symbol_id) *
+                     c->UeAntInstancCnt()) +
+                    ant_id;
 
     void* txbuf[2];
     for (size_t ch = 0; ch < c->NumChannels(); ++ch) {

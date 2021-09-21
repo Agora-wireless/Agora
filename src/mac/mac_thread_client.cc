@@ -357,7 +357,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
            "MAC thread: Failed to enqueue uplink packet");
 
   radio_buf_id = (radio_buf_id + 1) % kFrameWnd;
-  next_radio_id_ = (next_radio_id_ + 1) % cfg_->UeAntNum();
+  next_radio_id_ = (next_radio_id_ + 1) % cfg_->UeAntTotal();
   if (next_radio_id_ == 0) {
     next_tx_frame_id_++;
   }

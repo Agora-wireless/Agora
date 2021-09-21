@@ -46,7 +46,7 @@ ChannelSim::ChannelSim(const Config* const config_bs,
       bs_thread_num_(bs_thread_num),
       user_thread_num_(user_thread_num),
       bs_socket_num_(config_bs->BsAntNum()),
-      user_socket_num_(config_ue->UeAntNum()),
+      user_socket_num_(config_ue->UeAntTotal()),
       worker_thread_num_(worker_thread_num),
       core_offset_(in_core_offset),
       channel_type_(std::move(in_chan_type)),
@@ -67,18 +67,18 @@ ChannelSim::ChannelSim(const Config* const config_bs,
       kFrameWnd * dl_data_plus_beacon_symbols_ * bscfg_->BsAntNum() *
       kDefaultQueueSize);
   task_queue_user_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * ul_data_plus_pilot_symbols_ * uecfg_->UeAntNum() *
+      kFrameWnd * ul_data_plus_pilot_symbols_ * uecfg_->UeAntTotal() *
       kDefaultQueueSize);
   message_queue_ = moodycamel::ConcurrentQueue<EventData>(
       kFrameWnd * bscfg_->Frame().NumTotalSyms() *
-      (bscfg_->BsAntNum() + uecfg_->UeAntNum()) * kDefaultQueueSize);
+      (bscfg_->BsAntNum() + uecfg_->UeAntTotal()) * kDefaultQueueSize);
 
   assert(bscfg_->PacketLength() == uecfg_->PacketLength());
   payload_length_ = bscfg_->PacketLength() - Packet::kOffsetOfData;
 
   // initialize bs-facing and client-facing data buffers
   size_t tx_buffer_ue_size = kFrameWnd * dl_data_plus_beacon_symbols_ *
-                             uecfg_->UeAntNum() * payload_length_;
+                             uecfg_->UeAntTotal() * payload_length_;
   tx_buffer_ue_.resize(tx_buffer_ue_size);
 
   size_t tx_buffer_bs_size = kFrameWnd * ul_data_plus_pilot_symbols_ *
@@ -86,7 +86,7 @@ ChannelSim::ChannelSim(const Config* const config_bs,
   tx_buffer_bs_.resize(tx_buffer_bs_size);
 
   size_t rx_buffer_ue_size = kFrameWnd * ul_data_plus_pilot_symbols_ *
-                             uecfg_->UeAntNum() * payload_length_;
+                             uecfg_->UeAntTotal() * payload_length_;
   rx_buffer_ue_.resize(rx_buffer_ue_size);
 
   size_t rx_buffer_bs_size = kFrameWnd * dl_data_plus_beacon_symbols_ *
@@ -201,13 +201,13 @@ void ChannelSim::Start() {
                 total_symbol_id;
             user_rx_counter_[frame_offset]++;
             // when received all client antennas on this symbol, kick-off BS TX
-            if (user_rx_counter_[frame_offset] == uecfg_->UeAntNum()) {
+            if (user_rx_counter_[frame_offset] == uecfg_->UeAntTotal()) {
               user_rx_counter_[frame_offset] = 0;
               if (kDebugPrintPerSymbolDone) {
                 std::printf(
                     "Scheduling uplink transmission of frame %zu, symbol %zu, "
                     "from %zu user to %zu BS antennas\n",
-                    frame_id, symbol_id, uecfg_->UeAntNum(),
+                    frame_id, symbol_id, uecfg_->UeAntTotal(),
                     bscfg_->BsAntNum());
               }
               ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
@@ -230,7 +230,7 @@ void ChannelSim::Start() {
                     "Scheduling downlink transmission in frame %zu, symbol "
                     "%zu, from %zu BS to %zu user antennas\n",
                     frame_id, symbol_id, bscfg_->BsAntNum(),
-                    uecfg_->UeAntNum());
+                    uecfg_->UeAntTotal());
               }
               ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
                            &task_queue_user_, ptok_user);
@@ -421,7 +421,7 @@ void* ChannelSim::UeRxLoop(int tid) {
       size_t symbol_offset =
           (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ +
           total_symbol_id;
-      size_t offset = symbol_offset * uecfg_->UeAntNum() + ant_id;
+      size_t offset = symbol_offset * uecfg_->UeAntTotal() + ant_id;
       std::memcpy(&rx_buffer_ue_[offset * payload_length_], pkt->data_,
                   payload_length_);
 
@@ -489,17 +489,18 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
 
   size_t symbol_offset =
       (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ + total_symbol_id;
-  size_t total_offset_ue = symbol_offset * payload_length_ * uecfg_->UeAntNum();
+  size_t total_offset_ue =
+      symbol_offset * payload_length_ * uecfg_->UeAntTotal();
   size_t total_offset_bs = symbol_offset * payload_length_ * bscfg_->BsAntNum();
 
   auto* src_ptr = reinterpret_cast<short*>(&rx_buffer_ue_.at(total_offset_ue));
 
   // convert received data to complex float,
   // apply channel, convert back to complex short to TX
-  arma::cx_fmat fmat_src =
-      arma::zeros<arma::cx_fmat>(bscfg_->SampsPerSymbol(), uecfg_->UeAntNum());
+  arma::cx_fmat fmat_src = arma::zeros<arma::cx_fmat>(bscfg_->SampsPerSymbol(),
+                                                      uecfg_->UeAntTotal());
   SimdConvertShortToFloat(src_ptr, reinterpret_cast<float*>(fmat_src.memptr()),
-                          2 * bscfg_->SampsPerSymbol() * uecfg_->UeAntNum());
+                          2 * bscfg_->SampsPerSymbol() * uecfg_->UeAntTotal());
 
   // Apply Channel
   arma::cx_fmat fmat_dst;
@@ -539,7 +540,8 @@ void ChannelSim::DoTxUser(int tid, size_t tag) {
 
   size_t symbol_offset =
       (frame_id % kFrameWnd) * dl_data_plus_beacon_symbols_ + dl_symbol_id;
-  size_t total_offset_ue = symbol_offset * payload_length_ * uecfg_->UeAntNum();
+  size_t total_offset_ue =
+      symbol_offset * payload_length_ * uecfg_->UeAntTotal();
   size_t total_offset_bs = symbol_offset * payload_length_ * bscfg_->BsAntNum();
 
   auto* src_ptr = reinterpret_cast<short*>(&rx_buffer_bs_.at(total_offset_bs));
@@ -565,8 +567,9 @@ void ChannelSim::DoTxUser(int tid, size_t tag) {
     Utils::PrintMat(fmat_dst, "rx_dl");
   }
 
-  DoTx(frame_id, symbol_id, uecfg_->UeAntNum(), tx_buffer_ue_, total_offset_ue,
-       client_ue_, uecfg_->UeServerAddr(), uecfg_->UeServerPort(), fmat_dst);
+  DoTx(frame_id, symbol_id, uecfg_->UeAntTotal(), tx_buffer_ue_,
+       total_offset_ue, client_ue_, uecfg_->UeServerAddr(),
+       uecfg_->UeServerPort(), fmat_dst);
 
   RtAssert(message_queue_.enqueue(
                *task_ptok_[tid],

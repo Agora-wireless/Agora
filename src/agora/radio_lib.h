@@ -75,6 +75,7 @@ class RadioConfig {
   bool is_ue_;
   bool calib_;
   size_t calib_meas_num_;
+  std::vector<std::string> radio_ids_;
 
   std::atomic<size_t> num_radios_initialized_;
   std::atomic<size_t> num_radios_configured_;

@@ -14,8 +14,23 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   // load channels
   auto channels = Utils::StrToChannels(cfg_->Channel());
 
-  this->radio_num_ = cfg_->NumRadios();
-  this->antenna_num_ = radio_num_ * cfg_->NumChannels();
+  this->radio_num_ = 0;
+  this->antenna_num_ = 0;
+
+  if (cfg_->IsUe() == false) {
+    throw std::invalid_argument("Bad config! Must be a UE!");
+  }
+
+  //Build radio id array for existing logic to work
+  const size_t first_ue = cfg->UeAntInsanceOffset();
+  const size_t last_ue = first_ue + cfg->UeAntInstancCnt();
+  //Assumes a full list of UEs
+  for (size_t user = first_ue; user < last_ue; user++) {
+    const auto& sdr = cfg_->UserDefs().at(user);
+    radio_ids_.emplace_back(sdr.id_);
+    radio_num_++;
+    antenna_num_ += sdr.num_channels_;
+  }
   std::cout << "radio num is " << this->radio_num_ << std::endl;
 
   cl_stn_.resize(radio_num_);
@@ -54,7 +69,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
 #endif
 
   for (size_t i = 0; i < this->radio_num_; i++) {
-    std::cout << cfg_->RadioIds().at(i) << ": Front end "
+    std::cout << radio_ids_.at(i) << ": Front end "
               << cl_stn_[i]->getHardwareInfo()["frontend"] << std::endl;
     for (auto c : channels) {
       if (c < cl_stn_[i]->getNumChannels(SOAPY_SDR_RX)) {
@@ -131,10 +146,10 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
   args["timeout"] = "1000000";
   if (!kUseUHD) {
     args["driver"] = "iris";
-    args["serial"] = cfg_->RadioIds().at(tid);
+    args["serial"] = radio_ids_.at(tid);
   } else {
     args["driver"] = "uhd";
-    args["addr"] = cfg_->RadioIds().at(tid);
+    args["addr"] = radio_ids_.at(tid);
   }
   cl_stn_[tid] = SoapySDR::Device::make(args);
   for (auto ch : channels) {

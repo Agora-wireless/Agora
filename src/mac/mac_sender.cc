@@ -37,7 +37,7 @@ void DelayTicks(uint64_t start, uint64_t ticks) {
 inline size_t MacSender::TagToTxBuffersIndex(gen_tag_t tag) const {
   const size_t frame_slot = (tag.frame_id_ % kFrameWnd);
 
-  return (frame_slot * cfg_->UeAntNum()) + tag.ue_id_;
+  return (frame_slot * cfg_->UeAntTotal()) + tag.ue_id_;
 }
 
 // Only send Uplink (non-pilot data)
@@ -80,7 +80,7 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
   ticks_wnd2_ = ticks_all_ * 15;
 
   // tx buffers will be an array of MacPackets
-  tx_buffers_.Malloc(kFrameWnd * cfg_->UeAntNum(),
+  tx_buffers_.Malloc(kFrameWnd * cfg_->UeAntTotal(),
                      (packets_per_frame_ *
                       (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
                      Agora_memory::Alignment_t::kAlign64);
@@ -162,7 +162,7 @@ void MacSender::LoadFrame(size_t frame) {
 }
 
 void MacSender::ScheduleFrame(size_t frame) {
-  for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+  for (size_t i = 0; i < cfg_->UeAntTotal(); i++) {
     auto req_tag = gen_tag_t::FrmSymAnt(frame, 0, i);
     // Split up the antennas amoung the worker threads
     RtAssert(
@@ -212,7 +212,7 @@ void* MacSender::MasterThread(size_t /*unused*/) {
                   comp_frame_slot, frame_data_count.at(comp_frame_slot));
       }
       // Check to see if the current frame is finished (UeNum / UeAntNum)
-      if (frame_data_count.at(comp_frame_slot) == cfg_->UeAntNum()) {
+      if (frame_data_count.at(comp_frame_slot) == cfg_->UeAntTotal()) {
         frame_end_us = timestamp_us;
         // Finished with the current frame data
         frame_data_count.at(comp_frame_slot) = 0;
@@ -396,7 +396,7 @@ void* MacSender::DataUpdateThread(size_t tid) {
   while ((keep_running.load() == true) && (buffer_updates < kBufferInit)) {
     size_t tag = 0;
     if (data_update_queue_.try_dequeue(tag) == true) {
-      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+      for (size_t i = 0; i < cfg_->UeAntTotal(); i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
         UpdateTxBuffer(data_source.get(), tag_for_ue);
@@ -412,7 +412,7 @@ void* MacSender::DataUpdateThread(size_t tid) {
   while (keep_running.load() == true) {
     size_t tag = 0;
     if (data_update_queue_.try_dequeue(tag) == true) {
-      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+      for (size_t i = 0; i < cfg_->UeAntTotal(); i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
         UpdateTxBuffer(data_source.get(), tag_for_ue);
