@@ -1,9 +1,10 @@
 {
+  "UE": true,
+  "ue_num": 1,
   "ofdm_ca_num": 2048,
   "ofdm_data_num": 1200,
   "demul_block_size": 48,
-  "UE": true,
-  "ue_num": 1,
+  /* Frame construction */
   "symbol_num_perframe": 70,
   "client_ul_pilot_syms": 0,
   "ul_data_symbol_start": 0,
@@ -12,6 +13,7 @@
   "dl_data_symbol_start": 8,
   "dl_symbol_num_perframe": 3,
   "beacon_position": 0,
+  /* Compute configuration */
   "mac_rx_port": 9070,
   "mac_tx_port": 9080,
   "core_offset": 12,
