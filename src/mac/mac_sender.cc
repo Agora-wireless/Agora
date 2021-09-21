@@ -86,14 +86,14 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
                      Agora_memory::Alignment_t::kAlign64);
   MLPD_TRACE(
       "Tx buffer size: dim1 %zu, dim2 %zu, total %zu, start %zu, end: %zu\n",
-      (kFrameWnd * cfg_->UeAntNum()),
+      (kFrameWnd * cfg_->UeAntTotal()),
       (packets_per_frame_ *
        (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
-      (kFrameWnd * cfg_->UeAntNum()) *
+      (kFrameWnd * cfg_->UeAntTotal()) *
           (packets_per_frame_ *
            (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
       (size_t)tx_buffers_[0],
-      (size_t)tx_buffers_[(kFrameWnd * cfg_->UeAntNum()) - 1]);
+      (size_t)tx_buffers_[(kFrameWnd * cfg_->UeAntTotal()) - 1]);
 
   MLPD_INFO(
       "Initializing MacSender, sending to mac thread at %s:%zu, frame "

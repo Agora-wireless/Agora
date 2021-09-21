@@ -12,8 +12,8 @@
 RadioTxRx::RadioTxRx(Config* const cfg, int n_threads, int in_core_id)
     : config_(cfg), thread_num_(n_threads), core_id_(in_core_id) {
   if ((kUseArgos == false) && (kUseUHD == false)) {
-    udp_servers_.resize(config_->NumRadios());
-    udp_clients_.resize(config_->NumRadios());
+    udp_servers_.resize(config_->UeAntInstancCnt());
+    udp_clients_.resize(config_->UeAntInstancCnt());
   } else {
     radioconfig_ = std::make_unique<ClientRadioConfig>(config_);
   }
@@ -93,7 +93,7 @@ bool RadioTxRx::StartTxRx(Table<char>& in_buffer, size_t in_buffer_length,
   return true;
 }
 
-struct Packet* RadioTxRx::RecvEnqueue(size_t tid, size_t radio_id,
+struct Packet* RadioTxRx::RecvEnqueue(size_t tid, size_t ant_id,
                                       size_t rx_slot) {
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
   size_t packet_length = config_->PacketLength();
@@ -108,7 +108,7 @@ struct Packet* RadioTxRx::RecvEnqueue(size_t tid, size_t radio_id,
   }
   Packet* pkt = rx.RawPacket();
 
-  ssize_t rx_bytes = udp_servers_.at(radio_id)->Recv(
+  ssize_t rx_bytes = udp_servers_.at(ant_id)->Recv(
       reinterpret_cast<uint8_t*>(pkt), packet_length);
 
   if (0 > rx_bytes) {
@@ -129,7 +129,7 @@ struct Packet* RadioTxRx::RecvEnqueue(size_t tid, size_t radio_id,
     std::printf(
         "RadioTxRx: receive failed on %zu with less than full packet %zu : "
         "%zu\n",
-        radio_id, rx_bytes, packet_length);
+        ant_id, rx_bytes, packet_length);
     throw std::runtime_error(
         "RadioTxRx: receive failed with less than full packet");
   }
@@ -148,65 +148,69 @@ int RadioTxRx::DequeueSend(int tid) {
            "RadioTxRx: Wrong Event Type in TX Queue!");
 
   // std::printf("tx queue length: %d\n", task_queue_->size_approx());
-  size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+  size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
   size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
   std::vector<char> zeros(c->PacketLength(), 0);
   std::vector<char> pilot(c->PacketLength(), 0);
   std::memcpy(&pilot[Packet::kOffsetOfData], c->PilotCi16().data(),
               c->PacketLength() - Packet::kOffsetOfData);
 
-  // Transmit pilot symbols
-  for (size_t symbol_idx = 0; symbol_idx < c->Frame().NumPilotSyms();
-       symbol_idx++) {
-    if (kDebugPrintInTask) {
-      std::printf(
-          "In TX thread %d: Transmitted pilot in frame %zu, "
-          "symbol %zu, ant %zu\n",
-          tid, frame_id, c->Frame().GetPilotSymbol(symbol_idx), ant_id);
+  // Transmit pilot symbols on each UE channel
+  for (size_t channel = 0; channel < c->NumChannels(); channel++) {
+    const size_t ant_id = (ue_id * c->NumChannels()) + channel;
+    for (size_t symbol_idx = 0; symbol_idx < c->Frame().NumPilotSyms();
+         symbol_idx++) {
+      if (kDebugPrintInTask) {
+        std::printf(
+            "In TX thread %d: Transmitted pilot in frame %zu, "
+            "symbol %zu, ant %zu\n",
+            tid, frame_id, c->Frame().GetPilotSymbol(symbol_idx), ant_id);
+      }
+
+      auto* pkt = (symbol_idx == ant_id) ? (struct Packet*)pilot.data()
+                                         : (struct Packet*)zeros.data();
+      new (pkt) Packet(frame_id, c->Frame().GetPilotSymbol(symbol_idx),
+                       0 /* cell_id */, ant_id);
+
+      udp_clients_.at(ant_id)->Send(
+          config_->BsRruAddr(), config_->UeRruPort() + ant_id,
+          reinterpret_cast<uint8_t*>(pkt), c->PacketLength());
     }
 
-    auto* pkt = (symbol_idx == ant_id) ? (struct Packet*)pilot.data()
-                                       : (struct Packet*)zeros.data();
-    new (pkt) Packet(frame_id, c->Frame().GetPilotSymbol(symbol_idx),
-                     0 /* cell_id */, ant_id);
+    if (event.event_type_ == EventType::kPacketTX) {
+      for (size_t symbol_id = 0; symbol_id < c->Frame().NumULSyms();
+           symbol_id++) {
+        size_t offset = (c->GetTotalDataSymbolIdxUl(frame_id, symbol_id) *
+                         c->UeAntInstancCnt()) +
+                        ant_id;
 
-    udp_clients_.at(ant_id)->Send(
-        config_->BsRruAddr(), config_->UeRruPort() + ant_id,
-        reinterpret_cast<uint8_t*>(pkt), c->PacketLength());
-  }
+        if (kDebugPrintInTask) {
+          std::printf(
+              "In TX thread %d: Transmitted frame %zu, data symbol %zu, "
+              "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+              tid, frame_id, c->Frame().GetULSymbol(symbol_id), ant_id,
+              gen_tag_t(event.tags_[0]).tag_, offset,
+              message_queue_->size_approx());
+        }
+
+        auto* pkt = (struct Packet*)(tx_buffer_ + offset * c->PacketLength());
+        new (pkt) Packet(frame_id, c->Frame().GetULSymbol(symbol_id),
+                         0 /* cell_id */, ant_id);
+
+        // Send data (one OFDM symbol)
+        udp_clients_.at(ant_id)->Send(
+            config_->BsRruAddr(), config_->UeRruPort() + ant_id,
+            reinterpret_cast<uint8_t*>(pkt), c->PacketLength());
+      }
+    }  // event.event_type_ == EventType::kPacketTX
+  }    // foreach channel
+
   if (event.event_type_ == EventType::kPacketPilotTX) {
     RtAssert(message_queue_->enqueue(
                  *rx_ptoks_[tid],
                  EventData(EventType::kPacketPilotTX, event.tags_[0])),
              "Socket message enqueue failed\n");
-    return event.tags_[0];
-  }
-
-  // Transmit uplink pilots and data
-  for (size_t symbol_id = 0; symbol_id < c->Frame().NumULSyms(); symbol_id++) {
-    size_t offset = (c->GetTotalDataSymbolIdxUl(frame_id, symbol_id) *
-                     c->UeAntInstancCnt()) +
-                    ant_id;
-
-    if (kDebugPrintInTask) {
-      std::printf(
-          "In TX thread %d: Transmitted frame %zu, data symbol %zu, "
-          "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-          tid, frame_id, c->Frame().GetULSymbol(symbol_id), ant_id,
-          gen_tag_t(event.tags_[0]).tag_, offset,
-          message_queue_->size_approx());
-    }
-
-    auto* pkt = (struct Packet*)(tx_buffer_ + offset * c->PacketLength());
-    new (pkt) Packet(frame_id, c->Frame().GetULSymbol(symbol_id),
-                     0 /* cell_id */, ant_id);
-
-    // Send data (one OFDM symbol)
-    udp_clients_.at(ant_id)->Send(
-        config_->BsRruAddr(), config_->UeRruPort() + ant_id,
-        reinterpret_cast<uint8_t*>(pkt), c->PacketLength());
-  }
-  if (event.event_type_ == EventType::kPacketTX) {
+  } else if (event.event_type_ == EventType::kPacketTX) {
     RtAssert(
         message_queue_->enqueue(
             *rx_ptoks_[tid], EventData(EventType::kPacketTX, event.tags_[0])),
@@ -218,37 +222,37 @@ int RadioTxRx::DequeueSend(int tid) {
 void* RadioTxRx::LoopTxRx(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_id_, tid);
   size_t rx_slot = 0;
-  size_t radio_lo = tid * config_->NumRadios() / thread_num_;
-  size_t radio_hi = (tid + 1) * config_->NumRadios() / thread_num_;
-  std::printf("Receiver thread %zu has %zu radios\n", tid, radio_hi - radio_lo);
+  const size_t ant_lo = (tid * config_->UeAntInstancCnt()) / thread_num_;
+  const size_t ant_hi = ((tid + 1) * config_->UeAntInstancCnt()) / thread_num_;
+  std::printf("Receiver thread %zu has %zu antennas\n", tid, ant_hi - ant_lo);
 
   size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
-  for (size_t radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
-    size_t local_port_id = config_->UeServerPort() + radio_id;
-    udp_servers_.at(radio_id) =
+  for (size_t ant_id = ant_lo; ant_id < ant_hi; ++ant_id) {
+    size_t local_port_id = config_->UeServerPort() + ant_id;
+    udp_servers_.at(ant_id) =
         std::make_unique<UDPServer>(local_port_id, sock_buf_size);
-    udp_clients_.at(radio_id) = std::make_unique<UDPClient>();
+    udp_clients_.at(ant_id) = std::make_unique<UDPClient>();
     MLPD_FRAME(
         "TXRX thread %zu: set up UDP socket server listening to port %d"
         " with remote address %s:%d \n",
         tid, local_port_id, config_->BsRruAddr().c_str(),
-        config_->UeRruPort() + radio_id);
+        config_->UeRruPort() + ant_id);
   }
 
-  size_t radio_id = radio_lo;
+  size_t ant_id = ant_lo;
   while (config_->Running() == true) {
     if (-1 != DequeueSend(tid)) {
       continue;
     }
     // receive data
-    struct Packet* pkt = RecvEnqueue(tid, radio_id, rx_slot);
+    struct Packet* pkt = RecvEnqueue(tid, ant_id, rx_slot);
     if (pkt == nullptr) {
       continue;
     }
     rx_slot = (rx_slot + 1) % buffers_per_thread_;
 
-    if (++radio_id == radio_hi) {
-      radio_id = radio_lo;
+    if (++ant_id == ant_hi) {
+      ant_id = ant_lo;
     }
   }
   return nullptr;
@@ -276,7 +280,7 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
            "Wrong Event Type in TX Queue!");
 
   size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-  size_t ue_id = gen_tag_t(event.tags_[0]).ant_id_;
+  size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
   size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
   size_t ant_id = ue_id * c->NumChannels();
   long long tx_time(0);
@@ -356,14 +360,13 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
 
   size_t num_samps = c->SampsPerSymbol();
-
   long long rx_time(0);
 
   std::vector<void*> samp(c->NumChannels());
   for (size_t ch = 0; ch < c->NumChannels(); ++ch) {
     RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
     if (rx.Empty() == false) {
-      std::printf("RX thread %zu at rx_offset %zu buffer full\n", tid, rx_slot);
+      std::printf("RX [%zu] at rx_offset %zu buffer full\n", tid, rx_slot);
       c->Running(false);
       return nullptr;
     }
@@ -374,11 +377,12 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
     ClientRadioConfig* radio = radioconfig_.get();
     int r = radio->RadioRx(radio_id, samp.data(), num_samps, rx_time);
     if (r < static_cast<int>(num_samps)) {
-      std::cerr << "BAD Receive(" << r << "/" << num_samps << ") at Time "
-                << rx_time << std::endl;
+      std::cerr << "RX [" << tid << "]: BAD Receive(" << r << "/" << num_samps
+                << ") at Time " << rx_time << std::endl;
     }
     if (r < 0) {
-      std::cerr << "Receive error! Stopping... " << std::endl;
+      std::cerr << "RX [" << tid << "]: Receive error! Stopping... "
+                << std::endl;
       c->Running(false);
       return nullptr;
     }
@@ -393,9 +397,7 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
   }
   if (kDebugPrintInTask) {
     std::printf(
-        "downlink receive: thread %zu, frame_id %zu, symbol_id "
-        "%zu, radio_id %zu "
-        "rxtime %llx\n",
+        "RX [%zu]: frame_id %zu, symbol_id %zu, radio_id %zu rxtime %llx\n",
         tid, frame_id, symbol_id, radio_id, rx_time);
   }
   size_t ant_id = radio_id * c->NumChannels();
@@ -419,15 +421,16 @@ void* RadioTxRx::LoopTxRxArgos(size_t tid) {
   size_t num_radios = c->NumRadios();
   size_t radio_lo = tid * num_radios / thread_num_;
   size_t radio_hi = (tid + 1) * num_radios / thread_num_;
-  std::printf("receiver thread %zu has radios %zu to %zu (%zu)\n", tid,
+  std::printf("RadioTxRx thread %zu has radios %zu to %zu (%zu)\n", tid,
               radio_lo, radio_hi - 1, radio_hi - radio_lo);
 
   // Use mutex to sychronize data receiving across threads
   {
     std::unique_lock<std::mutex> locker(mutex_);
-    std::printf("Thread %zu: waiting for release\n", tid);
+    std::printf("RadioTxRx [%zu]: waiting for release\n", tid);
     cond_.wait(locker, [this] { return this->thread_sync_; });
   }
+  std::printf("RadioTxRx [%zu]: released\n", tid);
 
   ClientRadioConfig* radio = radioconfig_.get();
 
@@ -474,7 +477,7 @@ void* RadioTxRx::LoopTxRxArgos(size_t tid) {
 }
 
 void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
-  // FIXME: This only works when there is 1 radio per thread.
+  ///\todo FIXME: This only works when there is 1 radio per thread.
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_id_, tid);
   auto& c = config_;
   size_t num_samps = c->SampsPerSymbol();
@@ -507,9 +510,10 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
       frm_rx_buff.at(1) = frm_buff1.data();
     }
 
-    std::printf("Thread %zu: waiting for release\n", tid);
+    MLPD_INFO("RadioTxRx [%zu]: waiting for release\n", tid);
     cond_.wait(locker, [this] { return this->thread_sync_; });
   }
+  MLPD_INFO("RadioTxRx [%zu]: released\n", tid);
 
   // Keep receiving one frame of data until a beacon is found
   // Perform initial beacon detection every kBeaconDetectInterval frames
@@ -520,8 +524,9 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
       r = radio->RadioRx(radio_id, frm_rx_buff.data(), frm_num_samps, rx_time);
 
       if (r != static_cast<int>(frm_num_samps)) {
-        std::cerr << "BAD SYNC Receive(" << r << "/" << frm_num_samps
-                  << ") at Time " << rx_time << std::endl;
+        std::cerr << "RadioTxRx [" << radio_id << "]: BAD SYNC Receive(" << r
+                  << "/" << frm_num_samps << ") at Time " << rx_time
+                  << std::endl;
         continue;
       }
     }
@@ -534,8 +539,9 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
     }
     sync_index = CommsLib::FindBeaconAvx(sync_buff, c->GoldCf32());
     if (sync_index >= 0) {
-      MLPD_INFO("Client %zu: Beacon detected at Time %lld, sync_index: %ld\n",
-                radio_id, rx_time, sync_index);
+      MLPD_INFO(
+          "RadioTxRx [%zu]: Beacon detected at Time %lld, sync_index: %ld\n",
+          radio_id, rx_time, sync_index);
       rx_offset = sync_index - c->BeaconLen() - c->OfdmTxZeroPrefix();
     }
   }
@@ -564,11 +570,12 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
     int r = radio->RadioRx(radio_id, frm_rx_buff.data(), num_samps + rx_offset,
                            rx_time);
     if (r != static_cast<int>(num_samps + rx_offset)) {
-      std::cerr << "BAD Beacon Receive(" << r << "/" << num_samps
-                << ") at Time " << rx_time << std::endl;
+      std::cerr << "RadioTxRx [" << radio_id << "]: BAD Beacon Receive(" << r
+                << "/" << num_samps << ") at Time " << rx_time << std::endl;
     }
     if (r < 0) {
-      std::cerr << "Receive error! Stopping... " << std::endl;
+      std::cerr << "RadioTxRx [" << radio_id << "]: Receive error! Stopping... "
+                << std::endl;
       c->Running(false);
       break;
     }
@@ -585,9 +592,10 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
     symbol_id++;
     rx_slot = (rx_slot + c->NumChannels()) % buffers_per_thread_;
 
-    // resync every X=1000 frames:
-    // TODO: X should be a function of sample rate and max CFO
-    if (frame_id / 1000 > 0 && frame_id % 1000 == 0) {
+    static const size_t kFrameSync = 1000;
+    // resync every kFrameSync frames:
+    ///\todo: kFrameSync should be a function of sample rate and max CFO
+    if (((frame_id / kFrameSync) > 0) && ((frame_id % kFrameSync) == 0)) {
       resync = true;
     }
     rx_offset = 0;
@@ -607,8 +615,8 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
         resync_retry_cnt = 0;
         resync_success++;
         MLPD_INFO(
-            "Client %zu: Re-syncing with offset: %zu, after %zu tries, index: "
-            "%ld\n",
+            "RadioTxRx [%zu]: Re-syncing with offset %zu, after %zu tries, "
+            "index: %ld\n",
             radio_id, rx_offset, resync_retry_cnt + 1, sync_index);
       } else {
         resync_retry_cnt++;
@@ -616,46 +624,48 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
     }
     if (resync && resync_retry_cnt > resync_retry_max) {
       MLPD_ERROR(
-          "Client %zu: Exceeded resync retry limit (%zu) for client %zu "
+          "RadioTxRx [%zu]: Exceeded resync retry limit (%zu) for client %zu "
           "reached after %zu resync successes at frame: %zu.  Stopping!\n",
           radio_id, resync_retry_max, tid, resync_success, frame_id);
       c->Running(false);
       break;
     }
 
-    // schedule transmit pilots and symbols
+    // Schedule transmit pilots and symbols
     while (-1 != DequeueSendArgos(tid, time0)) {
       ;
     }
 
     // receive the remaining of the frame
     for (; symbol_id < c->Frame().NumTotalSyms(); symbol_id++) {
-      if (!config_->IsPilot(frame_id, symbol_id) &&
-          !(config_->IsDownlink(frame_id, symbol_id))) {
-        radio->RadioRx(radio_id, frm_rx_buff.data(), num_samps, rx_time);
-        if (r < static_cast<int>(num_samps)) {
-          std::cerr << "BAD Receive(" << r << "/" << num_samps << ") at Time "
-                    << rx_time << std::endl;
-        }
-        if (r < 0) {
-          std::cerr << "Receive error! Stopping... " << std::endl;
-          c->Running(false);
-          break;
-        }
-        if (kDebugPrintInTask) {
-          std::printf(
-              "idle receive: thread %zu, frame_id %zu, symbol_id %zu, "
-              "radio_id %zu "
-              "rxtime %llx\n",
-              tid, frame_id, symbol_id, radio_id, rx_time);
-        }
-      } else {
+      if ((config_->IsPilot(frame_id, symbol_id) == true) ||
+          (config_->IsDownlink(frame_id, symbol_id) == true)) {
         struct Packet* rx_pkt = RecvEnqueueArgos(tid, radio_id, frame_id,
                                                  symbol_id, rx_slot, false);
         if (rx_pkt == nullptr) {
           break;
         }
         rx_slot = (rx_slot + c->NumChannels()) % buffers_per_thread_;
+      } else {
+        //Otherwise throw away the data.
+        radio->RadioRx(radio_id, frm_rx_buff.data(), num_samps, rx_time);
+        if (r < static_cast<int>(num_samps)) {
+          std::cerr << "RadioTxRx [" << radio_id << "]: BAD Receive(" << r
+                    << " / " << num_samps << ") at Time " << rx_time
+                    << std::endl;
+        }
+        if (r < 0) {
+          std::cerr << "RadioTxRx [" << radio_id
+                    << "]: Receive error !Stopping... " << std::endl;
+          c->Running(false);
+          break;
+        }
+        if (kDebugPrintInTask) {
+          std::printf(
+              "RadioTxRx [%zu]: receive thread %zu, frame_id %zu, "
+              "symbol_id %zu, radio_id %zu rxtime %llx\n",
+              radio_id, tid, frame_id, symbol_id, radio_id, rx_time);
+        }
       }
     }
     frame_id++;

@@ -113,18 +113,25 @@ PhyUe::PhyUe(Config* config)
   for (size_t frame = 0; frame < this->frame_tasks_.size(); frame++) {
     FrameInit(frame);
   }
-  tx_counters_.Init(config_->UeAntInstancCnt());
   decode_counters_.Init(dl_data_symbol_perframe_, config_->UeAntInstancCnt());
   demul_counters_.Init(dl_data_symbol_perframe_, config_->UeAntInstancCnt());
   fft_dlpilot_counters_.Init(config->Frame().ClientDlPilotSymbols(),
                              config_->UeAntInstancCnt());
-  fft_dldata_counters_.Init(dl_data_symbol_perframe_,
-                            config_->UeAntInstancCnt());
+  fft_dldata_counters_.Init(dl_data_symbol_perframe_, config_->UeAntInstancCnt());
 
+  tx_counters_.Init(config_->UeAntInstancCnt());
   encode_counter_.Init(ul_data_symbol_perframe_, config_->UeAntInstancCnt());
-  modulation_counters_.Init(ul_data_symbol_perframe_,
-                            config_->UeAntInstancCnt());
-  ifft_counters_.Init(ul_symbol_perframe_, config_->UeAntInstancCnt());
+  modulation_counters_.Init(ul_data_symbol_perframe_, config_->UeAntInstancCnt());
+
+  const size_t num_ue = config_->UeAntInstancCnt();
+  ue_tracker_.reserve(num_ue);
+  ue_tracker_.resize(num_ue);
+  for (auto& ue : ue_tracker_) {
+    //Might want to change the 1 to NumChannels or channels per ue
+    ue.ifft_counters_.Init(ul_symbol_perframe_, 1);
+    ue.tx_pending_frame_ = 0;
+    ue.tx_ready_frames_.clear();
+  }
 
   // This usage doesn't effect the user num_reciprocity_pkts_per_frame_;
   rx_counters_.num_pkts_per_frame_ =
@@ -281,8 +288,7 @@ void PhyUe::Start() {
   size_t ret = 0;
   max_equaled_frame_ = 0;
   size_t cur_frame_id = 0;
-  size_t ifft_next_frame = 0;
-  std::vector<size_t> ifft_frame_status(kFrameWnd, SIZE_MAX);
+
   while ((config_->Running() == true) &&
          (SignalHandler::GotExitSignal() == false)) {
     // get a bulk of events
@@ -366,7 +372,7 @@ void PhyUe::Start() {
                              *tx_ptoks_ptr_[ant_id % rx_thread_num_]);
               }
             } else {
-              if (ant_id % config_->NumChannels() == 0) {
+              if ((ant_id % config_->NumChannels()) == 0) {
                 // Schedule the Uplink tasks
                 for (size_t symbol_idx = 0;
                      symbol_idx < config_->Frame().NumULSyms(); symbol_idx++) {
@@ -595,9 +601,9 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kEncode: {
-          size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
+          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
 
           PrintPerTaskDone(PrintType::kEncode, frame_id, symbol_id, ue_id);
 
@@ -620,9 +626,9 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kModul: {
-          size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
+          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
 
           PrintPerTaskDone(PrintType::kModul, frame_id, symbol_id, ue_id);
 
@@ -646,42 +652,52 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kIFFT: {
-          size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
+          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
 
           PrintPerTaskDone(PrintType::kIFFT, frame_id, symbol_id, ue_id);
 
+          UeTxVars& ue = ue_tracker_.at(ue_id);
+
           bool symbol_complete =
-              ifft_counters_.CompleteTask(frame_id, symbol_id);
+              ue.ifft_counters_.CompleteTask(frame_id, symbol_id);
           if (symbol_complete == true) {
             PrintPerSymbolDone(PrintType::kIFFT, frame_id, symbol_id);
 
-            bool ifft_complete = ifft_counters_.CompleteSymbol(frame_id);
+            bool ifft_complete = ue.ifft_counters_.CompleteSymbol(frame_id);
             if (ifft_complete == true) {
               this->stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
               PrintPerFrameDone(PrintType::kIFFT, frame_id);
-              ifft_counters_.Reset(frame_id);
+              ue.ifft_counters_.Reset(frame_id);
 
-              // Schedule Transmit in frame order
-              ifft_frame_status.at(frame_id % kFrameWnd) = frame_id;
-              for (size_t i = 0u; (i < kFrameWnd); i++) {
-                size_t ifft_stat_id = (ifft_next_frame % kFrameWnd);
-                if (ifft_frame_status.at(ifft_stat_id) == ifft_next_frame) {
-                  // Schedule TX for all users (by packet)
-                  for (size_t user = 0u; user < config_->UeAntInstancCnt();
-                       user++) {
-                    EventData do_tx_task(
-                        EventType::kPacketTX,
-                        gen_tag_t::FrmSymUe(ifft_next_frame, 0, user).tag_);
-                    ScheduleTask(do_tx_task, &tx_queue_,
-                                 *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
+              //If the completed frame is the next in line, schedule the transmission
+              if (ue.tx_pending_frame_ == frame_id) {
+                size_t current_frame = frame_id;
+
+                while (ue.tx_pending_frame_ == current_frame) {
+                  EventData do_tx_task(
+                      EventType::kPacketTX,
+                      gen_tag_t::FrmSymUe(ue.tx_pending_frame_, 0, ue_id).tag_);
+                  ScheduleTask(do_tx_task, &tx_queue_,
+                               *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
+
+                  size_t next_frame = current_frame + 1;
+                  ue.tx_pending_frame_ = next_frame;
+
+                  auto tx_next =
+                      std::find(ue.tx_ready_frames_.begin(),
+                                ue.tx_ready_frames_.end(), next_frame);
+                  if (tx_next != ue.tx_ready_frames_.end()) {
+                    //With c++20 we could check the return value of remove
+                    ue.tx_ready_frames_.erase(tx_next);
+                    current_frame = next_frame;
                   }
-                  ifft_next_frame++;
-                } else { /* Done */
-                  break;
                 }
-              }  // End for next transmit frame
+              } else {
+                //Otherwise defer the tx (could make this sorted insert in future)
+                ue.tx_ready_frames_.push_front(frame_id);
+              }
             }
           }
         } break;
@@ -977,8 +993,7 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
       case (PrintType::kEncode):
         std::printf(
             "PhyUe [frame %zu symbol %zu + %.3f ms]: Data Encode complete "
-            "for "
-            "%zu antennas\n",
+            "for %zu antennas\n",
             frame_id, symbol_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             encode_counter_.GetTaskCount(frame_id, symbol_id));
@@ -996,10 +1011,9 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
       case (PrintType::kIFFT):
         std::printf(
             "PhyUe [frame %zu symbol %zu + %.3f ms]: iFFT completed for "
-            "symbol %zu antennas\n",
+            "symbol\n",
             frame_id, symbol_id,
-            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
-            ifft_counters_.GetTaskCount(frame_id, symbol_id));
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kPacketToMac):
