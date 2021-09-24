@@ -8,9 +8,9 @@
 #include "udp_client.h"
 #include "udp_server.h"
 
-//#define STREAM_UDP_DATA
-static constexpr char kVideoStreamingAddr[] = "10.238.200.112";
-static constexpr uint16_t kVideoStreamingPort = 1235u;
+#define STREAM_UDP_DATA
+static constexpr char kVideoStreamingAddr[] = "168.6.245.97";
+static constexpr uint16_t kVideoStreamingPort = 1351u;
 
 static const bool kDebugMacReceiver = true;
 

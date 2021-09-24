@@ -12,7 +12,7 @@
 #include "udp_client.h"
 #include "video_receiver.h"
 
-//#define USE_UDP_DATA_SOURCE
+#define USE_UDP_DATA_SOURCE
 
 static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kFrameLoadAdvance = 10;
