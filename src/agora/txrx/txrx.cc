@@ -9,8 +9,11 @@
 #include "logger.h"
 
 static constexpr bool kEnableSlowStart = true;
-static constexpr bool kEnableSlowSending = true;
+static constexpr bool kEnableSlowSending = false;
 static constexpr bool kDebugPrintBeacon = false;
+
+static constexpr size_t kSlowStartMulStage1 = 32;
+static constexpr size_t kSlowStartMulStage2 = 8;
 
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     : cfg_(cfg),
@@ -139,13 +142,15 @@ void PacketTXRX::LoopTxRx(size_t tid) {
   const double rdtsc_freq = GetTime::MeasureRdtscFreq();
   const size_t frame_tsc_delta =
       cfg_->GetFrameDurationSec() * 1e9f * rdtsc_freq;
-  const size_t two_hundred_ms_ticks = (0.2f /* 200 ms */ * 1e9f * rdtsc_freq);
+  //const size_t two_hundred_ms_ticks = (0.2f /* 200 ms */ * 1e9f * rdtsc_freq);
 
   // Slow start variables (Start with no less than 200 ms)
-  const size_t slow_start_tsc1 =
-      std::max(40 * frame_tsc_delta, two_hundred_ms_ticks);
+  //const size_t slow_start_tsc1 =
+  //    std::max(kSlowStartMulStage1 * frame_tsc_delta, two_hundred_ms_ticks);
+
+  const size_t slow_start_tsc1 = kSlowStartMulStage1 * frame_tsc_delta;
   const size_t slow_start_thresh1 = kFrameWnd;
-  const size_t slow_start_tsc2 = 15 * frame_tsc_delta;
+  const size_t slow_start_tsc2 = kSlowStartMulStage2 * frame_tsc_delta;
   const size_t slow_start_thresh2 = kFrameWnd * 4;
   size_t delay_tsc = frame_tsc_delta;
 

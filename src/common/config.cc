@@ -467,13 +467,15 @@ Config::Config(const std::string& jsonfile)
       "%s,\n\t%zu codeblocks per symbol, %zu bytes per code block,"
       "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
       "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
-      "frame time %.3f usec\n",
+      "frame time %.3f usec, Max data tp (Mbps) %.3f \n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
       ldpc_config_.NumBlocksInSymbol(), num_bytes_per_cb_,
       ul_mac_data_bytes_num_perframe_, ul_mac_bytes_num_perframe_,
       dl_mac_data_bytes_num_perframe_, dl_mac_bytes_num_perframe_,
-      this->GetFrameDurationSec() * 1e6);
+      this->GetFrameDurationSec() * 1e6,
+      (ul_mac_data_bytes_num_perframe_ * 8.0f) /
+          (this->GetFrameDurationSec() * 1e6));
 }
 
 void Config::GenData() {

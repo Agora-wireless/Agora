@@ -18,6 +18,9 @@ static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kFrameLoadAdvance = 10;
 static constexpr size_t kBufferInit = 10;
 
+static constexpr size_t kSlowStartMulStage1 = 32;
+static constexpr size_t kSlowStartMulStage2 = 8;
+
 static_assert(kFrameLoadAdvance >= kBufferInit);
 static std::atomic<bool> keep_running(true);
 // A spinning barrier to synchronize the start of worker threads
@@ -76,8 +79,8 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
 
   ticks_all_ =
       ((frame_duration_us_ * ticks_per_usec_) / cfg->Frame().NumTotalSyms());
-  ticks_wnd1_ = ticks_all_ * 40;
-  ticks_wnd2_ = ticks_all_ * 15;
+  ticks_wnd1_ = ticks_all_ * kSlowStartMulStage1;
+  ticks_wnd2_ = ticks_all_ * kSlowStartMulStage2;
 
   // tx buffers will be an array of MacPackets
   tx_buffers_.Malloc(kFrameWnd * cfg_->UeAntNum(),
@@ -319,9 +322,7 @@ void* MacSender::WorkerThread(size_t tid) {
         if (kDebugSenderReceiver) {
           std::printf(
               "MacSender: Thread %zu (tag = %s) transmit frame %d, radio %zu, "
-              "TX "
-              "time: "
-              "%.3f us\n",
+              "TX time: %.3f us\n",
               tid, gen_tag_t(tag).ToString().c_str(), tag.frame_id_, cur_radio,
               GetTime::CyclesToUs(GetTime::Rdtsc() - start_tsc_send,
                                   freq_ghz_));
