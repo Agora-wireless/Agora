@@ -51,47 +51,51 @@ void* MacReceiver::LoopRecv(size_t tid) {
 #endif
 
   udp_server->MakeBlocking(1);
-
-  // TODO: Should each UE have a rx port?
   std::printf("MacReceiver: Set up UDP socket server listening to port %zu\n",
               server_tx_port_ + ue_id);
 
   // Create a rx buffer
-  const size_t packet_length = data_bytes_;
-  uint8_t* rx_buffer = new uint8_t[packet_length];
+  //////// NEED TO FIX THIS -> how do we know how many data bytes????? (might not matter)
+  const size_t max_packet_length = data_bytes_;
+  auto rx_buffer = std::make_unique<uint8_t>(max_packet_length);
 
   while ((SignalHandler::GotExitSignal() == false) &&
          (cfg_->Running() == true)) {
     ssize_t recvlen =
-        udp_server->RecvFrom(&rx_buffer[0u], packet_length, server_address_,
-                             server_tx_port_ + ue_id);
+        udp_server->RecvFrom(&rx_buffer.get()[0u], max_packet_length,
+                             server_address_, server_tx_port_ + ue_id);
     if (recvlen < 0) {
       std::perror("recv failed");
       throw std::runtime_error("Receiver: recv failed");
-    } else if (static_cast<size_t>(recvlen) == packet_length) {
-      // Write the data packet to a file or push to file writter queue
+    } else if ((recvlen > 0) &&
+               static_cast<size_t>(recvlen) <= max_packet_length) {
 #if defined(STREAM_UDP_DATA)
-      udp_video_streamer->Send(std::string(kVideoStreamingAddr),
-                               kVideoStreamingPort, &rx_buffer[0u],
-                               packet_length);
+      udp_video_streamer->Send(std::string(kVideoStreamingAddr + ue_id),
+                               kVideoStreamingPort + ue_id,
+                               &rx_buffer.get()[0u], max_packet_length);
 #endif
 
       if (kDebugMacReceiver) {
         std::printf("MacReceiver: Thread %zu,  Received Data:", tid);
-        for (size_t i = 0; i < packet_length; i++) {
-          std::printf(" %02x", rx_buffer[i]);
+        for (size_t i = 0; i < max_packet_length; i++) {
+          std::printf(" %02x", rx_buffer.get()[i]);
         }
         std::printf("\n");
       }
-    } else if (recvlen != 0) {
+
+      if (static_cast<size_t>(recvlen) != max_packet_length) {
+        std::printf(
+            "MacReceiver: Recv'd less than max requested bytes %zu:%zu\n",
+            recvlen, max_packet_length);
+      }
+    } /*else if (recvlen != 0) {
       std::printf(
           "MacReceiver: Recv failed with less than requested bytes %zu\n",
           recvlen);
       throw std::runtime_error(
           "MacReceiver: recv failed with less than requested bytes");
-    }
+    }*/
   }
-  delete[] rx_buffer;
   std::printf("MacReceiver: Finished\n");
   return nullptr;
 }
