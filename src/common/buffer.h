@@ -241,6 +241,21 @@ static_assert(sizeof(rx_tag_t) == sizeof(size_t));
 // Event data tag for FFT task requests
 using fft_req_tag_t = rx_tag_t;
 
+#pragma pack(push, 1)
+struct MacPacketPacked {
+  static constexpr size_t kOffsetOfData = 16 + sizeof(RBIndicator);
+
+  uint16_t frame_id_;
+  uint16_t symbol_id_;
+  uint16_t ue_id_;
+  uint16_t datalen_;  // length of payload in bytes or array data[]
+  uint16_t crc_;      // 16 bits CRC over calculated for the data[] array
+  uint16_t rsvd_[3];  // reserved for future use
+  RBIndicator rb_indicator_;  // RAN scheduling details for PHY
+  char data_[];               // Mac packet payload data
+};
+#pragma pack(pop)
+
 struct MacPacket {
   // The packet's data starts at kOffsetOfData bytes from the start
   static constexpr size_t kOffsetOfData = 16 + sizeof(RBIndicator);

@@ -134,26 +134,43 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
   // Only non-pilot uplink symbols have application data.
   if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
     auto* pkt = reinterpret_cast<const MacPacket*>(ul_data_ptr);
+    const size_t dest_packet_size = cfg_->MacPayloadLength();
 
     // We send data to app irrespective of CRC condition
     // TODO: enable ARQ and ensure reliable data goes to app
     const size_t frame_data_offset =
         (symbol_idx_ul - cfg_->Frame().ClientUlPilotSymbols()) *
-        cfg_->MacPayloadLength();
+        dest_packet_size;
 
-    /// Spot to be optimized #1
-    std::memcpy(&server_.frame_data_[ue_id][frame_data_offset], pkt->data_,
-                cfg_->MacPayloadLength());
+    //Who's junk is better? No reason to copy currupted data
+    server_.n_filled_in_frame_[ue_id] += dest_packet_size;
 
-    server_.data_size_.at(ue_id).at(
-        this->cfg_->Frame().GetULSymbolIdx(pkt->symbol_id_)) = pkt->datalen_;
-    server_.n_filled_in_frame_[ue_id] += cfg_->MacPayloadLength();
+    bool data_valid = false;
+    //Data validity check
+    if ((static_cast<size_t>(pkt->datalen_) <= dest_packet_size) &&
+        (pkt->symbol_id_ >=
+         cfg_->Frame().GetULSymbol(cfg_->Frame().ClientUlPilotSymbols())) &&
+        (pkt->symbol_id_ <= cfg_->Frame().GetULSymbolLast()) &&
+        (pkt->ue_id_ <= cfg_->UeAntNum())) {
+      auto crc = static_cast<uint16_t>(
+          crc_obj_->CalculateCrc24((unsigned char*)pkt->data_, pkt->datalen_) &
+          0xFFFF);
 
-    // Check CRC
-    auto crc = static_cast<uint16_t>(
-        crc_obj_->CalculateCrc24((unsigned char*)pkt->data_, pkt->datalen_) &
-        0xFFFF);
-    if (crc == pkt->crc_) {
+      data_valid = (crc == pkt->crc_);
+    }
+
+    if (data_valid) {
+      MLPD_FRAME(
+          "Base Station MAC thread received frame %zu, uplink "
+          "symbol index %zu, size %zu, copied to frame data offset %zu\n",
+          frame_id, symbol_idx_ul, cfg_->MacPayloadLength(), frame_data_offset);
+      /// Spot to be optimized #1
+      std::memcpy(&server_.frame_data_[ue_id][frame_data_offset], pkt->data_,
+                  pkt->datalen_);
+
+      server_.data_size_.at(ue_id).at(
+          this->cfg_->Frame().GetULSymbolIdx(pkt->symbol_id_) -
+          cfg_->Frame().ClientUlPilotSymbols()) = pkt->datalen_;
       // Print information about the received symbol
       if (kLogMacPackets) {
         std::fprintf(
@@ -174,7 +191,15 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
         ss.str("");
       }
     } else {
-      std::printf("Bad Packet: CRC Check Failed! \n");
+      MLPD_ERROR(
+          "Failed Data integrity check - invalid parameters frame %d:%zu "
+          "symbol %d:%zu user %d:%zu length %d crc %d\n",
+          pkt->frame_id_, frame_id, pkt->symbol_id_, symbol_id, pkt->ue_id_,
+          ue_id, pkt->datalen_, pkt->crc_);
+      //Set the default to 0 valid data bytes
+      server_.data_size_.at(ue_id).at(
+          this->cfg_->Frame().GetULSymbolIdx(symbol_id) -
+          cfg_->Frame().ClientUlPilotSymbols()) = 0;
     }
   }
 
@@ -186,19 +211,27 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
     size_t src_offset = 0;
     size_t dest_offset = 0;
     for (size_t packet = 0; packet < cfg_->UlMacPacketsPerframe(); packet++) {
-      if (server_.data_size_.at(ue_id).at(packet) < cfg_->MacPayloadLength() ||
-          (shifted == true)) {
+      const size_t rx_packet_size = server_.data_size_.at(ue_id).at(packet);
+      if (rx_packet_size < cfg_->MacPayloadLength() || (shifted == true)) {
         shifted = true;
-        std::memmove(&server_.frame_data_[ue_id][dest_offset],
-                     &server_.frame_data_[ue_id][src_offset],
-                     server_.data_size_.at(ue_id).at(packet));
+        if (rx_packet_size > 0) {
+          std::memmove(&server_.frame_data_[ue_id][dest_offset],
+                       &server_.frame_data_[ue_id][src_offset], rx_packet_size);
+        }
+        dest_offset += rx_packet_size;
+        src_offset += cfg_->MacPayloadLength();
       }
-      dest_offset += server_.data_size_.at(ue_id).at(packet);
-      src_offset += cfg_->MacPayloadLength();
     }
 
-    udp_client_->Send(kMacRemoteHostname, cfg_->BsMacTxPort() + ue_id,
-                      &server_.frame_data_[ue_id][0], dest_offset);
+    if (dest_offset > 0) {
+      udp_client_->Send(kMacRemoteHostname, cfg_->BsMacTxPort() + ue_id,
+                        &server_.frame_data_[ue_id][0], dest_offset);
+    }
+
+    std::fprintf(
+        stdout, "MAC thread: Sent data for frame %zu, ue %zu, size %zu:%zu\n",
+        frame_id, ue_id, dest_offset, cfg_->UlMacDataBytesNumPerframe());
+
     std::fprintf(log_file_,
                  "MAC thread: Sent data for frame %zu, ue %zu, size %zu:%zu\n",
                  frame_id, ue_id, dest_offset,

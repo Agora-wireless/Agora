@@ -11,8 +11,8 @@
 static std::atomic<bool> running = true;
 static constexpr bool kPrintChannelOutput = false;
 static const size_t kDefaultQueueSize = 36;
-static const bool kPrintDebugTxUser = true;
-static const bool kPrintDebugTxBs = true;
+static const bool kPrintDebugTxUser = false;
+static const bool kPrintDebugTxBs = false;
 
 static void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
                                     size_t length) {
