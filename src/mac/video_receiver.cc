@@ -53,15 +53,15 @@ size_t VideoReceiver::Load(char *destination, size_t requested_bytes) {
   size_t loaded_bytes = std::min(data_available_, requested_bytes);
   std::memcpy(destination, &local_rx_buffer_.at(data_start_offset_),
               loaded_bytes);
-  MLPD_INFO("[VideoReceiver] data loaded: %zu : %zu %zu @ %zu offset\n",
-            loaded_bytes, requested_bytes, data_available_, data_start_offset_);
+  MLPD_FRAME("[VideoReceiver] data loaded: %zu : %zu %zu @ %zu offset\n",
+             loaded_bytes, requested_bytes, data_available_,
+             data_start_offset_);
   data_start_offset_ += loaded_bytes;
   data_available_ -= loaded_bytes;
   loaded_bytes = loaded_bytes;
 
-  //May not be an error
   if (data_available_ < requested_bytes) {
-    MLPD_ERROR(
+    MLPD_FRAME(
         "[VideoReceiver] not enough data to service request %zu:%zu in %zu "
         "attempts\n",
         loaded_bytes, requested_bytes, rx_attempts);

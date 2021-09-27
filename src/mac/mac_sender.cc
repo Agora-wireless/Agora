@@ -303,19 +303,20 @@ void* MacSender::WorkerThread(size_t tid) {
         uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
 
         // Send the mac data to the data sinc
-        // Sending the entire mac packet (including padding) to a common port
         for (size_t packet = 0; packet < packets_per_frame_; packet++) {
-          auto* tx_packet = reinterpret_cast<MacPacket*>(mac_packet_location);
+          auto* tx_packet =
+              reinterpret_cast<const MacPacketPacked*>(mac_packet_location);
+          const size_t mac_header_size = MacPacket::kOffsetOfData;
           const size_t mac_packet_storage_size =
-              (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
+              (cfg_->MacPacketLength() + mac_header_size);
           const size_t mac_packet_tx_size =
-              mac_packet_storage_size -
-              (cfg_->MacPayloadLength() - tx_packet->datalen_);
+              mac_header_size + tx_packet->datalen_;
 
-          ///\todo since we are sending this data structure over the network we
-          ///should make sure it is packed as packing might changes between rx and tx
+          //std::printf("MacSender sending packet %zu, size %zu:%zu\n", packet,
+          //            mac_packet_tx_size, mac_packet_storage_size);
+
           udp_client.Send(server_address_, server_rx_port_,
-                          reinterpret_cast<uint8_t*>(tx_packet),
+                          reinterpret_cast<const uint8_t*>(tx_packet),
                           mac_packet_tx_size);
           mac_packet_location = mac_packet_location + mac_packet_storage_size;
         }
@@ -387,7 +388,13 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
   MLPD_INFO("MacSender: Data update thread %zu running on core %d\n", tid,
             sched_getcpu());
 
+#if defined(USE_UDP_DATA_SOURCE)
   std::vector<std::unique_ptr<VideoReceiver>> sources;
+#else
+  ///\todo need a list of file names for this
+  std::vector<std::unique_ptr<FileReceiver>> sources;
+#endif
+
   for (size_t source = 0; source < num_data_sources; source++) {
 #if defined(USE_UDP_DATA_SOURCE)
     //Assumes that the num_data_sources are spread evenly between threads
