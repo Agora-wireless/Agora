@@ -61,7 +61,7 @@ class MacSender {
  private:
   void* MasterThread(size_t tid);
   void* WorkerThread(size_t tid);
-  void* DataUpdateThread(size_t tid);
+  void* DataUpdateThread(size_t tid, size_t num_data_sources);
 
   // Get number of CPU ticks for a symbol given a frame index
   uint64_t GetTicksForFrame(size_t frame_id) const;

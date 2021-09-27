@@ -43,9 +43,6 @@ inline size_t MacSender::TagToTxBuffersIndex(gen_tag_t tag) const {
   return (frame_slot * cfg_->UeAntNum()) + tag.ue_id_;
 }
 
-// Only send Uplink (non-pilot data)
-// size_t tx_port = server_rx_port_;
-
 MacSender::MacSender(Config* cfg, std::string& data_filename,
                      size_t packets_per_frame, std::string server_address,
                      size_t server_rx_port,
@@ -120,8 +117,8 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
                                 socket_thread_num_);
   }
 
-  // Add the data update thread (background data reader)
-  this->threads_.emplace_back(&MacSender::DataUpdateThread, this, 0);
+  // Add the data update thread (background data reader), need to add a variable for the update source number
+  this->threads_.emplace_back(&MacSender::DataUpdateThread, this, 0, 1);
 }
 
 MacSender::~MacSender() {
@@ -303,20 +300,24 @@ void* MacSender::WorkerThread(size_t tid) {
           std::printf("MacSender : worker %zu processing frame %d : %d \n", tid,
                       tag.frame_id_, tag.ant_id_);
         }
-        // const size_t tx_bufs_idx = TagToTxBuffersIndex(tag);
         uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
 
-        // Mac Thread is currently looking for packets_per_frame_ bytes
-        // since we read in mac packets, we need to skip over the headers
+        // Send the mac data to the data sinc
+        // Sending the entire mac packet (including padding) to a common port
         for (size_t packet = 0; packet < packets_per_frame_; packet++) {
           auto* tx_packet = reinterpret_cast<MacPacket*>(mac_packet_location);
-          // TODO: Port + ue_radio?
-          udp_client.Send(server_address_, server_rx_port_,
-                          reinterpret_cast<uint8_t*>(&tx_packet->data_[0u]),
-                          cfg_->MacPayloadLength());
-          mac_packet_location =
-              mac_packet_location +
+          const size_t mac_packet_storage_size =
               (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
+          const size_t mac_packet_tx_size =
+              mac_packet_storage_size -
+              (cfg_->MacPayloadLength() - tx_packet->datalen_);
+
+          ///\todo since we are sending this data structure over the network we
+          ///should make sure it is packed as packing might changes between rx and tx
+          udp_client.Send(server_address_, server_rx_port_,
+                          reinterpret_cast<uint8_t*>(tx_packet),
+                          mac_packet_tx_size);
+          mac_packet_location = mac_packet_location + mac_packet_storage_size;
         }
 
         if (kDebugSenderReceiver) {
@@ -377,7 +378,7 @@ void MacSender::CreateWorkerThreads(size_t num_workers) {
 }
 
 /* Single threaded file reader to load a shared data structure */
-void* MacSender::DataUpdateThread(size_t tid) {
+void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
   size_t buffer_updates = 0;
   PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_ + 1, 0);
 
@@ -386,12 +387,17 @@ void* MacSender::DataUpdateThread(size_t tid) {
   MLPD_INFO("MacSender: Data update thread %zu running on core %d\n", tid,
             sched_getcpu());
 
+  std::vector<std::unique_ptr<MacDataReceiver>> sources;
+  for (size_t source = 0; source < num_data_sources; source++) {
 #if defined(USE_UDP_DATA_SOURCE)
-  auto data_source =
-      std::make_unique<VideoReceiver>(VideoReceiver::kVideoStreamRxPort);
+    //Assumes that the num_data_sources are spread evenly between threads
+    sources.emplace_back(std::make_unique<VideoReceiver>(
+        VideoReceiver::kVideoStreamRxPort + (tid * num_data_sources) + source));
 #else
-  auto data_source = std::make_unique<FileReceiver>(data_filename_);
+    ///\todo need a list of file names for this
+    sources.emplace_back(std::make_unique<FileReceiver>(data_filename_));
 #endif
+  }
 
   // Init the data buffers
   while ((keep_running.load() == true) && (buffer_updates < kBufferInit)) {
@@ -400,7 +406,8 @@ void* MacSender::DataUpdateThread(size_t tid) {
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
-        UpdateTxBuffer(data_source.get(), tag_for_ue);
+        size_t ant_source = i % num_data_sources;
+        UpdateTxBuffer(sources.at(ant_source).get(), tag_for_ue);
       }
       buffer_updates++;
     }
@@ -416,7 +423,8 @@ void* MacSender::DataUpdateThread(size_t tid) {
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
-        UpdateTxBuffer(data_source.get(), tag_for_ue);
+        size_t ant_source = i % num_data_sources;
+        UpdateTxBuffer(sources.at(ant_source).get(), tag_for_ue);
       }
     }
   }
@@ -436,12 +444,21 @@ void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
     // Read a MacPayload into the data section
     size_t loaded_bytes =
         data_source->Load(pkt->data_, cfg_->MacPayloadLength());
-    if (loaded_bytes != cfg_->MacPayloadLength()) {
+
+    pkt->datalen_ = loaded_bytes;
+
+    if (loaded_bytes > cfg_->MacPayloadLength()) {
       MLPD_ERROR(
-          "MacSender [frame %d, ue %d]: Data not available to be loaded\n",
+          "MacSender [frame %d, ue %d]: Too much data was loaded from the "
+          "source\n",
           tag.frame_id_, tag.ant_id_);
+    } else if (loaded_bytes < cfg_->MacPayloadLength()) {
+      MLPD_INFO(
+          "MacSender [frame %d, ue %d]: Not enough mac data available sending "
+          "%d bytes of padding\n",
+          tag.frame_id_, tag.ant_id_, cfg_->MacPayloadLength() - loaded_bytes);
     }
-    // TODO MacPacketLength should be the size of the mac packet but is not.
+    //MacPacketLength should be the size of the mac packet but is not.
     mac_packet_location = mac_packet_location +
                           (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
   }
