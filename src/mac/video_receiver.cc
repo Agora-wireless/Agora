@@ -16,11 +16,10 @@ VideoReceiver::VideoReceiver(size_t port)
       data_available_(0),
       data_start_offset_(0) {}
 
-size_t VideoReceiver::Load(char *destination, size_t num_load_bytes) {
-  size_t loaded_bytes = 0u;
+size_t VideoReceiver::Load(char *destination, size_t requested_bytes) {
   size_t rx_attempts = 0u;
 
-  if (num_load_bytes > data_available_) {
+  if (requested_bytes > data_available_) {
     //Check for potential local buffer wrap-around
     if ((data_available_ + data_start_offset_ +
          VideoReceiver::kVideoStreamMaxRxSize) > local_rx_buffer_.size()) {
@@ -29,7 +28,7 @@ size_t VideoReceiver::Load(char *destination, size_t num_load_bytes) {
       data_start_offset_ = 0u;
     }
 
-    while ((data_available_ < num_load_bytes) &&
+    while ((data_available_ < requested_bytes) &&
            (rx_attempts < kMaxRxAttempts)) {
       rx_attempts++;
       ssize_t rcv_ret = udp_video_receiver_.Recv(
@@ -50,20 +49,22 @@ size_t VideoReceiver::Load(char *destination, size_t num_load_bytes) {
     }
   }
 
-  if (data_available_ >= num_load_bytes) {
-    //Copy data from local buffer to requested memory location
-    std::memcpy(destination, &local_rx_buffer_.at(data_start_offset_),
-                num_load_bytes);
-    MLPD_INFO("[VideoReceiver] data loaded: %zu %zu %zu\n", num_load_bytes,
-              data_available_, data_start_offset_);
-    data_start_offset_ += num_load_bytes;
-    data_available_ -= num_load_bytes;
-    loaded_bytes = num_load_bytes;
-  } else {
+  //Copy what is available
+  size_t loaded_bytes = std::min(data_available_, requested_bytes);
+  std::memcpy(destination, &local_rx_buffer_.at(data_start_offset_),
+              loaded_bytes);
+  MLPD_INFO("[VideoReceiver] data loaded: %zu : %zu %zu @ %zu offset\n",
+            loaded_bytes, requested_bytes, data_available_, data_start_offset_);
+  data_start_offset_ += loaded_bytes;
+  data_available_ -= loaded_bytes;
+  loaded_bytes = loaded_bytes;
+
+  //May not be an error
+  if (data_available_ < requested_bytes) {
     MLPD_ERROR(
         "[VideoReceiver] not enough data to service request %zu:%zu in %zu "
         "attempts\n",
-        data_available_, num_load_bytes, rx_attempts);
+        loaded_bytes, requested_bytes, rx_attempts);
   }
   return loaded_bytes;
 }
