@@ -387,7 +387,7 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
   MLPD_INFO("MacSender: Data update thread %zu running on core %d\n", tid,
             sched_getcpu());
 
-  std::vector<std::unique_ptr<MacDataReceiver>> sources;
+  std::vector<std::unique_ptr<VideoReceiver>> sources;
   for (size_t source = 0; source < num_data_sources; source++) {
 #if defined(USE_UDP_DATA_SOURCE)
     //Assumes that the num_data_sources are spread evenly between threads
@@ -455,7 +455,7 @@ void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
     } else if (loaded_bytes < cfg_->MacPayloadLength()) {
       MLPD_INFO(
           "MacSender [frame %d, ue %d]: Not enough mac data available sending "
-          "%d bytes of padding\n",
+          "%zu bytes of padding\n",
           tag.frame_id_, tag.ant_id_, cfg_->MacPayloadLength() - loaded_bytes);
     }
     //MacPacketLength should be the size of the mac packet but is not.
