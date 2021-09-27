@@ -45,6 +45,8 @@ Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_thread
         enable_slow_start == 1 ? "yes" : "no");
 
     running_ = true;
+    fft_tsc_ = 0;
+    fft_count_ = 0;
 
     _unused(server_mac_addr_str);
     for (size_t i = 0; i < SOCKET_BUFFER_FRAME_NUM; i++) {
@@ -174,12 +176,13 @@ void* Sender::worker_thread(int tid)
         = reinterpret_cast<short*>(memalign(64, 2 * cfg->user_level_list.size() * cfg->num_load_levels * ant_num_this_thread * cfg->OFDM_CA_NUM * sizeof(short) * 2));
 
     // Prepare the data
+    size_t count = 0;
     for (size_t i = 0; i < 2 * cfg->user_level_list.size() * cfg->num_load_levels; i ++) {
         for (size_t j = radio_lo; j < radio_hi; j ++) {
             memcpy(data_buf + (i * ant_num_this_thread + j - radio_lo) * (2 * cfg->OFDM_CA_NUM),
                 iq_data_short_[(i * cfg->BS_ANT_NUM) + j],
                 (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
-            run_fft(data_buf + (i * ant_num_this_thread + j - radio_lo) * (2 * cfg->OFDM_CA_NUM), fft_inout, mkl_handle);
+            run_fft(data_buf + (i * ant_num_this_thread + j - radio_lo) * (2 * cfg->OFDM_CA_NUM), fft_inout, mkl_handle, false);
         }
     }
 
@@ -408,39 +411,21 @@ void Sender::write_stats_to_file(size_t tx_frame_count) const
 }
 
 void Sender::run_fft(short* src, complex_float* fft_inout,
-    DFTI_DESCRIPTOR_HANDLE mkl_handle, bool debug) const
+    DFTI_DESCRIPTOR_HANDLE mkl_handle, bool debug)
 {
     // pkt->data has (CP_LEN + OFDM_CA_NUM) unsigned short samples. After FFT,
     // we'll remove the cyclic prefix and have OFDM_CA_NUM short samples left.
     simd_convert_short_to_float(&src[2 * cfg->CP_LEN],
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
-    if (debug) {
-        printf("Before FFT: ");
-        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
-            printf("(%f %f) ", fft_inout[i].re, fft_inout[i].im);
-        }
-        printf("\n");
-    }
-
+    size_t start_tsc = rdtsc();
     DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
-
+    size_t end_tsc = rdtsc();
     if (debug) {
-        printf("After FFT: ");
-        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
-            printf("(%f %f) ", fft_inout[i].re, fft_inout[i].im);
-        }
-        printf("\n");
+        fft_tsc_ += end_tsc - start_tsc;
+        fft_count_ ++;
     }
 
     simd_convert_float32_to_float16(reinterpret_cast<float*>(src),
         reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
-
-    if (debug) {
-        printf("After FFT short: ");
-        for (size_t i = 0; i < cfg->OFDM_CA_NUM; i ++) {
-            printf("(%d %d) ", src[i*2], src[i*2+1]);
-        }
-        printf("\n");
-    }
 }

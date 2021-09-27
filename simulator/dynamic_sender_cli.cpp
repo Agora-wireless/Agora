@@ -27,5 +27,6 @@ int main(int argc, char* argv[])
     double* frame_end = new double[kNumStatsFrames]();
     sender->startTXfromMain(frame_start, frame_end);
     sender->join_thread();
+    printf("FFT uses %lf us on average\n", cycles_to_us(sender->fft_tsc_ / sender->fft_count_, measure_rdtsc_freq()));
     return 0;
 }

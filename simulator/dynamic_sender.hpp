@@ -78,6 +78,9 @@ public:
 
     bool running_;
 
+    std::atomic<size_t> fft_tsc_;
+    std::atomic<size_t> fft_count_;
+
 private:
     void* master_thread(int tid);
     void* worker_thread(int tid);
@@ -109,7 +112,7 @@ private:
     // Run FFT on the data field in pkt, output to fft_inout
     // Recombine pkt header data and fft output data into payload
     void run_fft(short* pkt, complex_float* fft_inout,
-        DFTI_DESCRIPTOR_HANDLE mkl_handle, bool debug = false) const;
+        DFTI_DESCRIPTOR_HANDLE mkl_handle, bool debug = false);
 
     Config* cfg;
     const double freq_ghz; // RDTSC frequency in GHz
