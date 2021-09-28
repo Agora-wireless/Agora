@@ -4,13 +4,14 @@
  */
 #include "mac_receiver.h"
 
+#include "logger.h"
 #include "signal_handler.h"
 #include "udp_client.h"
 #include "udp_server.h"
 
 #define STREAM_UDP_DATA
 static constexpr char kVideoStreamingAddr[] = "168.6.245.97";
-static constexpr uint16_t kVideoStreamingPort = 1351u;
+static constexpr uint16_t kVideoStreamingPort = 1230u;
 
 static const bool kDebugMacReceiver = true;
 
@@ -57,13 +58,13 @@ void* MacReceiver::LoopRecv(size_t tid) {
   // Create a rx buffer
   //////// NEED TO FIX THIS -> how do we know how many data bytes????? (might not matter)
   const size_t max_packet_length = data_bytes_;
-  auto rx_buffer = std::make_unique<uint8_t>(max_packet_length);
+  auto* rx_buffer = new uint8_t[max_packet_length];
 
   while ((SignalHandler::GotExitSignal() == false) &&
          (cfg_->Running() == true)) {
     ssize_t recvlen =
-        udp_server->RecvFrom(&rx_buffer.get()[0u], max_packet_length,
-                             server_address_, server_tx_port_ + ue_id);
+        udp_server->RecvFrom(&rx_buffer[0u], max_packet_length, server_address_,
+                             server_tx_port_ + ue_id);
     if (recvlen < 0) {
       std::perror("recv failed");
       throw std::runtime_error("Receiver: recv failed");
@@ -71,22 +72,24 @@ void* MacReceiver::LoopRecv(size_t tid) {
                static_cast<size_t>(recvlen) <= max_packet_length) {
 #if defined(STREAM_UDP_DATA)
       udp_video_streamer->Send(std::string(kVideoStreamingAddr + ue_id),
-                               kVideoStreamingPort + ue_id,
-                               &rx_buffer.get()[0u], max_packet_length);
+                               kVideoStreamingPort + ue_id, &rx_buffer[0u],
+                               recvlen);
 #endif
 
       if (kDebugMacReceiver) {
-        std::printf("MacReceiver: Thread %zu,  Received Data:", tid);
-        for (size_t i = 0; i < max_packet_length; i++) {
-          std::printf(" %02x", rx_buffer.get()[i]);
+        std::printf("MacReceiver: Thread %zu, Data Bytes: %zu:%zu, Data:", tid,
+                    recvlen, max_packet_length);
+        for (size_t i = 0; i < static_cast<size_t>(recvlen); i++) {
+          std::printf(" %02x", rx_buffer[i]);
         }
         std::printf("\n");
       }
 
       if (static_cast<size_t>(recvlen) != max_packet_length) {
-        std::printf(
-            "MacReceiver: Recv'd less than max requested bytes %zu:%zu\n",
-            recvlen, max_packet_length);
+        MLPD_INFO(
+            "MacReceiver: Thread %zu received less than max data bytes "
+            "%zu:%zu\n",
+            tid, recvlen, max_packet_length);
       }
     } /*else if (recvlen != 0) {
       std::printf(
@@ -96,6 +99,7 @@ void* MacReceiver::LoopRecv(size_t tid) {
           "MacReceiver: recv failed with less than requested bytes");
     }*/
   }
+  delete[] rx_buffer;
   std::printf("MacReceiver: Finished\n");
   return nullptr;
 }

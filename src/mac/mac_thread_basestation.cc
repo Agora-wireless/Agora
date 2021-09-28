@@ -218,9 +218,9 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
           std::memmove(&server_.frame_data_[ue_id][dest_offset],
                        &server_.frame_data_[ue_id][src_offset], rx_packet_size);
         }
-        dest_offset += rx_packet_size;
-        src_offset += cfg_->MacPayloadLength();
       }
+      dest_offset += rx_packet_size;
+      src_offset += cfg_->MacPayloadLength();
     }
 
     if (dest_offset > 0) {
