@@ -385,8 +385,8 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
   size_t src_pkt_offset = 0;
   //Copy from the packet rx buffer into ul_bits memory (unpacked)
   for (size_t pkt_id = 0; pkt_id < cfg_->UlMacPacketsPerframe(); pkt_id++) {
-    const auto* src_packet =
-        reinterpret_cast<const MacPacket*>(&payload[src_pkt_offset]);
+    auto* src_packet =
+        reinterpret_cast<const MacPacketPacked*>(&payload[src_pkt_offset]);
     //next_radio_id_ = src_packet->ue_id;
 
     // could use pkt_id vs src_packet->symbol_id_ but might reorder packets
