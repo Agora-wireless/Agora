@@ -29,7 +29,6 @@ DEFINE_uint64(
     "Send frames slower than the specified frame duration during warmup");
 
 int main(int argc, char* argv[]) {
-  PinToCoreWithOffset(ThreadType::kMaster, FLAGS_core_offset, 0);
   gflags::SetVersionString(GetAgoraProjectVersion());
 
   gflags::SetUsageMessage(
@@ -39,6 +38,7 @@ int main(int argc, char* argv[]) {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = FLAGS_conf_file;
   std::string data_filename = FLAGS_data_file;
+  PinToCoreWithOffset(ThreadType::kMaster, FLAGS_core_offset, 0);
 
   auto frame_start = new double[kNumStatsFrames];
   auto frame_end = new double[kNumStatsFrames];
