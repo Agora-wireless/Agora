@@ -133,7 +133,7 @@ Config::Config(const std::string& jsonfile)
   bs_server_port_ = tdd_conf.value("bs_server_port", 8000);
   bs_rru_port_ = tdd_conf.value("bs_rru_port", 9000);
   ue_rru_port_ = tdd_conf.value("ue_rru_port", 7000);
-  ue_server_port_ = tdd_conf.value("ue_sever_port", 6000);
+  ue_server_port_ = tdd_conf.value("ue_server_port", 6000);
 
   dpdk_num_ports_ = tdd_conf.value("dpdk_num_ports", 1);
   dpdk_port_offset_ = tdd_conf.value("dpdk_port_offset", 0);

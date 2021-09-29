@@ -52,16 +52,18 @@ MacThreadClient::MacThreadClient(
   // TODO: See if it makes more sense to split up the UE's by port here for
   // client mode.
   size_t udp_server_port = cfg_->UeMacRxPort();
-  MLPD_TRACE("MacThreadClient: setting up udp server at port %zu\n",
-             udp_server_port);
+  MLPD_INFO("MacThreadClient: setting up udp server for mac data at port %zu\n",
+            udp_server_port);
   udp_server_ = std::make_unique<UDPServer>(
       udp_server_port, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
 
   const size_t udp_control_len = sizeof(RBIndicator);
   udp_control_buf_.resize(udp_control_len);
 
-  MLPD_TRACE("MacThreadClient: setting up udp server at port %zu\n",
-             kMacBaseClientPort);
+  MLPD_INFO(
+      "MacThreadClient: setting up udp server for mac control channel at port "
+      "%zu\n",
+      kMacBaseClientPort);
   udp_control_channel_ = std::make_unique<UDPServer>(
       kMacBaseClientPort, udp_control_len * kMaxUEs * kMaxPktsPerUE);
 
