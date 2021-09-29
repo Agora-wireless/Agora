@@ -258,15 +258,20 @@ struct MacPacketPacked {
 
 struct MacPacket {
   // The packet's data starts at kOffsetOfData bytes from the start
+#if ENABLE_RB_IND
   static constexpr size_t kOffsetOfData = 16 + sizeof(RBIndicator);
-
+#else
+  static constexpr size_t kOffsetOfData = 16;
+#endif
   uint16_t frame_id_;
   uint16_t symbol_id_;
   uint16_t ue_id_;
   uint16_t datalen_;  // length of payload in bytes or array data[]
   uint16_t crc_;      // 16 bits CRC over calculated for the data[] array
   uint16_t rsvd_[3];  // reserved for future use
+#if ENABLE_RB_IND
   RBIndicator rb_indicator_;  // RAN scheduling details for PHY
+#endif
   char data_[];               // Mac packet payload data
   MacPacket(int f, int s, int u, int d,
             int cc)  // TODO: Should be unsigned integers

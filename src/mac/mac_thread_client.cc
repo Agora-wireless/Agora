@@ -408,7 +408,9 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
     pkt->rsvd_[0u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
     pkt->rsvd_[1u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
     pkt->rsvd_[2u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
+#if ENABLE_RB_IND
     pkt->rb_indicator_ = ri;
+#endif
 
     std::memcpy(pkt->data_, src_packet->data_, pkt->datalen_);
     // Insert CRC

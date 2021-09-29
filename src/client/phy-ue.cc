@@ -576,12 +576,15 @@ void PhyUe::Start() {
           if (current_frame_user_num_ == 0) {
             expected_frame_id_from_mac_++;
           }
+#if ENABLE_RB_IND
           config_->UpdateModCfgs(pkt->rb_indicator_.mod_order_bits_);
-
+#endif
           if (kDebugPrintPacketsFromMac) {
+#if ENABLE_RB_IND
             std::printf(
                 "PhyUe: received packet for frame %u with modulation %zu\n",
                 pkt->frame_id_, pkt->rb_indicator_.mod_order_bits_);
+#endif
             std::stringstream ss;
 
             for (size_t ul_data_symbol = 0;
