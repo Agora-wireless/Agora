@@ -333,8 +333,8 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
   for (size_t packet = 0u; packet < cfg_->UlMacPacketsPerframe(); packet++) {
     auto* pkt = reinterpret_cast<const MacPacketPacked*>(&payload[pkt_offset]);
 
-    //std::printf("Packet %zu, symbol %d, user %d\n", packet, pkt->symbol_id_,
-    //            pkt->ue_id_);
+    //std::printf("Frame %d, Packet %zu, symbol %d, user %d\n", pkt->frame_id_,
+    //            packet, pkt->symbol_id_, pkt->ue_id_);
     if (packet == 0) {
       ue_id = pkt->ue_id_;
     } else {
