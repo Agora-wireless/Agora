@@ -1,7 +1,7 @@
 {
   "UE": true,
   "ue_num": 1,
-  "antenna_num": 4,
+  "antenna_num": 8,
   "ofdm_ca_num": 2048,
   "ofdm_data_num": 1200,
   "demul_block_size": 48,
@@ -17,8 +17,8 @@
   /* compute configuration */
   "mac_rx_port": 9070,
   "mac_tx_port": 9080,
-  "core_offset": 16,
-  "worker_thread_num": 10,
+  "core_offset": 20,
+  "worker_thread_num": 12,
   "socket_thread_num": 1,
   "frames_to_test": 10000
 }
