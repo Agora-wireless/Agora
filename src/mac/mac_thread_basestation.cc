@@ -337,7 +337,9 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
     pkt->rsvd_[0] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
     pkt->rsvd_[1] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
     pkt->rsvd_[2] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
+#if ENABLE_RB_IND
     pkt->rb_indicator_ = ri;
+#endif
 
     std::memcpy(pkt->data_, payload + pkt_id * cfg_->MacPayloadLength(),
                 pkt->datalen_);

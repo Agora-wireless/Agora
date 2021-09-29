@@ -9,13 +9,13 @@
     "rate": 7.68e6,
     "cp_len": 32,
     "ofdm_ca_num": 512,
-    "ofdm_data_num": 432,
+    "ofdm_data_num": 400,
     "modulation": "16QAM",
-    "Zc": 26,
+    "Zc": 24,
     "ofdm_tx_zero_prefix": 160,
     "ofdm_tx_zero_postfix": 160,
     "frames": [
-        "BPGUUUUUUG"
+        "BPGUUUUG"
     ],
     "hw_framer": false,
     "frames_to_test": 100000,
