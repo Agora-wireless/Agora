@@ -71,7 +71,7 @@ void* MacReceiver::LoopRecv(size_t tid) {
     } else if ((recvlen > 0) &&
                static_cast<size_t>(recvlen) <= max_packet_length) {
 #if defined(STREAM_UDP_DATA)
-      udp_video_streamer->Send(std::string(kVideoStreamingAddr + ue_id),
+      udp_video_streamer->Send(std::string(kVideoStreamingAddr),
                                kVideoStreamingPort + ue_id, &rx_buffer[0u],
                                recvlen);
 #endif

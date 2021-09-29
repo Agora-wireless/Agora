@@ -320,15 +320,19 @@ void* MacSender::WorkerThread(size_t tid) {
         // Send the mac data to the data sinc
         for (size_t packet = 0; packet < packets_per_frame_; packet++) {
           auto* tx_packet =
-              reinterpret_cast<const MacPacketPacked*>(mac_packet_location);
+              reinterpret_cast<const MacPacket*>(mac_packet_location);
           const size_t mac_header_size = MacPacket::kOffsetOfData;
           const size_t mac_packet_storage_size =
               (cfg_->MacPacketLength() + mac_header_size);
           const size_t mac_packet_tx_size =
               mac_header_size + tx_packet->datalen_;
 
-          //std::printf("MacSender sending packet %zu, size %zu:%zu\n", packet,
-          //            mac_packet_tx_size, mac_packet_storage_size);
+          //std::printf(
+          //    "MacSender sending frame %d:%d, packet %zu, symbol %d, size "
+          //    "%zu:%zu\n",
+          //    tx_packet->frame_id_, tag.frame_id_, packet,
+          //    tx_packet->symbol_id_, mac_packet_tx_size,
+          //    mac_packet_storage_size);
 
           udp_client.Send(server_address_, server_rx_port_,
                           reinterpret_cast<const uint8_t*>(tx_packet),
@@ -405,12 +409,12 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
 
   const size_t ue_ant_low = tid * ue_per_thread;
   const size_t ue_ant_high =
-      std::min(ue_ant_low + ue_per_thread, cfg_->UeAntNum());
+      std::min((ue_ant_low + ue_per_thread) - 1, cfg_->UeAntNum() - 1);
 
   // Sender gets better performance when this thread is not pinned to core
   MLPD_INFO(
-      "MacSender: Data update thread %zu running on core %d servicing ue data "
-      "%zu to %zu\n",
+      "MacSender: Data update thread %zu running on core %d servicing ue "
+      "%zu:%zu data\n",
       tid, sched_getcpu(), ue_ant_low, ue_ant_high);
 
 #if defined(USE_UDP_DATA_SOURCE)
@@ -435,7 +439,7 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
   while ((keep_running.load() == true) && (buffer_updates < kBufferInit)) {
     size_t tag = 0;
     if (data_update_queue_.at(tid).try_dequeue(tag) == true) {
-      for (size_t i = ue_ant_low; i < ue_ant_high; i++) {
+      for (size_t i = ue_ant_low; i <= ue_ant_high; i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
         size_t ant_source = i % num_data_sources;
@@ -445,14 +449,14 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
     }
   }
 
-  MLPD_INFO("MacSender: Data update initialized\n");
+  MLPD_INFO("MacSender[%zu]: Data update initialized\n", tid);
   // Unlock the rest of the workers
   num_workers_ready_atomic.fetch_add(1);
   // Normal run loop
   while (keep_running.load() == true) {
     size_t tag = 0;
     if (data_update_queue_.at(tid).try_dequeue(tag) == true) {
-      for (size_t i = ue_ant_low; i < ue_ant_high; i++) {
+      for (size_t i = ue_ant_low; i <= ue_ant_high; i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
         size_t ant_source = i % num_data_sources;
