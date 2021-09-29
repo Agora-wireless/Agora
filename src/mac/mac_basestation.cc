@@ -14,6 +14,8 @@
 
 DEFINE_uint64(num_sender_worker_threads, 1,
               "Number of mac basestation sender worker threads");
+DEFINE_uint64(num_sender_update_threads, 1,
+              "Number of mac client sender update threads / streams");
 DEFINE_uint64(num_receiver_threads, 1,
               "Number of mac basestation receiver threads");
 DEFINE_uint64(core_offset, 6, "Core ID of the first sender thread");
@@ -75,8 +77,9 @@ int main(int argc, char* argv[]) {
       std::unique_ptr<MacSender> sender;
       std::unique_ptr<MacReceiver> receiver;
       std::vector<std::thread> rx_threads;
-      //+2 1 for main thread and 1 for data update thread
-      const size_t kNumTotalSenderThreads = FLAGS_num_sender_worker_threads + 2;
+      //+1 for main thread a
+      const size_t kNumTotalSenderThreads =
+          FLAGS_num_sender_worker_threads + 1 + FLAGS_num_sender_update_threads;
 
       // Register signal handler to handle kill signal
       signal_handler.SetupSignalHandlers();
@@ -86,8 +89,9 @@ int main(int argc, char* argv[]) {
             cfg->BsServerAddr(), cfg->BsMacRxPort(),
             std::bind(&FrameStats::GetDLDataSymbol, cfg->Frame(),
                       std::placeholders::_1),
-            FLAGS_num_sender_worker_threads, FLAGS_core_offset + 1,
-            FLAGS_frame_duration, 0, FLAGS_enable_slow_start, true);
+            FLAGS_core_offset + 1, FLAGS_num_sender_worker_threads,
+            FLAGS_num_sender_update_threads, FLAGS_frame_duration, 0,
+            FLAGS_enable_slow_start, true);
         sender->StartTXfromMain(frame_start, frame_end);
       }
       if (cfg->Frame().NumUlDataSyms() > 0) {
