@@ -330,6 +330,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
   size_t pkt_offset = 0;
   size_t ue_id = 0;
   size_t symbol_id = 0;
+  size_t frame_id = 0;
   for (size_t packet = 0u; packet < cfg_->UlMacPacketsPerframe(); packet++) {
     auto* pkt = reinterpret_cast<const MacPacketPacked*>(&payload[pkt_offset]);
 
@@ -337,6 +338,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
     //            packet, pkt->symbol_id_, pkt->ue_id_);
     if (packet == 0) {
       ue_id = pkt->ue_id_;
+      frame_id = pkt->frame_id_;
     } else {
       if (ue_id != pkt->ue_id_) {
         MLPD_ERROR(
@@ -346,6 +348,12 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
       if ((symbol_id + 1) != pkt->symbol_id_) {
         MLPD_ERROR("Received out of order symbol id %d, expected %zu\n",
                    pkt->symbol_id_, symbol_id + 1);
+      }
+
+      if (frame_id != pkt->frame_id_) {
+        MLPD_ERROR(
+            "Received pkt %zu data with unexpected frame id %zu, expected %d\n",
+            packet, frame_id, pkt->frame_id_);
       }
     }
     symbol_id = pkt->symbol_id_;
@@ -359,8 +367,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
 
   next_radio_id_ = ue_id;
 
-  // We've received bits for the uplink. The received MAC packet does not
-  // specify a radio ID, send to radios in round-robin order
+  // We've received bits for the uplink.
   size_t& radio_buf_id = client_.ul_bits_buffer_id_[next_radio_id_];
 
   if ((*client_.ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] == 1) {
@@ -444,7 +451,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
   EventData msg(EventType::kPacketFromMac,
                 rx_mac_tag_t(next_radio_id_, radio_buf_id).tag_);
 
-  MLPD_TRACE("Tx mac information to %zu %zu\n", next_radio_id_, radio_buf_id);
+  MLPD_INFO("Tx mac information to %zu %zu\n", next_radio_id_, radio_buf_id);
   RtAssert(tx_queue_->enqueue(msg),
            "MAC thread: Failed to enqueue uplink packet");
 
