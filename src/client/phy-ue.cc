@@ -570,7 +570,8 @@ void PhyUe::Start() {
               "%zu\n",
               pkt->frame_id_, pkt->symbol_id_, pkt->ue_id_, ue_id, radio_buf_id,
               (size_t)pkt);
-          RtAssert(pkt->frame_id_ == expected_frame_id_from_mac_,
+          RtAssert(pkt->frame_id_ ==
+                       static_cast<uint16_t>(expected_frame_id_from_mac_),
                    "PhyUe: Incorrect frame ID from MAC");
           current_frame_user_num_ =
               (current_frame_user_num_ + 1) % config_->UeAntNum();
@@ -605,7 +606,6 @@ void PhyUe::Start() {
             }
             std::printf("%s\n", ss.str().c_str());
           }
-
         } break;
 
         case EventType::kEncode: {
