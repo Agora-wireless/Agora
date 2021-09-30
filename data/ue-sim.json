@@ -5,7 +5,7 @@
   "Zc": 20,
   "UE": true,
   "ue_num": 2,
-  "symbol_num_perframe": 10,
+  "symbol_num_perframe": 16,
   "client_ul_pilot_syms": 2,
   "ul_data_symbol_start": 3,
   "ul_symbol_num_perframe": 3,
@@ -15,7 +15,7 @@
   "beacon_position": 0,
   "bs_server_port": 8100,
   "bs_rru_port": 8200,
-  "core_offset": 16,
-  "worker_thread_num": 2,
+  "core_offset": 2,
+  "worker_thread_num": 8,
   "socket_thread_num": 1
 }
