@@ -558,7 +558,8 @@ void PhyUe::Start() {
           // This is an entire frame (multiple mac packets)
           const size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
           const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
-          RtAssert(radio_buf_id == (expected_frame_id_from_mac_ % kFrameWnd));
+          RtAssert(radio_buf_id == (expected_frame_id_from_mac_ % kFrameWnd),
+                   "Radio buffer id does not match expected");
 
           auto* pkt = reinterpret_cast<MacPacket*>(
               &ul_bits_buffer_[ue_id][radio_buf_id *
