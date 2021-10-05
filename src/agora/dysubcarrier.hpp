@@ -72,31 +72,28 @@ public:
         /// The range of subcarriers handled by this subcarrier doer.
         Range sc_range,
         // input buffers
-        Table<char>& socket_buffer,
-        PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
+        Table<char>& freq_domain_iq_buffer,
+        PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffer,
         Table<complex_float>& calib_buffer, Table<int8_t>& dl_encoded_buffer,
         // output buffers
-        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send,
         Table<complex_float>& dl_ifft_buffer,
         // intermediate buffers owned by SubcarrierManager
-        Table<complex_float>& ue_spec_pilot_buffer,
         Table<complex_float>& equal_buffer,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
         std::vector<std::vector<ControlInfo>>& control_info_table,
         std::vector<size_t>& control_idx_list,
-        PhyStats* phy_stats, Stats* stats, RxStatus* rx_status = nullptr,
+        RxStatus* rx_status = nullptr,
         DemulStatus* demul_status = nullptr, PrecodeStatus* precode_status = nullptr)
-        : Doer(config, tid, freq_ghz, dummy_conq_, dummy_conq_,
-              nullptr /* tok */)
+        : Doer(config, tid, freq_ghz)
         , sc_range_(sc_range)
-        , socket_buffer_(socket_buffer)
-        , csi_buffers_(csi_buffers)
+        , freq_domain_iq_buffer_(freq_domain_iq_buffer)
+        , csi_buffer_(csi_buffer)
         , calib_buffer_(calib_buffer)
         , dl_encoded_buffer_(dl_encoded_buffer)
-        , demod_buffers_(demod_buffers)
+        , demod_buffer_to_send_(demod_buffer_to_send)
         , dl_ifft_buffer_(dl_ifft_buffer)
-        , ue_spec_pilot_buffer_(ue_spec_pilot_buffer)
         , equal_buffer_(equal_buffer)
         , ul_zf_matrices_(ul_zf_matrices)
         , dl_zf_matrices_(dl_zf_matrices)
@@ -107,19 +104,15 @@ public:
         , precode_status_(precode_status)
     {
         // Create the requisite Doers
-        do_zf_ = new DyZF(this->cfg, tid, freq_ghz, dummy_conq_, dummy_conq_,
-            nullptr /* ptok */, csi_buffers_, calib_buffer, ul_zf_matrices_,
-            dl_zf_matrices_, control_info_table_, control_idx_list_, stats);
+        do_zf_ = new DyZF(this->cfg, tid, freq_ghz, csi_buffer_, calib_buffer, ul_zf_matrices_,
+            dl_zf_matrices_, control_info_table_, control_idx_list_);
 
-        do_demul_ = new DyDemul(this->cfg, tid, freq_ghz, dummy_conq_,
-            dummy_conq_, nullptr /* ptok */, ul_zf_matrices_,
-            ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_, 
-            control_info_table_, control_idx_list_, phy_stats,
-            stats, &socket_buffer_);
+        do_demul_ = new DyDemul(this->cfg, tid, freq_ghz, freq_domain_iq_buffer_, ul_zf_matrices_,
+            equal_buffer_, demod_buffer_to_send_, 
+            control_info_table_, control_idx_list_);
 
-        do_precode_ = new DoPrecode(this->cfg, tid, freq_ghz, dummy_conq_,
-            dummy_conq_, nullptr /* ptok */, dl_zf_matrices_, dl_ifft_buffer_,
-            dl_encoded_buffer_, stats);
+        // do_precode_ = new DoPrecode(this->cfg, tid, freq_ghz, dl_zf_matrices_, dl_ifft_buffer_,
+        //     dl_encoded_buffer_);
 
         // Init internal states
         demul_cur_sym_ul_ = 0;
@@ -130,7 +123,6 @@ public:
         delete do_zf_;
         delete do_demul_;
         delete do_precode_;
-        // delete computeReciprocity_;
     }
 
     void start_work()
@@ -171,13 +163,8 @@ public:
                 loop_count ++;
             }
 
-            if (cfg->test_mode > 1) {
-                continue;
-            }
-
             if (zf_cur_frame_ > demul_cur_frame_) {
 
-                // work_start_tsc = rdtsc();
                 state_start_tsc = rdtsc();
                 bool ret = rx_status_->is_demod_ready(
                        demul_cur_frame_, demul_cur_sym_ul_);
@@ -185,7 +172,6 @@ public:
                 if (likely(start_tsc > 0)) {
                     state_operation_duration += state_tsc_usage;
                 }
-                // work_tsc_duration += rdtsc() - work_start_tsc;
 
                 if (ret) {
                     if (likely(start_tsc > 0)) {
@@ -210,13 +196,6 @@ public:
                     if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
                         n_demul_tasks_done_ = 0;
 
-                        // state_start_tsc = rdtsc();
-                        if (cfg->test_mode != 1) {
-                            demul_status_->demul_complete(
-                                demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_reqd);
-                        }
-                        // state_operation_duration += rdtsc() - state_start_tsc;
-
                         demul_cur_sym_ul_++;
                         if (demul_cur_sym_ul_ == cfg->ul_data_symbol_num_perframe) {
                             demul_cur_sym_ul_ = 0;
@@ -229,10 +208,6 @@ public:
                                 cfg->ul_data_symbol_num_perframe);
                             if (likely(start_tsc > 0)) {
                                 print_tsc_duration += rdtsc() - demod_start_tsc;
-                            }
-                            
-                            if (cfg->test_mode == 1) {
-                                rx_status_->decode_done(demul_cur_frame_);
                             }
 
                             demul_cur_frame_++;
@@ -327,14 +302,12 @@ public:
 
             size_t state_tsc_usage = 0;
             if (likely(start_tsc > 0)) {
-                // work_start_tsc = rdtsc();
                 state_start_tsc = rdtsc();
             }
             bool ret = rx_status_->received_all_pilots(csi_cur_frame_);
             if (likely(start_tsc > 0)) {
                 state_tsc_usage = rdtsc() - state_start_tsc;
                 state_operation_duration += state_tsc_usage;
-                // work_tsc_duration += rdtsc() - work_start_tsc;
             }
 
             if (ret) {
@@ -367,10 +340,6 @@ public:
                 }
 
                 csi_cur_frame_++;
-                // while (should_sleep(control_info_table_[control_idx_list_[csi_cur_frame_]])) {
-                //     csi_cur_frame_ ++;
-                //     usleep(800); // TODO: decide the sleeping length
-                // }
                 if (likely(start_tsc > 0)) {
                     work_tsc_duration += rdtsc() - work_start_tsc;
                 }
@@ -422,7 +391,7 @@ private:
 
         for (size_t i = 0; i < cfg->pilot_symbol_num_perframe; i++) {
             for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
-                auto* pkt = reinterpret_cast<Packet*>(socket_buffer_[j]
+                auto* pkt = reinterpret_cast<Packet*>(freq_domain_iq_buffer_[j]
                     + (frame_slot * cfg->symbol_num_perframe
                           * cfg->packet_length)
                     + i * cfg->packet_length);
@@ -447,7 +416,7 @@ private:
                             kSCsPerCacheline * 2);
 
                         const complex_float* src = converted_sc;
-                        complex_float* dst = csi_buffers_[frame_slot][i]
+                        complex_float* dst = csi_buffer_[frame_slot][i]
                             + block_base_offset + (j * kTransposeBlockSize)
                             + sc_j;
 
@@ -514,20 +483,19 @@ private:
 
     // Input buffers
 
-    Table<char>& socket_buffer_;
+    Table<char>& freq_domain_iq_buffer_;
 
-    PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffer_;
     Table<complex_float>& calib_buffer_;
     Table<int8_t>& dl_encoded_buffer_;
 
     // Output buffers
 
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send_;
     Table<complex_float>& dl_ifft_buffer_;
 
     // Intermediate buffers
 
-    Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_;
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;
@@ -557,8 +525,6 @@ private:
 
     // Shared status with TXRX threads
     PrecodeStatus* precode_status_;
-
-    moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
 
     // Control info
     std::vector<std::vector<ControlInfo>>& control_info_table_;

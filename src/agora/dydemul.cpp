@@ -6,41 +6,26 @@
 static constexpr bool kUseSIMDGather = true;
 
 DyDemul::DyDemul(Config* config, int tid, double freq_ghz,
-    moodycamel::ConcurrentQueue<Event_data>& task_queue,
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-    moodycamel::ProducerToken* worker_producer_token,
+    Table<char>& freq_domain_iq_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
-    Table<complex_float>& ue_spec_pilot_buffer,
     Table<complex_float>& equal_buffer,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send,
     std::vector<std::vector<ControlInfo>>& control_info_table,
-    std::vector<size_t>& control_idx_list,
-    PhyStats* in_phy_stats, Stats* stats_manager, Table<char>* socket_buffer)
-    : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
-          worker_producer_token)
+    std::vector<size_t>& control_idx_list)
+    : Doer(config, tid, freq_ghz)
     , ul_zf_matrices_(ul_zf_matrices)
-    , ue_spec_pilot_buffer_(ue_spec_pilot_buffer)
     , equal_buffer_(equal_buffer)
-    , demod_buffers_(demod_buffers)
-    , socket_buffer_(socket_buffer)
+    , demod_buffer_to_send_(demod_buffer_to_send)
+    , freq_domain_iq_buffer_(freq_domain_iq_buffer)
     , control_info_table_(control_info_table)
     , control_idx_list_(control_idx_list)
-    , phy_stats(in_phy_stats)
 {
-    duration_stat = stats_manager->get_duration_stat(DoerType::kDemul, tid);
-
     data_gather_buffer = reinterpret_cast<complex_float*>(memalign(
         64, cfg->OFDM_DATA_NUM * kMaxAntennas * sizeof(complex_float)));
     equaled_buffer_temp = reinterpret_cast<complex_float*>(
         memalign(64, cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
     equaled_buffer_temp_transposed = reinterpret_cast<complex_float*>(
         memalign(64, cfg->demul_block_size * kMaxUEs * sizeof(complex_float)));
-
-    // phase offset calibration data
-    cx_float* ue_pilot_ptr = (cx_float*)cfg->ue_specific_pilot[0];
-    cx_fmat mat_pilot_data(
-        ue_pilot_ptr, cfg->OFDM_DATA_NUM, cfg->UE_ANT_NUM, false);
-    ue_pilot_data = mat_pilot_data.st();
 
 #if USE_MKL_JIT
     MKL_Complex8 alpha = { 1, 0 };
@@ -82,8 +67,6 @@ void DyDemul::launch(
     }
 
     size_t max_sc_ite;
-    // max_sc_ite = std::min(
-    //     cfg->demul_block_size, (cfg->bs_server_addr_idx + 1) * cfg->get_num_sc_per_server() - base_sc_id);
     max_sc_ite = std::min(
         cfg->demul_block_size, cfg->subcarrier_end - base_sc_id);
     assert(max_sc_ite % kSCsPerCacheline == 0);
@@ -92,7 +75,7 @@ void DyDemul::launch(
     for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
             float* src;
-            src = reinterpret_cast<float*>((*socket_buffer_)[j]
+            src = reinterpret_cast<float*>(freq_domain_iq_buffer_[j]
                 + frame_slot * (cfg->symbol_num_perframe * cfg->packet_length)
                 + (symbol_idx_ul + cfg->pilot_symbol_num_perframe)
                     * cfg->packet_length
@@ -136,6 +119,7 @@ void DyDemul::launch(
             ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(cur_sc_id)]);
 
         size_t start_tsc2 = worker_rdtsc();
+
 #if USE_MKL_JIT
         mkl_jit_cgemm[ue_num](jitter[ue_num], (MKL_Complex8*)ul_zf_ptr, (MKL_Complex8*)data_ptr,
             (MKL_Complex8*)equal_ptr);
@@ -145,54 +129,8 @@ void DyDemul::launch(
         mat_equaled = mat_ul_zf * mat_data;
 #endif
 
-        if (symbol_idx_ul < cfg->UL_PILOT_SYMS) { // Calc new phase shift
-            if (symbol_idx_ul == 0 && cur_sc_id == 0) {
-                // Reset previous frame
-                cx_float* phase_shift_ptr
-                    = (cx_float*)ue_spec_pilot_buffer_[(frame_id - 1)
-                        % TASK_BUFFER_FRAME_NUM];
-                cx_fmat mat_phase_shift(
-                    phase_shift_ptr, cfg->UE_NUM, cfg->UL_PILOT_SYMS, false);
-                mat_phase_shift.fill(0);
-            }
-            cx_float* phase_shift_ptr
-                = (cx_float*)&ue_spec_pilot_buffer_[frame_id
-                    % TASK_BUFFER_FRAME_NUM][symbol_idx_ul * cfg->UE_NUM];
-            cx_fmat mat_phase_shift(phase_shift_ptr, cfg->UE_NUM, 1, false);
-            cx_fmat shift_sc
-                = sign(mat_equaled % conj(ue_pilot_data.col(cur_sc_id)));
-            mat_phase_shift += shift_sc;
-        } else if (cfg->UL_PILOT_SYMS
-            > 0) { // apply previously calc'ed phase shift to data
-            cx_float* pilot_corr_ptr = (cx_float*)
-                ue_spec_pilot_buffer_[frame_id % TASK_BUFFER_FRAME_NUM];
-            cx_fmat pilot_corr_mat(
-                pilot_corr_ptr, cfg->UE_NUM, cfg->UL_PILOT_SYMS, false);
-            fmat theta_mat = arg(pilot_corr_mat);
-            fmat theta_inc = zeros<fmat>(cfg->UE_NUM, 1);
-            for (size_t s = 1; s < cfg->UL_PILOT_SYMS; s++) {
-                fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
-                theta_inc += theta_diff;
-            }
-            theta_inc /= (float)std::max(1, (int)cfg->UL_PILOT_SYMS - 1);
-            fmat cur_theta = theta_mat.col(0) + (symbol_idx_ul * theta_inc);
-            cx_fmat mat_phase_correct = zeros<cx_fmat>(size(cur_theta));
-            mat_phase_correct.set_real(cos(-cur_theta));
-            mat_phase_correct.set_imag(sin(-cur_theta));
-            mat_equaled %= mat_phase_correct;
-
-            // Measure EVM from ground truth
-            if (symbol_idx_ul == cfg->UL_PILOT_SYMS) {
-                phy_stats->update_evm_stats(frame_id, cur_sc_id, mat_equaled);
-                if (kPrintPhyStats && cur_sc_id == 0) {
-                    phy_stats->print_evm_stats(frame_id - 1);
-                }
-            }
-        }
-
         size_t start_tsc3 = worker_rdtsc();
-        duration_stat->task_duration[2] += start_tsc3 - start_tsc2;
-        duration_stat->task_count++;
+
         equal_cycles_ += start_tsc3 - start_tsc2;
         equal_count_ ++;
     }
@@ -204,7 +142,6 @@ void DyDemul::launch(
     float* equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
 
     std::vector<ControlInfo>& info_list = control_info_table_[control_idx_list_[frame_id]];
-    // for (size_t i = 0; i < cfg->UE_NUM; i++) {
     for (size_t i = 0; i < info_list.size(); i ++) {
         ControlInfo& info = info_list[i];
         float* equal_ptr = nullptr;
@@ -225,7 +162,7 @@ void DyDemul::launch(
         }
         equal_T_ptr = (float*)(equaled_buffer_temp_transposed);
 
-        int8_t* demul_ptr = demod_buffers_[frame_slot][symbol_idx_ul][i]
+        int8_t* demul_ptr = demod_buffer_to_send_[frame_slot][symbol_idx_ul][i]
             + (cfg->mod_order_bits * base_sc_id);
 
         switch (cfg->mod_order_bits) {
@@ -241,8 +178,6 @@ void DyDemul::launch(
         }
     }
 
-    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc3;
-    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
     demod_cycles_ += worker_rdtsc() - start_tsc3;
     demod_count_ += max_sc_ite;
     total_cycles_ += worker_rdtsc() - start_tsc;

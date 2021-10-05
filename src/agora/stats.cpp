@@ -14,7 +14,7 @@ Stats::Stats(Config* cfg, size_t break_down_num, double freq_ghz)
 {
     rt_assert(
         break_down_num <= kMaxStatBreakdown, "Statistics breakdown too high");
-    frame_start.calloc(config_->socket_thread_num, kNumStatsFrames, 64);
+    frame_start.calloc(config_->rx_thread_num, kNumStatsFrames, 64);
 }
 
 Stats::~Stats() {}
@@ -436,7 +436,7 @@ void Stats::save_to_file()
 
         for (size_t i = 0; i < last_frame_id; i++) {
             size_t ref_tsc = SIZE_MAX;
-            for (size_t j = 0; j < config_->socket_thread_num; j++) {
+            for (size_t j = 0; j < config_->rx_thread_num; j++) {
                 ref_tsc = std::min(ref_tsc, frame_start[j][i]);
             }
             fprintf(fp_debug,
@@ -461,7 +461,7 @@ void Stats::save_to_file()
             "FFT, time in ZF, time in Demul, time in Decode\n");
         for (size_t i = 0; i < last_frame_id; i++) {
             size_t ref_tsc = SIZE_MAX;
-            for (size_t j = 0; j < config_->socket_thread_num; j++) {
+            for (size_t j = 0; j < config_->rx_thread_num; j++) {
                 ref_tsc = std::min(ref_tsc, frame_start[j][i]);
             }
 

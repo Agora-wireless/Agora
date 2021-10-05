@@ -391,7 +391,7 @@ int PacketTXRX::dequeue_send(int tid)
     new (pkt) Packet(frame_id, data_symbol_idx, 0, ant_id);
 
     // Send data (one OFDM symbol)
-    ssize_t ret = sendto(socket_[ant_id % config_->socket_thread_num],
+    ssize_t ret = sendto(socket_[ant_id % config_->rx_thread_num],
         cur_buffer_ptr, c->packet_length, 0, (struct sockaddr*)&servaddr_[tid],
         sizeof(servaddr_[tid]));
     rt_assert(ret > 0, "sendto() failed");

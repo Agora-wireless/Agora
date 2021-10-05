@@ -230,4 +230,7 @@ static constexpr bool kUseAVX2Encoder = false;
 
 // Enable debugging for sender and receiver applications
 static constexpr bool kDebugSenderReceiver = false;
+
+static const int kNumMasterThread = 1;
+static const int kNumDemodTxThread = 1;
 #endif

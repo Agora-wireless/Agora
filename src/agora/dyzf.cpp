@@ -9,18 +9,13 @@ static constexpr bool kUseSIMDGather = true;
 static constexpr size_t kUseInverseForZF = true;
 
 DyZF::DyZF(Config* config, int tid, double freq_ghz,
-    moodycamel::ConcurrentQueue<Event_data>& task_queue,
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-    moodycamel::ProducerToken* worker_producer_token,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
     Table<complex_float>& calib_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     std::vector<std::vector<ControlInfo>>& control_info_table,
-    std::vector<size_t>& control_idx_list,
-    Stats* stats_manager)
-    : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
-          worker_producer_token)
+    std::vector<size_t>& control_idx_list)
+    : Doer(config, tid, freq_ghz)
     , csi_buffers_(csi_buffers)
     , calib_buffer_(calib_buffer)
     , ul_zf_matrices_(ul_zf_matrices)
@@ -28,7 +23,6 @@ DyZF::DyZF(Config* config, int tid, double freq_ghz,
     , control_info_table_(control_info_table)
     , control_idx_list_(control_idx_list)
 {
-    duration_stat = stats_manager->get_duration_stat(DoerType::kZF, tid);
     pred_csi_buffer = reinterpret_cast<complex_float*>(
         memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
     csi_gather_buffer = reinterpret_cast<complex_float*>(
@@ -47,7 +41,6 @@ DyZF::~DyZF()
 Event_data DyZF::launch(size_t tag)
 {
     if (cfg->freq_orthogonal_pilot) {
-        // ZF_freq_orthogonal(tag);
         ZF_freq_orthogonal_dynamic(tag);
     } else {
         ZF_time_orthogonal(tag);
@@ -177,75 +170,13 @@ void DyZF::ZF_time_orthogonal(size_t tag)
                 cfg->BS_ANT_NUM);
         }
 
-        duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
         arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
             cfg->BS_ANT_NUM, cfg->UE_NUM, false);
 
         compute_precoder(mat_csi, calib_gather_buffer,
             ul_zf_matrices_[frame_slot][cur_sc_id],
             dl_zf_matrices_[frame_slot][cur_sc_id]);
-
-        double start_tsc2 = worker_rdtsc();
-        duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
-
-        // cout<<"Precoder:" <<mat_output<<endl;
-        double duration3 = worker_rdtsc() - start_tsc2;
-        duration_stat->task_duration[3] += duration3;
-        duration_stat->task_count++;
-        duration_stat->task_duration[0] += worker_rdtsc() - start_tsc1;
-        // if (duration > 500) {
-        //     printf("Thread %d ZF takes %.2f\n", tid, duration);
-        // }
     }
-}
-
-void DyZF::ZF_freq_orthogonal(size_t tag)
-{
-    const size_t frame_id = gen_tag_t(tag).frame_id;
-    const size_t base_sc_id = gen_tag_t(tag).sc_id;
-    const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-    if (kDebugPrintInTask) {
-        printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
-               "BS_ANT_NUM: %zu\n",
-            tid, frame_id, base_sc_id, base_sc_id / cfg->UE_NUM,
-            cfg->BS_ANT_NUM);
-    }
-
-    double start_tsc1 = worker_rdtsc();
-
-    // Gather CSIs from partially-transposed CSIs
-    for (size_t i = 0; i < cfg->UE_NUM; i++) {
-        const size_t cur_sc_id = base_sc_id + i;
-        float* dst_csi_ptr = (float*)(csi_gather_buffer + cfg->BS_ANT_NUM * i);
-        partial_transpose_gather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
-            dst_csi_ptr, cfg->BS_ANT_NUM);
-    }
-    if (cfg->recipCalEn) {
-        // Gather reciprocal calibration data from partially-transposed buffer
-        float* dst_calib_ptr = (float*)calib_gather_buffer;
-        partial_transpose_gather(base_sc_id, (float*)calib_buffer_[frame_slot],
-            dst_calib_ptr, cfg->BS_ANT_NUM);
-    }
-
-    duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
-    arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer),
-        cfg->BS_ANT_NUM, cfg->UE_NUM, false);
-
-    compute_precoder(mat_csi, calib_gather_buffer,
-        ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)],
-        dl_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)]);
-
-    double start_tsc2 = worker_rdtsc();
-    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
-
-    // cout<<"Precoder:" <<mat_output<<endl;
-    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
-    duration_stat->task_count++;
-    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc1;
-
-    // if (duration > 500) {
-    //     printf("Thread %d ZF takes %.2f\n", tid, duration);
-    // }
 }
 
 void DyZF::ZF_freq_orthogonal_dynamic(size_t tag)
@@ -263,12 +194,6 @@ void DyZF::ZF_freq_orthogonal_dynamic(size_t tag)
     double start_tsc1 = worker_rdtsc();
 
     // Gather CSIs from partially-transposed CSIs
-    // for (size_t i = 0; i < cfg->UE_NUM; i++) {
-    //     const size_t cur_sc_id = base_sc_id + i;
-    //     float* dst_csi_ptr = (float*)(csi_gather_buffer + cfg->BS_ANT_NUM * i);
-    //     partial_transpose_gather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
-    //         dst_csi_ptr, cfg->BS_ANT_NUM);
-    // }
     std::vector<ControlInfo>& info_list = control_info_table_[control_idx_list_[frame_id]];
     size_t total_ue_sc = 0;
     for (size_t i = 0; i < info_list.size(); i ++) {
@@ -293,7 +218,6 @@ void DyZF::ZF_freq_orthogonal_dynamic(size_t tag)
         return;
     }
 
-    duration_stat->task_duration[1] += worker_rdtsc() - start_tsc1;
     arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer),
         cfg->BS_ANT_NUM, total_ue_sc, false);
 
@@ -303,42 +227,6 @@ void DyZF::ZF_freq_orthogonal_dynamic(size_t tag)
         total_ue_sc);
 
     double start_tsc2 = worker_rdtsc();
-    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
     zf_tsc_ += start_tsc2 - start_tsc1;
     zf_count_ ++;
-
-    // cout<<"Precoder:" <<mat_output<<endl;
-    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
-    duration_stat->task_count++;
-    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc1;
-
-    // if (duration > 500) {
-    //     printf("Thread %d ZF takes %.2f\n", tid, duration);
-    // }
 }
-
-// Currently unused
-/*
-void DoZF::Predict(size_t tag)
-{
-    size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t base_sc_id = gen_tag_t(tag).sc_id;
-
-    // Use stale CSI as predicted CSI
-    // TODO: add prediction algorithm
-    const size_t offset_in_buffer
-        = ((frame_id % TASK_BUFFER_FRAME_NUM) * cfg->OFDM_DATA_NUM)
-        + base_sc_id;
-    auto* ptr_in = (arma::cx_float*)pred_csi_buffer;
-    memcpy(ptr_in, (arma::cx_float*)csi_buffer_[offset_in_buffer],
-        sizeof(arma::cx_float) * cfg->BS_ANT_NUM * cfg->UE_NUM);
-    arma::cx_fmat mat_input(ptr_in, cfg->BS_ANT_NUM, cfg->UE_NUM, false);
-
-    // Input matrix and calibration are for current frame, output precoders are
-    // for the next frame
-    compute_precoder(mat_input,
-        cfg->get_calib_buffer(calib_buffer_, frame_id, base_sc_id),
-        cfg->get_ul_zf_mat(ul_zf_buffer_, frame_id + 1, base_sc_id),
-        cfg->get_dl_zf_mat(dl_zf_buffer_, frame_id + 1, base_sc_id));
-}
-*/

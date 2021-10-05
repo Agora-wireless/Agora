@@ -30,17 +30,12 @@ using namespace arma;
 class DyDemul : public Doer {
 public:
     DyDemul(Config* config, int tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& task_queue,
-        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-        moodycamel::ProducerToken* worker_producer_token,
+        Table<char>& freq_domain_iq_buffer,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
-        Table<complex_float>& ue_spec_pilot_buffer,
         Table<complex_float>& equal_buffer,
-        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_,
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send,
         std::vector<std::vector<ControlInfo>>& control_info_table,
-        std::vector<size_t>& control_idx_list,
-        PhyStats* in_phy_stats, Stats* in_stats_manager,
-        Table<char>* socket_buffer_ = nullptr);
+        std::vector<size_t>& control_idx_list);
     ~DyDemul();
 
     /**
@@ -87,12 +82,9 @@ public:
 
 private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
-    Table<complex_float>& ue_spec_pilot_buffer_;
     Table<complex_float>& equal_buffer_; // Totally unused for now because of we always disable kExportConstellation
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
-    Table<char>* socket_buffer_;
-    DurationStat* duration_stat;
-    PhyStats* phy_stats;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send_;
+    Table<char>& freq_domain_iq_buffer_;
 
     /// Intermediate buffer to gather raw data. Size = subcarriers per cacheline
     /// times number of antennas
@@ -101,8 +93,6 @@ private:
     // Intermediate buffers for equalized data
     complex_float* equaled_buffer_temp;
     complex_float* equaled_buffer_temp_transposed;
-    cx_fmat ue_pilot_data;
-    int ue_num_simd256;
 
 #if USE_MKL_JIT
     void* jitter[kMaxUEs];

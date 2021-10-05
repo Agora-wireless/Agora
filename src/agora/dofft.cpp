@@ -1,6 +1,8 @@
 #include "dofft.hpp"
 #include "concurrent_queue_wrapper.hpp"
 #include "datatype_conversion.h"
+#include "shared_counters.hpp"
+#include "signalHandler.hpp"
 #include <malloc.h>
 
 using namespace arma;
@@ -60,23 +62,18 @@ static void convert_short_to_float_simd(
 #endif
 }
 
-DoFFT::DoFFT(Config* config, int tid, double freq_ghz,
-    moodycamel::ConcurrentQueue<Event_data>& task_queue,
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-    moodycamel::ProducerToken* worker_producer_token,
-    Table<char>& socket_buffer, Table<int>& socket_buffer_status,
-    Table<complex_float>& data_buffer,
-    PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers,
-    Table<complex_float>& calib_buffer, PhyStats* in_phy_stats,
-    Stats* stats_manager)
-    : Doer(config, tid, freq_ghz, task_queue, complete_task_queue,
+DoFFT::DoFFT(Config* config, int tid, double freq_ghz, Range ant_range,
+    Table<char>& time_domain_iq_buffer,
+    Table<char>& frequency_domain_iq_buffer_to_send, 
+    PhyStats* in_phy_stats,
+    Stats* stats_manager, RxStatus* rx_status)
+    : Doer(config, tid, freq_ghz, dummy_conq_, complete_task_queue,
           worker_producer_token)
-    , socket_buffer_(socket_buffer)
-    , socket_buffer_status_(socket_buffer_status)
-    , data_buffer_(data_buffer)
-    , csi_buffers_(csi_buffers)
-    , calib_buffer_(calib_buffer)
+    , ant_range_(ant_range)
+    , time_domain_iq_buffer_(time_domain_iq_buffer)
+    , frequency_domain_iq_buffer_to_send_(frequency_domain_iq_buffer_to_send)
     , phy_stats(in_phy_stats)
+    , rx_status_(rx_status)
 {
     duration_stat_fft = stats_manager->get_duration_stat(DoerType::kFFT, tid);
     duration_stat_csi = stats_manager->get_duration_stat(DoerType::kCSI, tid);
@@ -95,67 +92,102 @@ DoFFT::~DoFFT()
     free(fft_inout);
 }
 
-Event_data DoFFT::launch(size_t tag)
+void DoFFT::launch(size_t frame_id, size_t symbol_id, size_t ant_id)
 {
-    size_t socket_thread_id = fft_req_tag_t(tag).tid;
-    size_t buf_offset = fft_req_tag_t(tag).offset;
     size_t start_tsc = worker_rdtsc();
-    auto* pkt = (Packet*)(socket_buffer_[socket_thread_id]
-        + buf_offset * cfg->packet_length);
-    size_t frame_id = pkt->frame_id;
-    size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-    size_t symbol_id = pkt->symbol_id;
-    size_t ant_id = pkt->ant_id;
+    size_t frame_slot = frame_id % kFrameWnd;
 
-    simd_convert_float16_to_float32(reinterpret_cast<float*>(fft_inout),
-        reinterpret_cast<float*>(
-            &pkt->data[2 * cfg->ofdm_rx_zero_prefix_bs_]),
-        cfg->OFDM_CA_NUM * 2);
-
-    DurationStat dummy_duration_stat; // TODO: timing for calibration symbols
-    DurationStat* duration_stat = nullptr;
-    SymbolType sym_type = cfg->get_symbol_type(frame_id, symbol_id);
-    if (sym_type == SymbolType::kUL) {
-        duration_stat = duration_stat_fft;
-    } else if (sym_type == SymbolType::kPilot) {
-        duration_stat = duration_stat_csi;
-    } else {
-        duration_stat = &dummy_duration_stat; // For calibration symbols
-    }
+    simd_convert_short_to_float(reinterpret_cast<short*>(time_domain_iq_buffer_[ant_id] +
+        (frame_slot * cfg->symbol_num_perframe * cfg->packet_length)
+        + symbol_id * cfg->packet_length + Packet::kOffsetOfData),
+        reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
 
     size_t start_tsc1 = worker_rdtsc();
-    duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
+    DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
+_
     size_t start_tsc2 = worker_rdtsc();
-    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
-    if (sym_type == SymbolType::kPilot) {
-        if (kCollectPhyStats) {
-            phy_stats->update_pilot_snr(frame_id,
-                cfg->get_pilot_symbol_idx(frame_id, symbol_id), fft_inout);
+    simd_convert_float32_to_float16(reinterpret_cast<float*>(frequency_domain_iq_buffer_to_send_[ant_id] + 
+        (frame_slot * cfg->symbol_num_perframe * cfg->packet_length)
+        + symbol_id * cfg->packet_length),
+        reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+
+    return;
+}
+
+void DoFFT::start_work()
+{
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t fft_tsc_duration = 0;
+    size_t state_operation_duration = 0;
+    size_t loop_count = 0;
+    size_t work_count = 0;
+    size_t fft_task_count = 0;
+    size_t fft_start_tsc;
+    bool state_trigger = false;
+
+    while (cfg->running && !SignalHandler::gotExitSignal()) {
+
+        if (likely(state_trigger)) {
+            loop_count ++;
         }
+        size_t work_start_tsc, state_start_tsc;
+        size_t cur_symbol = cur_idx_ / (ant_range_.end - ant_range_.start);
+        size_t cur_ant = cur_idx_ % (ant_range_.end - ant_range_.start) + ant_range_.start;
 
-        const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
-        const size_t ue_id = cfg->get_pilot_symbol_idx(frame_id, symbol_id);
-        partial_transpose(
-            csi_buffers_[frame_slot][ue_id], ant_id, SymbolType::kPilot);
-    } else if (sym_type == SymbolType::kUL) {
-        partial_transpose(cfg->get_data_buf(data_buffer_, frame_id, symbol_id),
-            ant_id, SymbolType::kUL);
-    } else if ((sym_type == SymbolType::kCalDL and ant_id == cfg->ref_ant)
-        or (sym_type == SymbolType::kCalUL and ant_id != cfg->ref_ant)) {
-        partial_transpose(
-            calib_buffer_[frame_slot], ant_id, SymbolType::kCalUL);
-    } else {
-        rt_assert(false, "Unknown or unsupported symbol type");
-    }
+        if (cur_symbol == 0) {
+            if (likely(state_trigger)) {
+                work_start_tsc = rdtsc();
+                state_start_tsc = rdtsc();
+            }
+            bool ret = rx_status_->received_all_pilots(cur_frame_);
+            if (likely(state_trigger)) {
+                state_operation_duration += rdtsc() - state_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
 
-    duration_stat->task_duration[3] += worker_rdtsc() - start_tsc2;
-    socket_buffer_status_[socket_thread_id][buf_offset] = 0; // Reset sock buf
-    duration_stat->task_count++;
-    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
-    return Event_data(EventType::kFFT,
-        gen_tag_t::frm_sym(pkt->frame_id, pkt->symbol_id)._tag);
+            if (ret) {
+
+                if (unlikely(!state_trigger && cur_frame_ >= 200)) {
+                    loop_count ++;
+                    start_tsc = rdtsc();
+                    state_trigger = true;
+                }
+
+                if (likely(state_trigger)) {
+                    work_start_tsc = rdtsc();
+                    work_count ++;
+                }
+
+                if (likely(state_trigger)) {
+                    fft_start_tsc = rdtsc();
+                }
+                launch(cur_frame_, cur_symbol, cur_ant);
+                if (likely(state_trigger)) {
+                    fft_tsc_duration += rdtsc() - fft_start_tsc;
+                    fft_task_count += ant_range_.end - ant_range_.start;
+                }
+
+                if (likely(state_trigger)) {
+                    state_start_tsc = rdtsc();
+                }
+                rx_status_->fft_done(cur_frame_, cur_symbol, 1);
+                if (likely(state_trigger)) {
+                    state_operation_duration += rdtsc() - state_start_tsc;
+                    work_tsc_duration += rdtsc() - work_start_tsc;
+                }
+
+                cur_idx_ += cfg->fft_thread_num;
+            }
+        } else {
+            if (likely(state_trigger)) {
+                work_start_tsc = rdtsc();
+                state_start_tsc = rdtsc();
+            }
+            // TODO: Merge these two cases
+        }
 }
 
 void DoFFT::partial_transpose(

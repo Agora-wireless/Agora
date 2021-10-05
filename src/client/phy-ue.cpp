@@ -1041,8 +1041,8 @@ void Phy_UE::initialize_vars_from_cfg(void)
     ul_data_symbol_perframe = ul_symbol_perframe - ul_pilot_symbol_perframe;
     nCPUs = std::thread::hardware_concurrency();
     rx_thread_num = (kUseArgos && config_->hw_framer)
-        ? std::min(config_->UE_NUM, config_->socket_thread_num)
-        : kUseArgos ? config_->UE_NUM : config_->socket_thread_num;
+        ? std::min(config_->UE_NUM, config_->rx_thread_num)
+        : kUseArgos ? config_->UE_NUM : config_->rx_thread_num;
 
     tx_buffer_status_size
         = (ul_symbol_perframe * config_->UE_ANT_NUM * TASK_BUFFER_FRAME_NUM);

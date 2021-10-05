@@ -19,15 +19,10 @@ public:
         , num_pilot_symbols_per_frame_(cfg->pilot_symbol_num_perframe)
         , num_ul_data_symbol_per_frame_(cfg->ul_data_symbol_num_perframe)
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
-        // , num_decode_tasks_per_frame_(cfg->test_mode == 1 ? (cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size : 
-        //     cfg->decode_thread_num)
-        , num_decode_tasks_per_frame_(cfg->test_mode == 1 ? (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size : 
-            cfg->decode_thread_num)
-        // , num_precode_tasks_per_frame_((cfg->get_num_sc_per_server() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
+        , num_decode_tasks_per_frame_(cfg->decode_thread_num)
         , num_precode_tasks_per_frame_((cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
         , last_frame_cycles_(worker_rdtsc())
         , freq_ghz_(measure_rdtsc_freq())
-        , test_mode_(cfg->test_mode)
     {
         frame_start_time_ = new uint64_t[cfg->frames_to_test];
         frame_iq_time_ = new uint64_t[cfg->frames_to_test];
@@ -55,13 +50,10 @@ public:
             frame_start_time_[pkt->frame_id] = get_ns();
         }
 
-        size_t tsc1 = rdtsc();
         const size_t frame_slot = pkt->frame_id % kFrameWnd;
         bool full = false;
         num_pkts_[frame_slot]++;
-        size_t tsc2 = rdtsc();
         encode_ready_[frame_slot] = true;
-        size_t tsc3 = rdtsc();
         if (num_pkts_[frame_slot]
             == num_pkts_per_symbol_
                 * (num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_)) {
@@ -73,7 +65,6 @@ public:
             frame_iq_time_[pkt->frame_id] = get_ns();
         }
 
-        size_t tsc4 = rdtsc();
         if (pkt->symbol_id < num_pilot_symbols_per_frame_) {
             num_pilot_pkts_[frame_slot]++;
             if (num_pilot_pkts_[frame_slot] == num_pilot_pkts_per_frame_) {
@@ -84,46 +75,9 @@ public:
             num_data_pkts_[frame_slot][pkt->symbol_id - num_pilot_symbols_per_frame_]++;
         }
 
-        size_t tsc5 = rdtsc();
         if (pkt->frame_id > latest_frame_) {
             // TODO: race condition could happen here but the impact is small
             latest_frame_ = pkt->frame_id;
-        }
-        size_t tsc6 = rdtsc();
-        
-        if (unlikely(tsc2 - tsc1 > max_tsc1_[tid])) {
-            max_tsc1_[tid] = tsc2 - tsc1;
-            max_tsc1_frame_[tid] = pkt->frame_id;
-        }
-        if (unlikely(tsc3 - tsc2 > max_tsc2_[tid])) {
-            max_tsc2_[tid] = tsc3 - tsc2;
-            max_tsc2_frame_[tid] = pkt->frame_id;
-        }
-        if (unlikely(tsc4 - tsc3 > max_tsc3_[tid])) {
-            max_tsc3_[tid] = tsc4 - tsc3;
-            max_tsc3_frame_[tid] = pkt->frame_id;
-        }
-        if (unlikely(tsc5 - tsc4 > max_tsc4_[tid])) {
-            max_tsc4_[tid] = tsc5 - tsc4;
-            max_tsc4_frame_[tid] = pkt->frame_id;
-        }
-        if (unlikely(tsc6 - tsc5 > max_tsc5_[tid])) {
-            max_tsc5_[tid] = tsc6 - tsc5;
-            max_tsc5_frame_[tid] = pkt->frame_id;
-        }
-        if (test_mode_ >= 2) {
-            if (full && pkt->frame_id == cur_frame_) {
-                while (num_pkts_[cur_frame_ % kFrameWnd]
-                    == num_pkts_per_symbol_
-                        * (num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_)) {
-                    for (size_t j = 0; j < kMaxSymbols; j++) {
-                        num_data_pkts_[cur_frame_ % kFrameWnd][j] = 0;
-                    }
-                    num_pilot_pkts_[cur_frame_ % kFrameWnd] = 0;
-                    num_pkts_[cur_frame_ % kFrameWnd] = 0;
-                    cur_frame_ ++;
-                }
-            }
         }
         return true;
     }
@@ -164,10 +118,6 @@ public:
     void decode_done(size_t frame_id)
     {
         rt_assert(frame_id < cur_frame_ + kFrameWnd && frame_id >= cur_frame_, "Wrong completed decode task!");
-        // if (frame_id >= cur_frame_ + kFrameWnd) {
-            // fprintf(stderr, "Wrong completed decode task (%u:%u)\n", frame_id, cur_frame_);
-            // exit(1);
-        // }
         bool cont = false;
         decode_mutex_[frame_id % kFrameWnd].lock();
         num_decode_tasks_completed_[frame_id % kFrameWnd]++;
@@ -268,21 +218,6 @@ public:
     // The CPU frequency (in GHz), used to convert cycles to time
     size_t freq_ghz_;
 
-    // Test mode
-    size_t test_mode_;
-
-    // Cycle measurements
-    size_t max_tsc1_[kMaxThreads] = {0};
-    size_t max_tsc2_[kMaxThreads] = {0};
-    size_t max_tsc3_[kMaxThreads] = {0};
-    size_t max_tsc4_[kMaxThreads] = {0};
-    size_t max_tsc5_[kMaxThreads] = {0};
-    size_t max_tsc1_frame_[kMaxThreads] = {0};
-    size_t max_tsc2_frame_[kMaxThreads] = {0};
-    size_t max_tsc3_frame_[kMaxThreads] = {0};
-    size_t max_tsc4_frame_[kMaxThreads] = {0};
-    size_t max_tsc5_frame_[kMaxThreads] = {0};
-
     // Copies of Config variables
     const size_t num_pilot_pkts_per_frame_;
     const size_t num_pilot_symbols_per_frame_;
@@ -297,8 +232,6 @@ public:
 class DemulStatus {
 public:
     DemulStatus(Config* cfg)
-        // : num_demul_tasks_required_(
-        //       cfg->get_num_sc_per_server() / cfg->demul_block_size)
         : num_demul_tasks_required_(
               cfg->get_num_sc_to_process() / cfg->demul_block_size)
     {
@@ -368,11 +301,6 @@ public:
         : cfg_(cfg)
         , num_demod_data_required_(cfg->bs_server_addr_list.size())
     {
-        // cur_frame_ = new size_t[cfg->get_num_ues_to_process()];
-        // memset(cur_frame_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
-        // cur_symbol_ul_ = new size_t[cfg->get_num_ues_to_process()];
-        // memset(cur_symbol_ul_, 0, sizeof(size_t) * cfg->get_num_ues_to_process());
-
         num_demod_data_received_
             = new std::array<std::array<std::atomic<size_t>, kMaxSymbols>,
                 kFrameWnd>[cfg->UE_NUM];
@@ -381,7 +309,6 @@ public:
                 for (size_t k = 0; k < kMaxSymbols; k ++) {
                     num_demod_data_received_[i][j][k] = 0;
                 }
-                // num_demod_data_received_[i][j].fill(0);
             }
         }
 
@@ -392,7 +319,6 @@ public:
     void receive_demod_data(size_t ue_id, size_t frame_id, size_t symbol_id_ul)
     {
         num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul]++;
-        // printf("Receive demod data for frame %lu ue %lu symbol %lu (%u:%u)\n", frame_id, ue_id, symbol_id_ul, num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul], num_demod_data_required_);
     }
 
     bool received_all_demod_data(
@@ -404,7 +330,6 @@ public:
             num_demod_data_received_[ue_id]
                                     [frame_id % kFrameWnd][symbol_id_ul]
                 = 0;
-            // printf("Received all demod data for user %lu frame %lu symbol %lu\n", ue_id, frame_id, symbol_id_ul);
             if (symbol_id_ul == 0) {
                 frame_decode_time_[frame_id] = get_ns();
             }
@@ -415,8 +340,6 @@ public:
 
 // private:
     Config* cfg_;
-    // size_t* cur_frame_;
-    // size_t* cur_symbol_ul_; // symbol ID for UL data
     const size_t num_demod_data_required_;
 
     uint64_t *frame_decode_time_;
@@ -439,18 +362,13 @@ public:
     void encode_done(size_t ue_id, size_t frame_id, size_t symbol_id_dl) 
     {
         num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl] ++;
-        // printf("Encode done ue %u frame %u symbol %u (%u:1)\n", ue_id, frame_id, symbol_id_dl, 
-        //     num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl].load());
     }
 
     bool ready_to_precode(size_t ue_id, size_t frame_id, size_t symbol_id_dl)
     {
-        // printf("Test precode ue %u frame %u symbol %u (%u:1)\n", ue_id, frame_id, symbol_id_dl, 
-        //     num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl].load());
         if (num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl]
             == num_encode_tasks_required_) {
             num_encode_tasks_completed_[ue_id][frame_id % kFrameWnd][symbol_id_dl] = 0;
-            // printf("Encode is done for user %u frame %u symbol %u\n", ue_id, frame_id, symbol_id_dl);
             return true;
         }
         return false;
@@ -481,16 +399,11 @@ public:
             max_frame_ = frame_id;
         }
         num_encoded_data_received_[frame_id % kFrameWnd][symbol_id_dl] ++;
-        // printf("Receive encoded data frame %u symbol %u (%u:%u)\n", frame_id, symbol_id_dl, 
-        //     num_encoded_data_received_[frame_id % kFrameWnd][symbol_id_dl],
-        //     num_encoded_data_required_);
     }
 
     bool received_all_encoded_data(size_t frame_id, size_t symbol_id_dl) {
         if (num_encoded_data_received_[frame_id % kFrameWnd][symbol_id_dl] == 
             num_encoded_data_required_ && frame_id <= max_frame_ && frame_id + kFrameWnd > max_frame_) {
-            // num_encoded_data_received_[frame_id % kFrameWnd][symbol_id_dl] = 0;
-            // printf("Received all encoded data frame %u symbol %u\n", frame_id, symbol_id_dl);
             return true;
         }
         return false;

@@ -148,11 +148,8 @@ public:
 
     size_t core_offset;
     size_t worker_thread_num;
-    size_t socket_thread_num;
-    size_t fft_thread_num;
-    size_t demul_thread_num;
+    size_t rx_thread_num;
     size_t decode_thread_num;
-    size_t zf_thread_num;
 
     // Number of OFDM data subcarriers handled in one demodulation event
     size_t demul_block_size;
@@ -340,18 +337,18 @@ public:
     std::vector<std::string> bs_server_mac_list;
     std::string bs_rru_mac_addr;
 
-    // Test mode configurations
-    size_t test_mode;
-
     // NIC PCIe address (for DPDK)
     std::string pci_addr;
 
     // Dynamic workload
-    bool dynamic_workload;
     int fixed_control;
     std::vector<size_t> user_level_list;
     size_t num_load_levels;
     bool sleep_mode;
+
+    // IQ sample mode
+    bool use_time_domain_iq;
+    size_t fft_thread_num;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;

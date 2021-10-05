@@ -13,8 +13,7 @@ DyEncode::DyEncode(Config* in_config, int in_tid, double freq_ghz,
     Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
     Stats* in_stats_manager, RxStatus* rx_status,
     EncodeStatus* encode_status)
-    : Doer(in_config, in_tid, freq_ghz, dummy_conq_, complete_task_queue,
-          worker_producer_token)
+    : Doer(in_config, in_tid, freq_ghz)
     , raw_data_buffer_(in_raw_data_buffer)
     , encoded_buffer_(in_encoded_buffer)
     , rx_status_(rx_status)
@@ -129,30 +128,22 @@ void DyEncode::start_work()
 }
 
 DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
-    Table<int8_t> demod_soft_buffer_to_decode,
+    Table<int8_t> demod_buffer_to_decode,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
     std::vector<std::vector<ControlInfo>>& control_info_table,
     std::vector<size_t>& control_idx_list,
-    PhyStats* in_phy_stats, Stats* in_stats_manager, RxStatus* rx_status,
+    RxStatus* rx_status,
     DecodeStatus* decode_status)
-    : Doer(in_config, in_tid, freq_ghz, dummy_conq_, complete_task_queue,
-          worker_producer_token)
-    , demod_buffers_(demod_buffers)
-    , demod_soft_buffer_to_decode_(demod_soft_buffer_to_decode)
+    : Doer(in_config, in_tid, freq_ghz)
+    , demod_buffer_to_decode_(demod_buffer_to_decode)
     , decoded_buffers_(decoded_buffers)
     , control_info_table_(control_info_table)
     , control_idx_list_(control_idx_list)
-    , phy_stats(in_phy_stats)
     , rx_status_(rx_status)
     , decode_status_(decode_status)
-    // , ue_id_(in_tid / cfg->decode_thread_num_per_ue + in_config->ue_start)
-    // , tid_in_ue_(in_tid % cfg->decode_thread_num_per_ue)
     , total_dycode_num_(cfg->decode_thread_num)
     , total_ue_num_(cfg->ue_end - cfg->ue_start)
 {
-    duration_stat
-        = in_stats_manager->get_duration_stat(DoerType::kDecode, in_tid);
     resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
 }
 
@@ -193,7 +184,6 @@ Event_data DyDecode::launch(size_t tag)
     size_t nRows = info.Bg == 1 ? 46 : 42;
     uint32_t cbCodewLen = ldpc_num_encoded_bits(info.Bg, info.Zc, nRows);
     uint32_t cbLen = ldpc_num_input_bits(info.Bg, info.Zc);
-    // int16_t numChannelLlrs = LDPC_config.cbCodewLen;
     int16_t numChannelLlrs = cbCodewLen;
 
     ldpc_decoder_5gnr_request.numChannelLlrs = numChannelLlrs;
@@ -201,28 +191,18 @@ Event_data DyDecode::launch(size_t tag)
     ldpc_decoder_5gnr_request.maxIterations = LDPC_config.decoderIter;
     ldpc_decoder_5gnr_request.enableEarlyTermination
         = LDPC_config.earlyTermination;
-    // ldpc_decoder_5gnr_request.Zc = LDPC_config.Zc;
     ldpc_decoder_5gnr_request.Zc = info.Zc;
-    // ldpc_decoder_5gnr_request.baseGraph = LDPC_config.Bg;
     ldpc_decoder_5gnr_request.baseGraph = info.Bg;
-    // ldpc_decoder_5gnr_request.nRows = LDPC_config.nRows;
     ldpc_decoder_5gnr_request.nRows = nRows;
 
-    // int numMsgBits = LDPC_config.cbLen - numFillerBits;
     int numMsgBits = cbLen - numFillerBits;
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
     ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
 
-    // auto* llr_buffer_ptr
-    //     = cfg->get_demod_buf_to_decode(demod_soft_buffer_to_decode_, frame_id,
-    //         symbol_idx_ul, ue_id, LDPC_config.cbCodewLen * cur_cb_id);
     auto* llr_buffer_ptr
-        = cfg->get_demod_buf_to_decode(demod_soft_buffer_to_decode_, frame_id,
+        = cfg->get_demod_buf_to_decode(demod_buffer_to_decode_, frame_id,
             symbol_idx_ul, ue_id, info.sc_start);
 
-    // uint8_t* decoded_buffer_ptr
-    //     = decoded_buffers_[frame_slot][symbol_idx_ul][ue_id]
-    //     + (cur_cb_id * roundup<64>(cfg->num_bytes_per_cb));
     uint8_t* decoded_buffer_ptr
         = decoded_buffers_[frame_slot][symbol_idx_ul][ue_id];
 
@@ -243,13 +223,11 @@ Event_data DyDecode::launch(size_t tag)
     }
 
     size_t start_tsc1 = worker_rdtsc();
-    duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
     bblib_ldpc_decoder_5gnr(
         &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
 
     size_t start_tsc2 = worker_rdtsc();
-    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
     decode_count_ ++;
     decode_max_ = decode_max_ < start_tsc2 - start_tsc1 ? start_tsc2 - start_tsc1 : decode_max_;
     decode_tsc_ += start_tsc2 - start_tsc1;
@@ -270,39 +248,12 @@ Event_data DyDecode::launch(size_t tag)
         printf("\n");
     }
 
-    if (!kEnableMac && kPrintPhyStats && symbol_idx_ul == cfg->UL_PILOT_SYMS) {
-        phy_stats->update_decoded_bits(
-            ue_id, symbol_offset, cfg->num_bytes_per_cb * 8);
-        phy_stats->increment_decoded_blocks(ue_id, symbol_offset);
-        size_t block_error(0);
-        for (size_t i = 0; i < cfg->num_bytes_per_cb; i++) {
-            uint8_t rx_byte = decoded_buffer_ptr[i];
-            uint8_t tx_byte = (uint8_t)cfg->get_info_bits(
-                cfg->ul_bits, symbol_idx_ul, ue_id, cur_cb_id)[i];
-            phy_stats->update_bit_errors(
-                ue_id, symbol_offset, tx_byte, rx_byte);
-            if (rx_byte != tx_byte)
-                block_error++;
-        }
-        phy_stats->update_block_errors(ue_id, symbol_offset, block_error);
-    }
-
-    double duration = worker_rdtsc() - start_tsc;
-    duration_stat->task_duration[0] += duration;
-    duration_stat->task_count++;
-    if (cycles_to_us(duration, freq_ghz) > 500) {
-        printf("Thread %d Decode takes %.2f\n", tid,
-            cycles_to_us(duration, freq_ghz));
-    }
-
     return Event_data(EventType::kDecode, tag);
 }
 
 void DyDecode::start_work()
 {
-    // printf("Decode for ue %u tid %u starts to work!\n", ue_id_, tid_in_ue_);
     printf("Decode tid %u starts to work!\n", tid);
-    // cur_symbol_ = tid_in_ue_;
     cur_idx_ = tid;
     cur_symbol_ = cur_idx_ / total_ue_num_;
     cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
@@ -321,10 +272,6 @@ void DyDecode::start_work()
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
 
-        if (cfg->test_mode > 0) {
-            continue;
-        }
-
         if (likely(state_trigger)) {
             loop_count ++;
         }
@@ -342,8 +289,6 @@ void DyDecode::start_work()
                 work_count ++;
             }
             
-            // printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id_, cur_frame_, cur_symbol_);
-
             if (likely(state_trigger)) {
                 decode_start_tsc = rdtsc();
             }
@@ -357,26 +302,21 @@ void DyDecode::start_work()
                 decode_count ++;
             }
 
-            // printf("Start to decode user %lu frame %lu symbol %lu end\n", ue_id_, cur_frame_, cur_symbol_);
             if (likely(state_trigger)) {
                 decode_start_tsc = rdtsc();
             }
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                 cur_cb_ = 0;
-                // cur_symbol_ += cfg->decode_thread_num_per_ue;
                 cur_idx_ += total_dycode_num_;
                 cur_symbol_ = cur_idx_ / total_ue_num_;
                 cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
                 if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
-                    // cur_symbol_ = tid_in_ue_;
                     cur_idx_ = tid;
                     cur_symbol_ = cur_idx_ / total_ue_num_;
                     cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
 
-                    // decode_start_tsc = rdtsc();
                     rx_status_->decode_done(cur_frame_);
-                    // state_operation_duration += rdtsc() - decode_start_tsc;
 
                     cur_frame_++;
                     if (unlikely(cur_frame_ == cfg->frames_to_test)) {
@@ -419,7 +359,6 @@ void DyDecode::start_work()
                     work_count ++;
                 }
             
-                // printf("Start to decode user %lu frame %lu symbol %lu\n", ue_id_, cur_frame_, cur_symbol_);
 
                 if (likely(state_trigger)) {
                     decode_start_tsc = rdtsc();
@@ -434,26 +373,21 @@ void DyDecode::start_work()
                     decode_count ++;
                 }
 
-                // printf("Start to decode user %lu frame %lu symbol %lu end\n", ue_id_, cur_frame_, cur_symbol_);
                 if (likely(state_trigger)) {
                     state_start_tsc = rdtsc();
                 }
                 cur_cb_++;
                 if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                     cur_cb_ = 0;
-                    // cur_symbol_ += cfg->decode_thread_num_per_ue;
                     cur_idx_ += total_dycode_num_;
                     cur_symbol_ = cur_idx_ / total_ue_num_;
                     cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
                     if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
-                        // cur_symbol_ = tid_in_ue_;
                         cur_idx_ = tid;
                         cur_symbol_ = cur_idx_ / total_ue_num_;
                         cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
 
-                        // state_start_tsc = rdtsc();
                         rx_status_->decode_done(cur_frame_);
-                        // state_operation_duration += rdtsc() - state_start_tsc;
 
                         cur_frame_++;
                         if (unlikely(cur_frame_ == cfg->frames_to_test)) {
@@ -465,29 +399,16 @@ void DyDecode::start_work()
                         }
 
                         if (should_sleep(control_info_table_[control_idx_list_[cur_frame_]].size())) {
-                        //     cur_frame_ ++;
-                        //     if (unlikely(cur_frame_ == cfg->frames_to_test)) {
-                        //         if (likely(state_trigger)) {
-                        //             state_operation_duration += rdtsc() - state_start_tsc;
-                        //             work_tsc_duration += rdtsc() - work_start_tsc;
-                        //         }
-                        //         break;
-                        //     }
-                        //     usleep(800); // TODO: Adjust this number
                             std::this_thread::sleep_for(std::chrono::microseconds(900));
                         }
                     }
                 }
                 if (likely(state_trigger)) {
                     state_operation_duration += rdtsc() - state_start_tsc;
-                
                     work_tsc_duration += rdtsc() - work_start_tsc;
                 }
-
             }
-            
         }
-
     }
 
     size_t whole_duration = rdtsc() - start_tsc;

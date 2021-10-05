@@ -18,15 +18,11 @@
 
 class DoFFT : public Doer {
 public:
-    DoFFT(Config* config, int tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& task_queue,
-        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
-        moodycamel::ProducerToken* worker_producer_token,
-        Table<char>& socket_buffer, Table<int>& socket_buffer_status,
-        Table<complex_float>& data_buffer,
-        PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers,
-        Table<complex_float>& calib_buffer, PhyStats* in_phy_stats,
-        Stats* stats_manager);
+    DoFFT(Config* config, int tid, double freq_ghz, Range ant_range,
+        Table<char>& time_domain_iq_buffer, 
+        Table<complex_float>& frequency_domain_iq_buffer_to_send,
+        PhyStats* in_phy_stats,
+        Stats* stats_manager, RxStatus* rx_status);
     ~DoFFT();
 
     /**
@@ -61,52 +57,26 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(size_t tag);
+    void launch(size_t frame_id, size_t symbol_id, size_t ant_id);
 
-    /**
-     * Fill-in the partial transpose of the computed FFT for this antenna into
-     * out_buf.
-     *
-     * The fully-transposed matrix after FFT is a subcarriers x antennas matrix
-     * that should look like so (using the notation subcarrier/antenna, and
-     * assuming kTransposeBlockSize = 16)
-     *
-     * 0/0, 0/1, ........................................................., 0/63
-     * 1/0, 0/1, ........................................................ , 1/63
-     * ...
-     * 15/0, 15/1, ......................................................, 15/63
-     * ...
-     * 1199/0, 1199/1, ............................................... , 1199/63
-     *
-     *
-     * The partially-tranposed matrix looks like so:
-     * 0/0 1/0 ... 15/0  0/1 1/1 ... 15/1 .................... 0/3 1/3 .... 15/3
-     * 0/4 1/4 ... 15/4  0/5 1/5 ... 15/5 .................... 0/7 1/5 .... 15/7
-     * ...
-     * ...........................................................0/63 ... 15/63
-     * <end of partial transpose block>
-     * 16/0 17/0 ... 31/0 ....................................16/3 17/3 ... 31/3
-     * 16/4 17/4 ... 31/4 ....................................16/7 17/7 ... 31/7
-     *
-     *
-     * Each partially-transposed block is identical to the corresponding block
-     * of the fully-transposed matrix, but laid out in memory in column-major
-     * order.
-     */
-    void partial_transpose(
-        complex_float* out_buf, size_t ant_id, SymbolType symbol_type) const;
+    void start_work();
 
 private:
-    Table<char>& socket_buffer_;
-    Table<int>& socket_buffer_status_;
-    Table<complex_float>& data_buffer_;
-    PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers_;
-    Table<complex_float>& calib_buffer_;
+    Table<char>& time_domain_iq_buffer_;
+    Table<char>& frequency_domain_iq_buffer_to_send_;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     complex_float* fft_inout; // Buffer for both FFT input and output
     DurationStat* duration_stat_fft;
     DurationStat* duration_stat_csi;
     PhyStats* phy_stats;
+
+    struct Range ant_range_;
+    moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
+
+    size_t cur_frame_ = 0;
+    size_t cur_idx_ = 0;
+    
+    RxStatus *rx_status_;
 };
 
 class DoIFFT : public Doer {

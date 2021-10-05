@@ -70,11 +70,11 @@ public:
      * @return True on successfully starting the network I/O threads, false
      * otherwise
      */
-    bool startTXRX(Table<char>& buffer, Table<size_t>& frame_start,
+    bool startTXRX(Table<char>& buffer,
         Table<complex_float>* tx_buffer,
-        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers_
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers_to_send
         = nullptr,
-        Table<int8_t>* demod_soft_buffer_to_decode = nullptr,
+        Table<int8_t>* demod_buffer_to_decode = nullptr,
         Table<int8_t>* encoded_buffer_ = nullptr,
         Table<int8_t>* encoded_buffer_to_decode = nullptr);
 
@@ -92,8 +92,6 @@ private:
     void* loop_tx_rx(int tid);
 
     // A thread that sends and receives post-demodulation data
-    void* demod_thread(int tid);
-    void* demod_rx_thread(int tid);
     void* demod_tx_thread(int tid);
     void* encode_thread(int tid);
 
@@ -114,14 +112,13 @@ private:
     // {core_offset, ..., core_offset + socket_thread_num - 1}
     const size_t core_offset;
 
-    const size_t socket_thread_num;
-    Table<char>* buffer_;
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers_;
-    Table<int8_t>* demod_soft_buffer_to_decode_;
+    const size_t rx_thread_num;
+    Table<char>* freq_domain_iq_buffer_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffer_to_send_;
+    Table<int8_t>* demod_buffer_to_decode_;
     size_t packet_num_in_buffer_;
     char* tx_buffer_;
     Table<complex_float>* dl_ifft_buffer_;
-    Table<size_t>* frame_start_;
 
     // Downlink buffers
     Table<int8_t>* encoded_buffer_;

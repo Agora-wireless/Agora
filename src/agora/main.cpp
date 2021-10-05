@@ -1,11 +1,15 @@
 #include "agora.hpp"
+#include <gflags/gflags.h>
+
+DEFINE_string(conf_file,
+    TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
+    "Config filename");
 
 int main(int argc, char* argv[])
 {
+    gflags::ParseCommandLineFlags(&argc, &argv, true);
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    std::string confFile = cur_directory + "/data/tddconfig-sim-ul.json";
-    if (argc == 2)
-        confFile = std::string(argv[1]);
+    std::string confFile = FLAGS_conf_file;
     auto* cfg = new Config(confFile.c_str());
     cfg->genData();
     Agora* agora_cli;

@@ -203,13 +203,6 @@ add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(AGORA_SOURCES 
   src/agora/agora.cpp
-  src/agora/stats.cpp 
-  src/agora/phy_stats.cpp 
-  src/agora/dofft.cpp
-  src/agora/dozf.cpp
-  src/agora/dodemul.cpp
-  src/agora/doprecode.cpp
-  src/agora/docoding.cpp
   src/agora/dyzf.cpp
   src/agora/dydemul.cpp
   src/agora/dycoding.cpp

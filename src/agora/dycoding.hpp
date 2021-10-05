@@ -58,12 +58,10 @@ private:
 class DyDecode : public Doer {
 public:
     DyDecode(Config* in_config, int in_tid, double freq_ghz,
-        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
-        Table<int8_t> demod_soft_buffer_to_decode,
+        Table<int8_t> demod_buffer_to_decode,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
         std::vector<std::vector<ControlInfo>>& control_info_table_,
         std::vector<size_t>& control_idx_list_,
-        PhyStats* in_phy_stats, Stats* in_stats_manager,
         RxStatus* rx_status = nullptr, DecodeStatus* decode_status = nullptr);
 
     ~DyDecode();
@@ -75,19 +73,13 @@ public:
 private:
     inline bool should_sleep(size_t ue_num) { 
         return ue_num <= cfg->ue_start;
-        // return false;
     }
     int16_t* resp_var_nodes;
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
-    Table<int8_t> demod_soft_buffer_to_decode_;
+    Table<int8_t> demod_buffer_to_decode_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers_;
-    PhyStats* phy_stats;
-    DurationStat* duration_stat;
     RxStatus* rx_status_;
     DecodeStatus* decode_status_;
 
-    // size_t ue_id_;
-    // size_t tid_in_ue_;
     size_t total_ue_num_;
     size_t total_dycode_num_;
 
@@ -97,7 +89,6 @@ private:
     size_t cur_ue_ = 0;
     size_t cur_cb_ = 0; // Current code block id to decode
     size_t cur_idx_ = 0;
-    moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
 
     // Control info
     std::vector<std::vector<ControlInfo>>& control_info_table_;

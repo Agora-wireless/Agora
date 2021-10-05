@@ -181,12 +181,7 @@ Config::Config(std::string jsonfile)
     frames_to_test = tddConf.value("frames_to_test", 9600);
     core_offset = tddConf.value("core_offset", 0);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
-    socket_thread_num = tddConf.value("socket_thread_num", 4);
-    fft_thread_num = tddConf.value("fft_thread_num", 5);
-    demul_thread_num = tddConf.value("demul_thread_num", 5);
-    // decode_thread_num = tddConf.value("decode_thread_num", 10);
-    // zf_thread_num = worker_thread_num - fft_thread_num - demul_thread_num
-    //     - decode_thread_num;
+    rx_thread_num = tddConf.value("rx_thread_num", 4);
 
     demul_block_size = tddConf.value("demul_block_size", 48);
     rt_assert(demul_block_size % kSCsPerCacheline == 0,
@@ -239,15 +234,8 @@ Config::Config(std::string jsonfile)
         sum_subcarriers += subcarrier_num_list[i];
     }
 
-    // TODO: Should we be using OFDM_DATA_START here?
-    // subcarrier_start
-    //     = OFDM_DATA_START + bs_server_addr_idx * get_num_sc_per_server();
-    // subcarrier_end
-    //     = OFDM_DATA_START + (bs_server_addr_idx + 1) * get_num_sc_per_server();
     subcarrier_start = sum_subcarriers;
     subcarrier_end = subcarrier_start + subcarrier_num_list[bs_server_addr_idx];
-    // rt_assert(get_num_sc_per_server() % subcarrier_block_size == 0,
-    //     "Invalid subcarrier range and subcarrier block size!");
     ue_start = bs_server_addr_idx < UE_NUM % bs_server_addr_list.size()
         ? bs_server_addr_idx * (UE_NUM / bs_server_addr_list.size() + 1)
         : UE_NUM
@@ -257,11 +245,8 @@ Config::Config(std::string jsonfile)
         ? ue_start + UE_NUM / bs_server_addr_list.size() + 1
         : ue_start + UE_NUM / bs_server_addr_list.size();
 
-    // demul_events_per_symbol
-    //     = 1 + (get_num_sc_per_server() - 1) / demul_block_size;
     demul_events_per_symbol
         = 1 + (get_num_sc_to_process() - 1) / demul_block_size;
-    // zf_events_per_symbol = 1 + (get_num_sc_per_server() - 1) / zf_block_size;
     zf_events_per_symbol = 1 + (get_num_sc_to_process() - 1) / zf_block_size;
 
     demod_tx_port = tddConf.value("demod_tx_port", 8100);
@@ -301,11 +286,8 @@ Config::Config(std::string jsonfile)
             / (ldpc_num_input_cols(LDPC_config.Bg) - 2 + LDPC_config.nRows),
         LDPC_config.nRows);
 
-    test_mode = tddConf.value("test_mode", 0);
-
     pci_addr = tddConf.value("pci_addr", "37:00.0");
     
-    dynamic_workload = tddConf.value("dynamic_workload", false);
     fixed_control = tddConf.value("fixed_control", -1);
     user_level_list = tddConf.value("user_level_list", std::vector<size_t>(UE_NUM));
     num_load_levels = tddConf.value("num_load_levels", 10);
@@ -316,6 +298,13 @@ Config::Config(std::string jsonfile)
         decode_thread_num = ue_end - ue_start;
     } else {
         decode_thread_num = tmp_vec[bs_server_addr_idx];
+    }
+
+    use_time_domain_iq = tddConf.value("use_time_domain_iq", false);
+    if (use_time_domain_iq) {
+        tmp_vec = tddConf.value("fft_thread_num", std::vector<size_t>());
+        rt_assert(tmp_vec.size() == bs_server_addr_list.size());
+        fft_thread_num = tmp_vec[bs_server_addr_idx];
     }
 
     sampsPerSymbol

@@ -3,7 +3,7 @@
  "ue_num" : 8,
  "core_offset": 1,
  "worker_thread_num" : 22,
- "socket_thread_num": 2,
+ "rx_thread_num": 2,
  "symbol_num_perframe": 14,
  "frames" : [
      "BPDDDDDDDDDDDD"

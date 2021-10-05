@@ -6,14 +6,10 @@
 #include "concurrentqueue.h"
 #include "config.hpp"
 #include "control.hpp"
-#include "docoding.hpp"
 #include "dycoding.hpp"
-#include "dodemul.hpp"
 #include "dofft.hpp"
 #include "doprecode.hpp"
-#include "dosubcarrier.hpp"
 #include "dysubcarrier.hpp"
-#include "dozf.hpp"
 #include "gettime.h"
 #include "mac_thread.hpp"
 #include "memory_manage.h"
@@ -45,54 +41,17 @@ public:
 
     static const int kDequeueBulkSizeWorker = 4;
 
+
     Agora(Config*); /// Create an Agora object and start the worker threads
     ~Agora();
 
     void start(); /// The main Agora event loop
     void stop();
 
-    void* worker_fft(int tid);
-    void* worker_zf(int tid);
-    void* worker_demul(int tid);
     void* worker(int tid);
     void* subcarrier_worker(int tid);
     void* decode_worker(int tid);
     void* encode_worker(int tid);
-
-    void handle_event_fft(size_t tag);
-    void update_rx_counters(size_t frame_id, size_t symbol_id); // Not used
-    void print_per_frame_done(PrintType print_type, size_t frame_id);
-    void print_per_symbol_done(
-        PrintType print_type, size_t frame_id, size_t symbol_id);
-    void print_per_task_done(PrintType print_type, size_t frame_id,
-        size_t symbol_id, size_t ant_or_sc_id);
-
-    /// Update Agora's RAN config parameters
-    void update_ran_config(RanConfig rc);
-
-    void schedule_subcarriers(
-        EventType task_type, size_t frame_id, size_t symbol_id);
-    void schedule_antennas(
-        EventType task_type, size_t frame_id, size_t symbol_id);
-
-    /**
-     * @brief Schedule LDPC decoding or encoding over code blocks
-     * @param task_type Either LDPC decoding or LDPC encoding
-     * @param frame_id The monotonically increasing frame ID
-     * @param symbol_idx The index of the symbol among uplink symbols for LDPC
-     * decoding, and among downlink symbols for LDPC encoding
-     */
-    void schedule_codeblocks(
-        EventType task_type, size_t frame_id, size_t symbol_idx);
-
-    void schedule_users(EventType task_type, size_t frame_id, size_t symbol_id);
-
-    // Send current frame's SNR measurements from PHY to MAC
-    void send_snr_report(
-        EventType event_type, size_t frame_id, size_t symbol_id);
-
-    void move_events_between_queues(
-        EventType event_type1, EventType event_type2);
 
     void initialize_queues();
     void initialize_uplink_buffers();
@@ -103,7 +62,6 @@ public:
     void save_decode_data_to_file(int frame_id);
     void save_tx_data_to_file(int frame_id);
     void save_latency_data_to_file();
-    void getEqualData(float** ptr, int* size);
 
     void init_control_info();
 
@@ -117,6 +75,7 @@ public:
     } flags;
 
 private:
+
     /// Fetch the concurrent queue for this event type
     moodycamel::ConcurrentQueue<Event_data>* get_conq(EventType event_type)
     {
@@ -129,58 +88,26 @@ private:
         return sched_info_arr[static_cast<size_t>(event_type)].ptok;
     }
 
-    /// Return a string containing the sizes of the FFT queues
-    std::string get_fft_queue_sizes_string() const
-    {
-        std::ostringstream ret;
-        ret << "[";
-        for (size_t i = 0; i < TASK_BUFFER_FRAME_NUM; i++) {
-            ret << std::to_string(fft_queue_arr[i].size()) << " ";
-        }
-        ret << "]";
-        return ret.str();
-    }
-
-    const double freq_ghz; // RDTSC frequency in GHz
+    const double freq_ghz_; // RDTSC frequency in GHz
 
     // Worker thread i runs on core base_worker_core_offset + i
-    const size_t base_worker_core_offset;
+    size_t base_worker_core_offset;
 
     Config* config_;
-    size_t fft_created_count;
-    int max_equaled_frame = 0;
     std::unique_ptr<PacketTXRX> packet_tx_rx_;
-
-    MacThread* mac_thread_; // The thread running MAC layer functions
-    std::thread mac_std_thread_; // Handle for the MAC thread
-
-    Stats* stats;
-    PhyStats* phy_stats;
 
     /*****************************************************
      * Buffers
      *****************************************************/
 
-    /* Uplink */
-    size_t socket_buffer_size_; // RX buffer size per socket RX thread
-
     // Received data buffers
-    // 1st dimension: number of socket RX threads
-    // 2nd dimension: socket buffer size
-    Table<char> socket_buffer_;
+    // 1st dimension: number of antennas
+    // 2nd dimension: kFrameWnd * kMaxSymbols * packet_size
+    Table<char> freq_domain_iq_buffer_;
 
     // Preliminary CSI buffers. Each buffer has [number of antennas] rows and
     // [number of OFDM data subcarriers] columns.
-    PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers_;
-
-    // Data symbols after FFT
-    // 1st dimension: TASK_BUFFER_FRAME_NUM * uplink data symbols per frame
-    // 2nd dimension: number of antennas * number of OFDM data subcarriers
-    //
-    // 2nd dimension data order: 32 blocks each with 32 subcarriers each:
-    // subcarrier 1 -- 32 of antennas, subcarrier 33 -- 64 of antennas, ...,
-    // subcarrier 993 -- 1024 of antennas.
-    Table<complex_float> data_buffer_;
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffer_;
 
     // Calculated uplink zeroforcing detection matrices. Each matrix has
     // [number of antennas] rows and [number of UEs] columns.
@@ -193,34 +120,14 @@ private:
 
     // Data after demodulation. Each buffer has kMaxModType * number of OFDM
     // data subcarriers
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffer_to_send_;
 
     // Buffers to store demodulated data received by TX/RX threads in the
     // distributed version
-    Table<int8_t> demod_soft_buffer_to_decode_;
-
+    Table<int8_t> demod_buffer_to_decode_;
 
     // Data after LDPC decoding. Each buffer has [decoded bytes per UE] bytes.
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> decoded_buffer_;
-
-    Table<complex_float> ue_spec_pilot_buffer_;
-
-    RxCounters rx_counters_;
-    FFT_stats fft_stats_;
-    ZF_stats zf_stats_;
-    RC_stats rc_stats_;
-    Data_stats demul_stats_;
-    Data_stats decode_stats_;
-    Data_stats encode_stats_;
-    Data_stats precode_stats_;
-    Data_stats ifft_stats_;
-    Data_stats tx_stats_;
-    Data_stats tomac_stats_;
-    Data_stats frommac_stats_;
-
-    // Per-frame queues of delayed FFT tasks. The queue contains offsets into
-    // TX/RX buffers.
-    std::array<std::queue<fft_req_tag_t>, TASK_BUFFER_FRAME_NUM> fft_queue_arr;
 
     // Data for IFFT
     // 1st dimension: TASK_BUFFER_FRAME_NUM * number of antennas * number of
