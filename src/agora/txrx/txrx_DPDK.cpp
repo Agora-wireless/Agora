@@ -11,12 +11,24 @@
 
 static constexpr bool kDebugDPDK = false;
 
-PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
-    DemulStatus* demul_status, DecodeStatus* decode_status, EncodeStatus* encode_status, 
+PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, 
+    Table<char>& freq_domain_iq_buffer,
+    Table<complex_float>& dl_ifft_buffer,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send,
+    Table<int8_t>& demod_buffer_to_decode, Table<int8_t>& encoded_buffer,
+    Table<int8_t>& encoded_buffer_to_precode,
+    RxStatus* rx_status, DemulStatus* demul_status, 
+    DecodeStatus* decode_status, EncodeStatus* encode_status, 
     PrecodeStatus* precode_status)
     : cfg(cfg)
     , core_offset(core_offset)
     , rx_thread_num(cfg->rx_thread_num)
+    , freq_domain_iq_buffer_(freq_domain_iq_buffer)
+    , dl_ifft_buffer_(dl_ifft_buffer)
+    , demod_buffer_to_send_(demod_buffer_to_send)
+    , demod_buffer_to_decode_(demod_buffer_to_decode)
+    , encoded_buffer_(encoded_buffer)
+    , encoded_buffer_to_precode_(encoded_buffer_to_precode)
     , rx_status_(rx_status)
     , demul_status_(demul_status)
     , decode_status_(decode_status)
@@ -115,22 +127,8 @@ PacketTXRX::~PacketTXRX() {
     }
 }
 
-bool PacketTXRX::startTXRX(Table<char>& buffer,
-    Table<complex_float>* dl_ifft_buffer,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffer_to_send,
-    Table<int8_t>* demod_buffer_to_decode, Table<int8_t>* encoded_buffer,
-    Table<int8_t>* encoded_buffer_to_precode)
+bool PacketTXRX::startTXRX()
 {
-    freq_domain_iq_buffer_ = &buffer;
-
-    dl_ifft_buffer_ = dl_ifft_buffer;
-
-    demod_buffer_to_send_ = demod_buffer_to_send;
-    demod_buffer_to_decode_ = demod_buffer_to_decode;
-
-    encoded_buffer_ = encoded_buffer;
-    encoded_buffer_to_precode_ = encoded_buffer_to_precode;
-
     unsigned int lcore_id;
     size_t worker_id = 0;
     // Launch specific task to cores
@@ -204,13 +202,13 @@ void* PacketTXRX::demod_tx_thread(int tid)
             worked = 1;
 
             for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
-                int8_t* demod_ptr = &(*demod_buffer_to_send_)[demod_frame_to_send_
+                int8_t* demod_ptr = &demod_buffer_to_send_[demod_frame_to_send_
                     % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->subcarrier_start * cfg->mod_order_bits];
 
                 size_t target_server_idx = cfg->get_server_idx_by_ue(ue_id);
                 if (target_server_idx == cfg->bs_server_addr_idx) {
                     int8_t* target_demod_ptr
-                        = cfg->get_demod_buf_to_decode(*demod_buffer_to_decode_,
+                        = cfg->get_demod_buf_to_decode(demod_buffer_to_decode_,
                             demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg->subcarrier_start);
                     memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_to_process() * cfg->mod_order_bits);
                     decode_status_->receive_demod_data(
@@ -279,7 +277,7 @@ void* PacketTXRX::encode_thread(int tid)
         // 1. Try to send encoded data to dosubcarriers
         if (encode_status_->ready_to_precode(
                 encode_ue_to_send_, encode_frame_to_send_, encode_symbol_dl_to_send_)) {
-            int8_t* ptr = cfg->get_encoded_buf(*encoded_buffer_, encode_frame_to_send_, 
+            int8_t* ptr = cfg->get_encoded_buf(encoded_buffer_, encode_frame_to_send_, 
                 encode_symbol_dl_to_send_, encode_ue_to_send_, 0);
             // printf("Start to send encoded data frame %u symbol %u ue %u\n", encode_frame_to_send_, encode_symbol_dl_to_send_, encode_ue_to_send_);
             
@@ -287,10 +285,7 @@ void* PacketTXRX::encode_thread(int tid)
                 // int8_t* src_ptr = ptr + cfg->get_num_sc_per_server() * server_idx;
                 int8_t* src_ptr = ptr + cfg->subcarrier_num_start[server_idx];
                 if (server_idx == cfg->bs_server_addr_idx) {
-                    // printf("TXRX receive in situ encoded data frame %u symbol %u ue %u\n", encode_frame_to_send_, encode_symbol_dl_to_send_, encode_ue_to_send_);
-                    // int8_t* dst_ptr = cfg->get_encoded_buf(*encoded_buffer_to_precode_, encode_frame_to_send_,
-                    //     encode_symbol_dl_to_send_, encode_ue_to_send_, 0) + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server();
-                    int8_t* dst_ptr = cfg->get_encoded_buf(*encoded_buffer_to_precode_, encode_frame_to_send_,
+                    int8_t* dst_ptr = cfg->get_encoded_buf(encoded_buffer_to_precode_, encode_frame_to_send_,
                         encode_symbol_dl_to_send_, encode_ue_to_send_, 0) + cfg->subcarrier_start;
                     // memcpy(dst_ptr, src_ptr, cfg->get_num_sc_per_server());
                     memcpy(dst_ptr, src_ptr, cfg->get_num_sc_to_process());
@@ -383,11 +378,8 @@ void* PacketTXRX::encode_thread(int tid)
                 const size_t symbol_idx_dl = pkt->symbol_id;
                 const size_t ue_id = pkt->ue_id;
 
-                // int8_t* dst_ptr
-                //     = cfg->get_encoded_buf(*encoded_buffer_to_precode_,
-                //         pkt->frame_id, symbol_idx_dl, pkt->ue_id, 0) + cfg->bs_server_addr_idx * cfg->get_num_sc_per_server();
                 int8_t* dst_ptr
-                    = cfg->get_encoded_buf(*encoded_buffer_to_precode_,
+                    = cfg->get_encoded_buf(encoded_buffer_to_precode_,
                         pkt->frame_id, symbol_idx_dl, pkt->ue_id, 0) + cfg->subcarrier_start;
                 // DpdkTransport::fastMemcpy(dst_ptr, pkt->data,
                 //     cfg->get_num_sc_per_server());
@@ -494,7 +486,7 @@ int PacketTXRX::recv_relocate(int tid)
 
         auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset);
         if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
-            char* rx_buffer = (*freq_domain_iq_buffer_)[pkt->ant_id];
+            char* rx_buffer = freq_domain_iq_buffer_[pkt->ant_id];
             const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)
                     * cfg->symbol_num_perframe
                 + pkt->symbol_id;
@@ -540,7 +532,7 @@ int PacketTXRX::recv_relocate(int tid)
             const size_t sc_id = cfg->subcarrier_num_start[pkt->server_id];
 
             int8_t* demod_ptr
-                = cfg->get_demod_buf_to_decode(*demod_buffer_to_decode_,
+                = cfg->get_demod_buf_to_decode(demod_buffer_to_decode_,
                     pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
             memcpy(demod_ptr, pkt->data,
                 cfg->subcarrier_num_list[pkt->server_id] * cfg->mod_order_bits);
@@ -595,14 +587,9 @@ int PacketTXRX::dequeue_send(int tid, size_t symbol_dl_to_send, size_t ant_to_se
         size_t data_symbol_idx_dl = cfg->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
         size_t offset = data_symbol_idx_dl * cfg->BS_ANT_NUM + ant_to_send;
 
-        // simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data), 
-        //     reinterpret_cast<float*>(&(*dl_ifft_buffer_)[offset][0]), 
-        //     cfg->get_num_sc_per_server() * 2);
         simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data), 
-            reinterpret_cast<float*>(&(*dl_ifft_buffer_)[offset][0]), 
+            reinterpret_cast<float*>(&dl_ifft_buffer_[offset][0]), 
             cfg->get_num_sc_to_process() * 2);
-       
-        // printf("Send a packet out server:%u\n", pkt->server_id);
 
         // Send data (one OFDM symbol)
         size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);

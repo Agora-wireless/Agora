@@ -46,7 +46,13 @@
  */
 class PacketTXRX {
 public:
-    PacketTXRX(Config* cfg, size_t in_core_offset = 1,
+    PacketTXRX(Config* cfg, size_t in_core_offset,
+        Table<char>& buffer,
+        Table<complex_float>& tx_buffer,
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_to_send,
+        Table<int8_t>& demod_buffer_to_decode,
+        Table<int8_t>& encoded_buffer_,
+        Table<int8_t>& encoded_buffer_to_decode,
         RxStatus* rx_status = nullptr, DemulStatus* demul_status = nullptr,
         DecodeStatus* decode_status = nullptr,
         EncodeStatus* encode_status = nullptr,
@@ -70,13 +76,7 @@ public:
      * @return True on successfully starting the network I/O threads, false
      * otherwise
      */
-    bool startTXRX(Table<char>& buffer,
-        Table<complex_float>* tx_buffer,
-        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffers_to_send
-        = nullptr,
-        Table<int8_t>* demod_buffer_to_decode = nullptr,
-        Table<int8_t>* encoded_buffer_ = nullptr,
-        Table<int8_t>* encoded_buffer_to_decode = nullptr);
+    bool startTXRX();
 
     // TODO: Add documentation
     void send_beacon(int tid, size_t frame_id);
@@ -113,16 +113,16 @@ private:
     const size_t core_offset;
 
     const size_t rx_thread_num;
-    Table<char>* freq_domain_iq_buffer_;
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>* demod_buffer_to_send_;
-    Table<int8_t>* demod_buffer_to_decode_;
+    Table<char>& freq_domain_iq_buffer_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send_;
+    Table<int8_t>& demod_buffer_to_decode_;
     size_t packet_num_in_buffer_;
     char* tx_buffer_;
-    Table<complex_float>* dl_ifft_buffer_;
+    Table<complex_float>& dl_ifft_buffer_;
 
     // Downlink buffers
-    Table<int8_t>* encoded_buffer_;
-    Table<int8_t>* encoded_buffer_to_precode_;
+    Table<int8_t>& encoded_buffer_;
+    Table<int8_t>& encoded_buffer_to_precode_;
 
     std::vector<struct sockaddr_in> bs_rru_sockaddr_;
     std::vector<int> socket_;

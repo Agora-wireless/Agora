@@ -30,6 +30,9 @@ Agora::Agora(Config* cfg)
 
     /* Initialize TXRX threads */
     packet_tx_rx_.reset(new PacketTXRX(cfg, cfg->core_offset + kNumMasterThread,
+        freq_domain_iq_buffer_, dl_ifft_buffer_,
+        demod_buffer_to_send_, demod_buffer_to_decode_, dl_encoded_buffer_,
+        dl_encoded_buffer_to_precode_,
         &rx_status_, &demul_status_, &demod_status_, &encode_status_, &precode_status_));
     
     base_worker_core_offset = config_->core_offset + kNumMasterThread + 
@@ -39,7 +42,6 @@ Agora::Agora(Config* cfg)
     /* Create worker threads */
     do_subcarrier_threads_.resize(
         (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
-
     for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
         do_subcarrier_threads_[i]
             = std::thread(&Agora::subcarrier_worker, this, i);
@@ -96,10 +98,7 @@ void Agora::start()
     rte_eth_stats_get(0, &start_stats);
 
     // Start packet I/O
-    if (!packet_tx_rx_->startTXRX(freq_domain_iq_buffer_,
-            &dl_ifft_buffer_,
-            &demod_buffer_to_send_, &demod_buffer_to_decode_, &dl_encoded_buffer_,
-            &dl_encoded_buffer_to_precode_)) {
+    if (!packet_tx_rx_->startTXRX()) {
         this->stop();
         return;
     }

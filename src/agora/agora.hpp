@@ -48,19 +48,19 @@ public:
     void start(); /// The main Agora event loop
     void stop();
 
-    void* worker(int tid);
+    void* worker(int tid); // TODO: implement later
     void* subcarrier_worker(int tid);
     void* decode_worker(int tid);
-    void* encode_worker(int tid);
+    void* encode_worker(int tid); // TODO: implement later
 
-    void initialize_queues();
+    void initialize_queues(); // TODO: implement later
     void initialize_uplink_buffers();
-    void initialize_downlink_buffers();
+    void initialize_downlink_buffers(); // TODO: implement later
     void free_uplink_buffers();
-    void free_downlink_buffers();
+    void free_downlink_buffers(); // TODO: implement later
 
-    void save_decode_data_to_file(int frame_id);
-    void save_tx_data_to_file(int frame_id);
+    void save_decode_data_to_file(int frame_id); // TODO: implement later
+    void save_tx_data_to_file(int frame_id); // TODO: implement later
     void save_latency_data_to_file();
 
     void init_control_info();
