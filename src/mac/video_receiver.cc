@@ -16,7 +16,7 @@ VideoReceiver::VideoReceiver(size_t port)
       data_available_(0),
       data_start_offset_(0) {}
 
-size_t VideoReceiver::Load(char *destination, size_t requested_bytes) {
+size_t VideoReceiver::Load(unsigned char *destination, size_t requested_bytes) {
   size_t rx_attempts = 0u;
 
   if (requested_bytes > data_available_) {

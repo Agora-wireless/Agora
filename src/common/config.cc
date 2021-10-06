@@ -440,23 +440,18 @@ Config::Config(const std::string& jsonfile)
   data_bytes_num_persymbol_ =
       num_bytes_per_cb_ * ldpc_config_.NumBlocksInSymbol();
 
-  //  Pad the mac packets so that they can be stuffed into the same buffer
-  //  Align to kMacAlignmentBytes (64) byte boundaries
-  size_t padding =
-      kMacAlignmentBytes - (data_bytes_num_persymbol_ % kMacAlignmentBytes);
-  mac_packet_length_ = data_bytes_num_persymbol_ + padding;
-  mac_payload_length_ =
-      mac_packet_length_ - (padding + MacPacket::kOffsetOfData);
-  assert(mac_packet_length_ > (padding + MacPacket::kOffsetOfData));
+  mac_packet_length_ = data_bytes_num_persymbol_;
+  //Smallest over the air packet structure
+  mac_data_length_max_ = mac_packet_length_ - sizeof(MacPacketHeaderPacked);
 
   ul_mac_packets_perframe_ = this->frame_.NumUlDataSyms();
   ul_mac_data_bytes_num_perframe_ =
-      mac_payload_length_ * ul_mac_packets_perframe_;
+      mac_data_length_max_ * ul_mac_packets_perframe_;
   ul_mac_bytes_num_perframe_ = mac_packet_length_ * ul_mac_packets_perframe_;
 
   dl_mac_packets_perframe_ = this->frame_.NumDlDataSyms();
   dl_mac_data_bytes_num_perframe_ =
-      mac_payload_length_ * dl_mac_packets_perframe_;
+      mac_data_length_max_ * dl_mac_packets_perframe_;
   dl_mac_bytes_num_perframe_ = mac_packet_length_ * dl_mac_packets_perframe_;
 
   this->running_.store(true);
