@@ -6,7 +6,6 @@ using namespace std;
 Agora::Agora(Config* cfg)
     : freq_ghz_(measure_rdtsc_freq())
     , rx_status_(cfg)
-    , demul_status_(cfg)
     , demod_status_(cfg)
     , encode_status_(cfg)
     , precode_status_(cfg)
@@ -33,7 +32,7 @@ Agora::Agora(Config* cfg)
         freq_domain_iq_buffer_, dl_ifft_buffer_,
         demod_buffer_to_send_, demod_buffer_to_decode_, dl_encoded_buffer_,
         dl_encoded_buffer_to_precode_,
-        &rx_status_, &demul_status_, &demod_status_, &encode_status_, &precode_status_));
+        &rx_status_, &demod_status_, &encode_status_, &precode_status_));
     
     base_worker_core_offset = config_->core_offset + kNumMasterThread + 
         config_->rx_thread_num + kNumDemodTxThread;
@@ -164,7 +163,7 @@ void* Agora::subcarrier_worker(int tid)
         dl_encoded_buffer_to_precode_, demod_buffer_to_send_, dl_ifft_buffer_,
         equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
         control_info_table_, control_idx_list_,
-        &rx_status_, &demul_status_, &precode_status_);
+        &rx_status_, &precode_status_);
 
     computeSubcarrier->start_work();
     delete computeSubcarrier;
@@ -316,7 +315,7 @@ void Agora::save_latency_data_to_file()
     for (size_t i = 0; i < cfg->frames_to_test; i ++) {
         fprintf(fp, "%u %lu %lu %lu %lu %lu\n", i, rx_status_.frame_start_time_[i],
             rx_status_.frame_iq_time_[i],
-            demul_status_.frame_sc_time_[i],
+            rx_status_.frame_sc_time_[i],
             demod_status_.frame_decode_time_[i],
             rx_status_.frame_end_time_[i]);
     }

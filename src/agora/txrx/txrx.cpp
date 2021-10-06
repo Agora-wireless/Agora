@@ -9,7 +9,7 @@
 #include "udp_server.h"
 
 PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
-    DemulStatus* demul_status, DecodeStatus* decode_status)
+    DecodeStatus* decode_status)
     : cfg(cfg)
     , core_offset(core_offset)
     , socket_thread_num(cfg->socket_thread_num)

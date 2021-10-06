@@ -85,7 +85,7 @@ public:
         std::vector<std::vector<ControlInfo>>& control_info_table,
         std::vector<size_t>& control_idx_list,
         RxStatus* rx_status = nullptr,
-        DemulStatus* demul_status = nullptr, PrecodeStatus* precode_status = nullptr)
+        PrecodeStatus* precode_status = nullptr)
         : Doer(config, tid, freq_ghz)
         , sc_range_(sc_range)
         , freq_domain_iq_buffer_(freq_domain_iq_buffer)
@@ -100,7 +100,6 @@ public:
         , control_info_table_(control_info_table)
         , control_idx_list_(control_idx_list)
         , rx_status_(rx_status)
-        , demul_status_(demul_status)
         , precode_status_(precode_status)
     {
         // Create the requisite Doers
@@ -522,9 +521,6 @@ private:
     size_t precode_cur_frame_ = 0;
     size_t precode_cur_sym_dl_ = 0;
     size_t n_precode_tasks_done_ = 0;
-
-    // Shared status with Decode threads
-    DemulStatus* demul_status_;
 
     // Shared status with TXRX threads
     PrecodeStatus* precode_status_;
