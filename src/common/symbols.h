@@ -112,6 +112,7 @@ enum class PrintType : int {
 // crucial for good performance. For testing or developing Agora on machines
 // with insufficient cores, disable this flag.
 static constexpr bool kEnableThreadPinning = true;
+static constexpr bool kEnableThreadWrapping = false;
 
 #define BIGSTATION 0
 #if defined(USE_DPDK)
