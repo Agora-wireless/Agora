@@ -183,7 +183,7 @@ private:
     std::vector<std::thread> do_encode_threads_;
 
     // Shared states between socket threads and dosubcarriers
-    RxStatus rx_status_;
+    SharedState shared_state__;
 
     // Shared states between dosubcarriers and doencoders
     EncodeStatus encode_status_;

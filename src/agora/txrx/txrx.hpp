@@ -53,7 +53,7 @@ public:
         Table<int8_t>& demod_buffer_to_decode,
         Table<int8_t>& encoded_buffer_,
         Table<int8_t>& encoded_buffer_to_decode,
-        RxStatus* rx_status = nullptr,
+        SharedState* shared_state_ = nullptr,
         EncodeStatus* encode_status = nullptr,
         PrecodeStatus* precode_status = nullptr);
 
@@ -143,7 +143,7 @@ private:
 
     RadioConfig* radioconfig_; // Used only in Argos mode
 
-    RxStatus* rx_status_; // Shared states with workers
+    SharedState* shared_state__; // Shared states with workers
     size_t demod_frame_to_send_ = 0;
     size_t demod_symbol_ul_to_send_;
     EncodeStatus* encode_status_;

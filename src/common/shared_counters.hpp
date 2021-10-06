@@ -9,11 +9,11 @@
 #include <sstream>
 #include <vector>
 
-// We use one RxStatus object to track packet reception status.
+// We use one SharedState object to track packet reception status.
 // This object is shared between socket threads and subcarrier workers.
-class RxStatus {
+class SharedState {
 public:
-    RxStatus(Config* cfg)
+    SharedState(Config* cfg)
         : num_pilot_pkts_per_frame_(
               cfg->pilot_symbol_num_perframe * cfg->BS_ANT_NUM)
         , num_pilot_symbols_per_frame_(cfg->pilot_symbol_num_perframe)
@@ -50,12 +50,19 @@ public:
         }
     }
 
+
+    /*********************************************
+     * 
+     * Functions for receiving new packets
+     * 
+     *********************************************/
+
     // When receive a new packet, record it here
     bool receive_freq_iq_pkt(const Packet* pkt)
     {
         if (unlikely(pkt->frame_id >= cur_frame_ + kFrameWnd)) {
             MLPD_ERROR(
-                "SharedCounters RxStatus error: Received freq iq packet for future "
+                "SharedCounters SharedState error: Received freq iq packet for future "
                 "frame %u beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
                 "happen if Agora is running slowly, e.g., in debug mode. "
                 "Full packet = %s.\n",
@@ -100,7 +107,7 @@ public:
     {
         if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
             MLPD_ERROR(
-                "SharedCounters RxStatus error: Received demod packet for future "
+                "SharedCounters SharedState error: Received demod packet for future "
                 "frame %u beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
                 "happen if Agora is running slowly, e.g., in debug mode. \n",
                 frame_id, cur_frame_, kFrameWnd, cur_frame_, num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
@@ -110,6 +117,14 @@ public:
         num_demod_pkts_[ue_id][frame_id % kFrameWnd][symbol_id_ul]++;
         return true;
     }
+
+
+    /*********************************************
+     * 
+     * Functions for checking whether all packets
+     * of a certain type are received
+     * 
+     *********************************************/
 
     // Check whether all pilot packets are received for a frame
     // used by CSI
@@ -123,45 +138,13 @@ public:
     }
 
     // Check whether demodulation can proceed for a symbol in a frame
-    bool is_demod_ready(size_t frame_id, size_t symbol_id_ul)
+    bool received_all_data_pkts(size_t frame_id, size_t symbol_id_ul)
     {
         if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
             return false;
         }
         return num_data_pkts_[frame_id % kFrameWnd][symbol_id_ul]
             == num_pkts_per_symbol_;
-    }
-
-    // Check whether encoding can proceed for a frame
-    bool is_encode_ready(size_t frame_id) {
-        if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
-            return false;
-        }
-        return encode_ready_[frame_id % kFrameWnd];
-    }
-
-    // Mark [num_tasks] demodulation tasks for this frame and symbol as complete
-    void demul_done(size_t frame_id, size_t symbol_id_ul, size_t num_tasks)
-    {
-        rt_assert(frame_id >= cur_frame_ && frame_id < cur_frame_ + kFrameWnd,
-            "Complete a wrong frame in demul!");
-        num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
-            += num_tasks;
-    }
-
-    // Return true iff we have completed demodulation for all subcarriers in
-    // this symbol have
-    bool is_demod_tx_ready(size_t frame_id, size_t symbol_id_ul)
-    {
-        if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
-            return false;
-        }
-        if (num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
-            == num_demul_tasks_required_) {
-            frame_sc_time_[frame_id] = get_ns();
-            return true;
-        } 
-        return false;
     }
 
     bool received_all_demod_pkts(
@@ -175,6 +158,30 @@ public:
             return true;
         }
         return false;
+    }
+
+    // Check whether encoding can proceed for a frame
+    bool is_encode_ready(size_t frame_id) {
+        if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
+            return false;
+        }
+        return encode_ready_[frame_id % kFrameWnd];
+    }
+
+
+    /*********************************************
+     * 
+     * Functions for recording completed tasks
+     * 
+     *********************************************/
+
+    // Mark [num_tasks] demodulation tasks for this frame and symbol as complete
+    void demul_done(size_t frame_id, size_t symbol_id_ul, size_t num_tasks)
+    {
+        rt_assert(frame_id >= cur_frame_ && frame_id < cur_frame_ + kFrameWnd,
+            "Complete a wrong frame in demul!");
+        num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
+            += num_tasks;
     }
 
     // When decoding is done for a frame from one decoder, call this function
@@ -243,6 +250,36 @@ public:
         }
         precode_mutex_.unlock();
     }
+
+
+    /*********************************************
+     * 
+     * Functions for checking whether certain task
+     * is completed
+     * 
+     *********************************************/
+
+    // Return true iff we have completed demodulation for all subcarriers in
+    // this symbol have
+    bool is_demod_tx_ready(size_t frame_id, size_t symbol_id_ul)
+    {
+        if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
+            return false;
+        }
+        if (num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
+            == num_demul_tasks_required_) {
+            frame_sc_time_[frame_id] = get_ns();
+            return true;
+        } 
+        return false;
+    }
+
+
+    /*********************************************
+     * 
+     * Packet and task completion counters
+     * 
+     *********************************************/
 
     // TODO: Instead of having all-atomic counter arrays, can we just make
     // the entire class atomic?

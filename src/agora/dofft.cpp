@@ -66,14 +66,14 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz, Range ant_range,
     Table<char>& time_domain_iq_buffer,
     Table<char>& frequency_domain_iq_buffer_to_send, 
     PhyStats* in_phy_stats,
-    Stats* stats_manager, RxStatus* rx_status)
+    Stats* stats_manager, SharedState* shared_state_)
     : Doer(config, tid, freq_ghz, dummy_conq_, complete_task_queue,
           worker_producer_token)
     , ant_range_(ant_range)
     , time_domain_iq_buffer_(time_domain_iq_buffer)
     , frequency_domain_iq_buffer_to_send_(frequency_domain_iq_buffer_to_send)
     , phy_stats(in_phy_stats)
-    , rx_status_(rx_status)
+    , shared_state__(shared_state_)
 {
     duration_stat_fft = stats_manager->get_duration_stat(DoerType::kFFT, tid);
     duration_stat_csi = stats_manager->get_duration_stat(DoerType::kCSI, tid);
@@ -142,7 +142,7 @@ void DoFFT::start_work()
                 work_start_tsc = rdtsc();
                 state_start_tsc = rdtsc();
             }
-            bool ret = rx_status_->received_all_pilots(cur_frame_);
+            bool ret = shared_state__->received_all_pilots(cur_frame_);
             if (likely(state_trigger)) {
                 state_operation_duration += rdtsc() - state_start_tsc;
                 work_tsc_duration += rdtsc() - work_start_tsc;
@@ -173,7 +173,7 @@ void DoFFT::start_work()
                 if (likely(state_trigger)) {
                     state_start_tsc = rdtsc();
                 }
-                rx_status_->fft_done(cur_frame_, cur_symbol, 1);
+                shared_state__->fft_done(cur_frame_, cur_symbol, 1);
                 if (likely(state_trigger)) {
                     state_operation_duration += rdtsc() - state_start_tsc;
                     work_tsc_duration += rdtsc() - work_start_tsc;

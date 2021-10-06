@@ -27,7 +27,7 @@ class DyEncode : public Doer {
 public:
     DyEncode(Config* in_config, int in_tid, double freq_ghz,
         Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
-        Stats* in_stats_manager, RxStatus* rx_status,
+        Stats* in_stats_manager, SharedState* shared_state_,
         EncodeStatus* encode_status);
     ~DyEncode();
 
@@ -44,7 +44,7 @@ private:
     Table<int8_t>& encoded_buffer_;
     DurationStat* duration_stat;
 
-    RxStatus* rx_status_;
+    SharedState* shared_state__;
     EncodeStatus* encode_status_;
 
     size_t ue_id_;
@@ -62,7 +62,7 @@ public:
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
         std::vector<std::vector<ControlInfo>>& control_info_table_,
         std::vector<size_t>& control_idx_list_,
-        RxStatus* rx_status = nullptr);
+        SharedState* shared_state_ = nullptr);
 
     ~DyDecode();
 
@@ -77,7 +77,7 @@ private:
     int16_t* resp_var_nodes;
     Table<int8_t> demod_buffer_to_decode_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers_;
-    RxStatus* rx_status_;
+    SharedState* shared_state__;
 
     size_t total_ue_num_;
     size_t total_dycode_num_;

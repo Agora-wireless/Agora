@@ -11,12 +11,12 @@ static constexpr bool kPrintDecodedData = false;
 
 DyEncode::DyEncode(Config* in_config, int in_tid, double freq_ghz,
     Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
-    Stats* in_stats_manager, RxStatus* rx_status,
+    Stats* in_stats_manager, SharedState* shared_state_,
     EncodeStatus* encode_status)
     : Doer(in_config, in_tid, freq_ghz)
     , raw_data_buffer_(in_raw_data_buffer)
     , encoded_buffer_(in_encoded_buffer)
-    , rx_status_(rx_status)
+    , shared_state__(shared_state_)
     , encode_status_(encode_status)
     , ue_id_(in_tid + in_config->ue_start)
 {
@@ -107,7 +107,7 @@ void DyEncode::start_work()
 {
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_cb_ > 0
-            || rx_status_->is_encode_ready(cur_frame_)) {
+            || shared_state__->is_encode_ready(cur_frame_)) {
             // printf("Start to encode user %lu frame %lu symbol %lu cb %u\n", ue_id_, cur_frame_, cur_symbol_, cur_cb_);
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                 cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
@@ -132,13 +132,13 @@ DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
     std::vector<std::vector<ControlInfo>>& control_info_table,
     std::vector<size_t>& control_idx_list,
-    RxStatus* rx_status)
+    SharedState* shared_state_)
     : Doer(in_config, in_tid, freq_ghz)
     , demod_buffer_to_decode_(demod_buffer_to_decode)
     , decoded_buffers_(decoded_buffers)
     , control_info_table_(control_info_table)
     , control_idx_list_(control_idx_list)
-    , rx_status_(rx_status)
+    , shared_state__(shared_state_)
     , total_dycode_num_(cfg->decode_thread_num)
     , total_ue_num_(cfg->ue_end - cfg->ue_start)
 {
@@ -314,7 +314,7 @@ void DyDecode::start_work()
                     cur_symbol_ = cur_idx_ / total_ue_num_;
                     cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
 
-                    rx_status_->decode_done(cur_frame_);
+                    shared_state__->decode_done(cur_frame_);
 
                     cur_frame_++;
                     if (unlikely(cur_frame_ == cfg->frames_to_test)) {
@@ -337,7 +337,7 @@ void DyDecode::start_work()
                 work_start_tsc = rdtsc();
                 state_start_tsc = rdtsc();
             }
-            bool ret = rx_status_->received_all_demod_pkts(
+            bool ret = shared_state__->received_all_demod_pkts(
                    cur_ue_, cur_frame_, cur_symbol_);
             if (likely(state_trigger)) {
                 state_operation_duration += rdtsc() - state_start_tsc;
@@ -385,7 +385,7 @@ void DyDecode::start_work()
                         cur_symbol_ = cur_idx_ / total_ue_num_;
                         cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
 
-                        rx_status_->decode_done(cur_frame_);
+                        shared_state__->decode_done(cur_frame_);
 
                         cur_frame_++;
                         if (unlikely(cur_frame_ == cfg->frames_to_test)) {

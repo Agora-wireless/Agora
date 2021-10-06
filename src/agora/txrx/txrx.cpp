@@ -8,7 +8,7 @@
 #include "logger.h"
 #include "udp_server.h"
 
-PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, RxStatus* rx_status,
+PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset, SharedState* rx_status,
     DecodeStatus* decode_status)
     : cfg(cfg)
     , core_offset(core_offset)

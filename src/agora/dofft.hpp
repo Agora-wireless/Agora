@@ -22,7 +22,7 @@ public:
         Table<char>& time_domain_iq_buffer, 
         Table<complex_float>& frequency_domain_iq_buffer_to_send,
         PhyStats* in_phy_stats,
-        Stats* stats_manager, RxStatus* rx_status);
+        Stats* stats_manager, SharedState* shared_state_);
     ~DoFFT();
 
     /**
@@ -76,7 +76,7 @@ private:
     size_t cur_frame_ = 0;
     size_t cur_idx_ = 0;
     
-    RxStatus *rx_status_;
+    SharedState *shared_state__;
 };
 
 class DoIFFT : public Doer {

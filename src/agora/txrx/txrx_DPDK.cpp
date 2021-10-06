@@ -17,7 +17,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send,
     Table<int8_t>& demod_buffer_to_decode, Table<int8_t>& encoded_buffer,
     Table<int8_t>& encoded_buffer_to_precode,
-    RxStatus* rx_status,
+    SharedState* shared_state_,
     EncodeStatus* encode_status, 
     PrecodeStatus* precode_status)
     : cfg(cfg)
@@ -29,7 +29,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
     , demod_buffer_to_decode_(demod_buffer_to_decode)
     , encoded_buffer_(encoded_buffer)
     , encoded_buffer_to_precode_(encoded_buffer_to_precode)
-    , rx_status_(rx_status)
+    , shared_state__(shared_state_)
     , encode_status_(encode_status)
     , precode_status_(precode_status)
 {
@@ -188,7 +188,7 @@ void* PacketTXRX::demod_tx_thread(int tid)
         worked = 0;
 
         // 1. Try to send demodulated data to decoders
-        if (rx_status_->is_demod_tx_ready(
+        if (shared_state__->is_demod_tx_ready(
                 demod_frame_to_send_, demod_symbol_ul_to_send_)) {
 
             if (unlikely(start_tsc == 0)) {
@@ -209,7 +209,7 @@ void* PacketTXRX::demod_tx_thread(int tid)
                         = cfg->get_demod_buf_to_decode(demod_buffer_to_decode_,
                             demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg->subcarrier_start);
                     memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_to_process() * cfg->mod_order_bits);
-                    if (!rx_status_->receive_demod_pkt(ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_)) {
+                    if (!shared_state__->receive_demod_pkt(ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_)) {
                         cfg->running = false;
                     }
                 } else {
@@ -517,7 +517,7 @@ int PacketTXRX::recv_relocate(int tid)
 
             // get the position in rx_buffer
             cur_cycle = rdtsc();
-            if (!rx_status_->receive_freq_iq_pkt(pkt)) {
+            if (!shared_state__->receive_freq_iq_pkt(pkt)) {
                 cfg->running = false;
             }
             size_t record_cycle = rdtsc() - cur_cycle;
@@ -535,7 +535,7 @@ int PacketTXRX::recv_relocate(int tid)
                     pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
             memcpy(demod_ptr, pkt->data,
                 cfg->subcarrier_num_list[pkt->server_id] * cfg->mod_order_bits);
-            if (!rx_status_->receive_demod_pkt(pkt->ue_id, pkt->frame_id, symbol_idx_ul)) {
+            if (!shared_state__->receive_demod_pkt(pkt->ue_id, pkt->frame_id, symbol_idx_ul)) {
                 cfg->running = false;
             }
         } else {
@@ -551,7 +551,7 @@ int PacketTXRX::recv_relocate(int tid)
 // TODO: check correctness of this funcion
 int PacketTXRX::dequeue_send(int tid, size_t symbol_dl_to_send, size_t ant_to_send)
 {
-    if (rx_status_->cur_frame_ > frame_to_send_[tid]) {
+    if (shared_state__->cur_frame_ > frame_to_send_[tid]) {
 
         struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
         tx_bufs[0] = rte_pktmbuf_alloc(mbuf_pool_[tid]);
