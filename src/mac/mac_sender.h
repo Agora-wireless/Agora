@@ -116,6 +116,7 @@ class MacSender {
   std::vector<std::thread> threads_;
 
   Table<uint8_t> tx_buffers_;
+  size_t tx_buffer_pkt_offset_;
   std::string data_filename_;
 
   size_t packets_per_frame_;
