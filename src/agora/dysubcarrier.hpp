@@ -196,7 +196,7 @@ public:
                     if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
                         n_demul_tasks_done_ = 0;
 
-                        demul_status_->demul_complete(
+                        rx_status_->demul_done(
                             demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_reqd);
 
                         demul_cur_sym_ul_++;

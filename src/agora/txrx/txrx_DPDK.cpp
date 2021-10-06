@@ -190,7 +190,7 @@ void* PacketTXRX::demod_tx_thread(int tid)
         worked = 0;
 
         // 1. Try to send demodulated data to decoders
-        if (demul_status_->ready_to_decode(
+        if (rx_status_->is_demod_tx_ready(
                 demod_frame_to_send_, demod_symbol_ul_to_send_)) {
 
             if (unlikely(start_tsc == 0)) {

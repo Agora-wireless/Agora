@@ -21,15 +21,23 @@ public:
         , num_pkts_per_symbol_(cfg->BS_ANT_NUM)
         , num_decode_tasks_per_frame_(cfg->decode_thread_num)
         , num_precode_tasks_per_frame_((cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
+        , num_demul_tasks_required_(cfg->get_num_sc_to_process() / cfg->demul_block_size)
         , last_frame_cycles_(worker_rdtsc())
         , freq_ghz_(measure_rdtsc_freq())
     {
         frame_start_time_ = new uint64_t[cfg->frames_to_test];
         frame_iq_time_ = new uint64_t[cfg->frames_to_test];
+        frame_sc_time_ = new uint64_t[cfg->frames_to_test];
         frame_end_time_ = new uint64_t[cfg->frames_to_test];
         memset(frame_start_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
         memset(frame_iq_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+        memset(frame_sc_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
         memset(frame_end_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+        for (size_t i = 0; i < kFrameWnd; i++) {
+            for (size_t j = 0; j < kMaxSymbols; j++) {
+                num_demul_tasks_completed_[i][j] = 0;
+            }
+        }
     }
 
     // When receive a new packet, record it here
@@ -111,6 +119,30 @@ public:
         return encode_ready_[frame_id % kFrameWnd];
     }
 
+    // Mark [num_tasks] demodulation tasks for this frame and symbol as complete
+    void demul_done(size_t frame_id, size_t symbol_id_ul, size_t num_tasks)
+    {
+        rt_assert(frame_id >= cur_frame_ && frame_id < cur_frame_ + kFrameWnd,
+            "Complete a wrong frame in demul!");
+        num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
+            += num_tasks;
+    }
+
+    // Return true iff we have completed demodulation for all subcarriers in
+    // this symbol have
+    bool is_demod_tx_ready(size_t frame_id, size_t symbol_id_ul)
+    {
+        if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
+            return false;
+        }
+        if (num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
+            == num_demul_tasks_required_) {
+            frame_sc_time_[frame_id] = get_ns();
+            return true;
+        } 
+        return false;
+    }
+
     // When decoding is done for a frame from one decoder, call this function
     // This function will increase cur_frame when this frame is decoded so that
     // we can move on decoding the next frame and release the resources used by
@@ -137,6 +169,9 @@ public:
                 num_pilot_pkts_[frame_slot] = 0;
                 for (size_t j = 0; j < kMaxSymbols; j++) {
                     num_data_pkts_[frame_slot][j] = 0;
+                }
+                for (size_t i = 0; i < kMaxSymbols; i++) {
+                    num_demul_tasks_completed_[frame_slot][i] = 0;
                 }
                 MLPD_INFO("Main thread: Decode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
                 last_frame_cycles_ = cur_cycle;
@@ -186,6 +221,12 @@ public:
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_data_pkts_ = {};
 
+    // num_demul_tasks_completed[i % kFrameWnd][j] is
+    // the number of subcarriers completed for demul tasks in
+    // frame i and symbol j
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
+        num_demul_tasks_completed_;
+
     // encode_ready_[i % kFrameWnd] represents whether encoding can proceed
     // for frame i
     std::array<bool, kFrameWnd> encode_ready_;
@@ -210,6 +251,7 @@ public:
     // Latency measurement counters for each frame
     uint64_t *frame_start_time_;
     uint64_t *frame_iq_time_;
+    uint64_t *frame_sc_time_;
     uint64_t *frame_end_time_;
 
     // The timestamp when last frame was processed (in cycles)
@@ -225,6 +267,7 @@ public:
     const size_t num_pkts_per_symbol_;
     const size_t num_decode_tasks_per_frame_;
     const size_t num_precode_tasks_per_frame_;
+    const size_t num_demul_tasks_required_;
 };
 
 // We use DemulStatus to track # completed demul tasks for each symbol
