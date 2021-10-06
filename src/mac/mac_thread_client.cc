@@ -32,26 +32,30 @@ MacThreadClient::MacThreadClient(
   log_file_ = std::fopen(log_filename_.c_str(), "w");
   RtAssert(log_file_ != nullptr, "Failed to open MAC log file");
 
-  std::printf("MAC thread: Frame duration %.2f ms, tsc_delta %zu\n",
-              cfg_->GetFrameDurationSec() * 1000, tsc_delta_);
+  MLPD_INFO("MacThreadClient: Frame duration %.2f ms, tsc_delta %zu\n",
+            cfg_->GetFrameDurationSec() * 1000, tsc_delta_);
 
   // Set up buffers
+  client_.ul_bits_buffer_id_.fill(0);
   client_.ul_bits_buffer_ = ul_bits_buffer;
   client_.ul_bits_buffer_status_ = ul_bits_buffer_status;
 
   server_.n_filled_in_frame_.fill(0);
+  for (size_t ue_ant = 0; ue_ant < cfg_->UeAntTotal(); ue_ant++) {
+    server_.data_size_.emplace_back(
+        std::vector<size_t>(cfg->Frame().NumUlDataSyms()));
+  }
+
   for (auto& v : server_.frame_data_) {
     v.resize(cfg_->DlMacDataBytesNumPerframe());
   }
-
-  client_.ul_bits_buffer_id_.fill(0);
 
   const size_t udp_pkt_len = cfg_->UlMacDataBytesNumPerframe();
   udp_pkt_buf_.resize(udp_pkt_len + kUdpRxBufferPadding);
 
   // TODO: See if it makes more sense to split up the UE's by port here for
   // client mode.
-  size_t udp_server_port = cfg_->UeMacRxPort();
+  const size_t udp_server_port = cfg_->UeMacRxPort();
   MLPD_INFO("MacThreadClient: setting up udp server for mac data at port %zu\n",
             udp_server_port);
   udp_server_ = std::make_unique<UDPServer>(
@@ -73,7 +77,7 @@ MacThreadClient::MacThreadClient(
 
 MacThreadClient::~MacThreadClient() {
   std::fclose(log_file_);
-  MLPD_INFO("MAC thread destroyed\n");
+  MLPD_INFO("MacThreadClient: MAC thread destroyed\n");
 }
 
 void MacThreadClient::ProcessRxFromPhy() {
@@ -83,10 +87,10 @@ void MacThreadClient::ProcessRxFromPhy() {
   }
 
   if (event.event_type_ == EventType::kPacketToMac) {
-    MLPD_TRACE("MAC thread event kPacketToMac\n");
+    MLPD_TRACE("MacThreadClient: MAC thread event kPacketToMac\n");
     ProcessCodeblocksFromPhy(event);
   } else if (event.event_type_ == EventType::kSNRReport) {
-    MLPD_TRACE("MAC thread event kSNRReport\n");
+    MLPD_TRACE("MacThreadClient: MAC thread event kSNRReport\n");
     ProcessSnrReportFromPhy(event);
   }
 }
@@ -127,69 +131,128 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
 
   const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
   const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-  const size_t symbol_idx_dl = this->cfg_->Frame().GetDLSymbolIdx(symbol_id);
   const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
 
-  const int8_t* dl_data_ptr =
-      decoded_buffer_[(frame_id % kFrameWnd)][symbol_idx_dl][ue_id];
+  //Helper variables (changes with bs / user)
+  const size_t num_pilot_symbols = cfg_->Frame().ClientDlPilotSymbols();
+  const size_t symbol_array_index = cfg_->Frame().GetDLSymbolIdx(symbol_id);
+  const size_t data_symbol_index_start =
+      cfg_->Frame().GetDLSymbol(num_pilot_symbols);
+  const size_t data_symbol_index_end = cfg_->Frame().GetDLSymbolLast();
+  const size_t max_data_bytes_per_frame = cfg_->DlMacDataBytesNumPerframe();
+  const size_t num_mac_packets_per_frame = cfg_->DlMacPacketsPerframe();
+
+  const int8_t* src_data =
+      decoded_buffer_[(frame_id % kFrameWnd)][symbol_array_index][ue_id];
 
   std::stringstream ss;  // Debug-only
 
-  // Only non-pilot downlink symbols have application data.
-  if (symbol_idx_dl >= cfg_->Frame().ClientDlPilotSymbols()) {
-    auto* pkt = reinterpret_cast<struct MacPacket const*>(dl_data_ptr);
+  // Only non-pilot data symbols have application data.
+  if (symbol_array_index >= num_pilot_symbols) {
+    //The decoded symbol knows nothing about the padding / storage of the data
+    auto* pkt = reinterpret_cast<const MacPacketPacked*>(src_data);
+    //Destination only contains "payload"
+    const size_t dest_packet_size = cfg_->MacPayloadMaxLength();
 
-    // We send data to app irrespective of CRC condition
     // TODO: enable ARQ and ensure reliable data goes to app
     const size_t frame_data_offset =
-        (symbol_idx_dl - cfg_->Frame().ClientDlPilotSymbols()) *
-        cfg_->MacPayloadLength();
-    std::memcpy(&server_.frame_data_[ue_id][frame_data_offset], pkt->data_,
-                cfg_->MacPayloadLength());
-    server_.n_filled_in_frame_[ue_id] += cfg_->MacPayloadLength();
+        (symbol_array_index - num_pilot_symbols) * dest_packet_size;
 
-    // Check CRC
-    auto crc = static_cast<uint16_t>(
-        crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
-                                 cfg_->MacPayloadLength()) &
-        0xFFFF);
-    if (crc == pkt->crc_) {
+    //Who's junk is better? No reason to copy currupted data
+    server_.n_filled_in_frame_.at(ue_id) += dest_packet_size;
+
+    bool data_valid = false;
+    //Data validity check
+    if ((static_cast<size_t>(pkt->PayloadLength()) <= dest_packet_size) &&
+        ((pkt->Symbol() >= data_symbol_index_start) &&
+         (pkt->Symbol() <= data_symbol_index_end)) &&
+        (pkt->Ue() <= cfg_->UeAntNum())) {
+      auto crc = static_cast<uint16_t>(
+          crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) & 0xFFFF);
+
+      data_valid = (crc == pkt->Crc());
+    }
+
+    if (data_valid) {
+      MLPD_FRAME(
+          "Base Station MAC thread received frame %zu, uplink "
+          "symbol index %zu, size %zu, copied to frame data offset %zu\n",
+          frame_id, symbol_array_index, cfg_->MacPayloadMaxLength(),
+          frame_data_offset);
+      /// Spot to be optimized #1
+      std::memcpy(&server_.frame_data_.at(ue_id).at(frame_data_offset),
+                  pkt->Data(), pkt->PayloadLength());
+
+      server_.data_size_.at(ue_id).at(symbol_array_index - num_pilot_symbols) =
+          pkt->PayloadLength();
       // Print information about the received symbol
       if (kLogMacPackets) {
         std::fprintf(
             log_file_,
-            "User MAC thread received frame %zu, downlink symbol index %zu, "
+            "MacThreadClient: received frame %zu, downlink symbol index %zu, "
             "size %zu, copied to frame data offset %zu\n",
-            frame_id, symbol_idx_dl, cfg_->MacPayloadLength(),
+            frame_id, symbol_array_index, cfg_->MacPayloadMaxLength(),
             frame_data_offset);
 
         ss << "Header Info:\n"
-           << "FRAME_ID: " << pkt->frame_id_
-           << "\nSYMBOL_ID: " << pkt->symbol_id_ << "\nUE_ID: " << pkt->ue_id_
-           << "\nDATLEN: " << pkt->datalen_ << "\nPAYLOAD:\n";
-        for (size_t i = 0; i < cfg_->MacPayloadLength(); i++) {
-          ss << std::to_string(pkt->data_[i]) << " ";
+           << "FRAME_ID: " << pkt->Frame() << "\nSYMBOL_ID: " << pkt->Symbol()
+           << "\nUE_ID: " << pkt->Ue() << "\nDATLEN: " << pkt->PayloadLength()
+           << "\nPAYLOAD:\n";
+        for (size_t i = 0; i < cfg_->MacPayloadMaxLength(); i++) {
+          ss << std::to_string(pkt->Data()[i]) << " ";
         }
         std::fprintf(log_file_, "%s\n", ss.str().c_str());
         ss.str("");
       }
     } else {
-      std::printf("Bad Packet: CRC Check Failed! \n");
+      MLPD_ERROR(
+          "MacThreadClient: Failed Data integrity check - invalid parameters "
+          "frame %d:%zu symbol %d:%zu user %d:%zu length %d crc %d\n",
+          pkt->Frame(), frame_id, pkt->Symbol(), symbol_id, pkt->Ue(), ue_id,
+          pkt->PayloadLength(), pkt->Crc());
+      //Set the default to 0 valid data bytes
+      server_.data_size_.at(ue_id).at(symbol_array_index - num_pilot_symbols) =
+          0;
     }
   }
 
   // When the frame is full, send it to the application
-  if (server_.n_filled_in_frame_[ue_id] == cfg_->DlMacDataBytesNumPerframe()) {
-    server_.n_filled_in_frame_[ue_id] = 0;
+  if (server_.n_filled_in_frame_.at(ue_id) == max_data_bytes_per_frame) {
+    server_.n_filled_in_frame_.at(ue_id) = 0;
+    ///Spot to be optimized #2 -- left shift data over to remove padding
+    bool shifted = false;
+    size_t src_offset = 0;
+    size_t dest_offset = 0;
+    for (size_t packet = 0; packet < num_mac_packets_per_frame; packet++) {
+      const size_t rx_packet_size = server_.data_size_.at(ue_id).at(packet);
+      if (rx_packet_size < cfg_->MacPayloadMaxLength() || (shifted == true)) {
+        shifted = true;
+        if (rx_packet_size > 0) {
+          std::memmove(&server_.frame_data_.at(ue_id).at(dest_offset),
+                       &server_.frame_data_.at(ue_id).at(src_offset),
+                       rx_packet_size);
+        }
+      }
+      dest_offset += rx_packet_size;
+      src_offset += cfg_->MacPayloadMaxLength();
+    }
 
-    udp_client_->Send(kMacRemoteHostname, cfg_->UeMacTxPort() + ue_id,
-                      &server_.frame_data_[ue_id][0],
-                      cfg_->DlMacDataBytesNumPerframe());
-    std::fprintf(log_file_,
-                 "MAC thread: Sent data for frame %zu, ue %zu, size %zu\n",
-                 frame_id, ue_id, cfg_->DlMacDataBytesNumPerframe());
-    for (size_t i = 0; i < cfg_->DlMacDataBytesNumPerframe(); i++) {
-      ss << std::to_string(server_.frame_data_[ue_id][i]) << " ";
+    if (dest_offset > 0) {
+      udp_client_->Send(kMacRemoteHostname, cfg_->UeMacTxPort() + ue_id,
+                        &server_.frame_data_.at(ue_id).at(0), dest_offset);
+    }
+
+    std::fprintf(
+        stdout,
+        "MacThreadClient: Sent data for frame %zu, ue %zu, size %zu:%zu\n",
+        frame_id, ue_id, dest_offset, num_mac_packets_per_frame);
+
+    std::fprintf(
+        log_file_,
+        "MacThreadClient: Sent data for frame %zu, ue %zu, size %zu:%zu\n",
+        frame_id, ue_id, dest_offset, max_data_bytes_per_frame);
+    for (size_t i = 0u; i < dest_offset; i++) {
+      ss << std::to_string(server_.frame_data_.at(ue_id).at(i)) << " ";
     }
     std::fprintf(log_file_, "%s\n", ss.str().c_str());
     ss.str("");
@@ -198,18 +261,6 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
   RtAssert(
       tx_queue_->enqueue(EventData(EventType::kPacketToMac, event.tags_[0])),
       "Socket message enqueue failed\n");
-}
-
-void MacThreadClient::SendControlInformation() {
-  // send RAN control information UE
-  RBIndicator ri;
-  ri.ue_id_ = next_radio_id_;
-  ri.mod_order_bits_ = CommsLib::kQaM16;
-  udp_client_->Send(cfg_->UeServerAddr(), kMacBaseClientPort + ri.ue_id_,
-                    (uint8_t*)&ri, sizeof(RBIndicator));
-
-  // update RAN config within Agora
-  SendRanConfigUpdate(EventData(EventType::kRANUpdate));
 }
 
 void MacThreadClient::ProcessControlInformation() {
@@ -231,10 +282,13 @@ void MacThreadClient::ProcessControlInformation() {
 }
 
 void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
-  if (0 == cfg_->UlMacDataBytesNumPerframe()) return;
+  const size_t max_data_bytes_per_frame = cfg_->UlMacDataBytesNumPerframe();
+  const size_t num_mac_packets_per_frame = cfg_->UlMacPacketsPerframe();
 
-  //Processes the packets of an entire frame
-  const size_t packets_required = cfg_->UlMacPacketsPerframe();
+  if (0 == max_data_bytes_per_frame) return;
+
+  //Processes the packets of an entire frame (remove variable later)
+  const size_t packets_required = num_mac_packets_per_frame;
 
   size_t packets_received = 0;
   size_t current_packet_bytes = 0;
@@ -272,7 +326,7 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
       //    ret, packets_received, total_bytes_received, current_packet_bytes);
 
       //While we have packets remaining and a header to process
-      const size_t header_size = MacPacket::kOffsetOfData;
+      const size_t header_size = sizeof(MacPacketHeaderPacked);
       while ((packets_received < packets_required) &&
              (current_packet_bytes >= header_size)) {
         // See if we have enough data and process the MacPacket header
@@ -280,7 +334,7 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
             &udp_pkt_buf_.at(current_packet_start_index));
 
         const size_t current_packet_size =
-            header_size + rx_mac_packet_header->datalen_;
+            header_size + rx_mac_packet_header->PayloadLength();
 
         //std::printf("Packet number %zu @ %zu packet size %d:%zu total %zu\n",
         //            packets_received, current_packet_start_index,
@@ -318,7 +372,7 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
   }
   RtAssert(
       packets_received == packets_required,
-      "MacThreadClient:ProcessUdpPacketsFromApps incorrect data received!");
+      "MacThreadClient: ProcessUdpPacketsFromApps incorrect data received!");
 
   //Currently this is a packet list of mac packets
   ProcessUdpPacketsFromAppsClient((char*)&udp_pkt_buf_[0], ri);
@@ -326,38 +380,40 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
 
 void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
                                                       RBIndicator ri) {
+  const size_t num_mac_packets_per_frame = cfg_->UlMacPacketsPerframe();
+  const size_t num_pilot_symbols = cfg_->Frame().ClientUlPilotSymbols();
   // Data integrity check
   size_t pkt_offset = 0;
   size_t ue_id = 0;
   size_t symbol_id = 0;
   size_t frame_id = 0;
-  for (size_t packet = 0u; packet < cfg_->UlMacPacketsPerframe(); packet++) {
+  for (size_t packet = 0u; packet < num_mac_packets_per_frame; packet++) {
     auto* pkt = reinterpret_cast<const MacPacketPacked*>(&payload[pkt_offset]);
 
-    //std::printf("Frame %d, Packet %zu, symbol %d, user %d\n", pkt->frame_id_,
-    //            packet, pkt->symbol_id_, pkt->ue_id_);
+    //std::printf("Frame %d, Packet %zu, symbol %d, user %d\n", pkt->Frame(),
+    //            packet, pkt->Symbol(), pkt->Ue());
     if (packet == 0) {
-      ue_id = pkt->ue_id_;
-      frame_id = pkt->frame_id_;
+      ue_id = pkt->Ue();
+      frame_id = pkt->Frame();
     } else {
-      if (ue_id != pkt->ue_id_) {
+      if (ue_id != pkt->Ue()) {
         MLPD_ERROR(
             "Received pkt %zu data with unexpected UE id %zu, expected %d\n",
-            packet, ue_id, pkt->ue_id_);
+            packet, ue_id, pkt->Ue());
       }
-      if ((symbol_id + 1) != pkt->symbol_id_) {
+      if ((symbol_id + 1) != pkt->Symbol()) {
         MLPD_ERROR("Received out of order symbol id %d, expected %zu\n",
-                   pkt->symbol_id_, symbol_id + 1);
+                   pkt->Symbol(), symbol_id + 1);
       }
 
-      if (frame_id != pkt->frame_id_) {
+      if (frame_id != pkt->Frame()) {
         MLPD_ERROR(
             "Received pkt %zu data with unexpected frame id %zu, expected %d\n",
-            packet, frame_id, pkt->frame_id_);
+            packet, frame_id, pkt->Frame());
       }
     }
-    symbol_id = pkt->symbol_id_;
-    pkt_offset += MacPacket::kOffsetOfData + pkt->datalen_;
+    symbol_id = pkt->Symbol();
+    pkt_offset += MacPacketPacked::kHeaderSize + pkt->PayloadLength();
   }
 
   if (next_radio_id_ != ue_id) {
@@ -371,17 +427,18 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
   size_t& radio_buf_id = client_.ul_bits_buffer_id_[next_radio_id_];
 
   if ((*client_.ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] == 1) {
-    std::fprintf(stderr,
-                 "MAC thread: UDP RX buffer full, buffer ID: %zu. Dropping "
-                 "rx frame data\n",
-                 radio_buf_id);
+    std::fprintf(
+        stderr,
+        "MacThreadClient: UDP RX buffer full, buffer ID: %zu. Dropping "
+        "rx frame data\n",
+        radio_buf_id);
     return;
   }
 
   if (kLogMacPackets) {
     std::stringstream ss;
     std::fprintf(log_file_,
-                 "User MAC thread: Received data from app for frame %zu, ue "
+                 "MacThreadClient: Received data from app for frame %zu, ue "
                  "%zu size %zu\n",
                  next_tx_frame_id_, next_radio_id_, pkt_offset);
 
@@ -393,67 +450,64 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
 
   size_t src_pkt_offset = 0;
   //Copy from the packet rx buffer into ul_bits memory (unpacked)
-  for (size_t pkt_id = 0; pkt_id < cfg_->UlMacPacketsPerframe(); pkt_id++) {
+  for (size_t pkt_id = 0; pkt_id < num_mac_packets_per_frame; pkt_id++) {
     auto* src_packet =
         reinterpret_cast<const MacPacketPacked*>(&payload[src_pkt_offset]);
+    const size_t symbol_idx =
+        cfg_->Frame().GetULSymbolIdx(src_packet->Symbol());
     //next_radio_id_ = src_packet->ue_id;
 
     // could use pkt_id vs src_packet->symbol_id_ but might reorder packets
     const size_t dest_pkt_offset =
-        radio_buf_id * cfg_->UlMacBytesNumPerframe() +
-        ((cfg_->Frame().GetULSymbolIdx(src_packet->symbol_id_) -
-          cfg_->Frame().ClientUlPilotSymbols()) *
-         cfg_->MacPacketLength());
+        radio_buf_id * num_mac_packets_per_frame +
+        ((symbol_idx - num_pilot_symbols) * cfg_->MacPacketLength());
 
-    auto* pkt = reinterpret_cast<MacPacket*>(
+    auto* pkt = reinterpret_cast<MacPacketPacked*>(
         &(*client_.ul_bits_buffer_)[next_radio_id_][dest_pkt_offset]);
 
-    pkt->frame_id_ = next_tx_frame_id_;
-    pkt->symbol_id_ = src_packet->symbol_id_;
-    pkt->ue_id_ = src_packet->ue_id_;
-    pkt->datalen_ = src_packet->datalen_;
-    pkt->rsvd_[0u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-    pkt->rsvd_[1u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-    pkt->rsvd_[2u] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
+    pkt->Set(next_tx_frame_id_, src_packet->Symbol(), src_packet->Ue(),
+             src_packet->PayloadLength());
+
 #if ENABLE_RB_IND
     pkt->rb_indicator_ = ri;
 #endif
 
-    std::memcpy(pkt->data_, src_packet->data_, pkt->datalen_);
+    pkt->LoadData(src_packet->Data());
     // Insert CRC
-    pkt->crc_ = (uint16_t)(crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
-                                                    pkt->datalen_) &
-                           0xFFFF);
+    pkt->Crc(
+        (uint16_t)(crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
+                   0xFFFF));
 
     if (kLogMacPackets) {
       std::stringstream ss;
       std::printf(
-          "User MAC thread created packet frame %zu, pkt %zu, size %zu, "
+          "MacThreadClient created packet frame %zu, pkt %zu, size %zu, "
           "copied to location %zu dest offset %zu\n",
-          next_tx_frame_id_, pkt_id, cfg_->MacPayloadLength(), (size_t)pkt,
+          next_tx_frame_id_, pkt_id, cfg_->MacPayloadMaxLength(), (size_t)pkt,
           dest_pkt_offset);
 
       ss << "Header Info:\n"
-         << "FRAME_ID: " << pkt->frame_id_ << "\nSYMBOL_ID: " << pkt->symbol_id_
-         << "\nUE_ID: " << pkt->ue_id_ << "\nDATLEN: " << pkt->datalen_
+         << "FRAME_ID: " << pkt->Frame() << "\nSYMBOL_ID: " << pkt->Symbol()
+         << "\nUE_ID: " << pkt->Ue() << "\nDATLEN: " << pkt->PayloadLength()
          << "\nPAYLOAD:\n";
-      for (size_t i = 0; i < pkt->datalen_; i++) {
-        ss << std::to_string(pkt->data_[i]) << " ";
+      for (size_t i = 0; i < pkt->PayloadLength(); i++) {
+        ss << std::to_string(pkt->Data()[i]) << " ";
       }
       std::fprintf(log_file_, "%s\n", ss.str().c_str());
       std::printf("%s\n", ss.str().c_str());
       ss.str("");
     }
-    src_pkt_offset += pkt->datalen_ + MacPacket::kOffsetOfData;
+    src_pkt_offset += pkt->PayloadLength() + MacPacketPacked::kHeaderSize;
   }  // end all packets
 
   (*client_.ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
   EventData msg(EventType::kPacketFromMac,
                 rx_mac_tag_t(next_radio_id_, radio_buf_id).tag_);
 
-  MLPD_INFO("Tx mac information to %zu %zu\n", next_radio_id_, radio_buf_id);
+  MLPD_FRAME("MacThreadClient: Tx mac information to %zu %zu\n", next_radio_id_,
+             radio_buf_id);
   RtAssert(tx_queue_->enqueue(msg),
-           "MAC thread: Failed to enqueue uplink packet");
+           "MacThreadClient: Failed to enqueue uplink packet");
 
   radio_buf_id = (radio_buf_id + 1) % kFrameWnd;
   //Might be unnecessary now.
@@ -464,8 +518,9 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
 }
 
 void MacThreadClient::RunEventLoop() {
-  MLPD_INFO("Running MAC thread event loop, logging to file %s\n",
-            log_filename_.c_str());
+  MLPD_INFO(
+      "MacThreadClient: Running MAC thread event loop, logging to file %s\n",
+      log_filename_.c_str());
   PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_,
                       0 /* thread ID */);
 

@@ -25,7 +25,7 @@ FileReceiver::~FileReceiver() {
   }
 }
 
-size_t FileReceiver::Load(char *destination, size_t requested_bytes) {
+size_t FileReceiver::Load(unsigned char *destination, size_t requested_bytes) {
   size_t loaded_bytes = 0;
   const size_t file_read_size =
       std::max(FileReceiver::kFileStreamRxSize, requested_bytes);

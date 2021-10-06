@@ -68,10 +68,6 @@ class MacThreadClient {
   // Push RAN config update to PHY master thread.
   void SendRanConfigUpdate(EventData event);
 
-  // Send control information over (out-of-band) control channel
-  // from server to client
-  void SendControlInformation();
-
   // At client, process control information received from control
   // channel and forward to PHY UE, so it transmits data in the scheduled
   // time slots.
@@ -106,10 +102,6 @@ class MacThreadClient {
   // UDP endpoint for receiving control channel messages
   std::unique_ptr<UDPServer> udp_control_channel_;
 
-  // TODO: decoded_buffer_ is used by only the server, so it should be moved
-  // to server_ for clarity.
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer_;
-
   // A preallocated buffer to store UDP packets received via recv()
   std::vector<uint8_t> udp_pkt_buf_;
 
@@ -134,7 +126,7 @@ class MacThreadClient {
   // Server-only members
   struct {
     // Staging buffers to accumulate decoded uplink code blocks for each UE
-    std::vector<uint8_t> frame_data_[kMaxUEs];
+    std::array<std::vector<uint8_t>, kMaxUEs> frame_data_;
 
     // n_filled_in_frame_[i] is the number of bytes received in the current
     // frame for UE #i
@@ -142,9 +134,15 @@ class MacThreadClient {
 
     // snr_[i] contains a moving window of SNR measurement for UE #i
     std::array<std::queue<float>, kMaxUEs> snr_;
+
+    //Placing at the end because it is variable size based on configuration
+    std::vector<std::vector<size_t>> data_size_;
   } server_;
 
-  // Client-only members
+  // TODO: decoded_buffer_ is used by only the server, so it should be moved
+  // to server_ for clarity.
+  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer_;
+
   struct {
     // ul_bits_buffer_id_[i] is the index of the uplink data bits buffer to
     // next use for radio #i

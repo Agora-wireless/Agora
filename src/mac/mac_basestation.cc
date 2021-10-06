@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
       assert(create_file.is_open() == true);
 
       std::vector<char> mac_data;
-      mac_data.resize(cfg->MacPayloadLength());
+      mac_data.resize(cfg->MacPayloadMaxLength());
 
       for (size_t i = 0;
            i < (cfg->FramesToTest() * cfg->DlMacPacketsPerframe()); i++) {
