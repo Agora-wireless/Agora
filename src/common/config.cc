@@ -26,7 +26,7 @@ Config::Config(const std::string& jsonfile)
       frame_("") {
   pilots_ = nullptr;
   pilots_sgn_ = nullptr;
-  SetCpuLayoutOnNumaNodes();
+  SetCpuLayoutOnNumaNodes(true);
   std::string conf;
   Utils::LoadTddConfig(jsonfile, conf);
   // Allow json comments
