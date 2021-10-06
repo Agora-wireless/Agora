@@ -53,9 +53,7 @@ public:
         Table<int8_t>& demod_buffer_to_decode,
         Table<int8_t>& encoded_buffer_,
         Table<int8_t>& encoded_buffer_to_decode,
-        SharedState* shared_state_ = nullptr,
-        EncodeStatus* encode_status = nullptr,
-        PrecodeStatus* precode_status = nullptr);
+        SharedState* shared_state_ = nullptr);
 
     ~PacketTXRX();
 
@@ -146,8 +144,6 @@ private:
     SharedState* shared_state__; // Shared states with workers
     size_t demod_frame_to_send_ = 0;
     size_t demod_symbol_ul_to_send_;
-    EncodeStatus* encode_status_;
-    PrecodeStatus* precode_status_;
 
     size_t encode_frame_to_send_ = 0;
     size_t encode_symbol_dl_to_send_ = 0;

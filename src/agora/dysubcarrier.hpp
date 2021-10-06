@@ -84,8 +84,7 @@ public:
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
         std::vector<std::vector<ControlInfo>>& control_info_table,
         std::vector<size_t>& control_idx_list,
-        SharedState* shared_state_ = nullptr,
-        PrecodeStatus* precode_status = nullptr)
+        SharedState* shared_state_)
         : Doer(config, tid, freq_ghz)
         , sc_range_(sc_range)
         , freq_domain_iq_buffer_(freq_domain_iq_buffer)
@@ -100,7 +99,6 @@ public:
         , control_info_table_(control_info_table)
         , control_idx_list_(control_idx_list)
         , shared_state__(shared_state_)
-        , precode_status_(precode_status)
     {
         // Create the requisite Doers
         do_zf_ = new DyZF(this->cfg, tid, freq_ghz, csi_buffer_, calib_buffer, ul_zf_matrices_,
@@ -521,9 +519,6 @@ private:
     size_t precode_cur_frame_ = 0;
     size_t precode_cur_sym_dl_ = 0;
     size_t n_precode_tasks_done_ = 0;
-
-    // Shared status with TXRX threads
-    PrecodeStatus* precode_status_;
 
     // Control info
     std::vector<std::vector<ControlInfo>>& control_info_table_;

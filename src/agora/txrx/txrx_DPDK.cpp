@@ -17,9 +17,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send,
     Table<int8_t>& demod_buffer_to_decode, Table<int8_t>& encoded_buffer,
     Table<int8_t>& encoded_buffer_to_precode,
-    SharedState* shared_state_,
-    EncodeStatus* encode_status, 
-    PrecodeStatus* precode_status)
+    SharedState* shared_state_)
     : cfg(cfg)
     , core_offset(core_offset)
     , rx_thread_num(cfg->rx_thread_num)
@@ -30,8 +28,6 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
     , encoded_buffer_(encoded_buffer)
     , encoded_buffer_to_precode_(encoded_buffer_to_precode)
     , shared_state__(shared_state_)
-    , encode_status_(encode_status)
-    , precode_status_(precode_status)
 {
     DpdkTransport::dpdk_init(core_offset - kNumMasterThread, rx_thread_num + kNumMasterThread + kNumDemodTxThread, cfg->pci_addr);
     for (size_t i = 0; i < rx_thread_num + kNumDemodTxThread; i ++) {
@@ -147,15 +143,9 @@ bool PacketTXRX::startTXRX()
             context->obj_ptr = this;
             context->id = worker_id;
             printf("Launch demod tx thread on core %u\n", lcore_id);
-            if (cfg->downlink_mode) {
-                rte_eal_remote_launch((lcore_function_t*)
-                        pthread_fun_wrapper<PacketTXRX, &PacketTXRX::encode_thread>,
-                    context, lcore_id);
-            } else {
-                rte_eal_remote_launch((lcore_function_t*)
-                        pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_tx_thread>,
-                    context, lcore_id);
-            }
+            rte_eal_remote_launch((lcore_function_t*)
+                    pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_tx_thread>,
+                context, lcore_id);
         } 
         worker_id++;
     }
@@ -266,6 +256,155 @@ void* PacketTXRX::demod_tx_thread(int tid)
     return 0;
 }
 
+void* PacketTXRX::loop_tx_rx(int tid)
+{
+    int radio_lo = tid * cfg->nRadios / rx_thread_num;
+    int radio_hi = (tid + 1) * cfg->nRadios / rx_thread_num;
+    int radio_id = radio_lo;
+
+    frame_to_send_[tid] = 0;
+    size_t symbol_to_send = 0;
+    size_t ant_to_send = tid * (cfg->nRadios / rx_thread_num);
+
+    size_t recv_pkts = 0;
+
+    while (cfg->running) {
+        #if 0
+        // Receive data
+        if (cfg->downlink_mode && dequeue_send(tid, symbol_to_send, ant_to_send) == 1) {
+            ant_to_send ++;
+            if (ant_to_send == (tid + 1) * cfg->nRadios / rx_thread_num) {
+                ant_to_send = 0;
+                symbol_to_send ++;
+                if (symbol_to_send == cfg->dl_data_symbol_num_perframe) {
+                    symbol_to_send = 0;
+                    frame_to_send_[tid] ++;
+                }
+            }
+            continue;
+        }
+        #endif
+        int res = recv_relocate(tid);
+        // int res = recv(tid);
+        if (res == 0)
+            continue;
+
+        recv_pkts += res;
+
+        if (++radio_id == radio_hi)
+            radio_id = radio_lo;
+        
+    }
+    printf("Thread %u receive %lu packets, max gap is %lu, frame %u, max record %lu, frame %lu\n", tid, 
+        recv_pkts, max_inter_packet_gap_[tid], max_inter_packet_gap_frame_[tid],
+        max_packet_record_time_[tid], max_packet_record_time_frame_[tid]);
+    return 0;
+}
+
+int PacketTXRX::recv_relocate(int tid)
+{
+    rte_mbuf* rx_bufs[kRxBatchSize];
+    uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
+    if (unlikely(nb_rx == 0))
+        return 0;
+
+    size_t valid_pkts = 0;
+
+    for (size_t i = 0; i < nb_rx; i++) {
+        rte_mbuf* dpdk_pkt = rx_bufs[i];
+        auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+        auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+            reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+        auto* udp_hdr = reinterpret_cast<rte_udp_hdr*>(reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr) + sizeof(rte_ipv4_hdr));
+        uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+        if (kDebugDPDK) {
+            auto* udp_h = reinterpret_cast<rte_udp_hdr*>(
+                reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
+            DpdkTransport::print_pkt(ip_hdr->src_addr, ip_hdr->dst_addr,
+                udp_h->src_port, udp_h->dst_port, dpdk_pkt->data_len, tid);
+            printf("pkt_len: %d, nb_segs: %d, Header type: %d, IPV4: %d\n",
+                dpdk_pkt->pkt_len, dpdk_pkt->nb_segs, eth_type,
+                RTE_ETHER_TYPE_IPV4);
+            printf("UDP: %d, %d\n", ip_hdr->next_proto_id, IPPROTO_UDP);
+        }
+
+        if (unlikely(eth_type != RTE_ETHER_TYPE_IPV4
+            or ip_hdr->next_proto_id != IPPROTO_UDP)) {
+            rte_pktmbuf_free(rx_bufs[i]);
+            continue;
+        }
+
+        if (unlikely(ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx])) {
+            rte_pktmbuf_free(rx_bufs[i]);
+            continue;
+        }
+
+        auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset);
+        if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
+            char* rx_buffer = freq_domain_iq_buffer_[pkt->ant_id];
+            const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)
+                    * cfg->symbol_num_perframe
+                + pkt->symbol_id;
+
+            size_t sc_offset = Packet::kOffsetOfData
+                + 2 * sizeof(unsigned short)
+                    * (cfg->OFDM_DATA_START + cfg->subcarrier_start);
+            DpdkTransport::fastMemcpy(
+                &rx_buffer[rx_offset_ * cfg->packet_length], pkt, Packet::kOffsetOfData);
+            memcpy(
+                &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
+                (uint8_t*)pkt + Packet::kOffsetOfData,
+                cfg->get_num_sc_to_process() * 2 * sizeof(unsigned short));
+
+            valid_pkts ++;
+            size_t cur_cycle = rdtsc();
+            if (unlikely(last_packet_cycle_[tid] == 0) && pkt->frame_id > 2000) {
+                last_packet_cycle_[tid] = cur_cycle;
+            }
+
+            if (likely(last_packet_cycle_[tid] > 0) && unlikely(max_inter_packet_gap_[tid] < cur_cycle - last_packet_cycle_[tid])) {
+                max_inter_packet_gap_[tid] = cur_cycle - last_packet_cycle_[tid];
+                max_inter_packet_gap_frame_[tid] = pkt->frame_id;
+            }
+
+            if (likely(last_packet_cycle_[tid] > 0)) {
+                last_packet_cycle_[tid] = cur_cycle;
+            }
+
+            // get the position in rx_buffer
+            cur_cycle = rdtsc();
+            if (!shared_state__->receive_freq_iq_pkt(pkt)) {
+                cfg->running = false;
+            }
+            size_t record_cycle = rdtsc() - cur_cycle;
+            if (record_cycle > max_packet_record_time_[tid]) {
+                max_packet_record_time_[tid] = record_cycle;
+                max_packet_record_time_frame_[tid] = pkt->frame_id;
+            }
+
+        } else if (pkt->pkt_type == Packet::PktType::kDemod) {
+            const size_t symbol_idx_ul = pkt->symbol_id;
+            const size_t sc_id = cfg->subcarrier_num_start[pkt->server_id];
+
+            int8_t* demod_ptr
+                = cfg->get_demod_buf_to_decode(demod_buffer_to_decode_,
+                    pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
+            memcpy(demod_ptr, pkt->data,
+                cfg->subcarrier_num_list[pkt->server_id] * cfg->mod_order_bits);
+            if (!shared_state__->receive_demod_pkt(pkt->ue_id, pkt->frame_id, symbol_idx_ul)) {
+                cfg->running = false;
+            }
+        } else {
+            printf("Received unknown packet from rru\n");
+            exit(1);
+        }
+
+        rte_pktmbuf_free(rx_bufs[i]);
+    }
+    return valid_pkts;
+}
+
+#if 0
 void* PacketTXRX::encode_thread(int tid)
 {
     std::vector<uint8_t> recv_buf(cfg->packet_length);
@@ -402,152 +541,6 @@ void* PacketTXRX::encode_thread(int tid)
     return 0;
 }
 
-void* PacketTXRX::loop_tx_rx(int tid)
-{
-    int radio_lo = tid * cfg->nRadios / rx_thread_num;
-    int radio_hi = (tid + 1) * cfg->nRadios / rx_thread_num;
-    int radio_id = radio_lo;
-
-    frame_to_send_[tid] = 0;
-    size_t symbol_to_send = 0;
-    size_t ant_to_send = tid * (cfg->nRadios / rx_thread_num);
-
-    size_t recv_pkts = 0;
-
-    while (cfg->running) {
-        // Receive data
-        if (cfg->downlink_mode && dequeue_send(tid, symbol_to_send, ant_to_send) == 1) {
-            ant_to_send ++;
-            if (ant_to_send == (tid + 1) * cfg->nRadios / rx_thread_num) {
-                ant_to_send = 0;
-                symbol_to_send ++;
-                if (symbol_to_send == cfg->dl_data_symbol_num_perframe) {
-                    symbol_to_send = 0;
-                    frame_to_send_[tid] ++;
-                }
-            }
-            continue;
-        }
-        int res = recv_relocate(tid);
-        // int res = recv(tid);
-        if (res == 0)
-            continue;
-
-        recv_pkts += res;
-
-        if (++radio_id == radio_hi)
-            radio_id = radio_lo;
-        
-    }
-    printf("Thread %u receive %lu packets, max gap is %lu, frame %u, max record %lu, frame %lu\n", tid, 
-        recv_pkts, max_inter_packet_gap_[tid], max_inter_packet_gap_frame_[tid],
-        max_packet_record_time_[tid], max_packet_record_time_frame_[tid]);
-    return 0;
-}
-
-int PacketTXRX::recv_relocate(int tid)
-{
-    rte_mbuf* rx_bufs[kRxBatchSize];
-    uint16_t nb_rx = rte_eth_rx_burst(0, tid, rx_bufs, kRxBatchSize);
-    if (unlikely(nb_rx == 0))
-        return 0;
-
-    size_t valid_pkts = 0;
-
-    for (size_t i = 0; i < nb_rx; i++) {
-        rte_mbuf* dpdk_pkt = rx_bufs[i];
-        auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
-        auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
-            reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
-        auto* udp_hdr = reinterpret_cast<rte_udp_hdr*>(reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr) + sizeof(rte_ipv4_hdr));
-        uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
-        if (kDebugDPDK) {
-            auto* udp_h = reinterpret_cast<rte_udp_hdr*>(
-                reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
-            DpdkTransport::print_pkt(ip_hdr->src_addr, ip_hdr->dst_addr,
-                udp_h->src_port, udp_h->dst_port, dpdk_pkt->data_len, tid);
-            printf("pkt_len: %d, nb_segs: %d, Header type: %d, IPV4: %d\n",
-                dpdk_pkt->pkt_len, dpdk_pkt->nb_segs, eth_type,
-                RTE_ETHER_TYPE_IPV4);
-            printf("UDP: %d, %d\n", ip_hdr->next_proto_id, IPPROTO_UDP);
-        }
-
-        if (unlikely(eth_type != RTE_ETHER_TYPE_IPV4
-            or ip_hdr->next_proto_id != IPPROTO_UDP)) {
-            rte_pktmbuf_free(rx_bufs[i]);
-            continue;
-        }
-
-        if (unlikely(ip_hdr->dst_addr != bs_server_addrs_[cfg->bs_server_addr_idx])) {
-            rte_pktmbuf_free(rx_bufs[i]);
-            continue;
-        }
-
-        auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset);
-        if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
-            char* rx_buffer = freq_domain_iq_buffer_[pkt->ant_id];
-            const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)
-                    * cfg->symbol_num_perframe
-                + pkt->symbol_id;
-
-            size_t sc_offset = Packet::kOffsetOfData
-                + 2 * sizeof(unsigned short)
-                    * (cfg->OFDM_DATA_START + cfg->subcarrier_start);
-            DpdkTransport::fastMemcpy(
-                &rx_buffer[rx_offset_ * cfg->packet_length], pkt, Packet::kOffsetOfData);
-            memcpy(
-                &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
-                (uint8_t*)pkt + Packet::kOffsetOfData,
-                cfg->get_num_sc_to_process() * 2 * sizeof(unsigned short));
-
-            valid_pkts ++;
-            size_t cur_cycle = rdtsc();
-            if (unlikely(last_packet_cycle_[tid] == 0) && pkt->frame_id > 2000) {
-                last_packet_cycle_[tid] = cur_cycle;
-            }
-
-            if (likely(last_packet_cycle_[tid] > 0) && unlikely(max_inter_packet_gap_[tid] < cur_cycle - last_packet_cycle_[tid])) {
-                max_inter_packet_gap_[tid] = cur_cycle - last_packet_cycle_[tid];
-                max_inter_packet_gap_frame_[tid] = pkt->frame_id;
-            }
-
-            if (likely(last_packet_cycle_[tid] > 0)) {
-                last_packet_cycle_[tid] = cur_cycle;
-            }
-
-            // get the position in rx_buffer
-            cur_cycle = rdtsc();
-            if (!shared_state__->receive_freq_iq_pkt(pkt)) {
-                cfg->running = false;
-            }
-            size_t record_cycle = rdtsc() - cur_cycle;
-            if (record_cycle > max_packet_record_time_[tid]) {
-                max_packet_record_time_[tid] = record_cycle;
-                max_packet_record_time_frame_[tid] = pkt->frame_id;
-            }
-
-        } else if (pkt->pkt_type == Packet::PktType::kDemod) {
-            const size_t symbol_idx_ul = pkt->symbol_id;
-            const size_t sc_id = cfg->subcarrier_num_start[pkt->server_id];
-
-            int8_t* demod_ptr
-                = cfg->get_demod_buf_to_decode(demod_buffer_to_decode_,
-                    pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
-            memcpy(demod_ptr, pkt->data,
-                cfg->subcarrier_num_list[pkt->server_id] * cfg->mod_order_bits);
-            if (!shared_state__->receive_demod_pkt(pkt->ue_id, pkt->frame_id, symbol_idx_ul)) {
-                cfg->running = false;
-            }
-        } else {
-            printf("Received unknown packet from rru\n");
-            exit(1);
-        }
-
-        rte_pktmbuf_free(rx_bufs[i]);
-    }
-    return valid_pkts;
-}
-
 // TODO: check correctness of this funcion
 int PacketTXRX::dequeue_send(int tid, size_t symbol_dl_to_send, size_t ant_to_send)
 {
@@ -611,3 +604,4 @@ int PacketTXRX::dequeue_send(int tid, size_t symbol_dl_to_send, size_t ant_to_se
     
     return 0;
 }
+#endif

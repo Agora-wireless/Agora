@@ -23,6 +23,7 @@
 #include "shared_counters.hpp"
 #include "utils_ldpc.hpp"
 
+#if 0
 class DyEncode : public Doer {
 public:
     DyEncode(Config* in_config, int in_tid, double freq_ghz,
@@ -54,6 +55,7 @@ private:
     size_t cur_cb_ = 0;
     moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
 };
+#endif
 
 class DyDecode : public Doer {
 public:

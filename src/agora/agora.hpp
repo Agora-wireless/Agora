@@ -185,11 +185,13 @@ private:
     // Shared states between socket threads and dosubcarriers
     SharedState shared_state__;
 
+#if 0
     // Shared states between dosubcarriers and doencoders
     EncodeStatus encode_status_;
 
     // Shared states between dosubcarriers and socket threads
     PrecodeStatus precode_status_;
+#endif
 
     // Control info list
     std::vector<std::vector<ControlInfo>> control_info_table_;

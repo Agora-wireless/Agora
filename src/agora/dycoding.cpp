@@ -9,6 +9,7 @@ static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
 
+#if 0
 DyEncode::DyEncode(Config* in_config, int in_tid, double freq_ghz,
     Table<int8_t>& in_raw_data_buffer, Table<int8_t>& in_encoded_buffer,
     Stats* in_stats_manager, SharedState* shared_state_,
@@ -126,6 +127,7 @@ void DyEncode::start_work()
         }
     }
 }
+#endif
 
 DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,
     Table<int8_t> demod_buffer_to_decode,
