@@ -18,7 +18,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
     Table<int8_t>& demod_buffer_to_decode, Table<int8_t>& encoded_buffer,
     Table<int8_t>& encoded_buffer_to_precode,
     RxStatus* rx_status,
-    DecodeStatus* decode_status, EncodeStatus* encode_status, 
+    EncodeStatus* encode_status, 
     PrecodeStatus* precode_status)
     : cfg(cfg)
     , core_offset(core_offset)
@@ -30,7 +30,6 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
     , encoded_buffer_(encoded_buffer)
     , encoded_buffer_to_precode_(encoded_buffer_to_precode)
     , rx_status_(rx_status)
-    , decode_status_(decode_status)
     , encode_status_(encode_status)
     , precode_status_(precode_status)
 {

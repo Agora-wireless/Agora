@@ -6,7 +6,6 @@ using namespace std;
 Agora::Agora(Config* cfg)
     : freq_ghz_(measure_rdtsc_freq())
     , rx_status_(cfg)
-    , demod_status_(cfg)
     , encode_status_(cfg)
     , precode_status_(cfg)
 {
@@ -32,7 +31,7 @@ Agora::Agora(Config* cfg)
         freq_domain_iq_buffer_, dl_ifft_buffer_,
         demod_buffer_to_send_, demod_buffer_to_decode_, dl_encoded_buffer_,
         dl_encoded_buffer_to_precode_,
-        &rx_status_, &demod_status_, &encode_status_, &precode_status_));
+        &rx_status_, &encode_status_, &precode_status_));
     
     base_worker_core_offset = config_->core_offset + kNumMasterThread + 
         config_->rx_thread_num + kNumDemodTxThread;
@@ -179,7 +178,7 @@ void* Agora::decode_worker(int tid)
     auto computeDecoding = new DyDecode(config_, tid, freq_ghz_,
         demod_buffer_to_decode_,
         decoded_buffer_, control_info_table_, control_idx_list_, 
-        &rx_status_, &demod_status_);
+        &rx_status_);
 
     computeDecoding->start_work();
     delete computeDecoding;
@@ -316,7 +315,7 @@ void Agora::save_latency_data_to_file()
         fprintf(fp, "%u %lu %lu %lu %lu %lu\n", i, rx_status_.frame_start_time_[i],
             rx_status_.frame_iq_time_[i],
             rx_status_.frame_sc_time_[i],
-            demod_status_.frame_decode_time_[i],
+            rx_status_.frame_decode_time_[i],
             rx_status_.frame_end_time_[i]);
     }
     fclose(fp);

@@ -62,7 +62,7 @@ public:
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
         std::vector<std::vector<ControlInfo>>& control_info_table_,
         std::vector<size_t>& control_idx_list_,
-        RxStatus* rx_status = nullptr, DecodeStatus* decode_status = nullptr);
+        RxStatus* rx_status = nullptr);
 
     ~DyDecode();
 
@@ -78,7 +78,6 @@ private:
     Table<int8_t> demod_buffer_to_decode_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers_;
     RxStatus* rx_status_;
-    DecodeStatus* decode_status_;
 
     size_t total_ue_num_;
     size_t total_dycode_num_;

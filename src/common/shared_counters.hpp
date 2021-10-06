@@ -310,59 +310,6 @@ public:
     const size_t num_demod_pkts_per_symbol_per_ue_;
 };
 
-class DecodeStatus {
-public:
-    DecodeStatus(Config* cfg)
-        : cfg_(cfg)
-        , num_demod_data_required_(cfg->bs_server_addr_list.size())
-    {
-        num_demod_data_received_
-            = new std::array<std::array<std::atomic<size_t>, kMaxSymbols>,
-                kFrameWnd>[cfg->UE_NUM];
-        for (size_t i = 0; i < cfg->UE_NUM; i++) {
-            for (size_t j = 0; j < kFrameWnd; j++) {
-                for (size_t k = 0; k < kMaxSymbols; k ++) {
-                    num_demod_data_received_[i][j][k] = 0;
-                }
-            }
-        }
-
-        frame_decode_time_ = new uint64_t[cfg->frames_to_test]; 
-        memset(frame_decode_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
-    }
-
-    void receive_demod_data(size_t ue_id, size_t frame_id, size_t symbol_id_ul)
-    {
-        num_demod_data_received_[ue_id][frame_id % kFrameWnd][symbol_id_ul]++;
-    }
-
-    bool received_all_demod_data(
-        size_t ue_id, size_t frame_id, size_t symbol_id_ul)
-    {
-        if (num_demod_data_received_[ue_id]
-                                    [frame_id % kFrameWnd][symbol_id_ul]
-            == num_demod_data_required_) {
-            num_demod_data_received_[ue_id]
-                                    [frame_id % kFrameWnd][symbol_id_ul]
-                = 0;
-            if (symbol_id_ul == 0) {
-                frame_decode_time_[frame_id] = get_ns();
-            }
-            return true;
-        }
-        return false;
-    }
-
-// private:
-    Config* cfg_;
-    const size_t num_demod_data_required_;
-
-    uint64_t *frame_decode_time_;
-
-    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>*
-        num_demod_data_received_;
-};
-
 class EncodeStatus
 {
 public:

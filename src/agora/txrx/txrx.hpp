@@ -54,7 +54,6 @@ public:
         Table<int8_t>& encoded_buffer_,
         Table<int8_t>& encoded_buffer_to_decode,
         RxStatus* rx_status = nullptr,
-        DecodeStatus* decode_status = nullptr,
         EncodeStatus* encode_status = nullptr,
         PrecodeStatus* precode_status = nullptr);
 
@@ -147,7 +146,6 @@ private:
     RxStatus* rx_status_; // Shared states with workers
     size_t demod_frame_to_send_ = 0;
     size_t demod_symbol_ul_to_send_;
-    DecodeStatus* decode_status_;
     EncodeStatus* encode_status_;
     PrecodeStatus* precode_status_;
 

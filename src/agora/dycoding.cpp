@@ -132,15 +132,13 @@ DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
     std::vector<std::vector<ControlInfo>>& control_info_table,
     std::vector<size_t>& control_idx_list,
-    RxStatus* rx_status,
-    DecodeStatus* decode_status)
+    RxStatus* rx_status)
     : Doer(in_config, in_tid, freq_ghz)
     , demod_buffer_to_decode_(demod_buffer_to_decode)
     , decoded_buffers_(decoded_buffers)
     , control_info_table_(control_info_table)
     , control_idx_list_(control_idx_list)
     , rx_status_(rx_status)
-    , decode_status_(decode_status)
     , total_dycode_num_(cfg->decode_thread_num)
     , total_ue_num_(cfg->ue_end - cfg->ue_start)
 {
