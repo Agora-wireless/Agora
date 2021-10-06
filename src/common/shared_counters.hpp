@@ -22,20 +22,30 @@ public:
         , num_decode_tasks_per_frame_(cfg->decode_thread_num)
         , num_precode_tasks_per_frame_((cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
         , num_demul_tasks_required_(cfg->get_num_sc_to_process() / cfg->demul_block_size)
+        , num_demod_pkts_per_symbol_per_ue_(cfg->bs_server_addr_list.size())
         , last_frame_cycles_(worker_rdtsc())
         , freq_ghz_(measure_rdtsc_freq())
     {
         frame_start_time_ = new uint64_t[cfg->frames_to_test];
         frame_iq_time_ = new uint64_t[cfg->frames_to_test];
         frame_sc_time_ = new uint64_t[cfg->frames_to_test];
+        frame_decode_time_ = new uint64_t[cfg->frames_to_test]; 
         frame_end_time_ = new uint64_t[cfg->frames_to_test];
         memset(frame_start_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
         memset(frame_iq_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
         memset(frame_sc_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+        memset(frame_decode_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
         memset(frame_end_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
         for (size_t i = 0; i < kFrameWnd; i++) {
             for (size_t j = 0; j < kMaxSymbols; j++) {
                 num_demul_tasks_completed_[i][j] = 0;
+            }
+        }
+        for (size_t i = 0; i < cfg->UE_NUM; i++) {
+            for (size_t j = 0; j < kFrameWnd; j++) {
+                for (size_t k = 0; k < kMaxSymbols; k ++) {
+                    num_demod_pkts_[i][j][k] = 0;
+                }
             }
         }
     }
@@ -143,6 +153,26 @@ public:
         return false;
     }
 
+    void receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol_id_ul)
+    {
+        rt_assert(frame_id >= cur_frame_ && frame_id < cur_frame_ + kFrameWnd,
+            "Received demod packet out of range!");
+        num_demod_pkts_[ue_id][frame_id % kFrameWnd][symbol_id_ul]++;
+    }
+
+    bool received_all_demod_pkts(
+        size_t ue_id, size_t frame_id, size_t symbol_id_ul)
+    {
+        if (num_demod_pkts_[ue_id][frame_id % kFrameWnd][symbol_id_ul]
+            == num_demod_pkts_per_symbol_per_ue_) {
+            if (symbol_id_ul == 0) {
+                frame_decode_time_[frame_id] = get_ns();
+            }
+            return true;
+        }
+        return false;
+    }
+
     // When decoding is done for a frame from one decoder, call this function
     // This function will increase cur_frame when this frame is decoded so that
     // we can move on decoding the next frame and release the resources used by
@@ -172,6 +202,11 @@ public:
                 }
                 for (size_t i = 0; i < kMaxSymbols; i++) {
                     num_demul_tasks_completed_[frame_slot][i] = 0;
+                }
+                for (size_t i = 0; i < kMaxUEs; i ++) {
+                    for (size_t j = 0; j < kMaxSymbols; j++) {
+                        num_demod_pkts_[i][frame_slot][j] = 0;
+                    }
                 }
                 MLPD_INFO("Main thread: Decode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
                 last_frame_cycles_ = cur_cycle;
@@ -227,6 +262,9 @@ public:
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_demul_tasks_completed_;
 
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
+        num_demod_pkts_[kMaxUEs];
+
     // encode_ready_[i % kFrameWnd] represents whether encoding can proceed
     // for frame i
     std::array<bool, kFrameWnd> encode_ready_;
@@ -252,6 +290,7 @@ public:
     uint64_t *frame_start_time_;
     uint64_t *frame_iq_time_;
     uint64_t *frame_sc_time_;
+    uint64_t *frame_decode_time_;
     uint64_t *frame_end_time_;
 
     // The timestamp when last frame was processed (in cycles)
@@ -268,6 +307,7 @@ public:
     const size_t num_decode_tasks_per_frame_;
     const size_t num_precode_tasks_per_frame_;
     const size_t num_demul_tasks_required_;
+    const size_t num_demod_pkts_per_symbol_per_ue_;
 };
 
 class DecodeStatus {

@@ -339,7 +339,7 @@ void DyDecode::start_work()
                 work_start_tsc = rdtsc();
                 state_start_tsc = rdtsc();
             }
-            bool ret = decode_status_->received_all_demod_data(
+            bool ret = rx_status_->received_all_demod_pkts(
                    cur_ue_, cur_frame_, cur_symbol_);
             if (likely(state_trigger)) {
                 state_operation_duration += rdtsc() - state_start_tsc;

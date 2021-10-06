@@ -210,7 +210,7 @@ void* PacketTXRX::demod_tx_thread(int tid)
                         = cfg->get_demod_buf_to_decode(demod_buffer_to_decode_,
                             demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg->subcarrier_start);
                     memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_to_process() * cfg->mod_order_bits);
-                    decode_status_->receive_demod_data(
+                    rx_status_->receive_demod_pkt(
                         ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_);
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
@@ -535,7 +535,7 @@ int PacketTXRX::recv_relocate(int tid)
                     pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
             memcpy(demod_ptr, pkt->data,
                 cfg->subcarrier_num_list[pkt->server_id] * cfg->mod_order_bits);
-            decode_status_->receive_demod_data(
+            rx_status_->receive_demod_pkt(
                 pkt->ue_id, pkt->frame_id, symbol_idx_ul);
         } else {
             printf("Received unknown packet from rru\n");
