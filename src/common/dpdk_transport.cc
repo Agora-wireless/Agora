@@ -112,6 +112,16 @@ void DpdkTransport::FastMemcpy(void* pvDest, void* pvSrc, size_t nBytes) {
   // (intptr_t(pvSrc) & 31) ); assert(nBytes % 32 == 0);
   // assert((intptr_t(pvDest) & 31) == 0);
   // assert((intptr_t(pvSrc) & 31) == 0);
+#if defined(__AVX512F__) and (__GNUC__ >= 9)
+  __m512i* pSrc = reinterpret_cast<__m512i*>(pvSrc);
+  __m512i* pDest = reinterpret_cast<__m512i*>(pvDest);
+  int64_t nVects = nBytes / sizeof(*pSrc);
+  for (; nVects > 0; nVects--, pSrc++, pDest++) {
+    const __m512i loaded = _mm512_stream_load_si512(pSrc);
+    _mm512_stream_si512(pDest, loaded);
+  }
+
+#else
   const __m256i* pSrc = reinterpret_cast<const __m256i*>(pvSrc);
   __m256i* pDest = reinterpret_cast<__m256i*>(pvDest);
   int64_t nVects = nBytes / sizeof(*pSrc);
@@ -119,6 +129,7 @@ void DpdkTransport::FastMemcpy(void* pvDest, void* pvSrc, size_t nBytes) {
     const __m256i loaded = _mm256_stream_load_si256(pSrc);
     _mm256_stream_si256(pDest, loaded);
   }
+#endif
   _mm_sfence();
 }
 
