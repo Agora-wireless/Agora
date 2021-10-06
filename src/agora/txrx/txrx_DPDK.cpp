@@ -209,8 +209,9 @@ void* PacketTXRX::demod_tx_thread(int tid)
                         = cfg->get_demod_buf_to_decode(demod_buffer_to_decode_,
                             demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg->subcarrier_start);
                     memcpy(target_demod_ptr, demod_ptr, cfg->get_num_sc_to_process() * cfg->mod_order_bits);
-                    rx_status_->receive_demod_pkt(
-                        ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_);
+                    if (!rx_status_->receive_demod_pkt(ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_)) {
+                        cfg->running = false;
+                    }
                 } else {
                     struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
                     tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg->bs_server_addr_idx], bs_server_mac_addrs_[cfg->get_server_idx_by_ue(ue_id)],
@@ -516,7 +517,7 @@ int PacketTXRX::recv_relocate(int tid)
 
             // get the position in rx_buffer
             cur_cycle = rdtsc();
-            if (!rx_status_->add_new_packet(pkt, tid)) {
+            if (!rx_status_->receive_freq_iq_pkt(pkt)) {
                 cfg->running = false;
             }
             size_t record_cycle = rdtsc() - cur_cycle;
@@ -534,8 +535,9 @@ int PacketTXRX::recv_relocate(int tid)
                     pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
             memcpy(demod_ptr, pkt->data,
                 cfg->subcarrier_num_list[pkt->server_id] * cfg->mod_order_bits);
-            rx_status_->receive_demod_pkt(
-                pkt->ue_id, pkt->frame_id, symbol_idx_ul);
+            if (!rx_status_->receive_demod_pkt(pkt->ue_id, pkt->frame_id, symbol_idx_ul)) {
+                cfg->running = false;
+            }
         } else {
             printf("Received unknown packet from rru\n");
             exit(1);

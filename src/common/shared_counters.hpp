@@ -51,11 +51,11 @@ public:
     }
 
     // When receive a new packet, record it here
-    bool add_new_packet(const Packet* pkt, int tid = 0)
+    bool receive_freq_iq_pkt(const Packet* pkt)
     {
         if (unlikely(pkt->frame_id >= cur_frame_ + kFrameWnd)) {
             MLPD_ERROR(
-                "SharedCounters RxStatus error: Received packet for future "
+                "SharedCounters RxStatus error: Received freq iq packet for future "
                 "frame %u beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
                 "happen if Agora is running slowly, e.g., in debug mode. "
                 "Full packet = %s.\n",
@@ -93,10 +93,21 @@ public:
             num_data_pkts_[frame_slot][pkt->symbol_id - num_pilot_symbols_per_frame_]++;
         }
 
-        if (pkt->frame_id > latest_frame_) {
-            // TODO: race condition could happen here but the impact is small
-            latest_frame_ = pkt->frame_id;
+        return true;
+    }
+
+    bool receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol_id_ul)
+    {
+        if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
+            MLPD_ERROR(
+                "SharedCounters RxStatus error: Received demod packet for future "
+                "frame %u beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
+                "happen if Agora is running slowly, e.g., in debug mode. \n",
+                frame_id, cur_frame_, kFrameWnd, cur_frame_, num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
+                num_pkts_[cur_frame_ % kFrameWnd].load());
+            return false;
         }
+        num_demod_pkts_[ue_id][frame_id % kFrameWnd][symbol_id_ul]++;
         return true;
     }
 
@@ -151,13 +162,6 @@ public:
             return true;
         } 
         return false;
-    }
-
-    void receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol_id_ul)
-    {
-        rt_assert(frame_id >= cur_frame_ && frame_id < cur_frame_ + kFrameWnd,
-            "Received demod packet out of range!");
-        num_demod_pkts_[ue_id][frame_id % kFrameWnd][symbol_id_ul]++;
     }
 
     bool received_all_demod_pkts(
@@ -271,9 +275,6 @@ public:
 
     // cur_frame is the first frame for which decoding is incomplete
     size_t cur_frame_ = 0;
-
-    // The max frame number for which socket I/O threads have received any packet
-    size_t latest_frame_ = 0;
 
     // Atomic counter for # completed decode tasks
     // cur_frame will be incremented in all tasks are completed
