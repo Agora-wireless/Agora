@@ -50,7 +50,6 @@ EventData DoDemod::Launch(size_t tag) {
   const size_t symbol_idx_ul = this->cfg_->Frame().GetULSymbolIdx(symbol_id);
   const size_t total_data_symbol_idx_ul =
       cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul);
-  const complex_float* data_buf = equal_buffer_[total_data_symbol_idx_ul];
 
   const size_t frame_slot = frame_id % kFrameWnd;
   size_t start_tsc = GetTime::WorkerRdtsc();
@@ -63,53 +62,54 @@ EventData DoDemod::Launch(size_t tag) {
         total_data_symbol_idx_ul);
   }
 
+  // average phase shift across pilots and calculate correction multiplier
+  auto* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
+      ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
+  arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeNum(),
+                               cfg_->Frame().NumULSyms(), false);
+  arma::fmat theta_mat = arg(pilot_corr_mat.col(symbol_idx_ul));
+  arma::fmat cur_theta =
+      theta_mat / (cfg_->OfdmDataNum() / cfg_->OfdmPilotSpacing());
+  arma::cx_fmat mat_phase_correct = arma::zeros<arma::cx_fmat>(size(cur_theta));
+  mat_phase_correct.set_real(cos(-cur_theta));
+  mat_phase_correct.set_imag(sin(-cur_theta));
+
   size_t max_sc_ite =
       std::min(cfg_->DemulBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
   assert(max_sc_ite % kSCsPerCacheline == 0);
   // Iterate through cache lines
   for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
-    // Step 2: For each subcarrier, perform equalization by multiplying the
-    // subcarrier's data from each antenna with the subcarrier's precoder
+    // Step 2: For each subcarrier, perform phase correction by multiplying the
+    // subcarrier's equalized data with mat_phase_correct
     for (size_t j = 0; j < kSCsPerCacheline; j++) {
       const size_t cur_sc_id = base_sc_id + i + j;
-
-      arma::cx_float* equal_ptr = nullptr;
-      if (kExportConstellation) {
-        equal_ptr =
-            (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                            [cur_sc_id * cfg_->UeNum()]);
-      } else {
-        equal_ptr =
-            (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
-                                                    cfg_->UeNum()]);
-      }
-      arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeNum(), 1, false);
-
-      size_t start_tsc0 = GetTime::WorkerRdtsc();
-      // apply previously calc'ed phase shift to data
-      auto* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
-          ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
-      arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeNum(),
-                                   cfg_->Frame().NumULSyms(), false);
-      arma::fmat theta_mat = arg(pilot_corr_mat.col(symbol_idx_ul));
-      arma::fmat cur_theta =
-          theta_mat / (cfg_->OfdmDataNum() / cfg_->OfdmPilotSpacing());
-      arma::cx_fmat mat_phase_correct =
-          arma::zeros<arma::cx_fmat>(size(cur_theta));
-      mat_phase_correct.set_real(cos(-cur_theta));
-      mat_phase_correct.set_imag(sin(-cur_theta));
-      mat_equaled %= mat_phase_correct;
-
-      // Measure EVM from ground truth
-      if (symbol_idx_ul == cfg_->Frame().NumULSyms() - 1) {
-        phy_stats_->UpdateEvmStats(frame_id, cur_sc_id, mat_equaled);
-        if (kPrintPhyStats && cur_sc_id == 0) {
-          phy_stats_->PrintEvmStats(frame_id - 1);
+      if (cur_sc_id % cfg_->OfdmPilotSpacing() != 0) {  // if data subcarrier
+        size_t start_tsc0 = GetTime::WorkerRdtsc();
+        arma::cx_float* equal_ptr = nullptr;
+        if (kExportConstellation) {
+          equal_ptr =
+              (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
+                                              [cur_sc_id * cfg_->UeNum()]);
+        } else {
+          equal_ptr =
+              (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
+                                                      cfg_->UeNum()]);
         }
+        arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeNum(), 1, false);
+
+        mat_equaled %= mat_phase_correct;
+
+        // Measure EVM from ground truth
+        if (symbol_idx_ul == cfg_->Frame().NumULSyms() - 1) {
+          phy_stats_->UpdateEvmStats(frame_id, cur_sc_id, mat_equaled);
+          if (kPrintPhyStats && cur_sc_id == 0) {
+            phy_stats_->PrintEvmStats(frame_id - 1);
+          }
+        }
+        size_t start_tsc2 = GetTime::WorkerRdtsc();
+        duration_stat_->task_duration_[1] += start_tsc2 - start_tsc0;
+        duration_stat_->task_count_++;
       }
-      size_t start_tsc2 = GetTime::WorkerRdtsc();
-      duration_stat_->task_duration_[1] += start_tsc2 - start_tsc0;
-      duration_stat_->task_count_++;
     }
   }
 
