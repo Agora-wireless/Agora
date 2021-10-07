@@ -12,6 +12,7 @@ Stats::Stats(const Config* const cfg)
       fft_thread_num_(cfg->FftThreadNum()),
       zf_thread_num_(cfg->ZfThreadNum()),
       demul_thread_num_(cfg->DemulThreadNum()),
+      demod_thread_num_(cfg->DemodThreadNum()),
       decode_thread_num_(cfg->DecodeThreadNum()),
       freq_ghz_(cfg->FreqGhz()),
       creation_tsc_(GetTime::Rdtsc()) {
@@ -147,7 +148,7 @@ void Stats::SaveToFile() {
                  "Pilot RX by socket threads (= reference time), "
                  "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
                  "kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kDemulDone, "
-                 "kDecodeDone, kRXDone, time in CSI, time in "
+                 "kDemodDone, kDecodeDone, kRXDone, time in CSI, time in "
                  "FFT, time in ZF, time in Demul, time in Decode\n");
     for (size_t i = 0; i < this->last_frame_id_; i++) {
       size_t ref_tsc = SIZE_MAX;
@@ -157,8 +158,7 @@ void Stats::SaveToFile() {
       std::fprintf(
           fp_debug,
           "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
-          "%.3f %.3f %.3f "
-          "%.3f %.3f\n",
+          "%.3f %.3f %.3f %.3f %.3f %.3f %.3f\n",
           GetTime::CyclesToUs(ref_tsc - this->creation_tsc_, this->freq_ghz_),
           MasterGetUsFromRef(TsType::kFirstSymbolRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
@@ -169,12 +169,14 @@ void Stats::SaveToFile() {
           MasterGetUsFromRef(TsType::kIFFTDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kEncodeDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kDemulDone, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kDemodDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kDecodeDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kRXDone, i, ref_tsc),
           this->doer_us_.at(static_cast<size_t>(DoerType::kCSI)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kFFT)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kZF)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDemul)).at(i),
+          this->doer_us_.at(static_cast<size_t>(DoerType::kDemod)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDecode)).at(i));
     }
   } else if (config_->Frame().NumDLSyms() > 0) {
@@ -206,8 +208,8 @@ void Stats::SaveToFile() {
         fp_debug,
         "Pilot RX by socket threads (= reference time), "
         "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
-        "kZFDone, kDemulDone, kDecodeDone, kRXDone, time in CSI, time in "
-        "FFT, time in ZF, time in Demul, time in Decode\n");
+        "kZFDone, kDemulDone, kDemodDone, kDecodeDone, kRXDone, time "
+        "in CSI, time in FFT, time in ZF, time in Demul, time in Decode\n");
     for (size_t i = 0; i < this->last_frame_id_; i++) {
       size_t ref_tsc = SIZE_MAX;
       for (size_t j = 0; j < config_->SocketThreadNum(); j++) {
@@ -215,8 +217,8 @@ void Stats::SaveToFile() {
       }
       std::fprintf(
           fp_debug,
-          "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.3f %.3f %.3f "
-          "%.3f %.3f\n",
+          "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.3f %.3f %.3f "
+          "%.3f %.3f %.3f\n",
           GetTime::CyclesToUs(ref_tsc - this->creation_tsc_, this->freq_ghz_),
           MasterGetUsFromRef(TsType::kFirstSymbolRX, i, ref_tsc),
           MasterGetUsFromRef(TsType::kProcessingStarted, i, ref_tsc),
@@ -224,12 +226,14 @@ void Stats::SaveToFile() {
           MasterGetUsFromRef(TsType::kFFTPilotsDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kZFDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kDemulDone, i, ref_tsc),
+          MasterGetUsFromRef(TsType::kDemodDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kDecodeDone, i, ref_tsc),
           MasterGetUsFromRef(TsType::kRXDone, i, ref_tsc),
           this->doer_us_.at(static_cast<size_t>(DoerType::kCSI)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kFFT)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kZF)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDemul)).at(i),
+          this->doer_us_.at(static_cast<size_t>(DoerType::kDemod)).at(i),
           this->doer_us_.at(static_cast<size_t>(DoerType::kDecode)).at(i));
     }
   } else {
@@ -258,7 +262,8 @@ void Stats::SaveToFile() {
     for (size_t i = 0; i < this->last_frame_id_; i++) {
       std::fprintf(
           fp_debug_detailed,
-          "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f\n",
+          "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
+          "%.3f %.3f\n",
           this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kFFT))
                   .at(0)
                   .at(i) +
@@ -293,6 +298,15 @@ void Stats::SaveToFile() {
               .at(1)
               .at(i),
           this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kDemul))
+              .at(2)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kDemod))
+              .at(0)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kDemod))
+              .at(1)
+              .at(i),
+          this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kDemod))
               .at(2)
               .at(i),
           this->doer_breakdown_us_.at(static_cast<size_t>(DoerType::kDecode))
@@ -378,6 +392,10 @@ void Stats::PrintSummary() {
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kDemul)))) /
           (this->config_->OfdmDataNum() * this->config_->Frame().NumULSyms());
+      double demod_frames =
+          (static_cast<double>(
+              num_tasks.at(static_cast<size_t>(DoerType::kDemod)))) /
+          (this->config_->OfdmDataNum() * this->config_->Frame().NumULSyms());
       double decode_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kDecode)))) /
@@ -395,6 +413,9 @@ void Stats::PrintSummary() {
       std::printf("Demul (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kDemul)),
                   demul_frames);
+      std::printf("Demod (%zu, %.2f), ",
+                  num_tasks.at(static_cast<size_t>(DoerType::kDemod)),
+                  demod_frames);
       std::printf("Decode (%zu, %.2f)",
                   num_tasks.at(static_cast<size_t>(DoerType::kDecode)),
                   decode_frames);

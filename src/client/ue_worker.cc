@@ -534,9 +534,15 @@ void UeWorker::DoModul(size_t tag) {
     }
 
     // TODO place directly into the correct location of the fft buffer
+    size_t data_id = 0;
     for (size_t sc = 0; sc < config_.OfdmDataNum(); sc++) {
-      modul_buf[sc] =
-          ModSingleUint8(static_cast<uint8_t>(ul_bits[sc]), config_.ModTable());
+      if (sc % config_.OfdmPilotSpacing() == 0) {
+        modul_buf[sc] = config_.UeSpecificPilot()[ant_id][sc];
+      } else {
+        modul_buf[sc] = ModSingleUint8(static_cast<uint8_t>(ul_bits[data_id]),
+                                       config_.ModTable());
+        data_id++;
+      }
     }
   }
 

@@ -186,6 +186,7 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
 
   switch (event_type) {
     case EventType::kDemul:
+    case EventType::kDemod:
     case EventType::kPrecode:
       num_events = config_->DemulEventsPerSymbol();
       block_size = config_->DemulBlockSize();
@@ -395,12 +396,36 @@ void Agora::Start() {
               this->demul_counters_.CompleteTask(frame_id, symbol_id);
 
           if (last_demul_task == true) {
-            ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_id);
+            ScheduleSubcarriers(EventType::kDemod, frame_id, symbol_id);
+
             PrintPerSymbolDone(PrintType::kDemul, frame_id, symbol_id);
             bool last_demul_symbol =
                 this->demul_counters_.CompleteSymbol(frame_id);
             if (last_demul_symbol == true) {
               this->demul_counters_.Reset(frame_id);
+              this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
+              PrintPerFrameDone(PrintType::kDemul, frame_id);
+            }
+          }
+        } break;
+
+        case EventType::kDemod: {
+          size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          size_t base_sc_id = gen_tag_t(event.tags_[0]).sc_id_;
+
+          PrintPerTaskDone(PrintType::kDemod, frame_id, symbol_id, base_sc_id);
+          bool last_demod_task =
+              this->demod_counters_.CompleteTask(frame_id, symbol_id);
+
+          if (last_demod_task == true) {
+            ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_id);
+
+            PrintPerSymbolDone(PrintType::kDemod, frame_id, symbol_id);
+            bool last_demod_symbol =
+                this->demod_counters_.CompleteSymbol(frame_id);
+            if (last_demod_symbol == true) {
+              this->demod_counters_.Reset(frame_id);
               max_equaled_frame_ = frame_id;
               if (cfg->BigstationMode() == false) {
                 assert(cur_sche_frame_id_ == frame_id);
@@ -408,8 +433,8 @@ void Agora::Start() {
               } else {
                 ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_id);
               }
-              this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
-              PrintPerFrameDone(PrintType::kDemul, frame_id);
+              this->stats_->MasterSetTsc(TsType::kDemodDone, frame_id);
+              PrintPerFrameDone(PrintType::kDemod, frame_id);
             }
           }
         } break;
@@ -803,8 +828,11 @@ void Agora::Worker(int tid) {
 
   auto compute_demul = std::make_unique<DoDemul>(
       this->config_, tid, this->data_buffer_, this->ul_zf_matrices_,
-      this->ue_spec_pilot_buffer_, this->equal_buffer_, this->demod_buffers_,
-      this->phy_stats_.get(), this->stats_.get());
+      this->ue_spec_pilot_buffer_, this->equal_buffer_, this->stats_.get());
+
+  auto compute_demod = std::make_unique<DoDemod>(
+      this->config_, tid, this->ue_spec_pilot_buffer_, this->equal_buffer_,
+      this->demod_buffers_, this->phy_stats_.get(), this->stats_.get());
 
   std::vector<Doer*> computers_vec;
   std::vector<EventType> events_vec;
@@ -816,8 +844,10 @@ void Agora::Worker(int tid) {
 
   if (config_->Frame().NumULSyms() > 0) {
     computers_vec.push_back(compute_decoding.get());
+    computers_vec.push_back(compute_demod.get());
     computers_vec.push_back(compute_demul.get());
     events_vec.push_back(EventType::kDecode);
+    events_vec.push_back(EventType::kDemod);
     events_vec.push_back(EventType::kDemul);
   }
 
@@ -905,8 +935,11 @@ void Agora::WorkerDemul(int tid) {
 
   std::unique_ptr<DoDemul> compute_demul(
       new DoDemul(config_, tid, data_buffer_, ul_zf_matrices_,
-                  ue_spec_pilot_buffer_, equal_buffer_, demod_buffers_,
-                  this->phy_stats_.get(), this->stats_.get()));
+                  ue_spec_pilot_buffer_, equal_buffer_, this->stats_.get()));
+
+  std::unique_ptr<DoDemod> compute_demod(
+      new DoDemod(config_, tid, ue_spec_pilot_buffer_, equal_buffer_,
+                  demod_buffers_, this->phy_stats_.get(), this->stats_.get()));
 
   /* Initialize Precode operator */
   std::unique_ptr<DoPrecode> compute_precode(
@@ -1075,10 +1108,16 @@ void Agora::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
                         TsType::kZFDone, TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kDemul):
-        std::printf("Main [frame %zu + %.2f ms]: Completed demodulation\n",
+        std::printf("Main [frame %zu + %.2f ms]: Completed demultiplexing\n",
                     frame_id,
                     this->stats_->MasterGetDeltaMs(
                         TsType::kDemulDone, TsType::kFirstSymbolRX, frame_id));
+        break;
+      case (PrintType::kDemod):
+        std::printf("Main [frame %zu + %.2f ms]: Completed demodulation\n",
+                    frame_id,
+                    this->stats_->MasterGetDeltaMs(
+                        TsType::kDemodDone, TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kDecode):
         std::printf(
@@ -1161,11 +1200,20 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
       case (PrintType::kDemul):
         std::printf(
             "Main [frame %zu symbol %zu + %.3f ms]: Completed "
-            "demodulation, "
+            "demultiplexing, "
             "%zu symbols done\n",
             frame_id, symbol_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
             demul_counters_.GetSymbolCount(frame_id) + 1);
+        break;
+      case (PrintType::kDemod):
+        std::printf(
+            "Main [frame %zu symbol %zu + %.3f ms]: Completed "
+            "demodulation, "
+            "%zu symbols done\n",
+            frame_id, symbol_id,
+            this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id),
+            demod_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kDecode):
         std::printf(
@@ -1235,10 +1283,17 @@ void Agora::PrintPerTaskDone(PrintType print_type, size_t frame_id,
         break;
       case (PrintType::kDemul):
         std::printf(
-            "Main thread: Demodulation done frame: %zu, symbol: %zu, sc: "
+            "Main thread: Demultiplexing done frame: %zu, symbol: %zu, sc: "
             "%zu, num blocks done: %zu\n",
             frame_id, symbol_id, ant_or_sc_id,
             demul_counters_.GetTaskCount(frame_id, symbol_id));
+        break;
+      case (PrintType::kDemod):
+        std::printf(
+            "Main thread: Demodulation done frame: %zu, symbol: %zu, sc: "
+            "%zu, num blocks done: %zu\n",
+            frame_id, symbol_id, ant_or_sc_id,
+            demod_counters_.GetTaskCount(frame_id, symbol_id));
         break;
       case (PrintType::kDecode):
         std::printf(
@@ -1343,9 +1398,9 @@ void Agora::InitializeUplinkBuffers() {
   equal_buffer_.Malloc(task_buffer_symbol_num_ul,
                        cfg->OfdmDataNum() * cfg->UeNum(),
                        Agora_memory::Alignment_t::kAlign64);
-  ue_spec_pilot_buffer_.Calloc(
-      kFrameWnd, cfg->Frame().ClientUlPilotSymbols() * cfg->UeNum(),
-      Agora_memory::Alignment_t::kAlign64);
+  ue_spec_pilot_buffer_.Calloc(kFrameWnd,
+                               cfg->Frame().NumULSyms() * cfg->UeNum(),
+                               Agora_memory::Alignment_t::kAlign64);
 
   rx_counters_.num_pkts_per_frame_ =
       cfg->BsAntNum() *
@@ -1366,6 +1421,7 @@ void Agora::InitializeUplinkBuffers() {
   zf_counters_.Init(cfg->ZfEventsPerSymbol());
 
   demul_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
+  demod_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
 
   decode_counters_.Init(cfg->Frame().NumULSyms(),
                         cfg->LdpcConfig().NumBlocksInSymbol() * cfg->UeNum());

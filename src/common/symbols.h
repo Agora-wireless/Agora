@@ -39,6 +39,7 @@ enum class EventType : int {
   kPacketRX,
   kFFT,
   kZF,
+  kDemod,
   kDemul,
   kIFFT,
   kPrecode,
@@ -63,6 +64,7 @@ enum class DoerType : size_t {
   kCSI,
   kZF,
   kDemul,
+  kDemod,
   kDecode,
   kEncode,
   kIFFT,
@@ -70,9 +72,10 @@ enum class DoerType : size_t {
   kRC
 };
 static constexpr std::array<DoerType, (static_cast<size_t>(DoerType::kRC) + 1)>
-    kAllDoerTypes = {DoerType::kFFT,   DoerType::kCSI,     DoerType::kZF,
-                     DoerType::kDemul, DoerType::kDecode,  DoerType::kEncode,
-                     DoerType::kIFFT,  DoerType::kPrecode, DoerType::kRC};
+    kAllDoerTypes = {DoerType::kFFT,    DoerType::kCSI,   DoerType::kZF,
+                     DoerType::kDemul,  DoerType::kDemod, DoerType::kDecode,
+                     DoerType::kEncode, DoerType::kIFFT,  DoerType::kPrecode,
+                     DoerType::kRC};
 static constexpr size_t kNumDoerTypes = kAllDoerTypes.size();
 
 static const std::map<DoerType, std::string> kDoerNames = {
@@ -80,6 +83,7 @@ static const std::map<DoerType, std::string> kDoerNames = {
     {DoerType::kCSI, std::string("CSI")},
     {DoerType::kZF, std::string("ZF")},
     {DoerType::kDemul, std::string("Demul")},
+    {DoerType::kDemod, std::string("Demod")},
     {DoerType::kDecode, std::string("Decode")},
     {DoerType::kEncode, std::string("Encode")},
     {DoerType::kIFFT, std::string("iFFT")},
@@ -94,6 +98,7 @@ enum class PrintType : int {
   kFFTCal,
   kZF,
   kDemul,
+  kDemod,
   kIFFT,
   kPrecode,
   kPacketTXFirst,
@@ -169,6 +174,7 @@ enum class ThreadType {
   kWorkerFFT,
   kWorkerZF,
   kWorkerDemul,
+  kWorkerDemod,
   kWorkerDecode,
   kWorkerRX,
   kWorkerTX,
@@ -190,6 +196,8 @@ static inline std::string ThreadTypeStr(ThreadType thread_type) {
       return "Worker (ZF)";
     case ThreadType::kWorkerDemul:
       return "Worker (Demul)";
+    case ThreadType::kWorkerDemod:
+      return "Worker (Demod)";
     case ThreadType::kWorkerDecode:
       return "Worker (Decode)";
     case ThreadType::kWorkerRX:

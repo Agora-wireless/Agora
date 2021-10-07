@@ -256,6 +256,7 @@ set(AGORA_SOURCES
   src/agora/doifft.cc
   src/agora/dozf.cc
   src/agora/dodemul.cc
+  src/agora/dodemod.cc
   src/agora/doprecode.cc
   src/agora/dodecode.cc
   src/agora/radio_lib.cc

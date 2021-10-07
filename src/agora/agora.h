@@ -20,6 +20,7 @@
 #include "concurrentqueue.h"
 #include "config.h"
 #include "dodecode.h"
+#include "dodemod.h"
 #include "dodemul.h"
 #include "doencode.h"
 #include "dofft.h"
@@ -221,6 +222,7 @@ class Agora {
   FrameCounters uplink_fft_counters_;
   FrameCounters zf_counters_;
   FrameCounters demul_counters_;
+  FrameCounters demod_counters_;
   FrameCounters decode_counters_;
   FrameCounters encode_counters_;
   FrameCounters precode_counters_;

@@ -74,9 +74,9 @@ void MasterToWorkerDynamicWorker(
     // Wait
   }
 
-  auto compute_demul = std::make_unique<DoDemul>(
-      cfg, worker_id, data_buffer, ul_zf_matrices, ue_spec_pilot_buffer,
-      equal_buffer, demod_buffers_, phy_stats, stats);
+  auto compute_demul =
+      std::make_unique<DoDemul>(cfg, worker_id, data_buffer, ul_zf_matrices,
+                                ue_spec_pilot_buffer, equal_buffer, stats);
 
   size_t start_tsc = GetTime::Rdtsc();
   size_t num_tasks = 0;

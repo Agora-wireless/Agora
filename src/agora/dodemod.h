@@ -1,9 +1,9 @@
 /**
- * @file dodemul.h
+ * @file dodemod.h
  * @brief Declaration file for the DoDemul class.
  */
-#ifndef DODEMUL_H_
-#define DODEMUL_H_
+#ifndef DODEMOD_H_
+#define DODEMOD_H_
 
 #include <armadillo>
 #include <iostream>
@@ -19,13 +19,13 @@
 #include "stats.h"
 #include "symbols.h"
 
-class DoDemul : public Doer {
+class DoDemod : public Doer {
  public:
-  DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
-          PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
-          Table<complex_float>& ue_spec_pilot_buffer,
-          Table<complex_float>& equal_buffer, Stats* in_stats_manager);
-  ~DoDemul() override;
+  DoDemod(Config* config, int tid, Table<complex_float>& ue_spec_pilot_buffer,
+          Table<complex_float>& equal_buffer,
+          PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers,
+          PhyStats* in_phy_stats, Stats* in_stats_manager);
+  ~DoDemod() override;
 
   /**
    * Do demodulation task for a block of subcarriers (demul_block_size)
@@ -48,7 +48,6 @@ class DoDemul : public Doer {
    * users Event offset: offset Description:
    *     1. for each subcarrier in the block, block-wisely copy data from
    * data_buffer_ to data_gather_buffer_
-   *     2. perform equalization with data and percoder matrixes
    *     3. perform demodulation on equalized data matrix
    *     4. add an event to the message queue to infrom main thread the
    * completion of this task
@@ -56,17 +55,15 @@ class DoDemul : public Doer {
   EventData Launch(size_t tag) override;
 
  private:
-  Table<complex_float>& data_buffer_;
-  PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
   Table<complex_float>& ue_spec_pilot_buffer_;
   Table<complex_float>& equal_buffer_;
+  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_;
   DurationStat* duration_stat_;
   PhyStats* phy_stats_;
 
-  /// Intermediate buffer to gather raw data. Size = subcarriers per cacheline
-  /// times number of antennas
-  complex_float* data_gather_buffer_;
-
+  // Intermediate buffers for equalized data
+  complex_float* equaled_buffer_temp_;
+  complex_float* equaled_buffer_temp_transposed_;
   arma::cx_fmat ue_pilot_data_;
   int ue_num_simd256_;
 
@@ -76,4 +73,4 @@ class DoDemul : public Doer {
 #endif
 };
 
-#endif  // DODEMUL_H_
+#endif  // DODEMOD_H_

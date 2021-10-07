@@ -41,7 +41,7 @@ PhyStats::PhyStats(Config* const cfg) : config_(cfg) {
       gt_mat_ = dl_iq_f_mat.st();
     } else {
       auto* ul_iq_f_ptr = reinterpret_cast<arma::cx_float*>(
-          cfg->UlIqF()[cfg->Frame().ClientUlPilotSymbols()]);
+          cfg->UlIqF()[cfg->Frame().NumULSyms() - 1]);
       arma::cx_fmat ul_iq_f_mat(ul_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(),
                                 false);
       gt_mat_ = ul_iq_f_mat.st();

@@ -110,6 +110,7 @@ class Config {
 
   inline size_t FftThreadNum() const { return this->fft_thread_num_; }
   inline size_t DemulThreadNum() const { return this->demul_thread_num_; }
+  inline size_t DemodThreadNum() const { return this->demod_thread_num_; }
   inline size_t DecodeThreadNum() const { return this->decode_thread_num_; }
   inline size_t ZfThreadNum() const { return this->zf_thread_num_; }
   inline size_t DemulBlockSize() const { return this->demul_block_size_; }
@@ -514,6 +515,7 @@ class Config {
   size_t socket_thread_num_;
   size_t fft_thread_num_;
   size_t demul_thread_num_;
+  size_t demod_thread_num_;
   size_t decode_thread_num_;
   size_t zf_thread_num_;
 
