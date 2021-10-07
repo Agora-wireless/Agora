@@ -470,6 +470,12 @@ public:
         return freq_orthogonal_pilot ? sc_id - (sc_id % UE_NUM) : sc_id;
     }
 
+    inline char* get_freq_domain_iq_buffer(
+        Table<char>& freq_domain_iq_buffer, size_t ant_id, size_t frame_id, size_t symbol_id) const
+    {
+        return &freq_domain_iq_buffer[ant_id][((frame_id % kFrameWnd) * symbol_num_perframe + symbol_id) * packet_length];
+    }
+
     /// Get the calibration buffer for this frame and subcarrier ID
     inline complex_float* get_calib_buffer(
         Table<complex_float>& calib_buffer, size_t frame_id, size_t sc_id) const
@@ -487,6 +493,14 @@ public:
         return &decoded_buffer[total_data_symbol_id][roundup<64>(
                                                          num_bytes_per_cb)
             * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
+    }
+
+    inline int8_t* get_demod_buf_to_send(
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send,
+        size_t frame_id, size_t symbol_id_ul, size_t ue_id) const
+    {
+        return &demod_buffer_to_send[frame_id % kFrameWnd]
+            [symbol_id_ul][ue_id][subcarrier_start * mod_order_bits];
     }
 
     inline int8_t* get_demod_buf_to_decode(

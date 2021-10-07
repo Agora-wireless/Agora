@@ -17,7 +17,7 @@ DyEncode::DyEncode(Config* in_config, int in_tid, double freq_ghz,
     : Doer(in_config, in_tid, freq_ghz)
     , raw_data_buffer_(in_raw_data_buffer)
     , encoded_buffer_(in_encoded_buffer)
-    , shared_state__(shared_state_)
+    , shared_state_(shared_state_)
     , encode_status_(encode_status)
     , ue_id_(in_tid + in_config->ue_start)
 {
@@ -108,7 +108,7 @@ void DyEncode::start_work()
 {
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_cb_ > 0
-            || shared_state__->is_encode_ready(cur_frame_)) {
+            || shared_state_->is_encode_ready(cur_frame_)) {
             // printf("Start to encode user %lu frame %lu symbol %lu cb %u\n", ue_id_, cur_frame_, cur_symbol_, cur_cb_);
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                 cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
@@ -140,7 +140,7 @@ DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,
     , decoded_buffers_(decoded_buffers)
     , control_info_table_(control_info_table)
     , control_idx_list_(control_idx_list)
-    , shared_state__(shared_state_)
+    , shared_state_(shared_state_)
     , total_dycode_num_(cfg->decode_thread_num)
     , total_ue_num_(cfg->ue_end - cfg->ue_start)
 {
@@ -316,7 +316,7 @@ void DyDecode::start_work()
                     cur_symbol_ = cur_idx_ / total_ue_num_;
                     cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
 
-                    shared_state__->decode_done(cur_frame_);
+                    shared_state_->decode_done(cur_frame_);
 
                     cur_frame_++;
                     if (unlikely(cur_frame_ == cfg->frames_to_test)) {
@@ -339,7 +339,7 @@ void DyDecode::start_work()
                 work_start_tsc = rdtsc();
                 state_start_tsc = rdtsc();
             }
-            bool ret = shared_state__->received_all_demod_pkts(
+            bool ret = shared_state_->received_all_demod_pkts(
                    cur_ue_, cur_frame_, cur_symbol_);
             if (likely(state_trigger)) {
                 state_operation_duration += rdtsc() - state_start_tsc;
@@ -387,7 +387,7 @@ void DyDecode::start_work()
                         cur_symbol_ = cur_idx_ / total_ue_num_;
                         cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
 
-                        shared_state__->decode_done(cur_frame_);
+                        shared_state_->decode_done(cur_frame_);
 
                         cur_frame_++;
                         if (unlikely(cur_frame_ == cfg->frames_to_test)) {

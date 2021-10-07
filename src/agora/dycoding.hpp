@@ -45,7 +45,7 @@ private:
     Table<int8_t>& encoded_buffer_;
     DurationStat* duration_stat;
 
-    SharedState* shared_state__;
+    SharedState* shared_state_;
     EncodeStatus* encode_status_;
 
     size_t ue_id_;
@@ -79,7 +79,7 @@ private:
     int16_t* resp_var_nodes;
     Table<int8_t> demod_buffer_to_decode_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers_;
-    SharedState* shared_state__;
+    SharedState* shared_state_;
 
     size_t total_ue_num_;
     size_t total_dycode_num_;

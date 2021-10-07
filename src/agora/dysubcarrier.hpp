@@ -98,7 +98,7 @@ public:
         , dl_zf_matrices_(dl_zf_matrices)
         , control_info_table_(control_info_table)
         , control_idx_list_(control_idx_list)
-        , shared_state__(shared_state_)
+        , shared_state_(shared_state_)
     {
         // Create the requisite Doers
         do_zf_ = new DyZF(this->cfg, tid, freq_ghz, csi_buffer_, calib_buffer, ul_zf_matrices_,
@@ -163,7 +163,7 @@ public:
             if (zf_cur_frame_ > demul_cur_frame_) {
 
                 state_start_tsc = rdtsc();
-                bool ret = shared_state__->received_all_data_pkts(
+                bool ret = shared_state_->received_all_data_pkts(
                        demul_cur_frame_, demul_cur_sym_ul_);
                 size_t state_tsc_usage = rdtsc() - state_start_tsc;
                 if (likely(start_tsc > 0)) {
@@ -193,7 +193,7 @@ public:
                     if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
                         n_demul_tasks_done_ = 0;
 
-                        shared_state__->demul_done(
+                        shared_state_->demul_done(
                             demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_reqd);
 
                         demul_cur_sym_ul_++;
@@ -253,7 +253,7 @@ public:
             //             //     precode_cur_frame_,
             //             //     cfg->dl_data_symbol_num_perframe);
             //             precode_start_tsc = rdtsc();
-            //             shared_state__->precode_done(precode_cur_frame_);
+            //             shared_state_->precode_done(precode_cur_frame_);
             //             state_operation_duration += rdtsc() - precode_start_tsc;
             //             precode_cur_frame_ ++;
             //             if (unlikely(precode_cur_frame_ == cfg->frames_to_test)) {
@@ -304,7 +304,7 @@ public:
             if (likely(start_tsc > 0)) {
                 state_start_tsc = rdtsc();
             }
-            bool ret = shared_state__->received_all_pilots(csi_cur_frame_);
+            bool ret = shared_state_->received_all_pilots(csi_cur_frame_);
             if (likely(start_tsc > 0)) {
                 state_tsc_usage = rdtsc() - state_start_tsc;
                 state_operation_duration += state_tsc_usage;
@@ -501,7 +501,7 @@ private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;
 
     // Shared states with TXRX threads
-    SharedState* shared_state__;
+    SharedState* shared_state_;
 
     // Internal CSI states
     size_t csi_cur_frame_ = 0;

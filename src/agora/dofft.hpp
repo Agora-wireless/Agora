@@ -76,7 +76,7 @@ private:
     size_t cur_frame_ = 0;
     size_t cur_idx_ = 0;
     
-    SharedState *shared_state__;
+    SharedState *shared_state_;
 };
 
 class DoIFFT : public Doer {

@@ -183,7 +183,7 @@ private:
     std::vector<std::thread> do_encode_threads_;
 
     // Shared states between socket threads and dosubcarriers
-    SharedState shared_state__;
+    SharedState shared_state_;
 
 #if 0
     // Shared states between dosubcarriers and doencoders

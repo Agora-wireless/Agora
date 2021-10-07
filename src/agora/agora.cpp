@@ -5,7 +5,7 @@ using namespace std;
 
 Agora::Agora(Config* cfg)
     : freq_ghz_(measure_rdtsc_freq())
-    , shared_state__(cfg)
+    , shared_state_(cfg)
 {
     std::string directory = TOSTRING(PROJECT_DIRECTORY);
     printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
@@ -26,10 +26,8 @@ Agora::Agora(Config* cfg)
 
     /* Initialize TXRX threads */
     packet_tx_rx_.reset(new PacketTXRX(cfg, cfg->core_offset + kNumMasterThread,
-        freq_domain_iq_buffer_, dl_ifft_buffer_,
-        demod_buffer_to_send_, demod_buffer_to_decode_, dl_encoded_buffer_,
-        dl_encoded_buffer_to_precode_,
-        &shared_state__));
+        freq_domain_iq_buffer_, demod_buffer_to_send_, demod_buffer_to_decode_, 
+        &shared_state_));
     
     base_worker_core_offset = config_->core_offset + kNumMasterThread + 
         config_->rx_thread_num + kNumDemodTxThread;
@@ -109,7 +107,7 @@ void Agora::start()
             cfg->running = false;
             goto finish;
         } else {
-            if (shared_state__.cur_frame_ == cfg->frames_to_test) {
+            if (shared_state_.cur_frame_ == cfg->frames_to_test) {
                 cfg->running = false;
                 goto finish;
             }
@@ -160,7 +158,7 @@ void* Agora::subcarrier_worker(int tid)
         dl_encoded_buffer_to_precode_, demod_buffer_to_send_, dl_ifft_buffer_,
         equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
         control_info_table_, control_idx_list_,
-        &shared_state__);
+        &shared_state_);
 
     computeSubcarrier->start_work();
     delete computeSubcarrier;
@@ -176,7 +174,7 @@ void* Agora::decode_worker(int tid)
     auto computeDecoding = new DyDecode(config_, tid, freq_ghz_,
         demod_buffer_to_decode_,
         decoded_buffer_, control_info_table_, control_idx_list_, 
-        &shared_state__);
+        &shared_state_);
 
     computeDecoding->start_work();
     delete computeDecoding;
@@ -310,11 +308,11 @@ void Agora::save_latency_data_to_file()
     FILE* fp = fopen(filename.c_str(), "w");
 
     for (size_t i = 0; i < cfg->frames_to_test; i ++) {
-        fprintf(fp, "%u %lu %lu %lu %lu %lu\n", i, shared_state__.frame_start_time_[i],
-            shared_state__.frame_iq_time_[i],
-            shared_state__.frame_sc_time_[i],
-            shared_state__.frame_decode_time_[i],
-            shared_state__.frame_end_time_[i]);
+        fprintf(fp, "%u %lu %lu %lu %lu %lu\n", i, shared_state_.frame_start_time_[i],
+            shared_state_.frame_iq_time_[i],
+            shared_state_.frame_sc_time_[i],
+            shared_state_.frame_decode_time_[i],
+            shared_state_.frame_end_time_[i]);
     }
     fclose(fp);
 }

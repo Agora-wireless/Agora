@@ -47,13 +47,10 @@
 class PacketTXRX {
 public:
     PacketTXRX(Config* cfg, size_t in_core_offset,
-        Table<char>& buffer,
-        Table<complex_float>& tx_buffer,
+        Table<char>& freq_domain_iq_buffer,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_to_send,
         Table<int8_t>& demod_buffer_to_decode,
-        Table<int8_t>& encoded_buffer_,
-        Table<int8_t>& encoded_buffer_to_decode,
-        SharedState* shared_state_ = nullptr);
+        SharedState* shared_state = nullptr);
 
     ~PacketTXRX();
 
@@ -75,12 +72,6 @@ public:
      */
     bool startTXRX();
 
-    // TODO: Add documentation
-    void send_beacon(int tid, size_t frame_id);
-
-    // Not used
-    size_t get_dl_frame_to_send() { return dl_frame_to_send_; }
-
     // Current sending frame for each socket thread
     size_t frame_to_send_[kMaxThreads] = {0};
 
@@ -90,18 +81,10 @@ private:
 
     // A thread that sends and receives post-demodulation data
     void* demod_tx_thread(int tid);
-    void* encode_thread(int tid);
-
-    int dequeue_send(int tid, size_t symbol_to_send, size_t ant_to_send);
-    int recv_enqueue(int tid, int radio_id, size_t rx_offset);
 
     // Receive packets and relocate data to the correct address based on
     // the subcarrier range
     int recv_relocate(int tid);
-
-    void* loop_tx_rx_argos(int tid);
-    int dequeue_send_argos(int tid);
-    struct Packet* recv_enqueue_argos(int tid, int radio_id, int rx_offset);
 
     Config* cfg;
 
@@ -113,38 +96,23 @@ private:
     Table<char>& freq_domain_iq_buffer_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send_;
     Table<int8_t>& demod_buffer_to_decode_;
-    size_t packet_num_in_buffer_;
-    char* tx_buffer_;
-    Table<complex_float>& dl_ifft_buffer_;
-
-    // Downlink buffers
-    Table<int8_t>& encoded_buffer_;
-    Table<int8_t>& encoded_buffer_to_precode_;
-
-    std::vector<struct sockaddr_in> bs_rru_sockaddr_;
-    std::vector<int> socket_;
-    std::vector<struct sockaddr_in> bs_server_sockaddrs_;
-    int demod_tx_socket_;
-
-    char* send_buffer_;
-    uint8_t* recv_buffer_;
 
 #ifdef USE_DPDK
     uint32_t bs_rru_addr_; // IPv4 address of the simulator sender
     struct rte_mempool* mbuf_pool_[kMaxThreads];
-    // struct rte_mempool* mbuf_pool_;
     std::vector<uint32_t> bs_server_addrs_;
     std::vector<rte_ether_addr> bs_server_mac_addrs_;
     rte_ether_addr bs_rru_mac_addr_;
-    int recv(int tid);
 #endif
 
-    RadioConfig* radioconfig_; // Used only in Argos mode
-
-    SharedState* shared_state__; // Shared states with workers
+    SharedState* shared_state_; // Shared states with workers
     size_t demod_frame_to_send_ = 0;
     size_t demod_symbol_ul_to_send_;
 
+#if 0
+    void* encode_thread(int tid);
+    int dequeue_send(int tid, size_t symbol_to_send, size_t ant_to_send);
+    
     size_t encode_frame_to_send_ = 0;
     size_t encode_symbol_dl_to_send_ = 0;
     size_t encode_ue_to_send_;
@@ -152,6 +120,15 @@ private:
     // Not used
     size_t dl_frame_to_send_ = 0;
     size_t dl_symbol_to_send_ = 0;
+
+    // Downlink buffers
+    Table<int8_t>& encoded_buffer_;
+    Table<int8_t>& encoded_buffer_to_precode_;
+
+    char* tx_buffer_;
+
+    Table<complex_float>& dl_ifft_buffer_;
+#endif
 
     size_t last_packet_cycle_[kMaxThreads] = {0};
     size_t max_inter_packet_gap_[kMaxThreads] = {0};

@@ -15,77 +15,35 @@ class SharedState {
 public:
     SharedState(Config* cfg);
 
-
-    /*********************************************
-     * 
-     * Functions for receiving new packets
-     * 
-     *********************************************/
-
-    // When receive a new packet, record it here
+    // When receive a new freq iq packet, record it here
     bool receive_freq_iq_pkt(const Packet* pkt);
-
+    // When receive a new demod packet, record it here
     bool receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol_id_ul);
-
-
-    /*********************************************
-     * 
-     * Functions for checking whether all packets
-     * of a certain type are received
-     * 
-     *********************************************/
 
     // Check whether all pilot packets are received for a frame
     // used by CSI
     bool received_all_pilots(size_t frame_id);
-
     // Check whether demodulation can proceed for a symbol in a frame
     bool received_all_data_pkts(size_t frame_id, size_t symbol_id_ul);
-
     bool received_all_demod_pkts(size_t ue_id, size_t frame_id, size_t symbol_id_ul);
-
     // Check whether encoding can proceed for a frame
     bool is_encode_ready(size_t frame_id);
 
-
-    /*********************************************
-     * 
-     * Functions for recording completed tasks
-     * 
-     *********************************************/
-
     // Mark [num_tasks] demodulation tasks for this frame and symbol as complete
     void demul_done(size_t frame_id, size_t symbol_id_ul, size_t num_tasks);
-
     // When decoding is done for a frame from one decoder, call this function
     // This function will increase cur_frame when this frame is decoded so that
     // we can move on decoding the next frame and release the resources used by
     // this frame
     void decode_done(size_t frame_id);
-
     // When precoding is done for a frame from one dosubcarrier worker, call this function
     // This function will increase cur_frame_ when this frame is precoded so that
     // we can move on precoding the next frame and release the resources used by this frame
     void precode_done(size_t frame_id);
 
-
-    /*********************************************
-     * 
-     * Functions for checking whether certain task
-     * is completed
-     * 
-     *********************************************/
-
     // Return true iff we have completed demodulation for all subcarriers in
     // this symbol have
     bool is_demod_tx_ready(size_t frame_id, size_t symbol_id_ul);
-
-
-    /*********************************************
-     * 
-     * Slot time breakdown counters
-     * 
-     *********************************************/
 
     // Latency measurement counters for each frame
     uint64_t *frame_start_time_;
@@ -98,12 +56,6 @@ public:
     size_t cur_frame_ = 0;
 
 private:
-    /*********************************************
-     * 
-     * Packet and task completion counters
-     * 
-     *********************************************/
-
     // TODO: Instead of having all-atomic counter arrays, can we just make
     // the entire class atomic?
 
