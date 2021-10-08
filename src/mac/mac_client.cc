@@ -126,6 +126,7 @@ int main(int argc, char* argv[]) {
   delete[](frame_start);
   delete[](frame_end);
   std::printf("Mac user application terminated!\n");
+  PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
   return ret;
 }
