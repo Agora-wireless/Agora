@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, Rice University
+// Copyright (c) 2018-2021, Rice University
 // RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
 /**
@@ -8,35 +8,63 @@
 
 #include "utils.h"
 
+#include <list>
 #include <mutex>
+
+struct CoreInfo {
+  CoreInfo(size_t id, size_t req, size_t mapped, ThreadType type)
+      : thread_id_(id),
+        requested_core_(req),
+        mapped_core_(mapped),
+        type_(type) {}
+
+  size_t thread_id_;
+  size_t requested_core_;
+  size_t mapped_core_;
+  ThreadType type_;
+
+  bool operator<(const CoreInfo& comp) const {
+    return std::tie(mapped_core_, requested_core_, thread_id_) <
+           std::tie(comp.mapped_core_, comp.requested_core_, comp.thread_id_);
+  }
+  bool operator>(const CoreInfo& comp) const {
+    return std::tie(mapped_core_, requested_core_, thread_id_) >
+           std::tie(comp.mapped_core_, comp.requested_core_, comp.thread_id_);
+  }
+};
 
 static std::vector<size_t> cpu_layout;
 static bool cpu_layout_initialized = false;
 static std::mutex pin_core_mutex;
 
 /* Keep list of core-thread relationship*/
-static std::vector<std::pair<ThreadType, size_t>> core_list;
+static std::list<CoreInfo> core_list;
 
 /* Print out summary of core-thread relationship */
-void PrintCoreList(const std::vector<std::pair<ThreadType, size_t>>& clist) {
+static void PrintCoreList(const std::list<CoreInfo>& clist) {
   int numa_max_cpus = numa_num_configured_cpus();
   int system_cpus = sysconf(_SC_NPROCESSORS_ONLN);
   std::printf("=================================\n");
   std::printf("          CORE LIST SUMMARY      \n");
   std::printf("=================================\n");
   std::printf("Total Number of Cores: %d : %d \n", numa_max_cpus, system_cpus);
-  for (auto iter : clist) {
-    std::printf("|| Core ID: %zu || ThreadType: %s || \n", iter.second,
-                ThreadTypeStr(iter.first).c_str());
+  for (auto& iter : clist) {
+    std::printf(
+        "|| Core ID: %2zu || Requested: %2zu || ThreadType: %-16s || ThreadId: "
+        "%zu \n",
+        iter.mapped_core_, iter.requested_core_,
+        ThreadTypeStr(iter.type_).c_str(), iter.thread_id_);
   }
   std::printf("=================================\n");
 }
 
-void PrintBitmask(const struct bitmask* bm) {
+static void PrintBitmask(const struct bitmask* bm) {
   for (size_t i = 0; i < bm->size; ++i) {
     std::printf("%d", numa_bitmask_isbitset(bm, i));
   }
 }
+
+void PrintCoreAssignmentSummary() { PrintCoreList(core_list); }
 
 void SetCpuLayoutOnNumaNodes(bool verbose) {
   if (cpu_layout_initialized == false) {
@@ -52,7 +80,7 @@ void SetCpuLayoutOnNumaNodes(bool verbose) {
       numa_node_to_cpus(i, bm);
       if (verbose) {
         std::printf("NUMA node %d ", i);
-        //PrintBitmask(bm);
+        PrintBitmask(bm);
         std::printf(" CPUs: ");
       }
       for (size_t j = 0; j < bm->size; j++) {
@@ -129,12 +157,16 @@ void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
           ThreadTypeStr(thread_type).c_str(), thread_id, assigned_core);
       throw std::runtime_error("Utils: failed to pin to core");
     } else {
+      CoreInfo new_assignment((size_t)pthread_self(), assigned_core,
+                              requested_core, thread_type);
+      auto const insertion_point =
+          std::lower_bound(core_list.begin(), core_list.end(), new_assignment);
+
+      core_list.insert(insertion_point, new_assignment);
       if (verbose == true) {
-        core_list.push_back(std::make_pair(thread_type, assigned_core));
-        PrintCoreList(core_list);
-        std::printf("%s thread %d: pinned to core %zu, requested core %d \n",
+        std::printf("%s thread %d: pinned to core %zu, requested core %zu \n",
                     ThreadTypeStr(thread_type).c_str(), thread_id,
-                    assigned_core, core_offset + thread_id);
+                    assigned_core, requested_core);
       }
     }  // EnableThreadPinning == true
   }

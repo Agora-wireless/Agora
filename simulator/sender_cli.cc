@@ -37,5 +37,8 @@ int main(int argc, char* argv[]) {
       sender->StartTx();
     }  // end context sender
   }    // end context Config
+
+  PrintCoreAssignmentSummary();
+  gflags::ShutDownCommandLineFlags();
   return 0;
 }
