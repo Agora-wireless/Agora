@@ -79,26 +79,30 @@ int main(int argc, char* argv[]) {
       std::vector<std::thread> rx_threads;
       //+1 for main thread
       const size_t kNumTotalSenderThreads =
-          FLAGS_num_sender_worker_threads + 1 + FLAGS_num_sender_update_threads;
+          FLAGS_num_sender_worker_threads + FLAGS_num_sender_update_threads;
+      size_t thread_start = FLAGS_core_offset;
 
       // Register signal handler to handle kill signal
       signal_handler.SetupSignalHandlers();
       if (cfg->Frame().NumUlDataSyms() > 0) {
+        //Use the main thread as the TX master
+        thread_start += 1;
         sender = std::make_unique<MacSender>(
             cfg.get(), data_filename, cfg->UlMacPacketsPerframe(),
             cfg->UeServerAddr(), cfg->UeMacRxPort(),
             std::bind(&FrameStats::GetULDataSymbol, cfg->Frame(),
                       std::placeholders::_1),
-            FLAGS_core_offset + 1, FLAGS_num_sender_worker_threads,
+            thread_start, FLAGS_num_sender_worker_threads,
             FLAGS_num_sender_update_threads, FLAGS_frame_duration, 0,
             FLAGS_enable_slow_start, true);
+        thread_start += kNumTotalSenderThreads;
         sender->StartTXfromMain(frame_start, frame_end);
       }
+
       if (cfg->Frame().NumDlDataSyms() > 0) {
         receiver = std::make_unique<MacReceiver>(
             cfg.get(), cfg->DlMacDataBytesNumPerframe(), cfg->UeServerAddr(),
-            cfg->UeMacTxPort(), FLAGS_num_receiver_threads,
-            FLAGS_core_offset + kNumTotalSenderThreads);
+            cfg->UeMacTxPort(), FLAGS_num_receiver_threads, thread_start);
         rx_threads = receiver->StartRecv();
       }
 
