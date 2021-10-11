@@ -38,7 +38,6 @@ int main(int argc, char* argv[]) {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = FLAGS_conf_file;
   std::string data_filename = FLAGS_data_file;
-  PinToCoreWithOffset(ThreadType::kMaster, FLAGS_core_offset, 0);
 
   auto frame_start = new double[kNumStatsFrames];
   auto frame_end = new double[kNumStatsFrames];
@@ -72,6 +71,9 @@ int main(int argc, char* argv[]) {
       create_file.close();
     }
 
+    /* Share Main TX thread */
+    PinToCoreWithOffset(ThreadType::kMaster, FLAGS_core_offset, 0);
+
     try {
       SignalHandler signal_handler;
       std::unique_ptr<MacSender> sender;
@@ -85,8 +87,6 @@ int main(int argc, char* argv[]) {
       // Register signal handler to handle kill signal
       signal_handler.SetupSignalHandlers();
       if (cfg->Frame().NumUlDataSyms() > 0) {
-        //Use the main thread as the TX master
-        thread_start += 1;
         sender = std::make_unique<MacSender>(
             cfg.get(), data_filename, cfg->UlMacPacketsPerframe(),
             cfg->UeServerAddr(), cfg->UeMacRxPort(),
