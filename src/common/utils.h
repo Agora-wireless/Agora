@@ -49,7 +49,7 @@ int PinToCore(int core_id);
 
 /* Pin this thread to core (base_core_offset + thread_id) */
 void PinToCoreWithOffset(ThreadType thread, int base_core_offset, int thread_id,
-                         bool verbose = true);
+                         bool verbose = false);
 
 void PrintCoreAssignmentSummary();
 
