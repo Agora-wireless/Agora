@@ -207,6 +207,7 @@ set(AGORA_SOURCES
   src/agora/dyzf.cpp
   src/agora/dydemul.cpp
   src/agora/dycoding.cpp
+  src/agora/dysubcarrier.cpp
   src/agora/radio_lib.cpp
   src/agora/radio_calibrate.cpp
   src/mac/mac_thread.cpp)

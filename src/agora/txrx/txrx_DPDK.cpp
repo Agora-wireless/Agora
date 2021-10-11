@@ -161,8 +161,6 @@ void* PacketTXRX::demod_tx_thread(int tid)
             worked = 1;
 
             for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id++) {
-                // int8_t* demod_ptr = &demod_buffer_to_send_[demod_frame_to_send_
-                //     % kFrameWnd][demod_symbol_ul_to_send_][ue_id][cfg->subcarrier_start * cfg->mod_order_bits];
                 int8_t* demod_ptr = cfg->get_demod_buf_to_send(demod_buffer_to_send_, demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id);
 
                 size_t target_server_idx = cfg->get_server_idx_by_ue(ue_id);
@@ -297,21 +295,11 @@ int PacketTXRX::recv_relocate(int tid)
 
         auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset);
         if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
-            // char* rx_buffer = freq_domain_iq_buffer_[pkt->ant_id];
-            // const size_t rx_offset_ = (pkt->frame_id % kFrameWnd)
-            //         * cfg->symbol_num_perframe
-            //     + pkt->symbol_id;
             char* iq_ptr = cfg->get_freq_domain_iq_buffer(freq_domain_iq_buffer_, pkt->ant_id, pkt->frame_id, pkt->symbol_id);
 
             size_t sc_offset = Packet::kOffsetOfData
                 + 2 * sizeof(unsigned short)
                     * (cfg->OFDM_DATA_START + cfg->subcarrier_start);
-            // DpdkTransport::fastMemcpy(
-            //     &rx_buffer[rx_offset_ * cfg->packet_length], pkt, Packet::kOffsetOfData);
-            // memcpy(
-            //     &rx_buffer[rx_offset_ * cfg->packet_length + sc_offset],
-            //     (uint8_t*)pkt + Packet::kOffsetOfData,
-            //     cfg->get_num_sc_to_process() * 2 * sizeof(unsigned short));
             DpdkTransport::fastMemcpy(iq_ptr, pkt, Packet::kOffsetOfData);
             memcpy(iq_ptr + sc_offset,
                 (uint8_t*)pkt + Packet::kOffsetOfData,
