@@ -12,7 +12,7 @@
 #include <mutex>
 
 struct CoreInfo {
-  CoreInfo(size_t id, size_t req, size_t mapped, ThreadType type)
+  CoreInfo(size_t id, size_t mapped, size_t req, ThreadType type)
       : thread_id_(id),
         requested_core_(req),
         mapped_core_(mapped),

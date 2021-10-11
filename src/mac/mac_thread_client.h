@@ -28,7 +28,7 @@
 class MacThreadClient {
  public:
   // Default log file for MAC layer outputs
-  static constexpr char kDefaultLogFilename[] = "/tmp/mac_log_client";
+  static constexpr char kDefaultLogFilename[] = "data/mac_log_client";
 
   // Maximum number of outstanding UDP packets per UE that we allocate recv()
   // buffer space for
