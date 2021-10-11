@@ -446,9 +446,9 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
     //next_radio_id_ = src_packet->ue_id;
 
     // could use pkt_id vs src_packet->symbol_id_ but might reorder packets
-    const size_t dest_pkt_offset =
-        radio_buf_id * num_mac_packets_per_frame +
-        ((symbol_idx - num_pilot_symbols) * cfg_->MacPacketLength());
+    const size_t dest_pkt_offset = ((radio_buf_id * num_mac_packets_per_frame) +
+                                    (symbol_idx - num_pilot_symbols)) *
+                                   cfg_->MacPacketLength();
 
     auto* pkt = reinterpret_cast<MacPacketPacked*>(
         &(*client_.dl_bits_buffer_)[next_radio_id_][dest_pkt_offset]);
@@ -468,21 +468,24 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
 
     if (kLogMacPackets) {
       std::stringstream ss;
-      std::printf(
-          "MacThreadBasestation created packet frame %zu, pkt %zu, size %zu, "
-          "copied to location %zu dest offset %zu\n",
-          next_tx_frame_id_, pkt_id, cfg_->MacPayloadMaxLength(), (size_t)pkt,
-          dest_pkt_offset);
 
-      ss << "Header Info:\n"
-         << "FRAME_ID: " << pkt->Frame() << "\nSYMBOL_ID: " << pkt->Symbol()
-         << "\nUE_ID: " << pkt->Ue() << "\nDATLEN: " << pkt->PayloadLength()
-         << "\nPAYLOAD:\n";
+      ss << "MacThreadBasestation: created packet frame " << next_tx_frame_id_
+         << ", pkt " << pkt_id << ", size " << cfg_->MacPayloadMaxLength()
+         << " radio buff id " << radio_buf_id << ", loc " << (size_t)pkt
+         << " dest offset " << dest_pkt_offset << std::endl;
+
+      ss << "Header Info:" << std::endl
+         << "FRAME_ID: " << pkt->Frame() << std::endl
+         << "SYMBOL_ID: " << pkt->Symbol() << std::endl
+         << "UE_ID: " << pkt->Ue() << std::endl
+         << "DATLEN: " << pkt->PayloadLength() << std::endl
+         << "PAYLOAD:" << std::endl;
       for (size_t i = 0; i < pkt->PayloadLength(); i++) {
         ss << std::to_string(pkt->Data()[i]) << " ";
       }
-      std::fprintf(log_file_, "%s\n", ss.str().c_str());
-      std::printf("%s\n", ss.str().c_str());
+      ss << std::endl;
+      std::fprintf(stdout, "%s", ss.str().c_str());
+      std::fprintf(log_file_, "%s", ss.str().c_str());
       ss.str("");
     }
     src_pkt_offset += pkt->PayloadLength() + MacPacketPacked::kHeaderSize;
