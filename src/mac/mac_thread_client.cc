@@ -161,6 +161,25 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
     //Who's junk is better? No reason to copy currupted data
     server_.n_filled_in_frame_.at(ue_id) += dest_packet_size;
 
+    ss << "MacThreadClient: Received frame " << pkt->Frame() << ":"
+       << frame_id << " symbol " << pkt->Symbol() << ":" << symbol_id
+       << " user " << pkt->Ue() << ":" << ue_id << " length "
+       << pkt->PayloadLength() << ":" << cfg_->MacPayloadMaxLength() << " crc "
+       << pkt->Crc() << " copied to offset " << frame_data_offset << std::endl;
+
+    if (kLogMacPackets) {
+      ss << "Header Info:" << std::endl
+         << "FRAME_ID: " << pkt->Frame() << std::endl
+         << "SYMBOL_ID: " << pkt->Symbol() << std::endl
+         << "UE_ID: " << pkt->Ue() << std::endl
+         << "DATLEN: " << pkt->PayloadLength() << std::endl
+         << "PAYLOAD:" << std::endl;
+      for (size_t i = 0; i < cfg_->MacPayloadMaxLength(); i++) {
+        ss << std::to_string(pkt->Data()[i]) << " ";
+      }
+      ss << std::endl;
+    }
+
     bool data_valid = false;
     //Data validity check
     if ((static_cast<size_t>(pkt->PayloadLength()) <= dest_packet_size) &&
@@ -174,46 +193,25 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
     }
 
     if (data_valid) {
-      MLPD_FRAME(
-          "Base Station MAC thread received frame %zu, uplink "
-          "symbol index %zu, size %zu, copied to frame data offset %zu\n",
-          frame_id, symbol_array_index, cfg_->MacPayloadMaxLength(),
-          frame_data_offset);
+      MLPD_FRAME("%s", ss.str().c_str());
       /// Spot to be optimized #1
       std::memcpy(&server_.frame_data_.at(ue_id).at(frame_data_offset),
                   pkt->Data(), pkt->PayloadLength());
 
       server_.data_size_.at(ue_id).at(symbol_array_index - num_pilot_symbols) =
           pkt->PayloadLength();
-      // Print information about the received symbol
-      if (kLogMacPackets) {
-        std::fprintf(
-            log_file_,
-            "MacThreadClient: received frame %zu, downlink symbol index %zu, "
-            "size %zu, copied to frame data offset %zu\n",
-            frame_id, symbol_array_index, cfg_->MacPayloadMaxLength(),
-            frame_data_offset);
 
-        ss << "Header Info:\n"
-           << "FRAME_ID: " << pkt->Frame() << "\nSYMBOL_ID: " << pkt->Symbol()
-           << "\nUE_ID: " << pkt->Ue() << "\nDATLEN: " << pkt->PayloadLength()
-           << "\nPAYLOAD:\n";
-        for (size_t i = 0; i < cfg_->MacPayloadMaxLength(); i++) {
-          ss << std::to_string(pkt->Data()[i]) << " ";
-        }
-        std::fprintf(log_file_, "%s\n", ss.str().c_str());
-        ss.str("");
-      }
     } else {
-      MLPD_ERROR(
-          "MacThreadClient: Failed Data integrity check - invalid parameters "
-          "frame %d:%zu symbol %d:%zu user %d:%zu length %d crc %d\n",
-          pkt->Frame(), frame_id, pkt->Symbol(), symbol_id, pkt->Ue(), ue_id,
-          pkt->PayloadLength(), pkt->Crc());
+      ss << "  *****Failed Data integrity check - invalid parameters"
+         << std::endl;
+
+      MLPD_ERROR("%s", ss.str().c_str());
       //Set the default to 0 valid data bytes
       server_.data_size_.at(ue_id).at(symbol_array_index - num_pilot_symbols) =
           0;
     }
+    std::fprintf(log_file_, "%s", ss.str().c_str());
+    ss.str("");
   }
 
   // When the frame is full, send it to the application
@@ -242,19 +240,18 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
                         &server_.frame_data_.at(ue_id).at(0), dest_offset);
     }
 
-    std::fprintf(
-        stdout,
-        "MacThreadClient: Sent data for frame %zu, ue %zu, size %zu:%zu\n",
-        frame_id, ue_id, dest_offset, num_mac_packets_per_frame);
+    ss << "MacThreadClient: Sent data for frame " << frame_id << ", ue "
+       << ue_id << ", size " << dest_offset << ":" << max_data_bytes_per_frame
+       << std::endl;
 
-    std::fprintf(
-        log_file_,
-        "MacThreadClient: Sent data for frame %zu, ue %zu, size %zu:%zu\n",
-        frame_id, ue_id, dest_offset, max_data_bytes_per_frame);
+    if (kLogMacPackets) {
+      std::fprintf(stdout, "%s", ss.str().c_str());
+    }
+
     for (size_t i = 0u; i < dest_offset; i++) {
       ss << std::to_string(server_.frame_data_.at(ue_id).at(i)) << " ";
     }
-    std::fprintf(log_file_, "%s\n", ss.str().c_str());
+    std::fprintf(log_file_, "%s", ss.str().c_str());
     ss.str("");
   }
 
