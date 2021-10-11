@@ -76,6 +76,7 @@ private:
     inline bool should_sleep(size_t ue_num) { 
         return ue_num <= cfg->ue_start;
     }
+
     int16_t* resp_var_nodes;
     Table<int8_t> demod_buffer_to_decode_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers_;

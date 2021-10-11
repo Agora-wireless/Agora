@@ -1,5 +1,7 @@
 #include "dysubcarrier.hpp"
 
+#define TRIGGER_TIMER(stmt) if(likely(start_tsc>0)){stmt;}
+
 DySubcarrier::DySubcarrier(Config* config, int tid, double freq_ghz,
     /// The range of subcarriers handled by this subcarrier doer.
     Range sc_range,
@@ -40,9 +42,6 @@ DySubcarrier::DySubcarrier(Config* config, int tid, double freq_ghz,
         equal_buffer_, demod_buffer_to_send_, 
         control_info_table_, control_idx_list_);
 
-    // do_precode_ = new DoPrecode(this->cfg, tid, freq_ghz, dl_zf_matrices_, dl_ifft_buffer_,
-    //     dl_encoded_buffer_);
-
     // Init internal states
     demul_cur_sym_ul_ = 0;
 }
@@ -51,7 +50,6 @@ DySubcarrier::~DySubcarrier()
 {
     delete do_zf_;
     delete do_demul_;
-    // delete do_precode_;
 }
 
 void DySubcarrier::start_work()
@@ -88,24 +86,17 @@ void DySubcarrier::start_work()
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         size_t worked = 0;
-        if (likely(start_tsc > 0)) {
-            loop_count ++;
-        }
+        TRIGGER_TIMER(loop_count ++);
 
         if (zf_cur_frame_ > demul_cur_frame_) {
-
             state_start_tsc = rdtsc();
             bool ret = shared_state_->received_all_data_pkts(
                     demul_cur_frame_, demul_cur_sym_ul_);
             size_t state_tsc_usage = rdtsc() - state_start_tsc;
-            if (likely(start_tsc > 0)) {
-                state_operation_duration += state_tsc_usage;
-            }
+            TRIGGER_TIMER(state_operation_duration += state_tsc_usage);
 
             if (ret) {
-                if (likely(start_tsc > 0)) {
-                    work_tsc_duration += state_tsc_usage;
-                }
+                TRIGGER_TIMER(work_tsc_duration += state_tsc_usage);
                 work_start_tsc = rdtsc();
                 worked = 1;
 
@@ -114,12 +105,12 @@ void DySubcarrier::start_work()
                     demul_cur_sym_ul_,
                     sc_range_.start
                         + (n_demul_tasks_done_ * cfg->demul_block_size));
-                if (likely(start_tsc > 0)) {
+                TRIGGER_TIMER({
                     size_t demod_tmp_tsc = rdtsc() - demod_start_tsc;
                     demod_tsc_duration += demod_tmp_tsc;
                     demod_max = demod_max < demod_tmp_tsc ? demod_tmp_tsc : demod_max;
                     demod_count ++;
-                }
+                });
 
                 n_demul_tasks_done_++;
                 if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
@@ -138,15 +129,11 @@ void DySubcarrier::start_work()
                             tid,
                             demul_cur_frame_,
                             cfg->ul_data_symbol_num_perframe);
-                        if (likely(start_tsc > 0)) {
-                            print_tsc_duration += rdtsc() - demod_start_tsc;
-                        }
+                        TRIGGER_TIMER(print_tsc_duration += rdtsc() - demod_start_tsc);
 
                         demul_cur_frame_++;
                         if (unlikely(demul_cur_frame_ == cfg->frames_to_test)) {
-                            if (likely(start_tsc > 0)) {
-                                work_tsc_duration += rdtsc() - work_start_tsc;
-                            }
+                            TRIGGER_TIMER(work_tsc_duration += rdtsc() - work_start_tsc);
                             break;
                         }
 
@@ -156,47 +143,10 @@ void DySubcarrier::start_work()
                     }
                 }
 
-                if (likely(start_tsc > 0)) {
-                    work_tsc_duration += rdtsc() - work_start_tsc;
-                }
+                TRIGGER_TIMER(work_tsc_duration += rdtsc() - work_start_tsc);
                 continue;
             }
-            
         }
-
-        // if (precode_status_->received_all_encoded_data(precode_cur_frame_, precode_cur_sym_dl_) 
-        //     && zf_cur_frame_ > precode_cur_frame_) {
-        //     size_t work_start_tsc = rdtsc();
-        //     worked = 1;
-        //     size_t base_sc_id = n_precode_tasks_done_ * cfg->demul_block_size + sc_range_.start;
-        //     // printf("Precode frame %u symbol %u subcarrier %u\n", precode_cur_frame_, 
-        //         // precode_cur_sym_dl_, base_sc_id);
-        //     size_t precode_start_tsc = rdtsc();
-        //     do_precode_->launch(gen_tag_t::frm_sym_sc(precode_cur_frame_, precode_cur_sym_dl_, base_sc_id)._tag);
-        //     precode_tsc_duration += rdtsc() - precode_start_tsc;
-        //     n_precode_tasks_done_ ++;
-        //     if (n_precode_tasks_done_ == n_precode_tasks_reqd) {
-        //         n_precode_tasks_done_ = 0;
-        //         precode_cur_sym_dl_ ++;
-        //         if (precode_cur_sym_dl_ == cfg->dl_data_symbol_num_perframe) {
-        //             precode_cur_sym_dl_ = 0;
-        //             // printf("Main thread: Precode done frame: %lu "
-        //             //        "(%lu UL symbols)\n",
-        //             //     precode_cur_frame_,
-        //             //     cfg->dl_data_symbol_num_perframe);
-        //             precode_start_tsc = rdtsc();
-        //             shared_state_->precode_done(precode_cur_frame_);
-        //             state_operation_duration += rdtsc() - precode_start_tsc;
-        //             precode_cur_frame_ ++;
-        //             if (unlikely(precode_cur_frame_ == cfg->frames_to_test)) {
-        //                 work_tsc_duration += rdtsc() - work_start_tsc;
-        //                 break;
-        //             }
-        //         }
-        //     }
-        //     work_tsc_duration += rdtsc() - work_start_tsc;
-        //     continue;
-        // }
 
         if (csi_cur_frame_ > zf_cur_frame_) {
             work_start_tsc = rdtsc();
@@ -206,12 +156,12 @@ void DySubcarrier::start_work()
             do_zf_->launch(gen_tag_t::frm_sym_sc(zf_cur_frame_, 0,
                 sc_range_.start + n_zf_tasks_done_ * cfg->zf_block_size)
                             ._tag);
-            if (likely(start_tsc > 0)) {
+            TRIGGER_TIMER({
                 size_t zf_tmp_tsc = rdtsc() - zf_start_tsc;
                 zf_tsc_duration += zf_tmp_tsc;
                 zf_max = zf_max < zf_tmp_tsc ? zf_tmp_tsc : zf_max;
                 zf_count ++;
-            }
+            });
 
             n_zf_tasks_done_++;
             if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
@@ -219,67 +169,53 @@ void DySubcarrier::start_work()
 
                 zf_start_tsc = rdtsc();
                 MLPD_INFO("Main thread (%u): ZF done frame: %lu\n", tid, zf_cur_frame_);
-                if (likely(start_tsc > 0)) {
-                    print_tsc_duration += rdtsc() - zf_start_tsc;
-                }
+                TRIGGER_TIMER(print_tsc_duration += rdtsc() - zf_start_tsc);
 
                 zf_cur_frame_++;
             }
 
-            if (likely(start_tsc > 0)) {
-                work_tsc_duration += rdtsc() - work_start_tsc;
-            }
+            TRIGGER_TIMER(work_tsc_duration += rdtsc() - work_start_tsc);
             continue;
         }
 
         size_t state_tsc_usage = 0;
-        if (likely(start_tsc > 0)) {
-            state_start_tsc = rdtsc();
-        }
+        TRIGGER_TIMER(state_start_tsc = rdtsc());
         bool ret = shared_state_->received_all_pilots(csi_cur_frame_);
-        if (likely(start_tsc > 0)) {
+        TRIGGER_TIMER({
             state_tsc_usage = rdtsc() - state_start_tsc;
             state_operation_duration += state_tsc_usage;
-        }
+        });
 
         if (ret) {
             if (unlikely(start_tsc == 0 && csi_cur_frame_ >= 200)) {
                 start_tsc = rdtsc();
             }
 
-            if (likely(start_tsc > 0)) {
-                work_tsc_duration += state_tsc_usage;
-            }
+            TRIGGER_TIMER(work_tsc_duration += state_tsc_usage);
             work_start_tsc = rdtsc();
             worked = 1;
 
             size_t csi_start_tsc = rdtsc();
             run_csi(csi_cur_frame_, sc_range_.start);
-            if (likely(start_tsc > 0)) {
+            TRIGGER_TIMER({
                 size_t csi_tmp_tsc = rdtsc() - csi_start_tsc;
                 csi_tsc_duration += csi_tmp_tsc;
                 csi_max = csi_max < csi_tmp_tsc ? csi_tmp_tsc : csi_max;
                 csi_count ++;
-            }
+            });
 
             csi_start_tsc = rdtsc();
             MLPD_INFO(
                 "Main thread (%u): pilot frame: %lu, finished CSI for all pilot "
                 "symbols\n", tid,
                 csi_cur_frame_);
-            if (likely(start_tsc > 0)) {
-                print_tsc_duration += rdtsc() - csi_start_tsc;
-            }
+            TRIGGER_TIMER(print_tsc_duration += rdtsc() - csi_start_tsc);
 
             csi_cur_frame_++;
-            if (likely(start_tsc > 0)) {
-                work_tsc_duration += rdtsc() - work_start_tsc;
-            }
+            TRIGGER_TIMER(work_tsc_duration += rdtsc() - work_start_tsc);
         }
 
-        if (likely(start_tsc > 0)) {
-            work_count += worked;
-        }
+        TRIGGER_TIMER(work_count += worked);
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -297,7 +233,10 @@ void DySubcarrier::start_work()
         cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, work_count * 100.0f / loop_count);
-    do_demul_->print_overhead();
+    
+    if (kDebugPrintDemulStats) {
+        do_demul_->print_overhead();
+    }
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/performance_dysubcarrier.txt";

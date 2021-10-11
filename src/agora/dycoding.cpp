@@ -5,6 +5,8 @@
 #include "signalHandler.hpp"
 #include <malloc.h>
 
+#define TRIGGER_TIMER(stmt) if(likely(state_trigger)){stmt;}
+
 static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDecodedData = false;
@@ -50,48 +52,21 @@ Event_data DyEncode::launch(size_t tag)
             "In doEncode thread %d: frame: %zu, symbol: %zu, code block %zu\n",
             tid, frame_id, symbol_id, cur_cb_id);
     }
-    // printf("DoEncode frame %u symbol %u cb %u\n", frame_id, symbol_id, cur_cb_id);
 
     size_t start_tsc = worker_rdtsc();
 
-    // size_t symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
     size_t symbol_idx_dl = symbol_id;
     int8_t* input_ptr
         = cfg->get_info_bits(raw_data_buffer_, symbol_idx_dl, ue_id, cur_cb_id);
 
     ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, LDPC_config.nRows,
         encoded_buffer_temp, parity_buffer, input_ptr);
-    // Start Debug
-    // if (ue_id == 2) {
-    //     printf("frame id: %u, symbol id: %u, symbol idx dl: %u\n", frame_id, symbol_id, symbol_idx_dl);
-    //     printf("Raw data:\n");
-    //     for (size_t i = 0; i < ldpc_encoding_input_buf_size(LDPC_config.Bg, LDPC_config.Zc); i ++) {
-    //         printf("%02x ", (uint8_t)input_ptr[i]);
-    //     }
-    //     printf("\nEncoded data:\n");
-    //     for (size_t i = 0; i < ldpc_encoding_encoded_buf_size(LDPC_config.Bg, LDPC_config.Zc); i ++) {
-    //         printf("%02x ", (uint8_t)encoded_buffer_temp[i]);
-    //     }
-    //     printf("\n");
-    // }
-    // End Debug
+    
     int8_t* final_output_ptr = cfg->get_encoded_buf(
         encoded_buffer_, frame_id, symbol_idx_dl, ue_id, cur_cb_id);
     adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
         reinterpret_cast<uint8_t*>(final_output_ptr),
         bits_to_bytes(LDPC_config.cbCodewLen), cfg->mod_order_bits);
-
-    // if (ue_id == 2) {
-    //     complex_float tf = mod_single_uint8(final_output_ptr[1], cfg->mod_table);
-    //     printf("Mod data: (%lf %lf)\n", tf.re, tf.im);
-    // }
-
-    // printf("Encoded data\n");
-    // int num_mod = LDPC_config.cbCodewLen / cfg->mod_order_bits;
-    // for(int i = 0; i < num_mod; i++) {
-    //     printf("%u ", *(final_output_ptr + i));
-    // }
-    // printf("\n");
 
     size_t duration = worker_rdtsc() - start_tsc;
     duration_stat->task_duration[0] += duration;
@@ -109,13 +84,11 @@ void DyEncode::start_work()
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (cur_cb_ > 0
             || shared_state_->is_encode_ready(cur_frame_)) {
-            // printf("Start to encode user %lu frame %lu symbol %lu cb %u\n", ue_id_, cur_frame_, cur_symbol_, cur_cb_);
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                 cur_cb_ + ue_id_ * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
-                // printf("Encode is done??? ue %u\n", ue_id_);
                 cur_cb_ = 0;
                 encode_status_->encode_done(ue_id_, cur_frame_, cur_symbol_);
                 cur_symbol_++;
@@ -271,40 +244,33 @@ void DyDecode::start_work()
     size_t decode_max = 0;
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
-
-        if (likely(state_trigger)) {
-            loop_count ++;
-        }
+        TRIGGER_TIMER(loop_count ++);
         size_t work_start_tsc, state_start_tsc;
 
         if (cur_cb_ > 0) {
-
             if (unlikely(!state_trigger && cur_frame_ >= 200)) {
                 start_tsc = rdtsc();
                 state_trigger = true;
             }
 
-            if (likely(state_trigger)) {
+            TRIGGER_TIMER({
                 work_start_tsc = rdtsc();
                 work_count ++;
-            }
-            
-            if (likely(state_trigger)) {
                 decode_start_tsc = rdtsc();
-            }
+            });
+
             launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                 cur_cb_ + cur_ue_ * cfg->LDPC_config.nblocksInSymbol)
                        ._tag);
-            if (likely(state_trigger)) {
+            
+            TRIGGER_TIMER({
                 size_t decode_tmp_tsc = rdtsc() - decode_start_tsc;
                 decode_tsc_duration += decode_tmp_tsc;
                 decode_max = decode_max < decode_tmp_tsc ? decode_tmp_tsc : decode_max;
                 decode_count ++;
-            }
-
-            if (likely(state_trigger)) {
                 decode_start_tsc = rdtsc();
-            }
+            });
+
             cur_cb_++;
             if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                 cur_cb_ = 0;
@@ -320,62 +286,58 @@ void DyDecode::start_work()
 
                     cur_frame_++;
                     if (unlikely(cur_frame_ == cfg->frames_to_test)) {
-                        if (likely(state_trigger)) {
+                        TRIGGER_TIMER({
                             state_operation_duration += rdtsc() - decode_start_tsc;
                             work_tsc_duration += rdtsc() - work_start_tsc;
-                        }
+                        });
                         break;
                     }
                 }
             }
-            if (likely(state_trigger)) {
+
+            TRIGGER_TIMER({
                 state_operation_duration += rdtsc() - decode_start_tsc;
                 work_tsc_duration += rdtsc() - work_start_tsc;
-            }
-
+            });
         } else {
-
-            if (likely(state_trigger)) {
+            TRIGGER_TIMER({
                 work_start_tsc = rdtsc();
                 state_start_tsc = rdtsc();
-            }
+            });
+
             bool ret = shared_state_->received_all_demod_pkts(
                    cur_ue_, cur_frame_, cur_symbol_);
-            if (likely(state_trigger)) {
+            
+            TRIGGER_TIMER({
                 state_operation_duration += rdtsc() - state_start_tsc;
                 work_tsc_duration += rdtsc() - work_start_tsc;
-            }
+            });
 
             if (ret) {
-
                 if (unlikely(!state_trigger && cur_frame_ >= 200)) {
                     loop_count ++;
                     start_tsc = rdtsc();
                     state_trigger = true;
                 }
 
-                if (likely(state_trigger)) {
+                TRIGGER_TIMER({
                     work_start_tsc = rdtsc();
                     work_count ++;
-                }
-            
-
-                if (likely(state_trigger)) {
                     decode_start_tsc = rdtsc();
-                }
+                });
+                
                 launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
                     cur_cb_ + cur_ue_ * cfg->LDPC_config.nblocksInSymbol)
                         ._tag);
-                if (likely(state_trigger)) {
+
+                TRIGGER_TIMER({
                     size_t decode_tmp_tsc = rdtsc() - decode_start_tsc;
                     decode_tsc_duration += decode_tmp_tsc;
                     decode_max = decode_max < decode_tmp_tsc ? decode_tmp_tsc : decode_max;
                     decode_count ++;
-                }
-
-                if (likely(state_trigger)) {
                     state_start_tsc = rdtsc();
-                }
+                });
+
                 cur_cb_++;
                 if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
                     cur_cb_ = 0;
@@ -391,10 +353,10 @@ void DyDecode::start_work()
 
                         cur_frame_++;
                         if (unlikely(cur_frame_ == cfg->frames_to_test)) {
-                            if (likely(state_trigger)) {
+                            TRIGGER_TIMER({
                                 state_operation_duration += rdtsc() - state_start_tsc;
                                 work_tsc_duration += rdtsc() - work_start_tsc;
-                            }
+                            });
                             break;
                         }
 
@@ -403,10 +365,11 @@ void DyDecode::start_work()
                         }
                     }
                 }
-                if (likely(state_trigger)) {
+                
+                TRIGGER_TIMER({
                     state_operation_duration += rdtsc() - state_start_tsc;
                     work_tsc_duration += rdtsc() - work_start_tsc;
-                }
+                });
             }
         }
     }

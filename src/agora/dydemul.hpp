@@ -77,9 +77,6 @@ public:
             cycles_to_ms(demod_cycles_, freq_ghz), demod_count_, demod_cycles_ * 100.0f / total_cycles_);
     }
 
-    size_t get_equal_cycles() { return equal_cycles_; }
-    size_t get_equal_count() { return equal_count_; }
-
 private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
     Table<complex_float>& equal_buffer_; // Totally unused for now because of we always disable kExportConstellation

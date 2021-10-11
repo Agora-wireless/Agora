@@ -48,14 +48,13 @@ public:
 
 private:
     void ZF_time_orthogonal(size_t tag);
+    void ZF_freq_orthogonal(size_t tag);
 
     /// Compute the uplink zeroforcing detector matrix and/or the downlink
     /// zeroforcing precoder using this CSI matrix and calibration buffer
     void compute_precoder(const arma::cx_fmat& mat_csi,
         complex_float* calib_buf, complex_float* mat_ul_zf,
         complex_float* mat_dl_zf, size_t ue_num = 0);
-
-    void ZF_freq_orthogonal_dynamic(size_t tag);
 
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
     complex_float* pred_csi_buffer;

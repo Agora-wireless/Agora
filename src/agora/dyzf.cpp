@@ -41,7 +41,7 @@ DyZF::~DyZF()
 Event_data DyZF::launch(size_t tag)
 {
     if (cfg->freq_orthogonal_pilot) {
-        ZF_freq_orthogonal_dynamic(tag);
+        ZF_freq_orthogonal(tag);
     } else {
         ZF_time_orthogonal(tag);
     }
@@ -179,7 +179,7 @@ void DyZF::ZF_time_orthogonal(size_t tag)
     }
 }
 
-void DyZF::ZF_freq_orthogonal_dynamic(size_t tag)
+void DyZF::ZF_freq_orthogonal(size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
