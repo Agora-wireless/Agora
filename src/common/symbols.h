@@ -150,7 +150,7 @@ static constexpr bool kPrintPhyStats = true;
 static constexpr bool kCollectPhyStats = true;
 
 static constexpr bool kStatsPrintFrameSummary = true;
-static constexpr bool kDebugPrintPerFrameDone = true;
+static constexpr bool kDebugPrintPerFrameDone = false;
 static constexpr bool kDebugPrintPerFrameStart = true;
 static constexpr bool kDebugPrintPerSymbolDone = false;
 static constexpr bool kDebugPrintPerTaskDone = false;

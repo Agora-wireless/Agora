@@ -7,12 +7,13 @@
 #include <utility>
 
 #include "datatype_conversion.h"
+#include "logger.h"
 
 static std::atomic<bool> running = true;
 static constexpr bool kPrintChannelOutput = false;
-static const size_t kDefaultQueueSize = 36;
-static const bool kPrintDebugTxUser = false;
-static const bool kPrintDebugTxBs = false;
+static constexpr size_t kDefaultQueueSize = 36;
+static constexpr bool kPrintDebugTxUser = false;
+static constexpr bool kPrintDebugTxBs = false;
 
 static void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
                                     size_t length) {
@@ -333,9 +334,9 @@ void* ChannelSim::BsRxLoop(int tid) {
     } else if (static_cast<size_t>(rx_bytes) == udp_pkt_buf.size()) {
       const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
 
-      size_t frame_id = pkt->frame_id_;
-      size_t symbol_id = pkt->symbol_id_;
-      size_t ant_id = pkt->ant_id_;
+      const size_t frame_id = pkt->frame_id_;
+      const size_t symbol_id = pkt->symbol_id_;
+      const size_t ant_id = pkt->ant_id_;
       if (kDebugPrintInTask) {
         std::printf(
             "Received BS packet for frame %zu, symbol %zu, ant %zu from "
@@ -402,28 +403,32 @@ void* ChannelSim::UeRxLoop(int tid) {
     } else if (static_cast<size_t>(rx_bytes) == udp_pkt_buf.size()) {
       const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
 
-      size_t frame_id = pkt->frame_id_;
-      size_t symbol_id = pkt->symbol_id_;
-      size_t ant_id = pkt->ant_id_;
+      const size_t frame_id = pkt->frame_id_;
+      const size_t symbol_id = pkt->symbol_id_;
+      const size_t ant_id = pkt->ant_id_;
 
-      size_t pilot_symbol_id = uecfg_->Frame().GetPilotSymbolIdx(symbol_id);
-      size_t ul_symbol_id = uecfg_->Frame().GetULSymbolIdx(symbol_id);
+      const size_t pilot_symbol_id =
+          uecfg_->Frame().GetPilotSymbolIdx(symbol_id);
+      const size_t ul_symbol_id = uecfg_->Frame().GetULSymbolIdx(symbol_id);
       size_t total_symbol_id = pilot_symbol_id;
       if (pilot_symbol_id == SIZE_MAX) {
         total_symbol_id = ul_symbol_id + bscfg_->Frame().NumPilotSyms();
       }
-      if (kDebugPrintInTask) {
-        std::printf(
-            "Received UE packet for frame %zu, symbol %zu, ant %zu from "
-            "socket %zu\n",
-            frame_id, symbol_id, ant_id, socket_id);
-      }
+
       size_t symbol_offset =
           (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ +
           total_symbol_id;
       size_t offset = symbol_offset * uecfg_->UeAntNum() + ant_id;
-      std::memcpy(&rx_buffer_ue_[offset * payload_length_], pkt->data_,
-                  payload_length_);
+      char* rx_data_destination = &rx_buffer_ue_.at(offset * payload_length_);
+      std::memcpy(rx_data_destination, pkt->data_, payload_length_);
+
+      if (kDebugPrintInTask) {
+        std::printf(
+            "Received UE packet for frame %zu, symbol %zu, ant %zu from "
+            "socket %zu copying data to location %zu\n",
+            frame_id, symbol_id, ant_id, socket_id,
+            (size_t)rx_data_destination);
+      }
 
       RtAssert(
           message_queue_.enqueue(
@@ -474,8 +479,8 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
 
   //Modify this to check the symbol type
-  size_t pilot_symbol_id = bscfg_->Frame().GetPilotSymbolIdx(symbol_id);
-  size_t ul_symbol_id = bscfg_->Frame().GetULSymbolIdx(symbol_id);
+  const size_t pilot_symbol_id = bscfg_->Frame().GetPilotSymbolIdx(symbol_id);
+  const size_t ul_symbol_id = bscfg_->Frame().GetULSymbolIdx(symbol_id);
   size_t total_symbol_id = pilot_symbol_id;
   if (pilot_symbol_id == SIZE_MAX) {
     total_symbol_id = ul_symbol_id + bscfg_->Frame().NumPilotSyms();
@@ -488,19 +493,23 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
         frame_id, symbol_id, total_symbol_id, GetTime::GetTimeUs() / 1000);
   }
 
-  size_t symbol_offset =
+  const size_t symbol_offset =
       (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ + total_symbol_id;
-  size_t total_offset_ue = symbol_offset * payload_length_ * uecfg_->UeAntNum();
-  size_t total_offset_bs = symbol_offset * payload_length_ * bscfg_->BsAntNum();
+  const size_t total_offset_ue =
+      symbol_offset * payload_length_ * uecfg_->UeAntNum();
+  const size_t total_offset_bs =
+      symbol_offset * payload_length_ * bscfg_->BsAntNum();
 
-  auto* src_ptr = reinterpret_cast<short*>(&rx_buffer_ue_.at(total_offset_ue));
+  auto* src_ptr =
+      reinterpret_cast<const short*>(&rx_buffer_ue_.at(total_offset_ue));
 
-  //std::printf(
-  //    "Channel Sim: DoTxBs processing frame %zu, symbol %zu, ul symbol "
-  //    "%zu, samples per symbol %zu ue ant num %zu offset %zu ue plus %zu\n",
-  //    frame_id, symbol_id, total_symbol_id, bscfg_->SampsPerSymbol(),
-  //    uecfg_->UeAntNum(), total_offset_ue, ul_data_plus_pilot_symbols_);
-  //std::fflush(stdout);
+  MLPD_FRAME(
+      "Channel Sim: DoTxBs processing frame %zu, symbol %zu, ul symbol "
+      "%zu, samples per symbol %zu ue ant num %zu offset %zu ue plus %zu "
+      "location %zu\n",
+      frame_id, symbol_id, total_symbol_id, bscfg_->SampsPerSymbol(),
+      uecfg_->UeAntNum(), total_offset_ue, ul_data_plus_pilot_symbols_,
+      (size_t)src_ptr);
 
   // convert received data to complex float,
   // apply channel, convert back to complex short to TX
@@ -538,23 +547,27 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
 }
 
 void ChannelSim::DoTxUser(int tid, size_t tag) {
-  size_t frame_id = gen_tag_t(tag).frame_id_;
-  size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);  // If id = 0, then return 0;
+  const size_t frame_id = gen_tag_t(tag).frame_id_;
+  const size_t symbol_id = gen_tag_t(tag).symbol_id_;
+  // If id = 0, then return 0;
+  const size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);
 
   if (kPrintDebugTxUser) {
-    std::printf(
+    MLPD_INFO(
         "Channel Sim: DoTxUser processing frame %zu, symbol %zu, dl symbol "
         "%zu, at %f ms\n",
         frame_id, symbol_id, dl_symbol_id, GetTime::GetTimeUs() / 1000);
   }
 
-  size_t symbol_offset =
+  const size_t symbol_offset =
       (frame_id % kFrameWnd) * dl_data_plus_beacon_symbols_ + dl_symbol_id;
-  size_t total_offset_ue = symbol_offset * payload_length_ * uecfg_->UeAntNum();
-  size_t total_offset_bs = symbol_offset * payload_length_ * bscfg_->BsAntNum();
+  const size_t total_offset_ue =
+      symbol_offset * payload_length_ * uecfg_->UeAntNum();
+  const size_t total_offset_bs =
+      symbol_offset * payload_length_ * bscfg_->BsAntNum();
 
-  auto* src_ptr = reinterpret_cast<short*>(&rx_buffer_bs_.at(total_offset_bs));
+  auto* src_ptr =
+      reinterpret_cast<const short*>(&rx_buffer_bs_.at(total_offset_bs));
 
   // convert received data to complex float,
   // apply channel, convert back to complex short to TX
