@@ -26,8 +26,8 @@
   /* compute configuration */
   "ue_mac_rx_port": 9070,
   "ue_mac_tx_port": 9080,
-  "core_offset": 20,
-  "worker_thread_num": 4,
+  "core_offset": 11,
+  "worker_thread_num": 2,
   "socket_thread_num": 1,
   "frames_to_test": 9600
 }

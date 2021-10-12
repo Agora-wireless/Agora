@@ -26,8 +26,8 @@
   /* compute configuration */
   "bs_mac_rx_port": 8070,
   "bs_mac_tx_port": 8080,
-  "core_offset": 28,
-  "worker_thread_num": 16,
+  "core_offset": 0,
+  "worker_thread_num": 8,
   "socket_thread_num": 1,
   "frames_to_test": 9600
 }
