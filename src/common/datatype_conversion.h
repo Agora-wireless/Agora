@@ -21,7 +21,7 @@
 // https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
 static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
                                            size_t n_elems) {
-#if defined(NOT_DEFINED)  //__AVX512F__
+#if defined(__AVX512F__)
   const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
   const __m512i magic_i = _mm512_castps_si512(magic);
   for (size_t i = 0; i < n_elems; i += 16) {
