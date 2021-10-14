@@ -215,7 +215,9 @@ class Config {
   }
 
   inline size_t MacPacketLength() const { return this->mac_packet_length_; }
-  inline size_t MacPayloadLength() const { return this->mac_payload_length_; }
+  inline size_t MacPayloadMaxLength() const {
+    return this->mac_data_length_max_;
+  }
   inline size_t UlMacPacketsPerframe() const {
     return this->ul_mac_packets_perframe_;
   }
@@ -650,8 +652,8 @@ class Config {
   // The length (in bytes) of a MAC packet including the header
   size_t mac_packet_length_;
 
-  // The length (in bytes) of a MAC packet payload
-  size_t mac_payload_length_;
+  // The length (in bytes) of a MAC packet payload (data)
+  size_t mac_data_length_max_;
 
   // The total number of downlink mac packets sent/received in each frame
   size_t dl_mac_packets_perframe_;

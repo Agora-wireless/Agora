@@ -45,11 +45,10 @@ class MacSender {
   MacSender(Config* cfg, std::string& data_filename, size_t packets_per_frame,
             std::string server_address, size_t server_rx_port,
             std::function<size_t(size_t)> get_data_symbol_id,
-            size_t socket_thread_num = 1, size_t core_offset = 30,
-            size_t frame_duration_us = 0, size_t inter_frame_delay = 0,
-            size_t enable_slow_start = 1,
+            size_t core_offset = 30, size_t worker_thread_num = 1,
+            size_t update_thread_num = 1, size_t frame_duration_us = 0,
+            size_t inter_frame_delay = 0, size_t enable_slow_start = 1,
             bool create_thread_for_master = false);
-
   ~MacSender();
 
   void StartTx();
@@ -61,7 +60,7 @@ class MacSender {
  private:
   void* MasterThread(size_t tid);
   void* WorkerThread(size_t tid);
-  void* DataUpdateThread(size_t tid);
+  void* DataUpdateThread(size_t tid, size_t num_data_sources);
 
   // Get number of CPU ticks for a symbol given a frame index
   uint64_t GetTicksForFrame(size_t frame_id) const;
@@ -80,7 +79,8 @@ class MacSender {
   Config* cfg_;
   const double freq_ghz_;           // RDTSC frequency in GHz
   const double ticks_per_usec_;     // RDTSC frequency in GHz
-  const size_t socket_thread_num_;  // Number of worker threads sending pkts
+  const size_t worker_thread_num_;  // Number of worker threads sending pkts
+  const size_t update_thread_num_;  // Number of Tx buffer update threads
   const size_t enable_slow_start_;  // If 1, send frames slowly at first
 
   // The master thread runs on core core_offset. Worker threads use cores
@@ -107,8 +107,8 @@ class MacSender {
   moodycamel::ConcurrentQueue<size_t> completion_queue_ =
       moodycamel::ConcurrentQueue<size_t>(kMessageQueueSize);
   moodycamel::ProducerToken** task_ptok_;
-  moodycamel::ConcurrentQueue<size_t> data_update_queue_ =
-      moodycamel::ConcurrentQueue<size_t>(kMessageQueueSize);
+
+  std::vector<moodycamel::ConcurrentQueue<size_t>> data_update_queue_;
 
   double* frame_start_;
   double* frame_end_;
@@ -116,6 +116,7 @@ class MacSender {
   std::vector<std::thread> threads_;
 
   Table<uint8_t> tx_buffers_;
+  size_t tx_buffer_pkt_offset_;
   std::string data_filename_;
 
   size_t packets_per_frame_;

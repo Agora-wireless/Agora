@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, Rice University
+// Copyright (c) 2018-2021, Rice University
 // RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
 /**
@@ -8,22 +8,74 @@
 
 #include "utils.h"
 
-size_t cpu_layout[MAX_CORE_NUM];
-bool cpu_layout_initialized = false;
+#include <list>
+#include <mutex>
 
-void PrintBitmask(const struct bitmask* bm) {
+struct CoreInfo {
+  CoreInfo(size_t id, size_t mapped, size_t req, ThreadType type)
+      : thread_id_(id),
+        requested_core_(req),
+        mapped_core_(mapped),
+        type_(type) {}
+
+  size_t thread_id_;
+  size_t requested_core_;
+  size_t mapped_core_;
+  ThreadType type_;
+
+  bool operator<(const CoreInfo& comp) const {
+    return std::tie(mapped_core_, requested_core_, thread_id_) <
+           std::tie(comp.mapped_core_, comp.requested_core_, comp.thread_id_);
+  }
+  bool operator>(const CoreInfo& comp) const {
+    return std::tie(mapped_core_, requested_core_, thread_id_) >
+           std::tie(comp.mapped_core_, comp.requested_core_, comp.thread_id_);
+  }
+};
+
+static std::vector<size_t> cpu_layout;
+static bool cpu_layout_initialized = false;
+static std::mutex pin_core_mutex;
+
+/* Keep list of core-thread relationship*/
+static std::list<CoreInfo> core_list;
+
+/* Print out summary of core-thread relationship */
+static void PrintCoreList(const std::list<CoreInfo>& clist) {
+  int numa_max_cpus = numa_num_configured_cpus();
+  int system_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+  std::printf("=================================\n");
+  std::printf("          CORE LIST SUMMARY      \n");
+  std::printf("=================================\n");
+  std::printf("Total Number of Cores: %d : %d \n", numa_max_cpus, system_cpus);
+  for (auto& iter : clist) {
+    std::printf(
+        "|| Core ID: %2zu || Requested: %2zu || ThreadType: %-16s || ThreadId: "
+        "%zu \n",
+        iter.mapped_core_, iter.requested_core_,
+        ThreadTypeStr(iter.type_).c_str(), iter.thread_id_);
+  }
+  std::printf("=================================\n");
+}
+
+static void PrintBitmask(const struct bitmask* bm) {
   for (size_t i = 0; i < bm->size; ++i) {
     std::printf("%d", numa_bitmask_isbitset(bm, i));
   }
 }
 
+void PrintCoreAssignmentSummary() { PrintCoreList(core_list); }
+
 void SetCpuLayoutOnNumaNodes(bool verbose) {
   if (cpu_layout_initialized == false) {
-    int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-    // numa_set_localalloc();
+    int lib_accessable = numa_available();
+    if (lib_accessable == -1) {
+      throw std::runtime_error("libnuma not accessable");
+    }
+    int numa_max_cpus = numa_num_configured_cpus();
+    std::printf("System CPU count %d\n", numa_max_cpus);
 
-    bitmask* bm = numa_bitmask_alloc(num_cores);
-    int cpu_id = 0;
+    bitmask* bm = numa_bitmask_alloc(numa_max_cpus);
     for (int i = 0; i <= numa_max_node(); ++i) {
       numa_node_to_cpus(i, bm);
       if (verbose) {
@@ -36,14 +88,14 @@ void SetCpuLayoutOnNumaNodes(bool verbose) {
           if (verbose) {
             std::printf("%zu ", j);
           }
-          cpu_layout[cpu_id] = j;
-          cpu_id++;
+          cpu_layout.emplace_back(j);
         }
       }
       if (verbose) {
         std::printf("\n");
       }
     }
+    std::printf("Usable Cpu count %zu\n", cpu_layout.size());
 
     numa_bitmask_free(bm);
     cpu_layout_initialized = true;
@@ -52,7 +104,7 @@ void SetCpuLayoutOnNumaNodes(bool verbose) {
 
 size_t GetPhysicalCoreId(size_t core_id) {
   if (cpu_layout_initialized) {
-    return cpu_layout[core_id];
+    return cpu_layout.at(core_id);
   }
   return core_id;
 }
@@ -73,32 +125,48 @@ int PinToCore(int core_id) {
 
 void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
                          bool verbose) {
-  if (kEnableThreadPinning == true) {
-    int actual_core_id = core_offset + thread_id;
-    int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+  std::scoped_lock lock(pin_core_mutex);
 
-    /* Reserve core 0 for kernel threads */
-    if (actual_core_id >= num_cores) {
-      actual_core_id = (actual_core_id % num_cores) + 1;
+  if (kEnableThreadPinning == true) {
+    size_t requested_core = core_offset + thread_id;
+    const int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+
+    if (kEnableThreadWrapping) {
+      requested_core = requested_core % num_cores;
     }
 
-    size_t physical_core_id =
-        cpu_layout_initialized ? cpu_layout[actual_core_id] : actual_core_id;
+    size_t assigned_core = requested_core;
+    if (cpu_layout_initialized) {
+      assigned_core = cpu_layout.at(requested_core);
+    } else if (requested_core == 0) {
+      /* Reserve core 0 for kernel threads */
+      throw std::runtime_error(
+          "Thread requested core 0, but should be reserved for kernel");
+    } else if ((int)requested_core > num_cores) {
+      throw std::runtime_error(
+          "Thread requested a core that was > number in system");
+    }
 
-    if (PinToCore(physical_core_id) != 0) {
+    if (PinToCore(assigned_core) != 0) {
       std::fprintf(
           stderr,
           "%s thread %d: failed to pin to core %zu. Exiting. "
           "This can happen if the machine has insufficient cores. "
           "Set kEnableThreadPinning to false to run Agora to run despite "
           "this - performance will be low.\n",
-          ThreadTypeStr(thread_type).c_str(), thread_id, physical_core_id);
+          ThreadTypeStr(thread_type).c_str(), thread_id, assigned_core);
       throw std::runtime_error("Utils: failed to pin to core");
     } else {
+      CoreInfo new_assignment((size_t)pthread_self(), assigned_core,
+                              requested_core, thread_type);
+      auto const insertion_point =
+          std::lower_bound(core_list.begin(), core_list.end(), new_assignment);
+
+      core_list.insert(insertion_point, new_assignment);
       if (verbose == true) {
-        std::printf("%s thread %d: pinned to core %zu, requested core %d \n",
+        std::printf("%s thread %d: pinned to core %zu, requested core %zu \n",
                     ThreadTypeStr(thread_type).c_str(), thread_id,
-                    physical_core_id, core_offset + thread_id);
+                    assigned_core, requested_core);
       }
     }  // EnableThreadPinning == true
   }

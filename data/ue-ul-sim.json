@@ -1,6 +1,7 @@
 {
   "UE": true,
   "ue_num": 2,
+  "antenna_num": 8,
   "ofdm_ca_num": 2048,
   "ofdm_data_num": 1200,
   "demul_block_size": 48,
@@ -13,7 +14,7 @@
   "dl_symbol_num_perframe": 0,
   "beacon_position": 0,
   /* Compute configuration */
-  "core_offset": 16,
+  "core_offset": 12,
   "worker_thread_num": 2,
   "socket_thread_num": 1
 }

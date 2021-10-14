@@ -1,29 +1,35 @@
 {
     "bs_serials_file": "data/bs_topology.json",
-    "channel": "AB",
-    "frequency": 3.56e9,
-    "single_gain": false,
-    "rx_gain_a": 20,
-    "tx_gain_a": 40,
-    "rx_gain_b": 20,
-    "tx_gain_b": 40,
-    "rate": 5e6,
+    "channel": "A",
+    "frequency": 3.6e9,
+    "single_gain": true,
+    "rx_gain_a": 65,
+    "tx_gain_a": 75,
+    "rx_gain_b": 65,
+    "tx_gain_b": 75,
+    "rate": 7.68e6,
+
     "ofdm_tx_zero_prefix": 160,
     "ofdm_tx_zero_postfix": 160,
+    "ofdm_rx_zero_prefix_bs": 160,
     "ofdm_ca_num": 512,
-    "ofdm_data_num": 304,
+    "ofdm_data_num": 400,
     "cp_len": 32,
-    "ofdm_rx_zero_prefix_bs": 220,
     "demul_block_size": 48,
     "modulation": "16QAM",
-    "Zc": 18,
+    "Zc": 24,
     "beamsweep": false,
     /* Frame construction */
     "beacon_antenna": 0,
     "frames": [
-        "BGGGGGPGGUUUUG"
+        "BPGUUUUG"
     ],
     "client_ul_pilot_syms": 2,
     /* Compute configuration */
-    "worker_thread_num": 25
+    "worker_thread_num": 16,
+    "core_offset": 20,
+    "bs_mac_rx_port": 8070,
+    "bs_mac_tx_port": 8080,
+    "ue_server_addr": "10.42.0.1",
+    "frames_to_test": 10000
 }
