@@ -412,7 +412,7 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
   //const size_t ue_per_thread_source =
   //    std::ceil(ue_per_thread / num_data_sources);
 
-  const size_t ue_ant_low = cfg_->UeAntInsanceOffset() + (tid * ue_per_thread);
+  const size_t ue_ant_low = cfg_->UeAntInstanceOffset() + (tid * ue_per_thread);
   const size_t ue_ant_high =
       std::min((ue_ant_low + ue_per_thread) - 1, cfg_->UeAntInstancCnt() - 1);
 

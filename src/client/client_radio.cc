@@ -22,7 +22,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   }
 
   //Build radio id array for existing logic to work
-  const size_t first_ue = cfg->UeAntInsanceOffset();
+  const size_t first_ue = cfg->UeAntInstanceOffset();
   const size_t last_ue = first_ue + cfg->UeAntInstancCnt();
   //Assumes a full list of UEs
   for (size_t user = first_ue; user < last_ue; user++) {
