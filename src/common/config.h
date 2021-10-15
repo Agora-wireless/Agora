@@ -76,13 +76,14 @@ class Config {
 
   //inline size_t UeNum() const { return this->ue_num_; }
   inline size_t UeAntInstancCnt() const { return this->ue_ant_instance_cnt_; }
-  inline size_t UeAntInsanceOffset() const {
+  inline size_t UeAntInstanceOffset() const {
     return this->ue_ant_instance_offset_;
   }
 
   ///\todo Verify the usage of UeNum here (radios?)
   inline size_t UeNum() const { return this->ue_total_antennas_; }
   inline size_t UeAntTotal() const { return this->ue_total_antennas_; }
+  inline size_t UeRadioNum() const { return this->ue_total_radios_; }
 
   inline size_t OfdmCaNum() const { return this->ofdm_ca_num_; }
   inline size_t CpLen() const { return this->cp_len_; }

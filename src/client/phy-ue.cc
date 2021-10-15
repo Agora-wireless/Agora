@@ -62,9 +62,9 @@ PhyUe::PhyUe(Config* config)
       kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntInstancCnt() *
       kDefaultQueueSize);
   tx_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
+      kFrameWnd * config_->UeRadioNum() * kDefaultQueueSize);
   to_mac_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
+      kFrameWnd * config_->UeRadioNum() * kDefaultQueueSize);
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
     rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(complete_queue_);
@@ -117,11 +117,13 @@ PhyUe::PhyUe(Config* config)
   demul_counters_.Init(dl_data_symbol_perframe_, config_->UeAntInstancCnt());
   fft_dlpilot_counters_.Init(config->Frame().ClientDlPilotSymbols(),
                              config_->UeAntInstancCnt());
-  fft_dldata_counters_.Init(dl_data_symbol_perframe_, config_->UeAntInstancCnt());
+  fft_dldata_counters_.Init(dl_data_symbol_perframe_,
+                            config_->UeAntInstancCnt());
 
   tx_counters_.Init(config_->UeAntInstancCnt());
   encode_counter_.Init(ul_data_symbol_perframe_, config_->UeAntInstancCnt());
-  modulation_counters_.Init(ul_data_symbol_perframe_, config_->UeAntInstancCnt());
+  modulation_counters_.Init(ul_data_symbol_perframe_,
+                            config_->UeAntInstancCnt());
 
   const size_t num_ue = config_->UeAntInstancCnt();
   ue_tracker_.reserve(num_ue);
@@ -791,9 +793,10 @@ void PhyUe::InitializeVarsFromCfg() {
 
   assert(dl_pilot_symbol_perframe_ <= dl_symbol_perframe_);
   assert(ul_pilot_symbol_perframe <= ul_symbol_perframe_);
-  rx_thread_num_ = ((kUseArgos == true) && (config_->HwFramer() == false))
-                       ? config_->UeNum()
-                       : std::min(config_->UeNum(), config_->SocketThreadNum());
+  rx_thread_num_ =
+      ((kUseArgos == true) && (config_->HwFramer() == false))
+          ? config_->UeRadioNum()
+          : std::min(config_->UeRadioNum(), config_->SocketThreadNum());
 
   tx_buffer_status_size_ =
       (ul_symbol_perframe_ * config_->UeAntInstancCnt() * kFrameWnd);
