@@ -22,14 +22,19 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   }
 
   //Build radio id array for existing logic to work
-  const size_t first_ue = cfg->UeAntInstanceOffset();
-  const size_t last_ue = first_ue + cfg->UeAntInstancCnt();
+  const size_t first_ue_ant = cfg->UeAntInstanceOffset();
+  const size_t last_ue_ant = first_ue_ant + cfg->UeAntInstancCnt();
+  size_t antenna_count = 0;
   //Assumes a full list of UEs
-  for (size_t user = first_ue; user < last_ue; user++) {
-    const auto& sdr = cfg_->UserDefs().at(user);
-    radio_ids_.emplace_back(sdr.id_);
-    radio_num_++;
-    antenna_num_ += sdr.num_channels_;
+  for (const auto& sdr : cfg_->UserDefs()) {
+    if (antenna_count >= first_ue_ant) {
+      radio_ids_.emplace_back(sdr.id_);
+      radio_num_++;
+      antenna_num_ += sdr.num_channels_;
+    } else if (antenna_count > last_ue_ant) {
+      break;
+    }
+    antenna_count += sdr.num_channels_;
   }
   std::cout << "radio num is " << this->radio_num_ << std::endl;
 

@@ -2,7 +2,7 @@
     "UE": true,
     "ue_serials_file": "data/ue_topology_renewlab.json",
     "cells": 1,
-    "channel": "A",
+    "channel": "AB",
     /* General Settings */
     "antenna_num": 8,
     /* Hardware settings */
@@ -13,7 +13,6 @@
     "tx_gain_b": 70,
     "hw_framer": false,
     "tx_advance": [
-        140,
         140
     ],
     /* Waveform Parameters */
