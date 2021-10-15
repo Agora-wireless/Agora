@@ -27,9 +27,9 @@ static constexpr size_t kDefaultBSCells = 1u;
 static constexpr size_t kDefaultBSAntennas = 8u;
 static constexpr size_t kDefaultUEAntennas = 8u;
 static constexpr bool kDefaultIsUe = false;
-static constexpr size_t kExternalRefNode = false;
+static constexpr bool kExternalRefNode = false;
 static constexpr size_t kDefaultRefAntenna = 0u;
-static const std::string kDefaultRefNodeId = "SimRefExt";
+static const std::string kDefaultRefNodeId = "SimRefInt";
 static const std::string kDefaultChannel = "A";
 static const std::string kDefaultSerialFilename = "";
 
@@ -203,7 +203,7 @@ Config::Config(const std::string& jsonfile)
     Utils::LoadTddConfig(ue_serials_file, serials_str);
     const auto json_hwconfig = json::parse(serials_str, nullptr, true, true);
 
-    const auto& ue_sdrs = json_hwconfig.at("sdr");
+    const auto& ue_sdrs = json_hwconfig.at("Standalone Clients");
     for (const auto& ue : ue_sdrs) {
       AgoraRadio::SdrParameters& new_sdr = users_.emplace_back();
       new_sdr.id_ = ue;
@@ -256,10 +256,14 @@ Config::Config(const std::string& jsonfile)
                 ref_node_.sdr_.num_channels_, (int)ref_node_.type_);
   }
 
-  //Add the reference node to the total antenna count
-  bs_total_antennas_ += ref_node_.sdr_.num_channels_;
-  bs_total_radios_++;
+  /// Only good for external reference node...
   bs_ref_ant_ = tdd_conf.value("ref_ant", kDefaultRefAntenna);
+  bs_beamforming_ants_ = bs_total_antennas_;
+  if (ref_node_.type_ == AgoraRadio::RefNodeType::external) {
+    //Add the reference node to the total antenna count
+    bs_total_antennas_ += ref_node_.sdr_.num_channels_;
+    bs_total_radios_++;
+  }
 
   if (kDebugPrintBs) {
     std::printf(
@@ -269,13 +273,6 @@ Config::Config(const std::string& jsonfile)
 
   RtAssert(bs_total_radios_ != 0,
            "Error: No bs radios defined, please fix your configuration file");
-
-  //If external reference then set total_bf_antennas_ to last (-1 radio ants)
-  if (ref_node_.type_ == AgoraRadio::RefNodeType::external) {
-    bs_beamforming_ants_ = bs_total_antennas_ - num_channels_;
-  } else {
-    bs_beamforming_ants_ = bs_total_antennas_;
-  }
 
   //Calculate UE totals based on users_
   size_t ue_radios = 0;
@@ -308,7 +305,7 @@ Config::Config(const std::string& jsonfile)
 
   size_t num_radios = 0;
   ///\todo Remove these as time allows
-  if (is_ue_ == false) {
+  if (is_ue_ == true) {
     num_radios = ue_radios;
   } else {
     num_radios = bs_total_radios_;
@@ -692,8 +689,8 @@ Config::Config(const std::string& jsonfile)
       "%s,\n\t%zu codeblocks per symbol, %zu bytes per code block,"
       "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
       "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
-      "frame time %.3f usec \nUplink Max Mac data tp (Mbps) %.3f \nDownlink "
-      "Max Mac data tp (Mbps) %.3f \n",
+      "frame time %.3f usec \n\tUplink Mac data tp (Mbps) %.3f Downlink  Mac "
+      "data tp (Mbps) %.3f \n",
       bs_total_antennas_, ue_total_antennas_, frame_.NumPilotSyms(),
       frame_.NumULSyms(), frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_,
       modulation_.c_str(), ldpc_config_.NumBlocksInSymbol(), num_bytes_per_cb_,
