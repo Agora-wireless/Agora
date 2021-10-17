@@ -604,7 +604,7 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
   size_t n = 0;
   const size_t max_retries = 3;
   // second condition is for when too many attemps fail
-  while ((good_csi_cnt < calib_meas_num_) && (n < (2 * calib_meas_num_))) {
+  while ((good_csi_cnt < calib_meas_num_) && (n < (6 * calib_meas_num_))) {
     long long tx_time(0);
     long long rx_time(0);
     bool good_csi = true;
@@ -803,6 +803,20 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
             std::cout << "Potential bad pilots: At node " << i
                       << " uplink/downlink peak found at index " << peak_up
                       << "/" << peak_dn << std::endl;
+            if (kVerboseCalibration) {
+              std::cout << "dn(" << i << ")=";
+              for (size_t s = 0; s < dn.at(i).size(); s++) {
+                std::cout << dn.at(i).at(s).real() << "+1j*"
+                          << dn.at(i).at(s).imag() << " ";
+              }
+              std::cout << std::endl;
+              std::cout << "up(" << i << ")=";
+              for (size_t s = 0; s < up.at(i).size(); s++) {
+                std::cout << up.at(i).at(s).real() << "+1j*"
+                          << up.at(i).at(s).imag() << " ";
+              }
+              std::cout << std::endl;
+            }
             break;
           }
         } else {
@@ -812,11 +826,11 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
 
         float sig_up = 0;
         float noise_up = 0;
+        if (cfg_->OfdmCaNum() + start_up.at(i) >= up.at(i).size()) {
+          good_csi = false;
+          break;
+        }
         for (size_t q = 0; q < cfg_->OfdmCaNum(); q++) {
-          //if (q + start_up.at(i) >= up.at(i).size()) {
-          //  good_csi = false;
-          //  break;
-          //}
           sig_up += std::pow(std::abs(up.at(i).at(q + start_up.at(i))), 2);
           noise_up += std::pow(std::abs(noise.at(i).at(q + start_up.at(i))), 2);
         }
@@ -824,11 +838,11 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
 
         float sig_dn = 0;
         float noise_dn = 0;
+        if (cfg_->OfdmCaNum() + start_dn.at(i) >= dn.at(i).size()) {
+          good_csi = false;
+          break;
+        }
         for (size_t q = 0; q < cfg_->OfdmCaNum(); q++) {
-          //if (q + start_dn.at(i) >= dn.at(i).size()) {
-          //  good_csi = false;
-          //  break;
-          //}
           sig_dn += std::pow(std::abs(dn.at(i).at(q + start_dn.at(i))), 2);
           noise_dn += std::pow(
               std::abs(noise.at(cfg_->RefAnt()).at(q + start_dn.at(i))), 2);
@@ -889,77 +903,79 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
     if (good_csi == false) {
       std::cout << "Attempt " << n << " failed. Retrying..." << std::endl;
       continue;
-    } else
+    } else {
       std::cout << "Attempt " << n << " Succeeded. Processing " << good_csi_cnt
                 << "th calibration result..." << std::endl;
 
-    for (size_t i = 0; i < m; i++) {
-      size_t id = i;
-      if (cfg_->ExternalRefNode() && i / cfg_->NumChannels() == ref) {
-        continue;
-      }
-      if (cfg_->ExternalRefNode() && (i / cfg_->NumChannels() > ref)) {
-        id = i - cfg_->NumChannels();
-      }
-      if (kVerboseCalibration) {  // print time-domain data
-        std::cout << "up_t" << id << " = [";
-        for (size_t j = 0; j < read_len; j++) {
-          std::cout << buff.at(m + i).at(j).real() << "+1j*"
-                    << buff.at(m + i).at(j).imag() << " ";
+      for (size_t i = 0; i < m; i++) {
+        size_t id = i;
+        if (cfg_->ExternalRefNode() && i / cfg_->NumChannels() == ref) {
+          continue;
         }
-        std::cout << "];" << std::endl;
-        std::cout << "dn_t" << id << " = [";
-        for (size_t j = 0; j < read_len; j++) {
-          std::cout << buff.at(i).at(j).real() << "+1j*"
-                    << buff.at(i).at(j).imag() << " ";
+        if (cfg_->ExternalRefNode() && (i / cfg_->NumChannels() > ref)) {
+          id = i - cfg_->NumChannels();
         }
-        std::cout << "];" << std::endl;
-      }
-      // computing reciprocity calibration matrix
-      auto first_up = up.at(i).begin() + start_up.at(i);
-      auto last_up = up.at(i).begin() + start_up.at(i) + cfg_->OfdmCaNum();
-      std::vector<std::complex<float>> up_ofdm(first_up, last_up);
-      assert(up_ofdm.size() == cfg_->OfdmCaNum());
-
-      auto first_dn = dn.at(i).begin() + start_dn.at(i);
-      auto last_dn = dn.at(i).begin() + start_dn.at(i) + cfg_->OfdmCaNum();
-      std::vector<std::complex<float>> dn_ofdm(first_dn, last_dn);
-      assert(dn_ofdm.size() == cfg_->OfdmCaNum());
-
-      auto dn_f = CommsLib::FFT(dn_ofdm, cfg_->OfdmCaNum());
-      auto up_f = CommsLib::FFT(up_ofdm, cfg_->OfdmCaNum());
-      if (cfg_->ExternalRefNode() == false && i / cfg_->NumChannels() == ref) {
-        for (size_t j = 0; j < cfg_->OfdmCaNum(); j++) {
-          dn_f[j] = std::complex<float>(1, 0);
-          up_f[j] = std::complex<float>(1, 0);
+        if (kVerboseCalibration) {  // print time-domain data
+          std::cout << "up_t" << id << " = [";
+          for (size_t j = 0; j < read_len; j++) {
+            std::cout << buff.at(m + i).at(j).real() << "+1j*"
+                      << buff.at(m + i).at(j).imag() << " ";
+          }
+          std::cout << "];" << std::endl;
+          std::cout << "dn_t" << id << " = [";
+          for (size_t j = 0; j < read_len; j++) {
+            std::cout << buff.at(i).at(j).real() << "+1j*"
+                      << buff.at(i).at(j).imag() << " ";
+          }
+          std::cout << "];" << std::endl;
         }
-      }
-      arma::cx_fvec dn_vec(
-          reinterpret_cast<arma::cx_float*>(&dn_f[cfg_->OfdmDataStart()]),
-          cfg_->OfdmDataNum(), false);
-      arma::cx_fvec calib_dl_vec(
-          reinterpret_cast<arma::cx_float*>(
-              &init_calib_dl_[good_csi_cnt][id * cfg_->OfdmDataNum()]),
-          cfg_->OfdmDataNum(), false);
-      calib_dl_vec = dn_vec;
+        // computing reciprocity calibration matrix
+        auto first_up = up.at(i).begin() + start_up.at(i);
+        auto last_up = up.at(i).begin() + start_up.at(i) + cfg_->OfdmCaNum();
+        std::vector<std::complex<float>> up_ofdm(first_up, last_up);
+        assert(up_ofdm.size() == cfg_->OfdmCaNum());
 
-      arma::cx_fvec up_vec(
-          reinterpret_cast<arma::cx_float*>(&up_f[cfg_->OfdmDataStart()]),
-          cfg_->OfdmDataNum(), false);
-      arma::cx_fvec calib_ul_vec(
-          reinterpret_cast<arma::cx_float*>(
-              &init_calib_ul_[good_csi_cnt][id * cfg_->OfdmDataNum()]),
-          cfg_->OfdmDataNum(), false);
-      calib_ul_vec = up_vec;
-      // Utils::print_vec(dn_vec / up_vec,
-      //     "n" + std::to_string(good_csi_cnt) + "_ant" + std::to_string(i));
+        auto first_dn = dn.at(i).begin() + start_dn.at(i);
+        auto last_dn = dn.at(i).begin() + start_dn.at(i) + cfg_->OfdmCaNum();
+        std::vector<std::complex<float>> dn_ofdm(first_dn, last_dn);
+        assert(dn_ofdm.size() == cfg_->OfdmCaNum());
+
+        auto dn_f = CommsLib::FFT(dn_ofdm, cfg_->OfdmCaNum());
+        auto up_f = CommsLib::FFT(up_ofdm, cfg_->OfdmCaNum());
+        if (cfg_->ExternalRefNode() == false &&
+            i / cfg_->NumChannels() == ref) {
+          for (size_t j = 0; j < cfg_->OfdmCaNum(); j++) {
+            dn_f[j] = std::complex<float>(1, 0);
+            up_f[j] = std::complex<float>(1, 0);
+          }
+        }
+        arma::cx_fvec dn_vec(
+            reinterpret_cast<arma::cx_float*>(&dn_f[cfg_->OfdmDataStart()]),
+            cfg_->OfdmDataNum(), false);
+        arma::cx_fvec calib_dl_vec(
+            reinterpret_cast<arma::cx_float*>(
+                &init_calib_dl_[good_csi_cnt][id * cfg_->OfdmDataNum()]),
+            cfg_->OfdmDataNum(), false);
+        calib_dl_vec = dn_vec;
+
+        arma::cx_fvec up_vec(
+            reinterpret_cast<arma::cx_float*>(&up_f[cfg_->OfdmDataStart()]),
+            cfg_->OfdmDataNum(), false);
+        arma::cx_fvec calib_ul_vec(
+            reinterpret_cast<arma::cx_float*>(
+                &init_calib_ul_[good_csi_cnt][id * cfg_->OfdmDataNum()]),
+            cfg_->OfdmDataNum(), false);
+        calib_ul_vec = up_vec;
+        // Utils::print_vec(dn_vec / up_vec,
+        //     "n" + std::to_string(good_csi_cnt) + "_ant" + std::to_string(i));
+      }
+
+      // sample_adjusting trigger delays based on lts peak index
+      if (sample_adjust && good_csi_cnt == 0) {  // just do it once
+        AdjustDelays(offset);
+      }
+      good_csi_cnt++;
     }
-
-    // sample_adjusting trigger delays based on lts peak index
-    if (sample_adjust && good_csi_cnt == 0) {  // just do it once
-      AdjustDelays(offset);
-    }
-    good_csi_cnt++;
   }
   for (size_t i = 0; i < r; i++) {
     ba_stn_.at(i)->deactivateStream(this->tx_streams_.at(i));
