@@ -555,14 +555,20 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kPacketFromMac: {
-          // This is an entrie frame (multiple mac packets)
-          size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
-          size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
+          // This is an entire frame (multiple mac packets)
+          const size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
+          const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
           RtAssert(radio_buf_id == expected_frame_id_from_mac_ % kFrameWnd);
 
           auto* pkt = reinterpret_cast<MacPacket*>(
               &ul_bits_buffer_[ue_id][radio_buf_id *
                                       config_->UlMacBytesNumPerframe()]);
+
+          MLPD_TRACE(
+              "PhyUe: frame %d symbol %d user %d @ offset %zu %zu @ location "
+              "%zu\n",
+              pkt->frame_id_, pkt->symbol_id_, pkt->ue_id_, ue_id, radio_buf_id,
+              (size_t)pkt);
           RtAssert(pkt->frame_id_ == expected_frame_id_from_mac_,
                    "PhyUe: Incorrect frame ID from MAC");
           current_frame_user_num_ =
@@ -570,12 +576,15 @@ void PhyUe::Start() {
           if (current_frame_user_num_ == 0) {
             expected_frame_id_from_mac_++;
           }
+#if ENABLE_RB_IND
           config_->UpdateModCfgs(pkt->rb_indicator_.mod_order_bits_);
-
+#endif
           if (kDebugPrintPacketsFromMac) {
+#if ENABLE_RB_IND
             std::printf(
                 "PhyUe: received packet for frame %u with modulation %zu\n",
                 pkt->frame_id_, pkt->rb_indicator_.mod_order_bits_);
+#endif
             std::stringstream ss;
 
             for (size_t ul_data_symbol = 0;

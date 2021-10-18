@@ -12,7 +12,7 @@
  */
 class MacDataReceiver {
  public:
-  virtual size_t Load(char *destination, size_t num_load_bytes) = 0;
+  virtual size_t Load(char *destination, size_t requested_bytes) = 0;
 
  protected:
   inline MacDataReceiver(){};

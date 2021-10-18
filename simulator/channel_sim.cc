@@ -11,8 +11,8 @@
 static std::atomic<bool> running = true;
 static constexpr bool kPrintChannelOutput = false;
 static const size_t kDefaultQueueSize = 36;
-static const bool kPrintDebugTxUser = true;
-static const bool kPrintDebugTxBs = true;
+static const bool kPrintDebugTxUser = false;
+static const bool kPrintDebugTxBs = false;
 
 static void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
                                     size_t length) {
@@ -473,6 +473,7 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
 
+  //Modify this to check the symbol type
   size_t pilot_symbol_id = bscfg_->Frame().GetPilotSymbolIdx(symbol_id);
   size_t ul_symbol_id = bscfg_->Frame().GetULSymbolIdx(symbol_id);
   size_t total_symbol_id = pilot_symbol_id;
@@ -494,10 +495,21 @@ void ChannelSim::DoTxBs(int tid, size_t tag) {
 
   auto* src_ptr = reinterpret_cast<short*>(&rx_buffer_ue_.at(total_offset_ue));
 
+  //std::printf(
+  //    "Channel Sim: DoTxBs processing frame %zu, symbol %zu, ul symbol "
+  //    "%zu, samples per symbol %zu ue ant num %zu offset %zu ue plus %zu\n",
+  //    frame_id, symbol_id, total_symbol_id, bscfg_->SampsPerSymbol(),
+  //    uecfg_->UeAntNum(), total_offset_ue, ul_data_plus_pilot_symbols_);
+  //std::fflush(stdout);
+
   // convert received data to complex float,
   // apply channel, convert back to complex short to TX
   arma::cx_fmat fmat_src =
       arma::zeros<arma::cx_fmat>(bscfg_->SampsPerSymbol(), uecfg_->UeAntNum());
+
+  /////********* issue here when ....
+  //Channel Sim: DoTxBs processing frame 0, symbol 4, ul symbol 2, samples per symbol 2048 ue ant num 1 offset 16384 ue plus 11
+  //segfault...
   SimdConvertShortToFloat(src_ptr, reinterpret_cast<float*>(fmat_src.memptr()),
                           2 * bscfg_->SampsPerSymbol() * uecfg_->UeAntNum());
 
