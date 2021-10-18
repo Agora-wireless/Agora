@@ -41,6 +41,11 @@ MacThreadBaseStation::MacThreadBaseStation(
   dl_bits_buffer_id_.fill(0);
 
   server_.n_filled_in_frame_.fill(0);
+  for (size_t ue_ant = 0; ue_ant < cfg_->UeAntTotal(); ue_ant++) {
+    server_.data_size_.emplace_back(
+        std::vector<size_t>(cfg->Frame().NumUlDataSyms()));
+  }
+
   for (auto& v : server_.frame_data_) {
     v.resize(cfg_->UlMacDataBytesNumPerframe());
   }
@@ -128,23 +133,44 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
 
   // Only non-pilot uplink symbols have application data.
   if (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols()) {
-    auto* pkt = (struct MacPacket*)ul_data_ptr;
+    auto* pkt = reinterpret_cast<const MacPacket*>(ul_data_ptr);
+    const size_t dest_packet_size = cfg_->MacPayloadLength();
 
     // We send data to app irrespective of CRC condition
     // TODO: enable ARQ and ensure reliable data goes to app
     const size_t frame_data_offset =
         (symbol_idx_ul - cfg_->Frame().ClientUlPilotSymbols()) *
-        cfg_->MacPayloadLength();
-    std::memcpy(&server_.frame_data_[ue_id][frame_data_offset], pkt->data_,
-                cfg_->MacPayloadLength());
-    server_.n_filled_in_frame_[ue_id] += cfg_->MacPayloadLength();
+        dest_packet_size;
 
-    // Check CRC
-    auto crc = static_cast<uint16_t>(
-        crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
-                                 cfg_->MacPayloadLength()) &
-        0xFFFF);
-    if (crc == pkt->crc_) {
+    //Who's junk is better? No reason to copy currupted data
+    server_.n_filled_in_frame_[ue_id] += dest_packet_size;
+
+    bool data_valid = false;
+    //Data validity check
+    if ((static_cast<size_t>(pkt->datalen_) <= dest_packet_size) &&
+        (pkt->symbol_id_ >=
+         cfg_->Frame().GetULSymbol(cfg_->Frame().ClientUlPilotSymbols())) &&
+        (pkt->symbol_id_ <= cfg_->Frame().GetULSymbolLast()) &&
+        (pkt->ue_id_ <= cfg_->UeAntNum())) {
+      auto crc = static_cast<uint16_t>(
+          crc_obj_->CalculateCrc24((unsigned char*)pkt->data_, pkt->datalen_) &
+          0xFFFF);
+
+      data_valid = (crc == pkt->crc_);
+    }
+
+    if (data_valid) {
+      MLPD_FRAME(
+          "Base Station MAC thread received frame %zu, uplink "
+          "symbol index %zu, size %zu, copied to frame data offset %zu\n",
+          frame_id, symbol_idx_ul, cfg_->MacPayloadLength(), frame_data_offset);
+      /// Spot to be optimized #1
+      std::memcpy(&server_.frame_data_[ue_id][frame_data_offset], pkt->data_,
+                  pkt->datalen_);
+
+      server_.data_size_.at(ue_id).at(
+          this->cfg_->Frame().GetULSymbolIdx(pkt->symbol_id_) -
+          cfg_->Frame().ClientUlPilotSymbols()) = pkt->datalen_;
       // Print information about the received symbol
       if (kLogMacPackets) {
         std::fprintf(
@@ -165,21 +191,52 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
         ss.str("");
       }
     } else {
-      std::printf("Bad Packet: CRC Check Failed! \n");
+      MLPD_ERROR(
+          "Failed Data integrity check - invalid parameters frame %d:%zu "
+          "symbol %d:%zu user %d:%zu length %d crc %d\n",
+          pkt->frame_id_, frame_id, pkt->symbol_id_, symbol_id, pkt->ue_id_,
+          ue_id, pkt->datalen_, pkt->crc_);
+      //Set the default to 0 valid data bytes
+      server_.data_size_.at(ue_id).at(
+          this->cfg_->Frame().GetULSymbolIdx(symbol_id) -
+          cfg_->Frame().ClientUlPilotSymbols()) = 0;
     }
   }
 
   // When the frame is full, send it to the application
   if (server_.n_filled_in_frame_[ue_id] == cfg_->UlMacDataBytesNumPerframe()) {
     server_.n_filled_in_frame_[ue_id] = 0;
+    ///Spot to be optimized #2 -- left shift data over to remove padding
+    bool shifted = false;
+    size_t src_offset = 0;
+    size_t dest_offset = 0;
+    for (size_t packet = 0; packet < cfg_->UlMacPacketsPerframe(); packet++) {
+      const size_t rx_packet_size = server_.data_size_.at(ue_id).at(packet);
+      if (rx_packet_size < cfg_->MacPayloadLength() || (shifted == true)) {
+        shifted = true;
+        if (rx_packet_size > 0) {
+          std::memmove(&server_.frame_data_[ue_id][dest_offset],
+                       &server_.frame_data_[ue_id][src_offset], rx_packet_size);
+        }
+      }
+      dest_offset += rx_packet_size;
+      src_offset += cfg_->MacPayloadLength();
+    }
 
-    udp_client_->Send(kMacRemoteHostname, cfg_->BsMacTxPort() + ue_id,
-                      &server_.frame_data_[ue_id][0],
-                      cfg_->UlMacDataBytesNumPerframe());
+    if (dest_offset > 0) {
+      udp_client_->Send(kMacRemoteHostname, cfg_->BsMacTxPort() + ue_id,
+                        &server_.frame_data_[ue_id][0], dest_offset);
+    }
+
+    std::fprintf(
+        stdout, "MAC thread: Sent data for frame %zu, ue %zu, size %zu:%zu\n",
+        frame_id, ue_id, dest_offset, cfg_->UlMacDataBytesNumPerframe());
+
     std::fprintf(log_file_,
-                 "MAC thread: Sent data for frame %zu, ue %zu, size %zu\n",
-                 frame_id, ue_id, cfg_->UlMacDataBytesNumPerframe());
-    for (size_t i = 0; i < cfg_->UlMacDataBytesNumPerframe(); i++) {
+                 "MAC thread: Sent data for frame %zu, ue %zu, size %zu:%zu\n",
+                 frame_id, ue_id, dest_offset,
+                 cfg_->UlMacDataBytesNumPerframe());
+    for (size_t i = 0u; i < dest_offset; i++) {
       ss << std::to_string(server_.frame_data_[ue_id][i]) << " ";
     }
     std::fprintf(log_file_, "%s\n", ss.str().c_str());
@@ -280,14 +337,15 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
     pkt->rsvd_[0] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
     pkt->rsvd_[1] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
     pkt->rsvd_[2] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-    pkt->crc_ = 0;
+#if ENABLE_RB_IND
     pkt->rb_indicator_ = ri;
+#endif
 
     std::memcpy(pkt->data_, payload + pkt_id * cfg_->MacPayloadLength(),
-                cfg_->MacPayloadLength());
+                pkt->datalen_);
     // Insert CRC
     pkt->crc_ = (uint16_t)(crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
-                                                    cfg_->MacPayloadLength()) &
+                                                    pkt->datalen_) &
                            0xFFFF);
 
     if (kLogMacPackets) {

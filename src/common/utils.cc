@@ -8,8 +8,26 @@
 
 #include "utils.h"
 
-size_t cpu_layout[MAX_CORE_NUM];
-bool cpu_layout_initialized = false;
+static size_t cpu_layout[MAX_CORE_NUM];
+static bool cpu_layout_initialized = false;
+static std::mutex pin_core_mutex;
+
+/* Keep list of core-thread relationship*/
+static std::vector<std::pair<ThreadType, size_t>> core_list;
+
+/* Print out summary of core-thread relationship */
+void PrintCoreList(const std::vector<std::pair<ThreadType, size_t>>& clist) {
+  int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+  std::printf("=================================\n");
+  std::printf("          CORE LIST SUMMARY      \n");
+  std::printf("=================================\n");
+  std::printf("Total Number of Cores: %d \n", num_cores);
+  for (auto iter : clist) {
+    std::printf("|| Core ID: %zu || ThreadType: %s || \n", iter.second,
+                ThreadTypeStr(iter.first).c_str());
+  }
+  std::printf("=================================\n");
+}
 
 void PrintBitmask(const struct bitmask* bm) {
   for (size_t i = 0; i < bm->size; ++i) {
@@ -73,6 +91,8 @@ int PinToCore(int core_id) {
 
 void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
                          bool verbose) {
+  std::scoped_lock lock(pin_core_mutex);
+
   if (kEnableThreadPinning == true) {
     int actual_core_id = core_offset + thread_id;
     int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
@@ -95,6 +115,8 @@ void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
           ThreadTypeStr(thread_type).c_str(), thread_id, physical_core_id);
       throw std::runtime_error("Utils: failed to pin to core");
     } else {
+      core_list.push_back(std::make_pair(thread_type, physical_core_id));
+      PrintCoreList(core_list);
       if (verbose == true) {
         std::printf("%s thread %d: pinned to core %zu, requested core %d \n",
                     ThreadTypeStr(thread_type).c_str(), thread_id,
