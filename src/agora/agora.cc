@@ -281,8 +281,8 @@ void Agora::Start() {
   const auto& cfg = this->config_;
 
   // Start packet I/O
-  if (packet_tx_rx_->StartTxRx(socket_buffer_, socket_buffer_status_,
-                               socket_buffer_status_size_,
+  if (packet_tx_rx_->StartTxRx(socket_buffer_,
+                               socket_buffer_size_ / cfg->PacketLength(),
                                this->stats_->FrameStart(), dl_socket_buffer_,
                                calib_dl_buffer_, calib_ul_buffer_) == false) {
     this->Stop();
@@ -330,10 +330,7 @@ void Agora::Start() {
       // FFT processing is scheduled after falling through the switch
       switch (event.event_type_) {
         case EventType::kPacketRX: {
-          size_t socket_thread_id = rx_tag_t(event.tags_[0]).tid_;
-          size_t sock_buf_offset = rx_tag_t(event.tags_[0]).offset_;
-          auto* pkt = (Packet*)(socket_buffer_[socket_thread_id] +
-                                (sock_buf_offset * cfg->PacketLength()));
+          Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
 
           if (pkt->frame_id_ >= ((this->cur_sche_frame_id_ + kFrameWnd))) {
             MLPD_ERROR(
@@ -477,9 +474,7 @@ void Agora::Start() {
         } break;
 
         case EventType::kPacketFromMac: {
-          size_t frame_id = rx_tag_t(event.tags_[0]).offset_;
-
-          std::printf("EventType::kPacketFromMac: frame %zu\n", frame_id);
+          size_t frame_id = rx_mac_tag_t(event.tags_[0]).offset_;
 
           bool last_ue = this->mac_to_phy_counters_.CompleteTask(frame_id, 0);
           if (last_ue == true) {
@@ -499,7 +494,6 @@ void Agora::Start() {
             this->mac_to_phy_counters_.Reset(frame_id);
             PrintPerFrameDone(PrintType::kPacketFromMac, frame_id);
           }
-
         } break;
 
         case EventType::kEncode: {
@@ -784,9 +778,9 @@ void Agora::Worker(int tid) {
       this->stats_.get());
 
   auto compute_fft = std::make_unique<DoFFT>(
-      this->config_, tid, this->socket_buffer_, this->socket_buffer_status_,
-      this->data_buffer_, this->csi_buffers_, this->calib_dl_buffer_,
-      this->calib_ul_buffer_, this->phy_stats_.get(), this->stats_.get());
+      this->config_, tid, this->data_buffer_, this->csi_buffers_,
+      this->calib_dl_buffer_, this->calib_ul_buffer_, this->phy_stats_.get(),
+      this->stats_.get());
 
   // Downlink workers
   auto compute_ifft =
@@ -870,11 +864,10 @@ void Agora::Worker(int tid) {
 void Agora::WorkerFft(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerFFT, base_worker_core_offset_, tid);
 
-  /* Initialize IFFT operator */
+  /* Initialize FFT operator */
   std::unique_ptr<DoFFT> compute_fft(
-      new DoFFT(config_, tid, socket_buffer_, socket_buffer_status_,
-                data_buffer_, csi_buffers_, calib_dl_buffer_, calib_ul_buffer_,
-                this->phy_stats_.get(), this->stats_.get()));
+      new DoFFT(config_, tid, data_buffer_, csi_buffers_, calib_dl_buffer_,
+                calib_ul_buffer_, this->phy_stats_.get(), this->stats_.get()));
   std::unique_ptr<DoIFFT> compute_ifft(new DoIFFT(
       config_, tid, dl_ifft_buffer_, dl_socket_buffer_, this->stats_.get()));
 
@@ -1337,15 +1330,11 @@ void Agora::InitializeUplinkBuffers() {
   const auto& cfg = config_;
   const size_t task_buffer_symbol_num_ul = cfg->Frame().NumULSyms() * kFrameWnd;
 
-  socket_buffer_status_size_ =
-      cfg->BsAntNum() * kFrameWnd * cfg->Frame().NumTotalSyms();
-  socket_buffer_size_ = cfg->PacketLength() * socket_buffer_status_size_;
+  socket_buffer_size_ = cfg->PacketLength() * cfg->BsAntNum() * kFrameWnd *
+                        cfg->Frame().NumTotalSyms();
 
   socket_buffer_.Malloc(cfg->SocketThreadNum() /* RX */, socket_buffer_size_,
                         Agora_memory::Alignment_t::kAlign64);
-  socket_buffer_status_.Calloc(cfg->SocketThreadNum() /* RX */,
-                               socket_buffer_status_size_,
-                               Agora_memory::Alignment_t::kAlign64);
 
   data_buffer_.Malloc(task_buffer_symbol_num_ul,
                       cfg->OfdmDataNum() * cfg->BsAntNum(),
@@ -1445,7 +1434,6 @@ void Agora::InitializeDownlinkBuffers() {
 
 void Agora::FreeUplinkBuffers() {
   socket_buffer_.Free();
-  socket_buffer_status_.Free();
   data_buffer_.Free();
   equal_buffer_.Free();
   ue_spec_pilot_buffer_.Free();

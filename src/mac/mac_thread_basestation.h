@@ -121,9 +121,6 @@ class MacThreadBaseStation {
   // The radio ID of the next MAC packet we'll hand over to the PHY
   size_t next_radio_id_ = 0;
 
-  // The timestamp at which we last scheduled a TTI (frame)
-  size_t last_frame_tx_tsc_ = 0;
-
   // The frame ID of the next TTI that the scheduler plans for
   size_t scheduler_next_frame_id_ = 0;
 
