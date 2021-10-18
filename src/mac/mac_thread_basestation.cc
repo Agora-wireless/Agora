@@ -7,6 +7,8 @@
 #include "logger.h"
 #include "utils_ldpc.h"
 
+static constexpr size_t kUdpRxBufferPadding = 2048u;
+
 MacThreadBaseStation::MacThreadBaseStation(
     Config* cfg, size_t core_offset,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
@@ -44,7 +46,7 @@ MacThreadBaseStation::MacThreadBaseStation(
   }
 
   const size_t udp_pkt_len = cfg_->DlMacDataBytesNumPerframe();
-  udp_pkt_buf_.resize(udp_pkt_len);
+  udp_pkt_buf_.resize(udp_pkt_len + kUdpRxBufferPadding);
 
   // TODO: See if it makes more sense to split up the UE's by port here for
   // client mode.
@@ -53,7 +55,6 @@ MacThreadBaseStation::MacThreadBaseStation(
             udp_server_port);
   udp_server_ = std::make_unique<UDPServer>(
       udp_server_port, udp_pkt_len * kMaxUEs * kMaxPktsPerUE);
-  //udp_server_->MakeBlocking(10);
 
   const size_t udp_control_len = sizeof(RBIndicator);
   udp_control_buf_.resize(udp_control_len);
@@ -205,37 +206,45 @@ void MacThreadBaseStation::SendControlInformation() {
 void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
   if (0 == cfg_->DlMacDataBytesNumPerframe()) return;
 
-  std::memset(&udp_pkt_buf_[0], 0, udp_pkt_buf_.size());
-
   size_t rx_bytes = 0;
-  size_t rx_request_size = udp_pkt_buf_.size();
-  uint8_t* rx_location = &udp_pkt_buf_[0];
-  for (size_t rx_tries = 0; rx_tries < cfg_->DlMacPacketsPerframe();
-       rx_tries++) {
-    ssize_t ret = udp_server_->Recv(rx_location, rx_request_size);
+  size_t rx_bytes_required = cfg_->DlMacDataBytesNumPerframe();
+  const size_t max_recv_attempts = (cfg_->DlMacPacketsPerframe() * 10u);
+  size_t rx_attempts;
+  for (rx_attempts = 0u; rx_attempts < max_recv_attempts; rx_attempts++) {
+    ssize_t ret = udp_server_->Recv(&udp_pkt_buf_.at(rx_bytes),
+                                    udp_pkt_buf_.size() - rx_bytes);
     if (ret == 0) {
-      return;  // No data received
+      MLPD_FRAME("MacThreadBaseStation: No data received\n");
+      if (rx_bytes == 0) {
+        return;  // No data received
+      } else {
+        MLPD_FRAME(
+            "MacThreadBaseStation: No data received but there was data in "
+            "buffer pending %zu : try %zu out of %zu\n",
+            rx_bytes, rx_attempts, max_recv_attempts);
+      }
     } else if (ret < 0) {
       // There was an error in receiving
       MLPD_ERROR("MacThreadBaseStation: Error in reception %zu\n", ret);
       cfg_->Running(false);
       return;
     } else {
-      MLPD_FRAME("MacThreadBaseStation: Received %zu : %zu bytes\n", ret,
-                 rx_request_size);
       rx_bytes += ret;
-      if (rx_bytes == udp_pkt_buf_.size()) {
+      MLPD_TRACE("MacThreadBaseStation: Received %zu : %zu bytes\n", ret,
+                 rx_bytes_required);
+      if (rx_bytes >= rx_bytes_required) {
+        MLPD_FRAME("MacThreadBaseStation rx full frame data %zu\n", rx_bytes);
         break;
       }
-      rx_request_size -= ret;
-      rx_location += ret;
     }
   }
+
   if (rx_bytes != cfg_->DlMacDataBytesNumPerframe()) {
-    MLPD_ERROR("MacThreadBaseStation: Received %zu : %zu bytes\n", rx_bytes,
-               cfg_->DlMacDataBytesNumPerframe());
+    MLPD_ERROR(
+        "MacThreadBaseStation: Received %zu : %zu bytes in %zu attempts\n",
+        rx_bytes, cfg_->DlMacDataBytesNumPerframe(), rx_attempts);
   } else {
-    MLPD_INFO("MacThreadBaseStation: Received Mac Frame Data\n");
+    MLPD_FRAME("MacThreadBaseStation: Received Mac Frame Data\n");
   }
   RtAssert(rx_bytes == cfg_->DlMacDataBytesNumPerframe(),
            "MacThreadBaseStation:ProcessUdpPacketsFromApps incorrect number of "
@@ -303,7 +312,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
 
   (*dl_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
   EventData msg(EventType::kPacketFromMac,
-                rx_tag_t(next_radio_id_, next_tx_frame_id_).tag_);
+                rx_mac_tag_t(next_radio_id_, next_tx_frame_id_).tag_);
   RtAssert(tx_queue_->enqueue(msg),
            "MAC thread: Failed to enqueue uplink packet");
 
@@ -320,12 +329,14 @@ void MacThreadBaseStation::RunEventLoop() {
   PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_,
                       0 /* thread ID */);
 
+  size_t last_frame_tx_tsc = 0;
+
   while (cfg_->Running() == true) {
     ProcessRxFromPhy();
 
-    if (GetTime::Rdtsc() - last_frame_tx_tsc_ > tsc_delta_) {
+    if ((GetTime::Rdtsc() - last_frame_tx_tsc) > tsc_delta_) {
       SendControlInformation();
-      last_frame_tx_tsc_ = GetTime::Rdtsc();
+      last_frame_tx_tsc = GetTime::Rdtsc();
     }
 
     // No need to process incomming packets if we are finished

@@ -21,8 +21,7 @@
 
 class DoFFT : public Doer {
  public:
-  DoFFT(Config* config, int tid, Table<char>& socket_buffer,
-        Table<int>& socket_buffer_status, Table<complex_float>& data_buffer,
+  DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
         PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
         Table<complex_float>& calib_dl_buffer,
         Table<complex_float>& calib_ul_buffer, PhyStats* in_phy_stats,
@@ -97,8 +96,6 @@ class DoFFT : public Doer {
                         SymbolType symbol_type) const;
 
  private:
-  Table<char>& socket_buffer_;
-  Table<int>& socket_buffer_status_;
   Table<complex_float>& data_buffer_;
   PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
   Table<complex_float>& calib_dl_buffer_;

@@ -22,6 +22,8 @@
 #include <unistd.h>
 
 #include <cstring> /* std::strerror, std::memset, std::memcpy */
+#include <map>
+#include <mutex>
 #include <stdexcept>
 
 /// Basic UDP server class based on OS sockets that supports receiving messages
@@ -35,20 +37,12 @@ class UDPServer {
     if (kDebugPrintUdpServerInit) {
       std::printf("Creating UDP server listening at port %d\n", port);
     }
-    sock_fd_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    sock_fd_ = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
     if (sock_fd_ == -1) {
       throw std::runtime_error("UDPServer: Failed to create local socket.");
     }
 
-    // Set the socket as non-blocking
-    int flags = fcntl(sock_fd_, F_GETFL);
-    if (flags == -1) {
-      throw std::runtime_error("UDPServer: fcntl failed to get flags");
-    }
-    int ret = fcntl(sock_fd_, F_SETFL, flags | O_NONBLOCK);
-    if (ret == -1) {
-      throw std::runtime_error("UDPServer: fcntl failed to set nonblock");
-    }
+    int ret = 0;
 
     // Set buffer size
     if (rx_buffer_size != 0) {
@@ -63,7 +57,7 @@ class UDPServer {
     serveraddr.sin_family = AF_INET;
     serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
     serveraddr.sin_port = htons(static_cast<unsigned short>(port));
-    std::memset(serveraddr.sin_zero, 0, sizeof(serveraddr.sin_zero));
+    std::memset(serveraddr.sin_zero, 0u, sizeof(serveraddr.sin_zero));
 
     ret = bind(sock_fd_, reinterpret_cast<struct sockaddr*>(&serveraddr),
                sizeof(serveraddr));
@@ -102,16 +96,18 @@ class UDPServer {
    */
   ssize_t Recv(uint8_t* buf, size_t len) const {
     ssize_t ret = recv(sock_fd_, static_cast<void*>(buf), len, 0);
+
     if (ret == -1) {
-      if (errno == EAGAIN || ret == EWOULDBLOCK) {
+      if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
         // These errors mean that there's no data to receive
-        return 0;
+        ret = 0;
       } else {
         std::fprintf(stderr,
                      "UDPServer: recv() failed with unexpected error %s\n",
                      std::strerror(errno));
-        return ret;
       }
+    } else if (ret == 0) {
+      std::fprintf(stderr, "UDPServer: recv() failed with return of 0\n");
     }
     return ret;
   }
@@ -158,27 +154,21 @@ class UDPServer {
       rem_addrinfo = remote_itr->second;
     }
 
-    // struct sockaddr_in remote_addr;
-    // remote_addr.sin_family = AF_INET;
-    // remote_addr.sin_port = htons(src_port);
-    // remote_addr.sin_addr.s_addr = inet_addr(src_address.c_str());
-    // std::memset(remote_addr.sin_zero, 0, sizeof(remote_addr.sin_zero));
-    // socklen_t addrlen = sizeof(remote_addr);
-
     socklen_t addrlen = rem_addrinfo->ai_addrlen;
     ssize_t ret = recvfrom(sock_fd_, static_cast<void*>(buf), len, 0,
                            rem_addrinfo->ai_addr, &addrlen);
 
     if (ret == -1) {
-      if (errno == EAGAIN || ret == EWOULDBLOCK) {
+      if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
         // These errors mean that there's no data to receive
-        return 0;
+        ret = 0;
       } else {
         std::fprintf(stderr,
                      "UDPServer: recvfrom() failed with unexpected error %s\n",
                      std::strerror(errno));
-        return ret;
       }
+    } else if (ret == 0) {
+      std::fprintf(stderr, "UDPServer: recv() failed with return of 0\n");
     }
     return ret;
   }
@@ -188,14 +178,26 @@ class UDPServer {
    * will now block
    */
   void MakeBlocking(size_t timeout_sec = 0) {
-    int flags = fcntl(sock_fd_, F_GETFL);
-    if (flags == -1) {
+    int current_flags = fcntl(sock_fd_, F_GETFL);
+    if (current_flags == -1) {
       throw std::runtime_error("UDPServer: fcntl failed to get flags");
     }
-    flags = flags & (~O_NONBLOCK);
-    int ret = fcntl(sock_fd_, F_SETFL, flags);
-    if (ret == -1) {
-      throw std::runtime_error("UDPServer: fcntl failed to set blocking");
+    int desired_flags = current_flags & (~O_NONBLOCK);
+
+    if (desired_flags != current_flags) {
+      int fcntl_status = fcntl(sock_fd_, F_SETFL, desired_flags);
+      if (fcntl_status == -1) {
+        throw std::runtime_error("UDPServer: fcntl failed to set blocking");
+      }
+
+      //Verify the flags were properly set
+      current_flags = fcntl(sock_fd_, F_GETFL);
+      if (current_flags == -1) {
+        throw std::runtime_error("UDPServer: fcntl failed to get flags");
+      } else if (current_flags != desired_flags) {
+        throw std::runtime_error(
+            "UDPServer: failed to set UDP socket to blocking");
+      }
     }
 
     // Set timeout
@@ -203,8 +205,9 @@ class UDPServer {
       struct timeval tv;
       tv.tv_sec = timeout_sec;
       tv.tv_usec = 0;
-      ret = setsockopt(sock_fd_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-      if (ret != 0) {
+      int opt_status =
+          setsockopt(sock_fd_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+      if (opt_status != 0) {
         throw std::runtime_error("UDPServer: Failed to set timeout.");
       }
     }

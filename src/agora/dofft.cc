@@ -10,16 +10,12 @@
 static constexpr bool kPrintFFTInput = false;
 static constexpr bool kPrintPilotCorrStats = false;
 
-DoFFT::DoFFT(Config* config, int tid, Table<char>& socket_buffer,
-             Table<int>& socket_buffer_status,
-             Table<complex_float>& data_buffer,
+DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
              PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
              Table<complex_float>& calib_dl_buffer,
              Table<complex_float>& calib_ul_buffer, PhyStats* in_phy_stats,
              Stats* stats_manager)
     : Doer(config, tid),
-      socket_buffer_(socket_buffer),
-      socket_buffer_status_(socket_buffer_status),
       data_buffer_(data_buffer),
       csi_buffers_(csi_buffers),
       calib_dl_buffer_(calib_dl_buffer),
@@ -84,11 +80,8 @@ static inline void CalibRegressionEstimate(const arma::cx_fvec& in_vec,
 }
 
 EventData DoFFT::Launch(size_t tag) {
-  size_t socket_thread_id = fft_req_tag_t(tag).tid_;
-  size_t buf_offset = fft_req_tag_t(tag).offset_;
   size_t start_tsc = GetTime::WorkerRdtsc();
-  auto* pkt = (Packet*)(socket_buffer_[socket_thread_id] +
-                        buf_offset * cfg_->PacketLength());
+  Packet* pkt = fft_req_tag_t(tag).rx_packet_->RawPacket();
   size_t frame_id = pkt->frame_id_;
   size_t frame_slot = frame_id % kFrameWnd;
   size_t symbol_id = pkt->symbol_id_;
@@ -218,7 +211,8 @@ EventData DoFFT::Launch(size_t tag) {
   }
 
   duration_stat->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc2;
-  socket_buffer_status_[socket_thread_id][buf_offset] = 0;  // Reset sock buf
+
+  fft_req_tag_t(tag).rx_packet_->Free();
   duration_stat->task_count_++;
   duration_stat->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
   return EventData(EventType::kFFT,
