@@ -34,13 +34,13 @@ Some highlights:
     
   * See `scripts/ubuntu.sh` for required packages, including Linux packages, gtest, Armadillo, and SoapySDR, and the corresponding versions. Run `./scripts/ubuntu.sh` to install these packages.
   * Download and install Intel libraries:
-     * Install Intel compiler and MKL, refer to [INTELLIB_README.md](IINTELLIB_README.md).
+     * Install Intel compiler and MKL, refer to [INTELLIB_README.md](INTELLIB_README.md).
 
-     * Set required environment variables by sourcing `setvars.sh`. If oneAPI is in `/opt`,
+     * Set required environment variables by sourcing `setvars.sh`. If oneAPI is installed in `/opt`,
      run `source /opt/intel/oneapi/setvars.sh`.   
 
      * Install [Intel FlexRAN's FEC SDK](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules) for LDPC encoding and decoding:
-        * **NOTE** Compiling FlexRAN requires Intel compiler with version <= 19.0.4
+        * **NOTE**: Compiling FlexRAN requires Intel compiler with version <= 19.0.4.
           Newer versions of Intel compiler can also work, but require a patch for resolving conflicts with FlexRAN. 
           Please [contact](#contact) the current Agora developers to get the patch.
         * Download Intel FlexRAN's FEC SDK to `/opt`.
