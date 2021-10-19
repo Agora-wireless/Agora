@@ -251,6 +251,67 @@ static inline void SimdConvert12bitIqToFloat(const uint8_t* in_buf,
   const __m256 magic = _mm256_set1_ps(float((1 << 23) + (1 << 15)) / 131072.f);
   const __m256i magic_i = _mm256_castps_si256(magic);
 #endif
+#ifdef __AVX512F__
+  for (size_t i = 0; i < n_elems / 3; i += 32) {
+    __m512i temp_i =
+        _mm512_set_epi16(*(uint16_t*)(in_buf + 93), *(uint16_t*)(in_buf + 90),
+                         *(uint16_t*)(in_buf + 87), *(uint16_t*)(in_buf + 84),
+                         *(uint16_t*)(in_buf + 81), *(uint16_t*)(in_buf + 78),
+                         *(uint16_t*)(in_buf + 75), *(uint16_t*)(in_buf + 72),
+                         *(uint16_t*)(in_buf + 69), *(uint16_t*)(in_buf + 66),
+                         *(uint16_t*)(in_buf + 63), *(uint16_t*)(in_buf + 60),
+                         *(uint16_t*)(in_buf + 57), *(uint16_t*)(in_buf + 54),
+                         *(uint16_t*)(in_buf + 51), *(uint16_t*)(in_buf + 48),
+                         *(uint16_t*)(in_buf + 45), *(uint16_t*)(in_buf + 42),
+                         *(uint16_t*)(in_buf + 39), *(uint16_t*)(in_buf + 36),
+                         *(uint16_t*)(in_buf + 33), *(uint16_t*)(in_buf + 30),
+                         *(uint16_t*)(in_buf + 27), *(uint16_t*)(in_buf + 24),
+                         *(uint16_t*)(in_buf + 21), *(uint16_t*)(in_buf + 18),
+                         *(uint16_t*)(in_buf + 15), *(uint16_t*)(in_buf + 12),
+                         *(uint16_t*)(in_buf + 9), *(uint16_t*)(in_buf + 6),
+                         *(uint16_t*)(in_buf + 3), *(uint16_t*)(in_buf + 0));
+
+    __m512i mask_q = _mm512_set1_epi16(0xfff0);
+    __m512i temp_q =
+        _mm512_set_epi16(*(uint16_t*)(in_buf + 94), *(uint16_t*)(in_buf + 91),
+                         *(uint16_t*)(in_buf + 88), *(uint16_t*)(in_buf + 85),
+                         *(uint16_t*)(in_buf + 82), *(uint16_t*)(in_buf + 79),
+                         *(uint16_t*)(in_buf + 76), *(uint16_t*)(in_buf + 73),
+                         *(uint16_t*)(in_buf + 70), *(uint16_t*)(in_buf + 67),
+                         *(uint16_t*)(in_buf + 64), *(uint16_t*)(in_buf + 61),
+                         *(uint16_t*)(in_buf + 58), *(uint16_t*)(in_buf + 55),
+                         *(uint16_t*)(in_buf + 52), *(uint16_t*)(in_buf + 49),
+                         *(uint16_t*)(in_buf + 46), *(uint16_t*)(in_buf + 43),
+                         *(uint16_t*)(in_buf + 40), *(uint16_t*)(in_buf + 37),
+                         *(uint16_t*)(in_buf + 34), *(uint16_t*)(in_buf + 31),
+                         *(uint16_t*)(in_buf + 28), *(uint16_t*)(in_buf + 25),
+                         *(uint16_t*)(in_buf + 22), *(uint16_t*)(in_buf + 19),
+                         *(uint16_t*)(in_buf + 16), *(uint16_t*)(in_buf + 13),
+                         *(uint16_t*)(in_buf + 10), *(uint16_t*)(in_buf + 7),
+                         *(uint16_t*)(in_buf + 4), *(uint16_t*)(in_buf + 1));
+
+    temp_q = _mm512_and_si512(temp_q, mask_q);  // Set lower 4 bits to 0
+    temp_i = _mm512_slli_epi16(temp_i, 4);      // Shift left by 4 bits
+
+    __m512i iq_0 = _mm512_unpacklo_epi16(temp_i, temp_q);
+    __m512i iq_1 = _mm512_unpackhi_epi16(temp_i, temp_q);
+    __m512i output_0 = _mm512_permutex2var_epi64(
+        iq_0, _mm512_set_epi64(11, 10, 3, 2, 9, 8, 1, 0), iq_1);
+    __m512i output_1 = _mm512_permutex2var_epi64(
+        iq_0, _mm512_set_epi64(15, 14, 7, 6, 13, 12, 5, 4), iq_1);
+
+    simd_convert_16bit_iq_to_float(_mm512_extracti64x4_epi64(output_0, 0),
+                                   out_buf + i * 2, magic, magic_i);
+    simd_convert_16bit_iq_to_float(_mm512_extracti64x4_epi64(output_0, 1),
+                                   out_buf + i * 2 + 16, magic, magic_i);
+    simd_convert_16bit_iq_to_float(_mm512_extracti64x4_epi64(output_1, 0),
+                                   out_buf + i * 2 + 32, magic, magic_i);
+    simd_convert_16bit_iq_to_float(_mm512_extracti64x4_epi64(output_1, 1),
+                                   out_buf + i * 2 + 48, magic, magic_i);
+    in_buf += 96;
+  }
+
+#else
   for (size_t i = 0; i < n_elems / 3; i += 16) {
     // Convert 16 IQ smaples from 48 uint8_t to 32 shorts
     // convert_12bit_iq_to_16bit_iq(in_buf + i * 3, in_16bits_buf, 16);
@@ -282,11 +343,7 @@ static inline void SimdConvert12bitIqToFloat(const uint8_t* in_buf,
     __m256i iq_1 = _mm256_unpackhi_epi16(temp_i, temp_q);
     __m256i output_0 = _mm256_permute2f128_si256(iq_0, iq_1, 0x20);
     __m256i output_1 = _mm256_permute2f128_si256(iq_0, iq_1, 0x31);
-#ifdef __AVX512F__
-    simd_convert_16bit_iq_to_float(output_0, out_buf + i * 2, magic, magic_i);
-    simd_convert_16bit_iq_to_float(output_1, out_buf + i * 2 + 16, magic,
-                                   magic_i);
-#else
+
     _mm256_store_si256((__m256i*)(in_16bits_buf), output_0);
     _mm256_store_si256((__m256i*)(in_16bits_buf + 16), output_1);
 
@@ -315,9 +372,9 @@ static inline void SimdConvert12bitIqToFloat(const uint8_t* in_buf,
       _mm256_store_ps(out_buf + i * 2 + j * 16 + 8,
                       converted1);  // port 2,3,4,7
     }
-#endif
     in_buf += 48;
   }
+#endif
 }
 
 // Convert a float16 array [in_buf] to a float32 array [out_buf]. Each array

@@ -10,16 +10,20 @@ sudo apt -y install g++ cmake make
 
 # General libs
 sudo apt -y install liblapack-dev libblas-dev libboost-all-dev doxygen \
-  python-numpy python-pyqt5 libnuma-dev libgflags-dev libgtest-dev \
-  libpython-dev swig
+  libnuma-dev libgflags-dev libgtest-dev swig
+
+# These libraries may not exist on newer kernel versions
+# If they fail to be installed, try python3 version instead
+sudo apt -y python-numpy python-pyqt5 libpython-dev
+# sudo apt -y python3-numpy python3-pyqt5 libpython3-dev
 
 # GTest needs special compilation
 (cd /usr/src/gtest && sudo cmake . && sudo make && sudo mv libg* /usr/lib/)
 
 # Install Armadillo from source
-wget http://sourceforge.net/projects/arma/files/armadillo-9.300.2.tar.xz .
-tar xf armadillo-9.300.2.tar.xz
-(cd armadillo-9.300.2; cmake .; make -j; sudo make install)
+wget http://sourceforge.net/projects/arma/files/armadillo-10.7.1.tar.xz .
+tar xf armadillo-10.7.1.tar.xz
+(cd armadillo-10.7.1; cmake .; make -j; sudo make install)
 rm -rf armadillo*
 
 # Install nlohmann json-dev from the GitHub repo
