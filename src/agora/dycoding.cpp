@@ -378,8 +378,8 @@ void DyDecode::StartWork()
         "decode %.2lfms (%zu, %.2lf%%, %.2lfus, %zu, %.2lfus, %.2lfus), stating %.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%), "
         "working proportions (%zu/%zu: %.2lf%%)\n",
         tid_, cycles_to_ms(whole_duration, freq_ghz_),
-        cycles_to_ms(decode_tsc_duration, freq_ghz_), decode_count, decode_tsc_duration * 100.0f / whole_duration, cycles_to_us(decode_max, freq_ghz_), decode_count_, cycles_to_us(decode_max_, freq_ghz_), cycles_to_us(decode_tsc_ / decode_count_, freq_ghz_),
+        cycles_to_ms(decode_tsc_duration, freq_ghz_), decode_count, decode_tsc_duration * 100.0f / whole_duration, cycles_to_us(decode_max, freq_ghz_), decode_count_, cycles_to_us(decode_max_, freq_ghz_), cycles_to_us(decode_count_ == 0 ? 0 : decode_tsc_ / decode_count_, freq_ghz_),
         cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration,
-        work_count, loop_count, work_count * 100.0f / loop_count);
+        work_count, loop_count, loop_count == 0 ? 0 : work_count * 100.0f / loop_count);
 }
