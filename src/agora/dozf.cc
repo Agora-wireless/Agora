@@ -112,24 +112,47 @@ static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
   // The SIMD and non-SIMD methods are equivalent.
   size_t ant_start = 0;
   if (kUseSIMDGather and bs_ant_num >= 4) {
-    __m256i index = _mm256_setr_epi32(
-        0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
-        kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
-        kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1);
-
     const size_t transpose_block_id = cur_sc_id / kTransposeBlockSize;
     const size_t sc_inblock_idx = cur_sc_id % kTransposeBlockSize;
     const size_t offset_in_src_buffer =
         transpose_block_id * bs_ant_num * kTransposeBlockSize + sc_inblock_idx;
 
     src = src + offset_in_src_buffer * 2;
-    for (size_t ant_idx = 0; ant_idx < bs_ant_num; ant_idx += 4) {
+#ifdef __AVX512F__
+    size_t ant_num_per_simd = 8;
+    __m512i index = _mm512_setr_epi32(
+        0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
+        kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
+        kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1,
+        kTransposeBlockSize * 8, kTransposeBlockSize * 8 + 1,
+        kTransposeBlockSize * 10, kTransposeBlockSize * 10 + 1,
+        kTransposeBlockSize * 12, kTransposeBlockSize * 12 + 1,
+        kTransposeBlockSize * 14, kTransposeBlockSize * 14 + 1);
+    for (size_t ant_idx = 0; ant_idx < bs_ant_num;
+         ant_idx += ant_num_per_simd) {
+      // fetch 4 complex floats for 4 ants
+
+      __m512 t = kTransposeBlockSize == 1 ? _mm512_load_ps(src)
+                                          : _mm512_i32gather_ps(index, src, 4);
+      _mm512_storeu_ps(dst, t);
+      src += ant_num_per_simd * kTransposeBlockSize * 2;
+      dst += ant_num_per_simd * 2;
+    }
+#else
+    size_t ant_num_per_simd = 4;
+    __m256i index = _mm256_setr_epi32(
+        0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
+        kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
+        kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1);
+    for (size_t ant_idx = 0; ant_idx < bs_ant_num;
+         ant_idx += ant_num_per_simd) {
       // fetch 4 complex floats for 4 ants
       __m256 t = _mm256_i32gather_ps(src, index, 4);
       _mm256_storeu_ps(dst, t);
-      src += 8 * kTransposeBlockSize;
-      dst += 8;
+      src += ant_num_per_simd * kTransposeBlockSize * 2;
+      dst += ant_num_per_simd * 2;
     }
+#endif
     // Set the of the remaining antennas to use non-SIMD gather
     ant_start = bs_ant_num / 4 * 4;
   }
