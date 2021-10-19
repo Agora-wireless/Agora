@@ -17,8 +17,8 @@ static constexpr size_t frame_offsets[kAntTestNum] = { 0, 20, 30 };
 std::atomic<size_t> num_workers_ready_atomic;
 
 void MasterToWorkerDynamic_master(Config* cfg,
-    moodycamel::ConcurrentQueue<Event_data>& event_queue,
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue)
+    moodycamel::ConcurrentQueue<EventData>& event_queue,
+    moodycamel::ConcurrentQueue<EventData>& complete_task_queue)
 {
     pin_to_core_with_offset(ThreadType::kMaster, cfg->core_offset, 0);
     // Wait for all worker threads to be ready
@@ -33,14 +33,14 @@ void MasterToWorkerDynamic_master(Config* cfg,
                 = i / cfg->zf_events_per_symbol + frame_offsets[bs_ant_idx];
             size_t base_sc_id
                 = (i % cfg->zf_events_per_symbol) * cfg->zf_block_size;
-            event_queue.enqueue(Event_data(
+            event_queue.enqueue(EventData(
                 EventType::kZF, gen_tag_t::frm_sc(frame_id, base_sc_id)._tag));
         }
 
         // Dequeue all events in queue to avoid overflow
         size_t num_finished_events = 0;
         while (num_finished_events < kMaxTestNum) {
-            Event_data event;
+            EventData event;
             int ret = complete_task_queue.try_dequeue(event);
             if (ret)
                 num_finished_events++;
@@ -49,8 +49,8 @@ void MasterToWorkerDynamic_master(Config* cfg,
 }
 
 void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
-    double freq_ghz, moodycamel::ConcurrentQueue<Event_data>& event_queue,
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+    double freq_ghz, moodycamel::ConcurrentQueue<EventData>& event_queue,
+    moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
     moodycamel::ProducerToken* ptok,
     PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers,
     Table<complex_float>& calib_buffer,
@@ -73,14 +73,14 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
 
     size_t start_tsc = rdtsc();
     size_t num_tasks = 0;
-    Event_data req_event;
+    EventData req_event;
     size_t max_frame_id_wo_offset
         = (kMaxTestNum - 1) / (cfg->OFDM_DATA_NUM / cfg->zf_block_size);
     for (size_t i = 0; i < kMaxItrNum; i++) {
         if (event_queue.try_dequeue(req_event)) {
             num_tasks++;
             size_t frame_offset_id = 0;
-            size_t cur_frame_id = gen_tag_t(req_event.tags[0]).frame_id;
+            size_t cur_frame_id = gen_tag_t(req_event.tags_[0]).frame_id;
             if (cur_frame_id >= frame_offsets[1]
                 and cur_frame_id - frame_offsets[1] <= max_frame_id_wo_offset) {
                 frame_offset_id = 1;
@@ -89,8 +89,8 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
                 frame_offset_id = 2;
             }
             ASSERT_EQ(cfg->BS_ANT_NUM, bs_ant_nums[frame_offset_id]);
-            Event_data resp_event = computeZF->launch(req_event.tags[0]);
-            try_enqueue_fallback(&complete_task_queue, ptok, resp_event);
+            EventData resp_event = computeZF->launch(req_event.tags_[0]);
+            TryEnqueueFallback(&complete_task_queue, ptok, resp_event);
         }
     }
     double ms = cycles_to_ms(rdtsc() - start_tsc, freq_ghz);
@@ -109,10 +109,10 @@ TEST(TestZF, VaryingConfig)
 
     double freq_ghz = measure_rdtsc_freq();
 
-    auto event_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
+    auto event_queue = moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
     moodycamel::ProducerToken* ptoks[kNumWorkers];
     auto complete_task_queue
-        = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
+        = moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
     for (size_t i = 0; i < kNumWorkers; i++) {
         ptoks[i] = new moodycamel::ProducerToken(complete_task_queue);
     }

@@ -180,9 +180,9 @@ int main(int argc, char* argv[])
         SignalHandler signalHandler;
         signalHandler.setupSignalHandlers();
         auto* agora_cli = new Agora(cfg);
-        agora_cli->flags.enable_save_decode_data_to_file = true;
-        agora_cli->flags.enable_save_tx_data_to_file = true;
-        agora_cli->start();
+        agora_cli->flags_.enable_save_decode_data_to_file_ = true;
+        agora_cli->flags_.enable_save_tx_data_to_file_ = true;
+        agora_cli->Start();
 
         printf("Start correctness check\n");
         if (cfg->downlink_mode)

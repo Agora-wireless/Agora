@@ -84,16 +84,16 @@ public:
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
         std::vector<std::vector<ControlInfo>>& control_info_table,
         std::vector<size_t>& control_idx_list,
-        SharedState* shared_state_);
+        SharedState* shared_state);
 
     ~DySubcarrier();
 
-    void start_work();
+    void StartWork();
 
 private:
-    void run_csi(size_t frame_id, size_t base_sc_id);
+    void runCsi(size_t frame_id, size_t base_sc_id);
 
-    inline bool should_sleep(std::vector<ControlInfo>& control_list);
+    inline bool shouldSleep(std::vector<ControlInfo>& control_list);
 
     /// The subcarrier range handled by this subcarrier doer.
     struct Range sc_range_;

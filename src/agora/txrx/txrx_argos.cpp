@@ -29,7 +29,7 @@ void* PacketTXRX::loop_tx_rx_argos(int tid)
         rx_offset = (rx_offset + cfg->nChannels) % packet_num_in_buffer_;
 
         if (kIsWorkerTimingEnabled) {
-            int frame_id = pkt->frame_id;
+            int frame_id = pkt->frame_id_;
             if (frame_id > prev_frame_id) {
                 rx_frame_start[frame_id % kNumStatsFrames] = rdtsc();
                 prev_frame_id = frame_id;
@@ -63,7 +63,7 @@ struct Packet* PacketTXRX::recv_enqueue_argos(
             break;
         }
         pkt[ch] = (struct Packet*)&rx_buffer[(rx_offset + ch) * packet_length];
-        samp[ch] = pkt[ch]->data;
+        samp[ch] = pkt[ch]->data_;
     }
 
     long long frameTime;
@@ -82,7 +82,7 @@ struct Packet* PacketTXRX::recv_enqueue_argos(
             = 1; // has data, after it is read, it is set to 0
 
         // Push kPacketRX event into the queue.
-        Event_data rx_message(
+        EventData rx_message(
             EventType::kPacketRX, rx_tag_t(tid, rx_offset + ch)._tag);
 
         if (!message_queue_->enqueue(*local_ptok, rx_message)) {
@@ -96,16 +96,16 @@ struct Packet* PacketTXRX::recv_enqueue_argos(
 int PacketTXRX::dequeue_send_argos(int tid)
 {
     auto& c = cfg;
-    Event_data event;
+    EventData event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
         return -1;
 
     // printf("tx queue length: %d\n", task_queue_->size_approx());
-    assert(event.event_type == EventType::kPacketTX);
+    assert(event.event_type_ == EventType::kPacketTX);
 
-    size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
-    size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-    size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+    size_t ant_id = gen_tag_t(event.tags_[0]).ant_id;
+    size_t frame_id = gen_tag_t(event.tags_[0]).frame_id;
+    size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id;
 
     size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
     size_t offset
@@ -132,7 +132,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
     } else {
         char* cur_buffer_ptr = tx_buffer_ + offset * c->packet_length;
         struct Packet* pkt = (struct Packet*)cur_buffer_ptr;
-        txbuf[ch] = (void*)pkt->data;
+        txbuf[ch] = (void*)pkt->data_;
     }
 
     size_t last = c->DLSymbols[0].back();
@@ -149,7 +149,7 @@ int PacketTXRX::dequeue_send_argos(int tid)
     }
 
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
-                  Event_data(EventType::kPacketTX, event.tags[0])),
+                  EventData(EventType::kPacketTX, event.tags_[0])),
         "Socket message enqueue failed\n");
-    return event.tags[0];
+    return event.tags_[0];
 }

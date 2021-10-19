@@ -61,7 +61,7 @@ Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset, void* 
 }
 
 Receiver::Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
-    moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
+    moodycamel::ConcurrentQueue<EventData>* in_queue_message,
     moodycamel::ProducerToken** in_rx_ptoks)
     : Receiver(cfg, rx_thread_num, core_offset)
 {
@@ -142,10 +142,6 @@ void* Receiver::loopRecv(int tid)
 
     auto ifft_inout = reinterpret_cast<complex_float*>(
         memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
-    auto* socks_pkt_buf
-        = reinterpret_cast<Packet*>(memalign(64, cfg->packet_length));
-    auto* data_buf
-        = reinterpret_cast<Packet*>(memalign(64, cfg->packet_length));
 
     char* cur_buffer_ptr = buffer_ptr;
     int* cur_buffer_status_ptr = buffer_status_ptr;
@@ -198,25 +194,19 @@ void* Receiver::loopRecv(int tid)
             }
 
             auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<char*>(eth_hdr) + kPayloadOffset);
-            // printf("Received one packet: %u\n", pkt->pkt_type);
-            if (pkt->pkt_type == Packet::PktType::kIQFromServer) {
-                if (pkt->frame_id >= cur_frame_ + kFrameWnd) {
+            if (pkt->pkt_type_ == Packet::PktType::kIQFromServer) {
+                if (pkt->frame_id_ >= cur_frame_ + kFrameWnd) {
                     printf("Error! Socket buffer overflow!\n");
                     exit(1);
                 }
-                size_t frame_slot = pkt->frame_id % kFrameWnd;
-                size_t symbol_id = pkt->symbol_id;
-                size_t ant_id = pkt->ant_id;
-                size_t server_id = pkt->server_id;
+                size_t frame_slot = pkt->frame_id_ % kFrameWnd;
+                size_t symbol_id = pkt->symbol_id_;
+                size_t ant_id = pkt->ant_id_;
+                size_t server_id = pkt->server_id_;
                 size_t symbol_offset = frame_slot * cfg->symbol_num_perframe + symbol_id;
                 size_t table_offset = symbol_offset * cfg->packet_length 
                     + sizeof(float) * (cfg->OFDM_DATA_START + server_id * cfg->get_num_sc_per_server());
-                // printf("Received valid packets ant:%u offset:%u server:%u!\n", pkt->ant_id, table_offset, server_id);
-                // for (size_t i = 0; i < cfg->get_num_sc_per_server() * 2; i ++) {
-                //     printf("%04x ", (unsigned short)pkt->data[i]);
-                // }
-                // printf("\n");
-                DpdkTransport::fastMemcpy(&socket_buffer_[ant_id][table_offset], pkt->data, sizeof(float) * cfg->get_num_sc_per_server());
+                DpdkTransport::fastMemcpy(&socket_buffer_[ant_id][table_offset], pkt->data_, sizeof(float) * cfg->get_num_sc_per_server());
                 socket_buffer_status_[ant_id][symbol_offset] ++;
                 if (socket_buffer_status_[ant_id][symbol_offset] == cfg->bs_server_addr_list.size()) {
                     char* src = &socket_buffer_[ant_id][symbol_offset * cfg->packet_length];
@@ -228,9 +218,7 @@ void* Receiver::loopRecv(int tid)
                 }
                 frame_mutex_.lock();
                 frame_status_[frame_slot] ++;
-                // printf("Received %u(%u) packets in frame %u\n", frame_status_[frame_slot], cfg->dl_data_symbol_num_perframe * cfg->bs_server_addr_list.size() * cfg->BS_ANT_NUM, pkt->frame_id);
                 if (frame_status_[frame_slot] == cfg->dl_data_symbol_num_perframe * cfg->bs_server_addr_list.size() * cfg->BS_ANT_NUM) {
-                    // printf("Received all packets in frame %u\n", pkt->frame_id);
                     frame_status_[frame_slot] = 0;
                     cur_frame_ ++;
                 }
@@ -259,11 +247,11 @@ void* Receiver::loopRecv(int tid)
 
         // Read information from received packet
         auto* pkt = (struct Packet*)cur_buffer_ptr;
-        int frame_id = pkt->frame_id;
+        int frame_id = pkt->frame_id_;
 
         if (kDebugSenderReceiver) {
             printf("RX thread %d received frame %d symbol %d, ant %d\n ", tid,
-                frame_id, pkt->symbol_id, pkt->ant_id);
+                frame_id, pkt->symbol_id_, pkt->ant_id_);
         }
 
         if (kIsWorkerTimingEnabled) {

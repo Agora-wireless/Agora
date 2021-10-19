@@ -16,8 +16,8 @@ TEST(TestZF, Perf)
     int tid = 0;
     double freq_ghz = measure_rdtsc_freq();
 
-    auto event_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
-    auto comp_queue = moodycamel::ConcurrentQueue<Event_data>(2 * kNumIters);
+    auto event_queue = moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
+    auto comp_queue = moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
     auto ptok = new moodycamel::ProducerToken(comp_queue);
 
     PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;

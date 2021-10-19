@@ -32,7 +32,7 @@ public:
         EncodeStatus* encode_status);
     ~DyEncode();
 
-    Event_data launch(size_t tag);
+    EventData launch(size_t tag);
 
     void start_work();
 
@@ -53,7 +53,7 @@ private:
     size_t cur_frame_ = 0;
     size_t cur_symbol_ = 0;
     size_t cur_cb_ = 0;
-    moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
+    moodycamel::ConcurrentQueue<EventData> dummy_conq_;
 };
 #endif
 
@@ -68,16 +68,16 @@ public:
 
     ~DyDecode();
 
-    Event_data launch(size_t tag);
+    EventData Launch(size_t tag);
 
-    void start_work();
+    void StartWork();
 
 private:
-    inline bool should_sleep(size_t ue_num) { 
-        return ue_num <= cfg->ue_start;
+    inline bool shouldSleep(size_t ue_num) { 
+        return ue_num <= cfg_->ue_start;
     }
 
-    int16_t* resp_var_nodes;
+    int16_t* resp_var_nodes_;
     Table<int8_t> demod_buffer_to_decode_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers_;
     SharedState* shared_state_;

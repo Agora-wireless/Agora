@@ -54,8 +54,8 @@ public:
     // Transmit symbols to client antennas after applying channel
     void do_tx_user(int tid, size_t tag);
 
-    void schedule_task(Event_data do_task,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue,
+    void schedule_task(EventData do_task,
+        moodycamel::ConcurrentQueue<EventData>* in_queue,
         moodycamel::ProducerToken const& ptok);
     void* taskThread(int tid);
 
@@ -82,13 +82,13 @@ private:
     std::vector<char> rx_buffer_ue;
 
     // Task Queue for tasks related to incoming BS packets
-    moodycamel::ConcurrentQueue<Event_data> task_queue_bs;
+    moodycamel::ConcurrentQueue<EventData> task_queue_bs;
 
     // Task Queue for tasks related to incoming Users' packets
-    moodycamel::ConcurrentQueue<Event_data> task_queue_user;
+    moodycamel::ConcurrentQueue<EventData> task_queue_user;
 
     // Master thread's message queue for event completions;
-    moodycamel::ConcurrentQueue<Event_data> message_queue_;
+    moodycamel::ConcurrentQueue<EventData> message_queue_;
     moodycamel::ProducerToken* task_ptok[kMaxThreads];
 
     pthread_t* task_threads;

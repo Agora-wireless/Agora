@@ -423,6 +423,7 @@ void Config::genData()
 
     // Get uplink and downlink raw bits either from file or random numbers
     size_t num_bytes_per_ue = num_bytes_per_cb * LDPC_config.nblocksInSymbol;
+    _unused(num_bytes_per_ue);
     size_t num_bytes_per_ue_pad
         = roundup<64>(num_bytes_per_cb) * LDPC_config.nblocksInSymbol;
     dl_bits.malloc(

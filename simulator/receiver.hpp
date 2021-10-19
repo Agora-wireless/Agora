@@ -47,7 +47,7 @@ public:
      * in_queue: message queue to communicate with main thread
      */
     Receiver(Config* cfg, size_t rx_thread_num, size_t core_offset,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue_message,
+        moodycamel::ConcurrentQueue<EventData>* in_queue_message,
         moodycamel::ProducerToken** in_rx_ptoks);
     ~Receiver();
 
@@ -100,7 +100,7 @@ private:
     size_t tx_thread_num_;
 
     Table<double>* frame_start_;
-    moodycamel::ConcurrentQueue<Event_data>* message_queue_;
+    moodycamel::ConcurrentQueue<EventData>* message_queue_;
     moodycamel::ProducerToken** rx_ptoks_;
     size_t core_id_;
     Config* cfg;

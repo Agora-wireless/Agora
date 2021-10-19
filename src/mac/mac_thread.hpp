@@ -59,8 +59,8 @@ public:
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer,
         Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
         Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
-        moodycamel::ConcurrentQueue<Event_data>* rx_queue,
-        moodycamel::ConcurrentQueue<Event_data>* tx_queue,
+        moodycamel::ConcurrentQueue<EventData>* rx_queue,
+        moodycamel::ConcurrentQueue<EventData>* tx_queue,
         std::string log_filename = "");
 
     ~MacThread();
@@ -76,14 +76,14 @@ private:
 
     // Receive decoded codeblocks from the PHY master thread. Send
     // fully-received frames for UE #i to kRemoteHostname::(kBaseRemotePort + i)
-    void process_codeblocks_from_master(Event_data event);
+    void process_codeblocks_from_master(EventData event);
 
     // Receive SNR report from PHY master thread. Use for RB scheduling.
     // TODO: process CQI report here as well.
-    void process_snr_report_from_master(Event_data event);
+    void process_snr_report_from_master(EventData event);
 
     // Push RAN config update to PHY master thread.
-    void send_ran_config_update(Event_data event);
+    void send_ran_config_update(EventData event);
 
     // Send control information over (out-of-band) control channel
     // from server to client
@@ -178,10 +178,10 @@ private:
     } client_;
 
     // FIFO queue for receiving messages from the master thread
-    moodycamel::ConcurrentQueue<Event_data>* rx_queue_;
+    moodycamel::ConcurrentQueue<EventData>* rx_queue_;
 
     // FIFO queue for sending messages to the master thread
-    moodycamel::ConcurrentQueue<Event_data>* tx_queue_;
+    moodycamel::ConcurrentQueue<EventData>* tx_queue_;
 
     // CRC
     DoCRC* crc_obj;

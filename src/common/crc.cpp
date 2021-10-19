@@ -81,13 +81,13 @@ void DoCRC::add_crc24(struct MacPacket* p)
      * int tb_len = p->datalen_;    // Transport Block (TB) length in bits
      */
 
-    uint32_t crc = calculate_crc24((unsigned char*)p->data, p->datalen);
+    uint32_t crc = calculate_crc24((unsigned char*)p->data_, p->datalen_);
     /*
     p->crc[0] = HI(crc);
     p->crc[1] = MID(crc);
     p->crc[2] = LO(crc);
     */
-    p->crc = crc;
+    p->crc_ = crc;
 }
 
 uint32_t DoCRC::calculate_crc24(unsigned char* data, int len)

@@ -224,7 +224,7 @@ std::string DpdkTransport::pkt_to_string(const rte_mbuf* pkt)
         << " unused bytes ] ";
 
     auto* packet = reinterpret_cast<const Packet*>(buf + kPayloadOffset);
-    ret << packet->to_string();
+    ret << packet->ToString();
     return ret.str();
 }
 
@@ -385,7 +385,7 @@ rte_mempool* DpdkTransport::create_mempool(size_t mid)
 
     size_t mbuf_size = JUMBO_FRAME_MAX_SIZE + MBUF_CACHE_SIZE;
     char pool_name[32];
-    sprintf(pool_name, "MBUF_POOL%u", mid);
+    sprintf(pool_name, "MBUF_POOL%lu", mid);
     rte_mempool* mbuf_pool = rte_pktmbuf_pool_create(pool_name,
         NUM_MBUFS * nb_ports, MBUF_CACHE_SIZE, 0, mbuf_size, rte_socket_id());
 

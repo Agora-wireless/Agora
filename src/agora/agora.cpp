@@ -11,25 +11,25 @@ Agora::Agora(Config* cfg)
     printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
         directory.c_str(), freq_ghz_);
 
-    this->config_ = cfg;
+    config_ = cfg;
 
     pin_to_core_with_offset(
         ThreadType::kMaster, cfg->core_offset, 0, false /* quiet */);
-    initialize_uplink_buffers();
+    initializeUplinkBuffers();
 
     if (config_->dl_data_symbol_num_perframe > 0) {
         printf("Agora: Initializing downlink buffers\n");
-        initialize_downlink_buffers();
+        initializeDownlinkBuffers();
     }
 
-    init_control_info();
+    initControlInfo();
 
     /* Initialize TXRX threads */
     packet_tx_rx_.reset(new PacketTXRX(cfg, cfg->core_offset + kNumMasterThread,
         freq_domain_iq_buffer_, demod_buffer_to_send_, demod_buffer_to_decode_, 
         &shared_state_));
     
-    base_worker_core_offset = config_->core_offset + kNumMasterThread + 
+    base_worker_core_offset_ = config_->core_offset + kNumMasterThread + 
         config_->rx_thread_num + kNumDemodTxThread;
     // TODO: Add other possible threads
 
@@ -38,31 +38,30 @@ Agora::Agora(Config* cfg)
         (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
     for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
         do_subcarrier_threads_[i]
-            = std::thread(&Agora::subcarrier_worker, this, i);
+            = std::thread(&Agora::subcarrierWorker, this, i);
     }
 
     do_decode_threads_.resize(cfg->decode_thread_num);
     for (size_t i = 0; i < do_decode_threads_.size(); i++) {
         do_decode_threads_[i]
-            = std::thread(&Agora::decode_worker, this, i);
+            = std::thread(&Agora::decodeWorker, this, i);
     }
 
-creation_end:
     printf("Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
            "cores %zu--%zu\n",
         cfg->core_offset, cfg->core_offset + kNumMasterThread,
         cfg->core_offset + kNumMasterThread + cfg->rx_thread_num + kNumDemodTxThread - 1,
-        base_worker_core_offset,
-        base_worker_core_offset + do_subcarrier_threads_.size() + do_decode_threads_.size() + 
+        base_worker_core_offset_,
+        base_worker_core_offset_ + do_subcarrier_threads_.size() + do_decode_threads_.size() + 
         do_encode_threads_.size());
 }
 
 Agora::~Agora()
 {
-    free_uplink_buffers();
+    freeUplinkBuffers();
     /* Downlink */
     if (config_->dl_data_symbol_num_perframe > 0)
-        free_downlink_buffers();
+        freeDownlinkBuffers();
 
     for (auto& t : do_subcarrier_threads_)
         t.join();
@@ -75,7 +74,7 @@ Agora::~Agora()
     }
 }
 
-void Agora::stop()
+void Agora::Stop()
 {
     static const size_t kSleepBeforeTxRx = 1000;
     std::cout << "Agora: stopping threads" << std::endl;
@@ -84,7 +83,7 @@ void Agora::stop()
     packet_tx_rx_.reset();
 }
 
-void Agora::start()
+void Agora::Start()
 {
     auto& cfg = config_;
 
@@ -93,7 +92,7 @@ void Agora::start()
 
     // Start packet I/O
     if (!packet_tx_rx_->startTXRX()) {
-        this->stop();
+        Stop();
         return;
     }
 
@@ -102,7 +101,6 @@ void Agora::start()
             cfg->running = false;
             goto finish;
         }
-    keep_sleep:
         sleep(1);
     }
     cfg->running = false;
@@ -112,13 +110,13 @@ void Agora::start()
 finish:
 
     printf("Agora: printing stats and saving to file\n");
-    if (flags.enable_save_decode_data_to_file) {
+    if (flags_.enable_save_decode_data_to_file_) {
         // TODO: fix it
-        save_decode_data_to_file(0);
+        saveDecodeDataToFile(0);
     }
-    if (flags.enable_save_tx_data_to_file) {
+    if (flags_.enable_save_tx_data_to_file_) {
         // TODO: fix it
-        save_tx_data_to_file(0);
+        saveTxDataToFile(0);
     }
 
     rte_eth_stats end_stats;
@@ -128,15 +126,15 @@ finish:
         (double)(end_stats.obytes - start_stats.obytes) * 8 / (cfg->frames_to_test * 0.001) / 1000000000.0);
 
     // Printing latency stats
-    save_latency_data_to_file();
+    saveLatencyDataToFile();
 
-    this->stop();
+    Stop();
 }
 
-void* Agora::subcarrier_worker(int tid)
+void* Agora::subcarrierWorker(int tid)
 {
     pin_to_core_with_offset(
-        ThreadType::kWorkerSubcarrier, base_worker_core_offset, tid);
+        ThreadType::kWorkerSubcarrier, base_worker_core_offset_, tid);
 
     Range sc_range(tid * config_->subcarrier_block_size + config_->subcarrier_start,
         min((tid + 1) * config_->subcarrier_block_size + config_->subcarrier_start,
@@ -150,15 +148,15 @@ void* Agora::subcarrier_worker(int tid)
         control_info_table_, control_idx_list_,
         &shared_state_);
 
-    computeSubcarrier->start_work();
+    computeSubcarrier->StartWork();
     delete computeSubcarrier;
 
     return nullptr;
 }
 
-void* Agora::decode_worker(int tid)
+void* Agora::decodeWorker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset,
+    pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_,
         tid + do_subcarrier_threads_.size());
 
     auto computeDecoding = new DyDecode(config_, tid, freq_ghz_,
@@ -166,13 +164,13 @@ void* Agora::decode_worker(int tid)
         decoded_buffer_, control_info_table_, control_idx_list_, 
         &shared_state_);
 
-    computeDecoding->start_work();
+    computeDecoding->StartWork();
     delete computeDecoding;
     
     return nullptr;
 }
 
-void Agora::initialize_uplink_buffers()
+void Agora::initializeUplinkBuffers()
 {
     auto& cfg = config_;
     const size_t task_buffer_symbol_num_ul
@@ -196,7 +194,7 @@ void Agora::initialize_uplink_buffers()
         task_buffer_symbol_num_ul, kMaxModType * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
 }
 
-void Agora::initialize_downlink_buffers()
+void Agora::initializeDownlinkBuffers()
 {
     auto& cfg = config_;
     const size_t task_buffer_symbol_num
@@ -226,13 +224,13 @@ void Agora::initialize_downlink_buffers()
         roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
 }
 
-void Agora::free_uplink_buffers()
+void Agora::freeUplinkBuffers()
 {
     freq_domain_iq_buffer_.free();
     equal_buffer_.free();
 }
 
-void Agora::free_downlink_buffers()
+void Agora::freeDownlinkBuffers()
 {
     free_buffer_1d(&dl_socket_buffer_);
     free_buffer_1d(&dl_socket_buffer_status_);
@@ -242,7 +240,7 @@ void Agora::free_downlink_buffers()
     dl_encoded_buffer_.free();
 }
 
-void Agora::save_decode_data_to_file(int frame_id)
+void Agora::saveDecodeDataToFile(int frame_id)
 {
     auto& cfg = config_;
     const size_t num_decoded_bytes
@@ -263,7 +261,7 @@ void Agora::save_decode_data_to_file(int frame_id)
     fclose(fp);
 }
 
-void Agora::save_tx_data_to_file(UNUSED int frame_id)
+void Agora::saveTxDataToFile(UNUSED int frame_id)
 {
     auto& cfg = config_;
 
@@ -281,14 +279,14 @@ void Agora::save_tx_data_to_file(UNUSED int frame_id)
             size_t packet_length = config_->packet_length;
             struct Packet* pkt
                 = (struct Packet*)(&dl_socket_buffer_[offset * packet_length]);
-            short* socket_ptr = pkt->data;
+            short* socket_ptr = pkt->data_;
             fwrite(socket_ptr, cfg->sampsPerSymbol * 2, sizeof(short), fp);
         }
     }
     fclose(fp);
 }
 
-void Agora::save_latency_data_to_file()
+void Agora::saveLatencyDataToFile()
 {
     auto& cfg = config_;
 
@@ -298,7 +296,7 @@ void Agora::save_latency_data_to_file()
     FILE* fp = fopen(filename.c_str(), "w");
 
     for (size_t i = 0; i < cfg->frames_to_test; i ++) {
-        fprintf(fp, "%u %lu %lu %lu %lu %lu\n", i, shared_state_.frame_start_time_[i],
+        fprintf(fp, "%zu %lu %lu %lu %lu %lu\n", i, shared_state_.frame_start_time_[i],
             shared_state_.frame_iq_time_[i],
             shared_state_.frame_sc_time_[i],
             shared_state_.frame_decode_time_[i],
@@ -307,7 +305,7 @@ void Agora::save_latency_data_to_file()
     fclose(fp);
 }
 
-void Agora::init_control_info()
+void Agora::initControlInfo()
 {
     auto& cfg = config_;
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
@@ -315,9 +313,7 @@ void Agora::init_control_info()
     std::string filename_input = cur_directory
         + "/data/control_ue_template.bin";
     FILE* fp_input = fopen(filename_input.c_str(), "rb");
-    // for (size_t i = 0; i < kNumSlot; i++) {
     for (size_t i = 0; i < cfg->user_level_list.size() * cfg->num_load_levels; i ++) {
-        // size_t num_ue = (i / kNumLoadSetting + 1) * (cfg->UE_NUM / kNumUESetting);
         size_t num_ue = cfg->user_level_list[i / cfg->num_load_levels];
         std::vector<ControlInfo> info_list;
         ControlInfo tmp;
@@ -346,7 +342,7 @@ EXPORT Agora* Agora_new(Config* cfg)
 
     return agora;
 }
-EXPORT void Agora_start(Agora* agora) { agora->start(); }
+EXPORT void Agora_start(Agora* agora) { agora->Start(); }
 EXPORT void Agora_stop(/*Agora *agora*/)
 {
     SignalHandler::setExitSignal(true); /*agora->stop();*/

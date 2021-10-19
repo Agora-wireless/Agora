@@ -6,8 +6,8 @@ MacThread::MacThread(Mode mode, Config* cfg, size_t core_offset,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffer,
     Table<uint8_t>* ul_bits_buffer, Table<uint8_t>* ul_bits_buffer_status,
     Table<uint8_t>* dl_bits_buffer, Table<uint8_t>* dl_bits_buffer_status,
-    moodycamel::ConcurrentQueue<Event_data>* rx_queue,
-    moodycamel::ConcurrentQueue<Event_data>* tx_queue, std::string log_filename)
+    moodycamel::ConcurrentQueue<EventData>* rx_queue,
+    moodycamel::ConcurrentQueue<EventData>* tx_queue, std::string log_filename)
     : mode_(mode)
     , cfg_(cfg)
     , freq_ghz_(measure_rdtsc_freq())
@@ -61,29 +61,29 @@ MacThread::~MacThread()
 
 void MacThread::process_rx_from_master()
 {
-    Event_data event;
+    EventData event;
     if (!rx_queue_->try_dequeue(event))
         return;
 
-    if (event.event_type == EventType::kPacketToMac)
+    if (event.event_type_ == EventType::kPacketToMac)
         process_codeblocks_from_master(event);
-    else if (event.event_type == EventType::kSNRReport)
+    else if (event.event_type_ == EventType::kSNRReport)
         process_snr_report_from_master(event);
 }
 
-void MacThread::process_snr_report_from_master(Event_data event)
+void MacThread::process_snr_report_from_master(EventData event)
 {
-    const size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
+    const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id;
     if (server_.snr_[ue_id].size() == kSNRWindowSize) {
         server_.snr_[ue_id].pop();
     }
 
     float snr;
-    memcpy(&snr, &event.tags[1], sizeof(float));
+    memcpy(&snr, &event.tags_[1], sizeof(float));
     server_.snr_[ue_id].push(snr);
 }
 
-void MacThread::send_ran_config_update(Event_data event)
+void MacThread::send_ran_config_update(EventData event)
 {
     RanConfig rc;
     rc.n_antennas = 0; // TODO [arjun]: What's the correct value here?
@@ -93,24 +93,24 @@ void MacThread::send_ran_config_update(Event_data event)
     // cfg_->BS_ANT_NUM is added to fix compiler warning
     rc.n_antennas = cfg_->BS_ANT_NUM;
 
-    Event_data msg(EventType::kRANUpdate);
-    msg.num_tags = 3;
-    msg.tags[0] = rc.n_antennas;
-    msg.tags[1] = rc.mod_order_bits;
-    msg.tags[2] = rc.frame_id;
+    EventData msg(EventType::kRANUpdate);
+    msg.num_tags_ = 3;
+    msg.tags_[0] = rc.n_antennas;
+    msg.tags_[1] = rc.mod_order_bits;
+    msg.tags_[2] = rc.frame_id;
     rt_assert(tx_queue_->enqueue(msg),
         "MAC thread: failed to send RAN update to Agora");
 
     scheduler_next_frame_id_++;
 }
 
-void MacThread::process_codeblocks_from_master(Event_data event)
+void MacThread::process_codeblocks_from_master(EventData event)
 {
-    assert(event.event_type == EventType::kPacketToMac);
+    assert(event.event_type_ == EventType::kPacketToMac);
 
-    const size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-    const size_t symbol_idx_ul = gen_tag_t(event.tags[0]).symbol_id;
-    const size_t ue_id = gen_tag_t(event.tags[0]).ue_id;
+    const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id;
+    const size_t symbol_idx_ul = gen_tag_t(event.tags_[0]).symbol_id;
+    const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id;
     const uint8_t* ul_data_ptr
         = decoded_buffer_[frame_id % kFrameWnd][symbol_idx_ul][ue_id];
 
@@ -124,16 +124,16 @@ void MacThread::process_codeblocks_from_master(Event_data event)
         // TODO: enable ARQ and ensure reliable data goes to app
         const size_t frame_data__offset
             = (symbol_idx_ul - cfg_->UL_PILOT_SYMS) * cfg_->mac_payload_length;
-        memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data,
+        memcpy(&server_.frame_data_[ue_id][frame_data__offset], pkt->data_,
             cfg_->mac_payload_length);
         server_.n_filled_in_frame_[ue_id] += cfg_->mac_payload_length;
 
         // Check CRC
         uint16_t crc
-            = (uint16_t)(crc_obj->calculate_crc24((unsigned char*)pkt->data,
+            = (uint16_t)(crc_obj->calculate_crc24((unsigned char*)pkt->data_,
                              cfg_->mac_payload_length)
                 & 0xFFFF);
-        if (crc == pkt->crc) {
+        if (crc == pkt->crc_) {
 
             // Print information about the received symbol
             if (kDebugBSReceiver) {
@@ -144,9 +144,9 @@ void MacThread::process_codeblocks_from_master(Event_data event)
                     frame_data__offset);
 
                 ss << "Header Info:\n"
-                   << "FRAME_ID: " << pkt->frame_id
-                   << "\nSYMBOL_ID: " << pkt->symbol_id
-                   << "\nUE_ID: " << pkt->ue_id << "\nDATLEN: " << pkt->datalen
+                   << "FRAME_ID: " << pkt->frame_id_
+                   << "\nSYMBOL_ID: " << pkt->symbol_id_
+                   << "\nUE_ID: " << pkt->ue_id_ << "\nDATLEN: " << pkt->datalen_
                    << "\nPAYLOAD:\n";
                 for (size_t i = 0; i < cfg_->mac_payload_length; i++) {
                     ss << std::to_string(ul_data_ptr[i]) << " ";
@@ -177,7 +177,7 @@ void MacThread::process_codeblocks_from_master(Event_data event)
     }
 
     rt_assert(
-        tx_queue_->enqueue(Event_data(EventType::kPacketToMac, event.tags[0])),
+        tx_queue_->enqueue(EventData(EventType::kPacketToMac, event.tags_[0])),
         "Socket message enqueue failed\n");
 }
 
@@ -191,7 +191,7 @@ void MacThread::send_control_information()
         (uint8_t*)&ri, sizeof(RBIndicator));
 
     // update RAN config within Agora
-    send_ran_config_update(Event_data(EventType::kRANUpdate));
+    send_ran_config_update(EventData(EventType::kRANUpdate));
 }
 
 void MacThread::process_control_information()
@@ -238,11 +238,11 @@ void MacThread::process_udp_packets_from_apps_server(
 {
     // We've received bits for the downlink
     const size_t total_symbol_idx
-        = cfg_->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
+        = cfg_->get_total_data_symbol_idx_dl(pkt->frame_id_, pkt->symbol_id_);
     const size_t rx_offset
         = total_symbol_idx * cfg_->LDPC_config.nblocksInSymbol;
 
-    if ((*dl_bits_buffer_status_)[pkt->ue_id][rx_offset] == 1) {
+    if ((*dl_bits_buffer_status_)[pkt->ue_id_][rx_offset] == 1) {
         MLPD_ERROR("MAC thread: dl_bits_buffer full, offset %zu. Exiting.\n",
             rx_offset);
         cfg_->running = false;
@@ -250,13 +250,13 @@ void MacThread::process_udp_packets_from_apps_server(
     }
 
     for (size_t i = 0; i < cfg_->LDPC_config.nblocksInSymbol; i++)
-        (*dl_bits_buffer_status_)[pkt->ue_id][rx_offset + i] = 1;
+        (*dl_bits_buffer_status_)[pkt->ue_id_][rx_offset + i] = 1;
     memcpy(
-        &(*dl_bits_buffer_)[total_symbol_idx][pkt->ue_id * cfg_->OFDM_DATA_NUM],
-        pkt->data, udp_pkt_buf_.size());
+        &(*dl_bits_buffer_)[total_symbol_idx][pkt->ue_id_* cfg_->OFDM_DATA_NUM],
+        pkt->data_, udp_pkt_buf_.size());
 
-    Event_data msg(EventType::kPacketFromMac,
-        gen_tag_t::frm_sym_ue(pkt->frame_id, pkt->symbol_id, pkt->ue_id)._tag);
+    EventData msg(EventType::kPacketFromMac,
+        gen_tag_t::frm_sym_ue(pkt->frame_id_, pkt->symbol_id_, pkt->ue_id_)._tag);
     rt_assert(tx_queue_->enqueue(msg),
         "MAC thread: Failed to enqueue downlink packet");
 }
@@ -294,27 +294,27 @@ void MacThread::process_udp_packets_from_apps_client(
             + pkt_id * cfg_->mac_packet_length;
         auto* pkt = (MacPacket*)(&(
             *client_.ul_bits_buffer_)[next_radio_id_][data_offset]);
-        pkt->frame_id = next_frame_id_;
-        pkt->symbol_id = pkt_id;
-        pkt->ue_id = next_radio_id_;
-        pkt->datalen = cfg_->mac_payload_length;
-        pkt->rsvd[0] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
-        pkt->rsvd[1] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
-        pkt->rsvd[2] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
-        pkt->crc = 0;
-        pkt->rb_indicator = ri;
+        pkt->frame_id_ = next_frame_id_;
+        pkt->symbol_id_ = pkt_id;
+        pkt->ue_id_ = next_radio_id_;
+        pkt->datalen_ = cfg_->mac_payload_length;
+        pkt->rsvd_[0] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
+        pkt->rsvd_[1] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
+        pkt->rsvd_[2] = static_cast<uint16_t>(fast_rand_.next_u32() >> 16);
+        pkt->crc_ = 0;
+        pkt->rb_indicator_ = ri;
 
-        memcpy(pkt->data, payload + pkt_id * cfg_->mac_payload_length,
+        memcpy(pkt->data_, payload + pkt_id * cfg_->mac_payload_length,
             cfg_->mac_payload_length);
         // Insert CRC
-        pkt->crc
-            = (uint16_t)(crc_obj->calculate_crc24((unsigned char*)pkt->data,
+        pkt->crc_
+            = (uint16_t)(crc_obj->calculate_crc24((unsigned char*)pkt->data_,
                              cfg_->mac_payload_length)
                 & 0xFFFF);
     }
 
     (*client_.ul_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
-    Event_data msg(
+    EventData msg(
         EventType::kPacketFromMac, rx_tag_t(next_radio_id_, radio_buf_id)._tag);
     rt_assert(
         tx_queue_->enqueue(msg), "MAC thread: Failed to enqueue uplink packet");
@@ -360,16 +360,16 @@ void MacThread::run_event_loop()
 int PacketTXRX::dequeue_send(int tid)
 {
     auto& c = config_;
-    Event_data event;
+    EventData event;
     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
         return -1;
 
     // printf("tx queue length: %d\n", task_queue_->size_approx());
-    assert(event.event_type == EventType::kPacketTX);
+    assert(event.event_type_ == EventType::kPacketTX);
 
-    size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
-    size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-    size_t data_symbol_idx = gen_tag_t(event.tags[0]).symbol_id;
+    size_t ant_id = gen_tag_t(event.tags_[0]).ant_id;
+    size_t frame_id = gen_tag_t(event.tags_[0]).frame_id;
+    size_t data_symbol_idx = gen_tag_t(event.tags_[0]).symbol_id;
 
     size_t offset = (c->get_total_data_symbol_idx(frame_id, data_symbol_idx)
                         * c->BS_ANT_NUM)
@@ -379,7 +379,7 @@ int PacketTXRX::dequeue_send(int tid)
         printf("In TX thread %d: Transmitted frame %zu, symbol %zu, "
                "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
             tid, frame_id, data_symbol_idx, ant_id,
-            gen_tag_t(event.tags[0])._tag, offset,
+            gen_tag_t(event.tags_[0])._tag, offset,
             message_queue_->size_approx());
     }
 
@@ -397,8 +397,8 @@ int PacketTXRX::dequeue_send(int tid)
     rt_assert(ret > 0, "sendto() failed");
 
     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
-                  Event_data(EventType::kPacketTX, event.tags[0])),
+                  EventData(EventType::kPacketTX, event.tags_[0])),
         "Socket message enqueue failed\n");
-    return event.tags[0];
+    return event.tags_[0];
 }
 */

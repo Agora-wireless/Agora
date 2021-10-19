@@ -39,7 +39,7 @@ DyEncode::~DyEncode()
     free(encoded_buffer_temp);
 }
 
-Event_data DyEncode::launch(size_t tag)
+EventData DyEncode::launch(size_t tag)
 {
     LDPCconfig LDPC_config = cfg->LDPC_config;
     size_t frame_id = gen_tag_t(tag).frame_id;
@@ -76,7 +76,7 @@ Event_data DyEncode::launch(size_t tag)
             cycles_to_us(duration, freq_ghz));
     }
 
-    return Event_data(EventType::kEncode, tag);
+    return EventData(EventType::kEncode, tag);
 }
 
 void DyEncode::start_work() 
@@ -107,45 +107,43 @@ DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
     std::vector<std::vector<ControlInfo>>& control_info_table,
     std::vector<size_t>& control_idx_list,
-    SharedState* shared_state_)
+    SharedState* shared_state)
     : Doer(in_config, in_tid, freq_ghz)
     , demod_buffer_to_decode_(demod_buffer_to_decode)
     , decoded_buffers_(decoded_buffers)
+    , shared_state_(shared_state)
+    , total_ue_num_(cfg_->ue_end - cfg_->ue_start)
+    , total_dycode_num_(cfg_->decode_thread_num)
     , control_info_table_(control_info_table)
     , control_idx_list_(control_idx_list)
-    , shared_state_(shared_state_)
-    , total_dycode_num_(cfg->decode_thread_num)
-    , total_ue_num_(cfg->ue_end - cfg->ue_start)
 {
-    resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
+    resp_var_nodes_ = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
 }
 
-DyDecode::~DyDecode() { free(resp_var_nodes); }
+DyDecode::~DyDecode() { free(resp_var_nodes_); }
 
-Event_data DyDecode::launch(size_t tag)
+EventData DyDecode::Launch(size_t tag)
 {
-    LDPCconfig LDPC_config = cfg->LDPC_config;
+    LDPCconfig LDPC_config = cfg_->LDPC_config;
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t symbol_idx_ul = gen_tag_t(tag).symbol_id;
     const size_t cb_id = gen_tag_t(tag).cb_id;
     const size_t symbol_offset
-        = cfg->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
-    const size_t cur_cb_id = cb_id % cfg->LDPC_config.nblocksInSymbol;
-    const size_t ue_id = cb_id / cfg->LDPC_config.nblocksInSymbol;
+        = cfg_->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
+    const size_t cur_cb_id = cb_id % cfg_->LDPC_config.nblocksInSymbol;
+    const size_t ue_id = cb_id / cfg_->LDPC_config.nblocksInSymbol;
     const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
         printf("In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
                "%zu, ue: %zu\n",
-            tid, frame_id, symbol_idx_ul, cur_cb_id, ue_id);
+            tid_, frame_id, symbol_idx_ul, cur_cb_id, ue_id);
     }
 
     std::vector<ControlInfo>& info_list = control_info_table_[control_idx_list_[frame_id]];
     if (ue_id >= info_list.size()) {
-        return Event_data(EventType::kDecode, tag);
+        return EventData(EventType::kDecode, tag);
     }
     ControlInfo& info = info_list[ue_id];
-
-    size_t start_tsc = worker_rdtsc();
 
     struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
     };
@@ -170,10 +168,10 @@ Event_data DyDecode::launch(size_t tag)
 
     int numMsgBits = cbLen - numFillerBits;
     ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
-    ldpc_decoder_5gnr_response.varNodes = resp_var_nodes;
+    ldpc_decoder_5gnr_response.varNodes = resp_var_nodes_;
 
     auto* llr_buffer_ptr
-        = cfg->get_demod_buf_to_decode(demod_buffer_to_decode_, frame_id,
+        = cfg_->get_demod_buf_to_decode(demod_buffer_to_decode_, frame_id,
             symbol_idx_ul, ue_id, info.sc_start);
 
     uint8_t* decoded_buffer_ptr
@@ -221,15 +219,15 @@ Event_data DyDecode::launch(size_t tag)
         printf("\n");
     }
 
-    return Event_data(EventType::kDecode, tag);
+    return EventData(EventType::kDecode, tag);
 }
 
-void DyDecode::start_work()
+void DyDecode::StartWork()
 {
-    printf("Decode tid %u starts to work!\n", tid);
-    cur_idx_ = tid;
+    printf("Decode tid %u starts to work!\n", tid_);
+    cur_idx_ = tid_;
     cur_symbol_ = cur_idx_ / total_ue_num_;
-    cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
+    cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
 
     size_t start_tsc = 0;
     size_t work_tsc_duration = 0;
@@ -243,7 +241,7 @@ void DyDecode::start_work()
 
     size_t decode_max = 0;
 
-    while (cfg->running && !SignalHandler::gotExitSignal()) {
+    while (cfg_->running && !SignalHandler::gotExitSignal()) {
         TRIGGER_TIMER(loop_count ++);
         size_t work_start_tsc, state_start_tsc;
 
@@ -259,8 +257,8 @@ void DyDecode::start_work()
                 decode_start_tsc = rdtsc();
             });
 
-            launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
-                cur_cb_ + cur_ue_ * cfg->LDPC_config.nblocksInSymbol)
+            Launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
+                cur_cb_ + cur_ue_ * cfg_->LDPC_config.nblocksInSymbol)
                        ._tag);
             
             TRIGGER_TIMER({
@@ -272,20 +270,20 @@ void DyDecode::start_work()
             });
 
             cur_cb_++;
-            if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
+            if (cur_cb_ == cfg_->LDPC_config.nblocksInSymbol) {
                 cur_cb_ = 0;
                 cur_idx_ += total_dycode_num_;
                 cur_symbol_ = cur_idx_ / total_ue_num_;
-                cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
-                if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
-                    cur_idx_ = tid;
+                cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
+                if (cur_symbol_ >= cfg_->ul_data_symbol_num_perframe) {
+                    cur_idx_ = tid_;
                     cur_symbol_ = cur_idx_ / total_ue_num_;
-                    cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
+                    cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
 
                     shared_state_->decode_done(cur_frame_);
 
                     cur_frame_++;
-                    if (unlikely(cur_frame_ == cfg->frames_to_test)) {
+                    if (unlikely(cur_frame_ == cfg_->frames_to_test)) {
                         TRIGGER_TIMER({
                             state_operation_duration += rdtsc() - decode_start_tsc;
                             work_tsc_duration += rdtsc() - work_start_tsc;
@@ -326,8 +324,8 @@ void DyDecode::start_work()
                     decode_start_tsc = rdtsc();
                 });
                 
-                launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
-                    cur_cb_ + cur_ue_ * cfg->LDPC_config.nblocksInSymbol)
+                Launch(gen_tag_t::frm_sym_cb(cur_frame_, cur_symbol_,
+                    cur_cb_ + cur_ue_ * cfg_->LDPC_config.nblocksInSymbol)
                         ._tag);
 
                 TRIGGER_TIMER({
@@ -339,20 +337,20 @@ void DyDecode::start_work()
                 });
 
                 cur_cb_++;
-                if (cur_cb_ == cfg->LDPC_config.nblocksInSymbol) {
+                if (cur_cb_ == cfg_->LDPC_config.nblocksInSymbol) {
                     cur_cb_ = 0;
                     cur_idx_ += total_dycode_num_;
                     cur_symbol_ = cur_idx_ / total_ue_num_;
-                    cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
-                    if (cur_symbol_ >= cfg->ul_data_symbol_num_perframe) {
-                        cur_idx_ = tid;
+                    cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
+                    if (cur_symbol_ >= cfg_->ul_data_symbol_num_perframe) {
+                        cur_idx_ = tid_;
                         cur_symbol_ = cur_idx_ / total_ue_num_;
-                        cur_ue_ = cur_idx_ % total_ue_num_ + cfg->ue_start;
+                        cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
 
                         shared_state_->decode_done(cur_frame_);
 
                         cur_frame_++;
-                        if (unlikely(cur_frame_ == cfg->frames_to_test)) {
+                        if (unlikely(cur_frame_ == cfg_->frames_to_test)) {
                             TRIGGER_TIMER({
                                 state_operation_duration += rdtsc() - state_start_tsc;
                                 work_tsc_duration += rdtsc() - work_start_tsc;
@@ -360,7 +358,7 @@ void DyDecode::start_work()
                             break;
                         }
 
-                        if (should_sleep(control_info_table_[control_idx_list_[cur_frame_]].size())) {
+                        if (shouldSleep(control_info_table_[control_idx_list_[cur_frame_]].size())) {
                             std::this_thread::sleep_for(std::chrono::microseconds(900));
                         }
                     }
@@ -377,11 +375,11 @@ void DyDecode::start_work()
     size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("DoDecode Thread %u duration stats: total time used %.2lfms, "
-        "decode %.2lfms (%u, %.2lf\%, %.2lfus, %u, %.2lfus, %.2lfus), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
-        "working proportions (%u/%u: %.2lf\%)\n",
-        tid, cycles_to_ms(whole_duration, freq_ghz),
-        cycles_to_ms(decode_tsc_duration, freq_ghz), decode_count, decode_tsc_duration * 100.0f / whole_duration, cycles_to_us(decode_max, freq_ghz), decode_count_, cycles_to_us(decode_max_, freq_ghz), cycles_to_us(decode_tsc_ / decode_count_, freq_ghz),
-        cycles_to_ms(state_operation_duration, freq_ghz), state_operation_duration * 100.0f / whole_duration,
-        cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
+        "decode %.2lfms (%zu, %.2lf%%, %.2lfus, %zu, %.2lfus, %.2lfus), stating %.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%), "
+        "working proportions (%zu/%zu: %.2lf%%)\n",
+        tid_, cycles_to_ms(whole_duration, freq_ghz_),
+        cycles_to_ms(decode_tsc_duration, freq_ghz_), decode_count, decode_tsc_duration * 100.0f / whole_duration, cycles_to_us(decode_max, freq_ghz_), decode_count_, cycles_to_us(decode_max_, freq_ghz_), cycles_to_us(decode_tsc_ / decode_count_, freq_ghz_),
+        cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, work_count * 100.0f / loop_count);
 }

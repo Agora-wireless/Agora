@@ -32,66 +32,55 @@
 
 class Agora {
 public:
-    /* optimization parameters for block transpose (see the slides for more
-     * details) */
-    static const int transpose_block_num = 256;
-
-    // Dequeue batch size, used to reduce the overhead of dequeue in main thread
-    static const int kDequeueBulkSizeTXRX = 8;
-
-    static const int kDequeueBulkSizeWorker = 4;
-
-
     Agora(Config*); /// Create an Agora object and start the worker threads
     ~Agora();
 
-    void start(); /// The main Agora event loop
-    void stop();
+    void Start(); /// The main Agora event loop
+    void Stop();
 
+private:
     void* worker(int tid); // TODO: implement later
-    void* subcarrier_worker(int tid);
-    void* decode_worker(int tid);
-    void* encode_worker(int tid); // TODO: implement later
+    void* subcarrierWorker(int tid);
+    void* decodeWorker(int tid);
+    void* encodeWorker(int tid); // TODO: implement later
 
-    void initialize_queues(); // TODO: implement later
-    void initialize_uplink_buffers();
-    void initialize_downlink_buffers(); // TODO: implement later
-    void free_uplink_buffers();
-    void free_downlink_buffers(); // TODO: implement later
+    void initializeQueues(); // TODO: implement later
+    void initializeUplinkBuffers();
+    void initializeDownlinkBuffers(); // TODO: implement later
+    void freeUplinkBuffers();
+    void freeDownlinkBuffers(); // TODO: implement later
 
-    void save_decode_data_to_file(int frame_id); // TODO: implement later
-    void save_tx_data_to_file(int frame_id); // TODO: implement later
-    void save_latency_data_to_file();
+    void saveDecodeDataToFile(int frame_id); // TODO: implement later
+    void saveTxDataToFile(int frame_id); // TODO: implement later
+    void saveLatencyDataToFile();
 
-    void init_control_info();
+    void initControlInfo();
 
     // Flags that allow developer control over Agora internals
     struct {
         // Before exiting, save LDPC-decoded or demodulated data to a file
-        bool enable_save_decode_data_to_file = false;
+        bool enable_save_decode_data_to_file_ = false;
 
         // Before exiting, save data sent on downlink to a file
-        bool enable_save_tx_data_to_file = false;
-    } flags;
-
-private:
+        bool enable_save_tx_data_to_file_ = false;
+    } flags_;
 
     /// Fetch the concurrent queue for this event type
-    moodycamel::ConcurrentQueue<Event_data>* get_conq(EventType event_type)
+    inline moodycamel::ConcurrentQueue<EventData>* getConq(EventType event_type)
     {
-        return &sched_info_arr[static_cast<size_t>(event_type)].concurrent_q;
+        return &sched_info_arr[static_cast<size_t>(event_type)].concurrent_q_;
     }
 
     /// Fetch the producer token for this event type
-    moodycamel::ProducerToken* get_ptok(EventType event_type)
+    inline moodycamel::ProducerToken* getPtok(EventType event_type)
     {
-        return sched_info_arr[static_cast<size_t>(event_type)].ptok;
+        return sched_info_arr[static_cast<size_t>(event_type)].ptok_;
     }
 
     const double freq_ghz_; // RDTSC frequency in GHz
 
-    // Worker thread i runs on core base_worker_core_offset + i
-    size_t base_worker_core_offset;
+    // Worker thread i runs on core base_worker_core_offset_ + i
+    size_t base_worker_core_offset_;
 
     Config* config_;
     std::unique_ptr<PacketTXRX> packet_tx_rx_;

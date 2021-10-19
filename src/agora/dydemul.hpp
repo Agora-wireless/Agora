@@ -65,16 +65,16 @@ public:
      * completion of this task
      */
 
-    void launch(
+    void Launch(
         size_t frame_id, size_t symbol_idx_ul, size_t base_sc_id);
 
-    void print_overhead() {
+    void PrintOverhead() {
         printf("DoDemul thread %u overhead: total time: %.2lfms, "
-            "preprocess: %.2lfms (%.2lf\%), equal: %.2lfms (%u, %.2lf\%), "
-            "demod: %.2lfms (%u, %.2lf\%)\n", tid, cycles_to_ms(total_cycles_, freq_ghz),
-            cycles_to_ms(preprocess_cycles_, freq_ghz), preprocess_cycles_ * 100.0f / total_cycles_,
-            cycles_to_ms(equal_cycles_, freq_ghz), equal_count_, equal_cycles_ * 100.0f / total_cycles_,
-            cycles_to_ms(demod_cycles_, freq_ghz), demod_count_, demod_cycles_ * 100.0f / total_cycles_);
+            "preprocess: %.2lfms (%.2lf%%), equal: %.2lfms (%zu, %.2lf%%), "
+            "demod: %.2lfms (%zu, %.2lf%%)\n", tid_, cycles_to_ms(total_cycles_, freq_ghz_),
+            cycles_to_ms(preprocess_cycles_, freq_ghz_), preprocess_cycles_ * 100.0f / total_cycles_,
+            cycles_to_ms(equal_cycles_, freq_ghz_), equal_count_, equal_cycles_ * 100.0f / total_cycles_,
+            cycles_to_ms(demod_cycles_, freq_ghz_), demod_count_, demod_cycles_ * 100.0f / total_cycles_);
     }
 
 private:
@@ -85,11 +85,11 @@ private:
 
     /// Intermediate buffer to gather raw data. Size = subcarriers per cacheline
     /// times number of antennas
-    complex_float* data_gather_buffer;
+    complex_float* data_gather_buffer_;
 
     // Intermediate buffers for equalized data
-    complex_float* equaled_buffer_temp;
-    complex_float* equaled_buffer_temp_transposed;
+    complex_float* equaled_buffer_temp_;
+    complex_float* equaled_buffer_temp_transposed_;
 
 #if USE_MKL_JIT
     void* jitter[kMaxUEs];

@@ -51,8 +51,8 @@ public:
      * in_queue: message queue to communicate with main thread
      */
     RadioTXRX(Config* cfg, int n_tx_thread, int in_core_id,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue_task,
+        moodycamel::ConcurrentQueue<EventData>* in_queue,
+        moodycamel::ConcurrentQueue<EventData>* in_queue_task,
         moodycamel::ProducerToken** in_rx_ptoks,
         moodycamel::ProducerToken** in_tx_ptoks);
     ~RadioTXRX();
@@ -142,8 +142,8 @@ private:
     int thread_num_;
     int tx_thread_num_;
     // pointer of message_queue_
-    moodycamel::ConcurrentQueue<Event_data>* message_queue_;
-    moodycamel::ConcurrentQueue<Event_data>* task_queue_;
+    moodycamel::ConcurrentQueue<EventData>* message_queue_;
+    moodycamel::ConcurrentQueue<EventData>* task_queue_;
     moodycamel::ProducerToken** rx_ptoks_;
     moodycamel::ProducerToken** tx_ptoks_;
     int core_id_;

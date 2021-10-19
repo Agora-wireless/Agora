@@ -55,13 +55,13 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
         uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port + i);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
 
-        printf("Adding steering rule for src IP %s(%x), dest IP %s(%x), src port: %zu, "
-               "dst port: %zu, queue: %zu\n",
+        printf("Adding steering rule for src IP %s(%x), dest IP %s(%x), src port: %u, "
+               "dst port: %u, queue: %zu\n",
             cfg->bs_rru_addr.c_str(), bs_rru_addr_, cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(), bs_server_addrs_[cfg->bs_server_addr_idx],
             rte_cpu_to_be_16(src_port), rte_cpu_to_be_16(dst_port), i);
         DpdkTransport::install_flow_rule(
             port_id, i % rx_thread_num, bs_rru_addr_, bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
-    }
+    }   
 
     for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
         if (i == cfg->bs_server_addr_idx) {
@@ -105,7 +105,7 @@ bool PacketTXRX::startTXRX()
             auto context = new EventHandlerContext<PacketTXRX>;
             context->obj_ptr = this;
             context->id = worker_id;
-            printf("Launch TXRX thread %u on core %u\n", worker_id, lcore_id);
+            printf("Launch TXRX thread %zu on core %u\n", worker_id, lcore_id);
             rte_eal_remote_launch(
                 (lcore_function_t*)
                     pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx>,
@@ -182,12 +182,12 @@ void* PacketTXRX::demod_tx_thread(int tid)
 
                     char* payload = (char*)eth_hdr + kPayloadOffset;
                     auto* pkt = reinterpret_cast<Packet*>(payload);
-                    pkt->pkt_type = Packet::PktType::kDemod;
-                    pkt->frame_id = demod_frame_to_send_;
-                    pkt->symbol_id = demod_symbol_ul_to_send_;
-                    pkt->ue_id = ue_id;
-                    pkt->server_id = cfg->bs_server_addr_idx;
-                    memcpy(pkt->data, demod_ptr,
+                    pkt->pkt_type_ = Packet::PktType::kDemod;
+                    pkt->frame_id_ = demod_frame_to_send_;
+                    pkt->symbol_id_ = demod_symbol_ul_to_send_;
+                    pkt->ue_id_ = ue_id;
+                    pkt->server_id_ = cfg->bs_server_addr_idx;
+                    memcpy(pkt->data_, demod_ptr,
                         cfg->get_num_sc_to_process() * cfg->mod_order_bits);
 
                     // Send data (one OFDM symbol)
@@ -216,8 +216,8 @@ void* PacketTXRX::demod_tx_thread(int tid)
     size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("Demod TX Thread duration stats: total time used %.2lfms, "
-        "send %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
-        "working proportions (%u/%u: %.2lf\%)\n",
+        "send %.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%), "
+        "working proportions (%zu/%zu: %.2lf%%)\n",
         cycles_to_ms(whole_duration, freq_ghz),
         cycles_to_ms(send_tsc_duration, freq_ghz), send_tsc_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
@@ -233,8 +233,6 @@ void* PacketTXRX::loop_tx_rx(int tid)
     int radio_id = radio_lo;
 
     frame_to_send_[tid] = 0;
-    size_t symbol_to_send = 0;
-    size_t ant_to_send = tid * (cfg->nRadios / rx_thread_num);
 
     size_t recv_pkts = 0;
 
@@ -249,7 +247,7 @@ void* PacketTXRX::loop_tx_rx(int tid)
             radio_id = radio_lo;
         
     }
-    printf("Thread %u receive %lu packets, max gap is %lu, frame %u, max record %lu, frame %lu\n", tid, 
+    printf("Thread %u receive %lu packets, max gap is %lu, frame %zu, max record %lu, frame %lu\n", tid, 
         recv_pkts, max_inter_packet_gap_[tid], max_inter_packet_gap_frame_[tid],
         max_packet_record_time_[tid], max_packet_record_time_frame_[tid]);
     return 0;
@@ -269,7 +267,6 @@ int PacketTXRX::recv_relocate(int tid)
         auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
         auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
             reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
-        auto* udp_hdr = reinterpret_cast<rte_udp_hdr*>(reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr) + sizeof(rte_ipv4_hdr));
         uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
         if (kDebugDPDK) {
             auto* udp_h = reinterpret_cast<rte_udp_hdr*>(
@@ -294,8 +291,8 @@ int PacketTXRX::recv_relocate(int tid)
         }
 
         auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset);
-        if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
-            char* iq_ptr = cfg->get_freq_domain_iq_buffer(freq_domain_iq_buffer_, pkt->ant_id, pkt->frame_id, pkt->symbol_id);
+        if (pkt->pkt_type_ == Packet::PktType::kIQFromRRU) {
+            char* iq_ptr = cfg->get_freq_domain_iq_buffer(freq_domain_iq_buffer_, pkt->ant_id_, pkt->frame_id_, pkt->symbol_id_);
 
             size_t sc_offset = Packet::kOffsetOfData
                 + 2 * sizeof(unsigned short)
@@ -307,13 +304,13 @@ int PacketTXRX::recv_relocate(int tid)
 
             valid_pkts ++;
             size_t cur_cycle = rdtsc();
-            if (unlikely(last_packet_cycle_[tid] == 0) && pkt->frame_id > 2000) {
+            if (unlikely(last_packet_cycle_[tid] == 0) && pkt->frame_id_ > 2000) {
                 last_packet_cycle_[tid] = cur_cycle;
             }
 
             if (likely(last_packet_cycle_[tid] > 0) && unlikely(max_inter_packet_gap_[tid] < cur_cycle - last_packet_cycle_[tid])) {
                 max_inter_packet_gap_[tid] = cur_cycle - last_packet_cycle_[tid];
-                max_inter_packet_gap_frame_[tid] = pkt->frame_id;
+                max_inter_packet_gap_frame_[tid] = pkt->frame_id_;
             }
 
             if (likely(last_packet_cycle_[tid] > 0)) {
@@ -328,19 +325,19 @@ int PacketTXRX::recv_relocate(int tid)
             size_t record_cycle = rdtsc() - cur_cycle;
             if (record_cycle > max_packet_record_time_[tid]) {
                 max_packet_record_time_[tid] = record_cycle;
-                max_packet_record_time_frame_[tid] = pkt->frame_id;
+                max_packet_record_time_frame_[tid] = pkt->frame_id_;
             }
 
-        } else if (pkt->pkt_type == Packet::PktType::kDemod) {
-            const size_t symbol_idx_ul = pkt->symbol_id;
-            const size_t sc_id = cfg->subcarrier_num_start[pkt->server_id];
+        } else if (pkt->pkt_type_ == Packet::PktType::kDemod) {
+            const size_t symbol_idx_ul = pkt->symbol_id_;
+            const size_t sc_id = cfg->subcarrier_num_start[pkt->server_id_];
 
             int8_t* demod_ptr
                 = cfg->get_demod_buf_to_decode(demod_buffer_to_decode_,
-                    pkt->frame_id, symbol_idx_ul, pkt->ue_id, sc_id);
-            memcpy(demod_ptr, pkt->data,
-                cfg->subcarrier_num_list[pkt->server_id] * cfg->mod_order_bits);
-            if (!shared_state_->receive_demod_pkt(pkt->ue_id, pkt->frame_id, symbol_idx_ul)) {
+                    pkt->frame_id_, symbol_idx_ul, pkt->ue_id_, sc_id);
+            memcpy(demod_ptr, pkt->data_,
+                cfg->subcarrier_num_list[pkt->server_id_] * cfg->mod_order_bits);
+            if (!shared_state_->receive_demod_pkt(pkt->ue_id_, pkt->frame_id_, symbol_idx_ul)) {
                 cfg->running = false;
             }
         } else {
@@ -386,15 +383,15 @@ void* PacketTXRX::encode_thread(int tid)
 
                     char* payload = (char*)eth_hdr + kPayloadOffset;
                     auto* pkt = reinterpret_cast<Packet*>(payload);
-                    pkt->pkt_type = Packet::PktType::kEncode;
-                    pkt->frame_id = encode_frame_to_send_;
-                    pkt->symbol_id = encode_symbol_dl_to_send_;
-                    pkt->ue_id = encode_ue_to_send_;
-                    pkt->server_id = cfg->bs_server_addr_idx;
+                    pkt->pkt_type_ = Packet::PktType::kEncode;
+                    pkt->frame_id_ = encode_frame_to_send_;
+                    pkt->symbol_id_ = encode_symbol_dl_to_send_;
+                    pkt->ue_id_ = encode_ue_to_send_;
+                    pkt->server_id_ = cfg->bs_server_addr_idx;
                     // DpdkTransport::fastMemcpy(pkt->data, src_ptr,
                     //     cfg->get_num_sc_per_server());
                     // memcpy(pkt->data, src_ptr, cfg->get_num_sc_per_server());
-                    memcpy(pkt->data, src_ptr, cfg->get_num_sc_to_process());
+                    memcpy(pkt->data_, src_ptr, cfg->get_num_sc_to_process());
 
                     // printf("Send encoded data frame %u symbol %u ue %u to server %u\n", pkt->frame_id, pkt->symbol_id, pkt->ue_id, server_idx);
                     // Send data (one OFDM symbol)
@@ -521,15 +518,15 @@ int PacketTXRX::dequeue_send(int tid, size_t symbol_dl_to_send, size_t ant_to_se
 
         char* payload = (char*)eth_hdr + kPayloadOffset;
         auto* pkt = reinterpret_cast<Packet*>(payload);
-        pkt->pkt_type = Packet::PktType::kIQFromServer;
-        pkt->frame_id = frame_to_send_[tid];
-        pkt->symbol_id = symbol_dl_to_send;
-        pkt->ant_id = ant_to_send;
-        pkt->server_id = cfg->bs_server_addr_idx;
-        size_t data_symbol_idx_dl = cfg->get_total_data_symbol_idx_dl(pkt->frame_id, pkt->symbol_id);
+        pkt->pkt_type_ = Packet::PktType::kIQFromServer;
+        pkt->frame_id_ = frame_to_send_[tid];
+        pkt->symbol_id_ = symbol_dl_to_send;
+        pkt->ant_id_ = ant_to_send;
+        pkt->server_id_ = cfg->bs_server_addr_idx;
+        size_t data_symbol_idx_dl = cfg->get_total_data_symbol_idx_dl(pkt->frame_id_, pkt->symbol_id_);
         size_t offset = data_symbol_idx_dl * cfg->BS_ANT_NUM + ant_to_send;
 
-        simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data), 
+        simd_convert_float32_to_float16(reinterpret_cast<float*>(pkt->data_), 
             reinterpret_cast<float*>(&dl_ifft_buffer_[offset][0]), 
             cfg->get_num_sc_to_process() * 2);
 

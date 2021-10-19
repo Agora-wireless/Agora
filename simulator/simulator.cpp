@@ -88,7 +88,7 @@ void Simulator::start()
     int frame_count_rx = 0;
 
     int ret = 0;
-    Event_data events_list[kDequeueBulkSize];
+    EventData events_list[kDequeueBulkSize];
 
     /* start transmitter */
     sender_->startTXfromMain(frame_start_tx, frame_end_tx);
@@ -103,11 +103,11 @@ void Simulator::start()
 
     //     /* handle each event */
     //     for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
-    //         Event_data& event = events_list[bulk_count];
-    //         switch (event.event_type) {
+    //         EventData& event = events_list[bulk_count];
+    //         switch (event.event_type_) {
     //         case EventType::kPacketRX: {
-    //             int socket_thread_id = rx_tag_t(event.tags[0]).tid;
-    //             int buf_offset = rx_tag_t(event.tags[0]).offset;
+    //             int socket_thread_id = rx_tag_t(event.tags_[0]).tid;
+    //             int buf_offset = rx_tag_t(event.tags_[0]).offset;
 
     //             char* socket_buffer_ptr = socket_buffer_[socket_thread_id]
     //                 + (long long)buf_offset * packet_length;
@@ -227,9 +227,9 @@ void Simulator::initialize_vars_from_cfg(Config* cfg)
 
 void Simulator::initialize_queues()
 {
-    message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    message_queue_ = moodycamel::ConcurrentQueue<EventData>(
         512 * data_symbol_num_perframe);
-    complete_task_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    complete_task_queue_ = moodycamel::ConcurrentQueue<EventData>(
         512 * data_symbol_num_perframe * 4);
 
     rx_ptoks_ptr = (moodycamel::ProducerToken**)aligned_alloc(

@@ -67,12 +67,12 @@ ChannelSim::ChannelSim(Config* config_bs, Config* config_ue,
     servaddr_ue_.resize(user_socket_num);
 
     task_queue_bs
-        = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM
+        = moodycamel::ConcurrentQueue<EventData>(TASK_BUFFER_FRAME_NUM
             * dl_data_plus_beacon_symbols * bscfg->BS_ANT_NUM * 36);
     task_queue_user
-        = moodycamel::ConcurrentQueue<Event_data>(TASK_BUFFER_FRAME_NUM
+        = moodycamel::ConcurrentQueue<EventData>(TASK_BUFFER_FRAME_NUM
             * ul_data_plus_pilot_symbols * uecfg->UE_ANT_NUM * 36);
-    message_queue_ = moodycamel::ConcurrentQueue<Event_data>(
+    message_queue_ = moodycamel::ConcurrentQueue<EventData>(
         TASK_BUFFER_FRAME_NUM * bscfg->symbol_num_perframe
         * (bscfg->BS_ANT_NUM + uecfg->UE_ANT_NUM) * 36);
 
@@ -142,8 +142,8 @@ ChannelSim::~ChannelSim()
     //delete[] socket_bsrx_;
 }
 
-void ChannelSim::schedule_task(Event_data do_task,
-    moodycamel::ConcurrentQueue<Event_data>* in_queue,
+void ChannelSim::schedule_task(EventData do_task,
+    moodycamel::ConcurrentQueue<EventData>* in_queue,
     moodycamel::ProducerToken const& ptok)
 {
     if (!in_queue->try_enqueue(ptok, do_task)) {
@@ -195,21 +195,21 @@ void ChannelSim::start()
     int ret = 0;
 
     static constexpr size_t kDequeueBulkSize = 5;
-    Event_data events_list[kDequeueBulkSize];
+    EventData events_list[kDequeueBulkSize];
     while (true) {
         ret = message_queue_.try_dequeue_bulk(
             ctok, events_list, kDequeueBulkSize);
 
         for (int bulk_count = 0; bulk_count < ret; bulk_count++) {
-            Event_data& event = events_list[bulk_count];
+            EventData& event = events_list[bulk_count];
 
-            switch (event.event_type) {
+            switch (event.event_type_) {
 
             case EventType::kPacketRX: {
-                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-                size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+                size_t frame_id = gen_tag_t(event.tags_[0]).frame_id;
+                size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id;
                 // received a packet from a client antenna
-                if (gen_tag_t(event.tags[0]).tag_type
+                if (gen_tag_t(event.tags_[0]).tag_type
                     == gen_tag_t::TagType::kUsers) {
                     size_t pilot_symbol_id
                         = uecfg->get_pilot_symbol_idx(frame_id, symbol_id);
@@ -234,11 +234,11 @@ void ChannelSim::start()
                                 frame_id, symbol_id, uecfg->UE_ANT_NUM,
                                 bscfg->BS_ANT_NUM);
                         schedule_task(
-                            Event_data(EventType::kPacketTX, event.tags[0]),
+                            EventData(EventType::kPacketTX, event.tags_[0]),
                             &task_queue_bs, ptok_bs);
                     }
                     // received a packet from a BS antenna
-                } else if (gen_tag_t(event.tags[0]).tag_type
+                } else if (gen_tag_t(event.tags_[0]).tag_type
                     == gen_tag_t::TagType::kAntennas) {
                     size_t dl_symbol_id
                         = get_dl_symbol_idx(frame_id, symbol_id);
@@ -258,16 +258,16 @@ void ChannelSim::start()
                                 frame_id, symbol_id, bscfg->BS_ANT_NUM,
                                 uecfg->UE_ANT_NUM);
                         schedule_task(
-                            Event_data(EventType::kPacketTX, event.tags[0]),
+                            EventData(EventType::kPacketTX, event.tags_[0]),
                             &task_queue_user, ptok_user);
                     }
                 }
             } break;
 
             case EventType::kPacketTX: {
-                size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
+                size_t frame_id = gen_tag_t(event.tags_[0]).frame_id;
                 size_t offset = frame_id % TASK_BUFFER_FRAME_NUM;
-                if (gen_tag_t(event.tags[0]).tag_type
+                if (gen_tag_t(event.tags_[0]).tag_type
                     == gen_tag_t::TagType::kUsers) {
                     user_tx_counter_[offset]++;
                     if (user_tx_counter_[offset]
@@ -278,7 +278,7 @@ void ChannelSim::start()
                                 dl_data_plus_beacon_symbols, frame_id);
                         user_tx_counter_[offset] = 0;
                     }
-                } else if (gen_tag_t(event.tags[0]).tag_type
+                } else if (gen_tag_t(event.tags_[0]).tag_type
                     == gen_tag_t::TagType::kAntennas) {
                     bs_tx_counter_[offset]++;
                     if (bs_tx_counter_[offset] == ul_data_plus_pilot_symbols) {
@@ -304,12 +304,12 @@ void* ChannelSim::taskThread(int tid)
     pin_to_core_with_offset(ThreadType::kWorker,
         core_offset + bs_thread_num + 1 + user_thread_num, tid);
 
-    Event_data event;
+    EventData event;
     while (running) {
         if (task_queue_bs.try_dequeue(event))
-            do_tx_bs(tid, event.tags[0]);
+            do_tx_bs(tid, event.tags_[0]);
         else if (task_queue_user.try_dequeue(event))
-            do_tx_user(tid, event.tags[0]);
+            do_tx_user(tid, event.tags_[0]);
     }
     return 0;
 }
@@ -351,9 +351,9 @@ void* ChannelSim::bs_rx_loop(int tid)
         }
         const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
 
-        size_t frame_id = pkt->frame_id;
-        size_t symbol_id = pkt->symbol_id;
-        size_t ant_id = pkt->ant_id;
+        size_t frame_id = pkt->frame_id_;
+        size_t symbol_id = pkt->symbol_id_;
+        size_t ant_id = pkt->ant_id_;
         if (kDebugPrintInTask)
             printf("Received BS packet for frame %zu, symbol %zu, ant %zu from "
                    "socket %zu\n",
@@ -364,11 +364,11 @@ void* ChannelSim::bs_rx_loop(int tid)
             + dl_symbol_id;
         size_t offset = symbol_offset * bscfg->BS_ANT_NUM + ant_id;
         memcpy(
-            &rx_buffer_bs[offset * payload_length], pkt->data, payload_length);
+            &rx_buffer_bs[offset * payload_length], pkt->data_, payload_length);
 
         rt_assert(
             message_queue_.enqueue(local_ptok,
-                Event_data(EventType::kPacketRX,
+                EventData(EventType::kPacketRX,
                     gen_tag_t::frm_sym_ant(frame_id, symbol_id, ant_id)._tag)),
             "BS socket message enqueue failed!");
         if (++socket_id == socket_hi)
@@ -416,9 +416,9 @@ void* ChannelSim::ue_rx_loop(int tid)
 
         const auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
 
-        size_t frame_id = pkt->frame_id;
-        size_t symbol_id = pkt->symbol_id;
-        size_t ant_id = pkt->ant_id;
+        size_t frame_id = pkt->frame_id_;
+        size_t symbol_id = pkt->symbol_id_;
+        size_t ant_id = pkt->ant_id_;
 
         size_t pilot_symbol_id
             = uecfg->get_pilot_symbol_idx(frame_id, symbol_id);
@@ -435,11 +435,11 @@ void* ChannelSim::ue_rx_loop(int tid)
             + total_symbol_id;
         size_t offset = symbol_offset * uecfg->UE_ANT_NUM + ant_id;
         memcpy(
-            &rx_buffer_ue[offset * payload_length], pkt->data, payload_length);
+            &rx_buffer_ue[offset * payload_length], pkt->data_, payload_length);
 
         rt_assert(
             message_queue_.enqueue(local_ptok,
-                Event_data(EventType::kPacketRX,
+                EventData(EventType::kPacketRX,
                     gen_tag_t::frm_sym_ue(frame_id, symbol_id, ant_id)._tag)),
             "UE Socket message enqueue failed!");
         if (++socket_id == socket_hi)
@@ -491,11 +491,11 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
     auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
     for (size_t ant_id = 0; ant_id < bscfg->BS_ANT_NUM; ant_id++) {
-        pkt->frame_id = frame_id;
-        pkt->symbol_id = symbol_id;
-        pkt->ant_id = ant_id;
-        pkt->cell_id = 0;
-        memcpy(pkt->data,
+        pkt->frame_id_ = frame_id;
+        pkt->symbol_id_ = symbol_id;
+        pkt->ant_id_ = ant_id;
+        pkt->cell_id_ = 0;
+        memcpy(pkt->data_,
             &tx_buffer_bs[total_offset_bs + ant_id * payload_length],
             payload_length);
         ssize_t ret = sendto(socket_bs_[ant_id], (char*)udp_pkt_buf.data(),
@@ -505,7 +505,7 @@ void ChannelSim::do_tx_bs(int tid, size_t tag)
     }
 
     rt_assert(message_queue_.enqueue(*task_ptok[tid],
-                  Event_data(EventType::kPacketTX,
+                  EventData(EventType::kPacketTX,
                       gen_tag_t::frm_sym_ant(frame_id, symbol_id, 0)._tag)),
         "BS TX message enqueue failed!\n");
 }
@@ -547,11 +547,11 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
     std::vector<uint8_t> udp_pkt_buf(bscfg->packet_length, 0);
     auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf[0]);
     for (size_t ant_id = 0; ant_id < uecfg->UE_ANT_NUM; ant_id++) {
-        pkt->frame_id = frame_id;
-        pkt->symbol_id = symbol_id;
-        pkt->ant_id = ant_id;
-        pkt->cell_id = 0;
-        memcpy(pkt->data,
+        pkt->frame_id_ = frame_id;
+        pkt->symbol_id_ = symbol_id;
+        pkt->ant_id_ = ant_id;
+        pkt->cell_id_ = 0;
+        memcpy(pkt->data_,
             &tx_buffer_ue[total_offset_ue + ant_id * payload_length],
             payload_length);
         ssize_t ret = sendto(socket_ue_[ant_id], (char*)udp_pkt_buf.data(),
@@ -561,7 +561,7 @@ void ChannelSim::do_tx_user(int tid, size_t tag)
     }
 
     rt_assert(message_queue_.enqueue(*task_ptok[tid],
-                  Event_data(EventType::kPacketTX,
+                  EventData(EventType::kPacketTX,
                       gen_tag_t::frm_sym_ue(frame_id, symbol_id, 0)._tag)),
         "UE TX message enqueue failed!\n");
 }

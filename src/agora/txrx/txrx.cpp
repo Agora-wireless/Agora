@@ -298,16 +298,16 @@ int PacketTXRX::recv_relocate(int tid)
 // int PacketTXRX::dequeue_send(int tid)
 // {
 //     auto& c = cfg;
-//     Event_data event;
+//     EventData event;
 //     if (!task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event))
 //         return -1;
 
 //     // printf("tx queue length: %d\n", task_queue_->size_approx());
-//     assert(event.event_type == EventType::kPacketTX);
+//     assert(event.event_type_ == EventType::kPacketTX);
 
-//     size_t ant_id = gen_tag_t(event.tags[0]).ant_id;
-//     size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
-//     size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
+//     size_t ant_id = gen_tag_t(event.tags_[0]).ant_id;
+//     size_t frame_id = gen_tag_t(event.tags_[0]).frame_id;
+//     size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id;
 
 //     size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
 //     size_t offset
@@ -318,7 +318,7 @@ int PacketTXRX::recv_relocate(int tid)
 //     if (kDebugPrintInTask) {
 //         printf("In TXRX thread %d: Transmitted frame %zu, symbol %zu, "
 //                "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-//             tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags[0])._tag,
+//             tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags_[0])._tag,
 //             offset, message_queue_->size_approx());
 //     }
 
@@ -333,7 +333,7 @@ int PacketTXRX::recv_relocate(int tid)
 //     rt_assert(ret > 0, "sendto() failed");
 
 //     rt_assert(message_queue_->enqueue(*rx_ptoks_[tid],
-//                   Event_data(EventType::kPacketTX, event.tags[0])),
+//                   EventData(EventType::kPacketTX, event.tags_[0])),
 //         "Socket message enqueue failed\n");
-//     return event.tags[0];
+//     return event.tags_[0];
 // }

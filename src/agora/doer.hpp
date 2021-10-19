@@ -12,35 +12,35 @@ class Doer {
 public:
     /// The main event handling function that performs Doer-specific work.
     /// Doers that handle only one event type use this signature.
-    virtual Event_data launch(size_t tag)
+    virtual EventData Launch(size_t tag)
     {
         _unused(tag);
         rt_assert(false, "Doer: launch(tag) not implemented");
-        return Event_data();
+        return EventData();
     }
 
     /// The main event handling function that performs Doer-specific work.
     /// Doers that handle multiple event types use this signature.
-    virtual Event_data launch(size_t tag, EventType event_type)
+    virtual EventData Launch(size_t tag, EventType event_type)
     {
         _unused(tag);
         _unused(event_type);
         rt_assert(false, "Doer: launch(tag, event_type) not implemented");
-        return Event_data();
+        return EventData();
     }
 
 protected:
     Doer(Config* in_config, int in_tid, double freq_ghz)
-        : cfg(in_config)
-        , tid(in_tid)
-        , freq_ghz(freq_ghz)
+        : cfg_(in_config)
+        , tid_(in_tid)
+        , freq_ghz_(freq_ghz)
     {
     }
 
     virtual ~Doer() = default;
 
-    Config* cfg;
-    int tid; // Thread ID of this Doer
-    double freq_ghz; // RDTSC frequency in GHz
+    Config* cfg_;
+    int tid_; // Thread ID of this Doer
+    double freq_ghz_; // RDTSC frequency in GHz
 };
 #endif /* DOER */

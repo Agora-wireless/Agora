@@ -1,7 +1,9 @@
 #include "shared_counters.hpp"
 
 SharedState::SharedState(Config* cfg)
-    : num_pilot_pkts_per_frame_(
+    : last_frame_cycles_(worker_rdtsc())
+    , freq_ghz_(measure_rdtsc_freq())
+    , num_pilot_pkts_per_frame_(
             cfg->pilot_symbol_num_perframe * cfg->BS_ANT_NUM)
     , num_pilot_symbols_per_frame_(cfg->pilot_symbol_num_perframe)
     , num_ul_data_symbol_per_frame_(cfg->ul_data_symbol_num_perframe)
@@ -10,8 +12,6 @@ SharedState::SharedState(Config* cfg)
     , num_precode_tasks_per_frame_((cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
     , num_demul_tasks_required_(cfg->get_num_sc_to_process() / cfg->demul_block_size)
     , num_demod_pkts_per_symbol_per_ue_(cfg->bs_server_addr_list.size())
-    , last_frame_cycles_(worker_rdtsc())
-    , freq_ghz_(measure_rdtsc_freq())
 {
     frame_start_time_ = new uint64_t[cfg->frames_to_test];
     frame_iq_time_ = new uint64_t[cfg->frames_to_test];
@@ -39,23 +39,22 @@ SharedState::SharedState(Config* cfg)
 
 bool SharedState::receive_freq_iq_pkt(const Packet* pkt)
 {
-    if (unlikely(pkt->frame_id >= cur_frame_ + kFrameWnd)) {
+    if (unlikely(pkt->frame_id_ >= cur_frame_ + kFrameWnd)) {
         MLPD_ERROR(
             "SharedCounters SharedState error: Received freq iq packet for future "
             "frame %u beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
             "happen if Agora is running slowly, e.g., in debug mode. "
             "Full packet = %s.\n",
-            pkt->frame_id, cur_frame_, kFrameWnd, cur_frame_, num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
-            num_pkts_[cur_frame_ % kFrameWnd].load(), pkt->to_string().c_str());
+            pkt->frame_id_, cur_frame_, kFrameWnd, cur_frame_, (unsigned int)num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
+            (unsigned int)num_pkts_[cur_frame_ % kFrameWnd].load(), pkt->ToString().c_str());
         return false;
     }
 
-    if (unlikely(frame_start_time_[pkt->frame_id] == 0)) {
-        frame_start_time_[pkt->frame_id] = get_ns();
+    if (unlikely(frame_start_time_[pkt->frame_id_] == 0)) {
+        frame_start_time_[pkt->frame_id_] = get_ns();
     }
 
-    const size_t frame_slot = pkt->frame_id % kFrameWnd;
-    bool full = false;
+    const size_t frame_slot = pkt->frame_id_ % kFrameWnd;
     num_pkts_[frame_slot]++;
     encode_ready_[frame_slot] = true;
     if (num_pkts_[frame_slot]
@@ -63,20 +62,19 @@ bool SharedState::receive_freq_iq_pkt(const Packet* pkt)
             * (num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_)) {
         MLPD_INFO("SharedCounters: received all packets in frame: %u. "
                 "Pilot pkts = %zu of %zu\n",
-            pkt->frame_id, num_pilot_pkts_[frame_slot].load(),
+            pkt->frame_id_, num_pilot_pkts_[frame_slot].load(),
             num_pilot_pkts_per_frame_);
-        full = true;
-        frame_iq_time_[pkt->frame_id] = get_ns();
+        frame_iq_time_[pkt->frame_id_] = get_ns();
     }
 
-    if (pkt->symbol_id < num_pilot_symbols_per_frame_) {
+    if (pkt->symbol_id_ < num_pilot_symbols_per_frame_) {
         num_pilot_pkts_[frame_slot]++;
         if (num_pilot_pkts_[frame_slot] == num_pilot_pkts_per_frame_) {
             MLPD_INFO("SharedCounters: received all pilots in frame: %u\n",
-                pkt->frame_id);
+                pkt->frame_id_);
         }
     } else {
-        num_data_pkts_[frame_slot][pkt->symbol_id - num_pilot_symbols_per_frame_]++;
+        num_data_pkts_[frame_slot][pkt->symbol_id_ - num_pilot_symbols_per_frame_]++;
     }
 
     return true;
@@ -87,10 +85,10 @@ bool SharedState::receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol
     if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
         MLPD_ERROR(
             "SharedCounters SharedState error: Received demod packet for future "
-            "frame %u beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
+            "frame %zu beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
             "happen if Agora is running slowly, e.g., in debug mode. \n",
-            frame_id, cur_frame_, kFrameWnd, cur_frame_, num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
-            num_pkts_[cur_frame_ % kFrameWnd].load());
+            frame_id, cur_frame_, kFrameWnd, cur_frame_, (unsigned int)num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
+            (unsigned int)num_pkts_[cur_frame_ % kFrameWnd].load());
         return false;
     }
     num_demod_pkts_[ue_id][frame_id % kFrameWnd][symbol_id_ul]++;

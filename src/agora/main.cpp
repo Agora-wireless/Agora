@@ -21,7 +21,7 @@ int main(int argc, char* argv[])
         // Register signal handler to handle kill signal
         signalHandler.setupSignalHandlers();
         agora_cli = new Agora(cfg);
-        agora_cli->start();
+        agora_cli->Start();
         ret = EXIT_SUCCESS;
     } catch (SignalException& e) {
         std::cerr << "SignalException: " << e.what() << std::endl;

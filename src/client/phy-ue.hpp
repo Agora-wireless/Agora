@@ -142,8 +142,8 @@ public:
     void taskThread(int tid);
 
     /* Add tasks into task queue based on event type */
-    void schedule_task(Event_data do_task,
-        moodycamel::ConcurrentQueue<Event_data>* in_queue,
+    void schedule_task(EventData do_task,
+        moodycamel::ConcurrentQueue<EventData>* in_queue,
         moodycamel::ProducerToken const& ptok);
 
     void initialize_vars_from_cfg(void);
@@ -304,18 +304,18 @@ private:
 
     /* Concurrent queues */
     /* task queue for downlink FFT */
-    moodycamel::ConcurrentQueue<Event_data> fft_queue_;
+    moodycamel::ConcurrentQueue<EventData> fft_queue_;
     /* task queue for downlink demodulation */
-    moodycamel::ConcurrentQueue<Event_data> demul_queue_;
+    moodycamel::ConcurrentQueue<EventData> demul_queue_;
     /* task queue for downlink decoding */
-    moodycamel::ConcurrentQueue<Event_data> decode_queue_;
+    moodycamel::ConcurrentQueue<EventData> decode_queue_;
     /* main thread message queue */
-    moodycamel::ConcurrentQueue<Event_data> message_queue_;
-    moodycamel::ConcurrentQueue<Event_data> ifft_queue_;
-    moodycamel::ConcurrentQueue<Event_data> tx_queue_;
-    moodycamel::ConcurrentQueue<Event_data> to_mac_queue_;
-    moodycamel::ConcurrentQueue<Event_data> encode_queue_;
-    moodycamel::ConcurrentQueue<Event_data> modul_queue_;
+    moodycamel::ConcurrentQueue<EventData> message_queue_;
+    moodycamel::ConcurrentQueue<EventData> ifft_queue_;
+    moodycamel::ConcurrentQueue<EventData> tx_queue_;
+    moodycamel::ConcurrentQueue<EventData> to_mac_queue_;
+    moodycamel::ConcurrentQueue<EventData> encode_queue_;
+    moodycamel::ConcurrentQueue<EventData> modul_queue_;
 
     pthread_t task_threads[kMaxThreads];
 

@@ -46,8 +46,8 @@ find_package(GTest REQUIRED)
 option(DEBUG "Enable debugging" OFF)
 if(NOT DEBUG)
   message(STATUS "Debugging is disabled")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG -Wno-unused-result")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG -Wno-unused-result")
 else()
   message(STATUS "Debugging is enabled. Performance will be low")
 endif()
@@ -266,17 +266,10 @@ add_executable(user
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(user ${COMMON_LIBS})
 
-add_executable(sender
-  simulator/sender_cli.cpp
-  simulator/sender.cpp
-  src/common/dpdk_transport.cpp
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(sender ${COMMON_LIBS})
-
 add_executable(sim
   simulator/main.cpp
   simulator/simulator.cpp
-  simulator/sender.cpp
+  simulator/dynamic_sender.cpp
   simulator/receiver.cpp
   src/common/dpdk_transport.cpp
   $<TARGET_OBJECTS:common_sources_lib>)

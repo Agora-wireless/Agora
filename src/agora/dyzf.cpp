@@ -23,40 +23,37 @@ DyZF::DyZF(Config* config, int tid, double freq_ghz,
     , control_info_table_(control_info_table)
     , control_idx_list_(control_idx_list)
 {
-    pred_csi_buffer = reinterpret_cast<complex_float*>(
+    csi_gather_buffer_ = reinterpret_cast<complex_float*>(
         memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
-    csi_gather_buffer = reinterpret_cast<complex_float*>(
-        memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
-    calib_gather_buffer = reinterpret_cast<complex_float*>(
+    calib_gather_buffer_ = reinterpret_cast<complex_float*>(
         memalign(64, kMaxAntennas * sizeof(complex_float)));
 }
 
 DyZF::~DyZF()
 {
-    free(pred_csi_buffer);
-    free(csi_gather_buffer);
-    free(calib_gather_buffer);
+    free(csi_gather_buffer_);
+    free(calib_gather_buffer_);
 }
 
-Event_data DyZF::launch(size_t tag)
+EventData DyZF::Launch(size_t tag)
 {
-    if (cfg->freq_orthogonal_pilot) {
-        ZF_freq_orthogonal(tag);
+    if (cfg_->freq_orthogonal_pilot) {
+        ZFFreqOrthogonal(tag);
     } else {
-        ZF_time_orthogonal(tag);
+        ZFTimeOrthogonal(tag);
     }
-    return Event_data(EventType::kZF, tag);
+    return EventData(EventType::kZF, tag);
 }
 
-void DyZF::compute_precoder(const arma::cx_fmat& mat_csi,
+void DyZF::computePrecoder(const arma::cx_fmat& mat_csi,
     complex_float* calib_ptr, complex_float* _mat_ul_zf,
     complex_float* _mat_dl_zf, size_t ue_num)
 {
     if (ue_num == 0) {
-        ue_num = cfg->UE_NUM;
+        ue_num = cfg_->UE_NUM;
     }
     arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
-        ue_num, cfg->BS_ANT_NUM, false);
+        ue_num, cfg_->BS_ANT_NUM, false);
     if (kUseInverseForZF) {
         try {
             mat_ul_zf = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
@@ -71,16 +68,16 @@ void DyZF::compute_precoder(const arma::cx_fmat& mat_csi,
         arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
     }
 
-    if (cfg->dl_data_symbol_num_perframe > 0) {
+    if (cfg_->dl_data_symbol_num_perframe > 0) {
         arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
-            ue_num, cfg->BS_ANT_NUM, false);
-        if (cfg->recipCalEn) {
+            ue_num, cfg_->BS_ANT_NUM, false);
+        if (cfg_->recipCalEn) {
             arma::cx_fvec vec_calib(
-                reinterpret_cast<arma::cx_float*>(calib_ptr), cfg->BS_ANT_NUM,
+                reinterpret_cast<arma::cx_float*>(calib_ptr), cfg_->BS_ANT_NUM,
                 false);
 
-            vec_calib = vec_calib / vec_calib(cfg->ref_ant);
-            arma::cx_fmat mat_calib(cfg->BS_ANT_NUM, cfg->BS_ANT_NUM);
+            vec_calib = vec_calib / vec_calib(cfg_->ref_ant);
+            arma::cx_fmat mat_calib(cfg_->BS_ANT_NUM, cfg_->BS_ANT_NUM);
             mat_calib = arma::diagmat(vec_calib);
             mat_dl_zf = mat_ul_zf * arma::inv(mat_calib);
         } else
@@ -94,7 +91,7 @@ void DyZF::compute_precoder(const arma::cx_fmat& mat_csi,
 
 // Gather data of one symbol from partially-transposed buffer
 // produced by dofft
-static inline void partial_transpose_gather(
+static inline void partialTransposeGather(
     size_t cur_sc_id, float* src, float*& dst, size_t bs_ant_num)
 {
     // The SIMD and non-SIMD methods are equivalent.
@@ -135,51 +132,50 @@ static inline void partial_transpose_gather(
     }
 }
 
-void DyZF::ZF_time_orthogonal(size_t tag)
+void DyZF::ZFTimeOrthogonal(size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
     const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
     if (kDebugPrintInTask) {
-        printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid,
+        printf("In doZF thread %d: frame: %zu, base subcarrier: %zu\n", tid_,
             frame_id, base_sc_id);
     }
     // const size_t num_subcarriers = std::min(
-    //     cfg->zf_block_size, (cfg->bs_server_addr_idx + 1) * cfg->get_num_sc_per_server() - base_sc_id);
+    //     cfg_->zf_block_size, (cfg_->bs_server_addr_idx + 1) * cfg_->get_num_sc_per_server() - base_sc_id);
     const size_t num_subcarriers = std::min(
-        cfg->zf_block_size, cfg->subcarrier_end - base_sc_id);
+        cfg_->zf_block_size, cfg_->subcarrier_end - base_sc_id);
 
     // Handle each subcarrier one by one
     for (size_t i = 0; i < num_subcarriers; i++) {
-        size_t start_tsc1 = worker_rdtsc();
         const size_t cur_sc_id = base_sc_id + i;
 
         // Gather CSI matrices of each pilot from partially-transposed CSIs.
-        for (size_t ue_idx = 0; ue_idx < cfg->UE_NUM; ue_idx++) {
+        for (size_t ue_idx = 0; ue_idx < cfg_->UE_NUM; ue_idx++) {
             float* dst_csi_ptr
-                = (float*)(csi_gather_buffer + cfg->BS_ANT_NUM * ue_idx);
-            partial_transpose_gather(cur_sc_id,
+                = (float*)(csi_gather_buffer_ + cfg_->BS_ANT_NUM * ue_idx);
+            partialTransposeGather(cur_sc_id,
                 (float*)csi_buffers_[frame_slot][ue_idx], dst_csi_ptr,
-                cfg->BS_ANT_NUM);
+                cfg_->BS_ANT_NUM);
         }
-        if (cfg->recipCalEn) {
+        if (cfg_->recipCalEn) {
             // Gather reciprocal calibration data from partially-transposed buffer
-            float* dst_calib_ptr = (float*)calib_gather_buffer;
-            partial_transpose_gather(cur_sc_id,
+            float* dst_calib_ptr = (float*)calib_gather_buffer_;
+            partialTransposeGather(cur_sc_id,
                 (float*)calib_buffer_[frame_slot], dst_calib_ptr,
-                cfg->BS_ANT_NUM);
+                cfg_->BS_ANT_NUM);
         }
 
-        arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer,
-            cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+        arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_,
+            cfg_->BS_ANT_NUM, cfg_->UE_NUM, false);
 
-        compute_precoder(mat_csi, calib_gather_buffer,
+        computePrecoder(mat_csi, calib_gather_buffer_,
             ul_zf_matrices_[frame_slot][cur_sc_id],
             dl_zf_matrices_[frame_slot][cur_sc_id]);
     }
 }
 
-void DyZF::ZF_freq_orthogonal(size_t tag)
+void DyZF::ZFFreqOrthogonal(size_t tag)
 {
     const size_t frame_id = gen_tag_t(tag).frame_id;
     const size_t base_sc_id = gen_tag_t(tag).sc_id;
@@ -187,8 +183,8 @@ void DyZF::ZF_freq_orthogonal(size_t tag)
     if (kDebugPrintInTask) {
         printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
                "BS_ANT_NUM: %zu\n",
-            tid, frame_id, base_sc_id, base_sc_id / cfg->UE_NUM,
-            cfg->BS_ANT_NUM);
+            tid_, frame_id, base_sc_id, base_sc_id / cfg_->UE_NUM,
+            cfg_->BS_ANT_NUM);
     }
 
     double start_tsc1 = worker_rdtsc();
@@ -202,28 +198,28 @@ void DyZF::ZF_freq_orthogonal(size_t tag)
             continue;
         }
         const size_t cur_sc_id = base_sc_id + ue_id;
-        float* dst_csi_ptr = (float*)(csi_gather_buffer + cfg->BS_ANT_NUM * total_ue_sc);
-        partial_transpose_gather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
-            dst_csi_ptr, cfg->BS_ANT_NUM);
+        float* dst_csi_ptr = (float*)(csi_gather_buffer_ + cfg_->BS_ANT_NUM * total_ue_sc);
+        partialTransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
+            dst_csi_ptr, cfg_->BS_ANT_NUM);
         total_ue_sc ++;
     }
-    if (cfg->recipCalEn) {
+    if (cfg_->recipCalEn) {
         // Gather reciprocal calibration data from partially-transposed buffer
-        float* dst_calib_ptr = (float*)calib_gather_buffer;
-        partial_transpose_gather(base_sc_id, (float*)calib_buffer_[frame_slot],
-            dst_calib_ptr, cfg->BS_ANT_NUM);
+        float* dst_calib_ptr = (float*)calib_gather_buffer_;
+        partialTransposeGather(base_sc_id, (float*)calib_buffer_[frame_slot],
+            dst_calib_ptr, cfg_->BS_ANT_NUM);
     }
 
     if (total_ue_sc == 0) {
         return;
     }
 
-    arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer),
-        cfg->BS_ANT_NUM, total_ue_sc, false);
+    arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
+        cfg_->BS_ANT_NUM, total_ue_sc, false);
 
-    compute_precoder(mat_csi, calib_gather_buffer,
-        ul_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)],
-        dl_zf_matrices_[frame_slot][cfg->get_zf_sc_id(base_sc_id)],
+    computePrecoder(mat_csi, calib_gather_buffer_,
+        ul_zf_matrices_[frame_slot][cfg_->get_zf_sc_id(base_sc_id)],
+        dl_zf_matrices_[frame_slot][cfg_->get_zf_sc_id(base_sc_id)],
         total_ue_sc);
 
     double start_tsc2 = worker_rdtsc();

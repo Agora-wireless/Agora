@@ -20,8 +20,8 @@
 class DoPrecode : public Doer {
 public:
     DoPrecode(Config* in_config, int in_tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ConcurrentQueue<EventData>& in_task_queue,
+        moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
         Table<complex_float>& in_dl_ifft_buffer,
@@ -54,7 +54,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(size_t tag);
+    EventData Launch(size_t tag);
 
 private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;

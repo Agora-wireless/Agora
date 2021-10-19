@@ -57,9 +57,9 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    void launch(size_t frame_id, size_t symbol_id, size_t ant_id);
+    void Launch(size_t frame_id, size_t symbol_id, size_t ant_id);
 
-    void start_work();
+    void StartWork();
 
 private:
     Table<char>& time_domain_iq_buffer_;
@@ -71,7 +71,7 @@ private:
     PhyStats* phy_stats;
 
     struct Range ant_range_;
-    moodycamel::ConcurrentQueue<Event_data> dummy_conq_;
+    moodycamel::ConcurrentQueue<EventData> dummy_conq_;
 
     size_t cur_frame_ = 0;
     size_t cur_idx_ = 0;
@@ -82,8 +82,8 @@ private:
 class DoIFFT : public Doer {
 public:
     DoIFFT(Config* in_config, int in_tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-        moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+        moodycamel::ConcurrentQueue<EventData>& in_task_queue,
+        moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
         moodycamel::ProducerToken* worker_producer_token,
         Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
         Stats* in_stats_manager);
@@ -112,7 +112,7 @@ public:
      *     2. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    Event_data launch(size_t tag);
+    EventData launch(size_t tag);
 
 private:
     Table<complex_float>& dl_ifft_buffer_;

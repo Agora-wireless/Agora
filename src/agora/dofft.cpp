@@ -75,15 +75,15 @@ DoFFT::DoFFT(Config* config, int tid, double freq_ghz, Range ant_range,
     , phy_stats(in_phy_stats)
     , shared_state_(shared_state_)
 {
-    duration_stat_fft = stats_manager->get_duration_stat(DoerType::kFFT, tid);
-    duration_stat_csi = stats_manager->get_duration_stat(DoerType::kCSI, tid);
+    duration_stat_fft = stats_manager->get_duration_stat(DoerType::kFFT, tid_);
+    duration_stat_csi = stats_manager->get_duration_stat(DoerType::kCSI, tid_);
     DftiCreateDescriptor(
-        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg_->OFDM_CA_NUM);
     DftiCommitDescriptor(mkl_handle);
 
     // Aligned for SIMD
     fft_inout = reinterpret_cast<complex_float*>(
-        memalign(64, cfg->OFDM_CA_NUM * sizeof(complex_float)));
+        memalign(64, cfg_->OFDM_CA_NUM * sizeof(complex_float)));
 }
 
 DoFFT::~DoFFT()
@@ -92,15 +92,15 @@ DoFFT::~DoFFT()
     free(fft_inout);
 }
 
-void DoFFT::launch(size_t frame_id, size_t symbol_id, size_t ant_id)
+void DoFFT::Launch(size_t frame_id, size_t symbol_id, size_t ant_id)
 {
     size_t start_tsc = worker_rdtsc();
     size_t frame_slot = frame_id % kFrameWnd;
 
     simd_convert_short_to_float(reinterpret_cast<short*>(time_domain_iq_buffer_[ant_id] +
-        (frame_slot * cfg->symbol_num_perframe * cfg->packet_length)
-        + symbol_id * cfg->packet_length + Packet::kOffsetOfData),
-        reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+        (frame_slot * cfg_->symbol_num_perframe * cfg_->packet_length)
+        + symbol_id * cfg_->packet_length + Packet::kOffsetOfData),
+        reinterpret_cast<float*>(fft_inout), cfg_->OFDM_CA_NUM * 2);
 
     size_t start_tsc1 = worker_rdtsc();
 
@@ -109,14 +109,14 @@ _
     size_t start_tsc2 = worker_rdtsc();
 
     simd_convert_float32_to_float16(reinterpret_cast<float*>(frequency_domain_iq_buffer_to_send_[ant_id] + 
-        (frame_slot * cfg->symbol_num_perframe * cfg->packet_length)
-        + symbol_id * cfg->packet_length),
-        reinterpret_cast<float*>(fft_inout), cfg->OFDM_CA_NUM * 2);
+        (frame_slot * cfg_->symbol_num_perframe * cfg_->packet_length)
+        + symbol_id * cfg_->packet_length),
+        reinterpret_cast<float*>(fft_inout), cfg_->OFDM_CA_NUM * 2);
 
     return;
 }
 
-void DoFFT::start_work()
+void DoFFT::StartWork()
 {
     size_t start_tsc = 0;
     size_t work_tsc_duration = 0;
@@ -128,7 +128,7 @@ void DoFFT::start_work()
     size_t fft_start_tsc;
     bool state_trigger = false;
 
-    while (cfg->running && !SignalHandler::gotExitSignal()) {
+    while (cfg_->running && !SignalHandler::gotExitSignal()) {
 
         if (likely(state_trigger)) {
             loop_count ++;
@@ -179,7 +179,7 @@ void DoFFT::start_work()
                     work_tsc_duration += rdtsc() - work_start_tsc;
                 }
 
-                cur_idx_ += cfg->fft_thread_num;
+                cur_idx_ += cfg_->fft_thread_num;
             }
         } else {
             if (likely(state_trigger)) {
@@ -194,27 +194,27 @@ void DoFFT::partial_transpose(
     complex_float* out_buf, size_t ant_id, SymbolType symbol_type) const
 {
     // We have OFDM_DATA_NUM % kTransposeBlockSize == 0
-    const size_t num_blocks = cfg->OFDM_DATA_NUM / kTransposeBlockSize;
+    const size_t num_blocks = cfg_->OFDM_DATA_NUM / kTransposeBlockSize;
     // Do the 1st step of 2-step reciprocal calibration
     // The 2nd step will be performed in dozf
     if (symbol_type == SymbolType::kCalDL
         or symbol_type == SymbolType::kCalUL) {
-        for (size_t i = 0; i < cfg->OFDM_DATA_NUM; i += cfg->BS_ANT_NUM)
-            for (size_t j = 0; j < cfg->BS_ANT_NUM - 1; j++)
-                fft_inout[std::min(i + j, cfg->OFDM_DATA_NUM - 1)
-                    + cfg->OFDM_DATA_START]
-                    = fft_inout[i + cfg->OFDM_DATA_START];
+        for (size_t i = 0; i < cfg_->OFDM_DATA_NUM; i += cfg_->BS_ANT_NUM)
+            for (size_t j = 0; j < cfg_->BS_ANT_NUM - 1; j++)
+                fft_inout[std::min(i + j, cfg_->OFDM_DATA_NUM - 1)
+                    + cfg_->OFDM_DATA_START]
+                    = fft_inout[i + cfg_->OFDM_DATA_START];
     }
 
     for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
         const size_t block_base_offset
-            = block_idx * (kTransposeBlockSize * cfg->BS_ANT_NUM);
+            = block_idx * (kTransposeBlockSize * cfg_->BS_ANT_NUM);
         // We have kTransposeBlockSize % kSCsPerCacheline == 0
         for (size_t sc_j = 0; sc_j < kTransposeBlockSize;
              sc_j += kSCsPerCacheline) {
             const size_t sc_idx = (block_idx * kTransposeBlockSize) + sc_j;
             const complex_float* src
-                = &fft_inout[sc_idx + cfg->OFDM_DATA_START];
+                = &fft_inout[sc_idx + cfg_->OFDM_DATA_START];
 
             complex_float* dst = &out_buf[block_base_offset
                 + (ant_id * kTransposeBlockSize) + sc_j];
@@ -253,25 +253,25 @@ void DoFFT::partial_transpose(
                 = _mm256_load_ps(reinterpret_cast<const float*>(src + 4));
             if (symbol_type == SymbolType::kPilot) {
                 __m256 pilot_tx0 = _mm256_set_ps(
-                    cfg->pilots_sgn_[sc_idx + 3].im,
-                    cfg->pilots_sgn_[sc_idx + 3].re,
-                    cfg->pilots_sgn_[sc_idx + 2].im,
-                    cfg->pilots_sgn_[sc_idx + 2].re,
-                    cfg->pilots_sgn_[sc_idx + 1].im,
-                    cfg->pilots_sgn_[sc_idx + 1].re,
-                    cfg->pilots_sgn_[sc_idx].im, cfg->pilots_sgn_[sc_idx].re);
+                    cfg_->pilots_sgn_[sc_idx + 3].im,
+                    cfg_->pilots_sgn_[sc_idx + 3].re,
+                    cfg_->pilots_sgn_[sc_idx + 2].im,
+                    cfg_->pilots_sgn_[sc_idx + 2].re,
+                    cfg_>pilots_sgn_[sc_idx + 1].im,
+                    cfg_->pilots_sgn_[sc_idx + 1].re,
+                    cfg_->pilots_sgn_[sc_idx].im, cfg_->pilots_sgn_[sc_idx].re);
                 fft_result0 = CommsLib::__m256_complex_cf32_mult(
                     fft_result0, pilot_tx0, true);
 
                 __m256 pilot_tx1
-                    = _mm256_set_ps(cfg->pilots_sgn_[sc_idx + 7].im,
-                        cfg->pilots_sgn_[sc_idx + 7].re,
-                        cfg->pilots_sgn_[sc_idx + 6].im,
-                        cfg->pilots_sgn_[sc_idx + 6].re,
-                        cfg->pilots_sgn_[sc_idx + 5].im,
-                        cfg->pilots_sgn_[sc_idx + 5].re,
-                        cfg->pilots_sgn_[sc_idx + 4].im,
-                        cfg->pilots_sgn_[sc_idx + 4].re);
+                    = _mm256_set_ps(cfg_->pilots_sgn_[sc_idx + 7].im,
+                        cfg_->pilots_sgn_[sc_idx + 7].re,
+                        cfg_->pilots_sgn_[sc_idx + 6].im,
+                        cfg_->pilots_sgn_[sc_idx + 6].re,
+                        cfg_->pilots_sgn_[sc_idx + 5].im,
+                        cfg_->pilots_sgn_[sc_idx + 5].re,
+                        cfg_->pilots_sgn_[sc_idx + 4].im,
+                        cfg_->pilots_sgn_[sc_idx + 4].re);
                 fft_result1 = CommsLib::__m256_complex_cf32_mult(
                     fft_result1, pilot_tx1, true);
             }
@@ -283,8 +283,8 @@ void DoFFT::partial_transpose(
 }
 
 DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
-    moodycamel::ConcurrentQueue<Event_data>& in_task_queue,
-    moodycamel::ConcurrentQueue<Event_data>& complete_task_queue,
+    moodycamel::ConcurrentQueue<EventData>& in_task_queue,
+    moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
     moodycamel::ProducerToken* worker_producer_token,
     Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
     Stats* in_stats_manager)
@@ -296,37 +296,37 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
     duration_stat
         = in_stats_manager->get_duration_stat(DoerType::kIFFT, in_tid);
     (void)DftiCreateDescriptor(
-        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg->OFDM_CA_NUM);
+        &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg_->OFDM_CA_NUM);
     (void)DftiCommitDescriptor(mkl_handle);
 }
 
 DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); }
 
-Event_data DoIFFT::launch(size_t tag)
+EventData DoIFFT::launch(size_t tag)
 {
     size_t start_tsc = worker_rdtsc();
     size_t ant_id = gen_tag_t(tag).ant_id;
     size_t frame_id = gen_tag_t(tag).frame_id;
     size_t symbol_id = gen_tag_t(tag).symbol_id;
-    size_t data_symbol_idx_dl = cfg->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t data_symbol_idx_dl = cfg_->get_dl_symbol_idx(frame_id, symbol_id);
 
     if (kDebugPrintInTask) {
         printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
-            tid, frame_id, symbol_id, ant_id);
+            tid_, frame_id, symbol_id, ant_id);
     }
 
     size_t offset
-        = (cfg->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
-              * cfg->BS_ANT_NUM)
+        = (cfg_->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
+              * cfg_->BS_ANT_NUM)
         + ant_id;
 
     size_t start_tsc1 = worker_rdtsc();
     duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
     float* ifft_buf_ptr = (float*)dl_ifft_buffer_[offset];
-    memset(ifft_buf_ptr, 0, sizeof(float) * cfg->OFDM_DATA_START * 2);
-    memset(ifft_buf_ptr + (cfg->OFDM_DATA_STOP) * 2, 0,
-        sizeof(float) * cfg->OFDM_DATA_START * 2);
+    memset(ifft_buf_ptr, 0, sizeof(float) * cfg_->OFDM_DATA_START * 2);
+    memset(ifft_buf_ptr + (cfg_->OFDM_DATA_STOP) * 2, 0,
+        sizeof(float) * cfg_->OFDM_DATA_START * 2);
 
     DftiComputeBackward(mkl_handle, ifft_buf_ptr);
     // printf("data after ifft\n");
@@ -335,22 +335,22 @@ Event_data DoIFFT::launch(size_t tag)
     //         dl_ifft_buffer_[buffer_symbol_offset][i].im);
     // printf("\n");
 
-    cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg->OFDM_CA_NUM, false);
-    float post_scale = cfg->OFDM_CA_NUM;
+    cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg_->OFDM_CA_NUM, false);
+    float post_scale = cfg_->OFDM_CA_NUM;
     mat_data /= post_scale;
 
     size_t start_tsc2 = worker_rdtsc();
     duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
-    int dl_socket_buffer_status_size = cfg->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-        * cfg->dl_data_symbol_num_perframe;
+    int dl_socket_buffer_status_size = cfg_->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+        * cfg_->dl_data_symbol_num_perframe;
     int socket_symbol_offset = offset % dl_socket_buffer_status_size;
-    int packet_length = cfg->packet_length;
+    int packet_length = cfg_->packet_length;
     struct Packet* pkt = (struct Packet*)&dl_socket_buffer_[socket_symbol_offset
         * packet_length];
-    short* socket_ptr = &pkt->data[2 * cfg->TX_PREFIX_LEN];
+    short* socket_ptr = &pkt->data_[2 * cfg_->TX_PREFIX_LEN];
 
-    for (size_t sc_id = 0; sc_id < cfg->OFDM_CA_NUM; sc_id += 8) {
+    for (size_t sc_id = 0; sc_id < cfg_->OFDM_CA_NUM; sc_id += 8) {
         /* ifft scaled results by OFDM_CA_NUM */
         __m256 scale_factor = _mm256_set1_ps(32768.0);
         __m256 ifft1 = _mm256_load_ps(ifft_buf_ptr + 2 * sc_id);
@@ -363,10 +363,10 @@ Event_data DoIFFT::launch(size_t tag)
         integer1 = _mm256_permute4x64_epi64(integer1, 0xD8);
         //_mm256_stream_si256((__m256i*)&socket_ptr[2 * sc_id], integer1);
         _mm256_stream_si256(
-            (__m256i*)&socket_ptr[2 * (sc_id + cfg->CP_LEN)], integer1);
-        if (sc_id >= cfg->OFDM_CA_NUM - cfg->CP_LEN) // add CP
+            (__m256i*)&socket_ptr[2 * (sc_id + cfg_->CP_LEN)], integer1);
+        if (sc_id >= cfg_->OFDM_CA_NUM - cfg_->CP_LEN) // add CP
             _mm256_stream_si256((__m256i*)&socket_ptr[2
-                                    * (sc_id + cfg->CP_LEN - cfg->OFDM_CA_NUM)],
+                                    * (sc_id + cfg_->CP_LEN - cfg_->OFDM_CA_NUM)],
                 integer1);
     }
 
@@ -384,5 +384,5 @@ Event_data DoIFFT::launch(size_t tag)
 
     duration_stat->task_count++;
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
-    return Event_data(EventType::kIFFT, tag);
+    return EventData(EventType::kIFFT, tag);
 }

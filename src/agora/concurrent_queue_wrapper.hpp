@@ -7,9 +7,9 @@
 
 /// Enqueue one event to a concurrent queue and print a warning message
 /// if we're short on queue space
-static inline void try_enqueue_fallback(
-    moodycamel::ConcurrentQueue<Event_data>* mc_queue,
-    moodycamel::ProducerToken* producer_token, const Event_data& event)
+static inline void TryEnqueueFallback(
+    moodycamel::ConcurrentQueue<EventData>* mc_queue,
+    moodycamel::ProducerToken* producer_token, const EventData& event)
 {
     if (!mc_queue->try_enqueue(*producer_token, event)) {
         printf("Need more memory\n");
@@ -20,8 +20,8 @@ static inline void try_enqueue_fallback(
 
 /// Enqueue one event to a concurrent queue and print a warning message
 /// if we're short on queue space
-static inline void try_enqueue_fallback(
-    moodycamel::ConcurrentQueue<Event_data>* mc_queue, const Event_data& event)
+static inline void TryEnqueueFallback(
+    moodycamel::ConcurrentQueue<EventData>* mc_queue, const EventData& event)
 {
     if (!mc_queue->try_enqueue(event)) {
         printf("Need more memory\n");
@@ -31,9 +31,9 @@ static inline void try_enqueue_fallback(
 
 /// Enqueue a batch of events to a concurrent queue and print a warning message
 /// if we're short on queue space
-static inline void try_enqueue_bulk_fallback(
-    moodycamel::ConcurrentQueue<Event_data>& mc_queue,
-    moodycamel::ProducerToken& producer_token, const Event_data* event_list,
+static inline void TryEnqueueBulkFallback(
+    moodycamel::ConcurrentQueue<EventData>& mc_queue,
+    moodycamel::ProducerToken& producer_token, const EventData* event_list,
     size_t num_events)
 {
 
