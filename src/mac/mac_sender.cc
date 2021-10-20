@@ -12,11 +12,13 @@
 #include "udp_client.h"
 #include "video_receiver.h"
 
-//#define USE_UDP_DATA_SOURCE
-
+#define USE_UDP_DATA_SOURCE
 static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kFrameLoadAdvance = 10;
 static constexpr size_t kBufferInit = 10;
+
+static constexpr size_t kSlowStartMulStage1 = 32;
+static constexpr size_t kSlowStartMulStage2 = 8;
 
 static_assert(kFrameLoadAdvance >= kBufferInit);
 static std::atomic<bool> keep_running(true);
@@ -40,20 +42,19 @@ inline size_t MacSender::TagToTxBuffersIndex(gen_tag_t tag) const {
   return (frame_slot * cfg_->UeAntNum()) + tag.ue_id_;
 }
 
-// Only send Uplink (non-pilot data)
-// size_t tx_port = server_rx_port_;
-
 MacSender::MacSender(Config* cfg, std::string& data_filename,
                      size_t packets_per_frame, std::string server_address,
                      size_t server_rx_port,
                      std::function<size_t(size_t)> get_data_symbol_id,
-                     size_t socket_thread_num, size_t core_offset,
-                     size_t frame_duration_us, size_t inter_frame_delay,
-                     size_t enable_slow_start, bool create_thread_for_master)
+                     size_t core_offset, size_t worker_thread_num,
+                     size_t update_thread_num, size_t frame_duration_us,
+                     size_t inter_frame_delay, size_t enable_slow_start,
+                     bool create_thread_for_master)
     : cfg_(cfg),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
       ticks_per_usec_(freq_ghz_ * 1e3f),
-      socket_thread_num_(socket_thread_num),
+      worker_thread_num_(worker_thread_num),
+      update_thread_num_(update_thread_num),
       enable_slow_start_(enable_slow_start),
       core_offset_(core_offset),
       inter_frame_delay_(inter_frame_delay),
@@ -76,8 +77,8 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
 
   ticks_all_ =
       ((frame_duration_us_ * ticks_per_usec_) / cfg->Frame().NumTotalSyms());
-  ticks_wnd1_ = ticks_all_ * 40;
-  ticks_wnd2_ = ticks_all_ * 15;
+  ticks_wnd1_ = ticks_all_ * kSlowStartMulStage1;
+  ticks_wnd2_ = ticks_all_ * kSlowStartMulStage2;
 
   // tx buffers will be an array of MacPackets
   tx_buffers_.Malloc(kFrameWnd * cfg_->UeAntNum(),
@@ -104,8 +105,8 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
   task_ptok_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
           Agora_memory::Alignment_t::kAlign64,
-          (socket_thread_num * sizeof(moodycamel::ProducerToken*))));
-  for (size_t i = 0; i < socket_thread_num; i++) {
+          (worker_thread_num_ * sizeof(moodycamel::ProducerToken*))));
+  for (size_t i = 0; i < worker_thread_num_; i++) {
     task_ptok_[i] = new moodycamel::ProducerToken(send_queue_);
   }
 
@@ -114,11 +115,20 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
   if (create_thread_for_master == true) {
     MLPD_INFO("MacSender: creating master thread\n");
     this->threads_.emplace_back(&MacSender::MasterThread, this,
-                                socket_thread_num_);
+                                worker_thread_num_);
   }
 
-  // Add the data update thread (background data reader)
-  this->threads_.emplace_back(&MacSender::DataUpdateThread, this, 0);
+  // Add the data update thread (background data reader), need to add a variable for the update source number
+  for (size_t update_threads = 0; update_threads < update_thread_num_;
+       update_threads++) {
+    //1 update/data stream per thread.
+    this->threads_.emplace_back(&MacSender::DataUpdateThread, this,
+                                update_threads, 1);
+
+    data_update_queue_.emplace_back(
+        moodycamel::ConcurrentQueue<size_t>(kMessageQueueSize));
+    //make producer token here?
+  }
 }
 
 MacSender::~MacSender() {
@@ -129,7 +139,7 @@ MacSender::~MacSender() {
     thread.join();
   }
 
-  for (size_t i = 0; i < socket_thread_num_; i++) {
+  for (size_t i = 0; i < worker_thread_num_; i++) {
     delete (task_ptok_[i]);
   }
   std::free(task_ptok_);
@@ -141,7 +151,7 @@ void MacSender::StartTx() {
   this->frame_start_ = new double[kNumStatsFrames]();
   this->frame_end_ = new double[kNumStatsFrames]();
 
-  CreateWorkerThreads(socket_thread_num_);
+  CreateWorkerThreads(worker_thread_num_);
   signal(SIGINT, InterruptHandler);
   MasterThread(0);  // Start the master thread
 
@@ -153,12 +163,14 @@ void MacSender::StartTXfromMain(double* in_frame_start, double* in_frame_end) {
   frame_start_ = in_frame_start;
   frame_end_ = in_frame_end;
 
-  CreateWorkerThreads(socket_thread_num_);
+  CreateWorkerThreads(worker_thread_num_);
 }
 
 void MacSender::LoadFrame(size_t frame) {
   auto req_tag_for_data = gen_tag_t::FrmSym(frame, 0);
-  data_update_queue_.try_enqueue(req_tag_for_data.tag_);
+  for (size_t update = 0; update < update_thread_num_; update++) {
+    data_update_queue_.at(update).try_enqueue(req_tag_for_data.tag_);
+  }
 }
 
 void MacSender::ScheduleFrame(size_t frame) {
@@ -166,7 +178,7 @@ void MacSender::ScheduleFrame(size_t frame) {
     auto req_tag = gen_tag_t::FrmSymAnt(frame, 0, i);
     // Split up the antennas amoung the worker threads
     RtAssert(
-        send_queue_.enqueue(*task_ptok_[i % socket_thread_num_], req_tag.tag_),
+        send_queue_.enqueue(*task_ptok_[i % worker_thread_num_], req_tag.tag_),
         "Send task enqueue failed");
   }
 }
@@ -182,7 +194,8 @@ void* MacSender::MasterThread(size_t /*unused*/) {
   }
 
   num_workers_ready_atomic.fetch_add(1);
-  while (num_workers_ready_atomic.load() < (socket_thread_num_ + 2)) {
+  while (num_workers_ready_atomic.load() <
+         (worker_thread_num_ + 1 + update_thread_num_)) {
     // Wait
   }
   MLPD_FRAME("MacSender: Master thread running\n");
@@ -260,21 +273,23 @@ void* MacSender::MasterThread(size_t /*unused*/) {
  * the packet data could get mixed at the mac_thread receiver
  */
 void* MacSender::WorkerThread(size_t tid) {
-  PinToCoreWithOffset(ThreadType::kWorkerTX, (core_offset_ + 2), tid);
+  PinToCoreWithOffset(ThreadType::kWorkerTX,
+                      (core_offset_ + 1 + update_thread_num_), tid);
 
   // Wait for all Sender threads (including master) to start runnung
   num_workers_ready_atomic.fetch_add(1);
-  while (num_workers_ready_atomic.load() < (socket_thread_num_ + 2)) {
+  while (num_workers_ready_atomic.load() <
+         (worker_thread_num_ + 1 + update_thread_num_)) {
     // Wait
   }
   MLPD_FRAME("MacSender: worker thread %d running\n", tid);
 
   const size_t max_symbol_id = 1;
-  const size_t radio_lo = (tid * cfg_->NumRadios()) / socket_thread_num_;
-  const size_t radio_hi = ((tid + 1) * cfg_->NumRadios()) / socket_thread_num_;
+  const size_t radio_lo = (tid * cfg_->NumRadios()) / worker_thread_num_;
+  const size_t radio_hi = ((tid + 1) * cfg_->NumRadios()) / worker_thread_num_;
   const size_t ant_num_this_thread =
-      cfg_->NumRadios() / socket_thread_num_ +
-      (static_cast<size_t>(tid) < cfg_->NumRadios() % socket_thread_num_ ? 1
+      cfg_->NumRadios() / worker_thread_num_ +
+      (static_cast<size_t>(tid) < cfg_->NumRadios() % worker_thread_num_ ? 1
                                                                          : 0);
   UDPClient udp_client;
 
@@ -300,28 +315,31 @@ void* MacSender::WorkerThread(size_t tid) {
           std::printf("MacSender : worker %zu processing frame %d : %d \n", tid,
                       tag.frame_id_, tag.ant_id_);
         }
-        // const size_t tx_bufs_idx = TagToTxBuffersIndex(tag);
         uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
 
-        // Mac Thread is currently looking for packets_per_frame_ bytes
-        // since we read in mac packets, we need to skip over the headers
+        // Send the mac data to the data sinc
         for (size_t packet = 0; packet < packets_per_frame_; packet++) {
-          auto* tx_packet = reinterpret_cast<MacPacket*>(mac_packet_location);
-          // TODO: Port + ue_radio?
+          auto* tx_packet =
+              reinterpret_cast<const MacPacketPacked*>(mac_packet_location);
+          const size_t mac_header_size = MacPacket::kOffsetOfData;
+          const size_t mac_packet_storage_size =
+              (cfg_->MacPacketLength() + mac_header_size);
+          const size_t mac_packet_tx_size =
+              mac_header_size + tx_packet->datalen_;
+
+          //std::printf("MacSender sending packet %zu, size %zu:%zu\n", packet,
+          //            mac_packet_tx_size, mac_packet_storage_size);
+
           udp_client.Send(server_address_, server_rx_port_,
-                          reinterpret_cast<uint8_t*>(&tx_packet->data_[0u]),
-                          cfg_->MacPayloadLength());
-          mac_packet_location =
-              mac_packet_location +
-              (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
+                          reinterpret_cast<const uint8_t*>(tx_packet),
+                          mac_packet_tx_size);
+          mac_packet_location = mac_packet_location + mac_packet_storage_size;
         }
 
         if (kDebugSenderReceiver) {
           std::printf(
               "MacSender: Thread %zu (tag = %s) transmit frame %d, radio %zu, "
-              "TX "
-              "time: "
-              "%.3f us\n",
+              "TX time: %.3f us\n",
               tid, gen_tag_t(tag).ToString().c_str(), tag.frame_id_, cur_radio,
               GetTime::CyclesToUs(GetTime::Rdtsc() - start_tsc_send,
                                   freq_ghz_));
@@ -376,30 +394,52 @@ void MacSender::CreateWorkerThreads(size_t num_workers) {
 }
 
 /* Single threaded file reader to load a shared data structure */
-void* MacSender::DataUpdateThread(size_t tid) {
+void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
   size_t buffer_updates = 0;
-  PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_ + 1, 0);
+  PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_ + 1, tid);
+
+  //Split the Ue data up between threads and sources
+  const size_t ue_per_thread = std::ceil(cfg_->UeAntNum() / update_thread_num_);
+  //const size_t ue_per_thread_source =
+  //    std::ceil(ue_per_thread / num_data_sources);
+
+  const size_t ue_ant_low = tid * ue_per_thread;
+  const size_t ue_ant_high =
+      std::min(ue_ant_low + ue_per_thread, cfg_->UeAntNum());
 
   // Sender gets better performance when this thread is not pinned to core
-  // PinToCoreWithOffset(ThreadType::kWorker, 13, 0);
-  MLPD_INFO("MacSender: Data update thread %zu running on core %d\n", tid,
-            sched_getcpu());
+  MLPD_INFO(
+      "MacSender: Data update thread %zu running on core %d servicing ue data "
+      "%zu to %zu\n",
+      tid, sched_getcpu(), ue_ant_low, ue_ant_high);
 
 #if defined(USE_UDP_DATA_SOURCE)
-  auto data_source =
-      std::make_unique<VideoReceiver>(VideoReceiver::kVideoStreamRxPort);
+  std::vector<std::unique_ptr<VideoReceiver>> sources;
 #else
-  auto data_source = std::make_unique<FileReceiver>(data_filename_);
+  ///\todo need a list of file names for this
+  std::vector<std::unique_ptr<FileReceiver>> sources;
 #endif
+
+  for (size_t source = 0; source < num_data_sources; source++) {
+#if defined(USE_UDP_DATA_SOURCE)
+    //Assumes that the num_data_sources are spread evenly between threads
+    sources.emplace_back(std::make_unique<VideoReceiver>(
+        VideoReceiver::kVideoStreamRxPort + (tid * num_data_sources) + source));
+#else
+    ///\todo need a list of file names for this
+    sources.emplace_back(std::make_unique<FileReceiver>(data_filename_));
+#endif
+  }
 
   // Init the data buffers
   while ((keep_running.load() == true) && (buffer_updates < kBufferInit)) {
     size_t tag = 0;
-    if (data_update_queue_.try_dequeue(tag) == true) {
-      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+    if (data_update_queue_.at(tid).try_dequeue(tag) == true) {
+      for (size_t i = ue_ant_low; i < ue_ant_high; i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
-        UpdateTxBuffer(data_source.get(), tag_for_ue);
+        size_t ant_source = i % num_data_sources;
+        UpdateTxBuffer(sources.at(ant_source).get(), tag_for_ue);
       }
       buffer_updates++;
     }
@@ -411,11 +451,12 @@ void* MacSender::DataUpdateThread(size_t tid) {
   // Normal run loop
   while (keep_running.load() == true) {
     size_t tag = 0;
-    if (data_update_queue_.try_dequeue(tag) == true) {
-      for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+    if (data_update_queue_.at(tid).try_dequeue(tag) == true) {
+      for (size_t i = ue_ant_low; i < ue_ant_high; i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
-        UpdateTxBuffer(data_source.get(), tag_for_ue);
+        size_t ant_source = i % num_data_sources;
+        UpdateTxBuffer(sources.at(ant_source).get(), tag_for_ue);
       }
     }
   }
@@ -435,12 +476,21 @@ void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
     // Read a MacPayload into the data section
     size_t loaded_bytes =
         data_source->Load(pkt->data_, cfg_->MacPayloadLength());
-    if (loaded_bytes != cfg_->MacPayloadLength()) {
+
+    pkt->datalen_ = loaded_bytes;
+
+    if (loaded_bytes > cfg_->MacPayloadLength()) {
       MLPD_ERROR(
-          "MacSender [frame %d, ue %d]: Data not available to be loaded\n",
+          "MacSender [frame %d, ue %d]: Too much data was loaded from the "
+          "source\n",
           tag.frame_id_, tag.ant_id_);
+    } else if (loaded_bytes < cfg_->MacPayloadLength()) {
+      MLPD_INFO(
+          "MacSender [frame %d, ue %d]: Not enough mac data available sending "
+          "%zu bytes of padding\n",
+          tag.frame_id_, tag.ant_id_, cfg_->MacPayloadLength() - loaded_bytes);
     }
-    // TODO MacPacketLength should be the size of the mac packet but is not.
+    //MacPacketLength should be the size of the mac packet but is not.
     mac_packet_location = mac_packet_location +
                           (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
   }
