@@ -206,6 +206,7 @@ void* Sender::worker_thread(int tid)
         gen_tag_t tag = 0;
 
         for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
+            tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pools_[tid], sender_mac_addr,
                 server_mac_addr_list[i], bs_rru_addr, bs_server_addr_list[i],
                 cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
                 Packet::kOffsetOfData + cfg->subcarrier_num_list[i] * sizeof(unsigned short) * 2);
@@ -219,7 +220,7 @@ void* Sender::worker_thread(int tid)
             pkt->cell_id_ = 0;
             pkt->ant_id_ = cur_radio;
             size_t buf_offset = cur_slot_idx * 2 + (cur_symbol == 0 ? 0 : 1);
-            memcpy(pkt->data,
+            memcpy(pkt->data_,
                 data_buf + (buf_offset * ant_num_this_thread + cur_radio - radio_lo) * (2 * cfg->OFDM_CA_NUM)
                     + (cfg->subcarrier_num_start[i] + cfg->OFDM_DATA_START) * 2,
                 cfg->subcarrier_num_list[i] * sizeof(unsigned short) * 2);
