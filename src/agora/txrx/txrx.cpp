@@ -267,7 +267,7 @@ int PacketTXRX::recv_relocate(int tid)
     MLPD_TRACE("PacketTXRX: Thread %d received packet %s\n", tid,
         pkt->to_string().c_str());
 
-    if (pkt->pkt_type == Packet::PktType::kIQFromRRU) {
+    if (pkt->pkt_type == Packet::PktType::kFreqIQ) {
         char* rx_buffer = (*buffer_)[pkt->ant_id];
         const size_t rx_offset_ = (pkt->frame_id % SOCKET_BUFFER_FRAME_NUM)
                 * cfg->symbol_num_perframe

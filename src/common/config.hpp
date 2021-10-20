@@ -326,6 +326,9 @@ public:
     // This Agora server takes charge of ue range [ue_start, ue_end]
     size_t ue_start, ue_end;
 
+    uint16_t fft_tx_port;
+    uint16_t fft_rx_port;
+
     uint16_t demod_tx_port; // UDP port used to receive post-demodulation data
     uint16_t demod_rx_port; // UDP port used to send post-demodulation data
 
@@ -348,7 +351,10 @@ public:
 
     // IQ sample mode
     bool use_time_domain_iq;
-    size_t fft_thread_num;
+    size_t fft_thread_num = 0;
+    size_t fft_tx_thread_num = 0;
+
+    size_t ant_start, ant_end;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;
@@ -376,6 +382,11 @@ public:
 
     /// Return the symbol type of this symbol in this frame
     SymbolType get_symbol_type(size_t frame_id, size_t symbol_id);
+
+    inline size_t get_num_ant_to_process() const
+    {
+        return ant_end - ant_start;
+    }
 
     // Get the number of subcarriers this server takes charge of
     inline size_t get_num_sc_per_server() const
@@ -468,6 +479,12 @@ public:
     inline size_t get_zf_sc_id(size_t sc_id) const
     {
         return freq_orthogonal_pilot ? sc_id - (sc_id % UE_NUM) : sc_id;
+    }
+
+    inline char* get_time_domain_iq_buffer(
+        Table<char>& time_domain_iq_buffer, size_t ant_id, size_t frame_id, size_t symbol_id) const
+    {
+        return &time_domain_iq_buffer[ant_id][((frame_id % kFrameWnd) * symbol_num_perframe + symbol_id) * packet_length];    
     }
 
     inline char* get_freq_domain_iq_buffer(

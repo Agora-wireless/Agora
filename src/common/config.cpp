@@ -305,6 +305,16 @@ Config::Config(std::string jsonfile)
         tmp_vec = tddConf.value("fft_thread_num", std::vector<size_t>());
         rt_assert(tmp_vec.size() == bs_server_addr_list.size());
         fft_thread_num = tmp_vec[bs_server_addr_idx];
+        fft_tx_thread_num = tddConf.value("fft_tx_thread_num", 0);
+        ant_start = bs_server_addr_idx < BS_ANT_NUM % bs_server_addr_list.size()
+            ? bs_server_addr_idx * (BS_ANT_NUM / bs_server_addr_list.size() + 1)
+            : BS_ANT_NUM - (bs_server_addr_list.size() - bs_server_addr_idx)
+            * (BS_ANT_NUM / bs_server_addr_list.size());
+        ant_end = bs_server_addr_idx < BS_ANT_NUM % bs_server_addr_list.size()
+            ? ant_start + BS_ANT_NUM / bs_server_addr_list.size() + 1
+            : ant_start + BS_ANT_NUM / bs_server_addr_list.size();
+        fft_tx_port = tddConf.value("fft_tx_port", 9100);
+        fft_rx_port = tddConf.value("fft_rx_port", 9600);
     }
 
     sampsPerSymbol

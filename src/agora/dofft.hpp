@@ -9,6 +9,7 @@
 #include "gettime.h"
 #include "mkl_dfti.h"
 #include "phy_stats.hpp"
+#include "shared_counters.hpp"
 #include "stats.hpp"
 #include <armadillo>
 #include <iostream>
@@ -20,9 +21,8 @@ class DoFFT : public Doer {
 public:
     DoFFT(Config* config, int tid, double freq_ghz, Range ant_range,
         Table<char>& time_domain_iq_buffer, 
-        Table<complex_float>& frequency_domain_iq_buffer_to_send,
-        PhyStats* in_phy_stats,
-        Stats* stats_manager, SharedState* shared_state_);
+        Table<char>& freq_domain_iq_buffer_to_send,
+        SharedState* shared_state_);
     ~DoFFT();
 
     /**
@@ -62,16 +62,14 @@ public:
     void StartWork();
 
 private:
+    void partial_transpose(complex_float* out_buf, size_t ant_id, SymbolType symbol_type) const;
+
     Table<char>& time_domain_iq_buffer_;
-    Table<char>& frequency_domain_iq_buffer_to_send_;
+    Table<char>& freq_domain_iq_buffer_to_send_;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
     complex_float* fft_inout; // Buffer for both FFT input and output
-    DurationStat* duration_stat_fft;
-    DurationStat* duration_stat_csi;
-    PhyStats* phy_stats;
 
     struct Range ant_range_;
-    moodycamel::ConcurrentQueue<EventData> dummy_conq_;
 
     size_t cur_frame_ = 0;
     size_t cur_idx_ = 0;
@@ -79,6 +77,7 @@ private:
     SharedState *shared_state_;
 };
 
+#if 0
 class DoIFFT : public Doer {
 public:
     DoIFFT(Config* in_config, int in_tid, double freq_ghz,
@@ -120,5 +119,6 @@ private:
     DurationStat* duration_stat;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
 };
+#endif
 
 #endif

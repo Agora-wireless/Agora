@@ -47,6 +47,8 @@
 class PacketTXRX {
 public:
     PacketTXRX(Config* cfg, size_t in_core_offset,
+        Table<char>& time_domain_iq_buffer,
+        Table<char>& freq_domain_iq_buffer_to_send,
         Table<char>& freq_domain_iq_buffer,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_to_send,
         Table<int8_t>& demod_buffer_to_decode,
@@ -70,7 +72,7 @@ public:
      * @return True on successfully starting the network I/O threads, false
      * otherwise
      */
-    bool startTXRX();
+    bool StartTXRX();
 
     // Current sending frame for each socket thread
     size_t frame_to_send_[kMaxThreads] = {0};
@@ -79,6 +81,7 @@ private:
     // The simulation-mode thread function running on thread #tid
     void* loop_tx_rx(int tid);
 
+    void* fft_tx_thread(int tid);
     // A thread that sends and receives post-demodulation data
     void* demod_tx_thread(int tid);
 
@@ -86,13 +89,16 @@ private:
     // the subcarrier range
     int recv_relocate(int tid);
 
-    Config* cfg;
+    Config* cfg_;
 
     // The network I/O threads run on cores
     // {core_offset, ..., core_offset + socket_thread_num - 1}
-    const size_t core_offset;
+    const size_t core_offset_;
 
-    const size_t rx_thread_num;
+    const size_t rx_thread_num_;
+    const size_t fft_tx_thread_num_;
+    Table<char>& time_domain_iq_buffer_;
+    Table<char>& freq_domain_iq_buffer_to_send_;
     Table<char>& freq_domain_iq_buffer_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send_;
     Table<int8_t>& demod_buffer_to_decode_;

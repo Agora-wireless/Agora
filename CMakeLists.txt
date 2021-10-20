@@ -204,6 +204,7 @@ add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(AGORA_SOURCES 
   src/agora/agora.cpp
+  src/agora/dofft.cpp
   src/agora/dyzf.cpp
   src/agora/dydemul.cpp
   src/agora/dycoding.cpp

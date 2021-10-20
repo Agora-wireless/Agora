@@ -213,7 +213,7 @@ void* Sender::worker_thread(int tid)
 
         for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i++) {
             auto* pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[i], uint8_t*) + kPayloadOffset);
-            pkt->pkt_type_ = Packet::PktType::kIQFromRRU;
+            pkt->pkt_type_ = Packet::PktType::kFreqIQ;
             pkt->frame_id_ = cur_frame;
             pkt->symbol_id_ = cfg->getSymbolId(cur_symbol);
             pkt->cell_id_ = 0;

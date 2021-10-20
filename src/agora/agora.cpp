@@ -26,12 +26,19 @@ Agora::Agora(Config* cfg)
 
     /* Initialize TXRX threads */
     packet_tx_rx_.reset(new PacketTXRX(cfg, cfg->core_offset + kNumMasterThread,
+        time_domain_iq_buffer_, freq_domain_iq_buffer_to_send_,
         freq_domain_iq_buffer_, demod_buffer_to_send_, demod_buffer_to_decode_, 
         &shared_state_));
     
     base_worker_core_offset_ = config_->core_offset + kNumMasterThread + 
         config_->rx_thread_num + kNumDemodTxThread;
     // TODO: Add other possible threads
+
+    do_fft_threads_.resize(cfg->fft_thread_num);
+    for (size_t i = 0; i < do_fft_threads_.size(); i ++) {
+        do_fft_threads_[i]
+            = std::thread(&Agora::fftWorker, this, i);
+    }
 
     /* Create worker threads */
     do_subcarrier_threads_.resize(
@@ -91,7 +98,7 @@ void Agora::Start()
     rte_eth_stats_get(0, &start_stats);
 
     // Start packet I/O
-    if (!packet_tx_rx_->startTXRX()) {
+    if (!packet_tx_rx_->StartTXRX()) {
         Stop();
         return;
     }
@@ -129,6 +136,26 @@ finish:
     saveLatencyDataToFile();
 
     Stop();
+}
+
+void* Agora::fftWorker(int tid)
+{
+    pin_to_core_with_offset(
+        ThreadType::kWorkerFFT, base_worker_core_offset_, tid);
+
+    size_t ant_block = config_->get_num_ant_to_process() / config_->fft_thread_num;
+    size_t ant_off = config_->get_num_ant_to_process() % config_->fft_thread_num;
+
+    Range ant_range((size_t)tid < ant_off ? tid * (ant_block + 1) : tid * (ant_block + 1) - (tid - ant_off),
+        (size_t)tid < ant_off ? (tid + 1) * (ant_block + 1) : (tid + 1) * (ant_block + 1) - (tid + 1 - ant_off));
+
+    auto computeFFT = new DoFFT(config_, tid, freq_ghz_, ant_range, time_domain_iq_buffer_,
+        freq_domain_iq_buffer_to_send_, &shared_state_);
+
+    computeFFT->StartWork();
+    delete computeFFT;
+
+    return nullptr;
 }
 
 void* Agora::subcarrierWorker(int tid)
@@ -178,6 +205,11 @@ void Agora::initializeUplinkBuffers()
 
     size_t packet_buffer_size_ = cfg->packet_length * kFrameWnd * cfg->symbol_num_perframe;
 
+    if (cfg->use_time_domain_iq) {
+        time_domain_iq_buffer_.malloc(cfg->BS_ANT_NUM, packet_buffer_size_, 64);
+        freq_domain_iq_buffer_to_send_.malloc(cfg->BS_ANT_NUM, packet_buffer_size_, 64);
+    }
+
     freq_domain_iq_buffer_.malloc(cfg->BS_ANT_NUM,
         packet_buffer_size_, 64);
 
@@ -226,6 +258,10 @@ void Agora::initializeDownlinkBuffers()
 
 void Agora::freeUplinkBuffers()
 {
+    if (config_->use_time_domain_iq) {
+        time_domain_iq_buffer_.free();
+        freq_domain_iq_buffer_to_send_.free();
+    }
     freq_domain_iq_buffer_.free();
     equal_buffer_.free();
 }

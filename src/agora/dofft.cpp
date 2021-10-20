@@ -5,6 +5,8 @@
 #include "signalHandler.hpp"
 #include <malloc.h>
 
+#define TRIGGER_TIMER(stmt) if(likely(state_trigger)){stmt;}
+
 using namespace arma;
 
 static constexpr bool kPrintFFTInput = false;
@@ -64,19 +66,14 @@ static void convert_short_to_float_simd(
 
 DoFFT::DoFFT(Config* config, int tid, double freq_ghz, Range ant_range,
     Table<char>& time_domain_iq_buffer,
-    Table<char>& frequency_domain_iq_buffer_to_send, 
-    PhyStats* in_phy_stats,
-    Stats* stats_manager, SharedState* shared_state_)
-    : Doer(config, tid, freq_ghz, dummy_conq_, complete_task_queue,
-          worker_producer_token)
+    Table<char>& freq_domain_iq_buffer_to_send, 
+    SharedState* shared_state_)
+    : Doer(config, tid, freq_ghz)
     , ant_range_(ant_range)
     , time_domain_iq_buffer_(time_domain_iq_buffer)
-    , frequency_domain_iq_buffer_to_send_(frequency_domain_iq_buffer_to_send)
-    , phy_stats(in_phy_stats)
+    , freq_domain_iq_buffer_to_send_(freq_domain_iq_buffer_to_send)
     , shared_state_(shared_state_)
 {
-    duration_stat_fft = stats_manager->get_duration_stat(DoerType::kFFT, tid_);
-    duration_stat_csi = stats_manager->get_duration_stat(DoerType::kCSI, tid_);
     DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg_->OFDM_CA_NUM);
     DftiCommitDescriptor(mkl_handle);
@@ -105,10 +102,10 @@ void DoFFT::Launch(size_t frame_id, size_t symbol_id, size_t ant_id)
     size_t start_tsc1 = worker_rdtsc();
 
     DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
-_
+
     size_t start_tsc2 = worker_rdtsc();
 
-    simd_convert_float32_to_float16(reinterpret_cast<float*>(frequency_domain_iq_buffer_to_send_[ant_id] + 
+    simd_convert_float32_to_float16(reinterpret_cast<float*>(freq_domain_iq_buffer_to_send_[ant_id] + 
         (frame_slot * cfg_->symbol_num_perframe * cfg_->packet_length)
         + symbol_id * cfg_->packet_length),
         reinterpret_cast<float*>(fft_inout), cfg_->OFDM_CA_NUM * 2);
@@ -129,65 +126,46 @@ void DoFFT::StartWork()
     bool state_trigger = false;
 
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
-
-        if (likely(state_trigger)) {
-            loop_count ++;
-        }
+        TRIGGER_TIMER(loop_count ++);
         size_t work_start_tsc, state_start_tsc;
-        size_t cur_symbol = cur_idx_ / (ant_range_.end - ant_range_.start);
-        size_t cur_ant = cur_idx_ % (ant_range_.end - ant_range_.start) + ant_range_.start;
+        size_t cur_symbol = cur_idx_ / cfg_->get_num_ant_to_process();
+        size_t cur_ant = cur_idx_ % cfg_->get_num_ant_to_process() + cfg_->ant_start;
 
-        if (cur_symbol == 0) {
-            if (likely(state_trigger)) {
-                work_start_tsc = rdtsc();
-                state_start_tsc = rdtsc();
+        TRIGGER_TIMER({
+            work_start_tsc = rdtsc();
+            state_start_tsc = rdtsc();
+        });
+        bool ret = shared_state_->received_all_time_iq_pkts(cur_frame_, cur_symbol);
+        TRIGGER_TIMER({
+            state_operation_duration += rdtsc() - state_start_tsc;
+            work_tsc_duration += rdtsc() - work_start_tsc;
+        });
+
+        if (ret) {
+            if (unlikely(!state_trigger && cur_frame_ >= 200)) {
+                loop_count ++;
+                start_tsc = rdtsc();
+                state_trigger = true;
             }
-            bool ret = shared_state_->received_all_pilots(cur_frame_);
-            if (likely(state_trigger)) {
+            TRIGGER_TIMER({
+                work_start_tsc = rdtsc();
+                work_count ++;
+                fft_start_tsc = rdtsc();
+            });
+            Launch(cur_frame_, cur_symbol, cur_ant);
+            TRIGGER_TIMER({
+                fft_tsc_duration += rdtsc() - fft_start_tsc;
+                fft_task_count += ant_range_.end - ant_range_.start;
+                state_start_tsc = rdtsc();
+            });
+            shared_state_->fft_done(cur_frame_, cur_symbol);
+            TRIGGER_TIMER({
                 state_operation_duration += rdtsc() - state_start_tsc;
                 work_tsc_duration += rdtsc() - work_start_tsc;
-            }
-
-            if (ret) {
-
-                if (unlikely(!state_trigger && cur_frame_ >= 200)) {
-                    loop_count ++;
-                    start_tsc = rdtsc();
-                    state_trigger = true;
-                }
-
-                if (likely(state_trigger)) {
-                    work_start_tsc = rdtsc();
-                    work_count ++;
-                }
-
-                if (likely(state_trigger)) {
-                    fft_start_tsc = rdtsc();
-                }
-                launch(cur_frame_, cur_symbol, cur_ant);
-                if (likely(state_trigger)) {
-                    fft_tsc_duration += rdtsc() - fft_start_tsc;
-                    fft_task_count += ant_range_.end - ant_range_.start;
-                }
-
-                if (likely(state_trigger)) {
-                    state_start_tsc = rdtsc();
-                }
-                shared_state_->fft_done(cur_frame_, cur_symbol, 1);
-                if (likely(state_trigger)) {
-                    state_operation_duration += rdtsc() - state_start_tsc;
-                    work_tsc_duration += rdtsc() - work_start_tsc;
-                }
-
-                cur_idx_ += cfg_->fft_thread_num;
-            }
-        } else {
-            if (likely(state_trigger)) {
-                work_start_tsc = rdtsc();
-                state_start_tsc = rdtsc();
-            }
-            // TODO: Merge these two cases
+            });
+            cur_idx_ += cfg_->fft_thread_num;
         }
+    }
 }
 
 void DoFFT::partial_transpose(
@@ -257,7 +235,7 @@ void DoFFT::partial_transpose(
                     cfg_->pilots_sgn_[sc_idx + 3].re,
                     cfg_->pilots_sgn_[sc_idx + 2].im,
                     cfg_->pilots_sgn_[sc_idx + 2].re,
-                    cfg_>pilots_sgn_[sc_idx + 1].im,
+                    cfg_->pilots_sgn_[sc_idx + 1].im,
                     cfg_->pilots_sgn_[sc_idx + 1].re,
                     cfg_->pilots_sgn_[sc_idx].im, cfg_->pilots_sgn_[sc_idx].re);
                 fft_result0 = CommsLib::__m256_complex_cf32_mult(
@@ -282,6 +260,7 @@ void DoFFT::partial_transpose(
     }
 }
 
+#if 0
 DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
     moodycamel::ConcurrentQueue<EventData>& in_task_queue,
     moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
@@ -386,3 +365,4 @@ EventData DoIFFT::launch(size_t tag)
     duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
     return EventData(EventType::kIFFT, tag);
 }
+#endif

@@ -219,17 +219,19 @@ struct Packet {
 
     enum class PktType {
         kInvalid,
-        kIQFromRRU, // A packet containing IQ samples from the RRU
+        kTimeIQ, // A packet containing time-domain IQ samples from the RRU
+        kFreqIQ, // A packet containing frequency-domain IQ samples from the RRU or servers
         kIQFromServer, // A packet containing IQ samples from the server
         kDemod, // A packet generated after the demodulation stage
-        kEncode // A packet generated after the encode stage
+        kEncode, // A packet generated after the encode stage
+        kFFT
     };
 
     static const char* PktTypeStr(PktType pkt_type)
     {
         switch (pkt_type) {
-        case PktType::kIQFromRRU:
-            return "[IQ from RRU]";
+        case PktType::kFreqIQ:
+            return "[Freq IQ from RRU]";
         case PktType::kDemod:
             return "[Demodulated data]";
         default:

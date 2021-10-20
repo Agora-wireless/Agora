@@ -40,6 +40,7 @@ public:
 
 private:
     void* worker(int tid); // TODO: implement later
+    void* fftWorker(int tid);
     void* subcarrierWorker(int tid);
     void* decodeWorker(int tid);
     void* encodeWorker(int tid); // TODO: implement later
@@ -88,6 +89,9 @@ private:
     /*****************************************************
      * Buffers
      *****************************************************/
+
+    Table<char> time_domain_iq_buffer_;
+    Table<char> freq_domain_iq_buffer_to_send_;
 
     // Received data buffers
     // 1st dimension: number of antennas
@@ -161,6 +165,8 @@ private:
     int* dl_socket_buffer_status_;
 
     sched_info_t sched_info_arr[kMaxThreads];
+
+    std::vector<std::thread> do_fft_threads_;
 
     // Threads running the subcarrier-parallel processing
     std::vector<std::thread> do_subcarrier_threads_;

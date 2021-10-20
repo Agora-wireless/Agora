@@ -15,11 +15,13 @@ class SharedState {
 public:
     SharedState(Config* cfg);
 
+    bool receive_time_iq_pkt(size_t frame_id, size_t symbol_id);
     // When receive a new freq iq packet, record it here
-    bool receive_freq_iq_pkt(const Packet* pkt);
+    bool receive_freq_iq_pkt(size_t frame_id, size_t symbol_id);
     // When receive a new demod packet, record it here
     bool receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol_id_ul);
 
+    bool received_all_time_iq_pkts(size_t frame_id, size_t symbol_id);
     // Check whether all pilot packets are received for a frame
     // used by CSI
     bool received_all_pilots(size_t frame_id);
@@ -29,6 +31,7 @@ public:
     // Check whether encoding can proceed for a frame
     bool is_encode_ready(size_t frame_id);
 
+    void fft_done(size_t frame_id, size_t symbol_id);
     // Mark [num_tasks] demodulation tasks for this frame and symbol as complete
     void demul_done(size_t frame_id, size_t symbol_id_ul, size_t num_tasks);
     // When decoding is done for a frame from one decoder, call this function
@@ -41,6 +44,7 @@ public:
     // we can move on precoding the next frame and release the resources used by this frame
     void precode_done(size_t frame_id);
 
+    bool is_fft_tx_ready(size_t frame_id, size_t symbol_id);
     // Return true iff we have completed demodulation for all subcarriers in
     // this symbol have
     bool is_demod_tx_ready(size_t frame_id, size_t symbol_id_ul);
@@ -59,6 +63,9 @@ private:
     // TODO: Instead of having all-atomic counter arrays, can we just make
     // the entire class atomic?
 
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
+        num_time_iq_pkts_ = {};
+
     // num_pkts[i % kFrameWnd] is the total number of packets
     // received for frame i (may be removed if not used)
     std::array<std::atomic<size_t>, kFrameWnd> num_pkts_ = {};
@@ -72,11 +79,13 @@ private:
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_data_pkts_ = {};
 
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
+        num_fft_tasks_completed_ = {};
     // num_demul_tasks_completed[i % kFrameWnd][j] is
     // the number of subcarriers completed for demul tasks in
     // frame i and symbol j
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
-        num_demul_tasks_completed_;
+        num_demul_tasks_completed_ = {};
 
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_demod_pkts_[kMaxUEs];
@@ -103,10 +112,12 @@ private:
     size_t freq_ghz_;
 
     // Copies of Config variables
+    const size_t num_time_iq_pkts_per_symbol_;
     const size_t num_pilot_pkts_per_frame_;
     const size_t num_pilot_symbols_per_frame_;
     const size_t num_ul_data_symbol_per_frame_;
     const size_t num_pkts_per_symbol_;
+    const size_t num_fft_tasks_per_symbol_;
     const size_t num_decode_tasks_per_frame_;
     const size_t num_precode_tasks_per_frame_;
     const size_t num_demul_tasks_required_;
