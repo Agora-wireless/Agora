@@ -558,18 +558,20 @@ void PhyUe::Start() {
           // This is an entire frame (multiple mac packets)
           const size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
           const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
-          RtAssert(radio_buf_id == expected_frame_id_from_mac_ % kFrameWnd);
+          RtAssert(radio_buf_id == (expected_frame_id_from_mac_ % kFrameWnd),
+                   "Radio buffer id does not match expected");
 
-          auto* pkt = reinterpret_cast<MacPacket*>(
+          auto* pkt = reinterpret_cast<const MacPacketPacked*>(
               &ul_bits_buffer_[ue_id][radio_buf_id *
                                       config_->UlMacBytesNumPerframe()]);
 
           MLPD_TRACE(
               "PhyUe: frame %d symbol %d user %d @ offset %zu %zu @ location "
               "%zu\n",
-              pkt->frame_id_, pkt->symbol_id_, pkt->ue_id_, ue_id, radio_buf_id,
+              pkt->Frame(), pkt->Symbol(), pkt->Ue(), ue_id, radio_buf_id,
               (size_t)pkt);
-          RtAssert(pkt->frame_id_ == expected_frame_id_from_mac_,
+          RtAssert(pkt->Frame() ==
+                       static_cast<uint16_t>(expected_frame_id_from_mac_),
                    "PhyUe: Incorrect frame ID from MAC");
           current_frame_user_num_ =
               (current_frame_user_num_ + 1) % config_->UeAntNum();
@@ -590,21 +592,19 @@ void PhyUe::Start() {
             for (size_t ul_data_symbol = 0;
                  ul_data_symbol < config_->Frame().NumUlDataSyms();
                  ul_data_symbol++) {
-              ss << "PhyUe: kPacketFromMac, frame " << pkt->frame_id_
-                 << ", symbol " << std::to_string(pkt->symbol_id_) << " crc "
-                 << std::to_string(pkt->crc_) << " bytes: ";
-              for (size_t i = 0; i < pkt->datalen_; i++) {
-                ss << std::to_string(
-                          (reinterpret_cast<uint8_t*>(pkt->data_)[i]))
-                   << ", ";
+              ss << "PhyUe: kPacketFromMac, frame " << pkt->Frame()
+                 << ", symbol " << std::to_string(pkt->Symbol()) << " crc "
+                 << std::to_string(pkt->Crc()) << " bytes: ";
+              for (size_t i = 0; i < pkt->PayloadLength(); i++) {
+                ss << std::to_string((pkt->Data()[i])) << ", ";
               }
               ss << std::endl;
-              pkt = reinterpret_cast<MacPacket*>(
-                  reinterpret_cast<uint8_t*>(pkt) + config_->MacPacketLength());
+              pkt = reinterpret_cast<const MacPacketPacked*>(
+                  reinterpret_cast<const uint8_t*>(pkt) +
+                  config_->MacPacketLength());
             }
             std::printf("%s\n", ss.str().c_str());
           }
-
         } break;
 
         case EventType::kEncode: {

@@ -51,5 +51,7 @@ int main(int argc, char* argv[]) {
     }
   }
   std::printf("Channel Simulator Exit\n");
+  PrintCoreAssignmentSummary();
+  gflags::ShutDownCommandLineFlags();
   return ret;
 }
