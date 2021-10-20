@@ -28,7 +28,7 @@
 class MacThreadBaseStation {
  public:
   // Default log file for MAC layer outputs
-  static constexpr char kDefaultLogFilename[] = "/tmp/mac_log_server";
+  static constexpr char kDefaultLogFilename[] = "data/mac_log_server";
 
   // Maximum number of outstanding UDP packets per UE that we allocate recv()
   // buffer space for
@@ -76,6 +76,7 @@ class MacThreadBaseStation {
   // server, uplink bits at the MAC thread running at the client) and forward
   // them to the PHY.
   void ProcessUdpPacketsFromApps();
+  void ProcessUdpPacketsFromAppsBs(const char* payload);
 
   Config* const cfg_;
 
@@ -94,23 +95,8 @@ class MacThreadBaseStation {
   // UDP endpoint used for receiving messages
   std::unique_ptr<UDPServer> udp_server_;
 
-  // UDP endpoint for receiving control channel messages
-  std::unique_ptr<UDPServer> udp_control_channel_;
-
-  // TODO: decoded_buffer_ is used by only the server, so it should be moved
-  // to server_ for clarity.
-  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer_;
-
-  Table<int8_t>* dl_bits_buffer_;
-  Table<int8_t>* dl_bits_buffer_status_;
-  std::array<size_t, kMaxUEs> dl_bits_buffer_id_;
-
   // A preallocated buffer to store UDP packets received via recv()
   std::vector<uint8_t> udp_pkt_buf_;
-
-  // A preallocated buffer to store UDP control information
-  // received via recv()
-  std::vector<uint8_t> udp_control_buf_;
 
   // The timestamp at which we last received a UDP packet from an application
   size_t last_mac_pkt_rx_tsc_ = 0;
@@ -129,7 +115,7 @@ class MacThreadBaseStation {
   // Server-only members
   struct {
     // Staging buffers to accumulate decoded uplink code blocks for each UE
-    std::vector<uint8_t> frame_data_[kMaxUEs];
+    std::array<std::vector<uint8_t>, kMaxUEs> frame_data_;
 
     // n_filled_in_frame_[i] is the number of bytes received in the current
     // frame for UE #i
@@ -140,8 +126,19 @@ class MacThreadBaseStation {
 
     //Placing at the end because it is variable size based on configuration
     std::vector<std::vector<size_t>> data_size_;
+
   } server_;
 
+  // TODO: decoded_buffer_ is used by only the server, so it should be moved
+  // to server_ for clarity.
+  PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer_;
+
+  struct {
+    std::array<size_t, kMaxUEs> dl_bits_buffer_id_;
+
+    Table<int8_t>* dl_bits_buffer_;
+    Table<int8_t>* dl_bits_buffer_status_;
+  } client_;
   // FIFO queue for receiving messages from the master thread
   moodycamel::ConcurrentQueue<EventData>* rx_queue_;
 

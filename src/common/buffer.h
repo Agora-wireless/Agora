@@ -242,48 +242,65 @@ static_assert(sizeof(rx_tag_t) == sizeof(size_t));
 using fft_req_tag_t = rx_tag_t;
 
 #pragma pack(push, 1)
-struct MacPacketPacked {
-  static constexpr size_t kOffsetOfData = 16 + sizeof(RBIndicator);
+struct MacPacketHeaderPacked {
+ public:
+  inline const uint16_t &Frame() const { return frame_id_; }
+  inline const uint16_t &Symbol() const { return symbol_id_; }
+  inline const uint16_t &Ue() const { return ue_id_; }
+  inline const uint16_t &Crc() const { return crc_; }
+  inline const uint16_t &PayloadLength() const { return datalen_; }
 
+  //Modifiers
+  inline void Set(const uint16_t &f, const uint16_t &s, const uint16_t &u,
+                  const uint16_t &d, const uint16_t &cc) {
+    frame_id_ = f;
+    symbol_id_ = s;
+    ue_id_ = u;
+    datalen_ = d;
+    crc_ = cc;
+  }
+  inline void Crc(const uint16_t &crc) { crc_ = crc; }
+
+ private:
   uint16_t frame_id_;
   uint16_t symbol_id_;
   uint16_t ue_id_;
   uint16_t datalen_;  // length of payload in bytes or array data[]
   uint16_t crc_;      // 16 bits CRC over calculated for the data[] array
-  uint16_t rsvd_[3];  // reserved for future use
+#if ENABLE_RB_IND
   RBIndicator rb_indicator_;  // RAN scheduling details for PHY
-  char data_[];               // Mac packet payload data
+#endif
+};
+
+struct MacPacketPacked {
+ public:
+  static constexpr size_t kHeaderSize = sizeof(MacPacketHeaderPacked);
+
+  inline const uint16_t &Frame() const { return header_.Frame(); }
+  inline const uint16_t &Symbol() const { return header_.Symbol(); }
+  inline const uint16_t &Ue() const { return header_.Ue(); }
+  inline const uint16_t &Crc() const { return header_.Crc(); }
+  inline const uint16_t &PayloadLength() const {
+    return header_.PayloadLength();
+  }
+  inline const unsigned char *Data() const { return data_; };
+
+  //Modifiers
+  inline void Set(const uint16_t &f, const uint16_t &s, const uint16_t &u,
+                  const uint16_t &data_size) {
+    header_.Set(f, s, u, data_size, 0);
+  }
+  inline void LoadData(const unsigned char *src_data) {
+    std::memcpy(this->data_, src_data, this->PayloadLength());
+  }
+  inline void Crc(const uint16_t &crc) { header_.Crc(crc); }
+  inline unsigned char *DataPtr() { return data_; };
+
+ private:
+  MacPacketHeaderPacked header_;
+  unsigned char data_[];  // Mac packet payload data
 };
 #pragma pack(pop)
-
-struct MacPacket {
-  // The packet's data starts at kOffsetOfData bytes from the start
-#if ENABLE_RB_IND
-  static constexpr size_t kOffsetOfData = 16 + sizeof(RBIndicator);
-#else
-  static constexpr size_t kOffsetOfData = 16;
-#endif
-  uint16_t frame_id_;
-  uint16_t symbol_id_;
-  uint16_t ue_id_;
-  uint16_t datalen_;  // length of payload in bytes or array data[]
-  uint16_t crc_;      // 16 bits CRC over calculated for the data[] array
-  uint16_t rsvd_[3];  // reserved for future use
-#if ENABLE_RB_IND
-  RBIndicator rb_indicator_;  // RAN scheduling details for PHY
-#endif
-  char data_[];               // Mac packet payload data
-  MacPacket(int f, int s, int u, int d,
-            int cc)  // TODO: Should be unsigned integers
-      : frame_id_(f), symbol_id_(s), ue_id_(u), datalen_(d), crc_(cc) {}
-
-  std::string ToString() const {
-    std::ostringstream ret;
-    ret << "[Frame seq num " << frame_id_ << ", symbol ID " << symbol_id_
-        << ", user ID " << ue_id_ << "]";
-    return ret.str();
-  }
-};
 
 // Event data tag for Mac RX events
 union rx_mac_tag_t {

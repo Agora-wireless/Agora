@@ -26,7 +26,7 @@ Config::Config(const std::string& jsonfile)
       frame_("") {
   pilots_ = nullptr;
   pilots_sgn_ = nullptr;
-  SetCpuLayoutOnNumaNodes();
+  SetCpuLayoutOnNumaNodes(true);
   std::string conf;
   Utils::LoadTddConfig(jsonfile, conf);
   // Allow json comments
@@ -440,23 +440,18 @@ Config::Config(const std::string& jsonfile)
   data_bytes_num_persymbol_ =
       num_bytes_per_cb_ * ldpc_config_.NumBlocksInSymbol();
 
-  //  Pad the mac packets so that they can be stuffed into the same buffer
-  //  Align to kMacAlignmentBytes (64) byte boundaries
-  size_t padding =
-      kMacAlignmentBytes - (data_bytes_num_persymbol_ % kMacAlignmentBytes);
-  mac_packet_length_ = data_bytes_num_persymbol_ + padding;
-  mac_payload_length_ =
-      mac_packet_length_ - (padding + MacPacket::kOffsetOfData);
-  assert(mac_packet_length_ > (padding + MacPacket::kOffsetOfData));
+  mac_packet_length_ = data_bytes_num_persymbol_;
+  //Smallest over the air packet structure
+  mac_data_length_max_ = mac_packet_length_ - sizeof(MacPacketHeaderPacked);
 
   ul_mac_packets_perframe_ = this->frame_.NumUlDataSyms();
   ul_mac_data_bytes_num_perframe_ =
-      mac_payload_length_ * ul_mac_packets_perframe_;
+      mac_data_length_max_ * ul_mac_packets_perframe_;
   ul_mac_bytes_num_perframe_ = mac_packet_length_ * ul_mac_packets_perframe_;
 
   dl_mac_packets_perframe_ = this->frame_.NumDlDataSyms();
   dl_mac_data_bytes_num_perframe_ =
-      mac_payload_length_ * dl_mac_packets_perframe_;
+      mac_data_length_max_ * dl_mac_packets_perframe_;
   dl_mac_bytes_num_perframe_ = mac_packet_length_ * dl_mac_packets_perframe_;
 
   auto ul_per_user_phy_rate =
@@ -473,7 +468,8 @@ Config::Config(const std::string& jsonfile)
       "%s,\n\t%zu codeblocks per symbol, %zu bytes per code block,"
       "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
       "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
-      "frame time %.3f usec, Max data tp (Mbps) %.3f \n",
+      "frame time %.3f usec \nUplink Max Mac data tp (Mbps) %.3f \nDownlink "
+      "Max Mac data tp (Mbps) %.3f \n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
       ldpc_config_.NumBlocksInSymbol(), num_bytes_per_cb_,
@@ -481,6 +477,8 @@ Config::Config(const std::string& jsonfile)
       dl_mac_data_bytes_num_perframe_, dl_mac_bytes_num_perframe_,
       this->GetFrameDurationSec() * 1e6,
       (ul_mac_data_bytes_num_perframe_ * 8.0f) /
+          (this->GetFrameDurationSec() * 1e6),
+      (dl_mac_data_bytes_num_perframe_ * 8.0f) /
           (this->GetFrameDurationSec() * 1e6));
 }
 

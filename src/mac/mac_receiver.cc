@@ -10,7 +10,7 @@
 #include "udp_server.h"
 
 #define STREAM_UDP_DATA
-static constexpr char kVideoStreamingAddr[] = "10.42.0.24";
+static constexpr char kVideoStreamingAddr[] = "10.42.0.22";
 static constexpr uint16_t kVideoStreamingPort = 1230u;
 
 static const bool kDebugMacReceiver = true;
@@ -71,7 +71,7 @@ void* MacReceiver::LoopRecv(size_t tid) {
     } else if ((recvlen > 0) &&
                static_cast<size_t>(recvlen) <= max_packet_length) {
 #if defined(STREAM_UDP_DATA)
-      udp_video_streamer->Send(std::string(kVideoStreamingAddr + ue_id),
+      udp_video_streamer->Send(std::string(kVideoStreamingAddr),
                                kVideoStreamingPort + ue_id, &rx_buffer[0u],
                                recvlen);
 #endif

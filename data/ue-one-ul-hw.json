@@ -1,5 +1,5 @@
 {
-    "irises": "data/user-iris-serials.txt",
+    "irises": "data/user-iris-serials-ul-falcon.txt",
     "channel": "A",
     "frequency": 3.6e9,
     "rx_gain_a": 65,
@@ -24,9 +24,9 @@
     ],
     "UE": true,
     "client_ul_pilot_syms": 2,
-    "worker_thread_num": 1,
+    "worker_thread_num": 4,
     "demul_block_size": 48,
-    "core_offset": 20,
+    "core_offset": 26,
     "ue_mac_rx_port": 9070,
     "ue_mac_tx_port": 9080
 }

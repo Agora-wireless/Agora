@@ -13,6 +13,8 @@
 
 #include "utils.h"
 
+//#define DATATYPE_MEMORY_CHECK
+
 // Convert a short array [in_buf] to a float array [out_buf]. Each array must
 // have [n_elems] elements.
 // in_buf and out_buf must be 64-byte aligned
@@ -21,7 +23,14 @@
 // https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
 static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
                                            size_t n_elems) {
-#if defined(NOT_DEFINED)  //__AVX512F__
+#if defined(DATATYPE_MEMORY_CHECK)
+  RtAssert(((n_elems % 16) == 0) &&
+               ((reinterpret_cast<size_t>(in_buf) % 64) == 0) &&
+               ((reinterpret_cast<size_t>(out_buf) % 64) == 0),
+           "Data Alignment not correct before calling into AVX optimizations");
+#endif
+
+#if defined(__AVX512F__)
   const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
   const __m512i magic_i = _mm512_castps_si512(magic);
   for (size_t i = 0; i < n_elems; i += 16) {
@@ -71,6 +80,13 @@ static inline void SimdConvertShortToFloat(const short* in_buf, float* out_buf,
 static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
                                            size_t n_elems, size_t cp_len,
                                            size_t scale_down_factor) {
+#if defined(DATATYPE_MEMORY_CHECK)
+  RtAssert(((n_elems % 16) == 0) &&
+               ((reinterpret_cast<size_t>(in_buf) % 64) == 0) &&
+               ((reinterpret_cast<size_t>(out_buf) % 64) == 0),
+           "Data Alignment not correct before calling into AVX optimizations");
+#endif
+
   const float scale_factor_float = 32768.0 / scale_down_factor;
 
 #ifdef __AVX512F__
@@ -119,6 +135,10 @@ static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
 // n_elems must be multiples of 2
 static inline void ConvertFloatTo12bitIq(const float* in_buf, uint8_t* out_buf,
                                          size_t n_elems) {
+#if defined(DATATYPE_MEMORY_CHECK)
+  RtAssert(((n_elems % 2) == 0) &&
+           "ConvertFloatTo12bitIq n_elems not multiple of 2");
+#endif
   size_t index_short = 0;
   for (size_t i = 0; i < n_elems; i = i + 2) {
     auto temp_i = static_cast<unsigned short>(in_buf[i] * 32768 * 4);
@@ -157,6 +177,13 @@ static inline void simd_convert_16bit_iq_to_float(__m256i val, float* out_buf,
 
 static inline void Convert12bitIqTo16bitIq(uint8_t* in_buf, uint16_t* out_buf,
                                            size_t n_elems) {
+#if defined(DATATYPE_MEMORY_CHECK)
+  RtAssert(((n_elems % 16) == 0) &&
+               ((reinterpret_cast<size_t>(in_buf) % 32) == 0) &&
+               ((reinterpret_cast<size_t>(out_buf) % 32) == 0),
+           "Convert12bitIqTo16bitIq: Data Alignment not correct before calling "
+           "into AVX optimizations");
+#endif
   for (size_t i = 0; i < n_elems; i += 16) {
     _mm256_loadu_si256((__m256i const*)in_buf);
     _mm256_loadu_si256((__m256i const*)(in_buf + 16));
@@ -224,6 +251,67 @@ static inline void SimdConvert12bitIqToFloat(const uint8_t* in_buf,
   const __m256 magic = _mm256_set1_ps(float((1 << 23) + (1 << 15)) / 131072.f);
   const __m256i magic_i = _mm256_castps_si256(magic);
 #endif
+#ifdef __AVX512F__
+  for (size_t i = 0; i < n_elems / 3; i += 32) {
+    __m512i temp_i =
+        _mm512_set_epi16(*(uint16_t*)(in_buf + 93), *(uint16_t*)(in_buf + 90),
+                         *(uint16_t*)(in_buf + 87), *(uint16_t*)(in_buf + 84),
+                         *(uint16_t*)(in_buf + 81), *(uint16_t*)(in_buf + 78),
+                         *(uint16_t*)(in_buf + 75), *(uint16_t*)(in_buf + 72),
+                         *(uint16_t*)(in_buf + 69), *(uint16_t*)(in_buf + 66),
+                         *(uint16_t*)(in_buf + 63), *(uint16_t*)(in_buf + 60),
+                         *(uint16_t*)(in_buf + 57), *(uint16_t*)(in_buf + 54),
+                         *(uint16_t*)(in_buf + 51), *(uint16_t*)(in_buf + 48),
+                         *(uint16_t*)(in_buf + 45), *(uint16_t*)(in_buf + 42),
+                         *(uint16_t*)(in_buf + 39), *(uint16_t*)(in_buf + 36),
+                         *(uint16_t*)(in_buf + 33), *(uint16_t*)(in_buf + 30),
+                         *(uint16_t*)(in_buf + 27), *(uint16_t*)(in_buf + 24),
+                         *(uint16_t*)(in_buf + 21), *(uint16_t*)(in_buf + 18),
+                         *(uint16_t*)(in_buf + 15), *(uint16_t*)(in_buf + 12),
+                         *(uint16_t*)(in_buf + 9), *(uint16_t*)(in_buf + 6),
+                         *(uint16_t*)(in_buf + 3), *(uint16_t*)(in_buf + 0));
+
+    __m512i mask_q = _mm512_set1_epi16(0xfff0);
+    __m512i temp_q =
+        _mm512_set_epi16(*(uint16_t*)(in_buf + 94), *(uint16_t*)(in_buf + 91),
+                         *(uint16_t*)(in_buf + 88), *(uint16_t*)(in_buf + 85),
+                         *(uint16_t*)(in_buf + 82), *(uint16_t*)(in_buf + 79),
+                         *(uint16_t*)(in_buf + 76), *(uint16_t*)(in_buf + 73),
+                         *(uint16_t*)(in_buf + 70), *(uint16_t*)(in_buf + 67),
+                         *(uint16_t*)(in_buf + 64), *(uint16_t*)(in_buf + 61),
+                         *(uint16_t*)(in_buf + 58), *(uint16_t*)(in_buf + 55),
+                         *(uint16_t*)(in_buf + 52), *(uint16_t*)(in_buf + 49),
+                         *(uint16_t*)(in_buf + 46), *(uint16_t*)(in_buf + 43),
+                         *(uint16_t*)(in_buf + 40), *(uint16_t*)(in_buf + 37),
+                         *(uint16_t*)(in_buf + 34), *(uint16_t*)(in_buf + 31),
+                         *(uint16_t*)(in_buf + 28), *(uint16_t*)(in_buf + 25),
+                         *(uint16_t*)(in_buf + 22), *(uint16_t*)(in_buf + 19),
+                         *(uint16_t*)(in_buf + 16), *(uint16_t*)(in_buf + 13),
+                         *(uint16_t*)(in_buf + 10), *(uint16_t*)(in_buf + 7),
+                         *(uint16_t*)(in_buf + 4), *(uint16_t*)(in_buf + 1));
+
+    temp_q = _mm512_and_si512(temp_q, mask_q);  // Set lower 4 bits to 0
+    temp_i = _mm512_slli_epi16(temp_i, 4);      // Shift left by 4 bits
+
+    __m512i iq_0 = _mm512_unpacklo_epi16(temp_i, temp_q);
+    __m512i iq_1 = _mm512_unpackhi_epi16(temp_i, temp_q);
+    __m512i output_0 = _mm512_permutex2var_epi64(
+        iq_0, _mm512_set_epi64(11, 10, 3, 2, 9, 8, 1, 0), iq_1);
+    __m512i output_1 = _mm512_permutex2var_epi64(
+        iq_0, _mm512_set_epi64(15, 14, 7, 6, 13, 12, 5, 4), iq_1);
+
+    simd_convert_16bit_iq_to_float(_mm512_extracti64x4_epi64(output_0, 0),
+                                   out_buf + i * 2, magic, magic_i);
+    simd_convert_16bit_iq_to_float(_mm512_extracti64x4_epi64(output_0, 1),
+                                   out_buf + i * 2 + 16, magic, magic_i);
+    simd_convert_16bit_iq_to_float(_mm512_extracti64x4_epi64(output_1, 0),
+                                   out_buf + i * 2 + 32, magic, magic_i);
+    simd_convert_16bit_iq_to_float(_mm512_extracti64x4_epi64(output_1, 1),
+                                   out_buf + i * 2 + 48, magic, magic_i);
+    in_buf += 96;
+  }
+
+#else
   for (size_t i = 0; i < n_elems / 3; i += 16) {
     // Convert 16 IQ smaples from 48 uint8_t to 32 shorts
     // convert_12bit_iq_to_16bit_iq(in_buf + i * 3, in_16bits_buf, 16);
@@ -255,11 +343,7 @@ static inline void SimdConvert12bitIqToFloat(const uint8_t* in_buf,
     __m256i iq_1 = _mm256_unpackhi_epi16(temp_i, temp_q);
     __m256i output_0 = _mm256_permute2f128_si256(iq_0, iq_1, 0x20);
     __m256i output_1 = _mm256_permute2f128_si256(iq_0, iq_1, 0x31);
-#ifdef __AVX512F__
-    simd_convert_16bit_iq_to_float(output_0, out_buf + i * 2, magic, magic_i);
-    simd_convert_16bit_iq_to_float(output_1, out_buf + i * 2 + 16, magic,
-                                   magic_i);
-#else
+
     _mm256_store_si256((__m256i*)(in_16bits_buf), output_0);
     _mm256_store_si256((__m256i*)(in_16bits_buf + 16), output_1);
 
@@ -288,9 +372,9 @@ static inline void SimdConvert12bitIqToFloat(const uint8_t* in_buf,
       _mm256_store_ps(out_buf + i * 2 + j * 16 + 8,
                       converted1);  // port 2,3,4,7
     }
-#endif
     in_buf += 48;
   }
+#endif
 }
 
 // Convert a float16 array [in_buf] to a float32 array [out_buf]. Each array
@@ -300,6 +384,13 @@ static inline void SimdConvert12bitIqToFloat(const uint8_t* in_buf,
 static inline void SimdConvertFloat16ToFloat32(float* out_buf,
                                                const float* in_buf,
                                                size_t n_elems) {
+#if defined(DATATYPE_MEMORY_CHECK)
+  RtAssert(
+      ((n_elems % 16) == 0) && ((reinterpret_cast<size_t>(in_buf) % 32) == 0) &&
+          ((reinterpret_cast<size_t>(out_buf) % 32) == 0),
+      "SimdConvertFloat16ToFloat32: Data Alignment not correct before calling "
+      "into AVX optimizations");
+#endif
 #ifdef __AVX512F__
   for (size_t i = 0; i < n_elems; i += 16) {
     __m256i val_a = _mm256_load_si256((__m256i*)(in_buf + i / 2));
@@ -322,6 +413,14 @@ static inline void SimdConvertFloat16ToFloat32(float* out_buf,
 static inline void SimdConvertFloat32ToFloat16(float* out_buf,
                                                const float* in_buf,
                                                size_t n_elems) {
+#if defined(DATATYPE_MEMORY_CHECK)
+  RtAssert(
+      ((n_elems % 16) == 0) && ((reinterpret_cast<size_t>(in_buf) % 32) == 0) &&
+          ((reinterpret_cast<size_t>(out_buf) % 32) == 0),
+      "SimdConvertFloat32ToFloat16: Data Alignment not correct before calling "
+      "into AVX optimizations");
+#endif
+
 #ifdef __AVX512F__
   for (size_t i = 0; i < n_elems; i += 16) {
     __m512 val_a = _mm512_load_ps(in_buf + i);

@@ -16,6 +16,7 @@
 static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kFrameLoadAdvance = 10;
 static constexpr size_t kBufferInit = 10;
+static constexpr size_t kTxBufferElementAlignment = 64;
 
 static constexpr size_t kSlowStartMulStage1 = 32;
 static constexpr size_t kSlowStartMulStage2 = 8;
@@ -80,19 +81,21 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
   ticks_wnd1_ = ticks_all_ * kSlowStartMulStage1;
   ticks_wnd2_ = ticks_all_ * kSlowStartMulStage2;
 
-  // tx buffers will be an array of MacPackets
-  tx_buffers_.Malloc(kFrameWnd * cfg_->UeAntNum(),
-                     (packets_per_frame_ *
-                      (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
+  //Match element alignment with buffer alignment
+  const size_t padding = kTxBufferElementAlignment -
+                         (cfg_->MacPacketLength() % kTxBufferElementAlignment);
+
+  tx_buffer_pkt_offset_ = (cfg_->MacPacketLength() + padding);
+  assert((tx_buffer_pkt_offset_ % kTxBufferElementAlignment) == 0);
+
+  const size_t tx_packet_storage = (packets_per_frame_ * tx_buffer_pkt_offset_);
+  // tx buffers will be an array of
+  tx_buffers_.Malloc(kFrameWnd * cfg_->UeAntNum(), tx_packet_storage,
                      Agora_memory::Alignment_t::kAlign64);
   MLPD_TRACE(
       "Tx buffer size: dim1 %zu, dim2 %zu, total %zu, start %zu, end: %zu\n",
-      (kFrameWnd * cfg_->UeAntNum()),
-      (packets_per_frame_ *
-       (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
-      (kFrameWnd * cfg_->UeAntNum()) *
-          (packets_per_frame_ *
-           (cfg_->MacPacketLength() + MacPacket::kOffsetOfData)),
+      (kFrameWnd * cfg_->UeAntNum()), tx_packet_storage,
+      (kFrameWnd * cfg_->UeAntNum()) * tx_packet_storage,
       (size_t)tx_buffers_[0],
       (size_t)tx_buffers_[(kFrameWnd * cfg_->UeAntNum()) - 1]);
 
@@ -315,25 +318,30 @@ void* MacSender::WorkerThread(size_t tid) {
           std::printf("MacSender : worker %zu processing frame %d : %d \n", tid,
                       tag.frame_id_, tag.ant_id_);
         }
-        uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
+        const uint8_t* mac_packet_location =
+            tx_buffers_[TagToTxBuffersIndex(tag)];
 
         // Send the mac data to the data sinc
         for (size_t packet = 0; packet < packets_per_frame_; packet++) {
+          ///\todo Use assume_aligned<kTxBufferElementAlignment> when code has c++20 support
           auto* tx_packet =
               reinterpret_cast<const MacPacketPacked*>(mac_packet_location);
-          const size_t mac_header_size = MacPacket::kOffsetOfData;
-          const size_t mac_packet_storage_size =
-              (cfg_->MacPacketLength() + mac_header_size);
-          const size_t mac_packet_tx_size =
-              mac_header_size + tx_packet->datalen_;
 
-          //std::printf("MacSender sending packet %zu, size %zu:%zu\n", packet,
-          //            mac_packet_tx_size, mac_packet_storage_size);
+          const size_t mac_packet_tx_size =
+              cfg_->MacPacketLength() -
+              (cfg_->MacPayloadMaxLength() - tx_packet->PayloadLength());
+
+          //std::printf(
+          //    "MacSender sending frame %d:%d, packet %zu, symbol %d, size "
+          //    "%zu:%zu\n",
+          //    tx_packet->frame_id_, tag.frame_id_, packet,
+          //    tx_packet->symbol_id_, mac_packet_tx_size,
+          //    mac_packet_storage_size);
 
           udp_client.Send(server_address_, server_rx_port_,
                           reinterpret_cast<const uint8_t*>(tx_packet),
                           mac_packet_tx_size);
-          mac_packet_location = mac_packet_location + mac_packet_storage_size;
+          mac_packet_location += tx_buffer_pkt_offset_;
         }
 
         if (kDebugSenderReceiver) {
@@ -405,12 +413,12 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
 
   const size_t ue_ant_low = tid * ue_per_thread;
   const size_t ue_ant_high =
-      std::min(ue_ant_low + ue_per_thread, cfg_->UeAntNum());
+      std::min((ue_ant_low + ue_per_thread) - 1, cfg_->UeAntNum() - 1);
 
   // Sender gets better performance when this thread is not pinned to core
   MLPD_INFO(
-      "MacSender: Data update thread %zu running on core %d servicing ue data "
-      "%zu to %zu\n",
+      "MacSender: Data update thread %zu running on core %d servicing ue "
+      "%zu:%zu data\n",
       tid, sched_getcpu(), ue_ant_low, ue_ant_high);
 
 #if defined(USE_UDP_DATA_SOURCE)
@@ -435,7 +443,7 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
   while ((keep_running.load() == true) && (buffer_updates < kBufferInit)) {
     size_t tag = 0;
     if (data_update_queue_.at(tid).try_dequeue(tag) == true) {
-      for (size_t i = ue_ant_low; i < ue_ant_high; i++) {
+      for (size_t i = ue_ant_low; i <= ue_ant_high; i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
         size_t ant_source = i % num_data_sources;
@@ -445,14 +453,14 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
     }
   }
 
-  MLPD_INFO("MacSender: Data update initialized\n");
+  MLPD_INFO("MacSender[%zu]: Data update initialized\n", tid);
   // Unlock the rest of the workers
   num_workers_ready_atomic.fetch_add(1);
   // Normal run loop
   while (keep_running.load() == true) {
     size_t tag = 0;
     if (data_update_queue_.at(tid).try_dequeue(tag) == true) {
-      for (size_t i = ue_ant_low; i < ue_ant_high; i++) {
+      for (size_t i = ue_ant_low; i <= ue_ant_high; i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
         size_t ant_source = i % num_data_sources;
@@ -468,35 +476,31 @@ void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
   uint8_t* mac_packet_location = tx_buffers_[TagToTxBuffersIndex(tag)];
 
   for (size_t i = 0; i < packets_per_frame_; i++) {
-    auto* pkt = reinterpret_cast<MacPacket*>(mac_packet_location);
-    pkt->frame_id_ = tag.frame_id_;
-    pkt->symbol_id_ = get_data_symbol_id_(i);
-    pkt->ue_id_ = tag.ue_id_;
-
+    auto* pkt = reinterpret_cast<MacPacketPacked*>(mac_packet_location);
     // Read a MacPayload into the data section
     size_t loaded_bytes =
-        data_source->Load(pkt->data_, cfg_->MacPayloadLength());
+        data_source->Load(pkt->DataPtr(), cfg_->MacPayloadMaxLength());
 
-    pkt->datalen_ = loaded_bytes;
+    pkt->Set(tag.frame_id_, get_data_symbol_id_(i), tag.ue_id_, loaded_bytes);
 
-    if (loaded_bytes > cfg_->MacPayloadLength()) {
+    if (loaded_bytes > cfg_->MacPayloadMaxLength()) {
       MLPD_ERROR(
           "MacSender [frame %d, ue %d]: Too much data was loaded from the "
           "source\n",
           tag.frame_id_, tag.ant_id_);
-    } else if (loaded_bytes < cfg_->MacPayloadLength()) {
+    } else if (loaded_bytes < cfg_->MacPayloadMaxLength()) {
       MLPD_INFO(
           "MacSender [frame %d, ue %d]: Not enough mac data available sending "
           "%zu bytes of padding\n",
-          tag.frame_id_, tag.ant_id_, cfg_->MacPayloadLength() - loaded_bytes);
+          tag.frame_id_, tag.ant_id_,
+          cfg_->MacPayloadMaxLength() - loaded_bytes);
     }
     //MacPacketLength should be the size of the mac packet but is not.
-    mac_packet_location = mac_packet_location +
-                          (cfg_->MacPacketLength() + MacPacket::kOffsetOfData);
+    mac_packet_location += tx_buffer_pkt_offset_;
   }
   MLPD_INFO("MacSender [frame %d, ue %d]: Loaded packet for bytes %zu\n",
             tag.frame_id_, tag.ant_id_,
-            cfg_->MacPayloadLength() * packets_per_frame_);
+            cfg_->MacPayloadMaxLength() * packets_per_frame_);
 }
 
 void MacSender::WriteStatsToFile(size_t tx_frame_count) const {

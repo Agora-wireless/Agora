@@ -2,6 +2,7 @@
     "hubs": "data/bs-hub-serial.txt",
     "irises": "data/bs-iris-serials.txt",
     "cells": 1,
+    "ue_num": 1,
     "channel": "A",
     "frequency": 3.6e9,
     "rx_gain_a": 65,
@@ -21,12 +22,12 @@
         "BPGUUUUG"
     ],
     "frames_to_test": 100000,
-    "beamsweep": true,
+    "beamsweep": false,
     "beacon_antenna": 0,
     "client_ul_pilot_syms": 2,
-    "worker_thread_num": 32,
+    "worker_thread_num": 16,
     "demul_block_size": 48,
-    "core_offset": 10,
+    "core_offset": 20,
     "bs_mac_rx_port": 8070,
     "bs_mac_tx_port": 8080,
     "ue_server_addr": "10.42.0.1"

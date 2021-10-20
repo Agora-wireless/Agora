@@ -85,16 +85,16 @@ EventData DoEncode::Launch(size_t tag) {
                          symbol_idx_data, ue_id, cur_cb_id);
 
     if (kPrintRawMacData) {
-      auto* pkt = reinterpret_cast<MacPacket*>(tx_data_ptr);
+      auto* pkt = reinterpret_cast<MacPacketPacked*>(tx_data_ptr);
       std::printf(
           "In doEncode [%d] mac packet frame: %d, symbol: %zu:%d, ue_id: %d, "
           "data length %d, crc %d size %zu:%zu\n",
-          tid_, pkt->frame_id_, symbol_idx_data, pkt->symbol_id_, pkt->ue_id_,
-          pkt->datalen_, pkt->crc_, cfg_->MacPacketLength(),
+          tid_, pkt->Frame(), symbol_idx_data, pkt->Symbol(), pkt->Ue(),
+          pkt->PayloadLength(), pkt->Crc(), cfg_->MacPacketLength(),
           cfg_->NumBytesPerCb());
       std::printf("Data: ");
-      for (size_t i = 0; i < cfg_->MacPayloadLength(); i++) {
-        std::printf(" %02x", (uint8_t) * (pkt->data_ + i));
+      for (size_t i = 0; i < cfg_->MacPayloadMaxLength(); i++) {
+        std::printf(" %02x", (uint8_t)(pkt->Data()[i]));
       }
       std::printf("\n");
     }

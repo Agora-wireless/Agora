@@ -1,4 +1,4 @@
-[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Freceive-memory)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/receive-memory/)
+[![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fmaster)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/master/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
 
@@ -34,21 +34,17 @@ Some highlights:
     
   * See `scripts/ubuntu.sh` for required packages, including Linux packages, gtest, Armadillo, and SoapySDR, and the corresponding versions. Run `./scripts/ubuntu.sh` to install these packages.
   * Download and install Intel libraries:
-     * Install Intel FlexRAN's FEC SDK for LDPC encoding and decoding
-        * Download [Intel FlexRAN's FEC
-           SDK](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules)
-           for LDPC decoding to `/opt`.
-        * Compiling FlexRAN requires an Intel compiler. Intel compiler version <= 19.0.4 is required for compiling FlexRAN.
-          Newer versions will not work. 
-          * Intel compiler can be installed from Intel Parallel Studio XE or Intel System Studio. 
-	  We have tested version 2019 initial release of Intel Prallel Studio XE. 
-          * Newer versions of Intel compiler can also work, but require a patch for resolving conflicts with FlexRAN. 
-	  Please [contact](#contact) the current Agora developers to get the patch.
-        * Set required environment variables by sourcing `compilervars.sh`.
-          For example, if Intel compiler is in `/opt`, run `source $(find
-          2>/dev/null /opt -name compilervars.sh) intel64`. After running this
-          command, ensure that `icc --version` reports 19.0.4.
-        * After installing `icc 19.04`, compile FlexRAN as follows:
+     * Install Intel compiler and MKL, refer to [INTELLIB_README.md](INTELLIB_README.md).
+
+     * Set required environment variables by sourcing `setvars.sh`. If oneAPI is installed in `/opt`,
+     run `source /opt/intel/oneapi/setvars.sh`.   
+
+     * Install [Intel FlexRAN's FEC SDK](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules) for LDPC encoding and decoding:
+        * **NOTE**: Compiling FlexRAN requires Intel compiler with version <= 19.0.4.
+          Newer versions of Intel compiler can also work, but require a patch for resolving conflicts with FlexRAN. 
+          Please [contact](#contact) the current Agora developers to get the patch.
+        * Download Intel FlexRAN's FEC SDK to `/opt`.
+        * Compile FlexRAN as follows:
         <pre>
         $ sudo chmod -R a+rwX FlexRAN-FEC-SDK-19-04/ # Allow all users read-write access 
         $ cd /opt/FlexRAN-FEC-SDK-19-04/sdk/ 
@@ -57,10 +53,6 @@ Some highlights:
         $ cd build-avx512-icc # or build-avx2-icc 
         $ make -j
         </pre>
-    * Install Intel MKL - See
-       [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html).
-       * MKL can also be installed from Intel Parallel Studio XE. Agora has been tested with 2019, 2020, and 2021 versions. 
-       * **NOTE**: To enable JIT acceleration applied for matrix multiplication in the code, MKL version after 2019 update 3 is required.
 
     * Optional: DPDK
        * Refer to [DPDK_README.md](DPDK_README.md) for configuration and installation instructions.
