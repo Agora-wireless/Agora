@@ -33,9 +33,9 @@ echo -e "===========================================\n"
 echo "Emulated RRU Test" > test_user_output.txt
 echo "Emulated RRU Test" > test_agora_output.txt
 echo "Emulated RRU Test" > test_chsim_output.txt
-./build/user data/ue-sim-tmp.json >> test_user_output.txt &
-sleep 1; ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 42 --bs_conf_file data/bs-sim-tmp.json --ue_conf_file data/ue-sim-tmp.json >> test_chsim_output.txt &
-sleep 1; ./build/agora data/bs-sim-tmp.json >> test_agora_output.txt
+./build/user --conf_file data/ue-sim-tmp.json >> test_user_output.txt &
+sleep 1; ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 4 --core_offset 29 --bs_conf_file data/bs-sim-tmp.json --ue_conf_file data/ue-sim-tmp.json >> test_chsim_output.txt &
+sleep 1; ./build/agora -conf_file data/bs-sim-tmp.json >> test_agora_output.txt
 
 sleep 5;
 
