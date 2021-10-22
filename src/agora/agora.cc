@@ -8,7 +8,7 @@
 #include <cmath>
 #include <memory>
 
-static const bool kDebugDeferral = false;
+static const bool kDebugDeferral = true;
 static const size_t kDefaultMessageQueueSize = 512;
 static const size_t kDefaultWorkerQueueSize = 256;
 
@@ -233,18 +233,10 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
 void Agora::ScheduleCodeblocks(EventType event_type, size_t frame_id,
                                size_t symbol_idx) {
   auto base_tag = gen_tag_t::FrmSymCb(frame_id, symbol_idx, 0);
-
-  // for (size_t i = 0;
-  //      i < config_->UeNum() * config_->LdpcConfig().NumBlocksInSymbol();
-  //      i++) {
-  //     try_enqueue_fallback(GetConq(event_type), GetPtok(event_type),
-  //         Event_data(event_type, base_tag._tag));
-  //     base_tag.cb_id++;
-  // }
-  size_t num_tasks =
+  const size_t num_tasks =
       config_->UeNum() * config_->LdpcConfig().NumBlocksInSymbol();
   size_t num_blocks = num_tasks / config_->EncodeBlockSize();
-  size_t num_remainder = num_tasks % config_->EncodeBlockSize();
+  const size_t num_remainder = num_tasks % config_->EncodeBlockSize();
   if (num_remainder > 0) {
     num_blocks++;
   }
@@ -1553,7 +1545,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
 
     if (this->encode_deferral_.empty() == false) {
       for (size_t encode = 0; encode < kScheduleQueues; encode++) {
-        size_t deferred_frame = this->encode_deferral_.front();
+        const size_t deferred_frame = this->encode_deferral_.front();
         if (deferred_frame < (this->cur_proc_frame_id_ + kScheduleQueues)) {
           if (kDebugDeferral) {
             std::printf("   +++ Scheduling deferred frame %zu : %zu \n",
@@ -1562,7 +1554,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
           RtAssert(deferred_frame >= this->cur_proc_frame_id_,
                    "Error scheduling encoding because deferral frame is less "
                    "than current frame");
-          ScheduleDownlinkProcessing(frame_id);
+          ScheduleDownlinkProcessing(deferred_frame);
           this->encode_deferral_.pop();
         } else {
           // No need to check the next frame because it is too large
