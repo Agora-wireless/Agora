@@ -9,7 +9,7 @@
 
 DEFINE_uint64(num_threads, 4, "Number of sender threads");
 DEFINE_uint64(core_offset, 0, "Core ID of the first sender thread");
-DEFINE_uint64(frame_duration, 5000, "Frame duration in microseconds");
+DEFINE_uint64(frame_duration, 0, "Frame duration in microseconds");
 DEFINE_uint64(inter_frame_delay, 0, "Delay between two frames in microseconds");
 DEFINE_string(server_mac_addr, "ff:ff:ff:ff:ff:ff",
               "MAC address of the remote Agora server to send data to");
