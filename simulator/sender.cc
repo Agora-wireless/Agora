@@ -63,7 +63,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   MLPD_INFO(
       "Initializing sender, sending to base station server at %s, frame "
       "duration = %.2f ms, slow start = %s\n",
-      cfg->BsServerAddr().c_str(), frame_duration / 1000.0,
+      cfg->BsServerAddr().c_str(), frame_duration_ / 1000.0,
       enable_slow_start == 1 ? "yes" : "no");
 
   unused(server_mac_addr_str);
