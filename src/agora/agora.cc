@@ -159,22 +159,37 @@ void Agora::ScheduleAntennas(EventType event_type, size_t frame_id,
 
 void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
   auto base_tag = gen_tag_t::FrmSymAnt(frame_id, symbol_id, 0);
+  const size_t total_antennas = config_->BsAntNum();
+  const size_t handler_threads = config_->SocketThreadNum();
+  size_t schedule_antenna = 0;
 
-  size_t num_blocks = config_->BsAntNum() / config_->NumChannels();
-  std::array<EventData, kMaxChannels> events_list;
-  for (size_t i = 0; i < config_->NumChannels(); i++) {
-    events_list.at(i).num_tags_ = 1;
-    events_list.at(i).event_type_ = EventType::kPacketTX;
+  const size_t rem_antennas = total_antennas % handler_threads;
+  const size_t floor_events_per_handler = total_antennas / handler_threads;
+  size_t ceil_events_per_handler = floor_events_per_handler;
+  if (rem_antennas > 0) {
+    ceil_events_per_handler += 1;
   }
+  //Must put contiguous channels in same queue
+  assert(ceil_events_per_handler % config_->NumChannels() == 0);
 
-  for (size_t i = 0; i < num_blocks; i++) {
-    for (size_t j = 0; j < config_->NumChannels(); j++) {
-      events_list.at(j).tags_[0] = base_tag.tag_;
-      base_tag.ant_id_++;
+  std::vector<EventData> events_list(ceil_events_per_handler);
+  for (size_t radio_handler = 0; radio_handler < handler_threads;
+       radio_handler++) {
+    size_t tx_event;
+    for (tx_event = 0; tx_event < ceil_events_per_handler; tx_event++) {
+      if (schedule_antenna == total_antennas) {
+        //All antennas scheduled
+        break;
+      }
+
+      events_list.at(tx_event).num_tags_ = 1;
+      events_list.at(tx_event).event_type_ = EventType::kPacketTX;
+      events_list.at(tx_event).tags_[0u] = base_tag.tag_;
+      base_tag.ant_id_ = ++schedule_antenna;
     }
     TryEnqueueBulkFallback(GetConq(EventType::kPacketTX, 0),
-                           tx_ptoks_ptr_[i % config_->SocketThreadNum()],
-                           events_list.data(), config_->NumChannels());
+                           tx_ptoks_ptr_[radio_handler], events_list.data(),
+                           tx_event);
   }
 }
 
@@ -555,7 +570,7 @@ void Agora::Start() {
               ifft_cur_frame_for_symbol_.at(symbol_idx_dl) = frame_id;
               if (symbol_idx_dl == ifft_next_symbol_) {
                 // Check the available symbols starting from the current symbol
-                // Only schedule symbols that are continuously avaialbe
+                // Only schedule symbols that are continuously available
                 for (size_t sym_id = symbol_idx_dl;
                      sym_id <= ifft_counters_.GetSymbolCount(frame_id);
                      sym_id++) {

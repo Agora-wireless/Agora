@@ -407,13 +407,14 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
   PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_ + 1, tid);
 
   //Split the Ue data up between threads and sources
-  const size_t ue_per_thread = std::ceil(cfg_->UeAntNum() / update_thread_num_);
-  //const size_t ue_per_thread_source =
-  //    std::ceil(ue_per_thread / num_data_sources);
+  size_t ue_per_thread = (cfg_->UeAntNum() / update_thread_num_);
+  if (cfg_->UeAntNum() / update_thread_num_ > 0) {
+    ue_per_thread++;
+  }
 
   const size_t ue_ant_low = tid * ue_per_thread;
   const size_t ue_ant_high =
-      std::min((ue_ant_low + ue_per_thread) - 1, cfg_->UeAntNum() - 1);
+      std::min((ue_ant_low + ue_per_thread), cfg_->UeAntNum()) - 1;
 
   // Sender gets better performance when this thread is not pinned to core
   MLPD_INFO(
