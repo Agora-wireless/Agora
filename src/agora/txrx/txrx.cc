@@ -158,13 +158,18 @@ void PacketTXRX::LoopTxRx(size_t tid) {
     delay_tsc = slow_start_tsc1;
   }
 
-  size_t* rx_frame_start = (*frame_start_)[tid];
+  size_t* const rx_frame_start = (*frame_start_)[tid];
   size_t rx_slot = 0;
-  size_t radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
-  size_t radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
+  size_t radios_per_thread = (cfg_->NumRadios() / socket_thread_num_);
+  if (cfg_->NumRadios() % socket_thread_num_ > 0) {
+    radios_per_thread++;
+  }
+  const size_t radio_lo = tid * radios_per_thread;
+  const size_t radio_hi =
+      std::min((radio_lo + radios_per_thread), cfg_->BsAntNum()) - 1;
 
-  const size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
-  for (size_t radio_id = radio_lo; radio_id < radio_hi; ++radio_id) {
+  static constexpr size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
+  for (size_t radio_id = radio_lo; radio_id <= radio_hi; ++radio_id) {
     size_t local_port_id = cfg_->BsServerPort() + radio_id;
 
     udp_servers_.at(radio_id) =
@@ -176,6 +181,9 @@ void PacketTXRX::LoopTxRx(size_t tid) {
         tid, local_port_id, cfg_->BsRruAddr().c_str(),
         cfg_->BsRruPort() + radio_id);
   }
+
+  MLPD_INFO("LoopTxRx[%zu] has %zu:%zu total radios %zu\n", tid, radio_lo,
+            radio_hi, (radio_hi - radio_lo) + 1);
 
   int prev_frame_id = -1;
   size_t radio_id = radio_lo;
@@ -205,11 +213,11 @@ void PacketTXRX::LoopTxRx(size_t tid) {
       send_time += delay_tsc;
     }
 
-    int send_result = DequeueSend(tid);
-    if (-1 == send_result) {
+    const size_t send_result = DequeueSend(tid);
+    if (0 == send_result) {
       // receive data
 
-      struct Packet* pkt = RecvEnqueue(tid, radio_id, rx_slot);
+      Packet* pkt = RecvEnqueue(tid, radio_id, rx_slot);
       if (pkt != nullptr) {
         rx_slot = (rx_slot + 1) % buffers_per_socket_;
 
@@ -221,7 +229,7 @@ void PacketTXRX::LoopTxRx(size_t tid) {
           }
         }
 
-        if (++radio_id == radio_hi) {
+        if (++radio_id == (radio_hi + 1)) {
           radio_id = radio_lo;
         }
       }
@@ -229,8 +237,7 @@ void PacketTXRX::LoopTxRx(size_t tid) {
   }    // end while
 }
 
-struct Packet* PacketTXRX::RecvEnqueue(size_t tid, size_t radio_id,
-                                       size_t rx_slot) {
+Packet* PacketTXRX::RecvEnqueue(size_t tid, size_t radio_id, size_t rx_slot) {
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
   size_t packet_length = cfg_->PacketLength();
   RxPacket& rx = rx_packets_.at(tid).at(rx_slot);
@@ -285,45 +292,54 @@ struct Packet* PacketTXRX::RecvEnqueue(size_t tid, size_t radio_id,
   return pkt;
 }
 
-int PacketTXRX::DequeueSend(int tid) {
-  auto& c = cfg_;
-  EventData event;
-  if (task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event) == false) {
-    return -1;
+size_t PacketTXRX::DequeueSend(int tid) {
+  const size_t max_dequeue_items =
+      (cfg_->BsAntNum() / cfg_->SocketThreadNum()) + 1;
+  //call pull this into the class
+  std::vector<EventData> events(max_dequeue_items);
+
+  //Single producer ordering in q is preserved
+  const size_t dequeued_items = task_queue_->try_dequeue_bulk_from_producer(
+      *tx_ptoks_[tid], events.data(), events.size());
+
+  for (size_t item = 0; item < dequeued_items; item++) {
+    EventData& current_event = events.at(item);
+
+    // std::printf("tx queue length: %d\n", task_queue_->size_approx());
+    assert(current_event.event_type_ == EventType::kPacketTX);
+
+    const size_t ant_id = gen_tag_t(current_event.tags_[0]).ant_id_;
+    const size_t frame_id = gen_tag_t(current_event.tags_[0]).frame_id_;
+    const size_t symbol_id = gen_tag_t(current_event.tags_[0]).symbol_id_;
+
+    const size_t data_symbol_idx_dl = cfg_->Frame().GetDLSymbolIdx(symbol_id);
+    const size_t offset =
+        (cfg_->GetTotalDataSymbolIdxDl(frame_id, data_symbol_idx_dl) *
+         cfg_->BsAntNum()) +
+        ant_id;
+
+    if (kDebugPrintInTask) {
+      std::printf(
+          "PacketTXRX[%d]: Transmitted frame %zu, symbol %zu, ant %zu, tag "
+          "%zu, offset: %zu, item %zu:%zu, msg_queue_length: %zu\n",
+          tid, frame_id, symbol_id, ant_id,
+          gen_tag_t(current_event.tags_[0]).tag_, offset, item, dequeued_items,
+          message_queue_->size_approx());
+    }
+
+    auto* pkt =
+        reinterpret_cast<Packet*>(&tx_buffer_[offset * cfg_->DlPacketLength()]);
+    new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
+
+    // Send data (one OFDM symbol)
+    udp_clients_.at(ant_id)->Send(cfg_->BsRruAddr(), cfg_->BsRruPort() + ant_id,
+                                  reinterpret_cast<uint8_t*>(pkt),
+                                  cfg_->DlPacketLength());
+
+    RtAssert(message_queue_->enqueue(
+                 *rx_ptoks_[tid],
+                 EventData(EventType::kPacketTX, current_event.tags_[0])),
+             "Socket message enqueue failed\n");
   }
-
-  // std::printf("tx queue length: %d\n", task_queue_->size_approx());
-  assert(event.event_type_ == EventType::kPacketTX);
-
-  size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
-  size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-  size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-
-  size_t data_symbol_idx_dl = cfg_->Frame().GetDLSymbolIdx(symbol_id);
-  size_t offset = (c->GetTotalDataSymbolIdxDl(frame_id, data_symbol_idx_dl) *
-                   c->BsAntNum()) +
-                  ant_id;
-
-  if (kDebugPrintInTask) {
-    std::printf(
-        "In TXRX thread %d: Transmitted frame %zu, symbol %zu, "
-        "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-        tid, frame_id, symbol_id, ant_id, gen_tag_t(event.tags_[0]).tag_,
-        offset, message_queue_->size_approx());
-  }
-
-  char* cur_buffer_ptr = tx_buffer_ + offset * c->DlPacketLength();
-  auto* pkt = reinterpret_cast<Packet*>(cur_buffer_ptr);
-  new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
-
-  // Send data (one OFDM symbol)
-  udp_clients_.at(ant_id)->Send(cfg_->BsRruAddr(), cfg_->BsRruPort() + ant_id,
-                                reinterpret_cast<uint8_t*>(cur_buffer_ptr),
-                                c->DlPacketLength());
-
-  RtAssert(
-      message_queue_->enqueue(*rx_ptoks_[tid],
-                              EventData(EventType::kPacketTX, event.tags_[0])),
-      "Socket message enqueue failed\n");
-  return event.tags_[0];
+  return dequeued_items;
 }
