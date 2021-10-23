@@ -153,8 +153,8 @@ size_t PacketTXRX::DequeueSendArgos(int tid) {
     const bool last_antenna =
         ((ant_id % cfg_->NumChannels()) + 1) == (cfg_->NumChannels());
 
-    std::printf("PacketTXRX[%d]: tx antenna %zu radio %zu is last %d\n", tid,
-                ant_id, radio_id, last_antenna);
+    //std::printf("PacketTXRX[%d]: tx antenna %zu radio %zu is last %d\n", tid,
+    //            ant_id, radio_id, last_antenna);
 
     const size_t dl_symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
     const size_t offset =

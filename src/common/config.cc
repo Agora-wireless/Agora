@@ -454,12 +454,6 @@ Config::Config(const std::string& jsonfile)
       mac_data_length_max_ * dl_mac_packets_perframe_;
   dl_mac_bytes_num_perframe_ = mac_packet_length_ * dl_mac_packets_perframe_;
 
-  auto ul_per_user_phy_rate =
-      (8 * data_bytes_num_persymbol_ * this->frame_.NumUlDataSyms()) /
-      (this->GetFrameDurationSec() * 1e6);
-  auto dl_per_user_phy_rate =
-      (8 * data_bytes_num_persymbol_ * this->frame_.NumDlDataSyms()) /
-      (this->GetFrameDurationSec() * 1e6);
   this->running_.store(true);
   MLPD_INFO(
       "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
