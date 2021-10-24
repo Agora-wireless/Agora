@@ -29,14 +29,14 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
     , demod_buffer_to_decode_(demod_buffer_to_decode)
     , shared_state_(shared_state)
 {
-    DpdkTransport::dpdk_init(core_offset_ - kNumMasterThread, rx_thread_num_ + kNumMasterThread + kNumDemodTxThread + fft_tx_thread_num_, cfg_->pci_addr);
-    for (size_t i = 0; i < rx_thread_num_ + kNumDemodTxThread; i ++) {
+    DpdkTransport::dpdk_init(core_offset_, rx_thread_num_ + kNumDemodTxThread + fft_tx_thread_num_, cfg_->pci_addr);
+    for (size_t i = 0; i < std::max(rx_thread_num_, fft_tx_thread_num_ + kNumDemodTxThread); i ++) {
         mbuf_pool_[i] = DpdkTransport::create_mempool(i);
     }
     demod_symbol_ul_to_send_ = 0;
 
     const uint16_t port_id = 0; // The DPDK port ID
-    if (DpdkTransport::nic_init(port_id, mbuf_pool_, rx_thread_num_ + kNumDemodTxThread, kNumDemodTxThread + fft_tx_thread_num_) != 0)
+    if (DpdkTransport::nic_init(port_id, mbuf_pool_, rx_thread_num_, kNumDemodTxThread + fft_tx_thread_num_) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
 
     int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr_);
@@ -151,7 +151,7 @@ bool PacketTXRX::StartTXRX()
                     pthread_fun_wrapper<PacketTXRX, &PacketTXRX::fft_tx_thread>,
                 context, lcore_id);
         }
-        worker_id++;
+        worker_id ++;
     }
 
     return true;
