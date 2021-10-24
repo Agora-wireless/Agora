@@ -175,7 +175,9 @@ void* Sender::worker_thread(int tid)
             memcpy(data_buf + (i * ant_num_this_thread + j - radio_lo) * (2 * cfg->OFDM_CA_NUM),
                 iq_data_short_[(i * cfg->BS_ANT_NUM) + j],
                 (cfg->CP_LEN + cfg->OFDM_CA_NUM) * sizeof(unsigned short) * 2);
-            run_fft(data_buf + (i * ant_num_this_thread + j - radio_lo) * (2 * cfg->OFDM_CA_NUM), fft_inout, mkl_handle);
+            if (!cfg->use_time_domain_iq) {
+                run_fft(data_buf + (i * ant_num_this_thread + j - radio_lo) * (2 * cfg->OFDM_CA_NUM), fft_inout, mkl_handle);
+            }
         }
     }
 
