@@ -21,7 +21,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
     : cfg_(cfg)
     , core_offset_(core_offset)
     , rx_thread_num_(cfg->rx_thread_num)
-    , fft_tx_thread_num_(cfg->fft_tx_thread_num)
+    , fft_tx_thread_num_(cfg->use_time_domain_iq ? cfg->fft_tx_thread_num : 0)
     , time_domain_iq_buffer_(time_domain_iq_buffer)
     , freq_domain_iq_buffer_to_send_(freq_domain_iq_buffer_to_send)
     , freq_domain_iq_buffer_(freq_domain_iq_buffer)
@@ -161,7 +161,7 @@ void* PacketTXRX::fft_tx_thread(int tid)
 {
     size_t freq_ghz = measure_rdtsc_freq();
 
-    printf("Demodulation TX thread\n");
+    printf("FFT TX thread %d\n", tid);
 
     size_t start_tsc = 0;
     size_t work_tsc_duration = 0;
@@ -482,7 +482,7 @@ int PacketTXRX::recv_relocate(int tid)
                 cfg_->running = false;
             }
         } else if (pkt->pkt_type_ == Packet::PktType::kTimeIQ) {
-            char* iq_ptr = cfg_->get_freq_domain_iq_buffer(freq_domain_iq_buffer_, pkt->ant_id_, pkt->frame_id_, pkt->symbol_id_);
+            char* iq_ptr = cfg_->get_freq_domain_iq_buffer(time_domain_iq_buffer_, pkt->ant_id_, pkt->frame_id_, pkt->symbol_id_);
             memcpy(iq_ptr, (uint8_t*)pkt + Packet::kOffsetOfData, cfg_->OFDM_CA_NUM * 2 * sizeof(unsigned short));
             if (!shared_state_->receive_time_iq_pkt(pkt->frame_id_, pkt->symbol_id_)) {
                 cfg_->running = false;

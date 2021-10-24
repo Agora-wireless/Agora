@@ -34,10 +34,12 @@ Agora::Agora(Config* cfg)
         config_->rx_thread_num + kNumDemodTxThread;
     // TODO: Add other possible threads
 
-    do_fft_threads_.resize(cfg->fft_thread_num);
-    for (size_t i = 0; i < do_fft_threads_.size(); i ++) {
-        do_fft_threads_[i]
-            = std::thread(&Agora::fftWorker, this, i);
+    if (cfg->use_time_domain_iq) {
+        do_fft_threads_.resize(cfg->fft_thread_num);
+        for (size_t i = 0; i < do_fft_threads_.size(); i ++) {
+            do_fft_threads_[i]
+                = std::thread(&Agora::fftWorker, this, i);
+        }
     }
 
     /* Create worker threads */
@@ -77,6 +79,10 @@ Agora::~Agora()
             t.join();
     } else {
         for (auto& t : do_decode_threads_)
+            t.join();
+    }
+    if (config_->use_time_domain_iq) {
+        for (auto& t : do_fft_threads_)
             t.join();
     }
 }
