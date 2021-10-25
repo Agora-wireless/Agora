@@ -163,7 +163,8 @@ void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
     if (kEnableCoreReuse == false) {
       //Check to see if core has already been assigned (faster search is possible here but isn't necessary)
       for (auto& assigned : core_list) {
-        if (assigned.mapped_core_ == assigned_core) {
+        if ((assigned.mapped_core_ == assigned_core) &&
+            (assigned.thread_id_ != pthread_self())) {
           throw std::runtime_error(
               "The core has already been assigned to a managed thread, please "
               "adjust your request and try again");
