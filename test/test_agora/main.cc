@@ -1,4 +1,5 @@
 #include "agora.h"
+#include "gflags/gflags.h"
 
 static const bool kDebugPrintUlCorr = false;
 static const bool kDebugPrintDlCorr = false;
@@ -163,12 +164,20 @@ static unsigned int CheckCorrectness(Config const* const cfg) {
   return ul_error_count + dl_error_count;
 }
 
+DEFINE_string(conf_file,
+              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-both.json",
+              "Config filename");
+
 int main(int argc, char* argv[]) {
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string conf_file =
-      cur_directory + "/data/tddconfig-correctness-test-ul.json";
+  std::string conf_file;
+
+  // For backwards compatibility
   if (argc == 2) {
     conf_file = std::string(argv[1]);
+    std::printf("User: Setting configuration filename to %s\n",
+                conf_file.c_str());
+  } else {
+    conf_file = FLAGS_conf_file;
   }
 
   auto cfg = std::make_unique<Config>(conf_file.c_str());
