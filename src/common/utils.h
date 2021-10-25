@@ -40,7 +40,10 @@
 
 #include "symbols.h"
 
-void SetCpuLayoutOnNumaNodes(bool verbose = false);
+//Default argument is to exclude core 0 from the list
+void SetCpuLayoutOnNumaNodes(
+    bool verbose = false,
+    const std::vector<size_t>& cores_to_exclude = std::vector<size_t>(1, 0));
 
 size_t GetPhysicalCoreId(size_t core_id);
 
