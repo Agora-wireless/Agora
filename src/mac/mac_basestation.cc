@@ -25,6 +25,11 @@ DEFINE_string(conf_file, TOSTRING(PROJECT_DIRECTORY) "/data/bs-mac-sim.json",
 DEFINE_string(data_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/dl_increment_file.bin",
               "Downlink transmit filename");
+
+DEFINE_string(fwd_udp_address, "", "Forward decoded mac data to address");
+DEFINE_uint64(fwd_udp_port, 0,
+              "Forward decoded mac data port id (Set to 0 to disable)");
+
 DEFINE_uint64(
     enable_slow_start, 0,
     "Send frames slower than the specified frame duration during warmup");
@@ -98,9 +103,16 @@ int main(int argc, char* argv[]) {
         sender->StartTXfromMain(frame_start, frame_end);
       }
       if (cfg->Frame().NumUlDataSyms() > 0) {
-        receiver = std::make_unique<MacReceiver>(
-            cfg.get(), cfg->UlMacDataBytesNumPerframe(), cfg->BsServerAddr(),
-            cfg->BsMacTxPort(), FLAGS_num_receiver_threads, thread_start);
+        if ((FLAGS_fwd_udp_port != 0) && (FLAGS_fwd_udp_address != "")) {
+          receiver = std::make_unique<MacReceiver>(
+              cfg.get(), cfg->UlMacDataBytesNumPerframe(), cfg->BsServerAddr(),
+              cfg->BsMacTxPort(), FLAGS_fwd_udp_address, FLAGS_fwd_udp_port,
+              FLAGS_num_receiver_threads, thread_start);
+        } else {
+          receiver = std::make_unique<MacReceiver>(
+              cfg.get(), cfg->UlMacDataBytesNumPerframe(), cfg->BsServerAddr(),
+              cfg->BsMacTxPort(), FLAGS_num_receiver_threads, thread_start);
+        }
         rx_threads = receiver->StartRecv();
       }
 

@@ -9,18 +9,31 @@
 #include "udp_client.h"
 #include "udp_server.h"
 
-#define STREAM_UDP_DATA
-static constexpr char kVideoStreamingAddr[] = "10.42.0.22";
-static constexpr uint16_t kVideoStreamingPort = 1230u;
-
 static const bool kDebugMacReceiver = true;
 
 MacReceiver::MacReceiver(Config* const cfg, size_t num_frame_data_bytes,
-                         std::string server_address, size_t tx_port,
+                         std::string phy_server_address, size_t phy_port,
                          size_t rx_thread_num, size_t core_offset)
     : data_bytes_(num_frame_data_bytes),
-      server_address_(server_address),
-      server_tx_port_(tx_port),
+      phy_address_(phy_server_address),
+      phy_port_(phy_port),
+      enable_udp_output_(false),
+      udp_dest_port_(0),
+      udp_dest_address_(""),
+      rx_thread_num_(rx_thread_num),
+      core_id_(core_offset),
+      cfg_(cfg) {}
+
+MacReceiver::MacReceiver(Config* const cfg, size_t num_frame_data_bytes,
+                         std::string phy_server_address, size_t phy_port,
+                         std::string fwd_data_udp_address, size_t fwd_port,
+                         size_t rx_thread_num, size_t core_offset)
+    : data_bytes_(num_frame_data_bytes),
+      phy_address_(phy_server_address),
+      phy_port_(phy_port),
+      enable_udp_output_(true),
+      udp_dest_port_(fwd_port),
+      udp_dest_address_(std::move(fwd_data_udp_address)),
       rx_thread_num_(rx_thread_num),
       core_id_(core_offset),
       cfg_(cfg) {}
@@ -43,17 +56,18 @@ void* MacReceiver::LoopRecv(size_t tid) {
   size_t core_offset = core_id_ + rx_thread_num_;
   PinToCoreWithOffset(ThreadType::kWorkerRX, core_offset, tid);
 
-  const size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
+  static constexpr size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
   auto udp_server =
-      std::make_unique<UDPServer>(server_tx_port_ + ue_id, sock_buf_size);
+      std::make_unique<UDPServer>(phy_port_ + ue_id, sock_buf_size);
 
-#if defined(STREAM_UDP_DATA)
-  auto udp_video_streamer = std::make_unique<UDPClient>();
-#endif
+  std::unique_ptr<UDPClient> udp_streamer;
+  if (enable_udp_output_) {
+    udp_streamer = std::make_unique<UDPClient>();
+  }
 
   udp_server->MakeBlocking(1);
   std::printf("MacReceiver: Set up UDP socket server listening to port %zu\n",
-              server_tx_port_ + ue_id);
+              phy_port_ + ue_id);
 
   // Create a rx buffer
   //////// NEED TO FIX THIS -> how do we know how many data bytes????? (might not matter)
@@ -62,19 +76,17 @@ void* MacReceiver::LoopRecv(size_t tid) {
 
   while ((SignalHandler::GotExitSignal() == false) &&
          (cfg_->Running() == true)) {
-    ssize_t recvlen =
-        udp_server->RecvFrom(&rx_buffer[0u], max_packet_length, server_address_,
-                             server_tx_port_ + ue_id);
+    ssize_t recvlen = udp_server->RecvFrom(&rx_buffer[0u], max_packet_length,
+                                           phy_address_, phy_port_ + ue_id);
     if (recvlen < 0) {
       std::perror("recv failed");
       throw std::runtime_error("Receiver: recv failed");
     } else if ((recvlen > 0) &&
                static_cast<size_t>(recvlen) <= max_packet_length) {
-#if defined(STREAM_UDP_DATA)
-      udp_video_streamer->Send(std::string(kVideoStreamingAddr),
-                               kVideoStreamingPort + ue_id, &rx_buffer[0u],
-                               recvlen);
-#endif
+      if (enable_udp_output_) {
+        udp_streamer->Send(udp_dest_address_, udp_dest_port_ + ue_id,
+                           &rx_buffer[0u], recvlen);
+      }
 
       if (kDebugMacReceiver) {
         std::printf("MacReceiver: Thread %zu, Data Bytes: %zu:%zu, Data:", tid,
@@ -91,13 +103,7 @@ void* MacReceiver::LoopRecv(size_t tid) {
             "%zu:%zu\n",
             tid, recvlen, max_packet_length);
       }
-    } /*else if (recvlen != 0) {
-      std::printf(
-          "MacReceiver: Recv failed with less than requested bytes %zu\n",
-          recvlen);
-      throw std::runtime_error(
-          "MacReceiver: recv failed with less than requested bytes");
-    }*/
+    }
   }
   delete[] rx_buffer;
   std::printf("MacReceiver: Finished\n");
