@@ -161,7 +161,8 @@ void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
     size_t assigned_core = GetCoreId(requested_core);
 
     if (kEnableCoreReuse == false) {
-      //Check to see if core has already been assigned (faster search is possible here but isn't necessary)
+      //Check to see if core has already been assigned 
+      //(faster search is possible here but isn't necessary)
       for (auto& assigned : core_list) {
         if ((assigned.mapped_core_ == assigned_core) &&
             (assigned.thread_id_ != pthread_self())) {
