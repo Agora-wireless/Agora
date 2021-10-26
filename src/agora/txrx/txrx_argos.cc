@@ -45,7 +45,7 @@ void PacketTXRX::LoopTxRxArgos(size_t tid) {
           radio_id = radio_lo;
         }
       }  // if (pkt.size() > 0)
-    }    //DequeueSendArgos(tid) == 0
+    }    // DequeueSendArgos(tid) == 0
   }      // cfg_->Running() == true
 }
 
@@ -133,7 +133,7 @@ size_t PacketTXRX::DequeueSendArgos(int tid) {
 
   std::vector<EventData> events(max_dequeue_items);
 
-  //Single producer ordering in q is preserved
+  // Single producer ordering in q is preserved
   const size_t dequeued_items = task_queue_->try_dequeue_bulk_from_producer(
       *tx_ptoks_[tid], events.data(), events.size());
 
@@ -148,7 +148,8 @@ size_t PacketTXRX::DequeueSendArgos(int tid) {
     const size_t ant_id = gen_tag_t(current_event.tags_[0u]).ant_id_;
     const size_t radio_id = ant_id / cfg_->NumChannels();
 
-    //See if this is the last antenna on the radio.  Assume that we receive the last one
+    // See if this is the last antenna on the radio.  Assume that we receive the
+    // last one
     // last (and all the others came before).  No explicit tracking
     const bool last_antenna =
         ((ant_id % cfg_->NumChannels()) + 1) == (cfg_->NumChannels());

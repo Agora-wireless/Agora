@@ -123,7 +123,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
   const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
   const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
   const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
-  //Helper variables (changes with bs / user)
+  // Helper variables (changes with bs / user)
   const size_t num_pilot_symbols = cfg_->Frame().ClientUlPilotSymbols();
   const size_t symbol_array_index = cfg_->Frame().GetULSymbolIdx(symbol_id);
   const size_t data_symbol_index_start =
@@ -138,16 +138,16 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
 
   // Only non-pilot data symbols have application data.
   if (symbol_array_index >= num_pilot_symbols) {
-    //The decoded symbol knows nothing about the padding / storage of the data
+    // The decoded symbol knows nothing about the padding / storage of the data
     auto* pkt = reinterpret_cast<const MacPacketPacked*>(src_data);
-    //Destination only contains "payload"
+    // Destination only contains "payload"
     const size_t dest_packet_size = cfg_->MacPayloadMaxLength();
 
     // TODO: enable ARQ and ensure reliable data goes to app
     const size_t frame_data_offset =
         (symbol_array_index - num_pilot_symbols) * dest_packet_size;
 
-    //Who's junk is better? No reason to copy currupted data
+    // Who's junk is better? No reason to copy currupted data
     server_.n_filled_in_frame_.at(ue_id) += dest_packet_size;
 
     ss << "MacThreadBasestation: Received frame " << pkt->Frame() << ":"
@@ -170,7 +170,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
     }
 
     bool data_valid = false;
-    //Data validity check
+    // Data validity check
     if ((static_cast<size_t>(pkt->PayloadLength()) <= dest_packet_size) &&
         ((pkt->Symbol() >= data_symbol_index_start) &&
          (pkt->Symbol() <= data_symbol_index_end)) &&
@@ -195,7 +195,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
          << std::endl;
 
       MLPD_ERROR("%s", ss.str().c_str());
-      //Set the default to 0 valid data bytes
+      // Set the default to 0 valid data bytes
       server_.data_size_.at(ue_id).at(symbol_array_index - num_pilot_symbols) =
           0;
     }
@@ -206,7 +206,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
   // When the frame is full, send it to the application
   if (server_.n_filled_in_frame_.at(ue_id) == max_data_bytes_per_frame) {
     server_.n_filled_in_frame_.at(ue_id) = 0;
-    ///Spot to be optimized #2 -- left shift data over to remove padding
+    /// Spot to be optimized #2 -- left shift data over to remove padding
     bool shifted = false;
     size_t src_offset = 0;
     size_t dest_offset = 0;
@@ -267,7 +267,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
 
   if (0 == max_data_bytes_per_frame) return;
 
-  //Processes the packets of an entire frame (remove variable later)
+  // Processes the packets of an entire frame (remove variable later)
   const size_t packets_required = num_mac_packets_per_frame;
 
   size_t packets_received = 0;
@@ -301,11 +301,11 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
       total_bytes_received += ret;
       current_packet_bytes += ret;
 
-      //std::printf(
+      // std::printf(
       //    "Received %zu bytes packet number %zu packet size %zu total %zu\n",
       //    ret, packets_received, total_bytes_received, current_packet_bytes);
 
-      //While we have packets remaining and a header to process
+      // While we have packets remaining and a header to process
       const size_t header_size = sizeof(MacPacketHeaderPacked);
       while ((packets_received < packets_required) &&
              (current_packet_bytes >= header_size)) {
@@ -316,7 +316,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
         const size_t current_packet_size =
             header_size + rx_mac_packet_header->PayloadLength();
 
-        //std::printf("Packet number %zu @ %zu packet size %d:%zu total %zu\n",
+        // std::printf("Packet number %zu @ %zu packet size %d:%zu total %zu\n",
         //            packets_received, current_packet_start_index,
         //            rx_mac_packet_header->datalen_, current_packet_size,
         //            current_packet_bytes);
@@ -337,7 +337,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
           ret, total_bytes_received, packets_received, packets_required);
     }
 
-    //Check for completion
+    // Check for completion
     if (packets_received == packets_required) {
       break;
     }
@@ -355,7 +355,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
            "MacThreadBaseStation: ProcessUdpPacketsFromApps incorrect data "
            "received!");
 
-  //Currently this is a packet list of mac packets
+  // Currently this is a packet list of mac packets
   ProcessUdpPacketsFromAppsBs((char*)&udp_pkt_buf_[0]);
 }
 
@@ -371,7 +371,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
   for (size_t packet = 0u; packet < num_mac_packets_per_frame; packet++) {
     auto* pkt = reinterpret_cast<const MacPacketPacked*>(&payload[pkt_offset]);
 
-    //std::printf("Frame %d, Packet %zu, symbol %d, user %d\n", pkt->Frame(),
+    // std::printf("Frame %d, Packet %zu, symbol %d, user %d\n", pkt->Frame(),
     //            packet, pkt->Symbol(), pkt->Ue());
     if (packet == 0) {
       ue_id = pkt->Ue();
@@ -400,7 +400,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
   if (next_radio_id_ != ue_id) {
     MLPD_ERROR("Error - radio id %zu, expected %zu\n", ue_id, next_radio_id_);
   }
-  //End data integrity check
+  // End data integrity check
 
   next_radio_id_ = ue_id;
 
@@ -437,13 +437,13 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
   }
 
   size_t src_pkt_offset = 0;
-  //Copy from the packet rx buffer into ul_bits memory (unpacked)
+  // Copy from the packet rx buffer into ul_bits memory (unpacked)
   for (size_t pkt_id = 0; pkt_id < num_mac_packets_per_frame; pkt_id++) {
     auto* src_packet =
         reinterpret_cast<const MacPacketPacked*>(&payload[src_pkt_offset]);
     const size_t symbol_idx =
         cfg_->Frame().GetDLSymbolIdx(src_packet->Symbol());
-    //next_radio_id_ = src_packet->ue_id;
+    // next_radio_id_ = src_packet->ue_id;
 
     // could use pkt_id vs src_packet->symbol_id_ but might reorder packets
     const size_t dest_pkt_offset = ((radio_buf_id * num_mac_packets_per_frame) +
@@ -462,9 +462,8 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
 
     pkt->LoadData(src_packet->Data());
     // Insert CRC
-    pkt->Crc(
-        (uint16_t)(crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
-                   0xFFFF));
+    pkt->Crc((uint16_t)(
+        crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) & 0xFFFF));
 
     if (kLogMacPackets) {
       std::stringstream ss;
@@ -500,7 +499,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
            "MacThreadBasestation: Failed to enqueue uplink packet");
 
   radio_buf_id = (radio_buf_id + 1) % kFrameWnd;
-  //Might be unnecessary now.
+  // Might be unnecessary now.
   next_radio_id_ = (next_radio_id_ + 1) % cfg_->UeAntNum();
   if (next_radio_id_ == 0) {
     next_tx_frame_id_++;

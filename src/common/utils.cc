@@ -99,7 +99,7 @@ void SetCpuLayoutOnNumaNodes(bool verbose,
           if (verbose) {
             std::printf("%zu ", j);
           }
-          //If core id is not in the excluded list
+          // If core id is not in the excluded list
           if (std::find(cores_to_exclude.begin(), cores_to_exclude.end(), j) ==
               cores_to_exclude.end()) {
             cpu_layout.emplace_back(j);
@@ -157,11 +157,10 @@ void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
         cpu_layout_initialized == true,
         "CPU layout must be initialized before calling PinToCoreWithOffset\n");
 
-    //kEnableCoreReuse
     size_t assigned_core = GetCoreId(requested_core);
 
     if (kEnableCoreReuse == false) {
-      //Check to see if core has already been assigned 
+      // Check to see if core has already been assigned
       //(faster search is possible here but isn't necessary)
       for (auto& assigned : core_list) {
         if ((assigned.mapped_core_ == assigned_core) &&

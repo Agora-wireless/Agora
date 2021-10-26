@@ -25,18 +25,18 @@ class MacSender {
    * packets to a agora mac interface
    *
    * @param config The Agora config
-   * 
+   *
    * @param data_filename  Name of the file where the data bytes exist
    *
    * @param socket_thread_num Number of worker threads sending packets
-   * 
+   *
    * @param mac_packets_per_frame Number of mac packets in frame
    *
    * @param core_offset The master thread runs on core [core_offset]. Worker
    * thread #i runs on core [core_offset + i]
    *
    * @param frame_duration_us The TTI slot duration in us
-   * 
+   *
    * @param inter_frame_delay Delay between frames
    *
    * @param enable_slow_start If 1, the sender initially sends frames in a

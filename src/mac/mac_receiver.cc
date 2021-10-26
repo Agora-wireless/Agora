@@ -70,7 +70,6 @@ void* MacReceiver::LoopRecv(size_t tid) {
               phy_port_ + ue_id);
 
   // Create a rx buffer
-  //////// NEED TO FIX THIS -> how do we know how many data bytes????? (might not matter)
   const size_t max_packet_length = data_bytes_;
   auto* rx_buffer = new uint8_t[max_packet_length];
 

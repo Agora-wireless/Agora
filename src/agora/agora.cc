@@ -169,7 +169,7 @@ void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
   if (rem_antennas > 0) {
     ceil_events_per_handler += 1;
   }
-  //Must put contiguous channels in same queue
+  // Must put contiguous channels in same queue
   assert(ceil_events_per_handler % config_->NumChannels() == 0);
 
   std::vector<EventData> events_list(ceil_events_per_handler);
@@ -178,7 +178,7 @@ void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
     size_t tx_event;
     for (tx_event = 0; tx_event < ceil_events_per_handler; tx_event++) {
       if (schedule_antenna == total_antennas) {
-        //All antennas scheduled
+        // All antennas scheduled
         break;
       }
 
