@@ -14,6 +14,8 @@
 
 DEFINE_uint64(num_sender_worker_threads, 1,
               "Number of mac client sender worker threads");
+DEFINE_uint64(num_sender_update_threads, 1,
+              "Number of mac client sender update threads / streams");
 DEFINE_uint64(num_receiver_threads, 1, "Number of mac client receiver threads");
 DEFINE_uint64(core_offset, 1, "Core ID of the first sender thread");
 DEFINE_uint64(frame_duration, 0, "Frame duration in microseconds");
@@ -22,12 +24,15 @@ DEFINE_string(conf_file, TOSTRING(PROJECT_DIRECTORY) "/data/ue-mac-sim.json",
 DEFINE_string(data_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/ul_increment_file.bin",
               "Uplink transmit filename");
+
+DEFINE_string(fwd_udp_address, "", "Forward decoded mac data to address");
+DEFINE_uint64(fwd_udp_port, 0,
+              "Forward decoded mac data port id (Set to 0 to disable)");
 DEFINE_uint64(
     enable_slow_start, 0,
     "Send frames slower than the specified frame duration during warmup");
 
 int main(int argc, char* argv[]) {
-  PinToCoreWithOffset(ThreadType::kMaster, FLAGS_core_offset, 0);
   gflags::SetVersionString(GetAgoraProjectVersion());
 
   gflags::SetUsageMessage(
@@ -60,7 +65,7 @@ int main(int argc, char* argv[]) {
       assert(create_file.is_open() == true);
 
       std::vector<char> mac_data;
-      mac_data.resize(cfg->MacPayloadLength());
+      mac_data.resize(cfg->MacPayloadMaxLength());
 
       for (size_t i = 0;
            i < (cfg->FramesToTest() * cfg->UlMacPacketsPerframe()); i++) {
@@ -70,13 +75,18 @@ int main(int argc, char* argv[]) {
       create_file.close();
     }
 
+    /* Share Main TX thread */
+    PinToCoreWithOffset(ThreadType::kMaster, FLAGS_core_offset, 0);
+
     try {
       SignalHandler signal_handler;
       std::unique_ptr<MacSender> sender;
       std::unique_ptr<MacReceiver> receiver;
       std::vector<std::thread> rx_threads;
-      //+2 1 for main thread and 1 for data update thread
-      const size_t kNumTotalSenderThreads = FLAGS_num_sender_worker_threads + 2;
+      //+1 for main thread
+      const size_t kNumTotalSenderThreads =
+          FLAGS_num_sender_worker_threads + FLAGS_num_sender_update_threads;
+      size_t thread_start = FLAGS_core_offset;
 
       // Register signal handler to handle kill signal
       signal_handler.SetupSignalHandlers();
@@ -86,15 +96,24 @@ int main(int argc, char* argv[]) {
             cfg->UeServerAddr(), cfg->UeMacRxPort(),
             std::bind(&FrameStats::GetULDataSymbol, cfg->Frame(),
                       std::placeholders::_1),
-            FLAGS_num_sender_worker_threads, FLAGS_core_offset + 1,
-            FLAGS_frame_duration, 0, FLAGS_enable_slow_start, true);
+            thread_start, FLAGS_num_sender_worker_threads,
+            FLAGS_num_sender_update_threads, FLAGS_frame_duration, 0,
+            FLAGS_enable_slow_start, true);
+        thread_start += kNumTotalSenderThreads;
         sender->StartTXfromMain(frame_start, frame_end);
       }
+
       if (cfg->Frame().NumDlDataSyms() > 0) {
-        receiver = std::make_unique<MacReceiver>(
-            cfg.get(), cfg->DlMacDataBytesNumPerframe(), cfg->UeServerAddr(),
-            cfg->UeMacTxPort(), FLAGS_num_receiver_threads,
-            FLAGS_core_offset + kNumTotalSenderThreads);
+        if ((FLAGS_fwd_udp_port != 0) && (FLAGS_fwd_udp_address != "")) {
+          receiver = std::make_unique<MacReceiver>(
+              cfg.get(), cfg->DlMacDataBytesNumPerframe(), cfg->UeServerAddr(),
+              cfg->UeMacTxPort(), FLAGS_fwd_udp_address, FLAGS_fwd_udp_port,
+              FLAGS_num_receiver_threads, thread_start);
+        } else {
+          receiver = std::make_unique<MacReceiver>(
+              cfg.get(), cfg->DlMacDataBytesNumPerframe(), cfg->UeServerAddr(),
+              cfg->UeMacTxPort(), FLAGS_num_receiver_threads, thread_start);
+        }
         rx_threads = receiver->StartRecv();
       }
 
@@ -122,6 +141,7 @@ int main(int argc, char* argv[]) {
   delete[](frame_start);
   delete[](frame_end);
   std::printf("Mac user application terminated!\n");
+  PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
   return ret;
 }

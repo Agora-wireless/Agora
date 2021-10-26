@@ -28,7 +28,7 @@
 #if defined(USE_DPDK)
 #include "dpdk_transport.h"
 
-//Removed support for copy free dpdk memory due to slowdown issue.
+// Removed support for copy free dpdk memory due to slowdown issue.
 //#define USE_DPDK_MEMORY
 
 #if defined(USE_DPDK_MEMORY)
@@ -47,7 +47,7 @@ class DPDKRxPacket : public RxPacket {
  private:
   rte_mbuf* mem_;
   inline void GcPacket() override {
-    //std::printf("Garbage collecting the memory for DPDKRxPacket\n");
+    // std::printf("Garbage collecting the memory for DPDKRxPacket\n");
     rte_pktmbuf_free(mem_);
     this->Set(nullptr, nullptr);
   }
@@ -105,21 +105,21 @@ class PacketTXRX {
 
  private:
   void LoopTxRx(size_t tid);  // The thread function for thread [tid]
-  int DequeueSend(int tid);
-  struct Packet* RecvEnqueue(size_t tid, size_t radio_id, size_t rx_offset);
+  size_t DequeueSend(int tid);
+  Packet* RecvEnqueue(size_t tid, size_t radio_id, size_t rx_offset);
 
   void LoopTxRxArgos(size_t tid);
-  int DequeueSendArgos(int tid);
-  std::vector<struct Packet*> RecvEnqueueArgos(size_t tid, size_t radio_id,
-                                               size_t rx_slot);
+  size_t DequeueSendArgos(int tid);
+  std::vector<Packet*> RecvEnqueueArgos(size_t tid, size_t radio_id,
+                                        size_t rx_slot);
 
   long long rx_time_bs_;
   long long tx_time_bs_;
   void LoopTxRxUsrp(size_t tid);
   int DequeueSendUsrp(int tid);
   int DequeueSendUsrp(int tid, int frame_id, int symbol_id);
-  struct Packet* RecvEnqueueUsrp(size_t tid, size_t radio_id, size_t rx_slot,
-                                 size_t frame_id, size_t symbol_id);
+  Packet* RecvEnqueueUsrp(size_t tid, size_t radio_id, size_t rx_slot,
+                          size_t frame_id, size_t symbol_id);
 
   Config* cfg_;
 

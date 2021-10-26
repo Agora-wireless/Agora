@@ -42,7 +42,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
   std::unique_ptr<DoCRC> crc_obj_ = std::make_unique<DoCRC>();
   size_t input_size = cfg_->NumBytesPerCb();
-  //size_t input_size =
+  // size_t input_size =
   //    LdpcEncodingInputBufSize(this->cfg_->LdpcConfig().BaseGraph(),
   //                             this->cfg_->LdpcConfig().ExpansionFactor());
 
@@ -60,22 +60,14 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       ul_mac_info.at(ue_id).resize(num_ul_mac_bytes);
       for (size_t pkt_id = 0; pkt_id < cfg_->UlMacPacketsPerframe(); pkt_id++) {
         size_t pkt_offset = pkt_id * cfg_->MacPacketLength();
-        auto* pkt =
-            reinterpret_cast<MacPacket*>(&ul_mac_info.at(ue_id).at(pkt_offset));
+        auto* pkt = reinterpret_cast<MacPacketPacked*>(
+            &ul_mac_info.at(ue_id).at(pkt_offset));
 
-        pkt->frame_id_ = 0;
-        pkt->symbol_id_ = pkt_id;
-        pkt->ue_id_ = ue_id;
-        pkt->datalen_ = cfg_->MacPayloadLength();
-        pkt->rsvd_[0] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-        pkt->rsvd_[1] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-        pkt->rsvd_[2] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-        pkt->crc_ = 0;
+        pkt->Set(0, pkt_id, ue_id, cfg_->MacPayloadMaxLength());
         this->GenMacData(pkt, ue_id);
-        pkt->crc_ =
-            (uint16_t)(crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
-                                                cfg_->MacPayloadLength()) &
-                       0xFFFF);
+        pkt->Crc((uint16_t)(
+            crc_obj_->CalculateCrc24(pkt->Data(), cfg_->MacPayloadMaxLength()) &
+            0xFFFF));
       }
     }
 
@@ -114,9 +106,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::vector<std::vector<int8_t>> ul_encoded_codewords(num_ul_codeblocks);
 
     for (size_t cb = 0; cb < num_ul_codeblocks; cb++) {
-      //i : symbol -> ue -> cb (repeat)
+      // i : symbol -> ue -> cb (repeat)
       size_t sym_id = cb / (symbol_blocks);
-      //ue antenna for code block
+      // ue antenna for code block
       size_t sym_offset = cb % (symbol_blocks);
       size_t ue_id = sym_offset / this->cfg_->LdpcConfig().NumBlocksInSymbol();
       size_t ue_cb_id =
@@ -341,22 +333,14 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       dl_mac_info[ue_id].resize(num_dl_mac_bytes);
       for (size_t pkt_id = 0; pkt_id < cfg_->DlMacPacketsPerframe(); pkt_id++) {
         size_t pkt_offset = pkt_id * cfg_->MacPacketLength();
-        auto* pkt =
-            reinterpret_cast<MacPacket*>(&dl_mac_info.at(ue_id).at(pkt_offset));
+        auto* pkt = reinterpret_cast<MacPacketPacked*>(
+            &dl_mac_info.at(ue_id).at(pkt_offset));
 
-        pkt->frame_id_ = 0;
-        pkt->symbol_id_ = pkt_id;
-        pkt->ue_id_ = ue_id;
-        pkt->datalen_ = cfg_->MacPayloadLength();
-        pkt->rsvd_[0] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-        pkt->rsvd_[1] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-        pkt->rsvd_[2] = static_cast<uint16_t>(fast_rand_.NextU32() >> 16);
-        pkt->crc_ = 0;
+        pkt->Set(0, pkt_id, ue_id, cfg_->MacPayloadMaxLength());
         this->GenMacData(pkt, ue_id);
-        pkt->crc_ =
-            (uint16_t)(crc_obj_->CalculateCrc24((unsigned char*)pkt->data_,
-                                                cfg_->MacPayloadLength()) &
-                       0xFFFF);
+        pkt->Crc((uint16_t)(
+            crc_obj_->CalculateCrc24(pkt->Data(), cfg_->MacPayloadMaxLength()) &
+            0xFFFF));
       }
     }
 
@@ -394,9 +378,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
     std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
     for (size_t cb = 0; cb < num_dl_codeblocks; cb++) {
-      //i : symbol -> ue -> cb (repeat)
+      // i : symbol -> ue -> cb (repeat)
       size_t sym_id = cb / (symbol_blocks);
-      //ue antenna for code block
+      // ue antenna for code block
       size_t sym_offset = cb % (symbol_blocks);
       size_t ue_id = sym_offset / this->cfg_->LdpcConfig().NumBlocksInSymbol();
       size_t ue_cb_id =
