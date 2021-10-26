@@ -648,7 +648,7 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
         }
         rx_slot = (rx_slot + c->NumChannels()) % buffers_per_thread_;
       } else {
-        //Otherwise throw away the data.
+        // Otherwise throw away the data.
         radio->RadioRx(radio_id, frm_rx_buff.data(), num_samps, rx_time);
         if (r < static_cast<int>(num_samps)) {
           std::cerr << "RadioTxRx [" << radio_id << "]: BAD Receive(" << r

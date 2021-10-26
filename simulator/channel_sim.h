@@ -30,12 +30,12 @@ using AlignedByteVector =
 
 struct WorkerThreadStorage {
   size_t tid_;
-  //Aligned
+  // Aligned
   AlignedByteVector* ue_tx_buffer_;
   arma::cx_fmat* ue_input_matrix_;
   arma::cx_fmat* ue_output_matrix_;
 
-  //Aligned
+  // Aligned
   AlignedByteVector* bs_tx_buffer_;
   arma::cx_fmat* bs_input_matrix_;
   arma::cx_fmat* bs_output_matrix_;
@@ -99,11 +99,6 @@ class ChannelSim {
   const Config* const uecfg_;
   std::unique_ptr<Channel> channel_;
 
-  // Data buffer for symbols to be transmitted to BS antennas (uplink)
-  //AlignedByteVector tx_buffer_bs_;
-
-  // Data buffer for symbols to be transmitted to client antennas (downlink)
-  //AlignedByteVector tx_buffer_ue_;
 
   // Data buffer for received symbols from BS antennas (downlink)
   AlignedByteVector rx_buffer_bs_;

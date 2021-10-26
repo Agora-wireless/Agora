@@ -31,8 +31,8 @@ Config::Config(const std::string& jsonfile)
   // Allow json comments
   const auto tdd_conf = json::parse(conf, nullptr, true, true);
 
-  //Initialize the compute configuration
-  //Default exclude 1 core with id = 0
+  // Initialize the compute configuration
+  // Default exclude 1 core with id = 0
   std::vector<size_t> excluded(1, 0);
   if (tdd_conf.contains("exclude_cores")) {
     auto exclude_cores = tdd_conf.at("exclude_cores");
@@ -452,7 +452,7 @@ Config::Config(const std::string& jsonfile)
       num_bytes_per_cb_ * ldpc_config_.NumBlocksInSymbol();
 
   mac_packet_length_ = data_bytes_num_persymbol_;
-  //Smallest over the air packet structure
+  // Smallest over the air packet structure
   mac_data_length_max_ = mac_packet_length_ - sizeof(MacPacketHeaderPacked);
 
   ul_mac_packets_perframe_ = this->frame_.NumUlDataSyms();

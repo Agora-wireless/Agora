@@ -11,18 +11,18 @@
 #include "udp_server.h"
 
 /**
- * @brief The Video Receiver class creates a UDP server to receive a video stream
- * tested with VLC streaming application
+ * @brief The Video Receiver class creates a UDP server to receive a video
+ * stream tested with VLC streaming application
  */
 class VideoReceiver : public MacDataReceiver {
  public:
-  //Video stream specific variables
+  // Video stream specific variables
   static constexpr size_t kVideoStreamRxPort = 1350u;
-  //Typical rx size for a UDP data packet coming from VLC udp streamer
+  // Typical rx size for a UDP data packet coming from VLC udp streamer
   static constexpr size_t kVideoStreamRxSize = (1316u);
   static constexpr size_t kVideoStreamSocketRxBufSize =
       (kVideoStreamRxSize * 1000u);
-  //Oversize the potential receive size
+  // Oversize the potential receive size
   static constexpr size_t kVideoStreamMaxRxSize = 2048u;
   static constexpr size_t kVideoStreamLocalRxBufSize =
       kVideoStreamMaxRxSize * 10;

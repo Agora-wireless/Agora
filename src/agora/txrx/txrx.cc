@@ -142,13 +142,12 @@ void PacketTXRX::LoopTxRx(size_t tid) {
   const double rdtsc_freq = GetTime::MeasureRdtscFreq();
   const size_t frame_tsc_delta =
       cfg_->GetFrameDurationSec() * 1e9f * rdtsc_freq;
-  //const size_t two_hundred_ms_ticks = (0.2f /* 200 ms */ * 1e9f * rdtsc_freq);
+  const size_t two_hundred_ms_ticks = (0.2f /* 200 ms */ * 1e9f * rdtsc_freq);
 
   // Slow start variables (Start with no less than 200 ms)
-  //const size_t slow_start_tsc1 =
-  //    std::max(kSlowStartMulStage1 * frame_tsc_delta, two_hundred_ms_ticks);
+  const size_t slow_start_tsc1 =
+      std::max(kSlowStartMulStage1 * frame_tsc_delta, two_hundred_ms_ticks);
 
-  const size_t slow_start_tsc1 = kSlowStartMulStage1 * frame_tsc_delta;
   const size_t slow_start_thresh1 = kFrameWnd;
   const size_t slow_start_tsc2 = kSlowStartMulStage2 * frame_tsc_delta;
   const size_t slow_start_thresh2 = kFrameWnd * 4;
@@ -295,10 +294,10 @@ Packet* PacketTXRX::RecvEnqueue(size_t tid, size_t radio_id, size_t rx_slot) {
 size_t PacketTXRX::DequeueSend(int tid) {
   const size_t max_dequeue_items =
       (cfg_->BsAntNum() / cfg_->SocketThreadNum()) + 1;
-  //call pull this into the class
+  // can pull this into the class
   std::vector<EventData> events(max_dequeue_items);
 
-  //Single producer ordering in q is preserved
+  // Single producer ordering in q is preserved
   const size_t dequeued_items = task_queue_->try_dequeue_bulk_from_producer(
       *tx_ptoks_[tid], events.data(), events.size());
 
