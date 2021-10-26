@@ -26,11 +26,22 @@ Config::Config(const std::string& jsonfile)
       frame_("") {
   pilots_ = nullptr;
   pilots_sgn_ = nullptr;
-  SetCpuLayoutOnNumaNodes(true);
   std::string conf;
   Utils::LoadTddConfig(jsonfile, conf);
   // Allow json comments
   const auto tdd_conf = json::parse(conf, nullptr, true, true);
+
+  //Initialize the compute configuration
+  //Default exclude 1 core with id = 0
+  std::vector<size_t> excluded(1, 0);
+  if (tdd_conf.contains("exclude_cores")) {
+    auto exclude_cores = tdd_conf.at("exclude_cores");
+    excluded.resize(exclude_cores.size());
+    for (size_t i = 0; i < exclude_cores.size(); i++) {
+      excluded.at(i) = exclude_cores.at(i);
+    }
+  }
+  SetCpuLayoutOnNumaNodes(true, excluded);
 
   /* antenna configurations */
   if (kUseUHD == false) {
