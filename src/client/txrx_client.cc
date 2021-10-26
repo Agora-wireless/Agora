@@ -301,7 +301,8 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
       pilot_symbol_id = c->Frame().GetPilotSymbol(ant_id + 1);
       tx_time = time0 + tx_frame_id * frm_num_samps +
                 pilot_symbol_id * num_samps - c->ClTxAdvance().at(ue_id);
-      r = radio->RadioTx(ue_id, pilot_buff1_.data(), num_samps, 2, tx_time);
+      r = radio->RadioTx(ue_id, pilot_buff1_.data(), num_samps, flags_tx_pilot,
+                         tx_time);
       if (r < static_cast<int>(num_samps)) {
         std::cout << "BAD Write (PILOT): " << r << "/" << num_samps
                   << std::endl;
@@ -486,7 +487,7 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
   long long rx_time(0);
   size_t radio_id = tid;
   ssize_t sync_index(-1);
-  size_t rx_offset(0);
+  int rx_offset(0);
   size_t rx_slot = 0;
   std::stringstream sout;
   std::vector<std::complex<int16_t>> frm_buff0(frm_num_samps, 0);
@@ -612,12 +613,12 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
         rx_offset = sync_index - c->BeaconLen() - c->OfdmTxZeroPrefix();
         time0 += rx_offset;
         resync = false;
-        resync_retry_cnt = 0;
         resync_success++;
         MLPD_INFO(
-            "RadioTxRx [%zu]: Re-syncing with offset %zu, after %zu tries, "
+            "RadioTxRx [%zu]: Re-syncing with offset %d, after %zu tries, "
             "index: %ld\n",
             radio_id, rx_offset, resync_retry_cnt + 1, sync_index);
+        resync_retry_cnt = 0;
       } else {
         resync_retry_cnt++;
       }
