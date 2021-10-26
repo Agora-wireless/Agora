@@ -42,7 +42,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
   std::unique_ptr<DoCRC> crc_obj_ = std::make_unique<DoCRC>();
   size_t input_size = cfg_->NumBytesPerCb();
-  //size_t input_size =
+  // size_t input_size =
   //    LdpcEncodingInputBufSize(this->cfg_->LdpcConfig().BaseGraph(),
   //                             this->cfg_->LdpcConfig().ExpansionFactor());
 
@@ -65,9 +65,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
         pkt->Set(0, pkt_id, ue_id, cfg_->MacPayloadMaxLength());
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(crc_obj_->CalculateCrc24(
-                                pkt->Data(), cfg_->MacPayloadMaxLength()) &
-                            0xFFFF));
+        pkt->Crc((uint16_t)(
+            crc_obj_->CalculateCrc24(pkt->Data(), cfg_->MacPayloadMaxLength()) &
+            0xFFFF));
       }
     }
 
@@ -106,9 +106,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::vector<std::vector<int8_t>> ul_encoded_codewords(num_ul_codeblocks);
 
     for (size_t cb = 0; cb < num_ul_codeblocks; cb++) {
-      //i : symbol -> ue -> cb (repeat)
+      // i : symbol -> ue -> cb (repeat)
       size_t sym_id = cb / (symbol_blocks);
-      //ue antenna for code block
+      // ue antenna for code block
       size_t sym_offset = cb % (symbol_blocks);
       size_t ue_id = sym_offset / this->cfg_->LdpcConfig().NumBlocksInSymbol();
       size_t ue_cb_id =
@@ -338,9 +338,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
         pkt->Set(0, pkt_id, ue_id, cfg_->MacPayloadMaxLength());
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(crc_obj_->CalculateCrc24(
-                                pkt->Data(), cfg_->MacPayloadMaxLength()) &
-                            0xFFFF));
+        pkt->Crc((uint16_t)(
+            crc_obj_->CalculateCrc24(pkt->Data(), cfg_->MacPayloadMaxLength()) &
+            0xFFFF));
       }
     }
 
@@ -378,9 +378,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
     std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
     for (size_t cb = 0; cb < num_dl_codeblocks; cb++) {
-      //i : symbol -> ue -> cb (repeat)
+      // i : symbol -> ue -> cb (repeat)
       size_t sym_id = cb / (symbol_blocks);
-      //ue antenna for code block
+      // ue antenna for code block
       size_t sym_offset = cb % (symbol_blocks);
       size_t ue_id = sym_offset / this->cfg_->LdpcConfig().NumBlocksInSymbol();
       size_t ue_cb_id =

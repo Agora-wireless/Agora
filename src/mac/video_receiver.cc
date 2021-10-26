@@ -20,7 +20,7 @@ size_t VideoReceiver::Load(unsigned char *destination, size_t requested_bytes) {
   size_t rx_attempts = 0u;
 
   if (requested_bytes > data_available_) {
-    //Check for potential local buffer wrap-around
+    // Check for potential local buffer wrap-around
     if ((data_available_ + data_start_offset_ +
          VideoReceiver::kVideoStreamMaxRxSize) > local_rx_buffer_.size()) {
       std::memcpy(&local_rx_buffer_.at(0u),
@@ -49,7 +49,7 @@ size_t VideoReceiver::Load(unsigned char *destination, size_t requested_bytes) {
     }
   }
 
-  //Copy what is available
+  // Copy what is available
   size_t loaded_bytes = std::min(data_available_, requested_bytes);
   std::memcpy(destination, &local_rx_buffer_.at(data_start_offset_),
               loaded_bytes);

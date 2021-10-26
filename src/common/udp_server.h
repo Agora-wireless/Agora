@@ -67,7 +67,7 @@ class UDPServer {
       ret = getsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
                        &actual_buf_storage_size);
 
-      //Linux likes to return 2* the buffer size
+      // Linux likes to return 2* the buffer size
       if ((actual_buf_size != desired_buf_size) &&
           (actual_buf_size != (desired_buf_size * 2))) {
         std::printf(
@@ -214,7 +214,7 @@ class UDPServer {
         throw std::runtime_error("UDPServer: fcntl failed to set blocking");
       }
 
-      //Verify the flags were properly set
+      // Verify the flags were properly set
       current_flags = fcntl(sock_fd_, F_GETFL);
       if (current_flags == -1) {
         throw std::runtime_error("UDPServer: fcntl failed to get flags");

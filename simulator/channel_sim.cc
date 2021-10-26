@@ -225,10 +225,10 @@ void ChannelSim::Start() {
                 dl_symbol_id;
             bs_rx_counter_[frame_offset]++;
 
-            //std::printf("Dequeue bulk %d : %d : %d \n", bulk_count, ret,
-            ///            event.num_tags_);
+            // std::printf("Dequeue bulk %d : %d : %d \n", bulk_count, ret,
+            //             event.num_tags_);
 
-            //std::printf("Rx downlink frame %zu, symbol %zu, %zu\n", frame_id,
+            // std::printf("Rx downlink frame %zu, symbol %zu, %zu\n", frame_id,
             //            symbol_id, bs_rx_counter_[frame_offset]);
 
             // when received all BS antennas on this symbol, kick-off client TX
@@ -299,7 +299,7 @@ void* ChannelSim::TaskThread(size_t tid) {
                       core_offset_ + bs_thread_num_ + 1 + user_thread_num_,
                       tid);
 
-  //Set Up thread local storage here
+  // Set Up thread local storage here
   moodycamel::ConsumerToken bs_consumer_token(task_queue_bs_);
   moodycamel::ConsumerToken ue_consumer_token(task_queue_user_);
 
@@ -423,7 +423,7 @@ void* ChannelSim::BsRxLoop(size_t tid) {
       const size_t data_rx = static_cast<size_t>(rx_bytes);
       rx_buffer.data_size_ += data_rx;
 
-      //Process all the full packets
+      // Process all the full packets
       const size_t packets_to_process = rx_buffer.data_size_ / rx_packet_size;
       size_t processed_packets = 0;
       size_t data_offset = 0;
@@ -462,12 +462,12 @@ void* ChannelSim::BsRxLoop(size_t tid) {
         processed_packets++;
       }
 
-      //Shift over any processed data
+      // Shift over any processed data
       if (data_offset > 0) {
         /* Can be optimized */
         std::memmove(&rx_buffer.data_[0], &rx_buffer.data_[data_offset],
                      rx_buffer.data_size_);
-        //No need to update the offset  goes out of scope next
+        // No need to update the offset  goes out of scope next
       }
 
       MLPD_TRACE(
@@ -476,7 +476,7 @@ void* ChannelSim::BsRxLoop(size_t tid) {
           tid, socket_id, rx_buffer.data_size_, processed_packets);
     }  // bytes available
 
-    //Move to the next socket
+    // Move to the next socket
     if (++socket_id == socket_hi) {
       socket_id = socket_lo;
     }
@@ -541,7 +541,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
       const size_t data_rx = static_cast<size_t>(rx_bytes);
       rx_buffer.data_size_ += data_rx;
 
-      //Process all the full packets
+      // Process all the full packets
       const size_t packets_to_process = rx_buffer.data_size_ / rx_packet_size;
       size_t processed_packets = 0;
       size_t data_offset = 0;
@@ -589,12 +589,12 @@ void* ChannelSim::UeRxLoop(size_t tid) {
         processed_packets++;
       }
 
-      //Shift over any processed data
+      // Shift over any processed data
       if (data_offset > 0) {
         /* Can be optimized */
         std::memmove(&rx_buffer.data_[0], &rx_buffer.data_[data_offset],
                      rx_buffer.data_size_);
-        //No need to update the offset  goes out of scope next
+        // No need to update the offset  goes out of scope next
       }
 
       MLPD_TRACE(
@@ -603,7 +603,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
           tid, socket_id, rx_buffer.data_size_, processed_packets);
     }  // bytes available
 
-    //Move to the next socket
+    // Move to the next socket
     if (++socket_id == socket_hi) {
       socket_id = socket_lo;
     }
@@ -623,7 +623,7 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
                       AlignedByteVector* udp_pkt_buf,
                       std::vector<std::unique_ptr<UDPClient>>& udp_clients,
                       const std::string& dest_address, size_t dest_port) {
-  //The 2 is from complex float -> float
+  // The 2 is from complex float -> float
   const size_t convert_length = (2 * bscfg_->SampsPerSymbol() * max_ant);
   auto* dst_ptr = reinterpret_cast<short*>(tx_buffer);
 
@@ -636,8 +636,8 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
 
   ConvertFloatToShort(reinterpret_cast<const float*>(source_data), dst_ptr,
                       convert_length);
-  //SimdConvertFloatToShort(reinterpret_cast<const float*>(source_data), dst_ptr,
-  //                        convert_length, 0, 1);
+  // SimdConvertFloatToShort(reinterpret_cast<const float*>(source_data),
+  // dst_ptr, convert_length, 0, 1);
 
   auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf->at(0));
   for (size_t ant_id = 0u; ant_id < max_ant; ant_id++) {
@@ -645,19 +645,19 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
     pkt->symbol_id_ = symbol_id;
     pkt->ant_id_ = ant_id;
     pkt->cell_id_ = 0;
-    //Can remove this with some changes
+    // Can remove this with some changes
     std::memcpy(pkt->data_, &tx_buffer[ant_id * payload_length_],
                 payload_length_);
     udp_clients.at(ant_id)->Send(dest_address, dest_port + ant_id,
                                  udp_pkt_buf->data(), udp_pkt_buf->size());
-    //Assumes blocking
+    // Assumes blocking
   }
 }
 
 void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  //Modify this to check the symbol type
+  // Modify this to check the symbol type
   const size_t pilot_symbol_id = bscfg_->Frame().GetPilotSymbolIdx(symbol_id);
   const size_t ul_symbol_id = bscfg_->Frame().GetULSymbolIdx(symbol_id);
   size_t total_symbol_id = pilot_symbol_id;
@@ -684,8 +684,8 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
       reinterpret_cast<const short*>(&rx_buffer_ue_.at(total_offset_ue));
 
   arma::cx_fmat& fmat_src = *local.ue_input_matrix_;
-  //fmat_src.zeros(fmat_src.n_rows, fmat_src.n_cols);
-  //2 for complex type
+  // fmat_src.zeros(fmat_src.n_rows, fmat_src.n_cols);
+  // 2 for complex type
   const size_t convert_length = (2 * fmat_src.n_rows * fmat_src.n_cols);
 
   MLPD_FRAME(
@@ -714,7 +714,7 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
                           convert_length);
 
   arma::cx_fmat& fmat_noisy = *local.ue_output_matrix_;
-  //fmat_noisy.zeros(fmat_noisy.n_rows, fmat_noisy.n_cols);
+  // fmat_noisy.zeros(fmat_noisy.n_rows, fmat_noisy.n_cols);
 
   const bool is_downlink = false;
   bool is_new_frame;
@@ -770,8 +770,8 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
       reinterpret_cast<const short*>(&rx_buffer_bs_.at(total_offset_bs));
 
   arma::cx_fmat& fmat_src = *local.bs_input_matrix_;
-  //fmat_src.zeros(fmat_src.n_rows, fmat_src.n_cols);
-  //2 for complex type
+  // fmat_src.zeros(fmat_src.n_rows, fmat_src.n_cols);
+  // 2 for complex type
   const size_t convert_length = (2 * fmat_src.n_rows * fmat_src.n_cols);
 
   MLPD_FRAME(
@@ -798,7 +798,7 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
                           convert_length);
 
   arma::cx_fmat& fmat_noisy = *local.bs_output_matrix_;
-  //fmat_noisy.zeros(fmat_noisy.n_rows, fmat_noisy.n_cols);
+  // fmat_noisy.zeros(fmat_noisy.n_rows, fmat_noisy.n_cols);
   // Apply Channel
   const bool is_downlink = true;
   bool is_new_frame;
