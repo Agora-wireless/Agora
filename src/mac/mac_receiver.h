@@ -12,7 +12,12 @@
 class MacReceiver {
  public:
   explicit MacReceiver(Config* const cfg, size_t num_frame_data_bytes,
-                       std::string server_address, size_t tx_port,
+                       std::string phy_server_address, size_t phy_port,
+                       size_t rx_thread_num = 1, size_t core_offset = 1);
+
+  explicit MacReceiver(Config* const cfg, size_t num_frame_data_bytes,
+                       std::string phy_server_address, size_t phy_port,
+                       std::string fwd_data_udp_address, size_t fwd_port,
                        size_t rx_thread_num = 1, size_t core_offset = 1);
 
   ~MacReceiver() = default;
@@ -22,11 +27,15 @@ class MacReceiver {
 
  private:
   const size_t data_bytes_;
-  const std::string server_address_;
-  const size_t server_tx_port_;
+  const std::string phy_address_;
+  const size_t phy_port_;
 
-  size_t rx_thread_num_;
-  size_t core_id_;
+  const size_t enable_udp_output_;
+  const size_t udp_dest_port_;
+  const std::string udp_dest_address_;
+
+  const size_t rx_thread_num_;
+  const size_t core_id_;
   Config* const cfg_;
 };
 

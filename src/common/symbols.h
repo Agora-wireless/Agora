@@ -28,6 +28,8 @@ static constexpr size_t kFrameWnd = 40;
 #define USE_MKL_JIT 0
 #endif
 
+#define ENABLE_RB_IND 0
+
 /// Return true at compile time iff a constant is a power of two
 template <typename T>
 static constexpr inline bool IsPowerOfTwo(T x) {
@@ -110,6 +112,7 @@ enum class PrintType : int {
 // crucial for good performance. For testing or developing Agora on machines
 // with insufficient cores, disable this flag.
 static constexpr bool kEnableThreadPinning = true;
+static constexpr bool kEnableCoreReuse = false;
 
 #define BIGSTATION 0
 #if defined(USE_DPDK)

@@ -126,7 +126,7 @@ PhyUe::PhyUe(Config* config)
   ue_tracker_.reserve(num_ue);
   ue_tracker_.resize(num_ue);
   for (auto& ue : ue_tracker_) {
-    //Might want to change the 1 to NumChannels or channels per ue
+    // Might want to change the 1 to NumChannels or channels per ue
     ue.ifft_counters_.Init(ul_symbol_perframe_, 1);
     ue.tx_pending_frame_ = 0;
     ue.tx_ready_frames_.clear();
@@ -141,7 +141,7 @@ PhyUe::PhyUe(Config* config)
 
   rx_downlink_deferral_.resize(kFrameWnd);
 
-  //Mac counters for downlink data
+  // Mac counters for downlink data
   tomac_counters_.Init(config_->Frame().NumDlDataSyms(), config_->UeAntNum());
 }
 
@@ -555,47 +555,56 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kPacketFromMac: {
-          // This is an entrie frame (multiple mac packets)
-          size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
-          size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
-          RtAssert(radio_buf_id == expected_frame_id_from_mac_ % kFrameWnd);
+          // This is an entire frame (multiple mac packets)
+          const size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
+          const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
+          RtAssert(radio_buf_id == (expected_frame_id_from_mac_ % kFrameWnd),
+                   "Radio buffer id does not match expected");
 
-          auto* pkt = reinterpret_cast<MacPacket*>(
+          auto* pkt = reinterpret_cast<const MacPacketPacked*>(
               &ul_bits_buffer_[ue_id][radio_buf_id *
                                       config_->UlMacBytesNumPerframe()]);
-          RtAssert(pkt->frame_id_ == expected_frame_id_from_mac_,
+
+          MLPD_TRACE(
+              "PhyUe: frame %d symbol %d user %d @ offset %zu %zu @ location "
+              "%zu\n",
+              pkt->Frame(), pkt->Symbol(), pkt->Ue(), ue_id, radio_buf_id,
+              (size_t)pkt);
+          RtAssert(pkt->Frame() ==
+                       static_cast<uint16_t>(expected_frame_id_from_mac_),
                    "PhyUe: Incorrect frame ID from MAC");
           current_frame_user_num_ =
               (current_frame_user_num_ + 1) % config_->UeAntNum();
           if (current_frame_user_num_ == 0) {
             expected_frame_id_from_mac_++;
           }
+#if ENABLE_RB_IND
           config_->UpdateModCfgs(pkt->rb_indicator_.mod_order_bits_);
-
+#endif
           if (kDebugPrintPacketsFromMac) {
+#if ENABLE_RB_IND
             std::printf(
                 "PhyUe: received packet for frame %u with modulation %zu\n",
                 pkt->frame_id_, pkt->rb_indicator_.mod_order_bits_);
+#endif
             std::stringstream ss;
 
             for (size_t ul_data_symbol = 0;
                  ul_data_symbol < config_->Frame().NumUlDataSyms();
                  ul_data_symbol++) {
-              ss << "PhyUe: kPacketFromMac, frame " << pkt->frame_id_
-                 << ", symbol " << std::to_string(pkt->symbol_id_) << " crc "
-                 << std::to_string(pkt->crc_) << " bytes: ";
-              for (size_t i = 0; i < pkt->datalen_; i++) {
-                ss << std::to_string(
-                          (reinterpret_cast<uint8_t*>(pkt->data_)[i]))
-                   << ", ";
+              ss << "PhyUe: kPacketFromMac, frame " << pkt->Frame()
+                 << ", symbol " << std::to_string(pkt->Symbol()) << " crc "
+                 << std::to_string(pkt->Crc()) << " bytes: ";
+              for (size_t i = 0; i < pkt->PayloadLength(); i++) {
+                ss << std::to_string((pkt->Data()[i])) << ", ";
               }
               ss << std::endl;
-              pkt = reinterpret_cast<MacPacket*>(
-                  reinterpret_cast<uint8_t*>(pkt) + config_->MacPacketLength());
+              pkt = reinterpret_cast<const MacPacketPacked*>(
+                  reinterpret_cast<const uint8_t*>(pkt) +
+                  config_->MacPacketLength());
             }
             std::printf("%s\n", ss.str().c_str());
           }
-
         } break;
 
         case EventType::kEncode: {
@@ -669,7 +678,8 @@ void PhyUe::Start() {
               PrintPerFrameDone(PrintType::kIFFT, frame_id);
               ue.ifft_counters_.Reset(frame_id);
 
-              //If the completed frame is the next in line, schedule the transmission
+              // If the completed frame is the next in line, schedule the
+              // transmission
               if (ue.tx_pending_frame_ == frame_id) {
                 size_t current_frame = frame_id;
 
@@ -687,13 +697,14 @@ void PhyUe::Start() {
                       std::find(ue.tx_ready_frames_.begin(),
                                 ue.tx_ready_frames_.end(), next_frame);
                   if (tx_next != ue.tx_ready_frames_.end()) {
-                    //With c++20 we could check the return value of remove
+                    // With c++20 we could check the return value of remove
                     ue.tx_ready_frames_.erase(tx_next);
                     current_frame = next_frame;
                   }
                 }
               } else {
-                //Otherwise defer the tx (could make this sorted insert in future)
+                // Otherwise defer the tx (could make this sorted insert in
+                // future)
                 ue.tx_ready_frames_.push_front(frame_id);
               }
             }

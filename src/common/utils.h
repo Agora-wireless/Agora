@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, Rice University
+// Copyright (c) 2018-2021, Rice University
 // RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
 /**
@@ -40,9 +40,10 @@
 
 #include "symbols.h"
 
-#define MAX_CORE_NUM (200)
-
-void SetCpuLayoutOnNumaNodes(bool verbose = false);
+// Default argument is to exclude core 0 from the list
+void SetCpuLayoutOnNumaNodes(
+    bool verbose = false,
+    const std::vector<size_t>& cores_to_exclude = std::vector<size_t>(1, 0));
 
 size_t GetPhysicalCoreId(size_t core_id);
 
@@ -51,7 +52,9 @@ int PinToCore(int core_id);
 
 /* Pin this thread to core (base_core_offset + thread_id) */
 void PinToCoreWithOffset(ThreadType thread, int base_core_offset, int thread_id,
-                         bool verbose = true);
+                         bool verbose = false);
+
+void PrintCoreAssignmentSummary();
 
 template <class T>
 struct EventHandlerContext {

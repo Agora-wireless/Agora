@@ -8,7 +8,7 @@
 #include <cmath>
 #include <memory>
 
-static const bool kDebugDeferral = false;
+static const bool kDebugDeferral = true;
 static const size_t kDefaultMessageQueueSize = 512;
 static const size_t kDefaultWorkerQueueSize = 256;
 
@@ -159,22 +159,37 @@ void Agora::ScheduleAntennas(EventType event_type, size_t frame_id,
 
 void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
   auto base_tag = gen_tag_t::FrmSymAnt(frame_id, symbol_id, 0);
+  const size_t total_antennas = config_->BsAntNum();
+  const size_t handler_threads = config_->SocketThreadNum();
+  size_t schedule_antenna = 0;
 
-  size_t num_blocks = config_->BsAntNum() / config_->NumChannels();
-  std::array<EventData, kMaxChannels> events_list;
-  for (size_t i = 0; i < config_->NumChannels(); i++) {
-    events_list.at(i).num_tags_ = 1;
-    events_list.at(i).event_type_ = EventType::kPacketTX;
+  const size_t rem_antennas = total_antennas % handler_threads;
+  const size_t floor_events_per_handler = total_antennas / handler_threads;
+  size_t ceil_events_per_handler = floor_events_per_handler;
+  if (rem_antennas > 0) {
+    ceil_events_per_handler += 1;
   }
+  // Must put contiguous channels in same queue
+  assert(ceil_events_per_handler % config_->NumChannels() == 0);
 
-  for (size_t i = 0; i < num_blocks; i++) {
-    for (size_t j = 0; j < config_->NumChannels(); j++) {
-      events_list.at(j).tags_[0] = base_tag.tag_;
-      base_tag.ant_id_++;
+  std::vector<EventData> events_list(ceil_events_per_handler);
+  for (size_t radio_handler = 0; radio_handler < handler_threads;
+       radio_handler++) {
+    size_t tx_event;
+    for (tx_event = 0; tx_event < ceil_events_per_handler; tx_event++) {
+      if (schedule_antenna == total_antennas) {
+        // All antennas scheduled
+        break;
+      }
+
+      events_list.at(tx_event).num_tags_ = 1;
+      events_list.at(tx_event).event_type_ = EventType::kPacketTX;
+      events_list.at(tx_event).tags_[0u] = base_tag.tag_;
+      base_tag.ant_id_ = ++schedule_antenna;
     }
     TryEnqueueBulkFallback(GetConq(EventType::kPacketTX, 0),
-                           tx_ptoks_ptr_[i % config_->SocketThreadNum()],
-                           events_list.data(), config_->NumChannels());
+                           tx_ptoks_ptr_[radio_handler], events_list.data(),
+                           tx_event);
   }
 }
 
@@ -233,18 +248,10 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
 void Agora::ScheduleCodeblocks(EventType event_type, size_t frame_id,
                                size_t symbol_idx) {
   auto base_tag = gen_tag_t::FrmSymCb(frame_id, symbol_idx, 0);
-
-  // for (size_t i = 0;
-  //      i < config_->UeNum() * config_->LdpcConfig().NumBlocksInSymbol();
-  //      i++) {
-  //     try_enqueue_fallback(GetConq(event_type), GetPtok(event_type),
-  //         Event_data(event_type, base_tag._tag));
-  //     base_tag.cb_id++;
-  // }
-  size_t num_tasks =
+  const size_t num_tasks =
       config_->UeNum() * config_->LdpcConfig().NumBlocksInSymbol();
   size_t num_blocks = num_tasks / config_->EncodeBlockSize();
-  size_t num_remainder = num_tasks % config_->EncodeBlockSize();
+  const size_t num_remainder = num_tasks % config_->EncodeBlockSize();
   if (num_remainder > 0) {
     num_blocks++;
   }
@@ -563,7 +570,7 @@ void Agora::Start() {
               ifft_cur_frame_for_symbol_.at(symbol_idx_dl) = frame_id;
               if (symbol_idx_dl == ifft_next_symbol_) {
                 // Check the available symbols starting from the current symbol
-                // Only schedule symbols that are continuously avaialbe
+                // Only schedule symbols that are continuously available
                 for (size_t sym_id = symbol_idx_dl;
                      sym_id <= ifft_counters_.GetSymbolCount(frame_id);
                      sym_id++) {
@@ -1553,7 +1560,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
 
     if (this->encode_deferral_.empty() == false) {
       for (size_t encode = 0; encode < kScheduleQueues; encode++) {
-        size_t deferred_frame = this->encode_deferral_.front();
+        const size_t deferred_frame = this->encode_deferral_.front();
         if (deferred_frame < (this->cur_proc_frame_id_ + kScheduleQueues)) {
           if (kDebugDeferral) {
             std::printf("   +++ Scheduling deferred frame %zu : %zu \n",
@@ -1562,7 +1569,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
           RtAssert(deferred_frame >= this->cur_proc_frame_id_,
                    "Error scheduling encoding because deferral frame is less "
                    "than current frame");
-          ScheduleDownlinkProcessing(frame_id);
+          ScheduleDownlinkProcessing(deferred_frame);
           this->encode_deferral_.pop();
         } else {
           // No need to check the next frame because it is too large
