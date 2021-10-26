@@ -148,7 +148,6 @@ void PacketTXRX::LoopTxRx(size_t tid) {
   const size_t slow_start_tsc1 =
       std::max(kSlowStartMulStage1 * frame_tsc_delta, two_hundred_ms_ticks);
 
-  const size_t slow_start_tsc1 = kSlowStartMulStage1 * frame_tsc_delta;
   const size_t slow_start_thresh1 = kFrameWnd;
   const size_t slow_start_tsc2 = kSlowStartMulStage2 * frame_tsc_delta;
   const size_t slow_start_thresh2 = kFrameWnd * 4;
