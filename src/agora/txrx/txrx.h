@@ -28,7 +28,7 @@
 #if defined(USE_DPDK)
 #include "dpdk_transport.h"
 
-//Removed support for copy free dpdk memory due to slowdown issue.
+// Removed support for copy free dpdk memory due to slowdown issue.
 //#define USE_DPDK_MEMORY
 
 #if defined(USE_DPDK_MEMORY)
@@ -47,7 +47,7 @@ class DPDKRxPacket : public RxPacket {
  private:
   rte_mbuf* mem_;
   inline void GcPacket() override {
-    //std::printf("Garbage collecting the memory for DPDKRxPacket\n");
+    // std::printf("Garbage collecting the memory for DPDKRxPacket\n");
     rte_pktmbuf_free(mem_);
     this->Set(nullptr, nullptr);
   }

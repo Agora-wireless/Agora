@@ -250,7 +250,7 @@ struct MacPacketHeaderPacked {
   inline const uint16_t &Crc() const { return crc_; }
   inline const uint16_t &PayloadLength() const { return datalen_; }
 
-  //Modifiers
+  // Modifiers
   inline void Set(const uint16_t &f, const uint16_t &s, const uint16_t &u,
                   const uint16_t &d, const uint16_t &cc) {
     frame_id_ = f;
@@ -285,7 +285,7 @@ struct MacPacketPacked {
   }
   inline const unsigned char *Data() const { return data_; };
 
-  //Modifiers
+  // Modifiers
   inline void Set(const uint16_t &f, const uint16_t &s, const uint16_t &u,
                   const uint16_t &data_size) {
     header_.Set(f, s, u, data_size, 0);

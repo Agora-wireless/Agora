@@ -135,7 +135,7 @@ class MacThreadClient {
     // snr_[i] contains a moving window of SNR measurement for UE #i
     std::array<std::queue<float>, kMaxUEs> snr_;
 
-    //Placing at the end because it is variable size based on configuration
+    // Placing at the end because it is variable size based on configuration
     std::vector<std::vector<size_t>> data_size_;
   } server_;
 

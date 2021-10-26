@@ -81,7 +81,7 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
   ticks_wnd1_ = ticks_all_ * kSlowStartMulStage1;
   ticks_wnd2_ = ticks_all_ * kSlowStartMulStage2;
 
-  //Match element alignment with buffer alignment
+  // Match element alignment with buffer alignment
   const size_t padding = kTxBufferElementAlignment -
                          (cfg_->MacPacketLength() % kTxBufferElementAlignment);
 
@@ -121,16 +121,17 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
                                 worker_thread_num_);
   }
 
-  // Add the data update thread (background data reader), need to add a variable for the update source number
+  // Add the data update thread (background data reader), need to add a variable
+  // for the update source number
   for (size_t update_threads = 0; update_threads < update_thread_num_;
        update_threads++) {
-    //1 update/data stream per thread.
+    // 1 update/data stream per thread.
     this->threads_.emplace_back(&MacSender::DataUpdateThread, this,
                                 update_threads, 1);
 
     data_update_queue_.emplace_back(
         moodycamel::ConcurrentQueue<size_t>(kMessageQueueSize));
-    //make producer token here?
+    // make producer token here?
   }
 }
 
@@ -323,7 +324,8 @@ void* MacSender::WorkerThread(size_t tid) {
 
         // Send the mac data to the data sinc
         for (size_t packet = 0; packet < packets_per_frame_; packet++) {
-          ///\todo Use assume_aligned<kTxBufferElementAlignment> when code has c++20 support
+          ///\todo Use assume_aligned<kTxBufferElementAlignment> when code has
+          /// c++20 support
           auto* tx_packet =
               reinterpret_cast<const MacPacketPacked*>(mac_packet_location);
 
@@ -331,7 +333,7 @@ void* MacSender::WorkerThread(size_t tid) {
               cfg_->MacPacketLength() -
               (cfg_->MacPayloadMaxLength() - tx_packet->PayloadLength());
 
-          //std::printf(
+          // std::printf(
           //    "MacSender sending frame %d:%d, packet %zu, symbol %d, size "
           //    "%zu:%zu\n",
           //    tx_packet->frame_id_, tag.frame_id_, packet,
@@ -406,7 +408,7 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
   size_t buffer_updates = 0;
   PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_ + 1, tid);
 
-  //Split the Ue data up between threads and sources
+  // Split the Ue data up between threads and sources
   size_t ue_per_thread = (cfg_->UeAntNum() / update_thread_num_);
   if (cfg_->UeAntNum() / update_thread_num_ > 0) {
     ue_per_thread++;
@@ -431,7 +433,7 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
 
   for (size_t source = 0; source < num_data_sources; source++) {
 #if defined(USE_UDP_DATA_SOURCE)
-    //Assumes that the num_data_sources are spread evenly between threads
+    // Assumes that the num_data_sources are spread evenly between threads
     sources.emplace_back(std::make_unique<VideoReceiver>(
         VideoReceiver::kVideoStreamRxPort + (tid * num_data_sources) + source));
 #else
@@ -496,7 +498,7 @@ void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
           tag.frame_id_, tag.ant_id_,
           cfg_->MacPayloadMaxLength() - loaded_bytes);
     }
-    //MacPacketLength should be the size of the mac packet but is not.
+    // MacPacketLength should be the size of the mac packet but is not.
     mac_packet_location += tx_buffer_pkt_offset_;
   }
   MLPD_INFO("MacSender [frame %d, ue %d]: Loaded packet for bytes %zu\n",

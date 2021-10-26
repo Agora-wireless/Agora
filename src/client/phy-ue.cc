@@ -126,7 +126,7 @@ PhyUe::PhyUe(Config* config)
   ue_tracker_.reserve(num_ue);
   ue_tracker_.resize(num_ue);
   for (auto& ue : ue_tracker_) {
-    //Might want to change the 1 to NumChannels or channels per ue
+    // Might want to change the 1 to NumChannels or channels per ue
     ue.ifft_counters_.Init(ul_symbol_perframe_, 1);
     ue.tx_pending_frame_ = 0;
     ue.tx_ready_frames_.clear();
@@ -141,7 +141,7 @@ PhyUe::PhyUe(Config* config)
 
   rx_downlink_deferral_.resize(kFrameWnd);
 
-  //Mac counters for downlink data
+  // Mac counters for downlink data
   tomac_counters_.Init(config_->Frame().NumDlDataSyms(), config_->UeAntNum());
 }
 
@@ -678,7 +678,8 @@ void PhyUe::Start() {
               PrintPerFrameDone(PrintType::kIFFT, frame_id);
               ue.ifft_counters_.Reset(frame_id);
 
-              //If the completed frame is the next in line, schedule the transmission
+              // If the completed frame is the next in line, schedule the
+              // transmission
               if (ue.tx_pending_frame_ == frame_id) {
                 size_t current_frame = frame_id;
 
@@ -696,13 +697,14 @@ void PhyUe::Start() {
                       std::find(ue.tx_ready_frames_.begin(),
                                 ue.tx_ready_frames_.end(), next_frame);
                   if (tx_next != ue.tx_ready_frames_.end()) {
-                    //With c++20 we could check the return value of remove
+                    // With c++20 we could check the return value of remove
                     ue.tx_ready_frames_.erase(tx_next);
                     current_frame = next_frame;
                   }
                 }
               } else {
-                //Otherwise defer the tx (could make this sorted insert in future)
+                // Otherwise defer the tx (could make this sorted insert in
+                // future)
                 ue.tx_ready_frames_.push_front(frame_id);
               }
             }
