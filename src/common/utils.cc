@@ -40,6 +40,16 @@ static std::mutex pin_core_mutex;
 /* Keep list of core-thread relationship*/
 static std::list<CoreInfo> core_list;
 
+static size_t GetCoreId(size_t core) {
+  size_t result;
+  if (cpu_layout_initialized) {
+    result = cpu_layout.at(core % cpu_layout.size());
+  } else {
+    result = core;
+  }
+  return result;
+}
+
 /* Print out summary of core-thread relationship */
 static void PrintCoreList(const std::list<CoreInfo>& clist) {
   int numa_max_cpus = numa_num_configured_cpus();
@@ -50,8 +60,8 @@ static void PrintCoreList(const std::list<CoreInfo>& clist) {
   std::printf("Total Number of Cores: %d : %d \n", numa_max_cpus, system_cpus);
   for (auto& iter : clist) {
     std::printf(
-        "|| Core ID: %2zu || Requested: %2zu || ThreadType: %-16s || ThreadId: "
-        "%zu \n",
+        "|| Core ID: %2zu || Requested: %2zu || ThreadType: %-16s || "
+        "ThreadId: %zu \n",
         iter.mapped_core_, iter.requested_core_,
         ThreadTypeStr(iter.type_).c_str(), iter.thread_id_);
   }
@@ -66,7 +76,8 @@ static void PrintBitmask(const struct bitmask* bm) {
 
 void PrintCoreAssignmentSummary() { PrintCoreList(core_list); }
 
-void SetCpuLayoutOnNumaNodes(bool verbose) {
+void SetCpuLayoutOnNumaNodes(bool verbose,
+                             const std::vector<size_t>& cores_to_exclude) {
   if (cpu_layout_initialized == false) {
     int lib_accessable = numa_available();
     if (lib_accessable == -1) {
@@ -88,7 +99,11 @@ void SetCpuLayoutOnNumaNodes(bool verbose) {
           if (verbose) {
             std::printf("%zu ", j);
           }
-          cpu_layout.emplace_back(j);
+          //If core id is not in the excluded list
+          if (std::find(cores_to_exclude.begin(), cores_to_exclude.end(), j) ==
+              cores_to_exclude.end()) {
+            cpu_layout.emplace_back(j);
+          }
         }
       }
       if (verbose) {
@@ -103,10 +118,18 @@ void SetCpuLayoutOnNumaNodes(bool verbose) {
 }
 
 size_t GetPhysicalCoreId(size_t core_id) {
+  size_t core;
   if (cpu_layout_initialized) {
-    return cpu_layout.at(core_id);
+    core = cpu_layout.at(core_id);
+  } else {
+    int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+    if ((num_cores > 0) && (core_id >= static_cast<size_t>(num_cores))) {
+      core = (core_id % num_cores) + 1;
+    } else {
+      core = core_id;
+    }
   }
-  return core_id;
+  return core;
 }
 
 int PinToCore(int core_id) {
@@ -128,32 +151,33 @@ void PinToCoreWithOffset(ThreadType thread_type, int core_offset, int thread_id,
   std::scoped_lock lock(pin_core_mutex);
 
   if (kEnableThreadPinning == true) {
-    size_t requested_core = core_offset + thread_id;
-    const int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
+    const size_t requested_core = (core_offset + thread_id);
 
-    if (kEnableThreadWrapping) {
-      requested_core = requested_core % num_cores;
-    }
+    RtAssert(
+        cpu_layout_initialized == true,
+        "CPU layout must be initialized before calling PinToCoreWithOffset\n");
 
-    size_t assigned_core = requested_core;
-    if (cpu_layout_initialized) {
-      assigned_core = cpu_layout.at(requested_core);
-    } else if (requested_core == 0) {
-      /* Reserve core 0 for kernel threads */
-      throw std::runtime_error(
-          "Thread requested core 0, but should be reserved for kernel");
-    } else if ((int)requested_core > num_cores) {
-      throw std::runtime_error(
-          "Thread requested a core that was > number in system");
+    //kEnableCoreReuse
+    size_t assigned_core = GetCoreId(requested_core);
+
+    if (kEnableCoreReuse == false) {
+      //Check to see if core has already been assigned (faster search is possible here but isn't necessary)
+      for (auto& assigned : core_list) {
+        if ((assigned.mapped_core_ == assigned_core) &&
+            (assigned.thread_id_ != pthread_self())) {
+          throw std::runtime_error(
+              "The core has already been assigned to a managed thread, please "
+              "adjust your request and try again");
+        }
+      }
     }
 
     if (PinToCore(assigned_core) != 0) {
       std::fprintf(
           stderr,
-          "%s thread %d: failed to pin to core %zu. Exiting. "
-          "This can happen if the machine has insufficient cores. "
-          "Set kEnableThreadPinning to false to run Agora to run despite "
-          "this - performance will be low.\n",
+          "%s thread %d: failed to pin to core %zu. Exiting. This can happen "
+          "if the machine has insufficient cores. Set kEnableThreadPinning to "
+          "false to run Agora to run despite this - performance will be low.\n",
           ThreadTypeStr(thread_type).c_str(), thread_id, assigned_core);
       throw std::runtime_error("Utils: failed to pin to core");
     } else {
