@@ -115,6 +115,7 @@ void DoFFT::Launch(size_t frame_id, size_t symbol_id, size_t ant_id)
 
 void DoFFT::StartWork()
 {
+    cur_idx_ = tid_;
     size_t start_tsc = 0;
     size_t work_tsc_duration = 0;
     size_t fft_tsc_duration = 0;
@@ -164,6 +165,13 @@ void DoFFT::StartWork()
                 work_tsc_duration += rdtsc() - work_start_tsc;
             });
             cur_idx_ += cfg_->fft_thread_num;
+            if (cur_idx_ >= cfg_->get_num_ant_to_process() * cfg_->symbol_num_perframe) {
+                cur_idx_ = tid_;
+                cur_frame_ ++;
+                if (unlikely(cur_frame_ == cfg_->frames_to_test)) {
+                    break;
+                }
+            }
         }
     }
 }

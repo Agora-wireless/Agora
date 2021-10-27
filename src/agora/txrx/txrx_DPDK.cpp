@@ -230,6 +230,13 @@ void* PacketTXRX::fft_tx_thread(int tid)
                         pkt->server_id_ = cfg_->bs_server_addr_idx;
                         memcpy(pkt->data_, ant_ptr + 2 * sizeof(unsigned short) * (cfg_->OFDM_DATA_START + cfg_->subcarrier_num_start[target_server_idx]),
                             cfg_->subcarrier_num_list[target_server_idx] * 2 * sizeof(unsigned short));
+                        
+                        // if (fft_frame_to_send == 0 && fft_symbol_to_send == 0 && target_server_idx == 1 && ant_id == 1) {
+                        //     for (size_t k = 0; k < cfg_->subcarrier_num_list[target_server_idx]; k ++) {
+                        //         printf("(%d %d) ", pkt->data_[k*2], pkt->data_[k*2+1]);
+                        //     }
+                        //     printf("\n");
+                        // }
 
                         // Send data (one OFDM symbol)
                         size_t nb_tx_new = rte_eth_tx_burst(0, tid - rx_thread_num_, tx_bufs, 1);
