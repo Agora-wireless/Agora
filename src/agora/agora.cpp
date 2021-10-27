@@ -25,7 +25,7 @@ Agora::Agora(Config* cfg)
     initControlInfo();
 
     /* Initialize TXRX threads */
-    packet_tx_rx_.reset(new PacketTXRX(cfg, cfg->core_offset + kNumMasterThread,
+    packet_tx_rx_.reset(new PacketTXRX(cfg, cfg->core_offset,
         time_domain_iq_buffer_, freq_domain_iq_buffer_to_send_,
         freq_domain_iq_buffer_, demod_buffer_to_send_, demod_buffer_to_decode_, 
         &shared_state_));
@@ -33,6 +33,9 @@ Agora::Agora(Config* cfg)
     base_worker_core_offset_ = config_->core_offset + kNumMasterThread + 
         config_->rx_thread_num + kNumDemodTxThread;
     // TODO: Add other possible threads
+    if (config_->use_time_domain_iq) {
+        base_worker_core_offset_ += config_->fft_tx_thread_num;
+    }
 
     if (cfg->use_time_domain_iq) {
         do_fft_threads_.resize(cfg->fft_thread_num);
@@ -167,7 +170,7 @@ void* Agora::fftWorker(int tid)
 void* Agora::subcarrierWorker(int tid)
 {
     pin_to_core_with_offset(
-        ThreadType::kWorkerSubcarrier, base_worker_core_offset_, tid);
+        ThreadType::kWorkerSubcarrier, base_worker_core_offset_, tid + do_fft_threads_.size());
 
     Range sc_range(tid * config_->subcarrier_block_size + config_->subcarrier_start,
         min((tid + 1) * config_->subcarrier_block_size + config_->subcarrier_start,
@@ -190,7 +193,7 @@ void* Agora::subcarrierWorker(int tid)
 void* Agora::decodeWorker(int tid)
 {
     pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_,
-        tid + do_subcarrier_threads_.size());
+        tid + do_fft_threads_.size() + do_subcarrier_threads_.size());
 
     auto computeDecoding = new DyDecode(config_, tid, freq_ghz_,
         demod_buffer_to_decode_,

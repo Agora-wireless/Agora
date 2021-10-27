@@ -487,7 +487,7 @@ int PacketTXRX::recv_relocate(int tid)
             if (!shared_state_->receive_time_iq_pkt(pkt->frame_id_, pkt->symbol_id_)) {
                 cfg_->running = false;
             }
-            printf("Receive a packet from TimeIQ\n");
+            printf("Receive a packet from TimeIQ %zu %zu %zu\n", pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
         } else {
             printf("Received unknown packet from rru\n");
             exit(1);
