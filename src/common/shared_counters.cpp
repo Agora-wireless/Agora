@@ -53,6 +53,9 @@ bool SharedState::receive_time_iq_pkt(size_t frame_id, size_t symbol_id)
 
     const size_t frame_slot = frame_id % kFrameWnd;
     num_time_iq_pkts_[frame_slot][symbol_id] ++;
+    if (num_time_iq_pkts_[frame_slot][symbol_id] == num_time_iq_pkts_per_symbol_) {
+        MLPD_INFO("SharedCounters: received all time iq packets in frame: %u, symbol: %u\n", frame_id, symbol_id);
+    }
     return true;
 }
 
@@ -109,6 +112,9 @@ bool SharedState::receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol
         return false;
     }
     num_demod_pkts_[ue_id][frame_id % kFrameWnd][symbol_id_ul]++;
+    if (num_demod_pkts_[ue_id][frame_id % kFrameWnd][symbol_id_ul] == num_demod_pkts_per_symbol_per_ue_) {
+        MLPD_INFO("SharedCounters: received all demod packets in frame: %u, ue: %u, symbol: %u\n", frame_id, ue_id, symbol_id_ul);
+    }
     return true;
 }
 
@@ -164,6 +170,9 @@ void SharedState::fft_done(size_t frame_id, size_t symbol_id)
     rt_assert(frame_id >= cur_frame_ && frame_id < cur_frame_ + kFrameWnd,
         "Complete a wrong frame in fft!");
     num_fft_tasks_completed_[frame_id % kFrameWnd][symbol_id] ++;
+    if (num_fft_tasks_completed_[frame_id % kFrameWnd][symbol_id] == num_fft_tasks_per_symbol_) {
+        MLPD_INFO("SharedCounters: FFT done frame: %u, symbol: %u\n", frame_id, symbol_id);
+    }
 }
 
 void SharedState::demul_done(size_t frame_id, size_t symbol_id_ul, size_t num_tasks)
@@ -172,6 +181,9 @@ void SharedState::demul_done(size_t frame_id, size_t symbol_id_ul, size_t num_ta
         "Complete a wrong frame in demul!");
     num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
         += num_tasks;
+    if (num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul] == num_demul_tasks_required_) {
+        MLPD_INFO("SharedCounters: Demul done frame: %u, symbol: %u\n", frame_id, symbol_id_ul);
+    }
 }
 
 // When decoding is done for a frame from one decoder, call this function

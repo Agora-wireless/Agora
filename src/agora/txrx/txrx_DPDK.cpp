@@ -248,7 +248,7 @@ void* PacketTXRX::fft_tx_thread(int tid)
                 }
             }
             fft_symbol_to_send += fft_tx_thread_num_;
-            if (fft_symbol_to_send > cfg_->symbol_num_perframe) {
+            if (fft_symbol_to_send >= cfg_->symbol_num_perframe) {
                 fft_symbol_to_send = tid - rx_thread_num_ - kNumDemodTxThread;
                 fft_frame_to_send ++;
             }
