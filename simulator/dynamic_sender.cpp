@@ -211,7 +211,7 @@ void* Sender::worker_thread(int tid)
         gen_tag_t tag = 0;
 
         if (cfg->use_time_domain_iq) {
-            size_t server_id = cur_radio < (ant_block + 1) * ant_off ? cur_radio / (ant_block + 1) : (cur_radio - (ant_block + 1) * ant_off) / ant_block;
+            size_t server_id = cur_radio < (ant_block + 1) * ant_off ? cur_radio / (ant_block + 1) : (cur_radio - (ant_block + 1) * ant_off) / ant_block + ant_off;
             tx_mbufs[0] = DpdkTransport::alloc_udp(mbuf_pools_[tid], sender_mac_addr,
                 server_mac_addr_list[server_id], bs_rru_addr, bs_server_addr_list[server_id],
                 cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
