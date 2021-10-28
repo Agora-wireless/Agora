@@ -217,7 +217,7 @@ void* PacketTXRX::fft_tx_thread(int tid)
                             bs_server_mac_addrs_[target_server_idx],
                             bs_server_addrs_[cfg_->bs_server_addr_idx], bs_server_addrs_[target_server_idx], cfg_->fft_tx_port + ant_id, 
                             cfg_->fft_rx_port + ant_id, 
-                            Packet::kOffsetOfData + cfg_->get_num_sc_to_process() * 2 * sizeof(unsigned short));
+                            Packet::kOffsetOfData + cfg_->subcarrier_num_list[target_server_idx] * 2 * sizeof(unsigned short));
                         struct rte_ether_hdr* eth_hdr
                             = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
 
@@ -231,7 +231,7 @@ void* PacketTXRX::fft_tx_thread(int tid)
                         memcpy(pkt->data_, ant_ptr + 2 * sizeof(unsigned short) * (cfg_->OFDM_DATA_START + cfg_->subcarrier_num_start[target_server_idx]),
                             cfg_->subcarrier_num_list[target_server_idx] * 2 * sizeof(unsigned short));
                         
-                        // if (fft_frame_to_send == 0 && fft_symbol_to_send == 0 && target_server_idx == 1 && ant_id == 1) {
+                        // if (fft_frame_to_send == 20 && fft_symbol_to_send == 0 && target_server_idx == 1 && ant_id == 0) {
                         //     for (size_t k = 0; k < cfg_->subcarrier_num_list[target_server_idx]; k ++) {
                         //         printf("(%d %d) ", pkt->data_[k*2], pkt->data_[k*2+1]);
                         //     }
