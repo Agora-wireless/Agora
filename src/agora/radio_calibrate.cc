@@ -827,6 +827,14 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
         float sig_up = 0;
         float noise_up = 0;
         if (cfg_->OfdmCaNum() + start_up.at(i) >= up.at(i).size()) {
+          std::cout << "up(" << i << ")=";
+          for (size_t s = 0; s < up.at(i).size(); s++) {
+            std::cout << up.at(i).at(s).real() << "+1j*"
+                      << up.at(i).at(s).imag() << " ";
+          }
+          std::cout << std::endl;
+          std::cout << "Uplink pilot offset (" << start_up.at(i)
+                    << ") too large!" << std::endl;
           good_csi = false;
           break;
         }
@@ -839,6 +847,14 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
         float sig_dn = 0;
         float noise_dn = 0;
         if (cfg_->OfdmCaNum() + start_dn.at(i) >= dn.at(i).size()) {
+          std::cout << "Downlink pilot offset (" << start_dn.at(i)
+                    << ") too large!" << std::endl;
+          std::cout << "dn(" << i << ")=";
+          for (size_t s = 0; s < dn.at(i).size(); s++) {
+            std::cout << dn.at(i).at(s).real() << "+1j*"
+                      << dn.at(i).at(s).imag() << " ";
+          }
+          std::cout << std::endl;
           good_csi = false;
           break;
         }
@@ -885,6 +901,11 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
                 static_cast<int>(
                     kMaxArraySampleOffset)))) {  // make sure offsets are not too
                                                  // different from each other
+            std::cout << "Uplink and Downlink pilot offsets (" << start_up.at(i)
+                      << "/" << start_up.at(i - cfg_->NumChannels()) << ", "
+                      << start_dn.at(i) << "/"
+                      << start_dn.at(i - cfg_->NumChannels())
+                      << ") are far apart!" << std::endl;
             good_csi = false;
             break;
           }
