@@ -8,6 +8,7 @@
 #include "datatype_conversion.h"
 
 static constexpr bool kPrintFFTInput = false;
+static constexpr bool kPrintInputPilot = false;
 static constexpr bool kPrintPilotCorrStats = false;
 
 DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
@@ -134,9 +135,18 @@ EventData DoFFT::Launch(size_t tag) {
           "sig_offset %zu, peak %2.4f\n",
           tid_, frame_id, symbol_id, ant_id, sig_offset, peak);
     }
+    if (kPrintInputPilot) {
+      std::stringstream ss;
+      ss << "FFT_input_" << symbol_id << "_" << ant_id << "=[";
+      for (size_t i = 0; i < cfg_->SampsPerSymbol(); i++) {
+        ss << pkt->data_[2 * i] << "+1j*" << pkt->data_[2 * i + 1] << " ";
+      }
+      ss << "];" << std::endl;
+      std::cout << ss.str();
+    }
     if (kPrintFFTInput) {
       std::stringstream ss;
-      ss << "FFT_input" << ant_id << "=[";
+      ss << "FFT_input_" << symbol_id << "_" << ant_id << "=[";
       for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
         ss << std::fixed << std::setw(5) << std::setprecision(3)
            << fft_inout_[i].re << "+1j*" << fft_inout_[i].im << " ";
@@ -171,7 +181,7 @@ EventData DoFFT::Launch(size_t tag) {
   if (sym_type == SymbolType::kPilot) {
     size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
     if (kCollectPhyStats) {
-      phy_stats_->UpdatePilotSnr(frame_id, pilot_symbol_id, fft_inout_);
+      phy_stats_->UpdatePilotSnr(frame_id, pilot_symbol_id, ant_id, fft_inout_);
     }
     const size_t ue_id = pilot_symbol_id;
     PartialTranspose(csi_buffers_[frame_slot][ue_id], ant_id,

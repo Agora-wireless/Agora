@@ -31,7 +31,7 @@ class PhyStats {
   void UpdateEvmStats(size_t /*frame_id*/, size_t /*sc_id*/,
                       const arma::cx_fmat& /*eq*/);
   void PrintEvmStats(size_t /*frame_id*/);
-  void UpdatePilotSnr(size_t /*frame_id*/, size_t /*ue_id*/,
+  void UpdatePilotSnr(size_t /*frame_id*/, size_t /*ue_id*/, size_t /*ant_id*/,
                       complex_float* /*fft_data*/);
   float GetEvmSnr(size_t frame_id, size_t ue_id);
   void PrintSnrStats(size_t /*frame_id*/);

@@ -828,10 +828,10 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
         float noise_up = 0;
         if (cfg_->OfdmCaNum() + start_up.at(i) >= up.at(i).size()) {
           std::cout << "up(" << i << ")=";
-          for (size_t s = 0; s < up.at(i).size(); s++) {
-            std::cout << up.at(i).at(s).real() << "+1j*"
-                      << up.at(i).at(s).imag() << " ";
-          }
+          //for (size_t s = 0; s < up.at(i).size(); s++) {
+          //  std::cout << up.at(i).at(s).real() << "+1j*"
+          //            << up.at(i).at(s).imag() << " ";
+          //}
           std::cout << std::endl;
           std::cout << "Uplink pilot offset (" << start_up.at(i)
                     << ") too large!" << std::endl;
@@ -850,10 +850,10 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
           std::cout << "Downlink pilot offset (" << start_dn.at(i)
                     << ") too large!" << std::endl;
           std::cout << "dn(" << i << ")=";
-          for (size_t s = 0; s < dn.at(i).size(); s++) {
-            std::cout << dn.at(i).at(s).real() << "+1j*"
-                      << dn.at(i).at(s).imag() << " ";
-          }
+          //for (size_t s = 0; s < dn.at(i).size(); s++) {
+          //  std::cout << dn.at(i).at(s).real() << "+1j*"
+          //            << dn.at(i).at(s).imag() << " ";
+          //}
           std::cout << std::endl;
           good_csi = false;
           break;
