@@ -22,6 +22,7 @@ static constexpr bool kDebugPrintDecode = false;
 static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr bool kPrintEqualizedSymbols = false;
+static constexpr bool kRecordDownlinkFrame = true;
 static constexpr size_t kRecordFrameIndex = 1000;
 
 UeWorker::UeWorker(
@@ -162,7 +163,7 @@ void UeWorker::DoFftData(size_t tag) {
   size_t sig_offset = config_.OfdmRxZeroPrefixClient();
   size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
 
-  if (kPrintDownlinkPilotStats) {
+  if (kRecordDownlinkFrame) {
     if (frame_id == kRecordFrameIndex) {
       std::string fname = "rxdata" + std::to_string(symbol_id) + "_" +
                           std::to_string(ant_id) + ".bin";
@@ -324,6 +325,9 @@ void UeWorker::DoFftPilot(size_t tag) {
         "UeWorker: Fft Pilot(frame %zu symbol %zu ant %zu) sig offset "
         "%zu, SNR %2.1f \n",
         frame_id, symbol_id, ant_id, pilot_offset, snr);
+  }
+
+  if (kRecordDownlinkFrame) {
     if (frame_id == kRecordFrameIndex) {
       std::string fname = "rxpilot" + std::to_string(symbol_id) + "_" +
                           std::to_string(ant_id) + ".bin";
