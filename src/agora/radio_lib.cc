@@ -312,7 +312,7 @@ bool RadioConfig::RadioStart() {
                           Agora_memory::Alignment_t::kAlign64);
     if (cfg_->Frame().NumDLSyms() > 0) {
       int iter = 0;
-      int max_iter = 3;
+      int max_iter = 1;
       std::cout << "Start initial reciprocity calibration..." << std::endl;
       while (good_calib == false) {
         good_calib = InitialCalib(cfg_->SampleCalEn());
