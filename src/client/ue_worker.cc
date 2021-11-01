@@ -160,6 +160,8 @@ void UeWorker::DoFftData(size_t tag) {
   }
 
   size_t sig_offset = config_.OfdmRxZeroPrefixClient();
+  size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
+
   if (kPrintDownlinkPilotStats) {
     if (frame_id == kRecordFrameIndex) {
       std::string fname = "rxdata" + std::to_string(symbol_id) + "_" +
@@ -167,12 +169,16 @@ void UeWorker::DoFftData(size_t tag) {
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
       std::fclose(f);
+      fname = "txdata" + std::to_string(symbol_id) + "_" +
+              std::to_string(ant_id) + ".bin";
+      f = std::fopen(fname.c_str(), "wb");
+      std::fwrite(config_.DlIqF()[dl_symbol_id] + ant_id * config_.OfdmCaNum(),
+                  2 * sizeof(float), config_.OfdmCaNum(), f);
+      std::fclose(f);
     }
   }
 
   // remove CP, do FFT
-  size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
-
   size_t total_dl_symbol_id =
       (frame_slot * config_.Frame().NumDLSyms()) + dl_symbol_id;
   size_t fft_buffer_target_id =
@@ -234,6 +240,7 @@ void UeWorker::DoFftData(size_t tag) {
     }
   }
 
+  evm = std::sqrt(evm) / (config_.OfdmDataNum() - config_.GetOFDMPilotNum());
   if (kPrintEqualizedSymbols) {
     complex_float* tx =
         &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmCaNum() +
@@ -248,7 +255,6 @@ void UeWorker::DoFftData(size_t tag) {
                                    std::to_string(total_dl_symbol_id) +
                                    std::string("_") + std::to_string(ant_id));
   }
-  evm = std::sqrt(evm) / (config_.OfdmDataNum() - config_.GetOFDMPilotNum());
   if (kPrintPhyStats) {
     std::stringstream ss;
     ss << "Frame: " << frame_id << ", Symbol: " << symbol_id
@@ -324,6 +330,12 @@ void UeWorker::DoFftPilot(size_t tag) {
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
       std::fclose(f);
+      fname = "txpilot_f_" + std::to_string(symbol_id) + "_" +
+              std::to_string(ant_id) + ".bin";
+      f = std::fopen(fname.c_str(), "wb");
+      std::fwrite(config_.UeSpecificPilot()[ant_id], 2 * sizeof(float),
+                  config_.OfdmDataNum(), f);
+      std::fclose(f);
     }
   }
 
@@ -336,6 +348,8 @@ void UeWorker::DoFftPilot(size_t tag) {
 
   // transfer ushort to float
   size_t delay_offset = (sig_offset + config_.CpLen()) * 2;
+  RtAssert((delay_offset & 15) == 0,
+           "Data Alignment not correct before calling into AVX optimizations");
   auto* fft_buff = reinterpret_cast<float*>(fft_buffer_[fft_buffer_target_id]);
 
   SimdConvertShortToFloat(&pkt->data_[delay_offset], fft_buff,
