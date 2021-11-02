@@ -174,7 +174,7 @@ void Agora::handleEvents()
             progress_.csi_task_completed_ ++;
             if (cfg->use_general_worker) {
                 if (progress_.csi_task_completed_ == cfg->get_num_sc_to_process() / cfg->zf_block_size) {
-                    // MLPD_INFO("Main thread: launch ZF (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
+                    MLPD_INFO("Main thread: launch ZF (slot %u)\n", progress_.cur_slot_);
                     for (size_t j = cfg->subcarrier_start; j < cfg->subcarrier_end; j += cfg->zf_block_size) {
                         EventData event(EventType::kZF, gen_tag_t::frm_sc(progress_.cur_slot_, j)._tag);
                         TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kZF)].concurrent_q_, 
@@ -183,7 +183,7 @@ void Agora::handleEvents()
                 }
             } else {
                 if (progress_.csi_task_completed_ == do_subcarrier_threads_.size()) {
-                    // MLPD_INFO("Main thread: launch ZF (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
+                    MLPD_INFO("Main thread: launch ZF (slot %u)\n", progress_.cur_slot_);
                     for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                         EventData event(EventType::kZF, gen_tag_t::frm_sc(progress_.cur_slot_, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
                         TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
@@ -199,7 +199,7 @@ void Agora::handleEvents()
             symbol_id_ul = gen_tag_t(tag).symbol_id;
             progress_.demod_task_completed_[symbol_id_ul] ++;
             if (progress_.demod_task_completed_[symbol_id_ul] == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
-                // MLPD_INFO("Demod complete for (slot %d symbol %d) at %.2lfms\n", cur_slot, symbol_id_ul, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
+                MLPD_INFO("Demod complete for (slot %d symbol %d)\n", progress_.cur_slot_, symbol_id_ul);
                 shared_state_.demul_done(progress_.cur_slot_, symbol_id_ul, cfg->get_num_sc_to_process() / cfg->demul_block_size);
             }
             break;
@@ -216,7 +216,7 @@ void Agora::handleEvents()
                 progress_.zf_task_completed_ = 0;
                 progress_.demod_launch_symbol_ = 0;
                 progress_.decode_launch_symbol_ = 0;
-                // MLPD_INFO("Main thread: Decode done (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
+                MLPD_INFO("Main thread: Decode done (slot %u)\n", progress_.cur_slot_);
                 for (size_t j = 0; j < do_decode_threads_.size(); j ++) {
                     shared_state_.decode_done(progress_.cur_slot_);
                 }
@@ -229,7 +229,7 @@ void Agora::handleEvents()
     if (progress_.csi_launched_ == 0) {
         if (shared_state_.received_all_pilots(progress_.cur_slot_)) {
             progress_.csi_launched_ = 1;
-            // MLPD_INFO("Main thread: launch CSI (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz_));
+            MLPD_INFO("Main thread: launch CSI (slot %u)\n", progress_.cur_slot_);
             if (cfg->use_general_worker) {
                 for (size_t j = cfg->subcarrier_start; j < cfg->subcarrier_end; j += cfg->zf_block_size) {
                     EventData event(EventType::kCSI, gen_tag_t::frm_sc(progress_.cur_slot_, j)._tag);
@@ -248,7 +248,7 @@ void Agora::handleEvents()
     if (cfg->use_general_worker) {
         if (progress_.zf_task_completed_ == cfg->get_num_sc_to_process() / cfg->zf_block_size && progress_.demod_launch_symbol_ < cfg->ul_data_symbol_num_perframe) {
             if (shared_state_.received_all_data_pkts(progress_.cur_slot_, progress_.demod_launch_symbol_)) {
-                // MLPD_INFO("Main thread: launch Demod (slot %u, symbol %u) at %.2lfms\n", cur_slot, demod_launch_symbol, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
+                MLPD_INFO("Main thread: launch Demod (slot %u, symbol %u)\n", progress_.cur_slot_, progress_.demod_launch_symbol_);
                 for (size_t k = cfg->subcarrier_start; k < cfg->subcarrier_end; k += cfg->demul_block_size) {
                     EventData event(EventType::kDemul, gen_tag_t::frm_sym_sc(progress_.cur_slot_, progress_.demod_launch_symbol_, k)._tag);
                     TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kDemul)].concurrent_q_, 
@@ -260,7 +260,7 @@ void Agora::handleEvents()
     } else {
         if (progress_.zf_task_completed_ == do_subcarrier_threads_.size() && progress_.demod_launch_symbol_ < cfg->ul_data_symbol_num_perframe) {
             if (shared_state_.received_all_data_pkts(progress_.cur_slot_, progress_.demod_launch_symbol_)) {
-                // MLPD_INFO("Main thread: launch Demod (slot %u, symbol %u) at %.2lfms\n", cur_slot, demod_launch_symbol, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
+                MLPD_INFO("Main thread: launch Demod (slot %u, symbol %u)\n", progress_.cur_slot_, progress_.demod_launch_symbol_);
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
                         if (cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size >= cfg->subcarrier_end) continue;
@@ -288,6 +288,7 @@ void Agora::handleEvents()
             }
         }
         if (received) {
+            MLPD_INFO("Main thread: launch Decode (slot %u, symbol %u)\n", progress_.cur_slot_, progress_.decode_launch_symbol_);
             for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
                 size_t decode_idx = progress_.decode_launch_symbol_ * cfg->get_num_ues_to_process() + i - cfg->ue_start;
                 size_t thread_idx = decode_idx % do_decode_threads_.size() + do_subcarrier_threads_.size();
