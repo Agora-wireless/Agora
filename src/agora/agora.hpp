@@ -193,6 +193,9 @@ private:
     // Threads running the encoders
     std::vector<std::thread> do_encode_threads_;
 
+    // Threads running the general workers
+    std::vector<std::thread> worker_threads_;
+
     // Shared states between socket threads and dosubcarriers
     SharedState shared_state_;
 

@@ -40,6 +40,7 @@ Agora::Agora(Config* cfg)
         base_worker_core_offset_ += config_->fft_tx_thread_num;
     }
 
+    /* Create worker threads */
     if (cfg->use_time_domain_iq) {
         do_fft_threads_.resize(cfg->fft_thread_num);
         for (size_t i = 0; i < do_fft_threads_.size(); i ++) {
@@ -48,18 +49,25 @@ Agora::Agora(Config* cfg)
         }
     }
 
-    /* Create worker threads */
-    do_subcarrier_threads_.resize(
-        (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
-    for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
-        do_subcarrier_threads_[i]
-            = std::thread(&Agora::subcarrierWorker, this, i);
-    }
+    if (cfg->use_central_scheduler && cfg->use_general_worker) {
+        worker_threads_.resize(cfg->worker_thread_num);
+        for (size_t i = 0; i < worker_threads_.size(); i ++) {
+            worker_threads_[i]
+                = std::thread(&Agora::worker, this, i);
+        }
+    } else {
+        do_subcarrier_threads_.resize(
+            (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
+        for (size_t i = 0; i < do_subcarrier_threads_.size(); i++) {
+            do_subcarrier_threads_[i]
+                = std::thread(&Agora::subcarrierWorker, this, i);
+        }
 
-    do_decode_threads_.resize(cfg->decode_thread_num);
-    for (size_t i = 0; i < do_decode_threads_.size(); i++) {
-        do_decode_threads_[i]
-            = std::thread(&Agora::decodeWorker, this, i);
+        do_decode_threads_.resize(cfg->decode_thread_num);
+        for (size_t i = 0; i < do_decode_threads_.size(); i++) {
+            do_decode_threads_[i]
+                = std::thread(&Agora::decodeWorker, this, i);
+        }
     }
 
     printf("Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
@@ -80,17 +88,14 @@ Agora::~Agora()
 
     for (auto& t : do_subcarrier_threads_)
         t.join();
-    if (config_->downlink_mode) {
-        for (auto& t : do_encode_threads_)
-            t.join();
-    } else {
-        for (auto& t : do_decode_threads_)
-            t.join();
-    }
-    if (config_->use_time_domain_iq) {
-        for (auto& t : do_fft_threads_)
-            t.join();
-    }
+    for (auto& t : do_encode_threads_)
+        t.join();
+    for (auto& t : do_decode_threads_)
+        t.join();
+    for (auto& t : do_fft_threads_)
+        t.join();
+    for (auto& t : worker_threads_)
+        t.join();
 }
 
 void Agora::Stop()
@@ -171,7 +176,12 @@ void Agora::handleEvents()
                 // MLPD_INFO("Main thread: launch ZF (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                     EventData event(EventType::kZF, gen_tag_t::frm_sc(progress_.cur_slot_, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
-                    TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                    if (cfg->use_general_worker) {
+                        TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kZF)].concurrent_q_, 
+                            sched_info_arr_[static_cast<size_t>(EventType::kZF)].ptok_, event);
+                    } else {
+                        TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                    }
                 }
             }
             break;
@@ -216,7 +226,12 @@ void Agora::handleEvents()
             // MLPD_INFO("Main thread: launch CSI (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz_));
             for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
                 EventData event(EventType::kCSI, gen_tag_t::frm_sc(progress_.cur_slot_, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
-                TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                if (cfg->use_general_worker) {
+                        TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kCSI)].concurrent_q_, 
+                            sched_info_arr_[static_cast<size_t>(EventType::kCSI)].ptok_, event);
+                    } else {
+                        TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                    }
             }
         }
     } 
@@ -228,7 +243,12 @@ void Agora::handleEvents()
                 for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
                     if (cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size >= cfg->subcarrier_end) continue;
                     EventData event(EventType::kDemul, gen_tag_t::frm_sym_sc(progress_.cur_slot_, progress_.demod_launch_symbol_, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
-                    TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                    if (cfg->use_general_worker) {
+                        TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kDemul)].concurrent_q_, 
+                            sched_info_arr_[static_cast<size_t>(EventType::kDemul)].ptok_, event);
+                    } else {
+                        TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                    }
                 }
             }
             progress_.demod_launch_symbol_ ++;
@@ -249,7 +269,12 @@ void Agora::handleEvents()
                 size_t decode_idx = progress_.decode_launch_symbol_ * cfg->get_num_ues_to_process() + i - cfg->ue_start;
                 size_t thread_idx = decode_idx % do_decode_threads_.size() + do_subcarrier_threads_.size();
                 EventData event(EventType::kDecode, gen_tag_t::frm_sym_ue(progress_.cur_slot_, progress_.decode_launch_symbol_, i)._tag);
-                TryEnqueueFallback(&sched_info_arr_[thread_idx].concurrent_q_, sched_info_arr_[thread_idx].ptok_, event);
+                if (cfg->use_general_worker) {
+                    TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kDecode)].concurrent_q_, 
+                        sched_info_arr_[static_cast<size_t>(EventType::kDecode)].ptok_, event);
+                } else {
+                    TryEnqueueFallback(&sched_info_arr_[i].concurrent_q_, sched_info_arr_[i].ptok_, event);
+                }
             }
             progress_.decode_launch_symbol_ ++;
         }
@@ -324,6 +349,149 @@ void* Agora::decodeWorker(int tid)
     }
     delete computeDecoding;
     
+    return nullptr;
+}
+
+void* Agora::worker(int tid)
+{
+    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset_, tid);
+
+    auto computeSubcarrier = new DySubcarrier(config_, tid, freq_ghz_,
+        Range(0, 1),
+        freq_domain_iq_buffer_, csi_buffer_, calib_buffer_,
+        dl_encoded_buffer_to_precode_, demod_buffer_to_send_, dl_ifft_buffer_,
+        equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
+        control_info_table_, control_idx_list_,
+        &shared_state_);
+
+    auto computeDecoding = new DyDecode(config_, tid, freq_ghz_,
+        demod_buffer_to_decode_,
+        decoded_buffer_, control_info_table_, control_idx_list_, 
+        &shared_state_);
+
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t csi_tsc_duration = 0;
+    size_t zf_tsc_duration = 0;
+    size_t demod_tsc_duration = 0;
+    size_t decode_tsc_duration = 0;
+    size_t state_operation_duration = 0;
+    size_t loop_count = 0;
+    size_t work_count = 0;
+
+    size_t csi_count = 0;
+    size_t zf_count = 0;
+    size_t demod_count = 0;
+
+    size_t demod_max = 0;
+    size_t zf_max = 0;
+    size_t csi_max = 0;
+
+    size_t work_start_tsc, state_start_tsc;
+    size_t csi_start_tsc, zf_start_tsc, demod_start_tsc, decode_start_tsc;
+
+    bool state_trigger = false;
+
+    while (config_->running && !SignalHandler::gotExitSignal()) {
+        EventData event, resp;
+        size_t tag;
+        size_t slot_id;
+        size_t sc_id;
+        size_t symbol_id_ul;
+        size_t ue_id;
+
+        if (sched_info_arr_[static_cast<size_t>(EventType::kCSI)].concurrent_q_.try_dequeue(event)) {
+            tag = event.tags_[0];
+            slot_id = gen_tag_t(tag).frame_id;
+            sc_id = gen_tag_t(tag).sc_id;
+            if (unlikely(!state_trigger && slot_id >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
+            if (state_trigger) {
+                work_start_tsc = rdtsc();
+            }
+            // printf("Get CSI event %u %u!\n", slot_id, sc_id);
+            computeSubcarrier->runCsi(slot_id, sc_id);
+            resp = EventData(EventType::kCSI);
+            // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
+            TryEnqueueFallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
+            if (state_trigger) {
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
+        }
+
+        if (sched_info_arr_[static_cast<size_t>(EventType::kZF)].concurrent_q_.try_dequeue(event)) {
+            tag = event.tags_[0];
+            slot_id = gen_tag_t(tag).frame_id;
+            sc_id = gen_tag_t(tag).sc_id;
+            if (unlikely(!state_trigger && slot_id >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
+            if (state_trigger) {
+                work_start_tsc = rdtsc();
+            }
+            computeSubcarrier->do_zf_->Launch(gen_tag_t::frm_sym_sc(slot_id, 0, sc_id)._tag);
+            resp = EventData(EventType::kZF);
+            // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
+            TryEnqueueFallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
+            if (state_trigger) {
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
+        }
+
+        if (sched_info_arr_[static_cast<size_t>(EventType::kDemul)].concurrent_q_.try_dequeue(event)) {
+            tag = event.tags_[0];
+            slot_id = gen_tag_t(tag).frame_id;
+            symbol_id_ul = gen_tag_t(tag).symbol_id;
+            sc_id = gen_tag_t(tag).sc_id;
+            if (unlikely(!state_trigger && slot_id >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
+            if (state_trigger) {
+                work_start_tsc = rdtsc();
+            }
+            computeSubcarrier->do_demul_->Launch(slot_id, symbol_id_ul, sc_id);
+            resp = EventData(EventType::kDemul, gen_tag_t::frm_sym_sc(slot_id, symbol_id_ul, sc_id)._tag);
+            // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
+            TryEnqueueFallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
+            if (state_trigger) {
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
+        }
+
+        if (sched_info_arr_[static_cast<size_t>(EventType::kDecode)].concurrent_q_.try_dequeue(event)) {
+            tag = event.tags_[0];
+            slot_id = gen_tag_t(tag).frame_id;
+            symbol_id_ul = gen_tag_t(tag).symbol_id;
+            ue_id = gen_tag_t(tag).ue_id;
+            if (unlikely(!state_trigger && slot_id >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
+            if (state_trigger) {
+                work_start_tsc = rdtsc();
+            }
+            computeDecoding->Launch(gen_tag_t::frm_sym_cb(slot_id, symbol_id_ul,
+                ue_id * config_->LDPC_config.nblocksInSymbol)._tag);
+            resp = EventData(EventType::kDecode);
+            // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
+            TryEnqueueFallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
+            if (state_trigger) {
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            }
+        }
+    }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("Worker Thread %u duration stats: total time used %.2lfms, "
+        "idle %.2lfms (%.2lf\%)\n",
+        tid, cycles_to_ms(whole_duration, freq_ghz_),
+        cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration);
+
     return nullptr;
 }
 

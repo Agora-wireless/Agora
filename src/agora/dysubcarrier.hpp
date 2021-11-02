@@ -91,19 +91,19 @@ public:
     void StartWork();
     void StartWorkCentral();
 
-private:
+
     void runCsi(size_t frame_id, size_t base_sc_id);
 
     inline bool shouldSleep(std::vector<ControlInfo>& control_list);
-
-    /// The subcarrier range handled by this subcarrier doer.
-    struct Range sc_range_;
 
     DyZF* do_zf_;
     DyDemul* do_demul_;
     DoPrecode* do_precode_;
 
     // Input buffers
+private:
+    /// The subcarrier range handled by this subcarrier doer.
+    struct Range sc_range_;
 
     Table<char>& freq_domain_iq_buffer_;
 

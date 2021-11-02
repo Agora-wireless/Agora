@@ -318,6 +318,7 @@ Config::Config(std::string jsonfile)
     }
 
     use_central_scheduler = tddConf.value("use_central_scheduler", false);
+    use_general_worker = tddConf.value("use_general_worker", false);
 
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;

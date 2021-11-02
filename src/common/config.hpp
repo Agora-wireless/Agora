@@ -358,6 +358,7 @@ public:
 
     // Centralized scheduler mode
     bool use_central_scheduler;
+    bool use_general_worker;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;
