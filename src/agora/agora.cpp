@@ -163,7 +163,8 @@ void Agora::handleEvents()
 {
     auto& cfg = config_;
 
-    size_t max_events_needed = do_subcarrier_threads_.size() + do_decode_threads_.size();
+    size_t max_events_needed = cfg->use_central_scheduler && cfg->use_general_worker ? worker_threads_.size() : 
+        do_subcarrier_threads_.size() + do_decode_threads_.size();
     EventData events_list[max_events_needed];
     size_t num_events = complete_task_queue_.try_dequeue_bulk(events_list, max_events_needed);
     size_t tag, symbol_id_ul;
