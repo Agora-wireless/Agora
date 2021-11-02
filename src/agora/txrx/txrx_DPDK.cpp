@@ -112,7 +112,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
 }
 
 PacketTXRX::~PacketTXRX() { 
-    for (size_t i = 0; i < rx_thread_num_ + kNumDemodTxThread; i ++) {
+    for (size_t i = 0; i < std::max(rx_thread_num_, fft_tx_thread_num_ + kNumDemodTxThread); i ++) {
         rte_mempool_free(mbuf_pool_[i]); 
     }
 }
