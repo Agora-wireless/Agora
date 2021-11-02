@@ -172,14 +172,20 @@ void Agora::handleEvents()
         switch(event.event_type_) {
         case EventType::kCSI:
             progress_.csi_task_completed_ ++;
-            if (progress_.csi_task_completed_ == do_subcarrier_threads_.size()) {
-                // MLPD_INFO("Main thread: launch ZF (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
-                for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
-                    EventData event(EventType::kZF, gen_tag_t::frm_sc(progress_.cur_slot_, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
-                    if (cfg->use_general_worker) {
+            if (cfg->use_general_worker) {
+                if (progress_.csi_task_completed_ == cfg->get_num_sc_to_process() / cfg->zf_block_size) {
+                    // MLPD_INFO("Main thread: launch ZF (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
+                    for (size_t j = cfg->subcarrier_start; j < cfg->subcarrier_end; j += cfg->zf_block_size) {
+                        EventData event(EventType::kZF, gen_tag_t::frm_sc(progress_.cur_slot_, j)._tag);
                         TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kZF)].concurrent_q_, 
                             sched_info_arr_[static_cast<size_t>(EventType::kZF)].ptok_, event);
-                    } else {
+                    }
+                }
+            } else {
+                if (progress_.csi_task_completed_ == do_subcarrier_threads_.size()) {
+                    // MLPD_INFO("Main thread: launch ZF (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
+                    for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
+                        EventData event(EventType::kZF, gen_tag_t::frm_sc(progress_.cur_slot_, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
                         TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                     }
                 }
@@ -224,34 +230,51 @@ void Agora::handleEvents()
         if (shared_state_.received_all_pilots(progress_.cur_slot_)) {
             progress_.csi_launched_ = 1;
             // MLPD_INFO("Main thread: launch CSI (slot %u) at %.2lfms\n", cur_slot, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz_));
-            for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
-                EventData event(EventType::kCSI, gen_tag_t::frm_sc(progress_.cur_slot_, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
-                if (cfg->use_general_worker) {
-                        TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kCSI)].concurrent_q_, 
-                            sched_info_arr_[static_cast<size_t>(EventType::kCSI)].ptok_, event);
-                    } else {
-                        TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
-                    }
+            if (cfg->use_general_worker) {
+                for (size_t j = cfg->subcarrier_start; j < cfg->subcarrier_end; j += cfg->zf_block_size) {
+                    EventData event(EventType::kCSI, gen_tag_t::frm_sc(progress_.cur_slot_, j)._tag);
+                    TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kCSI)].concurrent_q_, 
+                        sched_info_arr_[static_cast<size_t>(EventType::kCSI)].ptok_, event);
+                }
+            } else {
+                for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
+                    EventData event(EventType::kCSI, gen_tag_t::frm_sc(progress_.cur_slot_, cfg->subcarrier_start + j * cfg->subcarrier_block_size)._tag);
+                    TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                }
             }
         }
     } 
 
-    if (progress_.zf_task_completed_ == do_subcarrier_threads_.size() && progress_.demod_launch_symbol_ < cfg->ul_data_symbol_num_perframe) {
-        if (shared_state_.received_all_data_pkts(progress_.cur_slot_, progress_.demod_launch_symbol_)) {
-            // MLPD_INFO("Main thread: launch Demod (slot %u, symbol %u) at %.2lfms\n", cur_slot, demod_launch_symbol, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
-            for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
-                for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
-                    if (cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size >= cfg->subcarrier_end) continue;
-                    EventData event(EventType::kDemul, gen_tag_t::frm_sym_sc(progress_.cur_slot_, progress_.demod_launch_symbol_, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
-                    if (cfg->use_general_worker) {
-                        TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kDemul)].concurrent_q_, 
-                            sched_info_arr_[static_cast<size_t>(EventType::kDemul)].ptok_, event);
-                    } else {
-                        TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+    if (cfg->use_general_worker) {
+        if (progress_.zf_task_completed_ == cfg->get_num_sc_to_process() / cfg->zf_block_size && progress_.demod_launch_symbol_ < cfg->ul_data_symbol_num_perframe) {
+            if (shared_state_.received_all_data_pkts(progress_.cur_slot_, progress_.demod_launch_symbol_)) {
+                // MLPD_INFO("Main thread: launch Demod (slot %u, symbol %u) at %.2lfms\n", cur_slot, demod_launch_symbol, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
+                for (size_t k = cfg->subcarrier_start; k < cfg->subcarrier_end; k += cfg->demul_block_size) {
+                    EventData event(EventType::kDemul, gen_tag_t::frm_sym_sc(progress_.cur_slot_, progress_.demod_launch_symbol_, k)._tag);
+                    TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kDemul)].concurrent_q_, 
+                        sched_info_arr_[static_cast<size_t>(EventType::kDemul)].ptok_, event);
+                }
+                progress_.demod_launch_symbol_ ++;
+            }
+        }
+    } else {
+        if (progress_.zf_task_completed_ == do_subcarrier_threads_.size() && progress_.demod_launch_symbol_ < cfg->ul_data_symbol_num_perframe) {
+            if (shared_state_.received_all_data_pkts(progress_.cur_slot_, progress_.demod_launch_symbol_)) {
+                // MLPD_INFO("Main thread: launch Demod (slot %u, symbol %u) at %.2lfms\n", cur_slot, demod_launch_symbol, cur_slot < 200 ? 0 : cycles_to_ms(rdtsc() - start_tsc, freq_ghz));
+                for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
+                    for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
+                        if (cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size >= cfg->subcarrier_end) continue;
+                        EventData event(EventType::kDemul, gen_tag_t::frm_sym_sc(progress_.cur_slot_, progress_.demod_launch_symbol_, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
+                        if (cfg->use_general_worker) {
+                            TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kDemul)].concurrent_q_, 
+                                sched_info_arr_[static_cast<size_t>(EventType::kDemul)].ptok_, event);
+                        } else {
+                            TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
+                        }
                     }
                 }
+                progress_.demod_launch_symbol_ ++;
             }
-            progress_.demod_launch_symbol_ ++;
         }
     }
 
@@ -273,7 +296,7 @@ void Agora::handleEvents()
                     TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kDecode)].concurrent_q_, 
                         sched_info_arr_[static_cast<size_t>(EventType::kDecode)].ptok_, event);
                 } else {
-                    TryEnqueueFallback(&sched_info_arr_[i].concurrent_q_, sched_info_arr_[i].ptok_, event);
+                    TryEnqueueFallback(&sched_info_arr_[thread_idx].concurrent_q_, sched_info_arr_[thread_idx].ptok_, event);
                 }
             }
             progress_.decode_launch_symbol_ ++;
