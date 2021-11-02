@@ -253,7 +253,7 @@ void DySubcarrier::StartWork()
 void DySubcarrier::runCsi(size_t frame_id, size_t base_sc_id)
 {
     const size_t frame_slot = frame_id % kFrameWnd;
-    rt_assert(base_sc_id == sc_range_.start, "Invalid SC in runCsi!");
+    // rt_assert(base_sc_id == sc_range_.start, "Invalid SC in runCsi!");
 
     complex_float converted_sc[kSCsPerCacheline];
 
