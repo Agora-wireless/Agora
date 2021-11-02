@@ -19,7 +19,7 @@ void PacketTXRX::LoopTxRxArgos(size_t tid) {
   }
   const size_t radio_lo = tid * radios_per_thread;
   const size_t radio_hi =
-      std::min((radio_lo + radios_per_thread), cfg_->BsAntNum()) - 1;
+      std::min((radio_lo + radios_per_thread), cfg_->NumRadios()) - 1;
   MLPD_INFO("LoopTxRxArgos[%zu] has %zu:%zu total radios %zu\n", tid, radio_lo,
             radio_hi - 1, radio_hi - radio_lo);
 
