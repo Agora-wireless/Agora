@@ -89,6 +89,7 @@ public:
     ~DySubcarrier();
 
     void StartWork();
+    void StartWorkCentral();
 
 private:
     void runCsi(size_t frame_id, size_t base_sc_id);

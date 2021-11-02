@@ -29,6 +29,15 @@ public:
         return EventData();
     }
 
+    void RegisterQueues(moodycamel::ConcurrentQueue<EventData>* task_queue,
+        moodycamel::ConcurrentQueue<EventData>* complete_queue,
+        moodycamel::ProducerToken* complete_queue_token)
+    {
+        task_queue_ = task_queue;
+        complete_queue_ = complete_queue;
+        complete_queue_token_ = complete_queue_token;
+    }
+
 protected:
     Doer(Config* in_config, int in_tid, double freq_ghz)
         : cfg_(in_config)
@@ -42,5 +51,10 @@ protected:
     Config* cfg_;
     int tid_; // Thread ID of this Doer
     double freq_ghz_; // RDTSC frequency in GHz
+
+    // Centralized scheduler mode
+    moodycamel::ConcurrentQueue<EventData>* task_queue_;
+    moodycamel::ConcurrentQueue<EventData>* complete_queue_;
+    moodycamel::ProducerToken* complete_queue_token_;
 };
 #endif /* DOER */

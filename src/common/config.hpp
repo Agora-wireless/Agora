@@ -356,6 +356,9 @@ public:
 
     size_t ant_start, ant_end;
 
+    // Centralized scheduler mode
+    bool use_central_scheduler;
+
     bool isUE;
     const size_t maxFrame = 1 << 30;
     const size_t data_offset = sizeof(int) * 16;

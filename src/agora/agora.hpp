@@ -57,6 +57,8 @@ private:
 
     void initControlInfo();
 
+    void handleEvents();
+
     // Flags that allow developer control over Agora internals
     struct {
         // Before exiting, save LDPC-decoded or demodulated data to a file
@@ -66,16 +68,28 @@ private:
         bool enable_save_tx_data_to_file_ = false;
     } flags_;
 
+    // States that used for centralized scheduler
+    struct {
+        size_t cur_slot_ = 0;
+        size_t csi_task_completed_ = 0;
+        size_t zf_task_completed_ = 0;
+        size_t demod_task_completed_[kMaxSymbols] = {0};
+        size_t decode_task_completed_ = 0;
+        size_t csi_launched_ = 0;
+        size_t demod_launch_symbol_ = 0;
+        size_t decode_launch_symbol_ = 0;
+    } progress_;
+
     /// Fetch the concurrent queue for this event type
     inline moodycamel::ConcurrentQueue<EventData>* getConq(EventType event_type)
     {
-        return &sched_info_arr[static_cast<size_t>(event_type)].concurrent_q_;
+        return &sched_info_arr_[static_cast<size_t>(event_type)].concurrent_q_;
     }
 
     /// Fetch the producer token for this event type
     inline moodycamel::ProducerToken* getPtok(EventType event_type)
     {
-        return sched_info_arr[static_cast<size_t>(event_type)].ptok_;
+        return sched_info_arr_[static_cast<size_t>(event_type)].ptok_;
     }
 
     const double freq_ghz_; // RDTSC frequency in GHz
@@ -164,7 +178,9 @@ private:
     char* dl_socket_buffer_;
     int* dl_socket_buffer_status_;
 
-    sched_info_t sched_info_arr[kMaxThreads];
+    sched_info_t sched_info_arr_[kMaxThreads];
+    moodycamel::ConcurrentQueue<EventData> complete_task_queue_;
+    moodycamel::ProducerToken* worker_ptoks_ptr_[kMaxThreads];
 
     std::vector<std::thread> do_fft_threads_;
 

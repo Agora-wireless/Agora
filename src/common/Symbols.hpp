@@ -32,6 +32,7 @@ template <typename T> static constexpr inline bool is_power_of_two(T x)
 enum class EventType : int {
     kPacketRX,
     kFFT,
+    kCSI,
     kZF,
     kDemul,
     kIFFT,
@@ -235,4 +236,7 @@ static constexpr bool kDebugSenderReceiver = false;
 
 static const int kNumMasterThread = 1;
 static const int kNumDemodTxThread = 1;
+
+static const size_t kDefaultMessageQueueSize = 512;
+static const size_t kDefaultWorkerQueueSize = 256;
 #endif

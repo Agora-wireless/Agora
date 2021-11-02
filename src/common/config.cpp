@@ -317,6 +317,8 @@ Config::Config(std::string jsonfile)
         fft_rx_port = tddConf.value("fft_rx_port", 9600);
     }
 
+    use_central_scheduler = tddConf.value("use_central_scheduler", false);
+
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;
     packet_length

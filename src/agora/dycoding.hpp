@@ -71,6 +71,7 @@ public:
     EventData Launch(size_t tag);
 
     void StartWork();
+    void StartWorkCentral();
 
 private:
     inline bool shouldSleep(size_t ue_num) { 
