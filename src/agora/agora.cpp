@@ -225,8 +225,12 @@ void Agora::handleEvents()
                 progress_.demod_launch_symbol_ = 0;
                 progress_.decode_launch_symbol_ = 0;
                 MLPD_INFO("Main thread: Decode done (slot %u)\n", progress_.cur_slot_);
-                for (size_t j = 0; j < do_decode_threads_.size(); j ++) {
+                if (cfg->use_central_scheduler && cfg->use_general_worker) {
                     shared_state_.decode_done(progress_.cur_slot_);
+                } else {
+                    for (size_t j = 0; j < do_decode_threads_.size(); j ++) {
+                        shared_state_.decode_done(progress_.cur_slot_);
+                    }
                 }
                 progress_.cur_slot_ ++;
             }
