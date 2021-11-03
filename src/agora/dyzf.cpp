@@ -60,7 +60,7 @@ void DyZF::computePrecoder(const arma::cx_fmat& mat_csi,
         } catch (std::runtime_error) {
             MLPD_WARN(
                 "Failed to invert channel matrix, falling back to pinv()\n");
-            std::cout << mat_csi << std::endl;
+            // std::cout << mat_csi << std::endl;
             rt_assert(false);
             arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
         }

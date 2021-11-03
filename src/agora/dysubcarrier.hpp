@@ -92,7 +92,7 @@ public:
     void StartWorkCentral();
 
 
-    void runCsi(size_t frame_id, size_t base_sc_id);
+    void runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size = 0);
 
     inline bool shouldSleep(std::vector<ControlInfo>& control_list);
 

@@ -175,6 +175,13 @@ void Agora::handleEvents()
             progress_.csi_task_completed_ ++;
             if (cfg->use_general_worker) {
                 if (progress_.csi_task_completed_ == cfg->get_num_sc_to_process() / cfg->zf_block_size) {
+                    // if (progress_.cur_slot_ == 0) {
+                    //     complex_float* ptr = csi_buffer_[0][0];
+                    //     for (size_t i = cfg->subcarrier_start; i < cfg->subcarrier_end; i ++) {
+                    //         printf("(%lf %lf) ", ptr[i].re, ptr[i].im);
+                    //     }
+                    //     printf("\n");
+                    // }
                     MLPD_INFO("Main thread: launch ZF (slot %u)\n", progress_.cur_slot_);
                     for (size_t j = cfg->subcarrier_start; j < cfg->subcarrier_end; j += cfg->zf_block_size) {
                         EventData event(EventType::kZF, gen_tag_t::frm_sc(progress_.cur_slot_, j)._tag);
@@ -231,6 +238,13 @@ void Agora::handleEvents()
         if (shared_state_.received_all_pilots(progress_.cur_slot_)) {
             progress_.csi_launched_ = 1;
             MLPD_INFO("Main thread: launch CSI (slot %u)\n", progress_.cur_slot_);
+            // if (progress_.cur_slot_ == 0) {
+            //     short* ptr = reinterpret_cast<short*>(cfg->get_freq_domain_iq_buffer(freq_domain_iq_buffer_, 0, 0, 0) + Packet::kOffsetOfData);
+            //     for (size_t i = cfg->OFDM_DATA_START + cfg->subcarrier_start; i < cfg->OFDM_DATA_START + cfg->subcarrier_end; i ++) {
+            //         printf("(%d %d) ", ptr[i*2], ptr[i*2+1]);
+            //     }
+            //     printf("\n");
+            // }
             if (cfg->use_general_worker) {
                 for (size_t j = cfg->subcarrier_start; j < cfg->subcarrier_end; j += cfg->zf_block_size) {
                     EventData event(EventType::kCSI, gen_tag_t::frm_sc(progress_.cur_slot_, j)._tag);
@@ -437,7 +451,7 @@ void* Agora::worker(int tid)
                 work_start_tsc = rdtsc();
             }
             // printf("Get CSI event %u %u!\n", slot_id, sc_id);
-            computeSubcarrier->runCsi(slot_id, sc_id);
+            computeSubcarrier->runCsi(slot_id, sc_id, config_->zf_block_size);
             resp = EventData(EventType::kCSI);
             // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);
             TryEnqueueFallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
@@ -457,6 +471,7 @@ void* Agora::worker(int tid)
             if (state_trigger) {
                 work_start_tsc = rdtsc();
             }
+            // printf("Get ZF event %u %u!\n", slot_id, sc_id);
             computeSubcarrier->do_zf_->Launch(gen_tag_t::frm_sym_sc(slot_id, 0, sc_id)._tag);
             resp = EventData(EventType::kZF);
             // printf("[Thread %u] Producer token: %p\n", tid, complete_queue_token_);

@@ -250,12 +250,16 @@ void DySubcarrier::StartWork()
     fclose(fp);
 }
 
-void DySubcarrier::runCsi(size_t frame_id, size_t base_sc_id)
+void DySubcarrier::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size)
 {
     const size_t frame_slot = frame_id % kFrameWnd;
     // rt_assert(base_sc_id == sc_range_.start, "Invalid SC in runCsi!");
 
     complex_float converted_sc[kSCsPerCacheline];
+
+    size_t sc_start = base_sc_id;
+    size_t sc_end = sc_block_size == 0 ? sc_range_.end : base_sc_id + sc_block_size;
+    sc_end = sc_end > cfg_->subcarrier_end ? cfg_->subcarrier_end : sc_end;
 
     for (size_t i = 0; i < cfg_->pilot_symbol_num_perframe; i++) {
         for (size_t j = 0; j < cfg_->BS_ANT_NUM; j++) {
@@ -265,8 +269,11 @@ void DySubcarrier::runCsi(size_t frame_id, size_t base_sc_id)
                 + i * cfg_->packet_length);
 
             // Subcarrier ranges should be aligned with kTransposeBlockSize
-            for (size_t block_idx = sc_range_.start / kTransposeBlockSize;
-                    block_idx < sc_range_.end / kTransposeBlockSize;
+            // for (size_t block_idx = sc_range_.start / kTransposeBlockSize;
+            //         block_idx < sc_range_.end / kTransposeBlockSize;
+            //         block_idx++) {
+            for (size_t block_idx = sc_start / kTransposeBlockSize;
+                    block_idx < sc_end / kTransposeBlockSize;
                     block_idx++) {
 
                 const size_t block_base_offset
@@ -287,6 +294,14 @@ void DySubcarrier::runCsi(size_t frame_id, size_t base_sc_id)
                     complex_float* dst = csi_buffer_[frame_slot][i]
                         + block_base_offset + (j * kTransposeBlockSize)
                         + sc_j;
+
+                    // if (frame_id == 0 && base_sc_id == 0) {
+                    //     printf("Run CSI: ");
+                    //     for (size_t k = 0; k < kSCsPerCacheline; k ++) {
+                    //         printf("(%lf %lf) ", src[k].re, src[k].im);
+                    //     }
+                    //     printf("\n");
+                    // }
 
                     // With either of AVX-512 or AVX2, load one cacheline =
                     // 16 float values = 8 subcarriers = kSCsPerCacheline
