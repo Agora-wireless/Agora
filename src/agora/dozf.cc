@@ -247,9 +247,14 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
           reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_cal_slot]),
           cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
 
-      arma::cx_fvec calib_vec_inst =
-          (cur_calib_dl_mat.row(cur_sc_id) / cur_calib_ul_mat.row(cur_sc_id))
-              .st();
+      arma::cx_fmat old_calib_dl_mat(reinterpret_cast<arma::cx_float*>(
+                                         calib_dl_buffer_[frame_cal_slot_old]),
+                                     cfg_->OfdmDataNum(), cfg_->BfAntNum(),
+                                     false);
+      arma::cx_fmat old_calib_ul_mat(reinterpret_cast<arma::cx_float*>(
+                                         calib_ul_buffer_[frame_cal_slot_old]),
+                                     cfg_->OfdmDataNum(), cfg_->BfAntNum(),
+                                     false);
 
       // update moving sum
       arma::cx_fmat cur_calib_dl_msum_mat(
@@ -269,15 +274,6 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
           reinterpret_cast<arma::cx_float*>(
               calib_ul_msum_buffer_[frame_cal_slot_prev]),
           cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-
-      arma::cx_fmat old_calib_dl_mat(reinterpret_cast<arma::cx_float*>(
-                                         calib_dl_buffer_[frame_cal_slot_old]),
-                                     cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                     false);
-      arma::cx_fmat old_calib_ul_mat(reinterpret_cast<arma::cx_float*>(
-                                         calib_ul_buffer_[frame_cal_slot_old]),
-                                     cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                     false);
 
       // Calculate a moving sum
       cur_calib_dl_msum_mat.row(cur_sc_id) =
@@ -309,6 +305,10 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
                            "online_calib_ul_vec" +
                                std::to_string(frame_id / cfg_->AntGroupNum()),
                            true /*append*/);
+
+            arma::cx_fvec calib_vec_inst = (cur_calib_dl_mat.row(cur_sc_id) /
+                                            cur_calib_ul_mat.row(cur_sc_id))
+                                               .st();
             Utils::SaveVec(calib_vec_inst, "calib_vec.m",
                            "online_calib_vec_inst" +
                                std::to_string(frame_id / cfg_->AntGroupNum()),

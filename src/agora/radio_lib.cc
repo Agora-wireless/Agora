@@ -296,10 +296,10 @@ bool RadioConfig::RadioStart() {
   AllocBuffer1d(&init_calib_ul_processed_,
                 cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
                 Agora_memory::Alignment_t::kAlign64, 1);
-  // initialize init_calib to a matrix of ones
+  // initialize init_calib to a matrix of zeros
   for (size_t i = 0; i < cfg_->OfdmDataNum() * cfg_->BfAntNum(); i++) {
-    init_calib_dl_processed_[i] = 1;
-    init_calib_ul_processed_[i] = 1;
+    init_calib_dl_processed_[i] = 0;
+    init_calib_ul_processed_[i] = 0;
   }
 
   calib_meas_num_ = cfg_->InitCalibRepeat();

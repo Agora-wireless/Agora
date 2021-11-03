@@ -133,7 +133,7 @@ Config::Config(const std::string& jsonfile)
   beamsweep_ = tdd_conf.value("beamsweep", false);
   sample_cal_en_ = tdd_conf.value("sample_calibrate", false);
   imbalance_cal_en_ = tdd_conf.value("imbalance_calibrate", false);
-  init_calib_repeat_ = tdd_conf.value("init_calib_repeat", 1);
+  init_calib_repeat_ = tdd_conf.value("init_calib_repeat", 0);
 
   modulation_ = tdd_conf.value("modulation", "16QAM");
 
