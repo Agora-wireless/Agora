@@ -22,6 +22,16 @@ TEST(TestZF, Perf) {
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
       cfg->UeNum() * cfg->BsAntNum());
 
+  Table<complex_float> calib_dl_msum_buffer;
+  calib_dl_msum_buffer.RandAllocCxFloat(kFrameWnd,
+                                        cfg->OfdmDataNum() * cfg->BsAntNum(),
+                                        Agora_memory::Alignment_t::kAlign64);
+
+  Table<complex_float> calib_ul_msum_buffer;
+  calib_ul_msum_buffer.RandAllocCxFloat(kFrameWnd,
+                                        cfg->OfdmDataNum() * cfg->BsAntNum(),
+                                        Agora_memory::Alignment_t::kAlign64);
+
   Table<complex_float> calib_dl_buffer;
   calib_dl_buffer.RandAllocCxFloat(kFrameWnd,
                                    cfg->OfdmDataNum() * cfg->BsAntNum(),
@@ -35,8 +45,9 @@ TEST(TestZF, Perf) {
   auto stats = std::make_unique<Stats>(cfg.get());
 
   auto compute_zf = std::make_unique<DoZF>(
-      cfg.get(), tid, csi_buffers, calib_dl_buffer, calib_ul_buffer,
-      ul_zf_matrices, dl_zf_matrices, stats.get());
+      cfg.get(), tid, csi_buffers, calib_dl_msum_buffer, calib_ul_msum_buffer,
+      calib_dl_buffer, calib_ul_buffer, ul_zf_matrices, dl_zf_matrices,
+      stats.get());
 
   FastRand fast_rand;
   size_t start_tsc = GetTime::Rdtsc();
@@ -51,6 +62,8 @@ TEST(TestZF, Perf) {
 
   std::printf("Time per zeroforcing iteration = %.4f ms\n", ms / kNumIters);
 
+  calib_dl_msum_buffer.Free();
+  calib_ul_msum_buffer.Free();
   calib_dl_buffer.Free();
   calib_ul_buffer.Free();
 }

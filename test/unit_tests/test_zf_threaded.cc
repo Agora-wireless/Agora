@@ -54,6 +54,8 @@ void MasterToWorkerDynamicWorker(
     moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
     moodycamel::ProducerToken* ptok,
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
+    Table<complex_float>& calib_dl_msum_buffer,
+    Table<complex_float>& calib_ul_msum_buffer,
     Table<complex_float>& calib_dl_buffer,
     Table<complex_float>& calib_ul_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
@@ -68,8 +70,8 @@ void MasterToWorkerDynamicWorker(
   }
 
   auto compute_zf = std::make_unique<DoZF>(
-      cfg, worker_id, csi_buffers, calib_dl_buffer, calib_ul_buffer,
-      ul_zf_matrices, dl_zf_matrices, stats);
+      cfg, worker_id, csi_buffers, calib_dl_msum_buffer, calib_ul_msum_buffer,
+      calib_dl_buffer, calib_ul_buffer, ul_zf_matrices, dl_zf_matrices, stats);
 
   size_t start_tsc = GetTime::Rdtsc();
   size_t num_tasks = 0;
@@ -114,6 +116,9 @@ TEST(TestZF, VaryingConfig) {
     ptok = new moodycamel::ProducerToken(complete_task_queue);
   }
 
+  Table<complex_float> calib_dl_msum_buffer;
+  Table<complex_float> calib_ul_msum_buffer;
+
   Table<complex_float> calib_dl_buffer;
   Table<complex_float> calib_ul_buffer;
 
@@ -140,6 +145,7 @@ TEST(TestZF, VaryingConfig) {
     threads.emplace_back(
         MasterToWorkerDynamicWorker, cfg.get(), i, std::ref(event_queue),
         std::ref(complete_task_queue), ptoks[i], std::ref(csi_buffers),
+        std::ref(calib_dl_msum_buffer), std::ref(calib_ul_msum_buffer),
         std::ref(calib_dl_buffer), std::ref(calib_ul_buffer),
         std::ref(ul_zf_matrices), std::ref(dl_zf_matrices), stats.get());
   }
@@ -147,6 +153,8 @@ TEST(TestZF, VaryingConfig) {
     thread.join();
   }
 
+  calib_dl_msum_buffer.Free();
+  calib_ul_msum_buffer.Free();
   calib_dl_buffer.Free();
   calib_ul_buffer.Free();
   for (auto& ptok : ptoks) {
