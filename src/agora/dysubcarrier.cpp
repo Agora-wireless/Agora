@@ -295,14 +295,6 @@ void DySubcarrier::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_si
                         + block_base_offset + (j * kTransposeBlockSize)
                         + sc_j;
 
-                    // if (frame_id == 0 && base_sc_id == 0) {
-                    //     printf("Run CSI: ");
-                    //     for (size_t k = 0; k < kSCsPerCacheline; k ++) {
-                    //         printf("(%lf %lf) ", src[k].re, src[k].im);
-                    //     }
-                    //     printf("\n");
-                    // }
-
                     // With either of AVX-512 or AVX2, load one cacheline =
                     // 16 float values = 8 subcarriers = kSCsPerCacheline
                     // TODO: AVX512 complex multiply support below
