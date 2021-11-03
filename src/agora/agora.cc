@@ -1422,8 +1422,13 @@ void Agora::InitializeDownlinkBuffers() {
     for (size_t f = 0; f < kFrameWnd; f++) {
       for (size_t i = 0; i < config_->OfdmDataNum() * config_->BfAntNum();
            i++) {
-        calib_dl_buffer_[f][i] = {0, 0};
-        calib_ul_buffer_[f][i] = {0, 0};
+        if (f == kFrameWnd - 1) {
+          calib_dl_buffer_[f][i] = {1, 0};
+          calib_ul_buffer_[f][i] = {1, 0};
+        } else {
+          calib_dl_buffer_[f][i] = {0, 0};
+          calib_ul_buffer_[f][i] = {0, 0};
+        }
         calib_dl_msum_buffer_[f][i] = {0, 0};
         calib_ul_msum_buffer_[f][i] = {0, 0};
       }
