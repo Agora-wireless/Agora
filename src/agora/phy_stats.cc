@@ -122,7 +122,7 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
      << " Pilot Signal SNR (dB) Range at BS Antennas: " << std::fixed
      << std::setw(5) << std::setprecision(1);
   for (size_t i = 0; i < config_->UeNum(); i++) {
-    float max_snr = 0;
+    float max_snr = FLT_MIN;
     float min_snr = FLT_MAX;
     float* frame_snr =
         &pilot_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
@@ -134,6 +134,8 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
       if (frame_snr[j] < min_snr) min_snr = frame_snr[j];
       if (frame_snr[j] > max_snr) max_snr = frame_snr[j];
     }
+    if (min_snr == FLT_MAX) min_snr = -100;
+    if (max_snr == FLT_MIN) max_snr = -100;
     ss << "User " << i << ": [" << min_snr << "," << max_snr << "]"
        << " ";
   }
