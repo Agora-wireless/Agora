@@ -195,10 +195,9 @@ Config::Config(std::string jsonfile)
 
     /* Distributed & normal mode options */
     subcarrier_block_size = tddConf.value(
-        "subcarrier_block_size", lcm(zf_block_size, demul_block_size));
-    rt_assert(subcarrier_block_size % lcm(zf_block_size, demul_block_size) == 0,
-        "Subcarrier block size should be a multiple of lcm(zf_block_size, "
-        "demul_block_size)!");
+        "subcarrier_block_size", zf_block_size);
+    rt_assert(subcarrier_block_size % zf_block_size == 0,
+        "Subcarrier block size should be a multiple of zf_block_size)!");
 
     decode_thread_num_per_ue = tddConf.value("decode_thread_num_per_ue", 1);
 
