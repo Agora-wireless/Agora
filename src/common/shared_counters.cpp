@@ -1,4 +1,5 @@
 #include "shared_counters.hpp"
+#include "utils.h"
 
 SharedState::SharedState(Config* cfg)
     : last_frame_cycles_(worker_rdtsc())
@@ -12,7 +13,7 @@ SharedState::SharedState(Config* cfg)
     , num_fft_tasks_per_symbol_(cfg->get_num_ant_to_process())
     , num_decode_tasks_per_frame_(cfg->use_central_scheduler && cfg->use_general_worker ? 1 : cfg->decode_thread_num)
     , num_precode_tasks_per_frame_((cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size)
-    , num_demul_tasks_required_(cfg->get_num_sc_to_process() / cfg->demul_block_size)
+    , num_demul_tasks_required_(ceil_divide(cfg->get_num_sc_to_process(), cfg->demul_block_size))
     , num_demod_pkts_per_symbol_per_ue_(cfg->bs_server_addr_list.size())
 {
     frame_start_time_ = new uint64_t[cfg->frames_to_test];

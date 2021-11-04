@@ -57,7 +57,7 @@ void DySubcarrier::StartWork()
     const size_t n_zf_tasks_reqd
         = (sc_range_.end - sc_range_.start) / cfg_->zf_block_size;
     const size_t n_demul_tasks_reqd
-        = (sc_range_.end - sc_range_.start) / cfg_->demul_block_size;
+        = ceil_divide(sc_range_.end - sc_range_.start, cfg_->demul_block_size);
     
     printf("Range [%zu:%zu] starts to work\n", sc_range_.start, sc_range_.end);
 

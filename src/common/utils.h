@@ -203,4 +203,9 @@ public:
         return static_cast<uint32_t>(seed >> 32);
     }
 };
+
+inline size_t ceil_divide(size_t a, size_t b)
+{
+    return (a + b - 1) / b;
+}
 #endif

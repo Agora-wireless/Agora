@@ -67,8 +67,9 @@ void DyDemul::Launch(
     }
 
     size_t max_sc_ite;
-    max_sc_ite = std::min(
-        cfg_->demul_block_size, cfg_->subcarrier_end - base_sc_id);
+    // max_sc_ite = std::min(cfg_->demul_block_size, cfg_->subcarrier_end - base_sc_id);
+    max_sc_ite = std::min(cfg_->demul_block_size, 
+        std::min(cfg_->subcarrier_start + (tid_ + 1) * cfg_->subcarrier_block_size, cfg_->subcarrier_end) - base_sc_id);
     assert(max_sc_ite % kSCsPerCacheline == 0);
 
     complex_float tmp[kSCsPerCacheline];

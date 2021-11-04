@@ -1,5 +1,6 @@
 #include "agora.hpp"
 #include "Symbols.hpp"
+#include "profiler.h"
 #include <rte_ethdev.h>
 using namespace std;
 
@@ -163,7 +164,11 @@ void Agora::handleEvents()
 {
     auto& cfg = config_;
 
-    size_t max_events_needed = cfg->use_central_scheduler && cfg->use_general_worker ? worker_threads_.size() : 
+    const size_t demul_task_per_symbol = cfg->use_general_worker ? ceil_divide(cfg->get_num_sc_to_process(), cfg->demul_block_size) 
+        : (do_subcarrier_threads_.size() - 1) * ceil_divide(cfg->subcarrier_block_size, cfg->demul_block_size) + 
+        ceil_divide((cfg->get_num_sc_to_process() - 1) % cfg->demul_block_size + 1, cfg->demul_block_size);
+
+    size_t max_events_needed = cfg->use_general_worker ? worker_threads_.size() : 
         do_subcarrier_threads_.size() + do_decode_threads_.size();
     EventData events_list[max_events_needed];
     size_t num_events = complete_task_queue_.try_dequeue_bulk(events_list, max_events_needed);
@@ -199,9 +204,9 @@ void Agora::handleEvents()
             tag = event.tags_[0];
             symbol_id_ul = gen_tag_t(tag).symbol_id;
             progress_.demod_task_completed_[symbol_id_ul] ++;
-            if (progress_.demod_task_completed_[symbol_id_ul] == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+            if (progress_.demod_task_completed_[symbol_id_ul] == demul_task_per_symbol) {
                 MLPD_INFO("Demod complete for (slot %d symbol %d)\n", progress_.cur_slot_, symbol_id_ul);
-                shared_state_.demul_done(progress_.cur_slot_, symbol_id_ul, cfg->get_num_sc_to_process() / cfg->demul_block_size);
+                shared_state_.demul_done(progress_.cur_slot_, symbol_id_ul, demul_task_per_symbol);
             }
             break;
         case EventType::kDecode:
@@ -267,15 +272,11 @@ void Agora::handleEvents()
             if (shared_state_.received_all_data_pkts(progress_.cur_slot_, progress_.demod_launch_symbol_)) {
                 MLPD_INFO("Main thread: launch Demod (slot %u, symbol %u)\n", progress_.cur_slot_, progress_.demod_launch_symbol_);
                 for (size_t j = 0; j < do_subcarrier_threads_.size(); j ++) {
-                    for (size_t k = 0; k < cfg->subcarrier_block_size / cfg->demul_block_size; k ++) {
-                        if (cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size >= cfg->subcarrier_end) continue;
-                        EventData event(EventType::kDemul, gen_tag_t::frm_sym_sc(progress_.cur_slot_, progress_.demod_launch_symbol_, cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
-                        if (cfg->use_general_worker) {
-                            TryEnqueueFallback(&sched_info_arr_[static_cast<size_t>(EventType::kDemul)].concurrent_q_, 
-                                sched_info_arr_[static_cast<size_t>(EventType::kDemul)].ptok_, event);
-                        } else {
-                            TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
-                        }
+                    for (size_t k = 0; k < ceil_divide(cfg->subcarrier_block_size, cfg->demul_block_size); k ++) {
+                        if (cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size >= cfg->subcarrier_end) break;
+                        EventData event(EventType::kDemul, gen_tag_t::frm_sym_sc(progress_.cur_slot_, progress_.demod_launch_symbol_, 
+                            cfg->subcarrier_start + j * cfg->subcarrier_block_size + k * cfg->demul_block_size)._tag);
+                        TryEnqueueFallback(&sched_info_arr_[j].concurrent_q_, sched_info_arr_[j].ptok_, event);
                     }
                 }
                 progress_.demod_launch_symbol_ ++;
@@ -284,7 +285,7 @@ void Agora::handleEvents()
     }
 
     if (progress_.decode_launch_symbol_ < cfg->ul_data_symbol_num_perframe && 
-        progress_.demod_task_completed_[progress_.decode_launch_symbol_] == cfg->get_num_sc_to_process() / cfg->demul_block_size) {
+        progress_.demod_task_completed_[progress_.decode_launch_symbol_] == demul_task_per_symbol) {
         bool received = true;
         for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
             if (!shared_state_.received_all_demod_pkts(i, progress_.cur_slot_, progress_.decode_launch_symbol_)) {
@@ -420,6 +421,7 @@ void* Agora::worker(int tid)
     size_t csi_start_tsc, zf_start_tsc, demod_start_tsc, decode_start_tsc;
 
     bool state_trigger = false;
+    size_t last_slot = 0;
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
         EventData event, resp;
@@ -433,6 +435,7 @@ void* Agora::worker(int tid)
             tag = event.tags_[0];
             slot_id = gen_tag_t(tag).frame_id;
             sc_id = gen_tag_t(tag).sc_id;
+            Profiler work_profile(tid, Profiler::Working, slot_id);
             if (unlikely(!state_trigger && slot_id >= 200)) {
                 start_tsc = rdtsc();
                 state_trigger = true;
@@ -452,6 +455,7 @@ void* Agora::worker(int tid)
             tag = event.tags_[0];
             slot_id = gen_tag_t(tag).frame_id;
             sc_id = gen_tag_t(tag).sc_id;
+            Profiler work_profile(tid, Profiler::Working, slot_id);
             if (unlikely(!state_trigger && slot_id >= 200)) {
                 start_tsc = rdtsc();
                 state_trigger = true;
@@ -472,6 +476,7 @@ void* Agora::worker(int tid)
             slot_id = gen_tag_t(tag).frame_id;
             symbol_id_ul = gen_tag_t(tag).symbol_id;
             sc_id = gen_tag_t(tag).sc_id;
+            Profiler work_profile(tid, Profiler::Working, slot_id);
             if (unlikely(!state_trigger && slot_id >= 200)) {
                 start_tsc = rdtsc();
                 state_trigger = true;
@@ -492,6 +497,7 @@ void* Agora::worker(int tid)
             slot_id = gen_tag_t(tag).frame_id;
             symbol_id_ul = gen_tag_t(tag).symbol_id;
             ue_id = gen_tag_t(tag).ue_id;
+            Profiler work_profile(tid, Profiler::Working, slot_id);
             if (unlikely(!state_trigger && slot_id >= 200)) {
                 start_tsc = rdtsc();
                 state_trigger = true;
@@ -507,10 +513,14 @@ void* Agora::worker(int tid)
                 work_tsc_duration += rdtsc() - work_start_tsc;
             }
         }
+
+        last_slot = max(last_slot, slot_id);
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
-    size_t idle_duration = whole_duration - work_tsc_duration;
+    // size_t idle_duration = whole_duration - work_tsc_duration;
+    // size_t whole_duration = Profiler::GetTsc(tid, Profiler::State::All);
+    size_t idle_duration = whole_duration - Profiler::GetTsc(tid, Profiler::State::Working);
     printf("Worker Thread %u duration stats: total time used %.2lfms, "
         "idle %.2lfms (%.2lf\%)\n",
         tid, cycles_to_ms(whole_duration, freq_ghz_),

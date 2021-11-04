@@ -197,6 +197,7 @@ set(COMMON_SOURCES
   src/common/net.cpp
   src/common/crc.cpp
   src/common/shared_counters.cpp
+  src/common/profiler.cpp
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
   src/encoder/iobuffer.cpp)
