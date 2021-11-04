@@ -189,6 +189,8 @@ Config::Config(std::string jsonfile)
         "cacheline");
     rt_assert(demul_block_size % kTransposeBlockSize == 0,
         "Demodulation block size must be a multiple of transpose block size");
+    rt_assert(demul_block_size > 0,
+        "Demodulation block size must be greater than 0!");
 
     zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
                                           : tddConf.value("zf_block_size", 1);
@@ -198,6 +200,8 @@ Config::Config(std::string jsonfile)
         "subcarrier_block_size", zf_block_size);
     rt_assert(subcarrier_block_size % zf_block_size == 0,
         "Subcarrier block size should be a multiple of zf_block_size)!");
+    rt_assert(demul_block_size <= subcarrier_block_size,
+        "Demodulation block size must no larger than subcarrier block size!");
 
     decode_thread_num_per_ue = tddConf.value("decode_thread_num_per_ue", 1);
 
