@@ -166,7 +166,7 @@ void Agora::handleEvents()
 
     const size_t demul_task_per_symbol = cfg->use_general_worker ? ceil_divide(cfg->get_num_sc_to_process(), cfg->demul_block_size) 
         : (do_subcarrier_threads_.size() - 1) * ceil_divide(cfg->subcarrier_block_size, cfg->demul_block_size) + 
-        ceil_divide((cfg->get_num_sc_to_process() - 1) % cfg->demul_block_size + 1, cfg->demul_block_size);
+        ceil_divide((cfg->get_num_sc_to_process() - 1) % cfg->subcarrier_block_size + 1, cfg->demul_block_size);
 
     size_t max_events_needed = cfg->use_general_worker ? worker_threads_.size() : 
         do_subcarrier_threads_.size() + do_decode_threads_.size();
