@@ -44,7 +44,7 @@ public:
      */
     EventData Launch(size_t tag);
 
-    double GetZfTscPerTask() {return cycles_to_us(zf_tsc_ / zf_count_, freq_ghz_);}
+    double GetZfTscPerTask() {return zf_count_ == 0 ? 0 : cycles_to_us(zf_tsc_ / zf_count_, freq_ghz_);}
 
 private:
     void ZFTimeOrthogonal(size_t tag);
