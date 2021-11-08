@@ -195,18 +195,6 @@ Config::Config(std::string jsonfile)
     zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
                                           : tddConf.value("zf_block_size", 1);
 
-    /* Distributed & normal mode options */
-    subcarrier_block_size = tddConf.value(
-        "subcarrier_block_size", zf_block_size);
-    // rt_assert(subcarrier_block_size % zf_block_size == 0,
-    //     "Subcarrier block size should be a multiple of zf_block_size)!");
-    rt_assert(subcarrier_block_size % kSCsPerCacheline == 0,
-        "Subcarrier block size should be a multiple of cacheline size)!");
-    rt_assert(demul_block_size <= subcarrier_block_size,
-        "Demodulation block size must no larger than subcarrier block size!");
-
-    decode_thread_num_per_ue = tddConf.value("decode_thread_num_per_ue", 1);
-
     // rt_assert(pilot_symbol_num_perframe + ul_data_symbol_num_perframe
     //         == symbol_num_perframe,
     //     "Masterless mode supports only pilot and uplink data syms for now");
@@ -225,6 +213,23 @@ Config::Config(std::string jsonfile)
         bs_rru_mac_addr
             = tddConf.value("bs_rru_mac_addr", "");
     }
+
+    /* Distributed & normal mode options */
+    std::vector<size_t> subcarrier_vec = tddConf.value(
+        "subcarrier_block_list", std::vector<size_t>());
+    rt_assert(subcarrier_vec.size() == bs_server_addr_list.size(),
+        "Subcarrier block list must be the same length with server list!");
+    // subcarrier_block_size = tddConf.value(
+    //     "subcarrier_block_size", zf_block_size);
+    subcarrier_block_size = subcarrier_vec[bs_server_addr_idx];
+    // rt_assert(subcarrier_block_size % zf_block_size == 0,
+    //     "Subcarrier block size should be a multiple of zf_block_size)!");
+    rt_assert(subcarrier_block_size % kSCsPerCacheline == 0,
+        "Subcarrier block size should be a multiple of cacheline size)!");
+    rt_assert(demul_block_size <= subcarrier_block_size,
+        "Demodulation block size must no larger than subcarrier block size!");
+
+    decode_thread_num_per_ue = tddConf.value("decode_thread_num_per_ue", 1);
 
     subcarrier_num_list = tddConf.value("subcarrier_num_list", std::vector<size_t>());
     rt_assert(bs_server_addr_list.size() == subcarrier_num_list.size(), "Subcarrier num list has a different size!");
