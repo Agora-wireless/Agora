@@ -127,10 +127,12 @@ private:
 
     // Internal CSI states
     size_t csi_cur_frame_ = 0;
+    size_t csi_cur_sc_ = 0;
 
     // Internal ZF states
     size_t zf_cur_frame_ = 0; // Current frame waiting for CSI matrix
     size_t n_zf_tasks_done_ = 0;
+    size_t zf_cur_sc_ = 0;
 
     // Internal Demul states
     size_t demul_cur_frame_; // Current frame waiting for ZF matrix

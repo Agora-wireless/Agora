@@ -192,7 +192,7 @@ enum class SymbolType { kBeacon, kUL, kDL, kPilot, kCalDL, kCalUL, kUnknown };
 static constexpr size_t kMaxSymbols = 70;
 
 // Maximum number of OFDM data subcarriers in the 5G spec
-static constexpr size_t kMaxDataSCs = 3300;
+static constexpr size_t kMaxDataSCs = 3600;
 
 // Maximum number of antennas supported by Agora
 static constexpr size_t kMaxAntennas = 256;

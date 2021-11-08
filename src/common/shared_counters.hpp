@@ -32,6 +32,7 @@ public:
     bool is_encode_ready(size_t frame_id);
 
     void fft_done(size_t frame_id, size_t symbol_id);
+    void zf_done(size_t frame_id, size_t zf_block_id);
     // Mark [num_tasks] demodulation tasks for this frame and symbol as complete
     void demul_done(size_t frame_id, size_t symbol_id_ul, size_t num_tasks);
     // When decoding is done for a frame from one decoder, call this function
@@ -48,6 +49,7 @@ public:
     // Return true iff we have completed demodulation for all subcarriers in
     // this symbol have
     bool is_demod_tx_ready(size_t frame_id, size_t symbol_id_ul);
+    bool is_zf_done(size_t frame_id, size_t zf_block_id);
 
     // Latency measurement counters for each frame
     uint64_t *frame_start_time_;
@@ -87,6 +89,9 @@ private:
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_demul_tasks_completed_ = {};
 
+    std::array<std::array<bool, kMaxDataSCs/kSCsPerCacheline>, kFrameWnd>
+        zf_task_completed_ = {};
+
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_demod_pkts_[kMaxUEs];
 
@@ -122,6 +127,7 @@ private:
     const size_t num_precode_tasks_per_frame_;
     const size_t num_demul_tasks_required_;
     const size_t num_demod_pkts_per_symbol_per_ue_;
+    const size_t num_zf_tasks_per_frame_;
 };
 
 #if 0

@@ -17,6 +17,7 @@ SharedState::SharedState(Config* cfg)
         (ceil_divide(cfg->get_num_sc_to_process(), cfg->subcarrier_block_size) - 1) * ceil_divide(cfg->subcarrier_block_size, cfg->demul_block_size) + 
         ceil_divide((cfg->get_num_sc_to_process() - 1) % cfg->subcarrier_block_size + 1, cfg->demul_block_size))
     , num_demod_pkts_per_symbol_per_ue_(cfg->bs_server_addr_list.size())
+    , num_zf_tasks_per_frame_(cfg->get_num_sc_to_process() / cfg->zf_block_size)
 {
     frame_start_time_ = new uint64_t[cfg->frames_to_test];
     frame_iq_time_ = new uint64_t[cfg->frames_to_test];
@@ -38,6 +39,11 @@ SharedState::SharedState(Config* cfg)
             for (size_t k = 0; k < kMaxSymbols; k ++) {
                 num_demod_pkts_[i][j][k] = 0;
             }
+        }
+    }
+    for (size_t i = 0; i < kFrameWnd; i++) {
+        for (size_t j = 0; j < num_zf_tasks_per_frame_; j++) {
+            zf_task_completed_[i][j] = false;
         }
     }
 }
@@ -178,6 +184,13 @@ void SharedState::fft_done(size_t frame_id, size_t symbol_id)
     }
 }
 
+void SharedState::zf_done(size_t frame_id, size_t zf_block_id)
+{
+    rt_assert(frame_id >= cur_frame_ && frame_id < cur_frame_ + kFrameWnd,
+        "Complete a wrong frame in fft!");
+    zf_task_completed_[frame_id % kFrameWnd][zf_block_id] = true;
+}
+
 void SharedState::demul_done(size_t frame_id, size_t symbol_id_ul, size_t num_tasks)
 {
     rt_assert(frame_id >= cur_frame_ && frame_id < cur_frame_ + kFrameWnd,
@@ -229,6 +242,9 @@ void SharedState::decode_done(size_t frame_id)
             }
             for (size_t i = 0; i < kMaxSymbols; i++) {
                 num_fft_tasks_completed_[frame_slot][i] = 0;
+            }
+            for (size_t i = 0; i < num_zf_tasks_per_frame_; i++) {
+                zf_task_completed_[frame_slot][i] = false;
             }
             MLPD_INFO("Main thread: Decode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
             last_frame_cycles_ = cur_cycle;
@@ -282,4 +298,12 @@ bool SharedState::is_demod_tx_ready(size_t frame_id, size_t symbol_id_ul)
         return true;
     } 
     return false;
+}
+
+bool SharedState::is_zf_done(size_t frame_id, size_t zf_block_id)
+{
+    if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
+        return false;
+    }
+    return zf_task_completed_[frame_id % kFrameWnd][zf_block_id];
 }
