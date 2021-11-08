@@ -198,8 +198,10 @@ Config::Config(std::string jsonfile)
     /* Distributed & normal mode options */
     subcarrier_block_size = tddConf.value(
         "subcarrier_block_size", zf_block_size);
-    rt_assert(subcarrier_block_size % zf_block_size == 0,
-        "Subcarrier block size should be a multiple of zf_block_size)!");
+    // rt_assert(subcarrier_block_size % zf_block_size == 0,
+    //     "Subcarrier block size should be a multiple of zf_block_size)!");
+    rt_assert(subcarrier_block_size % kSCsPerCacheline == 0,
+        "Subcarrier block size should be a multiple of cacheline size)!");
     rt_assert(demul_block_size <= subcarrier_block_size,
         "Demodulation block size must no larger than subcarrier block size!");
 
