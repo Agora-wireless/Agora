@@ -44,8 +44,8 @@ DySubcarrier::DySubcarrier(Config* config, int tid, double freq_ghz_,
 
     // Init internal states
     demul_cur_sym_ul_ = 0;
-    csi_cur_sc_ = sc_range.start % cfg_->zf_block_size == 0 ? zf_cur_sc_ : cfg_->zf_block_size * (sc_range.start / cfg_->zf_block_size + 1);
-    zf_cur_sc_ = sc_range.start % cfg_->zf_block_size == 0 ? zf_cur_sc_ : cfg_->zf_block_size * (sc_range.start / cfg_->zf_block_size + 1);
+    csi_cur_sc_ = sc_range.start % cfg_->zf_block_size == 0 ? sc_range.start : cfg_->zf_block_size * (sc_range.start / cfg_->zf_block_size + 1);
+    zf_cur_sc_ = sc_range.start % cfg_->zf_block_size == 0 ? sc_range.start : cfg_->zf_block_size * (sc_range.start / cfg_->zf_block_size + 1);
 }
 
 DySubcarrier::~DySubcarrier()
@@ -174,7 +174,7 @@ void DySubcarrier::StartWork()
             // if (n_zf_tasks_done_ == n_zf_tasks_reqd) {
             if (zf_cur_sc_ >= sc_range_.end) {
                 // n_zf_tasks_done_ = 0;
-                zf_cur_sc_ = sc_range_.start % cfg_->zf_block_size == 0 ? zf_cur_sc_ : cfg_->zf_block_size * (sc_range_.start / cfg_->zf_block_size + 1);
+                zf_cur_sc_ = sc_range_.start % cfg_->zf_block_size == 0 ? sc_range_.start : cfg_->zf_block_size * (sc_range_.start / cfg_->zf_block_size + 1);
 
                 // zf_start_tsc = rdtsc();
                 MLPD_INFO("Main thread (%u): ZF done frame: %lu\n", tid_, zf_cur_frame_);
@@ -218,7 +218,7 @@ void DySubcarrier::StartWork()
             }
 
             if (csi_cur_sc_ >= sc_range_.end) {
-                csi_cur_sc_ = sc_range_.start % cfg_->zf_block_size == 0 ? zf_cur_sc_ : cfg_->zf_block_size * (sc_range_.start / cfg_->zf_block_size + 1);
+                csi_cur_sc_ = sc_range_.start % cfg_->zf_block_size == 0 ? sc_range_.start : cfg_->zf_block_size * (sc_range_.start / cfg_->zf_block_size + 1);
                 // csi_start_tsc = rdtsc();
                 MLPD_INFO(
                     "Main thread (%u): pilot frame: %lu, finished CSI for all pilot "
