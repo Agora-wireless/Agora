@@ -15,19 +15,19 @@ PhyStats::PhyStats(Config* const cfg) : config_(cfg) {
   }
   const size_t task_buffer_symbol_num = num_rx_symbols_ * kFrameWnd;
 
-  decoded_bits_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
+  decoded_bits_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                              Agora_memory::Alignment_t::kAlign64);
-  bit_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
+  bit_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                           Agora_memory::Alignment_t::kAlign64);
 
-  decoded_blocks_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
+  decoded_blocks_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                                Agora_memory::Alignment_t::kAlign64);
-  block_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
+  block_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                             Agora_memory::Alignment_t::kAlign64);
 
-  uncoded_bits_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
+  uncoded_bits_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                              Agora_memory::Alignment_t::kAlign64);
-  uncoded_bit_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
+  uncoded_bit_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                                   Agora_memory::Alignment_t::kAlign64);
 
   evm_buffer_.Calloc(kFrameWnd, cfg->UeAntNum(),
@@ -77,7 +77,7 @@ void PhyStats::PrintPhyStats() {
   }
 
   if (num_rx_symbols_ > 0) {
-    for (size_t ue_id = 0; ue_id < this->config_->UeNum(); ue_id++) {
+    for (size_t ue_id = 0; ue_id < this->config_->UeAntNum(); ue_id++) {
       size_t total_decoded_bits(0);
       size_t total_bit_errors(0);
       size_t total_decoded_blocks(0);
@@ -101,7 +101,7 @@ void PhyStats::PrintPhyStats() {
 }
 
 void PhyStats::PrintEvmStats(size_t frame_id) {
-  arma::fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeNum(), 1,
+  arma::fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeAntNum(), 1,
                      false);
   evm_mat = sqrt(evm_mat) / config_->OfdmDataNum();
   std::stringstream ss;
@@ -121,7 +121,7 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
   ss << "Frame " << frame_id
      << " Pilot Signal SNR (dB) Range at BS Antennas: " << std::fixed
      << std::setw(5) << std::setprecision(1);
-  for (size_t i = 0; i < config_->UeNum(); i++) {
+  for (size_t i = 0; i < config_->UeAntNum(); i++) {
     float max_snr = FLT_MIN;
     float min_snr = FLT_MAX;
     float* frame_snr =
@@ -164,8 +164,8 @@ void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
                               const arma::cx_fmat& eq) {
   if (num_rx_symbols_ > 0) {
     arma::fmat evm = abs(eq - gt_mat_.col(sc_id));
-    arma::fmat cur_evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeNum(),
-                           1, false);
+    arma::fmat cur_evm_mat(evm_buffer_[frame_id % kFrameWnd],
+                           config_->UeAntNum(), 1, false);
     cur_evm_mat += evm % evm;
   }
 }
