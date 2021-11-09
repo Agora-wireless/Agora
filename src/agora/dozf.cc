@@ -12,6 +12,8 @@ static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
 static constexpr size_t kUseInverseForZF = 1u;
+static constexpr size_t kPrintSubcarrierIndex = 1;
+static constexpr bool kUseUlZfForDownlink = true;
 
 DoZF::DoZF(Config* config, int tid,
            PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
@@ -60,9 +62,9 @@ EventData DoZF::Launch(size_t tag) {
   return EventData(EventType::kZF, tag);
 }
 
-void DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
-                           complex_float* calib_ptr, complex_float* _mat_ul_zf,
-                           complex_float* _mat_dl_zf) {
+float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
+                            complex_float* calib_ptr, complex_float* _mat_ul_zf,
+                            complex_float* _mat_dl_zf) {
   arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
                           cfg_->UeNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_zf_tmp;
@@ -78,14 +80,25 @@ void DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
   }
 
   if (cfg_->Frame().NumDLSyms() > 0) {
-    arma::cx_fvec vec_calib(reinterpret_cast<arma::cx_float*>(calib_ptr),
+    arma::cx_fvec calib_vec(reinterpret_cast<arma::cx_float*>(calib_ptr),
                             cfg_->BfAntNum(), false);
-
-    // with orthonormal calib matrix:
-    // pinv(calib * csi) = pinv(csi)*inv(calib)
-    arma::cx_fmat calib_mat = arma::diagmat(arma::sign(vec_calib));
-    arma::cx_fmat mat_dl_zf_tmp = mat_ul_zf_tmp * inv(calib_mat);
-
+    arma::cx_fmat mat_dl_zf_tmp;
+    if (kUseUlZfForDownlink == true) {
+      // With orthonormal calib matrix:
+      // pinv(calib * csi) = pinv(csi)*inv(calib)
+      // This probably causes a performance hit since we are throwing
+      // magnitude info away by taking the sign of the calibration matrix
+      arma::cx_fmat calib_mat = arma::diagmat(arma::sign(calib_vec));
+      mat_dl_zf_tmp = mat_ul_zf_tmp * inv(calib_mat);
+    } else {
+      arma::cx_fmat mat_dl_csi = arma::diagmat(calib_vec) * mat_csi;
+      try {
+        mat_dl_zf_tmp =
+            arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
+      } catch (std::runtime_error&) {
+        arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
+      }
+    }
     // We should be scaling the beamforming matrix, so the IFFT
     // output can be scaled with OfdmCaNum() across all antennas.
     // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
@@ -107,6 +120,8 @@ void DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
         arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(), arma::fill::zeros));
   }
   mat_ul_zf = mat_ul_zf_tmp;
+  float rcond = arma::rcond(mat_csi.t() * mat_csi);
+  return rcond;
 }
 
 // Gather data of one symbol from partially-transposed buffer
@@ -228,8 +243,9 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
       size_t frame_cal_slot = kFrameWnd - 1;
       size_t frame_cal_slot_prev = kFrameWnd - 1;
       size_t frame_cal_slot_old = 0;
+      size_t frame_grp_id = 0;
       if (cfg_->Frame().IsRecCalEnabled() && frame_id >= TX_FRAME_DELTA) {
-        size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
+        frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
 
         // use the previous window which has a full set of calibration results
         frame_cal_slot = (frame_grp_id + kFrameWnd - 1) % kFrameWnd;
@@ -285,9 +301,14 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
           pre_calib_ul_msum_mat.row(cur_sc_id) -
           old_calib_ul_mat.row(cur_sc_id);
 
-      calib_vec = (cur_calib_dl_msum_mat.row(cur_sc_id) /
-                   cur_calib_ul_msum_mat.row(cur_sc_id))
-                      .st();
+      if (cfg_->InitCalibRepeat() == 0u && frame_grp_id == 0)
+        // fill with one until one full sweep
+        // of  calibration data is done
+        calib_vec.fill(arma::cx_float(1, 0));
+      else
+        calib_vec = (cur_calib_dl_msum_mat.row(cur_sc_id) /
+                     cur_calib_ul_msum_mat.row(cur_sc_id))
+                        .st();
 
       if (kRecordCalibrationMats == true) {
         if (cfg_->Frame().IsRecCalEnabled() && (frame_id >= TX_FRAME_DELTA)) {
@@ -330,9 +351,14 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     double start_tsc3 = GetTime::WorkerRdtsc();
     duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
-    ComputePrecoder(mat_csi, calib_gather_buffer_,
-                    ul_zf_matrices_[frame_slot][cur_sc_id],
-                    dl_zf_matrices_[frame_slot][cur_sc_id]);
+    auto rcond = ComputePrecoder(mat_csi, calib_gather_buffer_,
+                                 ul_zf_matrices_[frame_slot][cur_sc_id],
+                                 dl_zf_matrices_[frame_slot][cur_sc_id]);
+    if (kPrintPhyStats && cur_sc_id == kPrintSubcarrierIndex)
+      printf(
+          "Frame %zu, Subcarrier %zu, ZF Matrix Inverse Condition Number = "
+          "%.2f\n",
+          frame_id, kPrintSubcarrierIndex, rcond);
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
     duration_stat_->task_count_++;
