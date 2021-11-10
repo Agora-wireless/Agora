@@ -213,10 +213,11 @@ void PhyUe::ReceiveDownlinkSymbol(struct Packet* rx_packet, size_t tag) {
 void PhyUe::ScheduleDefferedDownlinkSymbols(size_t frame_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
   // Complete the csi offset
-  size_t csi_offset = frame_slot * config_->UeAntNum();
+  const size_t csi_offset_base = frame_slot * config_->UeAntNum();
 
   for (size_t user = 0; user < config_->UeAntNum(); user++) {
-    csi_offset = csi_offset + user;
+    const size_t csi_offset = csi_offset_base + user;
+
     for (size_t ofdm_data = 0; ofdm_data < config_->OfdmDataNum();
          ofdm_data++) {
       auto* csi_buffer_ptr =
@@ -237,10 +238,10 @@ void PhyUe::ClearCsi(size_t frame_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
 
   if (config_->Frame().ClientDlPilotSymbols() > 0) {
-    size_t csi_offset = frame_slot * config_->UeAntNum();
+    const size_t csi_offset_base = frame_slot * config_->UeAntNum();
     for (size_t user = 0; user < config_->UeAntNum(); user++) {
-      csi_offset = csi_offset + user;
-      for (size_t ofdm_data = 0; ofdm_data < config_->OfdmDataNum();
+      const size_t csi_offset = csi_offset_base + user;
+      for (size_t ofdm_data = 0u; ofdm_data < config_->OfdmDataNum();
            ofdm_data++) {
         auto* csi_buffer_ptr = reinterpret_cast<arma::cx_float*>(
             csi_buffer_.at(csi_offset).data());
