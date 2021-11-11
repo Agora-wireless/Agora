@@ -15,9 +15,9 @@ void interrupt_handler(int)
     keep_running = false;
 }
 
-void delay_ticks(uint64_t start, uint64_t ticks)
+void delay_ticks(int64_t start, int64_t ticks)
 {
-    while ((rdtsc() - start) < ticks)
+    while (((int64_t)rdtsc() - start) < ticks)
         _mm_pause();
 }
 
@@ -372,11 +372,14 @@ void* Sender::worker_thread(int tid)
     double start_time = get_time();
 
     size_t start_tsc_send;
+    size_t local_sync_tsc = get_sync_tsc();
     if (cfg->bs_rru_addr_list.size() > 1) {
         start_tsc_send = start_tsc_distributed_;
     } else {
-        start_tsc_send = get_sync_tsc();
+        start_tsc_send = local_sync_tsc;
     }
+
+    delay_ticks(start_tsc_send, 0);
 
     rte_mbuf** tx_mbufs = new rte_mbuf*[cfg->bs_server_addr_list.size()];
     rte_eth_stats tx_stats;
