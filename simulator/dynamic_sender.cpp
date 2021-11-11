@@ -247,6 +247,8 @@ void Sender::get_sync_tsc_distributed() {
                 auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
                 auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
                     reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+                auto* udp_hdr = reinterpret_cast<rte_udp_hdr*>(
+                    reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
                 uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
                 if (unlikely(eth_type != RTE_ETHER_TYPE_IPV4
                     or ip_hdr->next_proto_id != IPPROTO_UDP)) {
@@ -259,11 +261,21 @@ void Sender::get_sync_tsc_distributed() {
                 }
                 char* payload = (char*)eth_hdr + kPayloadOffset;
                 if (*((size_t*)payload) == magic) {
+                    printf("Recv valid pkt\n");
                     size_t cur_tsc = rdtsc();
                     size_t src_tsc = *((size_t*)payload + 1);
                     *((size_t*)payload + 1) = cfg->bs_rru_addr_idx;
                     *((size_t*)payload + 2) = src_tsc;
                     *((size_t*)payload + 3) = cur_tsc;
+                    rte_ether_addr tmp_ether = eth_hdr->s_addr;
+                    eth_hdr->s_addr = eth_hdr->d_addr;
+                    eth_hdr->d_addr = tmp_ether;
+                    uint32_t tmp_ip = ip_hdr->src_addr;
+                    ip_hdr->src_addr = ip_hdr->dst_addr;
+                    ip_hdr->dst_addr = tmp_ip;
+                    uint16_t tmp_port = udp_hdr->src_port;
+                    udp_hdr->src_port = udp_hdr->dst_port;
+                    udp_hdr->dst_port = tmp_port;
                     size_t nb_tx = rte_eth_tx_burst(0, 0, &dpdk_pkt, 1);
                     if (unlikely(nb_tx != 1)) {
                         printf("rte_eth_tx_burst() failed\n");
