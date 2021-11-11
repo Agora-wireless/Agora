@@ -371,7 +371,12 @@ void* Sender::worker_thread(int tid)
 
     double start_time = get_time();
 
-    size_t start_tsc_send = get_sync_tsc();
+    size_t start_tsc_send;
+    if (cfg->bs_rru_addr_list.size() > 1) {
+        start_tsc_send = start_tsc_distributed_;
+    } else {
+        start_tsc_send = get_sync_tsc();
+    }
 
     rte_mbuf** tx_mbufs = new rte_mbuf*[cfg->bs_server_addr_list.size()];
     rte_eth_stats tx_stats;
