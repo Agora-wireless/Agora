@@ -195,6 +195,14 @@ Config::Config(std::string jsonfile)
     zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
                                           : tddConf.value("zf_block_size", 1);
 
+    bs_rru_addr_list = tddConf.value("bs_rru_addr_list", std::vector<std::string>());
+    rt_assert(bs_rru_addr_list.size() > 0, "RRU address list is 0!");
+    bs_rru_addr_idx = tddConf.value("bs_rru_addr_idx", 0);
+    rt_assert(bs_rru_addr_idx >= 0 && bs_rru_addr_idx < bs_rru_addr_list.size(), 
+        "The rru address index must be within the list size!");
+    bs_rru_mac_list = tddConf.value("bs_rru_mac_list", std::vector<std::string>());
+    rt_assert(bs_rru_mac_list.size() == bs_rru_addr_list.size(), "RRU addr and mac list should have same size!");
+
     // rt_assert(pilot_symbol_num_perframe + ul_data_symbol_num_perframe
     //         == symbol_num_perframe,
     //     "Masterless mode supports only pilot and uplink data syms for now");

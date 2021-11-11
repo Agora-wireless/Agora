@@ -40,7 +40,6 @@ public:
     void gen_codeblock_ul(std::vector<int8_t>& information,
         std::vector<int8_t>& encoded_codeword, size_t Bg, size_t Zc)
     {
-        const LDPCconfig& lc = cfg->LDPC_config;
         size_t nRows = Bg == 1 ? 46 : 42;
         std::vector<int8_t> parity;
         // printf("parity size=%u, Bg=%u Zc=%u\n", ldpc_encoding_parity_buf_size(Bg, Zc), Bg, Zc);

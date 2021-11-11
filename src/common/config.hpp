@@ -313,6 +313,11 @@ public:
     // # threads for decoding each user data
     size_t decode_thread_num_per_ue;
 
+    // The list of IP addresses of all Agora RRU sender
+    std::vector<std::string> bs_rru_addr_list;
+    size_t bs_rru_addr_idx;
+    std::vector<std::string> bs_rru_mac_list;
+
     // The list of IP addresses of all Agora servers
     std::vector<std::string> bs_server_addr_list;
     size_t bs_server_addr_idx; // The index of this Agora server in the list

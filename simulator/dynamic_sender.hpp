@@ -62,7 +62,7 @@ public:
     Sender(Config* config, size_t num_master_threads, size_t num_worker_threads, size_t core_offset = 30,
         size_t frame_duration = 1000, size_t enable_slow_start = 1,
         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
-        bool create_thread_for_master = false, void* mbuf_pool = nullptr);
+        void* mbuf_pool = nullptr);
 
     ~Sender();
 
@@ -82,7 +82,8 @@ private:
     void* master_thread(int tid);
     void* worker_thread(int tid);
     void* worker_thread_auto(int tid);
-    size_t get_sync_tsc(int tid);
+    size_t get_sync_tsc();
+    void get_sync_tsc_distributed();
 
     /**
      * @brief Read time-domain 32-bit floating-point IQ samples from [filename]
@@ -156,11 +157,13 @@ private:
     std::thread master_threads_[kMaxMasterNum];
     std::thread worker_threads_[kMaxWorkerNum];
 
-    int num_invoked_threads_ = 0;
+    size_t num_invoked_threads_ = 0;
     size_t start_sync_tsc_ = 0;
     std::mutex start_tsc_mutex_;
 
     std::vector<size_t> control_idx_list_;
+
+    size_t start_tsc_distributed_;
 
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pools_[kMaxWorkerNum];
@@ -168,6 +171,8 @@ private:
     uint32_t bs_server_addr; // IPv4 address of the remote target Agora server
     std::vector<uint32_t> bs_server_addr_list; // IPv4 address list of all Agora servers
     rte_ether_addr sender_mac_addr; // MAC address of this data sender
+    std::vector<uint32_t> bs_rru_addr_list;
+    std::vector<rte_ether_addr> rru_mac_addr_list;
 
     // MAC address of the remote target Agora server
     rte_ether_addr server_mac_addr;

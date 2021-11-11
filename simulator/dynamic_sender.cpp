@@ -23,14 +23,13 @@ void delay_ticks(uint64_t start, uint64_t ticks)
 
 Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_threads_, 
     size_t core_offset, size_t frame_duration, size_t enable_slow_start,
-    std::string server_mac_addr_str, bool create_thread_for_master,
-    void* mbuf_pool)
+    std::string server_mac_addr_str, void* mbuf_pool)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
-    , num_master_threads_(num_master_threads_)
     , num_worker_threads_(num_worker_threads_)
     , enable_slow_start(enable_slow_start)
+    , num_master_threads_(num_master_threads_)
     , core_offset(core_offset)
     , frame_duration_(frame_duration)
     , ticks_all(frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
@@ -96,6 +95,32 @@ Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_thread
         memcpy(&server_mac_addr_list[i], parsed_mac, sizeof(ether_addr));
     }
 
+    bs_rru_addr_list.resize(cfg->bs_rru_addr_list.size());
+    for (size_t i = 0; i < cfg->bs_rru_addr_list.size(); i ++) {
+        ret = inet_pton(AF_INET, cfg->bs_rru_addr_list[i].c_str(), &bs_rru_addr_list[i]);
+    }
+
+    rru_mac_addr_list.resize(cfg->bs_rru_mac_list.size());
+    for (size_t i = 0; i < cfg->bs_rru_mac_list.size(); i ++) {
+        ether_addr* parsed_mac = ether_aton(cfg->bs_rru_mac_list[i].c_str());
+        rt_assert(parsed_mac != NULL, "Invalid server mac address");
+        memcpy(&rru_mac_addr_list[i], parsed_mac, sizeof(ether_addr));
+    }
+
+    for (size_t i = 0; i < cfg->bs_rru_addr_list.size(); i ++) {
+        if (cfg->bs_rru_addr_idx == i) {
+            continue;
+        }
+        uint16_t src_port = rte_cpu_to_be_16(2222);
+        uint16_t dst_port = rte_cpu_to_be_16(3333);
+        printf("Adding steering rule for src IP %s(%x), dest IP %s(%x), src port: %u, "
+               "dst port: %u, queue: %u\n",
+            cfg->bs_rru_addr_list[i].c_str(), bs_rru_addr_list[i], cfg->bs_rru_addr_list[cfg->bs_rru_addr_idx].c_str(), bs_rru_addr_list[cfg->bs_rru_addr_idx],
+            rte_cpu_to_be_16(src_port), rte_cpu_to_be_16(dst_port), 0);
+        DpdkTransport::install_flow_rule(
+            0, 0, bs_rru_addr_list[i], bs_rru_addr_list[cfg->bs_rru_addr_idx], src_port, dst_port);
+    }
+
     ret = rte_eth_macaddr_get(portid, &sender_mac_addr);
     rt_assert(ret == 0, "Cannot get MAC address of the port");
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
@@ -116,6 +141,11 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     frame_start = in_frame_start;
     frame_end = in_frame_end;
 
+    if (cfg->bs_rru_addr_list.size() > 1) {
+        get_sync_tsc_distributed();
+        printf("Sync cycle is %lu\n", start_tsc_distributed_);
+    }
+
     for (size_t i = 0; i < num_worker_threads_; i ++) {
         worker_threads_[i] = std::thread(&Sender::worker_thread, this, i);
     }
@@ -127,7 +157,7 @@ void Sender::join_thread() {
     }
 }
 
-size_t Sender::get_sync_tsc(int tid) {
+size_t Sender::get_sync_tsc() {
     start_tsc_mutex_.lock();
     num_invoked_threads_ ++;
     if (num_invoked_threads_ == num_worker_threads_) {
@@ -136,9 +166,142 @@ size_t Sender::get_sync_tsc(int tid) {
     start_tsc_mutex_.unlock();
     while (likely(num_invoked_threads_ != num_worker_threads_)) {
         usleep(1);
-        // printf("Wait thread %u: %d %d\n", tid, num_invoked_threads_, num_worker_threads_);
     }
     return start_sync_tsc_;
+}
+
+void Sender::get_sync_tsc_distributed() {
+    uint16_t src_port = 2222;
+    uint16_t dst_port = 3333;
+    const size_t magic = 0xea10baff;
+    rte_mbuf* mbuf[kRxBatchSize];
+    if (cfg->bs_rru_addr_idx == 0) {
+        std::vector<int64_t> tsc_diff;
+        tsc_diff.resize(cfg->bs_rru_addr_list.size());
+        for (size_t i = 1; i < cfg->bs_rru_addr_list.size(); i ++) {
+            mbuf[0] = DpdkTransport::alloc_udp(mbuf_pools_[0], sender_mac_addr,
+                rru_mac_addr_list[i], bs_rru_addr, bs_rru_addr_list[i], src_port, dst_port, 4*sizeof(size_t));
+            struct rte_ether_hdr* eth_hdr
+                = rte_pktmbuf_mtod(mbuf[0], struct rte_ether_hdr*);
+            char* payload = (char*)eth_hdr + kPayloadOffset;
+            *((size_t*)payload) = magic;
+            *((size_t*)payload + 1) = rdtsc();
+            size_t nb_tx = rte_eth_tx_burst(0, 0, mbuf, 1);
+            if (unlikely(nb_tx != 1)) {
+                printf("rte_eth_tx_burst() failed\n");
+                exit(0);
+            }
+        }
+        size_t recv = 1;
+        while (recv < cfg->bs_rru_addr_list.size()) {
+            uint16_t nb_rx = rte_eth_rx_burst(0, 0, mbuf, kRxBatchSize);
+            for (size_t i = 0; i < nb_rx; i ++) {
+                rte_mbuf* dpdk_pkt = mbuf[i];
+                auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+                auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+                    reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+                uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+                if (unlikely(eth_type != RTE_ETHER_TYPE_IPV4
+                    or ip_hdr->next_proto_id != IPPROTO_UDP)) {
+                    rte_pktmbuf_free(mbuf[i]);
+                    continue;
+                }
+                if (unlikely(ip_hdr->dst_addr != bs_rru_addr_list[cfg->bs_rru_addr_idx])) {
+                    rte_pktmbuf_free(mbuf[i]);
+                    continue;
+                }
+                char* payload = (char*)eth_hdr + kPayloadOffset;
+                if (*((size_t*)payload) == magic) {
+                    int64_t cur_tsc = rdtsc();
+                    size_t rru_id = *((size_t*)payload + 1);
+                    int64_t src_tsc = *((int64_t*)payload + 2);
+                    int64_t dst_tsc = *((int64_t*)payload + 3);
+                    int64_t prop_delay = (cur_tsc - src_tsc) / 2;
+                    tsc_diff[rru_id] = dst_tsc - prop_delay - src_tsc;
+                    recv ++;
+                }
+                rte_pktmbuf_free(dpdk_pkt);
+            }
+        }
+        start_tsc_distributed_ = rdtsc() + 10000000000L;
+        for (size_t i = 1; i < cfg->bs_rru_addr_list.size(); i ++) {
+            mbuf[0] = DpdkTransport::alloc_udp(mbuf_pools_[0], sender_mac_addr,
+                rru_mac_addr_list[i], bs_rru_addr, bs_rru_addr_list[i], src_port, dst_port, 4*sizeof(size_t));
+            struct rte_ether_hdr* eth_hdr
+                = rte_pktmbuf_mtod(mbuf[0], struct rte_ether_hdr*);
+            char* payload = (char*)eth_hdr + kPayloadOffset;
+            *((size_t*)payload) = magic;
+            *((size_t*)payload + 1) = start_tsc_distributed_ + tsc_diff[i];
+            size_t nb_tx = rte_eth_tx_burst(0, 0, mbuf, 1);
+            if (unlikely(nb_tx != 1)) {
+                printf("rte_eth_tx_burst() failed\n");
+                exit(0);
+            }
+        }
+    } else {
+        bool recv = false;
+        while (!recv) {
+            uint16_t nb_rx = rte_eth_rx_burst(0, 0, mbuf, kRxBatchSize);
+            for (size_t i = 0; i < nb_rx; i ++) {
+                rte_mbuf* dpdk_pkt = mbuf[i];
+                auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+                auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+                    reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+                uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+                if (unlikely(eth_type != RTE_ETHER_TYPE_IPV4
+                    or ip_hdr->next_proto_id != IPPROTO_UDP)) {
+                    rte_pktmbuf_free(mbuf[i]);
+                    continue;
+                }
+                if (unlikely(ip_hdr->dst_addr != bs_rru_addr_list[cfg->bs_rru_addr_idx])) {
+                    rte_pktmbuf_free(mbuf[i]);
+                    continue;
+                }
+                char* payload = (char*)eth_hdr + kPayloadOffset;
+                if (*((size_t*)payload) == magic) {
+                    size_t cur_tsc = rdtsc();
+                    size_t src_tsc = *((size_t*)payload + 1);
+                    *((size_t*)payload + 1) = cfg->bs_rru_addr_idx;
+                    *((size_t*)payload + 2) = src_tsc;
+                    *((size_t*)payload + 3) = cur_tsc;
+                    size_t nb_tx = rte_eth_tx_burst(0, 0, &dpdk_pkt, 1);
+                    if (unlikely(nb_tx != 1)) {
+                        printf("rte_eth_tx_burst() failed\n");
+                        exit(0);
+                    }
+                    recv = true;
+                } else {
+                    rte_pktmbuf_free(dpdk_pkt);
+                }
+            }
+        }
+        recv = false;
+        while (!recv) {
+            uint16_t nb_rx = rte_eth_rx_burst(0, 0, mbuf, kRxBatchSize);
+            for (size_t i = 0; i < nb_rx; i ++) {
+                rte_mbuf* dpdk_pkt = mbuf[i];
+                auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+                auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+                    reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+                uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+                if (unlikely(eth_type != RTE_ETHER_TYPE_IPV4
+                    or ip_hdr->next_proto_id != IPPROTO_UDP)) {
+                    rte_pktmbuf_free(mbuf[i]);
+                    continue;
+                }
+                if (unlikely(ip_hdr->dst_addr != bs_rru_addr_list[cfg->bs_rru_addr_idx])) {
+                    rte_pktmbuf_free(mbuf[i]);
+                    continue;
+                }
+                char* payload = (char*)eth_hdr + kPayloadOffset;
+                if (*((size_t*)payload) == magic) {
+                    start_tsc_distributed_ = *((size_t*)payload + 1);
+                    recv = true;
+                }
+                rte_pktmbuf_free(dpdk_pkt);
+            }
+        }
+    }
 }
 
 void* Sender::worker_thread(int tid)
@@ -159,8 +322,8 @@ void* Sender::worker_thread(int tid)
     const size_t max_symbol_id = get_max_symbol_id();
     const size_t radio_block_size = cfg->nRadios / num_worker_threads_;
     const size_t radio_block_off = cfg->nRadios % num_worker_threads_;
-    const size_t radio_lo = tid < radio_block_off ? tid * (radio_block_size + 1) : tid * radio_block_size + radio_block_off;
-    const size_t radio_hi = tid < radio_block_off ? radio_lo + radio_block_size + 1 : radio_lo + radio_block_size;
+    const size_t radio_lo = (size_t)tid < radio_block_off ? tid * (radio_block_size + 1) : tid * radio_block_size + radio_block_off;
+    const size_t radio_hi = (size_t)tid < radio_block_off ? radio_lo + radio_block_size + 1 : radio_lo + radio_block_size;
     const size_t ant_num_this_thread = cfg->BS_ANT_NUM / num_worker_threads_
         + ((size_t)tid < cfg->BS_ANT_NUM % num_worker_threads_ ? 1 : 0);
 
@@ -181,7 +344,6 @@ void* Sender::worker_thread(int tid)
         }
     }
 
-    double begin = get_time();
     size_t cur_radio = radio_lo;
     size_t cur_frame = 0;
     size_t cur_symbol = 0;
@@ -197,19 +359,16 @@ void* Sender::worker_thread(int tid)
 
     double start_time = get_time();
 
-    size_t start_tsc_send = get_sync_tsc(tid);
-
-    size_t loop_counter[10001] = {};
+    size_t start_tsc_send = get_sync_tsc();
 
     rte_mbuf** tx_mbufs = new rte_mbuf*[cfg->bs_server_addr_list.size()];
     rte_eth_stats tx_stats;
+    memset(&tx_stats, 0, sizeof(rte_eth_stats));
 
     size_t ant_block = cfg->BS_ANT_NUM / cfg->bs_server_addr_list.size();
     size_t ant_off = cfg->BS_ANT_NUM % cfg->bs_server_addr_list.size();
 
     while (true) {
-        gen_tag_t tag = 0;
-
         if (cfg->use_time_domain_iq) {
             size_t server_id = cur_radio < (ant_block + 1) * ant_off ? cur_radio / (ant_block + 1) : (cur_radio - (ant_block + 1) * ant_off) / ant_block + ant_off;
             tx_mbufs[0] = DpdkTransport::alloc_udp(mbuf_pools_[tid], sender_mac_addr,
@@ -269,7 +428,7 @@ void* Sender::worker_thread(int tid)
                 }
                 cur_slot_idx = control_idx_list_[cur_frame];
                 // delay_ticks(start_tsc_send, cur_frame * max_symbol_id * ticks_all);
-                printf("Thread %u send frame %u in %.1f ms\n", tid, cur_frame - 1, (get_time() - start_time) / 1000.0f);
+                printf("Thread %d send frame %zu in %.1f ms\n", tid, cur_frame - 1, (get_time() - start_time) / 1000.0f);
 
                 if (tid == 0) {
                     rte_eth_stats stats;

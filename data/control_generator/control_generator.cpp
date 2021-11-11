@@ -37,16 +37,11 @@ int main(int argc, char **argv)
     bool verbose = true;
 
     // 5G RAN configurations
-    // const size_t num_ue = 16;
-    const size_t num_ue = cfg->UE_NUM;
-    // const size_t num_slots = 4 * 10;
-    const size_t num_user_levels = cfg->user_level_list.size();
     const size_t num_load_levels = cfg->num_load_levels;
     const size_t num_slots = cfg->user_level_list.size() * cfg->num_load_levels;
     const size_t num_sc_per_rb = cfg->UE_NUM;
     const size_t num_rb = cfg->OFDM_DATA_NUM / num_sc_per_rb;
     const size_t max_ue_per_sc = cfg->UE_NUM;
-    const double avg_load = 0.5;
     srand(time(NULL));
 
     // Open control file to write for all UEs
@@ -58,16 +53,11 @@ int main(int argc, char **argv)
     std::set<size_t> zc_list = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
         15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48, 52, 56, 
         60, 64, 72, 80, 88, 96, 104};
-    // std::set<size_t> zc_list = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
-    //     15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48, 52, 56, 
-    //     60, 64, 72};
 
     // Assign control struct to all UEs
     for (size_t i = 0; i < num_slots; i ++) {
         // Basic settings
-        // size_t num_ue_slot = (i / 10 + 1) * 4;
         size_t num_ue_slot = cfg->user_level_list[i / num_load_levels];
-        // double load = 0.1 * (i % 10 + 1);
         double load = 1.0 / num_load_levels * (i % num_load_levels + 1);
 
         // Count UE num for each resource block
@@ -76,7 +66,6 @@ int main(int argc, char **argv)
 
         for (size_t j = 0; j < num_ue_slot; j ++) {
             // Generate the rb num for this ue
-            // size_t n_rb = num_rb_gen(load, num_rb);
             size_t n_rb = load * num_rb;
             n_rb = MIN(n_rb, num_rb - rb_start);
 
@@ -92,7 +81,7 @@ int main(int argc, char **argv)
             fwrite(&info, sizeof(ControlInfo), 1, file);
 
             if (verbose) {
-                printf("[Slot %u]: UE %u uses rb range (%u:%u), mod %u, Bg %u, Zc %u\n",
+                printf("[Slot %zu]: UE %zu uses rb range (%zu:%zu), mod %zu, Bg %zu, Zc %zu\n",
                     i, j, rb_start, rb_start + n_rb, mod_order_bits, bg, zc);
             }
 
@@ -113,8 +102,6 @@ int main(int argc, char **argv)
     file = fopen(filename.c_str(), "wb");
 
     for (size_t i = 0; i < cfg->frames_to_test; i ++) {
-        // size_t control_idx = rand() % num_slots;
-        // size_t control_idx = 1;
         size_t control_idx;
         if (cfg->fixed_control == -1) {
             control_idx = rand() % num_slots;
