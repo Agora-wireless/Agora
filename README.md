@@ -173,10 +173,11 @@ Both Faros and Iris have their roots in the [Argos massive MIMO base station](ht
 We use command line variables of cmake to switch between emulated RRU and real RRU. 
 We use `-DUSE_AGROS` for Faros RRU and Iris UEs, and `-DUSE_UHD` for USRP-based RRU and UEs. 
 
-Currently, Agora only supports uplink with real RRU and UEs. 
+Agora supports both uplink and downlink with real RRU and UEs. 
+For downlink, a reference node outside the array (and synchronized) is required for reciprocity calibration.
 We recommend using one server for controlling the RRU and running Agora, 
 and another server for controlling the UEs and running the UE code.
-Below we describe how to get the uplink demo work.
+Below we describe how to get the uplink and downlink demos working.
  * Rebuild the code on both servers for RRU side the UE side.
     * For Faros RRU and Iris UEs, pass `-DUSE_ARGOS=on -DUSE_UHD=off` to cmake
     * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on` to cmake 
@@ -184,17 +185,20 @@ Below we describe how to get the uplink demo work.
  * Run the UE code on the server connected to the Iris UEs
    * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
      from your setup.
-   * Run `./build/data_generator --conf_file data/ue-ul-hw.json` to generate required data files.
+   * Run `./build/data_generator --conf_file data/ue-ul-hw.json` to generate required data files. 
    * Run `./build/user --conf_file data/ue-ul-hw.json`.
+   * For downlink, use `data/ue-dl-hw.json` in the last two steps.
  * Run Agora on the server connected to the Faros RRU
    * scp over the generated file `data/LDPC_orig_data_512_ant2.bin` from the client
      machine to the server's `data` directory.
    * Rebuild the code
-     * Set `kPrintPhyStats = true` in `src/common/Symbols.hpp`, if you wish to see uplink BER results.
-     * Run `make -j` to recompile the code.
+     * Run `make -j` to compile the code.
    * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding
      serials of your RRU Irises and hub, respectively.
    * Run `./build/agora --conf_file data/bs-ul-hw.json`.
+   * For downlink, put the serial of the reference node in the last line
+     of `data/bs-iris-serials.txt` and modify/add `"ref_ant"` in `data/bs-dl-hw.json`
+     to reflect the antenna index of the reference node.
 
 ## Running performance test
 To test the real-time performance of Agora for processing 64x16 MU-MIMO with 20 MHz bandwidth and 64QAM modulation,
