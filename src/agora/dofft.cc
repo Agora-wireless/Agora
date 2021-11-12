@@ -115,7 +115,9 @@ EventData DoFFT::Launch(size_t tag) {
       std::printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
                   tid_, frame_id, symbol_id, ant_id);
     }
-    if (kPrintPilotCorrStats && sym_type == SymbolType::kPilot) {
+    if (kPrintPilotCorrStats &&
+        (sym_type == SymbolType::kPilot || sym_type == SymbolType::kCalDL ||
+         sym_type == SymbolType::kCalUL)) {
       SimdConvertShortToFloat(pkt->data_,
                               reinterpret_cast<float*>(rx_samps_tmp_),
                               2 * cfg_->SampsPerSymbol());
@@ -200,6 +202,7 @@ EventData DoFFT::Launch(size_t tag) {
       PartialTranspose(
           &calib_ul_buffer_[frame_grp_slot][ant_id * cfg_->OfdmDataNum()],
           ant_id, sym_type);
+      phy_stats_->UpdateCalibPilotSnr(frame_grp_id, 1, ant_id, fft_inout_);
     }
   } else if (sym_type == SymbolType::kCalDL && ant_id == cfg_->RefAnt()) {
     if (frame_id >= TX_FRAME_DELTA) {
@@ -212,6 +215,7 @@ EventData DoFFT::Launch(size_t tag) {
       complex_float* calib_dl_ptr =
           &calib_dl_buffer_[frame_grp_slot][cur_ant * cfg_->OfdmDataNum()];
       PartialTranspose(calib_dl_ptr, ant_id, sym_type);
+      phy_stats_->UpdateCalibPilotSnr(frame_grp_id, 0, cur_ant, fft_inout_);
     }
   } else {
     std::string error_message = "Unknown or unsupported symbol type " +
