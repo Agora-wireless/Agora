@@ -53,6 +53,8 @@ PhyStats::PhyStats(Config* const cfg) : config_(cfg) {
                     Agora_memory::Alignment_t::kAlign64);
   calib_pilot_snr_.Calloc(kFrameWnd, 2 * cfg->BsAntNum(),
                           Agora_memory::Alignment_t::kAlign64);
+  csi_cond_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
+                   Agora_memory::Alignment_t::kAlign64);
 }
 
 PhyStats::~PhyStats() {
@@ -207,6 +209,29 @@ void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
   float snr = (rssi - noise) / noise;
   pilot_snr_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
       10 * std::log10(snr);
+}
+
+void PhyStats::PrintZfStats(size_t frame_id) {
+  size_t frame_slot = frame_id % kFrameWnd;
+  std::stringstream ss;
+  ss << "Frame " << frame_id
+     << " ZF matrix inverse condition number range: " << std::fixed
+     << std::setw(5) << std::setprecision(2);
+  arma::fvec cond_vec(csi_cond_[frame_slot], config_->OfdmDataNum(), false);
+  float max_cond = 0;
+  float min_cond = 1;
+  for (size_t j = 0; j < config_->OfdmDataNum(); j++) {
+    if (cond_vec.at(j) < min_cond) min_cond = cond_vec.at(j);
+    if (cond_vec.at(j) > max_cond) max_cond = cond_vec.at(j);
+  }
+  ss << "[" << min_cond << "," << max_cond
+     << "], Mean: " << arma::mean(cond_vec);
+  ss << std::endl;
+  std::cout << ss.str();
+}
+
+void PhyStats::UpdateCsiCond(size_t frame_id, size_t sc_id, float cond) {
+  csi_cond_[frame_id % kFrameWnd][sc_id] = cond;
 }
 
 void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
