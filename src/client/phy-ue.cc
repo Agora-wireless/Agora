@@ -368,7 +368,7 @@ void PhyUe::Start() {
                         frame_id, config_->Frame().GetPilotSymbol(ue_id), ue_id)
                         .tag_);
                 ScheduleTask(do_tx_pilot_task, &tx_queue_,
-                             *tx_ptoks_ptr_[ant_id % rx_thread_num_]);
+                             *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
               }
             } else {
               if ((ant_id % config_->NumChannels()) == 0) {
