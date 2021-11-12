@@ -734,6 +734,14 @@ void Agora::HandleEventFft(size_t tag) {
           this->pilot_fft_counters_.Reset(frame_id);
           if (kPrintPhyStats == true) {
             this->phy_stats_->PrintSnrStats(frame_id);
+            if (config_->Frame().IsRecCalEnabled() == true) {
+              size_t frame_grp_id =
+                  (frame_id - TX_FRAME_DELTA) / config_->AntGroupNum();
+              if ((frame_id - TX_FRAME_DELTA) % config_->AntGroupNum() == 0 &&
+                  frame_grp_id > 0) {
+                this->phy_stats_->PrintCalibSnrStats(frame_grp_id - 1);
+              }
+            }
           }
           if (kEnableMac == true) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);

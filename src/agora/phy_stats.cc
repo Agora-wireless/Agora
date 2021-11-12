@@ -51,6 +51,8 @@ PhyStats::PhyStats(Config* const cfg) : config_(cfg) {
   }
   pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
                     Agora_memory::Alignment_t::kAlign64);
+  calib_pilot_snr_.Calloc(kFrameWnd, 2 * cfg->BsAntNum(),
+                          Agora_memory::Alignment_t::kAlign64);
 }
 
 PhyStats::~PhyStats() {
@@ -141,6 +143,53 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
   }
   ss << std::endl;
   std::cout << ss.str();
+}
+
+void PhyStats::PrintCalibSnrStats(size_t frame_id) {
+  std::stringstream ss;
+  ss << "Frame " << (frame_id + 1) * config_->AntGroupNum() + TX_FRAME_DELTA
+     << " Calibration Pilot Signal SNR (dB) Range at BS Antennas: "
+     << std::fixed << std::setw(5) << std::setprecision(1);
+  for (size_t i = 0; i < 2; i++) {
+    float max_snr = FLT_MIN;
+    float min_snr = FLT_MAX;
+    float* frame_snr =
+        &calib_pilot_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
+    for (size_t j = 0; j < config_->BsAntNum(); j++) {
+      if (config_->ExternalRefNode() == true &&
+          j / config_->NumChannels() ==
+              config_->RefAnt() / config_->NumChannels())
+        continue;
+      if (frame_snr[j] < min_snr) min_snr = frame_snr[j];
+      if (frame_snr[j] > max_snr) max_snr = frame_snr[j];
+    }
+    if (min_snr == FLT_MAX) min_snr = -100;
+    if (max_snr == FLT_MIN) max_snr = -100;
+    if (i == 0)
+      ss << "Downlink ";
+    else
+      ss << "Uplink ";
+    ss << ": [" << min_snr << "," << max_snr << "] ";
+  }
+  ss << std::endl;
+  std::cout << ss.str();
+}
+
+void PhyStats::UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id,
+                                   size_t ant_id, complex_float* fft_data) {
+  arma::cx_fmat fft_mat((arma::cx_float*)fft_data, config_->OfdmCaNum(), 1,
+                        false);
+  arma::fmat fft_abs_mat = abs(fft_mat);
+  arma::fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
+  float rssi = as_scalar(sum(fft_abs_mag));
+  float noise_per_sc1 =
+      as_scalar(mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
+  float noise_per_sc2 = as_scalar(mean(
+      fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
+  float noise = config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
+  float snr = (rssi - noise) / noise;
+  calib_pilot_snr_[frame_id % kFrameWnd][calib_sym_id * config_->BsAntNum() +
+                                         ant_id] = 10 * std::log10(snr);
 }
 
 void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
