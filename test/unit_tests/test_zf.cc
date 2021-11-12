@@ -42,12 +42,13 @@ TEST(TestZF, Perf) {
                                    cfg->OfdmDataNum() * cfg->BsAntNum(),
                                    Agora_memory::Alignment_t::kAlign64);
 
+  auto phy_stats = std::make_unique<PhyStats>(cfg.get());
   auto stats = std::make_unique<Stats>(cfg.get());
 
   auto compute_zf = std::make_unique<DoZF>(
       cfg.get(), tid, csi_buffers, calib_dl_msum_buffer, calib_ul_msum_buffer,
       calib_dl_buffer, calib_ul_buffer, ul_zf_matrices, dl_zf_matrices,
-      stats.get());
+      phy_stats.get(), stats.get());
 
   FastRand fast_rand;
   size_t start_tsc = GetTime::Rdtsc();

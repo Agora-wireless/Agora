@@ -13,6 +13,7 @@
 #include "config.h"
 #include "doer.h"
 #include "gettime.h"
+#include "phy_stats.h"
 #include "stats.h"
 #include "symbols.h"
 #include "utils.h"
@@ -27,7 +28,7 @@ class DoZF : public Doer {
        Table<complex_float>& calib_ul_msum_buffer,
        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_,
        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
-       Stats* stats_manager);
+       PhyStats* in_phy_stats, Stats* stats_manager);
   ~DoZF() override;
 
   /**
@@ -95,6 +96,7 @@ class DoZF : public Doer {
   complex_float* csi_gather_buffer_;  // Intermediate buffer to gather CSI
   // Intermediate buffer to gather reciprical calibration data vector
   complex_float* calib_gather_buffer_;
+  PhyStats* phy_stats_;
 };
 
 #endif  // DOZF_H_

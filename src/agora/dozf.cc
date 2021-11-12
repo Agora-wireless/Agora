@@ -12,7 +12,6 @@ static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
 static constexpr size_t kUseInverseForZF = 1u;
-static constexpr size_t kPrintSubcarrierIndex = 1;
 static constexpr bool kUseUlZfForDownlink = true;
 
 DoZF::DoZF(Config* config, int tid,
@@ -23,7 +22,7 @@ DoZF::DoZF(Config* config, int tid,
            Table<complex_float>& calib_ul_msum_buffer,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
-           Stats* stats_manager)
+           PhyStats* in_phy_stats, Stats* stats_manager)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
       calib_dl_buffer_(calib_dl_buffer),
@@ -31,7 +30,8 @@ DoZF::DoZF(Config* config, int tid,
       calib_dl_msum_buffer_(calib_dl_msum_buffer),
       calib_ul_msum_buffer_(calib_ul_msum_buffer),
       ul_zf_matrices_(ul_zf_matrices),
-      dl_zf_matrices_(dl_zf_matrices) {
+      dl_zf_matrices_(dl_zf_matrices),
+      phy_stats_(in_phy_stats) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kZF, tid);
   pred_csi_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
@@ -354,11 +354,7 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     auto rcond = ComputePrecoder(mat_csi, calib_gather_buffer_,
                                  ul_zf_matrices_[frame_slot][cur_sc_id],
                                  dl_zf_matrices_[frame_slot][cur_sc_id]);
-    if (kPrintPhyStats && cur_sc_id == kPrintSubcarrierIndex)
-      printf(
-          "Frame %zu, Subcarrier %zu, ZF Matrix Inverse Condition Number = "
-          "%.2f\n",
-          frame_id, kPrintSubcarrierIndex, rcond);
+    phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
     duration_stat_->task_count_++;

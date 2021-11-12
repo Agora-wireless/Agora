@@ -60,7 +60,7 @@ void MasterToWorkerDynamicWorker(
     Table<complex_float>& calib_ul_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
-    Stats* stats) {
+    PhyStats* phy_stats, Stats* stats) {
   PinToCoreWithOffset(ThreadType::kWorker, cfg->CoreOffset() + 1, worker_id);
 
   // Wait for all threads (including master) to start runnung
@@ -71,7 +71,8 @@ void MasterToWorkerDynamicWorker(
 
   auto compute_zf = std::make_unique<DoZF>(
       cfg, worker_id, csi_buffers, calib_dl_msum_buffer, calib_ul_msum_buffer,
-      calib_dl_buffer, calib_ul_buffer, ul_zf_matrices, dl_zf_matrices, stats);
+      calib_dl_buffer, calib_ul_buffer, ul_zf_matrices, dl_zf_matrices,
+      phy_stats, stats);
 
   size_t start_tsc = GetTime::Rdtsc();
   size_t num_tasks = 0;
@@ -135,6 +136,7 @@ TEST(TestZF, VaryingConfig) {
   calib_ul_buffer.RandAllocCxFloat(kFrameWnd, kMaxDataSCs * kMaxAntennas,
                                    Agora_memory::Alignment_t::kAlign64);
 
+  auto phy_stats = std::make_unique<PhyStats>(cfg.get());
   auto stats = std::make_unique<Stats>(cfg.get());
 
   std::vector<std::thread> threads;
@@ -147,7 +149,8 @@ TEST(TestZF, VaryingConfig) {
         std::ref(complete_task_queue), ptoks[i], std::ref(csi_buffers),
         std::ref(calib_dl_msum_buffer), std::ref(calib_ul_msum_buffer),
         std::ref(calib_dl_buffer), std::ref(calib_ul_buffer),
-        std::ref(ul_zf_matrices), std::ref(dl_zf_matrices), stats.get());
+        std::ref(ul_zf_matrices), std::ref(dl_zf_matrices), phy_stats.get(),
+        stats.get());
   }
   for (auto& thread : threads) {
     thread.join();
