@@ -125,7 +125,13 @@ Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_thread
     rt_assert(ret == 0, "Cannot get MAC address of the port");
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 
-    printf("Sender init done\n");
+    size_t ant_block = cfg->BS_ANT_NUM / cfg->bs_rru_addr_list.size();
+    size_t ant_off = cfg->BS_ANT_NUM % cfg->bs_rru_addr_list.size();
+    ant_start_ = cfg->bs_rru_addr_idx < ant_off ? (ant_block + 1) * cfg->bs_rru_addr_idx : (ant_block + 1) * ant_off + ant_block * (cfg->bs_rru_addr_idx - ant_off);
+    ant_end_ = cfg->bs_rru_addr_idx < ant_off ? ant_start_ + ant_block + 1 : ant_start_ + ant_block;
+    ant_num_ = ant_end_ - ant_start_;
+
+    printf("Sender init done. Sending IQ samples from ant [%zu:%zu]\n", ant_start_, ant_end_);
 }
 
 Sender::~Sender()
@@ -332,9 +338,13 @@ void* Sender::worker_thread(int tid)
     DftiCommitDescriptor(mkl_handle);
 
     const size_t max_symbol_id = get_max_symbol_id();
-    const size_t radio_block_size = cfg->nRadios / num_worker_threads_;
-    const size_t radio_block_off = cfg->nRadios % num_worker_threads_;
-    const size_t radio_lo = (size_t)tid < radio_block_off ? tid * (radio_block_size + 1) : tid * radio_block_size + radio_block_off;
+    // const size_t radio_block_size = cfg->nRadios / num_worker_threads_;
+    // const size_t radio_block_off = cfg->nRadios % num_worker_threads_;
+    const size_t radio_block_size = ant_num_ / num_worker_threads_;
+    const size_t radio_block_off = ant_num_ % num_worker_threads_;
+    // const size_t radio_lo = (size_t)tid < radio_block_off ? tid * (radio_block_size + 1) : tid * radio_block_size + radio_block_off;
+    // const size_t radio_hi = (size_t)tid < radio_block_off ? radio_lo + radio_block_size + 1 : radio_lo + radio_block_size;
+    const size_t radio_lo = (size_t)tid < radio_block_off ? ant_start_ + tid * (radio_block_size + 1) : ant_start_ + tid * radio_block_size + radio_block_off;
     const size_t radio_hi = (size_t)tid < radio_block_off ? radio_lo + radio_block_size + 1 : radio_lo + radio_block_size;
     const size_t ant_num_this_thread = cfg->BS_ANT_NUM / num_worker_threads_
         + ((size_t)tid < cfg->BS_ANT_NUM % num_worker_threads_ ? 1 : 0);

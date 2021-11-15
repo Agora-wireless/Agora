@@ -164,6 +164,9 @@ private:
     std::vector<size_t> control_idx_list_;
 
     size_t start_tsc_distributed_;
+    size_t ant_start_;
+    size_t ant_end_;
+    size_t ant_num_;
 
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pools_[kMaxWorkerNum];
