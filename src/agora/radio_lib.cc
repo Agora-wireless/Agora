@@ -407,7 +407,7 @@ bool RadioConfig::RadioStart() {
       if (c == 'C') {
         sched.replace(s, 1, is_ref_radio ? "R" : "T");
       } else if (c == 'L') {
-        sched.replace(s, 1, is_ref_radio ? "P" : "R");
+        sched.replace(s, 1, is_ref_radio ? "T" : "R");
       } else if (c == 'P') {
         sched.replace(s, 1, "R");
       } else if (c == 'U') {
