@@ -17,6 +17,8 @@ void PacketTXRX::LoopTxRxUsrp(size_t tid) {
   std::printf("LoopTxRxUsrp: TxRx thread %zu has %zu radios\n", tid,
               radio_hi - radio_lo);
 
+  threads_started_.fetch_add(1);
+
   // prepare BS beacon in host buffer
   std::vector<void*> beaconbuff(2);
   std::vector<void*> zeros(2);

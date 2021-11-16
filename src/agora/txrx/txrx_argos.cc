@@ -20,8 +20,14 @@ void PacketTXRX::LoopTxRxArgos(size_t tid) {
   const size_t radio_lo = tid * radios_per_thread;
   const size_t radio_hi =
       std::min((radio_lo + radios_per_thread), cfg_->NumRadios()) - 1;
+
+  threads_started_.fetch_add(1);
+  if (radio_lo > radio_hi) {
+    MLPD_INFO("LoopTxRxArgos[%zu] has no radios, exiting\n", tid);
+    return;
+  }
   MLPD_INFO("LoopTxRxArgos[%zu] has %zu:%zu total radios %zu\n", tid, radio_lo,
-            radio_hi - 1, radio_hi - radio_lo);
+            radio_hi, (radio_hi - radio_lo) + 1);
 
   ssize_t prev_frame_id = -1;
   size_t radio_id = radio_lo;
@@ -41,8 +47,10 @@ void PacketTXRX::LoopTxRxArgos(size_t tid) {
             prev_frame_id = frame_id;
           }
         }
-        if (++radio_id == (radio_hi + 1)) {
+        if (radio_id == radio_hi) {
           radio_id = radio_lo;
+        } else {
+          radio_id++;
         }
       }  // if (pkt.size() > 0)
     }    // DequeueSendArgos(tid) == 0

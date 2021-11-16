@@ -69,8 +69,6 @@ class DPDKRxPacket : public RxPacket {
  */
 class PacketTXRX {
  public:
-  static const int kMaxSocketNum = 10;  // Max number of socket threads allowed
-
   explicit PacketTXRX(Config* cfg, size_t in_core_offset = 1);
 
   PacketTXRX(Config* cfg, size_t core_offset,
@@ -130,7 +128,7 @@ class PacketTXRX {
   const size_t socket_thread_num_;
 
   // Handle for socket threads
-  std::array<std::thread, kMaxSocketNum> socket_std_threads_;
+  std::vector<std::thread> socket_std_threads_;
   size_t buffers_per_socket_;
 
   char* tx_buffer_;
@@ -142,6 +140,8 @@ class PacketTXRX {
 
   std::vector<std::unique_ptr<UDPServer>> udp_servers_;
   std::vector<std::unique_ptr<UDPClient>> udp_clients_;
+
+  std::atomic<size_t> threads_started_;
 
 #if defined(USE_DPDK)
   uint32_t bs_rru_addr_;     // IPv4 address of the simulator sender
