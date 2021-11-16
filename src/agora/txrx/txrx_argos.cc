@@ -172,25 +172,33 @@ size_t PacketTXRX::DequeueSendArgos(int tid) {
         ant_id;
 
     if (last_antenna) {
-      // Transmit downlink calibration (array to ref) pilot
+      // Transmit downlink/uplink calibration pilot
       std::vector<void*> caltxbuf(cfg_->NumChannels());
       if ((cfg_->Frame().IsRecCalEnabled() == true) &&
-          (symbol_id == cfg_->Frame().GetDLSymbol(0)) &&
-          (radio_id != cfg_->RefRadio())) {
+          (symbol_id == cfg_->Frame().GetDLSymbol(0))) {
         std::vector<std::complex<int16_t>> zeros(cfg_->SampsPerSymbol(),
                                                  std::complex<int16_t>(0, 0));
         for (size_t s = 0; s < cfg_->RadioPerGroup(); s++) {
-          bool calib_turn = (frame_id % cfg_->RadioGroupNum() ==
-                                 radio_id / cfg_->RadioPerGroup() &&
-                             s == radio_id % cfg_->RadioPerGroup());
-          for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
-            caltxbuf.at(ch) =
-                calib_turn ? cfg_->PilotCi16().data() : zeros.data();
-            if (cfg_->NumChannels() > 1) caltxbuf.at(1 - ch) = zeros.data();
+          if (radio_id != cfg_->RefRadio()) {
+            bool calib_turn = (frame_id % cfg_->RadioGroupNum() ==
+                                   radio_id / cfg_->RadioPerGroup() &&
+                               s == radio_id % cfg_->RadioPerGroup());
+            for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
+              caltxbuf.at(ch) =
+                  calib_turn ? cfg_->PilotCi16().data() : zeros.data();
+              if (cfg_->NumChannels() > 1) caltxbuf.at(1 - ch) = zeros.data();
+              long long frame_time =
+                  ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
+                  (cfg_->Frame().GetDLCalSymbol(s * cfg_->NumChannels() + ch)
+                   << 16);
+              radioconfig_->RadioTx(radio_id, caltxbuf.data(), 1, frame_time);
+            }
+          } else {
+            caltxbuf.at(0) = cfg_->PilotCi16().data();
+            if (cfg_->NumChannels() > 1) caltxbuf.at(1) = zeros.data();
             long long frame_time =
                 ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
-                (cfg_->Frame().GetDLCalSymbol(s * cfg_->NumChannels() + ch)
-                 << 16);
+                (cfg_->Frame().GetULCalSymbol(0) << 16);
             radioconfig_->RadioTx(radio_id, caltxbuf.data(), 1, frame_time);
           }
         }
