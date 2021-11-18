@@ -188,7 +188,7 @@ Config::Config(const std::string& jsonfile)
              "tx_advance size must be same as the number of clients!");
     cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
   }
-  hw_framer_ = tdd_conf.value("hw_framer", true);
+  hw_framer_ = tdd_conf.value("hw_framer", !kUseUHD);
 
   // If frames not specified explicitly, construct default based on frame_type /
   // symbol_num_perframe / pilot_num / ul_symbol_num_perframe /
