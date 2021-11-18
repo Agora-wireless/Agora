@@ -112,7 +112,7 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
   }
   MLPD_INFO("LoopTXRX: socket threads are waiting for events\n");
 
-  if ((kUseArgos == true) || (kUseUHD == true)) {
+  if ((kUseArgos == true && cfg_->HwFramer() == true) || (kUseUHD == true)) {
     radioconfig_->Go();
   }
   return true;

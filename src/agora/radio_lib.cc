@@ -395,64 +395,68 @@ bool RadioConfig::RadioStart() {
   size_t ndx = 0;
   for (size_t i = 0; i < this->radio_num_; i++) {
     bool is_ref_radio = (i == cfg_->RefRadio());
-    ba_stn_[i]->writeSetting(
-        "TX_SW_DELAY", "30");  // experimentally good value for dev front-end
-    ba_stn_[i]->writeSetting("TDD_MODE", "true");
-    std::vector<std::string> tdd_sched;
+    if (cfg_->HwFramer() == true) {
+      ba_stn_[i]->writeSetting(
+          "TX_SW_DELAY", "30");  // experimentally good value for dev front-end
+      ba_stn_[i]->writeSetting("TDD_MODE", "true");
+      std::vector<std::string> tdd_sched;
 
-    std::string sched = cfg_->Frame().FrameIdentifier();
-    size_t sched_size = sched.length();
-    for (size_t s = 0; s < sched_size; s++) {
-      char c = cfg_->Frame().FrameIdentifier().at(s);
-      if (c == 'C') {
-        sched.replace(s, 1, is_ref_radio ? "R" : "T");
-      } else if (c == 'L') {
-        sched.replace(s, 1, is_ref_radio ? "T" : "R");
-      } else if (c == 'P') {
-        sched.replace(s, 1, "R");
-      } else if (c == 'U') {
-        sched.replace(s, 1, "R");
-      } else if (c == 'D') {
-        sched.replace(s, 1, "T");
-      } else if (c != 'B') {
-        sched.replace(s, 1, "G");
-      }
-    }
-    std::cout << "Radio " << i << " Frame 1: " << sched << std::endl;
-    tdd_sched.push_back(sched);
-
-    conf["frames"] = tdd_sched;
-    std::string conf_string = conf.dump();
-    ba_stn_[i]->writeSetting("TDD_CONFIG", conf_string);
-
-    ba_stn_[i]->writeRegisters("BEACON_RAM", 0, beacon);
-    for (char const& c : cfg_->Channel()) {
-      bool is_beacon_antenna = !cfg_->Beamsweep() && ndx == cfg_->BeaconAnt();
-      std::vector<unsigned> beacon_weights(cfg_->NumAntennas(),
-                                           is_beacon_antenna ? 1 : 0);
-      std::string tx_ram_wgt = "BEACON_RAM_WGT_";
-      if (cfg_->Beamsweep()) {
-        for (size_t j = 0; j < cfg_->NumAntennas(); j++) {
-          beacon_weights[j] = CommsLib::Hadamard2(ndx, j);
+      std::string sched = cfg_->Frame().FrameIdentifier();
+      size_t sched_size = sched.length();
+      for (size_t s = 0; s < sched_size; s++) {
+        char c = cfg_->Frame().FrameIdentifier().at(s);
+        if (c == 'C') {
+          sched.replace(s, 1, is_ref_radio ? "R" : "T");
+        } else if (c == 'L') {
+          sched.replace(s, 1, is_ref_radio ? "T" : "R");
+        } else if (c == 'P') {
+          sched.replace(s, 1, "R");
+        } else if (c == 'U') {
+          sched.replace(s, 1, "R");
+        } else if (c == 'D') {
+          sched.replace(s, 1, "T");
+        } else if (c != 'B') {
+          sched.replace(s, 1, "G");
         }
       }
-      ba_stn_[i]->writeRegisters(tx_ram_wgt + c, 0, beacon_weights);
-      ++ndx;
-    }
-    ba_stn_[i]->writeSetting("BEACON_START", std::to_string(radio_num_));
-    if (cfg_->Frame().IsRecCalEnabled()) {
-      if (is_ref_radio) {
-        // Write to the first channel TX_RAM on the calibration node for
-        // ref-to-array transmission
-        ba_stn_[i]->writeRegisters(
-            std::string("TX_RAM_") + cfg_->Channel().at(0), 0, pilot);
+      std::cout << "Radio " << i << " Frame 1: " << sched << std::endl;
+      tdd_sched.push_back(sched);
+
+      conf["frames"] = tdd_sched;
+      std::string conf_string = conf.dump();
+      ba_stn_[i]->writeSetting("TDD_CONFIG", conf_string);
+
+      ba_stn_[i]->writeRegisters("BEACON_RAM", 0, beacon);
+      for (char const& c : cfg_->Channel()) {
+        bool is_beacon_antenna = !cfg_->Beamsweep() && ndx == cfg_->BeaconAnt();
+        std::vector<unsigned> beacon_weights(cfg_->NumAntennas(),
+                                             is_beacon_antenna ? 1 : 0);
+        std::string tx_ram_wgt = "BEACON_RAM_WGT_";
+        if (cfg_->Beamsweep()) {
+          for (size_t j = 0; j < cfg_->NumAntennas(); j++) {
+            beacon_weights[j] = CommsLib::Hadamard2(ndx, j);
+          }
+        }
+        ba_stn_[i]->writeRegisters(tx_ram_wgt + c, 0, beacon_weights);
+        ++ndx;
+      }
+      ba_stn_[i]->writeSetting("BEACON_START", std::to_string(radio_num_));
+      if (cfg_->Frame().IsRecCalEnabled()) {
+        if (is_ref_radio) {
+          // Write to the first channel TX_RAM on the calibration node for
+          // ref-to-array transmission
+          ba_stn_[i]->writeRegisters(
+              std::string("TX_RAM_") + cfg_->Channel().at(0), 0, pilot);
+        }
       }
     }
 
     if (!kUseUHD) {
       ba_stn_[i]->setHardwareTime(0, "TRIGGER");
-      ba_stn_[i]->activateStream(this->rx_streams_[i]);
-      ba_stn_[i]->activateStream(this->tx_streams_[i]);
+      if (cfg_->HwFramer() == true) {
+        ba_stn_[i]->activateStream(this->rx_streams_[i]);
+        ba_stn_[i]->activateStream(this->tx_streams_[i]);
+      }
     } else {
       ba_stn_[i]->setHardwareTime(0, "UNKNOWN_PPS");
       ba_stn_[i]->activateStream(this->rx_streams_[i], SOAPY_SDR_HAS_TIME, 1e9,
@@ -462,6 +466,14 @@ bool RadioConfig::RadioStart() {
     }
   }
 
+  if (!kUseUHD && cfg_->HwFramer() == false) {
+    this->Go();  // to set all radio timestamps to zero
+    int flags = SOAPY_SDR_HAS_TIME;
+    for (size_t i = 0; i < this->radio_num_; i++) {
+      ba_stn_[i]->activateStream(this->rx_streams_[i], flags, 1e9, 0);
+      ba_stn_[i]->activateStream(this->tx_streams_[i], flags, 1e9, 0);
+    }
+  }
   std::cout << "radio start done!" << std::endl;
   return true;
 }
@@ -498,7 +510,7 @@ int RadioConfig::RadioTx(size_t r /*radio id*/, void** buffs, int flags,
   // long long frameTime(0);
 
   int w;
-  if (!kUseUHD) {
+  if (cfg_->HwFramer() == true) {
     w = ba_stn_[r]->writeStream(this->tx_streams_[r], buffs,
                                 cfg_->SampsPerSymbol(), tx_flags, frameTime,
                                 1000000);
@@ -540,7 +552,7 @@ int RadioConfig::RadioRx(size_t r /*radio id*/, void** buffs,
                                      cfg_->SampsPerSymbol(), flags,
                                      frame_time_ns, 1000000);
 
-    if (!kUseUHD) {
+    if (cfg_->HwFramer() == true) {
       // SoapySDR::timeNsToTicks(frameTimeNs, _rate);
       frameTime = frame_time_ns;
     } else {
