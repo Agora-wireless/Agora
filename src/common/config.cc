@@ -444,8 +444,12 @@ Config::Config(const std::string& jsonfile)
   packet_length_ =
       Packet::kOffsetOfData + ((kUse12BitIQ ? 3 : 4) * samps_per_symbol_);
   dl_packet_length_ = Packet::kOffsetOfData + (samps_per_symbol_ * 4);
-  RtAssert(packet_length_ < 9000,
-           "Packet size must be smaller than jumbo frame");
+
+  //Don't check for jumbo frames when using the hardware, this might be temp
+  if (kUseArgos == false) {
+    RtAssert(packet_length_ < 9000,
+             "Packet size must be smaller than jumbo frame");
+  }
 
   num_bytes_per_cb_ = ldpc_config_.NumCbLen() / 8;
   data_bytes_num_persymbol_ =
