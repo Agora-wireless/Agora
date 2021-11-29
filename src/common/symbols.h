@@ -148,6 +148,7 @@ static constexpr bool kUsePartialTrans = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = true;
 static constexpr bool kCollectPhyStats = true;
+static constexpr bool kPrintZfStats = false;
 
 static constexpr bool kStatsPrintFrameSummary = true;
 static constexpr bool kDebugPrintPerFrameDone = true;

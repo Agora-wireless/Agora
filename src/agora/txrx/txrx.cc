@@ -194,7 +194,7 @@ void PacketTXRX::LoopTxRx(size_t tid) {
 
   MLPD_INFO("LoopTxRx[%zu] has %zu:%zu total radios %zu\n", tid, radio_lo,
             radio_hi, (radio_hi - radio_lo) + 1);
-  //\todo Sync the start of the threads
+  // \todo Sync the start of the threads
   threads_started_.fetch_add(1);
 
   int prev_frame_id = -1;
