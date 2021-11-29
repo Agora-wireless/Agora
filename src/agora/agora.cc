@@ -371,7 +371,7 @@ void Agora::Start() {
               zf_last_frame_ = frame_id;
               PrintPerFrameDone(PrintType::kZF, frame_id);
               this->zf_counters_.Reset(frame_id);
-              this->phy_stats_->PrintZfStats(frame_id);
+              if (kPrintZfStats) this->phy_stats_->PrintZfStats(frame_id);
 
               for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
                 if (this->fft_cur_frame_for_symbol_.at(i) == frame_id) {

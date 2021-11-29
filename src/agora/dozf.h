@@ -56,7 +56,7 @@ class DoZF : public Doer {
   /// zeroforcing precoder using this CSI matrix and calibration buffer
   float ComputePrecoder(const arma::cx_fmat& mat_csi, complex_float* calib_ptr,
                         complex_float* mat_ul_zf, complex_float* mat_dl_zf);
-
+  void ComputeCalib(size_t frame_id, size_t sc_id);
   void ZfFreqOrthogonal(size_t tag);
 
   /**
