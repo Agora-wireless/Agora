@@ -148,6 +148,7 @@ static constexpr bool kUsePartialTrans = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = true;
 static constexpr bool kCollectPhyStats = true;
+static constexpr bool kPrintZfStats = false;
 
 static constexpr bool kStatsPrintFrameSummary = true;
 static constexpr bool kDebugPrintPerFrameDone = true;
@@ -157,6 +158,7 @@ static constexpr bool kDebugPrintPerTaskDone = false;
 static constexpr bool kDebugPrintStatsPerThread = false;
 static constexpr bool kDebugPrintInTask = false;
 static constexpr bool kDebugMulticell = false;
+static constexpr bool kRecordCalibrationMats = false;
 
 /// Print the I/Q samples in the pilots
 static constexpr bool kDebugPrintPilot = false;

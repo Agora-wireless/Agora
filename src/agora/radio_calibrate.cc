@@ -589,16 +589,16 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
   std::vector<std::complex<int16_t>> dummybuff(read_len);
   // DrainBuffers();
 
-  for (size_t i = 0; i < r; i++) {
-    for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
-      ba_stn_.at(i)->setGain(
-          SOAPY_SDR_TX, ch, "PAD",
-          ch != 0u ? cfg_->CalibTxGainB() : cfg_->CalibTxGainA());
-    }
-    ba_stn_.at(i)->writeSetting("TDD_CONFIG", "{\"tdd_enabled\":false}");
-    ba_stn_.at(i)->writeSetting("TDD_MODE", "false");
-    ba_stn_.at(i)->activateStream(this->tx_streams_.at(i));
-  }
+  //for (size_t i = 0; i < r; i++) {
+  //  for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
+  //    ba_stn_.at(i)->setGain(
+  //        SOAPY_SDR_TX, ch, "PAD",
+  //        ch != 0u ? cfg_->CalibTxGainB() : cfg_->CalibTxGainA());
+  //  }
+  //  ba_stn_.at(i)->writeSetting("TDD_CONFIG", "{\"tdd_enabled\":false}");
+  //  ba_stn_.at(i)->writeSetting("TDD_MODE", "false");
+  //  ba_stn_.at(i)->activateStream(this->tx_streams_.at(i));
+  //}
 
   size_t good_csi_cnt = 0;
   size_t n = 0;
@@ -998,13 +998,13 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
       good_csi_cnt++;
     }
   }
-  for (size_t i = 0; i < r; i++) {
-    ba_stn_.at(i)->deactivateStream(this->tx_streams_.at(i));
-    ba_stn_.at(i)->deactivateStream(this->rx_streams_.at(i));
-    for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
-      ba_stn_.at(i)->setGain(SOAPY_SDR_TX, ch, "PAD",
-                             ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());
-    }
-  }
+  //for (size_t i = 0; i < r; i++) {
+  //  ba_stn_.at(i)->deactivateStream(this->tx_streams_.at(i));
+  //  ba_stn_.at(i)->deactivateStream(this->rx_streams_.at(i));
+  //  for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
+  //    ba_stn_.at(i)->setGain(SOAPY_SDR_TX, ch, "PAD",
+  //                           ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());
+  //  }
+  //}
   return good_csi_cnt == calib_meas_num_;
 }

@@ -31,10 +31,16 @@ class PhyStats {
   void UpdateEvmStats(size_t /*frame_id*/, size_t /*sc_id*/,
                       const arma::cx_fmat& /*eq*/);
   void PrintEvmStats(size_t /*frame_id*/);
+  float GetEvmSnr(size_t frame_id, size_t ue_id);
   void UpdatePilotSnr(size_t /*frame_id*/, size_t /*ue_id*/, size_t /*ant_id*/,
                       complex_float* /*fft_data*/);
-  float GetEvmSnr(size_t frame_id, size_t ue_id);
   void PrintSnrStats(size_t /*frame_id*/);
+  void UpdateCalibPilotSnr(size_t /*frame_id*/, size_t /*ue_id*/,
+                           size_t /*ant_id*/, complex_float* /*fft_data*/);
+  void PrintCalibSnrStats(size_t /*frame_id*/);
+  void UpdateCsiCond(size_t /*frame_id*/, size_t /*subcarrier_id*/,
+                     float /*condition number*/);
+  void PrintZfStats(size_t /*frame_id*/);
 
  private:
   Config const* const config_;
@@ -46,6 +52,8 @@ class PhyStats {
   Table<size_t> uncoded_bit_error_count_;
   Table<float> evm_buffer_;
   Table<float> pilot_snr_;
+  Table<float> calib_pilot_snr_;
+  Table<float> csi_cond_;
 
   arma::cx_fmat gt_mat_;
   size_t num_rx_symbols_;
