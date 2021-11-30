@@ -6,6 +6,8 @@
 
 #include "txrx.h"
 
+#include <chrono>
+
 #include "logger.h"
 
 static constexpr bool kEnableSlowStart = true;
@@ -44,8 +46,11 @@ PacketTXRX::~PacketTXRX() {
   if (kUseArgos || kUseUHD) {
     radioconfig_->RadioStop();
   }
-  for (size_t i = 0; i < cfg_->SocketThreadNum(); i++) {
-    socket_std_threads_.at(i).join();
+
+  for (auto& worker : socket_std_threads_) {
+    if (worker.joinable() == true) {
+      worker.join();
+    }
   }
 }
 
@@ -55,6 +60,7 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
                            Table<complex_float>& calib_ul_buffer) {
   frame_start_ = &frame_start;
   tx_buffer_ = tx_buffer;
+  threads_started_ = 0;
 
   if ((kUseArgos == true) || (kUseUHD == true)) {
     if (radioconfig_->RadioStart() == false) {
@@ -90,16 +96,21 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
     }
 
     if (kUseArgos == true) {
-      socket_std_threads_.at(i) =
-          std::thread(&PacketTXRX::LoopTxRxArgos, this, i);
+      socket_std_threads_.emplace_back(&PacketTXRX::LoopTxRxArgos, this, i);
     } else if (kUseUHD == true) {
-      socket_std_threads_.at(i) =
-          std::thread(&PacketTXRX::LoopTxRxUsrp, this, i);
+      socket_std_threads_.emplace_back(&PacketTXRX::LoopTxRxUsrp, this, i);
     } else {
       MLPD_SYMBOL("LoopTXRX: Starting thread %zu\n", i);
-      socket_std_threads_.at(i) = std::thread(&PacketTXRX::LoopTxRx, this, i);
+      socket_std_threads_.emplace_back(&PacketTXRX::LoopTxRx, this, i);
     }
   }
+  //Need to wait for all the threads to have started......
+  while (threads_started_.load() != socket_std_threads_.size()) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::printf("%zu : %zu Threads have started \n", threads_started_.load(),
+                socket_std_threads_.size());
+  }
+  MLPD_INFO("LoopTXRX: socket threads are waiting for events\n");
 
   if ((kUseArgos == true) || (kUseUHD == true)) {
     radioconfig_->Go();
@@ -183,6 +194,8 @@ void PacketTXRX::LoopTxRx(size_t tid) {
 
   MLPD_INFO("LoopTxRx[%zu] has %zu:%zu total radios %zu\n", tid, radio_lo,
             radio_hi, (radio_hi - radio_lo) + 1);
+  // \todo Sync the start of the threads
+  threads_started_.fetch_add(1);
 
   int prev_frame_id = -1;
   size_t radio_id = radio_lo;

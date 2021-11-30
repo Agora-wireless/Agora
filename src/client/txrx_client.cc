@@ -308,6 +308,12 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
                   << std::endl;
       }
     }
+
+    if (kDebugPrintInTask) {
+      std::printf(
+          "In TX thread %d: Transmitted frame %zu, pilot symbol %zu, ue %zu\n",
+          tid, frame_id, pilot_symbol_id, ue_id);
+    }
   }
   if (event.event_type_ == EventType::kPacketPilotTX) {
     RtAssert(message_queue_->enqueue(
@@ -344,6 +350,14 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
     r = radio->RadioTx(ue_id, txbuf, num_samps, flags_tx_symbol, tx_time);
     if (r < static_cast<int>(num_samps)) {
       std::cout << "BAD Write (UL): " << r << "/" << num_samps << std::endl;
+    }
+
+    if (kDebugPrintInTask) {
+      std::printf(
+          "In TX thread %d: Transmitted frame %zu, data symbol %zu, "
+          "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+          tid, frame_id, tx_symbol_id, ant_id, gen_tag_t(event.tags_[0]).tag_,
+          offset, message_queue_->size_approx());
     }
   }
 

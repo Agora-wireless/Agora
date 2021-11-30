@@ -393,6 +393,29 @@ void Utils::WriteBinaryFile(const std::string& name, size_t elem_size,
   std::fclose(f_handle);
 }
 
+void Utils::SaveMat(arma::cx_fmat c, const std::string& filename,
+                    const std::string& ss, const bool append) {
+  std::stringstream so;
+  std::ofstream of;
+  if (append == true)
+    of.open(filename, std::ios_base::app);
+  else
+    of.open(filename);
+  so << ss << " = [";
+  for (size_t i = 0; i < c.n_cols; i++) {
+    so << "[";
+    for (size_t j = 0; j < c.n_rows; j++) {
+      so << std::fixed << std::setw(5) << std::setprecision(3)
+         << c.at(j, i).real() << "+" << c.at(j, i).imag() << "i ";
+    }
+    so << "];\n";
+  }
+  so << "];\n";
+  so << std::endl;
+  of << so.str();
+  of.close();
+}
+
 void Utils::PrintMat(arma::cx_fmat c, const std::string& ss) {
   std::stringstream so;
   so << ss << " = [";
@@ -407,6 +430,25 @@ void Utils::PrintMat(arma::cx_fmat c, const std::string& ss) {
   so << "];\n";
   so << std::endl;
   std::cout << so.str();
+}
+
+void Utils::SaveVec(arma::cx_fvec c, const std::string& filename,
+                    const std::string& ss, const bool append) {
+  std::stringstream so;
+  std::ofstream of;
+  if (append == true)
+    of.open(filename, std::ios_base::app);
+  else
+    of.open(filename);
+  so << ss << " = [";
+  for (size_t j = 0; j < c.size(); j++) {
+    so << std::fixed << std::setw(5) << std::setprecision(3) << c.at(j).real()
+       << "+" << c.at(j).imag() << "i ";
+  }
+  so << "];\n";
+  so << std::endl;
+  of << so.str();
+  of.close();
 }
 
 void Utils::PrintVec(arma::cx_fvec c, const std::string& ss) {

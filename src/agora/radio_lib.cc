@@ -296,10 +296,10 @@ bool RadioConfig::RadioStart() {
   AllocBuffer1d(&init_calib_ul_processed_,
                 cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
                 Agora_memory::Alignment_t::kAlign64, 1);
-  // initialize init_calib to a matrix of ones
+  // initialize init_calib to a matrix of zeros
   for (size_t i = 0; i < cfg_->OfdmDataNum() * cfg_->BfAntNum(); i++) {
-    init_calib_dl_processed_[i] = 1;
-    init_calib_ul_processed_[i] = 1;
+    init_calib_dl_processed_[i] = 0;
+    init_calib_ul_processed_[i] = 0;
   }
 
   calib_meas_num_ = cfg_->InitCalibRepeat();
@@ -346,6 +346,14 @@ bool RadioConfig::RadioStart() {
           Utils::PrintMat(calib_dl_mat / calib_ul_mat,
                           "calib_mat" + std::to_string(i));
         }
+        if (kRecordCalibrationMats == true) {
+          Utils::SaveMat(calib_dl_mat, "calib_dl_mat.m",
+                         "init_calib_dl_mat" + std::to_string(i),
+                         i > 0 /*append*/);
+          Utils::SaveMat(calib_ul_mat, "calib_ul_mat.m",
+                         "init_calib_ul_mat" + std::to_string(i),
+                         i > 0 /*append*/);
+        }
       }
       arma::cx_fmat calib_dl_mean_mat(init_calib_dl_processed_,
                                       cfg_->OfdmDataNum(), cfg_->BfAntNum(),
@@ -359,6 +367,12 @@ bool RadioConfig::RadioStart() {
         Utils::PrintMat(calib_dl_mean_mat, "calib_dl_mat");
         Utils::PrintMat(calib_ul_mean_mat, "calib_ul_mat");
         Utils::PrintMat(calib_dl_mean_mat / calib_ul_mean_mat, "calib_mat");
+      }
+      if (kRecordCalibrationMats == true) {
+        Utils::SaveMat(calib_dl_mean_mat, "calib_dl_mat.m",
+                       "init_calib_dl_mat_mean", true /*append*/);
+        Utils::SaveMat(calib_ul_mean_mat, "calib_ul_mat.m",
+                       "init_calib_ul_mat_mean", true /*append*/);
       }
     }
     init_calib_dl_.Free();
@@ -393,7 +407,7 @@ bool RadioConfig::RadioStart() {
       if (c == 'C') {
         sched.replace(s, 1, is_ref_radio ? "R" : "T");
       } else if (c == 'L') {
-        sched.replace(s, 1, is_ref_radio ? "P" : "R");
+        sched.replace(s, 1, is_ref_radio ? "T" : "R");
       } else if (c == 'P') {
         sched.replace(s, 1, "R");
       } else if (c == 'U') {
@@ -433,40 +447,6 @@ bool RadioConfig::RadioStart() {
         ba_stn_[i]->writeRegisters(
             std::string("TX_RAM_") + cfg_->Channel().at(0), 0, pilot);
       }
-      // We currently stream array-to-ref transmission in txrx_argos but let's
-      // keep this block of code for future needs
-      // } else {
-      //  std::vector<std::complex<float>> recip_cal_dl_pilot;
-      //  std::vector<std::complex<float>> pre(cfg_->OfdmTxZeroPrefix(), 0);
-      //  std::vector<std::complex<float>> post(cfg_->OfdmTxZeroPostfix(), 0);
-      //  recip_cal_dl_pilot = CommsLib::ComposePartialPilotSym(
-      //      cfg_->CommonPilot(), cfg_->NumChannels() * i * kCalibScGroupSize,
-      //      kCalibScGroupSize, cfg_->OfdmCaNum(), cfg_->OfdmDataNum(),
-      //      cfg_->OfdmDataStart(), cfg_->CpLen(), false /*block type*/);
-      //  if (kDebugPrintPilot) {
-      //    std::cout << "recipCalPilot[" << i << "]: ";
-      //    for (auto const& cal_p : recip_cal_dl_pilot) {
-      //      std::cout << real(cal_p) << ", ";
-      //    }
-      //    std::cout << std::endl;
-      //  }
-      //  recip_cal_dl_pilot.insert(recip_cal_dl_pilot.begin(), pre.begin(),
-      //                            pre.end());
-      //  recip_cal_dl_pilot.insert(recip_cal_dl_pilot.end(), post.begin(),
-      //                            post.end());
-      //  ba_stn_[i]->writeRegisters(
-      //      "TX_RAM_A", 0,
-      //      Utils::Cfloat32ToUint32(recip_cal_dl_pilot, false, "QI"));
-      //  if (cfg_->NumChannels() == 2) {
-      //    recip_cal_dl_pilot = CommsLib::ComposePartialPilotSym(
-      //        cfg_->CommonPilot(), (2 * i + 1) * kCalibScGroupSize,
-      //        kCalibScGroupSize, cfg_->OfdmCaNum(), cfg_->OfdmDataNum(),
-      //        cfg_->OfdmDataStart(), cfg_->CpLen(), false);
-      //    ba_stn_[i]->writeRegisters(
-      //        "TX_RAM_B", 0,
-      //        Utils::Cfloat32ToUint32(recip_cal_dl_pilot, false, "QI"));
-      //  }
-      //}
     }
 
     if (!kUseUHD) {
