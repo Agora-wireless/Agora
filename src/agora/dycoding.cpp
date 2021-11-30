@@ -402,12 +402,14 @@ void DyDecode::StartWorkCentral()
         size_t work_start_tsc, state_start_tsc;
         EventData event;
         if (task_queue_->try_dequeue(event)) {
+            size_t tag, slot_id, symbol_id, ue_id;
+            EventData resp;
             switch (event.event_type_) {
             case EventType::kDecode:
-                size_t tag = event.tags_[0];
-                size_t slot_id = gen_tag_t(tag).frame_id;
-                size_t symbol_id = gen_tag_t(tag).symbol_id;
-                size_t ue_id = gen_tag_t(tag).ue_id;
+                tag = event.tags_[0];
+                slot_id = gen_tag_t(tag).frame_id;
+                symbol_id = gen_tag_t(tag).symbol_id;
+                ue_id = gen_tag_t(tag).ue_id;
                 if (unlikely(!state_trigger && slot_id >= 200)) {
                     start_tsc = rdtsc();
                     state_trigger = true;
@@ -427,12 +429,16 @@ void DyDecode::StartWorkCentral()
                 if (likely(state_trigger)) {
                     state_start_tsc = rdtsc();
                 }
-                EventData resp(EventType::kDecode);
+                resp = EventData(EventType::kDecode);
                 TryEnqueueFallback(complete_queue_, complete_queue_token_, resp);
                 if (likely(state_trigger)) {
                     state_operation_duration += rdtsc() - state_start_tsc;
                     work_tsc_duration += rdtsc() - work_start_tsc;
                 }
+                break;
+            default:
+                perror("Wrong type of task in Dycoding!");
+                exit(1);
                 break;
             }
         }
@@ -440,12 +446,12 @@ void DyDecode::StartWorkCentral()
 
     size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
-    printf("DoDecode Thread %u duration stats: total time used %.2lfms, "
-        "decode %.2lfms (%.2lf\%), stating %.2lfms (%.2lf\%), idle %.2lfms (%.2lf\%), "
-        "working proportions (%u/%u: %.2lf\%)\n",
+    printf("DoDecode Thread %d duration stats: total time used %.2lfms, "
+        "decode %.2lfms (%.2lf%%), stating %.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%), "
+        "working proportions (%zu/%zu: %.2lf%%)\n",
         tid_, cycles_to_ms(whole_duration, freq_ghz_),
         cycles_to_ms(decode_tsc_duration, freq_ghz_), decode_tsc_duration * 100.0f / whole_duration,
         cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration,
-        work_count, loop_count, work_count * 100.0f / loop_count);
+        work_count, loop_count, loop_count == 0 ? 0 : work_count * 100.0f / loop_count);
 }

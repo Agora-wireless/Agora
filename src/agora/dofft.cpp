@@ -11,67 +11,14 @@ using namespace arma;
 
 static constexpr bool kPrintFFTInput = false;
 
-/**
- * Use SIMD to vectorize data type conversion from short to float
- * reference:
- * https://stackoverflow.com/questions/50597764/convert-signed-short-to-float-in-c-simd
- * 0x4380'8000
- */
-static void convert_short_to_float_simd(
-    short* in_buf, float* out_buf, size_t length)
-{
-#ifdef __AVX512F__
-    const __m512 magic = _mm512_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
-    const __m512i magic_i = _mm512_castps_si512(magic);
-    for (size_t i = 0; i < length; i += 16) {
-        /* get input */
-        __m256i val = _mm256_load_si256((__m256i*)(in_buf + i)); // port 2,3
-        /* interleave with 0x0000 */
-        __m512i val_unpacked = _mm512_cvtepu16_epi32(val); // port 5
-        /* convert by xor-ing and subtracting magic value:
-         * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
-        __m512i val_f_int
-            = _mm512_xor_si512(val_unpacked, magic_i); // port 0,1,5
-        __m512 val_f = _mm512_castsi512_ps(val_f_int); // no instruction
-        __m512 converted = _mm512_sub_ps(val_f, magic); // port 1,5 ?
-        _mm512_store_ps(out_buf + i, converted); // port 2,3,4,7
-    }
-#else
-    const __m256 magic = _mm256_set1_ps(float((1 << 23) + (1 << 15)) / 32768.f);
-    const __m256i magic_i = _mm256_castps_si256(magic);
-    for (size_t i = 0; i < length; i += 16) {
-        /* get input */
-        __m128i val = _mm_load_si128((__m128i*)(in_buf + i)); // port 2,3
-
-        __m128i val1 = _mm_load_si128((__m128i*)(in_buf + i + 8));
-        /* interleave with 0x0000 */
-        __m256i val_unpacked = _mm256_cvtepu16_epi32(val); // port 5
-        /* convert by xor-ing and subtracting magic value:
-         * VPXOR avoids port5 bottlenecks on Intel CPUs before SKL */
-        __m256i val_f_int
-            = _mm256_xor_si256(val_unpacked, magic_i); // port 0,1,5
-        __m256 val_f = _mm256_castsi256_ps(val_f_int); // no instruction
-        __m256 converted = _mm256_sub_ps(val_f, magic); // port 1,5 ?
-        _mm256_store_ps(out_buf + i, converted); // port 2,3,4,7
-
-        __m256i val_unpacked1 = _mm256_cvtepu16_epi32(val1); // port 5
-        __m256i val_f_int1
-            = _mm256_xor_si256(val_unpacked1, magic_i); // port 0,1,5
-        __m256 val_f1 = _mm256_castsi256_ps(val_f_int1); // no instruction
-        __m256 converted1 = _mm256_sub_ps(val_f1, magic); // port 1,5 ?
-        _mm256_store_ps(out_buf + i + 8, converted1); // port 2,3,4,7
-    }
-#endif
-}
-
 DoFFT::DoFFT(Config* config, int tid, double freq_ghz, Range ant_range,
     Table<char>& time_domain_iq_buffer,
     Table<char>& freq_domain_iq_buffer_to_send, 
     SharedState* shared_state_)
     : Doer(config, tid, freq_ghz)
-    , ant_range_(ant_range)
     , time_domain_iq_buffer_(time_domain_iq_buffer)
     , freq_domain_iq_buffer_to_send_(freq_domain_iq_buffer_to_send)
+    , ant_range_(ant_range)
     , shared_state_(shared_state_)
 {
     DftiCreateDescriptor(
@@ -91,7 +38,6 @@ DoFFT::~DoFFT()
 
 void DoFFT::Launch(size_t frame_id, size_t symbol_id, size_t ant_id)
 {
-    size_t start_tsc = worker_rdtsc();
     size_t frame_slot = frame_id % kFrameWnd;
 
     simd_convert_short_to_float(reinterpret_cast<short*>(time_domain_iq_buffer_[ant_id] +
@@ -99,11 +45,7 @@ void DoFFT::Launch(size_t frame_id, size_t symbol_id, size_t ant_id)
         + symbol_id * cfg_->packet_length + Packet::kOffsetOfData),
         reinterpret_cast<float*>(fft_inout), cfg_->OFDM_CA_NUM * 2);
 
-    size_t start_tsc1 = worker_rdtsc();
-
     DftiComputeForward(mkl_handle, reinterpret_cast<float*>(fft_inout));
-
-    size_t start_tsc2 = worker_rdtsc();
 
     simd_convert_float32_to_float16(reinterpret_cast<float*>(freq_domain_iq_buffer_to_send_[ant_id] + 
         (frame_slot * cfg_->symbol_num_perframe * cfg_->packet_length)
@@ -174,6 +116,17 @@ void DoFFT::StartWork()
             }
         }
     }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("DoFFT Thread %d duration stats: total time used %.2lfms, "
+        "fft %.2lfms (%zu, %.2lf%%), stating %.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%), "
+        "working proportions (%zu/%zu: %.2lf%%)\n",
+        tid_, cycles_to_ms(whole_duration, freq_ghz_),
+        cycles_to_ms(fft_tsc_duration, freq_ghz_), fft_task_count, fft_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration,
+        work_count, loop_count, loop_count == 0 ? 0 : work_count * 100.0f / loop_count);
 }
 
 void DoFFT::partial_transpose(

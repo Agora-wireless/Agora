@@ -7,7 +7,7 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include "receiver.hpp"
-#include "sender.hpp"
+#include "dynamic_sender.hpp"
 #include "signalHandler.hpp"
 #include <algorithm>
 #include <emmintrin.h>

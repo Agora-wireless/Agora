@@ -38,6 +38,15 @@ public:
     void Start(); /// The main Agora event loop
     void Stop();
 
+    // Flags that allow developer control over Agora internals
+    struct {
+        // Before exiting, save LDPC-decoded or demodulated data to a file
+        bool enable_save_decode_data_to_file_ = false;
+
+        // Before exiting, save data sent on downlink to a file
+        bool enable_save_tx_data_to_file_ = false;
+    } flags_;
+
 private:
     void* worker(int tid); // TODO: implement later
     void* fftWorker(int tid);
@@ -58,15 +67,6 @@ private:
     void initControlInfo();
 
     void handleEvents();
-
-    // Flags that allow developer control over Agora internals
-    struct {
-        // Before exiting, save LDPC-decoded or demodulated data to a file
-        bool enable_save_decode_data_to_file_ = false;
-
-        // Before exiting, save data sent on downlink to a file
-        bool enable_save_tx_data_to_file_ = false;
-    } flags_;
 
     // States that used for centralized scheduler
     struct {

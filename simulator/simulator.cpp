@@ -35,7 +35,7 @@ Simulator::Simulator(Config* cfg, size_t in_task_thread_num,
 
     printf("new Sender\n");
     sender_ = new Sender(
-        config_, 1, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true, "ff:ff:ff:ff:ff:ff", true, mbuf_pool);
+        config_, 1, SOCKET_TX_THREAD_NUM, CORE_OFFSET + 1, sender_delay, true, "ff:ff:ff:ff:ff:ff", mbuf_pool);
 
     printf("new Receiver\n");
     receiver_ = new Receiver(config_, SOCKET_RX_THREAD_NUM, CORE_OFFSET + 2 + SOCKET_RX_THREAD_NUM,
@@ -86,9 +86,6 @@ void Simulator::start()
 
     /* counters for printing summary */
     int frame_count_rx = 0;
-
-    int ret = 0;
-    EventData events_list[kDequeueBulkSize];
 
     /* start transmitter */
     sender_->startTXfromMain(frame_start_tx, frame_end_tx);

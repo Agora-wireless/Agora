@@ -2,7 +2,7 @@
 // For some reason, gtest include order matters
 #include "concurrentqueue.h"
 #include "config.hpp"
-#include "dozf.hpp"
+#include "dyzf.hpp"
 #include "gettime.h"
 #include "utils.h"
 #include <thread>
@@ -55,8 +55,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
     PtrGrid<TASK_BUFFER_FRAME_NUM, kMaxUEs, complex_float>& csi_buffers,
     Table<complex_float>& calib_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
-    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
-    Stats* stats)
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices)
 {
     pin_to_core_with_offset(
         ThreadType::kWorker, cfg->core_offset + 1, worker_id);
@@ -67,9 +66,11 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
         // Wait
     }
 
-    auto computeZF = new DoZF(cfg, worker_id, freq_ghz, event_queue,
-        complete_task_queue, ptok, csi_buffers, calib_buffer, ul_zf_matrices,
-        dl_zf_matrices, stats);
+    std::vector<std::vector<ControlInfo>> info_table; 
+    std::vector<size_t> idx_list;
+
+    auto computeZF = new DyZF(cfg, worker_id, freq_ghz, csi_buffers, calib_buffer, ul_zf_matrices,
+        dl_zf_matrices, info_table, idx_list);
 
     size_t start_tsc = rdtsc();
     size_t num_tasks = 0;
@@ -89,7 +90,7 @@ void MasterToWorkerDynamic_worker(Config* cfg, size_t worker_id,
                 frame_offset_id = 2;
             }
             ASSERT_EQ(cfg->BS_ANT_NUM, bs_ant_nums[frame_offset_id]);
-            EventData resp_event = computeZF->launch(req_event.tags_[0]);
+            EventData resp_event = computeZF->Launch(req_event.tags_[0]);
             TryEnqueueFallback(&complete_task_queue, ptok, resp_event);
         }
     }
@@ -130,8 +131,6 @@ TEST(TestZF, VaryingConfig)
     calib_buffer.rand_alloc_cx_float(
         TASK_BUFFER_FRAME_NUM, kMaxDataSCs * kMaxAntennas, 64);
 
-    auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
-
     auto master = std::thread(MasterToWorkerDynamic_master, cfg,
         std::ref(event_queue), std::ref(complete_task_queue));
     std::thread workers[kNumWorkers];
@@ -139,7 +138,7 @@ TEST(TestZF, VaryingConfig)
         workers[i] = std::thread(MasterToWorkerDynamic_worker, cfg, i, freq_ghz,
             std::ref(event_queue), std::ref(complete_task_queue), ptoks[i],
             std::ref(csi_buffers), std::ref(calib_buffer),
-            std::ref(ul_zf_matrices), std::ref(dl_zf_matrices), stats);
+            std::ref(ul_zf_matrices), std::ref(dl_zf_matrices));
     }
     master.join();
     for (auto& w : workers)

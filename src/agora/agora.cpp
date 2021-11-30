@@ -233,6 +233,9 @@ void Agora::handleEvents()
                 progress_.cur_slot_ ++;
             }
             break;
+        default:
+            perror("Wrong type of task in Agora!");
+            exit(1);
         }
     }
 
@@ -401,24 +404,8 @@ void* Agora::worker(int tid)
 
     size_t start_tsc = 0;
     size_t work_tsc_duration = 0;
-    size_t csi_tsc_duration = 0;
-    size_t zf_tsc_duration = 0;
-    size_t demod_tsc_duration = 0;
-    size_t decode_tsc_duration = 0;
-    size_t state_operation_duration = 0;
-    size_t loop_count = 0;
-    size_t work_count = 0;
 
-    size_t csi_count = 0;
-    size_t zf_count = 0;
-    size_t demod_count = 0;
-
-    size_t demod_max = 0;
-    size_t zf_max = 0;
-    size_t csi_max = 0;
-
-    size_t work_start_tsc, state_start_tsc;
-    size_t csi_start_tsc, zf_start_tsc, demod_start_tsc, decode_start_tsc;
+    size_t work_start_tsc;
 
     bool state_trigger = false;
     size_t last_slot = 0;
@@ -522,7 +509,7 @@ void* Agora::worker(int tid)
     // size_t whole_duration = Profiler::GetTsc(tid, Profiler::State::All);
     size_t idle_duration = whole_duration - Profiler::GetTsc(tid, Profiler::State::Working);
     printf("Worker Thread %u duration stats: total time used %.2lfms, "
-        "idle %.2lfms (%.2lf\%)\n",
+        "idle %.2lfms (%.2lf%%)\n",
         tid, cycles_to_ms(whole_duration, freq_ghz_),
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration);
 

@@ -56,8 +56,6 @@ DySubcarrier::~DySubcarrier()
 
 void DySubcarrier::StartWork()
 {
-    const size_t n_zf_tasks_reqd
-        = (sc_range_.end - sc_range_.start) / cfg_->zf_block_size;
     const size_t n_demul_tasks_reqd
         = ceil_divide(sc_range_.end - sc_range_.start, cfg_->demul_block_size);
     

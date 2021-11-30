@@ -2,7 +2,7 @@
 // For some reason, gtest include order matters
 #include "concurrentqueue.h"
 #include "config.hpp"
-#include "dozf.hpp"
+#include "dyzf.hpp"
 #include "gettime.h"
 #include "utils.h"
 
@@ -16,10 +16,6 @@ TEST(TestZF, Perf)
     int tid = 0;
     double freq_ghz = measure_rdtsc_freq();
 
-    auto event_queue = moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
-    auto comp_queue = moodycamel::ConcurrentQueue<EventData>(2 * kNumIters);
-    auto ptok = new moodycamel::ProducerToken(comp_queue);
-
     PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffers;
     csi_buffers.rand_alloc_cx_float(cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM);
 
@@ -32,10 +28,11 @@ TEST(TestZF, Perf)
     calib_buffer.rand_alloc_cx_float(
         TASK_BUFFER_FRAME_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
-    auto stats = new Stats(cfg, kMaxStatBreakdown, freq_ghz);
-
-    auto computeZF = new DoZF(cfg, tid, freq_ghz, event_queue, comp_queue, ptok,
-        csi_buffers, calib_buffer, ul_zf_matrices, dl_zf_matrices, stats);
+    std::vector<std::vector<ControlInfo>> info_table; 
+    std::vector<size_t> idx_list;
+    auto computeZF = new DyZF(cfg, tid, freq_ghz,
+        csi_buffers, calib_buffer, ul_zf_matrices, dl_zf_matrices, 
+        info_table, idx_list);
 
     FastRand fast_rand;
     size_t start_tsc = rdtsc();
@@ -44,7 +41,7 @@ TEST(TestZF, Perf)
         size_t base_sc_id
             = (fast_rand.next_u32() % (cfg->OFDM_DATA_NUM / cfg->zf_block_size))
             * cfg->zf_block_size;
-        computeZF->launch(gen_tag_t::frm_sc(frame_id, base_sc_id)._tag);
+        computeZF->Launch(gen_tag_t::frm_sc(frame_id, base_sc_id)._tag);
     }
     double ms = cycles_to_ms(rdtsc() - start_tsc, freq_ghz);
 
