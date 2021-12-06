@@ -92,32 +92,81 @@ else()
 endif()
 
 # DPDK
+# if(${USE_DPDK})
+#   message(STATUS "DPDK is enabled for Agora")
+
+#   find_library(DPDK_LIB dpdk)
+#   message(STATUS "DPDK_LIB: ${DPDK_LIB}")
+#   if(NOT DPDK_LIB)
+#     message(FATAL_ERROR "DPDK library not found")
+#   endif()
+
+#   if(${USE_MLX_NIC})
+#     set(MLX_LIBRARIES -libverbs -lmlx5)
+#   endif()
+#   set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk ${MLX_LIBRARIES} -lnuma -Wl,--no-whole-archive dl)
+
+#   # DPDK include directory. Locating rte_config.h does not work on some systems.
+#   # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
+#   # from the real DPDK include directory (/usr/include/dpdk/).
+#   find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
+#   if (DPDK_INCLUDE_DIR)
+#     message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
+#   else()
+#     message(FATAL_ERROR "DPDK include directory not found")
+#   endif()
+#   include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
+
+#   add_definitions(-DUSE_DPDK)
+# endif()
+
 if(${USE_DPDK})
   message(STATUS "DPDK is enabled for Agora")
 
-  find_library(DPDK_LIB dpdk)
-  message(STATUS "DPDK_LIB: ${DPDK_LIB}")
-  if(NOT DPDK_LIB)
-    message(FATAL_ERROR "DPDK library not found")
+  if(NOT DEFINED ENV{RTE_SDK})
+    message(FATAL_ERROR "Please define RTE_SDK")
   endif()
 
-  if(${USE_MLX_NIC})
-    set(MLX_LIBRARIES -libverbs -lmlx5)
-  endif()
-  set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk ${MLX_LIBRARIES} -lnuma -Wl,--no-whole-archive dl)
+  set(DPDK_INSTALL_DIR "$ENV{RTE_SDK}/build/install/usr/local")
 
-  # DPDK include directory. Locating rte_config.h does not work on some systems.
-  # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
-  # from the real DPDK include directory (/usr/include/dpdk/).
-  find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
-  if (DPDK_INCLUDE_DIR)
-    message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
-  else()
-    message(FATAL_ERROR "DPDK include directory not found")
+  # DPDK installs libraries into local/lib on Mariner, but
+  # local/lib/x86_64-linux-gnu on Ubuntu
+  set(DPDK_LIB_DIR "${DPDK_INSTALL_DIR}/lib/x86_64-linux-gnu")
+  if(NOT EXISTS ${DPDK_LIB_DIR})
+    set(DPDK_LIB_DIR "${DPDK_INSTALL_DIR}/lib")
+    if(NOT EXISTS ${DPDK_LIB_DIR})
+      message(FATAL_ERROR "${DPDK_LIB_DIR} not found. Did you run `ninja install`?")
+    endif()
   endif()
-  include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
 
-  add_definitions(-DUSE_DPDK)
+  link_directories(${DPDK_LIB_DIR})
+  include_directories(SYSTEM ${DPDK_INSTALL_DIR}/include)
+
+  # We use some hacky command-line and CMake magic to construct DPDK library list
+  execute_process(
+    COMMAND bash -c "PKG_CONFIG_PATH=${DPDK_LIB_DIR}/pkgconfig pkg-config --static --libs-only-l libdpdk"
+    OUTPUT_VARIABLE DPDK_PKGCONFIG_OUT)
+  string(STRIP ${DPDK_PKGCONFIG_OUT} DPDK_PKGCONFIG_OUT) # Remove newline from pkg-config output
+
+  # Delete some DPDK libraries from the list:
+  # * Baseband-related libraries, since they require FlexRAN
+  # * DPDK's crypto libraries require an extra OpenSSL dependency.
+  # * DPDK 20.11's pkgconfig output contains multiple occurences of -lpthread,
+  #   which can cause build errors. So we delete -lpthread, and re-add it later.
+  set(DELETE_DPDK_LIBS
+    -librte_bbdev.a -l:librte_baseband_null.a -l:librte_baseband_turbo_sw.a
+    -l:librte_baseband_fpga_lte_fec.a -l:librte_baseband_fpga_5gnr_fec.a
+    -l:librte_baseband_acc100.a -lrte_bbdev
+    -l:librte_crypto_openssl.a -l:librte_crypto_ccp.a
+    -lpthread)
+  foreach(l IN LISTS DELETE_DPDK_LIBS)
+    string(REPLACE ${l} "" DPDK_PKGCONFIG_OUT ${DPDK_PKGCONFIG_OUT})
+  endforeach()
+
+  set(DPDK_LIBRARIES
+  "-Wl,--whole-archive -Wl,--as-needed -L${DPDK_LIB_DIR} ${DPDK_PKGCONFIG_OUT} -lpthread -Wl,--no-whole-archive")
+
+  # set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive -L${DPDK_LIB_DIR} -lnuma -Wl,--no-whole-archive dl)
 endif()
 
 message(STATUS "Use DPDK for agora: ${USE_DPDK}")

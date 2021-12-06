@@ -25,14 +25,12 @@
   "bs_rru_mac_addr": "b8:59:9f:f0:85:e1",
   "core_offset": 1,
   "bs_rru_addr_list": [
-    "192.168.21.184",
-    "192.168.21.183"
+    "192.168.60.193"
   ],
   "bs_rru_mac_list": [
-    "b8:59:9f:f0:85:e1",
-    "b8:59:9f:f0:85:d5"
+    "0c:42:a1:89:8f:80"
   ],
-  "bs_rru_addr_idx": 1,
+  "bs_rru_addr_idx": 0,
   "bs_server_addr_list": [
     "192.168.21.183",
     "192.168.21.182",
@@ -57,7 +55,7 @@
   "freq_orthogonal_pilot": true,
   "modulation": "64QAM",
   "test_mode": 0,
-  "pci_addr": "37:00.1",
+  "pci_addr": "37:00.0",
   "dynamic_workload": true,
   "fixed_control": 0,
   "user_level_list": [
