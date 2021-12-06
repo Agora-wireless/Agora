@@ -170,10 +170,10 @@ private:
 
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pools_[kMaxWorkerNum];
-    uint32_t bs_rru_addr; // IPv4 address of this data sender
-    uint32_t bs_server_addr; // IPv4 address of the remote target Agora server
+    // uint32_t bs_rru_addr; // IPv4 address of this data sender
+    // uint32_t bs_server_addr; // IPv4 address of the remote target Agora server
     std::vector<uint32_t> bs_server_addr_list; // IPv4 address list of all Agora servers
-    rte_ether_addr sender_mac_addr; // MAC address of this data sender
+    // rte_ether_addr sender_mac_addr; // MAC address of this data sender
     std::vector<uint32_t> bs_rru_addr_list;
     std::vector<rte_ether_addr> rru_mac_addr_list;
 

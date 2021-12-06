@@ -59,7 +59,7 @@ add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
 
 find_package(Armadillo)
 
-set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
+set(USE_DPDK True CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 

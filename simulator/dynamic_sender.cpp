@@ -78,14 +78,14 @@ Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_thread
     }
 
     // Parse IP addresses and MAC addresses
-    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
-    rt_assert(ret == 1, "Invalid sender IP address");
-    ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
-    rt_assert(ret == 1, "Invalid server IP address");
+    // int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr);
+    // rt_assert(ret == 1, "Invalid sender IP address");
+    // ret = inet_pton(AF_INET, cfg->bs_server_addr.c_str(), &bs_server_addr);
+    // rt_assert(ret == 1, "Invalid server IP address");
 
     bs_server_addr_list.resize(cfg->bs_server_addr_list.size());
     for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
-        ret = inet_pton(AF_INET, cfg->bs_server_addr_list[i].c_str(), &bs_server_addr_list[i]);
+        inet_pton(AF_INET, cfg->bs_server_addr_list[i].c_str(), &bs_server_addr_list[i]);
     }
 
     server_mac_addr_list.resize(cfg->bs_server_addr_list.size());
@@ -97,7 +97,7 @@ Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_thread
 
     bs_rru_addr_list.resize(cfg->bs_rru_addr_list.size());
     for (size_t i = 0; i < cfg->bs_rru_addr_list.size(); i ++) {
-        ret = inet_pton(AF_INET, cfg->bs_rru_addr_list[i].c_str(), &bs_rru_addr_list[i]);
+        inet_pton(AF_INET, cfg->bs_rru_addr_list[i].c_str(), &bs_rru_addr_list[i]);
     }
 
     rru_mac_addr_list.resize(cfg->bs_rru_mac_list.size());
@@ -121,8 +121,8 @@ Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_thread
             0, 0, bs_rru_addr_list[i], bs_rru_addr_list[cfg->bs_rru_addr_idx], src_port, dst_port);
     }
 
-    ret = rte_eth_macaddr_get(portid, &sender_mac_addr);
-    rt_assert(ret == 0, "Cannot get MAC address of the port");
+    // ret = rte_eth_macaddr_get(portid, &sender_mac_addr);
+    // rt_assert(ret == 0, "Cannot get MAC address of the port");
     printf("Number of DPDK cores: %d\n", rte_lcore_count());
 
     size_t ant_block = cfg->BS_ANT_NUM / cfg->bs_rru_addr_list.size();
@@ -185,8 +185,8 @@ void Sender::get_sync_tsc_distributed() {
         std::vector<int64_t> tsc_diff;
         tsc_diff.resize(cfg->bs_rru_addr_list.size());
         for (size_t i = 1; i < cfg->bs_rru_addr_list.size(); i ++) {
-            mbuf[0] = DpdkTransport::alloc_udp(mbuf_pools_[0], sender_mac_addr,
-                rru_mac_addr_list[i], bs_rru_addr, bs_rru_addr_list[i], src_port, dst_port, 4*sizeof(size_t));
+            mbuf[0] = DpdkTransport::alloc_udp(mbuf_pools_[0], rru_mac_addr_list[0],
+                rru_mac_addr_list[i], bs_rru_addr_list[0], bs_rru_addr_list[i], src_port, dst_port, 4*sizeof(size_t));
             struct rte_ether_hdr* eth_hdr
                 = rte_pktmbuf_mtod(mbuf[0], struct rte_ether_hdr*);
             char* payload = (char*)eth_hdr + kPayloadOffset;
@@ -231,8 +231,8 @@ void Sender::get_sync_tsc_distributed() {
         }
         start_tsc_distributed_ = rdtsc() + 10000000000L;
         for (size_t i = 1; i < cfg->bs_rru_addr_list.size(); i ++) {
-            mbuf[0] = DpdkTransport::alloc_udp(mbuf_pools_[0], sender_mac_addr,
-                rru_mac_addr_list[i], bs_rru_addr, bs_rru_addr_list[i], src_port, dst_port, 4*sizeof(size_t));
+            mbuf[0] = DpdkTransport::alloc_udp(mbuf_pools_[0], rru_mac_addr_list[0],
+                rru_mac_addr_list[i], bs_rru_addr_list[0], bs_rru_addr_list[i], src_port, dst_port, 4*sizeof(size_t));
             struct rte_ether_hdr* eth_hdr
                 = rte_pktmbuf_mtod(mbuf[0], struct rte_ether_hdr*);
             char* payload = (char*)eth_hdr + kPayloadOffset;
@@ -401,8 +401,8 @@ void* Sender::worker_thread(int tid)
     while (true) {
         if (cfg->use_time_domain_iq) {
             size_t server_id = cur_radio < (ant_block + 1) * ant_off ? cur_radio / (ant_block + 1) : (cur_radio - (ant_block + 1) * ant_off) / ant_block + ant_off;
-            tx_mbufs[0] = DpdkTransport::alloc_udp(mbuf_pools_[tid], sender_mac_addr,
-                server_mac_addr_list[server_id], bs_rru_addr, bs_server_addr_list[server_id],
+            tx_mbufs[0] = DpdkTransport::alloc_udp(mbuf_pools_[tid], rru_mac_addr_list[cfg->bs_rru_addr_idx],
+                server_mac_addr_list[server_id], bs_rru_addr_list[cfg->bs_rru_addr_idx], bs_server_addr_list[server_id],
                 cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
                 Packet::kOffsetOfData + cfg->OFDM_CA_NUM * sizeof(unsigned short) * 2);
             auto* pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[0], uint8_t*) + kPayloadOffset);
@@ -421,8 +421,8 @@ void* Sender::worker_thread(int tid)
             rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, 1) == 1, "rte_eth_tx_burst() failed");
         } else {
             for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
-                tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pools_[tid], sender_mac_addr,
-                    server_mac_addr_list[i], bs_rru_addr, bs_server_addr_list[i],
+                tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pools_[tid], rru_mac_addr_list[cfg->bs_rru_addr_idx],
+                    server_mac_addr_list[i], bs_rru_addr_list[cfg->bs_rru_addr_idx], bs_server_addr_list[i],
                     cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
                     Packet::kOffsetOfData + cfg->subcarrier_num_list[i] * sizeof(unsigned short) * 2);
             }
