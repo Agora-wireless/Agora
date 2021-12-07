@@ -112,15 +112,17 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   server_mac_addr_.resize(cfg->DpdkNumPorts());
 
   for (uint16_t port_id = 0; port_id < cfg->DpdkNumPorts(); port_id++) {
-    if (DpdkTransport::NicInit(port_id + cfg->DpdkPortOffset(), mbuf_pool_,
-                               socket_thread_num_, cfg->PacketLength()) != 0)
-      rte_exit(EXIT_FAILURE, "Cannot init port %u\n",
-               port_id + cfg->DpdkPortOffset());
     // Parse MAC addresses
     ether_addr* parsed_mac = ether_aton(
         server_mac_addr_str.substr(port_id * (kMacAddrBtyes + 1), kMacAddrBtyes)
             .c_str());
     RtAssert(parsed_mac != NULL, "Invalid server mac address");
+    if (port_id > 0) port_id++;
+    if (DpdkTransport::NicInit(port_id + cfg->DpdkPortOffset(), mbuf_pool_,
+                               socket_thread_num_, cfg->PacketLength()) != 0)
+      rte_exit(EXIT_FAILURE, "Cannot init port %u\n",
+               port_id + cfg->DpdkPortOffset());
+
     std::memcpy(&server_mac_addr_[port_id], parsed_mac, sizeof(ether_addr));
 
     ret = rte_eth_macaddr_get(port_id + cfg->DpdkPortOffset(),
@@ -328,7 +330,8 @@ void* Sender::WorkerThread(int tid) {
       (static_cast<size_t>(tid) < cfg_->BsAntNum() % socket_thread_num_ ? 1
                                                                         : 0);
 #if defined(USE_DPDK)
-  const size_t port_id = tid % cfg_->DpdkNumPorts();
+  size_t port_id = tid % cfg_->DpdkNumPorts();
+  if (port_id > 0) port_id++;
   const size_t queue_id = tid / cfg_->DpdkNumPorts();
   rte_mbuf* tx_mbufs[kDequeueBulkSize];
 #else
