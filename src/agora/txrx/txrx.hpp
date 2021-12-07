@@ -104,11 +104,13 @@ private:
     Table<int8_t>& demod_buffer_to_decode_;
 
 #ifdef USE_DPDK
-    uint32_t bs_rru_addr_; // IPv4 address of the simulator sender
+    // uint32_t bs_rru_addr_; // IPv4 address of the simulator sender
+    std::vector<uint32_t> bs_rru_addrs_;
     struct rte_mempool* mbuf_pool_[kMaxThreads];
     std::vector<uint32_t> bs_server_addrs_;
     std::vector<rte_ether_addr> bs_server_mac_addrs_;
-    rte_ether_addr bs_rru_mac_addr_;
+    // rte_ether_addr bs_rru_mac_addr_;
+    std::vector<rte_ether_addr> bs_rru_mac_addrs_;
 #endif
 
     SharedState* shared_state_; // Shared states with workers

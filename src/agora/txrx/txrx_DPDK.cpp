@@ -39,33 +39,46 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
     if (DpdkTransport::nic_init(port_id, mbuf_pool_, rx_thread_num_, kNumDemodTxThread + fft_tx_thread_num_) != 0)
         rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_id);
 
-    int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr_);
-    rt_assert(ret == 1, "Invalid sender IP address");
+    // int ret = inet_pton(AF_INET, cfg->bs_rru_addr.c_str(), &bs_rru_addr_);
+    // rt_assert(ret == 1, "Invalid sender IP address");
+    bs_rru_addrs_.resize(cfg->bs_rru_addr_list.size());
+    for (size_t i = 0; i < cfg->bs_rru_addr_list.size(); i ++) {
+        int ret = inet_pton(AF_INET, cfg->bs_rru_addr_list[i].c_str(), &bs_rru_addrs_[i]);
+        rt_assert(ret == 1, "Invalid sender IP address");
+    }
 
     bs_server_addrs_.resize(cfg->bs_server_addr_list.size());
     bs_server_mac_addrs_.resize(cfg->bs_server_addr_list.size());
 
-    ret = inet_pton(AF_INET, cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(), &bs_server_addrs_[cfg->bs_server_addr_idx]);
+    int ret = inet_pton(AF_INET, cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(), &bs_server_addrs_[cfg->bs_server_addr_idx]);
     rt_assert(ret == 1, "Invalid sender IP address");
 
     ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[cfg->bs_server_addr_idx].c_str());
     rt_assert(parsed_mac != NULL, "Invalid server mac address");
     memcpy(&bs_server_mac_addrs_[cfg->bs_server_addr_idx], parsed_mac, sizeof(ether_addr));
 
-    parsed_mac = ether_aton(cfg->bs_rru_mac_addr.c_str());
-    rt_assert(parsed_mac != NULL, "Invalid rru mac address");
-    memcpy(&bs_rru_mac_addr_, parsed_mac, sizeof(ether_addr));
+    // parsed_mac = ether_aton(cfg->bs_rru_mac_addr.c_str());
+    // rt_assert(parsed_mac != NULL, "Invalid rru mac address");
+    // memcpy(&bs_rru_mac_addr_, parsed_mac, sizeof(ether_addr));
+    bs_rru_mac_addrs_.resize(cfg->bs_rru_mac_list.size());
+    for (size_t i = 0; i < cfg->bs_rru_mac_list.size(); i ++) {
+        parsed_mac = ether_aton(cfg->bs_rru_mac_list[i].c_str());
+        rt_assert(parsed_mac != NULL, "Invalid rru mac address");
+        memcpy(&bs_rru_mac_addrs_[i], parsed_mac, sizeof(ether_addr));
+    }
 
     for (size_t i = 0; i < cfg->BS_ANT_NUM; i++) {
         uint16_t src_port = rte_cpu_to_be_16(cfg->bs_rru_port + i);
         uint16_t dst_port = rte_cpu_to_be_16(cfg->bs_server_port + i);
 
-        printf("Adding steering rule for src IP %s(%x), dest IP %s(%x), src port: %u, "
-               "dst port: %u, queue: %zu\n",
-            cfg->bs_rru_addr.c_str(), bs_rru_addr_, cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(), bs_server_addrs_[cfg->bs_server_addr_idx],
-            rte_cpu_to_be_16(src_port), rte_cpu_to_be_16(dst_port), i % rx_thread_num_);
-        DpdkTransport::install_flow_rule(
-            port_id, i % rx_thread_num_, bs_rru_addr_, bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
+        for (size_t j = 0; j < cfg->bs_rru_addr_list.size(); j ++) {
+            printf("Adding steering rule for src IP %s(%x), dest IP %s(%x), src port: %u, "
+                "dst port: %u, queue: %zu\n",
+                cfg->bs_rru_addr_list[j].c_str(), bs_rru_addrs_[j], cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(), bs_server_addrs_[cfg->bs_server_addr_idx],
+                rte_cpu_to_be_16(src_port), rte_cpu_to_be_16(dst_port), i % rx_thread_num_);
+            DpdkTransport::install_flow_rule(
+                port_id, i % rx_thread_num_, bs_rru_addrs_[j], bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
+        }
     }   
 
     for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {

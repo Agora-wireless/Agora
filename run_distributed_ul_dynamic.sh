@@ -2,8 +2,11 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-servers=(roce83 roce82 roce81)
-pci=('"37:00.1"' '"37:00.0"' '"37:00.0"')
+servers=(roce84 roce83 roce82 roce81)
+pci=('"37:00.1"' '"37:00.1"' '"37:00.0"' '"37:00.0"')
+
+rru_servers=(roce93 roce94)
+rru_pci=('"37:00.0"' '"37:00.0"')
 
 batch_mode=0
 
@@ -43,6 +46,18 @@ do
     # ssh ${servers[$i]} cd Agora; ./build/data_generator --conf_file ./data/tddconfig-sim-ul-distributed.json
     scp $DIR/data/control_ue_template.bin ${servers[$i]}:$DIR/data/control_ue_template.bin
     scp $DIR/data/control_ue.bin ${servers[$i]}:$DIR/data/control_ue.bin
+    scp $DIR/data/LDPC_rx_data_2048_ant${num_antennas}.bin ${servers[$i]}:$DIR/data/LDPC_rx_data_2048_ant${num_antennas}.bin
+done
+
+num_rrus=$(cat $DIR/data/tddconfig-sim-ul-distributed.json | jq '.bs_rru_addr_list | length')
+for (( i=1; i<$num_rrus; i++ ))
+do
+    cat $DIR/data/tddconfig-sim-ul-distributed.json | jq --argjson i $i '.bs_rru_addr_idx=$i' | jq --argjson pci_addr ${rru_pci[$i]} '.pci_addr=$pci_addr' > $DIR/data/tddconfig-sim-ul-distributed_$i.json
+    scp $DIR/data/tddconfig-sim-ul-distributed_$i.json ${rru_servers[$i]}:$DIR/data/tddconfig-sim-ul-distributed.json
+    # ssh ${rru_servers[$i]} cd Agora; ./build/data_generator --conf_file ./data/tddconfig-sim-ul-distributed.json
+    scp $DIR/data/control_ue_template.bin ${rru_servers[$i]}:$DIR/data/control_ue_template.bin
+    scp $DIR/data/control_ue.bin ${rru_servers[$i]}:$DIR/data/control_ue.bin
+    scp $DIR/data/LDPC_rx_data_2048_ant${num_antennas}.bin ${rru_servers[$i]}:$DIR/data/LDPC_rx_data_2048_ant${num_antennas}.bin
 done
 
 slot_us=$( cat $DIR/data/tddconfig-sim-ul-distributed.json | jq '.slot_size' )
