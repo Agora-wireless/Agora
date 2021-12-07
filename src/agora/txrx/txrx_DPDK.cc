@@ -39,17 +39,16 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     uint16_t src_port = rte_cpu_to_be_16(cfg_->BsRruPort() + i);
     uint16_t dst_port = rte_cpu_to_be_16(cfg_->BsServerPort() + i);
 
+    size_t port_id = i % this->cfg_->DpdkNumPorts() + cfg->DpdkPortOffset();
+    size_t q_id = i / this->cfg_->DpdkNumPorts();
     std::printf(
         "Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
         "dst port: %zu, DPDK port %zu, queue: %zu\n",
         this->cfg_->BsRruAddr().c_str(), this->cfg_->BsServerAddr().c_str(),
-        this->cfg_->BsRruPort() + i, this->cfg_->BsServerPort() + i,
-        i % this->cfg_->DpdkNumPorts() + cfg->DpdkPortOffset(),
-        i / this->cfg_->DpdkNumPorts());
-    DpdkTransport::InstallFlowRule(
-        i % this->cfg_->DpdkNumPorts() + cfg->DpdkPortOffset(),
-        i / this->cfg_->DpdkNumPorts(), bs_rru_addr_, bs_server_addr_, src_port,
-        dst_port);
+        this->cfg_->BsRruPort() + i, this->cfg_->BsServerPort() + i, port_id,
+        q_id);
+    DpdkTransport::InstallFlowRule(port_id, q_id, bs_rru_addr_, bs_server_addr_,
+                                   src_port, dst_port);
   }
 
   std::printf("Number of DPDK cores: %d\n", rte_lcore_count());
@@ -131,7 +130,7 @@ void PacketTXRX::LoopTxRx(size_t tid) {
   const uint16_t queue_id = tid / cfg_->DpdkNumPorts();
 
   while (this->cfg_->Running()) {
-    if (-1 != DequeueSend(tid)) {
+    if (0 != DequeueSend(tid)) {
       continue;
     }
     DpdkRecv((int)tid, port_id, queue_id, prev_frame_id, rx_slot);
@@ -222,10 +221,10 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
 }
 
 // TODO: check correctness of this funcion
-int PacketTXRX::DequeueSend(int tid) {
+size_t PacketTXRX::DequeueSend(int tid) {
   EventData event;
   if (task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event) == false) {
-    return -1;
+    return 0;
   }
 
   // std::printf("tx queue length: %d\n", task_queue_->size_approx());
@@ -285,5 +284,5 @@ int PacketTXRX::DequeueSend(int tid) {
       message_queue_->enqueue(*rx_ptoks_[tid],
                               EventData(EventType::kPacketTX, event.tags_[0])),
       "Socket message enqueue failed\n");
-  return 1;
+  return nb_tx_new;
 }
