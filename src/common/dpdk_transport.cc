@@ -18,10 +18,37 @@ inline const struct rte_eth_conf port_conf_default() {
   return port_conf;
 }
 
+std::vector<uint16_t> DpdkTransport::GetPortIDFromMacAddr(
+    size_t port_num, std::string mac_addrs) {
+  RtAssert(mac_addrs.length() == (port_num * (kMacAddrBtyes + 1) - 1),
+           "Invalid length of MAC address in config");
+  std::vector<uint16_t> port_ids;
+  for (size_t i = 0; i < port_num; i++) {
+    // Parse MAC addresses from string
+    ether_addr* parsed_mac = ether_aton(
+        mac_addrs.substr(i * (kMacAddrBtyes + 1), kMacAddrBtyes).c_str());
+    rte_ether_addr rte_mac_addr;
+    RtAssert(parsed_mac != NULL, "Invalid server mac address");
+    std::memcpy(&rte_mac_addr, parsed_mac, sizeof(ether_addr));
+    // Find the port id with the given MAC address
+    uint16_t port_id;
+    RTE_ETH_FOREACH_DEV(port_id) {
+      struct rte_ether_addr addr;
+      rte_eth_macaddr_get(port_id, &addr);
+      if (std::equal(std::begin(addr.addr_bytes), std::end(addr.addr_bytes),
+                     std::begin(rte_mac_addr.addr_bytes))) {
+        port_ids.push_back(port_id);
+        break;
+      }
+    }
+  }
+  return port_ids;
+}
+
 int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
                            int thread_num, size_t pkt_len) {
   struct rte_eth_conf port_conf = port_conf_default();
-  const uint16_t rxRings = thread_num, txRings = 2 * thread_num;
+  const uint16_t rxRings = thread_num, txRings = thread_num;
   int retval;
   uint16_t q;
   uint16_t nb_rxd = kRxRingSize;

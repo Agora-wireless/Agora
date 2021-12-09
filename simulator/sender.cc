@@ -16,7 +16,6 @@
 #endif
 
 static constexpr bool kDebugPrintSender = false;
-static constexpr size_t kMacAddrBtyes = 17;
 
 static std::atomic<bool> keep_running = true;
 // A spinning barrier to synchronize the start of worker threads
@@ -111,22 +110,27 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
   sender_mac_addr_.resize(cfg->DpdkNumPorts());
   server_mac_addr_.resize(cfg->DpdkNumPorts());
 
-  for (uint16_t port_id = 0; port_id < cfg->DpdkNumPorts(); port_id++) {
+  if (cfg->DpdkMacAddrs().length() > 0) {
+    port_ids_ = DpdkTransport::GetPortIDFromMacAddr(cfg->DpdkNumPorts(),
+                                                    cfg->DpdkMacAddrs());
+  } else {
+    for (uint16_t i = 0; i < cfg->DpdkNumPorts(); i++) {
+      port_ids_.push_back(i + cfg->DpdkPortOffset());
+    }
+  }
+  for (size_t i = 0; i < cfg->DpdkNumPorts(); i++) {
     // Parse MAC addresses
     ether_addr* parsed_mac = ether_aton(
-        server_mac_addr_str.substr(port_id * (kMacAddrBtyes + 1), kMacAddrBtyes)
+        server_mac_addr_str.substr(i * (kMacAddrBtyes + 1), kMacAddrBtyes)
             .c_str());
     RtAssert(parsed_mac != NULL, "Invalid server mac address");
-    if (port_id > 0) port_id++;
-    if (DpdkTransport::NicInit(port_id + cfg->DpdkPortOffset(), mbuf_pool_,
-                               socket_thread_num_, cfg->PacketLength()) != 0)
-      rte_exit(EXIT_FAILURE, "Cannot init port %u\n",
-               port_id + cfg->DpdkPortOffset());
+    if (DpdkTransport::NicInit(port_ids_.at(i), mbuf_pool_, socket_thread_num_,
+                               cfg->PacketLength()) != 0)
+      rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_ids_.at(i));
 
-    std::memcpy(&server_mac_addr_[port_id], parsed_mac, sizeof(ether_addr));
+    std::memcpy(&server_mac_addr_[i], parsed_mac, sizeof(ether_addr));
 
-    ret = rte_eth_macaddr_get(port_id + cfg->DpdkPortOffset(),
-                              &sender_mac_addr_[port_id]);
+    ret = rte_eth_macaddr_get(port_ids_.at(i), &sender_mac_addr_[i]);
     RtAssert(ret == 0, "Cannot get MAC address of the port");
     std::printf("Number of DPDK cores: %d\n", rte_lcore_count());
   }
@@ -330,9 +334,10 @@ void* Sender::WorkerThread(int tid) {
       (static_cast<size_t>(tid) < cfg_->BsAntNum() % socket_thread_num_ ? 1
                                                                         : 0);
 #if defined(USE_DPDK)
-  size_t port_id = tid % cfg_->DpdkNumPorts();
-  if (port_id > 0) port_id++;
+  uint16_t port_id = port_ids_.at(tid % cfg_->DpdkNumPorts());
   const size_t queue_id = tid / cfg_->DpdkNumPorts();
+  std::printf("Worker thread %d using port %u, queue %zu\n", tid, port_id,
+              queue_id);
   rte_mbuf* tx_mbufs[kDequeueBulkSize];
 #else
   UDPClient udp_client;
@@ -440,8 +445,8 @@ void* Sender::WorkerThread(int tid) {
       }
 
 #if defined(USE_DPDK)
-      size_t nb_tx_new = rte_eth_tx_burst(port_id + cfg_->DpdkPortOffset(),
-                                          queue_id, tx_mbufs, num_tags);
+      size_t nb_tx_new =
+          rte_eth_tx_burst(port_id, queue_id, tx_mbufs, num_tags);
       if (unlikely(nb_tx_new != num_tags)) {
         std::printf(
             "Thread %d rte_eth_tx_burst() failed, nb_tx_new: %zu, "
