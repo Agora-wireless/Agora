@@ -44,28 +44,28 @@ Config::Config(const std::string& jsonfile)
   }
   SetCpuLayoutOnNumaNodes(true, excluded);
 
-  /* antenna configurations */
-  if (kUseUHD == false) {
-    std::string hub_file = tdd_conf.value("hubs", "");
-    if (!hub_file.empty()) {
-      Utils::LoadDevices(hub_file, hub_id_);
-    }
-  }
-
   num_cells_ = tdd_conf.value("cells", 1);
 
   std::string serials_str;
   std::string serial_file = tdd_conf.value("serial_file", "");
   Utils::LoadTddConfig(serial_file, serials_str);
+  std::cout << serials_str << std::endl;
   external_ref_node_ = false;
   if (serials_str.empty() == false) {
     const auto j_serials = json::parse(serials_str, nullptr, true, true);
-    RtAssert(j_serials.size() == num_cells_, "Incorrect cells number!");
+
+    std::stringstream ss;
+    json j_bs_serials;
+    ss << j_serials.value("BaseStations", j_bs_serials);
+    j_bs_serials = json::parse(ss);
+    ss.str(std::string());
+    ss.clear();
+
+    RtAssert(j_bs_serials.size() == num_cells_, "Incorrect cells number!");
     for (size_t i = 0; i < num_cells_; i++) {
       json serials_conf;
-      std::string cell_str = "Cell" + std::to_string(i);
-      std::stringstream ss;
-      ss << j_serials[i].value(cell_str, serials_conf);
+      std::string cell_str = "BS" + std::to_string(i);
+      ss << j_bs_serials.value(cell_str, serials_conf);
       serials_conf = json::parse(ss);
       ss.str(std::string());
       ss.clear();
@@ -73,7 +73,7 @@ Config::Config(const std::string& jsonfile)
       auto hub_serial = serials_conf.value("hub", "");
       hub_id_.push_back(hub_serial);
       auto sdr_serials = serials_conf.value("sdr", json::array());
-      RtAssert(sdr_serials.size() == 0, "BS has zero sdrs!");
+      RtAssert(sdr_serials.size() != 0, "BS has zero sdrs!");
       radio_id_.insert(radio_id_.end(), sdr_serials.begin(), sdr_serials.end());
       num_radios_ += sdr_serials.size();
       cell_id_.resize(num_radios_, i);
@@ -92,9 +92,17 @@ Config::Config(const std::string& jsonfile)
         if (sdr_serials.at(j) == refnode_serial) external_ref_node = false;
       external_ref_node_ = external_ref_node;
     }
-    auto cl_serials = j_serials.value("Standalone Clients", json::array());
-    ue_radio_id_.assign(cl_serials.begin(), cl_serials.end());
+
+    json j_ue_serials;
+    ss << j_serials.value("Clients", j_ue_serials);
+    j_ue_serials = json::parse(ss);
+    ss.str(std::string());
+    ss.clear();
+
+    auto ue_serials = j_ue_serials.value("sdr", json::array());
+    ue_radio_id_.assign(ue_serials.begin(), ue_serials.end());
   }
+
   if (radio_id_.empty() == true) {
     num_radios_ = tdd_conf.value("bs_radio_num", 8);
     cell_id_.resize(num_radios_, 0);
