@@ -63,6 +63,7 @@ std::vector<Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid, size_t radio_id,
   size_t packet_length = cfg_->PacketLength();
 
   size_t ant_id = radio_id * cfg_->NumChannels();
+  size_t cell_id = cfg_->CellId().at(radio_id);
   std::vector<size_t> ant_ids(cfg_->NumChannels());
   std::vector<void*> samp(cfg_->NumChannels());
 
@@ -94,7 +95,7 @@ std::vector<Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid, size_t radio_id,
   /// \TODO: What if ref_ant is set to the second channel?
   if ((cfg_->Frame().IsRecCalEnabled() == true) &&
       (cfg_->IsCalDlPilot(frame_id, symbol_id) == true) &&
-      (radio_id == cfg_->RefRadio()) && (cfg_->AntPerGroup() > 1)) {
+      (radio_id == cfg_->RefRadio().at(cell_id)) && (cfg_->AntPerGroup() > 1)) {
     if (cfg_->AntPerGroup() > cfg_->NumChannels()) {
       symbol_ids.resize(cfg_->AntPerGroup());
       ant_ids.resize(cfg_->AntPerGroup());
@@ -121,7 +122,7 @@ std::vector<Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid, size_t radio_id,
     RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
     pkt.push_back(rx.RawPacket());
     new (rx.RawPacket())
-        Packet(frame_id, symbol_ids.at(ch), 0 /* cell_id */, ant_ids.at(ch));
+        Packet(frame_id, symbol_ids.at(ch), cell_id, ant_ids.at(ch));
 
     rx.Use();
     // Push kPacketRX event into the queue.
@@ -155,6 +156,7 @@ size_t PacketTXRX::DequeueSendArgos(int tid) {
     const size_t symbol_id = gen_tag_t(current_event.tags_[0u]).symbol_id_;
     const size_t ant_id = gen_tag_t(current_event.tags_[0u]).ant_id_;
     const size_t radio_id = ant_id / cfg_->NumChannels();
+    size_t cell_id = cfg_->CellId().at(radio_id);
 
     // See if this is the last antenna on the radio.  Assume that we receive the
     // last one
@@ -179,7 +181,7 @@ size_t PacketTXRX::DequeueSendArgos(int tid) {
         std::vector<std::complex<int16_t>> zeros(cfg_->SampsPerSymbol(),
                                                  std::complex<int16_t>(0, 0));
         for (size_t s = 0; s < cfg_->RadioPerGroup(); s++) {
-          if (radio_id != cfg_->RefRadio()) {
+          if (radio_id != cfg_->RefRadio().at(cell_id)) {
             bool calib_turn = (frame_id % cfg_->RadioGroupNum() ==
                                    radio_id / cfg_->RadioPerGroup() &&
                                s == radio_id % cfg_->RadioPerGroup());

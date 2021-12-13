@@ -62,7 +62,7 @@ bool RadioTxRx::StartTxRx(Table<char>& in_buffer, size_t in_buffer_length,
   txrx_threads_.resize(thread_num_);
   buffers_per_thread_ = in_buffer_length / thread_num_;
   /// Make sure we can fit each channel in the tread buffer without rollover
-  assert(buffers_per_thread_ % config_->NumChannels() == 0);
+  assert(buffers_per_thread_ % config_->NumUeChannels() == 0);
   rx_packets_.resize(thread_num_);
   for (size_t i = 0; i < thread_num_; i++) {
     rx_packets_.at(i).reserve(buffers_per_thread_);
@@ -156,8 +156,8 @@ int RadioTxRx::DequeueSend(int tid) {
               c->PacketLength() - Packet::kOffsetOfData);
 
   // Transmit pilot symbols on each UE channel
-  for (size_t channel = 0; channel < c->NumChannels(); channel++) {
-    const size_t ant_id = (ue_id * c->NumChannels()) + channel;
+  for (size_t channel = 0; channel < c->NumUeChannels(); channel++) {
+    const size_t ant_id = (ue_id * c->NumUeChannels()) + channel;
     for (size_t symbol_idx = 0; symbol_idx < c->Frame().NumPilotSyms();
          symbol_idx++) {
       if (kDebugPrintInTask) {
@@ -268,7 +268,7 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
 
   // For UHD devices, first pilot should not be with the END_BURST flag
   // 1: HAS_TIME, 2: HAS_TIME | END_BURST
-  int flags_tx_pilot = (kUseUHD && c->NumChannels() == 2) ? 1 : 2;
+  int flags_tx_pilot = (kUseUHD && c->NumUeChannels() == 2) ? 1 : 2;
 
   EventData event;
   if (task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event) == false) {
@@ -282,7 +282,7 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
   size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
   size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
   size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
-  size_t ant_id = ue_id * c->NumChannels();
+  size_t ant_id = ue_id * c->NumUeChannels();
   long long tx_time(0);
   int r;
 
@@ -297,7 +297,7 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
     if (r < static_cast<int>(num_samps)) {
       std::cout << "BAD Write: (PILOT)" << r << "/" << num_samps << std::endl;
     }
-    if (c->NumChannels() == 2) {
+    if (c->NumUeChannels() == 2) {
       pilot_symbol_id = c->Frame().GetPilotSymbol(ant_id + 1);
       tx_time = time0 + tx_frame_id * frm_num_samps +
                 pilot_symbol_id * num_samps - c->ClTxAdvance().at(ue_id);
@@ -333,7 +333,7 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
         ant_id;
 
     void* txbuf[2];
-    for (size_t ch = 0; ch < c->NumChannels(); ++ch) {
+    for (size_t ch = 0; ch < c->NumUeChannels(); ++ch) {
       auto* pkt = reinterpret_cast<struct Packet*>(
           tx_buffer_ + (offset + ch) * packet_length);
       txbuf[ch] = (void*)pkt->data_;
@@ -377,8 +377,8 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
   size_t num_samps = c->SampsPerSymbol();
   long long rx_time(0);
 
-  std::vector<void*> samp(c->NumChannels());
-  for (size_t ch = 0; ch < c->NumChannels(); ++ch) {
+  std::vector<void*> samp(c->NumUeChannels());
+  for (size_t ch = 0; ch < c->NumUeChannels(); ++ch) {
     RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
     if (rx.Empty() == false) {
       std::printf("RX [%zu] at rx_offset %zu buffer full\n", tid, rx_slot);
@@ -415,8 +415,8 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
         "RX [%zu]: frame_id %zu, symbol_id %zu, radio_id %zu rxtime %llx\n",
         tid, frame_id, symbol_id, radio_id, rx_time);
   }
-  size_t ant_id = radio_id * c->NumChannels();
-  for (size_t ch = 0; ch < c->NumChannels(); ++ch) {
+  size_t ant_id = radio_id * c->NumUeChannels();
+  for (size_t ch = 0; ch < c->NumUeChannels(); ++ch) {
     RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
     new (rx.RawPacket())
         Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id + ch);
@@ -433,7 +433,7 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
 void* RadioTxRx::LoopTxRxArgos(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_id_, tid);
   auto& c = config_;
-  size_t num_radios = c->NumRadios();
+  size_t num_radios = c->UeNum();
   size_t radio_lo = tid * num_radios / thread_num_;
   size_t radio_hi = (tid + 1) * num_radios / thread_num_;
   std::printf("RadioTxRx thread %zu has radios %zu to %zu (%zu)\n", tid,
@@ -483,7 +483,7 @@ void* RadioTxRx::LoopTxRxArgos(size_t tid) {
       continue;
     }
 
-    rx_slot = (rx_slot + c->NumChannels()) % buffers_per_thread_;
+    rx_slot = (rx_slot + c->NumUeChannels()) % buffers_per_thread_;
     if (++radio_id == radio_hi) {
       radio_id = radio_lo;
     }
@@ -518,7 +518,7 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
     pilot_buff0_.resize(2);
     pilot_buff1_.resize(2);
     pilot_buff0_.at(0) = c->PilotCi16().data();
-    if (c->NumChannels() == 2) {
+    if (c->NumUeChannels() == 2) {
       pilot_buff0_.at(1) = zeros0.data();
       pilot_buff1_.at(0) = zeros1.data();
       pilot_buff1_.at(1) = c->PilotCi16().data();
@@ -605,7 +605,7 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
       break;
     }
     symbol_id++;
-    rx_slot = (rx_slot + c->NumChannels()) % buffers_per_thread_;
+    rx_slot = (rx_slot + c->NumUeChannels()) % buffers_per_thread_;
 
     static const size_t kFrameSync = 1000;
     // resync every kFrameSync frames:
@@ -653,14 +653,13 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
 
     // receive the remaining of the frame
     for (; symbol_id < c->Frame().NumTotalSyms(); symbol_id++) {
-      if ((config_->IsPilot(frame_id, symbol_id) == true) ||
-          (config_->IsDownlink(frame_id, symbol_id) == true)) {
+      if (config_->IsDownlink(frame_id, symbol_id) == true) {
         struct Packet* rx_pkt = RecvEnqueueArgos(tid, radio_id, frame_id,
                                                  symbol_id, rx_slot, false);
         if (rx_pkt == nullptr) {
           break;
         }
-        rx_slot = (rx_slot + c->NumChannels()) % buffers_per_thread_;
+        rx_slot = (rx_slot + c->NumUeChannels()) % buffers_per_thread_;
       } else {
         // Otherwise throw away the data.
         radio->RadioRx(radio_id, frm_rx_buff.data(), num_samps, rx_time);
