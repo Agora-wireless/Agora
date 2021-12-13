@@ -415,7 +415,7 @@ Config::Config(const std::string& jsonfile)
   if ((freq_orthogonal_pilot_ == false) &&
       (tdd_conf.find("ue_radio_num") == tdd_conf.end())) {
     ue_num_ = frame_.NumPilotSyms();
-    ue_ant_num_ = ue_num_;
+    ue_ant_num_ = ue_num_ * num_ue_channels_;
   }
   ue_ant_offset_ = tdd_conf.value("ue_ant_offset", 0);
   ue_ant_total_ = tdd_conf.value("ue_ant_total", ue_ant_num_);
