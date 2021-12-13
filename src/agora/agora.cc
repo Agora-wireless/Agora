@@ -16,7 +16,7 @@ Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
       stats_(std::make_unique<Stats>(cfg)),
-      phy_stats_(std::make_unique<PhyStats>(cfg)),
+      phy_stats_(std::make_unique<PhyStats>(cfg, Direction::Uplink)),
       csi_buffers_(kFrameWnd, cfg->UeNum(),
                    cfg->BsAntNum() * cfg->OfdmDataNum()),
       ul_zf_matrices_(kFrameWnd, cfg->OfdmDataNum(),
@@ -809,7 +809,8 @@ void Agora::Worker(int tid) {
       this->dl_encoded_buffer_, this->stats_.get());
 
   auto compute_encoding = std::make_unique<DoEncode>(
-      config_, tid, (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
+      config_, tid, Direction::Downlink,
+      (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
       (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
       this->stats_.get());
 
@@ -949,10 +950,11 @@ void Agora::WorkerDemul(int tid) {
 void Agora::WorkerDecode(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerDecode, base_worker_core_offset_, tid);
 
-  std::unique_ptr<DoEncode> compute_encoding(new DoEncode(
-      config_, tid, (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
-      (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
-      this->stats_.get()));
+  std::unique_ptr<DoEncode> compute_encoding(
+      new DoEncode(config_, tid, Direction::Downlink,
+                   (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
+                   (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
+                   this->stats_.get()));
 
   std::unique_ptr<DoDecode> compute_decoding(
       new DoDecode(config_, tid, demod_buffers_, decoded_buffer_,

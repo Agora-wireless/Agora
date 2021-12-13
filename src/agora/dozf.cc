@@ -44,6 +44,13 @@ DoZF::DoZF(Config* config, int tid,
   calib_gather_buffer_ = static_cast<complex_float*>(
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        kMaxAntennas * sizeof(complex_float)));
+
+  if (cfg_->RefAnt().size() > 0) {
+    ref_ids.zeros(cfg_->NumCells() * cfg_->NumChannels());
+    for (size_t i = 0; i < cfg_->NumCells(); i++)
+      for (size_t j = 0; j < cfg_->NumChannels(); j++)
+        ref_ids.at(i * cfg_->NumChannels() + j) = cfg_->RefAnt().at(i) + j;
+  }
 }
 
 DoZF::~DoZF() {
@@ -106,18 +113,21 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     mat_dl_zf_tmp *= scale;
 
     if (cfg_->ExternalRefNode()) {
-      mat_dl_zf_tmp.insert_cols(
-          cfg_->RefAnt(),
-          arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(), arma::fill::zeros));
+      for (size_t i = 0; i < cfg_->NumCells(); i++)
+        mat_dl_zf_tmp.insert_cols(
+            cfg_->RefRadio().at(i) * cfg_->NumChannels(),
+            arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(),
+                          arma::fill::zeros));
     }
     arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
                             cfg_->BsAntNum(), cfg_->UeNum(), false);
     mat_dl_zf = mat_dl_zf_tmp.st();
   }
   if (cfg_->ExternalRefNode() == true) {
-    mat_ul_zf_tmp.insert_cols(
-        cfg_->RefAnt(),
-        arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(), arma::fill::zeros));
+    for (size_t i = 0; i < cfg_->NumCells(); i++)
+      mat_ul_zf_tmp.insert_cols(
+          cfg_->RefAnt().at(i) * cfg_->NumChannels(),
+          arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(), arma::fill::zeros));
   }
   mat_ul_zf = mat_ul_zf_tmp;
   float rcond = -1;
@@ -309,8 +319,7 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     if (cfg_->Frame().NumDLSyms() > 0) {
       ComputeCalib(frame_id, cur_sc_id);
       if (cfg_->ExternalRefNode()) {
-        mat_csi.shed_rows(cfg_->RefAnt(),
-                          cfg_->RefAnt() + cfg_->NumChannels() - 1);
+        mat_csi.shed_rows(ref_ids);
       }
     }
 

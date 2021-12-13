@@ -1,10 +1,9 @@
 {
-  "ofdm_ca_num": 2048,
+  "fft_size": 2048,
   "ofdm_data_num": 1200,
   "demul_block_size": 48,
-  "UE": false,
-  "ue_num": 1,
-  "antenna_num": 8,
+  "ue_radio_num": 1,
+  "bs_radio_num": 8,
   "symbol_num_perframe": 70,
   "client_ul_pilot_syms": 2,
   "ul_data_symbol_start": 3,
@@ -18,5 +17,10 @@
   "core_offset": 16,
   "worker_thread_num": 8,
   "socket_thread_num": 1,
-  "frames_to_test": 5
+  "ue_mac_rx_port": 9070,
+  "ue_mac_tx_port": 9080,
+  "ue_core_offset": 12,
+  "ue_worker_thread_num": 1,
+  "ue_socket_thread_num": 1,
+  "max_frame": 5
 }

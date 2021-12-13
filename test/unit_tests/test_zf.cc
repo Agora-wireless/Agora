@@ -42,7 +42,7 @@ TEST(TestZF, Perf) {
                                    cfg->OfdmDataNum() * cfg->BsAntNum(),
                                    Agora_memory::Alignment_t::kAlign64);
 
-  auto phy_stats = std::make_unique<PhyStats>(cfg.get());
+  auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::Uplink);
   auto stats = std::make_unique<Stats>(cfg.get());
 
   auto compute_zf = std::make_unique<DoZF>(

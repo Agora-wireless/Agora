@@ -36,6 +36,8 @@ static constexpr inline bool IsPowerOfTwo(T x) {
   return x && ((x & T(x - 1)) == 0);
 }
 
+enum class Direction : int { Downlink, Uplink };
+
 // TODO: Merge EventType and DoerType into WorkType
 enum class EventType : int {
   kPacketRX,
