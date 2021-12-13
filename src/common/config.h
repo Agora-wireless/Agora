@@ -283,14 +283,6 @@ class Config {
   /// Return the symbol type of this symbol in this frame
   SymbolType GetSymbolType(size_t symbol_id) const;
 
-  /* Inline functions */
-  inline size_t GetNumAntennas() const {
-    return (this->num_radios_ * this->num_channels_);
-  }
-  inline size_t GetNumClientAntennas() const {
-    return (this->ue_num_ * this->num_ue_channels_);
-  }
-
   inline void UpdateModCfgs(size_t new_mod_order_bits) {
     this->mod_order_bits_ = new_mod_order_bits;
     this->mod_order_ = static_cast<size_t>(pow(2, this->mod_order_bits_));

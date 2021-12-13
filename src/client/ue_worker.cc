@@ -94,7 +94,7 @@ void UeWorker::TaskThread(size_t core_offset) {
   PinToCoreWithOffset(ThreadType::kWorker, core_offset, tid_);
 
   auto encoder = std::make_unique<DoEncode>(
-      &config_, (int)tid_, Direction::Downlink,
+      &config_, (int)tid_, Direction::Uplink,
       (kEnableMac == true) ? ul_bits_buffer_ : config_.UlBits(),
       (kEnableMac == true) ? kFrameWnd : 1, encoded_buffer_, &stats_);
 
