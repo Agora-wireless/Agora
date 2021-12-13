@@ -425,6 +425,9 @@ Config::Config(const std::string& jsonfile)
   core_offset_ = tdd_conf.value("core_offset", 0);
   worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   socket_thread_num_ = tdd_conf.value("socket_thread_num", 4);
+  ue_core_offset_ = tdd_conf.value("ue_core_offset", 0);
+  ue_worker_thread_num_ = tdd_conf.value("ue_worker_thread_num", 25);
+  ue_socket_thread_num_ = tdd_conf.value("ue_socket_thread_num", 4);
   fft_thread_num_ = tdd_conf.value("fft_thread_num", 5);
   demul_thread_num_ = tdd_conf.value("demul_thread_num", 5);
   decode_thread_num_ = tdd_conf.value("decode_thread_num", 10);
