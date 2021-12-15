@@ -49,7 +49,6 @@ Config::Config(const std::string& jsonfile)
   std::string serials_str;
   std::string serial_file = tdd_conf.value("serial_file", "");
   Utils::LoadTddConfig(serial_file, serials_str);
-  std::cout << serials_str << std::endl;
   external_ref_node_ = false;
   if (serials_str.empty() == false) {
     const auto j_serials = json::parse(serials_str, nullptr, true, true);
@@ -78,7 +77,7 @@ Config::Config(const std::string& jsonfile)
       num_radios_ += sdr_serials.size();
       cell_id_.resize(num_radios_, i);
 
-      auto refnode_serial = serials_conf.value("reference node", "");
+      auto refnode_serial = serials_conf.value("reference", "");
       if (refnode_serial.empty()) {
         MLPD_INFO("No calibration node ID found in topology file!\n");
       } else {

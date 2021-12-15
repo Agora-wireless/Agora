@@ -18,7 +18,7 @@
                 "RF3E000127",
                 "RF3E000597"
             ],
-            "reference node": "RF3E000089"
+            "reference": "RF3E000089"
         }
     },
     "Clients" : {
