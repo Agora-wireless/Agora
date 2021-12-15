@@ -79,10 +79,10 @@ Config::Config(const std::string& jsonfile)
 
       auto refnode_serial = serials_conf.value("reference", "");
       if (refnode_serial.empty()) {
-        MLPD_INFO("No calibration node ID found in topology file!\n");
+        MLPD_INFO("No reference node ID found in topology file!\n");
       } else {
         radio_id_.push_back(refnode_serial);
-        ref_radio_.push_back(radio_id_.size());
+        ref_radio_.push_back(radio_id_.size() - 1);
         num_radios_++;
         cell_id_.resize(num_radios_, i);
       }
