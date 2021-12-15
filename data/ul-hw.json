@@ -21,17 +21,19 @@
     "frame_schedule": [
         "BPPGUUUUG"
     ],
+    "client_ul_pilot_syms" : 2,
+    "worker_thread_num" : 20,
+    "demul_block_size" : 48,
+    "ue_channel" : "A",
+    "ue_rx_gain_a" : [65,65],
+    "ue_tx_gain_a" : [75,75],
+    "ue_rx_gain_b" : [65,65],
+    "ue_tx_gain_b" : [75,75],    
     "hw_framer": false,
-    "max_frame": 100000,
     "tx_advance": [
         140,
         140
     ],
-    "ue_channel" : "A",
-    "downlink_mode": false,
-    "client_ul_pilot_syms" : 2,
-    "worker_thread_num" : 20,
-    "demul_block_size" : 48,
     "ue_worker_thread_num": 2,
     "ue_demul_block_size": 48,
     "ue_core_offset": 26,
