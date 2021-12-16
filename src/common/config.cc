@@ -233,14 +233,6 @@ Config::Config(const std::string& jsonfile)
   freq_orthogonal_pilot_ = tdd_conf.value("freq_orthogonal_pilot", false);
   correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
 
-  auto tx_advance = tdd_conf.value("tx_advance", json::array());
-  if (tx_advance.empty()) {
-    cl_tx_advance_.resize(ue_num_, 0);
-  } else {
-    RtAssert(tx_advance.size() == ue_num_,
-             "tx_advance size must be same as the number of clients!");
-    cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
-  }
   hw_framer_ = tdd_conf.value("hw_framer", true);
 
   // If frames not specified explicitly, construct default based on frame_type /
@@ -418,6 +410,15 @@ Config::Config(const std::string& jsonfile)
   }
   ue_ant_offset_ = tdd_conf.value("ue_ant_offset", 0);
   ue_ant_total_ = tdd_conf.value("ue_ant_total", ue_ant_num_);
+
+  auto tx_advance = tdd_conf.value("tx_advance", json::array());
+  if (tx_advance.empty()) {
+    cl_tx_advance_.resize(ue_num_, 0);
+  } else {
+    RtAssert(tx_advance.size() == ue_num_,
+             "tx_advance size must be same as the number of clients!");
+    cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
+  }
 
   // Agora configurations
   frames_to_test_ = tdd_conf.value("max_frame", 9600);
