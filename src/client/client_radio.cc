@@ -12,7 +12,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   SoapySDR::Kwargs args;
   SoapySDR::Kwargs sargs;
   // load channels
-  auto channels = Utils::StrToChannels(cfg_->Channel());
+  auto channels = Utils::StrToChannels(cfg_->UeChannel());
 
   this->radio_num_ = cfg_->UeNum();
   this->antenna_num_ = cfg_->UeAntNum();
@@ -124,7 +124,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
 
 void ClientRadioConfig::InitClientRadio(size_t tid) {
   // load channels
-  auto channels = Utils::StrToChannels(cfg_->Channel());
+  auto channels = Utils::StrToChannels(cfg_->UeChannel());
 
   SoapySDR::Kwargs args;
   SoapySDR::Kwargs sargs;
@@ -296,7 +296,7 @@ bool ClientRadioConfig::RadioStart() {
           "TX_SW_DELAY",
           "30");  // experimentally good value for dev front-end
       cl_stn_[i]->writeSetting("TDD_MODE", "true");
-      for (char const& c : cfg_->Channel()) {
+      for (char const& c : cfg_->UeChannel()) {
         std::string tx_ram = "TX_RAM_";
         cl_stn_[i]->writeRegisters(tx_ram + c, 0, pilot);
       }
@@ -309,7 +309,7 @@ bool ClientRadioConfig::RadioStart() {
       cl_stn_[i]->writeRegisters("CORR_COE", 0, cfg_->Coeffs());
 
       cl_stn_[i]->writeSetting("CORR_START",
-                               (cfg_->Channel() == "B") ? "B" : "A");
+                               (cfg_->UeChannel() == "B") ? "B" : "A");
     } else {
       if (!kUseUHD) {
         cl_stn_[i]->setHardwareTime(0, "TRIGGER");
