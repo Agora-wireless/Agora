@@ -193,7 +193,7 @@ EventData DoFFT::Launch(size_t tag) {
     PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
                      ant_id, SymbolType::kUL);
   } else if (sym_type == SymbolType::kCalUL and
-             ant_id != cfg_->RefAnt().at(cell_id)) {
+             ant_id != cfg_->RefAnt(cell_id)) {
     // Only process uplink for antennas that also do downlink in this frame
     // for consistency with calib downlink processing.
     if (frame_id >= TX_FRAME_DELTA &&
@@ -207,7 +207,7 @@ EventData DoFFT::Launch(size_t tag) {
       phy_stats_->UpdateCalibPilotSnr(frame_grp_id, 1, ant_id, fft_inout_);
     }
   } else if (sym_type == SymbolType::kCalDL &&
-             ant_id == cfg_->RefAnt().at(cell_id)) {
+             ant_id == cfg_->RefAnt(cell_id)) {
     if (frame_id >= TX_FRAME_DELTA) {
       size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
       size_t frame_grp_slot = frame_grp_id % kFrameWnd;

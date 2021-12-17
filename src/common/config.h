@@ -75,17 +75,17 @@ class Config {
   inline double RxGainB() const { return this->rx_gain_b_; }
   inline double CalibTxGainA() const { return this->calib_tx_gain_a_; }
   inline double CalibTxGainB() const { return this->calib_tx_gain_b_; }
-  inline std::vector<double> ClientTxGainA() const {
-    return this->client_tx_gain_a_;
+  inline double ClientTxGainA(size_t id) const {
+    return this->client_tx_gain_a_.at(id);
   }
-  inline std::vector<double> ClientRxGainA() const {
-    return this->client_rx_gain_a_;
+  inline double ClientRxGainA(size_t id) const {
+    return this->client_rx_gain_a_.at(id);
   }
-  inline std::vector<double> ClientTxGainB() const {
-    return this->client_tx_gain_b_;
+  inline double ClientTxGainB(size_t id) const {
+    return this->client_tx_gain_b_.at(id);
   }
-  inline std::vector<double> ClientRxGainB() const {
-    return this->client_rx_gain_b_;
+  inline double ClientRxGainB(size_t id) const {
+    return this->client_rx_gain_b_.at(id);
   }
   inline size_t NumCells() const { return this->num_cells_; }
   inline size_t NumRadios() const { return this->num_radios_; }
@@ -94,15 +94,17 @@ class Config {
   inline size_t NumAntennas() const { return this->num_antennas_; }
   inline size_t NumChannels() const { return this->num_channels_; }
   inline size_t NumUeChannels() const { return this->num_ue_channels_; }
-  inline std::vector<size_t> RefAnt() const { return this->ref_ant_; }
-  inline std::vector<size_t> RefRadio() const { return this->ref_radio_; }
+  inline size_t RefAnt(size_t id) const { return this->ref_ant_.at(id); }
+  inline size_t RefRadio(size_t id) const { return this->ref_radio_.at(id); }
   inline size_t BeaconAnt() const { return this->beacon_ant_; }
   inline size_t BeaconLen() const { return this->beacon_len_; }
 
   inline bool Beamsweep() const { return this->beamsweep_; }
   inline bool SampleCalEn() const { return this->sample_cal_en_; }
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
-  inline bool ExternalRefNode() const { return this->external_ref_node_; }
+  inline bool ExternalRefNode(size_t id) const {
+    return this->external_ref_node_.at(id);
+  }
   inline std::string Channel() const { return this->channel_; }
   inline std::string UeChannel() const { return this->ue_channel_; }
 
@@ -525,7 +527,7 @@ class Config {
   bool beamsweep_;
   bool sample_cal_en_;
   bool imbalance_cal_en_;
-  bool external_ref_node_;
+  std::vector<bool> external_ref_node_;
   std::string channel_;
   std::string ue_channel_;
   size_t ant_group_num_;
