@@ -104,6 +104,7 @@ class Config {
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
   inline bool ExternalRefNode() const { return this->external_ref_node_; }
   inline std::string Channel() const { return this->channel_; }
+  inline std::string UeChannel() const { return this->ue_channel_; }
 
   inline size_t AntGroupNum() const { return this->ant_group_num_; }
   inline size_t AntPerGroup() const { return this->ant_per_group_; }
