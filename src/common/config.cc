@@ -91,6 +91,7 @@ Config::Config(const std::string& jsonfile)
             std::find(sdr_serials.begin(), sdr_serials.end(), refnode_serial);
         if (serial_iterator == sdr_serials.end()) {
           radio_id_.push_back(refnode_serial);
+          ref_radio_.push_back(radio_id_.size() - 1);
           num_radios_++;
           cell_id_.resize(num_radios_, i);
           external_ref_node_.at(i) = true;
