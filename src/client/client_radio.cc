@@ -12,7 +12,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   SoapySDR::Kwargs args;
   SoapySDR::Kwargs sargs;
   // load channels
-  auto channels = Utils::StrToChannels(cfg_->Channel());
+  auto channels = Utils::StrToChannels(cfg_->UeChannel());
 
   this->radio_num_ = cfg_->UeNum();
   this->antenna_num_ = cfg_->UeAntNum();
@@ -124,7 +124,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
 
 void ClientRadioConfig::InitClientRadio(size_t tid) {
   // load channels
-  auto channels = Utils::StrToChannels(cfg_->Channel());
+  auto channels = Utils::StrToChannels(cfg_->UeChannel());
 
   SoapySDR::Kwargs args;
   SoapySDR::Kwargs sargs;
@@ -180,13 +180,13 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
       // Unified gains for both lime and frontend
       if (cfg_->SingleGain()) {
         // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
-        cl_stn_[tid]->setGain(SOAPY_SDR_RX, ch,
-                              ch != 0u ? cfg_->ClientRxGainB().at(tid)
-                                       : cfg_->ClientRxGainA().at(tid));
+        cl_stn_[tid]->setGain(
+            SOAPY_SDR_RX, ch,
+            ch != 0u ? cfg_->ClientRxGainB(tid) : cfg_->ClientRxGainA(tid));
         // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
-        cl_stn_[tid]->setGain(SOAPY_SDR_TX, ch,
-                              ch != 0u ? cfg_->ClientTxGainB().at(tid)
-                                       : cfg_->ClientTxGainA().at(tid));
+        cl_stn_[tid]->setGain(
+            SOAPY_SDR_TX, ch,
+            ch != 0u ? cfg_->ClientTxGainB(tid) : cfg_->ClientTxGainA(tid));
       } else {
         if (info["frontend"].find("CBRS") != std::string::npos) {
           if (cfg_->Freq() > 3e9) {
@@ -200,9 +200,8 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
         }
 
         cl_stn_[tid]->setGain(SOAPY_SDR_RX, ch, "LNA",
-                              ch != 0u
-                                  ? cfg_->RxGainB()
-                                  : cfg_->ClientRxGainA().at(tid));  //[0,30]
+                              ch != 0u ? cfg_->ClientRxGainB(tid)
+                                       : cfg_->ClientRxGainA(tid));  //[0,30]
         cl_stn_[tid]->setGain(SOAPY_SDR_RX, ch, "TIA", 0);           //[0,12]
         cl_stn_[tid]->setGain(SOAPY_SDR_RX, ch, "PGA", 0);           //[-12,19]
 
@@ -212,17 +211,16 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
         }
         cl_stn_[tid]->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);  //[0,12]
         cl_stn_[tid]->setGain(SOAPY_SDR_TX, ch, "PAD",
-                              ch != 0u
-                                  ? cfg_->ClientTxGainB().at(tid)
-                                  : cfg_->ClientTxGainA().at(tid));  //[0,30]
+                              ch != 0u ? cfg_->ClientTxGainB(tid)
+                                       : cfg_->ClientTxGainA(tid));  //[0,30]
       }
     } else {
-      cl_stn_[tid]->setGain(SOAPY_SDR_RX, ch, "PGA0",
-                            ch != 0u ? cfg_->ClientRxGainB().at(tid)
-                                     : cfg_->ClientRxGainA().at(tid));
-      cl_stn_[tid]->setGain(SOAPY_SDR_TX, ch, "PGA0",
-                            ch != 0u ? cfg_->ClientTxGainB().at(tid)
-                                     : cfg_->ClientTxGainA().at(tid));
+      cl_stn_[tid]->setGain(
+          SOAPY_SDR_RX, ch, "PGA0",
+          ch != 0u ? cfg_->ClientRxGainB(tid) : cfg_->ClientRxGainA(tid));
+      cl_stn_[tid]->setGain(
+          SOAPY_SDR_TX, ch, "PGA0",
+          ch != 0u ? cfg_->ClientTxGainB(tid) : cfg_->ClientTxGainA(tid));
     }
   }
 
@@ -296,7 +294,7 @@ bool ClientRadioConfig::RadioStart() {
           "TX_SW_DELAY",
           "30");  // experimentally good value for dev front-end
       cl_stn_[i]->writeSetting("TDD_MODE", "true");
-      for (char const& c : cfg_->Channel()) {
+      for (char const& c : cfg_->UeChannel()) {
         std::string tx_ram = "TX_RAM_";
         cl_stn_[i]->writeRegisters(tx_ram + c, 0, pilot);
       }
@@ -309,7 +307,7 @@ bool ClientRadioConfig::RadioStart() {
       cl_stn_[i]->writeRegisters("CORR_COE", 0, cfg_->Coeffs());
 
       cl_stn_[i]->writeSetting("CORR_START",
-                               (cfg_->Channel() == "B") ? "B" : "A");
+                               (cfg_->UeChannel() == "B") ? "B" : "A");
     } else {
       if (!kUseUHD) {
         cl_stn_[i]->setHardwareTime(0, "TRIGGER");

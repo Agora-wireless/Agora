@@ -177,9 +177,9 @@ std::vector<Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid, size_t radio_id,
   }
 
   long long frame_time;
-  bool cal_rx = (radio_id != cfg_->RefRadio().at(cell_id) &&
+  bool cal_rx = (radio_id != cfg_->RefRadio(cell_id) &&
                  cfg_->IsCalUlPilot(global_frame_id, global_symbol_id)) ||
-                (radio_id == cfg_->RefRadio().at(cell_id) &&
+                (radio_id == cfg_->RefRadio(cell_id) &&
                  cfg_->IsCalDlPilot(global_frame_id, global_symbol_id));
   bool dummy_read =
       (cfg_->HwFramer() == false) &&
@@ -216,8 +216,7 @@ std::vector<Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid, size_t radio_id,
       /// \TODO: What if ref_ant is set to the second channel?
       if ((cfg_->Frame().IsRecCalEnabled() == true) &&
           (cfg_->IsCalDlPilot(frame_id, symbol_id) == true) &&
-          (radio_id == cfg_->RefRadio().at(cell_id)) &&
-          (cfg_->AntPerGroup() > 1)) {
+          (radio_id == cfg_->RefRadio(cell_id)) && (cfg_->AntPerGroup() > 1)) {
         if (cfg_->AntPerGroup() > cfg_->NumChannels()) {
           symbol_ids.resize(cfg_->AntPerGroup());
           ant_ids.resize(cfg_->AntPerGroup());
@@ -339,7 +338,7 @@ size_t PacketTXRX::DequeueSendArgos(int tid, long long time0) {
         std::vector<std::complex<int16_t>> zeros(cfg_->SampsPerSymbol(),
                                                  std::complex<int16_t>(0, 0));
         for (size_t s = 0; s < cfg_->RadioPerGroup(); s++) {
-          if (radio_id != cfg_->RefRadio().at(cell_id)) {
+          if (radio_id != cfg_->RefRadio(cell_id)) {
             bool calib_turn = (frame_id % cfg_->RadioGroupNum() ==
                                    radio_id / cfg_->RadioPerGroup() &&
                                s == radio_id % cfg_->RadioPerGroup());

@@ -203,6 +203,10 @@ void RadioConfig::InitBsRadio(size_t tid) {
     ba_stn_[i]->setSampleRate(SOAPY_SDR_RX, ch, cfg_->Rate());
     ba_stn_[i]->setSampleRate(SOAPY_SDR_TX, ch, cfg_->Rate());
   }
+
+  // resets the DATA_clk domain logic.
+  ba_stn_[i]->writeSetting("RESET_DATA_LOGIC", "");
+
   rx_streams_[i] =
       ba_stn_[i]->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
   tx_streams_[i] =
@@ -213,9 +217,6 @@ void RadioConfig::InitBsRadio(size_t tid) {
 void RadioConfig::ConfigureBsRadio(size_t tid) {
   // load channels
   auto channels = Utils::StrToChannels(cfg_->Channel());
-
-  // resets the DATA_clk domain logic.
-  ba_stn_[tid]->writeSetting("RESET_DATA_LOGIC", "");
 
   // use the TRX antenna port for both tx and rx
   for (auto ch : channels) {
@@ -401,7 +402,7 @@ bool RadioConfig::RadioStart() {
   size_t ndx = 0;
   for (size_t i = 0; i < this->radio_num_; i++) {
     size_t cell_id = cfg_->CellId().at(i);
-    bool is_ref_radio = (i == cfg_->RefRadio().at(cell_id));
+    bool is_ref_radio = (i == cfg_->RefRadio(cell_id));
     if (cfg_->HwFramer() == true) {
       ba_stn_[i]->writeSetting(
           "TX_SW_DELAY", "30");  // experimentally good value for dev front-end
