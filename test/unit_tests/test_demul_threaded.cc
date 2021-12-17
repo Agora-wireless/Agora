@@ -153,7 +153,7 @@ TEST(TestDemul, VaryingConfig) {
           kMaxUEs * 1.0f / 1024 / 1024);
 
   auto stats = std::make_unique<Stats>(cfg.get());
-  auto phy_stats = std::make_unique<PhyStats>(cfg.get());
+  auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::Uplink);
 
   std::vector<std::thread> threads;
   threads.emplace_back(MasterToWorkerDynamicMaster, cfg.get(),

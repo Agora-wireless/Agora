@@ -94,19 +94,19 @@ CHECK_C_SOURCE_RUNS("int main() { asm volatile(\"vmovdqu64 %zmm0, %zmm1\"); retu
 if (ISA_AVX512)
   message(STATUS "Processor supports AVX-512")
   add_definitions(-DISA_AVX512)
-  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
   # Leave USE_AVX2_ENCODER unmodified
 else()
   message(STATUS "Processor does not support AVX-512")
-  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
   set(USE_AVX2_ENCODER True)
 endif()
 
 if(USE_AVX2_ENCODER)
   message(STATUS "Using Agora's (i.e., not FlexRAN's) AVX2 encoder")
+  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
   add_definitions(-DUSE_AVX2_ENCODER)
 else()
   message(STATUS "Using FlexRAN's (i.e., not Agora's) AVX512 encoder")
+  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
 endif()
 
 # DPDK
@@ -381,7 +381,7 @@ endforeach()
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
-  test_ptr_grid test_recipcal test_avx512_complex_mul test_scrambler
+  test_ptr_grid test_avx512_complex_mul test_scrambler
   test_256qam_demod)
 
 foreach(test_name IN LISTS UNIT_TESTS)

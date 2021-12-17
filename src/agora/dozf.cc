@@ -44,6 +44,13 @@ DoZF::DoZF(Config* config, int tid,
   calib_gather_buffer_ = static_cast<complex_float*>(
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        kMaxAntennas * sizeof(complex_float)));
+
+  if (cfg_->RefAnt().size() > 0) {
+    ref_ids.zeros(cfg_->NumCells() * cfg_->NumChannels());
+    for (size_t i = 0; i < cfg_->NumCells(); i++)
+      for (size_t j = 0; j < cfg_->NumChannels(); j++)
+        ref_ids.at(i * cfg_->NumChannels() + j) = cfg_->RefAnt().at(i) + j;
+  }
 }
 
 DoZF::~DoZF() {
@@ -106,22 +113,95 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     mat_dl_zf_tmp *= scale;
 
     if (cfg_->ExternalRefNode()) {
-      mat_dl_zf_tmp.insert_cols(
-          cfg_->RefAnt(),
-          arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(), arma::fill::zeros));
+      for (size_t i = 0; i < cfg_->NumCells(); i++)
+        mat_dl_zf_tmp.insert_cols(
+            cfg_->RefRadio().at(i) * cfg_->NumChannels(),
+            arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(),
+                          arma::fill::zeros));
     }
     arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
                             cfg_->BsAntNum(), cfg_->UeNum(), false);
     mat_dl_zf = mat_dl_zf_tmp.st();
   }
   if (cfg_->ExternalRefNode() == true) {
-    mat_ul_zf_tmp.insert_cols(
-        cfg_->RefAnt(),
-        arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(), arma::fill::zeros));
+    for (size_t i = 0; i < cfg_->NumCells(); i++)
+      mat_ul_zf_tmp.insert_cols(
+          cfg_->RefAnt().at(i) * cfg_->NumChannels(),
+          arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(), arma::fill::zeros));
   }
   mat_ul_zf = mat_ul_zf_tmp;
-  float rcond = arma::rcond(mat_csi.t() * mat_csi);
+  float rcond = -1;
+  if (kPrintZfStats) rcond = arma::rcond(mat_csi.t() * mat_csi);
   return rcond;
+}
+
+void DoZF::ComputeCalib(size_t frame_id, size_t sc_id) {
+  arma::cx_fvec calib_vec(
+      reinterpret_cast<arma::cx_float*>(calib_gather_buffer_), cfg_->BfAntNum(),
+      false);
+  size_t frame_cal_slot = kFrameWnd - 1;
+  size_t frame_cal_slot_prev = kFrameWnd - 1;
+  size_t frame_cal_slot_old = 0;
+  size_t frame_grp_id = 0;
+  if (cfg_->Frame().IsRecCalEnabled() && frame_id >= TX_FRAME_DELTA) {
+    frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
+
+    // use the previous window which has a full set of calibration results
+    frame_cal_slot = (frame_grp_id + kFrameWnd - 1) % kFrameWnd;
+    if (frame_id >= TX_FRAME_DELTA + cfg_->AntGroupNum()) {
+      frame_cal_slot_prev = (frame_grp_id + kFrameWnd - 2) % kFrameWnd;
+    }
+    frame_cal_slot_old =
+        (frame_cal_slot + 2) % kFrameWnd;  // oldest frame data in buffer
+  }
+
+  arma::cx_fmat cur_calib_dl_mat(
+      reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_cal_slot]),
+      cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+  arma::cx_fmat cur_calib_ul_mat(
+      reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_cal_slot]),
+      cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+
+  arma::cx_fmat old_calib_dl_mat(
+      reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_cal_slot_old]),
+      cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+  arma::cx_fmat old_calib_ul_mat(
+      reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_cal_slot_old]),
+      cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+
+  // update moving sum
+  arma::cx_fmat cur_calib_dl_msum_mat(
+      reinterpret_cast<arma::cx_float*>(calib_dl_msum_buffer_[frame_cal_slot]),
+      cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+  arma::cx_fmat cur_calib_ul_msum_mat(
+      reinterpret_cast<arma::cx_float*>(calib_ul_msum_buffer_[frame_cal_slot]),
+      cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+
+  arma::cx_fmat pre_calib_dl_msum_mat(
+      reinterpret_cast<arma::cx_float*>(
+          calib_dl_msum_buffer_[frame_cal_slot_prev]),
+      cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+  arma::cx_fmat pre_calib_ul_msum_mat(
+      reinterpret_cast<arma::cx_float*>(
+          calib_ul_msum_buffer_[frame_cal_slot_prev]),
+      cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+
+  // Calculate a moving sum
+  cur_calib_dl_msum_mat.row(sc_id) = cur_calib_dl_mat.row(sc_id) +
+                                     pre_calib_dl_msum_mat.row(sc_id) -
+                                     old_calib_dl_mat.row(sc_id);
+  cur_calib_ul_msum_mat.row(sc_id) = cur_calib_ul_mat.row(sc_id) +
+                                     pre_calib_ul_msum_mat.row(sc_id) -
+                                     old_calib_ul_mat.row(sc_id);
+
+  if (cfg_->InitCalibRepeat() == 0u && frame_grp_id == 0)
+    // fill with one until one full sweep
+    // of  calibration data is done
+    calib_vec.fill(arma::cx_float(1, 0));
+  else
+    calib_vec =
+        (cur_calib_dl_msum_mat.row(sc_id) / cur_calib_ul_msum_mat.row(sc_id))
+            .st();
 }
 
 // Gather data of one symbol from partially-transposed buffer
@@ -237,114 +317,9 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
                           cfg_->UeNum(), false);
 
     if (cfg_->Frame().NumDLSyms() > 0) {
-      arma::cx_fvec calib_vec(
-          reinterpret_cast<arma::cx_float*>(calib_gather_buffer_),
-          cfg_->BfAntNum(), false);
-      size_t frame_cal_slot = kFrameWnd - 1;
-      size_t frame_cal_slot_prev = kFrameWnd - 1;
-      size_t frame_cal_slot_old = 0;
-      size_t frame_grp_id = 0;
-      if (cfg_->Frame().IsRecCalEnabled() && frame_id >= TX_FRAME_DELTA) {
-        frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
-
-        // use the previous window which has a full set of calibration results
-        frame_cal_slot = (frame_grp_id + kFrameWnd - 1) % kFrameWnd;
-        if (frame_id >= TX_FRAME_DELTA + cfg_->AntGroupNum()) {
-          frame_cal_slot_prev = (frame_grp_id + kFrameWnd - 2) % kFrameWnd;
-        }
-        frame_cal_slot_old =
-            (frame_cal_slot + 2) % kFrameWnd;  // oldest frame data in buffer
-      }
-
-      arma::cx_fmat cur_calib_dl_mat(
-          reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_cal_slot]),
-          cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-      arma::cx_fmat cur_calib_ul_mat(
-          reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_cal_slot]),
-          cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-
-      arma::cx_fmat old_calib_dl_mat(reinterpret_cast<arma::cx_float*>(
-                                         calib_dl_buffer_[frame_cal_slot_old]),
-                                     cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                     false);
-      arma::cx_fmat old_calib_ul_mat(reinterpret_cast<arma::cx_float*>(
-                                         calib_ul_buffer_[frame_cal_slot_old]),
-                                     cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                     false);
-
-      // update moving sum
-      arma::cx_fmat cur_calib_dl_msum_mat(
-          reinterpret_cast<arma::cx_float*>(
-              calib_dl_msum_buffer_[frame_cal_slot]),
-          cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-      arma::cx_fmat cur_calib_ul_msum_mat(
-          reinterpret_cast<arma::cx_float*>(
-              calib_ul_msum_buffer_[frame_cal_slot]),
-          cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-
-      arma::cx_fmat pre_calib_dl_msum_mat(
-          reinterpret_cast<arma::cx_float*>(
-              calib_dl_msum_buffer_[frame_cal_slot_prev]),
-          cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-      arma::cx_fmat pre_calib_ul_msum_mat(
-          reinterpret_cast<arma::cx_float*>(
-              calib_ul_msum_buffer_[frame_cal_slot_prev]),
-          cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
-
-      // Calculate a moving sum
-      cur_calib_dl_msum_mat.row(cur_sc_id) =
-          cur_calib_dl_mat.row(cur_sc_id) +
-          pre_calib_dl_msum_mat.row(cur_sc_id) -
-          old_calib_dl_mat.row(cur_sc_id);
-      cur_calib_ul_msum_mat.row(cur_sc_id) =
-          cur_calib_ul_mat.row(cur_sc_id) +
-          pre_calib_ul_msum_mat.row(cur_sc_id) -
-          old_calib_ul_mat.row(cur_sc_id);
-
-      if (cfg_->InitCalibRepeat() == 0u && frame_grp_id == 0)
-        // fill with one until one full sweep
-        // of  calibration data is done
-        calib_vec.fill(arma::cx_float(1, 0));
-      else
-        calib_vec = (cur_calib_dl_msum_mat.row(cur_sc_id) /
-                     cur_calib_ul_msum_mat.row(cur_sc_id))
-                        .st();
-
-      if (kRecordCalibrationMats == true) {
-        if (cfg_->Frame().IsRecCalEnabled() && (frame_id >= TX_FRAME_DELTA)) {
-          // Write to file when a full sweep of calibration in done
-          if ((frame_id - TX_FRAME_DELTA) % cfg_->AntGroupNum() ==
-                  cfg_->AntGroupNum() - 1 &&
-              cur_sc_id == 0) {
-            Utils::SaveVec(cur_calib_dl_mat.row(cur_sc_id).st(),
-                           "calib_dl_vec.m",
-                           "online_calib_dl_vec" +
-                               std::to_string(frame_id / cfg_->AntGroupNum()),
-                           true /*append*/);
-            Utils::SaveVec(cur_calib_ul_mat.row(cur_sc_id).st(),
-                           "calib_ul_vec.m",
-                           "online_calib_ul_vec" +
-                               std::to_string(frame_id / cfg_->AntGroupNum()),
-                           true /*append*/);
-
-            arma::cx_fvec calib_vec_inst = (cur_calib_dl_mat.row(cur_sc_id) /
-                                            cur_calib_ul_mat.row(cur_sc_id))
-                                               .st();
-            Utils::SaveVec(calib_vec_inst, "calib_vec.m",
-                           "online_calib_vec_inst" +
-                               std::to_string(frame_id / cfg_->AntGroupNum()),
-                           true /*append*/);
-            Utils::SaveVec(calib_vec, "calib_vec.m",
-                           "online_calib_vec_mean" +
-                               std::to_string(frame_id / cfg_->AntGroupNum()),
-                           true /*append*/);
-          }
-        }
-      }
-
+      ComputeCalib(frame_id, cur_sc_id);
       if (cfg_->ExternalRefNode()) {
-        mat_csi.shed_rows(cfg_->RefAnt(),
-                          cfg_->RefAnt() + cfg_->NumChannels() - 1);
+        mat_csi.shed_rows(ref_ids);
       }
     }
 
@@ -354,7 +329,7 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     auto rcond = ComputePrecoder(mat_csi, calib_gather_buffer_,
                                  ul_zf_matrices_[frame_slot][cur_sc_id],
                                  dl_zf_matrices_[frame_slot][cur_sc_id]);
-    phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
+    if (kPrintZfStats) phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
     duration_stat_->task_count_++;

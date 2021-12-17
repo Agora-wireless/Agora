@@ -18,14 +18,16 @@
 
 class DoEncode : public Doer {
  public:
-  DoEncode(Config* in_config, int in_tid, Table<int8_t>& in_raw_data_buffer,
-           size_t in_buffer_rollover, Table<int8_t>& in_encoded_buffer,
-           Stats* in_stats_manager);
+  DoEncode(Config* in_config, int in_tid, Direction dir,
+           Table<int8_t>& in_raw_data_buffer, size_t in_buffer_rollover,
+           Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager);
   ~DoEncode() override;
 
   EventData Launch(size_t tag) override;
 
  private:
+  Direction dir_;
+
   // References to buffers allocated pre-construction
   Table<int8_t>& raw_data_buffer_;
   size_t raw_buffer_rollover_;

@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, Rice University
+// Copyright (c) 2018-2022, Rice University
 // RENEW OPEN SOURCE LICENSE: http://renew-wireless.org/license
 
 /**
@@ -26,6 +26,7 @@ Config::Config(const std::string& jsonfile)
       frame_("") {
   pilots_ = nullptr;
   pilots_sgn_ = nullptr;
+
   std::string conf;
   Utils::LoadTddConfig(jsonfile, conf);
   // Allow json comments
@@ -43,52 +44,88 @@ Config::Config(const std::string& jsonfile)
   }
   SetCpuLayoutOnNumaNodes(true, excluded);
 
-  /* antenna configurations */
-  if (kUseUHD == false) {
-    std::string hub_file = tdd_conf.value("hubs", "");
-    if (!hub_file.empty()) {
-      Utils::LoadDevices(hub_file, hub_ids_);
-    }
-  }
-  std::string serial_file = tdd_conf.value("irises", "");
-  ref_ant_ = tdd_conf.value("ref_ant", 0);
-  external_ref_node_ = tdd_conf.value("external_ref_node", false);
   num_cells_ = tdd_conf.value("cells", 1);
-  channel_ = tdd_conf.value("channel", "A");
-  num_channels_ = std::min(channel_.size(), (size_t)2);
-  bs_ant_num_ = tdd_conf.value("antenna_num", 8);
-  is_ue_ = tdd_conf.value("UE", false);
-  ue_num_ = tdd_conf.value("ue_num", 8);
-  ue_ant_num_ = ue_num_;
 
-  if (serial_file.empty() == false) {
-    Utils::LoadDevices(serial_file, radio_ids_);
-  }
-  if (radio_ids_.empty() == false) {
-    num_radios_ = radio_ids_.size();
-    num_antennas_ = num_channels_ * num_radios_;
-    if (is_ue_) {
-      ue_ant_num_ = num_antennas_;
-      ue_num_ = num_radios_;
-    } else {
-      if (ref_ant_ >= num_antennas_) {
-        ref_ant_ = 0;
+  std::string serials_str;
+  std::string serial_file = tdd_conf.value("serial_file", "");
+  Utils::LoadTddConfig(serial_file, serials_str);
+  external_ref_node_ = false;
+  if (serials_str.empty() == false) {
+    const auto j_serials = json::parse(serials_str, nullptr, true, true);
+
+    std::stringstream ss;
+    json j_bs_serials;
+    ss << j_serials.value("BaseStations", j_bs_serials);
+    j_bs_serials = json::parse(ss);
+    ss.str(std::string());
+    ss.clear();
+
+    RtAssert(j_bs_serials.size() == num_cells_, "Incorrect cells number!");
+    for (size_t i = 0; i < num_cells_; i++) {
+      json serials_conf;
+      std::string cell_str = "BS" + std::to_string(i);
+      ss << j_bs_serials.value(cell_str, serials_conf);
+      serials_conf = json::parse(ss);
+      ss.str(std::string());
+      ss.clear();
+
+      auto hub_serial = serials_conf.value("hub", "");
+      hub_id_.push_back(hub_serial);
+      auto sdr_serials = serials_conf.value("sdr", json::array());
+      RtAssert(sdr_serials.size() != 0, "BS has zero sdrs!");
+      radio_id_.insert(radio_id_.end(), sdr_serials.begin(), sdr_serials.end());
+      num_radios_ += sdr_serials.size();
+      cell_id_.resize(num_radios_, i);
+
+      auto refnode_serial = serials_conf.value("reference", "");
+      if (refnode_serial.empty()) {
+        MLPD_INFO("No reference node ID found in topology file!\n");
+      } else {
+        radio_id_.push_back(refnode_serial);
+        ref_radio_.push_back(radio_id_.size() - 1);
+        num_radios_++;
+        cell_id_.resize(num_radios_, i);
       }
-      if (bs_ant_num_ != num_antennas_) {
-        bs_ant_num_ = num_antennas_;
-      }
+      bool external_ref_node = true;
+      for (size_t j = 0; j < sdr_serials.size(); j++)
+        if (sdr_serials.at(j) == refnode_serial) external_ref_node = false;
+      external_ref_node_ = external_ref_node;
     }
+
+    json j_ue_serials;
+    ss << j_serials.value("Clients", j_ue_serials);
+    j_ue_serials = json::parse(ss);
+    ss.str(std::string());
+    ss.clear();
+
+    auto ue_serials = j_ue_serials.value("sdr", json::array());
+    ue_radio_id_.assign(ue_serials.begin(), ue_serials.end());
+  }
+
+  if (radio_id_.empty() == true) {
+    num_radios_ = tdd_conf.value("bs_radio_num", 8);
+    cell_id_.resize(num_radios_, 0);
+  }
+
+  if (ue_radio_id_.empty() == false) {
+    ue_num_ = ue_radio_id_.size();
   } else {
-    if (is_ue_) {
-      size_t ue_radios = ue_num_ / num_channels_;
-      num_radios_ = tdd_conf.value("radio_num", ue_radios);
-      ue_num_ = num_radios_;
-      ue_ant_num_ = ue_num_ * num_channels_;
-    } else {
-      num_radios_ = tdd_conf.value("radio_num", bs_ant_num_);
-      ue_ant_num_ = ue_num_;
+    ue_num_ = tdd_conf.value("ue_radio_num", 8);
+  }
+
+  channel_ = tdd_conf.value("channel", "A");
+  ue_channel_ = tdd_conf.value("ue_channel", "A");
+  num_channels_ = std::min(channel_.size(), (size_t)2);
+  num_ue_channels_ = std::min(ue_channel_.size(), (size_t)2);
+  bs_ant_num_ = num_channels_ * num_radios_;
+  ue_ant_num_ = ue_num_ * num_ue_channels_;
+
+  if (ref_radio_.empty() == false) {
+    for (size_t i = 0; i < num_cells_; i++) {
+      ref_ant_.push_back(ref_radio_.at(i) * num_channels_);
     }
   }
+
   bf_ant_num_ = bs_ant_num_;
   if (external_ref_node_ == true) {
     bf_ant_num_ = bs_ant_num_ - num_channels_;
@@ -107,25 +144,41 @@ Config::Config(const std::string& jsonfile)
   rx_gain_b_ = tdd_conf.value("rx_gain_b", 20);
   calib_tx_gain_a_ = tdd_conf.value("calib_tx_gain_a", tx_gain_a_);
   calib_tx_gain_b_ = tdd_conf.value("calib_tx_gain_b", tx_gain_b_);
-  auto gain_adj_json_a = tdd_conf.value("client_gain_adjust_a", json::array());
-  if (gain_adj_json_a.empty()) {
-    client_gain_adj_a_.resize(num_radios_, 0);
+
+  auto gain_tx_json_a = tdd_conf.value("ue_tx_gain_a", json::array());
+  if (gain_tx_json_a.empty()) {
+    client_tx_gain_a_.resize(ue_num_, 20);
   } else {
-    RtAssert(
-        gain_adj_json_a.size() == num_radios_,
-        "client_gain_adjust_a size must be same as the number of clients!");
-    client_gain_adj_a_.assign(gain_adj_json_a.begin(), gain_adj_json_a.end());
+    RtAssert(gain_tx_json_a.size() == ue_num_,
+             "ue_tx_gain_a size must be same as the number of clients!");
+    client_tx_gain_a_.assign(gain_tx_json_a.begin(), gain_tx_json_a.end());
   }
-  auto gain_adj_json_b = tdd_conf.value("client_gain_adjust_b", json::array());
-  if (gain_adj_json_b.empty()) {
-    client_gain_adj_b_.resize(num_radios_, 0);
+  auto gain_tx_json_b = tdd_conf.value("ue_tx_gain_b", json::array());
+  if (gain_tx_json_b.empty()) {
+    client_tx_gain_b_.resize(ue_num_, 0);
   } else {
-    RtAssert(
-        gain_adj_json_a.size() == num_radios_,
-        "client_gain_adjust_a size must be same as the number of clients!");
-    client_gain_adj_b_.assign(gain_adj_json_b.begin(), gain_adj_json_b.end());
+    RtAssert(gain_tx_json_b.size() == ue_num_,
+             "ue_tx_gain_b size must be same as the number of clients!");
+    client_tx_gain_b_.assign(gain_tx_json_b.begin(), gain_tx_json_b.end());
   }
-  rate_ = tdd_conf.value("rate", 5e6);
+  auto gain_rx_json_a = tdd_conf.value("ue_rx_gain_a", json::array());
+  if (gain_rx_json_a.empty()) {
+    client_rx_gain_a_.resize(ue_num_, 20);
+  } else {
+    RtAssert(gain_rx_json_a.size() == ue_num_,
+             "ue_rx_gain_a size must be same as the number of clients!");
+    client_rx_gain_a_.assign(gain_rx_json_a.begin(), gain_rx_json_a.end());
+  }
+  auto gain_rx_json_b = tdd_conf.value("ue_rx_gain_b", json::array());
+  if (gain_rx_json_b.empty()) {
+    client_rx_gain_b_.resize(ue_num_, 0);
+  } else {
+    RtAssert(gain_rx_json_b.size() == ue_num_,
+             "ue_rx_gain_b size must be same as the number of clients!");
+    client_rx_gain_b_.assign(gain_rx_json_b.begin(), gain_rx_json_b.end());
+  }
+
+  rate_ = tdd_conf.value("sample_rate", 5e6);
   nco_ = tdd_conf.value("nco_frequency", 0.75 * rate_);
   bw_filter_ = rate_ + 2 * nco_;
   radio_rf_freq_ = freq_ - nco_;
@@ -155,8 +208,8 @@ Config::Config(const std::string& jsonfile)
   bs_mac_rx_port_ = tdd_conf.value("bs_mac_rx_port", kMacBaseLocalPort);
 
   /* frame configurations */
-  cp_len_ = tdd_conf.value("cp_len", 0);
-  ofdm_ca_num_ = tdd_conf.value("ofdm_ca_num", 2048);
+  cp_len_ = tdd_conf.value("cp_size", 0);
+  ofdm_ca_num_ = tdd_conf.value("fft_size", 2048);
   ofdm_data_num_ = tdd_conf.value("ofdm_data_num", 1200);
   ofdm_tx_zero_prefix_ = tdd_conf.value("ofdm_tx_zero_prefix", 0);
   ofdm_tx_zero_postfix_ = tdd_conf.value("ofdm_tx_zero_postfix", 0);
@@ -180,20 +233,14 @@ Config::Config(const std::string& jsonfile)
   freq_orthogonal_pilot_ = tdd_conf.value("freq_orthogonal_pilot", false);
   correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
 
-  auto tx_advance = tdd_conf.value("tx_advance", json::array());
-  if (tx_advance.empty()) {
-    cl_tx_advance_.resize(num_radios_, 0);
-  } else {
-    RtAssert(tx_advance.size() == num_radios_,
-             "tx_advance size must be same as the number of clients!");
-    cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
-  }
-  hw_framer_ = tdd_conf.value("hw_framer", !kUseUHD);
+  hw_framer_ = tdd_conf.value("hw_framer", true);
+  if (kUseUHD) hw_framer_ = false;
+  ue_hw_framer_ = tdd_conf.value("ue_hw_framer", false);
 
   // If frames not specified explicitly, construct default based on frame_type /
   // symbol_num_perframe / pilot_num / ul_symbol_num_perframe /
   // dl_symbol_num_perframe / dl_data_symbol_start
-  if (tdd_conf.find("frames") == tdd_conf.end()) {
+  if (tdd_conf.find("frame_schedule") == tdd_conf.end()) {
     size_t ul_data_symbol_num_perframe = kDefaultULSymPerFrame;
     size_t ul_data_symbol_start = kDefaultULSymStart;
     size_t dl_data_symbol_num_perframe = kDefaultDLSymPerFrame;
@@ -317,7 +364,7 @@ Config::Config(const std::string& jsonfile)
 
     frame_ = FrameStats(sched);
   } else {
-    json jframes = tdd_conf.value("frames", json::array());
+    json jframes = tdd_conf.value("frame_schedule", json::array());
 
     // Only allow 1 unique frame type
     assert(jframes.size() == 1);
@@ -351,26 +398,38 @@ Config::Config(const std::string& jsonfile)
   ant_group_num_ =
       frame_.IsRecCalEnabled() ? (bf_ant_num_ / ant_per_group_) : 0;
 
-  if ((is_ue_ == true) && (freq_orthogonal_pilot_ == false) &&
+  if ((freq_orthogonal_pilot_ == false) &&
       (ue_ant_num_ != frame_.NumPilotSyms())) {
     RtAssert(
         false,
         "Number of pilot symbols: " + std::to_string(frame_.NumPilotSyms()) +
             " does not match number of UEs: " + std::to_string(ue_ant_num_));
   }
-  if ((is_ue_ == false) && (freq_orthogonal_pilot_ == false) &&
-      (tdd_conf.find("ue_num") == tdd_conf.end())) {
+  if ((freq_orthogonal_pilot_ == false) &&
+      (tdd_conf.find("ue_radio_num") == tdd_conf.end())) {
     ue_num_ = frame_.NumPilotSyms();
-    ue_ant_num_ = ue_num_;
+    ue_ant_num_ = ue_num_ * num_ue_channels_;
   }
   ue_ant_offset_ = tdd_conf.value("ue_ant_offset", 0);
   ue_ant_total_ = tdd_conf.value("ue_ant_total", ue_ant_num_);
 
+  auto tx_advance = tdd_conf.value("tx_advance", json::array());
+  if (tx_advance.empty()) {
+    cl_tx_advance_.resize(ue_num_, 0);
+  } else {
+    RtAssert(tx_advance.size() == ue_num_,
+             "tx_advance size must be same as the number of clients!");
+    cl_tx_advance_.assign(tx_advance.begin(), tx_advance.end());
+  }
+
   // Agora configurations
-  frames_to_test_ = tdd_conf.value("frames_to_test", 9600);
+  frames_to_test_ = tdd_conf.value("max_frame", 9600);
   core_offset_ = tdd_conf.value("core_offset", 0);
   worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   socket_thread_num_ = tdd_conf.value("socket_thread_num", 4);
+  ue_core_offset_ = tdd_conf.value("ue_core_offset", 0);
+  ue_worker_thread_num_ = tdd_conf.value("ue_worker_thread_num", 25);
+  ue_socket_thread_num_ = tdd_conf.value("ue_socket_thread_num", 4);
   fft_thread_num_ = tdd_conf.value("fft_thread_num", 5);
   demul_thread_num_ = tdd_conf.value("demul_thread_num", 5);
   decode_thread_num_ = tdd_conf.value("decode_thread_num", 10);
@@ -444,8 +503,12 @@ Config::Config(const std::string& jsonfile)
   packet_length_ =
       Packet::kOffsetOfData + ((kUse12BitIQ ? 3 : 4) * samps_per_symbol_);
   dl_packet_length_ = Packet::kOffsetOfData + (samps_per_symbol_ * 4);
-  RtAssert(packet_length_ < 9000,
-           "Packet size must be smaller than jumbo frame");
+
+  //Don't check for jumbo frames when using the hardware, this might be temp
+  if (kUseArgos == false) {
+    RtAssert(packet_length_ < 9000,
+             "Packet size must be smaller than jumbo frame");
+  }
 
   num_bytes_per_cb_ = ldpc_config_.NumCbLen() / 8;
   data_bytes_num_persymbol_ =
@@ -982,8 +1045,8 @@ size_t Config::GetSymbolId(size_t input_id) const {
   return symbol_id;
 }
 
-/* Returns True if symbol is valid index and is of symbol type 'P' or
-   if user equiptment and is a client dl pilot_.  False otherwise */
+/* Returns True if symbol is valid index and is of symbol type 'P'
+   False otherwise */
 bool Config::IsPilot(size_t /*frame_id*/, size_t symbol_id) const {
   bool is_pilot = false;
   assert(symbol_id < this->frame_.NumTotalSyms());
@@ -991,14 +1054,23 @@ bool Config::IsPilot(size_t /*frame_id*/, size_t symbol_id) const {
 #ifdef DEBUG3
   std::printf("IsPilot(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
-  if (this->is_ue_ == true) {
-    if ((s == 'D') && (this->frame_.ClientDlPilotSymbols() > 0)) {
-      size_t dl_index = this->frame_.GetDLSymbolIdx(symbol_id);
-      is_pilot = (this->frame_.ClientDlPilotSymbols() > dl_index);
-    }
-    // else { is_pilot = false; } Not needed due to default init
-  } else { /* TODO should use the symbol type here */
-    is_pilot = (s == 'P');
+  /* TODO should use the symbol type here */
+  is_pilot = (s == 'P');
+  return is_pilot;
+}
+
+/* Returns True if user equiptment and is a client dl pilot_
+ * False otherwise */
+bool Config::IsDlPilot(size_t /*frame_id*/, size_t symbol_id) const {
+  bool is_pilot = false;
+  assert(symbol_id < this->frame_.NumTotalSyms());
+  char s = frame_.FrameIdentifier().at(symbol_id);
+#ifdef DEBUG3
+  std::printf("IsDlPilot(%zu, %zu) = %c\n", frame_id, symbol_id, s);
+#endif
+  if ((s == 'D') && (this->frame_.ClientDlPilotSymbols() > 0)) {
+    size_t dl_index = this->frame_.GetDLSymbolIdx(symbol_id);
+    is_pilot = (this->frame_.ClientDlPilotSymbols() > dl_index);
   }
   return is_pilot;
 }
@@ -1006,18 +1078,14 @@ bool Config::IsPilot(size_t /*frame_id*/, size_t symbol_id) const {
 bool Config::IsCalDlPilot(size_t /*frame_id*/, size_t symbol_id) const {
   bool is_cal_dl_pilot = false;
   assert(symbol_id < this->frame_.NumTotalSyms());
-  if (this->is_ue_ == false) {
-    is_cal_dl_pilot = (this->frame_.FrameIdentifier().at(symbol_id) == 'C');
-  }
+  is_cal_dl_pilot = (this->frame_.FrameIdentifier().at(symbol_id) == 'C');
   return is_cal_dl_pilot;
 }
 
 bool Config::IsCalUlPilot(size_t /*frame_id*/, size_t symbol_id) const {
   bool is_cal_ul_pilot = false;
   assert(symbol_id < this->frame_.NumTotalSyms());
-  if (this->is_ue_ == false) {
-    is_cal_ul_pilot = (this->frame_.FrameIdentifier().at(symbol_id) == 'L');
-  }
+  is_cal_ul_pilot = (this->frame_.FrameIdentifier().at(symbol_id) == 'L');
   return is_cal_ul_pilot;
 }
 
@@ -1036,11 +1104,7 @@ bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const {
 #ifdef DEBUG3
   std::printf("IsDownlink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
 #endif
-  if (this->is_ue_ == true) {
-    return ((s == 'D') && (this->IsPilot(frame_id, symbol_id) == false));
-  } else {
-    return (s == 'D');
-  }
+  return (s == 'D');
 }
 
 SymbolType Config::GetSymbolType(size_t symbol_id) const {

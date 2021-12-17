@@ -41,20 +41,20 @@ void run_test(size_t base_graph, size_t zc) {
   int8_t* encoded[kNumCodeBlocks];
   int8_t* parity_reference[kNumCodeBlocks];
   for (size_t n = 0; n < kNumCodeBlocks; n++) {
-    input[n] = (int8_t*)read_binfile(
-        input_filename, ldpc_encoding_input_buf_size(base_graph, zc));
-    parity[n] = new int8_t[ldpc_encoding_parity_buf_size(base_graph, zc)]();
-    encoded[n] = new int8_t[ldpc_encoding_encoded_buf_size(base_graph, zc)]();
+    input[n] = (int8_t*)read_binfile(input_filename,
+                                     LdpcEncodingInputBufSize(base_graph, zc));
+    parity[n] = new int8_t[LdpcEncodingParityBufSize(base_graph, zc)]();
+    encoded[n] = new int8_t[LdpcEncodingEncodedBufSize(base_graph, zc)]();
     parity_reference[n] = (int8_t*)read_binfile(
-        reference_filename, ldpc_encoding_parity_buf_size(base_graph, zc));
+        reference_filename, LdpcEncodingParityBufSize(base_graph, zc));
 
-    ldpc_encode_helper(base_graph, zc, ldpc_max_num_rows(base_graph),
-                       encoded[n], parity[n], input[n]);
+    LdpcEncodeHelper(base_graph, zc, LdpcMaxNumRows(base_graph), encoded[n],
+                     parity[n], input[n]);
   }
 
   for (size_t n = 0; n < kNumCodeBlocks; n++) {
-    if (memcmp(parity[n], parity_reference[n],
-               bits_to_bytes(ldpc_max_num_parity_bits(base_graph, zc))) != 0) {
+    if (std::memcmp(parity[n], parity_reference[n],
+                    BitsToBytes(LdpcMaxNumParityBits(base_graph, zc))) != 0) {
       std::fprintf(stderr, "Mismatch for Zc = %zu, base graph = %zu\n", zc,
                    base_graph);
     } else {
@@ -83,7 +83,7 @@ int main() {
   const std::vector<size_t> zc_nofiles_vec = {2, 3, 4, 5, 6, 9, 13};
 
   for (const size_t& zc : zc_all_vec) {
-    if (zc < ldpc_get_min_zc() || zc > ldpc_get_max_zc()) {
+    if (zc < LdpcGetMinZc() || zc > LdpcGetMaxZc()) {
       std::fprintf(stderr, "Zc value %zu not supported. Skipping.\n", zc);
       continue;
     }

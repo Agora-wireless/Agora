@@ -7,8 +7,8 @@
 #include <cfloat>
 #include <cmath>
 
-PhyStats::PhyStats(Config* const cfg) : config_(cfg) {
-  if (config_->IsUe() == true) {
+PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
+  if (dir_ == Direction::Downlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
   } else {
     num_rx_symbols_ = cfg->Frame().NumULSyms();
@@ -34,7 +34,7 @@ PhyStats::PhyStats(Config* const cfg) : config_(cfg) {
                      Agora_memory::Alignment_t::kAlign64);
 
   if (num_rx_symbols_ > 0) {
-    if (config_->IsUe() == true) {
+    if (dir_ == Direction::Downlink) {
       auto* dl_iq_f_ptr = reinterpret_cast<arma::cx_float*>(
           cfg->DlIqF()[cfg->Frame().ClientDlPilotSymbols()]);
       arma::cx_fmat dl_iq_f_mat(dl_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(),
@@ -74,7 +74,7 @@ PhyStats::~PhyStats() {
 void PhyStats::PrintPhyStats() {
   const size_t task_buffer_symbol_num = num_rx_symbols_ * kFrameWnd;
   std::string tx_type;
-  if (config_->IsUe()) {
+  if (dir_ == Direction::Downlink) {
     tx_type = "Downlink";
   } else {
     tx_type = "Uplink";
@@ -131,9 +131,10 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
     float* frame_snr =
         &pilot_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
     for (size_t j = 0; j < config_->BsAntNum(); j++) {
+      size_t radio_id = j / config_->NumChannels();
+      size_t cell_id = config_->CellId().at(radio_id);
       if (config_->ExternalRefNode() == true &&
-          j / config_->NumChannels() ==
-              config_->RefAnt() / config_->NumChannels())
+          radio_id == config_->RefRadio().at(cell_id))
         continue;
       if (frame_snr[j] < min_snr) min_snr = frame_snr[j];
       if (frame_snr[j] > max_snr) max_snr = frame_snr[j];
@@ -158,9 +159,10 @@ void PhyStats::PrintCalibSnrStats(size_t frame_id) {
     float* frame_snr =
         &calib_pilot_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
     for (size_t j = 0; j < config_->BsAntNum(); j++) {
+      size_t radio_id = j / config_->NumChannels();
+      size_t cell_id = config_->CellId().at(radio_id);
       if (config_->ExternalRefNode() == true &&
-          j / config_->NumChannels() ==
-              config_->RefAnt() / config_->NumChannels())
+          radio_id == config_->RefRadio().at(cell_id))
         continue;
       if (frame_snr[j] < min_snr) min_snr = frame_snr[j];
       if (frame_snr[j] > max_snr) max_snr = frame_snr[j];

@@ -36,6 +36,8 @@ static constexpr inline bool IsPowerOfTwo(T x) {
   return x && ((x & T(x - 1)) == 0);
 }
 
+enum class Direction : int { Downlink, Uplink };
+
 // TODO: Merge EventType and DoerType into WorkType
 enum class EventType : int {
   kPacketRX,
@@ -148,6 +150,7 @@ static constexpr bool kUsePartialTrans = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = true;
 static constexpr bool kCollectPhyStats = true;
+static constexpr bool kPrintZfStats = false;
 
 static constexpr bool kStatsPrintFrameSummary = true;
 static constexpr bool kDebugPrintPerFrameDone = true;

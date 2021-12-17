@@ -7,7 +7,7 @@
 ###############################################################################
 
 # Check that all required executables are present
-exe_list="build/user build/data_generator build/chsim build/agora data/bs-sim.json"
+exe_list="build/user build/data_generator build/chsim build/agora data/chsim.json"
 for exe in ${exe_list}; do
   if [ ! -f ${exe} ]; then
       echo "${exe} not found. Exiting."
@@ -17,8 +17,8 @@ done
 
 
 # Setup the config with the number of frames to test
-cp data/bs-sim.json data/bs-sim-tmp.json
-cp data/ue-sim.json data/ue-sim-tmp.json
+cp data/chsim.json data/bs-sim-tmp.json
+cp data/chsim.json data/ue-sim-tmp.json
 sed -i '2i\ \ "frames_to_test": 1000,' data/bs-sim-tmp.json
 sed -i '2i\ \ "frames_to_test": 1000,' data/ue-sim-tmp.json
 
