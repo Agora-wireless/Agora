@@ -17,17 +17,20 @@ RadioConfig::RadioConfig(Config* cfg)
   auto channels = Utils::StrToChannels(cfg_->Channel());
 
   this->radio_num_ = cfg_->NumRadios();
-  this->antenna_num_ = radio_num_ * cfg_->NumChannels();
+  this->antenna_num_ = cfg_->BsAntNum();
   std::cout << "Radio num is " << this->radio_num_
             << " Antenna num: " << antenna_num_ << std::endl;
-  if (cfg_->IsUe() == true) {
-    throw std::invalid_argument("Bad config! Not a UE!");
-  }
-  if ((kUseUHD == false) && (cfg_->HubIds().empty() == false)) {
-    args["driver"] = "remote";
-    args["timeout"] = "1000000";
-    args["serial"] = cfg_->HubIds().at(0);
-    hubs_.push_back(SoapySDR::Device::make(args));
+  if (kUseUHD == false) {
+    for (size_t i = 0; i < cfg_->NumCells(); i++) {
+      if (cfg_->HubId().at(i) != "") {
+        args["driver"] = "remote";
+        args["timeout"] = "1000000";
+        args["serial"] = cfg_->HubId().at(i);
+        hubs_.push_back(SoapySDR::Device::make(args));
+      } else {
+        hubs_.push_back(nullptr);
+      }
+    }
   }
 
   ba_stn_.resize(radio_num_);
@@ -102,7 +105,7 @@ RadioConfig::RadioConfig(Config* cfg)
   }
 
   for (size_t i = 0; i < this->radio_num_; i++) {
-    std::cout << cfg_->RadioIds().at(i) << ": Front end "
+    std::cout << cfg_->RadioId().at(i) << ": Front end "
               << ba_stn_[i]->getHardwareInfo()["frontend"] << std::endl;
     for (auto c : channels) {
       if (c < ba_stn_[i]->getNumChannels(SOAPY_SDR_RX)) {
@@ -168,11 +171,14 @@ RadioConfig::RadioConfig(Config* cfg)
     std::cout << std::endl;
   }
 
-  if (!kUseUHD) {
-    if (hubs_.empty()) {
-      ba_stn_[0]->writeSetting("SYNC_DELAYS", "");
-    } else {
-      hubs_[0]->writeSetting("SYNC_DELAYS", "");
+  // TODO: For multi-cell, this procedure needs modification
+  if (kUseUHD == false) {
+    for (size_t i = 0; i < cfg_->NumCells(); i++) {
+      if (hubs_.at(i) == nullptr) {
+        ba_stn_[i]->writeSetting("SYNC_DELAYS", "");
+      } else {
+        hubs_[i]->writeSetting("SYNC_DELAYS", "");
+      }
     }
   }
 
@@ -187,10 +193,10 @@ void RadioConfig::InitBsRadio(size_t tid) {
   args["timeout"] = "1000000";
   if (!kUseUHD) {
     args["driver"] = "iris";
-    args["serial"] = cfg_->RadioIds().at(i);
+    args["serial"] = cfg_->RadioId().at(i);
   } else {
     args["driver"] = "uhd";
-    args["addr"] = cfg_->RadioIds().at(i);
+    args["addr"] = cfg_->RadioId().at(i);
   }
   ba_stn_[i] = SoapySDR::Device::make(args);
   for (auto ch : {0, 1}) {
@@ -394,7 +400,8 @@ bool RadioConfig::RadioStart() {
 
   size_t ndx = 0;
   for (size_t i = 0; i < this->radio_num_; i++) {
-    bool is_ref_radio = (i == cfg_->RefRadio());
+    size_t cell_id = cfg_->CellId().at(i);
+    bool is_ref_radio = (i == cfg_->RefRadio().at(cell_id));
     if (cfg_->HwFramer() == true) {
       ba_stn_[i]->writeSetting(
           "TX_SW_DELAY", "30");  // experimentally good value for dev front-end
@@ -479,13 +486,14 @@ bool RadioConfig::RadioStart() {
 }
 
 void RadioConfig::Go() {
-  if (!kUseUHD) {
-    if (hubs_.empty()) {
-      // std::cout << "triggering first Iris ..." << std::endl;
-      ba_stn_[0]->writeSetting("TRIGGER_GEN", "");
-    } else {
-      // std::cout << "triggering Hub ..." << std::endl;
-      hubs_[0]->writeSetting("TRIGGER_GEN", "");
+  // TODO: For multi-cell trigger process needs modification
+  if (kUseUHD == false) {
+    for (size_t i = 0; i < cfg_->NumCells(); i++) {
+      if (hubs_.at(i) == nullptr) {
+        ba_stn_[i]->writeSetting("TRIGGER_GEN", "");
+      } else {
+        hubs_[i]->writeSetting("TRIGGER_GEN", "");
+      }
     }
   }
 }

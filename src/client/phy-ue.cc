@@ -20,7 +20,7 @@ static const size_t kDefaultQueueSize = 36;
 
 PhyUe::PhyUe(Config* config)
     : stats_(std::make_unique<Stats>(config)),
-      phy_stats_(std::make_unique<PhyStats>(config)),
+      phy_stats_(std::make_unique<PhyStats>(config, Direction::Downlink)),
       demod_buffer_(kFrameWnd, config->Frame().NumDLSyms(), config->UeAntNum(),
                     kMaxModType * config->OfdmDataNum()),
       decoded_buffer_(kFrameWnd, config->Frame().NumDLSyms(),
@@ -75,16 +75,16 @@ PhyUe::PhyUe(Config* config)
   work_producer_token_ =
       std::make_unique<moodycamel::ProducerToken>(work_queue_);
 
-  ru_ = std::make_unique<RadioTxRx>(config_, rx_thread_num_,
-                                    config_->CoreOffset() + 1, &complete_queue_,
-                                    &tx_queue_, rx_ptoks_ptr_, tx_ptoks_ptr_);
+  ru_ = std::make_unique<RadioTxRx>(
+      config_, rx_thread_num_, config_->UeCoreOffset() + 1, &complete_queue_,
+      &tx_queue_, rx_ptoks_ptr_, tx_ptoks_ptr_);
 
   // uplink buffers init (tx)
   InitializeUplinkBuffers();
   // downlink buffers init (rx)
   InitializeDownlinkBuffers();
 
-  size_t core_offset_worker = config_->CoreOffset() + 1 + rx_thread_num_;
+  size_t core_offset_worker = config_->UeCoreOffset() + 1 + rx_thread_num_;
   if (kEnableMac == true) {
     mac_thread_ = std::make_unique<MacThreadClient>(
         config_, core_offset_worker, decoded_buffer_, &ul_bits_buffer_,
@@ -95,7 +95,7 @@ PhyUe::PhyUe(Config* config)
         std::thread(&MacThreadClient::RunEventLoop, mac_thread_.get());
   }
 
-  for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
+  for (size_t i = 0; i < config_->UeWorkerThreadNum(); i++) {
     auto new_worker = std::make_unique<UeWorker>(
         i, *config_, *stats_, *phy_stats_, complete_queue_, work_queue_,
         *work_producer_token_.get(), ul_bits_buffer_, ul_syms_buffer_,
@@ -126,7 +126,7 @@ PhyUe::PhyUe(Config* config)
   ue_tracker_.reserve(num_ue);
   ue_tracker_.resize(num_ue);
   for (auto& ue : ue_tracker_) {
-    // Might want to change the 1 to NumChannels or channels per ue
+    // Might want to change the 1 to NumUeChannels or channels per ue
     ue.ifft_counters_.Init(ul_symbol_perframe_, 1);
     ue.tx_pending_frame_ = 0;
     ue.tx_ready_frames_.clear();
@@ -146,9 +146,9 @@ PhyUe::PhyUe(Config* config)
 }
 
 PhyUe::~PhyUe() {
-  for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
+  for (size_t i = 0; i < config_->UeWorkerThreadNum(); i++) {
     std::printf("Joining Phy worker: %zu : %zu\n", i,
-                config_->WorkerThreadNum());
+                config_->UeWorkerThreadNum());
     workers_.at(i)->Stop();
   }
   workers_.clear();
@@ -262,7 +262,7 @@ void PhyUe::Stop() {
 }
 
 void PhyUe::Start() {
-  PinToCoreWithOffset(ThreadType::kMaster, config_->CoreOffset(), 0);
+  PinToCoreWithOffset(ThreadType::kMaster, config_->UeCoreOffset(), 0);
 
   if (ru_->StartTxRx(rx_buffer_, rx_buffer_size_ / config_->PacketLength(),
                      tx_buffer_, tx_buffer_status_, tx_buffer_status_size_,
@@ -314,7 +314,7 @@ void PhyUe::Start() {
           size_t frame_id = pkt->frame_id_;
           size_t symbol_id = pkt->symbol_id_;
           size_t ant_id = pkt->ant_id_;
-          size_t ue_id = ant_id / config_->NumChannels();
+          size_t ue_id = ant_id / config_->NumUeChannels();
           size_t frame_slot = frame_id % kFrameWnd;
           RtAssert(pkt->frame_id_ < (cur_frame_id + kFrameWnd),
                    "Error: Received packet for future frame beyond frame "
@@ -338,7 +338,7 @@ void PhyUe::Start() {
             }
           }
 
-          if (config_->IsPilot(frame_id, symbol_id)) {
+          if (config_->IsDlPilot(frame_id, symbol_id)) {
             rx_counters_.num_pilot_pkts_.at(frame_slot)++;
             if (rx_counters_.num_pilot_pkts_.at(frame_slot) ==
                 rx_counters_.num_pilot_pkts_per_frame_) {
@@ -361,7 +361,7 @@ void PhyUe::Start() {
               // Schedule Pilot after receiving last beacon
               // (Only when in Downlink Only mode, otherwise the pilots
               // will be transmitted with the uplink data)
-              if (ant_id % config_->NumChannels() == 0) {
+              if (ant_id % config_->NumUeChannels() == 0) {
                 EventData do_tx_pilot_task(
                     EventType::kPacketPilotTX,
                     gen_tag_t::FrmSymUe(
@@ -371,7 +371,7 @@ void PhyUe::Start() {
                              *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
               }
             } else {
-              if ((ant_id % config_->NumChannels()) == 0) {
+              if ((ant_id % config_->NumUeChannels()) == 0) {
                 // Schedule the Uplink tasks
                 for (size_t symbol_idx = 0;
                      symbol_idx < config_->Frame().NumULSyms(); symbol_idx++) {
@@ -792,9 +792,10 @@ void PhyUe::InitializeVarsFromCfg() {
 
   assert(dl_pilot_symbol_perframe_ <= dl_symbol_perframe_);
   assert(ul_pilot_symbol_perframe <= ul_symbol_perframe_);
-  rx_thread_num_ = ((kUseArgos == true) && (config_->HwFramer() == false))
-                       ? config_->UeNum()
-                       : std::min(config_->UeNum(), config_->SocketThreadNum());
+  rx_thread_num_ =
+      ((kUseArgos == true) && (config_->UeHwFramer() == false))
+          ? config_->UeNum()
+          : std::min(config_->UeNum(), config_->UeSocketThreadNum());
 
   tx_buffer_status_size_ =
       (ul_symbol_perframe_ * config_->UeAntNum() * kFrameWnd);

@@ -42,7 +42,6 @@ class Config {
   inline void BsAntNum(size_t n_bs_ant) { this->bs_ant_num_ = n_bs_ant; }
 
   // Inline accessors (basic types)
-  inline bool IsUe() const { return this->is_ue_; }
   inline size_t BfAntNum() const { return this->bf_ant_num_; }
   inline size_t UeNum() const { return this->ue_num_; }
   inline size_t UeAntNum() const { return this->ue_ant_num_; }
@@ -62,6 +61,7 @@ class Config {
 
   inline size_t ModOrderBits() const { return this->mod_order_bits_; }
   inline bool HwFramer() const { return this->hw_framer_; }
+  inline bool UeHwFramer() const { return this->ue_hw_framer_; }
   inline double Freq() const { return this->freq_; }
   inline double Rate() const { return this->rate_; }
   inline double Nco() const { return this->nco_; }
@@ -72,21 +72,31 @@ class Config {
   inline bool SingleGain() const { return this->single_gain_; }
   inline double TxGainA() const { return this->tx_gain_a_; }
   inline double RxGainA() const { return this->rx_gain_a_; }
-
   inline double TxGainB() const { return this->tx_gain_b_; }
   inline double RxGainB() const { return this->rx_gain_b_; }
   inline double CalibTxGainA() const { return this->calib_tx_gain_a_; }
   inline double CalibTxGainB() const { return this->calib_tx_gain_b_; }
+  inline std::vector<double> ClientTxGainA() const {
+    return this->client_tx_gain_a_;
+  }
+  inline std::vector<double> ClientRxGainA() const {
+    return this->client_rx_gain_a_;
+  }
+  inline std::vector<double> ClientTxGainB() const {
+    return this->client_tx_gain_b_;
+  }
+  inline std::vector<double> ClientRxGainB() const {
+    return this->client_rx_gain_b_;
+  }
   inline size_t NumCells() const { return this->num_cells_; }
   inline size_t NumRadios() const { return this->num_radios_; }
   inline size_t InitCalibRepeat() const { return this->init_calib_repeat_; }
 
   inline size_t NumAntennas() const { return this->num_antennas_; }
   inline size_t NumChannels() const { return this->num_channels_; }
-  inline size_t RefAnt() const { return this->ref_ant_; }
-  inline size_t RefRadio() const {
-    return this->ref_ant_ / this->num_channels_;
-  }
+  inline size_t NumUeChannels() const { return this->num_ue_channels_; }
+  inline std::vector<size_t> RefAnt() const { return this->ref_ant_; }
+  inline std::vector<size_t> RefRadio() const { return this->ref_radio_; }
   inline size_t BeaconAnt() const { return this->beacon_ant_; }
   inline size_t BeaconLen() const { return this->beacon_len_; }
 
@@ -107,6 +117,13 @@ class Config {
   inline size_t CoreOffset() const { return this->core_offset_; }
   inline size_t WorkerThreadNum() const { return this->worker_thread_num_; }
   inline size_t SocketThreadNum() const { return this->socket_thread_num_; }
+  inline size_t UeCoreOffset() const { return this->ue_core_offset_; }
+  inline size_t UeWorkerThreadNum() const {
+    return this->ue_worker_thread_num_;
+  }
+  inline size_t UeSocketThreadNum() const {
+    return this->ue_socket_thread_num_;
+  }
 
   inline size_t FftThreadNum() const { return this->fft_thread_num_; }
   inline size_t DemulThreadNum() const { return this->demul_thread_num_; }
@@ -218,19 +235,16 @@ class Config {
   inline const std::vector<std::complex<float>>& CommonPilot() const {
     return this->common_pilot_;
   };
-  inline const std::vector<double>& ClientGainAdjA() const {
-    return this->client_gain_adj_a_;
+  inline const std::vector<std::string>& RadioId() const {
+    return this->radio_id_;
   };
-
-  inline const std::vector<double>& ClientGainAdjB() const {
-    return this->client_gain_adj_b_;
+  inline const std::vector<std::string>& HubId() const {
+    return this->hub_id_;
   };
-  inline const std::vector<std::string>& RadioIds() const {
-    return this->radio_ids_;
+  inline const std::vector<std::string>& UeRadioId() const {
+    return this->ue_radio_id_;
   };
-  inline const std::vector<std::string>& HubIds() const {
-    return this->hub_ids_;
-  };
+  inline const std::vector<size_t>& CellId() const { return this->cell_id_; }
 
   // non-const (can modify)
   inline Table<complex_float>& UeSpecificPilot() {
@@ -260,6 +274,7 @@ class Config {
   size_t GetSymbolId(size_t input_id) const;
 
   bool IsPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
+  bool IsDlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
   bool IsCalDlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
   bool IsCalUlPilot(size_t /*unused*/, size_t /*symbol_id*/) const;
   bool IsDownlink(size_t /*frame_id*/, size_t /*symbol_id*/) const;
@@ -268,11 +283,6 @@ class Config {
   /* Public functions that do not meet coding standard format */
   /// Return the symbol type of this symbol in this frame
   SymbolType GetSymbolType(size_t symbol_id) const;
-
-  /* Inline functions */
-  inline size_t GetNumAntennas() const {
-    return (this->num_radios_ * this->num_channels_);
-  }
 
   inline void UpdateModCfgs(size_t new_mod_order_bits) {
     this->mod_order_bits_ = new_mod_order_bits;
@@ -333,11 +343,11 @@ class Config {
   }
 
   /// Get mac bits for this frame, symbol, user and code block ID
-  inline int8_t* GetMacBits(Table<int8_t>& info_bits, size_t frame_id,
-                            size_t symbol_id, size_t ue_id,
+  inline int8_t* GetMacBits(Table<int8_t>& info_bits, Direction dir,
+                            size_t frame_id, size_t symbol_id, size_t ue_id,
                             size_t cb_id) const {
     size_t mac_bytes_perframe;
-    if (is_ue_ == false) {
+    if (dir == Direction::Downlink) {
       mac_bytes_perframe = dl_mac_bytes_num_perframe_;
     } else {
       mac_bytes_perframe = ul_mac_bytes_num_perframe_;
@@ -356,12 +366,12 @@ class Config {
   }
 
   /// Get encoded_buffer for this frame, symbol, user and code block ID
-  inline int8_t* GetEncodedBuf(Table<int8_t>& encoded_buffer, size_t frame_id,
-                               size_t symbol_id, size_t ue_id,
+  inline int8_t* GetEncodedBuf(Table<int8_t>& encoded_buffer, Direction dir,
+                               size_t frame_id, size_t symbol_id, size_t ue_id,
                                size_t cb_id) const {
     size_t total_data_symbol_id;
 
-    if (is_ue_ == false) {
+    if (dir == Direction::Downlink) {
       total_data_symbol_id = GetTotalDataSymbolIdxDl(frame_id, symbol_id);
     } else {
       total_data_symbol_id = GetTotalDataSymbolIdxUl(frame_id, symbol_id);
@@ -392,7 +402,6 @@ class Config {
 
   /* Private class variables */
   const double freq_ghz_;  // RDTSC frequency in GHz
-  bool is_ue_;
 
   size_t bs_ant_num_;  // Total number of BS antennas
   size_t bf_ant_num_;  // Number of antennas used in beamforming
@@ -463,8 +472,10 @@ class Config {
   Table<std::complex<int16_t>> ue_specific_pilot_t_;
   std::vector<std::complex<float>> common_pilot_;
 
-  std::vector<double> client_gain_adj_a_;
-  std::vector<double> client_gain_adj_b_;
+  std::vector<double> client_gain_tx_a_;
+  std::vector<double> client_gain_tx_b_;
+  std::vector<double> client_gain_rx_a_;
+  std::vector<double> client_gain_rx_b_;
 
   std::string modulation_;  // Modulation order as a string, e.g., "16QAM"
   size_t mod_order_;  // Modulation order (e.g., 4: QPSK, 16: 16QAM, 64: 64QAM)
@@ -473,13 +484,18 @@ class Config {
   // Modulation lookup table for mapping binary bits to constellation points
   Table<complex_float> mod_table_;
 
-  std::vector<std::string> radio_ids_;
-  std::vector<std::string> hub_ids_;
+  std::vector<std::string> radio_id_;
+  std::vector<std::string> hub_id_;
+  std::vector<std::string> ue_radio_id_;
+  std::vector<size_t> ref_radio_;
+  std::vector<size_t> ref_ant_;
+  std::vector<size_t> cell_id_;
 
   // Controls whether the synchronization and frame time keeping is done
   // in hardware or software
   // true: use hardware correlator; false: use software corrleator
   bool hw_framer_;
+  bool ue_hw_framer_;
 
   double freq_;
   double rate_;
@@ -494,12 +510,16 @@ class Config {
   double rx_gain_b_;
   double calib_tx_gain_a_;
   double calib_tx_gain_b_;
+  std::vector<double> client_tx_gain_a_;
+  std::vector<double> client_rx_gain_a_;
+  std::vector<double> client_tx_gain_b_;
+  std::vector<double> client_rx_gain_b_;
 
   size_t num_cells_;
   size_t num_radios_;
   size_t num_antennas_;
   size_t num_channels_;
-  size_t ref_ant_;
+  size_t num_ue_channels_;
   size_t beacon_ant_;
   size_t beacon_len_;
   size_t init_calib_repeat_;
@@ -508,6 +528,7 @@ class Config {
   bool imbalance_cal_en_;
   bool external_ref_node_;
   std::string channel_;
+  std::string ue_channel_;
   size_t ant_group_num_;
   size_t ant_per_group_;
 
@@ -518,6 +539,10 @@ class Config {
   size_t demul_thread_num_;
   size_t decode_thread_num_;
   size_t zf_thread_num_;
+
+  size_t ue_core_offset_;
+  size_t ue_worker_thread_num_;
+  size_t ue_socket_thread_num_;
 
   // Number of OFDM data subcarriers handled in one demodulation event
   size_t demul_block_size_;
