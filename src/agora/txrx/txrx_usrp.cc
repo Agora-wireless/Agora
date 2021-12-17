@@ -201,7 +201,7 @@ int PacketTXRX::DequeueSendUsrp(int tid) {
   if (kDebugDownlink == true) {
     std::vector<std::complex<int16_t>> zeros(c->SampsPerSymbol());
     size_t dl_symbol_idx = c->Frame().GetDLSymbolIdx(symbol_id);
-    if (ant_id != c->RefAnt().at(cell_id)) {
+    if (ant_id != c->RefAnt(cell_id)) {
       txbuf[ch] = zeros.data();
     } else if (dl_symbol_idx < c->Frame().ClientDlPilotSymbols()) {
       txbuf[ch] = reinterpret_cast<void*>(c->UeSpecificPilotT()[0]);
@@ -270,7 +270,7 @@ int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id) {
   if (kDebugDownlink) {
     std::vector<std::complex<int16_t>> zeros(c->SampsPerSymbol());
     size_t dl_symbol_idx = c->Frame().GetDLSymbolIdx(symbol_id);
-    if (ant_id != c->RefAnt().at(cell_id)) {
+    if (ant_id != c->RefAnt(cell_id)) {
       txbuf[ch] = zeros.data();
     } else if (dl_symbol_idx < c->Frame().ClientDlPilotSymbols()) {
       txbuf[ch] = reinterpret_cast<void*>(c->UeSpecificPilotT()[0]);

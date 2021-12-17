@@ -133,8 +133,8 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
     for (size_t j = 0; j < config_->BsAntNum(); j++) {
       size_t radio_id = j / config_->NumChannels();
       size_t cell_id = config_->CellId().at(radio_id);
-      if (config_->ExternalRefNode() == true &&
-          radio_id == config_->RefRadio().at(cell_id))
+      if (config_->ExternalRefNode(cell_id) == true &&
+          radio_id == config_->RefRadio(cell_id))
         continue;
       if (frame_snr[j] < min_snr) min_snr = frame_snr[j];
       if (frame_snr[j] > max_snr) max_snr = frame_snr[j];
@@ -161,8 +161,8 @@ void PhyStats::PrintCalibSnrStats(size_t frame_id) {
     for (size_t j = 0; j < config_->BsAntNum(); j++) {
       size_t radio_id = j / config_->NumChannels();
       size_t cell_id = config_->CellId().at(radio_id);
-      if (config_->ExternalRefNode() == true &&
-          radio_id == config_->RefRadio().at(cell_id))
+      if (config_->ExternalRefNode(cell_id) == true &&
+          radio_id == config_->RefRadio(cell_id))
         continue;
       if (frame_snr[j] < min_snr) min_snr = frame_snr[j];
       if (frame_snr[j] > max_snr) max_snr = frame_snr[j];
