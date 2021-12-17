@@ -45,11 +45,12 @@ Config::Config(const std::string& jsonfile)
   SetCpuLayoutOnNumaNodes(true, excluded);
 
   num_cells_ = tdd_conf.value("cells", 1);
+  num_radios_ = 0;
+  ue_num_ = 0;
 
   std::string serials_str;
   std::string serial_file = tdd_conf.value("serial_file", "");
   Utils::LoadTddConfig(serial_file, serials_str);
-  external_ref_node_ = false;
   if (serials_str.empty() == false) {
     const auto j_serials = json::parse(serials_str, nullptr, true, true);
 
@@ -61,6 +62,7 @@ Config::Config(const std::string& jsonfile)
     ss.clear();
 
     RtAssert(j_bs_serials.size() == num_cells_, "Incorrect cells number!");
+    external_ref_node_.resize(num_cells_, false);
     for (size_t i = 0; i < num_cells_; i++) {
       json serials_conf;
       std::string cell_str = "BS" + std::to_string(i);
@@ -79,17 +81,24 @@ Config::Config(const std::string& jsonfile)
 
       auto refnode_serial = serials_conf.value("reference", "");
       if (refnode_serial.empty()) {
-        MLPD_INFO("No reference node ID found in topology file!\n");
-      } else {
-        radio_id_.push_back(refnode_serial);
+        MLPD_INFO(
+            "No reference node ID found in topology file! Taking the last node "
+            "as reference node!\n");
+        refnode_serial = radio_id_.back();
         ref_radio_.push_back(radio_id_.size() - 1);
-        num_radios_++;
-        cell_id_.resize(num_radios_, i);
+      } else {
+        auto serial_iterator =
+            std::find(sdr_serials.begin(), sdr_serials.end(), refnode_serial);
+        if (serial_iterator == sdr_serials.end()) {
+          radio_id_.push_back(refnode_serial);
+          num_radios_++;
+          cell_id_.resize(num_radios_, i);
+          external_ref_node_.at(i) = true;
+        } else {
+          ref_radio_.push_back(radio_id_.size() - sdr_serials.size() +
+                               serial_iterator - sdr_serials.begin());
+        }
       }
-      bool external_ref_node = true;
-      for (size_t j = 0; j < sdr_serials.size(); j++)
-        if (sdr_serials.at(j) == refnode_serial) external_ref_node = false;
-      external_ref_node_ = external_ref_node;
     }
 
     json j_ue_serials;
@@ -104,6 +113,7 @@ Config::Config(const std::string& jsonfile)
 
   if (radio_id_.empty() == true) {
     num_radios_ = tdd_conf.value("bs_radio_num", 8);
+    external_ref_node_.resize(num_cells_, false);
     cell_id_.resize(num_radios_, 0);
   }
 
@@ -120,15 +130,16 @@ Config::Config(const std::string& jsonfile)
   bs_ant_num_ = num_channels_ * num_radios_;
   ue_ant_num_ = ue_num_ * num_ue_channels_;
 
+  bf_ant_num_ = bs_ant_num_;
+  for (size_t i = 0; i < num_cells_; i++) {
+    if (external_ref_node_.at(i) == true)
+      bf_ant_num_ = bs_ant_num_ - num_channels_;
+  }
+
   if (serials_str.empty() == false) {
     for (size_t i = 0; i < num_cells_; i++) {
       ref_ant_.push_back(ref_radio_.at(i) * num_channels_);
     }
-  }
-
-  bf_ant_num_ = bs_ant_num_;
-  if (external_ref_node_ == true) {
-    bf_ant_num_ = bs_ant_num_ - num_channels_;
   }
 
   if ((kUseArgos == true) || (kUseUHD == true)) {
@@ -272,7 +283,8 @@ Config::Config(const std::string& jsonfile)
     if ((ul_data_symbol_num_perframe + dl_data_symbol_num_perframe +
          pilot_symbol_num_perframe) > symbol_num_perframe) {
       MLPD_ERROR(
-          "!!!!! Invalid configuration pilot + ul + dl exceeds total symbols "
+          "!!!!! Invalid configuration pilot + ul + dl exceeds total "
+          "symbols "
           "!!!!!\n");
       MLPD_ERROR(
           "Uplink symbols: %zu, Downlink Symbols :%zu, Pilot Symbols: %zu, "
@@ -529,12 +541,15 @@ Config::Config(const std::string& jsonfile)
   this->running_.store(true);
   MLPD_INFO(
       "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
-      "frame,\n\t%zu uplink data symbols per frame, %zu downlink data symbols "
-      "per frame,\n\t%zu OFDM subcarriers (%zu data subcarriers), modulation "
+      "frame,\n\t%zu uplink data symbols per frame, %zu downlink data "
+      "symbols "
+      "per frame,\n\t%zu OFDM subcarriers (%zu data subcarriers), "
+      "modulation "
       "%s,\n\t%zu codeblocks per symbol, %zu bytes per code block,"
       "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
       "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
-      "frame time %.3f usec \nUplink Max Mac data tp (Mbps) %.3f \nDownlink "
+      "frame time %.3f usec \nUplink Max Mac data tp (Mbps) %.3f "
+      "\nDownlink "
       "Max Mac data tp (Mbps) %.3f \n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
@@ -646,7 +661,8 @@ void Config::GenData() {
   auto zc_ue_pilot = Utils::DoubleToCfloat(zc_ue_pilot_double);
   for (size_t i = 0; i < ue_ant_num_; i++) {
     auto zc_ue_pilot_i = CommsLib::SeqCyclicShift(
-        zc_ue_pilot, (i + this->ue_ant_offset_) * (float)M_PI / 6);  // LTE DMRS
+        zc_ue_pilot,
+        (i + this->ue_ant_offset_) * (float)M_PI / 6);  // LTE DMRS
     for (size_t j = 0; j < this->ofdm_data_num_; j++) {
       this->ue_specific_pilot_[i][j] = {zc_ue_pilot_i[j].real(),
                                         zc_ue_pilot_i[j].imag()};
@@ -718,7 +734,8 @@ void Config::GenData() {
                               sizeof(int8_t), data_bytes_num_persymbol_, fd);
         if (r < data_bytes_num_persymbol_) {
           MLPD_ERROR(
-              " *** Error: Uplink bad read from file %s (batch %zu : %zu) %zu "
+              " *** Error: Uplink bad read from file %s (batch %zu : %zu) "
+              "%zu "
               ": %zu\n",
               ul_data_file.c_str(), i, j, r, data_bytes_num_persymbol_);
         }
@@ -757,7 +774,8 @@ void Config::GenData() {
                               sizeof(int8_t), data_bytes_num_persymbol_, fd);
         if (r < data_bytes_num_persymbol_) {
           MLPD_ERROR(
-              "***Error: Downlink bad read from file %s (batch %zu : %zu) \n",
+              "***Error: Downlink bad read from file %s (batch %zu : %zu) "
+              "\n",
               dl_data_file.c_str(), i, j);
         }
       }

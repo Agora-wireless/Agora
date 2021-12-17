@@ -45,11 +45,22 @@ DoZF::DoZF(Config* config, int tid,
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        kMaxAntennas * sizeof(complex_float)));
 
-  if (cfg_->RefAnt().size() > 0) {
-    ref_ids.zeros(cfg_->NumCells() * cfg_->NumChannels());
+  if (cfg_->Frame().NumDLSyms() > 0) {
+    num_ext_ref_ = 0;
     for (size_t i = 0; i < cfg_->NumCells(); i++)
-      for (size_t j = 0; j < cfg_->NumChannels(); j++)
-        ref_ids.at(i * cfg_->NumChannels() + j) = cfg_->RefAnt().at(i) + j;
+      if (cfg_->ExternalRefNode(i) == true) num_ext_ref_++;
+    if (num_ext_ref_ > 0) {
+      ext_ref_id_.zeros(num_ext_ref_);
+      size_t ext_id = 0;
+      for (size_t i = 0; i < cfg_->NumCells(); i++) {
+        if (cfg_->ExternalRefNode(i) == true) {
+          for (size_t j = 0; j < cfg_->NumChannels(); j++)
+            ext_ref_id_.at(ext_id * cfg_->NumChannels() + j) =
+                cfg_->RefAnt(i) + j;
+          ext_id++;
+        }
+      }
+    }
   }
 }
 
@@ -112,22 +123,23 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     float scale = 1 / (abs(mat_dl_zf_tmp).max());
     mat_dl_zf_tmp *= scale;
 
-    if (cfg_->ExternalRefNode()) {
-      for (size_t i = 0; i < cfg_->NumCells(); i++)
+    for (size_t i = 0; i < cfg_->NumCells(); i++) {
+      if (cfg_->ExternalRefNode(i) == true) {
         mat_dl_zf_tmp.insert_cols(
-            cfg_->RefRadio().at(i) * cfg_->NumChannels(),
-            arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(),
-                          arma::fill::zeros));
+            cfg_->RefAnt(i), arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(),
+                                           arma::fill::zeros));
+      }
     }
     arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
                             cfg_->BsAntNum(), cfg_->UeNum(), false);
     mat_dl_zf = mat_dl_zf_tmp.st();
   }
-  if (cfg_->ExternalRefNode() == true) {
-    for (size_t i = 0; i < cfg_->NumCells(); i++)
+  for (size_t i = 0; i < cfg_->NumCells(); i++) {
+    if (cfg_->ExternalRefNode(i) == true) {
       mat_ul_zf_tmp.insert_cols(
-          cfg_->RefAnt().at(i) * cfg_->NumChannels(),
+          cfg_->RefAnt(i),
           arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(), arma::fill::zeros));
+    }
   }
   mat_ul_zf = mat_ul_zf_tmp;
   float rcond = -1;
@@ -318,8 +330,8 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
 
     if (cfg_->Frame().NumDLSyms() > 0) {
       ComputeCalib(frame_id, cur_sc_id);
-      if (cfg_->ExternalRefNode()) {
-        mat_csi.shed_rows(ref_ids);
+      if (num_ext_ref_ > 0) {
+        mat_csi.shed_rows(ext_ref_id_);
       }
     }
 
