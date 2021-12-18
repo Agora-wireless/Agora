@@ -29,7 +29,7 @@
     "ue_tx_gain_a" : [75,75],
     "ue_rx_gain_b" : [65,65],
     "ue_tx_gain_b" : [75,75],    
-    "hw_framer": false,
+    "ue_hw_framer": false,
     "tx_advance": [
         140,
         140
