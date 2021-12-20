@@ -83,7 +83,9 @@ Config::Config(const std::string& jsonfile)
       if (refnode_serial.empty()) {
         MLPD_INFO(
             "No reference node ID found in topology file! Taking the last node "
-            "as reference node!\n");
+            "%s"
+            "as reference node!\n",
+            radio_id_.back().c_str());
         refnode_serial = radio_id_.back();
         ref_radio_.push_back(radio_id_.size() - 1);
       } else {
@@ -96,8 +98,9 @@ Config::Config(const std::string& jsonfile)
           cell_id_.resize(num_radios_, i);
           external_ref_node_.at(i) = true;
         } else {
-          ref_radio_.push_back(radio_id_.size() - sdr_serials.size() +
-                               serial_iterator - sdr_serials.begin());
+          size_t index = radio_id_.size() - sdr_serials.size() +
+                         serial_iterator - sdr_serials.begin();
+          ref_radio_.push_back(index);
         }
       }
     }

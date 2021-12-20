@@ -18,8 +18,8 @@ RadioConfig::RadioConfig(Config* cfg)
 
   this->radio_num_ = cfg_->NumRadios();
   this->antenna_num_ = cfg_->BsAntNum();
-  std::cout << "Radio num is " << this->radio_num_
-            << " Antenna num: " << antenna_num_ << std::endl;
+  std::cout << "BS Radio num is " << this->radio_num_
+            << ", Antenna num: " << antenna_num_ << std::endl;
   if (kUseUHD == false) {
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       if (cfg_->HubId().at(i) != "") {
