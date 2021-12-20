@@ -144,6 +144,7 @@ class PacketTXRX {
   std::atomic<size_t> threads_started_;
 
 #if defined(USE_DPDK)
+  std::vector<uint16_t> port_ids_;
   uint32_t bs_rru_addr_;     // IPv4 address of the simulator sender
   uint32_t bs_server_addr_;  // IPv4 address of the Agora server
   struct rte_mempool* mbuf_pool_;

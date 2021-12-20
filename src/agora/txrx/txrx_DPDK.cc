@@ -27,11 +27,19 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
   ret = inet_pton(AF_INET, cfg_->BsServerAddr().c_str(), &bs_server_addr_);
   RtAssert(ret == 1, "Invalid server IP address");
 
-  for (uint16_t port_id = 0; port_id < cfg_->DpdkNumPorts(); port_id++) {
-    if (DpdkTransport::NicInit(port_id + cfg->DpdkPortOffset(), mbuf_pool_,
+  if (cfg->DpdkMacAddrs().length() > 0) {
+    port_ids_ = DpdkTransport::GetPortIDFromMacAddr(cfg->DpdkNumPorts(),
+                                                    cfg->DpdkMacAddrs());
+  } else {
+    for (uint16_t i = 0; i < cfg->DpdkNumPorts(); i++) {
+      port_ids_.push_back(i + cfg->DpdkPortOffset());
+    }
+  }
+
+  for (size_t i = 0; i < cfg_->DpdkNumPorts(); i++) {
+    if (DpdkTransport::NicInit(port_ids_.at(i), mbuf_pool_,
                                socket_thread_num_) != 0) {
-      rte_exit(EXIT_FAILURE, "Cannot init port %u\n",
-               port_id + cfg->DpdkPortOffset());
+      rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_ids_.at(i));
     }
   }
 
@@ -39,7 +47,7 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     uint16_t src_port = rte_cpu_to_be_16(cfg_->BsRruPort() + i);
     uint16_t dst_port = rte_cpu_to_be_16(cfg_->BsServerPort() + i);
 
-    size_t port_id = i % this->cfg_->DpdkNumPorts() + cfg->DpdkPortOffset();
+    size_t port_id = port_ids_.at(i % this->cfg_->DpdkNumPorts());
     size_t q_id = i / this->cfg_->DpdkNumPorts();
     std::printf(
         "Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
@@ -126,7 +134,7 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
 void PacketTXRX::LoopTxRx(size_t tid) {
   size_t rx_slot = 0;
   size_t prev_frame_id = SIZE_MAX;
-  const uint16_t port_id = tid % cfg_->DpdkNumPorts() + cfg_->DpdkPortOffset();
+  const uint16_t port_id = port_ids_.at(tid % cfg_->DpdkNumPorts());
   const uint16_t queue_id = tid / cfg_->DpdkNumPorts();
 
   while (this->cfg_->Running()) {
