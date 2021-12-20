@@ -23,7 +23,7 @@ void PacketTXRX::LoopTxRxArgos(size_t tid) {
 
   threads_started_.fetch_add(1);
 
-  long long time0;
+  long long time0 = 0;
   if (cfg_->HwFramer() == false) {
     // prepare BS beacon in host buffer
     std::vector<void*> beaconbuff(2);

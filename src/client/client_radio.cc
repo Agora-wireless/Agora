@@ -240,7 +240,7 @@ bool ClientRadioConfig::RadioStart() {
   int flags(0);  // = SOAPY_SDR_WAIT_TRIGGER;
   std::vector<unsigned> zeros(cfg_->SampsPerSymbol(), 0);
   std::vector<uint32_t> beacon = cfg_->Beacon();
-  std::vector<unsigned> beacon_weights(cfg_->NumAntennas());
+  std::vector<unsigned> beacon_weights(cfg_->UeAntNum());
 
   std::vector<uint32_t> pilot = cfg_->Pilot();
 

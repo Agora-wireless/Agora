@@ -92,7 +92,6 @@ class Config {
   inline size_t NumRadios() const { return this->num_radios_; }
   inline size_t InitCalibRepeat() const { return this->init_calib_repeat_; }
 
-  inline size_t NumAntennas() const { return this->num_antennas_; }
   inline size_t NumChannels() const { return this->num_channels_; }
   inline size_t NumUeChannels() const { return this->num_ue_channels_; }
   inline size_t RefAnt(size_t id) const { return this->ref_ant_.at(id); }
@@ -520,7 +519,6 @@ class Config {
 
   size_t num_cells_;
   size_t num_radios_;
-  size_t num_antennas_;
   size_t num_channels_;
   size_t num_ue_channels_;
   size_t beacon_ant_;

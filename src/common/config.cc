@@ -546,15 +546,12 @@ Config::Config(const std::string& jsonfile)
   MLPD_INFO(
       "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
       "frame,\n\t%zu uplink data symbols per frame, %zu downlink data "
-      "symbols "
-      "per frame,\n\t%zu OFDM subcarriers (%zu data subcarriers), "
-      "modulation "
-      "%s,\n\t%zu codeblocks per symbol, %zu bytes per code block,"
+      "symbols "per frame,\n\t%zu OFDM subcarriers (%zu data subcarriers), "
+      "modulation %s,\n\t%zu codeblocks per symbol, %zu bytes per code block,"
       "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
       "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
       "frame time %.3f usec \nUplink Max Mac data tp (Mbps) %.3f "
-      "\nDownlink "
-      "Max Mac data tp (Mbps) %.3f \n",
+      "\nDownlink Max Mac data tp (Mbps) %.3f \n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
       ldpc_config_.NumBlocksInSymbol(), num_bytes_per_cb_,
@@ -739,8 +736,7 @@ void Config::GenData() {
         if (r < data_bytes_num_persymbol_) {
           MLPD_ERROR(
               " *** Error: Uplink bad read from file %s (batch %zu : %zu) "
-              "%zu "
-              ": %zu\n",
+              "%zu : %zu\n",
               ul_data_file.c_str(), i, j, r, data_bytes_num_persymbol_);
         }
       }
