@@ -9,7 +9,7 @@
   "fft_size": 512,
   "ofdm_data_num": 400,
   "demul_block_size": 48,
-  "cp_len": 32,
+  "cp_size": 32,
   "modulation": "16QAM",
   "Zc": 24,
   "frequency": 3.6e9,
