@@ -45,20 +45,18 @@ DoZF::DoZF(Config* config, int tid,
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        kMaxAntennas * sizeof(complex_float)));
 
-  if (cfg_->Frame().NumDLSyms() > 0) {
-    num_ext_ref_ = 0;
-    for (size_t i = 0; i < cfg_->NumCells(); i++)
-      if (cfg_->ExternalRefNode(i) == true) num_ext_ref_++;
-    if (num_ext_ref_ > 0) {
-      ext_ref_id_.zeros(num_ext_ref_);
-      size_t ext_id = 0;
-      for (size_t i = 0; i < cfg_->NumCells(); i++) {
-        if (cfg_->ExternalRefNode(i) == true) {
-          for (size_t j = 0; j < cfg_->NumChannels(); j++)
-            ext_ref_id_.at(ext_id * cfg_->NumChannels() + j) =
-                cfg_->RefAnt(i) + j;
-          ext_id++;
-        }
+  num_ext_ref_ = 0;
+  for (size_t i = 0; i < cfg_->NumCells(); i++)
+    if (cfg_->ExternalRefNode(i) == true) num_ext_ref_++;
+  if (num_ext_ref_ > 0) {
+    ext_ref_id_.zeros(num_ext_ref_ * cfg_->NumChannels());
+    size_t ext_id = 0;
+    for (size_t i = 0; i < cfg_->NumCells(); i++) {
+      if (cfg_->ExternalRefNode(i) == true) {
+        for (size_t j = 0; j < cfg_->NumChannels(); j++)
+          ext_ref_id_.at(ext_id * cfg_->NumChannels() + j) =
+              cfg_->RefAnt(i) + j;
+        ext_id++;
       }
     }
   }
@@ -134,7 +132,7 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
                             cfg_->BsAntNum(), cfg_->UeNum(), false);
     mat_dl_zf = mat_dl_zf_tmp.st();
   }
-  for (size_t i = 0; i < cfg_->NumCells(); i++) {
+  for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
     if (cfg_->ExternalRefNode(i) == true) {
       mat_ul_zf_tmp.insert_cols(
           cfg_->RefAnt(i),
@@ -330,9 +328,9 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
 
     if (cfg_->Frame().NumDLSyms() > 0) {
       ComputeCalib(frame_id, cur_sc_id);
-      if (num_ext_ref_ > 0) {
-        mat_csi.shed_rows(ext_ref_id_);
-      }
+    }
+    if (num_ext_ref_ > 0) {
+      mat_csi.shed_rows(ext_ref_id_);
     }
 
     double start_tsc3 = GetTime::WorkerRdtsc();
