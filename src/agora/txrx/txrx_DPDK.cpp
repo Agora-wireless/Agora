@@ -314,6 +314,9 @@ void* PacketTXRX::demod_tx_thread(int tid)
         if (shared_state_->is_demod_tx_ready(
                 demod_frame_to_send_, demod_symbol_ul_to_send_)) {
 
+            MLPD_INFO("Demod TX: Send demodulated data to decoders (frame %zu, symbol %zu)\n", 
+                demod_frame_to_send_, demod_symbol_ul_to_send_);
+
             if (unlikely(start_tsc == 0)) {
                 start_tsc = rdtsc();
             }

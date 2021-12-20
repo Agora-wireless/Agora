@@ -52,7 +52,7 @@ bool SharedState::receive_time_iq_pkt(size_t frame_id, size_t symbol_id)
 {
     if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
         MLPD_ERROR(
-            "SharedCounters SharedState error: Received freq iq packet for future "
+            "SharedState error: Received time iq packet for future "
             "frame %zu beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
             "happen if Agora is running slowly, e.g., in debug mode. \n",
             frame_id, cur_frame_, kFrameWnd, cur_frame_, (unsigned int)num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
@@ -72,7 +72,7 @@ bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id)
 {
     if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
         MLPD_ERROR(
-            "SharedCounters SharedState error: Received freq iq packet for future "
+            "SharedState error: Received freq iq packet for future "
             "frame %zu beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
             "happen if Agora is running slowly, e.g., in debug mode. \n",
             frame_id, cur_frame_, kFrameWnd, cur_frame_, (unsigned int)num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
@@ -113,7 +113,7 @@ bool SharedState::receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol
 {
     if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
         MLPD_ERROR(
-            "SharedCounters SharedState error: Received demod packet for future "
+            "SharedState error: Received demod packet for future "
             "frame %zu beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
             "happen if Agora is running slowly, e.g., in debug mode. \n",
             frame_id, cur_frame_, kFrameWnd, cur_frame_, (unsigned int)num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
