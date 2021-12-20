@@ -21,7 +21,7 @@
     "beamsweep" : false,
     "beacon_antenna" : 0,
     "frame_schedule": [
-        "BCLGPPGDDD"
+        "BCLGPPGGDDDGG"
     ],
     "client_dl_pilot_syms" : 2,
     "socket_thread_num" : 3,
