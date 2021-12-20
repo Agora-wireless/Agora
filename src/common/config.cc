@@ -83,8 +83,7 @@ Config::Config(const std::string& jsonfile)
       if (refnode_serial.empty()) {
         MLPD_INFO(
             "No reference node ID found in topology file! Taking the last node "
-            "%s"
-            "as reference node!\n",
+            "%s as reference node!\n",
             radio_id_.back().c_str());
         refnode_serial = radio_id_.back();
         ref_radio_.push_back(radio_id_.size() - 1);
@@ -128,9 +127,9 @@ Config::Config(const std::string& jsonfile)
   }
 
   channel_ = tdd_conf.value("channel", "A");
-  ue_channel_ = tdd_conf.value("ue_channel", "A");
-  num_channels_ = std::min(channel_.size(), (size_t)2);
-  num_ue_channels_ = std::min(ue_channel_.size(), (size_t)2);
+  ue_channel_ = tdd_conf.value("ue_channel", channel_);
+  num_channels_ = std::min(channel_.size(), kMaxChannels);
+  num_ue_channels_ = std::min(ue_channel_.size(), kMaxChannels);
   bs_ant_num_ = num_channels_ * num_radios_;
   ue_ant_num_ = ue_num_ * num_ue_channels_;
 
@@ -249,7 +248,9 @@ Config::Config(const std::string& jsonfile)
   correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
 
   hw_framer_ = tdd_conf.value("hw_framer", true);
-  if (kUseUHD) hw_framer_ = false;
+  if (kUseUHD) { 
+    hw_framer_ = false; 
+  }
   ue_hw_framer_ = tdd_conf.value("ue_hw_framer", false);
 
   // If frames not specified explicitly, construct default based on frame_type /
@@ -289,9 +290,7 @@ Config::Config(const std::string& jsonfile)
     if ((ul_data_symbol_num_perframe + dl_data_symbol_num_perframe +
          pilot_symbol_num_perframe) > symbol_num_perframe) {
       MLPD_ERROR(
-          "!!!!! Invalid configuration pilot + ul + dl exceeds total "
-          "symbols "
-          "!!!!!\n");
+          "!!!!! Invalid configuration pilot + ul + dl exceeds total symbols !!!!!\n");
       MLPD_ERROR(
           "Uplink symbols: %zu, Downlink Symbols :%zu, Pilot Symbols: %zu, "
           "Total Symbols: %zu\n",
@@ -308,8 +307,7 @@ Config::Config(const std::string& jsonfile)
           "!!!!! Invalid configuration ul and dl symbol overlap detected "
           "!!!!!\n");
       MLPD_ERROR(
-          "Uplink - start: %zu - stop :%zu, Downlink - start: %zu - stop "
-          "%zu\n",
+          "Uplink - start: %zu - stop :%zu, Downlink - start: %zu - stop %zu\n",
           ul_data_symbol_start, ul_data_symbol_stop, dl_data_symbol_start,
           dl_data_symbol_stop);
       throw std::runtime_error("Invalid Frame Configuration");
@@ -421,7 +419,7 @@ Config::Config(const std::string& jsonfile)
         "Number of pilot symbols: " + std::to_string(frame_.NumPilotSyms()) +
             " does not match number of UEs: " + std::to_string(ue_ant_num_));
   }
-  if ((freq_orthogonal_pilot_ == false) &&
+  if ((freq_orthogonal_pilot_ == false) && (ue_radio_id_.empty() == true) &&
       (tdd_conf.find("ue_radio_num") == tdd_conf.end())) {
     ue_num_ = frame_.NumPilotSyms();
     ue_ant_num_ = ue_num_ * num_ue_channels_;
