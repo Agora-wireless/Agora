@@ -4,9 +4,9 @@
     "channel" : "A",
     "frequency" : 3.6e9,
     "rx_gain_a" : 65,
-    "tx_gain_a" : 75,
+    "tx_gain_a" : 80,
     "rx_gain_b" : 65,
-    "tx_gain_b" : 75,
+    "tx_gain_b" : 80,
     "sample_rate": 7.68e6,
     "ofdm_tx_zero_prefix" : 160,
     "ofdm_tx_zero_postfix" : 160,
@@ -16,27 +16,27 @@
     "ofdm_data_num" : 304,
     "modulation" : "16QAM",
     "Zc" : 18,
-    "beamsweep" : true,
+    "beamsweep" : false,
     "beacon_antenna" : 0,
     "frame_schedule": [
         "BPPGUUUUG"
     ],
     "client_ul_pilot_syms" : 2,
+    "socket_thread_num" : 1,
     "worker_thread_num" : 20,
+    "core_offset" : 10,
     "demul_block_size" : 48,
     "ue_channel" : "A",
-    "ue_rx_gain_a" : [65,65],
-    "ue_tx_gain_a" : [75,75],
-    "ue_rx_gain_b" : [65,65],
-    "ue_tx_gain_b" : [75,75],    
-    "hw_framer": false,
+    "ue_rx_gain_a" : [65, 65],
+    "ue_tx_gain_a" : [80, 80],
+    "ue_rx_gain_b" : [65, 65],
+    "ue_tx_gain_b" : [80, 80],
+    "ue_hw_framer": false,
     "tx_advance": [
-        140,
-        140
+        144,
+        144
     ],
     "ue_worker_thread_num": 2,
     "ue_demul_block_size": 48,
-    "ue_core_offset": 26,
-    "ue_mac_rx_port": 9070,
-    "ue_mac_tx_port": 9080
+    "ue_core_offset": 26
 }
