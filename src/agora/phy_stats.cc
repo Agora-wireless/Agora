@@ -69,6 +69,8 @@ PhyStats::~PhyStats() {
 
   evm_buffer_.Free();
   pilot_snr_.Free();
+  csi_cond_.Free();
+  calib_pilot_snr_.Free();
 }
 
 void PhyStats::PrintPhyStats() {
