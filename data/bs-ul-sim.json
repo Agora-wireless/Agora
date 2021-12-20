@@ -4,7 +4,7 @@
   "demul_block_size": 48,
   "UE": false,
   "ue_num": 2,
-  "antenna_num": 8,
+  "antenna_num": 48,
   "symbol_num_perframe": 70,
   "client_ul_pilot_syms": 1,
   "ul_data_symbol_start": 3,

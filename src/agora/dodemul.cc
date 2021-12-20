@@ -114,16 +114,21 @@ EventData DoDemul::Launch(size_t tag) {
         ((base_sc_id + i) / kTransposeBlockSize) *
         (kTransposeBlockSize * cfg_->BsAntNum());
 
-    size_t ant_start = 0;
-    if (kUseSIMDGather and cfg_->BsAntNum() % 4 == 0 and kUsePartialTrans) {
+    size_t ant_num_all_simd = 0;
+#ifdef __AVX512F__
+    size_t ant_num_per_simd = 8; // for 512-bit aligned memory
+#else
+    size_t ant_num_per_simd = 4; // for 256-bit aligned memory
+#endif
+    if (kUseSIMDGather and kUsePartialTrans) {// and cfg_->BsAntNum() % ant_num_per_simd == 0
       // Gather data for all antennas and 8 subcarriers in the same cache
       // line, 1 subcarrier and 4 (AVX2) or 8 (AVX512) ants per iteration
+      ant_num_all_simd = cfg_->BsAntNum() - cfg_->BsAntNum() % ant_num_per_simd;
       size_t cur_sc_offset =
           partial_transpose_block_base + (base_sc_id + i) % kTransposeBlockSize;
       const auto* src = (const float*)&data_buf[cur_sc_offset];
       auto* dst = (float*)data_gather_buffer_;
 #ifdef __AVX512F__
-      size_t ant_num_per_simd = 8;
       __m512i index = _mm512_setr_epi32(
           0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
           kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
@@ -132,39 +137,39 @@ EventData DoDemul::Launch(size_t tag) {
           kTransposeBlockSize * 10, kTransposeBlockSize * 10 + 1,
           kTransposeBlockSize * 12, kTransposeBlockSize * 12 + 1,
           kTransposeBlockSize * 14, kTransposeBlockSize * 14 + 1);
-      for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
+      for (size_t ant_i = 0; ant_i < ant_num_all_simd;
            ant_i += ant_num_per_simd) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
           __m512 data_rx = kTransposeBlockSize == 1
-                               ? _mm512_load_ps(src + j * cfg_->BsAntNum() * 2)
+                               ? _mm512_load_ps(src + j * ant_num_all_simd * 2)
                                : _mm512_i32gather_ps(index, src + j * 2, 4);
-          _mm512_store_ps(dst + j * cfg_->BsAntNum() * 2, data_rx);
+          _mm512_store_ps(dst + j * ant_num_all_simd * 2, data_rx);
         }
         src += ant_num_per_simd * kTransposeBlockSize * 2;
         dst += ant_num_per_simd * 2;
       }
 #else
-      size_t ant_num_per_simd = 4;
       __m256i index = _mm256_setr_epi32(
           0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
           kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
           kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1);
-      for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
+      for (size_t ant_i = 0; ant_i < ant_num_all_simd;
            ant_i += ant_num_per_simd) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
           __m256 data_rx = _mm256_i32gather_ps(src + j * 2, index, 4);
-          _mm256_store_ps(dst + j * cfg_->BsAntNum() * 2, data_rx);
+          _mm256_store_ps(dst + j * ant_num_all_simd * 2, data_rx);
         }
         src += ant_num_per_simd * kTransposeBlockSize * 2;
         dst += ant_num_per_simd * 2;
       }
 #endif
       // Set the remaining number of antennas for non-SIMD gather
-      ant_start = cfg_->BsAntNum() % 4;
-    } else {
-      complex_float* dst = data_gather_buffer_ + ant_start;
+      //ant_start = cfg_->BsAntNum() % ant_num_per_simd;
+    }
+    if (ant_num_all_simd < cfg_->BsAntNum()) { // non-SIMD
+      auto* dst = (complex_float*)data_gather_buffer_ + ant_num_all_simd;
       for (size_t j = 0; j < kSCsPerCacheline; j++) {
-        for (size_t ant_i = ant_start; ant_i < cfg_->BsAntNum(); ant_i++) {
+        for (size_t ant_i = ant_num_all_simd; ant_i < cfg_->BsAntNum(); ant_i++) {
           *dst++ =
               kUsePartialTrans
                   ? data_buf[partial_transpose_block_base +
