@@ -7,6 +7,7 @@
 #define DPDK_TRANSPORT_H_
 
 #include <inttypes.h>
+#include <netinet/ether.h>
 #include <rte_byteorder.h>
 #include <rte_cycles.h>
 #include <rte_debug.h>
@@ -24,12 +25,14 @@
 
 #include <string>
 
+// #include "eth_common.h"
 #include "utils.h"
 
 static constexpr size_t kRxRingSize = 2048;
 static constexpr size_t kTxRingSize = 2048;
-static constexpr size_t kNumMBufs = ((32 * 1024) - 1);
+static constexpr size_t kNumMBufs = ((64 * 1024) - 1);
 static constexpr size_t kMBufCacheSize = 128;
+static constexpr size_t kMacAddrBtyes = 17;
 
 // allow max jumbo frame 9.5 KB
 static constexpr size_t kJumboFrameMaxSize = 0x2600;
@@ -47,6 +50,9 @@ class DpdkTransport {
  public:
   DpdkTransport();
   ~DpdkTransport();
+
+  static std::vector<uint16_t> GetPortIDFromMacAddr(size_t port_num,
+                                                    std::string mac_addrs);
 
   static int NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
                      int thread_num, size_t pkt_len = kJumboFrameMaxSize);
