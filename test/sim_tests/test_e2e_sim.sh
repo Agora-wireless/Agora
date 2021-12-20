@@ -19,8 +19,8 @@ done
 # Setup the config with the number of frames to test
 cp data/chsim.json data/bs-sim-tmp.json
 cp data/chsim.json data/ue-sim-tmp.json
-sed -i '2i\ \ "frames_to_test": 1000,' data/bs-sim-tmp.json
-sed -i '2i\ \ "frames_to_test": 1000,' data/ue-sim-tmp.json
+sed -i '2i\ \ "max_frame": 1000,' data/bs-sim-tmp.json
+sed -i '2i\ \ "max_frame": 1000,' data/ue-sim-tmp.json
 
 echo "==========================================="
 echo "Generating data for emulated RRU end-to-end test with channel simulator ......"
