@@ -546,7 +546,7 @@ Config::Config(const std::string& jsonfile)
   MLPD_INFO(
       "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
       "frame,\n\t%zu uplink data symbols per frame, %zu downlink data "
-      "symbols "per frame,\n\t%zu OFDM subcarriers (%zu data subcarriers), "
+      "symbols per frame,\n\t%zu OFDM subcarriers (%zu data subcarriers), "
       "modulation %s,\n\t%zu codeblocks per symbol, %zu bytes per code block,"
       "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
       "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
