@@ -82,7 +82,7 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
                             complex_float* calib_ptr, complex_float* _mat_ul_zf,
                             complex_float* _mat_dl_zf) {
   arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
-                          cfg_->UeNum(), cfg_->BsAntNum(), false);
+                          cfg_->UeAntNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_zf_tmp;
   if (kUseInverseForZF != 0u) {
     try {
@@ -124,19 +124,19 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       if (cfg_->ExternalRefNode(i) == true) {
         mat_dl_zf_tmp.insert_cols(
-            cfg_->RefAnt(i), arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(),
+            cfg_->RefAnt(i), arma::cx_fmat(cfg_->UeAntNum(), cfg_->NumChannels(),
                                            arma::fill::zeros));
       }
     }
     arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
-                            cfg_->BsAntNum(), cfg_->UeNum(), false);
+                            cfg_->BsAntNum(), cfg_->UeAntNum(), false);
     mat_dl_zf = mat_dl_zf_tmp.st();
   }
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
     if (cfg_->ExternalRefNode(i) == true) {
       mat_ul_zf_tmp.insert_cols(
           cfg_->RefAnt(i),
-          arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(), arma::fill::zeros));
+          arma::cx_fmat(cfg_->UeAntNum(), cfg_->NumChannels(), arma::fill::zeros));
     }
   }
   mat_ul_zf = mat_ul_zf_tmp;
@@ -307,7 +307,7 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     const size_t cur_sc_id = base_sc_id + i;
 
     // Gather CSI matrices of each pilot from partially-transposed CSIs.
-    for (size_t ue_idx = 0; ue_idx < cfg_->UeNum(); ue_idx++) {
+    for (size_t ue_idx = 0; ue_idx < cfg_->UeAntNum(); ue_idx++) {
       auto* dst_csi_ptr = reinterpret_cast<float*>(csi_gather_buffer_ +
                                                    cfg_->BsAntNum() * ue_idx);
       if (kUsePartialTrans) {
@@ -324,7 +324,7 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
     arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_, cfg_->BsAntNum(),
-                          cfg_->UeNum(), false);
+                          cfg_->UeAntNum(), false);
 
     if (cfg_->Frame().NumDLSyms() > 0) {
       ComputeCalib(frame_id, cur_sc_id);
@@ -358,14 +358,14 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
     std::printf(
         "In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
         "Basestation ant number: %zu\n",
-        tid_, frame_id, base_sc_id, base_sc_id / cfg_->UeNum(),
+        tid_, frame_id, base_sc_id, base_sc_id / cfg_->UeAntNum(),
         cfg_->BsAntNum());
   }
 
   double start_tsc1 = GetTime::WorkerRdtsc();
 
   // Gather CSIs from partially-transposed CSIs
-  for (size_t i = 0; i < cfg_->UeNum(); i++) {
+  for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
     const size_t cur_sc_id = base_sc_id + i;
     auto* dst_csi_ptr =
         reinterpret_cast<float*>(csi_gather_buffer_ + cfg_->BsAntNum() * i);
@@ -416,7 +416,7 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
   duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
   arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
-                        cfg_->BsAntNum(), cfg_->UeNum(), false);
+                        cfg_->BsAntNum(), cfg_->UeAntNum(), false);
 
   ComputePrecoder(mat_csi, calib_gather_buffer_,
                   ul_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)],
