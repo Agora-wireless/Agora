@@ -433,7 +433,7 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
 void* RadioTxRx::LoopTxRxArgos(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_id_, tid);
   auto& c = config_;
-  size_t num_radios = c->UeNum();
+  const size_t num_radios = c->UeNum();
   size_t radio_lo = tid * num_radios / thread_num_;
   size_t radio_hi = (tid + 1) * num_radios / thread_num_;
   std::printf("RadioTxRx thread %zu has radios %zu to %zu (%zu)\n", tid,
