@@ -61,9 +61,9 @@ PhyUe::PhyUe(Config* config)
       kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
       kDefaultQueueSize);
   tx_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
+      kFrameWnd * config_->UeAntNum() * kDefaultQueueSize);
   to_mac_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
+      kFrameWnd * config_->UeAntNum() * kDefaultQueueSize);
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
     rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(complete_queue_);
@@ -118,6 +118,7 @@ PhyUe::PhyUe(Config* config)
                              config_->UeAntNum());
   fft_dldata_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
 
+  /* Each UE / Radio will send a TxComplete */
   tx_counters_.Init(config_->UeNum());
   encode_counter_.Init(ul_data_symbol_perframe_, config_->UeNum());
   modulation_counters_.Init(ul_data_symbol_perframe_, config_->UeNum());
