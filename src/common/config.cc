@@ -562,6 +562,8 @@ Config::Config(const std::string& jsonfile)
           (this->GetFrameDurationSec() * 1e6),
       (dl_mac_data_bytes_num_perframe_ * 8.0f) /
           (this->GetFrameDurationSec() * 1e6));
+
+  Print();
 }
 
 void Config::GenData() {
@@ -1126,6 +1128,28 @@ bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const {
 SymbolType Config::GetSymbolType(size_t symbol_id) const {
   return kSymbolMap.at(this->frame_.FrameIdentifier().at(symbol_id));
 }
+
+void Config::Print( ) const
+{
+  std::cout << "Freq Ghz: " << freq_ghz_ << std::endl
+            << "BaseStation ant num: " << bs_ant_num_ << std::endl
+            << "BeamForming ant num: " << bf_ant_num_ << std::endl
+            << "Ue num: " << ue_num_ << std::endl
+            << "Ue ant num: " << ue_ant_num_ << std::endl
+            << "Ue ant total: " << ue_ant_total_ << std::endl
+            << "Ue ant offset: " << ue_ant_offset_ << std::endl
+            << "OFDM Ca num: " << ofdm_ca_num_ << std::endl
+            << "Cp Len: " << cp_len_ << std::endl
+            << "Ofdm data num: " << ofdm_data_num_ << std::endl
+            << "Ofdm data start: " << ofdm_data_start_ << std::endl
+            << "Ofdm data stop: " << ofdm_data_stop_ << std::endl
+            << "Ofdm pilot spacing: " << ofdm_pilot_spacing_ << std::endl
+            << "Hardware framer: " << hw_framer_ << std::endl
+            << "Ue Hardware framer: " << ue_hw_framer_ << std::endl
+            << "Freq: " << freq_ << std::endl
+            << "Rate: " << rate_ << std::endl;
+}
+
 
 extern "C" {
 __attribute__((visibility("default"))) Config* ConfigNew(char* filename) {

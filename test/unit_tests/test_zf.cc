@@ -18,9 +18,9 @@ TEST(TestZF, Perf) {
   csi_buffers.RandAllocCxFloat(cfg->BsAntNum() * cfg->OfdmDataNum());
 
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
-      cfg->BsAntNum() * cfg->UeNum());
+      cfg->BsAntNum() * cfg->UeAntNum());
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
-      cfg->UeNum() * cfg->BsAntNum());
+      cfg->UeAntNum() * cfg->BsAntNum());
 
   Table<complex_float> calib_dl_msum_buffer;
   calib_dl_msum_buffer.RandAllocCxFloat(kFrameWnd,
