@@ -120,14 +120,14 @@ EventData DoDemul::Launch(size_t tag) {
 #else
     size_t ant_num_per_simd = 4; // for 256-bit aligned memory
 #endif
-    if (kUseSIMDGather and kUsePartialTrans) {// and cfg_->BsAntNum() % ant_num_per_simd == 0
+    if (kUseSIMDGather and kUsePartialTrans) {
       // Gather data for all antennas and 8 subcarriers in the same cache
       // line, 1 subcarrier and 4 (AVX2) or 8 (AVX512) ants per iteration
       ant_num_all_simd = cfg_->BsAntNum() - cfg_->BsAntNum() % ant_num_per_simd;
       size_t cur_sc_offset =
           partial_transpose_block_base + (base_sc_id + i) % kTransposeBlockSize;
-      const auto* src = (const float*)&data_buf[cur_sc_offset];
-      auto* dst = (float*)data_gather_buffer_;
+      auto* src = reinterpret_cast<const float*>(&data_buf[cur_sc_offset]);
+      auto* dst = reinterpret_cast<float*>(data_gather_buffer_);
 #ifdef __AVX512F__
       __m512i index = _mm512_setr_epi32(
           0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
@@ -163,11 +163,10 @@ EventData DoDemul::Launch(size_t tag) {
         dst += ant_num_per_simd * 2;
       }
 #endif
-      // Set the remaining number of antennas for non-SIMD gather
-      //ant_start = cfg_->BsAntNum() % ant_num_per_simd;
     }
-    if (ant_num_all_simd < cfg_->BsAntNum()) { // non-SIMD
-      auto* dst = (complex_float*)data_gather_buffer_ + ant_num_all_simd;
+    if (ant_num_all_simd < cfg_->BsAntNum()) {
+      // non-SIMD processing for remaining antennas
+      complex_float* dst = data_gather_buffer_ + ant_num_all_simd;
       for (size_t j = 0; j < kSCsPerCacheline; j++) {
         for (size_t ant_i = ant_num_all_simd; ant_i < cfg_->BsAntNum(); ant_i++) {
           *dst++ =
