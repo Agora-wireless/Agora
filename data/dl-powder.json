@@ -1,40 +1,63 @@
 {
-    "serial_file" : "data/topology-powder.json",
-    "cells" : 1,
-    "channel" : "A",
-    "frequency" : 3.6e9,
-    "rx_gain_a" : 65,
-    "tx_gain_a" : 70,
-    "rx_gain_b" : 65,
-    "tx_gain_b" : 70,
-    "sample_rate" : 5e6,
-    "ofdm_tx_zero_prefix" : 160,
-    "ofdm_tx_zero_postfix" : 160,
-    "ofdm_rx_zero_prefix_bs" : 160,
-    "ofdm_rx_zero_prefix_cal_dl" : 288,
-    "ofdm_rx_zero_prefix_cal_ul" : 168,
-    "cp_size" : 32,
-    "fft_size" : 2048,
-    "ofdm_data_num" : 1200,
-    "modulation" : "16QAM",
-    "Zc" : 72,
-    "beamsweep" : false,
-    "beacon_antenna" : 0,
+    "serial_file": "data/topology-powder-dl.json",
+    "cells": 1,
+    "channel": "A",
+    "frequency": 3.6e9,
+    "rx_gain_a": 65,
+    "tx_gain_a": 80,
+    "rx_gain_b": 65,
+    "tx_gain_b": 80,
+    "sample_rate": 5e6,
+    "ofdm_tx_zero_prefix": 160,
+    "ofdm_tx_zero_postfix": 160,
+    "ofdm_rx_zero_prefix_bs": 160,
+    "ofdm_rx_zero_prefix_client": 160,
+    "ofdm_rx_zero_prefix_cal_dl": 288,
+    "ofdm_rx_zero_prefix_cal_ul": 168,
+    "cp_size": 32,
+    "fft_size": 2048,
+    "ofdm_data_num": 1200,
+    "modulation": "16QAM",
+    "Zc": 72,
+    "beamsweep": false,
+    "beacon_antenna": 0,
     "frame_schedule": [
-        "BGCLGGPPGGDDDGG"
+        "BCLGPPGGDDDGG"
     ],
-    "client_dl_pilot_syms" : 2,
-    "socket_thread_num" : 1,
-    "worker_thread_num" : 16,
-    "core_offset" : 10,
-    "demul_block_size" : 48,
-    "ue_channel" : "A",
-    "ue_rx_gain_a" : [65, 65],
-    "ue_tx_gain_a" : [70, 70],
-    "ue_rx_gain_b" : [65, 65],
-    "ue_tx_gain_b" : [70, 70],    
-    "hw_framer": false,
-    "tx_advance" : [140, 140],
-    "ue_core_offset" : 28,
-    "ue_worker_thread_num" : 2
+    "client_dl_pilot_syms": 2,
+    "demul_block_size": 48,
+    "ue_demul_block_size": 48,
+    "ue_channel": "A",
+    "ue_rx_gain_a": [
+        65,
+        65
+    ],
+    "ue_tx_gain_a": [
+        80,
+        80
+    ],
+    "ue_rx_gain_b": [
+        65,
+        65
+    ],
+    "ue_tx_gain_b": [
+        80,
+        80
+    ],
+    "tx_advance": [
+        140,
+        140
+    ],
+    "ue_hw_framer": false,
+    "hw_framer": true,
+    /* Compute configuration */
+    "exclude_cores": [],
+    "ue_core_offset": 12,
+    "ue_worker_thread_num": 4,
+    "ue_socket_thread_num": 2,
+    "core_offset": 16,
+    "worker_thread_num": 16,
+    /* 22 bs radios + 1 ref*/
+    "socket_thread_num": 6,
+    "max_frame": 10000
 }
