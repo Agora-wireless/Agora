@@ -248,8 +248,8 @@ Config::Config(const std::string& jsonfile)
   correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
 
   hw_framer_ = tdd_conf.value("hw_framer", true);
-  if (kUseUHD) { 
-    hw_framer_ = false; 
+  if (kUseUHD) {
+    hw_framer_ = false;
   }
   ue_hw_framer_ = tdd_conf.value("ue_hw_framer", false);
 
@@ -290,7 +290,8 @@ Config::Config(const std::string& jsonfile)
     if ((ul_data_symbol_num_perframe + dl_data_symbol_num_perframe +
          pilot_symbol_num_perframe) > symbol_num_perframe) {
       MLPD_ERROR(
-          "!!!!! Invalid configuration pilot + ul + dl exceeds total symbols !!!!!\n");
+          "!!!!! Invalid configuration pilot + ul + dl exceeds total symbols "
+          "!!!!!\n");
       MLPD_ERROR(
           "Uplink symbols: %zu, Downlink Symbols :%zu, Pilot Symbols: %zu, "
           "Total Symbols: %zu\n",
@@ -1129,8 +1130,7 @@ SymbolType Config::GetSymbolType(size_t symbol_id) const {
   return kSymbolMap.at(this->frame_.FrameIdentifier().at(symbol_id));
 }
 
-void Config::Print( ) const
-{
+void Config::Print() const {
   std::cout << "Freq Ghz: " << freq_ghz_ << std::endl
             << "BaseStation ant num: " << bs_ant_num_ << std::endl
             << "BeamForming ant num: " << bf_ant_num_ << std::endl
@@ -1147,9 +1147,38 @@ void Config::Print( ) const
             << "Hardware framer: " << hw_framer_ << std::endl
             << "Ue Hardware framer: " << ue_hw_framer_ << std::endl
             << "Freq: " << freq_ << std::endl
-            << "Rate: " << rate_ << std::endl;
+            << "Rate: " << rate_ << std::endl
+            << "NCO: " << nco_ << std::endl
+            << "Scrambler Enabled: " << scramble_enabled_ << std::endl
+            << "Radio Rf Freq: " << radio_rf_freq_ << std::endl
+            << "Bw filter: " << bw_filter_ << std::endl
+            << "Single Gain: " << single_gain_ << std::endl
+            << "Tx Gain A: " << tx_gain_a_ << std::endl
+            << "Rx Gain A: " << rx_gain_a_ << std::endl
+            << "Tx Gain B: " << tx_gain_b_ << std::endl
+            << "Rx Gain B: " << rx_gain_b_ << std::endl
+            << "Calib Tx Gain A: " << calib_tx_gain_a_ << std::endl
+            << "Calib Tx Gain B: " << calib_tx_gain_b_ << std::endl
+            << "Num Cells: " << num_cells_ << std::endl
+            << "Num Bs Radios: " << num_radios_ << std::endl
+            << "Num Bs Channels: " << num_channels_ << std::endl
+            << "Num Ue Channels: " << num_ue_channels_ << std::endl
+            << "Beacon Ant: " << beacon_ant_ << std::endl
+            << "Beacon len: " << beacon_len_ << std::endl
+            << "Calib init repeat: " << init_calib_repeat_ << std::endl
+            << "Beamsweep " << beamsweep_ << std::endl
+            << "Sample Cal En: " << sample_cal_en_ << std::endl
+            << "Imbalance Cal: " << imbalance_cal_en_ << std::endl
+            << "Bs Channel: " << channel_ << std::endl
+            << "Ue Channel: " << ue_channel_ << std::endl
+            << "Ant Group num: " << ant_group_num_ << std::endl
+            << "Ant Per Group: " << ant_per_group_ << std::endl
+            << "Max Frames: " << frames_to_test_ << std::endl
+            << "Transport Block Size: " << transport_block_size_ << std::endl
+            << "Noise Level: " << noise_level_ << std::endl
+            << "Bytes per CB: " << num_bytes_per_cb_ << std::endl
+            << "FFT in rru: " << fft_in_rru_ << std::endl;
 }
-
 
 extern "C" {
 __attribute__((visibility("default"))) Config* ConfigNew(char* filename) {
