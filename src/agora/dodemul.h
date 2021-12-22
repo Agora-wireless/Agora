@@ -19,6 +19,13 @@
 #include "stats.h"
 #include "symbols.h"
 
+namespace StoreData {
+size_t StoreRxDataAVX512(const float* src, float* dst, size_t ant_num);
+size_t StoreRxDataAVX2(const float* src, float* dst, size_t ant_num);
+void StoreRxDataLoop(const complex_float* src, complex_float* dst, Config* cfg_,
+                     size_t src_offset, size_t ant_start);
+};  // namespace StoreData
+
 class DoDemul : public Doer {
  public:
   DoDemul(Config* config, int tid, Table<complex_float>& data_buffer,
