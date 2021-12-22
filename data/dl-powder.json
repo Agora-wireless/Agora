@@ -11,7 +11,6 @@
     "ofdm_tx_zero_prefix": 160,
     "ofdm_tx_zero_postfix": 160,
     "ofdm_rx_zero_prefix_bs": 160,
-    "ofdm_rx_zero_prefix_client": 160,
     "ofdm_rx_zero_prefix_cal_dl": 288,
     "ofdm_rx_zero_prefix_cal_ul": 168,
     "cp_size": 32,
@@ -54,7 +53,6 @@
     "exclude_cores": [],
     "ue_core_offset": 12,
     "ue_worker_thread_num": 4,
-    "ue_socket_thread_num": 2,
     "core_offset": 16,
     "worker_thread_num": 16,
     /* 22 bs radios + 1 ref*/
