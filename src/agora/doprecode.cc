@@ -186,8 +186,9 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
       dl_zf_matrices_[frame_slot][cfg_->GetZfScId(sc_id)]);
   auto* data_ptr = reinterpret_cast<arma::cx_float*>(
       modulated_buffer_temp_ +
-      (kUseSpatialLocality ? (sc_id_in_block % kSCsPerCacheline * cfg_->UeAntNum())
-                           : 0));
+      (kUseSpatialLocality
+           ? (sc_id_in_block % kSCsPerCacheline * cfg_->UeAntNum())
+           : 0));
   auto* precoded_ptr = reinterpret_cast<arma::cx_float*>(
       precoded_buffer_temp_ + sc_id_in_block * cfg_->BsAntNum());
 #if USE_MKL_JIT

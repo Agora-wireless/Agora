@@ -642,7 +642,9 @@ void Agora::Start() {
                   cfg->OfdmDataNum() * tx_counters_.MaxSymbolCount() * 1000;
 
               MLPD_INFO(
-                  "TX %d samples (per-client) to %zu clients in %f secs, throughtput %f bps per-client (16QAM), current tx queue length %zu\n",
+                  "TX %d samples (per-client) to %zu clients in %f secs, "
+                  "throughtput %f bps per-client (16QAM), current tx queue "
+                  "length %zu\n",
                   samples_num_per_ue, cfg->UeAntNum(), diff,
                   samples_num_per_ue * std::log2(16.0f) / diff,
                   GetConq(EventType::kPacketTX, 0)->size_approx());
@@ -1385,8 +1387,9 @@ void Agora::InitializeUplinkBuffers() {
 
   demul_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
 
-  decode_counters_.Init(cfg->Frame().NumULSyms(),
-                        cfg->LdpcConfig().NumBlocksInSymbol() * cfg->UeAntNum());
+  decode_counters_.Init(
+      cfg->Frame().NumULSyms(),
+      cfg->LdpcConfig().NumBlocksInSymbol() * cfg->UeAntNum());
 
   tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->UeAntNum());
 }
@@ -1572,8 +1575,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
     this->ifft_counters_.Reset(frame_id);
     this->tx_counters_.Reset(frame_id);
     if (config_->Frame().NumDLSyms() > 0) {
-      for (size_t ue_id = 0; ue_id < config_->UeAntNum(); ue_id++) 
-      {
+      for (size_t ue_id = 0; ue_id < config_->UeAntNum(); ue_id++) {
         this->dl_bits_buffer_status_[ue_id][frame_id % kFrameWnd] = 0;
       }
     }

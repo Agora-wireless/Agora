@@ -238,10 +238,7 @@ bool ClientRadioConfig::RadioStart() {
   // send through the first radio for now
   // int beacon_ant = 1;
   int flags(0);  // = SOAPY_SDR_WAIT_TRIGGER;
-  std::vector<unsigned> zeros(cfg_->SampsPerSymbol(), 0);
   std::vector<uint32_t> beacon = cfg_->Beacon();
-  std::vector<unsigned> beacon_weights(cfg_->UeAntNum());
-
   std::vector<uint32_t> pilot = cfg_->Pilot();
 
   // beaconSize + 82 (BS FE delay) + 68 (path delay) + 17 (correlator delay) +
