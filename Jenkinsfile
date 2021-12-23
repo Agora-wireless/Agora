@@ -68,7 +68,7 @@ pipeline {
 				echo "CI building Agora ..."
 				dir("${WORKSPACE}") {
 					sh '''
-						source /opt/intel/compilers_and_libraries_2020.3.279/linux/bin/compilervars.sh intel64
+						source /opt/intel/oneapi/setvars.sh --force --config="/opt/intel/oneapi/renew-config.txt"
 						mkdir build && cd build
 						cmake .. && make -j && cd ..
 						cp ./build/CTestTestfile.cmake ./
@@ -82,7 +82,6 @@ pipeline {
 				echo "CI Emulated Agora testing ..."
 				dir("${WORKSPACE}") {
 					sh '''
-						export LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2020.3.279/linux/mkl/lib/intel64/:$LD_LIBRARY_PATH
 						./test/test_agora/test_agora.sh
 					'''
 					script {
@@ -114,12 +113,10 @@ pipeline {
 				dir("${WORKSPACE}") {
 					echo "Building data for unit tests ..."
 					sh '''
-						export LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2020.3.279/linux/mkl/lib/intel64/:$LD_LIBRARY_PATH
 						./build/data_generator --conf_file data/tddconfig-sim-ul.json
 					'''
 					
 					sh '''
-						export LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2020.3.279/linux/mkl/lib/intel64/:$LD_LIBRARY_PATH
 						ctest
 					'''
 				}
@@ -131,7 +128,6 @@ pipeline {
 				echo "CI E2E testing ..."
 				dir("${WORKSPACE}") {
 					sh '''
-						export LD_LIBRARY_PATH=/opt/intel/compilers_and_libraries_2020.3.279/linux/mkl/lib/intel64/:$LD_LIBRARY_PATH
 						./test/sim_tests/test_e2e_sim.sh 0.05
 					'''
 					script {
