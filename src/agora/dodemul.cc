@@ -225,7 +225,8 @@ EventData DoDemul::Launch(size_t tag) {
         auto* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
             &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
                                   [symbol_idx_ul * cfg_->UeAntNum()]);
-        arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1, false);
+        arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
+                                      false);
         arma::cx_fmat shift_sc =
             sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
         mat_phase_shift += shift_sc;
@@ -267,9 +268,10 @@ EventData DoDemul::Launch(size_t tag) {
   }
 
   size_t start_tsc3 = GetTime::WorkerRdtsc();
-  __m256i index2 = _mm256_setr_epi32(
-      0, 1, cfg_->UeAntNum() * 2, cfg_->UeAntNum() * 2 + 1, cfg_->UeAntNum() * 4,
-      cfg_->UeAntNum() * 4 + 1, cfg_->UeAntNum() * 6, cfg_->UeAntNum() * 6 + 1);
+  __m256i index2 =
+      _mm256_setr_epi32(0, 1, cfg_->UeAntNum() * 2, cfg_->UeAntNum() * 2 + 1,
+                        cfg_->UeAntNum() * 4, cfg_->UeAntNum() * 4 + 1,
+                        cfg_->UeAntNum() * 6, cfg_->UeAntNum() * 6 + 1);
   auto* equal_t_ptr = reinterpret_cast<float*>(equaled_buffer_temp_transposed_);
   for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
     float* equal_ptr = nullptr;

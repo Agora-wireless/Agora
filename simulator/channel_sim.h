@@ -99,7 +99,6 @@ class ChannelSim {
   const Config* const uecfg_;
   std::unique_ptr<Channel> channel_;
 
-
   // Data buffer for received symbols from BS antennas (downlink)
   AlignedByteVector rx_buffer_bs_;
 
