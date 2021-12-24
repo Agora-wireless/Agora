@@ -520,7 +520,7 @@ Config::Config(const std::string& jsonfile)
   dl_packet_length_ = Packet::kOffsetOfData + (samps_per_symbol_ * 4);
 
   //Don't check for jumbo frames when using the hardware, this might be temp
-  if (kUseArgos == false) {
+  if (false) {
     RtAssert(packet_length_ < 9000,
              "Packet size must be smaller than jumbo frame");
   }
