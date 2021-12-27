@@ -77,10 +77,15 @@ DoDemul::~DoDemul() {
 }
 
 namespace StoreData {
-size_t StoreRxDataAVX512(const float* src, float* dst, size_t ant_num) {
+size_t StoreRxDataAVX512(complex_float* dst, const complex_float* src,
+                         const Config* const cfg, size_t src_offset) {
 #ifdef __AVX512F__
+  auto* src_ = reinterpret_cast<const float*>(
+                  &src[src_offset % kTransposeBlockSize]);
+  auto* dst_ = reinterpret_cast<float*>(dst);
   size_t ant_num_per_simd = 8;  // for 512-bit aligned memory
-  size_t ant_num_all_simd = ant_num - ant_num % ant_num_per_simd;
+  size_t ant_num_all_simd = cfg->BsAntNum()
+                            - (cfg->BsAntNum() % ant_num_per_simd);
   __m512i index = _mm512_setr_epi32(
       0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
       kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
@@ -92,46 +97,52 @@ size_t StoreRxDataAVX512(const float* src, float* dst, size_t ant_num) {
   for (size_t ant_i = 0; ant_i < ant_num_all_simd; ant_i += ant_num_per_simd) {
     for (size_t j = 0; j < kSCsPerCacheline; j++) {
       __m512 data_rx = kTransposeBlockSize == 1
-                           ? _mm512_load_ps(src + j * ant_num_all_simd * 2)
-                           : _mm512_i32gather_ps(index, src + j * 2, 4);
-      _mm512_store_ps(dst + j * ant_num_all_simd * 2, data_rx);
+                           ? _mm512_load_ps(src_ + j * ant_num_all_simd * 2)
+                           : _mm512_i32gather_ps(index, src_ + j * 2, 4);
+      _mm512_store_ps(dst_ + j * ant_num_all_simd * 2, data_rx);
     }
-    src += ant_num_per_simd * kTransposeBlockSize * 2;
-    dst += ant_num_per_simd * 2;
+    src_ += ant_num_per_simd * kTransposeBlockSize * 2;
+    dst_ += ant_num_per_simd * 2;
   }
   return ant_num_all_simd;
 #else
-  size_t ant_num_all_simd = 0;
-#endif
-  return ant_num_all_simd;
+  return 0;
+#endif //__AVX512F__
 }
 
-size_t StoreRxDataAVX2(const float* src, float* dst, size_t ant_num) {
+size_t StoreRxDataAVX2(complex_float* dst, const complex_float* src,
+                       const Config* const cfg, size_t src_offset) {
+  auto* src_ = reinterpret_cast<const float*>(
+                  &src[src_offset % kTransposeBlockSize]);
+  auto* dst_ = reinterpret_cast<float*>(dst);
   size_t ant_num_per_simd = 4;  // for 256-bit aligned memory
-  size_t ant_num_all_simd = ant_num - ant_num % ant_num_per_simd;
+  size_t ant_num_all_simd = cfg->BsAntNum()
+                            - (cfg->BsAntNum() % ant_num_per_simd);
   __m256i index = _mm256_setr_epi32(
       0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
       kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
       kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1);
   for (size_t ant_i = 0; ant_i < ant_num_all_simd; ant_i += ant_num_per_simd) {
     for (size_t j = 0; j < kSCsPerCacheline; j++) {
-      __m256 data_rx = _mm256_i32gather_ps(src + j * 2, index, 4);
-      _mm256_store_ps(dst + j * ant_num_all_simd * 2, data_rx);
+      __m256 data_rx = _mm256_i32gather_ps(src_ + j * 2, index, 4);
+      _mm256_store_ps(dst_ + j * ant_num_all_simd * 2, data_rx);
     }
-    src += ant_num_per_simd * kTransposeBlockSize * 2;
-    dst += ant_num_per_simd * 2;
+    src_ += ant_num_per_simd * kTransposeBlockSize * 2;
+    dst_ += ant_num_per_simd * 2;
   }
   return ant_num_all_simd;
 }
 
-void StoreRxDataLoop(const complex_float* src, complex_float* dst, Config* cfg_,
-                     size_t src_offset, size_t ant_start) {
+void StoreRxDataLoop(complex_float* dst, const complex_float* src,
+                     const Config* const cfg, size_t src_offset,
+                     size_t ant_start) {
+  dst += ant_start;
   for (size_t j = 0; j < kSCsPerCacheline; j++) {
-    for (size_t ant_i = ant_start; ant_i < cfg_->BsAntNum(); ant_i++) {
+    for (size_t ant_i = ant_start; ant_i < cfg->BsAntNum(); ant_i++) {
       *dst++ = kUsePartialTrans
-                   ? src[ant_i * kTransposeBlockSize +
-                         (src_offset + j) % kTransposeBlockSize]
-                   : src[ant_i * cfg_->OfdmDataNum() + src_offset + j];
+                   ? src[(ant_i * kTransposeBlockSize) +
+                         ((src_offset + j) % kTransposeBlockSize)]
+                   : src[ant_i * cfg->OfdmDataNum() + src_offset + j];
     }
   }
 }
@@ -174,27 +185,24 @@ EventData DoDemul::Launch(size_t tag) {
     const size_t partial_transpose_block_base =
         ((base_sc_id + i) / kTransposeBlockSize) *
         (kTransposeBlockSize * cfg_->BsAntNum());
-
-    size_t ant_num_simd = 0;
+    const complex_float* src = data_buf;
+    if (kUsePartialTrans) src += partial_transpose_block_base;
+    size_t ant_num_done = 0;
     if (kUseSIMDGather && kUsePartialTrans) {
       // Gather data for all antennas and 8 subcarriers in the same cache
       // line, 1 subcarrier and 4 (AVX2) or 8 (AVX512) ants per iteration
-      size_t cur_sc_offset =
-          partial_transpose_block_base + (base_sc_id + i) % kTransposeBlockSize;
-      auto* src = reinterpret_cast<const float*>(&data_buf[cur_sc_offset]);
-      auto* dst = reinterpret_cast<float*>(data_gather_buffer_);
 #ifdef __AVX512F__
-      ant_num_simd = StoreData::StoreRxDataAVX512(src, dst, cfg_->BsAntNum());
+      ant_num_done = StoreData::StoreRxDataAVX512(data_gather_buffer_, src,
+                                                  cfg_, base_sc_id + i);
 #else
-      ant_num_simd = StoreData::StoreRxDataAVX2(src, dst, cfg_->BsAntNum());
+      ant_num_done = StoreData::StoreRxDataAVX2(data_gather_buffer_, src,
+                                                cfg_, base_sc_id + i);
 #endif
     }
-    if (ant_num_simd < cfg_->BsAntNum()) {
+    if (ant_num_done < cfg_->BsAntNum()) {
       // non-SIMD processing for remaining antennas
-      const complex_float* src = data_buf;
-      if (kUsePartialTrans) src += partial_transpose_block_base;
-      complex_float* dst = data_gather_buffer_ + ant_num_simd;
-      StoreData::StoreRxDataLoop(src, dst, cfg_, base_sc_id + i, ant_num_simd);
+      StoreData::StoreRxDataLoop(data_gather_buffer_, src, cfg_,
+                                  base_sc_id + i, ant_num_done);
     }
     duration_stat_->task_duration_[1] += GetTime::WorkerRdtsc() - start_tsc0;
 
