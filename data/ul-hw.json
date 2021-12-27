@@ -19,14 +19,14 @@
     "beamsweep" : false,
     "beacon_antenna" : 0,
     "frame_schedule": [
-        "BPPGUUUUG"
+        "BPPPPGUUUUG"
     ],
     "client_ul_pilot_syms" : 2,
     "socket_thread_num" : 1,
     "worker_thread_num" : 20,
     "core_offset" : 10,
     "demul_block_size" : 48,
-    "ue_channel" : "A",
+    "ue_channel" : "AB",
     "ue_rx_gain_a" : [65, 65],
     "ue_tx_gain_a" : [80, 80],
     "ue_rx_gain_b" : [65, 65],
