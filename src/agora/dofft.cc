@@ -221,9 +221,12 @@ EventData DoFFT::Launch(size_t tag) {
       phy_stats_->UpdateCalibPilotSnr(frame_grp_id, 0, cur_ant, fft_inout_);
     }
   } else {
-    std::string error_message = "Unknown or unsupported symbol type " +
-                                std::to_string(static_cast<int>(sym_type)) +
-                                "\n";
+    std::string error_message =
+        "Unknown or unsupported symbol type " +
+        std::to_string(static_cast<int>(sym_type)) + std::string(" at frame ") +
+        std::to_string(frame_id) + std::string(" symbol ") +
+        std::to_string(symbol_id) + std::string(" antenna ") +
+        std::to_string(ant_id) + "\n";
     RtAssert(false, error_message);
   }
 

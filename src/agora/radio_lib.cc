@@ -387,8 +387,6 @@ bool RadioConfig::RadioStart() {
   }
 
   std::vector<unsigned> zeros(cfg_->SampsPerSymbol(), 0);
-  std::vector<uint32_t> beacon = cfg_->Beacon();
-  std::vector<uint32_t> pilot = cfg_->Pilot();
 
   DrainBuffers();
   nlohmann::json conf;
@@ -434,7 +432,7 @@ bool RadioConfig::RadioStart() {
       std::string conf_string = conf.dump();
       ba_stn_[i]->writeSetting("TDD_CONFIG", conf_string);
 
-      ba_stn_[i]->writeRegisters("BEACON_RAM", 0, beacon);
+      ba_stn_[i]->writeRegisters("BEACON_RAM", 0, cfg_->Beacon());
       for (char const& c : cfg_->Channel()) {
         bool is_beacon_antenna = !cfg_->Beamsweep() && ndx == cfg_->BeaconAnt();
         std::vector<unsigned> beacon_weights(
@@ -449,14 +447,6 @@ bool RadioConfig::RadioStart() {
         ++ndx;
       }
       ba_stn_[i]->writeSetting("BEACON_START", std::to_string(radio_num_));
-      if (cfg_->Frame().IsRecCalEnabled()) {
-        if (is_ref_radio) {
-          // Write to the first channel TX_RAM on the calibration node for
-          // ref-to-array transmission
-          ba_stn_[i]->writeRegisters(
-              std::string("TX_RAM_") + cfg_->Channel().at(0), 0, pilot);
-        }
-      }
     }
 
     if (!kUseUHD) {

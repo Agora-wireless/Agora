@@ -238,8 +238,6 @@ bool ClientRadioConfig::RadioStart() {
   // send through the first radio for now
   // int beacon_ant = 1;
   int flags(0);  // = SOAPY_SDR_WAIT_TRIGGER;
-  std::vector<uint32_t> beacon = cfg_->Beacon();
-  std::vector<uint32_t> pilot = cfg_->Pilot();
 
   // beaconSize + 82 (BS FE delay) + 68 (path delay) + 17 (correlator delay) +
   // 82 (Client FE Delay)
@@ -293,7 +291,7 @@ bool ClientRadioConfig::RadioStart() {
       cl_stn_[i]->writeSetting("TDD_MODE", "true");
       for (char const& c : cfg_->UeChannel()) {
         std::string tx_ram = "TX_RAM_";
-        cl_stn_[i]->writeRegisters(tx_ram + c, 0, pilot);
+        cl_stn_[i]->writeRegisters(tx_ram + c, 0, cfg_->Pilot());
       }
       cl_stn_[i]->activateStream(this->rx_streams_[i], flags, 0);
       cl_stn_[i]->activateStream(this->tx_streams_[i]);

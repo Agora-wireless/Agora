@@ -118,7 +118,7 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
   return true;
 }
 
-void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
+void PacketTXRX::TxBeacon(int tid, size_t frame_id) {
   static double send_time = 0;
   double time_now = GetTime::GetTimeUs() / 1000;
   size_t radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
@@ -203,12 +203,12 @@ void PacketTXRX::LoopTxRx(size_t tid) {
   size_t tx_frame_id = 0;
   size_t send_time = delay_tsc + tx_frame_start;
   // Send Beacons for the first time to kick off sim
-  // SendBeacon(tid, tx_frame_id++);
+  // TxBeacon(tid, tx_frame_id++);
   while (cfg_->Running() == true) {
     size_t rdtsc_now = GetTime::Rdtsc();
 
     if (rdtsc_now > send_time) {
-      SendBeacon(tid, tx_frame_id++);
+      TxBeacon(tid, tx_frame_id++);
 
       if (kEnableSlowStart) {
         if (tx_frame_id == slow_start_thresh1) {

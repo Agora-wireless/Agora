@@ -25,13 +25,15 @@ void PacketTXRX::LoopTxRxArgos(size_t tid) {
 
   long long time0 = 0;
   if (cfg_->HwFramer() == false) {
+    size_t beacon_radio = cfg_->BeaconAnt() / cfg_->NumChannels();
+    size_t beacon_chan = cfg_->BeaconAnt() % cfg_->NumChannels();
     // prepare BS beacon in host buffer
     std::vector<void*> beaconbuff(2);
     std::vector<void*> zeros(2);
     zeros[0] = calloc(cfg_->SampsPerSymbol(), sizeof(int16_t) * 2);
     zeros[1] = calloc(cfg_->SampsPerSymbol(), sizeof(int16_t) * 2);
-    beaconbuff[0] = cfg_->BeaconCi16().data();
-    beaconbuff[1] = zeros[0];
+    beaconbuff[beacon_chan] = cfg_->BeaconCi16().data();
+    if (cfg_->NumChannels() > 1) beaconbuff[1 - beacon_chan] = zeros[0];
 
     std::vector<std::complex<int16_t>> samp_buffer0(cfg_->SampsPerSymbol(), 0);
     std::vector<std::complex<int16_t>> samp_buffer1(cfg_->SampsPerSymbol(), 0);
@@ -60,7 +62,6 @@ void PacketTXRX::LoopTxRxArgos(size_t tid) {
     for (auto radio = radio_lo + 1; radio < radio_hi; radio++)
       radioconfig_->RadioRx(radio_lo, samp_buffer.data(), rx_time_bs);
     // Schedule the first beacon in the future
-    size_t beacon_radio = cfg_->BeaconAnt() / cfg_->NumChannels();
     for (auto radio = radio_lo; radio < radio_hi; radio++) {
       if (radio == beacon_radio)
         tx_ret = radioconfig_->RadioTx(radio, beaconbuff.data(), 2, tx_time_bs);
@@ -137,7 +138,7 @@ void PacketTXRX::LoopTxRxArgos(size_t tid) {
             global_frame_id++;
             if (cfg_->Frame().NumDLSyms() == 0) {
               for (size_t radio = radio_lo; radio <= radio_hi; radio++)
-                this->SendBeaconHW(global_frame_id, radio, time0);
+                this->TxBeaconHW(global_frame_id, radio, time0);
             }
           }
         }
@@ -206,14 +207,17 @@ std::vector<Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid, size_t radio_id,
     }
     size_t frame_id = global_frame_id;
     size_t symbol_id = global_symbol_id;
+
     if (cfg_->HwFramer() == true) {
       frame_id = (size_t)(frame_time >> 32);
       symbol_id = (size_t)((frame_time >> 16) & 0xFFFF);
-      symbol_ids.clear();
-      symbol_ids.resize(cfg_->NumChannels(), symbol_id);
+      for (size_t ch = 0; ch < cfg_->NumChannels(); ch++)
+        symbol_ids.at(ch) = symbol_id;
 
-      // additional read for DL Calibration in two-chan case
-      /// \TODO: What if ref_ant is set to the second channel?
+      // Additional read for DL Calibration in two-chan case.
+      // In HW framer mode we need to be specific about
+      // which symbols to read a.o.t SW framer mode where
+      // we read all symbols and discard unused ones later.
       if ((cfg_->Frame().IsRecCalEnabled() == true) &&
           (cfg_->IsCalDlPilot(frame_id, symbol_id) == true) &&
           (radio_id == cfg_->RefRadio(cell_id)) && (cfg_->AntPerGroup() > 1)) {
@@ -259,8 +263,7 @@ std::vector<Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid, size_t radio_id,
   }
 }
 
-void PacketTXRX::SendBeaconHW(size_t frame_id, size_t radio_id,
-                              long long time0) {
+void PacketTXRX::TxBeaconHW(size_t frame_id, size_t radio_id, long long time0) {
   std::vector<void*> beaconbuff(2);
   std::vector<void*> zeros(2);
   zeros[0] = calloc(cfg_->SampsPerSymbol(), sizeof(int16_t) * 2);
@@ -288,6 +291,53 @@ void PacketTXRX::SendBeaconHW(size_t frame_id, size_t radio_id,
   }
 }
 
+void PacketTXRX::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
+                                          long long time0) {
+  size_t cell_id = cfg_->CellId().at(radio_id);
+  std::vector<std::complex<int16_t>> zeros(cfg_->SampsPerSymbol(),
+                                           std::complex<int16_t>(0, 0));
+  // Transmit downlink calibration (array to ref) pilot
+  std::vector<void*> caltxbuf(cfg_->NumChannels());
+  for (size_t s = 0; s < cfg_->RadioPerGroup(); s++) {
+    if (radio_id != cfg_->RefRadio(cell_id)) {
+      bool calib_turn = (frame_id % cfg_->RadioGroupNum() ==
+                             radio_id / cfg_->RadioPerGroup() &&
+                         s == radio_id % cfg_->RadioPerGroup());
+      for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
+        caltxbuf.at(ch) = calib_turn ? cfg_->PilotCi16().data() : zeros.data();
+        if (cfg_->NumChannels() > 1) caltxbuf.at(1 - ch) = zeros.data();
+        long long frame_time = 0;
+        if (cfg_->HwFramer() == false)
+          frame_time =
+              time0 +
+              cfg_->SampsPerSymbol() *
+                  ((frame_id + TX_FRAME_DELTA) * cfg_->Frame().NumTotalSyms() +
+                   cfg_->Frame().GetDLCalSymbol(s * cfg_->NumChannels() + ch));
+        else
+          frame_time =
+              ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
+              (cfg_->Frame().GetDLCalSymbol(s * cfg_->NumChannels() + ch)
+               << 16);
+        radioconfig_->RadioTx(radio_id, caltxbuf.data(), 1, frame_time);
+      }
+    } else {
+      // We choose to use channel A to tx from the reference radio
+      caltxbuf.at(0) = cfg_->PilotCi16().data();
+      if (cfg_->NumChannels() > 1) caltxbuf.at(1) = zeros.data();
+      long long frame_time = 0;
+      if (cfg_->HwFramer() == false)
+        frame_time =
+            time0 + cfg_->SampsPerSymbol() * ((frame_id + TX_FRAME_DELTA) *
+                                                  cfg_->Frame().NumTotalSyms() +
+                                              cfg_->Frame().GetULCalSymbol(0));
+      else
+        frame_time = ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
+                     (cfg_->Frame().GetULCalSymbol(0) << 16);
+      radioconfig_->RadioTx(radio_id, caltxbuf.data(), 1, frame_time);
+    }
+  }
+}
+
 size_t PacketTXRX::DequeueSendArgos(int tid, long long time0) {
   const size_t max_dequeue_items =
       (cfg_->BsAntNum() / cfg_->SocketThreadNum()) + 1;
@@ -308,7 +358,6 @@ size_t PacketTXRX::DequeueSendArgos(int tid, long long time0) {
     const size_t symbol_id = gen_tag_t(current_event.tags_[0u]).symbol_id_;
     const size_t ant_id = gen_tag_t(current_event.tags_[0u]).ant_id_;
     const size_t radio_id = ant_id / cfg_->NumChannels();
-    size_t cell_id = cfg_->CellId().at(radio_id);
 
     // See if this is the last antenna on the radio.  Assume that we receive the
     // last one
@@ -326,57 +375,16 @@ size_t PacketTXRX::DequeueSendArgos(int tid, long long time0) {
         ant_id;
 
     if (last_antenna) {
-      // Schedule beacon in the future
-      if (cfg_->HwFramer() == false && symbol_id == 0) {
-        this->SendBeaconHW(frame_id, radio_id, time0);
-      }
+      if (symbol_id == cfg_->Frame().GetDLSymbol(0)) {
+        // Schedule beacon in the future
+        if (cfg_->HwFramer() == false) {
+          this->TxBeaconHW(frame_id, radio_id, time0);
+        }
 
-      // Transmit downlink calibration (array to ref) pilot
-      std::vector<void*> caltxbuf(cfg_->NumChannels());
-      if ((cfg_->Frame().IsRecCalEnabled() == true) &&
-          (symbol_id == cfg_->Frame().GetDLSymbol(0))) {
-        std::vector<std::complex<int16_t>> zeros(cfg_->SampsPerSymbol(),
-                                                 std::complex<int16_t>(0, 0));
-        for (size_t s = 0; s < cfg_->RadioPerGroup(); s++) {
-          if (radio_id != cfg_->RefRadio(cell_id)) {
-            bool calib_turn = (frame_id % cfg_->RadioGroupNum() ==
-                                   radio_id / cfg_->RadioPerGroup() &&
-                               s == radio_id % cfg_->RadioPerGroup());
-            for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
-              caltxbuf.at(ch) =
-                  calib_turn ? cfg_->PilotCi16().data() : zeros.data();
-              if (cfg_->NumChannels() > 1) caltxbuf.at(1 - ch) = zeros.data();
-              long long frame_time = 0;
-              if (cfg_->HwFramer() == false)
-                frame_time = time0 + cfg_->SampsPerSymbol() *
-                                         ((frame_id + TX_FRAME_DELTA) *
-                                              cfg_->Frame().NumTotalSyms() +
-                                          cfg_->Frame().GetDLCalSymbol(
-                                              s * cfg_->NumChannels() + ch));
-              else
-                frame_time =
-                    ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
-                    (cfg_->Frame().GetDLCalSymbol(s * cfg_->NumChannels() + ch)
-                     << 16);
-              radioconfig_->RadioTx(radio_id, caltxbuf.data(), 1, frame_time);
-            }
-          } else {
-            caltxbuf.at(0) = cfg_->PilotCi16().data();
-            if (cfg_->NumChannels() > 1) caltxbuf.at(1) = zeros.data();
-            long long frame_time = 0;
-            if (cfg_->HwFramer() == false)
-              frame_time = time0 + cfg_->SampsPerSymbol() *
-                                       ((frame_id + TX_FRAME_DELTA) *
-                                            cfg_->Frame().NumTotalSyms() +
-                                        cfg_->Frame().GetULCalSymbol(0));
-            else
-              frame_time = ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
-                           (cfg_->Frame().GetULCalSymbol(0) << 16);
-            radioconfig_->RadioTx(radio_id, caltxbuf.data(), 1, frame_time);
-          }
+        if (cfg_->Frame().IsRecCalEnabled() == true) {
+          this->TxReciprocityCalibPilots(frame_id, radio_id, time0);
         }
       }
-
       std::vector<void*> txbuf(cfg_->NumChannels());
       if (kDebugDownlink == true) {
         std::vector<std::complex<int16_t>> zeros(cfg_->SampsPerSymbol());

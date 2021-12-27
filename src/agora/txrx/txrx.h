@@ -99,8 +99,10 @@ class PacketTXRX {
                  Table<complex_float>& calib_dl_buffer_,
                  Table<complex_float>& calib_ul_buffer_);
 
-  void SendBeacon(int tid, size_t frame_id);
-  void SendBeaconHW(size_t frame_id, size_t radio_id, long long time0);
+  void TxBeacon(int tid, size_t frame_id);
+  void TxBeaconHW(size_t frame_id, size_t radio_id, long long time0);
+  void TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
+                                long long time0);
 
  private:
   void LoopTxRx(size_t tid);  // The thread function for thread [tid]
