@@ -24,6 +24,8 @@ size_t StoreRxDataAVX512(complex_float* dst, const complex_float* src,
                          const Config* const cfg, size_t src_offset);
 size_t StoreRxDataAVX2(complex_float* dst, const complex_float* src,
                        const Config* const cfg, size_t src_offset);
+size_t StoreRxDataAVXLoop(complex_float* dst, const complex_float* src,
+                       const Config* const cfg, size_t src_offset);
 void StoreRxDataLoop(complex_float* dst, const complex_float* src,
                      const Config* const cfg, size_t src_offset,
                      size_t ant_start);
