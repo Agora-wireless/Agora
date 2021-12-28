@@ -162,7 +162,7 @@ EventData DoDemul::Launch(size_t tag) {
       for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
            ant_i += kAntNumPerSimd) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
-          std::printf("Ant: %zu Local sc: %zu\n", ant_i, j);
+          //std::printf("Ant: %zu Local sc: %zu\n", ant_i, j);
           assert((reinterpret_cast<size_t>((&src[j * 2]) % 32) == 0) && ((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) % 32) == 0));
           __m256 data_rx = _mm256_i32gather_ps(&src[j * 2], index, 4);
           _mm256_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
