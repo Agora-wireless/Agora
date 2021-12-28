@@ -1122,6 +1122,8 @@ bool Config::IsDownlink(size_t frame_id, size_t symbol_id) const {
   char s = frame_.FrameIdentifier().at(symbol_id);
 #ifdef DEBUG3
   std::printf("IsDownlink(%zu, %zu) = %c\n", frame_id, symbol_id, s);
+#else
+  unused(frame_id);
 #endif
   return (s == 'D');
 }
