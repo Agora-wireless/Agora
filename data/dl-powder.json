@@ -1,5 +1,6 @@
 {
-    "serial_file": "data/topology-powder-dl.json",
+    /* Tested with 17 bs radios 2 ue, 1 channel each */
+    "serial_file": "data/anechoic_conf/topology-powder-dl.json",
     "cells": 1,
     "channel": "A",
     "frequency": 3.6e9,
@@ -22,7 +23,7 @@
     "beamsweep": false,
     "beacon_antenna": 0,
     "frame_schedule": [
-        "BCLGPPGGDDDGG"
+        "BCLGPPGGDDDGGGG"
     ],
     "client_dl_pilot_syms": 2,
     "demul_block_size": 48,
@@ -56,7 +57,7 @@
     "ue_worker_thread_num": 4,
     "core_offset": 16,
     "worker_thread_num": 12,
-    /* 22 bs radios + 1 ref*/
-    "socket_thread_num": 3,
+    /* 17 bs radios + 1 ref*/
+    "socket_thread_num": 4,
     "max_frame": 10000
 }
