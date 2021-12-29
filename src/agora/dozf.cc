@@ -222,9 +222,9 @@ static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
   // The SIMD and non-SIMD methods are equivalent.
 
 #ifdef __AVX512F__
-    static constexpr size_t kAntNumPerSimd = 8;
+  static constexpr size_t kAntNumPerSimd = 8;
 #else
-    static constexpr size_t kAntNumPerSimd = 4;
+  static constexpr size_t kAntNumPerSimd = 4;
 #endif
 
   size_t ant_start = 0;
@@ -244,11 +244,11 @@ static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
         kTransposeBlockSize * 10, kTransposeBlockSize * 10 + 1,
         kTransposeBlockSize * 12, kTransposeBlockSize * 12 + 1,
         kTransposeBlockSize * 14, kTransposeBlockSize * 14 + 1);
-    for (size_t ant_idx = 0; ant_idx < bs_ant_num;
-         ant_idx += kAntNumPerSimd) {
+    for (size_t ant_idx = 0; ant_idx < bs_ant_num; ant_idx += kAntNumPerSimd) {
       // fetch 4 complex floats for 4 ants
-      __m512 t = (kTransposeBlockSize == 1) ? _mm512_load_ps(src)
-                                          : _mm512_i32gather_ps(index, src, 4);
+      __m512 t = (kTransposeBlockSize == 1)
+                     ? _mm512_load_ps(src)
+                     : _mm512_i32gather_ps(index, src, 4);
       _mm512_storeu_ps(dst, t);
       src += kAntNumPerSimd * kTransposeBlockSize * 2;
       dst += kAntNumPerSimd * 2;
@@ -258,8 +258,7 @@ static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
         0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
         kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
         kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1);
-    for (size_t ant_idx = 0; ant_idx < bs_ant_num;
-         ant_idx += kAntNumPerSimd) {
+    for (size_t ant_idx = 0; ant_idx < bs_ant_num; ant_idx += kAntNumPerSimd) {
       // fetch 4 complex floats for 4 ants
       __m256 t = _mm256_i32gather_ps(src, index, 4);
       _mm256_storeu_ps(dst, t);
