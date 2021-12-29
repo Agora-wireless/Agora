@@ -136,13 +136,13 @@ size_t StoreRxDataAVX2(complex_float* dst, const complex_float* src,
 size_t StoreRxDataAVXLoop(complex_float* dst, const complex_float* src,
                           const Config* const cfg, size_t src_offset) {
   src += src_offset % kTransposeBlockSize;
-  size_t ant_num_per_simd = 1;  // 4 or 8 for 256 or 512-bit aligned memory
+  size_t ant_num_per_simd = 4;  // 4 or 8 for 256 or 512-bit aligned memory
   size_t ant_num_all_simd = cfg->BsAntNum()
                             - (cfg->BsAntNum() % ant_num_per_simd);
   for (size_t ant_i = 0; ant_i < ant_num_all_simd; ant_i += ant_num_per_simd) {
     for (size_t j = 0; j < kSCsPerCacheline; j++) {
       for (size_t k = 0; k < ant_num_per_simd; k++) {
-        dst[ant_i + j * ant_num_all_simd + k]
+        dst[ant_i + j * cfg->BsAntNum()/*was ant_num_all_simd*/ + k]
             = src[(ant_i + k) * kTransposeBlockSize + j];
       }
     }
