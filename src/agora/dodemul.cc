@@ -121,12 +121,14 @@ EventData DoDemul::Launch(size_t tag) {
 #endif
 
     size_t ant_start = 0;
-    if (kUseSIMDGather && kUsePartialTrans && (cfg_->BsAntNum() % kAntNumPerSimd) == 0) {
+    if (kUseSIMDGather && kUsePartialTrans &&
+        (cfg_->BsAntNum() % kAntNumPerSimd) == 0) {
       // Gather data for all antennas and 8 subcarriers in the same cache
       // line, 1 subcarrier and 4 (AVX2) or 8 (AVX512) ants per iteration
       size_t cur_sc_offset =
           partial_transpose_block_base + (base_sc_id + i) % kTransposeBlockSize;
-      const float* src = reinterpret_cast<const float*>(&data_buf[cur_sc_offset]);
+      const float* src =
+          reinterpret_cast<const float*>(&data_buf[cur_sc_offset]);
       float* dst = reinterpret_cast<float*>(data_gather_buffer_);
 #ifdef __AVX512F__
       __m512i index = _mm512_setr_epi32(
@@ -148,7 +150,8 @@ EventData DoDemul::Launch(size_t tag) {
           //{
           //  std::printf("Ant: %zu:%zu subcarrier: %zu:%zu base address %zu\n", ant_i, cfg_->BsAntNum(), base_sc_id, j, reinterpret_cast<size_t>(dst));
           //}
-          assert( ( reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) % 64) == 0);
+          assert((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) %
+                  64) == 0);
           _mm512_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
         }
         src += kAntNumPerSimd * kTransposeBlockSize * 2;
@@ -163,7 +166,9 @@ EventData DoDemul::Launch(size_t tag) {
            ant_i += kAntNumPerSimd) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
           //std::printf("Ant: %zu Local sc: %zu\n", ant_i, j);
-          assert((reinterpret_cast<size_t>((&src[j * 2]) % 32) == 0) && ((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) % 32) == 0));
+          assert((reinterpret_cast<size_t>((&src[j * 2]) % 32) == 0) &&
+                 ((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) %
+                   32) == 0));
           __m256 data_rx = _mm256_i32gather_ps(&src[j * 2], index, 4);
           _mm256_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
         }

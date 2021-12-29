@@ -1133,8 +1133,7 @@ SymbolType Config::GetSymbolType(size_t symbol_id) const {
 }
 
 void Config::Print() const {
-  if (kDebugPrintConfiguration == true)
-  {
+  if (kDebugPrintConfiguration == true) {
     std::cout << "Freq Ghz: " << freq_ghz_ << std::endl
               << "BaseStation ant num: " << bs_ant_num_ << std::endl
               << "BeamForming ant num: " << bf_ant_num_ << std::endl
