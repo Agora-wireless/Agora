@@ -8,7 +8,7 @@
 #include "nlohmann/json.hpp"
 
 static constexpr bool kPrintCalibrationMats = false;
-static constexpr size_t kSoapyMakeMaxAttemps = 3;
+static constexpr size_t kSoapyMakeMaxAttemps = 2;
 
 RadioConfig::RadioConfig(Config* cfg)
     : cfg_(cfg), num_radios_initialized_(0), num_radios_configured_(0) {
@@ -214,7 +214,24 @@ void RadioConfig::InitBsRadio(size_t tid) {
     args["driver"] = "uhd";
     args["addr"] = cfg_->RadioId().at(i);
   }
-  ba_stn_.at(i) = SoapySDR::Device::make(args);
+
+  SoapySDR::Device* bs_device = nullptr;
+  for (size_t tries = 0; tries < kSoapyMakeMaxAttemps; tries++) {
+    try {
+      bs_device = SoapySDR::Device::make(args);
+      break;
+    } catch (const std::runtime_error& e) {
+      auto* message = e.what();
+      std::printf("InitBsRadio[%zu] - Soapy error try %zu -- %s\n", tid, tries,
+                  message);
+    }
+  }
+  if (bs_device == nullptr) {
+    std::printf("SoapySDR failed to locate the Bs radio %s in %zu attempts\n",
+                cfg_->RadioId().at(tid).c_str(), kSoapyMakeMaxAttemps);
+    throw std::runtime_error("SoapySDR failed to locate the Bs radio");
+  }
+  ba_stn_.at(i) = bs_device;
   for (auto ch : {0, 1}) {
     ba_stn_.at(i)->setSampleRate(SOAPY_SDR_RX, ch, cfg_->Rate());
     ba_stn_.at(i)->setSampleRate(SOAPY_SDR_TX, ch, cfg_->Rate());
