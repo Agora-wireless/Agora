@@ -1,14 +1,14 @@
 clear;
 close all;
 
-symbol_size = 864;
-fft_size = 512;
-data_size = 336;
+symbol_size = 2400;
+fft_size = 2048;
+data_size = 1200;
 offset = 160;
 cp = 32;
 n_user = 2;
-pig = 10:11;
-dig = [12];
+pig = 0:1;
+dig = [2];
 
 nz_start_idx = (fft_size - data_size)/2;
 nz_sc_idx = nz_start_idx+1:nz_start_idx+data_size;
