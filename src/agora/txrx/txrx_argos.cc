@@ -163,12 +163,13 @@ std::vector<Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid, size_t radio_id,
   std::vector<void*> samp(cfg_->NumChannels());
 
   for (size_t ch = 0; ch < cfg_->NumChannels(); ++ch) {
-    RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
+    size_t next_rx_slot = (rx_slot + ch) % buffers_per_socket_;
+    RxPacket& rx = rx_packets_.at(tid).at(next_rx_slot);
 
     // if rx_buffer is full, exit
     if (rx.Empty() == false) {
       MLPD_ERROR("TXRX thread %zu rx_buffer full, rx slot: %zu\n", tid,
-                 rx_slot);
+                 next_rx_slot);
       cfg_->Running(false);
       break;
     }
@@ -222,7 +223,8 @@ std::vector<Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid, size_t radio_id,
           ant_ids.resize(cfg_->AntPerGroup());
         }
         for (size_t s = 1; s < cfg_->AntPerGroup(); s++) {
-          RxPacket& rx = rx_packets_.at(tid).at(rx_slot + s);
+          size_t next_rx_slot = (rx_slot + s) % buffers_per_socket_;
+          RxPacket& rx = rx_packets_.at(tid).at(next_rx_slot);
 
           std::vector<void*> tmp_samp(cfg_->NumChannels());
           std::vector<char> dummy_buff(packet_length);
@@ -241,7 +243,8 @@ std::vector<Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid, size_t radio_id,
     }
     std::vector<Packet*> pkt;
     for (size_t ch = 0; ch < symbol_ids.size(); ++ch) {
-      RxPacket& rx = rx_packets_.at(tid).at(rx_slot + ch);
+      size_t next_rx_slot = (rx_slot + ch) % buffers_per_socket_;
+      RxPacket& rx = rx_packets_.at(tid).at(next_rx_slot);
       pkt.push_back(rx.RawPacket());
       new (rx.RawPacket())
           Packet(frame_id, symbol_ids.at(ch), cell_id, ant_ids.at(ch));
