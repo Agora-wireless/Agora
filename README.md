@@ -169,38 +169,37 @@ The following are steps to set up both Agora and the packet generator:
 
 ## Building and running with real RRU
 Agora supports a 64-antenna Faros base station as RRU and Iris UE devices. Both are commercially available from [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).\
-Both Faros and Iris have their roots in the [Argos massive MIMO base station](https://www.yecl.org/argos/), especially [ArgosV3](https://www.yecl.org/argos/pubs/Shepard-MobiCom17-Demo.pdf). 
-Agora also supports USRP-based RRU and UEs. We use command line variables of `cmake`\
-to switch between emulated RRU and real RRU. We use `-DUSE_AGROS` for Faros RRU and Iris UEs, and `-DUSE_UHD` for USRP-based RRU and UEs. 
+Both Faros and Iris have their roots in the [Argos massive MIMO base station](https://www.yecl.org/argos/), especially [ArgosV3](https://www.yecl.org/argos/pubs/Shepard-MobiCom17-Demo.pdf).
+Agora also supports USRP-based RRU and UEs.
 
-We recommend using one server for controlling the RRU and running Agora, 
+We recommend using one server for controlling the RRU and running Agora,
 and another server for controlling the UEs and running the UE code.
-
-The hardware connected to the server can be discovered using the [pyfaros](https://github.com/skylarkwireless/pyfaros) tool.
-
-The command `python3 -m pyfaros.discover --json-out` outputs a JSON file used as a configuration input for Agora as explained below.
-
-Agora supports both uplink and downlink with real RRU and UEs.
-
-For downlink, a reference node outside the array (and synchronized) is required for reciprocity calibration.
-It should also be indicated in the hardware JSON file.
+ 
+Agora supports both uplink and downlink with real RRU and UEs. For downlink, a reference node outside the array (and synchronized) is required for reciprocity calibration.\
+**Note:** Faros RRU and Iris UEs can be discovered using the [pyfaros](https://github.com/skylarkwireless/pyfaros) tool. You can use this tool to find the topology of the hardware connected to the server.
 
 We describe how to get the uplink and downlink demos working. Below XX can be replaced with either `ul` and `dl`.
  * Rebuild the code on both servers for RRU side the UE side.
     * For Faros RRU and Iris UEs, pass `-DUSE_ARGOS=on -DUSE_UHD=off` to cmake
-    * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on` to cmake 
+    * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on` to cmake
     * Run `make -j` to recompile the code.
  * Run the UE code on the server connected to the Iris UEs
-   * Use pyfaros tool to generate a 
+   * For Iris UEs, run the pyfaros tool in the `data` directory as follows:
+     <pre>
+     $ python3 -m pyfaros.discover --json-out
+     </pre>
+     This will output a file named `topology.json` with all the discoverable serial IDs included.
    * Modify `data/topology.json` by adding/removing serials of client Irises you'd like to include
-     from your setup. This file can be generated using the `pyfaros` tool as described above.
-   * Run `./build/data_generator --conf_file data/XX-hw.json` to generate required data files. 
+     from your setup.
+   * For USRP-based RRU and UEs, modify the existing `data/topology.json` and enter the appropriate IDs.
+   * Run `./build/data_generator --conf_file data/XX-hw.json` to generate required data files.
    * Run `./build/user --conf_file data/XX-hw.json`.
  * Run Agora on the server connected to the Faros RRU
    * scp over the generated file `data/LDPC_orig_XX_data_512_ant2.bin` from the client
      machine to the server's `data` directory.
    * Rebuild the code
      * Run `make -j` to compile the code.
+   * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`
    * Modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub.
    * Run `./build/agora --conf_file data/XX-hw.json`.
 
