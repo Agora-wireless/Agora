@@ -1,0 +1,41 @@
+#! /bin/bash
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+servers=(roce83 roce82 roce81)
+pci=('"37:00.1"' '"37:00.0"' '"37:00.0"')
+
+if [ $# -eq 1 ]
+then
+    cat $DIR/data/tddconfig-sim-ul-distributed.json | jq --argjson num_test $1 '.frames_to_test=$num_test' > tmp.json
+    mv tmp.json $DIR/data/tddconfig-sim-ul-distributed.json
+fi
+
+# $DIR/build/data_generator --conf_file $DIR/data/tddconfig-sim-ul-distributed.json
+$DIR/build/control_generator --conf_file $DIR/data/tddconfig-sim-ul-distributed.json
+$DIR/build/dynamic_generator --conf_file $DIR/data/tddconfig-sim-ul-distributed.json
+
+num_servers=$(cat $DIR/data/tddconfig-sim-ul-distributed.json | jq '.bs_server_addr_list | length')
+for (( i=0; i<$num_servers; i++ ))
+do
+    cat $DIR/data/tddconfig-sim-ul-distributed.json | jq --argjson i $i '.bs_server_addr_idx=$i' | jq --argjson pci_addr ${pci[$i]} '.pci_addr=$pci_addr' > $DIR/data/tddconfig-sim-ul-distributed_$i.json
+    scp $DIR/data/tddconfig-sim-ul-distributed_$i.json ${servers[$i]}:$DIR/data/tddconfig-sim-ul-distributed.json
+    # ssh ${servers[$i]} cd Agora; ./build/data_generator --conf_file ./data/tddconfig-sim-ul-distributed.json
+    scp $DIR/data/control_ue_template.bin ${servers[$i]}:$DIR/data/control_ue_template.bin
+    scp $DIR/data/control_ue.bin ${servers[$i]}:$DIR/data/control_ue.bin
+done
+
+for (( i=0; i<$num_servers; i++ ))
+do
+    ssh ${servers[$i]} "cd Agora; sudo env LD_LIBRARY_PATH=$LD_LIBRARY_PATH bash run_agora.sh > /dev/null" &
+done
+sleep 10
+for (( i=0; i<$num_servers; i++ ))
+do
+    ssh ${servers[$i]} "taskset 0x1 mpstat -P 0-31 1 100" > $DIR/data/cpu_usage_$i.txt &
+done
+sudo env LD_LIBRARY_PATH=$LD_LIBRARY_PATH nice -20 chrt -r 99 ./build/dynamic_sender --num_threads=6 --conf_file=./data/tddconfig-sim-ul-distributed.json --frame_duration=1000 --core_offset=4 > /dev/null
+for (( i=0; i<$num_servers; i++ ))
+do
+    ssh ${servers[$i]} sudo pkill mpstat
+done
