@@ -253,7 +253,7 @@ Config::Config(const std::string& jsonfile)
   if (kUseUHD) {
     hw_framer_ = false;
   } else {
-    RtAssert(ue_hw_framer_ == true,
+    RtAssert(hw_framer_ == true,
              "Base Station hardware framer (hw_framer) set to false is "
              "unsupported in this version of Agora");
   }
