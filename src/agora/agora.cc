@@ -98,9 +98,10 @@ void Agora::Stop() {
   packet_tx_rx_.reset();
 }
 
-void Agora::SendSnrReport(EventType /*event_type*/, size_t frame_id,
+void Agora::SendSnrReport(EventType event_type, size_t frame_id,
                           size_t symbol_id) {
   assert(event_type == EventType::kSNRReport);
+  unused(event_type);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
     EventData snr_report(EventType::kSNRReport, base_tag.tag_);
@@ -272,9 +273,10 @@ void Agora::ScheduleCodeblocks(EventType event_type, size_t frame_id,
   }
 }
 
-void Agora::ScheduleUsers(EventType /*event_type*/, size_t frame_id,
+void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
                           size_t symbol_id) {
   assert(event_type == EventType::kPacketToMac);
+  unused(event_type);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
 
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
@@ -1532,10 +1534,11 @@ void Agora::GetEqualData(float** ptr, int* size) {
   *ptr = (float*)&equal_buffer_[offset][0];
   *size = cfg->UeAntNum() * cfg->OfdmDataNum() * 2;
 }
-void Agora::CheckIncrementScheduleFrame(size_t /*frame_id*/,
+void Agora::CheckIncrementScheduleFrame(size_t frame_id,
                                         ScheduleProcessingFlags completed) {
   this->schedule_process_flags_ += completed;
   assert(this->cur_sche_frame_id_ == frame_id);
+  unused(frame_id);
 
   if (this->schedule_process_flags_ ==
       static_cast<uint8_t>(ScheduleProcessingFlags::kProcessingComplete)) {
