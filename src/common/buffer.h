@@ -189,7 +189,7 @@ class RxPacket {
   std::atomic<unsigned> references_;
   Packet *packet_;
 
-  inline virtual void GcPacket(void) {}
+  inline virtual void GcPacket() {}
 
  public:
   RxPacket() : references_(0) { packet_ = nullptr; }

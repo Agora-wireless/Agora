@@ -812,15 +812,15 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
                       << "/" << peak_dn << std::endl;
             if (kVerboseCalibration) {
               std::cout << "dn(" << i << ")=";
-              for (size_t s = 0; s < dn.at(i).size(); s++) {
-                std::cout << dn.at(i).at(s).real() << "+1j*"
-                          << dn.at(i).at(s).imag() << " ";
+              for (auto & s : dn.at(i)) {
+                std::cout << s.real() << "+1j*"
+                          << s.imag() << " ";
               }
               std::cout << std::endl;
               std::cout << "up(" << i << ")=";
-              for (size_t s = 0; s < up.at(i).size(); s++) {
-                std::cout << up.at(i).at(s).real() << "+1j*"
-                          << up.at(i).at(s).imag() << " ";
+              for (auto & s : up.at(i)) {
+                std::cout << s.real() << "+1j*"
+                          << s.imag() << " ";
               }
               std::cout << std::endl;
             }
