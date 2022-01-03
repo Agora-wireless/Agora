@@ -32,7 +32,7 @@ echo "Emulated RRU Test" > test_user_output.txt
 echo "Emulated RRU Test" > test_agora_output.txt
 echo "Emulated RRU Test" > test_chsim_output.txt
 ./build/user --conf_file data/chsim-tmp.json >> test_user_output.txt &
-sleep 1; ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 4 --core_offset 19 --bs_conf_file data/chsim-tmp.json --ue_conf_file data/chsim-tmp.json >> test_chsim_output.txt &
+sleep 1; ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 4 --core_offset 19 --conf_file data/chsim-tmp.json >> test_chsim_output.txt &
 sleep 1; ./build/agora --conf_file data/chsim-tmp.json >> test_agora_output.txt
 
 sleep 5;

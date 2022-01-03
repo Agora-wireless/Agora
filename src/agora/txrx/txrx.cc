@@ -43,15 +43,16 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
 }
 
 PacketTXRX::~PacketTXRX() {
-  if (kUseArgos || kUseUHD) {
-    radioconfig_->RadioStop();
-  }
-
   for (auto& worker : socket_std_threads_) {
     if (worker.joinable() == true) {
       worker.join();
     }
   }
+
+  if (kUseArgos || kUseUHD) {
+    radioconfig_->RadioStop();
+  }
+  MLPD_INFO("PacketTXRX workers joined\n");
 }
 
 bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,

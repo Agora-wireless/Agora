@@ -23,8 +23,8 @@
 
 class Channel {
  public:
-  Channel(const Config* const config_bs, const Config* const config_ue,
-          std::string& channel_type, double channel_snr);
+  Channel(const Config* const config, std::string& channel_type,
+          double channel_snr);
   ~Channel();
 
   // Dimensions of fmat_src: ( bscfg->sampsPerSymbol, uecfg->UE_ANT_NUM )
@@ -49,8 +49,7 @@ class Channel {
   void Lte3gpp(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst);
 
  private:
-  const Config* const bscfg_;
-  const Config* const uecfg_;
+  const Config* const cfg_;
 
   Channel* channel_;
   size_t bs_ant_;

@@ -47,17 +47,15 @@ struct SocketRxBuffer {
   uint8_t* data_ = nullptr;
 };
 
-ChannelSim::ChannelSim(const Config* const config_bs,
-                       const Config* const config_ue, size_t bs_thread_num,
+ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
                        size_t user_thread_num, size_t worker_thread_num,
                        size_t in_core_offset, std::string in_chan_type,
                        double in_chan_snr)
-    : bscfg_(config_bs),
-      uecfg_(config_ue),
+    : cfg_(config),
       bs_thread_num_(bs_thread_num),
       user_thread_num_(user_thread_num),
-      bs_socket_num_(config_bs->BsAntNum()),
-      user_socket_num_(config_ue->UeAntNum()),
+      bs_socket_num_(config->BsAntNum()),
+      user_socket_num_(config->UeAntNum()),
       worker_thread_num_(worker_thread_num),
       core_offset_(in_core_offset),
       channel_type_(std::move(in_chan_type)),
@@ -65,9 +63,9 @@ ChannelSim::ChannelSim(const Config* const config_bs,
   // initialize parameters from config
   srand(time(nullptr));
   dl_data_plus_beacon_symbols_ =
-      bscfg_->Frame().NumDLSyms() + bscfg_->Frame().NumBeaconSyms();
+      cfg_->Frame().NumDLSyms() + cfg_->Frame().NumBeaconSyms();
   ul_data_plus_pilot_symbols_ =
-      bscfg_->Frame().NumULSyms() + bscfg_->Frame().NumPilotSyms();
+      cfg_->Frame().NumULSyms() + cfg_->Frame().NumPilotSyms();
 
   server_bs_.resize(bs_socket_num_);
   client_bs_.resize(bs_socket_num_);
@@ -75,25 +73,25 @@ ChannelSim::ChannelSim(const Config* const config_bs,
   client_ue_.resize(user_socket_num_);
 
   task_queue_bs_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * dl_data_plus_beacon_symbols_ * bscfg_->BsAntNum() *
+      kFrameWnd * dl_data_plus_beacon_symbols_ * cfg_->BsAntNum() *
       kDefaultQueueSize);
   task_queue_user_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * ul_data_plus_pilot_symbols_ * uecfg_->UeAntNum() *
+      kFrameWnd * ul_data_plus_pilot_symbols_ * cfg_->UeAntNum() *
       kDefaultQueueSize);
   message_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * bscfg_->Frame().NumTotalSyms() *
-      (bscfg_->BsAntNum() + uecfg_->UeAntNum()) * kDefaultQueueSize);
+      kFrameWnd * cfg_->Frame().NumTotalSyms() *
+      (cfg_->BsAntNum() + cfg_->UeAntNum()) * kDefaultQueueSize);
 
-  assert(bscfg_->PacketLength() == uecfg_->PacketLength());
-  payload_length_ = bscfg_->PacketLength() - Packet::kOffsetOfData;
+  assert(cfg_->PacketLength() == cfg_->PacketLength());
+  payload_length_ = cfg_->PacketLength() - Packet::kOffsetOfData;
 
   // initialize bs-facing and client-facing data buffers
   size_t rx_buffer_ue_size = kFrameWnd * ul_data_plus_pilot_symbols_ *
-                             uecfg_->UeAntNum() * payload_length_;
+                             cfg_->UeAntNum() * payload_length_;
   rx_buffer_ue_.resize(rx_buffer_ue_size);
 
   size_t rx_buffer_bs_size = kFrameWnd * dl_data_plus_beacon_symbols_ *
-                             bscfg_->BsAntNum() * payload_length_;
+                             cfg_->BsAntNum() * payload_length_;
   rx_buffer_bs_.resize(rx_buffer_bs_size);
 
   // initilize rx and tx counters
@@ -109,8 +107,7 @@ ChannelSim::ChannelSim(const Config* const config_bs,
   user_tx_counter_.fill(0);
 
   // Initialize channel
-  channel_ = std::make_unique<Channel>(config_bs, config_ue, channel_type_,
-                                       channel_snr_);
+  channel_ = std::make_unique<Channel>(cfg_, channel_type_, channel_snr_);
 
   for (size_t i = 0; i < worker_thread_num; i++) {
     task_ptok_[i] = new moodycamel::ProducerToken(message_queue_);
@@ -193,26 +190,24 @@ void ChannelSim::Start() {
           // received a packet from a client antenna
           if (type == gen_tag_t::TagType::kUsers) {
             const size_t pilot_symbol_id =
-                uecfg_->Frame().GetPilotSymbolIdx(symbol_id);
-            const size_t ul_symbol_id =
-                uecfg_->Frame().GetULSymbolIdx(symbol_id);
+                cfg_->Frame().GetPilotSymbolIdx(symbol_id);
+            const size_t ul_symbol_id = cfg_->Frame().GetULSymbolIdx(symbol_id);
             size_t total_symbol_id = pilot_symbol_id;
             if (pilot_symbol_id == SIZE_MAX) {
-              total_symbol_id = ul_symbol_id + bscfg_->Frame().NumPilotSyms();
+              total_symbol_id = ul_symbol_id + cfg_->Frame().NumPilotSyms();
             }
             const size_t frame_offset =
                 (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ +
                 total_symbol_id;
             user_rx_counter_[frame_offset]++;
             // when received all client antennas on this symbol, kick-off BS TX
-            if (user_rx_counter_[frame_offset] == uecfg_->UeAntNum()) {
+            if (user_rx_counter_[frame_offset] == cfg_->UeAntNum()) {
               user_rx_counter_[frame_offset] = 0;
               if (kDebugPrintPerSymbolDone) {
                 std::printf(
                     "Scheduling uplink transmission of frame %zu, symbol %zu, "
                     "from %zu user to %zu BS antennas\n",
-                    frame_id, symbol_id, uecfg_->UeAntNum(),
-                    bscfg_->BsAntNum());
+                    frame_id, symbol_id, cfg_->UeAntNum(), cfg_->BsAntNum());
               }
               ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
                            &task_queue_bs_, ptok_bs);
@@ -232,14 +227,13 @@ void ChannelSim::Start() {
             //            symbol_id, bs_rx_counter_[frame_offset]);
 
             // when received all BS antennas on this symbol, kick-off client TX
-            if (bs_rx_counter_[frame_offset] == bscfg_->BsAntNum()) {
+            if (bs_rx_counter_[frame_offset] == cfg_->BsAntNum()) {
               bs_rx_counter_[frame_offset] = 0;
               if (kDebugPrintPerSymbolDone) {
                 std::printf(
                     "Scheduling downlink transmission in frame %zu, symbol "
                     "%zu, from %zu BS to %zu user antennas\n",
-                    frame_id, symbol_id, bscfg_->BsAntNum(),
-                    uecfg_->UeAntNum());
+                    frame_id, symbol_id, cfg_->BsAntNum(), cfg_->UeAntNum());
               }
               ScheduleTask(EventData(EventType::kPacketTX, event.tags_[0]),
                            &task_queue_user_, ptok_user);
@@ -304,47 +298,47 @@ void* ChannelSim::TaskThread(size_t tid) {
   moodycamel::ConsumerToken ue_consumer_token(task_queue_user_);
 
   size_t tx_buffer_ue_size =
-      dl_data_plus_beacon_symbols_ * uecfg_->UeAntNum() * payload_length_;
+      dl_data_plus_beacon_symbols_ * cfg_->UeAntNum() * payload_length_;
   AlignedByteVector tx_buffer_ue(tx_buffer_ue_size);
 
   size_t tx_buffer_bs_size =
-      ul_data_plus_pilot_symbols_ * bscfg_->BsAntNum() * payload_length_;
+      ul_data_plus_pilot_symbols_ * cfg_->BsAntNum() * payload_length_;
   AlignedByteVector tx_buffer_bs(tx_buffer_bs_size);
 
   void* bs_input_float_storage = PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
-      (bscfg_->SampsPerSymbol() * bscfg_->BsAntNum() * sizeof(arma::cx_float)));
+      (cfg_->SampsPerSymbol() * cfg_->BsAntNum() * sizeof(arma::cx_float)));
   void* bs_output_float_storage = PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
-      (bscfg_->SampsPerSymbol() * uecfg_->UeAntNum() * sizeof(arma::cx_float)));
+      (cfg_->SampsPerSymbol() * cfg_->UeAntNum() * sizeof(arma::cx_float)));
   void* ue_input_float_storage = PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
-      (bscfg_->SampsPerSymbol() * uecfg_->UeAntNum() * sizeof(arma::cx_float)));
+      (cfg_->SampsPerSymbol() * cfg_->UeAntNum() * sizeof(arma::cx_float)));
   void* ue_output_float_storage = PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
-      (bscfg_->SampsPerSymbol() * bscfg_->BsAntNum() * sizeof(arma::cx_float)));
+      (cfg_->SampsPerSymbol() * cfg_->BsAntNum() * sizeof(arma::cx_float)));
 
   arma::cx_fmat bs_input_matrix(
       reinterpret_cast<arma::cx_float*>(bs_input_float_storage),
-      bscfg_->SampsPerSymbol(), bscfg_->BsAntNum(), false, true);
-  bs_input_matrix.zeros(bscfg_->SampsPerSymbol(), bscfg_->BsAntNum());
+      cfg_->SampsPerSymbol(), cfg_->BsAntNum(), false, true);
+  bs_input_matrix.zeros(cfg_->SampsPerSymbol(), cfg_->BsAntNum());
 
   arma::cx_fmat bs_output_matrix(
       reinterpret_cast<arma::cx_float*>(bs_output_float_storage),
-      bscfg_->SampsPerSymbol(), uecfg_->UeAntNum(), false, true);
-  bs_output_matrix.zeros(bscfg_->SampsPerSymbol(), uecfg_->UeAntNum());
+      cfg_->SampsPerSymbol(), cfg_->UeAntNum(), false, true);
+  bs_output_matrix.zeros(cfg_->SampsPerSymbol(), cfg_->UeAntNum());
 
   arma::cx_fmat ue_input_matrix(
       reinterpret_cast<arma::cx_float*>(ue_input_float_storage),
-      bscfg_->SampsPerSymbol(), uecfg_->UeAntNum(), false, true);
-  ue_input_matrix.zeros(bscfg_->SampsPerSymbol(), uecfg_->UeAntNum());
+      cfg_->SampsPerSymbol(), cfg_->UeAntNum(), false, true);
+  ue_input_matrix.zeros(cfg_->SampsPerSymbol(), cfg_->UeAntNum());
 
   arma::cx_fmat ue_output_matrix(
       reinterpret_cast<arma::cx_float*>(ue_output_float_storage),
-      bscfg_->SampsPerSymbol(), bscfg_->BsAntNum(), false, true);
-  ue_output_matrix.zeros(bscfg_->SampsPerSymbol(), bscfg_->BsAntNum());
+      cfg_->SampsPerSymbol(), cfg_->BsAntNum(), false, true);
+  ue_output_matrix.zeros(cfg_->SampsPerSymbol(), cfg_->BsAntNum());
 
-  AlignedByteVector udp_tx_buffer(bscfg_->PacketLength());
+  AlignedByteVector udp_tx_buffer(cfg_->PacketLength());
 
   WorkerThreadStorage thread_store;
   thread_store.tid_ = tid;
@@ -385,18 +379,18 @@ void* ChannelSim::BsRxLoop(size_t tid) {
   // initialize bs-facing sockets
   static constexpr size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
   for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
-    const size_t local_port_id = bscfg_->BsRruPort() + socket_id;
+    const size_t local_port_id = cfg_->BsRruPort() + socket_id;
     server_bs_.at(socket_id) =
         std::make_unique<UDPServer>(local_port_id, sock_buf_size);
     client_bs_.at(socket_id) = std::make_unique<UDPClient>();
     std::printf(
         "ChannelSim::BsRxLoop[%zu]: set up UDP socket server listening to port "
         "%zu with remote address %s:%zu\n",
-        tid, local_port_id, bscfg_->BsServerAddr().c_str(),
-        bscfg_->BsServerPort() + socket_id);
+        tid, local_port_id, cfg_->BsServerAddr().c_str(),
+        cfg_->BsServerPort() + socket_id);
   }
 
-  const size_t rx_packet_size = bscfg_->PacketLength();
+  const size_t rx_packet_size = cfg_->PacketLength();
   const size_t buffer_size = (rx_packet_size) + kUdpMTU;
   std::vector<SocketRxBuffer> thread_rx_buffers_(total_sockets);
   for (auto& buffer : thread_rx_buffers_) {
@@ -445,7 +439,7 @@ void* ChannelSim::BsRxLoop(size_t tid) {
         const size_t symbol_offset =
             (frame_id % kFrameWnd) * dl_data_plus_beacon_symbols_ +
             dl_symbol_id;
-        const size_t dest_offset = symbol_offset * bscfg_->BsAntNum() + ant_id;
+        const size_t dest_offset = symbol_offset * cfg_->BsAntNum() + ant_id;
         std::memcpy(&rx_buffer_bs_[dest_offset * payload_length_], pkt->data_,
                     payload_length_);
 
@@ -502,7 +496,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
   // initialize client-facing sockets
   static constexpr size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
   for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
-    size_t local_port_id = uecfg_->UeRruPort() + socket_id;
+    size_t local_port_id = cfg_->UeRruPort() + socket_id;
     server_ue_.at(socket_id) =
         std::make_unique<UDPServer>(local_port_id, sock_buf_size);
     client_ue_.at(socket_id) = std::make_unique<UDPClient>();
@@ -510,11 +504,11 @@ void* ChannelSim::UeRxLoop(size_t tid) {
     std::printf(
         "ChannelSim::UeRxLoop[%zu]: set up UDP socket server listening to port "
         "%zu with remote address %s:%zu\n",
-        tid, local_port_id, uecfg_->UeServerAddr().c_str(),
-        uecfg_->UeServerPort() + socket_id);
+        tid, local_port_id, cfg_->UeServerAddr().c_str(),
+        cfg_->UeServerPort() + socket_id);
   }
 
-  const size_t rx_packet_size = bscfg_->PacketLength();
+  const size_t rx_packet_size = cfg_->PacketLength();
   const size_t buffer_size = rx_packet_size + kUdpMTU;
   std::vector<SocketRxBuffer> thread_rx_buffers_(total_sockets);
   for (auto& buffer : thread_rx_buffers_) {
@@ -554,17 +548,17 @@ void* ChannelSim::UeRxLoop(size_t tid) {
         const size_t ant_id = pkt->ant_id_;
 
         const size_t pilot_symbol_id =
-            uecfg_->Frame().GetPilotSymbolIdx(symbol_id);
-        const size_t ul_symbol_id = uecfg_->Frame().GetULSymbolIdx(symbol_id);
+            cfg_->Frame().GetPilotSymbolIdx(symbol_id);
+        const size_t ul_symbol_id = cfg_->Frame().GetULSymbolIdx(symbol_id);
         size_t total_symbol_id = pilot_symbol_id;
         if (pilot_symbol_id == SIZE_MAX) {
-          total_symbol_id = ul_symbol_id + bscfg_->Frame().NumPilotSyms();
+          total_symbol_id = ul_symbol_id + cfg_->Frame().NumPilotSyms();
         }
 
         const size_t symbol_offset =
             (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ +
             total_symbol_id;
-        size_t offset = symbol_offset * uecfg_->UeAntNum() + ant_id;
+        size_t offset = symbol_offset * cfg_->UeAntNum() + ant_id;
         auto* rx_data_destination = &rx_buffer_ue_.at(offset * payload_length_);
         std::memcpy(rx_data_destination, pkt->data_, payload_length_);
 
@@ -624,7 +618,7 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
                       std::vector<std::unique_ptr<UDPClient>>& udp_clients,
                       const std::string& dest_address, size_t dest_port) {
   // The 2 is from complex float -> float
-  const size_t convert_length = (2 * bscfg_->SampsPerSymbol() * max_ant);
+  const size_t convert_length = (2 * cfg_->SampsPerSymbol() * max_ant);
   auto* dst_ptr = reinterpret_cast<short*>(tx_buffer);
 
 #if defined(CHSIM_DEBUG_MEMORY)
@@ -658,11 +652,11 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   // Modify this to check the symbol type
-  const size_t pilot_symbol_id = bscfg_->Frame().GetPilotSymbolIdx(symbol_id);
-  const size_t ul_symbol_id = bscfg_->Frame().GetULSymbolIdx(symbol_id);
+  const size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
+  const size_t ul_symbol_id = cfg_->Frame().GetULSymbolIdx(symbol_id);
   size_t total_symbol_id = pilot_symbol_id;
   if (pilot_symbol_id == SIZE_MAX) {
-    total_symbol_id = ul_symbol_id + bscfg_->Frame().NumPilotSyms();
+    total_symbol_id = ul_symbol_id + cfg_->Frame().NumPilotSyms();
   }
 
   if (kPrintDebugTxBs) {
@@ -676,9 +670,9 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
   const size_t symbol_offset =
       (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ + total_symbol_id;
   const size_t total_offset_ue =
-      symbol_offset * payload_length_ * uecfg_->UeAntNum();
+      symbol_offset * payload_length_ * cfg_->UeAntNum();
   const size_t total_offset_bs =
-      total_symbol_id * payload_length_ * bscfg_->BsAntNum();
+      total_symbol_id * payload_length_ * cfg_->BsAntNum();
 
   auto* src_ptr =
       reinterpret_cast<const short*>(&rx_buffer_ue_.at(total_offset_ue));
@@ -692,9 +686,9 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
       "Channel Sim[%zu]: DoTxBs processing frame %zu, symbol %zu, ul symbol "
       "%zu, samples per symbol %zu ue ant num %zu offset %zu ue plus %zu "
       "location %zu\n",
-      local.tid_, frame_id, symbol_id, total_symbol_id,
-      bscfg_->SampsPerSymbol(), uecfg_->UeAntNum(), total_offset_ue,
-      ul_data_plus_pilot_symbols_, (size_t)src_ptr);
+      local.tid_, frame_id, symbol_id, total_symbol_id, cfg_->SampsPerSymbol(),
+      cfg_->UeAntNum(), total_offset_ue, ul_data_plus_pilot_symbols_,
+      (size_t)src_ptr);
 
   MLPD_TRACE(
       "Channel Sim[%zu]: SimdConvertShortToFloat: DoTxBs Length %lld samps "
@@ -733,10 +727,10 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
     Utils::PrintMat(fmat_noisy, "rx_ul");
   }
 
-  DoTx(frame_id, symbol_id, bscfg_->BsAntNum(),
+  DoTx(frame_id, symbol_id, cfg_->BsAntNum(),
        &local.bs_tx_buffer_->at(total_offset_bs), fmat_noisy.memptr(),
-       local.udp_tx_buffer_, client_bs_, bscfg_->BsServerAddr(),
-       bscfg_->BsServerPort());
+       local.udp_tx_buffer_, client_bs_, cfg_->BsServerAddr(),
+       cfg_->BsServerPort());
 
   RtAssert(message_queue_.enqueue(
                *task_ptok_[local.tid_],
@@ -762,9 +756,9 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
   const size_t symbol_offset =
       (frame_id % kFrameWnd) * dl_data_plus_beacon_symbols_ + dl_symbol_id;
   const size_t total_offset_bs =
-      symbol_offset * payload_length_ * bscfg_->BsAntNum();
+      symbol_offset * payload_length_ * cfg_->BsAntNum();
   const size_t total_offset_ue =
-      dl_symbol_id * payload_length_ * uecfg_->UeAntNum();
+      dl_symbol_id * payload_length_ * cfg_->UeAntNum();
 
   auto* src_ptr =
       reinterpret_cast<const short*>(&rx_buffer_bs_.at(total_offset_bs));
@@ -777,8 +771,8 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
   MLPD_FRAME(
       "Channel Sim[%zu]: DoTxUser processing frame %zu, symbol %zu, dl symbol "
       "%zu, samples per symbol %zu bs ant num %zu offset %zu location %zu\n",
-      local.tid_, frame_id, symbol_id, dl_symbol_id, bscfg_->SampsPerSymbol(),
-      uecfg_->BsAntNum(), total_offset_bs, (size_t)src_ptr);
+      local.tid_, frame_id, symbol_id, dl_symbol_id, cfg_->SampsPerSymbol(),
+      cfg_->BsAntNum(), total_offset_bs, (size_t)src_ptr);
 
   MLPD_TRACE(
       "Channel Sim[%zu]: SimdConvertShortToFloat: DoTxUser Length %lld samps "
@@ -816,10 +810,10 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
     Utils::PrintMat(fmat_noisy, "rx_dl");
   }
 
-  DoTx(frame_id, symbol_id, uecfg_->UeAntNum(),
+  DoTx(frame_id, symbol_id, cfg_->UeAntNum(),
        &local.ue_tx_buffer_->at(total_offset_ue), fmat_noisy.memptr(),
-       local.udp_tx_buffer_, client_ue_, uecfg_->UeServerAddr(),
-       uecfg_->UeServerPort());
+       local.udp_tx_buffer_, client_ue_, cfg_->UeServerAddr(),
+       cfg_->UeServerPort());
 
   RtAssert(message_queue_.enqueue(
                *task_ptok_[local.tid_],
