@@ -7,7 +7,7 @@
 ###############################################################################
 
 # Check that all required executables are present
-exe_list="build/user build/data_generator build/chsim build/agora data/bs-sim.json"
+exe_list="build/user build/data_generator build/chsim build/agora data/chsim.json"
 for exe in ${exe_list}; do
   if [ ! -f ${exe} ]; then
       echo "${exe} not found. Exiting."
@@ -17,15 +17,13 @@ done
 
 
 # Setup the config with the number of frames to test
-cp data/bs-sim.json data/bs-sim-tmp.json
-cp data/ue-sim.json data/ue-sim-tmp.json
-sed -i '2i\ \ "frames_to_test": 1000,' data/bs-sim-tmp.json
-sed -i '2i\ \ "frames_to_test": 1000,' data/ue-sim-tmp.json
+cp data/chsim.json data/chsim-tmp.json
+sed -i '2i\ \ "max_frame": 1000,' data/chsim-tmp.json
 
 echo "==========================================="
 echo "Generating data for emulated RRU end-to-end test with channel simulator ......"
 echo -e "===========================================\n"
-./build/data_generator --conf_file data/bs-sim-tmp.json
+./build/data_generator --conf_file data/chsim-tmp.json
 
 echo "==========================================="
 echo "Running emulated RRU end-to-end test with channel simulator ......"
@@ -33,15 +31,14 @@ echo -e "===========================================\n"
 echo "Emulated RRU Test" > test_user_output.txt
 echo "Emulated RRU Test" > test_agora_output.txt
 echo "Emulated RRU Test" > test_chsim_output.txt
-./build/user --conf_file data/ue-sim-tmp.json >> test_user_output.txt &
-sleep 1; ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 4 --core_offset 29 --bs_conf_file data/bs-sim-tmp.json --ue_conf_file data/ue-sim-tmp.json >> test_chsim_output.txt &
-sleep 1; ./build/agora --conf_file data/bs-sim-tmp.json >> test_agora_output.txt
+./build/user --conf_file data/chsim-tmp.json >> test_user_output.txt &
+sleep 1; ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 4 --core_offset 19 --conf_file data/chsim-tmp.json >> test_chsim_output.txt &
+sleep 1; ./build/agora --conf_file data/chsim-tmp.json >> test_agora_output.txt
 
 sleep 5;
 
 # Agora and User is terminated automatically. Manually terminate chsim
-rm data/bs-sim-tmp.json
-rm data/ue-sim-tmp.json
+rm data/chsim-tmp.json
 
 pkill -INT chsim
 pkill -INT user

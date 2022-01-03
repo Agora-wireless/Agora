@@ -43,8 +43,8 @@ int main(int argc, char* argv[]) {
   std::string filename = FLAGS_conf_file;
   std::string data_filename = FLAGS_data_file;
 
-  auto frame_start = new double[kNumStatsFrames];
-  auto frame_end = new double[kNumStatsFrames];
+  auto* frame_start = new double[kNumStatsFrames];
+  auto* frame_end = new double[kNumStatsFrames];
 
   int ret = EXIT_FAILURE;
   {
@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
     cfg->GenData();
 
     // Generate pattern file for testing
-    if (data_filename == "") {
+    if (data_filename.empty()) {
       std::ofstream create_file;
       data_filename = TOSTRING(PROJECT_DIRECTORY) +
                       std::string("/data/ul_increment_file.bin");
@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
       std::unique_ptr<MacReceiver> receiver;
       std::vector<std::thread> rx_threads;
       //+1 for main thread
-      const size_t kNumTotalSenderThreads =
+      const size_t k_num_total_sender_threads =
           FLAGS_num_sender_worker_threads + FLAGS_num_sender_update_threads;
       size_t thread_start = FLAGS_core_offset;
 
@@ -99,12 +99,12 @@ int main(int argc, char* argv[]) {
             thread_start, FLAGS_num_sender_worker_threads,
             FLAGS_num_sender_update_threads, FLAGS_frame_duration, 0,
             FLAGS_enable_slow_start, true);
-        thread_start += kNumTotalSenderThreads;
+        thread_start += k_num_total_sender_threads;
         sender->StartTXfromMain(frame_start, frame_end);
       }
 
       if (cfg->Frame().NumDlDataSyms() > 0) {
-        if ((FLAGS_fwd_udp_port != 0) && (FLAGS_fwd_udp_address != "")) {
+        if ((FLAGS_fwd_udp_port != 0) && (!FLAGS_fwd_udp_address.empty())) {
           receiver = std::make_unique<MacReceiver>(
               cfg.get(), cfg->DlMacDataBytesNumPerframe(), cfg->UeServerAddr(),
               cfg->UeMacTxPort(), FLAGS_fwd_udp_address, FLAGS_fwd_udp_port,

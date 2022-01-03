@@ -99,17 +99,21 @@ class PacketTXRX {
                  Table<complex_float>& calib_dl_buffer_,
                  Table<complex_float>& calib_ul_buffer_);
 
-  void SendBeacon(int tid, size_t frame_id);
+  void TxBeacon(int tid, size_t frame_id);
+  void TxBeaconHW(size_t frame_id, size_t radio_id, long long time0);
+  void TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
+                                long long time0);
 
  private:
   void LoopTxRx(size_t tid);  // The thread function for thread [tid]
   size_t DequeueSend(int tid);
-  Packet* RecvEnqueue(size_t tid, size_t radio_id, size_t rx_offset);
+  Packet* RecvEnqueue(size_t tid, size_t radio_id, size_t rx_slot);
 
   void LoopTxRxArgos(size_t tid);
-  size_t DequeueSendArgos(int tid);
+  size_t DequeueSendArgos(int tid, long long time0);
   std::vector<Packet*> RecvEnqueueArgos(size_t tid, size_t radio_id,
-                                        size_t rx_slot);
+                                        size_t rx_slot, size_t frame_id,
+                                        size_t symbol_id);
 
   long long rx_time_bs_;
   long long tx_time_bs_;
