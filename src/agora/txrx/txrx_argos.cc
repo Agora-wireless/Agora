@@ -24,7 +24,16 @@ void PacketTXRX::LoopTxRxArgos(size_t tid) {
   threads_started_.fetch_add(1);
 
   long long time0 = 0;
+  // When Hw Framer is enabled, frame time keeping is done by hardware.
+  // In particular, the Hw only forward useful receive (no Guard) symbols.
+  // In this mode, the format of rx timestamp (64 bits)is frame number at
+  // 32-bits msb and symbol number at 16-bit msb of 32-bit lsb.
+  // When Hw Framer is disabled (false), frame time keeping in done entirely
+  // in software as it is implemented here. All time domain symbols are transfered
+  // to the host by HW where software will decide how to handle each symbol.
   if (cfg_->HwFramer() == false) {
+    // Read some dummy symbols to get the hardware time and then schedule
+    // TX/RX accordingly
     size_t beacon_radio = cfg_->BeaconAnt() / cfg_->NumChannels();
     size_t beacon_chan = cfg_->BeaconAnt() % cfg_->NumChannels();
     // prepare BS beacon in host buffer
