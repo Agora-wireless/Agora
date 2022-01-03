@@ -252,8 +252,15 @@ Config::Config(const std::string& jsonfile)
   hw_framer_ = tdd_conf.value("hw_framer", true);
   if (kUseUHD) {
     hw_framer_ = false;
+  } else {
+    RtAssert(ue_hw_framer_ == true,
+             "Base Station hardware framer (hw_framer) set to false is "
+             "unsupported in this version of Agora");
   }
   ue_hw_framer_ = tdd_conf.value("ue_hw_framer", false);
+  RtAssert(ue_hw_framer_ == false,
+           "User equiptment hardware framer (ue_hw_framer) set to true is "
+           "unsupported in this version of Agora");
 
   // If frames not specified explicitly, construct default based on frame_type /
   // symbol_num_perframe / pilot_num / ul_symbol_num_perframe /
