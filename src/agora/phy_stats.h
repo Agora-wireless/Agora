@@ -13,7 +13,7 @@
 
 class PhyStats {
  public:
-  explicit PhyStats(Config* const cfg);
+  explicit PhyStats(Config* const cfg, Direction dir);
   ~PhyStats();
   void PrintPhyStats();
   void UpdateBitErrors(size_t /*ue_id*/, size_t /*offset*/, uint8_t /*tx_byte*/,
@@ -44,6 +44,7 @@ class PhyStats {
 
  private:
   Config const* const config_;
+  Direction dir_;
   Table<size_t> decoded_bits_count_;
   Table<size_t> bit_error_count_;
   Table<size_t> decoded_blocks_count_;

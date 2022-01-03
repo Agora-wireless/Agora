@@ -5,6 +5,7 @@
 #include "mac_sender.h"
 
 #include <thread>
+#include <utility>
 
 #include "datatype_conversion.h"
 #include "file_receiver.h"
@@ -63,9 +64,9 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
       data_filename_(data_filename),
       // end -- Ul / Dl     UE / BS
       packets_per_frame_(packets_per_frame),
-      server_address_(server_address),
+      server_address_(std::move(server_address)),
       server_rx_port_(server_rx_port),
-      get_data_symbol_id_(get_data_symbol_id)
+      get_data_symbol_id_(std::move(get_data_symbol_id))
 // end -- Ul / Dl     UE / BS
 {
   if (frame_duration_us == 0) {
@@ -326,7 +327,7 @@ void* MacSender::WorkerThread(size_t tid) {
         for (size_t packet = 0; packet < packets_per_frame_; packet++) {
           ///\todo Use assume_aligned<kTxBufferElementAlignment> when code has
           /// c++20 support
-          auto* tx_packet =
+          const auto* tx_packet =
               reinterpret_cast<const MacPacketPacked*>(mac_packet_location);
 
           const size_t mac_packet_tx_size =

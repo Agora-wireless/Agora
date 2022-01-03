@@ -44,6 +44,26 @@ DoZF::DoZF(Config* config, int tid,
   calib_gather_buffer_ = static_cast<complex_float*>(
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        kMaxAntennas * sizeof(complex_float)));
+
+  num_ext_ref_ = 0;
+  for (size_t i = 0; i < cfg_->NumCells(); i++) {
+    if (cfg_->ExternalRefNode(i) == true) {
+      num_ext_ref_++;
+    }
+  }
+  if (num_ext_ref_ > 0) {
+    ext_ref_id_.zeros(num_ext_ref_ * cfg_->NumChannels());
+    size_t ext_id = 0;
+    for (size_t i = 0; i < cfg_->NumCells(); i++) {
+      if (cfg_->ExternalRefNode(i) == true) {
+        for (size_t j = 0; j < cfg_->NumChannels(); j++) {
+          ext_ref_id_.at(ext_id * cfg_->NumChannels() + j) =
+              cfg_->RefAnt(i) + j;
+        }
+        ext_id++;
+      }
+    }
+  }
 }
 
 DoZF::~DoZF() {
@@ -66,7 +86,7 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
                             complex_float* calib_ptr, complex_float* _mat_ul_zf,
                             complex_float* _mat_dl_zf) {
   arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
-                          cfg_->UeNum(), cfg_->BsAntNum(), false);
+                          cfg_->UeAntNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_zf_tmp;
   if (kUseInverseForZF != 0u) {
     try {
@@ -105,23 +125,30 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     float scale = 1 / (abs(mat_dl_zf_tmp).max());
     mat_dl_zf_tmp *= scale;
 
-    if (cfg_->ExternalRefNode()) {
-      mat_dl_zf_tmp.insert_cols(
-          cfg_->RefAnt(),
-          arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(), arma::fill::zeros));
+    for (size_t i = 0; i < cfg_->NumCells(); i++) {
+      if (cfg_->ExternalRefNode(i) == true) {
+        mat_dl_zf_tmp.insert_cols(
+            cfg_->RefAnt(i),
+            arma::cx_fmat(cfg_->UeAntNum(), cfg_->NumChannels(),
+                          arma::fill::zeros));
+      }
     }
     arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
-                            cfg_->BsAntNum(), cfg_->UeNum(), false);
+                            cfg_->BsAntNum(), cfg_->UeAntNum(), false);
     mat_dl_zf = mat_dl_zf_tmp.st();
   }
-  if (cfg_->ExternalRefNode() == true) {
-    mat_ul_zf_tmp.insert_cols(
-        cfg_->RefAnt(),
-        arma::cx_fmat(cfg_->UeNum(), cfg_->NumChannels(), arma::fill::zeros));
+  for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
+    if (cfg_->ExternalRefNode(i) == true) {
+      mat_ul_zf_tmp.insert_cols(
+          cfg_->RefAnt(i), arma::cx_fmat(cfg_->UeAntNum(), cfg_->NumChannels(),
+                                         arma::fill::zeros));
+    }
   }
   mat_ul_zf = mat_ul_zf_tmp;
   float rcond = -1;
-  if (kPrintZfStats) rcond = arma::rcond(mat_csi.t() * mat_csi);
+  if (kPrintZfStats) {
+    rcond = arma::rcond(mat_csi.t() * mat_csi);
+  }
   return rcond;
 }
 
@@ -184,14 +211,15 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id) {
                                      pre_calib_ul_msum_mat.row(sc_id) -
                                      old_calib_ul_mat.row(sc_id);
 
-  if (cfg_->InitCalibRepeat() == 0u && frame_grp_id == 0)
+  if (cfg_->InitCalibRepeat() == 0u && frame_grp_id == 0) {
     // fill with one until one full sweep
     // of  calibration data is done
     calib_vec.fill(arma::cx_float(1, 0));
-  else
+  } else {
     calib_vec =
         (cur_calib_dl_msum_mat.row(sc_id) / cur_calib_ul_msum_mat.row(sc_id))
             .st();
+  }
 }
 
 // Gather data of one symbol from partially-transposed buffer
@@ -199,8 +227,15 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id) {
 static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
                                           float*& dst, size_t bs_ant_num) {
   // The SIMD and non-SIMD methods are equivalent.
+
+#ifdef __AVX512F__
+  static constexpr size_t kAntNumPerSimd = 8;
+#else
+  static constexpr size_t kAntNumPerSimd = 4;
+#endif
+
   size_t ant_start = 0;
-  if (kUseSIMDGather and bs_ant_num >= 4) {
+  if (kUseSIMDGather && (bs_ant_num >= kAntNumPerSimd)) {
     const size_t transpose_block_id = cur_sc_id / kTransposeBlockSize;
     const size_t sc_inblock_idx = cur_sc_id % kTransposeBlockSize;
     const size_t offset_in_src_buffer =
@@ -208,7 +243,6 @@ static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
 
     src = src + offset_in_src_buffer * 2;
 #ifdef __AVX512F__
-    size_t ant_num_per_simd = 8;
     __m512i index = _mm512_setr_epi32(
         0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
         kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
@@ -217,33 +251,30 @@ static inline void PartialTransposeGather(size_t cur_sc_id, float* src,
         kTransposeBlockSize * 10, kTransposeBlockSize * 10 + 1,
         kTransposeBlockSize * 12, kTransposeBlockSize * 12 + 1,
         kTransposeBlockSize * 14, kTransposeBlockSize * 14 + 1);
-    for (size_t ant_idx = 0; ant_idx < bs_ant_num;
-         ant_idx += ant_num_per_simd) {
+    for (size_t ant_idx = 0; ant_idx < bs_ant_num; ant_idx += kAntNumPerSimd) {
       // fetch 4 complex floats for 4 ants
-
-      __m512 t = kTransposeBlockSize == 1 ? _mm512_load_ps(src)
-                                          : _mm512_i32gather_ps(index, src, 4);
+      __m512 t = (kTransposeBlockSize == 1)
+                     ? _mm512_load_ps(src)
+                     : _mm512_i32gather_ps(index, src, 4);
       _mm512_storeu_ps(dst, t);
-      src += ant_num_per_simd * kTransposeBlockSize * 2;
-      dst += ant_num_per_simd * 2;
+      src += kAntNumPerSimd * kTransposeBlockSize * 2;
+      dst += kAntNumPerSimd * 2;
     }
 #else
-    size_t ant_num_per_simd = 4;
     __m256i index = _mm256_setr_epi32(
         0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
         kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
         kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1);
-    for (size_t ant_idx = 0; ant_idx < bs_ant_num;
-         ant_idx += ant_num_per_simd) {
+    for (size_t ant_idx = 0; ant_idx < bs_ant_num; ant_idx += kAntNumPerSimd) {
       // fetch 4 complex floats for 4 ants
       __m256 t = _mm256_i32gather_ps(src, index, 4);
       _mm256_storeu_ps(dst, t);
-      src += ant_num_per_simd * kTransposeBlockSize * 2;
-      dst += ant_num_per_simd * 2;
+      src += kAntNumPerSimd * kTransposeBlockSize * 2;
+      dst += kAntNumPerSimd * 2;
     }
 #endif
     // Set the of the remaining antennas to use non-SIMD gather
-    ant_start = bs_ant_num / 4 * 4;
+    ant_start = bs_ant_num - (bs_ant_num % kAntNumPerSimd);
   }
   if (ant_start < bs_ant_num) {
     const size_t pt_base_offset =
@@ -287,7 +318,7 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     const size_t cur_sc_id = base_sc_id + i;
 
     // Gather CSI matrices of each pilot from partially-transposed CSIs.
-    for (size_t ue_idx = 0; ue_idx < cfg_->UeNum(); ue_idx++) {
+    for (size_t ue_idx = 0; ue_idx < cfg_->UeAntNum(); ue_idx++) {
       auto* dst_csi_ptr = reinterpret_cast<float*>(csi_gather_buffer_ +
                                                    cfg_->BsAntNum() * ue_idx);
       if (kUsePartialTrans) {
@@ -304,14 +335,13 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
     arma::cx_fmat mat_csi((arma::cx_float*)csi_gather_buffer_, cfg_->BsAntNum(),
-                          cfg_->UeNum(), false);
+                          cfg_->UeAntNum(), false);
 
     if (cfg_->Frame().NumDLSyms() > 0) {
       ComputeCalib(frame_id, cur_sc_id);
-      if (cfg_->ExternalRefNode()) {
-        mat_csi.shed_rows(cfg_->RefAnt(),
-                          cfg_->RefAnt() + cfg_->NumChannels() - 1);
-      }
+    }
+    if (num_ext_ref_ > 0) {
+      mat_csi.shed_rows(ext_ref_id_);
     }
 
     double start_tsc3 = GetTime::WorkerRdtsc();
@@ -320,7 +350,9 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     auto rcond = ComputePrecoder(mat_csi, calib_gather_buffer_,
                                  ul_zf_matrices_[frame_slot][cur_sc_id],
                                  dl_zf_matrices_[frame_slot][cur_sc_id]);
-    if (kPrintZfStats) phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
+    if (kPrintZfStats) {
+      phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
+    }
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
     duration_stat_->task_count_++;
@@ -339,14 +371,14 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
     std::printf(
         "In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
         "Basestation ant number: %zu\n",
-        tid_, frame_id, base_sc_id, base_sc_id / cfg_->UeNum(),
+        tid_, frame_id, base_sc_id, base_sc_id / cfg_->UeAntNum(),
         cfg_->BsAntNum());
   }
 
   double start_tsc1 = GetTime::WorkerRdtsc();
 
   // Gather CSIs from partially-transposed CSIs
-  for (size_t i = 0; i < cfg_->UeNum(); i++) {
+  for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
     const size_t cur_sc_id = base_sc_id + i;
     auto* dst_csi_ptr =
         reinterpret_cast<float*>(csi_gather_buffer_ + cfg_->BsAntNum() * i);
@@ -397,7 +429,7 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
   duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
   arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
-                        cfg_->BsAntNum(), cfg_->UeNum(), false);
+                        cfg_->BsAntNum(), cfg_->UeAntNum(), false);
 
   ComputePrecoder(mat_csi, calib_gather_buffer_,
                   ul_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)],

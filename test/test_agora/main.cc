@@ -30,7 +30,7 @@ static void ReadFromFile(const std::string& filename, Table<TableType>& data,
 static void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
                            int num_bytes_per_ue, Config const* const cfg) {
   ReadFromFile(filename, data, cfg->Frame().NumULSyms(),
-               (num_bytes_per_ue * cfg->UeNum()), sizeof(uint8_t));
+               (num_bytes_per_ue * cfg->UeAntNum()), sizeof(uint8_t));
 }
 
 static void ReadFromFileDl(const std::string& filename, Table<short>& data,
@@ -40,7 +40,7 @@ static void ReadFromFileDl(const std::string& filename, Table<short>& data,
 }
 
 static unsigned int CheckCorrectnessUl(Config const* const cfg) {
-  int ue_num = cfg->UeNum();
+  int ue_num = cfg->UeAntNum();
   int num_uplink_syms = cfg->Frame().NumULSyms();
   int ofdm_data_num = cfg->OfdmDataNum();
   int ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
@@ -48,7 +48,7 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string raw_data_filename = cur_directory + "/data/LDPC_orig_ul_data_" +
                                   std::to_string(cfg->OfdmCaNum()) + "_ant" +
-                                  std::to_string(cfg->UeNum()) + ".bin";
+                                  std::to_string(cfg->UeAntNum()) + ".bin";
   std::string output_data_filename = cur_directory + "/data/decode_data.bin";
 
   Table<uint8_t> raw_data;

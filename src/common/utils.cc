@@ -58,7 +58,7 @@ static void PrintCoreList(const std::list<CoreInfo>& clist) {
   std::printf("          CORE LIST SUMMARY      \n");
   std::printf("=================================\n");
   std::printf("Total Number of Cores: %d : %d \n", numa_max_cpus, system_cpus);
-  for (auto& iter : clist) {
+  for (const auto& iter : clist) {
     std::printf(
         "|| Core ID: %2zu || Requested: %2zu || ThreadType: %-16s || "
         "ThreadId: %zu \n",
@@ -397,10 +397,11 @@ void Utils::SaveMat(arma::cx_fmat c, const std::string& filename,
                     const std::string& ss, const bool append) {
   std::stringstream so;
   std::ofstream of;
-  if (append == true)
+  if (append == true) {
     of.open(filename, std::ios_base::app);
-  else
+  } else {
     of.open(filename);
+  }
   so << ss << " = [";
   for (size_t i = 0; i < c.n_cols; i++) {
     so << "[";
@@ -436,10 +437,11 @@ void Utils::SaveVec(arma::cx_fvec c, const std::string& filename,
                     const std::string& ss, const bool append) {
   std::stringstream so;
   std::ofstream of;
-  if (append == true)
+  if (append == true) {
     of.open(filename, std::ios_base::app);
-  else
+  } else {
     of.open(filename);
+  }
   so << ss << " = [";
   for (size_t j = 0; j < c.size(); j++) {
     so << std::fixed << std::setw(5) << std::setprecision(3) << c.at(j).real()

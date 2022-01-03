@@ -39,7 +39,7 @@ UeWorker::UeWorker(
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
     std::vector<std::vector<std::complex<float>>>& ue_pilot_vec)
     : tid_(tid),
-      thread_(),
+
       notify_queue_(notify_queue),
       work_queue_(work_queue),
       work_producer_token_(work_producer),
@@ -94,7 +94,7 @@ void UeWorker::TaskThread(size_t core_offset) {
   PinToCoreWithOffset(ThreadType::kWorker, core_offset, tid_);
 
   auto encoder = std::make_unique<DoEncode>(
-      &config_, (int)tid_,
+      &config_, (int)tid_, Direction::kUplink,
       (kEnableMac == true) ? ul_bits_buffer_ : config_.UlBits(),
       (kEnableMac == true) ? kFrameWnd : 1, encoded_buffer_, &stats_);
 
@@ -165,12 +165,12 @@ void UeWorker::DoFftData(size_t tag) {
 
   if (kRecordDownlinkFrame) {
     if (frame_id == kRecordFrameIndex) {
-      std::string fname = "rxdata" + std::to_string(symbol_id) + "_" +
+      std::string fname = "rxdata" + std::to_string(dl_symbol_id) + "_" +
                           std::to_string(ant_id) + ".bin";
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
       std::fclose(f);
-      fname = "txdata" + std::to_string(symbol_id) + "_" +
+      fname = "txdata" + std::to_string(dl_symbol_id) + "_" +
               std::to_string(ant_id) + ".bin";
       f = std::fopen(fname.c_str(), "wb");
       std::fwrite(config_.DlIqF()[dl_symbol_id] + ant_id * config_.OfdmCaNum(),
@@ -298,7 +298,9 @@ void UeWorker::DoFftPilot(size_t tag) {
                 tid_, frame_id, symbol_id, ant_id);
   }
 
+  size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
   size_t sig_offset = config_.OfdmRxZeroPrefixClient();
+
   if (kPrintDownlinkPilotStats) {
     SimdConvertShortToFloat(pkt->data_, reinterpret_cast<float*>(rx_samps_tmp_),
                             2 * config_.SampsPerSymbol());
@@ -329,12 +331,12 @@ void UeWorker::DoFftPilot(size_t tag) {
 
   if (kRecordDownlinkFrame) {
     if (frame_id == kRecordFrameIndex) {
-      std::string fname = "rxpilot" + std::to_string(symbol_id) + "_" +
+      std::string fname = "rxpilot" + std::to_string(dl_symbol_id) + "_" +
                           std::to_string(ant_id) + ".bin";
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
       std::fclose(f);
-      fname = "txpilot_f_" + std::to_string(symbol_id) + "_" +
+      fname = "txpilot_f_" + std::to_string(dl_symbol_id) + "_" +
               std::to_string(ant_id) + ".bin";
       f = std::fopen(fname.c_str(), "wb");
       std::fwrite(config_.UeSpecificPilot()[ant_id], 2 * sizeof(float),
@@ -344,7 +346,6 @@ void UeWorker::DoFftPilot(size_t tag) {
   }
 
   // remove CP, do FFT
-  size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
   size_t total_dl_symbol_id =
       (frame_slot * config_.Frame().NumDLSyms()) + dl_symbol_id;
   size_t fft_buffer_target_id =
@@ -495,8 +496,8 @@ void UeWorker::DoEncodeUe(DoEncode* encoder, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ue_id = gen_tag_t(tag).ue_id_;
-  for (size_t ch = 0; ch < config_.NumChannels(); ch++) {
-    const size_t ant_id = (ue_id * config_.NumChannels()) + ch;
+  for (size_t ch = 0; ch < config_.NumUeChannels(); ch++) {
+    const size_t ant_id = (ue_id * config_.NumUeChannels()) + ch;
     // For now, call for each cb
     for (size_t cb_id = 0; cb_id < config_.LdpcConfig().NumBlocksInSymbol();
          cb_id++) {
@@ -527,8 +528,8 @@ void UeWorker::DoModul(size_t tag) {
   }
   size_t start_tsc = GetTime::Rdtsc();
 
-  for (size_t ch = 0; ch < config_.NumChannels(); ch++) {
-    const size_t ant_id = (ue_id * config_.NumChannels()) + ch;
+  for (size_t ch = 0; ch < config_.NumUeChannels(); ch++) {
+    const size_t ant_id = (ue_id * config_.NumUeChannels()) + ch;
 
     const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
     const size_t total_ul_data_symbol_id =
@@ -537,8 +538,8 @@ void UeWorker::DoModul(size_t tag) {
     complex_float* modul_buf =
         &modul_buffer_[total_ul_data_symbol_id][ant_id * config_.OfdmDataNum()];
 
-    auto* ul_bits = config_.GetEncodedBuf(encoded_buffer_, frame_id,
-                                          ul_symbol_idx, ant_id, 0);
+    auto* ul_bits = config_.GetEncodedBuf(encoded_buffer_, Direction::kUplink,
+                                          frame_id, ul_symbol_idx, ant_id, 0);
 
     if (kDebugPrintModul) {
       std::printf(
@@ -578,8 +579,8 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
   const size_t user_id = gen_tag_t(tag).ue_id_;
 
   // For now, call for each channel
-  for (size_t ch = 0; ch < config_.NumChannels(); ch++) {
-    size_t ant_id = (user_id * config_.NumChannels()) + ch;
+  for (size_t ch = 0; ch < config_.NumUeChannels(); ch++) {
+    size_t ant_id = (user_id * config_.NumUeChannels()) + ch;
 
     // TODO Remove this copy
     {
@@ -624,11 +625,11 @@ void UeWorker::DoIfft(size_t tag) {
   }
   size_t start_tsc = GetTime::Rdtsc();
 
-  for (size_t ch = 0; ch < config_.NumChannels(); ch++) {
+  for (size_t ch = 0; ch < config_.NumUeChannels(); ch++) {
     const size_t ul_symbol_perframe = config_.Frame().NumULSyms();
 
     size_t ul_symbol_id = config_.Frame().GetULSymbolIdx(symbol_id);
-    size_t ant_id = user_id * config_.NumChannels() + ch;
+    size_t ant_id = user_id * config_.NumUeChannels() + ch;
     size_t total_ul_symbol_id = frame_slot * ul_symbol_perframe + ul_symbol_id;
     size_t buff_offset = total_ul_symbol_id * config_.UeAntNum() + ant_id;
     complex_float* ifft_buff = ifft_buffer_[buff_offset];

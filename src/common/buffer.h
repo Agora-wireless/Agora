@@ -189,12 +189,12 @@ class RxPacket {
   std::atomic<unsigned> references_;
   Packet *packet_;
 
-  inline virtual void GcPacket(void) {}
+  inline virtual void GcPacket() {}
 
  public:
   RxPacket() : references_(0) { packet_ = nullptr; }
   explicit RxPacket(Packet *in) : references_(0) { Set(in); }
-  explicit RxPacket(const RxPacket &copy) : packet_(copy.packet_) {
+  RxPacket(const RxPacket &copy) : packet_(copy.packet_) {
     references_.store(copy.references_.load());
   }
   virtual ~RxPacket() = default;

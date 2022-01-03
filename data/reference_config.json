@@ -14,14 +14,14 @@
   "external_ref_node": false,
   "channel": "A",
   "radio_num": 8,
-  "rate": 5e6,
+  "sample_rate": 5e6,
   "demul_block_size": 48,
-  "cp_len": 0,
+  "cp_size": 0,
   "modulation": "16QAM",
-  "ofdm_ca_num": 2048,
+  "fft_size": 2048,
   "ofdm_data_num": 1200,
   "ofdm_pilot_spacing": 16,
-  /*  (ofdm_ca_num_ - ofdm_data_num_) / 2 */
+  /*  (fft_size - ofdm_data_num_) / 2 */
   "ofdm_data_start": 424,
   "ofdm_tx_zero_prefix": 0,
   "ofdm_tx_zero_postfix": 0,
@@ -65,7 +65,7 @@
   "hw_framer": true,
   /* Frame definition */
   /* 2a explicit frame construction */
-  "frames": [
+  "frame_schedule": [
     "BPGUUUUG"
   ],
   /* 2b wordy frame construction */
@@ -114,5 +114,5 @@
   "core_offset": 0,
   "worker_thread_num": 25,
   "socket_thread_num": 4,
-  "frames_to_test": 9600
+  "max_frame": 9600
 }

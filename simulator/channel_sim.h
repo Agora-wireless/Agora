@@ -52,9 +52,9 @@ struct WorkerThreadStorage {
  */
 class ChannelSim {
  public:
-  ChannelSim(const Config* const config_bs, const Config* const config_ue,
-             size_t bs_thread_num, size_t user_thread_num,
-             size_t worker_thread_num, size_t in_core_offset = 30,
+  ChannelSim(const Config* const config, size_t bs_thread_num,
+             size_t user_thread_num, size_t worker_thread_num,
+             size_t in_core_offset = 30,
              std::string in_chan_type = std::string("RAYLEIGH"),
              double in_chan_snr = 20);
   ~ChannelSim();
@@ -95,10 +95,8 @@ class ChannelSim {
   // UE-facing sockets
   std::vector<std::unique_ptr<UDPServer>> server_ue_;
 
-  const Config* const bscfg_;
-  const Config* const uecfg_;
+  const Config* const cfg_;
   std::unique_ptr<Channel> channel_;
-
 
   // Data buffer for received symbols from BS antennas (downlink)
   AlignedByteVector rx_buffer_bs_;
@@ -141,7 +139,7 @@ class ChannelSim {
     if (symbol_id == 0) {
       return 0;
     } else {
-      return bscfg_->Frame().GetDLSymbolIdx(symbol_id) + 1;
+      return cfg_->Frame().GetDLSymbolIdx(symbol_id) + 1;
     }
   }
 };
