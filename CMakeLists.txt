@@ -3,7 +3,7 @@ include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
 #Allow project version
 cmake_policy(SET CMP0048 NEW)
-project(Agora VERSION 1.0.0)
+project(Agora VERSION 1.1.0)
 
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   set(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
