@@ -41,7 +41,7 @@ Some highlights:
 
      * Install [Intel FlexRAN's FEC SDK](https://software.intel.com/en-us/articles/flexran-lte-and-5g-nr-fec-software-development-kit-modules) for LDPC encoding and decoding:
         * **NOTE**: Compiling FlexRAN requires Intel compiler with version <= 19.0.4.
-          Newer versions of Intel compiler can also work, but require a patch for resolving conflicts with FlexRAN. 
+          Newer versions of Intel compiler can also work, but require a patch for resolving conflicts with FlexRAN.\
           Please [contact](#contact) the current Agora developers to get the patch.
         * Download Intel FlexRAN's FEC SDK to `/opt`.
         * Compile FlexRAN as follows:
@@ -58,9 +58,11 @@ Some highlights:
        * Refer to [DPDK_README.md](DPDK_README.md) for configuration and installation instructions.
 
 ## Building and running with emulated RRU
-We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware. The following are steps to set up both Agora and the packet generator.
+We provide a high performance [packet generator](simulator) to emulate the RRU. This generator allows Agora to run and be tested without actual RRU hardware.\
+The following are steps to set up both Agora and the packet generator:
 
- * Build Agora. This step also builds the emulated RRU, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink, and several unit tests for testing either performance or correctness of individual functions.
+ * Build Agora. This step also builds the emulated RRU, a data generator that generates random input data files, an end-to-end test that checks correctness of end results for both uplink and downlink,\
+ and several unit tests for testing either performance or correctness of individual functions.
     <pre>
     $ cd Agora
     $ mkdir build
@@ -75,11 +77,11 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
     </pre>
 
  * Run Agora with emulated RRU traffic
-   * **NOTE**: We recommend running Agora and the emulated RRU on two different machines. 
-   If you are running them on the same machine, make sure Agora and the emulated RRU are using different set of cores, 
+   * **NOTE**: We recommend running Agora and the emulated RRU on two different machines.\
+   If you are running them on the same machine, make sure Agora and the emulated RRU are using different set of cores,
      otherwise there will be performance slow down. 
-   When running Agora and the emulated RRU on two different machines, the following steps 
-     use Linux networking stack for packet I/O. 
+     
+   When running Agora and the emulated RRU on two different machines, the following steps use Linux networking stack for packet I/O.\
      Agora also supports using DPDK to bypass the kernel for packet I/O. 
      See [DPDK_README.md](DPDK_README.md) for instructions of running emulated RRU and Agora with DPDK. 
    
@@ -103,22 +105,22 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
  * Run Agora with channel simulator and clients
    * First, return to the base directory (`cd ..`), then run
    <pre>
-   $ ./build/data_generator --conf_file data/bs-sim.json
+   $ ./build/data_generator --conf_file data/chsim.json
    </pre>
     to generate data files.
    * In one terminal, run
    <pre>
-   $ ./build/user --conf_file data/ue-sim.json
+   $ ./build/user --conf_file data/chsim.json
    </pre>
      to start clients with
      combined uplink & downlink configuration.
    * In another terminal, run
    <pre>
-   $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --bs_conf_file data/bs-sim.json --ue_conf_file data/ue-sim.json
+   $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 24 --conf_file data/chsim.json
    </pre>
    * In another terminal, run
    <pre>
-   $ ./build/agora data/bs-sim.json
+   $ ./build/agora --conf_file data/chsim.json
    </pre>
    to start Agora with the combined configuration.
    * Note: make sure Agora and sender are using different set of cores, otherwise there will be performance slow down.
@@ -128,36 +130,36 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
    <pre>
    $ cmake .. -DENABLE_MAC=true
    </pre>
-   * Uplink Testing (`--conf_file ue-mac-ul-sim.json / bs-mac-ul-sim.json`)
-   * Downlink Testing  (`--conf_file ue-mac-dl-sim.json / bs-mac-dl-sim.json`)
-   * Combined Testing  (`--conf_file ue-mac-sim.json / bs-mac-sim.json`)
+   * Uplink Testing (`--conf_file mac-ul-sim.json`)
+   * Downlink Testing  (`--conf_file mac-dl-sim.json`)
+   * Combined Testing  (`--conf_file mac-sim.json`)
      * Terminal 1:
      <pre>
-       $./build/data_generator --conf_file data/ue-mac-sim.json
+       $./build/data_generator --conf_file data/mac-sim.json
      </pre>
        to generate data files.
      <pre>
-       $./build/user --conf_file data/ue-mac-sim.json
+       $./build/user --conf_file data/mac-sim.json
      </pre>
        to start users.
      * Terminal 2:
      <pre>
-     $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --bs_conf_file data/bs-mac-sim.json --ue_conf_file data/ue-mac-sim.json
+     $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --bs_conf_file data/mac-sim.json --ue_conf_file data/mac-sim.json
      </pre>
        to run the channel simulator
      * Terminal 3:
      <pre>
-       $ ./build/macuser --enable_slow_start 1 --conf_file data/ue-mac-sim.json
+       $ ./build/macuser --enable_slow_start 1 --conf_file data/mac-sim.json
      </pre>
       to run to user mac app.  Specify `--data_file ""` to generate patterned data and `--conf_file` options as necessary.
      * Terminal 4:
      <pre>
-     $ ./build/agora --conf_file data/bs-mac-sim.json
+     $ ./build/agora --conf_file data/mac-sim.json
      </pre>
       run agora before running macbs.  Run macuser -> agora -> macbs in quick succession. 
      * Terminal 5:
      <pre>
-     $ ./build/macbs --enable_slow_start 1 --conf_file data/bs-mac-sim.json
+     $ ./build/macbs --enable_slow_start 1 --conf_file data/mac-sim.json
      </pre>
      to run to base station mac app. specify `--data_file ""` to generate patterned data and `--conf_file` options as necessary.
    * Note: make sure agora / user / chsim / macuser / macbs are using different set of cores, otherwise there will be performance slow down.
@@ -166,56 +168,56 @@ We provide a high performance [packet generator](simulator) to emulate the RRU. 
    [Agora with real RRU](#agora-with-real-rru) section below.
 
 ## Building and running with real RRU
-Agora supports a 64-antenna Faros base station as RRU and Iris UE devices. Both are commercially available from 
-[Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).
-Both Faros and Iris have their roots in the [Argos massive MIMO base station](https://www.yecl.org/argos/), especially [ArgosV3](https://www.yecl.org/argos/pubs/Shepard-MobiCom17-Demo.pdf). Agora also supports USRP-based RRU and UEs.
+Agora supports a 64-antenna Faros base station as RRU and Iris UE devices. Both are commercially available from [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).\
+Both Faros and Iris have their roots in the [Argos massive MIMO base station](https://www.yecl.org/argos/), especially [ArgosV3](https://www.yecl.org/argos/pubs/Shepard-MobiCom17-Demo.pdf).
+Agora also supports USRP-based RRU and UEs.
 
-We use command line variables of cmake to switch between emulated RRU and real RRU. 
-We use `-DUSE_AGROS` for Faros RRU and Iris UEs, and `-DUSE_UHD` for USRP-based RRU and UEs. 
-
-Agora supports both uplink and downlink with real RRU and UEs. 
-For downlink, a reference node outside the array (and synchronized) is required for reciprocity calibration.
-We recommend using one server for controlling the RRU and running Agora, 
+We recommend using one server for controlling the RRU and running Agora,
 and another server for controlling the UEs and running the UE code.
-Below we describe how to get the uplink and downlink demos working.
+ 
+Agora supports both uplink and downlink with real RRU and UEs. For downlink, a reference node outside the array (and synchronized) is required for reciprocity calibration.\
+**Note:** Faros RRU and Iris UEs can be discovered using the [pyfaros](https://github.com/skylarkwireless/pyfaros) tool. You can use this tool to find the topology of the hardware connected to the server.
+
+We describe how to get the uplink and downlink demos working. Below XX can be replaced with either `ul` and `dl`.
  * Rebuild the code on both servers for RRU side the UE side.
     * For Faros RRU and Iris UEs, pass `-DUSE_ARGOS=on -DUSE_UHD=off` to cmake
-    * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on` to cmake 
+    * For USRP-based RRU and UEs, pass `-DUSE_ARGOS=off -DUSE_UHD=on` to cmake
     * Run `make -j` to recompile the code.
  * Run the UE code on the server connected to the Iris UEs
-   * Modify `data/user-iris-serials.txt` by adding serials of two client Irises
+   * For Iris UEs, run the pyfaros tool in the `data` directory as follows:
+     <pre>
+     $ python3 -m pyfaros.discover --json-out
+     </pre>
+     This will output a file named `topology.json` with all the discoverable serial IDs included.
+   * Modify `data/topology.json` by adding/removing serials of client Irises you'd like to include
      from your setup.
-   * Run `./build/data_generator --conf_file data/ue-ul-hw.json` to generate required data files. 
-   * Run `./build/user --conf_file data/ue-ul-hw.json`.
-   * For downlink, use `data/ue-dl-hw.json` in the last two steps.
+   * For USRP-based RRU and UEs, modify the existing `data/topology.json` and enter the appropriate IDs.
+   * Run `./build/data_generator --conf_file data/XX-hw.json` to generate required data files.
+   * Run `./build/user --conf_file data/XX-hw.json`.
  * Run Agora on the server connected to the Faros RRU
-   * scp over the generated file `data/LDPC_orig_data_512_ant2.bin` from the client
+   * scp over the generated file `data/LDPC_orig_XX_data_512_ant2.bin` from the client
      machine to the server's `data` directory.
    * Rebuild the code
      * Run `make -j` to compile the code.
-   * Modify `data/bs-iris-serials.txt` and `data/bs-hub-serial.txt` by adding
-     serials of your RRU Irises and hub, respectively.
-   * Run `./build/agora --conf_file data/bs-ul-hw.json`.
-   * For downlink, put the serial of the reference node in the last line
-     of `data/bs-iris-serials.txt` and modify/add `"ref_ant"` in `data/bs-dl-hw.json`
-     to reflect the antenna index of the reference node.
+   * For Faros RRU, use the pyfaros tool the same as with the UEs to generate a new `data/topology.json`
+   * Modify `data/topology.json` by adding/removing serials of your RRU Irises, and the hub.
+   * Run `./build/agora --conf_file data/XX-hw.json`.
 
 ## Running performance test
-To test the real-time performance of Agora for processing 64x16 MU-MIMO with 20 MHz bandwidth and 64QAM modulation,
-we recommend using two servers 
-(one for Agora and another for the emulated RRU) and DPDK for networking. 
+To test the real-time performance of Agora for processing 64x16 MU-MIMO with 20 MHz bandwidth and 64QAM modulation, we recommend using two servers 
+(one for Agora and another for the emulated RRU) and DPDK\
+for networking. 
 In our experiments, we use 2 servers each with 4 Intel Xeon Gold 6130 CPUs. 
 The servers are connected by 40 GbE Intel XL710 dual-port NICs. 
 
-* **NOTE**: We recommend using at least 10 GbE NIC and a server with more than 10 cores 
-for testing real-time performance of 8x8 MU-MIMO. 
-For 8x8 MU-MIMO, our test on a machine with AVX-512 and CPU frequency of 2.3 GHz support shows that at least 7 worker cores are required to achieve real-time performance. Additionally, Agora requires one core for the manager thread and at least 1 core for network threads. We change "worker_thread_num" and "socket_thread_num" to change the number cores assigned to of worker threads and network threads in the json files, e.g., data/tddconfig-sim-ul.json. 
-If you do not have a powerful server or high throughput NICs, 
-we recommend increasing the value of `--frame_duration` when you run `./build/sender`, 
-which will increase frame duration and reduce throughput.
+* **NOTE**: We recommend using at least 10 GbE NIC and a server with more than 10 cores for testing real-time performance of 8x8 MU-MIMO. For 8x8 MU-MIMO, our test on a machine with AVX-512 and CPU frequency\
+of 2.3 GHz support shows that at least 7 worker cores are required to achieve real-time performance. Additionally, Agora requires one core for the manager thread and at least 1 core for network threads.\
+
+We change "worker_thread_num" and "socket_thread_num" to change the number cores assigned to of worker threads and network threads in the json files, e.g., data/tddconfig-sim-ul.json.\
+If you do not have a powerful server or high throughput NICs, we recommend increasing the value of `--frame_duration` when you run `./build/sender`, which will increase frame duration and reduce throughput.
 
 To process 64x16 MU-MIMO in real-time, we use both ports of 40 GbE Intel XL710 NIC with DPDK (see [DPDK_README.md](DPDK_README.md))
-to get enough throughput for the traffic of 64 antennas. 
+to get enough throughput for the traffic of 64 antennas. \
 (**NOTE**: For 100 GbE NIC, we just need to use one port to get enough thoughput.)
 
 To reduce performance variations, we did the following configurations for the server that runs Agora:
@@ -241,7 +243,7 @@ To reduce performance variations, we did the following configurations for the se
     
 The steps to collect and analyze timestamp traces are as follows:
   * Enable DPDK in Agora.  Make sure it is compiled / configured for supporting your specific hardware NICs (see [DPDK_README.md](DPDK_README.md)).
-  * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments. 
+  * We use data/tddconfig-sim-ul.json for uplink experiments and data/tddconfig-sim-dl.json for downlink experiments.\
     In our [paper](#documentation), we change “antenna_num”,  “ue_num” and “symbol_num_perframe” 
     to different values to collect different data points in the figures. 
   * Generate source data files by running

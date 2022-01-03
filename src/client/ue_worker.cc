@@ -165,12 +165,12 @@ void UeWorker::DoFftData(size_t tag) {
 
   if (kRecordDownlinkFrame) {
     if (frame_id == kRecordFrameIndex) {
-      std::string fname = "rxdata" + std::to_string(symbol_id) + "_" +
+      std::string fname = "rxdata" + std::to_string(dl_symbol_id) + "_" +
                           std::to_string(ant_id) + ".bin";
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
       std::fclose(f);
-      fname = "txdata" + std::to_string(symbol_id) + "_" +
+      fname = "txdata" + std::to_string(dl_symbol_id) + "_" +
               std::to_string(ant_id) + ".bin";
       f = std::fopen(fname.c_str(), "wb");
       std::fwrite(config_.DlIqF()[dl_symbol_id] + ant_id * config_.OfdmCaNum(),
@@ -298,7 +298,9 @@ void UeWorker::DoFftPilot(size_t tag) {
                 tid_, frame_id, symbol_id, ant_id);
   }
 
+  size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
   size_t sig_offset = config_.OfdmRxZeroPrefixClient();
+
   if (kPrintDownlinkPilotStats) {
     SimdConvertShortToFloat(pkt->data_, reinterpret_cast<float*>(rx_samps_tmp_),
                             2 * config_.SampsPerSymbol());
@@ -329,12 +331,12 @@ void UeWorker::DoFftPilot(size_t tag) {
 
   if (kRecordDownlinkFrame) {
     if (frame_id == kRecordFrameIndex) {
-      std::string fname = "rxpilot" + std::to_string(symbol_id) + "_" +
+      std::string fname = "rxpilot" + std::to_string(dl_symbol_id) + "_" +
                           std::to_string(ant_id) + ".bin";
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
       std::fclose(f);
-      fname = "txpilot_f_" + std::to_string(symbol_id) + "_" +
+      fname = "txpilot_f_" + std::to_string(dl_symbol_id) + "_" +
               std::to_string(ant_id) + ".bin";
       f = std::fopen(fname.c_str(), "wb");
       std::fwrite(config_.UeSpecificPilot()[ant_id], 2 * sizeof(float),
@@ -344,7 +346,6 @@ void UeWorker::DoFftPilot(size_t tag) {
   }
 
   // remove CP, do FFT
-  size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
   size_t total_dl_symbol_id =
       (frame_slot * config_.Frame().NumDLSyms()) + dl_symbol_id;
   size_t fft_buffer_target_id =

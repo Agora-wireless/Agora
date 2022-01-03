@@ -50,7 +50,6 @@ class ClientRadioConfig {
   void InitClientRadio(size_t tid);
 
   const Config* const cfg_;
-  std::vector<SoapySDR::Device*> hubs_;
   std::vector<SoapySDR::Device*> cl_stn_;
   SoapySDR::Device* ref_;
   SoapySDR::Stream* ref_rx_stream_;
