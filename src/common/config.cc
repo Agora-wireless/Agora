@@ -19,7 +19,7 @@
 using json = nlohmann::json;
 
 static const size_t kMacAlignmentBytes = 64u;
-static constexpr size_t kDebugPrintConfiguration = false;
+static constexpr bool kDebugPrintConfiguration = false;
 
 Config::Config(const std::string& jsonfile)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -75,7 +75,7 @@ Config::Config(const std::string& jsonfile)
       auto hub_serial = serials_conf.value("hub", "");
       hub_id_.push_back(hub_serial);
       auto sdr_serials = serials_conf.value("sdr", json::array());
-      RtAssert(sdr_serials.size() != 0, "BS has zero sdrs!");
+      RtAssert(!sdr_serials.empty(), "BS has zero sdrs!");
       radio_id_.insert(radio_id_.end(), sdr_serials.begin(), sdr_serials.end());
       num_radios_ += sdr_serials.size();
       cell_id_.resize(num_radios_, i);
@@ -136,8 +136,9 @@ Config::Config(const std::string& jsonfile)
 
   bf_ant_num_ = bs_ant_num_;
   for (size_t i = 0; i < num_cells_; i++) {
-    if (external_ref_node_.at(i) == true)
+    if (external_ref_node_.at(i) == true) {
       bf_ant_num_ = bs_ant_num_ - num_channels_;
+    }
   }
 
   if (ref_radio_.empty() == false) {

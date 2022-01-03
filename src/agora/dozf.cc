@@ -46,16 +46,20 @@ DoZF::DoZF(Config* config, int tid,
                                        kMaxAntennas * sizeof(complex_float)));
 
   num_ext_ref_ = 0;
-  for (size_t i = 0; i < cfg_->NumCells(); i++)
-    if (cfg_->ExternalRefNode(i) == true) num_ext_ref_++;
+  for (size_t i = 0; i < cfg_->NumCells(); i++) {
+    if (cfg_->ExternalRefNode(i) == true) {
+      num_ext_ref_++;
+    }
+  }
   if (num_ext_ref_ > 0) {
     ext_ref_id_.zeros(num_ext_ref_ * cfg_->NumChannels());
     size_t ext_id = 0;
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       if (cfg_->ExternalRefNode(i) == true) {
-        for (size_t j = 0; j < cfg_->NumChannels(); j++)
+        for (size_t j = 0; j < cfg_->NumChannels(); j++) {
           ext_ref_id_.at(ext_id * cfg_->NumChannels() + j) =
               cfg_->RefAnt(i) + j;
+        }
         ext_id++;
       }
     }
@@ -142,7 +146,9 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
   }
   mat_ul_zf = mat_ul_zf_tmp;
   float rcond = -1;
-  if (kPrintZfStats) rcond = arma::rcond(mat_csi.t() * mat_csi);
+  if (kPrintZfStats) {
+    rcond = arma::rcond(mat_csi.t() * mat_csi);
+  }
   return rcond;
 }
 
@@ -205,14 +211,15 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id) {
                                      pre_calib_ul_msum_mat.row(sc_id) -
                                      old_calib_ul_mat.row(sc_id);
 
-  if (cfg_->InitCalibRepeat() == 0u && frame_grp_id == 0)
+  if (cfg_->InitCalibRepeat() == 0u && frame_grp_id == 0) {
     // fill with one until one full sweep
     // of  calibration data is done
     calib_vec.fill(arma::cx_float(1, 0));
-  else
+  } else {
     calib_vec =
         (cur_calib_dl_msum_mat.row(sc_id) / cur_calib_ul_msum_mat.row(sc_id))
             .st();
+  }
 }
 
 // Gather data of one symbol from partially-transposed buffer
@@ -343,7 +350,9 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     auto rcond = ComputePrecoder(mat_csi, calib_gather_buffer_,
                                  ul_zf_matrices_[frame_slot][cur_sc_id],
                                  dl_zf_matrices_[frame_slot][cur_sc_id]);
-    if (kPrintZfStats) phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
+    if (kPrintZfStats) {
+      phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
+    }
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;
     duration_stat_->task_count_++;

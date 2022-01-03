@@ -39,7 +39,7 @@ UeWorker::UeWorker(
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
     std::vector<std::vector<std::complex<float>>>& ue_pilot_vec)
     : tid_(tid),
-      thread_(),
+
       notify_queue_(notify_queue),
       work_queue_(work_queue),
       work_producer_token_(work_producer),
@@ -94,7 +94,7 @@ void UeWorker::TaskThread(size_t core_offset) {
   PinToCoreWithOffset(ThreadType::kWorker, core_offset, tid_);
 
   auto encoder = std::make_unique<DoEncode>(
-      &config_, (int)tid_, Direction::Uplink,
+      &config_, (int)tid_, Direction::kUplink,
       (kEnableMac == true) ? ul_bits_buffer_ : config_.UlBits(),
       (kEnableMac == true) ? kFrameWnd : 1, encoded_buffer_, &stats_);
 
@@ -538,7 +538,7 @@ void UeWorker::DoModul(size_t tag) {
     complex_float* modul_buf =
         &modul_buffer_[total_ul_data_symbol_id][ant_id * config_.OfdmDataNum()];
 
-    auto* ul_bits = config_.GetEncodedBuf(encoded_buffer_, Direction::Uplink,
+    auto* ul_bits = config_.GetEncodedBuf(encoded_buffer_, Direction::kUplink,
                                           frame_id, ul_symbol_idx, ant_id, 0);
 
     if (kDebugPrintModul) {

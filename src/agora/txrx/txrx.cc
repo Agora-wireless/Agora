@@ -179,12 +179,12 @@ void PacketTXRX::LoopTxRx(size_t tid) {
   const size_t radio_hi =
       std::min((radio_lo + radios_per_thread), cfg_->BsAntNum()) - 1;
 
-  static constexpr size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
+  static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
   for (size_t radio_id = radio_lo; radio_id <= radio_hi; ++radio_id) {
     size_t local_port_id = cfg_->BsServerPort() + radio_id;
 
     udp_servers_.at(radio_id) =
-        std::make_unique<UDPServer>(local_port_id, sock_buf_size);
+        std::make_unique<UDPServer>(local_port_id, kSockBufSize);
     udp_clients_.at(radio_id) = std::make_unique<UDPClient>();
     MLPD_FRAME(
         "TXRX thread %d: set up UDP socket server listening to port %d"

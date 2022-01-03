@@ -16,7 +16,7 @@ Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
       stats_(std::make_unique<Stats>(cfg)),
-      phy_stats_(std::make_unique<PhyStats>(cfg, Direction::Uplink)),
+      phy_stats_(std::make_unique<PhyStats>(cfg, Direction::kUplink)),
       csi_buffers_(kFrameWnd, cfg->UeAntNum(),
                    cfg->BsAntNum() * cfg->OfdmDataNum()),
       ul_zf_matrices_(kFrameWnd, cfg->OfdmDataNum(),
@@ -98,7 +98,7 @@ void Agora::Stop() {
   packet_tx_rx_.reset();
 }
 
-void Agora::SendSnrReport(EventType event_type, size_t frame_id,
+void Agora::SendSnrReport(EventType /*event_type*/, size_t frame_id,
                           size_t symbol_id) {
   assert(event_type == EventType::kSNRReport);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
@@ -272,7 +272,7 @@ void Agora::ScheduleCodeblocks(EventType event_type, size_t frame_id,
   }
 }
 
-void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
+void Agora::ScheduleUsers(EventType /*event_type*/, size_t frame_id,
                           size_t symbol_id) {
   assert(event_type == EventType::kPacketToMac);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
@@ -371,7 +371,9 @@ void Agora::Start() {
               zf_last_frame_ = frame_id;
               PrintPerFrameDone(PrintType::kZF, frame_id);
               this->zf_counters_.Reset(frame_id);
-              if (kPrintZfStats) this->phy_stats_->PrintZfStats(frame_id);
+              if (kPrintZfStats) {
+                this->phy_stats_->PrintZfStats(frame_id);
+              }
 
               for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
                 if (this->fft_cur_frame_for_symbol_.at(i) == frame_id) {
@@ -809,7 +811,7 @@ void Agora::Worker(int tid) {
       this->dl_encoded_buffer_, this->stats_.get());
 
   auto compute_encoding = std::make_unique<DoEncode>(
-      config_, tid, Direction::Downlink,
+      config_, tid, Direction::kDownlink,
       (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
       (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
       this->stats_.get());
@@ -951,7 +953,7 @@ void Agora::WorkerDecode(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerDecode, base_worker_core_offset_, tid);
 
   std::unique_ptr<DoEncode> compute_encoding(
-      new DoEncode(config_, tid, Direction::Downlink,
+      new DoEncode(config_, tid, Direction::kDownlink,
                    (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
                    (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
                    this->stats_.get()));
@@ -1530,7 +1532,7 @@ void Agora::GetEqualData(float** ptr, int* size) {
   *ptr = (float*)&equal_buffer_[offset][0];
   *size = cfg->UeAntNum() * cfg->OfdmDataNum() * 2;
 }
-void Agora::CheckIncrementScheduleFrame(size_t frame_id,
+void Agora::CheckIncrementScheduleFrame(size_t /*frame_id*/,
                                         ScheduleProcessingFlags completed) {
   this->schedule_process_flags_ += completed;
   assert(this->cur_sche_frame_id_ == frame_id);

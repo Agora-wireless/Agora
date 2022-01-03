@@ -56,9 +56,9 @@ void* MacReceiver::LoopRecv(size_t tid) {
   size_t core_offset = core_id_ + rx_thread_num_;
   PinToCoreWithOffset(ThreadType::kWorkerRX, core_offset, tid);
 
-  static constexpr size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
+  static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
   auto udp_server =
-      std::make_unique<UDPServer>(phy_port_ + ue_id, sock_buf_size);
+      std::make_unique<UDPServer>(phy_port_ + ue_id, kSockBufSize);
 
   std::unique_ptr<UDPClient> udp_streamer;
   if (enable_udp_output_) {

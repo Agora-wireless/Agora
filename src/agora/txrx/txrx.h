@@ -107,7 +107,7 @@ class PacketTXRX {
  private:
   void LoopTxRx(size_t tid);  // The thread function for thread [tid]
   size_t DequeueSend(int tid);
-  Packet* RecvEnqueue(size_t tid, size_t radio_id, size_t rx_offset);
+  Packet* RecvEnqueue(size_t tid, size_t radio_id, size_t rx_slot);
 
   void LoopTxRxArgos(size_t tid);
   size_t DequeueSendArgos(int tid, long long time0);

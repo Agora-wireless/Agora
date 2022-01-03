@@ -145,7 +145,7 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
       ue_device = SoapySDR::Device::make(args);
       break;
     } catch (const std::runtime_error& e) {
-      auto* message = e.what();
+      const auto* message = e.what();
       std::printf("InitClientRadio[%zu] - Soapy error try %zu -- %s\n", tid,
                   tries, message);
     }

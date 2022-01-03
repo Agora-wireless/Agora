@@ -201,7 +201,7 @@ class UDPServer {
    * @brief Configures the socket in blocking mode.  Any calls to recv / send
    * will now block
    */
-  void MakeBlocking(size_t timeout_sec = 0) {
+  void MakeBlocking(size_t timeout_sec = 0) const {
     int current_flags = fcntl(sock_fd_, F_GETFL);
     if (current_flags == -1) {
       throw std::runtime_error("UDPServer: fcntl failed to get flags");

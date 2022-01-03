@@ -57,8 +57,9 @@ EventData DoEncode::Launch(size_t tag) {
 
   size_t start_tsc = GetTime::WorkerRdtsc();
 
-  size_t symbol_idx, symbol_idx_data;
-  if (dir_ == Direction::Downlink) {
+  size_t symbol_idx;
+  size_t symbol_idx_data;
+  if (dir_ == Direction::kDownlink) {
     symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
     assert(symbol_idx >= cfg_->Frame().ClientDlPilotSymbols());
     symbol_idx_data = symbol_idx - cfg_->Frame().ClientDlPilotSymbols();
@@ -120,7 +121,7 @@ EventData DoEncode::Launch(size_t tag) {
   int8_t* final_output_ptr = cfg_->GetEncodedBuf(
       encoded_buffer_, dir_, frame_id, symbol_idx, ue_id, cur_cb_id);
 
-  if (kPrintRawMacData && dir_ == Direction::Uplink) {
+  if (kPrintRawMacData && dir_ == Direction::kUplink) {
     std::printf("Encoded data - placed at location (%zu %zu %zu) %zu\n",
                 frame_id, symbol_idx, ue_id, (size_t)final_output_ptr);
   }

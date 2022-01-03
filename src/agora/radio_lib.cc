@@ -24,7 +24,7 @@ RadioConfig::RadioConfig(Config* cfg)
   if (kUseUHD == false) {
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       SoapySDR::Device* hub_device = nullptr;
-      if (cfg_->HubId().at(i) != "") {
+      if (!cfg_->HubId().at(i).empty()) {
         args["driver"] = "remote";
         args["timeout"] = "1000000";
         args["serial"] = cfg_->HubId().at(i);
@@ -34,7 +34,7 @@ RadioConfig::RadioConfig(Config* cfg)
             hub_device = SoapySDR::Device::make(args);
             break;
           } catch (const std::runtime_error& e) {
-            auto* message = e.what();
+            const auto* message = e.what();
             std::printf("Soapy error[%zu] -- %s\n", tries, message);
           }
         }
@@ -221,7 +221,7 @@ void RadioConfig::InitBsRadio(size_t tid) {
       bs_device = SoapySDR::Device::make(args);
       break;
     } catch (const std::runtime_error& e) {
-      auto* message = e.what();
+      const auto* message = e.what();
       std::printf("InitBsRadio[%zu] - Soapy error try %zu -- %s\n", tid, tries,
                   message);
     }
@@ -694,7 +694,7 @@ RadioConfig::~RadioConfig() {
   }
   ba_stn_.clear();
 
-  for (auto hub : hubs_) {
+  for (auto* hub : hubs_) {
     SoapySDR::Device::unmake(hub);
   }
   hubs_.clear();

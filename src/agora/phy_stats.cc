@@ -8,7 +8,7 @@
 #include <cmath>
 
 PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
-  if (dir_ == Direction::Downlink) {
+  if (dir_ == Direction::kDownlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
   } else {
     num_rx_symbols_ = cfg->Frame().NumULSyms();
@@ -34,7 +34,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                      Agora_memory::Alignment_t::kAlign64);
 
   if (num_rx_symbols_ > 0) {
-    if (dir_ == Direction::Downlink) {
+    if (dir_ == Direction::kDownlink) {
       auto* dl_iq_f_ptr = reinterpret_cast<arma::cx_float*>(
           cfg->DlIqF()[cfg->Frame().ClientDlPilotSymbols()]);
       arma::cx_fmat dl_iq_f_mat(dl_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(),
@@ -76,7 +76,7 @@ PhyStats::~PhyStats() {
 void PhyStats::PrintPhyStats() {
   const size_t task_buffer_symbol_num = num_rx_symbols_ * kFrameWnd;
   std::string tx_type;
-  if (dir_ == Direction::Downlink) {
+  if (dir_ == Direction::kDownlink) {
     tx_type = "Downlink";
   } else {
     tx_type = "Uplink";
@@ -136,13 +136,22 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
       size_t radio_id = j / config_->NumChannels();
       size_t cell_id = config_->CellId().at(radio_id);
       if (config_->ExternalRefNode(cell_id) == true &&
-          radio_id == config_->RefRadio(cell_id))
+          radio_id == config_->RefRadio(cell_id)) {
         continue;
-      if (frame_snr[j] < min_snr) min_snr = frame_snr[j];
-      if (frame_snr[j] > max_snr) max_snr = frame_snr[j];
+      }
+      if (frame_snr[j] < min_snr) {
+        min_snr = frame_snr[j];
+      }
+      if (frame_snr[j] > max_snr) {
+        max_snr = frame_snr[j];
+      }
     }
-    if (min_snr == FLT_MAX) min_snr = -100;
-    if (max_snr == FLT_MIN) max_snr = -100;
+    if (min_snr == FLT_MAX) {
+      min_snr = -100;
+    }
+    if (max_snr == FLT_MIN) {
+      max_snr = -100;
+    }
     ss << "User " << i << ": [" << min_snr << "," << max_snr << "]"
        << " ";
   }
@@ -164,17 +173,27 @@ void PhyStats::PrintCalibSnrStats(size_t frame_id) {
       size_t radio_id = j / config_->NumChannels();
       size_t cell_id = config_->CellId().at(radio_id);
       if (config_->ExternalRefNode(cell_id) == true &&
-          radio_id == config_->RefRadio(cell_id))
+          radio_id == config_->RefRadio(cell_id)) {
         continue;
-      if (frame_snr[j] < min_snr) min_snr = frame_snr[j];
-      if (frame_snr[j] > max_snr) max_snr = frame_snr[j];
+      }
+      if (frame_snr[j] < min_snr) {
+        min_snr = frame_snr[j];
+      }
+      if (frame_snr[j] > max_snr) {
+        max_snr = frame_snr[j];
+      }
     }
-    if (min_snr == FLT_MAX) min_snr = -100;
-    if (max_snr == FLT_MIN) max_snr = -100;
-    if (i == 0)
+    if (min_snr == FLT_MAX) {
+      min_snr = -100;
+    }
+    if (max_snr == FLT_MIN) {
+      max_snr = -100;
+    }
+    if (i == 0) {
       ss << "Downlink ";
-    else
+    } else {
       ss << "Uplink ";
+    }
     ss << ": [" << min_snr << "," << max_snr << "] ";
   }
   ss << std::endl;
@@ -225,8 +244,12 @@ void PhyStats::PrintZfStats(size_t frame_id) {
   float max_cond = 0;
   float min_cond = 1;
   for (size_t j = 0; j < config_->OfdmDataNum(); j++) {
-    if (cond_vec.at(j) < min_cond) min_cond = cond_vec.at(j);
-    if (cond_vec.at(j) > max_cond) max_cond = cond_vec.at(j);
+    if (cond_vec.at(j) < min_cond) {
+      min_cond = cond_vec.at(j);
+    }
+    if (cond_vec.at(j) > max_cond) {
+      max_cond = cond_vec.at(j);
+    }
   }
   ss << "[" << min_cond << "," << max_cond
      << "], Mean: " << arma::mean(cond_vec);

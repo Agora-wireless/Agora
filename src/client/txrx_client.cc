@@ -137,7 +137,7 @@ struct Packet* RadioTxRx::RecvEnqueue(size_t tid, size_t ant_id,
 }
 
 int RadioTxRx::DequeueSend(int tid) {
-  auto& c = config_;
+  const auto& c = config_;
   EventData event;
   if (task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event) == false) {
     return -1;
@@ -260,7 +260,7 @@ void* RadioTxRx::LoopTxRx(size_t tid) {
 
 // dequeue_send_sdr
 int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
-  auto& c = config_;
+  const auto& c = config_;
   auto& radio = radioconfig_;
   size_t packet_length = c->PacketLength();
   size_t num_samps = c->SampsPerSymbol();
@@ -371,7 +371,7 @@ int RadioTxRx::DequeueSendArgos(int tid, long long time0) {
 struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
                                            size_t& frame_id, size_t& symbol_id,
                                            size_t rx_slot, bool dummy_enqueue) {
-  auto& c = config_;
+  const auto& c = config_;
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
 
   size_t num_samps = c->SampsPerSymbol();
@@ -432,7 +432,7 @@ struct Packet* RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
 
 void* RadioTxRx::LoopTxRxArgos(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_id_, tid);
-  auto& c = config_;
+  const auto& c = config_;
   const size_t num_radios = c->UeNum();
   size_t radio_lo = tid * num_radios / thread_num_;
   size_t radio_hi = (tid + 1) * num_radios / thread_num_;
@@ -494,7 +494,7 @@ void* RadioTxRx::LoopTxRxArgos(size_t tid) {
 void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
   ///\todo FIXME: This only works when there is 1 radio per thread.
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_id_, tid);
-  auto& c = config_;
+  const auto& c = config_;
   size_t num_samps = c->SampsPerSymbol();
   size_t frm_num_samps = num_samps * c->Frame().NumTotalSyms();
   ClientRadioConfig* radio = radioconfig_.get();

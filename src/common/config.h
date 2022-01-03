@@ -349,7 +349,7 @@ class Config {
                             size_t frame_id, size_t symbol_id, size_t ue_id,
                             size_t cb_id) const {
     size_t mac_bytes_perframe;
-    if (dir == Direction::Downlink) {
+    if (dir == Direction::kDownlink) {
       mac_bytes_perframe = dl_mac_bytes_num_perframe_;
     } else {
       mac_bytes_perframe = ul_mac_bytes_num_perframe_;
@@ -373,7 +373,7 @@ class Config {
                                size_t cb_id) const {
     size_t total_data_symbol_id;
 
-    if (dir == Direction::Downlink) {
+    if (dir == Direction::kDownlink) {
       total_data_symbol_id = GetTotalDataSymbolIdxDl(frame_id, symbol_id);
     } else {
       total_data_symbol_id = GetTotalDataSymbolIdxUl(frame_id, symbol_id);
