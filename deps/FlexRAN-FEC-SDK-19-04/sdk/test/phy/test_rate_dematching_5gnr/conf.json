@@ -1,0 +1,318 @@
+ {
+  "functional": [
+    {
+        "name": "QPSK_1",
+        "parameters": {
+          "ncb": 9600,
+          "start_null": 1480,
+          "n_null": 56,
+          "e": 26400,
+          "rv_id": 0,
+          "z_c": 192,
+          "n_layer": 1,
+          "mod_q": 2,
+          "flag_of_bg": 2,
+          "is_retx": 0,
+          "data_in": "test_vectors/input_QPSK.bin"
+        },
+        "references": {
+          "data_out": "test_vectors/dataDeIn_9600_QPSK.bin"
+        }
+    },
+    {
+        "name": "QPSK_2",
+        "parameters": {
+          "ncb": 9600,
+          "start_null": 1480,
+          "n_null": 56,
+          "e": 6400,
+          "rv_id": 0,
+          "z_c": 192,
+          "n_layer": 1,
+          "mod_q": 2,
+          "flag_of_bg": 2,
+          "is_retx": 0,
+          "data_in": "test_vectors/input_QPSK.bin"
+        },
+        "references": {
+          "data_out": "test_vectors/dataDeIn_9600_QPSK.bin"
+        }
+    },
+    {
+        "name": "QPSK_3",
+        "parameters": {
+          "ncb": 9600,
+          "start_null": 1480,
+          "n_null": 56,
+          "e": 6408,
+          "rv_id": 0,
+          "z_c": 192,
+          "n_layer": 1,
+          "mod_q": 2,
+          "flag_of_bg": 2,
+          "is_retx": 0,
+          "data_in": "test_vectors/input_QPSK.bin"
+        },
+        "references": {
+          "data_out": "test_vectors/dataDeIn_9600_QPSK.bin"
+        }
+    },
+    {
+        "name": "QPSK_4",
+        "parameters": {
+          "ncb": 9600,
+          "start_null": 1480,
+          "n_null": 56,
+          "e": 26400,
+          "rv_id": 1,
+          "z_c": 192,
+          "n_layer": 1,
+          "mod_q": 2,
+          "flag_of_bg": 2,
+          "is_retx": 0,
+          "data_in": "test_vectors/input_QPSK.bin"
+        },
+        "references": {
+          "data_out": "test_vectors/dataDeIn_9600_QPSK_1.bin"
+        }
+    },
+    {
+        "name": "16QAM_1",
+        "parameters": {
+          "ncb": 21120,
+          "start_null": 5984,
+          "n_null": 416,
+          "e": 256,
+          "rv_id": 2,
+          "z_c": 320,
+          "n_layer": 1,
+          "mod_q": 4,
+          "flag_of_bg": 1,
+          "is_retx": 0,
+          "data_in": "test_vectors/input_16QAM.bin"
+        },
+        "references": {
+          "data_out": "test_vectors/dataDeIn_21120_16QAM.bin"
+        }
+    },
+    {
+        "name": "16QAM_2",
+        "parameters": {
+          "ncb": 21120,
+          "start_null": 1472,
+          "n_null": 416,
+          "e": 13200,
+          "rv_id": 2,
+          "z_c": 320,
+          "n_layer": 1,
+          "mod_q": 4,
+          "flag_of_bg": 1,
+          "is_retx": 0,
+          "data_in": "test_vectors/input_16QAM.bin"
+        },
+        "references": {
+          "data_out": "test_vectors/dataDeIn_21120_16QAM_1.bin"
+        }
+    },
+    {
+        "name": "64QAM_1",
+        "parameters": {
+          "ncb": 25344,
+          "start_null": 7686,
+          "n_null": 122,
+          "e": 9900,
+          "rv_id": 3,
+          "z_c": 320,
+          "n_layer": 1,
+          "mod_q": 6,
+          "flag_of_bg": 1,
+          "is_retx": 0,
+          "data_in": "test_vectors/input_64QAM.bin"
+        },
+        "references": {
+          "data_out": "test_vectors/dataDeIn_25344_64QAM.bin"
+        }
+    },
+    {
+        "name": "64QAM_2",
+        "parameters": {
+          "ncb": 25344,
+          "start_null": 7686,
+          "n_null": 122,
+          "e": 9900,
+          "rv_id": 1,
+          "z_c": 320,
+          "n_layer": 1,
+          "mod_q": 6,
+          "flag_of_bg": 1,
+          "is_retx": 0,
+          "data_in": "test_vectors/input_64QAM.bin"
+        },
+        "references": {
+          "data_out": "test_vectors/dataDeIn_25344_64QAM_1.bin"
+        }
+    },
+    {
+        "name": "64QAM_ncb25344_e8004_Rv0",
+        "parameters": {
+          "ncb": 25344,
+          "start_null": 7686,
+          "n_null": 122,
+          "e": 8004,
+          "rv_id": 0,
+          "z_c": 320,
+          "mod_q": 6,
+          "flag_of_bg": 1,
+          "is_retx": 0
+        }
+    },
+    {
+        "name": "256QAM_1",
+        "parameters": {
+          "ncb": 25344,
+          "start_null": 7558,
+          "n_null": 122,
+          "e": 13200,
+          "rv_id": 1,
+          "z_c": 384,
+          "n_layer": 1,
+          "mod_q": 8,
+          "flag_of_bg": 1,
+          "is_retx": 0,
+          "data_in": "test_vectors/input_256QAM.bin"
+        },
+        "references": {
+          "data_out": "test_vectors/dataDeIn_25344_256QAM.bin"
+        }
+    },
+    {
+        "name": "256QAM_2",
+        "parameters": {
+          "ncb": 25344,
+          "start_null": 13400,
+          "n_null": 122,
+          "e": 13200,
+          "rv_id": 0,
+          "z_c": 384,
+          "n_layer": 1,
+          "mod_q": 8,
+          "flag_of_bg": 1,
+          "is_retx": 0,
+          "data_in": "test_vectors/input_256QAM.bin"
+        },
+        "references": {
+          "data_out": "test_vectors/dataDeIn_25344_256QAM_1.bin"
+        }
+    },
+    {
+        "name": "256QAM_3",
+        "parameters": {
+          "ncb": 25344,
+          "start_null": 7558,
+          "n_null": 6000,
+          "e": 13200,
+          "rv_id": 1,
+          "z_c": 384,
+          "n_layer": 1,
+          "mod_q": 8,
+          "flag_of_bg": 1,
+          "is_retx": 0,
+          "data_in": "test_vectors/input_256QAM.bin"
+        },
+        "references": {
+          "data_out": "test_vectors/dataDeIn_25344_256QAM_2.bin"
+        }
+    }
+  ],
+
+  "performance": [
+    {
+        "name": "QPSK_ncb9600_e26400",
+        "parameters": {
+          "ncb": 9600,
+          "start_null": 1480,
+          "n_null": 56,
+          "e": 26400,
+          "rv_id": 0,
+          "z_c": 192,
+          "n_layer": 1,
+          "mod_q": 2,
+          "flag_of_bg": 2,
+          "is_retx": 0
+        }
+    },
+    {
+        "name": "16QAM_ncb21120_e13200",
+        "parameters": {
+          "ncb": 21120,
+          "start_null": 5984,
+          "n_null": 416,
+          "e": 13200,
+          "rv_id": 2,
+          "z_c": 320,
+          "n_layer": 1,
+          "mod_q": 4,
+          "flag_of_bg": 1,
+          "is_retx": 0
+        }
+    },
+    {
+        "name": "64QAM_ncb25344_e9900",
+        "parameters": {
+          "ncb": 25344,
+          "start_null": 7686,
+          "n_null": 122,
+          "e": 9900,
+          "rv_id": 3,
+          "z_c": 320,
+          "n_layer": 1,
+          "mod_q": 6,
+          "flag_of_bg": 1,
+          "is_retx": 0
+        }
+    },
+    {
+        "name": "64QAM_ncb25344_e9900_Rv0",
+        "parameters": {
+          "ncb": 25344,
+          "start_null": 7686,
+          "n_null": 122,
+          "e": 9900,
+          "rv_id": 0,
+          "z_c": 320,
+          "mod_q": 6,
+          "flag_of_bg": 1,
+          "is_retx": 0
+        }
+    },
+    {
+        "name": "64QAM_ncb25344_e8004_Rv0",
+        "parameters": {
+          "ncb": 25344,
+          "start_null": 7686,
+          "n_null": 122,
+          "e": 8004,
+          "rv_id": 0,
+          "z_c": 320,
+          "mod_q": 6,
+          "flag_of_bg": 1,
+          "is_retx": 0
+        }
+    },
+    {
+        "name": "256QAM_ncb25344_e13200",
+        "parameters": {
+          "ncb": 25344,
+          "start_null": 7558,
+          "n_null": 122,
+          "e": 13200,
+          "rv_id": 1,
+          "z_c": 384,
+          "n_layer": 1,
+          "mod_q": 8,
+          "flag_of_bg": 1,
+          "is_retx": 0
+        }
+    }
+  ]
+}

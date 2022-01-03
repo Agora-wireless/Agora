@@ -1,0 +1,162 @@
+{
+    "bitreverse_functional": [
+    {
+      "name": "bitreverse",
+      "parameters": {
+        "num_data": 8448,
+        "input": "test_vectors/left-aligned.bin"
+      },
+      "references": {
+        "output": "test_vectors/right-aligned.bin"
+      }
+    },
+    {
+      "name": "bitreverse-10k",
+      "parameters": {
+        "num_data": 10240,
+        "input": "test_vectors/left-aligned-10k.bin"
+      },
+      "references": {
+        "output": "test_vectors/right-aligned-10k.bin"
+      }
+    },
+    {
+      "name": "bitreverse-6450",
+      "parameters": {
+        "num_data": 6450,
+        "input": "test_vectors/left-aligned-6450.bin"
+      },
+      "references": {
+        "output": "test_vectors/right-aligned-6450.bin"
+      }
+    }
+  ],
+    "bitreverse_performance": [
+    {
+      "name": "bitreverse",
+      "parameters": {
+        "num_data": 8448,
+        "input": "test_vectors/left-aligned.bin"
+      },
+      "references": {
+        "output": "test_vectors/right-aligned.bin"
+      }
+    },
+    {
+      "name": "bitreverse-10k",
+      "parameters": {
+        "num_data": 10240,
+        "input": "test_vectors/left-aligned-10k.bin"
+      },
+      "references": {
+        "output": "test_vectors/right-aligned-10k.bin"
+      }
+    }
+  ],
+  "prbs_functional": [
+    {
+      "name": "PRBS",
+      "parameters": {
+        "case_num": 80,
+        "input_vars": "test_vectors/prbs_input_vars.bin"
+      },
+      "references": {
+        "output_data": "test_vectors/prbs_output_data.bin",
+        "output_num": "test_vectors/prbs_output_num.bin"
+      }
+    }
+  ],
+
+  "float_fix_functional": [
+    {
+      "name": "I2I",
+      "parameters": {
+        "test_type": 0,
+        "gain": 2,
+        "num_data": 64004,
+        "precision": 2
+      }
+    },
+    {
+      "name": "I2F",
+      "parameters": {
+        "test_type": 1,
+        "gain": 0.1,
+        "num_data": 64004,
+        "precision": 0.001
+      }
+    },
+    {
+      "name": "F2I",
+      "parameters": {
+        "test_type": 2,
+        "gain": 0.1,
+        "num_data": 64004,
+        "precision": 2
+      }
+    },
+    {
+      "name": "F2I_TH",
+      "parameters": {
+        "test_type": 3,
+        "gain": 0.5,
+        "num_data": 64004,
+        "threshold": 20,
+        "precision": 2
+      }
+    },
+    {
+      "name": "I2I_FXP",
+      "parameters": {
+        "test_type": 4,
+        "gain": 2,
+        "num_data": 64004,
+        "precision": 2
+      }
+    }
+  ],
+
+  "float_fix_performance": [
+    {
+      "name": "I2I",
+      "parameters": {
+        "test_type": 0,
+        "gain": 0.1,
+        "num_data": 300000
+      }
+    },
+    {
+      "name": "I2F",
+      "parameters": {
+        "test_type": 1,
+        "gain": 0.1,
+        "num_data": 300000
+      }
+    },
+    {
+      "name": "F2I",
+      "parameters": {
+        "test_type": 2,
+        "gain": 0.1,
+        "num_data": 300000
+      }
+    },
+    {
+      "name": "F2I_TH",
+      "parameters": {
+        "test_type": 3,
+        "gain": 0.5,
+        "num_data": 300000,
+        "threshold": 20
+      }
+    },
+    {
+      "name": "I2I_FXP",
+      "parameters": {
+        "test_type": 4,
+        "gain": 2,
+        "num_data": 300000
+      }
+    }
+  ]
+}

@@ -1,0 +1,489 @@
+{
+  "functional": [
+    {
+      "name": "DEC_CB1_Kidx119",
+      "parameters": {
+        "test_type": 0,
+        "c": 1,
+        "k": 1888,
+        "k_idx": 119,
+        "max_iter_num": 1,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB1_Kidx119_Input.bin",
+        "output_len": 236,
+        "force_error": 0
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB1_Kidx119_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB1_Kidx119_iter0",
+      "parameters": {
+        "test_type": 0,
+        "c": 1,
+        "k": 1888,
+        "k_idx": 119,
+        "max_iter_num": 0,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB1_Kidx119_iter0_Input.bin",
+        "output_len": 236,
+        "force_error": 0
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB1_Kidx119_iter0_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB1_Kidx119_earlyterm",
+      "parameters": {
+        "test_type": 0,
+        "c": 1,
+        "k": 1888,
+        "k_idx": 119,
+        "max_iter_num": 1,
+        "early_term_disable": 1,
+        "input": "test_vectors/TurboDecoder_CB1_Kidx119_earlyterm_Input.bin",
+        "output_len": 236,
+        "force_error": 0
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB1_Kidx119_earlyterm_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB1_Kidx119_forcefault1",
+      "parameters": {
+        "test_type": 0,
+        "c": 2,
+        "k": 1888,
+        "k_idx": 119,
+        "max_iter_num": 1,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB1_Kidx119_forcefault1_Input.bin",
+        "output_len": 236,
+        "force_error": 1
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB1_Kidx119_forcefault1_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB1_Kidx119_forcefault2",
+      "parameters": {
+        "test_type": 0,
+        "c": 2,
+        "k": 1888,
+        "k_idx": 119,
+        "max_iter_num": 1,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB1_Kidx119_forcefault2_Input.bin",
+        "output_len": 236,
+        "force_error": 1
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB1_Kidx119_forcefault2_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB2_Kidx161",
+      "parameters": {
+        "test_type": 0,
+        "c": 2,
+        "k": 4416,
+        "k_idx": 161,
+        "max_iter_num": 1,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB2_Kidx161_Input.bin",
+        "output_len": 552,
+        "force_error": 0
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB2_Kidx161_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB2_Kidx161_iter0",
+      "parameters": {
+        "test_type": 0,
+        "c": 2,
+        "k": 4416,
+        "k_idx": 161,
+        "max_iter_num": 0,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB2_Kidx161_iter0_Input.bin",
+        "output_len": 552,
+        "force_error": 0
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB2_Kidx161_iter0_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB2_Kidx161_earlyterm",
+      "parameters": {
+        "test_type": 0,
+        "c": 2,
+        "k": 4416,
+        "k_idx": 161,
+        "max_iter_num": 1,
+        "early_term_disable": 1,
+        "input": "test_vectors/TurboDecoder_CB2_Kidx161_earlyterm_Input.bin",
+        "output_len": 552,
+        "force_error": 0
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB2_Kidx161_earlyterm_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB2_Kidx161_forcefault",
+      "parameters": {
+        "test_type": 0,
+        "c": 1,
+        "k": 4416,
+        "k_idx": 161,
+        "max_iter_num": 1,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB2_Kidx161_forcefault_Input.bin",
+        "output_len": 552,
+        "force_error": 1
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB2_Kidx161_forcefault_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB3_Kidx188",
+      "parameters": {
+        "test_type": 0,
+        "c": 3,
+        "k": 6144,
+        "k_idx": 188,
+        "max_iter_num": 1,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB3_Kidx188_Input.bin",
+        "output_len": 800,
+        "force_error": 0
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB3_Kidx188_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB1_Kidx67",
+      "parameters": {
+        "test_type": 0,
+        "c": 1,
+        "k": 624,
+        "k_idx": 67,
+        "max_iter_num": 1,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB1_Kidx67_Input.bin",
+        "output_len": 78,
+        "force_error": 0
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB1_Kidx67_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB1_Kidx67_iter0",
+      "parameters": {
+        "test_type": 0,
+        "c": 1,
+        "k": 624,
+        "k_idx": 67,
+        "max_iter_num": 0,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB1_Kidx67_iter0_Input.bin",
+        "output_len": 78,
+        "force_error": 0
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB1_Kidx67_iter0_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB1_Kidx67_earlyterm",
+      "parameters": {
+        "test_type": 0,
+        "c": 1,
+        "k": 624,
+        "k_idx": 67,
+        "max_iter_num": 1,
+        "early_term_disable": 1,
+        "input": "test_vectors/TurboDecoder_CB1_Kidx67_earlyterm_Input.bin",
+        "output_len": 78,
+        "force_error": 0
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB1_Kidx67_earlyterm_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB1_Kidx67_forcefault1",
+      "parameters": {
+        "test_type": 0,
+        "c": 2,
+        "k": 624,
+        "k_idx": 67,
+        "max_iter_num": 1,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB1_Kidx67_forcefault1_Input.bin",
+        "output_len": 78,
+        "force_error": 1
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB1_Kidx67_forcefault1_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB1_Kidx67_forcefault2",
+      "parameters": {
+        "test_type": 0,
+        "c": 2,
+        "k": 624,
+        "k_idx": 67,
+        "max_iter_num": 0,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB1_Kidx67_forcefault2_Input.bin",
+        "output_len": 78,
+        "force_error": 1
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB1_Kidx67_forcefault2_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB1_Kidx31",
+      "parameters": {
+        "test_type": 0,
+        "c": 1,
+        "k": 280,
+        "k_idx": 31,
+        "max_iter_num": 1,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB1_Kidx31_Input.bin",
+        "output_len": 35,
+        "force_error": 0
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB1_Kidx31_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB1_Kidx17_forcefault1",
+      "parameters": {
+        "test_type": 0,
+        "c": 1,
+        "k": 168,
+        "k_idx": 17,
+        "max_iter_num": 1,
+        "early_term_disable": 1,
+        "input": "test_vectors/TurboDecoder_CB1_Kidx17_forcefault1_Input.bin",
+        "output_len": 21,
+        "force_error": 1
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB1_Kidx17_forcefault1_Output.bin"
+      }
+    },
+    {
+      "name": "DEC_CB1_Kidx17_forcefault2",
+      "parameters": {
+        "test_type": 0,
+        "c": 2,
+        "k": 168,
+        "k_idx": 17,
+        "max_iter_num": 1,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder_CB1_Kidx17_forcefault2_Input.bin",
+        "output_len": 21,
+        "force_error": 1
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder_CB1_Kidx17_forcefault2_Output.bin"
+      }
+    },
+    {
+      "name": "DEC",
+      "parameters": {
+        "test_type": 0,
+        "c": 2,
+        "k": 4416,
+        "k_idx": 161,
+        "max_iter_num": 1,
+        "early_term_disable": 0,
+        "input": "test_vectors/TurboDecoder32Input.bin",
+        "output_len": 552,
+        "force_error": 0
+      },
+      "references": {
+        "output": "test_vectors/TurboDecoder32Output.bin",
+        "ag_buf": "test_vectors/TurboDecoder32pAG.bin",
+        "cb_buf": "test_vectors/TurboDecoder32CodeBlock.bin"
+      }
+    },
+    {
+      "name": "ENC",
+      "parameters": {
+        "test_type": 1,
+        "turbo_len": 696,
+        "case_id": 179,
+        "input_win": "test_vectors/TurboInput1.bin",
+        "output_len": 697
+      },
+      "references": {
+        "output_win_0": "test_vectors/TurboOutput1.bin",
+        "output_win_1": "test_vectors/TurboOutput2.bin",
+        "output_win_2": "test_vectors/TurboOutput3.bin"
+      }
+    },
+    {
+      "name": "ENC_case_id_0",
+      "parameters": {
+        "test_type": 1,
+        "turbo_len": 1,
+        "case_id": 0,
+        "input_win": "test_vectors/TurboInput1.bin",
+        "output_len": 1
+      },
+      "references": {
+        "output_win_0": "test_vectors/TurboOutput1.bin",
+        "output_win_1": "test_vectors/TurboOutput2.bin",
+        "output_win_2": "test_vectors/TurboOutput3.bin"
+      }
+    },
+    {
+      "name": "ENC_case_id_172",
+      "parameters": {
+        "test_type": 1,
+        "turbo_len": 640,
+        "case_id": 172,
+        "input_win": "test_vectors/Turbo_case172_Input.bin",
+        "output_len": 641
+      },
+      "references": {
+        "output_win_0": "test_vectors/Turbo_case172_Output1.bin",
+        "output_win_1": "test_vectors/Turbo_case172_Output2.bin",
+        "output_win_2": "test_vectors/Turbo_case172_Output3.bin"
+      }
+    },
+    {
+      "name": "ENC_case_id_8",
+      "parameters": {
+        "test_type": 1,
+        "turbo_len": 12,
+        "case_id": 8,
+        "input_win": "test_vectors/Turbo_case8_Input.bin",
+        "output_len": 13
+      },
+      "references": {
+        "output_win_0": "test_vectors/Turbo_case8_Output1.bin",
+        "output_win_1": "test_vectors/Turbo_case8_Output2.bin",
+        "output_win_2": "test_vectors/Turbo_case8_Output3.bin"
+      }
+    },
+    {
+      "name": "ENC_case_id_156",
+      "parameters": {
+        "test_type": 1,
+        "turbo_len": 512,
+        "case_id": 156,
+        "input_win": "test_vectors/Turbo_case156_Input.bin",
+        "output_len": 513
+      },
+      "references": {
+        "output_win_0": "test_vectors/Turbo_case156_Output1.bin",
+        "output_win_1": "test_vectors/Turbo_case156_Output2.bin",
+        "output_win_2": "test_vectors/Turbo_case156_Output3.bin"
+      }
+    },
+    {
+      "name": "ENC_case_id_158",
+      "parameters": {
+        "test_type": 1,
+        "turbo_len": 528,
+        "case_id": 158,
+        "input_win": "test_vectors/Turbo_case158_Input.bin",
+        "output_len": 529
+      },
+      "references": {
+        "output_win_0": "test_vectors/Turbo_case158_Output1.bin",
+        "output_win_1": "test_vectors/Turbo_case158_Output2.bin",
+        "output_win_2": "test_vectors/Turbo_case158_Output3.bin"
+      }
+    },
+    {
+      "name": "ENC_case_id_58",
+      "parameters": {
+        "test_type": 1,
+        "turbo_len": 62,
+        "case_id": 58,
+        "input_win": "test_vectors/Turbo_case58_Input.bin",
+        "output_len": 63
+      },
+      "references": {
+        "output_win_0": "test_vectors/Turbo_case58_Output1.bin",
+        "output_win_1": "test_vectors/Turbo_case58_Output2.bin",
+        "output_win_2": "test_vectors/Turbo_case58_Output3.bin"
+      }
+    },
+    {
+      "name": "ENC_case_id_26",
+      "parameters": {
+        "test_type": 1,
+        "turbo_len": 30,
+        "case_id": 26,
+        "input_win": "test_vectors/Turbo_case26_Input.bin",
+        "output_len": 31
+      },
+      "references": {
+        "output_win_0": "test_vectors/Turbo_case26_Output1.bin",
+        "output_win_1": "test_vectors/Turbo_case26_Output2.bin",
+        "output_win_2": "test_vectors/Turbo_case26_Output3.bin"
+      }
+    },
+    {
+      "name": "ENC_case_id_176",
+      "parameters": {
+        "test_type": 1,
+        "turbo_len": 672,
+        "case_id": 176,
+        "input_win": "test_vectors/Turbo_case176_Input.bin",
+        "output_len": 673
+      },
+      "references": {
+        "output_win_0": "test_vectors/Turbo_case176_Output1.bin",
+        "output_win_1": "test_vectors/Turbo_case176_Output2.bin",
+        "output_win_2": "test_vectors/Turbo_case176_Output3.bin"
+      }
+    }
+  ],
+
+  "performance": [
+    {
+      "name": "DEC",
+      "parameters": {
+        "test_type": 0,
+        "c": 2,
+        "k": 4416,
+        "k_idx": 161,
+        "max_iter_num": 1,
+        "early_term_disable": 0,
+        "output_len": 648,
+        "force_error": 0
+      }
+    },
+    {
+      "name": "ENC",
+      "parameters": {
+        "test_type": 1,
+        "turbo_len": 696,
+        "case_id": 179,
+        "output_len": 697
+      }
+    }
+  ]
+}

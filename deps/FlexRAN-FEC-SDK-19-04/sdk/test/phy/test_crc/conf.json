@@ -1,0 +1,1564 @@
+{
+  "crc_byte_len_functional":
+  [
+    {
+      "name": "CRC 8BIT (1Byte) TEST (0xff)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_8bit_data.bin",
+        "data_length": 8
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xdd8538",
+        "crc24a_value": 14517560,
+        "Comment": "ref crc24b_value 0x3e3e",
+        "crc24b_value": 15934,
+        "Comment": "ref crc24c_value 0x7af4f4",
+        "crc24c_value": 8058100,
+        "Comment": "ref crc24c_1_value 0xd38071",
+        "crc24c_1_value": 13860977,
+        "Comment": "ref crc16_value 0x1ef0",
+        "crc16_value": 7920,
+        "Comment": "ref crc11_value 0x4b1",
+        "crc11_value": 1201,
+        "Comment": "ref crc6_value 0x09",
+        "crc6_value": 9,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 16BIT (2Byte) TEST (0xd36b)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_16bit_data.bin",
+        "data_length": 16
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xa1cf9d",
+        "crc24a_value": 10604445,
+        "Comment": "ref crc24b_value 0x357c16",
+        "crc24b_value": 3505174,
+        "Comment": "ref crc24c_value 0x568dcb",
+        "crc24c_value": 5672395,
+        "Comment": "ref crc24c_1_value 0x85a2b0",
+        "crc24c_1_value": 8757936,
+        "Comment": "ref crc16_value 0x9db9",
+        "crc16_value": 40377,
+        "Comment": "ref crc11_value 0x51d",
+        "crc11_value": 1309,
+        "Comment": "ref crc6_value 0x3d",
+        "crc6_value": 61,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 32BIT (4Byte) TEST (0xb10c24f5)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_32bit_data.bin",
+        "data_length": 32
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xea9769",
+        "crc24a_value": 15374185,
+        "Comment": "ref crc24b_value 0x1a66a8",
+        "crc24b_value": 1730216,
+        "Comment": "ref crc24c_value 0x240200",
+        "crc24c_value": 2359808,
+        "Comment": "ref crc24c_1_value 0x775fe9",
+        "crc24c_1_value": 7823337,
+        "Comment": "ref crc16_value 0x879c",
+        "crc16_value": 34716,
+        "Comment": "ref crc11_value 0x791",
+        "crc11_value": 1937,
+        "Comment": "ref crc6_value 0x2b",
+        "crc6_value": 43,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 64BIT (8Byte) TEST (0xb10c24f5 b10c24f5)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_64bit_data.bin",
+        "data_length": 64
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xc115b1",
+        "crc24a_value": 12654001,
+        "Comment": "ref crc24b_value 0xfc9093",
+        "crc24b_value": 16552083,
+        "Comment": "ref crc24c_value 0xcedada",
+        "crc24c_value": 13556442,
+        "Comment": "ref crc24c_1_value 0xbfce93",
+        "crc24c_1_value": 12570259,
+        "Comment": "ref crc16_value 0x6d1",
+        "crc16_value": 1745,
+        "Comment": "ref crc11_value 0x47",
+        "crc11_value": 71,
+        "Comment": "ref crc6_value 0x3e",
+        "crc6_value": 62,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 96BIT (12Byte) TEST (0xb10c24f5 b10c24f5 b10c24f5)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_96bit_data.bin",
+        "data_length": 96
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x649d7b",
+        "crc24a_value": 6593915,
+        "Comment": "ref crc24b_value 0x904a73",
+        "crc24b_value": 9456243,
+        "Comment": "ref crc24c_value 0x4c86c",
+        "crc24c_value": 313452,
+        "Comment": "ref crc24c_1_value 0x6a142b",
+        "crc24c_1_value": 6951979,
+        "Comment": "ref crc16_value 0xf2a1",
+        "crc16_value": 62113,
+        "Comment": "ref crc11_value 0x380",
+        "crc11_value": 896,
+        "Comment": "ref crc6_value 0x09",
+        "crc6_value": 9,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 128BIT (16Byte) TEST (0xb10c24f5 b10c24f5 b10c24f5 b10c24f5)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_128bit_data.bin",
+        "data_length": 128
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x98f580",
+        "crc24a_value": 10024320,
+        "Comment": "ref crc24b_value 0x1b464c",
+        "crc24b_value": 1787468,
+        "Comment": "ref crc24c_value 0x55d33a",
+        "crc24c_value": 5624634,
+        "Comment": "ref crc24c_1_value 0xb47e6d",
+        "crc24c_1_value": 11828845,
+        "Comment": "ref crc16_value 0x7f15",
+        "crc16_value": 32533,
+        "Comment": "ref crc11_value 0x1be",
+        "crc11_value": 446,
+        "Comment": "ref crc6_value 0x23",
+        "crc6_value": 35,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 192BIT (24Byte) TEST ",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_192bit_data.bin",
+        "data_length": 192
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x936ea2",
+        "crc24a_value": 9662114,
+        "Comment": "ref crc24b_value 0x26ee1c",
+        "crc24b_value": 2551324,
+        "Comment": "ref crc24c_value 0x2ef44a",
+        "crc24c_value": 3077194,
+        "Comment": "ref crc24c_1_value 0x972eec",
+        "crc24c_1_value": 9907948,
+        "Comment": "ref crc16_value 0x21c3",
+        "crc16_value": 8643,
+        "Comment": "ref crc11_value 0x388",
+        "crc11_value": 904,
+        "Comment": "ref crc6_value 0x19",
+        "crc6_value": 25,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 256BIT (32Byte) TEST ",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_256bit_data.bin",
+        "data_length": 256
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x8ece62",
+        "crc24a_value": 9358946,
+        "Comment": "ref crc24b_value 0x4edcbc",
+        "crc24b_value": 5168316,
+        "Comment": "ref crc24c_value 0x907b35",
+        "crc24c_value": 9468725,
+        "Comment": "ref crc24c_1_value 0x1196e9",
+        "crc24c_1_value": 1152745,
+        "Comment": "ref crc16_value 0x94fd",
+        "crc16_value": 38141,
+        "Comment": "ref crc11_value 0x9a",
+        "crc11_value": 154,
+        "Comment": "ref crc6_value 0x0c",
+        "crc6_value": 12,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 512BIT (64Byte) TEST",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_512bit_data.bin",
+        "data_length": 512
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xb502bb",
+        "crc24a_value": 11862715,
+        "Comment": "ref crc24b_value 0x2b8147",
+        "crc24b_value": 2851143,
+        "Comment": "ref crc24c_value 0x730688",
+        "crc24c_value": 7538312,
+        "Comment": "ref crc24c_1_value 0x2ec1cb",
+        "crc24c_1_value": 3064267,
+        "Comment": "ref crc16_value 0xd2a6",
+        "crc16_value": 53926,
+        "Comment": "ref crc11_value 0x5a",
+        "crc11_value": 90,
+        "Comment": "ref crc6_value 0x0e",
+        "crc6_value": 14,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 1024BIT (128Byte) TEST",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_1024bit_data.bin",
+        "data_length": 1024
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xb7bf4a",
+        "crc24a_value": 12042058,
+        "Comment": "ref crc24b_value 0x9e84f1",
+        "crc24b_value": 10388721,
+        "Comment": "ref crc24c_value 0x18ddb8",
+        "crc24c_value": 1629624,
+        "Comment": "ref crc24c_1_value 0x604d2d",
+        "crc24c_1_value": 6311213,
+        "Comment": "ref crc16_value 0x7430",
+        "crc16_value": 29744,
+        "Comment": "ref crc11_value 0x1d2",
+        "crc11_value": 466,
+        "Comment": "ref crc6_value 0x01",
+        "crc6_value": 1,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 2048BIT (256Byte) TEST",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2048bit_data.bin",
+        "data_length": 2048
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x97F66B",
+        "crc24a_value": 9959019,
+        "Comment": "ref crc24b_value 0x520B9A",
+        "crc24b_value": 5376922,
+        "Comment": "ref crc24c_value 0x4835C7",
+        "crc24c_value": 4732359,
+        "Comment": "ref crc24c_1_value 0x98d1d2",
+        "crc24c_1_value": 10015186,
+        "Comment": "ref crc16_value 0xE34F",
+        "crc16_value": 58191,
+        "Comment": "ref crc11_value 0x798",
+        "crc11_value": 1944,
+        "Comment": "ref crc6_value 0x2B",
+        "crc6_value": 43,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 4096BIT (512Byte) TEST",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_4096bit_data.bin",
+        "data_length": 4096
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x88cfa",
+        "crc24a_value": 560378,
+        "Comment": "ref crc24b_value 0x62504",
+        "crc24b_value": 402692,
+        "Comment": "ref crc24c_value 0x1A50F0",
+        "crc24c_value": 1724656,
+        "Comment": "ref crc24c_1_value 0x572644",
+        "crc24c_1_value": 5711428,
+        "Comment": "ref crc16_value 0x9c33",
+        "crc16_value": 39987,
+        "Comment": "ref crc11_value 0x689",
+        "crc11_value": 1673,
+        "Comment": "ref crc6_value 0x3e",
+        "crc6_value": 62,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 8192BIT (1024Byte) TEST",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_8192bit_data.bin",
+        "data_length": 8192
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x38DF21",
+        "crc24a_value": 3727137,
+        "Comment": "ref crc24b_value 0xFAFA3C",
+        "crc24b_value": 16448060,
+        "Comment": "ref crc24c_value 0x7334C2",
+        "crc24c_value": 7550146,
+        "Comment": "ref crc24c_1_value 0xbeb2f1",
+        "crc24c_1_value": 12497649,
+        "Comment": "ref crc16_value 0x1661",
+        "crc16_value": 5729,
+        "Comment": "ref crc11_value 0xef",
+        "crc11_value": 239,
+        "Comment": "ref crc6_value 0x23",
+        "crc6_value": 35,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 8448BIT (1056Byte) TEST",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_8448bit_data.bin",
+        "data_length": 8448
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xA49A4C",
+        "crc24a_value": 10787404,
+        "Comment": "ref crc24b_value 0xCEB7E0",
+        "crc24b_value": 13547488,
+        "Comment": "ref crc24c_value 0x7E7090",
+        "crc24c_value": 8286352,
+        "Comment": "ref crc24c_1_value 0xfe3fb7",
+        "crc24c_1_value": 16662455,
+        "Comment": "ref crc16_value 0x40D5",
+        "crc16_value": 16597,
+        "Comment": "ref crc11_value 0x76e",
+        "crc11_value": 1902,
+        "Comment": "ref crc6_value 0x13",
+        "crc6_value": 19,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 16384BIT (2048Byte) TEST",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_16384bit_data.bin",
+        "data_length": 16384
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x8FB215",
+        "crc24a_value": 9417237,
+        "Comment": "ref crc24b_value 0xC099EE",
+        "crc24b_value": 12622318,
+        "Comment": "ref crc24c_value 0xBE7745",
+        "crc24c_value": 12482373,
+        "Comment": "ref crc24c_1_value 0xc69ee6",
+        "crc24c_1_value": 13016806,
+        "Comment": "ref crc16_value 0x7FCD",
+        "crc16_value": 32717,
+        "Comment": "ref crc11_value 0x3e",
+        "crc11_value": 62,
+        "Comment": "ref crc6_value 0x0c",
+        "crc6_value": 12,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 65536BIT (8192Byte) TEST",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_65536bit_data.bin",
+        "data_length": 65536
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x",
+        "crc24a_value": 16165784,
+        "Comment": "ref crc24b_value 0x",
+        "crc24b_value": 2138402,
+        "Comment": "ref crc24c_value 0x",
+        "crc24c_value": 13593453,
+        "Comment": "ref crc24c_1_value 0x04e269",
+        "crc24c_1_value": 320105,
+        "Comment": "ref crc16_value 0x",
+        "crc16_value": 55680,
+        "Comment": "ref crc11_value 0x",
+        "crc11_value": 1937,
+        "Comment": "ref crc6_value 0x",
+        "crc6_value": 1,
+        "check_passed":true
+      }
+    }
+  ],
+
+
+
+
+  "crc_bit_len_functional":
+  [
+  {
+      "name": "CRC 1BIT TEST (0x80)",
+      "Comment": "This is the equivalent of 0x01 in online calc, msg=[1] in matlab",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_1bit_data.bin",
+        "data_length": 1
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x864cfb",
+        "crc24a_value": 8801531,
+        "Comment": "ref crc24b_value 0x800063",
+        "crc24b_value": 8388707,
+        "Comment": "ref crc24c_value 0xb2b117",
+        "crc24c_value": 11710743,
+        "Comment": "ref crc24c_1_value 0xd77595",
+        "crc24c_1_value": 14120341,
+        "Comment": "ref crc16_value 0x1021",
+        "crc16_value": 4129,
+        "Comment": "ref crc11_value 0x621",
+        "crc11_value": 1569,
+        "Comment": "ref crc6_value 0x21",
+        "crc6_value": 33,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 2BIT TEST (0xc0)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2bit_data.bin",
+        "data_length": 2
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x0c99f6",
+        "crc24a_value": 825846,
+        "Comment": "ref crc24b_value 0xc6",
+        "crc24b_value": 198,
+        "Comment": "ref crc24c_value 0x65622e",
+        "crc24c_value": 6644270,
+        "Comment": "ref crc24c_1_value 0xaeeb2a",
+        "crc24c_1_value": 11463466,
+        "Comment": "ref crc16_value 0x3063",
+        "crc16_value": 12387,
+        "Comment": "ref crc11_value 0x442",
+        "crc11_value": 1090,
+        "Comment": "ref crc6_value 0x02",
+        "crc6_value": 2,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 3BIT TEST (0xe0)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_3bit_data.bin",
+        "data_length": 3
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x9f7f17",
+        "crc24a_value": 10452759,
+        "Comment": "ref crc24b_value 0x8001ef",
+        "crc24b_value": 8389103,
+        "Comment": "ref crc24c_value 0x78754b",
+        "crc24c_value": 7894347,
+        "Comment": "ref crc24c_1_value 0x5dd654",
+        "crc24c_1_value": 6149716,
+        "Comment": "ref crc16_value 0x70E7",
+        "crc16_value": 28903,
+        "Comment": "ref crc11_value 0x84",
+        "crc11_value": 132,
+        "Comment": "ref crc6_value 0x25",
+        "crc6_value": 37,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 4BIT TEST (0xf0)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_4bit_data.bin",
+        "data_length": 4
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x3efe2e",
+        "crc24a_value": 4128302,
+        "Comment": "ref crc24b_value 0x3de",
+        "crc24b_value": 990,
+        "Comment": "ref crc24c_value 0x425b81",
+        "crc24c_value": 4348801,
+        "Comment": "ref crc24c_1_value 0x091dbf",
+        "crc24c_1_value": 597439,
+        "Comment": "ref crc16_value 0xF1EF",
+        "crc16_value": 61935,
+        "Comment": "ref crc11_value 0x729",
+        "crc11_value": 1833,
+        "Comment": "ref crc6_value 0x0a",
+        "crc6_value": 10,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 5BIT TEST (0xf8)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_5bit_data.bin",
+        "data_length": 5
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xfbb0a7",
+        "crc24a_value": 16494759,
+        "Comment": "ref crc24b_value 0x8007df",
+        "crc24b_value": 8390623,
+        "Comment": "ref crc24c_value 0x360615",
+        "crc24c_value": 3540501,
+        "Comment": "ref crc24c_1_value 0xa08a69",
+        "crc24c_1_value": 10521193,
+        "Comment": "ref crc16_value 0xE3DE",
+        "crc16_value": 58334,
+        "Comment": "ref crc11_value 0x652",
+        "crc11_value": 1618,
+        "Comment": "ref crc6_value 0x35",
+        "crc6_value": 53,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 6BIT TEST (0xfc)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_6bit_data.bin",
+        "data_length": 6
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xf7614e",
+        "crc24a_value": 16212302,
+        "Comment": "ref crc24b_value 0xfbe",
+        "crc24b_value": 4030,
+        "Comment": "ref crc24c_value 0xdebd3d",
+        "crc24c_value": 14597437,
+        "Comment": "ref crc24c_1_value 0x4114d2",
+        "crc24c_1_value": 4265170,
+        "Comment": "ref crc16_value 0xC7BC",
+        "crc16_value": 51132,
+        "Comment": "ref crc11_value 0x4a4",
+        "crc11_value": 1188,
+        "Comment": "ref crc6_value 0x2a",
+        "crc6_value": 42,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 7BIT TEST (0xfe)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_7bit_data.bin",
+        "data_length": 7
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xeec29c",
+        "crc24a_value": 15647388,
+        "Comment": "ref crc24b_value 0x801f1f",
+        "crc24b_value": 8396575,
+        "Comment": "ref crc24c_value 0xbd7a7a",
+        "crc24c_value": 12417658,
+        "Comment": "ref crc24c_1_value 0x3098b3",
+        "crc24c_1_value": 3184819,
+        "Comment": "ref crc16_value 0x8F78",
+        "crc16_value": 36728,
+        "Comment": "ref crc11_value 0x148",
+        "crc11_value": 328,
+        "Comment": "ref crc6_value 0x14",
+        "crc6_value": 20,
+        "check_passed":true
+      }
+    },
+
+    {
+      "name": "CRC 9BIT TEST (0xff8)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_9bit_data.bin",
+        "data_length": 9
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xbb0a70",
+        "crc24a_value": 12257904,
+        "Comment": "ref crc24b_value 0x807c1f",
+        "crc24b_value": 8420383,
+        "Comment": "ref crc24c_value 0x4758ff",
+        "crc24c_value": 4675839,
+        "Comment": "ref crc24c_1_value 0xa700e2",
+        "crc24c_1_value": 10944738,
+        "Comment": "ref crc16_value 0x2DC1",
+        "crc16_value": 11713,
+        "Comment": "ref crc11_value 0x162",
+        "crc11_value": 354,
+        "Comment": "ref crc6_value 0x33",
+        "crc6_value": 51,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 10BIT TEST (0xffc)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_10bit_data.bin",
+        "data_length": 10
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x7614e0",
+        "crc24a_value": 7738592,
+        "Comment": "ref crc24b_value 0xf83e",
+        "crc24b_value": 63550,
+        "Comment": "ref crc24c_value 0x3c00e9",
+        "crc24c_value": 3932393,
+        "Comment": "ref crc24c_1_value 0x4e01c4",
+        "crc24c_1_value": 5112260,
+        "Comment": "ref crc16_value 0x4BA3",
+        "crc16_value": 19363,
+        "Comment": "ref crc11_value 0x4e5",
+        "crc11_value": 1253,
+        "Comment": "ref crc6_value 0x26",
+        "crc6_value": 38,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 12BIT TEST (0xfff)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_12bit_data.bin",
+        "data_length": 12
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x52868D",
+        "crc24a_value": 5408397,
+        "Comment": "ref crc24b_value 0x3E03E",
+        "crc24b_value": 254014,
+        "Comment": "ref crc24c_value 0x95618A",
+        "crc24c_value": 9789834,
+        "Comment": "ref crc24c_1_value 0xefd429",
+        "crc24c_1_value": 15717417,
+        "Comment": "ref crc16_value 0xECE",
+        "crc16_value": 3790,
+        "Comment": "ref crc11_value 0x5B5",
+        "crc11_value": 1461,
+        "Comment": "ref crc6_value 0x39",
+        "crc6_value": 57,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 28BIT TEST (0xb10c24f)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_28bit_data.bin",
+        "data_length": 28
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xd4b165",
+        "crc24a_value": 13939045,
+        "Comment": "ref crc24b_value 0x91a65b",
+        "crc24b_value": 9545307,
+        "Comment": "ref crc24c_value 0x524020",
+        "crc24c_value": 5390368,
+        "Comment": "ref crc24c_1_value 0x7a08cd",
+        "crc24c_1_value": 7997645,
+        "Comment": "ref crc16_value 0x9461",
+        "crc16_value": 37985,
+        "Comment": "ref crc11_value 0x21b",
+        "crc11_value": 539,
+        "Comment": "ref crc6_value 0x2c",
+        "crc6_value": 44,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 30BIT TEST (0xb10c24f4)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_30bit_data.bin",
+        "data_length": 30
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xd81099",
+        "crc24a_value": 14160025,
+        "Comment": "ref crc24b_value 0x4699aa",
+        "crc24b_value": 4626858,
+        "Comment": "ref crc24c_value 0x490080",
+        "crc24c_value": 4784256,
+        "Comment": "ref crc24c_1_value 0xe82334",
+        "crc24c_1_value": 15213364,
+        "Comment": "ref crc16_value 0x61E7",
+        "crc16_value": 25063,
+        "Comment": "ref crc11_value 0x6c",
+        "crc11_value": 108,
+        "Comment": "ref crc6_value 0x32",
+        "crc6_value": 50,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 31BIT TEST (0xb10c24f6)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_31bit_data.bin",
+        "data_length": 31
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xb02132",
+        "crc24a_value": 11542834,
+        "Comment": "ref crc24b_value 0xd3337",
+        "crc24b_value": 865079,
+        "Comment": "ref crc24c_value 0x20b017",
+        "crc24c_value": 2142231,
+        "Comment": "ref crc24c_1_value 0xd04668",
+        "crc24c_1_value": 13649512,
+        "Comment": "ref crc16_value 0xD3EF",
+        "crc16_value": 54255,
+        "Comment": "ref crc11_value 0x6f9",
+        "crc11_value": 1785,
+        "Comment": "ref crc6_value 0x24",
+        "crc6_value": 36,
+        "check_passed":true
+      }
+    },
+
+    {
+      "name": "CRC 33BIT TEST (0xb10c24f58)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_33bit_data.bin",
+        "data_length": 33
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xd52ed2",
+        "crc24a_value": 13971154,
+        "Comment": "ref crc24b_value 0xb4cd33",
+        "crc24b_value": 11849011,
+        "Comment": "ref crc24c_value 0xfab517",
+        "crc24c_value": 16430359,
+        "Comment": "ref crc24c_1_value 0x5c0ec5",
+        "crc24c_1_value": 6033093,
+        "Comment": "ref crc16_value 0xF38",
+        "crc16_value": 3896,
+        "Comment": "ref crc11_value 0x722",
+        "crc11_value": 1826,
+        "Comment": "ref crc6_value 0x16",
+        "crc6_value": 22,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 62BIT TEST (0xb10c24f5 b10c24f4)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_62bit_data.bin",
+        "data_length": 62
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xd2f02f",
+        "crc24a_value": 13824047,
+        "Comment": "ref crc24b_value 0x1f243c",
+        "crc24b_value": 2040892,
+        "Comment": "ref crc24c_value 0xaaee3d",
+        "crc24c_value": 11202109,
+        "Comment": "ref crc24c_1_value 0x035fe1",
+        "crc24c_1_value": 221153,
+        "Comment": "ref crc16_value 0x5BC",
+        "crc16_value": 1468,
+        "Comment": "ref crc11_value 0x689",
+        "crc11_value": 1673,
+        "Comment": "ref crc6_value 0x2f",
+        "crc6_value": 47,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 63BIT TEST (0xb10c24f5 b10c24f6)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_63bit_data.bin",
+        "data_length": 63
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xa5e05e",
+        "crc24a_value": 10870878,
+        "Comment": "ref crc24b_value 0xbe481b",
+        "crc24b_value": 12470299,
+        "Comment": "ref crc24c_value 0x55dc7a",
+        "crc24c_value": 5627002,
+        "Comment": "ref crc24c_1_value 0xb40ed5",
+        "crc24c_1_value": 11800277,
+        "Comment": "ref crc16_value 0x1B59",
+        "crc16_value": 7001,
+        "Comment": "ref crc11_value 0x512",
+        "crc11_value": 1298,
+        "Comment": "ref crc6_value 0x1e",
+        "crc6_value": 30,
+        "check_passed":true
+      }
+    },
+
+    {
+      "name": "CRC 65BIT TEST (0xb10c24f5 b10c24f5 8)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_65bit_data.bin",
+        "data_length": 65
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x822b62",
+        "crc24a_value": 8530786,
+        "Comment": "ref crc24b_value 0xf92126",
+        "crc24b_value": 16326950,
+        "Comment": "ref crc24c_value 0x9db5b4",
+        "crc24c_value": 10335668,
+        "Comment": "ref crc24c_1_value 0x7f9d26",
+        "crc24c_1_value": 8363302,
+        "Comment": "ref crc16_value 0x1D83",
+        "crc16_value": 7555,
+        "Comment": "ref crc11_value 0x6af",
+        "crc11_value": 1711,
+        "Comment": "ref crc6_value 0x3c",
+        "crc6_value": 60,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 68BIT TEST (0xb10c24f5 b10c24f5 B)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_68bit_data.bin",
+        "data_length": 68
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x8e2407",
+        "crc24a_value": 9315335,
+        "Comment": "ref crc24b_value 0x490819",
+        "crc24b_value": 4786201,
+        "Comment": "ref crc24c_value 0x95d8eb",
+        "crc24c_value": 9820395,
+        "Comment": "ref crc24c_1_value 0xfce930",
+        "crc24c_1_value": 16574768,
+        "Comment": "ref crc16_value 0xDC7B",
+        "crc16_value": 56443,
+        "Comment": "ref crc11_value 0x79f",
+        "crc11_value": 1951,
+        "Comment": "ref crc6_value 0x07",
+        "crc6_value": 7,
+        "check_passed":true
+      }
+    },
+
+    {
+      "name": "CRC 94BIT TEST (0xb10c24f5 b10c24f5 b10c24f4)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_94bit_data.bin",
+        "data_length": 94
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x38b460",
+        "crc24a_value": 3716192,
+        "Comment": "ref crc24b_value 0x41284",
+        "crc24b_value": 266884,
+        "Comment": "ref crc24c_value 0x41321b",
+        "crc24c_value": 4272667,
+        "Comment": "ref crc24c_1_value 0x36294f",
+        "crc24c_1_value": 3549519,
+        "Comment": "ref crc16_value 0x38A0",
+        "crc16_value": 14496,
+        "Comment": "ref crc11_value 0x2e0",
+        "crc11_value": 736,
+        "Comment": "ref crc6_value 0x0a",
+        "crc6_value": 10,
+        "check_passed":true
+      }
+    },
+
+    {
+      "name": "CRC 105BIT TEST (0xb10c24f5 b10c24f5 b10c24f5 b18)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_105bit_data.bin",
+        "data_length": 105
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x48bb31",
+        "crc24a_value": 4766513,
+        "Comment": "ref crc24b_value 0x14f667",
+        "crc24b_value": 1373799,
+        "Comment": "ref crc24c_value 0xcbf597",
+        "crc24c_value": 13366679,
+        "Comment": "ref crc24c_1_value 0x36e772",
+        "crc24c_1_value": 3598194,
+        "Comment": "ref crc16_value 0xb34e",
+        "crc16_value": 45902,
+        "Comment": "ref crc11_value 0x468",
+        "crc11_value": 1128,
+        "Comment": "ref crc6_value 0x8",
+        "crc6_value": 8,
+        "check_passed":true
+      }
+    },
+
+
+    {
+      "name": "CRC 127BIT TEST (0xb10c24f5 b10c24f5 b10c24f5 b10c24f2)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_127bit_data.bin",
+        "data_length": 127
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0xc0e336",
+        "crc24a_value": 12641078,
+        "Comment": "ref crc24b_value 0x8da3e0",
+        "crc24b_value": 9282528,
+        "Comment": "ref crc24c_value 0xcf8bb3",
+        "crc24c_value": 13601715,
+        "Comment": "ref crc24c_1_value 0x660593",
+        "crc24c_1_value": 6686099,
+        "Comment": "ref crc16_value 0x7F9",
+        "crc16_value": 2041,
+        "Comment": "ref crc11_value 0x9d",
+        "crc11_value": 157,
+        "Comment": "ref crc6_value 0x03",
+        "crc6_value": 3,
+        "check_passed":true
+      }
+    },
+
+    {
+      "name": "CRC 129BIT TEST (0xb10c24f5 b10c24f5 b10c24f5 b10c24f5 8)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_129bit_data.bin",
+        "data_length": 129
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x31eb00",
+        "crc24a_value": 3271424,
+        "Comment": "ref crc24b_value 0xb68cfb",
+        "crc24b_value": 11963643,
+        "Comment": "ref crc24c_value 0x191763",
+        "crc24c_value": 1644387,
+        "Comment": "ref crc24c_1_value 0x68fcda",
+        "crc24c_1_value": 6880474,
+        "Comment": "ref crc16_value 0xEE0B",
+        "crc16_value": 60939,
+        "Comment": "ref crc11_value 0x55d",
+        "crc11_value": 1373,
+        "Comment": "ref crc6_value 0x06",
+        "crc6_value": 6,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 132BIT TEST (0xb10c24f5 b10c24f5 b10c24f5 b10c24f5 f)",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_132bit_data.bin",
+        "data_length": 132
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x966bec",
+        "crc24a_value": 9858028,
+        "Comment": "ref crc24b_value 0x34677d",
+        "crc24b_value": 3434365,
+        "Comment": "ref crc24c_value 0xb0ce53",
+        "crc24c_value": 11587155,
+        "Comment": "ref crc24c_1_value 0x5af1b5",
+        "crc24c_1_value": 5960117,
+        "Comment": "ref crc16_value 0x7058",
+        "crc16_value": 28760,
+        "Comment": "ref crc11_value 0x8b",
+        "crc11_value": 139,
+        "Comment": "ref crc6_value 0x15",
+        "crc6_value": 21,
+        "check_passed":true
+      }
+    },
+
+    {
+      "name": "CRC 193BIT TEST ",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_193bit_data.bin",
+        "data_length": 193
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x26dd44",
+        "crc24a_value": 2547012,
+        "Comment": "ref crc24b_value 0xcddc5b",
+        "crc24b_value": 13491291,
+        "Comment": "ref crc24c_value 0xef5983",
+        "crc24c_value": 15686019,
+        "Comment": "ref crc24c_1_value 0x2e5dd8",
+        "crc24c_1_value": 3038680,
+        "Comment": "ref crc16_value 0x53A7",
+        "crc16_value": 21415,
+        "Comment": "ref crc11_value 0x131",
+        "crc11_value": 305,
+        "Comment": "ref crc6_value 0x13",
+        "crc6_value": 19,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 255BIT TEST ",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_255bit_data.bin",
+        "data_length": 255
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x412bca",
+        "crc24a_value": 4271050,
+        "Comment": "ref crc24b_value 0x276e3d",
+        "crc24b_value": 2584125,
+        "Comment": "ref crc24c_value 0xa3d406",
+        "crc24c_value": 10736646,
+        "Comment": "ref crc24c_1_value 0xe322e8",
+        "crc24c_1_value": 14885608,
+        "Comment": "ref crc16_value 0x524F",
+        "crc16_value": 21071,
+        "Comment": "ref crc11_value 0x26c",
+        "crc11_value": 620,
+        "Comment": "ref crc6_value 0x07",
+        "crc6_value": 7,
+        "check_passed":true
+      }
+    },
+
+    {
+      "name": "CRC 257BIT TEST ",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_257bit_data.bin",
+        "data_length": 257
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x1d9cc4",
+        "crc24a_value": 1940676,
+        "Comment": "ref crc24b_value 0x1db91b",
+        "crc24b_value": 1947931,
+        "Comment": "ref crc24c_value 0x20f66a",
+        "crc24c_value": 2160234,
+        "Comment": "ref crc24c_1_value 0x919cc5",
+        "crc24c_1_value": 9542853,
+        "Comment": "ref crc16_value 0x29FA",
+        "crc16_value": 10746,
+        "Comment": "ref crc11_value 0x715",
+        "crc11_value": 1813,
+        "Comment": "ref crc6_value 0x39",
+        "crc6_value": 57,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 260BIT Asymetric Data TEST ",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_260bit_data.bin",
+        "data_length": 260
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x798a0b",
+        "crc24a_value": 7965195,
+        "Comment": "ref crc24b_value 0x220cb5",
+        "crc24b_value": 2231477,
+        "Comment": "ref crc24c_value 0xe5c22a",
+        "crc24c_value": 15057450,
+        "Comment": "ref crc24c_1_value 0xc13120",
+        "crc24c_1_value": 12661024,
+        "Comment": "ref crc16_value 0xb309",
+        "crc16_value": 45833,
+        "Comment": "ref crc11_value 0x491",
+        "crc11_value": 1169,
+        "Comment": "ref crc6_value 0x1b",
+        "crc6_value": 27,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 511BIT TEST",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_511bit_data.bin",
+        "data_length": 511
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x9febdb",
+        "crc24a_value": 10480603,
+        "Comment": "ref crc24b_value 0xd5c0f1",
+        "crc24b_value": 14008561,
+        "Comment": "ref crc24c_value 0xb3253",
+        "crc24c_value": 733779,
+        "Comment": "ref crc24c_1_value 0xfc8979",
+        "crc24c_1_value": 16550265,
+        "Comment": "ref crc16_value 0xF972",
+        "crc16_value": 63858,
+        "Comment": "ref crc11_value 0x20c",
+        "crc11_value": 524,
+        "Comment": "ref crc6_value 0x06",
+        "crc6_value": 6,
+        "check_passed":true
+      }
+    },
+
+    {
+      "name": "CRC 513BIT TEST",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_513bit_data.bin",
+        "data_length": 513
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x6a0576",
+        "crc24a_value": 6948214,
+        "Comment": "ref crc24b_value 0xd702ed",
+        "crc24b_value": 14090989,
+        "Comment": "ref crc24c_value 0x54bc07",
+        "crc24c_value": 5553159,
+        "Comment": "ref crc24c_1_value 0xef3281",
+        "crc24c_1_value": 15676033,
+        "Comment": "ref crc16_value 0xA54C",
+        "crc16_value": 42316,
+        "Comment": "ref crc11_value 0x695",
+        "crc11_value": 1685,
+        "Comment": "ref crc6_value 0x3d",
+        "crc6_value": 61,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 1023BIT TEST",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_1023bit_data.bin",
+        "data_length": 1023
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x5d935e",
+        "crc24a_value": 6132574,
+        "Comment": "ref crc24b_value 0x8f422a",
+        "crc24b_value": 9388586,
+        "Comment": "ref crc24c_value 0x3edfcb",
+        "crc24c_value": 4120523,
+        "Comment": "ref crc24c_1_value 0xdbcf0a",
+        "crc24c_1_value": 14405386,
+        "Comment": "ref crc16_value 0xAA39",
+        "crc16_value": 43577,
+        "Comment": "ref crc11_value 0x2c8",
+        "crc11_value": 712,
+        "Comment": "ref crc6_value 0x31",
+        "crc6_value": 49,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC 1025BIT TEST",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_1025bit_data.bin",
+        "data_length": 1025
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x6f7e94",
+        "crc24a_value": 7306900,
+        "Comment": "ref crc24b_value 0x3d09e2",
+        "crc24b_value": 4000226,
+        "Comment": "ref crc24c_value 0x830a67",
+        "crc24c_value": 8587879,
+        "Comment": "ref crc24c_1_value 0x722b4d",
+        "crc24c_1_value": 7482189,
+        "Comment": "ref crc16_value 0xF841",
+        "crc16_value": 63553,
+        "Comment": "ref crc11_value 0x585",
+        "crc11_value": 1413,
+        "Comment": "ref crc6_value 0x23",
+        "crc6_value": 35,
+        "check_passed":true
+      }
+    },
+    {
+      "name": "CRC PDCCH TEST",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_pdcch_data.bin",
+        "data_length": 79
+      },
+      "references":
+      {
+        "Comment": "ref crc24a_value 0x623515",
+        "crc24a_value": 6436117,
+        "Comment": "ref crc24b_value 0x7a10af",
+        "crc24b_value": 7999663,
+        "Comment": "ref crc24c_value 0x1deb68",
+        "crc24c_value": 1960808,
+        "Comment": "ref crc24c_1_value 0x3e9fef",
+        "crc24c_1_value": 4104175,
+        "Comment": "ref crc16_value 0x6cc6",
+        "crc16_value": 27846,
+        "Comment": "ref crc11_value 0x1d7",
+        "crc11_value": 471,
+        "Comment": "ref crc6_value 0x2e",
+        "crc6_value": 46,
+        "check_passed":true
+      }
+    }
+
+  ],
+
+
+
+
+  "performance_generate_crc24a":
+  [
+    {
+      "name": "CRC24A_Generate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    },
+    {
+      "name": "CRC24A_Generate_8448_bits",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_8448bit_perfdata.bin",
+        "data_length": 8448
+      }
+    },
+    {
+      "name": "CRC24A_Generate_32768_bytes",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_270336bit_perfdata.bin",
+        "data_length": 262144
+      }
+    }
+  ],
+
+  "performance_validate_crc24a":
+  [
+    {
+      "name": "CRC24A_Validate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    },
+    {
+      "name": "CRC24A_Validate_12415_bytes",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_270336bit_perfdata.bin",
+        "data_length": 99320
+      }
+    },
+    {
+      "name": "CRC24A_Validate_49659_bytes",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_270336bit_perfdata.bin",
+        "data_length": 397272
+      }
+    }
+  ],
+
+  "performance_generate_crc24b":
+  [
+    {
+      "name": "CRC24B_Generate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    },
+    {
+      "name": "CRC24B_Generate_8448_bits",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_8448bit_perfdata.bin",
+        "data_length": 8448
+      }
+    }
+  ],
+
+  "performance_validate_crc24b":
+  [
+    {
+      "name": "CRC24B_Validate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    }
+  ],
+
+  "performance_generate_crc24c":
+  [
+    {
+      "name": "CRC24C_Generate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    },
+    {
+      "name": "CRC24C_Generate_2340_bit_non_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2340bit_perfdata.bin",
+        "data_length": 2340
+      }
+    }
+  ],
+
+  "performance_validate_crc24c":
+  [
+    {
+      "name": "CRC24C_Validate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    },
+    {
+      "name": "CRC24C_Validate_2340_bit_non_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2340bit_perfdata.bin",
+        "data_length": 2340
+      }
+    }
+  ],
+
+  "performance_generate_crc24c_1":
+  [
+    {
+      "name": "CRC24C_init_1s_Generate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    },
+    {
+      "name": "CRC24C_init_1s_Generate_2340_bit_non_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2340bit_perfdata.bin",
+        "data_length": 2340
+      }
+    }
+  ],
+
+  "performance_validate_crc24c_1":
+  [
+    {
+      "name": "CRC24C_init_1s_Validate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    },
+    {
+      "name": "CRC24C_init_1s_Validate_2340_bit_non_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2340bit_perfdata.bin",
+        "data_length": 2340
+      }
+    }
+  ],
+
+  "performance_generate_crc11":
+  [
+    {
+      "name": "CRC11_Generate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    },
+    {
+      "name": "CRC11_Generate_2340_bit_non_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2340bit_perfdata.bin",
+        "data_length": 2340
+      }
+    }
+  ],
+
+  "performance_validate_crc11":
+  [
+    {
+      "name": "CRC11_Validate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    },
+    {
+      "name": "CRC11_Validate_2340_bit_non_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2340bit_perfdata.bin",
+        "data_length": 2340
+      }
+    }
+  ],
+
+  "performance_generate_crc6":
+  [
+    {
+      "name": "CRC6_Generate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    },
+    {
+      "name": "CRC6_Generate_2340_bit_non_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2340bit_perfdata.bin",
+        "data_length": 2340
+      }
+    }
+  ],
+
+  "performance_validate_crc6":
+  [
+    {
+      "name": "CRC6_Validate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    },
+    {
+      "name": "CRC6_Validate_2340_bit_non_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2340bit_perfdata.bin",
+        "data_length": 2340
+      }
+    }
+  ],
+
+  "performance_generate_crc16":
+  [
+    {
+      "name": "CRC16_Generate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    },
+    {
+      "name": "CRC16_Generate_2340_bit_non_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2340bit_perfdata.bin",
+        "data_length": 2340
+      }
+    }
+  ],
+
+    "performance_validate_crc16":
+  [
+    {
+      "name": "CRC16_Validate_2344_bit_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2344bit_perfdata.bin",
+        "data_length": 2344
+      }
+    },
+    {
+      "name": "CRC16_Validate_2340_bit_non_aligned",
+      "parameters":
+      {
+        "data_in": "test_vectors/crc_2340bit_perfdata.bin",
+        "data_length": 2340
+      }
+    }
+  ]
+}

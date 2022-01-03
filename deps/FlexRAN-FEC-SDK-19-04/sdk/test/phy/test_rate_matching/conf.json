@@ -1,0 +1,159 @@
+{
+  "functional": [
+    {
+      "name": "DL_SHORT",
+      "parameters": {
+        "test_type": 0,
+        "r": 0,
+        "C": 1,
+        "direction": 1,
+        "Nsoft": 3667200,
+        "KMIMO": 2,
+        "MDL_HARQ": 8,
+        "G": 8064,
+        "NL": 1,
+        "Qm": 2,
+        "rvidx": 0,
+        "bypass_rvidx": 0,
+        "Kidx": 77,
+        "nLen": 804,
+        "tin0": "test_vectors/rm_in0_short.dat",
+        "tin1": "test_vectors/rm_in1_short.dat",
+        "tin2": "test_vectors/rm_in2_short.dat"
+      },
+      "references": {
+        "output": "test_vectors/rm_out_short.dat",
+        "output_len": 1008
+      }
+    },
+    {
+      "name": "DL_LONG",
+      "parameters": {
+        "test_type": 0,
+        "r": 0,
+        "C": 2,
+        "direction": 1,
+        "Nsoft": 3667200,
+        "KMIMO": 2,
+        "MDL_HARQ": 8,
+        "G": 24192,
+        "NL": 1,
+        "Qm": 6,
+        "rvidx": 2,
+        "bypass_rvidx": 0,
+        "Kidx": 178,
+        "nLen": 5572,
+        "tin0": "test_vectors/rm_in0_long.dat",
+        "tin1": "test_vectors/rm_in1_long.dat",
+        "tin2": "test_vectors/rm_in2_long.dat"
+      },
+      "references": {
+        "output": "test_vectors/rm_out_long.dat",
+        "output_len": 1512
+      }
+    },
+    {
+      "name": "UL",
+      "parameters": {
+        "test_type": 1,
+        "k0withoutnull": 276,
+        "ncb": 13260,
+        "e": 7200,
+        "isretx": 0,
+        "isinverted": 0,
+        "dmout": "test_vectors/drm_in.dat"
+      },
+      "references": {
+        "harqout": "test_vectors/drm_out0.dat",
+        "output_len": 7200
+      }
+    },
+    {
+      "name": "UL_DEINTERLEAVE_NO_DUMMY",
+      "parameters": {
+        "test_type": 2,
+        "ncb": 13260,
+        "circ_buffer": 0,
+        "harqbuffer": "test_vectors/harqbuffer_no_dummy_in.bin"
+      },
+      "references": {
+        "interleavebuffer": "test_vectors/interleavebuffer_out.bin",
+        "num_dummy": 28,
+        "bitstream_len": 4448
+      }
+    },
+    {
+      "name": "UL_DEINTERLEAVE_WITH_DUMMY",
+      "parameters": {
+        "test_type": 2,
+        "ncb": 13344,
+        "circ_buffer": 1,
+        "harqbuffer": "test_vectors/harqbuffer_with_dummy_in.bin"
+      },
+      "references": {
+        "interleavebuffer": "test_vectors/interleavebuffer_out.bin",
+        "num_dummy": 28,
+        "bitstream_len": 4448
+      }
+    }
+  ],
+
+  "performance": [
+    {
+      "name": "DL_SHORT",
+      "parameters": {
+        "test_type": 0,
+        "r": 0,
+        "C": 1,
+        "direction": 1,
+        "Nsoft": 3667200,
+        "KMIMO": 2,
+        "MDL_HARQ": 8,
+        "G": 8064,
+        "NL": 1,
+        "Qm": 2,
+        "rvidx": 0,
+        "bypass_rvidx": 0,
+        "Kidx": 77,
+        "nLen": 804,
+        "tin0": "test_vectors/rm_in0_short.dat",
+        "tin1": "test_vectors/rm_in1_short.dat",
+        "tin2": "test_vectors/rm_in2_short.dat"
+      }
+    },
+    {
+      "name": "DL_LONG",
+      "parameters": {
+        "test_type": 0,
+        "r": 0,
+        "C": 2,
+        "direction": 1,
+        "Nsoft": 3667200,
+        "KMIMO": 2,
+        "MDL_HARQ": 8,
+        "G": 24192,
+        "NL": 1,
+        "Qm": 6,
+        "rvidx": 2,
+        "bypass_rvidx": 0,
+        "Kidx": 178,
+        "nLen": 5572,
+        "tin0": "test_vectors/rm_in0_long.dat",
+        "tin1": "test_vectors/rm_in1_long.dat",
+        "tin2": "test_vectors/rm_in2_long.dat"
+      }
+    },
+    {
+      "name": "UL",
+      "parameters": {
+        "test_type": 1,
+        "k0withoutnull": 276,
+        "ncb": 13260,
+        "e": 7200,
+        "isretx": 0,
+        "isinverted": 0,
+        "pdmout": "test_vectors/drm_in.dat"
+      }
+    }
+  ]
+}

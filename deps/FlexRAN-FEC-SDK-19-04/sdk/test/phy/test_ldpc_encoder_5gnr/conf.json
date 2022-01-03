@@ -1,0 +1,2684 @@
+{
+  "functional": [
+    {
+      "name": "BG2_Zc7",
+      "parameters": {
+        "Zc": 7,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc7.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc7.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc8",
+      "parameters": {
+        "Zc": 8,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc8.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc8.bin"
+      }
+    },
+            {
+      "name": "BG2_Zc10",
+      "parameters": {
+        "Zc": 10,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc10.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc10.bin"
+      }
+    },
+            {
+      "name": "BG2_Zc11",
+      "parameters": {
+        "Zc": 11,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc11.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc11.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc14",
+      "parameters": {
+        "Zc": 14,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc14.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc14.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc15",
+      "parameters": {
+        "Zc": 15,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc15.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc15.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc16",
+      "parameters": {
+        "Zc": 16,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc16.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc16.bin"
+      }
+    },
+          {
+      "name": "BG2_Zc18",
+      "parameters": {
+        "Zc": 18,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc18.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc18.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc20",
+      "parameters": {
+        "Zc": 20,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc20.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc20.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc22",
+      "parameters": {
+        "Zc": 22,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc22.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc22.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc24",
+      "parameters": {
+        "Zc": 24,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc24.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc24.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc26",
+      "parameters": {
+        "Zc": 26,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc26.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc26.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc28",
+      "parameters": {
+        "Zc": 28,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc28.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc28.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc30",
+      "parameters": {
+        "Zc": 30,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc30.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc30.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc32",
+      "parameters": {
+        "Zc": 32,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc32.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc32.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc36",
+      "parameters": {
+        "Zc": 36,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc36.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc36.bin"
+      }
+    },    
+    {
+      "name": "BG2_Zc40",
+      "parameters": {
+        "Zc": 40,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc40.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc40.bin"
+      }
+    },
+          {
+      "name": "BG2_Zc44",
+      "parameters": {
+        "Zc": 44,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc44.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc44.bin"
+      }
+    },
+          {
+      "name": "BG2_Zc48",
+      "parameters": {
+        "Zc": 48,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc48.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc48.bin"
+      }
+    },
+          {
+      "name": "BG2_Zc52",
+      "parameters": {
+        "Zc": 52,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc52.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc52.bin"
+      }
+    },
+      {
+      "name": "BG2_Zc56",
+      "parameters": {
+        "Zc": 56,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc56.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc56.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc60",
+      "parameters": {
+        "Zc": 60,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc60.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc60.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc64",
+      "parameters": {
+        "Zc": 64,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc64.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc64.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc72",
+      "parameters": {
+        "Zc": 72,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc72.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc72.bin"
+      }
+    },
+        {
+      "name": "BG2_Zc80",
+      "parameters": {
+        "Zc": 80,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc80.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc80.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc88",
+      "parameters": {
+        "Zc": 88,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1, 
+        "input": "test_vectors/input_BG2_Zc88.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc88.bin"
+      }
+    },
+      {
+      "name": "BG2_Zc96",
+      "parameters": {
+        "Zc": 96,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc96.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc96.bin"
+      }
+    },
+      {
+      "name": "BG2_Zc104",
+      "parameters": {
+        "Zc": 104,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc104.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc104.bin"
+      }
+    },
+      {
+      "name": "BG2_Zc112",
+      "parameters": {
+        "Zc": 112,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc112.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc112.bin"
+      }
+    },
+          {
+      "name": "BG2_Zc120",
+      "parameters": {
+        "Zc": 120,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc120.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc120.bin"
+      }
+    },
+      {
+      "name": "BG2_Zc128",
+      "parameters": {
+        "Zc": 128,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc128.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc128.bin"
+      }
+    },
+      {
+      "name": "BG2_Zc144",
+      "parameters": {
+        "Zc": 144,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc144.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc144.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc160",
+      "parameters": {
+        "Zc": 160,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc160.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc160.bin"
+      }
+    },    
+    {
+      "name": "BG2_Zc176+R46",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc176_R35",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 35,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc176_R24",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 24,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc176_R13",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 13,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc176_R10",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 10,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc176_R7",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 7,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc176_R5",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 7,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },    
+    {
+      "name": "BG2_Zc192",
+      "parameters": {
+        "Zc": 192,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc192.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc192.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc208",
+      "parameters": {
+        "Zc": 208,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc208.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc208.bin"
+      }
+    },    
+        {
+      "name": "BG2_Zc224",
+      "parameters": {
+        "Zc": 224,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc224.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc224.bin"
+      }
+    },
+        {
+      "name": "BG2_Zc240",
+      "parameters": {
+        "Zc": 240,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc240.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc240.bin"
+      }
+    },
+        {
+      "name": "BG2_Zc256",
+      "parameters": {
+        "Zc": 256,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc256.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc256.bin"
+      }
+    },
+        {
+      "name": "BG2_Zc288",
+      "parameters": {
+        "Zc": 288,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc288.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc288.bin"
+      }
+    },
+        {
+      "name": "BG2_Zc320",
+      "parameters": {
+        "Zc": 320,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc320.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc320.bin"
+      }
+    },
+        {
+      "name": "BG2_Zc352",
+      "parameters": {
+        "Zc": 352,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc352.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc352.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc384_R42",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc384_R22",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 2,
+        "nRows": 22,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc384_R17",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 2,
+        "nRows": 17,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc384_R12",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 2,
+        "nRows": 12,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc384_R7",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 2,
+        "nRows": 7,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc384.bin"
+      }
+    },
+   
+    {
+      "name": "BG1_Zc7",
+      "parameters": {
+        "Zc": 7,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc7.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc7.bin"
+      }
+    },
+            {
+      "name": "BG1_Zc8",
+      "parameters": {
+        "Zc": 8,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc8.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc8.bin"
+      }
+    },
+            {
+      "name": "BG1_Zc10",
+      "parameters": {
+        "Zc": 10,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc10.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc10.bin"
+      }
+    },
+            {
+      "name": "BG1_Zc11",
+      "parameters": {
+        "Zc": 11,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc11.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc11.bin"
+      }
+    },
+            {
+      "name": "BG1_Zc14",
+      "parameters": {
+        "Zc": 14,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc14.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc14.bin"
+      }
+    },
+            {
+      "name": "BG1_Zc15",
+      "parameters": {
+        "Zc": 15,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc15.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc15.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc16",
+      "parameters": {
+        "Zc": 16,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc16.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc16.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc18",
+      "parameters": {
+        "Zc": 18,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc18.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc18.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc20",
+      "parameters": {
+        "Zc": 20,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc20.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc20.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc22",
+      "parameters": {
+        "Zc": 22,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc22.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc22.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc24",
+      "parameters": {
+        "Zc": 24,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc24.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc24.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc26",
+      "parameters": {
+        "Zc": 26,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc26.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc26.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc28",
+      "parameters": {
+        "Zc": 28,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc28.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc28.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc30",
+      "parameters": {
+        "Zc": 30,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc30.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc30.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc32",
+      "parameters": {
+        "Zc": 32,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc32.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc32.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc40",
+      "parameters": {
+        "Zc": 40,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc40.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc40.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc44",
+      "parameters": {
+        "Zc": 44,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc44.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc44.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc48",
+      "parameters": {
+        "Zc": 48,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc48.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc48.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc52",
+      "parameters": {
+        "Zc": 52,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc52.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc52.bin"
+      }
+    },
+      {
+      "name": "BG1_Zc56",
+      "parameters": {
+        "Zc": 56,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc56.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc56.bin"
+      }
+    },      {
+      "name": "BG1_Zc60",
+      "parameters": {
+        "Zc": 60,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc60.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc60.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc88",
+      "parameters": {
+        "Zc": 88,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1, 
+        "input": "test_vectors/input_BG1_Zc88.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc88.bin"
+      }
+    },
+      {
+      "name": "BG1_Zc96",
+      "parameters": {
+        "Zc": 96,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc96.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc96.bin"
+      }
+    },
+      {
+      "name": "BG1_Zc104",
+      "parameters": {
+        "Zc": 104,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc104.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc104.bin"
+      }
+    },
+      {
+      "name": "BG1_Zc112",
+      "parameters": {
+        "Zc": 112,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc112.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc112.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc120",
+      "parameters": {
+        "Zc": 120,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc120.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc120.bin"
+      }
+    },
+      {
+      "name": "BG1_Zc128",
+      "parameters": {
+        "Zc": 128,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc128.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc128.bin"
+      }
+    },
+      {
+      "name": "BG1_Zc144",
+      "parameters": {
+        "Zc": 144,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc144.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc144.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc160",
+      "parameters": {
+        "Zc": 160,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc160.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc160.bin"
+      }
+    },    
+    {
+      "name": "BG1_Zc176+R46",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc176_R35",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 35,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc176_R24",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 24,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc176_R13",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 13,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc176_R10",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 10,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc176_R7",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 7,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc176_R5",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 7,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },    
+    {
+      "name": "BG1_Zc192",
+      "parameters": {
+        "Zc": 192,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc192.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc192.bin"
+      }
+    },
+        {
+    "name": "BG1_Zc192_2ways",
+      "parameters": {
+        "Zc": 192,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 2,
+        "input": "test_vectors/input_BG1_Zc192.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc192.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc208",
+      "parameters": {
+        "Zc": 208,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc208.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc208.bin"
+      }
+    },    
+        {
+      "name": "BG1_Zc224",
+      "parameters": {
+        "Zc": 224,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc224.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc224.bin"
+      }
+    },
+        {
+      "name": "BG1_Zc240",
+      "parameters": {
+        "Zc": 240,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc240.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc240.bin"
+      }
+    },
+        {
+      "name": "BG1_Zc256",
+      "parameters": {
+        "Zc": 256,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc256.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc256.bin"
+      }
+    },
+        {
+      "name": "BG1_Zc288",
+      "parameters": {
+        "Zc": 288,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc288.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc288.bin"
+      }
+    },
+        {
+      "name": "BG1_Zc320",
+      "parameters": {
+        "Zc": 320,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc320.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc320.bin"
+      }
+    },
+        {
+      "name": "BG1_Zc352",
+      "parameters": {
+        "Zc": 352,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc352.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc352.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R46",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R35",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 35,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R24",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 24,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R13",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 13,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R10",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 10,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R7",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 7,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R5",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 5,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    }
+  ],
+
+  "performance": [
+     {
+      "name": "BG2_Zc7",
+      "parameters": {
+        "Zc": 7,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc7.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc7.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc8",
+      "parameters": {
+        "Zc": 8,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc8.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc8.bin"
+      }
+    },
+            {
+      "name": "BG2_Zc10",
+      "parameters": {
+        "Zc": 10,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc10.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc10.bin"
+      }
+    },
+            {
+      "name": "BG2_Zc11",
+      "parameters": {
+        "Zc": 11,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc11.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc11.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc14",
+      "parameters": {
+        "Zc": 14,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc14.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc14.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc15",
+      "parameters": {
+        "Zc": 15,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc15.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc15.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc16",
+      "parameters": {
+        "Zc": 16,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc16.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc16.bin"
+      }
+    },
+          {
+      "name": "BG2_Zc18",
+      "parameters": {
+        "Zc": 18,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc18.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc18.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc20",
+      "parameters": {
+        "Zc": 20,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc20.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc20.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc22",
+      "parameters": {
+        "Zc": 22,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc22.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc22.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc24",
+      "parameters": {
+        "Zc": 24,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc24.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc24.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc26",
+      "parameters": {
+        "Zc": 26,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc26.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc26.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc28",
+      "parameters": {
+        "Zc": 28,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc28.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc28.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc30",
+      "parameters": {
+        "Zc": 30,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc30.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc30.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc32",
+      "parameters": {
+        "Zc": 32,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc32.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc32.bin"
+      }
+    },
+          {
+      "name": "BG2_Zc40",
+      "parameters": {
+        "Zc": 40,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc40.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc40.bin"
+      }
+    },
+          {
+      "name": "BG2_Zc44",
+      "parameters": {
+        "Zc": 44,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc44.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc44.bin"
+      }
+    },
+          {
+      "name": "BG2_Zc48",
+      "parameters": {
+        "Zc": 48,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc48.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc48.bin"
+      }
+    },
+          {
+      "name": "BG2_Zc52",
+      "parameters": {
+        "Zc": 52,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc52.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc52.bin"
+      }
+    },
+      {
+      "name": "BG2_Zc56",
+      "parameters": {
+        "Zc": 56,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc56.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc56.bin"
+      }
+    },      {
+      "name": "BG2_Zc60",
+      "parameters": {
+        "Zc": 60,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc60.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc60.bin"
+      }
+    },
+          {
+      "name": "BG2_Zc88",
+      "parameters": {
+        "Zc": 88,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1, 
+        "input": "test_vectors/input_BG2_Zc88.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc88.bin"
+      }
+    },
+      {
+      "name": "BG2_Zc96",
+      "parameters": {
+        "Zc": 96,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc96.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc96.bin"
+      }
+    },
+      {
+      "name": "BG2_Zc104",
+      "parameters": {
+        "Zc": 104,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc104.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc104.bin"
+      }
+    },
+      {
+      "name": "BG2_Zc112",
+      "parameters": {
+        "Zc": 112,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc112.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc112.bin"
+      }
+    },
+          {
+      "name": "BG2_Zc120",
+      "parameters": {
+        "Zc": 120,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc120.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc120.bin"
+      }
+    },
+      {
+      "name": "BG2_Zc128",
+      "parameters": {
+        "Zc": 128,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc128.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc128.bin"
+      }
+    },
+      {
+      "name": "BG2_Zc144",
+      "parameters": {
+        "Zc": 144,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc144.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc144.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc160",
+      "parameters": {
+        "Zc": 160,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc160.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc160.bin"
+      }
+    },    
+    {
+      "name": "BG2_Zc176+R46",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc176_R35",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 35,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc176_R24",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 24,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc176_R13",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 13,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc176_R10",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 10,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc176_R7",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 7,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc176_R5",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 2,
+        "nRows": 7,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc176.bin"
+      }
+    },    
+    {
+      "name": "BG2_Zc192",
+      "parameters": {
+        "Zc": 192,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc192.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc192.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc208",
+      "parameters": {
+        "Zc": 208,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc208.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc208.bin"
+      }
+    },    
+        {
+      "name": "BG2_Zc224",
+      "parameters": {
+        "Zc": 224,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc224.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc224.bin"
+      }
+    },
+        {
+      "name": "BG2_Zc240",
+      "parameters": {
+        "Zc": 240,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc240.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc240.bin"
+      }
+    },
+        {
+      "name": "BG2_Zc256",
+      "parameters": {
+        "Zc": 256,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc256.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc256.bin"
+      }
+    },
+        {
+      "name": "BG2_Zc288",
+      "parameters": {
+        "Zc": 288,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc288.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc288.bin"
+      }
+    },
+        {
+      "name": "BG2_Zc320",
+      "parameters": {
+        "Zc": 320,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc320.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc320.bin"
+      }
+    },
+        {
+      "name": "BG2_Zc352",
+      "parameters": {
+        "Zc": 352,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc352.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc352.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc384_R42",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 2,
+        "nRows": 42,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc384_R22",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 2,
+        "nRows": 22,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc384_R17",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 2,
+        "nRows": 17,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc384_R12",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 2,
+        "nRows": 12,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG2_Zc384_R7",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 2,
+        "nRows": 7,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG2_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG2_Zc384.bin"
+      }
+    },
+   
+    {
+      "name": "BG1_Zc7",
+      "parameters": {
+        "Zc": 7,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc7.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc7.bin"
+      }
+    },
+            {
+      "name": "BG1_Zc8",
+      "parameters": {
+        "Zc": 8,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc8.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc8.bin"
+      }
+    },
+            {
+      "name": "BG1_Zc10",
+      "parameters": {
+        "Zc": 10,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc10.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc10.bin"
+      }
+    },
+            {
+      "name": "BG1_Zc11",
+      "parameters": {
+        "Zc": 11,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc11.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc11.bin"
+      }
+    },
+            {
+      "name": "BG1_Zc14",
+      "parameters": {
+        "Zc": 14,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc14.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc14.bin"
+      }
+    },
+            {
+      "name": "BG1_Zc15",
+      "parameters": {
+        "Zc": 15,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc15.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc15.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc16",
+      "parameters": {
+        "Zc": 16,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc16.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc16.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc18",
+      "parameters": {
+        "Zc": 18,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc18.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc18.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc20",
+      "parameters": {
+        "Zc": 20,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc20.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc20.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc22",
+      "parameters": {
+        "Zc": 22,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc22.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc22.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc24",
+      "parameters": {
+        "Zc": 24,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc24.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc24.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc26",
+      "parameters": {
+        "Zc": 26,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc26.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc26.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc28",
+      "parameters": {
+        "Zc": 28,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc28.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc28.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc30",
+      "parameters": {
+        "Zc": 30,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc30.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc30.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc32",
+      "parameters": {
+        "Zc": 32,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc32.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc32.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc40",
+      "parameters": {
+        "Zc": 40,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc40.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc40.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc44",
+      "parameters": {
+        "Zc": 44,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc44.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc44.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc48",
+      "parameters": {
+        "Zc": 48,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc48.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc48.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc52",
+      "parameters": {
+        "Zc": 52,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc52.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc52.bin"
+      }
+    },
+      {
+      "name": "BG1_Zc56",
+      "parameters": {
+        "Zc": 56,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc56.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc56.bin"
+      }
+    },      {
+      "name": "BG1_Zc60",
+      "parameters": {
+        "Zc": 60,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc60.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc60.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc88",
+      "parameters": {
+        "Zc": 88,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1, 
+        "input": "test_vectors/input_BG1_Zc88.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc88.bin"
+      }
+    },
+      {
+      "name": "BG1_Zc96",
+      "parameters": {
+        "Zc": 96,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc96.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc96.bin"
+      }
+    },
+      {
+      "name": "BG1_Zc104",
+      "parameters": {
+        "Zc": 104,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc104.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc104.bin"
+      }
+    },
+      {
+      "name": "BG1_Zc112",
+      "parameters": {
+        "Zc": 112,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc112.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc112.bin"
+      }
+    },
+          {
+      "name": "BG1_Zc120",
+      "parameters": {
+        "Zc": 120,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc120.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc120.bin"
+      }
+    },
+      {
+      "name": "BG1_Zc128",
+      "parameters": {
+        "Zc": 128,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc128.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc128.bin"
+      }
+    },
+      {
+      "name": "BG1_Zc144",
+      "parameters": {
+        "Zc": 144,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc144.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc144.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc160",
+      "parameters": {
+        "Zc": 160,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc160.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc160.bin"
+      }
+    },    
+    {
+      "name": "BG1_Zc176+R46",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc176_R35",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 35,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc176_R24",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 24,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc176_R13",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 13,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc176_R10",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 10,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc176_R7",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 7,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc176_R5",
+      "parameters": {
+        "Zc": 176,
+        "baseGraph": 1,
+        "nRows": 7,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc176.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc176.bin"
+      }
+    },    
+    {
+      "name": "BG1_Zc192",
+      "parameters": {
+        "Zc": 192,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc192.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc192.bin"
+      }
+    },
+        {
+    "name": "BG1_Zc192_2ways",
+      "parameters": {
+        "Zc": 192,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 2,
+        "input": "test_vectors/input_BG1_Zc192.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc192.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc208",
+      "parameters": {
+        "Zc": 208,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc208.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc208.bin"
+      }
+    },    
+        {
+      "name": "BG1_Zc224",
+      "parameters": {
+        "Zc": 224,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc224.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc224.bin"
+      }
+    },
+        {
+      "name": "BG1_Zc240",
+      "parameters": {
+        "Zc": 240,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc240.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc240.bin"
+      }
+    },
+        {
+      "name": "BG1_Zc256",
+      "parameters": {
+        "Zc": 256,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc256.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc256.bin"
+      }
+    },
+        {
+      "name": "BG1_Zc288",
+      "parameters": {
+        "Zc": 288,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc288.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc288.bin"
+      }
+    },
+        {
+      "name": "BG1_Zc320",
+      "parameters": {
+        "Zc": 320,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc320.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc320.bin"
+      }
+    },
+        {
+      "name": "BG1_Zc352",
+      "parameters": {
+        "Zc": 352,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc352.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc352.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R46",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 46,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R35",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 35,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R24",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 24,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R13",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 13,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R10",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 10,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R7",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 7,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    },
+    {
+      "name": "BG1_Zc384_R5",
+      "parameters": {
+        "Zc": 384,
+        "baseGraph": 1,
+        "nRows": 5,
+        "numberCodeblocks": 1,
+        "input": "test_vectors/input_BG1_Zc384.bin"
+      },
+      "references": {
+        "output": "test_vectors/output_BG1_Zc384.bin"
+      }
+    }   
+  ]
+}

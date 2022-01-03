@@ -1,0 +1,234 @@
+{
+  "functional": [
+    {
+      "name": "BPSK",
+      "parameters": {
+        "r": 0,
+        "C": 0,
+        "Ncb": 1024,
+        "Zc": 240,
+        "E": 3002,
+        "Qm": 1,
+        "rvidx": 1,
+        "baseGraph": 2,
+        "nullIndex": 232,
+        "nLen": 12,
+        "data_in": "test_vectors/Input_BPSK.bin"
+      },
+      "references": {
+        "data_out": "test_vectors/Output_BPSK.bin"
+      }
+    },
+    {
+      "name": "QPSK",
+      "parameters": {
+        "r": 0,
+        "C": 0,
+        "Ncb": 1024,
+        "Zc": 240,
+        "E": 3002,
+        "Qm": 2,
+        "rvidx": 1,
+        "baseGraph": 1,
+        "nullIndex": 32,
+        "nLen": 12,
+        "data_in": "test_vectors/Input_QPSK.bin"
+      },
+      "references": {
+        "data_out": "test_vectors/Output_QPSK.bin"
+      }
+    },
+    {
+      "name": "16QAM",
+      "parameters": {
+        "r": 0,
+        "C": 0,
+        "Ncb": 1024,
+        "Zc": 240,
+        "E": 3004,
+        "Qm": 4,
+        "rvidx": 0,
+        "baseGraph": 1,
+        "nullIndex": 232,
+        "nLen": 12,
+        "data_in": "test_vectors/Input_16QAM.bin"
+      },
+      "references": {
+        "data_out": "test_vectors/Output_16QAM.bin"
+      }
+    },
+    {
+      "name": "16QAM_bg1_rvidx3",
+      "parameters": {
+        "r": 0,
+        "C": 0,
+        "Ncb": 1024,
+        "Zc": 240,
+        "E": 3004,
+        "Qm": 4,
+        "rvidx": 3,
+        "baseGraph": 1,
+        "nullIndex": 1000,
+        "nLen": 24,
+        "data_in": "test_vectors/Input_16QAM_bg1_rvidx3.bin"
+      },
+      "references": {
+        "data_out": "test_vectors/Output_16QAM_bg1_rvidx3.bin"
+      }
+    },
+    {
+      "name": "64QAM",
+      "parameters": {
+        "r": 0,
+        "C": 0,
+        "Ncb": 25344,
+        "Zc": 240,
+        "E": 9912,
+        "Qm": 6,
+        "rvidx": 0,
+        "baseGraph": 2,
+        "nullIndex": 7668,
+        "nLen": 12,
+        "data_in": "test_vectors/Input_64QAM.bin"
+      },
+      "references": {
+        "data_out": "test_vectors/Output_64QAM.bin"
+      }
+    },
+    {
+      "name": "64QAM_bg2_rvidx2",
+      "parameters": {
+        "r": 0,
+        "C": 0,
+        "Ncb": 1024,
+        "Zc": 240,
+        "E": 3000,
+        "Qm": 6,
+        "rvidx": 2,
+        "baseGraph": 2,
+        "nullIndex": 1000,
+        "nLen": 24,
+        "data_in": "test_vectors/Input_64QAM_bg2_rvidx2.bin"
+      },
+      "references": {
+        "data_out": "test_vectors/Output_64QAM_bg2_rvidx2.bin"
+      }
+    },
+    {
+      "name": "256QAM",
+      "parameters": {
+        "r": 0,
+        "C": 0,
+        "Ncb": 1024,
+        "Zc": 240,
+        "E": 6008,
+        "Qm": 8,
+        "rvidx": 2,
+        "baseGraph": 1,
+        "nullIndex": 232,
+        "nLen": 12,
+        "data_in": "test_vectors/Input_256QAM.bin"
+      },
+      "references": {
+        "data_out": "test_vectors/Output_256QAM.bin"
+      }
+    },
+    {
+      "name": "256QAM_bg2_rvidx3",
+      "parameters": {
+        "r": 0,
+        "C": 0,
+        "Ncb": 1024,
+        "Zc": 240,
+        "E": 4000,
+        "Qm": 8,
+        "rvidx": 3,
+        "baseGraph": 2,
+        "nullIndex": 1000,
+        "nLen": 24,
+        "data_in": "test_vectors/Input_256QAM_bg2_rvidx3.bin"
+      },
+      "references": {
+        "data_out": "test_vectors/Output_256QAM_bg2_rvidx3.bin"
+      }
+    }
+  ],
+
+  "performance": [
+    {
+      "name": "BPSK",
+      "parameters": {
+        "r": 0,
+        "C": 0,
+        "Ncb": 25344,
+        "Zc": 240,
+        "E": 24000,
+        "Qm": 1,
+        "rvidx": 0,
+        "baseGraph": 1,
+        "nullIndex": 7668,
+        "nLen": 12
+      }
+    },
+    {
+      "name": "QPSK",
+      "parameters": {
+        "r": 0,
+        "C": 0,
+        "Ncb": 25344,
+        "Zc": 240,
+        "E": 24000,
+        "Qm": 2,
+        "rvidx": 0,
+        "baseGraph": 1,
+        "nullIndex": 7668,
+        "nLen": 12
+      }
+    },
+    {
+      "name": "16QAM",
+      "parameters": {
+        "r": 0,
+        "C": 0,
+        "Ncb": 25344,
+        "Zc": 240,
+        "E": 24000,
+        "Qm": 4,
+        "rvidx": 0,
+        "baseGraph": 1,
+        "nullIndex": 7668,
+        "nLen": 12
+      }
+    },
+    {
+      "name": "64QAM",
+      "parameters": {
+        "r": 0,
+        "C": 0,
+        "Ncb": 25344,
+        "Zc": 240,
+        "E": 24000,
+        "Qm": 6,
+        "rvidx": 0,
+        "baseGraph": 1,
+        "nullIndex": 7668,
+        "nLen": 12
+      }
+    },
+    {
+      "name": "256QAM",
+      "parameters": {
+        "r": 0,
+        "C": 0,
+        "Ncb": 25344,
+        "Zc": 240,
+        "E": 24000,
+        "Qm": 8,
+        "rvidx": 0,
+        "baseGraph": 1,
+        "nullIndex": 7668,
+        "nLen": 12
+      }
+    }
+  ]
+}
