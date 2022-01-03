@@ -159,7 +159,7 @@ TEST(TestDemod256QAM, SoftAVX2) {
 
 #ifdef __AVX512F__
 TEST(TestDemod256QAM, SoftAVX512) {
-  Run256QAMSoftDemod(Demod256qamSoftAvx512, "Demod256qamSoftAvx512");
+  Run256QamSoftDemod(Demod256qamSoftAvx512, "Demod256qamSoftAvx512");
 }
 #endif
 
