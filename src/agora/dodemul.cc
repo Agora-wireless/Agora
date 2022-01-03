@@ -146,12 +146,10 @@ EventData DoDemul::Launch(size_t tag) {
                                ? _mm512_load_ps(&src[j * cfg_->BsAntNum() * 2])
                                : _mm512_i32gather_ps(index, &src[j * 2], 4);
 
-          //if ((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) % 64) > 0)
-          //{
-          //  std::printf("Ant: %zu:%zu subcarrier: %zu:%zu base address %zu\n", ant_i, cfg_->BsAntNum(), base_sc_id, j, reinterpret_cast<size_t>(dst));
-          //}
           assert((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) %
-                  64) == 0);
+                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
+          assert((reinterpret_cast<size_t>(&src[j * cfg_->BsAntNum() * 2]) %
+                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
           _mm512_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
         }
         src += kAntNumPerSimd * kTransposeBlockSize * 2;
@@ -165,10 +163,10 @@ EventData DoDemul::Launch(size_t tag) {
       for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
            ant_i += kAntNumPerSimd) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
-          //std::printf("Ant: %zu Local sc: %zu\n", ant_i, j);
-          assert((reinterpret_cast<size_t>((&src[j * 2]) % 32) == 0) &&
-                 ((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) %
-                   32) == 0));
+          assert((reinterpret_cast<size_t>(&src[j * 2]) %
+                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
+          assert((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) %
+                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
           __m256 data_rx = _mm256_i32gather_ps(&src[j * 2], index, 4);
           _mm256_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
         }
