@@ -20,7 +20,7 @@ static const size_t kDefaultQueueSize = 36;
 
 PhyUe::PhyUe(Config* config)
     : stats_(std::make_unique<Stats>(config)),
-      phy_stats_(std::make_unique<PhyStats>(config, Direction::Downlink)),
+      phy_stats_(std::make_unique<PhyStats>(config, Direction::kDownlink)),
       demod_buffer_(kFrameWnd, config->Frame().NumDLSyms(), config->UeAntNum(),
                     kMaxModType * config->OfdmDataNum()),
       decoded_buffer_(kFrameWnd, config->Frame().NumDLSyms(),
@@ -563,7 +563,7 @@ void PhyUe::Start() {
           RtAssert(radio_buf_id == (expected_frame_id_from_mac_ % kFrameWnd),
                    "Radio buffer id does not match expected");
 
-          auto* pkt = reinterpret_cast<const MacPacketPacked*>(
+          const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
               &ul_bits_buffer_[ue_id][radio_buf_id *
                                       config_->UlMacBytesNumPerframe()]);
 

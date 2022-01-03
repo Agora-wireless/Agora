@@ -326,7 +326,7 @@ void* MacSender::WorkerThread(size_t tid) {
         for (size_t packet = 0; packet < packets_per_frame_; packet++) {
           ///\todo Use assume_aligned<kTxBufferElementAlignment> when code has
           /// c++20 support
-          auto* tx_packet =
+          const auto* tx_packet =
               reinterpret_cast<const MacPacketPacked*>(mac_packet_location);
 
           const size_t mac_packet_tx_size =

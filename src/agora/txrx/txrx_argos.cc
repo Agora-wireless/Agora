@@ -42,7 +42,9 @@ void PacketTXRX::LoopTxRxArgos(size_t tid) {
     zeros[0] = calloc(cfg_->SampsPerSymbol(), sizeof(int16_t) * 2);
     zeros[1] = calloc(cfg_->SampsPerSymbol(), sizeof(int16_t) * 2);
     beaconbuff[beacon_chan] = cfg_->BeaconCi16().data();
-    if (cfg_->NumChannels() > 1) beaconbuff[1 - beacon_chan] = zeros[0];
+    if (cfg_->NumChannels() > 1) {
+      beaconbuff[1 - beacon_chan] = zeros[0];
+    }
 
     std::vector<std::complex<int16_t>> samp_buffer0(cfg_->SampsPerSymbol(), 0);
     std::vector<std::complex<int16_t>> samp_buffer1(cfg_->SampsPerSymbol(), 0);
@@ -60,39 +62,44 @@ void PacketTXRX::LoopTxRxArgos(size_t tid) {
     int rx_ret = 0;
     int tx_ret = 0;
     while ((rx_ret = radioconfig_->RadioRx(radio_lo, samp_buffer.data(),
-                                           rx_time_bs)) < 0)
+                                           rx_time_bs)) < 0) {
       ;
+    }
     tx_time_bs = rx_time_bs + frame_time * TX_FRAME_DELTA;
     time0 = tx_time_bs;
     std::cout << "Received first data at time " << rx_time_bs << " on thread "
               << tid << std::endl;
     std::cout << "Transmit first beacon at time " << tx_time_bs << " on thread "
               << tid << std::endl;
-    for (auto radio = radio_lo + 1; radio < radio_hi; radio++)
+    for (auto radio = radio_lo + 1; radio < radio_hi; radio++) {
       radioconfig_->RadioRx(radio_lo, samp_buffer.data(), rx_time_bs);
+    }
     // Schedule the first beacon in the future
     for (auto radio = radio_lo; radio < radio_hi; radio++) {
-      if (radio == beacon_radio)
+      if (radio == beacon_radio) {
         tx_ret = radioconfig_->RadioTx(radio, beaconbuff.data(), 2, tx_time_bs);
-      else
+      } else {
         tx_ret = radioconfig_->RadioTx(radio, zeros.data(), 2, tx_time_bs);
+      }
       if (tx_ret != (int)cfg_->SampsPerSymbol()) {
         std::cerr << "BAD Transmit(" << tx_ret << "/" << cfg_->SampsPerSymbol()
                   << ") at Time " << tx_time_bs << std::endl;
       }
     }
     for (size_t sym = 1; sym < cfg_->Frame().NumTotalSyms(); sym++) {
-      for (auto radio = radio_lo; radio < radio_hi; radio++)
+      for (auto radio = radio_lo; radio < radio_hi; radio++) {
         radioconfig_->RadioRx(radio, samp_buffer.data(), rx_time_bs);
+      }
     }
     for (size_t frm = 1; frm < TX_FRAME_DELTA; frm++) {
       tx_time_bs += frame_time;
       for (auto radio = radio_lo; radio < radio_hi; radio++) {
-        if (radio == beacon_radio)
+        if (radio == beacon_radio) {
           tx_ret =
               radioconfig_->RadioTx(radio, beaconbuff.data(), 2, tx_time_bs);
-        else
+        } else {
           tx_ret = radioconfig_->RadioTx(radio, zeros.data(), 2, tx_time_bs);
+        }
         if (tx_ret != (int)cfg_->SampsPerSymbol()) {
           std::cerr << "BAD Transmit(" << tx_ret << "/"
                     << cfg_->SampsPerSymbol() << ") at Time " << tx_time_bs
@@ -125,7 +132,7 @@ void PacketTXRX::LoopTxRxArgos(size_t tid) {
       // receive data
       auto pkts = RecvEnqueueArgos(tid, radio_id, rx_slot, global_frame_id,
                                    global_symbol_id);
-      if (pkts.size() > 0) {
+      if (!pkts.empty()) {
         rx_slot = (rx_slot + pkts.size()) % buffers_per_socket_;
         RtAssert(pkts.size() == cfg_->NumChannels(),
                  "Received data but it was the wrong dimension");
@@ -146,8 +153,9 @@ void PacketTXRX::LoopTxRxArgos(size_t tid) {
             global_symbol_id = 0;
             global_frame_id++;
             if (cfg_->Frame().NumDLSyms() == 0) {
-              for (size_t radio = radio_lo; radio <= radio_hi; radio++)
+              for (size_t radio = radio_lo; radio <= radio_hi; radio++) {
                 this->TxBeaconHW(global_frame_id, radio, time0);
+              }
             }
           }
         }
@@ -205,8 +213,9 @@ std::vector<Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid, size_t radio_id,
     if (cfg_->NumChannels() == 2) {
       samp_buffer[1] = samp_buffer1.data();
     }
-    if (cfg_->Running() == true)
+    if (cfg_->Running() == true) {
       radioconfig_->RadioRx(radio_id, samp_buffer.data(), frame_time);
+    }
     std::vector<Packet*> empty_pkt;
     return empty_pkt;
   } else {
@@ -221,8 +230,9 @@ std::vector<Packet*> PacketTXRX::RecvEnqueueArgos(size_t tid, size_t radio_id,
     if (cfg_->HwFramer() == true) {
       frame_id = (size_t)(frame_time >> 32);
       symbol_id = (size_t)((frame_time >> 16) & 0xFFFF);
-      for (size_t ch = 0; ch < cfg_->NumChannels(); ch++)
+      for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
         symbol_ids.at(ch) = symbol_id;
+      }
 
       // Additional read for DL Calibration in two-chan case.
       // In HW framer mode we need to be specific about
@@ -289,7 +299,9 @@ void PacketTXRX::TxBeaconHW(size_t frame_id, size_t radio_id, long long time0) {
     beaconbuff[0] = zeros[0];
     beaconbuff[1] = zeros[1];
   }
-  if (cfg_->NumChannels() > 1) beaconbuff[1] = zeros[0];
+  if (cfg_->NumChannels() > 1) {
+    beaconbuff[1] = zeros[0];
+  }
   // assuming beacon is first symbol
   long long frame_time = time0 + (frame_id + TX_FRAME_DELTA) *
                                      cfg_->SampsPerSymbol() *
@@ -317,34 +329,40 @@ void PacketTXRX::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
                          s == radio_id % cfg_->RadioPerGroup());
       for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
         caltxbuf.at(ch) = calib_turn ? cfg_->PilotCi16().data() : zeros.data();
-        if (cfg_->NumChannels() > 1) caltxbuf.at(1 - ch) = zeros.data();
+        if (cfg_->NumChannels() > 1) {
+          caltxbuf.at(1 - ch) = zeros.data();
+        }
         long long frame_time = 0;
-        if (cfg_->HwFramer() == false)
+        if (cfg_->HwFramer() == false) {
           frame_time =
               time0 +
               cfg_->SampsPerSymbol() *
                   ((frame_id + TX_FRAME_DELTA) * cfg_->Frame().NumTotalSyms() +
                    cfg_->Frame().GetDLCalSymbol(s * cfg_->NumChannels() + ch));
-        else
+        } else {
           frame_time =
               ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
               (cfg_->Frame().GetDLCalSymbol(s * cfg_->NumChannels() + ch)
                << 16);
+        }
         radioconfig_->RadioTx(radio_id, caltxbuf.data(), 1, frame_time);
       }
     } else {
       // We choose to use channel A to tx from the reference radio
       caltxbuf.at(0) = cfg_->PilotCi16().data();
-      if (cfg_->NumChannels() > 1) caltxbuf.at(1) = zeros.data();
+      if (cfg_->NumChannels() > 1) {
+        caltxbuf.at(1) = zeros.data();
+      }
       long long frame_time = 0;
-      if (cfg_->HwFramer() == false)
+      if (cfg_->HwFramer() == false) {
         frame_time =
             time0 + cfg_->SampsPerSymbol() * ((frame_id + TX_FRAME_DELTA) *
                                                   cfg_->Frame().NumTotalSyms() +
                                               cfg_->Frame().GetULCalSymbol(0));
-      else
+      } else {
         frame_time = ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
                      (cfg_->Frame().GetULCalSymbol(0) << 16);
+      }
       radioconfig_->RadioTx(radio_id, caltxbuf.data(), 1, frame_time);
     }
   }
@@ -426,14 +444,15 @@ size_t PacketTXRX::DequeueSendArgos(int tid, long long time0) {
       const int flags = (symbol_id != last) ? 1   // HAS_TIME
                                             : 2;  // HAS_TIME & END_BURST, fixme
       long long frame_time = 0;
-      if (cfg_->HwFramer() == false)
+      if (cfg_->HwFramer() == false) {
         frame_time =
             time0 + cfg_->SampsPerSymbol() * ((frame_id + TX_FRAME_DELTA) *
                                                   cfg_->Frame().NumTotalSyms() +
                                               symbol_id);
-      else
+      } else {
         frame_time =
             ((long long)(frame_id + TX_FRAME_DELTA) << 32) | (symbol_id << 16);
+      }
       radioconfig_->RadioTx(radio_id, txbuf.data(), flags, frame_time);
     }
 

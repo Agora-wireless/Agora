@@ -377,11 +377,11 @@ void* ChannelSim::BsRxLoop(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_ + 1, tid);
 
   // initialize bs-facing sockets
-  static constexpr size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
+  static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
   for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
     const size_t local_port_id = cfg_->BsRruPort() + socket_id;
     server_bs_.at(socket_id) =
-        std::make_unique<UDPServer>(local_port_id, sock_buf_size);
+        std::make_unique<UDPServer>(local_port_id, kSockBufSize);
     client_bs_.at(socket_id) = std::make_unique<UDPClient>();
     std::printf(
         "ChannelSim::BsRxLoop[%zu]: set up UDP socket server listening to port "
@@ -392,8 +392,8 @@ void* ChannelSim::BsRxLoop(size_t tid) {
 
   const size_t rx_packet_size = cfg_->PacketLength();
   const size_t buffer_size = (rx_packet_size) + kUdpMTU;
-  std::vector<SocketRxBuffer> thread_rx_buffers_(total_sockets);
-  for (auto& buffer : thread_rx_buffers_) {
+  std::vector<SocketRxBuffer> thread_rx_buffers(total_sockets);
+  for (auto& buffer : thread_rx_buffers) {
     buffer.data_ = reinterpret_cast<uint8_t*>(
         PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64, buffer_size));
     buffer.data_size_ = 0;
@@ -406,7 +406,7 @@ void* ChannelSim::BsRxLoop(size_t tid) {
 
   size_t socket_id = socket_lo;
   while (running) {
-    SocketRxBuffer& rx_buffer = thread_rx_buffers_.at(socket_id - socket_lo);
+    SocketRxBuffer& rx_buffer = thread_rx_buffers.at(socket_id - socket_lo);
     const size_t rx_buffer_rem_size = buffer_size - rx_buffer.data_size_;
     const int rx_bytes = server_bs_.at(socket_id)->Recv(
         &rx_buffer.data_[rx_buffer.data_size_], rx_buffer_rem_size);
@@ -476,7 +476,7 @@ void* ChannelSim::BsRxLoop(size_t tid) {
     }
   }  // running
 
-  for (auto& buffer : thread_rx_buffers_) {
+  for (auto& buffer : thread_rx_buffers) {
     std::free(buffer.data_);
     buffer.data_ = nullptr;
     buffer.data_size_ = 0;
@@ -494,11 +494,11 @@ void* ChannelSim::UeRxLoop(size_t tid) {
                       core_offset_ + 1 + bs_thread_num_, tid);
 
   // initialize client-facing sockets
-  static constexpr size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
+  static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
   for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
     size_t local_port_id = cfg_->UeRruPort() + socket_id;
     server_ue_.at(socket_id) =
-        std::make_unique<UDPServer>(local_port_id, sock_buf_size);
+        std::make_unique<UDPServer>(local_port_id, kSockBufSize);
     client_ue_.at(socket_id) = std::make_unique<UDPClient>();
 
     std::printf(
@@ -510,8 +510,8 @@ void* ChannelSim::UeRxLoop(size_t tid) {
 
   const size_t rx_packet_size = cfg_->PacketLength();
   const size_t buffer_size = rx_packet_size + kUdpMTU;
-  std::vector<SocketRxBuffer> thread_rx_buffers_(total_sockets);
-  for (auto& buffer : thread_rx_buffers_) {
+  std::vector<SocketRxBuffer> thread_rx_buffers(total_sockets);
+  for (auto& buffer : thread_rx_buffers) {
     buffer.data_ = reinterpret_cast<uint8_t*>(
         PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64, buffer_size));
     buffer.data_size_ = 0;
@@ -524,7 +524,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
 
   size_t socket_id = socket_lo;
   while (running) {
-    SocketRxBuffer& rx_buffer = thread_rx_buffers_.at(socket_id - socket_lo);
+    SocketRxBuffer& rx_buffer = thread_rx_buffers.at(socket_id - socket_lo);
     const size_t rx_buffer_rem_size = buffer_size - rx_buffer.data_size_;
     const int rx_bytes = server_ue_.at(socket_id)->Recv(
         &rx_buffer.data_[rx_buffer.data_size_], rx_buffer_rem_size);
@@ -603,7 +603,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
     }
   }  // running
 
-  for (auto& buffer : thread_rx_buffers_) {
+  for (auto& buffer : thread_rx_buffers) {
     std::free(buffer.data_);
     buffer.data_ = nullptr;
     buffer.data_size_ = 0;
@@ -674,7 +674,7 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
   const size_t total_offset_bs =
       total_symbol_id * payload_length_ * cfg_->BsAntNum();
 
-  auto* src_ptr =
+  const auto* src_ptr =
       reinterpret_cast<const short*>(&rx_buffer_ue_.at(total_offset_ue));
 
   arma::cx_fmat& fmat_src = *local.ue_input_matrix_;
@@ -760,7 +760,7 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
   const size_t total_offset_ue =
       dl_symbol_id * payload_length_ * cfg_->UeAntNum();
 
-  auto* src_ptr =
+  const auto* src_ptr =
       reinterpret_cast<const short*>(&rx_buffer_bs_.at(total_offset_bs));
 
   arma::cx_fmat& fmat_src = *local.bs_input_matrix_;

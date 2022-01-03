@@ -69,7 +69,7 @@ class MacSender {
   // Launch threads to run worker with thread IDs from tid_start to tid_end
   void CreateWorkerThreads(size_t num_workers);
 
-  void UpdateTxBuffer(MacDataReceiver* video, gen_tag_t tag);
+  void UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag);
   void WriteStatsToFile(size_t tx_frame_count) const;
 
   void ScheduleFrame(size_t frame);

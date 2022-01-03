@@ -614,7 +614,9 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
       if (good_csi == false) {
         break;
       }
-      if (i == ref) continue;
+      if (i == ref) {
+        continue;
+      }
 
       // Send a separate pilot from each antenna
       for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
@@ -649,8 +651,9 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
             std::cout << "bad read (" << ret << ") at node " << ref
                       << " from node " << i << std::endl;
             retry++;
-          } else
+          } else {
             break;
+          }
         }
         if (bad_read) {
           good_csi = false;
@@ -687,7 +690,9 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
           if (good_csi == false) {
             break;
           }
-          if (i == ref) continue;
+          if (i == ref) {
+            continue;
+          }
           std::vector<void*> rxbuff(2);
           rxbuff.at(0) = buff.at(m + cfg_->NumChannels() * i).data();
           if (cfg_->NumChannels() == 2) {
@@ -704,8 +709,9 @@ bool RadioConfig::InitialCalib(bool sample_adjust) {
         }
         if (bad_read) {
           retry++;
-        } else
+        } else {
           break;
+        }
       }
       if (bad_read) {
         good_csi = false;
