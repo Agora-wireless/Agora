@@ -7,7 +7,7 @@
 #include "version_config.h"
 
 DEFINE_string(conf_file,
-              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
+              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-both.json",
               "Config filename");
 
 int main(int argc, char* argv[]) {
@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "SignalException: " << e.what() << std::endl;
     ret = EXIT_FAILURE;
   }
-
+  PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
   return ret;
 }

@@ -85,7 +85,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::vector<int8_t>> encoded_codewords(num_codeblocks);
     for (size_t i = 0; i < num_codeblocks; i++) {
       data_generator.GenRawData(information.at(i),
-                                i % cfg->UeNum() /* UE ID */);
+                                i % cfg->UeAntNum() /* UE ID */);
       std::memcpy(input_ptr, information.at(i).data(), input_size);
       data_generator.GenCodeblock(input_ptr, encoded_codewords.at(i));
     }

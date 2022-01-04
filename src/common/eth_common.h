@@ -23,8 +23,8 @@
 #include <arpa/inet.h>
 #include <assert.h>
 #include <ifaddrs.h>
-#include <linux/if_arp.h>
 #include <linux/if_packet.h>
+#include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>

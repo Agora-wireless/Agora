@@ -43,12 +43,12 @@ class DataGenerator {
    * @param  information           The generated input bit sequence
    * @param  ue_id                 ID of the UE that this codeblock belongs to
    */
-  void GenMacData(MacPacket* mac, size_t ue_id) {
-    for (size_t i = 0; i < mac->datalen_; i++) {
+  void GenMacData(MacPacketPacked* mac, size_t ue_id) {
+    for (size_t i = 0; i < mac->PayloadLength(); i++) {
       if (profile_ == Profile::kRandom) {
-        mac->data_[i] = static_cast<int8_t>(fast_rand_.NextU32());
+        mac->DataPtr()[i] = static_cast<int8_t>(fast_rand_.NextU32());
       } else if (profile_ == Profile::kProfile123) {
-        mac->data_[i] = 1 + (ue_id * 3) + (i % 3);
+        mac->DataPtr()[i] = 1 + (ue_id * 3) + (i % 3);
       }
     }
   }

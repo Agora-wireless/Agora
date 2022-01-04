@@ -8,6 +8,7 @@
 #include "datatype_conversion.h"
 
 static constexpr bool kPrintFFTInput = false;
+static constexpr bool kPrintInputPilot = false;
 static constexpr bool kPrintPilotCorrStats = false;
 
 DoFFT::DoFFT(Config* config, size_t tid, Table<complex_float>& data_buffer,
@@ -86,6 +87,7 @@ EventData DoFFT::Launch(size_t tag) {
   size_t frame_slot = frame_id % kFrameWnd;
   size_t symbol_id = pkt->symbol_id_;
   size_t ant_id = pkt->ant_id_;
+  size_t cell_id = pkt->cell_id_;
   SymbolType sym_type = cfg_->GetSymbolType(symbol_id);
 
   if (cfg_->FftInRru() == true) {
@@ -114,7 +116,9 @@ EventData DoFFT::Launch(size_t tag) {
       std::printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
                   tid_, frame_id, symbol_id, ant_id);
     }
-    if (kPrintPilotCorrStats && sym_type == SymbolType::kPilot) {
+    if (kPrintPilotCorrStats &&
+        (sym_type == SymbolType::kPilot || sym_type == SymbolType::kCalDL ||
+         sym_type == SymbolType::kCalUL)) {
       SimdConvertShortToFloat(pkt->data_,
                               reinterpret_cast<float*>(rx_samps_tmp_),
                               2 * cfg_->SampsPerSymbol());
@@ -134,9 +138,18 @@ EventData DoFFT::Launch(size_t tag) {
           "sig_offset %zu, peak %2.4f\n",
           tid_, frame_id, symbol_id, ant_id, sig_offset, peak);
     }
+    if (kPrintInputPilot) {
+      std::stringstream ss;
+      ss << "FFT_input_" << symbol_id << "_" << ant_id << "=[";
+      for (size_t i = 0; i < cfg_->SampsPerSymbol(); i++) {
+        ss << pkt->data_[2 * i] << "+1j*" << pkt->data_[2 * i + 1] << " ";
+      }
+      ss << "];" << std::endl;
+      std::cout << ss.str();
+    }
     if (kPrintFFTInput) {
       std::stringstream ss;
-      ss << "FFT_input" << ant_id << "=[";
+      ss << "FFT_input_" << symbol_id << "_" << ant_id << "=[";
       for (size_t i = 0; i < cfg_->OfdmCaNum(); i++) {
         ss << std::fixed << std::setw(5) << std::setprecision(3)
            << fft_inout_[i].re << "+1j*" << fft_inout_[i].im << " ";
@@ -171,7 +184,7 @@ EventData DoFFT::Launch(size_t tag) {
   if (sym_type == SymbolType::kPilot) {
     size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
     if (kCollectPhyStats) {
-      phy_stats_->UpdatePilotSnr(frame_id, pilot_symbol_id, fft_inout_);
+      phy_stats_->UpdatePilotSnr(frame_id, pilot_symbol_id, ant_id, fft_inout_);
     }
     const size_t ue_id = pilot_symbol_id;
     PartialTranspose(csi_buffers_[frame_slot][ue_id], ant_id,
@@ -179,7 +192,8 @@ EventData DoFFT::Launch(size_t tag) {
   } else if (sym_type == SymbolType::kUL) {
     PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
                      ant_id, SymbolType::kUL);
-  } else if (sym_type == SymbolType::kCalUL and ant_id != cfg_->RefAnt()) {
+  } else if (sym_type == SymbolType::kCalUL &&
+             ant_id != cfg_->RefAnt(cell_id)) {
     // Only process uplink for antennas that also do downlink in this frame
     // for consistency with calib downlink processing.
     if (frame_id >= TX_FRAME_DELTA &&
@@ -190,8 +204,10 @@ EventData DoFFT::Launch(size_t tag) {
       PartialTranspose(
           &calib_ul_buffer_[frame_grp_slot][ant_id * cfg_->OfdmDataNum()],
           ant_id, sym_type);
+      phy_stats_->UpdateCalibPilotSnr(frame_grp_id, 1, ant_id, fft_inout_);
     }
-  } else if (sym_type == SymbolType::kCalDL && ant_id == cfg_->RefAnt()) {
+  } else if (sym_type == SymbolType::kCalDL &&
+             ant_id == cfg_->RefAnt(cell_id)) {
     if (frame_id >= TX_FRAME_DELTA) {
       size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
       size_t frame_grp_slot = frame_grp_id % kFrameWnd;
@@ -202,11 +218,15 @@ EventData DoFFT::Launch(size_t tag) {
       complex_float* calib_dl_ptr =
           &calib_dl_buffer_[frame_grp_slot][cur_ant * cfg_->OfdmDataNum()];
       PartialTranspose(calib_dl_ptr, ant_id, sym_type);
+      phy_stats_->UpdateCalibPilotSnr(frame_grp_id, 0, cur_ant, fft_inout_);
     }
   } else {
-    std::string error_message = "Unknown or unsupported symbol type " +
-                                std::to_string(static_cast<int>(sym_type)) +
-                                "\n";
+    std::string error_message =
+        "Unknown or unsupported symbol type " +
+        std::to_string(static_cast<int>(sym_type)) + std::string(" at frame ") +
+        std::to_string(frame_id) + std::string(" symbol ") +
+        std::to_string(symbol_id) + std::string(" antenna ") +
+        std::to_string(ant_id) + "\n";
     RtAssert(false, error_message);
   }
 

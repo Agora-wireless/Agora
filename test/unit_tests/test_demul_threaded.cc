@@ -136,7 +136,7 @@ TEST(TestDemul, VaryingConfig) {
                               cfg->Frame().ClientUlPilotSymbols() * kMaxUEs,
                               Agora_memory::Alignment_t::kAlign64);
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> demod_buffers(
-      kFrameWnd, cfg->Frame().NumTotalSyms(), cfg->UeNum(),
+      kFrameWnd, cfg->Frame().NumTotalSyms(), cfg->UeAntNum(),
       kMaxModType * cfg->OfdmDataNum());
   std::printf(
       "Size of [data_buffer, ul_zf_matrices, equal_buffer, "
@@ -153,7 +153,7 @@ TEST(TestDemul, VaryingConfig) {
           kMaxUEs * 1.0f / 1024 / 1024);
 
   auto stats = std::make_unique<Stats>(cfg.get());
-  auto phy_stats = std::make_unique<PhyStats>(cfg.get());
+  auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::kUplink);
 
   std::vector<std::thread> threads;
   threads.emplace_back(MasterToWorkerDynamicMaster, cfg.get(),

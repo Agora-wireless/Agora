@@ -24,7 +24,7 @@
 /// Correlation and Peak detection of a beacon with Gold code  (2 repetitions)
 int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
                             const std::vector<std::complex<float>>& seq) {
-  std::queue<int> valid_peaks;
+  std::vector<int> valid_peaks;
 
   // Original LTS sequence
   int seq_len = seq.size();
@@ -67,7 +67,7 @@ int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
   clock_gettime(CLOCK_MONOTONIC, &tv);
   for (size_t i = 0; i < gold_corr_avx_2.size(); i++) {
     if (gold_corr_avx_2[i] > thresh_avx[i]) {
-      valid_peaks.push(i);
+      valid_peaks.push_back(i);
     }
   }
   clock_gettime(CLOCK_MONOTONIC, &tv2);
@@ -82,7 +82,7 @@ int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
   std::cout << "Thresh calc AVX took " << diff3 << " usec" << std::endl;
   std::cout << "Peak Detect AVX took " << diff4 << " usec" << std::endl;
   std::printf("Saving Corr data\n");
-  std::string filename = "corr_simd.bin";
+  std::string filename("corr_simd.bin");
   FILE* fc = std::fopen(filename.c_str(), "wb");
   float* cdata_ptr = (float*)gold_corr_avx_2.data();
   std::fwrite(cdata_ptr, gold_corr_avx_2.size(), sizeof(float), fc);
@@ -100,10 +100,10 @@ int CommsLib::FindBeaconAvx(const std::vector<std::complex<float>>& iq,
 #endif
 
   if (valid_peaks.empty()) {
-    valid_peaks.push(-1);
+    valid_peaks.push_back(-1);
   }
 
-  return valid_peaks.front();
+  return valid_peaks.back();
 }
 
 static inline __m256i M256ComplexCs16Mult(__m256i data1, __m256i data2,

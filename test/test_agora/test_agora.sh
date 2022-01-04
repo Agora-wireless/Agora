@@ -68,8 +68,8 @@ for i in `seq 1 $num_iters`; do
     echo "Running uplink correctness test $i......"
     echo -e "===========================================\n"
     # We sleep before starting the sender to allow the Agora server to start
-    ./build/test_agora data/tddconfig-correctness-test-ul.json &
-    sleep 1; ./build/sender --num_threads 1 --core_offset 10 --frame_duration 5000 --conf_file "data/tddconfig-correctness-test-ul.json"
+    ./build/test_agora --conf_file data/tddconfig-correctness-test-ul.json &
+    sleep 1; ./build/sender --num_threads 1 --core_offset 10 --conf_file "data/tddconfig-correctness-test-ul.json"
     wait
 
     echo "==========================================="
@@ -81,8 +81,8 @@ for i in `seq 1 $num_iters`; do
     echo "==========================================="
     echo "Running downlink correctness test $i......"
     echo -e "===========================================\n"
-    ./build/test_agora data/tddconfig-correctness-test-dl.json &
-    sleep 1; ./build/sender --num_threads 1 --core_offset 10 --frame_duration 5000 --conf_file "data/tddconfig-correctness-test-dl.json"
+    ./build/test_agora --conf_file data/tddconfig-correctness-test-dl.json &
+    sleep 1; ./build/sender --num_threads 1 --core_offset 10 --conf_file "data/tddconfig-correctness-test-dl.json"
     echo -e "-------------------------------------------------------\n\n\n"
     wait
 
@@ -95,8 +95,8 @@ for i in `seq 1 $num_iters`; do
     echo "==========================================="
     echo "Running combined correctness test $i......"
     echo -e "===========================================\n"
-    ./build/test_agora data/tddconfig-correctness-test-both.json &
-    sleep 1; ./build/sender --num_threads 1 --core_offset 10 --frame_duration 5000 --conf_file "data/tddconfig-correctness-test-both.json"
+    ./build/test_agora --conf_file data/tddconfig-correctness-test-both.json &
+    sleep 1; ./build/sender --num_threads 1 --core_offset 10 --conf_file "data/tddconfig-correctness-test-both.json"
     echo -e "-------------------------------------------------------\n\n\n"
     wait
   } >> $out_file
