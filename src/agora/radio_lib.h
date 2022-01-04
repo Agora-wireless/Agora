@@ -72,7 +72,6 @@ class RadioConfig {
   Table<arma::cx_float> init_calib_dl_;
   size_t radio_num_;
   size_t antenna_num_;
-  bool is_ue_;
   bool calib_;
   size_t calib_meas_num_;
 

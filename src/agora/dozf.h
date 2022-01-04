@@ -97,6 +97,8 @@ class DoZF : public Doer {
   // Intermediate buffer to gather reciprical calibration data vector
   complex_float* calib_gather_buffer_;
   PhyStats* phy_stats_;
+  arma::uvec ext_ref_id_;
+  size_t num_ext_ref_;
 };
 
 #endif  // DOZF_H_

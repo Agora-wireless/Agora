@@ -19,15 +19,14 @@ static constexpr bool kPrintCSIFromFile = false;
 //   return rand_val;
 // }
 
-Channel::Channel(const Config* const config_bs, const Config* const config_ue,
-                 std::string& in_channel_type, double in_channel_snr)
-    : bscfg_(config_bs),
-      uecfg_(config_ue),
+Channel::Channel(const Config* const config, std::string& in_channel_type,
+                 double in_channel_snr)
+    : cfg_(config),
       sim_chan_model_(std::move(in_channel_type)),
       channel_snr_db_(in_channel_snr) {
-  bs_ant_ = bscfg_->BsAntNum();
-  ue_ant_ = uecfg_->UeAntNum();
-  n_samps_ = bscfg_->SampsPerSymbol();
+  bs_ant_ = cfg_->BsAntNum();
+  ue_ant_ = cfg_->UeAntNum();
+  n_samps_ = cfg_->SampsPerSymbol();
 
   if (sim_chan_model_ == "AWGN") {
     chan_model_ = kAwgn;
@@ -101,7 +100,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
     }
   }
   if (is_downlink) {
-    fmat_h = fmat_src * h_.st() / std::sqrt(bscfg_->BsAntNum());
+    fmat_h = fmat_src * h_.st() / std::sqrt(cfg_->BsAntNum());
   } else {
     fmat_h = fmat_src * h_;
   }
@@ -156,9 +155,8 @@ void Channel::AwgnNoise(const arma::cx_fmat& src, arma::cx_fmat& dst) const {
 
 void Channel::Lte3gpp(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst) {
   // TODO - In progress (Use Rayleigh for now...)
-  arma::cx_fmat h(
-      arma::randn<arma::fmat>(uecfg_->UeAntNum(), bscfg_->BsAntNum()),
-      arma::randn<arma::fmat>(uecfg_->UeAntNum(), bscfg_->BsAntNum()));
+  arma::cx_fmat h(arma::randn<arma::fmat>(cfg_->UeAntNum(), cfg_->BsAntNum()),
+                  arma::randn<arma::fmat>(cfg_->UeAntNum(), cfg_->BsAntNum()));
   h = (1 / sqrt(2)) * h;
   fmat_dst = fmat_src * h;
 }

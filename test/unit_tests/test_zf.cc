@@ -18,9 +18,9 @@ TEST(TestZF, Perf) {
   csi_buffers.RandAllocCxFloat(cfg->BsAntNum() * cfg->OfdmDataNum());
 
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> ul_zf_matrices(
-      cfg->BsAntNum() * cfg->UeNum());
+      cfg->BsAntNum() * cfg->UeAntNum());
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> dl_zf_matrices(
-      cfg->UeNum() * cfg->BsAntNum());
+      cfg->UeAntNum() * cfg->BsAntNum());
 
   Table<complex_float> calib_dl_msum_buffer;
   calib_dl_msum_buffer.RandAllocCxFloat(kFrameWnd,
@@ -42,7 +42,7 @@ TEST(TestZF, Perf) {
                                    cfg->OfdmDataNum() * cfg->BsAntNum(),
                                    Agora_memory::Alignment_t::kAlign64);
 
-  auto phy_stats = std::make_unique<PhyStats>(cfg.get());
+  auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::kUplink);
   auto stats = std::make_unique<Stats>(cfg.get());
 
   auto compute_zf = std::make_unique<DoZF>(

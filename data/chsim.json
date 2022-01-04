@@ -1,10 +1,10 @@
 {
-  "ofdm_ca_num": 512,
+  "fft_size": 512,
   "ofdm_data_num": 336,
   "demul_block_size": 48,
   "Zc": 20,
-  "UE": true,
-  "ue_num": 2,
+  "ue_radio_num": 2,
+  "bs_radio_num": 8,
   "symbol_num_perframe": 16,
   "client_ul_pilot_syms": 2,
   "ul_data_symbol_start": 3,
@@ -15,7 +15,10 @@
   "beacon_position": 0,
   "bs_server_port": 8100,
   "bs_rru_port": 8200,
-  "core_offset": 1,
-  "worker_thread_num": 8,
-  "socket_thread_num": 1
+  "core_offset": 5,
+  "worker_thread_num": 12,
+  "socket_thread_num": 1,
+  "ue_core_offset": 1,
+  "ue_worker_thread_num": 2,
+  "ue_socket_thread_num": 1
 }

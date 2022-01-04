@@ -87,6 +87,7 @@ EventData DoFFT::Launch(size_t tag) {
   size_t frame_slot = frame_id % kFrameWnd;
   size_t symbol_id = pkt->symbol_id_;
   size_t ant_id = pkt->ant_id_;
+  size_t cell_id = pkt->cell_id_;
   SymbolType sym_type = cfg_->GetSymbolType(symbol_id);
 
   if (cfg_->FftInRru() == true) {
@@ -191,7 +192,8 @@ EventData DoFFT::Launch(size_t tag) {
   } else if (sym_type == SymbolType::kUL) {
     PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
                      ant_id, SymbolType::kUL);
-  } else if (sym_type == SymbolType::kCalUL and ant_id != cfg_->RefAnt()) {
+  } else if (sym_type == SymbolType::kCalUL &&
+             ant_id != cfg_->RefAnt(cell_id)) {
     // Only process uplink for antennas that also do downlink in this frame
     // for consistency with calib downlink processing.
     if (frame_id >= TX_FRAME_DELTA &&
@@ -204,7 +206,8 @@ EventData DoFFT::Launch(size_t tag) {
           ant_id, sym_type);
       phy_stats_->UpdateCalibPilotSnr(frame_grp_id, 1, ant_id, fft_inout_);
     }
-  } else if (sym_type == SymbolType::kCalDL && ant_id == cfg_->RefAnt()) {
+  } else if (sym_type == SymbolType::kCalDL &&
+             ant_id == cfg_->RefAnt(cell_id)) {
     if (frame_id >= TX_FRAME_DELTA) {
       size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
       size_t frame_grp_slot = frame_grp_id % kFrameWnd;
@@ -218,9 +221,12 @@ EventData DoFFT::Launch(size_t tag) {
       phy_stats_->UpdateCalibPilotSnr(frame_grp_id, 0, cur_ant, fft_inout_);
     }
   } else {
-    std::string error_message = "Unknown or unsupported symbol type " +
-                                std::to_string(static_cast<int>(sym_type)) +
-                                "\n";
+    std::string error_message =
+        "Unknown or unsupported symbol type " +
+        std::to_string(static_cast<int>(sym_type)) + std::string(" at frame ") +
+        std::to_string(frame_id) + std::string(" symbol ") +
+        std::to_string(symbol_id) + std::string(" antenna ") +
+        std::to_string(ant_id) + "\n";
     RtAssert(false, error_message);
   }
 

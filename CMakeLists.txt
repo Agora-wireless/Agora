@@ -3,7 +3,7 @@ include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
 #Allow project version
 cmake_policy(SET CMP0048 NEW)
-project(Agora VERSION 1.0.0)
+project(Agora VERSION 1.1.0)
 
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   set(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
@@ -383,7 +383,7 @@ endforeach()
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
-  test_ptr_grid test_recipcal test_avx512_complex_mul test_scrambler
+  test_ptr_grid test_avx512_complex_mul test_scrambler
   test_256qam_demod)
 
 foreach(test_name IN LISTS UNIT_TESTS)

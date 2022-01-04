@@ -35,14 +35,13 @@ DataGenerator::DataGenerator(Config* cfg, uint64_t seed, Profile profile)
     fast_rand_.seed_ = seed;
   }
   std::string channel_type = cfg->ChannelType();
-  channel_ =
-      std::make_unique<Channel>(cfg, cfg, channel_type, cfg->ChannelSNR());
+  channel_ = std::make_unique<Channel>(cfg, channel_type, cfg->ChannelSNR());
 }
 
 void DataGenerator::DoDataGeneration(const std::string& directory) {
   srand(time(nullptr));
   auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
-  std::unique_ptr<DoCRC> crc_obj_ = std::make_unique<DoCRC>();
+  std::unique_ptr<DoCRC> crc_obj = std::make_unique<DoCRC>();
   size_t input_size = cfg_->NumBytesPerCb();
   // size_t input_size =
   //    LdpcEncodingInputBufSize(this->cfg_->LdpcConfig().BaseGraph(),
@@ -67,7 +66,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
         pkt->Set(0, pkt_id, ue_id, cfg_->MacPayloadMaxLength());
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(crc_obj_->CalculateCrc24(
+
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
                                 pkt->Data(), cfg_->MacPayloadMaxLength()) &
                             0xFFFF));
       }
@@ -270,7 +270,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
         pkt->Set(0, pkt_id, ue_id, cfg_->MacPayloadMaxLength());
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(crc_obj_->CalculateCrc24(
+        pkt->Crc((uint16_t)(crc_obj->CalculateCrc24(
                                 pkt->Data(), cfg_->MacPayloadMaxLength()) &
                             0xFFFF));
       }
