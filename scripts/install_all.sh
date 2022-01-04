@@ -3,7 +3,6 @@
 source $(dirname $0)/utils.sh
 source $(dirname $0)/ubuntu.sh
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 PROJECT_ROOT=~/project
 
 # Install Intel libraries
@@ -17,9 +16,12 @@ bash l_HPCKit_p_2021.4.0.3347.sh -a --silent --eula accept --components intel.on
 rm l_BaseKit_p_2021.4.0.3422.sh l_HPCKit_p_2021.4.0.3347.sh
 echo "source ~/project/intel/oneapi/setvars.sh" >> ~/.bashrc
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
 # Install FlexRAN SDK
 echocyan "Install FlexRAN SDK"
-cd ${DIR}/..
+cd ${SCRIPT_DIR}/..
+echocyan "Current DIR is $(pwd)"
 sudo cp -r deps/FlexRAN-FEC-SDK-19-04 /opt/
 sudo chmod 777 /opt/FlexRAN-FEC-SDK-19-04
 
@@ -55,7 +57,8 @@ DESTDIR=./install ninja install
 # Build Agora
 echocyan "Build Agora"
 sudo apt-get install -y python3-numpy
-cd ${DIR}/..
+cd ${SCRIPT_DIR}/..
+echocyan "Current DIR is $(pwd)"
 mkdir build
 cd build
 cmake ..
