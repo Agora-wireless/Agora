@@ -25,15 +25,15 @@ FileReceiver::~FileReceiver() {
   }
 }
 
-size_t FileReceiver::Load(char *destination, size_t num_load_bytes) {
+size_t FileReceiver::Load(unsigned char *destination, size_t requested_bytes) {
   size_t loaded_bytes = 0;
   const size_t file_read_size =
-      std::max(FileReceiver::kFileStreamRxSize, num_load_bytes);
-  //Make sure the local buffer is large enough to perform the correct read
+      std::max(FileReceiver::kFileStreamRxSize, requested_bytes);
+  // Make sure the local buffer is large enough to perform the correct read
   assert(file_read_size <= local_rx_buffer_.size());
   assert(data_stream_.is_open() == true);
-  if (num_load_bytes > data_available_) {
-    //Check for potential local buffer wrap-around
+  if (requested_bytes > data_available_) {
+    // Check for potential local buffer wrap-around
     if ((data_available_ + data_start_offset_ + file_read_size) >
         local_rx_buffer_.size()) {
       std::memcpy(&local_rx_buffer_.at(0),
@@ -43,7 +43,7 @@ size_t FileReceiver::Load(char *destination, size_t num_load_bytes) {
 
     size_t data_read = 0;
     size_t read_attempts = 0;
-    //Read until we have enough bytes, limit to kMaxReadAttempts
+    // Read until we have enough bytes, limit to kMaxReadAttempts
     while ((data_read < file_read_size) && (read_attempts < kMaxReadAttempts)) {
       data_stream_.read(reinterpret_cast<char *>(&local_rx_buffer_.at(
                             data_start_offset_ + data_available_ + data_read)),
@@ -64,7 +64,7 @@ size_t FileReceiver::Load(char *destination, size_t num_load_bytes) {
                           std::ifstream::in | std::ifstream::binary);
       }
 
-      //Check for errors on the stream
+      // Check for errors on the stream
       if (!data_stream_) {
         throw std::runtime_error("[FileReceiver] data stream errors\n");
       }
@@ -73,16 +73,16 @@ size_t FileReceiver::Load(char *destination, size_t num_load_bytes) {
     data_available_ += data_read;
   }
 
-  if (num_load_bytes > data_available_) {
+  if (requested_bytes > data_available_) {
     throw std::runtime_error("[FileReceiver] failed to load enough data\n");
   } else {
-    //Copy data from local buffer to requested memory location
+    // Copy data from local buffer to requested memory location
     std::memcpy(destination, &local_rx_buffer_.at(data_start_offset_),
-                num_load_bytes);
-    MLPD_FRAME("[FileReceiver] data loaded: %zu\n", num_load_bytes);
-    data_start_offset_ += num_load_bytes;
-    data_available_ -= num_load_bytes;
-    loaded_bytes = num_load_bytes;
+                requested_bytes);
+    MLPD_FRAME("[FileReceiver] data loaded: %zu\n", requested_bytes);
+    data_start_offset_ += requested_bytes;
+    data_available_ -= requested_bytes;
+    loaded_bytes = requested_bytes;
   }
   return loaded_bytes;
 }

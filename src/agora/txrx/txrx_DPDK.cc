@@ -27,11 +27,19 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
   ret = inet_pton(AF_INET, cfg_->BsServerAddr().c_str(), &bs_server_addr_);
   RtAssert(ret == 1, "Invalid server IP address");
 
-  for (uint16_t port_id = 0; port_id < cfg_->DpdkNumPorts(); port_id++) {
-    if (DpdkTransport::NicInit(port_id + cfg->DpdkPortOffset(), mbuf_pool_,
+  if (cfg->DpdkMacAddrs().length() > 0) {
+    port_ids_ = DpdkTransport::GetPortIDFromMacAddr(cfg->DpdkNumPorts(),
+                                                    cfg->DpdkMacAddrs());
+  } else {
+    for (uint16_t i = 0; i < cfg->DpdkNumPorts(); i++) {
+      port_ids_.push_back(i + cfg->DpdkPortOffset());
+    }
+  }
+
+  for (size_t i = 0; i < cfg_->DpdkNumPorts(); i++) {
+    if (DpdkTransport::NicInit(port_ids_.at(i), mbuf_pool_,
                                socket_thread_num_) != 0) {
-      rte_exit(EXIT_FAILURE, "Cannot init port %u\n",
-               port_id + cfg->DpdkPortOffset());
+      rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_ids_.at(i));
     }
   }
 
@@ -39,17 +47,16 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset)
     uint16_t src_port = rte_cpu_to_be_16(cfg_->BsRruPort() + i);
     uint16_t dst_port = rte_cpu_to_be_16(cfg_->BsServerPort() + i);
 
+    size_t port_id = port_ids_.at(i % this->cfg_->DpdkNumPorts());
+    size_t q_id = i / this->cfg_->DpdkNumPorts();
     std::printf(
         "Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
         "dst port: %zu, DPDK port %zu, queue: %zu\n",
         this->cfg_->BsRruAddr().c_str(), this->cfg_->BsServerAddr().c_str(),
-        this->cfg_->BsRruPort() + i, this->cfg_->BsServerPort() + i,
-        i % this->cfg_->DpdkNumPorts() + cfg->DpdkPortOffset(),
-        i / this->cfg_->DpdkNumPorts());
-    DpdkTransport::InstallFlowRule(
-        i % this->cfg_->DpdkNumPorts() + cfg->DpdkPortOffset(),
-        i / this->cfg_->DpdkNumPorts(), bs_rru_addr_, bs_server_addr_, src_port,
-        dst_port);
+        this->cfg_->BsRruPort() + i, this->cfg_->BsServerPort() + i, port_id,
+        q_id);
+    DpdkTransport::InstallFlowRule(port_id, q_id, bs_rru_addr_, bs_server_addr_,
+                                   src_port, dst_port);
   }
 
   std::printf("Number of DPDK cores: %d\n", rte_lcore_count());
@@ -127,11 +134,11 @@ void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
 void PacketTXRX::LoopTxRx(size_t tid) {
   size_t rx_slot = 0;
   size_t prev_frame_id = SIZE_MAX;
-  const uint16_t port_id = tid % cfg_->DpdkNumPorts() + cfg_->DpdkPortOffset();
+  const uint16_t port_id = port_ids_.at(tid % cfg_->DpdkNumPorts());
   const uint16_t queue_id = tid / cfg_->DpdkNumPorts();
 
   while (this->cfg_->Running()) {
-    if (-1 != DequeueSend(tid)) {
+    if (0 != DequeueSend(tid)) {
       continue;
     }
     DpdkRecv((int)tid, port_id, queue_id, prev_frame_id, rx_slot);
@@ -222,10 +229,10 @@ uint16_t PacketTXRX::DpdkRecv(int tid, uint16_t port_id, uint16_t queue_id,
 }
 
 // TODO: check correctness of this funcion
-int PacketTXRX::DequeueSend(int tid) {
+size_t PacketTXRX::DequeueSend(int tid) {
   EventData event;
   if (task_queue_->try_dequeue_from_producer(*tx_ptoks_[tid], event) == false) {
-    return -1;
+    return 0;
   }
 
   // std::printf("tx queue length: %d\n", task_queue_->size_approx());
@@ -285,5 +292,5 @@ int PacketTXRX::DequeueSend(int tid) {
       message_queue_->enqueue(*rx_ptoks_[tid],
                               EventData(EventType::kPacketTX, event.tags_[0])),
       "Socket message enqueue failed\n");
-  return 1;
+  return nb_tx_new;
 }

@@ -7,7 +7,7 @@ SOURCES="encoder_test.cc encoder.cc cyclic_shift.cc iobuffer.cc"
 CPU_FEATURES_DETECT_AVX512=`cat /proc/cpuinfo | grep avx512 | wc -l`
 
 compile_with_agora_encoder() {
-  g++ -std=c++11 -mavx2 -Wall -DUSE_AVX2_ENCODER \
+  g++ -std=c++17 -mavx2 -Wall -DUSE_AVX2_ENCODER \
     -I. \
     -isystem ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr \
     -isystem ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common \
@@ -16,7 +16,7 @@ compile_with_agora_encoder() {
 
 compile_with_flexran_encoder() {
   FLEXRAN_FEC_LIB_DIR=${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc
-  g++ -g -std=c++11 -march=native -Wall -no-pie \
+  g++ -g -std=c++17 -march=native -Wall -no-pie \
     -D_BBLIB_AVX512_ \
     -I. \
     -isystem ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr \

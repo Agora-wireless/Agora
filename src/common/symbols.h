@@ -28,11 +28,15 @@ static constexpr size_t kFrameWnd = 40;
 #define USE_MKL_JIT 0
 #endif
 
+#define ENABLE_RB_IND 0
+
 /// Return true at compile time iff a constant is a power of two
 template <typename T>
 static constexpr inline bool IsPowerOfTwo(T x) {
   return x && ((x & T(x - 1)) == 0);
 }
+
+enum class Direction : int { kDownlink, kUplink };
 
 // TODO: Merge EventType and DoerType into WorkType
 enum class EventType : int {
@@ -110,6 +114,7 @@ enum class PrintType : int {
 // crucial for good performance. For testing or developing Agora on machines
 // with insufficient cores, disable this flag.
 static constexpr bool kEnableThreadPinning = true;
+static constexpr bool kEnableCoreReuse = false;
 
 #define BIGSTATION 0
 #if defined(USE_DPDK)
@@ -145,6 +150,7 @@ static constexpr bool kUsePartialTrans = true;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = true;
 static constexpr bool kCollectPhyStats = true;
+static constexpr bool kPrintZfStats = true;
 
 static constexpr bool kStatsPrintFrameSummary = true;
 static constexpr bool kDebugPrintPerFrameDone = true;
@@ -154,6 +160,7 @@ static constexpr bool kDebugPrintPerTaskDone = false;
 static constexpr bool kDebugPrintStatsPerThread = false;
 static constexpr bool kDebugPrintInTask = false;
 static constexpr bool kDebugMulticell = false;
+static constexpr bool kRecordCalibrationMats = false;
 
 /// Print the I/Q samples in the pilots
 static constexpr bool kDebugPrintPilot = false;

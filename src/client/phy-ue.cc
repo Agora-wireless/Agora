@@ -20,7 +20,7 @@ static const size_t kDefaultQueueSize = 36;
 
 PhyUe::PhyUe(Config* config)
     : stats_(std::make_unique<Stats>(config)),
-      phy_stats_(std::make_unique<PhyStats>(config)),
+      phy_stats_(std::make_unique<PhyStats>(config, Direction::kDownlink)),
       demod_buffer_(kFrameWnd, config->Frame().NumDLSyms(), config->UeAntNum(),
                     kMaxModType * config->OfdmDataNum()),
       decoded_buffer_(kFrameWnd, config->Frame().NumDLSyms(),
@@ -61,9 +61,9 @@ PhyUe::PhyUe(Config* config)
       kFrameWnd * config_->Frame().NumTotalSyms() * config_->UeAntNum() *
       kDefaultQueueSize);
   tx_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
+      kFrameWnd * config_->UeAntNum() * kDefaultQueueSize);
   to_mac_queue_ = moodycamel::ConcurrentQueue<EventData>(
-      kFrameWnd * config_->UeNum() * kDefaultQueueSize);
+      kFrameWnd * config_->UeAntNum() * kDefaultQueueSize);
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
     rx_ptoks_ptr_[i] = new moodycamel::ProducerToken(complete_queue_);
@@ -75,16 +75,16 @@ PhyUe::PhyUe(Config* config)
   work_producer_token_ =
       std::make_unique<moodycamel::ProducerToken>(work_queue_);
 
-  ru_ = std::make_unique<RadioTxRx>(config_, rx_thread_num_,
-                                    config_->CoreOffset() + 1, &complete_queue_,
-                                    &tx_queue_, rx_ptoks_ptr_, tx_ptoks_ptr_);
+  ru_ = std::make_unique<RadioTxRx>(
+      config_, rx_thread_num_, config_->UeCoreOffset() + 1, &complete_queue_,
+      &tx_queue_, rx_ptoks_ptr_, tx_ptoks_ptr_);
 
   // uplink buffers init (tx)
   InitializeUplinkBuffers();
   // downlink buffers init (rx)
   InitializeDownlinkBuffers();
 
-  size_t core_offset_worker = config_->CoreOffset() + 1 + rx_thread_num_;
+  size_t core_offset_worker = config_->UeCoreOffset() + 1 + rx_thread_num_;
   if (kEnableMac == true) {
     mac_thread_ = std::make_unique<MacThreadClient>(
         config_, core_offset_worker, decoded_buffer_, &ul_bits_buffer_,
@@ -95,7 +95,7 @@ PhyUe::PhyUe(Config* config)
         std::thread(&MacThreadClient::RunEventLoop, mac_thread_.get());
   }
 
-  for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
+  for (size_t i = 0; i < config_->UeWorkerThreadNum(); i++) {
     auto new_worker = std::make_unique<UeWorker>(
         i, *config_, *stats_, *phy_stats_, complete_queue_, work_queue_,
         *work_producer_token_.get(), ul_bits_buffer_, ul_syms_buffer_,
@@ -118,6 +118,7 @@ PhyUe::PhyUe(Config* config)
                              config_->UeAntNum());
   fft_dldata_counters_.Init(dl_data_symbol_perframe_, config_->UeAntNum());
 
+  /* Each UE / Radio will send a TxComplete */
   tx_counters_.Init(config_->UeNum());
   encode_counter_.Init(ul_data_symbol_perframe_, config_->UeNum());
   modulation_counters_.Init(ul_data_symbol_perframe_, config_->UeNum());
@@ -126,7 +127,7 @@ PhyUe::PhyUe(Config* config)
   ue_tracker_.reserve(num_ue);
   ue_tracker_.resize(num_ue);
   for (auto& ue : ue_tracker_) {
-    //Might want to change the 1 to NumChannels or channels per ue
+    // Might want to change the 1 to NumUeChannels or channels per ue
     ue.ifft_counters_.Init(ul_symbol_perframe_, 1);
     ue.tx_pending_frame_ = 0;
     ue.tx_ready_frames_.clear();
@@ -141,14 +142,14 @@ PhyUe::PhyUe(Config* config)
 
   rx_downlink_deferral_.resize(kFrameWnd);
 
-  //Mac counters for downlink data
+  // Mac counters for downlink data
   tomac_counters_.Init(config_->Frame().NumDlDataSyms(), config_->UeAntNum());
 }
 
 PhyUe::~PhyUe() {
-  for (size_t i = 0; i < config_->WorkerThreadNum(); i++) {
+  for (size_t i = 0; i < config_->UeWorkerThreadNum(); i++) {
     std::printf("Joining Phy worker: %zu : %zu\n", i,
-                config_->WorkerThreadNum());
+                config_->UeWorkerThreadNum());
     workers_.at(i)->Stop();
   }
   workers_.clear();
@@ -213,10 +214,11 @@ void PhyUe::ReceiveDownlinkSymbol(struct Packet* rx_packet, size_t tag) {
 void PhyUe::ScheduleDefferedDownlinkSymbols(size_t frame_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
   // Complete the csi offset
-  size_t csi_offset = frame_slot * config_->UeAntNum();
+  const size_t csi_offset_base = frame_slot * config_->UeAntNum();
 
   for (size_t user = 0; user < config_->UeAntNum(); user++) {
-    csi_offset = csi_offset + user;
+    const size_t csi_offset = csi_offset_base + user;
+
     for (size_t ofdm_data = 0; ofdm_data < config_->OfdmDataNum();
          ofdm_data++) {
       auto* csi_buffer_ptr =
@@ -237,10 +239,10 @@ void PhyUe::ClearCsi(size_t frame_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
 
   if (config_->Frame().ClientDlPilotSymbols() > 0) {
-    size_t csi_offset = frame_slot * config_->UeAntNum();
+    const size_t csi_offset_base = frame_slot * config_->UeAntNum();
     for (size_t user = 0; user < config_->UeAntNum(); user++) {
-      csi_offset = csi_offset + user;
-      for (size_t ofdm_data = 0; ofdm_data < config_->OfdmDataNum();
+      const size_t csi_offset = csi_offset_base + user;
+      for (size_t ofdm_data = 0u; ofdm_data < config_->OfdmDataNum();
            ofdm_data++) {
         auto* csi_buffer_ptr = reinterpret_cast<arma::cx_float*>(
             csi_buffer_.at(csi_offset).data());
@@ -261,7 +263,7 @@ void PhyUe::Stop() {
 }
 
 void PhyUe::Start() {
-  PinToCoreWithOffset(ThreadType::kMaster, config_->CoreOffset(), 0);
+  PinToCoreWithOffset(ThreadType::kMaster, config_->UeCoreOffset(), 0);
 
   if (ru_->StartTxRx(rx_buffer_, rx_buffer_size_ / config_->PacketLength(),
                      tx_buffer_, tx_buffer_status_, tx_buffer_status_size_,
@@ -313,7 +315,7 @@ void PhyUe::Start() {
           size_t frame_id = pkt->frame_id_;
           size_t symbol_id = pkt->symbol_id_;
           size_t ant_id = pkt->ant_id_;
-          size_t ue_id = ant_id / config_->NumChannels();
+          size_t ue_id = ant_id / config_->NumUeChannels();
           size_t frame_slot = frame_id % kFrameWnd;
           RtAssert(pkt->frame_id_ < (cur_frame_id + kFrameWnd),
                    "Error: Received packet for future frame beyond frame "
@@ -337,7 +339,7 @@ void PhyUe::Start() {
             }
           }
 
-          if (config_->IsPilot(frame_id, symbol_id)) {
+          if (config_->IsDlPilot(frame_id, symbol_id)) {
             rx_counters_.num_pilot_pkts_.at(frame_slot)++;
             if (rx_counters_.num_pilot_pkts_.at(frame_slot) ==
                 rx_counters_.num_pilot_pkts_per_frame_) {
@@ -360,17 +362,17 @@ void PhyUe::Start() {
               // Schedule Pilot after receiving last beacon
               // (Only when in Downlink Only mode, otherwise the pilots
               // will be transmitted with the uplink data)
-              if (ant_id % config_->NumChannels() == 0) {
+              if (ant_id % config_->NumUeChannels() == 0) {
                 EventData do_tx_pilot_task(
                     EventType::kPacketPilotTX,
                     gen_tag_t::FrmSymUe(
                         frame_id, config_->Frame().GetPilotSymbol(ue_id), ue_id)
                         .tag_);
                 ScheduleTask(do_tx_pilot_task, &tx_queue_,
-                             *tx_ptoks_ptr_[ant_id % rx_thread_num_]);
+                             *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
               }
             } else {
-              if ((ant_id % config_->NumChannels()) == 0) {
+              if ((ant_id % config_->NumUeChannels()) == 0) {
                 // Schedule the Uplink tasks
                 for (size_t symbol_idx = 0;
                      symbol_idx < config_->Frame().NumULSyms(); symbol_idx++) {
@@ -555,47 +557,56 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kPacketFromMac: {
-          // This is an entrie frame (multiple mac packets)
-          size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
-          size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
-          RtAssert(radio_buf_id == expected_frame_id_from_mac_ % kFrameWnd);
+          // This is an entire frame (multiple mac packets)
+          const size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
+          const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
+          RtAssert(radio_buf_id == (expected_frame_id_from_mac_ % kFrameWnd),
+                   "Radio buffer id does not match expected");
 
-          auto* pkt = reinterpret_cast<MacPacket*>(
+          const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
               &ul_bits_buffer_[ue_id][radio_buf_id *
                                       config_->UlMacBytesNumPerframe()]);
-          RtAssert(pkt->frame_id_ == expected_frame_id_from_mac_,
+
+          MLPD_TRACE(
+              "PhyUe: frame %d symbol %d user %d @ offset %zu %zu @ location "
+              "%zu\n",
+              pkt->Frame(), pkt->Symbol(), pkt->Ue(), ue_id, radio_buf_id,
+              (size_t)pkt);
+          RtAssert(pkt->Frame() ==
+                       static_cast<uint16_t>(expected_frame_id_from_mac_),
                    "PhyUe: Incorrect frame ID from MAC");
           current_frame_user_num_ =
               (current_frame_user_num_ + 1) % config_->UeAntNum();
           if (current_frame_user_num_ == 0) {
             expected_frame_id_from_mac_++;
           }
+#if ENABLE_RB_IND
           config_->UpdateModCfgs(pkt->rb_indicator_.mod_order_bits_);
-
+#endif
           if (kDebugPrintPacketsFromMac) {
+#if ENABLE_RB_IND
             std::printf(
                 "PhyUe: received packet for frame %u with modulation %zu\n",
                 pkt->frame_id_, pkt->rb_indicator_.mod_order_bits_);
+#endif
             std::stringstream ss;
 
             for (size_t ul_data_symbol = 0;
                  ul_data_symbol < config_->Frame().NumUlDataSyms();
                  ul_data_symbol++) {
-              ss << "PhyUe: kPacketFromMac, frame " << pkt->frame_id_
-                 << ", symbol " << std::to_string(pkt->symbol_id_) << " crc "
-                 << std::to_string(pkt->crc_) << " bytes: ";
-              for (size_t i = 0; i < pkt->datalen_; i++) {
-                ss << std::to_string(
-                          (reinterpret_cast<uint8_t*>(pkt->data_)[i]))
-                   << ", ";
+              ss << "PhyUe: kPacketFromMac, frame " << pkt->Frame()
+                 << ", symbol " << std::to_string(pkt->Symbol()) << " crc "
+                 << std::to_string(pkt->Crc()) << " bytes: ";
+              for (size_t i = 0; i < pkt->PayloadLength(); i++) {
+                ss << std::to_string((pkt->Data()[i])) << ", ";
               }
               ss << std::endl;
-              pkt = reinterpret_cast<MacPacket*>(
-                  reinterpret_cast<uint8_t*>(pkt) + config_->MacPacketLength());
+              pkt = reinterpret_cast<const MacPacketPacked*>(
+                  reinterpret_cast<const uint8_t*>(pkt) +
+                  config_->MacPacketLength());
             }
             std::printf("%s\n", ss.str().c_str());
           }
-
         } break;
 
         case EventType::kEncode: {
@@ -669,7 +680,8 @@ void PhyUe::Start() {
               PrintPerFrameDone(PrintType::kIFFT, frame_id);
               ue.ifft_counters_.Reset(frame_id);
 
-              //If the completed frame is the next in line, schedule the transmission
+              // If the completed frame is the next in line, schedule the
+              // transmission
               if (ue.tx_pending_frame_ == frame_id) {
                 size_t current_frame = frame_id;
 
@@ -687,13 +699,14 @@ void PhyUe::Start() {
                       std::find(ue.tx_ready_frames_.begin(),
                                 ue.tx_ready_frames_.end(), next_frame);
                   if (tx_next != ue.tx_ready_frames_.end()) {
-                    //With c++20 we could check the return value of remove
+                    // With c++20 we could check the return value of remove
                     ue.tx_ready_frames_.erase(tx_next);
                     current_frame = next_frame;
                   }
                 }
               } else {
-                //Otherwise defer the tx (could make this sorted insert in future)
+                // Otherwise defer the tx (could make this sorted insert in
+                // future)
                 ue.tx_ready_frames_.push_front(frame_id);
               }
             }
@@ -780,9 +793,10 @@ void PhyUe::InitializeVarsFromCfg() {
 
   assert(dl_pilot_symbol_perframe_ <= dl_symbol_perframe_);
   assert(ul_pilot_symbol_perframe <= ul_symbol_perframe_);
-  rx_thread_num_ = ((kUseArgos == true) && (config_->HwFramer() == false))
-                       ? config_->UeNum()
-                       : std::min(config_->UeNum(), config_->SocketThreadNum());
+  rx_thread_num_ =
+      ((kUseArgos == true) && (config_->UeHwFramer() == false))
+          ? config_->UeNum()
+          : std::min(config_->UeNum(), config_->UeSocketThreadNum());
 
   tx_buffer_status_size_ =
       (ul_symbol_perframe_ * config_->UeAntNum() * kFrameWnd);

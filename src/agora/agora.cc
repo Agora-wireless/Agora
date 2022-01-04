@@ -8,7 +8,7 @@
 #include <cmath>
 #include <memory>
 
-static const bool kDebugDeferral = false;
+static const bool kDebugDeferral = true;
 static const size_t kDefaultMessageQueueSize = 512;
 static const size_t kDefaultWorkerQueueSize = 256;
 
@@ -16,18 +16,18 @@ Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
       stats_(std::make_unique<Stats>(cfg)),
-      phy_stats_(std::make_unique<PhyStats>(cfg)),
-      csi_buffers_(kFrameWnd, cfg->UeNum(),
+      phy_stats_(std::make_unique<PhyStats>(cfg, Direction::kUplink)),
+      csi_buffers_(kFrameWnd, cfg->UeAntNum(),
                    cfg->BsAntNum() * cfg->OfdmDataNum()),
       ul_zf_matrices_(kFrameWnd, cfg->OfdmDataNum(),
-                      cfg->BsAntNum() * cfg->UeNum()),
-      demod_buffers_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeNum(),
+                      cfg->BsAntNum() * cfg->UeAntNum()),
+      demod_buffers_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
                      kMaxModType * cfg->OfdmDataNum()),
-      decoded_buffer_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeNum(),
+      decoded_buffer_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
                       cfg->LdpcConfig().NumBlocksInSymbol() *
                           Roundup<64>(cfg->NumBytesPerCb())),
       dl_zf_matrices_(kFrameWnd, cfg->OfdmDataNum(),
-                      cfg->UeNum() * cfg->BsAntNum()) {
+                      cfg->UeAntNum() * cfg->BsAntNum()) {
   std::string directory = TOSTRING(PROJECT_DIRECTORY);
   std::printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
               directory.c_str(), cfg->FreqGhz());
@@ -101,8 +101,9 @@ void Agora::Stop() {
 void Agora::SendSnrReport(EventType event_type, size_t frame_id,
                           size_t symbol_id) {
   assert(event_type == EventType::kSNRReport);
+  unused(event_type);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
-  for (size_t i = 0; i < config_->UeNum(); i++) {
+  for (size_t i = 0; i < config_->UeAntNum(); i++) {
     EventData snr_report(EventType::kSNRReport, base_tag.tag_);
     snr_report.num_tags_ = 2;
     float snr = this->phy_stats_->GetEvmSnr(frame_id, i);
@@ -159,22 +160,37 @@ void Agora::ScheduleAntennas(EventType event_type, size_t frame_id,
 
 void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
   auto base_tag = gen_tag_t::FrmSymAnt(frame_id, symbol_id, 0);
+  const size_t total_antennas = config_->BsAntNum();
+  const size_t handler_threads = config_->SocketThreadNum();
+  size_t schedule_antenna = 0;
 
-  size_t num_blocks = config_->BsAntNum() / config_->NumChannels();
-  std::array<EventData, kMaxChannels> events_list;
-  for (size_t i = 0; i < config_->NumChannels(); i++) {
-    events_list.at(i).num_tags_ = 1;
-    events_list.at(i).event_type_ = EventType::kPacketTX;
+  const size_t rem_antennas = total_antennas % handler_threads;
+  const size_t floor_events_per_handler = total_antennas / handler_threads;
+  size_t ceil_events_per_handler = floor_events_per_handler;
+  if (rem_antennas > 0) {
+    ceil_events_per_handler += 1;
   }
+  // Must put contiguous channels in same queue
+  assert(ceil_events_per_handler % config_->NumChannels() == 0);
 
-  for (size_t i = 0; i < num_blocks; i++) {
-    for (size_t j = 0; j < config_->NumChannels(); j++) {
-      events_list.at(j).tags_[0] = base_tag.tag_;
-      base_tag.ant_id_++;
+  std::vector<EventData> events_list(ceil_events_per_handler);
+  for (size_t radio_handler = 0; radio_handler < handler_threads;
+       radio_handler++) {
+    size_t tx_event;
+    for (tx_event = 0; tx_event < ceil_events_per_handler; tx_event++) {
+      if (schedule_antenna == total_antennas) {
+        // All antennas scheduled
+        break;
+      }
+
+      events_list.at(tx_event).num_tags_ = 1;
+      events_list.at(tx_event).event_type_ = EventType::kPacketTX;
+      events_list.at(tx_event).tags_[0u] = base_tag.tag_;
+      base_tag.ant_id_ = ++schedule_antenna;
     }
     TryEnqueueBulkFallback(GetConq(EventType::kPacketTX, 0),
-                           tx_ptoks_ptr_[i % config_->SocketThreadNum()],
-                           events_list.data(), config_->NumChannels());
+                           tx_ptoks_ptr_[radio_handler], events_list.data(),
+                           tx_event);
   }
 }
 
@@ -233,18 +249,10 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
 void Agora::ScheduleCodeblocks(EventType event_type, size_t frame_id,
                                size_t symbol_idx) {
   auto base_tag = gen_tag_t::FrmSymCb(frame_id, symbol_idx, 0);
-
-  // for (size_t i = 0;
-  //      i < config_->UeNum() * config_->LdpcConfig().NumBlocksInSymbol();
-  //      i++) {
-  //     try_enqueue_fallback(GetConq(event_type), GetPtok(event_type),
-  //         Event_data(event_type, base_tag._tag));
-  //     base_tag.cb_id++;
-  // }
-  size_t num_tasks =
-      config_->UeNum() * config_->LdpcConfig().NumBlocksInSymbol();
+  const size_t num_tasks =
+      config_->UeAntNum() * config_->LdpcConfig().NumBlocksInSymbol();
   size_t num_blocks = num_tasks / config_->EncodeBlockSize();
-  size_t num_remainder = num_tasks % config_->EncodeBlockSize();
+  const size_t num_remainder = num_tasks % config_->EncodeBlockSize();
   if (num_remainder > 0) {
     num_blocks++;
   }
@@ -268,9 +276,10 @@ void Agora::ScheduleCodeblocks(EventType event_type, size_t frame_id,
 void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
                           size_t symbol_id) {
   assert(event_type == EventType::kPacketToMac);
+  unused(event_type);
   auto base_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, 0);
 
-  for (size_t i = 0; i < config_->UeNum(); i++) {
+  for (size_t i = 0; i < config_->UeAntNum(); i++) {
     TryEnqueueFallback(&mac_request_queue_,
                        EventData(EventType::kPacketToMac, base_tag.tag_));
     base_tag.ue_id_++;
@@ -364,6 +373,9 @@ void Agora::Start() {
               zf_last_frame_ = frame_id;
               PrintPerFrameDone(PrintType::kZF, frame_id);
               this->zf_counters_.Reset(frame_id);
+              if (kPrintZfStats) {
+                this->phy_stats_->PrintZfStats(frame_id);
+              }
 
               for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
                 if (this->fft_cur_frame_for_symbol_.at(i) == frame_id) {
@@ -563,7 +575,7 @@ void Agora::Start() {
               ifft_cur_frame_for_symbol_.at(symbol_idx_dl) = frame_id;
               if (symbol_idx_dl == ifft_next_symbol_) {
                 // Check the available symbols starting from the current symbol
-                // Only schedule symbols that are continuously avaialbe
+                // Only schedule symbols that are continuously available
                 for (size_t sym_id = symbol_idx_dl;
                      sym_id <= ifft_counters_.GetSymbolCount(frame_id);
                      sym_id++) {
@@ -634,10 +646,10 @@ void Agora::Start() {
                   cfg->OfdmDataNum() * tx_counters_.MaxSymbolCount() * 1000;
 
               MLPD_INFO(
-                  "TX %d samples (per-client) to %zu clients "
-                  "in %f secs, throughtput %f bps per-client "
-                  "(16QAM), current tx queue length %zu\n",
-                  samples_num_per_ue, cfg->UeNum(), diff,
+                  "TX %d samples (per-client) to %zu clients in %f secs, "
+                  "throughtput %f bps per-client (16QAM), current tx queue "
+                  "length %zu\n",
+                  samples_num_per_ue, cfg->UeAntNum(), diff,
                   samples_num_per_ue * std::log2(16.0f) / diff,
                   GetConq(EventType::kPacketTX, 0)->size_approx());
               unused(diff);
@@ -727,6 +739,14 @@ void Agora::HandleEventFft(size_t tag) {
           this->pilot_fft_counters_.Reset(frame_id);
           if (kPrintPhyStats == true) {
             this->phy_stats_->PrintSnrStats(frame_id);
+            if (config_->Frame().IsRecCalEnabled() == true) {
+              size_t frame_grp_id =
+                  (frame_id - TX_FRAME_DELTA) / config_->AntGroupNum();
+              if ((frame_id - TX_FRAME_DELTA) % config_->AntGroupNum() == 0 &&
+                  frame_grp_id > 0) {
+                this->phy_stats_->PrintCalibSnrStats(frame_grp_id - 1);
+              }
+            }
           }
           if (kEnableMac == true) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);
@@ -773,9 +793,10 @@ void Agora::Worker(int tid) {
 
   /* Initialize operators */
   auto compute_zf = std::make_unique<DoZF>(
-      this->config_, tid, this->csi_buffers_, this->calib_dl_buffer_,
-      this->calib_ul_buffer_, this->ul_zf_matrices_, this->dl_zf_matrices_,
-      this->stats_.get());
+      this->config_, tid, this->csi_buffers_, calib_dl_buffer_,
+      calib_ul_buffer_, this->calib_dl_msum_buffer_,
+      this->calib_ul_msum_buffer_, this->ul_zf_matrices_, this->dl_zf_matrices_,
+      this->phy_stats_.get(), this->stats_.get());
 
   auto compute_fft = std::make_unique<DoFFT>(
       this->config_, tid, this->data_buffer_, this->csi_buffers_,
@@ -792,7 +813,8 @@ void Agora::Worker(int tid) {
       this->dl_encoded_buffer_, this->stats_.get());
 
   auto compute_encoding = std::make_unique<DoEncode>(
-      config_, tid, (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
+      config_, tid, Direction::kDownlink,
+      (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
       (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
       this->stats_.get());
 
@@ -892,7 +914,8 @@ void Agora::WorkerZf(int tid) {
   /* Initialize ZF operator */
   std::unique_ptr<DoZF> compute_zf(
       new DoZF(config_, tid, csi_buffers_, calib_dl_buffer_, calib_ul_buffer_,
-               ul_zf_matrices_, dl_zf_matrices_, this->stats_.get()));
+               calib_dl_msum_buffer_, calib_ul_msum_buffer_, ul_zf_matrices_,
+               dl_zf_matrices_, this->phy_stats_.get(), this->stats_.get()));
 
   while (this->config_->Running() == true) {
     compute_zf->TryLaunch(*GetConq(EventType::kZF, 0), complete_task_queue_[0],
@@ -931,10 +954,11 @@ void Agora::WorkerDemul(int tid) {
 void Agora::WorkerDecode(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerDecode, base_worker_core_offset_, tid);
 
-  std::unique_ptr<DoEncode> compute_encoding(new DoEncode(
-      config_, tid, (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
-      (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
-      this->stats_.get()));
+  std::unique_ptr<DoEncode> compute_encoding(
+      new DoEncode(config_, tid, Direction::kDownlink,
+                   (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
+                   (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
+                   this->stats_.get()));
 
   std::unique_ptr<DoDecode> compute_decoding(
       new DoDecode(config_, tid, demod_buffers_, decoded_buffer_,
@@ -1341,10 +1365,10 @@ void Agora::InitializeUplinkBuffers() {
                       Agora_memory::Alignment_t::kAlign64);
 
   equal_buffer_.Malloc(task_buffer_symbol_num_ul,
-                       cfg->OfdmDataNum() * cfg->UeNum(),
+                       cfg->OfdmDataNum() * cfg->UeAntNum(),
                        Agora_memory::Alignment_t::kAlign64);
   ue_spec_pilot_buffer_.Calloc(
-      kFrameWnd, cfg->Frame().ClientUlPilotSymbols() * cfg->UeNum(),
+      kFrameWnd, cfg->Frame().ClientUlPilotSymbols() * cfg->UeAntNum(),
       Agora_memory::Alignment_t::kAlign64);
 
   rx_counters_.num_pkts_per_frame_ =
@@ -1367,10 +1391,11 @@ void Agora::InitializeUplinkBuffers() {
 
   demul_counters_.Init(cfg->Frame().NumULSyms(), cfg->DemulEventsPerSymbol());
 
-  decode_counters_.Init(cfg->Frame().NumULSyms(),
-                        cfg->LdpcConfig().NumBlocksInSymbol() * cfg->UeNum());
+  decode_counters_.Init(
+      cfg->Frame().NumULSyms(),
+      cfg->LdpcConfig().NumBlocksInSymbol() * cfg->UeAntNum());
 
-  tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->UeNum());
+  tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->UeAntNum());
 }
 
 void Agora::InitializeDownlinkBuffers() {
@@ -1390,9 +1415,9 @@ void Agora::InitializeDownlinkBuffers() {
                   Agora_memory::Alignment_t::kAlign64, 1);
 
     size_t dl_bits_buffer_size = kFrameWnd * config_->DlMacBytesNumPerframe();
-    this->dl_bits_buffer_.Calloc(config_->UeNum(), dl_bits_buffer_size,
+    this->dl_bits_buffer_.Calloc(config_->UeAntNum(), dl_bits_buffer_size,
                                  Agora_memory::Alignment_t::kAlign64);
-    this->dl_bits_buffer_status_.Calloc(config_->UeNum(), kFrameWnd,
+    this->dl_bits_buffer_status_.Calloc(config_->UeAntNum(), kFrameWnd,
                                         Agora_memory::Alignment_t::kAlign64);
 
     dl_ifft_buffer_.Calloc(config_->BsAntNum() * task_buffer_symbol_num,
@@ -1404,6 +1429,12 @@ void Agora::InitializeDownlinkBuffers() {
     calib_ul_buffer_.Calloc(kFrameWnd,
                             config_->BfAntNum() * config_->OfdmDataNum(),
                             Agora_memory::Alignment_t::kAlign64);
+    calib_dl_msum_buffer_.Calloc(kFrameWnd,
+                                 config_->BfAntNum() * config_->OfdmDataNum(),
+                                 Agora_memory::Alignment_t::kAlign64);
+    calib_ul_msum_buffer_.Calloc(kFrameWnd,
+                                 config_->BfAntNum() * config_->OfdmDataNum(),
+                                 Agora_memory::Alignment_t::kAlign64);
     // initialize the content of the last window to 1
     for (size_t i = 0; i < config_->OfdmDataNum() * config_->BfAntNum(); i++) {
       calib_dl_buffer_[kFrameWnd - 1][i] = {1, 0};
@@ -1411,12 +1442,12 @@ void Agora::InitializeDownlinkBuffers() {
     }
     dl_encoded_buffer_.Calloc(
         task_buffer_symbol_num,
-        Roundup<64>(config_->OfdmDataNum()) * config_->UeNum(),
+        Roundup<64>(config_->OfdmDataNum()) * config_->UeAntNum(),
         Agora_memory::Alignment_t::kAlign64);
 
     encode_counters_.Init(
         config_->Frame().NumDlDataSyms(),
-        config_->LdpcConfig().NumBlocksInSymbol() * config_->UeNum());
+        config_->LdpcConfig().NumBlocksInSymbol() * config_->UeAntNum());
     encode_cur_frame_for_symbol_ =
         std::vector<size_t>(config_->Frame().NumDLSyms(), SIZE_MAX);
     ifft_cur_frame_for_symbol_ =
@@ -1428,7 +1459,7 @@ void Agora::InitializeDownlinkBuffers() {
     ifft_counters_.Init(config_->Frame().NumDLSyms(), config_->BsAntNum());
     tx_counters_.Init(config_->Frame().NumDLSyms(), config_->BsAntNum());
     // mac data is sent per frame, so we set max symbol to 1
-    mac_to_phy_counters_.Init(1, config_->UeNum());
+    mac_to_phy_counters_.Init(1, config_->UeAntNum());
   }
 }
 
@@ -1447,6 +1478,8 @@ void Agora::FreeDownlinkBuffers() {
     dl_ifft_buffer_.Free();
     calib_dl_buffer_.Free();
     calib_ul_buffer_.Free();
+    calib_dl_msum_buffer_.Free();
+    calib_ul_msum_buffer_.Free();
     dl_encoded_buffer_.Free();
     dl_bits_buffer_.Free();
     dl_bits_buffer_status_.Free();
@@ -1464,7 +1497,7 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
   FILE* fp = std::fopen(filename.c_str(), "wb");
 
   for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
-    for (size_t j = 0; j < cfg->UeNum(); j++) {
+    for (size_t j = 0; j < cfg->UeAntNum(); j++) {
       int8_t* ptr = decoded_buffer_[(frame_id % kFrameWnd)][i][j];
       std::fwrite(ptr, num_decoded_bytes, sizeof(uint8_t), fp);
     }
@@ -1499,12 +1532,13 @@ void Agora::GetEqualData(float** ptr, int* size) {
   auto offset = cfg->GetTotalDataSymbolIdxUl(
       max_equaled_frame_, cfg->Frame().ClientUlPilotSymbols());
   *ptr = (float*)&equal_buffer_[offset][0];
-  *size = cfg->UeNum() * cfg->OfdmDataNum() * 2;
+  *size = cfg->UeAntNum() * cfg->OfdmDataNum() * 2;
 }
 void Agora::CheckIncrementScheduleFrame(size_t frame_id,
                                         ScheduleProcessingFlags completed) {
   this->schedule_process_flags_ += completed;
   assert(this->cur_sche_frame_id_ == frame_id);
+  unused(frame_id);
 
   if (this->schedule_process_flags_ ==
       static_cast<uint8_t>(ScheduleProcessingFlags::kProcessingComplete)) {
@@ -1546,14 +1580,15 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
     this->ifft_counters_.Reset(frame_id);
     this->tx_counters_.Reset(frame_id);
     if (config_->Frame().NumDLSyms() > 0) {
-      for (size_t ue_id = 0; ue_id < config_->UeNum(); ue_id++)
+      for (size_t ue_id = 0; ue_id < config_->UeAntNum(); ue_id++) {
         this->dl_bits_buffer_status_[ue_id][frame_id % kFrameWnd] = 0;
+      }
     }
     this->cur_proc_frame_id_++;
 
     if (this->encode_deferral_.empty() == false) {
       for (size_t encode = 0; encode < kScheduleQueues; encode++) {
-        size_t deferred_frame = this->encode_deferral_.front();
+        const size_t deferred_frame = this->encode_deferral_.front();
         if (deferred_frame < (this->cur_proc_frame_id_ + kScheduleQueues)) {
           if (kDebugDeferral) {
             std::printf("   +++ Scheduling deferred frame %zu : %zu \n",
@@ -1562,7 +1597,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
           RtAssert(deferred_frame >= this->cur_proc_frame_id_,
                    "Error scheduling encoding because deferral frame is less "
                    "than current frame");
-          ScheduleDownlinkProcessing(frame_id);
+          ScheduleDownlinkProcessing(deferred_frame);
           this->encode_deferral_.pop();
         } else {
           // No need to check the next frame because it is too large
