@@ -446,6 +446,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
   // Generate RX and TX data for multiple frames and save to files
   // CSI can either be constant or time-varying
+  // TODO: improve speed of multi-frame data generation for large MIMO sizes
   for (size_t frame_id = 0; frame_id < kNumGeneratedFrames; frame_id++) {
     // Uplink
     // Generate RX data received by base station after going through channels

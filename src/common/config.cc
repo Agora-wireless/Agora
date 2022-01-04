@@ -1186,7 +1186,6 @@ void Config::Print() const {
               << "Ant Per Group: " << ant_per_group_ << std::endl
               << "Max Frames: " << frames_to_test_ << std::endl
               << "Transport Block Size: " << transport_block_size_ << std::endl
-              << "Noise Level: " << noise_level_ << std::endl
               << "Bytes per CB: " << num_bytes_per_cb_ << std::endl
               << "FFT in rru: " << fft_in_rru_ << std::endl;
   }
