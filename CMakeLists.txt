@@ -226,6 +226,7 @@ include_directories(
   src/mac/
   src/agora/
   src/agora/txrx/
+  src/agora/txrx/workers
   src/client/
   /usr/include/mkl/
   src/data_generator)
@@ -268,13 +269,16 @@ set(AGORA_SOURCES
 if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
   set(AGORA_SOURCES ${AGORA_SOURCES} 
-    src/agora/txrx/txrx_DPDK.cc
+    src/agora/txrx/packet_txrx_dpdk.cc
     src/common/dpdk_transport.cc)
 else()
   set(AGORA_SOURCES ${AGORA_SOURCES} 
-    src/agora/txrx/txrx.cc
-    src/agora/txrx/txrx_argos.cc
-    src/agora/txrx/txrx_usrp.cc)
+    src/agora/txrx/packet_txrx.cc
+    src/agora/txrx/packet_txrx_radio.cc
+    src/agora/txrx/workers/txrx_worker.cc
+    src/agora/txrx/workers/txrx_worker_sim.cc
+    src/agora/txrx/workers/txrx_worker_argos.cc
+    src/agora/txrx/workers/txrx_worker_usrp.cc)
 endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
