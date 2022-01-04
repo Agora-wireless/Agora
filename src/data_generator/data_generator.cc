@@ -25,16 +25,18 @@
 
 static constexpr bool kPrintDebugCSI = false;
 static constexpr bool kDebugPrintRxData = false;
-static constexpr bool kPrintDlTxData = false;
 static constexpr bool kPrintDlModData = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
 static constexpr bool kPrintDownlinkInformationBytes = false;
 
-static float RandFloatFromShort(float min, float max) {
-  float rand_val = ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
-  auto rand_val_ushort = static_cast<short>(rand_val * 32768);
-  rand_val = (float)rand_val_ushort / 32768;
-  return rand_val;
+DataGenerator::DataGenerator(Config* cfg, uint64_t seed, Profile profile)
+    : cfg_(cfg), profile_(profile) {
+  if (seed != 0) {
+    fast_rand_.seed_ = seed;
+  }
+  std::string channel_type = cfg->ChannelType();
+  channel_ =
+      std::make_unique<Channel>(cfg, cfg, channel_type, cfg->ChannelSNR());
 }
 
 void DataGenerator::DoDataGeneration(const std::string& directory) {
@@ -65,9 +67,9 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
         pkt->Set(0, pkt_id, ue_id, cfg_->MacPayloadMaxLength());
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj_->CalculateCrc24(pkt->Data(), cfg_->MacPayloadMaxLength()) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj_->CalculateCrc24(
+                                pkt->Data(), cfg_->MacPayloadMaxLength()) &
+                            0xFFFF));
       }
     }
 
@@ -250,85 +252,15 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     }
   }
 
-  // Generate CSI matrix
-  Table<complex_float> csi_matrices;
-  float sqrt2_norm = 1 / std::sqrt(2);
-  csi_matrices.Calloc(this->cfg_->OfdmCaNum(),
-                      this->cfg_->UeAntNum() * this->cfg_->BsAntNum(),
-                      Agora_memory::Alignment_t::kAlign32);
-  for (size_t i = 0; i < (this->cfg_->UeAntNum() * this->cfg_->BsAntNum());
-       i++) {
-    complex_float csi = {RandFloatFromShort(-1, 1), RandFloatFromShort(-1, 1)};
-    for (size_t j = 0; j < this->cfg_->OfdmCaNum(); j++) {
-      csi_matrices[j][i].re = csi.re * sqrt2_norm;
-      csi_matrices[j][i].im = csi.im * sqrt2_norm;
-    }
-  }
-
-  // Generate RX data received by base station after going through channels
-  Table<complex_float> rx_data_all_symbols;
-  rx_data_all_symbols.Calloc(this->cfg_->Frame().NumTotalSyms(),
-                             this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum(),
-                             Agora_memory::Alignment_t::kAlign64);
-  for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
-    arma::cx_fmat mat_input_data(
-        reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
-        this->cfg_->OfdmCaNum(), this->cfg_->UeAntNum(), false);
-    arma::cx_fmat mat_output(
-        reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
-        this->cfg_->OfdmCaNum(), this->cfg_->BsAntNum(), false);
-
-    for (size_t j = 0; j < this->cfg_->OfdmCaNum(); j++) {
-      arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
-                            this->cfg_->BsAntNum(), this->cfg_->UeAntNum());
-      mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
-      for (size_t k = 0; k < this->cfg_->BsAntNum(); k++) {
-        arma::cx_float noise(RandFloatFromShort(-1, 1),
-                             RandFloatFromShort(-1, 1));
-        noise *= this->cfg_->NoiseLevel() * sqrt2_norm;
-        mat_output.at(j, k) += noise;
-      }
-    }
-    for (size_t j = 0; j < this->cfg_->BsAntNum(); j++) {
-      CommsLib::IFFT(rx_data_all_symbols[i] + j * this->cfg_->OfdmCaNum(),
-                     this->cfg_->OfdmCaNum(), false);
-    }
-  }
-
-  std::string filename_rx = directory + "/data/LDPC_rx_data_" +
-                            std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
-                            std::to_string(this->cfg_->BsAntNum()) + ".bin";
-  MLPD_INFO("Saving rx data to %s\n", filename_rx.c_str());
-  FILE* fp_rx = std::fopen(filename_rx.c_str(), "wb");
-  for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
-    auto* ptr = reinterpret_cast<float*>(rx_data_all_symbols[i]);
-    std::fwrite(ptr, this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum() * 2,
-                sizeof(float), fp_rx);
-  }
-  std::fclose(fp_rx);
-
-  if (kDebugPrintRxData) {
-    std::printf("rx data\n");
-    for (size_t i = 0; i < 10; i++) {
-      for (size_t j = 0; j < this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum();
-           j++) {
-        if (j % this->cfg_->OfdmCaNum() == 0) {
-          std::printf("\nsymbol %zu ant %zu\n", i, j / this->cfg_->OfdmCaNum());
-        }
-        std::printf("%.4f+%.4fi ", rx_data_all_symbols[i][j].re,
-                    rx_data_all_symbols[i][j].im);
-      }
-      std::printf("\n");
-    }
-  }
-
   /* ------------------------------------------------
    * Generate data for downlink test
    * ------------------------------------------------ */
+  Table<complex_float> dl_mod_data;
   if (this->cfg_->Frame().NumDLSyms() > 0) {
     const size_t num_dl_mac_bytes = this->cfg_->DlMacBytesNumPerframe();
     std::vector<std::vector<int8_t>> dl_mac_info(cfg_->UeAntNum());
     MLPD_SYMBOL("Total number of downlink MAC bytes: %zu\n", num_dl_mac_bytes);
+    // Generate MAC data for one frame
     for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
       dl_mac_info[ue_id].resize(num_dl_mac_bytes);
       for (size_t pkt_id = 0; pkt_id < cfg_->DlMacPacketsPerframe(); pkt_id++) {
@@ -338,13 +270,14 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
 
         pkt->Set(0, pkt_id, ue_id, cfg_->MacPayloadMaxLength());
         this->GenMacData(pkt, ue_id);
-        pkt->Crc((uint16_t)(
-            crc_obj_->CalculateCrc24(pkt->Data(), cfg_->MacPayloadMaxLength()) &
-            0xFFFF));
+        pkt->Crc((uint16_t)(crc_obj_->CalculateCrc24(
+                                pkt->Data(), cfg_->MacPayloadMaxLength()) &
+                            0xFFFF));
       }
     }
 
     {
+      // Save MAC data for one frame
       const std::string filename_input =
           directory + "/data/orig_dl_data_" +
           std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
@@ -436,42 +369,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       }
     }
 
-    // Compute precoder
-    Table<complex_float> precoder;
-    precoder.Calloc(this->cfg_->OfdmCaNum(),
-                    this->cfg_->UeAntNum() * this->cfg_->BsAntNum(),
-                    Agora_memory::Alignment_t::kAlign32);
-    for (size_t i = 0; i < this->cfg_->OfdmCaNum(); i++) {
-      arma::cx_fmat mat_input(
-          reinterpret_cast<arma::cx_float*>(csi_matrices[i]),
-          this->cfg_->BsAntNum(), this->cfg_->UeAntNum(), false);
-      arma::cx_fmat mat_output(reinterpret_cast<arma::cx_float*>(precoder[i]),
-                               this->cfg_->UeAntNum(), this->cfg_->BsAntNum(),
-                               false);
-      pinv(mat_output, mat_input, 1e-2, "dc");
-    }
-
-    if (kPrintDebugCSI) {
-      std::printf("CSI \n");
-      // for (size_t i = 0; i < this->cfg_->ofdm_ca_num(); i++)
-      for (size_t j = 0; j < this->cfg_->UeAntNum() * this->cfg_->BsAntNum();
-           j++) {
-        std::printf("%.3f+%.3fi ",
-                    csi_matrices[this->cfg_->OfdmDataStart()][j].re,
-                    csi_matrices[this->cfg_->OfdmDataStart()][j].im);
-      }
-      std::printf("\nprecoder \n");
-      // for (size_t i = 0; i < this->cfg_->ofdm_ca_num(); i++)
-      for (size_t j = 0; j < this->cfg_->UeAntNum() * this->cfg_->BsAntNum();
-           j++) {
-        std::printf("%.3f+%.3fi ", precoder[this->cfg_->OfdmDataStart()][j].re,
-                    precoder[this->cfg_->OfdmDataStart()][j].im);
-      }
-      std::printf("\n");
-    }
-
     // Prepare downlink data from mod_output
-    Table<complex_float> dl_mod_data;
     dl_mod_data.Calloc(this->cfg_->Frame().NumDLSyms(),
                        this->cfg_->OfdmCaNum() * this->cfg_->UeAntNum(),
                        Agora_memory::Alignment_t::kAlign64);
@@ -503,9 +401,6 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
              k < this->cfg_->OfdmDataStart() + this->cfg_->OfdmDataNum(); k++) {
           std::printf("symbol %zu, subcarrier %zu\n", i, k);
           for (size_t j = 0; j < this->cfg_->UeAntNum(); j++) {
-            // for (int k = this->cfg_->OfdmDataStart(); k <
-            // this->cfg_->OfdmDataStart() + this->cfg_->OfdmDataNum();
-            //      k++) {
             std::printf("%.3f+%.3fi ",
                         dl_mod_data[i][j * this->cfg_->OfdmCaNum() + k].re,
                         dl_mod_data[i][j * this->cfg_->OfdmCaNum() + k].im);
@@ -514,111 +409,171 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         }
       }
     }
+  }
 
-    // Perform precoding and IFFT
-    Table<complex_float> dl_ifft_data;
+  std::string filename_rx = directory + "/data/LDPC_rx_data_" +
+                            std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
+                            std::to_string(this->cfg_->BsAntNum()) + ".bin";
+  MLPD_INFO("Saving rx data to %s\n", filename_rx.c_str());
+  FILE* fp_rx = std::fopen(filename_rx.c_str(), "wb");
+  Table<complex_float> rx_data_all_symbols;
+  // Allocate buffer for Uplink
+  rx_data_all_symbols.Calloc(this->cfg_->Frame().NumTotalSyms(),
+                             this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum(),
+                             Agora_memory::Alignment_t::kAlign64);
+
+  std::string filename_dl_tx = directory + "/data/LDPC_dl_tx_data_" +
+                               std::to_string(this->cfg_->OfdmCaNum()) +
+                               "_ant" + std::to_string(this->cfg_->BsAntNum()) +
+                               ".bin";
+  MLPD_INFO("Saving dl tx data to %s\n", filename_dl_tx.c_str());
+  FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
+  // Allocate buffers for Downlink
+  Table<complex_float> precoder;
+  Table<complex_float> dl_ifft_data;
+  Table<short> dl_tx_data;
+  if (this->cfg_->Frame().NumDLSyms() > 0) {
+    precoder.Calloc(this->cfg_->OfdmCaNum(),
+                    this->cfg_->UeAntNum() * this->cfg_->BsAntNum(),
+                    Agora_memory::Alignment_t::kAlign32);
     dl_ifft_data.Calloc(this->cfg_->Frame().NumDLSyms(),
                         this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum(),
                         Agora_memory::Alignment_t::kAlign64);
-    Table<short> dl_tx_data;
     dl_tx_data.Calloc(this->cfg_->Frame().NumDLSyms(),
                       2 * this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum(),
                       Agora_memory::Alignment_t::kAlign64);
+  }
 
-    for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
+  // Generate RX and TX data for multiple frames and save to files
+  // CSI can either be constant or time-varying
+  for (size_t frame_id = 0; frame_id < kNumGeneratedFrames; frame_id++) {
+    // Uplink
+    // Generate RX data received by base station after going through channels
+    MLPD_INFO("Generating data for frame %zu...\n", frame_id);
+
+    for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
       arma::cx_fmat mat_input_data(
-          reinterpret_cast<arma::cx_float*>(dl_mod_data[i]),
+          reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
           this->cfg_->OfdmCaNum(), this->cfg_->UeAntNum(), false);
-
       arma::cx_fmat mat_output(
-          reinterpret_cast<arma::cx_float*>(dl_ifft_data[i]),
-          this->cfg_->OfdmCaNum(), this->cfg_->BsAntNum(), false);
-
-      for (size_t j = this->cfg_->OfdmDataStart();
-           j < this->cfg_->OfdmDataNum() + this->cfg_->OfdmDataStart(); j++) {
-        arma::cx_fmat mat_precoder(
-            reinterpret_cast<arma::cx_float*>(precoder[j]),
-            this->cfg_->UeAntNum(), this->cfg_->BsAntNum(), false);
-        mat_precoder /= abs(mat_precoder).max();
-        mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
-
-        // std::printf("symbol %d, sc: %d\n", i, j -
-        // this->cfg_->ofdm_data_start()); cout << "Precoder: \n" <<
-        // mat_precoder
-        // << endl; cout << "Data: \n" << mat_input_data.row(j) << endl; cout <<
-        // "Precoded data: \n" << mat_output.row(j) << endl;
-      }
+          reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
+          this->cfg_->OfdmCaNum(), this->cfg_->BsAntNum(), false, true);
+      // Only generate new CSI once per frame
+      channel_->ApplyChan(mat_input_data, mat_output, false, i == 0);
       for (size_t j = 0; j < this->cfg_->BsAntNum(); j++) {
-        complex_float* ptr_ifft = dl_ifft_data[i] + j * this->cfg_->OfdmCaNum();
-        CommsLib::IFFT(ptr_ifft, this->cfg_->OfdmCaNum(), false);
-
-        short* tx_symbol = dl_tx_data[i] + j * this->cfg_->SampsPerSymbol() * 2;
-        std::memset(tx_symbol, 0,
-                    sizeof(short) * 2 * this->cfg_->OfdmTxZeroPrefix());
-        for (size_t k = 0; k < this->cfg_->OfdmCaNum(); k++) {
-          tx_symbol[2 * (k + this->cfg_->CpLen() +
-                         this->cfg_->OfdmTxZeroPrefix())] =
-              static_cast<short>(32768 * ptr_ifft[k].re *
-                                 std::sqrt(this->cfg_->BsAntNum() * 1.f));
-          tx_symbol[2 * (k + this->cfg_->CpLen() +
-                         this->cfg_->OfdmTxZeroPrefix()) +
-                    1] =
-              static_cast<short>(32768 * ptr_ifft[k].im *
-                                 std::sqrt(this->cfg_->BsAntNum() * 1.f));
-        }
-        for (size_t k = 0; k < (2 * this->cfg_->CpLen()); k++) {
-          tx_symbol[2 * this->cfg_->OfdmTxZeroPrefix() + k] =
-              tx_symbol[2 * (this->cfg_->OfdmTxZeroPrefix() +
-                             this->cfg_->OfdmCaNum())];
-        }
-
-        const size_t tx_zero_postfix_offset =
-            2 * (this->cfg_->OfdmTxZeroPrefix() + this->cfg_->CpLen() +
-                 this->cfg_->OfdmCaNum());
-        std::memset(tx_symbol + tx_zero_postfix_offset, 0,
-                    sizeof(short) * 2 * this->cfg_->OfdmTxZeroPostfix());
+        CommsLib::IFFT(rx_data_all_symbols[i] + j * this->cfg_->OfdmCaNum(),
+                       this->cfg_->OfdmCaNum(), false);
       }
     }
 
-    std::string filename_dl_tx =
-        directory + "/data/LDPC_dl_tx_data_" +
-        std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
-        std::to_string(this->cfg_->BsAntNum()) + ".bin";
-    MLPD_INFO("Saving dl tx data to %s\n", filename_dl_tx.c_str());
-    FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
-    for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
-      short* ptr = dl_tx_data[i];
-      std::fwrite(ptr,
-                  this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum() * 2,
-                  sizeof(short), fp_dl_tx);
+    for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
+      auto* ptr = reinterpret_cast<float*>(rx_data_all_symbols[i]);
+      std::fwrite(ptr, this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum() * 2,
+                  sizeof(float), fp_rx);
     }
-    std::fclose(fp_dl_tx);
 
-    if (kPrintDlTxData) {
+    if (kDebugPrintRxData) {
       std::printf("rx data\n");
       for (size_t i = 0; i < 10; i++) {
         for (size_t j = 0; j < this->cfg_->OfdmCaNum() * this->cfg_->BsAntNum();
              j++) {
           if (j % this->cfg_->OfdmCaNum() == 0) {
-            std::printf("symbol %zu ant %zu\n", i, j / this->cfg_->OfdmCaNum());
+            std::printf("\nsymbol %zu ant %zu\n", i,
+                        j / this->cfg_->OfdmCaNum());
           }
-          // TODO keep and fix or remove
-          // std::printf("%d+%di ", dl_tx_data[i][j], dl_tx_data[i][j]);
+          std::printf("%.4f+%.4fi ", rx_data_all_symbols[i][j].re,
+                      rx_data_all_symbols[i][j].im);
         }
+        std::printf("\n");
       }
-      std::printf("\n");
     }
 
-    /* Clean Up memory */
-    dl_ifft_data.Free();
-    dl_tx_data.Free();
-    dl_mod_data.Free();
-    precoder.Free();
+    // Downlink
+    // Generate TX data sent by base station after going through channels
+    if (this->cfg_->Frame().NumDLSyms() > 0) {
+      // Compute precoder
+      for (size_t i = this->cfg_->OfdmDataStart();
+           i < this->cfg_->OfdmDataNum() + this->cfg_->OfdmDataStart(); i++) {
+        arma::cx_fmat mat_precoder(
+            reinterpret_cast<arma::cx_float*>(precoder[i]),
+            this->cfg_->UeAntNum(), this->cfg_->BsAntNum(), false);
+        pinv(mat_precoder, channel_->GetCurrentCSI().st(), 1e-2, "dc");
+      }
+
+      // Perform precoding and IFFT
+      for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
+        arma::cx_fmat mat_input_data(
+            reinterpret_cast<arma::cx_float*>(dl_mod_data[i]),
+            this->cfg_->OfdmCaNum(), this->cfg_->UeAntNum(), false);
+
+        arma::cx_fmat mat_output(
+            reinterpret_cast<arma::cx_float*>(dl_ifft_data[i]),
+            this->cfg_->OfdmCaNum(), this->cfg_->BsAntNum(), false);
+
+        for (size_t j = this->cfg_->OfdmDataStart();
+             j < this->cfg_->OfdmDataNum() + this->cfg_->OfdmDataStart(); j++) {
+          arma::cx_fmat mat_precoder(
+              reinterpret_cast<arma::cx_float*>(precoder[j]),
+              this->cfg_->UeAntNum(), this->cfg_->BsAntNum(), false);
+          mat_precoder /= abs(mat_precoder).max();
+          mat_output.row(j) = mat_input_data.row(j) * mat_precoder;
+        }
+        for (size_t j = 0; j < this->cfg_->BsAntNum(); j++) {
+          complex_float* ptr_ifft =
+              dl_ifft_data[i] + j * this->cfg_->OfdmCaNum();
+          CommsLib::IFFT(ptr_ifft, this->cfg_->OfdmCaNum(), false);
+
+          // Generate TX data with prefix and postfix for one antenna
+          short* tx_symbol =
+              dl_tx_data[i] + j * this->cfg_->SampsPerSymbol() * 2;
+          std::memset(tx_symbol, 0,
+                      sizeof(short) * 2 * this->cfg_->OfdmTxZeroPrefix());
+          for (size_t k = 0; k < this->cfg_->OfdmCaNum(); k++) {
+            size_t offset =
+                2 * (k + this->cfg_->CpLen() + this->cfg_->OfdmTxZeroPrefix());
+            tx_symbol[offset] =
+                static_cast<short>(32768 * ptr_ifft[k].re *
+                                   std::sqrt(this->cfg_->BsAntNum() * 1.f));
+            tx_symbol[offset + 1] =
+                static_cast<short>(32768 * ptr_ifft[k].im *
+                                   std::sqrt(this->cfg_->BsAntNum() * 1.f));
+          }
+          for (size_t k = 0; k < (2 * this->cfg_->CpLen()); k++) {
+            tx_symbol[2 * this->cfg_->OfdmTxZeroPrefix() + k] =
+                tx_symbol[2 * (this->cfg_->OfdmTxZeroPrefix() +
+                               this->cfg_->OfdmCaNum())];
+          }
+
+          const size_t tx_zero_postfix_offset =
+              2 * (this->cfg_->OfdmTxZeroPrefix() + this->cfg_->CpLen() +
+                   this->cfg_->OfdmCaNum());
+          std::memset(tx_symbol + tx_zero_postfix_offset, 0,
+                      sizeof(short) * 2 * this->cfg_->OfdmTxZeroPostfix());
+        }
+      }
+
+      for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
+        short* ptr = dl_tx_data[i];
+        std::fwrite(ptr,
+                    this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum() * 2,
+                    sizeof(short), fp_dl_tx);
+      }
+    }
   }
 
-  csi_matrices.Free();
+  std::fclose(fp_rx);
+  std::fclose(fp_dl_tx);
+
+  // csi_matrices.Free();
   tx_data_all_symbols.Free();
   rx_data_all_symbols.Free();
   ue_specific_pilot.Free();
   delete[] scrambler_buffer;
+  if (this->cfg_->Frame().NumDLSyms() > 0) {
+    /* Clean Up memory */
+    dl_mod_data.Free();
+    precoder.Free();
+    dl_tx_data.Free();
+    dl_mod_data.Free();
+  }
 }

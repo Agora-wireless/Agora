@@ -8,6 +8,7 @@
 
 #include <string>
 
+#include "channel.h"
 #include "config.h"
 #include "utils_ldpc.h"
 
@@ -27,13 +28,7 @@ class DataGenerator {
   };
 
   explicit DataGenerator(Config* cfg, uint64_t seed = 0,
-                         Profile profile = Profile::kRandom)
-      : cfg_(cfg), profile_(profile) {
-    if (seed != 0) {
-      fast_rand_.seed_ = seed;
-    }
-  }
-
+                         Profile profile = Profile::kRandom);
   void DoDataGeneration(const std::string& directory);
 
   /**
@@ -165,6 +160,7 @@ class DataGenerator {
   }
 
  private:
+  std::unique_ptr<Channel> channel_;
   FastRand fast_rand_;     // A fast random number generator
   Config* cfg_;            // The global Agora config
   const Profile profile_;  // The pattern of the input byte sequence

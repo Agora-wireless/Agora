@@ -228,7 +228,8 @@ include_directories(
   src/agora/txrx/
   src/client/
   /usr/include/mkl/
-  src/data_generator)
+  src/data_generator
+  simulator/)
 
 include_directories(SYSTEM src/third_party src/third_party/nlohmann/single_include)
 
@@ -250,7 +251,8 @@ set(COMMON_SOURCES
   src/common/scrambler.cc
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc
-  src/encoder/iobuffer.cc)
+  src/encoder/iobuffer.cc
+  simulator/channel.cc)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(AGORA_SOURCES 
@@ -343,7 +345,6 @@ target_link_libraries(sim ${COMMON_LIBS})
 add_executable(chsim
   simulator/chsim_main.cc
   simulator/channel_sim.cc
-  simulator/channel.cc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(chsim ${COMMON_LIBS})
 
@@ -370,7 +371,8 @@ set(LDPC_TESTS test_ldpc test_ldpc_mod test_ldpc_baseband)
 foreach(test_name IN LISTS LDPC_TESTS)
   add_executable(${test_name}
     test/compute_kernels/ldpc/${test_name}.cc
-    $<TARGET_OBJECTS:common_sources_lib>)
+    $<TARGET_OBJECTS:common_sources_lib>
+    src/data_generator/data_generator.cc)
   # Unit tests should pass without memory errors
   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
 

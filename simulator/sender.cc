@@ -43,7 +43,10 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
       enable_slow_start_(enable_slow_start),
       core_offset_(core_offset),
       inter_frame_delay_(inter_frame_delay),
-      ticks_inter_frame_(inter_frame_delay_ * ticks_per_usec_) {
+      ticks_inter_frame_(inter_frame_delay_ * ticks_per_usec_),
+      multi_frame_iq_data_short_(
+          kNumGeneratedFrames, cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum(),
+          (cfg_->CpLen() + cfg_->OfdmCaNum()) * 2) {
   if (frame_duration == 0) {
     frame_duration_ =
         (cfg->Frame().NumTotalSyms() * cfg->SampsPerSymbol() * 1000000ul) /
@@ -70,9 +73,10 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     i = new size_t[cfg->Frame().NumTotalSyms()]();
   }
 
-  InitIqFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)) +
-                 "/data/LDPC_rx_data_" + std::to_string(cfg->OfdmCaNum()) +
-                 "_ant" + std::to_string(cfg->BsAntNum()) + ".bin");
+  InitMultiFrameIqFromFile(std::string(TOSTRING(PROJECT_DIRECTORY)) +
+                           "/data/LDPC_rx_data_" +
+                           std::to_string(cfg->OfdmCaNum()) + "_ant" +
+                           std::to_string(cfg->BsAntNum()) + ".bin");
 
   task_ptok_ =
       static_cast<moodycamel::ProducerToken**>(Agora_memory::PaddedAlignedAlloc(
@@ -147,7 +151,6 @@ Sender::~Sender() {
     thread.join();
   }
 
-  iq_data_short_.Free();
   for (auto& i : packet_count_per_symbol_) {
     delete[] i;
   }
@@ -401,7 +404,9 @@ void* Sender::WorkerThread(int tid) {
         pkt->ant_id_ = tag.ant_id_ - ant_num_per_cell * (pkt->cell_id_);
         std::memcpy(
             pkt->data_,
-            iq_data_short_[(pkt->symbol_id_ * cfg_->BsAntNum()) + tag.ant_id_],
+            multi_frame_iq_data_short_[pkt->frame_id_ % kNumGeneratedFrames]
+                                      [(pkt->symbol_id_ * cfg_->BsAntNum()) +
+                                       tag.ant_id_],
             (cfg_->CpLen() + cfg_->OfdmCaNum()) * (kUse12BitIQ ? 3 : 4));
         if (cfg_->FftInRru() == true) {
           RunFft(pkt, fft_inout, mkl_handle);
@@ -482,47 +487,46 @@ uint64_t Sender::GetTicksForFrame(size_t frame_id) const {
   }
 }
 
-void Sender::InitIqFromFile(const std::string& filename) {
+void Sender::InitMultiFrameIqFromFile(const std::string& filename) {
   const size_t packets_per_frame =
       cfg_->Frame().NumTotalSyms() * cfg_->BsAntNum();
-  iq_data_short_.Calloc(packets_per_frame,
-                        (cfg_->CpLen() + cfg_->OfdmCaNum()) * 2,
-                        Agora_memory::Alignment_t::kAlign64);
 
-  Table<float> iq_data_float;
-  iq_data_float.Calloc(packets_per_frame,
-                       (cfg_->CpLen() + cfg_->OfdmCaNum()) * 2,
-                       Agora_memory::Alignment_t::kAlign64);
+  PtrGrid<kNumGeneratedFrames, kMaxSymbols * kMaxAntennas, float> iq_data_float(
+      kNumGeneratedFrames, packets_per_frame,
+      (cfg_->CpLen() + cfg_->OfdmCaNum()) * 2);
 
   FILE* fp = std::fopen(filename.c_str(), "rb");
   RtAssert(fp != nullptr, "Failed to open IQ data file");
 
-  for (size_t i = 0; i < packets_per_frame; i++) {
-    const size_t expected_count = (cfg_->CpLen() + cfg_->OfdmCaNum()) * 2;
-    const size_t actual_count =
-        std::fread(iq_data_float[i], sizeof(float), expected_count, fp);
-    if (expected_count != actual_count) {
-      std::fprintf(
-          stderr,
-          "Sender: Failed to read IQ data file %s. Packet %zu: expected "
-          "%zu I/Q samples but read %zu. Errno %s\n",
-          filename.c_str(), i, expected_count, actual_count, strerror(errno));
-      throw std::runtime_error("Sender: Failed to read IQ data file");
-    }
-    if (kUse12BitIQ) {
-      // Adapt 32-bit IQ samples to 24-bit to reduce network throughput
-      ConvertFloatTo12bitIq(iq_data_float[i],
-                            reinterpret_cast<uint8_t*>(iq_data_short_[i]),
-                            expected_count);
-    } else {
-      for (size_t j = 0; j < expected_count; j++) {
-        iq_data_short_[i][j] =
-            static_cast<unsigned short>(iq_data_float[i][j] * 32768);
+  for (size_t frame_id = 0; frame_id < kNumGeneratedFrames; frame_id++) {
+    for (size_t i = 0; i < packets_per_frame; i++) {
+      const size_t expected_count = (cfg_->CpLen() + cfg_->OfdmCaNum()) * 2;
+      const size_t actual_count = std::fread(iq_data_float[frame_id][i],
+                                             sizeof(float), expected_count, fp);
+      if (expected_count != actual_count) {
+        std::fprintf(
+            stderr,
+            "Sender: Failed to read IQ data file %s. Packet %zu: expected "
+            "%zu I/Q samples but read %zu. Errno %s\n",
+            filename.c_str(), i, expected_count, actual_count, strerror(errno));
+        throw std::runtime_error("Sender: Failed to read IQ data file");
+      }
+      if (kUse12BitIQ) {
+        // Adapt 32-bit IQ samples to 24-bit to reduce network throughput
+        ConvertFloatTo12bitIq(
+            iq_data_float[frame_id][i],
+            reinterpret_cast<uint8_t*>(multi_frame_iq_data_short_[frame_id][i]),
+            expected_count);
+      } else {
+        for (size_t j = 0; j < expected_count; j++) {
+          multi_frame_iq_data_short_[frame_id][i][j] =
+              static_cast<unsigned short>(iq_data_float[frame_id][i][j] *
+                                          32768);
+        }
       }
     }
   }
   std::fclose(fp);
-  iq_data_float.Free();
 }
 
 void Sender::CreateWorkerThreads(size_t num_workers) {

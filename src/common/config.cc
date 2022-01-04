@@ -395,9 +395,6 @@ Config::Config(const std::string& jsonfile)
   fft_block_size_ = std::max(fft_block_size_, num_channels_);
   encode_block_size_ = tdd_conf.value("encode_block_size", 1);
 
-  noise_level_ = tdd_conf.value("noise_level", 0.03);  // default: 30 dB
-  MLPD_SYMBOL("Noise level: %.2f\n", noise_level_);
-
   // LDPC Coding configurations
   uint16_t base_graph = tdd_conf.value("base_graph", 1);
   uint16_t zc = tdd_conf.value("Zc", 72);
@@ -438,6 +435,8 @@ Config::Config(const std::string& jsonfile)
       ldpc_config_.NumRows());
 
   fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
+  channel_snr_ = tdd_conf.value("channel_snr", 40);
+  channel_type_ = tdd_conf.value("channel_type", "RAYLEIGH");
 
   samps_per_symbol_ =
       ofdm_tx_zero_prefix_ + ofdm_ca_num_ + cp_len_ + ofdm_tx_zero_postfix_;
@@ -478,7 +477,7 @@ Config::Config(const std::string& jsonfile)
       "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
       "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
       "frame time %.3f usec \nUplink Max Mac data tp (Mbps) %.3f \nDownlink "
-      "Max Mac data tp (Mbps) %.3f \n",
+      "Max Mac data tp (Mbps) %.3f \nChannel model %s, SNR: %.2f\n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, modulation_.c_str(),
       ldpc_config_.NumBlocksInSymbol(), num_bytes_per_cb_,
@@ -488,7 +487,8 @@ Config::Config(const std::string& jsonfile)
       (ul_mac_data_bytes_num_perframe_ * 8.0f) /
           (this->GetFrameDurationSec() * 1e6),
       (dl_mac_data_bytes_num_perframe_ * 8.0f) /
-          (this->GetFrameDurationSec() * 1e6));
+          (this->GetFrameDurationSec() * 1e6),
+      channel_type_.c_str(), channel_snr_);
 }
 
 void Config::GenData() {

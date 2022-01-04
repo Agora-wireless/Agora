@@ -6,8 +6,18 @@
 
 #include <utility>
 
+#include "logger.h"
+
 static constexpr bool kPrintChannelOutput = false;
 static constexpr bool kPrintSNRCheck = false;
+static constexpr bool kPrintCSIFromFile = false;
+
+// static float RandFloatFromShort(float min, float max) {
+//   float rand_val = ((float(rand()) / float(RAND_MAX)) * (max - min)) + min;
+//   auto rand_val_ushort = static_cast<short>(rand_val * 32768);
+//   rand_val = (float)rand_val_ushort / 32768;
+//   return rand_val;
+// }
 
 Channel::Channel(const Config* const config_bs, const Config* const config_ue,
                  std::string& in_channel_type, double in_channel_snr)
@@ -25,8 +35,31 @@ Channel::Channel(const Config* const config_bs, const Config* const config_ue,
     chan_model_ = kRayleigh;
   } else if (sim_chan_model_ == "RAN_3GPP") {
     chan_model_ = kRan3Gpp;
-    printf("3GPP Model in progress, setting to RAYLEIGH channel \n");
-    chan_model_ = kRayleigh;
+    csi_matrices_ = arma::cx_fcube(ue_ant_, bs_ant_, kNumStatsFrames);
+    const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    const std::string filename_csi = cur_directory + "/data/H_" +
+                                     std::to_string(bs_ant_) + "x" +
+                                     std::to_string(ue_ant_) + ".bin";
+    FILE* fp = std::fopen(filename_csi.c_str(), "rb");
+    const size_t expected_count = bs_ant_ * ue_ant_ * 2;
+    RtAssert(fp != nullptr, "Failed to open CSI data file");
+    for (size_t i = 0; i < kNumStatsFrames; i++) {
+      const size_t actual_count = std::fread(csi_matrices_.slice(i).memptr(),
+                                             sizeof(float), expected_count, fp);
+      if (expected_count != actual_count) {
+        std::fprintf(stderr,
+                     "ChannelSim: Failed to read CSI data file %s. Time slice "
+                     "%zu: expected "
+                     "%zu I/Q samples but read %zu. Errno %s\n",
+                     filename_csi.c_str(), i, expected_count, actual_count,
+                     strerror(errno));
+        throw std::runtime_error("Sender: Failed to read IQ data file");
+      }
+      if (kPrintCSIFromFile) {
+        std::cout << "CSI slice: " << i << std::endl;
+        csi_matrices_.slice(i).print();
+      }
+    }
   } else {
     chan_model_ = kAwgn;
   }
@@ -37,8 +70,8 @@ Channel::~Channel() = default;
 void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
                         const bool is_downlink, const bool is_newChan) {
   arma::cx_fmat fmat_h;
-
-  if (is_newChan) {
+  bool gen_new_channel = is_newChan or h_.is_empty();
+  if (gen_new_channel) {
     switch (chan_model_) {
       case kAwgn: {
         arma::fmat rmat(ue_ant_, bs_ant_, arma::fill::ones);
@@ -54,12 +87,16 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
           arma::fmat imat(ue_ant_, bs_ant_, arma::fill::randn);
           h_ = arma::cx_fmat(rmat, imat);
           h_ = (1 / sqrt(2)) * h_;
+          // h_ = h_ / abs(h_).max();
           // H = H / abs(H).max();
         }
         break;
 
       case kRan3Gpp:
-        Lte3gpp(fmat_src, fmat_dst);
+        h_ = csi_matrices_.slice(time_slice_id_);
+        time_slice_id_++;
+        if (time_slice_id_ == kNumStatsFrames) time_slice_id_ = 0;
+        // Lte3gpp(fmat_src, fmat_dst);
         break;
     }
   }
@@ -70,14 +107,15 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
   }
 
   // Add noise
-  Awgn(fmat_h, fmat_dst);
+  // fmat_dst = fmat_h;
+  AwgnNoise(fmat_h, fmat_dst);
 
-  if (kPrintChannelOutput) {
+  if (kPrintChannelOutput and gen_new_channel) {
     Utils::PrintMat(h_, "H");
   }
 }
 
-void Channel::Awgn(const arma::cx_fmat& src, arma::cx_fmat& dst) const {
+void Channel::AwgnNoise(const arma::cx_fmat& src, arma::cx_fmat& dst) const {
   if (channel_snr_db_ < 120.0f) {
     const int n_row = src.n_rows;
     const int n_col = src.n_cols;

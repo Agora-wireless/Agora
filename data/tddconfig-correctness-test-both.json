@@ -13,5 +13,6 @@
   "worker_thread_num": 1,
   "socket_thread_num": 1,
   "frames_to_test": 1,
-  "noise_level": 0.01
+  "channel_snr": 40,
+  "channel_type": "RAYLEIGH"
 }

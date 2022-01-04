@@ -31,9 +31,11 @@ class Channel {
   void ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& mat_dst,
                  const bool is_downlink, const bool is_newChan);
 
+  arma::cx_fmat GetCurrentCSI() { return h_; }
+
   // Additive White Gaussian Noise. Dimensions of src: ( bscfg->sampsPerSymbol,
   // uecfg->UE_ANT_NUM )
-  void Awgn(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst) const;
+  void AwgnNoise(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst) const;
 
   /*
    * From "Study on 3D-channel model for Elevation Beamforming
@@ -62,6 +64,8 @@ class Channel {
   enum ChanModel { kAwgn, kRayleigh, kRan3Gpp } chan_model_;
 
   arma::cx_fmat h_;
+  arma::cx_fcube csi_matrices_;
+  size_t time_slice_id_ = 0;
 };
 
 #endif  // CHANNEL_H_

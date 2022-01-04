@@ -17,6 +17,8 @@
 // is the frame window that we track in Agora.
 static constexpr size_t kFrameWnd = 40;
 
+static constexpr size_t kNumGeneratedFrames = 1;
+
 #define TX_FRAME_DELTA 8
 #define SETTLE_TIME_MS 1
 

@@ -22,7 +22,8 @@ DEFINE_string(bs_conf_file,
 DEFINE_string(ue_conf_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ue.json",
               "UE Config filename");
-DEFINE_string(chan_model, "RAYLEIGH", "Simulator Channel Type: RAYLEIGH/AWGN");
+DEFINE_string(chan_model, "RAYLEIGH",
+              "Simulator Channel Type: RAYLEIGH/AWGN/RAN_3GPP");
 DEFINE_double(chan_snr, 20.0, "Signal-to-Noise Ratio");
 
 int main(int argc, char* argv[]) {

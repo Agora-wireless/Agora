@@ -81,6 +81,8 @@ void PhyStats::PrintPhyStats() {
   }
 
   if (num_rx_symbols_ > 0) {
+    size_t total_bit_errors_all_ues = 0;
+    size_t total_bits_all_ues = 0;
     for (size_t ue_id = 0; ue_id < this->config_->UeAntNum(); ue_id++) {
       size_t total_decoded_bits(0);
       size_t total_bit_errors(0);
@@ -93,6 +95,8 @@ void PhyStats::PrintPhyStats() {
         total_decoded_blocks += decoded_blocks_count_[ue_id][i];
         total_block_errors += block_error_count_[ue_id][i];
       }
+      total_bit_errors_all_ues += total_bit_errors;
+      total_bits_all_ues += total_decoded_bits;
       std::cout << "UE " << ue_id << ": " << tx_type << " bit errors (BER) "
                 << total_bit_errors << "/" << total_decoded_bits << "("
                 << 1.0 * total_bit_errors / total_decoded_bits
@@ -101,6 +105,10 @@ void PhyStats::PrintPhyStats() {
                 << 1.0 * total_block_errors / total_decoded_blocks << ")"
                 << std::endl;
     }
+    std::cout << "Average BER: " << total_bit_errors_all_ues << "/"
+              << total_bits_all_ues << "("
+              << 1.0 * total_bit_errors_all_ues / total_bits_all_ues << ")"
+              << std::endl;
   }
 }
 

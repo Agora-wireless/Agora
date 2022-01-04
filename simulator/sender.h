@@ -81,6 +81,8 @@ class Sender {
    */
   void InitIqFromFile(const std::string& filename);
 
+  void InitMultiFrameIqFromFile(const std::string& filename);
+
   // Get number of CPU ticks for a symbol given a frame index
   uint64_t GetTicksForFrame(size_t frame_id) const;
   size_t GetMaxSymbolId() const;
@@ -132,9 +134,11 @@ class Sender {
       moodycamel::ConcurrentQueue<size_t>(1024);
   moodycamel::ProducerToken** task_ptok_;
 
-  // First dimension: symbol_num_perframe * BS_ANT_NUM
-  // Second dimension: (CP_LEN + OFDM_CA_NUM) * 2
-  Table<unsigned short> iq_data_short_;
+  // First dimension: kNumGeneratedFrames
+  // Second dimension: symbol_num_perframe * BS_ANT_NUM
+  // Third dimension: (CP_LEN + OFDM_CA_NUM) * 2
+  PtrGrid<kNumGeneratedFrames, kMaxSymbols * kMaxAntennas, unsigned short>
+      multi_frame_iq_data_short_;
 
   // Number of packets transmitted for each symbol in a frame
   size_t* packet_count_per_symbol_[kFrameWnd];

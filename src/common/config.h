@@ -183,9 +183,10 @@ class Config {
   inline int UeRruPort() const { return this->ue_rru_port_; }
 
   inline size_t FramesToTest() const { return this->frames_to_test_; }
-  inline float NoiseLevel() const { return this->noise_level_; }
   inline size_t NumBytesPerCb() const { return this->num_bytes_per_cb_; }
   inline bool FftInRru() const { return this->fft_in_rru_; }
+  inline double ChannelSNR() const { return this->channel_snr_; }
+  inline std::string ChannelType() const { return this->channel_type_; }
 
   inline uint16_t DpdkNumPorts() const { return this->dpdk_num_ports_; }
   inline uint16_t DpdkPortOffset() const { return this->dpdk_port_offset_; }
@@ -650,11 +651,13 @@ class Config {
   // Size of tranport block given by upper layer
   size_t transport_block_size_;
 
-  float noise_level_;
-
   // Number of bytes per code block
   size_t num_bytes_per_cb_;
 
   bool fft_in_rru_;  // If true, the RRU does FFT instead of Agora
+
+  double channel_snr_;  // SNR of channels
+  // Type of channel model (RAYLEIGH/AWGN/RAN_3GPP)
+  std::string channel_type_;
 };
 #endif /* CONFIG_HPP_ */
