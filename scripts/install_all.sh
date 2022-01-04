@@ -15,11 +15,11 @@ wget https://registrationcenter-download.intel.com/akdlm/irc_nas/18211/l_HPCKit_
 bash l_HPCKit_p_2021.4.0.3347.sh -a --silent --eula accept --components intel.oneapi.lin.dpcpp-cpp-compiler-pro --install-dir /users/junzhig/project/intel/oneapi/
 rm l_BaseKit_p_2021.4.0.3422.sh l_HPCKit_p_2021.4.0.3347.sh
 echo "source ~/project/intel/oneapi/setvars.sh" >> ~/.bashrc
+source ~/project/intel/oneapi/setvars.sh
 
 # Install FlexRAN SDK
 echocyan "Install FlexRAN SDK"
 cd ${PROJECT_ROOT}/Agora
-echocyan "Current DIR is $(pwd)"
 sudo cp -r deps/FlexRAN-FEC-SDK-19-04 /opt/
 sudo chmod 777 /opt/FlexRAN-FEC-SDK-19-04
 
@@ -37,11 +37,13 @@ cd rdma-core
 bash build.sh
 echo "export LIBRARY_PATH=\${LIBRARY_PATH}:~/project/rdma-core/build/lib" >> ~/.bashrc
 echo "export LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:\${LIBRARY_PATH}" >> ~/.bashrc
+LIBRARY_PATH=${LIBRARY_PATH}:~/project/rdma-core/build/lib
+LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LIBRARY_PATH}
 
 # Install DPDK
 echocyan "Install DPDK"
 echo "export RTE_SDK=~/project/dpdk-stable-20.11.3" >> ~/.bashrc
-source ~/.bashrc
+RTE_SDK=~/project/dpdk-stable-20.11.3
 cd ${PROJECT_ROOT}
 wget http://fast.dpdk.org/rel/dpdk-20.11.3.tar.xz
 tar xf dpdk-20.11.3.tar.xz
@@ -56,7 +58,6 @@ DESTDIR=./install ninja install
 echocyan "Build Agora"
 sudo apt-get install -y python3-numpy
 cd ${PROJECT_ROOT}/Agora
-echocyan "Current DIR is $(pwd)"
 mkdir build
 cd build
 cmake ..
