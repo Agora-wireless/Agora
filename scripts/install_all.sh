@@ -37,13 +37,13 @@ cd rdma-core
 bash build.sh
 echo "export LIBRARY_PATH=\${LIBRARY_PATH}:~/project/rdma-core/build/lib" >> ~/.bashrc
 echo "export LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:\${LIBRARY_PATH}" >> ~/.bashrc
-LIBRARY_PATH=${LIBRARY_PATH}:~/project/rdma-core/build/lib
-LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LIBRARY_PATH}
+export LIBRARY_PATH=${LIBRARY_PATH}:~/project/rdma-core/build/lib
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LIBRARY_PATH}
 
 # Install DPDK
 echocyan "Install DPDK"
 echo "export RTE_SDK=~/project/dpdk-stable-20.11.3" >> ~/.bashrc
-RTE_SDK=~/project/dpdk-stable-20.11.3
+export RTE_SDK=~/project/dpdk-stable-20.11.3
 cd ${PROJECT_ROOT}
 wget http://fast.dpdk.org/rel/dpdk-20.11.3.tar.xz
 tar xf dpdk-20.11.3.tar.xz
