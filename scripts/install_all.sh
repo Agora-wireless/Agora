@@ -1,6 +1,7 @@
 #! /bin/bash
 
 source $(dirname $0)/utils.sh
+source $(dirname $0)/ubuntu.sh
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 PROJECT_ROOT=~/project
@@ -25,9 +26,7 @@ sudo chmod 777 /opt/FlexRAN-FEC-SDK-19-04
 # Install meson
 echocyan "Install meson"
 sudo apt-get install -y python3-pip
-pip3 install --user meson
-echo "export PATH=\${PATH}:~/.local/bin" >> ~/.bashrc
-source ~/.bashrc
+sudo pip3 install meson
 
 # Install rdma-core
 echocyan "Install rdma-core"
@@ -41,7 +40,7 @@ echo "export LD_LIBRARY_PATH=\${LD_LIBRARY_PATH}:\${LIBRARY_PATH}" >> ~/.bashrc
 
 # Install DPDK
 echocyan "Install DPDK"
-echo "export RTE_SDK=~/project/downloads/dpdk-stable-20.11.3" >> ~/.bashrc
+echo "export RTE_SDK=~/project/dpdk-stable-20.11.3" >> ~/.bashrc
 source ~/.bashrc
 cd ${PROJECT_ROOT}
 wget http://fast.dpdk.org/rel/dpdk-20.11.3.tar.xz
