@@ -56,7 +56,7 @@ DESTDIR=./install ninja install
 
 # Build Agora
 echocyan "Build Agora"
-sudo apt-get install -y python3-numpy
+sudo apt-get install -y python3-numpy jq
 cd ${PROJECT_ROOT}/Agora
 mkdir build
 cd build
