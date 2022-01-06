@@ -25,10 +25,10 @@ PacketTxRxRadio::PacketTxRxRadio(
 
 PacketTxRxRadio::~PacketTxRxRadio() {
   cfg_->Running(false);
-  radio_config_->RadioStop();
   for (auto& worker_threads : worker_threads_) {
     worker_threads->Stop();
   }
+  radio_config_->RadioStop();
   radio_config_.reset();
 }
 

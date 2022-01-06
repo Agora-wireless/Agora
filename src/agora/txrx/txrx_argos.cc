@@ -317,21 +317,25 @@ void PacketTXRX::TxBeaconHW(size_t frame_id, size_t radio_id, long long time0) {
 
 void PacketTXRX::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
                                           long long time0) {
-  size_t cell_id = cfg_->CellId().at(radio_id);
-  std::vector<std::complex<int16_t>> zeros(cfg_->SampsPerSymbol(),
-                                           std::complex<int16_t>(0, 0));
+  const size_t cell_id = cfg_->CellId().at(radio_id);
+  const std::vector<std::complex<int16_t>> zeros(cfg_->SampsPerSymbol(),
+                                                 std::complex<int16_t>(0, 0));
   // Transmit downlink calibration (array to ref) pilot
   std::vector<void*> caltxbuf(cfg_->NumChannels());
+
+  //Check to see if this is the cal symbol?
   for (size_t s = 0; s < cfg_->RadioPerGroup(); s++) {
     if (radio_id != cfg_->RefRadio(cell_id)) {
       bool calib_turn = (frame_id % cfg_->RadioGroupNum() ==
                              radio_id / cfg_->RadioPerGroup() &&
                          s == radio_id % cfg_->RadioPerGroup());
+      // Why is this here !!!!!!!!! ?????????? (each channel has its own symbol)
+      // Antennas per group / DL Cal Sumbols
       for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
         caltxbuf.at(ch) = calib_turn ? cfg_->PilotCi16().data() : zeros.data();
-        if (cfg_->NumChannels() > 1) {
-          caltxbuf.at(1 - ch) = zeros.data();
-        }
+        //if (cfg_->NumChannels() > 1) {
+        //  caltxbuf.at(1 - ch) = zeros.data();
+        //}
         long long frame_time = 0;
         if (cfg_->HwFramer() == false) {
           frame_time =
@@ -345,6 +349,7 @@ void PacketTXRX::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
               (cfg_->Frame().GetDLCalSymbol(s * cfg_->NumChannels() + ch)
                << 16);
         }
+        //Calling radio tx for all channels?
         radioconfig_->RadioTx(radio_id, caltxbuf.data(), 1, frame_time);
       }
     } else {
@@ -415,7 +420,7 @@ size_t PacketTXRX::DequeueSendArgos(int tid, long long time0) {
           this->TxReciprocityCalibPilots(frame_id, radio_id, time0);
         }
       }
-      std::vector<void*> txbuf(cfg_->NumChannels());
+      std::vector<void*> txbuf(cfg_->NumChannels(), nullptr);
       if (kDebugDownlink == true) {
         std::vector<std::complex<int16_t>> zeros(cfg_->SampsPerSymbol());
         for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {

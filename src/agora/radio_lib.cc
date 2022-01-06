@@ -534,7 +534,7 @@ void RadioConfig::RadioTx(void** buffs) {
   }
 }
 
-int RadioConfig::RadioTx(size_t r /*radio id*/, void** buffs, int flags,
+int RadioConfig::RadioTx(size_t radio_id, const void* const* buffs, int flags,
                          long long& frameTime) {
   int tx_flags = 0;
   if (flags == 1) {
@@ -546,26 +546,40 @@ int RadioConfig::RadioTx(size_t r /*radio id*/, void** buffs, int flags,
 
   int w;
   if (cfg_->HwFramer() == true) {
-    w = ba_stn_.at(r)->writeStream(this->tx_streams_[r], buffs,
-                                   cfg_->SampsPerSymbol(), tx_flags, frameTime,
-                                   1000000);
+    w = ba_stn_.at(radio_id)->writeStream(tx_streams_.at(radio_id), buffs,
+                                          cfg_->SampsPerSymbol(), tx_flags,
+                                          frameTime, 1000000);
   } else {
     // For UHD device xmit from host using frameTimeNs
     long long frame_time_ns = SoapySDR::ticksToTimeNs(frameTime, cfg_->Rate());
-    w = ba_stn_.at(r)->writeStream(this->tx_streams_[r], buffs,
-                                   cfg_->SampsPerSymbol(), tx_flags,
-                                   frame_time_ns, 1000000);
+    w = ba_stn_.at(radio_id)->writeStream(tx_streams_.at(radio_id), buffs,
+                                          cfg_->SampsPerSymbol(), tx_flags,
+                                          frame_time_ns, 1000000);
   }
   if (kDebugRadioTX) {
     size_t chan_mask;
     long timeout_us(0);
     int status_flag = 0;
-    int s = ba_stn_.at(r)->readStreamStatus(this->tx_streams_[r], chan_mask,
-                                            status_flag, frameTime, timeout_us);
-    std::cout << "radio " << r << " tx returned " << w << " and status " << s
-              << " when flags was " << flags << std::endl;
+    int s = ba_stn_.at(radio_id)->readStreamStatus(tx_streams_.at(radio_id),
+                                                   chan_mask, status_flag,
+                                                   frameTime, timeout_us);
+    std::cout << "radio " << radio_id << " tx returned " << w << " and status "
+              << s << " when flags was " << flags << std::endl;
   }
   return w;
+}
+
+int RadioConfig::RadioTx(
+    size_t radio_id,
+    const std::vector<std::vector<std::complex<int16_t>>>& tx_data, int flags,
+    long long& frameTime)
+
+{
+  std::vector<const void*> buffs(tx_data.size());
+  for (size_t i = 0; i < tx_data.size(); i++) {
+    buffs.at(i) = tx_data.at(i).data();
+  }
+  return RadioTx(radio_id, buffs.data(), flags, frameTime);
 }
 
 void RadioConfig::RadioRx(void** buffs) {
@@ -579,14 +593,13 @@ void RadioConfig::RadioRx(void** buffs) {
   }
 }
 
-int RadioConfig::RadioRx(size_t r /*radio id*/, void** buffs,
-                         long long& frameTime) {
+int RadioConfig::RadioRx(size_t radio_id, void** buffs, long long& frameTime) {
   int flags = 0;
-  if (r < this->radio_num_) {
+  if (radio_id < this->radio_num_) {
     long long frame_time_ns = 0;
-    int ret = ba_stn_.at(r)->readStream(this->rx_streams_[r], buffs,
-                                        cfg_->SampsPerSymbol(), flags,
-                                        frame_time_ns, 1000000);
+    int ret = ba_stn_.at(radio_id)->readStream(rx_streams_.at(radio_id), buffs,
+                                               cfg_->SampsPerSymbol(), flags,
+                                               frame_time_ns, 1000000);
 
     if (cfg_->HwFramer() == true) {
       // SoapySDR::timeNsToTicks(frameTimeNs, _rate);
@@ -598,16 +611,26 @@ int RadioConfig::RadioRx(size_t r /*radio id*/, void** buffs,
 
     if (kDebugRadioRX) {
       if (ret != (int)cfg_->SampsPerSymbol()) {
-        std::cout << "invalid return " << ret << " from radio " << r
+        std::cout << "invalid return " << ret << " from radio " << radio_id
                   << std::endl;
       } else {
-        std::cout << "radio " << r << "received " << ret << std::endl;
+        std::cout << "radio " << radio_id << "received " << ret << std::endl;
       }
     }
     return ret;
   }
-  std::cout << "invalid radio id " << r << std::endl;
+  std::cout << "invalid radio id " << radio_id << std::endl;
   return 0;
+}
+
+int RadioConfig::RadioRx(
+    size_t radio_id, std::vector<std::vector<std::complex<int16_t>>>& rx_data,
+    long long& frameTime) {
+  std::vector<void*> buffs(rx_data.size());
+  for (size_t i = 0; i < rx_data.size(); i++) {
+    buffs.at(i) = rx_data.at(i).data();
+  }
+  return RadioRx(radio_id, buffs.data(), frameTime);
 }
 
 void RadioConfig::DrainBuffers() {

@@ -108,14 +108,10 @@ class Config {
   inline std::string Channel() const { return this->channel_; }
   inline std::string UeChannel() const { return this->ue_channel_; }
 
+  //Groups for Downlink Recip Cal
   inline size_t AntGroupNum() const { return this->ant_group_num_; }
   inline size_t AntPerGroup() const { return this->ant_per_group_; }
-  inline size_t RadioGroupNum() const {
-    return this->ant_group_num_ / this->num_channels_;
-  }
-  inline size_t RadioPerGroup() const {
-    return this->ant_per_group_ / this->num_channels_;
-  }
+
   inline size_t CoreOffset() const { return this->core_offset_; }
   inline size_t WorkerThreadNum() const { return this->worker_thread_num_; }
   inline size_t SocketThreadNum() const { return this->socket_thread_num_; }

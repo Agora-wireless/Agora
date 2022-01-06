@@ -47,9 +47,11 @@ Agora::Agora(Config* const cfg)
   InitializeDownlinkBuffers();
 
   /* Initialize TXRX threads */
-  packet_tx_rx_ = std::make_unique<PacketTXRX>(
+  packet_tx_rx_ = std::make_unique<PacketTxRx>(
       cfg, cfg->CoreOffset() + 1, &message_queue_,
-      GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_);
+      GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
+      socket_buffer_, socket_buffer_size_ / cfg->PacketLength(),
+      this->stats_->FrameStart(), dl_socket_buffer_);
 
   if (kEnableMac == true) {
     const size_t mac_cpu_core =
@@ -289,11 +291,10 @@ void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
 void Agora::Start() {
   const auto& cfg = this->config_;
 
+  bool start_status =
+      packet_tx_rx_->StartTxRx(calib_dl_buffer_, calib_ul_buffer_);
   // Start packet I/O
-  if (packet_tx_rx_->StartTxRx(socket_buffer_,
-                               socket_buffer_size_ / cfg->PacketLength(),
-                               this->stats_->FrameStart(), dl_socket_buffer_,
-                               calib_dl_buffer_, calib_ul_buffer_) == false) {
+  if (start_status == false) {
     this->Stop();
     return;
   }

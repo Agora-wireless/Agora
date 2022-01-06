@@ -19,25 +19,25 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
     : cfg_(cfg),
       core_offset_(core_offset),
       tx_memory_(reinterpret_cast<std::byte* const>(tx_buffer)),
-      frame_start_(frame_start) {
-  size_t num_worker_threads = cfg->SocketThreadNum();
-  size_t num_ant_per_worker = (cfg->NumAntennas() / num_worker_threads) +
-                              ((cfg->NumAntennas() % num_worker_threads) != 0);
-
-  /// Interface to worker map (using vector because id's are sequential starting at 0)
-  interface_to_worker_.resize(cfg->NumRadios());
+      frame_start_(frame_start),
+      /// Interface to worker map (using vector because id's are sequential starting at 0)
+      interface_to_worker_(cfg->NumRadios(), 0) {
+  const size_t total_antennas = cfg->NumChannels() * cfg->NumRadios();
+  const size_t num_worker_threads = cfg->SocketThreadNum();
+  const size_t num_ant_per_worker =
+      (total_antennas / num_worker_threads) +
+      ((total_antennas % num_worker_threads) != 0);
 
   event_notify_q_ = event_notify_q;
   tx_pending_q_ = tx_pending_q;
   notify_producer_tokens_ = notify_producer_tokens;
   tx_producer_tokens_ = tx_producer_tokens;
 
-  const size_t interfaces_per_worker = num_ant_per_worker / cfg_->NumChannels();
   /// Make sure we can fit each channel in the thread buffer without rollover
   RtAssert((num_ant_per_worker % cfg_->NumChannels()) == 0,
            "Socket threads are misaligned with the number of channels\n");
 
-  size_t min_threads = cfg->NumAntennas() / num_ant_per_worker;
+  size_t min_threads = total_antennas / num_ant_per_worker;
   if (min_threads < num_worker_threads) {
     MLPD_WARN(
         "Using less than requested number of socket worker threads %zu : %zu\n",

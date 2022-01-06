@@ -28,8 +28,15 @@ class RadioConfig {
   void ReadSensors();
   void RadioTx(void** buffs);
   void RadioRx(void** buffs);
-  int RadioTx(size_t /*r*/, void** buffs, int flags, long long& frameTime);
-  int RadioRx(size_t /*r*/, void** buffs, long long& frameTime);
+  int RadioTx(size_t radio_id, const void* const* buffs, int flags,
+              long long& frameTime);
+  int RadioTx(size_t radio_id,
+              const std::vector<std::vector<std::complex<int16_t>>>& tx_data,
+              int flags, long long& frameTime);
+  int RadioRx(size_t radio_id, void** buffs, long long& frameTime);
+  int RadioRx(size_t radio_id,
+              std::vector<std::vector<std::complex<int16_t>>>& rx_data,
+              long long& frameTime);
   bool DoCalib() const { return calib_; }
   void Go();
   arma::cx_float* GetCalibUl() { return init_calib_ul_processed_; }
