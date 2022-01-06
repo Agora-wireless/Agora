@@ -20,18 +20,9 @@
 #include "symbols.h"
 
 namespace StoreData {
-size_t StoreRxDataAVX512(complex_float* dst, const complex_float* src,
-                         const Config* const cfg, size_t src_offset);
-size_t StoreRxDataAVX2(complex_float* dst, const complex_float* src,
-                       const Config* const cfg, size_t src_offset);
-size_t StoreRxDataAVXLoop(complex_float* dst, const complex_float* src,
-                          const Config* const cfg, size_t src_offset);
-void StoreRxDataGeneralLoop(complex_float* dst, const complex_float* src,
-                            const Config* const cfg, size_t src_offset,
-                            size_t ant_start);
-void StoreRxDataLoop(complex_float* dst, const complex_float* src,
-                     const Config* const cfg, size_t src_offset,
-                     size_t ant_start);
+void StoreRxDataAVX(complex_float*, const complex_float*, size_t, size_t);
+void StoreRxData(complex_float*, const complex_float*, size_t, size_t);
+void StoreRxDataOrg(complex_float*, const complex_float*, size_t, size_t, size_t);
 };  // namespace StoreData
 
 class DoDemul : public Doer {
