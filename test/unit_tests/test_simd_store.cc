@@ -8,7 +8,7 @@
 #include "gettime.h"
 
 TEST(TestSimdStore, CombinedMethodTest) {
-  Config cfg = Config("../data/bs-ul-sim.json");
+  Config cfg = Config("../data/ul-sim.json");
   for (size_t base_sc_id = 0; base_sc_id < 512; base_sc_id++) {
   for (size_t ant_num = 1; ant_num <= 48; ant_num++) {
     static const size_t memory_size_bytes =
