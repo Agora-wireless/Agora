@@ -185,6 +185,7 @@ void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
   // Must put contiguous channels in same queue
   assert(ceil_events_per_handler % config_->NumChannels() == 0);
 
+  /// \todo !!!!! Should use the packet_txrx class here to enqueue the id's to the correct worker
   std::vector<EventData> events_list(ceil_events_per_handler);
   for (size_t radio_handler = 0; radio_handler < handler_threads;
        radio_handler++) {

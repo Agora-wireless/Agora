@@ -220,14 +220,28 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
   const int rx_status =
       radio_config_->RadioRx(radio_id, samp.data(), frame_time);
 
-  if ((dummy_read == false) &&
-      (rx_status == static_cast<int>(Configuration()->SampsPerSymbol()))) {
+  if ((dummy_read == false) && (rx_status > 0)) {
+    //     (rx_status == static_cast<int>(Configuration()->SampsPerSymbol()))) {
     size_t frame_id = global_frame_id;
     size_t symbol_id = global_symbol_id;
 
     if (Configuration()->HwFramer() == true) {
       frame_id = static_cast<size_t>(frame_time >> 32);
       symbol_id = static_cast<size_t>((frame_time >> 16) & 0xFFFF);
+    }
+
+    if (rx_status != static_cast<int>(Configuration()->SampsPerSymbol())) {
+      MLPD_WARN(
+          "TxRxWorkerArgos[%zu]: Interface %zu | Radio %zu  - Attempted Frame: "
+          "%zu, Symbol: %zu, RX status = %d is not the expected value\n",
+          tid_, interface_id, interface_id + interface_offset_, frame_id,
+          symbol_id, rx_status);
+    } else {
+      MLPD_TRACE(
+          "TxRxWorkerArgos[%zu]: Interface %zu | Radio %zu  - Attempted Frame: "
+          "%zu, Symbol: %zu, RX status = %d is the expected value\n",
+          tid_, interface_id, interface_id + interface_offset_, frame_id,
+          symbol_id, rx_status);
     }
 
     for (size_t ant = 0; ant < ant_ids.size(); ant++) {
@@ -242,10 +256,19 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
       memory_tracking.at(ant) = nullptr;
     }
   } else if (rx_status < 0) {
-    MLPD_ERROR("RX status = %d is less than 0\n", rx_status);
+    MLPD_ERROR(
+        "TxRxWorkerArgos[%zu], Interface %zu | Radio %zu - Rx failure RX "
+        "status = %d is less than 0\n",
+        tid_, interface_id, interface_id + interface_offset_, rx_status);
   } else if (static_cast<size_t>(rx_status) !=
              Configuration()->SampsPerSymbol()) {
-    MLPD_ERROR("RX status = %d is not the expected value\n", rx_status);
+    const size_t rx_frame = static_cast<size_t>(frame_time >> 32);
+    const size_t rx_symbol = static_cast<size_t>((frame_time >> 16) & 0xFFFF);
+    MLPD_ERROR(
+        "TxRxWorkerArgos[%zu]: Interface %zu | Radio %zu  - Attempted Frame: "
+        "%zu, Symbol: %zu, RX status = %d is not the expected value\n",
+        tid_, interface_id, interface_id + interface_offset_, rx_frame,
+        rx_symbol, rx_status);
   }
 
   //Free memory from most recent allocated to latest

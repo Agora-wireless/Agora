@@ -28,6 +28,7 @@ PacketTxRxRadio::~PacketTxRxRadio() {
   for (auto& worker_threads : worker_threads_) {
     worker_threads->Stop();
   }
+  MLPD_INFO("PacketTxRxRadio: radio config stopped\n");
   radio_config_->RadioStop();
   radio_config_.reset();
 }
@@ -35,8 +36,7 @@ PacketTxRxRadio::~PacketTxRxRadio() {
 bool PacketTxRxRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
                                 Table<complex_float>& calib_ul_buffer) {
   MLPD_INFO("PacketTxRxRadio: StartTxRx threads %zu\n", worker_threads_.size());
-
-  bool status = radio_config_->RadioStart();
+  const bool status = radio_config_->RadioStart();
 
   //RadioStart creates the following: radio_config_->GetCalibDl() and radio_config_->GetCalibUl();
   if (cfg_->Frame().NumDLSyms() > 0) {
@@ -59,6 +59,7 @@ bool PacketTxRxRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
       }
       MLPD_INFO("PacketTxRxRadio[%zu] : worker started \n", worker->Id());
     }
+    MLPD_INFO("PacketTxRxRadio : All workers started\n");
     radio_config_->Go();
   }
   return status;
