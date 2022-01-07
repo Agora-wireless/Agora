@@ -32,7 +32,7 @@ class TxRxWorkerSim : public TxRxWorker {
   TxRxWorkerSim() = delete;
   size_t DequeueSend();
   void SendBeacon(size_t frame_id);
-  Packet* RecvEnqueue(RxPacket& rx_placement, size_t interface_id);
+  std::vector<Packet*> RecvEnqueue(size_t interface_id);
 
   //1 for each responsible interface (ie radio)
   //socket for incomming messages (received data)

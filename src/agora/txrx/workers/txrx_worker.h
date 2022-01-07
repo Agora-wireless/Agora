@@ -34,21 +34,28 @@ class TxRxWorker {
 
  protected:
   inline Config* Configuration() { return cfg_; }
+  bool NotifyComplete(EventData& complete_event);
+  std::vector<EventData> GetPendingTxEvents(size_t max_events = 0);
+  RxPacket& GetRxPacket();
+  void ReturnRxPacket(RxPacket& unused_packet);
+  Packet* GetTxPacket(size_t frame, size_t symbol, size_t ant);
 
- private:
-  TxRxWorker() = delete;
-  Config* const cfg_;
-
- protected:
   const size_t tid_;
   const size_t core_offset_;
   const size_t num_interfaces_;
   const size_t interface_offset_;
   const size_t channels_per_interface_;
   const size_t ant_per_cell_;
-
   size_t* const rx_frame_start_;
+  bool running_;
+  bool started_;
 
+ private:
+  TxRxWorker() = delete;
+  Config* const cfg_;
+  std::thread thread_;
+
+  size_t rx_memory_idx_;
   std::vector<RxPacket>& rx_memory_;
   std::byte* const tx_memory_;
 
@@ -58,9 +65,5 @@ class TxRxWorker {
   moodycamel::ProducerToken& tx_producer_token_;
   //local producer of notification messages (used for TX and RX)
   moodycamel::ProducerToken& notify_producer_token_;
-
-  std::thread thread_;
-  bool running_;
-  bool started_;
 };
 #endif  // TXRX_WORKER_H_

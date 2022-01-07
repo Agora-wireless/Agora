@@ -70,7 +70,6 @@ void TxRxWorkerSim::DoTxRx() {
   }
 
   size_t prev_frame_id = SIZE_MAX;
-  size_t rx_slot = 0;
   size_t tx_frame_start = GetTime::Rdtsc();
   size_t tx_frame_id = 0;
   size_t send_time = delay_tsc + tx_frame_start;
@@ -105,21 +104,19 @@ void TxRxWorkerSim::DoTxRx() {
     if (0 == send_result) {
       // receive data
       // Need to get NumChannels data here
-      Packet* pkt = RecvEnqueue(rx_memory_.at(rx_slot), current_interface);
-      if (pkt != nullptr) {
-        rx_slot = (rx_slot + 1) % rx_memory_.size();
-
+      auto rx_packets = RecvEnqueue(current_interface);
+      for (auto& packet : rx_packets) {
         if (kIsWorkerTimingEnabled) {
-          uint32_t frame_id = pkt->frame_id_;
+          uint32_t frame_id = packet->frame_id_;
           if (frame_id != prev_frame_id) {
             rx_frame_start_[frame_id % kNumStatsFrames] = GetTime::Rdtsc();
             prev_frame_id = frame_id;
           }
         }
+      }
 
-        if (++current_interface == num_interfaces_) {
-          current_interface = 0;
-        }
+      if (++current_interface == num_interfaces_) {
+        current_interface = 0;
       }
     }  // end if -1 == send_result
   }    // end while
@@ -133,8 +130,9 @@ void TxRxWorkerSim::SendBeacon(size_t frame_id) {
   auto* pkt = reinterpret_cast<Packet*>(beacon_buffer_.data());
 
   if (kDebugPrintBeacon) {
-    std::printf("TXRX [%zu]: Sending beacon for frame %zu tx delta %f ms\n",
-                tid_, frame_id, time_now - beacon_send_time_);
+    std::printf(
+        "TxRxWorkerSim [%zu]: Sending beacon for frame %zu tx delta %f ms\n",
+        tid_, frame_id, time_now - beacon_send_time_);
   }
   beacon_send_time_ = time_now;
 
@@ -158,28 +156,18 @@ void TxRxWorkerSim::SendBeacon(size_t frame_id) {
   }
 }
 
-Packet* TxRxWorkerSim::RecvEnqueue(RxPacket& rx_placement,
-                                   size_t interface_id) {
+std::vector<Packet*> TxRxWorkerSim::RecvEnqueue(size_t interface_id) {
+  std::vector<Packet*> rx_packets;
   const size_t packet_length = Configuration()->PacketLength();
 
-  // if rx_buffer is full, exit
-  if (rx_placement.Empty() == false) {
-    MLPD_ERROR("PacketTxRx [%zu]: rx_buffer full\n", tid_);
-    Configuration()->Running(false);
-    return (nullptr);
-  }
+  RxPacket& rx_placement = GetRxPacket();
   Packet* pkt = rx_placement.RawPacket();
 
   ssize_t rx_bytes = udp_servers_.at(interface_id)
                          ->Recv(reinterpret_cast<uint8_t*>(pkt), packet_length);
-  if (0 > rx_bytes) {
-    MLPD_ERROR("RecvEnqueue: Udp Recv failed with error\n");
-    throw std::runtime_error("PacketTxRx: recv failed");
-  } else if (rx_bytes == 0) {
-    pkt = nullptr;
-  } else if (static_cast<size_t>(rx_bytes) == packet_length) {
+  if (rx_bytes == static_cast<ssize_t>(packet_length)) {
     if (kDebugPrintInTask) {
-      std::printf("In TXRX thread %zu: Received frame %d, symbol %d, ant %d\n",
+      std::printf("TxRxWorkerSim[%zu]: Received frame %d, symbol %d, ant %d\n",
                   tid_, pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
     }
     if (kDebugMulticell) {
@@ -195,80 +183,65 @@ Packet* TxRxWorkerSim::RecvEnqueue(RxPacket& rx_placement,
           "from the cell %d\n",
           pkt->ant_id_, pkt->cell_id_);
     }
-
     // Push kPacketRX event into the queue.
-    rx_placement.Use();
     EventData rx_message(EventType::kPacketRX, rx_tag_t(rx_placement).tag_);
-    if (event_notify_q_->enqueue(notify_producer_token_, rx_message) == false) {
-      MLPD_ERROR("socket message enqueue failed\n");
-      throw std::runtime_error("PacketTxRx: socket message enqueue failed");
-    }
-  } else {
+    NotifyComplete(rx_message);
+    rx_packets.push_back(pkt);
+  } else if (0 > rx_bytes) {
+    MLPD_ERROR("RecvEnqueue: Udp Recv failed with error\n");
+    throw std::runtime_error("TxRxWorkerSim: recv failed");
+  } else if (0 != rx_bytes) {
     MLPD_ERROR("RecvEnqueue: Udp Recv failed to receive all expected bytes");
     throw std::runtime_error(
         "PacketTxRx::RecvEnqueue: Udp Recv failed to receive all expected "
         "bytes");
+  } else {
+    // Received 0 bytes.  Time to recycle the buffer
+    ReturnRxPacket(rx_placement);
   }
-  return pkt;
+  return rx_packets;
 }
 
 //Function of the TxRx thread
 size_t TxRxWorkerSim::DequeueSend() {
-  const size_t channels_per_interface = Configuration()->NumChannels();
-  const size_t max_dequeue_items = num_interfaces_ * channels_per_interface;
-  std::vector<EventData> events(max_dequeue_items);
+  auto tx_events = GetPendingTxEvents();
 
-  //Single producer ordering in q is preserved
-  const size_t dequeued_items = tx_pending_q_->try_dequeue_bulk_from_producer(
-      tx_producer_token_, events.data(), max_dequeue_items);
-
-  for (size_t item = 0; item < dequeued_items; item++) {
-    EventData& current_event = events.at(item);
-
+  //Process each pending tx event
+  for (const EventData& current_event : tx_events) {
     // std::printf("tx queue length: %d\n", tx_pending_q_->size_approx());
     assert(current_event.event_type_ == EventType::kPacketTX);
 
-    const size_t ant_id = gen_tag_t(current_event.tags_[0u]).ant_id_;
     const size_t frame_id = gen_tag_t(current_event.tags_[0u]).frame_id_;
     const size_t symbol_id = gen_tag_t(current_event.tags_[0u]).symbol_id_;
+    const size_t ant_id = gen_tag_t(current_event.tags_[0u]).ant_id_;
     const size_t interface_id = ant_id / channels_per_interface_;
 
     assert((interface_id >= interface_offset_) &&
            (interface_id <= (num_interfaces_ + interface_offset_)));
 
-    const size_t data_symbol_idx_dl =
-        Configuration()->Frame().GetDLSymbolIdx(symbol_id);
-    const size_t offset = (Configuration()->GetTotalDataSymbolIdxDl(
-                               frame_id, data_symbol_idx_dl) *
-                           Configuration()->BsAntNum()) +
-                          ant_id;
+    auto* pkt = GetTxPacket(frame_id, symbol_id, ant_id);
+    new (pkt) Packet(frame_id, symbol_id,
+                     Configuration()->CellId().at(interface_id), ant_id);
 
     if (kDebugPrintInTask) {
       std::printf(
-          "PacketTxRx:DequeueSend [%zu]: Transmitted frame %zu, symbol %zu, "
-          "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+          "TxRxWorkerSim[%zu]::DequeueSend() Transmitted frame %zu, symbol "
+          "%zu, ant %zu, tag %zu\n",
           tid_, frame_id, symbol_id, ant_id,
-          gen_tag_t(current_event.tags_[0]).tag_, offset,
-          event_notify_q_->size_approx());
+          gen_tag_t(current_event.tags_[0]).tag_);
     }
 
-    auto* pkt = reinterpret_cast<Packet*>(
-        &tx_memory_[offset * Configuration()->DlPacketLength()]);
-    new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
-
-    const size_t local_interface_id = interface_id - interface_offset_;
+    const size_t local_interface_idx = interface_id - interface_offset_;
     // Send data (one OFDM symbol)
-    udp_clients_.at(local_interface_id)
+    udp_clients_.at(local_interface_idx)
         ->Send(Configuration()->BsRruAddr(),
                Configuration()->BsRruPort() + interface_id,
                reinterpret_cast<uint8_t*>(pkt),
                Configuration()->DlPacketLength());
 
-    //Send tx completion event
-    RtAssert(event_notify_q_->enqueue(
-                 notify_producer_token_,
-                 EventData(EventType::kPacketTX, current_event.tags_[0])),
-             "Socket message enqueue failed\n");
+    auto complete_event =
+        EventData(EventType::kPacketTX, current_event.tags_[0]);
+    NotifyComplete(complete_event);
   }
-  return dequeued_items;
+  return tx_events.size();
 }

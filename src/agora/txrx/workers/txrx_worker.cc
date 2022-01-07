@@ -17,35 +17,126 @@ TxRxWorker::TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
                        moodycamel::ProducerToken& notify_producer,
                        std::vector<RxPacket>& rx_memory,
                        std::byte* const tx_memory)
-    : cfg_(config),
-      tid_(tid),
+    : tid_(tid),
       core_offset_(core_offset),
       num_interfaces_(interface_count),
       interface_offset_(interface_offset),
       channels_per_interface_(config->NumChannels()),
       ant_per_cell_(config->BsAntNum() / config->NumCells()),
       rx_frame_start_(rx_frame_start),
+      running_(false),
+      started_(false),
+      cfg_(config),
+      thread_(),
+      rx_memory_idx_(0),
       rx_memory_(rx_memory),
       tx_memory_(tx_memory),
       event_notify_q_(event_notify_q),
       tx_pending_q_(tx_pending_q),
       tx_producer_token_(tx_producer),
-      notify_producer_token_(notify_producer) {
-  running_ = false;
-  started_ = false;
-}
+      notify_producer_token_(notify_producer) {}
 
 TxRxWorker::~TxRxWorker() { Stop(); }
 
 void TxRxWorker::Start() {
-  MLPD_FRAME("TxRxWorker[%zu] starting\n", tid_);
+  MLPD_INFO("TxRxWorker[%zu] starting\n", tid_);
   thread_ = std::thread(&TxRxWorker::DoTxRx, this);
 }
 
 void TxRxWorker::Stop() {
-  MLPD_FRAME("TxRxWorker[%zu] stopping\n", tid_);
+  MLPD_INFO("TxRxWorker[%zu] stopping\n", tid_);
   cfg_->Running(false);
   if (thread_.joinable()) {
     thread_.join();
   }
+}
+
+bool TxRxWorker::NotifyComplete(EventData& complete_event) {
+  auto enqueue_status =
+      event_notify_q_->enqueue(notify_producer_token_, complete_event);
+  if (enqueue_status == false) {
+    std::printf("TxRxWorker[%zu]: socket message enqueue failed\n", tid_);
+    throw std::runtime_error("TxRxWorker: socket message enqueue failed");
+  }
+  return enqueue_status;
+}
+
+std::vector<EventData> TxRxWorker::GetPendingTxEvents(size_t max_events) {
+  size_t max_dequeue_items;
+  if (max_events == 0) {
+    max_dequeue_items = num_interfaces_ * channels_per_interface_;
+  } else {
+    max_dequeue_items = max_events;
+  }
+  std::vector<EventData> tx_events(max_dequeue_items);
+
+  //Single producer ordering in q is preserved
+  const size_t dequeued_items = tx_pending_q_->try_dequeue_bulk_from_producer(
+      tx_producer_token_, tx_events.data(), max_dequeue_items);
+
+  tx_events.resize(dequeued_items);
+  return tx_events;
+}
+
+//Rx memory management
+// This function as implmented is not thread safe
+RxPacket& TxRxWorker::GetRxPacket() {
+  RxPacket& new_packet = rx_memory_.at(rx_memory_idx_);
+
+  // if rx_buffer is full, exit
+  if (new_packet.Empty() == false) {
+    MLPD_ERROR("TxRxWorker [%zu]: rx buffer full, memory overrun\n", tid_);
+    throw std::runtime_error("rx buffer full, memory overrun");
+  }
+  // Mark the packet as used
+  new_packet.Use();
+
+  rx_memory_idx_ = (rx_memory_idx_ + 1);
+  //Round robbin
+  if (rx_memory_idx_ == rx_memory_.size()) {
+    rx_memory_idx_ = 0;
+  }
+  return new_packet;
+}
+
+//Rx memory management
+// Assumes you are returning the last RxPacket obtained by GetRxPacket
+// Could be dangerous if you call this on memory that has been passed to another object
+// This function as implmented is not thread safe
+void TxRxWorker::ReturnRxPacket(RxPacket& unused_packet) {
+  //Decrement the rx_memory_idx
+  if (rx_memory_idx_ == 0) {
+    rx_memory_idx_ = rx_memory_.size() - 1;
+  } else {
+    rx_memory_idx_ = rx_memory_idx_ - 1;
+  }
+  RxPacket& returned_packet = rx_memory_.at(rx_memory_idx_);
+  //Make sure we are returning the correct packet, used for extra error checking
+  if (&returned_packet != &unused_packet) {
+    MLPD_ERROR("TxRxWorker [%zu]: returned memory that wasn't used last\n",
+               tid_);
+    throw std::runtime_error(
+        "TxRxWorker: returned memory that wasn't used last");
+  }
+  // if the returned packet is free, something is wrong
+  if (returned_packet.Empty()) {
+    MLPD_ERROR("TxRxWorker [%zu]: rx buffer returned free memory\n", tid_);
+    throw std::runtime_error("TxRxWorker: rx buffer returned free memory");
+  }
+  // Mark the packet as free
+  returned_packet.Free();
+}
+
+//Returns the location of the tx packet for a given frame / symbol / antenna
+Packet* TxRxWorker::GetTxPacket(size_t frame, size_t symbol, size_t ant) {
+  const size_t data_symbol_idx_dl =
+      Configuration()->Frame().GetDLSymbolIdx(symbol);
+  const size_t offset =
+      (Configuration()->GetTotalDataSymbolIdxDl(frame, data_symbol_idx_dl) *
+       Configuration()->BsAntNum()) +
+      ant;
+
+  auto* pkt = reinterpret_cast<Packet*>(
+      &tx_memory_[offset * Configuration()->DlPacketLength()]);
+  return pkt;
 }

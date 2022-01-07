@@ -31,7 +31,6 @@ TxRxWorkerUsrp::~TxRxWorkerUsrp() {}
 //Main Thread Execution loop
 void TxRxWorkerUsrp::DoTxRx() {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid_);
-  size_t rx_slot = 0;
 
   MLPD_INFO("TxRxWorkerUsrp[%zu] has %zu:%zu total radios %zu\n", tid_,
             interface_offset_, (interface_offset_ + num_interfaces_) - 1,
@@ -88,8 +87,8 @@ void TxRxWorkerUsrp::DoTxRx() {
     // if (-1 != dequeue_send_usrp(tid))
     //   continue;
     // receive data
-    Packet* pkt = RecvEnqueue(local_interface, rx_slot, global_frame_id,
-                              global_symbol_id);
+    std::vector<Packet*> rx_pkts =
+        RecvEnqueue(local_interface, global_frame_id, global_symbol_id);
 
     // Schedule beacon in the future
     if (global_symbol_id == 0) {
@@ -116,13 +115,11 @@ void TxRxWorkerUsrp::DoTxRx() {
       global_frame_id++;
     }
 
-    if (pkt == nullptr) {
+    if (rx_pkts.empty()) {
       continue;
     }
-    rx_slot = (rx_slot + Configuration()->NumChannels()) % rx_memory_.size();
-
     if (kIsWorkerTimingEnabled) {
-      int frame_id = pkt->frame_id_;
+      int frame_id = rx_pkts.front()->frame_id_;
       if (frame_id > prev_frame_id) {
         rx_frame_start_[frame_id % kNumStatsFrames] = GetTime::Rdtsc();
         prev_frame_id = frame_id;
@@ -136,80 +133,64 @@ void TxRxWorkerUsrp::DoTxRx() {
 }
 
 //RX data
-Packet* TxRxWorkerUsrp::RecvEnqueue(size_t radio_id, size_t rx_slot,
-                                    size_t frame_id, size_t symbol_id) {
-  // init samp_buffer for dummy read
-  std::vector<std::complex<int16_t>> samp_buffer0(
-      Configuration()->SampsPerSymbol() *
-          Configuration()->Frame().NumTotalSyms(),
-      0);
-  std::vector<std::complex<int16_t>> samp_buffer1(
-      Configuration()->SampsPerSymbol() *
-          Configuration()->Frame().NumTotalSyms(),
-      0);
-  std::vector<void*> samp_buffer(2);
-  samp_buffer[0] = samp_buffer0.data();
-  if (Configuration()->NumChannels() == 2) {
-    samp_buffer[1] = samp_buffer1.data();
-  }
+std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(size_t radio_id,
+                                                 size_t frame_id,
+                                                 size_t symbol_id) {
+  std::vector<Packet*> rx_packets;
+  std::vector<RxPacket*> memory_tracking;
 
   size_t n_channels = Configuration()->NumChannels();
   std::vector<void*> samp(n_channels);
   for (size_t ch = 0; ch < n_channels; ++ch) {
-    RxPacket& rx = rx_memory_.at(rx_slot + ch);
-    // if rx_buffer is full, exit
-    if (rx.Empty() == false) {
-      std::printf("Receive thread %zu rx_buffer full, offset: %zu\n", tid_,
-                  rx_slot);
-      Configuration()->Running(false);
-      break;
-    }
+    RxPacket& rx = GetRxPacket();
+    memory_tracking.push_back(&rx);
     samp.at(ch) = rx.RawPacket();
   }
 
-  int tmp_ret;
-  if (Configuration()->IsPilot(frame_id, symbol_id) ||
-      Configuration()->IsUplink(frame_id, symbol_id)) {
-    tmp_ret = radio_config_->RadioRx(radio_id, samp.data(), rx_time_bs_);
-  } else {
-    tmp_ret = radio_config_->RadioRx(radio_id, samp_buffer.data(), rx_time_bs_);
+  bool dummy_read = false;
+  if ((Configuration()->IsPilot(frame_id, symbol_id) == false) &&
+      (Configuration()->IsUplink(frame_id, symbol_id) == false)) {
+    dummy_read = true;
   }
+  const int tmp_ret =
+      radio_config_->RadioRx(radio_id, samp.data(), rx_time_bs_);
 
-  if ((Configuration()->Running() == false) || tmp_ret <= 0 ||
-      (!Configuration()->IsPilot(frame_id, symbol_id) &&
-       !Configuration()->IsUplink(frame_id, symbol_id))) {
-    return nullptr;
-  }
-
-  size_t ant_id = radio_id * n_channels;
-  if (Configuration()->IsPilot(frame_id, symbol_id) ||
-      Configuration()->IsUplink(frame_id, symbol_id)) {
-    for (size_t ch = 0; ch < n_channels; ++ch) {
-      RxPacket& rx = rx_memory_.at(rx_slot + ch);
-      new (rx.RawPacket()) Packet(frame_id, symbol_id, 0, ant_id + ch);
-      rx.Use();
-      // Push kPacketRX event into the queue
-      EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
-
-      if (event_notify_q_->enqueue(notify_producer_token_, rx_message) ==
-          false) {
-        std::printf("socket message enqueue failed\n");
-        throw std::runtime_error("PacketTxRx: socket message enqueue failed");
+  if ((tmp_ret > 0) && (dummy_read == false)) {
+    const size_t ant_id = radio_id * n_channels;
+    if (Configuration()->IsPilot(frame_id, symbol_id) ||
+        Configuration()->IsUplink(frame_id, symbol_id)) {
+      for (size_t ch = 0; ch < n_channels; ++ch) {
+        RxPacket& rx = *memory_tracking.at(ch);
+        memory_tracking.at(ch) = nullptr;
+        new (rx.RawPacket()) Packet(frame_id, symbol_id, 0, ant_id + ch);
+        rx_packets.push_back(rx.RawPacket());
+        // Push kPacketRX event into the queue
+        EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
+        NotifyComplete(rx_message);
       }
     }
+    return rx_packets;
   }
-  return rx_memory_.at(rx_slot).RawPacket();
+  //Free memory from most recent allocated to latest
+  for (size_t idx = (memory_tracking.size() - 1); idx > 0; idx--) {
+    auto* memory_location = memory_tracking.at(idx);
+    if (memory_location != nullptr) {
+      ReturnRxPacket(*memory_location);
+    }
+  }
+  return rx_packets;
 }
 
 //Tx data
 int TxRxWorkerUsrp::DequeueSend() {
-  EventData event;
-  if (tx_pending_q_->try_dequeue_from_producer(tx_producer_token_, event) ==
-      0) {
+  auto events = GetPendingTxEvents(1);
+  if (events.size() == 0) {
+    return -1;
+  } else if (events.size() > 1) {
+    throw std::runtime_error("DequeueSend returned too many events");
     return -1;
   }
-
-  std::printf("tx queue length: %zu\n", tx_pending_q_->size_approx());
+  EventData event = events.at(0);
   assert(event.event_type_ == EventType::kPacketTX);
 
   const size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
@@ -248,8 +229,7 @@ int TxRxWorkerUsrp::DequeueSend() {
                         Configuration()->Frame().ClientDlPilotSymbols()]);
     }
   } else {
-    auto* pkt = reinterpret_cast<struct Packet*>(
-        &tx_memory_[offset * Configuration()->PacketLength()]);
+    auto* pkt = GetTxPacket(frame_id, symbol_id, ant_id + ch);
     txbuffs.at(ch) = reinterpret_cast<void*>(pkt->data_);
   }
 
@@ -262,27 +242,25 @@ int TxRxWorkerUsrp::DequeueSend() {
   if (kDebugPrintInTask == true) {
     std::printf(
         "TxRxWorkerUsrp[%zu]: Transmitted frame %zu, symbol %zu, "
-        "ant %zu, offset: %zu, msg_queue_length: %zu\n",
-        tid_, frame_id, symbol_id, ant_id, offset,
-        event_notify_q_->size_approx());
+        "ant %zu, offset: %zu\n",
+        tid_, frame_id, symbol_id, ant_id, offset);
   }
 
-  RtAssert(
-      event_notify_q_->enqueue(notify_producer_token_,
-                               EventData(EventType::kPacketTX, event.tags_[0])),
-      "Socket message enqueue failed\n");
+  auto complete_event = EventData(EventType::kPacketTX, event.tags_[0]);
+  NotifyComplete(complete_event);
   return event.tags_[0];
 }
 
 int TxRxWorkerUsrp::DequeueSend(int frame_id, int symbol_id) {
-  EventData event;
-  if (tx_pending_q_->try_dequeue_from_producer(tx_producer_token_, event) ==
-      0) {
+  auto events = GetPendingTxEvents(1);
+  if (events.size() == 0) {
+    return -1;
+  } else if (events.size() > 1) {
+    throw std::runtime_error("DequeueSend returned too many events");
     return -1;
   }
+  EventData event = events.at(0);
   std::cout << "DDD" << std::endl;
-
-  std::printf("tx queue length: %zu\n", tx_pending_q_->size_approx());
   assert(event.event_type_ == EventType::kPacketTX);
 
   const size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
@@ -323,8 +301,7 @@ int TxRxWorkerUsrp::DequeueSend(int frame_id, int symbol_id) {
                         Configuration()->Frame().ClientDlPilotSymbols()]);
     }
   } else {
-    auto* pkt = reinterpret_cast<struct Packet*>(
-        &tx_memory_[offset * Configuration()->PacketLength()]);
+    auto* pkt = GetTxPacket(frame_id, symbol_id, ant_id + ch);
     txbuffs.at(ch) = reinterpret_cast<void*>(pkt->data_);
   }
 
@@ -338,14 +315,11 @@ int TxRxWorkerUsrp::DequeueSend(int frame_id, int symbol_id) {
   if (kDebugPrintInTask) {
     std::printf(
         "TxRxWorkerUsrp[%zu]: Transmitted frame %d, symbol %d, "
-        "ant %zu, offset: %zu, msg_queue_length: %zu\n",
-        tid_, frame_id, symbol_id, ant_id, offset,
-        event_notify_q_->size_approx());
+        "ant %zu, offset: %zu\n",
+        tid_, frame_id, symbol_id, ant_id, offset);
   }
 
-  RtAssert(
-      event_notify_q_->enqueue(notify_producer_token_,
-                               EventData(EventType::kPacketTX, event.tags_[0])),
-      "Socket message enqueue failed\n");
+  auto complete_event = EventData(EventType::kPacketTX, event.tags_[0]);
+  NotifyComplete(complete_event);
   return event.tags_[0];
 }

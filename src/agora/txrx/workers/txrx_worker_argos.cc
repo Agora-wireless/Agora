@@ -147,19 +147,17 @@ void TxRxWorkerArgos::DoTxRx() {
     std::cout << "Start BS main recv loop..." << std::endl;
   }  // HwFramer == false
 
-  size_t rx_slot = 0;
   ssize_t prev_frame_id = -1;
-  size_t local_interface = 0;
+  size_t rx_interface = 0;
 
   size_t global_frame_id = 0;
   size_t global_symbol_id = 0;
   while (Configuration()->Running() == true) {
     if (0 == DequeueSend(time0)) {
-      // receive data
-      auto pkts = RecvEnqueue(local_interface, rx_slot, global_frame_id,
-                              global_symbol_id);
+      // attempt to receive symbol (might be good to reduce the rx timeout to allow for tx during dead time)
+      auto pkts = RecvEnqueue(rx_interface, global_frame_id, global_symbol_id);
+      size_t rx_symbol_id;
       if (!pkts.empty()) {
-        rx_slot = (rx_slot + pkts.size()) % rx_memory_.size();
         RtAssert(pkts.size() == channels_per_interface_,
                  "Received data but it was the wrong dimension");
 
@@ -170,56 +168,38 @@ void TxRxWorkerArgos::DoTxRx() {
             prev_frame_id = frame_id;
           }
         }
+        rx_symbol_id = pkts.front()->symbol_id_;
       }  // if (pkt.size() > 0)
-
-      local_interface++;
-      if (local_interface == num_interfaces_) {
-        local_interface = 0;
-        if (Configuration()->HwFramer() == false) {
-          // Update global frame_id and symbol_id
-          global_symbol_id++;
-          if (global_symbol_id == Configuration()->Frame().NumTotalSyms()) {
-            global_symbol_id = 0;
-            global_frame_id++;
-            if (Configuration()->Frame().NumDLSyms() == 0) {
-              for (size_t interface = 0; interface < num_interfaces_;
-                   interface++) {
-                this->TxBeaconHw(global_frame_id, interface, time0);
-              }
-            }
-          }
-        }  // HwFramer == false
+      else {
+        /* No Data received, what now? 
+         * at this time this is unlikely to happen, as the timeouts are very large */
+        rx_symbol_id = 0;
       }
+      rx_interface = UpdateRxInterface(rx_interface, rx_symbol_id);
     }  // DequeueSendArgos(time0) == 0
   }    // Configuration()->Running() == true
   running_ = false;
 }
 
-//RX data
+//RX data, should return channel number of packets || 0
 std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
-                                                  size_t rx_slot,
                                                   size_t global_frame_id,
                                                   size_t global_symbol_id) {
   const size_t radio_id = interface_id + interface_offset_;
   const size_t ant_id = radio_id * channels_per_interface_;
-  const size_t packet_length = Configuration()->DlPacketLength();
   const size_t cell_id = Configuration()->CellId().at(radio_id);
 
   std::vector<size_t> ant_ids(channels_per_interface_);
   std::vector<void*> samp(channels_per_interface_);
-  std::vector<size_t> symbol_ids(channels_per_interface_, global_symbol_id);
+  std::vector<RxPacket*> memory_tracking;
+
+  //Return value
   std::vector<Packet*> result_packets;
 
-  for (size_t ch = 0; ch < channels_per_interface_; ++ch) {
-    RxPacket& rx = rx_memory_.at(rx_slot + ch);
-
-    // if rx_buffer is full, exit
-    if (rx.Empty() == false) {
-      MLPD_ERROR("TxRxWorkerArgos[%zu] rx_buffer full, rx slot: %zu\n", tid_,
-                 rx_slot);
-      Configuration()->Running(false);
-      break;
-    }
+  //Allocate memory
+  for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+    RxPacket& rx = GetRxPacket();
+    memory_tracking.push_back(&rx);
     ant_ids.at(ch) = ant_id + ch;
     samp.at(ch) = rx.RawPacket()->data_;
   }
@@ -236,83 +216,46 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
        !Configuration()->IsUplink(global_frame_id, global_symbol_id) &&
        !cal_rx);
 
-  //std::vector<std::vector<std::complex<int16_t>>> dummmy_rx(
-  //    Configuration()->NumChannels(),
-  //    std::vector<std::complex<int16_t>>(Configuration()->SampsPerSymbol(), 0));
-
   //Ok to read into sample memory for dummy read
-  int rx_status = radio_config_->RadioRx(radio_id, samp.data(), frame_time);
+  const int rx_status =
+      radio_config_->RadioRx(radio_id, samp.data(), frame_time);
 
-  if (dummy_read) {
-    return result_packets;
-  } else if (rx_status == 0) {
-    return result_packets;
+  if ((dummy_read == false) &&
+      (rx_status == static_cast<int>(Configuration()->SampsPerSymbol()))) {
+    size_t frame_id = global_frame_id;
+    size_t symbol_id = global_symbol_id;
+
+    if (Configuration()->HwFramer() == true) {
+      frame_id = static_cast<size_t>(frame_time >> 32);
+      symbol_id = static_cast<size_t>((frame_time >> 16) & 0xFFFF);
+    }
+
+    for (size_t ant = 0; ant < ant_ids.size(); ant++) {
+      auto* rx_packet = memory_tracking.at(ant);
+      auto* raw_pkt = rx_packet->RawPacket();
+      new (raw_pkt) Packet(frame_id, symbol_id, cell_id, ant_ids.at(ant));
+      result_packets.push_back(raw_pkt);
+
+      // Push kPacketRX event into the queue.
+      EventData rx_message(EventType::kPacketRX, rx_tag_t(*rx_packet).tag_);
+      NotifyComplete(rx_message);
+      memory_tracking.at(ant) = nullptr;
+    }
   } else if (rx_status < 0) {
     MLPD_ERROR("RX status = %d is less than 0\n", rx_status);
   } else if (static_cast<size_t>(rx_status) !=
              Configuration()->SampsPerSymbol()) {
     MLPD_ERROR("RX status = %d is not the expected value\n", rx_status);
-    // WHAT TO DO HERE?????????????????
-    return result_packets;
-  }
-  size_t frame_id = global_frame_id;
-  size_t symbol_id = global_symbol_id;
-
-  if (Configuration()->HwFramer() == true) {
-    frame_id = (size_t)(frame_time >> 32);
-    symbol_id = (size_t)((frame_time >> 16) & 0xFFFF);
-    for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-      symbol_ids.at(ch) = symbol_id;
-    }
-
-    // Additional read for DL Calibration in two-chan case.
-    // In HW framer mode we need to be specific about
-    // which symbols to read a.o.t SW framer mode where
-    // we read all symbols and discard unused ones later.
-    if ((Configuration()->Frame().IsRecCalEnabled() == true) &&
-        (Configuration()->IsCalDlPilot(frame_id, symbol_id) == true) &&
-        (radio_id == Configuration()->RefRadio(cell_id)) &&
-        (Configuration()->AntPerGroup() > 1)) {
-      if (Configuration()->AntPerGroup() > channels_per_interface_) {
-        symbol_ids.resize(Configuration()->AntPerGroup());
-        ant_ids.resize(Configuration()->AntPerGroup());
-      }
-      for (size_t s = 1; s < Configuration()->AntPerGroup(); s++) {
-        RxPacket& rx = rx_memory_.at(rx_slot + s);
-
-        std::vector<void*> tmp_samp(channels_per_interface_);
-        std::vector<char> dummy_buff(packet_length);
-        tmp_samp.at(0) = rx.RawPacket()->data_;
-        tmp_samp.at(1) = dummy_buff.data();
-        if ((Configuration()->Running() == false) ||
-            radio_config_->RadioRx(radio_id, tmp_samp.data(), frame_time) <=
-                0) {
-          std::vector<Packet*> empty_pkt;
-          return empty_pkt;
-        }
-        symbol_ids.at(s) = Configuration()->Frame().GetDLCalSymbol(s);
-        ant_ids.at(s) = ant_id;
-      }
-    }
   }
 
-  for (size_t ch = 0; ch < symbol_ids.size(); ++ch) {
-    RxPacket& rx = rx_memory_.at(rx_slot + ch);
-    result_packets.push_back(rx.RawPacket());
-    new (rx.RawPacket())
-        Packet(frame_id, symbol_ids.at(ch), cell_id, ant_ids.at(ch));
-
-    rx.Use();
-    // Push kPacketRX event into the queue.
-    EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
-
-    if (event_notify_q_->enqueue(notify_producer_token_, rx_message) == false) {
-      std::printf("TxRxWorkerArgos[%zu]: socket message enqueue failed\n",
-                  tid_);
-      throw std::runtime_error(
-          "TxRxWorkerArgos: socket message enqueue failed");
+  //Free memory from most recent allocated to latest
+  for (size_t idx = (memory_tracking.size() - 1); idx > 0; idx--) {
+    auto* memory_location = memory_tracking.at(idx);
+    if (memory_location != nullptr) {
+      ReturnRxPacket(*memory_location);
     }
   }
+  //Free rx any memory that we didn't use here
   return result_packets;
 }
 
@@ -437,24 +380,17 @@ void TxRxWorkerArgos::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
 
 //Tx data
 size_t TxRxWorkerArgos::DequeueSend(long long time0) {
-  const size_t channels_per_interface = Configuration()->NumChannels();
-  const size_t max_dequeue_items = num_interfaces_ * channels_per_interface;
-  std::vector<EventData> events(max_dequeue_items);
+  auto tx_events = GetPendingTxEvents();
 
-  //Single producer ordering in q is preserved
-  const size_t dequeued_items = tx_pending_q_->try_dequeue_bulk_from_producer(
-      tx_producer_token_, events.data(), max_dequeue_items);
-
-  for (size_t item = 0; item < dequeued_items; item++) {
-    EventData& current_event = events.at(item);
-
+  //Process each pending tx event
+  for (const EventData& current_event : tx_events) {
     // std::printf("tx queue length: %d\n", task_queue_->size_approx());
     assert(current_event.event_type_ == EventType::kPacketTX);
 
     size_t frame_id = gen_tag_t(current_event.tags_[0u]).frame_id_;
     const size_t symbol_id = gen_tag_t(current_event.tags_[0u]).symbol_id_;
     const size_t ant_id = gen_tag_t(current_event.tags_[0u]).ant_id_;
-    const size_t radio_id = ant_id / channels_per_interface;
+    const size_t radio_id = ant_id / channels_per_interface_;
 
     RtAssert((radio_id >= interface_offset_) &&
              (radio_id <= (interface_offset_ + num_interfaces_)));
@@ -462,17 +398,13 @@ size_t TxRxWorkerArgos::DequeueSend(long long time0) {
     //See if this is the last antenna on the radio.  Assume that we receive the last one
     // last (and all the others came before).  No explicit tracking
     const bool last_antenna =
-        ((ant_id % channels_per_interface) + 1) == (channels_per_interface);
+        ((ant_id % channels_per_interface_) + 1) == (channels_per_interface_);
 
     //std::printf("TxRxWorkerArgos[%zu]: tx antenna %zu radio %zu is last %d\n",
     //            tid_, ant_id, radio_id, last_antenna);
 
     const size_t dl_symbol_idx =
         Configuration()->Frame().GetDLSymbolIdx(symbol_id);
-    const size_t offset =
-        (Configuration()->GetTotalDataSymbolIdxDl(frame_id, dl_symbol_idx) *
-         Configuration()->BsAntNum()) +
-        ant_id;
 
     // All antenna data is ready to tx for a given symbol, if last then TX out the data
     if (last_antenna) {
@@ -487,11 +419,11 @@ size_t TxRxWorkerArgos::DequeueSend(long long time0) {
           this->TxReciprocityCalibPilots(frame_id, radio_id, time0);
         }
       }
-      std::vector<const void*> txbuf(channels_per_interface);
+      std::vector<const void*> txbuf(channels_per_interface_);
       if (kDebugDownlink == true) {
         const std::vector<std::complex<int16_t>> zeros(
             Configuration()->SampsPerSymbol(), std::complex<int16_t>(0, 0));
-        for (size_t ch = 0; ch < channels_per_interface; ch++) {
+        for (size_t ch = 0; ch < channels_per_interface_; ch++) {
           // Not exactly sure why 0 index was selected here.  Could it be a beacon ant?
           if (ant_id != 0) {
             txbuf.at(ch) = zeros.data();
@@ -505,9 +437,8 @@ size_t TxRxWorkerArgos::DequeueSend(long long time0) {
           }
         }
       } else {
-        for (size_t ch = 0; ch < channels_per_interface; ch++) {
-          auto* pkt = reinterpret_cast<Packet*>(
-              &tx_memory_[((offset + ch) * Configuration()->DlPacketLength())]);
+        for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+          auto* pkt = GetTxPacket(frame_id, symbol_id, ant_id + ch);
           txbuf.at(ch) = reinterpret_cast<void*>(pkt->data_);
         }
       }
@@ -528,18 +459,14 @@ size_t TxRxWorkerArgos::DequeueSend(long long time0) {
 
     if (kDebugPrintInTask == true) {
       std::printf(
-          "TxRxWorkerArgos[%zu]: Transmitted frame %zu, symbol %zu, "
-          "ant %zu, offset: %zu, msg_queue_length: %zu\n",
-          tid_, frame_id, symbol_id, ant_id, offset,
-          event_notify_q_->size_approx());
+          "TxRxWorkerArgos[%zu]: Transmitted frame %zu, symbol %zu, ant %zu\n",
+          tid_, frame_id, symbol_id, ant_id);
     }
-
-    RtAssert(event_notify_q_->enqueue(
-                 notify_producer_token_,
-                 EventData(EventType::kPacketTX, current_event.tags_[0])),
-             "Socket message enqueue failed\n");
+    auto complete_event =
+        EventData(EventType::kPacketTX, current_event.tags_[0]);
+    NotifyComplete(complete_event);
   }
-  return dequeued_items;
+  return tx_events.size();
 }
 
 //Checks to see if the current symbol is followed by another tx symbol
@@ -578,4 +505,70 @@ int TxRxWorkerArgos::GetTxFlags(size_t radio_id, size_t tx_symbol_id) {
     tx_flags = 2;
   }
   return tx_flags;
+}
+
+size_t TxRxWorkerArgos::UpdateRxInterface(size_t last_interface,
+                                          size_t last_rx_symbol) {
+  size_t next_interface;
+
+  const size_t total_symbols = Configuration()->Frame().NumTotalSyms();
+  size_t serach_symbol = last_rx_symbol;
+  size_t start_interface = last_interface + 1;
+  bool interface_found = false;
+  //This search could probably be optimized (by creating a map in init)
+  while (interface_found == false) {
+    // For each symbol interate through all interfaces
+    for (size_t interface = start_interface; interface < num_interfaces_;
+         interface++) {
+      bool is_rx = IsRxSymbol(interface, serach_symbol);
+      if (is_rx) {
+        interface_found = true;
+        next_interface = interface;
+        break;
+      }
+    }
+    serach_symbol = (serach_symbol + 1) % total_symbols;
+    //Start at the first interface for each new symbol
+    start_interface = 0;
+    ///\todo Need to add an infinate loop catcher
+  }
+  return next_interface;
+}
+
+/*
+  if (Configuration()->HwFramer() == false) {
+    // Update global frame_id and symbol_id
+    global_symbol_id++;
+    if (global_symbol_id == Configuration()->Frame().NumTotalSyms()) {
+      global_symbol_id = 0;
+      global_frame_id++;
+      if (Configuration()->Frame().NumDLSyms() == 0) {
+        for (size_t interface = 0; interface < num_interfaces_; interface++) {
+          this->TxBeaconHw(global_frame_id, interface, time0);
+        }
+      }
+    }
+  }  // HwFramer == false
+*/
+
+bool TxRxWorkerArgos::IsRxSymbol(size_t interface, size_t symbol_id) {
+  auto symbol_type = Configuration()->GetSymbolType(symbol_id);
+  const auto cell_id =
+      Configuration()->CellId().at(interface + interface_offset_);
+  const auto reference_radio = Configuration()->RefRadio(cell_id);
+  const size_t radio_id = interface + interface_offset_;
+  bool is_rx;
+
+  if ((symbol_type == SymbolType::kPilot) || (symbol_type == SymbolType::kUL)) {
+    is_rx = true;
+  } else if ((reference_radio == radio_id) &&
+             (symbol_type == SymbolType::kCalDL)) {
+    is_rx = true;
+  } else if ((reference_radio != radio_id) &&
+             (symbol_type == SymbolType::kCalUL)) {
+    is_rx = true;
+  } else {
+    is_rx = false;
+  }
+  return is_rx;
 }

@@ -79,7 +79,6 @@ class PacketTxRxDpdk : public PacketTxRx {
                             std::vector<RxPacket>& rx_memory,
                             std::byte* const tx_memory) final override;
 
-  //const size_t ant_per_cell_;
   uint32_t bs_rru_addr_;     // IPv4 address of the simulator sender
   uint32_t bs_server_addr_;  // IPv4 address of the Agora server
   struct rte_mempool* mbuf_pool_;

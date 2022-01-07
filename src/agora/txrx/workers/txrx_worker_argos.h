@@ -32,8 +32,7 @@ class TxRxWorkerArgos : public TxRxWorker {
  private:
   TxRxWorkerArgos() = delete;
   size_t DequeueSend(long long time0);
-  std::vector<Packet*> RecvEnqueue(size_t interface_id, size_t rx_slot,
-                                   size_t global_frame_id,
+  std::vector<Packet*> RecvEnqueue(size_t interface_id, size_t global_frame_id,
                                    size_t global_symbol_id);
 
   void TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
@@ -42,6 +41,9 @@ class TxRxWorkerArgos : public TxRxWorker {
   void TxBeaconHw(size_t frame_id, size_t interface_id, long long time0);
   bool IsTxSymbolNext(size_t radio_id, size_t current_symbol);
   int GetTxFlags(size_t radio_id, size_t tx_symbol_id);
+
+  bool IsRxSymbol(size_t interface, size_t symbol_id);
+  size_t UpdateRxInterface(size_t last_interface, size_t last_rx_symbol);
   // This object is created / owned by the parent process
   RadioConfig* const radio_config_;
 };
