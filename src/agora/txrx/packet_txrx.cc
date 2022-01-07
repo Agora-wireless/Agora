@@ -31,17 +31,17 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
   /// Will make (packet_num_in_buffer % total_radios) unused buffers
   const size_t buffers_per_interface = packet_num_in_buffer / total_radios;
 
-  ///Make sure all antennas on an interface is assigned to the same worker
+  /// Make sure all antennas on an interface is assigned to the same worker
   MLPD_INFO(
       "Number of workers: %zu, Buffers per interface %zu, Number of Total "
       "buffers %zu\n",
       requested_worker_threads, buffers_per_interface, packet_num_in_buffer);
 
-  //For each requested worker, start assigning interfaces / buffers
+  /// For each requested worker, start assigning interfaces / buffers
   size_t target_interface_count = total_radios / requested_worker_threads;
   const size_t remaining_interfaces = total_radios % requested_worker_threads;
   if (remaining_interfaces > 0) {
-    //Front load the workers
+    /// Front load the workers
     target_interface_count++;
   }
 
@@ -56,7 +56,7 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
       MLPD_FRAME("Interface: %zu, assigned to worker %zu\n",
                  interface_to_worker_.size(), worker);
 
-      //Distribute the buffers per interface
+      /// Distribute the buffers per interface
       for (size_t buffer = 0; buffer < buffers_per_interface; buffer++) {
         auto* pkt_loc = reinterpret_cast<Packet*>(
             rx_buffer[worker] +
@@ -65,7 +65,7 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
         rx_packets_.at(worker).emplace_back(pkt_loc);
       }
 
-      //If last interface has been assigned, exit assignment.
+      /// If last interface has been assigned, exit assignment.
       if (interface_to_worker_.size() == total_radios) {
         /// The +1 is for worker_index to worker count conversion
         worker = worker + 1;

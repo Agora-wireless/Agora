@@ -148,7 +148,9 @@ void TxRxWorkerArgos::DoTxRx() {
   }  // HwFramer == false
 
   ssize_t prev_frame_id = -1;
-  size_t rx_interface = 0;
+  size_t rx_interface = UpdateRxInterface(0, 0);
+  MLPD_INFO("TxRxWorkerArgos[%zu] Starting rx interface id %zu\n", tid_,
+            rx_interface);
 
   size_t global_frame_id = 0;
   size_t global_symbol_id = 0;
@@ -175,7 +177,12 @@ void TxRxWorkerArgos::DoTxRx() {
          * at this time this is unlikely to happen, as the timeouts are very large */
         rx_symbol_id = 0;
       }
+      size_t current_interface = rx_interface;
       rx_interface = UpdateRxInterface(rx_interface, rx_symbol_id);
+      MLPD_INFO(
+          "TxRxWorkerArgos[%zu] Last Interface %zu, symbol %zu, next interface "
+          "%zu\n",
+          tid_, current_interface, rx_symbol_id, rx_interface);
     }  // DequeueSendArgos(time0) == 0
   }    // Configuration()->Running() == true
   running_ = false;
@@ -431,6 +438,9 @@ size_t TxRxWorkerArgos::DequeueSend(long long time0) {
 
     // All antenna data is ready to tx for a given symbol, if last then TX out the data
     if (last_antenna) {
+      MLPD_INFO("TxRxWorkerArgos[%zu]: tx antenna %zu radio %zu is last\n",
+                tid_, ant_id, radio_id);
+
       //When the first Tx symbol of the frame is ready, schedule beacon and cals
       if (symbol_id == Configuration()->Frame().GetDLSymbol(0)) {
         // Schedule beacon in the future
