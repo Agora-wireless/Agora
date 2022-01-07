@@ -201,11 +201,9 @@ EventData DoDemul::Launch(size_t tag) {
     const size_t partial_transpose_block_base =
         ((base_sc_id + i) / kTransposeBlockSize) *
         (kTransposeBlockSize * cfg_->BsAntNum());
-<<<<<<< HEAD
     const complex_float* src = data_buf;
     if (kUsePartialTrans) src += partial_transpose_block_base;
     if (kUseSIMDGather && kUsePartialTrans) {
-      //src += (base_sc_id + i) % kTransposeBlockSize;
       // Gather data for all antennas and 8 subcarriers in the same cacheline
       StoreData::StoreRxDataAVX(data_gather_buffer_, src, base_sc_id + i,
           cfg_->BsAntNum());
@@ -213,84 +211,6 @@ EventData DoDemul::Launch(size_t tag) {
     else {
       StoreData::StoreRxDataOrg(data_gather_buffer_, src, base_sc_id + i,
           cfg_->BsAntNum(), cfg_->OfdmDataNum());
-=======
-
-#ifdef __AVX512F__
-    static constexpr size_t kAntNumPerSimd = 8;
-#else
-    static constexpr size_t kAntNumPerSimd = 4;
-#endif
-
-    size_t ant_start = 0;
-    if (kUseSIMDGather && kUsePartialTrans &&
-        (cfg_->BsAntNum() % kAntNumPerSimd) == 0) {
-      // Gather data for all antennas and 8 subcarriers in the same cache
-      // line, 1 subcarrier and 4 (AVX2) or 8 (AVX512) ants per iteration
-      size_t cur_sc_offset =
-          partial_transpose_block_base + (base_sc_id + i) % kTransposeBlockSize;
-      const float* src =
-          reinterpret_cast<const float*>(&data_buf[cur_sc_offset]);
-      float* dst = reinterpret_cast<float*>(data_gather_buffer_);
-#ifdef __AVX512F__
-      __m512i index = _mm512_setr_epi32(
-          0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
-          kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
-          kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1,
-          kTransposeBlockSize * 8, kTransposeBlockSize * 8 + 1,
-          kTransposeBlockSize * 10, kTransposeBlockSize * 10 + 1,
-          kTransposeBlockSize * 12, kTransposeBlockSize * 12 + 1,
-          kTransposeBlockSize * 14, kTransposeBlockSize * 14 + 1);
-      for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
-           ant_i += kAntNumPerSimd) {
-        for (size_t j = 0; j < kSCsPerCacheline; j++) {
-          __m512 data_rx = kTransposeBlockSize == 1
-                               ? _mm512_load_ps(&src[j * cfg_->BsAntNum() * 2])
-                               : _mm512_i32gather_ps(index, &src[j * 2], 4);
-
-          assert((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) %
-                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
-          assert((reinterpret_cast<size_t>(&src[j * cfg_->BsAntNum() * 2]) %
-                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
-          _mm512_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
-        }
-        src += kAntNumPerSimd * kTransposeBlockSize * 2;
-        dst += kAntNumPerSimd * 2;
-      }
-#else
-      __m256i index = _mm256_setr_epi32(
-          0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
-          kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
-          kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1);
-      for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
-           ant_i += kAntNumPerSimd) {
-        for (size_t j = 0; j < kSCsPerCacheline; j++) {
-          assert((reinterpret_cast<size_t>(&src[j * 2]) %
-                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
-          assert((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) %
-                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
-          __m256 data_rx = _mm256_i32gather_ps(&src[j * 2], index, 4);
-          _mm256_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
-        }
-        src += kAntNumPerSimd * kTransposeBlockSize * 2;
-        dst += kAntNumPerSimd * 2;
-      }
-#endif
-      // Set the remaining number of antennas for non-SIMD gather
-      ant_start = cfg_->BsAntNum() - (cfg_->BsAntNum() % kAntNumPerSimd);
-    }
-    if (ant_start < cfg_->BsAntNum()) {
-      complex_float* dst = data_gather_buffer_ + ant_start;
-      for (size_t j = 0; j < kSCsPerCacheline; j++) {
-        for (size_t ant_i = ant_start; ant_i < cfg_->BsAntNum(); ant_i++) {
-          *dst++ =
-              kUsePartialTrans
-                  ? data_buf[partial_transpose_block_base +
-                             (ant_i * kTransposeBlockSize) +
-                             ((base_sc_id + i + j) % kTransposeBlockSize)]
-                  : data_buf[ant_i * cfg_->OfdmDataNum() + base_sc_id + i + j];
-        }
-      }
->>>>>>> develop
     }
     duration_stat_->task_duration_[1] += GetTime::WorkerRdtsc() - start_tsc0;
 
