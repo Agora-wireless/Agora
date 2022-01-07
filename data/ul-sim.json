@@ -1,10 +1,15 @@
 {
-  "ofdm_ca_num": 2048,
+  "fft_size": 2048,
   "ofdm_data_num": 1200,
   "demul_block_size": 48,
   "UE": false,
+<<<<<<< HEAD:data/bs-ul-sim.json
   "ue_num": 2,
   "antenna_num": 48,
+=======
+  "ue_radio_num": 2,
+  "bs_radio_num": 8,
+>>>>>>> develop:data/ul-sim.json
   "symbol_num_perframe": 70,
   "client_ul_pilot_syms": 1,
   "ul_data_symbol_start": 3,
@@ -14,5 +19,8 @@
   "beacon_position": 0,
   "core_offset": 1,
   "worker_thread_num": 8,
-  "socket_thread_num": 1
+  "socket_thread_num": 1,
+  "ue_core_offset": 12,
+  "ue_worker_thread_num": 2,
+  "ue_socket_thread_num": 1
 }

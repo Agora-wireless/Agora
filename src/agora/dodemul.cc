@@ -49,9 +49,9 @@ DoDemul::DoDemul(
   MKL_Complex8 beta = {0, 0};
 
   mkl_jit_status_t status = mkl_jit_create_cgemm(
-      &jitter_, MKL_COL_MAJOR, MKL_NOTRANS, MKL_NOTRANS, cfg_->UeNum(), 1,
-      cfg_->BsAntNum(), &alpha, cfg_->UeNum(), cfg_->BsAntNum(), &beta,
-      cfg_->UeNum());
+      &jitter_, MKL_COL_MAJOR, MKL_NOTRANS, MKL_NOTRANS, cfg_->UeAntNum(), 1,
+      cfg_->BsAntNum(), &alpha, cfg_->UeAntNum(), cfg_->BsAntNum(), &beta,
+      cfg_->UeAntNum());
   if (MKL_JIT_ERROR == status) {
     std::fprintf(
         stderr,
@@ -201,6 +201,7 @@ EventData DoDemul::Launch(size_t tag) {
     const size_t partial_transpose_block_base =
         ((base_sc_id + i) / kTransposeBlockSize) *
         (kTransposeBlockSize * cfg_->BsAntNum());
+<<<<<<< HEAD
     const complex_float* src = data_buf;
     if (kUsePartialTrans) src += partial_transpose_block_base;
     if (kUseSIMDGather && kUsePartialTrans) {
@@ -212,6 +213,84 @@ EventData DoDemul::Launch(size_t tag) {
     else {
       StoreData::StoreRxDataOrg(data_gather_buffer_, src, base_sc_id + i,
           cfg_->BsAntNum(), cfg_->OfdmDataNum());
+=======
+
+#ifdef __AVX512F__
+    static constexpr size_t kAntNumPerSimd = 8;
+#else
+    static constexpr size_t kAntNumPerSimd = 4;
+#endif
+
+    size_t ant_start = 0;
+    if (kUseSIMDGather && kUsePartialTrans &&
+        (cfg_->BsAntNum() % kAntNumPerSimd) == 0) {
+      // Gather data for all antennas and 8 subcarriers in the same cache
+      // line, 1 subcarrier and 4 (AVX2) or 8 (AVX512) ants per iteration
+      size_t cur_sc_offset =
+          partial_transpose_block_base + (base_sc_id + i) % kTransposeBlockSize;
+      const float* src =
+          reinterpret_cast<const float*>(&data_buf[cur_sc_offset]);
+      float* dst = reinterpret_cast<float*>(data_gather_buffer_);
+#ifdef __AVX512F__
+      __m512i index = _mm512_setr_epi32(
+          0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
+          kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
+          kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1,
+          kTransposeBlockSize * 8, kTransposeBlockSize * 8 + 1,
+          kTransposeBlockSize * 10, kTransposeBlockSize * 10 + 1,
+          kTransposeBlockSize * 12, kTransposeBlockSize * 12 + 1,
+          kTransposeBlockSize * 14, kTransposeBlockSize * 14 + 1);
+      for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
+           ant_i += kAntNumPerSimd) {
+        for (size_t j = 0; j < kSCsPerCacheline; j++) {
+          __m512 data_rx = kTransposeBlockSize == 1
+                               ? _mm512_load_ps(&src[j * cfg_->BsAntNum() * 2])
+                               : _mm512_i32gather_ps(index, &src[j * 2], 4);
+
+          assert((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) %
+                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
+          assert((reinterpret_cast<size_t>(&src[j * cfg_->BsAntNum() * 2]) %
+                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
+          _mm512_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
+        }
+        src += kAntNumPerSimd * kTransposeBlockSize * 2;
+        dst += kAntNumPerSimd * 2;
+      }
+#else
+      __m256i index = _mm256_setr_epi32(
+          0, 1, kTransposeBlockSize * 2, kTransposeBlockSize * 2 + 1,
+          kTransposeBlockSize * 4, kTransposeBlockSize * 4 + 1,
+          kTransposeBlockSize * 6, kTransposeBlockSize * 6 + 1);
+      for (size_t ant_i = 0; ant_i < cfg_->BsAntNum();
+           ant_i += kAntNumPerSimd) {
+        for (size_t j = 0; j < kSCsPerCacheline; j++) {
+          assert((reinterpret_cast<size_t>(&src[j * 2]) %
+                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
+          assert((reinterpret_cast<size_t>(&dst[j * cfg_->BsAntNum() * 2]) %
+                  (kAntNumPerSimd * sizeof(float) * 2)) == 0);
+          __m256 data_rx = _mm256_i32gather_ps(&src[j * 2], index, 4);
+          _mm256_store_ps(&dst[j * cfg_->BsAntNum() * 2], data_rx);
+        }
+        src += kAntNumPerSimd * kTransposeBlockSize * 2;
+        dst += kAntNumPerSimd * 2;
+      }
+#endif
+      // Set the remaining number of antennas for non-SIMD gather
+      ant_start = cfg_->BsAntNum() - (cfg_->BsAntNum() % kAntNumPerSimd);
+    }
+    if (ant_start < cfg_->BsAntNum()) {
+      complex_float* dst = data_gather_buffer_ + ant_start;
+      for (size_t j = 0; j < kSCsPerCacheline; j++) {
+        for (size_t ant_i = ant_start; ant_i < cfg_->BsAntNum(); ant_i++) {
+          *dst++ =
+              kUsePartialTrans
+                  ? data_buf[partial_transpose_block_base +
+                             (ant_i * kTransposeBlockSize) +
+                             ((base_sc_id + i + j) % kTransposeBlockSize)]
+                  : data_buf[ant_i * cfg_->OfdmDataNum() + base_sc_id + i + j];
+        }
+      }
+>>>>>>> develop
     }
     duration_stat_->task_duration_[1] += GetTime::WorkerRdtsc() - start_tsc0;
 
@@ -224,13 +303,13 @@ EventData DoDemul::Launch(size_t tag) {
       if (kExportConstellation) {
         equal_ptr =
             (arma::cx_float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                            [cur_sc_id * cfg_->UeNum()]);
+                                            [cur_sc_id * cfg_->UeAntNum()]);
       } else {
         equal_ptr =
             (arma::cx_float*)(&equaled_buffer_temp_[(cur_sc_id - base_sc_id) *
-                                                    cfg_->UeNum()]);
+                                                    cfg_->UeAntNum()]);
       }
-      arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeNum(), 1, false);
+      arma::cx_fmat mat_equaled(equal_ptr, cfg_->UeAntNum(), 1, false);
 
       auto* data_ptr = reinterpret_cast<arma::cx_float*>(
           &data_gather_buffer_[j * cfg_->BsAntNum()]);
@@ -245,7 +324,7 @@ EventData DoDemul::Launch(size_t tag) {
 #else
       arma::cx_fmat mat_data(data_ptr, cfg_->BsAntNum(), 1, false);
 
-      arma::cx_fmat mat_ul_zf(ul_zf_ptr, cfg_->UeNum(), cfg_->BsAntNum(),
+      arma::cx_fmat mat_ul_zf(ul_zf_ptr, cfg_->UeAntNum(), cfg_->BsAntNum(),
                               false);
       mat_equaled = mat_ul_zf * mat_data;
 #endif
@@ -256,15 +335,16 @@ EventData DoDemul::Launch(size_t tag) {
           // Reset previous frame
           auto* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
               ue_spec_pilot_buffer_[(frame_id - 1) % kFrameWnd]);
-          arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeNum(),
+          arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(),
                                         cfg_->Frame().ClientUlPilotSymbols(),
                                         false);
           mat_phase_shift.fill(0);
         }
         auto* phase_shift_ptr = reinterpret_cast<arma::cx_float*>(
             &ue_spec_pilot_buffer_[frame_id % kFrameWnd]
-                                  [symbol_idx_ul * cfg_->UeNum()]);
-        arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeNum(), 1, false);
+                                  [symbol_idx_ul * cfg_->UeAntNum()]);
+        arma::cx_fmat mat_phase_shift(phase_shift_ptr, cfg_->UeAntNum(), 1,
+                                      false);
         arma::cx_fmat shift_sc =
             sign(mat_equaled % conj(ue_pilot_data_.col(cur_sc_id)));
         mat_phase_shift += shift_sc;
@@ -273,11 +353,11 @@ EventData DoDemul::Launch(size_t tag) {
       else if (cfg_->Frame().ClientUlPilotSymbols() > 0) {
         auto* pilot_corr_ptr = reinterpret_cast<arma::cx_float*>(
             ue_spec_pilot_buffer_[frame_id % kFrameWnd]);
-        arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeNum(),
+        arma::cx_fmat pilot_corr_mat(pilot_corr_ptr, cfg_->UeAntNum(),
                                      cfg_->Frame().ClientUlPilotSymbols(),
                                      false);
         arma::fmat theta_mat = arg(pilot_corr_mat);
-        arma::fmat theta_inc = arma::zeros<arma::fmat>(cfg_->UeNum(), 1);
+        arma::fmat theta_inc = arma::zeros<arma::fmat>(cfg_->UeAntNum(), 1);
         for (size_t s = 1; s < cfg_->Frame().ClientUlPilotSymbols(); s++) {
           arma::fmat theta_diff = theta_mat.col(s) - theta_mat.col(s - 1);
           theta_inc += theta_diff;
@@ -306,16 +386,17 @@ EventData DoDemul::Launch(size_t tag) {
   }
 
   size_t start_tsc3 = GetTime::WorkerRdtsc();
-  __m256i index2 = _mm256_setr_epi32(
-      0, 1, cfg_->UeNum() * 2, cfg_->UeNum() * 2 + 1, cfg_->UeNum() * 4,
-      cfg_->UeNum() * 4 + 1, cfg_->UeNum() * 6, cfg_->UeNum() * 6 + 1);
+  __m256i index2 =
+      _mm256_setr_epi32(0, 1, cfg_->UeAntNum() * 2, cfg_->UeAntNum() * 2 + 1,
+                        cfg_->UeAntNum() * 4, cfg_->UeAntNum() * 4 + 1,
+                        cfg_->UeAntNum() * 6, cfg_->UeAntNum() * 6 + 1);
   auto* equal_t_ptr = reinterpret_cast<float*>(equaled_buffer_temp_transposed_);
-  for (size_t i = 0; i < cfg_->UeNum(); i++) {
+  for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
     float* equal_ptr = nullptr;
     if (kExportConstellation) {
       equal_ptr = reinterpret_cast<float*>(
           &equal_buffer_[total_data_symbol_idx_ul]
-                        [base_sc_id * cfg_->UeNum() + i]);
+                        [base_sc_id * cfg_->UeAntNum() + i]);
     } else {
       equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + i);
     }
@@ -324,7 +405,7 @@ EventData DoDemul::Launch(size_t tag) {
       __m256 equal_t_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
       _mm256_store_ps(equal_t_ptr, equal_t_temp);
       equal_t_ptr += 8;
-      equal_ptr += cfg_->UeNum() * k_num_double_in_sim_d256 * 2;
+      equal_ptr += cfg_->UeAntNum() * k_num_double_in_sim_d256 * 2;
     }
     equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
     int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][i] +

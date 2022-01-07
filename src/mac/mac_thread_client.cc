@@ -150,7 +150,7 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
   // Only non-pilot data symbols have application data.
   if (symbol_array_index >= num_pilot_symbols) {
     // The decoded symbol knows nothing about the padding / storage of the data
-    auto* pkt = reinterpret_cast<const MacPacketPacked*>(src_data);
+    const auto* pkt = reinterpret_cast<const MacPacketPacked*>(src_data);
     // Destination only contains "payload"
     const size_t dest_packet_size = cfg_->MacPayloadMaxLength();
 
@@ -282,7 +282,9 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
   const size_t max_data_bytes_per_frame = cfg_->UlMacDataBytesNumPerframe();
   const size_t num_mac_packets_per_frame = cfg_->UlMacPacketsPerframe();
 
-  if (0 == max_data_bytes_per_frame) return;
+  if (0 == max_data_bytes_per_frame) {
+    return;
+  }
 
   // Processes the packets of an entire frame (remove variable later)
   const size_t packets_required = num_mac_packets_per_frame;
@@ -327,8 +329,9 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
       while ((packets_received < packets_required) &&
              (current_packet_bytes >= header_size)) {
         // See if we have enough data and process the MacPacket header
-        auto* rx_mac_packet_header = reinterpret_cast<const MacPacketPacked*>(
-            &udp_pkt_buf_.at(current_packet_start_index));
+        const auto* rx_mac_packet_header =
+            reinterpret_cast<const MacPacketPacked*>(
+                &udp_pkt_buf_.at(current_packet_start_index));
 
         const size_t current_packet_size =
             header_size + rx_mac_packet_header->PayloadLength();
@@ -376,7 +379,7 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
 }
 
 void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
-                                                      RBIndicator ri) {
+                                                      RBIndicator /*ri*/) {
   const size_t num_mac_packets_per_frame = cfg_->UlMacPacketsPerframe();
   const size_t num_pilot_symbols = cfg_->Frame().ClientUlPilotSymbols();
   // Data integrity check
@@ -385,7 +388,8 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
   size_t symbol_id = 0;
   size_t frame_id = 0;
   for (size_t packet = 0u; packet < num_mac_packets_per_frame; packet++) {
-    auto* pkt = reinterpret_cast<const MacPacketPacked*>(&payload[pkt_offset]);
+    const auto* pkt =
+        reinterpret_cast<const MacPacketPacked*>(&payload[pkt_offset]);
 
     // std::printf("Frame %d, Packet %zu, symbol %d, user %d\n", pkt->Frame(),
     //            packet, pkt->Symbol(), pkt->Ue());
@@ -448,7 +452,7 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
   size_t src_pkt_offset = 0;
   // Copy from the packet rx buffer into ul_bits memory
   for (size_t pkt_id = 0; pkt_id < num_mac_packets_per_frame; pkt_id++) {
-    auto* src_packet =
+    const auto* src_packet =
         reinterpret_cast<const MacPacketPacked*>(&payload[src_pkt_offset]);
     const size_t symbol_idx =
         cfg_->Frame().GetULSymbolIdx(src_packet->Symbol());

@@ -136,7 +136,7 @@ TEST(TestZF, VaryingConfig) {
   calib_ul_buffer.RandAllocCxFloat(kFrameWnd, kMaxDataSCs * kMaxAntennas,
                                    Agora_memory::Alignment_t::kAlign64);
 
-  auto phy_stats = std::make_unique<PhyStats>(cfg.get());
+  auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::kUplink);
   auto stats = std::make_unique<Stats>(cfg.get());
 
   std::vector<std::thread> threads;

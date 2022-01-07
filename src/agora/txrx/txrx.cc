@@ -43,15 +43,16 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
 }
 
 PacketTXRX::~PacketTXRX() {
-  if (kUseArgos || kUseUHD) {
-    radioconfig_->RadioStop();
-  }
-
   for (auto& worker : socket_std_threads_) {
     if (worker.joinable() == true) {
       worker.join();
     }
   }
+
+  if (kUseArgos || kUseUHD) {
+    radioconfig_->RadioStop();
+  }
+  MLPD_INFO("PacketTXRX workers joined\n");
 }
 
 bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
@@ -112,13 +113,13 @@ bool PacketTXRX::StartTxRx(Table<char>& buffer, size_t packet_num_in_buffer,
   }
   MLPD_INFO("LoopTXRX: socket threads are waiting for events\n");
 
-  if ((kUseArgos == true) || (kUseUHD == true)) {
+  if ((kUseArgos == true && cfg_->HwFramer() == true) || (kUseUHD == true)) {
     radioconfig_->Go();
   }
   return true;
 }
 
-void PacketTXRX::SendBeacon(int tid, size_t frame_id) {
+void PacketTXRX::TxBeacon(int tid, size_t frame_id) {
   static double send_time = 0;
   double time_now = GetTime::GetTimeUs() / 1000;
   size_t radio_lo = tid * cfg_->NumRadios() / socket_thread_num_;
@@ -178,12 +179,12 @@ void PacketTXRX::LoopTxRx(size_t tid) {
   const size_t radio_hi =
       std::min((radio_lo + radios_per_thread), cfg_->BsAntNum()) - 1;
 
-  static constexpr size_t sock_buf_size = (1024 * 1024 * 64 * 8) - 1;
+  static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
   for (size_t radio_id = radio_lo; radio_id <= radio_hi; ++radio_id) {
     size_t local_port_id = cfg_->BsServerPort() + radio_id;
 
     udp_servers_.at(radio_id) =
-        std::make_unique<UDPServer>(local_port_id, sock_buf_size);
+        std::make_unique<UDPServer>(local_port_id, kSockBufSize);
     udp_clients_.at(radio_id) = std::make_unique<UDPClient>();
     MLPD_FRAME(
         "TXRX thread %d: set up UDP socket server listening to port %d"
@@ -203,12 +204,12 @@ void PacketTXRX::LoopTxRx(size_t tid) {
   size_t tx_frame_id = 0;
   size_t send_time = delay_tsc + tx_frame_start;
   // Send Beacons for the first time to kick off sim
-  // SendBeacon(tid, tx_frame_id++);
+  // TxBeacon(tid, tx_frame_id++);
   while (cfg_->Running() == true) {
     size_t rdtsc_now = GetTime::Rdtsc();
 
     if (rdtsc_now > send_time) {
-      SendBeacon(tid, tx_frame_id++);
+      TxBeacon(tid, tx_frame_id++);
 
       if (kEnableSlowStart) {
         if (tx_frame_id == slow_start_thresh1) {

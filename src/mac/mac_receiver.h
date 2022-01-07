@@ -30,7 +30,7 @@ class MacReceiver {
   const std::string phy_address_;
   const size_t phy_port_;
 
-  const size_t enable_udp_output_;
+  const bool enable_udp_output_;
   const size_t udp_dest_port_;
   const std::string udp_dest_address_;
 
