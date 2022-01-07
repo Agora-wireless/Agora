@@ -8,6 +8,8 @@
 #include <cmath>
 #include <memory>
 
+#include "packet_txrx_radio.h"
+
 static const bool kDebugDeferral = true;
 static const size_t kDefaultMessageQueueSize = 512;
 static const size_t kDefaultWorkerQueueSize = 256;
@@ -47,11 +49,19 @@ Agora::Agora(Config* const cfg)
   InitializeDownlinkBuffers();
 
   /* Initialize TXRX threads */
-  packet_tx_rx_ = std::make_unique<PacketTxRx>(
-      cfg, cfg->CoreOffset() + 1, &message_queue_,
-      GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
-      socket_buffer_, socket_buffer_size_ / cfg->PacketLength(),
-      this->stats_->FrameStart(), dl_socket_buffer_);
+  if (!kUseArgos && !kUseUHD) {
+    packet_tx_rx_ = std::make_unique<PacketTxRx>(
+        cfg, cfg->CoreOffset() + 1, &message_queue_,
+        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
+        socket_buffer_, socket_buffer_size_ / cfg->PacketLength(),
+        this->stats_->FrameStart(), dl_socket_buffer_);
+  } else {
+    packet_tx_rx_ = std::make_unique<PacketTxRxRadio>(
+        cfg, cfg->CoreOffset() + 1, &message_queue_,
+        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
+        socket_buffer_, socket_buffer_size_ / cfg->PacketLength(),
+        this->stats_->FrameStart(), dl_socket_buffer_);
+  }
 
   if (kEnableMac == true) {
     const size_t mac_cpu_core =
