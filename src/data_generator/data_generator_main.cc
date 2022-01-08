@@ -30,6 +30,7 @@ int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   gflags::SetVersionString(GetAgoraProjectVersion());
   auto cfg = std::make_unique<Config>(FLAGS_conf_file.c_str());
+  cfg->GenData();
 
   const DataGenerator::Profile profile =
       FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123

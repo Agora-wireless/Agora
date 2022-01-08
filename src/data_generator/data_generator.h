@@ -103,7 +103,29 @@ class DataGenerator {
    * @param encoded_codeword The encoded LDPC codeword bit sequence
    * @return An array of complex floats with OfdmDataNum() elements
    */
-  std::vector<complex_float> GetModulation(
+  std::vector<complex_float> GetULModulation(
+      const std::vector<int8_t>& encoded_codeword, size_t ue_id) {
+    std::vector<complex_float> modulated_codeword(cfg_->OfdmDataNum());
+    std::vector<uint8_t> mod_input(cfg_->GetOFDMDataNum());
+
+    AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
+                    &mod_input[0], cfg_->LdpcConfig().NumEncodedBytes(),
+                    cfg_->ModOrderBits());
+
+    size_t data_idx = 0;
+    for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
+      if (i % cfg_->OfdmPilotSpacing() == 0) {
+        modulated_codeword[i] = cfg_->UeSpecificPilot()[ue_id][i];
+      } else {
+        modulated_codeword[i] =
+            ModSingleUint8(mod_input[data_idx], cfg_->ModTable());
+        data_idx++;
+      }
+    }
+    return modulated_codeword;
+  }
+
+  std::vector<complex_float> GetDLModulation(
       const std::vector<int8_t>& encoded_codeword) {
     std::vector<complex_float> modulated_codeword(cfg_->OfdmDataNum());
     std::vector<uint8_t> mod_input(cfg_->OfdmDataNum());

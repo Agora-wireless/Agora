@@ -173,8 +173,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     std::vector<std::vector<complex_float>> ul_modulated_codewords(
         num_ul_codeblocks);
     for (size_t i = 0; i < num_ul_codeblocks; i++) {
+      size_t sym_offset = i % (symbol_blocks);
+      size_t ue_id = sym_offset / this->cfg_->LdpcConfig().NumBlocksInSymbol();
       ul_modulated_codewords.at(i) =
-          this->GetModulation(ul_encoded_codewords.at(i));
+          this->GetULModulation(ul_encoded_codewords.at(i), ue_id);
     }
 
     // Place modulated uplink data codewords into central IFFT bins
@@ -420,7 +422,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         num_dl_codeblocks);
     for (size_t i = 0; i < num_dl_codeblocks; i++) {
       dl_modulated_codewords.at(i) =
-          this->GetModulation(dl_encoded_codewords.at(i));
+          this->GetDLModulation(dl_encoded_codewords.at(i));
     }
 
     {

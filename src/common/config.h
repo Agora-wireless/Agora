@@ -278,7 +278,7 @@ class Config {
     this->mod_order_ = static_cast<size_t>(pow(2, this->mod_order_bits_));
     InitModulationTable(this->mod_table_, this->mod_order_);
     this->ldpc_config_.NumBlocksInSymbol(
-        (this->ofdm_data_num_ * this->mod_order_bits_) /
+        ((this->GetOFDMDataNum()) * this->mod_order_bits_) /
         this->ldpc_config_.NumCbCodewLen());
   }
 
@@ -378,6 +378,12 @@ class Config {
   // phase tracking
   inline size_t GetOFDMPilotNum() const {
     return ofdm_data_num_ / ofdm_pilot_spacing_;
+  }
+
+  // Returns the number of data subcarriers exclusing phase tracking pilot
+  // subcarriers
+  inline size_t GetOFDMDataNum() const {
+    return ofdm_data_num_ - GetOFDMPilotNum();
   }
 
  private:

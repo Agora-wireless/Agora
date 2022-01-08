@@ -5,7 +5,7 @@
   "antenna_num": 8,
   "ue_num": 8,
   "modulation": "64QAM",
-  "Zc": 104,
+  "Zc": 102,
   "symbol_num_perframe": 70,
   "client_ul_pilot_syms": 0,
   "dl_data_symbol_start": 0,
