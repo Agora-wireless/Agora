@@ -409,9 +409,13 @@ Config::Config(const std::string& jsonfile)
   // client_dl_pilot_sym uses the first x 'D' symbols for downlink channel
   // estimation for each user.
   size_t client_dl_pilot_syms = tdd_conf.value("client_dl_pilot_syms", 0);
+  RtAssert(client_dl_pilot_syms <= frame_.NumDLSyms(),
+           "Number of DL pilot symbol exceeds number of DL symbols!");
   // client_ul_pilot_sym uses the first x 'U' symbols for downlink channel
   // estimation for each user.
   size_t client_ul_pilot_syms = tdd_conf.value("client_ul_pilot_syms", 0);
+  RtAssert(client_ul_pilot_syms <= frame_.NumULSyms(),
+           "Number of UL pilot symbol exceeds number of UL symbols!");
 
   frame_.SetClientPilotSyms(client_ul_pilot_syms, client_dl_pilot_syms);
 
