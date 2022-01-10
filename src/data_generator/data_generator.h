@@ -118,6 +118,26 @@ class DataGenerator {
     return modulated_codeword;
   }
 
+  std::vector<complex_float> GetDLModulation(
+      const std::vector<int8_t>& encoded_codeword, complex_float* pilot_seq) {
+    std::vector<complex_float> modulated_codeword(cfg_->OfdmDataNum());
+    std::vector<uint8_t> mod_input(cfg_->GetOFDMDataNum());
+
+    AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
+                    &mod_input[0], cfg_->LdpcConfig().NumEncodedBytes(),
+                    cfg_->ModOrderBits());
+
+    for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
+      if (cfg_->IsDataSubcarrier(i) == true) {
+        modulated_codeword[i] = ModSingleUint8(
+            mod_input[cfg_->GetOFDMDataIndex(i)], cfg_->ModTable());
+      } else {
+        modulated_codeword[i] = pilot_seq[i];
+      }
+    }
+    return modulated_codeword;
+  }
+
   std::vector<complex_float> GetModulation(const int8_t* encoded_codeword,
                                            size_t num_bits) {
     std::vector<complex_float> modulated_codeword(cfg_->OfdmDataNum());

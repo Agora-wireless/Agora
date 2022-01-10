@@ -1442,7 +1442,7 @@ void Agora::InitializeDownlinkBuffers() {
     }
     dl_encoded_buffer_.Calloc(
         task_buffer_symbol_num,
-        Roundup<64>(config_->OfdmDataNum()) * config_->UeAntNum(),
+        Roundup<64>(config_->GetOFDMDataNum()) * config_->UeAntNum(),
         Agora_memory::Alignment_t::kAlign64);
 
     encode_counters_.Init(
