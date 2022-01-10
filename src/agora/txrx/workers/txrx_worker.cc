@@ -27,6 +27,9 @@ TxRxWorker::TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
       ant_per_cell_(config->BsAntNum() / config->NumCells()),
       rx_frame_start_(rx_frame_start),
       running_(false),
+      mutex_(sync_mutex),
+      cond_(sync_cond),
+      can_proceed_(can_proceed),
       cfg_(config),
       thread_(),
       rx_memory_idx_(0),
@@ -36,9 +39,6 @@ TxRxWorker::TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
       tx_pending_q_(tx_pending_q),
       tx_producer_token_(tx_producer),
       notify_producer_token_(notify_producer),
-      mutex_(sync_mutex),
-      cond_(sync_cond),
-      can_proceed_(can_proceed),
       started_(false) {}
 
 TxRxWorker::~TxRxWorker() { Stop(); }
@@ -61,11 +61,11 @@ void TxRxWorker::WaitSync() {
   // Use mutex to sychronize data receiving across threads
   {
     std::unique_lock<std::mutex> locker(mutex_);
-    MLPD_INFO("TxRxWorker [%zu]: waiting for sync\n", tid_);
+    MLPD_INFO("TxRxWorker[%zu]: waiting for sync\n", tid_);
     started_ = true;
     cond_.wait(locker, [this] { return can_proceed_.load(); });
   }
-  MLPD_INFO("TxRxWorker [%zu]: synchronized\n", tid_);
+  MLPD_INFO("TxRxWorker[%zu]: synchronized\n", tid_);
 }
 
 bool TxRxWorker::NotifyComplete(EventData& complete_event) {

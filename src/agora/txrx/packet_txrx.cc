@@ -134,8 +134,8 @@ bool PacketTxRx::StartTxRx(Table<complex_float>& calib_dl_buffer,
     worker->Start();
     while (worker->Started() == false) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      MLPD_INFO("PacketTxRx[%zu] : worker has started \n", worker->Id());
     }
+    MLPD_INFO("PacketTxRx: worker %zu has started \n", worker->Id());
   }
   MLPD_INFO("PacketTxRx: notifying workers\n");
   NotifyWorkers();

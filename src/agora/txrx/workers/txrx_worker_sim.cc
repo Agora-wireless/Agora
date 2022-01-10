@@ -73,13 +73,13 @@ void TxRxWorkerSim::DoTxRx() {
   }
 
   size_t prev_frame_id = SIZE_MAX;
-  size_t tx_frame_start = GetTime::Rdtsc();
   size_t tx_frame_id = 0;
-  size_t send_time = delay_tsc + tx_frame_start;
   size_t current_interface = 0;
-
   running_ = true;
   WaitSync();
+
+  size_t tx_frame_start = GetTime::Rdtsc();
+  size_t send_time = delay_tsc + tx_frame_start;
 
   // Send Beacons for the first time to kick off sim
   // SendBeacon(tid, tx_frame_id++);
@@ -87,6 +87,9 @@ void TxRxWorkerSim::DoTxRx() {
     size_t rdtsc_now = GetTime::Rdtsc();
 
     if (rdtsc_now > send_time) {
+      MLPD_INFO(
+          "TxRxWorkerSim[%zu]: sending beacon for frame %zu at time %zu\n",
+          tid_, tx_frame_id, rdtsc_now);
       SendBeacon(tx_frame_id++);
 
       if (kEnableSlowStart) {
