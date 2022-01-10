@@ -160,7 +160,6 @@ void TxRxWorkerArgos::DoTxRx() {
     if (0 == DequeueSend(time0)) {
       // attempt to receive symbol (might be good to reduce the rx timeout to allow for tx during dead time)
       auto pkts = RecvEnqueue(rx_interface, global_frame_id, global_symbol_id);
-      size_t rx_symbol_id;
       if (!pkts.empty()) {
         RtAssert(pkts.size() == channels_per_interface_,
                  "Received data but it was the wrong dimension");
@@ -172,21 +171,18 @@ void TxRxWorkerArgos::DoTxRx() {
             prev_frame_id = frame_id;
           }
         }
-        rx_symbol_id = pkts.front()->symbol_id_;
+        size_t rx_symbol_id = pkts.front()->symbol_id_;
+
+        //Symbol received, change the rx interface
+        size_t current_interface = rx_interface;
+        rx_interface = UpdateRxInterface(rx_interface, rx_symbol_id);
+        MLPD_INFO(
+            "TxRxWorkerArgos[%zu] Last Interface %zu, symbol %zu, next "
+            "interface %zu\n",
+            tid_, current_interface, rx_symbol_id, rx_interface);
       }  // if (pkt.size() > 0)
-      else {
-        /* No Data received, what now? 
-         * at this time this is unlikely to happen, as the timeouts are very large */
-        rx_symbol_id = 0;
-      }
-      size_t current_interface = rx_interface;
-      rx_interface = UpdateRxInterface(rx_interface, rx_symbol_id);
-      MLPD_INFO(
-          "TxRxWorkerArgos[%zu] Last Interface %zu, symbol %zu, next interface "
-          "%zu\n",
-          tid_, current_interface, rx_symbol_id, rx_interface);
-    }  // DequeueSendArgos(time0) == 0
-  }    // Configuration()->Running() == true
+    }    // DequeueSendArgos(time0) == 0
+  }      // Configuration()->Running() == true
   running_ = false;
 }
 
@@ -211,6 +207,8 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
     memory_tracking.push_back(&rx);
     ant_ids.at(ch) = ant_id + ch;
     samp.at(ch) = rx.RawPacket()->data_;
+    MLPD_TRACE("TxRxWorkerArgos[%zu]: Using Packet at location %zu\n", tid_,
+               (size_t)(&rx));
   }
 
   long long frame_time;
@@ -269,8 +267,8 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
         "TxRxWorkerArgos[%zu], Interface %zu | Radio %zu - Rx failure RX "
         "status = %d is less than 0\n",
         tid_, interface_id, interface_id + interface_offset_, rx_status);
-  } else if (static_cast<size_t>(rx_status) !=
-             Configuration()->SampsPerSymbol()) {
+  } else if ((rx_status != 0) && (static_cast<size_t>(rx_status) !=
+                                  Configuration()->SampsPerSymbol())) {
     const size_t rx_frame = static_cast<size_t>(frame_time >> 32);
     const size_t rx_symbol = static_cast<size_t>((frame_time >> 16) & 0xFFFF);
     MLPD_ERROR(
@@ -281,9 +279,15 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
   }
 
   //Free memory from most recent allocated to latest
-  for (size_t idx = (memory_tracking.size() - 1); idx > 0; idx--) {
+  MLPD_TRACE("TxRxWorkerArgos[%zu]: Memory allocation %zu\n", tid_,
+             memory_tracking.size());
+  for (ssize_t idx = (memory_tracking.size() - 1); idx > -1; idx--) {
     auto* memory_location = memory_tracking.at(idx);
+    MLPD_TRACE("TxRxWorkerArgos[%zu]: Checking location %zu\n", tid_,
+               (size_t)memory_location);
     if (memory_location != nullptr) {
+      MLPD_TRACE("TxRxWorkerArgos[%zu]: Returning Packet at location %zu\n",
+                 tid_, (size_t)memory_location);
       ReturnRxPacket(*memory_location);
     }
   }
@@ -337,6 +341,10 @@ void TxRxWorkerArgos::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
   const size_t cell_id = Configuration()->CellId().at(radio_id);
   const std::vector<std::complex<int16_t>> zeros(
       Configuration()->SampsPerSymbol(), std::complex<int16_t>(0, 0));
+
+  MLPD_INFO(
+      "TxRxWorkerArgos[%zu]: TxReciprocityCalibPilots frame %zu radio %zu\n",
+      tid_, frame_id, radio_id);
 
   //Schedule the Calibration Uplink 'L' Symbol on the reference radio
   if (radio_id == Configuration()->RefRadio(cell_id)) {

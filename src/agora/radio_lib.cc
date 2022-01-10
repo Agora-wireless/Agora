@@ -595,7 +595,8 @@ int RadioConfig::RadioRx(size_t radio_id, void** buffs, long long& frameTime) {
   int rx_status = 0;
   int rx_flags = 0;
   ///\todo Move this to 0 and see what happens
-  const long kRxTimeout = 10;
+  //const long kRxTimeout = 10;
+  const long kRxTimeout = 1000000;
   if (radio_id < this->radio_num_) {
     long long frame_time_ns = 0;
     int ret = ba_stn_.at(radio_id)->readStream(rx_streams_.at(radio_id), buffs,

@@ -52,6 +52,7 @@ bool PacketTxRxRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
     std::fprintf(stderr, "PacketTxRxRadio: Failed to start radio\n");
   } else {
     PacketTxRx::StartTxRx(calib_dl_buffer, calib_ul_buffer);
+    MLPD_INFO("PacketTxRxRadio : All workers started triggering the radio\n");
     radio_config_->Go();
   }
   return status;
