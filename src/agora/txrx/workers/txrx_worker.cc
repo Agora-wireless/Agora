@@ -16,7 +16,9 @@ TxRxWorker::TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
                        moodycamel::ProducerToken& tx_producer,
                        moodycamel::ProducerToken& notify_producer,
                        std::vector<RxPacket>& rx_memory,
-                       std::byte* const tx_memory)
+                       std::byte* const tx_memory, std::mutex& sync_mutex,
+                       std::condition_variable& sync_cond,
+                       std::atomic<bool>& can_proceed)
     : tid_(tid),
       core_offset_(core_offset),
       num_interfaces_(interface_count),
@@ -25,7 +27,6 @@ TxRxWorker::TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
       ant_per_cell_(config->BsAntNum() / config->NumCells()),
       rx_frame_start_(rx_frame_start),
       running_(false),
-      started_(false),
       cfg_(config),
       thread_(),
       rx_memory_idx_(0),
@@ -34,7 +35,11 @@ TxRxWorker::TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
       event_notify_q_(event_notify_q),
       tx_pending_q_(tx_pending_q),
       tx_producer_token_(tx_producer),
-      notify_producer_token_(notify_producer) {}
+      notify_producer_token_(notify_producer),
+      mutex_(sync_mutex),
+      cond_(sync_cond),
+      can_proceed_(can_proceed),
+      started_(false) {}
 
 TxRxWorker::~TxRxWorker() { Stop(); }
 
@@ -51,11 +56,23 @@ void TxRxWorker::Stop() {
   }
 }
 
+///Using a latch might be better but adds c++20 requirement
+void TxRxWorker::WaitSync() {
+  // Use mutex to sychronize data receiving across threads
+  {
+    std::unique_lock<std::mutex> locker(mutex_);
+    MLPD_INFO("TxRxWorker [%zu]: waiting for sync\n", tid_);
+    started_ = true;
+    cond_.wait(locker, [this] { return can_proceed_.load(); });
+  }
+  MLPD_INFO("TxRxWorker [%zu]: synchronized\n", tid_);
+}
+
 bool TxRxWorker::NotifyComplete(EventData& complete_event) {
   auto enqueue_status =
       event_notify_q_->enqueue(notify_producer_token_, complete_event);
   if (enqueue_status == false) {
-    std::printf("TxRxWorker[%zu]: socket message enqueue failed\n", tid_);
+    MLPD_ERROR("TxRxWorker[%zu]: socket message enqueue failed\n", tid_);
     throw std::runtime_error("TxRxWorker: socket message enqueue failed");
   }
   return enqueue_status;

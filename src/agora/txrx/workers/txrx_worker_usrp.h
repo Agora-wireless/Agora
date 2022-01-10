@@ -23,7 +23,8 @@ class TxRxWorkerUsrp : public TxRxWorker {
                  moodycamel::ProducerToken& tx_producer,
                  moodycamel::ProducerToken& notify_producer,
                  std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
-                 RadioConfig* const radio_config);
+                 std::mutex& sync_mutex, std::condition_variable& sync_cond,
+                 std::atomic<bool>& can_proceed, RadioConfig& radio_config);
 
   ~TxRxWorkerUsrp() final override;
 
@@ -39,6 +40,6 @@ class TxRxWorkerUsrp : public TxRxWorker {
   long long rx_time_bs_;
   long long tx_time_bs_;
   // This object is created / owned by the parent process
-  RadioConfig* const radio_config_;
+  RadioConfig& radio_config_;
 };
 #endif  // TXRX_WORKER_USRP_H_

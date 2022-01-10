@@ -20,10 +20,12 @@ TxRxWorkerArgos::TxRxWorkerArgos(
     moodycamel::ProducerToken& tx_producer,
     moodycamel::ProducerToken& notify_producer,
     std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
-    RadioConfig* const radio_config)
+    std::mutex& sync_mutex, std::condition_variable& sync_cond,
+    std::atomic<bool>& can_proceed, RadioConfig& radio_config)
     : TxRxWorker(core_offset, tid, interface_count, interface_offset, config,
                  rx_frame_start, event_notify_q, tx_pending_q, tx_producer,
-                 notify_producer, rx_memory, tx_memory),
+                 notify_producer, rx_memory, tx_memory, sync_mutex, sync_cond,
+                 can_proceed),
       radio_config_(radio_config) {}
 
 TxRxWorkerArgos::~TxRxWorkerArgos() {}
@@ -37,7 +39,7 @@ void TxRxWorkerArgos::DoTxRx() {
             num_interfaces_);
 
   running_ = true;
-  started_ = true;
+  WaitSync();
 
   if (num_interfaces_ == 0) {
     MLPD_WARN("TxRxWorkerArgos[%zu] has no interfaces, exiting\n", tid_);
@@ -95,7 +97,7 @@ void TxRxWorkerArgos::DoTxRx() {
         const size_t rx_radio_id = interface_offset_;
         while (rx_status < 0) {
           rx_status =
-              radio_config_->RadioRx(rx_radio_id, samp_buffer, rx_time_bs);
+              radio_config_.RadioRx(rx_radio_id, samp_buffer, rx_time_bs);
         }
         //First Frame has been rx'd by the first radio
         tx_time_bs = rx_time_bs + frame_time * TX_FRAME_DELTA;
@@ -108,7 +110,7 @@ void TxRxWorkerArgos::DoTxRx() {
         //Finish rx'ing symbol 0 on remaining radios
         for (size_t radio_id = rx_radio_id + 1;
              radio_id < rx_radio_id + num_interfaces_; radio_id++) {
-          rx_status = radio_config_->RadioRx(radio_id, samp_buffer, rx_time_bs);
+          rx_status = radio_config_.RadioRx(radio_id, samp_buffer, rx_time_bs);
           //---------------What to do about errors?
         }
         //Symbol complete
@@ -121,11 +123,11 @@ void TxRxWorkerArgos::DoTxRx() {
       for (size_t radio_id = interface_offset_;
            radio_id < interface_offset_ + num_interfaces_; radio_id++) {
         if (radio_id == beacon_radio) {
-          tx_status = radio_config_->RadioTx(radio_id, beaconbuffs.data(),
-                                             kBeacontxFlags, tx_time_bs);
+          tx_status = radio_config_.RadioTx(radio_id, beaconbuffs.data(),
+                                            kBeacontxFlags, tx_time_bs);
         } else {
-          tx_status = radio_config_->RadioTx(radio_id, zeros, kBeacontxFlags,
-                                             tx_time_bs);
+          tx_status = radio_config_.RadioTx(radio_id, zeros, kBeacontxFlags,
+                                            tx_time_bs);
         }
         if (tx_status != static_cast<int>(Configuration()->SampsPerSymbol())) {
           std::cerr << "BAD Transmit(" << tx_status << "/"
@@ -139,7 +141,7 @@ void TxRxWorkerArgos::DoTxRx() {
            sym < Configuration()->Frame().NumTotalSyms(); sym++) {
         for (size_t radio_id = interface_offset_;
              radio_id < interface_offset_ + num_interfaces_; radio_id++) {
-          rx_status = radio_config_->RadioRx(radio_id, samp_buffer, rx_time_bs);
+          rx_status = radio_config_.RadioRx(radio_id, samp_buffer, rx_time_bs);
           //---------------Check status?
         }
       }
@@ -225,7 +227,7 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
 
   //Ok to read into sample memory for dummy read
   const int rx_status =
-      radio_config_->RadioRx(radio_id, samp.data(), frame_time);
+      radio_config_.RadioRx(radio_id, samp.data(), frame_time);
 
   if ((dummy_read == false) && (rx_status > 0)) {
     //     (rx_status == static_cast<int>(Configuration()->SampsPerSymbol()))) {
@@ -317,9 +319,9 @@ void TxRxWorkerArgos::TxBeaconHw(size_t frame_id, size_t interface_id,
                                     Configuration()->Frame().NumTotalSyms()) +
                                    beacon_symbol_id));
 
-  int tx_ret = radio_config_->RadioTx(radio_id, tx_buffs.data(),
-                                      GetTxFlags(radio_id, beacon_symbol_id),
-                                      frame_time);
+  int tx_ret =
+      radio_config_.RadioTx(radio_id, tx_buffs.data(),
+                            GetTxFlags(radio_id, beacon_symbol_id), frame_time);
   if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
     std::cerr << "BAD BEACON Transmit(" << tx_ret << "/"
               << Configuration()->SampsPerSymbol() << ") at Time " << frame_time
@@ -357,8 +359,8 @@ void TxRxWorkerArgos::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
           ((long long)(frame_id + TX_FRAME_DELTA) << 32) | (tx_symbol_id << 16);
     }
     //Check to see if the next symbol is a Tx symbol for the reference node
-    radio_config_->RadioTx(radio_id, calultxbuf.data(),
-                           GetTxFlags(radio_id, tx_symbol_id), frame_time);
+    radio_config_.RadioTx(radio_id, calultxbuf.data(),
+                          GetTxFlags(radio_id, tx_symbol_id), frame_time);
   } else {
     // ! ref_radio -- Transmit downlink calibration (array to ref) pilot
     // Send all CalDl symbols 'C'
@@ -397,8 +399,8 @@ void TxRxWorkerArgos::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
         frame_time = ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
                      (tx_symbol_id << 16);
       }
-      radio_config_->RadioTx(radio_id, caldltxbuf.data(),
-                             GetTxFlags(radio_id, tx_symbol_id), frame_time);
+      radio_config_.RadioTx(radio_id, caldltxbuf.data(),
+                            GetTxFlags(radio_id, tx_symbol_id), frame_time);
 
       //Reset the caldltxbuf to zeros for next loop
       if (calib_radio == radio_id) {
@@ -486,8 +488,8 @@ size_t TxRxWorkerArgos::DequeueSend(long long time0) {
         frame_time =
             ((long long)(frame_id + TX_FRAME_DELTA) << 32) | (symbol_id << 16);
       }
-      radio_config_->RadioTx(radio_id, txbuf.data(),
-                             GetTxFlags(radio_id, symbol_id), frame_time);
+      radio_config_.RadioTx(radio_id, txbuf.data(),
+                            GetTxFlags(radio_id, symbol_id), frame_time);
     }
 
     if (kDebugPrintInTask == true) {

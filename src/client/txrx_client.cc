@@ -443,7 +443,7 @@ void* RadioTxRx::LoopTxRxArgos(size_t tid) {
   {
     std::unique_lock<std::mutex> locker(mutex_);
     std::printf("RadioTxRx [%zu]: waiting for release\n", tid);
-    cond_.wait(locker, [this] { return this->thread_sync_; });
+    cond_.wait(locker, [this] { return thread_sync_.load(); });
   }
   std::printf("RadioTxRx [%zu]: released\n", tid);
 
@@ -526,7 +526,7 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
     }
 
     MLPD_INFO("RadioTxRx [%zu]: waiting for release\n", tid);
-    cond_.wait(locker, [this] { return this->thread_sync_; });
+    cond_.wait(locker, [this] { return thread_sync_.load(); });
   }
   MLPD_INFO("RadioTxRx [%zu]: released\n", tid);
 

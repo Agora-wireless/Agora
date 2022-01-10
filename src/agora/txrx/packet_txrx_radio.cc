@@ -52,14 +52,6 @@ bool PacketTxRxRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
     std::fprintf(stderr, "PacketTxRxRadio: Failed to start radio\n");
   } else {
     PacketTxRx::StartTxRx(calib_dl_buffer, calib_ul_buffer);
-
-    for (auto& worker : worker_threads_) {
-      while (worker->Started() == false) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-      }
-      MLPD_INFO("PacketTxRxRadio[%zu] : worker started \n", worker->Id());
-    }
-    MLPD_INFO("PacketTxRxRadio : All workers started\n");
     radio_config_->Go();
   }
   return status;
@@ -84,13 +76,13 @@ bool PacketTxRxRadio::CreateWorker(size_t tid, size_t interface_count,
         core_offset_, tid, interface_count, interface_offset, cfg_,
         rx_frame_start, event_notify_q_, tx_pending_q_,
         *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,
-        tx_memory, radio_config_.get()));
+        tx_memory, mutex_, cond_, proceed_, *radio_config_.get()));
   } else if (kUseUHD) {
     worker_threads_.emplace_back(std::make_unique<TxRxWorkerUsrp>(
         core_offset_, tid, interface_count, interface_offset, cfg_,
         rx_frame_start, event_notify_q_, tx_pending_q_,
         *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,
-        tx_memory, radio_config_.get()));
+        tx_memory, mutex_, cond_, proceed_, *radio_config_.get()));
   } else {
     RtAssert(false, "This class does not support the current configuration");
   }

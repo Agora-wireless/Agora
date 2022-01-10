@@ -5,6 +5,9 @@
 #ifndef TXRX_WORKER_H_
 #define TXRX_WORKER_H_
 
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -20,7 +23,9 @@ class TxRxWorker {
              moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
              moodycamel::ProducerToken& tx_producer,
              moodycamel::ProducerToken& notify_producer,
-             std::vector<RxPacket>& rx_memory, std::byte* const tx_memory);
+             std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
+             std::mutex& sync_mutex, std::condition_variable& sync_cond,
+             std::atomic<bool>& can_proceed);
 
   virtual ~TxRxWorker();
 
@@ -33,6 +38,7 @@ class TxRxWorker {
   inline bool Running() const { return running_; }
 
  protected:
+  void WaitSync();
   inline Config* Configuration() { return cfg_; }
   bool NotifyComplete(EventData& complete_event);
   std::vector<EventData> GetPendingTxEvents(size_t max_events = 0);
@@ -48,7 +54,11 @@ class TxRxWorker {
   const size_t ant_per_cell_;
   size_t* const rx_frame_start_;
   bool running_;
-  bool started_;
+
+  ///Owned by the parent TxRx object for sync
+  std::mutex& mutex_;
+  std::condition_variable& cond_;
+  std::atomic<bool>& can_proceed_;
 
  private:
   TxRxWorker() = delete;
@@ -65,5 +75,7 @@ class TxRxWorker {
   moodycamel::ProducerToken& tx_producer_token_;
   //local producer of notification messages (used for TX and RX)
   moodycamel::ProducerToken& notify_producer_token_;
+
+  bool started_;
 };
 #endif  // TXRX_WORKER_H_

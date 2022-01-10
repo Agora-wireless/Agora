@@ -20,10 +20,11 @@ TxRxWorkerUsrp::TxRxWorkerUsrp(
     moodycamel::ProducerToken& tx_producer,
     moodycamel::ProducerToken& notify_producer,
     std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
-    RadioConfig* const radio_config)
+    std::mutex& sync_mutex, std::condition_variable& sync_cond,
+    std::atomic<bool>& can_proceed, RadioConfig& radio_config)
     : TxRxWorker(core_offset, tid, radio_hi, radio_lo, config, rx_frame_start,
                  event_notify_q, tx_pending_q, tx_producer, notify_producer,
-                 rx_memory, tx_memory),
+                 rx_memory, tx_memory, sync_mutex, sync_cond, can_proceed),
       radio_config_(radio_config) {}
 
 TxRxWorkerUsrp::~TxRxWorkerUsrp() {}
@@ -58,16 +59,16 @@ void TxRxWorkerUsrp::DoTxRx() {
   tx_time_bs_ = 0;
 
   std::cout << "Sync BS host and FGPA timestamp..." << std::endl;
-  radio_config_->RadioRx(0, samp_buffer.data(), rx_time_bs_);
+  radio_config_.RadioRx(0, samp_buffer.data(), rx_time_bs_);
   // Schedule the first beacon in the future
   tx_time_bs_ = rx_time_bs_ + Configuration()->SampsPerSymbol() *
                                   Configuration()->Frame().NumTotalSyms() * 40;
-  radio_config_->RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
+  radio_config_.RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
   long long bs_init_rx_offset = tx_time_bs_ - rx_time_bs_;
   for (int it = 0;
        it < std::floor(bs_init_rx_offset / Configuration()->SampsPerSymbol());
        it++) {
-    radio_config_->RadioRx(0, samp_buffer.data(), rx_time_bs_);
+    radio_config_.RadioRx(0, samp_buffer.data(), rx_time_bs_);
   }
 
   std::cout << std::endl;
@@ -81,7 +82,8 @@ void TxRxWorkerUsrp::DoTxRx() {
   size_t local_interface = 0;
 
   running_ = true;
-  started_ = true;
+  WaitSync();
+  
   while (Configuration()->Running() == true) {
     // transmit data
     // if (-1 != dequeue_send_usrp(tid))
@@ -95,7 +97,7 @@ void TxRxWorkerUsrp::DoTxRx() {
       tx_time_bs_ = rx_time_bs_ + Configuration()->SampsPerSymbol() *
                                       Configuration()->Frame().NumTotalSyms() *
                                       20;
-      int tx_ret = radio_config_->RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
+      int tx_ret = radio_config_.RadioTx(0, beaconbuff.data(), 2, tx_time_bs_);
       if (tx_ret != (int)Configuration()->SampsPerSymbol()) {
         std::cerr << "BAD Transmit(" << tx_ret << "/"
                   << Configuration()->SampsPerSymbol() << ") at Time "
@@ -152,8 +154,7 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(size_t radio_id,
       (Configuration()->IsUplink(frame_id, symbol_id) == false)) {
     dummy_read = true;
   }
-  const int tmp_ret =
-      radio_config_->RadioRx(radio_id, samp.data(), rx_time_bs_);
+  const int tmp_ret = radio_config_.RadioRx(radio_id, samp.data(), rx_time_bs_);
 
   if ((tmp_ret > 0) && (dummy_read == false)) {
     const size_t ant_id = radio_id * n_channels;
@@ -237,7 +238,7 @@ int TxRxWorkerUsrp::DequeueSend() {
   int flags = (symbol_id != last) ? 1   // HAS_TIME
                                   : 2;  // HAS_TIME & END_BURST, fixme
   long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
-  radio_config_->RadioTx(radio_id, txbuffs.data(), flags, frame_time);
+  radio_config_.RadioTx(radio_id, txbuffs.data(), flags, frame_time);
 
   if (kDebugPrintInTask == true) {
     std::printf(
@@ -310,7 +311,7 @@ int TxRxWorkerUsrp::DequeueSend(int frame_id, int symbol_id) {
                   ? 1   // HAS_TIME
                   : 2;  // HAS_TIME & END_BURST, fixme
   long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
-  radio_config_->RadioTx(radio_id, txbuffs.data(), flags, frame_time);
+  radio_config_.RadioTx(radio_id, txbuffs.data(), flags, frame_time);
 
   if (kDebugPrintInTask) {
     std::printf(

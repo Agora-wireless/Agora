@@ -134,7 +134,7 @@ class RadioTxRx {
  private:
   std::mutex mutex_;
   std::condition_variable cond_;
-  bool thread_sync_;
+  std::atomic<bool> thread_sync_;
 
   std::vector<std::thread> txrx_threads_;
 

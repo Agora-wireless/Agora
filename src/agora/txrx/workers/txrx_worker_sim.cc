@@ -26,10 +26,13 @@ TxRxWorkerSim::TxRxWorkerSim(
     moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
     moodycamel::ProducerToken& tx_producer,
     moodycamel::ProducerToken& notify_producer,
-    std::vector<RxPacket>& rx_memory, std::byte* const tx_memory)
+    std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
+    std::mutex& sync_mutex, std::condition_variable& sync_cond,
+    std::atomic<bool>& can_proceed)
     : TxRxWorker(core_offset, tid, interface_count, interface_offset, config,
                  rx_frame_start, event_notify_q, tx_pending_q, tx_producer,
-                 notify_producer, rx_memory, tx_memory) {
+                 notify_producer, rx_memory, tx_memory, sync_mutex, sync_cond,
+                 can_proceed) {
   for (size_t interface = 0; interface < num_interfaces_; ++interface) {
     const uint16_t local_port_id =
         config->BsServerPort() + interface + interface_offset_;
@@ -76,7 +79,8 @@ void TxRxWorkerSim::DoTxRx() {
   size_t current_interface = 0;
 
   running_ = true;
-  started_ = true;
+  WaitSync();
+
   // Send Beacons for the first time to kick off sim
   // SendBeacon(tid, tx_frame_id++);
   while (Configuration()->Running() == true) {

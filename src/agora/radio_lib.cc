@@ -197,7 +197,6 @@ RadioConfig::RadioConfig(Config* cfg)
       }
     }
   }
-
   std::cout << "radio init done!" << std::endl;
 }
 
@@ -420,8 +419,6 @@ bool RadioConfig::RadioStart() {
     init_calib_ul_.Free();
   }
 
-  std::vector<unsigned> zeros(cfg_->SampsPerSymbol(), 0);
-
   DrainBuffers();
   nlohmann::json conf;
   conf["tdd_enabled"] = true;
@@ -499,6 +496,7 @@ bool RadioConfig::RadioStart() {
     }
   }
 
+  //Stream is already activated?
   if (!kUseUHD && cfg_->HwFramer() == false) {
     this->Go();  // to set all radio timestamps to zero
     int flags = SOAPY_SDR_HAS_TIME;
@@ -594,12 +592,15 @@ void RadioConfig::RadioRx(void** buffs) {
 }
 
 int RadioConfig::RadioRx(size_t radio_id, void** buffs, long long& frameTime) {
-  int flags = 0;
+  int rx_status = 0;
+  int rx_flags = 0;
+  ///\todo Move this to 0 and see what happens
+  const long kRxTimeout = 10;
   if (radio_id < this->radio_num_) {
     long long frame_time_ns = 0;
     int ret = ba_stn_.at(radio_id)->readStream(rx_streams_.at(radio_id), buffs,
-                                               cfg_->SampsPerSymbol(), flags,
-                                               frame_time_ns, 1000000);
+                                               cfg_->SampsPerSymbol(), rx_flags,
+                                               frame_time_ns, kRxTimeout);
 
     if (cfg_->HwFramer() == true) {
       // SoapySDR::timeNsToTicks(frameTimeNs, _rate);
@@ -617,10 +618,10 @@ int RadioConfig::RadioRx(size_t radio_id, void** buffs, long long& frameTime) {
         std::cout << "radio " << radio_id << "received " << ret << std::endl;
       }
     }
-    return ret;
+  } else {
+    std::cout << "Invalid radio id " << radio_id << std::endl;
   }
-  std::cout << "invalid radio id " << radio_id << std::endl;
-  return 0;
+  return rx_status;
 }
 
 int RadioConfig::RadioRx(
@@ -634,13 +635,17 @@ int RadioConfig::RadioRx(
 }
 
 void RadioConfig::DrainBuffers() {
-  std::vector<std::complex<int16_t>> dummy_buff0(cfg_->SampsPerSymbol());
-  std::vector<std::complex<int16_t>> dummy_buff1(cfg_->SampsPerSymbol());
-  std::vector<void*> dummybuffs(2);
-  dummybuffs[0] = dummy_buff0.data();
-  dummybuffs[1] = dummy_buff1.data();
+  std::vector<std::vector<std::complex<int16_t>>> sample_storage(
+      cfg_->NumChannels(),
+      std::vector<std::complex<int16_t>>(cfg_->SampsPerSymbol(),
+                                         std::complex<int16_t>(0, 0)));
+  std::vector<void*> rx_buffs;
+  for (auto& buff : sample_storage) {
+    rx_buffs.push_back(buff.data());
+  }
+
   for (size_t i = 0; i < cfg_->NumRadios(); i++) {
-    RadioConfig::DrainRxBuffer(ba_stn_.at(i), rx_streams_.at(i), dummybuffs,
+    RadioConfig::DrainRxBuffer(ba_stn_.at(i), rx_streams_.at(i), rx_buffs,
                                cfg_->SampsPerSymbol());
   }
 }
@@ -658,7 +663,7 @@ void RadioConfig::DrainRxBuffer(SoapySDR::Device* ibsSdrs,
                             timeout_us);
     i++;
   }
-  // std::cout << "Number of reads needed to drain: " << i << std::endl;
+  std::cout << "Number of reads needed to drain: " << i << std::endl;
 }
 
 void RadioConfig::ReadSensors() {

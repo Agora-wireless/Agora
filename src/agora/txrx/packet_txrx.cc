@@ -22,6 +22,9 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
       tx_pending_q_(tx_pending_q),
       notify_producer_tokens_(notify_producer_tokens),
       tx_producer_tokens_(tx_producer_tokens),
+      mutex_(),
+      cond_(),
+      proceed_(false),
       tx_memory_(reinterpret_cast<std::byte* const>(tx_buffer)),
       frame_start_(frame_start),
       /// Interface to worker map (using vector because id's are sequential starting at 0)
@@ -129,12 +132,44 @@ bool PacketTxRx::StartTxRx(Table<complex_float>& calib_dl_buffer,
   MLPD_INFO("PacketTxRx: StartTxRx threads %zu\n", worker_threads_.size());
   for (auto& worker : worker_threads_) {
     worker->Start();
+    while (worker->Started() == false) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      MLPD_INFO("PacketTxRx[%zu] : worker has started \n", worker->Id());
+    }
   }
+  MLPD_INFO("PacketTxRx: notifying workers\n");
+  NotifyWorkers();
+  MLPD_INFO("PacketTxRx: workers notified\n");
   return true;
 }
 
 size_t PacketTxRx::AntNumToWorkerId(size_t ant_num) const {
   return (interface_to_worker_.at(ant_num / cfg_->NumChannels()));
+}
+
+/*
+void PacketTxRx::SyncWorkers() {
+  ///Wait for all workers to be ready
+  for (auto& worker : worker_threads_) {
+    while (worker->Started() == false) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    MLPD_INFO("PacketTxRx[%zu] : worker has started \n", worker->Id());
+  }
+  MLPD_INFO("PacketTxRx: notifying workers\n");
+  NotifyWorkers();
+  MLPD_INFO("PacketTxRx: workers notified\n");
+} */
+
+void PacketTxRx::NotifyWorkers() {  //Sync the workers
+  if (proceed_ == false) {
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    {
+      std::unique_lock<std::mutex> locker(mutex_);
+      proceed_ = true;
+      cond_.notify_all();
+    }
+  }
 }
 
 bool PacketTxRx::CreateWorker(size_t tid, size_t interface_count,
@@ -155,6 +190,7 @@ bool PacketTxRx::CreateWorker(size_t tid, size_t interface_count,
   worker_threads_.emplace_back(std::make_unique<TxRxWorkerSim>(
       core_offset_, tid, interface_count, interface_offset, cfg_,
       rx_frame_start, event_notify_q_, tx_pending_q_, *tx_producer_tokens_[tid],
-      *notify_producer_tokens_[tid], rx_memory, tx_memory));
+      *notify_producer_tokens_[tid], rx_memory, tx_memory, mutex_, cond_,
+      proceed_));
   return true;
 }

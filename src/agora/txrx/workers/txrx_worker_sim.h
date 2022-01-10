@@ -23,7 +23,9 @@ class TxRxWorkerSim : public TxRxWorker {
                 moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
                 moodycamel::ProducerToken& tx_producer,
                 moodycamel::ProducerToken& notify_producer,
-                std::vector<RxPacket>& rx_memory, std::byte* const tx_memory);
+                std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
+                std::mutex& sync_mutex, std::condition_variable& sync_cond,
+                std::atomic<bool>& can_proceed);
   ~TxRxWorkerSim() final override;
 
   void DoTxRx() final override;

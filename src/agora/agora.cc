@@ -310,8 +310,6 @@ void Agora::Start() {
     return;
   }
 
-  PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0);
-
   // Counters for printing summary
   size_t tx_count = 0;
   double tx_begin = GetTime::GetTimeUs();

@@ -56,7 +56,13 @@ class PacketTxRx {
    */
   size_t AntNumToWorkerId(size_t ant_num) const;
 
+  //Align all worker threads to common start event (this call)
+  // Must be called After start
+  //void SyncWorkers();
+
  protected:
+  void NotifyWorkers();
+
   std::vector<std::unique_ptr<TxRxWorker>> worker_threads_;
   Config* const cfg_;
 
@@ -68,6 +74,11 @@ class PacketTxRx {
   moodycamel::ProducerToken** notify_producer_tokens_;
   //Producers assigned to tx_pending_q (used for retrieving messages)
   moodycamel::ProducerToken** tx_producer_tokens_;
+
+  ///Owned by this class and shared with the workers
+  std::mutex mutex_;
+  std::condition_variable cond_;
+  std::atomic<bool> proceed_;
 
  private:
   virtual bool CreateWorker(size_t tid, size_t interface_count,
