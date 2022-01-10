@@ -245,6 +245,21 @@ Config::Config(const std::string& jsonfile)
       tdd_conf.value("ofdm_data_start", (ofdm_ca_num_ - ofdm_data_num_) / 2);
   ofdm_data_stop_ = ofdm_data_start_ + ofdm_data_num_;
 
+  // Build subcarrier map for data ofdm symbols
+  symbol_map_.resize(ofdm_data_num_);
+  // Maps subcarrier index to data index
+  symbol_data_id_.resize(ofdm_data_num_, 0);
+  size_t data_idx = 0;
+  for (size_t i = 0; i < ofdm_data_num_; i++) {
+    if (i % ofdm_pilot_spacing_ == 0)  // TODO: make this index configurable
+      symbol_map_.at(i) = SubcarrierType::kDMRS;
+    else {
+      symbol_map_.at(i) = SubcarrierType::kData;
+      symbol_data_id_.at(i) = data_idx;
+      data_idx++;
+    }
+  }
+
   bigstation_mode_ = tdd_conf.value("bigstation_mode", false);
   freq_orthogonal_pilot_ = tdd_conf.value("freq_orthogonal_pilot", false);
   correct_phase_shift_ = tdd_conf.value("correct_phase_shift", false);
@@ -805,6 +820,8 @@ void Config::GenData() {
       BitsToBytes(this->ldpc_config_.NumCbCodewLen());
   const size_t num_blocks_per_symbol =
       this->ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
+  const size_t encoded_sym_per_block =
+      this->ldpc_config_.NumCbCodewLen() / mod_order_bits_;
 
   // Used as an input ptr to
   auto* scramble_buffer =
@@ -874,7 +891,8 @@ void Config::GenData() {
   dl_encoded_bits.Malloc(this->frame_.NumDLSyms() * num_blocks_per_symbol,
                          encoded_bytes_per_block,
                          Agora_memory::Alignment_t::kAlign64);
-  dl_mod_input_.Calloc(this->frame_.NumDLSyms(), ofdm_data_num_ * ue_ant_num_,
+  dl_mod_input_.Calloc(this->frame_.NumDLSyms(),
+                       Roundup<64>(this->GetOFDMDataNum()) * ue_ant_num_,
                        Agora_memory::Alignment_t::kAlign32);
 
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
@@ -897,7 +915,7 @@ void Config::GenData() {
                          ldpc_config_.ExpansionFactor(), ldpc_config_.NumRows(),
                          coded_bits_ptr, temp_parity_buffer, ldpc_input);
         AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
-                        dl_mod_input_[i] + j * ofdm_data_num_ +
+                        dl_mod_input_[i] + j * Roundup<64>(GetOFDMDataNum()) +
                             k * encoded_bytes_per_block / mod_order_bits_,
                         encoded_bytes_per_block, mod_order_bits_);
       }
@@ -910,13 +928,13 @@ void Config::GenData() {
                     Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
     for (size_t u = 0; u < ue_ant_num_; u++) {
-      size_t p = u * ofdm_data_num_;
       size_t q = u * ofdm_ca_num_;
 
       for (size_t j = ofdm_data_start_; j < ofdm_data_stop_; j++) {
         int k = j - ofdm_data_start_;
-        size_t s = p + k;
-        if (k % ofdm_pilot_spacing_ != 0) {
+        size_t s =
+            u * Roundup<64>(this->GetOFDMDataNum()) + this->GetOFDMDataIndex(k);
+        if (IsDataSubcarrier(k) == true) {
           dl_iq_f_[i][q + j] = ModSingleUint8(dl_mod_input_[i][s], mod_table_);
         } else {
           dl_iq_f_[i][q + j] = ue_specific_pilot_[u][k];

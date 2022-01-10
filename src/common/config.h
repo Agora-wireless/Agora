@@ -383,7 +383,7 @@ class Config {
         ldpc_config_.NumCbCodewLen() / this->mod_order_bits_;
 
     return &encoded_buffer[total_data_symbol_id]
-                          [Roundup<64>(ofdm_data_num_) * ue_id +
+                          [Roundup<64>(GetOFDMDataNum()) * ue_id +
                            num_encoded_bytes_per_cb * cb_id];
   }
 
@@ -391,6 +391,18 @@ class Config {
   // phase tracking
   inline size_t GetOFDMPilotNum() const {
     return ofdm_data_num_ / ofdm_pilot_spacing_;
+  }
+
+  inline size_t GetOFDMDataNum() const {
+    return ofdm_data_num_ - GetOFDMPilotNum();
+  }
+
+  inline size_t GetOFDMDataIndex(size_t sc_id) const {
+    return symbol_data_id_.at(sc_id);
+  }
+
+  inline bool IsDataSubcarrier(size_t sc_id) const {
+    return symbol_map_.at(sc_id) == SubcarrierType::kData;
   }
 
  private:
@@ -452,6 +464,9 @@ class Config {
   std::atomic<bool> running_;
 
   size_t dl_packet_length_;  // HAS_TIME & END_BURST, fixme
+
+  std::vector<SubcarrierType> symbol_map_;
+  std::vector<size_t> symbol_data_id_;
 
   Table<int8_t> dl_bits_;
   Table<int8_t> ul_bits_;

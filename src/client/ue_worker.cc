@@ -23,7 +23,7 @@ static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr bool kRecordDownlinkFrame = true;
-static constexpr size_t kRecordFrameIndex = 1000;
+static constexpr size_t kRecordFrameIndex = 10;
 
 UeWorker::UeWorker(
     size_t tid, Config& config, Stats& shared_stats, PhyStats& shared_phy_stats,
@@ -214,8 +214,7 @@ void UeWorker::DoFftData(size_t tag) {
   // use pilot subcarriers for phase tracking and correction
   float theta = 0;
   for (size_t j = 0; j < config_.OfdmDataNum(); j++) {
-    if (j % config_.OfdmPilotSpacing() == 0) {
-      equ_buffer_ptr[j] = 0;
+    if (config_.IsDataSubcarrier(j) == false) {  //DMRS
       size_t sc_id = non_null_sc_ind_[j];
       arma::cx_float y = fft_buffer_ptr[sc_id];
       auto pilot_eq = y / csi_buffer_ptr[j];
@@ -229,19 +228,20 @@ void UeWorker::DoFftData(size_t tag) {
   auto phc = exp(arma::cx_float(0, -theta));
   float evm = 0;
   for (size_t j = 0; j < config_.OfdmDataNum(); j++) {
-    if (j % config_.OfdmPilotSpacing() != 0) {
+    if (config_.IsDataSubcarrier(j) == true) {
       // divide fft output by pilot data to get CSI estimation
       size_t sc_id = non_null_sc_ind_[j];
+      size_t data_sc_id = config_.GetOFDMDataIndex(j);
       arma::cx_float y = fft_buffer_ptr[sc_id];
-      equ_buffer_ptr[j] = (y / csi_buffer_ptr[j]) * phc;
+      equ_buffer_ptr[data_sc_id] = (y / csi_buffer_ptr[j]) * phc;
       complex_float tx =
-          config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmCaNum() +
-                                        config_.OfdmDataStart() + j];
-      evm += std::norm(equ_buffer_ptr[j] - arma::cx_float(tx.re, tx.im));
+          config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmCaNum() + sc_id];
+      evm +=
+          std::norm(equ_buffer_ptr[data_sc_id] - arma::cx_float(tx.re, tx.im));
     }
   }
 
-  evm = std::sqrt(evm) / (config_.OfdmDataNum() - config_.GetOFDMPilotNum());
+  evm = std::sqrt(evm) / config_.GetOFDMDataNum();
   if (kPrintEqualizedSymbols) {
     complex_float* tx =
         &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmCaNum() +
@@ -251,7 +251,7 @@ void UeWorker::DoFftData(size_t tag) {
     Utils::PrintVec(x_vec, std::string("x") +
                                std::to_string(total_dl_symbol_id) +
                                std::string("_") + std::to_string(ant_id));
-    arma::cx_fvec equal_vec(equ_buffer_ptr, config_.OfdmDataNum(), false);
+    arma::cx_fvec equal_vec(equ_buffer_ptr, config_.GetOFDMDataNum(), false);
     Utils::PrintVec(equal_vec, std::string("equ") +
                                    std::to_string(total_dl_symbol_id) +
                                    std::string("_") + std::to_string(ant_id));
@@ -426,13 +426,13 @@ void UeWorker::DoDemul(size_t tag) {
 
   switch (config_.ModOrderBits()) {
     case (CommsLib::kQpsk):
-      DemodQpskSoftSse(equal_ptr, demod_ptr, config_.OfdmDataNum());
+      DemodQpskSoftSse(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
       break;
     case (CommsLib::kQaM16):
-      Demod16qamSoftAvx2(equal_ptr, demod_ptr, config_.OfdmDataNum());
+      Demod16qamSoftAvx2(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
       break;
     case (CommsLib::kQaM64):
-      Demod64qamSoftAvx2(equal_ptr, demod_ptr, config_.OfdmDataNum());
+      Demod64qamSoftAvx2(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
       break;
     default:
       std::printf("UeWorker[%zu]: Demul - modulation type %s not supported!\n",
@@ -449,7 +449,7 @@ void UeWorker::DoDemul(size_t tag) {
   }
   if (kPrintLLRData) {
     std::printf("LLR data, symbol_offset: %zu\n", offset);
-    for (size_t i = 0; i < config_.OfdmDataNum(); i++) {
+    for (size_t i = 0; i < config_.GetOFDMDataNum(); i++) {
       std::printf("%x ", (uint8_t) * (demod_ptr + i));
     }
     std::printf("\n");

@@ -58,6 +58,7 @@ enum class EventType : int {
   kRANUpdate,   // Signal new RAN config to Agora
   kRBIndicator  // Signal RB schedule to UEs
 };
+
 static constexpr size_t kNumEventTypes =
     static_cast<size_t>(EventType::kPacketToMac) + 1;
 
@@ -73,6 +74,7 @@ enum class DoerType : size_t {
   kPrecode,
   kRC
 };
+
 static constexpr std::array<DoerType, (static_cast<size_t>(DoerType::kRC) + 1)>
     kAllDoerTypes = {DoerType::kFFT,   DoerType::kCSI,     DoerType::kZF,
                      DoerType::kDemul, DoerType::kDecode,  DoerType::kEncode,
@@ -230,6 +232,8 @@ static const std::map<char, SymbolType> kSymbolMap = {
     {'D', SymbolType::kDL},     {'G', SymbolType::kGuard},
     {'L', SymbolType::kCalUL},  {'P', SymbolType::kPilot},
     {'U', SymbolType::kUL}};
+
+enum class SubcarrierType { kNull, kDMRS, kData };
 
 // Intervals for beacon detection at the client (in frames)
 static constexpr size_t kBeaconDetectInterval = 10;
