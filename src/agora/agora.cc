@@ -24,8 +24,8 @@ Agora::Agora(Config* const cfg)
       demod_buffers_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
                      kMaxModType * cfg->OfdmDataNum()),
       decoded_buffer_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
-                      cfg->LdpcConfig().NumBlocksInSymbol() *
-                          Roundup<64>(cfg->NumBytesPerCb())),
+                      cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
+                          Roundup<64>(cfg->NumBytesPerCb(Direction::kUplink))),
       dl_zf_matrices_(kFrameWnd, cfg->OfdmDataNum(),
                       cfg->UeAntNum() * cfg->BsAntNum()) {
   std::string directory = TOSTRING(PROJECT_DIRECTORY);
@@ -126,7 +126,7 @@ void Agora::ScheduleDownlinkProcessing(size_t frame_id) {
   }
 
   for (size_t i = num_pilot_symbols; i < config_->Frame().NumDLSyms(); i++) {
-    ScheduleCodeblocks(EventType::kEncode, frame_id,
+    ScheduleCodeblocks(EventType::kEncode, Direction::kDownlink, frame_id,
                        config_->Frame().GetDLSymbol(i));
   }
 }
@@ -246,11 +246,11 @@ void Agora::ScheduleSubcarriers(EventType event_type, size_t frame_id,
   }
 }
 
-void Agora::ScheduleCodeblocks(EventType event_type, size_t frame_id,
-                               size_t symbol_idx) {
+void Agora::ScheduleCodeblocks(EventType event_type, Direction dir,
+                               size_t frame_id, size_t symbol_idx) {
   auto base_tag = gen_tag_t::FrmSymCb(frame_id, symbol_idx, 0);
   const size_t num_tasks =
-      config_->UeAntNum() * config_->LdpcConfig().NumBlocksInSymbol();
+      config_->UeAntNum() * config_->LdpcConfig(dir).NumBlocksInSymbol();
   size_t num_blocks = num_tasks / config_->EncodeBlockSize();
   const size_t num_remainder = num_tasks % config_->EncodeBlockSize();
   if (num_remainder > 0) {
@@ -407,7 +407,8 @@ void Agora::Start() {
               this->demul_counters_.CompleteTask(frame_id, symbol_id);
 
           if (last_demul_task == true) {
-            ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_id);
+            ScheduleCodeblocks(EventType::kDecode, Direction::kUplink, frame_id,
+                               symbol_id);
             PrintPerSymbolDone(PrintType::kDemul, frame_id, symbol_id);
             bool last_demul_symbol =
                 this->demul_counters_.CompleteSymbol(frame_id);
@@ -418,7 +419,8 @@ void Agora::Start() {
                 assert(cur_sche_frame_id_ == frame_id);
                 CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
               } else {
-                ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_id);
+                ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
+                                   frame_id, symbol_id);
               }
               this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
               PrintPerFrameDone(PrintType::kDemul, frame_id);
@@ -1006,7 +1008,9 @@ void Agora::CreateThreads() {
 }
 
 void Agora::UpdateRanConfig(RanConfig rc) {
-  config_->UpdateModCfgs(rc.mod_order_bits_);
+  nlohmann::json msc_params = config_->MCSParams(Direction::kUplink);
+  msc_params["modulation"] = MapModToStr(rc.mod_order_bits_);
+  config_->UpdateUlMCS(msc_params);
 }
 
 void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
@@ -1393,7 +1397,8 @@ void Agora::InitializeUplinkBuffers() {
 
   decode_counters_.Init(
       cfg->Frame().NumULSyms(),
-      cfg->LdpcConfig().NumBlocksInSymbol() * cfg->UeAntNum());
+      cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
+          cfg->UeAntNum());
 
   tomac_counters_.Init(cfg->Frame().NumULSyms(), cfg->UeAntNum());
 }
@@ -1414,7 +1419,8 @@ void Agora::InitializeDownlinkBuffers() {
     AllocBuffer1d(&dl_socket_buffer_status_, dl_socket_buffer_status_size,
                   Agora_memory::Alignment_t::kAlign64, 1);
 
-    size_t dl_bits_buffer_size = kFrameWnd * config_->DlMacBytesNumPerframe();
+    size_t dl_bits_buffer_size =
+        kFrameWnd * config_->MacBytesNumPerframe(Direction::kDownlink);
     this->dl_bits_buffer_.Calloc(config_->UeAntNum(), dl_bits_buffer_size,
                                  Agora_memory::Alignment_t::kAlign64);
     this->dl_bits_buffer_status_.Calloc(config_->UeAntNum(), kFrameWnd,
@@ -1447,7 +1453,8 @@ void Agora::InitializeDownlinkBuffers() {
 
     encode_counters_.Init(
         config_->Frame().NumDlDataSyms(),
-        config_->LdpcConfig().NumBlocksInSymbol() * config_->UeAntNum());
+        config_->LdpcConfig(Direction::kDownlink).NumBlocksInSymbol() *
+            config_->UeAntNum());
     encode_cur_frame_for_symbol_ =
         std::vector<size_t>(config_->Frame().NumDLSyms(), SIZE_MAX);
     ifft_cur_frame_for_symbol_ =
@@ -1489,7 +1496,8 @@ void Agora::FreeDownlinkBuffers() {
 void Agora::SaveDecodeDataToFile(int frame_id) {
   const auto& cfg = config_;
   const size_t num_decoded_bytes =
-      cfg->NumBytesPerCb() * cfg->LdpcConfig().NumBlocksInSymbol();
+      cfg->NumBytesPerCb(Direction::kUplink) *
+      cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = cur_directory + "/data/decode_data.bin";

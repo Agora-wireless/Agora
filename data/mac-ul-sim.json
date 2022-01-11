@@ -10,8 +10,10 @@
   "ofdm_data_num": 400,
   "demul_block_size": 48,
   "cp_size": 32,
-  "modulation": "16QAM",
-  "Zc": 24,
+  "ul_mcs" : {
+  	"modulation": "16QAM",
+  	"Zc": 24
+  },
   "ofdm_tx_zero_prefix": 160,
   "ofdm_tx_zero_postfix": 160,
   "ofdm_rx_zero_prefix_bs": 160,

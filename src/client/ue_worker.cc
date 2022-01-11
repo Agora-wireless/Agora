@@ -422,9 +422,9 @@ void UeWorker::DoDemul(size_t tag) {
   const size_t base_sc_id = 0;
 
   int8_t* demod_ptr = demod_buffer_[frame_slot][dl_symbol_id][ant_id] +
-                      (config_.ModOrderBits() * base_sc_id);
+                      (config_.ModOrderBits(Direction::kDownlink) * base_sc_id);
 
-  switch (config_.ModOrderBits()) {
+  switch (config_.ModOrderBits(Direction::kDownlink)) {
     case (CommsLib::kQpsk):
       DemodQpskSoftSse(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
       break;
@@ -436,7 +436,7 @@ void UeWorker::DoDemul(size_t tag) {
       break;
     default:
       std::printf("UeWorker[%zu]: Demul - modulation type %s not supported!\n",
-                  tid_, config_.Modulation().c_str());
+                  tid_, config_.Modulation(Direction::kDownlink).c_str());
   }
 
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintDemul == true)) {
@@ -464,20 +464,19 @@ void UeWorker::DoDecodeUe(DoDecodeClient* decoder, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ant_id_;
+  LDPCconfig ldpc_config = config_.LdpcConfig(Direction::kDownlink);
 
-  for (size_t cb_id = 0; cb_id < config_.LdpcConfig().NumBlocksInSymbol();
-       cb_id++) {
+  for (size_t cb_id = 0; cb_id < ldpc_config.NumBlocksInSymbol(); cb_id++) {
     // For now, call for each cb
     if (kDebugPrintDecode) {
       std::printf(
           "Decoding [Frame %zu, Symbol %zu, User %zu, Code Block %zu : %zu]\n",
           frame_id, symbol_id, ant_id, cb_id,
-          config_.LdpcConfig().NumBlocksInSymbol() - 1);
+          ldpc_config.NumBlocksInSymbol() - 1);
     }
     decoder->Launch(
-        gen_tag_t::FrmSymCb(
-            frame_id, symbol_id,
-            cb_id + (ant_id * config_.LdpcConfig().NumBlocksInSymbol()))
+        gen_tag_t::FrmSymCb(frame_id, symbol_id,
+                            cb_id + (ant_id * ldpc_config.NumBlocksInSymbol()))
             .tag_);
   }
 
@@ -496,17 +495,17 @@ void UeWorker::DoEncodeUe(DoEncode* encoder, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ue_id = gen_tag_t(tag).ue_id_;
+  LDPCconfig ldpc_config = config_.LdpcConfig(Direction::kUplink);
+
   for (size_t ch = 0; ch < config_.NumUeChannels(); ch++) {
     const size_t ant_id = (ue_id * config_.NumUeChannels()) + ch;
     // For now, call for each cb
-    for (size_t cb_id = 0; cb_id < config_.LdpcConfig().NumBlocksInSymbol();
-         cb_id++) {
+    for (size_t cb_id = 0; cb_id < ldpc_config.NumBlocksInSymbol(); cb_id++) {
       // For now, call for each cb
-      encoder->Launch(
-          gen_tag_t::FrmSymCb(
-              frame_id, symbol_id,
-              cb_id + (ant_id * config_.LdpcConfig().NumBlocksInSymbol()))
-              .tag_);
+      encoder->Launch(gen_tag_t::FrmSymCb(
+                          frame_id, symbol_id,
+                          cb_id + (ant_id * ldpc_config.NumBlocksInSymbol()))
+                          .tag_);
     }
   }
   // Post the completion event (symbol)
@@ -554,8 +553,8 @@ void UeWorker::DoModul(size_t tag) {
 
     // TODO place directly into the correct location of the fft buffer
     for (size_t sc = 0; sc < config_.OfdmDataNum(); sc++) {
-      modul_buf[sc] =
-          ModSingleUint8(static_cast<uint8_t>(ul_bits[sc]), config_.ModTable());
+      modul_buf[sc] = ModSingleUint8(static_cast<uint8_t>(ul_bits[sc]),
+                                     config_.ModTable(Direction::kUplink));
     }
   }
 

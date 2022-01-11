@@ -307,9 +307,9 @@ EventData DoDemul::Launch(size_t tag) {
     }
     equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
     int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][i] +
-                        (cfg_->ModOrderBits() * base_sc_id);
+                        (cfg_->ModOrderBits(Direction::kUplink) * base_sc_id);
 
-    switch (cfg_->ModOrderBits()) {
+    switch (cfg_->ModOrderBits(Direction::kUplink)) {
       case (CommsLib::kQpsk):
         DemodQpskSoftSse(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
@@ -321,14 +321,14 @@ EventData DoDemul::Launch(size_t tag) {
         break;
       default:
         std::printf("Demodulation: modulation type %s not supported!\n",
-                    cfg_->Modulation().c_str());
+                    cfg_->Modulation(Direction::kUplink).c_str());
     }
     // std::printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
     //     tid, frame_id, symbol_idx_ul, base_sc_id);
     // cout << "Demuled data : \n ";
     // cout << " UE " << i << ": ";
-    // for (int k = 0; k < max_sc_ite * cfg->ModOrderBits(); k++)
-    //     std::printf("%i ", demul_ptr[k]);
+    // for (int k = 0; k < max_sc_ite * cfg->ModOrderBits(Direction::kUplink); k++)
+    //   std::printf("%i ", demul_ptr[k]);
     // cout << endl;
   }
 

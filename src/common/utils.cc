@@ -366,7 +366,7 @@ void Utils::LoadTddConfig(const std::string& filename, std::string& jconfig) {
   }
 
   else {
-    std::printf("Unable to open config file %s\n", filename.c_str());
+    std::printf("Unable to open config file \"%s\"\n", filename.c_str());
   }
 }
 
