@@ -23,10 +23,10 @@ PhyUe::PhyUe(Config* config)
       phy_stats_(std::make_unique<PhyStats>(config, Direction::kDownlink)),
       demod_buffer_(kFrameWnd, config->Frame().NumDLSyms(), config->UeAntNum(),
                     kMaxModType * Roundup<64>(config->GetOFDMDataNum())),
-      decoded_buffer_(kFrameWnd, config->Frame().NumDLSyms(),
-                      config->UeAntNum(),
-                      config->LdpcConfig().NumBlocksInSymbol() *
-                          Roundup<64>(config->NumBytesPerCb())) {
+      decoded_buffer_(
+          kFrameWnd, config->Frame().NumDLSyms(), config->UeAntNum(),
+          config->LdpcConfig(Direction::kDownlink).NumBlocksInSymbol() *
+              Roundup<64>(config->NumBytesPerCb(Direction::kDownlink))) {
   srand(time(nullptr));
 
   // TODO take into account the UeAntOffset to allow for multiple PhyUe
@@ -559,8 +559,9 @@ void PhyUe::Start() {
                    "Radio buffer id does not match expected");
 
           const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
-              &ul_bits_buffer_[ue_id][radio_buf_id *
-                                      config_->UlMacBytesNumPerframe()]);
+              &ul_bits_buffer_[ue_id]
+                              [radio_buf_id * config_->MacBytesNumPerframe(
+                                                  Direction::kUplink)]);
 
           MLPD_TRACE(
               "PhyUe: frame %d symbol %d user %d @ offset %zu %zu @ location "
@@ -598,7 +599,7 @@ void PhyUe::Start() {
               ss << std::endl;
               pkt = reinterpret_cast<const MacPacketPacked*>(
                   reinterpret_cast<const uint8_t*>(pkt) +
-                  config_->MacPacketLength());
+                  config_->MacPacketLength(Direction::kUplink));
             }
             std::printf("%s\n", ss.str().c_str());
           }
@@ -804,7 +805,8 @@ void PhyUe::InitializeVarsFromCfg() {
 
 void PhyUe::InitializeUplinkBuffers() {
   // initialize ul data buffer
-  ul_bits_buffer_size_ = kFrameWnd * config_->UlMacBytesNumPerframe();
+  ul_bits_buffer_size_ =
+      kFrameWnd * config_->MacBytesNumPerframe(Direction::kUplink);
   ul_bits_buffer_.Malloc(config_->UeAntNum(), ul_bits_buffer_size_,
                          Agora_memory::Alignment_t::kAlign64);
   ul_bits_buffer_status_.Calloc(config_->UeAntNum(), kFrameWnd,

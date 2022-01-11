@@ -31,6 +31,29 @@
 #define QAM256_THRESHOLD_6 (12 / sqrt(170))
 #define QAM256_THRESHOLD_7 (14 / sqrt(170))
 
+static std::map<std::string, size_t> kModulStringMap{
+    {"BPSK", 1},  {"QPSK", 2},   {"16QAM", 4},
+    {"64QAM", 6}, {"256QAM", 8}, {"1024QAM", 10}};
+
+static inline std::string MapModToStr(size_t mod_order) {
+  switch (mod_order) {
+    case 1:
+      return std::string("BPSK");
+    case 2:
+      return std::string("QPSK");
+    case 4:
+      return std::string("16QAM");
+    case 6:
+      return std::string("64QAM");
+    case 8:
+      return std::string("256QAM");
+    case 10:
+      return std::string("1024QAM");
+    default:
+      return std::string("UNKNOWN!");
+  }
+}
+
 void InitModulationTable(Table<complex_float>& table, size_t mod_order);
 void InitQpskTable(Table<complex_float>& table);
 void InitQam16Table(Table<complex_float>& table);
