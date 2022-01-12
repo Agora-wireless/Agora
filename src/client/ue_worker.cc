@@ -39,7 +39,6 @@ UeWorker::UeWorker(
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
     std::vector<std::vector<std::complex<float>>>& ue_pilot_vec)
     : tid_(tid),
-
       notify_queue_(notify_queue),
       work_queue_(work_queue),
       work_producer_token_(work_producer),
@@ -403,6 +402,7 @@ void UeWorker::DoFftPilot(size_t tag) {
 }
 
 void UeWorker::DoDemul(size_t tag) {
+  // TODO: We assume one code block per ofdm symbol here
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ant_id_;
@@ -423,23 +423,55 @@ void UeWorker::DoDemul(size_t tag) {
   auto* equal_ptr = reinterpret_cast<float*>(&equal_buffer_[offset][0]);
 
   const size_t base_sc_id = 0;
+  const size_t cb_id = 0;
 
   int8_t* demod_ptr = demod_buffer_[frame_slot][dl_symbol_id][ant_id] +
                       (config_.ModOrderBits() * base_sc_id);
 
   switch (config_.ModOrderBits()) {
     case (CommsLib::kQpsk):
-      DemodQpskSoftSse(equal_ptr, demod_ptr, config_.OfdmDataNum());
+      kDownlinkHardDemod
+          ? DemodQpskHardLoop(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
+                              config_.OfdmDataNum())
+          : DemodQpskSoftSse(equal_ptr, demod_ptr, config_.OfdmDataNum());
       break;
     case (CommsLib::kQaM16):
-      Demod16qamSoftAvx2(equal_ptr, demod_ptr, config_.OfdmDataNum());
+      kDownlinkHardDemod
+          ? Demod16qamHardAvx2(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
+                               config_.OfdmDataNum())
+          : Demod16qamSoftAvx2(equal_ptr, demod_ptr, config_.OfdmDataNum());
       break;
     case (CommsLib::kQaM64):
-      Demod64qamSoftAvx2(equal_ptr, demod_ptr, config_.OfdmDataNum());
+      kDownlinkHardDemod
+          ? Demod64qamHardAvx2(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
+                               config_.OfdmDataNum())
+          : Demod64qamSoftAvx2(equal_ptr, demod_ptr, config_.OfdmDataNum());
       break;
     default:
       std::printf("UeWorker[%zu]: Demul - modulation type %s not supported!\n",
                   tid_, config_.Modulation().c_str());
+  }
+
+  if ((kDownlinkHardDemod == true) && (kPrintPhyStats == true) &&
+      (dl_symbol_id >= config_.Frame().ClientDlPilotSymbols())) {
+    phy_stats_.UpdateDecodedBits(
+        ant_id, total_dl_symbol_id,
+        config_.OfdmDataNum() * config_.ModOrderBits());
+    phy_stats_.IncrementDecodedBlocks(ant_id, total_dl_symbol_id);
+    int8_t* tx_bytes =
+        config_.GetModBitsBuf(config_.DlModBits(), Direction::kDownlink, 0,
+                              dl_symbol_id, kDebugDownlink ? 0 : ant_id, cb_id);
+    size_t block_error(0);
+    for (size_t i = 0; i < config_.OfdmDataNum(); i++) {
+      uint8_t rx_byte = static_cast<uint8_t>(demod_ptr[i]);
+      uint8_t tx_byte = static_cast<uint8_t>(tx_bytes[i]);
+      phy_stats_.UpdateBitErrors(ant_id, total_dl_symbol_id, tx_byte, rx_byte);
+      if (rx_byte != tx_byte) {
+        block_error++;
+      }
+    }
+
+    phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, block_error);
   }
 
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintDemul == true)) {
@@ -541,7 +573,7 @@ void UeWorker::DoModul(size_t tag) {
     complex_float* modul_buf =
         &modul_buffer_[total_ul_data_symbol_id][ant_id * config_.OfdmDataNum()];
 
-    auto* ul_bits = config_.GetEncodedBuf(encoded_buffer_, Direction::kUplink,
+    auto* ul_bits = config_.GetModBitsBuf(encoded_buffer_, Direction::kUplink,
                                           frame_id, ul_symbol_idx, ant_id, 0);
 
     if (kDebugPrintModul) {
