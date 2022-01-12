@@ -625,7 +625,7 @@ void Config::UpdateDlMCS(json dl_mcs) {
   dl_ldpc_config_ = LDPCconfig(base_graph, zc, max_decoder_iter, early_term,
                                num_cb_len, num_cb_codew_len, num_rows, 0);
 
-  dl_ldpc_config_.NumBlocksInSymbol((ofdm_data_num_ * dl_mod_order_bits_) /
+  dl_ldpc_config_.NumBlocksInSymbol((GetOFDMDataNum() * dl_mod_order_bits_) /
                                     dl_ldpc_config_.NumCbCodewLen());
   RtAssert(
       dl_ldpc_config_.NumBlocksInSymbol() > 0,
