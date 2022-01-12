@@ -15,12 +15,12 @@ static constexpr bool kPrintRawMacData = false;
 
 DoEncode::DoEncode(Config* in_config, int in_tid, Direction dir,
                    Table<int8_t>& in_raw_data_buffer, size_t in_buffer_rollover,
-                   Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager)
+                   Table<int8_t>& in_mod_bits_buffer, Stats* in_stats_manager)
     : Doer(in_config, in_tid),
       dir_(dir),
       raw_data_buffer_(in_raw_data_buffer),
       raw_buffer_rollover_(in_buffer_rollover),
-      encoded_buffer_(in_encoded_buffer),
+      mod_bits_buffer_(in_mod_bits_buffer),
       scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kEncode, in_tid);
   parity_buffer_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
@@ -118,15 +118,15 @@ EventData DoEncode::Launch(size_t tag) {
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                    ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
                    ldpc_input);
-  int8_t* final_output_ptr = cfg_->GetEncodedBuf(
-      encoded_buffer_, dir_, frame_id, symbol_idx, ue_id, cur_cb_id);
+  int8_t* mod_buffer_ptr = cfg_->GetModBitsBuf(mod_bits_buffer_, dir_, frame_id,
+                                               symbol_idx, ue_id, cur_cb_id);
 
   if (kPrintRawMacData && dir_ == Direction::kUplink) {
     std::printf("Encoded data - placed at location (%zu %zu %zu) %zu\n",
-                frame_id, symbol_idx, ue_id, (size_t)final_output_ptr);
+                frame_id, symbol_idx, ue_id, (size_t)mod_buffer_ptr);
   }
   AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp_),
-                  reinterpret_cast<uint8_t*>(final_output_ptr),
+                  reinterpret_cast<uint8_t*>(mod_buffer_ptr),
                   BitsToBytes(ldpc_config.NumCbCodewLen()),
                   cfg_->ModOrderBits());
 
@@ -134,7 +134,7 @@ EventData DoEncode::Launch(size_t tag) {
     std::printf("Encoded data\n");
     size_t num_mod = cfg_->LdpcConfig().NumCbCodewLen() / cfg_->ModOrderBits();
     for (size_t i = 0; i < num_mod; i++) {
-      std::printf("%u ", *(final_output_ptr + i));
+      std::printf("%u ", *(mod_buffer_ptr + i));
     }
     std::printf("\n");
   }

@@ -458,8 +458,10 @@ void PhyUe::Start() {
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
 
-          EventData do_decode_task(EventType::kDecode, event.tags_[0]);
-          ScheduleWork(do_decode_task);
+          if (kDownlinkHardDemod == false) {
+            EventData do_decode_task(EventType::kDecode, event.tags_[0]);
+            ScheduleWork(do_decode_task);
+          }
 
           PrintPerTaskDone(PrintType::kDemul, frame_id, symbol_id, ant_id);
           bool symbol_complete =
@@ -472,6 +474,18 @@ void PhyUe::Start() {
               this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
               PrintPerFrameDone(PrintType::kDemul, frame_id);
               demul_counters_.Reset(frame_id);
+              if (kDownlinkHardDemod == true) {
+                bool finished =
+                    FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
+                if (finished == true) {
+                  if ((cur_frame_id + 1) >= config_->FramesToTest()) {
+                    config_->Running(false);
+                  } else {
+                    FrameInit(frame_id);
+                    cur_frame_id = frame_id + 1;
+                  }
+                }
+              }
             }
           }
         } break;

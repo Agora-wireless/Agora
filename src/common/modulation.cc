@@ -254,6 +254,28 @@ void ModSimd(uint8_t* in, complex_float*& out, size_t len,
  ***********************************************************************************
  */
 
+/**
+ * QPSK modulation
+ *              Q
+ *  01  |  11
+ *---------------> I
+ *  00  |  10
+ */
+void DemodQpskHardLoop(const float* vec_in, uint8_t* vec_out, int num) {
+  for (int i = 0; i < num; i++) {
+    float real_val = *(vec_in + i * 2);
+    float imag_val = *(vec_in + i * 2 + 1);
+
+    *(vec_out + i) = 0;
+    if (real_val >= 0) {
+      *(vec_out + i) |= 1UL << 1;
+    }
+    if (imag_val >= 0) {
+      *(vec_out + i) |= 1UL;
+    }
+  }
+}
+
 // /**
 //   * 16-QAM demodulation
 //   *              Q
@@ -296,6 +318,7 @@ void ModSimd(uint8_t* in, complex_float*& out, size_t len,
  *  1110  1100  |  0100  0110
  *  1111  1101  |  0101  0111
  */
+
 void Demod16qamHardLoop(const float* vec_in, uint8_t* vec_out, int num) {
   float float_val = QAM16_THRESHOLD;
 

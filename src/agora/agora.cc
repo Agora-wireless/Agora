@@ -810,12 +810,12 @@ void Agora::Worker(int tid) {
 
   auto compute_precode = std::make_unique<DoPrecode>(
       this->config_, tid, this->dl_zf_matrices_, this->dl_ifft_buffer_,
-      this->dl_encoded_buffer_, this->stats_.get());
+      this->dl_mod_bits_buffer_, this->stats_.get());
 
   auto compute_encoding = std::make_unique<DoEncode>(
       config_, tid, Direction::kDownlink,
       (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
-      (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
+      (kEnableMac == true) ? kFrameWnd : 1, dl_mod_bits_buffer_,
       this->stats_.get());
 
   // Uplink workers
@@ -934,7 +934,7 @@ void Agora::WorkerDemul(int tid) {
   /* Initialize Precode operator */
   std::unique_ptr<DoPrecode> compute_precode(
       new DoPrecode(config_, tid, dl_zf_matrices_, dl_ifft_buffer_,
-                    dl_encoded_buffer_, this->stats_.get()));
+                    dl_mod_bits_buffer_, this->stats_.get()));
 
   assert(false);
 
@@ -957,7 +957,7 @@ void Agora::WorkerDecode(int tid) {
   std::unique_ptr<DoEncode> compute_encoding(
       new DoEncode(config_, tid, Direction::kDownlink,
                    (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
-                   (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
+                   (kEnableMac == true) ? kFrameWnd : 1, dl_mod_bits_buffer_,
                    this->stats_.get()));
 
   std::unique_ptr<DoDecode> compute_decoding(
@@ -1440,7 +1440,7 @@ void Agora::InitializeDownlinkBuffers() {
       calib_dl_buffer_[kFrameWnd - 1][i] = {1, 0};
       calib_ul_buffer_[kFrameWnd - 1][i] = {1, 0};
     }
-    dl_encoded_buffer_.Calloc(
+    dl_mod_bits_buffer_.Calloc(
         task_buffer_symbol_num,
         Roundup<64>(config_->OfdmDataNum()) * config_->UeAntNum(),
         Agora_memory::Alignment_t::kAlign64);
@@ -1480,7 +1480,7 @@ void Agora::FreeDownlinkBuffers() {
     calib_ul_buffer_.Free();
     calib_dl_msum_buffer_.Free();
     calib_ul_msum_buffer_.Free();
-    dl_encoded_buffer_.Free();
+    dl_mod_bits_buffer_.Free();
     dl_bits_buffer_.Free();
     dl_bits_buffer_status_.Free();
   }
