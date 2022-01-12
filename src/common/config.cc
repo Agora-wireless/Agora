@@ -951,7 +951,7 @@ void Config::GenData() {
       size_t r = u * this->samps_per_symbol_;
       CommsLib::Ifft2tx(&dl_iq_ifft[i][q], &this->dl_iq_t_[i][r],
                         this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
-                        this->cp_len_, this->scale_);
+                        this->cp_len_, kDebugDownlink ? 1 : this->scale_);
     }
   }
 
@@ -970,7 +970,7 @@ void Config::GenData() {
   for (size_t i = 0; i < this->ue_ant_num_; i++) {
     CommsLib::Ifft2tx(ue_pilot_ifft[i], this->ue_specific_pilot_t_[i],
                       this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
-                      this->cp_len_, this->scale_);
+                      this->cp_len_, kDebugDownlink ? 1 : this->scale_);
     if (kDebugPrintPilot == true) {
       std::printf("ue_specific_pilot_t%zu=[", i);
       for (size_t j = 0; j < this->ofdm_ca_num_; j++) {

@@ -219,7 +219,8 @@ void UeWorker::DoFftData(size_t tag) {
       size_t sc_id = non_null_sc_ind_[j];
       arma::cx_float y = fft_buffer_ptr[sc_id];
       auto pilot_eq = y / csi_buffer_ptr[j];
-      auto p = config_.UeSpecificPilot()[ant_id][j];
+      size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
+      auto p = config_.UeSpecificPilot()[ant][j];
       theta += arg(pilot_eq * arma::cx_float(p.re, -p.im));
     }
   }
@@ -234,8 +235,9 @@ void UeWorker::DoFftData(size_t tag) {
       size_t sc_id = non_null_sc_ind_[j];
       arma::cx_float y = fft_buffer_ptr[sc_id];
       equ_buffer_ptr[j] = (y / csi_buffer_ptr[j]) * phc;
+      size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
       complex_float tx =
-          config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmCaNum() +
+          config_.DlIqF()[dl_symbol_id][ant * config_.OfdmCaNum() +
                                         config_.OfdmDataStart() + j];
       evm += std::norm(equ_buffer_ptr[j] - arma::cx_float(tx.re, tx.im));
     }
@@ -375,7 +377,8 @@ void UeWorker::DoFftPilot(size_t tag) {
   // see Argos paper (Mobicom'12)
   if (dl_symbol_id < config_.Frame().ClientDlPilotSymbols()) {
     for (size_t j = 0; j < config_.OfdmDataNum(); j++) {
-      complex_float p = config_.UeSpecificPilot()[ant_id][j];
+      size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
+      complex_float p = config_.UeSpecificPilot()[ant][j];
       size_t sc_id = non_null_sc_ind_[j];
       csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / arma::cx_float(p.re, p.im));
     }
