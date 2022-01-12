@@ -5,6 +5,25 @@ source $(dirname $0)/utils.sh
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 ROOT_DIR=${DIR}/..
 
+# Run modes
+mode=0
+slot_us=1000
+
+if [ "$#" -eq 0 ]; then
+    echocyan "Default mode: running the whole system"
+elif [ "$#" -eq 1 ]; then
+    if [ "$1" == "rru" ]; then
+        echocyan "Running in RRU mode"
+        mode=1
+    else
+        echored "Invalid mode"
+        exit
+    fi
+else
+    echored "Invalid number of argumemts"
+    exit
+fi
+
 # Initialize the info of the platform:
 # app_name, servers, NIC info
 hydra_app_name="agora"
@@ -137,13 +156,15 @@ for (( i=0; i<${hydra_rru_num}; i++ )) do
     cat tmp.json | jq --argjson idx $i '.bs_rru_addr_idx=$idx' > tmp_0.json
     server_name=$(cat ${hydra_deploy_fn} | jq --argjson i $i '.rru_servers[$i]')
     echo "Create config file to RRU ${server_name}"
+    pci_addr=$(cat ${hydra_platform_fn} | jq --argjson node ${server_name} '.[$node].pcie' | tr -d '"')
+    cat tmp_0.json | jq --arg pci ${pci_addr} '.pci_addr=$pci' > tmp_1.json
     hostname=$(hostname)
     if [ "$hostname" == "$(echo ${server_name} | tr -d '"')" ]; then
-        cp tmp_0.json ${ROOT_DIR}/config/run.json
+        cp tmp_1.json ${ROOT_DIR}/config/run.json
     else
-        scp -oStrictHostKeyChecking=no tmp_0.json $(echo ${server_name} | tr -d '"'):${ROOT_DIR}/config/run.json 
+        scp -oStrictHostKeyChecking=no tmp_1.json $(echo ${server_name} | tr -d '"'):~/project/Agora/config/run.json 
     fi
-    rm tmp.json tmp_0.json
+    rm tmp.json tmp_0.json tmp_1.json
 done
 
 # Create config for Hydra servers
@@ -187,14 +208,36 @@ for (( i=0; i<${hydra_num}; i++ )) do
     cat tmp.json | jq --argjson idx $i '.bs_server_addr_idx=$idx' > tmp_0.json
     server_name=$(cat ${hydra_deploy_fn} | jq --argjson i $i '.hydra_servers[$i]')
     echo "Create config file to hydra server ${server_name}"
+    pci_addr=$(cat ${hydra_platform_fn} | jq --argjson node ${server_name} '.[$node].pcie' | tr -d '"')
+    cat tmp_0.json | jq --arg pci ${pci_addr} '.pci_addr=$pci' > tmp_1.json
     hostname=$(hostname)
     if [ "$hostname" == "$(echo ${server_name} | tr -d '"')" ]; then
-        cp tmp_0.json ${ROOT_DIR}/config/run.json
+        cp tmp_1.json ${ROOT_DIR}/config/run.json
     else
-        scp -oStrictHostKeyChecking=no tmp_0.json $(echo ${server_name} | tr -d '"'):${ROOT_DIR}/config/run.json 
+        scp -oStrictHostKeyChecking=no tmp_1.json $(echo ${server_name} | tr -d '"'):~/project/Agora/config/run.json 
     fi
-    rm tmp.json tmp_0.json
+    rm tmp.json tmp_0.json tmp_1.json
 done
+
+mkdir -p /tmp/Hydra
+
+# Prepare for the data
+server_name=$(cat ${hydra_deploy_fn} | jq '.rru_servers[0]' | tr -d '"')
+echocyan "Run control and config generator on ${server_name}"
+hostname=$(hostname)
+if [ "$hostname" == "${server_name}" ]; then
+    sudo ${ROOT_DIR}/build/control_generator --conf_file ${ROOT_DIR}/config/run.json
+    sudo ${ROOT_DIR}/build/data_generator --conf_file ${ROOT_DIR}/config/run.json
+else
+    ssh -oStrictHostKeyChecking=no ${server_name} "source ~/.bash_profile; \
+        cd ~/project/Agora; \
+        ./build/control_generator --conf_file ./config/run.json; \
+        ./build/data_generator --conf_file ./config/run.json;"
+fi
+num_antennas=$(cat ${hydra_template_fn} | jq '.antenna_num')
+scp -oStrictHostKeyChecking=no ${server_name}:~/project/Agora/data/control_ue_template.bin ${ROOT_DIR}/data/
+scp -oStrictHostKeyChecking=no ${server_name}:~/project/Agora/data/control_ue.bin ${ROOT_DIR}/data/
+scp -oStrictHostKeyChecking=no ${server_name}:~/project/Agora/data/LDPC_rx_data_2048_ant${num_antennas}.bin ${ROOT_DIR}/data/
 
 # Run all Hydra servers (TODO: complete)
 for (( i=0; i<${hydra_num}; i++ )) do
@@ -205,7 +248,12 @@ for (( i=0; i<${hydra_num}; i++ )) do
         sudo -E env LD_LIBRARY_PATH=$LD_LIBRARY_PATH nice -20 chrt -r 99 \
             ./build/agora --conf_file config/run.json &
     else
-        ssh -oStrictHostKeyChecking=no ${server_name} "" &
+        scp -oStrictHostKeyChecking=no ${ROOT_DIR}/data/control_ue_template.bin ${server_name}:~/project/Agora/data/
+        scp -oStrictHostKeyChecking=no ${ROOT_DIR}/data/control_ue.bin ${server_name}:~/project/Agora/data/
+        scp -oStrictHostKeyChecking=no ${ROOT_DIR}/data/LDPC_rx_data_2048_ant${num_antennas}.bin ${server_name}:~/project/Agora/data/
+        ssh -oStrictHostKeyChecking=no ${server_name} "source ~/.bash_profile;\
+            cd ~/project/Agora; \
+            sudo -E env LD_LIBRARY_PATH=\$LD_LIBRARY_PATH nice -20 chrt -r 99 ./build/agora --conf_file config/run.json" > /tmp/Hydra/log_${server_name}.txt &
     fi
 done
 
@@ -215,21 +263,36 @@ sleep 5
 # Run all RRU servers
 for (( i=1; i<${hydra_rru_num}; i++ )) do
     server_name=$(cat ${hydra_deploy_fn} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
-    echo "Run hydra server ${server_name}"
+    echocyan "Run RRU server ${server_name}"
     hostname=$(hostname)
     if [ "$hostname" == "${server_name}" ]; then
-        echo Run on ${server_name} &
+        sudo env LD_LIBRARY_PATH=$LD_LIBRARY_PATH nice -20 chrt -r 99 ./build/dynamic_sender --num_threads=6 --conf_file=${ROOT_DIR}/config/run.json \
+            --frame_duration=$slot_us --core_offset=0 > /tmp/Hydra/log_${server_name}.txt &
     else
-        echo Run on ${server_name} &
+        scp -oStrictHostKeyChecking=no ${ROOT_DIR}/data/control_ue_template.bin ${server_name}:~/project/Agora/data/
+        scp -oStrictHostKeyChecking=no ${ROOT_DIR}/data/control_ue.bin ${server_name}:~/project/Agora/data/
+        scp -oStrictHostKeyChecking=no ${ROOT_DIR}/data/LDPC_rx_data_2048_ant${num_antennas}.bin ${server_name}:~/project/Agora/data/
+        ssh -oStrictHostKeyChecking=no ${server_name} "source ~/.bash_profile; \
+            cd ~/project/Agora; \
+            sudo -E env LD_LIBRARY_PATH=\$LD_LIBRARY_PATH nice -20 chrt -r 99 ./build/dynamic_sender --num_threads=6 \
+                --conf_file=./config/run.json --frame_duration=$slot_us --core_offset=0" > /tmp/Hydra/log_${server_name}.txt &
     fi
 done
 
 server_name=$(cat ${hydra_deploy_fn} | jq '.rru_servers[0]' | tr -d '"')
-echo "Run hydra server ${server_name}"
+echocyan "Run RRU server ${server_name}"
 hostname=$(hostname)
 if [ "$hostname" == "${server_name}" ]; then
-    echo Run on ${server_name} &
+    sudo env LD_LIBRARY_PATH=$LD_LIBRARY_PATH nice -20 chrt -r 99 ./build/dynamic_sender --num_threads=6 --conf_file=${ROOT_DIR}/config/run.json \
+        --frame_duration=$slot_us --core_offset=0 > /tmp/Hydra/log_${server_name}.txt &
 else
-    echo Run on ${server_name} &
+    scp -oStrictHostKeyChecking=no ${ROOT_DIR}/data/control_ue_template.bin ${server_name}:~/project/Agora/data/
+    scp -oStrictHostKeyChecking=no ${ROOT_DIR}/data/control_ue.bin ${server_name}:~/project/Agora/data/
+    scp -oStrictHostKeyChecking=no ${ROOT_DIR}/data/LDPC_rx_data_2048_ant${num_antennas}.bin ${server_name}:~/project/Agora/data/
+    ssh -oStrictHostKeyChecking=no ${server_name} "source ~/.bash_profile; \
+        cd ~/project/Agora; \
+        sudo -E env LD_LIBRARY_PATH=\$LD_LIBRARY_PATH nice -20 chrt -r 99 ./build/dynamic_sender --num_threads=6 \
+            --conf_file=./config/run.json --frame_duration=$slot_us --core_offset=0" > /tmp/Hydra/log_${server_name}.txt &
 fi
+
 wait

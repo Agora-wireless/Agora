@@ -17,8 +17,8 @@ for (( i=0; i<${hydra_server_num}; i++ )) do
         continue
     fi
     echo "Run rsync $hostname->$(echo ${server_name} | tr -d '"')"
-    rsync -a --exclude '*.bin' ${ROOT_DIR}/src $(echo ${server_name} | tr -d '"'):${ROOT_DIR}/
-    rsync -a --exclude '*.bin' ${ROOT_DIR}/simulator $(echo ${server_name} | tr -d '"'):${ROOT_DIR}/
-    rsync -a --exclude '*.bin' ${ROOT_DIR}/scripts $(echo ${server_name} | tr -d '"'):${ROOT_DIR}/
-    rsync -a --exclude '*.bin' ${ROOT_DIR}/config $(echo ${server_name} | tr -d '"'):${ROOT_DIR}/
+    rsync -a --exclude '*.bin' ${ROOT_DIR}/src $(echo ${server_name} | tr -d '"'):~/project/Agora/
+    rsync -a --exclude '*.bin' ${ROOT_DIR}/simulator $(echo ${server_name} | tr -d '"'):~/project/Agora/
+    rsync -a --exclude '*.bin' ${ROOT_DIR}/scripts $(echo ${server_name} | tr -d '"'):~/project/Agora/
+    rsync -a --exclude '*.bin' ${ROOT_DIR}/config $(echo ${server_name} | tr -d '"'):~/project/Agora/
 done
