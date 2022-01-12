@@ -119,8 +119,9 @@ EventData DoDecodeClient::Launch(size_t tag) {
     size_t block_error(0);
     for (size_t i = 0; i < cfg_->NumBytesPerCb(); i++) {
       uint8_t rx_byte = decoded_buffer_ptr[i];
-      auto tx_byte = static_cast<uint8_t>(cfg_->GetInfoBits(
-          cfg_->DlBits(), symbol_idx_dl, ue_id, cur_cb_id)[i]);
+      auto tx_byte = static_cast<uint8_t>(
+          cfg_->GetInfoBits(cfg_->DlBits(), symbol_idx_dl,
+                            kDebugDownlink ? 0 : ue_id, cur_cb_id)[i]);
       phy_stats_->UpdateBitErrors(ue_id, symbol_offset, tx_byte, rx_byte);
       if (rx_byte != tx_byte) {
         block_error++;
