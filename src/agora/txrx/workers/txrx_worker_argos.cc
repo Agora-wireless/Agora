@@ -28,7 +28,7 @@ TxRxWorkerArgos::TxRxWorkerArgos(
                  can_proceed),
       radio_config_(radio_config) {}
 
-TxRxWorkerArgos::~TxRxWorkerArgos() {}
+TxRxWorkerArgos::~TxRxWorkerArgos() = default;
 
 //Main Thread Execution loop
 void TxRxWorkerArgos::DoTxRx() {
@@ -56,7 +56,7 @@ void TxRxWorkerArgos::DoTxRx() {
   // in software as it is implemented here. All time domain symbols are transfered
   // to the host by HW where software will decide how to handle each symbol.
   if (Configuration()->HwFramer() == false) {
-    const int kBeacontxFlags = 2;  // END BURST
+    constexpr int kBeacontxFlags = 2;  // END BURST
     // Read some dummy symbols to get the hardware time and then schedule
     // TX/RX accordingly
     const size_t beacon_radio =

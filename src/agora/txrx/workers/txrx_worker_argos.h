@@ -27,8 +27,8 @@ class TxRxWorkerArgos : public TxRxWorker {
                   std::mutex& sync_mutex, std::condition_variable& sync_cond,
                   std::atomic<bool>& can_proceed, RadioConfig& radio_config);
 
-  ~TxRxWorkerArgos() final override;
-  void DoTxRx() final override;
+  ~TxRxWorkerArgos() final;
+  void DoTxRx() final;
 
  private:
   TxRxWorkerArgos() = delete;

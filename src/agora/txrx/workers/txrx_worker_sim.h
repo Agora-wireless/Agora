@@ -26,9 +26,9 @@ class TxRxWorkerSim : public TxRxWorker {
                 std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
                 std::mutex& sync_mutex, std::condition_variable& sync_cond,
                 std::atomic<bool>& can_proceed);
-  ~TxRxWorkerSim() final override;
+  ~TxRxWorkerSim() final;
 
-  void DoTxRx() final override;
+  void DoTxRx() final;
 
  private:
   TxRxWorkerSim() = delete;

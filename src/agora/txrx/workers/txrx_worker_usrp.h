@@ -26,9 +26,9 @@ class TxRxWorkerUsrp : public TxRxWorker {
                  std::mutex& sync_mutex, std::condition_variable& sync_cond,
                  std::atomic<bool>& can_proceed, RadioConfig& radio_config);
 
-  ~TxRxWorkerUsrp() final override;
+  ~TxRxWorkerUsrp() final;
 
-  void DoTxRx() final override;
+  void DoTxRx() final;
 
  private:
   TxRxWorkerUsrp() = delete;

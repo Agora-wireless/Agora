@@ -27,7 +27,7 @@ TxRxWorkerUsrp::TxRxWorkerUsrp(
                  rx_memory, tx_memory, sync_mutex, sync_cond, can_proceed),
       radio_config_(radio_config) {}
 
-TxRxWorkerUsrp::~TxRxWorkerUsrp() {}
+TxRxWorkerUsrp::~TxRxWorkerUsrp() = default;
 
 //Main Thread Execution loop
 void TxRxWorkerUsrp::DoTxRx() {
@@ -185,7 +185,7 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(size_t radio_id,
 //Tx data
 int TxRxWorkerUsrp::DequeueSend() {
   auto events = GetPendingTxEvents(1);
-  if (events.size() == 0) {
+  if (events.empty()) {
     return -1;
   } else if (events.size() > 1) {
     throw std::runtime_error("DequeueSend returned too many events");
@@ -254,7 +254,7 @@ int TxRxWorkerUsrp::DequeueSend() {
 
 int TxRxWorkerUsrp::DequeueSend(int frame_id, int symbol_id) {
   auto events = GetPendingTxEvents(1);
-  if (events.size() == 0) {
+  if (events.empty()) {
     return -1;
   } else if (events.size() > 1) {
     throw std::runtime_error("DequeueSend returned too many events");

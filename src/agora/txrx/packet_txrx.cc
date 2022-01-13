@@ -22,13 +22,10 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
       tx_pending_q_(tx_pending_q),
       notify_producer_tokens_(notify_producer_tokens),
       tx_producer_tokens_(tx_producer_tokens),
-      mutex_(),
-      cond_(),
+
       proceed_(false),
       tx_memory_(reinterpret_cast<std::byte* const>(tx_buffer)),
-      frame_start_(frame_start),
-      /// Interface to worker map (using vector because id's are sequential starting at 0)
-      interface_to_worker_() {
+      frame_start_(frame_start) {
   const size_t total_radios = cfg->NumRadios();
   const size_t requested_worker_threads = cfg->SocketThreadNum();
   /// Will make (packet_num_in_buffer % total_radios) unused buffers

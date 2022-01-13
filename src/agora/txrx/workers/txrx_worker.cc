@@ -31,7 +31,7 @@ TxRxWorker::TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
       cond_(sync_cond),
       can_proceed_(can_proceed),
       cfg_(config),
-      thread_(),
+
       rx_memory_idx_(0),
       rx_memory_(rx_memory),
       tx_memory_(tx_memory),

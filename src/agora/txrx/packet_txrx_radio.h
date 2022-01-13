@@ -28,14 +28,14 @@ class PacketTxRxRadio : public PacketTxRx {
                   moodycamel::ProducerToken** tx_producer_tokens,
                   Table<char>& rx_buffer, size_t packet_num_in_buffer,
                   Table<size_t>& frame_start, char* tx_buffer);
-  ~PacketTxRxRadio() final override;
+  ~PacketTxRxRadio() final;
   bool StartTxRx(Table<complex_float>& calib_dl_buffer,
-                 Table<complex_float>& calib_ul_buffer) final override;
+                 Table<complex_float>& calib_ul_buffer) final;
 
  private:
   bool CreateWorker(size_t tid, size_t interface_count, size_t interface_offset,
                     size_t* rx_frame_start, std::vector<RxPacket>& rx_memory,
-                    std::byte* const tx_memory) final override;
+                    std::byte* const tx_memory) final;
 
   std::unique_ptr<RadioConfig> radio_config_;
 };

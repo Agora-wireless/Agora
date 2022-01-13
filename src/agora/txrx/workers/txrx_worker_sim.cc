@@ -48,7 +48,7 @@ TxRxWorkerSim::TxRxWorkerSim(
   beacon_buffer_.resize(config->PacketLength());
 }
 
-TxRxWorkerSim::~TxRxWorkerSim() {}
+TxRxWorkerSim::~TxRxWorkerSim() = default;
 
 //Main Thread Execution loop
 void TxRxWorkerSim::DoTxRx() {

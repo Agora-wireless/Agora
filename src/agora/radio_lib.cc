@@ -595,7 +595,7 @@ int RadioConfig::RadioRx(size_t radio_id, void** buffs, long long& rx_time_ns) {
   int rx_status = 0;
   // SOAPY_SDR_ONE_PACKET; SOAPY_SDR_END_BURST
   int rx_flags = SOAPY_SDR_END_BURST;
-  const long kRxTimeout = 1;  // 1uS
+  constexpr long kRxTimeout = 1;  // 1uS
 
   if (radio_id < radio_num_) {
     long long frame_time_ns = 0;
@@ -652,6 +652,7 @@ void RadioConfig::DrainBuffers() {
       std::vector<std::complex<int16_t>>(cfg_->SampsPerSymbol(),
                                          std::complex<int16_t>(0, 0)));
   std::vector<void*> rx_buffs;
+  rx_buffs.reserve(sample_storage.size());
   for (auto& buff : sample_storage) {
     rx_buffs.push_back(buff.data());
   }
