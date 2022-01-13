@@ -83,7 +83,7 @@ void TxRxWorkerUsrp::DoTxRx() {
 
   running_ = true;
   WaitSync();
-  
+
   while (Configuration()->Running() == true) {
     // transmit data
     // if (-1 != dequeue_send_usrp(tid))
