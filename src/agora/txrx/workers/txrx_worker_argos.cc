@@ -224,8 +224,10 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
        !cal_rx);
 
   //Ok to read into sample memory for dummy read
+  double rx_start_us = GetTime::GetTimeUs();
   const int rx_status =
       radio_config_.RadioRx(radio_id, samp.data(), frame_time);
+  double rx_time_us = GetTime::GetTimeUs() - rx_start_us;
 
   if ((dummy_read == false) && (rx_status > 0)) {
     //     (rx_status == static_cast<int>(Configuration()->SampsPerSymbol()))) {
@@ -240,15 +242,16 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
     if (rx_status != static_cast<int>(Configuration()->SampsPerSymbol())) {
       MLPD_WARN(
           "TxRxWorkerArgos[%zu]: Interface %zu | Radio %zu  - Attempted Frame: "
-          "%zu, Symbol: %zu, RX status = %d is not the expected value\n",
+          "%zu, Symbol: %zu, RX status = %d is not the expected value and took "
+          "uS %f to receive\n",
           tid_, interface_id, interface_id + interface_offset_, frame_id,
-          symbol_id, rx_status);
+          symbol_id, rx_status, rx_time_us);
     } else {
-      MLPD_TRACE(
+      MLPD_INFO(
           "TxRxWorkerArgos[%zu]: Interface %zu | Radio %zu  - Attempted Frame: "
-          "%zu, Symbol: %zu, RX status = %d is the expected value\n",
+          "%zu, Symbol: %zu, RX status = %d took uS to %f receive\n",
           tid_, interface_id, interface_id + interface_offset_, frame_id,
-          symbol_id, rx_status);
+          symbol_id, rx_status, rx_time_us);
     }
 
     for (size_t ant = 0; ant < ant_ids.size(); ant++) {

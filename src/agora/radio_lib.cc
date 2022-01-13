@@ -591,48 +591,59 @@ void RadioConfig::RadioRx(void** buffs) {
   }
 }
 
-int RadioConfig::RadioRx(size_t radio_id, void** buffs, long long& frameTime) {
+int RadioConfig::RadioRx(size_t radio_id, void** buffs, long long& rx_time_ns) {
   int rx_status = 0;
-  int rx_flags = 0;
-  ///\todo Move this to 0 and see what happens
-  //const long kRxTimeout = 10;
-  const long kRxTimeout = 1000000;
-  if (radio_id < this->radio_num_) {
+  // SOAPY_SDR_ONE_PACKET; SOAPY_SDR_END_BURST
+  int rx_flags = SOAPY_SDR_END_BURST;
+  const long kRxTimeout = 1;  // 1uS
+
+  if (radio_id < radio_num_) {
     long long frame_time_ns = 0;
-    int ret = ba_stn_.at(radio_id)->readStream(rx_streams_.at(radio_id), buffs,
-                                               cfg_->SampsPerSymbol(), rx_flags,
-                                               frame_time_ns, kRxTimeout);
+    rx_status = ba_stn_.at(radio_id)->readStream(
+        rx_streams_.at(radio_id), buffs, cfg_->SampsPerSymbol(), rx_flags,
+        frame_time_ns, kRxTimeout);
 
     if (cfg_->HwFramer() == true) {
-      // SoapySDR::timeNsToTicks(frameTimeNs, _rate);
-      frameTime = frame_time_ns;
+      rx_time_ns = frame_time_ns;
     } else {
       // for UHD device recv using ticks
-      frameTime = SoapySDR::timeNsToTicks(frame_time_ns, cfg_->Rate());
+      rx_time_ns = SoapySDR::timeNsToTicks(frame_time_ns, cfg_->Rate());
     }
 
     if (kDebugRadioRX) {
-      if (ret != (int)cfg_->SampsPerSymbol()) {
-        std::cout << "invalid return " << ret << " from radio " << radio_id
+      if (rx_status == static_cast<int>(cfg_->SampsPerSymbol())) {
+        std::cout << "Radio " << radio_id << " received " << rx_status
+                  << " flags: " << rx_flags << " MTU "
+                  << ba_stn_.at(radio_id)->getStreamMTU(
+                         rx_streams_.at(radio_id))
                   << std::endl;
       } else {
-        std::cout << "radio " << radio_id << "received " << ret << std::endl;
+        if (!((rx_status == SOAPY_SDR_TIMEOUT) && (rx_flags == 0))) {
+          std::cout << "Unexpected RadioRx return value " << rx_status
+                    << " from radio " << radio_id << " flags: " << rx_flags
+                    << std::endl;
+        }
       }
     }
   } else {
     std::cout << "Invalid radio id " << radio_id << std::endl;
+  }
+
+  /// If a timeout occurs tell the user you received 0 bytes
+  if (rx_status == SOAPY_SDR_TIMEOUT) {
+    rx_status = 0;
   }
   return rx_status;
 }
 
 int RadioConfig::RadioRx(
     size_t radio_id, std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-    long long& frameTime) {
+    long long& rx_time_ns) {
   std::vector<void*> buffs(rx_data.size());
-  for (size_t i = 0; i < rx_data.size(); i++) {
+  for (size_t i = 0u; i < rx_data.size(); i++) {
     buffs.at(i) = rx_data.at(i).data();
   }
-  return RadioRx(radio_id, buffs.data(), frameTime);
+  return RadioRx(radio_id, buffs.data(), rx_time_ns);
 }
 
 void RadioConfig::DrainBuffers() {
