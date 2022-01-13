@@ -109,7 +109,7 @@ void PhyStats::PrintPhyStats() {
 void PhyStats::PrintEvmStats(size_t frame_id) {
   arma::fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeAntNum(), 1,
                      false);
-  evm_mat = sqrt(evm_mat) / config_->OfdmDataNum();
+  evm_mat = evm_mat / config_->OfdmDataNum();
   std::stringstream ss;
   ss << "Frame " << frame_id << " Constellation:\n"
      << "  EVM " << 100 * evm_mat.st() << ", SNR " << -10 * log10(evm_mat.st());
@@ -118,7 +118,7 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
 
 float PhyStats::GetEvmSnr(size_t frame_id, size_t ue_id) {
   float evm = evm_buffer_[frame_id % kFrameWnd][ue_id];
-  evm = std::sqrt(evm) / config_->OfdmDataNum();
+  evm = evm / config_->OfdmDataNum();
   return -10 * std::log10(evm);
 }
 
