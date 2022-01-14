@@ -596,6 +596,7 @@ int RadioConfig::RadioRx(size_t radio_id, void** buffs, long long& rx_time_ns) {
   // SOAPY_SDR_ONE_PACKET; SOAPY_SDR_END_BURST
   int rx_flags = SOAPY_SDR_END_BURST;
   constexpr long kRxTimeout = 1;  // 1uS
+  //constexpr long kRxTimeout = 1000000;  // 1S
 
   if (radio_id < radio_num_) {
     long long frame_time_ns = 0;
@@ -676,7 +677,7 @@ void RadioConfig::DrainRxBuffer(SoapySDR::Device* ibsSdrs,
                             timeout_us);
     i++;
   }
-  std::cout << "Number of reads needed to drain: " << i << std::endl;
+  //std::cout << "Number of reads needed to drain: " << i << std::endl;
 }
 
 void RadioConfig::ReadSensors() {

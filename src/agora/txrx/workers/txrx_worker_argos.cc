@@ -11,6 +11,7 @@
 #include "logger.h"
 
 static constexpr bool kDebugDownlink = false;
+static constexpr bool kSymbolTimingEnabled = true;
 
 TxRxWorkerArgos::TxRxWorkerArgos(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -30,9 +31,15 @@ TxRxWorkerArgos::TxRxWorkerArgos(
 
 TxRxWorkerArgos::~TxRxWorkerArgos() = default;
 
+struct RxTimeTracker {
+  size_t start_ticks_;
+  size_t end_ticks_;
+};
+
 //Main Thread Execution loop
 void TxRxWorkerArgos::DoTxRx() {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid_);
+  const double freq_ghz = GetTime::MeasureRdtscFreq();
 
   MLPD_INFO("TxRxWorkerArgos[%zu] has %zu:%zu total radios %zu\n", tid_,
             interface_offset_, (interface_offset_ + num_interfaces_) - 1,
@@ -150,16 +157,26 @@ void TxRxWorkerArgos::DoTxRx() {
   }  // HwFramer == false
 
   ssize_t prev_frame_id = -1;
-  size_t rx_interface = UpdateRxInterface(0, 0);
-  MLPD_INFO("TxRxWorkerArgos[%zu] Starting rx interface id %zu\n", tid_,
-            rx_interface);
+
+  TxRxWorkerRx::RxParameters receive_attempt;
+  receive_attempt = UpdateRxInterface(receive_attempt);
+  MLPD_INFO(
+      "TxRxWorkerArgos[%zu] Starting rx interface id %zu looking for symbol "
+      "%zu\n",
+      tid_, receive_attempt.interface_, receive_attempt.symbol_);
 
   size_t global_frame_id = 0;
   size_t global_symbol_id = 0;
+  std::vector<RxTimeTracker> rx_times(num_interfaces_);
+  size_t program_start_ticks = GetTime::Rdtsc();
   while (Configuration()->Running() == true) {
     if (0 == DequeueSend(time0)) {
       // attempt to receive symbol (might be good to reduce the rx timeout to allow for tx during dead time)
-      auto pkts = RecvEnqueue(rx_interface, global_frame_id, global_symbol_id);
+      if (kSymbolTimingEnabled) {
+        rx_times.at(receive_attempt.interface_).start_ticks_ = GetTime::Rdtsc();
+      }
+      auto pkts = RecvEnqueue(receive_attempt.interface_, global_frame_id,
+                              global_symbol_id);
       if (!pkts.empty()) {
         RtAssert(pkts.size() == channels_per_interface_,
                  "Received data but it was the wrong dimension");
@@ -171,18 +188,88 @@ void TxRxWorkerArgos::DoTxRx() {
             prev_frame_id = frame_id;
           }
         }
+
+        if (kSymbolTimingEnabled) {
+          rx_times.at(receive_attempt.interface_).end_ticks_ = GetTime::Rdtsc();
+        }
         size_t rx_symbol_id = pkts.front()->symbol_id_;
 
-        //Symbol received, change the rx interface
-        size_t current_interface = rx_interface;
-        rx_interface = UpdateRxInterface(rx_interface, rx_symbol_id);
-        MLPD_INFO(
-            "TxRxWorkerArgos[%zu] Last Interface %zu, symbol %zu, next "
-            "interface %zu\n",
-            tid_, current_interface, rx_symbol_id, rx_interface);
-      }  // if (pkt.size() > 0)
-    }    // DequeueSendArgos(time0) == 0
-  }      // Configuration()->Running() == true
+        RtAssert(
+            rx_symbol_id == receive_attempt.symbol_,
+            "The expected receive symbol does not match the actual symbol");
+
+        // Symbol received, change the rx interface
+        TxRxWorkerRx::RxParameters successful_receive = receive_attempt;
+        receive_attempt = UpdateRxInterface(successful_receive);
+        MLPD_TRACE(
+            "TxRxWorkerArgos[%zu]: Last Interface %zu - symbol %zu:%zu, next "
+            "interface %zu - symbol %zu\n",
+            tid_, successful_receive.interface_, successful_receive.symbol_,
+            rx_symbol_id, receive_attempt.interface_, receive_attempt.symbol_);
+
+        if (kSymbolTimingEnabled) {
+          //Check to see if symbol receiption is complete
+          if (successful_receive.symbol_ != receive_attempt.symbol_) {
+            std::vector<double> rx_us(num_interfaces_, 0.0f);
+            double total_symbol_rx_time = 0.0f;
+            size_t symbol_start_ticks = 0;
+            for (size_t i = 0; i < num_interfaces_; i++) {
+              if (symbol_start_ticks == 0 && rx_times.at(i).start_ticks_ > 0) {
+                symbol_start_ticks = rx_times.at(i).start_ticks_;
+              }
+              rx_us.at(i) = GetTime::CyclesToUs(
+                  (rx_times.at(i).end_ticks_ - rx_times.at(i).start_ticks_),
+                  freq_ghz);
+              total_symbol_rx_time += rx_us.at(i);
+              MLPD_TRACE(
+                  "TxRxWorkerArgos[%zu]: Radio %zu Frame %d Symbol %zu Rx "
+                  "Start uS %f for %f uS\n",
+                  tid_, i + interface_offset_, pkts.front()->frame_id_,
+                  successful_receive.symbol_,
+                  GetTime::CyclesToUs(rx_times.at(i).start_ticks_, freq_ghz),
+                  rx_us.at(i));
+
+              rx_times.at(i).start_ticks_ = 0;
+              rx_times.at(i).end_ticks_ = 0;
+            }
+
+            const double avg_rx_time = total_symbol_rx_time / num_interfaces_;
+            std::ostringstream result_message;
+            //Add any radio that is > 2x the average
+            result_message << std::fixed << std::setprecision(2)
+                           << "TxRxWorkerArgos[" << tid_ << "]: Frame "
+                           << pkts.front()->frame_id_ << " Symbol "
+                           << successful_receive.symbol_ << " started rx @ "
+                           << GetTime::CyclesToUs(
+                                  symbol_start_ticks - program_start_ticks,
+                                  freq_ghz)
+                           << " radio rx time (total:total:average) "
+                           << total_symbol_rx_time << ":"
+                           << GetTime::CyclesToUs(
+                                  GetTime::Rdtsc() - symbol_start_ticks,
+                                  freq_ghz)
+                           << ":" << avg_rx_time;
+
+            for (size_t i = 0; i < num_interfaces_; i++) {
+              if (rx_us.at(i) > (avg_rx_time * 2)) {
+                result_message << " Radio " << (i + interface_offset_)
+                               << " rx time us " << rx_us.at(i);
+              }
+            }
+            MLPD_INFO("%s\n", result_message.str().c_str());
+          }
+
+          //Frame RX complete -- print summary
+          if (successful_receive.symbol_ > receive_attempt.symbol_) {
+            MLPD_INFO("TxRxWorkerArgos[%zu]: Frame %d rx complete @ %.2f\n",
+                      tid_, pkts.front()->frame_id_,
+                      GetTime::CyclesToUs(
+                          GetTime::Rdtsc() - program_start_ticks, freq_ghz));
+          }
+        }  //  if (kSymbolTimingEnabled)
+      }    // if (pkt.size() > 0)
+    }      // DequeueSendArgos(time0) == 0
+  }        // Configuration()->Running() == true
   running_ = false;
 }
 
@@ -208,7 +295,7 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
     ant_ids.at(ch) = ant_id + ch;
     samp.at(ch) = rx.RawPacket()->data_;
     MLPD_TRACE("TxRxWorkerArgos[%zu]: Using Packet at location %zu\n", tid_,
-               (size_t)(&rx));
+               reinterpret_cast<size_t>(&rx));
   }
 
   long long frame_time;
@@ -224,10 +311,8 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
        !cal_rx);
 
   //Ok to read into sample memory for dummy read
-  double rx_start_us = GetTime::GetTimeUs();
   const int rx_status =
       radio_config_.RadioRx(radio_id, samp.data(), frame_time);
-  double rx_time_us = GetTime::GetTimeUs() - rx_start_us;
 
   if ((dummy_read == false) && (rx_status > 0)) {
     //     (rx_status == static_cast<int>(Configuration()->SampsPerSymbol()))) {
@@ -241,17 +326,18 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
 
     if (rx_status != static_cast<int>(Configuration()->SampsPerSymbol())) {
       MLPD_WARN(
-          "TxRxWorkerArgos[%zu]: Interface %zu | Radio %zu  - Attempted Frame: "
-          "%zu, Symbol: %zu, RX status = %d is not the expected value and took "
-          "uS %f to receive\n",
+          "TxRxWorkerArgos[%zu]: Interface %zu | Radio %zu  - Attempted "
+          "Frame: "
+          "%zu, Symbol: %zu, RX status = %d is not the expected value\n",
           tid_, interface_id, interface_id + interface_offset_, frame_id,
-          symbol_id, rx_status, rx_time_us);
+          symbol_id, rx_status);
     } else {
-      MLPD_INFO(
-          "TxRxWorkerArgos[%zu]: Interface %zu | Radio %zu  - Attempted Frame: "
-          "%zu, Symbol: %zu, RX status = %d took uS to %f receive\n",
+      MLPD_FRAME(
+          "TxRxWorkerArgos[%zu]: Interface %zu | Radio %zu  - Attempted "
+          "Frame: "
+          "%zu, Symbol: %zu, RX status = %d\n",
           tid_, interface_id, interface_id + interface_offset_, frame_id,
-          symbol_id, rx_status, rx_time_us);
+          symbol_id, rx_status);
     }
 
     for (size_t ant = 0; ant < ant_ids.size(); ant++) {
@@ -294,7 +380,6 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
       ReturnRxPacket(*memory_location);
     }
   }
-  //Free rx any memory that we didn't use here
   return result_packets;
 }
 
@@ -505,7 +590,8 @@ size_t TxRxWorkerArgos::DequeueSend(long long time0) {
 
     if (kDebugPrintInTask == true) {
       std::printf(
-          "TxRxWorkerArgos[%zu]: Transmitted frame %zu, symbol %zu, ant %zu\n",
+          "TxRxWorkerArgos[%zu]: Transmitted frame %zu, symbol %zu, ant "
+          "%zu\n",
           tid_, frame_id, symbol_id, ant_id);
     }
     auto complete_event =
@@ -553,32 +639,34 @@ int TxRxWorkerArgos::GetTxFlags(size_t radio_id, size_t tx_symbol_id) {
   return tx_flags;
 }
 
-size_t TxRxWorkerArgos::UpdateRxInterface(size_t last_interface,
-                                          size_t last_rx_symbol) {
-  size_t next_interface;
+/// Returns the next symbol and interface
+TxRxWorkerRx::RxParameters TxRxWorkerArgos::UpdateRxInterface(
+    const TxRxWorkerRx::RxParameters& last_rx) {
+  TxRxWorkerRx::RxParameters next_rx;
 
   const size_t total_symbols = Configuration()->Frame().NumTotalSyms();
-  size_t serach_symbol = last_rx_symbol;
-  size_t start_interface = last_interface + 1;
+  size_t search_symbol = last_rx.symbol_;
+  size_t start_interface = last_rx.interface_ + 1;
   bool interface_found = false;
   //This search could probably be optimized (by creating a map in init)
   while (interface_found == false) {
     // For each symbol interate through all interfaces
     for (size_t interface = start_interface; interface < num_interfaces_;
          interface++) {
-      bool is_rx = IsRxSymbol(interface, serach_symbol);
+      bool is_rx = IsRxSymbol(interface, search_symbol);
       if (is_rx) {
         interface_found = true;
-        next_interface = interface;
+        next_rx.interface_ = interface;
+        next_rx.symbol_ = search_symbol;
         break;
       }
     }
-    serach_symbol = (serach_symbol + 1) % total_symbols;
+    search_symbol = (search_symbol + 1) % total_symbols;
     //Start at the first interface for each new symbol
     start_interface = 0;
     ///\todo Need to add an infinate loop catcher
   }
-  return next_interface;
+  return next_rx;
 }
 
 /*

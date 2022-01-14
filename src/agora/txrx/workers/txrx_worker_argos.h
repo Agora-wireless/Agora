@@ -14,6 +14,13 @@
 #include "radio_lib.h"
 #include "txrx_worker.h"
 
+namespace TxRxWorkerRx {
+struct RxParameters {
+  size_t symbol_ = 0;
+  size_t interface_ = 0;
+};
+}  // namespace TxRxWorkerRx
+
 class TxRxWorkerArgos : public TxRxWorker {
  public:
   TxRxWorkerArgos(size_t core_offset, size_t tid, size_t interface_count,
@@ -44,7 +51,9 @@ class TxRxWorkerArgos : public TxRxWorker {
   int GetTxFlags(size_t radio_id, size_t tx_symbol_id);
 
   bool IsRxSymbol(size_t interface, size_t symbol_id);
-  size_t UpdateRxInterface(size_t last_interface, size_t last_rx_symbol);
+
+  TxRxWorkerRx::RxParameters UpdateRxInterface(
+      const TxRxWorkerRx::RxParameters& last_rx);
   // This object is created / owned by the parent process
   RadioConfig& radio_config_;
 };
