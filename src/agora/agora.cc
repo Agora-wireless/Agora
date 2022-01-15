@@ -407,23 +407,34 @@ void Agora::Start() {
               this->demul_counters_.CompleteTask(frame_id, symbol_id);
 
           if (last_demul_task == true) {
-            ScheduleCodeblocks(EventType::kDecode, Direction::kUplink, frame_id,
-                               symbol_id);
+            if (kUplinkHardDemod == false) {
+              ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
+                                 frame_id, symbol_id);
+            }
             PrintPerSymbolDone(PrintType::kDemul, frame_id, symbol_id);
             bool last_demul_symbol =
                 this->demul_counters_.CompleteSymbol(frame_id);
             if (last_demul_symbol == true) {
-              this->demul_counters_.Reset(frame_id);
               max_equaled_frame_ = frame_id;
-              if (cfg->BigstationMode() == false) {
-                assert(cur_sche_frame_id_ == frame_id);
-                CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
-              } else {
-                ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
-                                   frame_id, symbol_id);
-              }
               this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
               PrintPerFrameDone(PrintType::kDemul, frame_id);
+              if (kUplinkHardDemod == true) {
+                assert(this->cur_proc_frame_id_ == frame_id);
+                CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
+                bool work_finished = this->CheckFrameComplete(frame_id);
+                if (work_finished == true) {
+                  goto finish;
+                }
+              } else {
+                this->demul_counters_.Reset(frame_id);
+                if (cfg->BigstationMode() == false) {
+                  assert(cur_sche_frame_id_ == frame_id);
+                  CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
+                } else {
+                  ScheduleCodeblocks(EventType::kDecode, Direction::kUplink,
+                                     frame_id, symbol_id);
+                }
+              }
             }
           }
         } break;
@@ -812,12 +823,12 @@ void Agora::Worker(int tid) {
 
   auto compute_precode = std::make_unique<DoPrecode>(
       this->config_, tid, this->dl_zf_matrices_, this->dl_ifft_buffer_,
-      this->dl_encoded_buffer_, this->stats_.get());
+      this->dl_mod_bits_buffer_, this->stats_.get());
 
   auto compute_encoding = std::make_unique<DoEncode>(
       config_, tid, Direction::kDownlink,
       (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
-      (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
+      (kEnableMac == true) ? kFrameWnd : 1, dl_mod_bits_buffer_,
       this->stats_.get());
 
   // Uplink workers
@@ -936,7 +947,7 @@ void Agora::WorkerDemul(int tid) {
   /* Initialize Precode operator */
   std::unique_ptr<DoPrecode> compute_precode(
       new DoPrecode(config_, tid, dl_zf_matrices_, dl_ifft_buffer_,
-                    dl_encoded_buffer_, this->stats_.get()));
+                    dl_mod_bits_buffer_, this->stats_.get()));
 
   assert(false);
 
@@ -959,7 +970,7 @@ void Agora::WorkerDecode(int tid) {
   std::unique_ptr<DoEncode> compute_encoding(
       new DoEncode(config_, tid, Direction::kDownlink,
                    (kEnableMac == true) ? dl_bits_buffer_ : config_->DlBits(),
-                   (kEnableMac == true) ? kFrameWnd : 1, dl_encoded_buffer_,
+                   (kEnableMac == true) ? kFrameWnd : 1, dl_mod_bits_buffer_,
                    this->stats_.get()));
 
   std::unique_ptr<DoDecode> compute_decoding(
@@ -1446,7 +1457,7 @@ void Agora::InitializeDownlinkBuffers() {
       calib_dl_buffer_[kFrameWnd - 1][i] = {1, 0};
       calib_ul_buffer_[kFrameWnd - 1][i] = {1, 0};
     }
-    dl_encoded_buffer_.Calloc(
+    dl_mod_bits_buffer_.Calloc(
         task_buffer_symbol_num,
         Roundup<64>(config_->GetOFDMDataNum()) * config_->UeAntNum(),
         Agora_memory::Alignment_t::kAlign64);
@@ -1487,7 +1498,7 @@ void Agora::FreeDownlinkBuffers() {
     calib_ul_buffer_.Free();
     calib_dl_msum_buffer_.Free();
     calib_ul_msum_buffer_.Free();
-    dl_encoded_buffer_.Free();
+    dl_mod_bits_buffer_.Free();
     dl_bits_buffer_.Free();
     dl_bits_buffer_status_.Free();
   }
@@ -1579,10 +1590,13 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
       (true == this->tx_counters_.IsLastSymbol(frame_id)) &&
       (((false == kEnableMac) &&
         (true == this->decode_counters_.IsLastSymbol(frame_id))) ||
+       ((true == kUplinkHardDemod) &&
+        (true == this->demul_counters_.IsLastSymbol(frame_id))) ||
        ((true == kEnableMac) &&
         (true == this->tomac_counters_.IsLastSymbol(frame_id))))) {
     this->stats_->UpdateStats(frame_id);
     assert(frame_id == this->cur_proc_frame_id_);
+    if (true == kUplinkHardDemod) this->demul_counters_.Reset(frame_id);
     this->decode_counters_.Reset(frame_id);
     this->tomac_counters_.Reset(frame_id);
     this->ifft_counters_.Reset(frame_id);

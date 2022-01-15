@@ -344,6 +344,19 @@ size_t PacketTXRX::DequeueSend(int tid) {
         reinterpret_cast<Packet*>(&tx_buffer_[offset * cfg_->DlPacketLength()]);
     new (pkt) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
+    if (kDebugDownlink == true) {
+      if (ant_id != 0) {
+        std::memset(pkt->data_, 0,
+                    cfg_->SampsPerSymbol() * sizeof(int16_t) * 2);
+      } else if (data_symbol_idx_dl < cfg_->Frame().ClientDlPilotSymbols()) {
+        std::memcpy(pkt->data_, cfg_->UeSpecificPilotT()[0],
+                    cfg_->SampsPerSymbol() * sizeof(int16_t) * 2);
+      } else {
+        std::memcpy(pkt->data_, cfg_->DlIqT()[data_symbol_idx_dl],
+                    cfg_->SampsPerSymbol() * sizeof(int16_t) * 2);
+      }
+    }
+
     // Send data (one OFDM symbol)
     udp_clients_.at(ant_id)->Send(cfg_->BsRruAddr(), cfg_->BsRruPort() + ant_id,
                                   reinterpret_cast<uint8_t*>(pkt),

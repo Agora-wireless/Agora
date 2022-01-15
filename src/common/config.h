@@ -212,6 +212,9 @@ class Config {
     return dir == Direction::kUplink ? this->ul_mcs_params_
                                      : this->dl_mcs_params_;
   }
+  inline size_t SubcarrierPerCodeBlock(Direction dir) {
+    return this->LdpcConfig(dir).NumCbCodewLen() / this->ModOrderBits(dir);
+  }
 
   inline bool ScrambleEnabled() const { return this->scramble_enabled_; }
 
@@ -285,6 +288,8 @@ class Config {
 
   inline Table<int8_t>& DlBits() { return this->dl_bits_; }
   inline Table<int8_t>& UlBits() { return this->ul_bits_; }
+  inline Table<int8_t>& DlModBits() { return this->dl_mod_bits_; }
+  inline Table<int8_t>& UlModBits() { return this->ul_mod_bits_; }
   inline Table<complex_float>& UlIqF() { return this->ul_iq_f_; }
   inline Table<complex_float>& DlIqF() { return this->dl_iq_f_; }
   inline Table<std::complex<int16_t>>& DlIqT() { return this->dl_iq_t_; }
@@ -396,27 +401,21 @@ class Config {
   }
 
   /// Get encoded_buffer for this frame, symbol, user and code block ID
-  inline int8_t* GetEncodedBuf(Table<int8_t>& encoded_buffer, Direction dir,
+  inline int8_t* GetModBitsBuf(Table<int8_t>& mod_bits_buffer, Direction dir,
                                size_t frame_id, size_t symbol_id, size_t ue_id,
-                               size_t cb_id) const {
+                               size_t sc_id) const {
     size_t total_data_symbol_id;
     size_t ofdm_data_num;
-    size_t num_encoded_bytes_per_cb;
     if (dir == Direction::kDownlink) {
       total_data_symbol_id = GetTotalDataSymbolIdxDl(frame_id, symbol_id);
       ofdm_data_num = GetOFDMDataNum();
-      num_encoded_bytes_per_cb =
-          this->dl_ldpc_config_.NumCbCodewLen() / this->dl_mod_order_bits_;
     } else {
       total_data_symbol_id = GetTotalDataSymbolIdxUl(frame_id, symbol_id);
       ofdm_data_num = this->ofdm_data_num_;
-      num_encoded_bytes_per_cb =
-          this->ul_ldpc_config_.NumCbCodewLen() / this->ul_mod_order_bits_;
     }
 
-    return &encoded_buffer[total_data_symbol_id]
-                          [Roundup<64>(ofdm_data_num) * ue_id +
-                           num_encoded_bytes_per_cb * cb_id];
+    return &mod_bits_buffer[total_data_symbol_id]
+                           [Roundup<64>(ofdm_data_num) * ue_id + sc_id];
   }
 
   // Returns the number of pilot subcarriers in downlink symbols used for
@@ -521,9 +520,8 @@ class Config {
 
   Table<int8_t> dl_bits_;
   Table<int8_t> ul_bits_;
-  Table<int8_t> ul_encoded_bits_;
-  Table<uint8_t> ul_mod_input_;
-  Table<uint8_t> dl_mod_input_;
+  Table<int8_t> ul_mod_bits_;
+  Table<int8_t> dl_mod_bits_;
   Table<complex_float> dl_iq_f_;
   Table<complex_float> ul_iq_f_;
   Table<std::complex<int16_t>> dl_iq_t_;
