@@ -407,21 +407,32 @@ void Agora::Start() {
               this->demul_counters_.CompleteTask(frame_id, symbol_id);
 
           if (last_demul_task == true) {
-            ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_id);
+            if (kUplinkHardDemod == false) {
+              ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_id);
+            }
             PrintPerSymbolDone(PrintType::kDemul, frame_id, symbol_id);
             bool last_demul_symbol =
                 this->demul_counters_.CompleteSymbol(frame_id);
             if (last_demul_symbol == true) {
-              this->demul_counters_.Reset(frame_id);
               max_equaled_frame_ = frame_id;
-              if (cfg->BigstationMode() == false) {
-                assert(cur_sche_frame_id_ == frame_id);
-                CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
-              } else {
-                ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_id);
-              }
               this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
               PrintPerFrameDone(PrintType::kDemul, frame_id);
+              if (kUplinkHardDemod == true) {
+                assert(this->cur_proc_frame_id_ == frame_id);
+                CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
+                bool work_finished = this->CheckFrameComplete(frame_id);
+                if (work_finished == true) {
+                  goto finish;
+                }
+              } else {
+                this->demul_counters_.Reset(frame_id);
+                if (cfg->BigstationMode() == false) {
+                  assert(cur_sche_frame_id_ == frame_id);
+                  CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
+                } else {
+                  ScheduleCodeblocks(EventType::kDecode, frame_id, symbol_id);
+                }
+              }
             }
           }
         } break;
@@ -1571,10 +1582,13 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
       (true == this->tx_counters_.IsLastSymbol(frame_id)) &&
       (((false == kEnableMac) &&
         (true == this->decode_counters_.IsLastSymbol(frame_id))) ||
+       ((true == kUplinkHardDemod) &&
+        (true == this->demul_counters_.IsLastSymbol(frame_id))) ||
        ((true == kEnableMac) &&
         (true == this->tomac_counters_.IsLastSymbol(frame_id))))) {
     this->stats_->UpdateStats(frame_id);
     assert(frame_id == this->cur_proc_frame_id_);
+    if (true == kUplinkHardDemod) this->demul_counters_.Reset(frame_id);
     this->decode_counters_.Reset(frame_id);
     this->tomac_counters_.Reset(frame_id);
     this->ifft_counters_.Reset(frame_id);
