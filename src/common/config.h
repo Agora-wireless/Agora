@@ -288,13 +288,16 @@ class Config {
   /// Return the symbol type of this symbol in this frame
   SymbolType GetSymbolType(size_t symbol_id) const;
 
+  inline size_t SubcarrierPerCodeBlock() {
+    return ldpc_config_.NumCbCodewLen() / this->mod_order_bits_;
+  }
+
   inline void UpdateModCfgs(size_t new_mod_order_bits) {
     this->mod_order_bits_ = new_mod_order_bits;
     this->mod_order_ = static_cast<size_t>(pow(2, this->mod_order_bits_));
     InitModulationTable(this->mod_table_, this->mod_order_);
-    this->ldpc_config_.NumBlocksInSymbol(
-        (this->ofdm_data_num_ * this->mod_order_bits_) /
-        this->ldpc_config_.NumCbCodewLen());
+    this->ldpc_config_.NumBlocksInSymbol(this->ofdm_data_num_ /
+                                         SubcarrierPerCodeBlock());
   }
 
   /// Return total number of data symbols of all frames in a buffer
@@ -372,7 +375,7 @@ class Config {
   /// Get encoded_buffer for this frame, symbol, user and code block ID
   inline int8_t* GetModBitsBuf(Table<int8_t>& mod_bits_buffer, Direction dir,
                                size_t frame_id, size_t symbol_id, size_t ue_id,
-                               size_t cb_id) const {
+                               size_t sc_id) const {
     size_t total_data_symbol_id;
 
     if (dir == Direction::kDownlink) {
@@ -381,12 +384,8 @@ class Config {
       total_data_symbol_id = GetTotalDataSymbolIdxUl(frame_id, symbol_id);
     }
 
-    size_t num_encoded_bytes_per_cb =
-        ldpc_config_.NumCbCodewLen() / this->mod_order_bits_;
-
     return &mod_bits_buffer[total_data_symbol_id]
-                           [Roundup<64>(ofdm_data_num_) * ue_id +
-                            num_encoded_bytes_per_cb * cb_id];
+                           [Roundup<64>(ofdm_data_num_) * ue_id + sc_id];
   }
 
   // Returns the number of pilot subcarriers in downlink symbols used for
