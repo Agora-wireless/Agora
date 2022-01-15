@@ -8,6 +8,9 @@
   "dl_mcs" : {
     "Zc": 18
   },
+  /* set sample rate to 1Ms
+  to make sure tests pass*/
+  "sample_rate" : 1e6,
   "ue_radio_num": 2,
   "bs_radio_num": 8,
   "symbol_num_perframe": 16,
@@ -20,7 +23,7 @@
   "beacon_position": 0,
   "bs_server_port": 8100,
   "bs_rru_port": 8200,
-  "core_offset": 14,
+  "core_offset": 5,
   "worker_thread_num": 12,
   "socket_thread_num": 1,
   "ue_core_offset": 1,

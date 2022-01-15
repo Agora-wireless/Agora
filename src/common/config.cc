@@ -888,8 +888,6 @@ void Config::GenData() {
       BitsToBytes(this->ul_ldpc_config_.NumCbCodewLen());
   const size_t ul_num_blocks_per_symbol =
       this->ul_ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
-  const size_t ul_encoded_sym_per_block =
-      this->ul_ldpc_config_.NumCbCodewLen() / ul_mod_order_bits_;
 
   // Used as an input ptr to
   auto* ul_scramble_buffer =
@@ -898,12 +896,13 @@ void Config::GenData() {
   int8_t* ldpc_input = nullptr;
 
   // Encode uplink bits
-  ul_encoded_bits_.Malloc(this->frame_.NumULSyms() * ul_num_blocks_per_symbol,
-                          ul_encoded_bytes_per_block,
-                          Agora_memory::Alignment_t::kAlign64);
-  ul_mod_input_.Calloc(this->frame_.NumULSyms(),
-                       this->ofdm_data_num_ * this->ue_ant_num_,
-                       Agora_memory::Alignment_t::kAlign32);
+  Table<int8_t> ul_encoded_bits;
+  ul_encoded_bits.Malloc(this->frame_.NumULSyms() * ul_num_blocks_per_symbol,
+                         ul_encoded_bytes_per_block,
+                         Agora_memory::Alignment_t::kAlign64);
+  ul_mod_bits_.Calloc(this->frame_.NumULSyms(),
+                      Roundup<64>(this->ofdm_data_num_) * this->ue_ant_num_,
+                      Agora_memory::Alignment_t::kAlign32);
   auto* ul_temp_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
       this->ul_ldpc_config_.BaseGraph(),
       this->ul_ldpc_config_.ExpansionFactor())];
@@ -912,8 +911,8 @@ void Config::GenData() {
     for (size_t j = 0; j < ue_ant_num_; j++) {
       for (size_t k = 0; k < ul_ldpc_config_.NumBlocksInSymbol(); k++) {
         int8_t* coded_bits_ptr =
-            ul_encoded_bits_[i * ul_num_blocks_per_symbol +
-                             j * ul_ldpc_config_.NumBlocksInSymbol() + k];
+            ul_encoded_bits[i * ul_num_blocks_per_symbol +
+                            j * ul_ldpc_config_.NumBlocksInSymbol() + k];
 
         if (scramble_enabled_) {
           std::memcpy(ul_scramble_buffer,
@@ -929,9 +928,10 @@ void Config::GenData() {
                          ul_ldpc_config_.ExpansionFactor(),
                          ul_ldpc_config_.NumRows(), coded_bits_ptr,
                          ul_temp_parity_buffer, ldpc_input);
+        int8_t* mod_input_ptr =
+            GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, j, k);
         AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
-                        ul_mod_input_[i] + j * ofdm_data_num_ +
-                            k * ul_encoded_sym_per_block,
+                        reinterpret_cast<uint8_t*>(mod_input_ptr),
                         ul_encoded_bytes_per_block, ul_mod_order_bits_);
       }
     }
@@ -944,13 +944,13 @@ void Config::GenData() {
                     Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t u = 0; u < this->ue_ant_num_; u++) {
-      size_t p = u * this->ofdm_data_num_;
       size_t q = u * this->ofdm_ca_num_;
 
       for (size_t j = this->ofdm_data_start_; j < this->ofdm_data_stop_; j++) {
         size_t k = j - ofdm_data_start_;
-        size_t s = p + k;
-        ul_iq_f_[i][q + j] = ModSingleUint8(ul_mod_input_[i][s], ul_mod_table_);
+        int8_t* mod_input_ptr =
+            GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, k);
+        ul_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, ul_mod_table_);
         ul_iq_ifft[i][q + j] = ul_iq_f_[i][q + j];
       }
       CommsLib::IFFT(&ul_iq_ifft[i][q], ofdm_ca_num_, false);
@@ -962,8 +962,6 @@ void Config::GenData() {
       BitsToBytes(this->dl_ldpc_config_.NumCbCodewLen());
   const size_t dl_num_blocks_per_symbol =
       this->dl_ldpc_config_.NumBlocksInSymbol() * this->ue_ant_num_;
-  const size_t dl_encoded_sym_per_block =
-      this->dl_ldpc_config_.NumCbCodewLen() / dl_mod_order_bits_;
 
   auto* dl_scramble_buffer =
       new int8_t[dl_num_bytes_per_cb_ +
@@ -973,9 +971,9 @@ void Config::GenData() {
   dl_encoded_bits.Malloc(this->frame_.NumDLSyms() * dl_num_blocks_per_symbol,
                          dl_encoded_bytes_per_block,
                          Agora_memory::Alignment_t::kAlign64);
-  dl_mod_input_.Calloc(this->frame_.NumDLSyms(),
-                       Roundup<64>(this->GetOFDMDataNum()) * ue_ant_num_,
-                       Agora_memory::Alignment_t::kAlign32);
+  dl_mod_bits_.Calloc(this->frame_.NumDLSyms(),
+                      Roundup<64>(this->GetOFDMDataNum()) * ue_ant_num_,
+                      Agora_memory::Alignment_t::kAlign32);
   auto* dl_temp_parity_buffer = new int8_t[LdpcEncodingParityBufSize(
       this->dl_ldpc_config_.BaseGraph(),
       this->dl_ldpc_config_.ExpansionFactor())];
@@ -1001,9 +999,10 @@ void Config::GenData() {
                          dl_ldpc_config_.ExpansionFactor(),
                          dl_ldpc_config_.NumRows(), coded_bits_ptr,
                          dl_temp_parity_buffer, ldpc_input);
+        int8_t* mod_input_ptr =
+            GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, i, j, k);
         AdaptBitsForMod(reinterpret_cast<uint8_t*>(coded_bits_ptr),
-                        dl_mod_input_[i] + j * Roundup<64>(GetOFDMDataNum()) +
-                            k * dl_encoded_sym_per_block,
+                        reinterpret_cast<uint8_t*>(mod_input_ptr),
                         dl_encoded_bytes_per_block, dl_mod_order_bits_);
       }
     }
@@ -1019,11 +1018,11 @@ void Config::GenData() {
 
       for (size_t j = ofdm_data_start_; j < ofdm_data_stop_; j++) {
         int k = j - ofdm_data_start_;
-        size_t s =
-            u * Roundup<64>(this->GetOFDMDataNum()) + this->GetOFDMDataIndex(k);
         if (IsDataSubcarrier(k) == true) {
-          dl_iq_f_[i][q + j] =
-              ModSingleUint8(dl_mod_input_[i][s], dl_mod_table_);
+          int8_t* mod_input_ptr =
+              GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, i, u,
+                            this->GetOFDMDataIndex(k));
+          dl_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, dl_mod_table_);
         } else {
           dl_iq_f_[i][q + j] = ue_specific_pilot_[u][k];
         }
@@ -1061,7 +1060,7 @@ void Config::GenData() {
       size_t r = u * this->samps_per_symbol_;
       CommsLib::Ifft2tx(&dl_iq_ifft[i][q], &this->dl_iq_t_[i][r],
                         this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
-                        this->cp_len_, this->scale_);
+                        this->cp_len_, kDebugDownlink ? 1 : this->scale_);
     }
   }
 
@@ -1080,7 +1079,7 @@ void Config::GenData() {
   for (size_t i = 0; i < this->ue_ant_num_; i++) {
     CommsLib::Ifft2tx(ue_pilot_ifft[i], this->ue_specific_pilot_t_[i],
                       this->ofdm_ca_num_, this->ofdm_tx_zero_prefix_,
-                      this->cp_len_, this->scale_);
+                      this->cp_len_, kDebugDownlink ? 1 : this->scale_);
     if (kDebugPrintPilot == true) {
       std::printf("ue_specific_pilot_t%zu=[", i);
       for (size_t j = 0; j < this->ofdm_ca_num_; j++) {
@@ -1133,13 +1132,11 @@ void Config::GenData() {
 
   delete[](ul_temp_parity_buffer);
   delete[](dl_temp_parity_buffer);
-  dl_encoded_bits.Free();
   ul_iq_ifft.Free();
   dl_iq_ifft.Free();
   ue_pilot_ifft.Free();
-  ul_mod_input_.Free();
-  ul_encoded_bits_.Free();
-  dl_mod_input_.Free();
+  dl_encoded_bits.Free();
+  ul_encoded_bits.Free();
   FreeBuffer1d(&pilot_ifft);
   delete[] ul_scramble_buffer;
   delete[] dl_scramble_buffer;
@@ -1158,6 +1155,8 @@ Config::~Config() {
   dl_mod_table_.Free();
   dl_bits_.Free();
   ul_bits_.Free();
+  ul_mod_bits_.Free();
+  dl_mod_bits_.Free();
   dl_iq_f_.Free();
   dl_iq_t_.Free();
   ul_iq_f_.Free();

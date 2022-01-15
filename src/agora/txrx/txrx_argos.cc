@@ -6,8 +6,6 @@
 #include "logger.h"
 #include "txrx.h"
 
-static constexpr bool kDebugDownlink = false;
-
 void PacketTXRX::LoopTxRxArgos(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid);
 

@@ -39,7 +39,6 @@ UeWorker::UeWorker(
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
     std::vector<std::vector<std::complex<float>>>& ue_pilot_vec)
     : tid_(tid),
-
       notify_queue_(notify_queue),
       work_queue_(work_queue),
       work_producer_token_(work_producer),
@@ -144,144 +143,6 @@ void UeWorker::TaskThread(size_t core_offset) {
 //////////////////////////////////////////////////////////
 //                   DOWNLINK Operations                //
 //////////////////////////////////////////////////////////
-void UeWorker::DoFftData(size_t tag) {
-  size_t start_tsc = GetTime::Rdtsc();
-
-  // read info of one frame
-  Packet* pkt = fft_req_tag_t(tag).rx_packet_->RawPacket();
-
-  size_t frame_id = pkt->frame_id_;
-  size_t symbol_id = pkt->symbol_id_;
-  size_t ant_id = pkt->ant_id_;
-  size_t frame_slot = frame_id % kFrameWnd;
-
-  if (kDebugPrintInTask || kDebugPrintFft) {
-    std::printf("UeWorker[%zu]: Fft Data(frame %zu, symbol %zu, ant %zu)\n",
-                tid_, frame_id, symbol_id, ant_id);
-  }
-
-  size_t sig_offset = config_.OfdmRxZeroPrefixClient();
-  size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
-
-  if (kRecordDownlinkFrame) {
-    if (frame_id == kRecordFrameIndex) {
-      std::string fname = "rxdata" + std::to_string(dl_symbol_id) + "_" +
-                          std::to_string(ant_id) + ".bin";
-      FILE* f = std::fopen(fname.c_str(), "wb");
-      std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
-      std::fclose(f);
-      fname = "txdata" + std::to_string(dl_symbol_id) + "_" +
-              std::to_string(ant_id) + ".bin";
-      f = std::fopen(fname.c_str(), "wb");
-      std::fwrite(config_.DlIqF()[dl_symbol_id] + ant_id * config_.OfdmCaNum(),
-                  2 * sizeof(float), config_.OfdmCaNum(), f);
-      std::fclose(f);
-    }
-  }
-
-  // remove CP, do FFT
-  size_t total_dl_symbol_id =
-      (frame_slot * config_.Frame().NumDLSyms()) + dl_symbol_id;
-  size_t fft_buffer_target_id =
-      (total_dl_symbol_id * config_.UeAntNum()) + ant_id;
-
-  // transfer ushort to float
-  size_t delay_offset = (sig_offset + config_.CpLen()) * 2;
-  auto* fft_buff = reinterpret_cast<float*>(fft_buffer_[fft_buffer_target_id]);
-
-  SimdConvertShortToFloat(&pkt->data_[delay_offset], fft_buff,
-                          config_.OfdmCaNum() * 2);
-
-  // perform fft
-  DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
-
-  size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
-  auto* csi_buffer_ptr =
-      reinterpret_cast<arma::cx_float*>(csi_buffer_.at(csi_offset).data());
-  auto* fft_buffer_ptr =
-      reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
-
-  size_t dl_data_symbol_perframe = config_.Frame().NumDlDataSyms();
-  size_t total_dl_data_symbol_id =
-      (frame_slot * dl_data_symbol_perframe) +
-      (dl_symbol_id - config_.Frame().ClientDlPilotSymbols());
-  size_t eq_buffer_offset =
-      total_dl_data_symbol_id * config_.UeAntNum() + ant_id;
-
-  auto* equ_buffer_ptr = reinterpret_cast<arma::cx_float*>(
-      equal_buffer_.at(eq_buffer_offset).data());
-
-  // use pilot subcarriers for phase tracking and correction
-  float theta = 0;
-  for (size_t j = 0; j < config_.OfdmDataNum(); j++) {
-    if (config_.IsDataSubcarrier(j) == false) {  //DMRS
-      size_t sc_id = non_null_sc_ind_[j];
-      arma::cx_float y = fft_buffer_ptr[sc_id];
-      auto pilot_eq = y / csi_buffer_ptr[j];
-      auto p = config_.UeSpecificPilot()[ant_id][j];
-      theta += arg(pilot_eq * arma::cx_float(p.re, -p.im));
-    }
-  }
-  if (config_.GetOFDMPilotNum() > 0) {
-    theta /= config_.GetOFDMPilotNum();
-  }
-  auto phc = exp(arma::cx_float(0, -theta));
-  float evm = 0;
-  for (size_t j = 0; j < config_.OfdmDataNum(); j++) {
-    if (config_.IsDataSubcarrier(j) == true) {
-      // divide fft output by pilot data to get CSI estimation
-      size_t sc_id = non_null_sc_ind_[j];
-      size_t data_sc_id = config_.GetOFDMDataIndex(j);
-      arma::cx_float y = fft_buffer_ptr[sc_id];
-      equ_buffer_ptr[data_sc_id] = (y / csi_buffer_ptr[j]) * phc;
-      complex_float tx =
-          config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmCaNum() + sc_id];
-      evm +=
-          std::norm(equ_buffer_ptr[data_sc_id] - arma::cx_float(tx.re, tx.im));
-    }
-  }
-
-  evm = std::sqrt(evm) / config_.GetOFDMDataNum();
-  if (kPrintEqualizedSymbols) {
-    complex_float* tx =
-        &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmCaNum() +
-                                       config_.OfdmDataStart()];
-    arma::cx_fvec x_vec(reinterpret_cast<arma::cx_float*>(tx),
-                        config_.OfdmDataNum(), false);
-    Utils::PrintVec(x_vec, std::string("x") +
-                               std::to_string(total_dl_symbol_id) +
-                               std::string("_") + std::to_string(ant_id));
-    arma::cx_fvec equal_vec(equ_buffer_ptr, config_.GetOFDMDataNum(), false);
-    Utils::PrintVec(equal_vec, std::string("equ") +
-                                   std::to_string(total_dl_symbol_id) +
-                                   std::string("_") + std::to_string(ant_id));
-  }
-  if (kPrintPhyStats) {
-    std::stringstream ss;
-    ss << "Frame: " << frame_id << ", Symbol: " << symbol_id
-       << ", User: " << ant_id << ", EVM: " << 100 * evm
-       << "%, SNR: " << -10 * std::log10(evm) << std::endl;
-    std::cout << ss.str();
-  }
-
-  if (kDebugPrintPerTaskDone || kDebugPrintFft) {
-    size_t fft_duration_stat = GetTime::Rdtsc() - start_tsc;
-    std::printf(
-        "UeWorker[%zu]: Fft Data(frame %zu, symbol %zu, ant %zu) Duration "
-        "%2.4f ms\n",
-        tid_, frame_id, symbol_id, ant_id,
-        GetTime::CyclesToMs(fft_duration_stat, GetTime::MeasureRdtscFreq()));
-  }
-
-  // Free the rx buffer
-  fft_req_tag_t(tag).rx_packet_->Free();
-
-  EventData fft_finish_event = EventData(
-      EventType::kFFT, gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_);
-  RtAssert(notify_queue_.enqueue(*ptok_.get(), fft_finish_event),
-           "UeWorker: FFT message enqueue failed");
-}
-
 void UeWorker::DoFftPilot(size_t tag) {
   size_t start_tsc = GetTime::Rdtsc();
 
@@ -375,7 +236,8 @@ void UeWorker::DoFftPilot(size_t tag) {
   // see Argos paper (Mobicom'12)
   if (dl_symbol_id < config_.Frame().ClientDlPilotSymbols()) {
     for (size_t j = 0; j < config_.OfdmDataNum(); j++) {
-      complex_float p = config_.UeSpecificPilot()[ant_id][j];
+      size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
+      complex_float p = config_.UeSpecificPilot()[ant][j];
       size_t sc_id = non_null_sc_ind_[j];
       csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / arma::cx_float(p.re, p.im));
     }
@@ -399,7 +261,148 @@ void UeWorker::DoFftPilot(size_t tag) {
            "UeWorker: FFT Pilot message enqueue failed");
 }
 
+void UeWorker::DoFftData(size_t tag) {
+  size_t start_tsc = GetTime::Rdtsc();
+
+  // read info of one frame
+  Packet* pkt = fft_req_tag_t(tag).rx_packet_->RawPacket();
+
+  size_t frame_id = pkt->frame_id_;
+  size_t symbol_id = pkt->symbol_id_;
+  size_t ant_id = pkt->ant_id_;
+  size_t frame_slot = frame_id % kFrameWnd;
+
+  if (kDebugPrintInTask || kDebugPrintFft) {
+    std::printf("UeWorker[%zu]: Fft Data(frame %zu, symbol %zu, ant %zu)\n",
+                tid_, frame_id, symbol_id, ant_id);
+  }
+
+  size_t sig_offset = config_.OfdmRxZeroPrefixClient();
+  size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
+
+  if (kRecordDownlinkFrame) {
+    if (frame_id == kRecordFrameIndex) {
+      std::string fname = "rxdata" + std::to_string(dl_symbol_id) + "_" +
+                          std::to_string(ant_id) + ".bin";
+      FILE* f = std::fopen(fname.c_str(), "wb");
+      std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
+      std::fclose(f);
+      fname = "txdata" + std::to_string(dl_symbol_id) + "_" +
+              std::to_string(ant_id) + ".bin";
+      f = std::fopen(fname.c_str(), "wb");
+      std::fwrite(config_.DlIqF()[dl_symbol_id] + ant_id * config_.OfdmCaNum(),
+                  2 * sizeof(float), config_.OfdmCaNum(), f);
+      std::fclose(f);
+    }
+  }
+
+  // remove CP, do FFT
+  size_t total_dl_symbol_id =
+      (frame_slot * config_.Frame().NumDLSyms()) + dl_symbol_id;
+  size_t fft_buffer_target_id =
+      (total_dl_symbol_id * config_.UeAntNum()) + ant_id;
+
+  // transfer ushort to float
+  size_t delay_offset = (sig_offset + config_.CpLen()) * 2;
+  auto* fft_buff = reinterpret_cast<float*>(fft_buffer_[fft_buffer_target_id]);
+
+  SimdConvertShortToFloat(&pkt->data_[delay_offset], fft_buff,
+                          config_.OfdmCaNum() * 2);
+
+  // perform fft
+  DftiComputeForward(mkl_handle_, fft_buffer_[fft_buffer_target_id]);
+
+  size_t csi_offset = frame_slot * config_.UeAntNum() + ant_id;
+  auto* csi_buffer_ptr =
+      reinterpret_cast<arma::cx_float*>(csi_buffer_.at(csi_offset).data());
+  auto* fft_buffer_ptr =
+      reinterpret_cast<arma::cx_float*>(fft_buffer_[fft_buffer_target_id]);
+
+  size_t dl_data_symbol_perframe = config_.Frame().NumDlDataSyms();
+  size_t total_dl_data_symbol_id =
+      (frame_slot * dl_data_symbol_perframe) +
+      (dl_symbol_id - config_.Frame().ClientDlPilotSymbols());
+  size_t eq_buffer_offset =
+      total_dl_data_symbol_id * config_.UeAntNum() + ant_id;
+
+  auto* equ_buffer_ptr = reinterpret_cast<arma::cx_float*>(
+      equal_buffer_.at(eq_buffer_offset).data());
+
+  // use pilot subcarriers for phase tracking and correction
+  float theta = 0;
+  for (size_t j = 0; j < config_.OfdmDataNum(); j++) {
+    if (config_.IsDataSubcarrier(j) == false) {  //DMRS
+      size_t sc_id = non_null_sc_ind_[j];
+      arma::cx_float y = fft_buffer_ptr[sc_id];
+      auto pilot_eq = y / csi_buffer_ptr[j];
+      size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
+      auto p = config_.UeSpecificPilot()[ant][j];
+      theta += arg(pilot_eq * arma::cx_float(p.re, -p.im));
+    }
+  }
+  if (config_.GetOFDMPilotNum() > 0) {
+    theta /= config_.GetOFDMPilotNum();
+  }
+  auto phc = exp(arma::cx_float(0, -theta));
+  float evm = 0;
+  for (size_t j = 0; j < config_.OfdmDataNum(); j++) {
+    if (config_.IsDataSubcarrier(j) == true) {
+      // divide fft output by pilot data to get CSI estimation
+      size_t sc_id = non_null_sc_ind_[j];
+      size_t data_sc_id = config_.GetOFDMDataIndex(j);
+      arma::cx_float y = fft_buffer_ptr[sc_id];
+      equ_buffer_ptr[data_sc_id] = (y / csi_buffer_ptr[j]) * phc;
+      size_t ant = (kDebugDownlink == true) ? 0 : ant_id;
+      complex_float tx =
+          config_.DlIqF()[dl_symbol_id][ant * config_.OfdmCaNum() + sc_id];
+      evm +=
+          std::norm(equ_buffer_ptr[data_sc_id] - arma::cx_float(tx.re, tx.im));
+    }
+  }
+
+  evm = evm / config_.GetOFDMDataNum();
+  if (kPrintEqualizedSymbols) {
+    complex_float* tx =
+        &config_.DlIqF()[dl_symbol_id][ant_id * config_.OfdmCaNum() +
+                                       config_.OfdmDataStart()];
+    arma::cx_fvec x_vec(reinterpret_cast<arma::cx_float*>(tx),
+                        config_.OfdmDataNum(), false);
+    Utils::PrintVec(x_vec, std::string("x") +
+                               std::to_string(total_dl_symbol_id) +
+                               std::string("_") + std::to_string(ant_id));
+    arma::cx_fvec equal_vec(equ_buffer_ptr, config_.GetOFDMDataNum(), false);
+    Utils::PrintVec(equal_vec, std::string("equ") +
+                                   std::to_string(total_dl_symbol_id) +
+                                   std::string("_") + std::to_string(ant_id));
+  }
+  if (kPrintPhyStats) {
+    std::stringstream ss;
+    ss << "Frame: " << frame_id << ", Symbol: " << symbol_id
+       << ", User: " << ant_id << ", EVM: " << 100 * evm
+       << "%, SNR: " << -10 * std::log10(evm) << std::endl;
+    std::cout << ss.str();
+  }
+
+  if (kDebugPrintPerTaskDone || kDebugPrintFft) {
+    size_t fft_duration_stat = GetTime::Rdtsc() - start_tsc;
+    std::printf(
+        "UeWorker[%zu]: Fft Data(frame %zu, symbol %zu, ant %zu) Duration "
+        "%2.4f ms\n",
+        tid_, frame_id, symbol_id, ant_id,
+        GetTime::CyclesToMs(fft_duration_stat, GetTime::MeasureRdtscFreq()));
+  }
+
+  // Free the rx buffer
+  fft_req_tag_t(tag).rx_packet_->Free();
+
+  EventData fft_finish_event = EventData(
+      EventType::kFFT, gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_);
+  RtAssert(notify_queue_.enqueue(*ptok_.get(), fft_finish_event),
+           "UeWorker: FFT message enqueue failed");
+}
+
 void UeWorker::DoDemul(size_t tag) {
+  // TODO: We assume one code block per ofdm symbol here
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
   const size_t ant_id = gen_tag_t(tag).ant_id_;
@@ -426,17 +429,51 @@ void UeWorker::DoDemul(size_t tag) {
 
   switch (config_.ModOrderBits(Direction::kDownlink)) {
     case (CommsLib::kQpsk):
-      DemodQpskSoftSse(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
+      kDownlinkHardDemod
+          ? DemodQpskHardLoop(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
+                              config_.GetOFDMDataNum())
+          : DemodQpskSoftSse(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
       break;
     case (CommsLib::kQaM16):
-      Demod16qamSoftAvx2(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
+      kDownlinkHardDemod
+          ? Demod16qamHardAvx2(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
+                               config_.GetOFDMDataNum())
+          : Demod16qamSoftAvx2(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
       break;
     case (CommsLib::kQaM64):
-      Demod64qamSoftAvx2(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
+      kDownlinkHardDemod
+          ? Demod64qamHardAvx2(equal_ptr, reinterpret_cast<uint8_t*>(demod_ptr),
+                               config_.GetOFDMDataNum())
+          : Demod64qamSoftAvx2(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
       break;
     default:
       std::printf("UeWorker[%zu]: Demul - modulation type %s not supported!\n",
                   tid_, config_.Modulation(Direction::kDownlink).c_str());
+  }
+
+  if ((kDownlinkHardDemod == true) && (kPrintPhyStats == true) &&
+      (dl_symbol_id >= config_.Frame().ClientDlPilotSymbols())) {
+    phy_stats_.UpdateDecodedBits(
+        ant_id, total_dl_symbol_id,
+        config_.GetOFDMDataNum() * config_.ModOrderBits(Direction::kDownlink));
+    phy_stats_.IncrementDecodedBlocks(ant_id, total_dl_symbol_id);
+    int8_t* tx_bytes = config_.GetModBitsBuf(
+        config_.DlModBits(), Direction::kDownlink, 0, dl_symbol_id,
+        kDebugDownlink ? 0 : ant_id, base_sc_id);
+    size_t block_error(0);
+    for (size_t i = 0; i < config_.GetOFDMDataNum(); i++) {
+      uint8_t rx_byte = static_cast<uint8_t>(demod_ptr[i]);
+      uint8_t tx_byte = static_cast<uint8_t>(tx_bytes[i]);
+      phy_stats_.UpdateBitErrors(ant_id, total_dl_symbol_id, tx_byte, rx_byte);
+      if (rx_byte != tx_byte) {
+        block_error++;
+      }
+    }
+    if (block_error > 0)
+      std::printf("Frame %zu Symbol %zu Ue %zu: %zu symbol errors\n", frame_id,
+                  symbol_id, ant_id, block_error);
+
+    phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, block_error);
   }
 
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintDemul == true)) {
@@ -537,7 +574,7 @@ void UeWorker::DoModul(size_t tag) {
     complex_float* modul_buf =
         &modul_buffer_[total_ul_data_symbol_id][ant_id * config_.OfdmDataNum()];
 
-    auto* ul_bits = config_.GetEncodedBuf(encoded_buffer_, Direction::kUplink,
+    auto* ul_bits = config_.GetModBitsBuf(encoded_buffer_, Direction::kUplink,
                                           frame_id, ul_symbol_idx, ant_id, 0);
 
     if (kDebugPrintModul) {

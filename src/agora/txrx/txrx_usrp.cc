@@ -6,8 +6,6 @@
 
 #include "txrx.h"
 
-static constexpr bool kDebugDownlink = false;
-
 void PacketTXRX::LoopTxRxUsrp(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid);
   size_t* rx_frame_start = (*frame_start_)[tid];
