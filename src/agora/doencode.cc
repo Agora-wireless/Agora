@@ -132,7 +132,7 @@ EventData DoEncode::Launch(size_t tag) {
 
   if (kPrintEncodedData == true) {
     std::printf("Encoded data\n");
-    size_t num_mod = cfg_->LdpcConfig().NumCbCodewLen() / cfg_->ModOrderBits();
+    size_t num_mod = cfg_->SubcarrierPerCodeBlock();
     for (size_t i = 0; i < num_mod; i++) {
       std::printf("%u ", *(mod_buffer_ptr + i));
     }

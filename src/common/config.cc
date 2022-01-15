@@ -854,13 +854,13 @@ void Config::GenData() {
                     Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->frame_.NumULSyms(); i++) {
     for (size_t u = 0; u < this->ue_ant_num_; u++) {
-      size_t p = u * this->ofdm_data_num_;
       size_t q = u * this->ofdm_ca_num_;
 
       for (size_t j = this->ofdm_data_start_; j < this->ofdm_data_stop_; j++) {
         size_t k = j - ofdm_data_start_;
-        size_t s = p + k;
-        ul_iq_f_[i][q + j] = ModSingleUint8(ul_mod_bits_[i][s], mod_table_);
+        int8_t* mod_input_ptr =
+            GetModBitsBuf(ul_mod_bits_, Direction::kUplink, 0, i, u, k);
+        ul_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, mod_table_);
         ul_iq_ifft[i][q + j] = ul_iq_f_[i][q + j];
       }
       CommsLib::IFFT(&ul_iq_ifft[i][q], ofdm_ca_num_, false);
@@ -910,14 +910,14 @@ void Config::GenData() {
                     Agora_memory::Alignment_t::kAlign64);
   for (size_t i = 0; i < this->frame_.NumDLSyms(); i++) {
     for (size_t u = 0; u < ue_ant_num_; u++) {
-      size_t p = u * ofdm_data_num_;
       size_t q = u * ofdm_ca_num_;
 
       for (size_t j = ofdm_data_start_; j < ofdm_data_stop_; j++) {
         int k = j - ofdm_data_start_;
-        size_t s = p + k;
         if (k % ofdm_pilot_spacing_ != 0) {
-          dl_iq_f_[i][q + j] = ModSingleUint8(dl_mod_bits_[i][s], mod_table_);
+          int8_t* mod_input_ptr =
+              GetModBitsBuf(dl_mod_bits_, Direction::kDownlink, 0, i, u, k);
+          dl_iq_f_[i][q + j] = ModSingleUint8(*mod_input_ptr, mod_table_);
         } else {
           dl_iq_f_[i][q + j] = ue_specific_pilot_[u][k];
         }

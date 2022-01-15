@@ -144,7 +144,7 @@ static constexpr bool kUseUHD = false;
 // Use 12-bit IQ sample to reduce network throughput
 static constexpr bool kUse12BitIQ = false;
 static constexpr bool kDebug12BitIQ = false;
-static constexpr bool kDebugDownlink = true;
+static constexpr bool kDebugDownlink = false;
 
 static constexpr bool kUsePartialTrans = true;
 
