@@ -289,14 +289,14 @@ EventData DoDemul::Launch(size_t tag) {
                         cfg_->UeAntNum() * 4, cfg_->UeAntNum() * 4 + 1,
                         cfg_->UeAntNum() * 6, cfg_->UeAntNum() * 6 + 1);
   auto* equal_t_ptr = reinterpret_cast<float*>(equaled_buffer_temp_transposed_);
-  for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+  for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
     float* equal_ptr = nullptr;
     if (kExportConstellation) {
       equal_ptr = reinterpret_cast<float*>(
           &equal_buffer_[total_data_symbol_idx_ul]
-                        [base_sc_id * cfg_->UeAntNum() + i]);
+                        [base_sc_id * cfg_->UeAntNum() + ue_id]);
     } else {
-      equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + i);
+      equal_ptr = reinterpret_cast<float*>(equaled_buffer_temp_ + ue_id);
     }
     size_t k_num_double_in_sim_d256 = sizeof(__m256) / sizeof(double);  // == 4
     for (size_t j = 0; j < max_sc_ite / k_num_double_in_sim_d256; j++) {
@@ -306,27 +306,62 @@ EventData DoDemul::Launch(size_t tag) {
       equal_ptr += cfg_->UeAntNum() * k_num_double_in_sim_d256 * 2;
     }
     equal_t_ptr = (float*)(equaled_buffer_temp_transposed_);
-    int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][i] +
+    int8_t* demod_ptr = demod_buffers_[frame_slot][symbol_idx_ul][ue_id] +
                         (cfg_->ModOrderBits() * base_sc_id);
 
     switch (cfg_->ModOrderBits()) {
       case (CommsLib::kQpsk):
-        DemodQpskSoftSse(equal_t_ptr, demod_ptr, max_sc_ite);
+        kUplinkHardDemod
+            ? DemodQpskHardLoop(equal_t_ptr,
+                                reinterpret_cast<uint8_t*>(demod_ptr),
+                                max_sc_ite)
+            : DemodQpskSoftSse(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
       case (CommsLib::kQaM16):
-        Demod16qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
+        kUplinkHardDemod
+            ? Demod16qamHardAvx2(equal_t_ptr,
+                                 reinterpret_cast<uint8_t*>(demod_ptr),
+                                 max_sc_ite)
+            : Demod16qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
       case (CommsLib::kQaM64):
-        Demod64qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
+        kUplinkHardDemod
+            ? Demod64qamHardAvx2(equal_t_ptr,
+                                 reinterpret_cast<uint8_t*>(demod_ptr),
+                                 max_sc_ite)
+            : Demod64qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
       default:
         std::printf("Demodulation: modulation type %s not supported!\n",
                     cfg_->Modulation().c_str());
     }
+    if ((kUplinkHardDemod == true) && (kPrintPhyStats == true) &&
+        (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
+      phy_stats_->UpdateDecodedBits(ue_id, total_data_symbol_idx_ul,
+                                    max_sc_ite * cfg_->ModOrderBits());
+      // Each block here is max_sc_ite
+      phy_stats_->IncrementDecodedBlocks(ue_id, total_data_symbol_idx_ul);
+      size_t block_error(0);
+      int8_t* tx_bytes =
+          cfg_->GetModBitsBuf(cfg_->UlModBits(), Direction::kUplink, 0,
+                              symbol_idx_ul, ue_id, base_sc_id);
+      for (size_t i = 0; i < max_sc_ite; i++) {
+        uint8_t rx_byte = static_cast<uint8_t>(demod_ptr[i]);
+        uint8_t tx_byte = static_cast<uint8_t>(tx_bytes[i]);
+        phy_stats_->UpdateBitErrors(ue_id, total_data_symbol_idx_ul, tx_byte,
+                                    rx_byte);
+        if (rx_byte != tx_byte) {
+          block_error++;
+        }
+      }
+      phy_stats_->UpdateBlockErrors(ue_id, total_data_symbol_idx_ul,
+                                    block_error);
+    }
+
     // std::printf("In doDemul thread %d: frame: %d, symbol: %d, sc_id: %d \n",
     //     tid, frame_id, symbol_idx_ul, base_sc_id);
     // cout << "Demuled data : \n ";
-    // cout << " UE " << i << ": ";
+    // cout << " UE " << ue_id << ": ";
     // for (int k = 0; k < max_sc_ite * cfg->ModOrderBits(); k++)
     //     std::printf("%i ", demul_ptr[k]);
     // cout << endl;
