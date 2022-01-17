@@ -1,7 +1,10 @@
 #! /bin/bash
 
-source $(dirname $0)/../utils/utils.sh
-source $(dirname $0)/../install/ubuntu.sh
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+ROOT_DIR=$( cd ${DIR}/../.. >/dev/null 2>&1 && pwd )
+
+source ${ROOT_DIR}/scripts/utils/utils.sh
+source ${ROOT_DIR}/scripts/install/ubuntu.sh
 
 PROJECT_ROOT=~/project
 
@@ -57,15 +60,10 @@ ninja
 DESTDIR=./install ninja install
 
 # Build Agora
-echocyan "Build Agora"
+echocyan "Build Hydra"
 sudo apt-get install -y python3-numpy jq
 cd ${PROJECT_ROOT}/Agora
 mkdir build
 cd build
 cmake .. -DLOG_LEVEL=warn
 make -j
-
-# Setup Hugepages and modprobe
-cd ${PROJECT_ROOT}/dpdk-stable-20.11.3
-sudo ./usertools/dpdk-hugepages.py --setup 22G
-sudo modprobe -a ib_uverbs mlx5_core mlx5_ib

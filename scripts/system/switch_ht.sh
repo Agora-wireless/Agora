@@ -1,9 +1,9 @@
 #! /bin/bash
 
-source $(dirname $0)/../utils/utils.sh
-
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-ROOT_DIR=${DIR}/..
+ROOT_DIR=$( cd ${DIR}/../.. >/dev/null 2>&1 && pwd )
+
+source ${ROOT_DIR}/scripts/utils/utils.sh
 
 mode=0
 
