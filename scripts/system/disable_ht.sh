@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source $(dirname $0)/utils.sh
+source $(dirname $0)/../utils/utils.sh
 
 core_low=0
 core_high=0

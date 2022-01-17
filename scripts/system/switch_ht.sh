@@ -1,6 +1,6 @@
 #! /bin/bash
 
-source $(dirname $0)/utils.sh
+source $(dirname $0)/../utils/utils.sh
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 ROOT_DIR=${DIR}/..
@@ -37,10 +37,10 @@ for (( i=0; i<${hydra_server_num}; i++ )) do
         core_high=$(( num_core*2 ))
         if [ "$mode" -eq "0" ]; then
             echocyan "Disable hyperthreading on ${server_name}"
-            sudo ${ROOT_DIR}/scripts/disable_ht.sh ${num_core} ${core_high} 0
+            sudo ${ROOT_DIR}/scripts/system/disable_ht.sh ${num_core} ${core_high} 0
         else
             echocyan "Enable hyperthreading on ${server_name}"
-            sudo ${ROOT_DIR}/scripts/disable_ht.sh ${num_core} ${core_high} 1
+            sudo ${ROOT_DIR}/scripts/system/disable_ht.sh ${num_core} ${core_high} 1
         fi
     else
         core_per_socket=$(ssh -oStrictHostKeyChecking=no ${server_name} "lscpu | grep 'Core'" | awk '{ print $4 }')
@@ -49,10 +49,10 @@ for (( i=0; i<${hydra_server_num}; i++ )) do
         core_high=$(( num_core*2 ))
         if [ "$mode" -eq "0" ]; then
             echocyan "Disable hyperthreading on ${server_name}"
-            ssh -oStrictHostKeyChecking=no ${server_name} "cd ~/project/Agora; sudo ./scripts/disable_ht.sh ${num_core} ${core_high} 0"
+            ssh -oStrictHostKeyChecking=no ${server_name} "cd ~/project/Agora; sudo ./scripts/system/disable_ht.sh ${num_core} ${core_high} 0"
         else
             echocyan "Enable hyperthreading on ${server_name}"
-            ssh -oStrictHostKeyChecking=no ${server_name} "cd ~/project/Agora; sudo ./scripts/disable_ht.sh ${num_core} ${core_high} 1"
+            ssh -oStrictHostKeyChecking=no ${server_name} "cd ~/project/Agora; sudo ./scripts/system/disable_ht.sh ${num_core} ${core_high} 1"
         fi
     fi
 done

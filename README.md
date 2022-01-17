@@ -30,7 +30,7 @@ Agora can be built with the following setup.
  * Toolchain: A C++11 compiler and CMake 2.8+.
  * Operating system: Linux (Ubuntu 16.04 and 18.04 are tested)
  * Required packages
-   * Install required Ubuntu libraries, Armadillo, nlohmann json-dev and SoapySDR: ./scripts/ubuntu.sh.
+   * Install required Ubuntu libraries, Armadillo, nlohmann json-dev and SoapySDR: ./scripts/install/ubuntu.sh.
    * Download and install Intel libraries:
      * Install Intel MKL - See
        [instructions](https://software.intel.com/content/www/us/en/develop/articles/installing-intel-free-libs-and-python-apt-repo.html).
@@ -142,7 +142,7 @@ We did the following server configurations for the server that runs Agora
 	 (scripts/tune_hyperthread.sh), where the core indices are machine dependent.
   * Set IRQ affinity to direct OS interrupts away from Agora's cores. 
     We direct all the interrupts to core 0 in our experiments.  
-	  We provide an example bash script (scripts/set_smp_affinity.sh), 
+	  We provide an example bash script (scripts/system/set_smp_affinity.sh), 
     where the IRQ indices are machine dependent.
   * Compile code with `cmake -DUSE_DPDK=1 -DUSE_MLX_NIC=0 ..; make -j`.
     

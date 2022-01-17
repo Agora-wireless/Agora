@@ -24,6 +24,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <cstdio>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <array>
 
 static constexpr float kNoiseLevel = 1.0 / 200;
 static constexpr bool kVerbose = false;
@@ -34,6 +40,21 @@ DEFINE_string(profile, "random",
 DEFINE_string(conf_file,
     TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
     "Agora config filename");
+DEFINE_string(mode, "naive", 
+    "The mode of generating output channel signals (e.g., 'naive', 'matlab'");
+
+std::string exec(const char* cmd) {
+    std::array<char, 128> buffer;
+    std::string result;
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+    if (!pipe) {
+        throw std::runtime_error("popen() failed!");
+    }
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+        result += buffer.data();
+    }
+    return result;
+}
 
 float rand_float(float min, float max)
 {
@@ -60,6 +81,8 @@ int main(int argc, char* argv[])
         ? DataGenerator::Profile::k123
         : DataGenerator::Profile::kRandom;
     DataGenerator data_generator(cfg, 0 /* RNG seed */, profile);
+
+    size_t mode = (FLAGS_mode == "naive" ? 0 : 1);
 
     printf("DataGenerator: Config file: %s, data profile = %s\n",
         FLAGS_conf_file.c_str(),
@@ -264,19 +287,48 @@ int main(int argc, char* argv[])
     rx_data_all_symbols.calloc(
         2 * cfg->user_level_list.size() * cfg->num_load_levels, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, 64);
     for (size_t i = 0; i < 2 * cfg->user_level_list.size() * cfg->num_load_levels; i++) {
-        arma::cx_fmat mat_input_data(
-            reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
-            cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
-        arma::cx_fmat mat_output(
-            reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
-            cfg->OFDM_CA_NUM, cfg->BS_ANT_NUM, false);
+        if (mode == 0) {
+            arma::cx_fmat mat_input_data(
+                reinterpret_cast<arma::cx_float*>(tx_data_all_symbols[i]),
+                cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM, false);
+            arma::cx_fmat mat_output(
+                reinterpret_cast<arma::cx_float*>(rx_data_all_symbols[i]),
+                cfg->OFDM_CA_NUM, cfg->BS_ANT_NUM, false);
 
-        for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
-            arma::cx_fmat mat_csi(
-                reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
-                cfg->BS_ANT_NUM, cfg->UE_ANT_NUM);
-            mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
+            for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
+                arma::cx_fmat mat_csi(
+                    reinterpret_cast<arma::cx_float*>(csi_matrices[j]),
+                    cfg->BS_ANT_NUM, cfg->UE_ANT_NUM);
+                mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
+            }
+        } else {
+            FILE* matlab_input = fopen("/tmp/Hydra/matlab_input.txt", "w");
+            for (size_t j = 0; j < cfg->OFDM_CA_NUM; j ++) {
+                for (size_t k = 0; k < cfg->UE_ANT_NUM; k ++) {
+                    complex_float tmp = tx_data_all_symbols[i][k * cfg->OFDM_CA_NUM + j];
+                    if (tmp.im >= 0) {
+                        fprintf(matlab_input, "%lf+%lfi ", tmp.re, tmp.im);
+                    } else {
+                        fprintf(matlab_input, "%lf%lfi ", tmp.re, tmp.im);
+                    }
+                }
+                fprintf(matlab_input, "\n");
+            }
+            fclose(matlab_input);
+            char commands[128];
+            sprintf(commands, "cd matlab; ../MATLAB/R2021b/bin/matlab -batch \"generate_uplink(%d,%d)\"", cfg->UE_ANT_NUM, cfg->BS_ANT_NUM);
+            std::string result = exec(commands);
+            FILE* matlab_output = fopen("/tmp/Hydra/matlab_output.txt", "r");
+            for (size_t j = 0; j < cfg->OFDM_CA_NUM; j ++) {
+                for (size_t k = 0; k < cfg->BS_ANT_NUM; k ++) {
+                    complex_float tmp;
+                    fprintf(matlab_input, "%lf%lfi ", &tmp.re, &tmp.im);
+                    rx_data_all_symbols[i][k * cfg->OFDM_CA_NUM + j] = tmp;
+                }
+            }
+            fclose(matlab_output);
         }
+
         for (size_t j = 0; j < cfg->BS_ANT_NUM; j++) {
             CommsLib::IFFT(rx_data_all_symbols[i] + j * cfg->OFDM_CA_NUM,
                 cfg->OFDM_CA_NUM, false);

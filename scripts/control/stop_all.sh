@@ -1,6 +1,6 @@
 #! /bin/bash
 
-source $(dirname $0)/utils.sh
+source $(dirname $0)/../utils/utils.sh
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 ROOT_DIR=${DIR}/..

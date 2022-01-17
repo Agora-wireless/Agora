@@ -1,6 +1,6 @@
 #! /bin/bash
 
-source $(dirname $0)/utils.sh
+source $(dirname $0)/../utils/utils.sh
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 ROOT_DIR=${DIR}/..
@@ -232,7 +232,7 @@ else
     ssh -oStrictHostKeyChecking=no ${server_name} "source ~/.bash_profile; \
         cd ~/project/Agora; \
         ./build/control_generator --conf_file ./config/run.json; \
-        ./build/data_generator --conf_file ./config/run.json;"
+        ./build/dynamic_generator --conf_file ./config/run.json;"
 fi
 num_antennas=$(cat ${hydra_template_fn} | jq '.antenna_num')
 scp -oStrictHostKeyChecking=no ${server_name}:~/project/Agora/data/control_ue_template.bin ${ROOT_DIR}/data/

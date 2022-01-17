@@ -1,7 +1,7 @@
 #! /bin/bash
 
-source $(dirname $0)/utils.sh
-source $(dirname $0)/ubuntu.sh
+source $(dirname $0)/../utils/utils.sh
+source $(dirname $0)/../install/ubuntu.sh
 
 PROJECT_ROOT=~/project
 
