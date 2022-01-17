@@ -27,6 +27,7 @@ for (( i=0; i<${hydra_server_num}; i++ )) do
     if [ "${inits}" == 1 ]; then
         ssh -oStrictHostKeyChecking=no ${server_name} "cd Agora; ./scripts/system/server_init.sh" 
     fi
+    ssh -oStrictHostKeyChecking=no ${server_name} "cd ~/project; cp -r ~/Agora ./"
     ssh -oStrictHostKeyChecking=no ${server_name} "cd ~/project/Agora; ./scripts/install/install_all.sh" &
 done
 

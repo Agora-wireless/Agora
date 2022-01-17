@@ -8,6 +8,3 @@ sudo mkfs -t ext3 /dev/sda4 <<< y
 sudo mount -t auto /dev/sda4 ./project
 sudo chown junzhig ./project
 sudo chgrp opensketch-PG0 ./project
-cd project
-cp -r ~/Agora ./
-cd Agora

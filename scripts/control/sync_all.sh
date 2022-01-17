@@ -1,9 +1,9 @@
 #! /bin/bash
 
-source $(dirname $0)/../utils/utils.sh
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+ROOT_DIR=$( cd ${DIR}/../.. >/dev/null 2>&1 && pwd )
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-ROOT_DIR=${DIR}/..
+source ${ROOT_DIR}/scripts/utils/utils.sh
 
 # Initialize the info of the platform:
 # app_name, servers, NIC info
