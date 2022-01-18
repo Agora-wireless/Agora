@@ -9,8 +9,9 @@ source ${ROOT_DIR}/scripts/utils/utils.sh
 mode=0
 slot_us=1000
 data_gen=1
+matlab_gen=0
 
-while getopts "h?:frs:d" opt; do
+while getopts "h?:frs:dm" opt; do
     case "$opt" in
         h|\?)
             echo "Help"
@@ -19,6 +20,7 @@ while getopts "h?:frs:d" opt; do
             echo -e "\t-r\tRun RRU only"
             echo -e "\t-s\tSet slot size (unit: us)"
             echo -e "\t-d\tGenerate data only"
+            echo -e "\t-m\tUse matlab to generate channel data (Rayleigh)"
             exit 0
             ;;
         f)
@@ -41,6 +43,9 @@ while getopts "h?:frs:d" opt; do
         d)
             mode=2
             ;;
+        m)
+            matlab_gen=1
+            ;;
     esac
 done
 
@@ -54,12 +59,12 @@ source ${ROOT_DIR}/scripts/control/check_deploy.sh
 # Create config for servers
 source ${ROOT_DIR}/scripts/control/create_config.sh
 
+mkdir -p /tmp/Hydra
+
 if [ "${data_gen}" == 1 ]; then
     # Generate control data and traffic data
     source ${ROOT_DIR}/scripts/control/gen_data.sh
 fi
-
-mkdir -p /tmp/Hydra
 
 if [ "${mode}" == 0 ]; then
     # Run the Hydra application

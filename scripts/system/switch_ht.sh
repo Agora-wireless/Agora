@@ -5,22 +5,22 @@ ROOT_DIR=$( cd ${DIR}/../.. >/dev/null 2>&1 && pwd )
 
 source ${ROOT_DIR}/scripts/utils/utils.sh
 
+# Enable or disable hyperthreading (0 for disable, 1 for enable)
 mode=0
 
-if [ "$#" -eq 0 ]; then
-    echocyan "Disable hyperthreading on servers"
-elif [ "$#" -eq 1 ]; then
-    if [ "$1" == "enable" ]; then
-        echocyan "Enable hyperthreading on servers"
-        mode=1
-    else
-        echored "Invalid mode"
-        exit
-    fi
-else
-    echored "Invalid number of argumemts"
-    exit
-fi
+while getopts "h?:e" opt; do
+    case "$opt" in
+        h|\?)
+            echo "Help"
+            echo -e "\t-h\tShow this infomation"
+            echo -e "\t-e\tEnable hyperthreading"
+            exit 0
+            ;;
+        e)
+            mode=1
+            ;;
+    esac
+done
 
 # Initialize the info of the platform:
 # app_name, servers, NIC info

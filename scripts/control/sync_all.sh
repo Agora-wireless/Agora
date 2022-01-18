@@ -21,4 +21,5 @@ for (( i=0; i<${hydra_server_num}; i++ )) do
     rsync -a --exclude '*.bin' ${ROOT_DIR}/simulator $(echo ${server_name} | tr -d '"'):~/project/Agora/
     rsync -a --exclude '*.bin' ${ROOT_DIR}/scripts $(echo ${server_name} | tr -d '"'):~/project/Agora/
     rsync -a --exclude '*.bin' ${ROOT_DIR}/config $(echo ${server_name} | tr -d '"'):~/project/Agora/
+    rsync -a --exclude '*.bin' ${ROOT_DIR}/data $(echo ${server_name} | tr -d '"'):~/project/Agora/
 done

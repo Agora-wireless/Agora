@@ -154,3 +154,12 @@ static inline bool is_log_level_reasonable()
 {
     return MLPD_LOG_LEVEL <= MLPD_LOG_LEVEL_INFO;
 }
+
+#define DPRINT_DATA(type, addr, num, sym) \
+{ \
+    for (size_t d_i = 0; d_i < (num); d_i ++) { \
+        type* d_p = (type*)(addr); \
+        d_p += d_i; \
+        fprintf(stderr, #sym, *d_p); \
+    } \
+} 
