@@ -9,7 +9,7 @@ for (( i=1; i<${hydra_rru_num}; i++ )) do
         sudo env LD_LIBRARY_PATH=$LD_LIBRARY_PATH nice -20 chrt -r 99 ./build/dynamic_sender --num_threads=6 --conf_file=${ROOT_DIR}/config/run.json \
             --frame_duration=$slot_us --core_offset=0 > /tmp/Hydra/log_${server_name}.txt &
     else
-        ssh -oStrictHostKeyChecking=no ${server_name} "source ~/.bash_profile; \
+        ssh -oStrictHostKeyChecking=no ${server_name} "source ${ROOT_DIR}/scripts/install/setvars.sh; \
             cd ~/project/Agora; \
             sudo -E env LD_LIBRARY_PATH=\$LD_LIBRARY_PATH nice -20 chrt -r 99 ./build/dynamic_sender --num_threads=6 \
                 --conf_file=./config/run.json --frame_duration=${slot_us} --core_offset=0" > /tmp/Hydra/log_${server_name}.txt &
@@ -23,7 +23,7 @@ if [ "${hostname}" == "${server_name}" ]; then
     sudo env LD_LIBRARY_PATH=$LD_LIBRARY_PATH nice -20 chrt -r 99 ./build/dynamic_sender --num_threads=6 --conf_file=${ROOT_DIR}/config/run.json \
         --frame_duration=$slot_us --core_offset=0 > /tmp/Hydra/log_${server_name}.txt &
 else
-    ssh -oStrictHostKeyChecking=no ${server_name} "source ~/.bash_profile; \
+    ssh -oStrictHostKeyChecking=no ${server_name} "source ${ROOT_DIR}/scripts/install/setvars.sh; \
         cd ~/project/Agora; \
         sudo -E env LD_LIBRARY_PATH=\$LD_LIBRARY_PATH nice -20 chrt -r 99 ./build/dynamic_sender --num_threads=6 \
             --conf_file=./config/run.json --frame_duration=${slot_us} --core_offset=0" > /tmp/Hydra/log_${server_name}.txt &
