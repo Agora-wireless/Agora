@@ -53,6 +53,9 @@ class DoDemod : public Doer {
    * completion of this task
    */
   EventData Launch(size_t tag) override;
+  void Demodulate(float* equal_t_ptr, int8_t* demod_ptr, size_t symbol_idx_ul,
+                  size_t total_data_symbol_idx_ul, size_t ue_id,
+                  size_t base_sc_id, size_t max_sc_ite);
 
  private:
   Table<complex_float>& ue_spec_pilot_buffer_;

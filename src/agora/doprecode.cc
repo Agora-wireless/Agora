@@ -21,7 +21,7 @@ DoPrecode::DoPrecode(
   duration_stat_ =
       in_stats_manager->GetDurationStat(DoerType::kPrecode, in_tid);
 
-  AllocBuffer1d(&modulated_buffer_temp_, kSCsPerCacheline * cfg_->UeNum(),
+  AllocBuffer1d(&modulated_buffer_temp_, kSCsPerCacheline * cfg_->UeAntNum(),
                 Agora_memory::Alignment_t::kAlign64, 0);
   AllocBuffer1d(&precoded_buffer_temp_,
                 cfg_->DemulBlockSize() * cfg_->BsAntNum(),
@@ -30,12 +30,12 @@ DoPrecode::DoPrecode(
 #if USE_MKL_JIT
   MKL_Complex8 alpha = {1, 0};
   MKL_Complex8 beta = {0, 0};
-  // Input: A: BsAntNum() x UeNum() , B: UeNum() x 1
+  // Input: A: BsAntNum() x UeAntNum() , B: UeAntNum() x 1
   // Output: C: BsAntNum() x 1
   // Leading dimensions: A: bs_ant_num(), B: ue_num(), C: bs_ant_num()
   mkl_jit_status_t status = mkl_jit_create_cgemm(
       &jitter_, MKL_COL_MAJOR, MKL_NOTRANS, MKL_NOTRANS, cfg_->BsAntNum(), 1,
-      cfg_->UeNum(), &alpha, cfg_->BsAntNum(), cfg_->UeNum(), &beta,
+      cfg_->UeAntNum(), &alpha, cfg_->BsAntNum(), cfg_->UeAntNum(), &beta,
       cfg_->BsAntNum());
 
   if (MKL_JIT_ERROR == status) {
@@ -101,7 +101,7 @@ EventData DoPrecode::Launch(size_t tag) {
   if (kUseSpatialLocality) {
     for (size_t i = 0; i < max_sc_ite; i = i + kSCsPerCacheline) {
       size_t start_tsc1 = GetTime::WorkerRdtsc();
-      for (size_t user_id = 0; user_id < cfg_->UeNum(); user_id++) {
+      for (size_t user_id = 0; user_id < cfg_->UeAntNum(); user_id++) {
         for (size_t j = 0; j < kSCsPerCacheline; j++) {
           LoadInputData(symbol_idx_dl, total_data_symbol_idx, user_id,
                         base_sc_id + i + j, j);
@@ -121,7 +121,7 @@ EventData DoPrecode::Launch(size_t tag) {
     for (size_t i = 0; i < max_sc_ite; i++) {
       size_t start_tsc1 = GetTime::WorkerRdtsc();
       int cur_sc_id = base_sc_id + i;
-      for (size_t user_id = 0; user_id < cfg_->UeNum(); user_id++) {
+      for (size_t user_id = 0; user_id < cfg_->UeAntNum(); user_id++) {
         LoadInputData(symbol_idx_dl, total_data_symbol_idx, user_id, cur_sc_id,
                       0);
       }
@@ -167,16 +167,17 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
                               size_t total_data_symbol_idx, size_t user_id,
                               size_t sc_id, size_t sc_id_in_block) {
   complex_float* data_ptr =
-      modulated_buffer_temp_ + sc_id_in_block * cfg_->UeNum();
+      modulated_buffer_temp_ + sc_id_in_block * cfg_->UeAntNum();
   if ((symbol_idx_dl < cfg_->Frame().ClientDlPilotSymbols()) ||
-      ((sc_id % cfg_->OfdmPilotSpacing()) == 0)) {
+      (cfg_->IsDataSubcarrier(sc_id) == false)) {
     data_ptr[user_id] = cfg_->UeSpecificPilot()[user_id][sc_id];
   } else {
     int8_t* raw_data_ptr =
         &dl_raw_data_[total_data_symbol_idx]
-                     [sc_id + Roundup<64>(cfg_->OfdmDataNum()) * user_id];
-    data_ptr[user_id] =
-        ModSingleUint8((uint8_t)(*raw_data_ptr), cfg_->ModTable());
+                     [cfg_->GetOFDMDataIndex(sc_id) +
+                      Roundup<64>(cfg_->GetOFDMDataNum()) * user_id];
+    data_ptr[user_id] = ModSingleUint8((uint8_t)(*raw_data_ptr),
+                                       cfg_->ModTable(Direction::kDownlink));
   }
 }
 
@@ -186,17 +187,18 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
       dl_zf_matrices_[frame_slot][cfg_->GetZfScId(sc_id)]);
   auto* data_ptr = reinterpret_cast<arma::cx_float*>(
       modulated_buffer_temp_ +
-      (kUseSpatialLocality ? (sc_id_in_block % kSCsPerCacheline * cfg_->UeNum())
-                           : 0));
+      (kUseSpatialLocality
+           ? (sc_id_in_block % kSCsPerCacheline * cfg_->UeAntNum())
+           : 0));
   auto* precoded_ptr = reinterpret_cast<arma::cx_float*>(
       precoded_buffer_temp_ + sc_id_in_block * cfg_->BsAntNum());
 #if USE_MKL_JIT
   my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
             (MKL_Complex8*)precoded_ptr);
 #else
-  arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->UeNum(),
+  arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->UeAntNum(),
                              false);
-  arma::cx_fmat mat_data(data_ptr, cfg_->UeNum(), 1, false);
+  arma::cx_fmat mat_data(data_ptr, cfg_->UeAntNum(), 1, false);
   arma::cx_fmat mat_precoded(precoded_ptr, cfg_->BsAntNum(), 1, false);
   mat_precoded = mat_precoder * mat_data;
   // cout << "Precoder: \n" << mat_precoder << endl;

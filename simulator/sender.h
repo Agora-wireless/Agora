@@ -7,6 +7,7 @@
 
 #include <emmintrin.h>
 #include <immintrin.h>
+#include <netinet/ether.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -28,8 +29,6 @@
 #include "utils.h"
 
 #if defined(USE_DPDK)
-#include <netinet/ether.h>
-
 #include "dpdk_transport.h"
 #endif
 
@@ -146,6 +145,7 @@ class Sender {
   std::vector<std::thread> threads_;
 
 #if defined(USE_DPDK)
+  std::vector<uint16_t> port_ids_;
   struct rte_mempool* mbuf_pool_;
   uint32_t bs_rru_addr_;     // IPv4 address of this data sender
   uint32_t bs_server_addr_;  // IPv4 address of the remote target Agora server

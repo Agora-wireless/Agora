@@ -4,36 +4,37 @@
  */
 #include "phy_stats.h"
 
+#include <cfloat>
 #include <cmath>
 
-PhyStats::PhyStats(Config* const cfg) : config_(cfg) {
-  if (config_->IsUe() == true) {
+PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
+  if (dir_ == Direction::kDownlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
   } else {
     num_rx_symbols_ = cfg->Frame().NumULSyms();
   }
   const size_t task_buffer_symbol_num = num_rx_symbols_ * kFrameWnd;
 
-  decoded_bits_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
+  decoded_bits_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                              Agora_memory::Alignment_t::kAlign64);
-  bit_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
+  bit_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                           Agora_memory::Alignment_t::kAlign64);
 
-  decoded_blocks_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
+  decoded_blocks_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                                Agora_memory::Alignment_t::kAlign64);
-  block_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
+  block_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                             Agora_memory::Alignment_t::kAlign64);
 
-  uncoded_bits_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
+  uncoded_bits_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                              Agora_memory::Alignment_t::kAlign64);
-  uncoded_bit_error_count_.Calloc(cfg->UeNum(), task_buffer_symbol_num,
+  uncoded_bit_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                                   Agora_memory::Alignment_t::kAlign64);
 
   evm_buffer_.Calloc(kFrameWnd, cfg->UeAntNum(),
                      Agora_memory::Alignment_t::kAlign64);
 
   if (num_rx_symbols_ > 0) {
-    if (config_->IsUe() == true) {
+    if (dir_ == Direction::kDownlink) {
       auto* dl_iq_f_ptr = reinterpret_cast<arma::cx_float*>(
           cfg->DlIqF()[cfg->Frame().ClientDlPilotSymbols()]);
       arma::cx_fmat dl_iq_f_mat(dl_iq_f_ptr, cfg->OfdmCaNum(), cfg->UeAntNum(),
@@ -48,8 +49,12 @@ PhyStats::PhyStats(Config* const cfg) : config_(cfg) {
     }
     gt_mat_ = gt_mat_.cols(cfg->OfdmDataStart(), (cfg->OfdmDataStop() - 1));
   }
-  pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum(),
+  pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
                     Agora_memory::Alignment_t::kAlign64);
+  calib_pilot_snr_.Calloc(kFrameWnd, 2 * cfg->BsAntNum(),
+                          Agora_memory::Alignment_t::kAlign64);
+  csi_cond_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
+                   Agora_memory::Alignment_t::kAlign64);
 }
 
 PhyStats::~PhyStats() {
@@ -64,19 +69,21 @@ PhyStats::~PhyStats() {
 
   evm_buffer_.Free();
   pilot_snr_.Free();
+  csi_cond_.Free();
+  calib_pilot_snr_.Free();
 }
 
 void PhyStats::PrintPhyStats() {
   const size_t task_buffer_symbol_num = num_rx_symbols_ * kFrameWnd;
   std::string tx_type;
-  if (config_->IsUe()) {
+  if (dir_ == Direction::kDownlink) {
     tx_type = "Downlink";
   } else {
     tx_type = "Uplink";
   }
 
   if (num_rx_symbols_ > 0) {
-    for (size_t ue_id = 0; ue_id < this->config_->UeNum(); ue_id++) {
+    for (size_t ue_id = 0; ue_id < this->config_->UeAntNum(); ue_id++) {
       size_t total_decoded_bits(0);
       size_t total_bit_errors(0);
       size_t total_decoded_blocks(0);
@@ -100,9 +107,9 @@ void PhyStats::PrintPhyStats() {
 }
 
 void PhyStats::PrintEvmStats(size_t frame_id) {
-  arma::fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeNum(), 1,
+  arma::fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeAntNum(), 1,
                      false);
-  evm_mat = sqrt(evm_mat) / config_->OfdmDataNum();
+  evm_mat = evm_mat / config_->OfdmDataNum();
   std::stringstream ss;
   ss << "Frame " << frame_id << " Constellation:\n"
      << "  EVM " << 100 * evm_mat.st() << ", SNR " << -10 * log10(evm_mat.st());
@@ -111,21 +118,106 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
 
 float PhyStats::GetEvmSnr(size_t frame_id, size_t ue_id) {
   float evm = evm_buffer_[frame_id % kFrameWnd][ue_id];
-  evm = std::sqrt(evm) / config_->OfdmDataNum();
+  evm = evm / config_->OfdmDataNum();
   return -10 * std::log10(evm);
 }
 
 void PhyStats::PrintSnrStats(size_t frame_id) {
   std::stringstream ss;
-  ss << "Frame " << frame_id << " Pilot Signal SNR: ";
-  for (size_t i = 0; i < config_->UeNum(); i++) {
-    ss << pilot_snr_[frame_id % kFrameWnd][i] << " ";
+  ss << "Frame " << frame_id
+     << " Pilot Signal SNR (dB) Range at BS Antennas: " << std::fixed
+     << std::setw(5) << std::setprecision(1);
+  for (size_t i = 0; i < config_->UeAntNum(); i++) {
+    float max_snr = FLT_MIN;
+    float min_snr = FLT_MAX;
+    float* frame_snr =
+        &pilot_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
+    for (size_t j = 0; j < config_->BsAntNum(); j++) {
+      size_t radio_id = j / config_->NumChannels();
+      size_t cell_id = config_->CellId().at(radio_id);
+      if (config_->ExternalRefNode(cell_id) == true &&
+          radio_id == config_->RefRadio(cell_id)) {
+        continue;
+      }
+      if (frame_snr[j] < min_snr) {
+        min_snr = frame_snr[j];
+      }
+      if (frame_snr[j] > max_snr) {
+        max_snr = frame_snr[j];
+      }
+    }
+    if (min_snr == FLT_MAX) {
+      min_snr = -100;
+    }
+    if (max_snr == FLT_MIN) {
+      max_snr = -100;
+    }
+    ss << "User " << i << ": [" << min_snr << "," << max_snr << "]"
+       << " ";
   }
   ss << std::endl;
   std::cout << ss.str();
 }
 
-void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id,
+void PhyStats::PrintCalibSnrStats(size_t frame_id) {
+  std::stringstream ss;
+  ss << "Frame " << (frame_id + 1) * config_->AntGroupNum() + TX_FRAME_DELTA
+     << " Calibration Pilot Signal SNR (dB) Range at BS Antennas: "
+     << std::fixed << std::setw(5) << std::setprecision(1);
+  for (size_t i = 0; i < 2; i++) {
+    float max_snr = FLT_MIN;
+    float min_snr = FLT_MAX;
+    float* frame_snr =
+        &calib_pilot_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
+    for (size_t j = 0; j < config_->BsAntNum(); j++) {
+      size_t radio_id = j / config_->NumChannels();
+      size_t cell_id = config_->CellId().at(radio_id);
+      if (config_->ExternalRefNode(cell_id) == true &&
+          radio_id == config_->RefRadio(cell_id)) {
+        continue;
+      }
+      if (frame_snr[j] < min_snr) {
+        min_snr = frame_snr[j];
+      }
+      if (frame_snr[j] > max_snr) {
+        max_snr = frame_snr[j];
+      }
+    }
+    if (min_snr == FLT_MAX) {
+      min_snr = -100;
+    }
+    if (max_snr == FLT_MIN) {
+      max_snr = -100;
+    }
+    if (i == 0) {
+      ss << "Downlink ";
+    } else {
+      ss << "Uplink ";
+    }
+    ss << ": [" << min_snr << "," << max_snr << "] ";
+  }
+  ss << std::endl;
+  std::cout << ss.str();
+}
+
+void PhyStats::UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id,
+                                   size_t ant_id, complex_float* fft_data) {
+  arma::cx_fmat fft_mat((arma::cx_float*)fft_data, config_->OfdmCaNum(), 1,
+                        false);
+  arma::fmat fft_abs_mat = abs(fft_mat);
+  arma::fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
+  float rssi = as_scalar(sum(fft_abs_mag));
+  float noise_per_sc1 =
+      as_scalar(mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
+  float noise_per_sc2 = as_scalar(mean(
+      fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
+  float noise = config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
+  float snr = (rssi - noise) / noise;
+  calib_pilot_snr_[frame_id % kFrameWnd][calib_sym_id * config_->BsAntNum() +
+                                         ant_id] = 10 * std::log10(snr);
+}
+
+void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
                               complex_float* fft_data) {
   arma::cx_fmat fft_mat((arma::cx_float*)fft_data, config_->OfdmCaNum(), 1,
                         false);
@@ -138,15 +230,43 @@ void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id,
       fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
   float noise = config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
   float snr = (rssi - noise) / noise;
-  pilot_snr_[frame_id % kFrameWnd][ue_id] = 10 * std::log10(snr);
+  pilot_snr_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
+      10 * std::log10(snr);
+}
+
+void PhyStats::PrintZfStats(size_t frame_id) {
+  size_t frame_slot = frame_id % kFrameWnd;
+  std::stringstream ss;
+  ss << "Frame " << frame_id
+     << " ZF matrix inverse condition number range: " << std::fixed
+     << std::setw(5) << std::setprecision(2);
+  arma::fvec cond_vec(csi_cond_[frame_slot], config_->OfdmDataNum(), false);
+  float max_cond = 0;
+  float min_cond = 1;
+  for (size_t j = 0; j < config_->OfdmDataNum(); j++) {
+    if (cond_vec.at(j) < min_cond) {
+      min_cond = cond_vec.at(j);
+    }
+    if (cond_vec.at(j) > max_cond) {
+      max_cond = cond_vec.at(j);
+    }
+  }
+  ss << "[" << min_cond << "," << max_cond
+     << "], Mean: " << arma::mean(cond_vec);
+  ss << std::endl;
+  std::cout << ss.str();
+}
+
+void PhyStats::UpdateCsiCond(size_t frame_id, size_t sc_id, float cond) {
+  csi_cond_[frame_id % kFrameWnd][sc_id] = cond;
 }
 
 void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
                               const arma::cx_fmat& eq) {
   if (num_rx_symbols_ > 0) {
     arma::fmat evm = abs(eq - gt_mat_.col(sc_id));
-    arma::fmat cur_evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeNum(),
-                           1, false);
+    arma::fmat cur_evm_mat(evm_buffer_[frame_id % kFrameWnd],
+                           config_->UeAntNum(), 1, false);
     cur_evm_mat += evm % evm;
   }
 }

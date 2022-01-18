@@ -17,9 +17,11 @@
  * @param len: length of input and output signal (number of symbols)
  * @param snr: desired SNR in dB
  */
-static void apply_awgn(complex_float *signal, complex_float *output, int len,
-                       float snr) {
-  float gamma, power, N0;
+static void ApplyAwgn(complex_float *signal, complex_float *output, int len,
+                      float snr) {
+  float gamma;
+  float power;
+  float n0;
   int i;
   std::default_random_engine generator;
   // Normal distribution
@@ -32,10 +34,10 @@ static void apply_awgn(complex_float *signal, complex_float *output, int len,
     power += (signal[i].re * signal[i].re) + (signal[i].im * signal[i].im);
   }
   power = power / ((float)len);
-  N0 = power / gamma;  // Noise spectral density
+  n0 = power / gamma;  // Noise spectral density
   for (i = 0; i < len; i++) {
-    output[i].re = signal[i].re + sqrtf(N0 / 2) * distribution(generator);
-    output[i].im = signal[i].im + sqrtf(N0 / 2) * distribution(generator);
+    output[i].re = signal[i].re + sqrtf(n0 / 2) * distribution(generator);
+    output[i].im = signal[i].im + sqrtf(n0 / 2) * distribution(generator);
   }
 }
 
@@ -46,20 +48,24 @@ static void apply_awgn(complex_float *signal, complex_float *output, int len,
  * @param demod_func: Function to use for demodulation
  * @param func_desc: string describing function
  */
-static void run_256QAM_soft_demod(void (*demod_func)(const float *, int8_t *,
-                                                     int),
-                                  const char *func_desc) {
-  uint8_t *input_symbols, *output_symbols;
+static void Run256QamSoftDemod(void (*demod_func)(const float *, int8_t *, int),
+                               const char *func_desc) {
+  uint8_t *input_symbols;
+  uint8_t *output_symbols;
   complex_float *channel_input;
   Table<complex_float> mod_table;
   complex_float *channel_output;
   int8_t *output_demod;
   int shift_offset = 7;
-  unsigned int i, j, snr_idx;
+  unsigned int i;
+  unsigned int j;
+  unsigned int snr_idx;
   unsigned int num = NUM_SYMBOLS;
-  double runtime, start_time;
-  float SNR_vals[] = {10.0, 25.0, 50.0, 100.0};
-  float SNR, err_rate;
+  double runtime;
+  double start_time;
+  float snr_vals[] = {10.0, 25.0, 50.0, 100.0};
+  float snr;
+  float err_rate;
 
   // Allocate storage buffers
   AllocBuffer1d(&input_symbols, num, Agora_memory::Alignment_t::kAlign64, 1);
@@ -76,8 +82,8 @@ static void run_256QAM_soft_demod(void (*demod_func)(const float *, int8_t *,
    * 25 db
    * 50 db
    */
-  for (snr_idx = 0; snr_idx < sizeof(SNR_vals) / sizeof(float); snr_idx++) {
-    SNR = SNR_vals[snr_idx];
+  for (snr_idx = 0; snr_idx < sizeof(snr_vals) / sizeof(float); snr_idx++) {
+    snr = snr_vals[snr_idx];
     err_rate = 0.0;
     for (i = 0; i < NUM_ITERATIONS; i++) {
       for (j = 0; j < num; j++) {
@@ -88,7 +94,7 @@ static void run_256QAM_soft_demod(void (*demod_func)(const float *, int8_t *,
         channel_input[j] = ModSingle(input_symbols[j], mod_table);
       }
       // Add noise to symbols
-      apply_awgn(channel_input, channel_output, num, SNR);
+      ApplyAwgn(channel_input, channel_output, num, snr);
       // Demodulate Symbols
       start_time = GetTime::GetTimeUs();
       demod_func((float *)channel_output, output_demod, num);
@@ -124,7 +130,7 @@ static void run_256QAM_soft_demod(void (*demod_func)(const float *, int8_t *,
         num, runtime / NUM_ITERATIONS, NUM_ITERATIONS);
     err_rate = (err_rate * 100) / (NUM_SYMBOLS * NUM_ITERATIONS);
     std::printf("Soft Demod Error Rate for 256 QAM was %.2f%% at %f db SNR\n",
-                err_rate, SNR);
+                err_rate, snr);
   }
   /*
    * For the last SNR, assert that the error rate is zero. Although a
@@ -140,20 +146,20 @@ static void run_256QAM_soft_demod(void (*demod_func)(const float *, int8_t *,
 }
 
 TEST(TestDemod256QAM, SoftLoop) {
-  run_256QAM_soft_demod(Demod256qamSoftLoop, "Demod256qamSoftLoop");
+  Run256QamSoftDemod(Demod256qamSoftLoop, "Demod256qamSoftLoop");
 }
 
 TEST(TestDemod256QAM, SoftSSE) {
-  run_256QAM_soft_demod(Demod256qamSoftSse, "Demod256qamSoftSse");
+  Run256QamSoftDemod(Demod256qamSoftSse, "Demod256qamSoftSse");
 }
 
 TEST(TestDemod256QAM, SoftAVX2) {
-  run_256QAM_soft_demod(Demod256qamSoftAvx2, "Demod256qamSoftAvx2");
+  Run256QamSoftDemod(Demod256qamSoftAvx2, "Demod256qamSoftAvx2");
 }
 
 #ifdef __AVX512F__
 TEST(TestDemod256QAM, SoftAVX512) {
-  run_256QAM_soft_demod(Demod256qamSoftAvx512, "Demod256qamSoftAvx512");
+  Run256QamSoftDemod(Demod256qamSoftAvx512, "Demod256qamSoftAvx512");
 }
 #endif
 

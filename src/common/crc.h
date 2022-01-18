@@ -105,7 +105,7 @@ class DoCRC {
   /*
    * Compute and add CRC to packet
    */
-  void AddCrc24(struct MacPacket* p);
+  void AddCrc24(MacPacketPacked* p);
 
   /*
    * Verify CRC

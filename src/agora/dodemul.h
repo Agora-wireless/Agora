@@ -66,7 +66,7 @@ class DoDemul : public Doer {
   /// Intermediate buffer to gather raw data. Size = subcarriers per cacheline
   /// times number of antennas
   complex_float* data_gather_buffer_;
-
+  arma::cx_float* equal_buffer_tmp_;
   arma::cx_fmat ue_pilot_data_;
   int ue_num_simd256_;
 

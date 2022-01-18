@@ -28,11 +28,15 @@ static constexpr size_t kFrameWnd = 40;
 #define USE_MKL_JIT 0
 #endif
 
+#define ENABLE_RB_IND 0
+
 /// Return true at compile time iff a constant is a power of two
 template <typename T>
 static constexpr inline bool IsPowerOfTwo(T x) {
   return x && ((x & T(x - 1)) == 0);
 }
+
+enum class Direction : int { kDownlink, kUplink };
 
 // TODO: Merge EventType and DoerType into WorkType
 enum class EventType : int {
@@ -55,6 +59,7 @@ enum class EventType : int {
   kRANUpdate,   // Signal new RAN config to Agora
   kRBIndicator  // Signal RB schedule to UEs
 };
+
 static constexpr size_t kNumEventTypes =
     static_cast<size_t>(EventType::kPacketToMac) + 1;
 
@@ -71,6 +76,7 @@ enum class DoerType : size_t {
   kPrecode,
   kRC
 };
+
 static constexpr std::array<DoerType, (static_cast<size_t>(DoerType::kRC) + 1)>
     kAllDoerTypes = {DoerType::kFFT,    DoerType::kCSI,   DoerType::kZF,
                      DoerType::kDemul,  DoerType::kDemod, DoerType::kDecode,
@@ -115,6 +121,7 @@ enum class PrintType : int {
 // crucial for good performance. For testing or developing Agora on machines
 // with insufficient cores, disable this flag.
 static constexpr bool kEnableThreadPinning = true;
+static constexpr bool kEnableCoreReuse = false;
 
 #define BIGSTATION 0
 #if defined(USE_DPDK)
@@ -144,12 +151,16 @@ static constexpr bool kUseUHD = false;
 // Use 12-bit IQ sample to reduce network throughput
 static constexpr bool kUse12BitIQ = false;
 static constexpr bool kDebug12BitIQ = false;
+static constexpr bool kDebugDownlink = false;
 
 static constexpr bool kUsePartialTrans = true;
 
+static constexpr bool kDownlinkHardDemod = false;
+static constexpr bool kUplinkHardDemod = false;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = true;
 static constexpr bool kCollectPhyStats = true;
+static constexpr bool kPrintZfStats = true;
 
 static constexpr bool kStatsPrintFrameSummary = true;
 static constexpr bool kDebugPrintPerFrameDone = true;
@@ -159,6 +170,7 @@ static constexpr bool kDebugPrintPerTaskDone = false;
 static constexpr bool kDebugPrintStatsPerThread = false;
 static constexpr bool kDebugPrintInTask = false;
 static constexpr bool kDebugMulticell = false;
+static constexpr bool kRecordCalibrationMats = false;
 
 /// Print the I/Q samples in the pilots
 static constexpr bool kDebugPrintPilot = false;
@@ -231,6 +243,8 @@ static const std::map<char, SymbolType> kSymbolMap = {
     {'D', SymbolType::kDL},     {'G', SymbolType::kGuard},
     {'L', SymbolType::kCalUL},  {'P', SymbolType::kPilot},
     {'U', SymbolType::kUL}};
+
+enum class SubcarrierType { kNull, kDMRS, kData };
 
 // Intervals for beacon detection at the client (in frames)
 static constexpr size_t kBeaconDetectInterval = 10;

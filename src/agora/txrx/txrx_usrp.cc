@@ -6,8 +6,6 @@
 
 #include "txrx.h"
 
-static constexpr bool kDebugDownlink = false;
-
 void PacketTXRX::LoopTxRxUsrp(size_t tid) {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid);
   size_t* rx_frame_start = (*frame_start_)[tid];
@@ -16,6 +14,8 @@ void PacketTXRX::LoopTxRxUsrp(size_t tid) {
   size_t radio_hi = (tid + 1) * cfg_->NumRadios() / socket_thread_num_;
   std::printf("LoopTxRxUsrp: TxRx thread %zu has %zu radios\n", tid,
               radio_hi - radio_lo);
+
+  threads_started_.fetch_add(1);
 
   // prepare BS beacon in host buffer
   std::vector<void*> beaconbuff(2);
@@ -180,9 +180,11 @@ int PacketTXRX::DequeueSendUsrp(int tid) {
   std::printf("tx queue length: %zu\n", task_queue_->size_approx());
   assert(event.event_type_ == EventType::kPacketTX);
 
-  size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
   size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
   size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+  size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+  size_t radio_id = ant_id / c->NumChannels();
+  size_t cell_id = c->CellId().at(radio_id);
 
   size_t offset =
       (c->GetTotalDataSymbolIdx(frame_id, symbol_id) * c->BsAntNum()) + ant_id;
@@ -197,7 +199,7 @@ int PacketTXRX::DequeueSendUsrp(int tid) {
   if (kDebugDownlink == true) {
     std::vector<std::complex<int16_t>> zeros(c->SampsPerSymbol());
     size_t dl_symbol_idx = c->Frame().GetDLSymbolIdx(symbol_id);
-    if (ant_id != c->RefAnt()) {
+    if (ant_id != c->RefAnt(cell_id)) {
       txbuf[ch] = zeros.data();
     } else if (dl_symbol_idx < c->Frame().ClientDlPilotSymbols()) {
       txbuf[ch] = reinterpret_cast<void*>(c->UeSpecificPilotT()[0]);
@@ -215,7 +217,7 @@ int PacketTXRX::DequeueSendUsrp(int tid) {
   int flags = (symbol_id != last) ? 1   // HAS_TIME
                                   : 2;  // HAS_TIME & END_BURST, fixme
   long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
-  radioconfig_->RadioTx(ant_id / n_channels, txbuf, flags, frame_time);
+  radioconfig_->RadioTx(radio_id, txbuf, flags, frame_time);
 
   if (kDebugPrintInTask == true) {
     std::printf(
@@ -244,6 +246,8 @@ int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id) {
   assert(event.event_type_ == EventType::kPacketTX);
 
   size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+  size_t radio_id = ant_id / c->NumChannels();
+  size_t cell_id = c->CellId().at(radio_id);
   // size_t frame_id = gen_tag_t(event.tags[0]).frame_id;
   // size_t symbol_id = gen_tag_t(event.tags[0]).symbol_id;
 
@@ -264,7 +268,7 @@ int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id) {
   if (kDebugDownlink) {
     std::vector<std::complex<int16_t>> zeros(c->SampsPerSymbol());
     size_t dl_symbol_idx = c->Frame().GetDLSymbolIdx(symbol_id);
-    if (ant_id != c->RefAnt()) {
+    if (ant_id != c->RefAnt(cell_id)) {
       txbuf[ch] = zeros.data();
     } else if (dl_symbol_idx < c->Frame().ClientDlPilotSymbols()) {
       txbuf[ch] = reinterpret_cast<void*>(c->UeSpecificPilotT()[0]);
@@ -283,7 +287,7 @@ int PacketTXRX::DequeueSendUsrp(int tid, int frame_id, int symbol_id) {
                   ? 1   // HAS_TIME
                   : 2;  // HAS_TIME & END_BURST, fixme
   long long frame_time = ((long long)frame_id << 32) | (symbol_id << 16);
-  radioconfig_->RadioTx(ant_id / n_channels, txbuf, flags, frame_time);
+  radioconfig_->RadioTx(radio_id, txbuf, flags, frame_time);
 
   if (kDebugPrintInTask) {
     std::printf(

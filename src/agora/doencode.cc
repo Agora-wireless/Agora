@@ -13,29 +13,31 @@
 static constexpr bool kPrintEncodedData = false;
 static constexpr bool kPrintRawMacData = false;
 
-DoEncode::DoEncode(Config* in_config, int in_tid,
+DoEncode::DoEncode(Config* in_config, int in_tid, Direction dir,
                    Table<int8_t>& in_raw_data_buffer, size_t in_buffer_rollover,
-                   Table<int8_t>& in_encoded_buffer, Stats* in_stats_manager)
+                   Table<int8_t>& in_mod_bits_buffer, Stats* in_stats_manager)
     : Doer(in_config, in_tid),
+      dir_(dir),
       raw_data_buffer_(in_raw_data_buffer),
       raw_buffer_rollover_(in_buffer_rollover),
-      encoded_buffer_(in_encoded_buffer),
+      mod_bits_buffer_(in_mod_bits_buffer),
       scrambler_(std::make_unique<AgoraScrambler::Scrambler>()) {
   duration_stat_ = in_stats_manager->GetDurationStat(DoerType::kEncode, in_tid);
   parity_buffer_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
-      LdpcEncodingParityBufSize(cfg_->LdpcConfig().BaseGraph(),
-                                cfg_->LdpcConfig().ExpansionFactor())));
+      LdpcEncodingParityBufSize(cfg_->LdpcConfig(dir).BaseGraph(),
+                                cfg_->LdpcConfig(dir).ExpansionFactor())));
   assert(parity_buffer_ != nullptr);
   encoded_buffer_temp_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
-      LdpcEncodingEncodedBufSize(cfg_->LdpcConfig().BaseGraph(),
-                                 cfg_->LdpcConfig().ExpansionFactor())));
+      LdpcEncodingEncodedBufSize(cfg_->LdpcConfig(dir).BaseGraph(),
+                                 cfg_->LdpcConfig(dir).ExpansionFactor())));
   assert(encoded_buffer_temp_ != nullptr);
 
   scrambler_buffer_ = static_cast<int8_t*>(Agora_memory::PaddedAlignedAlloc(
       Agora_memory::Alignment_t::kAlign64,
-      cfg_->NumBytesPerCb() + kLdpcHelperFunctionInputBufferSizePaddingBytes));
+      cfg_->NumBytesPerCb(dir) +
+          kLdpcHelperFunctionInputBufferSizePaddingBytes));
 
   assert(scrambler_buffer_ != nullptr);
 }
@@ -47,17 +49,18 @@ DoEncode::~DoEncode() {
 }
 
 EventData DoEncode::Launch(size_t tag) {
-  const LDPCconfig& ldpc_config = cfg_->LdpcConfig();
+  const LDPCconfig& ldpc_config = cfg_->LdpcConfig(dir_);
   size_t frame_id = gen_tag_t(tag).frame_id_;
   size_t symbol_id = gen_tag_t(tag).symbol_id_;
   size_t cb_id = gen_tag_t(tag).cb_id_;
-  size_t cur_cb_id = cb_id % cfg_->LdpcConfig().NumBlocksInSymbol();
-  size_t ue_id = cb_id / cfg_->LdpcConfig().NumBlocksInSymbol();
+  size_t cur_cb_id = cb_id % ldpc_config.NumBlocksInSymbol();
+  size_t ue_id = cb_id / ldpc_config.NumBlocksInSymbol();
 
   size_t start_tsc = GetTime::WorkerRdtsc();
 
-  size_t symbol_idx, symbol_idx_data;
-  if (cfg_->IsUe() == false) {
+  size_t symbol_idx;
+  size_t symbol_idx_data;
+  if (dir_ == Direction::kDownlink) {
     symbol_idx = cfg_->Frame().GetDLSymbolIdx(symbol_id);
     assert(symbol_idx >= cfg_->Frame().ClientDlPilotSymbols());
     symbol_idx_data = symbol_idx - cfg_->Frame().ClientDlPilotSymbols();
@@ -80,34 +83,34 @@ EventData DoEncode::Launch(size_t tag) {
   /// universal with raw_buffer_rollover_ the parameter.
   if (kEnableMac) {
     // All cb's per symbol are included in 1 mac packet
-    tx_data_ptr =
-        cfg_->GetMacBits(raw_data_buffer_, (frame_id % raw_buffer_rollover_),
-                         symbol_idx_data, ue_id, cur_cb_id);
+    tx_data_ptr = cfg_->GetMacBits(raw_data_buffer_, dir_,
+                                   (frame_id % raw_buffer_rollover_),
+                                   symbol_idx_data, ue_id, cur_cb_id);
 
     if (kPrintRawMacData) {
-      auto* pkt = reinterpret_cast<MacPacket*>(tx_data_ptr);
+      auto* pkt = reinterpret_cast<MacPacketPacked*>(tx_data_ptr);
       std::printf(
           "In doEncode [%d] mac packet frame: %d, symbol: %zu:%d, ue_id: %d, "
           "data length %d, crc %d size %zu:%zu\n",
-          tid_, pkt->frame_id_, symbol_idx_data, pkt->symbol_id_, pkt->ue_id_,
-          pkt->datalen_, pkt->crc_, cfg_->MacPacketLength(),
-          cfg_->NumBytesPerCb());
+          tid_, pkt->Frame(), symbol_idx_data, pkt->Symbol(), pkt->Ue(),
+          pkt->PayloadLength(), pkt->Crc(), cfg_->MacPacketLength(dir_),
+          cfg_->NumBytesPerCb(dir_));
       std::printf("Data: ");
-      for (size_t i = 0; i < cfg_->MacPayloadLength(); i++) {
-        std::printf(" %02x", (uint8_t) * (pkt->data_ + i));
+      for (size_t i = 0; i < cfg_->MacPayloadMaxLength(dir_); i++) {
+        std::printf(" %02x", (uint8_t)(pkt->Data()[i]));
       }
       std::printf("\n");
     }
   } else {
     tx_data_ptr =
-        cfg_->GetInfoBits(raw_data_buffer_, symbol_idx, ue_id, cur_cb_id);
+        cfg_->GetInfoBits(raw_data_buffer_, dir_, symbol_idx, ue_id, cur_cb_id);
   }
 
   int8_t* ldpc_input = nullptr;
 
   if (this->cfg_->ScrambleEnabled()) {
-    std::memcpy(scrambler_buffer_, tx_data_ptr, cfg_->NumBytesPerCb());
-    scrambler_->Scramble(scrambler_buffer_, cfg_->NumBytesPerCb());
+    std::memcpy(scrambler_buffer_, tx_data_ptr, cfg_->NumBytesPerCb(dir_));
+    scrambler_->Scramble(scrambler_buffer_, cfg_->NumBytesPerCb(dir_));
     ldpc_input = scrambler_buffer_;
   } else {
     ldpc_input = tx_data_ptr;
@@ -116,23 +119,23 @@ EventData DoEncode::Launch(size_t tag) {
   LdpcEncodeHelper(ldpc_config.BaseGraph(), ldpc_config.ExpansionFactor(),
                    ldpc_config.NumRows(), encoded_buffer_temp_, parity_buffer_,
                    ldpc_input);
-  int8_t* final_output_ptr = cfg_->GetEncodedBuf(encoded_buffer_, frame_id,
-                                                 symbol_idx, ue_id, cur_cb_id);
+  int8_t* mod_buffer_ptr = cfg_->GetModBitsBuf(mod_bits_buffer_, dir_, frame_id,
+                                               symbol_idx, ue_id, cur_cb_id);
 
-  if (kPrintRawMacData && cfg_->IsUe()) {
+  if (kPrintRawMacData && dir_ == Direction::kUplink) {
     std::printf("Encoded data - placed at location (%zu %zu %zu) %zu\n",
-                frame_id, symbol_idx, ue_id, (size_t)final_output_ptr);
+                frame_id, symbol_idx, ue_id, (size_t)mod_buffer_ptr);
   }
   AdaptBitsForMod(reinterpret_cast<uint8_t*>(encoded_buffer_temp_),
-                  reinterpret_cast<uint8_t*>(final_output_ptr),
+                  reinterpret_cast<uint8_t*>(mod_buffer_ptr),
                   BitsToBytes(ldpc_config.NumCbCodewLen()),
-                  cfg_->ModOrderBits());
+                  cfg_->ModOrderBits(dir_));
 
   if (kPrintEncodedData == true) {
     std::printf("Encoded data\n");
-    size_t num_mod = cfg_->LdpcConfig().NumCbCodewLen() / cfg_->ModOrderBits();
+    size_t num_mod = cfg_->SubcarrierPerCodeBlock(dir_);
     for (size_t i = 0; i < num_mod; i++) {
-      std::printf("%u ", *(final_output_ptr + i));
+      std::printf("%u ", *(mod_buffer_ptr + i));
     }
     std::printf("\n");
   }

@@ -46,10 +46,34 @@ class UDPServer {
 
     // Set buffer size
     if (rx_buffer_size != 0) {
-      ret = setsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &rx_buffer_size,
-                       sizeof(rx_buffer_size));
-      if (ret != 0) {
-        throw std::runtime_error("UDPServer: Failed to set RX buffer size.");
+      const unsigned int desired_buf_size =
+          static_cast<unsigned int>(rx_buffer_size);
+      unsigned int actual_buf_size;
+      socklen_t actual_buf_storage_size = sizeof(actual_buf_size);
+
+      ret = getsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
+                       &actual_buf_storage_size);
+
+      if (ret < 0 || (actual_buf_size != desired_buf_size)) {
+        actual_buf_size = desired_buf_size;
+        ret = setsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
+                         actual_buf_storage_size);
+
+        if (ret != 0) {
+          throw std::runtime_error("UDPServer: Failed to set RX buffer size.");
+        }
+      }
+
+      ret = getsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
+                       &actual_buf_storage_size);
+
+      // Linux likes to return 2* the buffer size
+      if ((actual_buf_size != desired_buf_size) &&
+          (actual_buf_size != (desired_buf_size * 2))) {
+        std::printf(
+            "***Error setting RX buffer size to %zu actual size %d with status "
+            "%d\n",
+            rx_buffer_size, actual_buf_size, ret);
       }
     }
 
@@ -177,7 +201,7 @@ class UDPServer {
    * @brief Configures the socket in blocking mode.  Any calls to recv / send
    * will now block
    */
-  void MakeBlocking(size_t timeout_sec = 0) {
+  void MakeBlocking(size_t timeout_sec = 0) const {
     int current_flags = fcntl(sock_fd_, F_GETFL);
     if (current_flags == -1) {
       throw std::runtime_error("UDPServer: fcntl failed to get flags");
@@ -190,7 +214,7 @@ class UDPServer {
         throw std::runtime_error("UDPServer: fcntl failed to set blocking");
       }
 
-      //Verify the flags were properly set
+      // Verify the flags were properly set
       current_flags = fcntl(sock_fd_, F_GETFL);
       if (current_flags == -1) {
         throw std::runtime_error("UDPServer: fcntl failed to get flags");

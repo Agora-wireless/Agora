@@ -133,12 +133,21 @@ void Stats::UpdateStats(size_t frame_id) {
 }
 
 void Stats::SaveToFile() {
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string filename = cur_directory + "/data/timeresult.txt";
+  const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+  const std::string filename = cur_directory + "/data/timeresult.txt";
   std::printf("Stats: Saving master timestamps to %s\n", filename.c_str());
   FILE* fp_debug = std::fopen(filename.c_str(), "w");
   RtAssert(fp_debug != nullptr,
            std::string("Open file failed ") + std::to_string(errno));
+
+  size_t first_frame_idx = 0;
+  size_t last_frame_idx = this->last_frame_id_;
+  size_t total_stat_frames = this->last_frame_id_;
+  if (total_stat_frames > kNumStatsFrames) {
+    last_frame_idx = last_frame_idx % kNumStatsFrames;
+    first_frame_idx = (last_frame_idx + 1) % kNumStatsFrames;
+    total_stat_frames = kNumStatsFrames;
+  }
 
   // For backwards compatibility, it is easier to make a new file format for
   // the combined case
@@ -150,7 +159,9 @@ void Stats::SaveToFile() {
                  "kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kDemulDone, "
                  "kDemodDone, kDecodeDone, kRXDone, time in CSI, time in "
                  "FFT, time in ZF, time in Demul, time in Decode\n");
-    for (size_t i = 0; i < this->last_frame_id_; i++) {
+
+    for (size_t frame = 0; frame < total_stat_frames; frame++) {
+      const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
       size_t ref_tsc = SIZE_MAX;
       for (size_t j = 0; j < config_->SocketThreadNum(); j++) {
         ref_tsc = std::min(ref_tsc, this->frame_start_[j][i]);
@@ -184,7 +195,8 @@ void Stats::SaveToFile() {
                  "Pilot RX by socket threads (= reference time), "
                  "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
                  "kZFDone, kPrecodeDone, kIFFTDone, kEncodeDone, kRXDone\n");
-    for (size_t i = 0; i < this->last_frame_id_; i++) {
+    for (size_t frame = 0; frame < total_stat_frames; frame++) {
+      const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
       size_t ref_tsc = SIZE_MAX;
       for (size_t j = 0; j < config_->SocketThreadNum(); j++) {
         ref_tsc = std::min(ref_tsc, this->frame_start_[j][i]);
@@ -210,7 +222,8 @@ void Stats::SaveToFile() {
         "kPilotRX, kProcessingStarted, kPilotAllRX, kFFTPilotsDone, "
         "kZFDone, kDemulDone, kDemodDone, kDecodeDone, kRXDone, time "
         "in CSI, time in FFT, time in ZF, time in Demul, time in Decode\n");
-    for (size_t i = 0; i < this->last_frame_id_; i++) {
+    for (size_t frame = 0; frame < total_stat_frames; frame++) {
+      const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
       size_t ref_tsc = SIZE_MAX;
       for (size_t j = 0; j < config_->SocketThreadNum(); j++) {
         ref_tsc = std::min(ref_tsc, this->frame_start_[j][i]);
@@ -259,7 +272,8 @@ void Stats::SaveToFile() {
         "fft_0, fft_1, fft_2, zf_0, zf_1, zf_2, demul_0, demul_1, demul_2, "
         "decode_0, decode_1, decode_2\n");
 
-    for (size_t i = 0; i < this->last_frame_id_; i++) {
+    for (size_t frame = 0; frame < total_stat_frames; frame++) {
+      const size_t i = (first_frame_idx + frame) % kNumStatsFrames;
       std::fprintf(
           fp_debug_detailed,
           "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f "
@@ -363,8 +377,8 @@ void Stats::PrintSummary() {
       double encode_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kEncode)))) /
-          (this->config_->LdpcConfig().NumBlocksInSymbol() *
-           this->config_->UeNum() * this->config_->Frame().NumDLSyms());
+          (this->config_->LdpcConfig(Direction::kDownlink).NumBlocksInSymbol() *
+           this->config_->UeAntNum() * this->config_->Frame().NumDLSyms());
       std::printf("Downlink totals (tasks, frames): ");
       std::printf("CSI (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kCSI)),
@@ -399,8 +413,8 @@ void Stats::PrintSummary() {
       double decode_frames =
           (static_cast<double>(
               num_tasks.at(static_cast<size_t>(DoerType::kDecode)))) /
-          (this->config_->LdpcConfig().NumBlocksInSymbol() *
-           this->config_->UeNum() * this->config_->Frame().NumULSyms());
+          (this->config_->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
+           this->config_->UeAntNum() * this->config_->Frame().NumULSyms());
       std::printf("Uplink totals (tasks, frames): ");
       std::printf("CSI (%zu, %.2f), ",
                   num_tasks.at(static_cast<size_t>(DoerType::kCSI)),

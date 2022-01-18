@@ -3,7 +3,7 @@ include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
 #Allow project version
 cmake_policy(SET CMP0048 NEW)
-project(Agora VERSION 1.0.0)
+project(Agora VERSION 1.1.0)
 
 if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   set(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
@@ -29,6 +29,9 @@ if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
   set(CMAKE_C_FLAGS "-std=gnu11 -Wall -g -march=native -m64")
   set(CMAKE_CXX_FLAGS "-std=c++17 -Wall -g -march=native -m64")
   set(MKL_LIBS -Wl,--no-as-needed -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -ldl)
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.2)
+    message(STATUS "GCC version: ${CMAKE_CXX_COMPILER_VERSION} (versions newer than 9.2 are suggested for using AVX512 optimizations)")
+  endif()
 elseif(${CMAKE_C_COMPILER_ID} STREQUAL "Intel")
   message(STATUS "Using Intel compiler, compiler ID ${CMAKE_C_COMPILER_ID}")
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/intel-compile-options.cmake)
@@ -91,19 +94,19 @@ CHECK_C_SOURCE_RUNS("int main() { asm volatile(\"vmovdqu64 %zmm0, %zmm1\"); retu
 if (ISA_AVX512)
   message(STATUS "Processor supports AVX-512")
   add_definitions(-DISA_AVX512)
-  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
   # Leave USE_AVX2_ENCODER unmodified
 else()
   message(STATUS "Processor does not support AVX-512")
-  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
   set(USE_AVX2_ENCODER True)
 endif()
 
 if(USE_AVX2_ENCODER)
   message(STATUS "Using Agora's (i.e., not FlexRAN's) AVX2 encoder")
+  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx2-icc)
   add_definitions(-DUSE_AVX2_ENCODER)
 else()
   message(STATUS "Using FlexRAN's (i.e., not Agora's) AVX512 encoder")
+  set(FLEXRAN_FEC_LIB_DIR ${FLEXRAN_FEC_SDK_DIR}/build-avx512-icc)
 endif()
 
 # DPDK
@@ -379,7 +382,7 @@ endforeach()
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
-  test_ptr_grid test_recipcal test_avx512_complex_mul test_scrambler
+  test_ptr_grid test_avx512_complex_mul test_scrambler
   test_256qam_demod)
 
 foreach(test_name IN LISTS UNIT_TESTS)

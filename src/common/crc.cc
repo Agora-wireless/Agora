@@ -68,20 +68,20 @@ int main() {
 }
 #endif
 
-void DoCRC::AddCrc24(struct MacPacket* p) {
+void DoCRC::AddCrc24(MacPacketPacked* p) {
   /* Init
    * TODO: Size of CRC should depend on Transport Block length and should
    * consider both header and data, not just data
    * int tb_len = p->datalen_;    // Transport Block (TB) length in bits
    */
 
-  uint32_t crc = CalculateCrc24((unsigned char*)p->data_, p->datalen_);
+  uint32_t crc = CalculateCrc24(p->Data(), p->PayloadLength());
   /*
   p->crc[0] = HI(crc);
   p->crc[1] = MID(crc);
   p->crc[2] = LO(crc);
   */
-  p->crc_ = crc;
+  p->Crc(crc);
 }
 
 uint32_t DoCRC::CalculateCrc24(const unsigned char* data, int len) {

@@ -1,4 +1,5 @@
 #include "agora.h"
+#include "gflags/gflags.h"
 
 static const bool kDebugPrintUlCorr = false;
 static const bool kDebugPrintDlCorr = false;
@@ -29,7 +30,7 @@ static void ReadFromFile(const std::string& filename, Table<TableType>& data,
 static void ReadFromFileUl(const std::string& filename, Table<uint8_t>& data,
                            int num_bytes_per_ue, Config const* const cfg) {
   ReadFromFile(filename, data, cfg->Frame().NumULSyms(),
-               (num_bytes_per_ue * cfg->UeNum()), sizeof(uint8_t));
+               (num_bytes_per_ue * cfg->UeAntNum()), sizeof(uint8_t));
 }
 
 static void ReadFromFileDl(const std::string& filename, Table<short>& data,
@@ -39,15 +40,15 @@ static void ReadFromFileDl(const std::string& filename, Table<short>& data,
 }
 
 static unsigned int CheckCorrectnessUl(Config const* const cfg) {
-  int ue_num = cfg->UeNum();
+  int ue_num = cfg->UeAntNum();
   int num_uplink_syms = cfg->Frame().NumULSyms();
-  int ofdm_data_num = cfg->OfdmDataNum();
+  int ofdm_data_num = cfg->GetOFDMDataNum();
   int ul_pilot_syms = cfg->Frame().ClientUlPilotSymbols();
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string raw_data_filename = cur_directory + "/data/LDPC_orig_ul_data_" +
                                   std::to_string(cfg->OfdmCaNum()) + "_ant" +
-                                  std::to_string(cfg->UeNum()) + ".bin";
+                                  std::to_string(cfg->UeAntNum()) + ".bin";
   std::string output_data_filename = cur_directory + "/data/decode_data.bin";
 
   Table<uint8_t> raw_data;
@@ -57,8 +58,9 @@ static unsigned int CheckCorrectnessUl(Config const* const cfg) {
   output_data.Calloc(num_uplink_syms, (ofdm_data_num * ue_num),
                      Agora_memory::Alignment_t::kAlign64);
 
-  int num_bytes_per_ue = (cfg->LdpcConfig().NumCbLen() + 7) >>
-                         3 * cfg->LdpcConfig().NumBlocksInSymbol();
+  int num_bytes_per_ue =
+      (cfg->LdpcConfig(Direction::kUplink).NumCbLen() + 7) >>
+      3 * cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol();
   ReadFromFileUl(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
   ReadFromFileUl(output_data_filename, output_data, num_bytes_per_ue, cfg);
 
@@ -163,12 +165,22 @@ static unsigned int CheckCorrectness(Config const* const cfg) {
   return ul_error_count + dl_error_count;
 }
 
+DEFINE_string(conf_file,
+              TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-both.json",
+              "Config filename");
+
 int main(int argc, char* argv[]) {
-  std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-  std::string conf_file =
-      cur_directory + "/data/tddconfig-correctness-test-ul.json";
+  std::string conf_file;
+  gflags::SetUsageMessage("conf_file : set the configuration filename");
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+  // For backwards compatibility
   if (argc == 2) {
     conf_file = std::string(argv[1]);
+    std::printf("User: Setting configuration filename to %s\n",
+                conf_file.c_str());
+  } else {
+    conf_file = FLAGS_conf_file;
   }
 
   auto cfg = std::make_unique<Config>(conf_file.c_str());
@@ -216,5 +228,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "SignalException: " << e.what() << std::endl;
     ret = EXIT_FAILURE;
   }
+  PrintCoreAssignmentSummary();
+  gflags::ShutDownCommandLineFlags();
   return ret;
 }

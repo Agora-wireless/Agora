@@ -174,7 +174,8 @@ void InitQam64Table(Table<complex_float>& qam64_table) {
  */
 void InitQam256Table(Table<complex_float>& qam256_table) {
   float scale = 1 / sqrt(170);
-  uint8_t imag_i, real_i;
+  uint8_t imag_i;
+  uint8_t real_i;
   /**
    * To generate this table, first create a 4 bit gray code. Then, generate a
    * vector of the scales you want for your QAM table. Finally, use the gray
@@ -253,6 +254,38 @@ void ModSimd(uint8_t* in, complex_float*& out, size_t len,
  ***********************************************************************************
  */
 
+/**
+ * QPSK modulation
+ *              Q
+ *  01  |  11
+ *---------------> I
+ *  00  |  10
+ */
+void DemodQpskHardLoop(const float* vec_in, uint8_t* vec_out, int num) {
+  for (int i = 0; i < num; i++) {
+    float real_val = *(vec_in + i * 2);
+    float imag_val = *(vec_in + i * 2 + 1);
+
+    *(vec_out + i) = 0;
+    if (real_val >= 0) {
+      *(vec_out + i) |= 1UL << 1;
+    }
+    if (imag_val >= 0) {
+      *(vec_out + i) |= 1UL;
+    }
+  }
+}
+
+void DemodQpskSoftLoop(float* vec_in, int8_t* llr, int num) {
+  for (int i = 0; i < num; i++) {
+    auto yre = static_cast<int8_t>(SCALE_BYTE_CONV_QPSK * (vec_in[2 * i]));
+    auto yim = static_cast<int8_t>(SCALE_BYTE_CONV_QPSK * (vec_in[2 * i + 1]));
+
+    llr[2 * i + 0] = yre;
+    llr[2 * i + 1] = yim;
+  }
+}
+
 // /**
 //   * 16-QAM demodulation
 //   *              Q
@@ -295,6 +328,7 @@ void ModSimd(uint8_t* in, complex_float*& out, size_t len,
  *  1110  1100  |  0100  0110
  *  1111  1101  |  0101  0111
  */
+
 void Demod16qamHardLoop(const float* vec_in, uint8_t* vec_out, int num) {
   float float_val = QAM16_THRESHOLD;
 
@@ -1077,6 +1111,7 @@ void Demod64qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
 }
 
 void Demod64qamSoftAvx2(float* vec_in, int8_t* llr, int num) {
+  std::printf("Demod64qamSoftAvx2: llr pointer %p, num %d\n", llr, num);
   auto* symbols_ptr = static_cast<float*>(vec_in);
   auto* result_ptr = reinterpret_cast<__m256i*>(llr);
   __m256 symbol1;
@@ -1303,16 +1338,54 @@ void Demod256qamHardLoop(const float* vec_in, uint8_t* vec_out, int num) {
 }
 
 void Demod256qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
-  __m128 symbol1, symbol2, symbol3, symbol4;
-  __m128i intsymbol1, intsymbol2, intsymbol3, intsymbol4, symbol12, symbol34,
-      symbol_abs, symbol_gt_0, symbol_gt_threshold1, symbol_gt_threshold2,
-      symbol_lt_threshold3, symbol_lt_threshold4, symbol_gt_threshold5,
-      symbol_lt_threshold6, symbol_lt_threshold7, symbol12_bit0, symbol12_bit1,
-      symbol12_bit2, symbol12_bit3, symbol12_bit4, symbol12_bit5, symbol12_bit6,
-      symbol12_bit7, symbol34_bit0, symbol34_bit1, symbol34_bit2, symbol34_bit3,
-      symbol34_bit4, symbol34_bit5, symbol34_bit6, symbol34_bit7, bit7, bit6,
-      bit5, bit4, bit3, bit2, bit1, bit0, result, symbol_bit01, symbol_bit23,
-      symbol_bit45, symbol_bit67 __attribute__((aligned(16)));
+  __m128 symbol1;
+  __m128 symbol2;
+  __m128 symbol3;
+  __m128 symbol4;
+  __m128i intsymbol1;
+  __m128i intsymbol2;
+  __m128i intsymbol3;
+  __m128i intsymbol4;
+  __m128i symbol12;
+  __m128i symbol34;
+  __m128i symbol_abs;
+  __m128i symbol_gt_0;
+  __m128i symbol_gt_threshold1;
+  __m128i symbol_gt_threshold2;
+  __m128i symbol_lt_threshold3;
+  __m128i symbol_lt_threshold4;
+  __m128i symbol_gt_threshold5;
+  __m128i symbol_lt_threshold6;
+  __m128i symbol_lt_threshold7;
+  __m128i symbol12_bit0;
+  __m128i symbol12_bit1;
+  __m128i symbol12_bit2;
+  __m128i symbol12_bit3;
+  __m128i symbol12_bit4;
+  __m128i symbol12_bit5;
+  __m128i symbol12_bit6;
+  __m128i symbol12_bit7;
+  __m128i symbol34_bit0;
+  __m128i symbol34_bit1;
+  __m128i symbol34_bit2;
+  __m128i symbol34_bit3;
+  __m128i symbol34_bit4;
+  __m128i symbol34_bit5;
+  __m128i symbol34_bit6;
+  __m128i symbol34_bit7;
+  __m128i bit7;
+  __m128i bit6;
+  __m128i bit5;
+  __m128i bit4;
+  __m128i bit3;
+  __m128i bit2;
+  __m128i bit1;
+  __m128i bit0;
+  __m128i result;
+  __m128i symbol_bit01;
+  __m128i symbol_bit23;
+  __m128i symbol_bit45;
+  __m128i symbol_bit67 __attribute__((aligned(16)));
   auto* result_ptr = reinterpret_cast<__m64*>(vec_out);
   int remaining_symbols;
   /*
@@ -1507,16 +1580,54 @@ void Demod256qamHardSse(float* vec_in, uint8_t* vec_out, int num) {
 void Demod256qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
   auto* result_ptr = reinterpret_cast<__m128i*>(vec_out);
-  __m256 symbol1, symbol2, symbol3, symbol4;
-  __m256i intsymbol1, intsymbol2, intsymbol3, intsymbol4, symbol12, symbol34,
-      symbol_abs, symbol_gt_0, symbol_gt_threshold1, symbol_gt_threshold2,
-      symbol_lt_threshold3, symbol_lt_threshold4, symbol_gt_threshold5,
-      symbol_lt_threshold6, symbol_lt_threshold7, symbol12_bit0, symbol12_bit1,
-      symbol12_bit2, symbol12_bit3, symbol12_bit4, symbol12_bit5, symbol12_bit6,
-      symbol12_bit7, symbol34_bit0, symbol34_bit1, symbol34_bit2, symbol34_bit3,
-      symbol34_bit4, symbol34_bit5, symbol34_bit6, symbol34_bit7, bit7, bit6,
-      bit5, bit4, bit3, bit2, bit1, bit0, result, symbol_bit01, symbol_bit23,
-      symbol_bit45, symbol_bit67;
+  __m256 symbol1;
+  __m256 symbol2;
+  __m256 symbol3;
+  __m256 symbol4;
+  __m256i intsymbol1;
+  __m256i intsymbol2;
+  __m256i intsymbol3;
+  __m256i intsymbol4;
+  __m256i symbol12;
+  __m256i symbol34;
+  __m256i symbol_abs;
+  __m256i symbol_gt_0;
+  __m256i symbol_gt_threshold1;
+  __m256i symbol_gt_threshold2;
+  __m256i symbol_lt_threshold3;
+  __m256i symbol_lt_threshold4;
+  __m256i symbol_gt_threshold5;
+  __m256i symbol_lt_threshold6;
+  __m256i symbol_lt_threshold7;
+  __m256i symbol12_bit0;
+  __m256i symbol12_bit1;
+  __m256i symbol12_bit2;
+  __m256i symbol12_bit3;
+  __m256i symbol12_bit4;
+  __m256i symbol12_bit5;
+  __m256i symbol12_bit6;
+  __m256i symbol12_bit7;
+  __m256i symbol34_bit0;
+  __m256i symbol34_bit1;
+  __m256i symbol34_bit2;
+  __m256i symbol34_bit3;
+  __m256i symbol34_bit4;
+  __m256i symbol34_bit5;
+  __m256i symbol34_bit6;
+  __m256i symbol34_bit7;
+  __m256i bit7;
+  __m256i bit6;
+  __m256i bit5;
+  __m256i bit4;
+  __m256i bit3;
+  __m256i bit2;
+  __m256i bit1;
+  __m256i bit0;
+  __m256i result;
+  __m256i symbol_bit01;
+  __m256i symbol_bit23;
+  __m256i symbol_bit45;
+  __m256i symbol_bit67;
   int next_start;
 
   /*
@@ -2027,7 +2138,8 @@ void Demod256qamSoftLoop(const float* vec_in, int8_t* llr, int num) {
    * Equations 7, 8, and 9
    */
   int i;
-  int8_t re, im;
+  int8_t re;
+  int8_t im;
   const uint8_t t1 = QAM256_THRESHOLD_4 * SCALE_BYTE_CONV_QAM256;
   const uint8_t t2 = QAM256_THRESHOLD_2 * SCALE_BYTE_CONV_QAM256;
   const uint8_t t3 = QAM256_THRESHOLD_1 * SCALE_BYTE_CONV_QAM256;

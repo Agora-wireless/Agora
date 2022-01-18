@@ -14,6 +14,8 @@
 
 DEFINE_uint64(num_sender_worker_threads, 1,
               "Number of mac basestation sender worker threads");
+DEFINE_uint64(num_sender_update_threads, 1,
+              "Number of mac client sender update threads / streams");
 DEFINE_uint64(num_receiver_threads, 1,
               "Number of mac basestation receiver threads");
 DEFINE_uint64(core_offset, 6, "Core ID of the first sender thread");
@@ -23,12 +25,16 @@ DEFINE_string(conf_file, TOSTRING(PROJECT_DIRECTORY) "/data/bs-mac-sim.json",
 DEFINE_string(data_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/dl_increment_file.bin",
               "Downlink transmit filename");
+
+DEFINE_string(fwd_udp_address, "", "Forward decoded mac data to address");
+DEFINE_uint64(fwd_udp_port, 0,
+              "Forward decoded mac data port id (Set to 0 to disable)");
+
 DEFINE_uint64(
     enable_slow_start, 0,
     "Send frames slower than the specified frame duration during warmup");
 
 int main(int argc, char* argv[]) {
-  PinToCoreWithOffset(ThreadType::kMaster, FLAGS_core_offset, 0);
   gflags::SetVersionString(GetAgoraProjectVersion());
   gflags::SetUsageMessage(
       "num_sender_threads, num_receiver_threads, core_offset, frame_duration, "
@@ -38,8 +44,8 @@ int main(int argc, char* argv[]) {
   std::string filename = FLAGS_conf_file;
   std::string data_filename = FLAGS_data_file;
 
-  auto frame_start = new double[kNumStatsFrames];
-  auto frame_end = new double[kNumStatsFrames];
+  auto* frame_start = new double[kNumStatsFrames];
+  auto* frame_end = new double[kNumStatsFrames];
 
   int ret = EXIT_FAILURE;
   {
@@ -47,7 +53,7 @@ int main(int argc, char* argv[]) {
     cfg->GenData();
 
     // Generate pattern file for testing
-    if (data_filename == "") {
+    if (data_filename.empty()) {
       std::ofstream create_file;
       data_filename = TOSTRING(PROJECT_DIRECTORY) +
                       std::string("/data/dl_increment_file.bin");
@@ -60,41 +66,58 @@ int main(int argc, char* argv[]) {
       assert(create_file.is_open() == true);
 
       std::vector<char> mac_data;
-      mac_data.resize(cfg->MacPayloadLength());
+      mac_data.resize(cfg->MacPayloadMaxLength(Direction::kDownlink));
 
-      for (size_t i = 0;
-           i < (cfg->FramesToTest() * cfg->DlMacPacketsPerframe()); i++) {
+      for (size_t i = 0; i < (cfg->FramesToTest() *
+                              cfg->MacPacketsPerframe(Direction::kDownlink));
+           i++) {
         std::fill(mac_data.begin(), mac_data.end(), (char)i);
         create_file.write(mac_data.data(), mac_data.size());
       }
       create_file.close();
     }
 
+    PinToCoreWithOffset(ThreadType::kMaster, FLAGS_core_offset, 0);
+
     try {
       SignalHandler signal_handler;
       std::unique_ptr<MacSender> sender;
       std::unique_ptr<MacReceiver> receiver;
       std::vector<std::thread> rx_threads;
-      //+2 1 for main thread and 1 for data update thread
-      const size_t kNumTotalSenderThreads = FLAGS_num_sender_worker_threads + 2;
+      //+1 for main thread a
+      const size_t k_num_total_sender_threads =
+          FLAGS_num_sender_worker_threads + FLAGS_num_sender_update_threads;
+      size_t thread_start = FLAGS_core_offset;
 
       // Register signal handler to handle kill signal
       signal_handler.SetupSignalHandlers();
       if (cfg->Frame().NumDlDataSyms() > 0) {
         sender = std::make_unique<MacSender>(
-            cfg.get(), data_filename, cfg->DlMacPacketsPerframe(),
-            cfg->BsServerAddr(), cfg->BsMacRxPort(),
+            cfg.get(), data_filename,
+            cfg->MacPacketLength(Direction::kDownlink),
+            cfg->MacPayloadMaxLength(Direction::kDownlink),
+            cfg->MacPacketsPerframe(Direction::kDownlink), cfg->BsServerAddr(),
+            cfg->BsMacRxPort(),
             std::bind(&FrameStats::GetDLDataSymbol, cfg->Frame(),
                       std::placeholders::_1),
-            FLAGS_num_sender_worker_threads, FLAGS_core_offset + 1,
-            FLAGS_frame_duration, 0, FLAGS_enable_slow_start, true);
+            thread_start, FLAGS_num_sender_worker_threads,
+            FLAGS_num_sender_update_threads, FLAGS_frame_duration, 0,
+            FLAGS_enable_slow_start, true);
+        thread_start += k_num_total_sender_threads;
         sender->StartTXfromMain(frame_start, frame_end);
       }
       if (cfg->Frame().NumUlDataSyms() > 0) {
-        receiver = std::make_unique<MacReceiver>(
-            cfg.get(), cfg->UlMacDataBytesNumPerframe(), cfg->BsServerAddr(),
-            cfg->BsMacTxPort(), FLAGS_num_receiver_threads,
-            FLAGS_core_offset + kNumTotalSenderThreads);
+        if ((FLAGS_fwd_udp_port != 0) && (!FLAGS_fwd_udp_address.empty())) {
+          receiver = std::make_unique<MacReceiver>(
+              cfg.get(), cfg->MacDataBytesNumPerframe(Direction::kDownlink),
+              cfg->BsServerAddr(), cfg->BsMacTxPort(), FLAGS_fwd_udp_address,
+              FLAGS_fwd_udp_port, FLAGS_num_receiver_threads, thread_start);
+        } else {
+          receiver = std::make_unique<MacReceiver>(
+              cfg.get(), cfg->MacDataBytesNumPerframe(Direction::kDownlink),
+              cfg->BsServerAddr(), cfg->BsMacTxPort(),
+              FLAGS_num_receiver_threads, thread_start);
+        }
         rx_threads = receiver->StartRecv();
       }
 
@@ -122,6 +145,7 @@ int main(int argc, char* argv[]) {
   delete[](frame_start);
   delete[](frame_end);
   std::printf("Mac basestation application terminated!\n");
+  PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
   return ret;
 }

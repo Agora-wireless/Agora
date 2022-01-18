@@ -28,7 +28,7 @@
 #if defined(USE_DPDK)
 #include "dpdk_transport.h"
 
-//Removed support for copy free dpdk memory due to slowdown issue.
+// Removed support for copy free dpdk memory due to slowdown issue.
 //#define USE_DPDK_MEMORY
 
 #if defined(USE_DPDK_MEMORY)
@@ -47,7 +47,7 @@ class DPDKRxPacket : public RxPacket {
  private:
   rte_mbuf* mem_;
   inline void GcPacket() override {
-    //std::printf("Garbage collecting the memory for DPDKRxPacket\n");
+    // std::printf("Garbage collecting the memory for DPDKRxPacket\n");
     rte_pktmbuf_free(mem_);
     this->Set(nullptr, nullptr);
   }
@@ -69,8 +69,6 @@ class DPDKRxPacket : public RxPacket {
  */
 class PacketTXRX {
  public:
-  static const int kMaxSocketNum = 10;  // Max number of socket threads allowed
-
   explicit PacketTXRX(Config* cfg, size_t in_core_offset = 1);
 
   PacketTXRX(Config* cfg, size_t core_offset,
@@ -101,25 +99,29 @@ class PacketTXRX {
                  Table<complex_float>& calib_dl_buffer_,
                  Table<complex_float>& calib_ul_buffer_);
 
-  void SendBeacon(int tid, size_t frame_id);
+  void TxBeacon(int tid, size_t frame_id);
+  void TxBeaconHW(size_t frame_id, size_t radio_id, long long time0);
+  void TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
+                                long long time0);
 
  private:
   void LoopTxRx(size_t tid);  // The thread function for thread [tid]
-  int DequeueSend(int tid);
-  struct Packet* RecvEnqueue(size_t tid, size_t radio_id, size_t rx_offset);
+  size_t DequeueSend(int tid);
+  Packet* RecvEnqueue(size_t tid, size_t radio_id, size_t rx_slot);
 
   void LoopTxRxArgos(size_t tid);
-  int DequeueSendArgos(int tid);
-  std::vector<struct Packet*> RecvEnqueueArgos(size_t tid, size_t radio_id,
-                                               size_t rx_slot);
+  size_t DequeueSendArgos(int tid, long long time0);
+  std::vector<Packet*> RecvEnqueueArgos(size_t tid, size_t radio_id,
+                                        size_t rx_slot, size_t frame_id,
+                                        size_t symbol_id);
 
   long long rx_time_bs_;
   long long tx_time_bs_;
   void LoopTxRxUsrp(size_t tid);
   int DequeueSendUsrp(int tid);
   int DequeueSendUsrp(int tid, int frame_id, int symbol_id);
-  struct Packet* RecvEnqueueUsrp(size_t tid, size_t radio_id, size_t rx_slot,
-                                 size_t frame_id, size_t symbol_id);
+  Packet* RecvEnqueueUsrp(size_t tid, size_t radio_id, size_t rx_slot,
+                          size_t frame_id, size_t symbol_id);
 
   Config* cfg_;
 
@@ -130,7 +132,7 @@ class PacketTXRX {
   const size_t socket_thread_num_;
 
   // Handle for socket threads
-  std::array<std::thread, kMaxSocketNum> socket_std_threads_;
+  std::vector<std::thread> socket_std_threads_;
   size_t buffers_per_socket_;
 
   char* tx_buffer_;
@@ -143,7 +145,10 @@ class PacketTXRX {
   std::vector<std::unique_ptr<UDPServer>> udp_servers_;
   std::vector<std::unique_ptr<UDPClient>> udp_clients_;
 
+  std::atomic<size_t> threads_started_;
+
 #if defined(USE_DPDK)
+  std::vector<uint16_t> port_ids_;
   uint32_t bs_rru_addr_;     // IPv4 address of the simulator sender
   uint32_t bs_server_addr_;  // IPv4 address of the Agora server
   struct rte_mempool* mbuf_pool_;
