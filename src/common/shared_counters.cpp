@@ -16,6 +16,7 @@ SharedState::SharedState(Config* cfg)
     , num_demul_tasks_required_(cfg->use_general_worker ? ceil_divide(cfg->get_num_sc_to_process(), cfg->demul_block_size) :
         (ceil_divide(cfg->get_num_sc_to_process(), cfg->subcarrier_block_size) - 1) * ceil_divide(cfg->subcarrier_block_size, cfg->demul_block_size) + 
         ceil_divide((cfg->get_num_sc_to_process() - 1) % cfg->subcarrier_block_size + 1, cfg->demul_block_size))
+    , num_encode_tasks_required_(cfg->get_num_ues_to_process())
     , num_demod_pkts_per_symbol_per_ue_(cfg->bs_server_addr_list.size())
     , num_zf_tasks_per_frame_(cfg->get_num_sc_to_process() / cfg->zf_block_size)
 {
@@ -269,10 +270,23 @@ void SharedState::precode_done(size_t frame_id)
         for (size_t j = 0; j < kMaxSymbols; j++) {
             num_data_pkts_[frame_slot][j] = 0;
         }
+        for (size_t j = 0; j < kMaxSymbols; j++) {
+            num_encode_tasks_completed_[frame_slot][j] = 0;
+        }
         MLPD_INFO("Main thread: Precode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
         last_frame_cycles_ = cur_cycle;
     }
     precode_mutex_.unlock();
+}
+
+void SharedState::encode_done(size_t frame_id, size_t symbol_id_dl)
+{   
+    rt_assert(frame_id >= cur_frame_ && frame_id < cur_frame_ + kFrameWnd,
+        "Complete a wrong frame in encode!");
+    num_encode_tasks_completed_[frame_id % kFrameWnd][symbol_id_dl] ++;
+    if (num_encode_tasks_completed_[frame_id % kFrameWnd][symbol_id_dl] == num_encode_tasks_required_) {
+        MLPD_INFO("SharedCounters: Encode done frame: %u, symbol: %u\n", frame_id, symbol_id_dl);
+    }
 }
 
 bool SharedState::is_fft_tx_ready(size_t frame_id, size_t symbol_id)

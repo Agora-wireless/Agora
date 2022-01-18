@@ -160,12 +160,6 @@ private:
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
     Table<uint8_t> dl_bits_buffer_;
 
-    // 1st dimension: number of UEs
-    // 2nd dimension: number of OFDM data subcarriers * TASK_BUFFER_FRAME_NUM
-    //                * number of DL data symbols per frame
-    // Use different dimensions from dl_bits_buffer_ to avoid cache false sharing
-    Table<uint8_t> dl_bits_buffer_status_;
-
     /**
      * Data for transmission
      *

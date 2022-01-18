@@ -44,6 +44,7 @@ public:
     // This function will increase cur_frame_ when this frame is precoded so that
     // we can move on precoding the next frame and release the resources used by this frame
     void precode_done(size_t frame_id);
+    void encode_done(size_t frame_id, size_t symbol_id);
 
     bool is_fft_tx_ready(size_t frame_id, size_t symbol_id);
     // Return true iff we have completed demodulation for all subcarriers in
@@ -93,6 +94,9 @@ private:
         zf_task_completed_ = {};
 
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
+        num_encode_tasks_completed_ = {};
+
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_demod_pkts_[kMaxUEs];
 
     // encode_ready_[i % kFrameWnd] represents whether encoding can proceed
@@ -126,6 +130,7 @@ private:
     const size_t num_decode_tasks_per_frame_;
     const size_t num_precode_tasks_per_frame_;
     const size_t num_demul_tasks_required_;
+    const size_t num_encode_tasks_required_;
     const size_t num_demod_pkts_per_symbol_per_ue_;
     const size_t num_zf_tasks_per_frame_;
 };
