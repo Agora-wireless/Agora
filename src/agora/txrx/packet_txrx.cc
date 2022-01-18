@@ -9,6 +9,9 @@
 #include "logger.h"
 #include "txrx_worker_sim.h"
 
+static constexpr size_t kNotifyWaitMs = 100;
+static constexpr size_t kWorkerStartWaitMs = 10;
+
 PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
                        moodycamel::ConcurrentQueue<EventData>* event_notify_q,
                        moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
@@ -22,7 +25,6 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
       tx_pending_q_(tx_pending_q),
       notify_producer_tokens_(notify_producer_tokens),
       tx_producer_tokens_(tx_producer_tokens),
-
       proceed_(false),
       tx_memory_(reinterpret_cast<std::byte* const>(tx_buffer)),
       frame_start_(frame_start) {
@@ -33,8 +35,8 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
 
   /// Make sure all antennas on an interface is assigned to the same worker
   MLPD_INFO(
-      "Number of workers: %zu, Buffers per interface %zu, Number of Total "
-      "buffers %zu\n",
+      "PacketTxRx: Number of workers %zu, Buffers per interface %zu, Number of "
+      "Total buffers %zu\n",
       requested_worker_threads, buffers_per_interface, packet_num_in_buffer);
 
   /// For each requested worker, start assigning interfaces / buffers
@@ -81,9 +83,9 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
   }
   rx_packets_.resize(actual_worker_threads);
 
-  MLPD_INFO(
-      "Number of workers: %zu, Interfaces per thread: ~%zu, Buffers per "
-      "thread: ~%zu\n",
+  MLPD_FRAME(
+      "PacketTxRx: Number of workers %zu, Interfaces per thread: ~%zu, Buffers "
+      "per thread: ~%zu\n",
       actual_worker_threads, target_interface_count,
       target_interface_count * buffers_per_interface);
 }
@@ -122,21 +124,22 @@ bool PacketTxRx::StartTxRx(Table<complex_float>& calib_dl_buffer,
     CreateWorker(worker_id, num_worker_interfaces, interface_offset,
                  frame_start_[worker_id], rx_packets_.at(worker_id),
                  tx_memory_);
-    MLPD_INFO("Creating worker %zu, with interfaces %zu, offset %zu\n",
-              worker_id, num_worker_interfaces, interface_offset);
+    MLPD_FRAME("Creating worker %zu, with interfaces %zu, offset %zu\n",
+               worker_id, num_worker_interfaces, interface_offset);
   }
 
-  MLPD_INFO("PacketTxRx: StartTxRx threads %zu\n", worker_threads_.size());
+  MLPD_FRAME("PacketTxRx: StartTxRx threads %zu\n", worker_threads_.size());
   for (auto& worker : worker_threads_) {
     worker->Start();
     while (worker->Started() == false) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      std::this_thread::sleep_for(
+          std::chrono::milliseconds(kWorkerStartWaitMs));
     }
-    MLPD_INFO("PacketTxRx: worker %zu has started \n", worker->Id());
+    MLPD_TRACE("PacketTxRx: worker %zu has started \n", worker->Id());
   }
-  MLPD_INFO("PacketTxRx: notifying workers\n");
+  MLPD_TRACE("PacketTxRx: notifying workers\n");
   NotifyWorkers();
-  MLPD_INFO("PacketTxRx: workers notified\n");
+  MLPD_INFO("PacketTxRx: workers synchronized\n");
   return true;
 }
 
@@ -144,23 +147,9 @@ size_t PacketTxRx::AntNumToWorkerId(size_t ant_num) const {
   return (interface_to_worker_.at(ant_num / cfg_->NumChannels()));
 }
 
-/*
-void PacketTxRx::SyncWorkers() {
-  ///Wait for all workers to be ready
-  for (auto& worker : worker_threads_) {
-    while (worker->Started() == false) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-    MLPD_INFO("PacketTxRx[%zu] : worker has started \n", worker->Id());
-  }
-  MLPD_INFO("PacketTxRx: notifying workers\n");
-  NotifyWorkers();
-  MLPD_INFO("PacketTxRx: workers notified\n");
-} */
-
 void PacketTxRx::NotifyWorkers() {  //Sync the workers
   if (proceed_ == false) {
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::milliseconds(kNotifyWaitMs));
     {
       std::unique_lock<std::mutex> locker(mutex_);
       proceed_ = true;

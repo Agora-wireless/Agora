@@ -11,7 +11,7 @@
 #include "logger.h"
 
 static constexpr bool kDebugDownlink = false;
-static constexpr bool kSymbolTimingEnabled = true;
+static constexpr bool kSymbolTimingEnabled = false;
 
 TxRxWorkerArgos::TxRxWorkerArgos(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -157,7 +157,7 @@ void TxRxWorkerArgos::DoTxRx() {
   TxRxWorkerRx::RxParameters receive_attempt;
   receive_attempt = UpdateRxInterface(receive_attempt);
   MLPD_INFO(
-      "TxRxWorkerArgos[%zu] Starting rx interface id %zu looking for symbol "
+      "TxRxWorkerArgos[%zu]: Starting rx interface id %zu looking for symbol "
       "%zu\n",
       tid_, receive_attempt.interface_, receive_attempt.symbol_);
 
@@ -173,11 +173,24 @@ void TxRxWorkerArgos::DoTxRx() {
       }
       auto pkts = RecvEnqueue(receive_attempt.interface_, global_frame_id,
                               global_symbol_id);
-      const double rx_time_ticks = GetTime::Rdtsc();
+
+      const size_t rx_time_ticks = GetTime::Rdtsc();
+      if (kSymbolTimingEnabled) {
+        rx_times.at(receive_attempt.interface_).end_ticks_ = rx_time_ticks;
+      }
+
       if (!pkts.empty()) {
         RtAssert(pkts.size() == channels_per_interface_,
                  "Received data but it was the wrong dimension");
         size_t rx_symbol_id = pkts.front()->symbol_id_;
+
+        if (unlikely(rx_symbol_id != receive_attempt.symbol_)) {
+          MLPD_ERROR(
+              "TxRxWorkerArgos[%zu]: Frame %d - Expected symbol %zu but "
+              "received %zu\n",
+              tid_, pkts.front()->frame_id_, receive_attempt.symbol_,
+              rx_symbol_id);
+        }
 
         RtAssert(
             rx_symbol_id == receive_attempt.symbol_,
@@ -198,10 +211,6 @@ void TxRxWorkerArgos::DoTxRx() {
             rx_frame_start_[frame_id % kNumStatsFrames] = rx_time_ticks;
             prev_frame_id = frame_id;
           }
-        }
-
-        if (kSymbolTimingEnabled) {
-          rx_times.at(receive_attempt.interface_).end_ticks_ = rx_time_ticks;
         }
 
         PrintRxSymbolTiming(rx_times, pkts.front()->frame_id_,
@@ -674,6 +683,7 @@ void TxRxWorkerArgos::PrintRxSymbolTiming(
         rx_times.at(i).end_ticks_ = 0;
       }
 
+      const size_t ticks_now = GetTime::Rdtsc();
       const double avg_rx_time = total_symbol_rx_time / num_interfaces_;
       std::ostringstream result_message;
       //Add any radio that is > 2x the average
@@ -685,8 +695,8 @@ void TxRxWorkerArgos::PrintRxSymbolTiming(
                             freq_ghz_)
                      << " radio rx time (total:total:average) "
                      << total_symbol_rx_time << ":"
-                     << GetTime::CyclesToUs(
-                            GetTime::Rdtsc() - symbol_start_ticks, freq_ghz_)
+                     << GetTime::CyclesToUs(ticks_now - symbol_start_ticks,
+                                            freq_ghz_)
                      << ":" << avg_rx_time;
 
       for (size_t i = 0; i < num_interfaces_; i++) {
@@ -700,7 +710,7 @@ void TxRxWorkerArgos::PrintRxSymbolTiming(
 
     //Frame RX complete -- print summary
     if (current_symbol > next_symbol) {
-      MLPD_INFO("TxRxWorkerArgos[%zu]: Frame %d rx complete @ %.2f\n", tid_,
+      MLPD_INFO("TxRxWorkerArgos[%zu]: Frame %zu rx complete @ %.2f\n", tid_,
                 current_frame,
                 GetTime::CyclesToUs(GetTime::Rdtsc() - program_start_ticks_,
                                     freq_ghz_));

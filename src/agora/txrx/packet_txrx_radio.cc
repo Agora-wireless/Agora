@@ -10,6 +10,8 @@
 #include "txrx_worker_argos.h"
 #include "txrx_worker_usrp.h"
 
+static constexpr size_t kRadioTriggerWaitMs = 100;
+
 PacketTxRxRadio::PacketTxRxRadio(
     Config* const cfg, size_t core_offset,
     moodycamel::ConcurrentQueue<EventData>* event_notify_q,
@@ -28,14 +30,15 @@ PacketTxRxRadio::~PacketTxRxRadio() {
   for (auto& worker_threads : worker_threads_) {
     worker_threads->Stop();
   }
-  MLPD_INFO("PacketTxRxRadio: radio config stopped\n");
+  MLPD_INFO("PacketTxRxRadio: shutting down radios\n");
   radio_config_->RadioStop();
   radio_config_.reset();
 }
 
 bool PacketTxRxRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
                                 Table<complex_float>& calib_ul_buffer) {
-  MLPD_INFO("PacketTxRxRadio: StartTxRx threads %zu\n", worker_threads_.size());
+  MLPD_FRAME("PacketTxRxRadio: StartTxRx threads %zu\n",
+             worker_threads_.size());
   const bool status = radio_config_->RadioStart();
 
   //RadioStart creates the following: radio_config_->GetCalibDl() and radio_config_->GetCalibUl();
@@ -52,6 +55,7 @@ bool PacketTxRxRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
     std::fprintf(stderr, "PacketTxRxRadio: Failed to start radio\n");
   } else {
     PacketTxRx::StartTxRx(calib_dl_buffer, calib_ul_buffer);
+    std::this_thread::sleep_for(std::chrono::milliseconds(kRadioTriggerWaitMs));
     MLPD_INFO("PacketTxRxRadio : All workers started triggering the radio\n");
     radio_config_->Go();
   }

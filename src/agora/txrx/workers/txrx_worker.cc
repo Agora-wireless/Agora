@@ -31,7 +31,6 @@ TxRxWorker::TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
       cond_(sync_cond),
       can_proceed_(can_proceed),
       cfg_(config),
-
       rx_memory_idx_(0),
       rx_memory_(rx_memory),
       tx_memory_(tx_memory),
@@ -44,14 +43,20 @@ TxRxWorker::TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
 TxRxWorker::~TxRxWorker() { Stop(); }
 
 void TxRxWorker::Start() {
-  MLPD_INFO("TxRxWorker[%zu] starting\n", tid_);
-  thread_ = std::thread(&TxRxWorker::DoTxRx, this);
+  MLPD_FRAME("TxRxWorker[%zu] starting\n", tid_);
+  if (!thread_.joinable()) {
+    thread_ = std::thread(&TxRxWorker::DoTxRx, this);
+  } else {
+    throw std::runtime_error(
+        "TxRxWorker::Start() called with thread already assigned.  Ensure you "
+        "have called Stop() before calling Start() a second time.");
+  }
 }
 
 void TxRxWorker::Stop() {
-  MLPD_INFO("TxRxWorker[%zu] stopping\n", tid_);
   cfg_->Running(false);
   if (thread_.joinable()) {
+    MLPD_FRAME("TxRxWorker[%zu] stopping\n", tid_);
     thread_.join();
   }
 }
@@ -61,7 +66,7 @@ void TxRxWorker::WaitSync() {
   // Use mutex to sychronize data receiving across threads
   {
     std::unique_lock<std::mutex> locker(mutex_);
-    MLPD_INFO("TxRxWorker[%zu]: waiting for sync\n", tid_);
+    MLPD_TRACE("TxRxWorker[%zu]: waiting for sync\n", tid_);
     started_ = true;
     cond_.wait(locker, [this] { return can_proceed_.load(); });
   }

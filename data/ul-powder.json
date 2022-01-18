@@ -1,5 +1,5 @@
 {
-  /* Tested with 21 bs radios and 2 ue radios */
+  /* Tested with 22 bs radios and 2 ue radios */
   "serial_file": "data/anechoic_conf/topology-powder-ul.json",
   "cells": 1,
   "channel": "AB",
@@ -56,7 +56,7 @@
   "ue_worker_thread_num": 4,
   "core_offset": 16,
   "worker_thread_num": 8,
-  /* 21 bs radios */
+  /* 22 bs radios */
   "socket_thread_num": 4,
   "max_frame": 10000
 }
