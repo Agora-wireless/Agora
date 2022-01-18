@@ -357,6 +357,11 @@ add_executable(macbs
      ${COMMON_SOURCES})
 target_link_libraries(macbs ${COMMON_LIBS})
 
+add_executable(radio_test
+    test/radio_test/main.cc
+    ${AGORA_SOURCES}
+    ${COMMON_SOURCES})
+target_link_libraries(radio_test ${COMMON_LIBS})
 
 # End-to-end test
 add_executable(test_agora
