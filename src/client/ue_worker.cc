@@ -23,7 +23,7 @@ static constexpr bool kPrintLLRData = false;
 static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr bool kRecordDownlinkFrame = true;
-static constexpr size_t kRecordFrameIndex = 10;
+static constexpr size_t kRecordFrameIndex = 100;
 
 UeWorker::UeWorker(
     size_t tid, Config& config, Stats& shared_stats, PhyStats& shared_phy_stats,
