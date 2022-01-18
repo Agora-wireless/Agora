@@ -604,7 +604,7 @@ void Config::UpdateUlMCS(json ul_mcs) {
 
   ul_ldpc_config_.NumBlocksInSymbol((ofdm_data_num_ * ul_mod_order_bits_) /
                                     ul_ldpc_config_.NumCbCodewLen());
-  RtAssert(ul_ldpc_config_.NumBlocksInSymbol() > 0,
+  RtAssert(this->frame_.NumULSyms() == 0 || ul_ldpc_config_.NumBlocksInSymbol() > 0,
            "Uplink LDPC expansion factor is too large for number of OFDM data "
            "subcarriers.");
 }
@@ -628,7 +628,7 @@ void Config::UpdateDlMCS(json dl_mcs) {
   dl_ldpc_config_.NumBlocksInSymbol((GetOFDMDataNum() * dl_mod_order_bits_) /
                                     dl_ldpc_config_.NumCbCodewLen());
   RtAssert(
-      dl_ldpc_config_.NumBlocksInSymbol() > 0,
+      this->frame_.NumDLSyms() == 0 || dl_ldpc_config_.NumBlocksInSymbol() > 0,
       "Downlink LDPC expansion factor is too large for number of OFDM data "
       "subcarriers.");
 }
