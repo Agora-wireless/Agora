@@ -19,6 +19,11 @@ struct RxParameters {
   size_t symbol_ = 0;
   size_t interface_ = 0;
 };
+
+struct RxTimeTracker {
+  size_t start_ticks_;
+  size_t end_ticks_;
+};
 }  // namespace TxRxWorkerRx
 
 class TxRxWorkerArgos : public TxRxWorker {
@@ -54,7 +59,14 @@ class TxRxWorkerArgos : public TxRxWorker {
 
   TxRxWorkerRx::RxParameters UpdateRxInterface(
       const TxRxWorkerRx::RxParameters& last_rx);
+
+  void PrintRxSymbolTiming(std::vector<TxRxWorkerRx::RxTimeTracker>& rx_times,
+                           size_t current_frame, size_t current_symbol,
+                           size_t next_symbol);
+
   // This object is created / owned by the parent process
   RadioConfig& radio_config_;
+  size_t program_start_ticks_;
+  const double freq_ghz_;
 };
 #endif  // TXRX_WORKER_SIM_H_
