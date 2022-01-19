@@ -51,7 +51,9 @@ Config::Config(const std::string& jsonfile)
 
   std::string serials_str;
   std::string serial_file = tdd_conf.value("serial_file", "");
-  Utils::LoadTddConfig(serial_file, serials_str);
+  if (serial_file != "") {
+    Utils::LoadTddConfig(serial_file, serials_str);
+  }
   if (serials_str.empty() == false) {
     const auto j_serials = json::parse(serials_str, nullptr, true, true);
 
@@ -113,6 +115,9 @@ Config::Config(const std::string& jsonfile)
 
     auto ue_serials = j_ue_serials.value("sdr", json::array());
     ue_radio_id_.assign(ue_serials.begin(), ue_serials.end());
+  } else if (kUseArgos == true) {
+    throw std::runtime_error(
+        "Hardware is enabled but the serials files was not accessable");
   }
 
   if (radio_id_.empty() == true) {
@@ -604,9 +609,10 @@ void Config::UpdateUlMCS(json ul_mcs) {
 
   ul_ldpc_config_.NumBlocksInSymbol((ofdm_data_num_ * ul_mod_order_bits_) /
                                     ul_ldpc_config_.NumCbCodewLen());
-  RtAssert(this->frame_.NumULSyms() == 0 || ul_ldpc_config_.NumBlocksInSymbol() > 0,
-           "Uplink LDPC expansion factor is too large for number of OFDM data "
-           "subcarriers.");
+  RtAssert(
+      (frame_.NumULSyms() == 0) || (ul_ldpc_config_.NumBlocksInSymbol() > 0),
+      "Uplink LDPC expansion factor is too large for number of OFDM data "
+      "subcarriers.");
 }
 
 void Config::UpdateDlMCS(json dl_mcs) {
