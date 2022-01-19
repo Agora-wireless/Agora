@@ -592,12 +592,12 @@ int RadioConfig::RadioTx(
 }
 
 void RadioConfig::RadioRx(void** buffs) {
-  int flags = 0;
   long long frame_time(0);
+  int rx_flags = SOAPY_SDR_END_BURST;
   for (size_t i = 0; i < this->radio_num_; i++) {
     void** buff = buffs + (i * 2);
     ba_stn_.at(i)->readStream(this->rx_streams_.at(i), buff,
-                              cfg_->SampsPerSymbol(), flags, frame_time,
+                              cfg_->SampsPerSymbol(), rx_flags, frame_time,
                               1000000);
   }
 }

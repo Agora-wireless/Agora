@@ -377,11 +377,13 @@ void TxRxWorkerArgos::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
   const std::vector<std::complex<int16_t>> zeros(
       Configuration()->SampsPerSymbol(), std::complex<int16_t>(0, 0));
 
-  MLPD_INFO(
-      "TxRxWorkerArgos[%zu]: TxReciprocityCalibPilots frame %zu radio %zu\n",
+  MLPD_FRAME(
+      "TxRxWorkerArgos[%zu]: TxReciprocityCalibPilots (Frame %zu,         , "
+      "Radio %zu\n",
       tid_, frame_id, radio_id);
 
   //Schedule the Calibration Uplink 'L' Symbol on the reference radio
+  // assumes there is only 1 ULCalSymbol
   if (radio_id == Configuration()->RefRadio(cell_id)) {
     const size_t tx_symbol_id = Configuration()->Frame().GetULCalSymbol(0);
     std::vector<const void*> calultxbuf(Configuration()->NumChannels(),
@@ -401,7 +403,12 @@ void TxRxWorkerArgos::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
       frame_time =
           ((long long)(frame_id + TX_FRAME_DELTA) << 32) | (tx_symbol_id << 16);
     }
-    //Check to see if the next symbol is a Tx symbol for the reference node
+
+    MLPD_TRACE(
+        "TxRxWorkerArgos[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
+        "%zu, Radio %zu) is reference tx on channel %zu\n",
+        tid_, frame_id, tx_symbol_id, radio_id, ant_idx);
+    // Check to see if the next symbol is a Tx symbol for the reference node
     radio_config_.RadioTx(radio_id, calultxbuf.data(),
                           GetTxFlags(radio_id, tx_symbol_id), frame_time);
   } else {
@@ -445,6 +452,12 @@ void TxRxWorkerArgos::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
       radio_config_.RadioTx(radio_id, caldltxbuf.data(),
                             GetTxFlags(radio_id, tx_symbol_id), frame_time);
 
+      MLPD_TRACE(
+          "TxRxWorkerArgos[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
+          "%zu, Radio %zu) dl pilot tx has data %d on channel %zu\n",
+          tid_, frame_id, tx_symbol_id, radio_id, calib_radio == radio_id,
+          pilot_idx);
+
       //Reset the caldltxbuf to zeros for next loop
       if (calib_radio == radio_id) {
         caldltxbuf.at(pilot_idx) = zeros.data();
@@ -475,18 +488,18 @@ size_t TxRxWorkerArgos::DequeueSend(long long time0) {
     const bool last_antenna =
         ((ant_id % channels_per_interface_) + 1) == (channels_per_interface_);
 
-    //std::printf("TxRxWorkerArgos[%zu]: tx antenna %zu radio %zu is last %d\n",
-    //            tid_, ant_id, radio_id, last_antenna);
-
     const size_t dl_symbol_idx =
         Configuration()->Frame().GetDLSymbolIdx(symbol_id);
 
     // All antenna data is ready to tx for a given symbol, if last then TX out the data
     if (last_antenna) {
-      MLPD_INFO("TxRxWorkerArgos[%zu]: tx antenna %zu radio %zu is last\n",
-                tid_, ant_id, radio_id);
+      MLPD_TRACE(
+          "TxRxWorkerArgos[%zu]: (Frame %zu, Symbol %zu) last tx antenna %zu "
+          "for radio %zu has tx data for all antennas / channels\n",
+          tid_, frame_id, symbol_id, ant_id, radio_id);
 
-      //When the first Tx symbol of the frame is ready, schedule beacon and cals
+      // When the first Tx symbol of the frame is ready (for a specific radio), schedule beacon and cals
+      // assumes the symbols are in the correct order (ie get symbol 0 before symbol 1)
       if (symbol_id == Configuration()->Frame().GetDLSymbol(0)) {
         // Schedule beacon in the future
         if (Configuration()->HwFramer() == false) {
@@ -537,8 +550,7 @@ size_t TxRxWorkerArgos::DequeueSend(long long time0) {
 
     if (kDebugPrintInTask == true) {
       std::printf(
-          "TxRxWorkerArgos[%zu]: Transmitted frame %zu, symbol %zu, ant "
-          "%zu\n",
+          "TxRxWorkerArgos[%zu]: Transmitted frame %zu, symbol %zu, ant %zu\n",
           tid_, frame_id, symbol_id, ant_id);
     }
     auto complete_event =
