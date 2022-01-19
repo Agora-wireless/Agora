@@ -4,7 +4,7 @@ DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
 ROOT_DIR=$( cd ${DIR}/../.. >/dev/null 2>&1 && pwd )
 
 # Build Agora
-source ${ROOT_DIR}/scripts/install/setvars.sh
+source ~/project/Agora/scripts/install/setvars.sh
 echocyan "Build Hydra"
 cd ${ROOT_DIR}
 mkdir build
