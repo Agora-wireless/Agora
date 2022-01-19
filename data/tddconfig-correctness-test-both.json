@@ -4,11 +4,11 @@
   "demul_block_size": 40,
   "bs_radio_num": 8,
   "ue_radio_num": 8,
-  "ul_ldpc" : {
+  "ul_mcs": {
     "modulation": "64QAM",
     "Zc": 104
   },
-  "dl_ldpc" : {
+  "dl_mcs": {
     "modulation": "64QAM",
     "Zc": 102
   },
