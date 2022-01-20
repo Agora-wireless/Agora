@@ -39,9 +39,9 @@ else()
 endif()
 
 # Unit tests
-enable_testing()
-set (GTEST_ROOT /usr/src/gtest)
-find_package(GTest REQUIRED)
+# enable_testing()
+# set (GTEST_ROOT /usr/src/gtest)
+# find_package(GTest REQUIRED)
 
 option(DEBUG "Enable debugging" OFF)
 if(NOT DEBUG)
@@ -57,7 +57,10 @@ message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
 
-find_package(Armadillo)
+find_package(Armadillo PATHS ~/project/armadillo)
+include_directories(SYSTEM ~/project/armadillo/include)
+find_package(nlohmann_json PATHS ~/project/json)
+include_directories(SYSTEM ~/project/json/include)
 
 set(USE_DPDK True CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
@@ -69,7 +72,7 @@ set(USE_AVX2_ENCODER False CACHE STRING "Use Agora's AVX2 encoder instead of Fle
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
 
-set(FLEXRAN_FEC_SDK_DIR /opt/FlexRAN-FEC-SDK-19-04/sdk)
+set(FLEXRAN_FEC_SDK_DIR ~/project/Agora/deps/FlexRAN-FEC-SDK-19-04/sdk)
 
 # Determine if the current machine supports AVX-512
 CHECK_C_SOURCE_RUNS("int main() { asm volatile(\"vmovdqu64 %zmm0, %zmm1\"); return 0; }" ISA_AVX512)
@@ -90,35 +93,6 @@ if(USE_AVX2_ENCODER)
 else()
   message(STATUS "Using FlexRAN's (i.e., not Agora's) AVX512 encoder")
 endif()
-
-# DPDK
-# if(${USE_DPDK})
-#   message(STATUS "DPDK is enabled for Agora")
-
-#   find_library(DPDK_LIB dpdk)
-#   message(STATUS "DPDK_LIB: ${DPDK_LIB}")
-#   if(NOT DPDK_LIB)
-#     message(FATAL_ERROR "DPDK library not found")
-#   endif()
-
-#   if(${USE_MLX_NIC})
-#     set(MLX_LIBRARIES -libverbs -lmlx5)
-#   endif()
-#   set(DPDK_LIBRARIES ${DPDK_LIBRARIES} -Wl,--whole-archive dpdk ${MLX_LIBRARIES} -lnuma -Wl,--no-whole-archive dl)
-
-#   # DPDK include directory. Locating rte_config.h does not work on some systems.
-#   # Example: it may be kept in /usr/include/x86_64-linux-gnu/, and symlinked
-#   # from the real DPDK include directory (/usr/include/dpdk/).
-#   find_path(DPDK_INCLUDE_DIR NAMES rte_ethdev.h PATH_SUFFIXES dpdk)
-#   if (DPDK_INCLUDE_DIR)
-#     message(STATUS "DPDK include directory = ${DPDK_INCLUDE_DIR}")
-#   else()
-#     message(FATAL_ERROR "DPDK include directory not found")
-#   endif()
-#   include_directories(SYSTEM ${DPDK_INCLUDE_DIR})
-
-#   add_definitions(-DUSE_DPDK)
-# endif()
 
 if(${USE_DPDK})
   message(STATUS "DPDK is enabled for Agora")
@@ -181,7 +155,7 @@ if(${USE_ARGOS})
   add_definitions(-DUSE_ARGOS)
 endif()
 
-find_package(SoapySDR "0.7" CONFIG)
+find_package(SoapySDR "0.7" CONFIG PATHS ~/project/SoapySDR)
 if(NOT SoapySDR_FOUND)
   message(FATAL_ERROR "SoapySDR development files not found")
 endif()
@@ -293,8 +267,10 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
+# set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
+#   ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
-  ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
+  ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags nlohmann_json::nlohmann_json)
 
 # TODO: The main agora executable is performance-critical, so we need to
 # test if compiling against precompiled objects instead of compiling directly
@@ -347,38 +323,22 @@ target_link_libraries(test_ldpc ${COMMON_LIBS})
 add_test(NAME test_ldpc COMMAND test_ldpc)
 
 # Unit tests
-set(UNIT_TESTS test_datatype_conversion test_udp_client_server
-  test_concurrent_queue test_zf test_zf_threaded # test_demul_threaded 
-  test_ptr_grid test_recipcal)
+# set(UNIT_TESTS test_datatype_conversion test_udp_client_server
+#   test_concurrent_queue test_zf test_zf_threaded # test_demul_threaded 
+#   test_ptr_grid test_recipcal)
 
-foreach(test_name IN LISTS UNIT_TESTS)
-  add_executable(${test_name}
-    test/unit_tests/${test_name}.cc
-    $<TARGET_OBJECTS:agora_sources_lib>
-    $<TARGET_OBJECTS:common_sources_lib>)
-
-  # Unit tests should pass without memory errors
-  set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
-
-  target_link_libraries(${test_name} ${COMMON_LIBS})
-  add_test(NAME ${test_name} COMMAND ${test_name})
-endforeach()
-
-# if(NOT ${USE_DPDK})
-#   # Create shared libraries for Python
-#   # DPDK is currently not supported
-#    add_library(comp MODULE
-#      $<TARGET_OBJECTS:agora_sources_lib>
-#      $<TARGET_OBJECTS:common_sources_lib>)
-#    target_link_libraries(comp ${COMMON_LIBS})
-
-#   add_library(ue_phy MODULE
-#     $<TARGET_OBJECTS:client_sources_lib>
+# foreach(test_name IN LISTS UNIT_TESTS)
+#   add_executable(${test_name}
+#     test/unit_tests/${test_name}.cc
+#     $<TARGET_OBJECTS:agora_sources_lib>
 #     $<TARGET_OBJECTS:common_sources_lib>)
-#   target_link_libraries(ue_phy ${COMMON_LIBS})
-# else()
-#   message(STATUS "Warning: DPDK is not supported for creating shared libraries!")
-# endif()
+
+#   # Unit tests should pass without memory errors
+#   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
+
+#   target_link_libraries(${test_name} ${COMMON_LIBS})
+#   add_test(NAME ${test_name} COMMAND ${test_name})
+# endforeach()
 
 add_executable(test_clock_sender
   tool/test_clock_sender.cpp
