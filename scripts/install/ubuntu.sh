@@ -5,6 +5,7 @@
 
 if [ -n ${SYSTEM_INSTALL} ]; then
   if [ ${SYSTEM_INSTALL} == "1" ]; then
+    sudo apt-get update
     sudo apt-get install -y g++ cmake make liblapack-dev libblas-dev libboost-all-dev \
       libnuma-dev libgflags-dev libgtest-dev swig python-numpy python-pyqt5 \
       libpython-dev python3-pip build-essential gcc libudev-dev libnl-3-dev \

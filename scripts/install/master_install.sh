@@ -13,6 +13,8 @@ while getopts "h?:is:a" opt; do
             echo "Help"
             echo -e "\t-h\tShow this infomation"
             echo -e "\t-i\tRun server init"
+            echo -e "\t-s [hostname]\tRun installation on a specific server"
+            echo -e "\t-a\tInstall all system-level installations using sudo"
             exit 0
             ;;
         i)
