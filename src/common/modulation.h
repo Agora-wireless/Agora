@@ -31,7 +31,7 @@
 #define QAM256_THRESHOLD_6 (12 / sqrt(170))
 #define QAM256_THRESHOLD_7 (14 / sqrt(170))
 
-static std::map<std::string, size_t> kModulStringMap{
+static const std::map<std::string, size_t> kModulStringMap{
     {"BPSK", 1},  {"QPSK", 2},   {"16QAM", 4},
     {"64QAM", 6}, {"256QAM", 8}, {"1024QAM", 10}};
 
@@ -65,7 +65,7 @@ complex_float ModSingleUint8(uint8_t x, Table<complex_float>& mod_table);
 void ModSimd(uint8_t* in, complex_float*& out, size_t len,
              Table<complex_float>& mod_table);
 
-void DemodQpskHardLoop(const float* x, uint8_t* z, int len);
+void DemodQpskHardLoop(const float* vec_in, uint8_t* vec_out, int num);
 void DemodQpskSoftSse(float* x, int8_t* z, int len);
 
 void Demod16qamHardLoop(const float* vec_in, uint8_t* vec_out, int num);

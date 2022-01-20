@@ -1596,7 +1596,9 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
         (true == this->tomac_counters_.IsLastSymbol(frame_id))))) {
     this->stats_->UpdateStats(frame_id);
     assert(frame_id == this->cur_proc_frame_id_);
-    if (true == kUplinkHardDemod) this->demul_counters_.Reset(frame_id);
+    if (true == kUplinkHardDemod) {
+      this->demul_counters_.Reset(frame_id);
+    }
     this->decode_counters_.Reset(frame_id);
     this->tomac_counters_.Reset(frame_id);
     this->ifft_counters_.Reset(frame_id);

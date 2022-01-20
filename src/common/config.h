@@ -212,7 +212,7 @@ class Config {
     return dir == Direction::kUplink ? this->ul_mcs_params_
                                      : this->dl_mcs_params_;
   }
-  inline size_t SubcarrierPerCodeBlock(Direction dir) {
+  inline size_t SubcarrierPerCodeBlock(Direction dir) const {
     return this->LdpcConfig(dir).NumCbCodewLen() / this->ModOrderBits(dir);
   }
 
@@ -296,8 +296,8 @@ class Config {
 
   // Public functions
   void GenData();
-  void UpdateUlMCS(nlohmann::json mcs);
-  void UpdateDlMCS(nlohmann::json mcs);
+  void UpdateUlMCS(const nlohmann::json& mcs);
+  void UpdateDlMCS(const nlohmann::json& mcs);
 
   /// TODO document and review
   size_t GetSymbolId(size_t input_id) const;
@@ -438,7 +438,7 @@ class Config {
 
  private:
   void Print() const;
-  nlohmann::json parse(nlohmann::json in_json, std::string json_handle);
+  nlohmann::json Parse(const nlohmann::json& in_json, const std::string& json_handle);
   void DumpMcsInfo();
 
   /* Class constants */

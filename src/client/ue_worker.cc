@@ -469,10 +469,10 @@ void UeWorker::DoDemul(size_t tag) {
         block_error++;
       }
     }
-    if (block_error > 0)
+    if (block_error > 0) {
       std::printf("Frame %zu Symbol %zu Ue %zu: %zu symbol errors\n", frame_id,
                   symbol_id, ant_id, block_error);
-
+    }
     phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, block_error);
   }
 
