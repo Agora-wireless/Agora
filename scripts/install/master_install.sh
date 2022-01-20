@@ -1,4 +1,20 @@
 #! /bin/bash
+# TODOs:
+#  * 3--4 bulleted lines about what the script does
+#    * This script should be run on the laptop
+#  * Parameters that should be specified by the user of this script should be
+#    in ALL_CAPS, other variables in small caps
+#    * hydra_platform_fn should be HYDRA_SERVER_LIST_JSON
+#    * target should be ONLY_SINGLE_SERVER
+#      * If target is not null, then HYDRA_SERVER_LIST_JSON will be ignored?
+#    * all should be INSTALL_HYDRA_PKGS_SYSTEM_LEVEL
+#  * Better naming
+#    * ROOT_DIR -> hydra_root_dir
+#    * inits -> more descriptive
+#    * target -> more descriptive
+#    * all -> more descriptive
+#    * project -> AgoraRemoteRunner
+#  * Print to console briefly what the script is doing
 
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
 ROOT_DIR=$( cd ${DIR}/../.. >/dev/null 2>&1 && pwd )

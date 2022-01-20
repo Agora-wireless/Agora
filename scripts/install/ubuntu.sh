@@ -1,5 +1,10 @@
 #!/bin/bash
-#
+# TODO
+#  * Check for DPDK: Check if ${RTE_SDK} is present
+#  * Check if rte_common.h is present in the expected folder
+#  * Check if librte_pmd_mlx5.a is present in the expected folder
+# TODO:
+#  * project should use ${hydra_install_root}
 # Set up a fresh Ubuntu 18.04 box with packages for building Agora.
 # This does not include installing Intel compilers and FlexRAN
 

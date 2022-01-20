@@ -1,4 +1,11 @@
 #! /bin/bash
+# TODO: Describe what it does, under what conditions will this be run
+# TODO: SYSTEM_INSTALL should be HYDRA_PKGS_INSTALL_SYSTEM_LEVEL
+# TODO: PROJECT_ROOT should be called "hydra_install_root"
+# TODO: Mention that rdma-core will get installed in a private directory
+# TODO: Convert into functions (nlohmann, Intel mkl, dpdk, rdma-core). Nice
+#       to have function-level line comment about.
+# 
 
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
 ROOT_DIR=$( cd ${DIR}/../.. >/dev/null 2>&1 && pwd )
