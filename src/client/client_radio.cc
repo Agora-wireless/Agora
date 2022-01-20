@@ -60,8 +60,9 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
     SoapySDR::Kwargs hw_info = cl_stn_.at(i)->getHardwareInfo();
     std::string label = hw_info["revision"];
     std::string frontend = "";
-    if (hw_info.find("frontend") != hw_info.end())
+    if (hw_info.find("frontend") != hw_info.end()) {
       frontend = hw_info["frontend"];
+    }
     std::cout << cfg_->UeRadioId().at(i) << " - " << label << " - " << frontend
               << std::endl;
     for (auto c : channels) {
@@ -204,8 +205,9 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
     if (kUseUHD == false) {
       std::string sdr_label = hw_info["revision"];
       std::string sdr_fe = "";
-      if (hw_info.find("frontend") != hw_info.end())
+      if (hw_info.find("frontend") != hw_info.end()) {
         sdr_fe = hw_info["frontend"];
+      }
       bool is_cbrs = (sdr_fe.find("CBRS") != std::string::npos);
       // Check if the hardware is Iris-030
       if (sdr_label.find("Iris") != std::string::npos) {

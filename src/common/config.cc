@@ -51,7 +51,7 @@ Config::Config(const std::string& jsonfile)
 
   std::string serials_str;
   std::string serial_file = tdd_conf.value("serial_file", "");
-  if (serial_file != "") {
+  if (!serial_file.empty()) {
     Utils::LoadTddConfig(serial_file, serials_str);
   }
   if (serials_str.empty() == false) {
@@ -254,9 +254,9 @@ Config::Config(const std::string& jsonfile)
   symbol_data_id_.resize(ofdm_data_num_, 0);
   size_t data_idx = 0;
   for (size_t i = 0; i < ofdm_data_num_; i++) {
-    if (i % ofdm_pilot_spacing_ == 0)  // TODO: make this index configurable
+    if (i % ofdm_pilot_spacing_ == 0) {  // TODO: make this index configurable
       symbol_map_.at(i) = SubcarrierType::kDMRS;
-    else {
+    } else {
       symbol_map_.at(i) = SubcarrierType::kData;
       symbol_data_id_.at(i) = data_idx;
       data_idx++;
@@ -507,10 +507,10 @@ Config::Config(const std::string& jsonfile)
   scramble_enabled_ = tdd_conf.value("wlan_scrambler", true);
 
   // LDPC Coding and Modulation configurations
-  ul_mcs_params_ = this->parse(tdd_conf, "ul_mcs");
+  ul_mcs_params_ = this->Parse(tdd_conf, "ul_mcs");
   this->UpdateUlMCS(ul_mcs_params_);
 
-  dl_mcs_params_ = this->parse(tdd_conf, "dl_mcs");
+  dl_mcs_params_ = this->Parse(tdd_conf, "dl_mcs");
   this->UpdateDlMCS(dl_mcs_params_);
 
   fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
@@ -580,20 +580,22 @@ Config::Config(const std::string& jsonfile)
   Print();
 }
 
-json Config::parse(json in_json, std::string json_handle) {
+json Config::Parse(const json& in_json, const std::string& json_handle) {
   json out_json;
   std::stringstream ss;
   ss << in_json.value(json_handle, out_json);
   out_json = json::parse(ss);
-  if (out_json == nullptr) out_json = json::object();
+  if (out_json == nullptr) {
+    out_json = json::object();
+  }
   ss.str(std::string());
   ss.clear();
   return out_json;
 }
 
-void Config::UpdateUlMCS(json ul_mcs) {
+void Config::UpdateUlMCS(const json& ul_mcs) {
   ul_modulation_ = ul_mcs.value("modulation", "16QAM");
-  ul_mod_order_bits_ = kModulStringMap[ul_modulation_];
+  ul_mod_order_bits_ = kModulStringMap.at(ul_modulation_);
   ul_mod_order_ = static_cast<size_t>(pow(2, ul_mod_order_bits_));
   InitModulationTable(this->ul_mod_table_, ul_mod_order_);
 
@@ -615,9 +617,9 @@ void Config::UpdateUlMCS(json ul_mcs) {
       "subcarriers.");
 }
 
-void Config::UpdateDlMCS(json dl_mcs) {
+void Config::UpdateDlMCS(const json& dl_mcs) {
   dl_modulation_ = dl_mcs.value("modulation", "16QAM");
-  dl_mod_order_bits_ = kModulStringMap[dl_modulation_];
+  dl_mod_order_bits_ = kModulStringMap.at(dl_modulation_);
   dl_mod_order_ = static_cast<size_t>(pow(2, dl_mod_order_bits_));
   InitModulationTable(this->dl_mod_table_, dl_mod_order_);
 
