@@ -161,7 +161,7 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
 
 void PhyStats::PrintCalibSnrStats(size_t frame_id) {
   std::stringstream ss;
-  ss << "Frame " << (frame_id + 1) * config_->AntGroupNum() + TX_FRAME_DELTA
+  ss << "Cal Index " << frame_id
      << " Calibration Pilot Signal SNR (dB) Range at BS Antennas: "
      << std::fixed << std::setw(5) << std::setprecision(1);
   for (size_t i = 0; i < 2; i++) {

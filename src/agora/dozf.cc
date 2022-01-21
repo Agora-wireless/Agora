@@ -157,20 +157,18 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id) {
       reinterpret_cast<arma::cx_float*>(calib_gather_buffer_), cfg_->BfAntNum(),
       false);
   size_t frame_cal_slot = kFrameWnd - 1;
-  size_t frame_cal_slot_prev = kFrameWnd - 1;
+  size_t frame_cal_slot_prev = kFrameWnd - 2;
   size_t frame_cal_slot_old = 0;
-  size_t frame_grp_id = 0;
   if (cfg_->Frame().IsRecCalEnabled() && frame_id >= TX_FRAME_DELTA) {
     const size_t tx_frame_id = frame_id - TX_FRAME_DELTA;
-    frame_grp_id = tx_frame_id / cfg_->AntGroupNum();
+    const size_t frames_to_complete = cfg_->RecipCalFrameCnt();
+    const size_t current_cal_index = tx_frame_id / frames_to_complete;
 
     // use the previous window which has a full set of calibration results
-    frame_cal_slot = (frame_grp_id + kFrameWnd - 1) % kFrameWnd;
-    if (frame_id >= TX_FRAME_DELTA + cfg_->AntGroupNum()) {
-      frame_cal_slot_prev = (frame_grp_id + kFrameWnd - 2) % kFrameWnd;
-    }
-    frame_cal_slot_old =
-        (frame_cal_slot + 2) % kFrameWnd;  // oldest frame data in buffer
+    frame_cal_slot = (current_cal_index + (kFrameWnd - 1)) % kFrameWnd;
+    frame_cal_slot_prev = (frame_cal_slot + (kFrameWnd - 1)) % kFrameWnd;
+    // oldest frame data in buffer but could be partially written
+    frame_cal_slot_old = (current_cal_index % kFrameWnd);
   }
 
   arma::cx_fmat cur_calib_dl_mat(
@@ -212,9 +210,9 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id) {
                                      pre_calib_ul_msum_mat.row(sc_id) -
                                      old_calib_ul_mat.row(sc_id);
 
-  if (cfg_->InitCalibRepeat() == 0u && frame_grp_id == 0) {
+  if (cfg_->InitCalibRepeat() == 0u && (frame_id < TX_FRAME_DELTA)) {
     // fill with one until one full sweep
-    // of  calibration data is done
+    // of calibration data is done
     calib_vec.fill(arma::cx_float(1, 0));
   } else {
     calib_vec =
@@ -395,15 +393,15 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
         reinterpret_cast<arma::cx_float*>(calib_gather_buffer_),
         cfg_->BfAntNum(), false);
     size_t frame_cal_slot = kFrameWnd - 1;
-    size_t frame_cal_slot_prev = kFrameWnd - 1;
+    size_t frame_cal_slot_prev = kFrameWnd - 2;
     if (cfg_->Frame().IsRecCalEnabled() && (frame_id >= TX_FRAME_DELTA)) {
-      size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
+      const size_t tx_frame_id = frame_id - TX_FRAME_DELTA;
+      const size_t frames_to_complete = cfg_->RecipCalFrameCnt();
+      const size_t current_cal_index = tx_frame_id / frames_to_complete;
 
       // use the previous window which has a full set of calibration results
-      frame_cal_slot = (frame_grp_id + kFrameWnd - 1) % kFrameWnd;
-      if (frame_id >= TX_FRAME_DELTA + cfg_->AntGroupNum()) {
-        frame_cal_slot_prev = (frame_grp_id + kFrameWnd - 2) % kFrameWnd;
-      }
+      frame_cal_slot = (current_cal_index + (kFrameWnd - 1)) % kFrameWnd;
+      frame_cal_slot_prev = (frame_cal_slot + (kFrameWnd - 1)) % kFrameWnd;
     }
     arma::cx_fmat calib_dl_mat(
         reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_cal_slot]),

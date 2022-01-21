@@ -381,61 +381,61 @@ void TxRxWorkerArgos::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
       "Radio %zu\n",
       tid_, frame_id, radio_id);
 
-  //Schedule the Calibration Uplink 'L' Symbol on the reference radio
-  // assumes there is only 1 ULCalSymbol
+  //Schedule the Calibration Uplink 'L' Symbol(s) on the reference radio
   if (radio_id == Configuration()->RefRadio(cell_id)) {
-    const size_t tx_symbol_id = Configuration()->Frame().GetULCalSymbol(0);
-    std::vector<const void*> calultxbuf(Configuration()->NumChannels(),
-                                        zeros.data());
+    for (size_t ul_cal_sym_idx = 0;
+         ul_cal_sym_idx < Configuration()->Frame().NumULCalSyms();
+         ul_cal_sym_idx++) {
+      const size_t tx_symbol_id =
+          Configuration()->Frame().GetULCalSymbol(ul_cal_sym_idx);
+      std::vector<const void*> calultxbuf(Configuration()->NumChannels(),
+                                          zeros.data());
 
-    const size_t ref_ant = Configuration()->RefAnt(cell_id);
-    const size_t ant_idx = ref_ant % Configuration()->NumChannels();
-    // We choose to use the reference antenna to tx from the reference radio
-    calultxbuf.at(ant_idx) = Configuration()->PilotCi16().data();
-    long long frame_time = 0;
-    if (Configuration()->HwFramer() == false) {
-      frame_time = time0 + (Configuration()->SampsPerSymbol() *
-                            (((frame_id + TX_FRAME_DELTA) *
-                              Configuration()->Frame().NumTotalSyms()) +
-                             tx_symbol_id));
-    } else {
-      frame_time =
-          ((long long)(frame_id + TX_FRAME_DELTA) << 32) | (tx_symbol_id << 16);
+      const size_t ref_ant = Configuration()->RefAnt(cell_id);
+      const size_t ant_idx = ref_ant % Configuration()->NumChannels();
+      // We choose to use the reference antenna to tx from the reference radio
+      calultxbuf.at(ant_idx) = Configuration()->PilotCi16().data();
+      long long frame_time = 0;
+      if (Configuration()->HwFramer() == false) {
+        frame_time = time0 + (Configuration()->SampsPerSymbol() *
+                              (((frame_id + TX_FRAME_DELTA) *
+                                Configuration()->Frame().NumTotalSyms()) +
+                               tx_symbol_id));
+      } else {
+        frame_time = ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
+                     (tx_symbol_id << 16);
+      }
+
+      MLPD_TRACE(
+          "TxRxWorkerArgos[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
+          "%zu, Radio %zu) is reference tx on channel %zu\n",
+          tid_, frame_id, tx_symbol_id, radio_id, ant_idx);
+      // Check to see if the next symbol is a Tx symbol for the reference node
+      radio_config_.RadioTx(radio_id, calultxbuf.data(),
+                            GetTxFlags(radio_id, tx_symbol_id), frame_time);
     }
-
-    MLPD_TRACE(
-        "TxRxWorkerArgos[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
-        "%zu, Radio %zu) is reference tx on channel %zu\n",
-        tid_, frame_id, tx_symbol_id, radio_id, ant_idx);
-    // Check to see if the next symbol is a Tx symbol for the reference node
-    radio_config_.RadioTx(radio_id, calultxbuf.data(),
-                          GetTxFlags(radio_id, tx_symbol_id), frame_time);
   } else {
     // ! ref_radio -- Transmit downlink calibration (array to ref) pilot
     // Send all CalDl symbols 'C'
     std::vector<const void*> caldltxbuf(Configuration()->NumChannels(),
                                         zeros.data());
-    const size_t num_dl_cal = Configuration()->AntPerGroup();
-    assert(Configuration()->AntPerGroup() ==
-           Configuration()->Frame().NumDLCalSyms());
-    const size_t calib_ant_complete = (frame_id * num_dl_cal);
-
-    // bf_ant_num_ == total number bs antenna's minus any external reference nodes
-    //AntPerGroup() = frame_.NumDLCalSyms();                                         2
-    //AntGroupNum() = frame_.IsRecCalEnabled() ? (bf_ant_num_ / ant_per_group_) : 0; 12
 
     // For each C only 1 channel / antenna can send pilots.  All others send zeros for now, per schedule.
-    for (size_t cal_tx_pilot = 0; cal_tx_pilot < num_dl_cal; cal_tx_pilot++) {
+    for (size_t dl_cal_sym_idx = 0;
+         dl_cal_sym_idx < Configuration()->Frame().NumDLCalSyms();
+         dl_cal_sym_idx++) {
+      const size_t tx_symbol_id =
+          Configuration()->Frame().GetDLCalSymbol(dl_cal_sym_idx);
+
       //Check to see if the pilot antenna is on radio_id
       const size_t calib_antenna =
-          (calib_ant_complete + cal_tx_pilot) % Configuration()->AntGroupNum();
+          Configuration()->RecipCalDlAnt(frame_id, tx_symbol_id);
+
       const size_t calib_radio = calib_antenna / channels_per_interface_;
-      const size_t pilot_idx = calib_antenna % channels_per_interface_;
-      const size_t tx_symbol_id =
-          Configuration()->Frame().GetDLCalSymbol(cal_tx_pilot);
+      const size_t channel_offset = calib_antenna % channels_per_interface_;
 
       if (calib_radio == radio_id) {
-        caldltxbuf.at(pilot_idx) = Configuration()->PilotCi16().data();
+        caldltxbuf.at(channel_offset) = Configuration()->PilotCi16().data();
       }
 
       long long frame_time = 0;
@@ -455,11 +455,11 @@ void TxRxWorkerArgos::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
           "TxRxWorkerArgos[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
           "%zu, Radio %zu) dl pilot tx has data %d on channel %zu\n",
           tid_, frame_id, tx_symbol_id, radio_id, calib_radio == radio_id,
-          pilot_idx);
+          channel_offset);
 
-      //Reset the caldltxbuf to zeros for next loop
+      // Reset the caldltxbuf to zeros for next loop
       if (calib_radio == radio_id) {
-        caldltxbuf.at(pilot_idx) = zeros.data();
+        caldltxbuf.at(channel_offset) = zeros.data();
       }
     }  // end s < Configuration()->RadioPerGroup()
   }    // ! ref radio

@@ -776,14 +776,6 @@ void Agora::HandleEventFft(size_t tag) {
           this->pilot_fft_counters_.Reset(frame_id);
           if (kPrintPhyStats == true) {
             this->phy_stats_->PrintSnrStats(frame_id);
-            if (config_->Frame().IsRecCalEnabled() == true) {
-              size_t frame_grp_id =
-                  (frame_id - TX_FRAME_DELTA) / config_->AntGroupNum();
-              if ((frame_id - TX_FRAME_DELTA) % config_->AntGroupNum() == 0 &&
-                  frame_grp_id > 0) {
-                this->phy_stats_->PrintCalibSnrStats(frame_grp_id - 1);
-              }
-            }
           }
           if (kEnableMac == true) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);
@@ -821,8 +813,25 @@ void Agora::HandleEventFft(size_t tag) {
       this->rc_counters_.Reset(frame_id);
       this->stats_->MasterSetTsc(TsType::kRCDone, frame_id);
       this->rc_last_frame_ = frame_id;
+
+      // See if the calibration has completed (skipping TX_FRAME_DELTA on purpose)
+      if (kPrintPhyStats && (frame_id > TX_FRAME_DELTA)) {
+        const size_t tx_frame = frame_id - TX_FRAME_DELTA;
+        // This makes an assumption that if antenna 0 tx'd pilots during the current complete frame
+        // then the previous frame stats can be printed
+        const size_t cal_index = config_->RecipCalUlRxIndex(tx_frame, 0);
+        if (cal_index != SIZE_MAX) {
+          size_t print_index;
+          if (cal_index == 0) {
+            print_index = kFrameWnd;
+          } else {
+            print_index = cal_index - 1;
+          }
+          phy_stats_->PrintCalibSnrStats(print_index);
+        }
+      }
     }
-  }
+  }  // kCaLDL || kCalUl
 }
 
 void Agora::Worker(int tid) {
