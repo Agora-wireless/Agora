@@ -105,10 +105,7 @@ class Config {
   inline std::string Channel() const { return this->channel_; }
   inline std::string UeChannel() const { return this->ue_channel_; }
 
-  //Groups for Downlink Recip Cal
-  inline size_t AntGroupNum() const { return this->ant_group_num_; }
-  inline size_t AntPerGroup() const { return this->ant_per_group_; }
-
+  // Groups for Downlink Recip Cal
   // Returns antenna number for rec cal dl symbol
   // Assumes that there are the same number of dl cal symbols in each frame
   inline size_t RecipCalDlAnt(size_t frame_id, size_t dl_cal_symbol) const {
@@ -125,7 +122,7 @@ class Config {
 
   // Returns the cal index if ant tx dl cal pilots this frame
   // SIZE_MAX otherwise
-  size_t RecipCalUlRxIndex(size_t frame_id, size_t ant) const {
+  inline size_t RecipCalUlRxIndex(size_t frame_id, size_t ant) const {
     size_t cal_ind;
     const size_t num_frames_for_full_cal = bf_ant_num_ / frame_.NumDLCalSyms();
     const size_t frame_cal_idx = frame_id / num_frames_for_full_cal;
@@ -140,6 +137,13 @@ class Config {
                 frame_id, ant, cal_ind);
     return (cal_ind);
   };
+
+  // Returns the number of frames to obtain a full set of RecipCal data
+  // assumes that bf_ant_num_ % frame_.NumDLCalSyms() == 0
+  inline size_t RecipCalFrameCnt() const {
+    assert(bf_ant_num_ % frame_.NumDLCalSyms());
+    return bf_ant_num_ / frame_.NumDLCalSyms();
+  }
 
   inline size_t CoreOffset() const { return this->core_offset_; }
   inline size_t WorkerThreadNum() const { return this->worker_thread_num_; }
@@ -466,7 +470,8 @@ class Config {
 
  private:
   void Print() const;
-  nlohmann::json Parse(const nlohmann::json& in_json, const std::string& json_handle);
+  nlohmann::json Parse(const nlohmann::json& in_json,
+                       const std::string& json_handle);
   void DumpMcsInfo();
 
   /* Class constants */
@@ -616,8 +621,6 @@ class Config {
   std::vector<bool> external_ref_node_;
   std::string channel_;
   std::string ue_channel_;
-  size_t ant_group_num_;
-  size_t ant_per_group_;
 
   size_t core_offset_;
   size_t worker_thread_num_;

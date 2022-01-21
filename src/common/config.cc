@@ -436,13 +436,14 @@ Config::Config(const std::string& jsonfile)
            "Number of UL pilot symbol exceeds number of UL symbols!");
 
   frame_.SetClientPilotSyms(client_ul_pilot_syms, client_dl_pilot_syms);
+  if (frame_.NumDLCalSyms() > 0) {
+    RtAssert(bf_ant_num_ > frame_.NumDLCalSyms(),
+             "Too many DL Cal symbols for the number of base station antennas");
 
-  ant_per_group_ = frame_.NumDLCalSyms();
-  RtAssert(ant_per_group_ % num_channels_ == 0,
-           "Number of Downlink calibration symbols per frame must be "
-           "multiplier of number of channels!");
-  ant_group_num_ =
-      frame_.IsRecCalEnabled() ? (bf_ant_num_ / ant_per_group_) : 0;
+    RtAssert(bf_ant_num_ % frame_.NumDLCalSyms(),
+             "Number of Downlink calibration symbols per frame must complete "
+             "calibration on frame boundary!");
+  }
 
   if ((freq_orthogonal_pilot_ == false) &&
       (ue_ant_num_ != frame_.NumPilotSyms())) {
@@ -1306,8 +1307,6 @@ void Config::Print() const {
               << "Imbalance Cal: " << imbalance_cal_en_ << std::endl
               << "Bs Channel: " << channel_ << std::endl
               << "Ue Channel: " << ue_channel_ << std::endl
-              << "Ant Group num: " << ant_group_num_ << std::endl
-              << "Ant Per Group: " << ant_per_group_ << std::endl
               << "Max Frames: " << frames_to_test_ << std::endl
               << "Transport Block Size: " << transport_block_size_ << std::endl
               << "Noise Level: " << noise_level_ << std::endl
