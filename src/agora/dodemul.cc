@@ -335,6 +335,7 @@ EventData DoDemul::Launch(size_t tag) {
         std::printf("Demodulation: modulation type %s not supported!\n",
                     cfg_->Modulation(Direction::kUplink).c_str());
     }
+    // if hard demod is enabled calculate BER with modulated bits
     if ((kUplinkHardDemod == true) && (kPrintPhyStats == true) &&
         (symbol_idx_ul >= cfg_->Frame().ClientUlPilotSymbols())) {
       phy_stats_->UpdateDecodedBits(

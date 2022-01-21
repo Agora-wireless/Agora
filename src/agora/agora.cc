@@ -418,6 +418,7 @@ void Agora::Start() {
               max_equaled_frame_ = frame_id;
               this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
               PrintPerFrameDone(PrintType::kDemul, frame_id);
+              // skip Decode when hard demod is enabled
               if (kUplinkHardDemod == true) {
                 assert(this->cur_proc_frame_id_ == frame_id);
                 CheckIncrementScheduleFrame(frame_id, kUplinkComplete);
