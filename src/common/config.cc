@@ -156,6 +156,15 @@ Config::Config(const std::string& jsonfile)
     RtAssert(num_radios_ != 0, "Error: No radios exist in Argos mode");
   }
 
+  if (frame_.NumDLCalSyms() > 0) {
+    RtAssert(bf_ant_num_ > frame_.NumDLCalSyms(),
+             "Too many DL Cal symbols for the number of base station antennas");
+
+    RtAssert(bf_ant_num_ % frame_.NumDLCalSyms(),
+             "Number of Downlink calibration symbols per frame must complete "
+             "calibration on frame boundary!");
+  }
+
   /* radio configurations */
   freq_ = tdd_conf.value("frequency", 3.6e9);
   single_gain_ = tdd_conf.value("single_gain", true);
@@ -436,14 +445,6 @@ Config::Config(const std::string& jsonfile)
            "Number of UL pilot symbol exceeds number of UL symbols!");
 
   frame_.SetClientPilotSyms(client_ul_pilot_syms, client_dl_pilot_syms);
-  if (frame_.NumDLCalSyms() > 0) {
-    RtAssert(bf_ant_num_ > frame_.NumDLCalSyms(),
-             "Too many DL Cal symbols for the number of base station antennas");
-
-    RtAssert(bf_ant_num_ % frame_.NumDLCalSyms(),
-             "Number of Downlink calibration symbols per frame must complete "
-             "calibration on frame boundary!");
-  }
 
   if ((freq_orthogonal_pilot_ == false) &&
       (ue_ant_num_ != frame_.NumPilotSyms())) {
