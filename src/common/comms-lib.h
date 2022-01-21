@@ -37,7 +37,13 @@ class CommsLib {
     kHadamard
   };
 
-  enum ModulationOrder { kQpsk = 2, kQaM16 = 4, kQaM64 = 6 };
+  enum ModulationOrder {
+    kBpsk = 1,
+    kQpsk = 2,
+    kQaM16 = 4,
+    kQaM64 = 6,
+    kQam256 = 8
+  };
 
   explicit CommsLib(std::string);
   ~CommsLib();

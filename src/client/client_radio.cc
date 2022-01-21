@@ -6,6 +6,7 @@
 #include "client_radio.h"
 
 #include "comms-lib.h"
+#include "logger.h"
 #include "nlohmann/json.hpp"
 
 static constexpr size_t kSoapyMakeMaxAttemps = 2;
@@ -56,8 +57,14 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
 #endif
 
   for (size_t i = 0; i < this->radio_num_; i++) {
-    std::cout << cfg_->UeRadioId().at(i) << ": Front end "
-              << cl_stn_.at(i)->getHardwareInfo()["frontend"] << std::endl;
+    SoapySDR::Kwargs hw_info = cl_stn_.at(i)->getHardwareInfo();
+    std::string label = hw_info["revision"];
+    std::string frontend = "";
+    if (hw_info.find("frontend") != hw_info.end()) {
+      frontend = hw_info["frontend"];
+    }
+    std::cout << cfg_->UeRadioId().at(i) << " - " << label << " - " << frontend
+              << std::endl;
     for (auto c : channels) {
       if (c < cl_stn_.at(i)->getNumChannels(SOAPY_SDR_RX)) {
         std::printf("RX Channel %zu\n", c);
@@ -167,13 +174,16 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
       SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
 
   // resets the DATA_clk domain logic.
-  if (!kUseUHD) {
-    cl_stn_.at(tid)->writeSetting("RESET_DATA_LOGIC", "");
+  SoapySDR::Kwargs hw_info = cl_stn_.at(tid)->getHardwareInfo();
+  if (kUseUHD == false) {
+    if (hw_info["revision"].find("Iris") != std::string::npos) {
+      cl_stn_.at(tid)->writeSetting("RESET_DATA_LOGIC", "");
+    }
   }
 
   // use the TRX antenna port for both tx and rx
   for (auto ch : channels) {
-    if (!kUseUHD) {
+    if (kUseUHD == false) {
       cl_stn_.at(tid)->setAntenna(SOAPY_SDR_RX, ch, "TRX");
     } else {
       cl_stn_.at(tid)->setAntenna(SOAPY_SDR_RX, ch, "RX2");
@@ -181,13 +191,9 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
     }
   }
 
-  SoapySDR::Kwargs info = cl_stn_.at(tid)->getHardwareInfo();
   for (auto ch : channels) {
     cl_stn_.at(tid)->setBandwidth(SOAPY_SDR_RX, ch, cfg_->BwFilter());
     cl_stn_.at(tid)->setBandwidth(SOAPY_SDR_TX, ch, cfg_->BwFilter());
-
-    // cl_stn_.at(tid)->setSampleRate(SOAPY_SDR_RX, ch, cfg->rate);
-    // cl_stn_.at(tid)->setSampleRate(SOAPY_SDR_TX, ch, cfg->rate);
 
     cl_stn_.at(tid)->setFrequency(SOAPY_SDR_RX, ch, "RF", cfg_->RadioRfFreq());
     cl_stn_.at(tid)->setFrequency(SOAPY_SDR_RX, ch, "BB",
@@ -196,44 +202,71 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
     cl_stn_.at(tid)->setFrequency(SOAPY_SDR_TX, ch, "BB",
                                   kUseUHD ? 0 : cfg_->Nco());
 
-    if (!kUseUHD) {
-      // Unified gains for both lime and frontend
-      if (cfg_->SingleGain()) {
-        // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
-        cl_stn_.at(tid)->setGain(
-            SOAPY_SDR_RX, ch,
-            ch != 0u ? cfg_->ClientRxGainB(tid) : cfg_->ClientRxGainA(tid));
-        // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
-        cl_stn_.at(tid)->setGain(
-            SOAPY_SDR_TX, ch,
-            ch != 0u ? cfg_->ClientTxGainB(tid) : cfg_->ClientTxGainA(tid));
-      } else {
-        if (info["frontend"].find("CBRS") != std::string::npos) {
-          if (cfg_->Freq() > 3e9) {
-            cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "ATTN", -6);  //[-18,0]
-          } else if ((cfg_->Freq() > 2e9) && (cfg_->Freq() < 3e9)) {
-            cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "ATTN", -18);  //[-18,0]
-          } else {
-            cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "ATTN", -12);  //[-18,0]
+    if (kUseUHD == false) {
+      std::string sdr_label = hw_info["revision"];
+      std::string sdr_fe = "";
+      if (hw_info.find("frontend") != hw_info.end()) {
+        sdr_fe = hw_info["frontend"];
+      }
+      bool is_cbrs = (sdr_fe.find("CBRS") != std::string::npos);
+      // Check if the hardware is Iris-030
+      if (sdr_label.find("Iris") != std::string::npos) {
+        // Unified gains are only available for CBRS FE for now
+        if (is_cbrs && cfg_->SingleGain() == true) {
+          // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
+          cl_stn_.at(tid)->setGain(
+              SOAPY_SDR_RX, ch,
+              ch != 0u ? cfg_->ClientRxGainB(tid) : cfg_->ClientRxGainA(tid));
+          // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
+          cl_stn_.at(tid)->setGain(
+              SOAPY_SDR_TX, ch,
+              ch != 0u ? cfg_->ClientTxGainB(tid) : cfg_->ClientTxGainA(tid));
+          MLPD_INFO("Tx gain: %lf, Rx gain: %lf\n",
+                    cl_stn_.at(tid)->getGain(SOAPY_SDR_TX, ch),
+                    cl_stn_.at(tid)->getGain(SOAPY_SDR_RX, ch));
+        } else {
+          if (is_cbrs) {
+            if (cfg_->Freq() > 3e9) {
+              cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "ATTN", -6);  //[-18,0]
+            } else if ((cfg_->Freq() > 2e9) && (cfg_->Freq() < 3e9)) {
+              cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "ATTN",
+                                       -18);  //[-18,0]
+            } else {
+              cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "ATTN",
+                                       -12);  //[-18,0]
+            }
+            cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "LNA2", 17);  //[0,17]
           }
-          cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "LNA2", 17);  //[0,17]
-        }
 
+          cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "LNA",
+                                   ch != 0u
+                                       ? cfg_->ClientRxGainB(tid)
+                                       : cfg_->ClientRxGainA(tid));  //[0,30]
+          cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "TIA", 0);      //[0,12]
+          cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "PGA", 0);      //[-12,19]
+
+          if (is_cbrs) {
+            cl_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "ATTN",
+                                     -6);  //[-18,0] by 3
+            cl_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "PA2", 0);  //[0|15]
+          }
+          cl_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);  //[0,12]
+          cl_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "PAD",
+                                   ch != 0u
+                                       ? cfg_->ClientTxGainB(tid)
+                                       : cfg_->ClientTxGainA(tid));  //[0,30]
+        }
+      } else if (sdr_label.find("VGER") != std::string::npos) {
+        double rxgain_a = std::min(30.0, cfg_->ClientRxGainA(tid));
+        double rxgain_b = std::min(30.0, cfg_->ClientRxGainB(tid));
+        double txgain_a = std::min(50.0, cfg_->ClientTxGainA(tid));
+        double txgain_b = std::min(50.0, cfg_->ClientTxGainB(tid));
         cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "LNA",
-                                 ch != 0u ? cfg_->ClientRxGainB(tid)
-                                          : cfg_->ClientRxGainA(tid));  //[0,30]
-        cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "TIA", 0);           //[0,12]
-        cl_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "PGA", 0);  //[-12,19]
-
-        if (info["frontend"].find("CBRS") != std::string::npos) {
-          cl_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "ATTN",
-                                   -6);                          //[-18,0] by 3
-          cl_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "PA2", 0);  //[0|15]
-        }
-        cl_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);  //[0,12]
+                                 ch != 0u ? rxgain_a : rxgain_b);  //[0,30]
         cl_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "PAD",
-                                 ch != 0u ? cfg_->ClientTxGainB(tid)
-                                          : cfg_->ClientTxGainA(tid));  //[0,30]
+                                 ch != 0u ? txgain_a : txgain_b);  //[0,52]
+      } else {
+        MLPD_ERROR("SDR is not supported!");
       }
     } else {
       cl_stn_.at(tid)->setGain(
@@ -248,7 +281,7 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
   for (auto ch : channels) {
     // cl_stn_.at(tid)->writeSetting(SOAPY_SDR_RX, ch, "CALIBRATE", "SKLK");
     // cl_stn_.at(tid)->writeSetting(SOAPY_SDR_TX, ch, "CALIBRATE", "");
-    if (!kUseUHD) {
+    if (kUseUHD == false) {
       cl_stn_.at(tid)->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
     }
   }
@@ -260,11 +293,6 @@ bool ClientRadioConfig::RadioStart() {
   // int beacon_ant = 1;
   int flags(0);  // = SOAPY_SDR_WAIT_TRIGGER;
 
-  // beaconSize + 82 (BS FE delay) + 68 (path delay) + 17 (correlator delay) +
-  // 82 (Client FE Delay)
-  int cl_trig_offset = cfg_->BeaconLen() + 249;
-  int sf_start = cl_trig_offset / cfg_->SampsPerSymbol();
-  int sp_start = cl_trig_offset % cfg_->SampsPerSymbol();
   for (size_t i = 0; i < this->radio_num_; i++) {
     if (cfg_->UeHwFramer()) {
       nlohmann::json conf;
@@ -303,6 +331,11 @@ bool ClientRadioConfig::RadioStart() {
       conf["symbol_size"] = cfg_->SampsPerSymbol();
       std::string conf_string = conf.dump();
       cl_stn_.at(i)->writeSetting("TDD_CONFIG", conf_string);
+      // beaconSize + 82 (BS FE delay) + 68 (path delay) + 17 (correlator delay) +
+      // 82 (Client FE Delay)
+      int cl_trig_offset = cfg_->BeaconLen() + 249;
+      int sf_start = cl_trig_offset / cfg_->SampsPerSymbol();
+      int sp_start = cl_trig_offset % cfg_->SampsPerSymbol();
       cl_stn_.at(i)->setHardwareTime(
           SoapySDR::ticksToTimeNs((sf_start << 16) | sp_start, cfg_->Rate()),
           "TRIGGER");

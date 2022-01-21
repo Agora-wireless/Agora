@@ -59,8 +59,9 @@ class DataGenerator {
    * @param  information           The generated input bit sequence
    * @param  ue_id                 ID of the UE that this codeblock belongs to
    */
-  void GenRawData(std::vector<int8_t>& information, size_t ue_id) {
-    const LDPCconfig& lc = cfg_->LdpcConfig();
+  void GenRawData(Direction dir, std::vector<int8_t>& information,
+                  size_t ue_id) {
+    const LDPCconfig& lc = cfg_->LdpcConfig(dir);
     information.resize(
         LdpcEncodingInputBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
 
@@ -80,9 +81,9 @@ class DataGenerator {
    * @param  input_ptr             The input bit sequence to be encoded
    * @param  encoded_codeword      The generated encoded codeword bit sequence
    */
-  void GenCodeblock(const int8_t* input_ptr,
+  void GenCodeblock(Direction dir, const int8_t* input_ptr,
                     std::vector<int8_t>& encoded_codeword) {
-    const LDPCconfig& lc = cfg_->LdpcConfig();
+    const LDPCconfig& lc = cfg_->LdpcConfig(dir);
     std::vector<int8_t> parity;
     parity.resize(
         LdpcEncodingParityBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
@@ -90,10 +91,8 @@ class DataGenerator {
     encoded_codeword.resize(
         LdpcEncodingEncodedBufSize(lc.BaseGraph(), lc.ExpansionFactor()));
 
-    LdpcEncodeHelper(cfg_->LdpcConfig().BaseGraph(),
-                     cfg_->LdpcConfig().ExpansionFactor(),
-                     cfg_->LdpcConfig().NumRows(), &encoded_codeword.at(0),
-                     &parity.at(0), input_ptr);
+    LdpcEncodeHelper(lc.BaseGraph(), lc.ExpansionFactor(), lc.NumRows(),
+                     &encoded_codeword.at(0), &parity.at(0), input_ptr);
 
     encoded_codeword.resize(lc.NumEncodedBytes());
   }
@@ -109,11 +108,35 @@ class DataGenerator {
     std::vector<uint8_t> mod_input(cfg_->OfdmDataNum());
 
     AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-                    &mod_input[0], cfg_->LdpcConfig().NumEncodedBytes(),
-                    cfg_->ModOrderBits());
+                    &mod_input[0],
+                    cfg_->LdpcConfig(Direction::kUplink).NumEncodedBytes(),
+                    cfg_->ModOrderBits(Direction::kUplink));
 
     for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
-      modulated_codeword[i] = ModSingleUint8(mod_input[i], cfg_->ModTable());
+      modulated_codeword[i] =
+          ModSingleUint8(mod_input[i], cfg_->ModTable(Direction::kUplink));
+    }
+    return modulated_codeword;
+  }
+
+  std::vector<complex_float> GetDLModulation(
+      const std::vector<int8_t>& encoded_codeword, complex_float* pilot_seq) {
+    std::vector<complex_float> modulated_codeword(cfg_->OfdmDataNum());
+    std::vector<uint8_t> mod_input(cfg_->GetOFDMDataNum());
+
+    AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
+                    &mod_input[0],
+                    cfg_->LdpcConfig(Direction::kDownlink).NumEncodedBytes(),
+                    cfg_->ModOrderBits(Direction::kDownlink));
+
+    for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
+      if (cfg_->IsDataSubcarrier(i) == true) {
+        modulated_codeword[i] =
+            ModSingleUint8(mod_input[cfg_->GetOFDMDataIndex(i)],
+                           cfg_->ModTable(Direction::kDownlink));
+      } else {
+        modulated_codeword[i] = pilot_seq[i];
+      }
     }
     return modulated_codeword;
   }
@@ -124,10 +147,12 @@ class DataGenerator {
     std::vector<uint8_t> mod_input(cfg_->OfdmDataNum());
 
     AdaptBitsForMod(reinterpret_cast<const uint8_t*>(&encoded_codeword[0]),
-                    &mod_input[0], BitsToBytes(num_bits), cfg_->ModOrderBits());
+                    &mod_input[0], BitsToBytes(num_bits),
+                    cfg_->ModOrderBits(Direction::kUplink));
 
     for (size_t i = 0; i < cfg_->OfdmDataNum(); i++) {
-      modulated_codeword[i] = ModSingleUint8(mod_input[i], cfg_->ModTable());
+      modulated_codeword[i] =
+          ModSingleUint8(mod_input[i], cfg_->ModTable(Direction::kUplink));
     }
     return modulated_codeword;
   }

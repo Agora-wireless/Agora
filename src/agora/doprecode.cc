@@ -169,14 +169,15 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
   complex_float* data_ptr =
       modulated_buffer_temp_ + sc_id_in_block * cfg_->UeAntNum();
   if ((symbol_idx_dl < cfg_->Frame().ClientDlPilotSymbols()) ||
-      ((sc_id % cfg_->OfdmPilotSpacing()) == 0)) {
+      (cfg_->IsDataSubcarrier(sc_id) == false)) {
     data_ptr[user_id] = cfg_->UeSpecificPilot()[user_id][sc_id];
   } else {
     int8_t* raw_data_ptr =
         &dl_raw_data_[total_data_symbol_idx]
-                     [sc_id + Roundup<64>(cfg_->OfdmDataNum()) * user_id];
-    data_ptr[user_id] =
-        ModSingleUint8((uint8_t)(*raw_data_ptr), cfg_->ModTable());
+                     [cfg_->GetOFDMDataIndex(sc_id) +
+                      Roundup<64>(cfg_->GetOFDMDataNum()) * user_id];
+    data_ptr[user_id] = ModSingleUint8((uint8_t)(*raw_data_ptr),
+                                       cfg_->ModTable(Direction::kDownlink));
   }
 }
 

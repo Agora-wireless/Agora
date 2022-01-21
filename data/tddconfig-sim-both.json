@@ -4,8 +4,14 @@
     "frame_schedule": [
         "BPUUUUUGGDDDDD"
     ],
-    "modulation": "64QAM",
-    "Zc": 104,
+    "ul_mcs": {
+        "modulation": "64QAM",
+        "Zc": 104
+    },
+    "dl_mcs": {
+        "modulation": "64QAM",
+        "Zc": 102
+    },
     "bs_server_addr": "127.0.0.1",
     "bs_rru_addr": "127.0.0.1",
     "fft_size": 2048,
@@ -15,7 +21,9 @@
     "fft_block_size": 2,
     /* Compute configuration */
     "core_offset": 4,
-    "exclude_cores": [0],
+    "exclude_cores": [
+        0
+    ],
     "worker_thread_num": 22,
     "socket_thread_num": 2
 }
