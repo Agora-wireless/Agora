@@ -238,6 +238,23 @@ size_t TxRxWorkerSim::DequeueSend() {
           gen_tag_t(current_event.tags_[0]).tag_);
     }
 
+    if (kDebugDownlink == true) {
+      const size_t data_symbol_idx_dl =
+          Configuration()->Frame().GetDLSymbolIdx(symbol_id);
+
+      if (ant_id != 0) {
+        std::memset(pkt->data_, 0,
+                    Configuration()->SampsPerSymbol() * sizeof(int16_t) * 2);
+      } else if (data_symbol_idx_dl <
+                 Configuration()->Frame().ClientDlPilotSymbols()) {
+        std::memcpy(pkt->data_, Configuration()->UeSpecificPilotT()[0],
+                    Configuration()->SampsPerSymbol() * sizeof(int16_t) * 2);
+      } else {
+        std::memcpy(pkt->data_, Configuration()->DlIqT()[data_symbol_idx_dl],
+                    Configuration()->SampsPerSymbol() * sizeof(int16_t) * 2);
+      }
+    }
+
     const size_t local_interface_idx = interface_id - interface_offset_;
     // Send data (one OFDM symbol)
     udp_clients_.at(local_interface_idx)

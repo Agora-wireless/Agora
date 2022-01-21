@@ -10,7 +10,6 @@
 
 #include "logger.h"
 
-static constexpr bool kDebugDownlink = false;
 static constexpr bool kSymbolTimingEnabled = false;
 
 TxRxWorkerArgos::TxRxWorkerArgos(

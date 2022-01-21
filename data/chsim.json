@@ -2,7 +2,15 @@
   "fft_size": 512,
   "ofdm_data_num": 336,
   "demul_block_size": 48,
-  "Zc": 20,
+  "ul_mcs" : {
+    "Zc": 20
+  },
+  "dl_mcs" : {
+    "Zc": 18
+  },
+  /* set sample rate to 1Ms
+  to make sure tests pass*/
+  "sample_rate" : 1e6,
   "ue_radio_num": 2,
   "bs_radio_num": 8,
   "symbol_num_perframe": 16,

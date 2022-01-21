@@ -10,8 +10,6 @@
 
 #include "logger.h"
 
-static constexpr bool kDebugDownlink = false;
-
 TxRxWorkerUsrp::TxRxWorkerUsrp(
     size_t core_offset, size_t tid, size_t radio_hi, size_t radio_lo,
     Config* const config, size_t* rx_frame_start,

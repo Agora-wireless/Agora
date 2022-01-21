@@ -22,11 +22,11 @@ PhyUe::PhyUe(Config* config)
     : stats_(std::make_unique<Stats>(config)),
       phy_stats_(std::make_unique<PhyStats>(config, Direction::kDownlink)),
       demod_buffer_(kFrameWnd, config->Frame().NumDLSyms(), config->UeAntNum(),
-                    kMaxModType * config->OfdmDataNum()),
-      decoded_buffer_(kFrameWnd, config->Frame().NumDLSyms(),
-                      config->UeAntNum(),
-                      config->LdpcConfig().NumBlocksInSymbol() *
-                          Roundup<64>(config->NumBytesPerCb())) {
+                    kMaxModType * Roundup<64>(config->GetOFDMDataNum())),
+      decoded_buffer_(
+          kFrameWnd, config->Frame().NumDLSyms(), config->UeAntNum(),
+          config->LdpcConfig(Direction::kDownlink).NumBlocksInSymbol() *
+              Roundup<64>(config->NumBytesPerCb(Direction::kDownlink))) {
   srand(time(nullptr));
 
   // TODO take into account the UeAntOffset to allow for multiple PhyUe
@@ -34,15 +34,10 @@ PhyUe::PhyUe(Config* config)
   this->config_ = config;
   InitializeVarsFromCfg();
 
-  std::vector<size_t> data_sc_ind;
   for (size_t i = config_->OfdmDataStart();
        i < config_->OfdmDataStart() + config_->OfdmDataNum(); i++) {
-    data_sc_ind.push_back(i);
+    non_null_sc_ind_.push_back(i);
   }
-
-  non_null_sc_ind_.insert(non_null_sc_ind_.end(), data_sc_ind.begin(),
-                          data_sc_ind.end());
-  std::sort(non_null_sc_ind_.begin(), non_null_sc_ind_.end());
 
   ue_pilot_vec_.resize(config_->UeAntNum());
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
@@ -458,8 +453,10 @@ void PhyUe::Start() {
           size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
           size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
 
-          EventData do_decode_task(EventType::kDecode, event.tags_[0]);
-          ScheduleWork(do_decode_task);
+          if (kDownlinkHardDemod == false) {
+            EventData do_decode_task(EventType::kDecode, event.tags_[0]);
+            ScheduleWork(do_decode_task);
+          }
 
           PrintPerTaskDone(PrintType::kDemul, frame_id, symbol_id, ant_id);
           bool symbol_complete =
@@ -472,6 +469,18 @@ void PhyUe::Start() {
               this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
               PrintPerFrameDone(PrintType::kDemul, frame_id);
               demul_counters_.Reset(frame_id);
+              if (kDownlinkHardDemod == true) {
+                bool finished =
+                    FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
+                if (finished == true) {
+                  if ((cur_frame_id + 1) >= config_->FramesToTest()) {
+                    config_->Running(false);
+                  } else {
+                    FrameInit(frame_id);
+                    cur_frame_id = frame_id + 1;
+                  }
+                }
+              }
             }
           }
         } break;
@@ -564,8 +573,9 @@ void PhyUe::Start() {
                    "Radio buffer id does not match expected");
 
           const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
-              &ul_bits_buffer_[ue_id][radio_buf_id *
-                                      config_->UlMacBytesNumPerframe()]);
+              &ul_bits_buffer_[ue_id]
+                              [radio_buf_id * config_->MacBytesNumPerframe(
+                                                  Direction::kUplink)]);
 
           MLPD_TRACE(
               "PhyUe: frame %d symbol %d user %d @ offset %zu %zu @ location "
@@ -603,7 +613,7 @@ void PhyUe::Start() {
               ss << std::endl;
               pkt = reinterpret_cast<const MacPacketPacked*>(
                   reinterpret_cast<const uint8_t*>(pkt) +
-                  config_->MacPacketLength());
+                  config_->MacPacketLength(Direction::kUplink));
             }
             std::printf("%s\n", ss.str().c_str());
           }
@@ -809,7 +819,8 @@ void PhyUe::InitializeVarsFromCfg() {
 
 void PhyUe::InitializeUplinkBuffers() {
   // initialize ul data buffer
-  ul_bits_buffer_size_ = kFrameWnd * config_->UlMacBytesNumPerframe();
+  ul_bits_buffer_size_ =
+      kFrameWnd * config_->MacBytesNumPerframe(Direction::kUplink);
   ul_bits_buffer_.Malloc(config_->UeAntNum(), ul_bits_buffer_size_,
                          Agora_memory::Alignment_t::kAlign64);
   ul_bits_buffer_status_.Calloc(config_->UeAntNum(), kFrameWnd,
@@ -890,7 +901,7 @@ void PhyUe::InitializeDownlinkBuffers() {
     size_t buffer_size = config_->UeAntNum() * task_buffer_symbol_num_dl;
     equal_buffer_.resize(buffer_size);
     for (auto& i : equal_buffer_) {
-      i.resize(config_->OfdmDataNum());
+      i.resize(config_->GetOFDMDataNum());
     }
   }
 }
@@ -1138,14 +1149,14 @@ void PhyUe::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
 void PhyUe::GetDemulData(long long** ptr, int* size) {
   *ptr = (long long*)&equal_buffer_[max_equaled_frame_ *
                                     dl_data_symbol_perframe_][0];
-  *size = config_->UeAntNum() * config_->OfdmCaNum();
+  *size = config_->UeAntNum() * config_->GetOFDMDataNum();
 }
 
 void PhyUe::GetEqualData(float** ptr, int* size, int ue_id) {
   *ptr = (float*)&equal_buffer_[max_equaled_frame_ * dl_data_symbol_perframe_ *
                                     config_->UeAntNum() +
                                 ue_id][0];
-  *size = config_->UeAntNum() * config_->OfdmDataNum() * 2;
+  *size = config_->UeAntNum() * config_->GetOFDMDataNum() * 2;
 }
 
 void PhyUe::FrameInit(size_t frame) {
