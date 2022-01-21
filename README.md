@@ -76,7 +76,7 @@ The following are steps to set up both Agora and the packet generator:
     $ ./test/test_agora/test_agora.sh 10 out # Runs test for 10 iterations
     </pre>
 
- * Run Agora with emulated RRU traffic
+#### Run Agora with emulated RRU traffic
    * **NOTE**: We recommend running Agora and the emulated RRU on two different machines.\
    If you are running them on the same machine, make sure Agora and the emulated RRU are using different set of cores,
      otherwise there will be performance slow down. 
@@ -102,7 +102,7 @@ The following are steps to set up both Agora and the packet generator:
    to start the emulated RRU with uplink configuration.
    * To test the real-time performance of Agora, see the [Running performance test](#running-performance-test) section below.
 
- * Run Agora with channel simulator and clients
+#### Run Agora with channel simulator and clients
    * First, return to the base directory (`cd ..`), then run
    <pre>
    $ ./build/data_generator --conf_file data/chsim.json
@@ -125,7 +125,7 @@ The following are steps to set up both Agora and the packet generator:
    to start Agora with the combined configuration.
    * Note: make sure Agora and sender are using different set of cores, otherwise there will be performance slow down.
 
- * Run Agora with channel simulator, clients, and mac enabled.
+#### Run Agora with channel simulator, clients, and mac enabled
    * Compile the code with
    <pre>
    $ cmake .. -DENABLE_MAC=true
@@ -163,9 +163,6 @@ The following are steps to set up both Agora and the packet generator:
      </pre>
      to run to base station mac app. specify `--data_file ""` to generate patterned data and `--conf_file` options as necessary.
    * Note: make sure agora / user / chsim / macuser / macbs are using different set of cores, otherwise there will be performance slow down.
-
- * To run with real wireless traffic from Faros/Iris hardware UEs, see the
-   [Agora with real RRU](#agora-with-real-rru) section below.
 
 ## Building and running with real RRU
 Agora supports a 64-antenna Faros base station as RRU and Iris UE devices. Both are commercially available from [Skylark Wireless](https://skylarkwireless.com) and are used in the [POWER-RENEW PAWR testbed](https://powderwireless.net/).\
