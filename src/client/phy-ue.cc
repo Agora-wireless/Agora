@@ -134,7 +134,7 @@ PhyUe::PhyUe(Config* config)
   }
 
   // This usage doesn't effect the user num_reciprocity_pkts_per_frame_;
-  rx_counters_.num_pkts_per_frame_ =
+  rx_counters_.num_rx_pkts_per_frame_ =
       config_->UeAntNum() *
       (config_->Frame().NumDLSyms() + config_->Frame().NumBeaconSyms());
   rx_counters_.num_pilot_pkts_per_frame_ =
@@ -350,7 +350,7 @@ void PhyUe::Start() {
           }
           rx_counters_.num_pkts_.at(frame_slot)++;
           if (rx_counters_.num_pkts_.at(frame_slot) ==
-              rx_counters_.num_pkts_per_frame_) {
+              rx_counters_.num_rx_pkts_per_frame_) {
             this->stats_->MasterSetTsc(TsType::kRXDone, frame_id);
             PrintPerFrameDone(PrintType::kPacketRX, frame_id);
             rx_counters_.num_pkts_.at(frame_slot) = 0;

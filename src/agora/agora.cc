@@ -362,8 +362,8 @@ void Agora::Start() {
           }
 
           UpdateRxCounters(pkt->frame_id_, pkt->symbol_id_);
-          fft_queue_arr_[pkt->frame_id_ % kFrameWnd].push(
-              fft_req_tag_t(event.tags_[0]));
+          fft_queue_arr_.at(pkt->frame_id_ % kFrameWnd)
+              .push(fft_req_tag_t(event.tags_[0]));
         } break;
 
         case EventType::kFFT: {
@@ -677,7 +677,7 @@ void Agora::Start() {
       // either (a) sufficient packets received for the current frame,
       // or (b) the current frame being updated.
       std::queue<fft_req_tag_t>& cur_fftq =
-          fft_queue_arr_[(this->cur_sche_frame_id_ % kFrameWnd)];
+          fft_queue_arr_.at(this->cur_sche_frame_id_ % kFrameWnd);
       size_t qid = this->cur_sche_frame_id_ & 0x1;
       if (cur_fftq.size() >= config_->FftBlockSize()) {
         size_t num_fft_blocks = cur_fftq.size() / config_->FftBlockSize();
@@ -695,7 +695,8 @@ void Agora::Start() {
                                          this->cur_sche_frame_id_);
             }
             this->fft_created_count_++;
-            if (this->fft_created_count_ == rx_counters_.num_pkts_per_frame_) {
+            if (this->fft_created_count_ ==
+                rx_counters_.num_rx_pkts_per_frame_) {
               this->fft_created_count_ = 0;
               if (cfg->BigstationMode() == true) {
                 this->CheckIncrementScheduleFrame(cur_sche_frame_id_,
@@ -1023,32 +1024,33 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
   if (config_->IsPilot(frame_id, symbol_id)) {
     rx_counters_.num_pilot_pkts_[frame_slot]++;
-    if (rx_counters_.num_pilot_pkts_[frame_slot] ==
+    if (rx_counters_.num_pilot_pkts_.at(frame_slot) ==
         rx_counters_.num_pilot_pkts_per_frame_) {
-      rx_counters_.num_pilot_pkts_[frame_slot] = 0;
+      rx_counters_.num_pilot_pkts_.at(frame_slot) = 0;
       this->stats_->MasterSetTsc(TsType::kPilotAllRX, frame_id);
       PrintPerFrameDone(PrintType::kPacketRXPilots, frame_id);
     }
-  } else if (config_->IsCalDlPilot(frame_id, symbol_id) or
+  } else if (config_->IsCalDlPilot(frame_id, symbol_id) ||
              config_->IsCalUlPilot(frame_id, symbol_id)) {
-    if (++rx_counters_.num_reciprocity_pkts_[frame_slot] ==
+    rx_counters_.num_reciprocity_pkts_.at(frame_slot)++;
+    if (rx_counters_.num_reciprocity_pkts_.at(frame_slot) ==
         rx_counters_.num_reciprocity_pkts_per_frame_) {
-      rx_counters_.num_reciprocity_pkts_[frame_slot] = 0;
+      rx_counters_.num_reciprocity_pkts_.at(frame_slot) = 0;
       this->stats_->MasterSetTsc(TsType::kRCAllRX, frame_id);
     }
   }
   // Receive first packet in a frame
-  if (rx_counters_.num_pkts_[frame_slot] == 0) {
+  if (rx_counters_.num_pkts_.at(frame_slot) == 0) {
     if (kEnableMac == false) {
       // schedule this frame's encoding
       // Defer the schedule.  If frames are already deferred or the current
       // received frame is too far off
-      if ((this->encode_deferral_.empty() == false) ||
+      if ((encode_deferral_.empty() == false) ||
           (frame_id >= (this->cur_proc_frame_id_ + kScheduleQueues))) {
         if (kDebugDeferral) {
           std::printf("   +++ Deferring encoding of frame %zu\n", frame_id);
         }
-        this->encode_deferral_.push(frame_id);
+        encode_deferral_.push(frame_id);
       } else {
         ScheduleDownlinkProcessing(frame_id);
       }
@@ -1066,11 +1068,12 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
     }
   }
 
-  rx_counters_.num_pkts_[frame_slot]++;
-  if (rx_counters_.num_pkts_[frame_slot] == rx_counters_.num_pkts_per_frame_) {
+  rx_counters_.num_pkts_.at(frame_slot)++;
+  if (rx_counters_.num_pkts_.at(frame_slot) ==
+      rx_counters_.num_rx_pkts_per_frame_) {
     this->stats_->MasterSetTsc(TsType::kRXDone, frame_id);
     PrintPerFrameDone(PrintType::kPacketRX, frame_id);
-    rx_counters_.num_pkts_[frame_slot] = 0;
+    rx_counters_.num_pkts_.at(frame_slot) = 0;
   }
 }
 
@@ -1381,13 +1384,26 @@ void Agora::InitializeUplinkBuffers() {
       kFrameWnd, cfg->Frame().ClientUlPilotSymbols() * cfg->UeAntNum(),
       Agora_memory::Alignment_t::kAlign64);
 
-  rx_counters_.num_pkts_per_frame_ =
-      cfg->BsAntNum() *
-      (cfg->Frame().NumPilotSyms() + cfg->Frame().NumULSyms() +
-       static_cast<size_t>(cfg->Frame().IsRecCalEnabled()));
   rx_counters_.num_pilot_pkts_per_frame_ =
       cfg->BsAntNum() * cfg->Frame().NumPilotSyms();
-  rx_counters_.num_reciprocity_pkts_per_frame_ = cfg->BsAntNum();
+  // BfAntNum() for each 'L' symbol (no ref node)
+  // RefRadio * NumChannels() for each 'C'.
+  //rx_counters_.num_reciprocity_pkts_per_frame_ = cfg->BsAntNum();
+  const size_t num_rx_ul_cal_antennas = cfg->BfAntNum();
+  // Same as the number of rx reference antennas (ref ant + other channels)
+  const size_t num_rx_dl_cal_antennas = cfg->BsAntNum() - cfg->BfAntNum();
+
+  rx_counters_.num_reciprocity_pkts_per_frame_ =
+      (cfg->Frame().NumULCalSyms() * num_rx_ul_cal_antennas) +
+      (cfg->Frame().NumDLCalSyms() * num_rx_dl_cal_antennas);
+
+  std::printf("Total recip cal receive symbols per frame: %zu",
+              rx_counters_.num_reciprocity_pkts_per_frame_);
+
+  rx_counters_.num_rx_pkts_per_frame_ =
+      rx_counters_.num_pilot_pkts_per_frame_ +
+      rx_counters_.num_reciprocity_pkts_per_frame_ +
+      (cfg->BsAntNum() * cfg->Frame().NumULSyms());
 
   fft_created_count_ = 0;
   pilot_fft_counters_.Init(cfg->Frame().NumPilotSyms(), cfg->BsAntNum());

@@ -476,6 +476,10 @@ Config::Config(const std::string& jsonfile)
 
   fft_block_size_ = tdd_conf.value("fft_block_size", 1);
   fft_block_size_ = std::max(fft_block_size_, num_channels_);
+  RtAssert(bs_ant_num_ % fft_block_size_ == 0,
+           "FFT block size is set to an invalid value - all rx symbols per "
+           "frame must fit inside an fft block");
+
   encode_block_size_ = tdd_conf.value("encode_block_size", 1);
 
   noise_level_ = tdd_conf.value("noise_level", 0.03);  // default: 30 dB
