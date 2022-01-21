@@ -45,6 +45,7 @@ inline size_t MacSender::TagToTxBuffersIndex(gen_tag_t tag) const {
 }
 
 MacSender::MacSender(Config* cfg, std::string& data_filename,
+                     size_t mac_packet_length, size_t mac_payload_max_length,
                      size_t packets_per_frame, std::string server_address,
                      size_t server_rx_port,
                      std::function<size_t(size_t)> get_data_symbol_id,
@@ -63,6 +64,8 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
       ticks_inter_frame_(inter_frame_delay_ * ticks_per_usec_),
       data_filename_(data_filename),
       // end -- Ul / Dl     UE / BS
+      mac_packet_length_(mac_packet_length),
+      mac_payload_max_length_(mac_payload_max_length),
       packets_per_frame_(packets_per_frame),
       server_address_(std::move(server_address)),
       server_rx_port_(server_rx_port),
@@ -84,9 +87,9 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
 
   // Match element alignment with buffer alignment
   const size_t padding = kTxBufferElementAlignment -
-                         (cfg_->MacPacketLength() % kTxBufferElementAlignment);
+                         (mac_packet_length_ % kTxBufferElementAlignment);
 
-  tx_buffer_pkt_offset_ = (cfg_->MacPacketLength() + padding);
+  tx_buffer_pkt_offset_ = (mac_packet_length_ + padding);
   assert((tx_buffer_pkt_offset_ % kTxBufferElementAlignment) == 0);
 
   const size_t tx_packet_storage = (packets_per_frame_ * tx_buffer_pkt_offset_);
@@ -331,8 +334,8 @@ void* MacSender::WorkerThread(size_t tid) {
               reinterpret_cast<const MacPacketPacked*>(mac_packet_location);
 
           const size_t mac_packet_tx_size =
-              cfg_->MacPacketLength() -
-              (cfg_->MacPayloadMaxLength() - tx_packet->PayloadLength());
+              mac_packet_length_ -
+              (mac_payload_max_length_ - tx_packet->PayloadLength());
 
           // std::printf(
           //    "MacSender sending frame %d:%d, packet %zu, symbol %d, size "
@@ -483,28 +486,27 @@ void MacSender::UpdateTxBuffer(MacDataReceiver* data_source, gen_tag_t tag) {
     auto* pkt = reinterpret_cast<MacPacketPacked*>(mac_packet_location);
     // Read a MacPayload into the data section
     size_t loaded_bytes =
-        data_source->Load(pkt->DataPtr(), cfg_->MacPayloadMaxLength());
+        data_source->Load(pkt->DataPtr(), mac_payload_max_length_);
 
     pkt->Set(tag.frame_id_, get_data_symbol_id_(i), tag.ue_id_, loaded_bytes);
 
-    if (loaded_bytes > cfg_->MacPayloadMaxLength()) {
+    if (loaded_bytes > mac_payload_max_length_) {
       MLPD_ERROR(
           "MacSender [frame %d, ue %d]: Too much data was loaded from the "
           "source\n",
           tag.frame_id_, tag.ant_id_);
-    } else if (loaded_bytes < cfg_->MacPayloadMaxLength()) {
+    } else if (loaded_bytes < mac_payload_max_length_) {
       MLPD_INFO(
           "MacSender [frame %d, ue %d]: Not enough mac data available sending "
           "%zu bytes of padding\n",
-          tag.frame_id_, tag.ant_id_,
-          cfg_->MacPayloadMaxLength() - loaded_bytes);
+          tag.frame_id_, tag.ant_id_, mac_payload_max_length_ - loaded_bytes);
     }
     // MacPacketLength should be the size of the mac packet but is not.
     mac_packet_location += tx_buffer_pkt_offset_;
   }
   MLPD_INFO("MacSender [frame %d, ue %d]: Loaded packet for bytes %zu\n",
             tag.frame_id_, tag.ant_id_,
-            cfg_->MacPayloadMaxLength() * packets_per_frame_);
+            mac_payload_max_length_ * packets_per_frame_);
 }
 
 void MacSender::WriteStatsToFile(size_t tx_frame_count) const {

@@ -125,7 +125,7 @@ class Agora {
    * @param symbol_idx The index of the symbol among uplink symbols for LDPC
    * decoding, and among downlink symbols for LDPC encoding
    */
-  void ScheduleCodeblocks(EventType event_type, size_t frame_id,
+  void ScheduleCodeblocks(EventType event_type, Direction dir, size_t frame_id,
                           size_t symbol_idx);
 
   void ScheduleUsers(EventType event_type, size_t frame_id, size_t symbol_id);
@@ -275,7 +275,7 @@ class Agora {
 
   // 1st dimension: kFrameWnd * number of data symbols per frame
   // 2nd dimension: number of OFDM data subcarriers * number of UEs
-  Table<int8_t> dl_encoded_buffer_;
+  Table<int8_t> dl_mod_bits_buffer_;
 
   // 1st dimension: kFrameWnd * number of DL data symbols per frame
   // 2nd dimension: number of OFDM data subcarriers * number of UEs

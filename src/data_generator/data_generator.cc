@@ -41,32 +41,37 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   srand(time(nullptr));
   auto scrambler = std::make_unique<AgoraScrambler::Scrambler>();
   std::unique_ptr<DoCRC> crc_obj = std::make_unique<DoCRC>();
-  size_t input_size = cfg_->NumBytesPerCb();
-  // size_t input_size =
+  size_t ul_cb_bytes = cfg_->NumBytesPerCb(Direction::kUplink);
+  LDPCconfig ul_ldpc_config = this->cfg_->LdpcConfig(Direction::kUplink);
+  // size_t ul_cb_bytes =
   //    LdpcEncodingInputBufSize(this->cfg_->LdpcConfig().BaseGraph(),
   //                             this->cfg_->LdpcConfig().ExpansionFactor());
 
-  auto* scrambler_buffer =
-      new int8_t[input_size + kLdpcHelperFunctionInputBufferSizePaddingBytes];
+  auto* ul_scrambler_buffer =
+      new int8_t[ul_cb_bytes + kLdpcHelperFunctionInputBufferSizePaddingBytes];
 
   // Step 1: Generate the information buffers (MAC Packets) and LDPC-encoded
   // buffers for uplink
   std::vector<std::vector<complex_float>> pre_ifft_data_syms;
-  const size_t num_ul_mac_bytes = this->cfg_->UlMacBytesNumPerframe();
+  const size_t num_ul_mac_bytes =
+      this->cfg_->MacBytesNumPerframe(Direction::kUplink);
   if (num_ul_mac_bytes > 0) {
     std::vector<std::vector<int8_t>> ul_mac_info(cfg_->UeAntNum());
     MLPD_INFO("Total number of uplink MAC bytes: %zu\n", num_ul_mac_bytes);
     for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
       ul_mac_info.at(ue_id).resize(num_ul_mac_bytes);
-      for (size_t pkt_id = 0; pkt_id < cfg_->UlMacPacketsPerframe(); pkt_id++) {
-        size_t pkt_offset = pkt_id * cfg_->MacPacketLength();
+      for (size_t pkt_id = 0;
+           pkt_id < cfg_->MacPacketsPerframe(Direction::kUplink); pkt_id++) {
+        size_t pkt_offset = pkt_id * cfg_->MacPacketLength(Direction::kUplink);
         auto* pkt = reinterpret_cast<MacPacketPacked*>(
             &ul_mac_info.at(ue_id).at(pkt_offset));
 
-        pkt->Set(0, pkt_id, ue_id, cfg_->MacPayloadMaxLength());
+        pkt->Set(0, pkt_id, ue_id,
+                 cfg_->MacPayloadMaxLength(Direction::kUplink));
         this->GenMacData(pkt, ue_id);
         pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(pkt->Data(), cfg_->MacPayloadMaxLength()) &
+            crc_obj->CalculateCrc24(
+                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kUplink)) &
             0xFFFF));
       }
     }
@@ -97,7 +102,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     }
 
     const size_t symbol_blocks =
-        this->cfg_->LdpcConfig().NumBlocksInSymbol() * this->cfg_->UeAntNum();
+        ul_ldpc_config.NumBlocksInSymbol() * this->cfg_->UeAntNum();
     const size_t num_ul_codeblocks =
         this->cfg_->Frame().NumUlDataSyms() * symbol_blocks;
     MLPD_SYMBOL("Total number of ul blocks: %zu\n", num_ul_codeblocks);
@@ -110,27 +115,28 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       size_t sym_id = cb / (symbol_blocks);
       // ue antenna for code block
       size_t sym_offset = cb % (symbol_blocks);
-      size_t ue_id = sym_offset / this->cfg_->LdpcConfig().NumBlocksInSymbol();
-      size_t ue_cb_id =
-          sym_offset % this->cfg_->LdpcConfig().NumBlocksInSymbol();
+      size_t ue_id = sym_offset / ul_ldpc_config.NumBlocksInSymbol();
+      size_t ue_cb_id = sym_offset % ul_ldpc_config.NumBlocksInSymbol();
       size_t ue_cb_cnt =
-          (sym_id * this->cfg_->LdpcConfig().NumBlocksInSymbol()) + ue_cb_id;
+          (sym_id * ul_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
 
       MLPD_TRACE(
           "cb %zu -- user %zu -- user block %zu -- user cb id %zu -- input "
           "size %zu, index %zu, total size %zu\n",
-          cb, ue_id, ue_cb_id, ue_cb_cnt, input_size, ue_cb_cnt * input_size,
+          cb, ue_id, ue_cb_id, ue_cb_cnt, ul_cb_bytes, ue_cb_cnt * ul_cb_bytes,
           ul_mac_info.at(ue_id).size());
-      int8_t* cb_start = &ul_mac_info.at(ue_id).at(ue_cb_cnt * input_size);
+      int8_t* cb_start = &ul_mac_info.at(ue_id).at(ue_cb_cnt * ul_cb_bytes);
       ul_information.at(cb) =
-          std::vector<int8_t>(cb_start, cb_start + input_size);
+          std::vector<int8_t>(cb_start, cb_start + ul_cb_bytes);
 
-      std::memcpy(scrambler_buffer, ul_information.at(cb).data(), input_size);
+      std::memcpy(ul_scrambler_buffer, ul_information.at(cb).data(),
+                  ul_cb_bytes);
 
       if (this->cfg_->ScrambleEnabled()) {
-        scrambler->Scramble(scrambler_buffer, input_size);
+        scrambler->Scramble(ul_scrambler_buffer, ul_cb_bytes);
       }
-      this->GenCodeblock(scrambler_buffer, ul_encoded_codewords.at(cb));
+      this->GenCodeblock(Direction::kUplink, ul_scrambler_buffer,
+                         ul_encoded_codewords.at(cb));
     }
 
     {
@@ -143,7 +149,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
       for (size_t i = 0; i < num_ul_codeblocks; i++) {
         std::fwrite(reinterpret_cast<uint8_t*>(&ul_information.at(i).at(0)),
-                    input_size, sizeof(uint8_t), fp_input);
+                    ul_cb_bytes, sizeof(uint8_t), fp_input);
       }
       std::fclose(fp_input);
 
@@ -152,7 +158,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         for (size_t n = 0; n < num_ul_codeblocks; n++) {
           std::printf("Symbol %zu, UE %zu\n", n / this->cfg_->UeAntNum(),
                       n % this->cfg_->UeAntNum());
-          for (size_t i = 0; i < input_size; i++) {
+          for (size_t i = 0; i < ul_cb_bytes; i++) {
             std::printf("%u ",
                         static_cast<uint8_t>(ul_information.at(n).at(i)));
           }
@@ -170,8 +176,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     }
 
     // Place modulated uplink data codewords into central IFFT bins
-    RtAssert(this->cfg_->LdpcConfig().NumBlocksInSymbol() ==
-             1);  // TODO: Assumption
+    RtAssert(ul_ldpc_config.NumBlocksInSymbol() == 1);  // TODO: Assumption
     pre_ifft_data_syms.resize(this->cfg_->UeAntNum() *
                               this->cfg_->Frame().NumUlDataSyms());
     for (size_t i = 0; i < pre_ifft_data_syms.size(); i++) {
@@ -325,21 +330,30 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   /* ------------------------------------------------
    * Generate data for downlink test
    * ------------------------------------------------ */
+  size_t dl_cb_bytes = cfg_->NumBytesPerCb(Direction::kDownlink);
+  LDPCconfig dl_ldpc_config = this->cfg_->LdpcConfig(Direction::kDownlink);
+  auto* dl_scrambler_buffer =
+      new int8_t[dl_cb_bytes + kLdpcHelperFunctionInputBufferSizePaddingBytes];
   if (this->cfg_->Frame().NumDLSyms() > 0) {
-    const size_t num_dl_mac_bytes = this->cfg_->DlMacBytesNumPerframe();
+    const size_t num_dl_mac_bytes =
+        this->cfg_->MacBytesNumPerframe(Direction::kDownlink);
     std::vector<std::vector<int8_t>> dl_mac_info(cfg_->UeAntNum());
     MLPD_SYMBOL("Total number of downlink MAC bytes: %zu\n", num_dl_mac_bytes);
     for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
       dl_mac_info[ue_id].resize(num_dl_mac_bytes);
-      for (size_t pkt_id = 0; pkt_id < cfg_->DlMacPacketsPerframe(); pkt_id++) {
-        size_t pkt_offset = pkt_id * cfg_->MacPacketLength();
+      for (size_t pkt_id = 0;
+           pkt_id < cfg_->MacPacketsPerframe(Direction::kDownlink); pkt_id++) {
+        size_t pkt_offset =
+            pkt_id * cfg_->MacPacketLength(Direction::kDownlink);
         auto* pkt = reinterpret_cast<MacPacketPacked*>(
             &dl_mac_info.at(ue_id).at(pkt_offset));
 
-        pkt->Set(0, pkt_id, ue_id, cfg_->MacPayloadMaxLength());
+        pkt->Set(0, pkt_id, ue_id,
+                 cfg_->MacPayloadMaxLength(Direction::kDownlink));
         this->GenMacData(pkt, ue_id);
         pkt->Crc((uint16_t)(
-            crc_obj->CalculateCrc24(pkt->Data(), cfg_->MacPayloadMaxLength()) &
+            crc_obj->CalculateCrc24(
+                pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kDownlink)) &
             0xFFFF));
       }
     }
@@ -370,7 +384,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     }
 
     const size_t symbol_blocks =
-        this->cfg_->LdpcConfig().NumBlocksInSymbol() * this->cfg_->UeAntNum();
+        dl_ldpc_config.NumBlocksInSymbol() * this->cfg_->UeAntNum();
     const size_t num_dl_codeblocks =
         this->cfg_->Frame().NumDlDataSyms() * symbol_blocks;
     MLPD_SYMBOL("Total number of dl data blocks: %zu\n", num_dl_codeblocks);
@@ -382,29 +396,32 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       size_t sym_id = cb / (symbol_blocks);
       // ue antenna for code block
       size_t sym_offset = cb % (symbol_blocks);
-      size_t ue_id = sym_offset / this->cfg_->LdpcConfig().NumBlocksInSymbol();
-      size_t ue_cb_id =
-          sym_offset % this->cfg_->LdpcConfig().NumBlocksInSymbol();
+      size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+      size_t ue_cb_id = sym_offset % dl_ldpc_config.NumBlocksInSymbol();
       size_t ue_cb_cnt =
-          (sym_id * this->cfg_->LdpcConfig().NumBlocksInSymbol()) + ue_cb_id;
-      int8_t* cb_start = &dl_mac_info.at(ue_id).at(ue_cb_cnt * input_size);
+          (sym_id * dl_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
+      int8_t* cb_start = &dl_mac_info.at(ue_id).at(ue_cb_cnt * dl_cb_bytes);
       dl_information.at(cb) =
-          std::vector<int8_t>(cb_start, cb_start + input_size);
+          std::vector<int8_t>(cb_start, cb_start + dl_cb_bytes);
 
-      std::memcpy(scrambler_buffer, dl_information.at(cb).data(), input_size);
+      std::memcpy(dl_scrambler_buffer, dl_information.at(cb).data(),
+                  dl_cb_bytes);
 
       if (this->cfg_->ScrambleEnabled()) {
-        scrambler->Scramble(scrambler_buffer, input_size);
+        scrambler->Scramble(dl_scrambler_buffer, dl_cb_bytes);
       }
-      this->GenCodeblock(scrambler_buffer, dl_encoded_codewords.at(cb));
+      this->GenCodeblock(Direction::kDownlink, dl_scrambler_buffer,
+                         dl_encoded_codewords.at(cb));
     }
 
     // Modulate the encoded codewords
     std::vector<std::vector<complex_float>> dl_modulated_codewords(
         num_dl_codeblocks);
     for (size_t i = 0; i < num_dl_codeblocks; i++) {
-      dl_modulated_codewords.at(i) =
-          this->GetModulation(dl_encoded_codewords.at(i));
+      size_t sym_offset = i % (symbol_blocks);
+      size_t ue_id = sym_offset / dl_ldpc_config.NumBlocksInSymbol();
+      dl_modulated_codewords.at(i) = this->GetDLModulation(
+          dl_encoded_codewords.at(i), ue_specific_pilot[ue_id]);
     }
 
     {
@@ -418,7 +435,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
       for (size_t i = 0; i < num_dl_codeblocks; i++) {
         std::fwrite(reinterpret_cast<uint8_t*>(&dl_information.at(i).at(0)),
-                    input_size, sizeof(uint8_t), fp_input);
+                    dl_cb_bytes, sizeof(uint8_t), fp_input);
       }
       std::fclose(fp_input);
 
@@ -427,7 +444,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         for (size_t n = 0; n < num_dl_codeblocks; n++) {
           std::printf("Symbol %zu, UE %zu\n", n / this->cfg_->UeAntNum(),
                       n % this->cfg_->UeAntNum());
-          for (size_t i = 0; i < input_size; i++) {
+          for (size_t i = 0; i < dl_cb_bytes; i++) {
             std::printf("%u ",
                         static_cast<unsigned>(dl_information.at(n).at(i)));
           }
@@ -620,5 +637,6 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   tx_data_all_symbols.Free();
   rx_data_all_symbols.Free();
   ue_specific_pilot.Free();
-  delete[] scrambler_buffer;
+  delete[] ul_scrambler_buffer;
+  delete[] dl_scrambler_buffer;
 }
