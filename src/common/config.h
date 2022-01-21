@@ -114,9 +114,8 @@ class Config {
                                  frame_.GetDLCalSymbolIdx(dl_cal_symbol);
 
     const size_t tx_ant = dl_cal_offset % bf_ant_num_;
-    std::printf("RecipCalDlAnt (Frame %zu, Symbol %zu) tx antenna %zu\n",
-                frame_id, dl_cal_symbol, tx_ant);
-
+    //std::printf("RecipCalDlAnt (Frame %zu, Symbol %zu) tx antenna %zu\n",
+    //            frame_id, dl_cal_symbol, tx_ant);
     return (tx_ant);
   };
 
@@ -133,8 +132,8 @@ class Config {
     } else {
       cal_ind = SIZE_MAX;
     }
-    std::printf("RecipCalUlRxIndex (Frame %zu, Antenna %zu) index %zu\n",
-                frame_id, ant, cal_ind);
+    //std::printf("RecipCalUlRxIndex (Frame %zu, Antenna %zu) index %zu\n",
+    //            frame_id, ant, cal_ind);
     return (cal_ind);
   };
 
