@@ -112,7 +112,7 @@ class Config {
   // Returns antenna number for rec cal dl symbol
   // Assumes that there are the same number of dl cal symbols in each frame
   inline size_t RecipCalDlAnt(size_t frame_id, size_t dl_cal_symbol) const {
-    assert(cfg_->GetSymbolType(symbol_id) == SymbolType::kCalDL);
+    assert(GetSymbolType(dl_cal_symbol) == SymbolType::kCalDL);
     const size_t dl_cal_offset = (frame_id * frame_.NumDLCalSyms()) +
                                  frame_.GetDLCalSymbolIdx(dl_cal_symbol);
 
@@ -466,7 +466,8 @@ class Config {
 
  private:
   void Print() const;
-  nlohmann::json Parse(const nlohmann::json& in_json, const std::string& json_handle);
+  nlohmann::json Parse(const nlohmann::json& in_json,
+                       const std::string& json_handle);
   void DumpMcsInfo();
 
   /* Class constants */
