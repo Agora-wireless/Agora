@@ -624,7 +624,7 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
   size_t num_rows = int(LdpcNumInputCols(base_graph) / ul_code_rate_) - (LdpcNumInputCols(base_graph)-2);
 
   bool early_term = ul_mcs.value("earlyTermination", true);
-  int16_t max_decoder_iter = ul_mcs.value("decoderIter", 15);
+  int16_t max_decoder_iter = ul_mcs.value("decoderIter", 20);
 
   uint32_t num_cb_len = LdpcNumInputBits(base_graph, zc);
   uint32_t num_cb_codew_len = LdpcNumEncodedBits(base_graph, zc, num_rows);
@@ -670,7 +670,7 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
 
 //  uint16_t zc = dl_mcs.value("Zc", 68);
   bool early_term = dl_mcs.value("earlyTermination", true);
-  int16_t max_decoder_iter = dl_mcs.value("decoderIter", 15);
+  int16_t max_decoder_iter = dl_mcs.value("decoderIter", 20);
 //  size_t num_rows = dl_mcs.value("nRows", (base_graph == 1) ? 46 : 42);
   uint32_t num_cb_len = LdpcNumInputBits(base_graph, zc);
   uint32_t num_cb_codew_len = LdpcNumEncodedBits(base_graph, zc, num_rows);
