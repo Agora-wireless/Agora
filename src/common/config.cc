@@ -593,17 +593,39 @@ json Config::Parse(const json& in_json, const std::string& json_handle) {
   return out_json;
 }
 
+
+
 void Config::UpdateUlMCS(const json& ul_mcs) {
+// Modulation      
   ul_modulation_ = ul_mcs.value("modulation", "16QAM");
   ul_mod_order_bits_ = kModulStringMap.at(ul_modulation_);
   ul_mod_order_ = static_cast<size_t>(pow(2, ul_mod_order_bits_));
   InitModulationTable(this->ul_mod_table_, ul_mod_order_);
-
+  
+// LDPC 
   uint16_t base_graph = ul_mcs.value("base_graph", 1);
-  uint16_t zc = ul_mcs.value("Zc", 72);
+  ul_code_rate_ = ul_mcs.value("code_rate", 0.333);
+
+  std::vector<size_t> zc_vec = {
+      2,   4,   8,   16, 32, 64,  128, 256, 3,   6,   12,  24, 48,
+      96,  192, 384, 5,  10, 20,  40,  80,  160, 320, 7,   14, 28,
+      56,  112, 224, 9,  18, 36,  72,  144, 288, 11,  22,  44, 88,
+      176, 352, 13,  26, 52, 104, 208, 15,  30,  60,  120, 240};
+  std::sort(zc_vec.begin(), zc_vec.end());
+  size_t *p = zc_vec.data();
+  uint16_t zc = 72; 
+  for (size_t i = 0; i < zc_vec.size(); i++) {
+    if ((*(p+i) * LdpcNumInputCols(base_graph) < ofdm_data_num_ * ul_code_rate_ * ul_mod_order_bits_) && (*(p+i+1) * LdpcNumInputCols(base_graph) > ofdm_data_num_ * ul_code_rate_ * ul_mod_order_bits_))
+        zc = *(p+i);
+    else
+	continue;
+  }
+  
+  size_t num_rows = int(LdpcNumInputCols(base_graph) / ul_code_rate_) - (LdpcNumInputCols(base_graph)-2);
+
   bool early_term = ul_mcs.value("earlyTermination", true);
-  int16_t max_decoder_iter = ul_mcs.value("decoderIter", 5);
-  size_t num_rows = ul_mcs.value("nRows", (base_graph == 1) ? 46 : 42);
+  int16_t max_decoder_iter = ul_mcs.value("decoderIter", 15);
+
   uint32_t num_cb_len = LdpcNumInputBits(base_graph, zc);
   uint32_t num_cb_codew_len = LdpcNumEncodedBits(base_graph, zc, num_rows);
   ul_ldpc_config_ = LDPCconfig(base_graph, zc, max_decoder_iter, early_term,
@@ -624,10 +646,32 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   InitModulationTable(this->dl_mod_table_, dl_mod_order_);
 
   uint16_t base_graph = dl_mcs.value("base_graph", 1);
-  uint16_t zc = dl_mcs.value("Zc", 68);
+
+  dl_code_rate_ = dl_mcs.value("code_rate", 0.333);
+
+  std::vector<size_t> zc_vec = {
+      2,   4,   8,   16, 32, 64,  128, 256, 3,   6,   12,  24, 48,
+      96,  192, 384, 5,  10, 20,  40,  80,  160, 320, 7,   14, 28,
+      56,  112, 224, 9,  18, 36,  72,  144, 288, 11,  22,  44, 88,
+      176, 352, 13,  26, 52, 104, 208, 15,  30,  60,  120, 240};
+  std::sort(zc_vec.begin(), zc_vec.end());
+  size_t *p = zc_vec.data();
+  uint16_t zc = 72;
+  for (size_t i = 0; i < zc_vec.size(); i++) {
+    if ((*(p+i) * LdpcNumInputCols(base_graph) < ofdm_data_num_ * dl_code_rate_ * dl_mod_order_bits_) && (*(p+i+1) * LdpcNumInputCols(base_graph) > ofdm_data_num_ * dl_code_rate_ * dl_mod_order_bits_))
+        zc = *p;
+    else
+        continue;
+  }
+
+  size_t num_rows = int(LdpcNumInputCols(base_graph) / dl_code_rate_) - (LdpcNumInputCols(base_graph)-2);
+
+
+
+//  uint16_t zc = dl_mcs.value("Zc", 68);
   bool early_term = dl_mcs.value("earlyTermination", true);
-  int16_t max_decoder_iter = dl_mcs.value("decoderIter", 5);
-  size_t num_rows = dl_mcs.value("nRows", (base_graph == 1) ? 46 : 42);
+  int16_t max_decoder_iter = dl_mcs.value("decoderIter", 15);
+//  size_t num_rows = dl_mcs.value("nRows", (base_graph == 1) ? 46 : 42);
   uint32_t num_cb_len = LdpcNumInputBits(base_graph, zc);
   uint32_t num_cb_codew_len = LdpcNumEncodedBits(base_graph, zc, num_rows);
   dl_ldpc_config_ = LDPCconfig(base_graph, zc, max_decoder_iter, early_term,

@@ -490,11 +490,16 @@ class Config {
   std::string ul_modulation_;  // Modulation order as a string, e.g., "16QAM"
   size_t
       ul_mod_order_;  // Modulation order (e.g., 4: QPSK, 16: 16QAM, 64: 64QAM)
+  
+  double ul_code_rate_;
+
   size_t
       ul_mod_order_bits_;  // Number of binary bits used for a modulation order
   std::string dl_modulation_;
   size_t dl_mod_order_;
   size_t dl_mod_order_bits_;
+  
+  double dl_code_rate_;
 
   // Modulation lookup table for mapping binary bits to constellation points
   Table<complex_float> ul_mod_table_;
