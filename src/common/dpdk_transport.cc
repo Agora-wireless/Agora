@@ -11,7 +11,7 @@
 #include "rte_version.h"
 #include "utils.h"
 
-inline const struct rte_eth_conf port_conf_default() {
+inline struct rte_eth_conf PortConfDefault() {
   struct rte_eth_conf port_conf = rte_eth_conf();
   port_conf.rxmode.max_rx_pkt_len = kJumboFrameMaxSize;
   port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
@@ -19,7 +19,7 @@ inline const struct rte_eth_conf port_conf_default() {
 }
 
 std::vector<uint16_t> DpdkTransport::GetPortIDFromMacAddr(
-    size_t port_num, std::string mac_addrs) {
+    size_t port_num, const std::string& mac_addrs) {
   RtAssert(mac_addrs.length() == (port_num * (kMacAddrBtyes + 1) - 1),
            "Invalid length of MAC address in config");
   std::vector<uint16_t> port_ids;
@@ -47,8 +47,9 @@ std::vector<uint16_t> DpdkTransport::GetPortIDFromMacAddr(
 
 int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
                            int thread_num, size_t pkt_len) {
-  struct rte_eth_conf port_conf = port_conf_default();
-  const uint16_t rxRings = thread_num, txRings = thread_num;
+  struct rte_eth_conf port_conf = PortConfDefault();
+  const uint16_t rxRings = thread_num;
+  const uint16_t txRings = thread_num;
   int retval;
   uint16_t q;
   uint16_t nb_rxd = kRxRingSize;
@@ -58,11 +59,13 @@ int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
   struct rte_eth_rxconf rxconf;
   struct rte_eth_txconf txconf;
 
-  if (rte_eth_dev_count_avail() < port)
+  if (rte_eth_dev_count_avail() < port) {
     rte_exit(EXIT_FAILURE, "Not Enough NICs\n");
+  }
 
-  if (!rte_eth_dev_is_valid_port(port))
+  if (rte_eth_dev_is_valid_port(port) == 0) {
     rte_exit(EXIT_FAILURE, "NIC ID is invalid\n");
+  }
 
   rte_eth_dev_set_mtu(port, 9000);
   uint16_t mtu_size = 0;
@@ -75,8 +78,9 @@ int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
   RtAssert(promiscuous_en == 1, "Unable to set promiscuous mode");
 
   rte_eth_dev_info_get(port, &dev_info);
-  if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
+  if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE) != 0u) {
     port_conf.txmode.offloads |= DEV_TX_OFFLOAD_MBUF_FAST_FREE;
+  }
 
   port_conf.rxmode.max_rx_pkt_len =
       RTE_MIN(RTE_MIN(dev_info.max_rx_pktlen, port_conf.rxmode.max_rx_pkt_len),
@@ -84,9 +88,13 @@ int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
   // port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 
   retval = rte_eth_dev_configure(port, rxRings, txRings, &port_conf);
-  if (retval != 0) return retval;
+  if (retval != 0) {
+    return retval;
+  }
   retval = rte_eth_dev_adjust_nb_rx_tx_desc(port, &nb_rxd, &nb_txd);
-  if (retval != 0) return retval;
+  if (retval != 0) {
+    return retval;
+  }
 
   rxconf = dev_info.default_rxconf;
   rxconf.offloads = port_conf.rxmode.offloads;
@@ -94,7 +102,9 @@ int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
   for (q = 0; q < rxRings; q++) {
     retval = rte_eth_rx_queue_setup(
         port, q, nb_rxd, rte_eth_dev_socket_id(port), &rxconf, mbuf_pool);
-    if (retval < 0) return retval;
+    if (retval < 0) {
+      return retval;
+    }
   }
 
   txconf = dev_info.default_txconf;
@@ -103,11 +113,15 @@ int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
   for (q = 0; q < txRings; q++) {
     retval = rte_eth_tx_queue_setup(port, q, nb_txd,
                                     rte_eth_dev_socket_id(port), &txconf);
-    if (retval < 0) return retval;
+    if (retval < 0) {
+      return retval;
+    }
   }
 
   retval = rte_eth_dev_start(port);
-  if (retval < 0) return retval;
+  if (retval < 0) {
+    return retval;
+  }
 
   struct rte_ether_addr addr;
   rte_eth_macaddr_get(port, &addr);
@@ -149,12 +163,12 @@ void DpdkTransport::FastMemcpy(void* pvDest, void* pvSrc, size_t nBytes) {
   }
 
 #else
-  const __m256i* pSrc = reinterpret_cast<const __m256i*>(pvSrc);
-  __m256i* pDest = reinterpret_cast<__m256i*>(pvDest);
-  int64_t nVects = nBytes / sizeof(*pSrc);
-  for (; nVects > 0; nVects--, pSrc++, pDest++) {
-    const __m256i loaded = _mm256_stream_load_si256(pSrc);
-    _mm256_stream_si256(pDest, loaded);
+  const __m256i* p_src = reinterpret_cast<const __m256i*>(pvSrc);
+  __m256i* p_dest = reinterpret_cast<__m256i*>(pvDest);
+  int64_t n_vects = nBytes / sizeof(*p_src);
+  for (; n_vects > 0; n_vects--, p_src++, p_dest++) {
+    const __m256i loaded = _mm256_stream_load_si256(p_src);
+    _mm256_stream_si256(p_dest, loaded);
   }
 #endif
   _mm_sfence();
@@ -168,7 +182,7 @@ std::string DpdkTransport::PktToString(const rte_mbuf* pkt) {
       << std::to_string(kPayloadOffset - kInetHdrsTotSize)
       << " unused bytes ] ";
 
-  auto* packet = reinterpret_cast<const Packet*>(buf + kPayloadOffset);
+  const auto* packet = reinterpret_cast<const Packet*>(buf + kPayloadOffset);
   ret << packet->ToString();
   return ret.str();
 }
@@ -176,7 +190,8 @@ std::string DpdkTransport::PktToString(const rte_mbuf* pkt) {
 void DpdkTransport::PrintPkt(int src_ip, int dst_ip, uint16_t src_port,
                              uint16_t dst_port, int len, int tid) {
   uint8_t b[12];
-  uint16_t sp, dp;
+  uint16_t sp;
+  uint16_t dp;
 
   b[0] = src_ip & 0xFF;
   b[1] = (src_ip >> 8) & 0xFF;
@@ -309,9 +324,10 @@ rte_mbuf* DpdkTransport::AllocUdp(rte_mempool* mbuf_pool,
 void DpdkTransport::DpdkInit(uint16_t core_offset, size_t thread_num) {
   // DPDK setup
   std::string core_list = std::to_string(GetPhysicalCoreId(core_offset));
-  for (size_t i = 1; i < thread_num + 1; i++)
+  for (size_t i = 1; i < thread_num + 1; i++) {
     core_list =
         core_list + "," + std::to_string(GetPhysicalCoreId(core_offset + i));
+  }
   // n: channels, m: maximum memory in megabytes
   const char* rte_argv[] = {"txrx",        "-l", core_list.c_str(),
                             "--log-level", "0",  nullptr};

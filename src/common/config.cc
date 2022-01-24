@@ -220,6 +220,7 @@ Config::Config(const std::string& jsonfile)
 
   dpdk_num_ports_ = tdd_conf.value("dpdk_num_ports", 1);
   dpdk_port_offset_ = tdd_conf.value("dpdk_port_offset", 0);
+  dpdk_mac_addrs_ = tdd_conf.value("dpdk_mac_addrs", "");
 
   ue_mac_tx_port_ = tdd_conf.value("ue_mac_tx_port", kMacUserRemotePort);
   ue_mac_rx_port_ = tdd_conf.value("ue_mac_rx_port", kMacUserLocalPort);

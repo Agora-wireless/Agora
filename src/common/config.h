@@ -262,6 +262,10 @@ class Config {
   inline uint16_t DpdkNumPorts() const { return this->dpdk_num_ports_; }
   inline uint16_t DpdkPortOffset() const { return this->dpdk_port_offset_; }
 
+  inline const std::string& DpdkMacAddrs() const {
+    return this->dpdk_mac_addrs_;
+  }
+
   inline size_t BsMacRxPort() const { return this->bs_mac_rx_port_; }
   inline size_t BsMacTxPort() const { return this->bs_mac_tx_port_; }
 
@@ -756,6 +760,9 @@ class Config {
 
   // Offset of the first NIC port used by Agora's DPDK mode
   uint16_t dpdk_port_offset_;
+
+  // MAC addresses of NIC ports separated by ';'
+  std::string dpdk_mac_addrs_;
 
   // Port ID at BaseStation MAC layer side
   size_t bs_mac_rx_port_;
