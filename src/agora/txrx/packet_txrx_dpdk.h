@@ -45,11 +45,13 @@ class DPDKRxPacket : public RxPacket {
  */
 class PacketTxRxDpdk : public PacketTxRx {
  public:
-  PacketTxRxDpdk(Config* cfg, size_t core_offset,
-                 moodycamel::ConcurrentQueue<EventData>* queue_message,
-                 moodycamel::ConcurrentQueue<EventData>* queue_task,
-                 moodycamel::ProducerToken** rx_ptoks,
-                 moodycamel::ProducerToken** tx_ptoks);
+  PacketTxRxDpdk(Config* const cfg, size_t core_offset,
+                 moodycamel::ConcurrentQueue<EventData>* event_notify_q,
+                 moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
+                 moodycamel::ProducerToken** notify_producer_tokens,
+                 moodycamel::ProducerToken** tx_producer_tokens,
+                 Table<char>& rx_buffer, size_t packet_num_in_buffer,
+                 Table<size_t>& frame_start, char* tx_buffer);
   ~PacketTxRxDpdk() final override;
 
   /**
@@ -65,14 +67,13 @@ class PacketTxRxDpdk : public PacketTxRx {
                  Table<complex_float>& calib_ul_buffer_) final override;
 
  private:
-  explicit PacketTxRxDpdk(Config* cfg, size_t core_offset);
   void DoTxRx(size_t tid);  // The thread function for thread [tid]
 
   // At thread [tid], receive packets from the NIC and enqueue them to the
   // master thread
   uint16_t DpdkRecv(size_t tid, uint16_t port_id, uint16_t queue_id,
                     size_t& prev_frame_id, size_t& rx_slot);
-  size_t DequeueSend(int tid);
+  size_t DequeueSend(size_t tid);
 
   virtual bool CreateWorker(size_t tid, size_t interface_count,
                             size_t interface_offset, size_t* rx_frame_start,
