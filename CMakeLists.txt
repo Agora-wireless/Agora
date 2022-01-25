@@ -7,7 +7,7 @@ if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
   set(GCC_COVERAGE_COMPILE_FLAGS "-faligned-new")
 endif()
 
-set(SOURCE_DIR ".")
+set (PROJECT_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 option(FORCE_BUILD_PATH "Hardcode the build directory path to be 'Agora/build/'" ON)
 if(FORCE_BUILD_PATH)
@@ -38,11 +38,6 @@ else()
   set(CMAKE_CXX_STANDARD 11)
 endif()
 
-# Unit tests
-# enable_testing()
-# set (GTEST_ROOT /usr/src/gtest)
-# find_package(GTest REQUIRED)
-
 option(DEBUG "Enable debugging" OFF)
 if(NOT DEBUG)
   message(STATUS "Debugging is disabled")
@@ -55,12 +50,12 @@ endif()
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
-add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
+add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
 
-find_package(Armadillo PATHS ~/project/armadillo)
-include_directories(SYSTEM ~/project/armadillo/include)
-find_package(nlohmann_json PATHS ~/project/json)
-include_directories(SYSTEM ~/project/json/include)
+find_package(Armadillo PATHS ${PROJECT_ROOT_DIR}/armadillo)
+include_directories(SYSTEM ${PROJECT_ROOT_DIR}/armadillo/include)
+find_package(nlohmann_json PATHS ${PROJECT_ROOT_DIR}/json)
+include_directories(SYSTEM ${PROJECT_ROOT_DIR}/json/include)
 
 set(USE_DPDK True CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
@@ -72,7 +67,7 @@ set(USE_AVX2_ENCODER False CACHE STRING "Use Agora's AVX2 encoder instead of Fle
 message(STATUS "USE_ARGOS: ${USE_ARGOS}")
 message(STATUS "ENABLE_MAC: ${ENABLE_MAC}")
 
-set(FLEXRAN_FEC_SDK_DIR ~/project/Agora/deps/FlexRAN-FEC-SDK-19-04/sdk)
+set(FLEXRAN_FEC_SDK_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps/FlexRAN-FEC-SDK-19-04/sdk)
 
 # Determine if the current machine supports AVX-512
 CHECK_C_SOURCE_RUNS("int main() { asm volatile(\"vmovdqu64 %zmm0, %zmm1\"); return 0; }" ISA_AVX512)
@@ -155,7 +150,7 @@ if(${USE_ARGOS})
   add_definitions(-DUSE_ARGOS)
 endif()
 
-find_package(SoapySDR "0.7" CONFIG PATHS ~/project/SoapySDR)
+find_package(SoapySDR "0.7" CONFIG PATHS ${PROJECT_ROOT_DIR}/SoapySDR)
 if(NOT SoapySDR_FOUND)
   message(FATAL_ERROR "SoapySDR development files not found")
 endif()
@@ -260,7 +255,7 @@ include_directories(
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_encoder_5gnr
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_common
-  ${SOURCE_DIR}/src/encoder)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/encoder)
 
 set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_encoder_5gnr/libldpc_encoder_5gnr.a
@@ -321,24 +316,6 @@ add_executable(test_ldpc
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_ldpc ${COMMON_LIBS})
 add_test(NAME test_ldpc COMMAND test_ldpc)
-
-# Unit tests
-# set(UNIT_TESTS test_datatype_conversion test_udp_client_server
-#   test_concurrent_queue test_zf test_zf_threaded # test_demul_threaded 
-#   test_ptr_grid test_recipcal)
-
-# foreach(test_name IN LISTS UNIT_TESTS)
-#   add_executable(${test_name}
-#     test/unit_tests/${test_name}.cc
-#     $<TARGET_OBJECTS:agora_sources_lib>
-#     $<TARGET_OBJECTS:common_sources_lib>)
-
-#   # Unit tests should pass without memory errors
-#   set_target_properties(${test_name} PROPERTIES CMAKE_CXX_FLAGS "-fsanitize=address")
-
-#   target_link_libraries(${test_name} ${COMMON_LIBS})
-#   add_test(NAME ${test_name} COMMAND ${test_name})
-# endforeach()
 
 add_executable(test_clock_sender
   tool/test_clock_sender.cpp

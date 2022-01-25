@@ -1,22 +1,17 @@
 #! /bin/bash
 
-source $(dirname $0)/../utils/utils.sh
+set -e
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-ROOT_DIR=${DIR}/..
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+hydra_root_dir=$( cd ${script_dir}/../.. >/dev/null 2>&1 && pwd )
 
-# Initialize the info of the platform:
-# app_name, servers, NIC info
-hydra_app_name="agora"
-hydra_rru_app_name="dynamic_sender"
-hydra_deploy_fn=${ROOT_DIR}/config/deploy.json
-hydra_rru_num=$(cat ${hydra_deploy_fn} | jq '.rru_servers | length')
-hydra_num=$(cat ${hydra_deploy_fn} | jq '.hydra_servers | length')
+source ${hydra_root_dir}/scripts/utils/utils.sh
+source ${hydra_root_dir}/scripts/control/init_platform.sh
 
 # Kill all RRU processes
 echocyan "Kill all RRU processes..."
 for (( i=0; i<${hydra_rru_num}; i++ )) do
-    server_name=$(cat ${hydra_deploy_fn} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
+    server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
     hostname=$(hostname)
     echo "Kill ${hydra_rru_app_name} process on ${server_name}"
     if [ "$hostname" == "${server_name}" ]; then
@@ -28,8 +23,8 @@ done
 
 # Kill all Hydra processes
 echocyan "Kill all Hydra processes..."
-for (( i=0; i<${hydra_num}; i++ )) do
-    server_name=$(cat ${hydra_deploy_fn} | jq --argjson i $i '.hydra_servers[$i]' | tr -d '"')
+for (( i=0; i<${hydra_app_num}; i++ )) do
+    server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.hydra_servers[$i]' | tr -d '"')
     hostname=$(hostname)
     echo "Kill ${hydra_app_name} process on ${server_name}"
     if [ "$hostname" == "${server_name}" ]; then
@@ -42,7 +37,7 @@ done
 # Check running processes
 # echocyan "Check all processes..."
 for (( i=0; i<${hydra_rru_num}; i++ )) do
-    server_name=$(cat ${hydra_deploy_fn} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
+    server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
     hostname=$(hostname)
     # echo "Check process on ${server_name}"
     if [ "$hostname" == "${server_name}" ]; then
@@ -57,8 +52,8 @@ for (( i=0; i<${hydra_rru_num}; i++ )) do
         fi
     fi
 done
-for (( i=0; i<${hydra_num}; i++ )) do
-    server_name=$(cat ${hydra_deploy_fn} | jq --argjson i $i '.hydra_servers[$i]' | tr -d '"')
+for (( i=0; i<${hydra_app_num}; i++ )) do
+    server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.hydra_servers[$i]' | tr -d '"')
     hostname=$(hostname)
     # echo "Check process on ${server_name}"
     if [ "$hostname" == "${server_name}" ]; then

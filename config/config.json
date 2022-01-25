@@ -1,0 +1,6 @@
+{
+    "hydra_runner_root": "~/HydraRemoteRunner",
+    "hydra_server_list_json": "config/platform.json",
+    "hydra_system_config_json": "config/template.json",
+    "hydra_server_deploy_json": "config/deploy.json"
+}

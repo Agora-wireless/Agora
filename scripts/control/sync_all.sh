@@ -1,26 +1,52 @@
 #! /bin/bash
 
-DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
-ROOT_DIR=$( cd ${DIR}/../.. >/dev/null 2>&1 && pwd )
+# This script runs on your laptop
+# This script sync all changes from your laptop to all remote servers
 
-source ${ROOT_DIR}/scripts/utils/utils.sh
+set -e
+
+script_dir=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+hydra_root_dir=$( cd ${script_dir}/../.. >/dev/null 2>&1 && pwd )
+
+source ${hydra_root_dir}/scripts/utils/utils.sh
+
+checkpkg jq
+if [ ${checkpkg_res} == "0" ]; then
+    exit
+fi
+
+HYDRA_SERVER_LIST_JSON=${hydra_root_dir}/config/platform.json
+HYDRA_RUNNER_ROOT="~/HydraRemoteRunner"
+
+# Read HYDRA_SERVER_LIST_JSON and HYDRA_RUNNER_ROOT from file config/config.json
+hydra_master_config_json=${hydra_root_dir}/config/config.json
+if [ ! -f ${hydra_master_config_json} ]; then
+    echored "ERROR: config file ${hydra_master_config_json} does not exist"
+fi
+res=$(cat ${hydra_master_config_json} | jq '.hydra_server_list_json' | tr -d '"')
+if [ "${res}" != "null" ]; then
+    HYDRA_SERVER_LIST_JSON=${hydra_root_dir}/${res}
+fi
+res=$(cat ${hydra_master_config_json} | jq '.hydra_runner_root' | tr -d '"')
+if [ "${res}" != "null" ]; then
+    HYDRA_RUNNER_ROOT=${res}
+fi
 
 # Initialize the info of the platform:
 # app_name, servers, NIC info
-hydra_platform_fn=${ROOT_DIR}/config/platform.json
-hydra_server_num=$(cat ${hydra_platform_fn} | jq '. | length')
+hydra_server_num=$(cat ${HYDRA_SERVER_LIST_JSON} | jq '. | length')
 
 for (( i=0; i<${hydra_server_num}; i++ )) do
-    server_name=$(cat ${ROOT_DIR}/config/platform.json | jq --argjson i $i '. | keys | .[$i]')
+    server_name=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --argjson i $i '. | keys | .[$i]')
     hostname=$(hostname)
-    if [ "$hostname" == "$(echo ${server_name} | tr -d '"')" ]; then
+    if [ "${hostname}" == "$(echo ${server_name} | tr -d '"')" ]; then
         continue
     fi
-    echo "Run rsync $hostname->$(echo ${server_name} | tr -d '"')"
-    rsync -a --exclude '*.bin' ${ROOT_DIR}/src $(echo ${server_name} | tr -d '"'):~/project/Agora/
-    rsync -a --exclude '*.bin' ${ROOT_DIR}/simulator $(echo ${server_name} | tr -d '"'):~/project/Agora/
-    rsync -a --exclude '*.bin' ${ROOT_DIR}/scripts $(echo ${server_name} | tr -d '"'):~/project/Agora/
-    rsync -a --exclude '*.bin' ${ROOT_DIR}/config $(echo ${server_name} | tr -d '"'):~/project/Agora/
-    rsync -a --exclude '*.bin' ${ROOT_DIR}/data $(echo ${server_name} | tr -d '"'):~/project/Agora/
-    rsync -a ${ROOT_DIR}/CMakeLists.txt $(echo ${server_name} | tr -d '"'):~/project/Agora/
+    echo "Run rsync ${hostname}->$(echo ${server_name} | tr -d '"')"
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/src $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/simulator $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/scripts $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/config $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/data $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
+    eval "rsync -a ${hydra_root_dir}/CMakeLists.txt $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
 done

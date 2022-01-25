@@ -1,6 +1,11 @@
 #!/bin/bash
 
-source $(dirname $0)/../utils/utils.sh
+set -e
+
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+hydra_root_dir=$( cd ${script_dir}/../.. >/dev/null 2>&1 && pwd )
+
+source ${hydra_root_dir}/scripts/utils/utils.sh
 
 core_low=0
 core_high=0
