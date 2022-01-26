@@ -1,3 +1,54 @@
+## Installation instruction of Hydra
+
+Hydra is a distributed massive MIMO baseband processing system.
+
+Clone Hydra git repo to your laptop, and using your laptop to manage the installation, building, and running of Hydra on a set of remote servers.
+
+### Required packages
+
+* Your laptop: jq
+* Remote servers: using the following command to install all required packages
+  ```
+  sudo apt-get update
+  sudo apt-get install -y g++ cmake make liblapack-dev libblas-dev libboost-all-dev \
+    libnuma-dev libgflags-dev libgtest-dev swig python-numpy python-pyqt5 \
+    libpython-dev python3-pip build-essential gcc libudev-dev libnl-3-dev \
+    libnl-route-3-dev ninja-build pkg-config valgrind python3-dev \
+    cython3 python3-docutils pandoc jq
+  sudo pip3 install meson
+  ```
+
+### Pre-install
+
+Before install Hydra to remote servers, edit the following configuration files
+* `config/config.json`: global parameters of installing and launching Hydra application
+  * `hydra_runner_root`: The root directory to install Hydra and its dependent packages on remote servers
+  * `hydra_server_list_json`: The JSON file that records the list of remote servers and their basic information
+  * `hydra_system_config_json`: The JSON file that set the parameters of running the Hydra application
+  * `hydra_server_deploy_json`: The JSON file that allocate resources across remote servers
+* `hydra_server_list_json`: create or edit this file to list remote servers. `config/platform.json` is an example
+* `hydra_system_config_json`: create or edit this file to configure Hydra. `config/template.json` is an example
+* `hydra_server_deploy_json`: create or edit this file to allocate resource across remote servers. `config/deploy.json` is an example
+  * `rru_servers`: list the remote servers to run the RRU traffic generator
+  * `hydra_servers`: list the remote servers to run the Hydra application
+  * `subcarrier_num_list`: list the number of subcarriers each Hydra application processes
+  * `subcarrier_block_list`: list the number of subcarriers to process by each CPU core on each Hydra server
+  * `decode_thread_num`: list the number of CPU cores to process decoding on each Hydra server
+
+### Installation
+
+On your laptop, run
+  ```
+  scripts/install/master_install.sh
+  ```
+This script has several user-specific options, including
+  ```
+    -s [hostname]: Specify the only remote server to install packages and Hydra app
+    -a: Install all system-level packages required by Hydra on remote servers (require sudo)
+  ```
+
+### Running Hydra
+
 Agora is a high-performance system for real-time massive MIMO baseband processing. 
 
 Some highlights:

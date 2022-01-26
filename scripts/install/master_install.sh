@@ -38,40 +38,45 @@ HYDRA_RUNNER_ROOT="~/HydraRemoteRunner"
 # Parse input arguments
 # Run "master_install.sh -h" to check all argument options
 while getopts "h?:is:a" opt; do
-    case "$opt" in
-        h|\?)
-            echo "Help"
-            echo -e "\t-h\tShow this infomation"
-            echo -e "\t-i\tRun server initialization scripts on all remote servers (Check scripts/system/server_init.sh)"
-            echo -e "\t-s [hostname]\tSpecify the only remote server to install packages and Hydra app"
-            echo -e "\t-a\tInstall all system-level packages required by Hydra on remote servers (require sudo)"
-            exit 0
-            ;;
-        i)
-            RUN_SERVER_INIT=1
-            ;;
-        s)
-            ONLY_SINGLE_SERVER="${OPTARG}"
-            ;;
-        a)
-            INSTALL_HYDRA_PKGS_SYSTEM_LEVEL=1
-            ;;
-    esac
+  case "$opt" in
+    h|\?)
+      echo "Help"
+      echo -e "\t-h\tShow this infomation"
+      echo -e "\t-i\tRun server initialization scripts on all remote servers (Check scripts/system/server_init.sh)"
+      echo -e "\t-s [hostname]\tSpecify the only remote server to install packages and Hydra app"
+      echo -e "\t-a\tInstall all system-level packages required by Hydra on remote servers (require sudo)"
+      exit 0
+      ;;
+    i)
+      RUN_SERVER_INIT=1
+      ;;
+    s)
+      ONLY_SINGLE_SERVER="${OPTARG}"
+      ;;
+    a)
+      INSTALL_HYDRA_PKGS_SYSTEM_LEVEL=1
+      ;;
+  esac
 done
 
 # Read HYDRA_SERVER_LIST_JSON and HYDRA_RUNNER_ROOT from file config/config.json
 hydra_master_config_json=${hydra_root_dir}/config/config.json
 if [ ! -f ${hydra_master_config_json} ]; then
-    echored "ERROR: config file ${hydra_master_config_json} does not exist"
+  echored "ERROR: config file ${hydra_master_config_json} does not exist"
 fi
 res=$(cat ${hydra_master_config_json} | jq '.hydra_server_list_json' | tr -d '"')
 if [ "${res}" != "null" ]; then
-    HYDRA_SERVER_LIST_JSON=${hydra_root_dir}/${res}
+  HYDRA_SERVER_LIST_JSON=${hydra_root_dir}/${res}
 fi
 res=$(cat ${hydra_master_config_json} | jq '.hydra_runner_root' | tr -d '"')
 if [ "${res}" != "null" ]; then
-    HYDRA_RUNNER_ROOT=${res}
+  HYDRA_RUNNER_ROOT=${res}
 fi
+
+echocyan "Hydra global configurations:"
+echocyan "  Hydra server list: ${HYDRA_SERVER_LIST_JSON}"
+echocyan "  Hydra root runner directory on remote servers: ${HYDRA_RUNNER_ROOT}"
+echo
 
 # Create a diretory for storing logs
 mkdir -p /tmp/Hydra
@@ -81,28 +86,51 @@ hydra_server_num=$(cat ${HYDRA_SERVER_LIST_JSON} | jq '. | length')
 
 # If ONLY_SERVER_SERVER is "all", install on all remote servers in HYDRA_SERVER_LIST_JSON
 if [ ${ONLY_SINGLE_SERVER} == "all" ]; then
+  echocyan "Detected ${hydra_server_num} servers listed in ${HYDRA_SERVER_LIST_JSON}"
+  echocyan "Copying Hydra codebase to all remote servers"
+  for (( i=0; i<${hydra_server_num}; i++ )) do
+    server_name=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --argjson i $i '. | keys | .[$i]' | tr -d '"')
+    hydra_tmp_dir[$i]=$(ssh -oStrictHostKeyChecking=no ${server_name} "mktemp -d")
+    (scp -oStrictHostKeyChecking=no -r ${hydra_root_dir} ${server_name}:${hydra_tmp_dir[$i]}/ &> /dev/null; \
+      echo "${server_name} copy complete") &
+  done
+  wait
+  if [ "${RUN_SERVER_INIT}" == 1 ]; then
+    echocyan "Initialize server setup on all remote servers"
     for (( i=0; i<${hydra_server_num}; i++ )) do
-        server_name=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --argjson i $i '. | keys | .[$i]' | tr -d '"')
-        rsync -a --exclude '*.bin' . ${server_name}:~/Agora
-        if [ "${RUN_SERVER_INIT}" == 1 ]; then
-            ssh -oStrictHostKeyChecking=no ${server_name} "cd Agora; ./scripts/system/server_init.sh" 
-        fi
-        ssh -oStrictHostKeyChecking=no ${server_name} "mkdir -p ${HYDRA_RUNNER_ROOT}; \
-            cd ${HYDRA_RUNNER_ROOT}; cp -r ~/Agora ./; rm -rf ~/Agora; cd Agora; \
-            INSTALL_HYDRA_PKGS_SYSTEM_LEVEL=${INSTALL_HYDRA_PKGS_SYSTEM_LEVEL} \
-            ./scripts/install/install_all.sh" > /tmp/Hydra/install_${server_name}.txt &
+      server_name=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --argjson i $i '. | keys | .[$i]' | tr -d '"')
+      (ssh -oStrictHostKeyChecking=no ${server_name} "cd ${hydra_tmp_dir[$i]}/Agora; \
+        ./scripts/system/server_init.sh" &> /tmp/Hydra/init_${server_name}.txt; \
+        echo "${server_name} initialization complete";) &
     done
+    wait
+  fi
+  echocyan "Install dependent packages and Hydra application on all remote servers"
+  for (( i=0; i<${hydra_server_num}; i++ )) do
+    server_name=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --argjson i $i '. | keys | .[$i]' | tr -d '"')
+    (ssh -oStrictHostKeyChecking=no ${server_name} "mkdir -p ${HYDRA_RUNNER_ROOT}; \
+      cd ${HYDRA_RUNNER_ROOT}; cp -r ${hydra_tmp_dir[$i]}/Agora ./; rm -rf ${hydra_tmp_dir[$i]}/Agora; \
+      cd Agora; INSTALL_HYDRA_PKGS_SYSTEM_LEVEL=${INSTALL_HYDRA_PKGS_SYSTEM_LEVEL} \
+      ./scripts/install/install_all.sh"; \
+      scp -oStrictHostKeyChecking=no ${server_name}:/tmp/Hydra/install.txt /tmp/Hydra/install_${server_name}.txt; \
+      echo "${server_name} installation complete") &
+  done
+  wait
 # If ONLY_SERVER_SERVER is not "all", install on the only server named ${ONLY_SERVER_SERVER}
 else
-    server_name=${ONLY_SINGLE_SERVER}
-    rsync -a --exclude '*.bin' . ${server_name}:~/Agora
-    if [ "${RUN_SERVER_INIT}" == 1 ]; then
-        ssh -oStrictHostKeyChecking=no ${server_name} "cd Agora; ./scripts/system/server_init.sh" 
-    fi
-    ssh -oStrictHostKeyChecking=no ${server_name} "mkdir -p ${HYDRA_RUNNER_ROOT}; \
-        cd ${HYDRA_RUNNER_ROOT}; cp -r ~/Agora ./; rm -rf ~/Agora; cd Agora; \
-        INSTALL_HYDRA_PKGS_SYSTEM_LEVEL=${INSTALL_HYDRA_PKGS_SYSTEM_LEVEL} \
-        ./scripts/install/install_all.sh" > /tmp/Hydra/install_${server_name}.txt &
+  server_name=${ONLY_SINGLE_SERVER}
+  echocyan "Copying Hydra codebase to ${server_name}"
+  hydra_tmp_dir=$(ssh -oStrictHostKeyChecking=no ${server_name} "mktemp -d")
+  scp -oStrictHostKeyChecking=no -r ${hydra_root_dir} ${server_name}:${hydra_tmp_dir}/ > /dev/null
+  if [ "${RUN_SERVER_INIT}" == 1 ]; then
+    echocyan "Initialize server setup on ${server_name}"
+    ssh -oStrictHostKeyChecking=no ${server_name} "cd ${hydra_tmp_dir}/Agora; \
+      ./scripts/system/server_init.sh" > /tmp/Hydra/init_${server_name}.txt
+  fi
+  echocyan "Install dependent packages and Hydra application on ${server_name}"
+  ssh -oStrictHostKeyChecking=no ${server_name} "mkdir -p ${HYDRA_RUNNER_ROOT}; \
+    cd ${HYDRA_RUNNER_ROOT}; cp -r ${hydra_tmp_dir}/Agora ./; rm -rf ${hydra_tmp_dir}/Agora; cd Agora; \
+    INSTALL_HYDRA_PKGS_SYSTEM_LEVEL=${INSTALL_HYDRA_PKGS_SYSTEM_LEVEL} \
+    ./scripts/install/install_all.sh"
+  scp -oStrictHostKeyChecking=no ${server_name}:/tmp/Hydra/install.txt /tmp/Hydra/install_${server_name}.txt
 fi
-
-wait

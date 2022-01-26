@@ -35,46 +35,46 @@ GEN_NEW_TRAFFIC_DATA=1
 USE_MATLAB_GEN_RAYLEIGH=0
 
 while getopts "h?:frs:dm" opt; do
-    case "$opt" in
-        h|\?)
-            echo "Help"
-            echo -e "\t-h\tShow this infomation"
-            echo -e "\t-f\tRun Hydra without generating new input traffic data"
-            echo -e "\t-r\tRun Hydra RRU traffic generator only"
-            echo -e "\t-s [slot size]\tSet the slot size used in Hydra (unit: us, default: 1000 us)"
-            echo -e "\t-d\tenerate new input traffic data"
-            echo -e "\t-m\tUse MATLAB to generate input traffic data for Rayleigh channel (require MATLAB to be installed)"
-            exit 0
-            ;;
-        f)
-            GEN_NEW_TRAFFIC_DATA=0
-            ;;
-        r)
-            HYDRA_RUN_MODE=1
-            ;;
-        s)  
-            SLOT_US=${OPTARG}
-            if [ "${SLOT_US}" -lt 500 ]; then
-                echored "Slot size should be no smaller than 500us"
-                exit
-            fi
-            if [ "${SLOT_US}" -gt 10000 ]; then
-                echored "Slot size should be no larger than 10000us"
-                exit
-            fi
-            ;;
-        d)
-            HYDRA_RUN_MODE=2
-            ;;
-        m)
-            USE_MATLAB_GEN_RAYLEIGH=1
-            ;;
-    esac
+  case "$opt" in
+    h|\?)
+      echo "Help"
+      echo -e "\t-h\tShow this infomation"
+      echo -e "\t-f\tRun Hydra without generating new input traffic data"
+      echo -e "\t-r\tRun Hydra RRU traffic generator only"
+      echo -e "\t-s [slot size]\tSet the slot size used in Hydra (unit: us, default: 1000 us)"
+      echo -e "\t-d\tenerate new input traffic data"
+      echo -e "\t-m\tUse MATLAB to generate input traffic data for Rayleigh channel (require MATLAB to be installed)"
+      exit 0
+      ;;
+    f)
+      GEN_NEW_TRAFFIC_DATA=0
+      ;;
+    r)
+      HYDRA_RUN_MODE=1
+      ;;
+    s)  
+      SLOT_US=${OPTARG}
+      if [ "${SLOT_US}" -lt 500 ]; then
+        echored "Slot size should be no smaller than 500us"
+        exit
+      fi
+      if [ "${SLOT_US}" -gt 10000 ]; then
+        echored "Slot size should be no larger than 10000us"
+        exit
+      fi
+      ;;
+    d)
+      HYDRA_RUN_MODE=2
+      ;;
+    m)
+      USE_MATLAB_GEN_RAYLEIGH=1
+      ;;
+  esac
 done
 
 checkpkg jq
 if [ ${checkpkg_res} == "0" ]; then
-    exit
+  exit
 fi
 
 # Initialize the info of the platform:
@@ -82,29 +82,34 @@ fi
 source ${hydra_root_dir}/scripts/control/init_platform.sh
 
 # Check the validity of the deployment config files
+echocyan "Checking the validity of configuration files"
 source ${hydra_root_dir}/scripts/control/check_deploy.sh
 
 # Create config for servers
+echocyan "Create and deploy configuration file for each remote server"
 source ${hydra_root_dir}/scripts/control/create_config.sh
 
 mkdir -p /tmp/Hydra
 
 if [ "${GEN_NEW_TRAFFIC_DATA}" == 1 ]; then
-    # Generate control data and traffic data
-    source ${hydra_root_dir}/scripts/control/gen_data.sh
+  # Generate control data and traffic data
+  echocyan "Generate RRU traffic data"
+  source ${hydra_root_dir}/scripts/control/gen_data.sh
 fi
 
 if [ "${HYDRA_RUN_MODE}" == 0 ]; then
-    # Run the Hydra application
-    source ${hydra_root_dir}/scripts/control/run_hydra.sh
+  # Run the Hydra application
+  echocyan "Run Hydra applications and wait for 5 seconds"
+  source ${hydra_root_dir}/scripts/control/run_hydra.sh
 
-    # Give Hydra servers 5 seconds to initialize
-    sleep 5
+  # Give Hydra servers 5 seconds to initialize
+  sleep 5
 fi
 
 if [ "${HYDRA_RUN_MODE}" == 0 ] || [ "${HYDRA_RUN_MODE}" == 1 ]; then
-    # Run the RRU application
-    source ${hydra_root_dir}/scripts/control/run_rru.sh
+  # Run the RRU application
+  echocyan "Run RRU traffic generators"
+  source ${hydra_root_dir}/scripts/control/run_rru.sh
 fi
 
 wait

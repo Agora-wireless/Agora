@@ -16,17 +16,17 @@ HYDRA_RUNNER_ROOT="~/HydraRemoteRunner"
 
 checkpkg jq
 if [ ${checkpkg_res} == "0" ]; then
-    exit
+  exit
 fi
 
 # Read HYDRA_RUNNER_ROOT from file config/config.json
 hydra_master_config_json=${hydra_root_dir}/config/config.json
 if [ ! -f ${hydra_master_config_json} ]; then
-    echored "ERROR: config file ${hydra_master_config_json} does not exist"
+  echored "ERROR: config file ${hydra_master_config_json} does not exist"
 fi
 res=$(cat ${hydra_master_config_json} | jq '.hydra_runner_root' | tr -d '"')
 if [ "${res}" != "null" ]; then
-    HYDRA_RUNNER_ROOT=${res}
+  HYDRA_RUNNER_ROOT=${res}
 fi
 
 # Set required env vars for building and running Hydra

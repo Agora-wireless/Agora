@@ -16,175 +16,180 @@ HYDRA_RUNNER_ROOT="~/HydraRemoteRunner"
 
 checkpkg jq
 if [ ${checkpkg_res} == "0" ]; then
-    exit
+  exit
 fi
 
 # Read HYDRA_RUNNER_ROOT from file config/config.json
 hydra_master_config_json=${hydra_root_dir}/config/config.json
 if [ ! -f ${hydra_master_config_json} ]; then
-    echored "ERROR: config file ${hydra_master_config_json} does not exist"
+  echo "[$(hostname)] ERROR: config file ${hydra_master_config_json} does not exist"
 fi
 res=$(cat ${hydra_master_config_json} | jq '.hydra_runner_root' | tr -d '"')
 if [ "${res}" != "null" ]; then
-    HYDRA_RUNNER_ROOT=${res}
+  HYDRA_RUNNER_ROOT=${res}
 fi
+
+mkdir -p /tmp/Hydra
 
 # Check whether system packages are installed
 # If not, report en error
 function check_sys_pkgs() {
-    systemPkgs=(g++ cmake make liblapack-dev libblas-dev libboost-all-dev \
-        libnuma-dev libgflags-dev libgtest-dev swig python-numpy python-pyqt5 \
-        libpython-dev python3-pip build-essential gcc libudev-dev libnl-3-dev \
-        libnl-route-3-dev ninja-build pkg-config valgrind python3-dev \
-        cython3 python3-docutils pandoc jq rsync)
-    for pkg in ${systemPkgs[@]}; do
-        checkpkg ${pkg}
-        if [ ${checkpkg_res} == "0" ]; then
-            echocyan "Required packages:"
-            echo -en "\t"
-            for pkg1 in ${systemPkgs[@]}; do
-                echo -n "${pkg1} "
-            done
-            echo
-            exit
-        fi
-    done
-    res=$(meson --version | grep "0.")
-    if [ -z ${res} ]; then
-        echored "Error: meson is required"
-        echo -e "\tRun pip3 install meson"
-        exit
+  systemPkgs=(g++ cmake make liblapack-dev libblas-dev libboost-all-dev \
+    libnuma-dev libgflags-dev libgtest-dev swig python-numpy python-pyqt5 \
+    libpython-dev python3-pip build-essential gcc libudev-dev libnl-3-dev \
+    libnl-route-3-dev ninja-build pkg-config valgrind python3-dev \
+    cython3 python3-docutils pandoc jq rsync)
+  for pkg in ${systemPkgs[@]}; do
+    checkpkg ${pkg}
+    if [ ${checkpkg_res} == "0" ]; then
+      echo -n "[$(hostname)] Required packages: "
+      for pkg1 in ${systemPkgs[@]}; do
+        echo -n "${pkg1} "
+      done
+      echo
+      exit
     fi
+  done
+  res=$(meson --version | grep "0.")
+  if [ -z ${res} ]; then
+    echo "[$(hostname)] Error: meson is required, please run 'pip3 install meson'"
+    exit
+  fi
 } 
 
 # Install all system-level packages if INSTALL_HYDRA_PKGS_SYSTEM_LEVEL is set to 1
 function install_sys_pkgs() {
-    echocyan "Installing system packages"
-    sudo apt-get update
-    sudo apt-get install -y g++ cmake make liblapack-dev libblas-dev libboost-all-dev \
-        libnuma-dev libgflags-dev libgtest-dev swig python-numpy python-pyqt5 \
-        libpython-dev python3-pip build-essential gcc libudev-dev libnl-3-dev \
-        libnl-route-3-dev ninja-build pkg-config valgrind python3-dev \
-        cython3 python3-docutils pandoc jq rsync
-    sudo pip3 install meson
+  echo "[$(hostname)] Installing system packages"
+  sudo apt-get update &>> /tmp/Hydra/install.txt
+  sudo apt-get install -y g++ cmake make liblapack-dev libblas-dev libboost-all-dev \
+    libnuma-dev libgflags-dev libgtest-dev swig python-numpy python-pyqt5 \
+    libpython-dev python3-pip build-essential gcc libudev-dev libnl-3-dev \
+    libnl-route-3-dev ninja-build pkg-config valgrind python3-dev \
+    cython3 python3-docutils pandoc jq rsync &>> /tmp/Hydra/install.txt
+  sudo pip3 install meson &>> /tmp/Hydra/install.txt
 }
 
 function install_armadillo() {
-    echocyan "Installing Armadillo"
-    eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
-    eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
-    wget http://sourceforge.net/projects/arma/files/armadillo-10.7.1.tar.xz
-    tar xf armadillo-10.7.1.tar.xz
-    eval "(cd armadillo-10.7.1; cmake . -DCMAKE_INSTALL_PREFIX:PATH=${HYDRA_RUNNER_ROOT}/armadillo/; make -j; make install)"
-    rm -rf armadillo*
+  echo "[$(hostname)] Installing Armadillo"
+  eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
+  eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
+  wget http://sourceforge.net/projects/arma/files/armadillo-10.7.1.tar.xz &>> /tmp/Hydra/install.txt
+  tar xf armadillo-10.7.1.tar.xz &>> /tmp/Hydra/install.txt
+  eval "(cd armadillo-10.7.1; cmake . -DCMAKE_INSTALL_PREFIX:PATH=${HYDRA_RUNNER_ROOT}/armadillo/; make -j; make install)" \
+    &>> /tmp/Hydra/install.txt
+  rm -rf armadillo*
 }
 
 function install_nlohmann() {
-    echocyan "Installing nlohmann json"
-    eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
-    eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
-    git clone --depth=1 https://github.com/nlohmann/json.git
-    cd json
-    mkdir build
-    cd build
-    eval "cmake .. -DCMAKE_INSTALL_PREFIX:PATH=${HYDRA_RUNNER_ROOT}/json/"
-    make -j
-    make install
-    eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
-    rm -rf json
+  echo "[$(hostname)] Installing nlohmann json"
+  eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
+  eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
+  git clone --depth=1 https://github.com/nlohmann/json.git &>> /tmp/Hydra/install.txt
+  cd json
+  mkdir build
+  cd build
+  eval "cmake .. -DCMAKE_INSTALL_PREFIX:PATH=${HYDRA_RUNNER_ROOT}/json/" &>> /tmp/Hydra/install.txt
+  make -j &>> /tmp/Hydra/install.txt
+  make install &>> /tmp/Hydra/install.txt
+  eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
+  rm -rf json
 }
 
 function install_soapysdr() {
-    echocyan "Installing Soapy SDR"
-    eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
-    eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
-    git clone --depth=1 https://github.com/pothosware/SoapySDR.git
-    cd SoapySDR
-    mkdir build
-    cd build
-    eval "cmake .. -DCMAKE_INSTALL_PREFIX:PATH=${HYDRA_RUNNER_ROOT}/SoapySDR/"
-    make -j
-    make install
-    eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
-    rm -rf SoapySDR
+  echo "[$(hostname)] Installing Soapy SDR"
+  eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
+  eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
+  git clone --depth=1 https://github.com/pothosware/SoapySDR.git &>> /tmp/Hydra/install.txt
+  cd SoapySDR
+  mkdir build
+  cd build
+  eval "cmake .. -DCMAKE_INSTALL_PREFIX:PATH=${HYDRA_RUNNER_ROOT}/SoapySDR/" &>> /tmp/Hydra/install.txt
+  make -j &>> /tmp/Hydra/install.txt
+  make install &>> /tmp/Hydra/install.txt
+  eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
+  rm -rf SoapySDR
 }
 
 # Check whether DPDK lib is installed on this server
 #    by checking RTE_SDK variable and necessary files in RTE_SDK directory
 function check_dpdk() {
-    dpdk_detected=1
-    if [ -z "${RTE_SDK}" ]; then
-        dpdk_detected=0
-    fi
-    res=$(ls ${RTE_SDK}/build/install/usr/local/include/rte_common.h) || :
-    if [ "$?" != "0" ]; then
-        dpdk_detected=0
-    fi
-    res=$(ls ${RTE_SDK}/build/install/usr/local/lib/x86_64-linux-gnu/librte_common_mlx5.a) || :
-    if [ "$?" != "0" ]; then
-        dpdk_detected=0
-    fi
-    res=$(cat ${RTE_SDK}/VERSION) || :
-    if [ "$?" != "0" ]; then
-        dpdk_detected=0
-    fi
-    if [ "${res}" != "20.11.3" ]; then
-        echocyan "WARNING: Recommend DPDK version 20.11.3"
-    fi
+  dpdk_detected=1
+  if [ -z "${RTE_SDK}" ]; then
+    dpdk_detected=0
+  fi
+  res=$(ls ${RTE_SDK}/build/install/usr/local/include/rte_common.h) &> /dev/null || :
+  if [ "$?" != "0" ]; then
+    dpdk_detected=0
+  fi
+  res=$(ls ${RTE_SDK}/build/install/usr/local/lib/x86_64-linux-gnu/librte_common_mlx5.a) &> /dev/null || :
+  if [ "$?" != "0" ]; then
+    dpdk_detected=0
+  fi
+  res=$(cat ${RTE_SDK}/VERSION) &> /dev/null || :
+  if [ "$?" != "0" ]; then
+    dpdk_detected=0
+  fi
+  if [ "${res}" != "20.11.3" ]; then
+    echo "[$(hostname)] WARNING: Recommend DPDK version 20.11.3"
+  fi
 }
 
 function install_dpdk() {
-    echocyan "Installing DPDK"
-    eval "export RTE_SDK=${HYDRA_RUNNER_ROOT}/dpdk-stable-20.11.3"
-    eval "cd ${HYDRA_RUNNER_ROOT}"
-    wget http://fast.dpdk.org/rel/dpdk-20.11.3.tar.xz
-    tar xf dpdk-20.11.3.tar.xz
-    rm dpdk-20.11.3.tar.xz
-    cd dpdk-stable-20.11.3
-    meson build
-    cd build
-    ninja
-    DESTDIR=./install ninja install
+  echo "[$(hostname)] Installing DPDK"
+  eval "export RTE_SDK=${HYDRA_RUNNER_ROOT}/dpdk-stable-20.11.3"
+  eval "cd ${HYDRA_RUNNER_ROOT}"
+  wget http://fast.dpdk.org/rel/dpdk-20.11.3.tar.xz &>> /tmp/Hydra/install.txt
+  tar xf dpdk-20.11.3.tar.xz &>> /tmp/Hydra/install.txt
+  rm dpdk-20.11.3.tar.xz
+  cd dpdk-stable-20.11.3
+  meson build &>> /tmp/Hydra/install.txt
+  cd build
+  ninja &>> /tmp/Hydra/install.txt
+  DESTDIR=./install ninja install &>> /tmp/Hydra/install.txt
 }
 
 function install_intel_lib() {
-    echocyan "Installing Intel libraries"
-    eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
-    eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
-    wget https://registrationcenter-download.intel.com/akdlm/irc_nas/18236/l_BaseKit_p_2021.4.0.3422.sh
-    eval "bash l_BaseKit_p_2021.4.0.3422.sh -a --silent --eula accept --components \
-        intel.oneapi.lin.ipp.devel:intel.oneapi.lin.mkl.devel --install-dir ${HYDRA_RUNNER_ROOT}/intel/oneapi"
-    wget https://registrationcenter-download.intel.com/akdlm/irc_nas/18211/l_HPCKit_p_2021.4.0.3347.sh
-    eval "bash l_HPCKit_p_2021.4.0.3347.sh -a --silent --eula accept --components \
-        intel.oneapi.lin.dpcpp-cpp-compiler-pro --install-dir ${HYDRA_RUNNER_ROOT}/intel/oneapi/"
-    rm l_BaseKit_p_2021.4.0.3422.sh l_HPCKit_p_2021.4.0.3347.sh
-    eval "source ${HYDRA_RUNNER_ROOT}/intel/oneapi/setvars.sh"
+  echo "[$(hostname)] Installing Intel libraries"
+  eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
+  eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
+  wget https://registrationcenter-download.intel.com/akdlm/irc_nas/18236/l_BaseKit_p_2021.4.0.3422.sh \
+    &>> /tmp/Hydra/install.txt
+  eval "bash l_BaseKit_p_2021.4.0.3422.sh -a --silent --eula accept --components \
+    intel.oneapi.lin.ipp.devel:intel.oneapi.lin.mkl.devel --install-dir ${HYDRA_RUNNER_ROOT}/intel/oneapi" \
+    &>> /tmp/Hydra/install.txt
+  wget https://registrationcenter-download.intel.com/akdlm/irc_nas/18211/l_HPCKit_p_2021.4.0.3347.sh \
+    &>> /tmp/Hydra/install.txt
+  eval "bash l_HPCKit_p_2021.4.0.3347.sh -a --silent --eula accept --components \
+    intel.oneapi.lin.dpcpp-cpp-compiler-pro --install-dir ${HYDRA_RUNNER_ROOT}/intel/oneapi/" \
+    &>> /tmp/Hydra/install.txt
+  rm l_BaseKit_p_2021.4.0.3422.sh l_HPCKit_p_2021.4.0.3347.sh
+  eval "source ${HYDRA_RUNNER_ROOT}/intel/oneapi/setvars.sh" &>> /tmp/Hydra/install.txt
 }
 
 function install_rdma_core() {
-    echocyan "Installing rdma-core"
-    eval "cd ${HYDRA_RUNNER_ROOT}"
-    git clone https://github.com/linux-rdma/rdma-core.git
-    cd rdma-core
-    bash build.sh
-    eval "export LIBRARY_PATH=${LIBRARY_PATH}:${HYDRA_RUNNER_ROOT}/rdma-core/build/lib"
-    export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LIBRARY_PATH}
+  echo "[$(hostname)] Installing rdma-core"
+  eval "cd ${HYDRA_RUNNER_ROOT}"
+  git clone https://github.com/linux-rdma/rdma-core.git &>> /tmp/Hydra/install.txt
+  cd rdma-core
+  bash build.sh &>> /tmp/Hydra/install.txt
+  eval "export LIBRARY_PATH=${LIBRARY_PATH}:${HYDRA_RUNNER_ROOT}/rdma-core/build/lib"
+  export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LIBRARY_PATH}
 }
 
 function install_hydra() {
-    echocyan "Building Hydra"
-    eval "cd ${HYDRA_RUNNER_ROOT}/Agora"
-    mkdir build
-    cd build
-    cmake .. -DLOG_LEVEL=warn
-    make -j
+  echo "[$(hostname)] Building Hydra"
+  eval "cd ${HYDRA_RUNNER_ROOT}/Agora"
+  mkdir build
+  cd build
+  cmake .. -DLOG_LEVEL=warn &>> /tmp/Hydra/install.txt
+  make -j &>> /tmp/Hydra/install.txt
 }
 
 # Install system-level packages if INSTALL_HYDRA_PKGS_SYSTEM_LEVEL is set to 1
 if [ -n ${INSTALL_HYDRA_PKGS_SYSTEM_LEVEL} ]; then
-    if [ ${INSTALL_HYDRA_PKGS_SYSTEM_LEVEL} == "1" ]; then
-        install_sys_pkgs
-    fi
+  if [ ${INSTALL_HYDRA_PKGS_SYSTEM_LEVEL} == "1" ]; then
+    install_sys_pkgs
+  fi
 fi
 
 # Verify that system-level packages are installed
@@ -202,7 +207,7 @@ install_rdma_core
 # Otherwise, install DPDK
 check_dpdk
 if [ "${dpdk_detected}" == "0" ]; then
-    install_dpdk
+  install_dpdk
 fi
 
 # Build and install Hydra app
