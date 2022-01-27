@@ -15,7 +15,7 @@
 #include <arpa/inet.h>
 #endif
 
-static constexpr bool kDebugPrintSender = false;
+static constexpr bool kDebugPrintSender = true;
 
 static std::atomic<bool> keep_running = true;
 // A spinning barrier to synchronize the start of worker threads
@@ -318,7 +318,6 @@ void* Sender::WorkerThread(int tid) {
   while (num_workers_ready_atomic.load() < (socket_thread_num_ + 1)) {
     // Wait
   }
-  MLPD_FRAME("Sender: worker thread %d running\n", tid);
 
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
   DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1,
@@ -334,6 +333,17 @@ void* Sender::WorkerThread(int tid) {
       cfg_->BsAntNum() / socket_thread_num_ +
       (static_cast<size_t>(tid) < cfg_->BsAntNum() % socket_thread_num_ ? 1
                                                                         : 0);
+
+  //This thread has nothing to do
+  if (ant_num_this_thread == 0) {
+    return nullptr;
+  }
+
+  MLPD_INFO(
+      "Sender worker[%d]: running emulating radios %zu:%zu radios this thread "
+      "%zu\n",
+      tid, radio_lo, radio_hi, ant_num_this_thread);
+
 #if defined(USE_DPDK)
   uint16_t port_id = port_ids_.at(tid % cfg_->DpdkNumPorts());
   const size_t queue_id = tid / cfg_->DpdkNumPorts();
@@ -343,6 +353,7 @@ void* Sender::WorkerThread(int tid) {
 #else
   UDPClient udp_client;
 #endif
+  //!!!!!!!!Setup the source port.....
 
   auto* fft_inout =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
@@ -408,18 +419,20 @@ void* Sender::WorkerThread(int tid) {
           RunFft(pkt, fft_inout, mkl_handle);
         }
 
+        const size_t dest_port = cfg_->BsServerPort() + cur_radio;
+
 #ifndef USE_DPDK
-        udp_client.Send(cfg_->BsServerAddr(), cfg_->BsServerPort() + cur_radio,
+        udp_client.Send(cfg_->BsServerAddr(), dest_port,
                         reinterpret_cast<uint8_t*>(socks_pkt_buf),
                         cfg_->PacketLength());
 #endif
 
         if (kDebugSenderReceiver == true) {
           std::printf(
-              "Thread %d (tag = %s) transmit frame %d, symbol %d, ant "
-              "%d, TX time: %.3f us\n",
+              "Thread %d (tag = %s) transmit frame %d, symbol %d, ant %d, size "
+              "%zu, dest port %zu, TX time: %.3f us\n",
               tid, gen_tag_t(tag).ToString().c_str(), pkt->frame_id_,
-              pkt->symbol_id_, pkt->ant_id_,
+              pkt->symbol_id_, pkt->ant_id_, cfg_->PacketLength(), dest_port,
               GetTime::CyclesToUs(GetTime::Rdtsc() - start_tsc_send,
                                   freq_ghz_));
         }
@@ -440,8 +453,10 @@ void* Sender::WorkerThread(int tid) {
           total_tx_packets_rolling = 0;
         }
 
-        if (++cur_radio == radio_hi) {
+        if (cur_radio == radio_hi) {
           cur_radio = radio_lo;
+        } else {
+          cur_radio++;
         }
       }
 
