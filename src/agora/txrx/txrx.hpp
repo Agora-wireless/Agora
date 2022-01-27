@@ -52,6 +52,8 @@ public:
         Table<char>& freq_domain_iq_buffer,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffers_to_send,
         Table<int8_t>& demod_buffer_to_decode,
+        Table<int8_t>& encoded_buffer_to_send,
+        Table<int8_t>& encoded_buffer_to_precode,
         SharedState* shared_state = nullptr);
 
     ~PacketTXRX();
@@ -84,6 +86,8 @@ private:
     void* fft_tx_thread(int tid);
     // A thread that sends and receives post-demodulation data
     void* demod_tx_thread(int tid);
+    // A thread that sends and receives post-encode data
+    void* encode_tx_thread(int tid);
 
     // Receive packets and relocate data to the correct address based on
     // the subcarrier range
@@ -102,6 +106,8 @@ private:
     Table<char>& freq_domain_iq_buffer_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send_;
     Table<int8_t>& demod_buffer_to_decode_;
+    Table<int8_t>& encoded_buffer_to_send_;
+    Table<int8_t>& encoded_buffer_to_precode_;
 
 #ifdef USE_DPDK
     // uint32_t bs_rru_addr_; // IPv4 address of the simulator sender
@@ -117,14 +123,13 @@ private:
     size_t demod_frame_to_send_ = 0;
     size_t demod_symbol_ul_to_send_;
 
-#if 0
-    void* encode_thread(int tid);
     int dequeue_send(int tid, size_t symbol_to_send, size_t ant_to_send);
     
     size_t encode_frame_to_send_ = 0;
     size_t encode_symbol_dl_to_send_ = 0;
     size_t encode_ue_to_send_;
 
+#if 0
     // Not used
     size_t dl_frame_to_send_ = 0;
     size_t dl_symbol_to_send_ = 0;

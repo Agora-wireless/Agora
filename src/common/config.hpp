@@ -461,7 +461,7 @@ public:
     inline size_t get_total_data_symbol_idx_dl(
         size_t frame_id, size_t symbol_idx_dl) const
     {
-        return ((frame_id % TASK_BUFFER_FRAME_NUM)
+        return ((frame_id % kFrameWnd)
                    * dl_data_symbol_num_perframe)
             + symbol_idx_dl;
     }

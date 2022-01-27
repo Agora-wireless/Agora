@@ -59,53 +59,53 @@ function check_sys_pkgs() {
 
 # Install all system-level packages if INSTALL_HYDRA_PKGS_SYSTEM_LEVEL is set to 1
 function install_sys_pkgs() {
-  echo "[$(hostname)] Installing system packages"
-  sudo apt-get update &>> /tmp/Hydra/install.txt
+  echo "[$(hostname)] Downloading required system packages"
+  sudo apt-get update >> /tmp/Hydra/install.log 2>&1
   sudo apt-get install -y g++ cmake make liblapack-dev libblas-dev libboost-all-dev \
     libnuma-dev libgflags-dev libgtest-dev swig python-numpy python-pyqt5 \
     libpython-dev python3-pip build-essential gcc libudev-dev libnl-3-dev \
     libnl-route-3-dev ninja-build pkg-config valgrind python3-dev \
-    cython3 python3-docutils pandoc jq rsync &>> /tmp/Hydra/install.txt
-  sudo pip3 install meson &>> /tmp/Hydra/install.txt
+    cython3 python3-docutils pandoc jq rsync >> /tmp/Hydra/install.log 2>&1
+  sudo pip3 install meson >> /tmp/Hydra/install.log 2>&1
 }
 
 function install_armadillo() {
-  echo "[$(hostname)] Installing Armadillo"
+  echo "[$(hostname)] Downloading and building Armadillo"
   eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
   eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
-  wget http://sourceforge.net/projects/arma/files/armadillo-10.7.1.tar.xz &>> /tmp/Hydra/install.txt
-  tar xf armadillo-10.7.1.tar.xz &>> /tmp/Hydra/install.txt
+  wget http://sourceforge.net/projects/arma/files/armadillo-10.7.1.tar.xz >> /tmp/Hydra/install.log 2>&1
+  tar xf armadillo-10.7.1.tar.xz >> /tmp/Hydra/install.log 2>&1
   eval "(cd armadillo-10.7.1; cmake . -DCMAKE_INSTALL_PREFIX:PATH=${HYDRA_RUNNER_ROOT}/armadillo/; make -j; make install)" \
-    &>> /tmp/Hydra/install.txt
+    >> /tmp/Hydra/install.log 2>&1
   rm -rf armadillo*
 }
 
 function install_nlohmann() {
-  echo "[$(hostname)] Installing nlohmann json"
+  echo "[$(hostname)] Downloading and building nlohmann json"
   eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
   eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
-  git clone --depth=1 https://github.com/nlohmann/json.git &>> /tmp/Hydra/install.txt
+  git clone --depth=1 https://github.com/nlohmann/json.git >> /tmp/Hydra/install.log 
   cd json
   mkdir build
   cd build
-  eval "cmake .. -DCMAKE_INSTALL_PREFIX:PATH=${HYDRA_RUNNER_ROOT}/json/" &>> /tmp/Hydra/install.txt
-  make -j &>> /tmp/Hydra/install.txt
-  make install &>> /tmp/Hydra/install.txt
+  eval "cmake .. -DCMAKE_INSTALL_PREFIX:PATH=${HYDRA_RUNNER_ROOT}/json/" >> /tmp/Hydra/install.log 2>&1
+  make -j >> /tmp/Hydra/install.log 2>&1
+  make install >> /tmp/Hydra/install.log 2>&1
   eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
   rm -rf json
 }
 
 function install_soapysdr() {
-  echo "[$(hostname)] Installing Soapy SDR"
+  echo "[$(hostname)] Downloading and building Soapy SDR"
   eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
   eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
-  git clone --depth=1 https://github.com/pothosware/SoapySDR.git &>> /tmp/Hydra/install.txt
+  git clone --depth=1 https://github.com/pothosware/SoapySDR.git >> /tmp/Hydra/install.log 2>&1
   cd SoapySDR
   mkdir build
   cd build
-  eval "cmake .. -DCMAKE_INSTALL_PREFIX:PATH=${HYDRA_RUNNER_ROOT}/SoapySDR/" &>> /tmp/Hydra/install.txt
-  make -j &>> /tmp/Hydra/install.txt
-  make install &>> /tmp/Hydra/install.txt
+  eval "cmake .. -DCMAKE_INSTALL_PREFIX:PATH=${HYDRA_RUNNER_ROOT}/SoapySDR/" >> /tmp/Hydra/install.log 2>&1
+  make -j >> /tmp/Hydra/install.log 2>&1
+  make install >> /tmp/Hydra/install.log 2>&1
   eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
   rm -rf SoapySDR
 }
@@ -117,15 +117,15 @@ function check_dpdk() {
   if [ -z "${RTE_SDK}" ]; then
     dpdk_detected=0
   fi
-  res=$(ls ${RTE_SDK}/build/install/usr/local/include/rte_common.h) &> /dev/null || :
+  res=$(ls ${RTE_SDK}/build/install/usr/local/include/rte_common.h) > /dev/null 2>&1 || :
   if [ "$?" != "0" ]; then
     dpdk_detected=0
   fi
-  res=$(ls ${RTE_SDK}/build/install/usr/local/lib/x86_64-linux-gnu/librte_common_mlx5.a) &> /dev/null || :
+  res=$(ls ${RTE_SDK}/build/install/usr/local/lib/x86_64-linux-gnu/librte_common_mlx5.a) > /dev/null 2>&1 || :
   if [ "$?" != "0" ]; then
     dpdk_detected=0
   fi
-  res=$(cat ${RTE_SDK}/VERSION) &> /dev/null || :
+  res=$(cat ${RTE_SDK}/VERSION) > /dev/null 2>&1 || :
   if [ "$?" != "0" ]; then
     dpdk_detected=0
   fi
@@ -135,43 +135,43 @@ function check_dpdk() {
 }
 
 function install_dpdk() {
-  echo "[$(hostname)] Installing DPDK"
+  echo "[$(hostname)] Downloading and building DPDK"
   eval "export RTE_SDK=${HYDRA_RUNNER_ROOT}/dpdk-stable-20.11.3"
   eval "cd ${HYDRA_RUNNER_ROOT}"
-  wget http://fast.dpdk.org/rel/dpdk-20.11.3.tar.xz &>> /tmp/Hydra/install.txt
-  tar xf dpdk-20.11.3.tar.xz &>> /tmp/Hydra/install.txt
+  wget http://fast.dpdk.org/rel/dpdk-20.11.3.tar.xz >> /tmp/Hydra/install.log 2>&1
+  tar xf dpdk-20.11.3.tar.xz >> /tmp/Hydra/install.log 2>&1
   rm dpdk-20.11.3.tar.xz
   cd dpdk-stable-20.11.3
-  meson build &>> /tmp/Hydra/install.txt
+  meson build >> /tmp/Hydra/install.log 2>&1
   cd build
-  ninja &>> /tmp/Hydra/install.txt
-  DESTDIR=./install ninja install &>> /tmp/Hydra/install.txt
+  ninja >> /tmp/Hydra/install.log 2>&1
+  DESTDIR=./install ninja install >> /tmp/Hydra/install.log 2>&1
 }
 
 function install_intel_lib() {
-  echo "[$(hostname)] Installing Intel libraries"
+  echo "[$(hostname)] Downloading Intel libraries for MKL (this could take several minutes)"
   eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
   eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
   wget https://registrationcenter-download.intel.com/akdlm/irc_nas/18236/l_BaseKit_p_2021.4.0.3422.sh \
-    &>> /tmp/Hydra/install.txt
+    >> /tmp/Hydra/install.log 2>&1
   eval "bash l_BaseKit_p_2021.4.0.3422.sh -a --silent --eula accept --components \
     intel.oneapi.lin.ipp.devel:intel.oneapi.lin.mkl.devel --install-dir ${HYDRA_RUNNER_ROOT}/intel/oneapi" \
-    &>> /tmp/Hydra/install.txt
+    >> /tmp/Hydra/install.log 2>&1
   wget https://registrationcenter-download.intel.com/akdlm/irc_nas/18211/l_HPCKit_p_2021.4.0.3347.sh \
-    &>> /tmp/Hydra/install.txt
+    >> /tmp/Hydra/install.log 2>&1
   eval "bash l_HPCKit_p_2021.4.0.3347.sh -a --silent --eula accept --components \
     intel.oneapi.lin.dpcpp-cpp-compiler-pro --install-dir ${HYDRA_RUNNER_ROOT}/intel/oneapi/" \
-    &>> /tmp/Hydra/install.txt
+    >> /tmp/Hydra/install.log 2>&1
   rm l_BaseKit_p_2021.4.0.3422.sh l_HPCKit_p_2021.4.0.3347.sh
-  eval "source ${HYDRA_RUNNER_ROOT}/intel/oneapi/setvars.sh" &>> /tmp/Hydra/install.txt
+  eval "source ${HYDRA_RUNNER_ROOT}/intel/oneapi/setvars.sh" >> /tmp/Hydra/install.log 2>&1
 }
 
 function install_rdma_core() {
-  echo "[$(hostname)] Installing rdma-core"
+  echo "[$(hostname)] Downloading and building rdma-core"
   eval "cd ${HYDRA_RUNNER_ROOT}"
-  git clone https://github.com/linux-rdma/rdma-core.git &>> /tmp/Hydra/install.txt
+  git clone https://github.com/linux-rdma/rdma-core.git >> /tmp/Hydra/install.log 2>&1
   cd rdma-core
-  bash build.sh &>> /tmp/Hydra/install.txt
+  bash build.sh >> /tmp/Hydra/install.log 2>&1
   eval "export LIBRARY_PATH=${LIBRARY_PATH}:${HYDRA_RUNNER_ROOT}/rdma-core/build/lib"
   export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LIBRARY_PATH}
 }
@@ -181,8 +181,8 @@ function install_hydra() {
   eval "cd ${HYDRA_RUNNER_ROOT}/Agora"
   mkdir build
   cd build
-  cmake .. -DLOG_LEVEL=warn &>> /tmp/Hydra/install.txt
-  make -j &>> /tmp/Hydra/install.txt
+  cmake .. -DLOG_LEVEL=warn >> /tmp/Hydra/install.log 2>&1
+  make -j >> /tmp/Hydra/install.log 2>&1
 }
 
 # Install system-level packages if INSTALL_HYDRA_PKGS_SYSTEM_LEVEL is set to 1

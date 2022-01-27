@@ -18,6 +18,7 @@ SharedState::SharedState(Config* cfg)
         ceil_divide((cfg->get_num_sc_to_process() - 1) % cfg->subcarrier_block_size + 1, cfg->demul_block_size))
     , num_encode_tasks_required_(cfg->get_num_ues_to_process())
     , num_demod_pkts_per_symbol_per_ue_(cfg->bs_server_addr_list.size())
+    , num_encoded_pkts_per_symbol_(cfg->UE_NUM)
     , num_zf_tasks_per_frame_(cfg->get_num_sc_to_process() / cfg->zf_block_size)
 {
     frame_start_time_ = new uint64_t[cfg->frames_to_test];
@@ -128,6 +129,24 @@ bool SharedState::receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol
     return true;
 }
 
+bool SharedState::receive_encoded_pkt(size_t frame_id, size_t symbol_id_dl)
+{
+    if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
+        MLPD_ERROR(
+            "SharedState error: Received encoded packet for future "
+            "frame %zu beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
+            "happen if Agora is running slowly, e.g., in debug mode. \n",
+            frame_id, cur_frame_, kFrameWnd, cur_frame_, (unsigned int)num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
+            (unsigned int)num_pkts_[cur_frame_ % kFrameWnd].load());
+        return false;
+    }
+    num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl]++;
+    if (num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl] == num_encoded_pkts_per_symbol_) {
+        MLPD_INFO("SharedCounters: received all demod packets in frame: %u, symbol: %u\n", frame_id, symbol_id_dl);
+    }
+    return true;
+}
+
 bool SharedState::received_all_time_iq_pkts(size_t frame_id, size_t symbol_id)
 {
     if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
@@ -163,6 +182,15 @@ bool SharedState::received_all_demod_pkts(
         if (symbol_id_ul == 0) {
             frame_decode_time_[frame_id] = get_ns();
         }
+        return true;
+    }
+    return false;
+}
+
+bool SharedState::received_all_encoded_pkts(size_t frame_id, size_t symbol_id_dl)
+{
+    if (num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl]
+        == num_encoded_pkts_per_symbol_) {
         return true;
     }
     return false;
@@ -273,6 +301,9 @@ void SharedState::precode_done(size_t frame_id)
         for (size_t j = 0; j < kMaxSymbols; j++) {
             num_encode_tasks_completed_[frame_slot][j] = 0;
         }
+        for (size_t j = 0; j < kMaxSymbols; j++) {
+            num_encoded_pkts_[frame_slot][j] = 0;
+        }
         MLPD_INFO("Main thread: Precode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
         last_frame_cycles_ = cur_cycle;
     }
@@ -309,6 +340,18 @@ bool SharedState::is_demod_tx_ready(size_t frame_id, size_t symbol_id_ul)
     if (num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
         == num_demul_tasks_required_) {
         frame_sc_time_[frame_id] = get_ns();
+        return true;
+    } 
+    return false;
+}
+
+bool SharedState::is_encode_tx_ready(size_t frame_id, size_t symbol_id_dl)
+{
+    if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
+        return false;
+    }
+    if (num_encode_tasks_completed_[frame_id % kFrameWnd][symbol_id_dl]
+        == num_encode_tasks_required_) {
         return true;
     } 
     return false;

@@ -20,6 +20,8 @@ public:
     bool receive_freq_iq_pkt(size_t frame_id, size_t symbol_id);
     // When receive a new demod packet, record it here
     bool receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol_id_ul);
+    // When receive a new encode packet, record it here
+    bool receive_encoded_pkt(size_t frame_id, size_t symbol_id_dl);
 
     bool received_all_time_iq_pkts(size_t frame_id, size_t symbol_id);
     // Check whether all pilot packets are received for a frame
@@ -28,6 +30,7 @@ public:
     // Check whether demodulation can proceed for a symbol in a frame
     bool received_all_data_pkts(size_t frame_id, size_t symbol_id_ul);
     bool received_all_demod_pkts(size_t ue_id, size_t frame_id, size_t symbol_id_ul);
+    bool received_all_encoded_pkts(size_t frame_id, size_t symbol_id_dl);
     // Check whether encoding can proceed for a frame
     bool is_encode_ready(size_t frame_id);
 
@@ -50,6 +53,7 @@ public:
     // Return true iff we have completed demodulation for all subcarriers in
     // this symbol have
     bool is_demod_tx_ready(size_t frame_id, size_t symbol_id_ul);
+    bool is_encode_tx_ready(size_t frame_id, size_t symbol_id_dl);
     bool is_zf_done(size_t frame_id, size_t zf_block_id);
 
     // Latency measurement counters for each frame
@@ -99,6 +103,9 @@ private:
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_demod_pkts_[kMaxUEs];
 
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
+        num_encoded_pkts_ = {};
+
     // encode_ready_[i % kFrameWnd] represents whether encoding can proceed
     // for frame i
     std::array<bool, kFrameWnd> encode_ready_;
@@ -132,6 +139,7 @@ private:
     const size_t num_demul_tasks_required_;
     const size_t num_encode_tasks_required_;
     const size_t num_demod_pkts_per_symbol_per_ue_;
+    const size_t num_encoded_pkts_per_symbol_;
     const size_t num_zf_tasks_per_frame_;
 };
 

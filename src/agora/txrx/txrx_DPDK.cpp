@@ -17,6 +17,8 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
     Table<char>& freq_domain_iq_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send,
     Table<int8_t>& demod_buffer_to_decode,
+    Table<int8_t>& encoded_buffer_to_send,
+    Table<int8_t>& encoded_buffer_to_precode,
     SharedState* shared_state)
     : cfg_(cfg)
     , core_offset_(core_offset)
@@ -27,6 +29,8 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
     , freq_domain_iq_buffer_(freq_domain_iq_buffer)
     , demod_buffer_to_send_(demod_buffer_to_send)
     , demod_buffer_to_decode_(demod_buffer_to_decode)
+    , encoded_buffer_to_send_(encoded_buffer_to_send)
+    , encoded_buffer_to_precode_(encoded_buffer_to_precode)
     , shared_state_(shared_state)
 {
     DpdkTransport::dpdk_init(core_offset_, rx_thread_num_ + kNumDemodTxThread + fft_tx_thread_num_, cfg_->pci_addr);
@@ -391,6 +395,112 @@ void* PacketTXRX::demod_tx_thread(int tid)
     return 0;
 }
 
+void* PacketTXRX::encode_tx_thread(int tid)
+{
+    size_t freq_ghz = measure_rdtsc_freq();
+
+    printf("Encode TX thread\n");
+
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t send_tsc_duration = 0;
+    size_t loop_count = 0;
+    size_t work_count = 0;
+    
+    size_t work_start_tsc, send_start_tsc, send_end_tsc;
+    size_t worked;
+
+    while (cfg_->running) {
+
+        if (likely(start_tsc > 0)) {
+            loop_count ++;
+        }
+
+        worked = 0;
+
+        // 1. Try to send encoded data to precoders
+        if (shared_state_->is_encode_tx_ready(
+                encode_frame_to_send_, encode_symbol_dl_to_send_)) {
+
+            MLPD_INFO("Encode TX: Send encoded data to precoders (frame %zu, symbol %zu)\n", 
+                encode_frame_to_send_, encode_symbol_dl_to_send_);
+
+            if (unlikely(start_tsc == 0)) {
+                start_tsc = rdtsc();
+            }
+            
+            work_start_tsc = rdtsc();
+            send_start_tsc = work_start_tsc;
+            worked = 1;
+
+            for (size_t ue_id = 0; ue_id < cfg_->UE_NUM; ue_id++) {
+                int8_t* encode_ptr = cfg_->get_encoded_buf(encoded_buffer_to_send_, 
+                    encode_frame_to_send_, encode_symbol_dl_to_send_, ue_id, 0);
+
+                for (size_t target_server_idx = 0; target_server_idx < cfg_->bs_server_addr_list.size(); target_server_idx ++) {
+                    size_t sc_start = cfg_->subcarrier_num_start[target_server_idx];
+                    int8_t* src_ptr = encode_ptr + sc_start * cfg_->mod_order_bits;
+                    if (target_server_idx == cfg_->bs_server_addr_idx) {
+                        int8_t* target_ptr = cfg_->get_encoded_buf(encoded_buffer_to_precode_,
+                            encode_frame_to_send_, encode_symbol_dl_to_send_, ue_id, 0) + sc_start * cfg_->mod_order_bits;
+                        memcpy(target_ptr, src_ptr, cfg_->get_num_sc_to_process() * cfg_->mod_order_bits);
+                    } else {
+                        struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
+                        tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 
+                            bs_server_mac_addrs_[target_server_idx],
+                            bs_server_addrs_[cfg_->bs_server_addr_idx], bs_server_addrs_[target_server_idx], 
+                            cfg_->encode_tx_port + encode_symbol_dl_to_send_, cfg_->encode_rx_port + encode_symbol_dl_to_send_, 
+                            Packet::kOffsetOfData + cfg_->subcarrier_num_list[target_server_idx] * cfg_->mod_order_bits);
+                        struct rte_ether_hdr* eth_hdr
+                            = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
+                        char* payload = (char*)eth_hdr + kPayloadOffset;
+                        auto* pkt = reinterpret_cast<Packet*>(payload);
+                        pkt->pkt_type_ = Packet::PktType::kEncode;
+                        pkt->frame_id_ = encode_frame_to_send_;
+                        pkt->symbol_id_ = encode_symbol_dl_to_send_;
+                        pkt->ue_id_ = ue_id;
+                        pkt->server_id_ = cfg_->bs_server_addr_idx;
+                        memcpy(pkt->data_, src_ptr, cfg_->subcarrier_num_list[target_server_idx] * 
+                            cfg_->mod_order_bits);
+
+                        // Send data (one OFDM symbol)
+                        size_t nb_tx_new = rte_eth_tx_burst(0, 0, tx_bufs, 1);
+                        if (unlikely(nb_tx_new != 1)) {
+                            printf("rte_eth_tx_burst() failed\n");
+                            exit(0);
+                        }
+                    }
+                }
+            }
+
+            encode_symbol_dl_to_send_++;
+            if (encode_symbol_dl_to_send_
+                == cfg_->dl_data_symbol_num_perframe) {
+                encode_symbol_dl_to_send_ = 0;
+                encode_frame_to_send_++;
+            }
+
+            send_end_tsc = rdtsc();
+            send_tsc_duration += send_end_tsc - send_start_tsc;
+            work_tsc_duration += send_end_tsc - work_start_tsc;
+        }
+
+        work_count += worked;
+    }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("Encode TX thread duration stats: total time used %.2lfms, "
+        "send %.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%), "
+        "working proportions (%zu/%zu: %.2lf%%)\n",
+        cycles_to_ms(whole_duration, freq_ghz),
+        cycles_to_ms(send_tsc_duration, freq_ghz), send_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
+        work_count, loop_count, work_count * 100.0f / loop_count);
+
+    return 0;
+}
+
 void* PacketTXRX::loop_tx_rx(int tid)
 {
     int radio_lo = tid * cfg_->nRadios / rx_thread_num_;
@@ -510,9 +620,21 @@ int PacketTXRX::recv_relocate(int tid)
             if (!shared_state_->receive_time_iq_pkt(pkt->frame_id_, pkt->symbol_id_)) {
                 cfg_->running = false;
             }
+        } else if (pkt->pkt_type_ == Packet::PktType::kEncode) {
+            const size_t symbol_idx_dl = pkt->symbol_id_;
+            const size_t sc_id = cfg_->get_num_sc_to_process();
+
+            int8_t* encode_ptr
+                = cfg_->get_encoded_buf(encoded_buffer_to_precode_,
+                    pkt->frame_id_, symbol_idx_dl, pkt->ue_id_, 0);
+            memcpy(encode_ptr, pkt->data_,
+                cfg_->get_num_sc_to_process() * cfg_->mod_order_bits);
+            if (!shared_state_->receive_encoded_pkt(pkt->frame_id_, symbol_idx_dl)) {
+                cfg_->running = false;
+            }
         } else {
-            printf("Received unknown packet from rru\n");
-            exit(1);
+            // printf("Received unknown packet from rru\n");
+            // exit(1);
         }
 
         rte_pktmbuf_free(rx_bufs[i]);

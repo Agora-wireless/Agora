@@ -91,7 +91,7 @@ if [ ${ONLY_SINGLE_SERVER} == "all" ]; then
   for (( i=0; i<${hydra_server_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --argjson i $i '. | keys | .[$i]' | tr -d '"')
     hydra_tmp_dir[$i]=$(ssh -oStrictHostKeyChecking=no ${server_name} "mktemp -d")
-    (scp -oStrictHostKeyChecking=no -r ${hydra_root_dir} ${server_name}:${hydra_tmp_dir[$i]}/ &> /dev/null; \
+    (scp -oStrictHostKeyChecking=no -r ${hydra_root_dir} ${server_name}:${hydra_tmp_dir[$i]}/ > /dev/null 2>&1; \
       echo "${server_name} copy complete") &
   done
   wait
@@ -100,7 +100,7 @@ if [ ${ONLY_SINGLE_SERVER} == "all" ]; then
     for (( i=0; i<${hydra_server_num}; i++ )) do
       server_name=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --argjson i $i '. | keys | .[$i]' | tr -d '"')
       (ssh -oStrictHostKeyChecking=no ${server_name} "cd ${hydra_tmp_dir[$i]}/Agora; \
-        ./scripts/system/server_init.sh" &> /tmp/Hydra/init_${server_name}.txt; \
+        ./scripts/system/server_init.sh" > /tmp/Hydra/init_${server_name}.log 2>&1; \
         echo "${server_name} initialization complete";) &
     done
     wait
@@ -112,7 +112,7 @@ if [ ${ONLY_SINGLE_SERVER} == "all" ]; then
       cd ${HYDRA_RUNNER_ROOT}; cp -r ${hydra_tmp_dir[$i]}/Agora ./; rm -rf ${hydra_tmp_dir[$i]}/Agora; \
       cd Agora; INSTALL_HYDRA_PKGS_SYSTEM_LEVEL=${INSTALL_HYDRA_PKGS_SYSTEM_LEVEL} \
       ./scripts/install/install_all.sh"; \
-      scp -oStrictHostKeyChecking=no ${server_name}:/tmp/Hydra/install.txt /tmp/Hydra/install_${server_name}.txt; \
+      scp -oStrictHostKeyChecking=no ${server_name}:/tmp/Hydra/install.log /tmp/Hydra/install_${server_name}.log; \
       echo "${server_name} installation complete") &
   done
   wait
@@ -125,12 +125,12 @@ else
   if [ "${RUN_SERVER_INIT}" == 1 ]; then
     echocyan "Initialize server setup on ${server_name}"
     ssh -oStrictHostKeyChecking=no ${server_name} "cd ${hydra_tmp_dir}/Agora; \
-      ./scripts/system/server_init.sh" > /tmp/Hydra/init_${server_name}.txt
+      ./scripts/system/server_init.sh" > /tmp/Hydra/init_${server_name}.log
   fi
   echocyan "Install dependent packages and Hydra application on ${server_name}"
   ssh -oStrictHostKeyChecking=no ${server_name} "mkdir -p ${HYDRA_RUNNER_ROOT}; \
     cd ${HYDRA_RUNNER_ROOT}; cp -r ${hydra_tmp_dir}/Agora ./; rm -rf ${hydra_tmp_dir}/Agora; cd Agora; \
     INSTALL_HYDRA_PKGS_SYSTEM_LEVEL=${INSTALL_HYDRA_PKGS_SYSTEM_LEVEL} \
     ./scripts/install/install_all.sh"
-  scp -oStrictHostKeyChecking=no ${server_name}:/tmp/Hydra/install.txt /tmp/Hydra/install_${server_name}.txt
+  scp -oStrictHostKeyChecking=no ${server_name}:/tmp/Hydra/install.log /tmp/Hydra/install_${server_name}.log
 fi

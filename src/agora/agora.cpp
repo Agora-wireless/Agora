@@ -32,6 +32,7 @@ Agora::Agora(Config* cfg)
     packet_tx_rx_.reset(new PacketTXRX(cfg, cfg->core_offset,
         time_domain_iq_buffer_, freq_domain_iq_buffer_to_send_,
         freq_domain_iq_buffer_, demod_buffer_to_send_, demod_buffer_to_decode_, 
+        dl_encoded_buffer_, dl_encoded_buffer_to_precode_,
         &shared_state_));
     
     base_worker_core_offset_ = config_->core_offset + kNumMasterThread + 
