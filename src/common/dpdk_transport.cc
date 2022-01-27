@@ -142,7 +142,6 @@ int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
     std::printf("Link down on NIC %" PRIx16 "\n", port);
     return 0;
   }
-
   return 0;
 }
 
@@ -341,13 +340,12 @@ void DpdkTransport::DpdkInit(uint16_t core_offset, size_t thread_num) {
 
 rte_mempool* DpdkTransport::CreateMempool(size_t num_ports,
                                           size_t packet_length) {
-  size_t mbuf_size = packet_length + kMBufCacheSize;
+  const size_t mbuf_size = packet_length + kMBufCacheSize;
   rte_mempool* mbuf_pool =
       rte_pktmbuf_pool_create("MBUF_POOL", kNumMBufs * num_ports,
                               kMBufCacheSize, 0, mbuf_size, rte_socket_id());
 
   RtAssert(mbuf_pool != NULL, "Cannot create mbuf pool");
-
   return mbuf_pool;
 }
 

@@ -1,5 +1,5 @@
 /**
- * @file txrx_worker.cc
+ * @file txrx_worker_sim.cc
  * @brief Implementation of PacketTxRx initialization functions, and datapath
  * functions for communicating with simulators.
  */

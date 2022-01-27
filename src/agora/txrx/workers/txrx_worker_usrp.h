@@ -1,7 +1,7 @@
 /**
  * @file txrx_worker_usrp.h
  * @brief Implementation of PacketTxRx datapath functions for communicating
- * with real hardware
+ * with usrp hardware
  */
 
 #ifndef TXRX_WORKER_USRP_H_

@@ -56,12 +56,16 @@ class PacketTxRx {
    */
   size_t AntNumToWorkerId(size_t ant_num) const;
 
-  //Align all worker threads to common start event (this call)
-  // Must be called After start
-  //void SyncWorkers();
-
  protected:
+  //Align all worker threads to common start event (this call)
   void NotifyWorkers();
+  inline size_t NumberTotalWorkers() const { return worker_thread_count_; }
+  inline size_t NumberTotalInterfaces() const {
+    return interface_to_worker_.size();
+  }
+  inline const size_t& InterfaceToWorker(size_t interface) const {
+    return interface_to_worker_.at(interface);
+  }
 
   std::vector<std::unique_ptr<TxRxWorker>> worker_threads_;
   Config* const cfg_;
@@ -92,6 +96,7 @@ class PacketTxRx {
   std::byte* const tx_memory_;
   Table<size_t>& frame_start_;
 
+  size_t worker_thread_count_;
   std::vector<size_t> interface_to_worker_;
 };
 

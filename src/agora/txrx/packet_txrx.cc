@@ -88,6 +88,8 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
       "per thread: ~%zu\n",
       actual_worker_threads, target_interface_count,
       target_interface_count * buffers_per_interface);
+
+  worker_thread_count_ = actual_worker_threads;
 }
 
 PacketTxRx::~PacketTxRx() {
@@ -103,11 +105,10 @@ bool PacketTxRx::StartTxRx(Table<complex_float>& calib_dl_buffer,
   unused(calib_ul_buffer);
 
   const size_t num_interfaces = interface_to_worker_.size();
-  const size_t num_workers = rx_packets_.size();
 
   size_t interface = 0;
   //Create the worker objects per the mapping completed in the constructor
-  for (size_t worker_id = 0; worker_id < num_workers; worker_id++) {
+  for (size_t worker_id = 0; worker_id < NumberTotalWorkers(); worker_id++) {
     size_t interface_offset = interface;
     //Search can be optimized but probably not necessary as this isn't a high frequncy call
     // assumes that the workers are assigned sequentially, ordered, and a match exists

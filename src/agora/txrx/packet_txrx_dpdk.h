@@ -52,28 +52,10 @@ class PacketTxRxDpdk : public PacketTxRx {
                  moodycamel::ProducerToken** tx_producer_tokens,
                  Table<char>& rx_buffer, size_t packet_num_in_buffer,
                  Table<size_t>& frame_start, char* tx_buffer);
-  ~PacketTxRxDpdk() final override;
-
-  /**
-   * @brief Start the network I/O threads
-   *
-   * @param buffer Ring buffer to save packets
-   * @param packet_num_in_buffer Total number of buffers in an RX ring
-   *
-   * @return True on successfully starting the network I/O threads, false
-   * otherwise
-   */
-  bool StartTxRx(Table<complex_float>& calib_dl_buffer_,
-                 Table<complex_float>& calib_ul_buffer_) final override;
+  ~PacketTxRxDpdk() final;
 
  private:
   void DoTxRx(size_t tid);  // The thread function for thread [tid]
-
-  // At thread [tid], receive packets from the NIC and enqueue them to the
-  // master thread
-  uint16_t DpdkRecv(size_t tid, uint16_t port_id, uint16_t queue_id,
-                    size_t& prev_frame_id, size_t& rx_slot);
-  size_t DequeueSend(size_t tid);
 
   virtual bool CreateWorker(size_t tid, size_t interface_count,
                             size_t interface_offset, size_t* rx_frame_start,
@@ -82,7 +64,11 @@ class PacketTxRxDpdk : public PacketTxRx {
 
   uint32_t bs_rru_addr_;     // IPv4 address of the simulator sender
   uint32_t bs_server_addr_;  // IPv4 address of the Agora server
-  struct rte_mempool* mbuf_pool_;
+  rte_mempool* mbuf_pool_;
+
+  // Worker x (dpdk dev : queueid)
+  std::vector<std::vector<std::pair<uint16_t, uint16_t>>>
+      worker_dev_queue_assignment_;
 
   // Dimension 1: socket_thread
   // Dimension 2: rx_packet
