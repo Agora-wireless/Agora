@@ -113,3 +113,5 @@ if [ "${HYDRA_RUN_MODE}" == 0 ] || [ "${HYDRA_RUN_MODE}" == 1 ]; then
 fi
 
 wait
+
+echocyan "All running logs will be stored in /tmp/Hydra/log_[server].txt"
