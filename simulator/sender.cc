@@ -123,7 +123,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
     ether_addr* parsed_mac = ether_aton(
         server_mac_addr_str.substr(i * (kMacAddrBtyes + 1), kMacAddrBtyes)
             .c_str());
-    RtAssert(parsed_mac != NULL, "Invalid server mac address");
+    RtAssert(parsed_mac != nullptr, "Invalid server mac address");
     if (DpdkTransport::NicInit(port_ids_.at(i), mbuf_pool_, socket_thread_num_,
                                cfg->PacketLength()) != 0) {
       rte_exit(EXIT_FAILURE, "Cannot init port %u\n", port_ids_.at(i));

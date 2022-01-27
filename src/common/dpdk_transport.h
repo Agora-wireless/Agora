@@ -44,7 +44,7 @@ static constexpr size_t kTxBatchSize = 1;
 static constexpr size_t kPayloadOffset = sizeof(struct rte_ether_hdr) +
                                          sizeof(struct rte_ipv4_hdr) +
                                          sizeof(struct rte_udp_hdr) + 22;
-static_assert(kPayloadOffset == 64, "");
+static_assert(kPayloadOffset == 64, "kPayloadOffset must equal 64");
 
 class DpdkTransport {
  public:

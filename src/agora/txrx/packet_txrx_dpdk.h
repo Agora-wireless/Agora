@@ -57,10 +57,9 @@ class PacketTxRxDpdk : public PacketTxRx {
  private:
   void DoTxRx(size_t tid);  // The thread function for thread [tid]
 
-  virtual bool CreateWorker(size_t tid, size_t interface_count,
-                            size_t interface_offset, size_t* rx_frame_start,
-                            std::vector<RxPacket>& rx_memory,
-                            std::byte* const tx_memory) final override;
+  bool CreateWorker(size_t tid, size_t interface_count, size_t interface_offset,
+                    size_t* rx_frame_start, std::vector<RxPacket>& rx_memory,
+                    std::byte* const tx_memory) final;
 
   uint32_t bs_rru_addr_;     // IPv4 address of the simulator sender
   uint32_t bs_server_addr_;  // IPv4 address of the Agora server

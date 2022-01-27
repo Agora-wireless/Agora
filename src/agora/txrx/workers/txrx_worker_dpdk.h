@@ -26,7 +26,7 @@ class TxRxWorkerDpdk : public TxRxWorker {
                  std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
                  std::mutex& sync_mutex, std::condition_variable& sync_cond,
                  std::atomic<bool>& can_proceed,
-                 const std::vector<std::pair<uint16_t, uint16_t>>& dpdk_phy,
+                 std::vector<std::pair<uint16_t, uint16_t>> dpdk_phy,
                  rte_mempool* mbuf_pool);
   ~TxRxWorkerDpdk() final;
   void DoTxRx() final;

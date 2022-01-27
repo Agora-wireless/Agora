@@ -28,7 +28,7 @@ std::vector<uint16_t> DpdkTransport::GetPortIDFromMacAddr(
     ether_addr* parsed_mac = ether_aton(
         mac_addrs.substr(i * (kMacAddrBtyes + 1), kMacAddrBtyes).c_str());
     rte_ether_addr rte_mac_addr;
-    RtAssert(parsed_mac != NULL, "Invalid server mac address");
+    RtAssert(parsed_mac != nullptr, "Invalid server mac address");
     std::memcpy(&rte_mac_addr, parsed_mac, sizeof(ether_addr));
     // Find the port id with the given MAC address
     uint16_t port_id;
@@ -48,8 +48,8 @@ std::vector<uint16_t> DpdkTransport::GetPortIDFromMacAddr(
 int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
                            int thread_num, size_t pkt_len) {
   struct rte_eth_conf port_conf = PortConfDefault();
-  const uint16_t rxRings = thread_num;
-  const uint16_t txRings = thread_num;
+  const uint16_t rx_rings = thread_num;
+  const uint16_t tx_rings = thread_num;
   int retval;
   uint16_t q;
   uint16_t nb_rxd = kRxRingSize;
@@ -87,7 +87,7 @@ int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
               pkt_len);
   // port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 
-  retval = rte_eth_dev_configure(port, rxRings, txRings, &port_conf);
+  retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);
   if (retval != 0) {
     return retval;
   }
@@ -99,7 +99,7 @@ int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
   rxconf = dev_info.default_rxconf;
   rxconf.offloads = port_conf.rxmode.offloads;
 
-  for (q = 0; q < rxRings; q++) {
+  for (q = 0; q < rx_rings; q++) {
     retval = rte_eth_rx_queue_setup(
         port, q, nb_rxd, rte_eth_dev_socket_id(port), &rxconf, mbuf_pool);
     if (retval < 0) {
@@ -110,7 +110,7 @@ int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
   txconf = dev_info.default_txconf;
   txconf.offloads = port_conf.txmode.offloads;
 
-  for (q = 0; q < txRings; q++) {
+  for (q = 0; q < tx_rings; q++) {
     retval = rte_eth_tx_queue_setup(port, q, nb_txd,
                                     rte_eth_dev_socket_id(port), &txconf);
     if (retval < 0) {
@@ -266,7 +266,7 @@ void DpdkTransport::InstallFlowRule(uint16_t port_id, uint16_t rx_q,
   udp_item.type = RTE_FLOW_ITEM_TYPE_UDP;
   udp_item.spec = &udp_spec;
   udp_item.mask = &udp_mask;
-  udp_item.last = NULL;
+  udp_item.last = nullptr;
   pattern[2] = udp_item;
 
   rte_flow_error error;
@@ -345,7 +345,7 @@ rte_mempool* DpdkTransport::CreateMempool(size_t num_ports,
       rte_pktmbuf_pool_create("MBUF_POOL", kNumMBufs * num_ports,
                               kMBufCacheSize, 0, mbuf_size, rte_socket_id());
 
-  RtAssert(mbuf_pool != NULL, "Cannot create mbuf pool");
+  RtAssert(mbuf_pool != nullptr, "Cannot create mbuf pool");
   return mbuf_pool;
 }
 

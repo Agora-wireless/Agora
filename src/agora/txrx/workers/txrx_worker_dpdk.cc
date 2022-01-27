@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 
 #include <cassert>
+#include <utility>
 
 #include "dpdk_transport.h"
 #include "logger.h"
@@ -25,13 +26,12 @@ TxRxWorkerDpdk::TxRxWorkerDpdk(
     std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
     std::mutex& sync_mutex, std::condition_variable& sync_cond,
     std::atomic<bool>& can_proceed,
-    const std::vector<std::pair<uint16_t, uint16_t>>& dpdk_phy,
-    rte_mempool* mbuf_pool)
+    std::vector<std::pair<uint16_t, uint16_t>> dpdk_phy, rte_mempool* mbuf_pool)
     : TxRxWorker(core_offset, tid, interface_count, interface_offset, config,
                  rx_frame_start, event_notify_q, tx_pending_q, tx_producer,
                  notify_producer, rx_memory, tx_memory, sync_mutex, sync_cond,
                  can_proceed),
-      dpdk_phy_port_queues_(dpdk_phy),
+      dpdk_phy_port_queues_(std::move(dpdk_phy)),
       mbuf_pool_(mbuf_pool) {
   int ret = inet_pton(AF_INET, config->BsRruAddr().c_str(), &bs_rru_addr_);
   RtAssert(ret == 1, "Invalid sender IP address");
@@ -102,7 +102,7 @@ void TxRxWorkerDpdk::DoTxRx() {
   while (Configuration()->Running()) {
     const size_t send_result = DequeueSend();
     if (0 == send_result) {
-      auto& port_queue_id = dpdk_phy_port_queues_.at(rx_index);
+      const auto& port_queue_id = dpdk_phy_port_queues_.at(rx_index);
       auto rx_result = RecvEnqueue(port_queue_id.first, port_queue_id.second);
       for (auto& rx_packet : rx_result) {
         //Could move this to the Recv function
@@ -248,7 +248,8 @@ size_t TxRxWorkerDpdk::DequeueSend() {
 
     // Send data (one OFDM symbol)
     // Must send this out the correct port (dev) + queue that is assigned to this interface (convert gloabl to local index)
-    auto& tx_info = dpdk_phy_port_queues_.at(interface_id - interface_offset_);
+    const auto& tx_info =
+        dpdk_phy_port_queues_.at(interface_id - interface_offset_);
     size_t nb_tx_new =
         rte_eth_tx_burst(tx_info.first, tx_info.second, tx_bufs, kTxBatchSize);
     if (unlikely(nb_tx_new != kTxBatchSize)) {
