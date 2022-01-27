@@ -152,7 +152,7 @@ static constexpr bool kUsePartialTrans = true;
 
 // Enable hard demodulation and disable LDPC decoding
 // Useful for evaluating constellation quality
-static constexpr bool kDownlinkHardDemod = false;
+static constexpr bool kDownlinkHardDemod = true;
 static constexpr bool kUplinkHardDemod = false;
 
 static constexpr bool kExportConstellation = false;
@@ -161,8 +161,8 @@ static constexpr bool kCollectPhyStats = true;
 static constexpr bool kPrintZfStats = true;
 
 static constexpr bool kStatsPrintFrameSummary = true;
-static constexpr bool kDebugPrintPerFrameDone = true;
-static constexpr bool kDebugPrintPerFrameStart = true;
+static constexpr bool kDebugPrintPerFrameDone = false;
+static constexpr bool kDebugPrintPerFrameStart = false;
 static constexpr bool kDebugPrintPerSymbolDone = false;
 static constexpr bool kDebugPrintPerTaskDone = false;
 static constexpr bool kDebugPrintStatsPerThread = false;
