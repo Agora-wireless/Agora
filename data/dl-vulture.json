@@ -1,5 +1,4 @@
 {
-    /* Tested with 20 bs + 1 external ref + 2 ue radios, 1 channel each */
     "serial_file": "data/topology-vulture-dl.json",
     "cells": 1,
     "channel": "A",
