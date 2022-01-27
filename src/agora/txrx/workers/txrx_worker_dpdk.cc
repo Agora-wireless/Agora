@@ -14,7 +14,7 @@
 #include "dpdk_transport.h"
 #include "logger.h"
 
-static constexpr bool kDebugDPDK = false;
+static constexpr bool kDebugDPDK = true;
 
 TxRxWorkerDpdk::TxRxWorkerDpdk(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -46,10 +46,10 @@ TxRxWorkerDpdk::TxRxWorkerDpdk(
   // and multi radios (interfaces, local ports) per device
   //Direct the traffic flow to this thread and its interfaces
   for (size_t interface = 0; interface < num_interfaces_; interface++) {
-    const uint16_t dest_port = rte_cpu_to_be_16(
-        config->BsServerPort() + (interface + interface_offset_));
+    const uint16_t dest_port =
+        config->BsServerPort() + (interface + interface_offset_);
     const uint16_t src_port =
-        rte_cpu_to_be_16(config->BsRruPort() + (interface + interface_offset_));
+        config->BsRruPort() + (interface + interface_offset_);
 
     const auto& port_queue_id = dpdk_phy_port_queues_.at(interface);
     const auto& port_id = port_queue_id.first;
@@ -77,19 +77,19 @@ static void ClassFunctioWrapper(TxRxWorkerDpdk* context) {
 // worker:lcore
 void TxRxWorkerDpdk::Start() {
   rte_eal_wait_lcore(tid_);
-  MLPD_INFO("TxRxWorkerDpdk[%zu] starting\n", tid_);
+  MLPD_TRACE("TxRxWorkerDpdk[%zu] starting\n", tid_);
   int status = rte_eal_remote_launch(
       (lcore_function_t*)(ClassFunctioWrapper<&TxRxWorkerDpdk::DoTxRx>), this,
       tid_);
-  MLPD_INFO("TxRxWorkerDpdk: started on lcore %zu\n", tid_);
+  MLPD_INFO("TxRxWorkerDpdk[%zu]: started on dpdk managed l_core\n", tid_);
   RtAssert(status == 0, "Lcore cannot launch TxRx function");
 }
 
 void TxRxWorkerDpdk::Stop() {
   Configuration()->Running(false);
-  MLPD_INFO("TxRxWorker[%zu] stopping\n", tid_);
+  MLPD_INFO("TxRxWorkerDpdk[%zu] stopping\n", tid_);
   rte_eal_wait_lcore(tid_);
-  MLPD_INFO("TxRxWorker[%zu] stopped\n", tid_);
+  MLPD_INFO("TxRxWorkerDpdk[%zu] stopped\n", tid_);
 }
 
 void TxRxWorkerDpdk::DoTxRx() {
@@ -97,7 +97,9 @@ void TxRxWorkerDpdk::DoTxRx() {
   size_t rx_index = 0;
 
   running_ = true;
+  MLPD_TRACE("TxRxWorkerDpdk[%zu] sych wait\n", tid_);
   WaitSync();
+  MLPD_TRACE("TxRxWorkerDpdk[%zu] synced\n", tid_);
 
   while (Configuration()->Running()) {
     const size_t send_result = DequeueSend();
@@ -138,17 +140,6 @@ std::vector<Packet*> TxRxWorkerDpdk::RecvEnqueue(uint16_t port_id,
     auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
         reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
     uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
-    if (kDebugDPDK) {
-      auto* udp_h = reinterpret_cast<rte_udp_hdr*>(
-          reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
-      DpdkTransport::PrintPkt(ip_hdr->src_addr, ip_hdr->dst_addr,
-                              udp_h->src_port, udp_h->dst_port,
-                              dpdk_pkt->data_len, H5T_UNIX_D32BE_g);
-      std::printf("pkt_len: %d, nb_segs: %d, Header type: %d, IPV4: %d\n",
-                  dpdk_pkt->pkt_len, dpdk_pkt->nb_segs, eth_type,
-                  RTE_ETHER_TYPE_IPV4);
-      std::printf("UDP: %d, %d\n", ip_hdr->next_proto_id, IPPROTO_UDP);
-    }
 
     bool discard_rx = false;
 
@@ -159,15 +150,29 @@ std::vector<Packet*> TxRxWorkerDpdk::RecvEnqueue(uint16_t port_id,
     }
 
     if (ip_hdr->src_addr != bs_rru_addr_) {
-      std::fprintf(stderr, "DPDK: Source addr does not match\n");
+      std::fprintf(stderr, "DPDK: Source addr %d does not match %d\n",
+                   ip_hdr->src_addr, bs_rru_addr_);
       discard_rx = true;
     }
     if (ip_hdr->dst_addr != bs_server_addr_) {
-      std::fprintf(stderr, "DPDK: Destination addr does not match\n");
+      std::fprintf(stderr, "DPDK: Destination addr %d does not match %d\n",
+                   ip_hdr->dst_addr, bs_server_addr_);
       discard_rx = true;
     }
 
     if (discard_rx == false) {
+      if (kDebugDPDK) {
+        auto* udp_h = reinterpret_cast<rte_udp_hdr*>(
+            reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
+        DpdkTransport::PrintPkt(ip_hdr->src_addr, ip_hdr->dst_addr,
+                                udp_h->src_port, udp_h->dst_port,
+                                dpdk_pkt->data_len, tid_);
+        std::printf("pkt_len: %d, nb_segs: %d, Header type: %d, IPv4: %d\n",
+                    dpdk_pkt->pkt_len, dpdk_pkt->nb_segs, eth_type,
+                    RTE_ETHER_TYPE_IPV4);
+        //std::printf("UDP: %d, %d\n", ip_hdr->next_proto_id, IPPROTO_UDP);
+      }
+
       auto* payload = reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset;
       auto& rx = GetRxPacket();
       Packet* pkt = rx.RawPacket();

@@ -52,8 +52,8 @@ Agora::Agora(Config* const cfg)
   InitializeDownlinkBuffers();
 
   /* Initialize TXRX threads */
-  if (!kUseArgos && !kUseUHD) {
-    packet_tx_rx_ = std::make_unique<PacketTxRx>(
+  if (kUseArgos || kUseUHD) {
+    packet_tx_rx_ = std::make_unique<PacketTxRxRadio>(
         cfg, cfg->CoreOffset() + 1, &message_queue_,
         GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
         socket_buffer_, socket_buffer_size_ / cfg->PacketLength(),
@@ -67,7 +67,8 @@ Agora::Agora(Config* const cfg)
         this->stats_->FrameStart(), dl_socket_buffer_);
 #endif
   } else {
-    packet_tx_rx_ = std::make_unique<PacketTxRxRadio>(
+    /* Default to the simulator */
+    packet_tx_rx_ = std::make_unique<PacketTxRx>(
         cfg, cfg->CoreOffset() + 1, &message_queue_,
         GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
         socket_buffer_, socket_buffer_size_ / cfg->PacketLength(),
@@ -1424,7 +1425,7 @@ void Agora::InitializeUplinkBuffers() {
       (cfg->Frame().NumULCalSyms() * num_rx_ul_cal_antennas) +
       (cfg->Frame().NumDLCalSyms() * num_rx_dl_cal_antennas);
 
-  std::printf("Total recip cal receive symbols per frame: %zu",
+  std::printf("Total recip cal receive symbols per frame: %zu\n",
               rx_counters_.num_reciprocity_pkts_per_frame_);
 
   rx_counters_.num_rx_pkts_per_frame_ =

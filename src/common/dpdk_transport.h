@@ -64,8 +64,9 @@ class DpdkTransport {
                               uint16_t dst_port);
 
   static void FastMemcpy(void* pvDest, void* pvSrc, size_t nBytes);
-  static void PrintPkt(int src_ip, int dst_ip, uint16_t src_port,
-                       uint16_t dst_port, int len, int tid);
+  static void PrintPkt(rte_be32_t src_ip, rte_be32_t dst_ip,
+                       rte_be16_t src_port, rte_be16_t dst_port, size_t len,
+                       size_t tid);
 
   /// Return a string representation of this packet
   static std::string PktToString(const rte_mbuf* pkt);

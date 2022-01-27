@@ -186,11 +186,13 @@ std::string DpdkTransport::PktToString(const rte_mbuf* pkt) {
   return ret.str();
 }
 
-void DpdkTransport::PrintPkt(int src_ip, int dst_ip, uint16_t src_port,
-                             uint16_t dst_port, int len, int tid) {
+// Expecting Network Byte orders
+void DpdkTransport::PrintPkt(rte_be32_t src_ip, rte_be32_t dst_ip,
+                             rte_be16_t src_port, rte_be16_t dst_port,
+                             size_t len, size_t tid) {
   uint8_t b[12];
-  uint16_t sp;
-  uint16_t dp;
+  uint16_t sp = rte_be_to_cpu_16(src_port);
+  uint16_t dp = rte_be_to_cpu_16(dst_port);
 
   b[0] = src_ip & 0xFF;
   b[1] = (src_ip >> 8) & 0xFF;
@@ -198,17 +200,19 @@ void DpdkTransport::PrintPkt(int src_ip, int dst_ip, uint16_t src_port,
   b[3] = (src_ip >> 24) & 0xFF;
   b[4] = src_port & 0xFF;
   b[5] = (src_port >> 8) & 0xFF;
-  sp = ((b[4] << 8) & 0xFF00) | (b[5] & 0x00FF);
+  uint16_t sp0 = ((b[4] << 8) & 0xFF00) | (b[5] & 0x00FF);
   b[6] = dst_ip & 0xFF;
   b[7] = (dst_ip >> 8) & 0xFF;
   b[8] = (dst_ip >> 16) & 0xFF;
   b[9] = (dst_ip >> 24) & 0xFF;
   b[10] = dst_port & 0xFF;
   b[11] = (dst_port >> 8) & 0xFF;
-  dp = ((b[10] << 8) & 0xFF00) | (b[11] & 0x00FF);
+  uint16_t dp0 = ((b[10] << 8) & 0xFF00) | (b[11] & 0x00FF);
   std::printf(
-      "In RX thread %d: rx: %u.%u.%u.%u:%u -> %u.%u.%u.%u:%u (%d bytes)\n", tid,
-      b[0], b[1], b[2], b[3], sp, b[6], b[7], b[8], b[9], dp, len);
+      "DpdkTransport[%zu]: received %u.%u.%u.%u:%u|%u -> %u.%u.%u.%u:%u|%u (%d "
+      "bytes)\n",
+      tid, b[0], b[1], b[2], b[3], sp0, sp, b[6], b[7], b[8], b[9], dp0, dp,
+      len);
 }
 
 void DpdkTransport::InstallFlowRule(uint16_t port_id, uint16_t rx_q,
@@ -253,8 +257,8 @@ void DpdkTransport::InstallFlowRule(uint16_t port_id, uint16_t rx_q,
   struct rte_flow_item_udp udp_spec;
   struct rte_flow_item_udp udp_mask;
   struct rte_flow_item udp_item;
-  udp_spec.hdr.src_port = src_port;
-  udp_spec.hdr.dst_port = dst_port;
+  udp_spec.hdr.src_port = rte_cpu_to_be_16(src_port);
+  udp_spec.hdr.dst_port = rte_cpu_to_be_16(dst_port);
   udp_spec.hdr.dgram_len = 0;
   udp_spec.hdr.dgram_cksum = 0;
 
@@ -333,8 +337,12 @@ void DpdkTransport::DpdkInit(uint16_t core_offset, size_t thread_num) {
   int rte_argc = static_cast<int>(sizeof(rte_argv) / sizeof(rte_argv[0])) - 1;
 
   // Initialize DPDK environment
+  std::printf("Dpdk init on core start %d, num threads %zu\n", core_offset,
+              thread_num);
   int ret = rte_eal_init(rte_argc, const_cast<char**>(rte_argv));
-  RtAssert(ret >= 0, "Failed to initialize DPDK");
+  RtAssert(
+      ret >= 0,
+      "Failed to initialize DPDK.  Are you running with root permissions?");
   std::printf("%s initialized\n", rte_version());
 }
 
