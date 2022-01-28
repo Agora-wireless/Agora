@@ -37,18 +37,21 @@ class UDPClient {
     }
     sock_fd_ = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock_fd_ == -1) {
-      throw std::runtime_error("UDPClient: Failed to create local socket.");
+      throw std::runtime_error(
+          "UDPClient: Failed to create local socket. errno = " +
+          std::string(std::strerror(errno)));
     }
 
     // Configure source address (helpful for flow control)
     if (src_port != 0) {
-      ::sockaddr_in client_address;
-      std::memset(&client_address, 0u, sizeof(client_address));
-      client_address.sin_family = AF_INET;
-      client_address.sin_addr.s_addr = htonl(INADDR_ANY);
-      client_address.sin_port = htons(src_port);
+      ::sockaddr_in local_address;
+      local_address.sin_family = AF_INET;
+      local_address.sin_addr.s_addr = htonl(INADDR_ANY);
+      local_address.sin_port = htons(src_port);
+      std::memset(local_address.sin_zero, 0u, sizeof(local_address.sin_zero));
       const int bind_result =
-          ::bind(sock_fd_, (sockaddr*)&client_address, sizeof(client_address));
+          ::bind(sock_fd_, reinterpret_cast<::sockaddr*>(&local_address),
+                 sizeof(local_address));
       if (bind_result != 0) {
         throw std::runtime_error("UDPClient: Failed to bind local socket.");
       }
@@ -63,7 +66,13 @@ class UDPClient {
     }
     addrinfo_map_.clear();
     if (sock_fd_ != -1) {
-      ::close(sock_fd_);
+      const int close_status = ::close(sock_fd_);
+      if (close_status != 0) {
+        std::printf(
+            "WARNING - UDPClient failed while trying to close socket %d with "
+            "status %d\n",
+            sock_fd_, close_status);
+      }
       sock_fd_ = -1;
     }
 
@@ -86,17 +95,17 @@ class UDPClient {
   void Send(const std::string& rem_hostname, uint16_t rem_port,
             const uint8_t* msg, size_t len) {
     std::string remote_uri = rem_hostname + ":" + std::to_string(rem_port);
-    addrinfo* rem_addrinfo = nullptr;
+    ::addrinfo* rem_addrinfo = nullptr;
 
     if (kDebugPrintUdpClientSend) {
-      std::printf("UDPClient sending message to %s to port %d\n",
-                  rem_hostname.c_str(), rem_port);
+      std::printf("UDPClient sending message to %s:%d of size %zu\n",
+                  rem_hostname.c_str(), rem_port, len);
     }
 
     const auto remote_itr = addrinfo_map_.find(remote_uri);
     if (remote_itr == addrinfo_map_.end()) {
       char port_str[16u];
-      snprintf(port_str, sizeof(port_str), "%u", rem_port);
+      std::snprintf(port_str, sizeof(port_str), "%u", rem_port);
 
       ::addrinfo hints;
       std::memset(&hints, 0, sizeof(hints));

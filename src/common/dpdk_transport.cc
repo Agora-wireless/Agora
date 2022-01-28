@@ -152,6 +152,8 @@ void DpdkTransport::FastMemcpy(void* pvDest, void* pvSrc, size_t nBytes) {
   // (intptr_t(pvSrc) & 31) ); assert(nBytes % 32 == 0);
   // assert((intptr_t(pvDest) & 31) == 0);
   // assert((intptr_t(pvSrc) & 31) == 0);
+
+  // Requires 64 Byte alignment of src and desy
 #if defined(__AVX512F__) and (__GNUC__ >= 9)
   __m512i* pSrc = reinterpret_cast<__m512i*>(pvSrc);
   __m512i* pDest = reinterpret_cast<__m512i*>(pvDest);
@@ -161,6 +163,7 @@ void DpdkTransport::FastMemcpy(void* pvDest, void* pvSrc, size_t nBytes) {
     _mm512_stream_si512(pDest, loaded);
   }
 
+  // Requires 32 Byte alignment of src and desy
 #else
   const __m256i* p_src = reinterpret_cast<const __m256i*>(pvSrc);
   __m256i* p_dest = reinterpret_cast<__m256i*>(pvDest);
@@ -190,7 +193,7 @@ std::string DpdkTransport::PktToString(const rte_mbuf* pkt) {
 void DpdkTransport::PrintPkt(rte_be32_t src_ip, rte_be32_t dst_ip,
                              rte_be16_t src_port, rte_be16_t dst_port,
                              size_t len, size_t tid) {
-  uint8_t b[12];
+  uint8_t b[8u];
   uint16_t sp = rte_be_to_cpu_16(src_port);
   uint16_t dp = rte_be_to_cpu_16(dst_port);
 
@@ -198,21 +201,16 @@ void DpdkTransport::PrintPkt(rte_be32_t src_ip, rte_be32_t dst_ip,
   b[1] = (src_ip >> 8) & 0xFF;
   b[2] = (src_ip >> 16) & 0xFF;
   b[3] = (src_ip >> 24) & 0xFF;
-  b[4] = src_port & 0xFF;
-  b[5] = (src_port >> 8) & 0xFF;
-  uint16_t sp0 = ((b[4] << 8) & 0xFF00) | (b[5] & 0x00FF);
-  b[6] = dst_ip & 0xFF;
-  b[7] = (dst_ip >> 8) & 0xFF;
-  b[8] = (dst_ip >> 16) & 0xFF;
-  b[9] = (dst_ip >> 24) & 0xFF;
-  b[10] = dst_port & 0xFF;
-  b[11] = (dst_port >> 8) & 0xFF;
-  uint16_t dp0 = ((b[10] << 8) & 0xFF00) | (b[11] & 0x00FF);
+
+  b[4] = dst_ip & 0xFF;
+  b[5] = (dst_ip >> 8) & 0xFF;
+  b[6] = (dst_ip >> 16) & 0xFF;
+  b[7] = (dst_ip >> 24) & 0xFF;
+
   std::printf(
-      "DpdkTransport[%zu]: received %u.%u.%u.%u:%u|%u -> %u.%u.%u.%u:%u|%u (%d "
+      "DpdkTransport[%zu]: received %u.%u.%u.%u:%u -> %u.%u.%u.%u:%u (%zu "
       "bytes)\n",
-      tid, b[0], b[1], b[2], b[3], sp0, sp, b[6], b[7], b[8], b[9], dp0, dp,
-      len);
+      tid, b[0u], b[1u], b[2u], b[3u], sp, b[4u], b[5u], b[6u], b[7u], dp, len);
 }
 
 void DpdkTransport::InstallFlowRule(uint16_t port_id, uint16_t rx_q,

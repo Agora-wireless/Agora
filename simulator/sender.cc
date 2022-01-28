@@ -417,7 +417,7 @@ void* Sender::WorkerThread(int tid) {
 
         if ((kDebugPrintSender == true)) {
           std::printf(
-              "Sender : worker %d processing frame %d symbol %d, type %d\n",
+              "Sender worker [%d]: processing frame %d symbol %d, type %d\n",
               tid, tag.frame_id_, tag.symbol_id_,
               static_cast<int>(cfg_->GetSymbolType(tag.symbol_id_)));
         }
@@ -436,9 +436,9 @@ void* Sender::WorkerThread(int tid) {
         }
 
         const size_t dest_port = cfg_->BsServerPort() + cur_radio;
-        const size_t interface_idx = cur_radio - radio_lo;
 
 #ifndef USE_DPDK
+        const size_t interface_idx = cur_radio - radio_lo;
         udp_clients.at(interface_idx)
             ->Send(cfg_->BsServerAddr(), dest_port,
                    reinterpret_cast<uint8_t*>(socks_pkt_buf),

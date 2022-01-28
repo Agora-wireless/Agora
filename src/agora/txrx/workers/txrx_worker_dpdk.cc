@@ -164,26 +164,45 @@ std::vector<Packet*> TxRxWorkerDpdk::RecvEnqueue(uint16_t port_id,
       if (kDebugDPDK) {
         auto* udp_h = reinterpret_cast<rte_udp_hdr*>(
             reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
+
+        //if (rte_be_to_cpu_16(ip_hdr->fragment_offset) != 0) {
+        //  std::printf("WARNING:  fragmented packet %u:%u\n",
+        //              ip_hdr->fragment_offset,
+        //              rte_be_to_cpu_16(ip_hdr->fragment_offset));
+        //}
         DpdkTransport::PrintPkt(ip_hdr->src_addr, ip_hdr->dst_addr,
                                 udp_h->src_port, udp_h->dst_port,
                                 dpdk_pkt->data_len, tid_);
-        std::printf("pkt_len: %d, nb_segs: %d, Header type: %d, IPv4: %d\n",
-                    dpdk_pkt->pkt_len, dpdk_pkt->nb_segs, eth_type,
-                    RTE_ETHER_TYPE_IPV4);
-        //std::printf("UDP: %d, %d\n", ip_hdr->next_proto_id, IPPROTO_UDP);
+        std::printf(
+            "pkt_len: %d, datagram len %d, data len %d, nb_segs: %d, data "
+            "offset %d, Header type: %d, IPv4: %d on dpdk dev %u and queue id "
+            "%u\n",
+            dpdk_pkt->pkt_len, rte_be_to_cpu_16(udp_h->dgram_len),
+            dpdk_pkt->data_len, dpdk_pkt->nb_segs, dpdk_pkt->data_off, eth_type,
+            RTE_ETHER_TYPE_IPV4, port_id, queue_id);
       }
 
-      auto* payload = reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset;
+      //auto* payload = reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset;
+      // We are playing an alignment game here to use FastMemcpy
+      auto* payload = reinterpret_cast<uint8_t*>(ip_hdr) +
+                      sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr);
       auto& rx = GetRxPacket();
       Packet* pkt = rx.RawPacket();
 
 #if defined(USE_DPDK_MEMORY)
       rx.Set(dpdk_pkt, reinterpret_cast<Packet*>(payload));
 #else
-      DpdkTransport::FastMemcpy(reinterpret_cast<uint8_t*>(pkt), payload,
-                                Configuration()->PacketLength());
+      //DpdkTransport::FastMemcpy(reinterpret_cast<uint8_t*>(pkt), payload,
+      //                          Configuration()->PacketLength());
+      memcpy(pkt, payload, Configuration()->PacketLength());
       rte_pktmbuf_free(dpdk_pkt);
 #endif
+
+      MLPD_INFO(
+          "TxRxWorkerDpdk[%zu]::RecvEnqueue received pkt (frame %d, symbol "
+          "%d, ant %d) on port %u queue %u\n",
+          tid_, pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_, port_id,
+          queue_id);
 
       // Push kPacketRX event into the queue.
       EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
