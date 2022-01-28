@@ -15,7 +15,7 @@
 #include <arpa/inet.h>
 #endif
 
-static constexpr bool kDebugPrintSender = true;
+static constexpr bool kDebugPrintSender = false;
 
 static std::atomic<bool> keep_running = true;
 // A spinning barrier to synchronize the start of worker threads
@@ -193,12 +193,18 @@ size_t Sender::FindNextSymbol(size_t start_symbol) {
 }
 
 void Sender::ScheduleSymbol(size_t frame, size_t symbol_id) {
-  for (size_t i = 0; i < cfg_->BsAntNum(); i++) {
-    auto req_tag = gen_tag_t::FrmSymAnt(frame, symbol_id, i);
+  size_t radios_per_worker = (cfg_->NumRadios() / socket_thread_num_);
+  if ((cfg_->NumRadios() % socket_thread_num_) != 0) {
+    radios_per_worker++;
+  }
+  const size_t ant_per_worker = radios_per_worker * cfg_->NumChannels();
+  //Change to bulk enqueue
+  for (size_t ant_num = 0; ant_num < cfg_->BsAntNum(); ant_num++) {
+    const size_t worker_id = ant_num / ant_per_worker;
+    auto req_tag = gen_tag_t::FrmSymAnt(frame, symbol_id, ant_num);
     // Split up the antennas amoung the worker threads
-    RtAssert(
-        send_queue_.enqueue(*task_ptok_[i % socket_thread_num_], req_tag.tag_),
-        "Send task enqueue failed");
+    RtAssert(send_queue_.enqueue(*task_ptok_[worker_id], req_tag.tag_),
+             "Send task enqueue failed");
   }
 }
 
@@ -319,41 +325,51 @@ void* Sender::WorkerThread(int tid) {
     // Wait
   }
 
+  const size_t max_symbol_id =
+      cfg_->Frame().NumPilotSyms() +
+      cfg_->Frame().NumULSyms();  // TEMP not sure if this is ok
+
+  size_t radios_per_worker = (cfg_->NumRadios() / socket_thread_num_);
+  if ((cfg_->NumRadios() % socket_thread_num_) != 0) {
+    radios_per_worker++;
+  }
+
+  const size_t radio_lo = tid * radios_per_worker;
+  //This thread has nothing to do
+  if (radio_lo >= cfg_->NumRadios()) {
+    return nullptr;
+  }
+  const size_t radio_hi =
+      std::min(radio_lo + radios_per_worker, cfg_->NumRadios()) - 1;
+  const size_t radios_this_worker = ((radio_hi - radio_lo) + 1);
+  const size_t ant_num_this_thread = radios_this_worker * cfg_->NumChannels();
+
+  MLPD_INFO(
+      "Sender worker[%d]: emulating radios %zu:%zu total radios handled by "
+      "this worker %zu\n",
+      tid, radio_lo, radio_hi, radios_this_worker);
+
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
   DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1,
                        cfg_->OfdmCaNum());
   DftiCommitDescriptor(mkl_handle);
 
-  const size_t max_symbol_id =
-      cfg_->Frame().NumPilotSyms() +
-      cfg_->Frame().NumULSyms();  // TEMP not sure if this is ok
-  const size_t radio_lo = (tid * cfg_->NumRadios()) / socket_thread_num_;
-  const size_t radio_hi = ((tid + 1) * cfg_->NumRadios()) / socket_thread_num_;
-  const size_t ant_num_this_thread =
-      cfg_->BsAntNum() / socket_thread_num_ +
-      (static_cast<size_t>(tid) < cfg_->BsAntNum() % socket_thread_num_ ? 1
-                                                                        : 0);
-
-  //This thread has nothing to do
-  if (ant_num_this_thread == 0) {
-    return nullptr;
-  }
-
-  MLPD_INFO(
-      "Sender worker[%d]: running emulating radios %zu:%zu radios this thread "
-      "%zu\n",
-      tid, radio_lo, radio_hi, ant_num_this_thread);
-
 #if defined(USE_DPDK)
   uint16_t port_id = port_ids_.at(tid % cfg_->DpdkNumPorts());
   const size_t queue_id = tid / cfg_->DpdkNumPorts();
-  std::printf("Worker thread %d using port %u, queue %zu\n", tid, port_id,
+  std::printf("Sender worker[%d]: using port %u, queue %zu\n", tid, port_id,
               queue_id);
   rte_mbuf* tx_mbufs[kDequeueBulkSize];
 #else
-  UDPClient udp_client;
+  // Make a client / socket for each interface (simular to radio behavior)
+  std::vector<std::unique_ptr<UDPClient> > udp_clients;
+  //Setting up the source port.  Each radio has a unique source port id
+  for (size_t radio_number = radio_lo; radio_number <= radio_hi;
+       radio_number++) {
+    udp_clients.emplace_back(
+        std::make_unique<UDPClient>(cfg_->BsRruPort() + radio_number));
+  }
 #endif
-  //!!!!!!!!Setup the source port.....
 
   auto* fft_inout =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
@@ -367,14 +383,14 @@ void* Sender::WorkerThread(int tid) {
   size_t total_tx_packets_rolling = 0;
   size_t cur_radio = radio_lo;
 
-  MLPD_INFO("Sender: In thread %d, %zu antennas, total bs antennas: %zu\n", tid,
+  MLPD_INFO("Sender worker[%d]: %zu antennas, total bs antennas: %zu\n", tid,
             ant_num_this_thread, cfg_->BsAntNum());
 
   // We currently don't support zero-padding OFDM prefix and postfix
   RtAssert(cfg_->PacketLength() ==
            Packet::kOffsetOfData +
                (kUse12BitIQ ? 3 : 4) * (cfg_->CpLen() + cfg_->OfdmCaNum()));
-  size_t ant_num_per_cell = cfg_->BsAntNum() / cfg_->NumCells();
+  const size_t ant_num_per_cell = cfg_->BsAntNum() / cfg_->NumCells();
 
   size_t tags[kDequeueBulkSize];
   while (keep_running.load() == true) {
@@ -420,11 +436,13 @@ void* Sender::WorkerThread(int tid) {
         }
 
         const size_t dest_port = cfg_->BsServerPort() + cur_radio;
+        const size_t interface_idx = cur_radio - radio_lo;
 
 #ifndef USE_DPDK
-        udp_client.Send(cfg_->BsServerAddr(), dest_port,
-                        reinterpret_cast<uint8_t*>(socks_pkt_buf),
-                        cfg_->PacketLength());
+        udp_clients.at(interface_idx)
+            ->Send(cfg_->BsServerAddr(), dest_port,
+                   reinterpret_cast<uint8_t*>(socks_pkt_buf),
+                   cfg_->PacketLength());
 #endif
 
         if (kDebugSenderReceiver == true) {
@@ -441,10 +459,10 @@ void* Sender::WorkerThread(int tid) {
         total_tx_packets++;
         if (total_tx_packets_rolling ==
             ant_num_this_thread * max_symbol_id * 1000) {
-          double end = GetTime::GetTimeUs();
-          double byte_len = cfg_->PacketLength() * ant_num_this_thread *
-                            max_symbol_id * 1000.f;
-          double diff = end - begin;
+          const double end = GetTime::GetTimeUs();
+          const double byte_len = cfg_->PacketLength() * ant_num_this_thread *
+                                  max_symbol_id * 1000.f;
+          const double diff = end - begin;
           std::printf("Thread %zu send %zu frames in %f secs, tput %f Mbps\n",
                       (size_t)tid,
                       total_tx_packets / (ant_num_this_thread * max_symbol_id),

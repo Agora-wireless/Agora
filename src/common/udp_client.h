@@ -30,13 +30,28 @@ class UDPClient {
  public:
   static const bool kDebugPrintUdpClientInit = false;
   static const bool kDebugPrintUdpClientSend = false;
-  UDPClient() {
+  explicit UDPClient(uint16_t src_port = 0) {
     if (kDebugPrintUdpClientInit) {
-      std::printf("Creating UDP Client socket\n");
+      std::printf("Creating UDP Client socket sending from port %d\n",
+                  src_port);
     }
-    sock_fd_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    sock_fd_ = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock_fd_ == -1) {
       throw std::runtime_error("UDPClient: Failed to create local socket.");
+    }
+
+    // Configure source address (helpful for flow control)
+    if (src_port != 0) {
+      ::sockaddr_in client_address;
+      std::memset(&client_address, 0u, sizeof(client_address));
+      client_address.sin_family = AF_INET;
+      client_address.sin_addr.s_addr = htonl(INADDR_ANY);
+      client_address.sin_port = htons(src_port);
+      const int bind_result =
+          ::bind(sock_fd_, (sockaddr*)&client_address, sizeof(client_address));
+      if (bind_result != 0) {
+        throw std::runtime_error("UDPClient: Failed to bind local socket.");
+      }
     }
   }
 
@@ -44,11 +59,11 @@ class UDPClient {
 
   ~UDPClient() {
     for (const auto& kv : addrinfo_map_) {
-      freeaddrinfo(kv.second);
+      ::freeaddrinfo(kv.second);
     }
     addrinfo_map_.clear();
     if (sock_fd_ != -1) {
-      close(sock_fd_);
+      ::close(sock_fd_);
       sock_fd_ = -1;
     }
 
@@ -71,7 +86,7 @@ class UDPClient {
   void Send(const std::string& rem_hostname, uint16_t rem_port,
             const uint8_t* msg, size_t len) {
     std::string remote_uri = rem_hostname + ":" + std::to_string(rem_port);
-    struct addrinfo* rem_addrinfo = nullptr;
+    addrinfo* rem_addrinfo = nullptr;
 
     if (kDebugPrintUdpClientSend) {
       std::printf("UDPClient sending message to %s to port %d\n",
@@ -83,18 +98,18 @@ class UDPClient {
       char port_str[16u];
       snprintf(port_str, sizeof(port_str), "%u", rem_port);
 
-      struct addrinfo hints;
+      ::addrinfo hints;
       std::memset(&hints, 0, sizeof(hints));
       hints.ai_family = AF_INET;
       hints.ai_socktype = SOCK_DGRAM;
       hints.ai_protocol = IPPROTO_UDP;
 
       int r =
-          getaddrinfo(rem_hostname.c_str(), port_str, &hints, &rem_addrinfo);
+          ::getaddrinfo(rem_hostname.c_str(), port_str, &hints, &rem_addrinfo);
       if ((r != 0) || (rem_addrinfo == nullptr)) {
         char issue_msg[1000u];
-        sprintf(issue_msg, "Failed to resolve %s. getaddrinfo error = %s.",
-                remote_uri.c_str(), gai_strerror(r));
+        std::sprintf(issue_msg, "Failed to resolve %s. getaddrinfo error = %s.",
+                     remote_uri.c_str(), gai_strerror(r));
         throw std::runtime_error(issue_msg);
       }
 
@@ -113,15 +128,15 @@ class UDPClient {
       }
 
       if (map_insert_result.second == false) {
-        freeaddrinfo(rem_addrinfo);
+        ::freeaddrinfo(rem_addrinfo);
         rem_addrinfo = map_insert_result.first->second;
       }
     } else {
       rem_addrinfo = remote_itr->second;
     }
 
-    ssize_t ret = sendto(sock_fd_, msg, len, 0, rem_addrinfo->ai_addr,
-                         rem_addrinfo->ai_addrlen);
+    ssize_t ret = ::sendto(sock_fd_, msg, len, 0, rem_addrinfo->ai_addr,
+                           rem_addrinfo->ai_addrlen);
     if (ret != static_cast<ssize_t>(len)) {
       throw std::runtime_error("sendto() failed. errno = " +
                                std::string(std::strerror(errno)));
