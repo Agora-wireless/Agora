@@ -11,8 +11,10 @@
 #include "rte_version.h"
 #include "utils.h"
 
-inline struct rte_eth_conf PortConfDefault() {
-  struct rte_eth_conf port_conf = rte_eth_conf();
+static constexpr size_t kJumboFrameSize = 9000;
+
+inline rte_eth_conf PortConfDefault() {
+  rte_eth_conf port_conf = rte_eth_conf();
   port_conf.rxmode.max_rx_pkt_len = kJumboFrameMaxSize;
   port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
   return port_conf;
@@ -33,7 +35,7 @@ std::vector<uint16_t> DpdkTransport::GetPortIDFromMacAddr(
     // Find the port id with the given MAC address
     uint16_t port_id;
     RTE_ETH_FOREACH_DEV(port_id) {
-      struct rte_ether_addr addr;
+      rte_ether_addr addr;
       rte_eth_macaddr_get(port_id, &addr);
       if (std::equal(std::begin(addr.addr_bytes), std::end(addr.addr_bytes),
                      std::begin(rte_mac_addr.addr_bytes))) {
@@ -45,9 +47,9 @@ std::vector<uint16_t> DpdkTransport::GetPortIDFromMacAddr(
   return port_ids;
 }
 
-int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
+int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
                            int thread_num, size_t pkt_len) {
-  struct rte_eth_conf port_conf = PortConfDefault();
+  rte_eth_conf port_conf = PortConfDefault();
   const uint16_t rx_rings = thread_num;
   const uint16_t tx_rings = thread_num;
   int retval;
@@ -55,9 +57,9 @@ int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
   uint16_t nb_rxd = kRxRingSize;
   uint16_t nb_txd = kTxRingSize;
 
-  struct rte_eth_dev_info dev_info;
-  struct rte_eth_rxconf rxconf;
-  struct rte_eth_txconf txconf;
+  rte_eth_dev_info dev_info;
+  rte_eth_rxconf rxconf;
+  rte_eth_txconf txconf;
 
   if (rte_eth_dev_count_avail() < port) {
     rte_exit(EXIT_FAILURE, "Not Enough NICs\n");
@@ -67,17 +69,22 @@ int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
     rte_exit(EXIT_FAILURE, "NIC ID is invalid\n");
   }
 
-  rte_eth_dev_set_mtu(port, 9000);
+  int status;
+  status = rte_eth_dev_set_mtu(port, kJumboFrameSize);
+  RtAssert(status == 0, "Cannot set the MTU size for the given dev");
+
   uint16_t mtu_size = 0;
-  rte_eth_dev_get_mtu(port, &mtu_size);
-  RtAssert(mtu_size == 9000, "Invalid MTU (must be 9000 bytes)");
+  status = rte_eth_dev_get_mtu(port, &mtu_size);
+  RtAssert(status == 0, "Cannot get the MTU size for the given dev");
+  RtAssert(mtu_size == kJumboFrameSize, "Invalid MTU (must be 9000 bytes)");
 
   int promiscuous_en = rte_eth_promiscuous_get(port);
   rte_eth_promiscuous_enable(port);
   promiscuous_en = rte_eth_promiscuous_get(port);
   RtAssert(promiscuous_en == 1, "Unable to set promiscuous mode");
 
-  rte_eth_dev_info_get(port, &dev_info);
+  status = rte_eth_dev_info_get(port, &dev_info);
+  RtAssert(status == 0, "Unable to obtain dev info");
   if ((dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE) != 0u) {
     port_conf.txmode.offloads |= DEV_TX_OFFLOAD_MBUF_FAST_FREE;
   }
@@ -123,7 +130,7 @@ int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
     return retval;
   }
 
-  struct rte_ether_addr addr;
+  rte_ether_addr addr;
   rte_eth_macaddr_get(port, &addr);
   std::printf("NIC %u Socket: %d, MAC: %02" PRIx8 " %02" PRIx8 " %02" PRIx8
               " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 " \n",
@@ -131,7 +138,7 @@ int DpdkTransport::NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
               addr.addr_bytes[1], addr.addr_bytes[2], addr.addr_bytes[3],
               addr.addr_bytes[4], addr.addr_bytes[5]);
 
-  struct rte_eth_link link;
+  rte_eth_link link;
   rte_eth_link_get_nowait(port, &link);
   while (!link.link_status) {
     std::printf("Waiting for link up on NIC %" PRIu16 "\n", port);
@@ -216,45 +223,47 @@ void DpdkTransport::PrintPkt(rte_be32_t src_ip, rte_be32_t dst_ip,
 void DpdkTransport::InstallFlowRule(uint16_t port_id, uint16_t rx_q,
                                     uint32_t src_ip, uint32_t dest_ip,
                                     uint16_t src_port, uint16_t dst_port) {
-  struct rte_flow_attr attr;
-  struct rte_flow_item pattern[4];
-  struct rte_flow_action action[2];
-  struct rte_flow_action_queue queue = {.index = rx_q};
-  std::memset(pattern, 0, sizeof(pattern));
-  std::memset(action, 0, sizeof(action));
+  rte_flow_attr attr;
+  rte_flow_item pattern[4u];
+  rte_flow_action action[2u];
+  rte_flow_action_queue queue = {.index = rx_q};
+  std::memset(pattern, 0u, sizeof(pattern));
+  std::memset(action, 0u, sizeof(action));
 
   // Set the rule attribute. Only ingress packets will be checked.
-  std::memset(&attr, 0, sizeof(struct rte_flow_attr));
+  std::memset(&attr, 0u, sizeof(rte_flow_attr));
   attr.ingress = 1;
   attr.priority = 0;
 
   // Create the action sequence. One action only: move packet to queue
-  action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
-  action[0].conf = &queue;
-  action[1].type = RTE_FLOW_ACTION_TYPE_END;
+  action[0u].type = RTE_FLOW_ACTION_TYPE_QUEUE;
+  action[0u].conf = &queue;
+  action[1u].type = RTE_FLOW_ACTION_TYPE_END;
 
   // Set the first level of the pattern (ETH), allow all
-  pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
-  pattern[3].type = RTE_FLOW_ITEM_TYPE_END;
+  pattern[0u].type = RTE_FLOW_ITEM_TYPE_ETH;
+  pattern[3u].type = RTE_FLOW_ITEM_TYPE_END;
 
   // Set the second level of the pattern (IP)
-  struct rte_flow_item_ipv4 ip_spec;
-  struct rte_flow_item_ipv4 ip_mask;
-  std::memset(&ip_spec, 0, sizeof(struct rte_flow_item_ipv4));
-  std::memset(&ip_mask, 0, sizeof(struct rte_flow_item_ipv4));
+  rte_flow_item_ipv4 ip_spec;
+  rte_flow_item_ipv4 ip_mask;
+  std::memset(&ip_spec, 0, sizeof(rte_flow_item_ipv4));
+  std::memset(&ip_mask, 0, sizeof(rte_flow_item_ipv4));
+  //ip_spec.hdr.dst_addr = rte_cpu_to_be_32(dest_ip);
   ip_spec.hdr.dst_addr = dest_ip;
   ip_mask.hdr.dst_addr = 0xffffffff;
+  //ip_spec.hdr.src_addr = rte_cpu_to_be_32(src_ip);
   ip_spec.hdr.src_addr = src_ip;
   ip_mask.hdr.src_addr = 0xffffffff;
 
-  pattern[1].type = RTE_FLOW_ITEM_TYPE_IPV4;
-  pattern[1].spec = &ip_spec;
-  pattern[1].mask = &ip_mask;
+  pattern[1u].type = RTE_FLOW_ITEM_TYPE_IPV4;
+  pattern[1u].spec = &ip_spec;
+  pattern[1u].mask = &ip_mask;
 
   // Set the third level of the pattern (UDP)
-  struct rte_flow_item_udp udp_spec;
-  struct rte_flow_item_udp udp_mask;
-  struct rte_flow_item udp_item;
+  rte_flow_item_udp udp_spec;
+  rte_flow_item_udp udp_mask;
+  rte_flow_item udp_item;
   udp_spec.hdr.src_port = rte_cpu_to_be_16(src_port);
   udp_spec.hdr.dst_port = rte_cpu_to_be_16(dst_port);
   udp_spec.hdr.dgram_len = 0;
@@ -269,7 +278,7 @@ void DpdkTransport::InstallFlowRule(uint16_t port_id, uint16_t rx_q,
   udp_item.spec = &udp_spec;
   udp_item.mask = &udp_mask;
   udp_item.last = nullptr;
-  pattern[2] = udp_item;
+  pattern[2u] = udp_item;
 
   rte_flow_error error;
   int res = rte_flow_validate(port_id, &attr, pattern, action, &error);

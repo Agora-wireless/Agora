@@ -405,7 +405,7 @@ void* Sender::WorkerThread(int tid) {
                (cfg_->GetSymbolType(tag.symbol_id_) == SymbolType::kUL));
 
         // Send a message to the server. We assume that the server is running.
-        Packet* pkt = socks_pkt_buf;
+        Packet* pkt = nullptr;
 #if defined(USE_DPDK)
         tx_mbufs[tag_id] = DpdkTransport::AllocUdp(
             mbuf_pool_, sender_mac_addr_[port_id], server_mac_addr_[port_id],
@@ -413,6 +413,8 @@ void* Sender::WorkerThread(int tid) {
             this->cfg_->BsServerPort() + tid, this->cfg_->PacketLength());
         pkt = reinterpret_cast<Packet*>(
             rte_pktmbuf_mtod(tx_mbufs[tag_id], uint8_t*) + kPayloadOffset);
+#else
+        pkt = socks_pkt_buf;
 #endif
 
         if ((kDebugPrintSender == true)) {
@@ -500,7 +502,6 @@ void* Sender::WorkerThread(int tid) {
   std::free(static_cast<void*>(socks_pkt_buf));
   std::free(static_cast<void*>(fft_inout));
   MLPD_FRAME("Sender: worker thread %d exit\n", tid);
-  std::printf("Sender: worker thread %d exit\n", tid);
   return nullptr;
 }
 

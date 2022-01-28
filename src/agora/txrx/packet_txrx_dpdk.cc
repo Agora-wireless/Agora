@@ -85,11 +85,14 @@ PacketTxRxDpdk::PacketTxRxDpdk(
       }
     }
   }
-  MLPD_INFO("Number of DPDK worker lcores: %d\n", rte_lcore_count());
+  MLPD_INFO("DPDK main core id %d, worker lcores (worker + main): %d\n",
+            rte_get_main_lcore(), rte_lcore_count());
 }
 
 PacketTxRxDpdk::~PacketTxRxDpdk() {
+  std::printf("~PacketTxRxDpdk: eal cleanup\n");
   rte_mempool_free(mbuf_pool_);
+  rte_delay_ms(100);
   rte_eal_cleanup();
 }
 

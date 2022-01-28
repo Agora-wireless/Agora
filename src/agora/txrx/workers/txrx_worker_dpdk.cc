@@ -146,21 +146,58 @@ std::vector<Packet*> TxRxWorkerDpdk::RecvEnqueue(uint16_t port_id,
     //Is this the data we care about
     if ((eth_type != RTE_ETHER_TYPE_IPV4) ||
         (ip_hdr->next_proto_id != IPPROTO_UDP)) {
+      std::fprintf(
+          stderr,
+          "TxRxWorkerDpdk[%zu]: Rx pkt not a UDPv4 packet - type %d, proto %d "
+          "source %d dest %d on port %d queue %d\n",
+          tid_, eth_type, ip_hdr->next_proto_id,
+          rte_be_to_cpu_32(ip_hdr->src_addr),
+          rte_be_to_cpu_32(ip_hdr->dst_addr), port_id, queue_id);
       discard_rx = true;
     }
 
     if (ip_hdr->src_addr != bs_rru_addr_) {
-      std::fprintf(stderr, "DPDK: Source addr %d does not match %d\n",
-                   ip_hdr->src_addr, bs_rru_addr_);
-      discard_rx = true;
-    }
-    if (ip_hdr->dst_addr != bs_server_addr_) {
-      std::fprintf(stderr, "DPDK: Destination addr %d does not match %d\n",
-                   ip_hdr->dst_addr, bs_server_addr_);
+      std::fprintf(stderr,
+                   "TxRxWorkerDpdk[%zu]: Source addr %d does not match %d\n",
+                   tid_, rte_be_to_cpu_32(ip_hdr->src_addr),
+                   rte_be_to_cpu_32(bs_rru_addr_));
       discard_rx = true;
     }
 
-    if (discard_rx == false) {
+    if (ip_hdr->dst_addr != bs_server_addr_) {
+      char pkt_dest_buf[INET_ADDRSTRLEN];
+      char check_dest_buf[INET_ADDRSTRLEN];
+      ::in_addr pkt_dest;
+      ::in_addr check_dest;
+      pkt_dest.s_addr = ip_hdr->dst_addr;
+      check_dest.s_addr = bs_server_addr_;
+      ::inet_ntop(AF_INET, &pkt_dest, pkt_dest_buf, sizeof(pkt_dest_buf));
+      ::inet_ntop(AF_INET, &check_dest, check_dest_buf, sizeof(check_dest_buf));
+
+      std::fprintf(
+          stderr,
+          "TxRxWorkerDpdk[%zu]: Destination addr %s does not match %s\n", tid_,
+          pkt_dest_buf, check_dest_buf);
+      discard_rx = true;
+    }
+
+    if (discard_rx) {
+      char pkt_dest_buf[INET_ADDRSTRLEN];
+      char pkt_src_buf[INET_ADDRSTRLEN];
+      ::in_addr pkt_dest;
+      ::in_addr pkt_src;
+      pkt_dest.s_addr = ip_hdr->dst_addr;
+      pkt_src.s_addr = ip_hdr->src_addr;
+      ::inet_ntop(AF_INET, &pkt_dest, pkt_dest_buf, sizeof(pkt_dest_buf));
+      ::inet_ntop(AF_INET, &pkt_src, pkt_src_buf, sizeof(pkt_src_buf));
+
+      std::printf(
+          "TxRxWorkerDpdk[%zu]: Ignoring pkt rx on dev %d queue %d. "
+          "Pkt dest addr %s : Pkt source addr %s\n",
+          tid_, port_id, queue_id, pkt_dest_buf, pkt_src_buf);
+      // Not using the rx data
+      rte_pktmbuf_free(dpdk_pkt);
+    } else {
       if (kDebugDPDK) {
         auto* udp_h = reinterpret_cast<rte_udp_hdr*>(
             reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
@@ -208,9 +245,6 @@ std::vector<Packet*> TxRxWorkerDpdk::RecvEnqueue(uint16_t port_id,
       EventData rx_message(EventType::kPacketRX, rx_tag_t(rx).tag_);
       NotifyComplete(rx_message);
       rx_packets.push_back(pkt);
-    } else {
-      // Not using the rx data
-      rte_pktmbuf_free(dpdk_pkt);
     }
   }
   return rx_packets;
