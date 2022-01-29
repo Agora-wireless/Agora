@@ -20,7 +20,7 @@ static constexpr bool kDebugPrintModul = false;
 static constexpr bool kDebugPrintDecode = false;
 
 static constexpr bool kPrintLLRData = false;
-static constexpr bool kPrintDownlinkPilotStats = false;
+static constexpr bool kPrintDownlinkPilotStats = true;
 static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr bool kRecordDownlinkFrame = true;
 static constexpr size_t kRecordFrameIndex = 100;
