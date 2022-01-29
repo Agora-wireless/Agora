@@ -36,6 +36,8 @@ class TxRxWorkerDpdk : public TxRxWorker {
  private:
   std::vector<Packet*> RecvEnqueue(uint16_t port_id, uint16_t queue_id);
   size_t DequeueSend();
+  // Returns true if packet should be ignored - will garbage collect.  Handles arp requests
+  bool Filter(rte_mbuf* packet, uint16_t port_id, uint16_t queue_id);
 
   uint32_t bs_rru_addr_;     // IPv4 address of the simulator sender
   uint32_t bs_server_addr_;  // IPv4 address of the Agora server

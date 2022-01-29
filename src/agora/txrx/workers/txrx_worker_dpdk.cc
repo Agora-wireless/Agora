@@ -77,7 +77,7 @@ static void ClassFunctioWrapper(TxRxWorkerDpdk* context) {
 // worker:lcore
 void TxRxWorkerDpdk::Start() {
   rte_eal_wait_lcore(tid_);
-  MLPD_TRACE("TxRxWorkerDpdk[%zu] starting\n", tid_);
+  MLPD_TRACE("TxRxWorkerDpdk[%zu]: starting\n", tid_);
   int status = rte_eal_remote_launch(
       (lcore_function_t*)(ClassFunctioWrapper<&TxRxWorkerDpdk::DoTxRx>), this,
       tid_);
@@ -95,11 +95,25 @@ void TxRxWorkerDpdk::Stop() {
 void TxRxWorkerDpdk::DoTxRx() {
   size_t prev_frame_id = SIZE_MAX;
   size_t rx_index = 0;
+  const unsigned int thread_socket = rte_socket_id();
 
+  MLPD_INFO("TxRxWorkerDpdk[%zu]: running on socket %u\n", tid_, thread_socket);
+  uint16_t dev_id = UINT16_MAX;
+  for (auto& device_queue : dpdk_phy_port_queues_) {
+    const uint16_t current_dev_id = device_queue.first;
+    const unsigned int dev_socket = rte_eth_dev_socket_id(current_dev_id);
+    if ((dev_id != current_dev_id) && (thread_socket != dev_socket)) {
+      MLPD_WARN(
+          "TxRxWorkerDpdk[%zu]: running on socket %u but the ethernet device "
+          "is "
+          "on socket %u\n",
+          tid_, thread_socket, dev_socket);
+    }
+    dev_id = current_dev_id;
+  }
   running_ = true;
-  MLPD_TRACE("TxRxWorkerDpdk[%zu] sych wait\n", tid_);
   WaitSync();
-  MLPD_TRACE("TxRxWorkerDpdk[%zu] synced\n", tid_);
+  MLPD_TRACE("TxRxWorkerDpdk[%zu]: synced\n", tid_);
 
   while (Configuration()->Running()) {
     const size_t send_result = DequeueSend();
@@ -139,74 +153,23 @@ std::vector<Packet*> TxRxWorkerDpdk::RecvEnqueue(uint16_t port_id,
     auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
     auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
         reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
-    uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
 
-    bool discard_rx = false;
-
-    //Is this the data we care about
-    if ((eth_type != RTE_ETHER_TYPE_IPV4) ||
-        (ip_hdr->next_proto_id != IPPROTO_UDP)) {
-      std::fprintf(
-          stderr,
-          "TxRxWorkerDpdk[%zu]: Rx pkt not a UDPv4 packet - type %d, proto %d "
-          "source %d dest %d on port %d queue %d\n",
-          tid_, eth_type, ip_hdr->next_proto_id,
-          rte_be_to_cpu_32(ip_hdr->src_addr),
-          rte_be_to_cpu_32(ip_hdr->dst_addr), port_id, queue_id);
-      discard_rx = true;
+    const uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+    if (eth_type == RTE_ETHER_TYPE_VLAN) {
+      MLPD_WARN("VLAN taged frame, larger than normal offset!");
+      throw std::runtime_error("VLAN Tagging not supported!");
     }
 
-    if (ip_hdr->src_addr != bs_rru_addr_) {
-      std::fprintf(stderr,
-                   "TxRxWorkerDpdk[%zu]: Source addr %d does not match %d\n",
-                   tid_, rte_be_to_cpu_32(ip_hdr->src_addr),
-                   rte_be_to_cpu_32(bs_rru_addr_));
-      discard_rx = true;
-    }
+    /// \todo Add support / detection of fragmented packets
 
-    if (ip_hdr->dst_addr != bs_server_addr_) {
-      char pkt_dest_buf[INET_ADDRSTRLEN];
-      char check_dest_buf[INET_ADDRSTRLEN];
-      ::in_addr pkt_dest;
-      ::in_addr check_dest;
-      pkt_dest.s_addr = ip_hdr->dst_addr;
-      check_dest.s_addr = bs_server_addr_;
-      ::inet_ntop(AF_INET, &pkt_dest, pkt_dest_buf, sizeof(pkt_dest_buf));
-      ::inet_ntop(AF_INET, &check_dest, check_dest_buf, sizeof(check_dest_buf));
+    // This function will free the rx packet if returning true
+    bool discard_rx = Filter(dpdk_pkt, port_id, queue_id);
 
-      std::fprintf(
-          stderr,
-          "TxRxWorkerDpdk[%zu]: Destination addr %s does not match %s\n", tid_,
-          pkt_dest_buf, check_dest_buf);
-      discard_rx = true;
-    }
-
-    if (discard_rx) {
-      char pkt_dest_buf[INET_ADDRSTRLEN];
-      char pkt_src_buf[INET_ADDRSTRLEN];
-      ::in_addr pkt_dest;
-      ::in_addr pkt_src;
-      pkt_dest.s_addr = ip_hdr->dst_addr;
-      pkt_src.s_addr = ip_hdr->src_addr;
-      ::inet_ntop(AF_INET, &pkt_dest, pkt_dest_buf, sizeof(pkt_dest_buf));
-      ::inet_ntop(AF_INET, &pkt_src, pkt_src_buf, sizeof(pkt_src_buf));
-
-      std::printf(
-          "TxRxWorkerDpdk[%zu]: Ignoring pkt rx on dev %d queue %d. "
-          "Pkt dest addr %s : Pkt source addr %s\n",
-          tid_, port_id, queue_id, pkt_dest_buf, pkt_src_buf);
-      // Not using the rx data
-      rte_pktmbuf_free(dpdk_pkt);
-    } else {
+    if (discard_rx == false) {
       if (kDebugDPDK) {
         auto* udp_h = reinterpret_cast<rte_udp_hdr*>(
             reinterpret_cast<uint8_t*>(ip_hdr) + sizeof(rte_ipv4_hdr));
 
-        //if (rte_be_to_cpu_16(ip_hdr->fragment_offset) != 0) {
-        //  std::printf("WARNING:  fragmented packet %u:%u\n",
-        //              ip_hdr->fragment_offset,
-        //              rte_be_to_cpu_16(ip_hdr->fragment_offset));
-        //}
         DpdkTransport::PrintPkt(ip_hdr->src_addr, ip_hdr->dst_addr,
                                 udp_h->src_port, udp_h->dst_port,
                                 dpdk_pkt->data_len, tid_);
@@ -215,8 +178,9 @@ std::vector<Packet*> TxRxWorkerDpdk::RecvEnqueue(uint16_t port_id,
             "offset %d, Header type: %d, IPv4: %d on dpdk dev %u and queue id "
             "%u\n",
             dpdk_pkt->pkt_len, rte_be_to_cpu_16(udp_h->dgram_len),
-            dpdk_pkt->data_len, dpdk_pkt->nb_segs, dpdk_pkt->data_off, eth_type,
-            RTE_ETHER_TYPE_IPV4, port_id, queue_id);
+            dpdk_pkt->data_len, dpdk_pkt->nb_segs, dpdk_pkt->data_off,
+            rte_be_to_cpu_16(eth_hdr->ether_type), RTE_ETHER_TYPE_IPV4, port_id,
+            queue_id);
       }
 
       //auto* payload = reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset;
@@ -319,4 +283,81 @@ size_t TxRxWorkerDpdk::DequeueSend() {
     NotifyComplete(complete_event);
   }
   return tx_events.size();
+}
+
+// return true if the packet is not useful
+bool TxRxWorkerDpdk::Filter(rte_mbuf* packet, uint16_t port_id,
+                            uint16_t queue_id) {
+  auto* eth_hdr = rte_pktmbuf_mtod(packet, rte_ether_hdr*);
+  const uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+
+  bool discard = true;
+  // By default, free and discard the message
+  bool free_message = true;
+
+  if (eth_type == RTE_ETHER_TYPE_IPV4) {
+    auto* ip_hdr = reinterpret_cast<const rte_ipv4_hdr*>(
+        reinterpret_cast<const uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+
+    if ((ip_hdr->next_proto_id == IPPROTO_UDP) &&
+        (ip_hdr->src_addr == bs_rru_addr_) &&
+        (ip_hdr->dst_addr == bs_server_addr_)) {
+      // Do not filter this out
+      discard = false;
+      free_message = false;
+    } else {
+      // IPV4 packet
+      char pkt_dest_buf[INET_ADDRSTRLEN];
+      char pkt_src_buf[INET_ADDRSTRLEN];
+      ::in_addr pkt_dest;
+      ::in_addr pkt_src;
+      pkt_dest.s_addr = ip_hdr->dst_addr;
+      pkt_src.s_addr = ip_hdr->src_addr;
+      ::inet_ntop(AF_INET, &pkt_dest, pkt_dest_buf, sizeof(pkt_dest_buf));
+      ::inet_ntop(AF_INET, &pkt_src, pkt_src_buf, sizeof(pkt_src_buf));
+
+      std::printf(
+          "TxRxWorkerDpdk[%zu]: Ignoring pkt rx on dev %d queue %d. "
+          "Pkt dest addr %s : Pkt source addr %s : proto %u:%u\n",
+          tid_, port_id, queue_id, pkt_dest_buf, pkt_src_buf,
+          ip_hdr->next_proto_id, IPPROTO_UDP);
+    }
+  } else if (eth_type == RTE_ETHER_TYPE_ARP) {
+    rte_ether_addr dst_addr;
+    rte_ether_addr bond_mac_addr;
+
+    //Handle ARP
+    //auto* arp_hdr = (rte_arp_hdr*)((char*)(eth_hdr + 1) + offset);
+    auto* arp_hdr = reinterpret_cast<rte_arp_hdr*>(
+        reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+    if (arp_hdr->arp_opcode == rte_cpu_to_be_16(RTE_ARP_OP_REQUEST)) {
+      MLPD_INFO("TxRxWorkerDpdk[%zu]: Arp request\n", tid_);
+      rte_eth_macaddr_get(port_id, &bond_mac_addr);
+      arp_hdr->arp_opcode = rte_cpu_to_be_16(RTE_ARP_OP_REPLY);
+      // Switch src and dst data and set bonding MAC
+      rte_ether_addr_copy(&eth_hdr->s_addr, &eth_hdr->d_addr);
+      rte_ether_addr_copy(&bond_mac_addr, &eth_hdr->s_addr);
+      rte_ether_addr_copy(&arp_hdr->arp_data.arp_sha,
+                          &arp_hdr->arp_data.arp_tha);
+      arp_hdr->arp_data.arp_tip = arp_hdr->arp_data.arp_sip;
+      rte_ether_addr_copy(&bond_mac_addr, &dst_addr);
+      rte_ether_addr_copy(&dst_addr, &arp_hdr->arp_data.arp_sha);
+      arp_hdr->arp_data.arp_sip = bs_server_addr_;
+      //Message is reused and will be freed by the tx
+      free_message = false;
+      rte_eth_tx_burst(port_id, queue_id, &packet, 1);
+    } else {
+      MLPD_INFO("TxRxWorkerDpdk[%zu]: Arp - odcode %u\n", tid_,
+                arp_hdr->arp_opcode);
+      rte_eth_tx_burst(port_id, queue_id, NULL, 0);
+    }
+  } else {
+    MLPD_WARN("TxRxWorkerDpdk[%zu]: Rx pkt unhandled - type %u\n", tid_,
+              eth_type);
+  }
+
+  if (free_message == true) {
+    rte_pktmbuf_free(packet);
+  }
+  return discard;
 }

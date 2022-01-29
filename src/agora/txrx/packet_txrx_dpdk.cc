@@ -114,25 +114,22 @@ bool PacketTxRxDpdk::CreateWorker(size_t tid, size_t interface_count,
   //interface_count = number of ports (logical) to monitor
   //interface_offset = starting port (logical)
   const unsigned int thread_l_core = tid + core_offset_;
-  unsigned int lcore_id;
-  bool worker_assigned = false;
-  // Launch specific task to cores, make sure the worker was allocated
-  // For dpdk version >= 20.11.1 use RTE_LCORE_FOREACH_WORKER
-  RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-    // launch communication and task thread onto specific core
-    if (thread_l_core == lcore_id) {
-      worker_threads_.emplace_back(std::make_unique<TxRxWorkerDpdk>(
-          core_offset_, thread_l_core, interface_count, interface_offset, cfg_,
-          rx_frame_start, event_notify_q_, tx_pending_q_,
-          *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,
-          tx_memory, mutex_, cond_, proceed_,
-          worker_dev_queue_assignment_.at(tid), mbuf_pool_));
-      std::printf("PacketTxRxDpdk: worker #%zu with tid %d using lcore_id %d\n",
-                  tid, thread_l_core, lcore_id);
-      worker_assigned = true;
-      break;
-    }
+
+  // Verify the lcore id is enabled (should have be inited with proper id)
+  int enabled = rte_lcore_is_enabled(thread_l_core);
+  if (!enabled) {
+    throw std::runtime_error(
+        "The lcore tid passed to CreateWorker is not enabled");
   }
-  RtAssert(worker_assigned == true, "The dpdk worker was not assigned");
-  return worker_assigned;
+
+  // launch communication and task thread onto specific core
+  worker_threads_.emplace_back(std::make_unique<TxRxWorkerDpdk>(
+      core_offset_, thread_l_core, interface_count, interface_offset, cfg_,
+      rx_frame_start, event_notify_q_, tx_pending_q_, *tx_producer_tokens_[tid],
+      *notify_producer_tokens_[tid], rx_memory, tx_memory, mutex_, cond_,
+      proceed_, worker_dev_queue_assignment_.at(tid), mbuf_pool_));
+  MLPD_INFO("PacketTxRxDpdk: worker %zu assigned to lcore %d \n", tid,
+            thread_l_core);
+
+  return true;
 }
