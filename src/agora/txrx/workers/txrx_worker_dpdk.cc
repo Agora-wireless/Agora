@@ -14,7 +14,7 @@
 #include "dpdk_transport.h"
 #include "logger.h"
 
-static constexpr bool kDebugDPDK = true;
+static constexpr bool kDebugDPDK = false;
 
 TxRxWorkerDpdk::TxRxWorkerDpdk(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -87,9 +87,8 @@ void TxRxWorkerDpdk::Start() {
 
 void TxRxWorkerDpdk::Stop() {
   Configuration()->Running(false);
-  MLPD_INFO("TxRxWorkerDpdk[%zu] stopping\n", tid_);
+  //Wait until the lcore finishes its job (join)
   rte_eal_wait_lcore(tid_);
-  MLPD_INFO("TxRxWorkerDpdk[%zu] stopped\n", tid_);
 }
 
 void TxRxWorkerDpdk::DoTxRx() {
@@ -163,7 +162,6 @@ std::vector<Packet*> TxRxWorkerDpdk::RecvEnqueue(uint16_t port_id,
 
     // This function will free the rx packet if returning true
     bool discard_rx = Filter(dpdk_pkt, port_id, queue_id);
-
     if (discard_rx == false) {
       if (kDebugDPDK) {
         auto* udp_h = reinterpret_cast<rte_udp_hdr*>(
@@ -194,7 +192,7 @@ std::vector<Packet*> TxRxWorkerDpdk::RecvEnqueue(uint16_t port_id,
       rte_pktmbuf_free(dpdk_pkt);
 #endif
 
-      MLPD_INFO(
+      MLPD_FRAME(
           "TxRxWorkerDpdk[%zu]::RecvEnqueue received pkt (frame %d, symbol "
           "%d, ant %d) on port %u queue %u\n",
           tid_, pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_, port_id,
