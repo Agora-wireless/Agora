@@ -146,6 +146,10 @@ if(${USE_DPDK})
   include_directories(SYSTEM ${DPDK_INCLUDE_DIRS})
 
   add_definitions(-DUSE_DPDK)
+  if (ISA_AVX512)
+    message(STATUS "Enabling AVX-512 memcpy implementation for dpdk")
+    add_definitions(-DRTE_MEMCPY_AVX512)
+  endif()
 endif()
 
 # MAC

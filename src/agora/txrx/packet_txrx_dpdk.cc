@@ -90,8 +90,40 @@ PacketTxRxDpdk::PacketTxRxDpdk(
 }
 
 PacketTxRxDpdk::~PacketTxRxDpdk() {
-  std::printf("~PacketTxRxDpdk: eal cleanup\n");
+  StopTxRx();
+
+  rte_flow_error flow_error;
+  std::printf("~PacketTxRxDpdk: dpdk eal cleanup\n");
   rte_mempool_free(mbuf_pool_);
+
+  uint16_t eth_port = UINT16_MAX;
+  for (auto& worker_devices : worker_dev_queue_assignment_) {
+    for (auto& device_queue : worker_devices) {
+      const auto check_port = device_queue.first;
+      if (eth_port != check_port) {
+        eth_port = check_port;
+        // All workers should have exited, shutdown the resources nicely
+        auto ret_status = rte_flow_flush(eth_port, &flow_error);
+        if (ret_status != 0) {
+          std::printf(
+              "Flow cannot be flushed %d message: %s\n", flow_error.type,
+              flow_error.message ? flow_error.message : "(no stated reason)");
+        }
+
+        ret_status = rte_eth_dev_stop(eth_port);
+        if (ret_status < 0) {
+          std::printf("Failed to stop port %u: %s", eth_port,
+                      rte_strerror(-ret_status));
+        }
+        ret_status = rte_eth_dev_close(eth_port);
+        if (ret_status < 0) {
+          std::printf("Failed to close device %u: %s", eth_port,
+                      rte_strerror(-ret_status));
+        }
+        MLPD_INFO("PacketTxRxDpdk::Shuttdown down dev port %d\n", eth_port);
+      }
+    }
+  }
   rte_delay_ms(100);
   rte_eal_cleanup();
 }

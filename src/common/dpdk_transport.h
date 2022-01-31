@@ -41,9 +41,12 @@ static constexpr size_t kRxBatchSize = 16;
 static constexpr size_t kTxBatchSize = 1;
 
 /// Offset to the payload starting from the beginning of the UDP frame
+//static constexpr size_t kPayloadOffset =
+//    sizeof(rte_ether_hdr) + sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr) + 22;
+//static_assert(kPayloadOffset == 64, "kPayloadOffset must equal 64");
+
 static constexpr size_t kPayloadOffset =
-    sizeof(rte_ether_hdr) + sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr) + 22;
-static_assert(kPayloadOffset == 64, "kPayloadOffset must equal 64");
+    sizeof(rte_ether_hdr) + sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr) ;
 
 class DpdkTransport {
  public:

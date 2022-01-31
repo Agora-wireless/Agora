@@ -92,11 +92,14 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
   worker_thread_count_ = actual_worker_threads;
 }
 
-PacketTxRx::~PacketTxRx() {
+PacketTxRx::~PacketTxRx() { StopTxRx(); }
+
+bool PacketTxRx::StopTxRx() {
   cfg_->Running(false);
   for (auto& worker_threads : worker_threads_) {
     worker_threads->Stop();
   }
+  return true;
 }
 
 bool PacketTxRx::StartTxRx(Table<complex_float>& calib_dl_buffer,

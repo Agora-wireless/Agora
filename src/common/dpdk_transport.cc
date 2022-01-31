@@ -78,10 +78,25 @@ int DpdkTransport::NicInit(uint16_t port, rte_mempool* mbuf_pool,
   RtAssert(status == 0, "Cannot get the MTU size for the given dev");
   RtAssert(mtu_size == kJumboFrameSize, "Invalid MTU (must be 9000 bytes)");
 
+#if defined(ETH_IN_PROMISCUOUS_MODE)
+  // All the rx examples have this enabled, but it doesn't seem like this is necessary
+  // for our use case where we know the sender and dest addresses
   int promiscuous_en = rte_eth_promiscuous_get(port);
   rte_eth_promiscuous_enable(port);
   promiscuous_en = rte_eth_promiscuous_get(port);
   RtAssert(promiscuous_en == 1, "Unable to set promiscuous mode");
+#endif
+
+  // 1 == enable
+  // This will make dpdk follow the flow rules to deliver packets to the application
+  // Allows the application to not have to filter unnecessary traffic
+  rte_flow_error flow_error;
+  int en_isolate = rte_flow_isolate(port, 1, &flow_error);
+  if (en_isolate != 0) {
+    std::printf("Flow cannot be isolated %d message: %s\n", flow_error.type,
+                flow_error.message ? flow_error.message : "(no stated reason)");
+    RtAssert(en_isolate == 0, "Unable to set flow isolate mode");
+  }
 
   status = rte_eth_dev_info_get(port, &dev_info);
   RtAssert(status == 0, "Unable to obtain dev info");
@@ -157,11 +172,12 @@ void DpdkTransport::FastMemcpy(void* pvDest, void* pvSrc, size_t nBytes) {
   // std::printf("pvDest: 0x%lx, pvSrc: 0x%lx, Dest: %lx, Src,
   // %lx\n",intptr_t(pvDest), intptr_t(pvSrc), (intptr_t(pvDest) & 31),
   // (intptr_t(pvSrc) & 31) ); assert(nBytes % 32 == 0);
-  // assert((intptr_t(pvDest) & 31) == 0);
-  // assert((intptr_t(pvSrc) & 31) == 0);
 
-  // Requires 64 Byte alignment of src and desy
 #if defined(__AVX512F__) and (__GNUC__ >= 9)
+  // Requires 64 Byte alignment of src and dest
+  assert((reinterpret_cast<intptr_t>(pvDest) & 0x3F) == 0);
+  assert((reinterpret_cast<intptr_t>(pvSrc) & 0x3F) == 0);
+
   __m512i* pSrc = reinterpret_cast<__m512i*>(pvSrc);
   __m512i* pDest = reinterpret_cast<__m512i*>(pvDest);
   int64_t nVects = nBytes / sizeof(*pSrc);
@@ -169,9 +185,10 @@ void DpdkTransport::FastMemcpy(void* pvDest, void* pvSrc, size_t nBytes) {
     const __m512i loaded = _mm512_stream_load_si512(pSrc);
     _mm512_stream_si512(pDest, loaded);
   }
-
-  // Requires 32 Byte alignment of src and desy
 #else
+  // Requires 32 Byte alignment of src and dest
+  assert((reinterpret_cast<intptr_t>(pvDest) & 0x1F) == 0);
+  assert((reinterpret_cast<intptr_t>(pvSrc) & 0x1F) == 0);
   const __m256i* p_src = reinterpret_cast<const __m256i*>(pvSrc);
   __m256i* p_dest = reinterpret_cast<__m256i*>(pvDest);
   int64_t n_vects = nBytes / sizeof(*p_src);

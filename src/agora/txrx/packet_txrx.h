@@ -57,6 +57,7 @@ class PacketTxRx {
   size_t AntNumToWorkerId(size_t ant_num) const;
 
  protected:
+  bool StopTxRx();
   //Align all worker threads to common start event (this call)
   void NotifyWorkers();
   inline size_t NumberTotalWorkers() const { return worker_thread_count_; }

@@ -105,8 +105,7 @@ void TxRxWorkerDpdk::DoTxRx() {
     if ((dev_id != current_dev_id) && (thread_socket != dev_socket)) {
       MLPD_WARN(
           "TxRxWorkerDpdk[%zu]: running on socket %u but the ethernet device "
-          "is "
-          "on socket %u\n",
+          "is on socket %u\n",
           tid_, thread_socket, dev_socket);
     }
     dev_id = current_dev_id;
@@ -183,19 +182,15 @@ std::vector<Packet*> TxRxWorkerDpdk::RecvEnqueue(uint16_t port_id,
             queue_id);
       }
 
-      //auto* payload = reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset;
-      // We are playing an alignment game here to use FastMemcpy
-      auto* payload = reinterpret_cast<uint8_t*>(ip_hdr) +
-                      sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr);
+      auto* payload = reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset;
       auto& rx = GetRxPacket();
       Packet* pkt = rx.RawPacket();
 
 #if defined(USE_DPDK_MEMORY)
       rx.Set(dpdk_pkt, reinterpret_cast<Packet*>(payload));
 #else
-      //DpdkTransport::FastMemcpy(reinterpret_cast<uint8_t*>(pkt), payload,
-      //                          Configuration()->PacketLength());
-      memcpy(pkt, payload, Configuration()->PacketLength());
+      rte_memcpy(reinterpret_cast<uint8_t*>(pkt), payload,
+                 Configuration()->PacketLength());
       rte_pktmbuf_free(dpdk_pkt);
 #endif
 
@@ -264,9 +259,8 @@ size_t TxRxWorkerDpdk::DequeueSend() {
 
     tx_bufs[0]->pkt_len = Configuration()->DlPacketLength() + kPayloadOffset;
     tx_bufs[0]->data_len = Configuration()->DlPacketLength() + kPayloadOffset;
-    char* payload = (char*)eth_hdr + kPayloadOffset;
-    DpdkTransport::FastMemcpy(payload, (char*)pkt,
-                              Configuration()->DlPacketLength());
+    auto* payload = reinterpret_cast<char*>(eth_hdr) + kPayloadOffset;
+    rte_memcpy(payload, pkt, Configuration()->DlPacketLength());
 
     // Send data (one OFDM symbol)
     // Must send this out the correct port (dev) + queue that is assigned to this interface (convert gloabl to local index)
@@ -325,6 +319,8 @@ bool TxRxWorkerDpdk::Filter(rte_mbuf* packet, uint16_t port_id,
   } else if (eth_type == RTE_ETHER_TYPE_ARP) {
     rte_ether_addr dst_addr;
     rte_ether_addr bond_mac_addr;
+
+    throw std::runtime_error("Got an arp request?");
 
     //Handle ARP
     //auto* arp_hdr = (rte_arp_hdr*)((char*)(eth_hdr + 1) + offset);
