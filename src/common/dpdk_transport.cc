@@ -237,9 +237,16 @@ void DpdkTransport::PrintPkt(rte_be32_t src_ip, rte_be32_t dst_ip,
       tid, b[0u], b[1u], b[2u], b[3u], sp, b[4u], b[5u], b[6u], b[7u], dp, len);
 }
 
+// Matches source / dest udp ipv4 packets and rountes them to specific rx queues
 void DpdkTransport::InstallFlowRule(uint16_t port_id, uint16_t rx_q,
                                     uint32_t src_ip, uint32_t dest_ip,
                                     uint16_t src_port, uint16_t dst_port) {
+  //constexpr enum rte_flow_item_type kPattherEthIpv4Udp[] = {
+  //    RTE_FLOW_ITEM_TYPE_ETH,
+  //    RTE_FLOW_ITEM_TYPE_IPV4,
+  //    RTE_FLOW_ITEM_TYPE_UDP,
+  //    RTE_FLOW_ITEM_TYPE_END,
+  //};
   rte_flow_attr attr;
   rte_flow_item pattern[4u];
   rte_flow_action action[2u];
@@ -258,14 +265,25 @@ void DpdkTransport::InstallFlowRule(uint16_t port_id, uint16_t rx_q,
   action[1u].type = RTE_FLOW_ACTION_TYPE_END;
 
   // Set the first level of the pattern (ETH), allow all
-  pattern[0u].type = RTE_FLOW_ITEM_TYPE_ETH;
-  pattern[3u].type = RTE_FLOW_ITEM_TYPE_END;
+  rte_flow_item& eth_pattern = pattern[0u];
+  rte_flow_item_eth eth_spec;
+  rte_flow_item_eth eth_mask;
+  std::memset(&eth_spec, 0u, sizeof(rte_flow_item_eth));
+  std::memset(&eth_mask, 0u, sizeof(rte_flow_item_eth));
+
+  eth_spec.type = 0;
+  eth_mask.type = 0;
+
+  eth_pattern.type = RTE_FLOW_ITEM_TYPE_ETH;
+  eth_pattern.spec = &eth_spec;
+  eth_pattern.mask = &eth_mask;
+  eth_pattern.last = nullptr;
 
   // Set the second level of the pattern (IP)
   rte_flow_item_ipv4 ip_spec;
   rte_flow_item_ipv4 ip_mask;
-  std::memset(&ip_spec, 0, sizeof(rte_flow_item_ipv4));
-  std::memset(&ip_mask, 0, sizeof(rte_flow_item_ipv4));
+  std::memset(&ip_spec, 0u, sizeof(rte_flow_item_ipv4));
+  std::memset(&ip_mask, 0u, sizeof(rte_flow_item_ipv4));
   //ip_spec.hdr.dst_addr = rte_cpu_to_be_32(dest_ip);
   ip_spec.hdr.dst_addr = dest_ip;
   ip_mask.hdr.dst_addr = 0xffffffff;
@@ -273,14 +291,17 @@ void DpdkTransport::InstallFlowRule(uint16_t port_id, uint16_t rx_q,
   ip_spec.hdr.src_addr = src_ip;
   ip_mask.hdr.src_addr = 0xffffffff;
 
-  pattern[1u].type = RTE_FLOW_ITEM_TYPE_IPV4;
-  pattern[1u].spec = &ip_spec;
-  pattern[1u].mask = &ip_mask;
+  rte_flow_item& ipv4_pattern = pattern[1u];
+  ipv4_pattern.type = RTE_FLOW_ITEM_TYPE_IPV4;
+  ipv4_pattern.spec = &ip_spec;
+  ipv4_pattern.mask = &ip_mask;
+  ipv4_pattern.last = nullptr;
 
   // Set the third level of the pattern (UDP)
   rte_flow_item_udp udp_spec;
   rte_flow_item_udp udp_mask;
-  rte_flow_item udp_item;
+
+  rte_flow_item& udp_item = pattern[2u];
   udp_spec.hdr.src_port = rte_cpu_to_be_16(src_port);
   udp_spec.hdr.dst_port = rte_cpu_to_be_16(dst_port);
   udp_spec.hdr.dgram_len = 0;
@@ -295,14 +316,61 @@ void DpdkTransport::InstallFlowRule(uint16_t port_id, uint16_t rx_q,
   udp_item.spec = &udp_spec;
   udp_item.mask = &udp_mask;
   udp_item.last = nullptr;
-  pattern[2u] = udp_item;
+  //End the filter
+  pattern[3u].type = RTE_FLOW_ITEM_TYPE_END;
+
+  rte_flow_error flow_error;
+  int res = rte_flow_validate(port_id, &attr, pattern, action, &flow_error);
+  if (res != 0) {
+    std::printf("UDP flow rule cannot be validated %d message: %s\n",
+                flow_error.type,
+                flow_error.message ? flow_error.message : "(no stated reason)");
+  }
+  RtAssert(res == 0, "DPDK: Failed to validate flow rule");
+
+  rte_flow* flow =
+      rte_flow_create(port_id, &attr, pattern, action, &flow_error);
+  RtAssert(flow != nullptr, "DPDK: Failed to install flow rule");
+}
+
+// Matches source / dest udp ipv4 packets and rountes them to specific rx queues
+void DpdkTransport::InstallFlowRuleDropAll(uint16_t port_id) {
+  rte_flow_attr attr;
+  rte_flow_item pattern[2u];
+  rte_flow_action action[2u];
+  std::memset(pattern, 0u, sizeof(pattern));
+  std::memset(action, 0u, sizeof(action));
+
+  // Set the rule attribute. Only ingress packets will be checked.
+  std::memset(&attr, 0u, sizeof(rte_flow_attr));
+  attr.ingress = 1;
+  attr.priority = 1;
+
+  // Drop everything
+  action[0u].type = RTE_FLOW_ACTION_TYPE_DROP;
+  action[1u].type = RTE_FLOW_ACTION_TYPE_END;
+
+  rte_flow_item& eth_pattern = pattern[0u];
+  rte_flow_item_eth eth_spec;
+  rte_flow_item_eth eth_mask;
+  std::memset(&eth_spec, 0u, sizeof(rte_flow_item_eth));
+  std::memset(&eth_mask, 0u, sizeof(rte_flow_item_eth));
+  eth_spec.type = 0;
+  eth_mask.type = 0;
+
+  eth_pattern.type = RTE_FLOW_ITEM_TYPE_ETH;
+  eth_pattern.spec = &eth_spec;
+  eth_pattern.mask = &eth_mask;
+  eth_pattern.last = nullptr;
+
+  pattern[1u].type = RTE_FLOW_ITEM_TYPE_END;
 
   rte_flow_error error;
   int res = rte_flow_validate(port_id, &attr, pattern, action, &error);
-  RtAssert(res == 0, "DPDK: Failed to validate flow rule");
+  RtAssert(res == 0, "DPDK: Failed to validate drop all flow rule");
 
   rte_flow* flow = rte_flow_create(port_id, &attr, pattern, action, &error);
-  RtAssert(flow != nullptr, "DPDK: Failed to install flow rule");
+  RtAssert(flow != nullptr, "DPDK: Failed to install drop all flow rule");
 }
 
 rte_mbuf* DpdkTransport::AllocUdp(rte_mempool* mbuf_pool,

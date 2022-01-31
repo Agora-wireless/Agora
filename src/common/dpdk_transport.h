@@ -46,7 +46,7 @@ static constexpr size_t kTxBatchSize = 1;
 //static_assert(kPayloadOffset == 64, "kPayloadOffset must equal 64");
 
 static constexpr size_t kPayloadOffset =
-    sizeof(rte_ether_hdr) + sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr) ;
+    sizeof(rte_ether_hdr) + sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr);
 
 class DpdkTransport {
  public:
@@ -64,6 +64,8 @@ class DpdkTransport {
   static void InstallFlowRule(uint16_t port_id, uint16_t rx_q, uint32_t src_ip,
                               uint32_t dest_ip, uint16_t src_port,
                               uint16_t dst_port);
+
+  static void InstallFlowRuleDropAll(uint16_t port_id);
 
   static void FastMemcpy(void* pvDest, void* pvSrc, size_t nBytes);
   static void PrintPkt(rte_be32_t src_ip, rte_be32_t dst_ip,
