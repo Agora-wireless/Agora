@@ -1,5 +1,5 @@
 {
-    "serial_file": "data/topology-vulture-dl.json",
+    "serial_file": "data/topology-vulture-dl-listener.json",
     "cells": 1,
     "channel": "A",
     "frequency": 3.6e9,
@@ -28,7 +28,7 @@
     "beamsweep": false,
     "beacon_antenna": 0,
     "frame_schedule": [
-        "BGCLGGPGGDDDG"
+        "BGCLGGGPGDDDG"
     ],
     "client_dl_pilot_syms": 2,
     "ue_channel": "A",
