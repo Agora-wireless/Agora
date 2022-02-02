@@ -318,6 +318,13 @@ Config::Config(std::string jsonfile)
         decode_thread_num = tmp_vec[bs_server_addr_idx];
     }
 
+    tmp_vec = tddConf.value("encode_thread_num", std::vector<size_t>());
+    if (tmp_vec.size() <= bs_server_addr_idx) {
+        encode_thread_num = ue_end - ue_start;
+    } else {
+        encode_thread_num = tmp_vec[bs_server_addr_idx];
+    }
+
     use_time_domain_iq = tddConf.value("use_time_domain_iq", false);
     if (use_time_domain_iq) {
         tmp_vec = tddConf.value("fft_thread_num", std::vector<size_t>());

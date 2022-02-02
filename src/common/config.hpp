@@ -150,6 +150,7 @@ public:
     size_t worker_thread_num;
     size_t rx_thread_num;
     size_t decode_thread_num;
+    size_t encode_thread_num;
 
     // Number of OFDM data subcarriers handled in one demodulation event
     size_t demul_block_size;

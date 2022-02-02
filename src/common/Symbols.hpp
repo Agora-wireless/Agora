@@ -148,7 +148,8 @@ enum class ThreadType {
     kMasterTX,
     kWorkerDemodTXRX,
     kWorkerSubcarrier,
-    kWorkerDecode
+    kWorkerDecode,
+    kWorkerEncode
 };
 
 static inline std::string thread_type_str(ThreadType thread_type)

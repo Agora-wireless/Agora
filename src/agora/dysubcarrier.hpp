@@ -8,7 +8,7 @@
 #include "datatype_conversion.h"
 #include "dydemul.hpp"
 #include "doer.hpp"
-#include "doprecode.hpp"
+#include "dyprecode.hpp"
 #include "dyzf.hpp"
 #include "gettime.h"
 #include "modulation.hpp"
@@ -74,7 +74,7 @@ public:
         // input buffers
         Table<char>& freq_domain_iq_buffer,
         PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffer,
-        Table<complex_float>& calib_buffer, Table<int8_t>& dl_encoded_buffer,
+        Table<complex_float>& calib_buffer, Table<int8_t>& dl_encoded_buffer_to_precode,
         // output buffers
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer_to_send,
         Table<complex_float>& dl_ifft_buffer,
@@ -90,7 +90,7 @@ public:
 
     void StartWork();
     void StartWorkCentral();
-
+    void StartWorkDownlink();
 
     void runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size = 0);
 
@@ -98,7 +98,7 @@ public:
 
     DyZF* do_zf_;
     DyDemul* do_demul_;
-    DoPrecode* do_precode_;
+    DyPrecode* do_precode_;
 
     // Input buffers
 private:
@@ -109,7 +109,7 @@ private:
 
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffer_;
     Table<complex_float>& calib_buffer_;
-    Table<int8_t>& dl_encoded_buffer_;
+    Table<int8_t>& dl_encoded_buffer_to_precode_;
 
     // Output buffers
 
