@@ -608,6 +608,9 @@ class Config {
   size_t ue_worker_thread_num_;
   size_t ue_socket_thread_num_;
 
+  // Number of Code blocks in one OFDM symbol
+  const size_t kCbPerSymbol=1;
+
   // Number of OFDM data subcarriers handled in one demodulation event
   size_t demul_block_size_;
   size_t demul_events_per_symbol_;  // Derived from demul_block_size

@@ -613,12 +613,17 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
       176, 352, 13,  26, 52, 104, 208, 15,  30,  60,  120, 240};
   std::sort(zc_vec.begin(), zc_vec.end());
   size_t *p = zc_vec.data();
-  uint16_t zc = 72; 
+  size_t zc = 72; 
   for (size_t i = 0; i < zc_vec.size(); i++) {
-    if ((*(p+i) * LdpcNumInputCols(base_graph) < ofdm_data_num_ * ul_code_rate_ * ul_mod_order_bits_) && (*(p+i+1) * LdpcNumInputCols(base_graph) > ofdm_data_num_ * ul_code_rate_ * ul_mod_order_bits_))
+    if ((*(p+i) * LdpcNumInputCols(base_graph) * kCbPerSymbol < ofdm_data_num_ * ul_code_rate_ * ul_mod_order_bits_) && (*(p+i+1) * LdpcNumInputCols(base_graph) * kCbPerSymbol > ofdm_data_num_ * ul_code_rate_ * ul_mod_order_bits_)){
         zc = *(p+i);
+        std::fprintf(stderr, "UL Zc value is %zu.\n",zc);
+        break;
+    }
+    else if (i != (zc_vec.size()-1))
+        continue;
     else
-	continue;
+        std::fprintf(stderr, "There is not apporiate zc, please modify code blocks number per OFDM symbol or OFDM data subcarriers number \n");
   }
   
   size_t num_rows = int(LdpcNumInputCols(base_graph) / ul_code_rate_) - (LdpcNumInputCols(base_graph)-2);
@@ -656,12 +661,17 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
       176, 352, 13,  26, 52, 104, 208, 15,  30,  60,  120, 240};
   std::sort(zc_vec.begin(), zc_vec.end());
   size_t *p = zc_vec.data();
-  uint16_t zc = 72;
+  size_t zc = 72;
   for (size_t i = 0; i < zc_vec.size(); i++) {
-    if ((*(p+i) * LdpcNumInputCols(base_graph) < ofdm_data_num_ * dl_code_rate_ * dl_mod_order_bits_) && (*(p+i+1) * LdpcNumInputCols(base_graph) > ofdm_data_num_ * dl_code_rate_ * dl_mod_order_bits_))
-        zc = *p;
-    else
+    if ((*(p+i) * LdpcNumInputCols(base_graph) * kCbPerSymbol < ofdm_data_num_ * dl_code_rate_ * dl_mod_order_bits_) && (*(p+i+1) * LdpcNumInputCols(base_graph) * kCbPerSymbol > ofdm_data_num_ * dl_code_rate_ * dl_mod_order_bits_)){
+        zc = *(p+i);
+        std::fprintf(stderr, "DL Zc value is %zu.\n",zc);
+        break;
+    }
+    else if (i != (zc_vec.size()-1))
         continue;
+    else
+        std::fprintf(stderr, "There is not apporiate zc, please modify code blocks number per OFDM symbol or OFDM data subcarriers number \n");
   }
 
   size_t num_rows = int(LdpcNumInputCols(base_graph) / dl_code_rate_) - (LdpcNumInputCols(base_graph)-2);
