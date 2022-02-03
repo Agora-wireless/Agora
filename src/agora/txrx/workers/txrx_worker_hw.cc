@@ -50,107 +50,8 @@ void TxRxWorkerHw::DoTxRx() {
   }
 
   long long time0 = 0;
-  // When Hw Framer is enabled, frame time keeping is done by hardware.
-  // In particular, the Hw only forward useful receive (no Guard) symbols.
-  // In this mode, the format of rx timestamp (64 bits)is frame number at
-  // 32-bits msb and symbol number at 16-bit msb of 32-bit lsb.
-  // When Hw Framer is disabled (false), frame time keeping in done entirely
-  // in software as it is implemented here. All time domain symbols are transfered
-  // to the host by HW where software will decide how to handle each symbol.
-  if (Configuration()->HwFramer() == false) {
-    constexpr int kBeacontxFlags = 2;  // END BURST
-    // Read some dummy symbols to get the hardware time and then schedule
-    // TX/RX accordingly
-    const size_t beacon_radio =
-        Configuration()->BeaconAnt() / Configuration()->NumChannels();
-    const size_t beacon_chan =
-        Configuration()->BeaconAnt() % Configuration()->NumChannels();
 
-    // Can probably remove the NumChannels dimension (just point to same location)
-    const std::vector<std::vector<std::complex<int16_t>>> zeros(
-        Configuration()->NumChannels(),
-        std::vector<std::complex<int16_t>>(Configuration()->SampsPerSymbol(),
-                                           std::complex<int16_t>(0, 0)));
-
-    // prepare BS beacon in host buffer
-    std::vector<const void*> beaconbuffs(Configuration()->NumChannels(),
-                                         zeros.at(0).data());
-    beaconbuffs.at(beacon_chan) = Configuration()->BeaconCi16().data();
-
-    std::vector<std::vector<std::complex<int16_t>>> samp_buffer(
-        Configuration()->NumChannels(),
-        std::vector<std::complex<int16_t>>(Configuration()->SampsPerSymbol(),
-                                           std::complex<int16_t>(0, 0)));
-
-    long long rx_time_bs = 0;
-    long long tx_time_bs = 0;
-    size_t frame_time = Configuration()->SampsPerSymbol() *
-                        Configuration()->Frame().NumTotalSyms();
-
-    std::cout << "Sync BS host and FGPA timestamp..." << std::endl;
-
-    //RX / TX all symbols in tx frame delta
-    for (size_t frm = 0; frm < TX_FRAME_DELTA; frm++) {
-      int rx_status = -1;
-      int tx_status = -1;
-      size_t rx_symbol = 0;
-      //Handle First frame / symbol special
-      if (frm == 0) {
-        const size_t rx_radio_id = interface_offset_;
-        while (rx_status < 0) {
-          rx_status =
-              radio_config_.RadioRx(rx_radio_id, samp_buffer, rx_time_bs);
-        }
-        //First Frame has been rx'd by the first radio
-        tx_time_bs = rx_time_bs + frame_time * TX_FRAME_DELTA;
-        time0 = tx_time_bs;
-        std::cout << "Received first data at time " << rx_time_bs
-                  << " on thread " << tid_ << std::endl;
-        std::cout << "Transmit first beacon at time " << tx_time_bs
-                  << " on thread " << tid_ << std::endl;
-
-        //Finish rx'ing symbol 0 on remaining radios
-        for (size_t radio_id = rx_radio_id + 1;
-             radio_id < rx_radio_id + num_interfaces_; radio_id++) {
-          rx_status = radio_config_.RadioRx(radio_id, samp_buffer, rx_time_bs);
-          //---------------What to do about errors?
-        }
-        //Symbol complete
-        rx_symbol++;
-      } else {
-        tx_time_bs += frame_time;
-      }
-
-      // Schedule the tx
-      for (size_t radio_id = interface_offset_;
-           radio_id < interface_offset_ + num_interfaces_; radio_id++) {
-        if (radio_id == beacon_radio) {
-          tx_status = radio_config_.RadioTx(radio_id, beaconbuffs.data(),
-                                            kBeacontxFlags, tx_time_bs);
-        } else {
-          tx_status = radio_config_.RadioTx(radio_id, zeros, kBeacontxFlags,
-                                            tx_time_bs);
-        }
-        if (tx_status != static_cast<int>(Configuration()->SampsPerSymbol())) {
-          std::cerr << "BAD Transmit(" << tx_status << "/"
-                    << Configuration()->SampsPerSymbol() << ") at Time "
-                    << tx_time_bs << std::endl;
-        }
-      }  // end TX schedule
-
-      // Rx all symbols on remaining radios
-      for (size_t sym = rx_symbol;
-           sym < Configuration()->Frame().NumTotalSyms(); sym++) {
-        for (size_t radio_id = interface_offset_;
-             radio_id < interface_offset_ + num_interfaces_; radio_id++) {
-          rx_status = radio_config_.RadioRx(radio_id, samp_buffer, rx_time_bs);
-          //---------------Check status?
-        }
-      }
-    }
-    std::cout << "Start BS main recv loop..." << std::endl;
-  }  // HwFramer == false
-
+  time0 = GetHwTime();
   ssize_t prev_frame_id = -1;
 
   TxRxWorkerRx::RxParameters receive_attempt;
@@ -727,4 +628,109 @@ void TxRxWorkerHw::PrintRxSymbolTiming(
                                     freq_ghz_));
     }
   }  //  if (kSymbolTimingEnabled)
+}
+
+// When Hw Framer is enabled, frame time keeping is done by hardware.
+// In particular, the Hw only forward useful receive (no Guard) symbols.
+// In this mode, the format of rx timestamp (64 bits)is frame number at
+// 32-bits msb and symbol number at 16-bit msb of 32-bit lsb.
+// When Hw Framer is disabled (false), frame time keeping in done entirely
+// in software as it is implemented here. All time domain symbols are transfered
+// to the host by HW where software will decide how to handle each symbol.
+long long int TxRxWorkerHw::GetHwTime() {
+  long long hw_time = 0;
+  if (Configuration()->HwFramer() == false) {
+    constexpr int kBeacontxFlags = 2;  // END BURST
+    // Read some dummy symbols to get the hardware time and then schedule
+    // TX/RX accordingly
+    const size_t beacon_radio =
+        Configuration()->BeaconAnt() / Configuration()->NumChannels();
+    const size_t beacon_chan =
+        Configuration()->BeaconAnt() % Configuration()->NumChannels();
+
+    // Can probably remove the NumChannels dimension (just point to same location)
+    const std::vector<std::vector<std::complex<int16_t>>> zeros(
+        Configuration()->NumChannels(),
+        std::vector<std::complex<int16_t>>(Configuration()->SampsPerSymbol(),
+                                           std::complex<int16_t>(0, 0)));
+
+    // prepare BS beacon in host buffer
+    std::vector<const void*> beaconbuffs(Configuration()->NumChannels(),
+                                         zeros.at(0).data());
+    beaconbuffs.at(beacon_chan) = Configuration()->BeaconCi16().data();
+
+    std::vector<std::vector<std::complex<int16_t>>> samp_buffer(
+        Configuration()->NumChannels(),
+        std::vector<std::complex<int16_t>>(Configuration()->SampsPerSymbol(),
+                                           std::complex<int16_t>(0, 0)));
+
+    long long rx_time_bs = 0;
+    long long tx_time_bs = 0;
+    size_t frame_time = Configuration()->SampsPerSymbol() *
+                        Configuration()->Frame().NumTotalSyms();
+
+    std::cout << "Sync BS host and FGPA timestamp..." << std::endl;
+
+    //RX / TX all symbols in tx frame delta
+    for (size_t frm = 0; frm < TX_FRAME_DELTA; frm++) {
+      int rx_status = -1;
+      int tx_status = -1;
+      size_t rx_symbol = 0;
+      //Handle First frame / symbol special
+      if (frm == 0) {
+        const size_t rx_radio_id = interface_offset_;
+        while (rx_status < 0) {
+          rx_status =
+              radio_config_.RadioRx(rx_radio_id, samp_buffer, rx_time_bs);
+        }
+        //First Frame has been rx'd by the first radio
+        tx_time_bs = rx_time_bs + frame_time * TX_FRAME_DELTA;
+        hw_time = tx_time_bs;
+        std::cout << "Received first data at time " << rx_time_bs
+                  << " on thread " << tid_ << std::endl;
+        std::cout << "Transmit first beacon at time " << tx_time_bs
+                  << " on thread " << tid_ << std::endl;
+
+        //Finish rx'ing symbol 0 on remaining radios
+        for (size_t radio_id = rx_radio_id + 1;
+             radio_id < rx_radio_id + num_interfaces_; radio_id++) {
+          rx_status = radio_config_.RadioRx(radio_id, samp_buffer, rx_time_bs);
+          //---------------What to do about errors?
+        }
+        //Symbol complete
+        rx_symbol++;
+      } else {
+        tx_time_bs += frame_time;
+      }
+
+      // Schedule the tx
+      for (size_t radio_id = interface_offset_;
+           radio_id < interface_offset_ + num_interfaces_; radio_id++) {
+        if (radio_id == beacon_radio) {
+          tx_status = radio_config_.RadioTx(radio_id, beaconbuffs.data(),
+                                            kBeacontxFlags, tx_time_bs);
+        } else {
+          tx_status = radio_config_.RadioTx(radio_id, zeros, kBeacontxFlags,
+                                            tx_time_bs);
+        }
+        if (tx_status != static_cast<int>(Configuration()->SampsPerSymbol())) {
+          std::cerr << "BAD Transmit(" << tx_status << "/"
+                    << Configuration()->SampsPerSymbol() << ") at Time "
+                    << tx_time_bs << std::endl;
+        }
+      }  // end TX schedule
+
+      // Rx all symbols on remaining radios
+      for (size_t sym = rx_symbol;
+           sym < Configuration()->Frame().NumTotalSyms(); sym++) {
+        for (size_t radio_id = interface_offset_;
+             radio_id < interface_offset_ + num_interfaces_; radio_id++) {
+          rx_status = radio_config_.RadioRx(radio_id, samp_buffer, rx_time_bs);
+          //---------------Check status?
+        }
+      }
+    }
+    std::cout << "Start BS main recv loop..." << std::endl;
+  }  // HwFramer == false
+  return hw_time;
 }
