@@ -1,11 +1,11 @@
 /**
- * @file txrx_worker_argos.h
+ * @file txrx_worker_hw.h
  * @brief Implementation of PacketTxRx datapath functions for communicating
- * with real Argos hardware
+ * with real iris / faros hardware
  */
 
-#ifndef TXRX_WORKER_ARGOS_H_
-#define TXRX_WORKER_ARGOS_H_
+#ifndef TXRX_WORKER_HW_H_
+#define TXRX_WORKER_HW_H_
 
 #include <memory>
 #include <vector>
@@ -26,24 +26,24 @@ struct RxTimeTracker {
 };
 }  // namespace TxRxWorkerRx
 
-class TxRxWorkerArgos : public TxRxWorker {
+class TxRxWorkerHw : public TxRxWorker {
  public:
-  TxRxWorkerArgos(size_t core_offset, size_t tid, size_t interface_count,
-                  size_t interface_offset, Config* const config,
-                  size_t* rx_frame_start,
-                  moodycamel::ConcurrentQueue<EventData>* event_notify_q,
-                  moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
-                  moodycamel::ProducerToken& tx_producer,
-                  moodycamel::ProducerToken& notify_producer,
-                  std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
-                  std::mutex& sync_mutex, std::condition_variable& sync_cond,
-                  std::atomic<bool>& can_proceed, RadioConfig& radio_config);
+  TxRxWorkerHw(size_t core_offset, size_t tid, size_t interface_count,
+               size_t interface_offset, Config* const config,
+               size_t* rx_frame_start,
+               moodycamel::ConcurrentQueue<EventData>* event_notify_q,
+               moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
+               moodycamel::ProducerToken& tx_producer,
+               moodycamel::ProducerToken& notify_producer,
+               std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
+               std::mutex& sync_mutex, std::condition_variable& sync_cond,
+               std::atomic<bool>& can_proceed, RadioConfig& radio_config);
 
-  ~TxRxWorkerArgos() final;
+  ~TxRxWorkerHw() final;
   void DoTxRx() final;
 
  private:
-  TxRxWorkerArgos() = delete;
+  TxRxWorkerHw() = delete;
   size_t DequeueSend(long long time0);
   std::vector<Packet*> RecvEnqueue(size_t interface_id, size_t global_frame_id,
                                    size_t global_symbol_id);

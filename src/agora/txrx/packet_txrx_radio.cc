@@ -7,7 +7,7 @@
 #include "packet_txrx_radio.h"
 
 #include "logger.h"
-#include "txrx_worker_argos.h"
+#include "txrx_worker_hw.h"
 #include "txrx_worker_usrp.h"
 
 static constexpr size_t kRadioTriggerWaitMs = 100;
@@ -77,7 +77,7 @@ bool PacketTxRxRadio::CreateWorker(size_t tid, size_t interface_count,
 
   //This is the spot to choose what type of TxRxWorker you want....
   if (kUseArgos) {
-    worker_threads_.emplace_back(std::make_unique<TxRxWorkerArgos>(
+    worker_threads_.emplace_back(std::make_unique<TxRxWorkerHw>(
         core_offset_, tid, interface_count, interface_offset, cfg_,
         rx_frame_start, event_notify_q_, tx_pending_q_,
         *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,

@@ -1,10 +1,10 @@
 /**
- * @file txrx_worker_argos.cc
+ * @file txrx_worker_hw.cc
  * @brief Implementation of PacketTxRx datapath functions for communicating
- * with real Argos hardware
+ * with real iris / faros hardware
  */
 
-#include "txrx_worker_argos.h"
+#include "txrx_worker_hw.h"
 
 #include <cassert>
 
@@ -12,7 +12,7 @@
 
 static constexpr bool kSymbolTimingEnabled = false;
 
-TxRxWorkerArgos::TxRxWorkerArgos(
+TxRxWorkerHw::TxRxWorkerHw(
     size_t core_offset, size_t tid, size_t interface_count,
     size_t interface_offset, Config* const config, size_t* rx_frame_start,
     moodycamel::ConcurrentQueue<EventData>* event_notify_q,
@@ -30,13 +30,13 @@ TxRxWorkerArgos::TxRxWorkerArgos(
       program_start_ticks_(0),
       freq_ghz_(GetTime::MeasureRdtscFreq()) {}
 
-TxRxWorkerArgos::~TxRxWorkerArgos() = default;
+TxRxWorkerHw::~TxRxWorkerHw() = default;
 
 //Main Thread Execution loop
-void TxRxWorkerArgos::DoTxRx() {
+void TxRxWorkerHw::DoTxRx() {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid_);
 
-  MLPD_INFO("TxRxWorkerArgos[%zu] has %zu:%zu total radios %zu\n", tid_,
+  MLPD_INFO("TxRxWorkerHw[%zu] has %zu:%zu total radios %zu\n", tid_,
             interface_offset_, (interface_offset_ + num_interfaces_) - 1,
             num_interfaces_);
 
@@ -44,7 +44,7 @@ void TxRxWorkerArgos::DoTxRx() {
   WaitSync();
 
   if (num_interfaces_ == 0) {
-    MLPD_WARN("TxRxWorkerArgos[%zu] has no interfaces, exiting\n", tid_);
+    MLPD_WARN("TxRxWorkerHw[%zu] has no interfaces, exiting\n", tid_);
     running_ = false;
     return;
   }
@@ -156,7 +156,7 @@ void TxRxWorkerArgos::DoTxRx() {
   TxRxWorkerRx::RxParameters receive_attempt;
   receive_attempt = UpdateRxInterface(receive_attempt);
   MLPD_INFO(
-      "TxRxWorkerArgos[%zu]: Starting rx interface id %zu looking for symbol "
+      "TxRxWorkerHw[%zu]: Starting rx interface id %zu looking for symbol "
       "%zu\n",
       tid_, receive_attempt.interface_, receive_attempt.symbol_);
 
@@ -185,7 +185,7 @@ void TxRxWorkerArgos::DoTxRx() {
 
         if (unlikely(rx_symbol_id != receive_attempt.symbol_)) {
           MLPD_ERROR(
-              "TxRxWorkerArgos[%zu]: Frame %d - Expected symbol %zu but "
+              "TxRxWorkerHw[%zu]: Frame %d - Expected symbol %zu but "
               "received %zu\n",
               tid_, pkts.front()->frame_id_, receive_attempt.symbol_,
               rx_symbol_id);
@@ -199,7 +199,7 @@ void TxRxWorkerArgos::DoTxRx() {
         TxRxWorkerRx::RxParameters successful_receive = receive_attempt;
         receive_attempt = UpdateRxInterface(successful_receive);
         MLPD_TRACE(
-            "TxRxWorkerArgos[%zu]: Last Interface %zu - symbol %zu:%zu, next "
+            "TxRxWorkerHw[%zu]: Last Interface %zu - symbol %zu:%zu, next "
             "interface %zu - symbol %zu\n",
             tid_, successful_receive.interface_, successful_receive.symbol_,
             rx_symbol_id, receive_attempt.interface_, receive_attempt.symbol_);
@@ -222,9 +222,9 @@ void TxRxWorkerArgos::DoTxRx() {
 }
 
 //RX data, should return channel number of packets || 0
-std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
-                                                  size_t global_frame_id,
-                                                  size_t global_symbol_id) {
+std::vector<Packet*> TxRxWorkerHw::RecvEnqueue(size_t interface_id,
+                                               size_t global_frame_id,
+                                               size_t global_symbol_id) {
   const size_t radio_id = interface_id + interface_offset_;
   const size_t ant_id = radio_id * channels_per_interface_;
   const size_t cell_id = Configuration()->CellId().at(radio_id);
@@ -242,7 +242,7 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
     memory_tracking.push_back(&rx);
     ant_ids.at(ch) = ant_id + ch;
     samp.at(ch) = rx.RawPacket()->data_;
-    MLPD_TRACE("TxRxWorkerArgos[%zu]: Using Packet at location %zu\n", tid_,
+    MLPD_TRACE("TxRxWorkerHw[%zu]: Using Packet at location %zu\n", tid_,
                reinterpret_cast<size_t>(&rx));
   }
 
@@ -274,13 +274,13 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
 
     if (rx_status != static_cast<int>(Configuration()->SampsPerSymbol())) {
       MLPD_WARN(
-          "TxRxWorkerArgos[%zu]: Interface %zu | Radio %zu  - Attempted "
+          "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted "
           "Frame: %zu, Symbol: %zu, RX status = %d is not the expected value\n",
           tid_, interface_id, interface_id + interface_offset_, frame_id,
           symbol_id, rx_status);
     } else {
       MLPD_FRAME(
-          "TxRxWorkerArgos[%zu]: Interface %zu | Radio %zu  - Attempted "
+          "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted "
           "Frame: %zu, Symbol: %zu, RX status = %d\n",
           tid_, interface_id, interface_id + interface_offset_, frame_id,
           symbol_id, rx_status);
@@ -299,7 +299,7 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
     }
   } else if (rx_status < 0) {
     MLPD_ERROR(
-        "TxRxWorkerArgos[%zu], Interface %zu | Radio %zu - Rx failure RX "
+        "TxRxWorkerHw[%zu], Interface %zu | Radio %zu - Rx failure RX "
         "status = %d is less than 0\n",
         tid_, interface_id, interface_id + interface_offset_, rx_status);
   } else if ((rx_status != 0) && (static_cast<size_t>(rx_status) !=
@@ -307,30 +307,30 @@ std::vector<Packet*> TxRxWorkerArgos::RecvEnqueue(size_t interface_id,
     const size_t rx_frame = static_cast<size_t>(frame_time >> 32);
     const size_t rx_symbol = static_cast<size_t>((frame_time >> 16) & 0xFFFF);
     MLPD_ERROR(
-        "TxRxWorkerArgos[%zu]: Interface %zu | Radio %zu  - Attempted Frame: "
+        "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted Frame: "
         "%zu, Symbol: %zu, RX status = %d is not the expected value\n",
         tid_, interface_id, interface_id + interface_offset_, rx_frame,
         rx_symbol, rx_status);
   }
 
   //Free memory from most recent allocated to latest
-  MLPD_TRACE("TxRxWorkerArgos[%zu]: Memory allocation %zu\n", tid_,
+  MLPD_TRACE("TxRxWorkerHw[%zu]: Memory allocation %zu\n", tid_,
              memory_tracking.size());
   for (ssize_t idx = (memory_tracking.size() - 1); idx > -1; idx--) {
     auto* memory_location = memory_tracking.at(idx);
-    MLPD_TRACE("TxRxWorkerArgos[%zu]: Checking location %zu\n", tid_,
+    MLPD_TRACE("TxRxWorkerHw[%zu]: Checking location %zu\n", tid_,
                (size_t)memory_location);
     if (memory_location != nullptr) {
-      MLPD_TRACE("TxRxWorkerArgos[%zu]: Returning Packet at location %zu\n",
-                 tid_, (size_t)memory_location);
+      MLPD_TRACE("TxRxWorkerHw[%zu]: Returning Packet at location %zu\n", tid_,
+                 (size_t)memory_location);
       ReturnRxPacket(*memory_location);
     }
   }
   return result_packets;
 }
 
-void TxRxWorkerArgos::TxBeaconHw(size_t frame_id, size_t interface_id,
-                                 long long time0) {
+void TxRxWorkerHw::TxBeaconHw(size_t frame_id, size_t interface_id,
+                              long long time0) {
   RtAssert(Configuration()->HwFramer() == false,
            "HwFramer == true when TxBeaconHw was called");
   const auto beacon_symbol_id = Configuration()->Frame().GetBeaconSymbol(0);
@@ -370,14 +370,14 @@ void TxRxWorkerArgos::TxBeaconHw(size_t frame_id, size_t interface_id,
 //Called when finished with the last antenna of the given radio
 // C / L symbols must occur before the downlink D symbols.
 // Could move this to the main agora tx scheduler which should simplify the tx logic
-void TxRxWorkerArgos::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
-                                               long long time0) {
+void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
+                                            long long time0) {
   const size_t cell_id = Configuration()->CellId().at(radio_id);
   const std::vector<std::complex<int16_t>> zeros(
       Configuration()->SampsPerSymbol(), std::complex<int16_t>(0, 0));
 
   MLPD_FRAME(
-      "TxRxWorkerArgos[%zu]: TxReciprocityCalibPilots (Frame %zu,         , "
+      "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu,         , "
       "Radio %zu\n",
       tid_, frame_id, radio_id);
 
@@ -407,7 +407,7 @@ void TxRxWorkerArgos::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
       }
 
       MLPD_TRACE(
-          "TxRxWorkerArgos[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
+          "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
           "%zu, Radio %zu) is reference tx on channel %zu\n",
           tid_, frame_id, tx_symbol_id, radio_id, ant_idx);
       // Check to see if the next symbol is a Tx symbol for the reference node
@@ -452,7 +452,7 @@ void TxRxWorkerArgos::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
                             GetTxFlags(radio_id, tx_symbol_id), frame_time);
 
       MLPD_TRACE(
-          "TxRxWorkerArgos[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
+          "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
           "%zu, Radio %zu) dl pilot tx has data %d on channel %zu\n",
           tid_, frame_id, tx_symbol_id, radio_id, calib_radio == radio_id,
           channel_offset);
@@ -466,7 +466,7 @@ void TxRxWorkerArgos::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
 }
 
 //Tx data
-size_t TxRxWorkerArgos::DequeueSend(long long time0) {
+size_t TxRxWorkerHw::DequeueSend(long long time0) {
   auto tx_events = GetPendingTxEvents();
 
   //Process each pending tx event
@@ -493,7 +493,7 @@ size_t TxRxWorkerArgos::DequeueSend(long long time0) {
     // All antenna data is ready to tx for a given symbol, if last then TX out the data
     if (last_antenna) {
       MLPD_TRACE(
-          "TxRxWorkerArgos[%zu]: (Frame %zu, Symbol %zu) last tx antenna %zu "
+          "TxRxWorkerHw[%zu]: (Frame %zu, Symbol %zu) last tx antenna %zu "
           "for radio %zu has tx data for all antennas / channels\n",
           tid_, frame_id, symbol_id, ant_id, radio_id);
 
@@ -549,7 +549,7 @@ size_t TxRxWorkerArgos::DequeueSend(long long time0) {
 
     if (kDebugPrintInTask == true) {
       std::printf(
-          "TxRxWorkerArgos[%zu]: Transmitted frame %zu, symbol %zu, ant %zu\n",
+          "TxRxWorkerHw[%zu]: Transmitted frame %zu, symbol %zu, ant %zu\n",
           tid_, frame_id, symbol_id, ant_id);
     }
     auto complete_event =
@@ -561,7 +561,7 @@ size_t TxRxWorkerArgos::DequeueSend(long long time0) {
 
 //Checks to see if the current symbol is followed by another tx symbol
 //Need the radio id, to check against the reference radio
-bool TxRxWorkerArgos::IsTxSymbolNext(size_t radio_id, size_t current_symbol) {
+bool TxRxWorkerHw::IsTxSymbolNext(size_t radio_id, size_t current_symbol) {
   bool tx_symbol_next = false;
   const auto cell_id = Configuration()->CellId().at(radio_id);
   const auto reference_radio = Configuration()->RefRadio(cell_id);
@@ -584,7 +584,7 @@ bool TxRxWorkerArgos::IsTxSymbolNext(size_t radio_id, size_t current_symbol) {
   return tx_symbol_next;
 }
 
-int TxRxWorkerArgos::GetTxFlags(size_t radio_id, size_t tx_symbol_id) {
+int TxRxWorkerHw::GetTxFlags(size_t radio_id, size_t tx_symbol_id) {
   int tx_flags;
   //Flags == 1   // HAS_TIME
   //Flags == 2;  // HAS_TIME & END_BURST, name me
@@ -598,7 +598,7 @@ int TxRxWorkerArgos::GetTxFlags(size_t radio_id, size_t tx_symbol_id) {
 }
 
 /// Returns the next symbol and interface
-TxRxWorkerRx::RxParameters TxRxWorkerArgos::UpdateRxInterface(
+TxRxWorkerRx::RxParameters TxRxWorkerHw::UpdateRxInterface(
     const TxRxWorkerRx::RxParameters& last_rx) {
   TxRxWorkerRx::RxParameters next_rx;
 
@@ -643,7 +643,7 @@ TxRxWorkerRx::RxParameters TxRxWorkerArgos::UpdateRxInterface(
   }  // HwFramer == false
 */
 
-bool TxRxWorkerArgos::IsRxSymbol(size_t interface, size_t symbol_id) {
+bool TxRxWorkerHw::IsRxSymbol(size_t interface, size_t symbol_id) {
   auto symbol_type = Configuration()->GetSymbolType(symbol_id);
   const auto cell_id =
       Configuration()->CellId().at(interface + interface_offset_);
@@ -665,7 +665,7 @@ bool TxRxWorkerArgos::IsRxSymbol(size_t interface, size_t symbol_id) {
   return is_rx;
 }
 
-void TxRxWorkerArgos::PrintRxSymbolTiming(
+void TxRxWorkerHw::PrintRxSymbolTiming(
     std::vector<TxRxWorkerRx::RxTimeTracker>& rx_times, size_t current_frame,
     size_t current_symbol, size_t next_symbol) {
   if (kSymbolTimingEnabled) {
@@ -683,7 +683,7 @@ void TxRxWorkerArgos::PrintRxSymbolTiming(
             freq_ghz_);
         total_symbol_rx_time += rx_us.at(i);
         MLPD_TRACE(
-            "TxRxWorkerArgos[%zu]: Radio %zu Frame %d Symbol %zu Rx "
+            "TxRxWorkerHw[%zu]: Radio %zu Frame %d Symbol %zu Rx "
             "Start uS %f for %f uS\n",
             tid_, i + interface_offset_, pkts.front()->frame_id_,
             successful_receive.symbol_,
@@ -698,7 +698,7 @@ void TxRxWorkerArgos::PrintRxSymbolTiming(
       const double avg_rx_time = total_symbol_rx_time / num_interfaces_;
       std::ostringstream result_message;
       //Add any radio that is > 2x the average
-      result_message << std::fixed << std::setprecision(2) << "TxRxWorkerArgos["
+      result_message << std::fixed << std::setprecision(2) << "TxRxWorkerHw["
                      << tid_ << "]: Frame " << current_frame << " Symbol "
                      << current_symbol << " started rx @ "
                      << GetTime::CyclesToUs(
@@ -721,7 +721,7 @@ void TxRxWorkerArgos::PrintRxSymbolTiming(
 
     //Frame RX complete -- print summary
     if (current_symbol > next_symbol) {
-      MLPD_INFO("TxRxWorkerArgos[%zu]: Frame %zu rx complete @ %.2f\n", tid_,
+      MLPD_INFO("TxRxWorkerHw[%zu]: Frame %zu rx complete @ %.2f\n", tid_,
                 current_frame,
                 GetTime::CyclesToUs(GetTime::Rdtsc() - program_start_ticks_,
                                     freq_ghz_));
