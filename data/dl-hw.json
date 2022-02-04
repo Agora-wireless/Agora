@@ -17,8 +17,8 @@
     "fft_size" : 2048,
     "ofdm_data_num" : 1200,
     "dl_mcs" : {
-    	"modulation" : "16QAM",
-    	"Zc" : 72
+      "modulation" : "16QAM",
+      "code_rate" : 0.333
     },
     "beamsweep" : false,
     "beacon_antenna" : 0,

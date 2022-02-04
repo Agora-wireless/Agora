@@ -6,7 +6,7 @@
   "ue_radio_num": 8,
   "ul_mcs" : {
     "modulation": "64QAM",
-    "Zc": 104
+    "code_rate": 0.666
   },
   "symbol_num_perframe": 70,
   "client_ul_pilot_syms": 0,

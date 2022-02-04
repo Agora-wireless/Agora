@@ -11,8 +11,8 @@
   "demul_block_size": 48,
   "cp_size": 32,
   "dl_mcs" : {
-  	"modulation": "16QAM",
-  	"Zc": 24
+    "modulation": "16QAM",
+    "code_rate": 0.333
   },
   "frequency": 3.6e9,
   "sample_rate": 7.68e6,
