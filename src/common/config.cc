@@ -513,6 +513,8 @@ Config::Config(const std::string& jsonfile)
   dl_mcs_params_ = this->Parse(tdd_conf, "dl_mcs");
   this->UpdateDlMCS(dl_mcs_params_);
 
+  this->DumpMcsInfo();
+
   fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
 
   samps_per_symbol_ =
@@ -564,8 +566,8 @@ Config::Config(const std::string& jsonfile)
       "bytes per code block,"
       "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
       "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
-      "\n\tframe time %.3f usec \nUplink Max Mac data tp (Mbps) %.3f "
-      "\nDownlink Max Mac data tp (Mbps) %.3f \n",
+      "\n\tframe time %.3f usec \nUplink Max Mac data per-user tp (Mbps) %.3f "
+      "\nDownlink Max Mac data per-user tp (Mbps) %.3f \n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, ul_modulation_.c_str(),
       dl_modulation_.c_str(), ul_ldpc_config_.NumBlocksInSymbol(),

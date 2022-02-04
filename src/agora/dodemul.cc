@@ -331,6 +331,13 @@ EventData DoDemul::Launch(size_t tag) {
                                  max_sc_ite)
             : Demod64qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
         break;
+      case (CommsLib::kQaM256):
+        kUplinkHardDemod
+            ? Demod256qamHardAvx2(equal_t_ptr,
+                                  reinterpret_cast<uint8_t*>(demod_ptr),
+                                  max_sc_ite)
+            : Demod256qamSoftAvx2(equal_t_ptr, demod_ptr, max_sc_ite);
+        break;
       default:
         std::printf("Demodulation: modulation type %s not supported!\n",
                     cfg_->Modulation(Direction::kUplink).c_str());
