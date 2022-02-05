@@ -135,7 +135,15 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     }
     arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
                             cfg_->BsAntNum(), cfg_->UeAntNum(), false);
-    mat_dl_zf = mat_dl_zf_tmp.st();
+    mat_dl_zf = mat_dl_zf_tmp.st(); // or com out this line and keep  mat_dl_zf.zeros(size(mat_dl_zf)); below
+    //  /* Baseline#2: experiment with all-one bmfm*/
+    // // arma::mat AA;
+    // // AA.ones(size(mat_dl_zf));
+    // // mat_dl_zf = AA;
+    // mat_dl_zf.ones(size(mat_dl_zf));
+
+    // /* Baseline#3: experiment with purely random bmfm*/
+    // //
   }
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
     if (cfg_->ExternalRefNode(i) == true) {
