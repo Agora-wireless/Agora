@@ -329,7 +329,7 @@ class RxCounters {
   std::array<size_t, kFrameWnd> num_reciprocity_pkts_;
 
   // Number of packets we'll receive per frame on the uplink
-  size_t num_pkts_per_frame_;
+  size_t num_rx_pkts_per_frame_;
 
   // Number of pilot packets we'll receive per frame
   size_t num_pilot_pkts_per_frame_;
@@ -438,8 +438,10 @@ class FrameCounters {
       is_last = false;
     } else {
       is_last = true;
-      std::printf("Task Count %zu,  Max Count %zu, Symbol %zu\n", task_count,
-                  this->max_task_count_, symbol_id);
+      std::printf(
+          "Unexpected result in IsLastTask: Task Count %zu,  Max Count %zu, "
+          "Frame %zu, Symbol %zu\n",
+          task_count, this->max_task_count_, frame_id, symbol_id);
       std::fflush(stdout);
       // This should never happen
       assert(false);

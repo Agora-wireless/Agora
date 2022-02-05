@@ -220,6 +220,7 @@ Config::Config(const std::string& jsonfile)
 
   dpdk_num_ports_ = tdd_conf.value("dpdk_num_ports", 1);
   dpdk_port_offset_ = tdd_conf.value("dpdk_port_offset", 0);
+  dpdk_mac_addrs_ = tdd_conf.value("dpdk_mac_addrs", "");
 
   ue_mac_tx_port_ = tdd_conf.value("ue_mac_tx_port", kMacUserRemotePort);
   ue_mac_rx_port_ = tdd_conf.value("ue_mac_rx_port", kMacUserLocalPort);
@@ -498,6 +499,10 @@ Config::Config(const std::string& jsonfile)
 
   fft_block_size_ = tdd_conf.value("fft_block_size", 1);
   fft_block_size_ = std::max(fft_block_size_, num_channels_);
+  RtAssert(bs_ant_num_ % fft_block_size_ == 0,
+           "FFT block size is set to an invalid value - all rx symbols per "
+           "frame must fit inside an fft block");
+
   encode_block_size_ = tdd_conf.value("encode_block_size", 1);
 
   noise_level_ = tdd_conf.value("noise_level", 0.03);  // default: 30 dB
@@ -522,7 +527,7 @@ Config::Config(const std::string& jsonfile)
   dl_packet_length_ = Packet::kOffsetOfData + (samps_per_symbol_ * 4);
 
   //Don't check for jumbo frames when using the hardware, this might be temp
-  if (false) {
+  if (!kUseArgos) {
     RtAssert(packet_length_ < 9000,
              "Packet size must be smaller than jumbo frame");
   }

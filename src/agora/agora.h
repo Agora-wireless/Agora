@@ -28,10 +28,10 @@
 #include "dozf.h"
 #include "mac_thread_basestation.h"
 #include "memory_manage.h"
+#include "packet_txrx.h"
 #include "phy_stats.h"
 #include "signal_handler.h"
 #include "stats.h"
-#include "txrx.h"
 #include "utils.h"
 
 class Agora {
@@ -161,7 +161,7 @@ class Agora {
   Config* const config_;
   size_t fft_created_count_;
   size_t max_equaled_frame_ = SIZE_MAX;
-  std::unique_ptr<PacketTXRX> packet_tx_rx_;
+  std::unique_ptr<PacketTxRx> packet_tx_rx_;
 
   // The thread running MAC layer functions
   std::unique_ptr<MacThreadBaseStation> mac_thread_;
