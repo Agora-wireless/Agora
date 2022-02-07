@@ -13,7 +13,7 @@
 #include "udp_client.h"
 #include "video_receiver.h"
 
-#define USE_UDP_DATA_SOURCE
+//#define USE_UDP_DATA_SOURCE
 static constexpr bool kDebugPrintSender = false;
 static constexpr size_t kFrameLoadAdvance = 10;
 static constexpr size_t kBufferInit = 10;
@@ -21,6 +21,7 @@ static constexpr size_t kTxBufferElementAlignment = 64;
 
 static constexpr size_t kSlowStartMulStage1 = 32;
 static constexpr size_t kSlowStartMulStage2 = 8;
+static constexpr size_t kMasterThreadId = 0;
 
 static_assert(kFrameLoadAdvance >= kBufferInit);
 static std::atomic<bool> keep_running(true);
@@ -69,9 +70,9 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
       packets_per_frame_(packets_per_frame),
       server_address_(std::move(server_address)),
       server_rx_port_(server_rx_port),
-      get_data_symbol_id_(std::move(get_data_symbol_id))
-// end -- Ul / Dl     UE / BS
-{
+      get_data_symbol_id_(std::move(get_data_symbol_id)),
+      // end -- Ul / Dl     UE / BS
+      has_master_thread_(create_thread_for_master) {
   if (frame_duration_us == 0) {
     frame_duration_us_ =
         (cfg->Frame().NumTotalSyms() * cfg->SampsPerSymbol() * 1000000ul) /
@@ -117,25 +118,27 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
     task_ptok_[i] = new moodycamel::ProducerToken(send_queue_);
   }
 
-  num_workers_ready_atomic.store(0);
-  // Create a master thread when started from simulator
-  if (create_thread_for_master == true) {
-    MLPD_INFO("MacSender: creating master thread\n");
-    this->threads_.emplace_back(&MacSender::MasterThread, this,
-                                worker_thread_num_);
-  }
+  MLPD_TRACE("MacSender: Data update thread count: %zu\n", update_thread_num_);
 
   // Add the data update thread (background data reader), need to add a variable
   // for the update source number
+  const size_t kUpdateSourcePerThread = 1;
   for (size_t update_threads = 0; update_threads < update_thread_num_;
        update_threads++) {
-    // 1 update/data stream per thread.
-    this->threads_.emplace_back(&MacSender::DataUpdateThread, this,
-                                update_threads, 1);
-
     data_update_queue_.emplace_back(
         moodycamel::ConcurrentQueue<size_t>(kMessageQueueSize));
     // make producer token here?
+
+    // 1 update/data stream per thread.
+    threads_.emplace_back(&MacSender::DataUpdateThread, this, update_threads,
+                          kUpdateSourcePerThread);
+  }
+
+  num_workers_ready_atomic.store(0);
+  // Create a master thread when started from simulator
+  if (has_master_thread_) {
+    MLPD_INFO("MacSender: creating master thread\n");
+    threads_.emplace_back(&MacSender::MasterThread, this, kMasterThreadId);
   }
 }
 
@@ -161,13 +164,14 @@ void MacSender::StartTx() {
 
   CreateWorkerThreads(worker_thread_num_);
   signal(SIGINT, InterruptHandler);
-  MasterThread(0);  // Start the master thread
+  // Run the master thread (from current thread)
+  MasterThread(kMasterThreadId);
 
   delete[](this->frame_start_);
   delete[](this->frame_end_);
 }
 
-void MacSender::StartTXfromMain(double* in_frame_start, double* in_frame_end) {
+void MacSender::StartTxfromMain(double* in_frame_start, double* in_frame_end) {
   frame_start_ = in_frame_start;
   frame_end_ = in_frame_end;
 
@@ -191,8 +195,10 @@ void MacSender::ScheduleFrame(size_t frame) {
   }
 }
 
-void* MacSender::MasterThread(size_t /*unused*/) {
-  PinToCoreWithOffset(ThreadType::kMasterTX, core_offset_, 0);
+void* MacSender::MasterThread(size_t tid) {
+  const bool allow_core_sharing = has_master_thread_;
+  PinToCoreWithOffset(ThreadType::kMasterTX, core_offset_, tid,
+                      allow_core_sharing);
   std::array<size_t, kFrameWnd> frame_data_count;
   frame_data_count.fill(0);
 

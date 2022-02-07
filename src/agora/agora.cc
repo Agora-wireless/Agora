@@ -37,7 +37,7 @@ Agora::Agora(Config* const cfg)
   std::printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
               directory.c_str(), cfg->FreqGhz());
 
-  PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0,
+  PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0, kEnableCoreReuse,
                       false /* quiet */);
   CheckIncrementScheduleFrame(0, ScheduleProcessingFlags::kProcessingComplete);
   // Important to set cur_sche_frame_id_ after the call to
