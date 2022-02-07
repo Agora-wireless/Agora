@@ -1,7 +1,7 @@
 {
   /* General Settings */
   "cells": 1,
-  "bs_radio_num": 8,
+  "bs_radio_num": 4,
   "ue_radio_num": 1,
   "beamsweep": true,
   "beacon_antenna": 0,
@@ -10,31 +10,27 @@
   "ofdm_data_num": 400,
   "demul_block_size": 48,
   "cp_size": 32,
-  "dl_mcs" : {
-  	"modulation": "16QAM",
-  	"Zc": 24
+  "dl_mcs": {
+    "modulation": "16QAM",
+    "Zc": 18
   },
   "frequency": 3.6e9,
-  "sample_rate": 7.68e6,
-  "ofdm_tx_zero_prefix": 160,
-  "ofdm_tx_zero_postfix": 160,
-  "ofdm_rx_zero_prefix_bs": 160,
-  "ofdm_rx_zero_prefix_client": 160,
   /* Frame definition */
   "frame_schedule": [
-    "BPGDDDDG"
+    "BPGDDDD"
   ],
   "client_dl_pilot_syms": 2,
   /* compute configuration */
   "bs_mac_rx_port": 8070,
   "bs_mac_tx_port": 8080,
-  "core_offset": 0,
-  "worker_thread_num": 8,
+  "core_offset": 11,
+  "exclude_cores": [],
+  "worker_thread_num": 2,
   "socket_thread_num": 1,
   "ue_mac_rx_port": 9070,
   "ue_mac_tx_port": 9080,
-  "ue_core_offset": 11,
+  "ue_core_offset": 6,
   "ue_worker_thread_num": 2,
   "ue_socket_thread_num": 1,
-  "max_frame": 1
+  "max_frame": 20
 }
