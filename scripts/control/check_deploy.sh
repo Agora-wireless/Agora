@@ -31,11 +31,11 @@ fi
 # Check the length of 
 #  * subcarrier_num_list
 #  * subcarrier_block_list
-#  * decode_thread_num
+#  * coding_thread_num
 # are equal 
 sc_num_list_len=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.subcarrier_num_list | length')
 sc_block_list_len=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.subcarrier_block_list | length')
-dc_thread_list_len=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.decode_thread_num | length')
+dc_thread_list_len=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.coding_thread_num | length')
 if [ "${hydra_app_num}" -ne "${sc_num_list_len}" ]; then
   echored "ERROR: hydra_servers != subcarrier_num_list"
   exit
@@ -45,7 +45,7 @@ if [ "${hydra_app_num}" -ne "${sc_block_list_len}" ]; then
   exit
 fi
 if [ "${hydra_app_num}" -ne "${dc_thread_list_len}" ]; then
-  echored "ERROR: hydra_servers != decode_thread_num"
+  echored "ERROR: hydra_servers != coding_thread_num"
   exit
 fi
 

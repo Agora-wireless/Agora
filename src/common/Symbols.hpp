@@ -183,6 +183,8 @@ static inline std::string thread_type_str(ThreadType thread_type)
         return "Worker (Subcarrier)";
     case ThreadType::kWorkerDecode:
         return "Worker (Decode)";
+    case ThreadType::kWorkerEncode:
+        return "Worker (Encode)";
     }
     return "Invalid thread type";
 }

@@ -8,9 +8,7 @@
 #include "doer.hpp"
 #include "gettime.h"
 #include "mkl_dfti.h"
-#include "phy_stats.hpp"
 #include "shared_counters.hpp"
-#include "stats.hpp"
 #include <armadillo>
 #include <iostream>
 #include <stdio.h>

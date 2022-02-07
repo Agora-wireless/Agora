@@ -10,7 +10,6 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
-#include "stats.hpp"
 #include <armadillo>
 #include <iostream>
 #include <stdio.h>
@@ -54,7 +53,7 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    EventData Launch(size_t frame_id, size_t symbol_idx_dl, size_t base_sc_id);
+    void Launch(size_t frame_id, size_t symbol_idx_dl, size_t base_sc_id);
 
 private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;

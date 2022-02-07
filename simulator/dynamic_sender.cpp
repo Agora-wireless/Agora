@@ -470,15 +470,16 @@ void* Sender::worker_thread(int tid)
 
                 start_time = get_time();
             }
+            size_t real_symbol_num = cfg->symbol_num_perframe;
             if (cur_frame < 80) {
-                delay_ticks(start_tsc_send, (cur_frame * max_symbol_id + cur_symbol) * ticks_wnd_1);
+                delay_ticks(start_tsc_send, (cur_frame * real_symbol_num + cur_symbol) * ticks_wnd_1);
             } else if (cur_frame < 200) {
-                delay_ticks(start_tsc_send, (80 * max_symbol_id * ticks_wnd_1) + 
-                    ((cur_frame - 80) * max_symbol_id + cur_symbol) * ticks_wnd_2);
+                delay_ticks(start_tsc_send, (80 * real_symbol_num * ticks_wnd_1) + 
+                    ((cur_frame - 80) * real_symbol_num + cur_symbol) * ticks_wnd_2);
             } else {
-                delay_ticks(start_tsc_send, (80 * max_symbol_id * ticks_wnd_1) +
-                    (120 * max_symbol_id * ticks_wnd_2) +
-                    ((cur_frame - 200) * max_symbol_id + cur_symbol) * ticks_all);
+                delay_ticks(start_tsc_send, (80 * real_symbol_num * ticks_wnd_1) +
+                    (120 * real_symbol_num * ticks_wnd_2) +
+                    ((cur_frame - 200) * real_symbol_num + cur_symbol) * ticks_all);
             }
         }
     }

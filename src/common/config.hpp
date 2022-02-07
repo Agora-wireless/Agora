@@ -42,7 +42,6 @@ public:
     size_t nRows; /// Number of rows in the LDPC base graph to use
     uint32_t cbLen; /// Number of information bits input to LDPC encoding
     uint32_t cbCodewLen; /// Number of codeword bits output from LDPC encoding
-    size_t nblocksInSymbol;
 
     // Return the number of bytes in the information bit sequence for LDPC
     // encoding of one code block
@@ -371,6 +370,7 @@ public:
     const size_t data_offset = sizeof(int) * 16;
     // int dl_data_symbol_perframe;
     std::atomic<bool> running;
+    std::atomic<bool> error;
 
     size_t getNumAntennas() { return nRadios * nChannels; }
     int getSymbolId(size_t symbol_id);
@@ -434,8 +434,6 @@ public:
         mod_order_bits = new_mod_order_bits;
         mod_order = (size_t)pow(2, mod_order_bits);
         init_modulation_table(mod_table, mod_order);
-        LDPC_config.nblocksInSymbol
-            = OFDM_DATA_NUM * mod_order_bits / LDPC_config.cbCodewLen;
     }
 
     /// Return total number of data symbols of all frames in a buffer
@@ -519,7 +517,7 @@ public:
             = get_total_data_symbol_idx_ul(frame_id, symbol_id);
         return &decoded_buffer[total_data_symbol_id][roundup<64>(
                                                          num_bytes_per_cb)
-            * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
+            * (ue_id + cb_id)];
     }
 
     inline int8_t* get_demod_buf_to_send(
@@ -543,23 +541,22 @@ public:
 
     /// Get ul_bits for this symbol, user and code block ID
     inline int8_t* get_info_bits(Table<int8_t>& info_bits, size_t symbol_id,
-        size_t ue_id, size_t cb_id) const
+        size_t ue_id) const
     {
         return &info_bits[symbol_id][roundup<64>(num_bytes_per_cb)
-            * (LDPC_config.nblocksInSymbol * ue_id + cb_id)];
+            * ue_id];
     }
 
     /// Get encoded_buffer for this frame, symbol, user and code block ID
     inline int8_t* get_encoded_buf(Table<int8_t>& encoded_buffer,
-        size_t frame_id, size_t symbol_id_dl, size_t ue_id, size_t cb_id) const
+        size_t frame_id, size_t symbol_id_dl, size_t ue_id) const
     {
         size_t total_data_symbol_id
             = get_total_data_symbol_idx_dl(frame_id, symbol_id_dl);
         size_t num_encoded_bytes_per_cb
             = LDPC_config.cbCodewLen / mod_order_bits;
         return &encoded_buffer[total_data_symbol_id]
-                              [roundup<64>(OFDM_DATA_NUM) * ue_id
-                                  + num_encoded_bytes_per_cb * cb_id];
+                              [roundup<64>(OFDM_DATA_NUM) * ue_id];
     }
 
     // Returns the number of pilot subcarriers in downlink symbols used for

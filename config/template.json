@@ -3,12 +3,12 @@
   "use_central_scheduler": false,
   "use_general_worker": false,
   "worker_thread_num": 10,
-  "demul_block_size": 16,
+  "demul_block_size": 8,
   "antenna_num": 32,
   "ue_num": 8,
   "core_offset": 0,
   "frames": [
-    "PUUUUUUUUUUUUU"
+    "PDDDDDDDDDDDDD"
   ],
   "bs_port": 11000,
   "ue_rx_port": 10000,

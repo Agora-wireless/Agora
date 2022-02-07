@@ -70,7 +70,7 @@ void check_correctness_ul(Config* cfg)
     output_data.calloc(data_symbol_num_perframe, OFDM_DATA_NUM * UE_NUM, 64);
 
     int num_bytes_per_ue
-        = (cfg->LDPC_config.cbLen + 7) >> 3 * cfg->LDPC_config.nblocksInSymbol;
+        = (cfg->LDPC_config.cbLen + 7) >> 3;
     read_from_file_ul(raw_data_filename, raw_data, num_bytes_per_ue, cfg);
     read_from_file_ul(output_data_filename, output_data, num_bytes_per_ue, cfg);
 

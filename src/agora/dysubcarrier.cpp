@@ -240,7 +240,7 @@ void DySubcarrier::StartWork()
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("DySubcarrier Thread %u duration stats: total time used %.2lfms, "
         "csi %.2lfms (%.2lf%%, %zu, %.2lfus), zf %.2lfms (%.2lf%%, %zu, %.2lfus, %.2lfus), demod %.2lfms (%.2lf%%, %zu, %.2lfus), "
-        "precode %.2lfms (%.2lf%%), print %.2lfms (%.2lf%%), stating "
+        "print %.2lfms (%.2lf%%), stating "
         "%.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%), working rate (%zu/%zu: %.2lf%%)\n", 
         tid_, cycles_to_ms(whole_duration, freq_ghz_),
         cycles_to_ms(csi_tsc_duration, freq_ghz_), csi_tsc_duration * 100.0f / whole_duration, csi_count, cycles_to_us(csi_max, freq_ghz_),
@@ -496,10 +496,10 @@ void DySubcarrier::StartWorkCentral() {
 }
 
 void DySubcarrier::StartWorkDownlink() {
-    const size_t n_demul_tasks_reqd
+    const size_t n_precode_tasks_reqd
         = ceil_divide(sc_range_.end - sc_range_.start, cfg_->demul_block_size);
     
-    printf("Range [%zu:%zu] starts to work\n", sc_range_.start, sc_range_.end);
+    printf("Range [%zu:%zu] starts to work (downlink mode)\n", sc_range_.start, sc_range_.end);
 
     size_t start_tsc = 0;
     size_t work_tsc_duration = 0;
@@ -521,6 +521,8 @@ void DySubcarrier::StartWorkDownlink() {
 
     size_t work_start_tsc, state_start_tsc;
 
+    size_t frame_tag = 0;
+
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
         size_t worked = 0;
         TRIGGER_TIMER(loop_count ++);
@@ -532,13 +534,26 @@ void DySubcarrier::StartWorkDownlink() {
             size_t state_tsc_usage = rdtsc() - state_start_tsc;
             TRIGGER_TIMER(state_operation_duration += state_tsc_usage);
 
+            // if (frame_tag == 0) {
+            //     printf("Checking recvd all encoded pkts for frame %lu ret %lu\n", precode_cur_frame_, ret);
+            //     frame_tag = 1;
+            // }
+
             if (ret) {
                 TRIGGER_TIMER(work_tsc_duration += state_tsc_usage);
                 work_start_tsc = rdtsc();
                 worked = 1;
 
+                // if (frame_tag == 0) {
+                //     printf("Checking zf done for frame %lu\n", precode_cur_frame_);
+                //     frame_tag = 1;
+                // }
+
                 if (shared_state_->is_zf_done(precode_cur_frame_, (sc_range_.start + (n_precode_tasks_done_ * cfg_->demul_block_size)) / cfg_->zf_block_size)) {
                     size_t precode_start_tsc = rdtsc();
+                    // printf("Start to precode frame %zu symbol %zu sc %zu\n", precode_cur_frame_, precode_cur_sym_dl_, 
+                    //     sc_range_.start
+                    //         + (n_precode_tasks_done_ * cfg_->demul_block_size));
                     do_precode_->Launch(precode_cur_frame_,
                         precode_cur_sym_dl_,
                         sc_range_.start
@@ -560,16 +575,24 @@ void DySubcarrier::StartWorkDownlink() {
                         precode_cur_sym_dl_ = 0;
 
                         // demod_start_tsc = rdtsc();
-                        MLPD_INFO("Main thread (%u): Demodulation done frame: %lu "
+                        MLPD_INFO("Main thread (%u): Precode done frame: %lu "
                             "(%lu UL symbols)\n",
                             tid_,
                             precode_cur_frame_,
                             cfg_->dl_data_symbol_num_perframe);
                         // TRIGGER_TIMER(print_tsc_duration += rdtsc() - demod_start_tsc);
 
-                        shared_state_->precode_done(precode_cur_frame_);
+                        bool ret = shared_state_->precode_done(precode_cur_frame_);
+                        if (!ret) {
+                            MLPD_ERROR("DySubcarrier Thread %zu precode done error (frame %zu)!\n", 
+                                tid_, precode_cur_frame_);
+                            cfg_->error = true;
+                            cfg_->running = false;
+                            break;
+                        }
 
                         precode_cur_frame_++;
+                        frame_tag = 0;
                         if (unlikely(precode_cur_frame_ == cfg_->frames_to_test)) {
                             TRIGGER_TIMER(work_tsc_duration += rdtsc() - work_start_tsc);
                             break;
@@ -669,24 +692,29 @@ void DySubcarrier::StartWorkDownlink() {
         TRIGGER_TIMER(work_count += worked);
     }
 
+    if (cfg_->error) {
+        printf("Dysubcarrier Thread %zu error traceback: csi (frame %zu, sc %zu), "
+            "zf (frame %zu, sc %zu), precode (frame %zu, symbol %zu, task %zu), recvd packets done %zu\n", tid_, 
+            csi_cur_frame_, csi_cur_sc_, zf_cur_frame_, zf_cur_sc_, precode_cur_frame_,
+            precode_cur_sym_dl_, n_precode_tasks_done_, shared_state_->received_all_encoded_pkts(
+                    precode_cur_frame_, precode_cur_sym_dl_));
+        shared_state_->print_receiving_encoded_pkts(precode_cur_frame_, precode_cur_sym_dl_);
+    }
+
     size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("DySubcarrier Thread %u duration stats: total time used %.2lfms, "
-        "csi %.2lfms (%.2lf%%, %zu, %.2lfus), zf %.2lfms (%.2lf%%, %zu, %.2lfus, %.2lfus), demod %.2lfms (%.2lf%%, %zu, %.2lfus), "
-        "precode %.2lfms (%.2lf%%), print %.2lfms (%.2lf%%), stating "
+        "csi %.2lfms (%.2lf%%, %zu, %.2lfus), zf %.2lfms (%.2lf%%, %zu, %.2lfus, %.2lfus), "
+        "precode %.2lfms (%.2lf%%, %zu, %zu, %zu), print %.2lfms (%.2lf%%), stating "
         "%.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%), working rate (%zu/%zu: %.2lf%%)\n", 
         tid_, cycles_to_ms(whole_duration, freq_ghz_),
         cycles_to_ms(csi_tsc_duration, freq_ghz_), csi_tsc_duration * 100.0f / whole_duration, csi_count, cycles_to_us(csi_max, freq_ghz_),
         cycles_to_ms(zf_tsc_duration, freq_ghz_), zf_tsc_duration * 100.0f / whole_duration, zf_count, cycles_to_us(zf_max, freq_ghz_), do_zf_->GetZfTscPerTask(),
-        cycles_to_ms(precode_tsc_duration, freq_ghz_), precode_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(precode_tsc_duration, freq_ghz_), precode_tsc_duration * 100.0f / whole_duration, precode_cur_frame_, precode_cur_sym_dl_, n_precode_tasks_reqd,
         cycles_to_ms(print_tsc_duration, freq_ghz_), print_tsc_duration * 100.0f / whole_duration,
         cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, work_count * 100.0f / loop_count);
-    
-    if (kDebugPrintDemulStats) {
-        do_demul_->PrintOverhead();
-    }
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/performance_dysubcarrier.txt";

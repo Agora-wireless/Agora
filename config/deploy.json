@@ -27,7 +27,7 @@
         128,
         128
     ],
-    "decode_thread_num": [
+    "coding_thread_num": [
         4,
         4,
         2,

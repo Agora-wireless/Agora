@@ -13,10 +13,8 @@
 #include "gettime.h"
 #include "mac_thread.hpp"
 #include "memory_manage.h"
-#include "phy_stats.hpp"
 #include "shared_counters.hpp"
 #include "signalHandler.hpp"
-#include "stats.hpp"
 #include "txrx.hpp"
 #include "utils.h"
 #include <algorithm>
@@ -158,7 +156,7 @@ private:
 
     // 1st dimension: TASK_BUFFER_FRAME_NUM * number of DL data symbols per frame
     // 2nd dimension: number of OFDM data subcarriers * number of UEs
-    Table<uint8_t> dl_bits_buffer_;
+    Table<int8_t> dl_bits_buffer_;
 
     /**
      * Data for transmission

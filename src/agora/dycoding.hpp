@@ -10,8 +10,6 @@
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
-#include "phy_stats.hpp"
-#include "stats.hpp"
 #include <armadillo>
 #include <iostream>
 #include <stdio.h>
@@ -34,7 +32,7 @@ public:
 
     ~DyEncode();
 
-    EventData Launch(size_t tag);
+    void Launch(size_t frame_id, size_t symbol_id_dl, size_t ue_id);
 
     void StartWork();
 
@@ -55,7 +53,6 @@ private:
     size_t cur_frame_ = 0;
     size_t cur_symbol_ = 0;
     size_t cur_ue_ = 0;
-    size_t cur_cb_ = 0;
     size_t cur_idx_ = 0;
 
     // Control info
@@ -78,7 +75,7 @@ public:
 
     ~DyDecode();
 
-    EventData Launch(size_t tag);
+    void Launch(size_t frame_id, size_t symbol_id_ul, size_t ue_id);
 
     void StartWork();
     void StartWorkCentral();
@@ -100,7 +97,6 @@ private:
     size_t cur_frame_ = 0; // Current frame to decode
     size_t cur_symbol_ = 0; // Current symbol to decode
     size_t cur_ue_ = 0;
-    size_t cur_cb_ = 0; // Current code block id to decode
     size_t cur_idx_ = 0;
 
     // Control info

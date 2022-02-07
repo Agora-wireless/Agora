@@ -20,6 +20,8 @@ SharedState::SharedState(Config* cfg)
     , num_demod_pkts_per_symbol_per_ue_(cfg->bs_server_addr_list.size())
     , num_encoded_pkts_per_symbol_(cfg->UE_NUM)
     , num_zf_tasks_per_frame_(cfg->get_num_sc_to_process() / cfg->zf_block_size)
+    , slot_us_(1000)
+    , symbol_num_per_frame_(cfg->symbol_num_perframe)
 {
     frame_start_time_ = new uint64_t[cfg->frames_to_test];
     frame_iq_time_ = new uint64_t[cfg->frames_to_test];
@@ -83,12 +85,11 @@ bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id)
     }
 
     if (unlikely(frame_start_time_[frame_id] == 0)) {
-        frame_start_time_[frame_id] = get_ns();
+        frame_start_time_[frame_id] = get_us();
     }
 
     const size_t frame_slot = frame_id % kFrameWnd;
     num_pkts_[frame_slot]++;
-    encode_ready_[frame_slot] = true;
     if (num_pkts_[frame_slot]
         == num_pkts_per_symbol_
             * (num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_)) {
@@ -96,13 +97,14 @@ bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id)
                 "Pilot pkts = %zu of %zu\n",
             frame_id, num_pilot_pkts_[frame_slot].load(),
             num_pilot_pkts_per_frame_);
-        frame_iq_time_[frame_id] = get_ns();
+        frame_iq_time_[frame_id] = get_us();
     }
 
     if (symbol_id < num_pilot_symbols_per_frame_) {
         num_pilot_pkts_[frame_slot]++;
         if (num_pilot_pkts_[frame_slot] == num_pilot_pkts_per_frame_) {
             MLPD_INFO("SharedCounters: received all pilots in frame: %u\n", frame_id);
+            encode_ready_[frame_slot] = true;
         }
     } else {
         num_data_pkts_[frame_slot][symbol_id - num_pilot_symbols_per_frame_]++;
@@ -129,7 +131,7 @@ bool SharedState::receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol
     return true;
 }
 
-bool SharedState::receive_encoded_pkt(size_t frame_id, size_t symbol_id_dl)
+bool SharedState::receive_encoded_pkt(size_t frame_id, size_t symbol_id_dl, size_t ue_id)
 {
     if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
         MLPD_ERROR(
@@ -141,8 +143,12 @@ bool SharedState::receive_encoded_pkt(size_t frame_id, size_t symbol_id_dl)
         return false;
     }
     num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl]++;
+    num_encoded_pkts_states_[frame_id % kFrameWnd][symbol_id_dl] ^= (1 << ue_id);
     if (num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl] == num_encoded_pkts_per_symbol_) {
-        MLPD_INFO("SharedCounters: received all demod packets in frame: %u, symbol: %u\n", frame_id, symbol_id_dl);
+        MLPD_INFO("SharedCounters: received all encoded packets in frame: %u, symbol: %u, packets: %zu\n", frame_id, symbol_id_dl, num_encoded_pkts_per_symbol_);
+    } else if (num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl] > num_encoded_pkts_per_symbol_) {
+        printf("ERROR!\n");
+        exit(0);
     }
     return true;
 }
@@ -180,7 +186,7 @@ bool SharedState::received_all_demod_pkts(
     if (num_demod_pkts_[ue_id][frame_id % kFrameWnd][symbol_id_ul]
         == num_demod_pkts_per_symbol_per_ue_) {
         if (symbol_id_ul == 0) {
-            frame_decode_time_[frame_id] = get_ns();
+            frame_decode_time_[frame_id] = get_us();
         }
         return true;
     }
@@ -189,6 +195,11 @@ bool SharedState::received_all_demod_pkts(
 
 bool SharedState::received_all_encoded_pkts(size_t frame_id, size_t symbol_id_dl)
 {
+    // static size_t frame_tag = 0;
+    // if (frame_tag == frame_id) {
+    //     printf("Recvd packets: %zu, required: %zu\n", num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl].load(), num_encoded_pkts_per_symbol_);
+    //     frame_tag ++;
+    // }
     if (num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl]
         == num_encoded_pkts_per_symbol_) {
         return true;
@@ -196,11 +207,27 @@ bool SharedState::received_all_encoded_pkts(size_t frame_id, size_t symbol_id_dl
     return false;
 }
 
-bool SharedState::is_encode_ready(size_t frame_id) {
+void num_to_binary(char* res, size_t num, size_t n_bits) {
+    for (size_t i = 0; i < n_bits; i ++) {
+        res[i] = '0' + ((num >> i) & 1);
+    }
+    res[n_bits] = '\0';
+}
+
+void SharedState::print_receiving_encoded_pkts(size_t frame_id, size_t symbol_id_dl) 
+{
+    char res[64];
+    num_to_binary(res, num_encoded_pkts_states_[frame_id % kFrameWnd][symbol_id_dl].load(), num_encoded_pkts_per_symbol_);
+    printf("[Shared State] Frame %zu symbol %zu: received %zu encoded packets, required %zu, state %s\n",
+        frame_id, symbol_id_dl, num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl].load(), num_encoded_pkts_per_symbol_, res);
+}
+
+bool SharedState::is_encode_ready(size_t frame_id, size_t symbol_id_dl) {
     if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
         return false;
     }
-    return encode_ready_[frame_id % kFrameWnd];
+    return encode_ready_[frame_id % kFrameWnd] && 
+        (get_us() - frame_start_time_[frame_id]) >= (symbol_id_dl + 1) * slot_us_ / symbol_num_per_frame_;
 }
 
 void SharedState::fft_done(size_t frame_id, size_t symbol_id)
@@ -247,7 +274,7 @@ void SharedState::decode_done(size_t frame_id)
     if (unlikely(cont)) {
         cur_frame_mutex_.lock();
         while (num_decode_tasks_completed_[cur_frame_ % kFrameWnd] == num_decode_tasks_per_frame_) {
-            frame_end_time_[cur_frame_] = get_ns();
+            frame_end_time_[cur_frame_] = get_us();
             cur_frame_ ++;
             encode_ready_[(cur_frame_ - 1) % kFrameWnd] = false;
             size_t cur_cycle = worker_rdtsc();
@@ -282,16 +309,21 @@ void SharedState::decode_done(size_t frame_id)
     }
 }
 
-void SharedState::precode_done(size_t frame_id)
+bool SharedState::precode_done(size_t frame_id)
 {
-    rt_assert(frame_id == cur_frame_, "Wrong completed precode task!");
+    // rt_assert(frame_id == cur_frame_, "Wrong completed precode task!");
+    // if (unlikely(frame_id != cur_frame_)) {
+    //     MLPD_ERROR("SharedState error: commit a wrong precode frame id (committed: %zu, expected: %u)!\n",
+    //         frame_id, cur_frame_);
+    //     return false;
+    // }
     precode_mutex_.lock();
-    num_precode_tasks_completed_++;
-    if (num_precode_tasks_completed_ == num_precode_tasks_per_frame_) {
+    num_precode_tasks_completed_[frame_id % kFrameWnd]++;
+    while (frame_id == cur_frame_ && num_precode_tasks_completed_[frame_id % kFrameWnd] == num_precode_tasks_per_frame_) {
         cur_frame_++;
-        encode_ready_[(cur_frame_ - 1) % kFrameWnd] = false;
+        encode_ready_[frame_id % kFrameWnd] = false;
         size_t cur_cycle = worker_rdtsc();
-        num_precode_tasks_completed_ = 0;
+        num_precode_tasks_completed_[frame_id % kFrameWnd] = 0;
         size_t frame_slot = frame_id % kFrameWnd;
         num_pkts_[frame_slot] = 0;
         num_pilot_pkts_[frame_slot] = 0;
@@ -301,13 +333,17 @@ void SharedState::precode_done(size_t frame_id)
         for (size_t j = 0; j < kMaxSymbols; j++) {
             num_encode_tasks_completed_[frame_slot][j] = 0;
         }
+        // num_encode_tasks_completed_[frame_slot] = 0;
         for (size_t j = 0; j < kMaxSymbols; j++) {
             num_encoded_pkts_[frame_slot][j] = 0;
+            num_encoded_pkts_states_[frame_slot][j] = 0;
         }
         MLPD_INFO("Main thread: Precode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
         last_frame_cycles_ = cur_cycle;
+        frame_id ++;
     }
     precode_mutex_.unlock();
+    return true;
 }
 
 void SharedState::encode_done(size_t frame_id, size_t symbol_id_dl)
@@ -339,7 +375,7 @@ bool SharedState::is_demod_tx_ready(size_t frame_id, size_t symbol_id_ul)
     }
     if (num_demul_tasks_completed_[frame_id % kFrameWnd][symbol_id_ul]
         == num_demul_tasks_required_) {
-        frame_sc_time_[frame_id] = get_ns();
+        frame_sc_time_[frame_id] = get_us();
         return true;
     } 
     return false;

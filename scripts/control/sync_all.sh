@@ -48,5 +48,7 @@ for (( i=0; i<${hydra_server_num}; i++ )) do
   eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/scripts $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
   eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/config $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
   eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/data $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
+  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/test $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
+  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/tool $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
   eval "rsync -a ${hydra_root_dir}/CMakeLists.txt $(echo ${server_name} | tr -d '"'):${HYDRA_RUNNER_ROOT}/Agora/"
 done

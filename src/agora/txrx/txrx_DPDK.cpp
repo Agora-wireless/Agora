@@ -152,13 +152,23 @@ bool PacketTXRX::StartTXRX()
                     pthread_fun_wrapper<PacketTXRX, &PacketTXRX::loop_tx_rx>,
                 context, lcore_id);
         } else if (worker_id == rx_thread_num_) {
-            auto context = new EventHandlerContext<PacketTXRX>;
-            context->obj_ptr = this;
-            context->id = worker_id;
-            printf("Launch demod tx thread on core %u\n", lcore_id);
-            rte_eal_remote_launch((lcore_function_t*)
-                    pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_tx_thread>,
-                context, lcore_id);
+            if (cfg_->downlink_mode) {
+                auto context = new EventHandlerContext<PacketTXRX>;
+                context->obj_ptr = this;
+                context->id = worker_id;
+                printf("Launch encode tx thread on core %u\n", lcore_id);
+                rte_eal_remote_launch((lcore_function_t*)
+                        pthread_fun_wrapper<PacketTXRX, &PacketTXRX::encode_tx_thread>,
+                    context, lcore_id);
+            } else {
+                auto context = new EventHandlerContext<PacketTXRX>;
+                context->obj_ptr = this;
+                context->id = worker_id;
+                printf("Launch demod tx thread on core %u\n", lcore_id);
+                rte_eal_remote_launch((lcore_function_t*)
+                        pthread_fun_wrapper<PacketTXRX, &PacketTXRX::demod_tx_thread>,
+                    context, lcore_id);
+            }
         } else if (cfg_->use_time_domain_iq && worker_id > rx_thread_num_) {
             auto context = new EventHandlerContext<PacketTXRX>;
             context->obj_ptr = this;
@@ -226,6 +236,7 @@ void* PacketTXRX::fft_tx_thread(int tid)
                                 * (cfg_->OFDM_DATA_START + cfg_->subcarrier_start),
                             cfg_->get_num_sc_to_process() * 2 * sizeof(unsigned short));
                         if (!shared_state_->receive_freq_iq_pkt(fft_frame_to_send, fft_symbol_to_send)) {
+                            cfg_->error = true;
                             cfg_->running = false;
                         }
                     } else {
@@ -339,6 +350,7 @@ void* PacketTXRX::demod_tx_thread(int tid)
                             demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg_->subcarrier_start);
                     memcpy(target_demod_ptr, demod_ptr, cfg_->get_num_sc_to_process() * cfg_->mod_order_bits);
                     if (!shared_state_->receive_demod_pkt(ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_)) {
+                        cfg_->error = true;
                         cfg_->running = false;
                     }
                 } else {
@@ -433,17 +445,18 @@ void* PacketTXRX::encode_tx_thread(int tid)
             send_start_tsc = work_start_tsc;
             worked = 1;
 
-            for (size_t ue_id = 0; ue_id < cfg_->UE_NUM; ue_id++) {
+            for (size_t ue_id = cfg_->ue_start; ue_id < cfg_->ue_end; ue_id++) {
                 int8_t* encode_ptr = cfg_->get_encoded_buf(encoded_buffer_to_send_, 
-                    encode_frame_to_send_, encode_symbol_dl_to_send_, ue_id, 0);
+                    encode_frame_to_send_, encode_symbol_dl_to_send_, ue_id);
 
                 for (size_t target_server_idx = 0; target_server_idx < cfg_->bs_server_addr_list.size(); target_server_idx ++) {
                     size_t sc_start = cfg_->subcarrier_num_start[target_server_idx];
                     int8_t* src_ptr = encode_ptr + sc_start * cfg_->mod_order_bits;
                     if (target_server_idx == cfg_->bs_server_addr_idx) {
                         int8_t* target_ptr = cfg_->get_encoded_buf(encoded_buffer_to_precode_,
-                            encode_frame_to_send_, encode_symbol_dl_to_send_, ue_id, 0) + sc_start * cfg_->mod_order_bits;
+                            encode_frame_to_send_, encode_symbol_dl_to_send_, ue_id) + sc_start * cfg_->mod_order_bits;
                         memcpy(target_ptr, src_ptr, cfg_->get_num_sc_to_process() * cfg_->mod_order_bits);
+                        shared_state_->receive_encoded_pkt(encode_frame_to_send_, encode_symbol_dl_to_send_, ue_id);
                     } else {
                         struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
                         tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 
@@ -594,6 +607,7 @@ int PacketTXRX::recv_relocate(int tid)
             // get the position in rx_buffer
             cur_cycle = rdtsc();
             if (!shared_state_->receive_freq_iq_pkt(pkt->frame_id_, pkt->symbol_id_)) {
+                cfg_->error = true;
                 cfg_->running = false;
             }
             size_t record_cycle = rdtsc() - cur_cycle;
@@ -612,12 +626,14 @@ int PacketTXRX::recv_relocate(int tid)
             memcpy(demod_ptr, pkt->data_,
                 cfg_->subcarrier_num_list[pkt->server_id_] * cfg_->mod_order_bits);
             if (!shared_state_->receive_demod_pkt(pkt->ue_id_, pkt->frame_id_, symbol_idx_ul)) {
+                cfg_->error = true;
                 cfg_->running = false;
             }
         } else if (pkt->pkt_type_ == Packet::PktType::kTimeIQ) {
             char* iq_ptr = cfg_->get_freq_domain_iq_buffer(time_domain_iq_buffer_, pkt->ant_id_, pkt->frame_id_, pkt->symbol_id_);
             memcpy(iq_ptr, (uint8_t*)pkt + Packet::kOffsetOfData, cfg_->OFDM_CA_NUM * 2 * sizeof(unsigned short));
             if (!shared_state_->receive_time_iq_pkt(pkt->frame_id_, pkt->symbol_id_)) {
+                cfg_->error = true;
                 cfg_->running = false;
             }
         } else if (pkt->pkt_type_ == Packet::PktType::kEncode) {
@@ -626,10 +642,11 @@ int PacketTXRX::recv_relocate(int tid)
 
             int8_t* encode_ptr
                 = cfg_->get_encoded_buf(encoded_buffer_to_precode_,
-                    pkt->frame_id_, symbol_idx_dl, pkt->ue_id_, 0);
+                    pkt->frame_id_, symbol_idx_dl, pkt->ue_id_);
             memcpy(encode_ptr, pkt->data_,
                 cfg_->get_num_sc_to_process() * cfg_->mod_order_bits);
-            if (!shared_state_->receive_encoded_pkt(pkt->frame_id_, symbol_idx_dl)) {
+            if (!shared_state_->receive_encoded_pkt(pkt->frame_id_, symbol_idx_dl, pkt->ue_id_)) {
+                cfg_->error = true;
                 cfg_->running = false;
             }
         } else {

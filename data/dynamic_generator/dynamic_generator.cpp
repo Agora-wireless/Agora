@@ -179,7 +179,6 @@ int main(int argc, char* argv[])
     }
 
     // Place modulated uplink data codewords into central IFFT bins
-    rt_assert(cfg->LDPC_config.nblocksInSymbol == 1); // TODO: Assumption
     std::vector<std::vector<complex_float>> pre_ifft_data_syms(
         cfg->UE_ANT_NUM * cfg->user_level_list.size() * cfg->num_load_levels);
     if (mode == 0 || mode == 1) {

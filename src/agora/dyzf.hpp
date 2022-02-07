@@ -8,7 +8,6 @@
 #include "control.hpp"
 #include "doer.hpp"
 #include "gettime.h"
-#include "stats.hpp"
 #include "utils.h"
 #include <armadillo>
 #include <iostream>

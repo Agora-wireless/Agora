@@ -12,10 +12,8 @@
 #include "dyzf.hpp"
 #include "gettime.h"
 #include "modulation.hpp"
-#include "phy_stats.hpp"
 #include "shared_counters.hpp"
 #include "signalHandler.hpp"
-#include "stats.hpp"
 #include <armadillo>
 #include <iostream>
 #include <stdio.h>

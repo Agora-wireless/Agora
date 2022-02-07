@@ -28,7 +28,7 @@ static inline size_t rdtsc()
 }
 
 /// Return the system timestamp
-static inline size_t get_ns()
+static inline size_t get_us()
 {
     struct timeval current_time;
     gettimeofday(&current_time, NULL);

@@ -9,8 +9,6 @@
 #include "doer.hpp"
 #include "gettime.h"
 #include "modulation.hpp"
-#include "phy_stats.hpp"
-#include "stats.hpp"
 #include <armadillo>
 #include <iostream>
 #include <mkl.h>

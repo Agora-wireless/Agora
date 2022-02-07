@@ -199,8 +199,7 @@ include_directories(
 	src/common/
 	src/mac/
   src/agora/
-  src/agora/txrx/
-  src/client/)
+  src/agora/txrx/)
 
 include_directories(SYSTEM src/third_party)
 
@@ -228,6 +227,7 @@ set(AGORA_SOURCES
   src/agora/dydemul.cpp
   src/agora/dycoding.cpp
   src/agora/dysubcarrier.cpp
+  src/agora/dyprecode.cpp
   src/agora/radio_lib.cpp
   src/agora/radio_calibrate.cpp
   src/mac/mac_thread.cpp)
@@ -243,13 +243,6 @@ else()
     src/agora/txrx/txrx_argos.cpp)
 endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
-
-set(CLIENT_SOURCES
-  src/client/client_radio.cpp
-  src/client/phy-ue.cpp
-  src/client/txrx_client.cpp
-  src/mac/mac_thread.cpp)
-add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
 
 include_directories(
   ${FLEXRAN_FEC_SDK_DIR}/source/phy/lib_ldpc_decoder_5gnr
@@ -275,18 +268,6 @@ add_executable(agora
   $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(agora ${COMMON_LIBS})
-
-add_executable(data_generator
-  ${CMAKE_CURRENT_SOURCE_DIR}/data/data_generator/data_generator.cpp
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(data_generator ${COMMON_LIBS})
-target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
-
-add_executable(user
-  src/client/user-main.cpp
-  $<TARGET_OBJECTS:client_sources_lib>
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(user ${COMMON_LIBS})
 
 add_executable(sim
   simulator/main.cpp

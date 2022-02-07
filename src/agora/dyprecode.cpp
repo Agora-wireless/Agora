@@ -27,7 +27,7 @@ DyPrecode::~DyPrecode()
     free_buffer_1d(&precoded_buffer_temp_);
 }
 
-EventData DyPrecode::Launch(
+void DyPrecode::Launch(
     size_t frame_id, size_t symbol_id_dl, size_t base_sc_id)
 {
     // size_t data_symbol_idx_dl = cfg_->get_dl_symbol_idx(frame_id, symbol_id);
@@ -63,7 +63,7 @@ EventData DyPrecode::Launch(
             for (size_t user_id = 0; user_id < cfg_->UE_NUM; user_id++) {
                 int8_t* raw_data_ptr
                     = cfg_->get_encoded_buf(encoded_buffer_to_precode_, frame_id,
-                    symbol_id_dl, user_id, 0) + cur_sc_id * cfg_->mod_order_bits;
+                    symbol_id_dl, user_id) + cur_sc_id * cfg_->mod_order_bits;
                 if (cur_sc_id % cfg_->OFDM_PILOT_SPACING == 0)
                     data_ptr[user_id]
                         = cfg_->ue_specific_pilot[user_id][cur_sc_id];
@@ -148,5 +148,4 @@ EventData DyPrecode::Launch(
                "subcarrier: %zu\n",
             tid_, frame_id, symbol_id_dl, base_sc_id);
     }
-    return EventData(EventType::kPrecode, tag);
 }

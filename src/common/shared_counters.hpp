@@ -21,7 +21,7 @@ public:
     // When receive a new demod packet, record it here
     bool receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol_id_ul);
     // When receive a new encode packet, record it here
-    bool receive_encoded_pkt(size_t frame_id, size_t symbol_id_dl);
+    bool receive_encoded_pkt(size_t frame_id, size_t symbol_id_dl, size_t ue_id);
 
     bool received_all_time_iq_pkts(size_t frame_id, size_t symbol_id);
     // Check whether all pilot packets are received for a frame
@@ -31,8 +31,12 @@ public:
     bool received_all_data_pkts(size_t frame_id, size_t symbol_id_ul);
     bool received_all_demod_pkts(size_t ue_id, size_t frame_id, size_t symbol_id_ul);
     bool received_all_encoded_pkts(size_t frame_id, size_t symbol_id_dl);
+
+    // Print 
+    void print_receiving_encoded_pkts(size_t frame_id, size_t symbol_id_dl);
+
     // Check whether encoding can proceed for a frame
-    bool is_encode_ready(size_t frame_id);
+    bool is_encode_ready(size_t frame_id, size_t symbol_id_dl);
 
     void fft_done(size_t frame_id, size_t symbol_id);
     void zf_done(size_t frame_id, size_t zf_block_id);
@@ -46,8 +50,9 @@ public:
     // When precoding is done for a frame from one dosubcarrier worker, call this function
     // This function will increase cur_frame_ when this frame is precoded so that
     // we can move on precoding the next frame and release the resources used by this frame
-    void precode_done(size_t frame_id);
+    bool precode_done(size_t frame_id);
     void encode_done(size_t frame_id, size_t symbol_id);
+    // void encode_done(size_t frame_id);
 
     bool is_fft_tx_ready(size_t frame_id, size_t symbol_id);
     // Return true iff we have completed demodulation for all subcarriers in
@@ -105,6 +110,8 @@ private:
 
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_encoded_pkts_ = {};
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
+        num_encoded_pkts_states_ = {};
 
     // encode_ready_[i % kFrameWnd] represents whether encoding can proceed
     // for frame i
@@ -118,7 +125,7 @@ private:
 
     // Atomic counter for # completed precode tasks
     // cur_frame_ will be incremented in all tasks are completed
-    size_t num_precode_tasks_completed_;
+    std::array<size_t, kFrameWnd> num_precode_tasks_completed_;
     std::mutex precode_mutex_;
 
     // The timestamp when last frame was processed (in cycles)
@@ -141,6 +148,8 @@ private:
     const size_t num_demod_pkts_per_symbol_per_ue_;
     const size_t num_encoded_pkts_per_symbol_;
     const size_t num_zf_tasks_per_frame_;
+    const size_t slot_us_;
+    const size_t symbol_num_per_frame_;
 };
 
 #if 0

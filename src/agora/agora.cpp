@@ -364,6 +364,8 @@ void* Agora::subcarrierWorker(int tid)
         computeSubcarrier->RegisterQueues(&sched_info_arr_[tid].concurrent_q_,
             &complete_task_queue_, worker_ptoks_ptr_[tid]);
         computeSubcarrier->StartWorkCentral();
+    } else if (config_->downlink_mode) {
+        computeSubcarrier->StartWorkDownlink();
     } else {
         computeSubcarrier->StartWork();
     }
@@ -518,8 +520,7 @@ void* Agora::worker(int tid)
             if (state_trigger) {
                 work_start_tsc = rdtsc();
             }
-            computeDecoding->Launch(gen_tag_t::frm_sym_cb(slot_id, symbol_id_ul,
-                ue_id * config_->LDPC_config.nblocksInSymbol)._tag);
+            computeDecoding->Launch(slot_id, symbol_id_ul, ue_id);
             resp = EventData(EventType::kDecode);
             TryEnqueueFallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
             if (state_trigger) {
@@ -563,7 +564,7 @@ void Agora::initializeUplinkBuffers()
     dl_zf_matrices_.alloc(kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM);
 
     demod_buffer_to_send_.alloc(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM, kMaxModType * cfg->OFDM_DATA_NUM);
-    decoded_buffer_.alloc(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM, cfg->LDPC_config.nblocksInSymbol * roundup<64>(cfg->num_bytes_per_cb));
+    decoded_buffer_.alloc(kFrameWnd, cfg->symbol_num_perframe, cfg->UE_NUM, roundup<64>(cfg->num_bytes_per_cb));
 
     equal_buffer_.malloc(
         task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
@@ -627,7 +628,7 @@ void Agora::saveDecodeDataToFile(int frame_id)
 {
     auto& cfg = config_;
     const size_t num_decoded_bytes
-        = cfg->num_bytes_per_cb * cfg->LDPC_config.nblocksInSymbol;
+        = cfg->num_bytes_per_cb;
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/decode_data.bin";
