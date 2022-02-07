@@ -16,7 +16,6 @@ class MacDataReceiver {
 
  protected:
   inline MacDataReceiver() = default;
-  ;
   virtual ~MacDataReceiver() = default;
 };
 

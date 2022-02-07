@@ -37,9 +37,11 @@ class UDPServer {
     if (kDebugPrintUdpServerInit) {
       std::printf("Creating UDP server listening at port %d\n", port);
     }
-    sock_fd_ = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+    sock_fd_ = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
     if (sock_fd_ == -1) {
-      throw std::runtime_error("UDPServer: Failed to create local socket.");
+      throw std::runtime_error(
+          "UDPServer: Failed to create local socket. errno = " +
+          std::string(std::strerror(errno)));
     }
 
     int ret = 0;
@@ -51,21 +53,21 @@ class UDPServer {
       unsigned int actual_buf_size;
       socklen_t actual_buf_storage_size = sizeof(actual_buf_size);
 
-      ret = getsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
-                       &actual_buf_storage_size);
+      ret = ::getsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
+                         &actual_buf_storage_size);
 
       if (ret < 0 || (actual_buf_size != desired_buf_size)) {
         actual_buf_size = desired_buf_size;
-        ret = setsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
-                         actual_buf_storage_size);
+        ret = ::setsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
+                           actual_buf_storage_size);
 
         if (ret != 0) {
           throw std::runtime_error("UDPServer: Failed to set RX buffer size.");
         }
       }
 
-      ret = getsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
-                       &actual_buf_storage_size);
+      ret = ::getsockopt(sock_fd_, SOL_SOCKET, SO_RCVBUF, &actual_buf_size,
+                         &actual_buf_storage_size);
 
       // Linux likes to return 2* the buffer size
       if ((actual_buf_size != desired_buf_size) &&
@@ -77,14 +79,14 @@ class UDPServer {
       }
     }
 
-    struct sockaddr_in serveraddr;
+    ::sockaddr_in serveraddr;
     serveraddr.sin_family = AF_INET;
     serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
     serveraddr.sin_port = htons(static_cast<unsigned short>(port));
     std::memset(serveraddr.sin_zero, 0u, sizeof(serveraddr.sin_zero));
 
-    ret = bind(sock_fd_, reinterpret_cast<struct sockaddr*>(&serveraddr),
-               sizeof(serveraddr));
+    ret = ::bind(sock_fd_, reinterpret_cast<::sockaddr*>(&serveraddr),
+                 sizeof(serveraddr));
     if (ret != 0) {
       throw std::runtime_error("UDPServer: Failed to bind socket to port " +
                                std::to_string(port) +
@@ -97,12 +99,12 @@ class UDPServer {
 
   ~UDPServer() {
     for (const auto& kv : addrinfo_map_) {
-      freeaddrinfo(kv.second);
+      ::freeaddrinfo(kv.second);
     }
     addrinfo_map_.clear();
 
     if (sock_fd_ != -1) {
-      close(sock_fd_);
+      ::close(sock_fd_);
       sock_fd_ = -1;
     }
 
@@ -146,14 +148,14 @@ class UDPServer {
   ssize_t RecvFrom(uint8_t* buf, size_t len, const std::string& src_address,
                    uint16_t src_port) {
     std::string remote_uri = src_address + ":" + std::to_string(src_port);
-    struct addrinfo* rem_addrinfo = nullptr;
+    addrinfo* rem_addrinfo = nullptr;
 
     const auto remote_itr = addrinfo_map_.find(remote_uri);
     if (remote_itr == addrinfo_map_.end()) {
       char port_str[16u];
       snprintf(port_str, sizeof(port_str), "%u", src_port);
 
-      struct addrinfo hints;
+      addrinfo hints;
       std::memset(&hints, 0, sizeof(hints));
       hints.ai_family = AF_INET;
       hints.ai_socktype = SOCK_DGRAM;
@@ -167,12 +169,12 @@ class UDPServer {
         throw std::runtime_error(issue_msg);
       }
 
-      std::pair<std::map<std::string, struct addrinfo*>::iterator, bool>
+      std::pair<std::map<std::string, addrinfo*>::iterator, bool>
           map_insert_result;
       {  // Synchronize access to insert for thread safety
         std::scoped_lock map_access(map_insert_access_);
         map_insert_result = addrinfo_map_.insert(
-            std::pair<std::string, struct addrinfo*>(remote_uri, rem_addrinfo));
+            std::pair<std::string, addrinfo*>(remote_uri, rem_addrinfo));
       }
     } else {
       rem_addrinfo = remote_itr->second;
@@ -226,7 +228,7 @@ class UDPServer {
 
     // Set timeout
     if (timeout_sec != 0) {
-      struct timeval tv;
+      timeval tv;
       tv.tv_sec = timeout_sec;
       tv.tv_usec = 0;
       int opt_status =
@@ -250,7 +252,7 @@ class UDPServer {
   /**
    * @brief A cache mapping hostname:udp_port to addrinfo
    */
-  std::map<std::string, struct addrinfo*> addrinfo_map_;
+  std::map<std::string, addrinfo*> addrinfo_map_;
   /**
    * @brief Variable to control write access to the non-thread safe data
    * structures
