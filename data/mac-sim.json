@@ -2,8 +2,18 @@
   "fft_size": 2048,
   "ofdm_data_num": 1200,
   "demul_block_size": 48,
+  "ul_mcs": {
+      "modulation": "64QAM",
+      "code_rate": 0.333
+  },
+  "dl_mcs": {
+      "modulation": "64QAM",
+      "code_rate": 0.333
+  },
   "ue_radio_num": 1,
   "bs_radio_num": 8,
+  "freq_orthogonal_pilot": true,
+  "pilot_num" : 1,
   "symbol_num_perframe": 70,
   "client_ul_pilot_syms": 2,
   "ul_data_symbol_start": 3,

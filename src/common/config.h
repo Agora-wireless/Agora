@@ -482,6 +482,11 @@ class Config {
   inline static const size_t kDefaultDLSymPerFrame = 30;
   inline static const size_t kDefaultDLSymStart = 40;
 
+  // Number of code blocks per OFDM symbol
+  // Temporarily set to 1
+  // TODO: This number should independent of OFDM symbols
+  static constexpr size_t kCbPerSymbol = 1;
+
   /* Private class variables */
   const double freq_ghz_;  // RDTSC frequency in GHz
 

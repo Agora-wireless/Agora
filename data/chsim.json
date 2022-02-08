@@ -3,10 +3,10 @@
   "ofdm_data_num": 336,
   "demul_block_size": 48,
   "ul_mcs" : {
-    "Zc": 20
+    "code_rate": 0.333
   },
   "dl_mcs" : {
-    "Zc": 18
+    "code_rate": 0.333
   },
   /* set sample rate to 1Ms
   to make sure tests pass*/

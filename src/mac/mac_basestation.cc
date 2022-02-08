@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
       //+1 for main thread a
       const size_t k_num_total_sender_threads =
           FLAGS_num_sender_worker_threads + FLAGS_num_sender_update_threads;
-      size_t thread_start = FLAGS_core_offset;
+      size_t thread_start = FLAGS_core_offset + 1;
 
       // Register signal handler to handle kill signal
       signal_handler.SetupSignalHandlers();
