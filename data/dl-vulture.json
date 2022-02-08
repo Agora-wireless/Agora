@@ -17,13 +17,13 @@
     "cp_size": 32,
     "fft_size": 512,
     "ofdm_data_num": 304,
-    "dl_mcs" : {
-      "modulation": "16QAM",
-      "Zc": 16
+    "dl_mcs": {
+        "modulation": "16QAM",
+        "code_rate": 0.333
     },
-    "ul_mcs" : {
-      "modulation": "16QAM",
-      "Zc": 18
+    "ul_mcs": {
+        "modulation": "16QAM",
+        "code_rate": 0.333
     },
     "beamsweep": true,
     "beacon_antenna": 0,
