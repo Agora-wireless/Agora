@@ -4,12 +4,18 @@
  */
 #include "agora.h"
 #include "gflags/gflags.h"
+#include "radio_lib.h"
 #include "version_config.h"
 
-DEFINE_string(conf_file, TOSTRING(PROJECT_DIRECTORY) "/data/ul-vulture.json",
+DEFINE_string(conf_file,
+              TOSTRING(PROJECT_DIRECTORY) "/data/ul-one-vulture.json",
               "Config filename");
 
-void TestRadio(Config* cfg);
+DEFINE_uint32(rx_symbols, 10,
+              "The number of symbols to receive before the program terminates");
+
+//Forward declaration
+void TestRadio(Config* cfg, const uint32_t max_rx);
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");
@@ -36,7 +42,7 @@ int main(int argc, char* argv[]) {
     // Register signal handler to handle kill signal
     signal_handler.SetupSignalHandlers();
 
-    TestRadio(cfg.get());
+    TestRadio(cfg.get(), FLAGS_rx_symbols);
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;
@@ -47,7 +53,7 @@ int main(int argc, char* argv[]) {
   return ret;
 }
 
-void TestRadio(Config* cfg) {
+void TestRadio(Config* cfg, const uint32_t max_rx) {
   const size_t total_radios = cfg->NumRadios();
   const size_t radio_lo = 0;
   const size_t radio_hi = total_radios;
@@ -82,6 +88,7 @@ void TestRadio(Config* cfg) {
       std::vector<std::byte>(cfg->PacketLength(), std::byte(0)));
 
   if (kUseArgos) {
+    // Makes the soapy remove "HUB" / InitBsRadio / ConfigureBsRadio
     auto radioconfig_ = std::make_unique<RadioConfig>(cfg);
 
     radioconfig_->RadioStart();
@@ -89,27 +96,35 @@ void TestRadio(Config* cfg) {
     //Radio Trigger (start rx)
     radioconfig_->Go();
 
+    uint32_t num_rx_symbols = 0;
     //Super thread loop
-    while (SignalHandler::GotExitSignal() == false) {
+    while ((SignalHandler::GotExitSignal() == false) &&
+           (num_rx_symbols < max_rx)) {
       for (auto radio = radio_lo; radio < radio_hi; radio++) {
         long long rx_time;
-        radioconfig_->RadioRx(radio, rx_buffs.at(radio).data(), rx_time);
-        //Rx data.....
-        size_t frame_id = 0;
-        size_t symbol_id = 0;
-        if (cfg->HwFramer() == true) {
-          frame_id = static_cast<size_t>(rx_time >> 32);
-          symbol_id = static_cast<size_t>((rx_time >> 16) & 0xFFFF);
-        }
+        int rx_bytes =
+            radioconfig_->RadioRx(radio, rx_buffs.at(radio).data(), rx_time);
+        if (rx_bytes > 0) {
+          //Rx data.....
+          size_t frame_id = 0;
+          size_t symbol_id = 0;
+          if (cfg->HwFramer() == true) {
+            frame_id = static_cast<size_t>(rx_time >> 32);
+            symbol_id = static_cast<size_t>((rx_time >> 16) & 0xFFFF);
+          }
 
-        //There will be NumChannels "Packets" at this spot
-        for (size_t ch = 0; ch < cfg->NumChannels(); ch++) {
-          Packet* rx_packet =
-              reinterpret_cast<Packet*>(packet_buffer.at(ch).data());
-          new (rx_packet) Packet(frame_id, symbol_id, cell_id,
-                                 (radio * cfg->NumChannels()) + ch);
+          //There will be NumChannels "Packets" at this spot
+          for (size_t ch = 0; ch < cfg->NumChannels(); ch++) {
+            Packet* rx_packet =
+                reinterpret_cast<Packet*>(packet_buffer.at(ch).data());
+            new (rx_packet) Packet(frame_id, symbol_id, cell_id,
+                                   (radio * cfg->NumChannels()) + ch);
 
-          std::cout << "Rx Packet: " << rx_packet->ToString() << std::endl;
+            std::cout << "Rx Packet: " << rx_packet->ToString() << std::endl;
+          }
+          num_rx_symbols++;
+        } else if (rx_bytes < 0) {
+          throw std::runtime_error("Radio rx error!!");
         }
       }  // end for each radio
     }    // while no exit signal
