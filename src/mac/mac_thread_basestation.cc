@@ -101,7 +101,7 @@ void MacThreadBaseStation::ProcessSnrReportFromPhy(EventData event) {
 void MacThreadBaseStation::SendRanConfigUpdate(EventData /*event*/) {
   RanConfig rc;
   rc.n_antennas_ = 0;  // TODO [arjun]: What's the correct value here?
-  rc.mod_order_bits_ = CommsLib::kQaM16;
+  rc.mod_order_bits_ = cfg_->ModOrderBits(Direction::kUplink);
   rc.frame_id_ = scheduler_next_frame_id_;
   // TODO: change n_antennas to a desired value
   // cfg_->BsAntNum() is added to fix compiler warning
@@ -258,7 +258,7 @@ void MacThreadBaseStation::SendControlInformation() {
   // send RAN control information UE
   RBIndicator ri;
   ri.ue_id_ = next_radio_id_;
-  ri.mod_order_bits_ = CommsLib::kQaM16;
+  ri.mod_order_bits_ = cfg_->ModOrderBits(Direction::kUplink);
   udp_client_->Send(cfg_->UeServerAddr(), kMacBaseClientPort + ri.ue_id_,
                     (uint8_t*)&ri, sizeof(RBIndicator));
 

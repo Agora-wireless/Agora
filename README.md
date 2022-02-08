@@ -144,7 +144,7 @@ The following are steps to set up both Agora and the packet generator:
        to start users.
      * Terminal 2:
      <pre>
-     $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --bs_conf_file data/mac-sim.json --ue_conf_file data/mac-sim.json
+     $ ./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 28 --conf_file data/mac-sim.json
      </pre>
        to run the channel simulator
      * Terminal 3:
