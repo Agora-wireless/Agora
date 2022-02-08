@@ -650,7 +650,9 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
     zc = kMaxSupportedZc;
   }
 
-  size_t num_rows = size_t(LdpcNumInputCols(base_graph) / ul_code_rate) -
+  // Always positive since ul_code_rate is smaller than 1
+  size_t num_rows = static_cast<size_t>(std::round(
+                        LdpcNumInputCols(base_graph) / ul_code_rate)) -
                     (LdpcNumInputCols(base_graph) - 2);
 
   uint32_t num_cb_len = LdpcNumInputBits(base_graph, zc);
@@ -715,7 +717,9 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
     zc = kMaxSupportedZc;
   }
 
-  size_t num_rows = size_t(LdpcNumInputCols(base_graph) / dl_code_rate) -
+  // Always positive since dl_code_rate is smaller than 1
+  size_t num_rows = static_cast<size_t>(std::round(
+                        LdpcNumInputCols(base_graph) / dl_code_rate)) -
                     (LdpcNumInputCols(base_graph) - 2);
 
   uint32_t num_cb_len = LdpcNumInputBits(base_graph, zc);
