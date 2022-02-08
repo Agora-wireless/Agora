@@ -14,9 +14,9 @@ TEST(TestComplexMul, Multiply) {
   __m256 result_256_upper __attribute((aligned(64)));
   __m512 result_512 __attribute((aligned(64)));
   uint64_t ticks;
-  for (int i = 0; i < 32; i++) {
+  for (float& value : values) {
     // Set each float to a random value between -1 and 1
-    values[i] = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    value = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
   }
   /* Load the generated values */
   __m256 values0_lower_256 =
@@ -62,9 +62,9 @@ TEST(TestComplexMul, ConjMultiply) {
   __m256 result_256_upper __attribute((aligned(64)));
   __m512 result_512 __attribute((aligned(64)));
   uint64_t ticks;
-  for (int i = 0; i < 32; i++) {
+  for (float& value : values) {
     // Set each float to a random value between -1 and 1
-    values[i] = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+    value = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
   }
   /* Load the generated values */
   __m256 values0_lower_256 =

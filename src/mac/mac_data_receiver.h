@@ -15,7 +15,7 @@ class MacDataReceiver {
   virtual size_t Load(unsigned char *destination, size_t requested_bytes) = 0;
 
  protected:
-  inline MacDataReceiver() = default;;
+  inline MacDataReceiver() = default;
   virtual ~MacDataReceiver() = default;
 };
 
