@@ -22,7 +22,7 @@ RadioConfig::RadioConfig(Config* cfg)
   // load channels
   auto channels = Utils::StrToChannels(cfg_->Channel());
   ///Reduce the soapy log level
-  SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_NOTICE);
+  SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_SSI);
 
   this->radio_num_ = cfg_->NumRadios();
   this->antenna_num_ = cfg_->BsAntNum();
@@ -33,8 +33,13 @@ RadioConfig::RadioConfig(Config* cfg)
       SoapySDR::Device* hub_device = nullptr;
       if (!cfg_->HubId().at(i).empty()) {
         args["driver"] = "remote";
-        args["timeout"] = "1000000";
+        args["timeout"] = "100000";
         args["serial"] = cfg_->HubId().at(i);
+        args["remote:type"] = "faros";
+        args["remote:driver"] = "faros";
+        args["remote:mtu"] = "1500";
+        args["remote:ipver"] = "6";
+        args["remote:prot"] = "udp";
 
         for (size_t tries = 0; tries < kSoapyMakeMaxAttempts; tries++) {
           try {
