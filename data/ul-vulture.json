@@ -12,10 +12,12 @@
   "cp_size": 32,
   "fft_size": 2048,
   "ofdm_data_num": 1200,
-  "modulation": "16QAM",
   "demul_block_size": 48,
   "ue_demul_block_size": 48,
-  "Zc": 72,
+  "ul_mcs" : {
+    "modulation": "16QAM",
+    "code_rate": 0.333
+  },
   "ofdm_tx_zero_prefix": 160,
   "ofdm_tx_zero_postfix": 160,
   "ofdm_rx_zero_prefix_bs": 160,

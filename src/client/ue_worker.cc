@@ -446,6 +446,13 @@ void UeWorker::DoDemul(size_t tag) {
                                config_.GetOFDMDataNum())
           : Demod64qamSoftAvx2(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
       break;
+    case (CommsLib::kQaM256):
+      kDownlinkHardDemod
+          ? Demod256qamHardAvx2(equal_ptr,
+                                reinterpret_cast<uint8_t*>(demod_ptr),
+                                config_.GetOFDMDataNum())
+          : Demod256qamSoftAvx2(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
+      break;
     default:
       std::printf("UeWorker[%zu]: Demul - modulation type %s not supported!\n",
                   tid_, config_.Modulation(Direction::kDownlink).c_str());

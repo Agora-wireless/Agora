@@ -65,9 +65,6 @@ class MacThreadClient {
   // TODO: process CQI report here as well.
   void ProcessSnrReportFromPhy(EventData event);
 
-  // Push RAN config update to PHY master thread.
-  void SendRanConfigUpdate(EventData event);
-
   // At client, process control information received from control
   // channel and forward to PHY UE, so it transmits data in the scheduled
   // time slots.
