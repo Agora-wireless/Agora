@@ -485,7 +485,7 @@ class Config {
   // Number of code blocks per OFDM symbol
   // Temporarily set to 1
   // TODO: This number should independent of OFDM symbols
-  inline static const size_t kCbPerSymbol = 1;
+  static constexpr size_t kCbPerSymbol = 1;
 
   /* Private class variables */
   const double freq_ghz_;  // RDTSC frequency in GHz
