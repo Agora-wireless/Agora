@@ -81,9 +81,14 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
     frame_duration_us_ = frame_duration_us;
   }
 
-  ticks_all_ =
-      ((frame_duration_us_ * ticks_per_usec_) / cfg->Frame().NumTotalSyms());
-  ticks_wnd1_ = ticks_all_ * kSlowStartMulStage1;
+  ticks_all_ = static_cast<uint64_t>(
+      ((frame_duration_us_ * ticks_per_usec_) / cfg->Frame().NumTotalSyms()));
+
+  const uint64_t two_hundred_ms_ticks = static_cast<uint64_t>(
+      (ticks_per_usec_ * 200000.0f) / cfg->Frame().NumTotalSyms());
+
+  ticks_wnd1_ =
+      std::max((ticks_all_ * kSlowStartMulStage1), two_hundred_ms_ticks);
   ticks_wnd2_ = ticks_all_ * kSlowStartMulStage2;
 
   // Match element alignment with buffer alignment

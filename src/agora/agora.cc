@@ -13,6 +13,7 @@
 #endif
 #include "packet_txrx_radio.h"
 
+static const bool kDebugPrintPacketsFromMac = false;
 static const bool kDebugDeferral = true;
 static const size_t kDefaultMessageQueueSize = 512;
 static const size_t kDefaultWorkerQueueSize = 256;
@@ -37,8 +38,8 @@ Agora::Agora(Config* const cfg)
   std::printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
               directory.c_str(), cfg->FreqGhz());
 
-  PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0, kEnableCoreReuse,
-                      false /* quiet */);
+  PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0,
+                      kEnableCoreReuse, false /* quiet */);
   CheckIncrementScheduleFrame(0, ScheduleProcessingFlags::kProcessingComplete);
   // Important to set cur_sche_frame_id_ after the call to
   // CheckIncrementScheduleFrame because it will be incremented however,
@@ -522,9 +523,43 @@ void Agora::Start() {
         } break;
 
         case EventType::kPacketFromMac: {
-          size_t frame_id = rx_mac_tag_t(event.tags_[0]).offset_;
+          // This is an entire frame (multiple mac packets)
+          const size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
+          const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
+          const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
+              &dl_bits_buffer_[ue_id]
+                              [radio_buf_id * config_->MacBytesNumPerframe(
+                                                  Direction::kDownlink)]);
 
-          bool last_ue = this->mac_to_phy_counters_.CompleteTask(frame_id, 0);
+          MLPD_TRACE(
+              "Agora: frame %d symbol %d user %d @ offset %zu %zu @ location "
+              "%zu\n",
+              pkt->Frame(), pkt->Symbol(), pkt->Ue(), ue_id, radio_buf_id,
+              (size_t)pkt);
+
+          if (kDebugPrintPacketsFromMac) {
+            std::stringstream ss;
+
+            for (size_t dl_data_symbol = 0;
+                 dl_data_symbol < config_->Frame().NumDlDataSyms();
+                 dl_data_symbol++) {
+              ss << "Agora: kPacketFromMac, frame " << pkt->Frame()
+                 << ", symbol " << std::to_string(pkt->Symbol()) << " crc "
+                 << std::to_string(pkt->Crc()) << " bytes: ";
+              for (size_t i = 0; i < pkt->PayloadLength(); i++) {
+                ss << std::to_string((pkt->Data()[i])) << ", ";
+              }
+              ss << std::endl;
+              pkt = reinterpret_cast<const MacPacketPacked*>(
+                  reinterpret_cast<const uint8_t*>(pkt) +
+                  config_->MacPacketLength(Direction::kDownlink));
+            }
+            std::printf("%s\n", ss.str().c_str());
+          }
+
+          const size_t frame_id = pkt->Frame();
+          const bool last_ue =
+              this->mac_to_phy_counters_.CompleteTask(frame_id, 0);
           if (last_ue == true) {
             // schedule this frame's encoding
             // Defer the schedule.  If frames are already deferred or the

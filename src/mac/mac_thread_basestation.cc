@@ -512,7 +512,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
   MLPD_FRAME("MacThreadBasestation: Tx mac information to %zu %zu\n",
              next_radio_id_, radio_buf_id);
   RtAssert(tx_queue_->enqueue(msg),
-           "MacThreadBasestation: Failed to enqueue uplink packet");
+           "MacThreadBasestation: Failed to enqueue downlink packet");
 
   radio_buf_id = (radio_buf_id + 1) % kFrameWnd;
   // Might be unnecessary now.
