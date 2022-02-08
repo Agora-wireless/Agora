@@ -12,7 +12,7 @@
 static constexpr bool kPrintCalibrationMats = false;
 static constexpr bool kPrintRadioSettings = false;
 
-static constexpr size_t kSoapyMakeMaxAttemps = 3;
+static constexpr size_t kSoapyMakeMaxAttempts = 3;
 static constexpr size_t kHubMissingWaitMs = 100;
 
 RadioConfig::RadioConfig(Config* cfg)
@@ -36,7 +36,7 @@ RadioConfig::RadioConfig(Config* cfg)
         args["timeout"] = "1000000";
         args["serial"] = cfg_->HubId().at(i);
 
-        for (size_t tries = 0; tries < kSoapyMakeMaxAttemps; tries++) {
+        for (size_t tries = 0; tries < kSoapyMakeMaxAttempts; tries++) {
           try {
             hub_device = SoapySDR::Device::make(args);
             break;
@@ -51,7 +51,7 @@ RadioConfig::RadioConfig(Config* cfg)
         if (hub_device == nullptr) {
           std::printf(
               "SoapySDR failed to locate the hub device %s in %zu tries\n",
-              cfg_->HubId().at(i).c_str(), kSoapyMakeMaxAttemps);
+              cfg_->HubId().at(i).c_str(), kSoapyMakeMaxAttempts);
           throw std::runtime_error("SoapySDR failed to locate the hub device");
         }
       }
@@ -226,7 +226,7 @@ void RadioConfig::InitBsRadio(size_t tid) {
   }
 
   SoapySDR::Device* bs_device = nullptr;
-  for (size_t tries = 0; tries < kSoapyMakeMaxAttemps; tries++) {
+  for (size_t tries = 0; tries < kSoapyMakeMaxAttempts; tries++) {
     try {
       bs_device = SoapySDR::Device::make(args);
       break;
@@ -238,7 +238,7 @@ void RadioConfig::InitBsRadio(size_t tid) {
   }
   if (bs_device == nullptr) {
     std::printf("SoapySDR failed to locate the Bs radio %s in %zu attempts\n",
-                cfg_->RadioId().at(tid).c_str(), kSoapyMakeMaxAttemps);
+                cfg_->RadioId().at(tid).c_str(), kSoapyMakeMaxAttempts);
     throw std::runtime_error("SoapySDR failed to locate the Bs radio");
   }
   ba_stn_.at(i) = bs_device;

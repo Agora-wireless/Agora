@@ -9,7 +9,7 @@
 #include "logger.h"
 #include "nlohmann/json.hpp"
 
-static constexpr size_t kSoapyMakeMaxAttemps = 2;
+static constexpr size_t kSoapyMakeMaxAttempts = 2;
 
 ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   SoapySDR::Kwargs args;
@@ -147,7 +147,7 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
   }
 
   SoapySDR::Device* ue_device = nullptr;
-  for (size_t tries = 0; tries < kSoapyMakeMaxAttemps; tries++) {
+  for (size_t tries = 0; tries < kSoapyMakeMaxAttempts; tries++) {
     try {
       ue_device = SoapySDR::Device::make(args);
       break;
@@ -159,7 +159,7 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
   }
   if (ue_device == nullptr) {
     std::printf("SoapySDR failed to locate the Ue device %s in %zu attempts\n",
-                cfg_->UeRadioId().at(tid).c_str(), kSoapyMakeMaxAttemps);
+                cfg_->UeRadioId().at(tid).c_str(), kSoapyMakeMaxAttempts);
     throw std::runtime_error("SoapySDR failed to locate the Ue device");
   }
   cl_stn_.at(tid) = ue_device;
