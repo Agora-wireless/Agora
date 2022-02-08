@@ -12,7 +12,7 @@
   "cp_size": 32,
   "dl_mcs": {
     "modulation": "16QAM",
-    "Zc": 18
+    "code_rate": 0.333
   },
   "frequency": 3.6e9,
   /* Frame definition */

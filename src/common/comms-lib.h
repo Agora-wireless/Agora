@@ -42,7 +42,7 @@ class CommsLib {
     kQpsk = 2,
     kQaM16 = 4,
     kQaM64 = 6,
-    kQam256 = 8
+    kQaM256 = 8
   };
 
   explicit CommsLib(std::string);

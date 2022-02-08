@@ -107,26 +107,6 @@ void MacThreadClient::ProcessSnrReportFromPhy(EventData event) {
   server_.snr_[ue_id].push(snr);
 }
 
-void MacThreadClient::SendRanConfigUpdate(EventData /*event*/) {
-  RanConfig rc;
-  rc.n_antennas_ = 0;  // TODO [arjun]: What's the correct value here?
-  rc.mod_order_bits_ = CommsLib::kQaM16;
-  rc.frame_id_ = scheduler_next_frame_id_;
-  // TODO: change n_antennas to a desired value
-  // cfg_->BsAntNum() is added to fix compiler warning
-  rc.n_antennas_ = cfg_->BsAntNum();
-
-  EventData msg(EventType::kRANUpdate);
-  msg.num_tags_ = 3;
-  msg.tags_[0] = rc.n_antennas_;
-  msg.tags_[1] = rc.mod_order_bits_;
-  msg.tags_[2] = rc.frame_id_;
-  RtAssert(tx_queue_->enqueue(msg),
-           "MAC thread: failed to send RAN update to Agora");
-
-  scheduler_next_frame_id_++;
-}
-
 void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
   assert(event.event_type_ == EventType::kPacketToMac);
 
