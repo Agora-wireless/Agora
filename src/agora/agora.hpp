@@ -8,7 +8,7 @@
 #include "control.hpp"
 #include "dycoding.hpp"
 #include "dofft.hpp"
-#include "doprecode.hpp"
+#include "dyprecode.hpp"
 #include "dysubcarrier.hpp"
 #include "gettime.h"
 #include "mac_thread.hpp"

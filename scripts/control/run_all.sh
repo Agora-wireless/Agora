@@ -81,6 +81,8 @@ fi
 # app_name, servers, NIC info
 source ${hydra_root_dir}/scripts/control/init_platform.sh
 
+source ${hydra_root_dir}/scripts/control/check_hugepage.sh
+
 # Check the validity of the deployment config files
 echocyan "Checking the validity of configuration files"
 source ${hydra_root_dir}/scripts/control/check_deploy.sh
