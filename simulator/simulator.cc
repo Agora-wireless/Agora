@@ -75,7 +75,7 @@ void Simulator::Start() {
   std::array<EventData, kDequeueBulkSize> events_list;
 
   /* start transmitter */
-  sender_->StartTXfromMain(frame_start_tx_, frame_end_tx_);
+  sender_->StartTxfromMain(frame_start_tx_, frame_end_tx_);
   while ((config_->Running() == true) &&
          (SignalHandler::GotExitSignal() == false)) {
     /* get a bulk of events */
