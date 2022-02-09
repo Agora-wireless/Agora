@@ -627,15 +627,15 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
   size_t max_zc_index =
       (std::find(zc_vec.begin(), zc_vec.end(), kMaxSupportedZc) -
        zc_vec.begin());
-  size_t maxUplinkUncodedBits =
+  size_t max_uplink_uncoded_bits =
       size_t(this->OfdmDataNum() * ul_code_rate * ul_mod_order_bits_);
   size_t zc = SIZE_MAX;
   size_t i = 0;
   for (; i < max_zc_index; i++) {
     if ((zc_vec.at(i) * LdpcNumInputCols(base_graph) * kCbPerSymbol <
-         maxUplinkUncodedBits) &&
+         max_uplink_uncoded_bits) &&
         (zc_vec.at(i + 1) * LdpcNumInputCols(base_graph) * kCbPerSymbol >
-         maxUplinkUncodedBits)) {
+         max_uplink_uncoded_bits)) {
       zc = zc_vec.at(i);
       break;
     }
@@ -694,15 +694,15 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   size_t max_zc_index =
       (std::find(zc_vec.begin(), zc_vec.end(), kMaxSupportedZc) -
        zc_vec.begin());
-  size_t maxDownlinkUncodedBits =
+  size_t max_downlink_uncoded_bits =
       size_t(this->GetOFDMDataNum() * dl_code_rate * dl_mod_order_bits_);
   size_t zc = SIZE_MAX;
   size_t i = 0;
   for (; i < max_zc_index; i++) {
     if ((zc_vec.at(i) * LdpcNumInputCols(base_graph) * kCbPerSymbol <
-         maxDownlinkUncodedBits) &&
+         max_downlink_uncoded_bits) &&
         (zc_vec.at(i + 1) * LdpcNumInputCols(base_graph) * kCbPerSymbol >
-         maxDownlinkUncodedBits)) {
+         max_downlink_uncoded_bits)) {
       zc = zc_vec.at(i);
       break;
     }
