@@ -152,7 +152,7 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
 MacSender::~MacSender() {
   keep_running.store(false);
 
-  for (auto& thread : this->threads_) {
+  for (auto& thread : threads_) {
     MLPD_INFO("MacSender: Joining threads\n");
     thread.join();
   }
@@ -166,16 +166,16 @@ MacSender::~MacSender() {
 }
 
 void MacSender::StartTx() {
-  this->frame_start_ = new double[kNumStatsFrames]();
-  this->frame_end_ = new double[kNumStatsFrames]();
+  frame_start_ = new double[kNumStatsFrames]();
+  frame_end_ = new double[kNumStatsFrames]();
 
   CreateWorkerThreads(worker_thread_num_);
   signal(SIGINT, InterruptHandler);
   // Run the master thread (from current thread)
   MasterThread(kMasterThreadId);
 
-  delete[](this->frame_start_);
-  delete[](this->frame_end_);
+  delete[](frame_start_);
+  delete[](frame_end_);
 }
 
 void MacSender::StartTxfromMain(double* in_frame_start, double* in_frame_end) {
@@ -193,12 +193,17 @@ void MacSender::LoadFrame(size_t frame) {
 }
 
 void MacSender::ScheduleFrame(size_t frame) {
-  for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
-    auto req_tag = gen_tag_t::FrmSymAnt(frame, 0, i);
+  size_t users_per_worker = (cfg_->UeAntNum() / worker_thread_num_);
+  if ((cfg_->UeAntNum() % worker_thread_num_) != 0) {
+    users_per_worker++;
+  }
+  ///\todo Change to bulk enqueue
+  for (size_t ue_ant = 0; ue_ant < cfg_->UeAntNum(); ue_ant++) {
+    const size_t worker_id = ue_ant / users_per_worker;
+    auto req_tag = gen_tag_t::FrmSymAnt(frame, 0u, ue_ant);
     // Split up the antennas amoung the worker threads
-    RtAssert(
-        send_queue_.enqueue(*task_ptok_[i % worker_thread_num_], req_tag.tag_),
-        "Send task enqueue failed");
+    RtAssert(send_queue_.enqueue(*task_ptok_[worker_id], req_tag.tag_),
+             "Send task enqueue failed");
   }
 }
 
@@ -227,7 +232,7 @@ void* MacSender::MasterThread(size_t tid) {
   uint64_t tick_start = GetTime::Rdtsc();
   double frame_start_us = timestamp_us;
   double frame_end_us = 0;
-  this->frame_start_[0] =
+  frame_start_[0] =
       timestamp_us -
       ((cfg_->Frame().NumTotalSyms() * GetTicksForFrame(0)) / ticks_per_usec_);
 
@@ -258,7 +263,7 @@ void* MacSender::MasterThread(size_t tid) {
                     ctag.frame_id_, (frame_end_us - frame_start_us) / 1000.0,
                     next_frame_id);
         }
-        this->frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = frame_end_us;
+        frame_end_[(ctag.frame_id_ % kNumStatsFrames)] = frame_end_us;
 
         if (next_frame_id == cfg_->FramesToTest()) {
           keep_running.store(false);
@@ -269,8 +274,7 @@ void* MacSender::MasterThread(size_t tid) {
           tick_start += ticks_inter_frame_;
           frame_start_us = GetTime::GetTimeUs();
           // Set the frame start time to the start of next frame (now)
-          this->frame_start_[(next_frame_id % kNumStatsFrames)] =
-              frame_start_us;
+          frame_start_[(next_frame_id % kNumStatsFrames)] = frame_start_us;
           // Wait frame ticks to send the next frame
           uint64_t frame_ticks =
               GetTicksForFrame(next_frame_id) * cfg_->Frame().NumTotalSyms();
@@ -289,7 +293,7 @@ void* MacSender::MasterThread(size_t tid) {
   return nullptr;
 }
 
-/* Worker will send 1 MacPacket data size to the radio)
+/* Worker will send 1 MacPacket of data size to the mac thread
  * since we are using UDP between the antennas and in the multiple antenna case
  * the packet data could get mixed at the mac_thread receiver
  */
@@ -303,33 +307,39 @@ void* MacSender::WorkerThread(size_t tid) {
          (worker_thread_num_ + 1 + update_thread_num_)) {
     // Wait
   }
-  MLPD_FRAME("MacSender: worker thread %d running\n", tid);
 
   const size_t max_symbol_id = 1;
-  const size_t radio_lo = (tid * cfg_->NumRadios()) / worker_thread_num_;
-  const size_t radio_hi = ((tid + 1) * cfg_->NumRadios()) / worker_thread_num_;
-  const size_t ant_num_this_thread =
-      cfg_->NumRadios() / worker_thread_num_ +
-      (static_cast<size_t>(tid) < cfg_->NumRadios() % worker_thread_num_ ? 1
-                                                                         : 0);
+  size_t users_per_worker = (cfg_->UeAntNum() / worker_thread_num_);
+  if ((cfg_->UeAntNum() % worker_thread_num_) != 0) {
+    users_per_worker++;
+  }
+
+  const size_t user_first = tid * users_per_worker;
+  //This thread has nothing to do
+  if (user_first >= cfg_->UeAntNum()) {
+    return nullptr;
+  }
+  const size_t user_last =
+      std::min(user_first + users_per_worker, cfg_->UeAntNum()) - 1;
+  const size_t users_this_worker = ((user_last - user_first) + 1);
+
+  MLPD_INFO("MacSender[%zu]: emulating users %zu:%zu total users %zu\n", tid,
+            user_first, user_last, users_this_worker);
+
   UDPClient udp_client;
 
   double begin = GetTime::GetTimeUs();
   size_t total_tx_packets = 0;
   size_t total_tx_packets_rolling = 0;
-  size_t cur_radio = radio_lo;
-
-  MLPD_INFO("MacSender[%zu]: %zu antennas, total antennas: %zu\n", tid,
-            ant_num_this_thread, cfg_->NumRadios());
+  size_t user_current = user_first;
 
   std::array<size_t, kDequeueBulkSize> tags;
   while (keep_running.load() == true) {
-    size_t num_tags = this->send_queue_.try_dequeue_bulk_from_producer(
-        *(this->task_ptok_[tid]), tags.data(), kDequeueBulkSize);
+    size_t num_tags = send_queue_.try_dequeue_bulk_from_producer(
+        *(task_ptok_[tid]), tags.data(), kDequeueBulkSize);
     if (num_tags > 0) {
       for (size_t tag_id = 0; (tag_id < num_tags); tag_id++) {
         size_t start_tsc_send = GetTime::Rdtsc();
-
         auto tag = gen_tag_t(tags.at(tag_id));
 
         if ((kDebugPrintSender)) {
@@ -352,10 +362,9 @@ void* MacSender::WorkerThread(size_t tid) {
 
           MLPD_TRACE(
               "MacSender[%zu] sending frame %d:%d, packet %zu, symbol %d, size "
-              "%zu:%zu\n",
+              "%zu\n",
               tid, tx_packet->frame_id_, tag.frame_id_, packet,
-              tx_packet->symbol_id_, mac_packet_tx_size,
-              mac_packet_storage_size);
+              tx_packet->symbol_id_, mac_packet_tx_size);
 
           udp_client.Send(server_address_, server_rx_port_,
                           reinterpret_cast<const uint8_t*>(tx_packet),
@@ -365,9 +374,10 @@ void* MacSender::WorkerThread(size_t tid) {
 
         if (kDebugSenderReceiver) {
           std::printf(
-              "MacSender%zu]: (tag = %s) transmit frame %d, radio %zu, TX "
+              "MacSender[%zu]: (tag = %s) transmit frame %d, user %zu, TX "
               "time: %.3f us\n",
-              tid, gen_tag_t(tag).ToString().c_str(), tag.frame_id_, cur_radio,
+              tid, gen_tag_t(tag).ToString().c_str(), tag.frame_id_,
+              user_current,
               GetTime::CyclesToUs(GetTime::Rdtsc() - start_tsc_send,
                                   freq_ghz_));
         }
@@ -375,22 +385,23 @@ void* MacSender::WorkerThread(size_t tid) {
         total_tx_packets_rolling++;
         total_tx_packets++;
         if (total_tx_packets_rolling ==
-            ant_num_this_thread * max_symbol_id * 1000) {
+            users_this_worker * max_symbol_id * 1000u) {
           double end = GetTime::GetTimeUs();
-          double byte_len = cfg_->PacketLength() * ant_num_this_thread *
-                            max_symbol_id * 1000.f;
+          double byte_len =
+              cfg_->PacketLength() * users_this_worker * max_symbol_id * 1000.f;
           double diff = end - begin;
           std::printf(
-              "MacSender%zu]: send %zu frames in %f secs, tput %f Mbps\n",
-              (size_t)tid,
-              total_tx_packets / (ant_num_this_thread * max_symbol_id),
+              "MacSender[%zu]: send %zu frames in %f secs, tput %f Mbps\n", tid,
+              total_tx_packets / (users_this_worker * max_symbol_id),
               diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
           begin = GetTime::GetTimeUs();
           total_tx_packets_rolling = 0;
         }
 
-        if (++cur_radio == radio_hi) {
-          cur_radio = radio_lo;
+        if (user_current == user_last) {
+          user_current = user_first;
+        } else {
+          user_current++;
         }
       }
       RtAssert(completion_queue_.enqueue_bulk(tags.data(), num_tags),
@@ -415,13 +426,14 @@ uint64_t MacSender::GetTicksForFrame(size_t frame_id) const {
 
 void MacSender::CreateWorkerThreads(size_t num_workers) {
   for (size_t i = 0u; i < num_workers; i++) {
-    this->threads_.emplace_back(&MacSender::WorkerThread, this, i);
+    threads_.emplace_back(&MacSender::WorkerThread, this, i);
   }
 }
 
 /* Single threaded file reader to load a shared data structure */
 void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
   size_t buffer_updates = 0;
+  // Sender may get better performance when this thread is not pinned to core
   PinToCoreWithOffset(ThreadType::kWorkerMacTXRX, core_offset_ + 1, tid);
 
   // Split the Ue data up between threads and sources
@@ -430,15 +442,14 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
     ue_per_thread++;
   }
 
-  const size_t ue_ant_low = tid * ue_per_thread;
-  const size_t ue_ant_high =
-      std::min((ue_ant_low + ue_per_thread), cfg_->UeAntNum()) - 1;
+  const size_t ue_low = tid * ue_per_thread;
+  const size_t ue_high =
+      std::min((ue_low + ue_per_thread), cfg_->UeAntNum()) - 1;
 
-  // Sender gets better performance when this thread is not pinned to core
   MLPD_INFO(
-      "MacSender: Data update thread %zu running on core %d servicing ue "
+      "MacSender: Data update thread %zu running on core %d servicing user "
       "%zu:%zu data\n",
-      tid, sched_getcpu(), ue_ant_low, ue_ant_high);
+      tid, sched_getcpu(), ue_low, ue_high);
 
 #if defined(USE_UDP_DATA_SOURCE)
   std::vector<std::unique_ptr<VideoReceiver>> sources;
@@ -462,7 +473,7 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
   while ((keep_running.load() == true) && (buffer_updates < kBufferInit)) {
     size_t tag = 0;
     if (data_update_queue_.at(tid).try_dequeue(tag) == true) {
-      for (size_t i = ue_ant_low; i <= ue_ant_high; i++) {
+      for (size_t i = ue_low; i <= ue_high; i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
         size_t ant_source = i % num_data_sources;
@@ -479,10 +490,11 @@ void* MacSender::DataUpdateThread(size_t tid, size_t num_data_sources) {
   while (keep_running.load() == true) {
     size_t tag = 0;
     if (data_update_queue_.at(tid).try_dequeue(tag) == true) {
-      for (size_t i = ue_ant_low; i <= ue_ant_high; i++) {
+      for (size_t i = ue_low; i <= ue_high; i++) {
         auto tag_for_ue = gen_tag_t::FrmSymUe(((gen_tag_t)tag).frame_id_,
                                               ((gen_tag_t)tag).symbol_id_, i);
         size_t ant_source = i % num_data_sources;
+        // Load all the symbols for a given user data
         UpdateTxBuffer(sources.at(ant_source).get(), tag_for_ue);
       }
     }

@@ -258,7 +258,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
 void MacThreadBaseStation::SendControlInformation() {
   // send RAN control information UE
   RBIndicator ri;
-  ri.ue_id_ = next_radio_id_;
+  ri.ue_id_ = next_user_id_;
   ri.mod_order_bits_ = cfg_->ModOrderBits(Direction::kUplink);
   udp_client_->Send(cfg_->UeServerAddr(), kMacBaseClientPort + ri.ue_id_,
                     (uint8_t*)&ri, sizeof(RBIndicator));
@@ -283,10 +283,9 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
   size_t packets_received = 0;
   size_t current_packet_bytes = 0;
   size_t current_packet_start_index = 0;
-
   size_t total_bytes_received = 0;
 
-  const size_t max_recv_attempts = (packets_required * 10u);
+  const size_t max_recv_attempts = (packets_required * 100u);
   size_t rx_attempts;
   for (rx_attempts = 0u; rx_attempts < max_recv_attempts; rx_attempts++) {
     ssize_t ret = udp_server_->Recv(&udp_pkt_buf_.at(total_bytes_received),
@@ -311,9 +310,9 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
       total_bytes_received += ret;
       current_packet_bytes += ret;
 
-      // std::printf(
-      //    "Received %zu bytes packet number %zu packet size %zu total %zu\n",
-      //    ret, packets_received, total_bytes_received, current_packet_bytes);
+      MLPD_INFO(
+          "Received %zu bytes packet number %zu packet size %zu total %zu\n",
+          ret, packets_received, total_bytes_received, current_packet_bytes);
 
       // While we have packets remaining and a header to process
       const size_t header_size = sizeof(MacPacketHeaderPacked);
@@ -327,10 +326,10 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
         const size_t current_packet_size =
             header_size + rx_mac_packet_header->PayloadLength();
 
-        // std::printf("Packet number %zu @ %zu packet size %d:%zu total %zu\n",
-        //            packets_received, current_packet_start_index,
-        //            rx_mac_packet_header->datalen_, current_packet_size,
-        //            current_packet_bytes);
+        MLPD_INFO("Packet number %zu @ %zu packet size %d:%zu total %zu\n",
+                  packets_received, current_packet_start_index,
+                  rx_mac_packet_header->PayloadLength(), current_packet_size,
+                  current_packet_bytes);
 
         if (current_packet_bytes >= current_packet_size) {
           current_packet_bytes = current_packet_bytes - current_packet_size;
@@ -385,25 +384,31 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
     const auto* pkt =
         reinterpret_cast<const MacPacketPacked*>(&payload[pkt_offset]);
 
-    // std::printf("Frame %d, Packet %zu, symbol %d, user %d\n", pkt->Frame(),
-    //            packet, pkt->Symbol(), pkt->Ue());
+    MLPD_INFO(
+        "MacThreadBaseStation: Frame %d, Packet %zu, symbol %d, user %d\n",
+        pkt->Frame(), packet, pkt->Symbol(), pkt->Ue());
     if (packet == 0) {
       ue_id = pkt->Ue();
       frame_id = pkt->Frame();
     } else {
       if (ue_id != pkt->Ue()) {
         MLPD_ERROR(
-            "Received pkt %zu data with unexpected UE id %zu, expected %d\n",
+            "MacThreadBaseStation: Received pkt %zu data with unexpected UE id "
+            "%zu, expected %d\n",
             packet, ue_id, pkt->Ue());
       }
       if ((symbol_id + 1) != pkt->Symbol()) {
-        MLPD_ERROR("Received out of order symbol id %d, expected %zu\n",
-                   pkt->Symbol(), symbol_id + 1);
+        MLPD_ERROR(
+            "MacThreadBaseStation: Received out of order symbol id %d, "
+            "expected "
+            "%zu\n",
+            pkt->Symbol(), symbol_id + 1);
       }
 
       if (frame_id != pkt->Frame()) {
         MLPD_ERROR(
-            "Received pkt %zu data with unexpected frame id %zu, expected %d\n",
+            "MacThreadBaseStation: Received pkt %zu data with unexpected frame "
+            "id %zu, expected %d\n",
             packet, frame_id, pkt->Frame());
       }
     }
@@ -411,17 +416,17 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
     pkt_offset += MacPacketPacked::kHeaderSize + pkt->PayloadLength();
   }
 
-  if (next_radio_id_ != ue_id) {
-    MLPD_ERROR("Error - radio id %zu, expected %zu\n", ue_id, next_radio_id_);
+  if (next_user_id_ != ue_id) {
+    MLPD_ERROR("Error - user id %zu, expected %zu\n", ue_id, next_user_id_);
   }
   // End data integrity check
 
-  next_radio_id_ = ue_id;
+  next_user_id_ = ue_id;
 
   // We've received bits for the uplink.
-  size_t& radio_buf_id = client_.dl_bits_buffer_id_[next_radio_id_];
+  size_t& radio_buf_id = client_.dl_bits_buffer_id_[next_user_id_];
 
-  if ((*client_.dl_bits_buffer_status_)[next_radio_id_][radio_buf_id] == 1) {
+  if ((*client_.dl_bits_buffer_status_)[next_user_id_][radio_buf_id] == 1) {
     std::fprintf(
         stderr,
         "MacThreadBasestation: UDP RX buffer full, buffer ID: %zu. Dropping "
@@ -432,7 +437,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
 
 #if ENABLE_RB_IND
   RBIndicator ri;
-  ri.ue_id_ = next_radio_id_;
+  ri.ue_id_ = next_user_id_;
   ri.mod_order_bits_ = CommsLib::kQaM16;
 #endif
 
@@ -442,7 +447,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
         log_file_,
         "MacThreadBasestation: Received data from app for frame %zu, ue "
         "%zu size %zu\n",
-        next_tx_frame_id_, next_radio_id_, pkt_offset);
+        next_tx_frame_id_, next_user_id_, pkt_offset);
 
     for (size_t i = 0; i < pkt_offset; i++) {
       ss << std::to_string((uint8_t)(payload[i])) << " ";
@@ -457,7 +462,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
         reinterpret_cast<const MacPacketPacked*>(&payload[src_pkt_offset]);
     const size_t symbol_idx =
         cfg_->Frame().GetDLSymbolIdx(src_packet->Symbol());
-    // next_radio_id_ = src_packet->ue_id;
+    // next_user_id_ = src_packet->ue_id;
 
     // could use pkt_id vs src_packet->symbol_id_ but might reorder packets
     const size_t dest_pkt_offset = ((radio_buf_id * num_mac_packets_per_frame) +
@@ -465,7 +470,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
                                    mac_packet_length;
 
     auto* pkt = reinterpret_cast<MacPacketPacked*>(
-        &(*client_.dl_bits_buffer_)[next_radio_id_][dest_pkt_offset]);
+        &(*client_.dl_bits_buffer_)[next_user_id_][dest_pkt_offset]);
 
     pkt->Set(next_tx_frame_id_, src_packet->Symbol(), src_packet->Ue(),
              src_packet->PayloadLength());
@@ -476,8 +481,9 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
 
     pkt->LoadData(src_packet->Data());
     // Insert CRC
-    pkt->Crc((uint16_t)(
-        crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) & 0xFFFF));
+    pkt->Crc(
+        (uint16_t)(crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
+                   0xFFFF));
 
     if (kLogMacPackets) {
       std::stringstream ss;
@@ -505,18 +511,18 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
     src_pkt_offset += pkt->PayloadLength() + MacPacketPacked::kHeaderSize;
   }  // end all packets
 
-  (*client_.dl_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
+  (*client_.dl_bits_buffer_status_)[next_user_id_][radio_buf_id] = 1;
   EventData msg(EventType::kPacketFromMac,
-                rx_mac_tag_t(next_radio_id_, radio_buf_id).tag_);
+                rx_mac_tag_t(next_user_id_, radio_buf_id).tag_);
   MLPD_FRAME("MacThreadBasestation: Tx mac information to %zu %zu\n",
-             next_radio_id_, radio_buf_id);
+             next_user_id_, radio_buf_id);
   RtAssert(tx_queue_->enqueue(msg),
            "MacThreadBasestation: Failed to enqueue downlink packet");
 
   radio_buf_id = (radio_buf_id + 1) % kFrameWnd;
   // Might be unnecessary now.
-  next_radio_id_ = (next_radio_id_ + 1) % cfg_->UeAntNum();
-  if (next_radio_id_ == 0) {
+  next_user_id_ = (next_user_id_ + 1) % cfg_->UeAntNum();
+  if (next_user_id_ == 0) {
     next_tx_frame_id_++;
   }
 }
@@ -540,7 +546,7 @@ void MacThreadBaseStation::RunEventLoop() {
     }
 
     // No need to process incomming packets if we are finished
-    if (next_tx_frame_id_ != cfg_->FramesToTest()) {
+    if (next_tx_frame_id_ < cfg_->FramesToTest()) {
       ProcessUdpPacketsFromApps();
     }
   }

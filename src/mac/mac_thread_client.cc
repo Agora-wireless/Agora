@@ -314,9 +314,10 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
       total_bytes_received += ret;
       current_packet_bytes += ret;
 
-      // std::printf(
-      //    "Received %zu bytes packet number %zu packet size %zu total %zu\n",
-      //    ret, packets_received, total_bytes_received, current_packet_bytes);
+      MLPD_TRACE(
+          "MacThreadClient: Received %zu bytes packet number %zu packet size "
+          "%zu total %zu\n",
+          ret, packets_received, total_bytes_received, current_packet_bytes);
 
       // While we have packets remaining and a header to process
       const size_t header_size = sizeof(MacPacketHeaderPacked);
@@ -330,10 +331,12 @@ void MacThreadClient::ProcessUdpPacketsFromApps(RBIndicator ri) {
         const size_t current_packet_size =
             header_size + rx_mac_packet_header->PayloadLength();
 
-        // std::printf("Packet number %zu @ %zu packet size %d:%zu total %zu\n",
-        //            packets_received, current_packet_start_index,
-        //            rx_mac_packet_header->datalen_, current_packet_size,
-        //            current_packet_bytes);
+        MLPD_INFO(
+            "MacThreadClient: Packet number %zu @ %zu packet size %d:%zu total "
+            "%zu\n",
+            packets_received, current_packet_start_index,
+            rx_mac_packet_header->PayloadLength(), current_packet_size,
+            current_packet_bytes);
 
         if (current_packet_bytes >= current_packet_size) {
           current_packet_bytes = current_packet_bytes - current_packet_size;
@@ -470,8 +473,9 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
 
     pkt->LoadData(src_packet->Data());
     // Insert CRC
-    pkt->Crc((uint16_t)(
-        crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) & 0xFFFF));
+    pkt->Crc(
+        (uint16_t)(crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
+                   0xFFFF));
 
     if (kLogMacPackets) {
       std::stringstream ss;

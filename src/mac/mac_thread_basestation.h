@@ -104,8 +104,8 @@ class MacThreadBaseStation {
   // The frame ID of the next MAC packet we'll hand over to the PHY
   size_t next_tx_frame_id_ = 0;
 
-  // The radio ID of the next MAC packet we'll hand over to the PHY
-  size_t next_radio_id_ = 0;
+  // The user ID of the next MAC packet we'll hand over to the PHY
+  size_t next_user_id_ = 0;
 
   // The frame ID of the next TTI that the scheduler plans for
   size_t scheduler_next_frame_id_ = 0;
