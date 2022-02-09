@@ -178,8 +178,8 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
     }
 
     if (data_valid) {
-      MLPD_INFO("%s", ss.str().c_str());
-      MLPD_INFO(
+      MLPD_SYMBOL("%s", ss.str().c_str());
+      MLPD_TRACE(
           "Looking at index ue %zu:%zu, offset %zu:%zu, length %d\nFrame Data "
           "size: %zu:%zu  %zu:%zu\n",
           ue_id, server_.frame_data_.size(), frame_data_offset,

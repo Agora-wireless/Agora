@@ -524,18 +524,16 @@ void Agora::Start() {
 
         case EventType::kPacketFromMac: {
           // This is an entire frame (multiple mac packets)
-          const size_t ue_id = rx_mac_tag_t(event.tags_[0]).tid_;
-          const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0]).offset_;
+          const size_t ue_id = rx_mac_tag_t(event.tags_[0u]).tid_;
+          const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0u]).offset_;
           const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
               &dl_bits_buffer_[ue_id]
                               [radio_buf_id * config_->MacBytesNumPerframe(
                                                   Direction::kDownlink)]);
 
-          MLPD_TRACE(
-              "Agora: frame %d symbol %d user %d @ offset %zu %zu @ location "
-              "%zu\n",
-              pkt->Frame(), pkt->Symbol(), pkt->Ue(), ue_id, radio_buf_id,
-              (size_t)pkt);
+          MLPD_INFO("Agora: frame %d @ offset %zu %zu @ location %zu\n",
+                    pkt->Frame(), ue_id, radio_buf_id,
+                    reinterpret_cast<intptr_t>(pkt));
 
           if (kDebugPrintPacketsFromMac) {
             std::stringstream ss;

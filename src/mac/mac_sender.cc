@@ -19,6 +19,8 @@ static constexpr size_t kFrameLoadAdvance = 10;
 static constexpr size_t kBufferInit = 10;
 static constexpr size_t kTxBufferElementAlignment = 64;
 
+static constexpr size_t kSlowStartThresh1 = kFrameWnd;
+static constexpr size_t kSlowStartThresh2 = (kFrameWnd * 4);
 static constexpr size_t kSlowStartMulStage1 = 32;
 static constexpr size_t kSlowStartMulStage2 = 8;
 static constexpr size_t kMasterThreadId = 0;
@@ -270,10 +272,10 @@ void* MacSender::MasterThread(size_t tid) {
           this->frame_start_[(next_frame_id % kNumStatsFrames)] =
               frame_start_us;
           // Wait frame ticks to send the next frame
-          DelayTicks(tick_start, GetTicksForFrame(ctag.frame_id_) *
-                                     cfg_->Frame().NumTotalSyms());
-          tick_start +=
-              (GetTicksForFrame(ctag.frame_id_) * cfg_->Frame().NumTotalSyms());
+          uint64_t frame_ticks =
+              GetTicksForFrame(next_frame_id) * cfg_->Frame().NumTotalSyms();
+          DelayTicks(tick_start, frame_ticks);
+          tick_start += frame_ticks;
           // Save the scheduled time to apply for the end of the frame
           timestamp_us = GetTime::GetTimeUs();
           ScheduleFrame(next_frame_id);
@@ -317,8 +319,8 @@ void* MacSender::WorkerThread(size_t tid) {
   size_t total_tx_packets_rolling = 0;
   size_t cur_radio = radio_lo;
 
-  MLPD_INFO("MacSender: In thread %zu, %zu antennas, total antennas: %zu\n",
-            tid, ant_num_this_thread, cfg_->NumRadios());
+  MLPD_INFO("MacSender[%zu]: %zu antennas, total antennas: %zu\n", tid,
+            ant_num_this_thread, cfg_->NumRadios());
 
   std::array<size_t, kDequeueBulkSize> tags;
   while (keep_running.load() == true) {
@@ -331,8 +333,8 @@ void* MacSender::WorkerThread(size_t tid) {
         auto tag = gen_tag_t(tags.at(tag_id));
 
         if ((kDebugPrintSender)) {
-          std::printf("MacSender : worker %zu processing frame %d : %d \n", tid,
-                      tag.frame_id_, tag.ant_id_);
+          std::printf("MacSender[%zu] : worker processing frame %d : %d \n",
+                      tid, tag.frame_id_, tag.ant_id_);
         }
         const uint8_t* mac_packet_location =
             tx_buffers_[TagToTxBuffersIndex(tag)];
@@ -348,12 +350,12 @@ void* MacSender::WorkerThread(size_t tid) {
               mac_packet_length_ -
               (mac_payload_max_length_ - tx_packet->PayloadLength());
 
-          // std::printf(
-          //    "MacSender sending frame %d:%d, packet %zu, symbol %d, size "
-          //    "%zu:%zu\n",
-          //    tx_packet->frame_id_, tag.frame_id_, packet,
-          //    tx_packet->symbol_id_, mac_packet_tx_size,
-          //    mac_packet_storage_size);
+          MLPD_TRACE(
+              "MacSender[%zu] sending frame %d:%d, packet %zu, symbol %d, size "
+              "%zu:%zu\n",
+              tid, tx_packet->frame_id_, tag.frame_id_, packet,
+              tx_packet->symbol_id_, mac_packet_tx_size,
+              mac_packet_storage_size);
 
           udp_client.Send(server_address_, server_rx_port_,
                           reinterpret_cast<const uint8_t*>(tx_packet),
@@ -363,8 +365,8 @@ void* MacSender::WorkerThread(size_t tid) {
 
         if (kDebugSenderReceiver) {
           std::printf(
-              "MacSender: Thread %zu (tag = %s) transmit frame %d, radio %zu, "
-              "TX time: %.3f us\n",
+              "MacSender%zu]: (tag = %s) transmit frame %d, radio %zu, TX "
+              "time: %.3f us\n",
               tid, gen_tag_t(tag).ToString().c_str(), tag.frame_id_, cur_radio,
               GetTime::CyclesToUs(GetTime::Rdtsc() - start_tsc_send,
                                   freq_ghz_));
@@ -379,8 +381,7 @@ void* MacSender::WorkerThread(size_t tid) {
                             max_symbol_id * 1000.f;
           double diff = end - begin;
           std::printf(
-              "MacSender: Thread %zu send %zu frames in %f secs, tput %f "
-              "Mbps\n",
+              "MacSender%zu]: send %zu frames in %f secs, tput %f Mbps\n",
               (size_t)tid,
               total_tx_packets / (ant_num_this_thread * max_symbol_id),
               diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
@@ -403,9 +404,9 @@ void* MacSender::WorkerThread(size_t tid) {
 uint64_t MacSender::GetTicksForFrame(size_t frame_id) const {
   if (enable_slow_start_ == 0) {
     return ticks_all_;
-  } else if (frame_id < kFrameWnd) {
+  } else if (frame_id < kSlowStartThresh1) {
     return ticks_wnd1_;
-  } else if (frame_id < (kFrameWnd * 4)) {
+  } else if (frame_id < kSlowStartThresh2) {
     return ticks_wnd2_;
   } else {
     return ticks_all_;
