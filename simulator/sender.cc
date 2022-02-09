@@ -172,7 +172,7 @@ void Sender::StartTx() {
   delete[](this->frame_end_);
 }
 
-void Sender::StartTXfromMain(double* in_frame_start, double* in_frame_end) {
+void Sender::StartTxfromMain(double* in_frame_start, double* in_frame_end) {
   frame_start_ = in_frame_start;
   frame_end_ = in_frame_end;
 
@@ -209,7 +209,8 @@ void Sender::ScheduleSymbol(size_t frame, size_t symbol_id) {
 }
 
 void* Sender::MasterThread(int /*unused*/) {
-  PinToCoreWithOffset(ThreadType::kMasterTX, core_offset_, 0);
+  constexpr size_t kSenderMasterTid = 0;
+  PinToCoreWithOffset(ThreadType::kMasterTX, core_offset_, kSenderMasterTid);
 
   // Wait for all worker threads to be ready (+1 for Master)
   num_workers_ready_atomic.fetch_add(1);

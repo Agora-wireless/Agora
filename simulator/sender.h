@@ -66,7 +66,7 @@ class Sender {
 
   // in_frame_start and in_frame_end must have space for at least
   // kNumStatsFrames entries
-  void StartTXfromMain(double* in_frame_start, double* in_frame_end);
+  void StartTxfromMain(double* in_frame_start, double* in_frame_end);
 
  private:
   void* MasterThread(int tid);

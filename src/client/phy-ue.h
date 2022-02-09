@@ -55,7 +55,7 @@ class PhyUe {
                           size_t symbol_id);
   void PrintPerFrameDone(PrintType print_type, size_t frame_id);
 
-  void ReceiveDownlinkSymbol(struct Packet* rx_packet, size_t tag);
+  void ReceiveDownlinkSymbol(Packet* rx_packet, size_t tag);
   void ScheduleDefferedDownlinkSymbols(size_t frame_id);
   void ClearCsi(size_t frame_id);
 

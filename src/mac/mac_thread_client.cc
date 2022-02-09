@@ -43,9 +43,10 @@ MacThreadClient::MacThreadClient(
   server_.n_filled_in_frame_.fill(0);
   for (size_t ue_ant = 0; ue_ant < cfg_->UeAntTotal(); ue_ant++) {
     server_.data_size_.emplace_back(
-        std::vector<size_t>(cfg->Frame().NumUlDataSyms()));
+        std::vector<size_t>(cfg->Frame().NumDlDataSyms()));
   }
 
+  // The frame data will hold the data comming from the Phy (Received)
   for (auto& v : server_.frame_data_) {
     v.resize(cfg_->MacDataBytesNumPerframe(Direction::kDownlink));
   }
@@ -177,7 +178,14 @@ void MacThreadClient::ProcessCodeblocksFromPhy(EventData event) {
     }
 
     if (data_valid) {
-      MLPD_FRAME("%s", ss.str().c_str());
+      MLPD_SYMBOL("%s", ss.str().c_str());
+      MLPD_TRACE(
+          "Looking at index ue %zu:%zu, offset %zu:%zu, length %d\nFrame Data "
+          "size: %zu:%zu  %zu:%zu\n",
+          ue_id, server_.frame_data_.size(), frame_data_offset,
+          server_.frame_data_.at(ue_id).size(), pkt->PayloadLength(), ue_id,
+          server_.data_size_.size(), symbol_array_index - num_pilot_symbols,
+          server_.data_size_.at(ue_id).size());
       /// Spot to be optimized #1
       std::memcpy(&server_.frame_data_.at(ue_id).at(frame_data_offset),
                   pkt->Data(), pkt->PayloadLength());
@@ -462,8 +470,9 @@ void MacThreadClient::ProcessUdpPacketsFromAppsClient(const char* payload,
 
     pkt->LoadData(src_packet->Data());
     // Insert CRC
-    pkt->Crc((uint16_t)(
-        crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) & 0xFFFF));
+    pkt->Crc(
+        (uint16_t)(crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
+                   0xFFFF));
 
     if (kLogMacPackets) {
       std::stringstream ss;
