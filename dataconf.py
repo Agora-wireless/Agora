@@ -5,4 +5,4 @@ xlims = [[0,10000] for i in range(20)]
 ylims = [[-30,30], [0,20], []]
 enable_trace_plot = True
 enable_stats_plot = True
-qam_symbols_per_frame = 304
+qam_symbols_per_frame = 304 - (304 / 16)
