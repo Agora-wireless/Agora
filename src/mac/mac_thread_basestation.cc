@@ -287,16 +287,18 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
 
   const size_t max_recv_attempts = (packets_required * 100u);
   size_t rx_attempts;
+
+  // Each UDP packet is 1 symbol (MacPacket) for a user, loop until we get the entire frame for the given user
+  //  would be good to rework this per symbol then we can remove the loop
   for (rx_attempts = 0u; rx_attempts < max_recv_attempts; rx_attempts++) {
+    // Should return 1 mac packet per receive
     ssize_t ret = udp_server_->Recv(&udp_pkt_buf_.at(total_bytes_received),
                                     udp_pkt_buf_.size() - total_bytes_received);
     if (ret == 0) {
-      MLPD_TRACE("MacThreadBaseStation: No data received with %zu pending\n",
-                 total_bytes_received);
       if (total_bytes_received == 0) {
         return;  // No data received
       } else {
-        MLPD_INFO(
+        MLPD_TRACE(
             "MacThreadBaseStation: No data received but there was data in "
             "buffer pending %zu : try %zu out of %zu\n",
             total_bytes_received, rx_attempts, max_recv_attempts);
@@ -306,12 +308,13 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
       MLPD_ERROR("MacThreadBaseStation: Error in reception %zu\n", ret);
       cfg_->Running(false);
       return;
-    } else { /* Got some data */
+    } else { /* Got some data, assume we can make a MacPacket from it*/
       total_bytes_received += ret;
       current_packet_bytes += ret;
 
-      MLPD_INFO(
-          "Received %zu bytes packet number %zu packet size %zu total %zu\n",
+      MLPD_TRACE(
+          "MacThreadBaseStation: Received %zu bytes packet number %zu packet "
+          "size %zu total %zu\n",
           ret, packets_received, total_bytes_received, current_packet_bytes);
 
       // While we have packets remaining and a header to process
@@ -326,10 +329,12 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
         const size_t current_packet_size =
             header_size + rx_mac_packet_header->PayloadLength();
 
-        MLPD_INFO("Packet number %zu @ %zu packet size %d:%zu total %zu\n",
-                  packets_received, current_packet_start_index,
-                  rx_mac_packet_header->PayloadLength(), current_packet_size,
-                  current_packet_bytes);
+        MLPD_TRACE(
+            "MacThreadBaseStation: Packet number %zu @ %zu packet size %d:%zu "
+            "total %zu\n",
+            packets_received, current_packet_start_index,
+            rx_mac_packet_header->PayloadLength(), current_packet_size,
+            current_packet_bytes);
 
         if (current_packet_bytes >= current_packet_size) {
           current_packet_bytes = current_packet_bytes - current_packet_size;
@@ -337,7 +342,11 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
               current_packet_start_index + current_packet_size;
           packets_received++;
         } else {
-          // Don't have the entire packet, keep trying
+          // Don't have the entire packet, keep trying (unexpected)
+          MLPD_WARN(
+              "MacThreadBaseStation: Unexpected - Incomplete packet received "
+              "%zu:%zu\n",
+              current_packet_bytes, current_packet_size);
           break;
         }
       }
@@ -353,18 +362,26 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
     }
   }  // end rx attempts
 
-  if (packets_received != packets_required) {
-    MLPD_ERROR(
+  if (rx_attempts > 10) {
+    MLPD_INFO(
         "MacThreadBaseStation: Received %zu : %zu packets with %zu total bytes "
         "in %zu attempts\n",
         packets_received, packets_required, total_bytes_received, rx_attempts);
+  }
+
+  if (packets_received != packets_required) {
+    MLPD_ERROR(
+        "MacThreadBaseStation: Error - didn't receive enough packets %zu : %zu "
+        "with %zu total bytes in %zu attempts\n",
+        packets_received, packets_required, total_bytes_received, rx_attempts);
+    RtAssert(packets_received == packets_required,
+             "MacThreadBaseStation: ProcessUdpPacketsFromApps incorrect data "
+             "received!");
   } else {
     MLPD_FRAME("MacThreadClient: Received Mac Frame Data\n");
+    RtAssert(current_packet_bytes == 0,
+             "Received the complete frame data but had remaining bytes\n");
   }
-  RtAssert(packets_received == packets_required,
-           "MacThreadBaseStation: ProcessUdpPacketsFromApps incorrect data "
-           "received!");
-
   // Currently this is a packet list of mac packets
   ProcessUdpPacketsFromAppsBs((char*)&udp_pkt_buf_[0]);
 }
@@ -384,7 +401,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
     const auto* pkt =
         reinterpret_cast<const MacPacketPacked*>(&payload[pkt_offset]);
 
-    MLPD_INFO(
+    MLPD_FRAME(
         "MacThreadBaseStation: Frame %d, Packet %zu, symbol %d, user %d\n",
         pkt->Frame(), packet, pkt->Symbol(), pkt->Ue());
     if (packet == 0) {

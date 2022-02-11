@@ -531,9 +531,11 @@ void Agora::Start() {
                               [radio_buf_id * config_->MacBytesNumPerframe(
                                                   Direction::kDownlink)]);
 
-          MLPD_INFO("Agora: frame %d @ offset %zu %zu @ location %zu\n",
-                    pkt->Frame(), ue_id, radio_buf_id,
-                    reinterpret_cast<intptr_t>(pkt));
+          MLPD_FRAME(
+              "Agora::kPacketFromMac [Frame %d user %zu] - received all frame "
+              "data for the user at offset %zu. location %zu\n",
+              pkt->Frame(), ue_id, radio_buf_id,
+              reinterpret_cast<intptr_t>(pkt));
 
           if (kDebugPrintPacketsFromMac) {
             std::stringstream ss;
@@ -541,9 +543,9 @@ void Agora::Start() {
             for (size_t dl_data_symbol = 0;
                  dl_data_symbol < config_->Frame().NumDlDataSyms();
                  dl_data_symbol++) {
-              ss << "Agora: kPacketFromMac, frame " << pkt->Frame()
-                 << ", symbol " << std::to_string(pkt->Symbol()) << " crc "
-                 << std::to_string(pkt->Crc()) << " bytes: ";
+              ss << "Agora::kPacketFromMac, frame " << pkt->Frame() << " user "
+                 << ue_id << ", symbol " << std::to_string(pkt->Symbol())
+                 << " crc " << std::to_string(pkt->Crc()) << " bytes: ";
               for (size_t i = 0; i < pkt->PayloadLength(); i++) {
                 ss << std::to_string((pkt->Data()[i])) << ", ";
               }
@@ -568,6 +570,10 @@ void Agora::Start() {
                 std::printf("   +++ Deferring encoding of frame %zu\n",
                             frame_id);
               }
+
+              RtAssert(
+                  frame_id > cur_proc_frame_id_,
+                  "Deferral is less than the current frame in kPacketFromMac!");
               this->encode_deferral_.push(frame_id);
             } else {
               ScheduleDownlinkProcessing(frame_id);
@@ -1111,6 +1117,8 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
         if (kDebugDeferral) {
           std::printf("   +++ Deferring encoding of frame %zu\n", frame_id);
         }
+        RtAssert(frame_id > cur_proc_frame_id_,
+                 "Deferral is less than the current frame!");
         encode_deferral_.push(frame_id);
       } else {
         ScheduleDownlinkProcessing(frame_id);

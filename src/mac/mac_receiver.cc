@@ -43,7 +43,7 @@ MacReceiver::MacReceiver(Config* const cfg, size_t num_frame_data_bytes,
 std::vector<std::thread> MacReceiver::StartRecv() {
   std::vector<std::thread> created_threads;
 
-  std::printf("MacReceiver:  Start Recv threads %zu\n", rx_thread_num_);
+  MLPD_INFO("MacReceiver:  Start Recv threads %zu\n", rx_thread_num_);
   created_threads.resize(rx_thread_num_);
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
@@ -53,9 +53,9 @@ std::vector<std::thread> MacReceiver::StartRecv() {
 }
 
 void* MacReceiver::LoopRecv(size_t tid) {
-  // TODO: Temp
-  size_t ue_id = tid;
-  size_t core_offset = core_id_ + rx_thread_num_;
+  // one user per tid for now
+  const size_t ue_id = tid;
+  const size_t core_offset = core_id_ + rx_thread_num_;
   PinToCoreWithOffset(ThreadType::kWorkerRX, core_offset, tid);
 
   static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
@@ -67,9 +67,9 @@ void* MacReceiver::LoopRecv(size_t tid) {
     udp_streamer = std::make_unique<UDPClient>();
   }
 
-  udp_server->MakeBlocking(1);
-  std::printf("MacReceiver: Set up UDP socket server listening to port %zu\n",
-              phy_port_ + ue_id);
+  MLPD_INFO(
+      "MacReceiver[%zu]: Set up UDP socket server listening to port %zu\n", tid,
+      phy_port_ + ue_id);
 
   // Create a rx buffer
   const size_t max_packet_length = data_bytes_;
@@ -77,11 +77,11 @@ void* MacReceiver::LoopRecv(size_t tid) {
 
   while ((SignalHandler::GotExitSignal() == false) &&
          (cfg_->Running() == true)) {
-    ssize_t recvlen = udp_server->RecvFrom(&rx_buffer[0u], max_packet_length,
-                                           phy_address_, phy_port_ + ue_id);
+    const ssize_t recvlen = udp_server->RecvFrom(
+        &rx_buffer[0u], max_packet_length, phy_address_, phy_port_ + ue_id);
     if (recvlen < 0) {
-      std::perror("recv failed");
-      throw std::runtime_error("Receiver: recv failed");
+      std::perror("MacReceiver: recv failed");
+      throw std::runtime_error("MacReceiver: recv failed");
     } else if ((recvlen > 0) &&
                static_cast<size_t>(recvlen) <= max_packet_length) {
       if (enable_udp_output_) {
@@ -90,23 +90,27 @@ void* MacReceiver::LoopRecv(size_t tid) {
       }
 
       if (kDebugMacReceiver) {
-        std::printf("MacReceiver: Thread %zu, Data Bytes: %zu:%zu, Data:", tid,
-                    recvlen, max_packet_length);
+        std::stringstream ss;
+        ss << "MacReceiver[" << tid << "]: Data Bytes: " << recvlen << ":"
+           << max_packet_length;
+
+        ss << std::hex << std::setfill('0');
         for (size_t i = 0; i < static_cast<size_t>(recvlen); i++) {
-          std::printf(" %02x", rx_buffer[i]);
+          ss << " 0x" << std::setw(2) << static_cast<int>(rx_buffer[i]);
         }
-        std::printf("\n");
+        ss << std::dec;
+        std::printf("%s\n", ss.str().c_str());
       }
 
       if (static_cast<size_t>(recvlen) != max_packet_length) {
         MLPD_INFO(
-            "MacReceiver: Thread %zu received less than max data bytes "
+            "MacReceiver[%zu]: received less than max data bytes "
             "%zu:%zu\n",
             tid, recvlen, max_packet_length);
       }
     }
   }
   delete[] rx_buffer;
-  std::printf("MacReceiver: Finished\n");
+  std::printf("MacReceiver[%zu]: Finished\n", tid);
   return nullptr;
 }

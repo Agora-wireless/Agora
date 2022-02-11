@@ -1,8 +1,8 @@
 {
   /* General Settings */
   "cells": 1,
-  "bs_radio_num": 4,
-  "ue_radio_num": 1,
+  "bs_radio_num": 8,
+  "ue_radio_num": 4,
   "beamsweep": true,
   "beacon_antenna": 0,
   /* Waveform Parameters */
@@ -17,7 +17,7 @@
   "frequency": 3.6e9,
   /* Frame definition */
   "frame_schedule": [
-    "BPGGGGGGGGGGGGGGGGGGGDDDDGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+    "BPPPPDDDDGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
   ],
   "client_dl_pilot_syms": 2,
   /* compute configuration */
@@ -32,5 +32,5 @@
   "ue_core_offset": 6,
   "ue_worker_thread_num": 2,
   "ue_socket_thread_num": 1,
-  "max_frame": 1000
+  "max_frame": 40
 }
