@@ -332,3 +332,9 @@ add_executable(test_decode_spec
   test/compute_kernels/ldpc/test_decode_spec.cpp
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_decode_spec ${COMMON_LIBS})
+
+add_executable(benchmark
+  test/benchmark/benchmark.cpp
+  $<TARGET_OBJECTS:agora_sources_lib>
+  $<TARGET_OBJECTS:common_sources_lib>)
+target_link_libraries(benchmark ${COMMON_LIBS})
