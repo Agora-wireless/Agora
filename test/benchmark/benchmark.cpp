@@ -37,6 +37,7 @@ static constexpr float kNoiseLevel = 1.0 / 200;
 static constexpr float kBg = 1;
 static constexpr float kZc = 72;
 static constexpr float kNumIterations = 1000;
+static constexpr float kZFIterations = 100;
 
 DEFINE_string(conf_file,
     TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
@@ -535,14 +536,14 @@ int main(int argc, char **argv)
     complex_float* csi_gather_buffer = reinterpret_cast<complex_float*>(
         memalign(64, kMaxAntennas * kMaxUEs * sizeof(complex_float)));
     start_tsc = rdtsc();
-    for (size_t iter = 0; iter < kNumIterations; iter ++) {
+    for (size_t iter = 0; iter < kZFIterations; iter ++) {
         for (size_t base_sc_id = 0; base_sc_id < cfg->OFDM_DATA_NUM; base_sc_id += cfg->UE_NUM) {
             run_zf(csi_buffer, csi_gather_buffer, ul_zf_matrices, dl_zf_matrices, base_sc_id);
         }
     }
     end_tsc = rdtsc();
     free(csi_gather_buffer);
-    printf("%lf times/sec\n", (double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
+    printf("%lf times/sec\n", (double)kZFIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
 
     printf("Running Demul: ");    
     Table<int8_t> demod_buffer;
