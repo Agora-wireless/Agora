@@ -752,6 +752,8 @@ void Agora::Start() {
           do_fft_task.event_type_ = EventType::kFFT;
 
           for (size_t j = 0; j < config_->FftBlockSize(); j++) {
+            RtAssert(!cur_fftq.empty(),
+                     "Using front element cur_fftq when it is empty");
             do_fft_task.tags_[j] = cur_fftq.front().tag_;
             cur_fftq.pop();
 
@@ -1690,8 +1692,14 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
     }
     this->cur_proc_frame_id_++;
 
-    if (this->encode_deferral_.empty() == false) {
-      for (size_t encode = 0; encode < kScheduleQueues; encode++) {
+    if (frame_id == (this->config_->FramesToTest() - 1)) {
+      finished = true;
+    } else {
+      // Only schedule up to kScheduleQueues so we don't flood the queues
+      // Cannot access the front() element if the queue is empty
+      for (size_t encode = 0;
+           (encode < kScheduleQueues) && (!encode_deferral_.empty());
+           encode++) {
         const size_t deferred_frame = this->encode_deferral_.front();
         if (deferred_frame < (this->cur_proc_frame_id_ + kScheduleQueues)) {
           if (kDebugDeferral) {
@@ -1707,12 +1715,8 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
           // No need to check the next frame because it is too large
           break;
         }
-      }
-    }
-
-    if (frame_id == (this->config_->FramesToTest() - 1)) {
-      finished = true;
-    }
+      }  // for each encodable frames in kScheduleQueues
+    }    // !finished
   }
   return finished;
 }
