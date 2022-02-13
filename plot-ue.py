@@ -47,8 +47,12 @@ for i in range(num_file):
 	for j in range(num_dev):
 		idx = i * num_dev + j
 		data_select = dfs[idx][ylabels[i]] \
-				[(dc.xlims[j][0] <= dfs[idx][xlabel]) & (dfs[idx][xlabel] <= dc.xlims[j][1])]
+				[(dc.xlims[j][0] <= dfs[idx][xlabel]) & (dfs[idx][xlabel] < dc.xlims[j][1])]
 		array2float(data_select)
+		if dc.stats_zero_fill[i]:
+			len_zeros = (dc.xlims[j][1] - dc.xlims[j][0]) - len(data_select)
+			data_select = pd.concat([data_select, pd.Series(np.zeros(len_zeros))])
+		print(data_select)
 		if dc.enable_stats_plot:
 			axs[i].plot(np.sort(data_select), \
 					1. * np.arange(len(data_select)) / (len(data_select) - 1))
