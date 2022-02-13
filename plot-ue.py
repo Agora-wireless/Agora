@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 import dataconf as dc
 
 def array2float(arr):
-	for i in range(len(arr)):
+	for i in range(arr.index[0], arr.index[-1]):
 		if isinstance(arr[i], str):
 			arr[i] = float(re.sub(r"([A-Z]+)|([a-z]+)", '', arr[i]))
 	return arr
