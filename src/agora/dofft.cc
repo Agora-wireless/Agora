@@ -81,14 +81,15 @@ static inline void CalibRegressionEstimate(const arma::cx_fvec& in_vec,
 }
 
 EventData DoFFT::Launch(size_t tag) {
-  size_t start_tsc = GetTime::WorkerRdtsc();
+  const size_t start_tsc = GetTime::WorkerRdtsc();
   Packet* pkt = fft_req_tag_t(tag).rx_packet_->RawPacket();
-  size_t frame_id = pkt->frame_id_;
-  size_t frame_slot = frame_id % kFrameWnd;
-  size_t symbol_id = pkt->symbol_id_;
-  size_t ant_id = pkt->ant_id_;
-  size_t cell_id = pkt->cell_id_;
-  SymbolType sym_type = cfg_->GetSymbolType(symbol_id);
+  const size_t frame_id = pkt->frame_id_;
+  const size_t frame_slot = frame_id % kFrameWnd;
+  const size_t symbol_id = pkt->symbol_id_;
+  const size_t ant_id = pkt->ant_id_;
+  const size_t radio_id = ant_id / cfg_->NumChannels();
+  const size_t cell_id = pkt->cell_id_;
+  const SymbolType sym_type = cfg_->GetSymbolType(symbol_id);
 
   if (cfg_->FftInRru() == true) {
     SimdConvertFloat16ToFloat32(
@@ -116,9 +117,11 @@ EventData DoFFT::Launch(size_t tag) {
       std::printf("In doFFT thread %d: frame: %zu, symbol: %zu, ant: %zu\n",
                   tid_, frame_id, symbol_id, ant_id);
     }
-    if (kPrintPilotCorrStats &&
-        (sym_type == SymbolType::kPilot || sym_type == SymbolType::kCalDL ||
-         sym_type == SymbolType::kCalUL)) {
+
+    if ((kPrintPilotCorrStats == true) &&
+        ((sym_type == SymbolType::kPilot) || (sym_type == SymbolType::kCalUL) ||
+         ((sym_type == SymbolType::kCalDL) &&
+          (ant_id == cfg_->RefAnt(cell_id))))) {
       SimdConvertShortToFloat(pkt->data_,
                               reinterpret_cast<float*>(rx_samps_tmp_),
                               2 * cfg_->SampsPerSymbol());
@@ -170,7 +173,7 @@ EventData DoFFT::Launch(size_t tag) {
   }
 
   size_t start_tsc1 = GetTime::WorkerRdtsc();
-  duration_stat->task_duration_[1] += start_tsc1 - start_tsc;
+  duration_stat->task_duration_.at(1) += start_tsc1 - start_tsc;
 
   if (!cfg_->FftInRru() == true) {
     DftiComputeForward(
@@ -179,7 +182,7 @@ EventData DoFFT::Launch(size_t tag) {
   }
 
   size_t start_tsc2 = GetTime::WorkerRdtsc();
-  duration_stat->task_duration_[2] += start_tsc2 - start_tsc1;
+  duration_stat->task_duration_.at(2) += start_tsc2 - start_tsc1;
 
   if (sym_type == SymbolType::kPilot) {
     size_t pilot_symbol_id = cfg_->Frame().GetPilotSymbolIdx(symbol_id);
@@ -192,23 +195,24 @@ EventData DoFFT::Launch(size_t tag) {
   } else if (sym_type == SymbolType::kUL) {
     PartialTranspose(cfg_->GetDataBuf(data_buffer_, frame_id, symbol_id),
                      ant_id, SymbolType::kUL);
-  } else if (sym_type == SymbolType::kCalUL &&
-             ant_id != cfg_->RefAnt(cell_id)) {
+  } else if (sym_type == SymbolType::kCalUL) {
     // Only process uplink for antennas that also do downlink in this frame
     // for consistency with calib downlink processing.
     if (frame_id >= TX_FRAME_DELTA &&
         ant_id / cfg_->AntPerGroup() ==
             (frame_id - TX_FRAME_DELTA) % cfg_->AntGroupNum()) {
-      size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
-      size_t frame_grp_slot = frame_grp_id % kFrameWnd;
+      const size_t frame_grp_id =
+          (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
+      const size_t frame_grp_slot = frame_grp_id % kFrameWnd;
       PartialTranspose(
           &calib_ul_buffer_[frame_grp_slot][ant_id * cfg_->OfdmDataNum()],
           ant_id, sym_type);
       phy_stats_->UpdateCalibPilotSnr(frame_grp_id, 1, ant_id, fft_inout_);
     }
-  } else if (sym_type == SymbolType::kCalDL &&
-             ant_id == cfg_->RefAnt(cell_id)) {
-    if (frame_id >= TX_FRAME_DELTA) {
+    RtAssert(radio_id != cfg_->RefRadio(cell_id),
+             "Received a Cal Ul symbol for an antenna on the reference radio");
+  } else if (sym_type == SymbolType::kCalDL) {
+    if ((ant_id == cfg_->RefAnt(cell_id)) && (frame_id >= TX_FRAME_DELTA)) {
       size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
       size_t frame_grp_slot = frame_grp_id % kFrameWnd;
       size_t cal_dl_symbol_id = symbol_id - cfg_->Frame().GetDLCalSymbol(0);
@@ -220,6 +224,10 @@ EventData DoFFT::Launch(size_t tag) {
       PartialTranspose(calib_dl_ptr, ant_id, sym_type);
       phy_stats_->UpdateCalibPilotSnr(frame_grp_id, 0, cur_ant, fft_inout_);
     }
+    //Do nothing with frame < TX_FRAME_DELTA and other antennas on the ref radio
+    RtAssert(
+        radio_id == cfg_->RefRadio(cell_id),
+        "Received a Cal Dl symbol for an antenna not on the reference radio");
   } else {
     std::string error_message =
         "Unknown or unsupported symbol type " +

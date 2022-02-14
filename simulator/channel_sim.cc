@@ -149,8 +149,9 @@ void ChannelSim::ScheduleTask(EventData do_task,
 }
 
 void ChannelSim::Start() {
+  constexpr size_t kChanSimMasterTid = 0;
   std::printf("Starting Channel Simulator ...\n");
-  PinToCoreWithOffset(ThreadType::kMaster, core_offset_, 0);
+  PinToCoreWithOffset(ThreadType::kMaster, core_offset_, kChanSimMasterTid);
 
   moodycamel::ProducerToken ptok_bs(task_queue_bs_);
   moodycamel::ProducerToken ptok_user(task_queue_user_);
@@ -399,7 +400,7 @@ void* ChannelSim::BsRxLoop(size_t tid) {
     buffer.data_size_ = 0;
   }
 
-  MLPD_FRAME(
+  MLPD_INFO(
       "BsRxLoop[%zu]: handling sockets %zu from %zu to %zu rx packet bytes "
       "%zu, max udp rx %zu \n",
       tid, total_sockets, socket_lo, socket_hi, rx_packet_size, buffer_size);

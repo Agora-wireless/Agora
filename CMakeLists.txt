@@ -146,6 +146,10 @@ if(${USE_DPDK})
   include_directories(SYSTEM ${DPDK_INCLUDE_DIRS})
 
   add_definitions(-DUSE_DPDK)
+  if (ISA_AVX512)
+    message(STATUS "Enabling AVX-512 memcpy implementation for dpdk")
+    add_definitions(-DRTE_MEMCPY_AVX512)
+  endif()
 endif()
 
 # MAC
@@ -226,6 +230,7 @@ include_directories(
   src/mac/
   src/agora/
   src/agora/txrx/
+  src/agora/txrx/workers
   src/client/
   /usr/include/mkl/
   src/data_generator)
@@ -253,7 +258,15 @@ set(COMMON_SOURCES
   src/encoder/iobuffer.cc)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
-set(AGORA_SOURCES 
+if(${USE_DPDK})
+  add_definitions(-DUSE_DPDK)
+  set(AGORA_SOURCES
+    src/common/dpdk_transport.cc
+    src/agora/txrx/packet_txrx_dpdk.cc
+    src/agora/txrx/workers/txrx_worker_dpdk.cc)
+endif()
+
+set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/agora.cc
   src/agora/dofft.cc
   src/agora/doifft.cc
@@ -263,19 +276,14 @@ set(AGORA_SOURCES
   src/agora/dodecode.cc
   src/agora/radio_lib.cc
   src/agora/radio_calibrate.cc
-  src/mac/mac_thread_basestation.cc)
+  src/mac/mac_thread_basestation.cc
+  src/agora/txrx/packet_txrx.cc
+  src/agora/txrx/packet_txrx_radio.cc
+  src/agora/txrx/workers/txrx_worker.cc
+  src/agora/txrx/workers/txrx_worker_sim.cc
+  src/agora/txrx/workers/txrx_worker_argos.cc
+  src/agora/txrx/workers/txrx_worker_usrp.cc)
 
-if(${USE_DPDK})
-  add_definitions(-DUSE_DPDK)
-  set(AGORA_SOURCES ${AGORA_SOURCES} 
-    src/agora/txrx/txrx_DPDK.cc
-    src/common/dpdk_transport.cc)
-else()
-  set(AGORA_SOURCES ${AGORA_SOURCES} 
-    src/agora/txrx/txrx.cc
-    src/agora/txrx/txrx_argos.cc
-    src/agora/txrx/txrx_usrp.cc)
-endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
 set(CLIENT_SOURCES
@@ -364,7 +372,6 @@ add_executable(test_agora
   $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_agora ${COMMON_LIBS})
-
 
 set(LDPC_TESTS test_ldpc test_ldpc_mod test_ldpc_baseband)
 foreach(test_name IN LISTS LDPC_TESTS)

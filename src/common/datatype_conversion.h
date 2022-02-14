@@ -103,9 +103,10 @@ static inline void SimdConvertFloatToShort(const float* in_buf, short* out_buf,
     integer1 = _mm512_permutexvar_epi64(permute_index, integer1);
     _mm512_stream_si512((__m512i*)&out_buf[2 * (i + cp_len)], integer1);
     // Set cyclic prefix
-    if (i >= n_elems - cp_len)
+    if (i >= n_elems - cp_len) {
       _mm512_stream_si512((__m512i*)&out_buf[2 * (i + cp_len - n_elems)],
                           integer1);
+    }
   }
 #else
   const __m256 scale_factor = _mm256_set1_ps(scale_factor_float);
@@ -161,9 +162,8 @@ static inline void ConvertFloatTo12bitIq(const float* in_buf, uint8_t* out_buf,
 }
 
 #ifdef __AVX512F__
-static inline void simd_convert_16bit_iq_to_float(__m256i val, float* out_buf,
-                                                  __m512 magic,
-                                                  __m512i magic_i) {
+static inline void SimdConvert16bitIqToFloat(__m256i val, float* out_buf,
+                                             __m512 magic, __m512i magic_i) {
   /* interleave with 0x0000 */
   __m512i val_unpacked = _mm512_cvtepu16_epi32(val);  // port 5
   /* convert by xor-ing and subtracting magic value:
@@ -241,7 +241,7 @@ static inline void Convert12bitIqTo16bitIq(uint8_t* in_buf, uint16_t* out_buf,
 // n_elems must be multiples of 3
 static inline void SimdConvert12bitIqToFloat(const uint8_t* in_buf,
                                              float* out_buf,
-                                             uint16_t* in_16bits_buf,
+                                             const uint16_t* in_16bits_buf,
                                              size_t n_elems) {
   unused(in_16bits_buf);
 #ifdef __AVX512F__
@@ -300,14 +300,14 @@ static inline void SimdConvert12bitIqToFloat(const uint8_t* in_buf,
     __m512i output_1 = _mm512_permutex2var_epi64(
         iq_0, _mm512_set_epi64(15, 14, 7, 6, 13, 12, 5, 4), iq_1);
 
-    simd_convert_16bit_iq_to_float(_mm512_extracti64x4_epi64(output_0, 0),
-                                   out_buf + i * 2, magic, magic_i);
-    simd_convert_16bit_iq_to_float(_mm512_extracti64x4_epi64(output_0, 1),
-                                   out_buf + i * 2 + 16, magic, magic_i);
-    simd_convert_16bit_iq_to_float(_mm512_extracti64x4_epi64(output_1, 0),
-                                   out_buf + i * 2 + 32, magic, magic_i);
-    simd_convert_16bit_iq_to_float(_mm512_extracti64x4_epi64(output_1, 1),
-                                   out_buf + i * 2 + 48, magic, magic_i);
+    SimdConvert16bitIqToFloat(_mm512_extracti64x4_epi64(output_0, 0),
+                              out_buf + i * 2, magic, magic_i);
+    SimdConvert16bitIqToFloat(_mm512_extracti64x4_epi64(output_0, 1),
+                              out_buf + i * 2 + 16, magic, magic_i);
+    SimdConvert16bitIqToFloat(_mm512_extracti64x4_epi64(output_1, 0),
+                              out_buf + i * 2 + 32, magic, magic_i);
+    SimdConvert16bitIqToFloat(_mm512_extracti64x4_epi64(output_1, 1),
+                              out_buf + i * 2 + 48, magic, magic_i);
     in_buf += 96;
   }
 
