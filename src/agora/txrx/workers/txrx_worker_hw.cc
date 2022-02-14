@@ -49,8 +49,9 @@ void TxRxWorkerHw::DoTxRx() {
     return;
   }
 
-  long long time0 = 0;
+  program_start_ticks_ = GetTime::Rdtsc();
 
+  long long time0 = 0ul;
   time0 = GetHwTime();
   ssize_t prev_frame_id = -1;
 
@@ -64,15 +65,21 @@ void TxRxWorkerHw::DoTxRx() {
   size_t global_frame_id = 0;
   size_t global_symbol_id = 0;
   std::vector<TxRxWorkerRx::RxTimeTracker> rx_times(num_interfaces_);
-  program_start_ticks_ = GetTime::Rdtsc();
+
+  // Schedule TX_FRAME_DELTA transmit frames ( B + C + L + D )
+  ScheduleTxInit(TX_FRAME_DELTA, time0);
+
+  // Agora will generate Tx data only after the first Rx............. (Typically the pilots from the UEs)
+  //  The first Rx will happen based on a Hw trigger
   while (Configuration()->Running() == true) {
-    if (0 == DequeueSend(time0)) {
-      // attempt to receive symbol (might be good to reduce the rx timeout to allow for tx during dead time)
+    const size_t tx_items = DoTx(time0);
+    // If no items transmitted, then try to receive
+    if (0 == tx_items) {
       if (kSymbolTimingEnabled) {
         rx_times.at(receive_attempt.interface_).start_ticks_ = GetTime::Rdtsc();
       }
-      auto pkts = RecvEnqueue(receive_attempt.interface_, global_frame_id,
-                              global_symbol_id);
+      auto pkts =
+          DoRx(receive_attempt.interface_, global_frame_id, global_symbol_id);
 
       const size_t rx_time_ticks = GetTime::Rdtsc();
       if (kSymbolTimingEnabled) {
@@ -82,7 +89,7 @@ void TxRxWorkerHw::DoTxRx() {
       if (!pkts.empty()) {
         RtAssert(pkts.size() == channels_per_interface_,
                  "Received data but it was the wrong dimension");
-        size_t rx_symbol_id = pkts.front()->symbol_id_;
+        const size_t rx_symbol_id = pkts.front()->symbol_id_;
 
         if (unlikely(rx_symbol_id != receive_attempt.symbol_)) {
           MLPD_ERROR(
@@ -117,15 +124,17 @@ void TxRxWorkerHw::DoTxRx() {
                             successful_receive.symbol_,
                             receive_attempt.symbol_);
       }  // if (pkt.size() > 0)
-    }    // DequeueSendArgos(time0) == 0
+    }    // DoTx(time0) == 0
   }      // Configuration()->Running() == true
   running_ = false;
 }
 
 //RX data, should return channel number of packets || 0
-std::vector<Packet*> TxRxWorkerHw::RecvEnqueue(size_t interface_id,
-                                               size_t global_frame_id,
-                                               size_t global_symbol_id) {
+// global_frame_id will be used and updated
+// global_symbol_id will be used and updated
+std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
+                                        size_t& global_frame_id,
+                                        size_t& global_symbol_id) {
   const size_t radio_id = interface_id + interface_offset_;
   const size_t ant_id = radio_id * channels_per_interface_;
   const size_t cell_id = Configuration()->CellId().at(radio_id);
@@ -148,32 +157,23 @@ std::vector<Packet*> TxRxWorkerHw::RecvEnqueue(size_t interface_id,
   }
 
   long long frame_time;
-  bool cal_rx =
-      (radio_id != Configuration()->RefRadio(cell_id) &&
-       Configuration()->IsCalUlPilot(global_frame_id, global_symbol_id)) ||
-      (radio_id == Configuration()->RefRadio(cell_id) &&
-       Configuration()->IsCalDlPilot(global_frame_id, global_symbol_id));
-  bool dummy_read =
-      (Configuration()->HwFramer() == false) &&
-      (!Configuration()->IsPilot(global_frame_id, global_symbol_id) &&
-       !Configuration()->IsUplink(global_frame_id, global_symbol_id) &&
-       !cal_rx);
 
   //Ok to read into sample memory for dummy read
   const int rx_status =
       radio_config_.RadioRx(radio_id, samp.data(), frame_time);
 
-  if ((dummy_read == false) && (rx_status > 0)) {
-    //     (rx_status == static_cast<int>(Configuration()->SampsPerSymbol()))) {
-    size_t frame_id = global_frame_id;
-    size_t symbol_id = global_symbol_id;
-
+  //Should be Configuration()->SampsPerSymbol() but adding this check causes issues
+  if (rx_status > 0) {
+    // The frame time is returned in the RadioRx call so use it instead of the software tracked value
     if (Configuration()->HwFramer() == true) {
-      frame_id = static_cast<size_t>(frame_time >> 32);
-      symbol_id = static_cast<size_t>((frame_time >> 16) & 0xFFFF);
+      global_frame_id = static_cast<size_t>(frame_time >> 32);
+      global_symbol_id = static_cast<size_t>((frame_time >> 16) & 0xFFFF);
     }
 
-    if (rx_status != static_cast<int>(Configuration()->SampsPerSymbol())) {
+    const size_t frame_id = global_frame_id;
+    const size_t symbol_id = global_symbol_id;
+
+    if (static_cast<size_t>(rx_status) != Configuration()->SampsPerSymbol()) {
       MLPD_WARN(
           "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted "
           "Frame: %zu, Symbol: %zu, RX status = %d is not the expected value\n",
@@ -187,31 +187,42 @@ std::vector<Packet*> TxRxWorkerHw::RecvEnqueue(size_t interface_id,
           symbol_id, rx_status);
     }
 
-    for (size_t ant = 0; ant < ant_ids.size(); ant++) {
-      auto* rx_packet = memory_tracking.at(ant);
-      auto* raw_pkt = rx_packet->RawPacket();
-      new (raw_pkt) Packet(frame_id, symbol_id, cell_id, ant_ids.at(ant));
-      result_packets.push_back(raw_pkt);
+    const bool cal_rx =
+        (radio_id != Configuration()->RefRadio(cell_id) &&
+         Configuration()->IsCalUlPilot(global_frame_id, global_symbol_id)) ||
+        (radio_id == Configuration()->RefRadio(cell_id) &&
+         Configuration()->IsCalDlPilot(global_frame_id, global_symbol_id));
+    const bool ignore_rx_data =
+        (Configuration()->HwFramer() == false) &&
+        (!Configuration()->IsPilot(global_frame_id, global_symbol_id) &&
+         !Configuration()->IsUplink(global_frame_id, global_symbol_id) &&
+         !cal_rx);
 
-      // Push kPacketRX event into the queue.
-      EventData rx_message(EventType::kPacketRX, rx_tag_t(*rx_packet).tag_);
-      NotifyComplete(rx_message);
-      memory_tracking.at(ant) = nullptr;
+    // Update global frame_id and symbol_id
+    global_symbol_id++;
+    if (global_symbol_id == Configuration()->Frame().NumTotalSyms()) {
+      global_symbol_id = 0;
+      global_frame_id++;
+    }
+
+    if (ignore_rx_data == false) {
+      for (size_t ant = 0; ant < ant_ids.size(); ant++) {
+        auto* rx_packet = memory_tracking.at(ant);
+        auto* raw_pkt = rx_packet->RawPacket();
+        new (raw_pkt) Packet(frame_id, symbol_id, cell_id, ant_ids.at(ant));
+        result_packets.push_back(raw_pkt);
+
+        // Push kPacketRX event into the queue.
+        EventData rx_message(EventType::kPacketRX, rx_tag_t(*rx_packet).tag_);
+        NotifyComplete(rx_message);
+        memory_tracking.at(ant) = nullptr;
+      }
     }
   } else if (rx_status < 0) {
     MLPD_ERROR(
         "TxRxWorkerHw[%zu], Interface %zu | Radio %zu - Rx failure RX "
         "status = %d is less than 0\n",
         tid_, interface_id, interface_id + interface_offset_, rx_status);
-  } else if ((rx_status != 0) && (static_cast<size_t>(rx_status) !=
-                                  Configuration()->SampsPerSymbol())) {
-    const size_t rx_frame = static_cast<size_t>(frame_time >> 32);
-    const size_t rx_symbol = static_cast<size_t>((frame_time >> 16) & 0xFFFF);
-    MLPD_ERROR(
-        "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted Frame: "
-        "%zu, Symbol: %zu, RX status = %d is not the expected value\n",
-        tid_, interface_id, interface_id + interface_offset_, rx_frame,
-        rx_symbol, rx_status);
   }
 
   //Free memory from most recent allocated to latest
@@ -253,18 +264,19 @@ void TxRxWorkerHw::TxBeaconHw(size_t frame_id, size_t interface_id,
     tx_buffs.at(beacon_ch) = Configuration()->BeaconCi16().data();
   }
   // assuming beacon is first symbol
-  long long frame_time = time0 + (Configuration()->SampsPerSymbol() *
-                                  (((frame_id + TX_FRAME_DELTA) *
-                                    Configuration()->Frame().NumTotalSyms()) +
-                                   beacon_symbol_id));
+  long long frame_time =
+      time0 + (Configuration()->SampsPerSymbol() *
+               ((frame_id * Configuration()->Frame().NumTotalSyms()) +
+                beacon_symbol_id));
 
-  int tx_ret =
+  const int tx_ret =
       radio_config_.RadioTx(radio_id, tx_buffs.data(),
                             GetTxFlags(radio_id, beacon_symbol_id), frame_time);
+
   if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
-    std::cerr << "BAD BEACON Transmit(" << tx_ret << "/"
-              << Configuration()->SampsPerSymbol() << ") at Time " << frame_time
-              << ", frame count " << frame_id << std::endl;
+    std::cerr << "BAD Transmit on radio " << radio_id << " - status " << tx_ret
+              << ",  expected " << Configuration()->SampsPerSymbol()
+              << " at Time " << frame_time << std::endl;
   }
 }
 
@@ -278,8 +290,8 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
       Configuration()->SampsPerSymbol(), std::complex<int16_t>(0, 0));
 
   MLPD_FRAME(
-      "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu,         , "
-      "Radio %zu\n",
+      "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu,         , Radio "
+      "%zu\n",
       tid_, frame_id, radio_id);
 
   //Schedule the Calibration Uplink 'L' Symbol(s) on the reference radio
@@ -298,13 +310,12 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
       calultxbuf.at(ant_idx) = Configuration()->PilotCi16().data();
       long long frame_time = 0;
       if (Configuration()->HwFramer() == false) {
-        frame_time = time0 + (Configuration()->SampsPerSymbol() *
-                              (((frame_id + TX_FRAME_DELTA) *
-                                Configuration()->Frame().NumTotalSyms()) +
-                               tx_symbol_id));
+        frame_time =
+            time0 + (Configuration()->SampsPerSymbol() *
+                     ((frame_id * Configuration()->Frame().NumTotalSyms()) +
+                      tx_symbol_id));
       } else {
-        frame_time = ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
-                     (tx_symbol_id << 16);
+        frame_time = ((long long)(frame_id) << 32) | (tx_symbol_id << 16);
       }
 
       MLPD_TRACE(
@@ -312,8 +323,15 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
           "%zu, Radio %zu) is reference tx on channel %zu\n",
           tid_, frame_id, tx_symbol_id, radio_id, ant_idx);
       // Check to see if the next symbol is a Tx symbol for the reference node
-      radio_config_.RadioTx(radio_id, calultxbuf.data(),
-                            GetTxFlags(radio_id, tx_symbol_id), frame_time);
+      const int tx_ret =
+          radio_config_.RadioTx(radio_id, calultxbuf.data(),
+                                GetTxFlags(radio_id, tx_symbol_id), frame_time);
+      if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
+        std::cerr << "BAD Transmit rep pilot on radio " << radio_id
+                  << " - status " << tx_ret << ",  expected "
+                  << Configuration()->SampsPerSymbol() << " at Time "
+                  << frame_time << std::endl;
+      }
     }
   } else {
     // ! ref_radio -- Transmit downlink calibration (array to ref) pilot
@@ -341,16 +359,22 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
 
       long long frame_time = 0;
       if (Configuration()->HwFramer() == false) {
-        frame_time = time0 + (Configuration()->SampsPerSymbol() *
-                              ((frame_id + TX_FRAME_DELTA) *
-                                   Configuration()->Frame().NumTotalSyms() +
-                               tx_symbol_id));
+        frame_time =
+            time0 + (Configuration()->SampsPerSymbol() *
+                     ((frame_id * Configuration()->Frame().NumTotalSyms()) +
+                      tx_symbol_id));
       } else {
-        frame_time = ((long long)(frame_id + TX_FRAME_DELTA) << 32) |
-                     (tx_symbol_id << 16);
+        frame_time = ((long long)(frame_id) << 32) | (tx_symbol_id << 16);
       }
-      radio_config_.RadioTx(radio_id, caldltxbuf.data(),
-                            GetTxFlags(radio_id, tx_symbol_id), frame_time);
+      const int tx_status =
+          radio_config_.RadioTx(radio_id, caldltxbuf.data(),
+                                GetTxFlags(radio_id, tx_symbol_id), frame_time);
+      if (tx_status != static_cast<int>(Configuration()->SampsPerSymbol())) {
+        std::cerr << "BAD Transmit on radio " << radio_id << " - status "
+                  << tx_status << ",  expected "
+                  << Configuration()->SampsPerSymbol() << " at Time "
+                  << frame_time << std::endl;
+      }
 
       MLPD_TRACE(
           "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
@@ -367,18 +391,18 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
 }
 
 //Tx data
-size_t TxRxWorkerHw::DequeueSend(long long time0) {
+size_t TxRxWorkerHw::DoTx(long long time0) {
   auto tx_events = GetPendingTxEvents();
 
   //Process each pending tx event
   for (const EventData& current_event : tx_events) {
-    // std::printf("tx queue length: %d\n", task_queue_->size_approx());
     assert(current_event.event_type_ == EventType::kPacketTX);
 
-    size_t frame_id = gen_tag_t(current_event.tags_[0u]).frame_id_;
+    const size_t frame_id = gen_tag_t(current_event.tags_[0u]).frame_id_;
     const size_t symbol_id = gen_tag_t(current_event.tags_[0u]).symbol_id_;
     const size_t ant_id = gen_tag_t(current_event.tags_[0u]).ant_id_;
     const size_t radio_id = ant_id / channels_per_interface_;
+    const size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
 
     RtAssert((radio_id >= interface_offset_) &&
              (radio_id <= (interface_offset_ + num_interfaces_)));
@@ -403,13 +427,14 @@ size_t TxRxWorkerHw::DequeueSend(long long time0) {
       if (symbol_id == Configuration()->Frame().GetDLSymbol(0)) {
         // Schedule beacon in the future
         if (Configuration()->HwFramer() == false) {
-          this->TxBeaconHw(frame_id, radio_id, time0);
+          TxBeaconHw(tx_frame_id, radio_id, time0);
         }
 
         if (Configuration()->Frame().IsRecCalEnabled() == true) {
-          this->TxReciprocityCalibPilots(frame_id, radio_id, time0);
+          TxReciprocityCalibPilots(tx_frame_id, radio_id, time0);
         }
       }
+
       std::vector<const void*> txbuf(channels_per_interface_);
       if (kDebugDownlink == true) {
         const std::vector<std::complex<int16_t>> zeros(
@@ -436,16 +461,21 @@ size_t TxRxWorkerHw::DequeueSend(long long time0) {
 
       long long frame_time = 0;
       if (Configuration()->HwFramer() == false) {
-        frame_time = time0 + (Configuration()->SampsPerSymbol() *
-                              (((frame_id + TX_FRAME_DELTA) *
-                                Configuration()->Frame().NumTotalSyms()) +
-                               symbol_id));
-      } else {
         frame_time =
-            ((long long)(frame_id + TX_FRAME_DELTA) << 32) | (symbol_id << 16);
+            time0 + (Configuration()->SampsPerSymbol() *
+                     ((tx_frame_id * Configuration()->Frame().NumTotalSyms()) +
+                      symbol_id));
+      } else {
+        frame_time = ((long long)(tx_frame_id) << 32) | (symbol_id << 16);
       }
-      radio_config_.RadioTx(radio_id, txbuf.data(),
-                            GetTxFlags(radio_id, symbol_id), frame_time);
+      const int radio_status = radio_config_.RadioTx(
+          radio_id, txbuf.data(), GetTxFlags(radio_id, symbol_id), frame_time);
+      if (radio_status != static_cast<int>(Configuration()->SampsPerSymbol())) {
+        std::cerr << "BAD Transmit on radio " << radio_id << " - status "
+                  << radio_status << ",  expected "
+                  << Configuration()->SampsPerSymbol() << " at Time "
+                  << frame_time << std::endl;
+      }
     }
 
     if (kDebugPrintInTask == true) {
@@ -527,22 +557,6 @@ TxRxWorkerRx::RxParameters TxRxWorkerHw::UpdateRxInterface(
   }
   return next_rx;
 }
-
-/*
-  if (Configuration()->HwFramer() == false) {
-    // Update global frame_id and symbol_id
-    global_symbol_id++;
-    if (global_symbol_id == Configuration()->Frame().NumTotalSyms()) {
-      global_symbol_id = 0;
-      global_frame_id++;
-      if (Configuration()->Frame().NumDLSyms() == 0) {
-        for (size_t interface = 0; interface < num_interfaces_; interface++) {
-          this->TxBeaconHw(global_frame_id, interface, time0);
-        }
-      }
-    }
-  }  // HwFramer == false
-*/
 
 bool TxRxWorkerHw::IsRxSymbol(size_t interface, size_t symbol_id) {
   auto symbol_type = Configuration()->GetSymbolType(symbol_id);
@@ -714,8 +728,9 @@ long long int TxRxWorkerHw::GetHwTime() {
                                             tx_time_bs);
         }
         if (tx_status != static_cast<int>(Configuration()->SampsPerSymbol())) {
-          std::cerr << "BAD Transmit(" << tx_status << "/"
-                    << Configuration()->SampsPerSymbol() << ") at Time "
+          std::cerr << "BAD Transmit on radio " << radio_id << " - status "
+                    << tx_status << ",  expected "
+                    << Configuration()->SampsPerSymbol() << " at Time "
                     << tx_time_bs << std::endl;
         }
       }  // end TX schedule
@@ -733,4 +748,59 @@ long long int TxRxWorkerHw::GetHwTime() {
     std::cout << "Start BS main recv loop..." << std::endl;
   }  // HwFramer == false
   return hw_time;
+}
+
+//Maybe only schedule frame 0, then let the TX_FRAME_DELTA happen after the RX
+void TxRxWorkerHw::ScheduleTxInit(size_t frames_to_schedule, long long time0) {
+  for (size_t frame = 0; frame < TX_FRAME_DELTA; frame++) {
+    for (size_t radio = interface_offset_;
+         radio < (interface_offset_ + num_interfaces_); radio++) {
+      if (Configuration()->HwFramer() == false) {
+        TxBeaconHw(frame, radio, time0);
+      }
+      //Keep the assumption that Cal is before an 'D' symbols
+      // Maybe a good idea to combine / optimize the schedule by iterating through the entire frame symbol by symbol
+      if (Configuration()->Frame().IsRecCalEnabled() == true) {
+        TxReciprocityCalibPilots(frame, radio, time0);
+      }
+      TxDownlinkZeros(frame, radio, time0);
+    }  // for each radio
+  }    // fpr each frame
+}
+
+// All DL symbols
+void TxRxWorkerHw::TxDownlinkZeros(size_t frame_id, size_t radio_id,
+                                   long long time0) {
+  const std::vector<std::complex<int16_t>> zeros(
+      std::vector<std::complex<int16_t>>(Configuration()->SampsPerSymbol(),
+                                         std::complex<int16_t>(0, 0)));
+
+  //Pointing to the same tx location
+  std::vector<const void*> tx_buffs(Configuration()->NumChannels(),
+                                    zeros.data());
+
+  for (size_t dl_sym_idx = 0; dl_sym_idx < Configuration()->Frame().NumDLSyms();
+       dl_sym_idx++) {
+    const size_t tx_symbol_id =
+        Configuration()->Frame().GetDLSymbol(dl_sym_idx);
+    long long frame_time = 0;
+    if (Configuration()->HwFramer() == false) {
+      frame_time =
+          time0 + (Configuration()->SampsPerSymbol() *
+                   (((frame_id)*Configuration()->Frame().NumTotalSyms()) +
+                    tx_symbol_id));
+    } else {
+      frame_time = ((long long)(frame_id) << 32) | (tx_symbol_id << 16);
+    }
+
+    const int tx_ret =
+        radio_config_.RadioTx(radio_id, tx_buffs.data(),
+                              GetTxFlags(radio_id, tx_symbol_id), frame_time);
+
+    if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
+      std::cerr << "BAD Transmit on radio " << radio_id << " - status "
+                << tx_ret << ",  expected " << Configuration()->SampsPerSymbol()
+                << " at Time " << frame_time << std::endl;
+    }
+  }
 }

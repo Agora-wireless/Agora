@@ -44,9 +44,12 @@ class TxRxWorkerHw : public TxRxWorker {
 
  private:
   TxRxWorkerHw() = delete;
-  size_t DequeueSend(long long time0);
-  std::vector<Packet*> RecvEnqueue(size_t interface_id, size_t global_frame_id,
-                                   size_t global_symbol_id);
+  size_t DoTx(long long time0);
+  std::vector<Packet*> DoRx(size_t interface_id, size_t& global_frame_id,
+                            size_t& global_symbol_id);
+
+  void ScheduleTxInit(size_t frames_to_schedule, long long time0);
+  void TxDownlinkZeros(size_t frame_id, size_t radio_id, long long time0);
 
   void TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
                                 long long time0);
