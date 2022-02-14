@@ -211,9 +211,10 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id) {
                                      pre_calib_ul_msum_mat.row(sc_id) -
                                      old_calib_ul_mat.row(sc_id);
 
-  if ((cfg_->InitCalibRepeat() == 0u) && (0 < frames_to_complete)) {
-    // fill with one until one full sweep
-    // of calibration data is done
+  if ((cfg_->InitCalibRepeat() == 0u) &&
+      ((cfg_->Frame().IsRecCalEnabled() == false) ||
+       (cfg_->Frame().IsRecCalEnabled() && (frame_id >= frames_to_complete)))) {
+    // fill with one until one full sweep of calibration data is done
     calib_vec.fill(arma::cx_float(1, 0));
   } else {
     calib_vec =
