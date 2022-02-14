@@ -814,12 +814,11 @@ void Agora::HandleEventFft(size_t tag) {
       this->stats_->MasterSetTsc(TsType::kRCDone, frame_id);
       this->rc_last_frame_ = frame_id;
 
-      // See if the calibration has completed (skipping TX_FRAME_DELTA on purpose)
-      if (kPrintPhyStats && (frame_id > TX_FRAME_DELTA)) {
-        const size_t tx_frame = frame_id - TX_FRAME_DELTA;
+      // See if the calibration has completed
+      if (kPrintPhyStats && (frame_id > 0)) {
         // This makes an assumption that if antenna 0 tx'd pilots during the current complete frame
         // then the previous frame stats can be printed
-        const size_t cal_index = config_->RecipCalUlRxIndex(tx_frame, 0);
+        const size_t cal_index = config_->RecipCalUlRxIndex(frame_id, 0);
         if (cal_index != SIZE_MAX) {
           size_t print_index;
           if (cal_index == 0) {

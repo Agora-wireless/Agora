@@ -127,7 +127,7 @@ class Config {
     const size_t frame_cal_idx = frame_id / num_frames_for_full_cal;
     const size_t tx_ant_start = frame_id % num_frames_for_full_cal;
     const size_t tx_ant_end = tx_ant_start + (frame_.NumDLCalSyms() - 1);
-    if (ant >= tx_ant_start && ant <= tx_ant_end) {
+    if ((ant >= tx_ant_start) && (ant <= tx_ant_end)) {
       cal_ind = frame_cal_idx % kFrameWnd;
     } else {
       cal_ind = SIZE_MAX;
