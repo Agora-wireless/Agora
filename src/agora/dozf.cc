@@ -157,11 +157,12 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id) {
       reinterpret_cast<arma::cx_float*>(calib_gather_buffer_), cfg_->BfAntNum(),
       false);
 
-  const size_t frames_to_complete = cfg_->RecipCalFrameCnt();
+  size_t frames_to_complete = 0;
   size_t frame_cal_slot = kFrameWnd - 1;
   size_t frame_cal_slot_prev = kFrameWnd - 2;
   size_t frame_cal_slot_old = 0;
   if (cfg_->Frame().IsRecCalEnabled()) {
+    frames_to_complete = cfg_->RecipCalFrameCnt();
     const size_t current_cal_index = frame_id / frames_to_complete;
 
     // use the previous window which has a full set of calibration results
@@ -210,7 +211,7 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id) {
                                      pre_calib_ul_msum_mat.row(sc_id) -
                                      old_calib_ul_mat.row(sc_id);
 
-  if ((cfg_->InitCalibRepeat() == 0u) && (frame_id < frames_to_complete)) {
+  if ((cfg_->InitCalibRepeat() == 0u) && (0 < frames_to_complete)) {
     // fill with one until one full sweep
     // of calibration data is done
     calib_vec.fill(arma::cx_float(1, 0));
