@@ -28,7 +28,10 @@ TxRxWorkerHw::TxRxWorkerHw(
                  can_proceed),
       radio_config_(radio_config),
       program_start_ticks_(0),
-      freq_ghz_(GetTime::MeasureRdtscFreq()) {}
+      freq_ghz_(GetTime::MeasureRdtscFreq()) {
+  std::vector<std::complex<int16_t>> zeros_(Configuration()->SampsPerSymbol(),
+                                            std::complex<int16_t>(0, 0));
+}
 
 TxRxWorkerHw::~TxRxWorkerHw() = default;
 
@@ -247,13 +250,10 @@ void TxRxWorkerHw::TxBeaconHw(size_t frame_id, size_t interface_id,
            "HwFramer == true when TxBeaconHw was called");
   const auto beacon_symbol_id = Configuration()->Frame().GetBeaconSymbol(0);
   const size_t radio_id = interface_id + interface_offset_;
-  const std::vector<std::complex<int16_t>> zeros(
-      std::vector<std::complex<int16_t>>(Configuration()->SampsPerSymbol(),
-                                         std::complex<int16_t>(0, 0)));
 
   //We can just point the tx to the same zeros location, no need to make more
   std::vector<const void*> tx_buffs(Configuration()->NumChannels(),
-                                    zeros.data());
+                                    zeros_.data());
 
   const size_t beacon_radio =
       Configuration()->BeaconAnt() / Configuration()->NumChannels();
@@ -286,8 +286,6 @@ void TxRxWorkerHw::TxBeaconHw(size_t frame_id, size_t interface_id,
 void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
                                             long long time0) {
   const size_t cell_id = Configuration()->CellId().at(radio_id);
-  const std::vector<std::complex<int16_t>> zeros(
-      Configuration()->SampsPerSymbol(), std::complex<int16_t>(0, 0));
 
   MLPD_FRAME(
       "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu,         , Radio "
@@ -302,7 +300,7 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
       const size_t tx_symbol_id =
           Configuration()->Frame().GetULCalSymbol(ul_cal_sym_idx);
       std::vector<const void*> calultxbuf(Configuration()->NumChannels(),
-                                          zeros.data());
+                                          zeros_.data());
 
       const size_t ref_ant = Configuration()->RefAnt(cell_id);
       const size_t ant_idx = ref_ant % Configuration()->NumChannels();
@@ -337,7 +335,7 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
     // ! ref_radio -- Transmit downlink calibration (array to ref) pilot
     // Send all CalDl symbols 'C'
     std::vector<const void*> caldltxbuf(Configuration()->NumChannels(),
-                                        zeros.data());
+                                        zeros_.data());
 
     // For each C only 1 channel / antenna can send pilots.  All others send zeros for now, per schedule.
     for (size_t dl_cal_sym_idx = 0;
@@ -384,7 +382,7 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
 
       // Reset the caldltxbuf to zeros for next loop
       if (calib_radio == radio_id) {
-        caldltxbuf.at(channel_offset) = zeros.data();
+        caldltxbuf.at(channel_offset) = zeros_.data();
       }
     }  // end s < Configuration()->RadioPerGroup()
   }    // ! ref radio
@@ -437,12 +435,10 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
 
       std::vector<const void*> txbuf(channels_per_interface_);
       if (kDebugDownlink == true) {
-        const std::vector<std::complex<int16_t>> zeros(
-            Configuration()->SampsPerSymbol(), std::complex<int16_t>(0, 0));
         for (size_t ch = 0; ch < channels_per_interface_; ch++) {
           // Not exactly sure why 0 index was selected here.  Could it be a beacon ant?
           if (ant_id != 0) {
-            txbuf.at(ch) = zeros.data();
+            txbuf.at(ch) = zeros_.data();
           } else if (dl_symbol_idx <
                      Configuration()->Frame().ClientDlPilotSymbols()) {
             txbuf.at(ch) =
@@ -771,13 +767,9 @@ void TxRxWorkerHw::ScheduleTxInit(size_t frames_to_schedule, long long time0) {
 // All DL symbols
 void TxRxWorkerHw::TxDownlinkZeros(size_t frame_id, size_t radio_id,
                                    long long time0) {
-  const std::vector<std::complex<int16_t>> zeros(
-      std::vector<std::complex<int16_t>>(Configuration()->SampsPerSymbol(),
-                                         std::complex<int16_t>(0, 0)));
-
   //Pointing to the same tx location
   std::vector<const void*> tx_buffs(Configuration()->NumChannels(),
-                                    zeros.data());
+                                    zeros_.data());
 
   for (size_t dl_sym_idx = 0; dl_sym_idx < Configuration()->Frame().NumDLSyms();
        dl_sym_idx++) {

@@ -476,9 +476,8 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
 
     pkt->LoadData(src_packet->Data());
     // Insert CRC
-    pkt->Crc(
-        (uint16_t)(crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
-                   0xFFFF));
+    pkt->Crc((uint16_t)(
+        crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) & 0xFFFF));
 
     if (kLogMacPackets) {
       std::stringstream ss;

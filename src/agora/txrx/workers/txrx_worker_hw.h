@@ -72,5 +72,7 @@ class TxRxWorkerHw : public TxRxWorker {
   RadioConfig& radio_config_;
   size_t program_start_ticks_;
   const double freq_ghz_;
+
+  std::vector<std::complex<int16_t>> zeros_;
 };
 #endif  // TXRX_WORKER_SIM_H_
