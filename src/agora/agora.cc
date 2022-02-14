@@ -8,6 +8,12 @@
 #include <cmath>
 #include <memory>
 
+#if defined(USE_DPDK)
+#include "packet_txrx_dpdk.h"
+#endif
+#include "packet_txrx_radio.h"
+
+static const bool kDebugPrintPacketsFromMac = false;
 static const bool kDebugDeferral = true;
 static const size_t kDefaultMessageQueueSize = 512;
 static const size_t kDefaultWorkerQueueSize = 256;
@@ -33,7 +39,7 @@ Agora::Agora(Config* const cfg)
               directory.c_str(), cfg->FreqGhz());
 
   PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0,
-                      false /* quiet */);
+                      kEnableCoreReuse, false /* quiet */);
   CheckIncrementScheduleFrame(0, ScheduleProcessingFlags::kProcessingComplete);
   // Important to set cur_sche_frame_id_ after the call to
   // CheckIncrementScheduleFrame because it will be incremented however,
@@ -47,9 +53,28 @@ Agora::Agora(Config* const cfg)
   InitializeDownlinkBuffers();
 
   /* Initialize TXRX threads */
-  packet_tx_rx_ = std::make_unique<PacketTXRX>(
-      cfg, cfg->CoreOffset() + 1, &message_queue_,
-      GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_);
+  if (kUseArgos || kUseUHD) {
+    packet_tx_rx_ = std::make_unique<PacketTxRxRadio>(
+        cfg, cfg->CoreOffset() + 1, &message_queue_,
+        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
+        socket_buffer_, socket_buffer_size_ / cfg->PacketLength(),
+        this->stats_->FrameStart(), dl_socket_buffer_);
+#if defined(USE_DPDK)
+  } else if (kUseDPDK) {
+    packet_tx_rx_ = std::make_unique<PacketTxRxDpdk>(
+        cfg, cfg->CoreOffset() + 1, &message_queue_,
+        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
+        socket_buffer_, socket_buffer_size_ / cfg->PacketLength(),
+        this->stats_->FrameStart(), dl_socket_buffer_);
+#endif
+  } else {
+    /* Default to the simulator */
+    packet_tx_rx_ = std::make_unique<PacketTxRx>(
+        cfg, cfg->CoreOffset() + 1, &message_queue_,
+        GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
+        socket_buffer_, socket_buffer_size_ / cfg->PacketLength(),
+        this->stats_->FrameStart(), dl_socket_buffer_);
+  }
 
   if (kEnableMac == true) {
     const size_t mac_cpu_core =
@@ -173,6 +198,7 @@ void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
   // Must put contiguous channels in same queue
   assert(ceil_events_per_handler % config_->NumChannels() == 0);
 
+  /// \todo !!!!! Should use the packet_txrx class here to enqueue the id's to the correct worker
   std::vector<EventData> events_list(ceil_events_per_handler);
   for (size_t radio_handler = 0; radio_handler < handler_threads;
        radio_handler++) {
@@ -289,16 +315,13 @@ void Agora::ScheduleUsers(EventType event_type, size_t frame_id,
 void Agora::Start() {
   const auto& cfg = this->config_;
 
+  bool start_status =
+      packet_tx_rx_->StartTxRx(calib_dl_buffer_, calib_ul_buffer_);
   // Start packet I/O
-  if (packet_tx_rx_->StartTxRx(socket_buffer_,
-                               socket_buffer_size_ / cfg->PacketLength(),
-                               this->stats_->FrameStart(), dl_socket_buffer_,
-                               calib_dl_buffer_, calib_ul_buffer_) == false) {
+  if (start_status == false) {
     this->Stop();
     return;
   }
-
-  PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0);
 
   // Counters for printing summary
   size_t tx_count = 0;
@@ -352,8 +375,8 @@ void Agora::Start() {
           }
 
           UpdateRxCounters(pkt->frame_id_, pkt->symbol_id_);
-          fft_queue_arr_[pkt->frame_id_ % kFrameWnd].push(
-              fft_req_tag_t(event.tags_[0]));
+          fft_queue_arr_.at(pkt->frame_id_ % kFrameWnd)
+              .push(fft_req_tag_t(event.tags_[0]));
         } break;
 
         case EventType::kFFT: {
@@ -500,9 +523,41 @@ void Agora::Start() {
         } break;
 
         case EventType::kPacketFromMac: {
-          size_t frame_id = rx_mac_tag_t(event.tags_[0]).offset_;
+          // This is an entire frame (multiple mac packets)
+          const size_t ue_id = rx_mac_tag_t(event.tags_[0u]).tid_;
+          const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0u]).offset_;
+          const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
+              &dl_bits_buffer_[ue_id]
+                              [radio_buf_id * config_->MacBytesNumPerframe(
+                                                  Direction::kDownlink)]);
 
-          bool last_ue = this->mac_to_phy_counters_.CompleteTask(frame_id, 0);
+          MLPD_INFO("Agora: frame %d @ offset %zu %zu @ location %zu\n",
+                    pkt->Frame(), ue_id, radio_buf_id,
+                    reinterpret_cast<intptr_t>(pkt));
+
+          if (kDebugPrintPacketsFromMac) {
+            std::stringstream ss;
+
+            for (size_t dl_data_symbol = 0;
+                 dl_data_symbol < config_->Frame().NumDlDataSyms();
+                 dl_data_symbol++) {
+              ss << "Agora: kPacketFromMac, frame " << pkt->Frame()
+                 << ", symbol " << std::to_string(pkt->Symbol()) << " crc "
+                 << std::to_string(pkt->Crc()) << " bytes: ";
+              for (size_t i = 0; i < pkt->PayloadLength(); i++) {
+                ss << std::to_string((pkt->Data()[i])) << ", ";
+              }
+              ss << std::endl;
+              pkt = reinterpret_cast<const MacPacketPacked*>(
+                  reinterpret_cast<const uint8_t*>(pkt) +
+                  config_->MacPacketLength(Direction::kDownlink));
+            }
+            std::printf("%s\n", ss.str().c_str());
+          }
+
+          const size_t frame_id = pkt->Frame();
+          const bool last_ue =
+              this->mac_to_phy_counters_.CompleteTask(frame_id, 0);
           if (last_ue == true) {
             // schedule this frame's encoding
             // Defer the schedule.  If frames are already deferred or the
@@ -681,7 +736,7 @@ void Agora::Start() {
       // either (a) sufficient packets received for the current frame,
       // or (b) the current frame being updated.
       std::queue<fft_req_tag_t>& cur_fftq =
-          fft_queue_arr_[(this->cur_sche_frame_id_ % kFrameWnd)];
+          fft_queue_arr_.at(this->cur_sche_frame_id_ % kFrameWnd);
       size_t qid = this->cur_sche_frame_id_ & 0x1;
       if (cur_fftq.size() >= config_->FftBlockSize()) {
         size_t num_fft_blocks = cur_fftq.size() / config_->FftBlockSize();
@@ -691,6 +746,8 @@ void Agora::Start() {
           do_fft_task.event_type_ = EventType::kFFT;
 
           for (size_t j = 0; j < config_->FftBlockSize(); j++) {
+            RtAssert(!cur_fftq.empty(),
+                     "Using front element cur_fftq when it is empty");
             do_fft_task.tags_[j] = cur_fftq.front().tag_;
             cur_fftq.pop();
 
@@ -699,7 +756,8 @@ void Agora::Start() {
                                          this->cur_sche_frame_id_);
             }
             this->fft_created_count_++;
-            if (this->fft_created_count_ == rx_counters_.num_pkts_per_frame_) {
+            if (this->fft_created_count_ ==
+                rx_counters_.num_rx_pkts_per_frame_) {
               this->fft_created_count_ = 0;
               if (cfg->BigstationMode() == true) {
                 this->CheckIncrementScheduleFrame(cur_sche_frame_id_,
@@ -1029,32 +1087,33 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
   if (config_->IsPilot(frame_id, symbol_id)) {
     rx_counters_.num_pilot_pkts_[frame_slot]++;
-    if (rx_counters_.num_pilot_pkts_[frame_slot] ==
+    if (rx_counters_.num_pilot_pkts_.at(frame_slot) ==
         rx_counters_.num_pilot_pkts_per_frame_) {
-      rx_counters_.num_pilot_pkts_[frame_slot] = 0;
+      rx_counters_.num_pilot_pkts_.at(frame_slot) = 0;
       this->stats_->MasterSetTsc(TsType::kPilotAllRX, frame_id);
       PrintPerFrameDone(PrintType::kPacketRXPilots, frame_id);
     }
-  } else if (config_->IsCalDlPilot(frame_id, symbol_id) or
+  } else if (config_->IsCalDlPilot(frame_id, symbol_id) ||
              config_->IsCalUlPilot(frame_id, symbol_id)) {
-    if (++rx_counters_.num_reciprocity_pkts_[frame_slot] ==
+    rx_counters_.num_reciprocity_pkts_.at(frame_slot)++;
+    if (rx_counters_.num_reciprocity_pkts_.at(frame_slot) ==
         rx_counters_.num_reciprocity_pkts_per_frame_) {
-      rx_counters_.num_reciprocity_pkts_[frame_slot] = 0;
+      rx_counters_.num_reciprocity_pkts_.at(frame_slot) = 0;
       this->stats_->MasterSetTsc(TsType::kRCAllRX, frame_id);
     }
   }
   // Receive first packet in a frame
-  if (rx_counters_.num_pkts_[frame_slot] == 0) {
+  if (rx_counters_.num_pkts_.at(frame_slot) == 0) {
     if (kEnableMac == false) {
       // schedule this frame's encoding
       // Defer the schedule.  If frames are already deferred or the current
       // received frame is too far off
-      if ((this->encode_deferral_.empty() == false) ||
+      if ((encode_deferral_.empty() == false) ||
           (frame_id >= (this->cur_proc_frame_id_ + kScheduleQueues))) {
         if (kDebugDeferral) {
           std::printf("   +++ Deferring encoding of frame %zu\n", frame_id);
         }
-        this->encode_deferral_.push(frame_id);
+        encode_deferral_.push(frame_id);
       } else {
         ScheduleDownlinkProcessing(frame_id);
       }
@@ -1072,11 +1131,12 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
     }
   }
 
-  rx_counters_.num_pkts_[frame_slot]++;
-  if (rx_counters_.num_pkts_[frame_slot] == rx_counters_.num_pkts_per_frame_) {
+  rx_counters_.num_pkts_.at(frame_slot)++;
+  if (rx_counters_.num_pkts_.at(frame_slot) ==
+      rx_counters_.num_rx_pkts_per_frame_) {
     this->stats_->MasterSetTsc(TsType::kRXDone, frame_id);
     PrintPerFrameDone(PrintType::kPacketRX, frame_id);
-    rx_counters_.num_pkts_[frame_slot] = 0;
+    rx_counters_.num_pkts_.at(frame_slot) = 0;
   }
 }
 
@@ -1387,13 +1447,26 @@ void Agora::InitializeUplinkBuffers() {
       kFrameWnd, cfg->Frame().ClientUlPilotSymbols() * cfg->UeAntNum(),
       Agora_memory::Alignment_t::kAlign64);
 
-  rx_counters_.num_pkts_per_frame_ =
-      cfg->BsAntNum() *
-      (cfg->Frame().NumPilotSyms() + cfg->Frame().NumULSyms() +
-       static_cast<size_t>(cfg->Frame().IsRecCalEnabled()));
   rx_counters_.num_pilot_pkts_per_frame_ =
       cfg->BsAntNum() * cfg->Frame().NumPilotSyms();
-  rx_counters_.num_reciprocity_pkts_per_frame_ = cfg->BsAntNum();
+  // BfAntNum() for each 'L' symbol (no ref node)
+  // RefRadio * NumChannels() for each 'C'.
+  //rx_counters_.num_reciprocity_pkts_per_frame_ = cfg->BsAntNum();
+  const size_t num_rx_ul_cal_antennas = cfg->BfAntNum();
+  // Same as the number of rx reference antennas (ref ant + other channels)
+  const size_t num_rx_dl_cal_antennas = cfg->BsAntNum() - cfg->BfAntNum();
+
+  rx_counters_.num_reciprocity_pkts_per_frame_ =
+      (cfg->Frame().NumULCalSyms() * num_rx_ul_cal_antennas) +
+      (cfg->Frame().NumDLCalSyms() * num_rx_dl_cal_antennas);
+
+  std::printf("Total recip cal receive symbols per frame: %zu\n",
+              rx_counters_.num_reciprocity_pkts_per_frame_);
+
+  rx_counters_.num_rx_pkts_per_frame_ =
+      rx_counters_.num_pilot_pkts_per_frame_ +
+      rx_counters_.num_reciprocity_pkts_per_frame_ +
+      (cfg->BsAntNum() * cfg->Frame().NumULSyms());
 
   fft_created_count_ = 0;
   pilot_fft_counters_.Init(cfg->Frame().NumPilotSyms(), cfg->BsAntNum());
@@ -1611,8 +1684,14 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
     }
     this->cur_proc_frame_id_++;
 
-    if (this->encode_deferral_.empty() == false) {
-      for (size_t encode = 0; encode < kScheduleQueues; encode++) {
+    if (frame_id == (this->config_->FramesToTest() - 1)) {
+      finished = true;
+    } else {
+      // Only schedule up to kScheduleQueues so we don't flood the queues
+      // Cannot access the front() element if the queue is empty
+      for (size_t encode = 0;
+           (encode < kScheduleQueues) && (!encode_deferral_.empty());
+           encode++) {
         const size_t deferred_frame = this->encode_deferral_.front();
         if (deferred_frame < (this->cur_proc_frame_id_ + kScheduleQueues)) {
           if (kDebugDeferral) {
@@ -1628,12 +1707,8 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
           // No need to check the next frame because it is too large
           break;
         }
-      }
-    }
-
-    if (frame_id == (this->config_->FramesToTest() - 1)) {
-      finished = true;
-    }
+      }  // for each encodable frames in kScheduleQueues
+    }    // !finished
   }
   return finished;
 }

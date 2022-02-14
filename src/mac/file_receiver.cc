@@ -66,7 +66,8 @@ size_t FileReceiver::Load(unsigned char *destination, size_t requested_bytes) {
 
       // Check for errors on the stream
       if (!data_stream_) {
-        throw std::runtime_error("[FileReceiver] data stream errors\n");
+        throw std::runtime_error(
+            "[FileReceiver] data stream errors - does the file exist?\n");
       }
       read_attempts++;
     }

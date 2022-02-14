@@ -161,7 +161,8 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id) {
   size_t frame_cal_slot_old = 0;
   size_t frame_grp_id = 0;
   if (cfg_->Frame().IsRecCalEnabled() && frame_id >= TX_FRAME_DELTA) {
-    frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
+    const size_t tx_frame_id = frame_id - TX_FRAME_DELTA;
+    frame_grp_id = tx_frame_id / cfg_->AntGroupNum();
 
     // use the previous window which has a full set of calibration results
     frame_cal_slot = (frame_grp_id + kFrameWnd - 1) % kFrameWnd;

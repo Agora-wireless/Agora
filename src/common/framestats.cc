@@ -154,3 +154,7 @@ size_t FrameStats::GetULSymbolIdx(size_t symbol_number) const {
 size_t FrameStats::GetPilotSymbolIdx(size_t symbol_number) const {
   return FrameStats::GetSymbolIdx(this->pilot_symbols_, symbol_number);
 }
+
+size_t FrameStats::GetDLCalSymbolIdx(size_t symbol_number) const {
+  return FrameStats::GetSymbolIdx(this->dl_cal_symbols_, symbol_number);
+}

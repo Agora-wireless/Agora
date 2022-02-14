@@ -9,7 +9,7 @@
 #include "logger.h"
 #include "nlohmann/json.hpp"
 
-static constexpr size_t kSoapyMakeMaxAttemps = 2;
+static constexpr size_t kSoapyMakeMaxAttempts = 2;
 
 ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   SoapySDR::Kwargs args;
@@ -147,7 +147,7 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
   }
 
   SoapySDR::Device* ue_device = nullptr;
-  for (size_t tries = 0; tries < kSoapyMakeMaxAttemps; tries++) {
+  for (size_t tries = 0; tries < kSoapyMakeMaxAttempts; tries++) {
     try {
       ue_device = SoapySDR::Device::make(args);
       break;
@@ -159,7 +159,7 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
   }
   if (ue_device == nullptr) {
     std::printf("SoapySDR failed to locate the Ue device %s in %zu attempts\n",
-                cfg_->UeRadioId().at(tid).c_str(), kSoapyMakeMaxAttemps);
+                cfg_->UeRadioId().at(tid).c_str(), kSoapyMakeMaxAttempts);
     throw std::runtime_error("SoapySDR failed to locate the Ue device");
   }
   cl_stn_.at(tid) = ue_device;
@@ -416,16 +416,17 @@ int ClientRadioConfig::RadioTx(size_t r /*radio id*/, void** buffs,
 
 int ClientRadioConfig::RadioRx(size_t r /*radio id*/, void** buffs,
                                size_t num_samps, long long& frameTime) {
-  int flags(0);
-  if (r < this->radio_num_) {
+  static constexpr size_t kRxTimeoutuS = 1000000;
+  int rx_flags = SOAPY_SDR_END_BURST;
+  if (r < radio_num_) {
     int ret(0);
     if (cfg_->UeHwFramer()) {
       ret = cl_stn_.at(r)->readStream(this->rx_streams_.at(r), buffs, num_samps,
-                                      flags, frameTime, 1000000);
+                                      rx_flags, frameTime, kRxTimeoutuS);
     } else {
       long long frame_time_ns = 0;
       ret = cl_stn_.at(r)->readStream(this->rx_streams_.at(r), buffs, num_samps,
-                                      flags, frame_time_ns, 1000000);
+                                      rx_flags, frame_time_ns, kRxTimeoutuS);
       frameTime = SoapySDR::timeNsToTicks(frame_time_ns, cfg_->Rate());
     }
     if (kDebugRadioRX) {

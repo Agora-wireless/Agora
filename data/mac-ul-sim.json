@@ -11,8 +11,8 @@
   "demul_block_size": 48,
   "cp_size": 32,
   "ul_mcs" : {
-  	"modulation": "16QAM",
-  	"Zc": 24
+    "modulation": "16QAM",
+    "code_rate": 0.333
   },
   "ofdm_tx_zero_prefix": 160,
   "ofdm_tx_zero_postfix": 160,
