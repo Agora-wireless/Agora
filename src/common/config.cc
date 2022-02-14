@@ -19,6 +19,7 @@ using json = nlohmann::json;
 
 static const size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
+static const size_t kMaxSupportedZc = 256;
 
 Config::Config(const std::string& jsonfile)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -520,6 +521,8 @@ Config::Config(const std::string& jsonfile)
   dl_mcs_params_ = this->Parse(tdd_conf, "dl_mcs");
   this->UpdateDlMCS(dl_mcs_params_);
 
+  this->DumpMcsInfo();
+
   fft_in_rru_ = tdd_conf.value("fft_in_rru", false);
 
   samps_per_symbol_ =
@@ -571,8 +574,8 @@ Config::Config(const std::string& jsonfile)
       "bytes per code block,"
       "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
       "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
-      "\n\tframe time %.3f usec \nUplink Max Mac data tp (Mbps) %.3f "
-      "\nDownlink Max Mac data tp (Mbps) %.3f \n",
+      "\n\tframe time %.3f usec \nUplink Max Mac data per-user tp (Mbps) %.3f "
+      "\nDownlink Max Mac data per-user tp (Mbps) %.3f \n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, ul_modulation_.c_str(),
       dl_modulation_.c_str(), ul_ldpc_config_.NumBlocksInSymbol(),
@@ -606,11 +609,54 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
   ul_mod_order_ = static_cast<size_t>(pow(2, ul_mod_order_bits_));
   InitModulationTable(this->ul_mod_table_, ul_mod_order_);
 
+  double ul_code_rate = ul_mcs.value("code_rate", 0.333);
+  RtAssert(
+      ul_code_rate <= 8.0 / 9.0 && ul_code_rate >= 0.1,
+      "Invalid UL code rate! It must be a real number between 1/10 and 8/9.");
   uint16_t base_graph = ul_mcs.value("base_graph", 1);
-  uint16_t zc = ul_mcs.value("Zc", 72);
   bool early_term = ul_mcs.value("earlyTermination", true);
   int16_t max_decoder_iter = ul_mcs.value("decoderIter", 5);
-  size_t num_rows = ul_mcs.value("nRows", (base_graph == 1) ? 46 : 42);
+
+  // Set of LDPC lifting size Zc, from TS38.212 Table 5.3.2-1
+  std::vector<size_t> zc_vec = {
+      2,   4,   8,   16, 32, 64,  128, 256, 3,   6,   12,  24, 48,
+      96,  192, 384, 5,  10, 20,  40,  80,  160, 320, 7,   14, 28,
+      56,  112, 224, 9,  18, 36,  72,  144, 288, 11,  22,  44, 88,
+      176, 352, 13,  26, 52, 104, 208, 15,  30,  60,  120, 240};
+  std::sort(zc_vec.begin(), zc_vec.end());
+  // According to cyclic_shift.cc cyclic shifter for zc
+  // larger than 256 has not been implemented, so we skip them here.
+  size_t max_zc_index =
+      (std::find(zc_vec.begin(), zc_vec.end(), kMaxSupportedZc) -
+       zc_vec.begin());
+  size_t maxUplinkUncodedBits =
+      size_t(this->OfdmDataNum() * ul_code_rate * ul_mod_order_bits_);
+  size_t zc = SIZE_MAX;
+  size_t i = 0;
+  for (; i < max_zc_index; i++) {
+    if ((zc_vec.at(i) * LdpcNumInputCols(base_graph) * kCbPerSymbol <
+         maxUplinkUncodedBits) &&
+        (zc_vec.at(i + 1) * LdpcNumInputCols(base_graph) * kCbPerSymbol >
+         maxUplinkUncodedBits)) {
+      zc = zc_vec.at(i);
+      break;
+    }
+  }
+  if (zc == SIZE_MAX) {
+    MLPD_WARN(
+        "Exceeded possible range of LDPC lifting Zc for uplink! Setting "
+        "lifting size to max possible value(%zu).\nThis may lead to too many "
+        "unused subcarriers. For better use of the PHY resources, you may "
+        "reduce your coding or modulation rate.",
+        kMaxSupportedZc);
+    zc = kMaxSupportedZc;
+  }
+
+  // Always positive since ul_code_rate is smaller than 1
+  size_t num_rows = static_cast<size_t>(std::round(
+                        LdpcNumInputCols(base_graph) / ul_code_rate)) -
+                    (LdpcNumInputCols(base_graph) - 2);
+
   uint32_t num_cb_len = LdpcNumInputBits(base_graph, zc);
   uint32_t num_cb_codew_len = LdpcNumEncodedBits(base_graph, zc, num_rows);
   ul_ldpc_config_ = LDPCconfig(base_graph, zc, max_decoder_iter, early_term,
@@ -630,11 +676,54 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   dl_mod_order_ = static_cast<size_t>(pow(2, dl_mod_order_bits_));
   InitModulationTable(this->dl_mod_table_, dl_mod_order_);
 
+  double dl_code_rate = dl_mcs.value("code_rate", 0.333);
+  RtAssert(
+      dl_code_rate <= 8.0 / 9.0 && dl_code_rate >= 0.1,
+      "Invalid DL code rate! It must be a real number between 1/10 and 8/9.");
   uint16_t base_graph = dl_mcs.value("base_graph", 1);
-  uint16_t zc = dl_mcs.value("Zc", 68);
   bool early_term = dl_mcs.value("earlyTermination", true);
   int16_t max_decoder_iter = dl_mcs.value("decoderIter", 5);
-  size_t num_rows = dl_mcs.value("nRows", (base_graph == 1) ? 46 : 42);
+
+  // Set of LDPC lifting size Zc, from TS38.212 Table 5.3.2-1
+  std::vector<size_t> zc_vec = {
+      2,   4,   8,   16, 32, 64,  128, 256, 3,   6,   12,  24, 48,
+      96,  192, 384, 5,  10, 20,  40,  80,  160, 320, 7,   14, 28,
+      56,  112, 224, 9,  18, 36,  72,  144, 288, 11,  22,  44, 88,
+      176, 352, 13,  26, 52, 104, 208, 15,  30,  60,  120, 240};
+  std::sort(zc_vec.begin(), zc_vec.end());
+  // According to cyclic_shift.cc cyclic shifter for zc
+  // larger than 256 has not been implemented, so we skip them here.
+  size_t max_zc_index =
+      (std::find(zc_vec.begin(), zc_vec.end(), kMaxSupportedZc) -
+       zc_vec.begin());
+  size_t maxDownlinkUncodedBits =
+      size_t(this->GetOFDMDataNum() * dl_code_rate * dl_mod_order_bits_);
+  size_t zc = SIZE_MAX;
+  size_t i = 0;
+  for (; i < max_zc_index; i++) {
+    if ((zc_vec.at(i) * LdpcNumInputCols(base_graph) * kCbPerSymbol <
+         maxDownlinkUncodedBits) &&
+        (zc_vec.at(i + 1) * LdpcNumInputCols(base_graph) * kCbPerSymbol >
+         maxDownlinkUncodedBits)) {
+      zc = zc_vec.at(i);
+      break;
+    }
+  }
+  if (zc == SIZE_MAX) {
+    MLPD_WARN(
+        "Exceeded possible range of LDPC lifting Zc for downlink! Setting "
+        "lifting size to max possible value(%zu).\nThis may lead to too many "
+        "unused subcarriers. For better use of the PHY resources, you may "
+        "reduce your coding or modulation rate.",
+        kMaxSupportedZc);
+    zc = kMaxSupportedZc;
+  }
+
+  // Always positive since dl_code_rate is smaller than 1
+  size_t num_rows = static_cast<size_t>(std::round(
+                        LdpcNumInputCols(base_graph) / dl_code_rate)) -
+                    (LdpcNumInputCols(base_graph) - 2);
+
   uint32_t num_cb_len = LdpcNumInputBits(base_graph, zc);
   uint32_t num_cb_codew_len = LdpcNumEncodedBits(base_graph, zc, num_rows);
   dl_ldpc_config_ = LDPCconfig(base_graph, zc, max_decoder_iter, early_term,

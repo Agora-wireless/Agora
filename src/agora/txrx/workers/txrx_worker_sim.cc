@@ -14,6 +14,8 @@ static constexpr bool kEnableSlowStart = true;
 static constexpr bool kEnableSlowSending = false;
 static constexpr bool kDebugPrintBeacon = false;
 
+static constexpr size_t kSlowStartThresh1 = kFrameWnd;
+static constexpr size_t kSlowStartThresh2 = (kFrameWnd * 4);
 static constexpr size_t kSlowStartMulStage1 = 32;
 static constexpr size_t kSlowStartMulStage2 = 8;
 
@@ -63,9 +65,7 @@ void TxRxWorkerSim::DoTxRx() {
   const size_t slow_start_tsc1 =
       std::max(kSlowStartMulStage1 * frame_tsc_delta, two_hundred_ms_ticks);
 
-  const size_t slow_start_thresh1 = kFrameWnd;
   const size_t slow_start_tsc2 = kSlowStartMulStage2 * frame_tsc_delta;
-  const size_t slow_start_thresh2 = kFrameWnd * 4;
   size_t delay_tsc = frame_tsc_delta;
 
   if (kEnableSlowStart) {
@@ -87,20 +87,24 @@ void TxRxWorkerSim::DoTxRx() {
     size_t rdtsc_now = GetTime::Rdtsc();
 
     if (rdtsc_now > send_time) {
-      MLPD_INFO(
+      MLPD_SYMBOL(
           "TxRxWorkerSim[%zu]: sending beacon for frame %zu at time %zu\n",
           tid_, tx_frame_id, rdtsc_now);
       SendBeacon(tx_frame_id++);
 
       if (kEnableSlowStart) {
-        if (tx_frame_id == slow_start_thresh1) {
+        if (tx_frame_id == kSlowStartThresh1) {
           delay_tsc = slow_start_tsc2;
-        } else if (tx_frame_id == slow_start_thresh2) {
+          MLPD_TRACE(
+              "TxRxWorkerSim[%zu]: increasing beacon rate at frame %zu time "
+              "%zu\n",
+              tid_, kSlowStartThresh1, rdtsc_now);
+        } else if (tx_frame_id == kSlowStartThresh2) {
           delay_tsc = frame_tsc_delta;
-          if (kEnableSlowSending) {
-            // Temp for historic reasons
-            delay_tsc = frame_tsc_delta * 4;
-          }
+          MLPD_TRACE(
+              "TxRxWorkerSim[%zu]: increasing beacon rate to full speed at "
+              "frame %zu time %zu\n",
+              tid_, kSlowStartThresh2, rdtsc_now);
         }
       }
       tx_frame_start = send_time;

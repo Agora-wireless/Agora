@@ -13,6 +13,7 @@
 #endif
 #include "packet_txrx_radio.h"
 
+static const bool kDebugPrintPacketsFromMac = false;
 static const bool kDebugDeferral = true;
 static const size_t kDefaultMessageQueueSize = 512;
 static const size_t kDefaultWorkerQueueSize = 256;
@@ -38,7 +39,7 @@ Agora::Agora(Config* const cfg)
               directory.c_str(), cfg->FreqGhz());
 
   PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0,
-                      false /* quiet */);
+                      kEnableCoreReuse, false /* quiet */);
   CheckIncrementScheduleFrame(0, ScheduleProcessingFlags::kProcessingComplete);
   // Important to set cur_sche_frame_id_ after the call to
   // CheckIncrementScheduleFrame because it will be incremented however,
@@ -522,9 +523,41 @@ void Agora::Start() {
         } break;
 
         case EventType::kPacketFromMac: {
-          size_t frame_id = rx_mac_tag_t(event.tags_[0]).offset_;
+          // This is an entire frame (multiple mac packets)
+          const size_t ue_id = rx_mac_tag_t(event.tags_[0u]).tid_;
+          const size_t radio_buf_id = rx_mac_tag_t(event.tags_[0u]).offset_;
+          const auto* pkt = reinterpret_cast<const MacPacketPacked*>(
+              &dl_bits_buffer_[ue_id]
+                              [radio_buf_id * config_->MacBytesNumPerframe(
+                                                  Direction::kDownlink)]);
 
-          bool last_ue = this->mac_to_phy_counters_.CompleteTask(frame_id, 0);
+          MLPD_INFO("Agora: frame %d @ offset %zu %zu @ location %zu\n",
+                    pkt->Frame(), ue_id, radio_buf_id,
+                    reinterpret_cast<intptr_t>(pkt));
+
+          if (kDebugPrintPacketsFromMac) {
+            std::stringstream ss;
+
+            for (size_t dl_data_symbol = 0;
+                 dl_data_symbol < config_->Frame().NumDlDataSyms();
+                 dl_data_symbol++) {
+              ss << "Agora: kPacketFromMac, frame " << pkt->Frame()
+                 << ", symbol " << std::to_string(pkt->Symbol()) << " crc "
+                 << std::to_string(pkt->Crc()) << " bytes: ";
+              for (size_t i = 0; i < pkt->PayloadLength(); i++) {
+                ss << std::to_string((pkt->Data()[i])) << ", ";
+              }
+              ss << std::endl;
+              pkt = reinterpret_cast<const MacPacketPacked*>(
+                  reinterpret_cast<const uint8_t*>(pkt) +
+                  config_->MacPacketLength(Direction::kDownlink));
+            }
+            std::printf("%s\n", ss.str().c_str());
+          }
+
+          const size_t frame_id = pkt->Frame();
+          const bool last_ue =
+              this->mac_to_phy_counters_.CompleteTask(frame_id, 0);
           if (last_ue == true) {
             // schedule this frame's encoding
             // Defer the schedule.  If frames are already deferred or the
@@ -713,6 +746,8 @@ void Agora::Start() {
           do_fft_task.event_type_ = EventType::kFFT;
 
           for (size_t j = 0; j < config_->FftBlockSize(); j++) {
+            RtAssert(!cur_fftq.empty(),
+                     "Using front element cur_fftq when it is empty");
             do_fft_task.tags_[j] = cur_fftq.front().tag_;
             cur_fftq.pop();
 
@@ -1657,8 +1692,14 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
     }
     this->cur_proc_frame_id_++;
 
-    if (this->encode_deferral_.empty() == false) {
-      for (size_t encode = 0; encode < kScheduleQueues; encode++) {
+    if (frame_id == (this->config_->FramesToTest() - 1)) {
+      finished = true;
+    } else {
+      // Only schedule up to kScheduleQueues so we don't flood the queues
+      // Cannot access the front() element if the queue is empty
+      for (size_t encode = 0;
+           (encode < kScheduleQueues) && (!encode_deferral_.empty());
+           encode++) {
         const size_t deferred_frame = this->encode_deferral_.front();
         if (deferred_frame < (this->cur_proc_frame_id_ + kScheduleQueues)) {
           if (kDebugDeferral) {
@@ -1674,12 +1715,8 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
           // No need to check the next frame because it is too large
           break;
         }
-      }
-    }
-
-    if (frame_id == (this->config_->FramesToTest() - 1)) {
-      finished = true;
-    }
+      }  // for each encodable frames in kScheduleQueues
+    }    // !finished
   }
   return finished;
 }
