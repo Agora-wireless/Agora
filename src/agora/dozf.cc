@@ -182,11 +182,6 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id,
             calib_ul_msum_buffer_[frame_cal_slot]),
         cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
 
-    if (frame_id == frames_to_complete) {
-      std::printf("ComputeCalib Frame %zu, sc_id %zu, is update? %d\n",
-                  frame_id, sc_id, frame_update);
-    }
-
     // Update the moving sum
     if (frame_update) {
       // Add the most recently completed value
@@ -220,6 +215,14 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id,
           reinterpret_cast<arma::cx_float*>(
               calib_ul_msum_buffer_[frame_cal_slot_prev]),
           cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
+
+      if (sc_id == 0) {
+        MLPD_TRACE(
+            "DoZF[%d]: (Frame %zu, sc_id %zu), ComputeCalib updating calib at "
+            "slot %zu : prev %zu, old %zu\n",
+            tid_, frame_id, sc_id, frame_cal_slot, frame_cal_slot_prev,
+            frame_cal_slot_old);
+      }
 
       // Add new value to old rolling sum.  Then subtract out the oldest.
       cur_calib_dl_msum_mat.row(sc_id) =

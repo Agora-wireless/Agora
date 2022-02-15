@@ -28,10 +28,8 @@ TxRxWorkerHw::TxRxWorkerHw(
                  can_proceed),
       radio_config_(radio_config),
       program_start_ticks_(0),
-      freq_ghz_(GetTime::MeasureRdtscFreq()) {
-  std::vector<std::complex<int16_t>> zeros_(Configuration()->SampsPerSymbol(),
-                                            std::complex<int16_t>(0, 0));
-}
+      freq_ghz_(GetTime::MeasureRdtscFreq()),
+      zeros_(config->SampsPerSymbol(), std::complex<int16_t>(0u, 0u)) {}
 
 TxRxWorkerHw::~TxRxWorkerHw() = default;
 
@@ -71,6 +69,7 @@ void TxRxWorkerHw::DoTxRx() {
 
   // Schedule TX_FRAME_DELTA transmit frames ( B + C + L + D )
   ScheduleTxInit(TX_FRAME_DELTA, time0);
+  MLPD_FRAME("TxRxWorkerHw[%zu]: Tx init\n", tid_);
 
   // Agora will generate Tx data only after the first Rx............. (Typically the pilots from the UEs)
   //  The first Rx will happen based on a Hw trigger
@@ -223,7 +222,7 @@ std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
     }
   } else if (rx_status < 0) {
     MLPD_ERROR(
-        "TxRxWorkerHw[%zu], Interface %zu | Radio %zu - Rx failure RX "
+        "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
         "status = %d is less than 0\n",
         tid_, interface_id, interface_id + interface_offset_, rx_status);
   }
@@ -751,6 +750,8 @@ void TxRxWorkerHw::ScheduleTxInit(size_t frames_to_schedule, long long time0) {
   for (size_t frame = 0; frame < TX_FRAME_DELTA; frame++) {
     for (size_t radio = interface_offset_;
          radio < (interface_offset_ + num_interfaces_); radio++) {
+      MLPD_TRACE("TxRxWorkerHw[%zu]: Scheduling frame %zu on interface %zu\n",
+                 tid_, frame, radio);
       if (Configuration()->HwFramer() == false) {
         TxBeaconHw(frame, radio, time0);
       }
@@ -767,6 +768,10 @@ void TxRxWorkerHw::ScheduleTxInit(size_t frames_to_schedule, long long time0) {
 // All DL symbols
 void TxRxWorkerHw::TxDownlinkZeros(size_t frame_id, size_t radio_id,
                                    long long time0) {
+  MLPD_FRAME(
+      "TxRxWorkerHw[%zu]: TxDownlinkZeros frame %zu, interface %zu, time "
+      "%lld\n",
+      tid_, frame_id, radio_id, time0);
   //Pointing to the same tx location
   std::vector<const void*> tx_buffs(Configuration()->NumChannels(),
                                     zeros_.data());
@@ -775,6 +780,11 @@ void TxRxWorkerHw::TxDownlinkZeros(size_t frame_id, size_t radio_id,
        dl_sym_idx++) {
     const size_t tx_symbol_id =
         Configuration()->Frame().GetDLSymbol(dl_sym_idx);
+
+    MLPD_TRACE(
+        "TxRxWorkerHw[%zu]: TxDownlinkZeros frame %zu, symbol %zu:%zu, "
+        "interface %zu, time %lld\n",
+        tid_, frame_id, dl_sym_idx, tx_symbol_id, radio_id, time0);
     long long frame_time = 0;
     if (Configuration()->HwFramer() == false) {
       frame_time =
@@ -782,17 +792,20 @@ void TxRxWorkerHw::TxDownlinkZeros(size_t frame_id, size_t radio_id,
                    (((frame_id)*Configuration()->Frame().NumTotalSyms()) +
                     tx_symbol_id));
     } else {
-      frame_time = ((long long)(frame_id) << 32) | (tx_symbol_id << 16);
+      frame_time =
+          (static_cast<long long>(frame_id) << 32) | (tx_symbol_id << 16);
     }
 
+    const int tx_flags = GetTxFlags(radio_id, tx_symbol_id);
+
     const int tx_ret =
-        radio_config_.RadioTx(radio_id, tx_buffs.data(),
-                              GetTxFlags(radio_id, tx_symbol_id), frame_time);
+        radio_config_.RadioTx(radio_id, tx_buffs.data(), tx_flags, frame_time);
 
     if (tx_ret != static_cast<int>(Configuration()->SampsPerSymbol())) {
       std::cerr << "BAD Transmit on radio " << radio_id << " - status "
                 << tx_ret << ",  expected " << Configuration()->SampsPerSymbol()
-                << " at Time " << frame_time << std::endl;
+                << " at Time " << frame_time << " with flags " << tx_flags
+                << std::endl;
     }
-  }
+  }  // end for all symbols
 }

@@ -143,7 +143,7 @@ class Config {
     if ((frame_.IsRecCalEnabled() == false) || (frame_.NumDLCalSyms() == 0)) {
       return 0;
     } else {
-      assert(bf_ant_num_ % frame_.NumDLCalSyms());
+      assert((bf_ant_num_ % frame_.NumDLCalSyms()) == 0);
       return bf_ant_num_ / frame_.NumDLCalSyms();
     }
   }
