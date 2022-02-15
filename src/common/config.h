@@ -140,8 +140,12 @@ class Config {
   // Returns the number of frames to obtain a full set of RecipCal data
   // assumes that bf_ant_num_ % frame_.NumDLCalSyms() == 0
   inline size_t RecipCalFrameCnt() const {
-    assert(bf_ant_num_ % frame_.NumDLCalSyms());
-    return bf_ant_num_ / frame_.NumDLCalSyms();
+    if ((frame_.IsRecCalEnabled() == false) || (frame_.NumDLCalSyms() == 0)) {
+      return 0;
+    } else {
+      assert(bf_ant_num_ % frame_.NumDLCalSyms());
+      return bf_ant_num_ / frame_.NumDLCalSyms();
+    }
   }
 
   inline size_t CoreOffset() const { return this->core_offset_; }

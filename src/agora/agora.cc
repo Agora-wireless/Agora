@@ -1522,22 +1522,29 @@ void Agora::InitializeDownlinkBuffers() {
     dl_ifft_buffer_.Calloc(config_->BsAntNum() * task_buffer_symbol_num,
                            config_->OfdmCaNum(),
                            Agora_memory::Alignment_t::kAlign64);
-    calib_dl_buffer_.Calloc(kFrameWnd,
+    calib_dl_buffer_.Malloc(kFrameWnd,
                             config_->BfAntNum() * config_->OfdmDataNum(),
                             Agora_memory::Alignment_t::kAlign64);
-    calib_ul_buffer_.Calloc(kFrameWnd,
+    calib_ul_buffer_.Malloc(kFrameWnd,
                             config_->BfAntNum() * config_->OfdmDataNum(),
                             Agora_memory::Alignment_t::kAlign64);
-    calib_dl_msum_buffer_.Calloc(kFrameWnd,
+    calib_dl_msum_buffer_.Malloc(kFrameWnd,
                                  config_->BfAntNum() * config_->OfdmDataNum(),
                                  Agora_memory::Alignment_t::kAlign64);
-    calib_ul_msum_buffer_.Calloc(kFrameWnd,
+    calib_ul_msum_buffer_.Malloc(kFrameWnd,
                                  config_->BfAntNum() * config_->OfdmDataNum(),
                                  Agora_memory::Alignment_t::kAlign64);
-    // initialize the content of the last window to 1
-    for (size_t i = 0; i < config_->OfdmDataNum() * config_->BfAntNum(); i++) {
-      calib_dl_buffer_[kFrameWnd - 1][i] = {1, 0};
-      calib_ul_buffer_[kFrameWnd - 1][i] = {1, 0};
+    //initialize the calib buffers
+    const complex_float complex_init = {0.0f, 0.0f};
+    //const complex_float complex_init = {1.0f, 0.0f};
+    for (size_t frame = 0u; frame < kFrameWnd; frame++) {
+      for (size_t i = 0; i < (config_->OfdmDataNum() * config_->BfAntNum());
+           i++) {
+        calib_dl_buffer_[frame][i] = complex_init;
+        calib_ul_buffer_[frame][i] = complex_init;
+        calib_dl_msum_buffer_[frame][i] = complex_init;
+        calib_ul_msum_buffer_[frame][i] = complex_init;
+      }
     }
     dl_mod_bits_buffer_.Calloc(
         task_buffer_symbol_num,
