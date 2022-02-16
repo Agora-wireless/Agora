@@ -227,7 +227,7 @@ EventData DoFFT::Launch(size_t tag) {
 
       complex_float* calib_dl_ptr =
           &calib_dl_buffer_[cal_index][pilot_tx_ant * cfg_->OfdmDataNum()];
-      PartialTranspose(calib_dl_ptr, ant_id, sym_type);
+      PartialTranspose(calib_dl_ptr, pilot_tx_ant, sym_type);
       phy_stats_->UpdateCalibPilotSnr(cal_index, 0, pilot_tx_ant, fft_inout_);
     }
     RtAssert(

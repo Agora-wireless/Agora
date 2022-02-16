@@ -160,7 +160,7 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
 }
 
 // Called for each frame_id / sc_id
-// Updates calib_gather_buffer_
+// Updates calib_sc_vec
 void DoZF::ComputeCalib(size_t frame_id, size_t sc_id,
                         arma::cx_fvec& calib_sc_vec) {
   const size_t frames_to_complete = cfg_->RecipCalFrameCnt();

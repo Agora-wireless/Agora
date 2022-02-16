@@ -418,7 +418,7 @@ Config::Config(const std::string& jsonfile)
             frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
 
   if (frame_.IsRecCalEnabled()) {
-    RtAssert(bf_ant_num_ > frame_.NumDLCalSyms(),
+    RtAssert(bf_ant_num_ >= frame_.NumDLCalSyms(),
              "Too many DL Cal symbols for the number of base station antennas");
 
     RtAssert(((bf_ant_num_ % frame_.NumDLCalSyms()) == 0),
