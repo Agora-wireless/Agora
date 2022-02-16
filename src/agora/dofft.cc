@@ -200,6 +200,11 @@ EventData DoFFT::Launch(size_t tag) {
     // for consistency with calib downlink processing.
     const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, ant_id);
     if (cal_index != SIZE_MAX) {
+      MLPD_TRACE(
+          "DoFFT[%d]: (Frame %zu Symbol %zu Ant %zu) - Received a CalUl symbol "
+          "for current cal index %zu\n",
+          tid_, frame_id, symbol_id, ant_id, cal_index);
+
       complex_float* calib_ul_ptr =
           &calib_ul_buffer_[cal_index][ant_id * cfg_->OfdmDataNum()];
 
@@ -210,9 +215,15 @@ EventData DoFFT::Launch(size_t tag) {
              "Received a Cal Ul symbol for an antenna on the reference radio");
   } else if (sym_type == SymbolType::kCalDL) {
     if (ant_id == cfg_->RefAnt(cell_id)) {
-      //Find out what antenna transmitted a pilot on this symbol
+      //Find out what antenna transmitted a pilot on this symbol 'C'
       const size_t pilot_tx_ant = cfg_->RecipCalDlAnt(frame_id, symbol_id);
       const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, pilot_tx_ant);
+
+      MLPD_TRACE(
+          "DoFFT[%d]: (Frame %zu Symbol %zu Ant %zu) - Received a CalDL "
+          "symbol for current cal index %zu\n",
+          tid_, frame_id, symbol_id, pilot_tx_ant, cal_index);
+      RtAssert(cal_index != SIZE_MAX, "Out of bounds index");
 
       complex_float* calib_dl_ptr =
           &calib_dl_buffer_[cal_index][pilot_tx_ant * cfg_->OfdmDataNum()];

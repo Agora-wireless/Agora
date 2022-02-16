@@ -33,6 +33,7 @@
 
 class Config {
  public:
+  static constexpr bool kDebugRecipCal = false;
   // Constructor
   explicit Config(const std::string& /*jsonfile*/);
   ~Config();
@@ -114,26 +115,38 @@ class Config {
                                  frame_.GetDLCalSymbolIdx(dl_cal_symbol);
 
     const size_t tx_ant = dl_cal_offset % bf_ant_num_;
-    //std::printf("RecipCalDlAnt (Frame %zu, Symbol %zu) tx antenna %zu\n",
-    //            frame_id, dl_cal_symbol, tx_ant);
+
+    if (kDebugRecipCal) {
+      std::printf("RecipCalDlAnt (Frame %zu, Symbol %zu) tx antenna %zu\n",
+                  frame_id, dl_cal_symbol, tx_ant);
+    }
     return (tx_ant);
   };
 
   // Returns the cal index if ant tx dl cal pilots this frame
   // SIZE_MAX otherwise
   inline size_t RecipCalUlRxIndex(size_t frame_id, size_t ant) const {
+    const size_t num_frames_for_full_cal = RecipCalFrameCnt();
+    const size_t num_cal_per_idx = frame_.NumDLCalSyms();
+    const size_t cal_offset = (frame_id % num_frames_for_full_cal);
+    const size_t tx_ant_start = cal_offset * num_cal_per_idx;
+    const size_t tx_ant_end = tx_ant_start + (num_cal_per_idx - 1);
+
     size_t cal_ind;
-    const size_t num_frames_for_full_cal = bf_ant_num_ / frame_.NumDLCalSyms();
-    const size_t frame_cal_idx = frame_id / num_frames_for_full_cal;
-    const size_t tx_ant_start = frame_id % num_frames_for_full_cal;
-    const size_t tx_ant_end = tx_ant_start + (frame_.NumDLCalSyms() - 1);
     if ((ant >= tx_ant_start) && (ant <= tx_ant_end)) {
-      cal_ind = frame_cal_idx % kFrameWnd;
+      const size_t frame_cal_idx = frame_id / num_frames_for_full_cal;
+      cal_ind = (frame_cal_idx % kFrameWnd);
     } else {
       cal_ind = SIZE_MAX;
     }
-    //std::printf("RecipCalUlRxIndex (Frame %zu, Antenna %zu) index %zu\n",
-    //            frame_id, ant, cal_ind);
+
+    if (kDebugRecipCal) {
+      std::printf(
+          "RecipCalUlRxIndex (Frame %zu, Antenna %zu) index %zu - Start %zu, "
+          "End %zu, full %zu\n",
+          frame_id, ant, cal_ind, tx_ant_start, tx_ant_end,
+          num_frames_for_full_cal);
+    }
     return (cal_ind);
   };
 

@@ -350,6 +350,12 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
       const size_t calib_radio = calib_antenna / channels_per_interface_;
       const size_t channel_offset = calib_antenna % channels_per_interface_;
 
+      MLPD_FRAME(
+          "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
+          "%zu, Radio %zu) dl pilot tx has data %d on channel %zu\n",
+          tid_, frame_id, tx_symbol_id, radio_id, calib_radio == radio_id,
+          channel_offset);
+
       if (calib_radio == radio_id) {
         caldltxbuf.at(channel_offset) = Configuration()->PilotCi16().data();
       }
@@ -372,12 +378,6 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
                   << Configuration()->SampsPerSymbol() << " at Time "
                   << frame_time << std::endl;
       }
-
-      MLPD_TRACE(
-          "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
-          "%zu, Radio %zu) dl pilot tx has data %d on channel %zu\n",
-          tid_, frame_id, tx_symbol_id, radio_id, calib_radio == radio_id,
-          channel_offset);
 
       // Reset the caldltxbuf to zeros for next loop
       if (calib_radio == radio_id) {
@@ -427,7 +427,7 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
           TxBeaconHw(tx_frame_id, radio_id, time0);
         }
 
-        if (Configuration()->Frame().IsRecCalEnabled() == true) {
+        if (Configuration()->Frame().IsRecCalEnabled()) {
           TxReciprocityCalibPilots(tx_frame_id, radio_id, time0);
         }
       }

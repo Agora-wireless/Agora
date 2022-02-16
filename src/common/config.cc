@@ -157,15 +157,6 @@ Config::Config(const std::string& jsonfile)
     RtAssert(num_radios_ != 0, "Error: No radios exist in Argos mode");
   }
 
-  if (frame_.NumDLCalSyms() > 0) {
-    RtAssert(bf_ant_num_ > frame_.NumDLCalSyms(),
-             "Too many DL Cal symbols for the number of base station antennas");
-
-    RtAssert(bf_ant_num_ % frame_.NumDLCalSyms(),
-             "Number of Downlink calibration symbols per frame must complete "
-             "calibration on frame boundary!");
-  }
-
   /* radio configurations */
   freq_ = tdd_conf.value("frequency", 3.6e9);
   single_gain_ = tdd_conf.value("single_gain", true);
@@ -426,6 +417,15 @@ Config::Config(const std::string& jsonfile)
   MLPD_INFO("Config: Frame schedule %s (%zu symbols)\n",
             frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
 
+  if (frame_.IsRecCalEnabled()) {
+    RtAssert(bf_ant_num_ > frame_.NumDLCalSyms(),
+             "Too many DL Cal symbols for the number of base station antennas");
+
+    RtAssert(((bf_ant_num_ % frame_.NumDLCalSyms()) == 0),
+             "Number of Downlink calibration symbols per frame must complete "
+             "calibration on frame boundary!");
+  }
+
   // Check for frame validity.
   // We should remove the restriction of the beacon symbol placement when tested
   // more thoroughly
@@ -565,17 +565,18 @@ Config::Config(const std::string& jsonfile)
 
   this->running_.store(true);
   MLPD_INFO(
-      "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
-      "frame,\n\t%zu uplink data symbols per frame, %zu downlink data "
-      "symbols per frame,\n\t%zu OFDM subcarriers (%zu data subcarriers), "
-      "\n\tUL modulation %s, DL modulation %s,\n\t%zu UL codeblocks per "
-      "symbol, "
-      "%zu UL bytes per code block,\n\t%zu DL codeblocks per symbol, %zu DL "
-      "bytes per code block,"
-      "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
-      "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
-      "\n\tframe time %.3f usec \nUplink Max Mac data per-user tp (Mbps) %.3f "
-      "\nDownlink Max Mac data per-user tp (Mbps) %.3f \n",
+      "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per frame,\n"
+      "\t%zu uplink data symbols per frame, %zu downlink data symbols per "
+      "frame,\n"
+      "\t%zu OFDM subcarriers (%zu data subcarriers),\n"
+      "\tUL modulation %s, DL modulation %s,\n\t%zu UL codeblocks per symbol, "
+      "%zu UL bytes per code block,\n"
+      "\t%zu DL codeblocks per symbol, %zu DL bytes per code block,\n"
+      "\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame,\n"
+      "\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame,\n"
+      "\tFrame time %.3f usec\n"
+      "Uplink Max Mac data per-user tp (Mbps) %.3f\n"
+      "Downlink Max Mac data per-user tp (Mbps) %.3f \n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, ul_modulation_.c_str(),
       dl_modulation_.c_str(), ul_ldpc_config_.NumBlocksInSymbol(),
@@ -587,6 +588,13 @@ Config::Config(const std::string& jsonfile)
           (this->GetFrameDurationSec() * 1e6),
       (dl_mac_data_bytes_num_perframe_ * 8.0f) /
           (this->GetFrameDurationSec() * 1e6));
+
+  if (frame_.IsRecCalEnabled()) {
+    MLPD_INFO(
+        "Reciprical Calibration Enabled.  Full calibration data ready every "
+        "%zu frame(s) using %zu symbols per frame\n",
+        RecipCalFrameCnt(), frame_.NumDLCalSyms());
+  }
   Print();
 }
 
