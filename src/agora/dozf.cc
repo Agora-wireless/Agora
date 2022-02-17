@@ -133,9 +133,10 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     mat_dl_zf_tmp *= scale;
 
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
-      if (cfg_->ExternalRefNode(i) == true) {
+      if (cfg_->ExternalRefNode(i)) {
+        // Zero out all antennas on the reference radio
         mat_dl_zf_tmp.insert_cols(
-            cfg_->RefAnt(i),
+            (cfg_->RefRadio(i) * cfg_->NumChannels()),
             arma::cx_fmat(cfg_->UeAntNum(), cfg_->NumChannels(),
                           arma::fill::zeros));
       }
@@ -147,8 +148,9 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
     if (cfg_->ExternalRefNode(i) == true) {
       mat_ul_zf_tmp.insert_cols(
-          cfg_->RefAnt(i), arma::cx_fmat(cfg_->UeAntNum(), cfg_->NumChannels(),
-                                         arma::fill::zeros));
+          (cfg_->RefRadio(i) * cfg_->NumChannels()),
+          arma::cx_fmat(cfg_->UeAntNum(), cfg_->NumChannels(),
+                        arma::fill::zeros));
     }
   }
   mat_ul_zf = mat_ul_zf_tmp;
