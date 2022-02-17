@@ -91,8 +91,10 @@ if [ ${ONLY_SINGLE_SERVER} == "all" ]; then
   for (( i=0; i<${hydra_server_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --argjson i $i '. | keys | .[$i]' | tr -d '"')
     hydra_tmp_dir[$i]=$(ssh -oStrictHostKeyChecking=no ${server_name} "mktemp -d")
-    (scp -oStrictHostKeyChecking=no -r ${hydra_root_dir} ${server_name}:${hydra_tmp_dir[$i]}/ > /dev/null 2>&1; \
-      echo "${server_name} copy complete") &
+    # (scp -oStrictHostKeyChecking=no -r ${hydra_root_dir} ${server_name}:${hydra_tmp_dir[$i]}/ > /dev/null 2>&1; \
+    #   echo "${server_name} copy complete") &
+    (rsync -a --exclude '*.bin' --exclude '*.git/*' ${hydra_root_dir} ${server_name}:${hydra_tmp_dir[$i]}/ > /dev/null 2>&1; \
+      echo "${server_name} rsync complete") &
   done
   wait
   if [ "${RUN_SERVER_INIT}" == 1 ]; then
@@ -116,21 +118,24 @@ if [ ${ONLY_SINGLE_SERVER} == "all" ]; then
       echo "${server_name} installation complete") &
   done
   wait
+  echocyan "All remote servers installation complete. Check /tmp/Hydra/install_{server_name}.log for details"
 # If ONLY_SERVER_SERVER is not "all", install on the only server named ${ONLY_SERVER_SERVER}
 else
   server_name=${ONLY_SINGLE_SERVER}
   echocyan "Copying Hydra codebase to ${server_name}"
   hydra_tmp_dir=$(ssh -oStrictHostKeyChecking=no ${server_name} "mktemp -d")
-  scp -oStrictHostKeyChecking=no -r ${hydra_root_dir} ${server_name}:${hydra_tmp_dir}/ > /dev/null
+  # scp -oStrictHostKeyChecking=no -r ${hydra_root_dir} ${server_name}:${hydra_tmp_dir}/ > /dev/null 2>&1
+  rsync -a --exclude '*.bin' --exclude '*.git/*' ${hydra_root_dir} ${server_name}:${hydra_tmp_dir}/ > /dev/null 2>&1
   if [ "${RUN_SERVER_INIT}" == 1 ]; then
     echocyan "Initialize server setup on ${server_name}"
     ssh -oStrictHostKeyChecking=no ${server_name} "cd ${hydra_tmp_dir}/Agora; \
-      ./scripts/system/server_init.sh" > /tmp/Hydra/init_${server_name}.log
+      ./scripts/system/server_init.sh" > /tmp/Hydra/init_${server_name}.log 2&>1
   fi
   echocyan "Install dependent packages and Hydra application on ${server_name}"
   ssh -oStrictHostKeyChecking=no ${server_name} "mkdir -p ${HYDRA_RUNNER_ROOT}; \
     cd ${HYDRA_RUNNER_ROOT}; cp -r ${hydra_tmp_dir}/Agora ./; rm -rf ${hydra_tmp_dir}/Agora; cd Agora; \
     INSTALL_HYDRA_PKGS_SYSTEM_LEVEL=${INSTALL_HYDRA_PKGS_SYSTEM_LEVEL} \
     ./scripts/install/install_all.sh"
-  scp -oStrictHostKeyChecking=no ${server_name}:/tmp/Hydra/install.log /tmp/Hydra/install_${server_name}.log
+  scp -oStrictHostKeyChecking=no ${server_name}:/tmp/Hydra/install.log /tmp/Hydra/install_${server_name}.log > /dev/null 2>&1
+  echocyan "${server_name} installation complete. Please check /tmp/Hydra/install_${server_name}.log for details"
 fi

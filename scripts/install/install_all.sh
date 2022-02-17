@@ -34,11 +34,11 @@ mkdir -p /tmp/Hydra
 # Check whether system packages are installed
 # If not, report en error
 function check_sys_pkgs() {
-  systemPkgs=(g++ cmake make liblapack-dev libblas-dev libboost-all-dev \
-    libnuma-dev libgflags-dev libgtest-dev swig python-numpy python-pyqt5 \
-    libpython-dev python3-pip build-essential gcc libudev-dev libnl-3-dev \
-    libnl-route-3-dev ninja-build pkg-config valgrind python3-dev \
-    cython3 python3-docutils pandoc jq rsync)
+  systemPkgs=(g++ cmake make liblapack-dev libblas-dev \
+    libboost-all-dev libnuma-dev python3-pip build-essential \
+    gcc libudev-dev libnl-3-dev libnl-route-3-dev ninja-build \
+    pkg-config valgrind python3-dev cython3 python3-docutils \
+    pandoc jq rsync)
   for pkg in ${systemPkgs[@]}; do
     checkpkg ${pkg}
     if [ ${checkpkg_res} == "0" ]; then
@@ -61,11 +61,11 @@ function check_sys_pkgs() {
 function install_sys_pkgs() {
   echo "[$(hostname)] Downloading required system packages"
   sudo apt-get update >> /tmp/Hydra/install.log 2>&1
-  sudo apt-get install -y g++ cmake make liblapack-dev libblas-dev libboost-all-dev \
-    libnuma-dev libgflags-dev libgtest-dev swig python-numpy python-pyqt5 \
-    libpython-dev python3-pip build-essential gcc libudev-dev libnl-3-dev \
-    libnl-route-3-dev ninja-build pkg-config valgrind python3-dev \
-    cython3 python3-docutils pandoc jq rsync >> /tmp/Hydra/install.log 2>&1
+  sudo apt-get install -y g++ cmake make liblapack-dev libblas-dev \
+    libboost-all-dev libnuma-dev python3-pip build-essential gcc \
+    libudev-dev libnl-3-dev libnl-route-3-dev ninja-build \
+    pkg-config valgrind python3-dev cython3 python3-docutils pandoc \
+    jq rsync >> /tmp/Hydra/install.log 2>&1
   sudo pip3 install meson >> /tmp/Hydra/install.log 2>&1
 }
 
@@ -84,7 +84,7 @@ function install_nlohmann() {
   echo "[$(hostname)] Downloading and building nlohmann json"
   eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
   eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
-  git clone --depth=1 https://github.com/nlohmann/json.git >> /tmp/Hydra/install.log 
+  git clone --depth=1 https://github.com/nlohmann/json.git >> /tmp/Hydra/install.log 2>&1
   cd json
   mkdir build
   cd build
@@ -95,21 +95,6 @@ function install_nlohmann() {
   rm -rf json
 }
 
-function install_soapysdr() {
-  echo "[$(hostname)] Downloading and building Soapy SDR"
-  eval "mkdir -p ${HYDRA_RUNNER_ROOT}/tmp"
-  eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
-  git clone --depth=1 https://github.com/pothosware/SoapySDR.git >> /tmp/Hydra/install.log 2>&1
-  cd SoapySDR
-  mkdir build
-  cd build
-  eval "cmake .. -DCMAKE_INSTALL_PREFIX:PATH=${HYDRA_RUNNER_ROOT}/SoapySDR/" >> /tmp/Hydra/install.log 2>&1
-  make -j >> /tmp/Hydra/install.log 2>&1
-  make install >> /tmp/Hydra/install.log 2>&1
-  eval "cd ${HYDRA_RUNNER_ROOT}/tmp"
-  rm -rf SoapySDR
-}
-
 # Check whether DPDK lib is installed on this server
 #    by checking RTE_SDK variable and necessary files in RTE_SDK directory
 function check_dpdk() {
@@ -117,15 +102,15 @@ function check_dpdk() {
   if [ -z "${RTE_SDK}" ]; then
     dpdk_detected=0
   fi
-  res=$(ls ${RTE_SDK}/build/install/usr/local/include/rte_common.h) > /dev/null 2>&1 || :
+  res=$(ls ${RTE_SDK}/build/install/usr/local/include/rte_common.h 2> /dev/null) || :
   if [ "$?" != "0" ]; then
     dpdk_detected=0
   fi
-  res=$(ls ${RTE_SDK}/build/install/usr/local/lib/x86_64-linux-gnu/librte_common_mlx5.a) > /dev/null 2>&1 || :
+  res=$(ls ${RTE_SDK}/build/install/usr/local/lib/x86_64-linux-gnu/librte_common_mlx5.a 2> /dev/null) || :
   if [ "$?" != "0" ]; then
     dpdk_detected=0
   fi
-  res=$(cat ${RTE_SDK}/VERSION) > /dev/null 2>&1 || :
+  res=$(cat ${RTE_SDK}/VERSION 2> /dev/null) || :
   if [ "$?" != "0" ]; then
     dpdk_detected=0
   fi
@@ -195,10 +180,9 @@ fi
 # Verify that system-level packages are installed
 check_sys_pkgs
 
-# Install armadillo, nlohmann JSON, Soapy SDR, Intel lib, and RDMA core
+# Install armadillo, nlohmann JSON, Intel lib, and RDMA core
 install_armadillo
 install_nlohmann
-install_soapysdr
 install_intel_lib
 install_rdma_core
 

@@ -5,11 +5,11 @@ set -e
 # Create config for servers running RRU traffic generator
 sc_num_list=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.subcarrier_num_list')
 sc_block_list=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.subcarrier_block_list')
-dc_thread_list=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.decode_thread_num')
+cd_thread_list=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.coding_thread_num')
 for (( i=0; i<${hydra_rru_num}; i++ )) do
   cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson list "${sc_num_list}" '.subcarrier_num_list=$list' | \
     jq --argjson list "${sc_block_list}" '.subcarrier_block_list=$list' | \
-    jq --argjson list "${dc_thread_list}" '.decode_thread_num=$list' > tmp_0.json
+    jq --argjson list "${cd_thread_list}" '.coding_thread_num=$list' > tmp_0.json
   for (( j=0; j<${hydra_rru_num}; j++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson j $j '.rru_servers[$j]' | tr -d '"')
     unset list_idx
@@ -61,7 +61,7 @@ done
 for (( i=0; i<${hydra_app_num}; i++ )) do
   cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson list "${sc_num_list}" '.subcarrier_num_list=$list' | \
     jq --argjson list "${sc_block_list}" '.subcarrier_block_list=$list' | \
-    jq --argjson list "${dc_thread_list}" '.decode_thread_num=$list' > tmp_0.json
+    jq --argjson list "${cd_thread_list}" '.coding_thread_num=$list' > tmp_0.json
   for (( j=0; j<${hydra_rru_num}; j++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson j $j '.rru_servers[$j]' | tr -d '"')
     unset list_idx

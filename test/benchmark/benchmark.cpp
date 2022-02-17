@@ -15,7 +15,7 @@
 #include <armadillo>
 #include <bitset>
 #include <fstream>
-#include <gflags/gflags.h>
+// #include <gflags/gflags.h>
 #include <immintrin.h>
 #include <iostream>
 #include <malloc.h>
@@ -39,9 +39,9 @@ static constexpr float kZc = 72;
 static constexpr float kNumIterations = 1000;
 static constexpr float kZFIterations = 100;
 
-DEFINE_string(conf_file,
-    TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
-    "Agora config filename");
+// DEFINE_string(conf_file,
+//     TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
+//     "Agora config filename");
 
 Config *cfg;
 
@@ -427,8 +427,21 @@ void run_decode(Table<int8_t>& input, Table<int8_t>& output,
 
 int main(int argc, char **argv)
 {
-    gflags::ParseCommandLineFlags(&argc, &argv, true);
-    cfg = new Config(FLAGS_conf_file.c_str());
+    int opt;
+    std::string conf_file = TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json";
+    while ((opt = getopt(argc, argv, "c:")) != -1) {
+        switch (opt) {
+            case 'c':
+                conf_file = optarg;
+                break;
+            default:
+                std::cerr << "Usage: " << argv[0] << " [-c conf_file]" << std::endl;
+                exit(EXIT_FAILURE);
+        }
+    }
+
+    // gflags::ParseCommandLineFlags(&argc, &argv, true);
+    cfg = new Config(conf_file.c_str());
     cfg->genData();
 
     const size_t num_codeblocks = cfg->UE_NUM;

@@ -10,6 +10,7 @@
 #include "doer.hpp"
 #include "dyprecode.hpp"
 #include "dyzf.hpp"
+#include "diagnosis.hpp"
 #include "gettime.h"
 #include "modulation.hpp"
 #include "shared_counters.hpp"
@@ -82,7 +83,8 @@ public:
         PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
         std::vector<std::vector<ControlInfo>>& control_info_table,
         std::vector<size_t>& control_idx_list,
-        SharedState* shared_state);
+        SharedState* shared_state,
+        BottleneckSubcarrier& bn_message);
 
     ~DySubcarrier();
 
@@ -145,4 +147,6 @@ private:
     // Control info
     std::vector<std::vector<ControlInfo>>& control_info_table_;
     std::vector<size_t>& control_idx_list_;
+
+    BottleneckSubcarrier& bn_message_;
 };

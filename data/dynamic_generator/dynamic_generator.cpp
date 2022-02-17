@@ -15,7 +15,7 @@
 #include <armadillo>
 #include <bitset>
 #include <fstream>
-#include <gflags/gflags.h>
+// #include <gflags/gflags.h>
 #include <immintrin.h>
 #include <iostream>
 #include <malloc.h>
@@ -36,13 +36,13 @@ static constexpr float kNoiseLevel = 1.0 / 200;
 static constexpr bool kVerbose = false;
 static constexpr bool kPrintUplinkInformationBytes = false;
 
-DEFINE_string(profile, "random",
-    "The profile of the input user bytes (e.g., 'random', '123')");
-DEFINE_string(conf_file,
-    TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
-    "Agora config filename");
-DEFINE_string(mode, "all", 
-    "The mode of generating outputing channel signals (e.g., 'all', 'prechannel', 'postchannel'");
+// DEFINE_string(profile, "random",
+//     "The profile of the input user bytes (e.g., 'random', '123')");
+// DEFINE_string(conf_file,
+//     TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
+//     "Agora config filename");
+// DEFINE_string(mode, "all", 
+//     "The mode of generating outputing channel signals (e.g., 'all', 'prechannel', 'postchannel'");
 
 std::string exec(const char* cmd) {
     std::array<char, 128> buffer;
@@ -74,24 +74,50 @@ static std::vector<std::vector<ControlInfo>> control_info_table;
 
 int main(int argc, char* argv[])
 {
-    const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    gflags::ParseCommandLineFlags(&argc, &argv, true);
-    auto* cfg = new Config(FLAGS_conf_file.c_str());
+    int opt;
+    std::string conf_file = TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json";
+    std::string profile_string = "random";
+    std::string mode_string = "all";
+    while ((opt = getopt(argc, argv, "p:c:m:")) != -1) {
+        switch (opt) {
+        case 'p':
+            profile_string = optarg;
+            break;
+        case 'c':
+            conf_file = optarg;
+            break;
+        case 'm':
+            mode_string = optarg;
+            break;
+        default:
+            fprintf(stderr, "Usage: %s [-c config_file] [-p profile] [-m mode] \n",
+                    argv[0]);
+            exit(EXIT_FAILURE);
+        }
+    }
 
-    const DataGenerator::Profile profile = FLAGS_profile == "123"
+    const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    // gflags::ParseCommandLineFlags(&argc, &argv, true);
+    // auto* cfg = new Config(FLAGS_conf_file.c_str());
+    auto* cfg = new Config(conf_file.c_str());
+
+    // const DataGenerator::Profile profile = FLAGS_profile == "123"
+    //     ? DataGenerator::Profile::k123
+    //     : DataGenerator::Profile::kRandom;
+    const DataGenerator::Profile profile = profile_string == "123"
         ? DataGenerator::Profile::k123
         : DataGenerator::Profile::kRandom;
     DataGenerator data_generator(cfg, 0 /* RNG seed */, profile);
 
     size_t mode = 0;
-    if (FLAGS_mode == "prechannel") {
+    if (mode_string == "prechannel") {
         mode = 1;
-    } else if (FLAGS_mode == "postchannel") {
+    } else if (mode_string == "postchannel") {
         mode = 2;
     }
 
     printf("DataGenerator: Config file: %s, data profile = %s\n",
-        FLAGS_conf_file.c_str(),
+        conf_file.c_str(),
         profile == DataGenerator::Profile::k123 ? "123" : "random");
 
     printf("DataGenerator: Using %s-orthogonal pilots\n",

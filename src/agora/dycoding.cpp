@@ -158,7 +158,8 @@ DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
     std::vector<std::vector<ControlInfo>>& control_info_table,
     std::vector<size_t>& control_idx_list,
-    SharedState* shared_state)
+    SharedState* shared_state,
+    BottleneckDecode& bottleneck_decode)
     : Doer(in_config, in_tid, freq_ghz)
     , demod_buffer_to_decode_(demod_buffer_to_decode)
     , decoded_buffers_(decoded_buffers)
@@ -167,6 +168,7 @@ DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,
     , total_dycode_num_(cfg_->decode_thread_num)
     , control_info_table_(control_info_table)
     , control_idx_list_(control_idx_list)
+    , bottleneck_decode_(bottleneck_decode)
 {
     resp_var_nodes_ = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
 }
@@ -336,6 +338,9 @@ void DyDecode::StartWork()
         cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, loop_count == 0 ? 0 : work_count * 100.0f / loop_count);
+
+    bottleneck_decode_.decode = decode_tsc_duration * 100.0f / whole_duration;
+    bottleneck_decode_.idle = idle_duration * 100.0f / whole_duration;
 }
 
 void DyDecode::StartWorkCentral() 

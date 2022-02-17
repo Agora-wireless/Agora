@@ -7,7 +7,6 @@
 #include "config.hpp"
 #include "gettime.h"
 #include "net.hpp"
-#include "radio_lib.hpp"
 #include "shared_counters.hpp"
 #include <algorithm>
 #include <arpa/inet.h>

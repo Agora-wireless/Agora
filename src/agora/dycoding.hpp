@@ -7,6 +7,7 @@
 #include "config.hpp"
 #include "control.hpp"
 #include "doer.hpp"
+#include "diagnosis.hpp"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "modulation.hpp"
@@ -71,7 +72,8 @@ public:
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& decoded_buffers,
         std::vector<std::vector<ControlInfo>>& control_info_table,
         std::vector<size_t>& control_idx_list,
-        SharedState* shared_state = nullptr);
+        SharedState* shared_state,
+        BottleneckDecode& bottleneck_decode);
 
     ~DyDecode();
 
@@ -106,6 +108,8 @@ private:
     size_t decode_count_ = 0;
     size_t decode_max_ = 0;
     size_t decode_tsc_ = 0;
+
+    BottleneckDecode& bottleneck_decode_;
 };
 
 #endif

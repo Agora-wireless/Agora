@@ -9,6 +9,8 @@
 #include <sstream>
 #include <vector>
 
+class Diagnosis;
+
 // We use one SharedState object to track packet reception status.
 // This object is shared between socket threads and subcarrier workers.
 class SharedState {
@@ -150,6 +152,8 @@ private:
     const size_t num_zf_tasks_per_frame_;
     const size_t slot_us_;
     const size_t symbol_num_per_frame_;
+
+    friend class Diagnosis;
 };
 
 #if 0

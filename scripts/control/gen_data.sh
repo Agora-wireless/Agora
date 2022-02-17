@@ -9,32 +9,32 @@ hostname=$(hostname)
 num_antennas=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.antenna_num')
 num_users=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.ue_num')
 if [ "${hostname}" == "${server_name}" ]; then
-  sudo ${hydra_root_dir}/build/control_generator --conf_file ${hydra_root_dir}/config/run.json > /dev/null
+  sudo ${hydra_root_dir}/build/control_generator -c ${hydra_root_dir}/config/run.json > /dev/null
   if [ "${USE_MATLAB_GEN_RAYLEIGH}" == 1 ]; then
-    sudo ${hydra_root_dir}/build/dynamic_generator --conf_file ${hydra_root_dir}/config/run.json --mode prechannel > /dev/null
+    sudo ${hydra_root_dir}/build/dynamic_generator -c ${hydra_root_dir}/config/run.json -m prechannel > /dev/null
     cd ${hydra_root_dir}/matlab; matlab -batch "generate_uplink(${num_users}, ${num_antennas})" > /dev/null
-    sudo ${hydra_root_dir}/build/dynamic_generator --conf_file ${hydra_root_dir}/config/run.json --mode postchannel > /dev/null
+    sudo ${hydra_root_dir}/build/dynamic_generator -c ${hydra_root_dir}/config/run.json -m postchannel > /dev/null
   else
-    sudo ${hydra_root_dir}/build/dynamic_generator --conf_file ${hydra_root_dir}/config/run.json > /dev/null
+    sudo ${hydra_root_dir}/build/dynamic_generator -c ${hydra_root_dir}/config/run.json > /dev/null
   fi
 else
   ssh -oStrictHostKeyChecking=no ${server_name} "source ${HYDRA_RUNNER_ROOT}/Agora/scripts/install/setvars.sh; \
     cd ${HYDRA_RUNNER_ROOT}/Agora; \
-    ./build/control_generator --conf_file ./config/run.json" > /dev/null
+    ./build/control_generator -c ./config/run.json" > /dev/null
   if [ "${USE_MATLAB_GEN_RAYLEIGH}" == 1 ]; then
     ssh -oStrictHostKeyChecking=no ${server_name} "source ${HYDRA_RUNNER_ROOT}/Agora/scripts/install/setvars.sh; \
       cd ${HYDRA_RUNNER_ROOT}/Agora; \
-      ./build/dynamic_generator --conf_file ./config/run.json --mode prechannel" > /dev/null
+      ./build/dynamic_generator -c ./config/run.json -m prechannel" > /dev/null
     scp -oStrictHostKeyChecking=no ${server_name}:/tmp/Hydra/matlab_input.txt /tmp/Hydra/ > /dev/null
     cd ${hydra_root_dir}/matlab; matlab -batch "generate_uplink(${num_users}, ${num_antennas})" > /dev/null
     scp -oStrictHostKeyChecking=no /tmp/Hydra/matlab_output.txt ${server_name}:/tmp/Hydra/ > /dev/null
     ssh -oStrictHostKeyChecking=no ${server_name} "source ${HYDRA_RUNNER_ROOT}/Agora/scripts/install/setvars.sh; \
       cd ${HYDRA_RUNNER_ROOT}/Agora; \
-      ./build/dynamic_generator --conf_file ./config/run.json --mode postchannel" > /dev/null
+      ./build/dynamic_generator -c ./config/run.json -m postchannel" > /dev/null
   else
     ssh -oStrictHostKeyChecking=no ${server_name} "source ${HYDRA_RUNNER_ROOT}/Agora/scripts/install/setvars.sh; \
       cd ${HYDRA_RUNNER_ROOT}/Agora; \
-      ./build/dynamic_generator --conf_file ./config/run.json" > /dev/null
+      ./build/dynamic_generator -c ./config/run.json" > /dev/null
   fi
 fi
 eval "scp -oStrictHostKeyChecking=no ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/data/control_ue_template.bin ${hydra_root_dir}/data/" > /dev/null

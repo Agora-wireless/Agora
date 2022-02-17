@@ -110,10 +110,23 @@ fi
 
 if [ "${HYDRA_RUN_MODE}" == 0 ] || [ "${HYDRA_RUN_MODE}" == 1 ]; then
   # Run the RRU application
-  echocyan "Run RRU traffic generators"
+  echocyan "Run RRU traffic generators (slot size: ${SLOT_US} us)"
   source ${hydra_root_dir}/scripts/control/run_rru.sh
 fi
 
-wait
+time_to_run=$(( SLOT_US*slots_to_test/1000000+10 ))
+sleep ${time_to_run}
+
+set +e
+
+source ${hydra_root_dir}/scripts/control/check_running_all.sh
+
+if [ "${is_running}" == "1" ]; then
+  echored "Hydra is still running (timeout), please check the log files. Now kill all Hydra processes"
+  source ${hydra_root_dir}/scripts/control/stop_all.sh
+  exit
+fi
 
 echocyan "All running logs will be stored in /tmp/Hydra/log_[server].txt"
+
+source ${hydra_root_dir}/scripts/control/error_diagnosis.sh

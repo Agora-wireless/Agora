@@ -202,6 +202,10 @@ private:
     // Control info list
     std::vector<std::vector<ControlInfo>> control_info_table_;
     std::vector<size_t> control_idx_list_;
+
+    // Bottleneck messages for each worker thread
+    std::vector<BottleneckSubcarrier> bottleneck_subcarrier_;
+    std::vector<BottleneckDecode> bottleneck_decode_;
 };
 
 #endif

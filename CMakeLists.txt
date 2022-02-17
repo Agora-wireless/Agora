@@ -58,9 +58,7 @@ find_package(nlohmann_json PATHS ${PROJECT_ROOT_DIR}/json)
 include_directories(SYSTEM ${PROJECT_ROOT_DIR}/json/include)
 
 set(USE_DPDK True CACHE STRING "USE_DPDK defaulting to 'False'")
-set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
-set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
-set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
+set(LOG_LEVEL "warn" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
 set(USE_AVX2_ENCODER False CACHE STRING "Use Agora's AVX2 encoder instead of FlexRAN's AVX512 encoder")
 
@@ -140,28 +138,11 @@ endif()
 
 message(STATUS "Use DPDK for agora: ${USE_DPDK}")
 
-# MAC
-if(${ENABLE_MAC})
-  add_definitions(-DENABLE_MAC)
-endif()
-
-# Argos support
-if(${USE_ARGOS})
-  add_definitions(-DUSE_ARGOS)
-endif()
-
-find_package(SoapySDR "0.7" CONFIG PATHS ${PROJECT_ROOT_DIR}/SoapySDR)
-if(NOT SoapySDR_FOUND)
-  message(FATAL_ERROR "SoapySDR development files not found")
-endif()
 message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
-find_package(PythonLibs REQUIRED)
-message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
-message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
-message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
-include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
-set(SOAPY_LIB ${SoapySDR_LIBRARIES})
-set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
+# find_package(PythonLibs REQUIRED)
+# message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
+# include_directories(${PYTHON_INCLUDE_DIRS})
+# set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
 add_definitions(-DTHREADED_INIT)
 
 # Intel MKL
@@ -228,9 +209,8 @@ set(AGORA_SOURCES
   src/agora/dycoding.cpp
   src/agora/dysubcarrier.cpp
   src/agora/dyprecode.cpp
-  src/agora/radio_lib.cpp
-  src/agora/radio_calibrate.cpp
-  src/mac/mac_thread.cpp)
+  src/mac/mac_thread.cpp
+  src/agora/diagnosis.cpp)
 
 if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
@@ -238,9 +218,7 @@ if(${USE_DPDK})
     src/agora/txrx/txrx_DPDK.cpp
     src/common/dpdk_transport.cpp)
 else()
-  set(AGORA_SOURCES ${AGORA_SOURCES} 
-    src/agora/txrx/txrx.cpp
-    src/agora/txrx/txrx_argos.cpp)
+  message(FATAL_ERROR "DPDK should be enabled")
 endif()
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
@@ -255,10 +233,10 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-# set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
+# set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES}
 #   ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
-set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES} ${SOAPY_LIB}
-  ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags nlohmann_json::nlohmann_json)
+set(COMMON_LIBS armadillo ${MKL_LIBS} ${DPDK_LIBRARIES}
+   ${FLEXRAN_LDPC_LIBS} util nlohmann_json::nlohmann_json)
 
 # TODO: The main agora executable is performance-critical, so we need to
 # test if compiling against precompiled objects instead of compiling directly
@@ -277,13 +255,6 @@ add_executable(sim
   src/common/dpdk_transport.cpp
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(sim ${COMMON_LIBS})
-
-add_executable(chsim
-  simulator/chsim_main.cpp
-  simulator/channel_sim.cpp
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(chsim ${COMMON_LIBS})
-
 
 # End-to-end test
 add_executable(test_agora

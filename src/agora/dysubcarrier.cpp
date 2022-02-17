@@ -18,7 +18,8 @@ DySubcarrier::DySubcarrier(Config* config, int tid, double freq_ghz_,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
     std::vector<std::vector<ControlInfo>>& control_info_table,
     std::vector<size_t>& control_idx_list,
-    SharedState* shared_state)
+    SharedState* shared_state,
+    BottleneckSubcarrier& bn_message)
     : Doer(config, tid, freq_ghz_)
     , sc_range_(sc_range)
     , freq_domain_iq_buffer_(freq_domain_iq_buffer)
@@ -33,6 +34,7 @@ DySubcarrier::DySubcarrier(Config* config, int tid, double freq_ghz_,
     , shared_state_(shared_state)
     , control_info_table_(control_info_table)
     , control_idx_list_(control_idx_list)
+    , bn_message_(bn_message)
 {
     // Create the requisite Doers
     do_zf_ = new DyZF(cfg_, tid_, freq_ghz_, csi_buffer_, calib_buffer, ul_zf_matrices_,
@@ -267,6 +269,11 @@ void DySubcarrier::StartWork()
         csi_count, zf_count, demod_count, 
         cycles_to_us(csi_max, freq_ghz_), cycles_to_us(zf_max, freq_ghz_), cycles_to_us(demod_max, freq_ghz_));
     fclose(fp);
+
+    bn_message_.csi = csi_tsc_duration * 100.0f / whole_duration;
+    bn_message_.zf = zf_tsc_duration * 100.0f / whole_duration;
+    bn_message_.demul = demod_tsc_duration * 100.0f / whole_duration;
+    bn_message_.idle = idle_duration * 100.0f / whole_duration;
 }
 
 void DySubcarrier::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size)

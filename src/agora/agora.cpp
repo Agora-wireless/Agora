@@ -1,6 +1,7 @@
 #include "agora.hpp"
 #include "Symbols.hpp"
 #include "profiler.h"
+#include "diagnosis.hpp"
 #include <rte_ethdev.h>
 using namespace std;
 
@@ -57,6 +58,8 @@ Agora::Agora(Config* cfg)
             worker_threads_[i]
                 = std::thread(&Agora::worker, this, i);
         }
+        bottleneck_subcarrier_.resize(1);
+        bottleneck_decode_.resize(1);
     } else {
         do_subcarrier_threads_.resize(
             (cfg->get_num_sc_to_process() + cfg->subcarrier_block_size - 1) / cfg->subcarrier_block_size);
@@ -64,6 +67,7 @@ Agora::Agora(Config* cfg)
             do_subcarrier_threads_[i]
                 = std::thread(&Agora::subcarrierWorker, this, i);
         }
+        bottleneck_subcarrier_.resize(do_subcarrier_threads_.size());
 
         if (cfg->dl_data_symbol_num_perframe > 0) {
             do_encode_threads_.resize(cfg->encode_thread_num);
@@ -77,6 +81,7 @@ Agora::Agora(Config* cfg)
                 do_decode_threads_[i]
                     = std::thread(&Agora::decodeWorker, this, i);
             }
+            bottleneck_decode_.resize(do_decode_threads_.size());
         }
     }
 
@@ -146,6 +151,13 @@ void Agora::Start()
     return;
 
 finish:
+
+    if (cfg->error) {
+        Diagnosis(cfg, &shared_state_, bottleneck_subcarrier_,
+            bottleneck_decode_);
+    } else {
+        printf("Agora: No error detected\n");
+    }
 
     printf("Agora: printing stats and saving to file\n");
     if (flags_.enable_save_decode_data_to_file_) {
@@ -358,7 +370,7 @@ void* Agora::subcarrierWorker(int tid)
         dl_encoded_buffer_to_precode_, demod_buffer_to_send_, dl_ifft_buffer_,
         equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
         control_info_table_, control_idx_list_,
-        &shared_state_);
+        &shared_state_, bottleneck_subcarrier_[tid]);
 
     if (config_->use_central_scheduler) {
         computeSubcarrier->RegisterQueues(&sched_info_arr_[tid].concurrent_q_,
@@ -382,7 +394,7 @@ void* Agora::decodeWorker(int tid)
     auto computeDecoding = new DyDecode(config_, tid, freq_ghz_,
         demod_buffer_to_decode_,
         decoded_buffer_, control_info_table_, control_idx_list_, 
-        &shared_state_);
+        &shared_state_, bottleneck_decode_[tid]);
 
     if (config_->use_central_scheduler) {
         computeDecoding->RegisterQueues(&sched_info_arr_[tid + do_subcarrier_threads_.size()].concurrent_q_,
@@ -423,12 +435,12 @@ void* Agora::worker(int tid)
         dl_encoded_buffer_to_precode_, demod_buffer_to_send_, dl_ifft_buffer_,
         equal_buffer_, ul_zf_matrices_, dl_zf_matrices_,
         control_info_table_, control_idx_list_,
-        &shared_state_);
+        &shared_state_, bottleneck_subcarrier_[0]);
 
     auto computeDecoding = new DyDecode(config_, tid, freq_ghz_,
         demod_buffer_to_decode_,
         decoded_buffer_, control_info_table_, control_idx_list_, 
-        &shared_state_);
+        &shared_state_, bottleneck_decode_[0]);
 
     size_t start_tsc = 0;
     size_t work_tsc_duration = 0;
