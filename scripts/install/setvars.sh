@@ -24,7 +24,7 @@ if ! command -v icpc &> /dev/null; then
   eval "source ${HYDRA_RUNNER_ROOT}/intel/oneapi/setvars.sh"
 fi
 
-if [[ -f /opt/intel/system_studio_2019/bin/compilervars.sh intel64 ]]; then
+if [[ -f "/opt/intel/system_studio_2019/bin/compilervars.sh" ]]; then
   eval "source /opt/intel/system_studio_2019/bin/compilervars.sh intel64"
 else
   echo "[$(hostname)] Global Intel compiler not found. Downloading."
