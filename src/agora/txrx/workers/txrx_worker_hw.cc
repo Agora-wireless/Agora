@@ -315,10 +315,11 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
         frame_time = ((long long)(frame_id) << 32) | (tx_symbol_id << 16);
       }
 
-      MLPD_TRACE(
+      MLPD_SYMBOL(
           "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
-          "%zu, Radio %zu) is reference tx on channel %zu\n",
-          tid_, frame_id, tx_symbol_id, radio_id, ant_idx);
+          "%zu, Ant %zu) - transmit ref pilot for uplink recip cal\n",
+          tid_, frame_id, tx_symbol_id,
+          (radio_id * Configuration()->NumChannels()) + ant_idx);
       // Check to see if the next symbol is a Tx symbol for the reference node
       const int tx_ret =
           radio_config_.RadioTx(radio_id, calultxbuf.data(),
@@ -358,6 +359,12 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
 
       if (calib_radio == radio_id) {
         caldltxbuf.at(channel_offset) = Configuration()->PilotCi16().data();
+
+        MLPD_SYMBOL(
+            "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
+            "%zu, Ant %zu) - transmit pilot for downlink recip cal\n",
+            tid_, frame_id, tx_symbol_id,
+            (radio_id * channels_per_interface_) + channel_offset);
       }
 
       long long frame_time = 0;
@@ -399,10 +406,16 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
     const size_t symbol_id = gen_tag_t(current_event.tags_[0u]).symbol_id_;
     const size_t ant_id = gen_tag_t(current_event.tags_[0u]).ant_id_;
     const size_t radio_id = ant_id / channels_per_interface_;
-    const size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
+    const size_t tx_frame_id = (frame_id + TX_FRAME_DELTA);
 
+    MLPD_TRACE(
+        "TxRxWorkerHw[%zu]: (Frame %zu, Symbol %zu, Ant %zu) - Transmit ready "
+        "for radio %zu [%zu:%zu]\n",
+        tid_, frame_id, symbol_id, ant_id, radio_id, interface_offset_,
+        (interface_offset_ + num_interfaces_) - 1);
     RtAssert((radio_id >= interface_offset_) &&
-             (radio_id <= (interface_offset_ + num_interfaces_)));
+                 (radio_id <= ((interface_offset_ + num_interfaces_) - 1)),
+             "Radio id does not match the radio for this worker");
 
     //See if this is the last antenna on the radio.  Assume that we receive the last one
     // last (and all the others came before).  No explicit tracking

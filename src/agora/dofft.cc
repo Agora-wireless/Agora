@@ -201,8 +201,8 @@ EventData DoFFT::Launch(size_t tag) {
     const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, ant_id);
     if (cal_index != SIZE_MAX) {
       MLPD_TRACE(
-          "DoFFT[%d]: (Frame %zu Symbol %zu Ant %zu) - Received a CalUl symbol "
-          "for current cal index %zu\n",
+          "DoFFT[%d]: (Frame %zu, Symbol %zu, Ant %zu) - Received a CalUl "
+          "symbol for current cal index %zu\n",
           tid_, frame_id, symbol_id, ant_id, cal_index);
 
       complex_float* calib_ul_ptr =
@@ -220,7 +220,7 @@ EventData DoFFT::Launch(size_t tag) {
       const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, pilot_tx_ant);
 
       MLPD_TRACE(
-          "DoFFT[%d]: (Frame %zu Symbol %zu Ant %zu) - Received a CalDL "
+          "DoFFT[%d]: (Frame %zu, Symbol %zu, Ant %zu) - Received a CalDL "
           "symbol for current cal index %zu\n",
           tid_, frame_id, symbol_id, pilot_tx_ant, cal_index);
       RtAssert(cal_index != SIZE_MAX, "Out of bounds index");

@@ -184,39 +184,40 @@ void Agora::ScheduleAntennas(EventType event_type, size_t frame_id,
 }
 
 void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
-  auto base_tag = gen_tag_t::FrmSymAnt(frame_id, symbol_id, 0);
   const size_t total_antennas = config_->BsAntNum();
   const size_t handler_threads = config_->SocketThreadNum();
-  size_t schedule_antenna = 0;
 
-  const size_t rem_antennas = total_antennas % handler_threads;
-  const size_t floor_events_per_handler = total_antennas / handler_threads;
-  size_t ceil_events_per_handler = floor_events_per_handler;
-  if (rem_antennas > 0) {
-    ceil_events_per_handler += 1;
+  // Build the worker event lists
+  std::vector<std::vector<EventData>> worker_events(handler_threads);
+  for (size_t antenna = 0u; antenna < total_antennas; antenna++) {
+    const size_t enqueue_worker_id = packet_tx_rx_->AntNumToWorkerId(antenna);
+    EventData tx_data;
+    tx_data.num_tags_ = 1;
+    tx_data.event_type_ = EventType::kPacketTX;
+    tx_data.tags_.at(0) =
+        gen_tag_t::FrmSymAnt(frame_id, symbol_id, antenna).tag_;
+    worker_events.at(enqueue_worker_id).push_back(tx_data);
+
+    MLPD_TRACE(
+        "ScheduleAntennasTX: (Frame %zu, Symbol %zu, Ant %zu) - tx event added "
+        "to worker %zu : %zu\n",
+        frame_id, symbol_id, antenna, enqueue_worker_id, worker_events.size());
   }
-  // Must put contiguous channels in same queue
-  assert(ceil_events_per_handler % config_->NumChannels() == 0);
 
-  /// \todo !!!!! Should use the packet_txrx class here to enqueue the id's to the correct worker
-  std::vector<EventData> events_list(ceil_events_per_handler);
-  for (size_t radio_handler = 0; radio_handler < handler_threads;
-       radio_handler++) {
-    size_t tx_event;
-    for (tx_event = 0; tx_event < ceil_events_per_handler; tx_event++) {
-      if (schedule_antenna == total_antennas) {
-        // All antennas scheduled
-        break;
-      }
+  //Enqueue all events for all workers
+  size_t enqueue_worker_id = 0;
+  for (const auto& worker : worker_events) {
+    if (!worker.empty()) {
+      MLPD_TRACE(
+          "ScheduleAntennasTX: (Frame %zu, Symbol %zu) - adding %zu "
+          "event(s) to worker %zu transmit queue\n",
+          frame_id, symbol_id, worker.size(), enqueue_worker_id);
 
-      events_list.at(tx_event).num_tags_ = 1;
-      events_list.at(tx_event).event_type_ = EventType::kPacketTX;
-      events_list.at(tx_event).tags_[0u] = base_tag.tag_;
-      base_tag.ant_id_ = ++schedule_antenna;
+      TryEnqueueBulkFallback(GetConq(EventType::kPacketTX, 0),
+                             tx_ptoks_ptr_[enqueue_worker_id], worker.data(),
+                             worker.size());
     }
-    TryEnqueueBulkFallback(GetConq(EventType::kPacketTX, 0),
-                           tx_ptoks_ptr_[radio_handler], events_list.data(),
-                           tx_event);
+    enqueue_worker_id++;
   }
 }
 
