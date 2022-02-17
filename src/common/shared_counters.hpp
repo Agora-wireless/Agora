@@ -19,7 +19,7 @@ public:
 
     bool receive_time_iq_pkt(size_t frame_id, size_t symbol_id);
     // When receive a new freq iq packet, record it here
-    bool receive_freq_iq_pkt(size_t frame_id, size_t symbol_id);
+    bool receive_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t ant_id);
     // When receive a new demod packet, record it here
     bool receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol_id_ul);
     // When receive a new encode packet, record it here
@@ -92,6 +92,8 @@ private:
     // packets received for frame i and symbol j
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_data_pkts_ = {};
+
+    std::array<size_t, kMaxAntennas> last_frame_symbol_each_ant_ = {};
 
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_fft_tasks_completed_ = {};

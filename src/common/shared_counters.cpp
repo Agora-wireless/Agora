@@ -72,7 +72,7 @@ bool SharedState::receive_time_iq_pkt(size_t frame_id, size_t symbol_id)
     return true;
 }
 
-bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id)
+bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t ant_id)
 {
     if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
         MLPD_ERROR(
@@ -86,6 +86,57 @@ bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id)
 
     if (unlikely(frame_start_time_[frame_id] == 0)) {
         frame_start_time_[frame_id] = get_us();
+    }
+
+    size_t last_frame_symbol = last_frame_symbol_each_ant_[ant_id];
+    size_t last_frame = last_frame_symbol >> 32;
+    size_t last_symbol = last_frame_symbol & 0xffffffff;
+    if (last_frame == frame_id) {
+        if (last_symbol < symbol_id) {
+            num_pkts_[frame_id % kFrameWnd] += (symbol_id - last_symbol);
+            if (symbol_id < num_pilot_symbols_per_frame_) {
+                num_pilot_pkts_[frame_id % kFrameWnd] += (symbol_id - last_symbol);
+            } else {
+                if (last_symbol < num_pilot_symbols_per_frame_) {
+                    num_pilot_pkts_[frame_id % kFrameWnd] += (num_pilot_symbols_per_frame_ - last_symbol);
+                    for (size_t si = num_pilot_symbols_per_frame_; si < symbol_id; si++) {
+                        num_data_pkts_[frame_id % kFrameWnd][si] ++;
+                    }
+                } else {
+                    for (size_t si = last_symbol; si < symbol_id; si++) {
+                        num_data_pkts_[frame_id % kFrameWnd][si] ++;
+                    } 
+                }
+            }
+        }
+    } else if (last_frame < frame_id) {
+        num_pkts_[last_frame % kFrameWnd] += (symbol_num_per_frame_ - last_symbol);
+        if (last_symbol < num_pilot_symbols_per_frame_) {
+            num_pilot_pkts_[frame_id % kFrameWnd] += (num_pilot_symbols_per_frame_ - last_symbol);
+            for (size_t si = num_pilot_symbols_per_frame_; si < symbol_num_per_frame_; si++) {
+                num_data_pkts_[frame_id % kFrameWnd][si] ++;
+            }
+        } else {
+            for (size_t si = last_symbol; si < symbol_num_per_frame_; si++) {
+                num_data_pkts_[frame_id % kFrameWnd][si] ++;
+            } 
+        }
+        for (size_t fi = last_frame + 1; fi < frame_id; fi ++) {
+            num_pkts_[fi % kFrameWnd] += symbol_num_per_frame_;
+            num_pilot_pkts_[fi % kFrameWnd] += num_pilot_symbols_per_frame_;
+            for (size_t si = num_pilot_symbols_per_frame_; si < symbol_num_per_frame_; si ++) {
+                num_data_pkts_[fi % kFrameWnd][si] ++;
+            }
+        }
+        num_pkts_[frame_id % kFrameWnd] += symbol_id;
+        if (symbol_id < num_pilot_symbols_per_frame_) {
+            num_pilot_pkts_[frame_id % kFrameWnd] += symbol_id;
+        } else {
+            num_pilot_pkts_[frame_id % kFrameWnd] += num_pilot_symbols_per_frame_;
+            for (size_t si = num_pilot_symbols_per_frame_; si < symbol_id; si++) {
+                num_data_pkts_[frame_id % kFrameWnd][si] ++;
+            }
+        }
     }
 
     const size_t frame_slot = frame_id % kFrameWnd;
@@ -109,6 +160,13 @@ bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id)
     } else {
         num_data_pkts_[frame_slot][symbol_id - num_pilot_symbols_per_frame_]++;
     }
+
+    last_symbol = symbol_id + 1;
+    if (last_symbol == symbol_num_per_frame_) {
+        last_symbol = 0;
+        last_frame = frame_id + 1;
+    }
+    last_frame_symbol_each_ant_[ant_id] = (((uint64_t)last_frame) << 32) | last_symbol;
 
     return true;
 }

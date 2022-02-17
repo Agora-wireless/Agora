@@ -235,7 +235,7 @@ void* PacketTXRX::fft_tx_thread(int tid)
                         memcpy(target_ant_ptr + sc_offset, ant_ptr + 2 * sizeof(unsigned short)
                                 * (cfg_->OFDM_DATA_START + cfg_->subcarrier_start),
                             cfg_->get_num_sc_to_process() * 2 * sizeof(unsigned short));
-                        if (!shared_state_->receive_freq_iq_pkt(fft_frame_to_send, fft_symbol_to_send)) {
+                        if (!shared_state_->receive_freq_iq_pkt(fft_frame_to_send, fft_symbol_to_send, ant_id)) {
                             cfg_->error = true;
                             cfg_->running = false;
                         }
@@ -606,7 +606,7 @@ int PacketTXRX::recv_relocate(int tid)
 
             // get the position in rx_buffer
             cur_cycle = rdtsc();
-            if (!shared_state_->receive_freq_iq_pkt(pkt->frame_id_, pkt->symbol_id_)) {
+            if (!shared_state_->receive_freq_iq_pkt(pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_)) {
                 cfg_->error = true;
                 cfg_->running = false;
             }
