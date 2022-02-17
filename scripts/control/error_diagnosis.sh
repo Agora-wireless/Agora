@@ -1,6 +1,5 @@
 #! /bin/bash
 
-echocyan "Diagnosing errors in RRU servers"
 for (( i=0; i<${hydra_rru_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
     log_fn="/tmp/Hydra/log_${server_name}.txt"
@@ -18,7 +17,6 @@ for (( i=0; i<${hydra_rru_num}; i++ )) do
     fi
 done
 
-echocyan "Diganosing errors in Hydra servers"
 pkt_loss_rru=0
 bottleneck=0
 success=0
