@@ -183,7 +183,15 @@ check_sys_pkgs
 # Install armadillo, nlohmann JSON, Intel lib, and RDMA core
 install_armadillo
 install_nlohmann
-install_intel_lib
+
+if [[ -f "/opt/intel/system_studio_2019/bin/compilervars.sh" ]]; then
+  echo "[$(hostname)] Global Intel compiler found. Skipping download"
+  source  /opt/intel/system_studio_2019/bin/compilervars.sh intel64
+else
+  echo "[$(hostname)] Global Intel compiler not found. Downloading."
+  install_intel_lib
+fi
+
 install_rdma_core
 
 # Check whether DPDK is installed

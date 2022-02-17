@@ -1,7 +1,5 @@
 #! /bin/bash
 
-set -e
-
 # Find the root directory of Hydra app
 script_dir=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
 hydra_root_dir=$( cd ${script_dir}/../.. >/dev/null 2>&1 && pwd )
@@ -21,7 +19,18 @@ if [ "${res}" != "null" ]; then
   HYDRA_RUNNER_ROOT=${res}
 fi
 
-eval "source ${HYDRA_RUNNER_ROOT}/intel/oneapi/setvars.sh"
+# Source local Intel compiler install if there's no global install
+if ! command -v icpc &> /dev/null; then
+  eval "source ${HYDRA_RUNNER_ROOT}/intel/oneapi/setvars.sh"
+fi
+
+if [[ -f /opt/intel/system_studio_2019/bin/compilervars.sh intel64 ]]; then
+  eval "source /opt/intel/system_studio_2019/bin/compilervars.sh intel64"
+else
+  echo "[$(hostname)] Global Intel compiler not found. Downloading."
+  eval "source ${HYDRA_RUNNER_ROOT}/intel/oneapi/setvars.sh"
+fi
+
 eval "export LIBRARY_PATH=${LIBRARY_PATH}:${HYDRA_RUNNER_ROOT}/rdma-core/build/lib"
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LIBRARY_PATH}
 eval "export RTE_SDK=${HYDRA_RUNNER_ROOT}/dpdk-stable-20.11.3"
