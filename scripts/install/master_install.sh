@@ -104,7 +104,7 @@ if [ ${ONLY_SINGLE_SERVER} == "all" ]; then
 # If ONLY_SERVER_SERVER is not "all", install on the only server named ${ONLY_SERVER_SERVER}
 else
   server_list=$(echo ${ONLY_SINGLE_SERVER} | tr "," "\n")
-  hydra_server_num=$(echo ${server_list} | wc -l)
+  hydra_server_num=$(echo ${server_list} | wc -w)
   echocyan "Detected ${hydra_server_num} servers: $(echo ${ONLY_SINGLE_SERVER} | tr "," " ")"
   echocyan "Copying Hydra codebase to all remote servers"
   i=0
