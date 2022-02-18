@@ -477,7 +477,7 @@ void* RadioTxRx::LoopTxRxArgos(size_t tid) {
       continue;
     }
 
-    struct Packet* pkt =
+    Packet* pkt =
         RecvEnqueueArgos(tid, radio_id, frame_id, symbol_id, rx_slot, false);
     if (pkt == nullptr) {
       continue;

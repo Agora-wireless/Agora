@@ -444,14 +444,17 @@ int ClientRadioConfig::RadioRx(size_t r /*radio id*/, void** buffs,
 }
 
 void ClientRadioConfig::DrainBuffers() {
-  std::vector<std::complex<int16_t>> dummy_buff0(cfg_->SampsPerSymbol());
-  std::vector<std::complex<int16_t>> dummy_buff1(cfg_->SampsPerSymbol());
-  std::vector<void*> dummybuffs(2);
-  dummybuffs[0] = dummy_buff0.data();
-  dummybuffs[1] = dummy_buff1.data();
+  std::vector<std::vector<std::complex<int16_t>>> sample_storage(
+      cfg_->NumUeChannels(),
+      std::vector<std::complex<int16_t>>(cfg_->SampsPerSymbol(),
+                                         std::complex<int16_t>(0, 0)));
+  std::vector<void*> rx_buffs;
+  for (auto& buff : sample_storage) {
+    rx_buffs.push_back(buff.data());
+  }
   for (size_t i = 0; i < cfg_->UeNum(); i++) {
-    ClientRadioConfig::DrainRxBuffer(cl_stn_.at(i), rx_streams_.at(i),
-                                     dummybuffs, cfg_->SampsPerSymbol());
+    ClientRadioConfig::DrainRxBuffer(cl_stn_.at(i), rx_streams_.at(i), rx_buffs,
+                                     cfg_->SampsPerSymbol());
   }
 }
 

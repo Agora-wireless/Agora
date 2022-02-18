@@ -224,7 +224,7 @@ void PhyUe::ScheduleDefferedDownlinkSymbols(size_t frame_id) {
   }
   std::queue<EventData>* defferal_queue = &rx_downlink_deferral_.at(frame_slot);
 
-  while (defferal_queue->empty() == false) {
+  while (!defferal_queue->empty()) {
     ScheduleWork(defferal_queue->front());
     defferal_queue->pop();
   }

@@ -50,11 +50,11 @@ DoZF::DoZF(Config* config, int tid,
       false);
 
   //Init to identity
-  calib_sc_vec_ptr_->fill(arma::cx_float(1, 0));
+  calib_sc_vec_ptr_->fill(arma::cx_float(1.0f, 0.0f));
 
   num_ext_ref_ = 0;
   for (size_t i = 0; i < cfg_->NumCells(); i++) {
-    if (cfg_->ExternalRefNode(i) == true) {
+    if (cfg_->ExternalRefNode(i)) {
       num_ext_ref_++;
     }
   }
@@ -62,10 +62,10 @@ DoZF::DoZF(Config* config, int tid,
     ext_ref_id_.zeros(num_ext_ref_ * cfg_->NumChannels());
     size_t ext_id = 0;
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
-      if (cfg_->ExternalRefNode(i) == true) {
+      if (cfg_->ExternalRefNode(i)) {
         for (size_t j = 0; j < cfg_->NumChannels(); j++) {
           ext_ref_id_.at(ext_id * cfg_->NumChannels() + j) =
-              cfg_->RefAnt(i) + j;
+              (cfg_->RefRadio(i) * cfg_->NumChannels()) + j;
         }
         ext_id++;
       }

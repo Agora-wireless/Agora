@@ -83,7 +83,7 @@ void TxRxWorkerSim::DoTxRx() {
   // Send Beacons for the first time to kick off sim
   // SendBeacon(tid, tx_frame_id++);
   while (Configuration()->Running() == true) {
-    size_t rdtsc_now = GetTime::Rdtsc();
+    const size_t rdtsc_now = GetTime::Rdtsc();
 
     if (rdtsc_now > send_time) {
       MLPD_SYMBOL(
@@ -114,10 +114,10 @@ void TxRxWorkerSim::DoTxRx() {
     if (0 == send_result) {
       // receive data
       // Need to get NumChannels data here
-      auto rx_packets = RecvEnqueue(current_interface);
+      const auto rx_packets = RecvEnqueue(current_interface);
       for (auto& packet : rx_packets) {
         if (kIsWorkerTimingEnabled) {
-          uint32_t frame_id = packet->frame_id_;
+          const uint32_t frame_id = packet->frame_id_;
           if (frame_id != prev_frame_id) {
             rx_frame_start_[frame_id % kNumStatsFrames] = GetTime::Rdtsc();
             prev_frame_id = frame_id;

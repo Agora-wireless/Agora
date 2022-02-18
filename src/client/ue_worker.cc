@@ -144,23 +144,23 @@ void UeWorker::TaskThread(size_t core_offset) {
 //                   DOWNLINK Operations                //
 //////////////////////////////////////////////////////////
 void UeWorker::DoFftPilot(size_t tag) {
-  size_t start_tsc = GetTime::Rdtsc();
+  const size_t start_tsc = GetTime::Rdtsc();
 
   // read info of one frame
   Packet* pkt = fft_req_tag_t(tag).rx_packet_->RawPacket();
 
-  size_t frame_id = pkt->frame_id_;
-  size_t symbol_id = pkt->symbol_id_;
-  size_t ant_id = pkt->ant_id_;
-  size_t frame_slot = frame_id % kFrameWnd;
+  const size_t frame_id = pkt->frame_id_;
+  const size_t symbol_id = pkt->symbol_id_;
+  const size_t ant_id = pkt->ant_id_;
+  const size_t frame_slot = frame_id % kFrameWnd;
 
   if (kDebugPrintInTask || kDebugPrintFft) {
     std::printf("UeWorker[%zu]: Fft Pilot(frame %zu, symbol %zu, ant %zu)\n",
                 tid_, frame_id, symbol_id, ant_id);
   }
 
-  size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
-  size_t sig_offset = config_.OfdmRxZeroPrefixClient();
+  const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
+  const size_t sig_offset = config_.OfdmRxZeroPrefixClient();
 
   if (kPrintDownlinkPilotStats) {
     SimdConvertShortToFloat(pkt->data_, reinterpret_cast<float*>(rx_samps_tmp_),
@@ -262,23 +262,23 @@ void UeWorker::DoFftPilot(size_t tag) {
 }
 
 void UeWorker::DoFftData(size_t tag) {
-  size_t start_tsc = GetTime::Rdtsc();
+  const size_t start_tsc = GetTime::Rdtsc();
 
   // read info of one frame
   Packet* pkt = fft_req_tag_t(tag).rx_packet_->RawPacket();
 
-  size_t frame_id = pkt->frame_id_;
-  size_t symbol_id = pkt->symbol_id_;
-  size_t ant_id = pkt->ant_id_;
-  size_t frame_slot = frame_id % kFrameWnd;
+  const size_t frame_id = pkt->frame_id_;
+  const size_t symbol_id = pkt->symbol_id_;
+  const size_t ant_id = pkt->ant_id_;
+  const size_t frame_slot = frame_id % kFrameWnd;
 
   if (kDebugPrintInTask || kDebugPrintFft) {
     std::printf("UeWorker[%zu]: Fft Data(frame %zu, symbol %zu, ant %zu)\n",
                 tid_, frame_id, symbol_id, ant_id);
   }
 
-  size_t sig_offset = config_.OfdmRxZeroPrefixClient();
-  size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
+  const size_t sig_offset = config_.OfdmRxZeroPrefixClient();
+  const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
 
   if (kRecordDownlinkFrame) {
     if (frame_id == kRecordFrameIndex) {
@@ -411,14 +411,14 @@ void UeWorker::DoDemul(size_t tag) {
     std::printf("UeWorker[%zu]: Demul  (frame %zu, symbol %zu, ant %zu)\n",
                 tid_, frame_id, symbol_id, ant_id);
   }
-  size_t start_tsc = GetTime::Rdtsc();
+  const size_t start_tsc = GetTime::Rdtsc();
 
   const size_t frame_slot = frame_id % kFrameWnd;
-  size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
-  size_t dl_data_symbol_perframe = config_.Frame().NumDlDataSyms();
-  size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe +
-                              dl_symbol_id -
-                              config_.Frame().ClientDlPilotSymbols();
+  const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
+  const size_t dl_data_symbol_perframe = config_.Frame().NumDlDataSyms();
+  const size_t total_dl_symbol_id = frame_slot * dl_data_symbol_perframe +
+                                    dl_symbol_id -
+                                    config_.Frame().ClientDlPilotSymbols();
   size_t offset = total_dl_symbol_id * config_.UeAntNum() + ant_id;
   auto* equal_ptr = reinterpret_cast<float*>(&equal_buffer_[offset][0]);
 

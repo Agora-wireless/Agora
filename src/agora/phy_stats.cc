@@ -130,11 +130,11 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
     float max_snr = FLT_MIN;
     float min_snr = FLT_MAX;
-    float* frame_snr =
+    const float* frame_snr =
         &pilot_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
     for (size_t j = 0; j < config_->BsAntNum(); j++) {
-      size_t radio_id = j / config_->NumChannels();
-      size_t cell_id = config_->CellId().at(radio_id);
+      const size_t radio_id = j / config_->NumChannels();
+      const size_t cell_id = config_->CellId().at(radio_id);
       if (config_->ExternalRefNode(cell_id) == true &&
           radio_id == config_->RefRadio(cell_id)) {
         continue;
@@ -167,11 +167,11 @@ void PhyStats::PrintCalibSnrStats(size_t frame_id) {
   for (size_t i = 0; i < 2; i++) {
     float max_snr = FLT_MIN;
     float min_snr = FLT_MAX;
-    float* frame_snr =
+    const float* frame_snr =
         &calib_pilot_snr_[frame_id % kFrameWnd][i * config_->BsAntNum()];
     for (size_t j = 0; j < config_->BsAntNum(); j++) {
-      size_t radio_id = j / config_->NumChannels();
-      size_t cell_id = config_->CellId().at(radio_id);
+      const size_t radio_id = j / config_->NumChannels();
+      const size_t cell_id = config_->CellId().at(radio_id);
       if (config_->ExternalRefNode(cell_id) == true &&
           radio_id == config_->RefRadio(cell_id)) {
         continue;
@@ -206,13 +206,14 @@ void PhyStats::UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id,
                         false);
   arma::fmat fft_abs_mat = abs(fft_mat);
   arma::fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
-  float rssi = as_scalar(sum(fft_abs_mag));
-  float noise_per_sc1 =
+  const float rssi = as_scalar(sum(fft_abs_mag));
+  const float noise_per_sc1 =
       as_scalar(mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
-  float noise_per_sc2 = as_scalar(mean(
+  const float noise_per_sc2 = as_scalar(mean(
       fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
-  float noise = config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
-  float snr = (rssi - noise) / noise;
+  const float noise =
+      config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
+  const float snr = (rssi - noise) / noise;
   calib_pilot_snr_[frame_id % kFrameWnd][calib_sym_id * config_->BsAntNum() +
                                          ant_id] = 10 * std::log10(snr);
 }
@@ -223,19 +224,20 @@ void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
                         false);
   arma::fmat fft_abs_mat = abs(fft_mat);
   arma::fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
-  float rssi = as_scalar(sum(fft_abs_mag));
-  float noise_per_sc1 =
+  const float rssi = as_scalar(sum(fft_abs_mag));
+  const float noise_per_sc1 =
       as_scalar(mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
-  float noise_per_sc2 = as_scalar(mean(
+  const float noise_per_sc2 = as_scalar(mean(
       fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
-  float noise = config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
-  float snr = (rssi - noise) / noise;
+  const float noise =
+      config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
+  const float snr = (rssi - noise) / noise;
   pilot_snr_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
       10 * std::log10(snr);
 }
 
 void PhyStats::PrintZfStats(size_t frame_id) {
-  size_t frame_slot = frame_id % kFrameWnd;
+  const size_t frame_slot = frame_id % kFrameWnd;
   std::stringstream ss;
   ss << "Frame " << frame_id
      << " ZF matrix inverse condition number range: " << std::fixed
