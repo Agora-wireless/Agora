@@ -82,7 +82,7 @@ class RadioTxRx {
    * (radio_id) and writes to an offset (rx_offset) in the receive buffer
    * (buffer_)
    */
-  struct Packet* RecvEnqueue(size_t tid, size_t ant_id, size_t rx_slot);
+  Packet* RecvEnqueue(size_t tid, size_t ant_id, size_t rx_slot);
 
   /**
    * @brief transmits a tx packet that is ready from PHY through socket
@@ -94,15 +94,16 @@ class RadioTxRx {
    * @brief receives a packet from hardware through radio index (radio_id)
    * and writes to an offset (rx_offset) in the receive buffer (buffer_)
    */
-  struct Packet* RecvEnqueueArgos(size_t tid, size_t radio_id, size_t& frame_id,
-                                  size_t& symbol_id, size_t rx_slot,
-                                  bool dummy_enqueue);
+
+  std::vector<Packet*> RecvEnqueueArgos(size_t tid, size_t radio_id,
+                                        size_t& frame_id, size_t& symbol_id,
+                                        size_t rx_slot, bool dummy_enqueue);
 
   /**
    * @brief transmits a tx samples packet that is ready from PHY through client
    * wireless hardware
    */
-  int DequeueSendArgos(int tid, long long time0);
+  int DequeueSendArgos(size_t tid, const long long time0);
 
   /**
    * @brief loop thread function that performs sample Packet I/O in simulation
@@ -157,8 +158,8 @@ class RadioTxRx {
   int tx_buffer_length_;
 
   size_t thread_num_;
-  int tx_thread_num_;
-  // pointer of message_queue_
+
+  // Message passing queues
   moodycamel::ConcurrentQueue<EventData>* message_queue_;
   moodycamel::ConcurrentQueue<EventData>* task_queue_;
   moodycamel::ProducerToken** rx_ptoks_;
@@ -167,7 +168,7 @@ class RadioTxRx {
   int tx_core_id_;
 
   // helper buffers
-  std::vector<void*> pilot_buff0_;
-  std::vector<void*> pilot_buff1_;
+  //std::vector<void*> pilot_buff0_;
+  //std::vector<void*> pilot_buff1_;
 };
 #endif  // RADIOTXRX_H_
