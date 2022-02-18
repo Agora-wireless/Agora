@@ -30,6 +30,8 @@ while getopts "h?:s:" opt; do
   esac
 done
 
+mkdir -p /tmp/hydra
+
 # Read HYDRA_SERVER_LIST_JSON and HYDRA_RUNNER_ROOT from file config/config.json
 hydra_master_config_json=${hydra_root_dir}/config/config.json
 if [ ! -f ${hydra_master_config_json} ]; then
