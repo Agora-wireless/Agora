@@ -94,11 +94,10 @@ if [ ${ONLY_SINGLE_SERVER} == "all" ]; then
     (install_success=1; ssh -oStrictHostKeyChecking=no ${server_name} "mkdir -p ${HYDRA_RUNNER_ROOT}; \
       cd ${HYDRA_RUNNER_ROOT}; cp -r ${hydra_tmp_dir[$i]}/Agora ./; rm -rf ${hydra_tmp_dir[$i]}/Agora; \
       cd Agora; INSTALL_HYDRA_PKGS_SYSTEM_LEVEL=${INSTALL_HYDRA_PKGS_SYSTEM_LEVEL} \
-      ./scripts/install/install_all.sh" || (install_success=0; \
-      echored "Installation on ${server_name} failed. Check /tmp/hydra/install_${server_name}.log for details"); \
-      if [ "${install_success}" == "1" ]; then scp -oStrictHostKeyChecking=no ${server_name}:/tmp/hydra/install.log \
-      /tmp/hydra/install_${server_name}.log > /dev/null; \
-      echo "${server_name} installation complete"; fi ) &
+      ./scripts/install/install_all.sh" || install_success=0 \
+      echored "Installation on ${server_name} failed. Check /tmp/hydra/install_${server_name}.log for details"; \
+      scp -oStrictHostKeyChecking=no ${server_name}:/tmp/hydra/install.log /tmp/hydra/install_${server_name}.log > /dev/null; \
+      if [ "${install_success}" == "1" ]; then echo "${server_name} installation complete"; fi ) &
   done
   wait
   echocyan "All remote servers installation complete. Check /tmp/hydra/install_{server_name}.log for details"
