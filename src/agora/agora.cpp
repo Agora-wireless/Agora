@@ -75,6 +75,7 @@ Agora::Agora(Config* cfg)
                 do_encode_threads_[i]
                     = std::thread(&Agora::encodeWorker, this, i);
             }
+            bottleneck_encode_.resize(do_encode_threads_.size());
         } else {
             do_decode_threads_.resize(cfg->decode_thread_num);
             for (size_t i = 0; i < do_decode_threads_.size(); i++) {
@@ -154,7 +155,7 @@ finish:
 
     if (cfg->error) {
         Diagnosis(cfg, &shared_state_, bottleneck_subcarrier_,
-            bottleneck_decode_);
+            bottleneck_decode_, bottleneck_encode_);
     } else {
         printf("Agora: No error detected\n");
     }
@@ -416,7 +417,7 @@ void* Agora::encodeWorker(int tid)
     auto computeEncoding = new DyEncode(config_, tid, freq_ghz_,
         dl_bits_buffer_,
         dl_encoded_buffer_, control_info_table_, control_idx_list_, 
-        &shared_state_);
+        &shared_state_, bottleneck_encode_[tid]);
 
     computeEncoding->StartWork();
 

@@ -49,11 +49,7 @@ for (( i=0; i<${hydra_rru_num}; i++ )) do
   pci_addr=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --arg node "${server_name}" '.[$node].pcie' | tr -d '"')
   cat tmp_0.json | jq --arg pci ${pci_addr} '.pci_addr=$pci' > tmp_1.json
   hostname=$(hostname)
-  if [ "${hostname}" == "${server_name}" ]; then
-    cp tmp_1.json ${hydra_root_dir}/config/run.json
-  else
-    eval "scp -oStrictHostKeyChecking=no tmp_1.json ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/config/run.json" > /dev/null 2>&1
-  fi
+  eval "scp -oStrictHostKeyChecking=no tmp_1.json ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/config/run.json" > /dev/null 2>&1
   rm tmp.json tmp_0.json tmp_1.json
 done
 
@@ -101,10 +97,6 @@ for (( i=0; i<${hydra_app_num}; i++ )) do
   pci_addr=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --arg node "${server_name}" '.[$node].pcie' | tr -d '"')
   cat tmp_0.json | jq --arg pci ${pci_addr} '.pci_addr=$pci' > tmp_1.json
   hostname=$(hostname)
-  if [ "${hostname}" == "${server_name}" ]; then
-    cp tmp_1.json ${hydra_root_dir}/config/run.json
-  else
-    eval "scp -oStrictHostKeyChecking=no tmp_1.json ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/config/run.json" > /dev/null 2>&1
-  fi
+  eval "scp -oStrictHostKeyChecking=no tmp_1.json ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/config/run.json" > /dev/null 2>&1
   rm tmp.json tmp_0.json tmp_1.json
 done

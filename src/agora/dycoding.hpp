@@ -29,7 +29,8 @@ public:
         Table<int8_t>& dl_encoded_buffer,
         std::vector<std::vector<ControlInfo>>& control_info_table,
         std::vector<size_t>& control_idx_list,
-        SharedState* shared_state = nullptr);
+        SharedState* shared_state,
+        BottleneckEncode& bottleneck_encode);
 
     ~DyEncode();
 
@@ -63,6 +64,8 @@ private:
     size_t encode_count_ = 0;
     size_t encode_max_ = 0;
     size_t encode_tsc_ = 0;
+
+    BottleneckEncode& bottleneck_encode_;
 };
 
 class DyDecode : public Doer {

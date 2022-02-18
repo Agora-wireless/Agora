@@ -2,7 +2,7 @@
 
 for (( i=0; i<${hydra_rru_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
-    log_fn="/tmp/Hydra/log_${server_name}.txt"
+    log_fn="/tmp/hydra/log_${server_name}.txt"
     diagnose_start=0
     while IFS= read -r line
     do
@@ -22,7 +22,7 @@ bottleneck=0
 success=0
 for (( i=0; i<${hydra_app_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.hydra_servers[$i]' | tr -d '"')
-    log_fn="/tmp/Hydra/log_${server_name}.txt"
+    log_fn="/tmp/hydra/log_${server_name}.txt"
     diagnose_start=0
     pkt_msg=0
     while IFS= read -r line

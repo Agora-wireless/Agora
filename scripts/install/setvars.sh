@@ -19,18 +19,19 @@ if [ "${res}" != "null" ]; then
   HYDRA_RUNNER_ROOT=${res}
 fi
 
-# Source local Intel compiler install if there's no global install
-if ! command -v icpc &> /dev/null; then
-  eval "source ${HYDRA_RUNNER_ROOT}/intel/oneapi/setvars.sh"
-fi
+source ${hydra_root_dir}/scripts/install/load_progress.sh
 
-if [[ -f "/opt/intel/system_studio_2019/bin/compilervars.sh" ]]; then
+if [ "${installed_mkl}" == "custom1" ]; then
   eval "source /opt/intel/system_studio_2019/bin/compilervars.sh intel64"
-else
-  echo "[$(hostname)] Global Intel compiler not found. Downloading."
+elif [ "${installed_mkl}" == "custom2" ]; then
+  eval "source /opt/intel/oneapi/setvars.sh"
+elif [ "${installed_mkl}" == "local" ]; then
   eval "source ${HYDRA_RUNNER_ROOT}/intel/oneapi/setvars.sh"
 fi
 
 eval "export LIBRARY_PATH=${LIBRARY_PATH}:${HYDRA_RUNNER_ROOT}/rdma-core/build/lib"
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LIBRARY_PATH}
-eval "export RTE_SDK=${HYDRA_RUNNER_ROOT}/dpdk-stable-20.11.3"
+
+if [ "${installed_dpdk}" == "local" ]; then
+  eval "export RTE_SDK=${HYDRA_RUNNER_ROOT}/dpdk-stable-20.11.3"
+fi

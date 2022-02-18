@@ -2,7 +2,7 @@
 
 # Run this script on your laptop
 # Run the entire Hydra application across all remote servers
-# Record the results and logs to /tmp/Hydra on your laptop
+# Record the results and logs to /tmp/hydra on your laptop
 # * Options
 #   * -f Run Hydra without generating new input traffic data
 #   * -r Run Hydra RRU traffic generator only
@@ -91,7 +91,7 @@ source ${hydra_root_dir}/scripts/control/check_deploy.sh
 echocyan "Create and deploy configuration file for each remote server"
 source ${hydra_root_dir}/scripts/control/create_config.sh
 
-mkdir -p /tmp/Hydra
+mkdir -p /tmp/hydra
 
 if [ "${GEN_NEW_TRAFFIC_DATA}" == 1 ]; then
   # Generate control data and traffic data
@@ -127,6 +127,6 @@ if [ "${is_running}" == "1" ]; then
   exit
 fi
 
-echocyan "All running logs will be stored in /tmp/Hydra/log_[server].txt"
+echocyan "All running logs will be stored in /tmp/hydra/log_[server].txt"
 
 source ${hydra_root_dir}/scripts/control/error_diagnosis.sh

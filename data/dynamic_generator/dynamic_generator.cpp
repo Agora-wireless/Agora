@@ -322,8 +322,8 @@ int main(int argc, char* argv[])
                 mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
             }
         } else if (mode == 1) {
-            std::string result = exec("mkdir -p /tmp/Hydra");
-            FILE* matlab_input = fopen("/tmp/Hydra/matlab_input.txt", "w");
+            std::string result = exec("mkdir -p /tmp/hydra");
+            FILE* matlab_input = fopen("/tmp/hydra/matlab_input.txt", "w");
             for (size_t j = 0; j < cfg->OFDM_CA_NUM; j ++) {
                 for (size_t k = 0; k < cfg->UE_ANT_NUM; k ++) {
                     complex_float tmp = tx_data_all_symbols[i][k * cfg->OFDM_CA_NUM + j];
@@ -337,7 +337,7 @@ int main(int argc, char* argv[])
             }
             fclose(matlab_input);
         } else if (mode == 2) {
-            FILE* matlab_output = fopen("/tmp/Hydra/matlab_output.txt", "r");
+            FILE* matlab_output = fopen("/tmp/hydra/matlab_output.txt", "r");
             for (size_t j = 0; j < cfg->OFDM_CA_NUM; j ++) {
                 for (size_t k = 0; k < cfg->BS_ANT_NUM; k ++) {
                     complex_float tmp;

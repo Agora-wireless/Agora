@@ -2,10 +2,12 @@
 
 Diagnosis::Diagnosis(Config* cfg, SharedState* state,
     std::vector<BottleneckSubcarrier>& subcarrier_bottleneck,
-    std::vector<BottleneckDecode>& decode_bottleneck) {
+    std::vector<BottleneckDecode>& decode_bottleneck,
+    std::vector<BottleneckEncode>& encode_bottleneck) {
     size_t base_frame = state->cur_frame_;
     if (cfg->downlink_mode) {
-        printf("Sorry! The diagnosis is not supported in downlink mode.\n");
+        printf("\n********************Diagnosis start********************\n");
+        
     } else {
         printf("\n********************Diagnosis start********************\n");
         printf("Checking packet receiving:\n");

@@ -16,7 +16,8 @@ DyEncode::DyEncode(Config* in_config, int in_tid, double freq_ghz,
     Table<int8_t>& dl_encoded_buffer,
     std::vector<std::vector<ControlInfo>>& control_info_table,
     std::vector<size_t>& control_idx_list,
-    SharedState* shared_state)
+    SharedState* shared_state,
+    BottleneckEncode& bottleneck_encode)
     : Doer(in_config, in_tid, freq_ghz)
     , dl_bits_buffer_(dl_bits_buffer)
     , dl_encoded_buffer_(dl_encoded_buffer)
@@ -25,6 +26,7 @@ DyEncode::DyEncode(Config* in_config, int in_tid, double freq_ghz,
     , total_dycode_num_(cfg_->encode_thread_num)
     , control_info_table_(control_info_table)
     , control_idx_list_(control_idx_list)
+    , bottleneck_encode_(bottleneck_encode)
 {
     parity_buffer = (int8_t*)memalign(64,
         32768);
@@ -151,6 +153,9 @@ void DyEncode::StartWork()
         cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, loop_count == 0 ? 0 : work_count * 100.0f / loop_count);
+
+    bottleneck_encode_.encode = encode_tsc_duration * 100.0f / whole_duration;
+    bottleneck_encode_.idle = idle_duration * 100.0f / whole_duration;
 }
 
 DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,

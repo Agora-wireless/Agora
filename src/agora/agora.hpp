@@ -206,6 +206,7 @@ private:
     // Bottleneck messages for each worker thread
     std::vector<BottleneckSubcarrier> bottleneck_subcarrier_;
     std::vector<BottleneckDecode> bottleneck_decode_;
+    std::vector<BottleneckEncode> bottleneck_encode_;
 };
 
 #endif
