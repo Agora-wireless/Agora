@@ -12,7 +12,7 @@ installed_dpdk="none"
 
 # Find the progress file
 if [ -f ${hydra_root_dir}/progress/progress.txt ]; then
-  echocyan "Found progress file: ${hydra_root_dir}/progress/progress.txt. Load the installation progress."
+  echocyan "[$(hostname)] Found progress file: ${hydra_root_dir}/progress/progress.txt. Load the installation progress."
   while IFS='' read -r line || [[ -n "$line" ]]; do
     token=$(echo "$line" | cut -d'=' -f1)
     value=$(echo "$line" | cut -d'=' -f2)
@@ -39,7 +39,7 @@ if [ -f ${hydra_root_dir}/progress/progress.txt ]; then
     esac
   done < ${hydra_root_dir}/progress/progress.txt
 else
-  echocyan "Create progress file: ${hydra_root_dir}/progress/progress.txt. Check if any package is installed."
+  echocyan "[$(hostname)] Create progress file: ${hydra_root_dir}/progress/progress.txt. Check if any package is installed."
   mkdir -p ${hydra_root_dir}/progress
   source ${hydra_root_dir}/scripts/install/check_global_package.sh
   check_global_armadillo
