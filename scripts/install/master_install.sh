@@ -14,10 +14,6 @@ hydra_root_dir=$( cd ${script_dir}/../.. >/dev/null 2>&1 && pwd )
 
 source ${hydra_root_dir}/scripts/utils/utils.sh
 
-# Run server initialization scripts on all remote servers
-# Check scripts/system/server_init.sh
-RUN_SERVER_INIT=0 
-
 # Specify the remote server to install packages and Hydra app
 # If ONLY_SINGLE_SERVER is all, then install on all remote servers
 #   listed in config/platform.json
@@ -37,18 +33,14 @@ HYDRA_RUNNER_ROOT="~/HydraRemoteRunner"
 
 # Parse input arguments
 # Run "master_install.sh -h" to check all argument options
-while getopts "h?:is:a" opt; do
+while getopts "h?:s:a" opt; do
   case "$opt" in
     h|\?)
       echo "Help"
       echo -e "\t-h\tShow this infomation"
-      echo -e "\t-i\tRun server initialization scripts on all remote servers (Check scripts/system/server_init.sh)"
       echo -e "\t-s [hostname]\tSpecify the only remote server to install packages and Hydra app"
       echo -e "\t-a\tInstall all system-level packages required by Hydra on remote servers (require sudo)"
       exit 0
-      ;;
-    i)
-      RUN_SERVER_INIT=1
       ;;
     s)
       ONLY_SINGLE_SERVER="${OPTARG}"
@@ -96,16 +88,6 @@ if [ ${ONLY_SINGLE_SERVER} == "all" ]; then
       echo "${server_name} rsync complete") &
   done
   wait
-  if [ "${RUN_SERVER_INIT}" == 1 ]; then
-    echocyan "Initialize server setup on all remote servers"
-    for (( i=0; i<${hydra_server_num}; i++ )) do
-      server_name=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --argjson i $i '. | keys | .[$i]' | tr -d '"')
-      (ssh -oStrictHostKeyChecking=no ${server_name} "cd ${hydra_tmp_dir[$i]}/Agora; \
-        ./scripts/system/server_init.sh" > /tmp/hydra/init_${server_name}.log 2>&1; \
-        echo "${server_name} initialization complete";) &
-    done
-    wait
-  fi
   echocyan "Install dependent packages and Hydra application on all remote servers"
   for (( i=0; i<${hydra_server_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --argjson i $i '. | keys | .[$i]' | tr -d '"')
@@ -125,11 +107,6 @@ else
   hydra_tmp_dir=$(ssh -oStrictHostKeyChecking=no ${server_name} "mktemp -d")
   rsync -a --exclude '*.bin' --exclude '*.git/*' ${hydra_root_dir} ${server_name}:${hydra_tmp_dir}/ \
     > /dev/null 2>&1 || (echo "Copying source code to ${server_name} failed"; exit)
-  if [ "${RUN_SERVER_INIT}" == 1 ]; then
-    echocyan "Initialize server setup on ${server_name}"
-    ssh -oStrictHostKeyChecking=no ${server_name} "cd ${hydra_tmp_dir}/Agora; \
-      ./scripts/system/server_init.sh" > /tmp/hydra/init_${server_name}.log 2&>1
-  fi
   echocyan "Install dependent packages and Hydra application on ${server_name}"
   ssh -oStrictHostKeyChecking=no ${server_name} "mkdir -p ${HYDRA_RUNNER_ROOT}; \
     cd ${HYDRA_RUNNER_ROOT}; cp -r ${hydra_tmp_dir}/Agora ./; rm -rf ${hydra_tmp_dir}/Agora; cd Agora; \

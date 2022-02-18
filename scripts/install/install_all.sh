@@ -31,6 +31,7 @@ fi
 
 mkdir -p /tmp/hydra
 rm -f /tmp/hydra/install.log || :
+touch /tmp/hydra/install.log
 
 # Check whether system packages are installed
 # If not, report en error

@@ -15,9 +15,9 @@ function echocyan() {
 }
 
 function checkpkg() {
-  res=$(dpkg-query -l "$1") || :
+  res=$(dpkg-query -l "$1" 2> /dev/null) || :
   if [ -z "$res" ]; then
-    echored "Error: Package $1 not installed"
+    echored "[$(hostname)] Error: Package $1 not installed"
     checkpkg_res=0
   else
     checkpkg_res=1

@@ -9,8 +9,6 @@ set -e
 script_dir=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
 hydra_root_dir=$( cd ${script_dir}/../.. >/dev/null 2>&1 && pwd )
 
-source ${hydra_root_dir}/scripts/utils/utils.sh
-
 HYDRA_RUNNER_ROOT="~/HydraRemoteRunner"
 
 sudo apt-get update
@@ -19,7 +17,7 @@ sudo apt-get install -y jq
 # Read HYDRA_RUNNER_ROOT from file config/config.json
 hydra_master_config_json=${hydra_root_dir}/config/config.json
 if [ ! -f ${hydra_master_config_json} ]; then
-  echored "ERROR: config file ${hydra_master_config_json} does not exist"
+  echo "ERROR: config file ${hydra_master_config_json} does not exist"
 fi
 res=$(cat ${hydra_master_config_json} | jq '.hydra_runner_root' | tr -d '"')
 if [ "${res}" != "null" ]; then
