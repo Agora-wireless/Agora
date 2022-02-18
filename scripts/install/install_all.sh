@@ -49,13 +49,13 @@ function check_sys_pkgs() {
         echo -n "${pkg1} "
       done
       echo
-      exit
+      exit 1
     fi
   done
   res=$(meson --version | grep "0.")
   if [ -z ${res} ]; then
     echo "[$(hostname)] Error: meson is required, please run 'pip3 install meson'"
-    exit
+    exit 1
   fi
 } 
 
