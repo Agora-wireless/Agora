@@ -167,6 +167,7 @@ function install_hydra() {
   echo "[$(hostname)] Building Hydra"
   eval "source ${HYDRA_RUNNER_ROOT}/Agora/scripts/install/setvars.sh" >> /tmp/hydra/install.log 2>&1
   eval "cd ${HYDRA_RUNNER_ROOT}/Agora"
+  rm -rf build
   mkdir -p build
   cd build
   cmake .. -DLOG_LEVEL=warn >> /tmp/hydra/install.log 2>&1
