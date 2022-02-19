@@ -97,7 +97,7 @@ bool RadioTxRx::StartTxRx(Table<char>& in_buffer, size_t in_buffer_length,
 
 Packet* RadioTxRx::RecvEnqueue(size_t tid, size_t ant_id, size_t rx_slot) {
   moodycamel::ProducerToken* local_ptok = rx_ptoks_[tid];
-  size_t packet_length = config_->PacketLength();
+  const size_t packet_length = config_->PacketLength();
   RxPacket& rx = rx_packets_.at(tid).at(rx_slot);
 
   // if rx_buffer is full, exit
@@ -149,8 +149,8 @@ int RadioTxRx::DequeueSend(int tid) {
            "RadioTxRx: Wrong Event Type in TX Queue!");
 
   // std::printf("tx queue length: %d\n", task_queue_->size_approx());
-  size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
-  size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+  const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+  const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
   std::vector<char> zeros(c->PacketLength(), 0);
   std::vector<char> pilot(c->PacketLength(), 0);
   std::memcpy(&pilot[Packet::kOffsetOfData], c->PilotCi16().data(),
@@ -168,8 +168,8 @@ int RadioTxRx::DequeueSend(int tid) {
             tid, frame_id, c->Frame().GetPilotSymbol(symbol_idx), ant_id);
       }
 
-      auto* pkt = (symbol_idx == ant_id) ? (struct Packet*)pilot.data()
-                                         : (struct Packet*)zeros.data();
+      auto* pkt = (symbol_idx == ant_id) ? (Packet*)pilot.data()
+                                         : (Packet*)zeros.data();
       new (pkt) Packet(frame_id, c->Frame().GetPilotSymbol(symbol_idx),
                        0 /* cell_id */, ant_id);
 
@@ -194,7 +194,7 @@ int RadioTxRx::DequeueSend(int tid) {
               message_queue_->size_approx());
         }
 
-        auto* pkt = (struct Packet*)(tx_buffer_ + offset * c->PacketLength());
+        auto* pkt = (Packet*)(tx_buffer_ + offset * c->PacketLength());
         new (pkt) Packet(frame_id, c->Frame().GetULSymbol(symbol_id),
                          0 /* cell_id */, ant_id);
 
@@ -246,7 +246,7 @@ void* RadioTxRx::LoopTxRx(size_t tid) {
       continue;
     }
     // receive data
-    struct Packet* pkt = RecvEnqueue(tid, ant_id, rx_slot);
+    Packet* pkt = RecvEnqueue(tid, ant_id, rx_slot);
     if (pkt == nullptr) {
       continue;
     }
@@ -263,15 +263,10 @@ void* RadioTxRx::LoopTxRx(size_t tid) {
 int RadioTxRx::DequeueSendArgos(size_t tid, const long long time0) {
   const auto& c = config_;
   auto& radio = radioconfig_;
-  //const size_t packet_length = c->PacketLength();
   const size_t num_channels = c->NumUeChannels();
   const size_t samples_per_symbol = c->SampsPerSymbol();
   const size_t samples_per_frame =
       samples_per_symbol * c->Frame().NumTotalSyms();
-
-  // For UHD devices, first pilot should not be with the END_BURST flag
-  // 1: HAS_TIME, 2: HAS_TIME | END_BURST
-  int flags_tx_pilot = (kUseUHD && c->NumUeChannels() == 2) ? 1 : 2;
 
   EventData event;
   const bool tx_ready =
@@ -286,48 +281,68 @@ int RadioTxRx::DequeueSendArgos(size_t tid, const long long time0) {
 
   //Assuming the 1 message per radio per frame
   const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+  //ue_id = radio_id
   const size_t ue_id = gen_tag_t(event.tags_[0]).ue_id_;
-  const size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
-  //const size_t ant_id = ue_id * c->NumUeChannels();
+  const size_t ue_ant_start = ue_id * c->NumUeChannels();
+  const size_t tx_frame_id = (frame_id + TX_FRAME_DELTA);
   long long tx_time = 0;
+
+  std::vector<std::complex<int16_t>> zeros(samples_per_symbol,
+                                           std::complex<int16_t>(0, 0));
+  //Place zeros in all dimensions
+  std::vector<void*> tx_data(num_channels, zeros.data());
 
   MLPD_INFO("DequeueSendArgos[%zu]: Transmitted frame %zu, ue %zu\n", tid,
             frame_id, ue_id);
+  RtAssert(ue_id == tid, "DequeueSendArgos Ue id was not the expected values");
 
-  // Transmit pilot
+  // Transmit pilot(s)
+  // For UHD devices, first pilot should not be with the END_BURST flag
+  // 1: HAS_TIME, 2: HAS_TIME | END_BURST
+  int flags_tx = 1;
+
   if (c->UeHwFramer() == false) {
-    const size_t antenna_start = ue_id * c->NumUeChannels();
-    //for (size_t ch = 0; ch < num_channels; ch++) {
-    //  const size_t ant_id = antenna_start + ch;
-    //  const size_t pilot_symbol_id = c->Frame().GetPilotSymbol(ant_id);
-    //}
-    const size_t first_pilot_symbol_id =
-        c->Frame().GetPilotSymbol(antenna_start);
+    for (size_t ch = 0; ch < num_channels; ch++) {
+      const size_t ant_pilot = ue_ant_start + ch;
+      const size_t pilot_symbol_id = c->Frame().GetPilotSymbol(ant_pilot);
 
-    tx_time = time0 + (tx_frame_id * samples_per_frame) +
-              (first_pilot_symbol_id * samples_per_symbol) -
-              c->ClTxAdvance().at(ue_id);
-    const int tx_status = radio->RadioTx(ue_id, pilot_buff0_.data(), num_samps,
-                                         flags_tx_pilot, tx_time);
-    if (r < static_cast<int>(num_samps)) {
-      std::cout << "BAD Write: (PILOT)" << r << "/" << num_samps << std::endl;
-    }
-    if (c->NumUeChannels() == 2) {
-      pilot_symbol_id = c->Frame().GetPilotSymbol(ant_id + 1);
-      tx_time = time0 + tx_frame_id * frm_num_samps +
-                pilot_symbol_id * num_samps - c->ClTxAdvance().at(ue_id);
-      r = radio->RadioTx(ue_id, pilot_buff1_.data(), num_samps, flags_tx_pilot,
-                         tx_time);
-      if (r < static_cast<int>(num_samps)) {
-        std::cout << "BAD Write (PILOT): " << r << "/" << num_samps
-                  << std::endl;
+      //See if we need to set end burst for the last channel
+      // (see if the next symbol is an uplink symbol)
+      if ((ch + 1) == num_channels) {
+        if (c->Frame().NumULSyms() > 0) {
+          const size_t first_ul_symbol = c->Frame().GetULSymbol(0);
+          if ((pilot_symbol_id + 1) == (first_ul_symbol)) {
+            flags_tx = 2;
+          }
+        }
       }
-    }
 
-    if (kDebugPrintInTask) {
-      std::printf(
-          "In TX thread %zu: Transmitted frame %zu, pilot symbol %zu, ue %zu\n",
-          tid, frame_id, pilot_symbol_id, ue_id);
+      //Add the pilot to the correct index
+      tx_data.at(ch) = c->PilotCi16().data();
+
+      tx_time = time0 + (tx_frame_id * samples_per_frame) +
+                (pilot_symbol_id * samples_per_symbol) -
+                c->ClTxAdvance().at(ue_id);
+
+      const int tx_status = radio->RadioTx(
+          ue_id, tx_data.data(), samples_per_symbol, flags_tx, tx_time);
+
+      if (tx_status < 0) {
+        std::cout << "BAD Radio Tx: (PILOT)" << tx_status << "For Ue Radio "
+                  << ue_id << "/" << samples_per_symbol << std::endl;
+      } else if (tx_status != static_cast<int>(samples_per_symbol)) {
+        std::cout << "BAD Write: (PILOT)" << tx_status << "For Ue Radio "
+                  << ue_id << "/" << samples_per_symbol << std::endl;
+      }
+
+      if (kDebugPrintInTask) {
+        std::printf(
+            "In TX thread %zu: Transmitted frame %zu, pilot symbol %zu, ue "
+            "%zu\n",
+            tid, frame_id, pilot_symbol_id, ue_id);
+      }
+      //Replace the pilot with zeros for next channel pilot
+      tx_data.at(ch) = zeros.data();
     }
   }
   if (event.event_type_ == EventType::kPacketPilotTX) {
@@ -340,38 +355,44 @@ int RadioTxRx::DequeueSendArgos(size_t tid, const long long time0) {
     return event.tags_[0];
   }
 
-  // Transmit data
+  // Transmit data for all symbols
+  const size_t packet_length = c->PacketLength();
+  flags_tx = 1;
   for (size_t symbol_id = 0; symbol_id < c->Frame().NumULSyms(); symbol_id++) {
-    size_t tx_symbol_id = c->Frame().GetULSymbol(symbol_id);
-    size_t offset =
+    const size_t tx_symbol_id = c->Frame().GetULSymbol(symbol_id);
+    const size_t offset =
         (c->GetTotalDataSymbolIdxUl(frame_id, symbol_id) * c->UeAntNum()) +
-        ant_id;
+        ue_ant_start;
 
-    void* txbuf[2];
-    for (size_t ch = 0; ch < c->NumUeChannels(); ++ch) {
-      auto* pkt = reinterpret_cast<struct Packet*>(
-          tx_buffer_ + (offset + ch) * packet_length);
-      txbuf[ch] = (void*)pkt->data_;
+    for (size_t ch = 0; ch < num_channels; ch++) {
+      auto* tx_pkt =
+          reinterpret_cast<Packet*>(tx_buffer_[(offset + ch) * packet_length]);
+      tx_data.at(ch) = static_cast<void*>(tx_pkt->data_);
       tx_buffer_status_[offset + ch] = 0;
     }
-    tx_time = c->UeHwFramer()
-                  ? ((long long)tx_frame_id << 32) | (tx_symbol_id << 16)
-                  : time0 + tx_frame_id * frm_num_samps +
-                        tx_symbol_id * num_samps - c->ClTxAdvance().at(ue_id);
-    int flags_tx_symbol = 1;  // HAS_TIME
-    if (tx_symbol_id == c->Frame().GetULSymbolLast()) {
-      flags_tx_symbol = 2;  // HAS_TIME & END_BURST, fixme
+    if (c->UeHwFramer()) {
+      tx_time = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
+    } else {
+      tx_time = time0 + (tx_frame_id * samples_per_frame) +
+                (tx_symbol_id * samples_per_symbol) -
+                c->ClTxAdvance().at(ue_id);
     }
-    r = radio->RadioTx(ue_id, txbuf, num_samps, flags_tx_symbol, tx_time);
-    if (r < static_cast<int>(num_samps)) {
-      std::cout << "BAD Write (UL): " << r << "/" << num_samps << std::endl;
+
+    if (tx_symbol_id == c->Frame().GetULSymbolLast()) {
+      flags_tx = 2;  // HAS_TIME & END_BURST, fixme
+    }
+    const int tx_status = radio->RadioTx(ue_id, tx_data.data(),
+                                         samples_per_symbol, flags_tx, tx_time);
+    if (tx_status < static_cast<int>(samples_per_symbol)) {
+      std::cout << "BAD Write (UL): For Ue " << ue_id << " " << tx_status << "/"
+                << samples_per_symbol << std::endl;
     }
 
     if (kDebugPrintInTask) {
       std::printf(
-          "In TX thread %d: Transmitted frame %zu, data symbol %zu, "
-          "ant %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
-          tid, frame_id, tx_symbol_id, ant_id, gen_tag_t(event.tags_[0]).tag_,
+          "DequeueSendArgos[%zu]: Transmitted frame %zu, data symbol %zu, "
+          "radio %zu, tag %zu, offset: %zu, msg_queue_length: %zu\n",
+          tid, frame_id, tx_symbol_id, ue_id, gen_tag_t(event.tags_[0]).tag_,
           offset, message_queue_->size_approx());
     }
   }
@@ -415,9 +436,8 @@ std::vector<Packet*> RadioTxRx::RecvEnqueueArgos(size_t tid, size_t radio_id,
                 << std::endl;
       c->Running(false);
       return rx_info;
-    } else if (static_cast<size_t>(rx_status) !=
-               static_cast<int>(num_rx_samps)) {
-      std::cerr << "RX [" << tid << "]: BAD Receive(" << r << "/"
+    } else if (static_cast<size_t>(rx_status) != num_rx_samps) {
+      std::cerr << "RX [" << tid << "]: BAD Receive(" << rx_status << "/"
                 << num_rx_samps << ") at Time " << rx_time << std::endl;
     }
 
@@ -500,9 +520,11 @@ void* RadioTxRx::LoopTxRxArgos(size_t tid) {
       continue;
     }
 
-    std::vector<Packet*> rx_pkts =
+    const auto rx_pkts =
         RecvEnqueueArgos(tid, radio_id, frame_id, symbol_id, rx_slot, false);
     if (rx_pkts.size() != c->NumUeChannels()) {
+      throw std::runtime_error(
+          "Received data but it was not the correct dimension");
       continue;
     }
 
@@ -647,10 +669,11 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
     }
 
     // Enqueue the rx'd beacon symbol = 0
-    auto* pkt =
+    const auto rx_pkts =
         RecvEnqueueArgos(tid, radio_id, rx_frame_id, symbol_id, rx_slot, true);
-    if (pkt == nullptr) {
-      break;
+    if (rx_pkts.size() == c->NumUeChannels()) {
+      throw std::runtime_error(
+          "Received data but it was not the correct dimension");
     }
     symbol_id++;
     //Increment the rx buffer space.
@@ -714,11 +737,11 @@ void* RadioTxRx::LoopTxRxArgosSync(size_t tid) {
       }
 
       if (config_->IsDownlink(rx_frame_id, symbol_id) == true) {
-        Packet* rx_pkt = RecvEnqueueArgos(tid, radio_id, rx_frame_id, symbol_id,
-                                          rx_slot, false);
-        if (rx_pkt == nullptr) {
-          //This should be an error????
-          break;
+        const auto rx_pkts = RecvEnqueueArgos(tid, radio_id, rx_frame_id,
+                                              symbol_id, rx_slot, false);
+        if (rx_pkts.size() != c->NumUeChannels()) {
+          throw std::runtime_error(
+              "Received data but it was not the correct dimension");
         }
         rx_slot = (rx_slot + c->NumUeChannels()) % buffers_per_thread_;
       } else {
