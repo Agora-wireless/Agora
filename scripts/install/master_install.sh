@@ -83,7 +83,7 @@ if [ ${ONLY_SINGLE_SERVER} == "all" ]; then
   for (( i=0; i<${hydra_server_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --argjson i $i '. | keys | .[$i]' | tr -d '"')
     hydra_tmp_dir[$i]=$(ssh -oStrictHostKeyChecking=no ${server_name} "mktemp -d")
-    (rsync -a --exclude '*.bin' --exclude '*.git/*' ${hydra_root_dir} ${server_name}:${hydra_tmp_dir[$i]}/ \
+    (rsync -a --exclude '*.bin' --exclude '*.git/*' --exclude '*build/*' ${hydra_root_dir} ${server_name}:${hydra_tmp_dir[$i]}/ \
       > /dev/null 2>&1 || (echo "Copying source code to ${server_name} failed"; exit); \
       echo "${server_name} rsync complete") &
   done
@@ -111,7 +111,7 @@ else
   for server_name in ${server_list}
   do
     hydra_tmp_dir[$i]=$(ssh -oStrictHostKeyChecking=no ${server_name} "mktemp -d")
-    (rsync -a --exclude '*.bin' --exclude '*.git/*' ${hydra_root_dir} ${server_name}:${hydra_tmp_dir[$i]}/ \
+    (rsync -a --exclude '*.bin' --exclude '*.git/*' --exclude '*build/*' ${hydra_root_dir} ${server_name}:${hydra_tmp_dir[$i]}/ \
       > /dev/null 2>&1 || (echo "Copying source code to ${server_name} failed"; exit); \
       echo "${server_name} rsync complete") &
     i=$((i+1))
