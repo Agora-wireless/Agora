@@ -93,3 +93,5 @@ else
 fi
 
 wait
+
+echocyan "Hydra app is built successfully"

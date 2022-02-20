@@ -687,7 +687,7 @@ void DySubcarrier::StartWorkDownlink() {
 
     if (cfg_->error) {
         printf("Dysubcarrier Thread %d error traceback: csi (frame %zu, sc %zu), "
-            "zf (frame %zu, sc %zu), precode (frame %zu, symbol %zu, task %zu), recvd packets done %zu\n", tid_, 
+            "zf (frame %zu, sc %zu), precode (frame %zu, symbol %zu, task %zu), recvd packets done %d\n", tid_, 
             csi_cur_frame_, csi_cur_sc_, zf_cur_frame_, zf_cur_sc_, precode_cur_frame_,
             precode_cur_sym_dl_, n_precode_tasks_done_, shared_state_->received_all_encoded_pkts(
                     precode_cur_frame_, precode_cur_sym_dl_));
