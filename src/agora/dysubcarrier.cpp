@@ -586,7 +586,6 @@ void DySubcarrier::StartWorkDownlink() {
                         }
 
                         precode_cur_frame_++;
-                        frame_tag = 0;
                         if (unlikely(precode_cur_frame_ == cfg_->frames_to_test)) {
                             TRIGGER_TIMER(work_tsc_duration += rdtsc() - work_start_tsc);
                             break;

@@ -638,7 +638,6 @@ int PacketTXRX::recv_relocate(int tid)
             }
         } else if (pkt->pkt_type_ == Packet::PktType::kEncode) {
             const size_t symbol_idx_dl = pkt->symbol_id_;
-            const size_t sc_id = cfg_->get_num_sc_to_process();
 
             int8_t* encode_ptr
                 = cfg_->get_encoded_buf(encoded_buffer_to_precode_,
