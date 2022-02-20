@@ -72,9 +72,9 @@ else
   mkdir -p ${hydra_root_dir}/build
   cd ${hydra_root_dir}/build
   cmake .. -DLOG_LEVEL=warn > /tmp/hydra/install.log || \
-    (echored "Failed to build hydra. Please check /tmp/hydra/install.log for details"; exit)
+    echored "Failed to build hydra. Please check /tmp/hydra/install.log for details" && exit 1
   make -j >> /tmp/hydra/install.log || \
-    (echored "Failed to build hydra. Please check /tmp/hydra/install.log for details"; exit)
+    echored "Failed to build hydra. Please check /tmp/hydra/install.log for details" && exit 1
   for (( i=0; i<${rru_server_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
     scp -oStrictHostKeyChecking=no ${hydra_root_dir}/build/* ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/build/ >> /tmp/hydra/install.log || \
