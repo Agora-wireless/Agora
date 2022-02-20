@@ -4,11 +4,6 @@
 #include <cstdio>
 #include <string>
 #include <set>
-// #include <gflags/gflags.h>
-
-// DEFINE_string(conf_file,
-//     TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json",
-//     "Agora config filename");
 
 size_t num_rb_gen(double avg_load, size_t total_rb) {
     double p_base = 1.0 / (1 + total_rb);
@@ -46,8 +41,6 @@ int main(int argc, char **argv)
 
     // Load the config file
     const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
-    // gflags::ParseCommandLineFlags(&argc, &argv, true);
-    // auto* cfg = new Config(FLAGS_conf_file.c_str());
     auto* cfg = new Config(conf_file.c_str());
     bool verbose = true;
 
@@ -113,6 +106,8 @@ int main(int argc, char **argv)
     // Close files
     fclose(file);
 
+    printf("Save control template information to %s\n", filename.c_str());
+
     filename = cur_directory + "/data/control_ue.bin";
     file = fopen(filename.c_str(), "wb");
 
@@ -127,6 +122,8 @@ int main(int argc, char **argv)
     }
 
     fclose(file);
+
+    printf("Save control information to %s\n", filename.c_str());
 
     return 0;
 }

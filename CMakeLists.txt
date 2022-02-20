@@ -52,9 +52,9 @@ message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR})
 
-find_package(Armadillo PATHS ${PROJECT_ROOT_DIR}/armadillo)
+find_package(Armadillo PATHS ${PROJECT_ROOT_DIR}/armadillo REQUIRED)
 include_directories(SYSTEM ${PROJECT_ROOT_DIR}/armadillo/include)
-find_package(nlohmann_json PATHS ${PROJECT_ROOT_DIR}/json)
+find_package(nlohmann_json PATHS ${PROJECT_ROOT_DIR}/json REQUIRED)
 include_directories(SYSTEM ${PROJECT_ROOT_DIR}/json/include)
 
 set(USE_DPDK True CACHE STRING "USE_DPDK defaulting to 'False'")

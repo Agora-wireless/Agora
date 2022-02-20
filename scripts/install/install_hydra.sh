@@ -34,7 +34,8 @@ eval "source ${HYDRA_RUNNER_ROOT}/Agora/scripts/install/setvars.sh"
 
 echocyan "Building Hydra"
 cd ${hydra_root_dir}
-mkdir -p build || :
+rm -r build || :
+mkdir -p build
 cd build
 cmake .. -DLOG_LEVEL=warn
 make -j
