@@ -73,7 +73,6 @@ void DySubcarrier::StartWork()
     size_t csi_tsc_duration = 0;
     size_t zf_tsc_duration = 0;
     size_t demod_tsc_duration = 0;
-    size_t precode_tsc_duration = 0;
     size_t print_tsc_duration = 0;
     size_t state_operation_duration = 0;
     size_t loop_count = 0;
@@ -528,8 +527,6 @@ void DySubcarrier::StartWorkDownlink() {
 
     size_t work_start_tsc, state_start_tsc;
 
-    size_t frame_tag = 0;
-
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
         size_t worked = 0;
         TRIGGER_TIMER(loop_count ++);
@@ -541,20 +538,10 @@ void DySubcarrier::StartWorkDownlink() {
             size_t state_tsc_usage = rdtsc() - state_start_tsc;
             TRIGGER_TIMER(state_operation_duration += state_tsc_usage);
 
-            // if (frame_tag == 0) {
-            //     printf("Checking recvd all encoded pkts for frame %lu ret %lu\n", precode_cur_frame_, ret);
-            //     frame_tag = 1;
-            // }
-
             if (ret) {
                 TRIGGER_TIMER(work_tsc_duration += state_tsc_usage);
                 work_start_tsc = rdtsc();
                 worked = 1;
-
-                // if (frame_tag == 0) {
-                //     printf("Checking zf done for frame %lu\n", precode_cur_frame_);
-                //     frame_tag = 1;
-                // }
 
                 if (shared_state_->is_zf_done(precode_cur_frame_, (sc_range_.start + (n_precode_tasks_done_ * cfg_->demul_block_size)) / cfg_->zf_block_size)) {
                     size_t precode_start_tsc = rdtsc();
@@ -591,7 +578,7 @@ void DySubcarrier::StartWorkDownlink() {
 
                         bool ret = shared_state_->precode_done(precode_cur_frame_);
                         if (!ret) {
-                            MLPD_ERROR("DySubcarrier Thread %zu precode done error (frame %zu)!\n", 
+                            MLPD_ERROR("DySubcarrier Thread %d precode done error (frame %zu)!\n", 
                                 tid_, precode_cur_frame_);
                             cfg_->error = true;
                             cfg_->running = false;
@@ -700,7 +687,7 @@ void DySubcarrier::StartWorkDownlink() {
     }
 
     if (cfg_->error) {
-        printf("Dysubcarrier Thread %zu error traceback: csi (frame %zu, sc %zu), "
+        printf("Dysubcarrier Thread %d error traceback: csi (frame %zu, sc %zu), "
             "zf (frame %zu, sc %zu), precode (frame %zu, symbol %zu, task %zu), recvd packets done %zu\n", tid_, 
             csi_cur_frame_, csi_cur_sc_, zf_cur_frame_, zf_cur_sc_, precode_cur_frame_,
             precode_cur_sym_dl_, n_precode_tasks_done_, shared_state_->received_all_encoded_pkts(

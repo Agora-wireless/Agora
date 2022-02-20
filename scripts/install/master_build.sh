@@ -54,7 +54,9 @@ rru_server_num=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.rru_servers | length')
 hydra_server_num=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.hydra_servers | length')
 
 if [ "${BUILD_MODE}" == "remote" ]; then
+  echocyan "Sync all source codes to remote servers"
   source ${hydra_root_dir}/scripts/control/sync_all.sh
+  echocyan "Build Hydra app on remote servers"
   for (( i=0; i<${rru_server_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
     ssh -oStrictHostKeyChecking=no ${server_name} "cd ${HYDRA_RUNNER_ROOT}/Agora; \
@@ -68,24 +70,24 @@ if [ "${BUILD_MODE}" == "remote" ]; then
       echored "Server ${server_name} failed to build hydra. Please check /tmp/hydra/install_${server_name}.log for details" &
   done
 else
-  echo "Build Hydra app on the local server"
+  echocyan "Build Hydra app on the local server"
   rm -rf ${hydra_root_dir}/build || :
   mkdir -p ${hydra_root_dir}/build
   cd ${hydra_root_dir}/build
-  echo "Building Hydra app..."
+  echocyan "Building Hydra app..."
   cmake .. -DLOG_LEVEL=warn > /tmp/hydra/install.log || \
     { echored "Failed to build hydra. Please check /tmp/hydra/install.log for details" && exit 1; }
   make -j >> /tmp/hydra/install.log || \
     { echored "Failed to build hydra. Please check /tmp/hydra/install.log for details" && exit 1; }
-  echo "Copying Hydra binaries..."
+  echocyan "Copying Hydra binaries..."
   for (( i=0; i<${rru_server_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
-    scp -oStrictHostKeyChecking=no ${hydra_root_dir}/build/* ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/build/ >> /tmp/hydra/install.log || \
+    scp -r -oStrictHostKeyChecking=no ${hydra_root_dir}/build/* ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/build/ >> /tmp/hydra/install.log || \
       echored "Copying binaries to server ${server_name} failed. Please check /tmp/hydra/install.log for details" &
   done
   for (( i=0; i<${hydra_server_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.hydra_servers[$i]' | tr -d '"')
-    scp -oStrictHostKeyChecking=no ${hydra_root_dir}/build/* ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/build/ >> /tmp/hydra/install.log || \
+    scp -r -oStrictHostKeyChecking=no ${hydra_root_dir}/build/* ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/build/ >> /tmp/hydra/install.log || \
       echored "Copying binaries to server ${server_name} failed. Please check /tmp/hydra/install.log for details" &
   done
 fi

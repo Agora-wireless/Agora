@@ -35,7 +35,6 @@ void DyPrecode::Launch(
     size_t total_data_symbol_idx
         = cfg_->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl);
 
-    size_t start_tsc = worker_rdtsc();
     if (kDebugPrintInTask) {
         printf("In doPrecode TID %d: frame %zu, symbol %zu, subcarrier %zu\n",
             tid_, frame_id, symbol_id_dl, base_sc_id);
@@ -54,9 +53,7 @@ void DyPrecode::Launch(
     // End Debug
 
     for (int i = 0; i < max_sc_ite; i = i + 4) {
-        size_t start_tsc1 = worker_rdtsc();
         for (int j = 0; j < 4; j++) {
-            size_t start_tsc2 = worker_rdtsc();
             int cur_sc_id = base_sc_id + i + j;
 
             complex_float* data_ptr = modulated_buffer_temp_;
@@ -117,8 +114,6 @@ void DyPrecode::Launch(
     //     printf("\n");
     // }
     // End Debug
-
-    size_t start_tsc3 = worker_rdtsc();
 
     float* precoded_ptr = (float*)precoded_buffer_temp_;
     for (size_t ant_id = 0; ant_id < cfg_->BS_ANT_NUM; ant_id++) {

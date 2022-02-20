@@ -247,14 +247,14 @@ add_executable(agora
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(agora ${COMMON_LIBS})
 
-add_executable(sim
-  simulator/main.cpp
-  simulator/simulator.cpp
-  simulator/dynamic_sender.cpp
-  simulator/receiver.cpp
-  src/common/dpdk_transport.cpp
-  $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(sim ${COMMON_LIBS})
+# add_executable(sim
+#   simulator/main.cpp
+#   simulator/simulator.cpp
+#   simulator/dynamic_sender.cpp
+#   simulator/receiver.cpp
+#   src/common/dpdk_transport.cpp
+#   $<TARGET_OBJECTS:common_sources_lib>)
+# target_link_libraries(sim ${COMMON_LIBS})
 
 # End-to-end test
 add_executable(test_agora

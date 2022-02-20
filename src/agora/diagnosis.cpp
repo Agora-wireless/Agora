@@ -12,9 +12,9 @@ Diagnosis::Diagnosis(Config* cfg, SharedState* state,
         printf("\n********************Diagnosis start********************\n");
         printf("Checking packet receiving:\n");
 
-        size_t cur_frame;
-        size_t symbol_id_ul;
-        size_t ue_id;
+        size_t cur_frame = 0;
+        size_t symbol_id_ul = 0;
+        size_t ue_id = 0;
         for (cur_frame = base_frame; cur_frame < base_frame + kFrameWnd; cur_frame ++) {
             for (symbol_id_ul = 0; symbol_id_ul < cfg->ul_data_symbol_num_perframe; symbol_id_ul ++) {
                 for (ue_id = cfg->ue_start; ue_id < cfg->ue_end; ue_id ++) {

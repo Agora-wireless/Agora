@@ -42,9 +42,6 @@ DyEncode::~DyEncode()
 
 void DyEncode::Launch(size_t frame_id, size_t symbol_id_dl, size_t ue_id)
 {
-    const size_t symbol_offset
-        = cfg_->get_total_data_symbol_idx_ul(frame_id, symbol_id_dl);
-    const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
         printf(
             "In doEncode thread %d: frame: %zu, symbol: %zu, ue %zu\n",
@@ -93,7 +90,7 @@ void DyEncode::StartWork()
 
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
         TRIGGER_TIMER(loop_count ++);
-        size_t work_start_tsc, state_start_tsc;
+        size_t work_start_tsc;
 
         if (shared_state_->is_encode_ready(cur_frame_, cur_symbol_)) {
             if (unlikely(!state_trigger && cur_frame_ >= 200)) {
@@ -138,7 +135,7 @@ void DyEncode::StartWork()
     }
 
     if (cfg_->error) {
-        printf("DyEncode Thread %zu error traceback: encode (frame %zu, symbol %zu, ue %zu) "
+        printf("DyEncode Thread %d error traceback: encode (frame %zu, symbol %zu, ue %zu) "
             "total ue num %zu, total dyencode num %zu\n",
             tid_, cur_frame_, cur_symbol_, cur_ue_, total_ue_num_, total_dycode_num_);
     }
@@ -183,8 +180,6 @@ DyDecode::~DyDecode() { free(resp_var_nodes_); }
 void DyDecode::Launch(size_t frame_id, size_t symbol_id_ul, size_t ue_id)
 {
     LDPCconfig LDPC_config = cfg_->LDPC_config;
-    const size_t symbol_offset
-        = cfg_->get_total_data_symbol_idx_ul(frame_id, symbol_id_ul);
     const size_t frame_slot = frame_id % kFrameWnd;
     if (kDebugPrintInTask) {
         printf("In doDecode thread %d: frame: %zu, symbol: %zu, ue: %zu\n",

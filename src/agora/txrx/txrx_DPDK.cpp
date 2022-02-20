@@ -139,7 +139,7 @@ bool PacketTXRX::StartTXRX()
     unsigned int lcore_id;
     size_t worker_id = 0;
     // Launch specific task to cores
-    RTE_LCORE_FOREACH_SLAVE(lcore_id)
+    RTE_LCORE_FOREACH_WORKER(lcore_id)
     {
         // launch communication and task thread onto specific core
         if (worker_id < rx_thread_num_) {

@@ -553,8 +553,6 @@ public:
     {
         size_t total_data_symbol_id
             = get_total_data_symbol_idx_dl(frame_id, symbol_id_dl);
-        size_t num_encoded_bytes_per_cb
-            = LDPC_config.cbCodewLen / mod_order_bits;
         return &encoded_buffer[total_data_symbol_id]
                               [roundup<64>(OFDM_DATA_NUM) * ue_id];
     }
