@@ -68,13 +68,16 @@ if [ "${BUILD_MODE}" == "remote" ]; then
       echored "Server ${server_name} failed to build hydra. Please check /tmp/hydra/install_${server_name}.log for details" &
   done
 else
+  echo "Build Hydra app on the local server"
   rm -rf ${hydra_root_dir}/build || :
   mkdir -p ${hydra_root_dir}/build
   cd ${hydra_root_dir}/build
+  echo "Building Hydra app..."
   cmake .. -DLOG_LEVEL=warn > /tmp/hydra/install.log || \
     echored "Failed to build hydra. Please check /tmp/hydra/install.log for details" && exit 1
   make -j >> /tmp/hydra/install.log || \
     echored "Failed to build hydra. Please check /tmp/hydra/install.log for details" && exit 1
+  echo "Copying Hydra binaries..."
   for (( i=0; i<${rru_server_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
     scp -oStrictHostKeyChecking=no ${hydra_root_dir}/build/* ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/build/ >> /tmp/hydra/install.log || \
