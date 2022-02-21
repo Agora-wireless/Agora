@@ -51,7 +51,7 @@
     "hw_framer": true,
     /* Compute configuration */
     "exclude_cores": [],
-    "ue_core_offset": 7,
+    "ue_core_offset": 13,
     "ue_worker_thread_num": 4,
     "ue_socket_thread_num": 2,
     "core_offset": 0,

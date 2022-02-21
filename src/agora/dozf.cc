@@ -7,11 +7,12 @@
 
 #include "concurrent_queue_wrapper.h"
 #include "doer.h"
+#include <iostream>
 
 static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
-static constexpr size_t kUseInverseForZF = 1u;
+static constexpr size_t kUseInverseForZF = 1u;  // 1u -- unsigned
 static constexpr bool kUseUlZfForDownlink = true;
 
 DoZF::DoZF(Config* config, int tid,
@@ -64,6 +65,7 @@ DoZF::DoZF(Config* config, int tid,
       }
     }
   }
+  arma::arma_rng::set_seed_random(); // IMPORTANT: always rememeber to set seed!
 }
 
 DoZF::~DoZF() {
@@ -135,15 +137,49 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     }
     arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
                             cfg_->BsAntNum(), cfg_->UeAntNum(), false);
-    mat_dl_zf = mat_dl_zf_tmp.st(); // or com out this line and keep  mat_dl_zf.zeros(size(mat_dl_zf)); below
-    //  /* Baseline#2: experiment with all-one bmfm*/
-    // // arma::mat AA;
-    // // AA.ones(size(mat_dl_zf));
-    // // mat_dl_zf = AA;
+    mat_dl_zf = mat_dl_zf_tmp.st(); // <---Baseline#1: DL bmfm
+    // std::cout << "check default mat_dl_zf:" <<std::endl
+    //     << mat_dl_zf << std::endl;
+
+    /****************************************************
+    *      Baseline#2: experiment with all-one bmfm
+    *****************************************************/
     // mat_dl_zf.ones(size(mat_dl_zf));
 
-    // /* Baseline#3: experiment with purely random bmfm*/
-    // //
+
+    /************************************************************************
+    *      Baseline#3: experiment with purely random bmfm (gaussian e.g.,)
+    *************************************************************************/
+    // arma::fmat mat_dl_zf_re = arma::randn<arma::fmat>( size(mat_dl_zf) )*2.0;
+    // arma::fmat mat_dl_zf_im = arma::randn<arma::fmat>( size(mat_dl_zf) )*2.0; // normal distri
+    // mat_dl_zf.set_real(mat_dl_zf_re);
+    // mat_dl_zf.set_imag(mat_dl_zf_im);
+
+
+    /*************************************************************************
+    *      Baseline#4: experiment with ASM random bmfm (per-frame-level)
+    **************************************************************************/
+    // Assuming SU-DM, the mat_dl_zf should be of Nt-by-1; however, Agora also takes REF
+    // into account, resulting in an (Nt+1)-by-1 mat_dl_zf;
+    // E.g., using one chain at BS, mat_dl_zf is of 9-by-1.
+
+    arma::fmat thinvec = arma::ones<arma::fmat>(mat_dl_zf.n_rows-1, 1);
+    int OFF; // num of OFF antennas in one-chain BS
+    OFF= 4;
+    arma::vec index = arma::randperm<arma::vec>(8,OFF ); 
+    for(int i=0; i < index.n_rows; i++)
+    {
+        thinvec(index(i)) = 0.0;
+        // std::cout <<"##"<< index(i) << std::endl; // check the rnd seed placed in DoZF
+    }
+    arma::fmat mat_singleton;   // there might be more efficient way
+    mat_singleton.zeros(1,1);
+    thinvec = arma::join_vert(thinvec, mat_singleton); //append an 0 to thinvec, to match size of mat_dl_zf
+    mat_dl_zf = mat_dl_zf % thinvec; //element-wise product
+    // std::cout << "check: mat_dl_zf after .* with thinvec" << std::endl
+    //    << mat_dl_zf << std::endl;
+  
+
   }
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
     if (cfg_->ExternalRefNode(i) == true) {
