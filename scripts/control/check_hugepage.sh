@@ -11,7 +11,7 @@ for (( i=0; i<${hydra_app_num}; i++ )) do
   total_sz=$(( hugepage_sz*hugepage_num ))
   if [ "${total_sz}" -le "8388608" ]; then
       echored "ERROR: Server ${server_name} does not have 8GB hugepage!"
-      exit
+      exit 1
   fi
 done
 
@@ -24,6 +24,6 @@ for (( i=0; i<${hydra_rru_num}; i++ )) do
   total_sz=$(( hugepage_sz*hugepage_num ))
   if [ "${total_sz}" -le "8388608" ]; then
       echored "ERROR: Server ${server_name} does not have 8GB hugepage!"
-      exit
+      exit 1
   fi
 done

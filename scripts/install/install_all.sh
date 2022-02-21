@@ -56,6 +56,12 @@ function check_sys_pkgs() {
   if [ -z ${res} ]; then
     echo "[$(hostname)] Error: meson is required, please run 'pip3 install meson'"
     exit 1
+  else
+    version_middle=$(echo ${res} | cut -d '.' -f 2)
+    if [ ${version_middle} -lt 47 ]; then
+      echo "[$(hostname)] Error: meson version is too low (<0.47.*), please run 'pip3 install meson'"
+      exit 1
+    fi
   fi
 } 
 
