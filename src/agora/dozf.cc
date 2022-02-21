@@ -80,10 +80,11 @@ DoZF::~DoZF() {
 
   if (kMatLogLimit > 0) {
     FILE* of = fopen("log-mat.csv", "w");
-    fprintf(of, "Frame,Real,Imag\n");
+    fprintf(of, "Frame,Subcarrier,Real,Imag\n");
     for (size_t i = 0; i < mat_log_cnt_; i++) {
       IdCx* idcx = &mat_log_buffer_[i];
-      fprintf(of, "%lu,%f,%f\n", idcx->id, idcx->cx.re, idcx->cx.im);
+      fprintf(of, "%lu,%lu,%f,%f\n", idcx->id[0], idcx->id[1],
+              idcx->cx.re, idcx->cx.im);
     }
     fclose(of);
     std::free(mat_log_buffer_);
@@ -100,9 +101,9 @@ EventData DoZF::Launch(size_t tag) {
   return EventData(EventType::kZF, tag);
 }
 
-float DoZF::ComputePrecoder(size_t frame_id, const arma::cx_fmat& mat_csi,
-                            complex_float* calib_ptr, complex_float* _mat_ul_zf,
-                            complex_float* _mat_dl_zf) {
+float DoZF::ComputePrecoder(size_t frame_id, size_t sc_id,
+                            const arma::cx_fmat& mat_csi, complex_float* calib_ptr,
+                            complex_float* _mat_ul_zf, complex_float* _mat_dl_zf) {
   arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
                           cfg_->UeAntNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_zf_tmp;
@@ -157,7 +158,8 @@ float DoZF::ComputePrecoder(size_t frame_id, const arma::cx_fmat& mat_csi,
     if (mat_log_cnt_ + mat_dl_zf.n_rows <= kMatLogLimit) {
       for (size_t i = 0; i < mat_dl_zf.n_rows; i++) {
         IdCx* mat_log_ptr = &mat_log_buffer_[mat_log_cnt_ + i];
-        mat_log_ptr->id = frame_id;
+        mat_log_ptr->id[0] = frame_id;
+        mat_log_ptr->id[1] = sc_id;
         mat_log_ptr->cx.re = mat_dl_zf(i, 0).real();
         mat_log_ptr->cx.im = mat_dl_zf(i, 0).imag();
       }
@@ -375,7 +377,8 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     double start_tsc3 = GetTime::WorkerRdtsc();
     duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
-    auto rcond = ComputePrecoder(frame_id, mat_csi, calib_gather_buffer_,
+    auto rcond = ComputePrecoder(frame_id, cur_sc_id,
+                                 mat_csi, calib_gather_buffer_,
                                  ul_zf_matrices_[frame_slot][cur_sc_id],
                                  dl_zf_matrices_[frame_slot][cur_sc_id]);
     if (kPrintZfStats) {
@@ -459,7 +462,7 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
   arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
                         cfg_->BsAntNum(), cfg_->UeAntNum(), false);
 
-  ComputePrecoder(frame_id, mat_csi, calib_gather_buffer_,
+  ComputePrecoder(frame_id, base_sc_id, mat_csi, calib_gather_buffer_,
                   ul_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)],
                   dl_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)]);
 

@@ -19,7 +19,7 @@
 #include "utils.h"
 
 typedef struct IdCx {
-  size_t id;
+  size_t id[2];
   complex_float cx;
 } IdCx;
 
@@ -59,9 +59,9 @@ class DoZF : public Doer {
 
   /// Compute the uplink zeroforcing detector matrix and/or the downlink
   /// zeroforcing precoder using this CSI matrix and calibration buffer
-  float ComputePrecoder(size_t frame_id, const arma::cx_fmat& mat_csi,
-                        complex_float* calib_ptr, complex_float* mat_ul_zf,
-                        complex_float* mat_dl_zf);
+  float ComputePrecoder(size_t frame_id, size_t sc_id,
+                        const arma::cx_fmat& mat_csi, complex_float* calib_ptr,
+                        complex_float* mat_ul_zf, complex_float* mat_dl_zf);
   void ComputeCalib(size_t frame_id, size_t sc_id);
   void ZfFreqOrthogonal(size_t tag);
 
