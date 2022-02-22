@@ -207,6 +207,9 @@ private:
     std::vector<BottleneckSubcarrier> bottleneck_subcarrier_;
     std::vector<BottleneckDecode> bottleneck_decode_;
     std::vector<BottleneckEncode> bottleneck_encode_;
+
+    // Buffers for the BigStation mode
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t> bst_time_iq_buffer_;
 };
 
 #endif

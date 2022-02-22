@@ -81,7 +81,7 @@ fi
 # app_name, servers, NIC info
 source ${hydra_root_dir}/scripts/control/init_platform.sh
 
-echocyan "Checking hugepage size on reomte servers"
+echocyan "Checking hugepage size on remote servers"
 source ${hydra_root_dir}/scripts/control/check_hugepage.sh
 
 # Check the validity of the deployment config files
@@ -98,7 +98,8 @@ rm -f /tmp/hydra/install.log
 if [ "${GEN_NEW_TRAFFIC_DATA}" == 1 ]; then
   # Generate control data and traffic data
   echocyan "Generate RRU traffic data"
-  source ${hydra_root_dir}/scripts/control/gen_data.sh
+  source ${hydra_root_dir}/scripts/control/gen_data.sh || \
+    { echored "Failed to generate RRU traffic data. Please check /tmp/hydra/install.log for details"; exit 1; }
 fi
 
 if [ "${HYDRA_RUN_MODE}" == 0 ]; then

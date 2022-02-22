@@ -721,4 +721,9 @@ void DySubcarrier::StartWorkDownlink() {
         csi_count, zf_count, precode_count, 
         cycles_to_us(csi_max, freq_ghz_), cycles_to_us(zf_max, freq_ghz_), cycles_to_us(precode_max, freq_ghz_));
     fclose(fp);
+
+    bn_message_.csi = csi_tsc_duration * 100.0f / whole_duration;
+    bn_message_.zf = zf_tsc_duration * 100.0f / whole_duration;
+    bn_message_.precode = precode_tsc_duration * 100.0f / whole_duration;
+    bn_message_.idle = idle_duration * 100.0f / whole_duration;
 }

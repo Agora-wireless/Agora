@@ -7,6 +7,7 @@ struct BottleneckSubcarrier {
     double csi;
     double zf;
     double demul;
+    double precode;
     double idle;
 };
 struct BottleneckDecode {

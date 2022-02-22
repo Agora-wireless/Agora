@@ -7,7 +7,66 @@ Diagnosis::Diagnosis(Config* cfg, SharedState* state,
     size_t base_frame = state->cur_frame_;
     if (cfg->downlink_mode) {
         printf("\n********************Diagnosis start********************\n");
-        
+        printf("Checking packet receiving:\n");
+
+        size_t cur_frame = 0;
+        size_t symbol_id_dl = 0;
+        size_t ue_id = 0;
+        for (cur_frame = base_frame; cur_frame < base_frame + kFrameWnd; cur_frame ++) {
+            for (symbol_id_dl = 0; symbol_id_dl < cfg->dl_data_symbol_num_perframe; symbol_id_dl ++) {
+                if (!state->received_all_encoded_pkts(cur_frame, symbol_id_dl)) {
+                    goto encode_pkt_check_done;
+                }
+            }
+        }
+    encode_pkt_check_done:
+        size_t encode_last_frame = cur_frame;
+        printf("[Encode packet recv] Last frame: %zu. Symbol %zu, received %zu, required %zu\n", 
+            encode_last_frame, symbol_id_dl, state->num_encoded_pkts_[cur_frame%kFrameWnd][symbol_id_dl].load(),
+            state->num_encoded_pkts_per_symbol_);
+
+        cur_frame = base_frame;
+        for (cur_frame = base_frame; cur_frame < base_frame + kFrameWnd; cur_frame ++) {
+            if (!state->received_all_pilots(cur_frame)) {
+                goto dl_pilot_check_done;            
+            }
+        }
+    dl_pilot_check_done:
+        size_t pilot_last_frame = cur_frame;
+        printf("[Pilot recv] Last frame: %zu. Received %zu, required %zu\n", 
+            pilot_last_frame, state->num_pilot_pkts_[cur_frame%kFrameWnd].load(), state->num_pilot_pkts_per_frame_);
+
+        if (base_frame + kFrameWnd - encode_last_frame < 5) {
+            printf("Did not receive all encoded packets. It could be packet loss among Hydra servers, or some Hydra servers did not finish their encode work.\n");
+        } else if (base_frame + kFrameWnd - pilot_last_frame < 5) {
+            printf("Packet loss for pilot packets. See details further.\n");
+        } else {
+            printf("Precoding might be the bottleneck. See details further.\n");
+        }
+
+        if (base_frame <= 200) {
+            printf("Hydra did not cross the slow start duration. Bottleneck analysis did not start.\n");
+        } else {
+            printf("\nChecking bottleneck:\n");
+            for (size_t i = 0; i < subcarrier_bottleneck.size(); i ++) {
+                if (subcarrier_bottleneck[i].idle < 1) {
+                    printf("Subcarrier %zu is bottlenecked.\n", i);
+                    printf("Subcarrier %zu bottleneck data: (csi %lf, zf %lf, precode %lf)\n", i,
+                        subcarrier_bottleneck[i].csi, subcarrier_bottleneck[i].zf, 
+                        subcarrier_bottleneck[i].precode);
+                    return;
+                } 
+            }
+            for (size_t i = 0; i < encode_bottleneck.size(); i ++) {
+                if (encode_bottleneck[i].idle < 1) {
+                    printf("Encode %zu is bottlenecked.\n", i);
+                    printf("Encode %zu bottleneck data: (encode %lf)\n", i,
+                        encode_bottleneck[i].encode);
+                    return;
+                } 
+            }
+            printf("No bottleneck found.\n");
+        }
     } else {
         printf("\n********************Diagnosis start********************\n");
         printf("Checking packet receiving:\n");
