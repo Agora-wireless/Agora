@@ -65,6 +65,10 @@ class DoZF : public Doer {
   void ComputeCalib(size_t frame_id, size_t sc_id);
   void ZfFreqOrthogonal(size_t tag);
 
+  void UpdateMatLogBuffer(size_t log_id, size_t frame_id, size_t sc_id,
+                          const arma::cx_fmat& mat_in);
+  void FlushMatLogBuffer();
+
   /**
    * Do prediction task for one subcarrier
    * @param tid: task thread index, used for selecting task ptok
@@ -102,8 +106,8 @@ class DoZF : public Doer {
   complex_float* csi_gather_buffer_;  // Intermediate buffer to gather CSI
   // Intermediate buffer to gather reciprical calibration data vector
   complex_float* calib_gather_buffer_;
-  IdCx* mat_log_buffer_;
-  size_t mat_log_cnt_;
+  IdCx** mat_log_buffer_;
+  size_t* mat_log_cnt_;
   PhyStats* phy_stats_;
   arma::uvec ext_ref_id_;
   size_t num_ext_ref_;
