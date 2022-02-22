@@ -57,6 +57,10 @@ for (( i=0; i<${hydra_app_num}; i++ )) do
             elif [ -n "$(echo "$line" | grep "Packet loss for pilot packets")" ]; then
                 pkt_msg=5
                 pkt_loss_rru=1
+            elif [ -n "$(echo "$line" | grep "Did not receive all encoded packets")" ]; then
+                pkt_msg=6
+            elif [ -n "$(echo "$line" | grep "Precoding might be the bottleneck")" ]; then
+                pkt_msg=7
             fi
         elif [ "$diagnose_start" == "6" ]; then
             diagnose_start=7
@@ -78,6 +82,9 @@ for (( i=0; i<${hydra_app_num}; i++ )) do
             elif [ -n "$(echo "$line" | grep "Subcarrier")" ]; then
                 bottleneck=1
                 echored "Subcarrier bottleneck detected in Hydra server ${server_name}. Please check its log for further information."
+            elif [ -n "$(echo "$line" | grep "Encode")" ]; then
+                bottleneck=1
+                echored "Encode bottleneck detected in Hydra server ${server_name}. Please check its log for further information."
             fi
             break
         fi

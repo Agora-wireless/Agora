@@ -11,7 +11,6 @@ Diagnosis::Diagnosis(Config* cfg, SharedState* state,
 
         size_t cur_frame = 0;
         size_t symbol_id_dl = 0;
-        size_t ue_id = 0;
         for (cur_frame = base_frame; cur_frame < base_frame + kFrameWnd; cur_frame ++) {
             for (symbol_id_dl = 0; symbol_id_dl < cfg->dl_data_symbol_num_perframe; symbol_id_dl ++) {
                 if (!state->received_all_encoded_pkts(cur_frame, symbol_id_dl)) {
