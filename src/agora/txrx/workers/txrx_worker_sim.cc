@@ -30,10 +30,10 @@ TxRxWorkerSim::TxRxWorkerSim(
     std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
     std::mutex& sync_mutex, std::condition_variable& sync_cond,
     std::atomic<bool>& can_proceed)
-    : TxRxWorker(core_offset, tid, interface_count, interface_offset, config,
-                 rx_frame_start, event_notify_q, tx_pending_q, tx_producer,
-                 notify_producer, rx_memory, tx_memory, sync_mutex, sync_cond,
-                 can_proceed) {
+    : TxRxWorker(core_offset, tid, interface_count, interface_offset,
+                 config->NumChannels(), config, rx_frame_start, event_notify_q,
+                 tx_pending_q, tx_producer, notify_producer, rx_memory,
+                 tx_memory, sync_mutex, sync_cond, can_proceed) {
   for (size_t interface = 0; interface < num_interfaces_; ++interface) {
     const uint16_t local_port_id =
         config->BsServerPort() + interface + interface_offset_;
@@ -42,7 +42,7 @@ TxRxWorkerSim::TxRxWorkerSim(
         std::make_unique<UDPServer>(local_port_id, kSocketRxBufferSize));
     udp_clients_.emplace_back(std::make_unique<UDPClient>());
     MLPD_FRAME(
-        "TXRX thread [%zu]: set up UDP socket server listening to local port "
+        "TxRxWorkerSim[%zu]: set up UDP socket server listening to local port "
         "%d\n",
         tid_, local_port_id);
   }
@@ -73,7 +73,7 @@ void TxRxWorkerSim::DoTxRx() {
 
   size_t prev_frame_id = SIZE_MAX;
   size_t tx_frame_id = 0;
-  size_t current_interface = 0;
+  size_t thread_local_interface = 0;
   running_ = true;
   WaitSync();
 
@@ -114,7 +114,7 @@ void TxRxWorkerSim::DoTxRx() {
     if (0 == send_result) {
       // receive data
       // Need to get NumChannels data here
-      const auto rx_packets = RecvEnqueue(current_interface);
+      const auto rx_packets = RecvEnqueue(thread_local_interface);
       for (auto& packet : rx_packets) {
         if (kIsWorkerTimingEnabled) {
           const uint32_t frame_id = packet->frame_id_;
@@ -125,8 +125,9 @@ void TxRxWorkerSim::DoTxRx() {
         }
       }
 
-      if (++current_interface == num_interfaces_) {
-        current_interface = 0;
+      thread_local_interface++;
+      if (thread_local_interface == num_interfaces_) {
+        thread_local_interface = 0;
       }
     }  // end if -1 == send_result
   }    // end while
@@ -186,7 +187,8 @@ std::vector<Packet*> TxRxWorkerSim::RecvEnqueue(size_t interface_id) {
           "%d in cell %d,\n",
           pkt->ant_id_, pkt->cell_id_);
     }
-    pkt->ant_id_ += pkt->cell_id_ * ant_per_cell_;
+    pkt->ant_id_ += pkt->cell_id_ *
+                    (Configuration()->BsAntNum() / Configuration()->NumCells());
     if (kDebugMulticell) {
       std::printf(
           "After packet combining: the combined antenna ID is %d, it comes "

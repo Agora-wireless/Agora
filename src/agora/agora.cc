@@ -12,6 +12,7 @@
 #include "packet_txrx_dpdk.h"
 #endif
 #include "packet_txrx_radio.h"
+#include "packet_txrx_sim.h"
 
 static const bool kDebugPrintPacketsFromMac = false;
 static const bool kDebugDeferral = true;
@@ -69,7 +70,7 @@ Agora::Agora(Config* const cfg)
 #endif
   } else {
     /* Default to the simulator */
-    packet_tx_rx_ = std::make_unique<PacketTxRx>(
+    packet_tx_rx_ = std::make_unique<PacketTxRxSim>(
         cfg, cfg->CoreOffset() + 1, &message_queue_,
         GetConq(EventType::kPacketTX, 0), rx_ptoks_ptr_, tx_ptoks_ptr_,
         socket_buffer_, socket_buffer_size_ / cfg->PacketLength(),

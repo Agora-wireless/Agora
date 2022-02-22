@@ -22,10 +22,10 @@ TxRxWorkerHw::TxRxWorkerHw(
     std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
     std::mutex& sync_mutex, std::condition_variable& sync_cond,
     std::atomic<bool>& can_proceed, RadioConfig& radio_config)
-    : TxRxWorker(core_offset, tid, interface_count, interface_offset, config,
-                 rx_frame_start, event_notify_q, tx_pending_q, tx_producer,
-                 notify_producer, rx_memory, tx_memory, sync_mutex, sync_cond,
-                 can_proceed),
+    : TxRxWorker(core_offset, tid, interface_count, interface_offset,
+                 config->NumChannels(), config, rx_frame_start, event_notify_q,
+                 tx_pending_q, tx_producer, notify_producer, rx_memory,
+                 tx_memory, sync_mutex, sync_cond, can_proceed),
       radio_config_(radio_config),
       program_start_ticks_(0),
       freq_ghz_(GetTime::MeasureRdtscFreq()),
@@ -157,7 +157,6 @@ std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
     MLPD_TRACE("TxRxWorkerHw[%zu]: Using Packet at location %zu\n", tid_,
                reinterpret_cast<size_t>(&rx));
   }
-
   long long frame_time;
 
   //Ok to read into sample memory for dummy read

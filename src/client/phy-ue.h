@@ -20,9 +20,9 @@
 #include "datatype_conversion.h"
 #include "mac_thread_client.h"
 #include "modulation.h"
+#include "packet_txrx.h"
 #include "phy_stats.h"
 #include "stats.h"
-#include "txrx_client.h"
 #include "ue_worker.h"
 
 class PhyUe {
@@ -157,7 +157,7 @@ class PhyUe {
   Table<complex_float> modul_buffer_;
 
   // Remote unit
-  std::unique_ptr<RadioTxRx> ru_;
+  std::unique_ptr<PacketTxRx> ru_;
 
   /**
    * Received data

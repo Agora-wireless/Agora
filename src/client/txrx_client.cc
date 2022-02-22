@@ -156,9 +156,9 @@ int RadioTxRx::DequeueSend(int tid) {
   std::memcpy(&pilot[Packet::kOffsetOfData], c->PilotCi16().data(),
               c->PacketLength() - Packet::kOffsetOfData);
 
-  // Transmit pilot symbols on each UE channel
   for (size_t channel = 0; channel < c->NumUeChannels(); channel++) {
     const size_t ant_id = (ue_id * c->NumUeChannels()) + channel;
+    // Transmit pilot symbols on each UE channel
     for (size_t symbol_idx = 0; symbol_idx < c->Frame().NumPilotSyms();
          symbol_idx++) {
       if (kDebugPrintInTask) {

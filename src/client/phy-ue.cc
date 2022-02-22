@@ -6,6 +6,8 @@
 
 #include <memory>
 
+#include "packet_txrx_client_radio.h"
+#include "packet_txrx_client_sim.h"
 #include "phy_ldpc_decoder_5gnr.h"
 #include "phy_stats.h"
 #include "scrambler.h"
@@ -70,14 +72,25 @@ PhyUe::PhyUe(Config* config)
   work_producer_token_ =
       std::make_unique<moodycamel::ProducerToken>(work_queue_);
 
-  ru_ = std::make_unique<RadioTxRx>(
-      config_, rx_thread_num_, config_->UeCoreOffset() + 1, &complete_queue_,
-      &tx_queue_, rx_ptoks_ptr_, tx_ptoks_ptr_);
-
   // uplink buffers init (tx)
   InitializeUplinkBuffers();
   // downlink buffers init (rx)
   InitializeDownlinkBuffers();
+
+  if (kUseArgos) {
+    ru_ = std::make_unique<PacketTxRxClientRadio>(
+        config_, config_->UeCoreOffset() + 1, &complete_queue_, &tx_queue_,
+        rx_ptoks_ptr_, tx_ptoks_ptr_, rx_buffer_,
+        rx_buffer_size_ / config->PacketLength(), stats_->FrameStart(),
+        tx_buffer_);
+    //} else if (kUseUHD) {
+  } else {
+    ru_ = std::make_unique<PacketTxRxClientSim>(
+        config_, config_->UeCoreOffset() + 1, &complete_queue_, &tx_queue_,
+        rx_ptoks_ptr_, tx_ptoks_ptr_, rx_buffer_,
+        rx_buffer_size_ / config->PacketLength(), stats_->FrameStart(),
+        tx_buffer_);
+  }
 
   size_t core_offset_worker = config_->UeCoreOffset() + 1 + rx_thread_num_;
   if (kEnableMac == true) {
@@ -260,9 +273,13 @@ void PhyUe::Stop() {
 void PhyUe::Start() {
   PinToCoreWithOffset(ThreadType::kMaster, config_->UeCoreOffset(), 0);
 
-  if (ru_->StartTxRx(rx_buffer_, rx_buffer_size_ / config_->PacketLength(),
-                     tx_buffer_, tx_buffer_status_, tx_buffer_status_size_,
-                     tx_buffer_size_) == false) {
+  Table<complex_float> calib_buffer;
+  calib_buffer.Malloc(kFrameWnd, config_->UeAntNum() * config_->OfdmDataNum(),
+                      Agora_memory::Alignment_t::kAlign64);
+
+  const bool start_status = ru_->StartTxRx(calib_buffer, calib_buffer);
+  calib_buffer.Free();
+  if (start_status == false) {
     this->Stop();
     return;
   }
