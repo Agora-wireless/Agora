@@ -16,6 +16,8 @@
 
 class TxRxWorker {
  public:
+  static constexpr bool kDebugTxMemory = false;
+
   TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
              size_t interface_offset, size_t channels_per_interface,
              Config* const config, size_t* rx_frame_start,

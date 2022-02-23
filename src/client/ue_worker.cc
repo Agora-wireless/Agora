@@ -24,6 +24,7 @@ static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr bool kRecordDownlinkFrame = true;
 static constexpr size_t kRecordFrameIndex = 100;
+static constexpr bool kDebugTxMemory = false;
 
 UeWorker::UeWorker(
     size_t tid, Config& config, Stats& shared_stats, PhyStats& shared_phy_stats,
@@ -685,11 +686,15 @@ void UeWorker::DoIfft(size_t tag) {
 
   const size_t tx_offset = buff_offset * config_.PacketLength();
   char* cur_tx_buffer = &tx_buffer_[tx_offset];
-  //std::printf(
-  //    "Tx data for (Frame %zu Symbol %zu Ant %zu) is located at tx offset "
-  //    "%zu:%zu at location %ld\n",
-  //    frame_id, symbol_id, ant_id, buff_offset, tx_offset,
-  //    (intptr_t)cur_tx_buffer);
+
+  if (kDebugTxMemory) {
+    std::printf(
+        "Tx data for (Frame %zu Symbol %zu Ant %zu) is located at tx offset "
+        "%zu:%zu at location %ld\n",
+        frame_id, symbol_id, ant_id, buff_offset, tx_offset,
+        (intptr_t)cur_tx_buffer);
+  }
+
   auto* pkt = reinterpret_cast<Packet*>(cur_tx_buffer);
   auto* tx_data_ptr = reinterpret_cast<std::complex<short>*>(pkt->data_);
   CommsLib::Ifft2tx(ifft_buff, tx_data_ptr, config_.OfdmCaNum(),

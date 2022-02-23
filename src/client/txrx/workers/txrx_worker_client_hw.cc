@@ -13,6 +13,8 @@
 
 static constexpr size_t kSyncDetectChannel = 0;
 static constexpr size_t kFrameSync = 1000u;
+static constexpr bool kVerifyFirstSync = true;
+static constexpr size_t kReSyncRetryCount = 1000;
 
 TxRxWorkerClientHw::TxRxWorkerClientHw(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -40,7 +42,7 @@ TxRxWorkerClientHw::TxRxWorkerClientHw(
           std::vector<std::complex<int16_t>>(
               (config->SampsPerSymbol() * config->Frame().NumTotalSyms()),
               std::complex<int16_t>(0, 0))),
-      rx_frame_(config->NumUeChannels(), nullptr) {
+      rx_frame_(config->NumUeChannels()) {
   for (size_t channel = 0; channel < config->NumUeChannels(); channel++) {
     rx_frame_.at(channel) = frame_storage_.at(channel).data();
   }
@@ -93,6 +95,11 @@ void TxRxWorkerClientHw::DoTxRx() {
           "TxRxWorkerClientHw [%zu]: Beacon detected, sync_index: %ld, rx "
           "sample offset: %ld\n",
           radio_id, sync_index, rx_adjust_samples);
+      //Make adjustment
+      RtAssert(rx_adjust_samples > 0,
+               "Adjustment Samples must be greater than 0");
+      AdjustRx(radio_id, rx_adjust_samples);
+      rx_adjust_samples = 0;
     } else if (Configuration()->Running()) {
       MLPD_WARN(
           "TxRxWorkerClientHw [%zu]: Beacon could not be detected - "
@@ -107,19 +114,38 @@ void TxRxWorkerClientHw::DoTxRx() {
 
   bool resync = false;
   size_t resync_retry_cnt = 0;
-  static constexpr size_t kReSyncRetryCount = 100;
   size_t resync_success = 0;
 
   std::stringstream sout;
 
   //Establish time0 from symbol = 0 (beacon), frame 0
   while (Configuration()->Running() && (time0 == 0)) {
+    rx_adjust_samples = 0;
     const auto rx_pkts =
         DoRx(radio_id, rx_frame_id, rx_symbol_id, rx_time, rx_adjust_samples);
     if (rx_pkts.size() == channels_per_interface_) {
       time0 = rx_time;
-    }
+
+      if (kVerifyFirstSync) {
+        const ssize_t sync_index =
+            FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
+                               rx_pkts.at(kSyncDetectChannel)->data_),
+                           samples_per_symbol);
+        if (sync_index >= 0) {
+          rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
+                              Configuration()->OfdmTxZeroPrefix();
+          MLPD_INFO(
+              "TxRxWorkerClientHw [%zu]: Initial Sync - radio %zu, sync_index: "
+              "%ld, rx sample offset: %ld\n",
+              tid_, radio_id, sync_index, rx_adjust_samples);
+        } else {
+          throw std::runtime_error("No Beacon Detected at Frame 0 / Symbol 0");
+        }
+      }
+    }  // received Frame 0 Symbol 0
   }
+
+  //PreSchedule TX_FRAME_OFFSET pilots and zero out uplink symbols
 
   //Beacon sync detected run main rx routines
   while (Configuration()->Running()) {
@@ -135,23 +161,26 @@ void TxRxWorkerClientHw::DoTxRx() {
       const auto rx_pkts =
           DoRx(radio_id, rx_frame_id, rx_symbol_id, rx_time, rx_adjust_samples);
       if (rx_pkts.size() == channels_per_interface_) {
+        const size_t pkt_frame = rx_pkts.at(0)->frame_id_;
+        const size_t pkt_symbol = rx_pkts.at(0)->symbol_id_;
+
         if (kDebugPrintInTask) {
           std::printf(
-              "DoTxRx [%zu]: radio %zu received frame id %zu, symbol id %zu at time %lld\n",
-              tid_, radio_id, rx_frame_id, rx_symbol_id, rx_time);
+              "DoTxRx[%zu]: radio %zu received frame id %zu, symbol id %zu at "
+              "time %lld\n",
+              tid_, radio_id, pkt_frame, pkt_symbol, rx_time);
         }
         // resync every kFrameSync frames:
         // Only sync on beacon symbols
         ///\todo: kFrameSync should be a function of sample rate and max CFO
-        if ((rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast()) &&
-            ((rx_frame_id / kFrameSync) > 0) &&
-            ((rx_frame_id % kFrameSync) == 0)) {
+        if ((pkt_symbol == Configuration()->Frame().GetBeaconSymbolLast()) &&
+            ((pkt_frame / kFrameSync) > 0) && ((pkt_frame % kFrameSync) == 0)) {
           resync = true;
         }
 
-        //If we have a beacon and we would like to resynch
+        //If we have a beacon and we would like to resync
         if (resync &&
-            (rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast())) {
+            (pkt_symbol == Configuration()->Frame().GetBeaconSymbolLast())) {
           //This is adding a race condition on this data, it is ok for now but we should fix this
           const ssize_t sync_index =
               FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
@@ -259,8 +288,8 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
 
       if (kDebugPrintInTask) {
         std::printf(
-            "TxRxWorkerClientHw [%zu]: rx'd frame %zu, symbol %zu, radio id "
-            "%zu rxtime %llx\n",
+            "TxRxWorkerClientHw [%zu]: rx'd Frame %zu, Symbol %zu, Radio id "
+            "%zu rxtime %lld\n",
             tid_, global_frame_id, global_symbol_id, radio_id, receive_time);
       }
 
@@ -334,9 +363,10 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
       tx_data.at(ch) = frame_zeros_.at(ch).data();
     }
 
-    MLPD_INFO(
-        "TxRxWorkerClientHw::DoTx[%zu]: Request to Transmit (Frame %zu, User %zu, Ant %zu)\n",
-        tid_, frame_id, ue_ant, interface_id);
+    MLPD_FRAME(
+        "TxRxWorkerClientHw::DoTx[%zu]: Request to Transmit (Frame %zu:%zu, "
+        "User %zu, Ant %zu) time0 %lld\n",
+        tid_, frame_id, tx_frame_id, ue_ant, interface_id, time0);
 
     RtAssert((interface_id >= interface_offset_) &&
                  (interface_id <= (num_interfaces_ + interface_offset_)),
@@ -393,9 +423,10 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
 
           if (kDebugPrintInTask) {
             std::printf(
-                "TxRxWorkerClientHw [%zu]: Transmitted pilot (Frame %zu, Symbol "
-                "%zu, Ue %zu) at time %lld with flags %d\n",
-                tid_, frame_id, pilot_symbol_id, interface_id, tx_time, flags_tx);
+                "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Pilot  (Frame "
+                "%zu:%zu, Symbol %zu, Ue %zu) at time %lld flags %d\n",
+                tid_, frame_id, tx_frame_id, pilot_symbol_id, interface_id,
+                tx_time, flags_tx);
           }
           //Replace the pilot with zeros for next channel pilot
           tx_data.at(ch) = frame_zeros_.at(ch).data();
@@ -413,14 +444,15 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
       if (current_event.event_type_ == EventType::kPacketTX) {
         // Transmit data for all symbols
         flags_tx = 1;
-        for (size_t symbol_id = 0;
-             symbol_id < Configuration()->Frame().NumULSyms(); symbol_id++) {
+        for (size_t ul_symbol_idx = 0;
+             ul_symbol_idx < Configuration()->Frame().NumULSyms();
+             ul_symbol_idx++) {
           const size_t tx_symbol_id =
-              Configuration()->Frame().GetULSymbol(symbol_id);
+              Configuration()->Frame().GetULSymbol(ul_symbol_idx);
 
           for (size_t ch = 0; ch < channels_per_interface_; ch++) {
             const size_t tx_ant = (interface_id * channels_per_interface_) + ch;
-            auto* pkt = GetUlTxPacket(frame_id, symbol_id, tx_ant);
+            auto* pkt = GetUlTxPacket(frame_id, tx_symbol_id, tx_ant);
             tx_data.at(ch) = reinterpret_cast<void*>(pkt->data_);
           }
 
@@ -445,8 +477,10 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
 
           if (kDebugPrintInTask) {
             std::printf(
-                "TxRxWorkerClientHw::DoTx[%zu]: Completed Transmit (Frame %zu, Symbol %zu, Ue %zu) tx time %lld flags %d\n",
-                tid_, frame_id, tx_symbol_id, interface_id, tx_time, flags_tx);
+                "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Symbol (Frame "
+                "%zu:%zu, Symbol %zu, Ue %zu) tx time %lld flags %d\n",
+                tid_, frame_id, tx_frame_id, tx_symbol_id, interface_id,
+                tx_time, flags_tx);
           }
         }
 
@@ -459,13 +493,30 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
                         gen_tag_t::FrmSymUe(frame_id, 0, tx_ant).tag_);
           NotifyComplete(complete_event);
         }
-        MLPD_INFO(
-            "TxRxWorkerClientHw::DoTx[%zu]: Frame %zu Transmit Complete for Ue %zu\n",
+        MLPD_TRACE(
+            "TxRxWorkerClientHw::DoTx[%zu]: Frame %zu Transmit Complete for Ue "
+            "%zu\n",
             tid_, frame_id, interface_id);
       }
     }
   }  // End all events
   return tx_events.size();
+}
+
+void TxRxWorkerClientHw::AdjustRx(size_t radio_id, size_t discard_samples) {
+  long long rx_time = 0;
+  while (Configuration()->Running() && (discard_samples > 0)) {
+    const int rx_status =
+        radio_.RadioRx(radio_id, rx_frame_.data(), discard_samples, rx_time);
+
+    if (rx_status < 0) {
+      std::cerr << "RadioTxRx [" << radio_id << "]: BAD SYNC Receive("
+                << rx_status << "/" << discard_samples << ") at Time "
+                << rx_time << std::endl;
+    } else {
+      discard_samples = discard_samples - rx_status;
+    }
+  }
 }
 
 ssize_t TxRxWorkerClientHw::SyncBeacon(size_t radio_id, size_t sample_window) {
@@ -512,17 +563,6 @@ ssize_t TxRxWorkerClientHw::FindSyncBeacon(std::complex<int16_t>* check_data,
       CommsLib::FindBeaconAvx(sync_compare, Configuration()->GoldCf32());
   return sync_index;
 }
-
-/*
-if (sync_index >= 0) {
-  rx_offset = sync_index - Configuration()->BeaconLen() -
-              Configuration()->OfdmTxZeroPrefix();
-  MLPD_INFO(
-      "RadioTxRx [%zu]: Beacon detected at Time %lld, sync_index: "
-      "%ld, rx sample offset: %d\n",
-      radio_id, rx_time, sync_index, rx_offset);
-}
-*/
 
 bool TxRxWorkerClientHw::IsRxSymbol(size_t symbol_id) {
   auto symbol_type = Configuration()->GetSymbolType(symbol_id);

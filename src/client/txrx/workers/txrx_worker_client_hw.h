@@ -42,6 +42,7 @@ class TxRxWorkerClientHw : public TxRxWorker {
   ssize_t SyncBeacon(size_t radio_id, size_t sample_window);
   ssize_t FindSyncBeacon(std::complex<int16_t>* check_data,
                          size_t sample_window);
+  void AdjustRx(size_t radio_id, size_t discard_samples);
 
   bool IsRxSymbol(size_t symbol_id);
 

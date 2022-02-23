@@ -170,11 +170,13 @@ Packet* TxRxWorker::GetUlTxPacket(size_t frame, size_t symbol, size_t ant) {
        Configuration()->UeAntNum()) +
       ant;
 
-  //std::printf(
-  //    "GetUlTxPacket: (Frame %zu Symbol %zu Ant %zu) Tx Offset %zu:%zu "
-  //    "location %ld\n",
-  //    frame, symbol, ant, offset, offset * Configuration()->PacketLength(),
-  //    (intptr_t)(&tx_memory_[offset * Configuration()->PacketLength()]));
+  if (TxRxWorker::kDebugTxMemory) {
+    std::printf(
+        "GetUlTxPacket: (Frame %zu Symbol %zu Ant %zu) Tx Offset %zu:%zu "
+        "location %ld\n",
+        frame, symbol, ant, offset, offset * Configuration()->PacketLength(),
+        (intptr_t)(&tx_memory_[offset * Configuration()->PacketLength()]));
+  }
 
   return reinterpret_cast<Packet*>(
       &tx_memory_[offset * Configuration()->PacketLength()]);
