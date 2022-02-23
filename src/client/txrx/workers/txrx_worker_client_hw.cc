@@ -78,7 +78,7 @@ void TxRxWorkerClientHw::DoTxRx() {
     return;
   }
 
-  const size_t radio_id = tid_;
+  const size_t local_interface = 0;
 
   // Keep receiving one frame of data until a beacon is found
   // Perform initial beacon detection every kBeaconDetectInterval frames
@@ -87,24 +87,24 @@ void TxRxWorkerClientHw::DoTxRx() {
   ssize_t rx_adjust_samples = 0;
   //Scope the variables
   {
-    const ssize_t sync_index = SyncBeacon(radio_id, samples_per_frame);
+    const ssize_t sync_index = SyncBeacon(local_interface, samples_per_frame);
     if (sync_index >= 0) {
       rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
                           Configuration()->OfdmTxZeroPrefix();
       MLPD_INFO(
           "TxRxWorkerClientHw [%zu]: Beacon detected, sync_index: %ld, rx "
           "sample offset: %ld\n",
-          radio_id, sync_index, rx_adjust_samples);
+          local_interface, sync_index, rx_adjust_samples);
       //Make adjustment
       RtAssert(rx_adjust_samples > 0,
                "Adjustment Samples must be greater than 0");
-      AdjustRx(radio_id, rx_adjust_samples);
+      AdjustRx(local_interface, rx_adjust_samples);
       rx_adjust_samples = 0;
     } else if (Configuration()->Running()) {
       MLPD_WARN(
           "TxRxWorkerClientHw [%zu]: Beacon could not be detected - "
           "sync_index: %ld\n",
-          radio_id, sync_index);
+          local_interface, sync_index);
       throw std::runtime_error("rx sample offset is less than 0");
     }
   }
@@ -121,8 +121,8 @@ void TxRxWorkerClientHw::DoTxRx() {
   //Establish time0 from symbol = 0 (beacon), frame 0
   while (Configuration()->Running() && (time0 == 0)) {
     rx_adjust_samples = 0;
-    const auto rx_pkts =
-        DoRx(radio_id, rx_frame_id, rx_symbol_id, rx_time, rx_adjust_samples);
+    const auto rx_pkts = DoRx(local_interface, rx_frame_id, rx_symbol_id,
+                              rx_time, rx_adjust_samples);
     if (rx_pkts.size() == channels_per_interface_) {
       time0 = rx_time;
 
@@ -137,7 +137,8 @@ void TxRxWorkerClientHw::DoTxRx() {
           MLPD_INFO(
               "TxRxWorkerClientHw [%zu]: Initial Sync - radio %zu, sync_index: "
               "%ld, rx sample offset: %ld\n",
-              tid_, radio_id, sync_index, rx_adjust_samples);
+              tid_, local_interface + interface_offset_, sync_index,
+              rx_adjust_samples);
         } else {
           throw std::runtime_error("No Beacon Detected at Frame 0 / Symbol 0");
         }
@@ -158,8 +159,8 @@ void TxRxWorkerClientHw::DoTxRx() {
     //Attempt Tx
     const size_t tx_status = DoTx(time0);
     if (tx_status == 0) {
-      const auto rx_pkts =
-          DoRx(radio_id, rx_frame_id, rx_symbol_id, rx_time, rx_adjust_samples);
+      const auto rx_pkts = DoRx(local_interface, rx_frame_id, rx_symbol_id,
+                                rx_time, rx_adjust_samples);
       if (rx_pkts.size() == channels_per_interface_) {
         const size_t pkt_frame = rx_pkts.at(0)->frame_id_;
         const size_t pkt_symbol = rx_pkts.at(0)->symbol_id_;
@@ -168,7 +169,8 @@ void TxRxWorkerClientHw::DoTxRx() {
           std::printf(
               "DoTxRx[%zu]: radio %zu received frame id %zu, symbol id %zu at "
               "time %lld\n",
-              tid_, radio_id, pkt_frame, pkt_symbol, rx_time);
+              tid_, local_interface + interface_offset_, pkt_frame, pkt_symbol,
+              rx_time);
         }
         // resync every kFrameSync frames:
         // Only sync on beacon symbols
@@ -192,8 +194,8 @@ void TxRxWorkerClientHw::DoTxRx() {
             MLPD_INFO(
                 "TxRxWorkerClientHw [%zu]: Re-syncing radio %zu, sync_index: "
                 "%ld, rx sample offset: %ld tries %zu\n",
-                tid_, radio_id, sync_index, rx_adjust_samples,
-                resync_retry_cnt);
+                tid_, local_interface + interface_offset_, sync_index,
+                rx_adjust_samples, resync_retry_cnt);
             resync_success++;
             resync = false;
 
@@ -207,8 +209,8 @@ void TxRxWorkerClientHw::DoTxRx() {
                   "TxRxWorkerClientHw [%zu]: Exceeded resync retry limit (%zu) "
                   "for client %zu reached after %zu resync successes at frame: "
                   "%zu.  Stopping!\n",
-                  tid_, kReSyncRetryCount, radio_id, resync_success,
-                  rx_frame_id);
+                  tid_, kReSyncRetryCount, local_interface + interface_offset_,
+                  resync_success, rx_frame_id);
               Configuration()->Running(false);
               break;
             }
@@ -275,8 +277,11 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
         "status = %d is less than 0\n",
         tid_, interface_id, interface_id + interface_offset_, rx_status);
   } else if (static_cast<size_t>(rx_status) != num_rx_samps) {
-    std::cerr << "RX [" << tid_ << "]: BAD Receive(" << rx_status << "/"
-              << num_rx_samps << ") at Time " << receive_time << std::endl;
+    MLPD_ERROR(
+        "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
+        "status = %d is less than num samples %zu\n",
+        tid_, interface_id, interface_id + interface_offset_, rx_status,
+        num_rx_samps);
   } else {
     //sample_offset > 0 means we ignore the rx'd data (don't update the symbol / frame tracking)
     if (sample_offset <= 0) {
@@ -503,7 +508,9 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
   return tx_events.size();
 }
 
-void TxRxWorkerClientHw::AdjustRx(size_t radio_id, size_t discard_samples) {
+void TxRxWorkerClientHw::AdjustRx(size_t local_interface,
+                                  size_t discard_samples) {
+  const size_t radio_id = local_interface + interface_offset_;
   long long rx_time = 0;
   while (Configuration()->Running() && (discard_samples > 0)) {
     const int rx_status =
@@ -519,7 +526,9 @@ void TxRxWorkerClientHw::AdjustRx(size_t radio_id, size_t discard_samples) {
   }
 }
 
-ssize_t TxRxWorkerClientHw::SyncBeacon(size_t radio_id, size_t sample_window) {
+ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
+                                       size_t sample_window) {
+  const size_t radio_id = local_interface + interface_offset_;
   ssize_t sync_index = -1;
   long long rx_time = 0;
   assert(sample_window <=
