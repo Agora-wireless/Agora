@@ -308,6 +308,12 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
               Packet(global_frame_id, global_symbol_id, 0, ant_ids.at(ant));
           result_packets.push_back(raw_pkt);
 
+          MLPD_FRAME(
+              "TxRxWorkerClientHw [%zu]: Rx Downlink (Frame %zu, Symbol %zu, "
+              "Ant %zu) from Radio %zu - rxtime %lld\n",
+              tid_, global_frame_id, global_symbol_id, ant_ids.at(ant),
+              radio_id, receive_time);
+
           // Push kPacketRX event into the queue.
           EventData rx_message(EventType::kPacketRX, rx_tag_t(*rx_packet).tag_);
           NotifyComplete(rx_message);
