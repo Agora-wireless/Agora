@@ -127,20 +127,22 @@ void TxRxWorkerClientHw::DoTxRx() {
       time0 = rx_time;
 
       if (kVerifyFirstSync) {
-        const ssize_t sync_index =
-            FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
-                               rx_pkts.at(kSyncDetectChannel)->data_),
-                           samples_per_symbol);
-        if (sync_index >= 0) {
-          rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
-                              Configuration()->OfdmTxZeroPrefix();
-          MLPD_INFO(
-              "TxRxWorkerClientHw [%zu]: Initial Sync - radio %zu, sync_index: "
-              "%ld, rx sample offset: %ld\n",
-              tid_, local_interface + interface_offset_, sync_index,
-              rx_adjust_samples);
-        } else {
-          throw std::runtime_error("No Beacon Detected at Frame 0 / Symbol 0");
+        for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+          const ssize_t sync_index = FindSyncBeacon(
+              reinterpret_cast<std::complex<int16_t>*>(rx_pkts.at(ch)->data_),
+              samples_per_symbol);
+          if (sync_index >= 0) {
+            rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
+                                Configuration()->OfdmTxZeroPrefix();
+            MLPD_INFO(
+                "TxRxWorkerClientHw [%zu]: Initial Sync - radio %zu, "
+                "sync_index: %ld, rx sample offset: %ld\n",
+                tid_, (local_interface + interface_offset_) + ch, sync_index,
+                rx_adjust_samples);
+          } else {
+            throw std::runtime_error(
+                "No Beacon Detected at Frame 0 / Symbol 0");
+          }
         }
       }
     }  // received Frame 0 Symbol 0
@@ -368,10 +370,10 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
       tx_data.at(ch) = frame_zeros_.at(ch).data();
     }
 
-    MLPD_FRAME(
+    MLPD_INFO(
         "TxRxWorkerClientHw::DoTx[%zu]: Request to Transmit (Frame %zu:%zu, "
         "User %zu, Ant %zu) time0 %lld\n",
-        tid_, frame_id, tx_frame_id, ue_ant, interface_id, time0);
+        tid_, frame_id, tx_frame_id, interface_id, ue_ant, time0);
 
     RtAssert((interface_id >= interface_offset_) &&
                  (interface_id <= (num_interfaces_ + interface_offset_)),
@@ -390,6 +392,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
 
       if (!Configuration()->UeHwFramer()) {
         for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+          flags_tx = 2;
           const size_t pilot_ant =
               (interface_id * channels_per_interface_) + ch;
           const size_t pilot_symbol_id =
@@ -405,6 +408,8 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
                 flags_tx = 1;
               }
             }
+          } else {
+            flags_tx = 1;
           }
 
           //Add the pilot to the correct index
@@ -426,12 +431,13 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
                       << interface_id << "/" << samples_per_symbol << std::endl;
           }
 
-          if (kDebugPrintInTask) {
+          if (kDebugPrintInTask || true) {
             std::printf(
                 "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Pilot  (Frame "
-                "%zu:%zu, Symbol %zu, Ue %zu) at time %lld flags %d\n",
-                tid_, frame_id, tx_frame_id, pilot_symbol_id, interface_id,
-                tx_time, flags_tx);
+                "%zu:%zu, Symbol %zu, Ue %zu, Ant %zu:%zu) at time %lld flags "
+                "%d\n",
+                tid_, frame_id, tx_frame_id, pilot_symbol_id, interface_id, ch,
+                pilot_ant, tx_time, flags_tx);
           }
           //Replace the pilot with zeros for next channel pilot
           tx_data.at(ch) = frame_zeros_.at(ch).data();
@@ -480,7 +486,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
                       << tx_status << "/" << samples_per_symbol << std::endl;
           }
 
-          if (kDebugPrintInTask) {
+          if (kDebugPrintInTask || true) {
             std::printf(
                 "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Symbol (Frame "
                 "%zu:%zu, Symbol %zu, Ue %zu) tx time %lld flags %d\n",
