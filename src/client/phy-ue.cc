@@ -755,7 +755,7 @@ void PhyUe::Start() {
 
           PrintPerTaskDone(PrintType::kPacketTX, frame_id, symbol_id, ant_id);
 
-          bool last_tx_task = this->tx_counters_.CompleteTask(frame_id);
+          bool last_tx_task = tx_counters_.CompleteTask(frame_id);
           if (last_tx_task) {
             stats_->MasterSetTsc(TsType::kTXDone, frame_id);
             PrintPerFrameDone(PrintType::kPacketTX, frame_id);
