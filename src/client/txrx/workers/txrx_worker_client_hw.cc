@@ -76,8 +76,10 @@ void TxRxWorkerClientHw::DoTxRx() {
     MLPD_WARN("TxRxWorkerClientHw[%zu] has no interfaces, exiting\n", tid_);
     running_ = false;
     return;
+  } else if (num_interfaces_ > 1) {
+    throw std::runtime_error(
+        "TxRxWorkerClientHw does not support multiple interfaces per thread");
   }
-
   const size_t local_interface = 0;
 
   // Keep receiving one frame of data until a beacon is found
@@ -96,8 +98,10 @@ void TxRxWorkerClientHw::DoTxRx() {
           "sample offset: %ld\n",
           local_interface, sync_index, rx_adjust_samples);
       //Make adjustment
-      RtAssert(rx_adjust_samples > 0,
-               "Adjustment Samples must be greater than 0");
+      //If negative, take offset out of the next frame
+      if (rx_adjust_samples < 0) {
+        rx_adjust_samples += samples_per_frame;
+      }
       AdjustRx(local_interface, rx_adjust_samples);
       rx_adjust_samples = 0;
     } else if (Configuration()->Running()) {
@@ -117,10 +121,10 @@ void TxRxWorkerClientHw::DoTxRx() {
   size_t resync_success = 0;
 
   std::stringstream sout;
+  rx_adjust_samples = 0;
 
   //Establish time0 from symbol = 0 (beacon), frame 0
   while (Configuration()->Running() && (time0 == 0)) {
-    rx_adjust_samples = 0;
     const auto rx_pkts = DoRx(local_interface, rx_frame_id, rx_symbol_id,
                               rx_time, rx_adjust_samples);
     if (rx_pkts.size() == channels_per_interface_) {
@@ -376,7 +380,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
       tx_data.at(ch) = frame_zeros_.at(ch).data();
     }
 
-    MLPD_INFO(
+    MLPD_FRAME(
         "TxRxWorkerClientHw::DoTx[%zu]: Request to Transmit (Frame %zu:%zu, "
         "User %zu, Ant %zu) time0 %lld\n",
         tid_, frame_id, tx_frame_id, interface_id, ue_ant, time0);
@@ -437,7 +441,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
                       << interface_id << "/" << samples_per_symbol << std::endl;
           }
 
-          if (kDebugPrintInTask || true) {
+          if (kDebugPrintInTask) {
             std::printf(
                 "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Pilot  (Frame "
                 "%zu:%zu, Symbol %zu, Ue %zu, Ant %zu:%zu) at time %lld flags "
@@ -492,7 +496,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
                       << tx_status << "/" << samples_per_symbol << std::endl;
           }
 
-          if (kDebugPrintInTask || true) {
+          if (kDebugPrintInTask) {
             std::printf(
                 "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Symbol (Frame "
                 "%zu:%zu, Symbol %zu, Ue %zu) tx time %lld flags %d\n",
