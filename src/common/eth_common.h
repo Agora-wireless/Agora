@@ -21,7 +21,6 @@
 #define ETH_COMMON_H_
 
 #include <arpa/inet.h>
-#include <assert.h>
 #include <ifaddrs.h>
 #include <linux/if_packet.h>
 #include <net/if.h>
@@ -30,6 +29,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <cassert>
 #include <sstream>
 #include <string>
 
@@ -143,7 +143,7 @@ struct udp_hdr_t {
 
 static constexpr size_t kInetHdrsTotSize =
     sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t);
-static_assert(kInetHdrsTotSize == 42, "");
+static_assert(kInetHdrsTotSize == 42);
 
 /// Return a string representation of the Ethernet + IPv4 + UDP frame headers
 /// starting at \p buf
@@ -193,7 +193,7 @@ static inline void gen_udp_header(udp_hdr_t* udp_hdr, uint16_t src_port,
 }
 
 /// Return the IPv4 address of a kernel-visible interface in host-byte order
-static inline uint32_t get_interface_ipv4_addr(std::string interface) {
+static inline uint32_t get_interface_ipv4_addr(const std::string& interface) {
   struct ifaddrs *ifaddr, *ifa;
   RtAssert(getifaddrs(&ifaddr) == 0);
   uint32_t ipv4_addr = 0;
@@ -218,7 +218,8 @@ static inline uint32_t get_interface_ipv4_addr(std::string interface) {
 }
 
 /// Fill the MAC address of kernel-visible interface
-static inline void fill_interface_mac(std::string interface, uint8_t* mac) {
+static inline void fill_interface_mac(const std::string& interface,
+                                      uint8_t* mac) {
   struct ifreq ifr;
   ifr.ifr_addr.sa_family = AF_INET;
   strncpy(ifr.ifr_name, interface.c_str(), IFNAMSIZ - 1);

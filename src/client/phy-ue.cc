@@ -129,7 +129,7 @@ PhyUe::PhyUe(Config* config)
   }
 
   // This usage doesn't effect the user num_reciprocity_pkts_per_frame_;
-  rx_counters_.num_pkts_per_frame_ =
+  rx_counters_.num_rx_pkts_per_frame_ =
       config_->UeAntNum() *
       (config_->Frame().NumDLSyms() + config_->Frame().NumBeaconSyms());
   rx_counters_.num_pilot_pkts_per_frame_ =
@@ -187,7 +187,7 @@ void PhyUe::ScheduleWork(EventData do_task) {
   }
 }
 
-void PhyUe::ReceiveDownlinkSymbol(struct Packet* rx_packet, size_t tag) {
+void PhyUe::ReceiveDownlinkSymbol(Packet* rx_packet, size_t tag) {
   const size_t frame_slot = rx_packet->frame_id_ % kFrameWnd;
   const size_t dl_symbol_idx =
       config_->Frame().GetDLSymbolIdx(rx_packet->symbol_id_);
@@ -307,11 +307,11 @@ void PhyUe::Start() {
           RxPacket* rx = rx_tag_t(event.tags_[0]).rx_packet_;
           Packet* pkt = rx->RawPacket();
 
-          size_t frame_id = pkt->frame_id_;
-          size_t symbol_id = pkt->symbol_id_;
-          size_t ant_id = pkt->ant_id_;
-          size_t ue_id = ant_id / config_->NumUeChannels();
-          size_t frame_slot = frame_id % kFrameWnd;
+          const size_t frame_id = pkt->frame_id_;
+          const size_t symbol_id = pkt->symbol_id_;
+          const size_t ant_id = pkt->ant_id_;
+          const size_t ue_id = ant_id / config_->NumUeChannels();
+          const size_t frame_slot = frame_id % kFrameWnd;
           RtAssert(pkt->frame_id_ < (cur_frame_id + kFrameWnd),
                    "Error: Received packet for future frame beyond frame "
                    "window. This can happen if PHY is running "
@@ -345,7 +345,7 @@ void PhyUe::Start() {
           }
           rx_counters_.num_pkts_.at(frame_slot)++;
           if (rx_counters_.num_pkts_.at(frame_slot) ==
-              rx_counters_.num_pkts_per_frame_) {
+              rx_counters_.num_rx_pkts_per_frame_) {
             this->stats_->MasterSetTsc(TsType::kRXDone, frame_id);
             PrintPerFrameDone(PrintType::kPacketRX, frame_id);
             rx_counters_.num_pkts_.at(frame_slot) = 0;
@@ -404,16 +404,16 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kFFTPilot: {
-          size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          const size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
 
           PrintPerTaskDone(PrintType::kFFTPilots, frame_id, symbol_id, ant_id);
-          bool tasks_complete =
+          const bool tasks_complete =
               fft_dlpilot_counters_.CompleteTask(frame_id, symbol_id);
           if (tasks_complete == true) {
             PrintPerSymbolDone(PrintType::kFFTPilots, frame_id, symbol_id);
-            bool pilot_fft_complete =
+            const bool pilot_fft_complete =
                 fft_dlpilot_counters_.CompleteSymbol(frame_id);
             if (pilot_fft_complete == true) {
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
@@ -424,16 +424,16 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kFFT: {
-          size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          const size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
 
           // Schedule the Demul
           EventData do_demul_task(EventType::kDemul, event.tags_[0]);
           ScheduleWork(do_demul_task);
 
           PrintPerTaskDone(PrintType::kFFTData, frame_id, symbol_id, ant_id);
-          bool tasks_complete =
+          const bool tasks_complete =
               fft_dldata_counters_.CompleteTask(frame_id, symbol_id);
           if (tasks_complete == true) {
             PrintPerSymbolDone(PrintType::kFFTData, frame_id, symbol_id);
@@ -449,9 +449,9 @@ void PhyUe::Start() {
         } break;
 
         case EventType::kDemul: {
-          size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
-          size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
-          size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
+          const size_t frame_id = gen_tag_t(event.tags_[0]).frame_id_;
+          const size_t symbol_id = gen_tag_t(event.tags_[0]).symbol_id_;
+          const size_t ant_id = gen_tag_t(event.tags_[0]).ant_id_;
 
           if (kDownlinkHardDemod == false) {
             EventData do_decode_task(EventType::kDecode, event.tags_[0]);
@@ -459,7 +459,7 @@ void PhyUe::Start() {
           }
 
           PrintPerTaskDone(PrintType::kDemul, frame_id, symbol_id, ant_id);
-          bool symbol_complete =
+          const bool symbol_complete =
               demul_counters_.CompleteTask(frame_id, symbol_id);
           if (symbol_complete == true) {
             PrintPerSymbolDone(PrintType::kDemul, frame_id, symbol_id);
@@ -492,7 +492,7 @@ void PhyUe::Start() {
 
           PrintPerTaskDone(PrintType::kDecode, frame_id, symbol_id, ant_id);
 
-          bool symbol_complete =
+          const bool symbol_complete =
               decode_counters_.CompleteTask(frame_id, symbol_id);
           if (symbol_complete == true) {
             if (kEnableMac) {
@@ -539,17 +539,18 @@ void PhyUe::Start() {
                 "MAC\n",
                 frame_id, symbol_id, dl_symbol_idx);
           }
-          bool last_tomac_task =
-              this->tomac_counters_.CompleteTask(frame_id, dl_symbol_idx);
+          const bool last_tomac_task =
+              tomac_counters_.CompleteTask(frame_id, dl_symbol_idx);
 
           if (last_tomac_task == true) {
             PrintPerSymbolDone(PrintType::kPacketToMac, frame_id, symbol_id);
 
-            bool last_tomac_symbol =
-                this->tomac_counters_.CompleteSymbol(frame_id);
+            const bool last_tomac_symbol =
+                tomac_counters_.CompleteSymbol(frame_id);
 
             if (last_tomac_symbol == true) {
               PrintPerFrameDone(PrintType::kPacketToMac, frame_id);
+              tomac_counters_.Reset(frame_id);
 
               const bool finished =
                   FrameComplete(frame_id, FrameTasksFlags::kMacTxComplete);

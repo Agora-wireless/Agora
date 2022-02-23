@@ -6,7 +6,6 @@
 #ifndef DPDK_TRANSPORT_H_
 #define DPDK_TRANSPORT_H_
 
-#include <inttypes.h>
 #include <netinet/ether.h>
 #include <rte_byteorder.h>
 #include <rte_cycles.h>
@@ -23,6 +22,7 @@
 #include <rte_udp.h>
 #include <unistd.h>
 
+#include <cinttypes>
 #include <string>
 
 // #include "eth_common.h"
@@ -41,18 +41,20 @@ static constexpr size_t kRxBatchSize = 16;
 static constexpr size_t kTxBatchSize = 1;
 
 /// Offset to the payload starting from the beginning of the UDP frame
-static constexpr size_t kPayloadOffset = sizeof(struct rte_ether_hdr) +
-                                         sizeof(struct rte_ipv4_hdr) +
-                                         sizeof(struct rte_udp_hdr) + 22;
-static_assert(kPayloadOffset == 64, "");
+//static constexpr size_t kPayloadOffset =
+//    sizeof(rte_ether_hdr) + sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr) + 22;
+//static_assert(kPayloadOffset == 64, "kPayloadOffset must equal 64");
+
+static constexpr size_t kPayloadOffset =
+    sizeof(rte_ether_hdr) + sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr);
 
 class DpdkTransport {
  public:
   DpdkTransport();
   ~DpdkTransport();
 
-  static std::vector<uint16_t> GetPortIDFromMacAddr(size_t port_num,
-                                                    std::string mac_addrs);
+  static std::vector<uint16_t> GetPortIDFromMacAddr(
+      size_t port_num, const std::string& mac_addrs);
 
   static int NicInit(uint16_t port, struct rte_mempool* mbuf_pool,
                      int thread_num, size_t pkt_len = kJumboFrameMaxSize);
@@ -63,9 +65,12 @@ class DpdkTransport {
                               uint32_t dest_ip, uint16_t src_port,
                               uint16_t dst_port);
 
+  static void InstallFlowRuleDropAll(uint16_t port_id);
+
   static void FastMemcpy(void* pvDest, void* pvSrc, size_t nBytes);
-  static void PrintPkt(int src_ip, int dst_ip, uint16_t src_port,
-                       uint16_t dst_port, int len, int tid);
+  static void PrintPkt(rte_be32_t src_ip, rte_be32_t dst_ip,
+                       rte_be16_t src_port, rte_be16_t dst_port, size_t len,
+                       size_t tid);
 
   /// Return a string representation of this packet
   static std::string PktToString(const rte_mbuf* pkt);

@@ -329,7 +329,7 @@ class RxCounters {
   std::array<size_t, kFrameWnd> num_reciprocity_pkts_;
 
   // Number of packets we'll receive per frame on the uplink
-  size_t num_pkts_per_frame_;
+  size_t num_rx_pkts_per_frame_;
 
   // Number of pilot packets we'll receive per frame
   size_t num_pilot_pkts_per_frame_;
@@ -401,16 +401,21 @@ class FrameCounters {
    */
   bool IsLastSymbol(size_t frame_id) const {
     const size_t frame_slot = (frame_id % kFrameWnd);
+    const size_t symbol_count = symbol_count_.at(frame_slot);
     bool is_last;
-    size_t symbol_count = this->symbol_count_.at(frame_slot);
-    if (symbol_count == this->max_symbol_count_) {
+    if (symbol_count == max_symbol_count_) {
       is_last = true;
-    } else if (symbol_count < this->max_symbol_count_) {
+    } else if (symbol_count < max_symbol_count_) {
       is_last = false;
     } else {
-      is_last = true;
       /* This should never happen */
+      is_last = true;
+      std::printf(
+          "Unexpected result in IsLastSymbol: Symbol Count %zu,  Max Count "
+          "%zu, Frame %zu\n",
+          symbol_count, max_symbol_count_, frame_id);
       assert(false);
+      throw std::runtime_error("IsLastSymbol error!");
     }
     return is_last;
   }
@@ -430,19 +435,21 @@ class FrameCounters {
    */
   bool IsLastTask(size_t frame_id, size_t symbol_id) const {
     const size_t frame_slot = frame_id % kFrameWnd;
+    const size_t task_count = this->task_count_.at(frame_slot).at(symbol_id);
     bool is_last;
-    size_t task_count = this->task_count_.at(frame_slot).at(symbol_id);
     if (task_count == this->max_task_count_) {
       is_last = true;
     } else if (task_count < this->max_task_count_) {
       is_last = false;
     } else {
-      is_last = true;
-      std::printf("Task Count %zu,  Max Count %zu, Symbol %zu\n", task_count,
-                  this->max_task_count_, symbol_id);
-      std::fflush(stdout);
       // This should never happen
+      is_last = true;
+      std::printf(
+          "Unexpected result in IsLastTask: Task Count %zu,  Max Count %zu, "
+          "Frame %zu, Symbol %zu\n",
+          task_count, this->max_task_count_, frame_id, symbol_id);
       assert(false);
+      throw std::runtime_error("IsLastTask error!");
     }
     return is_last;
   }

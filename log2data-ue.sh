@@ -1,16 +1,28 @@
 #!/bin/bash
 
-if [ $# -ne 1 ]; then
-  echo 'usage: $0 <input_log_file>'
+if [ $# -eq 0 ]; then
+  echo "usage: $0 <log_file_0> [<log_file_1> <log_file_2> ...]"
   exit
 fi
-echo 'Frame,User,EVM,EVM-SNR' > uedata-evmsnr.csv
-grep 'Frame.*Symbol.*User.*EVM.*SNR.*' $1 | awk '{print $2 $6 $8 $10}' \
-| sed 's/%//g' >> uedata-evmsnr.csv
-echo 'Frame,User,Symbol_Errors' > uedata-se.csv
-grep 'Frame.*Symbol.*Ue.*symbol errors' $1 | awk '{print $2 "," $6 "," $7}' \
-| sed 's/://g' >> uedata-se.csv
-echo 'Frame,User,RF-SNR' > uedata-rfsnr.csv
-grep 'UeWorker: Fft Pilot(frame.*symbol 10 ant.*) sig offset.*SNR.*' $1 \
-| awk '{print $4 "," $8 "," $13}' | sed 's/)//g' >> uedata-rfsnr.csv
-python3 plot-ue.py
+
+echo 'Bit-Errors,Decoded-Bits,BER' > uedata-ber.csv
+rm uedata-evmsnr-*.csv uedata-rfsnr-*.csv uedata-se-*.csv
+idx=0
+for file in $@
+do
+  echo 'Frame,EVM,EVM-SNR' > "uedata-evmsnr-$idx.csv"
+  grep 'Frame.*Symbol.*User: 0, EVM.*SNR.*' $file | awk '{print $2 $8 $10}' \
+      | sed 's/%//g;/nan/d;/inf/d' >> "uedata-evmsnr-$idx.csv"
+  echo 'Frame,Symbol-Errors' > "uedata-se-$idx.csv"
+  grep 'Frame.*Symbol.*Ue 0:.*symbol errors' $file | awk '{print $2 "," $7}' \
+      | sed 's/://g;/nan/d;/inf/d' >> "uedata-se-$idx.csv"
+  echo 'Frame,RF-SNR' > "uedata-rfsnr-$idx.csv"
+  grep 'UeWorker: Fft Pilot(frame.*symbol 10 ant 0) sig offset.*SNR.*' $file \
+      | awk '{print $4 "," $13}' | sed 's/)//g;/nan/d;/inf/d' \
+      >> "uedata-rfsnr-$idx.csv"
+  grep 'UE 0: Downlink bit errors (BER).*' $file | awk '{print $7}' \
+      | sed 's/\//,/g;s/(/,/g;s/),//g;/nan/d;/inf/d' >> uedata-ber.csv
+  ((idx++))
+done
+
+python3 plot-ue.py $idx

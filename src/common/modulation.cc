@@ -1854,16 +1854,54 @@ void Demod256qamHardAvx2(float* vec_in, uint8_t* vec_out, int num) {
 void Demod256qamHardAvx512(float* vec_in, uint8_t* vec_out, int num) {
   float* symbols_ptr = vec_in;
   auto* result_ptr = reinterpret_cast<__m256i*>(vec_out);
-  __m512 symbol1, symbol2, symbol3, symbol4;
-  __m512i intsymbol1, intsymbol2, intsymbol3, intsymbol4, symbol12, symbol34,
-      symbol_abs, symbol_gt_0, symbol_gt_threshold1, symbol_gt_threshold2,
-      symbol_lt_threshold3, symbol_lt_threshold4, symbol_gt_threshold5,
-      symbol_lt_threshold6, symbol_lt_threshold7, symbol12_bit0, symbol12_bit1,
-      symbol12_bit2, symbol12_bit3, symbol12_bit4, symbol12_bit5, symbol12_bit6,
-      symbol12_bit7, symbol34_bit0, symbol34_bit1, symbol34_bit2, symbol34_bit3,
-      symbol34_bit4, symbol34_bit5, symbol34_bit6, symbol34_bit7, bit7, bit6,
-      bit5, bit4, bit3, bit2, bit1, bit0, result, symbol_bit01, symbol_bit23,
-      symbol_bit45, symbol_bit67;
+  __m512 symbol1;
+  __m512 symbol2;
+  __m512 symbol3;
+  __m512 symbol4;
+  __m512i intsymbol1;
+  __m512i intsymbol2;
+  __m512i intsymbol3;
+  __m512i intsymbol4;
+  __m512i symbol12;
+  __m512i symbol34;
+  __m512i symbol_abs;
+  __m512i symbol_gt_0;
+  __m512i symbol_gt_threshold1;
+  __m512i symbol_gt_threshold2;
+  __m512i symbol_lt_threshold3;
+  __m512i symbol_lt_threshold4;
+  __m512i symbol_gt_threshold5;
+  __m512i symbol_lt_threshold6;
+  __m512i symbol_lt_threshold7;
+  __m512i symbol12_bit0;
+  __m512i symbol12_bit1;
+  __m512i symbol12_bit2;
+  __m512i symbol12_bit3;
+  __m512i symbol12_bit4;
+  __m512i symbol12_bit5;
+  __m512i symbol12_bit6;
+  __m512i symbol12_bit7;
+  __m512i symbol34_bit0;
+  __m512i symbol34_bit1;
+  __m512i symbol34_bit2;
+  __m512i symbol34_bit3;
+  __m512i symbol34_bit4;
+  __m512i symbol34_bit5;
+  __m512i symbol34_bit6;
+  __m512i symbol34_bit7;
+  __m512i bit7;
+  __m512i bit6;
+  __m512i bit5;
+  __m512i bit4;
+  __m512i bit3;
+  __m512i bit2;
+  __m512i bit1;
+  __m512i bit0;
+  __m512i result;
+  __m512i symbol_bit01;
+  __m512i symbol_bit23;
+  __m512i symbol_bit45;
+  __m512i symbol_bit67;
   int next_start;
 
   /*
