@@ -26,7 +26,9 @@ TxRxWorkerClientSim::TxRxWorkerClientSim(
     : TxRxWorker(core_offset, tid, interface_count, interface_offset,
                  config->NumUeChannels(), config, rx_frame_start,
                  event_notify_q, tx_pending_q, tx_producer, notify_producer,
-                 rx_memory, tx_memory, sync_mutex, sync_cond, can_proceed) {
+                 rx_memory, tx_memory, sync_mutex, sync_cond, can_proceed),
+      tx_pkt_zeros_(config->PacketLength(), 0u),
+      tx_pkt_pilot_(config->PacketLength(), 0u) {
   for (size_t interface = 0; interface < num_interfaces_; interface++) {
     const uint16_t local_port_id =
         config->UeServerPort() + interface + interface_offset_;
@@ -40,10 +42,8 @@ TxRxWorkerClientSim::TxRxWorkerClientSim(
         tid_, local_port_id);
   }
 
-  tx_pkt_zeros_ = std::vector<char*>(config->PacketLength(), 0);
-  tx_pkt_pilot_ = std::vector<char*>(config->PacketLength(), 0);
-  std::memcpy(&tx_pkt_pilot_.at(Packet::kOffsetOfData),
-              config->PilotCi16().data(),
+  auto* pilot_pkt = reinterpret_cast<Packet*>(tx_pkt_pilot_.data());
+  std::memcpy(pilot_pkt->data_, config->PilotCi16().data(),
               config->PacketLength() - Packet::kOffsetOfData);
 }
 
@@ -140,26 +140,35 @@ size_t TxRxWorkerClientSim::DequeueSend() {
     for (size_t channel = 0; channel < channels_per_interface_; channel++) {
       const size_t ant_id = (ue_id * channels_per_interface_) + channel;
       // Transmit pilot symbols on each UE channel
-      for (size_t symbol_idx = 0;
-           symbol_idx < Configuration()->Frame().NumPilotSyms(); symbol_idx++) {
-        if (kDebugPrintInTask) {
-          std::printf(
-              "TxRxWorkerClientSim[%zu]: Transmitted pilot in frame %zu, "
-              "symbol %zu, ant %zu\n",
-              tid_, frame_id,
-              Configuration()->Frame().GetPilotSymbol(symbol_idx), ant_id);
-        }
+      for (size_t pilot_symbol_idx = 0;
+           pilot_symbol_idx < Configuration()->Frame().NumPilotSyms();
+           pilot_symbol_idx++) {
+        const size_t symbol_id =
+            Configuration()->Frame().GetPilotSymbol(pilot_symbol_idx);
+
         Packet* tx_packet = nullptr;
-        if (symbol_idx == ant_id) {
+        if (pilot_symbol_idx == ant_id) {
           tx_packet = reinterpret_cast<Packet*>(tx_pkt_pilot_.data());
         } else {
           tx_packet = reinterpret_cast<Packet*>(tx_pkt_zeros_.data());
         }
 
+        if (kDebugPrintInTask) {
+          if (pilot_symbol_idx == ant_id) {
+            std::printf(
+                "TxRxWorkerClientSim[%zu]: Transmitted pilot frame %zu, symbol "
+                "%zu, ant %zu\n",
+                tid_, frame_id, symbol_id, ant_id);
+          } else {
+            std::printf(
+                "TxRxWorkerClientSim[%zu]: Transmitted zeros frame \"%zu, "
+                "symbol %zu, ant %zu\n",
+                tid_, frame_id, symbol_id, ant_id);
+          }
+        }
+
         //Fill out the frame / symbol / cell / ant
-        new (tx_packet) Packet(
-            frame_id, Configuration()->Frame().GetPilotSymbol(symbol_idx),
-            0 /* cell_id */, ant_id);
+        new (tx_packet) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
         udp_clients_.at(local_interface)
             ->Send(Configuration()->BsRruAddr(),
@@ -169,27 +178,26 @@ size_t TxRxWorkerClientSim::DequeueSend() {
       }
 
       if (current_event.event_type_ == EventType::kPacketTX) {
-        for (size_t symbol_id = 0;
-             symbol_id < Configuration()->Frame().NumULSyms(); symbol_id++) {
+        for (size_t ul_symbol_idx = 0;
+             ul_symbol_idx < Configuration()->Frame().NumULSyms();
+             ul_symbol_idx++) {
+          const size_t symbol_id =
+              Configuration()->Frame().GetULSymbol(ul_symbol_idx);
           if (kDebugPrintInTask) {
             std::printf(
-                "TxRxWorkerClientSim[%zu]: Transmitted frame %zu, data symbol "
-                "%zu, ant %zu, tag %zu\n",
-                tid_, frame_id, Configuration()->Frame().GetULSymbol(symbol_id),
-                ant_id, gen_tag_t(current_event.tags_[0]).tag_);
+                "TxRxWorkerClientSim[%zu]: Transmitted frame %zu, symbol %zu, "
+                "ant %zu\n",
+                tid_, frame_id, symbol_id, ant_id);
           }
 
-          //auto* pkt = (Packet*)(tx_buffer_ + offset * c->PacketLength());
-          auto* tx_pkt = GetUlTxPacket(frame_id, symbol_id, ant_id);
-          new (tx_pkt)
-              Packet(frame_id, Configuration()->Frame().GetULSymbol(symbol_id),
-                     0 /* cell_id */, ant_id);
+          auto* tx_packet = GetUlTxPacket(frame_id, symbol_id, ant_id);
+          new (tx_packet) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
 
           // Send data (one OFDM symbol)
           udp_clients_.at(local_interface)
               ->Send(Configuration()->BsRruAddr(),
                      Configuration()->UeRruPort() + ant_id,
-                     reinterpret_cast<uint8_t*>(tx_pkt),
+                     reinterpret_cast<uint8_t*>(tx_packet),
                      Configuration()->PacketLength());
         }
       }  // event.event_type_ == EventType::kPacketTX

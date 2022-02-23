@@ -157,9 +157,8 @@ Packet* TxRxWorker::GetTxPacket(size_t frame, size_t symbol, size_t ant) {
        Configuration()->BsAntNum()) +
       ant;
 
-  auto* pkt = reinterpret_cast<Packet*>(
+  return reinterpret_cast<Packet*>(
       &tx_memory_[offset * Configuration()->DlPacketLength()]);
-  return pkt;
 }
 
 //Returns the location of the tx packet for a given frame / symbol / antenna (uplink / user)
@@ -171,7 +170,12 @@ Packet* TxRxWorker::GetUlTxPacket(size_t frame, size_t symbol, size_t ant) {
        Configuration()->UeAntNum()) +
       ant;
 
-  auto* pkt = reinterpret_cast<Packet*>(
+  //std::printf(
+  //    "GetUlTxPacket: (Frame %zu Symbol %zu Ant %zu) Tx Offset %zu:%zu "
+  //    "location %ld\n",
+  //    frame, symbol, ant, offset, offset * Configuration()->PacketLength(),
+  //    (intptr_t)(&tx_memory_[offset * Configuration()->PacketLength()]));
+
+  return reinterpret_cast<Packet*>(
       &tx_memory_[offset * Configuration()->PacketLength()]);
-  return pkt;
 }

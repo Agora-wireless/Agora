@@ -623,7 +623,7 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
 
   // For now, call for each channel
   for (size_t ch = 0; ch < config_.NumUeChannels(); ch++) {
-    size_t ant_id = (user_id * config_.NumUeChannels()) + ch;
+    const size_t ant_id = (user_id * config_.NumUeChannels()) + ch;
 
     // TODO Remove this copy
     {
@@ -637,7 +637,8 @@ void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
         source_data =
             &modul_buffer_[total_ul_symbol_id][ant_id * config_.OfdmDataNum()];
       }
-      size_t buff_offset = (total_ul_symbol_id * config_.UeAntNum()) + ant_id;
+      const size_t buff_offset =
+          (total_ul_symbol_id * config_.UeAntNum()) + ant_id;
       complex_float* dest_loc =
           ifft_buffer_[buff_offset] + (config_.OfdmDataStart());
       std::memcpy(dest_loc, source_data,
@@ -671,14 +672,16 @@ void UeWorker::DoIfft(size_t tag) {
   for (size_t ch = 0; ch < config_.NumUeChannels(); ch++) {
     const size_t ul_symbol_perframe = config_.Frame().NumULSyms();
 
-    size_t ul_symbol_id = config_.Frame().GetULSymbolIdx(symbol_id);
-    size_t ant_id = user_id * config_.NumUeChannels() + ch;
-    size_t total_ul_symbol_id = frame_slot * ul_symbol_perframe + ul_symbol_id;
-    size_t buff_offset = total_ul_symbol_id * config_.UeAntNum() + ant_id;
+    const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
+    const size_t ant_id = user_id * config_.NumUeChannels() + ch;
+    const size_t total_ul_symbol_id =
+        frame_slot * ul_symbol_perframe + ul_symbol_idx;
+    const size_t buff_offset =
+        (total_ul_symbol_id * config_.UeAntNum()) + ant_id;
     complex_float* ifft_buff = ifft_buffer_[buff_offset];
 
-    std::memset(ifft_buff, 0, sizeof(complex_float) * config_.OfdmDataStart());
-    if (ul_symbol_id < config_.Frame().ClientUlPilotSymbols()) {
+    std::memset(ifft_buff, 0u, sizeof(complex_float) * config_.OfdmDataStart());
+    if (ul_symbol_idx < config_.Frame().ClientUlPilotSymbols()) {
       std::memcpy(ifft_buff + config_.OfdmDataStart(),
                   config_.UeSpecificPilot()[ant_id],
                   config_.OfdmDataNum() * sizeof(complex_float));
@@ -693,16 +696,21 @@ void UeWorker::DoIfft(size_t tag) {
 
     CommsLib::IFFT(ifft_buff, config_.OfdmCaNum(), false);
 
-    size_t tx_offset = buff_offset * config_.PacketLength();
+    const size_t tx_offset = buff_offset * config_.PacketLength();
     char* cur_tx_buffer = &tx_buffer_[tx_offset];
-    auto* pkt = reinterpret_cast<struct Packet*>(cur_tx_buffer);
+    //std::printf(
+    //    "Tx data for (Frame %zu Symbol %zu Ant %zu) is located at tx offset "
+    //    "%zu:%zu at location %ld\n",
+    //    frame_id, symbol_id, ant_id, buff_offset, tx_offset,
+    //    (intptr_t)cur_tx_buffer);
+    auto* pkt = reinterpret_cast<Packet*>(cur_tx_buffer);
     auto* tx_data_ptr = reinterpret_cast<std::complex<short>*>(pkt->data_);
     CommsLib::Ifft2tx(ifft_buff, tx_data_ptr, config_.OfdmCaNum(),
                       config_.OfdmTxZeroPrefix(), config_.CpLen(),
                       config_.Scale());
   }
 
-  if ((kDebugPrintPerTaskDone == true)) {
+  if (kDebugPrintPerTaskDone) {
     size_t ifft_duration_stat = GetTime::Rdtsc() - start_tsc;
     std::printf(
         "User Task[%zu]: iFFT   (frame %zu,       , user %zu) Duration "

@@ -370,7 +370,7 @@ void PhyUe::Start() {
 
           // Schedule uplink pilots transmission and uplink processing
           if (symbol_id == config_->Frame().GetBeaconSymbolLast()) {
-            if (ul_data_symbol_perframe_ == 0) {
+            if (ul_symbol_perframe_ == 0) {
               // Schedule Pilot after receiving last beacon
               // (Only when in Downlink Only mode, otherwise the pilots
               // will be transmitted with the uplink data)
@@ -697,12 +697,13 @@ void PhyUe::Start() {
 
           UeTxVars& ue = ue_tracker_.at(ue_id);
 
-          bool symbol_complete =
+          const bool symbol_complete =
               ue.ifft_counters_.CompleteTask(frame_id, symbol_id);
           if (symbol_complete == true) {
             PrintPerSymbolDone(PrintType::kIFFT, frame_id, symbol_id);
 
-            bool ifft_complete = ue.ifft_counters_.CompleteSymbol(frame_id);
+            const bool ifft_complete =
+                ue.ifft_counters_.CompleteSymbol(frame_id);
             if (ifft_complete == true) {
               this->stats_->MasterSetTsc(TsType::kIFFTDone, frame_id);
               PrintPerFrameDone(PrintType::kIFFT, frame_id);
@@ -720,10 +721,10 @@ void PhyUe::Start() {
                   ScheduleTask(do_tx_task, &tx_queue_,
                                *tx_ptoks_ptr_[ue_id % rx_thread_num_]);
 
-                  size_t next_frame = current_frame + 1;
+                  const size_t next_frame = current_frame + 1;
                   ue.tx_pending_frame_ = next_frame;
 
-                  auto tx_next =
+                  const auto tx_next =
                       std::find(ue.tx_ready_frames_.begin(),
                                 ue.tx_ready_frames_.end(), next_frame);
                   if (tx_next != ue.tx_ready_frames_.end()) {
@@ -826,11 +827,10 @@ void PhyUe::InitializeVarsFromCfg() {
           ? config_->UeNum()
           : std::min(config_->UeNum(), config_->UeSocketThreadNum());
 
-  tx_buffer_status_size_ =
-      (ul_symbol_perframe_ * config_->UeAntNum() * kFrameWnd);
-  tx_buffer_size_ = config_->PacketLength() * tx_buffer_status_size_;
+  tx_buffer_size_ = config_->PacketLength() *
+                    (ul_symbol_perframe_ * config_->UeAntNum() * kFrameWnd);
 
-  rx_buffer_size_ = config_->PacketLength() *
+  rx_buffer_size_ = config_->DlPacketLength() *
                     (dl_symbol_perframe_ + config_->Frame().NumBeaconSyms()) *
                     config_->UeAntNum() * kFrameWnd;
 }
@@ -863,15 +863,13 @@ void PhyUe::InitializeUplinkBuffers() {
                        Agora_memory::Alignment_t::kAlign64);
 
   // initialize IFFT buffer
-  size_t ifft_buffer_block_num =
+  const size_t ifft_buffer_block_num =
       config_->UeAntNum() * ul_symbol_perframe_ * kFrameWnd;
   ifft_buffer_.Calloc(ifft_buffer_block_num, config_->OfdmCaNum(),
                       Agora_memory::Alignment_t::kAlign64);
 
   AllocBuffer1d(&tx_buffer_, tx_buffer_size_,
                 Agora_memory::Alignment_t::kAlign64, 0);
-  AllocBuffer1d(&tx_buffer_status_, tx_buffer_status_size_,
-                Agora_memory::Alignment_t::kAlign64, 1);
 }
 
 void PhyUe::FreeUplinkBuffers() {
@@ -882,7 +880,6 @@ void PhyUe::FreeUplinkBuffers() {
   ifft_buffer_.Free();
 
   FreeBuffer1d(&tx_buffer_);
-  FreeBuffer1d(&tx_buffer_status_);
 }
 
 void PhyUe::InitializeDownlinkBuffers() {

@@ -125,10 +125,7 @@ class PhyUe {
    * entries: TX_THREAD_NUM * TX_BUFFER_FRAME_NUM * UE_NUM * DL_SYM_PER_FRAME
    */
   char* tx_buffer_;
-  int* tx_buffer_status_;
-
   size_t tx_buffer_size_;
-  int tx_buffer_status_size_;
 
   /**
    * Data for IFFT, (prefix added)

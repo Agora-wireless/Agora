@@ -34,7 +34,6 @@ class TxRxWorkerClientSim : public TxRxWorker {
  private:
   TxRxWorkerClientSim() = delete;
   size_t DequeueSend();
-  void SendBeacon(size_t frame_id);
   std::vector<Packet*> RecvEnqueue(size_t interface_id);
 
   //1 for each responsible interface (ie radio)
@@ -45,7 +44,7 @@ class TxRxWorkerClientSim : public TxRxWorker {
   std::vector<std::unique_ptr<UDPClient>> udp_clients_;
 
   //Helper tx vectors
-  std::vector<char*> tx_pkt_zeros_;
-  std::vector<char*> tx_pkt_pilot_;
+  std::vector<uint8_t> tx_pkt_zeros_;
+  std::vector<uint8_t> tx_pkt_pilot_;
 };
 #endif  // TXRX_WORKER_CLIENT_SIM_H_
