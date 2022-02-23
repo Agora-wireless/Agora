@@ -54,8 +54,8 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
     : cfg_(config),
       bs_thread_num_(bs_thread_num),
       user_thread_num_(user_thread_num),
-      bs_socket_num_(config->BsAntNum()),
-      user_socket_num_(config->UeAntNum()),
+      bs_socket_num_(config->NumRadios()),
+      user_socket_num_(config->UeNum()),
       worker_thread_num_(worker_thread_num),
       core_offset_(in_core_offset),
       channel_type_(std::move(in_chan_type)),
@@ -496,13 +496,13 @@ void* ChannelSim::UeRxLoop(size_t tid) {
 
   // initialize client-facing sockets
   static constexpr size_t kSockBufSize = (1024 * 1024 * 64 * 8) - 1;
-  for (size_t socket_id = socket_lo; socket_id < socket_hi; ++socket_id) {
+  for (size_t socket_id = socket_lo; socket_id < socket_hi; socket_id++) {
     size_t local_port_id = cfg_->UeRruPort() + socket_id;
     server_ue_.at(socket_id) =
         std::make_unique<UDPServer>(local_port_id, kSockBufSize);
     client_ue_.at(socket_id) = std::make_unique<UDPClient>();
 
-    std::printf(
+    MLPD_INFO(
         "ChannelSim::UeRxLoop[%zu]: set up UDP socket server listening to port "
         "%zu with remote address %s:%zu\n",
         tid, local_port_id, cfg_->UeServerAddr().c_str(),
@@ -525,7 +525,8 @@ void* ChannelSim::UeRxLoop(size_t tid) {
 
   size_t socket_id = socket_lo;
   while (running) {
-    SocketRxBuffer& rx_buffer = thread_rx_buffers.at(socket_id - socket_lo);
+    const size_t rx_index = socket_id - socket_lo;
+    SocketRxBuffer& rx_buffer = thread_rx_buffers.at(rx_index);
     const size_t rx_buffer_rem_size = buffer_size - rx_buffer.data_size_;
     const int rx_bytes = server_ue_.at(socket_id)->Recv(
         &rx_buffer.data_[rx_buffer.data_size_], rx_buffer_rem_size);
@@ -559,7 +560,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
         const size_t symbol_offset =
             (frame_id % kFrameWnd) * ul_data_plus_pilot_symbols_ +
             total_symbol_id;
-        size_t offset = symbol_offset * cfg_->UeAntNum() + ant_id;
+        const size_t offset = symbol_offset * cfg_->UeAntNum() + ant_id;
         auto* rx_data_destination = &rx_buffer_ue_.at(offset * payload_length_);
         std::memcpy(rx_data_destination, pkt->data_, payload_length_);
 
@@ -614,7 +615,8 @@ void* ChannelSim::UeRxLoop(size_t tid) {
 
 /// Warning: Threads are sharing these sender sockets.
 void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
-                      uint8_t* tx_buffer, const arma::cx_float* source_data,
+                      size_t ant_per_socket, uint8_t* tx_buffer,
+                      const arma::cx_float* source_data,
                       AlignedByteVector* udp_pkt_buf,
                       std::vector<std::unique_ptr<UDPClient>>& udp_clients,
                       const std::string& dest_address, size_t dest_port) {
@@ -636,6 +638,7 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
 
   auto* pkt = reinterpret_cast<Packet*>(&udp_pkt_buf->at(0));
   for (size_t ant_id = 0u; ant_id < max_ant; ant_id++) {
+    const size_t socket = ant_id / ant_per_socket;
     pkt->frame_id_ = frame_id;
     pkt->symbol_id_ = symbol_id;
     pkt->ant_id_ = ant_id;
@@ -643,7 +646,7 @@ void ChannelSim::DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
     // Can remove this with some changes
     std::memcpy(pkt->data_, &tx_buffer[ant_id * payload_length_],
                 payload_length_);
-    udp_clients.at(ant_id)->Send(dest_address, dest_port + ant_id,
+    udp_clients.at(socket)->Send(dest_address, dest_port + socket,
                                  udp_pkt_buf->data(), udp_pkt_buf->size());
     // Assumes blocking
   }
@@ -728,7 +731,7 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
     Utils::PrintMat(fmat_noisy, "rx_ul");
   }
 
-  DoTx(frame_id, symbol_id, cfg_->BsAntNum(),
+  DoTx(frame_id, symbol_id, cfg_->BsAntNum(), cfg_->NumChannels(),
        &local.bs_tx_buffer_->at(total_offset_bs), fmat_noisy.memptr(),
        local.udp_tx_buffer_, client_bs_, cfg_->BsServerAddr(),
        cfg_->BsServerPort());
@@ -811,7 +814,7 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
     Utils::PrintMat(fmat_noisy, "rx_dl");
   }
 
-  DoTx(frame_id, symbol_id, cfg_->UeAntNum(),
+  DoTx(frame_id, symbol_id, cfg_->UeAntNum(), cfg_->NumUeChannels(),
        &local.ue_tx_buffer_->at(total_offset_ue), fmat_noisy.memptr(),
        local.udp_tx_buffer_, client_ue_, cfg_->UeServerAddr(),
        cfg_->UeServerPort());

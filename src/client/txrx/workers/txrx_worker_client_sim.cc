@@ -129,86 +129,85 @@ size_t TxRxWorkerClientSim::DequeueSend() {
              "RadioTxRx: Wrong Event Type in TX Queue!");
 
     //Handle Pilot symbols first, then send the client data.
-    const size_t frame_id = gen_tag_t(current_event.tags_[0]).frame_id_;
-    const size_t ue_id = gen_tag_t(current_event.tags_[0]).ue_id_;
+    const size_t frame_id = gen_tag_t(current_event.tags_[0u]).frame_id_;
+    const size_t ue_ant = gen_tag_t(current_event.tags_[0u]).ue_id_;
+    const size_t ue_id = ue_ant / channels_per_interface_;
 
-    assert((ue_id >= interface_offset_) &&
-           (ue_id <= (num_interfaces_ + interface_offset_)));
+    RtAssert((ue_id >= interface_offset_) &&
+                 (ue_id <= (num_interfaces_ + interface_offset_)),
+             "Invalid Tx interface Id");
 
     const size_t local_interface = ue_id - interface_offset_;
 
-    for (size_t channel = 0; channel < channels_per_interface_; channel++) {
-      const size_t ant_id = (ue_id * channels_per_interface_) + channel;
-      // Transmit pilot symbols on each UE channel
-      for (size_t pilot_symbol_idx = 0;
-           pilot_symbol_idx < Configuration()->Frame().NumPilotSyms();
-           pilot_symbol_idx++) {
-        const size_t symbol_id =
-            Configuration()->Frame().GetPilotSymbol(pilot_symbol_idx);
+    // Transmit pilot symbols on each UE channel
+    for (size_t pilot_symbol_idx = 0;
+         pilot_symbol_idx < Configuration()->Frame().NumPilotSyms();
+         pilot_symbol_idx++) {
+      const size_t symbol_id =
+          Configuration()->Frame().GetPilotSymbol(pilot_symbol_idx);
 
-        Packet* tx_packet = nullptr;
-        if (pilot_symbol_idx == ant_id) {
-          tx_packet = reinterpret_cast<Packet*>(tx_pkt_pilot_.data());
+      Packet* tx_packet = nullptr;
+      if (pilot_symbol_idx == ue_ant) {
+        tx_packet = reinterpret_cast<Packet*>(tx_pkt_pilot_.data());
+      } else {
+        tx_packet = reinterpret_cast<Packet*>(tx_pkt_zeros_.data());
+      }
+
+      if (kDebugPrintInTask) {
+        if (pilot_symbol_idx == ue_ant) {
+          std::printf(
+              "TxRxWorkerClientSim[%zu]: Transmitted pilot frame %zu, symbol "
+              "%zu, ant %zu\n",
+              tid_, frame_id, symbol_id, ue_ant);
         } else {
-          tx_packet = reinterpret_cast<Packet*>(tx_pkt_zeros_.data());
+          std::printf(
+              "TxRxWorkerClientSim[%zu]: Transmitted zeros frame \"%zu, "
+              "symbol %zu, ant %zu\n",
+              tid_, frame_id, symbol_id, ue_ant);
         }
+      }
 
+      //Fill out the frame / symbol / cell / ant
+      new (tx_packet) Packet(frame_id, symbol_id, 0 /* cell_id */, ue_ant);
+
+      udp_clients_.at(local_interface)
+          ->Send(Configuration()->BsRruAddr(),
+                 Configuration()->UeRruPort() + ue_id,
+                 reinterpret_cast<uint8_t*>(tx_packet),
+                 Configuration()->PacketLength());
+    }
+
+    if (current_event.event_type_ == EventType::kPacketTX) {
+      for (size_t ul_symbol_idx = 0;
+           ul_symbol_idx < Configuration()->Frame().NumULSyms();
+           ul_symbol_idx++) {
+        const size_t symbol_id =
+            Configuration()->Frame().GetULSymbol(ul_symbol_idx);
         if (kDebugPrintInTask) {
-          if (pilot_symbol_idx == ant_id) {
-            std::printf(
-                "TxRxWorkerClientSim[%zu]: Transmitted pilot frame %zu, symbol "
-                "%zu, ant %zu\n",
-                tid_, frame_id, symbol_id, ant_id);
-          } else {
-            std::printf(
-                "TxRxWorkerClientSim[%zu]: Transmitted zeros frame \"%zu, "
-                "symbol %zu, ant %zu\n",
-                tid_, frame_id, symbol_id, ant_id);
-          }
+          std::printf(
+              "TxRxWorkerClientSim[%zu]: Transmitted frame %zu, symbol %zu, "
+              "ant %zu\n",
+              tid_, frame_id, symbol_id, ue_ant);
         }
 
-        //Fill out the frame / symbol / cell / ant
-        new (tx_packet) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
+        auto* tx_packet = GetUlTxPacket(frame_id, symbol_id, ue_ant);
+        new (tx_packet) Packet(frame_id, symbol_id, 0 /* cell_id */, ue_ant);
 
+        // Send data (one OFDM symbol)
         udp_clients_.at(local_interface)
             ->Send(Configuration()->BsRruAddr(),
-                   Configuration()->UeRruPort() + ant_id,
+                   Configuration()->UeRruPort() + ue_id,
                    reinterpret_cast<uint8_t*>(tx_packet),
                    Configuration()->PacketLength());
       }
-
-      if (current_event.event_type_ == EventType::kPacketTX) {
-        for (size_t ul_symbol_idx = 0;
-             ul_symbol_idx < Configuration()->Frame().NumULSyms();
-             ul_symbol_idx++) {
-          const size_t symbol_id =
-              Configuration()->Frame().GetULSymbol(ul_symbol_idx);
-          if (kDebugPrintInTask) {
-            std::printf(
-                "TxRxWorkerClientSim[%zu]: Transmitted frame %zu, symbol %zu, "
-                "ant %zu\n",
-                tid_, frame_id, symbol_id, ant_id);
-          }
-
-          auto* tx_packet = GetUlTxPacket(frame_id, symbol_id, ant_id);
-          new (tx_packet) Packet(frame_id, symbol_id, 0 /* cell_id */, ant_id);
-
-          // Send data (one OFDM symbol)
-          udp_clients_.at(local_interface)
-              ->Send(Configuration()->BsRruAddr(),
-                     Configuration()->UeRruPort() + ant_id,
-                     reinterpret_cast<uint8_t*>(tx_packet),
-                     Configuration()->PacketLength());
-        }
-      }  // event.event_type_ == EventType::kPacketTX
-    }    // foreach channel
+    }  // event.event_type_ == EventType::kPacketTX
 
     EventData complete_event;
     if (current_event.event_type_ == EventType::kPacketPilotTX) {
       complete_event =
-          EventData(EventType::kPacketPilotTX, current_event.tags_[0]);
+          EventData(EventType::kPacketPilotTX, current_event.tags_[0u]);
     } else if (current_event.event_type_ == EventType::kPacketTX) {
-      complete_event = EventData(EventType::kPacketTX, current_event.tags_[0]);
+      complete_event = EventData(EventType::kPacketTX, current_event.tags_[0u]);
     } else {
       RtAssert(false, "Invalid type of event");
     }
