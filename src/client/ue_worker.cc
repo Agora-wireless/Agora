@@ -612,38 +612,31 @@ void UeWorker::DoModul(size_t tag) {
 void UeWorker::DoIfftUe(DoIFFTClient* iffter, size_t tag) {
   const size_t frame_id = gen_tag_t(tag).frame_id_;
   const size_t symbol_id = gen_tag_t(tag).symbol_id_;
-  const size_t user_id = gen_tag_t(tag).ue_id_;
+  const size_t ant_id = gen_tag_t(tag).ue_id_;
 
-  // For now, call for each channel
-  for (size_t ch = 0; ch < config_.NumUeChannels(); ch++) {
-    const size_t ant_id = (user_id * config_.NumUeChannels()) + ch;
-
-    // TODO Remove this copy
-    {
-      complex_float const* source_data = nullptr;
-      const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
-      size_t total_ul_symbol_id =
-          config_.GetTotalDataSymbolIdxUl(frame_id, ul_symbol_idx);
-      if (ul_symbol_idx < config_.Frame().ClientUlPilotSymbols()) {
-        source_data = config_.UeSpecificPilot()[ant_id];
-      } else {
-        source_data =
-            &modul_buffer_[total_ul_symbol_id][ant_id * config_.OfdmDataNum()];
-      }
-      const size_t buff_offset =
-          (total_ul_symbol_id * config_.UeAntNum()) + ant_id;
-      complex_float* dest_loc =
-          ifft_buffer_[buff_offset] + (config_.OfdmDataStart());
-      std::memcpy(dest_loc, source_data,
-                  sizeof(complex_float) * config_.OfdmDataNum());
+  // TODO Remove this copy
+  {
+    complex_float const* source_data = nullptr;
+    const size_t ul_symbol_idx = config_.Frame().GetULSymbolIdx(symbol_id);
+    size_t total_ul_symbol_id =
+        config_.GetTotalDataSymbolIdxUl(frame_id, ul_symbol_idx);
+    if (ul_symbol_idx < config_.Frame().ClientUlPilotSymbols()) {
+      source_data = config_.UeSpecificPilot()[ant_id];
+    } else {
+      source_data =
+          &modul_buffer_[total_ul_symbol_id][ant_id * config_.OfdmDataNum()];
     }
-
-    iffter->Launch(gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_);
+    const size_t buff_offset =
+        (total_ul_symbol_id * config_.UeAntNum()) + ant_id;
+    complex_float* dest_loc =
+        ifft_buffer_[buff_offset] + (config_.OfdmDataStart());
+    std::memcpy(dest_loc, source_data,
+                sizeof(complex_float) * config_.OfdmDataNum());
   }
+  iffter->Launch(gen_tag_t::FrmSymAnt(frame_id, symbol_id, ant_id).tag_);
 
   // Post the completion event (symbol)
-  size_t completion_tag =
-      gen_tag_t::FrmSymUe(frame_id, symbol_id, user_id).tag_;
+  size_t completion_tag = gen_tag_t::FrmSymUe(frame_id, symbol_id, ant_id).tag_;
   RtAssert(notify_queue_.enqueue(*ptok_.get(),
                                  EventData(EventType::kIFFT, completion_tag)),
            "IFFT symbol complete message enqueue failed");
