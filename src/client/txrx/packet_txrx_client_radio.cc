@@ -19,7 +19,7 @@ PacketTxRxClientRadio::PacketTxRxClientRadio(
     moodycamel::ProducerToken** notify_producer_tokens,
     moodycamel::ProducerToken** tx_producer_tokens, Table<char>& rx_buffer,
     size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer)
-    : PacketTxRx(AgoraTxRx::TxRxTypes::kBaseStation, cfg, core_offset,
+    : PacketTxRx(AgoraTxRx::TxRxTypes::kUserEquiptment, cfg, core_offset,
                  event_notify_q, tx_pending_q, notify_producer_tokens,
                  tx_producer_tokens, rx_buffer, packet_num_in_buffer,
                  frame_start, tx_buffer) {

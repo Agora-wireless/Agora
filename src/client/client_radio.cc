@@ -8,6 +8,7 @@
 #include "comms-lib.h"
 #include "logger.h"
 #include "nlohmann/json.hpp"
+#include <SoapySDR/Logger.hpp>
 
 static constexpr size_t kSoapyMakeMaxAttempts = 2;
 
@@ -16,6 +17,8 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   SoapySDR::Kwargs sargs;
   // load channels
   auto channels = Utils::StrToChannels(cfg_->UeChannel());
+  /// Reduce the soapy log level
+  SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_NOTICE);
 
   this->radio_num_ = cfg_->UeNum();
   this->antenna_num_ = cfg_->UeAntNum();

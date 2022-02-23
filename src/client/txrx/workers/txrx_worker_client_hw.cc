@@ -93,7 +93,7 @@ void TxRxWorkerClientHw::DoTxRx() {
           "TxRxWorkerClientHw [%zu]: Beacon detected, sync_index: %ld, rx "
           "sample offset: %ld\n",
           radio_id, sync_index, rx_adjust_samples);
-    } else {
+    } else if (Configuration()->Running()) {
       MLPD_WARN(
           "TxRxWorkerClientHw [%zu]: Beacon could not be detected - "
           "sync_index: %ld\n",
@@ -137,8 +137,7 @@ void TxRxWorkerClientHw::DoTxRx() {
       if (rx_pkts.size() == channels_per_interface_) {
         if (kDebugPrintInTask) {
           std::printf(
-              "DoTxRx [%zu]: radio %zu received frame id %zu, symbol id "
-              "%zu at time %lld\n",
+              "DoTxRx [%zu]: radio %zu received frame id %zu, symbol id %zu at time %lld\n",
               tid_, radio_id, rx_frame_id, rx_symbol_id, rx_time);
         }
         // resync every kFrameSync frames:
@@ -336,8 +335,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
     }
 
     MLPD_INFO(
-        "interface_id::DoTx[%zu]: Request to Transmit (Frame %zu, ue %zu, "
-        "ant %zu)\n",
+        "TxRxWorkerClientHw::DoTx[%zu]: Request to Transmit (Frame %zu, User %zu, Ant %zu)\n",
         tid_, frame_id, ue_ant, interface_id);
 
     RtAssert((interface_id >= interface_offset_) &&
@@ -353,7 +351,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
       // Transmit pilot(s)
       // For UHD devices, first pilot should not be with the END_BURST flag
       // 1: HAS_TIME, 2: HAS_TIME | END_BURST
-      int flags_tx = 1;
+      int flags_tx = 2;
 
       if (!Configuration()->UeHwFramer()) {
         for (size_t ch = 0; ch < channels_per_interface_; ch++) {
@@ -369,7 +367,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
               const size_t first_ul_symbol =
                   Configuration()->Frame().GetULSymbol(0);
               if ((pilot_symbol_id + 1) == (first_ul_symbol)) {
-                flags_tx = 2;
+                flags_tx = 1;
               }
             }
           }
@@ -393,11 +391,11 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
                       << interface_id << "/" << samples_per_symbol << std::endl;
           }
 
-          if (true) {
+          if (kDebugPrintInTask) {
             std::printf(
-                "TxRxWorkerClientHw [%zu]: Transmitted frame %zu, pilot symbol "
-                "%zu, ue %zu\n",
-                tid_, frame_id, pilot_symbol_id, interface_id);
+                "TxRxWorkerClientHw [%zu]: Transmitted pilot (Frame %zu, Symbol "
+                "%zu, Ue %zu) at time %lld with flags %d\n",
+                tid_, frame_id, pilot_symbol_id, interface_id, tx_time, flags_tx);
           }
           //Replace the pilot with zeros for next channel pilot
           tx_data.at(ch) = frame_zeros_.at(ch).data();
@@ -412,7 +410,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
         }  //For each channel
       }
 
-      if (current_event.event_type_ == EventType::kPacketPilotTX) {
+      if (current_event.event_type_ == EventType::kPacketTX) {
         // Transmit data for all symbols
         flags_tx = 1;
         for (size_t symbol_id = 0;
@@ -447,10 +445,8 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
 
           if (kDebugPrintInTask) {
             std::printf(
-                "TxRxWorkerClientHw::DoTx[%zu]: Transmitted frame %zu, "
-                "data symbol %zu, radio %zu, tag %zu\n",
-                tid_, frame_id, tx_symbol_id, interface_id,
-                gen_tag_t(current_event.tags_[0]).tag_);
+                "TxRxWorkerClientHw::DoTx[%zu]: Completed Transmit (Frame %zu, Symbol %zu, Ue %zu) tx time %lld flags %d\n",
+                tid_, frame_id, tx_symbol_id, interface_id, tx_time, flags_tx);
           }
         }
 
@@ -464,8 +460,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
           NotifyComplete(complete_event);
         }
         MLPD_INFO(
-            "TxRxWorkerClientHw::DoTx[%zu]: Transmitted frame %zu for radio "
-            "%zu\n",
+            "TxRxWorkerClientHw::DoTx[%zu]: Frame %zu Transmit Complete for Ue %zu\n",
             tid_, frame_id, interface_id);
       }
     }
