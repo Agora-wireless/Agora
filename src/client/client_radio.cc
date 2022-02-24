@@ -453,6 +453,7 @@ void ClientRadioConfig::DrainBuffers() {
       std::vector<std::complex<int16_t>>(cfg_->SampsPerSymbol(),
                                          std::complex<int16_t>(0, 0)));
   std::vector<void*> rx_buffs;
+  rx_buffs.reserve(sample_storage.size());
   for (auto& buff : sample_storage) {
     rx_buffs.push_back(buff.data());
   }

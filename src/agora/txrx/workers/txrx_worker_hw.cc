@@ -759,7 +759,7 @@ long long int TxRxWorkerHw::GetHwTime() {
 
 //Maybe only schedule frame 0, then let the TX_FRAME_DELTA happen after the RX
 void TxRxWorkerHw::ScheduleTxInit(size_t frames_to_schedule, long long time0) {
-  for (size_t frame = 0; frame < TX_FRAME_DELTA; frame++) {
+  for (size_t frame = 0; frame < frames_to_schedule; frame++) {
     for (size_t radio = interface_offset_;
          radio < (interface_offset_ + num_interfaces_); radio++) {
       MLPD_TRACE("TxRxWorkerHw[%zu]: Scheduling frame %zu on interface %zu\n",

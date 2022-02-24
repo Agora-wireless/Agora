@@ -27,7 +27,7 @@ class PacketTxRxSim : public PacketTxRx {
                 moodycamel::ProducerToken** tx_producer_tokens,
                 Table<char>& rx_buffer, size_t packet_num_in_buffer,
                 Table<size_t>& frame_start, char* tx_buffer);
-  virtual ~PacketTxRxSim() = default;
+  ~PacketTxRxSim() final = default;
 
  private:
   bool CreateWorker(size_t tid, size_t interface_count, size_t interface_offset,
