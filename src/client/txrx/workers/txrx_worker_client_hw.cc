@@ -118,8 +118,9 @@ void TxRxWorkerClientHw::DoTxRx() {
     }
   }
   long long time0 = 0;
-  size_t rx_frame_id = 0;
-  size_t rx_symbol_id = 0;
+  //Set initial frame and symbol to max value so we start at 0
+  size_t rx_frame_id = SIZE_MAX;
+  size_t rx_symbol_id = Configuration()->Frame().NumTotalSyms() - 1;
 
   bool resync = false;
   size_t resync_retry_cnt = 0;
@@ -144,21 +145,21 @@ void TxRxWorkerClientHw::DoTxRx() {
             rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
                                 Configuration()->OfdmTxZeroPrefix();
             MLPD_INFO(
-                "TxRxWorkerClientHw [%zu]: Initial Sync - radio %zu, "
-                "sync_index: %ld, rx sample offset: %ld time0 %lld\n",
-                tid_, (local_interface + interface_offset_) + ch, sync_index,
-                rx_adjust_samples, time0);
+                "TxRxWorkerClientHw [%zu]: Initial Sync - radio %zu, frame "
+                "%zu, symbol %zu sync_index: %ld, rx sample offset: %ld time0 "
+                "%lld\n",
+                tid_, (local_interface + interface_offset_) + ch, rx_frame_id,
+                rx_symbol_id, sync_index, rx_adjust_samples, time0);
           } else {
             throw std::runtime_error(
                 "No Beacon Detected at Frame 0 / Symbol 0");
           }
         }
-      }
-    }  // received Frame 0 Symbol 0
-  }
+      }  // end verify first sync
+    }    // received Frame 0 Symbol 0
+  }      // end - establish time0 for a given interface
 
-  //PreSchedule TX_FRAME_DELTA pilots and zero out uplink symbols
-  ScheduleTxInit(TX_FRAME_DELTA, time0);
+  //No Need to preschedule the TX_FRAME_DELTA init in software framer mode
 
   //Beacon sync detected run main rx routines
   while (Configuration()->Running()) {
@@ -174,27 +175,25 @@ void TxRxWorkerClientHw::DoTxRx() {
       const auto rx_pkts = DoRx(local_interface, rx_frame_id, rx_symbol_id,
                                 rx_time, rx_adjust_samples);
       if (rx_pkts.size() == channels_per_interface_) {
-        const size_t pkt_frame = rx_pkts.at(0)->frame_id_;
-        const size_t pkt_symbol = rx_pkts.at(0)->symbol_id_;
-
         if (kDebugPrintInTask) {
           std::printf(
               "DoTxRx[%zu]: radio %zu received frame id %zu, symbol id %zu at "
               "time %lld\n",
-              tid_, local_interface + interface_offset_, pkt_frame, pkt_symbol,
-              rx_time);
+              tid_, local_interface + interface_offset_, rx_frame_id,
+              rx_symbol_id, rx_time);
         }
         // resync every kFrameSync frames:
         // Only sync on beacon symbols
         ///\todo: kFrameSync should be a function of sample rate and max CFO
-        if ((pkt_symbol == Configuration()->Frame().GetBeaconSymbolLast()) &&
-            ((pkt_frame / kFrameSync) > 0) && ((pkt_frame % kFrameSync) == 0)) {
+        if ((rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast()) &&
+            ((rx_frame_id / kFrameSync) > 0) &&
+            ((rx_frame_id % kFrameSync) == 0)) {
           resync = true;
         }
 
         //If we have a beacon and we would like to resync
         if (resync &&
-            (pkt_symbol == Configuration()->Frame().GetBeaconSymbolLast())) {
+            (rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast())) {
           //This is adding a race condition on this data, it is ok for now but we should fix this
           const ssize_t sync_index =
               FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
@@ -238,35 +237,38 @@ void TxRxWorkerClientHw::DoTxRx() {
 }
 
 //RX data, should return channel number of packets || 0
-// global_frame_id will be used and updated
-// global_symbol_id will be used and updated
+// global_frame_id  in - frame id of the last rx packet
+//                 out - frame id of the current rx packet
+// global_symbol_id in - symbol id of the last rx packet
+//                 out - symbol id of the current rx packet
+//
 std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
                                               size_t& global_frame_id,
                                               size_t& global_symbol_id,
                                               long long& receive_time,
                                               ssize_t& sample_offset) {
   const size_t radio_id = interface_id + interface_offset_;
-  const size_t ant_id = radio_id * channels_per_interface_;
+  const size_t first_ant_id = radio_id * channels_per_interface_;
   std::vector<Packet*> result_packets;
 
   size_t num_rx_samps = Configuration()->SampsPerSymbol();
 
   std::vector<RxPacket*> memory_tracking(channels_per_interface_);
   std::vector<size_t> ant_ids(channels_per_interface_);
-  std::vector<void*> samp(channels_per_interface_);
+  std::vector<void*> rx_samples(channels_per_interface_);
 
   //Allocate memory for reception
   for (size_t ch = 0; ch < channels_per_interface_; ch++) {
     RxPacket& rx = GetRxPacket();
     memory_tracking.at(ch) = &rx;
-    ant_ids.at(ch) = ant_id + ch;
+    ant_ids.at(ch) = first_ant_id + ch;
     //Align current symbol, and read less for remaining (+2 is for I/Q)
     if (sample_offset < 0) {
       const size_t padding = (-2 * sample_offset);
-      std::memset(rx.RawPacket()->data_, 0, padding);
-      samp.at(ch) = &rx.RawPacket()->data_[padding];
+      std::memset(rx.RawPacket()->data_, 0u, padding);
+      rx_samples.at(ch) = &rx.RawPacket()->data_[padding];
     } else {
-      samp.at(ch) = rx.RawPacket()->data_;
+      rx_samples.at(ch) = rx.RawPacket()->data_;
     }
     MLPD_TRACE("TxRxWorkerClientHw[%zu]: Using Packet at location %zu\n", tid_,
                reinterpret_cast<size_t>(&rx));
@@ -282,7 +284,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
   }
 
   const int rx_status =
-      radio_.RadioRx(radio_id, samp.data(), num_rx_samps, receive_time);
+      radio_.RadioRx(radio_id, rx_samples.data(), num_rx_samps, receive_time);
   if (rx_status < 0) {
     MLPD_ERROR(
         "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
@@ -301,12 +303,19 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
       if (Configuration()->UeHwFramer()) {
         global_frame_id = static_cast<size_t>(receive_time >> 32);
         global_symbol_id = static_cast<size_t>((receive_time >> 16) & 0xFFFF);
+      } else {
+        //Update the rx-symbol
+        global_symbol_id++;
+        if (global_symbol_id == Configuration()->Frame().NumTotalSyms()) {
+          global_symbol_id = 0;
+          global_frame_id++;
+        }
       }
 
       if (kDebugPrintInTask) {
         std::printf(
-            "TxRxWorkerClientHw [%zu]: rx'd Frame %zu, Symbol %zu, Radio id "
-            "%zu rxtime %lld\n",
+            "TxRxWorkerClientHw [%zu]: Rx (Frame %zu, Symbol %zu, Radio "
+            "%zu) - at time %lld\n",
             tid_, global_frame_id, global_symbol_id, radio_id, receive_time);
       }
 
@@ -320,7 +329,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
 
           MLPD_FRAME(
               "TxRxWorkerClientHw [%zu]: Rx Downlink (Frame %zu, Symbol %zu, "
-              "Ant %zu) from Radio %zu - rxtime %lld\n",
+              "Ant %zu) from Radio %zu at time %lld\n",
               tid_, global_frame_id, global_symbol_id, ant_ids.at(ant),
               radio_id, receive_time);
 
@@ -330,16 +339,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
           memory_tracking.at(ant) = nullptr;
         }
       }  // end is RxSymbol
-
-      //Update the rx-symbol
-      if (!Configuration()->UeHwFramer()) {
-        global_symbol_id++;
-        if (global_symbol_id == Configuration()->Frame().NumTotalSyms()) {
-          global_symbol_id = 0;
-          global_frame_id++;
-        }
-      }
-    }  // sample offset <= 0
+    }    // sample offset <= 0
     sample_offset = 0;
   }
 
@@ -375,9 +375,9 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
     const size_t ant_offset = ue_ant % channels_per_interface_;
 
     MLPD_FRAME(
-        "TxRxWorkerClientHw::DoTx[%zu]: Request to Transmit (Frame %zu:%zu, "
+        "TxRxWorkerClientHw::DoTx[%zu]: Request to Transmit (Frame %zu, "
         "User %zu, Ant %zu) time0 %lld\n",
-        tid_, frame_id, tx_frame_id, interface_id, ue_ant, time0);
+        tid_, frame_id, interface_id, ue_ant, time0);
 
     RtAssert((interface_id >= interface_offset_) &&
                  (interface_id <= (num_interfaces_ + interface_offset_)),
@@ -395,7 +395,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
           const size_t pilot_ant =
               (interface_id * channels_per_interface_) + ch;
           //Each pilot will be in a different tx slot (called for each pilot)
-          TxPilot(pilot_ant, frame_id + TX_FRAME_DELTA, time0);
+          TxPilot(pilot_ant, frame_id, time0);
 
           //Pilot transmit complete for pilot ue
           if (current_event.event_type_ == EventType::kPacketPilotTX) {
@@ -507,25 +507,6 @@ bool TxRxWorkerClientHw::IsRxSymbol(size_t symbol_id) {
   return is_rx;
 }
 
-//Maybe only schedule frame 0, then let the TX_FRAME_DELTA happen after the RX
-void TxRxWorkerClientHw::ScheduleTxInit(size_t frames_to_schedule,
-                                        long long time0) {
-  for (size_t frame = 0; frame < frames_to_schedule; frame++) {
-    for (size_t radio = interface_offset_;
-         radio < (interface_offset_ + num_interfaces_); radio++) {
-      MLPD_INFO(
-          "TxRxWorkerClientHw[%zu]: Scheduling frame %zu on interface %zu\n",
-          tid_, frame, radio);
-      if (!Configuration()->HwFramer()) {
-        //TxPilot(radio, frame, time0);
-      }
-      //Keep the assumption that Pilot is before any 'U' symbols
-      // Maybe a good idea to combine / optimize the schedule by iterating through the entire frame symbol by symbol
-      //TxUplinkSymbols(radio, frame, time0);
-    }  // for each radio
-  }    // fpr each frame
-}
-
 // All UL symbols
 void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
                                          long long time0) {
@@ -565,10 +546,10 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
       std::cout << "BAD Write (UL): For Ue " << radio_id << " " << tx_status
                 << "/" << samples_per_symbol << std::endl;
     }
-    if (kDebugPrintInTask || true) {
+    if (kDebugPrintInTask) {
       std::printf(
           "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Symbol (Frame "
-          "%zu:%zu, Symbol %zu, Ue %zu) tx time %lld flags %d\n",
+          "%zu:%zu, Symbol %zu, Ue %zu) at time %lld flags %d\n",
           tid_, frame_id, tx_frame_id, tx_symbol_id, radio_id, tx_time,
           flags_tx);
     }
@@ -577,11 +558,13 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
 
 void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
                                  long long time0) {
+  const size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
   const size_t pilot_channel = (pilot_ant % channels_per_interface_);
   const size_t radio = pilot_ant / channels_per_interface_;
   const size_t samples_per_symbol = Configuration()->SampsPerSymbol();
   const size_t samples_per_frame =
       samples_per_symbol * Configuration()->Frame().NumTotalSyms();
+  long long tx_time;
 
   std::vector<void*> tx_data(channels_per_interface_);
   for (size_t ch = 0; ch < channels_per_interface_; ch++) {
@@ -609,9 +592,13 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
     flags_tx = 1;
   }
 
-  long long tx_time = time0 + (frame_id * samples_per_frame) +
-                      (pilot_symbol_id * samples_per_symbol) -
-                      Configuration()->ClTxAdvance().at(radio);
+  if (Configuration()->UeHwFramer()) {
+    tx_time = ((long long)tx_frame_id << 32) | (pilot_symbol_id << 16);
+  } else {
+    tx_time = time0 + (tx_frame_id * samples_per_frame) +
+              (pilot_symbol_id * samples_per_symbol) -
+              Configuration()->ClTxAdvance().at(radio);
+  }
 
   const int tx_status = radio_.RadioTx(radio, tx_data.data(),
                                        samples_per_symbol, flags_tx, tx_time);
@@ -624,12 +611,12 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
               << "/" << samples_per_symbol << std::endl;
   }
 
-  if (kDebugPrintInTask || true) {
+  if (kDebugPrintInTask) {
     std::printf(
         "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Pilot  (Frame "
-        "%zu, Symbol %zu, Ue %zu, Ant %zu:%zu) at time %lld flags "
+        "%zu:%zu, Symbol %zu, Ue %zu, Ant %zu:%zu) at time %lld flags "
         "%d\n",
-        tid_, frame_id, pilot_symbol_id, radio, pilot_channel, pilot_ant,
-        tx_time, flags_tx);
+        tid_, frame_id, tx_frame_id, pilot_symbol_id, radio, pilot_channel,
+        pilot_ant, tx_time, flags_tx);
   }
 }
