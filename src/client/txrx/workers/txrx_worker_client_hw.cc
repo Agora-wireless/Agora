@@ -560,11 +560,11 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
     const int rx_status =
         radio_.RadioRx(radio_id, rx_frame_.data(), sample_window, rx_time);
 
-    if (rx_status != static_cast<int>(sample_window))
+    if (rx_status != static_cast<int>(sample_window)) {
       std::cerr << "RadioTxRx [" << radio_id << "]: BAD SYNC Receive("
                 << rx_status << "/" << sample_window << ") at Time " << rx_time
                 << std::endl;
-    else {
+    } else {
       sync_index = FindSyncBeacon(reinterpret_cast<std::complex<int16_t>*>(
                                       rx_frame_.at(kSyncDetectChannel)),
                                   sample_window);

@@ -129,7 +129,7 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
 
   // Add the data update thread (background data reader), need to add a variable
   // for the update source number
-  const size_t kUpdateSourcePerThread = 1;
+  static constexpr size_t kUpdateSourcePerThread = 1;
   for (size_t update_threads = 0; update_threads < update_thread_num_;
        update_threads++) {
     data_update_queue_.emplace_back(

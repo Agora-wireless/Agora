@@ -115,7 +115,7 @@ void TxRxWorkerSim::DoTxRx() {
       // receive data
       // Need to get NumChannels data here
       const auto rx_packets = RecvEnqueue(thread_local_interface);
-      for (auto& packet : rx_packets) {
+      for (const auto& packet : rx_packets) {
         if (kIsWorkerTimingEnabled) {
           const uint32_t frame_id = packet->frame_id_;
           if (frame_id != prev_frame_id) {

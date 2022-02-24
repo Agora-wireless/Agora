@@ -5,10 +5,11 @@
 
 #include "client_radio.h"
 
+#include <SoapySDR/Logger.hpp>
+
 #include "comms-lib.h"
 #include "logger.h"
 #include "nlohmann/json.hpp"
-#include <SoapySDR/Logger.hpp>
 
 static constexpr size_t kSoapyMakeMaxAttempts = 2;
 
