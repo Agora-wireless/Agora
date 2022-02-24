@@ -14,7 +14,7 @@
 static constexpr size_t kSyncDetectChannel = 0;
 static constexpr size_t kFrameSync = 1000u;
 static constexpr bool kVerifyFirstSync = true;
-static constexpr size_t kReSyncRetryCount = 1000;
+static constexpr size_t kReSyncRetryCount = 100u;
 
 TxRxWorkerClientHw::TxRxWorkerClientHw(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -145,9 +145,9 @@ void TxRxWorkerClientHw::DoTxRx() {
                                 Configuration()->OfdmTxZeroPrefix();
             MLPD_INFO(
                 "TxRxWorkerClientHw [%zu]: Initial Sync - radio %zu, "
-                "sync_index: %ld, rx sample offset: %ld\n",
+                "sync_index: %ld, rx sample offset: %ld time0 %lld\n",
                 tid_, (local_interface + interface_offset_) + ch, sync_index,
-                rx_adjust_samples);
+                rx_adjust_samples, time0);
           } else {
             throw std::runtime_error(
                 "No Beacon Detected at Frame 0 / Symbol 0");

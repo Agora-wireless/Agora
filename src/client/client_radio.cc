@@ -295,7 +295,7 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
 bool ClientRadioConfig::RadioStart() {
   // send through the first radio for now
   // int beacon_ant = 1;
-  int flags(0);  // = SOAPY_SDR_WAIT_TRIGGER;
+  int flags = SOAPY_SDR_WAIT_TRIGGER;
 
   for (size_t i = 0; i < this->radio_num_; i++) {
     if (cfg_->UeHwFramer()) {
@@ -303,8 +303,9 @@ bool ClientRadioConfig::RadioStart() {
       conf["tdd_enabled"] = true;
       conf["frame_mode"] = "continuous_resync";
       int max_frame =
-          (int)(2.0 / ((cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms()) /
-                       cfg_->Rate()));
+          (int)(2.0f /
+                ((cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms()) /
+                 cfg_->Rate()));
       conf["max_frame"] = max_frame;
       conf["dual_pilot"] = (cfg_->NumUeChannels() == 2);
       auto tdd_sched = cfg_->Frame().FrameIdentifier();
@@ -351,8 +352,8 @@ bool ClientRadioConfig::RadioStart() {
         std::string tx_ram = "TX_RAM_";
         cl_stn_.at(i)->writeRegisters(tx_ram + c, 0, cfg_->Pilot());
       }
-      cl_stn_.at(i)->activateStream(this->rx_streams_.at(i), flags, 0);
-      cl_stn_.at(i)->activateStream(this->tx_streams_.at(i));
+      cl_stn_.at(i)->activateStream(rx_streams_.at(i), flags);
+      cl_stn_.at(i)->activateStream(tx_streams_.at(i), flags);
 
       std::string corr_conf_string =
           R"({"corr_enabled":true,"corr_threshold":)" + std::to_string(1) + "}";
@@ -364,9 +365,8 @@ bool ClientRadioConfig::RadioStart() {
     } else {
       if (!kUseUHD) {
         cl_stn_.at(i)->setHardwareTime(0, "TRIGGER");
-        cl_stn_.at(i)->activateStream(this->rx_streams_.at(i), flags, 0);
-        cl_stn_.at(i)->activateStream(this->tx_streams_.at(i));
-        cl_stn_.at(i)->writeSetting("TRIGGER_GEN", "");
+        cl_stn_.at(i)->activateStream(rx_streams_.at(i), flags);
+        cl_stn_.at(i)->activateStream(tx_streams_.at(i), flags);
       } else {
         cl_stn_.at(i)->setHardwareTime(0, "UNKNOWN_PPS");
         cl_stn_.at(i)->activateStream(this->rx_streams_.at(i),
@@ -376,15 +376,16 @@ bool ClientRadioConfig::RadioStart() {
       }
     }
   }
-
   std::cout << "radio start done!" << std::endl;
   return true;
 }
 
 void ClientRadioConfig::Go() {
   if (!kUseUHD) {
-    // std::cout << "triggering first Iris ..." << std::endl;
-    cl_stn_.at(0)->writeSetting("TRIGGER_GEN", "");
+    for (size_t i = 0; i < this->radio_num_; i++) {
+      //std::cout << "triggering Iris ..." << i << std::endl;
+      cl_stn_.at(i)->writeSetting("TRIGGER_GEN", "");
+    }
   }
 }
 

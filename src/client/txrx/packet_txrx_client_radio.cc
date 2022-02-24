@@ -49,7 +49,7 @@ bool PacketTxRxClientRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
     std::this_thread::sleep_for(std::chrono::milliseconds(kRadioTriggerWaitMs));
     MLPD_INFO(
         "PacketTxRxClientRadio : All workers started triggering the radio\n");
-    //radio_config_->Go();
+    radio_config_->Go();
   }
   return status;
 }
