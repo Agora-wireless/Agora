@@ -87,28 +87,33 @@ void TxRxWorkerClientHw::DoTxRx() {
   long long rx_time = 0;
 
   ssize_t rx_adjust_samples = 0;
+
+  const size_t beacon_detect_window =
+      static_cast<size_t>(static_cast<float>(samples_per_symbol) * 2.33f);
+  const size_t alignment_samples = samples_per_frame - beacon_detect_window;
+  RtAssert(beacon_detect_window < samples_per_frame,
+           "Frame must be greater than 3 Symbols");
+
   //Scope the variables
   {
-    const ssize_t sync_index = SyncBeacon(local_interface, samples_per_frame);
+    const ssize_t sync_index =
+        SyncBeacon(local_interface, beacon_detect_window);
     if (sync_index >= 0) {
       rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
                           Configuration()->OfdmTxZeroPrefix();
       MLPD_INFO(
-          "TxRxWorkerClientHw [%zu]: Beacon detected, sync_index: %ld, rx "
-          "sample offset: %ld\n",
-          local_interface, sync_index, rx_adjust_samples);
-      //Make adjustment
-      //If negative, take offset out of the next frame
-      if (rx_adjust_samples < 0) {
-        rx_adjust_samples += samples_per_frame;
-      }
-      AdjustRx(local_interface, rx_adjust_samples);
+          "TxRxWorkerClientHw [%zu]: Beacon detected for radio %zu, "
+          "sync_index: %ld, rx sample offset: %ld\n",
+          tid_, local_interface + interface_offset_, sync_index,
+          rx_adjust_samples);
+
+      AdjustRx(local_interface, alignment_samples + rx_adjust_samples);
       rx_adjust_samples = 0;
     } else if (Configuration()->Running()) {
       MLPD_WARN(
-          "TxRxWorkerClientHw [%zu]: Beacon could not be detected - "
-          "sync_index: %ld\n",
-          local_interface, sync_index);
+          "TxRxWorkerClientHw [%zu]: Beacon could not be detected on interface "
+          "%zu - sync_index: %ld\n",
+          tid_, local_interface, sync_index);
       throw std::runtime_error("rx sample offset is less than 0");
     }
   }

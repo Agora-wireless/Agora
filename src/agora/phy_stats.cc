@@ -276,8 +276,8 @@ void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
 void PhyStats::UpdateBitErrors(size_t ue_id, size_t offset, uint8_t tx_byte,
                                uint8_t rx_byte) {
   static constexpr size_t kBitsInByte = 8;
-  // std::printf("Updating bit errors: %zu %zu %d %d\n", ue_id, offset, tx_byte,
-  // rx_byte);
+  //std::printf("Updating bit errors: User %zu Offset  %zu Tx %d Rx %d\n", ue_id, offset, tx_byte,
+  //            rx_byte);
   uint8_t xor_byte(tx_byte ^ rx_byte);
   size_t bit_errors = 0;
   for (size_t j = 0; j < kBitsInByte; j++) {

@@ -45,9 +45,11 @@ PhyUe::PhyUe(Config* config)
   for (size_t i = 0; i < config_->UeAntNum(); i++) {
     for (size_t j = config->OfdmTxZeroPrefix();
          j < config_->SampsPerSymbol() - config->OfdmTxZeroPostfix(); j++) {
-      ue_pilot_vec_[i].push_back(std::complex<float>(
-          config_->UeSpecificPilotT()[i][j].real() / 32768.0f,
-          config_->UeSpecificPilotT()[i][j].imag() / 32768.0f));
+      ue_pilot_vec_.at(i).push_back(std::complex<float>(
+          static_cast<float>(config_->UeSpecificPilotT()[i][j].real()) /
+              32768.0f,
+          static_cast<float>(config_->UeSpecificPilotT()[i][j].imag()) /
+              32768.0f));
     }
   }
 
