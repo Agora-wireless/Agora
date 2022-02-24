@@ -46,6 +46,9 @@ class TxRxWorkerClientHw : public TxRxWorker {
 
   bool IsRxSymbol(size_t symbol_id);
 
+  void ScheduleTxInit(size_t frames_to_schedule, long long time0);
+  void TxUplinkSymbols(size_t interface_id, size_t frame_id, long long time0);
+  void TxPilot(size_t pilot_ant, size_t frame_id, long long time0);
   // This object is created / owned by the parent process
   ClientRadioConfig& radio_;
   size_t program_start_ticks_;

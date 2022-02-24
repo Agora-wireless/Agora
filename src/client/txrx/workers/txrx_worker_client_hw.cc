@@ -157,7 +157,8 @@ void TxRxWorkerClientHw::DoTxRx() {
     }  // received Frame 0 Symbol 0
   }
 
-  //PreSchedule TX_FRAME_OFFSET pilots and zero out uplink symbols
+  //PreSchedule TX_FRAME_DELTA pilots and zero out uplink symbols
+  ScheduleTxInit(TX_FRAME_DELTA, time0);
 
   //Beacon sync detected run main rx routines
   while (Configuration()->Running()) {
@@ -360,10 +361,6 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
 
 //Tx data
 size_t TxRxWorkerClientHw::DoTx(const long long time0) {
-  const size_t samples_per_symbol = Configuration()->SampsPerSymbol();
-  const size_t samples_per_frame =
-      samples_per_symbol * Configuration()->Frame().NumTotalSyms();
-
   auto tx_events = GetPendingTxEvents();
 
   for (const EventData& current_event : tx_events) {
@@ -376,14 +373,6 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
     const size_t ue_ant = gen_tag_t(current_event.tags_[0u]).ue_id_;
     const size_t interface_id = ue_ant / channels_per_interface_;
     const size_t ant_offset = ue_ant % channels_per_interface_;
-
-    const size_t tx_frame_id = (frame_id + TX_FRAME_DELTA);
-    long long tx_time = 0;
-    //Place zeros in all dimensions
-    std::vector<void*> tx_data(channels_per_interface_);
-    for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-      tx_data.at(ch) = frame_zeros_.at(ch).data();
-    }
 
     MLPD_FRAME(
         "TxRxWorkerClientHw::DoTx[%zu]: Request to Transmit (Frame %zu:%zu, "
@@ -401,61 +390,12 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
     //other antennas (enforced in the passing utility)
     if ((ant_offset + 1) == channels_per_interface_) {
       // Transmit pilot(s)
-      // For UHD devices, first pilot should not be with the END_BURST flag
-      // 1: HAS_TIME, 2: HAS_TIME | END_BURST
-      int flags_tx = 2;
-
       if (!Configuration()->UeHwFramer()) {
         for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-          flags_tx = 2;
           const size_t pilot_ant =
               (interface_id * channels_per_interface_) + ch;
-          const size_t pilot_symbol_id =
-              Configuration()->Frame().GetPilotSymbol(pilot_ant);
-
-          //See if we need to set end burst for the last channel
-          // (see if the next symbol is an uplink symbol)
-          if ((ch + 1) == channels_per_interface_) {
-            if (Configuration()->Frame().NumULSyms() > 0) {
-              const size_t first_ul_symbol =
-                  Configuration()->Frame().GetULSymbol(0);
-              if ((pilot_symbol_id + 1) == (first_ul_symbol)) {
-                flags_tx = 1;
-              }
-            }
-          } else {
-            flags_tx = 1;
-          }
-
-          //Add the pilot to the correct index
-          tx_data.at(ch) = Configuration()->PilotCi16().data();
-
-          tx_time = time0 + (tx_frame_id * samples_per_frame) +
-                    (pilot_symbol_id * samples_per_symbol) -
-                    Configuration()->ClTxAdvance().at(interface_id);
-
-          const int tx_status =
-              radio_.RadioTx(interface_id, tx_data.data(), samples_per_symbol,
-                             flags_tx, tx_time);
-
-          if (tx_status < 0) {
-            std::cout << "BAD Radio Tx: (PILOT)" << tx_status << "For Ue Radio "
-                      << interface_id << "/" << samples_per_symbol << std::endl;
-          } else if (tx_status != static_cast<int>(samples_per_symbol)) {
-            std::cout << "BAD Write: (PILOT)" << tx_status << "For Ue Radio "
-                      << interface_id << "/" << samples_per_symbol << std::endl;
-          }
-
-          if (kDebugPrintInTask) {
-            std::printf(
-                "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Pilot  (Frame "
-                "%zu:%zu, Symbol %zu, Ue %zu, Ant %zu:%zu) at time %lld flags "
-                "%d\n",
-                tid_, frame_id, tx_frame_id, pilot_symbol_id, interface_id, ch,
-                pilot_ant, tx_time, flags_tx);
-          }
-          //Replace the pilot with zeros for next channel pilot
-          tx_data.at(ch) = frame_zeros_.at(ch).data();
+          //Each pilot will be in a different tx slot (called for each pilot)
+          TxPilot(pilot_ant, frame_id + TX_FRAME_DELTA, time0);
 
           //Pilot transmit complete for pilot ue
           if (current_event.event_type_ == EventType::kPacketPilotTX) {
@@ -468,48 +408,8 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
       }
 
       if (current_event.event_type_ == EventType::kPacketTX) {
-        // Transmit data for all symbols
-        flags_tx = 1;
-        for (size_t ul_symbol_idx = 0;
-             ul_symbol_idx < Configuration()->Frame().NumULSyms();
-             ul_symbol_idx++) {
-          const size_t tx_symbol_id =
-              Configuration()->Frame().GetULSymbol(ul_symbol_idx);
-
-          for (size_t ch = 0; ch < channels_per_interface_; ch++) {
-            const size_t tx_ant = (interface_id * channels_per_interface_) + ch;
-            auto* pkt = GetUlTxPacket(frame_id, tx_symbol_id, tx_ant);
-            tx_data.at(ch) = reinterpret_cast<void*>(pkt->data_);
-          }
-
-          if (Configuration()->UeHwFramer()) {
-            tx_time = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
-          } else {
-            tx_time = time0 + (tx_frame_id * samples_per_frame) +
-                      (tx_symbol_id * samples_per_symbol) -
-                      Configuration()->ClTxAdvance().at(interface_id);
-          }
-
-          if (tx_symbol_id == Configuration()->Frame().GetULSymbolLast()) {
-            flags_tx = 2;  // HAS_TIME & END_BURST, fixme
-          }
-          const int tx_status =
-              radio_.RadioTx(interface_id, tx_data.data(), samples_per_symbol,
-                             flags_tx, tx_time);
-          if (tx_status < static_cast<int>(samples_per_symbol)) {
-            std::cout << "BAD Write (UL): For Ue " << interface_id << " "
-                      << tx_status << "/" << samples_per_symbol << std::endl;
-          }
-
-          if (kDebugPrintInTask) {
-            std::printf(
-                "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Symbol (Frame "
-                "%zu:%zu, Symbol %zu, Ue %zu) tx time %lld flags %d\n",
-                tid_, frame_id, tx_frame_id, tx_symbol_id, interface_id,
-                tx_time, flags_tx);
-          }
-        }
-
+        // Transmit data for all symbols (each cannel transmits for each symbol)
+        TxUplinkSymbols(interface_id, frame_id, time0);
         //Notify the tx is complete for all antennas on the interface
         for (size_t ch = 0; ch < channels_per_interface_; ch++) {
           const size_t tx_ant = (interface_id * channels_per_interface_) + ch;
@@ -605,4 +505,131 @@ bool TxRxWorkerClientHw::IsRxSymbol(size_t symbol_id) {
     is_rx = false;
   }
   return is_rx;
+}
+
+//Maybe only schedule frame 0, then let the TX_FRAME_DELTA happen after the RX
+void TxRxWorkerClientHw::ScheduleTxInit(size_t frames_to_schedule,
+                                        long long time0) {
+  for (size_t frame = 0; frame < frames_to_schedule; frame++) {
+    for (size_t radio = interface_offset_;
+         radio < (interface_offset_ + num_interfaces_); radio++) {
+      MLPD_INFO(
+          "TxRxWorkerClientHw[%zu]: Scheduling frame %zu on interface %zu\n",
+          tid_, frame, radio);
+      if (!Configuration()->HwFramer()) {
+        //TxPilot(radio, frame, time0);
+      }
+      //Keep the assumption that Pilot is before any 'U' symbols
+      // Maybe a good idea to combine / optimize the schedule by iterating through the entire frame symbol by symbol
+      //TxUplinkSymbols(radio, frame, time0);
+    }  // for each radio
+  }    // fpr each frame
+}
+
+// All UL symbols
+void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
+                                         long long time0) {
+  const size_t tx_frame_id = frame_id + TX_FRAME_DELTA;
+  const size_t samples_per_symbol = Configuration()->SampsPerSymbol();
+  const size_t samples_per_frame =
+      samples_per_symbol * Configuration()->Frame().NumTotalSyms();
+  long long tx_time;
+  int flags_tx = 1;  // HAS_TIME
+
+  std::vector<void*> tx_data(channels_per_interface_);
+  for (size_t ul_symbol_idx = 0;
+       ul_symbol_idx < Configuration()->Frame().NumULSyms(); ul_symbol_idx++) {
+    const size_t tx_symbol_id =
+        Configuration()->Frame().GetULSymbol(ul_symbol_idx);
+
+    for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+      const size_t tx_ant = (radio_id * channels_per_interface_) + ch;
+      auto* pkt = GetUlTxPacket(frame_id, tx_symbol_id, tx_ant);
+      tx_data.at(ch) = reinterpret_cast<void*>(pkt->data_);
+    }
+
+    if (Configuration()->UeHwFramer()) {
+      tx_time = ((long long)tx_frame_id << 32) | (tx_symbol_id << 16);
+    } else {
+      tx_time = time0 + (tx_frame_id * samples_per_frame) +
+                (tx_symbol_id * samples_per_symbol) -
+                Configuration()->ClTxAdvance().at(radio_id);
+    }
+
+    if (tx_symbol_id == Configuration()->Frame().GetULSymbolLast()) {
+      flags_tx = 2;  // HAS_TIME & END_BURST, fixme
+    }
+    const int tx_status = radio_.RadioTx(radio_id, tx_data.data(),
+                                         samples_per_symbol, flags_tx, tx_time);
+    if (tx_status < static_cast<int>(samples_per_symbol)) {
+      std::cout << "BAD Write (UL): For Ue " << radio_id << " " << tx_status
+                << "/" << samples_per_symbol << std::endl;
+    }
+    if (kDebugPrintInTask || true) {
+      std::printf(
+          "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Symbol (Frame "
+          "%zu:%zu, Symbol %zu, Ue %zu) tx time %lld flags %d\n",
+          tid_, frame_id, tx_frame_id, tx_symbol_id, radio_id, tx_time,
+          flags_tx);
+    }
+  }
+}
+
+void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
+                                 long long time0) {
+  const size_t pilot_channel = (pilot_ant % channels_per_interface_);
+  const size_t radio = pilot_ant / channels_per_interface_;
+  const size_t samples_per_symbol = Configuration()->SampsPerSymbol();
+  const size_t samples_per_frame =
+      samples_per_symbol * Configuration()->Frame().NumTotalSyms();
+
+  std::vector<void*> tx_data(channels_per_interface_);
+  for (size_t ch = 0; ch < channels_per_interface_; ch++) {
+    if (ch == pilot_channel) {
+      tx_data.at(ch) = Configuration()->PilotCi16().data();
+    } else {
+      tx_data.at(ch) = frame_zeros_.at(ch).data();
+    }
+  }
+
+  const size_t pilot_symbol_id =
+      Configuration()->Frame().GetPilotSymbol(pilot_ant);
+
+  int flags_tx = 2;  // END_BURST
+  //See if we need to set end burst for the last channel
+  // (see if the next symbol is an uplink symbol)
+  if ((pilot_channel + 1) == channels_per_interface_) {
+    if (Configuration()->Frame().NumULSyms() > 0) {
+      const size_t first_ul_symbol = Configuration()->Frame().GetULSymbol(0);
+      if ((pilot_symbol_id + 1) == (first_ul_symbol)) {
+        flags_tx = 1;
+      }
+    }
+  } else {
+    flags_tx = 1;
+  }
+
+  long long tx_time = time0 + (frame_id * samples_per_frame) +
+                      (pilot_symbol_id * samples_per_symbol) -
+                      Configuration()->ClTxAdvance().at(radio);
+
+  const int tx_status = radio_.RadioTx(radio, tx_data.data(),
+                                       samples_per_symbol, flags_tx, tx_time);
+
+  if (tx_status < 0) {
+    std::cout << "BAD Radio Tx: (PILOT)" << tx_status << "For Ue Radio "
+              << radio << "/" << samples_per_symbol << std::endl;
+  } else if (tx_status != static_cast<int>(samples_per_symbol)) {
+    std::cout << "BAD Write: (PILOT)" << tx_status << "For Ue Radio " << radio
+              << "/" << samples_per_symbol << std::endl;
+  }
+
+  if (kDebugPrintInTask || true) {
+    std::printf(
+        "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Pilot  (Frame "
+        "%zu, Symbol %zu, Ue %zu, Ant %zu:%zu) at time %lld flags "
+        "%d\n",
+        tid_, frame_id, pilot_symbol_id, radio, pilot_channel, pilot_ant,
+        tx_time, flags_tx);
+  }
 }
