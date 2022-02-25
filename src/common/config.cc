@@ -21,7 +21,7 @@ static const size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
 static const size_t kMaxSupportedZc = 256;
 
-Config::Config(const std::string& jsonfile)
+Config::Config(const std::string& jsonfile, int ue_id)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
       ul_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
@@ -115,7 +115,12 @@ Config::Config(const std::string& jsonfile)
     ss.clear();
 
     auto ue_serials = j_ue_serials.value("sdr", json::array());
-    ue_radio_id_.assign(ue_serials.begin(), ue_serials.end());
+    if (ue_id >= 0) { //select one user only
+      ue_radio_id_.assign({ue_serials.at(ue_id)});
+    }
+    else {
+      ue_radio_id_.assign(ue_serials.begin(), ue_serials.end());
+    }
   } else if (kUseArgos == true) {
     throw std::runtime_error(
         "Hardware is enabled but the serials files was not accessable");
@@ -127,11 +132,8 @@ Config::Config(const std::string& jsonfile)
     cell_id_.resize(num_radios_, 0);
   }
 
-  if (ue_radio_id_.empty() == false) {
-    ue_num_ = ue_radio_id_.size();
-  } else {
-    ue_num_ = tdd_conf.value("ue_radio_num", 8);
-  }
+  ue_num_ = tdd_conf.value("ue_radio_num", ue_radio_id_.empty() ? 1 :
+                           ue_radio_id_.size());
 
   channel_ = tdd_conf.value("channel", "A");
   ue_channel_ = tdd_conf.value("ue_channel", channel_);
@@ -410,9 +412,12 @@ Config::Config(const std::string& jsonfile)
   } else {
     json jframes = tdd_conf.value("frame_schedule", json::array());
 
-    // Only allow 1 unique frame type
-    assert(jframes.size() == 1);
-    frame_ = FrameStats(jframes.at(0).get<std::string>());
+    if (ue_id == -1) {
+      // Only allow 1 unique frame type
+      assert(jframes.size() == 1);
+    }
+    frame_ = FrameStats(jframes.at(ue_id > 0 && jframes.size() > 1 ? ue_id: 0)
+                        .get<std::string>());
   }
   MLPD_INFO("Config: Frame schedule %s (%zu symbols)\n",
             frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
@@ -476,6 +481,10 @@ Config::Config(const std::string& jsonfile)
   worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   socket_thread_num_ = tdd_conf.value("socket_thread_num", 4);
   ue_core_offset_ = tdd_conf.value("ue_core_offset", 0);
+  ue_core_offset_step_ = tdd_conf.value("ue_core_offset_step", 0);
+  if (ue_id > 0) {
+    ue_core_offset_ += ue_core_offset_step_ * ue_id;
+  }
   ue_worker_thread_num_ = tdd_conf.value("ue_worker_thread_num", 25);
   ue_socket_thread_num_ = tdd_conf.value("ue_socket_thread_num", 4);
   fft_thread_num_ = tdd_conf.value("fft_thread_num", 5);

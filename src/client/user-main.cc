@@ -14,6 +14,8 @@ DEFINE_string(conf_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/userconfig_512.json",
               "Config filename");
 
+DEFINE_int32(ue_id, -1, "optional UE ID to select a user radio");
+
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");
   gflags::SetVersionString(GetAgoraProjectVersion());
@@ -28,7 +30,7 @@ int main(int argc, char* argv[]) {
   } else {
     filename = FLAGS_conf_file;
   }
-  auto config = std::make_unique<Config>(filename.c_str());
+  auto config = std::make_unique<Config>(filename.c_str(), FLAGS_ue_id);
   config->GenData();
   int ret;
   try {

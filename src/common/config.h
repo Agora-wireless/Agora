@@ -34,7 +34,7 @@
 class Config {
  public:
   // Constructor
-  explicit Config(const std::string& /*jsonfile*/);
+  explicit Config(const std::string& /*jsonfile*/, int ue_id = -1);
   ~Config();
 
   inline void Running(bool value) { this->running_.store(value); }
@@ -638,6 +638,7 @@ class Config {
   size_t zf_thread_num_;
 
   size_t ue_core_offset_;
+  size_t ue_core_offset_step_;
   size_t ue_worker_thread_num_;
   size_t ue_socket_thread_num_;
 
