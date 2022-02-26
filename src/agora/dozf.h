@@ -18,11 +18,6 @@
 #include "symbols.h"
 #include "utils.h"
 
-typedef struct IdCx {
-  size_t id[2];
-  complex_float cx;
-} IdCx;
-
 class DoZF : public Doer {
  public:
   DoZF(Config* in_config, int tid,
@@ -106,8 +101,6 @@ class DoZF : public Doer {
   complex_float* csi_gather_buffer_;  // Intermediate buffer to gather CSI
   // Intermediate buffer to gather reciprical calibration data vector
   complex_float* calib_gather_buffer_;
-  IdCx** mat_log_buffer_;
-  size_t* mat_log_cnt_;
   PhyStats* phy_stats_;
   arma::uvec ext_ref_id_;
   size_t num_ext_ref_;
