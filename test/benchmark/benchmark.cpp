@@ -639,6 +639,7 @@ int main(int argc, char **argv)
     start_tsc = rdtsc();
     for (size_t iter = 0; iter < kZFIterations; iter ++) {
         for (size_t base_sc_id = 0; base_sc_id < cfg->OFDM_DATA_NUM; base_sc_id += cfg->UE_NUM) {
+            printf("base_sc_id: %zu\n", base_sc_id);
             run_zf(csi_buffer, csi_gather_buffer, ul_zf_matrices, dl_zf_matrices, base_sc_id);
         }
     }
