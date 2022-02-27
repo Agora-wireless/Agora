@@ -703,8 +703,8 @@ int main(int argc, char **argv)
     printf("%lf users/sec\n", (double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
 
     printf("Running Precode: ");
-    Table<complex_float> tx_data_all_symbols;
-    tx_data_all_symbols.calloc(1, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, 64);
+    Table<complex_float> tx_data_all_symbols_precode;
+    tx_data_all_symbols_precode.calloc(1, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, 64);
     complex_float* modulated_buffer_temp;
     alloc_buffer_1d(&modulated_buffer_temp, cfg->UE_NUM, 64, 0);
     complex_float* precoded_buffer_temp;
@@ -712,7 +712,7 @@ int main(int argc, char **argv)
     start_tsc = rdtsc();
     for (size_t iter = 0; iter < kNumIterations; iter ++) {
         for (size_t base_sc_id = 0; base_sc_id < cfg->OFDM_DATA_NUM; base_sc_id += cfg->demul_block_size) {
-            run_precode(encoded_buffer, tx_data_all_symbols, dl_zf_matrices, modulated_buffer_temp, precoded_buffer_temp, base_sc_id);
+            run_precode(encoded_buffer, tx_data_all_symbols_precode[0], dl_zf_matrices, modulated_buffer_temp, precoded_buffer_temp, base_sc_id);
         }
     }
     end_tsc = rdtsc();
