@@ -88,56 +88,56 @@ bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t 
         frame_start_time_[frame_id] = get_us();
     }
 
-    size_t last_frame_symbol = last_frame_symbol_each_ant_[ant_id];
-    size_t last_frame = last_frame_symbol >> 32;
-    size_t last_symbol = last_frame_symbol & 0xffffffff;
-    if (last_frame == frame_id) {
-        if (last_symbol < symbol_id) {
-            num_pkts_[frame_id % kFrameWnd] += (symbol_id - last_symbol);
-            if (symbol_id < num_pilot_symbols_per_frame_) {
-                num_pilot_pkts_[frame_id % kFrameWnd] += (symbol_id - last_symbol);
-            } else {
-                if (last_symbol < num_pilot_symbols_per_frame_) {
-                    num_pilot_pkts_[frame_id % kFrameWnd] += (num_pilot_symbols_per_frame_ - last_symbol);
-                    for (size_t si = num_pilot_symbols_per_frame_; si < symbol_id; si++) {
-                        num_data_pkts_[frame_id % kFrameWnd][si] ++;
-                    }
-                } else {
-                    for (size_t si = last_symbol; si < symbol_id; si++) {
-                        num_data_pkts_[frame_id % kFrameWnd][si] ++;
-                    } 
-                }
-            }
-        }
-    } else if (last_frame < frame_id) {
-        num_pkts_[last_frame % kFrameWnd] += (symbol_num_per_frame_ - last_symbol);
-        if (last_symbol < num_pilot_symbols_per_frame_) {
-            num_pilot_pkts_[frame_id % kFrameWnd] += (num_pilot_symbols_per_frame_ - last_symbol);
-            for (size_t si = num_pilot_symbols_per_frame_; si < symbol_num_per_frame_; si++) {
-                num_data_pkts_[frame_id % kFrameWnd][si] ++;
-            }
-        } else {
-            for (size_t si = last_symbol; si < symbol_num_per_frame_; si++) {
-                num_data_pkts_[frame_id % kFrameWnd][si] ++;
-            } 
-        }
-        for (size_t fi = last_frame + 1; fi < frame_id; fi ++) {
-            num_pkts_[fi % kFrameWnd] += symbol_num_per_frame_;
-            num_pilot_pkts_[fi % kFrameWnd] += num_pilot_symbols_per_frame_;
-            for (size_t si = num_pilot_symbols_per_frame_; si < symbol_num_per_frame_; si ++) {
-                num_data_pkts_[fi % kFrameWnd][si] ++;
-            }
-        }
-        num_pkts_[frame_id % kFrameWnd] += symbol_id;
-        if (symbol_id < num_pilot_symbols_per_frame_) {
-            num_pilot_pkts_[frame_id % kFrameWnd] += symbol_id;
-        } else {
-            num_pilot_pkts_[frame_id % kFrameWnd] += num_pilot_symbols_per_frame_;
-            for (size_t si = num_pilot_symbols_per_frame_; si < symbol_id; si++) {
-                num_data_pkts_[frame_id % kFrameWnd][si] ++;
-            }
-        }
-    }
+    // size_t last_frame_symbol = last_frame_symbol_each_ant_[ant_id];
+    // size_t last_frame = last_frame_symbol >> 32;
+    // size_t last_symbol = last_frame_symbol & 0xffffffff;
+    // if (last_frame == frame_id) {
+    //     if (last_symbol < symbol_id) {
+    //         num_pkts_[frame_id % kFrameWnd] += (symbol_id - last_symbol);
+    //         if (symbol_id < num_pilot_symbols_per_frame_) {
+    //             num_pilot_pkts_[frame_id % kFrameWnd] += (symbol_id - last_symbol);
+    //         } else {
+    //             if (last_symbol < num_pilot_symbols_per_frame_) {
+    //                 num_pilot_pkts_[frame_id % kFrameWnd] += (num_pilot_symbols_per_frame_ - last_symbol);
+    //                 for (size_t si = num_pilot_symbols_per_frame_; si < symbol_id; si++) {
+    //                     num_data_pkts_[frame_id % kFrameWnd][si] ++;
+    //                 }
+    //             } else {
+    //                 for (size_t si = last_symbol; si < symbol_id; si++) {
+    //                     num_data_pkts_[frame_id % kFrameWnd][si] ++;
+    //                 } 
+    //             }
+    //         }
+    //     }
+    // } else if (last_frame < frame_id) {
+    //     num_pkts_[last_frame % kFrameWnd] += (symbol_num_per_frame_ - last_symbol);
+    //     if (last_symbol < num_pilot_symbols_per_frame_) {
+    //         num_pilot_pkts_[frame_id % kFrameWnd] += (num_pilot_symbols_per_frame_ - last_symbol);
+    //         for (size_t si = num_pilot_symbols_per_frame_; si < symbol_num_per_frame_; si++) {
+    //             num_data_pkts_[frame_id % kFrameWnd][si] ++;
+    //         }
+    //     } else {
+    //         for (size_t si = last_symbol; si < symbol_num_per_frame_; si++) {
+    //             num_data_pkts_[frame_id % kFrameWnd][si] ++;
+    //         } 
+    //     }
+    //     for (size_t fi = last_frame + 1; fi < frame_id; fi ++) {
+    //         num_pkts_[fi % kFrameWnd] += symbol_num_per_frame_;
+    //         num_pilot_pkts_[fi % kFrameWnd] += num_pilot_symbols_per_frame_;
+    //         for (size_t si = num_pilot_symbols_per_frame_; si < symbol_num_per_frame_; si ++) {
+    //             num_data_pkts_[fi % kFrameWnd][si] ++;
+    //         }
+    //     }
+    //     num_pkts_[frame_id % kFrameWnd] += symbol_id;
+    //     if (symbol_id < num_pilot_symbols_per_frame_) {
+    //         num_pilot_pkts_[frame_id % kFrameWnd] += symbol_id;
+    //     } else {
+    //         num_pilot_pkts_[frame_id % kFrameWnd] += num_pilot_symbols_per_frame_;
+    //         for (size_t si = num_pilot_symbols_per_frame_; si < symbol_id; si++) {
+    //             num_data_pkts_[frame_id % kFrameWnd][si] ++;
+    //         }
+    //     }
+    // }
 
     const size_t frame_slot = frame_id % kFrameWnd;
     num_pkts_[frame_slot]++;
@@ -161,12 +161,12 @@ bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t 
         num_data_pkts_[frame_slot][symbol_id - num_pilot_symbols_per_frame_]++;
     }
 
-    last_symbol = symbol_id + 1;
-    if (last_symbol == symbol_num_per_frame_) {
-        last_symbol = 0;
-        last_frame = frame_id + 1;
-    }
-    last_frame_symbol_each_ant_[ant_id] = (((uint64_t)last_frame) << 32) | last_symbol;
+    // last_symbol = symbol_id + 1;
+    // if (last_symbol == symbol_num_per_frame_) {
+    //     last_symbol = 0;
+    //     last_frame = frame_id + 1;
+    // }
+    // last_frame_symbol_each_ant_[ant_id] = (((uint64_t)last_frame) << 32) | last_symbol;
 
     return true;
 }
@@ -201,6 +201,14 @@ bool SharedState::receive_encoded_pkt(size_t frame_id, size_t symbol_id_dl, size
         return false;
     }
     num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl]++;
+    if (unlikely(((num_encoded_pkts_states_[frame_id % kFrameWnd][symbol_id_dl] >> ue_id) & 1) == 1)) {
+        printf("ERROR! Duplicate encoded packet for frame %zu symbol %zu ue %zu\n", frame_id, symbol_id_dl, ue_id);
+        exit(0);
+    }
+    if (unlikely(ue_id >= num_encoded_pkts_per_symbol_)) {
+        printf("ERROR! UE ID is larger than limit (%zu >= %zu)\n", ue_id, num_encoded_pkts_per_symbol_);
+        exit(0);
+    }
     num_encoded_pkts_states_[frame_id % kFrameWnd][symbol_id_dl] ^= (1 << ue_id);
     if (num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl] == num_encoded_pkts_per_symbol_) {
         MLPD_INFO("SharedCounters: received all encoded packets in frame: %u, symbol: %u, packets: %zu\n", frame_id, symbol_id_dl, num_encoded_pkts_per_symbol_);
@@ -333,11 +341,10 @@ void SharedState::decode_done(size_t frame_id)
         cur_frame_mutex_.lock();
         while (num_decode_tasks_completed_[cur_frame_ % kFrameWnd] == num_decode_tasks_per_frame_) {
             frame_end_time_[cur_frame_] = get_us();
-            cur_frame_ ++;
-            encode_ready_[(cur_frame_ - 1) % kFrameWnd] = false;
+            encode_ready_[(cur_frame_) % kFrameWnd] = false;
             size_t cur_cycle = worker_rdtsc();
-            num_decode_tasks_completed_[(cur_frame_ - 1) % kFrameWnd] = 0;
-            size_t frame_slot = (cur_frame_ - 1) % kFrameWnd;
+            num_decode_tasks_completed_[(cur_frame_) % kFrameWnd] = 0;
+            size_t frame_slot = (cur_frame_) % kFrameWnd;
             num_pkts_[frame_slot] = 0;
             num_pilot_pkts_[frame_slot] = 0;
             for (size_t j = 0; j < kMaxSymbols; j++) {
@@ -360,8 +367,9 @@ void SharedState::decode_done(size_t frame_id)
             for (size_t i = 0; i < num_zf_tasks_per_frame_; i++) {
                 zf_task_completed_[frame_slot][i] = false;
             }
-            MLPD_INFO("Main thread: Decode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
+            MLPD_INFO("Main thread: Decode done frame: %lu, for %.2lfms\n", cur_frame_, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
             last_frame_cycles_ = cur_cycle;
+            cur_frame_ ++;
         }
         cur_frame_mutex_.unlock();
     }
@@ -378,7 +386,6 @@ bool SharedState::precode_done(size_t frame_id)
     precode_mutex_.lock();
     num_precode_tasks_completed_[frame_id % kFrameWnd]++;
     while (frame_id == cur_frame_ && num_precode_tasks_completed_[frame_id % kFrameWnd] == num_precode_tasks_per_frame_) {
-        cur_frame_++;
         encode_ready_[frame_id % kFrameWnd] = false;
         size_t cur_cycle = worker_rdtsc();
         num_precode_tasks_completed_[frame_id % kFrameWnd] = 0;
@@ -396,8 +403,9 @@ bool SharedState::precode_done(size_t frame_id)
             num_encoded_pkts_[frame_slot][j] = 0;
             num_encoded_pkts_states_[frame_slot][j] = 0;
         }
-        MLPD_INFO("Main thread: Precode done frame: %lu, for %.2lfms\n", cur_frame_ - 1, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
+        MLPD_INFO("Main thread: Precode done frame: %lu, for %.2lfms\n", cur_frame_, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
         last_frame_cycles_ = cur_cycle;
+        cur_frame_ ++;
         frame_id ++;
     }
     precode_mutex_.unlock();

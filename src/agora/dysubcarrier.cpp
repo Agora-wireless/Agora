@@ -698,12 +698,12 @@ void DySubcarrier::StartWorkDownlink() {
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("DySubcarrier Thread %u duration stats: total time used %.2lfms, "
         "csi %.2lfms (%.2lf%%, %zu, %.2lfus), zf %.2lfms (%.2lf%%, %zu, %.2lfus, %.2lfus), "
-        "precode %.2lfms (%.2lf%%, %zu, %zu, %zu), print %.2lfms (%.2lf%%), stating "
+        "precode %.2lfms (%.2lf%%, %zu, %zu, %zu, %zu), print %.2lfms (%.2lf%%), stating "
         "%.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%), working rate (%zu/%zu: %.2lf%%)\n", 
         tid_, cycles_to_ms(whole_duration, freq_ghz_),
         cycles_to_ms(csi_tsc_duration, freq_ghz_), csi_tsc_duration * 100.0f / whole_duration, csi_count, cycles_to_us(csi_max, freq_ghz_),
         cycles_to_ms(zf_tsc_duration, freq_ghz_), zf_tsc_duration * 100.0f / whole_duration, zf_count, cycles_to_us(zf_max, freq_ghz_), do_zf_->GetZfTscPerTask(),
-        cycles_to_ms(precode_tsc_duration, freq_ghz_), precode_tsc_duration * 100.0f / whole_duration, precode_cur_frame_, precode_cur_sym_dl_, n_precode_tasks_reqd,
+        cycles_to_ms(precode_tsc_duration, freq_ghz_), precode_tsc_duration * 100.0f / whole_duration, precode_count, precode_cur_frame_, precode_cur_sym_dl_, n_precode_tasks_reqd,
         cycles_to_ms(print_tsc_duration, freq_ghz_), print_tsc_duration * 100.0f / whole_duration,
         cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration,

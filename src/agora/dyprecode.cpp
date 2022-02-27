@@ -71,11 +71,13 @@ void DyPrecode::Launch(
 
             // Begin Debug
             // printf("(%lf %lf) ", data_ptr[0].re, data_ptr[0].im);
-            // printf("| ");
-            // for (size_t k = 0; k < cfg_->UE_NUM; k ++) {
-            //     printf("(%lf %lf) ", data_ptr[k].re, data_ptr[k].im);
+            // if (frame_id == 800 && symbol_id_dl == 7 && base_sc_id == 304) {
+            //     printf("| ");
+            //     for (size_t k = 0; k < cfg_->UE_NUM; k ++) {
+            //         printf("(%lf %lf) ", data_ptr[k].re, data_ptr[k].im);
+            //     }
+            //     printf("| ");
             // }
-            // printf("| ");
             // End Debug
 
             auto* precoder_ptr = reinterpret_cast<cx_float*>(
