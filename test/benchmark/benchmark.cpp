@@ -425,6 +425,80 @@ void run_decode(Table<int8_t>& input, Table<int8_t>& output,
         &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
 }
 
+void run_encode(Table<int8_t>& input, Table<int8_t>& output,
+    int8_t* encoded_buffer_temp, int8_t* parity_buffer,
+    size_t ue_id, size_t Bg, size_t Zc)
+{
+    size_t nRows = Bg == 1 ? 46 : 42;
+    uint32_t cbCodewLen = ldpc_num_encoded_bits(Bg, Zc, nRows);
+
+    int8_t* input_ptr = input[ue_id];
+
+    ldpc_encode_helper(Bg, Zc, nRows,
+        encoded_buffer_temp, parity_buffer, input_ptr);
+    
+    int8_t* final_output_ptr = output[ue_id];
+    adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
+        reinterpret_cast<uint8_t*>(final_output_ptr),
+        bits_to_bytes(cbCodewLen), cfg->mod_order_bits);
+}
+
+void run_precode(Table<int8_t>& input, complex_float* output,
+    Table<complex_float>& dl_zf_matrices, complex_float* modulated_buffer_temp,
+    complex_float* precoded_buffer_temp, size_t base_sc_id)
+{
+    __m256i index = _mm256_setr_epi64x(
+        0, cfg->BS_ANT_NUM, cfg->BS_ANT_NUM * 2, cfg->BS_ANT_NUM * 3);
+
+    size_t max_sc_ite;
+    max_sc_ite = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
+    assert(max_sc_ite % kSCsPerCacheline == 0);
+
+    for (int i = 0; i < max_sc_ite; i = i + 4) {
+        for (int j = 0; j < 4; j++) {
+            int cur_sc_id = base_sc_id + i + j;
+
+            complex_float* data_ptr = modulated_buffer_temp;
+            for (size_t user_id = 0; user_id < cfg->UE_NUM; user_id++) {
+                int8_t* raw_data_ptr
+                    = input[user_id] + cur_sc_id * cfg->mod_order_bits;
+                if (cur_sc_id % cfg->OFDM_PILOT_SPACING == 0)
+                    data_ptr[user_id]
+                        = cfg->ue_specific_pilot[user_id][cur_sc_id];
+                else
+                    data_ptr[user_id] = mod_single_uint8(
+                        (uint8_t) * (raw_data_ptr), cfg->mod_table);
+            }
+
+            auto* precoder_ptr = reinterpret_cast<cx_float*>(
+                dl_zf_matrices_[cfg->get_zf_sc_id(cur_sc_id)]);
+
+            cx_fmat mat_precoder(
+                precoder_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+            cx_fmat mat_data((cx_float*)data_ptr, 1, cfg->UE_NUM, false);
+            cx_float* precoded_ptr
+                = (cx_float*)precoded_buffer_temp + (i + j) * cfg->BS_ANT_NUM;
+            cx_fmat mat_precoded(precoded_ptr, 1, cfg->BS_ANT_NUM, false);
+
+            mat_precoded = mat_data * mat_precoder;
+        }
+    }
+
+    float* precoded_ptr = (float*)precoded_buffer_temp;
+    for (size_t ant_id = 0; ant_id < cfg->BS_ANT_NUM; ant_id++) {
+        int ifft_buffer_offset = ant_id;
+        float* ifft_ptr
+            = (float*)&output[ifft_buffer_offset * cfg->OFDM_CA_NUM + base_sc_id];
+        for (size_t i = 0; i < cfg->demul_block_size / 4; i++) {
+            float* input_shifted_ptr
+                = precoded_ptr + 4 * i * 2 * cfg->BS_ANT_NUM + ant_id * 2;
+            __m256d t_data
+                = _mm256_i64gather_pd((double*)input_shifted_ptr, index, 8);
+            _mm256_store_pd((double*)(ifft_ptr + i * 8), t_data);
+        }
+    }
+}
+
 int main(int argc, char **argv)
 {
     int opt;
@@ -609,6 +683,40 @@ int main(int argc, char **argv)
     end_tsc = rdtsc();
     free(resp_var_nodes);
     printf("%lf users/sec\n", (double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
+
+    printf("Running Encode: ");
+    Table<int8_t> encoded_buffer;
+    encoded_buffer.calloc(cfg->UE_NUM, roundup<64>(cfg->num_bytes_per_cb), 64);
+    int8_t* encoded_buffer_temp = (int8_t*)memalign(64, 32768);
+    int8_t* parity_buffer = (int8_t*)memalign(64, 32768);
+    start_tsc = rdtsc();
+    for (size_t iter = 0; iter < kNumIterations; iter ++) {
+        for (size_t ue_id = 0; ue_id < cfg->UE_NUM; ue_id ++) {
+            run_encode(decoded_buffer, encoded_buffer, encoded_buffer_temp, parity_buffer, ue_id, kBg, kZc);
+        }
+    }
+    end_tsc = rdtsc();
+    free(encoded_buffer_temp);
+    free(parity_buffer);
+    printf("%lf users/sec\n", (double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
+
+    printf("Running Precode: ");
+    Table<complex_float> tx_data_all_symbols;
+    tx_data_all_symbols.calloc(1, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, 64);
+    complex_float* modulated_buffer_temp;
+    alloc_buffer_1d(&modulated_buffer_temp, cfg->UE_NUM, 64, 0);
+    complex_float* precoded_buffer_temp;
+    alloc_buffer_1d(&precoded_buffer_temp, cfg->demul_block_size * cfg->BS_ANT_NUM, 64, 0);
+    start_tsc = rdtsc();
+    for (size_t iter = 0; iter < kNumIterations; iter ++) {
+        for (size_t base_sc_id = 0; base_sc_id < cfg->OFDM_DATA_NUM; base_sc_id += cfg->demul_block_size) {
+            run_precode(encoded_buffer, tx_data_all_symbols, dl_zf_matrices, modulated_buffer_temp, precoded_buffer_temp, base_sc_id);
+        }
+    }
+    end_tsc = rdtsc();
+    free(modulated_buffer_temp);
+    free(precoded_buffer_temp);
+    printf("%lf subcarriers/sec\n", (double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
 
     return 0;
 }
