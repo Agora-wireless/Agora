@@ -599,6 +599,8 @@ int main(int argc, char **argv)
             mat_output.row(j) = mat_input_data.row(j) * mat_csi.st();
         }
     }
+    csi_matrices.free();
+    tx_data_all_symbols.free();
 
     double freq_ghz = measure_rdtsc_freq();
     // All the data is prepared, now start the simulation
@@ -632,6 +634,7 @@ int main(int argc, char **argv)
     }
     end_tsc = rdtsc();
     free(csi_gather_buffer);
+    csi_buffer.free();
     printf("%lf times/sec\n", (double)kZFIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
 
     printf("Running Demul: ");    
@@ -669,6 +672,11 @@ int main(int argc, char **argv)
         }
     }
     end_tsc = rdtsc();
+    rx_data_all_symbols.free();
+    ul_zf_matrices.free();
+    free(data_gather_buffer);
+    free(equaled_buffer_temp);
+    free(equaled_buffer_temp_transposed);
     printf("%lf subcarriers/sec\n", (double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
 
     printf("Running Decode: ");
@@ -684,6 +692,7 @@ int main(int argc, char **argv)
     }
     end_tsc = rdtsc();
     free(resp_var_nodes);
+    demod_buffer.free();
     printf("%lf users/sec\n", (double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
 
     printf("Running Encode: ");
