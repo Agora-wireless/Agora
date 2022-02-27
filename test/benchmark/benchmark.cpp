@@ -604,7 +604,7 @@ int main(int argc, char **argv)
 
     printf("*********** Benchmark for Hydra components ***********\n");
     printf("*                                                    *\n");
-    printf("*   UE_NUM: %d, BS_ANT_NUM: %d, OFDM_DATA_NUM: %d,   *\n",
+    printf("*   UE_NUM: %zu, BS_ANT_NUM: %zu, OFDM_DATA_NUM: %zu,   *\n",
         cfg->UE_NUM, cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM);
     printf("\n");
 
