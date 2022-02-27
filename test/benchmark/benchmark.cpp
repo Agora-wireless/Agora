@@ -700,6 +700,7 @@ int main(int argc, char **argv)
     end_tsc = rdtsc();
     free(encoded_buffer_temp);
     free(parity_buffer);
+    decoded_buffer.free();
     printf("%lf users/sec\n", (double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
 
     printf("Running Precode: ");
