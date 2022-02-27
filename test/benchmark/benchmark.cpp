@@ -602,6 +602,12 @@ int main(int argc, char **argv)
     csi_matrices.free();
     tx_data_all_symbols.free();
 
+    printf("*********** Benchmark for Hydra components ***********\n");
+    printf("*                                                    *\n");
+    printf("*   UE_NUM: %d, BS_ANT_NUM: %d, OFDM_DATA_NUM: %d,   *\n",
+        cfg->UE_NUM, cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM);
+    printf("\n");
+
     double freq_ghz = measure_rdtsc_freq();
     // All the data is prepared, now start the simulation
     printf("Running CSI: ");
@@ -616,7 +622,8 @@ int main(int argc, char **argv)
         }
     }
     size_t end_tsc = rdtsc();
-    printf("%lf subcarriers/sec\n", (double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
+    printf("%lf subcarriers/sec (%lf ns/subcarrier)\n", (double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
+        1000000000.0f / ((double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
 
     printf("Running ZF: ");
     Table<complex_float> ul_zf_matrices;
@@ -635,7 +642,9 @@ int main(int argc, char **argv)
     end_tsc = rdtsc();
     free(csi_gather_buffer);
     csi_buffer.free();
-    printf("%lf times/sec\n", (double)kZFIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
+    printf("%lf times/sec (%lf us each matrix inversion)\n", 
+        (double)kZFIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
+        1000000.0f / ((double)kZFIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
 
     printf("Running Demul: ");    
     Table<int8_t> demod_buffer;
@@ -677,7 +686,9 @@ int main(int argc, char **argv)
     free(data_gather_buffer);
     free(equaled_buffer_temp);
     free(equaled_buffer_temp_transposed);
-    printf("%lf subcarriers/sec\n", (double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
+    printf("%lf subcarriers/sec (%lf ns/subcarrier)\n", 
+        (double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
+        1000000000.0f / ((double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
 
     printf("Running Decode: ");
     Table<int8_t> decoded_buffer;
@@ -693,7 +704,9 @@ int main(int argc, char **argv)
     end_tsc = rdtsc();
     free(resp_var_nodes);
     demod_buffer.free();
-    printf("%lf users/sec\n", (double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
+    printf("%lf users/sec (%lf us/user)\n", 
+        (double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
+        1000000.0f / ((double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
 
     printf("Running Encode: ");
     Table<int8_t> encoded_buffer;
@@ -710,7 +723,9 @@ int main(int argc, char **argv)
     free(encoded_buffer_temp);
     free(parity_buffer);
     decoded_buffer.free();
-    printf("%lf users/sec\n", (double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
+    printf("%lf users/sec (%lf us/user)\n", 
+        (double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
+        1000000.0f / ((double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
 
     printf("Running Precode: ");
     Table<complex_float> tx_data_all_symbols_precode;
@@ -728,7 +743,9 @@ int main(int argc, char **argv)
     end_tsc = rdtsc();
     free(modulated_buffer_temp);
     free(precoded_buffer_temp);
-    printf("%lf subcarriers/sec\n", (double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
+    printf("%lf subcarriers/sec (%lf ns/subcarrier)\n", 
+        (double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
+        1000000000.0f / ((double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
 
     return 0;
 }
