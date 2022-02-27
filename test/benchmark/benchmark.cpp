@@ -708,7 +708,7 @@ int main(int argc, char **argv)
     tx_data_all_symbols_precode.calloc(1, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, 64);
     complex_float* modulated_buffer_temp;
     alloc_buffer_1d(&modulated_buffer_temp, cfg->UE_NUM, 64, 0);
-    complex_float* precoded_buffer_temp = malloc(cfg->demul_block_size * cfg->BS_ANT_NUM * sizeof(complex_float));
+    complex_float* precoded_buffer_temp = (complex_float*) malloc(cfg->demul_block_size * cfg->BS_ANT_NUM * sizeof(complex_float));
     // alloc_buffer_1d(&precoded_buffer_temp, cfg->demul_block_size * cfg->BS_ANT_NUM, 64, 0);
     start_tsc = rdtsc();
     for (size_t iter = 0; iter < kNumIterations; iter ++) {
