@@ -639,7 +639,7 @@ int main(int argc, char **argv)
     start_tsc = rdtsc();
     for (size_t iter = 0; iter < kZFIterations; iter ++) {
         for (size_t base_sc_id = 0; base_sc_id < cfg->OFDM_DATA_NUM; base_sc_id += cfg->UE_NUM) {
-            printf("Run ZF base_sc_id: %zu\n", base_sc_id);
+            // printf("Run ZF base_sc_id: %zu\n", base_sc_id);
             run_zf(csi_buffer, csi_gather_buffer, ul_zf_matrices, dl_zf_matrices, base_sc_id);
         }
     }
@@ -714,7 +714,7 @@ int main(int argc, char **argv)
 
     printf("Running Encode: ");
     Table<int8_t> encoded_buffer;
-    encoded_buffer.calloc(cfg->UE_NUM, roundup<64>(cfg->num_bytes_per_cb), 64);
+    encoded_buffer.calloc(cfg->UE_NUM, 32768, 64);
     int8_t* encoded_buffer_temp = (int8_t*)memalign(64, 32768);
     int8_t* parity_buffer = (int8_t*)memalign(64, 32768);
     start_tsc = rdtsc();
