@@ -33,6 +33,8 @@
 #include <string>
 #include <array>
 
+using namespace arma;
+
 static constexpr float kNoiseLevel = 1.0 / 200;
 static constexpr float kBg = 1;
 static constexpr float kZc = 72;
@@ -454,7 +456,7 @@ void run_precode(Table<int8_t>& input, complex_float* output,
     max_sc_ite = std::min(cfg->demul_block_size, cfg->OFDM_DATA_NUM - base_sc_id);
     assert(max_sc_ite % kSCsPerCacheline == 0);
 
-    for (int i = 0; i < max_sc_ite; i = i + 4) {
+    for (size_t i = 0; i < max_sc_ite; i = i + 4) {
         for (int j = 0; j < 4; j++) {
             int cur_sc_id = base_sc_id + i + j;
 
@@ -471,7 +473,7 @@ void run_precode(Table<int8_t>& input, complex_float* output,
             }
 
             auto* precoder_ptr = reinterpret_cast<cx_float*>(
-                dl_zf_matrices_[cfg->get_zf_sc_id(cur_sc_id)]);
+                dl_zf_matrices[cfg->get_zf_sc_id(cur_sc_id)]);
 
             cx_fmat mat_precoder(
                 precoder_ptr, cfg->UE_NUM, cfg->BS_ANT_NUM, false);
