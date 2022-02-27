@@ -297,6 +297,9 @@ void run_zf(Table<complex_float>& csi_buffer, complex_float* csi_gather_buffer,
     Table<complex_float>& dl_zf_matrices, size_t base_sc_id)
 {
     // Gather CSIs from partially-transposed CSIs
+    arma::cx_fmat mat_csi_tmp(reinterpret_cast<arma::cx_float*>(csi_buffer),
+        cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+    std::cout << mat_csi_tmp << std::endl;
     for (size_t i = 0; i < cfg->UE_NUM; i ++) {
         const size_t cur_sc_id = base_sc_id + i;
         float* dst_csi_ptr = (float*)(csi_gather_buffer + cfg->BS_ANT_NUM * i);
