@@ -297,9 +297,9 @@ void run_zf(Table<complex_float>& csi_buffer, complex_float* csi_gather_buffer,
     Table<complex_float>& dl_zf_matrices, size_t base_sc_id)
 {
     // Gather CSIs from partially-transposed CSIs
-    arma::cx_fmat mat_csi_tmp(reinterpret_cast<arma::cx_float*>(csi_buffer[0]),
-        cfg->BS_ANT_NUM, cfg->UE_NUM, false);
-    std::cout << mat_csi_tmp << std::endl;
+    // arma::cx_fmat mat_csi_tmp(reinterpret_cast<arma::cx_float*>(csi_buffer[0]),
+    //     cfg->BS_ANT_NUM, cfg->UE_NUM, false);
+    // std::cout << mat_csi_tmp << std::endl;
     for (size_t i = 0; i < cfg->UE_NUM; i ++) {
         const size_t cur_sc_id = base_sc_id + i;
         float* dst_csi_ptr = (float*)(csi_gather_buffer + cfg->BS_ANT_NUM * i);
@@ -639,7 +639,7 @@ int main(int argc, char **argv)
     start_tsc = rdtsc();
     for (size_t iter = 0; iter < kZFIterations; iter ++) {
         for (size_t base_sc_id = 0; base_sc_id < cfg->OFDM_DATA_NUM; base_sc_id += cfg->UE_NUM) {
-            printf("base_sc_id: %zu\n", base_sc_id);
+            printf("Run ZF base_sc_id: %zu\n", base_sc_id);
             run_zf(csi_buffer, csi_gather_buffer, ul_zf_matrices, dl_zf_matrices, base_sc_id);
         }
     }
