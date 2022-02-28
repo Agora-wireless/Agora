@@ -123,6 +123,16 @@ class Config {
     return (tx_ant);
   };
 
+  inline size_t ModifyRecCalIndex(size_t previous_index,
+                                  int mod_value = 0) const {
+    return (previous_index + mod_value) % kFrameWnd;
+  }
+
+  inline size_t RecipCalIndex(size_t frame_id) const {
+    const size_t frame_cal_idx = frame_id / RecipCalFrameCnt();
+    return ModifyRecCalIndex(frame_cal_idx);
+  }
+
   // Returns the cal index if ant tx dl cal pilots this frame
   // SIZE_MAX otherwise
   inline size_t RecipCalUlRxIndex(size_t frame_id, size_t ant) const {
@@ -134,8 +144,7 @@ class Config {
 
     size_t cal_ind;
     if ((ant >= tx_ant_start) && (ant <= tx_ant_end)) {
-      const size_t frame_cal_idx = frame_id / num_frames_for_full_cal;
-      cal_ind = (frame_cal_idx % kFrameWnd);
+      cal_ind = RecipCalIndex(frame_id);
     } else {
       cal_ind = SIZE_MAX;
     }

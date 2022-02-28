@@ -859,13 +859,10 @@ void Agora::HandleEventFft(size_t tag) {
         const size_t frames_for_cal = config_->RecipCalFrameCnt();
 
         if ((frame_id % frames_for_cal) == 0 && (frame_id > 0)) {
-          const size_t cal_index = (frame_id / frames_for_cal) % kFrameWnd;
+          const size_t previous_cal_slot =
+              config_->ModifyRecCalIndex(config_->RecipCalIndex(frame_id), -1);
           //Print the previous index
-          if (cal_index == 0) {
-            phy_stats_->PrintCalibSnrStats(kFrameWnd - 1);
-          } else {
-            phy_stats_->PrintCalibSnrStats(cal_index - 1);
-          }
+          phy_stats_->PrintCalibSnrStats(previous_cal_slot);
         }
       }  // kPrintPhyStats
     }    // last_rc_task

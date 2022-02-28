@@ -167,55 +167,55 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id,
                         arma::cx_fvec& calib_sc_vec) {
   const size_t frames_to_complete = cfg_->RecipCalFrameCnt();
   if (cfg_->Frame().IsRecCalEnabled() && (frame_id >= frames_to_complete)) {
-    const size_t current_cal_index = frame_id / frames_to_complete;
+    const size_t cal_slot_current = cfg_->RecipCalIndex(frame_id);
     const bool frame_update = ((frame_id % frames_to_complete) == 0);
 
     // Use the previous window which has a full set of calibration results
-    const size_t frame_cal_slot =
-        (current_cal_index + (kFrameWnd - 1)) % kFrameWnd;
+    const size_t cal_slot_complete =
+        cfg_->ModifyRecCalIndex(cal_slot_current, -1);
 
     // update moving sum
     arma::cx_fmat cur_calib_dl_msum_mat(
         reinterpret_cast<arma::cx_float*>(
-            calib_dl_msum_buffer_[frame_cal_slot]),
+            calib_dl_msum_buffer_[cal_slot_complete]),
         cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
     arma::cx_fmat cur_calib_ul_msum_mat(
         reinterpret_cast<arma::cx_float*>(
-            calib_ul_msum_buffer_[frame_cal_slot]),
+            calib_ul_msum_buffer_[cal_slot_complete]),
         cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
 
     // Update the moving sum
     if (frame_update) {
       // Add the most recently completed value
       const arma::cx_fmat cur_calib_dl_mat(
-          reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_cal_slot]),
+          reinterpret_cast<arma::cx_float*>(
+              calib_dl_buffer_[cal_slot_complete]),
           cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
       const arma::cx_fmat cur_calib_ul_mat(
-          reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_cal_slot]),
+          reinterpret_cast<arma::cx_float*>(
+              calib_ul_buffer_[cal_slot_complete]),
           cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
 
       // oldest frame data in buffer but could be partially written with newest values
       // using the second oldest....
-      const size_t frame_cal_slot_old = ((current_cal_index + 1) % kFrameWnd);
+      const size_t cal_slot_old = cfg_->ModifyRecCalIndex(cal_slot_current, +1);
 
       const arma::cx_fmat old_calib_dl_mat(
-          reinterpret_cast<arma::cx_float*>(
-              calib_dl_buffer_[frame_cal_slot_old]),
+          reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[cal_slot_old]),
           cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
       const arma::cx_fmat old_calib_ul_mat(
-          reinterpret_cast<arma::cx_float*>(
-              calib_ul_buffer_[frame_cal_slot_old]),
+          reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[cal_slot_old]),
           cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
 
-      const size_t frame_cal_slot_prev =
-          (frame_cal_slot + (kFrameWnd - 1)) % kFrameWnd;
+      const size_t cal_slot_prev =
+          cfg_->ModifyRecCalIndex(cal_slot_complete, -1);
       const arma::cx_fmat prev_calib_dl_msum_mat(
           reinterpret_cast<arma::cx_float*>(
-              calib_dl_msum_buffer_[frame_cal_slot_prev]),
+              calib_dl_msum_buffer_[cal_slot_prev]),
           cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
       const arma::cx_fmat prev_calib_ul_msum_mat(
           reinterpret_cast<arma::cx_float*>(
-              calib_ul_msum_buffer_[frame_cal_slot_prev]),
+              calib_ul_msum_buffer_[cal_slot_prev]),
           cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
 
       if (sc_id == 0) {
@@ -412,29 +412,29 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
   duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
   if (cfg_->Frame().NumDLSyms() > 0) {
-    size_t frame_cal_slot = kFrameWnd - 1;
-    size_t frame_cal_slot_prev = kFrameWnd - 2;
+    size_t cal_slot_current;
     if (cfg_->Frame().IsRecCalEnabled()) {
-      const size_t frames_to_complete = cfg_->RecipCalFrameCnt();
-      const size_t current_cal_index = frame_id / frames_to_complete;
-
-      // use the previous window which has a full set of calibration results
-      frame_cal_slot = (current_cal_index + (kFrameWnd - 1)) % kFrameWnd;
-      frame_cal_slot_prev = (frame_cal_slot + (kFrameWnd - 1)) % kFrameWnd;
+      cal_slot_current = cfg_->RecipCalIndex(frame_id);
+    } else {
+      cal_slot_current = frame_id;
     }
+
+    // use the previous window which has a full set of calibration results
+    const size_t cal_slot_complete =
+        cfg_->ModifyRecCalIndex(cal_slot_current, -1);
+    const size_t cal_slot_prev = cfg_->ModifyRecCalIndex(cal_slot_current, -2);
+
     const arma::cx_fmat calib_dl_mat(
-        reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[frame_cal_slot]),
+        reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[cal_slot_complete]),
         cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
     const arma::cx_fmat calib_ul_mat(
-        reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[frame_cal_slot]),
+        reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[cal_slot_complete]),
         cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
     const arma::cx_fmat calib_dl_mat_prev(
-        reinterpret_cast<arma::cx_float*>(
-            calib_dl_buffer_[frame_cal_slot_prev]),
+        reinterpret_cast<arma::cx_float*>(calib_dl_buffer_[cal_slot_prev]),
         cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
     const arma::cx_fmat calib_ul_mat_prev(
-        reinterpret_cast<arma::cx_float*>(
-            calib_ul_buffer_[frame_cal_slot_prev]),
+        reinterpret_cast<arma::cx_float*>(calib_ul_buffer_[cal_slot_prev]),
         cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
     arma::cx_fvec calib_dl_vec =
         (calib_dl_mat.row(base_sc_id) + calib_dl_mat_prev.row(base_sc_id)).st();
