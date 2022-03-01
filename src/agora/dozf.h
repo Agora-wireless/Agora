@@ -54,9 +54,10 @@ class DoZF : public Doer {
 
   /// Compute the uplink zeroforcing detector matrix and/or the downlink
   /// zeroforcing precoder using this CSI matrix and calibration buffer
-  float ComputePrecoder(const arma::cx_fmat& mat_csi, complex_float* calib_ptr,
-                        complex_float* mat_ul_zf, complex_float* mat_dl_zf);
-  void ComputeCalib(size_t frame_id, size_t sc_id);
+  float ComputePrecoder(const arma::cx_fmat& mat_csi,
+                        const arma::cx_fvec& calib_sc_vec,
+                        complex_float* ul_zf_mem, complex_float* dl_zf_mem);
+  void ComputeCalib(size_t frame_id, size_t sc_id, arma::cx_fvec& calib_sc_vec);
   void ZfFreqOrthogonal(size_t tag);
 
   /**
@@ -85,10 +86,14 @@ class DoZF : public Doer {
 
   PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
   complex_float* pred_csi_buffer_;
-  Table<complex_float> calib_dl_buffer_;
-  Table<complex_float> calib_ul_buffer_;
-  Table<complex_float> calib_dl_msum_buffer_;
-  Table<complex_float> calib_ul_msum_buffer_;
+
+  //Should be read only (Set by FFT and read by Zf)
+  Table<complex_float>& calib_dl_buffer_;
+  Table<complex_float>& calib_ul_buffer_;
+
+  //Shared by all doZf objects
+  Table<complex_float>& calib_dl_msum_buffer_;
+  Table<complex_float>& calib_ul_msum_buffer_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;
   DurationStat* duration_stat_;
@@ -96,6 +101,8 @@ class DoZF : public Doer {
   complex_float* csi_gather_buffer_;  // Intermediate buffer to gather CSI
   // Intermediate buffer to gather reciprical calibration data vector
   complex_float* calib_gather_buffer_;
+  std::unique_ptr<arma::cx_fvec> calib_sc_vec_ptr_;
+
   PhyStats* phy_stats_;
   arma::uvec ext_ref_id_;
   size_t num_ext_ref_;

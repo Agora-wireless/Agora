@@ -5,6 +5,8 @@
 
 #include "client_radio.h"
 
+#include <SoapySDR/Logger.hpp>
+
 #include "comms-lib.h"
 #include "logger.h"
 #include "nlohmann/json.hpp"
@@ -16,6 +18,8 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   SoapySDR::Kwargs sargs;
   // load channels
   auto channels = Utils::StrToChannels(cfg_->UeChannel());
+  /// Reduce the soapy log level
+  SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_NOTICE);
 
   this->radio_num_ = cfg_->UeNum();
   this->antenna_num_ = cfg_->UeAntNum();
@@ -291,7 +295,7 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
 bool ClientRadioConfig::RadioStart() {
   // send through the first radio for now
   // int beacon_ant = 1;
-  int flags(0);  // = SOAPY_SDR_WAIT_TRIGGER;
+  int flags = SOAPY_SDR_WAIT_TRIGGER;
 
   for (size_t i = 0; i < this->radio_num_; i++) {
     if (cfg_->UeHwFramer()) {
@@ -299,8 +303,9 @@ bool ClientRadioConfig::RadioStart() {
       conf["tdd_enabled"] = true;
       conf["frame_mode"] = "continuous_resync";
       int max_frame =
-          (int)(2.0 / ((cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms()) /
-                       cfg_->Rate()));
+          (int)(2.0f /
+                ((cfg_->SampsPerSymbol() * cfg_->Frame().NumTotalSyms()) /
+                 cfg_->Rate()));
       conf["max_frame"] = max_frame;
       conf["dual_pilot"] = (cfg_->NumUeChannels() == 2);
       auto tdd_sched = cfg_->Frame().FrameIdentifier();
@@ -347,8 +352,8 @@ bool ClientRadioConfig::RadioStart() {
         std::string tx_ram = "TX_RAM_";
         cl_stn_.at(i)->writeRegisters(tx_ram + c, 0, cfg_->Pilot());
       }
-      cl_stn_.at(i)->activateStream(this->rx_streams_.at(i), flags, 0);
-      cl_stn_.at(i)->activateStream(this->tx_streams_.at(i));
+      cl_stn_.at(i)->activateStream(rx_streams_.at(i), flags);
+      cl_stn_.at(i)->activateStream(tx_streams_.at(i), flags);
 
       std::string corr_conf_string =
           R"({"corr_enabled":true,"corr_threshold":)" + std::to_string(1) + "}";
@@ -360,9 +365,8 @@ bool ClientRadioConfig::RadioStart() {
     } else {
       if (!kUseUHD) {
         cl_stn_.at(i)->setHardwareTime(0, "TRIGGER");
-        cl_stn_.at(i)->activateStream(this->rx_streams_.at(i), flags, 0);
-        cl_stn_.at(i)->activateStream(this->tx_streams_.at(i));
-        cl_stn_.at(i)->writeSetting("TRIGGER_GEN", "");
+        cl_stn_.at(i)->activateStream(rx_streams_.at(i), flags);
+        cl_stn_.at(i)->activateStream(tx_streams_.at(i), flags);
       } else {
         cl_stn_.at(i)->setHardwareTime(0, "UNKNOWN_PPS");
         cl_stn_.at(i)->activateStream(this->rx_streams_.at(i),
@@ -372,15 +376,16 @@ bool ClientRadioConfig::RadioStart() {
       }
     }
   }
-
   std::cout << "radio start done!" << std::endl;
   return true;
 }
 
 void ClientRadioConfig::Go() {
   if (!kUseUHD) {
-    // std::cout << "triggering first Iris ..." << std::endl;
-    cl_stn_.at(0)->writeSetting("TRIGGER_GEN", "");
+    for (size_t i = 0; i < this->radio_num_; i++) {
+      //std::cout << "triggering Iris ..." << i << std::endl;
+      cl_stn_.at(i)->writeSetting("TRIGGER_GEN", "");
+    }
   }
 }
 
@@ -444,14 +449,18 @@ int ClientRadioConfig::RadioRx(size_t r /*radio id*/, void** buffs,
 }
 
 void ClientRadioConfig::DrainBuffers() {
-  std::vector<std::complex<int16_t>> dummy_buff0(cfg_->SampsPerSymbol());
-  std::vector<std::complex<int16_t>> dummy_buff1(cfg_->SampsPerSymbol());
-  std::vector<void*> dummybuffs(2);
-  dummybuffs[0] = dummy_buff0.data();
-  dummybuffs[1] = dummy_buff1.data();
+  std::vector<std::vector<std::complex<int16_t>>> sample_storage(
+      cfg_->NumUeChannels(),
+      std::vector<std::complex<int16_t>>(cfg_->SampsPerSymbol(),
+                                         std::complex<int16_t>(0, 0)));
+  std::vector<void*> rx_buffs;
+  rx_buffs.reserve(sample_storage.size());
+  for (auto& buff : sample_storage) {
+    rx_buffs.push_back(buff.data());
+  }
   for (size_t i = 0; i < cfg_->UeNum(); i++) {
-    ClientRadioConfig::DrainRxBuffer(cl_stn_.at(i), rx_streams_.at(i),
-                                     dummybuffs, cfg_->SampsPerSymbol());
+    ClientRadioConfig::DrainRxBuffer(cl_stn_.at(i), rx_streams_.at(i), rx_buffs,
+                                     cfg_->SampsPerSymbol());
   }
 }
 
