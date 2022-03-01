@@ -292,8 +292,9 @@ bool SharedState::is_encode_ready(size_t frame_id, size_t symbol_id_dl) {
     if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
         return false;
     }
-    return encode_ready_[frame_id % kFrameWnd] && 
-        (get_us() - frame_start_time_[frame_id]) >= (symbol_id_dl + 1) * slot_us_ / symbol_num_per_frame_;
+    // return encode_ready_[frame_id % kFrameWnd] && 
+    //     (get_us() - frame_start_time_[frame_id]) >= (symbol_id_dl + 1) * slot_us_ / symbol_num_per_frame_;
+    return encode_ready_[frame_id % kFrameWnd];
 }
 
 void SharedState::fft_done(size_t frame_id, size_t symbol_id)
