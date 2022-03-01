@@ -119,10 +119,14 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
       mat_dl_zf_tmp = mat_ul_zf_tmp * inv(calib_mat);
     } else {
       arma::cx_fmat mat_dl_csi = arma::diagmat(calib_sc_vec) * mat_csi;
-      try {
-        mat_dl_zf_tmp =
-            arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
-      } catch (std::runtime_error&) {
+      if (kUseInverseForZF != 0u) {
+        try {
+          mat_dl_zf_tmp =
+              arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
+        } catch (std::runtime_error&) {
+          arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
+        }
+      } else {
         arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
       }
     }
