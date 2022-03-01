@@ -84,8 +84,8 @@ class Table {
     if (this->data_ != nullptr) {
       std::free(this->data_);
     }
-    this->dim2_ = 0;
-    this->dim1_ = 0;
+    this->dim2_ = 0u;
+    this->dim1_ = 0u;
     this->data_ = nullptr;
   }
 

@@ -52,12 +52,13 @@ EventData DoIFFT::Launch(size_t tag) {
                 tid_, frame_id, symbol_id, ant_id);
   }
 
-  size_t offset = (cfg_->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl) *
-                   cfg_->BsAntNum()) +
-                  ant_id;
+  const size_t offset =
+      (cfg_->GetTotalDataSymbolIdxDl(frame_id, symbol_idx_dl) *
+       cfg_->BsAntNum()) +
+      ant_id;
 
-  size_t start_tsc1 = GetTime::WorkerRdtsc();
-  duration_stat_->task_duration_[1] += start_tsc1 - start_tsc;
+  const size_t start_tsc1 = GetTime::WorkerRdtsc();
+  duration_stat_->task_duration_[1u] += start_tsc1 - start_tsc;
 
   auto* ifft_in_ptr = reinterpret_cast<float*>(dl_ifft_buffer_[offset]);
   auto* ifft_out_ptr =
@@ -78,8 +79,8 @@ EventData DoIFFT::Launch(size_t tag) {
       // to 0 since their values are not changed after IFFT
       DftiComputeBackward(mkl_handle_, ifft_in_ptr, ifft_out_ptr);
     } else {
-      std::memset(ifft_in_ptr, 0, sizeof(float) * cfg_->OfdmDataStart() * 2);
-      std::memset(ifft_in_ptr + (cfg_->OfdmDataStop()) * 2, 0,
+      std::memset(ifft_in_ptr, 0u, sizeof(float) * cfg_->OfdmDataStart() * 2);
+      std::memset(ifft_in_ptr + (cfg_->OfdmDataStop()) * 2, 0u,
                   sizeof(float) * cfg_->OfdmDataStart() * 2);
       DftiComputeBackward(mkl_handle_, ifft_in_ptr);
     }
@@ -97,19 +98,19 @@ EventData DoIFFT::Launch(size_t tag) {
     std::cout << ss.str();
   }
 
-  size_t start_tsc2 = GetTime::WorkerRdtsc();
-  duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
+  const size_t start_tsc2 = GetTime::WorkerRdtsc();
+  duration_stat_->task_duration_[2u] += start_tsc2 - start_tsc1;
 
   auto* pkt = reinterpret_cast<struct Packet*>(
       &dl_socket_buffer_[offset * cfg_->DlPacketLength()]);
-  short* socket_ptr = &pkt->data_[2 * cfg_->OfdmTxZeroPrefix()];
+  short* socket_ptr = &pkt->data_[2u * cfg_->OfdmTxZeroPrefix()];
 
   // IFFT scaled results by OfdmCaNum(), we scale down IFFT results
   // during data type coversion
   SimdConvertFloatToShort(ifft_out_ptr, socket_ptr, cfg_->OfdmCaNum(),
                           cfg_->CpLen(), ifft_scale_factor_);
 
-  duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc2;
+  duration_stat_->task_duration_[3u] += GetTime::WorkerRdtsc() - start_tsc2;
 
   if (kPrintSocketOutput) {
     std::stringstream ss;
@@ -122,6 +123,6 @@ EventData DoIFFT::Launch(size_t tag) {
   }
 
   duration_stat_->task_count_++;
-  duration_stat_->task_duration_[0] += GetTime::WorkerRdtsc() - start_tsc;
+  duration_stat_->task_duration_[0u] += GetTime::WorkerRdtsc() - start_tsc;
   return EventData(EventType::kIFFT, tag);
 }

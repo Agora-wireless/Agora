@@ -18,9 +18,10 @@ PacketTxRxDpdk::PacketTxRxDpdk(
     moodycamel::ProducerToken** notify_producer_tokens,
     moodycamel::ProducerToken** tx_producer_tokens, Table<char>& rx_buffer,
     size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer)
-    : PacketTxRx(cfg, core_offset, event_notify_q, tx_pending_q,
-                 notify_producer_tokens, tx_producer_tokens, rx_buffer,
-                 packet_num_in_buffer, frame_start, tx_buffer) {
+    : PacketTxRx(AgoraTxRx::TxRxTypes::kBaseStation, cfg, core_offset,
+                 event_notify_q, tx_pending_q, notify_producer_tokens,
+                 tx_producer_tokens, rx_buffer, packet_num_in_buffer,
+                 frame_start, tx_buffer) {
   const size_t num_dpdk_eth_dev = cfg_->DpdkNumPorts();
   const size_t worker_threads = NumberTotalWorkers();
   DpdkTransport::DpdkInit(core_offset_ - 1, worker_threads);
@@ -135,13 +136,13 @@ bool PacketTxRxDpdk::CreateWorker(size_t tid, size_t interface_count,
                                   std::byte* const tx_memory) {
   RtAssert(kUseDPDK, "DPDK Mode must be enabled fro CreateWorker\n");
 
+  const size_t num_channels = NumChannels();
   MLPD_INFO(
       "PacketTxRxDpdk[%zu]: Creating worker handling %zu interfaces starting "
       "at %zu - antennas %zu:%zu\n",
-      tid, interface_count, interface_offset,
-      interface_offset * cfg_->NumChannels(),
-      ((interface_offset * cfg_->NumChannels()) +
-       (interface_count * cfg_->NumChannels()) - 1));
+      tid, interface_count, interface_offset, interface_offset * num_channels,
+      ((interface_offset * num_channels) + (interface_count * num_channels) -
+       1));
 
   //interface_count = number of ports (logical) to monitor
   //interface_offset = starting port (logical)

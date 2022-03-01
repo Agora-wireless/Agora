@@ -129,7 +129,7 @@ MacSender::MacSender(Config* cfg, std::string& data_filename,
 
   // Add the data update thread (background data reader), need to add a variable
   // for the update source number
-  const size_t kUpdateSourcePerThread = 1;
+  static constexpr size_t kUpdateSourcePerThread = 1;
   for (size_t update_threads = 0; update_threads < update_thread_num_;
        update_threads++) {
     data_update_queue_.emplace_back(
@@ -193,11 +193,17 @@ void MacSender::LoadFrame(size_t frame) {
 }
 
 void MacSender::ScheduleFrame(size_t frame) {
-  for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
-    auto req_tag = gen_tag_t::FrmSymAnt(frame, 0, i);
-    // Split up the antennas amoung the worker threads
+  //Switch to Enqueue Bulk?
+  size_t ant_per_thread = cfg_->UeAntNum() / worker_thread_num_;
+  if ((cfg_->UeAntNum() % worker_thread_num_) != 0) {
+    ant_per_thread++;
+  }
+
+  for (size_t ant_id = 0; ant_id < cfg_->UeAntNum(); ant_id++) {
+    const auto req_tag = gen_tag_t::FrmSymAnt(frame, 0, ant_id);
+    // Split up the antennas among the worker threads
     RtAssert(
-        send_queue_.enqueue(*task_ptok_[i % worker_thread_num_], req_tag.tag_),
+        send_queue_.enqueue(*task_ptok_[ant_id / ant_per_thread], req_tag.tag_),
         "Send task enqueue failed");
   }
 }
@@ -245,7 +251,7 @@ void* MacSender::MasterThread(size_t tid) {
         MLPD_INFO("MacSender: Checking frame %d : %zu : %zu\n", ctag.frame_id_,
                   comp_frame_slot, frame_data_count.at(comp_frame_slot));
       }
-      // Check to see if the current frame is finished (UeNum / UeAntNum)
+      // Check to see if the current frame is finished (UeAntNum)
       if (frame_data_count.at(comp_frame_slot) == cfg_->UeAntNum()) {
         frame_end_us = timestamp_us;
         // Finished with the current frame data
@@ -303,24 +309,38 @@ void* MacSender::WorkerThread(size_t tid) {
          (worker_thread_num_ + 1 + update_thread_num_)) {
     // Wait
   }
-  MLPD_FRAME("MacSender: worker thread %d running\n", tid);
-
+  MLPD_FRAME("MacSender[%zu]: worker thread running\n", tid);
   const size_t max_symbol_id = 1;
-  const size_t radio_lo = (tid * cfg_->NumRadios()) / worker_thread_num_;
-  const size_t radio_hi = ((tid + 1) * cfg_->NumRadios()) / worker_thread_num_;
-  const size_t ant_num_this_thread =
-      cfg_->NumRadios() / worker_thread_num_ +
-      (static_cast<size_t>(tid) < cfg_->NumRadios() % worker_thread_num_ ? 1
-                                                                         : 0);
+
+  size_t ant_per_thread = cfg_->UeAntNum() / worker_thread_num_;
+  if ((cfg_->UeAntNum() % worker_thread_num_) != 0) {
+    ant_per_thread++;
+  }
+
+  const size_t ue_ant_low = tid * ant_per_thread;
+  const size_t ue_ant_high =
+      std::min((ue_ant_low + ant_per_thread), cfg_->UeAntNum()) - 1;
+
+  const size_t ant_this_thread = (ue_ant_high - ue_ant_low) + 1;
+
+  if (ue_ant_low >= cfg_->UeAntNum()) {
+    MLPD_WARN(
+        "MacSender[%zu]: worker thread exiting because there are no antennas "
+        "left to process %zu:%zu\n",
+        tid, ue_ant_low, ue_ant_high);
+    return nullptr;
+  }
+
   UDPClient udp_client;
 
   double begin = GetTime::GetTimeUs();
   size_t total_tx_packets = 0;
   size_t total_tx_packets_rolling = 0;
-  size_t cur_radio = radio_lo;
+  size_t cur_ant = ue_ant_low;
 
-  MLPD_INFO("MacSender[%zu]: %zu antennas, total antennas: %zu\n", tid,
-            ant_num_this_thread, cfg_->NumRadios());
+  MLPD_INFO(
+      "MacSender[%zu]: processing work for antennas %zu:%zu total: %zu:%zu\n",
+      tid, ue_ant_low, ue_ant_high, ant_this_thread, cfg_->UeAntNum());
 
   std::array<size_t, kDequeueBulkSize> tags;
   while (keep_running.load() == true) {
@@ -328,9 +348,9 @@ void* MacSender::WorkerThread(size_t tid) {
         *(this->task_ptok_[tid]), tags.data(), kDequeueBulkSize);
     if (num_tags > 0) {
       for (size_t tag_id = 0; (tag_id < num_tags); tag_id++) {
-        size_t start_tsc_send = GetTime::Rdtsc();
+        const size_t start_tsc_send = GetTime::Rdtsc();
 
-        auto tag = gen_tag_t(tags.at(tag_id));
+        const auto tag = gen_tag_t(tags.at(tag_id));
 
         if ((kDebugPrintSender)) {
           std::printf("MacSender[%zu] : worker processing frame %d : %d \n",
@@ -365,9 +385,9 @@ void* MacSender::WorkerThread(size_t tid) {
 
         if (kDebugSenderReceiver) {
           std::printf(
-              "MacSender%zu]: (tag = %s) transmit frame %d, radio %zu, TX "
+              "MacSender%zu]: (tag = %s) transmit frame %d, ant %zu, TX "
               "time: %.3f us\n",
-              tid, gen_tag_t(tag).ToString().c_str(), tag.frame_id_, cur_radio,
+              tid, gen_tag_t(tag).ToString().c_str(), tag.frame_id_, cur_ant,
               GetTime::CyclesToUs(GetTime::Rdtsc() - start_tsc_send,
                                   freq_ghz_));
         }
@@ -375,22 +395,23 @@ void* MacSender::WorkerThread(size_t tid) {
         total_tx_packets_rolling++;
         total_tx_packets++;
         if (total_tx_packets_rolling ==
-            ant_num_this_thread * max_symbol_id * 1000) {
+            ant_this_thread * max_symbol_id * 1000) {
           double end = GetTime::GetTimeUs();
-          double byte_len = cfg_->PacketLength() * ant_num_this_thread *
-                            max_symbol_id * 1000.f;
+          double byte_len =
+              cfg_->PacketLength() * ant_this_thread * max_symbol_id * 1000.f;
           double diff = end - begin;
           std::printf(
               "MacSender%zu]: send %zu frames in %f secs, tput %f Mbps\n",
-              (size_t)tid,
-              total_tx_packets / (ant_num_this_thread * max_symbol_id),
+              (size_t)tid, total_tx_packets / (ant_this_thread * max_symbol_id),
               diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);
           begin = GetTime::GetTimeUs();
           total_tx_packets_rolling = 0;
         }
 
-        if (++cur_radio == radio_hi) {
-          cur_radio = radio_lo;
+        if (cur_ant == ue_ant_high) {
+          cur_ant = ue_ant_low;
+        } else {
+          cur_ant++;
         }
       }
       RtAssert(completion_queue_.enqueue_bulk(tags.data(), num_tags),

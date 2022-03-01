@@ -20,9 +20,10 @@ TxRxWorkerUsrp::TxRxWorkerUsrp(
     std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
     std::mutex& sync_mutex, std::condition_variable& sync_cond,
     std::atomic<bool>& can_proceed, RadioConfig& radio_config)
-    : TxRxWorker(core_offset, tid, radio_hi, radio_lo, config, rx_frame_start,
-                 event_notify_q, tx_pending_q, tx_producer, notify_producer,
-                 rx_memory, tx_memory, sync_mutex, sync_cond, can_proceed),
+    : TxRxWorker(core_offset, tid, radio_hi, radio_lo, config->NumChannels(),
+                 config, rx_frame_start, event_notify_q, tx_pending_q,
+                 tx_producer, notify_producer, rx_memory, tx_memory, sync_mutex,
+                 sync_cond, can_proceed),
       radio_config_(radio_config) {}
 
 TxRxWorkerUsrp::~TxRxWorkerUsrp() = default;

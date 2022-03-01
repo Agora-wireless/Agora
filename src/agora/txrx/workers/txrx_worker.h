@@ -16,9 +16,11 @@
 
 class TxRxWorker {
  public:
+  static constexpr bool kDebugTxMemory = false;
+
   TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
-             size_t interface_offset, Config* const config,
-             size_t* rx_frame_start,
+             size_t interface_offset, size_t channels_per_interface,
+             Config* const config, size_t* rx_frame_start,
              moodycamel::ConcurrentQueue<EventData>* event_notify_q,
              moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
              moodycamel::ProducerToken& tx_producer,
@@ -45,13 +47,13 @@ class TxRxWorker {
   RxPacket& GetRxPacket();
   void ReturnRxPacket(RxPacket& unused_packet);
   Packet* GetTxPacket(size_t frame, size_t symbol, size_t ant);
+  Packet* GetUlTxPacket(size_t frame, size_t symbol, size_t ant);
 
   const size_t tid_;
   const size_t core_offset_;
   const size_t num_interfaces_;
   const size_t interface_offset_;
   const size_t channels_per_interface_;
-  const size_t ant_per_cell_;
   size_t* const rx_frame_start_;
   bool running_;
 

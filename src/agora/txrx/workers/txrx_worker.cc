@@ -9,8 +9,8 @@
 #include "logger.h"
 
 TxRxWorker::TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
-                       size_t interface_offset, Config* const config,
-                       size_t* rx_frame_start,
+                       size_t interface_offset, size_t channels_per_interface,
+                       Config* const config, size_t* rx_frame_start,
                        moodycamel::ConcurrentQueue<EventData>* event_notify_q,
                        moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
                        moodycamel::ProducerToken& tx_producer,
@@ -23,8 +23,7 @@ TxRxWorker::TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
       core_offset_(core_offset),
       num_interfaces_(interface_count),
       interface_offset_(interface_offset),
-      channels_per_interface_(config->NumChannels()),
-      ant_per_cell_(config->BsAntNum() / config->NumCells()),
+      channels_per_interface_(channels_per_interface),
       rx_frame_start_(rx_frame_start),
       running_(false),
       mutex_(sync_mutex),
@@ -158,7 +157,27 @@ Packet* TxRxWorker::GetTxPacket(size_t frame, size_t symbol, size_t ant) {
        Configuration()->BsAntNum()) +
       ant;
 
-  auto* pkt = reinterpret_cast<Packet*>(
+  return reinterpret_cast<Packet*>(
       &tx_memory_[offset * Configuration()->DlPacketLength()]);
-  return pkt;
+}
+
+//Returns the location of the tx packet for a given frame / symbol / antenna (uplink / user)
+Packet* TxRxWorker::GetUlTxPacket(size_t frame, size_t symbol, size_t ant) {
+  const size_t data_symbol_idx_ul =
+      Configuration()->Frame().GetULSymbolIdx(symbol);
+  const size_t offset =
+      (Configuration()->GetTotalDataSymbolIdxUl(frame, data_symbol_idx_ul) *
+       Configuration()->UeAntNum()) +
+      ant;
+
+  if (TxRxWorker::kDebugTxMemory) {
+    std::printf(
+        "GetUlTxPacket: (Frame %zu Symbol %zu Ant %zu) Tx Offset %zu:%zu "
+        "location %ld\n",
+        frame, symbol, ant, offset, offset * Configuration()->PacketLength(),
+        (intptr_t)(&tx_memory_[offset * Configuration()->PacketLength()]));
+  }
+
+  return reinterpret_cast<Packet*>(
+      &tx_memory_[offset * Configuration()->PacketLength()]);
 }
