@@ -19,6 +19,21 @@ DyPrecode::DyPrecode(Config* in_config, int in_tid, double freq_ghz,
     alloc_buffer_1d(&modulated_buffer_temp_, cfg_->UE_NUM, 64, 0);
     alloc_buffer_1d(
         &precoded_buffer_temp_, cfg_->demul_block_size * cfg_->BS_ANT_NUM, 64, 0);
+
+    MKL_Complex8 alpha = { 1, 0 };
+    MKL_Complex8 beta = { 0, 0 };
+
+    for (size_t i = 1; i <= cfg_->UE_NUM; i ++) {
+        mkl_jit_status_t status = mkl_jit_create_cgemm(&jitter[i], MKL_COL_MAJOR,
+            MKL_NOTRANS, MKL_NOTRANS, cfg_->BS_ANT_NUM, 1, i, &alpha,
+            cfg_->BS_ANT_NUM, i, &beta, cfg_->BS_ANT_NUM);
+        if (MKL_JIT_ERROR == status) {
+            fprintf(stderr,
+                "Error: insufficient memory to JIT and store the DGEMM kernel\n");
+            exit(1);
+        }
+        mkl_jit_cgemm[i] = mkl_jit_get_cgemm_ptr(jitter[i]);
+    }
 }
 
 DyPrecode::~DyPrecode()
@@ -91,7 +106,10 @@ void DyPrecode::Launch(
                 = (cx_float*)precoded_buffer_temp_ + (i + j) * cfg_->BS_ANT_NUM;
             cx_fmat mat_precoded(precoded_ptr, 1, cfg_->BS_ANT_NUM, false);
 
-            mat_precoded = mat_data * mat_precoder;
+            mkl_jit_cgemm[cfg_->UE_NUM](jitter[cfg_->UE_NUM], (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
+                (MKL_Complex8*)precoded_ptr);
+
+            // mat_precoded = mat_data * mat_precoder;
 
             // printf("In doPrecode thread %d: frame: %d, symbol: %d, "
             //        "subcarrier: % d\n ",

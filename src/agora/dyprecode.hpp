@@ -12,6 +12,7 @@
 #include "modulation.hpp"
 #include <armadillo>
 #include <iostream>
+#include <mkl.h>
 #include <stdio.h>
 #include <string.h>
 #include <vector>
@@ -62,6 +63,9 @@ private:
     Table<float> qam_table_;
     complex_float* modulated_buffer_temp_;
     complex_float* precoded_buffer_temp_;
+
+    void* jitter[kMaxUEs];
+    cgemm_jit_kernel_t mkl_jit_cgemm[kMaxUEs];
 
     // Control info
     std::vector<std::vector<ControlInfo>>& control_info_table_;
