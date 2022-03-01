@@ -49,6 +49,9 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
     }
     gt_mat_ = gt_mat_.cols(cfg->OfdmDataStart(), (cfg->OfdmDataStop() - 1));
   }
+  dl_pilot_snr_.Calloc(kFrameWnd,
+                       cfg->UeAntNum() * cfg->Frame().ClientDlPilotSymbols(),
+                       Agora_memory::Alignment_t::kAlign64);
   pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
                     Agora_memory::Alignment_t::kAlign64);
   calib_pilot_snr_.Calloc(kFrameWnd, 2 * cfg->BsAntNum(),
@@ -120,6 +123,20 @@ float PhyStats::GetEvmSnr(size_t frame_id, size_t ue_id) {
   float evm = evm_buffer_[frame_id % kFrameWnd][ue_id];
   evm = evm / config_->OfdmDataNum();
   return -10 * std::log10(evm);
+}
+
+void PhyStats::PrintDlSnrStats(size_t frame_id, size_t ant_id) {
+  std::stringstream ss;
+  ss << "Frame " << frame_id << " Pilot SNR (dB) at UE Antenna " << ant_id
+     << ": [" << std::fixed << std::setw(5) << std::setprecision(1);
+  size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
+  for (size_t i = 0; i < dl_pilots_num; i++) {
+    float frame_snr =
+        dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + i];
+    ss << frame_snr << " ";
+  }
+  ss << "]" << std::endl;
+  std::cout << ss.str();
 }
 
 void PhyStats::PrintSnrStats(size_t frame_id) {
@@ -233,6 +250,24 @@ void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
       config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
   const float snr = (rssi - noise) / noise;
   pilot_snr_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
+      10 * std::log10(snr);
+}
+
+void PhyStats::UpdateDlPilotSnr(size_t frame_id, size_t symbol_id,
+                                size_t ant_id, complex_float* fft_data) {
+  arma::cx_fmat fft_mat((arma::cx_float*)fft_data, config_->OfdmCaNum(), 1,
+                        false);
+  arma::fmat fft_abs_mat = abs(fft_mat);
+  arma::fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
+  float rssi = as_scalar(sum(fft_abs_mag));
+  float noise_per_sc1 =
+      as_scalar(mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
+  float noise_per_sc2 = as_scalar(mean(
+      fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
+  float noise = config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
+  float snr = (rssi - noise) / noise;
+  size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
+  dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + symbol_id] =
       10 * std::log10(snr);
 }
 

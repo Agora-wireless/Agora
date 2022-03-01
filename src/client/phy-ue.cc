@@ -429,6 +429,9 @@ void PhyUe::Start() {
             const bool pilot_fft_complete =
                 fft_dlpilot_counters_.CompleteSymbol(frame_id);
             if (pilot_fft_complete == true) {
+              if (kPrintPhyStats == true) {
+                this->phy_stats_->PrintDlSnrStats(frame_id, ant_id);
+              }
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
               ScheduleDefferedDownlinkSymbols(frame_id);

@@ -176,19 +176,22 @@ void UeWorker::DoFftPilot(size_t tag) {
         std::max_element(pilot_corr_abs.begin(), pilot_corr_abs.end()) -
         pilot_corr_abs.begin();
     size_t pilot_offset = peak_offset < seq_len ? 0 : peak_offset - seq_len;
-    float noise_power = 0;
-    for (size_t i = 0; i < pilot_offset; i++) {
-      noise_power += std::pow(std::abs(samples_vec[i]), 2);
-    }
-    float signal_power = 0;
-    for (size_t i = pilot_offset; i < 2 * pilot_offset; i++) {
-      signal_power += std::pow(std::abs(samples_vec[i]), 2);
-    }
-    float snr = 10 * std::log10(signal_power / noise_power);
     std::printf(
-        "UeWorker: Fft Pilot(frame %zu symbol %zu ant %zu) sig offset "
-        "%zu, SNR %2.1f \n",
-        frame_id, symbol_id, ant_id, pilot_offset, snr);
+        "UeWorker: Fft Pilot(frame %zu symbol %zu ant %zu) sig offset %zu\n",
+        frame_id, symbol_id, ant_id, pilot_offset);
+    //float noise_power = 0;
+    //for (size_t i = 0; i < pilot_offset; i++) {
+    //  noise_power += std::pow(std::abs(samples_vec[i]), 2);
+    //}
+    //float signal_power = 0;
+    //for (size_t i = pilot_offset; i < 2 * pilot_offset; i++) {
+    //  signal_power += std::pow(std::abs(samples_vec[i]), 2);
+    //}
+    //float snr = 10 * std::log10(signal_power / noise_power);
+    //std::printf(
+    //    "UeWorker: Fft Pilot(frame %zu symbol %zu ant %zu) sig offset "
+    //    "%zu, SNR %2.1f \n",
+    //    frame_id, symbol_id, ant_id, pilot_offset, snr);
   }
 
   if (kRecordDownlinkFrame) {
@@ -241,6 +244,10 @@ void UeWorker::DoFftPilot(size_t tag) {
       complex_float p = config_.UeSpecificPilot()[ant][j];
       size_t sc_id = non_null_sc_ind_[j];
       csi_buffer_ptr[j] += (fft_buffer_ptr[sc_id] / arma::cx_float(p.re, p.im));
+    }
+    if (kCollectPhyStats) {
+      phy_stats_.UpdateDlPilotSnr(frame_id, dl_symbol_id, ant_id,
+                                  fft_buffer_[fft_buffer_target_id]);
     }
   }
 
