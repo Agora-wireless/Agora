@@ -20,7 +20,7 @@ SharedState::SharedState(Config* cfg)
     , num_demod_pkts_per_symbol_per_ue_(cfg->bs_server_addr_list.size())
     , num_encoded_pkts_per_symbol_(cfg->UE_NUM)
     , num_zf_tasks_per_frame_(cfg->get_num_sc_to_process() / cfg->zf_block_size)
-    , slot_us_(1000)
+    , slot_us_(cfg->slot_us)
     , symbol_num_per_frame_(cfg->symbol_num_perframe)
 {
     frame_start_time_ = new uint64_t[cfg->frames_to_test];
@@ -86,6 +86,10 @@ bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t 
 
     if (unlikely(frame_start_time_[frame_id] == 0)) {
         frame_start_time_[frame_id] = get_us();
+    }
+
+    if (frame_id == 0 && symbol_id == 0) {
+        printf("Recv pilot packet ant %zu\n", ant_id);
     }
 
     // size_t last_frame_symbol = last_frame_symbol_each_ant_[ant_id];
@@ -292,9 +296,9 @@ bool SharedState::is_encode_ready(size_t frame_id, size_t symbol_id_dl) {
     if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
         return false;
     }
-    // return encode_ready_[frame_id % kFrameWnd] && 
-    //     (get_us() - frame_start_time_[frame_id]) >= (symbol_id_dl + 1) * slot_us_ / symbol_num_per_frame_;
-    return encode_ready_[frame_id % kFrameWnd];
+    return encode_ready_[frame_id % kFrameWnd] && 
+        (get_us() - frame_start_time_[frame_id]) >= (symbol_id_dl + 1) * slot_us_ / symbol_num_per_frame_;
+    // return encode_ready_[frame_id % kFrameWnd];
 }
 
 void SharedState::fft_done(size_t frame_id, size_t symbol_id)

@@ -92,7 +92,7 @@ Agora::Agora(Config* cfg)
         cfg->core_offset + kNumMasterThread + cfg->rx_thread_num + kNumDemodTxThread - 1,
         base_worker_core_offset_,
         base_worker_core_offset_ + do_subcarrier_threads_.size() + do_decode_threads_.size() + 
-        do_encode_threads_.size());
+        do_encode_threads_.size() - 1);
 }
 
 Agora::~Agora()

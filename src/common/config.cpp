@@ -340,6 +340,8 @@ Config::Config(std::string jsonfile)
         fft_rx_port = tddConf.value("fft_rx_port", 9600);
     }
 
+    slot_us = tddConf.value("slot_us", 1000);
+
     use_central_scheduler = tddConf.value("use_central_scheduler", false);
     use_general_worker = tddConf.value("use_general_worker", false);
 

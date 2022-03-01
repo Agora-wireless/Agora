@@ -23,9 +23,6 @@ source ${hydra_root_dir}/scripts/utils/utils.sh
 # 2 for not running Hydra and RRU
 HYDRA_RUN_MODE=0
 
-# The slot size for running Hydra
-SLOT_US=1000
-
 # 1 for generating new input traffic data, 0 for not
 GEN_NEW_TRAFFIC_DATA=1
 
@@ -34,14 +31,13 @@ GEN_NEW_TRAFFIC_DATA=1
 # TODO: integrate this option
 USE_MATLAB_GEN_RAYLEIGH=0
 
-while getopts "h?:frs:dm" opt; do
+while getopts "h?:frdm" opt; do
   case "$opt" in
     h|\?)
       echo "Help"
       echo -e "\t-h\tShow this infomation"
       echo -e "\t-f\tRun Hydra without generating new input traffic data"
       echo -e "\t-r\tRun Hydra RRU traffic generator only"
-      echo -e "\t-s [slot size]\tSet the slot size used in Hydra (unit: us, default: 1000 us)"
       echo -e "\t-d\tenerate new input traffic data"
       echo -e "\t-m\tUse MATLAB to generate input traffic data for Rayleigh channel (require MATLAB to be installed)"
       exit 0
@@ -51,17 +47,6 @@ while getopts "h?:frs:dm" opt; do
       ;;
     r)
       HYDRA_RUN_MODE=1
-      ;;
-    s)  
-      SLOT_US=${OPTARG}
-      if [ "${SLOT_US}" -lt 500 ]; then
-        echored "Slot size should be no smaller than 500us"
-        exit
-      fi
-      if [ "${SLOT_US}" -gt 10000 ]; then
-        echored "Slot size should be no larger than 10000us"
-        exit
-      fi
       ;;
     d)
       HYDRA_RUN_MODE=2
@@ -104,20 +89,22 @@ fi
 
 if [ "${HYDRA_RUN_MODE}" == 0 ]; then
   # Run the Hydra application
-  echocyan "Run Hydra applications and wait for 5 seconds"
+  echocyan "Run Hydra applications and wait the initialization to finish"
   source ${hydra_root_dir}/scripts/control/run_hydra.sh
 
+  source ${hydra_root_dir}/scripts/control/check_hydra_ready.sh
+
   # Give Hydra servers 5 seconds to initialize
-  sleep 5
+  sleep 2
 fi
 
 if [ "${HYDRA_RUN_MODE}" == 0 ] || [ "${HYDRA_RUN_MODE}" == 1 ]; then
   # Run the RRU application
-  echocyan "Run RRU traffic generators (slot size: ${SLOT_US} us)"
+  echocyan "Run RRU traffic generators (slot size: ${slot_us} us)"
   source ${hydra_root_dir}/scripts/control/run_rru.sh
 fi
 
-time_to_run=$(( SLOT_US*slots_to_test/1000000+10 ))
+time_to_run=$(( slot_us*slots_to_test/1000000+10 ))
 sleep ${time_to_run}
 
 set +e

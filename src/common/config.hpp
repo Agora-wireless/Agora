@@ -361,6 +361,8 @@ public:
 
     size_t ant_start, ant_end;
 
+    size_t slot_us;
+
     // Centralized scheduler mode
     bool use_central_scheduler;
     bool use_general_worker;
