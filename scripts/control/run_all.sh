@@ -92,6 +92,8 @@ if [ "${HYDRA_RUN_MODE}" == 0 ]; then
   echocyan "Run Hydra applications and wait the initialization to finish"
   source ${hydra_root_dir}/scripts/control/run_hydra.sh
 
+  sleep 2
+
   source ${hydra_root_dir}/scripts/control/check_hydra_ready.sh
 
   # Give Hydra servers 5 seconds to initialize

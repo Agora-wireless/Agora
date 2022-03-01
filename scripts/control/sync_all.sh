@@ -37,26 +37,30 @@ hydra_server_num=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.hydra_servers | length
 
 for (( i=0; i<${rru_server_num}; i++ )) do
   server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
-  echo "Copying ${hydra_root_dir} to ${server_name} at ${HYDRA_RUNNER_ROOT}/Agora/"
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/src ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/simulator ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/scripts ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/config ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/data ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/test ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/tool ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a ${hydra_root_dir}/CMakeLists.txt ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
+  ( echo "Copying ${hydra_root_dir} to ${server_name} at ${HYDRA_RUNNER_ROOT}/Agora/"; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/src ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/simulator ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/scripts ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/config ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/data ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/test ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/tool ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a ${hydra_root_dir}/CMakeLists.txt ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue ) &
 done
 
 for (( i=0; i<${hydra_server_num}; i++ )) do
   server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.hydra_servers[$i]' | tr -d '"')
-  echo "Copying ${hydra_root_dir} to ${server_name} at ${HYDRA_RUNNER_ROOT}/Agora/"
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/src ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/simulator ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/scripts ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/config ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/data ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/test ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/tool ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
-  eval "rsync -a ${hydra_root_dir}/CMakeLists.txt ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue
+  ( echo "Copying ${hydra_root_dir} to ${server_name} at ${HYDRA_RUNNER_ROOT}/Agora/"; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/src ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/simulator ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/scripts ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/config ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/data ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/test ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a --exclude '*.bin' ${hydra_root_dir}/tool ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue; \
+    eval "rsync -a ${hydra_root_dir}/CMakeLists.txt ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/" || continue ) &
 done
+
+wait
+
+echo "Copying ${hydra_root_dir} to all remote servers done"

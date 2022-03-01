@@ -6,8 +6,8 @@ do
   is_ready=0
   for (( i=0; i<${hydra_app_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.hydra_servers[$i]' | tr -d '"')
-    ret=$(cat /tmp/hydra/log_${server_name}.txt | grep "Master thread core") || :
-    if [ -n "${ret}" ]; then
+    ret=$(ssh ${server_name} "cat /tmp/hydra/ready") || :
+    if [ "${ret}" == "1" ]; then
       is_ready=$(( is_ready+1 ))
     fi
   done

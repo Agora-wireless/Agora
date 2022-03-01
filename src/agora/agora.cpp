@@ -136,6 +136,16 @@ void Agora::Start()
         return;
     }
 
+    // Give master a signal that this Hydra app has finished initializing
+    FILE* fp = fopen("/tmp/hydra/ready", "w");
+    if (fp) {
+        fprintf(fp, "1");
+        fclose(fp);
+    } else {
+        std::cerr << "Agora: failed to open /tmp/hydra/ready" << std::endl;
+        exit(1);
+    }
+
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (shared_state_.cur_frame_ == cfg->frames_to_test) {
             cfg->running = false;

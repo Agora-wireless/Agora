@@ -88,9 +88,9 @@ bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t 
         frame_start_time_[frame_id] = get_us();
     }
 
-    if (frame_id == 0 && symbol_id == 0) {
-        printf("Recv pilot packet ant %zu\n", ant_id);
-    }
+    // if (frame_id == 0 && symbol_id == 0) {
+    //     printf("Recv pilot packet ant %zu\n", ant_id);
+    // }
 
     // size_t last_frame_symbol = last_frame_symbol_each_ant_[ant_id];
     // size_t last_frame = last_frame_symbol >> 32;
