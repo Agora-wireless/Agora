@@ -73,6 +73,8 @@ public:
     // cur_frame is the first frame for which decoding is incomplete
     size_t cur_frame_ = 0;
 
+    size_t rru_start_ = false;
+
 private:
     // TODO: Instead of having all-atomic counter arrays, can we just make
     // the entire class atomic?

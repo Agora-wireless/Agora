@@ -91,13 +91,6 @@ if [ "${HYDRA_RUN_MODE}" == 0 ]; then
   # Run the Hydra application
   echocyan "Run Hydra applications and wait the initialization to finish"
   source ${hydra_root_dir}/scripts/control/run_hydra.sh
-
-  sleep 2
-
-  source ${hydra_root_dir}/scripts/control/check_hydra_ready.sh
-
-  # Give Hydra servers 5 seconds to initialize
-  sleep 2
 fi
 
 if [ "${HYDRA_RUN_MODE}" == 0 ] || [ "${HYDRA_RUN_MODE}" == 1 ]; then
@@ -106,7 +99,8 @@ if [ "${HYDRA_RUN_MODE}" == 0 ] || [ "${HYDRA_RUN_MODE}" == 1 ]; then
   source ${hydra_root_dir}/scripts/control/run_rru.sh
 fi
 
-time_to_run=$(( slot_us*slots_to_test/1000000+10 ))
+time_to_run=$(( slot_us*slots_to_test/1000000+20 ))
+echocyan "Wait ${time_to_run} seconds for the test to finish"
 sleep ${time_to_run}
 
 set +e

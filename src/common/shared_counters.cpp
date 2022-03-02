@@ -64,6 +64,10 @@ bool SharedState::receive_time_iq_pkt(size_t frame_id, size_t symbol_id)
         return false;
     }
 
+    if (unlikely(!rru_start_)) {
+        rru_start_ = true;
+    }
+
     const size_t frame_slot = frame_id % kFrameWnd;
     num_time_iq_pkts_[frame_slot][symbol_id] ++;
     if (num_time_iq_pkts_[frame_slot][symbol_id] == num_time_iq_pkts_per_symbol_) {
@@ -82,6 +86,10 @@ bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t 
             frame_id, cur_frame_, kFrameWnd, cur_frame_, (unsigned int)num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
             (unsigned int)num_pkts_[cur_frame_ % kFrameWnd].load());
         return false;
+    }
+
+    if (unlikely(!rru_start_)) {
+        rru_start_ = true;
     }
 
     if (unlikely(frame_start_time_[frame_id] == 0)) {

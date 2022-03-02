@@ -53,6 +53,8 @@ fi
 rru_server_num=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.rru_servers | length')
 hydra_server_num=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.hydra_servers | length')
 
+mkdir -p /tmp/hydra
+
 if [ "${BUILD_MODE}" == "remote" ]; then
   echocyan "Sync all source codes to remote servers"
   source ${hydra_root_dir}/scripts/control/sync_all.sh

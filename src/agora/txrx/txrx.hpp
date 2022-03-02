@@ -75,6 +75,8 @@ public:
      */
     bool StartTXRX();
 
+    void notify_sender();
+
     // Current sending frame for each socket thread
     size_t frame_to_send_[kMaxThreads] = {0};
 
