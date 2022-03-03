@@ -363,8 +363,13 @@ void* Agora::fftWorker(int tid)
 
 void* Agora::subcarrierWorker(int tid)
 {
-    pin_to_core_with_offset(
-        ThreadType::kWorkerSubcarrier, base_worker_core_offset_, tid + do_fft_threads_.size());
+    if (config_->use_hyperthreading) {
+        pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, base_worker_core_offset_, tid + do_fft_threads_.size()
+            true, true, config_->phy_core_num);
+    } else {
+        pin_to_core_with_offset(
+            ThreadType::kWorkerSubcarrier, base_worker_core_offset_, tid + do_fft_threads_.size());
+    }
 
     Range sc_range(tid * config_->subcarrier_block_size + config_->subcarrier_start,
         min((tid + 1) * config_->subcarrier_block_size + config_->subcarrier_start,
@@ -394,8 +399,13 @@ void* Agora::subcarrierWorker(int tid)
 
 void* Agora::decodeWorker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_,
-        tid + do_fft_threads_.size() + do_subcarrier_threads_.size());
+    if (config_->use_hyperthreading) {
+        pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_,
+            tid + do_fft_threads_.size() + do_subcarrier_threads_.size(), true, true, config_->phy_core_num);
+    } else {
+        pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_,
+            tid + do_fft_threads_.size() + do_subcarrier_threads_.size());
+    }
 
     auto computeDecoding = new DyDecode(config_, tid, freq_ghz_,
         demod_buffer_to_decode_,
@@ -416,8 +426,13 @@ void* Agora::decodeWorker(int tid)
 
 void* Agora::encodeWorker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorkerEncode, base_worker_core_offset_,
-        tid + do_fft_threads_.size() + do_subcarrier_threads_.size());
+    if (config_->use_hyperthreading) {
+        pin_to_core_with_offset(ThreadType::kWorkerEncode, base_worker_core_offset_,
+            tid + do_fft_threads_.size() + do_subcarrier_threads_.size(), true, true, config_->phy_core_num);
+    } else {
+        pin_to_core_with_offset(ThreadType::kWorkerEncode, base_worker_core_offset_,
+            tid + do_fft_threads_.size() + do_subcarrier_threads_.size());
+    }
 
     auto computeEncoding = new DyEncode(config_, tid, freq_ghz_,
         dl_bits_buffer_,
@@ -433,7 +448,12 @@ void* Agora::encodeWorker(int tid)
 
 void* Agora::worker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset_, tid);
+    if (config_->use_hyperthreading) {
+        pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset_, tid, 
+            true, true, config_->phy_core_num);
+    } else {
+        pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset_, tid);
+    }
 
     auto computeSubcarrier = new DySubcarrier(config_, tid, freq_ghz_,
         Range(0, 1),

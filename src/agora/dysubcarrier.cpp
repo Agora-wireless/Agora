@@ -284,7 +284,8 @@ void DySubcarrier::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_si
 
     size_t sc_start = base_sc_id;
     size_t sc_end = sc_block_size == 0 ? sc_range_.end : base_sc_id + sc_block_size;
-    sc_end = sc_end > cfg_->subcarrier_end ? cfg_->subcarrier_end : sc_end;
+    // sc_end = sc_end > cfg_->subcarrier_end ? cfg_->subcarrier_end : sc_end;
+    rt_assert(sc_end <= cfg_->subcarrier_end, "Illegal subcarrier number for csi to process!");
 
     for (size_t i = 0; i < cfg_->pilot_symbol_num_perframe; i++) {
         for (size_t j = 0; j < cfg_->BS_ANT_NUM; j++) {
