@@ -150,6 +150,8 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     if (cfg->bs_rru_addr_list.size() > 1) {
         get_sync_tsc_distributed();
         printf("Sync cycle is %lu\n", start_tsc_distributed_);
+    } else {
+        wait_for_hydra_request();
     }
 
     for (size_t i = 0; i < num_worker_threads_; i ++) {
@@ -347,6 +349,43 @@ void Sender::get_sync_tsc_distributed() {
                 }
                 rte_pktmbuf_free(dpdk_pkt);
             }
+        }
+    }
+}
+
+void Sender::wait_for_hydra_request()
+{  
+    uint16_t src_port = 2222;
+    uint16_t dst_port = 3333;
+    const size_t magic = 0xea10baff;
+    const size_t magic2 = 0xea10bafe;
+    rte_mbuf* mbuf[kRxBatchSize];
+    size_t hydra_app_notification_map = 0;
+    size_t notification_goal = (1 << cfg->bs_server_addr_list.size()) - 1;
+    while (hydra_app_notification_map != notification_goal) {
+        size_t num_rx = rte_eth_rx_burst(0, 0, mbuf, kRxBatchSize);
+        for (size_t i = 0; i < num_rx; i ++) {
+            rte_prefetch0(rte_pktmbuf_mtod(mbuf[i], void*));
+            rte_mbuf* dpdk_pkt = mbuf[i];
+            auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+            auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+                reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+            uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+            if (unlikely(eth_type != RTE_ETHER_TYPE_IPV4
+                or ip_hdr->next_proto_id != IPPROTO_UDP)) {
+                rte_pktmbuf_free(mbuf[i]);
+                continue;
+            }
+            if (unlikely(ip_hdr->dst_addr != bs_rru_addr_list[cfg->bs_rru_addr_idx])) {
+                rte_pktmbuf_free(mbuf[i]);
+                continue;
+            }
+            char* payload = (char*)eth_hdr + kPayloadOffset;
+            if (*((size_t*)payload) == magic2) {
+                size_t hydra_id = *((size_t*)payload + 1);
+                hydra_app_notification_map |= (1 << hydra_id);
+            }
+            rte_pktmbuf_free(dpdk_pkt);
         }
     }
 }

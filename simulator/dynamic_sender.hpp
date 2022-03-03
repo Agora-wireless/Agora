@@ -98,6 +98,7 @@ private:
     // Get number of CPU ticks for a symbol given a frame index
     uint64_t get_ticks_for_frame(size_t frame_id);
     size_t get_max_symbol_id() const;
+    void wait_for_hydra_request();
 
     // Launch threads to run worker with thread IDs from tid_start to tid_end
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
