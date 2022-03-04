@@ -122,7 +122,7 @@ ChannelSim::ChannelSim(const Config* const config, size_t bs_thread_num,
 }
 
 ChannelSim::~ChannelSim() {
-  std::printf("Destroying channel simulator\n");
+  AGORA_LOG_INFO("Destroying channel simulator\n");
   running.store(false);
   for (auto& join_thread : task_threads_) {
     join_thread.join();
@@ -140,9 +140,9 @@ void ChannelSim::ScheduleTask(EventData do_task,
                               moodycamel::ConcurrentQueue<EventData>* in_queue,
                               moodycamel::ProducerToken const& ptok) {
   if (!in_queue->try_enqueue(ptok, do_task)) {
-    std::printf("need more memory\n");
+    AGORA_LOG_WARN("need more memory\n");
     if (!in_queue->enqueue(ptok, do_task)) {
-      std::printf("task enqueue failed\n");
+      AGORA_LOG_ERROR("task enqueue failed\n");
       throw std::runtime_error("ChannelSim: task enqueue failed");
     }
   }
@@ -150,7 +150,7 @@ void ChannelSim::ScheduleTask(EventData do_task,
 
 void ChannelSim::Start() {
   constexpr size_t kChanSimMasterTid = 0;
-  std::printf("Starting Channel Simulator ...\n");
+  AGORA_LOG_INFO("Starting Channel Simulator ...\n");
   PinToCoreWithOffset(ThreadType::kMaster, core_offset_, kChanSimMasterTid);
 
   moodycamel::ProducerToken ptok_bs(task_queue_bs_);
@@ -205,7 +205,7 @@ void ChannelSim::Start() {
             if (user_rx_counter_[frame_offset] == cfg_->UeAntNum()) {
               user_rx_counter_[frame_offset] = 0;
               if (kDebugPrintPerSymbolDone) {
-                std::printf(
+                AGORA_LOG_SYMBOL(
                     "Scheduling uplink transmission of frame %zu, symbol %zu, "
                     "from %zu user to %zu BS antennas\n",
                     frame_id, symbol_id, cfg_->UeAntNum(), cfg_->BsAntNum());
@@ -221,17 +221,14 @@ void ChannelSim::Start() {
                 dl_symbol_id;
             bs_rx_counter_[frame_offset]++;
 
-            // std::printf("Dequeue bulk %d : %d : %d \n", bulk_count, ret,
-            //             event.num_tags_);
-
-            // std::printf("Rx downlink frame %zu, symbol %zu, %zu\n", frame_id,
-            //            symbol_id, bs_rx_counter_[frame_offset]);
+            AGORA_LOG_TRACE("Rx downlink frame %zu, symbol %zu, %zu\n",
+                            frame_id, symbol_id, bs_rx_counter_[frame_offset]);
 
             // when received all BS antennas on this symbol, kick-off client TX
             if (bs_rx_counter_[frame_offset] == cfg_->BsAntNum()) {
               bs_rx_counter_[frame_offset] = 0;
               if (kDebugPrintPerSymbolDone) {
-                std::printf(
+                AGORA_LOG_SYMBOL(
                     "Scheduling downlink transmission in frame %zu, symbol "
                     "%zu, from %zu BS to %zu user antennas\n",
                     frame_id, symbol_id, cfg_->BsAntNum(), cfg_->UeAntNum());
@@ -250,7 +247,7 @@ void ChannelSim::Start() {
             user_tx_counter_[offset]++;
             if (user_tx_counter_[offset] == dl_data_plus_beacon_symbols_) {
               if (kDebugPrintPerFrameDone) {
-                std::printf(
+                AGORA_LOG_FRAME(
                     "Finished downlink transmission %zu symbols "
                     "in frame %zu\n",
                     dl_data_plus_beacon_symbols_, frame_id);
@@ -262,7 +259,7 @@ void ChannelSim::Start() {
             bs_tx_counter_[offset]++;
             if (bs_tx_counter_[offset] == ul_data_plus_pilot_symbols_) {
               if (kDebugPrintPerFrameDone) {
-                std::printf(
+                AGORA_LOG_FRAME(
                     "Finished uplink transmission of %zu "
                     "symbols in frame %zu\n",
                     ul_data_plus_pilot_symbols_, frame_id);
@@ -272,7 +269,7 @@ void ChannelSim::Start() {
           }
         } break;
         default:
-          std::cout << "Invalid Event Type!" << std::endl;
+          AGORA_LOG_ERROR("Invalid Event Type!\n");
           break;
       }
     }
@@ -384,7 +381,7 @@ void* ChannelSim::BsRxLoop(size_t tid) {
     server_bs_.at(socket_id) =
         std::make_unique<UDPServer>(local_port_id, kSockBufSize);
     client_bs_.at(socket_id) = std::make_unique<UDPClient>();
-    std::printf(
+    AGORA_LOG_INFO(
         "ChannelSim::BsRxLoop[%zu]: set up UDP socket server listening to port "
         "%zu with remote address %s:%zu\n",
         tid, local_port_id, cfg_->BsServerAddr().c_str(),
@@ -412,7 +409,8 @@ void* ChannelSim::BsRxLoop(size_t tid) {
     const int rx_bytes = server_bs_.at(socket_id)->Recv(
         &rx_buffer.data_[rx_buffer.data_size_], rx_buffer_rem_size);
     if (0 > rx_bytes) {
-      std::printf("BsRxLoop[%zu] socket %zu receive failed\n", tid, socket_id);
+      AGORA_LOG_WARN("BsRxLoop[%zu] socket %zu receive failed\n", tid,
+                     socket_id);
       throw std::runtime_error("ChannelSim: BS socket receive failed");
     } else if (rx_bytes != 0) {
       const size_t data_rx = static_cast<size_t>(rx_bytes);
@@ -430,7 +428,7 @@ void* ChannelSim::BsRxLoop(size_t tid) {
         const size_t symbol_id = pkt->symbol_id_;
         const size_t ant_id = pkt->ant_id_;
         if (kDebugPrintInTask) {
-          std::printf(
+          AGORA_LOG_INFO(
               "BsRxLoop[%zu]: Received BS packet for frame %zu, symbol %zu, "
               "ant %zu from socket %zu\n",
               tid, frame_id, symbol_id, ant_id, socket_id);
@@ -531,7 +529,8 @@ void* ChannelSim::UeRxLoop(size_t tid) {
     const int rx_bytes = server_ue_.at(socket_id)->Recv(
         &rx_buffer.data_[rx_buffer.data_size_], rx_buffer_rem_size);
     if (0 > rx_bytes) {
-      std::printf("UeRxLoop[%zu]: socket %zu receive failed\n", tid, socket_id);
+      AGORA_LOG_WARN("UeRxLoop[%zu]: socket %zu receive failed\n", tid,
+                     socket_id);
       throw std::runtime_error("ChannelSim: UE socket receive failed");
     } else if (rx_bytes != 0) {
       const size_t data_rx = static_cast<size_t>(rx_bytes);
@@ -565,7 +564,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
         std::memcpy(rx_data_destination, pkt->data_, payload_length_);
 
         if (kDebugPrintInTask) {
-          std::printf(
+          AGORA_LOG_TRACE(
               "UeRxLoop[%zu]: Received UE packet for frame %zu, symbol %zu, "
               "ant %zu from socket %zu copying data to location %zu\n",
               tid, frame_id, symbol_id, ant_id, socket_id,
@@ -664,7 +663,7 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
   }
 
   if (kPrintDebugTxBs) {
-    std::printf(
+    AGORA_LOG_INFO(
         "Channel Sim[%zu]: DoTxBs processing frame %zu, symbol %zu, ul "
         "symbol %zu, at %f ms\n",
         local.tid_, frame_id, symbol_id, total_symbol_id,

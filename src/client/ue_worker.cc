@@ -377,11 +377,9 @@ void UeWorker::DoFftData(size_t tag) {
                                    std::string("_") + std::to_string(ant_id));
   }
   if (kPrintPhyStats) {
-    std::stringstream ss;
-    ss << "Frame: " << frame_id << ", Symbol: " << symbol_id
-       << ", User: " << ant_id << ", EVM: " << 100 * evm
-       << "%, SNR: " << -10 * std::log10(evm) << std::endl;
-    AGORA_LOG_INFO(ss.str().c_str());
+    AGORA_LOG_INFO("Frame: %zu, Symbol: %zu, User: %zu, EVM: %f, SNR: %f\n",
+                   frame_id, symbol_id, ant_id, (100.0f * evm),
+                   (-10.0f * std::log10(evm)));
   }
 
   if (kDebugPrintPerTaskDone || kDebugPrintFft) {

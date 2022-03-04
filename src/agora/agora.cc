@@ -36,8 +36,8 @@ Agora::Agora(Config* const cfg)
       dl_zf_matrices_(kFrameWnd, cfg->OfdmDataNum(),
                       cfg->UeAntNum() * cfg->BsAntNum()) {
   std::string directory = TOSTRING(PROJECT_DIRECTORY);
-  std::printf("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
-              directory.c_str(), cfg->FreqGhz());
+  AGORA_LOG_INFO("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
+                 directory.c_str(), cfg->FreqGhz());
 
   PinToCoreWithOffset(ThreadType::kMaster, cfg->CoreOffset(), 0,
                       kEnableCoreReuse, false /* quiet */);
@@ -553,7 +553,7 @@ void Agora::Start() {
                   reinterpret_cast<const uint8_t*>(pkt) +
                   config_->MacPacketLength(Direction::kDownlink));
             }
-            std::printf("%s\n", ss.str().c_str());
+            AGORA_LOG_INFO("%s\n", ss.str().c_str());
           }
 
           const size_t frame_id = pkt->Frame();
@@ -566,8 +566,8 @@ void Agora::Start() {
             if ((this->encode_deferral_.empty() == false) ||
                 (frame_id >= (this->cur_proc_frame_id_ + kScheduleQueues))) {
               if (kDebugDeferral) {
-                std::printf("   +++ Deferring encoding of frame %zu\n",
-                            frame_id);
+                AGORA_LOG_INFO("   +++ Deferring encoding of frame %zu\n",
+                               frame_id);
               }
               this->encode_deferral_.push(frame_id);
             } else {
@@ -1120,7 +1120,7 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
       if ((encode_deferral_.empty() == false) ||
           (frame_id >= (this->cur_proc_frame_id_ + kScheduleQueues))) {
         if (kDebugDeferral) {
-          std::printf("   +++ Deferring encoding of frame %zu\n", frame_id);
+          AGORA_LOG_INFO("   +++ Deferring encoding of frame %zu\n", frame_id);
         }
         encode_deferral_.push(frame_id);
       } else {
@@ -1130,7 +1130,7 @@ void Agora::UpdateRxCounters(size_t frame_id, size_t symbol_id) {
     this->stats_->MasterSetTsc(TsType::kFirstSymbolRX, frame_id);
     if (kDebugPrintPerFrameStart) {
       const size_t prev_frame_slot = (frame_slot + kFrameWnd - 1) % kFrameWnd;
-      std::printf(
+      AGORA_LOG_INFO(
           "Main [frame %zu + %.2f ms since last frame]: Received "
           "first packet. Remaining packets in prev frame: %zu\n",
           frame_id,
@@ -1153,44 +1153,44 @@ void Agora::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
   if (kDebugPrintPerFrameDone == true) {
     switch (print_type) {
       case (PrintType::kPacketRXPilots):
-        std::printf("Main [frame %zu + %.2f ms]: Received all pilots\n",
-                    frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kPilotAllRX, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Received all pilots\n", frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kPilotAllRX,
+                                           TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kPacketRX):
-        std::printf("Main [frame %zu + %.2f ms]: Received all packets\n",
-                    frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kRXDone, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Received all packets\n",
+                       frame_id,
+                       this->stats_->MasterGetDeltaMs(
+                           TsType::kRXDone, TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kFFTPilots):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu + %.2f ms]: FFT-ed all pilots\n", frame_id,
             this->stats_->MasterGetDeltaMs(TsType::kFFTPilotsDone,
                                            TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kFFTCal):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu + %.2f ms]: FFT-ed all calibration symbols\n",
             frame_id,
             this->stats_->MasterGetUsSince(TsType::kRCAllRX, frame_id) /
                 1000.0);
         break;
       case (PrintType::kZF):
-        std::printf("Main [frame %zu + %.2f ms]: Completed zero-forcing\n",
-                    frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kZFDone, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO("Main [frame %zu + %.2f ms]: Completed zero-forcing\n",
+                       frame_id,
+                       this->stats_->MasterGetDeltaMs(
+                           TsType::kZFDone, TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kDemul):
-        std::printf("Main [frame %zu + %.2f ms]: Completed demodulation\n",
-                    frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kDemulDone, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed demodulation\n", frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kDemulDone,
+                                           TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kDecode):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu + %.2f ms]: Completed LDPC decoding (%zu UL "
             "symbols)\n",
             frame_id,
@@ -1199,36 +1199,37 @@ void Agora::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
             config_->Frame().NumULSyms());
         break;
       case (PrintType::kPacketFromMac):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu + %.2f ms]: Completed MAC RX \n", frame_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kEncode):
-        std::printf("Main [frame %zu + %.2f ms]: Completed LDPC encoding\n",
-                    frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kEncodeDone, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed LDPC encoding\n", frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kEncodeDone,
+                                           TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kPrecode):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu + %.2f ms]: Completed precoding\n", frame_id,
             this->stats_->MasterGetDeltaMs(TsType::kPrecodeDone,
                                            TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kIFFT):
-        std::printf("Main [frame %zu + %.2f ms]: Completed IFFT\n", frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kIFFTDone, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO(
+            "Main [frame %zu + %.2f ms]: Completed IFFT\n", frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kIFFTDone,
+                                           TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kPacketTXFirst):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu + %.2f ms]: Completed TX of first symbol\n",
             frame_id,
             this->stats_->MasterGetDeltaMs(TsType::kTXProcessedFirst,
                                            TsType::kFirstSymbolRX, frame_id));
         break;
       case (PrintType::kPacketTX):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu + %.2f ms]: Completed TX (%zu DL symbols)\n",
             frame_id,
             this->stats_->MasterGetDeltaMs(TsType::kTXDone,
@@ -1236,12 +1237,12 @@ void Agora::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
             config_->Frame().NumDLSyms());
         break;
       case (PrintType::kPacketToMac):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
         break;
       default:
-        std::printf("Wrong task type in frame done print!");
+        AGORA_LOG_ERROR("Wrong task type in frame done print!");
     }
   }
 }
@@ -1251,7 +1252,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
   if (kDebugPrintPerSymbolDone == true) {
     switch (print_type) {
       case (PrintType::kFFTPilots):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed pilot symbol, "
             "%zu symbols done\n",
             frame_id, symbol_id,
@@ -1259,7 +1260,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             pilot_fft_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kFFTData):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu symbol %zu + %.3f ms]: FFT-ed data symbol, "
             "%zu precoder status: %d\n",
             frame_id, symbol_id,
@@ -1268,7 +1269,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             static_cast<int>(zf_last_frame_ == frame_id));
         break;
       case (PrintType::kDemul):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu symbol %zu + %.3f ms]: Completed "
             "demodulation, "
             "%zu symbols done\n",
@@ -1277,7 +1278,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             demul_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kDecode):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu symbol %zu + %.3f ms]: Completed decoding, "
             "%zu symbols done\n",
             frame_id, symbol_id,
@@ -1285,7 +1286,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             decode_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kEncode):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu symbol %zu + %.3f ms]: Completed encoding, "
             "%zu symbols done\n",
             frame_id, symbol_id,
@@ -1293,7 +1294,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             encode_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kPrecode):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu symbol %zu + %.3f ms]: Completed precoding, "
             "%zu symbols done\n",
             frame_id, symbol_id,
@@ -1301,7 +1302,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             precode_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kIFFT):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu symbol %zu + %.3f ms]: Completed IFFT, "
             "%zu symbols done\n",
             frame_id, symbol_id,
@@ -1309,7 +1310,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             ifft_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kPacketTX):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu symbol %zu + %.3f ms]: Completed TX, "
             "%zu symbols done\n",
             frame_id, symbol_id,
@@ -1317,7 +1318,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             tx_counters_.GetSymbolCount(frame_id) + 1);
         break;
       case (PrintType::kPacketToMac):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
             "%zu symbols done\n",
             frame_id, symbol_id,
@@ -1325,7 +1326,7 @@ void Agora::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             tomac_counters_.GetSymbolCount(frame_id) + 1);
         break;
       default:
-        std::printf("Wrong task type in symbol done print!");
+        AGORA_LOG_INFO("Wrong task type in symbol done print!");
     }
   }
 }
@@ -1335,50 +1336,50 @@ void Agora::PrintPerTaskDone(PrintType print_type, size_t frame_id,
   if (kDebugPrintPerTaskDone == true) {
     switch (print_type) {
       case (PrintType::kZF):
-        std::printf("Main thread: ZF done frame: %zu, subcarrier %zu\n",
-                    frame_id, ant_or_sc_id);
+        AGORA_LOG_INFO("Main thread: ZF done frame: %zu, subcarrier %zu\n",
+                       frame_id, ant_or_sc_id);
         break;
       case (PrintType::kRC):
-        std::printf("Main thread: RC done frame: %zu, subcarrier %zu\n",
-                    frame_id, ant_or_sc_id);
+        AGORA_LOG_INFO("Main thread: RC done frame: %zu, subcarrier %zu\n",
+                       frame_id, ant_or_sc_id);
         break;
       case (PrintType::kDemul):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main thread: Demodulation done frame: %zu, symbol: %zu, sc: "
             "%zu, num blocks done: %zu\n",
             frame_id, symbol_id, ant_or_sc_id,
             demul_counters_.GetTaskCount(frame_id, symbol_id));
         break;
       case (PrintType::kDecode):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main thread: Decoding done frame: %zu, symbol: %zu, sc: %zu, "
             "num blocks done: %zu\n",
             frame_id, symbol_id, ant_or_sc_id,
             decode_counters_.GetTaskCount(frame_id, symbol_id));
         break;
       case (PrintType::kPrecode):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main thread: Precoding done frame: %zu, symbol: %zu, "
             "subcarrier: %zu, total SCs: %zu\n",
             frame_id, symbol_id, ant_or_sc_id,
             precode_counters_.GetTaskCount(frame_id, symbol_id));
         break;
       case (PrintType::kIFFT):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main thread: IFFT done frame: %zu, symbol: %zu, antenna: %zu, "
             "total ants: %zu\n",
             frame_id, symbol_id, ant_or_sc_id,
             ifft_counters_.GetTaskCount(frame_id, symbol_id));
         break;
       case (PrintType::kPacketTX):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main thread: TX done frame: %zu, symbol: %zu, antenna: %zu, "
             "total packets: %zu\n",
             frame_id, symbol_id, ant_or_sc_id,
             tx_counters_.GetTaskCount(frame_id, symbol_id));
         break;
       default:
-        std::printf("Wrong task type in task done print!");
+        AGORA_LOG_INFO("Wrong task type in task done print!");
     }
   }
 }
@@ -1469,8 +1470,8 @@ void Agora::InitializeUplinkBuffers() {
       (cfg->Frame().NumULCalSyms() * num_rx_ul_cal_antennas) +
       (cfg->Frame().NumDLCalSyms() * num_rx_dl_cal_antennas);
 
-  std::printf("Agora: Total recip cal receive symbols per frame: %zu\n",
-              rx_counters_.num_reciprocity_pkts_per_frame_);
+  AGORA_LOG_INFO("Agora: Total recip cal receive symbols per frame: %zu\n",
+                 rx_counters_.num_reciprocity_pkts_per_frame_);
 
   rx_counters_.num_rx_pkts_per_frame_ =
       rx_counters_.num_pilot_pkts_per_frame_ +
@@ -1499,7 +1500,7 @@ void Agora::InitializeUplinkBuffers() {
 
 void Agora::InitializeDownlinkBuffers() {
   if (config_->Frame().NumDLSyms() > 0) {
-    std::printf("Agora: Initializing downlink buffers\n");
+    AGORA_LOG_TRACE("Agora: Initializing downlink buffers\n");
 
     const size_t task_buffer_symbol_num =
         config_->Frame().NumDLSyms() * kFrameWnd;
@@ -1599,7 +1600,7 @@ void Agora::SaveDecodeDataToFile(int frame_id) {
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = cur_directory + "/data/decode_data.bin";
-  std::printf("Saving decode data to %s\n", filename.c_str());
+  AGORA_LOG_INFO("Saving decode data to %s\n", filename.c_str());
   FILE* fp = std::fopen(filename.c_str(), "wb");
 
   for (size_t i = 0; i < cfg->Frame().NumULSyms(); i++) {
@@ -1616,7 +1617,7 @@ void Agora::SaveTxDataToFile(UNUSED int frame_id) {
 
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = cur_directory + "/data/tx_data.bin";
-  std::printf("Saving Frame %d TX data to %s\n", frame_id, filename.c_str());
+  AGORA_LOG_INFO("Saving Frame %d TX data to %s\n", frame_id, filename.c_str());
   FILE* fp = std::fopen(filename.c_str(), "wb");
 
   for (size_t i = 0; i < cfg->Frame().NumDLSyms(); i++) {
@@ -1708,8 +1709,8 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
         const size_t deferred_frame = this->encode_deferral_.front();
         if (deferred_frame < (this->cur_proc_frame_id_ + kScheduleQueues)) {
           if (kDebugDeferral) {
-            std::printf("   +++ Scheduling deferred frame %zu : %zu \n",
-                        deferred_frame, cur_proc_frame_id_);
+            AGORA_LOG_INFO("   +++ Scheduling deferred frame %zu : %zu \n",
+                           deferred_frame, cur_proc_frame_id_);
           }
           RtAssert(deferred_frame >= this->cur_proc_frame_id_,
                    "Error scheduling encoding because deferral frame is less "
@@ -1728,7 +1729,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
 
 extern "C" {
 EXPORT Agora* AgoraNew(Config* cfg) {
-  // std::printf("Size of Agora: %d\n",sizeof(Agora *));
+  AGORA_LOG_TRACE("Size of Agora: %d\n", sizeof(Agora*));
   auto* agora = new Agora(cfg);
 
   return agora;
