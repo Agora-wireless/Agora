@@ -379,6 +379,8 @@ target_link_libraries(macbs ${COMMON_LIBS})
 if (USE_ARGOS)
 add_executable(radio_test
     test/radio_test/main.cc
+    test/radio_test/radio_lib_mod.cc
+    test/radio_test/radio_calibrate_mod.cc
     $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:shared_txrx_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)
