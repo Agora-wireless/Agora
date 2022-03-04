@@ -96,14 +96,19 @@
 
 #else
 
+#include "spdlog/async.h"
 #include "spdlog/fmt/bundled/printf.h"  // support for printf-style
 #include "spdlog/pattern_formatter.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/spdlog.h"
 
-#define AGORA_LOG_INIT()                                \
-  auto f = std::make_unique<spdlog::pattern_formatter>( \
-      spdlog::pattern_time_type::utc, std::string("")); \
-  f->set_pattern("[%S:%f][%^%L%$] %v");                 \
+#define AGORA_LOG_INIT()                                                       \
+  spdlog::init_thread_pool(8192, 1);                                           \
+  spdlog::default_logger() =                                                   \
+      spdlog::create_async_nb<spdlog::sinks::stdout_color_sink_mt>("console"); \
+  auto f = std::make_unique<spdlog::pattern_formatter>(                        \
+      spdlog::pattern_time_type::utc, std::string(""));                        \
+  f->set_pattern("[%S:%f][%^%L%$] %v");                                        \
   spdlog::set_formatter(std::move(f));
 
 #define AGORA_LOG_SHUTDOWN() spdlog::shutdown();
