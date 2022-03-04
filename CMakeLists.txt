@@ -376,11 +376,14 @@ add_executable(macbs
      ${COMMON_SOURCES})
 target_link_libraries(macbs ${COMMON_LIBS})
 
+if (USE_ARGOS)
 add_executable(radio_test
     test/radio_test/main.cc
-    ${AGORA_SOURCES}
-    ${COMMON_SOURCES})
+    $<TARGET_OBJECTS:agora_sources_lib>
+    $<TARGET_OBJECTS:shared_txrx_sources_lib>
+    $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(radio_test ${COMMON_LIBS})
+endif()
 
 # End-to-end test
 add_executable(test_agora
