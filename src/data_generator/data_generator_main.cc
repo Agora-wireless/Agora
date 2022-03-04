@@ -37,14 +37,15 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<DataGenerator> data_generator =
       std::make_unique<DataGenerator>(cfg.get(), 0 /* RNG seed */, profile);
 
-  MLPD_INFO("DataGenerator: Config file: %s, data profile = %s\n",
-            FLAGS_conf_file.c_str(),
-            profile == DataGenerator::Profile::kProfile123 ? "123" : "random");
+  AGORA_LOG_INFO(
+      "DataGenerator: Config file: %s, data profile = %s\n",
+      FLAGS_conf_file.c_str(),
+      profile == DataGenerator::Profile::kProfile123 ? "123" : "random");
 
-  MLPD_INFO("DataGenerator: Using %s-orthogonal pilots\n",
-            cfg->FreqOrthogonalPilot() ? "frequency" : "time");
+  AGORA_LOG_INFO("DataGenerator: Using %s-orthogonal pilots\n",
+                 cfg->FreqOrthogonalPilot() ? "frequency" : "time");
 
-  MLPD_INFO("DataGenerator: Generating encoded and modulated data\n");
+  AGORA_LOG_INFO("DataGenerator: Generating encoded and modulated data\n");
   data_generator->DoDataGeneration(cur_directory);
 
   return 0;

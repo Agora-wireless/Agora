@@ -591,7 +591,7 @@ void PhyUe::Start() {
                               [radio_buf_id * config_->MacBytesNumPerframe(
                                                   Direction::kUplink)]);
 
-          MLPD_TRACE(
+          AGORA_LOG_TRACE(
               "PhyUe: frame %d symbol %d user %d @ offset %zu %zu @ location "
               "%zu\n",
               pkt->Frame(), pkt->Symbol(), pkt->Ue(), ue_id, radio_buf_id,

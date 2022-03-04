@@ -225,9 +225,9 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
           cl_stn_.at(tid)->setGain(
               SOAPY_SDR_TX, ch,
               ch != 0u ? cfg_->ClientTxGainB(tid) : cfg_->ClientTxGainA(tid));
-          MLPD_INFO("Tx gain: %lf, Rx gain: %lf\n",
-                    cl_stn_.at(tid)->getGain(SOAPY_SDR_TX, ch),
-                    cl_stn_.at(tid)->getGain(SOAPY_SDR_RX, ch));
+          AGORA_LOG_INFO("Tx gain: %lf, Rx gain: %lf\n",
+                         cl_stn_.at(tid)->getGain(SOAPY_SDR_TX, ch),
+                         cl_stn_.at(tid)->getGain(SOAPY_SDR_RX, ch));
         } else {
           if (is_cbrs) {
             if (cfg_->Freq() > 3e9) {
@@ -270,7 +270,7 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
         cl_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "PAD",
                                  ch != 0u ? txgain_a : txgain_b);  //[0,52]
       } else {
-        MLPD_ERROR("SDR is not supported!");
+        AGORA_LOG_ERROR("SDR is not supported!");
       }
     } else {
       cl_stn_.at(tid)->setGain(

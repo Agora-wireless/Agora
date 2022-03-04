@@ -99,7 +99,7 @@ void* MacReceiver::LoopRecv(size_t tid) {
       }
 
       if (static_cast<size_t>(recvlen) != max_packet_length) {
-        MLPD_INFO(
+        AGORA_LOG_INFO(
             "MacReceiver: Thread %zu received less than max data bytes "
             "%zu:%zu\n",
             tid, recvlen, max_packet_length);

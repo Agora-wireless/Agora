@@ -489,7 +489,7 @@ std::vector<float> CommsLib::CorrelateAvxS(std::vector<float> const& f,
   std::vector<float> in(length_f + length_g, 0);
   size_t length = in.size();
 
-  // MLPD_TRACE("correlate_avx_s len_f: %zu, len_g: %zu, length: %zu\n",
+  // AGORA_LOG_TRACE("correlate_avx_s len_f: %zu, len_g: %zu, length: %zu\n",
   // length_f, length_g, length); in[length_g:length] = f[0:length_f]
   for (size_t i = length_g; i < length; i++) {
     size_t j = i - length_g;

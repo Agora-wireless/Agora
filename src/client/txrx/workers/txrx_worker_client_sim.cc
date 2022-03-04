@@ -36,7 +36,7 @@ TxRxWorkerClientSim::TxRxWorkerClientSim(
     udp_servers_.emplace_back(
         std::make_unique<UDPServer>(local_port_id, kSocketRxBufferSize));
     udp_clients_.emplace_back(std::make_unique<UDPClient>());
-    MLPD_FRAME(
+    AGORA_LOG_FRAME(
         "TxRxWorkerClientSim[%zu]: set up UDP socket server listening "
         "to local port %d\n",
         tid_, local_port_id);
@@ -104,10 +104,11 @@ std::vector<Packet*> TxRxWorkerClientSim::RecvEnqueue(size_t interface_id) {
     NotifyComplete(rx_message);
     rx_packets.push_back(pkt);
   } else if (0 > rx_bytes) {
-    MLPD_ERROR("RecvEnqueue: Udp Recv failed with error\n");
+    AGORA_LOG_ERROR("RecvEnqueue: Udp Recv failed with error\n");
     throw std::runtime_error("TxRxWorkerClientSim: recv failed");
   } else if (0 != rx_bytes) {
-    MLPD_ERROR("RecvEnqueue: Udp Recv failed to receive all expected bytes");
+    AGORA_LOG_ERROR(
+        "RecvEnqueue: Udp Recv failed to receive all expected bytes");
     throw std::runtime_error(
         "PacketTxRx::RecvEnqueue: Udp Recv failed to receive all expected "
         "bytes");

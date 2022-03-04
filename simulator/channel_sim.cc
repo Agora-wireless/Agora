@@ -400,7 +400,7 @@ void* ChannelSim::BsRxLoop(size_t tid) {
     buffer.data_size_ = 0;
   }
 
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "BsRxLoop[%zu]: handling sockets %zu from %zu to %zu rx packet bytes "
       "%zu, max udp rx %zu \n",
       tid, total_sockets, socket_lo, socket_hi, rx_packet_size, buffer_size);
@@ -465,7 +465,7 @@ void* ChannelSim::BsRxLoop(size_t tid) {
         // No need to update the offset  goes out of scope next
       }
 
-      MLPD_TRACE(
+      AGORA_LOG_TRACE(
           "BsRxLoop[%zu]: handling socket %zu data buffered %zu processed "
           "%zu\n",
           tid, socket_id, rx_buffer.data_size_, processed_packets);
@@ -502,7 +502,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
         std::make_unique<UDPServer>(local_port_id, kSockBufSize);
     client_ue_.at(socket_id) = std::make_unique<UDPClient>();
 
-    MLPD_INFO(
+    AGORA_LOG_INFO(
         "ChannelSim::UeRxLoop[%zu]: set up UDP socket server listening to port "
         "%zu with remote address %s:%zu\n",
         tid, local_port_id, cfg_->UeServerAddr().c_str(),
@@ -518,7 +518,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
     buffer.data_size_ = 0;
   }
 
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "UeRxLoop[%zu]: handling sockets %zu from %zu to %zu rx packet bytes "
       "%zu, max udp rx %zu \n",
       tid, total_sockets, socket_lo, socket_hi, rx_packet_size, buffer_size);
@@ -593,7 +593,7 @@ void* ChannelSim::UeRxLoop(size_t tid) {
         // No need to update the offset  goes out of scope next
       }
 
-      MLPD_TRACE(
+      AGORA_LOG_TRACE(
           "UeRxLoop[%zu]: handling socket %zu data buffered %zu processed "
           "%zu\n",
           tid, socket_id, rx_buffer.data_size_, processed_packets);
@@ -686,7 +686,7 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
   // 2 for complex type
   const size_t convert_length = (2 * fmat_src.n_rows * fmat_src.n_cols);
 
-  MLPD_FRAME(
+  AGORA_LOG_FRAME(
       "Channel Sim[%zu]: DoTxBs processing frame %zu, symbol %zu, ul symbol "
       "%zu, samples per symbol %zu ue ant num %zu offset %zu ue plus %zu "
       "location %zu\n",
@@ -694,7 +694,7 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
       cfg_->UeAntNum(), total_offset_ue, ul_data_plus_pilot_symbols_,
       (size_t)src_ptr);
 
-  MLPD_TRACE(
+  AGORA_LOG_TRACE(
       "Channel Sim[%zu]: SimdConvertShortToFloat: DoTxBs Length %lld samps "
       "%lld ue ants %lld data size %zu\n",
       local.tid_, fmat_src.n_elem, fmat_src.n_cols, fmat_src.n_rows,
@@ -724,8 +724,8 @@ void ChannelSim::DoTxBs(WorkerThreadStorage& local, size_t tag) {
   // Apply Channel
   channel_->ApplyChan(fmat_src, fmat_noisy, is_downlink, is_new_frame);
 
-  MLPD_TRACE("Noisy dimensions %lld x %lld : %lld\n", fmat_noisy.n_rows,
-             fmat_noisy.n_cols, fmat_noisy.n_elem);
+  AGORA_LOG_TRACE("Noisy dimensions %lld x %lld : %lld\n", fmat_noisy.n_rows,
+                  fmat_noisy.n_cols, fmat_noisy.n_elem);
 
   if (kPrintChannelOutput) {
     Utils::PrintMat(fmat_noisy, "rx_ul");
@@ -750,7 +750,7 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
   const size_t dl_symbol_id = GetDlSymbolIdx(symbol_id);
 
   if (kPrintDebugTxUser) {
-    MLPD_INFO(
+    AGORA_LOG_INFO(
         "Channel Sim[%zu]: DoTxUser processing frame %zu, symbol %zu, dl "
         "symbol %zu, at %f ms\n",
         local.tid_, frame_id, symbol_id, dl_symbol_id,
@@ -772,13 +772,13 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
   // 2 for complex type
   const size_t convert_length = (2 * fmat_src.n_rows * fmat_src.n_cols);
 
-  MLPD_FRAME(
+  AGORA_LOG_FRAME(
       "Channel Sim[%zu]: DoTxUser processing frame %zu, symbol %zu, dl symbol "
       "%zu, samples per symbol %zu bs ant num %zu offset %zu location %zu\n",
       local.tid_, frame_id, symbol_id, dl_symbol_id, cfg_->SampsPerSymbol(),
       cfg_->BsAntNum(), total_offset_bs, (size_t)src_ptr);
 
-  MLPD_TRACE(
+  AGORA_LOG_TRACE(
       "Channel Sim[%zu]: SimdConvertShortToFloat: DoTxUser Length %lld samps "
       "%lld bs ants %lld data size %zu\n",
       local.tid_, fmat_src.n_elem, fmat_src.n_cols, fmat_src.n_rows,
@@ -807,8 +807,8 @@ void ChannelSim::DoTxUser(WorkerThreadStorage& local, size_t tag) {
   }
   channel_->ApplyChan(fmat_src, fmat_noisy, is_downlink, is_new_frame);
 
-  MLPD_TRACE("Noisy dimensions %lld x %lld : %lld\n", fmat_noisy.n_rows,
-             fmat_noisy.n_cols, fmat_noisy.n_elem);
+  AGORA_LOG_TRACE("Noisy dimensions %lld x %lld : %lld\n", fmat_noisy.n_rows,
+                  fmat_noisy.n_cols, fmat_noisy.n_elem);
 
   if (kPrintChannelOutput) {
     Utils::PrintMat(fmat_noisy, "rx_dl");

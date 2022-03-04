@@ -28,7 +28,7 @@ bool PacketTxRxSim::CreateWorker(size_t tid, size_t interface_count,
                                  std::byte* const tx_memory) {
   const size_t num_channels = NumChannels();
 
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "PacketTxRxSim[%zu]: Creating worker handling %zu interfaces starting at "
       "%zu - antennas %zu:%zu\n",
       tid, interface_count, interface_offset, interface_offset * num_channels,

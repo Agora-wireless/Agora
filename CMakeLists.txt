@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 2.8.8)
+#cmake_minimum_required(VERSION 2.8.8)
+cmake_minimum_required(VERSION 3.10)
 include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
 #Allow project version
@@ -72,10 +73,19 @@ message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
 
-find_package(Armadillo)
+find_package(Armadillo REQUIRED)
+
+#if(NOT TARGET spdlog)
+    # Stand-alone build
+#    find_package(spdlog REQUIRED)
+#else()
+add_definitions(-DUSE_SPDLOG=true)
+add_definitions(-DSPDLOG_COMPILED_LIB)
+add_subdirectory(src/third_party/spdlog)
+#endif()
 
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
-set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
+set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'Fsalse'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
@@ -194,6 +204,7 @@ set(SOAPY_LIB ${SoapySDR_LIBRARIES})
 set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
 add_definitions(-DTHREADED_INIT)
 
+
 # Intel MKL
 set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS)
@@ -201,28 +212,28 @@ find_package(BLAS)
 # Console logging level
 if(LOG_LEVEL STREQUAL "none")
   message(STATUS "Logging level = none.")
-  add_definitions(-DMLPD_LOG_LEVEL=0)
+  add_definitions(-DAGORA_LOG_LEVEL=0)
 elseif(LOG_LEVEL STREQUAL "error")
   message(STATUS "Logging level = error.")
-  add_definitions(-DMLPD_LOG_LEVEL=1)
+  add_definitions(-DAGORA_LOG_LEVEL=1)
 elseif(LOG_LEVEL STREQUAL "warn")
   message(STATUS "Logging level = warn.")
-  add_definitions(-DMLPD_LOG_LEVEL=2)
+  add_definitions(-DAGORA_LOG_LEVEL=2)
 elseif(LOG_LEVEL STREQUAL "info")
   message(STATUS "Logging level = info.")
-  add_definitions(-DMLPD_LOG_LEVEL=3)
+  add_definitions(-DAGORA_LOG_LEVEL=3)
 elseif(LOG_LEVEL STREQUAL "frame")
   message(STATUS "Logging level = frame. Warning: Performance will be low.")
-  add_definitions(-DMLPD_LOG_LEVEL=4)
+  add_definitions(-DAGORA_LOG_LEVEL=4)
 elseif(LOG_LEVEL STREQUAL "subframe")
   message(STATUS "Logging level = subframe. Warning: Performance will be low.")
-  add_definitions(-DMLPD_LOG_LEVEL=5)
+  add_definitions(-DAGORA_LOG_LEVEL=5)
 elseif(LOG_LEVEL STREQUAL "trace")
   message(STATUS "Logging level = trace. Warning: Performance will be low.")
-  add_definitions(-DMLPD_LOG_LEVEL=6)
+  add_definitions(-DAGORA_LOG_LEVEL=6)
 else()
   message(STATUS "No logging level specified. Using warning level.")
-  add_definitions(-DMLPD_LOG_LEVEL=2)
+  add_definitions(-DAGORA_LOG_LEVEL=2)
 endif()
 
 include_directories(
@@ -237,7 +248,7 @@ include_directories(
   /usr/include/mkl/
   src/data_generator)
 
-include_directories(SYSTEM src/third_party src/third_party/nlohmann/single_include)
+include_directories(SYSTEM src/third_party src/third_party/spdlog/include src/third_party/nlohmann/single_include)
 
 set(COMMON_SOURCES
   src/agora/stats.cc
@@ -317,7 +328,7 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
 set(COMMON_LIBS armadillo -lnuma ${DPDK_LIBRARIES} ${MKL_LIBS} ${SOAPY_LIB}
-  ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
+    ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest spdlog::spdlog)
 
 # TODO: The main agora executable is performance-critical, so we need to
 # test if compiling against precompiled objects instead of compiling directly

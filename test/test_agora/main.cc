@@ -10,16 +10,16 @@ static void ReadFromFile(const std::string& filename, Table<TableType>& data,
                          size_t element_size) {
   FILE* fp = std::fopen(filename.c_str(), "rb");
   if (fp == nullptr) {
-    MLPD_ERROR("Open file failed: %s, error %s\n", filename.c_str(),
-               strerror(errno));
+    AGORA_LOG_ERROR("Open file failed: %s, error %s\n", filename.c_str(),
+                    strerror(errno));
   } else {
-    MLPD_INFO("Opening file %s\n", filename.c_str());
+    AGORA_LOG_INFO("Opening file %s\n", filename.c_str());
   }
 
   for (size_t i = 0; i < num_reads; i++) {
     size_t elements = std::fread(data[i], element_size, read_elements, fp);
     if (read_elements != elements) {
-      MLPD_ERROR(
+      AGORA_LOG_ERROR(
           "Read file failed: %s, symbol %zu, expect: %zu, actual: %zu "
           "bytes, error %s\n",
           filename.c_str(), i, read_elements, elements, strerror(errno));

@@ -37,15 +37,15 @@ TxRxWorkerHw::~TxRxWorkerHw() = default;
 void TxRxWorkerHw::DoTxRx() {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid_);
 
-  MLPD_INFO("TxRxWorkerHw[%zu] has %zu:%zu total radios %zu\n", tid_,
-            interface_offset_, (interface_offset_ + num_interfaces_) - 1,
-            num_interfaces_);
+  AGORA_LOG_INFO("TxRxWorkerHw[%zu] has %zu:%zu total radios %zu\n", tid_,
+                 interface_offset_, (interface_offset_ + num_interfaces_) - 1,
+                 num_interfaces_);
 
   running_ = true;
   WaitSync();
 
   if (num_interfaces_ == 0) {
-    MLPD_WARN("TxRxWorkerHw[%zu] has no interfaces, exiting\n", tid_);
+    AGORA_LOG_WARN("TxRxWorkerHw[%zu] has no interfaces, exiting\n", tid_);
     running_ = false;
     return;
   }
@@ -58,7 +58,7 @@ void TxRxWorkerHw::DoTxRx() {
 
   TxRxWorkerRx::RxParameters receive_attempt;
   receive_attempt = UpdateRxInterface(receive_attempt);
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "TxRxWorkerHw[%zu]: Starting rx interface id %zu looking for symbol "
       "%zu\n",
       tid_, receive_attempt.interface_, receive_attempt.symbol_);
@@ -69,7 +69,7 @@ void TxRxWorkerHw::DoTxRx() {
 
   // Schedule TX_FRAME_DELTA transmit frames ( B + C + L + D )
   ScheduleTxInit(TX_FRAME_DELTA, time0);
-  MLPD_FRAME("TxRxWorkerHw[%zu]: Tx init\n", tid_);
+  AGORA_LOG_FRAME("TxRxWorkerHw[%zu]: Tx init\n", tid_);
 
   // Agora will generate Tx data only after the first Rx............. (Typically the pilots from the UEs)
   //  The first Rx will happen based on a Hw trigger
@@ -94,7 +94,7 @@ void TxRxWorkerHw::DoTxRx() {
         const size_t rx_symbol_id = pkts.front()->symbol_id_;
 
         if (unlikely(rx_symbol_id != receive_attempt.symbol_)) {
-          MLPD_ERROR(
+          AGORA_LOG_ERROR(
               "TxRxWorkerHw[%zu]: Frame %d - Expected symbol %zu but "
               "received %zu\n",
               tid_, pkts.front()->frame_id_, receive_attempt.symbol_,
@@ -108,7 +108,7 @@ void TxRxWorkerHw::DoTxRx() {
         // Symbol received, change the rx interface
         TxRxWorkerRx::RxParameters successful_receive = receive_attempt;
         receive_attempt = UpdateRxInterface(successful_receive);
-        MLPD_TRACE(
+        AGORA_LOG_TRACE(
             "TxRxWorkerHw[%zu]: Last Interface %zu - symbol %zu:%zu, next "
             "interface %zu - symbol %zu\n",
             tid_, successful_receive.interface_, successful_receive.symbol_,
@@ -154,8 +154,8 @@ std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
     memory_tracking.push_back(&rx);
     ant_ids.at(ch) = ant_id + ch;
     samp.at(ch) = rx.RawPacket()->data_;
-    MLPD_TRACE("TxRxWorkerHw[%zu]: Using Packet at location %zu\n", tid_,
-               reinterpret_cast<size_t>(&rx));
+    AGORA_LOG_TRACE("TxRxWorkerHw[%zu]: Using Packet at location %zu\n", tid_,
+                    reinterpret_cast<size_t>(&rx));
   }
   long long frame_time;
 
@@ -175,13 +175,13 @@ std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
     const size_t symbol_id = global_symbol_id;
 
     if (static_cast<size_t>(rx_status) != Configuration()->SampsPerSymbol()) {
-      MLPD_WARN(
+      AGORA_LOG_WARN(
           "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted "
           "Frame: %zu, Symbol: %zu, RX status = %d is not the expected value\n",
           tid_, interface_id, interface_id + interface_offset_, frame_id,
           symbol_id, rx_status);
     } else {
-      MLPD_FRAME(
+      AGORA_LOG_FRAME(
           "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted "
           "Frame: %zu, Symbol: %zu, RX status = %d\n",
           tid_, interface_id, interface_id + interface_offset_, frame_id,
@@ -220,22 +220,22 @@ std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
       }
     }
   } else if (rx_status < 0) {
-    MLPD_ERROR(
+    AGORA_LOG_ERROR(
         "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
         "status = %d is less than 0\n",
         tid_, interface_id, interface_id + interface_offset_, rx_status);
   }
 
   //Free memory from most recent allocated to latest
-  MLPD_TRACE("TxRxWorkerHw[%zu]: Memory allocation %zu\n", tid_,
-             memory_tracking.size());
+  AGORA_LOG_TRACE("TxRxWorkerHw[%zu]: Memory allocation %zu\n", tid_,
+                  memory_tracking.size());
   for (ssize_t idx = (memory_tracking.size() - 1); idx > -1; idx--) {
     auto* memory_location = memory_tracking.at(idx);
-    MLPD_TRACE("TxRxWorkerHw[%zu]: Checking location %zu\n", tid_,
-               (size_t)memory_location);
+    AGORA_LOG_TRACE("TxRxWorkerHw[%zu]: Checking location %zu\n", tid_,
+                    (size_t)memory_location);
     if (memory_location != nullptr) {
-      MLPD_TRACE("TxRxWorkerHw[%zu]: Returning Packet at location %zu\n", tid_,
-                 (size_t)memory_location);
+      AGORA_LOG_TRACE("TxRxWorkerHw[%zu]: Returning Packet at location %zu\n",
+                      tid_, (size_t)memory_location);
       ReturnRxPacket(*memory_location);
     }
   }
@@ -285,7 +285,7 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
                                             long long time0) {
   const size_t cell_id = Configuration()->CellId().at(radio_id);
 
-  MLPD_FRAME(
+  AGORA_LOG_FRAME(
       "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu,         , Radio "
       "%zu\n",
       tid_, frame_id, radio_id);
@@ -314,7 +314,7 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
         frame_time = ((long long)(frame_id) << 32) | (tx_symbol_id << 16);
       }
 
-      MLPD_SYMBOL(
+      AGORA_LOG_SYMBOL(
           "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
           "%zu, Ant %zu) - transmit ref pilot for uplink recip cal\n",
           tid_, frame_id, tx_symbol_id,
@@ -350,7 +350,7 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
       const size_t calib_radio = calib_antenna / channels_per_interface_;
       const size_t channel_offset = calib_antenna % channels_per_interface_;
 
-      MLPD_FRAME(
+      AGORA_LOG_FRAME(
           "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
           "%zu, Radio %zu) dl pilot tx has data %d on channel %zu\n",
           tid_, frame_id, tx_symbol_id, radio_id, calib_radio == radio_id,
@@ -359,7 +359,7 @@ void TxRxWorkerHw::TxReciprocityCalibPilots(size_t frame_id, size_t radio_id,
       if (calib_radio == radio_id) {
         caldltxbuf.at(channel_offset) = Configuration()->PilotCi16().data();
 
-        MLPD_SYMBOL(
+        AGORA_LOG_SYMBOL(
             "TxRxWorkerHw[%zu]: TxReciprocityCalibPilots (Frame %zu, Symbol "
             "%zu, Ant %zu) - transmit pilot for downlink recip cal\n",
             tid_, frame_id, tx_symbol_id,
@@ -407,7 +407,7 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
     const size_t radio_id = ant_id / channels_per_interface_;
     const size_t tx_frame_id = (frame_id + TX_FRAME_DELTA);
 
-    MLPD_TRACE(
+    AGORA_LOG_TRACE(
         "TxRxWorkerHw[%zu]: (Frame %zu, Symbol %zu, Ant %zu) - Transmit ready "
         "for radio %zu [%zu:%zu]\n",
         tid_, frame_id, symbol_id, ant_id, radio_id, interface_offset_,
@@ -426,7 +426,7 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
 
     // All antenna data is ready to tx for a given symbol, if last then TX out the data
     if (last_antenna) {
-      MLPD_TRACE(
+      AGORA_LOG_TRACE(
           "TxRxWorkerHw[%zu]: (Frame %zu, Symbol %zu) last tx antenna %zu "
           "for radio %zu has tx data for all antennas / channels\n",
           tid_, frame_id, symbol_id, ant_id, radio_id);
@@ -604,7 +604,7 @@ void TxRxWorkerHw::PrintRxSymbolTiming(
             (rx_times.at(i).end_ticks_ - rx_times.at(i).start_ticks_),
             freq_ghz_);
         total_symbol_rx_time += rx_us.at(i);
-        MLPD_TRACE(
+        AGORA_LOG_TRACE(
             "TxRxWorkerHw[%zu]: Radio %zu Frame %d Symbol %zu Rx "
             "Start uS %f for %f uS\n",
             tid_, i + interface_offset_, pkts.front()->frame_id_,
@@ -638,15 +638,15 @@ void TxRxWorkerHw::PrintRxSymbolTiming(
                          << " rx time us " << rx_us.at(i);
         }
       }
-      MLPD_INFO("%s\n", result_message.str().c_str());
+      AGORA_LOG_INFO("%s\n", result_message.str().c_str());
     }
 
     //Frame RX complete -- print summary
     if (current_symbol > next_symbol) {
-      MLPD_INFO("TxRxWorkerHw[%zu]: Frame %zu rx complete @ %.2f\n", tid_,
-                current_frame,
-                GetTime::CyclesToUs(GetTime::Rdtsc() - program_start_ticks_,
-                                    freq_ghz_));
+      AGORA_LOG_INFO("TxRxWorkerHw[%zu]: Frame %zu rx complete @ %.2f\n", tid_,
+                     current_frame,
+                     GetTime::CyclesToUs(
+                         GetTime::Rdtsc() - program_start_ticks_, freq_ghz_));
     }
   }  //  if (kSymbolTimingEnabled)
 }
@@ -762,8 +762,9 @@ void TxRxWorkerHw::ScheduleTxInit(size_t frames_to_schedule, long long time0) {
   for (size_t frame = 0; frame < frames_to_schedule; frame++) {
     for (size_t radio = interface_offset_;
          radio < (interface_offset_ + num_interfaces_); radio++) {
-      MLPD_TRACE("TxRxWorkerHw[%zu]: Scheduling frame %zu on interface %zu\n",
-                 tid_, frame, radio);
+      AGORA_LOG_TRACE(
+          "TxRxWorkerHw[%zu]: Scheduling frame %zu on interface %zu\n", tid_,
+          frame, radio);
       if (Configuration()->HwFramer() == false) {
         TxBeaconHw(frame, radio, time0);
       }
@@ -780,7 +781,7 @@ void TxRxWorkerHw::ScheduleTxInit(size_t frames_to_schedule, long long time0) {
 // All DL symbols
 void TxRxWorkerHw::TxDownlinkZeros(size_t frame_id, size_t radio_id,
                                    long long time0) {
-  MLPD_FRAME(
+  AGORA_LOG_FRAME(
       "TxRxWorkerHw[%zu]: TxDownlinkZeros frame %zu, interface %zu, time "
       "%lld\n",
       tid_, frame_id, radio_id, time0);
@@ -793,7 +794,7 @@ void TxRxWorkerHw::TxDownlinkZeros(size_t frame_id, size_t radio_id,
     const size_t tx_symbol_id =
         Configuration()->Frame().GetDLSymbol(dl_sym_idx);
 
-    MLPD_TRACE(
+    AGORA_LOG_TRACE(
         "TxRxWorkerHw[%zu]: TxDownlinkZeros frame %zu, symbol %zu:%zu, "
         "interface %zu, time %lld\n",
         tid_, frame_id, dl_sym_idx, tx_symbol_id, radio_id, time0);

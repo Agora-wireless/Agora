@@ -200,7 +200,7 @@ EventData DoFFT::Launch(size_t tag) {
     // for consistency with calib downlink processing.
     const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, ant_id);
     if (cal_index != SIZE_MAX) {
-      MLPD_TRACE(
+      AGORA_LOG_TRACE(
           "DoFFT[%d]: (Frame %zu, Symbol %zu, Ant %zu) - Received a CalUl "
           "symbol for current cal index %zu\n",
           tid_, frame_id, symbol_id, ant_id, cal_index);
@@ -219,7 +219,7 @@ EventData DoFFT::Launch(size_t tag) {
       const size_t pilot_tx_ant = cfg_->RecipCalDlAnt(frame_id, symbol_id);
       const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, pilot_tx_ant);
 
-      MLPD_TRACE(
+      AGORA_LOG_TRACE(
           "DoFFT[%d]: (Frame %zu, Symbol %zu, Ant %zu) - Received a CalDL "
           "symbol for current cal index %zu\n",
           tid_, frame_id, symbol_id, pilot_tx_ant, cal_index);

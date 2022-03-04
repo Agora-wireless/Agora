@@ -91,7 +91,7 @@ Agora::Agora(Config* const cfg)
   // Create worker threads
   CreateThreads();
 
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
       "cores %zu--%zu\n",
       cfg->CoreOffset(), cfg->CoreOffset() + 1,
@@ -106,7 +106,7 @@ Agora::~Agora() {
   }
 
   for (auto& worker_thread : workers_) {
-    MLPD_SYMBOL("Agora: Joining worker thread\n");
+    AGORA_LOG_SYMBOL("Agora: Joining worker thread\n");
     worker_thread.join();
   }
   FreeUplinkBuffers();
@@ -118,7 +118,7 @@ Agora::~Agora() {
 }
 
 void Agora::Stop() {
-  MLPD_INFO("Agora: terminating\n");
+  AGORA_LOG_INFO("Agora: terminating\n");
   config_->Running(false);
   usleep(1000);
   packet_tx_rx_.reset();
@@ -199,7 +199,7 @@ void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
         gen_tag_t::FrmSymAnt(frame_id, symbol_id, antenna).tag_;
     worker_events.at(enqueue_worker_id).push_back(tx_data);
 
-    MLPD_TRACE(
+    AGORA_LOG_TRACE(
         "ScheduleAntennasTX: (Frame %zu, Symbol %zu, Ant %zu) - tx event added "
         "to worker %zu : %zu\n",
         frame_id, symbol_id, antenna, enqueue_worker_id, worker_events.size());
@@ -209,7 +209,7 @@ void Agora::ScheduleAntennasTX(size_t frame_id, size_t symbol_id) {
   size_t enqueue_worker_id = 0;
   for (const auto& worker : worker_events) {
     if (!worker.empty()) {
-      MLPD_TRACE(
+      AGORA_LOG_TRACE(
           "ScheduleAntennasTX: (Frame %zu, Symbol %zu) - adding %zu "
           "event(s) to worker %zu transmit queue\n",
           frame_id, symbol_id, worker.size(), enqueue_worker_id);
@@ -367,7 +367,7 @@ void Agora::Start() {
           Packet* pkt = rx_tag_t(event.tags_[0]).rx_packet_->RawPacket();
 
           if (pkt->frame_id_ >= ((this->cur_sche_frame_id_ + kFrameWnd))) {
-            MLPD_ERROR(
+            AGORA_LOG_ERROR(
                 "Error: Received packet for future frame %u beyond "
                 "frame window (= %zu + %zu). This can happen if "
                 "Agora is running slowly, e.g., in debug mode\n",
@@ -532,9 +532,9 @@ void Agora::Start() {
                               [radio_buf_id * config_->MacBytesNumPerframe(
                                                   Direction::kDownlink)]);
 
-          MLPD_INFO("Agora: frame %d @ offset %zu %zu @ location %zu\n",
-                    pkt->Frame(), ue_id, radio_buf_id,
-                    reinterpret_cast<intptr_t>(pkt));
+          AGORA_LOG_INFO("Agora: frame %d @ offset %zu %zu @ location %zu\n",
+                         pkt->Frame(), ue_id, radio_buf_id,
+                         reinterpret_cast<intptr_t>(pkt));
 
           if (kDebugPrintPacketsFromMac) {
             std::stringstream ss;
@@ -716,7 +716,7 @@ void Agora::Start() {
               const int samples_num_per_ue =
                   cfg->OfdmDataNum() * tx_counters_.MaxSymbolCount() * 1000;
 
-              MLPD_INFO(
+              AGORA_LOG_INFO(
                   "TX %d samples (per-client) to %zu clients in %f secs, "
                   "throughtput %f bps per-client (16QAM), current tx queue "
                   "length %zu\n",
@@ -730,7 +730,7 @@ void Agora::Start() {
           }
         } break;
         default:
-          MLPD_ERROR("Wrong event type in message queue!");
+          AGORA_LOG_ERROR("Wrong event type in message queue!");
           std::exit(0);
       } /* End of switch */
 
@@ -775,7 +775,7 @@ void Agora::Start() {
   }   /* End of while */
 
 finish:
-  MLPD_INFO("Agora: printing stats and saving to file\n");
+  AGORA_LOG_INFO("Agora: printing stats and saving to file\n");
   this->stats_->PrintSummary();
   this->stats_->SaveToFile();
   if (flags_.enable_save_decode_data_to_file_ == true) {
@@ -961,7 +961,7 @@ void Agora::Worker(int tid) {
       empty_queue = true;
     }
   }
-  MLPD_SYMBOL("Agora worker %d exit\n", tid);
+  AGORA_LOG_SYMBOL("Agora worker %d exit\n", tid);
 }
 
 void Agora::WorkerFft(int tid) {
@@ -1079,7 +1079,7 @@ void Agora::CreateThreads() {
       workers_.emplace_back(&Agora::WorkerDecode, this, i);
     }
   } else {
-    MLPD_SYMBOL("Agora: creating %zu workers\n", cfg->WorkerThreadNum());
+    AGORA_LOG_SYMBOL("Agora: creating %zu workers\n", cfg->WorkerThreadNum());
     for (size_t i = 0; i < cfg->WorkerThreadNum(); i++) {
       workers_.emplace_back(&Agora::Worker, this, i);
     }
@@ -1663,7 +1663,7 @@ void Agora::CheckIncrementScheduleFrame(size_t frame_id,
 bool Agora::CheckFrameComplete(size_t frame_id) {
   bool finished = false;
 
-  MLPD_TRACE(
+  AGORA_LOG_TRACE(
       "Checking work complete %zu, ifft %d, tx %d, decode %d, tomac %d, tx "
       "%d\n",
       frame_id, static_cast<int>(this->ifft_counters_.IsLastSymbol(frame_id)),

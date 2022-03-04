@@ -8,6 +8,9 @@
 #include "gflags/gflags.h"
 #include "phy-ue.h"
 #include "signal_handler.h"
+#include "spdlog/fmt/bundled/printf.h"  // support for printf-style
+#include "spdlog/pattern_formatter.h"
+#include "spdlog/spdlog.h"
 #include "version_config.h"
 
 DEFINE_string(conf_file,
@@ -18,6 +21,11 @@ int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");
   gflags::SetVersionString(GetAgoraProjectVersion());
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+  auto f = std::make_unique<spdlog::pattern_formatter>(
+      spdlog::pattern_time_type::utc, std::string(""));  // disable eol
+  f->set_pattern("[%f][%^%l%$] %v");
+  spdlog::set_formatter(std::move(f));
 
   std::string filename;
   // For backwards compatibility
@@ -46,5 +54,6 @@ int main(int argc, char* argv[]) {
 
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
+  spdlog::shutdown();
   return ret;
 }
