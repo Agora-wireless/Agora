@@ -64,7 +64,7 @@ DySubcarrier::~DySubcarrier()
 void DySubcarrier::StartWork()
 {
     const size_t n_demul_tasks_reqd
-        = ceil_divide(sc_range_.end - sc_range_.start, cfg_->demul_block_size);
+        = ceil_divide(sc_range_.end - sc_range_.start / 8 * 8, cfg_->demul_block_size);
     
     printf("Range [%zu:%zu] starts to work\n", sc_range_.start, sc_range_.end);
 
@@ -104,12 +104,13 @@ void DySubcarrier::StartWork()
                 work_start_tsc = rdtsc();
                 worked = 1;
 
-                if (shared_state_->is_zf_done(demul_cur_frame_, (sc_range_.start + (n_demul_tasks_done_ * cfg_->demul_block_size)) / cfg_->zf_block_size)) {
+                if (shared_state_->is_zf_done(demul_cur_frame_, (sc_range_.start / 8 * 8 + (n_demul_tasks_done_ * cfg_->demul_block_size)) / cfg_->zf_block_size)) {
                     size_t demod_start_tsc = rdtsc();
+                    size_t base_sc_id = sc_range_.start / 8 * 8 + (n_precode_tasks_done_ * cfg_->demul_block_size);
+                    base_sc_id = std::max(base_sc_id, sc_range_.start);
                     do_demul_->Launch(demul_cur_frame_,
                         demul_cur_sym_ul_,
-                        sc_range_.start
-                            + (n_demul_tasks_done_ * cfg_->demul_block_size));
+                        base_sc_id);
                     TRIGGER_TIMER({
                         size_t demod_tmp_tsc = rdtsc() - demod_start_tsc;
                         demod_tsc_duration += demod_tmp_tsc;
@@ -504,7 +505,7 @@ void DySubcarrier::StartWorkCentral() {
 
 void DySubcarrier::StartWorkDownlink() {
     const size_t n_precode_tasks_reqd
-        = ceil_divide(sc_range_.end - sc_range_.start, cfg_->demul_block_size);
+        = ceil_divide(sc_range_.end - sc_range_.start / 8 * 8, cfg_->demul_block_size);
     
     printf("Range [%zu:%zu] starts to work (downlink mode)\n", sc_range_.start, sc_range_.end);
 
@@ -544,15 +545,17 @@ void DySubcarrier::StartWorkDownlink() {
                 work_start_tsc = rdtsc();
                 worked = 1;
 
-                if (shared_state_->is_zf_done(precode_cur_frame_, (sc_range_.start + (n_precode_tasks_done_ * cfg_->demul_block_size)) / cfg_->zf_block_size)) {
+                if (shared_state_->is_zf_done(precode_cur_frame_, (sc_range_.start / 8 * 8 + (n_precode_tasks_done_ * cfg_->demul_block_size)) / cfg_->zf_block_size)) {
                     size_t precode_start_tsc = rdtsc();
-                    // printf("Start to precode frame %zu symbol %zu sc %zu\n", precode_cur_frame_, precode_cur_sym_dl_, 
+                    size_t base_sc_id = sc_range_.start / 8 * 8 + (n_precode_tasks_done_ * cfg_->demul_block_size);
+                    base_sc_id = std::max(base_sc_id, sc_range_.start);
+                    // do_precode_->Launch(precode_cur_frame_,
+                    //     precode_cur_sym_dl_,
                     //     sc_range_.start
                     //         + (n_precode_tasks_done_ * cfg_->demul_block_size));
                     do_precode_->Launch(precode_cur_frame_,
                         precode_cur_sym_dl_,
-                        sc_range_.start
-                            + (n_precode_tasks_done_ * cfg_->demul_block_size));
+                        base_sc_id);
                     TRIGGER_TIMER({
                         size_t precode_tmp_tsc = rdtsc() - precode_start_tsc;
                         precode_tsc_duration += precode_tmp_tsc;

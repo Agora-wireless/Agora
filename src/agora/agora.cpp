@@ -364,7 +364,7 @@ void* Agora::fftWorker(int tid)
 void* Agora::subcarrierWorker(int tid)
 {
     if (config_->use_hyperthreading) {
-        pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, base_worker_core_offset_, tid + do_fft_threads_.size()
+        pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, base_worker_core_offset_, tid + do_fft_threads_.size(),
             true, true, config_->phy_core_num);
     } else {
         pin_to_core_with_offset(

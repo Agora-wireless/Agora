@@ -67,13 +67,18 @@ void DyDemul::Launch(
     }
 
     size_t max_sc_ite;
-    // max_sc_ite = std::min(cfg_->demul_block_size, cfg_->subcarrier_end - base_sc_id);
     max_sc_ite = std::min(cfg_->demul_block_size, 
         std::min(cfg_->subcarrier_start + (tid_ + 1) * cfg_->subcarrier_block_size, cfg_->subcarrier_end) - base_sc_id);
-    assert(max_sc_ite % kSCsPerCacheline == 0);
+    // assert(max_sc_ite % kSCsPerCacheline == 0);
+
+    size_t pre_sc_off = 0;
+    if (base_sc_id % kSCsPerCacheline > 0) {
+        pre_sc_off = kSCsPerCacheline - base_sc_id % kSCsPerCacheline;
+    }
 
     complex_float tmp[kSCsPerCacheline];
-    for (size_t i = 0; i < max_sc_ite; i += kSCsPerCacheline) {
+    if (pre_sc_off > 0) {
+        size_t sc_chunk_size = pre_sc_off;
         for (size_t j = 0; j < cfg_->BS_ANT_NUM; j++) {
             float* src;
             src = reinterpret_cast<float*>(freq_domain_iq_buffer_[j]
@@ -81,12 +86,31 @@ void DyDemul::Launch(
                 + (symbol_idx_ul + cfg_->pilot_symbol_num_perframe)
                     * cfg_->packet_length
                 + Packet::kOffsetOfData
-                + 2 * sizeof(short) * (i + base_sc_id + cfg_->OFDM_DATA_START));
+                + 2 * sizeof(short) * (base_sc_id / kSCsPerCacheline * kSCsPerCacheline + cfg_->OFDM_DATA_START));
             simd_convert_float16_to_float32(
                 reinterpret_cast<float*>(tmp), src, kSCsPerCacheline * 2);
-            for (size_t t = 0; t < kSCsPerCacheline; t++) {
+            for (size_t t = 0; t < sc_chunk_size; t++) {
                 complex_float* dst = data_gather_buffer_
-                    + (base_sc_id + i + t) * cfg_->BS_ANT_NUM + j;
+                    + (base_sc_id + t) * cfg_->BS_ANT_NUM + j;
+                *dst = tmp[t + base_sc_id % kSCsPerCacheline];
+            }
+        }
+    }
+    for (size_t i = 0; i < max_sc_ite - pre_sc_off; i += kSCsPerCacheline) {
+        size_t sc_chunk_size = std::min(kSCsPerCacheline, max_sc_ite - pre_sc_off - i);
+        for (size_t j = 0; j < cfg_->BS_ANT_NUM; j++) {
+            float* src;
+            src = reinterpret_cast<float*>(freq_domain_iq_buffer_[j]
+                + frame_slot * (cfg_->symbol_num_perframe * cfg_->packet_length)
+                + (symbol_idx_ul + cfg_->pilot_symbol_num_perframe)
+                    * cfg_->packet_length
+                + Packet::kOffsetOfData
+                + 2 * sizeof(short) * (i + base_sc_id + pre_sc_off + cfg_->OFDM_DATA_START));
+            simd_convert_float16_to_float32(
+                reinterpret_cast<float*>(tmp), src, kSCsPerCacheline * 2);
+            for (size_t t = 0; t < sc_chunk_size; t++) {
+                complex_float* dst = data_gather_buffer_
+                    + (base_sc_id + i + pre_sc_off + t) * cfg_->BS_ANT_NUM + j;
                 *dst = tmp[t];
             }
         }
@@ -140,37 +164,67 @@ void DyDemul::Launch(
     __m256i index2 = _mm256_setr_epi32(0, 1, cfg_->UE_NUM * 2,
         cfg_->UE_NUM * 2 + 1, cfg_->UE_NUM * 4, cfg_->UE_NUM * 4 + 1,
         cfg_->UE_NUM * 6, cfg_->UE_NUM * 6 + 1);
-    float* equal_T_ptr = (float*)(equaled_buffer_temp_transposed_);
+    size_t kNumDoubleInSIMD256 = sizeof(__m256) / sizeof(double); // == 4
+    float* equal_T_ptr = (float*)(equaled_buffer_temp_transposed_) + (base_sc_id % kSCsPerCacheline) * 2;
 
     std::vector<ControlInfo>& info_list = control_info_table_[control_idx_list_[frame_id]];
     for (size_t i = 0; i < info_list.size(); i ++) {
+        equal_T_ptr = (float*)(equaled_buffer_temp_transposed_) + (base_sc_id % kSCsPerCacheline) * 2;
         ControlInfo& info = info_list[i];
         float* equal_ptr = nullptr;
         if (kExportConstellation) {
             equal_ptr = (float*)(&equal_buffer_[total_data_symbol_idx_ul]
-                                               [base_sc_id * cfg_->UE_NUM + i]);
+                                               [base_sc_id * cfg_->UE_NUM + info.ue_id]);
         } else {
-            equal_ptr = (float*)(equaled_buffer_temp_ + i);
+            equal_ptr = (float*)(equaled_buffer_temp_ + info.ue_id);
         }
-        size_t kNumDoubleInSIMD256 = sizeof(__m256) / sizeof(double); // == 4
-        for (size_t j = 0; j < max_sc_ite / kNumDoubleInSIMD256; j++) {
-            if (info.sc_start <= j + base_sc_id && info.sc_end > j + base_sc_id) {
+        if (pre_sc_off > 0) {
+            for (size_t j = 0; j < pre_sc_off; j ++) {
+                memcpy(equal_T_ptr + j * 2, 
+                    equal_ptr + j * 2 * cfg_->UE_NUM + info.ue_id * 2,
+                    2 * sizeof(float));
+            }
+        }
+        // if (base_sc_id == 210) {
+        //     printf("Demul: equal ptr %p->%p, pre sc off %zu, origin %p\n", equal_T_ptr, 
+        //         equal_T_ptr + pre_sc_off * 2, pre_sc_off, equaled_buffer_temp_transposed_);
+        // }
+        equal_T_ptr += pre_sc_off * 2;     
+        equal_ptr += cfg_->UE_NUM * pre_sc_off * 2;
+        for (size_t j = 0; j < (max_sc_ite - pre_sc_off) / kNumDoubleInSIMD256; j++) {
+            if (info.sc_start <= j * kNumDoubleInSIMD256 + base_sc_id + pre_sc_off && 
+                info.sc_end > j * kNumDoubleInSIMD256 + base_sc_id + pre_sc_off) {
                 __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
                 _mm256_store_ps(equal_T_ptr, equal_T_temp);
             }
             equal_T_ptr += 8;
             equal_ptr += cfg_->UE_NUM * kNumDoubleInSIMD256 * 2;
         }
-        equal_T_ptr = (float*)(equaled_buffer_temp_transposed_);
+        if ((max_sc_ite - pre_sc_off) % kNumDoubleInSIMD256 > 0) {
+            for (size_t j = 0; j < (max_sc_ite - pre_sc_off) % kNumDoubleInSIMD256; j ++) {
+                memcpy(equal_T_ptr + j * 2, equal_ptr + cfg_->UE_NUM * j * 2, 2 * sizeof(float));
+            }
+        }
+        equal_T_ptr = (float*)(equaled_buffer_temp_transposed_) + (base_sc_id % kSCsPerCacheline) * 2;
 
         int8_t* demul_ptr = demod_buffer_to_send_[frame_slot][symbol_idx_ul][i]
             + (cfg_->mod_order_bits * base_sc_id);
 
         switch (cfg_->mod_order_bits) {
         case (CommsLib::QAM16):
+            if (pre_sc_off > 0) {
+                demod_16qam_hard_loop(equal_T_ptr, (uint8_t*)demul_ptr, pre_sc_off);
+                equal_T_ptr += pre_sc_off * 2;
+                demul_ptr += cfg_->mod_order_bits * pre_sc_off;
+            }
             demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
             break;
         case (CommsLib::QAM64):
+            if (pre_sc_off > 0) {
+                demod_64qam_hard_loop(equal_T_ptr, (uint8_t*)demul_ptr, pre_sc_off);
+                equal_T_ptr += pre_sc_off * 2;
+                demul_ptr += cfg_->mod_order_bits * pre_sc_off;
+            }
             demod_64qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
             break;
         default:

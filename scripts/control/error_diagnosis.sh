@@ -1,5 +1,7 @@
 #! /bin/bash
 
+echocyan "Begin to diagnose the output from each Hydra app"
+
 for (( i=0; i<${hydra_rru_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
     log_fn="/tmp/hydra/log_${server_name}.txt"

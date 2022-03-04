@@ -91,11 +91,11 @@ fi
 # * Each item should be larger than 0
 for (( i=0; i<${hydra_app_num}; i++ )) do
   sc_block_cur=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.subcarrier_block_list[$i]')
-  sc_ue_mol=$(( ${sc_block_cur}%8 ))
-  if [ "${sc_ue_mol}" -ne "0" ]; then
-    echored "ERROR: subcarrier_block_list[$i] % 8 != 0"
-    exit
-  fi
+  # sc_ue_mol=$(( ${sc_block_cur}%8 ))
+  # if [ "${sc_ue_mol}" -ne "0" ]; then
+  #   echored "ERROR: subcarrier_block_list[$i] % 8 != 0"
+  #   exit
+  # fi
   if [ "${sc_block_cur}" == "0" ]; then
     echored "ERROR: subcarrier_block_list[$i] == 0"
     exit
