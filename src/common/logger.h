@@ -110,7 +110,8 @@ constexpr size_t kLogThreadCount = 1;
   auto f = std::make_unique<spdlog::pattern_formatter>(                        \
       spdlog::pattern_time_type::utc, std::string(""));                        \
   f->set_pattern("[%S:%f][%^%L%$] %v");                                        \
-  spdlog::set_formatter(std::move(f));
+  spdlog::set_formatter(std::move(f));                                         \
+  spdlog::set_level(SPDLOG_LEVEL);
 
 #define AGORA_LOG_SHUTDOWN() spdlog::shutdown();
 
@@ -133,13 +134,13 @@ constexpr size_t kLogThreadCount = 1;
 #endif
 
 #if AGORA_LOG_LEVEL >= AGORA_LOG_LEVEL_FRAME
-#define AGORA_LOG_FRAME(...) spdlog::trace(fmt::sprintf(__VA_ARGS__));
+#define AGORA_LOG_FRAME(...) spdlog::debug(fmt::sprintf(__VA_ARGS__));
 #else
 #define AGORA_LOG_FRAME(...) ((void)0)
 #endif
 
 #if AGORA_LOG_LEVEL >= AGORA_LOG_LEVEL_SYMBOL
-#define AGORA_LOG_SYMBOL(...) spdlog::trace(fmt::sprintf(__VA_ARGS__));
+#define AGORA_LOG_SYMBOL(...) spdlog::debug(fmt::sprintf(__VA_ARGS__));
 #else
 #define AGORA_LOG_SYMBOL(...) ((void)0)
 #endif
