@@ -1,4 +1,3 @@
-#cmake_minimum_required(VERSION 2.8.8)
 cmake_minimum_required(VERSION 3.10)
 include(CheckCSourceRuns)
 cmake_policy(SET CMP0054 NEW)
@@ -45,11 +44,13 @@ else()
   set(CMAKE_CXX_STANDARD 17)
 endif()
 
-# Unit tests
-enable_testing()
-find_package(GTest REQUIRED)
-
 option(DEBUG "Enable debugging" OFF)
+
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+  message(STATUS "Enabling debug mode due to build type")
+  set(DEBUG ON)
+endif()
+
 if(NOT DEBUG)
   message(STATUS "Debugging is disabled")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG")
@@ -69,10 +70,9 @@ endif()
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
-find_package(Armadillo REQUIRED)
 
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
-set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'Fsalse'")
+set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'False'")
 set(ENABLE_MAC False CACHE STRING "ENABLE_MAC defaulting to 'False'")
 set(LOG_LEVEL "info" CACHE STRING "Console logging level (none/error/warn/info/frame/subframe/trace)") 
 set(USE_MLX_NIC True CACHE STRING "USE_MLX_NIC defaulting to 'True'")
@@ -177,6 +177,9 @@ elseif(${USE_UHD})
   add_definitions(-DUSE_UHD)
 endif()
 
+#External Libraries
+find_package(Armadillo)
+
 find_package(SoapySDR "0.7" CONFIG)
 if(NOT SoapySDR_FOUND)
   message(FATAL_ERROR "SoapySDR development files not found")
@@ -190,7 +193,6 @@ include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
 set(SOAPY_LIB ${SoapySDR_LIBRARIES})
 set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
 add_definitions(-DTHREADED_INIT)
-
 
 # Intel MKL
 set(BLA_VENDOR Intel10_64lp)
@@ -258,6 +260,13 @@ else()
   message(STATUS "No logging level specified. Using warning level.")
   add_definitions(-DAGORA_LOG_LEVEL=2)
 endif()
+
+find_package(gflags REQUIRED)
+message(STATUS "gflags include directory found: ${GFLAGS_INCLUDE_DIR}")
+
+# Unit tests
+enable_testing()
+find_package(GTest REQUIRED)
 
 include_directories(
   src/common/
@@ -434,7 +443,7 @@ endforeach()
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
-  test_ptr_grid test_avx512_complex_mul test_scrambler
+  test_ptr_grid test_recipcal test_avx512_complex_mul test_scrambler
   test_256qam_demod)
 
 foreach(test_name IN LISTS UNIT_TESTS)
