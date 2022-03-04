@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
   int ret = EXIT_FAILURE;
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   gflags::SetVersionString(GetAgoraProjectVersion());
-  AGORA_LOG_INIT()
+  AGORA_LOG_INIT();
   std::printf("Base Station configuration\n");
   auto config = std::make_unique<Config>(FLAGS_conf_file);
   {
@@ -49,6 +49,6 @@ int main(int argc, char* argv[]) {
   std::printf("Channel Simulator Exit\n");
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
-  AGORA_LOG_SHUTDOWN()
+  AGORA_LOG_SHUTDOWN();
   return ret;
 }

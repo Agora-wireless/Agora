@@ -605,10 +605,9 @@ void TxRxWorkerHw::PrintRxSymbolTiming(
             freq_ghz_);
         total_symbol_rx_time += rx_us.at(i);
         AGORA_LOG_TRACE(
-            "TxRxWorkerHw[%zu]: Radio %zu Frame %d Symbol %zu Rx "
+            "TxRxWorkerHw[%zu]: Radio %zu Frame %zu Symbol %zu Rx "
             "Start uS %f for %f uS\n",
-            tid_, i + interface_offset_, pkts.front()->frame_id_,
-            successful_receive.symbol_,
+            tid_, i + interface_offset_, current_frame, current_symbol,
             GetTime::CyclesToUs(rx_times.at(i).start_ticks_, freq_ghz_),
             rx_us.at(i));
 

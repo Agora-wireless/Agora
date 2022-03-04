@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
   gflags::SetVersionString(GetAgoraProjectVersion());
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  AGORA_LOG_INIT()
+  AGORA_LOG_INIT();
 
   std::string filename;
   // For backwards compatibility
@@ -49,6 +49,6 @@ int main(int argc, char* argv[]) {
 
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
-  AGORA_LOG_SHUTDOWN()
+  AGORA_LOG_SHUTDOWN();
   return ret;
 }

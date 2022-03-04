@@ -21,21 +21,19 @@
 #define AGORA_LOG_DEFAULT_STREAM (stdout)
 #define AGORA_LOG_STREAM (AGORA_LOG_DEFAULT_STREAM)
 
-// If AGORA_LOG_LEVEL is not defined, default to the highest level so that
-// Log messages with "FRAME" or higher verbosity get written to
-// mlpd_trace_file_or_default_stream. This can be stdout for basic debugging, or
-// a file named "trace_file" for more involved debugging.
-
-//#define mlpd_trace_file_or_default_stream trace_file
-//#define mlpd_trace_file_or_default_stream (MLPD_LOG_DEFAULT_STREAM)
-
 #if !defined(USE_SPDLOG)
 
 #include <ctime>
 #include <string>
 
-#define AGORA_LOG_INIT() ((void)0)
-#define AGORA_LOG_SHUTDOWN() ((void)0)
+// If AGORA_LOG_LEVEL is not defined, default to the highest level so that
+// Log messages with "FRAME" or higher verbosity get written to
+// mlpd_trace_file_or_default_stream. This can be stdout for basic debugging, or
+// a file named "trace_file" for more involved debugging.
+#define Agora_trace_file_or_default_stream (AGORA_LOG_DEFAULT_STREAM)
+
+#define AGORA_LOG_INIT() ((void)0);
+#define AGORA_LOG_SHUTDOWN() ((void)0);
 
 #if AGORA_LOG_LEVEL >= AGORA_LOG_LEVEL_ERROR
 #define AGORA_LOG_ERROR(...)                                             \
@@ -66,30 +64,30 @@
 
 #if AGORA_LOG_LEVEL >= AGORA_LOG_LEVEL_FRAME
 #define AGORA_LOG_FRAME(...)                                     \
-  AgoraOutputLogHeader(AGORA_trace_file_or_default_stream,       \
+  AgoraOutputLogHeader(Agora_trace_file_or_default_stream,       \
                        AGORA_LOG_LEVEL_FRAME);                   \
-  std::fprintf(AGORA_trace_file_or_default_stream, __VA_ARGS__); \
-  std::fflush(AGORA_trace_file_or_default_stream)
+  std::fprintf(Agora_trace_file_or_default_stream, __VA_ARGS__); \
+  std::fflush(Agora_trace_file_or_default_stream)
 #else
 #define AGORA_LOG_FRAME(...) ((void)0)
 #endif
 
 #if AGORA_LOG_LEVEL >= AGORA_LOG_LEVEL_SYMBOL
 #define AGORA_LOG_SYMBOL(...)                                    \
-  AgoraOutputLogHeader(AGORA_trace_file_or_default_stream,       \
+  AgoraOutputLogHeader(Agora_trace_file_or_default_stream,       \
                        AGORA_LOG_LEVEL_SYMBOL);                  \
-  std::fprintf(AGORA_trace_file_or_default_stream, __VA_ARGS__); \
-  std::fflush(AGORA_trace_file_or_default_stream)
+  std::fprintf(Agora_trace_file_or_default_stream, __VA_ARGS__); \
+  std::fflush(Agora_trace_file_or_default_stream)
 #else
 #define AGORA_LOG_SYMBOL(...) ((void)0)
 #endif
 
 #if AGORA_LOG_LEVEL >= AGORA_LOG_LEVEL_TRACE
 #define AGORA_LOG_TRACE(...)                                     \
-  AgoraOutputLogHeader(AGORA_trace_file_or_default_stream,       \
+  AgoraOutputLogHeader(Agora_trace_file_or_default_stream,       \
                        AGORA_LOG_LEVEL_TRACE);                   \
-  std::fprintf(AGORA_trace_file_or_default_stream, __VA_ARGS__); \
-  std::fflush(AGORA_trace_file_or_default_stream)
+  std::fprintf(Agora_trace_file_or_default_stream, __VA_ARGS__); \
+  std::fflush(Agora_trace_file_or_default_stream)
 #else
 #define AGORA_LOG_TRACE(...) ((void)0)
 #endif

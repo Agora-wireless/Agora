@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = FLAGS_conf_file;
   std::string data_filename = FLAGS_data_file;
-  AGORA_LOG_INIT()
+  AGORA_LOG_INIT();
 
   auto* frame_start = new double[kNumStatsFrames];
   auto* frame_end = new double[kNumStatsFrames];
@@ -153,6 +153,6 @@ int main(int argc, char* argv[]) {
   std::printf("Mac basestation application terminated!\n");
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
-  AGORA_LOG_SHUTDOWN()
+  AGORA_LOG_SHUTDOWN();
   return ret;
 }

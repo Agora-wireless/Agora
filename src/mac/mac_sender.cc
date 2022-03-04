@@ -375,10 +375,9 @@ void* MacSender::WorkerThread(size_t tid) {
 
           AGORA_LOG_TRACE(
               "MacSender[%zu] sending frame %d:%d, packet %zu, symbol %d, size "
-              "%zu:%zu\n",
-              tid, tx_packet->frame_id_, tag.frame_id_, packet,
-              tx_packet->symbol_id_, mac_packet_tx_size,
-              mac_packet_storage_size);
+              "%zu\n",
+              tid, tx_packet->Frame(), tag.frame_id_, packet,
+              tx_packet->Symbol(), mac_packet_tx_size);
 
           udp_client.Send(server_address_, server_rx_port_,
                           reinterpret_cast<const uint8_t*>(tx_packet),

@@ -101,7 +101,7 @@ void PhyStats::PrintPhyStats() {
       AGORA_LOG_INFO(
           "UE %zu: %s bit errors (BER) %zu/%zu (%f), block errors (BLER) "
           "%zu/%zu (%f)\n",
-          ue_id, tx_type, total_bit_errors, total_decoded_bits,
+          ue_id, tx_type.c_str(), total_bit_errors, total_decoded_bits,
           static_cast<float>(total_bit_errors) /
               static_cast<float>(total_decoded_bits),
           total_block_errors, total_decoded_blocks,

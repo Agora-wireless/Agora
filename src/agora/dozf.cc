@@ -223,8 +223,8 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id,
         AGORA_LOG_TRACE(
             "DoZF[%d]: (Frame %zu, sc_id %zu), ComputeCalib updating calib at "
             "slot %zu : prev %zu, old %zu\n",
-            tid_, frame_id, sc_id, frame_cal_slot, frame_cal_slot_prev,
-            frame_cal_slot_old);
+            tid_, frame_id, sc_id, cal_slot_complete, cal_slot_prev,
+            cal_slot_old);
       }
 
       // Add new value to old rolling sum.  Then subtract out the oldest.

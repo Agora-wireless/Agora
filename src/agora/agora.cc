@@ -1729,7 +1729,7 @@ bool Agora::CheckFrameComplete(size_t frame_id) {
 
 extern "C" {
 EXPORT Agora* AgoraNew(Config* cfg) {
-  AGORA_LOG_TRACE("Size of Agora: %d\n", sizeof(Agora*));
+  AGORA_LOG_TRACE("Size of Agora: %zu\n", sizeof(Agora*));
   auto* agora = new Agora(cfg);
 
   return agora;

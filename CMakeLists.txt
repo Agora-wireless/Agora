@@ -66,23 +66,10 @@ else()
   #-fsanitize=leak -fsanitize=undefined -fsanitize=null
 endif()
 
-#if(CMAKE_BUILD_TYPE MATCHES Debug)
-
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
-
 message(STATUS "CURRENT DIRECTORY: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DPROJECT_DIRECTORY=${SOURCE_DIR})
-
 find_package(Armadillo REQUIRED)
-
-#if(NOT TARGET spdlog)
-    # Stand-alone build
-#    find_package(spdlog REQUIRED)
-#else()
-add_definitions(-DUSE_SPDLOG=true)
-add_definitions(-DSPDLOG_COMPILED_LIB)
-add_subdirectory(src/third_party/spdlog)
-#endif()
 
 set(USE_DPDK False CACHE STRING "USE_DPDK defaulting to 'False'")
 set(USE_ARGOS False CACHE STRING "USE_ARGOS defaulting to 'Fsalse'")
@@ -209,6 +196,19 @@ add_definitions(-DTHREADED_INIT)
 set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS)
 
+set(USE_SPDLOG True CACHE STRING "USE_SPDLOG defaulting to 'True'")
+message(STATUS "USE_SPDLOG: ${USE_SPDLOG}")
+set(USE_SPDLOG True CACHE STRING "USE_SPDLOG defaulting to 'True'")
+if(USE_SPDLOG)
+  message(STATUS "Using spdlog async logger as the default logger")
+  add_definitions(-DUSE_SPDLOG=true)
+  add_definitions(-DSPDLOG_COMPILED_LIB)
+  add_subdirectory(src/third_party/spdlog)
+  set(COMMON_LIBS spdlog::spdlog)
+else ()
+  message(STATUS "Using agora raw logger")
+endif()
+
 # Console logging level
 if(LOG_LEVEL STREQUAL "none")
   message(STATUS "Logging level = none.")
@@ -327,8 +327,8 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-set(COMMON_LIBS armadillo -lnuma ${DPDK_LIBRARIES} ${MKL_LIBS} ${SOAPY_LIB}
-    ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest spdlog::spdlog)
+set(COMMON_LIBS ${COMMON_LIBS} armadillo -lnuma ${DPDK_LIBRARIES} ${MKL_LIBS} ${SOAPY_LIB}
+    ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
 # TODO: The main agora executable is performance-critical, so we need to
 # test if compiling against precompiled objects instead of compiling directly

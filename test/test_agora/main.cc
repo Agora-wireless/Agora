@@ -174,7 +174,7 @@ int main(int argc, char* argv[]) {
   std::string conf_file;
   gflags::SetUsageMessage("conf_file : set the configuration filename");
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  AGORA_LOG_INIT()
+  AGORA_LOG_INIT();
 
   // For backwards compatibility
   if (argc == 2) {
@@ -232,6 +232,6 @@ int main(int argc, char* argv[]) {
   }
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
-  AGORA_LOG_SHUTDOWN()
+  AGORA_LOG_SHUTDOWN();
   return ret;
 }
