@@ -33,10 +33,10 @@ class PhyStats {
                         complex_float* fft_data);
   void PrintSnrStats(size_t frame_id);
   void PrintDlSnrStats(size_t frame_id, size_t ant_id);
-  void UpdateCalibPilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
+  void UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id, size_t ant_id,
                            complex_float* fft_data);
   void PrintCalibSnrStats(size_t frame_id);
-  void UpdateCsiCond(size_t frame_id, size_t subcarrier_id, float cond);
+  void UpdateCsiCond(size_t frame_id, size_t sc_id, float cond);
   void PrintZfStats(size_t frame_id);
 
  private:

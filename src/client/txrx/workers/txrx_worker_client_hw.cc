@@ -452,8 +452,8 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
   const size_t radio_id = local_interface + interface_offset_;
   ssize_t sync_index = -1;
   long long rx_time = 0;
-  assert(sample_window <=
-         (config->SampsPerSymbol() * config->Frame().NumTotalSyms()));
+  assert(sample_window <= (Configuration()->SampsPerSymbol() *
+                           Configuration()->Frame().NumTotalSyms()));
 
   //\todo add a retry exit.
   while ((Configuration()->Running() == true) && (sync_index < 0)) {
@@ -476,8 +476,8 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
 ssize_t TxRxWorkerClientHw::FindSyncBeacon(std::complex<int16_t>* check_data,
                                            size_t sample_window) {
   ssize_t sync_index = -1;
-  assert(sample_window <=
-         (config->SampsPerSymbol() * config->Frame().NumTotalSyms()));
+  assert(sample_window <= (Configuration()->SampsPerSymbol() *
+                           Configuration()->Frame().NumTotalSyms()));
 
   //Allocate memory, only used for beacon detection
   std::vector<std::complex<float>> sync_compare(
