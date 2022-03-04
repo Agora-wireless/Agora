@@ -265,7 +265,7 @@ void PhyUe::ClearCsi(size_t frame_id) {
 }
 
 void PhyUe::Stop() {
-  std::cout << "PhyUe: Stopping threads " << std::endl;
+  AGORA_LOG_INFO("PhyUe: Stopping threads\n");
   config_->Running(false);
   usleep(1000);
   ru_.reset();
@@ -807,7 +807,7 @@ void PhyUe::Start() {
         } break;
 
         default:
-          std::cout << "Invalid Event Type!" << std::endl;
+          AGORA_LOG_INFO("Invalid Event Type!\n");
           throw std::runtime_error("PhyUe: Invalid Event Type");
       }
     }

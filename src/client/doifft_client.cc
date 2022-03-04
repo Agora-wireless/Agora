@@ -99,7 +99,7 @@ EventData DoIFFTClient::Launch(size_t tag) {
          << " ";
     }
     ss << "];" << std::endl;
-    std::cout << ss.str();
+    AGORA_LOG_INFO(ss.str().c_str());
   }
 
   size_t start_tsc2 = GetTime::WorkerRdtsc();
@@ -123,7 +123,7 @@ EventData DoIFFTClient::Launch(size_t tag) {
       ss << socket_ptr[i * 2] << "+1j*" << socket_ptr[i * 2 + 1] << " ";
     }
     ss << "];" << std::endl;
-    std::cout << ss.str();
+    AGORA_LOG_INFO(ss.str().c_str());
   }
 
   duration_stat_->task_count_++;

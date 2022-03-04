@@ -381,7 +381,7 @@ void UeWorker::DoFftData(size_t tag) {
     ss << "Frame: " << frame_id << ", Symbol: " << symbol_id
        << ", User: " << ant_id << ", EVM: " << 100 * evm
        << "%, SNR: " << -10 * std::log10(evm) << std::endl;
-    std::cout << ss.str();
+    AGORA_LOG_INFO(ss.str().c_str());
   }
 
   if (kDebugPrintPerTaskDone || kDebugPrintFft) {

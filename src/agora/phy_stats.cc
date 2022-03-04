@@ -7,6 +7,8 @@
 #include <cfloat>
 #include <cmath>
 
+#include "logger.h"
+
 PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
   if (dir_ == Direction::kDownlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
@@ -95,13 +97,14 @@ void PhyStats::PrintPhyStats() {
         total_decoded_blocks += decoded_blocks_count_[ue_id][i];
         total_block_errors += block_error_count_[ue_id][i];
       }
-      std::cout << "UE " << ue_id << ": " << tx_type << " bit errors (BER) "
-                << total_bit_errors << "/" << total_decoded_bits << "("
-                << 1.0 * total_bit_errors / total_decoded_bits
-                << "), block errors (BLER) " << total_block_errors << "/"
-                << total_decoded_blocks << " ("
-                << 1.0 * total_block_errors / total_decoded_blocks << ")"
-                << std::endl;
+      std::stringstream ss;
+      ss << "UE " << ue_id << ": " << tx_type << " bit errors (BER) "
+         << total_bit_errors << "/" << total_decoded_bits << "("
+         << 1.0 * total_bit_errors / total_decoded_bits
+         << "), block errors (BLER) " << total_block_errors << "/"
+         << total_decoded_blocks << " ("
+         << 1.0 * total_block_errors / total_decoded_blocks << ")" << std::endl;
+      AGORA_LOG_INFO(ss.str().c_str());
     }
   }
 }
@@ -113,7 +116,7 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
   std::stringstream ss;
   ss << "Frame " << frame_id << " Constellation:\n"
      << "  EVM " << 100 * evm_mat.st() << ", SNR " << -10 * log10(evm_mat.st());
-  std::cout << ss.str();
+  AGORA_LOG_INFO(ss.str().c_str());
 }
 
 float PhyStats::GetEvmSnr(size_t frame_id, size_t ue_id) {
@@ -156,7 +159,7 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
        << " ";
   }
   ss << std::endl;
-  std::cout << ss.str();
+  AGORA_LOG_INFO(ss.str().c_str());
 }
 
 void PhyStats::PrintCalibSnrStats(size_t frame_id) {
@@ -197,7 +200,7 @@ void PhyStats::PrintCalibSnrStats(size_t frame_id) {
     ss << ": [" << min_snr << "," << max_snr << "] ";
   }
   ss << std::endl;
-  std::cout << ss.str();
+  AGORA_LOG_INFO(ss.str().c_str());
 }
 
 void PhyStats::UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id,
@@ -256,7 +259,7 @@ void PhyStats::PrintZfStats(size_t frame_id) {
   ss << "[" << min_cond << "," << max_cond
      << "], Mean: " << arma::mean(cond_vec);
   ss << std::endl;
-  std::cout << ss.str();
+  AGORA_LOG_INFO(ss.str().c_str());
 }
 
 void PhyStats::UpdateCsiCond(size_t frame_id, size_t sc_id, float cond) {
