@@ -50,9 +50,6 @@ class RadioConfigNoRxStream {
 
  private:
   bool InitialCalib(bool /*sample_adjust*/);
-  static void DrainRxBuffer(SoapySDR::Device* ibsSdrs,
-                            SoapySDR::Stream* istream, std::vector<void*> buffs,
-                            size_t symSamp);
   void DrainBuffers();
   void AdjustDelays(std::vector<int> /*offset*/);
   static void DciqMinimize(SoapySDR::Device* /*targetDev*/,
@@ -72,8 +69,7 @@ class RadioConfigNoRxStream {
   std::vector<SoapySDR::Device*> hubs_;
   std::vector<SoapySDR::Device*> ba_stn_;
   SoapySDR::Stream* ref_rx_stream_;
-  std::vector<SoapySDR::Stream*> tx_streams_;
-  std::vector<SoapySDR::Stream*> rx_streams_;
+
   arma::cx_float* init_calib_ul_processed_;
   arma::cx_float* init_calib_dl_processed_;
   Table<arma::cx_float> init_calib_ul_;
