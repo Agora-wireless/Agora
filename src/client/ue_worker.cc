@@ -179,19 +179,6 @@ void UeWorker::DoFftPilot(size_t tag) {
     std::printf(
         "UeWorker: Fft Pilot(frame %zu symbol %zu ant %zu) sig offset %zu\n",
         frame_id, symbol_id, ant_id, pilot_offset);
-    //float noise_power = 0;
-    //for (size_t i = 0; i < pilot_offset; i++) {
-    //  noise_power += std::pow(std::abs(samples_vec[i]), 2);
-    //}
-    //float signal_power = 0;
-    //for (size_t i = pilot_offset; i < 2 * pilot_offset; i++) {
-    //  signal_power += std::pow(std::abs(samples_vec[i]), 2);
-    //}
-    //float snr = 10 * std::log10(signal_power / noise_power);
-    //std::printf(
-    //    "UeWorker: Fft Pilot(frame %zu symbol %zu ant %zu) sig offset "
-    //    "%zu, SNR %2.1f \n",
-    //    frame_id, symbol_id, ant_id, pilot_offset, snr);
   }
 
   if (kRecordDownlinkFrame) {

@@ -16,34 +16,28 @@ class PhyStats {
   explicit PhyStats(Config* const cfg, Direction dir);
   ~PhyStats();
   void PrintPhyStats();
-  void UpdateBitErrors(size_t /*ue_id*/, size_t /*offset*/, uint8_t /*tx_byte*/,
-                       uint8_t /*rx_byte*/);
-  void UpdateDecodedBits(size_t /*ue_id*/, size_t /*offset*/,
-                         size_t /*new_bits_num*/);
-  void UpdateBlockErrors(size_t /*ue_id*/, size_t /*offset*/,
-                         size_t /*block_error_count*/);
-  void IncrementDecodedBlocks(size_t /*ue_id*/, size_t /*offset*/);
-  void UpdateUncodedBitErrors(size_t /*ue_id*/, size_t /*offset*/,
-                              size_t /*mod_bit_size*/, uint8_t /*tx_byte*/,
-                              uint8_t /*rx_byte*/);
-  void UpdateUncodedBits(size_t /*ue_id*/, size_t /*offset*/,
-                         size_t /*new_bits_num*/);
-  void UpdateEvmStats(size_t /*frame_id*/, size_t /*sc_id*/,
-                      const arma::cx_fmat& /*eq*/);
-  void PrintEvmStats(size_t /*frame_id*/);
+  void UpdateBitErrors(size_t ue_id, size_t offset, uint8_t tx_byte,
+                       uint8_t rx_byte);
+  void UpdateDecodedBits(size_t ue_id, size_t offset, size_t new_bits_num);
+  void UpdateBlockErrors(size_t ue_id, size_t offset, size_t block_error_count);
+  void IncrementDecodedBlocks(size_t ue_id, size_t offset);
+  void UpdateUncodedBitErrors(size_t ue_id, size_t offset, size_t mod_bit_size,
+                              uint8_t tx_byte, uint8_t rx_byte);
+  void UpdateUncodedBits(size_t ue_id, size_t offset, size_t new_bits_num);
+  void UpdateEvmStats(size_t frame_id, size_t sc_id, const arma::cx_fmat& eq);
+  void PrintEvmStats(size_t frame_id);
   float GetEvmSnr(size_t frame_id, size_t ue_id);
-  void UpdatePilotSnr(size_t /*frame_id*/, size_t /*ue_id*/, size_t /*ant_id*/,
-                      complex_float* /*fft_data*/);
-  void UpdateDlPilotSnr(size_t /*frame_id*/, size_t /*symbol_id*/,
-                        size_t /*ant_id*/, complex_float* /*fft_data*/);
-  void PrintSnrStats(size_t /*frame_id*/);
-  void PrintDlSnrStats(size_t /*frame_id*/, size_t /*ant_id*/);
-  void UpdateCalibPilotSnr(size_t /*frame_id*/, size_t /*ue_id*/,
-                           size_t /*ant_id*/, complex_float* /*fft_data*/);
-  void PrintCalibSnrStats(size_t /*frame_id*/);
-  void UpdateCsiCond(size_t /*frame_id*/, size_t /*subcarrier_id*/,
-                     float /*condition number*/);
-  void PrintZfStats(size_t /*frame_id*/);
+  void UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
+                      complex_float* fft_data);
+  void UpdateDlPilotSnr(size_t frame_id, size_t symbol_id, size_t ant_id,
+                        complex_float* fft_data);
+  void PrintSnrStats(size_t frame_id);
+  void PrintDlSnrStats(size_t frame_id, size_t ant_id);
+  void UpdateCalibPilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
+                           complex_float* fft_data);
+  void PrintCalibSnrStats(size_t frame_id);
+  void UpdateCsiCond(size_t frame_id, size_t subcarrier_id, float cond);
+  void PrintZfStats(size_t frame_id);
 
  private:
   Config const* const config_;

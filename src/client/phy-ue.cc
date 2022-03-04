@@ -424,12 +424,12 @@ void PhyUe::Start() {
           PrintPerTaskDone(PrintType::kFFTPilots, frame_id, symbol_id, ant_id);
           const bool tasks_complete =
               fft_dlpilot_counters_.CompleteTask(frame_id, symbol_id);
-          if (tasks_complete == true) {
+          if (tasks_complete) {
             PrintPerSymbolDone(PrintType::kFFTPilots, frame_id, symbol_id);
             const bool pilot_fft_complete =
                 fft_dlpilot_counters_.CompleteSymbol(frame_id);
-            if (pilot_fft_complete == true) {
-              if (kPrintPhyStats == true) {
+            if (pilot_fft_complete) {
+              if (kPrintPhyStats) {
                 this->phy_stats_->PrintDlSnrStats(frame_id, ant_id);
               }
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
