@@ -177,7 +177,7 @@ void TxRxWorkerClientHw::DoTxRx() {
                                 rx_time, rx_adjust_samples);
       if (rx_pkts.size() == channels_per_interface_) {
         if (kDebugPrintInTask) {
-          std::printf(
+          AGORA_LOG_INFO(
               "DoTxRx[%zu]: radio %zu received frame id %zu, symbol id %zu at "
               "time %lld\n",
               tid_, local_interface + interface_offset_, rx_frame_id,
@@ -314,7 +314,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
       }
 
       if (kDebugPrintInTask) {
-        std::printf(
+        AGORA_LOG_INFO(
             "TxRxWorkerClientHw [%zu]: Rx (Frame %zu, Symbol %zu, Radio "
             "%zu) - at time %lld\n",
             tid_, global_frame_id, global_symbol_id, radio_id, receive_time);
@@ -549,7 +549,7 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
                 << "/" << samples_per_symbol << std::endl;
     }
     if (kDebugPrintInTask) {
-      std::printf(
+      AGORA_LOG_INFO(
           "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Symbol (Frame "
           "%zu:%zu, Symbol %zu, Ue %zu) at time %lld flags %d\n",
           tid_, frame_id, tx_frame_id, tx_symbol_id, radio_id, tx_time,
@@ -614,7 +614,7 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
   }
 
   if (kDebugPrintInTask) {
-    std::printf(
+    AGORA_LOG_INFO(
         "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Pilot  (Frame "
         "%zu:%zu, Symbol %zu, Ue %zu, Ant %zu:%zu) at time %lld flags "
         "%d\n",

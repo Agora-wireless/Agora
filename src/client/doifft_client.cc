@@ -52,8 +52,9 @@ EventData DoIFFTClient::Launch(size_t tag) {
   const size_t symbol_idx_ul = cfg_->Frame().GetULSymbolIdx(symbol_id);
 
   if (kDebugPrintInTask) {
-    std::printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
-                tid_, frame_id, symbol_id, ant_id);
+    AGORA_LOG_INFO(
+        "In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n", tid_,
+        frame_id, symbol_id, ant_id);
   }
 
   size_t offset = (cfg_->GetTotalDataSymbolIdxUl(frame_id, symbol_idx_ul) *

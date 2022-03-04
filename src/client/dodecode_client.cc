@@ -43,7 +43,7 @@ EventData DoDecodeClient::Launch(size_t tag) {
   const size_t frame_slot = (frame_id % kFrameWnd);
 
   if (kDebugPrintInTask == true) {
-    std::printf(
+    AGORA_LOG_INFO(
         "In doDecode thread %d: frame: %zu, symbol: %zu, code block: "
         "%zu, ue: %zu offset %zu\n",
         tid_, frame_id, symbol_id, cur_cb_id, ue_id, symbol_offset);
@@ -97,19 +97,19 @@ EventData DoDecodeClient::Launch(size_t tag) {
   duration_stat_->task_duration_[2] += start_tsc2 - start_tsc1;
 
   if (kPrintLLRData) {
-    std::printf("LLR data, symbol_offset: %zu\n", symbol_offset);
+    AGORA_LOG_INFO("LLR data, symbol_offset: %zu\n", symbol_offset);
     for (size_t i = 0; i < ldpc_config.NumCbCodewLen(); i++) {
-      std::printf("%d ", *(llr_buffer_ptr + i));
+      AGORA_LOG_INFO("%d ", *(llr_buffer_ptr + i));
     }
-    std::printf("\n");
+    AGORA_LOG_INFO("\n");
   }
 
   if (kPrintDecodedData) {
-    std::printf("Decoded data\n");
+    AGORA_LOG_INFO("Decoded data\n");
     for (size_t i = 0; i < (ldpc_config.NumCbLen() >> 3); i++) {
-      std::printf("%u ", *(decoded_buffer_ptr + i));
+      AGORA_LOG_INFO("%u ", *(decoded_buffer_ptr + i));
     }
-    std::printf("\n");
+    AGORA_LOG_INFO("\n");
   }
 
   if ((kEnableMac == false) && (kPrintPhyStats == true) &&
@@ -135,8 +135,8 @@ EventData DoDecodeClient::Launch(size_t tag) {
   duration_stat_->task_duration_[0] += duration;
   duration_stat_->task_count_++;
   if (GetTime::CyclesToUs(duration, cfg_->FreqGhz()) > 500) {
-    std::printf("Thread %d Decode takes %.2f\n", tid_,
-                GetTime::CyclesToUs(duration, cfg_->FreqGhz()));
+    AGORA_LOG_INFO("Thread %d Decode takes %.2f\n", tid_,
+                   GetTime::CyclesToUs(duration, cfg_->FreqGhz()));
   }
 
   return EventData(EventType::kDecode, tag);

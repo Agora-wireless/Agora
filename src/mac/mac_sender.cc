@@ -356,8 +356,8 @@ void* MacSender::WorkerThread(size_t tid) {
         const auto tag = gen_tag_t(tags.at(tag_id));
 
         if ((kDebugPrintSender)) {
-          std::printf("MacSender[%zu] : worker processing frame %d : %d \n",
-                      tid, tag.frame_id_, tag.ant_id_);
+          AGORA_LOG_INFO("MacSender[%zu] : worker processing frame %d : %d \n",
+                         tid, tag.frame_id_, tag.ant_id_);
         }
         const uint8_t* mac_packet_location =
             tx_buffers_[TagToTxBuffersIndex(tag)];
@@ -387,7 +387,7 @@ void* MacSender::WorkerThread(size_t tid) {
         }
 
         if (kDebugSenderReceiver) {
-          std::printf(
+          AGORA_LOG_INFO(
               "MacSender%zu]: (tag = %s) transmit frame %d, ant %zu, TX "
               "time: %.3f us\n",
               tid, gen_tag_t(tag).ToString().c_str(), tag.frame_id_, cur_ant,
@@ -403,7 +403,7 @@ void* MacSender::WorkerThread(size_t tid) {
           double byte_len =
               cfg_->PacketLength() * ant_this_thread * max_symbol_id * 1000.f;
           double diff = end - begin;
-          std::printf(
+          AGORA_LOG_INFO(
               "MacSender%zu]: send %zu frames in %f secs, tput %f Mbps\n",
               (size_t)tid, total_tx_packets / (ant_this_thread * max_symbol_id),
               diff / 1e6, byte_len * 8 * 1e6 / diff / 1024 / 1024);

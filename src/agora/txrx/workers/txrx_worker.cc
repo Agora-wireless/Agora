@@ -171,7 +171,7 @@ Packet* TxRxWorker::GetUlTxPacket(size_t frame, size_t symbol, size_t ant) {
       ant;
 
   if (TxRxWorker::kDebugTxMemory) {
-    std::printf(
+    AGORA_LOG_INFO(
         "GetUlTxPacket: (Frame %zu Symbol %zu Ant %zu) Tx Offset %zu:%zu "
         "location %ld\n",
         frame, symbol, ant, offset, offset * Configuration()->PacketLength(),

@@ -157,8 +157,8 @@ PhyUe::PhyUe(Config* config)
 
 PhyUe::~PhyUe() {
   for (size_t i = 0; i < config_->UeWorkerThreadNum(); i++) {
-    std::printf("Joining Phy worker: %zu : %zu\n", i,
-                config_->UeWorkerThreadNum());
+    AGORA_LOG_INFO("Joining Phy worker: %zu : %zu\n", i,
+                   config_->UeWorkerThreadNum());
     workers_.at(i)->Stop();
   }
   workers_.clear();
@@ -182,9 +182,9 @@ void PhyUe::ScheduleTask(EventData do_task,
                          moodycamel::ConcurrentQueue<EventData>* in_queue,
                          moodycamel::ProducerToken const& ptok) {
   if (in_queue->try_enqueue(ptok, do_task) == false) {
-    std::printf("PhyUe: Cannot enqueue task, need more memory");
+    AGORA_LOG_INFO("PhyUe: Cannot enqueue task, need more memory");
     if (in_queue->enqueue(ptok, do_task) == false) {
-      std::printf("PhyUe: task enqueue failed\n");
+      AGORA_LOG_INFO("PhyUe: task enqueue failed\n");
       throw std::runtime_error("PhyUe: task enqueue failed");
     }
   }
@@ -193,9 +193,9 @@ void PhyUe::ScheduleTask(EventData do_task,
 void PhyUe::ScheduleWork(EventData do_task) {
   if (work_queue_.try_enqueue(*(work_producer_token_.get()), do_task) ==
       false) {
-    std::printf("PhyUe: Cannot enqueue work task, need more memory");
+    AGORA_LOG_INFO("PhyUe: Cannot enqueue work task, need more memory");
     if (work_queue_.enqueue(*(work_producer_token_.get()), do_task) == false) {
-      std::printf("PhyUe: work task enqueue failed\n");
+      AGORA_LOG_INFO("PhyUe: work task enqueue failed\n");
       throw std::runtime_error("PhyUe: work task enqueue failed");
     }
   }
@@ -341,7 +341,7 @@ void PhyUe::Start() {
             if (kDebugPrintPerFrameStart) {
               const size_t prev_frame_slot =
                   (frame_slot + kFrameWnd - 1) % kFrameWnd;
-              std::printf(
+              AGORA_LOG_INFO(
                   "PhyUe [frame %zu + %.2f ms since last frame]: Received "
                   "first packet. Remaining packets in prev frame: %zu\n",
                   frame_id,
@@ -547,7 +547,7 @@ void PhyUe::Start() {
               config_->Frame().GetDLSymbolIdx(symbol_id);
 
           if (kDebugPrintPacketsToMac) {
-            std::printf(
+            AGORA_LOG_INFO(
                 "PhyUe: sent decoded packet for (frame %zu, symbol %zu:%zu) to "
                 "MAC\n",
                 frame_id, symbol_id, dl_symbol_idx);
@@ -609,7 +609,7 @@ void PhyUe::Start() {
 #endif
           if (kDebugPrintPacketsFromMac) {
 #if ENABLE_RB_IND
-            std::printf(
+            AGORA_LOG_INFO(
                 "PhyUe: received packet for frame %u with modulation %zu\n",
                 pkt->frame_id_, pkt->rb_indicator_.mod_order_bits_);
 #endif
@@ -629,7 +629,7 @@ void PhyUe::Start() {
                   reinterpret_cast<const uint8_t*>(pkt) +
                   config_->MacPacketLength(Direction::kUplink));
             }
-            std::printf("%s\n", ss.str().c_str());
+            AGORA_LOG_INFO("%s\n", ss.str().c_str());
           }
         } break;
 
@@ -938,58 +938,59 @@ void PhyUe::PrintPerTaskDone(PrintType print_type, size_t frame_id,
     // if (true) {
     switch (print_type) {
       case (PrintType::kPacketRX):
-        std::printf("PhyUe [frame %zu symbol %zu ant %zu]: Rx packet\n",
-                    frame_id, symbol_id, ant);
+        AGORA_LOG_INFO("PhyUe [frame %zu symbol %zu ant %zu]: Rx packet\n",
+                       frame_id, symbol_id, ant);
         break;
 
       case (PrintType::kPacketTX):
-        std::printf(
+        AGORA_LOG_INFO(
             "PhyUe [frame %zu symbol %zu ant %zu]: %zu User Tx "
             "finished\n",
             frame_id, symbol_id, ant, tx_counters_.GetTaskCount(frame_id) + 1);
         break;
 
       case (PrintType::kFFTPilots):
-        std::printf(
+        AGORA_LOG_INFO(
             "PhyUe [frame %zu symbol %zu ant %zu]: Pilot FFT Equalization "
             "done\n",
             frame_id, symbol_id, ant);
         break;
 
       case (PrintType::kFFTData):
-        std::printf(
+        AGORA_LOG_INFO(
             "PhyUe [frame %zu symbol %zu ant %zu]: Data FFT Equalization "
             "done\n",
             frame_id, symbol_id, ant);
         break;
 
       case (PrintType::kDemul):
-        std::printf("PhyUe [frame %zu symbol %zu ant %zu]: Demul done\n",
-                    frame_id, symbol_id, ant);
+        AGORA_LOG_INFO("PhyUe [frame %zu symbol %zu ant %zu]: Demul done\n",
+                       frame_id, symbol_id, ant);
         break;
 
       case (PrintType::kDecode):
-        std::printf("PhyUe [frame %zu symbol %zu ant %zu]: Decoding done\n",
-                    frame_id, symbol_id, ant);
+        AGORA_LOG_INFO("PhyUe [frame %zu symbol %zu ant %zu]: Decoding done\n",
+                       frame_id, symbol_id, ant);
         break;
 
       case (PrintType::kEncode):
-        std::printf("PhyUe [frame %zu symbol %zu ant %zu]: Encoding done\n",
-                    frame_id, symbol_id, ant);
+        AGORA_LOG_INFO("PhyUe [frame %zu symbol %zu ant %zu]: Encoding done\n",
+                       frame_id, symbol_id, ant);
         break;
 
       case (PrintType::kModul):
-        std::printf("PhyUe [frame %zu symbol %zu ant %zu]: Modulation done\n",
-                    frame_id, symbol_id, ant);
+        AGORA_LOG_INFO(
+            "PhyUe [frame %zu symbol %zu ant %zu]: Modulation done\n", frame_id,
+            symbol_id, ant);
         break;
 
       case (PrintType::kIFFT):
-        std::printf("PhyUe [frame %zu symbol %zu ant %zu]: iFFT done\n",
-                    frame_id, symbol_id, ant);
+        AGORA_LOG_INFO("PhyUe [frame %zu symbol %zu ant %zu]: iFFT done\n",
+                       frame_id, symbol_id, ant);
         break;
 
       default:
-        std::printf("Wrong task type in task done print!");
+        AGORA_LOG_INFO("Wrong task type in task done print!");
     }
   }
 }
@@ -1000,7 +1001,7 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
     // if (true) {
     switch (print_type) {
       case (PrintType::kFFTPilots):
-        std::printf(
+        AGORA_LOG_INFO(
             "PhyUe [frame %zu symbol %zu + %.3f ms]: Pilot FFT complete for "
             "%zu antennas\n",
             frame_id, symbol_id,
@@ -1009,7 +1010,7 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
         break;
 
       case (PrintType::kFFTData):
-        std::printf(
+        AGORA_LOG_INFO(
             "PhyUe [frame %zu symbol %zu + %.3f ms]: Data FFT complete for "
             "%zu antennas\n",
             frame_id, symbol_id,
@@ -1018,7 +1019,7 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
         break;
 
       case (PrintType::kDemul):
-        std::printf(
+        AGORA_LOG_INFO(
             "PhyUe [frame %zu symbol %zu + %.3f ms]: Demul completed for "
             "%zu antennas\n",
             frame_id, symbol_id,
@@ -1027,7 +1028,7 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
         break;
 
       case (PrintType::kDecode):
-        std::printf(
+        AGORA_LOG_INFO(
             "PhyUe [frame %zu symbol %zu + %.3f ms]: Decoding completed "
             "for %zu antennas\n",
             frame_id, symbol_id,
@@ -1035,7 +1036,7 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
             decode_counters_.GetTaskCount(frame_id, symbol_id));
         break;
       case (PrintType::kEncode):
-        std::printf(
+        AGORA_LOG_INFO(
             "PhyUe [frame %zu symbol %zu + %.3f ms]: Data Encode complete "
             "for %zu antennas\n",
             frame_id, symbol_id,
@@ -1044,7 +1045,7 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
         break;
 
       case (PrintType::kModul):
-        std::printf(
+        AGORA_LOG_INFO(
             "PhyUe [frame %zu symbol %zu + %.3f ms]: Modul completed for "
             "symbol %zu antennas\n",
             frame_id, symbol_id,
@@ -1053,7 +1054,7 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
         break;
 
       case (PrintType::kIFFT):
-        std::printf(
+        AGORA_LOG_INFO(
             "PhyUe [frame %zu symbol %zu + %.3f ms]: iFFT completed for "
             "symbol\n",
             frame_id, symbol_id,
@@ -1061,7 +1062,7 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
         break;
 
       case (PrintType::kPacketToMac):
-        std::printf(
+        AGORA_LOG_INFO(
             "Main [frame %zu symbol %zu + %.3f ms]: Completed MAC TX, "
             "%zu symbols done\n",
             frame_id, symbol_id,
@@ -1070,7 +1071,7 @@ void PhyUe::PrintPerSymbolDone(PrintType print_type, size_t frame_id,
         break;
 
       default:
-        std::printf("Wrong task type in symbol done print!");
+        AGORA_LOG_INFO("Wrong task type in symbol done print!");
     }
   }
 }
@@ -1080,81 +1081,82 @@ void PhyUe::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
     // if (true) {
     switch (print_type) {
       case (PrintType::kPacketRX):
-        std::printf("PhyUe [frame %zu + %.2f ms]: Received all packets\n",
-                    frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kRXDone, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO("PhyUe [frame %zu + %.2f ms]: Received all packets\n",
+                       frame_id,
+                       this->stats_->MasterGetDeltaMs(
+                           TsType::kRXDone, TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kPacketRXPilots):
-        std::printf("PhyUe [frame %zu + %.2f ms]: Received all pilots\n",
-                    frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kPilotAllRX, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO(
+            "PhyUe [frame %zu + %.2f ms]: Received all pilots\n", frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kPilotAllRX,
+                                           TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kPacketTX):
-        std::printf("PhyUe [frame %zu + %.2f ms]: Completed TX\n", frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kTXDone, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO("PhyUe [frame %zu + %.2f ms]: Completed TX\n", frame_id,
+                       this->stats_->MasterGetDeltaMs(
+                           TsType::kTXDone, TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kFFTPilots):
-        std::printf(
+        AGORA_LOG_INFO(
             "PhyUe [frame %zu + %.2f ms]: Pilot FFT finished\n", frame_id,
             this->stats_->MasterGetDeltaMs(TsType::kFFTPilotsDone,
                                            TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kFFTData):
-        std::printf("PhyUe [frame %zu + %.2f ms]: Data FFT finished\n",
-                    frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kFFTDone, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO("PhyUe [frame %zu + %.2f ms]: Data FFT finished\n",
+                       frame_id,
+                       this->stats_->MasterGetDeltaMs(
+                           TsType::kFFTDone, TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kDemul):
-        std::printf("PhyUe [frame %zu + %.2f ms]: Completed demodulation\n",
-                    frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kDemulDone, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO(
+            "PhyUe [frame %zu + %.2f ms]: Completed demodulation\n", frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kDemulDone,
+                                           TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kDecode):
-        std::printf("PhyUe [frame %zu + %.2f ms]: Completed decoding\n",
-                    frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kDecodeDone, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO(
+            "PhyUe [frame %zu + %.2f ms]: Completed decoding\n", frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kDecodeDone,
+                                           TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kEncode):
-        std::printf("PhyUe [frame %zu + %.2f ms]: Completed encoding\n",
-                    frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kEncodeDone, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO(
+            "PhyUe [frame %zu + %.2f ms]: Completed encoding\n", frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kEncodeDone,
+                                           TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kModul):
-        std::printf("PhyUe [frame %zu + %.2f ms]: Completed modulation\n",
-                    frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kModulDone, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO(
+            "PhyUe [frame %zu + %.2f ms]: Completed modulation\n", frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kModulDone,
+                                           TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kIFFT):
-        std::printf("PhyUe [frame %zu + %.2f ms]: Completed iFFT\n", frame_id,
-                    this->stats_->MasterGetDeltaMs(
-                        TsType::kIFFTDone, TsType::kFirstSymbolRX, frame_id));
+        AGORA_LOG_INFO(
+            "PhyUe [frame %zu + %.2f ms]: Completed iFFT\n", frame_id,
+            this->stats_->MasterGetDeltaMs(TsType::kIFFTDone,
+                                           TsType::kFirstSymbolRX, frame_id));
         break;
 
       case (PrintType::kPacketToMac):
-        std::printf(
+        AGORA_LOG_INFO(
             "PhyUe [frame %zu + %.2f ms]: Completed MAC TX \n", frame_id,
             this->stats_->MasterGetMsSince(TsType::kFirstSymbolRX, frame_id));
         break;
 
       /*
-      case (PrintType::kPacketTXFirst): std::printf(
+      case (PrintType::kPacketTXFirst): AGORA_LOG_INFO(
             "PhyUe [frame %zu + %.2f ms]: Completed TX of first symbol\n",
             frame_id,
             this->stats_->MasterGetDeltaMs(TsType::kTXProcessedFirst,
@@ -1162,7 +1164,7 @@ void PhyUe::PrintPerFrameDone(PrintType print_type, size_t frame_id) {
       frame_id)); break;
       */
       default:
-        std::printf("PhyUe: Wrong task type in frame done print!\n");
+        AGORA_LOG_INFO("PhyUe: Wrong task type in frame done print!\n");
     }
   }
 }

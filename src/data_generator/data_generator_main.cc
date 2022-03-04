@@ -30,6 +30,7 @@ int main(int argc, char* argv[]) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   gflags::SetVersionString(GetAgoraProjectVersion());
   auto cfg = std::make_unique<Config>(FLAGS_conf_file.c_str());
+  AGORA_LOG_INIT();
 
   const DataGenerator::Profile profile =
       FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123
@@ -47,6 +48,6 @@ int main(int argc, char* argv[]) {
 
   AGORA_LOG_INFO("DataGenerator: Generating encoded and modulated data\n");
   data_generator->DoDataGeneration(cur_directory);
-
+  AGORA_LOG_SHUTDOWN();
   return 0;
 }

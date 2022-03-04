@@ -1,5 +1,6 @@
 #include "agora.h"
 #include "gflags/gflags.h"
+#include "logger.h"
 
 static const bool kDebugPrintUlCorr = false;
 static const bool kDebugPrintDlCorr = false;
@@ -173,6 +174,7 @@ int main(int argc, char* argv[]) {
   std::string conf_file;
   gflags::SetUsageMessage("conf_file : set the configuration filename");
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+  AGORA_LOG_INIT()
 
   // For backwards compatibility
   if (argc == 2) {
@@ -230,5 +232,6 @@ int main(int argc, char* argv[]) {
   }
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
+  AGORA_LOG_SHUTDOWN()
   return ret;
 }

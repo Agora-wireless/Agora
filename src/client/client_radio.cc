@@ -46,7 +46,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   while (num_client_radios_init != this->radio_num_) {
     num_checks++;
     if (num_checks > 1e9) {
-      std::printf(
+      AGORA_LOG_INFO(
           "RadioConfig: Waiting for radio initialization, %zu of %zu "
           "ready\n",
           num_client_radios_init, this->radio_num_);
@@ -71,63 +71,63 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
               << std::endl;
     for (auto c : channels) {
       if (c < cl_stn_.at(i)->getNumChannels(SOAPY_SDR_RX)) {
-        std::printf("RX Channel %zu\n", c);
-        std::printf("Actual RX sample rate: %fMSps...\n",
-                    (cl_stn_.at(i)->getSampleRate(SOAPY_SDR_RX, c) / 1e6));
-        std::printf("Actual RX frequency: %fGHz...\n",
-                    (cl_stn_.at(i)->getFrequency(SOAPY_SDR_RX, c) / 1e9));
-        std::printf("Actual RX gain: %f...\n",
-                    (cl_stn_.at(i)->getGain(SOAPY_SDR_RX, c)));
+        AGORA_LOG_INFO("RX Channel %zu\n", c);
+        AGORA_LOG_INFO("Actual RX sample rate: %fMSps...\n",
+                       (cl_stn_.at(i)->getSampleRate(SOAPY_SDR_RX, c) / 1e6));
+        AGORA_LOG_INFO("Actual RX frequency: %fGHz...\n",
+                       (cl_stn_.at(i)->getFrequency(SOAPY_SDR_RX, c) / 1e9));
+        AGORA_LOG_INFO("Actual RX gain: %f...\n",
+                       (cl_stn_.at(i)->getGain(SOAPY_SDR_RX, c)));
         if (!kUseUHD) {
-          std::printf("Actual RX LNA gain: %f...\n",
-                      (cl_stn_.at(i)->getGain(SOAPY_SDR_RX, c, "LNA")));
-          std::printf("Actual RX PGA gain: %f...\n",
-                      (cl_stn_.at(i)->getGain(SOAPY_SDR_RX, c, "PGA")));
-          std::printf("Actual RX TIA gain: %f...\n",
-                      (cl_stn_.at(i)->getGain(SOAPY_SDR_RX, c, "TIA")));
+          AGORA_LOG_INFO("Actual RX LNA gain: %f...\n",
+                         (cl_stn_.at(i)->getGain(SOAPY_SDR_RX, c, "LNA")));
+          AGORA_LOG_INFO("Actual RX PGA gain: %f...\n",
+                         (cl_stn_.at(i)->getGain(SOAPY_SDR_RX, c, "PGA")));
+          AGORA_LOG_INFO("Actual RX TIA gain: %f...\n",
+                         (cl_stn_.at(i)->getGain(SOAPY_SDR_RX, c, "TIA")));
           if (cl_stn_.at(i)->getHardwareInfo()["frontend"].find("CBRS") !=
               std::string::npos) {
-            std::printf("Actual RX LNA1 gain: %f...\n",
-                        (cl_stn_.at(i)->getGain(SOAPY_SDR_RX, c, "LNA1")));
-            std::printf("Actual RX LNA2 gain: %f...\n",
-                        (cl_stn_.at(i)->getGain(SOAPY_SDR_RX, c, "LNA2")));
+            AGORA_LOG_INFO("Actual RX LNA1 gain: %f...\n",
+                           (cl_stn_.at(i)->getGain(SOAPY_SDR_RX, c, "LNA1")));
+            AGORA_LOG_INFO("Actual RX LNA2 gain: %f...\n",
+                           (cl_stn_.at(i)->getGain(SOAPY_SDR_RX, c, "LNA2")));
           }
         }
-        std::printf("Actual RX bandwidth: %fM...\n",
-                    (cl_stn_.at(i)->getBandwidth(SOAPY_SDR_RX, c) / 1e6));
-        std::printf("Actual RX antenna: %s...\n",
-                    (cl_stn_.at(i)->getAntenna(SOAPY_SDR_RX, c).c_str()));
+        AGORA_LOG_INFO("Actual RX bandwidth: %fM...\n",
+                       (cl_stn_.at(i)->getBandwidth(SOAPY_SDR_RX, c) / 1e6));
+        AGORA_LOG_INFO("Actual RX antenna: %s...\n",
+                       (cl_stn_.at(i)->getAntenna(SOAPY_SDR_RX, c).c_str()));
       }
     }
 
     for (auto c : channels) {
       if (c < cl_stn_.at(i)->getNumChannels(SOAPY_SDR_TX)) {
-        std::printf("TX Channel %zu\n", c);
-        std::printf("Actual TX sample rate: %fMSps...\n",
-                    (cl_stn_.at(i)->getSampleRate(SOAPY_SDR_TX, c) / 1e6));
-        std::printf("Actual TX frequency: %fGHz...\n",
-                    (cl_stn_.at(i)->getFrequency(SOAPY_SDR_TX, c) / 1e9));
-        std::printf("Actual TX gain: %f...\n",
-                    (cl_stn_.at(i)->getGain(SOAPY_SDR_TX, c)));
+        AGORA_LOG_INFO("TX Channel %zu\n", c);
+        AGORA_LOG_INFO("Actual TX sample rate: %fMSps...\n",
+                       (cl_stn_.at(i)->getSampleRate(SOAPY_SDR_TX, c) / 1e6));
+        AGORA_LOG_INFO("Actual TX frequency: %fGHz...\n",
+                       (cl_stn_.at(i)->getFrequency(SOAPY_SDR_TX, c) / 1e9));
+        AGORA_LOG_INFO("Actual TX gain: %f...\n",
+                       (cl_stn_.at(i)->getGain(SOAPY_SDR_TX, c)));
         if (!kUseUHD) {
-          std::printf("Actual TX PAD gain: %f...\n",
-                      (cl_stn_.at(i)->getGain(SOAPY_SDR_TX, c, "PAD")));
-          std::printf("Actual TX IAMP gain: %f...\n",
-                      (cl_stn_.at(i)->getGain(SOAPY_SDR_TX, c, "IAMP")));
+          AGORA_LOG_INFO("Actual TX PAD gain: %f...\n",
+                         (cl_stn_.at(i)->getGain(SOAPY_SDR_TX, c, "PAD")));
+          AGORA_LOG_INFO("Actual TX IAMP gain: %f...\n",
+                         (cl_stn_.at(i)->getGain(SOAPY_SDR_TX, c, "IAMP")));
           if (cl_stn_.at(i)->getHardwareInfo()["frontend"].find("CBRS") !=
               std::string::npos) {
-            std::printf("Actual TX PA1 gain: %f...\n",
-                        (cl_stn_.at(i)->getGain(SOAPY_SDR_TX, c, "PA1")));
-            std::printf("Actual TX PA2 gain: %f...\n",
-                        (cl_stn_.at(i)->getGain(SOAPY_SDR_TX, c, "PA2")));
-            std::printf("Actual TX PA3 gain: %f...\n",
-                        (cl_stn_.at(i)->getGain(SOAPY_SDR_TX, c, "PA3")));
+            AGORA_LOG_INFO("Actual TX PA1 gain: %f...\n",
+                           (cl_stn_.at(i)->getGain(SOAPY_SDR_TX, c, "PA1")));
+            AGORA_LOG_INFO("Actual TX PA2 gain: %f...\n",
+                           (cl_stn_.at(i)->getGain(SOAPY_SDR_TX, c, "PA2")));
+            AGORA_LOG_INFO("Actual TX PA3 gain: %f...\n",
+                           (cl_stn_.at(i)->getGain(SOAPY_SDR_TX, c, "PA3")));
           }
         }
-        std::printf("Actual TX bandwidth: %fM...\n",
-                    (cl_stn_.at(i)->getBandwidth(SOAPY_SDR_TX, c) / 1e6));
-        std::printf("Actual TX antenna: %s...\n",
-                    (cl_stn_.at(i)->getAntenna(SOAPY_SDR_TX, c).c_str()));
+        AGORA_LOG_INFO("Actual TX bandwidth: %fM...\n",
+                       (cl_stn_.at(i)->getBandwidth(SOAPY_SDR_TX, c) / 1e6));
+        AGORA_LOG_INFO("Actual TX antenna: %s...\n",
+                       (cl_stn_.at(i)->getAntenna(SOAPY_SDR_TX, c).c_str()));
       }
     }
     std::cout << std::endl;
@@ -157,13 +157,14 @@ void ClientRadioConfig::InitClientRadio(size_t tid) {
       break;
     } catch (const std::runtime_error& e) {
       const auto* message = e.what();
-      std::printf("InitClientRadio[%zu] - Soapy error try %zu -- %s\n", tid,
-                  tries, message);
+      AGORA_LOG_INFO("InitClientRadio[%zu] - Soapy error try %zu -- %s\n", tid,
+                     tries, message);
     }
   }
   if (ue_device == nullptr) {
-    std::printf("SoapySDR failed to locate the Ue device %s in %zu attempts\n",
-                cfg_->UeRadioId().at(tid).c_str(), kSoapyMakeMaxAttempts);
+    AGORA_LOG_INFO(
+        "SoapySDR failed to locate the Ue device %s in %zu attempts\n",
+        cfg_->UeRadioId().at(tid).c_str(), kSoapyMakeMaxAttempts);
     throw std::runtime_error("SoapySDR failed to locate the Ue device");
   }
   cl_stn_.at(tid) = ue_device;

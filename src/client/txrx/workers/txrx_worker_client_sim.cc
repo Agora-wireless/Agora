@@ -95,7 +95,7 @@ std::vector<Packet*> TxRxWorkerClientSim::RecvEnqueue(size_t interface_id) {
                          ->Recv(reinterpret_cast<uint8_t*>(pkt), packet_length);
   if (rx_bytes == static_cast<ssize_t>(packet_length)) {
     if (kDebugPrintInTask) {
-      std::printf(
+      AGORA_LOG_INFO(
           "TxRxWorkerClientSim[%zu]: Received frame %d, symbol %d, ant %d\n",
           tid_, pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
     }
@@ -156,12 +156,12 @@ size_t TxRxWorkerClientSim::DequeueSend() {
 
       if (kDebugPrintInTask) {
         if (pilot_symbol_idx == ue_ant) {
-          std::printf(
+          AGORA_LOG_INFO(
               "TxRxWorkerClientSim[%zu]: Transmitted pilot frame %zu, symbol "
               "%zu, ant %zu\n",
               tid_, frame_id, symbol_id, ue_ant);
         } else {
-          std::printf(
+          AGORA_LOG_INFO(
               "TxRxWorkerClientSim[%zu]: Transmitted zeros frame \"%zu, "
               "symbol %zu, ant %zu\n",
               tid_, frame_id, symbol_id, ue_ant);
@@ -185,7 +185,7 @@ size_t TxRxWorkerClientSim::DequeueSend() {
         const size_t symbol_id =
             Configuration()->Frame().GetULSymbol(ul_symbol_idx);
         if (kDebugPrintInTask) {
-          std::printf(
+          AGORA_LOG_INFO(
               "TxRxWorkerClientSim[%zu]: Transmitted frame %zu, symbol %zu, "
               "ant %zu\n",
               tid_, frame_id, symbol_id, ue_ant);

@@ -72,7 +72,7 @@ UeWorker::UeWorker(
 UeWorker::~UeWorker() {
   DftiFreeDescriptor(&mkl_handle_);
   FreeBuffer1d(&rx_samps_tmp_);
-  std::printf("UeWorker[%zu] Terminated\n", tid_);
+  AGORA_LOG_INFO("UeWorker[%zu] Terminated\n", tid_);
 }
 
 void UeWorker::Start(size_t core_offset) {
@@ -85,12 +85,12 @@ void UeWorker::Start(size_t core_offset) {
 }
 
 void UeWorker::Stop() {
-  std::printf("Joining PhyUe worker %zu\n", tid_);
+  AGORA_LOG_INFO("Joining PhyUe worker %zu\n", tid_);
   thread_.join();
 }
 
 void UeWorker::TaskThread(size_t core_offset) {
-  std::printf("UeWorker[%zu]: started\n", tid_);
+  AGORA_LOG_INFO("UeWorker[%zu]: started\n", tid_);
   PinToCoreWithOffset(ThreadType::kWorker, core_offset, tid_);
 
   auto encoder = std::make_unique<DoEncode>(
@@ -133,8 +133,8 @@ void UeWorker::TaskThread(size_t core_offset) {
           DoFftData(event.tags_[0]);
         } break;
         default: {
-          std::printf("***** Invalid Event Type [%d] in Work Queue\n",
-                      static_cast<int>(event.event_type_));
+          AGORA_LOG_INFO("***** Invalid Event Type [%d] in Work Queue\n",
+                         static_cast<int>(event.event_type_));
         }
       }
     }  // end dequeue
@@ -156,8 +156,8 @@ void UeWorker::DoFftPilot(size_t tag) {
   const size_t frame_slot = frame_id % kFrameWnd;
 
   if (kDebugPrintInTask || kDebugPrintFft) {
-    std::printf("UeWorker[%zu]: Fft Pilot(frame %zu, symbol %zu, ant %zu)\n",
-                tid_, frame_id, symbol_id, ant_id);
+    AGORA_LOG_INFO("UeWorker[%zu]: Fft Pilot(frame %zu, symbol %zu, ant %zu)\n",
+                   tid_, frame_id, symbol_id, ant_id);
   }
 
   const size_t dl_symbol_id = config_.Frame().GetDLSymbolIdx(symbol_id);
@@ -185,7 +185,7 @@ void UeWorker::DoFftPilot(size_t tag) {
       signal_power += std::pow(std::abs(samples_vec[i]), 2);
     }
     float snr = 10 * std::log10(signal_power / noise_power);
-    std::printf(
+    AGORA_LOG_INFO(
         "UeWorker: Fft Pilot(frame %zu symbol %zu ant %zu) sig offset "
         "%zu, SNR %2.1f \n",
         frame_id, symbol_id, ant_id, pilot_offset, snr);
@@ -246,7 +246,7 @@ void UeWorker::DoFftPilot(size_t tag) {
 
   if (kDebugPrintPerTaskDone || kDebugPrintFft) {
     size_t fft_duration_stat = GetTime::Rdtsc() - start_tsc;
-    std::printf(
+    AGORA_LOG_INFO(
         "UeWorker[%zu]: Fft Pilot(frame %zu, symbol %zu, ant %zu) Duration "
         "%2.4f ms\n",
         tid_, frame_id, symbol_id, ant_id,
@@ -274,8 +274,8 @@ void UeWorker::DoFftData(size_t tag) {
   const size_t frame_slot = frame_id % kFrameWnd;
 
   if (kDebugPrintInTask || kDebugPrintFft) {
-    std::printf("UeWorker[%zu]: Fft Data(frame %zu, symbol %zu, ant %zu)\n",
-                tid_, frame_id, symbol_id, ant_id);
+    AGORA_LOG_INFO("UeWorker[%zu]: Fft Data(frame %zu, symbol %zu, ant %zu)\n",
+                   tid_, frame_id, symbol_id, ant_id);
   }
 
   const size_t sig_offset = config_.OfdmRxZeroPrefixClient();
@@ -386,7 +386,7 @@ void UeWorker::DoFftData(size_t tag) {
 
   if (kDebugPrintPerTaskDone || kDebugPrintFft) {
     size_t fft_duration_stat = GetTime::Rdtsc() - start_tsc;
-    std::printf(
+    AGORA_LOG_INFO(
         "UeWorker[%zu]: Fft Data(frame %zu, symbol %zu, ant %zu) Duration "
         "%2.4f ms\n",
         tid_, frame_id, symbol_id, ant_id,
@@ -409,8 +409,8 @@ void UeWorker::DoDemul(size_t tag) {
   const size_t ant_id = gen_tag_t(tag).ant_id_;
 
   if (kDebugPrintInTask || kDebugPrintDemul) {
-    std::printf("UeWorker[%zu]: Demul  (frame %zu, symbol %zu, ant %zu)\n",
-                tid_, frame_id, symbol_id, ant_id);
+    AGORA_LOG_INFO("UeWorker[%zu]: Demul  (frame %zu, symbol %zu, ant %zu)\n",
+                   tid_, frame_id, symbol_id, ant_id);
   }
   const size_t start_tsc = GetTime::Rdtsc();
 
@@ -455,8 +455,9 @@ void UeWorker::DoDemul(size_t tag) {
           : Demod256qamSoftAvx2(equal_ptr, demod_ptr, config_.GetOFDMDataNum());
       break;
     default:
-      std::printf("UeWorker[%zu]: Demul - modulation type %s not supported!\n",
-                  tid_, config_.Modulation(Direction::kDownlink).c_str());
+      AGORA_LOG_INFO(
+          "UeWorker[%zu]: Demul - modulation type %s not supported!\n", tid_,
+          config_.Modulation(Direction::kDownlink).c_str());
   }
 
   if ((kDownlinkHardDemod == true) && (kPrintPhyStats == true) &&
@@ -478,26 +479,26 @@ void UeWorker::DoDemul(size_t tag) {
       }
     }
     if (block_error > 0) {
-      std::printf("Frame %zu Symbol %zu Ue %zu: %zu symbol errors\n", frame_id,
-                  symbol_id, ant_id, block_error);
+      AGORA_LOG_INFO("Frame %zu Symbol %zu Ue %zu: %zu symbol errors\n",
+                     frame_id, symbol_id, ant_id, block_error);
     }
     phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, block_error);
   }
 
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintDemul == true)) {
     size_t dem_duration_stat = GetTime::Rdtsc() - start_tsc;
-    std::printf(
+    AGORA_LOG_INFO(
         "UeWorker[%zu]: Demul  (frame %zu, symbol %zu, ant %zu) Duration "
         "%2.4f ms\n",
         tid_, frame_id, symbol_id, ant_id,
         GetTime::CyclesToMs(dem_duration_stat, GetTime::MeasureRdtscFreq()));
   }
   if (kPrintLLRData) {
-    std::printf("LLR data, symbol_offset: %zu\n", offset);
+    AGORA_LOG_INFO("LLR data, symbol_offset: %zu\n", offset);
     for (size_t i = 0; i < config_.GetOFDMDataNum(); i++) {
-      std::printf("%x ", (uint8_t) * (demod_ptr + i));
+      AGORA_LOG_INFO("%x ", (uint8_t) * (demod_ptr + i));
     }
-    std::printf("\n");
+    AGORA_LOG_INFO("\n");
   }
 
   RtAssert(
@@ -514,7 +515,7 @@ void UeWorker::DoDecodeUe(DoDecodeClient* decoder, size_t tag) {
   for (size_t cb_id = 0; cb_id < ldpc_config.NumBlocksInSymbol(); cb_id++) {
     // For now, call for each cb
     if (kDebugPrintDecode) {
-      std::printf(
+      AGORA_LOG_INFO(
           "Decoding [Frame %zu, Symbol %zu, User %zu, Code Block %zu : %zu]\n",
           frame_id, symbol_id, ant_id, cb_id,
           ldpc_config.NumBlocksInSymbol() - 1);
@@ -564,8 +565,8 @@ void UeWorker::DoModul(size_t tag) {
   const size_t ant_id = gen_tag_t(tag).ue_id_;
 
   if (kDebugPrintInTask || kDebugPrintModul) {
-    std::printf("UeWorker[%zu]: Modul  (frame %zu, symbol %zu, ant %zu)\n",
-                tid_, frame_id, symbol_id, ant_id);
+    AGORA_LOG_INFO("UeWorker[%zu]: Modul  (frame %zu, symbol %zu, ant %zu)\n",
+                   tid_, frame_id, symbol_id, ant_id);
   }
   size_t start_tsc = GetTime::Rdtsc();
 
@@ -580,7 +581,7 @@ void UeWorker::DoModul(size_t tag) {
                                         frame_id, ul_symbol_idx, ant_id, 0);
 
   if (kDebugPrintModul) {
-    std::printf(
+    AGORA_LOG_INFO(
         "UeWorker[%zu]: Modul  (frame %zu, symbol %zu, ant %zu) - getting "
         "from location (%zu %zu %zu) %zu and putting into location (%zu, "
         "%zu) %zu\n\n",
@@ -598,7 +599,7 @@ void UeWorker::DoModul(size_t tag) {
 
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintModul == true)) {
     size_t mod_duration_stat = GetTime::Rdtsc() - start_tsc;
-    std::printf(
+    AGORA_LOG_INFO(
         "UeWorker[%zu]: Modul  (frame %zu, symbol %zu, user %zu) Duration "
         "%2.4f ms\n",
         tid_, frame_id, symbol_id, ant_id,
@@ -649,8 +650,8 @@ void UeWorker::DoIfft(size_t tag) {
   const size_t frame_slot = (frame_id % kFrameWnd);
 
   if (kDebugPrintInTask) {
-    std::printf("User Task[%zu]: iFFT   (frame %zu, symbol %zu, user %zu)\n",
-                tid_, frame_id, symbol_id, ant_id);
+    AGORA_LOG_INFO("User Task[%zu]: iFFT   (frame %zu, symbol %zu, user %zu)\n",
+                   tid_, frame_id, symbol_id, ant_id);
   }
   size_t start_tsc = GetTime::Rdtsc();
 
@@ -681,7 +682,7 @@ void UeWorker::DoIfft(size_t tag) {
   char* cur_tx_buffer = &tx_buffer_[tx_offset];
 
   if (kDebugTxMemory) {
-    std::printf(
+    AGORA_LOG_INFO(
         "Tx data for (Frame %zu Symbol %zu Ant %zu) is located at tx offset "
         "%zu:%zu at location %ld\n",
         frame_id, symbol_id, ant_id, buff_offset, tx_offset,
@@ -696,7 +697,7 @@ void UeWorker::DoIfft(size_t tag) {
 
   if (kDebugPrintPerTaskDone) {
     size_t ifft_duration_stat = GetTime::Rdtsc() - start_tsc;
-    std::printf(
+    AGORA_LOG_INFO(
         "User Task[%zu]: iFFT   (frame %zu,       , user %zu) Duration "
         "%2.4f ms\n",
         tid_, frame_id, ant_id,

@@ -39,7 +39,7 @@ PacketTxRxRadio::~PacketTxRxRadio() {
 bool PacketTxRxRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
                                 Table<complex_float>& calib_ul_buffer) {
   AGORA_LOG_FRAME("PacketTxRxRadio: StartTxRx threads %zu\n",
-             worker_threads_.size());
+                  worker_threads_.size());
   const bool status = radio_config_->RadioStart();
 
   //RadioStart creates the following: radio_config_->GetCalibDl() and radio_config_->GetCalibUl();

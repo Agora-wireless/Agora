@@ -51,7 +51,7 @@ size_t FileReceiver::Load(unsigned char *destination, size_t requested_bytes) {
 
       data_read += data_stream_.gcount();
       AGORA_LOG_FRAME("[FileReceiver] data received: %zu:%zu \n", data_read,
-                 file_read_size);
+                      file_read_size);
 
       // Check for eof after read
       if (data_stream_.eof()) {

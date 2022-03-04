@@ -34,6 +34,9 @@
 #include <ctime>
 #include <string>
 
+#define AGORA_LOG_INIT() ((void)0)
+#define AGORA_LOG_SHUTDOWN() ((void)0)
+
 #if AGORA_LOG_LEVEL >= AGORA_LOG_LEVEL_ERROR
 #define AGORA_LOG_ERROR(...)                                             \
   AgoraOutputLogHeader(AGORA_LOG_DEFAULT_STREAM, AGORA_LOG_LEVEL_ERROR); \
@@ -94,7 +97,16 @@
 #else
 
 #include "spdlog/fmt/bundled/printf.h"  // support for printf-style
+#include "spdlog/pattern_formatter.h"
 #include "spdlog/spdlog.h"
+
+#define AGORA_LOG_INIT()                                \
+  auto f = std::make_unique<spdlog::pattern_formatter>( \
+      spdlog::pattern_time_type::utc, std::string("")); \
+  f->set_pattern("[%S:%f][%^%L%$] %v");                 \
+  spdlog::set_formatter(std::move(f));
+
+#define AGORA_LOG_SHUTDOWN() spdlog::shutdown();
 
 #if AGORA_LOG_LEVEL >= AGORA_LOG_LEVEL_ERROR
 #define AGORA_LOG_ERROR(...) spdlog::error(fmt::sprintf(__VA_ARGS__));
@@ -130,6 +142,8 @@
 #define AGORA_LOG_TRACE(...) spdlog::trace(fmt::sprintf(__VA_ARGS__));
 #else
 #define AGORA_LOG_TRACE(...) ((void)0)
+#endif
+
 #endif
 
 /// Return decent-precision time formatted as seconds:microseconds
@@ -172,7 +186,6 @@ static inline void AgoraOutputLogHeader(FILE* stream, int level) {
   }
   std::fprintf(stream, "%s %s: ", formatted_time.c_str(), type);
 }
-#endif
 
 /// Return true if the logging verbosity is reasonable for non-developer users
 /// of Agora

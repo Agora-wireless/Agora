@@ -54,8 +54,8 @@ size_t VideoReceiver::Load(unsigned char *destination, size_t requested_bytes) {
   std::memcpy(destination, &local_rx_buffer_.at(data_start_offset_),
               loaded_bytes);
   AGORA_LOG_FRAME("[VideoReceiver] data loaded: %zu : %zu %zu @ %zu offset\n",
-             loaded_bytes, requested_bytes, data_available_,
-             data_start_offset_);
+                  loaded_bytes, requested_bytes, data_available_,
+                  data_start_offset_);
   data_start_offset_ += loaded_bytes;
   data_available_ -= loaded_bytes;
   loaded_bytes = loaded_bytes;
