@@ -27,10 +27,10 @@ TxRxWorkerDpdk::TxRxWorkerDpdk(
     std::mutex& sync_mutex, std::condition_variable& sync_cond,
     std::atomic<bool>& can_proceed,
     std::vector<std::pair<uint16_t, uint16_t>> dpdk_phy, rte_mempool* mbuf_pool)
-    : TxRxWorker(core_offset, tid, interface_count, interface_offset, config,
-                 rx_frame_start, event_notify_q, tx_pending_q, tx_producer,
-                 notify_producer, rx_memory, tx_memory, sync_mutex, sync_cond,
-                 can_proceed),
+    : TxRxWorker(core_offset, tid, interface_count, interface_offset,
+                 config->NumChannels(), config, rx_frame_start, event_notify_q,
+                 tx_pending_q, tx_producer, notify_producer, rx_memory,
+                 tx_memory, sync_mutex, sync_cond, can_proceed),
       dpdk_phy_port_queues_(std::move(dpdk_phy)),
       mbuf_pool_(mbuf_pool) {
   int ret = inet_pton(AF_INET, config->BsRruAddr().c_str(), &bs_rru_addr_);

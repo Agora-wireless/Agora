@@ -80,8 +80,8 @@ class ChannelSim {
 
  private:
   void DoTx(size_t frame_id, size_t symbol_id, size_t max_ant,
-            uint8_t* tx_buffer, const arma::cx_float* source_data,
-            AlignedByteVector* udp_pkt_buf,
+            size_t ant_per_socket, uint8_t* tx_buffer,
+            const arma::cx_float* source_data, AlignedByteVector* udp_pkt_buf,
             std::vector<std::unique_ptr<UDPClient>>& udp_clients,
             const std::string& dest_address, size_t dest_port);
 

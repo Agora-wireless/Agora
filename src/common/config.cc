@@ -417,6 +417,15 @@ Config::Config(const std::string& jsonfile)
   MLPD_INFO("Config: Frame schedule %s (%zu symbols)\n",
             frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
 
+  if (frame_.IsRecCalEnabled()) {
+    RtAssert(bf_ant_num_ >= frame_.NumDLCalSyms(),
+             "Too many DL Cal symbols for the number of base station antennas");
+
+    RtAssert(((bf_ant_num_ % frame_.NumDLCalSyms()) == 0),
+             "Number of Downlink calibration symbols per frame must complete "
+             "calibration on frame boundary!");
+  }
+
   // Check for frame validity.
   // We should remove the restriction of the beacon symbol placement when tested
   // more thoroughly
@@ -438,13 +447,6 @@ Config::Config(const std::string& jsonfile)
            "Number of UL pilot symbol exceeds number of UL symbols!");
 
   frame_.SetClientPilotSyms(client_ul_pilot_syms, client_dl_pilot_syms);
-
-  ant_per_group_ = frame_.NumDLCalSyms();
-  RtAssert(ant_per_group_ % num_channels_ == 0,
-           "Number of Downlink calibration symbols per frame must be "
-           "multiplier of number of channels!");
-  ant_group_num_ =
-      frame_.IsRecCalEnabled() ? (bf_ant_num_ / ant_per_group_) : 0;
 
   if ((freq_orthogonal_pilot_ == false) &&
       (ue_ant_num_ != frame_.NumPilotSyms())) {
@@ -563,17 +565,18 @@ Config::Config(const std::string& jsonfile)
 
   this->running_.store(true);
   MLPD_INFO(
-      "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
-      "frame,\n\t%zu uplink data symbols per frame, %zu downlink data "
-      "symbols per frame,\n\t%zu OFDM subcarriers (%zu data subcarriers), "
-      "\n\tUL modulation %s, DL modulation %s,\n\t%zu UL codeblocks per "
-      "symbol, "
-      "%zu UL bytes per code block,\n\t%zu DL codeblocks per symbol, %zu DL "
-      "bytes per code block,"
-      "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
-      "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
-      "\n\tframe time %.3f usec \nUplink Max Mac data per-user tp (Mbps) %.3f "
-      "\nDownlink Max Mac data per-user tp (Mbps) %.3f \n",
+      "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per frame,\n"
+      "\t%zu uplink data symbols per frame, %zu downlink data symbols per "
+      "frame,\n"
+      "\t%zu OFDM subcarriers (%zu data subcarriers),\n"
+      "\tUL modulation %s, DL modulation %s,\n\t%zu UL codeblocks per symbol, "
+      "%zu UL bytes per code block,\n"
+      "\t%zu DL codeblocks per symbol, %zu DL bytes per code block,\n"
+      "\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame,\n"
+      "\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame,\n"
+      "\tFrame time %.3f usec\n"
+      "Uplink Max Mac data per-user tp (Mbps) %.3f\n"
+      "Downlink Max Mac data per-user tp (Mbps) %.3f \n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, ul_modulation_.c_str(),
       dl_modulation_.c_str(), ul_ldpc_config_.NumBlocksInSymbol(),
@@ -585,6 +588,13 @@ Config::Config(const std::string& jsonfile)
           (this->GetFrameDurationSec() * 1e6),
       (dl_mac_data_bytes_num_perframe_ * 8.0f) /
           (this->GetFrameDurationSec() * 1e6));
+
+  if (frame_.IsRecCalEnabled()) {
+    MLPD_INFO(
+        "Reciprical Calibration Enabled.  Full calibration data ready every "
+        "%zu frame(s) using %zu symbols per frame\n",
+        RecipCalFrameCnt(), frame_.NumDLCalSyms());
+  }
   Print();
 }
 
@@ -627,15 +637,15 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
   size_t max_zc_index =
       (std::find(zc_vec.begin(), zc_vec.end(), kMaxSupportedZc) -
        zc_vec.begin());
-  size_t maxUplinkUncodedBits =
+  size_t max_uplink_uncoded_bits =
       size_t(this->OfdmDataNum() * ul_code_rate * ul_mod_order_bits_);
   size_t zc = SIZE_MAX;
   size_t i = 0;
   for (; i < max_zc_index; i++) {
     if ((zc_vec.at(i) * LdpcNumInputCols(base_graph) * kCbPerSymbol <
-         maxUplinkUncodedBits) &&
+         max_uplink_uncoded_bits) &&
         (zc_vec.at(i + 1) * LdpcNumInputCols(base_graph) * kCbPerSymbol >
-         maxUplinkUncodedBits)) {
+         max_uplink_uncoded_bits)) {
       zc = zc_vec.at(i);
       break;
     }
@@ -694,15 +704,15 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   size_t max_zc_index =
       (std::find(zc_vec.begin(), zc_vec.end(), kMaxSupportedZc) -
        zc_vec.begin());
-  size_t maxDownlinkUncodedBits =
+  size_t max_downlink_uncoded_bits =
       size_t(this->GetOFDMDataNum() * dl_code_rate * dl_mod_order_bits_);
   size_t zc = SIZE_MAX;
   size_t i = 0;
   for (; i < max_zc_index; i++) {
     if ((zc_vec.at(i) * LdpcNumInputCols(base_graph) * kCbPerSymbol <
-         maxDownlinkUncodedBits) &&
+         max_downlink_uncoded_bits) &&
         (zc_vec.at(i + 1) * LdpcNumInputCols(base_graph) * kCbPerSymbol >
-         maxDownlinkUncodedBits)) {
+         max_downlink_uncoded_bits)) {
       zc = zc_vec.at(i);
       break;
     }
@@ -1396,8 +1406,6 @@ void Config::Print() const {
               << "Imbalance Cal: " << imbalance_cal_en_ << std::endl
               << "Bs Channel: " << channel_ << std::endl
               << "Ue Channel: " << ue_channel_ << std::endl
-              << "Ant Group num: " << ant_group_num_ << std::endl
-              << "Ant Per Group: " << ant_per_group_ << std::endl
               << "Max Frames: " << frames_to_test_ << std::endl
               << "Transport Block Size: " << transport_block_size_ << std::endl
               << "Noise Level: " << noise_level_ << std::endl

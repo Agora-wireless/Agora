@@ -40,4 +40,4 @@ class PacketTxRxRadio : public PacketTxRx {
   std::unique_ptr<RadioConfig> radio_config_;
 };
 
-#endif  // PACKETTXRX_H_
+#endif  // PACKETTXRX_RADIO_H_

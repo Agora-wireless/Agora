@@ -56,8 +56,12 @@ int main(int argc, char* argv[]) {
       std::ofstream create_file;
       data_filename = TOSTRING(PROJECT_DIRECTORY) +
                       std::string("/data/ul_increment_file.bin");
-      std::printf("Generating test binary file for user uplink%s\n",
-                  data_filename.c_str());
+      std::printf(
+          "Generating test binary file for user uplink %s.  Frames: "
+          "%zu, Packets: %zu, Packet Size: %zu\n",
+          data_filename.c_str(), cfg->FramesToTest(),
+          cfg->MacPacketsPerframe(Direction::kUplink),
+          cfg->MacPayloadMaxLength(Direction::kUplink));
 
       create_file.open(
           data_filename,
@@ -77,7 +81,7 @@ int main(int argc, char* argv[]) {
     }
 
     /* Share Main TX thread */
-    PinToCoreWithOffset(ThreadType::kMaster, FLAGS_core_offset, 0);
+    PinToCoreWithOffset(ThreadType::kMaster, FLAGS_core_offset, 0, true);
 
     try {
       SignalHandler signal_handler;
@@ -85,9 +89,9 @@ int main(int argc, char* argv[]) {
       std::unique_ptr<MacReceiver> receiver;
       std::vector<std::thread> rx_threads;
       //+1 for main thread
-      const size_t k_num_total_sender_threads =
+      const size_t num_total_sender_threads =
           FLAGS_num_sender_worker_threads + FLAGS_num_sender_update_threads;
-      size_t thread_start = FLAGS_core_offset + 1;
+      size_t thread_start = FLAGS_core_offset;
 
       // Register signal handler to handle kill signal
       signal_handler.SetupSignalHandlers();
@@ -102,8 +106,8 @@ int main(int argc, char* argv[]) {
             thread_start, FLAGS_num_sender_worker_threads,
             FLAGS_num_sender_update_threads, FLAGS_frame_duration, 0,
             FLAGS_enable_slow_start, true);
-        thread_start += k_num_total_sender_threads;
-        sender->StartTXfromMain(frame_start, frame_end);
+        thread_start += num_total_sender_threads;
+        sender->StartTxfromMain(frame_start, frame_end);
       }
 
       if (cfg->Frame().NumDlDataSyms() > 0) {

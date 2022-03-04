@@ -17,18 +17,18 @@
 // is the frame window that we track in Agora.
 static constexpr size_t kFrameWnd = 40;
 
-#define TX_FRAME_DELTA 8
-#define SETTLE_TIME_MS 1
+#define TX_FRAME_DELTA (4)
+#define SETTLE_TIME_MS (1)
 
 // Just-in-time optimization for MKL cgemm is available only after MKL 2019
 // update 3. Disable this on systems with an older MKL version.
 #if __INTEL_MKL__ >= 2020 || (__INTEL_MKL__ == 2019 && __INTEL_MKL_UPDATE__ > 3)
-#define USE_MKL_JIT 1
+#define USE_MKL_JIT (1)
 #else
-#define USE_MKL_JIT 0
+#define USE_MKL_JIT (0)
 #endif
 
-#define ENABLE_RB_IND 0
+#define ENABLE_RB_IND (0)
 
 /// Return true at compile time iff a constant is a power of two
 template <typename T>
@@ -118,7 +118,7 @@ enum class PrintType : int {
 static constexpr bool kEnableThreadPinning = true;
 static constexpr bool kEnableCoreReuse = false;
 
-#define BIGSTATION 0
+#define BIGSTATION (0)
 #if defined(USE_DPDK)
 static constexpr bool kUseDPDK = true;
 #else

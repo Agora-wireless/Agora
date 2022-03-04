@@ -56,7 +56,7 @@ class MacSender {
 
   // in_frame_start and in_frame_end must have space for at least
   // kNumStatsFrames entries
-  void StartTXfromMain(double* in_frame_start, double* in_frame_end);
+  void StartTxfromMain(double* in_frame_start, double* in_frame_end);
 
  private:
   void* MasterThread(size_t tid);
@@ -126,6 +126,7 @@ class MacSender {
   const std::string server_address_;
   const size_t server_rx_port_;
   std::function<size_t(size_t)> get_data_symbol_id_;
+  const bool has_master_thread_;
 };
 
 #endif  // MAC_SENDER_H_

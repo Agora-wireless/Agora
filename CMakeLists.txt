@@ -232,6 +232,8 @@ include_directories(
   src/agora/txrx/
   src/agora/txrx/workers
   src/client/
+  src/client/txrx
+  src/client/txrx/workers
   /usr/include/mkl/
   src/data_generator)
 
@@ -258,6 +260,11 @@ set(COMMON_SOURCES
   src/encoder/iobuffer.cc)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
+set(SHARED_TXRX_SOURCES
+  src/agora/txrx/packet_txrx.cc
+  src/agora/txrx/workers/txrx_worker.cc)
+add_library(shared_txrx_sources_lib OBJECT ${SHARED_TXRX_SOURCES})
+
 if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
   set(AGORA_SOURCES
@@ -277,11 +284,10 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/radio_lib.cc
   src/agora/radio_calibrate.cc
   src/mac/mac_thread_basestation.cc
-  src/agora/txrx/packet_txrx.cc
+  src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/packet_txrx_radio.cc
-  src/agora/txrx/workers/txrx_worker.cc
   src/agora/txrx/workers/txrx_worker_sim.cc
-  src/agora/txrx/workers/txrx_worker_argos.cc
+  src/agora/txrx/workers/txrx_worker_hw.cc
   src/agora/txrx/workers/txrx_worker_usrp.cc)
 
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
@@ -292,7 +298,10 @@ set(CLIENT_SOURCES
   src/client/client_radio.cc
   src/client/ue_worker.cc
   src/client/phy-ue.cc
-  src/client/txrx_client.cc
+  src/client/txrx/packet_txrx_client_sim.cc
+  src/client/txrx/packet_txrx_client_radio.cc
+  src/client/txrx/workers/txrx_worker_client_sim.cc
+   src/client/txrx/workers/txrx_worker_client_hw.cc
   src/mac/mac_thread_client.cc)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
   
@@ -316,6 +325,7 @@ set(COMMON_LIBS armadillo -lnuma ${DPDK_LIBRARIES} ${MKL_LIBS} ${SOAPY_LIB}
 add_executable(agora
   src/agora/main.cc
   $<TARGET_OBJECTS:agora_sources_lib>
+  $<TARGET_OBJECTS:shared_txrx_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(agora ${COMMON_LIBS})
 
@@ -329,6 +339,7 @@ target_compile_definitions(data_generator PRIVATE GENERATE_DATA)
 add_executable(user
   src/client/user-main.cc
   $<TARGET_OBJECTS:client_sources_lib>
+  $<TARGET_OBJECTS:shared_txrx_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(user ${COMMON_LIBS})
 
@@ -375,6 +386,7 @@ target_link_libraries(radio_test ${COMMON_LIBS})
 add_executable(test_agora
   test/test_agora/main.cc
   $<TARGET_OBJECTS:agora_sources_lib>
+  $<TARGET_OBJECTS:shared_txrx_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(test_agora ${COMMON_LIBS})
 
@@ -400,6 +412,7 @@ foreach(test_name IN LISTS UNIT_TESTS)
   add_executable(${test_name}
     test/unit_tests/${test_name}.cc
     $<TARGET_OBJECTS:agora_sources_lib>
+    $<TARGET_OBJECTS:shared_txrx_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)
 
   # Unit tests should pass without memory errors

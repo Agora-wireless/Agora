@@ -46,8 +46,9 @@ MacThreadBaseStation::MacThreadBaseStation(
         std::vector<size_t>(cfg->Frame().NumUlDataSyms()));
   }
 
+  // The frame data will hold the data comming from the Phy (Received)
   for (auto& v : server_.frame_data_) {
-    v.resize(cfg_->MacDataBytesNumPerframe(Direction::kDownlink));
+    v.resize(cfg_->MacDataBytesNumPerframe(Direction::kUplink));
   }
 
   const size_t udp_pkt_len =
@@ -130,7 +131,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
   const size_t data_symbol_index_start =
       cfg_->Frame().GetULSymbol(num_pilot_symbols);
   const size_t data_symbol_index_end = cfg_->Frame().GetULSymbolLast();
-  const size_t max_data_bytes_per_frame =
+  const size_t mac_data_bytes_per_frame =
       cfg_->MacDataBytesNumPerframe(Direction::kUplink);
   const size_t num_mac_packets_per_frame =
       cfg_->MacPacketsPerframe(Direction::kUplink);
@@ -158,7 +159,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
     ss << "MacThreadBasestation: Received frame " << pkt->Frame() << ":"
        << frame_id << " symbol " << pkt->Symbol() << ":" << symbol_id
        << " user " << pkt->Ue() << ":" << ue_id << " length "
-       << pkt->PayloadLength() << ":" << mac_payload_max_length << " crc "
+       << pkt->PayloadLength() << ":" << dest_packet_size << " crc "
        << pkt->Crc() << " copied to offset " << frame_data_offset << std::endl;
 
     if (kLogMacPackets) {
@@ -168,7 +169,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
          << "UE_ID: " << pkt->Ue() << std::endl
          << "DATLEN: " << pkt->PayloadLength() << std::endl
          << "PAYLOAD:" << std::endl;
-      for (size_t i = 0; i < mac_payload_max_length; i++) {
+      for (size_t i = 0; i < dest_packet_size; i++) {
         ss << std::to_string(pkt->Data()[i]) << " ";
       }
       ss << std::endl;
@@ -209,7 +210,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
   }
 
   // When the frame is full, send it to the application
-  if (server_.n_filled_in_frame_.at(ue_id) == max_data_bytes_per_frame) {
+  if (server_.n_filled_in_frame_.at(ue_id) == mac_data_bytes_per_frame) {
     server_.n_filled_in_frame_.at(ue_id) = 0;
     /// Spot to be optimized #2 -- left shift data over to remove padding
     bool shifted = false;
@@ -217,7 +218,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
     size_t dest_offset = 0;
     for (size_t packet = 0; packet < num_mac_packets_per_frame; packet++) {
       const size_t rx_packet_size = server_.data_size_.at(ue_id).at(packet);
-      if (rx_packet_size < mac_payload_max_length || (shifted == true)) {
+      if ((rx_packet_size < mac_payload_max_length) || (shifted == true)) {
         shifted = true;
         if (rx_packet_size > 0) {
           std::memmove(&server_.frame_data_.at(ue_id).at(dest_offset),
@@ -235,7 +236,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
     }
 
     ss << "MacThreadBasestation: Sent data for frame " << frame_id << ", ue "
-       << ue_id << ", size " << dest_offset << ":" << max_data_bytes_per_frame
+       << ue_id << ", size " << dest_offset << ":" << mac_data_bytes_per_frame
        << std::endl;
 
     if (kLogMacPackets) {
@@ -510,7 +511,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
   MLPD_FRAME("MacThreadBasestation: Tx mac information to %zu %zu\n",
              next_radio_id_, radio_buf_id);
   RtAssert(tx_queue_->enqueue(msg),
-           "MacThreadBasestation: Failed to enqueue uplink packet");
+           "MacThreadBasestation: Failed to enqueue downlink packet");
 
   radio_buf_id = (radio_buf_id + 1) % kFrameWnd;
   // Might be unnecessary now.
