@@ -198,9 +198,8 @@ add_definitions(-DTHREADED_INIT)
 set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS)
 
-set(USE_SPDLOG True CACHE STRING "USE_SPDLOG defaulting to 'True'")
+set(USE_SPDLOG False CACHE STRING "USE_SPDLOG defaulting to 'False'")
 message(STATUS "USE_SPDLOG: ${USE_SPDLOG}")
-set(USE_SPDLOG True CACHE STRING "USE_SPDLOG defaulting to 'True'")
 if(USE_SPDLOG)
   if(LOG_LEVEL STREQUAL "none")
     add_definitions(-DSPDLOG_LEVEL=spdlog::level::off)
@@ -443,7 +442,7 @@ endforeach()
 # Unit tests
 set(UNIT_TESTS test_datatype_conversion test_udp_client_server
   test_concurrent_queue test_zf test_zf_threaded test_demul_threaded 
-  test_ptr_grid test_recipcal test_avx512_complex_mul test_scrambler
+  test_ptr_grid test_avx512_complex_mul test_scrambler
   test_256qam_demod)
 
 foreach(test_name IN LISTS UNIT_TESTS)
