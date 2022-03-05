@@ -61,53 +61,53 @@ void DyPrecode::Launch(
     //     = std::min(cfg_->demul_block_size, (cfg_->bs_server_addr_idx + 1) * cfg_->get_num_sc_per_server() - base_sc_id);
     int max_sc_ite = std::min(cfg_->demul_block_size, 
         std::min(cfg_->subcarrier_start + (tid_ + 1) * cfg_->subcarrier_block_size, cfg_->subcarrier_end) - base_sc_id);
-    assert(max_sc_ite % kSCsPerCacheline == 0);
+    // assert(max_sc_ite % kSCsPerCacheline == 0);
 
     // Begin Debug
     // printf("DL mod data base sc %u:\n", base_sc_id);
     // End Debug
 
-    for (int i = 0; i < max_sc_ite; i = i + 4) {
-        for (int j = 0; j < 4; j++) {
-            int cur_sc_id = base_sc_id + i + j;
+    for (int i = 0; i < max_sc_ite; i ++) {
+        // for (int j = 0; j < 4; j++) {
+        int cur_sc_id = base_sc_id + i;
 
-            complex_float* data_ptr = modulated_buffer_temp_;
-            for (size_t user_id = 0; user_id < cfg_->UE_NUM; user_id++) {
-                int8_t* raw_data_ptr
-                    = cfg_->get_encoded_buf(encoded_buffer_to_precode_, frame_id,
-                    symbol_id_dl, user_id) + cur_sc_id * cfg_->mod_order_bits;
-                if (cur_sc_id % cfg_->OFDM_PILOT_SPACING == 0)
-                    data_ptr[user_id]
-                        = cfg_->ue_specific_pilot[user_id][cur_sc_id];
-                else
-                    data_ptr[user_id] = mod_single_uint8(
-                        (uint8_t) * (raw_data_ptr), cfg_->mod_table);
-            }
+        complex_float* data_ptr = modulated_buffer_temp_;
+        for (size_t user_id = 0; user_id < cfg_->UE_NUM; user_id++) {
+            int8_t* raw_data_ptr
+                = cfg_->get_encoded_buf(encoded_buffer_to_precode_, frame_id,
+                symbol_id_dl, user_id) + cur_sc_id * cfg_->mod_order_bits;
+            if (cur_sc_id % cfg_->OFDM_PILOT_SPACING == 0)
+                data_ptr[user_id]
+                    = cfg_->ue_specific_pilot[user_id][cur_sc_id];
+            else
+                data_ptr[user_id] = mod_single_uint8(
+                    (uint8_t) * (raw_data_ptr), cfg_->mod_table);
+        }
 
-            // Begin Debug
-            // printf("(%lf %lf) ", data_ptr[0].re, data_ptr[0].im);
-            // if (frame_id == 800 && symbol_id_dl == 7 && base_sc_id == 304) {
-            //     printf("| ");
-            //     for (size_t k = 0; k < cfg_->UE_NUM; k ++) {
-            //         printf("(%lf %lf) ", data_ptr[k].re, data_ptr[k].im);
-            //     }
-            //     printf("| ");
-            // }
-            // End Debug
+        // Begin Debug
+        // printf("(%lf %lf) ", data_ptr[0].re, data_ptr[0].im);
+        // if (frame_id == 800 && symbol_id_dl == 7 && base_sc_id == 304) {
+        //     printf("| ");
+        //     for (size_t k = 0; k < cfg_->UE_NUM; k ++) {
+        //         printf("(%lf %lf) ", data_ptr[k].re, data_ptr[k].im);
+        //     }
+        //     printf("| ");
+        // }
+        // End Debug
 
-            auto* precoder_ptr = reinterpret_cast<cx_float*>(
-                dl_zf_matrices_[frame_id % kFrameWnd]
-                               [cfg_->get_zf_sc_id(cur_sc_id)]);
+        auto* precoder_ptr = reinterpret_cast<cx_float*>(
+            dl_zf_matrices_[frame_id % kFrameWnd]
+                            [cfg_->get_zf_sc_id(cur_sc_id)]);
 
-            cx_fmat mat_precoder(
-                precoder_ptr, cfg_->UE_NUM, cfg_->BS_ANT_NUM, false);
-            cx_fmat mat_data((cx_float*)data_ptr, 1, cfg_->UE_NUM, false);
-            cx_float* precoded_ptr
-                = (cx_float*)precoded_buffer_temp_ + (i + j) * cfg_->BS_ANT_NUM;
-            cx_fmat mat_precoded(precoded_ptr, 1, cfg_->BS_ANT_NUM, false);
+        cx_fmat mat_precoder(
+            precoder_ptr, cfg_->UE_NUM, cfg_->BS_ANT_NUM, false);
+        cx_fmat mat_data((cx_float*)data_ptr, 1, cfg_->UE_NUM, false);
+        cx_float* precoded_ptr
+            = (cx_float*)precoded_buffer_temp_ + i * cfg_->BS_ANT_NUM;
+        cx_fmat mat_precoded(precoded_ptr, 1, cfg_->BS_ANT_NUM, false);
 
-            mkl_jit_cgemm[cfg_->UE_NUM](jitter[cfg_->UE_NUM], (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
-                (MKL_Complex8*)precoded_ptr);
+        mkl_jit_cgemm[cfg_->UE_NUM](jitter[cfg_->UE_NUM], (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
+            (MKL_Complex8*)precoded_ptr);
 
             // mat_precoded = mat_data * mat_precoder;
 
@@ -117,7 +117,7 @@ void DyPrecode::Launch(
             // cout << "Precoder: \n" << mat_precoder << endl;
             // cout << "Data: \n" << mat_data << endl;
             // cout << "Precoded data: \n" << mat_precoded << endl;
-        }
+        // }
     }
 
     // Begin Debug
@@ -141,12 +141,30 @@ void DyPrecode::Launch(
             = ant_id + cfg_->BS_ANT_NUM * total_data_symbol_idx;
         float* ifft_ptr
             = (float*)&dl_ifft_buffer_[ifft_buffer_offset][base_sc_id];
-        for (size_t i = 0; i < cfg_->demul_block_size / 4; i++) {
+        // for (size_t i = 0; i < cfg_->demul_block_size / 4; i++) {
+        size_t pre_sc_off = 0;
+        if (base_sc_id % 4 > 0) {
+            pre_sc_off = 4 - base_sc_id % 4;
+            for (size_t i = 0; i < pre_sc_off; i ++) {
+                memcpy(ifft_ptr + i * 2, 
+                    precoded_ptr + i * 2 * cfg_->BS_ANT_NUM + ant_id * 2,
+                    2 * sizeof(float));
+            }
+        }
+        rt_assert(max_sc_ite > pre_sc_off, "Invalid subcarrier allocation (too small)!");
+        for (size_t i = 0; i < (max_sc_ite - pre_sc_off) / 4; i ++) {
             float* input_shifted_ptr
-                = precoded_ptr + 4 * i * 2 * cfg_->BS_ANT_NUM + ant_id * 2;
+                = precoded_ptr + (4 * i + pre_sc_off) * 2 * cfg_->BS_ANT_NUM + ant_id * 2;
             __m256d t_data
                 = _mm256_i64gather_pd((double*)input_shifted_ptr, index, 8);
-            _mm256_store_pd((double*)(ifft_ptr + i * 8), t_data);
+            _mm256_store_pd((double*)(ifft_ptr + pre_sc_off * 2 + i * 8), t_data);
+        }
+        if ((max_sc_ite - pre_sc_off) % 4 > 0) {
+            for (size_t i = 0; i < (max_sc_ite - pre_sc_off) % 4; i ++) {
+                memcpy(ifft_ptr + pre_sc_off * 2 + (max_sc_ite - pre_sc_off) / 4 * 8 + i * 2, 
+                    precoded_ptr + (((max_sc_ite - pre_sc_off) / 4) * 4 + i + pre_sc_off) * 2 * cfg_->BS_ANT_NUM + ant_id * 2,
+                    2 * sizeof(float));
+            }
         }
     }
 
