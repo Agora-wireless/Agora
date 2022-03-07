@@ -44,7 +44,7 @@ class TxRxWorkerClientHw : public TxRxWorker {
                          size_t sample_window);
   void AdjustRx(size_t local_interface, size_t discard_samples);
   bool IsRxSymbol(size_t symbol_id);
-  void TxUplinkSymbols(size_t interface_id, size_t frame_id, long long time0);
+  void TxUplinkSymbols(size_t radio_id, size_t frame_id, long long time0);
   void TxPilot(size_t pilot_ant, size_t frame_id, long long time0);
 
   // This object is created / owned by the parent process
