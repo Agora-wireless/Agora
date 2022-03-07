@@ -11,7 +11,7 @@
 static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
-static constexpr size_t kUseInverseForZF = 1u;
+static constexpr bool kUseInverseForZF = true;
 static constexpr bool kUseUlZfForDownlink = true;
 
 DoZF::DoZF(Config* config, int tid,
@@ -97,7 +97,7 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
   arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(ul_zf_mem),
                           cfg_->UeAntNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_zf_tmp;
-  if (kUseInverseForZF != 0u) {
+  if (kUseInverseForZF) {
     try {
       mat_ul_zf_tmp = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
     } catch (std::runtime_error&) {
@@ -117,13 +117,17 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
       // This probably causes a performance hit since we are throwing
       // magnitude info away by taking the sign of the calibration matrix
       arma::cx_fmat calib_mat = arma::diagmat(arma::sign(calib_sc_vec));
-      mat_dl_zf_tmp = mat_ul_zf_tmp * inv(calib_mat);
+      mat_dl_zf_tmp = mat_ul_zf_tmp * arma::inv(calib_mat);
     } else {
       arma::cx_fmat mat_dl_csi = arma::diagmat(calib_sc_vec) * mat_csi;
-      try {
-        mat_dl_zf_tmp =
-            arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
-      } catch (std::runtime_error&) {
+      if (kUseInverseForZF) {
+        try {
+          mat_dl_zf_tmp =
+              arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
+        } catch (std::runtime_error&) {
+          arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
+        }
+      } else {
         arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
       }
     }
