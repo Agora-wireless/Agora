@@ -6,6 +6,8 @@
 
 #include <SoapySDR/Logger.hpp>
 
+#include "SoapyRPCSocket.hpp"
+#include "SoapyURLUtils.hpp"
 #include "comms-lib.h"
 #include "nlohmann/json.hpp"
 
@@ -18,7 +20,6 @@ static constexpr size_t kHubMissingWaitMs = 100;
 RadioConfigNoRxStream::RadioConfigNoRxStream(Config* cfg)
     : cfg_(cfg), num_radios_initialized_(0), num_radios_configured_(0) {
   SoapySDR::Kwargs args;
-  SoapySDR::Kwargs sargs;
   // load channels
   auto channels = Utils::StrToChannels(cfg_->Channel());
   ///Reduce the soapy log level
@@ -90,16 +91,6 @@ RadioConfigNoRxStream::RadioConfigNoRxStream(Config* cfg)
 
   for (auto& join_thread : init_bs_threads) {
     join_thread.join();
-  }
-
-  // Perform DC Offset & IQ Imbalance Calibration
-  if (cfg_->ImbalanceCalEn()) {
-    if (cfg_->Channel().find('A') != std::string::npos) {
-      DciqCalibrationProc(0);
-    }
-    if (cfg_->Channel().find('B') != std::string::npos) {
-      DciqCalibrationProc(1);
-    }
   }
 
   std::vector<std::thread> config_bs_threads;
@@ -208,9 +199,6 @@ RadioConfigNoRxStream::RadioConfigNoRxStream(Config* cfg)
 }
 
 RadioConfigNoRxStream::~RadioConfigNoRxStream() {
-  FreeBuffer1d(&init_calib_dl_processed_);
-  FreeBuffer1d(&init_calib_ul_processed_);
-
   if (radio_num_ != ba_stn_.size()) {
     std::printf(
         "**************************** BAD NEWS ****************************");
@@ -233,7 +221,6 @@ void RadioConfigNoRxStream::InitBsRadio(size_t tid) {
   size_t i = tid;
   auto channels = Utils::StrToChannels(cfg_->Channel());
   SoapySDR::Kwargs args;
-  SoapySDR::Kwargs sargs;
   args["timeout"] = "1000000";
   args["driver"] = "iris";
   args["serial"] = cfg_->RadioId().at(i);
@@ -262,6 +249,8 @@ void RadioConfigNoRxStream::InitBsRadio(size_t tid) {
 
   // resets the DATA_clk domain logic.
   ba_stn_.at(i)->writeSetting("RESET_DATA_LOGIC", "");
+
+  ConfigureRx(i);
 
   //rx_streams_.at(i) =
   //    ba_stn_.at(i)->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
@@ -338,96 +327,105 @@ void RadioConfigNoRxStream::ConfigureBsRadio(size_t tid) {
   num_radios_configured_.fetch_add(1);
 }
 
-bool RadioConfigNoRxStream::RadioStart() {
-  bool good_calib = false;
-  AllocBuffer1d(&init_calib_dl_processed_,
-                cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
-                Agora_memory::Alignment_t::kAlign64, 1);
-  AllocBuffer1d(&init_calib_ul_processed_,
-                cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
-                Agora_memory::Alignment_t::kAlign64, 1);
-  // initialize init_calib to a matrix of zeros
-  for (size_t i = 0; i < cfg_->OfdmDataNum() * cfg_->BfAntNum(); i++) {
-    init_calib_dl_processed_[i] = 0;
-    init_calib_ul_processed_[i] = 0;
+void RadioConfigNoRxStream::ConfigureRx(size_t radio_id) {
+  //SoapySDR::Kwargs sargs;
+  //auto channels = Utils::StrToChannels(cfg_->Channel());
+  //rx_streams_.at(radio_id) =
+  //    ba_stn_.at(radio_id)->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
+
+  std::string stream_protocol =
+      ba_stn_.at(radio_id)->readSetting("STREAM_PROTOCOL");
+  if (stream_protocol != "twbw64") {
+    throw std::runtime_error("Stream protocol mismatch");
   }
 
-  calib_meas_num_ = cfg_->InitCalibRepeat();
-  if (calib_meas_num_ != 0u) {
-    init_calib_ul_.Calloc(calib_meas_num_,
-                          cfg_->OfdmDataNum() * cfg_->BfAntNum(),
-                          Agora_memory::Alignment_t::kAlign64);
-    init_calib_dl_.Calloc(calib_meas_num_,
-                          cfg_->OfdmDataNum() * cfg_->BfAntNum(),
-                          Agora_memory::Alignment_t::kAlign64);
-    if (cfg_->Frame().NumDLSyms() > 0) {
-      int iter = 0;
-      int max_iter = 1;
-      std::cout << "Start initial reciprocity calibration..." << std::endl;
-      while (good_calib == false) {
-        good_calib = InitialCalib(cfg_->SampleCalEn());
-        iter++;
-        if ((iter == max_iter) && (good_calib == false)) {
-          std::cout << "attempted " << max_iter
-                    << " unsucessful calibration, stopping ..." << std::endl;
-          break;
-        }
-      }
-      if (good_calib == false) {
-        return good_calib;
-      } else {
-        std::cout << "initial calibration successful!" << std::endl;
-      }
-      // process initial measurements
-      arma::cx_fcube calib_dl_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                   calib_meas_num_, arma::fill::zeros);
-      arma::cx_fcube calib_ul_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                   calib_meas_num_, arma::fill::zeros);
-      for (size_t i = 0; i < calib_meas_num_; i++) {
-        arma::cx_fmat calib_dl_mat(init_calib_dl_[i], cfg_->OfdmDataNum(),
-                                   cfg_->BfAntNum(), false);
-        arma::cx_fmat calib_ul_mat(init_calib_ul_[i], cfg_->OfdmDataNum(),
-                                   cfg_->BfAntNum(), false);
-        calib_dl_cube.slice(i) = calib_dl_mat;
-        calib_ul_cube.slice(i) = calib_ul_mat;
-        if (kPrintCalibrationMats) {
-          Utils::PrintMat(calib_dl_mat, "calib_dl_mat" + std::to_string(i));
-          Utils::PrintMat(calib_ul_mat, "calib_ul_mat" + std::to_string(i));
-          Utils::PrintMat(calib_dl_mat / calib_ul_mat,
-                          "calib_mat" + std::to_string(i));
-        }
-        if (kRecordCalibrationMats == true) {
-          Utils::SaveMat(calib_dl_mat, "calib_dl_mat.m",
-                         "init_calib_dl_mat" + std::to_string(i),
-                         i > 0 /*append*/);
-          Utils::SaveMat(calib_ul_mat, "calib_ul_mat.m",
-                         "init_calib_ul_mat" + std::to_string(i),
-                         i > 0 /*append*/);
-        }
-      }
-      arma::cx_fmat calib_dl_mean_mat(init_calib_dl_processed_,
-                                      cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                      false);
-      arma::cx_fmat calib_ul_mean_mat(init_calib_ul_processed_,
-                                      cfg_->OfdmDataNum(), cfg_->BfAntNum(),
-                                      false);
-      calib_dl_mean_mat = arma::mean(calib_dl_cube, 2);  // mean along dim 2
-      calib_ul_mean_mat = arma::mean(calib_ul_cube, 2);  // mean along dim 2
-      if (kPrintCalibrationMats) {
-        Utils::PrintMat(calib_dl_mean_mat, "calib_dl_mat");
-        Utils::PrintMat(calib_ul_mean_mat, "calib_ul_mat");
-        Utils::PrintMat(calib_dl_mean_mat / calib_ul_mean_mat, "calib_mat");
-      }
-      if (kRecordCalibrationMats == true) {
-        Utils::SaveMat(calib_dl_mean_mat, "calib_dl_mat.m",
-                       "init_calib_dl_mat_mean", true /*append*/);
-        Utils::SaveMat(calib_ul_mean_mat, "calib_ul_mat.m",
-                       "init_calib_ul_mat_mean", true /*append*/);
-      }
-    }
-    init_calib_dl_.Free();
-    init_calib_ul_.Free();
+  //query remote iris endpoint configuration
+  const auto remote_address =
+      ba_stn_.at(radio_id)->readSetting("ETH0_IPv6_ADDR");
+  const auto remote_port =
+      ba_stn_.at(radio_id)->readSetting("UDP_SERVICE_PORT");
+  if (remote_address.empty()) {
+    throw std::runtime_error(
+        "Iris::setupStream: Failed to query Iris IPv6 address");
   }
+  if (remote_port.empty()) {
+    throw std::runtime_error(
+        "Iris::setupStream: Failed to query Iris UDP service port");
+  }
+
+  //ipv6 mac and scope for the remote socket
+  std::string ethName;
+  unsigned long long localMac64(0);
+  int localScopeId(-1);
+  // {
+  //   sklk_SoapyRPCSocket junkSock;
+  //   //junkSock.connect(args.at("remote"));
+  //   SoapyURL url(junkSock.getsockname());
+  //   SockAddrData addr;
+  //   auto err = url.toSockAddr(addr);
+  //   sockAddrInterfaceLookup(addr.addr(), ethName, localMac64, localScopeId);
+  //   if (ethName.empty())
+  //     throw std::runtime_error(
+  //         "Iris::setupStream: Failed to determine ethernet device name for " +
+  //         url.getNode());
+  //   if (localMac64 == 0)
+  //     throw std::runtime_error(
+  //         "Iris::setupStream: Failed to lookup network hardware address for " +
+  //         ethName);
+  //   if (localScopeId == -1)
+  //     throw std::runtime_error(
+  //         "Iris::setupStream: Failed to discover the IPv6 scope ID\n"
+  //         "  (Does interface='" +
+  //         ethName + "' have an IPv6 address)?");
+  //   std::printf("Using local ethernet interface: %s", ethName.c_str());
+  // }
+
+  //get the scope id to get the remote ipv6 address with the local scope id
+  const auto percentPos = remote_address.find_last_of('%');
+  //if (percentPos != std::string::npos) {
+  //  remote_address =
+  //      remote_address.substr(0, percentPos + 1) + std::to_string(localScopeId);
+  //}
+
+  //Setup the socket
+  sklk_SoapyRPCSocket sock;
+  const SoapyURL bindURL("udp", "::", "0");
+  int ret = sock.bind(bindURL.toString());
+  if (ret != 0)
+    throw std::runtime_error("Iris::setupStream: Failed to bind to " +
+                             bindURL.toString() + ": " + sock.lastErrorMsg());
+  const SoapyURL connectURL("udp", remote_address, remote_port);
+  ret = sock.connect(connectURL.toString());
+  if (ret != 0)
+    throw std::runtime_error("Iris::setupStream: Failed to connect to " +
+                             connectURL.toString() + ": " +
+                             sock.lastErrorMsg());
+
+  //lookup the local mac address to program the framer
+  SoapyURL localEp(sock.getsockname());
+
+  std::printf(" eth_dst %s\n ip6_dst %s\n udp_dst %s\n",
+              std::to_string(localMac64).c_str(), localEp.getNode().c_str(),
+              localEp.getService().c_str());
+
+  //pass arguments within the args to program the framer
+  //SoapySDR::Kwargs args(_args);
+  //args["iris:eth_dst"] = std::to_string(localMac64);
+  //args["iris:ip6_dst"] = localEp.getNode();
+  //args["iris:udp_dst"] = localEp.getService();
+  //args["iris:mtu"] = std::to_string(data->mtuElements);
+  //SoapySDR::logf(
+  //    SOAPY_SDR_INFO,
+  //    "mtu %d bytes -> %d samples X %d channels, %d bytes per element",
+  //    int(mtu), int(data->mtuElements), int(data->numHostChannels),
+  //    int(data->bytesPerElement));
+
+  //Setup the socket
+  throw std::runtime_error("end of program");
+}
+
+bool RadioConfigNoRxStream::RadioStart() {
+  bool good_calib = false;
 
   DrainBuffers();
   nlohmann::json conf;
@@ -491,10 +489,6 @@ bool RadioConfigNoRxStream::RadioStart() {
       ba_stn_.at(i)->writeSetting("BEACON_START", std::to_string(radio_num_));
     }
     ba_stn_.at(i)->setHardwareTime(0, "TRIGGER");
-  }
-  if (!cfg_->HwFramer()) {
-    Go();  // to set all radio timestamps to zero
-    int flags = SOAPY_SDR_HAS_TIME;
   }
   std::cout << "radio start done!" << std::endl;
   return true;

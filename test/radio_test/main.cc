@@ -175,6 +175,7 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
   if (kUseArgos) {
     // Makes the soapy remove "HUB" / InitBsRadio / ConfigureBsRadio
     auto radioconfig_ = std::make_unique<RadioConfigNoRxStream>(cfg);
+
     radioconfig_->RadioStart();
 
     //Radio Trigger (start rx)
