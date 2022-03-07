@@ -9,6 +9,7 @@
 #include "phy-ue.h"
 #include "signal_handler.h"
 #include "version_config.h"
+#include "csv_logger.h"
 
 DEFINE_string(conf_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/userconfig_512.json",
@@ -30,6 +31,7 @@ int main(int argc, char* argv[]) {
   } else {
     filename = FLAGS_conf_file;
   }
+  CsvLogSetDev(FLAGS_ue_id);
   auto config = std::make_unique<Config>(filename.c_str(), FLAGS_ue_id);
   config->GenData();
   int ret;
@@ -48,5 +50,6 @@ int main(int argc, char* argv[]) {
 
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
+  //CsvLogEnd();
   return ret;
 }

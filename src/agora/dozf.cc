@@ -4,6 +4,7 @@
  * subcarrier.
  */
 #include "dozf.h"
+#include "csv_logger.h"
 
 #include "concurrent_queue_wrapper.h"
 #include "doer.h"
