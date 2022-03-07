@@ -4,6 +4,7 @@
  * each worker.
  */
 #include "ue_worker.h"
+#include "csv_logger.h"
 
 #include <memory>
 
@@ -184,10 +185,14 @@ void UeWorker::DoFftPilot(size_t tag) {
       signal_power += std::pow(std::abs(samples_vec[i]), 2);
     }
     float snr = 10 * std::log10(signal_power / noise_power);
+#if (ENABLE_CSV_LOGGER == false)
     std::printf(
         "UeWorker: Fft Pilot(frame %zu symbol %zu ant %zu) sig offset "
         "%zu, SNR %2.1f \n",
         frame_id, symbol_id, ant_id, pilot_offset, snr);
+#endif
+    CSV_LOG(kCsvLogRFSNR, "%zu,%zu,%zu,%zu,%2.1f\n",
+            frame_id, symbol_id, ant_id, pilot_offset, snr);
   }
 
   if (kRecordDownlinkFrame) {
@@ -376,11 +381,15 @@ void UeWorker::DoFftData(size_t tag) {
                                    std::string("_") + std::to_string(ant_id));
   }
   if (kPrintPhyStats) {
+#if (ENABLE_CSV_LOGGER == false)
     std::stringstream ss;
     ss << "Frame: " << frame_id << ", Symbol: " << symbol_id
        << ", User: " << ant_id << ", EVM: " << 100 * evm
        << "%, SNR: " << -10 * std::log10(evm) << std::endl;
     std::cout << ss.str();
+#endif
+    CSV_LOG(kCsvLogEVMSNR, "%zu,%zu,%zu,%f,%f\n",
+            frame_id, symbol_id, ant_id, 100 * evm, -10 * std::log10(evm));
   }
 
   if (kDebugPrintPerTaskDone || kDebugPrintFft) {
@@ -477,8 +486,12 @@ void UeWorker::DoDemul(size_t tag) {
       }
     }
     if (block_error > 0) {
+#if (ENABLE_CSV_LOGGER == false)
       std::printf("Frame %zu Symbol %zu Ue %zu: %zu symbol errors\n", frame_id,
                   symbol_id, ant_id, block_error);
+#endif
+      CSV_LOG(kCsvLogSE, "%zu,%zu,%zu,%zu\n",
+              frame_id, symbol_id, ant_id, block_error);
     }
     phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, block_error);
   }
