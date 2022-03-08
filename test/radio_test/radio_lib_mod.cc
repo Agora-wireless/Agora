@@ -66,6 +66,8 @@ RadioConfigNoRxStream::RadioConfigNoRxStream(Config* cfg)
   }
 
   ba_stn_.resize(radio_num_);
+  tx_streams_.resize(radio_num_);
+  rx_streams_.resize(radio_num_);
   std::vector<std::thread> init_bs_threads;
 
   for (size_t i = 0; i < radio_num_; i++) {
@@ -205,6 +207,8 @@ RadioConfigNoRxStream::~RadioConfigNoRxStream() {
   }
 
   for (size_t i = 0; i < radio_num_; i++) {
+    ba_stn_.at(i)->closeStream(rx_streams_.at(i));
+    ba_stn_.at(i)->closeStream(tx_streams_.at(i));
     SoapySDR::Device::unmake(ba_stn_.at(i));
     ba_stn_.at(i) = nullptr;
   }
@@ -220,6 +224,7 @@ void RadioConfigNoRxStream::InitBsRadio(size_t tid) {
   size_t i = tid;
   auto channels = Utils::StrToChannels(cfg_->Channel());
   SoapySDR::Kwargs args;
+  SoapySDR::Kwargs sargs;
   args["timeout"] = "1000000";
   args["driver"] = "iris";
   args["serial"] = cfg_->RadioId().at(i);
@@ -253,8 +258,8 @@ void RadioConfigNoRxStream::InitBsRadio(size_t tid) {
 
   //rx_streams_.at(i) =
   //    ba_stn_.at(i)->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
-  //tx_streams_.at(i) =
-  //    ba_stn_.at(i)->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
+  tx_streams_.at(i) =
+      ba_stn_.at(i)->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
   num_radios_initialized_.fetch_add(1);
 }
 
@@ -361,7 +366,7 @@ void RadioConfigNoRxStream::ConfigureRx(size_t radio_id) {
 
   //ipv6 mac and scope for the remote socket
   //std::string ethName;
-  unsigned long long localMac64(0);
+  //unsigned long long localMac64(0);
   int local_interface(-1);
   // {
   //   sklk_SoapyRPCSocket junkSock;
@@ -420,10 +425,14 @@ void RadioConfigNoRxStream::ConfigureRx(size_t radio_id) {
   //lookup the local mac address to program the framer
   SoapyURL local_endpoint(sock.getsockname());
 
-  std::printf(" eth_dst %s\n ip6_dst %s\n udp_dst %s\n",
-              std::to_string(localMac64).c_str(),
-              local_endpoint.getNode().c_str(),
+  std::printf(" ip6_dst %s\n udp_dst %s\n", local_endpoint.getNode().c_str(),
               local_endpoint.getService().c_str());
+
+  SoapySDR::Kwargs sargs;
+  sargs["iris:ip6_dst"] = local_endpoint.getNode();
+  sargs["iris:udp_dst"] = local_endpoint.getService();
+  rx_streams_.at(radio_id) = ba_stn_.at(radio_id)->setupStream(
+      SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
 
   // bool tryBypassMode(false);
   // for (const auto& streamArg : ba_stn_.at(radio_id)->getStreamArgsInfo(
@@ -520,6 +529,8 @@ bool RadioConfigNoRxStream::RadioStart() {
       ba_stn_.at(i)->writeSetting("BEACON_START", std::to_string(radio_num_));
     }
     ba_stn_.at(i)->setHardwareTime(0, "TRIGGER");
+    ba_stn_.at(i)->activateStream(rx_streams_.at(i));
+    ba_stn_.at(i)->activateStream(tx_streams_.at(i));
   }
   std::cout << "radio start done!" << std::endl;
   return true;
@@ -615,6 +626,8 @@ void RadioConfigNoRxStream::RadioStop() {
   std::string corr_conf_str = "{\"corr_enabled\":false}";
   std::string tdd_conf_str = "{\"tdd_enabled\":false}";
   for (size_t i = 0; i < radio_num_; i++) {
+    ba_stn_.at(i)->deactivateStream(rx_streams_.at(i));
+    ba_stn_.at(i)->deactivateStream(tx_streams_.at(i));
     ba_stn_.at(i)->writeSetting("TDD_MODE", "false");
     ba_stn_.at(i)->writeSetting("TDD_CONFIG", tdd_conf_str);
   }

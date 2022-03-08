@@ -180,18 +180,23 @@ elseif(${USE_UHD})
   add_definitions(-DUSE_UHD)
 endif()
 
-find_package(SoapySDR "0.7" CONFIG)
+find_package(PythonLibs REQUIRED)
+set(PYTHON_LIB ${PYTHON_LIBRARIES})
+include_directories(${PYTHON_INCLUDE_DIRS})
+
+#Soapy (Static or Dynamic?)
+find_package(SoapySDR "0.8.0" CONFIG)
 if(NOT SoapySDR_FOUND)
   message(FATAL_ERROR "SoapySDR development files not found")
 endif()
-message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
-find_package(PythonLibs REQUIRED)
-message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
-message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
-message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
-include_directories(${PYTHON_INCLUDE_DIRS} ${SoapySDR_INCLUDE_DIRS})
 set(SOAPY_LIB ${SoapySDR_LIBRARIES})
-set(PYTHON_LIB ${PYTHON_LIBRARIES}) 
+include_directories(${SOAPY_INCLUDE_DIRS})
+
+#include_directories(src/third_party/SoapySDR/include)
+#add_subdirectory(src/third_party/SoapySDR)
+#add_subdirectory(src/third_party/SoapyIris)
+#set(COMMON_LIBS SoapySDR)
+message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions(-DTHREADED_INIT)
 
 # Intel MKL
@@ -301,7 +306,7 @@ set(CLIENT_SOURCES
   src/client/txrx/packet_txrx_client_sim.cc
   src/client/txrx/packet_txrx_client_radio.cc
   src/client/txrx/workers/txrx_worker_client_sim.cc
-   src/client/txrx/workers/txrx_worker_client_hw.cc
+  src/client/txrx/workers/txrx_worker_client_hw.cc
   src/mac/mac_thread_client.cc)
 add_library(client_sources_lib OBJECT ${CLIENT_SOURCES})
   
@@ -316,7 +321,7 @@ set(FLEXRAN_LDPC_LIBS
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_ldpc_decoder_5gnr/libldpc_decoder_5gnr.a
   ${FLEXRAN_FEC_LIB_DIR}/source/phy/lib_common/libcommon.a)
 
-set(COMMON_LIBS armadillo -lnuma ${DPDK_LIBRARIES} ${MKL_LIBS} ${SOAPY_LIB}
+set(COMMON_LIBS ${COMMON_LIBS} armadillo -lnuma ${DPDK_LIBRARIES} ${MKL_LIBS} ${SOAPY_LIB}
   ${PYTHON_LIB} ${FLEXRAN_LDPC_LIBS} util gflags gtest)
 
 # TODO: The main agora executable is performance-critical, so we need to

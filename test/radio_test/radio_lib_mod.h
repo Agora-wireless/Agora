@@ -65,5 +65,6 @@ class RadioConfigNoRxStream {
 
   std::vector<sklk_SoapyRPCSocket> rx_sockets_;
   std::vector<SoapySDR::Stream*> rx_streams_;
+  std::vector<SoapySDR::Stream*> tx_streams_;
 };
 #endif  // RADIO_LIB_MOD_H_

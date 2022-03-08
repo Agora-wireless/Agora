@@ -205,7 +205,8 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
             new (rx_packet) Packet(frame_id, symbol_id, cell_id,
                                    (radio * cfg->NumChannels()) + ch);
 
-            std::cout << "Rx Packet: " << rx_packet->ToString() << std::endl;
+            std::cout << "Rx Packet: " << rx_packet->ToString()
+                      << " Rx bytes: " << rx_bytes << std::endl;
           }
           num_rx_symbols++;
         } else if (rx_bytes < 0) {
