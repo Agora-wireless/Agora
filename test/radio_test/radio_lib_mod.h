@@ -18,6 +18,7 @@
 #include <iostream>
 #include <string>
 
+#include "SoapyRPCSocket.hpp"
 #include "config.h"
 
 class RadioConfigNoRxStream {
@@ -61,5 +62,8 @@ class RadioConfigNoRxStream {
 
   std::atomic<size_t> num_radios_initialized_;
   std::atomic<size_t> num_radios_configured_;
+
+  std::vector<sklk_SoapyRPCSocket> rx_sockets_;
+  std::vector<SoapySDR::Stream*> rx_streams_;
 };
 #endif  // RADIO_LIB_MOD_H_

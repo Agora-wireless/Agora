@@ -6,7 +6,6 @@
 
 #include <SoapySDR/Logger.hpp>
 
-#include "SoapyRPCSocket.hpp"
 #include "SoapyURLUtils.hpp"
 #include "comms-lib.h"
 #include "nlohmann/json.hpp"
@@ -329,9 +328,13 @@ void RadioConfigNoRxStream::ConfigureBsRadio(size_t tid) {
 
 void RadioConfigNoRxStream::ConfigureRx(size_t radio_id) {
   //SoapySDR::Kwargs sargs;
-  //auto channels = Utils::StrToChannels(cfg_->Channel());
+  auto channels = Utils::StrToChannels(cfg_->Channel());
   //rx_streams_.at(radio_id) =
   //    ba_stn_.at(radio_id)->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
+
+  //std::string remote_comm = ba_stn_.at(radio_id)->readSetting("remote");
+  //std::printf("Talking to remote radio %zu, %s\n", radio_id,
+  //            remote_comm.c_str());
 
   std::string stream_protocol =
       ba_stn_.at(radio_id)->readSetting("STREAM_PROTOCOL");
@@ -340,8 +343,7 @@ void RadioConfigNoRxStream::ConfigureRx(size_t radio_id) {
   }
 
   //query remote iris endpoint configuration
-  const auto remote_address =
-      ba_stn_.at(radio_id)->readSetting("ETH0_IPv6_ADDR");
+  auto remote_address = ba_stn_.at(radio_id)->readSetting("ETH0_IPv6_ADDR");
   const auto remote_port =
       ba_stn_.at(radio_id)->readSetting("UDP_SERVICE_PORT");
   if (remote_address.empty()) {
@@ -353,10 +355,14 @@ void RadioConfigNoRxStream::ConfigureRx(size_t radio_id) {
         "Iris::setupStream: Failed to query Iris UDP service port");
   }
 
+  std::printf(
+      " STREAM_PROTOCOL  %s\n ETH0_IPv6_ADDR   %s\n UDP_SERVICE_PORT %s\n",
+      stream_protocol.c_str(), remote_address.c_str(), remote_port.c_str());
+
   //ipv6 mac and scope for the remote socket
-  std::string ethName;
+  //std::string ethName;
   unsigned long long localMac64(0);
-  int localScopeId(-1);
+  int local_interface(-1);
   // {
   //   sklk_SoapyRPCSocket junkSock;
   //   //junkSock.connect(args.at("remote"));
@@ -380,48 +386,73 @@ void RadioConfigNoRxStream::ConfigureRx(size_t radio_id) {
   //   std::printf("Using local ethernet interface: %s", ethName.c_str());
   // }
 
+  std::string connect_address;
+  local_interface = 5;
   //get the scope id to get the remote ipv6 address with the local scope id
+  std::printf(" Remote address  %s\n", remote_address.c_str());
   const auto percentPos = remote_address.find_last_of('%');
-  //if (percentPos != std::string::npos) {
-  //  remote_address =
-  //      remote_address.substr(0, percentPos + 1) + std::to_string(localScopeId);
-  //}
+  if (percentPos != std::string::npos) {
+    connect_address = remote_address.substr(0, percentPos + 1) +
+                      std::to_string(local_interface);
+  }
+  std::printf(" Connect address %s\n", connect_address.c_str());
 
-  //Setup the socket
-  sklk_SoapyRPCSocket sock;
+  //Setup the socket interface to the radio for the rx stream
+  rx_sockets_.emplace_back();
+  sklk_SoapyRPCSocket& sock = rx_sockets_.back();
+
   const SoapyURL bindURL("udp", "::", "0");
+  //Bind to the LOCAL_ADDRESS
+  //What is the local port?
   int ret = sock.bind(bindURL.toString());
   if (ret != 0)
     throw std::runtime_error("Iris::setupStream: Failed to bind to " +
                              bindURL.toString() + ": " + sock.lastErrorMsg());
-  const SoapyURL connectURL("udp", remote_address, remote_port);
-  ret = sock.connect(connectURL.toString());
+  const SoapyURL connect_url("udp", connect_address, remote_port);
+  ret = sock.connect(connect_url.toString());
   if (ret != 0)
     throw std::runtime_error("Iris::setupStream: Failed to connect to " +
-                             connectURL.toString() + ": " +
+                             connect_url.toString() + ": " +
                              sock.lastErrorMsg());
 
+  sock.setNonBlocking(true);
+
   //lookup the local mac address to program the framer
-  SoapyURL localEp(sock.getsockname());
+  SoapyURL local_endpoint(sock.getsockname());
 
   std::printf(" eth_dst %s\n ip6_dst %s\n udp_dst %s\n",
-              std::to_string(localMac64).c_str(), localEp.getNode().c_str(),
-              localEp.getService().c_str());
+              std::to_string(localMac64).c_str(),
+              local_endpoint.getNode().c_str(),
+              local_endpoint.getService().c_str());
+
+  // bool tryBypassMode(false);
+  // for (const auto& streamArg : ba_stn_.at(radio_id)->getStreamArgsInfo(
+  //          SOAPY_SDR_RX, channels.front())) {
+  //   std::printf("Keys %s\n", streamArg.key.c_str());
+  //   if (streamArg.key != "remote:prot") continue;
+  //   auto it =
+  //       std::find(streamArg.options.begin(), streamArg.options.end(), "none");
+  //   tryBypassMode = it != streamArg.options.end();
+  // }
+  // std::printf("Try bypass mode? %d\n", tryBypassMode);
 
   //pass arguments within the args to program the framer
-  //SoapySDR::Kwargs args(_args);
+  //SoapySDR::Kwargs args;
   //args["iris:eth_dst"] = std::to_string(localMac64);
-  //args["iris:ip6_dst"] = localEp.getNode();
-  //args["iris:udp_dst"] = localEp.getService();
+  //args["iris:ip6_dst"] = local_endpoint.getNode();
+  //args["iris:udp_dst"] = local_endpoint.getService();
   //args["iris:mtu"] = std::to_string(data->mtuElements);
   //SoapySDR::logf(
   //    SOAPY_SDR_INFO,
   //    "mtu %d bytes -> %d samples X %d channels, %d bytes per element",
   //    int(mtu), int(data->mtuElements), int(data->numHostChannels),
   //    int(data->bytesPerElement));
+  //SoapySDR::Kwargs sargs;
+  //rx_streams_.at(i) =
+  //    ba_stn_.at(i)->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
 
-  //Setup the socket
-  throw std::runtime_error("end of program");
+  //_remote->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, args);
+  //ba_stn_.at(i)->activateStream(rx_streams_.at(i));
 }
 
 bool RadioConfigNoRxStream::RadioStart() {
@@ -529,7 +560,12 @@ void RadioConfigNoRxStream::RadioRx(void** buffs) {}
 
 int RadioConfigNoRxStream::RadioRx(size_t radio_id, void** buffs,
                                    long long& rx_time_ns) {
-  return 0;
+  int ret = 0;
+  sklk_SoapyRPCSocket& sock = rx_sockets_.at(radio_id);
+  constexpr size_t kRxBufSize = 8192u;
+  char rcv_buff[kRxBufSize];
+  ret = sock.recv(&rcv_buff, kRxBufSize);
+  return ret;
 }
 
 int RadioConfigNoRxStream::RadioRx(

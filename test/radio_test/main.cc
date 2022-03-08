@@ -175,7 +175,6 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
   if (kUseArgos) {
     // Makes the soapy remove "HUB" / InitBsRadio / ConfigureBsRadio
     auto radioconfig_ = std::make_unique<RadioConfigNoRxStream>(cfg);
-
     radioconfig_->RadioStart();
 
     //Radio Trigger (start rx)
@@ -187,6 +186,7 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
            (num_rx_symbols < max_rx)) {
       for (auto radio = radio_lo; radio < radio_hi; radio++) {
         long long rx_time;
+        //std::printf("Calling RadioRx() symbol %u\n", num_rx_symbols);
         int rx_bytes =
             radioconfig_->RadioRx(radio, rx_buffs.at(radio).data(), rx_time);
         if (rx_bytes > 0) {
@@ -209,7 +209,13 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
           }
           num_rx_symbols++;
         } else if (rx_bytes < 0) {
-          throw std::runtime_error("Radio rx error!!");
+          if ((errno != EAGAIN) && (errno != EWOULDBLOCK)) {
+            std::printf("Radio rx error %d - message %s\n", rx_bytes,
+                        strerror(errno));
+            std::fflush(stdout);
+            throw std::runtime_error("Radio rx error!!");
+          }
+          //num_rx_symbols++;
         }
       }  // end for each radio
     }    // while no exit signal
