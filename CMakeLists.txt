@@ -162,13 +162,15 @@ set(MAC_CLIENT_SOURCES
   src/mac/mac_receiver.cc
   src/mac/video_receiver.cc
   src/mac/file_receiver.cc
-  src/mac/mac_client.cc)
+  src/mac/mac_client.cc
+  src/scheduler/throughput.cc)
 set(MAC_BS_SOURCES
   src/mac/mac_sender.cc
   src/mac/mac_receiver.cc
   src/mac/video_receiver.cc
   src/mac/file_receiver.cc
-  src/mac/mac_basestation.cc)
+  src/mac/mac_basestation.cc
+  src/scheduler/throughput.cc)
 
 # Don't allow both Argos and UHD support
 if(${USE_ARGOS} AND ${USE_UHD})
@@ -233,7 +235,8 @@ include_directories(
   src/agora/txrx/workers
   src/client/
   /usr/include/mkl/
-  src/data_generator)
+  src/data_generator
+  src/scheduler/)
 
 include_directories(SYSTEM src/third_party src/third_party/nlohmann/single_include)
 
@@ -282,7 +285,8 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/txrx/workers/txrx_worker.cc
   src/agora/txrx/workers/txrx_worker_sim.cc
   src/agora/txrx/workers/txrx_worker_argos.cc
-  src/agora/txrx/workers/txrx_worker_usrp.cc)
+  src/agora/txrx/workers/txrx_worker_usrp.cc
+  src/scheduler/scheduler.cc)
 
 add_library(agora_sources_lib OBJECT ${AGORA_SOURCES})
 
