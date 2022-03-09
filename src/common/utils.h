@@ -208,4 +208,8 @@ inline size_t ceil_divide(size_t a, size_t b)
 {
     return (a + b - 1) / b;
 }
+
+inline size_t simple_hash(size_t num) {
+    return ((num * 0xdead0143 + 17) >> 5) * 4591;
+}
 #endif
