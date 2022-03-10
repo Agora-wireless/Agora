@@ -160,17 +160,6 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
                                                 cfg->SampsPerSymbol(),
                                                 std::complex<int16_t>(0, 0))));
 
-  //Radio x Channels
-  std::vector<std::vector<void*>> rx_buffs(
-      total_radios, std::vector<void*>(cfg->NumChannels(), nullptr));
-  //Setup pointers to all of the memory rx sections
-  for (auto radio = radio_lo; radio < radio_hi; radio++) {
-    const size_t radio_channels = rx_buffs.at(radio).size();
-    for (size_t ch = 0; ch < radio_channels; ch++) {
-      rx_buffs.at(radio).at(ch) = rx_buffer.at(radio).at(ch).data();
-    }
-  }
-
   //Memory for 1 packet for each channel (could be extended for each radio if necessary)
   // Channels x PacketLength (bytes)
   std::vector<std::vector<std::byte>> packet_buffer(
@@ -192,7 +181,7 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
       for (auto radio = radio_lo; radio < radio_hi; radio++) {
         long long rx_time;
         int rx_samples =
-            radioconfig_->RadioRx(radio, rx_buffs.at(radio).data(), rx_time);
+            radioconfig_->RadioRx(radio, rx_buffer.at(radio), rx_time);
         if (rx_samples > 0) {
           //Rx data.....
           size_t frame_id = 0;

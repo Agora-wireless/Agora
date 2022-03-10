@@ -5,21 +5,13 @@
 #ifndef RADIO_LIB_MOD_H_
 #define RADIO_LIB_MOD_H_
 
-#include <SoapySDR/Device.hpp>
-#include <SoapySDR/Errors.hpp>
-#include <SoapySDR/Formats.hpp>
-#include <SoapySDR/Time.hpp>
-#include <chrono>
+#include <atomic>
 #include <complex>
-#include <csignal>
-#include <cstddef>
-#include <cstdint>
-#include <cstdlib>
-#include <iostream>
-#include <string>
+#include <vector>
 
-#include "SoapyRPCSocket.hpp"
+#include "SoapySDR/Device.hpp"
 #include "config.h"
+#include "radio_socket.h"
 
 class RadioConfigNoRxStream {
  public:
@@ -29,14 +21,11 @@ class RadioConfigNoRxStream {
   bool RadioStart();
   void RadioStop();
   void ReadSensors();
-  void RadioTx(void** buffs);
-  void RadioRx(void** buffs);
   int RadioTx(size_t radio_id, const void* const* buffs, int flags,
               long long& frameTime);
   int RadioTx(size_t radio_id,
               const std::vector<std::vector<std::complex<int16_t>>>& tx_data,
               int flags, long long& frameTime);
-  int RadioRx(size_t radio_id, void** buffs, long long& rx_time_ns);
   int RadioRx(size_t radio_id,
               std::vector<std::vector<std::complex<int16_t>>>& rx_data,
               long long& rx_time_ns);
@@ -66,7 +55,8 @@ class RadioConfigNoRxStream {
   std::atomic<size_t> num_radios_initialized_;
   std::atomic<size_t> num_radios_configured_;
 
-  std::vector<sklk_SoapyRPCSocket> rx_sockets_;
+  //Rx stream
+  std::vector<RadioSocket> rx_sockets_;
   std::vector<SoapySDR::Stream*> rx_streams_;
   std::vector<SoapySDR::Stream*> tx_streams_;
 };

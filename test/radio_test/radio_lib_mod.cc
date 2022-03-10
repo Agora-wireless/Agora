@@ -4,8 +4,8 @@
  */
 #include "radio_lib_mod.h"
 
-#include <SoapySDR/Logger.hpp>
-
+#include "SoapySDR/Formats.hpp"
+#include "SoapySDR/Logger.hpp"
 #include "SoapyURLUtils.hpp"
 #include "comms-lib.h"
 #include "nlohmann/json.hpp"
@@ -15,62 +15,6 @@ static constexpr bool kPrintRadioSettings = false;
 
 static constexpr size_t kSoapyMakeMaxAttempts = 3;
 static constexpr size_t kHubMissingWaitMs = 100;
-
-//#define MAX_TX_STATUS_DEPTH (64)
-
-// #define RX_SOCKET_BUFFER_BYTES
-//   (50 * 1024 * 1024)  // arbitrary and large PC buffer size
-
-// #define ETHERNET_MTU (1500)  // L2 MTU without the 14-byte eth header
-// #define ROUTE_HDR_SIZE (16)  // 128-bit transfer for routing header
-// #define PADDED_ETH_HDR_SIZE
-//   (16)  // 14 bytes + 2 bytes padding (holds size in bytes)
-// #define IPv6_UDP_SIZE (40 + 8)  // 40 bytes of IPv6 + 8 bytes of UDP header
-// #define TWBW_HDR_SIZE (sizeof(uint64_t) * 4)  // 4 transfers at 64-bits width
-
-constexpr size_t kDebugIrisRx = false;
-//constexpr size_t kDebugIrisTxStatus = false;
-
-/// Iris tx status header flags
-#define SEQUENCE_MASK (0xffff)
-#define HAS_SEQUENCE_bp (16)
-#define HAS_SEQUENCE_bf (uint64_t(1) << HAS_SEQUENCE_bp)
-#define SEQUENCE_ERROR_bp (17)
-#define SEQUENCE_ERROR_bf (uint64_t(1) << SEQUENCE_ERROR_bp)
-#define HAS_STATUS_bp (18)
-#define HAS_STATUS_bf (uint64_t(1) << HAS_STATUS_bp)
-#define HAS_TIME_bp (19)
-#define HAS_TIME_bf (uint64_t(1) << HAS_TIME_bp)
-#define TIME_ERROR_bp (20)
-#define TIME_ERROR_bf (uint64_t(1) << TIME_ERROR_bp)
-#define UNDERFLOW_ERROR_bp (21)
-#define UNDERFLOW_ERROR_bf (uint64_t(1) << UNDERFLOW_ERROR_bp)
-#define BURST_END_bp (22)
-#define BURST_END_bf (uint64_t(1) << BURST_END_bp)
-#define OVERFLOW_ERROR_bp (23)
-#define OVERFLOW_ERROR_bf (uint64_t(1) << OVERFLOW_ERROR_bp)
-
-/// Iris rx header flags
-#define SEQ_REQUEST_bp (25)
-#define SEQ_REQUEST_bf (uint64_t(1) << SEQ_REQUEST_bp)
-#define IS_TRIGGER_bp (26)
-#define IS_TRIGGER_bf (uint64_t(1) << IS_TRIGGER_bp)
-#define IS_BURST_bp (28)
-#define IS_BURST_bf (uint64_t(1) << IS_BURST_bp)
-#define RX_OVERFLOW_bp (29)
-#define RX_OVERFLOW_bf (uint64_t(1) << RX_OVERFLOW_bp)
-#define RX_TIME_ERROR_bp (30)
-#define RX_TIME_ERROR_bf (uint64_t(1) << RX_TIME_ERROR_bp)
-#define HAS_TIME_RX_bp (31)
-#define HAS_TIME_RX_bf (uint64_t(1) << HAS_TIME_RX_bp)
-
-// Packing this would probably be advisable
-struct IrisCommData {
-  uint64_t header_[2u];
-  // Raw sample data, byte accessable
-  uint8_t data_[];
-};
-static_assert(sizeof(IrisCommData::header_) == 16);
 
 RadioConfigNoRxStream::RadioConfigNoRxStream(Config* cfg)
     : cfg_(cfg), num_radios_initialized_(0), num_radios_configured_(0) {
@@ -425,36 +369,15 @@ void RadioConfigNoRxStream::ConfigureRx(size_t radio_id) {
   std::printf(" Connect address %s\n", connect_address.c_str());
 
   //Setup the socket interface to the radio for the rx stream
-  rx_sockets_.emplace_back();
-  sklk_SoapyRPCSocket& sock = rx_sockets_.back();
-
-  const SoapyURL bindURL("udp", "::", "0");
-  //Bind to the LOCAL_ADDRESS
-  //What is the local port?
-  int ret = sock.bind(bindURL.toString());
-  if (ret != 0)
-    throw std::runtime_error("Iris::setupStream: Failed to bind to " +
-                             bindURL.toString() + ": " + sock.lastErrorMsg());
-  const SoapyURL connect_url("udp", connect_address, remote_port);
-  ret = sock.connect(connect_url.toString());
-  if (ret != 0)
-    throw std::runtime_error("Iris::setupStream: Failed to connect to " +
-                             connect_url.toString() + ": " +
-                             sock.lastErrorMsg());
-
-  sock.setNonBlocking(true);
-
-  //lookup the local mac address to program the framer
-  SoapyURL local_endpoint(sock.getsockname());
-
-  std::printf(" ip6_dst %s\n udp_dst %s\n", local_endpoint.getNode().c_str(),
-              local_endpoint.getService().c_str());
+  rx_sockets_.emplace_back(cfg_->SampsPerSymbol());
+  auto& sock = rx_sockets_.back();
+  sock.Create(connect_address, remote_port);
 
   SoapySDR::Kwargs sargs;
   //Not sure if "bypass mode" works
   sargs["remote:prot"] = "none";
-  sargs["iris:ip6_dst"] = local_endpoint.getNode();
-  sargs["iris:udp_dst"] = local_endpoint.getService();
+  sargs["iris:ip6_dst"] = sock.GetAddress();
+  sargs["iris:udp_dst"] = sock.GetPort();
   rx_streams_.at(radio_id) = ba_stn_.at(radio_id)->setupStream(
       SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
 }
@@ -540,8 +463,6 @@ void RadioConfigNoRxStream::Go() {
   }
 }
 
-void RadioConfigNoRxStream::RadioTx(void** buffs) {}
-
 int RadioConfigNoRxStream::RadioTx(size_t radio_id, const void* const* buffs,
                                    int flags, long long& frameTime) {
   return 0;
@@ -560,139 +481,19 @@ int RadioConfigNoRxStream::RadioTx(
   return RadioTx(radio_id, buffs.data(), flags, frameTime);
 }
 
-void RadioConfigNoRxStream::RadioRx(void** buffs) {}
-
-/* Returns the number of samples */
-int RadioConfigNoRxStream::RadioRx(size_t radio_id, void** buffs,
-                                   long long& rx_time_ns) {
-  constexpr size_t kMaxRxTries = 10000000;
-  /* For now, radio rx will return 1 symbol */
-  int rx_return = 0;
-  constexpr size_t kRxBufSize = 8192u;
-  char rcv_buff[kRxBufSize];
-  size_t byte_offset = 0;
-  size_t num_samples = 0;
-
-  for (size_t i = 0; i < kMaxRxTries; i++) {
-    rx_return = rx_sockets_.at(radio_id).recv(&rcv_buff[byte_offset],
-                                              (kRxBufSize - byte_offset));
-    if (rx_return > 0) {
-      const bool rx_complete = ParseRxStream(&rcv_buff[byte_offset], rx_return,
-                                             buffs, num_samples, rx_time_ns);
-      byte_offset += rx_return;
-      std::printf("Rx'd sample count %zu\n", num_samples);
-
-      if (rx_complete) {
-        // Rx'd everything
-        break;
-      }
-    } else if (rx_return < 0) {
-      if ((errno != EAGAIN) && (errno != EWOULDBLOCK)) {
-        throw std::runtime_error("Error in RadioRx!");
-      } else if (num_samples == 0) {
-        //No Data Stop Trying
-        break;
-      }
-    }
-  }
-  return num_samples;
-}
-
-bool RadioConfigNoRxStream::ParseRxStream(const char* raw_rx_data,
-                                          size_t num_rx_bytes,
-                                          void** samples_out,
-                                          size_t& sample_offset,
-                                          long long& rx_time_ns) {
-  bool finished;
-  // unpacker logic for twbw_rx_framer64
-  const auto* rx_data = reinterpret_cast<const IrisCommData*>(raw_rx_data);
-  const auto* payload = rx_data->data_;
-
-  const long long rx_time_ticks = static_cast<long long>(rx_data->header_[1u]);
-  const size_t burst_count = size_t(rx_data->header_[0u] & 0xffff) + 1;
-  const size_t payload_bytes = size_t(num_rx_bytes) - sizeof(rx_data->header_);
-  //bytes_per_element is based on "WIRE" format
-  //info.options = {SOAPY_SDR_CS16, SOAPY_SDR_CS12, SOAPY_SDR_CS8};
-  //info.optionNames = {"Complex int16", "Complex int12", "Complex int8"};
-  // this is also a bit more complex and needs to be reviewed for multiple cases
-  // 3 bytes == 1 Sample (8 bit + 4 bit) Real (8 bit + 4 bit) Img = 24 bits = 3 Bytes
-  const size_t bytes_per_element = 3;
-  const size_t rx_samples = payload_bytes / bytes_per_element;
-  const size_t num_output_channels = cfg_->NumChannels();
-  RtAssert(((payload_bytes % bytes_per_element) == 0), "Invalid payload size!");
-  RtAssert(((rx_samples % num_output_channels) == 0),
-           "Unexpected number of received samples");
-
-  //Return time
-  rx_time_ns = rx_time_ticks;
-  if (kDebugIrisRx) {
-    const bool has_time = (rx_data->header_[0u] & HAS_TIME_RX_bf) != 0;
-    const bool error_time = (rx_data->header_[0u] & RX_TIME_ERROR_bf) != 0;
-    const bool error_overflow = (rx_data->header_[0u] & RX_OVERFLOW_bf) != 0;
-    const bool is_burst = (rx_data->header_[0u] & IS_BURST_bf) != 0;
-    const bool is_trigger = (rx_data->header_[0u] & IS_TRIGGER_bf) != 0;
-    std::cout << "===========================================" << std::endl
-              << "Received " << std::dec << num_rx_bytes << " bytes "
-              << std::endl
-              << "hdr0 " << std::hex << rx_data->header_[0u] << std::endl
-              << "hdr1 " << std::hex << rx_data->header_[1u] << std::endl
-              << std::dec << "Has Time " << has_time << " Time Error "
-              << error_time << std::endl
-              << "Overflow " << error_overflow << std::endl
-              << "Is burst " << is_burst << " is Trigger " << is_trigger
-              << std::endl
-              << "Burst Count = " << burst_count
-              << " payload bytes = " << payload_bytes
-              << " samples = " << rx_samples << std::endl
-              << "Rx Time: " << rx_time_ticks << std::endl
-              << "Frame: "
-              << static_cast<size_t>((rx_time_ns >> 32u) & 0xFFFFFFFF)
-              << "  Symbol: "
-              << static_cast<size_t>((rx_time_ticks >> 16u) & 0xFFFF)
-              << std::endl
-              << "===========================================" << std::endl;
-  }
-
-  //static void wire48_to_cs16x1(const void* inBuff, void* const* outBuffs,
-  //                             const size_t num) {
-  size_t byte_offset = 0;
-  size_t channel_number = 0;
-  const size_t total_samples = sample_offset + rx_samples;
-  while (sample_offset < total_samples) {
-    const uint16_t i_lsb = uint16_t(payload[byte_offset]);
-    const uint16_t split = uint16_t(payload[byte_offset + 1u]);
-    const uint16_t q_msb = uint16_t(payload[byte_offset + 2u]);
-    //Sign extend the 16 bit value (zero out lsb);
-    auto output =
-        reinterpret_cast<std::complex<int16_t>*>(samples_out[channel_number]);
-    output[sample_offset++] =
-        std::complex<int16_t>(int16_t((split << 12u) | (i_lsb << 4u)),
-                              int16_t((q_msb << 8u) | (split & 0xf0)));
-    byte_offset += bytes_per_element;
-    channel_number++;
-    if (channel_number == cfg_->NumChannels()) {
-      channel_number = 0;
-    }
-  }
-  RtAssert(total_samples <= cfg_->SampsPerSymbol(),
-           "Number of samples exceeds samples per symbol");
-
-  if ((total_samples == cfg_->SampsPerSymbol()) || (burst_count > rx_samples)) {
-    finished = true;
-  } else {
-    finished = false;
-  }
-  return finished;
-}
-
 int RadioConfigNoRxStream::RadioRx(
     size_t radio_id, std::vector<std::vector<std::complex<int16_t>>>& rx_data,
     long long& rx_time_ns) {
-  std::vector<void*> buffs(rx_data.size());
-  for (size_t i = 0u; i < rx_data.size(); i++) {
-    buffs.at(i) = rx_data.at(i).data();
+  // For now, radio rx will return 1 symbol
+  int rx_return = 0;
+
+  rx_return = rx_sockets_.at(radio_id).RxSymbol(rx_data, rx_time_ns);
+  if (rx_return > 0) {
+    std::printf("Rx'd sample count %d\n", rx_return);
+  } else if (rx_return < 0) {
+    throw std::runtime_error("Error in RadioRx!");
   }
-  return RadioRx(radio_id, buffs.data(), rx_time_ns);
+  return rx_return;
 }
 
 void RadioConfigNoRxStream::DrainBuffers() {
