@@ -13,6 +13,8 @@ for (( i=1; i<${hydra_rru_num}; i++ )) do
     -c ./config/run.json -o 0" > /tmp/hydra/log_${server_name}.txt 2>&1 &
 done
 
+sleep 5
+
 server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.rru_servers[0]' | tr -d '"')
 echocyan "Run RRU server ${server_name}"
 hostname=$(hostname)
