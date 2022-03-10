@@ -104,9 +104,9 @@ void TestRadioRxStream(Config* cfg, const uint32_t max_rx) {
            (num_rx_symbols < max_rx)) {
       for (auto radio = radio_lo; radio < radio_hi; radio++) {
         long long rx_time;
-        int rx_bytes =
+        int rx_samples =
             radioconfig_->RadioRx(radio, rx_buffs.at(radio).data(), rx_time);
-        if (rx_bytes > 0) {
+        if (rx_samples > 0) {
           //Rx data.....
           size_t frame_id = 0;
           size_t symbol_id = 0;
@@ -122,10 +122,15 @@ void TestRadioRxStream(Config* cfg, const uint32_t max_rx) {
             new (rx_packet) Packet(frame_id, symbol_id, cell_id,
                                    (radio * cfg->NumChannels()) + ch);
 
-            std::cout << "Rx Packet: " << rx_packet->ToString() << std::endl;
+            std::printf("Rx Packet: %s Rx samples: %d:%zu\n",
+                        rx_packet->ToString().c_str(), rx_samples,
+                        cfg->SampsPerSymbol());
           }
           num_rx_symbols++;
-        } else if (rx_bytes < 0) {
+        } else if (rx_samples < 0) {
+          std::printf("Radio rx error %d - message %s\n", rx_samples,
+                      strerror(errno));
+          std::fflush(stdout);
           throw std::runtime_error("Radio rx error!!");
         }
       }  // end for each radio
@@ -186,10 +191,9 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
            (num_rx_symbols < max_rx)) {
       for (auto radio = radio_lo; radio < radio_hi; radio++) {
         long long rx_time;
-        //std::printf("Calling RadioRx() symbol %u\n", num_rx_symbols);
-        int rx_bytes =
+        int rx_samples =
             radioconfig_->RadioRx(radio, rx_buffs.at(radio).data(), rx_time);
-        if (rx_bytes > 0) {
+        if (rx_samples > 0) {
           //Rx data.....
           size_t frame_id = 0;
           size_t symbol_id = 0;
@@ -205,18 +209,16 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
             new (rx_packet) Packet(frame_id, symbol_id, cell_id,
                                    (radio * cfg->NumChannels()) + ch);
 
-            std::cout << "Rx Packet: " << rx_packet->ToString()
-                      << " Rx bytes: " << rx_bytes << std::endl;
+            std::printf("Rx Packet: %s Rx samples: %d:%zu\n",
+                        rx_packet->ToString().c_str(), rx_samples,
+                        cfg->SampsPerSymbol());
           }
           num_rx_symbols++;
-        } else if (rx_bytes < 0) {
-          if ((errno != EAGAIN) && (errno != EWOULDBLOCK)) {
-            std::printf("Radio rx error %d - message %s\n", rx_bytes,
-                        strerror(errno));
-            std::fflush(stdout);
-            throw std::runtime_error("Radio rx error!!");
-          }
-          //num_rx_symbols++;
+        } else if (rx_samples < 0) {
+          std::printf("Radio rx error %d - message %s\n", rx_samples,
+                      strerror(errno));
+          std::fflush(stdout);
+          throw std::runtime_error("Radio rx error!!");
         }
       }  // end for each radio
     }    // while no exit signal

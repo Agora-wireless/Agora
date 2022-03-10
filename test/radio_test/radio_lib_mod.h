@@ -49,6 +49,9 @@ class RadioConfigNoRxStream {
  private:
   void DrainBuffers();
   void ConfigureRx(size_t radio_id);
+  bool ParseRxStream(const char* raw_rx_data, size_t num_rx_bytes,
+                     void** samples_out, size_t& sample_offset,
+                     long long& rx_time_ns);
 
   Config* cfg_;
   std::vector<SoapySDR::Device*> hubs_;
