@@ -4,6 +4,7 @@
  */
 #include <gflags/gflags.h>
 
+#include "logger.h"
 #include "sender.h"
 #include "version_config.h"
 
@@ -25,6 +26,7 @@ int main(int argc, char* argv[]) {
   gflags::SetVersionString(GetAgoraProjectVersion());
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = FLAGS_conf_file;
+  AGORA_LOG_INIT();
 
   {
     auto cfg = std::make_unique<Config>(filename.c_str());
@@ -40,5 +42,6 @@ int main(int argc, char* argv[]) {
 
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
+  AGORA_LOG_SHUTDOWN();
   return 0;
 }

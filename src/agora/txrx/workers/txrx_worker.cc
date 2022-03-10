@@ -42,7 +42,7 @@ TxRxWorker::TxRxWorker(size_t core_offset, size_t tid, size_t interface_count,
 TxRxWorker::~TxRxWorker() { Stop(); }
 
 void TxRxWorker::Start() {
-  MLPD_FRAME("TxRxWorker[%zu] starting\n", tid_);
+  AGORA_LOG_FRAME("TxRxWorker[%zu] starting\n", tid_);
   if (!thread_.joinable()) {
     thread_ = std::thread(&TxRxWorker::DoTxRx, this);
   } else {
@@ -55,7 +55,7 @@ void TxRxWorker::Start() {
 void TxRxWorker::Stop() {
   cfg_->Running(false);
   if (thread_.joinable()) {
-    MLPD_FRAME("TxRxWorker[%zu] stopping\n", tid_);
+    AGORA_LOG_FRAME("TxRxWorker[%zu] stopping\n", tid_);
     thread_.join();
   }
 }
@@ -65,18 +65,18 @@ void TxRxWorker::WaitSync() {
   // Use mutex to sychronize data receiving across threads
   {
     std::unique_lock<std::mutex> locker(mutex_);
-    MLPD_TRACE("TxRxWorker[%zu]: waiting for sync\n", tid_);
+    AGORA_LOG_TRACE("TxRxWorker[%zu]: waiting for sync\n", tid_);
     started_ = true;
     cond_.wait(locker, [this] { return can_proceed_.load(); });
   }
-  MLPD_INFO("TxRxWorker[%zu]: synchronized\n", tid_);
+  AGORA_LOG_INFO("TxRxWorker[%zu]: synchronized\n", tid_);
 }
 
 bool TxRxWorker::NotifyComplete(EventData& complete_event) {
   auto enqueue_status =
       event_notify_q_->enqueue(notify_producer_token_, complete_event);
   if (enqueue_status == false) {
-    MLPD_ERROR("TxRxWorker[%zu]: socket message enqueue failed\n", tid_);
+    AGORA_LOG_ERROR("TxRxWorker[%zu]: socket message enqueue failed\n", tid_);
     throw std::runtime_error("TxRxWorker: socket message enqueue failed");
   }
   return enqueue_status;
@@ -106,7 +106,7 @@ RxPacket& TxRxWorker::GetRxPacket() {
 
   // if rx_buffer is full, exit
   if (new_packet.Empty() == false) {
-    MLPD_ERROR("TxRxWorker [%zu]: rx buffer full, memory overrun\n", tid_);
+    AGORA_LOG_ERROR("TxRxWorker [%zu]: rx buffer full, memory overrun\n", tid_);
     throw std::runtime_error("rx buffer full, memory overrun");
   }
   // Mark the packet as used
@@ -134,14 +134,14 @@ void TxRxWorker::ReturnRxPacket(RxPacket& unused_packet) {
   RxPacket& returned_packet = rx_memory_.at(rx_memory_idx_);
   //Make sure we are returning the correct packet, used for extra error checking
   if (&returned_packet != &unused_packet) {
-    MLPD_ERROR("TxRxWorker [%zu]: returned memory that wasn't used last\n",
-               tid_);
+    AGORA_LOG_ERROR("TxRxWorker [%zu]: returned memory that wasn't used last\n",
+                    tid_);
     throw std::runtime_error(
         "TxRxWorker: returned memory that wasn't used last");
   }
   // if the returned packet is free, something is wrong
   if (returned_packet.Empty()) {
-    MLPD_ERROR("TxRxWorker [%zu]: rx buffer returned free memory\n", tid_);
+    AGORA_LOG_ERROR("TxRxWorker [%zu]: rx buffer returned free memory\n", tid_);
     throw std::runtime_error("TxRxWorker: rx buffer returned free memory");
   }
   // Mark the packet as free
@@ -171,7 +171,7 @@ Packet* TxRxWorker::GetUlTxPacket(size_t frame, size_t symbol, size_t ant) {
       ant;
 
   if (TxRxWorker::kDebugTxMemory) {
-    std::printf(
+    AGORA_LOG_INFO(
         "GetUlTxPacket: (Frame %zu Symbol %zu Ant %zu) Tx Offset %zu:%zu "
         "location %ld\n",
         frame, symbol, ant, offset, offset * Configuration()->PacketLength(),

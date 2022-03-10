@@ -32,9 +32,9 @@ TxRxWorkerUsrp::~TxRxWorkerUsrp() = default;
 void TxRxWorkerUsrp::DoTxRx() {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid_);
 
-  MLPD_INFO("TxRxWorkerUsrp[%zu] has %zu:%zu total radios %zu\n", tid_,
-            interface_offset_, (interface_offset_ + num_interfaces_) - 1,
-            num_interfaces_);
+  AGORA_LOG_INFO("TxRxWorkerUsrp[%zu] has %zu:%zu total radios %zu\n", tid_,
+                 interface_offset_, (interface_offset_ + num_interfaces_) - 1,
+                 num_interfaces_);
 
   // prepare BS beacon in host buffer
   std::vector<void*> beaconbuff(2);

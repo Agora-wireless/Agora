@@ -7,6 +7,8 @@
 #include <cfloat>
 #include <cmath>
 
+#include "logger.h"
+
 PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
   if (dir_ == Direction::kDownlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
@@ -99,13 +101,16 @@ void PhyStats::PrintPhyStats() {
         total_decoded_blocks += decoded_blocks_count_[ue_id][i];
         total_block_errors += block_error_count_[ue_id][i];
       }
-      std::cout << "UE " << ue_id << ": " << tx_type << " bit errors (BER) "
-                << total_bit_errors << "/" << total_decoded_bits << "("
-                << 1.0 * total_bit_errors / total_decoded_bits
-                << "), block errors (BLER) " << total_block_errors << "/"
-                << total_decoded_blocks << " ("
-                << 1.0 * total_block_errors / total_decoded_blocks << ")"
-                << std::endl;
+
+      AGORA_LOG_INFO(
+          "UE %zu: %s bit errors (BER) %zu/%zu (%f), block errors (BLER) "
+          "%zu/%zu (%f)\n",
+          ue_id, tx_type.c_str(), total_bit_errors, total_decoded_bits,
+          static_cast<float>(total_bit_errors) /
+              static_cast<float>(total_decoded_bits),
+          total_block_errors, total_decoded_blocks,
+          static_cast<float>(total_block_errors) /
+              static_cast<float>(total_decoded_blocks));
     }
   }
 }
@@ -114,16 +119,18 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
   arma::fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeAntNum(), 1,
                      false);
   evm_mat = evm_mat / config_->OfdmDataNum();
+
   std::stringstream ss;
   ss << "Frame " << frame_id << " Constellation:\n"
-     << "  EVM " << 100 * evm_mat.st() << ", SNR " << -10 * log10(evm_mat.st());
-  std::cout << ss.str();
+     << "  EVM " << (100.0f * evm_mat.st()) << ", SNR "
+     << (-10.0f * log10(evm_mat.st()));
+  AGORA_LOG_INFO("%s\n", ss.str().c_str());
 }
 
 float PhyStats::GetEvmSnr(size_t frame_id, size_t ue_id) {
   float evm = evm_buffer_[frame_id % kFrameWnd][ue_id];
   evm = evm / config_->OfdmDataNum();
-  return -10 * std::log10(evm);
+  return (-10.0f * std::log10(evm));
 }
 
 void PhyStats::PrintDlSnrStats(size_t frame_id, size_t ant_id) {
@@ -174,7 +181,7 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
        << " ";
   }
   ss << std::endl;
-  std::cout << ss.str();
+  AGORA_LOG_INFO("%s", ss.str().c_str());
 }
 
 void PhyStats::PrintCalibSnrStats(size_t frame_id) {
@@ -215,7 +222,7 @@ void PhyStats::PrintCalibSnrStats(size_t frame_id) {
     ss << ": [" << min_snr << "," << max_snr << "] ";
   }
   ss << std::endl;
-  std::cout << ss.str();
+  AGORA_LOG_INFO("%s", ss.str().c_str());
 }
 
 void PhyStats::UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id,
@@ -292,7 +299,7 @@ void PhyStats::PrintZfStats(size_t frame_id) {
   ss << "[" << min_cond << "," << max_cond
      << "], Mean: " << arma::mean(cond_vec);
   ss << std::endl;
-  std::cout << ss.str();
+  AGORA_LOG_INFO("%s", ss.str().c_str());
 }
 
 void PhyStats::UpdateCsiCond(size_t frame_id, size_t sc_id, float cond) {
@@ -312,8 +319,8 @@ void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
 void PhyStats::UpdateBitErrors(size_t ue_id, size_t offset, uint8_t tx_byte,
                                uint8_t rx_byte) {
   static constexpr size_t kBitsInByte = 8;
-  //std::printf("Updating bit errors: User %zu Offset  %zu Tx %d Rx %d\n", ue_id, offset, tx_byte,
-  //            rx_byte);
+  AGORA_LOG_TRACE("Updating bit errors: User %zu Offset  %zu Tx %d Rx %d\n",
+                  ue_id, offset, tx_byte, rx_byte);
   uint8_t xor_byte(tx_byte ^ rx_byte);
   size_t bit_errors = 0;
   for (size_t j = 0; j < kBitsInByte; j++) {

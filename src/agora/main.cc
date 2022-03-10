@@ -4,6 +4,7 @@
  */
 #include "agora.h"
 #include "gflags/gflags.h"
+#include "logger.h"
 #include "version_config.h"
 
 DEFINE_string(conf_file,
@@ -14,6 +15,8 @@ int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");
   gflags::SetVersionString(GetAgoraProjectVersion());
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+  AGORA_LOG_INIT();
   std::string conf_file;
 
   // For backwards compatibility
@@ -43,5 +46,6 @@ int main(int argc, char* argv[]) {
   }
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
+  AGORA_LOG_SHUTDOWN();
   return ret;
 }
