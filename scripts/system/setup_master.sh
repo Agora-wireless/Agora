@@ -16,7 +16,7 @@ do
     node_id=$(( node_id+1 ))
 done
 
-ssh -oStrictHostKeyChecking=no ${node_list[0]} "ssh-keygen -N \'\' -f ~/.ssh/id_rsa << y"
+ssh -oStrictHostKeyChecking=no ${node_list[0]} "ssh-keygen -N '' -f ~/.ssh/id_rsa << y"
 echo
 pub_key=$(ssh -oStrictHostKeyChecking=no ${node_list[0]} "cat ~/.ssh/id_rsa.pub")
 
