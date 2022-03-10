@@ -25,7 +25,7 @@ class RxStatus {
   // When receive a new packet, record it here
   bool add_new_packet(const Packet* pkt) {
     if (pkt->frame_id >= cur_frame_ + kFrameWnd) {
-      MLPD_ERROR(
+      AGORA_LOG_ERROR(
           "SharedCounters RxStatus error: Received packet for future "
           "frame %u beyond frame window (%zu + %zu). This can "
           "happen if Agora is running slowly, e.g., in debug mode. "

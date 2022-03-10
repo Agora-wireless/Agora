@@ -57,7 +57,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       this->cfg_->MacBytesNumPerframe(Direction::kUplink);
   if (num_ul_mac_bytes > 0) {
     std::vector<std::vector<int8_t>> ul_mac_info(cfg_->UeAntNum());
-    MLPD_INFO("Total number of uplink MAC bytes: %zu\n", num_ul_mac_bytes);
+    AGORA_LOG_INFO("Total number of uplink MAC bytes: %zu\n", num_ul_mac_bytes);
     for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
       ul_mac_info.at(ue_id).resize(num_ul_mac_bytes);
       for (size_t pkt_id = 0;
@@ -81,7 +81,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           directory + "/data/orig_ul_data_" +
           std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
           std::to_string(this->cfg_->UeAntNum()) + ".bin";
-      MLPD_INFO("Saving uplink MAC data to %s\n", filename_input.c_str());
+      AGORA_LOG_INFO("Saving uplink MAC data to %s\n", filename_input.c_str());
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
         std::fwrite(reinterpret_cast<uint8_t*>(ul_mac_info.at(i).data()),
@@ -105,7 +105,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         ul_ldpc_config.NumBlocksInSymbol() * this->cfg_->UeAntNum();
     const size_t num_ul_codeblocks =
         this->cfg_->Frame().NumUlDataSyms() * symbol_blocks;
-    MLPD_SYMBOL("Total number of ul blocks: %zu\n", num_ul_codeblocks);
+    AGORA_LOG_SYMBOL("Total number of ul blocks: %zu\n", num_ul_codeblocks);
 
     std::vector<std::vector<int8_t>> ul_information(num_ul_codeblocks);
     std::vector<std::vector<int8_t>> ul_encoded_codewords(num_ul_codeblocks);
@@ -120,7 +120,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
       size_t ue_cb_cnt =
           (sym_id * ul_ldpc_config.NumBlocksInSymbol()) + ue_cb_id;
 
-      MLPD_TRACE(
+      AGORA_LOG_TRACE(
           "cb %zu -- user %zu -- user block %zu -- user cb id %zu -- input "
           "size %zu, index %zu, total size %zu\n",
           cb, ue_id, ue_cb_id, ue_cb_cnt, ul_cb_bytes, ue_cb_cnt * ul_cb_bytes,
@@ -144,8 +144,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           directory + "/data/LDPC_orig_ul_data_" +
           std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
           std::to_string(this->cfg_->UeAntNum()) + ".bin";
-      MLPD_INFO("Saving raw uplink data (using LDPC) to %s\n",
-                filename_input.c_str());
+      AGORA_LOG_INFO("Saving raw uplink data (using LDPC) to %s\n",
+                     filename_input.c_str());
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
       for (size_t i = 0; i < num_ul_codeblocks; i++) {
         std::fwrite(reinterpret_cast<uint8_t*>(&ul_information.at(i).at(0)),
@@ -303,7 +303,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
   std::string filename_rx = directory + "/data/LDPC_rx_data_" +
                             std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
                             std::to_string(this->cfg_->BsAntNum()) + ".bin";
-  MLPD_INFO("Saving rx data to %s\n", filename_rx.c_str());
+  AGORA_LOG_INFO("Saving rx data to %s\n", filename_rx.c_str());
   FILE* fp_rx = std::fopen(filename_rx.c_str(), "wb");
   for (size_t i = 0; i < this->cfg_->Frame().NumTotalSyms(); i++) {
     auto* ptr = reinterpret_cast<float*>(rx_data_all_symbols[i]);
@@ -338,7 +338,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     const size_t num_dl_mac_bytes =
         this->cfg_->MacBytesNumPerframe(Direction::kDownlink);
     std::vector<std::vector<int8_t>> dl_mac_info(cfg_->UeAntNum());
-    MLPD_SYMBOL("Total number of downlink MAC bytes: %zu\n", num_dl_mac_bytes);
+    AGORA_LOG_SYMBOL("Total number of downlink MAC bytes: %zu\n",
+                     num_dl_mac_bytes);
     for (size_t ue_id = 0; ue_id < cfg_->UeAntNum(); ue_id++) {
       dl_mac_info[ue_id].resize(num_dl_mac_bytes);
       for (size_t pkt_id = 0;
@@ -363,7 +364,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           directory + "/data/orig_dl_data_" +
           std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
           std::to_string(this->cfg_->UeAntNum()) + ".bin";
-      MLPD_INFO("Saving downlink MAC data to %s\n", filename_input.c_str());
+      AGORA_LOG_INFO("Saving downlink MAC data to %s\n",
+                     filename_input.c_str());
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
         std::fwrite(reinterpret_cast<uint8_t*>(dl_mac_info.at(i).data()),
@@ -387,7 +389,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         dl_ldpc_config.NumBlocksInSymbol() * this->cfg_->UeAntNum();
     const size_t num_dl_codeblocks =
         this->cfg_->Frame().NumDlDataSyms() * symbol_blocks;
-    MLPD_SYMBOL("Total number of dl data blocks: %zu\n", num_dl_codeblocks);
+    AGORA_LOG_SYMBOL("Total number of dl data blocks: %zu\n",
+                     num_dl_codeblocks);
 
     std::vector<std::vector<int8_t>> dl_information(num_dl_codeblocks);
     std::vector<std::vector<int8_t>> dl_encoded_codewords(num_dl_codeblocks);
@@ -430,8 +433,8 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
           directory + "/data/LDPC_orig_dl_data_" +
           std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
           std::to_string(this->cfg_->UeAntNum()) + ".bin";
-      MLPD_INFO("Saving raw dl data (using LDPC) to %s\n",
-                filename_input.c_str());
+      AGORA_LOG_INFO("Saving raw dl data (using LDPC) to %s\n",
+                     filename_input.c_str());
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
       for (size_t i = 0; i < num_dl_codeblocks; i++) {
         std::fwrite(reinterpret_cast<uint8_t*>(&dl_information.at(i).at(0)),
@@ -601,7 +604,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         directory + "/data/LDPC_dl_tx_data_" +
         std::to_string(this->cfg_->OfdmCaNum()) + "_ant" +
         std::to_string(this->cfg_->BsAntNum()) + ".bin";
-    MLPD_INFO("Saving dl tx data to %s\n", filename_dl_tx.c_str());
+    AGORA_LOG_INFO("Saving dl tx data to %s\n", filename_dl_tx.c_str());
     FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
     for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
       short* ptr = dl_tx_data[i];

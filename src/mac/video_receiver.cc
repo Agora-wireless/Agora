@@ -43,7 +43,7 @@ size_t VideoReceiver::Load(unsigned char *destination, size_t requested_bytes) {
             "[VideoReceiver] Received packet larger than max receive size -- "
             "inspect");
       } else if (rcv_ret > 0) {
-        MLPD_INFO("[VideoReceiver] data received: %zd\n", rcv_ret);
+        AGORA_LOG_INFO("[VideoReceiver] data received: %zd\n", rcv_ret);
       }
       data_available_ += rcv_ret;
     }
@@ -53,15 +53,15 @@ size_t VideoReceiver::Load(unsigned char *destination, size_t requested_bytes) {
   size_t loaded_bytes = std::min(data_available_, requested_bytes);
   std::memcpy(destination, &local_rx_buffer_.at(data_start_offset_),
               loaded_bytes);
-  MLPD_FRAME("[VideoReceiver] data loaded: %zu : %zu %zu @ %zu offset\n",
-             loaded_bytes, requested_bytes, data_available_,
-             data_start_offset_);
+  AGORA_LOG_FRAME("[VideoReceiver] data loaded: %zu : %zu %zu @ %zu offset\n",
+                  loaded_bytes, requested_bytes, data_available_,
+                  data_start_offset_);
   data_start_offset_ += loaded_bytes;
   data_available_ -= loaded_bytes;
   loaded_bytes = loaded_bytes;
 
   if (data_available_ < requested_bytes) {
-    MLPD_FRAME(
+    AGORA_LOG_FRAME(
         "[VideoReceiver] not enough data to service request %zu:%zu in %zu "
         "attempts\n",
         loaded_bytes, requested_bytes, rx_attempts);
