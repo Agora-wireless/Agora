@@ -41,16 +41,20 @@ hydra_master_config_json=${hydra_root_dir}/config/config.json
 if [ ! -f ${hydra_master_config_json} ]; then
   echored "ERROR: config file ${hydra_master_config_json} does not exist"
 fi
+echo "Parsing 1"
 res=$(cat ${hydra_master_config_json} | jq '.hydra_server_deploy_json' | tr -d '"')
 if [ "${res}" != "null" ]; then
   HYDRA_SERVER_DEPLOY_JSON=${hydra_root_dir}/${res}
 fi
+echo "Parsing 2"
 res=$(cat ${hydra_master_config_json} | jq '.hydra_runner_root' | tr -d '"')
 if [ "${res}" != "null" ]; then
   HYDRA_RUNNER_ROOT=${res}
 fi
 
+echo "Parsing 3"
 rru_server_num=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.rru_servers | length')
+echo "Parsing 4"
 hydra_server_num=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.hydra_servers | length')
 
 mkdir -p /tmp/hydra

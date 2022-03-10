@@ -1,24 +1,23 @@
 {
     "rru_servers": [
-        "roce96"
+        "roce94"
     ],
     "hydra_servers": [
-        "roce89",
-        "roce95"
+        "roce95",
+        "roce96"
+        "roce83"
     ],
     "subcarrier_num_list": [
-        400,
-        400,
-        400
+        608,
+        592,
+        592
     ],
     "subcarrier_block_list": [
         48,
-        48,
         48
     ],
-    "decode_thread_num": [
-        5,
-        4,
-        4
+    "coding_thread_num": [
+        6,
+        6
     ]
 }

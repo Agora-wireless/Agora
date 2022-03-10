@@ -8,7 +8,7 @@
   "ue_num": 16,
   "core_offset": 0,
   "frames": [
-    "PUUUUUUUUUUUUU"
+    "PDDDDDDDDDDDDD"
   ],
   "bs_port": 11000,
   "ue_rx_port": 10000,
