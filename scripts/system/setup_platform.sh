@@ -31,7 +31,7 @@ node_id=1
 for node in ${node_list_str}
 do
     cat ${HYDRA_SERVER_LIST_JSON} | jq --arg node ${node} --arg ip \
-        "10.0.0.${node_id}" '. + {($node): {"pcie": "0000:03:00.1", "ip": $ip, "mac": "ff:ff:ff:ff:ff:ff"}}' \
+        "10.10.1.${node_id}" '. + {($node): {"pcie": "0000:03:00.1", "ip": $ip, "mac": "ff:ff:ff:ff:ff:ff"}}' \
         > tmp_platform
     mv tmp_platform ${HYDRA_SERVER_LIST_JSON}
     node_id=$(( node_id+1 ))
