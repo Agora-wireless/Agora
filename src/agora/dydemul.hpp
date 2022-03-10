@@ -64,7 +64,7 @@ public:
      */
 
     void Launch(
-        size_t frame_id, size_t symbol_idx_ul, size_t base_sc_id);
+        size_t frame_id, size_t symbol_idx_ul, size_t base_sc_id, size_t sc_block_size);
 
     void PrintOverhead() {
         printf("DoDemul thread %u overhead: total time: %.2lfms, "

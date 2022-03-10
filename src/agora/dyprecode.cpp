@@ -43,7 +43,7 @@ DyPrecode::~DyPrecode()
 }
 
 void DyPrecode::Launch(
-    size_t frame_id, size_t symbol_id_dl, size_t base_sc_id)
+    size_t frame_id, size_t symbol_id_dl, size_t base_sc_id, size_t sc_block_size)
 {
     // size_t data_symbol_idx_dl = cfg_->get_dl_symbol_idx(frame_id, symbol_id);
     size_t data_symbol_idx_dl = symbol_id_dl;
@@ -59,12 +59,14 @@ void DyPrecode::Launch(
         0, cfg_->BS_ANT_NUM, cfg_->BS_ANT_NUM * 2, cfg_->BS_ANT_NUM * 3);
     // int max_sc_ite
     //     = std::min(cfg_->demul_block_size, (cfg_->bs_server_addr_idx + 1) * cfg_->get_num_sc_per_server() - base_sc_id);
-    int max_sc_ite = std::min(cfg_->demul_block_size, 
-        std::min(cfg_->subcarrier_start + (tid_ + 1) * cfg_->subcarrier_block_size, cfg_->subcarrier_end) - base_sc_id);
+    // int max_sc_ite = std::min(cfg_->demul_block_size, 
+    //     std::min(cfg_->subcarrier_start + (tid_ + 1) * cfg_->subcarrier_block_size, cfg_->subcarrier_end) - base_sc_id);
     // assert(max_sc_ite % kSCsPerCacheline == 0);
+    int max_sc_ite = sc_block_size;
 
     // Begin Debug
-    // printf("DL mod data base sc %u:\n", base_sc_id);
+    // if (frame_id == 200)
+    // printf("[Precoder %d] (%zu->%zu)\n", tid_, base_sc_id, base_sc_id + max_sc_ite - 1);
     // End Debug
 
     for (int i = 0; i < max_sc_ite; i ++) {
@@ -151,7 +153,11 @@ void DyPrecode::Launch(
                     2 * sizeof(float));
             }
         }
-        rt_assert(max_sc_ite > pre_sc_off, "Invalid subcarrier allocation (too small)!");
+        // rt_assert(max_sc_ite > pre_sc_off, "Invalid subcarrier allocation (too small)!");
+        if (max_sc_ite < pre_sc_off) {
+            printf("Invalid subcarrier allocation (too small: %zu %zu %d)!", base_sc_id, sc_block_size, max_sc_ite);
+            exit(0);
+        }
         for (size_t i = 0; i < (max_sc_ite - pre_sc_off) / 4; i ++) {
             float* input_shifted_ptr
                 = precoded_ptr + (4 * i + pre_sc_off) * 2 * cfg_->BS_ANT_NUM + ant_id * 2;
@@ -168,6 +174,9 @@ void DyPrecode::Launch(
         }
     }
 
+    if (frame_id >= 200) {
+        task_count_ += max_sc_ite;
+    }
     // Begin Debug
     // printf("\nPrecoded data base sc %lu:\n", base_sc_id);
     // for (size_t i = 0; i < max_sc_ite; i ++) {

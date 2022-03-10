@@ -53,7 +53,7 @@ DyDemul::~DyDemul()
 }
 
 void DyDemul::Launch(
-    size_t frame_id, size_t symbol_idx_ul, size_t base_sc_id)
+    size_t frame_id, size_t symbol_idx_ul, size_t base_sc_id, size_t sc_block_size)
 {
     const size_t total_data_symbol_idx_ul
         = cfg_->get_total_data_symbol_idx_ul(frame_id, symbol_idx_ul);
@@ -66,9 +66,9 @@ void DyDemul::Launch(
             tid_, frame_id, symbol_idx_ul, base_sc_id);
     }
 
-    size_t max_sc_ite;
-    max_sc_ite = std::min(cfg_->demul_block_size, 
-        std::min(cfg_->subcarrier_start + (tid_ + 1) * cfg_->subcarrier_block_size, cfg_->subcarrier_end) - base_sc_id);
+    size_t max_sc_ite = sc_block_size;
+    // max_sc_ite = std::min(cfg_->demul_block_size, 
+    //     std::min(cfg_->subcarrier_start + (tid_ + 1) * cfg_->subcarrier_block_size, cfg_->subcarrier_end) - base_sc_id);
     // assert(max_sc_ite % kSCsPerCacheline == 0);
 
     size_t pre_sc_off = 0;
@@ -217,7 +217,7 @@ void DyDemul::Launch(
                 equal_T_ptr += pre_sc_off * 2;
                 demul_ptr += cfg_->mod_order_bits * pre_sc_off;
             }
-            demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            demod_16qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite - pre_sc_off);
             break;
         case (CommsLib::QAM64):
             if (pre_sc_off > 0) {
@@ -225,7 +225,7 @@ void DyDemul::Launch(
                 equal_T_ptr += pre_sc_off * 2;
                 demul_ptr += cfg_->mod_order_bits * pre_sc_off;
             }
-            demod_64qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite);
+            demod_64qam_soft_avx2(equal_T_ptr, demul_ptr, max_sc_ite - pre_sc_off);
             break;
         default:
             printf("Demodulation: modulation type %s not supported!\n",

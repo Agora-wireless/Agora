@@ -537,7 +537,7 @@ void* Agora::worker(int tid)
             if (state_trigger) {
                 work_start_tsc = rdtsc();
             }
-            computeSubcarrier->do_demul_->Launch(slot_id, symbol_id_ul, sc_id);
+            computeSubcarrier->do_demul_->Launch(slot_id, symbol_id_ul, sc_id, config_->demul_block_size);
             resp = EventData(EventType::kDemul, gen_tag_t::frm_sym_sc(slot_id, symbol_id_ul, sc_id)._tag);
             TryEnqueueFallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
             if (state_trigger) {

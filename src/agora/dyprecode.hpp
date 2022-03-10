@@ -54,7 +54,9 @@ public:
      *     4. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    void Launch(size_t frame_id, size_t symbol_idx_dl, size_t base_sc_id);
+    void Launch(size_t frame_id, size_t symbol_idx_dl, size_t base_sc_id, size_t sc_block_size);
+
+    size_t task_count_ = 0;
 
 private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_;
@@ -70,6 +72,7 @@ private:
     // Control info
     std::vector<std::vector<ControlInfo>>& control_info_table_;
     std::vector<size_t>& control_idx_list_;
+
 };
 
 #endif

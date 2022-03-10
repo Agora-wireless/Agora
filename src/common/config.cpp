@@ -184,9 +184,9 @@ Config::Config(std::string jsonfile)
     rx_thread_num = tddConf.value("rx_thread_num", 4);
 
     demul_block_size = tddConf.value("demul_block_size", 48);
-    // rt_assert(demul_block_size % kSCsPerCacheline == 0,
-    //     "Demodulation block size must be a multiple of subcarriers per "
-    //     "cacheline");
+    rt_assert(demul_block_size % kSCsPerCacheline == 0,
+        "Demodulation block size must be a multiple of subcarriers per "
+        "cacheline");
     // rt_assert(demul_block_size % kTransposeBlockSize == 0,
     //     "Demodulation block size must be a multiple of transpose block size");
     rt_assert(demul_block_size > 0,
@@ -194,6 +194,8 @@ Config::Config(std::string jsonfile)
 
     zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
                                           : tddConf.value("zf_block_size", 1);
+    rt_assert(zf_block_size % demul_block_size == 0,
+        "ZF block size must be a multiple of demul block size!");
 
     bs_rru_addr_list = tddConf.value("bs_rru_addr_list", std::vector<std::string>());
     rt_assert(bs_rru_addr_list.size() > 0, "RRU address list is 0!");
