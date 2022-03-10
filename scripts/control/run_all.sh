@@ -99,7 +99,7 @@ if [ "${HYDRA_RUN_MODE}" == 0 ] || [ "${HYDRA_RUN_MODE}" == 1 ]; then
   source ${hydra_root_dir}/scripts/control/run_rru.sh
 fi
 
-time_to_run=$(( slot_us*slots_to_test/1000000+20 ))
+time_to_run=$(( slot_us*slots_to_test/1000000+25 ))
 echocyan "Wait ${time_to_run} seconds for the test to finish"
 sleep ${time_to_run}
 

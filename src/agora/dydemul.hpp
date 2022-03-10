@@ -75,6 +75,13 @@ public:
             cycles_to_ms(demod_cycles_, freq_ghz_), demod_count_, demod_cycles_ * 100.0f / total_cycles_);
     }
 
+    size_t total_cycles_ = 0;
+    size_t preprocess_cycles_ = 0;
+    size_t equal_cycles_ = 0;
+    size_t demod_cycles_ = 0;
+    size_t equal_count_ = 0;
+    size_t demod_count_ = 0;
+
 private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
     Table<complex_float>& equal_buffer_; // Totally unused for now because of we always disable kExportConstellation
@@ -93,13 +100,6 @@ private:
     void* jitter[kMaxUEs];
     cgemm_jit_kernel_t mkl_jit_cgemm[kMaxUEs];
 #endif
-
-    size_t total_cycles_ = 0;
-    size_t preprocess_cycles_ = 0;
-    size_t equal_cycles_ = 0;
-    size_t demod_cycles_ = 0;
-    size_t equal_count_ = 0;
-    size_t demod_count_ = 0;
 
     // Control info
     std::vector<std::vector<ControlInfo>>& control_info_table_;

@@ -261,7 +261,7 @@ void DySubcarrier::StartWork()
         tid_, cycles_to_ms(whole_duration, freq_ghz_),
         cycles_to_ms(csi_tsc_duration, freq_ghz_), csi_tsc_duration * 100.0f / whole_duration, csi_count, cycles_to_us(csi_max, freq_ghz_), csi_cur_frame_, csi_cur_sc_,
         cycles_to_ms(zf_tsc_duration, freq_ghz_), zf_tsc_duration * 100.0f / whole_duration, zf_count, cycles_to_us(zf_max, freq_ghz_), do_zf_->GetZfTscPerTask(), zf_cur_frame_, zf_cur_sc_,
-        cycles_to_ms(demod_tsc_duration, freq_ghz_), demod_tsc_duration * 100.0f / whole_duration, demod_count, cycles_to_us(demod_max, freq_ghz_), demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_done_,
+        cycles_to_ms(demod_tsc_duration, freq_ghz_), demod_tsc_duration * 100.0f / whole_duration, do_demul_->demod_count_, cycles_to_us(demod_max, freq_ghz_), demul_cur_frame_, demul_cur_sym_ul_, n_demul_tasks_done_,
         cycles_to_ms(print_tsc_duration, freq_ghz_), print_tsc_duration * 100.0f / whole_duration,
         cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration,
