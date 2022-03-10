@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
     // auto* sender = new Sender(cfg, FLAGS_num_masters, FLAGS_num_threads, FLAGS_core_offset,
     //     FLAGS_frame_duration, FLAGS_enable_slow_start, FLAGS_server_mac_addr);
     auto* sender = new Sender(cfg, num_masters, num_threads, core_offset,
-        frame_duration, enable_slow_start, server_mac_addr, non_wait);
+        frame_duration, enable_slow_start, server_mac_addr, nullptr, non_wait);
     double* frame_start = new double[kNumStatsFrames]();
     double* frame_end = new double[kNumStatsFrames]();
     sender->startTXfromMain(frame_start, frame_end);
