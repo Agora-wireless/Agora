@@ -1,5 +1,5 @@
 {
-  "rx_thread_num": 3,
+  "rx_thread_num": 2,
   "use_central_scheduler": false,
   "use_general_worker": false,
   "worker_thread_num": 10,
@@ -28,5 +28,7 @@
   "num_load_levels": 1,
   "sleep_mode": false,
   "ofdm_data_num": 1216,
-  "slot_us": 1000
+  "slot_us": 1000,
+  "use_hyperthreading": true,
+  "phy_core_num": 10
 }
