@@ -26,6 +26,8 @@
 #include <mutex>
 #include <stdexcept>
 
+#include "logger.h"
+
 /// Basic UDP server class based on OS sockets that supports receiving messages
 class UDPServer {
  public:
@@ -35,7 +37,7 @@ class UDPServer {
   // size = rx_buffer_size
   explicit UDPServer(uint16_t port, size_t rx_buffer_size = 0) : port_(port) {
     if (kDebugPrintUdpServerInit) {
-      std::printf("Creating UDP server listening at port %d\n", port);
+      AGORA_LOG_INFO("Creating UDP server listening at port %d\n", port);
     }
     sock_fd_ = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
     if (sock_fd_ == -1) {
@@ -72,8 +74,8 @@ class UDPServer {
       // Linux likes to return 2* the buffer size
       if ((actual_buf_size != desired_buf_size) &&
           (actual_buf_size != (desired_buf_size * 2))) {
-        std::printf(
-            "***Error setting RX buffer size to %zu actual size %d with status "
+        AGORA_LOG_ERROR(
+            "Error setting RX buffer size to %zu actual size %d with status "
             "%d\n",
             rx_buffer_size, actual_buf_size, ret);
       }
@@ -109,7 +111,7 @@ class UDPServer {
     }
 
     if (kDebugPrintUdpServerInit) {
-      std::printf("Destroying UDPServer\n");
+      AGORA_LOG_INFO("Destroying UDPServer\n");
     }
   }
 
@@ -121,19 +123,18 @@ class UDPServer {
    * in receiving, return -1.
    */
   ssize_t Recv(uint8_t* buf, size_t len) const {
-    ssize_t ret = recv(sock_fd_, static_cast<void*>(buf), len, 0);
+    ssize_t ret = ::recv(sock_fd_, static_cast<void*>(buf), len, 0);
 
     if (ret == -1) {
       if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
         // These errors mean that there's no data to receive
         ret = 0;
       } else {
-        std::fprintf(stderr,
-                     "UDPServer: recv() failed with unexpected error %s\n",
-                     std::strerror(errno));
+        AGORA_LOG_ERROR("UDPServer: recv() failed with unexpected error %s\n",
+                        std::strerror(errno));
       }
     } else if (ret == 0) {
-      std::fprintf(stderr, "UDPServer: recv() failed with return of 0\n");
+      AGORA_LOG_ERROR("UDPServer: recv() failed with return of 0\n");
     }
     return ret;
   }
@@ -153,7 +154,7 @@ class UDPServer {
     const auto remote_itr = addrinfo_map_.find(remote_uri);
     if (remote_itr == addrinfo_map_.end()) {
       char port_str[16u];
-      snprintf(port_str, sizeof(port_str), "%u", src_port);
+      ::snprintf(port_str, sizeof(port_str), "%u", src_port);
 
       addrinfo hints;
       std::memset(&hints, 0, sizeof(hints));
@@ -161,11 +162,13 @@ class UDPServer {
       hints.ai_socktype = SOCK_DGRAM;
       hints.ai_protocol = IPPROTO_UDP;
 
-      int r = getaddrinfo(src_address.c_str(), port_str, &hints, &rem_addrinfo);
+      int r =
+          ::getaddrinfo(src_address.c_str(), port_str, &hints, &rem_addrinfo);
       if ((r != 0) || (rem_addrinfo == nullptr)) {
         char issue_msg[1000u];
-        sprintf(issue_msg, "Failed to resolve %s. getaddrinfo error = %s.",
-                remote_uri.c_str(), gai_strerror(r));
+        AGORA_LOG_ERROR(issue_msg,
+                        "Failed to resolve %s. getaddrinfo error = %s.",
+                        remote_uri.c_str(), gai_strerror(r));
         throw std::runtime_error(issue_msg);
       }
 
@@ -181,20 +184,20 @@ class UDPServer {
     }
 
     socklen_t addrlen = rem_addrinfo->ai_addrlen;
-    ssize_t ret = recvfrom(sock_fd_, static_cast<void*>(buf), len, 0,
-                           rem_addrinfo->ai_addr, &addrlen);
+    ssize_t ret = ::recvfrom(sock_fd_, static_cast<void*>(buf), len, 0,
+                             rem_addrinfo->ai_addr, &addrlen);
 
     if (ret == -1) {
       if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
         // These errors mean that there's no data to receive
         ret = 0;
       } else {
-        std::fprintf(stderr,
-                     "UDPServer: recvfrom() failed with unexpected error %s\n",
-                     std::strerror(errno));
+        AGORA_LOG_ERROR(
+            "UDPServer: recvfrom() failed with unexpected error %s\n",
+            std::strerror(errno));
       }
     } else if (ret == 0) {
-      std::fprintf(stderr, "UDPServer: recv() failed with return of 0\n");
+      AGORA_LOG_ERROR("UDPServer: recv() failed with return of 0\n");
     }
     return ret;
   }
@@ -204,20 +207,20 @@ class UDPServer {
    * will now block
    */
   void MakeBlocking(size_t timeout_sec = 0) const {
-    int current_flags = fcntl(sock_fd_, F_GETFL);
+    int current_flags = ::fcntl(sock_fd_, F_GETFL);
     if (current_flags == -1) {
       throw std::runtime_error("UDPServer: fcntl failed to get flags");
     }
     int desired_flags = current_flags & (~O_NONBLOCK);
 
     if (desired_flags != current_flags) {
-      int fcntl_status = fcntl(sock_fd_, F_SETFL, desired_flags);
+      int fcntl_status = ::fcntl(sock_fd_, F_SETFL, desired_flags);
       if (fcntl_status == -1) {
         throw std::runtime_error("UDPServer: fcntl failed to set blocking");
       }
 
       // Verify the flags were properly set
-      current_flags = fcntl(sock_fd_, F_GETFL);
+      current_flags = ::fcntl(sock_fd_, F_GETFL);
       if (current_flags == -1) {
         throw std::runtime_error("UDPServer: fcntl failed to get flags");
       } else if (current_flags != desired_flags) {
@@ -232,7 +235,7 @@ class UDPServer {
       tv.tv_sec = timeout_sec;
       tv.tv_usec = 0;
       int opt_status =
-          setsockopt(sock_fd_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+          ::setsockopt(sock_fd_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
       if (opt_status != 0) {
         throw std::runtime_error("UDPServer: Failed to set timeout.");
       }

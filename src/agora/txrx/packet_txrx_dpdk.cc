@@ -25,7 +25,7 @@ PacketTxRxDpdk::PacketTxRxDpdk(
   const size_t num_dpdk_eth_dev = cfg_->DpdkNumPorts();
   const size_t worker_threads = NumberTotalWorkers();
   DpdkTransport::DpdkInit(core_offset_ - 1, worker_threads);
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "PacketTxRxDpdk: Requested devices %zu (offset: %d), %d available, "
       "socket: %d\n",
       num_dpdk_eth_dev, cfg_->DpdkPortOffset(), rte_eth_dev_count_avail(),
@@ -86,15 +86,15 @@ PacketTxRxDpdk::PacketTxRxDpdk(
       }
     }
   }
-  MLPD_INFO("DPDK main core id %d, worker lcores (worker + main): %d\n",
-            rte_get_main_lcore(), rte_lcore_count());
+  AGORA_LOG_INFO("DPDK main core id %d, worker lcores (worker + main): %d\n",
+                 rte_get_main_lcore(), rte_lcore_count());
 }
 
 PacketTxRxDpdk::~PacketTxRxDpdk() {
   StopTxRx();
 
   rte_flow_error flow_error;
-  MLPD_FRAME("~PacketTxRxDpdk: dpdk eal cleanup\n");
+  AGORA_LOG_FRAME("~PacketTxRxDpdk: dpdk eal cleanup\n");
   rte_mempool_free(mbuf_pool_);
 
   uint16_t eth_port = UINT16_MAX;
@@ -106,22 +106,23 @@ PacketTxRxDpdk::~PacketTxRxDpdk() {
         // All workers should have exited, shutdown the resources nicely
         auto ret_status = rte_flow_flush(eth_port, &flow_error);
         if (ret_status != 0) {
-          MLPD_ERROR(
+          AGORA_LOG_ERROR(
               "Flow cannot be flushed %d message: %s\n", flow_error.type,
               flow_error.message ? flow_error.message : "(no stated reason)");
         }
 
         ret_status = rte_eth_dev_stop(eth_port);
         if (ret_status < 0) {
-          MLPD_ERROR("Failed to stop port %u: %s", eth_port,
-                     rte_strerror(-ret_status));
+          AGORA_LOG_ERROR("Failed to stop port %u: %s", eth_port,
+                          rte_strerror(-ret_status));
         }
         ret_status = rte_eth_dev_close(eth_port);
         if (ret_status < 0) {
-          MLPD_ERROR("Failed to close device %u: %s", eth_port,
-                     rte_strerror(-ret_status));
+          AGORA_LOG_ERROR("Failed to close device %u: %s", eth_port,
+                          rte_strerror(-ret_status));
         }
-        MLPD_INFO("PacketTxRxDpdk::Shuttdown down dev port %d\n", eth_port);
+        AGORA_LOG_INFO("PacketTxRxDpdk::Shuttdown down dev port %d\n",
+                       eth_port);
       }
     }
   }
@@ -137,7 +138,7 @@ bool PacketTxRxDpdk::CreateWorker(size_t tid, size_t interface_count,
   RtAssert(kUseDPDK, "DPDK Mode must be enabled fro CreateWorker\n");
 
   const size_t num_channels = NumChannels();
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "PacketTxRxDpdk[%zu]: Creating worker handling %zu interfaces starting "
       "at %zu - antennas %zu:%zu\n",
       tid, interface_count, interface_offset, interface_offset * num_channels,
@@ -161,8 +162,8 @@ bool PacketTxRxDpdk::CreateWorker(size_t tid, size_t interface_count,
       rx_frame_start, event_notify_q_, tx_pending_q_, *tx_producer_tokens_[tid],
       *notify_producer_tokens_[tid], rx_memory, tx_memory, mutex_, cond_,
       proceed_, worker_dev_queue_assignment_.at(tid), mbuf_pool_));
-  MLPD_INFO("PacketTxRxDpdk: worker %zu assigned to lcore %d \n", tid,
-            thread_l_core);
+  AGORA_LOG_INFO("PacketTxRxDpdk: worker %zu assigned to lcore %d \n", tid,
+                 thread_l_core);
 
   return true;
 }

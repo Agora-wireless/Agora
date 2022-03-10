@@ -101,7 +101,8 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     try {
       mat_ul_zf_tmp = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
     } catch (std::runtime_error&) {
-      MLPD_WARN("Failed to invert channel matrix, falling back to pinv()\n");
+      AGORA_LOG_WARN(
+          "Failed to invert channel matrix, falling back to pinv()\n");
       arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
     }
   } else {
@@ -223,11 +224,11 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id,
           cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
 
       if (sc_id == 0) {
-        MLPD_TRACE(
+        AGORA_LOG_TRACE(
             "DoZF[%d]: (Frame %zu, sc_id %zu), ComputeCalib updating calib at "
             "slot %zu : prev %zu, old %zu\n",
-            tid_, frame_id, sc_id, frame_cal_slot, frame_cal_slot_prev,
-            frame_cal_slot_old);
+            tid_, frame_id, sc_id, cal_slot_complete, cal_slot_prev,
+            cal_slot_old);
       }
 
       // Add new value to old rolling sum.  Then subtract out the oldest.

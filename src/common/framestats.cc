@@ -11,6 +11,8 @@
 #include <cassert>
 #include <utility>
 
+#include "logger.h"
+
 FrameStats::FrameStats(std::string new_frame_id)
     : frame_identifier_(std::move(new_frame_id)),
       client_ul_pilot_symbols_(0),
@@ -53,8 +55,8 @@ FrameStats::FrameStats(std::string new_frame_id)
       }
 
       default: {
-        std::printf("!!!!! Unknown symbol in frame: %c : %s !!!!!\n", symbol,
-                    frame_identifier_.c_str());
+        AGORA_LOG_ERROR("!!!!! Unknown symbol in frame: %c : %s !!!!!\n",
+                        symbol, frame_identifier_.c_str());
       }
     }
   }

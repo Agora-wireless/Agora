@@ -36,7 +36,7 @@ TxRxWorkerClientSim::TxRxWorkerClientSim(
     udp_servers_.emplace_back(
         std::make_unique<UDPServer>(local_port_id, kSocketRxBufferSize));
     udp_clients_.emplace_back(std::make_unique<UDPClient>());
-    MLPD_FRAME(
+    AGORA_LOG_FRAME(
         "TxRxWorkerClientSim[%zu]: set up UDP socket server listening "
         "to local port %d\n",
         tid_, local_port_id);
@@ -95,7 +95,7 @@ std::vector<Packet*> TxRxWorkerClientSim::RecvEnqueue(size_t interface_id) {
                          ->Recv(reinterpret_cast<uint8_t*>(pkt), packet_length);
   if (rx_bytes == static_cast<ssize_t>(packet_length)) {
     if (kDebugPrintInTask) {
-      std::printf(
+      AGORA_LOG_INFO(
           "TxRxWorkerClientSim[%zu]: Received frame %d, symbol %d, ant %d\n",
           tid_, pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
     }
@@ -104,10 +104,11 @@ std::vector<Packet*> TxRxWorkerClientSim::RecvEnqueue(size_t interface_id) {
     NotifyComplete(rx_message);
     rx_packets.push_back(pkt);
   } else if (0 > rx_bytes) {
-    MLPD_ERROR("RecvEnqueue: Udp Recv failed with error\n");
+    AGORA_LOG_ERROR("RecvEnqueue: Udp Recv failed with error\n");
     throw std::runtime_error("TxRxWorkerClientSim: recv failed");
   } else if (0 != rx_bytes) {
-    MLPD_ERROR("RecvEnqueue: Udp Recv failed to receive all expected bytes");
+    AGORA_LOG_ERROR(
+        "RecvEnqueue: Udp Recv failed to receive all expected bytes");
     throw std::runtime_error(
         "PacketTxRx::RecvEnqueue: Udp Recv failed to receive all expected "
         "bytes");
@@ -155,12 +156,12 @@ size_t TxRxWorkerClientSim::DequeueSend() {
 
       if (kDebugPrintInTask) {
         if (pilot_symbol_idx == ue_ant) {
-          std::printf(
+          AGORA_LOG_INFO(
               "TxRxWorkerClientSim[%zu]: Transmitted pilot frame %zu, symbol "
               "%zu, ant %zu\n",
               tid_, frame_id, symbol_id, ue_ant);
         } else {
-          std::printf(
+          AGORA_LOG_INFO(
               "TxRxWorkerClientSim[%zu]: Transmitted zeros frame \"%zu, "
               "symbol %zu, ant %zu\n",
               tid_, frame_id, symbol_id, ue_ant);
@@ -184,7 +185,7 @@ size_t TxRxWorkerClientSim::DequeueSend() {
         const size_t symbol_id =
             Configuration()->Frame().GetULSymbol(ul_symbol_idx);
         if (kDebugPrintInTask) {
-          std::printf(
+          AGORA_LOG_INFO(
               "TxRxWorkerClientSim[%zu]: Transmitted frame %zu, symbol %zu, "
               "ant %zu\n",
               tid_, frame_id, symbol_id, ue_ant);
