@@ -21,13 +21,12 @@ for info in node_info:
     f.write('   User junzhig\n')
 f.close()
 
-os.system("ssh-keygen -N '' -f ~/.ssh/id_rsa -q <<y > /dev/null 2>&1")
-
-f = open(os.path.expanduser('~/.ssh/id_rsa.pub'), 'r')
-pub_key = f.readlines()[0]
-print pub_key
+f = open('node_list', 'w')
+for info in node_info:
+    f.write('%s\n' % info[0])
 f.close()
 
+f = open('addr_list', 'w')
 for info in node_info:
-    print "ssh -oStrictHostKeyChecking=no {} 'echo {} >> ~/.ssh/authorized_keys'".format(info[0], pub_key)
-    os.system("ssh -oStrictHostKeyChecking=no {} 'echo {} >> ~/.ssh/authorized_keys'".format(info[0], pub_key))
+    f.write('%s\n' % info[1])
+f.close()
