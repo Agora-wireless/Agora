@@ -115,4 +115,6 @@ fi
 
 echocyan "All running logs will be stored in /tmp/hydra/log_[server].txt"
 
-source ${hydra_root_dir}/scripts/control/error_diagnosis.sh
+if [ "${HYDRA_RUN_MODE}" == 0 ]; then
+  source ${hydra_root_dir}/scripts/control/error_diagnosis.sh
+fi
