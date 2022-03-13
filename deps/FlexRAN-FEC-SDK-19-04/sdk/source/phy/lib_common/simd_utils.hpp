@@ -654,5 +654,20 @@ inline void bblib_complex_mult(__m512i input0, __m512i input1, __m512i *outPtr) 
     _mm512_store_si512((__m512i *) outPtr, result);
 }
 
+uint64_t rdtsc(){
+    unsigned int lo,hi;
+    __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+    return ((uint64_t)hi << 32) | lo;
+}
 
+class Profiler{
+public:
+    Profiler(size_t idx): idx_(idx) {cur_start_cycle_ = rdtsc();}
+    ~Profiler() {total_cycles[idx_] += rdtsc() - cur_start_cycle_; total_calls[idx_] ++;}
+
+    size_t cur_start_cycle_;
+    size_t idx_;
+    static size_t total_cycles[128];
+    static size_t total_calls[128];
+};
 
