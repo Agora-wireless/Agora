@@ -182,6 +182,7 @@ Config::Config(std::string jsonfile)
     core_offset = tddConf.value("core_offset", 0);
     worker_thread_num = tddConf.value("worker_thread_num", 25);
     rx_thread_num = tddConf.value("rx_thread_num", 4);
+    tx_thread_num = tddConf.value("tx_thread_num", 4);
 
     demul_block_size = tddConf.value("demul_block_size", 48);
     rt_assert(demul_block_size % kSCsPerCacheline == 0,
@@ -342,6 +343,163 @@ Config::Config(std::string jsonfile)
 
     use_central_scheduler = tddConf.value("use_central_scheduler", false);
     use_general_worker = tddConf.value("use_general_worker", false);
+    use_bigstation_mode = tddConf.value("use_bigstation_mode", false);
+
+    if (use_bigstation_mode) {
+        rt_assert(!downlink_mode, "Bigstation mode is not supported for downlink");
+        num_fft_workers = tddConf.value("num_fft_workers", std::vector<size_t>());
+        num_zf_workers = tddConf.value("num_zf_workers", std::vector<size_t>());
+        num_demul_workers = tddConf.value("num_demul_workers", std::vector<size_t>());
+        num_decode_workers = tddConf.value("num_decode_workers", std::vector<size_t>());
+        
+        rt_assert(num_fft_workers.size() == bs_server_addr_list.size(),
+            "num_fft_workers size is not equal to bs_server_addr_list size");
+        size_t next_bar = num_fft_workers[0];
+        size_t cur_server_id = 0;
+        size_t total_thread_num = 0;
+        ant_server_mapping.resize(BS_ANT_NUM);
+        for (size_t i = 0; i < num_fft_workers.size(); i++) {
+            total_thread_num += num_fft_workers[i];
+        }
+        for (size_t i = 0; i < BS_ANT_NUM; i ++) {
+            double tid = i * 1.0 * total_thread_num / BS_ANT_NUM;
+            if (tid < next_bar) {
+                ant_server_mapping[i] = cur_server_id;
+            } else {
+                cur_server_id ++;
+                next_bar += num_fft_workers[cur_server_id];
+                ant_server_mapping[i] = cur_server_id;
+            }
+        }
+        ant_start = -1;
+        ant_end = 0;
+        for (size_t i = 0; i < BS_ANT_NUM; i ++) {
+            if (ant_server_mapping[i] == bs_server_addr_idx) {
+                ant_start = std::min(ant_start, i);
+                ant_end = std::max(ant_end, i);
+            }
+        }
+        ant_end ++;
+        fft_thread_offset = 0;
+        for (size_t i = 0; i < bs_server_addr_idx; i ++) {
+            fft_thread_offset += num_fft_workers[i];
+        }
+        total_fft_workers = 0;
+        for (size_t i = 0; i < num_fft_workers.size(); i ++) {
+            total_fft_workers += num_fft_workers[i];
+        }
+
+        rt_assert(num_zf_workers.size() == bs_server_addr_list.size(),
+            "num_zf_workers size is not equal to bs_server_addr_list size");
+        next_bar = num_zf_workers[0];
+        cur_server_id = 0;
+        total_thread_num = 0;
+        zf_server_mapping.resize(OFDM_DATA_NUM);
+        for (size_t i = 0; i < num_zf_workers.size(); i++) {
+            total_thread_num += num_zf_workers[i];
+        }
+        for (size_t i = 0; i < OFDM_DATA_NUM; i ++) {
+            double tid = i * 1.0 * total_thread_num / OFDM_DATA_NUM;
+            if (tid < next_bar) {
+                zf_server_mapping[i] = cur_server_id;
+            } else {
+                cur_server_id ++;
+                next_bar += num_zf_workers[cur_server_id];
+                zf_server_mapping[i] = cur_server_id;
+            }
+        }
+        zf_start = -1;
+        zf_end = 0;
+        for (size_t i = 0; i < OFDM_DATA_NUM; i ++) {
+            if (zf_server_mapping[i] == bs_server_addr_idx) {
+                zf_start = std::min(zf_start, i);
+                zf_end = std::max(zf_end, i);
+            }
+        }
+        zf_end ++;
+        zf_thread_offset = 0;
+        for (size_t i = 0; i < bs_server_addr_idx; i ++) {
+            zf_thread_offset += num_zf_workers[i];
+        }
+        total_zf_workers = 0;
+        for (size_t i = 0; i < num_zf_workers.size(); i ++) {
+            total_zf_workers += num_zf_workers[i];
+        }
+
+        rt_assert(num_demul_workers.size() == bs_server_addr_list.size(),
+            "num_demul_workers size is not equal to bs_server_addr_list size");
+        next_bar = num_demul_workers[0];
+        cur_server_id = 0;
+        total_thread_num = 0;
+        demul_server_mapping.resize(OFDM_DATA_NUM);
+        for (size_t i = 0; i < num_demul_workers.size(); i++) {
+            total_thread_num += num_demul_workers[i];
+        }
+        for (size_t i = 0; i < OFDM_DATA_NUM; i ++) {
+            double tid = i * 1.0 * total_thread_num / OFDM_DATA_NUM;
+            if (tid < next_bar) {
+                demul_server_mapping[i] = cur_server_id;
+            } else {
+                cur_server_id ++;
+                next_bar += num_demul_workers[cur_server_id];
+                demul_server_mapping[i] = cur_server_id;
+            }
+        }
+        demul_start = -1;
+        demul_end = 0;
+        for (size_t i = 0; i < OFDM_DATA_NUM; i ++) {
+            if (demul_server_mapping[i] == bs_server_addr_idx) {
+                demul_start = std::min(demul_start, i);
+                demul_end = std::max(demul_end, i);
+            }
+        }
+        demul_end ++;
+        demul_thread_offset = 0;
+        for (size_t i = 0; i < bs_server_addr_idx; i ++) {
+            demul_thread_offset += num_demul_workers[i];
+        }
+        total_demul_workers = 0;
+        for (size_t i = 0; i < num_demul_workers.size(); i ++) {
+            total_demul_workers += num_demul_workers[i];
+        }
+
+        rt_assert(num_decode_workers.size() == bs_server_addr_list.size(),
+            "num_decode_workers size is not equal to bs_server_addr_list size");
+        next_bar = num_decode_workers[0];
+        cur_server_id = 0;
+        total_thread_num = 0;
+        ue_server_mapping.resize(UE_NUM);
+        for (size_t i = 0; i < num_decode_workers.size(); i++) {
+            total_thread_num += num_decode_workers[i];
+        }
+        for (size_t i = 0; i < UE_NUM; i ++) {
+            double tid = i * 1.0 * total_thread_num / UE_NUM;
+            if (tid < next_bar) {
+                ue_server_mapping[i] = cur_server_id;
+            } else {
+                cur_server_id ++;
+                next_bar += num_decode_workers[cur_server_id];
+                ue_server_mapping[i] = cur_server_id;
+            }
+        }
+        ue_start = -1;
+        ue_end = 0;
+        for (size_t i = 0; i < UE_NUM; i ++) {
+            if (ue_server_mapping[i] == bs_server_addr_idx) {
+                ue_start = std::min(ue_start, i);
+                ue_end = std::max(ue_end, i);
+            }
+        }
+        ue_end ++;
+        decode_thread_offset = 0;
+        for (size_t i = 0; i < bs_server_addr_idx; i ++) {
+            decode_thread_offset += num_decode_workers[i];
+        }
+        total_decode_workers = 0;
+        for (size_t i = 0; i < num_decode_workers.size(); i ++) {
+            total_decode_workers += num_decode_workers[i];
+        }
+    }
 
     sampsPerSymbol
         = ofdm_tx_zero_prefix_ + OFDM_CA_NUM + CP_LEN + ofdm_tx_zero_postfix_;

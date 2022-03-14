@@ -148,6 +148,7 @@ public:
     size_t core_offset;
     size_t worker_thread_num;
     size_t rx_thread_num;
+    size_t tx_thread_num;
     size_t decode_thread_num;
     size_t encode_thread_num;
 
@@ -364,6 +365,27 @@ public:
     // Centralized scheduler mode
     bool use_central_scheduler;
     bool use_general_worker;
+
+    bool use_bigstation_mode;
+    std::vector<size_t> num_fft_workers;
+    std::vector<size_t> num_zf_workers;
+    std::vector<size_t> num_demul_workers;
+    std::vector<size_t> num_decode_workers;
+    size_t total_fft_workers;
+    size_t total_zf_workers;
+    size_t total_demul_workers;
+    size_t total_decode_workers;
+
+    size_t zf_start, zf_end;
+    size_t demul_start, demul_end;
+    std::vector<size_t> ant_server_mapping;
+    std::vector<size_t> zf_server_mapping;
+    std::vector<size_t> demul_server_mapping;
+    std::vector<size_t> ue_server_mapping;
+    size_t fft_thread_offset;
+    size_t zf_thread_offset;
+    size_t demul_thread_offset;
+    size_t decode_thread_offset;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;
