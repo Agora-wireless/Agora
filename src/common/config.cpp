@@ -188,13 +188,15 @@ Config::Config(std::string jsonfile)
     rt_assert(demul_block_size % kSCsPerCacheline == 0,
         "Demodulation block size must be a multiple of subcarriers per "
         "cacheline");
-    rt_assert(demul_block_size % kTransposeBlockSize == 0,
-        "Demodulation block size must be a multiple of transpose block size");
+    // rt_assert(demul_block_size % kTransposeBlockSize == 0,
+    //     "Demodulation block size must be a multiple of transpose block size");
     rt_assert(demul_block_size > 0,
         "Demodulation block size must be greater than 0!");
 
     zf_block_size = freq_orthogonal_pilot ? UE_ANT_NUM
                                           : tddConf.value("zf_block_size", 1);
+    rt_assert(zf_block_size % demul_block_size == 0,
+        "ZF block size must be a multiple of demul block size!");
 
     bs_rru_addr_list = tddConf.value("bs_rru_addr_list", std::vector<std::string>());
     rt_assert(bs_rru_addr_list.size() > 0, "RRU address list is 0!");
@@ -233,8 +235,8 @@ Config::Config(std::string jsonfile)
     subcarrier_block_size = subcarrier_vec[bs_server_addr_idx];
     // rt_assert(subcarrier_block_size % zf_block_size == 0,
     //     "Subcarrier block size should be a multiple of zf_block_size)!");
-    rt_assert(subcarrier_block_size % kSCsPerCacheline == 0,
-        "Subcarrier block size should be a multiple of cacheline size)!");
+    // rt_assert(subcarrier_block_size % kSCsPerCacheline == 0,
+    //     "Subcarrier block size should be a multiple of cacheline size)!");
     rt_assert(demul_block_size <= subcarrier_block_size,
         "Demodulation block size must no larger than subcarrier block size!");
 
@@ -340,6 +342,10 @@ Config::Config(std::string jsonfile)
         fft_tx_port = tddConf.value("fft_tx_port", 9100);
         fft_rx_port = tddConf.value("fft_rx_port", 9600);
     }
+
+    slot_us = tddConf.value("slot_us", 1000);
+    use_hyperthreading = tddConf.value("use_hyperthreading", false);
+    phy_core_num = tddConf.value("phy_core_num", 10);
 
     use_central_scheduler = tddConf.value("use_central_scheduler", false);
     use_general_worker = tddConf.value("use_general_worker", false);

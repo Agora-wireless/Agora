@@ -658,6 +658,26 @@ int PacketTXRX::recv_relocate(int tid)
     return valid_pkts;
 }
 
+void PacketTXRX::notify_sender()
+{
+    uint16_t src_port = 2222;
+    uint16_t dst_port = 3333;
+    const size_t magic = 0xea10bafe;
+    rte_mbuf* mbuf = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 
+        bs_rru_mac_addrs_[0], bs_server_addrs_[cfg_->bs_server_addr_idx], bs_rru_addrs_[0], 
+        src_port, dst_port, 4*sizeof(size_t));
+    struct rte_ether_hdr* eth_hdr
+        = rte_pktmbuf_mtod(mbuf, struct rte_ether_hdr*);
+    char* payload = (char*)eth_hdr + kPayloadOffset;
+    *((size_t*)payload) = magic;
+    *((size_t*)payload + 1) = cfg_->bs_server_addr_idx;
+    size_t nb_tx = rte_eth_tx_burst(0, 0, &mbuf, 1);
+    if (unlikely(nb_tx != 1)) {
+        printf("rte_eth_tx_burst() failed\n");
+        exit(0);
+    }
+}
+
 #if 0
 void* PacketTXRX::encode_thread(int tid)
 {

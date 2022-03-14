@@ -41,20 +41,26 @@ hydra_master_config_json=${hydra_root_dir}/config/config.json
 if [ ! -f ${hydra_master_config_json} ]; then
   echored "ERROR: config file ${hydra_master_config_json} does not exist"
 fi
+echo "Parsing 1"
 res=$(cat ${hydra_master_config_json} | jq '.hydra_server_deploy_json' | tr -d '"')
 if [ "${res}" != "null" ]; then
   HYDRA_SERVER_DEPLOY_JSON=${hydra_root_dir}/${res}
 fi
+echo "Parsing 2"
 res=$(cat ${hydra_master_config_json} | jq '.hydra_runner_root' | tr -d '"')
 if [ "${res}" != "null" ]; then
   HYDRA_RUNNER_ROOT=${res}
 fi
 
+echo "Parsing 3"
 rru_server_num=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.rru_servers | length')
+echo "Parsing 4"
 hydra_server_num=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.hydra_servers | length')
 
+mkdir -p /tmp/hydra
+
 if [ "${BUILD_MODE}" == "remote" ]; then
-  echocyan "Sync all source codes to remote servers"
+  echocyan "Sync Hydra source codes to remote servers"
   source ${hydra_root_dir}/scripts/control/sync_all.sh
   echocyan "Build Hydra app on remote servers"
   for (( i=0; i<${rru_server_num}; i++ )) do
@@ -79,7 +85,7 @@ else
     { echored "Failed to build hydra. Please check /tmp/hydra/install.log for details" && exit 1; }
   make -j >> /tmp/hydra/install.log || \
     { echored "Failed to build hydra. Please check /tmp/hydra/install.log for details" && exit 1; }
-  echocyan "Copying Hydra binaries..."
+  echocyan "Copying Hydra binaries to ${HYDRA_RUNNER_ROOT} on remote servers"
   for (( i=0; i<${rru_server_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
     scp -r -oStrictHostKeyChecking=no ${hydra_root_dir}/build/* ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/build/ >> /tmp/hydra/install.log || \

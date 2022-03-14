@@ -62,7 +62,7 @@ public:
     Sender(Config* config, size_t num_master_threads, size_t num_worker_threads, size_t core_offset = 30,
         size_t frame_duration = 1000, size_t enable_slow_start = 1,
         std::string server_mac_addr_str = "ff:ff:ff:ff:ff:ff",
-        void* mbuf_pool = nullptr);
+        void* mbuf_pool = nullptr, bool non_wait = false);
 
     ~Sender();
 
@@ -98,6 +98,7 @@ private:
     // Get number of CPU ticks for a symbol given a frame index
     uint64_t get_ticks_for_frame(size_t frame_id);
     size_t get_max_symbol_id() const;
+    void wait_for_hydra_request();
 
     // Launch threads to run worker with thread IDs from tid_start to tid_end
     void create_threads(void* (*worker)(void*), int tid_start, int tid_end);
@@ -167,6 +168,8 @@ private:
     size_t ant_start_;
     size_t ant_end_;
     size_t ant_num_;
+
+    bool non_wait_;
 
 #ifdef USE_DPDK
     struct rte_mempool* mbuf_pools_[kMaxWorkerNum];

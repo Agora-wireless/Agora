@@ -23,12 +23,19 @@ int pin_to_core(int core_id)
 }
 
 void pin_to_core_with_offset(
-    ThreadType thread_type, int core_offset, int thread_id, bool verbose)
+    ThreadType thread_type, int core_offset, int thread_id, bool verbose, bool hyper, int phy_core_num)
 {
     if (!kEnableThreadPinning)
         return;
 
-    int actual_core_id = core_offset + thread_id;
+    // int actual_core_id = core_offset + thread_id;
+    int actual_core_id;
+    if (hyper) {
+        actual_core_id = thread_id % 2 == 0 ? core_offset + thread_id / 2 : 
+            core_offset + thread_id / 2 + phy_core_num;
+    } else {
+        actual_core_id = core_offset + thread_id;
+    }
     int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
 
     /* Reserve core 0 for kernel threads */

@@ -92,7 +92,7 @@ Agora::Agora(Config* cfg)
         cfg->core_offset + kNumMasterThread + cfg->rx_thread_num + kNumDemodTxThread - 1,
         base_worker_core_offset_,
         base_worker_core_offset_ + do_subcarrier_threads_.size() + do_decode_threads_.size() + 
-        do_encode_threads_.size());
+        do_encode_threads_.size() - 1);
 }
 
 Agora::~Agora()
@@ -134,6 +134,11 @@ void Agora::Start()
     if (!packet_tx_rx_->StartTXRX()) {
         Stop();
         return;
+    }
+
+    while (shared_state_.rru_start_ == false) {
+        packet_tx_rx_->notify_sender();
+        usleep(100000);
     }
 
     while (cfg->running && !SignalHandler::gotExitSignal()) {
@@ -358,8 +363,13 @@ void* Agora::fftWorker(int tid)
 
 void* Agora::subcarrierWorker(int tid)
 {
-    pin_to_core_with_offset(
-        ThreadType::kWorkerSubcarrier, base_worker_core_offset_, tid + do_fft_threads_.size());
+    if (config_->use_hyperthreading) {
+        pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, base_worker_core_offset_ - kNumDemodTxThread, 
+            tid + do_fft_threads_.size() + kNumDemodTxThread, true, true, config_->phy_core_num);
+    } else {
+        pin_to_core_with_offset(
+            ThreadType::kWorkerSubcarrier, base_worker_core_offset_, tid + do_fft_threads_.size());
+    }
 
     Range sc_range(tid * config_->subcarrier_block_size + config_->subcarrier_start,
         min((tid + 1) * config_->subcarrier_block_size + config_->subcarrier_start,
@@ -389,8 +399,14 @@ void* Agora::subcarrierWorker(int tid)
 
 void* Agora::decodeWorker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_,
-        tid + do_fft_threads_.size() + do_subcarrier_threads_.size());
+    if (config_->use_hyperthreading) {
+        pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_ - kNumDemodTxThread,
+            tid + do_fft_threads_.size() + do_subcarrier_threads_.size() + kNumDemodTxThread, 
+            true, true, config_->phy_core_num);
+    } else {
+        pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_,
+            tid + do_fft_threads_.size() + do_subcarrier_threads_.size());
+    }
 
     auto computeDecoding = new DyDecode(config_, tid, freq_ghz_,
         demod_buffer_to_decode_,
@@ -411,8 +427,14 @@ void* Agora::decodeWorker(int tid)
 
 void* Agora::encodeWorker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorkerEncode, base_worker_core_offset_,
-        tid + do_fft_threads_.size() + do_subcarrier_threads_.size());
+    if (config_->use_hyperthreading) {
+        pin_to_core_with_offset(ThreadType::kWorkerEncode, base_worker_core_offset_ - kNumDemodTxThread,
+            tid + do_fft_threads_.size() + do_subcarrier_threads_.size() + kNumDemodTxThread, 
+            true, true, config_->phy_core_num);
+    } else {
+        pin_to_core_with_offset(ThreadType::kWorkerEncode, base_worker_core_offset_,
+            tid + do_fft_threads_.size() + do_subcarrier_threads_.size());
+    }
 
     auto computeEncoding = new DyEncode(config_, tid, freq_ghz_,
         dl_bits_buffer_,
@@ -428,7 +450,12 @@ void* Agora::encodeWorker(int tid)
 
 void* Agora::worker(int tid)
 {
-    pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset_, tid);
+    if (config_->use_hyperthreading) {
+        pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset_, tid, 
+            true, true, config_->phy_core_num);
+    } else {
+        pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset_, tid);
+    }
 
     auto computeSubcarrier = new DySubcarrier(config_, tid, freq_ghz_,
         Range(0, 1),
@@ -512,7 +539,7 @@ void* Agora::worker(int tid)
             if (state_trigger) {
                 work_start_tsc = rdtsc();
             }
-            computeSubcarrier->do_demul_->Launch(slot_id, symbol_id_ul, sc_id);
+            computeSubcarrier->do_demul_->Launch(slot_id, symbol_id_ul, sc_id, config_->demul_block_size);
             resp = EventData(EventType::kDemul, gen_tag_t::frm_sym_sc(slot_id, symbol_id_ul, sc_id)._tag);
             TryEnqueueFallback(&complete_task_queue_, worker_ptoks_ptr_[tid], resp);
             if (state_trigger) {

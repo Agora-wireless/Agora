@@ -362,6 +362,10 @@ public:
 
     size_t ant_start, ant_end;
 
+    size_t slot_us;
+    bool use_hyperthreading;
+    size_t phy_core_num; // Assumption: all servers have the same CPU core setting
+
     // Centralized scheduler mode
     bool use_central_scheduler;
     bool use_general_worker;

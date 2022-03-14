@@ -23,7 +23,7 @@ void delay_ticks(int64_t start, int64_t ticks)
 
 Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_threads_, 
     size_t core_offset, size_t frame_duration, size_t enable_slow_start,
-    std::string server_mac_addr_str, void* mbuf_pool)
+    std::string server_mac_addr_str, void* mbuf_pool, bool non_wait)
     : cfg(cfg)
     , freq_ghz(measure_rdtsc_freq())
     , ticks_per_usec(freq_ghz * 1e3)
@@ -37,6 +37,7 @@ Sender::Sender(Config* cfg, size_t num_master_threads_, size_t num_worker_thread
           4 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
     , ticks_wnd_2(
           2 * frame_duration_ * ticks_per_usec / cfg->symbol_num_perframe)
+    , non_wait_(non_wait)
 {
     printf("Initializing sender, sending to base station server at %s, frame "
            "duration = %.2f ms, slow start = %s\n",
@@ -150,6 +151,8 @@ void Sender::startTXfromMain(double* in_frame_start, double* in_frame_end)
     if (cfg->bs_rru_addr_list.size() > 1) {
         get_sync_tsc_distributed();
         printf("Sync cycle is %lu\n", start_tsc_distributed_);
+    } else if (!non_wait_) {
+        wait_for_hydra_request();
     }
 
     for (size_t i = 0; i < num_worker_threads_; i ++) {
@@ -180,8 +183,39 @@ void Sender::get_sync_tsc_distributed() {
     uint16_t src_port = 2222;
     uint16_t dst_port = 3333;
     const size_t magic = 0xea10baff;
+    const size_t magic2 = 0xea10bafe;
     rte_mbuf* mbuf[kRxBatchSize];
     if (cfg->bs_rru_addr_idx == 0) {
+        if (!non_wait_) {
+            size_t hydra_app_notification_map = 0;
+            size_t notification_goal = (1 << cfg->bs_server_addr_list.size()) - 1;
+            while (hydra_app_notification_map != notification_goal) {
+                size_t num_rx = rte_eth_rx_burst(0, 0, mbuf, kRxBatchSize);
+                for (size_t i = 0; i < num_rx; i ++) {
+                    rte_prefetch0(rte_pktmbuf_mtod(mbuf[i], void*));
+                    rte_mbuf* dpdk_pkt = mbuf[i];
+                    auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+                    auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+                        reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+                    uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+                    if (unlikely(eth_type != RTE_ETHER_TYPE_IPV4
+                        or ip_hdr->next_proto_id != IPPROTO_UDP)) {
+                        rte_pktmbuf_free(mbuf[i]);
+                        continue;
+                    }
+                    if (unlikely(ip_hdr->dst_addr != bs_rru_addr_list[cfg->bs_rru_addr_idx])) {
+                        rte_pktmbuf_free(mbuf[i]);
+                        continue;
+                    }
+                    char* payload = (char*)eth_hdr + kPayloadOffset;
+                    if (*((size_t*)payload) == magic2) {
+                        size_t hydra_id = *((size_t*)payload + 1);
+                        hydra_app_notification_map |= (1 << hydra_id);
+                    }
+                    rte_pktmbuf_free(dpdk_pkt);
+                }
+            }
+        }
         std::vector<int64_t> tsc_diff;
         tsc_diff.resize(cfg->bs_rru_addr_list.size());
         for (size_t i = 1; i < cfg->bs_rru_addr_list.size(); i ++) {
@@ -318,6 +352,43 @@ void Sender::get_sync_tsc_distributed() {
                 }
                 rte_pktmbuf_free(dpdk_pkt);
             }
+        }
+    }
+}
+
+void Sender::wait_for_hydra_request()
+{  
+    uint16_t src_port = 2222;
+    uint16_t dst_port = 3333;
+    const size_t magic = 0xea10baff;
+    const size_t magic2 = 0xea10bafe;
+    rte_mbuf* mbuf[kRxBatchSize];
+    size_t hydra_app_notification_map = 0;
+    size_t notification_goal = (1 << cfg->bs_server_addr_list.size()) - 1;
+    while (hydra_app_notification_map != notification_goal) {
+        size_t num_rx = rte_eth_rx_burst(0, 0, mbuf, kRxBatchSize);
+        for (size_t i = 0; i < num_rx; i ++) {
+            rte_prefetch0(rte_pktmbuf_mtod(mbuf[i], void*));
+            rte_mbuf* dpdk_pkt = mbuf[i];
+            auto* eth_hdr = rte_pktmbuf_mtod(dpdk_pkt, rte_ether_hdr*);
+            auto* ip_hdr = reinterpret_cast<rte_ipv4_hdr*>(
+                reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
+            uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+            if (unlikely(eth_type != RTE_ETHER_TYPE_IPV4
+                or ip_hdr->next_proto_id != IPPROTO_UDP)) {
+                rte_pktmbuf_free(mbuf[i]);
+                continue;
+            }
+            if (unlikely(ip_hdr->dst_addr != bs_rru_addr_list[cfg->bs_rru_addr_idx])) {
+                rte_pktmbuf_free(mbuf[i]);
+                continue;
+            }
+            char* payload = (char*)eth_hdr + kPayloadOffset;
+            if (*((size_t*)payload) == magic2) {
+                size_t hydra_id = *((size_t*)payload + 1);
+                hydra_app_notification_map |= (1 << hydra_id);
+            }
+            rte_pktmbuf_free(dpdk_pkt);
         }
     }
 }

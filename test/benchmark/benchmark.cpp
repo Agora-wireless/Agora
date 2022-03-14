@@ -450,7 +450,8 @@ void run_encode(Table<int8_t>& input, Table<int8_t>& output,
 
 void run_precode(Table<int8_t>& input, complex_float* output,
     Table<complex_float>& dl_zf_matrices, complex_float* modulated_buffer_temp,
-    complex_float* precoded_buffer_temp, size_t base_sc_id)
+    complex_float* precoded_buffer_temp, void** jitter, cgemm_jit_kernel_t* mkl_jit_cgemm, 
+    size_t base_sc_id)
 {
     __m256i index = _mm256_setr_epi64x(
         0, cfg->BS_ANT_NUM, cfg->BS_ANT_NUM * 2, cfg->BS_ANT_NUM * 3);
@@ -485,7 +486,10 @@ void run_precode(Table<int8_t>& input, complex_float* output,
                 = (cx_float*)precoded_buffer_temp + (i + j) * cfg->BS_ANT_NUM;
             cx_fmat mat_precoded(precoded_ptr, 1, cfg->BS_ANT_NUM, false);
 
-            mat_precoded = mat_data * mat_precoder;
+            mkl_jit_cgemm[cfg->UE_NUM](jitter[cfg->UE_NUM], (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
+                (MKL_Complex8*)precoded_ptr);
+
+            // mat_precoded = mat_data * mat_precoder;
         }
     }
 
@@ -738,10 +742,23 @@ int main(int argc, char **argv)
     alloc_buffer_1d(&modulated_buffer_temp, cfg->UE_NUM, 64, 0);
     complex_float* precoded_buffer_temp;
     alloc_buffer_1d(&precoded_buffer_temp, cfg->demul_block_size * cfg->BS_ANT_NUM, 64, 0);
+    for (size_t i = 1; i <= cfg->UE_NUM; i ++) {
+        mkl_jit_status_t status = mkl_jit_create_cgemm(&jitter[i], MKL_COL_MAJOR,
+            MKL_NOTRANS, MKL_NOTRANS, cfg->BS_ANT_NUM, 1, i, &alpha,
+            cfg->BS_ANT_NUM, i, &beta, cfg->BS_ANT_NUM);
+        if (MKL_JIT_ERROR == status) {
+            fprintf(stderr,
+                "Error: insufficient memory to JIT and store the DGEMM kernel\n");
+            exit(1);
+        }
+        mkl_jit_cgemm[i] = mkl_jit_get_cgemm_ptr(jitter[i]);
+    }
+
     start_tsc = rdtsc();
     for (size_t iter = 0; iter < kNumIterations; iter ++) {
         for (size_t base_sc_id = 0; base_sc_id < cfg->OFDM_DATA_NUM; base_sc_id += cfg->demul_block_size) {
-            run_precode(encoded_buffer, tx_data_all_symbols_precode[0], dl_zf_matrices, modulated_buffer_temp, precoded_buffer_temp, base_sc_id);
+            run_precode(encoded_buffer, tx_data_all_symbols_precode[0], dl_zf_matrices, modulated_buffer_temp, 
+                precoded_buffer_temp, jitter, mkl_jit_cgemm, base_sc_id);
         }
     }
     end_tsc = rdtsc();

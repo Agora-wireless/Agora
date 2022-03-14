@@ -64,7 +64,7 @@ public:
      */
 
     void Launch(
-        size_t frame_id, size_t symbol_idx_ul, size_t base_sc_id);
+        size_t frame_id, size_t symbol_idx_ul, size_t base_sc_id, size_t sc_block_size);
 
     void PrintOverhead() {
         printf("DoDemul thread %u overhead: total time: %.2lfms, "
@@ -74,6 +74,13 @@ public:
             cycles_to_ms(equal_cycles_, freq_ghz_), equal_count_, equal_cycles_ * 100.0f / total_cycles_,
             cycles_to_ms(demod_cycles_, freq_ghz_), demod_count_, demod_cycles_ * 100.0f / total_cycles_);
     }
+
+    size_t total_cycles_ = 0;
+    size_t preprocess_cycles_ = 0;
+    size_t equal_cycles_ = 0;
+    size_t demod_cycles_ = 0;
+    size_t equal_count_ = 0;
+    size_t demod_count_ = 0;
 
 private:
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_;
@@ -93,13 +100,6 @@ private:
     void* jitter[kMaxUEs];
     cgemm_jit_kernel_t mkl_jit_cgemm[kMaxUEs];
 #endif
-
-    size_t total_cycles_ = 0;
-    size_t preprocess_cycles_ = 0;
-    size_t equal_cycles_ = 0;
-    size_t demod_cycles_ = 0;
-    size_t equal_count_ = 0;
-    size_t demod_count_ = 0;
 
     // Control info
     std::vector<std::vector<ControlInfo>>& control_info_table_;

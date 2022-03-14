@@ -23,7 +23,8 @@ int main(int argc, char* argv[])
     uint64_t core_offset = 0;
     uint64_t frame_duration = 5000;
     uint64_t enable_slow_start = 1;
-    while ((opt = getopt(argc, argv, "c:s:t:m:o:d:e")) != -1) {
+    bool non_wait = false;
+    while ((opt = getopt(argc, argv, "c:s:t:m:o:ef")) != -1) {
         switch (opt) {
             case 'c':
                 conf_file = optarg;
@@ -40,14 +41,14 @@ int main(int argc, char* argv[])
             case 'o':
                 core_offset = std::stoul(optarg);
                 break;
-            case 'd':
-                frame_duration = std::stoul(optarg);
-                break;
             case 'e':
                 enable_slow_start = 0;
                 break;
+            case 'f':
+                non_wait = true;
+                break;
             default:
-                std::cerr << "Usage: " << argv[0] << " [-c conf_file] [-s server_mac_addr] [-t num_threads] [-m num_masters] [-o core_offset] [-d frame_duration] [-e]" << std::endl;
+                std::cerr << "Usage: " << argv[0] << " [-c conf_file] [-s server_mac_addr] [-t num_threads] [-m num_masters] [-o core_offset] [-e] [-f]" << std::endl;
                 exit(EXIT_FAILURE);
         }
     }
@@ -57,11 +58,12 @@ int main(int argc, char* argv[])
     std::string filename = conf_file;
     auto* cfg = new Config(filename.c_str());
     cfg->genData();
+    frame_duration = cfg->slot_us;
 
     // auto* sender = new Sender(cfg, FLAGS_num_masters, FLAGS_num_threads, FLAGS_core_offset,
     //     FLAGS_frame_duration, FLAGS_enable_slow_start, FLAGS_server_mac_addr);
     auto* sender = new Sender(cfg, num_masters, num_threads, core_offset,
-        frame_duration, enable_slow_start, server_mac_addr);
+        frame_duration, enable_slow_start, server_mac_addr, nullptr, non_wait);
     double* frame_start = new double[kNumStatsFrames]();
     double* frame_end = new double[kNumStatsFrames]();
     sender->startTXfromMain(frame_start, frame_end);

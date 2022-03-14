@@ -51,3 +51,4 @@ done
 hydra_rru_num=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.rru_servers | length')
 hydra_app_num=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.hydra_servers | length')
 slots_to_test=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.frames_to_test')
+slot_us=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.slot_us')
