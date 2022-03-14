@@ -11,7 +11,8 @@ echo "********** Running control generator **********" >> /tmp/hydra/install.log
 ssh -oStrictHostKeyChecking=no ${server_name} "source ${HYDRA_RUNNER_ROOT}/Agora/scripts/install/setvars.sh; \
   cd ${HYDRA_RUNNER_ROOT}/Agora; \
   ./build/control_generator -c ./config/run.json" >> /tmp/hydra/install.log 2>&1 || \
-  { echo "Failed to run control generator on ${server_name}"; exit 1; }
+  { echo "Failed to run control generator on ${server_name}; Please check /tmp/hydra/install.log for more details";
+    exit 1; }
 echo "********** Running traffic data generator **********" >> /tmp/hydra/install.log
 if [ "${USE_MATLAB_GEN_RAYLEIGH}" == 1 ]; then
   ssh -oStrictHostKeyChecking=no ${server_name} "source ${HYDRA_RUNNER_ROOT}/Agora/scripts/install/setvars.sh; \
