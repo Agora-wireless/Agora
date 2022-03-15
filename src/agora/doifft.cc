@@ -31,7 +31,8 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
   ifft_out_ = static_cast<float*>(
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        2 * cfg_->OfdmCaNum() * sizeof(float)));
-  ifft_scale_factor_ = cfg_->OfdmCaNum() / std::sqrt(cfg_->BfAntNum() * 1.f);
+  ifft_scale_factor_ =
+      cfg_->OfdmCaNum();  // / std::sqrt(cfg_->BfAntNum() * 1.f);
 }
 
 DoIFFT::~DoIFFT() {
