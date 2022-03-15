@@ -11,6 +11,7 @@ static constexpr bool kPrintIFFTOutput = false;
 static constexpr bool kPrintSocketOutput = false;
 static constexpr bool kUseOutOfPlaceIFFT = false;
 static constexpr bool kMemcpyBeforeIFFT = true;
+static constexpr bool kPrintIfftStats = false;
 
 DoIFFT::DoIFFT(Config* in_config, int in_tid,
                Table<complex_float>& in_dl_ifft_buffer,
@@ -84,6 +85,32 @@ EventData DoIFFT::Launch(size_t tag) {
                   sizeof(float) * cfg_->OfdmDataStart() * 2);
       DftiComputeBackward(mkl_handle_, ifft_in_ptr);
     }
+  }
+
+  bool clipping = false;
+  float max_abs = 0;
+  for (size_t i = 0; i < 2 * cfg_->OfdmCaNum(); i++) {
+    float sample_val = ifft_out_ptr[i] / ifft_scale_factor_;
+    if (sample_val >= 1) {
+      clipping = true;
+      break;
+    }
+    if (std::abs(sample_val) > max_abs) max_abs = std::abs(sample_val);
+  }
+  if (clipping) {
+    std::stringstream ss;
+    ss << "WARNING: Clipping Occured in Frame " << frame_id << " Symbol "
+       << symbol_id << " Antenna " << ant_id << std::endl;
+    std::cout << ss.str();
+  }
+  if (ant_id < cfg_->BfAntNum() && max_abs < 1e-4) {
+    std::stringstream ss;
+    ss << "WARNING: Possibly bad antenna " << ant_id
+       << " with max sample value " << max_abs << std::endl;
+    std::cout << ss.str();
+  }
+  if (kPrintIfftStats) {
+    printf("%2.3f\n", max_abs);
   }
 
   if (kPrintIFFTOutput) {
