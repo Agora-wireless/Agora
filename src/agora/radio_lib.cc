@@ -340,6 +340,9 @@ void RadioConfig::ConfigureBsRadio(size_t tid) {
 }
 
 bool RadioConfig::RadioStart() {
+  if (cfg_->SampleCalEn()) {
+    CalibrateSampleOffset();
+  }
   bool good_calib = false;
   AllocBuffer1d(&init_calib_dl_processed_,
                 cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
@@ -366,7 +369,7 @@ bool RadioConfig::RadioStart() {
       int max_iter = 1;
       std::cout << "Start initial reciprocity calibration..." << std::endl;
       while (good_calib == false) {
-        good_calib = InitialCalib(cfg_->SampleCalEn());
+        good_calib = InitialCalib();
         iter++;
         if ((iter == max_iter) && (good_calib == false)) {
           std::cout << "attempted " << max_iter

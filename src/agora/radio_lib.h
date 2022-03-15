@@ -48,7 +48,14 @@ class RadioConfig {
   void ConfigureBsRadio(size_t tid);
 
  private:
-  bool InitialCalib(bool /*sample_adjust*/);
+  void CalibrateSampleOffset();
+  std::vector<std::vector<std::complex<int16_t>>> TxArrayToRef(
+      std::vector<std::complex<int16_t>> tx_vec);
+  std::vector<std::vector<std::complex<int16_t>>> TxRefToArray(
+      std::vector<std::complex<int16_t>> tx_vec);
+  bool FindTimeOffset(std::vector<std::vector<std::complex<int16_t>>> rx_mat,
+                      std::vector<int>& offset);
+  bool InitialCalib();
   static void DrainRxBuffer(SoapySDR::Device* ibsSdrs,
                             SoapySDR::Stream* istream, std::vector<void*> buffs,
                             size_t symSamp);

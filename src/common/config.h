@@ -212,8 +212,14 @@ class Config {
   inline size_t OfdmRxZeroPrefixCalUl() const {
     return this->ofdm_rx_zero_prefix_cal_ul_;
   }
+  void OfdmRxZeroPrefixCalUl(size_t prefix) {
+    this->ofdm_rx_zero_prefix_cal_ul_ = prefix;
+  }
   inline size_t OfdmRxZeroPrefixCalDl() const {
     return this->ofdm_rx_zero_prefix_cal_dl_;
+  }
+  void OfdmRxZeroPrefixCalDl(const size_t prefix) {
+    this->ofdm_rx_zero_prefix_cal_dl_ = prefix;
   }
   inline size_t OfdmRxZeroPrefixClient() const {
     return this->ofdm_rx_zero_prefix_client_;
