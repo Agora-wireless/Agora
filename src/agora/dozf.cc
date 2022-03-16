@@ -13,7 +13,10 @@ static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
 static constexpr size_t kUseInverseForZF = 1u;  // 1u -- unsigned
-static constexpr bool kUseUlZfForDownlink = true;
+
+// static constexpr bool kUseUlZfForDownlink = true;  // for faster computing of pinv of product of two mats
+static constexpr bool kUseUlZfForDownlink = false; // set to false for a more accurate DLBF
+
 static constexpr size_t kMatLogNum = 2; //set to 0 to disable mat log
 static constexpr size_t kMatLogFrames = 250, kMatLogSCs = 304, kMatLogAnts = 8;
 static constexpr const char* kMatLogFile[kMatLogNum] =
@@ -148,6 +151,9 @@ float DoZF::ComputePrecoder(size_t frame_id, size_t sc_id,
     if (kUseUlZfForDownlink == true) {
       // With orthonormal calib matrix:
       // pinv(calib * csi) = pinv(csi)*inv(calib)
+      // For more details,
+      // https://en.wikipedia.org/wiki/Moore%E2%80%93Penrose_inverse#Products
+      
       // This probably causes a performance hit since we are throwing
       // magnitude info away by taking the sign of the calibration matrix
       arma::cx_fmat calib_mat = arma::diagmat(arma::sign(calib_vec));

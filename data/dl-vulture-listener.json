@@ -8,6 +8,7 @@
     "rx_gain_b": 65,
     "tx_gain_b": 70,
     "sample_rate": 3.84e6,
+    /*"sample_rate": 7.68e6,*/
     "ofdm_tx_zero_prefix": 160,
     "ofdm_tx_zero_postfix": 160,
     "ofdm_rx_zero_prefix_bs": 160,
