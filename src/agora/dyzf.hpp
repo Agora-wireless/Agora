@@ -43,6 +43,8 @@ public:
      */
     EventData Launch(size_t tag);
 
+    void ZFFreqOrthogonalStatic(size_t tag);
+
     double GetZfTscPerTask() {return zf_count_ == 0 ? 0 : cycles_to_us(zf_tsc_ / zf_count_, freq_ghz_);}
 
 private:
@@ -54,6 +56,10 @@ private:
     void computePrecoder(const arma::cx_fmat& mat_csi,
         complex_float* calib_buf, complex_float* mat_ul_zf,
         complex_float* mat_dl_zf, size_t ue_num = 0);
+    void computeULPrecoder(const arma::cx_fmat& mat_csi,
+        complex_float* calib_buf, complex_float* mat_ul_zf);
+    void computeDLPrecoder(const arma::cx_fmat& mat_csi,
+        complex_float* calib_buf, complex_float* mat_dl_zf);
 
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
     Table<complex_float> calib_buffer_;

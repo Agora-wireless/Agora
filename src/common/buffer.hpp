@@ -224,7 +224,8 @@ struct Packet {
         kIQFromServer, // A packet containing IQ samples from the server
         kDemod, // A packet generated after the demodulation stage
         kEncode, // A packet generated after the encode stage
-        kFFT
+        kFFT,
+        kPostZF
     };
 
     static const char* PktTypeStr(PktType pkt_type)
@@ -246,7 +247,11 @@ struct Packet {
     uint32_t ue_id_;
     uint32_t ant_id_;
     uint32_t server_id_;
-    uint32_t fill_[9]; // Padding for 64-byte alignment needed for SIMD
+    uint32_t sc_id_;
+    uint32_t sc_len_;
+    uint32_t data_off_;
+    uint32_t data_len_;
+    uint32_t fill_[5]; // Padding for 64-byte alignment needed for SIMD
     short data_[]; // Elements sent by antennae are two bytes (I/Q samples)
     Packet(int f, int s, int c, int a) // TODO: Should be unsigned integers
         : frame_id_(f)

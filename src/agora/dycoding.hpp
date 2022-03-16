@@ -81,6 +81,7 @@ public:
     ~DyDecode();
 
     void Launch(size_t frame_id, size_t symbol_id_ul, size_t ue_id);
+    void LaunchStatic(size_t frame_id, size_t symbol_id_ul, size_t ue_id);
 
     void StartWork();
     void StartWorkCentral();
