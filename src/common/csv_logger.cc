@@ -1,37 +1,33 @@
-#include <iostream>
 #include "csv_logger.h"
 
-FILE* fp_csvlog[kCsvLogN] = {nullptr};
+#if defined(CSV_LOG_LEVEL)
 
-static int dev_id = -1;
+std::shared_ptr<spdlog::logger> csv_logger[kCsvLogNUM] = {nullptr};
 
-static constexpr const char* kCsvLogName[kCsvLogN] = {
-  "uedata-rfsnr",
-  "uedata-evmsnr",
-  "uedata-be",
-  "uedata-se"
+static const char* kCsvLogName[kCsvLogNUM] = {
+  "log-dlpsnr-ue",
+  "log-evmsnr-ue",
+  "log-berser-ue",
+  "log-matcsi-bs",
+  "log-matdlzf-bs"
 };
 
-static constexpr const char* kCsvLogHeader[kCsvLogN] = {
-  "Frame,Symbol,Ant,Pilot-Offset,RF-SNR",
-  "Frame,Symbol,User,EVM,EVM-SNR",
-  "",
-  "Frame,Symbol,UE,Symbol-Errors"
+static const char* kCsvLogHeader[kCsvLogNUM] = {
+  "Frame,Symbol,UE-Ant,DL-Pilot-SNR",
+  "Frame,Symbol,UE-Ant,EVM,EVM-SNR",
+  "Frame,Symbol,UE-Ant,Bit-Error-Rate,Symbol-Error-Rate",
+  "Frame,Subcarrier,BS-Ant,UE-Ant,CSI-Real,CSI-Imag",
+  "Frame,Subcarrier,BS-Ant,UE-Ant,DLZF-Real,DLZF-Imag"
 };
 
-void CsvLogSetDev(int id) {
-  dev_id = id;
+void CsvLogInit(size_t dev_id, size_t log_id) {
+  std::string filename = fmt::sprintf("%s-%zu.csv", kCsvLogName[log_id], dev_id);
+  std::remove(filename.c_str());
+  csv_logger[log_id] = spdlog::create_async_nb<spdlog::sinks::basic_file_sink_mt>
+      (fmt::sprintf("csv_logger_%zu", log_id), filename);
+  csv_logger[log_id]->set_level(spdlog::level::CSV_LOG_LEVEL);
+  csv_logger[log_id]->set_pattern("%v");
+  csv_logger[log_id]->CSV_LOG_LEVEL(kCsvLogHeader[log_id]);
 }
 
-void CsvLogInit(size_t log_id) {
-  char filename[64];
-  sprintf(filename, "%s-%d.csv", kCsvLogName[log_id], dev_id);
-  fp_csvlog[log_id] = fopen(filename, "w");
-  fprintf(fp_csvlog[log_id], "%s\n", kCsvLogHeader[log_id]);
-}
-
-void CsvLogEnd() {
-  for (size_t i = 0; i < kCsvLogN; i++) {
-    fclose(fp_csvlog[i]);
-  }
-}
+#endif //CSV_LOG_LEVEL

@@ -179,8 +179,8 @@ class Stats {
                                     size_t thread_num, size_t break_down_num);
   static void PrintPerThreadPerTask(std::string const& doer_string,
                                     FrameSummary const& s);
-  static void PrintPerFrame(std::string const& doer_string,
-                            FrameSummary const& frame_summary);
+  static std::string PrintPerFrame(std::string const& doer_string,
+                                   FrameSummary const& frame_summary);
 
   size_t GetTotalTaskCount(DoerType doer_type, size_t thread_num);
 

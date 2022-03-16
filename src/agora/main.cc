@@ -4,6 +4,7 @@
  */
 #include "agora.h"
 #include "gflags/gflags.h"
+#include "logger.h"
 #include "version_config.h"
 #include "csv_logger.h"
 
@@ -15,6 +16,8 @@ int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");
   gflags::SetVersionString(GetAgoraProjectVersion());
   gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+  AGORA_LOG_INIT();
   std::string conf_file;
 
   // For backwards compatibility
@@ -25,7 +28,9 @@ int main(int argc, char* argv[]) {
   } else {
     conf_file = FLAGS_conf_file;
   }
-  CsvLogSetDev(255);
+
+  CSV_LOG_INIT(255, kCsvLogCSI);
+  CSV_LOG_INIT(255, kCsvLogDLZF);
 
   std::unique_ptr<Config> cfg = std::make_unique<Config>(conf_file.c_str());
   cfg->GenData();
@@ -43,8 +48,10 @@ int main(int argc, char* argv[]) {
     std::cerr << "SignalException: " << e.what() << std::endl;
     ret = EXIT_FAILURE;
   }
+
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
-  //CsvLogEnd();
+  AGORA_LOG_SHUTDOWN();
+
   return ret;
 }

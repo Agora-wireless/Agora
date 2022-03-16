@@ -51,7 +51,8 @@ size_t GetPhysicalCoreId(size_t core_id);
 int PinToCore(size_t core_id);
 
 /* Pin this thread to core (base_core_offset + thread_id) */
-void PinToCoreWithOffset(ThreadType thread, size_t base_core_offset, size_t thread_id, bool allow_reuse = false,
+void PinToCoreWithOffset(ThreadType thread, size_t base_core_offset,
+                         size_t thread_id, bool allow_reuse = false,
                          bool verbose = false);
 
 void PrintCoreAssignmentSummary();

@@ -27,10 +27,10 @@ TxRxWorkerDpdk::TxRxWorkerDpdk(
     std::mutex& sync_mutex, std::condition_variable& sync_cond,
     std::atomic<bool>& can_proceed,
     std::vector<std::pair<uint16_t, uint16_t>> dpdk_phy, rte_mempool* mbuf_pool)
-    : TxRxWorker(core_offset, tid, interface_count, interface_offset, config,
-                 rx_frame_start, event_notify_q, tx_pending_q, tx_producer,
-                 notify_producer, rx_memory, tx_memory, sync_mutex, sync_cond,
-                 can_proceed),
+    : TxRxWorker(core_offset, tid, interface_count, interface_offset,
+                 config->NumChannels(), config, rx_frame_start, event_notify_q,
+                 tx_pending_q, tx_producer, notify_producer, rx_memory,
+                 tx_memory, sync_mutex, sync_cond, can_proceed),
       dpdk_phy_port_queues_(std::move(dpdk_phy)),
       mbuf_pool_(mbuf_pool) {
   int ret = inet_pton(AF_INET, config->BsRruAddr().c_str(), &bs_rru_addr_);
@@ -55,7 +55,7 @@ TxRxWorkerDpdk::TxRxWorkerDpdk(
     const auto& port_id = port_queue_id.first;
     const auto& queue_id = port_queue_id.second;
 
-    MLPD_INFO(
+    AGORA_LOG_INFO(
         "Adding steering rule for src IP %s, dest IP %s, src port: "
         "%d, dst port: %d, DPDK dev %d, queue: %d\n",
         config->BsRruAddr().c_str(), config->BsServerAddr().c_str(), src_port,
@@ -77,11 +77,11 @@ static void ClassFunctioWrapper(TxRxWorkerDpdk* context) {
 // worker:lcore
 void TxRxWorkerDpdk::Start() {
   rte_eal_wait_lcore(tid_);
-  MLPD_TRACE("TxRxWorkerDpdk[%zu]: starting\n", tid_);
+  AGORA_LOG_TRACE("TxRxWorkerDpdk[%zu]: starting\n", tid_);
   int status = rte_eal_remote_launch(
       (lcore_function_t*)(ClassFunctioWrapper<&TxRxWorkerDpdk::DoTxRx>), this,
       tid_);
-  MLPD_INFO("TxRxWorkerDpdk[%zu]: started on dpdk managed l_core\n", tid_);
+  AGORA_LOG_INFO("TxRxWorkerDpdk[%zu]: started on dpdk managed l_core\n", tid_);
   RtAssert(status == 0, "Lcore cannot launch TxRx function");
 }
 
@@ -96,13 +96,14 @@ void TxRxWorkerDpdk::DoTxRx() {
   size_t rx_index = 0;
   const unsigned int thread_socket = rte_socket_id();
 
-  MLPD_INFO("TxRxWorkerDpdk[%zu]: running on socket %u\n", tid_, thread_socket);
+  AGORA_LOG_INFO("TxRxWorkerDpdk[%zu]: running on socket %u\n", tid_,
+                 thread_socket);
   uint16_t dev_id = UINT16_MAX;
   for (auto& device_queue : dpdk_phy_port_queues_) {
     const uint16_t current_dev_id = device_queue.first;
     const unsigned int dev_socket = rte_eth_dev_socket_id(current_dev_id);
     if ((dev_id != current_dev_id) && (thread_socket != dev_socket)) {
-      MLPD_WARN(
+      AGORA_LOG_WARN(
           "TxRxWorkerDpdk[%zu]: running on socket %u but the ethernet device "
           "is on socket %u\n",
           tid_, thread_socket, dev_socket);
@@ -111,7 +112,7 @@ void TxRxWorkerDpdk::DoTxRx() {
   }
   running_ = true;
   WaitSync();
-  MLPD_TRACE("TxRxWorkerDpdk[%zu]: synced\n", tid_);
+  AGORA_LOG_TRACE("TxRxWorkerDpdk[%zu]: synced\n", tid_);
 
   while (Configuration()->Running()) {
     const size_t send_result = DequeueSend();
@@ -154,7 +155,7 @@ std::vector<Packet*> TxRxWorkerDpdk::RecvEnqueue(uint16_t port_id,
 
     const uint16_t eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
     if (eth_type == RTE_ETHER_TYPE_VLAN) {
-      MLPD_WARN("VLAN taged frame, larger than normal offset!");
+      AGORA_LOG_WARN("VLAN taged frame, larger than normal offset!");
       throw std::runtime_error("VLAN Tagging not supported!");
     }
 
@@ -192,7 +193,7 @@ std::vector<Packet*> TxRxWorkerDpdk::RecvEnqueue(uint16_t port_id,
       rte_pktmbuf_free(dpdk_pkt);
 #endif
 
-      MLPD_FRAME(
+      AGORA_LOG_FRAME(
           "TxRxWorkerDpdk[%zu]::RecvEnqueue received pkt (frame %d, symbol "
           "%d, ant %d) on port %u queue %u\n",
           tid_, pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_, port_id,
@@ -325,7 +326,7 @@ bool TxRxWorkerDpdk::Filter(rte_mbuf* packet, uint16_t port_id,
     auto* arp_hdr = reinterpret_cast<rte_arp_hdr*>(
         reinterpret_cast<uint8_t*>(eth_hdr) + sizeof(rte_ether_hdr));
     if (arp_hdr->arp_opcode == rte_cpu_to_be_16(RTE_ARP_OP_REQUEST)) {
-      MLPD_INFO("TxRxWorkerDpdk[%zu]: Arp request\n", tid_);
+      AGORA_LOG_INFO("TxRxWorkerDpdk[%zu]: Arp request\n", tid_);
       rte_eth_macaddr_get(port_id, &bond_mac_addr);
       arp_hdr->arp_opcode = rte_cpu_to_be_16(RTE_ARP_OP_REPLY);
       // Switch src and dst data and set bonding MAC
@@ -341,13 +342,13 @@ bool TxRxWorkerDpdk::Filter(rte_mbuf* packet, uint16_t port_id,
       free_message = false;
       rte_eth_tx_burst(port_id, queue_id, &packet, 1);
     } else {
-      MLPD_INFO("TxRxWorkerDpdk[%zu]: Arp - odcode %u\n", tid_,
-                arp_hdr->arp_opcode);
+      AGORA_LOG_INFO("TxRxWorkerDpdk[%zu]: Arp - odcode %u\n", tid_,
+                     arp_hdr->arp_opcode);
       rte_eth_tx_burst(port_id, queue_id, NULL, 0);
     }
   } else {
-    MLPD_WARN("TxRxWorkerDpdk[%zu]: Rx pkt unhandled - type %u\n", tid_,
-              eth_type);
+    AGORA_LOG_WARN("TxRxWorkerDpdk[%zu]: Rx pkt unhandled - type %u\n", tid_,
+                   eth_type);
   }
 
   if (free_message == true) {

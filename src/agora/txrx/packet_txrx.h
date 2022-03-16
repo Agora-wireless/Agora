@@ -14,6 +14,10 @@
 #include "config.h"
 #include "txrx_worker.h"
 
+namespace AgoraTxRx {
+enum TxRxTypes { kBaseStation, kUserEquiptment };
+}
+
 /**
  * @brief Implementations of this class provide packet I/O for Agora.
  *
@@ -26,10 +30,9 @@
  * with real wireless hardware peers (antenna hubs for the server, UE devices
  * for the client).
  */
-
 class PacketTxRx {
  public:
-  PacketTxRx(Config* const cfg, size_t core_offset,
+  PacketTxRx(AgoraTxRx::TxRxTypes type, Config* const cfg, size_t core_offset,
              moodycamel::ConcurrentQueue<EventData>* event_notify_q,
              moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
              moodycamel::ProducerToken** notify_producer_tokens,
@@ -67,6 +70,7 @@ class PacketTxRx {
   inline const size_t& InterfaceToWorker(size_t interface) const {
     return interface_to_worker_.at(interface);
   }
+  inline size_t NumChannels() const { return num_channels_; }
 
   std::vector<std::unique_ptr<TxRxWorker>> worker_threads_;
   Config* const cfg_;
@@ -89,7 +93,7 @@ class PacketTxRx {
   virtual bool CreateWorker(size_t tid, size_t interface_count,
                             size_t interface_offset, size_t* rx_frame_start,
                             std::vector<RxPacket>& rx_memory,
-                            std::byte* const tx_memory);
+                            std::byte* const tx_memory) = 0;
 
   // Dimension 1: socket_thread
   // Dimension 2: rx_packet
@@ -99,6 +103,8 @@ class PacketTxRx {
 
   size_t worker_thread_count_;
   std::vector<size_t> interface_to_worker_;
+  const AgoraTxRx::TxRxTypes type_;
+  size_t num_channels_;
 };
 
 #endif  // PACKETTXRX_H_

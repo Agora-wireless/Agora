@@ -24,6 +24,8 @@
 #include <stdexcept>
 #include <vector>
 
+#include "logger.h"
+
 // Basic UDP client class based on OS sockets that supports sending messages
 // and caches remote addrinfo mappings
 class UDPClient {
@@ -32,8 +34,8 @@ class UDPClient {
   static const bool kDebugPrintUdpClientSend = false;
   explicit UDPClient(uint16_t src_port = 0) {
     if (kDebugPrintUdpClientInit) {
-      std::printf("Creating UDP Client socket sending from port %d\n",
-                  src_port);
+      AGORA_LOG_INFO("Creating UDP Client socket sending from port %d\n",
+                     src_port);
     }
     sock_fd_ = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock_fd_ == -1) {
@@ -68,7 +70,7 @@ class UDPClient {
     if (sock_fd_ != -1) {
       const int close_status = ::close(sock_fd_);
       if (close_status != 0) {
-        std::printf(
+        AGORA_LOG_WARN(
             "WARNING - UDPClient failed while trying to close socket %d with "
             "status %d\n",
             sock_fd_, close_status);
@@ -77,7 +79,7 @@ class UDPClient {
     }
 
     if (kDebugPrintUdpClientInit) {
-      std::printf("Destroying UDPClient\n");
+      AGORA_LOG_INFO("Destroying UDPClient\n");
     }
   }
 
@@ -98,8 +100,8 @@ class UDPClient {
     ::addrinfo* rem_addrinfo = nullptr;
 
     if (kDebugPrintUdpClientSend) {
-      std::printf("UDPClient sending message to %s:%d of size %zu\n",
-                  rem_hostname.c_str(), rem_port, len);
+      AGORA_LOG_INFO("UDPClient sending message to %s:%d of size %zu\n",
+                     rem_hostname.c_str(), rem_port, len);
     }
 
     const auto remote_itr = addrinfo_map_.find(remote_uri);
@@ -123,8 +125,8 @@ class UDPClient {
       }
 
       if (kDebugPrintUdpClientInit) {
-        std::printf("%d Resolving: %s map size %zu\n", sock_fd_,
-                    remote_uri.c_str(), addrinfo_map_.size());
+        AGORA_LOG_INFO("%d Resolving: %s map size %zu\n", sock_fd_,
+                       remote_uri.c_str(), addrinfo_map_.size());
       }
 
       std::pair<std::map<std::string, struct addrinfo*>::iterator, bool>

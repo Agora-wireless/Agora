@@ -297,7 +297,6 @@ class Agora {
    * Size of each downlink socket buffer status entry: one integer
    */
   char* dl_socket_buffer_;
-  int* dl_socket_buffer_status_;
 
   struct SchedInfoT {
     moodycamel::ConcurrentQueue<EventData> concurrent_q_;
