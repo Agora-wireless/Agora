@@ -12,7 +12,7 @@ static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
 static constexpr size_t kUseInverseForZF = 1u;
-static constexpr bool kUseUlZfForDownlink = true;
+static constexpr bool kUseUlZfForDownlink = false;
 
 DoZF::DoZF(Config* config, int tid,
            PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers,
@@ -135,8 +135,12 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi, const arma::cx_fmat& s
                           arma::fill::zeros));
       }
     }
+    // QMACS: correct the shape 
+    // arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
+                            // cfg_->BsAntNum(), cfg_->UeAntNum(), false);
     arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
-                            cfg_->BsAntNum(), cfg_->UeAntNum(), false);
+                            cfg_->BsAntNum(), cfg_->scheduler_->GetSelectNum(), false); // change this shape
+    // QMACS
     mat_dl_zf = mat_dl_zf_tmp.st();
   }
   for (int i = (int)cfg_->NumCells() - 1; i >= 0; i--) {
@@ -444,7 +448,10 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
                         cfg_->BsAntNum(), cfg_->UeAntNum(), false);
 
   // QMACS: scheduler for ZfFreqOrthogonal haven't been supported, input mat_csi twice
-  ComputePrecoder(mat_csi, mat_csi, calib_gather_buffer_,
+  // QMACS: compute scheduled CSI
+  arma::cx_fmat sche_mat_csi;
+  this->cfg_->scheduler_->ScheduleCSI(frame_slot, cfg_->GetZfScId(base_sc_id), sche_mat_csi, mat_csi);
+  ComputePrecoder(mat_csi, sche_mat_csi, calib_gather_buffer_,
                   ul_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)],
                   dl_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)]);
   // QMACS

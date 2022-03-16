@@ -28,7 +28,8 @@ Scheduler::~Scheduler() {
 
 void Scheduler::Launch(size_t frame_id) {
   // called after kFFT finish CSI of all UEs (kPilot)
-  std::cout << "**************scheduler launch!**************" << std::endl;
+  std::cout << "**************scheduler launch!**************\n frame id:" << frame_id << std::endl;
+  frame_id %= kFrameWnd;
   // currently use round robin
   // for (size_t symbol_id = 0; symbol_id < NumDLSyms_; ++symbol_id) {
   for (size_t symbol_id = 0; !symbol_id; ++symbol_id) {
@@ -55,7 +56,7 @@ void Scheduler::PrintQueue() {
 void Scheduler::PrintSelect(size_t frame_id, size_t symbol_id) {
   unsigned int *selection = selection_[frame_id][symbol_id];
   arma::Mat<arma::u32> selection_mat(reinterpret_cast<arma::u32*>(selection), select_num, UeNum_, false);
-  // std::cout << "Selection Matrix--- \n" << selection_mat << std::endl;
+  std::cout << "Selection Matrix--- \n" << selection_mat << std::endl;
 }
 
 void Scheduler::ScheduleCSI(const size_t frame_id, const size_t sc_id, arma::cx_fmat& dst_csi_mat, arma::cx_fmat& src_csi_mat) {
@@ -79,6 +80,7 @@ void Scheduler::ScheduleDATA(const size_t frame_id, const size_t sc_id, arma::cx
 }
 
 void Scheduler::UpdateQueue(size_t frame_id) {
+  frame_id %= kFrameWnd;
   unsigned int *selection = selection_[frame_id][0];
   arma::Mat<arma::u32> selection_mat(reinterpret_cast<arma::u32*>(selection), select_num, UeNum_, false);
   auto compression = arma::sum(selection_mat, 0);
