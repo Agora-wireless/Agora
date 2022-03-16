@@ -198,8 +198,7 @@ set(COMMON_SOURCES
   src/common/profiler.cpp
   src/encoder/cyclic_shift.cpp
   src/encoder/encoder.cpp
-  src/encoder/iobuffer.cpp
-  src/common/bigstation_counters.cpp)
+  src/encoder/iobuffer.cpp)
 add_library(common_sources_lib OBJECT ${COMMON_SOURCES})
 
 set(AGORA_SOURCES 
@@ -211,15 +210,13 @@ set(AGORA_SOURCES
   src/agora/dysubcarrier.cpp
   src/agora/dyprecode.cpp
   src/mac/mac_thread.cpp
-  src/agora/diagnosis.cpp
-  src/agora/bigstation.cpp)
+  src/agora/diagnosis.cpp)
 
 if(${USE_DPDK})
   add_definitions(-DUSE_DPDK)
   set(AGORA_SOURCES ${AGORA_SOURCES} 
     src/agora/txrx/txrx_DPDK.cpp
-    src/common/dpdk_transport.cpp
-    src/agora/txrx/txrx_bigstation.cpp)
+    src/common/dpdk_transport.cpp)
 else()
   message(FATAL_ERROR "DPDK should be enabled")
 endif()
