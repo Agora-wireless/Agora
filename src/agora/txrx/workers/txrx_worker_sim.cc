@@ -30,10 +30,10 @@ TxRxWorkerSim::TxRxWorkerSim(
     std::vector<RxPacket>& rx_memory, std::byte* const tx_memory,
     std::mutex& sync_mutex, std::condition_variable& sync_cond,
     std::atomic<bool>& can_proceed)
-    : TxRxWorker(core_offset, tid, interface_count, interface_offset, config,
-                 rx_frame_start, event_notify_q, tx_pending_q, tx_producer,
-                 notify_producer, rx_memory, tx_memory, sync_mutex, sync_cond,
-                 can_proceed) {
+    : TxRxWorker(core_offset, tid, interface_count, interface_offset,
+                 config->NumChannels(), config, rx_frame_start, event_notify_q,
+                 tx_pending_q, tx_producer, notify_producer, rx_memory,
+                 tx_memory, sync_mutex, sync_cond, can_proceed) {
   for (size_t interface = 0; interface < num_interfaces_; ++interface) {
     const uint16_t local_port_id =
         config->BsServerPort() + interface + interface_offset_;
@@ -41,8 +41,8 @@ TxRxWorkerSim::TxRxWorkerSim(
     udp_servers_.emplace_back(
         std::make_unique<UDPServer>(local_port_id, kSocketRxBufferSize));
     udp_clients_.emplace_back(std::make_unique<UDPClient>());
-    MLPD_FRAME(
-        "TXRX thread [%zu]: set up UDP socket server listening to local port "
+    AGORA_LOG_FRAME(
+        "TxRxWorkerSim[%zu]: set up UDP socket server listening to local port "
         "%d\n",
         tid_, local_port_id);
   }
@@ -73,7 +73,7 @@ void TxRxWorkerSim::DoTxRx() {
 
   size_t prev_frame_id = SIZE_MAX;
   size_t tx_frame_id = 0;
-  size_t current_interface = 0;
+  size_t thread_local_interface = 0;
   running_ = true;
   WaitSync();
 
@@ -83,10 +83,10 @@ void TxRxWorkerSim::DoTxRx() {
   // Send Beacons for the first time to kick off sim
   // SendBeacon(tid, tx_frame_id++);
   while (Configuration()->Running() == true) {
-    size_t rdtsc_now = GetTime::Rdtsc();
+    const size_t rdtsc_now = GetTime::Rdtsc();
 
     if (rdtsc_now > send_time) {
-      MLPD_SYMBOL(
+      AGORA_LOG_SYMBOL(
           "TxRxWorkerSim[%zu]: sending beacon for frame %zu at time %zu\n",
           tid_, tx_frame_id, rdtsc_now);
       SendBeacon(tx_frame_id++);
@@ -94,13 +94,13 @@ void TxRxWorkerSim::DoTxRx() {
       if (kEnableSlowStart) {
         if (tx_frame_id == kSlowStartThresh1) {
           delay_tsc = slow_start_tsc2;
-          MLPD_TRACE(
+          AGORA_LOG_TRACE(
               "TxRxWorkerSim[%zu]: increasing beacon rate at frame %zu time "
               "%zu\n",
               tid_, kSlowStartThresh1, rdtsc_now);
         } else if (tx_frame_id == kSlowStartThresh2) {
           delay_tsc = frame_tsc_delta;
-          MLPD_TRACE(
+          AGORA_LOG_TRACE(
               "TxRxWorkerSim[%zu]: increasing beacon rate to full speed at "
               "frame %zu time %zu\n",
               tid_, kSlowStartThresh2, rdtsc_now);
@@ -114,10 +114,10 @@ void TxRxWorkerSim::DoTxRx() {
     if (0 == send_result) {
       // receive data
       // Need to get NumChannels data here
-      auto rx_packets = RecvEnqueue(current_interface);
-      for (auto& packet : rx_packets) {
+      const auto rx_packets = RecvEnqueue(thread_local_interface);
+      for (const auto& packet : rx_packets) {
         if (kIsWorkerTimingEnabled) {
-          uint32_t frame_id = packet->frame_id_;
+          const uint32_t frame_id = packet->frame_id_;
           if (frame_id != prev_frame_id) {
             rx_frame_start_[frame_id % kNumStatsFrames] = GetTime::Rdtsc();
             prev_frame_id = frame_id;
@@ -125,8 +125,9 @@ void TxRxWorkerSim::DoTxRx() {
         }
       }
 
-      if (++current_interface == num_interfaces_) {
-        current_interface = 0;
+      thread_local_interface++;
+      if (thread_local_interface == num_interfaces_) {
+        thread_local_interface = 0;
       }
     }  // end if -1 == send_result
   }    // end while
@@ -186,7 +187,8 @@ std::vector<Packet*> TxRxWorkerSim::RecvEnqueue(size_t interface_id) {
           "%d in cell %d,\n",
           pkt->ant_id_, pkt->cell_id_);
     }
-    pkt->ant_id_ += pkt->cell_id_ * ant_per_cell_;
+    pkt->ant_id_ += pkt->cell_id_ *
+                    (Configuration()->BsAntNum() / Configuration()->NumCells());
     if (kDebugMulticell) {
       std::printf(
           "After packet combining: the combined antenna ID is %d, it comes "
@@ -198,10 +200,11 @@ std::vector<Packet*> TxRxWorkerSim::RecvEnqueue(size_t interface_id) {
     NotifyComplete(rx_message);
     rx_packets.push_back(pkt);
   } else if (0 > rx_bytes) {
-    MLPD_ERROR("RecvEnqueue: Udp Recv failed with error\n");
+    AGORA_LOG_ERROR("RecvEnqueue: Udp Recv failed with error\n");
     throw std::runtime_error("TxRxWorkerSim: recv failed");
   } else if (0 != rx_bytes) {
-    MLPD_ERROR("RecvEnqueue: Udp Recv failed to receive all expected bytes");
+    AGORA_LOG_ERROR(
+        "RecvEnqueue: Udp Recv failed to receive all expected bytes");
     throw std::runtime_error(
         "PacketTxRx::RecvEnqueue: Udp Recv failed to receive all expected "
         "bytes");

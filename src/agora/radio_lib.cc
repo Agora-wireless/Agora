@@ -534,17 +534,19 @@ void RadioConfig::Go() {
 }
 
 void RadioConfig::RadioTx(void** buffs) {
+  static constexpr size_t kTxTimeoutUs = 1000000;
   int flags = 0;
   long long frame_time(0);
   for (size_t i = 0; i < this->radio_num_; i++) {
     ba_stn_.at(i)->writeStream(this->tx_streams_.at(i), buffs,
                                cfg_->SampsPerSymbol(), flags, frame_time,
-                               1000000);
+                               kTxTimeoutUs);
   }
 }
 
 int RadioConfig::RadioTx(size_t radio_id, const void* const* buffs, int flags,
                          long long& frameTime) {
+  static constexpr size_t kTxTimeoutUs = 1000000;
   int tx_flags = 0;
   if (flags == 1) {
     tx_flags = SOAPY_SDR_HAS_TIME;
@@ -557,13 +559,13 @@ int RadioConfig::RadioTx(size_t radio_id, const void* const* buffs, int flags,
   if (cfg_->HwFramer() == true) {
     w = ba_stn_.at(radio_id)->writeStream(tx_streams_.at(radio_id), buffs,
                                           cfg_->SampsPerSymbol(), tx_flags,
-                                          frameTime, 1000000);
+                                          frameTime, kTxTimeoutUs);
   } else {
     // For UHD device xmit from host using frameTimeNs
     long long frame_time_ns = SoapySDR::ticksToTimeNs(frameTime, cfg_->Rate());
     w = ba_stn_.at(radio_id)->writeStream(tx_streams_.at(radio_id), buffs,
                                           cfg_->SampsPerSymbol(), tx_flags,
-                                          frame_time_ns, 1000000);
+                                          frame_time_ns, kTxTimeoutUs);
   }
   if (kDebugRadioTX) {
     size_t chan_mask;
@@ -592,13 +594,14 @@ int RadioConfig::RadioTx(
 }
 
 void RadioConfig::RadioRx(void** buffs) {
+  static constexpr size_t kTxTimeoutUs = 1000000;
   long long frame_time(0);
   int rx_flags = SOAPY_SDR_END_BURST;
   for (size_t i = 0; i < this->radio_num_; i++) {
     void** buff = buffs + (i * 2);
     ba_stn_.at(i)->readStream(this->rx_streams_.at(i), buff,
                               cfg_->SampsPerSymbol(), rx_flags, frame_time,
-                              1000000);
+                              kTxTimeoutUs);
   }
 }
 

@@ -177,7 +177,7 @@ class DoSubcarrier : public Doer {
         n_demul_tasks_done_++;
         if (n_demul_tasks_done_ == n_demul_tasks_reqd) {
           /*
-          // Debug printing: TODO, should use MLPD_TRACE
+          // Debug printing: TODO, should use AGORA_LOG_TRACE
           for (size_t i = 0; i < 4; i++) {
               usleep(tid * 3000);
               int8_t* demul_ptr = demod_buffers_[demul_cur_frame_

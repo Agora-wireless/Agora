@@ -58,6 +58,7 @@ class Channel {
 
   std::string sim_chan_model_;
   double channel_snr_db_;
+  double noise_samp_std_;
   enum ChanModel { kAwgn, kRayleigh, kRan3Gpp } chan_model_;
 
   arma::cx_fmat h_;

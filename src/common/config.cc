@@ -85,7 +85,7 @@ Config::Config(const std::string& jsonfile, int ue_id)
 
       auto refnode_serial = serials_conf.value("reference", "");
       if (refnode_serial.empty()) {
-        MLPD_INFO(
+        AGORA_LOG_INFO(
             "No reference node ID found in topology file! Taking the last node "
             "%s as reference node!\n",
             radio_id_.back().c_str());
@@ -320,10 +320,10 @@ Config::Config(const std::string& jsonfile, int ue_id)
 
     if ((ul_data_symbol_num_perframe + dl_data_symbol_num_perframe +
          pilot_symbol_num_perframe) > symbol_num_perframe) {
-      MLPD_ERROR(
+      AGORA_LOG_ERROR(
           "!!!!! Invalid configuration pilot + ul + dl exceeds total symbols "
           "!!!!!\n");
-      MLPD_ERROR(
+      AGORA_LOG_ERROR(
           "Uplink symbols: %zu, Downlink Symbols :%zu, Pilot Symbols: %zu, "
           "Total Symbols: %zu\n",
           ul_data_symbol_num_perframe, dl_data_symbol_num_perframe,
@@ -335,10 +335,10 @@ Config::Config(const std::string& jsonfile, int ue_id)
                  (ul_data_symbol_start < dl_data_symbol_stop)) ||
                 ((ul_data_symbol_stop > dl_data_symbol_start) &&
                  (ul_data_symbol_stop <= dl_data_symbol_stop)))) {
-      MLPD_ERROR(
+      AGORA_LOG_ERROR(
           "!!!!! Invalid configuration ul and dl symbol overlap detected "
           "!!!!!\n");
-      MLPD_ERROR(
+      AGORA_LOG_ERROR(
           "Uplink - start: %zu - stop :%zu, Downlink - start: %zu - stop %zu\n",
           ul_data_symbol_start, ul_data_symbol_stop, dl_data_symbol_start,
           dl_data_symbol_stop);
@@ -366,7 +366,7 @@ Config::Config(const std::string& jsonfile, int ue_id)
       second_sym_start = dl_data_symbol_start;
       second_sym_count = dl_data_symbol_num_perframe;
     }
-    MLPD_SYMBOL(
+    AGORA_LOG_SYMBOL(
         "Symbol %c, start %zu, count %zu. Symbol %c, start %zu, count %zu. "
         "Total Symbols: %zu\n",
         first_sym, first_sym_start, first_sym_start, second_sym,
@@ -401,8 +401,9 @@ Config::Config(const std::string& jsonfile, int ue_id)
     // Add the beacon
     if (beacon_symbol_position < sched.length()) {
       if (sched.at(beacon_symbol_position) != 'G') {
-        MLPD_ERROR("Invalid beacon location %zu replacing %c\n",
-                   beacon_symbol_position, sched.at(beacon_symbol_position));
+        AGORA_LOG_ERROR("Invalid beacon location %zu replacing %c\n",
+                        beacon_symbol_position,
+                        sched.at(beacon_symbol_position));
         throw std::runtime_error("Invalid Frame Configuration");
       }
       sched.replace(beacon_symbol_position, 1, "B");
@@ -419,15 +420,24 @@ Config::Config(const std::string& jsonfile, int ue_id)
     frame_ = FrameStats(jframes.at(ue_id > 0 && jframes.size() > 1 ? ue_id: 0)
                         .get<std::string>());
   }
-  MLPD_INFO("Config: Frame schedule %s (%zu symbols)\n",
-            frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
+  AGORA_LOG_INFO("Config: Frame schedule %s (%zu symbols)\n",
+                 frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
+
+  if (frame_.IsRecCalEnabled()) {
+    RtAssert(bf_ant_num_ >= frame_.NumDLCalSyms(),
+             "Too many DL Cal symbols for the number of base station antennas");
+
+    RtAssert(((bf_ant_num_ % frame_.NumDLCalSyms()) == 0),
+             "Number of Downlink calibration symbols per frame must complete "
+             "calibration on frame boundary!");
+  }
 
   // Check for frame validity.
   // We should remove the restriction of the beacon symbol placement when tested
   // more thoroughly
   if (((frame_.NumBeaconSyms() > 1)) ||
       ((frame_.NumBeaconSyms() == 1) && (frame_.GetBeaconSymbolLast() > 1))) {
-    MLPD_ERROR("Invalid beacon symbol placement\n");
+    AGORA_LOG_ERROR("Invalid beacon symbol placement\n");
     throw std::runtime_error("Invalid beacon symbol placement");
   }
 
@@ -443,13 +453,6 @@ Config::Config(const std::string& jsonfile, int ue_id)
            "Number of UL pilot symbol exceeds number of UL symbols!");
 
   frame_.SetClientPilotSyms(client_ul_pilot_syms, client_dl_pilot_syms);
-
-  ant_per_group_ = frame_.NumDLCalSyms();
-  RtAssert(ant_per_group_ % num_channels_ == 0,
-           "Number of Downlink calibration symbols per frame must be "
-           "multiplier of number of channels!");
-  ant_group_num_ =
-      frame_.IsRecCalEnabled() ? (bf_ant_num_ / ant_per_group_) : 0;
 
   if ((freq_orthogonal_pilot_ == false) &&
       (ue_ant_num_ != frame_.NumPilotSyms())) {
@@ -516,7 +519,7 @@ Config::Config(const std::string& jsonfile, int ue_id)
   encode_block_size_ = tdd_conf.value("encode_block_size", 1);
 
   noise_level_ = tdd_conf.value("noise_level", 0.03);  // default: 30 dB
-  MLPD_SYMBOL("Noise level: %.2f\n", noise_level_);
+  AGORA_LOG_SYMBOL("Noise level: %.2f\n", noise_level_);
 
   // Scrambler and descrambler configurations
   scramble_enabled_ = tdd_conf.value("wlan_scrambler", true);
@@ -571,18 +574,19 @@ Config::Config(const std::string& jsonfile, int ue_id)
   dl_mac_bytes_num_perframe_ = dl_mac_packet_length_ * dl_mac_packets_perframe_;
 
   this->running_.store(true);
-  MLPD_INFO(
-      "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
-      "frame,\n\t%zu uplink data symbols per frame, %zu downlink data "
-      "symbols per frame,\n\t%zu OFDM subcarriers (%zu data subcarriers), "
-      "\n\tUL modulation %s, DL modulation %s,\n\t%zu UL codeblocks per "
-      "symbol, "
-      "%zu UL bytes per code block,\n\t%zu DL codeblocks per symbol, %zu DL "
-      "bytes per code block,"
-      "\n\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame, "
-      "\n\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame, "
-      "\n\tframe time %.3f usec \nUplink Max Mac data per-user tp (Mbps) %.3f "
-      "\nDownlink Max Mac data per-user tp (Mbps) %.3f \n",
+  AGORA_LOG_INFO(
+      "Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per frame,\n"
+      "\t%zu uplink data symbols per frame, %zu downlink data symbols per "
+      "frame,\n"
+      "\t%zu OFDM subcarriers (%zu data subcarriers),\n"
+      "\tUL modulation %s, DL modulation %s,\n\t%zu UL codeblocks per symbol, "
+      "%zu UL bytes per code block,\n"
+      "\t%zu DL codeblocks per symbol, %zu DL bytes per code block,\n"
+      "\t%zu UL MAC data bytes per frame, %zu UL MAC bytes per frame,\n"
+      "\t%zu DL MAC data bytes per frame, %zu DL MAC bytes per frame,\n"
+      "\tFrame time %.3f usec\n"
+      "Uplink Max Mac data per-user tp (Mbps) %.3f\n"
+      "Downlink Max Mac data per-user tp (Mbps) %.3f \n",
       bs_ant_num_, ue_ant_num_, frame_.NumPilotSyms(), frame_.NumULSyms(),
       frame_.NumDLSyms(), ofdm_ca_num_, ofdm_data_num_, ul_modulation_.c_str(),
       dl_modulation_.c_str(), ul_ldpc_config_.NumBlocksInSymbol(),
@@ -594,6 +598,13 @@ Config::Config(const std::string& jsonfile, int ue_id)
           (this->GetFrameDurationSec() * 1e6),
       (dl_mac_data_bytes_num_perframe_ * 8.0f) /
           (this->GetFrameDurationSec() * 1e6));
+
+  if (frame_.IsRecCalEnabled()) {
+    AGORA_LOG_INFO(
+        "Reciprical Calibration Enabled.  Full calibration data ready every "
+        "%zu frame(s) using %zu symbols per frame\n",
+        RecipCalFrameCnt(), frame_.NumDLCalSyms());
+  }
   Print();
 }
 
@@ -636,21 +647,21 @@ void Config::UpdateUlMCS(const json& ul_mcs) {
   size_t max_zc_index =
       (std::find(zc_vec.begin(), zc_vec.end(), kMaxSupportedZc) -
        zc_vec.begin());
-  size_t maxUplinkUncodedBits =
+  size_t max_uplink_uncoded_bits =
       size_t(this->OfdmDataNum() * ul_code_rate * ul_mod_order_bits_);
   size_t zc = SIZE_MAX;
   size_t i = 0;
   for (; i < max_zc_index; i++) {
     if ((zc_vec.at(i) * LdpcNumInputCols(base_graph) * kCbPerSymbol <
-         maxUplinkUncodedBits) &&
+         max_uplink_uncoded_bits) &&
         (zc_vec.at(i + 1) * LdpcNumInputCols(base_graph) * kCbPerSymbol >
-         maxUplinkUncodedBits)) {
+         max_uplink_uncoded_bits)) {
       zc = zc_vec.at(i);
       break;
     }
   }
   if (zc == SIZE_MAX) {
-    MLPD_WARN(
+    AGORA_LOG_WARN(
         "Exceeded possible range of LDPC lifting Zc for uplink! Setting "
         "lifting size to max possible value(%zu).\nThis may lead to too many "
         "unused subcarriers. For better use of the PHY resources, you may "
@@ -703,21 +714,21 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
   size_t max_zc_index =
       (std::find(zc_vec.begin(), zc_vec.end(), kMaxSupportedZc) -
        zc_vec.begin());
-  size_t maxDownlinkUncodedBits =
+  size_t max_downlink_uncoded_bits =
       size_t(this->GetOFDMDataNum() * dl_code_rate * dl_mod_order_bits_);
   size_t zc = SIZE_MAX;
   size_t i = 0;
   for (; i < max_zc_index; i++) {
     if ((zc_vec.at(i) * LdpcNumInputCols(base_graph) * kCbPerSymbol <
-         maxDownlinkUncodedBits) &&
+         max_downlink_uncoded_bits) &&
         (zc_vec.at(i + 1) * LdpcNumInputCols(base_graph) * kCbPerSymbol >
-         maxDownlinkUncodedBits)) {
+         max_downlink_uncoded_bits)) {
       zc = zc_vec.at(i);
       break;
     }
   }
   if (zc == SIZE_MAX) {
-    MLPD_WARN(
+    AGORA_LOG_WARN(
         "Exceeded possible range of LDPC lifting Zc for downlink! Setting "
         "lifting size to max possible value(%zu).\nThis may lead to too many "
         "unused subcarriers. For better use of the PHY resources, you may "
@@ -745,7 +756,7 @@ void Config::UpdateDlMCS(const json& dl_mcs) {
 }
 
 void Config::DumpMcsInfo() {
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "Downlink MCS Info: LDPC: Zc: %d, %zu code blocks per symbol, %d "
       "information "
       "bits per encoding, %d bits per encoded code word, decoder "
@@ -757,7 +768,7 @@ void Config::DumpMcsInfo() {
           (LdpcNumInputCols(dl_ldpc_config_.BaseGraph()) - 2 +
            dl_ldpc_config_.NumRows()),
       dl_ldpc_config_.NumRows(), dl_modulation_.c_str());
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "Uplink MCS Info: LDPC: Zc: %d, %zu code blocks per symbol, %d "
       "information "
       "bits per encoding, %d bits per encoded code word, decoder "
@@ -922,11 +933,12 @@ void Config::GenData() {
     std::string ul_data_file = cur_directory + "/data/LDPC_orig_ul_data_" +
                                std::to_string(this->ofdm_ca_num_) + "_ant" +
                                std::to_string(this->ue_ant_total_) + ".bin";
-    MLPD_SYMBOL("Config: Reading raw ul data from %s\n", ul_data_file.c_str());
+    AGORA_LOG_SYMBOL("Config: Reading raw ul data from %s\n",
+                     ul_data_file.c_str());
     FILE* fd = std::fopen(ul_data_file.c_str(), "rb");
     if (fd == nullptr) {
-      MLPD_ERROR("Failed to open antenna file %s. Error %s.\n",
-                 ul_data_file.c_str(), strerror(errno));
+      AGORA_LOG_ERROR("Failed to open antenna file %s. Error %s.\n",
+                      ul_data_file.c_str(), strerror(errno));
       throw std::runtime_error("Config: Failed to open antenna file");
     }
 
@@ -934,8 +946,9 @@ void Config::GenData() {
          i < this->frame_.NumULSyms(); i++) {
       if (std::fseek(fd, (ul_data_bytes_num_persymbol_ * this->ue_ant_offset_),
                      SEEK_CUR) != 0) {
-        MLPD_ERROR(" *** Error: failed to seek propertly (pre) into %s file\n",
-                   ul_data_file.c_str());
+        AGORA_LOG_ERROR(
+            " *** Error: failed to seek propertly (pre) into %s file\n",
+            ul_data_file.c_str());
         RtAssert(false,
                  "Failed to seek propertly into " + ul_data_file + "file\n");
       }
@@ -943,7 +956,7 @@ void Config::GenData() {
         size_t r = std::fread(this->ul_bits_[i] + (j * ul_num_bytes_per_ue_pad),
                               sizeof(int8_t), ul_data_bytes_num_persymbol_, fd);
         if (r < ul_data_bytes_num_persymbol_) {
-          MLPD_ERROR(
+          AGORA_LOG_ERROR(
               " *** Error: Uplink bad read from file %s (batch %zu : %zu) "
               "%zu : %zu\n",
               ul_data_file.c_str(), i, j, r, ul_data_bytes_num_persymbol_);
@@ -954,8 +967,9 @@ void Config::GenData() {
                          (this->ue_ant_total_ - this->ue_ant_offset_ -
                           this->ue_ant_num_),
                      SEEK_CUR) != 0) {
-        MLPD_ERROR(" *** Error: failed to seek propertly (post) into %s file\n",
-                   ul_data_file.c_str());
+        AGORA_LOG_ERROR(
+            " *** Error: failed to seek propertly (post) into %s file\n",
+            ul_data_file.c_str());
         RtAssert(false,
                  "Failed to seek propertly into " + ul_data_file + "file\n");
       }
@@ -968,11 +982,12 @@ void Config::GenData() {
                                std::to_string(this->ofdm_ca_num_) + "_ant" +
                                std::to_string(this->ue_ant_total_) + ".bin";
 
-    MLPD_SYMBOL("Config: Reading raw dl data from %s\n", dl_data_file.c_str());
+    AGORA_LOG_SYMBOL("Config: Reading raw dl data from %s\n",
+                     dl_data_file.c_str());
     FILE* fd = std::fopen(dl_data_file.c_str(), "rb");
     if (fd == nullptr) {
-      MLPD_ERROR("Failed to open antenna file %s. Error %s.\n",
-                 dl_data_file.c_str(), strerror(errno));
+      AGORA_LOG_ERROR("Failed to open antenna file %s. Error %s.\n",
+                      dl_data_file.c_str(), strerror(errno));
       throw std::runtime_error("Config: Failed to open dl antenna file");
     }
 
@@ -982,7 +997,7 @@ void Config::GenData() {
         size_t r = std::fread(this->dl_bits_[i] + j * dl_num_bytes_per_ue_pad,
                               sizeof(int8_t), dl_data_bytes_num_persymbol_, fd);
         if (r < dl_data_bytes_num_persymbol_) {
-          MLPD_ERROR(
+          AGORA_LOG_ERROR(
               "***Error: Downlink bad read from file %s (batch %zu : %zu) "
               "\n",
               dl_data_file.c_str(), i, j);
@@ -1405,8 +1420,6 @@ void Config::Print() const {
               << "Imbalance Cal: " << imbalance_cal_en_ << std::endl
               << "Bs Channel: " << channel_ << std::endl
               << "Ue Channel: " << ue_channel_ << std::endl
-              << "Ant Group num: " << ant_group_num_ << std::endl
-              << "Ant Per Group: " << ant_per_group_ << std::endl
               << "Max Frames: " << frames_to_test_ << std::endl
               << "Transport Block Size: " << transport_block_size_ << std::endl
               << "Noise Level: " << noise_level_ << std::endl

@@ -32,8 +32,9 @@ MacThreadBaseStation::MacThreadBaseStation(
   log_file_ = std::fopen(log_filename_.c_str(), "w");
   RtAssert(log_file_ != nullptr, "Failed to open MAC log file");
 
-  MLPD_INFO("MacThreadBaseStation: Frame duration %.2f ms, tsc_delta %zu\n",
-            cfg_->GetFrameDurationSec() * 1000, tsc_delta_);
+  AGORA_LOG_INFO(
+      "MacThreadBaseStation: Frame duration %.2f ms, tsc_delta %zu\n",
+      cfg_->GetFrameDurationSec() * 1000, tsc_delta_);
 
   // Set up buffers
   client_.dl_bits_buffer_id_.fill(0);
@@ -58,7 +59,7 @@ MacThreadBaseStation::MacThreadBaseStation(
   // TODO: See if it makes more sense to split up the UE's by port here for
   // client mode.
   size_t udp_server_port = cfg_->BsMacRxPort();
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "MacThreadBaseStation: setting up udp server for mac data at port %zu\n",
       udp_server_port);
   udp_server_ = std::make_unique<UDPServer>(
@@ -70,7 +71,7 @@ MacThreadBaseStation::MacThreadBaseStation(
 
 MacThreadBaseStation::~MacThreadBaseStation() {
   std::fclose(log_file_);
-  MLPD_INFO("MacThreadBaseStation: MAC thread destroyed\n");
+  AGORA_LOG_INFO("MacThreadBaseStation: MAC thread destroyed\n");
 }
 
 void MacThreadBaseStation::ProcessRxFromPhy() {
@@ -80,10 +81,10 @@ void MacThreadBaseStation::ProcessRxFromPhy() {
   }
 
   if (event.event_type_ == EventType::kPacketToMac) {
-    MLPD_TRACE("MacThreadBaseStation: MAC thread event kPacketToMac\n");
+    AGORA_LOG_TRACE("MacThreadBaseStation: MAC thread event kPacketToMac\n");
     ProcessCodeblocksFromPhy(event);
   } else if (event.event_type_ == EventType::kSNRReport) {
-    MLPD_TRACE("MacThreadBaseStation: MAC thread event kSNRReport\n");
+    AGORA_LOG_TRACE("MacThreadBaseStation: MAC thread event kSNRReport\n");
     ProcessSnrReportFromPhy(event);
   }
 }
@@ -188,7 +189,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
     }
 
     if (data_valid) {
-      MLPD_FRAME("%s", ss.str().c_str());
+      AGORA_LOG_FRAME("%s", ss.str().c_str());
       /// Spot to be optimized #1
       std::memcpy(&server_.frame_data_.at(ue_id).at(frame_data_offset),
                   pkt->Data(), pkt->PayloadLength());
@@ -200,7 +201,7 @@ void MacThreadBaseStation::ProcessCodeblocksFromPhy(EventData event) {
       ss << "  *****Failed Data integrity check - invalid parameters"
          << std::endl;
 
-      MLPD_ERROR("%s", ss.str().c_str());
+      AGORA_LOG_ERROR("%s", ss.str().c_str());
       // Set the default to 0 valid data bytes
       server_.data_size_.at(ue_id).at(symbol_array_index - num_pilot_symbols) =
           0;
@@ -292,19 +293,20 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
     ssize_t ret = udp_server_->Recv(&udp_pkt_buf_.at(total_bytes_received),
                                     udp_pkt_buf_.size() - total_bytes_received);
     if (ret == 0) {
-      MLPD_TRACE("MacThreadBaseStation: No data received with %zu pending\n",
-                 total_bytes_received);
+      AGORA_LOG_TRACE(
+          "MacThreadBaseStation: No data received with %zu pending\n",
+          total_bytes_received);
       if (total_bytes_received == 0) {
         return;  // No data received
       } else {
-        MLPD_INFO(
+        AGORA_LOG_INFO(
             "MacThreadBaseStation: No data received but there was data in "
             "buffer pending %zu : try %zu out of %zu\n",
             total_bytes_received, rx_attempts, max_recv_attempts);
       }
     } else if (ret < 0) {
       // There was an error in receiving
-      MLPD_ERROR("MacThreadBaseStation: Error in reception %zu\n", ret);
+      AGORA_LOG_ERROR("MacThreadBaseStation: Error in reception %zu\n", ret);
       cfg_->Running(false);
       return;
     } else { /* Got some data */
@@ -342,7 +344,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
           break;
         }
       }
-      MLPD_FRAME(
+      AGORA_LOG_FRAME(
           "MacThreadBaseStation: Received %zu : %zu bytes in packet %zu : "
           "%zu\n",
           ret, total_bytes_received, packets_received, packets_required);
@@ -355,12 +357,12 @@ void MacThreadBaseStation::ProcessUdpPacketsFromApps() {
   }  // end rx attempts
 
   if (packets_received != packets_required) {
-    MLPD_ERROR(
+    AGORA_LOG_ERROR(
         "MacThreadBaseStation: Received %zu : %zu packets with %zu total bytes "
         "in %zu attempts\n",
         packets_received, packets_required, total_bytes_received, rx_attempts);
   } else {
-    MLPD_FRAME("MacThreadClient: Received Mac Frame Data\n");
+    AGORA_LOG_FRAME("MacThreadClient: Received Mac Frame Data\n");
   }
   RtAssert(packets_received == packets_required,
            "MacThreadBaseStation: ProcessUdpPacketsFromApps incorrect data "
@@ -392,17 +394,17 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
       frame_id = pkt->Frame();
     } else {
       if (ue_id != pkt->Ue()) {
-        MLPD_ERROR(
+        AGORA_LOG_ERROR(
             "Received pkt %zu data with unexpected UE id %zu, expected %d\n",
             packet, ue_id, pkt->Ue());
       }
       if ((symbol_id + 1) != pkt->Symbol()) {
-        MLPD_ERROR("Received out of order symbol id %d, expected %zu\n",
-                   pkt->Symbol(), symbol_id + 1);
+        AGORA_LOG_ERROR("Received out of order symbol id %d, expected %zu\n",
+                        pkt->Symbol(), symbol_id + 1);
       }
 
       if (frame_id != pkt->Frame()) {
-        MLPD_ERROR(
+        AGORA_LOG_ERROR(
             "Received pkt %zu data with unexpected frame id %zu, expected %d\n",
             packet, frame_id, pkt->Frame());
       }
@@ -412,7 +414,8 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
   }
 
   if (next_radio_id_ != ue_id) {
-    MLPD_ERROR("Error - radio id %zu, expected %zu\n", ue_id, next_radio_id_);
+    AGORA_LOG_ERROR("Error - radio id %zu, expected %zu\n", ue_id,
+                    next_radio_id_);
   }
   // End data integrity check
 
@@ -476,9 +479,8 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
 
     pkt->LoadData(src_packet->Data());
     // Insert CRC
-    pkt->Crc(
-        (uint16_t)(crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) &
-                   0xFFFF));
+    pkt->Crc((uint16_t)(
+        crc_obj_->CalculateCrc24(pkt->Data(), pkt->PayloadLength()) & 0xFFFF));
 
     if (kLogMacPackets) {
       std::stringstream ss;
@@ -509,8 +511,8 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
   (*client_.dl_bits_buffer_status_)[next_radio_id_][radio_buf_id] = 1;
   EventData msg(EventType::kPacketFromMac,
                 rx_mac_tag_t(next_radio_id_, radio_buf_id).tag_);
-  MLPD_FRAME("MacThreadBasestation: Tx mac information to %zu %zu\n",
-             next_radio_id_, radio_buf_id);
+  AGORA_LOG_FRAME("MacThreadBasestation: Tx mac information to %zu %zu\n",
+                  next_radio_id_, radio_buf_id);
   RtAssert(tx_queue_->enqueue(msg),
            "MacThreadBasestation: Failed to enqueue downlink packet");
 
@@ -523,7 +525,7 @@ void MacThreadBaseStation::ProcessUdpPacketsFromAppsBs(const char* payload) {
 }
 
 void MacThreadBaseStation::RunEventLoop() {
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "MacThreadBasestation: Running MAC thread event loop, logging to file "
       "%s\n",
       log_filename_.c_str());

@@ -198,33 +198,38 @@ EventData DoFFT::Launch(size_t tag) {
   } else if (sym_type == SymbolType::kCalUL) {
     // Only process uplink for antennas that also do downlink in this frame
     // for consistency with calib downlink processing.
-    if (frame_id >= TX_FRAME_DELTA &&
-        ant_id / cfg_->AntPerGroup() ==
-            (frame_id - TX_FRAME_DELTA) % cfg_->AntGroupNum()) {
-      const size_t frame_grp_id =
-          (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
-      const size_t frame_grp_slot = frame_grp_id % kFrameWnd;
-      PartialTranspose(
-          &calib_ul_buffer_[frame_grp_slot][ant_id * cfg_->OfdmDataNum()],
-          ant_id, sym_type);
-      phy_stats_->UpdateCalibPilotSnr(frame_grp_id, 1, ant_id, fft_inout_);
+    const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, ant_id);
+    if (cal_index != SIZE_MAX) {
+      AGORA_LOG_TRACE(
+          "DoFFT[%d]: (Frame %zu, Symbol %zu, Ant %zu) - Received a CalUl "
+          "symbol for current cal index %zu\n",
+          tid_, frame_id, symbol_id, ant_id, cal_index);
+
+      complex_float* calib_ul_ptr =
+          &calib_ul_buffer_[cal_index][ant_id * cfg_->OfdmDataNum()];
+
+      PartialTranspose(calib_ul_ptr, ant_id, sym_type);
+      phy_stats_->UpdateCalibPilotSnr(cal_index, 1, ant_id, fft_inout_);
     }
     RtAssert(radio_id != cfg_->RefRadio(cell_id),
              "Received a Cal Ul symbol for an antenna on the reference radio");
   } else if (sym_type == SymbolType::kCalDL) {
-    if ((ant_id == cfg_->RefAnt(cell_id)) && (frame_id >= TX_FRAME_DELTA)) {
-      size_t frame_grp_id = (frame_id - TX_FRAME_DELTA) / cfg_->AntGroupNum();
-      size_t frame_grp_slot = frame_grp_id % kFrameWnd;
-      size_t cal_dl_symbol_id = symbol_id - cfg_->Frame().GetDLCalSymbol(0);
-      size_t cur_ant = ((frame_id - TX_FRAME_DELTA) % cfg_->AntGroupNum()) *
-                           cfg_->AntPerGroup() +
-                       cal_dl_symbol_id;
+    if (ant_id == cfg_->RefAnt(cell_id)) {
+      //Find out what antenna transmitted a pilot on this symbol 'C'
+      const size_t pilot_tx_ant = cfg_->RecipCalDlAnt(frame_id, symbol_id);
+      const size_t cal_index = cfg_->RecipCalUlRxIndex(frame_id, pilot_tx_ant);
+
+      AGORA_LOG_TRACE(
+          "DoFFT[%d]: (Frame %zu, Symbol %zu, Ant %zu) - Received a CalDL "
+          "symbol for current cal index %zu\n",
+          tid_, frame_id, symbol_id, pilot_tx_ant, cal_index);
+      RtAssert(cal_index != SIZE_MAX, "Out of bounds index");
+
       complex_float* calib_dl_ptr =
-          &calib_dl_buffer_[frame_grp_slot][cur_ant * cfg_->OfdmDataNum()];
-      PartialTranspose(calib_dl_ptr, ant_id, sym_type);
-      phy_stats_->UpdateCalibPilotSnr(frame_grp_id, 0, cur_ant, fft_inout_);
+          &calib_dl_buffer_[cal_index][pilot_tx_ant * cfg_->OfdmDataNum()];
+      PartialTranspose(calib_dl_ptr, pilot_tx_ant, sym_type);
+      phy_stats_->UpdateCalibPilotSnr(cal_index, 0, pilot_tx_ant, fft_inout_);
     }
-    //Do nothing with frame < TX_FRAME_DELTA and other antennas on the ref radio
     RtAssert(
         radio_id == cfg_->RefRadio(cell_id),
         "Received a Cal Dl symbol for an antenna not on the reference radio");

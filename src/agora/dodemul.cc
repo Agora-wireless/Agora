@@ -274,6 +274,7 @@ EventData DoDemul::Launch(size_t tag) {
           phy_stats_->UpdateEvmStats(frame_id, cur_sc_id, mat_equaled);
           if (kPrintPhyStats && cur_sc_id == 0) {
             phy_stats_->PrintEvmStats(frame_id - 1);
+            phy_stats_->RecordEvmSnr(frame_id - 1);
           }
         }
       }

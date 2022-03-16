@@ -7,7 +7,7 @@
 #include "packet_txrx_radio.h"
 
 #include "logger.h"
-#include "txrx_worker_argos.h"
+#include "txrx_worker_hw.h"
 #include "txrx_worker_usrp.h"
 
 static constexpr size_t kRadioTriggerWaitMs = 100;
@@ -19,9 +19,10 @@ PacketTxRxRadio::PacketTxRxRadio(
     moodycamel::ProducerToken** notify_producer_tokens,
     moodycamel::ProducerToken** tx_producer_tokens, Table<char>& rx_buffer,
     size_t packet_num_in_buffer, Table<size_t>& frame_start, char* tx_buffer)
-    : PacketTxRx(cfg, core_offset, event_notify_q, tx_pending_q,
-                 notify_producer_tokens, tx_producer_tokens, rx_buffer,
-                 packet_num_in_buffer, frame_start, tx_buffer) {
+    : PacketTxRx(AgoraTxRx::TxRxTypes::kBaseStation, cfg, core_offset,
+                 event_notify_q, tx_pending_q, notify_producer_tokens,
+                 tx_producer_tokens, rx_buffer, packet_num_in_buffer,
+                 frame_start, tx_buffer) {
   radio_config_ = std::make_unique<RadioConfig>(cfg);
 }
 
@@ -30,15 +31,15 @@ PacketTxRxRadio::~PacketTxRxRadio() {
   for (auto& worker_threads : worker_threads_) {
     worker_threads->Stop();
   }
-  MLPD_INFO("PacketTxRxRadio: shutting down radios\n");
+  AGORA_LOG_INFO("PacketTxRxRadio: shutting down radios\n");
   radio_config_->RadioStop();
   radio_config_.reset();
 }
 
 bool PacketTxRxRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
                                 Table<complex_float>& calib_ul_buffer) {
-  MLPD_FRAME("PacketTxRxRadio: StartTxRx threads %zu\n",
-             worker_threads_.size());
+  AGORA_LOG_FRAME("PacketTxRxRadio: StartTxRx threads %zu\n",
+                  worker_threads_.size());
   const bool status = radio_config_->RadioStart();
 
   //RadioStart creates the following: radio_config_->GetCalibDl() and radio_config_->GetCalibUl();
@@ -56,7 +57,8 @@ bool PacketTxRxRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
   } else {
     PacketTxRx::StartTxRx(calib_dl_buffer, calib_ul_buffer);
     std::this_thread::sleep_for(std::chrono::milliseconds(kRadioTriggerWaitMs));
-    MLPD_INFO("PacketTxRxRadio : All workers started triggering the radio\n");
+    AGORA_LOG_INFO(
+        "PacketTxRxRadio : All workers started triggering the radio\n");
     radio_config_->Go();
   }
   return status;
@@ -67,17 +69,17 @@ bool PacketTxRxRadio::CreateWorker(size_t tid, size_t interface_count,
                                    size_t* rx_frame_start,
                                    std::vector<RxPacket>& rx_memory,
                                    std::byte* const tx_memory) {
-  MLPD_INFO(
+  const size_t num_channels = NumChannels();
+  AGORA_LOG_INFO(
       "PacketTxRxRadio[%zu]: Creating worker handling %zu interfaces starting "
       "at %zu - antennas %zu:%zu\n",
-      tid, interface_count, interface_offset,
-      interface_offset * cfg_->NumChannels(),
-      ((interface_offset * cfg_->NumChannels()) +
-       (interface_count * cfg_->NumChannels()) - 1));
+      tid, interface_count, interface_offset, interface_offset * num_channels,
+      ((interface_offset * num_channels) + (interface_count * num_channels) -
+       1));
 
   //This is the spot to choose what type of TxRxWorker you want....
   if (kUseArgos) {
-    worker_threads_.emplace_back(std::make_unique<TxRxWorkerArgos>(
+    worker_threads_.emplace_back(std::make_unique<TxRxWorkerHw>(
         core_offset_, tid, interface_count, interface_offset, cfg_,
         rx_frame_start, event_notify_q_, tx_pending_q_,
         *tx_producer_tokens_[tid], *notify_producer_tokens_[tid], rx_memory,

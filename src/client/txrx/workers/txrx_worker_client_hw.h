@@ -1,0 +1,58 @@
+/**
+ * @file txrx_worker_client_hw.h
+ * @brief Implementation of PacketTxRxRadio datapath functions for communicating
+ * with real iris / faros hardware
+ */
+
+#ifndef TXRX_WORKER_CLIENT_HW_H_
+#define TXRX_WORKER_CLIENT_HW_H_
+
+#include <memory>
+#include <vector>
+
+#include "buffer.h"
+#include "client_radio.h"
+#include "txrx_worker.h"
+
+class TxRxWorkerClientHw : public TxRxWorker {
+ public:
+  TxRxWorkerClientHw(size_t core_offset, size_t tid, size_t interface_count,
+                     size_t interface_offset, Config* const config,
+                     size_t* rx_frame_start,
+                     moodycamel::ConcurrentQueue<EventData>* event_notify_q,
+                     moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
+                     moodycamel::ProducerToken& tx_producer,
+                     moodycamel::ProducerToken& notify_producer,
+                     std::vector<RxPacket>& rx_memory,
+                     std::byte* const tx_memory, std::mutex& sync_mutex,
+                     std::condition_variable& sync_cond,
+                     std::atomic<bool>& can_proceed,
+                     ClientRadioConfig& radio_config);
+
+  ~TxRxWorkerClientHw() final;
+  void DoTxRx() final;
+
+ private:
+  TxRxWorkerClientHw() = delete;
+  size_t DoTx(const long long time0);
+  std::vector<Packet*> DoRx(size_t interface_id, size_t& global_frame_id,
+                            size_t& global_symbol_id, long long& receive_time,
+                            ssize_t& sample_offset);
+
+  ssize_t SyncBeacon(size_t local_interface, size_t sample_window);
+  ssize_t FindSyncBeacon(std::complex<int16_t>* check_data,
+                         size_t sample_window);
+  void AdjustRx(size_t local_interface, size_t discard_samples);
+  bool IsRxSymbol(size_t symbol_id);
+  void TxUplinkSymbols(size_t radio_id, size_t frame_id, long long time0);
+  void TxPilot(size_t pilot_ant, size_t frame_id, long long time0);
+
+  // This object is created / owned by the parent process
+  ClientRadioConfig& radio_;
+  size_t program_start_ticks_;
+
+  std::vector<std::vector<std::complex<int16_t>>> frame_zeros_;
+  std::vector<std::vector<std::complex<int16_t>>> frame_storage_;
+  std::vector<void*> rx_frame_;
+};
+#endif  // TXRX_WORKER_CLIENT_HW_H_

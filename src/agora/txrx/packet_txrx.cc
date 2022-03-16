@@ -7,12 +7,12 @@
 #include "packet_txrx.h"
 
 #include "logger.h"
-#include "txrx_worker_sim.h"
 
 static constexpr size_t kNotifyWaitMs = 100;
 static constexpr size_t kWorkerStartWaitMs = 10;
 
-PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
+PacketTxRx::PacketTxRx(AgoraTxRx::TxRxTypes type, Config* const cfg,
+                       size_t core_offset,
                        moodycamel::ConcurrentQueue<EventData>* event_notify_q,
                        moodycamel::ConcurrentQueue<EventData>* tx_pending_q,
                        moodycamel::ProducerToken** notify_producer_tokens,
@@ -27,14 +27,25 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
       tx_producer_tokens_(tx_producer_tokens),
       proceed_(false),
       tx_memory_(reinterpret_cast<std::byte* const>(tx_buffer)),
-      frame_start_(frame_start) {
-  const size_t total_radios = cfg->NumRadios();
-  const size_t requested_worker_threads = cfg->SocketThreadNum();
+      frame_start_(frame_start),
+      type_(type) {
+  size_t total_radios;
+  size_t requested_worker_threads;
+  if (type_ == AgoraTxRx::TxRxTypes::kBaseStation) {
+    total_radios = cfg->NumRadios();
+    requested_worker_threads = cfg->SocketThreadNum();
+    num_channels_ = cfg->NumChannels();
+  } else {
+    total_radios = cfg->UeNum();
+    requested_worker_threads = cfg->UeSocketThreadNum();
+    num_channels_ = cfg->NumUeChannels();
+  }
+
   /// Will make (packet_num_in_buffer % total_radios) unused buffers
   const size_t buffers_per_interface = packet_num_in_buffer / total_radios;
 
   /// Make sure all antennas on an interface is assigned to the same worker
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "PacketTxRx: Number of workers %zu, Buffers per interface %zu, Number of "
       "Total buffers %zu\n",
       requested_worker_threads, buffers_per_interface, packet_num_in_buffer);
@@ -55,8 +66,8 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
     for (size_t interface = 0; interface < target_interface_count;
          interface++) {
       interface_to_worker_.push_back(worker);
-      MLPD_FRAME("Interface: %zu, assigned to worker %zu\n",
-                 interface_to_worker_.size(), worker);
+      AGORA_LOG_FRAME("Interface: %zu, assigned to worker %zu\n",
+                      interface_to_worker_.size(), worker);
 
       /// Distribute the buffers per interface
       for (size_t buffer = 0; buffer < buffers_per_interface; buffer++) {
@@ -77,13 +88,13 @@ PacketTxRx::PacketTxRx(Config* const cfg, size_t core_offset,
     }
   }
   if (actual_worker_threads != requested_worker_threads) {
-    MLPD_WARN(
+    AGORA_LOG_WARN(
         "Using less than the number of requested worker threads %zu:%zu\n",
         actual_worker_threads, requested_worker_threads);
   }
   rx_packets_.resize(actual_worker_threads);
 
-  MLPD_FRAME(
+  AGORA_LOG_FRAME(
       "PacketTxRx: Number of workers %zu, Interfaces per thread: ~%zu, Buffers "
       "per thread: ~%zu\n",
       actual_worker_threads, target_interface_count,
@@ -128,27 +139,28 @@ bool PacketTxRx::StartTxRx(Table<complex_float>& calib_dl_buffer,
     CreateWorker(worker_id, num_worker_interfaces, interface_offset,
                  frame_start_[worker_id], rx_packets_.at(worker_id),
                  tx_memory_);
-    MLPD_FRAME("Creating worker %zu, with interfaces %zu, offset %zu\n",
-               worker_id, num_worker_interfaces, interface_offset);
+    AGORA_LOG_FRAME("Creating worker %zu, with interfaces %zu, offset %zu\n",
+                    worker_id, num_worker_interfaces, interface_offset);
   }
 
-  MLPD_FRAME("PacketTxRx: StartTxRx threads %zu\n", worker_threads_.size());
+  AGORA_LOG_FRAME("PacketTxRx: StartTxRx threads %zu\n",
+                  worker_threads_.size());
   for (auto& worker : worker_threads_) {
     worker->Start();
     while (worker->Started() == false) {
       std::this_thread::sleep_for(
           std::chrono::milliseconds(kWorkerStartWaitMs));
     }
-    MLPD_TRACE("PacketTxRx: worker %zu has started \n", worker->Id());
+    AGORA_LOG_TRACE("PacketTxRx: worker %zu has started \n", worker->Id());
   }
-  MLPD_TRACE("PacketTxRx: notifying workers\n");
+  AGORA_LOG_TRACE("PacketTxRx: notifying workers\n");
   NotifyWorkers();
-  MLPD_INFO("PacketTxRx: workers synchronized\n");
+  AGORA_LOG_INFO("PacketTxRx: workers synchronized\n");
   return true;
 }
 
 size_t PacketTxRx::AntNumToWorkerId(size_t ant_num) const {
-  return (interface_to_worker_.at(ant_num / cfg_->NumChannels()));
+  return (interface_to_worker_.at(ant_num / num_channels_));
 }
 
 void PacketTxRx::NotifyWorkers() {  //Sync the workers
@@ -160,27 +172,4 @@ void PacketTxRx::NotifyWorkers() {  //Sync the workers
       cond_.notify_all();
     }
   }
-}
-
-bool PacketTxRx::CreateWorker(size_t tid, size_t interface_count,
-                              size_t interface_offset, size_t* rx_frame_start,
-                              std::vector<RxPacket>& rx_memory,
-                              std::byte* const tx_memory) {
-  MLPD_INFO(
-      "PacketTxRx[%zu]: Creating worker handling %zu interfaces starting at "
-      "%zu - antennas %zu:%zu\n",
-      tid, interface_count, interface_offset,
-      interface_offset * cfg_->NumChannels(),
-      ((interface_offset * cfg_->NumChannels()) +
-       (interface_count * cfg_->NumChannels()) - 1));
-
-  //This is the spot to choose what type of TxRxWorker you want....
-  RtAssert((kUseArgos == false) && (kUseUHD == false),
-           "This class does not support hardware implementations");
-  worker_threads_.emplace_back(std::make_unique<TxRxWorkerSim>(
-      core_offset_, tid, interface_count, interface_offset, cfg_,
-      rx_frame_start, event_notify_q_, tx_pending_q_, *tx_producer_tokens_[tid],
-      *notify_producer_tokens_[tid], rx_memory, tx_memory, mutex_, cond_,
-      proceed_));
-  return true;
 }

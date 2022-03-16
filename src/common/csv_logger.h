@@ -1,28 +1,37 @@
 #ifndef CSV_LOGGER_H_
 #define CSV_LOGGER_H_
 
-#define ENABLE_CSV_LOGGER true
+#include "logger.h"
 
-enum CsvLog {
-  kCsvLogRFSNR,
+enum CsvLogEnum {
+  kCsvLogDLPSNR,
   kCsvLogEVMSNR,
-  kCsvLogBE,
-  kCsvLogSE,
-  kCsvLogN
+  kCsvLogBERSER,
+  kCsvLogCSI,
+  kCsvLogDLZF,
+  kCsvLogNUM
 };
 
-extern FILE* fp_csvlog[kCsvLogN];
+#if defined(CSV_LOG_LEVEL)
 
-extern void CsvLogSetDev(int id);
-extern void CsvLogInit(size_t log_id);
-extern void CsvLogEnd();
+#include "spdlog/sinks/basic_file_sink.h"
 
-#if ENABLE_CSV_LOGGER
+extern std::shared_ptr<spdlog::logger> csv_logger[kCsvLogNUM];
+extern void CsvLogInit(size_t dev_id, size_t log_id);
+
+#define CSV_LOG_INIT(DEV_ID, LOG_ID) CsvLogInit(DEV_ID, LOG_ID)
 #define CSV_LOG(LOG_ID, ...) \
-  if (fp_csvlog[LOG_ID] == nullptr) { CsvLogInit(LOG_ID); } \
-  fprintf(fp_csvlog[LOG_ID], __VA_ARGS__)
+  if (csv_logger[LOG_ID] != nullptr) { \
+    csv_logger[LOG_ID]->CSV_LOG_LEVEL(fmt::sprintf(__VA_ARGS__)); \
+  }
+#define CSV_LOG_VAR(VAR, EXPR) VAR = EXPR
+
 #else
+
+#define CSV_LOG_INIT(DEV_ID, LOG_ID)
 #define CSV_LOG(LOG_ID, ...)
-#endif
+#define CSV_LOG_VAR(VAR, EXPR)
+
+#endif //CSV_LOG_LEVEL
 
 #endif //CSV_LOGGER_H_

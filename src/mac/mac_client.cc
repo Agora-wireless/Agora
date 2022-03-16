@@ -7,6 +7,7 @@
 #include <chrono>
 #include <thread>
 
+#include "logger.h"
 #include "mac_receiver.h"
 #include "mac_sender.h"
 #include "signal_handler.h"
@@ -42,6 +43,7 @@ int main(int argc, char* argv[]) {
   std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   std::string filename = FLAGS_conf_file;
   std::string data_filename = FLAGS_data_file;
+  AGORA_LOG_INIT();
 
   auto* frame_start = new double[kNumStatsFrames];
   auto* frame_end = new double[kNumStatsFrames];
@@ -56,7 +58,7 @@ int main(int argc, char* argv[]) {
       std::ofstream create_file;
       data_filename = TOSTRING(PROJECT_DIRECTORY) +
                       std::string("/data/ul_increment_file.bin");
-      std::printf(
+      AGORA_LOG_INFO(
           "Generating test binary file for user uplink %s.  Frames: "
           "%zu, Packets: %zu, Packet Size: %zu\n",
           data_filename.c_str(), cfg->FramesToTest(),
@@ -125,7 +127,7 @@ int main(int argc, char* argv[]) {
         rx_threads = receiver->StartRecv();
       }
 
-      std::printf("Running mac client application\n");
+      AGORA_LOG_INFO("Running mac client application\n");
       while ((cfg->Running() == true) &&
              (SignalHandler::GotExitSignal() == false)) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -133,7 +135,7 @@ int main(int argc, char* argv[]) {
 
       /* May want to move this exit section to after the exception */
       cfg->Running(false);
-      std::printf("Terminating mac client application\n");
+      AGORA_LOG_INFO("Terminating mac client application\n");
       sender.reset();
       for (auto& thread : rx_threads) {
         thread.join();
@@ -148,8 +150,9 @@ int main(int argc, char* argv[]) {
   }  // end context Config
   delete[](frame_start);
   delete[](frame_end);
-  std::printf("Mac user application terminated!\n");
+  AGORA_LOG_INFO("Mac user application terminated!\n");
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
+  AGORA_LOG_SHUTDOWN();
   return ret;
 }

@@ -59,7 +59,7 @@ Sender::Sender(Config* cfg, size_t socket_thread_num, size_t core_offset,
                                                cfg->Frame().NumTotalSyms()));
   ticks_wnd2_ = ticks_all_ * 15;
 
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "Initializing sender, sending to base station server at %s, frame "
       "duration = %.2f ms, slow start = %s\n",
       cfg->BsServerAddr().c_str(), frame_duration_ / 1000.0,
@@ -144,7 +144,7 @@ Sender::~Sender() {
   keep_running.store(false);
 
   for (auto& thread : this->threads_) {
-    MLPD_INFO("Sender: Joining threads\n");
+    AGORA_LOG_INFO("Sender: Joining threads\n");
     thread.join();
   }
 
@@ -157,7 +157,7 @@ Sender::~Sender() {
     delete (task_ptok_[i]);
   }
   std::free(task_ptok_);
-  MLPD_INFO("Sender: Complete\n");
+  AGORA_LOG_INFO("Sender: Complete\n");
 }
 
 void Sender::StartTx() {
@@ -226,7 +226,7 @@ void* Sender::MasterThread(int /*unused*/) {
   size_t start_symbol = FindNextSymbol(0);
   // Delay until the start of the first symbol
   if (start_symbol > 0) {
-    MLPD_INFO("Sender: Starting symbol %zu delaying\n", start_symbol);
+    AGORA_LOG_INFO("Sender: Starting symbol %zu delaying\n", start_symbol);
     DelayTicks(tick_start, GetTicksForFrame(0) * start_symbol);
     tick_start = tick_start + (GetTicksForFrame(0) * start_symbol);
   }
@@ -345,7 +345,7 @@ void* Sender::WorkerThread(int tid) {
   const size_t radios_this_worker = ((radio_hi - radio_lo) + 1);
   const size_t ant_num_this_thread = radios_this_worker * cfg_->NumChannels();
 
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "Sender worker[%d]: emulating radios %zu:%zu total radios handled by "
       "this worker %zu\n",
       tid, radio_lo, radio_hi, radios_this_worker);
@@ -384,8 +384,8 @@ void* Sender::WorkerThread(int tid) {
   size_t total_tx_packets_rolling = 0;
   size_t cur_radio = radio_lo;
 
-  MLPD_INFO("Sender worker[%d]: %zu antennas, total bs antennas: %zu\n", tid,
-            ant_num_this_thread, cfg_->BsAntNum());
+  AGORA_LOG_INFO("Sender worker[%d]: %zu antennas, total bs antennas: %zu\n",
+                 tid, ant_num_this_thread, cfg_->BsAntNum());
 
   // We currently don't support zero-padding OFDM prefix and postfix
   RtAssert(cfg_->PacketLength() ==
@@ -502,7 +502,7 @@ void* Sender::WorkerThread(int tid) {
 
   std::free(static_cast<void*>(socks_pkt_buf));
   std::free(static_cast<void*>(fft_inout));
-  MLPD_FRAME("Sender: worker thread %d exit\n", tid);
+  AGORA_LOG_FRAME("Sender: worker thread %d exit\n", tid);
   return nullptr;
 }
 
