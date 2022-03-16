@@ -42,7 +42,7 @@ void Scheduler::Launch(size_t frame_id) {
       last_ue = (last_ue + 1)%UeNum_;
     }
   }
-  update.store(true);
+  // update.store(true);
   PrintSelect(frame_id, 0);
 }
 

@@ -447,7 +447,7 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
   arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
                         cfg_->BsAntNum(), cfg_->UeAntNum(), false);
 
-  // QMACS: scheduler for ZfFreqOrthogonal haven't been supported, input mat_csi twice
+  // QMACS: scheduler for ZfFreqOrthogonal haven't been tested
   // QMACS: compute scheduled CSI
   arma::cx_fmat sche_mat_csi;
   this->cfg_->scheduler_->ScheduleCSI(frame_slot, cfg_->GetZfScId(base_sc_id), sche_mat_csi, mat_csi);

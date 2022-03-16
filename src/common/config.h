@@ -792,7 +792,8 @@ class Config {
   size_t dl_num_bytes_per_cb_;
 
   bool fft_in_rru_;  // If true, the RRU does FFT instead of Agora
-
+  
+  // QMACS: pointer to scheduler
   public:
   Scheduler *scheduler_; // special varible only for QMACS
 };

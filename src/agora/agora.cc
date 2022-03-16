@@ -91,10 +91,6 @@ Agora::Agora(Config* const cfg)
   CreateThreads();
 
   // QMACS: Create Scheduler
-  // config_->scheduler_ = std::make_unique<Scheduler>(config_->UeNum(),
-  //                                                 config_->Frame().NumDLSyms(),
-  //                                                 config_->UeAntNum(), 
-  //                                                 csi_buffers_).get();
   config_->scheduler_ = new Scheduler (config_->UeNum(),
                                       config_->Frame().NumDLSyms(),
                                       config_->UeAntNum(), 
