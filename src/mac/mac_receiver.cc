@@ -43,6 +43,9 @@ MacReceiver::MacReceiver(Config* const cfg, size_t num_frame_data_bytes,
 std::vector<std::thread> MacReceiver::StartRecv() {
   std::vector<std::thread> created_threads;
 
+  // Throughput: init
+  tp = new Throughput(rx_thread_num_);
+
   MLPD_INFO("MacReceiver:  Start Recv threads %zu\n", rx_thread_num_);
   created_threads.resize(rx_thread_num_);
 
@@ -79,6 +82,10 @@ void* MacReceiver::LoopRecv(size_t tid) {
          (cfg_->Running() == true)) {
     const ssize_t recvlen = udp_server->RecvFrom(
         &rx_buffer[0u], max_packet_length, phy_address_, phy_port_ + ue_id);
+    
+    // Throughput: timestamp here
+    tp->Stamp(tid, recvlen);
+
     if (recvlen < 0) {
       std::perror("MacReceiver: recv failed");
       throw std::runtime_error("MacReceiver: recv failed");
@@ -110,6 +117,13 @@ void* MacReceiver::LoopRecv(size_t tid) {
       }
     }
   }
+  
+  // Throughput: free memory
+  if (tid == 0) {
+    delete tp;
+  }
+  // Throughput
+
   delete[] rx_buffer;
   std::printf("MacReceiver[%zu]: Finished\n", tid);
   return nullptr;

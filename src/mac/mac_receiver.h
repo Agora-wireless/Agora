@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "config.h"
+#include "throughput.h"
 
 class MacReceiver {
  public:
@@ -37,6 +38,9 @@ class MacReceiver {
   const size_t rx_thread_num_;
   const size_t core_id_;
   Config* const cfg_;
+
+  // Throughput: declare
+  Throughput* tp;
 };
 
 #endif  // MAC_RECEIVER_H_

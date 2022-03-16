@@ -12,7 +12,7 @@
 
 #include "buffer.h"
 #include "concurrentqueue.h"
-#include "config.h"
+// #include "config.h"
 #include "gettime.h"
 #include "memory_manage.h"
 #include "symbols.h"
@@ -20,7 +20,7 @@
 // #define SELECT_NUM 2
 class Scheduler {
   public:
-    Scheduler(Config* const cfg_, PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers);
+    Scheduler(size_t UeNum, size_t NumDLSyms, size_t UeAntNum, PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers);
     ~Scheduler();
     
     void Launch(size_t frame_id); // scheduling based on csi_buffer
@@ -34,8 +34,12 @@ class Scheduler {
     void UpdateQueue(size_t frame_id); // update the data queue according to schedule
 
   private:
-    Config* const cfg_;
+    // Config* const cfg_;
     PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers_;
+    size_t UeNum_;
+    size_t NumDLSyms_;
+    size_t UeAntNum_;
+
     PtrGrid<kFrameWnd, kMaxSymbols, unsigned int> selection_;
     // e.g. 
     // 3 ue in total and select_num = 2

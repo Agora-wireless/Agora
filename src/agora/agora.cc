@@ -90,6 +90,16 @@ Agora::Agora(Config* const cfg)
   // Create worker threads
   CreateThreads();
 
+  // QMACS: Create Scheduler
+  // config_->scheduler_ = std::make_unique<Scheduler>(config_->UeNum(),
+  //                                                 config_->Frame().NumDLSyms(),
+  //                                                 config_->UeAntNum(), 
+  //                                                 csi_buffers_).get();
+  config_->scheduler_ = new Scheduler (config_->UeNum(),
+                                      config_->Frame().NumDLSyms(),
+                                      config_->UeAntNum(), 
+                                      csi_buffers_);
+
   MLPD_INFO(
       "Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
       "cores %zu--%zu\n",
@@ -103,6 +113,9 @@ Agora::~Agora() {
   if (kEnableMac == true) {
     mac_std_thread_.join();
   }
+
+  // QMACS: free scheduler
+  delete config_->scheduler_;
 
   for (auto& worker_thread : workers_) {
     MLPD_SYMBOL("Agora: Joining worker thread\n");
@@ -706,6 +719,9 @@ void Agora::Start() {
               this->stats_->MasterSetTsc(TsType::kTXDone, frame_id);
               PrintPerFrameDone(PrintType::kPacketTX, frame_id);
 
+              // QMACS: update data queue
+              config_->scheduler_->UpdateQueue(frame_id);
+
               bool work_finished = this->CheckFrameComplete(frame_id);
               if (work_finished == true) {
                 goto finish;
@@ -829,6 +845,10 @@ void Agora::HandleEventFft(size_t tag) {
           if (kEnableMac == true) {
             SendSnrReport(EventType::kSNRReport, frame_id, symbol_id);
           }
+
+          // QMACS: launch scheduler
+          config_->scheduler_->Launch(frame_id);
+
           ScheduleSubcarriers(EventType::kZF, frame_id, 0);
         }
       }

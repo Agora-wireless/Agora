@@ -30,6 +30,7 @@
 #include "symbols.h"
 #include "utils.h"
 #include "utils_ldpc.h"
+#include "scheduler.h"
 
 class Config {
  public:
@@ -791,5 +792,8 @@ class Config {
   size_t dl_num_bytes_per_cb_;
 
   bool fft_in_rru_;  // If true, the RRU does FFT instead of Agora
+
+  public:
+  Scheduler *scheduler_; // special varible only for QMACS
 };
 #endif /* CONFIG_HPP_ */
