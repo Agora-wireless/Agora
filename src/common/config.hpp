@@ -379,6 +379,8 @@ public:
     size_t total_zf_workers;
     size_t total_demul_workers;
     size_t total_decode_workers;
+    size_t time_iq_sc_step_size;
+    size_t post_zf_step_size;
 
     size_t zf_start, zf_end;
     size_t demul_start, demul_end;
@@ -439,6 +441,11 @@ public:
     inline size_t get_num_ues_to_process() const
     {
         return ue_end - ue_start;
+    }
+
+    inline size_t get_num_demul_sc_to_process() const
+    {
+        return demul_end - demul_start;
     }
 
     // Get the Agora server index given an UE ID

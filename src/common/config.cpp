@@ -505,6 +505,9 @@ Config::Config(std::string jsonfile)
         for (size_t i = 0; i < num_decode_workers.size(); i ++) {
             total_decode_workers += num_decode_workers[i];
         }
+
+        time_iq_sc_step_size = tddConf.value("time_iq_sc_step_size", 200);
+        post_zf_step_size = tddConf.value("post_zf_step_size", 1200);
     }
 
     sampsPerSymbol

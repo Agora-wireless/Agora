@@ -89,6 +89,50 @@ void DyZF::computePrecoder(const arma::cx_fmat& mat_csi,
     }
 }
 
+void DyZF::computeULPrecoder(const arma::cx_fmat& mat_csi,
+    complex_float* calib_ptr, complex_float* _mat_ul_zf)
+{
+    arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
+        cfg_->UE_NUM, cfg_->BS_ANT_NUM, false);
+    if (kUseInverseForZF) {
+        try {
+            mat_ul_zf = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+        } catch (std::runtime_error) {
+            MLPD_WARN(
+                "Failed to invert channel matrix, falling back to pinv()\n");
+            // std::cout << mat_csi << std::endl;
+            rt_assert(false);
+            arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
+        }
+    } else {
+        arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
+    }
+}
+
+void DyZF::computeDLPrecoder(const arma::cx_fmat& mat_csi,
+    complex_float* calib_ptr, complex_float* _mat_dl_zf)
+{
+    if (cfg_->dl_data_symbol_num_perframe > 0) {
+        arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
+            cfg_->UE_NUM, cfg_->BS_ANT_NUM, false);
+        if (cfg_->recipCalEn) {
+            arma::cx_fvec vec_calib(
+                reinterpret_cast<arma::cx_float*>(calib_ptr), cfg_->BS_ANT_NUM,
+                false);
+
+            vec_calib = vec_calib / vec_calib(cfg_->ref_ant);
+            arma::cx_fmat mat_calib(cfg_->BS_ANT_NUM, cfg_->BS_ANT_NUM);
+            mat_calib = arma::diagmat(vec_calib);
+            mat_dl_zf = mat_ul_zf * arma::inv(mat_calib);
+        } else
+            mat_dl_zf = mat_ul_zf;
+        // We should be scaling the beamforming matrix, so the IFFT
+        // output can be scaled with OFDM_CA_NUM across all antennas.
+        // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
+        mat_dl_zf /= abs(mat_dl_zf).max();
+    }
+}
+
 // Gather data of one symbol from partially-transposed buffer
 // produced by dofft
 static inline void partialTransposeGather(
@@ -221,6 +265,50 @@ void DyZF::ZFFreqOrthogonal(size_t tag)
         ul_zf_matrices_[frame_slot][cfg_->get_zf_sc_id(base_sc_id)],
         dl_zf_matrices_[frame_slot][cfg_->get_zf_sc_id(base_sc_id)],
         total_ue_sc);
+
+    double start_tsc2 = worker_rdtsc();
+    zf_tsc_ += start_tsc2 - start_tsc1;
+    zf_count_ ++;
+}
+
+void DyZF::ZFFreqOrthogonalStatic(size_t tag)
+{
+    const size_t frame_id = gen_tag_t(tag).frame_id;
+    const size_t base_sc_id = gen_tag_t(tag).sc_id;
+    const size_t frame_slot = frame_id % TASK_BUFFER_FRAME_NUM;
+    if (kDebugPrintInTask) {
+        printf("In doZF thread %d: frame: %zu, subcarrier: %zu, block: %zu, "
+               "BS_ANT_NUM: %zu\n",
+            tid_, frame_id, base_sc_id, base_sc_id / cfg_->UE_NUM,
+            cfg_->BS_ANT_NUM);
+    }
+
+    double start_tsc1 = worker_rdtsc();
+
+    // Gather CSIs from partially-transposed CSIs
+    for (size_t ue_id = 0; ue_id < cfg_->UE_NUM; ue_id ++) {
+        const size_t cur_sc_id = base_sc_id + ue_id;
+        float* dst_csi_ptr = (float*)(csi_gather_buffer_ + cfg_->BS_ANT_NUM * ue_id);
+        partialTransposeGather(cur_sc_id, (float*)csi_buffers_[frame_slot][0],
+            dst_csi_ptr, cfg_->BS_ANT_NUM);
+    }
+    if (cfg_->recipCalEn) {
+        // Gather reciprocal calibration data from partially-transposed buffer
+        float* dst_calib_ptr = (float*)calib_gather_buffer_;
+        partialTransposeGather(base_sc_id, (float*)calib_buffer_[frame_slot],
+            dst_calib_ptr, cfg_->BS_ANT_NUM);
+    }
+
+    arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
+        cfg_->BS_ANT_NUM, cfg_->UE_NUM, false);
+
+    if (cfg_->downlink_mode) {
+        computeDLPrecoder(mat_csi, calib_gather_buffer_,
+            dl_zf_matrices_[frame_slot][cfg_->get_zf_sc_id(base_sc_id)]);
+    } else {
+        computeULPrecoder(mat_csi, calib_gather_buffer_,
+            ul_zf_matrices_[frame_slot][cfg_->get_zf_sc_id(base_sc_id)]);
+    }
 
     double start_tsc2 = worker_rdtsc();
     zf_tsc_ += start_tsc2 - start_tsc1;

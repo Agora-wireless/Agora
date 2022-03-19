@@ -238,6 +238,61 @@ void DyDecode::Launch(size_t frame_id, size_t symbol_id_ul, size_t ue_id)
     decode_tsc_ += start_tsc2 - start_tsc1;
 }
 
+void DyDecode::LaunchStatic(size_t frame_id, size_t symbol_id_ul, size_t ue_id)
+{
+    LDPCconfig LDPC_config = cfg_->LDPC_config;
+    const size_t frame_slot = frame_id % kFrameWnd;
+    if (kDebugPrintInTask) {
+        printf("In doDecode thread %d: frame: %zu, symbol: %zu, ue: %zu\n",
+            tid_, frame_id, symbol_id_ul, ue_id);
+    }
+
+    struct bblib_ldpc_decoder_5gnr_request ldpc_decoder_5gnr_request {
+    };
+    struct bblib_ldpc_decoder_5gnr_response ldpc_decoder_5gnr_response {
+    };
+
+    // Decoder setup
+    int16_t numFillerBits = 0;
+    size_t nRows = LDPC_config.Bg == 1 ? 46 : 42;
+    uint32_t cbCodewLen = ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc, nRows);
+    uint32_t cbLen = ldpc_num_input_bits(LDPC_config.Bg, LDPC_config.Zc);
+    int16_t numChannelLlrs = cbCodewLen;
+
+    ldpc_decoder_5gnr_request.numChannelLlrs = numChannelLlrs;
+    ldpc_decoder_5gnr_request.numFillerBits = numFillerBits;
+    ldpc_decoder_5gnr_request.maxIterations = LDPC_config.decoderIter;
+    ldpc_decoder_5gnr_request.enableEarlyTermination
+        = LDPC_config.earlyTermination;
+    ldpc_decoder_5gnr_request.Zc = LDPC_config.Zc;
+    ldpc_decoder_5gnr_request.baseGraph = LDPC_config.Bg;
+    ldpc_decoder_5gnr_request.nRows = nRows;
+
+    int numMsgBits = cbLen - numFillerBits;
+    ldpc_decoder_5gnr_response.numMsgBits = numMsgBits;
+    ldpc_decoder_5gnr_response.varNodes = resp_var_nodes_;
+
+    auto* llr_buffer_ptr
+        = cfg_->get_demod_buf_to_decode(demod_buffer_to_decode_, frame_id,
+            symbol_id_ul, ue_id, 0);
+
+    uint8_t* decoded_buffer_ptr
+        = decoded_buffers_[frame_slot][symbol_id_ul][ue_id];
+
+    ldpc_decoder_5gnr_request.varNodes = llr_buffer_ptr;
+    ldpc_decoder_5gnr_response.compactedMessageBytes = decoded_buffer_ptr;
+
+    size_t start_tsc1 = worker_rdtsc();
+
+    bblib_ldpc_decoder_5gnr(
+        &ldpc_decoder_5gnr_request, &ldpc_decoder_5gnr_response);
+
+    size_t start_tsc2 = worker_rdtsc();
+    decode_count_ ++;
+    decode_max_ = decode_max_ < start_tsc2 - start_tsc1 ? start_tsc2 - start_tsc1 : decode_max_;
+    decode_tsc_ += start_tsc2 - start_tsc1;
+}
+
 void DyDecode::StartWork()
 {
     printf("Decode tid %u starts to work!\n", tid_);

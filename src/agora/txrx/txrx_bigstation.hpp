@@ -6,7 +6,7 @@
 #include "config.hpp"
 #include "gettime.h"
 #include "net.hpp"
-#include "shared_counters.hpp"
+#include "bigstation_counters.hpp"
 #include <algorithm>
 #include <arpa/inet.h>
 #include <cassert>
@@ -33,7 +33,14 @@
 class BigStationTXRX {
 public:
     BigStationTXRX(Config* cfg, size_t in_core_offset,
-        PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t>& time_iq_buffer,
+        Table<char>& time_iq_buffer,
+        Table<char>& freq_iq_buffer_to_send,
+        Table<char>& freq_iq_buffer,
+        PtrGrid<kFrameWnd, kMaxDataSCs, uint8_t>& post_zf_buffer_to_send,
+        PtrGrid<kFrameWnd, kMaxDataSCs, uint8_t>& post_zf_buffer,
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_demul_buffer_to_send,
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_demul_buffer,
+        PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_decode_buffer,
         BigStationState* bigstation_state);
 
     ~BigStationTXRX();
@@ -70,8 +77,19 @@ private:
 
     BigStationState* bigstation_state_;
 
-    // Current sending frame for each socket thread
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t>& time_iq_buffer_;
+    // Current receiving frame for each socket thread
+    // PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t>& time_iq_buffer_;
+    Table<char>& time_iq_buffer_;
+    // PtrGrid<kFrameWnd, kMaxAntennas, uint8_t>& pilot_buffer_;
+    // PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t>& freq_iq_buffer_to_send_;
+    Table<char>& freq_iq_buffer_to_send_;
+    // PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t>& data_buffer_;
+    Table<char>& freq_iq_buffer_;
+    PtrGrid<kFrameWnd, kMaxDataSCs, uint8_t>& post_zf_buffer_to_send_;
+    PtrGrid<kFrameWnd, kMaxDataSCs, uint8_t>& post_zf_buffer_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_demul_buffer_to_send_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_demul_buffer_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_decode_buffer_;
 
     std::vector<uint32_t> bs_rru_addrs_;
     struct rte_mempool* mbuf_pool_[kMaxThreads];

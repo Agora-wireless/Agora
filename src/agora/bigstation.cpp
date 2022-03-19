@@ -150,6 +150,8 @@ void BigStation::fftWorker(int tid)
             }
         }
     }
+
+    delete do_fft;
 }
 
 void BigStation::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size)
@@ -163,7 +165,7 @@ void BigStation::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size
 
     for (size_t i = 0; i < cfg_->pilot_symbol_num_perframe; i++) {
         for (size_t j = 0; j < cfg_->BS_ANT_NUM; j++) {
-            auto* pkt = reinterpret_cast<Packet*>(pilot_buffer_[j]
+            auto* pkt = reinterpret_cast<Packet*>(freq_iq_buffer_[j]
                 + (frame_slot * cfg_->symbol_num_perframe
                         * cfg_->packet_length)
                 + i * cfg_->packet_length);
@@ -245,27 +247,130 @@ void BigStation::zfWorker(int tid)
     size_t sc_start = tid * config_->OFDM_DATA_NUM / config_->total_zf_workers;
     size_t sc_end = (tid + 1) * config_->OFDM_DATA_NUM / config_->total_zf_workers;
 
-    sc_start = (sc_start + config_->UE_NUM - 1) / config_->UE_NUM * config_->UE_NUM;
-    sc_end = (sc_end - 1) / config_->UE_NUM * config_->UE_NUM;
-
-    if (sc_start < sc_end) return;
+    size_t cur_zf_frame = 0;
 
     PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffer;
-    csi_buffer.alloc(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * (sc_end - sc_start));
+    csi_buffer.alloc(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM);
+    Table<complex_float> calib_buffer;
+    std::vector<std::vector<ControlInfo> > dummy_table;
+    std::vector<size_t> dummy_list;
 
+    DyZF *do_zf = new DyZF(config_, tid, freq_ghz_, csi_buffer, calib_buffer, post_zf_buffer_,
+        post_zf_buffer_, dummy_table, dummy_list);
 
+    while (config_->running && !SignalHandler::gotExitSignal()) {
+        if (bigstation_state_.received_all_pilot_pkts(cur_zf_frame)) {
+            size_t sc_offset = simple_hash(cur_zf_frame) % config_->UE_NUM;
+            int first_possible_sc = sc_start - sc_start % config_->UE_NUM + sc_offset;
+            int last_possible_sc = sc_end - sc_end % config_->UE_NUM + sc_offset;
+            if (first_possible_sc < (int)sc_start) {
+                first_possible_sc += config_->UE_NUM;
+            }
+            if (last_possible_sc >= (int)sc_end) {
+                last_possible_sc -= config_->UE_NUM;
+            }
+            if (last_possible_sc >= first_possible_sc) {
+                for (size_t sc_id = first_possible_sc; sc_id <= last_possible_sc; sc_id += config_->UE_NUM) {
+                    runCsi(cur_zf_frame, sc_id - sc_id % config_->UE_NUM, config_->UE_NUM);
+                    do_zf->ZFFreqOrthogonalStatic(gen_tag_t::frm_sym_sc(cur_zf_frame, 0, sc_id - (sc_id % cfg_->UE_NUM))._tag);
+                }
+            }
+            if (!bigstation_state_.prepare_zf_pkt(cur_zf_frame)) {
+                config_->error = true;
+                config_->running = false;
+            }
+            cur_zf_frame++;
+        }
+    }
+
+    delete do_zf;
 }
 
-void BigStation::demulWorker(int tid);
-void BigStation::decodeWorker(int tid);
+void BigStation::demulWorker(int tid)
+{
+    size_t sc_start = tid * config_->OFDM_DATA_NUM / config_->total_demul_workers;
+    size_t sc_end = (tid + 1) * config_->OFDM_DATA_NUM / config_->total_demul_workers;
+
+    size_t cur_demul_frame = 0;
+    size_t cur_demul_symbol_ul = 0;
+    size_t cur_demul_sc = sc_start;
+
+    const size_t task_buffer_symbol_num_ul
+        = cfg->ul_data_symbol_num_perframe * kFrameWnd;
+
+    Table<complex_float> equal_buffer;
+    equal_buffer.malloc(
+        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+    std::vector<std::vector<ControlInfo> > dummy_table;
+    std::vector<size_t> dummy_list;
+
+    DyDemul *do_demul = new DyDemul(config_, tid, freq_ghz_, freq_iq_buffer_, post_zf_buffer_, 
+        equal_buffer, post_demul_buffer_to_send_, dummy_table, dummy_list);
+
+    while (config_->running && !SignalHandler::gotExitSignal()) {
+        if (bigstation_state_.received_all_zf_pkts(cur_demul_frame) && 
+            bigstation_state_.received_all_ul_data_pkts(cur_demul_frame, cur_demul_symbol_ul)) {
+            do_demul->LaunchStatic(cur_demul_frame, cur_demul_symbol_ul, sc_start, sc_end - sc_start);
+            if (!bigstation_state_.prepare_demod_pkt(cur_demul_frame, cur_demul_symbol_ul)) {
+                config_->error = true;
+                config_->running = false;
+            }
+            cur_demul_symbol_ul++;
+            if (cur_demul_symbol_ul >= cfg->ul_data_symbol_num_perframe) {
+                cur_demul_symbol_ul = 0;
+                cur_demul_frame++;
+            }
+        }
+    }
+
+    delete do_demul;
+}
+
+void BigStation::decodeWorker(int tid)
+{
+    size_t tid_offset = tid - config_->decode_thread_offset;
+    size_t cur_decode_frame = 0;
+    size_t cur_decode_idx = tid_offset;
+
+    std::vector<std::vector<ControlInfo> > dummy_table;
+    std::vector<size_t> dummy_list;
+
+    DyDecode *do_decode = new DyDecode(config_, tid, freq_ghz_, post_demul_buffer_, post_decode_buffer_,
+        dummy_table, dummy_list);
+
+    while (config_->running && !SignalHandler::gotExitSignal()) {
+        size_t cur_symbol_ul = cur_decode_idx / config_->get_num_ues_to_process();
+        size_t cur_ue = cur_decode_idx % config_->get_num_ues_to_process();
+        if (bigstation_state_.received_all_demod_pkts(cur_decode_frame, cur_symbol_ul)) {
+            do_decode->LaunchStatic(cur_decode_frame, cur_symbol_ul, cur_ue);
+            cur_decode_idx += config_->num_demul_workers[config_->bs_server_addr_idx];
+            if (cur_decode_idx >= config_->get_num_ues_to_process() * cfg->ul_data_symbol_num_perframe) {
+                cur_decode_idx = 0;
+                if (!bigstation_state_.decode_done(cur_decode_frame)) {
+                    config_->error = true;
+                    config_->running = false;
+                }
+                cur_decode_frame++;
+            }
+        }
+    }
+
+    delete do_decode;
+}
 
 void BigStation::initializeBigStationBuffers()
 {
     auto& cfg = config_;
-    time_iq_buffer_.alloc(kFrameWnd, cfg->symbol_num_perframe, cfg->BS_ANT_NUM, cfg->OFDM_CA_NUM * sizeof(short) * 2);
-    pilot_buffer_.alloc(kFrameWnd, cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM * sizeof(short) * 2);
-    freq_iq_buffer_to_send_.alloc(kFrameWnd, cfg->symbol_num_perframe, cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM * sizeof(short) * 2);
-    data_buffer_.alloc(kFrameWnd, cfg->symbol_num_perframe, cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM * sizeof(short) * 2);
+
+    size_t packet_buffer_size = cfg->packet_length * kFrameWnd * cfg->symbol_num_perframe;
+
+    // time_iq_buffer_.alloc(kFrameWnd, cfg->symbol_num_perframe, cfg->BS_ANT_NUM, cfg->OFDM_CA_NUM * sizeof(short) * 2);
+    time_iq_buffer_.malloc(cfg->BS_ANT_NUM, packet_buffer_size, 64);
+    // pilot_buffer_.alloc(kFrameWnd, cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM * sizeof(short) * 2);
+    // freq_iq_buffer_to_send_.alloc(kFrameWnd, cfg->symbol_num_perframe, cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM * sizeof(short) * 2);
+    freq_iq_buffer_to_send_.malloc(cfg->BS_ANT_NUM, packet_buffer_size, 64);
+    // data_buffer_.alloc(kFrameWnd, cfg->symbol_num_perframe, cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM * sizeof(short) * 2);
+    freq_iq_buffer_.malloc(cfg->BS_ANT_NUM, packet_buffer_size, 64);
     post_zf_buffer_to_send_.alloc(kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM * sizeof(complex_float)); // TODO: this could make packet size over limit
     post_zf_buffer_.alloc(kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM * sizeof(complex_float));
     post_demul_buffer_to_send_.alloc(kFrameWnd, cfg->ul_data_symbol_num_perframe, cfg->UE_NUM, cfg->OFDM_DATA_NUM * kMaxModType);

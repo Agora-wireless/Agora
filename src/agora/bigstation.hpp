@@ -6,7 +6,7 @@
 #include "dyprecode.hpp"
 #include "dysubcarrier.hpp"
 #include "gettime.h"
-#include "shared_counters.hpp"
+#include "bigstation_counters.hpp"
 #include "signalHandler.hpp"
 #include "txrx.hpp"
 #include "utils.h"
@@ -56,10 +56,13 @@ private:
     BigStationState bigstation_state_;
 
     // Buffers for the BigStation mode
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t> time_iq_buffer_;
-    PtrGrid<kFrameWnd, kMaxAntennas, uint8_t> pilot_buffer_;
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t> freq_iq_buffer_to_send_;
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t> data_buffer_;
+    // PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t> time_iq_buffer_;
+    Table<char> time_iq_buffer_;
+    // PtrGrid<kFrameWnd, kMaxAntennas, uint8_t> pilot_buffer_;
+    // PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t> freq_iq_buffer_to_send_;
+    Table<char> freq_iq_buffer_to_send_;
+    // PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t> data_buffer_;
+    Table<char> freq_iq_buffer_;
     PtrGrid<kFrameWnd, kMaxDataSCs, uint8_t> post_zf_buffer_to_send_;
     PtrGrid<kFrameWnd, kMaxDataSCs, uint8_t> post_zf_buffer_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> post_demul_buffer_to_send_;
