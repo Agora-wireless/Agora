@@ -94,12 +94,12 @@ bool BigStationState::receive_demod_pkt(size_t frame_id, size_t symbol_id_ul, si
 }
 
 // Packet prepare functions
-bool BigStationState::prepare_freq_iq_pkt(size_t frame_id, size_t symbol_id_ul, size_t ant_id)
+bool BigStationState::prepare_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t ant_id)
 {
     if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
         return false;
     }
-    num_data_pkts_prepared_[frame_id % kFrameWnd][symbol_id_ul] ++;
+    num_freq_iq_pkts_prepared_[frame_id % kFrameWnd][symbol_id] ++;
     return true;
 }
 
@@ -163,12 +163,12 @@ bool BigStationState::received_all_demod_pkts(size_t frame_id, size_t symbol_id_
 }
 
 // Packet prepare checking functions
-bool BigStationState::prepared_all_freq_iq_pkts(size_t frame_id, size_t symbol_id_ul)
+bool BigStationState::prepared_all_freq_iq_pkts(size_t frame_id, size_t symbol_id)
 {
     if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
         return false;
     }
-    return num_data_pkts_prepared_[frame_id % kFrameWnd][symbol_id_ul] == num_freq_iq_pkts_prepared_per_symbol_;
+    return num_freq_iq_pkts_prepared_[frame_id % kFrameWnd][symbol_id] == num_freq_iq_pkts_prepared_per_symbol_;
 }
 
 bool BigStationState::prepared_all_zf_pkts(size_t frame_id)

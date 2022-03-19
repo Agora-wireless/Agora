@@ -8,7 +8,7 @@
 #include "gettime.h"
 #include "bigstation_counters.hpp"
 #include "signalHandler.hpp"
-#include "txrx.hpp"
+#include "txrx_bigstation.hpp"
 #include "utils.h"
 #include <iostream>
 #include <memory>

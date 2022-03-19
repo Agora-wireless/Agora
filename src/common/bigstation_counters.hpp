@@ -16,13 +16,13 @@ public:
 
     // Packet receiving functions
     bool receive_time_iq_pkt(size_t frame_id, size_t symbol_id, size_t ant_id);
-    bool receive_pilot_pkt(size_t frame_id, size_t ant_id, size_t sc_len);
+    bool receive_pilot_pkt(size_t frame_id, size_t ant_id);
     bool receive_ul_data_pkt(size_t frame_id, size_t symbol_id_ul, size_t ant_id);
     bool receive_zf_pkt(size_t frame_id, size_t sc_id);
     bool receive_demod_pkt(size_t frame_id, size_t symbol_id_ul, size_t ue_id, size_t sc_len);
 
     // Packet prepare functions
-    bool prepare_freq_iq_pkt(size_t frame_id, size_t symbol_id_ul, size_t ant_id);
+    bool prepare_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t ant_id);
     bool prepare_zf_pkt(size_t frame_id);
     bool prepare_demod_pkt(size_t frame_id, size_t symbol_id_ul);
 
@@ -34,7 +34,7 @@ public:
     bool received_all_demod_pkts(size_t frame_id, size_t symbol_id_ul);
 
     // Packet prepare checking functions
-    bool prepared_all_freq_iq_pkts(size_t frame_id, size_t symbol_id_ul);
+    bool prepared_all_freq_iq_pkts(size_t frame_id, size_t symbol_id);
     bool prepared_all_zf_pkts(size_t frame_id);
     bool prepared_all_demod_pkts(size_t frame_id, size_t symbol_id_ul);
 

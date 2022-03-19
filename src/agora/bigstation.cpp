@@ -140,7 +140,7 @@ void BigStation::fftWorker(int tid)
             if (cur_ant == ant_end) {
                 cur_ant = ant_start;
                 cur_symbol++;
-                if (cur_symbol == config_->BS_SYMBOL_NUM) {
+                if (cur_symbol == config_->symbol_num_perframe) {
                     cur_symbol = 0;
                     cur_frame++;
                     if (cur_frame == config_->frames_to_test) {
@@ -163,12 +163,12 @@ void BigStation::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size
     size_t sc_start = base_sc_id;
     size_t sc_end = sc_start + sc_block_size;
 
-    for (size_t i = 0; i < cfg_->pilot_symbol_num_perframe; i++) {
-        for (size_t j = 0; j < cfg_->BS_ANT_NUM; j++) {
+    for (size_t i = 0; i < config_->pilot_symbol_num_perframe; i++) {
+        for (size_t j = 0; j < config_->BS_ANT_NUM; j++) {
             auto* pkt = reinterpret_cast<Packet*>(freq_iq_buffer_[j]
-                + (frame_slot * cfg_->symbol_num_perframe
-                        * cfg_->packet_length)
-                + i * cfg_->packet_length);
+                + (frame_slot * config_->symbol_num_perframe
+                        * config_->packet_length)
+                + i * config_->packet_length);
 
             // Subcarrier ranges should be aligned with kTransposeBlockSize
             // for (size_t block_idx = sc_range_.start / kTransposeBlockSize;
@@ -179,7 +179,7 @@ void BigStation::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size
                     block_idx++) {
 
                 const size_t block_base_offset
-                    = block_idx * (kTransposeBlockSize * cfg_->BS_ANT_NUM);
+                    = block_idx * (kTransposeBlockSize * config_->BS_ANT_NUM);
 
                 for (size_t sc_j = 0; sc_j < kTransposeBlockSize;
                         sc_j += kSCsPerCacheline) {
@@ -189,7 +189,7 @@ void BigStation::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size
                     simd_convert_float16_to_float32(
                         reinterpret_cast<float*>(converted_sc),
                         reinterpret_cast<float*>(pkt->data_
-                            + (cfg_->OFDM_DATA_START + sc_idx) * 2),
+                            + (config_->OFDM_DATA_START + sc_idx) * 2),
                         kSCsPerCacheline * 2);
 
                     const complex_float* src = converted_sc;
@@ -209,26 +209,26 @@ void BigStation::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size
                     __m256 fft_result1 = _mm256_load_ps(
                         reinterpret_cast<const float*>(src + 4));
                     __m256 pilot_tx0 = _mm256_set_ps(
-                        cfg_->pilots_sgn_[sc_idx + 3 + pilots_sgn_offset].im,
-                        cfg_->pilots_sgn_[sc_idx + 3 + pilots_sgn_offset].re,
-                        cfg_->pilots_sgn_[sc_idx + 2 + pilots_sgn_offset].im,
-                        cfg_->pilots_sgn_[sc_idx + 2 + pilots_sgn_offset].re,
-                        cfg_->pilots_sgn_[sc_idx + 1 + pilots_sgn_offset].im,
-                        cfg_->pilots_sgn_[sc_idx + 1 + pilots_sgn_offset].re,
-                        cfg_->pilots_sgn_[sc_idx + pilots_sgn_offset].im,
-                        cfg_->pilots_sgn_[sc_idx + pilots_sgn_offset].re);
+                        config_->pilots_sgn_[sc_idx + 3 + pilots_sgn_offset].im,
+                        config_->pilots_sgn_[sc_idx + 3 + pilots_sgn_offset].re,
+                        config_->pilots_sgn_[sc_idx + 2 + pilots_sgn_offset].im,
+                        config_->pilots_sgn_[sc_idx + 2 + pilots_sgn_offset].re,
+                        config_->pilots_sgn_[sc_idx + 1 + pilots_sgn_offset].im,
+                        config_->pilots_sgn_[sc_idx + 1 + pilots_sgn_offset].re,
+                        config_->pilots_sgn_[sc_idx + pilots_sgn_offset].im,
+                        config_->pilots_sgn_[sc_idx + pilots_sgn_offset].re);
                     fft_result0 = CommsLib::__m256_complex_cf32_mult(
                         fft_result0, pilot_tx0, true);
 
                     __m256 pilot_tx1 = _mm256_set_ps(
-                        cfg_->pilots_sgn_[sc_idx + 7 + pilots_sgn_offset].im,
-                        cfg_->pilots_sgn_[sc_idx + 7 + pilots_sgn_offset].re,
-                        cfg_->pilots_sgn_[sc_idx + 6 + pilots_sgn_offset].im,
-                        cfg_->pilots_sgn_[sc_idx + 6 + pilots_sgn_offset].re,
-                        cfg_->pilots_sgn_[sc_idx + 5 + pilots_sgn_offset].im,
-                        cfg_->pilots_sgn_[sc_idx + 5 + pilots_sgn_offset].re,
-                        cfg_->pilots_sgn_[sc_idx + 4 + pilots_sgn_offset].im,
-                        cfg_->pilots_sgn_[sc_idx + 4 + pilots_sgn_offset]
+                        config_->pilots_sgn_[sc_idx + 7 + pilots_sgn_offset].im,
+                        config_->pilots_sgn_[sc_idx + 7 + pilots_sgn_offset].re,
+                        config_->pilots_sgn_[sc_idx + 6 + pilots_sgn_offset].im,
+                        config_->pilots_sgn_[sc_idx + 6 + pilots_sgn_offset].re,
+                        config_->pilots_sgn_[sc_idx + 5 + pilots_sgn_offset].im,
+                        config_->pilots_sgn_[sc_idx + 5 + pilots_sgn_offset].re,
+                        config_->pilots_sgn_[sc_idx + 4 + pilots_sgn_offset].im,
+                        config_->pilots_sgn_[sc_idx + 4 + pilots_sgn_offset]
                             .re);
                     fft_result1 = CommsLib::__m256_complex_cf32_mult(
                         fft_result1, pilot_tx1, true);
@@ -250,7 +250,7 @@ void BigStation::zfWorker(int tid)
     size_t cur_zf_frame = 0;
 
     PtrGrid<kFrameWnd, kMaxUEs, complex_float> csi_buffer;
-    csi_buffer.alloc(kFrameWnd, cfg->UE_NUM, cfg->BS_ANT_NUM * cfg->OFDM_DATA_NUM);
+    csi_buffer.alloc(kFrameWnd, config_->UE_NUM, config_->BS_ANT_NUM * config_->OFDM_DATA_NUM);
     Table<complex_float> calib_buffer;
     std::vector<std::vector<ControlInfo> > dummy_table;
     std::vector<size_t> dummy_list;
@@ -300,7 +300,7 @@ void BigStation::demulWorker(int tid)
 
     Table<complex_float> equal_buffer;
     equal_buffer.malloc(
-        task_buffer_symbol_num_ul, cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
+        task_buffer_symbol_num_ul, config_->OFDM_DATA_NUM * config_->UE_NUM, 64);
     std::vector<std::vector<ControlInfo> > dummy_table;
     std::vector<size_t> dummy_list;
 
@@ -316,7 +316,7 @@ void BigStation::demulWorker(int tid)
                 config_->running = false;
             }
             cur_demul_symbol_ul++;
-            if (cur_demul_symbol_ul >= cfg->ul_data_symbol_num_perframe) {
+            if (cur_demul_symbol_ul >= config_->ul_data_symbol_num_perframe) {
                 cur_demul_symbol_ul = 0;
                 cur_demul_frame++;
             }
@@ -344,7 +344,7 @@ void BigStation::decodeWorker(int tid)
         if (bigstation_state_.received_all_demod_pkts(cur_decode_frame, cur_symbol_ul)) {
             do_decode->LaunchStatic(cur_decode_frame, cur_symbol_ul, cur_ue);
             cur_decode_idx += config_->num_demul_workers[config_->bs_server_addr_idx];
-            if (cur_decode_idx >= config_->get_num_ues_to_process() * cfg->ul_data_symbol_num_perframe) {
+            if (cur_decode_idx >= config_->get_num_ues_to_process() * config_->ul_data_symbol_num_perframe) {
                 cur_decode_idx = 0;
                 if (!bigstation_state_.decode_done(cur_decode_frame)) {
                     config_->error = true;
