@@ -9,6 +9,13 @@
 
 #include "logger.h"
 
+static constexpr enum CsvLogID kMatLogId[] = {kCsvLogCSI, kCsvLogDLZF};
+static constexpr size_t kMatLogs = sizeof(kMatLogId) / sizeof(enum CsvLogID),
+                        kMatLogFrames = 1000, kMatLogSCs = 304,
+                        kMatLogBSAnts = 8, kMatLogUEAnts = 1;
+static complex_float mat_buffer[kMatLogs][kMatLogFrames][kMatLogSCs]
+                               [kMatLogBSAnts][kMatLogUEAnts];
+
 PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
   if (dir_ == Direction::kDownlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
@@ -60,9 +67,6 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                           Agora_memory::Alignment_t::kAlign64);
   csi_cond_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
                    Agora_memory::Alignment_t::kAlign64);
-  mat_csi_.Calloc(kFrameMatBuf,
-                  cfg->OfdmDataNum() * cfg->BsAntNum() * cfg->UeAntNum(),
-                  Agora_memory::Alignment_t::kAlign64);
 }
 
 PhyStats::~PhyStats() {
@@ -80,7 +84,6 @@ PhyStats::~PhyStats() {
   csi_cond_.Free();
   calib_pilot_snr_.Free();
   dl_pilot_snr_.Free();
-  mat_csi_.Free();
 }
 
 void PhyStats::PrintPhyStats() {
@@ -329,8 +332,8 @@ void PhyStats::PrintZfStats(size_t frame_id) {
 void PhyStats::UpdateCsiCond(size_t frame_id, size_t sc_id, float cond) {
   csi_cond_[frame_id % kFrameWnd][sc_id] = cond;
 }
-
-void PhyStats::RecordMatZf(enum CsvLogEnum log_id, size_t frame_id,
+/*
+void PhyStats::RecordMatZf(enum CsvLogID log_id, size_t frame_id,
                            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& buf) {
   unused(log_id);
   for (size_t sc_id = 0; sc_id < config_->OfdmDataNum(); sc_id++) {
@@ -374,7 +377,7 @@ void PhyStats::UpdateMatCsi(size_t frame_id, size_t sc_id,
     }
   }
 }
-
+*/
 void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
                               const arma::cx_fmat& eq) {
   if (num_rx_symbols_ > 0) {
@@ -444,4 +447,53 @@ void PhyStats::UpdateUncodedBitErrors(size_t ue_id, size_t offset,
 void PhyStats::UpdateUncodedBits(size_t ue_id, size_t offset,
                                  size_t new_bits_num) {
   uncoded_bits_count_[ue_id][offset] += new_bits_num;
+}
+
+void PhyStats::UpdateMatBuffer(enum CsvLogID log_id, size_t frame_id, size_t sc_id,
+                               const arma::cx_fmat& mat_in) {
+  size_t i, j, mat_idx = 0;
+  for (i = 0; i < kMatLogs; i++) {
+    if (kMatLogId[i] == log_id) {
+      mat_idx = i;
+      break;
+    }
+  }
+  if (i == kMatLogs || frame_id >= kMatLogFrames || sc_id >= kMatLogSCs) {
+    return;
+  }
+  const size_t bs_ants = mat_in.n_rows < kMatLogBSAnts ?
+                         mat_in.n_rows : kMatLogBSAnts;
+  const size_t ue_ants = mat_in.n_cols < kMatLogUEAnts ?
+                         mat_in.n_cols : kMatLogUEAnts;
+  for (i = 0; i < bs_ants; i++) {
+    for (j = 0; j < ue_ants; j++) {
+      complex_float* cx = &mat_buffer[mat_idx][frame_id][sc_id][i][j];
+      cx->re = mat_in(i, j).real();
+      cx->im = mat_in(i, j).imag();
+    }
+  }
+}
+
+void PhyStats::FlushMatBuffer(enum CsvLogID log_id) {
+  size_t i, j, mat_idx = 0;
+  for (i = 0; i < kMatLogs; i++) {
+    if (kMatLogId[i] == log_id) {
+      mat_idx = i;
+      break;
+    }
+  }
+  if (i == kMatLogs) { //log id not found
+    return;
+  }
+  for (size_t frame_id = 0; frame_id < kMatLogFrames; frame_id++) {
+    for (size_t sc_id = 0; sc_id < kMatLogSCs; sc_id++) {
+      for (i = 0; i < kMatLogBSAnts; i++) {
+        for (j = 0; j < kMatLogUEAnts; j++) {
+          const complex_float* cx = &mat_buffer[mat_idx][frame_id][sc_id][i][j];
+          CSV_LOG(log_id, "%zu,%zu,%zu,%zu,%f,%f", frame_id, sc_id, i, j,
+                  cx->re, cx->im);
+        }
+      }
+    }
+  }
 }

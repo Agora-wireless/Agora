@@ -3,7 +3,7 @@
 
 #include "logger.h"
 
-enum CsvLogEnum {
+enum CsvLogID {
   kCsvLogDLPSNR,
   kCsvLogEVMSNR,
   kCsvLogBERSER,
