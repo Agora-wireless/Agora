@@ -43,10 +43,9 @@ class PhyStats {
   void PrintCalibSnrStats(size_t frame_id);
   void UpdateCsiCond(size_t frame_id, size_t sc_id, float cond);
   void PrintZfStats(size_t frame_id);
-  void RecordMatZf(enum CsvLogEnum log_id, size_t frame_id,
-                   PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& buf);
-  void RecordMatCsi(size_t frame_id);
-  void UpdateMatCsi(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
+  void UpdateMatBuffer(enum CsvLogID log_id, size_t frame_id, size_t sc_id,
+                       const arma::cx_fmat& mat_in);
+  void FlushMatBuffer(enum CsvLogID log_id);
 
  private:
   Config const* const config_;
@@ -62,7 +61,6 @@ class PhyStats {
   Table<float> dl_pilot_snr_;
   Table<float> calib_pilot_snr_;
   Table<float> csi_cond_;
-  Table<complex_float> mat_csi_;
 
   arma::cx_fmat gt_mat_;
   size_t num_rx_symbols_;

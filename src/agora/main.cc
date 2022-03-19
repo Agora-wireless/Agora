@@ -29,8 +29,8 @@ int main(int argc, char* argv[]) {
     conf_file = FLAGS_conf_file;
   }
 
-  CSV_LOG_INIT(255, kCsvLogCSI);
-  CSV_LOG_INIT(255, kCsvLogDLZF);
+  CSV_LOG_INIT(0, kCsvLogCSI);
+  CSV_LOG_INIT(0, kCsvLogDLZF);
 
   std::unique_ptr<Config> cfg = std::make_unique<Config>(conf_file.c_str());
   cfg->GenData();

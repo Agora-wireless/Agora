@@ -33,7 +33,7 @@ Agora::Agora(Config* const cfg)
       decoded_buffer_(kFrameWnd, cfg->Frame().NumULSyms(), cfg->UeAntNum(),
                       cfg->LdpcConfig(Direction::kUplink).NumBlocksInSymbol() *
                           Roundup<64>(cfg->NumBytesPerCb(Direction::kUplink))),
-      dl_zf_matrices_(kFrameMatBuf, cfg->OfdmDataNum(),
+      dl_zf_matrices_(kFrameWnd, cfg->OfdmDataNum(),
                       cfg->UeAntNum() * cfg->BsAntNum()) {
   std::string directory = TOSTRING(PROJECT_DIRECTORY);
   AGORA_LOG_INFO("Agora: project directory [%s], RDTSC frequency = %.2f GHz\n",
@@ -108,13 +108,6 @@ Agora::~Agora() {
   for (auto& worker_thread : workers_) {
     AGORA_LOG_SYMBOL("Agora: Joining worker thread\n");
     worker_thread.join();
-  }
-
-  const size_t start_frame = config_->FramesToTest() > kFrameMatBuf ?
-                             config_->FramesToTest() - kFrameMatBuf : 0;
-  for (size_t i = start_frame; i < config_->FramesToTest(); i++) {
-    phy_stats_->RecordMatCsi(i);
-    phy_stats_->RecordMatZf(kCsvLogDLZF, i, dl_zf_matrices_);
   }
   FreeUplinkBuffers();
   FreeDownlinkBuffers();
