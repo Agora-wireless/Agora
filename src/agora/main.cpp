@@ -27,9 +27,10 @@ int main(int argc, char* argv[])
     auto* cfg = new Config(confFile.c_str());
     cfg->genData();
 
+    int ret;
+
     if (cfg->use_bigstation_mode) {
         BigStation* bigstation_cli;
-        int ret;
         try {
             SignalHandler signalHandler;
             signalHandler.setupSignalHandlers();
@@ -41,9 +42,7 @@ int main(int argc, char* argv[])
             ret = EXIT_FAILURE;
         }
     } else {
-
-    Agora* agora_cli;
-        int ret;
+        Agora* agora_cli;
         try {
             SignalHandler signalHandler;
             // Register signal handler to handle kill signal

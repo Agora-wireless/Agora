@@ -40,6 +40,8 @@ public:
 
     bool decode_done(size_t frame_id);
 
+    size_t cur_frame_ = 0;
+
 private:
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_time_iq_pkts_received_ = {};
@@ -61,7 +63,6 @@ private:
     std::array<size_t, kFrameWnd> num_decode_tasks_completed_ = {};
     std::array<std::mutex, kFrameWnd> decode_mutex_ = {};
 
-    size_t cur_frame_ = 0;
     std::mutex cur_frame_mutex_;
     
     Config* cfg_;

@@ -10,9 +10,9 @@ BigStationTXRX::BigStationTXRX(Config* cfg, size_t in_core_offset,
     Table<char>& freq_iq_buffer_to_send,
     Table<char>& freq_iq_buffer,
     PtrGrid<kFrameWnd, kMaxDataSCs, uint8_t>& post_zf_buffer_to_send,
-    PtrGrid<kFrameWnd, kMaxDataSCs, uint8_t>& post_zf_buffer,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_demul_buffer_to_send,
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_demul_buffer,
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& post_zf_buffer,
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& post_demul_buffer_to_send,
+    Table<int8_t>& post_demul_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_decode_buffer,
     BigStationState* bigstation_state)
     : cfg_(cfg)
@@ -215,7 +215,9 @@ int BigStationTXRX::recv_relocate(int tid)
                 }
             }
         } else if (pkt->pkt_type_ == Packet::PktType::kDemod) {
-            uint8_t* dst_ptr = post_demul_buffer_[pkt->frame_id_][pkt->symbol_id_][pkt->ue_id_] + pkt->sc_id_ * cfg_->mod_order_bits;
+            // uint8_t* dst_ptr = post_demul_buffer_[pkt->frame_id_][pkt->symbol_id_][pkt->ue_id_] + pkt->sc_id_ * cfg_->mod_order_bits;
+            int8_t* dst_ptr = post_demul_buffer_[(pkt->frame_id_%kFrameWnd)*cfg_->ul_data_symbol_num_perframe+pkt->symbol_id_] +
+                cfg_->OFDM_DATA_NUM * kMaxModType * pkt->ue_id_ + pkt->sc_id_ * cfg_->mod_order_bits;
             memcpy(dst_ptr, pkt->data_, pkt->sc_len_ * cfg_->mod_order_bits);
             if (!bigstation_state_->receive_demod_pkt(pkt->frame_id_, pkt->symbol_id_, pkt->ue_id_, pkt->sc_len_)) {
                 cfg_->error = true;
@@ -223,7 +225,7 @@ int BigStationTXRX::recv_relocate(int tid)
             }
         } else if (pkt->pkt_type_ == Packet::PktType::kTimeIQ) {
             // uint8_t* iq_ptr = time_iq_buffer_[pkt->frame_id_][pkt->symbol_id_][pkt->ant_id_] + pkt->sc_id_ * 2 * sizeof(unsigned short);
-            uint8_t* iq_ptr = time_iq_buffer_[pkt->ant_id_] + (pkt->frame_id_ % kFrameWnd) * cfg_->symbol_num_perframe
+            uint8_t* iq_ptr = (uint8_t*)time_iq_buffer_[pkt->ant_id_] + (pkt->frame_id_ % kFrameWnd) * cfg_->symbol_num_perframe
                 * cfg_->packet_length + pkt->symbol_id_ * cfg_->packet_length + Packet::kOffsetOfData
                 + pkt->sc_id_ * 2 * sizeof(unsigned short);
             memcpy(iq_ptr, (uint8_t*)pkt + Packet::kOffsetOfData, pkt->sc_len_ * 2 * sizeof(unsigned short));
@@ -232,7 +234,7 @@ int BigStationTXRX::recv_relocate(int tid)
                 cfg_->running = false;
             }
         } else if (pkt->pkt_type_ == Packet::PktType::kPostZF) {
-            uint8_t* dst_ptr = post_zf_buffer_[pkt->frame_id_][pkt->sc_id_] + pkt->data_off_;
+            uint8_t* dst_ptr = ((uint8_t*)post_zf_buffer_[pkt->frame_id_][pkt->sc_id_]) + pkt->data_off_;
             memcpy(dst_ptr, pkt->data_, pkt->data_len_);
             if (!bigstation_state_->receive_zf_pkt(pkt->frame_id_, pkt->sc_id_)) {
                 cfg_->error = true;
@@ -320,7 +322,7 @@ void* BigStationTXRX::tx_thread(int tid)
                 }
             } else {
                 // uint8_t* ant_ptr = freq_iq_buffer_to_send_[freq_iq_pkt_frame][freq_iq_pkt_symbol][freq_iq_pkt_ant]; 
-                uint8_t* ant_ptr = freq_iq_buffer_to_send_[freq_iq_pkt_ant] + (freq_iq_pkt_frame % kFrameWnd) * 
+                uint8_t* ant_ptr = (uint8_t*)freq_iq_buffer_to_send_[freq_iq_pkt_ant] + (freq_iq_pkt_frame % kFrameWnd) * 
                     cfg_->symbol_num_perframe * cfg_->packet_length + freq_iq_pkt_symbol * cfg_->packet_length;
                 size_t demul_start = 0;
                 size_t demul_end = 0;
@@ -335,7 +337,7 @@ void* BigStationTXRX::tx_thread(int tid)
                         bs_server_mac_addrs_[server_id],
                         bs_server_addrs_[cfg_->bs_server_addr_idx], bs_server_addrs_[server_id], 
                         cfg_->demod_tx_port + freq_iq_pkt_ant, cfg_->demod_rx_port + freq_iq_pkt_ant, 
-                        Packet::kOffsetOfData + pkt->sc_len_ * 2 * sizeof(short));
+                        Packet::kOffsetOfData + (demul_end - demul_start) * 2 * sizeof(short));
                     struct rte_ether_hdr* eth_hdr
                         = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
                     char* payload = (char*)eth_hdr + kPayloadOffset;
@@ -423,7 +425,7 @@ void* BigStationTXRX::tx_thread(int tid)
         }
 
         if (bigstation_state_->prepared_all_demod_pkts(demul_pkt_frame, demul_pkt_symbol_ul)) {
-            uint8_t* src_ptr = post_demul_buffer_to_send_[demul_pkt_frame][demul_pkt_symbol_ul][demul_pkt_ue] + cfg_->demul_start * cfg_->mod_order_bits;
+            uint8_t* src_ptr = (uint8_t*)post_demul_buffer_to_send_[demul_pkt_frame][demul_pkt_symbol_ul][demul_pkt_ue] + cfg_->demul_start * cfg_->mod_order_bits;
             struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
             size_t server_id = cfg_->ue_server_mapping[demul_pkt_ue];
             tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 

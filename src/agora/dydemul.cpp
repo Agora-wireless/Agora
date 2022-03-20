@@ -365,11 +365,8 @@ void DyDemul::LaunchStatic(
         equal_T_ptr += pre_sc_off * 2;     
         equal_ptr += cfg_->UE_NUM * pre_sc_off * 2;
         for (size_t j = 0; j < (max_sc_ite - pre_sc_off) / kNumDoubleInSIMD256; j++) {
-            if (info.sc_start <= j * kNumDoubleInSIMD256 + base_sc_id + pre_sc_off && 
-                info.sc_end > j * kNumDoubleInSIMD256 + base_sc_id + pre_sc_off) {
-                __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
-                _mm256_store_ps(equal_T_ptr, equal_T_temp);
-            }
+            __m256 equal_T_temp = _mm256_i32gather_ps(equal_ptr, index2, 4);
+            _mm256_store_ps(equal_T_ptr, equal_T_temp);
             equal_T_ptr += 8;
             equal_ptr += cfg_->UE_NUM * kNumDoubleInSIMD256 * 2;
         }

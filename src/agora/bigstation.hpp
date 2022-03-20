@@ -35,7 +35,8 @@ private:
     void demulWorker(int tid);
     void decodeWorker(int tid);
 
-    void runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size);
+    void runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size, 
+        PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffer);
 
     void initializeBigStationBuffers();
     void freeBigStationBuffers();
@@ -64,8 +65,9 @@ private:
     // PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t> data_buffer_;
     Table<char> freq_iq_buffer_;
     PtrGrid<kFrameWnd, kMaxDataSCs, uint8_t> post_zf_buffer_to_send_;
-    PtrGrid<kFrameWnd, kMaxDataSCs, uint8_t> post_zf_buffer_;
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> post_demul_buffer_to_send_;
-    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> post_demul_buffer_;
+    PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> post_zf_buffer_;
+    PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> post_demul_buffer_to_send_;
+    // PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> post_demul_buffer_;
+    Table<int8_t> post_demul_buffer_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> post_decode_buffer_;
 };

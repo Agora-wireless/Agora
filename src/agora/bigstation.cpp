@@ -6,7 +6,7 @@
 using namespace std;
 
 BigStation::BigStation(Config* config)
-    : freq_ghz_(config->freq_ghz_)
+    : freq_ghz_(measure_rdtsc_freq())
     , config_(config)
     , bigstation_state_(config)
 {
@@ -19,7 +19,9 @@ BigStation::BigStation(Config* config)
 
     initializeBigStationBuffers();
 
-    bigstation_tx_rx_.reset(new BigStationTXRX(config, cfg->core_offset, time_iq_buffer_));
+    bigstation_tx_rx_.reset(new BigStationTXRX(config, config->core_offset, time_iq_buffer_, freq_iq_buffer_to_send_,
+        freq_iq_buffer_, post_zf_buffer_to_send_, post_zf_buffer_, post_demul_buffer_to_send_, post_demul_buffer_, 
+        post_decode_buffer_, &bigstation_state_));
 
     base_worker_core_offset_ = config_->core_offset + kNumMasterThread + 
         config_->rx_thread_num + config_->tx_thread_num;
@@ -154,7 +156,8 @@ void BigStation::fftWorker(int tid)
     delete do_fft;
 }
 
-void BigStation::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size)
+void BigStation::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size,
+    PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffer)
 {
     const size_t frame_slot = frame_id % kFrameWnd;
 
@@ -193,7 +196,7 @@ void BigStation::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size
                         kSCsPerCacheline * 2);
 
                     const complex_float* src = converted_sc;
-                    complex_float* dst = csi_buffer_[frame_slot][i]
+                    complex_float* dst = csi_buffer[frame_slot][i]
                         + block_base_offset + (j * kTransposeBlockSize)
                         + sc_j;
 
@@ -271,8 +274,8 @@ void BigStation::zfWorker(int tid)
             }
             if (last_possible_sc >= first_possible_sc) {
                 for (size_t sc_id = first_possible_sc; sc_id <= last_possible_sc; sc_id += config_->UE_NUM) {
-                    runCsi(cur_zf_frame, sc_id - sc_id % config_->UE_NUM, config_->UE_NUM);
-                    do_zf->ZFFreqOrthogonalStatic(gen_tag_t::frm_sym_sc(cur_zf_frame, 0, sc_id - (sc_id % cfg_->UE_NUM))._tag);
+                    runCsi(cur_zf_frame, sc_id - sc_id % config_->UE_NUM, config_->UE_NUM, csi_buffer);
+                    do_zf->ZFFreqOrthogonalStatic(gen_tag_t::frm_sym_sc(cur_zf_frame, 0, sc_id - (sc_id % config_->UE_NUM))._tag);
                 }
             }
             if (!bigstation_state_.prepare_zf_pkt(cur_zf_frame)) {
@@ -296,7 +299,7 @@ void BigStation::demulWorker(int tid)
     size_t cur_demul_sc = sc_start;
 
     const size_t task_buffer_symbol_num_ul
-        = cfg->ul_data_symbol_num_perframe * kFrameWnd;
+        = config_->ul_data_symbol_num_perframe * kFrameWnd;
 
     Table<complex_float> equal_buffer;
     equal_buffer.malloc(
@@ -335,8 +338,10 @@ void BigStation::decodeWorker(int tid)
     std::vector<std::vector<ControlInfo> > dummy_table;
     std::vector<size_t> dummy_list;
 
+    BottleneckDecode bottleneck_decode;
+
     DyDecode *do_decode = new DyDecode(config_, tid, freq_ghz_, post_demul_buffer_, post_decode_buffer_,
-        dummy_table, dummy_list);
+        dummy_table, dummy_list, nullptr, bottleneck_decode);
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
         size_t cur_symbol_ul = cur_decode_idx / config_->get_num_ues_to_process();
@@ -363,6 +368,8 @@ void BigStation::initializeBigStationBuffers()
     auto& cfg = config_;
 
     size_t packet_buffer_size = cfg->packet_length * kFrameWnd * cfg->symbol_num_perframe;
+    const size_t task_buffer_symbol_num_ul
+        = cfg->ul_data_symbol_num_perframe * kFrameWnd;
 
     // time_iq_buffer_.alloc(kFrameWnd, cfg->symbol_num_perframe, cfg->BS_ANT_NUM, cfg->OFDM_CA_NUM * sizeof(short) * 2);
     time_iq_buffer_.malloc(cfg->BS_ANT_NUM, packet_buffer_size, 64);
@@ -372,8 +379,21 @@ void BigStation::initializeBigStationBuffers()
     // data_buffer_.alloc(kFrameWnd, cfg->symbol_num_perframe, cfg->BS_ANT_NUM, cfg->OFDM_DATA_NUM * sizeof(short) * 2);
     freq_iq_buffer_.malloc(cfg->BS_ANT_NUM, packet_buffer_size, 64);
     post_zf_buffer_to_send_.alloc(kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM * sizeof(complex_float)); // TODO: this could make packet size over limit
-    post_zf_buffer_.alloc(kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM * sizeof(complex_float));
+    post_zf_buffer_.alloc(kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM);
     post_demul_buffer_to_send_.alloc(kFrameWnd, cfg->ul_data_symbol_num_perframe, cfg->UE_NUM, cfg->OFDM_DATA_NUM * kMaxModType);
-    post_demul_buffer_.alloc(kFrameWnd, cfg->ul_data_symbol_num_perframe, cfg->UE_NUM, cfg->OFDM_DATA_NUM * kMaxModType);
+    // post_demul_buffer_.alloc(kFrameWnd, cfg->ul_data_symbol_num_perframe, cfg->UE_NUM, cfg->OFDM_DATA_NUM * kMaxModType);
+    post_demul_buffer_.malloc(task_buffer_symbol_num_ul, kMaxModType * cfg->OFDM_DATA_NUM * cfg->UE_NUM, 64);
     post_decode_buffer_.alloc(kFrameWnd, cfg->ul_data_symbol_num_perframe, cfg->UE_NUM, cfg->OFDM_DATA_NUM * kMaxModType);
+}
+
+void BigStation::freeBigStationBuffers()
+{
+    time_iq_buffer_.free();
+    freq_iq_buffer_to_send_.free();
+    freq_iq_buffer_.free();
+    // post_zf_buffer_to_send_.free();
+    // post_zf_buffer_.free();
+    // post_demul_buffer_to_send_.free();
+    // post_demul_buffer_.free();
+    // post_decode_buffer_.free();
 }
