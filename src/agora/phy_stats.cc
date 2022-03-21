@@ -11,7 +11,7 @@
 
 static constexpr enum CsvLogID kMatLogId[] = {kCsvLogCSI, kCsvLogDLZF};
 static constexpr size_t kMatLogs = sizeof(kMatLogId) / sizeof(enum CsvLogID),
-                        kMatLogFrames = 1000, kMatLogSCs = 304,
+                        kMatLogFrames = 40, kMatLogSCs = 304,
                         kMatLogBSAnts = 8, kMatLogUEAnts = 1;
 static complex_float mat_buffer[kMatLogs][kMatLogFrames][kMatLogSCs]
                                [kMatLogBSAnts][kMatLogUEAnts];
