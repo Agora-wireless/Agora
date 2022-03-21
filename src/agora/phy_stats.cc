@@ -490,6 +490,7 @@ void PhyStats::FlushMatBuffer(enum CsvLogID log_id) {
       for (i = 0; i < kMatLogBSAnts; i++) {
         for (j = 0; j < kMatLogUEAnts; j++) {
           const complex_float* cx = &mat_buffer[mat_idx][frame_id][sc_id][i][j];
+          unused(cx);
           CSV_LOG(log_id, "%zu,%zu,%zu,%zu,%f,%f", frame_id, sc_id, i, j,
                   cx->re, cx->im);
         }

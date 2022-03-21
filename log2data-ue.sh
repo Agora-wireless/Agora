@@ -5,24 +5,33 @@ if [ $# -eq 0 ]; then
   exit
 fi
 
+pattern1="Frame (.+) Pilot SNR \(dB\) at UE Antenna (.+): \[ (.+) (.+) \]"
+pattern2="Frame: (.+), Symbol: (.+), User: (.+), EVM: (.+), SNR: (.+)"
+pattern3="Frame (.+) Symbol (.+) Ue (.+): (.+) symbol errors"
+pattern4="UE (.+): Downlink bit errors \(BER\) (.+)/(.+) \((.+)\),"
+
 echo 'Bit-Errors,Decoded-Bits,BER' > uedata-ber.csv
-rm uedata-evmsnr-*.csv uedata-rfsnr-*.csv uedata-se-*.csv
 idx=0
-for file in $@
-do
+for file in $@; do
+  echo 'Frame,DL-Pilot-SNR' > "uedata-dlpsnr-$idx.csv"
   echo 'Frame,EVM,EVM-SNR' > "uedata-evmsnr-$idx.csv"
-  grep 'Frame.*Symbol.*User: 0, EVM.*SNR.*' $file | awk '{print $2 $8 $10}' \
-      | sed 's/%//g;/nan/d;/inf/d' >> "uedata-evmsnr-$idx.csv"
   echo 'Frame,Symbol-Errors' > "uedata-se-$idx.csv"
-  grep 'Frame.*Symbol.*Ue 0:.*symbol errors' $file | awk '{print $2 "," $7}' \
-      | sed 's/://g;/nan/d;/inf/d' >> "uedata-se-$idx.csv"
-  echo 'Frame,RF-SNR' > "uedata-rfsnr-$idx.csv"
-  grep 'UeWorker: Fft Pilot(frame.*symbol 10 ant 0) sig offset.*SNR.*' $file \
-      | awk '{print $4 "," $13}' | sed 's/)//g;/nan/d;/inf/d' \
-      >> "uedata-rfsnr-$idx.csv"
-  grep 'UE 0: Downlink bit errors (BER).*' $file | awk '{print $7}' \
-      | sed 's/\//,/g;s/(/,/g;s/),//g;/nan/d;/inf/d' >> uedata-ber.csv
+  while read -r line; do
+    if [[ $line =~ $pattern1 ]]; then
+      printf "%s,%s\n" ${BASH_REMATCH[1]} ${BASH_REMATCH[3]} \
+          >> "uedata-dlpsnr-$idx.csv"
+    elif [[ $line =~ $pattern2 ]]; then
+      printf "%s,%s,%s\n" ${BASH_REMATCH[1]} ${BASH_REMATCH[4]} ${BASH_REMATCH[5]} \
+          >> "uedata-evmsnr-$idx.csv"
+    elif [[ $line =~ $pattern3 ]]; then
+      printf "%s,%s\n" ${BASH_REMATCH[1]} ${BASH_REMATCH[4]} \
+          >> "uedata-se-$idx.csv"
+    elif [[ $line =~ $pattern4 ]]; then
+      printf "%s,%s,%s\n" ${BASH_REMATCH[2]} ${BASH_REMATCH[3]} ${BASH_REMATCH[4]} \
+          >> "uedata-ber.csv"
+    fi
+  done < $file
   ((idx++))
 done
 
-python3 plot-ue.py $idx
+python3 plot-ue.py $idx False

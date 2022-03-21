@@ -28,9 +28,11 @@
     "beamsweep": false,
     "beacon_antenna": 0,
     "frame_schedule": [
-        "BGCLGGPGGDDDG"
+        "BGCLGGPGGDDDG",
+        "BGCLGGGPGDDDG"
     ],
     "client_dl_pilot_syms": 2,
+    "ue_radio_num": 1,
     "ue_channel": "A",
     "ue_rx_gain_a": [
         65
@@ -52,6 +54,7 @@
     /* Compute configuration */
     "exclude_cores": [],
     "ue_core_offset": 7,
+    "ue_core_offset_step": 6,
     "ue_worker_thread_num": 4,
     "ue_socket_thread_num": 2,
     "core_offset": 0,
