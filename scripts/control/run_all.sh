@@ -31,7 +31,11 @@ GEN_NEW_TRAFFIC_DATA=1
 # TODO: integrate this option
 USE_MATLAB_GEN_RAYLEIGH=0
 
-while getopts "h?:frdm" opt; do
+# 1 for print diagnosis digest for each Hydra server
+# 0 for not print
+PRINT_DIGEST_ALL=1
+
+while getopts "h?:frdms" opt; do
   case "$opt" in
     h|\?)
       echo "Help"
@@ -40,6 +44,7 @@ while getopts "h?:frdm" opt; do
       echo -e "\t-r\tRun Hydra RRU traffic generator only"
       echo -e "\t-d\tenerate new input traffic data"
       echo -e "\t-m\tUse MATLAB to generate input traffic data for Rayleigh channel (require MATLAB to be installed)"
+      echo -e "\t-s\tDo not print diagnosis digest for each Hydra server"
       exit 0
       ;;
     f)
@@ -53,6 +58,9 @@ while getopts "h?:frdm" opt; do
       ;;
     m)
       USE_MATLAB_GEN_RAYLEIGH=1
+      ;;
+    s)
+      PRINT_DIGEST_ALL=1
       ;;
   esac
 done

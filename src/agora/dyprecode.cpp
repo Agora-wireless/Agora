@@ -62,16 +62,16 @@ void DyPrecode::Launch(
     // int max_sc_ite = std::min(cfg_->demul_block_size, 
     //     std::min(cfg_->subcarrier_start + (tid_ + 1) * cfg_->subcarrier_block_size, cfg_->subcarrier_end) - base_sc_id);
     // assert(max_sc_ite % kSCsPerCacheline == 0);
-    int max_sc_ite = sc_block_size;
+    size_t max_sc_ite = sc_block_size;
 
     // Begin Debug
     // if (frame_id == 200)
     // printf("[Precoder %d] (%zu->%zu)\n", tid_, base_sc_id, base_sc_id + max_sc_ite - 1);
     // End Debug
 
-    for (int i = 0; i < max_sc_ite; i ++) {
+    for (size_t i = 0; i < max_sc_ite; i ++) {
         // for (int j = 0; j < 4; j++) {
-        int cur_sc_id = base_sc_id + i;
+        size_t cur_sc_id = base_sc_id + i;
 
         complex_float* data_ptr = modulated_buffer_temp_;
         for (size_t user_id = 0; user_id < cfg_->UE_NUM; user_id++) {
@@ -155,7 +155,7 @@ void DyPrecode::Launch(
         }
         // rt_assert(max_sc_ite > pre_sc_off, "Invalid subcarrier allocation (too small)!");
         if (max_sc_ite < pre_sc_off) {
-            printf("Invalid subcarrier allocation (too small: %zu %zu %d)!", base_sc_id, sc_block_size, max_sc_ite);
+            printf("Invalid subcarrier allocation (too small: %zu %zu %zu)!", base_sc_id, sc_block_size, max_sc_ite);
             exit(0);
         }
         for (size_t i = 0; i < (max_sc_ite - pre_sc_off) / 4; i ++) {

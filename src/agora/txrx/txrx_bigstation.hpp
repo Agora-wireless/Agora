@@ -75,8 +75,6 @@ private:
     size_t rx_thread_num_;
     size_t tx_thread_num_;
 
-    BigStationState* bigstation_state_;
-
     // Current receiving frame for each socket thread
     // PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t>& time_iq_buffer_;
     Table<char>& time_iq_buffer_;
@@ -91,6 +89,8 @@ private:
     // PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_demul_buffer_;
     Table<int8_t>& post_demul_buffer_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_decode_buffer_;
+
+    BigStationState* bigstation_state_;
 
     std::vector<uint32_t> bs_rru_addrs_;
     struct rte_mempool* mbuf_pool_[kMaxThreads];

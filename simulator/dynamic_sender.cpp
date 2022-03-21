@@ -358,9 +358,6 @@ void Sender::get_sync_tsc_distributed() {
 
 void Sender::wait_for_hydra_request()
 {  
-    uint16_t src_port = 2222;
-    uint16_t dst_port = 3333;
-    const size_t magic = 0xea10baff;
     const size_t magic2 = 0xea10bafe;
     rte_mbuf* mbuf[kRxBatchSize];
     size_t hydra_app_notification_map = 0;

@@ -273,7 +273,7 @@ void BigStation::zfWorker(int tid)
                 last_possible_sc -= config_->UE_NUM;
             }
             if (last_possible_sc >= first_possible_sc) {
-                for (size_t sc_id = first_possible_sc; sc_id <= last_possible_sc; sc_id += config_->UE_NUM) {
+                for (int sc_id = first_possible_sc; sc_id <= last_possible_sc; sc_id += config_->UE_NUM) {
                     runCsi(cur_zf_frame, sc_id - sc_id % config_->UE_NUM, config_->UE_NUM, csi_buffer);
                     do_zf->ZFFreqOrthogonalStatic(gen_tag_t::frm_sym_sc(cur_zf_frame, 0, sc_id - (sc_id % config_->UE_NUM))._tag);
                 }
@@ -296,7 +296,6 @@ void BigStation::demulWorker(int tid)
 
     size_t cur_demul_frame = 0;
     size_t cur_demul_symbol_ul = 0;
-    size_t cur_demul_sc = sc_start;
 
     const size_t task_buffer_symbol_num_ul
         = config_->ul_data_symbol_num_perframe * kFrameWnd;

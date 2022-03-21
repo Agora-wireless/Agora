@@ -36,23 +36,44 @@ for (( i=0; i<${hydra_app_num}; i++ )) do
         if [ "$diagnose_start" == "0" ]; then
             if [ -n "$(echo "$line" | grep "Diagnosis start")" ]; then
                 diagnose_start=1
+                if [ "${PRINT_DIGEST_ALL}" == "1" ]; then
+                    echo "-------- ${server_name} diagnosis digest --------"
+                    echo $line
+                fi
             fi
         elif [ "$diagnose_start" == "1" ]; then
             diagnose_start=2
+            if [ "${PRINT_DIGEST_ALL}" == "1" ]; then
+                echo $line
+            fi
         elif [ "$diagnose_start" == "2" ]; then
             diagnose_start=3
+            if [ "${PRINT_DIGEST_ALL}" == "1" ]; then
+                echo $line
+            fi
         elif [ "$diagnose_start" == "3" ]; then
             diagnose_start=4
+            if [ "${PRINT_DIGEST_ALL}" == "1" ]; then
+                echo $line
+            fi
         elif [ "$diagnose_start" == "4" ]; then
             diagnose_start=5
+            if [ "${PRINT_DIGEST_ALL}" == "1" ]; then
+                echo $line
+            fi
         elif [ "$diagnose_start" == "5" ]; then
             diagnose_start=6
+            if [ "${PRINT_DIGEST_ALL}" == "1" ]; then
+                echo $line
+            fi
             if [ -n "$(echo "$line" | grep "Decoding might be")" ]; then
                 pkt_msg=1
             elif [ -n "$(echo "$line" | grep "Did not receive all demod packets")" ]; then
                 pkt_msg=2
             elif [ -n "$(echo "$line" | grep "It could be a combination of problems")" ]; then
                 pkt_msg=3
+                bottleneck=1
+                pkt_loss_rru=1
             elif [ -n "$(echo "$line" | grep "Packet loss for data packets")" ]; then
                 pkt_msg=4
                 pkt_loss_rru=1
@@ -66,13 +87,27 @@ for (( i=0; i<${hydra_app_num}; i++ )) do
             fi
         elif [ "$diagnose_start" == "6" ]; then
             diagnose_start=7
+            if [ -n "$(echo "$line" | grep "did not cross the slow")" ]; then
+                echored "Hydra did not cross the slow start duration in Hydra server ${server_name}. Please check its log for further information."
+            fi
+            if [ "${PRINT_DIGEST_ALL}" == "1" ]; then
+                echo $line
+            fi
         elif [ "$diagnose_start" == "7" ]; then
             diagnose_start=8
+            if [ "${PRINT_DIGEST_ALL}" == "1" ]; then
+                echo $line
+            fi
         elif [ "$diagnose_start" == "8" ]; then
             diagnose_start=9
+            if [ "${PRINT_DIGEST_ALL}" == "1" ]; then
+                echo $line
+            fi
             if [ -n "$(echo "$line" | grep "No bottleneck found")" ]; then
                 if [ "${pkt_msg}" == "1" ]; then
                     echored "An unknown error occurred in Hydra server ${server_name}. Please check its log for further information."
+                elif [ "${pkt_msg}" == "3" ]; then
+                    echored "Packet loss and bottleneck detected in Hydra server ${server_name}. Please check its log for further information."
                 elif [ "${pkt_msg}" == "4" ]; then
                     echored "Packet loss detected in Hydra server ${server_name}. Please check its log for further information."
                 elif [ "${pkt_msg}" == "5" ]; then
@@ -102,7 +137,7 @@ done
 if [ "${success}" == "0" ]; then
     if [ "${pkt_loss_rru}" == "0" ]; then
         if [ "${bottleneck}" == "0" ]; then
-            echored "Analysis failed. Please check the log files for further information."
+            echored "Analysis failed (no packet loss detected and no bottleneck found). Please check the log files for further information."
         fi
     fi
 else

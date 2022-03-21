@@ -312,6 +312,8 @@ void DyDecode::StartWork()
 
     size_t decode_max = 0;
 
+    size_t last_sleep_tsc = 0;
+
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
         TRIGGER_TIMER(loop_count ++);
         size_t work_start_tsc, state_start_tsc;
@@ -381,6 +383,12 @@ void DyDecode::StartWork()
                 work_tsc_duration += rdtsc() - work_start_tsc;
             });
         }
+
+        size_t cur_sleep_tsc = rdtsc();
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(1));
+        }
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -408,6 +416,8 @@ void DyDecode::StartWorkCentral()
     size_t work_count = 0;
     size_t decode_start_tsc;
     bool state_trigger = false;
+
+    size_t last_sleep_tsc = 0;
 
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
         if (likely(state_trigger)) {
@@ -454,6 +464,12 @@ void DyDecode::StartWorkCentral()
                 exit(1);
                 break;
             }
+        }
+
+        size_t cur_sleep_tsc = rdtsc();
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(1));
         }
     }
 

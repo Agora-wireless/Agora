@@ -385,7 +385,7 @@ void* BigStationTXRX::tx_thread(int tid)
                     last_possible_sc -= cfg_->UE_NUM;
                 }
                 if (last_possible_sc >= first_possible_sc) {
-                    for (size_t sc_id = first_possible_sc; sc_id <= last_possible_sc; sc_id += cfg_->UE_NUM) {
+                    for (int sc_id = first_possible_sc; sc_id <= last_possible_sc; sc_id += cfg_->UE_NUM) {
                         size_t server_start = cfg_->demul_server_mapping[sc_id - sc_id % cfg_->UE_NUM];
                         size_t server_end = cfg_->demul_server_mapping[sc_id - sc_id % cfg_->UE_NUM + cfg_->UE_NUM - 1];
                         for (size_t server_id = server_start; server_id < server_end; server_id ++) {
@@ -464,4 +464,6 @@ void* BigStationTXRX::tx_thread(int tid)
             }
         }
     }
+
+    return nullptr;
 }

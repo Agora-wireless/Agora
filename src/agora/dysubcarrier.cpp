@@ -88,6 +88,7 @@ void DySubcarrier::StartWork()
     size_t csi_max = 0;
 
     size_t work_start_tsc, state_start_tsc;
+    size_t last_sleep_tsc = 0;
 
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
         size_t worked = 0;
@@ -248,6 +249,12 @@ void DySubcarrier::StartWork()
         }
 
         TRIGGER_TIMER(work_count += worked);
+
+        size_t cur_sleep_tsc = rdtsc();
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(1));
+        }
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -413,6 +420,8 @@ void DySubcarrier::StartWorkCentral() {
     size_t work_start_tsc, state_start_tsc;
     size_t csi_start_tsc, zf_start_tsc, demod_start_tsc;
 
+    size_t last_sleep_tsc = 0;
+
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
         EventData event, resp;
         size_t tag;
@@ -498,6 +507,12 @@ void DySubcarrier::StartWorkCentral() {
                 work_tsc_duration += rdtsc() - work_start_tsc;
             }
         }
+
+        size_t cur_sleep_tsc = rdtsc();
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(1));
+        }
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -543,6 +558,7 @@ void DySubcarrier::StartWorkDownlink() {
     size_t csi_max = 0;
 
     size_t work_start_tsc, state_start_tsc;
+    size_t last_sleep_tsc = 0;
 
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
         size_t worked = 0;
@@ -708,6 +724,12 @@ void DySubcarrier::StartWorkDownlink() {
         }
 
         TRIGGER_TIMER(work_count += worked);
+
+        size_t cur_sleep_tsc = rdtsc();
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(1));
+        }
     }
 
     if (cfg_->error) {
