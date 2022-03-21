@@ -5,6 +5,8 @@
 #include <rte_ethdev.h>
 using namespace std;
 
+#define TRIGGER_TIMER(stmt) if(likely(state_trigger)){stmt;}
+
 BigStation::BigStation(Config* config)
     : freq_ghz_(measure_rdtsc_freq())
     , config_(config)
@@ -130,12 +132,39 @@ void BigStation::fftWorker(int tid)
     size_t cur_symbol = 0;
     size_t cur_ant = ant_start;
 
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t fft_tsc_duration = 0;
+    size_t fft_count = 0;
+    size_t state_operation_duration = 0;
+    bool state_trigger = false;
+
+    size_t last_sleep_tsc = 0;
+
     DoFFT *do_fft = new DoFFT(config_, tid, freq_ghz_, Range(ant_start, ant_end), time_iq_buffer_,
         freq_iq_buffer_to_send_, nullptr);
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
+        size_t work_start_tsc, fft_start_tsc;
         if (bigstation_state_.received_all_time_iq_pkts(cur_frame, cur_symbol)) {
+            if (unlikely(!state_trigger && cur_frame >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
+
+            TRIGGER_TIMER({
+                work_start_tsc = rdtsc();
+                fft_start_tsc = rdtsc();
+            });
+
             do_fft->Launch(cur_frame, cur_symbol, cur_ant);
+
+            TRIGGER_TIMER({
+                size_t fft_tmp_tsc = rdtsc() - fft_start_tsc;
+                fft_tsc_duration += fft_tmp_tsc;
+                fft_count ++;
+                fft_start_tsc = rdtsc();
+            });
 
             bigstation_state_.prepare_freq_iq_pkt(cur_frame, cur_symbol, cur_ant);
             cur_ant++;
@@ -150,8 +179,33 @@ void BigStation::fftWorker(int tid)
                     }
                 }
             }
+
+            TRIGGER_TIMER({
+                state_operation_duration += rdtsc() - fft_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            });
+        }
+
+        size_t cur_sleep_tsc = rdtsc();
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(1));
         }
     }
+
+    if (config_->error) {
+        printf("FFT Thread %d error traceback: fft (frame %zu, symbol %zu, ant %zu)\n",
+            tid, cur_frame, cur_symbol, cur_ant);
+    }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("FFT Thread %u duration stats: total time used %.2lfms, "
+        "fft %.2lfms (%zu, %.2lf%%), stating %.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%)\n",
+        tid, cycles_to_ms(whole_duration, freq_ghz_),
+        cycles_to_ms(fft_tsc_duration, freq_ghz_), fft_count, fft_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration);
 
     delete do_fft;
 }
@@ -258,11 +312,31 @@ void BigStation::zfWorker(int tid)
     std::vector<std::vector<ControlInfo> > dummy_table;
     std::vector<size_t> dummy_list;
 
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t zf_tsc_duration = 0;
+    size_t zf_count = 0;
+    size_t state_operation_duration = 0;
+    bool state_trigger = false;
+
+    size_t last_sleep_tsc = 0;
+
     DyZF *do_zf = new DyZF(config_, tid, freq_ghz_, csi_buffer, calib_buffer, post_zf_buffer_,
         post_zf_buffer_, dummy_table, dummy_list);
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
+        size_t work_start_tsc, zf_start_tsc;
         if (bigstation_state_.received_all_pilot_pkts(cur_zf_frame)) {
+            if (unlikely(!state_trigger && cur_zf_frame >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
+
+            TRIGGER_TIMER({
+                work_start_tsc = rdtsc();
+                zf_start_tsc = rdtsc();
+            });
+
             size_t sc_offset = simple_hash(cur_zf_frame) % config_->UE_NUM;
             int first_possible_sc = sc_start - sc_start % config_->UE_NUM + sc_offset;
             int last_possible_sc = sc_end - sc_end % config_->UE_NUM + sc_offset;
@@ -272,19 +346,54 @@ void BigStation::zfWorker(int tid)
             if (last_possible_sc >= (int)sc_end) {
                 last_possible_sc -= config_->UE_NUM;
             }
+            size_t tmp_count = 0;
             if (last_possible_sc >= first_possible_sc) {
                 for (int sc_id = first_possible_sc; sc_id <= last_possible_sc; sc_id += config_->UE_NUM) {
                     runCsi(cur_zf_frame, sc_id - sc_id % config_->UE_NUM, config_->UE_NUM, csi_buffer);
                     do_zf->ZFFreqOrthogonalStatic(gen_tag_t::frm_sym_sc(cur_zf_frame, 0, sc_id - (sc_id % config_->UE_NUM))._tag);
+                    tmp_count ++;
                 }
             }
+
+            TRIGGER_TIMER({
+                size_t zf_tmp_tsc = rdtsc() - zf_start_tsc;
+                zf_tsc_duration += zf_tmp_tsc;
+                zf_count += tmp_count;
+                zf_start_tsc = rdtsc();
+            });
+
             if (!bigstation_state_.prepare_zf_pkt(cur_zf_frame)) {
                 config_->error = true;
                 config_->running = false;
             }
             cur_zf_frame++;
+
+            TRIGGER_TIMER({
+                state_operation_duration += rdtsc() - zf_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            });
+        }
+
+        size_t cur_sleep_tsc = rdtsc();
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(1));
         }
     }
+
+    if (config_->error) {
+        printf("ZF Thread %d error traceback: zf (frame %zu)\n",
+            tid, cur_zf_frame);
+    }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("ZF Thread %u duration stats: total time used %.2lfms, "
+        "zf %.2lfms (%zu, %.2lf%%), stating %.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%)\n",
+        tid, cycles_to_ms(whole_duration, freq_ghz_),
+        cycles_to_ms(zf_tsc_duration, freq_ghz_), zf_count, zf_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration);
 
     delete do_zf;
 }
@@ -306,13 +415,41 @@ void BigStation::demulWorker(int tid)
     std::vector<std::vector<ControlInfo> > dummy_table;
     std::vector<size_t> dummy_list;
 
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t demul_tsc_duration = 0;
+    size_t demul_count = 0;
+    size_t state_operation_duration = 0;
+    bool state_trigger = false;
+
+    size_t last_sleep_tsc = 0;
+
     DyDemul *do_demul = new DyDemul(config_, tid, freq_ghz_, freq_iq_buffer_, post_zf_buffer_, 
         equal_buffer, post_demul_buffer_to_send_, dummy_table, dummy_list);
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
+        size_t work_start_tsc, demul_start_tsc;
         if (bigstation_state_.received_all_zf_pkts(cur_demul_frame) && 
             bigstation_state_.received_all_ul_data_pkts(cur_demul_frame, cur_demul_symbol_ul)) {
+            if (unlikely(!state_trigger && cur_demul_frame >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
+
+            TRIGGER_TIMER({
+                work_start_tsc = rdtsc();
+                demul_start_tsc = rdtsc();
+            });
+
             do_demul->LaunchStatic(cur_demul_frame, cur_demul_symbol_ul, sc_start, sc_end - sc_start);
+
+            TRIGGER_TIMER({
+                size_t demul_tmp_tsc = rdtsc() - demul_start_tsc;
+                demul_tsc_duration += demul_tmp_tsc;
+                demul_count += sc_end - sc_start;
+                demul_start_tsc = rdtsc();
+            });
+
             if (!bigstation_state_.prepare_demod_pkt(cur_demul_frame, cur_demul_symbol_ul)) {
                 config_->error = true;
                 config_->running = false;
@@ -322,8 +459,33 @@ void BigStation::demulWorker(int tid)
                 cur_demul_symbol_ul = 0;
                 cur_demul_frame++;
             }
+
+            TRIGGER_TIMER({
+                state_operation_duration += rdtsc() - demul_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            });
+        }
+
+        size_t cur_sleep_tsc = rdtsc();
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(1));
         }
     }
+
+    if (config_->error) {
+        printf("Demul Thread %d error traceback: demul (frame %zu, symbol %zu)\n",
+            tid, cur_demul_frame, cur_demul_symbol_ul);
+    }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("Demul Thread %u duration stats: total time used %.2lfms, "
+        "demul %.2lfms (%zu, %.2lf%%), stating %.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%)\n",
+        tid, cycles_to_ms(whole_duration, freq_ghz_),
+        cycles_to_ms(demul_tsc_duration, freq_ghz_), demul_count, demul_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration);
 
     delete do_demul;
 }
@@ -339,14 +501,42 @@ void BigStation::decodeWorker(int tid)
 
     BottleneckDecode bottleneck_decode;
 
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t decode_tsc_duration = 0;
+    size_t decode_count = 0;
+    size_t state_operation_duration = 0;
+    bool state_trigger = false;
+
+    size_t last_sleep_tsc = 0;
+
     DyDecode *do_decode = new DyDecode(config_, tid, freq_ghz_, post_demul_buffer_, post_decode_buffer_,
         dummy_table, dummy_list, nullptr, bottleneck_decode);
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
+        size_t work_start_tsc, decode_start_tsc;
         size_t cur_symbol_ul = cur_decode_idx / config_->get_num_ues_to_process();
         size_t cur_ue = cur_decode_idx % config_->get_num_ues_to_process();
         if (bigstation_state_.received_all_demod_pkts(cur_decode_frame, cur_symbol_ul)) {
+            if (unlikely(!state_trigger && cur_decode_frame >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
+
+            TRIGGER_TIMER({
+                work_start_tsc = rdtsc();
+                decode_start_tsc = rdtsc();
+            });
+
             do_decode->LaunchStatic(cur_decode_frame, cur_symbol_ul, cur_ue);
+
+            TRIGGER_TIMER({
+                size_t decode_tmp_tsc = rdtsc() - decode_start_tsc;
+                decode_tsc_duration += decode_tmp_tsc;
+                decode_count ++;
+                decode_start_tsc = rdtsc();
+            });
+
             cur_decode_idx += config_->num_demul_workers[config_->bs_server_addr_idx];
             if (cur_decode_idx >= config_->get_num_ues_to_process() * config_->ul_data_symbol_num_perframe) {
                 cur_decode_idx = 0;
@@ -356,8 +546,33 @@ void BigStation::decodeWorker(int tid)
                 }
                 cur_decode_frame++;
             }
+
+            TRIGGER_TIMER({
+                state_operation_duration += rdtsc() - decode_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            });
+        }
+
+        size_t cur_sleep_tsc = rdtsc();
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(1));
         }
     }
+
+    if (config_->error) {
+        printf("Decode Thread %d error traceback: decode (frame %zu, idx %zu)\n",
+            tid, cur_decode_frame, cur_decode_idx);
+    }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("Decode Thread %u duration stats: total time used %.2lfms, "
+        "decode %.2lfms (%zu, %.2lf%%), stating %.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%)\n",
+        tid, cycles_to_ms(whole_duration, freq_ghz_),
+        cycles_to_ms(decode_tsc_duration, freq_ghz_), decode_count, decode_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration);
 
     delete do_decode;
 }

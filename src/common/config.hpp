@@ -311,9 +311,6 @@ public:
     // lcm(zf_block_size, demul_block_size)
     size_t subcarrier_block_size;
 
-    // # threads for decoding each user data
-    size_t decode_thread_num_per_ue;
-
     // The list of IP addresses of all Agora RRU sender
     std::vector<std::string> bs_rru_addr_list;
     size_t bs_rru_addr_idx;

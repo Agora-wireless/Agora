@@ -225,51 +225,53 @@ Config::Config(std::string jsonfile)
             = tddConf.value("bs_rru_mac_addr", "");
     }
 
-    /* Distributed & normal mode options */
-    std::vector<size_t> subcarrier_vec = tddConf.value(
-        "subcarrier_block_list", std::vector<size_t>());
-    rt_assert(subcarrier_vec.size() == bs_server_addr_list.size(),
-        "Subcarrier block list must be the same length with server list!");
-    // subcarrier_block_size = tddConf.value(
-    //     "subcarrier_block_size", zf_block_size);
-    subcarrier_block_size = subcarrier_vec[bs_server_addr_idx];
-    // rt_assert(subcarrier_block_size % zf_block_size == 0,
-    //     "Subcarrier block size should be a multiple of zf_block_size)!");
-    // rt_assert(subcarrier_block_size % kSCsPerCacheline == 0,
-    //     "Subcarrier block size should be a multiple of cacheline size)!");
-    rt_assert(demul_block_size <= subcarrier_block_size,
-        "Demodulation block size must no larger than subcarrier block size!");
+    use_bigstation_mode = tddConf.value("use_bigstation_mode", false);
 
-    decode_thread_num_per_ue = tddConf.value("decode_thread_num_per_ue", 1);
+    if (!use_bigstation_mode) {
+        /* Distributed & normal mode options */
+        std::vector<size_t> subcarrier_vec = tddConf.value(
+            "subcarrier_block_list", std::vector<size_t>());
+        rt_assert(subcarrier_vec.size() == bs_server_addr_list.size(),
+            "Subcarrier block list must be the same length with server list!");
+        // subcarrier_block_size = tddConf.value(
+        //     "subcarrier_block_size", zf_block_size);
+        subcarrier_block_size = subcarrier_vec[bs_server_addr_idx];
+        // rt_assert(subcarrier_block_size % zf_block_size == 0,
+        //     "Subcarrier block size should be a multiple of zf_block_size)!");
+        // rt_assert(subcarrier_block_size % kSCsPerCacheline == 0,
+        //     "Subcarrier block size should be a multiple of cacheline size)!");
+        rt_assert(demul_block_size <= subcarrier_block_size,
+            "Demodulation block size must no larger than subcarrier block size!");
 
-    subcarrier_num_list = tddConf.value("subcarrier_num_list", std::vector<size_t>());
-    rt_assert(bs_server_addr_list.size() == subcarrier_num_list.size(), "Subcarrier num list has a different size!");
-    size_t sum_subcarriers = 0;
-    for (const size_t subc : subcarrier_num_list) {
-        subcarrier_num_start.push_back(sum_subcarriers);
-        sum_subcarriers += subc;
+        subcarrier_num_list = tddConf.value("subcarrier_num_list", std::vector<size_t>());
+        rt_assert(bs_server_addr_list.size() == subcarrier_num_list.size(), "Subcarrier num list has a different size!");
+        size_t sum_subcarriers = 0;
+        for (const size_t subc : subcarrier_num_list) {
+            subcarrier_num_start.push_back(sum_subcarriers);
+            sum_subcarriers += subc;
+        }
+        rt_assert(sum_subcarriers == OFDM_DATA_NUM, "Subcarrier sum is different from OFDM DATA NUM!");
+        sum_subcarriers = 0;
+        for (size_t i = 0; i < bs_server_addr_idx; i ++) {
+            sum_subcarriers += subcarrier_num_list[i];
+        }
+
+        subcarrier_start = sum_subcarriers;
+        subcarrier_end = subcarrier_start + subcarrier_num_list[bs_server_addr_idx];
+        ue_start = bs_server_addr_idx < UE_NUM % bs_server_addr_list.size()
+            ? bs_server_addr_idx * (UE_NUM / bs_server_addr_list.size() + 1)
+            : UE_NUM
+                - (bs_server_addr_list.size() - bs_server_addr_idx)
+                    * (UE_NUM / bs_server_addr_list.size());
+        ue_end = bs_server_addr_idx < UE_NUM % bs_server_addr_list.size()
+            ? ue_start + UE_NUM / bs_server_addr_list.size() + 1
+            : ue_start + UE_NUM / bs_server_addr_list.size();
+
+        demul_events_per_symbol
+            = 1 + (get_num_sc_to_process() - 1) / demul_block_size;
+        zf_events_per_symbol = 1 + (get_num_sc_to_process() - 1) / zf_block_size;
     }
-    rt_assert(sum_subcarriers == OFDM_DATA_NUM, "Subcarrier sum is different from OFDM DATA NUM!");
-    sum_subcarriers = 0;
-    for (size_t i = 0; i < bs_server_addr_idx; i ++) {
-        sum_subcarriers += subcarrier_num_list[i];
-    }
-
-    subcarrier_start = sum_subcarriers;
-    subcarrier_end = subcarrier_start + subcarrier_num_list[bs_server_addr_idx];
-    ue_start = bs_server_addr_idx < UE_NUM % bs_server_addr_list.size()
-        ? bs_server_addr_idx * (UE_NUM / bs_server_addr_list.size() + 1)
-        : UE_NUM
-            - (bs_server_addr_list.size() - bs_server_addr_idx)
-                * (UE_NUM / bs_server_addr_list.size());
-    ue_end = bs_server_addr_idx < UE_NUM % bs_server_addr_list.size()
-        ? ue_start + UE_NUM / bs_server_addr_list.size() + 1
-        : ue_start + UE_NUM / bs_server_addr_list.size();
-
-    demul_events_per_symbol
-        = 1 + (get_num_sc_to_process() - 1) / demul_block_size;
-    zf_events_per_symbol = 1 + (get_num_sc_to_process() - 1) / zf_block_size;
-
+    
     demod_tx_port = tddConf.value("demod_tx_port", 8100);
     demod_rx_port = tddConf.value("demod_rx_port", 8600);
 
@@ -349,8 +351,7 @@ Config::Config(std::string jsonfile)
 
     use_central_scheduler = tddConf.value("use_central_scheduler", false);
     use_general_worker = tddConf.value("use_general_worker", false);
-    use_bigstation_mode = tddConf.value("use_bigstation_mode", false);
-
+    
     if (use_bigstation_mode) {
         rt_assert(!downlink_mode, "Bigstation mode is not supported for downlink");
         num_fft_workers = tddConf.value("num_fft_workers", std::vector<size_t>());
