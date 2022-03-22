@@ -404,6 +404,19 @@ Now Agora will initialize the `scheduler` sharing with `dozf` `doprecode`. To fu
 
 ## Commands to run the simulator
 
+### Compile
+
+To compile the program with MAC enabled
+
+```shell
+/Agora$ rm -rf build
+/Agora$ cd build
+/Agora/build$ cmake .. -DENABLE_MAC true
+/Agora/build$ make -j8
+```
+
+### Run
+
 You need 5-6 terminals to run the following commands separately:
 
 Run this command in advance:

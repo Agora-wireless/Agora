@@ -67,7 +67,7 @@ void Throughput::WriteFile() {
       
       debug_file << "Buffer[" << i << ":" << tp.frame_id << ":"
                 << tp.ue_id << "] buffer_size: " << tp.buffer_size_
-                << "[Byte] Time: " << tp.buffer_time_ << "[us]\n"
+                << "[Byte] Time: " << tp.buffer_time_ << "[us], Duration: " << tp.buffer_time_ - last_stamp << "[us]\n"
                 << "Last Interval Throughput: " << tp.buffer_size_/((tp.buffer_time_ - last_stamp)/1e6) << "[B/s]\n"
                 << "Average Throughput: " << (total_buffer += tp.buffer_size_)/((tp.buffer_time_ - baseTime)/1e6) << "[B/s]\n"; 
       last_stamp = tp.buffer_time_;

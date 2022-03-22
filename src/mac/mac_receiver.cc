@@ -10,6 +10,8 @@
 #include "signal_handler.h"
 #include "udp_client.h"
 #include "udp_server.h"
+
+//Throughput: set output file
 #include <gflags/gflags.h>
 
 DEFINE_string(rx_file, "", "Output result file for throughput");

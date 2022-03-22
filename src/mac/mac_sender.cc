@@ -12,6 +12,8 @@
 #include "logger.h"
 #include "udp_client.h"
 #include "video_receiver.h"
+
+//Throughput: set output file
 #include <gflags/gflags.h>
 
 DEFINE_string(tx_file, "", "Output result file for throughput");
