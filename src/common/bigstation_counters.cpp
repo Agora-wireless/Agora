@@ -31,6 +31,11 @@ bool BigStationState::receive_time_iq_pkt(size_t frame_id, size_t symbol_id, siz
             frame_id, cur_frame_, kFrameWnd);
         return false;
     }
+
+    if (unlikely(!rru_start_)) {
+        rru_start_ = true;
+    }
+
     num_time_iq_pkts_received_[frame_id % kFrameWnd][symbol_id] ++;
     return true;
 }
@@ -45,6 +50,11 @@ bool BigStationState::receive_pilot_pkt(size_t frame_id, size_t ant_id)
             frame_id, cur_frame_, kFrameWnd);
         return false;
     }
+
+    if (unlikely(!rru_start_)) {
+        rru_start_ = true;
+    }
+
     num_pilot_pkts_received_[frame_id % kFrameWnd] ++;
     return true;
 }
@@ -59,6 +69,11 @@ bool BigStationState::receive_ul_data_pkt(size_t frame_id, size_t symbol_id_ul, 
             frame_id, cur_frame_, kFrameWnd);
         return false;
     }
+
+    if (unlikely(!rru_start_)) {
+        rru_start_ = true;
+    }
+
     num_data_pkts_received_[frame_id % kFrameWnd][symbol_id_ul] ++;
     return true;
 }
@@ -73,6 +88,11 @@ bool BigStationState::receive_zf_pkt(size_t frame_id, size_t sc_id)
             frame_id, cur_frame_, kFrameWnd);
         return false;
     }
+
+    if (unlikely(!rru_start_)) {
+        rru_start_ = true;
+    }
+
     size_t sc_start = std::max(sc_id, cfg_->demul_start);
     size_t sc_end = std::min(sc_id + cfg_->UE_NUM, cfg_->demul_end);
     num_zf_pkts_received_[frame_id % kFrameWnd] += (sc_end - sc_start);
@@ -89,6 +109,11 @@ bool BigStationState::receive_demod_pkt(size_t frame_id, size_t symbol_id_ul, si
             frame_id, cur_frame_, kFrameWnd);
         return false;
     }
+
+    if (unlikely(!rru_start_)) {
+        rru_start_ = true;
+    }
+    
     num_demod_pkts_received_[frame_id % kFrameWnd][symbol_id_ul] += sc_len;
     return true;
 }

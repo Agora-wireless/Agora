@@ -235,6 +235,14 @@ struct Packet {
             return "[Freq IQ from RRU]";
         case PktType::kDemod:
             return "[Demodulated data]";
+        case PktType::kTimeIQ:
+            return "[Time IQ from RRU]";
+        case PktType::kEncode:
+            return "[Encoded data]";
+        case PktType::kFFT:
+            return "[Post FFT data]";
+        case PktType::kPostZF:
+            return "[Post ZF data]";
         default:
             return "[Invalid]";
         }

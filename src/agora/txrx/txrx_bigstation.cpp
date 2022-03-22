@@ -182,6 +182,9 @@ int BigStationTXRX::recv_relocate(int tid)
         }
 
         auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset);
+
+        // printf("Recv packet for frame %zu\n", pkt->frame_id_);
+
         if (pkt->pkt_type_ == Packet::PktType::kFreqIQ) {
             // if (pkt->symbol_id < cfg_->pilot_symbol_num_perframe) {
             //     char* dst_ptr = pilot_buffer_[pkt->frame_id][pkt->ant_id] + pkt->sc_id_ * 2 * sizeof(unsigned short);
@@ -229,6 +232,7 @@ int BigStationTXRX::recv_relocate(int tid)
                 * cfg_->packet_length + pkt->symbol_id_ * cfg_->packet_length + Packet::kOffsetOfData
                 + pkt->sc_id_ * 2 * sizeof(unsigned short);
             memcpy(iq_ptr, (uint8_t*)pkt + Packet::kOffsetOfData, pkt->sc_len_ * 2 * sizeof(unsigned short));
+            // printf("Recv TimeIQ packet for frame %zu symbol %zu ant %zu\n", pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
             if (!bigstation_state_->receive_time_iq_pkt(pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_)) {
                 cfg_->error = true;
                 cfg_->running = false;
@@ -466,4 +470,24 @@ void* BigStationTXRX::tx_thread(int tid)
     }
 
     return nullptr;
+}
+
+void BigStationTXRX::notify_sender()
+{
+    uint16_t src_port = 2222;
+    uint16_t dst_port = 3333;
+    const size_t magic = 0xea10bafe;
+    rte_mbuf* mbuf = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 
+        bs_rru_mac_addrs_[0], bs_server_addrs_[cfg_->bs_server_addr_idx], bs_rru_addrs_[0], 
+        src_port, dst_port, 4*sizeof(size_t));
+    struct rte_ether_hdr* eth_hdr
+        = rte_pktmbuf_mtod(mbuf, struct rte_ether_hdr*);
+    char* payload = (char*)eth_hdr + kPayloadOffset;
+    *((size_t*)payload) = magic;
+    *((size_t*)payload + 1) = cfg_->bs_server_addr_idx;
+    size_t nb_tx = rte_eth_tx_burst(0, 0, &mbuf, 1);
+    if (unlikely(nb_tx != 1)) {
+        printf("rte_eth_tx_burst() failed\n");
+        exit(0);
+    }
 }

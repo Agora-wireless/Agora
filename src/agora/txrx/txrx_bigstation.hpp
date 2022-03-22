@@ -57,6 +57,8 @@ public:
      */
     bool StartTXRX();
 
+    void notify_sender();
+
 private:
     // The simulation-mode thread function running on thread #tid
     void* loop_tx_rx(int tid);

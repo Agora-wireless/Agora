@@ -1,20 +1,13 @@
 {
     "rru_servers": [
-        "node0",
-        "node1"
+        "node0"
     ],
     "hydra_servers": [
         "node2",
         "node3",
-        "node4",
-        "node5",
-        "node6",
-        "node7"
+        "node4"
     ],
     "num_fft_workers": [
-        2,
-        2,
-        2,
         2,
         2,
         2
@@ -22,23 +15,14 @@
     "num_zf_workers": [
         2,
         2,
-        2,
-        2,
-        2,
         2
     ],
     "num_demul_workers": [
         4,
         4,
-        4,
-        4,
-        4,
         4
     ],
     "num_decode_workers": [
-        4,
-        4,
-        4,
         4,
         4,
         4

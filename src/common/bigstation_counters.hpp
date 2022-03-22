@@ -42,6 +42,8 @@ public:
 
     size_t cur_frame_ = 0;
 
+    size_t rru_start_ = false;
+
 private:
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_time_iq_pkts_received_ = {};

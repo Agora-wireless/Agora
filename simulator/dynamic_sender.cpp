@@ -483,30 +483,41 @@ void* Sender::worker_thread(int tid)
             memcpy(pkt->data_,
                 data_buf + (buf_offset * ant_num_this_thread + cur_radio - radio_lo) * (2 * cfg->OFDM_CA_NUM),
                 cfg->OFDM_CA_NUM * sizeof(unsigned short) * 2);
-            MLPD_TRACE("Sender: Sending packet %s to %s:%ld\n",
-                pkt->ToString().c_str(), cfg->bs_server_addr_list[server_id].c_str(),
+            MLPD_TRACE("Sender: Sending packet %s to %02x%02x%02x%02x%02x%02x:%s:%ld\n",
+                pkt->ToString().c_str(), server_mac_addr_list[server_id].addr_bytes[0], 
+                server_mac_addr_list[server_id].addr_bytes[1], server_mac_addr_list[server_id].addr_bytes[2], 
+                server_mac_addr_list[server_id].addr_bytes[3], server_mac_addr_list[server_id].addr_bytes[4], 
+                server_mac_addr_list[server_id].addr_bytes[5], cfg->bs_server_addr_list[server_id].c_str(),
                 cfg->bs_server_port + cur_radio);
             rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, 1) == 1, "rte_eth_tx_burst() failed");
         } else if (cfg->use_bigstation_mode) {
             size_t server_id = cfg->ant_server_mapping[cur_radio];
-            tx_mbufs[0] = DpdkTransport::alloc_udp(mbuf_pools_[tid], rru_mac_addr_list[cfg->bs_rru_addr_idx],
-                server_mac_addr_list[server_id], bs_rru_addr_list[cfg->bs_rru_addr_idx], bs_server_addr_list[server_id],
-                cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
-                Packet::kOffsetOfData + cfg->OFDM_CA_NUM * sizeof(unsigned short) * 2);
-            auto* pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[0], uint8_t*) + kPayloadOffset);
-            pkt->pkt_type_ = Packet::PktType::kTimeIQ;
-            pkt->frame_id_ = cur_frame;
-            pkt->symbol_id_ = cfg->getSymbolId(cur_symbol);
-            pkt->cell_id_ = 0;
-            pkt->ant_id_ = cur_radio;
-            size_t buf_offset = cur_slot_idx * 2 + (cur_symbol == 0 ? 0 : 1);
-            memcpy(pkt->data_,
-                data_buf + (buf_offset * ant_num_this_thread + cur_radio - radio_lo) * (2 * cfg->OFDM_CA_NUM),
-                cfg->OFDM_CA_NUM * sizeof(unsigned short) * 2);
-            MLPD_TRACE("Sender: Sending packet %s to %s:%ld\n",
-                pkt->ToString().c_str(), cfg->bs_server_addr_list[server_id].c_str(),
-                cfg->bs_server_port + cur_radio);
-            rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, 1) == 1, "rte_eth_tx_burst() failed");
+            for (size_t i = 0; i < cfg->OFDM_CA_NUM; i += cfg->time_iq_sc_step_size) {
+                size_t cur_num_sc = std::min(cfg->time_iq_sc_step_size, cfg->OFDM_CA_NUM - i);
+                tx_mbufs[0] = DpdkTransport::alloc_udp(mbuf_pools_[tid], rru_mac_addr_list[cfg->bs_rru_addr_idx],
+                    server_mac_addr_list[server_id], bs_rru_addr_list[cfg->bs_rru_addr_idx], bs_server_addr_list[server_id],
+                    cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
+                    Packet::kOffsetOfData + cur_num_sc * sizeof(unsigned short) * 2);
+                auto* pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[0], uint8_t*) + kPayloadOffset);
+                pkt->pkt_type_ = Packet::PktType::kTimeIQ;
+                pkt->frame_id_ = cur_frame;
+                pkt->symbol_id_ = cfg->getSymbolId(cur_symbol);
+                pkt->cell_id_ = 0;
+                pkt->ant_id_ = cur_radio;
+                pkt->sc_id_ = i;
+                pkt->sc_len_ = cur_num_sc;
+                size_t buf_offset = cur_slot_idx * 2 + (cur_symbol == 0 ? 0 : 1);
+                memcpy(pkt->data_,
+                    data_buf + (buf_offset * ant_num_this_thread + cur_radio - radio_lo) * (2 * cfg->OFDM_CA_NUM) + 2 * i,
+                    cur_num_sc * sizeof(unsigned short) * 2);
+                MLPD_TRACE("Sender: Sending packet %s to %02x%02x%02x%02x%02x%02x:%s:%ld\n",
+                    pkt->ToString().c_str(), server_mac_addr_list[server_id].addr_bytes[0], 
+                    server_mac_addr_list[server_id].addr_bytes[1], server_mac_addr_list[server_id].addr_bytes[2], 
+                    server_mac_addr_list[server_id].addr_bytes[3], server_mac_addr_list[server_id].addr_bytes[4], 
+                    server_mac_addr_list[server_id].addr_bytes[5], cfg->bs_server_addr_list[server_id].c_str(),
+                    cfg->bs_server_port + cur_radio);
+                rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, 1) == 1, "rte_eth_tx_burst() failed");
+            }
         } else {
             for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
                 tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pools_[tid], rru_mac_addr_list[cfg->bs_rru_addr_idx],

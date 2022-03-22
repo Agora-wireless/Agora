@@ -94,6 +94,11 @@ void BigStation::Start()
         return;
     }
 
+    while (bigstation_state_.rru_start_ == false && !SignalHandler::gotExitSignal()) {
+        bigstation_tx_rx_->notify_sender();
+        usleep(100000);
+    }
+
     while (cfg->running && !SignalHandler::gotExitSignal()) {
         if (bigstation_state_.cur_frame_ == cfg->frames_to_test) {
             cfg->running = false;
