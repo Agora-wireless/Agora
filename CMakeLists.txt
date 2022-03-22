@@ -274,6 +274,7 @@ find_package(GTest REQUIRED)
 
 include_directories(
   src/common/
+  src/common/ipc
   src/mac/
   src/agora/
   src/agora/txrx/
@@ -289,8 +290,8 @@ include_directories(SYSTEM src/third_party src/third_party/spdlog/include src/th
 set(COMMON_SOURCES
   src/agora/stats.cc
   src/agora/phy_stats.cc
-  src/common/framestats.cc
   src/agora/doencode.cc
+  src/common/framestats.cc
   src/common/config.cc
   src/common/utils.cc
   src/common/comms-lib.cc
@@ -302,6 +303,9 @@ set(COMMON_SOURCES
   src/common/crc.cc
   src/common/memory_manage.cc
   src/common/scrambler.cc
+  src/common/ipc/udp_client.cc
+  src/common/ipc/udp_server.cc
+  src/common/ipc/network_utils.cc
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc
   src/encoder/iobuffer.cc)

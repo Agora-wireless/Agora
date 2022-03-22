@@ -3,6 +3,7 @@
  * @brief Main file for the radio test program
  */
 #include "gflags/gflags.h"
+#include "network_utils.h"
 #include "radio_lib.h"
 #include "radio_lib_mod.h"
 #include "signal_handler.h"
@@ -44,8 +45,9 @@ int main(int argc, char* argv[]) {
     // Register signal handler to handle kill signal
     signal_handler.SetupSignalHandlers();
 
-    TestRadioRxStream(cfg.get(), FLAGS_rx_symbols);
-    TestRadioRxSocket(cfg.get(), FLAGS_rx_symbols);
+    //TestRadioRxStream(cfg.get(), FLAGS_rx_symbols);
+    //TestRadioRxSocket(cfg.get(), FLAGS_rx_symbols);
+    agora_comm::ListLocalInterfaces();
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;

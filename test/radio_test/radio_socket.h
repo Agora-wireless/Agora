@@ -24,12 +24,13 @@ class RadioSocket {
                long long& rx_time_ns);
 
  private:
-  bool CheckSymbolComplete(const size_t& bytes);
+  bool CheckSymbolComplete(const std::byte* in_data, const int& in_count);
   size_t ParseRxSymbol(
       std::vector<std::vector<std::complex<int16_t>>>& out_samples,
       long long& rx_time_ns);
 
   sklk_SoapyRPCSocket socket_;
+  //UDPServer socket_;
   std::vector<std::byte> rx_buffer_;
   size_t rx_bytes_;
   size_t rx_samples_;

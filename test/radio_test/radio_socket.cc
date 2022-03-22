@@ -79,12 +79,12 @@ RadioSocket::RadioSocket(size_t samples_per_symbol)
       bytes_per_element_(3u) {}
 
 void RadioSocket::Create(const std::string& address, const std::string& port) {
-  const SoapyURL bindURL("udp", "::", "0");
+  const SoapyURL local_url("udp", "::", "0");
 
-  int ret = socket_.bind(bindURL.toString());
+  int ret = socket_.bind(local_url.toString());
   if (ret != 0)
     throw std::runtime_error("Iris::setupStream: Failed to bind to " +
-                             bindURL.toString() + ": " +
+                             local_url.toString() + ": " +
                              socket_.lastErrorMsg());
   const SoapyURL connect_url("udp", address, port);
   ret = socket_.connect(connect_url.toString());
@@ -107,13 +107,14 @@ int RadioSocket::RxSymbol(
     std::vector<std::vector<std::complex<int16_t>>>& out_data,
     long long& rx_time_ns) {
   size_t num_samples = 0;
+  const auto* rx_buffer = &rx_buffer_.at(rx_bytes_);
   const int rx_return =
       socket_.recv(&rx_buffer_.at(rx_bytes_), (rx_buffer_.size() - rx_bytes_));
 
   if (rx_return > 0) {
     std::printf("Received %d bytes\n", rx_return);
     const size_t new_bytes = static_cast<size_t>(rx_return);
-    const bool symbol_complete = CheckSymbolComplete(new_bytes);
+    const bool symbol_complete = CheckSymbolComplete(rx_buffer, rx_return);
     rx_bytes_ += new_bytes;
 
     if (symbol_complete) {
@@ -130,19 +131,23 @@ int RadioSocket::RxSymbol(
   return num_samples;
 }
 
-bool RadioSocket::CheckSymbolComplete(const size_t& bytes) {
+bool RadioSocket::CheckSymbolComplete(const std::byte* in_data,
+                                      const int& in_count) {
   bool finished;
   // unpacker logic for twbw_rx_framer64
-  const auto* rx_data =
-      reinterpret_cast<const IrisCommData*>(&rx_buffer_.at(rx_bytes_));
+  const auto* rx_data = reinterpret_cast<const IrisCommData*>(in_data);
   const long long rx_time_ticks = static_cast<long long>(rx_data->header_[1u]);
 
   const size_t burst_count = size_t(rx_data->header_[0u] & 0xffff) + 1;
-  const size_t payload_bytes = size_t(bytes) - sizeof(rx_data->header_);
-
+  const size_t payload_bytes = size_t(in_count) - sizeof(rx_data->header_);
   const size_t samples = payload_bytes / bytes_per_element_;
   RtAssert(((payload_bytes % bytes_per_element_) == 0),
            "Invalid payload size!");
+
+  const size_t current_frame_id =
+      static_cast<size_t>((rx_time_ticks >> 32u) & 0xFFFFFFFF);
+  const size_t current_symbol_id =
+      static_cast<size_t>((rx_time_ticks >> 16u) & 0xFFFF);
 
   if (kDebugIrisRx) {
     const bool has_time = (rx_data->header_[0u] & HAS_TIME_RX_bf) != 0;
@@ -152,7 +157,7 @@ bool RadioSocket::CheckSymbolComplete(const size_t& bytes) {
     const bool is_trigger = (rx_data->header_[0u] & IS_TRIGGER_bf) != 0;
     std::printf(
         "===========================================\n"
-        "Received %zu bytes \n"
+        "Received %d bytes \n"
         "hdr0 %lx\n"
         "hdr1 %lx\n"
         "Has Time %d Time Error %d\n"
@@ -163,11 +168,10 @@ bool RadioSocket::CheckSymbolComplete(const size_t& bytes) {
         "Rx Time: %lld\n"
         "Frame: %zu    Symbol: %zu\n"
         "===========================================\n",
-        bytes, rx_data->header_[0u], rx_data->header_[1u], has_time, error_time,
-        error_overflow, is_burst, is_trigger, burst_count, payload_bytes,
-        samples, rx_time_ticks,
-        static_cast<size_t>((rx_time_ticks >> 32u) & 0xFFFFFFFF),
-        static_cast<size_t>((rx_time_ticks >> 16u) & 0xFFFF));
+        in_count, rx_data->header_[0u], rx_data->header_[1u], has_time,
+        error_time, error_overflow, is_burst, is_trigger, burst_count,
+        payload_bytes, samples, rx_time_ticks, current_frame_id,
+        current_symbol_id);
   }
   const size_t start_sample = (rx_time_ticks & 0xFFFF);
   if (start_sample > rx_samples_) {
@@ -216,6 +220,7 @@ size_t RadioSocket::ParseRxSymbol(
     if (processed_bytes == 0) {
       rx_time_ns = rx_time_ticks;
     }
+
     //const size_t start_sample = (rx_time_ticks & 0xFFFF);
     //Burst count... (assumption)
     const size_t sample_count = size_t(rx_data->header_[0u] & 0xffff) + 1;
