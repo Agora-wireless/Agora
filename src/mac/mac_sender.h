@@ -14,6 +14,7 @@
 #include "config.h"
 #include "mac_data_receiver.h"
 #include "memory_manage.h"
+#include "throughput.h"
 
 class MacSender {
  public:
@@ -127,6 +128,8 @@ class MacSender {
   const size_t server_rx_port_;
   std::function<size_t(size_t)> get_data_symbol_id_;
   const bool has_master_thread_;
+
+  Throughput * tp;
 };
 
 #endif  // MAC_SENDER_H_

@@ -12,6 +12,9 @@
 #include "logger.h"
 #include "udp_client.h"
 #include "video_receiver.h"
+#include <gflags/gflags.h>
+
+DEFINE_string(tx_file, "", "Output result file for throughput");
 
 //#define USE_UDP_DATA_SOURCE
 static constexpr bool kDebugPrintSender = false;
@@ -178,7 +181,7 @@ void MacSender::StartTx() {
   delete[](frame_end_);
 }
 
-void MacSender::StartTxfromMain(double* in_frame_start, double* in_frame_end) {
+void MacSender::StartTxfromMain(double* in_frame_start, double* in_frame_end) { // called
   frame_start_ = in_frame_start;
   frame_end_ = in_frame_end;
 
@@ -290,6 +293,7 @@ void* MacSender::MasterThread(size_t tid) {
   }
   MLPD_INFO("MacSender: main thread exit\n");
   WriteStatsToFile(cfg_->FramesToTest());
+  delete tp;
   return nullptr;
 }
 
@@ -369,6 +373,9 @@ void* MacSender::WorkerThread(size_t tid) {
           udp_client.Send(server_address_, server_rx_port_,
                           reinterpret_cast<const uint8_t*>(tx_packet),
                           mac_packet_tx_size);
+
+          // Throughput: timestamp here
+          tp->Stamp(tid, mac_packet_tx_size, tx_packet->Frame(), user_current);
           mac_packet_location += tx_buffer_pkt_offset_;
         }
 
@@ -428,6 +435,8 @@ void MacSender::CreateWorkerThreads(size_t num_workers) {
   for (size_t i = 0u; i < num_workers; i++) {
     threads_.emplace_back(&MacSender::WorkerThread, this, i);
   }
+  // Throughput: init
+  tp = new Throughput(num_workers, FLAGS_tx_file.c_str());
 }
 
 /* Single threaded file reader to load a shared data structure */

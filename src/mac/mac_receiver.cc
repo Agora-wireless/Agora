@@ -10,6 +10,9 @@
 #include "signal_handler.h"
 #include "udp_client.h"
 #include "udp_server.h"
+#include <gflags/gflags.h>
+
+DEFINE_string(rx_file, "", "Output result file for throughput");
 
 static const bool kDebugMacReceiver = true;
 
@@ -44,7 +47,7 @@ std::vector<std::thread> MacReceiver::StartRecv() {
   std::vector<std::thread> created_threads;
 
   // Throughput: init
-  tp = new Throughput(rx_thread_num_);
+  tp = new Throughput(rx_thread_num_, FLAGS_rx_file.c_str());
 
   MLPD_INFO("MacReceiver:  Start Recv threads %zu\n", rx_thread_num_);
   created_threads.resize(rx_thread_num_);
@@ -84,7 +87,7 @@ void* MacReceiver::LoopRecv(size_t tid) {
         &rx_buffer[0u], max_packet_length, phy_address_, phy_port_ + ue_id);
     
     // Throughput: timestamp here
-    tp->Stamp(tid, recvlen);
+    tp->Stamp(tid, recvlen, 0, ue_id);
 
     if (recvlen < 0) {
       std::perror("MacReceiver: recv failed");
