@@ -7,7 +7,7 @@
 #include <utility>
 
 static constexpr bool kPrintChannelOutput = false;
-static constexpr bool kPrintSNRCheck = false;
+static constexpr bool kPrintSNRCheck = true;
 
 Channel::Channel(const Config* const config, std::string& in_channel_type,
                  double in_channel_snr)

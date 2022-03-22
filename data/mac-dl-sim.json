@@ -1,8 +1,8 @@
 {
   /* General Settings */
   "cells": 1,
-  "bs_radio_num": 8,
-  "ue_radio_num": 4,
+  "bs_radio_num": 10,
+  "ue_radio_num": 8,
   "beamsweep": true,
   "beacon_antenna": 0,
   /* Waveform Parameters */
@@ -17,7 +17,7 @@
   "frequency": 3.6e9,
   /* Frame definition */
   "frame_schedule": [
-    "BPPPPDDDDGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+    "BPPPPPPPPDDDDGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
   ],
   "client_dl_pilot_syms": 2,
   /* compute configuration */
