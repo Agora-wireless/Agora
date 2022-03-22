@@ -433,7 +433,6 @@ add_executable(radio_test
     test/radio_test/main.cc
     test/radio_test/radio_lib_mod.cc
     test/radio_test/radio_socket.cc
-    test/radio_test/SoapyRPCSocket.cpp
     test/radio_test/SoapyURLUtils.cpp
     $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:shared_txrx_sources_lib>
