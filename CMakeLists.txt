@@ -305,6 +305,7 @@ set(COMMON_SOURCES
   src/common/scrambler.cc
   src/common/ipc/udp_client.cc
   src/common/ipc/udp_server.cc
+  src/common/ipc/udp_server_ipv6.cc
   src/common/ipc/network_utils.cc
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc

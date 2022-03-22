@@ -45,9 +45,9 @@ int main(int argc, char* argv[]) {
     // Register signal handler to handle kill signal
     signal_handler.SetupSignalHandlers();
 
-    //TestRadioRxStream(cfg.get(), FLAGS_rx_symbols);
-    //TestRadioRxSocket(cfg.get(), FLAGS_rx_symbols);
     agora_comm::ListLocalInterfaces();
+    TestRadioRxStream(cfg.get(), FLAGS_rx_symbols);
+    TestRadioRxSocket(cfg.get(), FLAGS_rx_symbols);
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;
@@ -93,7 +93,7 @@ void TestRadioRxStream(Config* cfg, const uint32_t max_rx) {
       std::vector<std::byte>(cfg->PacketLength(), std::byte(0)));
 
   if (kUseArgos) {
-    // Makes the soapy remove "HUB" / InitBsRadio / ConfigureBsRadio
+    // Makes the soapy remote "HUB" / InitBsRadio / ConfigureBsRadio
     auto radioconfig_ = std::make_unique<RadioConfig>(cfg);
     radioconfig_->RadioStart();
 
@@ -169,7 +169,7 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
       std::vector<std::byte>(cfg->PacketLength(), std::byte(0)));
 
   if (kUseArgos) {
-    // Makes the soapy remove "HUB" / InitBsRadio / ConfigureBsRadio
+    // Makes the soapy remote "HUB" / InitBsRadio / ConfigureBsRadio
     auto radioconfig_ = std::make_unique<RadioConfigNoRxStream>(cfg);
     radioconfig_->RadioStart();
 

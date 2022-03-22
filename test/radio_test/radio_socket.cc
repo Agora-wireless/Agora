@@ -71,36 +71,26 @@ static_assert(sizeof(IrisCommData::header_) == 16);
 // this is also a bit more complex and needs to be reviewed for multiple cases
 // 3 bytes == 1 Sample (8 bit + 4 bit) Real (8 bit + 4 bit) Img = 24 bits = 3 Bytes
 RadioSocket::RadioSocket(size_t samples_per_symbol)
-    : socket_(),
-      rx_buffer_(kRxBufferSize, std::byte(0)),
+    : rx_buffer_(kRxBufferSize, std::byte(0)),
       rx_bytes_(0),
       rx_samples_(0),
       samples_per_symbol_(samples_per_symbol),
       bytes_per_element_(3u) {}
 
-void RadioSocket::Create(const std::string& address, const std::string& port) {
-  const SoapyURL local_url("udp", "::", "0");
+void RadioSocket::Create(const std::string& local_addr,
+                         const std::string& remote_addr,
+                         const std::string& local_port,
+                         const std::string& remote_port) {
+  socket_ = std::make_unique<UDPServerIPv6>(local_addr, local_port);
 
-  int ret = socket_.bind(local_url.toString());
-  if (ret != 0)
-    throw std::runtime_error("Iris::setupStream: Failed to bind to " +
-                             local_url.toString() + ": " +
-                             socket_.lastErrorMsg());
-  const SoapyURL connect_url("udp", address, port);
-  ret = socket_.connect(connect_url.toString());
-  if (ret != 0)
+  //Creates a 1:1 connection for DATAGRAM sockets
+  size_t ret = socket_->Connect(remote_addr, remote_port);
+  if (ret != 0) {
     throw std::runtime_error("Iris::setupStream: Failed to connect to " +
-                             connect_url.toString() + ": " +
-                             socket_.lastErrorMsg());
-
-  socket_.setNonBlocking(true);
-
-  //lookup the local mac address to program the framer
-  SoapyURL local_endpoint(socket_.getsockname());
-  address_ = local_endpoint.getNode();
-  port_ = local_endpoint.getService();
-
-  std::printf(" ip6_dst %s\n udp_dst %s\n", address_.c_str(), port_.c_str());
+                             remote_addr + " : " + remote_port);
+  }
+  std::printf(" ip6_dst %s\n udp_dst %s\n", socket_->Address().c_str(),
+              socket_->Port().c_str());
 }
 
 int RadioSocket::RxSymbol(
@@ -109,7 +99,7 @@ int RadioSocket::RxSymbol(
   size_t num_samples = 0;
   const auto* rx_buffer = &rx_buffer_.at(rx_bytes_);
   const int rx_return =
-      socket_.recv(&rx_buffer_.at(rx_bytes_), (rx_buffer_.size() - rx_bytes_));
+      socket_->Recv(&rx_buffer_.at(rx_bytes_), (rx_buffer_.size() - rx_bytes_));
 
   if (rx_return > 0) {
     std::printf("Received %d bytes\n", rx_return);

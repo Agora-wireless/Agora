@@ -7,18 +7,22 @@
 
 #include <complex>
 #include <cstddef>
+#include <memory>
+#include <string>
 #include <vector>
 
-#include "SoapyRPCSocket.hpp"
+#include "udp_server_ipv6.h"
 
+///Class to commicate with the Radios.  Including symbol parsing, packing and unpacking based on control plan MTU settings.
 class RadioSocket {
  public:
   RadioSocket(size_t samples_per_symbol);
   ~RadioSocket() = default;
 
-  void Create(const std::string& address, const std::string& port);
-  inline const std::string& GetAddress() const { return address_; }
-  inline const std::string& GetPort() const { return port_; };
+  void Create(const std::string& local_addr, const std::string& remote_addr,
+              const std::string& local_port, const std::string& remote_port);
+  inline const std::string& Address() const { return socket_->Address(); }
+  inline const std::string& Port() const { return socket_->Port(); };
 
   int RxSymbol(std::vector<std::vector<std::complex<int16_t>>>& out_data,
                long long& rx_time_ns);
@@ -29,14 +33,10 @@ class RadioSocket {
       std::vector<std::vector<std::complex<int16_t>>>& out_samples,
       long long& rx_time_ns);
 
-  sklk_SoapyRPCSocket socket_;
-  //UDPServer socket_;
+  std::unique_ptr<UDPServerIPv6> socket_;
   std::vector<std::byte> rx_buffer_;
   size_t rx_bytes_;
   size_t rx_samples_;
-
-  std::string address_;
-  std::string port_;
 
   const size_t samples_per_symbol_;
   const size_t bytes_per_element_;

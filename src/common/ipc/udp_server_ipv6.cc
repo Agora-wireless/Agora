@@ -15,33 +15,86 @@
 #include <stdexcept>
 
 #include "logger.h"
+#include "utils.h"
+
+//Allow IPv4 or IPv6(AF_UNSPEC);
+static const int kAllowedAiFamily = AF_INET6;
+
+UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
+                             uint16_t local_port, size_t rx_buffer_size)
+    : UDPServerIPv6(local_address, std::to_string(local_port), rx_buffer_size) {
+}
 
 // Initialize a UDP server listening on this UDP port with socket buffer
 // size = rx_buffer_size
-UDPServerIPv6::UDPServerIPv6(uint16_t port, size_t rx_buffer_size)
-    : port_(port) {
-  std::string local_port(std::to_string(port));
+UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
+                             const std::string& local_port,
+                             size_t rx_buffer_size)
+    : port_(local_port),
+      address_(local_address),
+      sock_fd_(-1),
+      server_address_info_(nullptr),
+      connected_address_info_(nullptr) {
+  std::printf("Creating UDP Server at address %s port %s\n",
+              local_address.c_str(), local_port.c_str());
+
+  //Set node to nullptr for loopback
+  char address_buffer[INET6_ADDRSTRLEN];
+  const char* node = &address_buffer[0u];
+  ::inet_pton(kAllowedAiFamily, local_address.c_str(), address_buffer);
 
   addrinfo hints;
   std::memset(&hints, 0u, sizeof(hints));
-  hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-  hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
-  hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
-  hints.ai_protocol = 0;          /* Any protocol */
-  hints.ai_canonname = NULL;
-  hints.ai_addr = NULL;
-  hints.ai_next = NULL;
+  hints.ai_family = kAllowedAiFamily;
+  hints.ai_socktype = SOCK_DGRAM;
+  hints.ai_flags = AI_NUMERICSERV;
+  //hints.ai_flags = AI_NUMERICSERV;
+  if (address_.empty()) {
+    //Set node to NULL for loopback or all interfaces
+    node = nullptr;
+    hints.ai_flags |= AI_PASSIVE; /* wildcard */
+  } else {
+    node = address_.c_str();
+    hints.ai_flags |= AI_NUMERICHOST;
+  }
+  hints.ai_protocol = 0; /* Any protocol */
+  hints.ai_canonname = nullptr;
+  hints.ai_addr = nullptr;
+  hints.ai_next = nullptr;
 
-  addrinfo* found_addresses = nullptr;
-  //Set node to NULL for loopback
-  int r = ::getaddrinfo(local_address.c_str(), local_port.c_str(), &hints,
-                        &found_addresses);
+  int r = ::getaddrinfo(node, port_.c_str(), &hints, &server_address_info_);
+  if (r < 0) {
+    std::printf("getaddrinfo returned error - %s (%d)\n", gai_strerror(r), r);
+  }
+
+  for (addrinfo* rp = server_address_info_; rp != nullptr; rp = rp->ai_next) {
+    const int family = rp->ai_family;
+    std::printf("Found address with family : %s (%d) type %d and protocol %d\n",
+                (family == AF_PACKET)  ? "AF_PACKET"
+                : (family == AF_INET)  ? "AF_INET"
+                : (family == AF_INET6) ? "AF_INET6"
+                                       : "???",
+                rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+    if (family == AF_INET6) {
+      auto address_ptr = &((sockaddr_in6*)rp->ai_addr)->sin6_addr;
+      std::printf("Internet Address:  %s \n",
+                  ::inet_ntop(family, address_ptr, address_buffer,
+                              sizeof(address_buffer)));
+    }
+  }
+
+  RtAssert((r == 0) && (server_address_info_ != nullptr) &&
+               (server_address_info_->ai_next == nullptr),
+           "Found 0 or more than 1 acceptable address with return status " +
+               std::to_string(r));
 
   if (kDebugPrintUdpServerInit) {
-    AGORA_LOG_INFO("Creating UDP server listening at port %d\n", port);
+    AGORA_LOG_INFO("Creating UDP server listening at port %s\n", port_.c_str());
   }
-  sock_fd_ = ::socket(AF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-  if (sock_fd_ == -1) {
+  sock_fd_ = ::socket(server_address_info_->ai_family,
+                      server_address_info_->ai_socktype | SOCK_NONBLOCK,
+                      server_address_info_->ai_protocol);
+  if (sock_fd_ < 0) {
     throw std::runtime_error(
         "UDPServerIPv6: Failed to create local socket. errno = " +
         std::string(std::strerror(errno)));
@@ -83,46 +136,29 @@ UDPServerIPv6::UDPServerIPv6(uint16_t port, size_t rx_buffer_size)
     }
   }
 
-  //Replace with getaddrinfo / getifaddrs
-  //::sockaddr_in6 serveraddr;
-  //std::memset(&serveraddr, 0u, sizeof(serveraddr));
-  //serveraddr.sin6_family = AF_INET6;
-  //serveraddr.sin6_addr = in6addr_any; /* :: */
-  //serveraddr.sin6_port = htons(static_cast<unsigned short>(port));
-
-  addrinfo hints;
-  std::memset(&hints, 0u, sizeof(hints));
-  hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-  hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
-  hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
-  hints.ai_protocol = 0;          /* Any protocol */
-  hints.ai_canonname = NULL;
-  hints.ai_addr = NULL;
-  hints.ai_next = NULL;
-
-  addrinfo* found_addresses = nullptr;
-  //Set node to NULL for loopback
-  int r = ::getaddrinfo(local_address.c_str(), local_port.c_str(), &hints,
-                        &found_addresses);
-
-    ret = ::bind(sock_fd_, reinterpret_cast<::sockaddr*>(&serveraddr),
-               sizeof(serveraddr));
+  //Listen on the found address
+  ret = ::bind(sock_fd_, server_address_info_->ai_addr,
+               server_address_info_->ai_addrlen);
   if (ret != 0) {
     throw std::runtime_error("UDPServerIPv6: Failed to bind socket to port " +
-                             std::to_string(port) +
-                             ". Error: " + std::strerror(errno));
+                             port_ + ". Error: " + std::strerror(errno));
   }
 }
 
 UDPServerIPv6::~UDPServerIPv6() {
-  if (sock_fd_ != -1) {
+  if (sock_fd_ < 0) {
     ::close(sock_fd_);
     sock_fd_ = -1;
   }
 
-  if (socket_address_info_ != nullptr) {
-    ::freeaddrinfo(socket_address_info_);
-    socket_address_info_ = nullptr;
+  if (server_address_info_ != nullptr) {
+    ::freeaddrinfo(server_address_info_);
+    server_address_info_ = nullptr;
+  }
+
+  if (connected_address_info_ != nullptr) {
+    ::freeaddrinfo(connected_address_info_);
+    connected_address_info_ = nullptr;
   }
 
   if (kDebugPrintUdpServerInit) {
@@ -137,7 +173,7 @@ UDPServerIPv6::~UDPServerIPv6() {
    * received. If no bytes are received, return zero. If there was an error
    * in receiving, return -1.
    */
-ssize_t UDPServerIPv6::Recv(uint8_t* buf, size_t len) const {
+ssize_t UDPServerIPv6::Recv(std::byte* buf, size_t len) const {
   ssize_t ret = ::recv(sock_fd_, static_cast<void*>(buf), len, 0);
 
   if (ret == -1) {
@@ -159,36 +195,41 @@ ssize_t UDPServerIPv6::Recv(uint8_t* buf, size_t len) const {
    *
    * @return Connect for DGRAM sockets just indicates a 1:1 socket
    */
-ssize_t UDPServerIPv6::Connect(const std::string& src_address,
-                               uint16_t src_port) {
-  std::string remote_port(std::to_string(src_port));
-  addrinfo* found_addresses = nullptr;
+ssize_t UDPServerIPv6::Connect(const std::string& remote_address,
+                               const std::string& remote_port) {
+  RtAssert(
+      (connected_address_info_ == nullptr) && (server_address_info_ != nullptr),
+      "Connected address must be null before connection");
 
   addrinfo hints;
   std::memset(&hints, 0u, sizeof(hints));
-  hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-  hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
-  hints.ai_flags = AI_PASSIVE;    /* For wildcard IP address */
-  hints.ai_protocol = 0;          /* Any protocol */
-  hints.ai_canonname = NULL;
+  hints.ai_family = server_address_info_->ai_family;
+  hints.ai_socktype = server_address_info_->ai_socktype;
+  hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
+  hints.ai_protocol = server_address_info_->ai_protocol;
+  hints.ai_canonname = server_address_info_->ai_canonname;
   hints.ai_addr = NULL;
   hints.ai_next = NULL;
 
-  int r = ::getaddrinfo(src_address.c_str(), remote_port.c_str(), &hints,
-                        &found_addresses);
-  if ((r != 0) || (found_addresses == nullptr)) {
+  int r = ::getaddrinfo(remote_address.c_str(), remote_port.c_str(), &hints,
+                        &connected_address_info_);
+  if ((r != 0) || (connected_address_info_ == nullptr)) {
     AGORA_LOG_ERROR("Failed to resolve %s. getaddrinfo error = %s.",
-                    src_address.c_str(), gai_strerror(r));
+                    remote_address.c_str(), gai_strerror(r));
     throw std::runtime_error("Failed to result getaddrinfo");
+  } else if (connected_address_info_->ai_next != nullptr) {
+    AGORA_LOG_ERROR("Too many client sockets found for address %s. port %s.\n",
+                    remote_address.c_str(), remote_port.c_str());
+    throw std::runtime_error(
+        "Connect(): Too many acceptable addresses returned from getaddrinfo");
   }
 
-  addrinfo* rem_connect;
   // getaddrinfo() returns a list of address structures, find the correct one to connect
-  for (rem_connect = found_addresses; rem_connect != nullptr;
+  for (addrinfo* rem_connect = connected_address_info_; rem_connect != nullptr;
        rem_connect = rem_connect->ai_next) {
-    if ((rem_connect->ai_family == local_address_->ai_family) &&
-        (rem_connect->ai_socktype == local_address_->ai_socktype) &&
-        (rem_connect->ai_protocol == local_address_->ai_protocol)) {
+    if ((rem_connect->ai_family == server_address_info_->ai_family) &&
+        (rem_connect->ai_socktype == server_address_info_->ai_socktype) &&
+        (rem_connect->ai_protocol == server_address_info_->ai_protocol)) {
       AGORA_LOG_INFO("Found remote with family %d, type %d, proto %d\n",
                      rem_connect->ai_family, rem_connect->ai_socktype,
                      rem_connect->ai_protocol);
@@ -198,14 +239,15 @@ ssize_t UDPServerIPv6::Connect(const std::string& src_address,
                     rem_connect->ai_family, rem_connect->ai_socktype,
                     rem_connect->ai_protocol);
   }
-
-  if (rem_connect != nullptr) {
-    AGORA_LOG_WARN("Could not find a compatible remote with address %s:%s\n",
-                   src_address, remote_port);
-  }
-  r = ::connect(sock_fd_, rem_connect->ai_addr, rem_connect->ai_addrlen);
-  ::freeaddrinfo(found_addresses);
+  //Need to change this to rem_connect if we allow more than 1.
+  r = ::connect(sock_fd_, connected_address_info_->ai_addr,
+                connected_address_info_->ai_addrlen);
   return r;
+}
+
+ssize_t UDPServerIPv6::Connect(const std::string& remote_address,
+                               uint16_t remote_port) {
+  return Connect(remote_address, std::to_string(remote_port));
 }
 
 /**

@@ -369,15 +369,21 @@ void RadioConfigNoRxStream::ConfigureRx(size_t radio_id) {
   std::printf(" Connect address %s\n", connect_address.c_str());
 
   //Setup the socket interface to the radio for the rx stream
-  rx_sockets_.emplace_back(cfg_->SampsPerSymbol());
+  rx_sockets_.emplace_back(
+      std::make_unique<RadioSocket>(cfg_->SampsPerSymbol()));
+
   auto& sock = rx_sockets_.back();
-  sock.Create(connect_address, remote_port);
+  sock->Create(cfg_->BsServerAddr(), connect_address,
+               std::to_string(cfg_->BsServerPort() + radio_id), remote_port);
 
   SoapySDR::Kwargs sargs;
   //Not sure if "bypass mode" works
   sargs["remote:prot"] = "none";
-  sargs["iris:ip6_dst"] = sock.GetAddress();
-  sargs["iris:udp_dst"] = sock.GetPort();
+  sargs["iris:ip6_dst"] = sock->Address();
+  sargs["iris:udp_dst"] = sock->Port();
+
+  std::printf(" iris:ip6_dst %s\n iris:udp_dst %s\n",
+              sargs["iris:ip6_dst"].c_str(), sargs["iris:udp_dst"].c_str());
   rx_streams_.at(radio_id) = ba_stn_.at(radio_id)->setupStream(
       SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
 }
@@ -486,8 +492,7 @@ int RadioConfigNoRxStream::RadioRx(
     long long& rx_time_ns) {
   // For now, radio rx will return 1 symbol
   int rx_return = 0;
-
-  rx_return = rx_sockets_.at(radio_id).RxSymbol(rx_data, rx_time_ns);
+  rx_return = rx_sockets_.at(radio_id)->RxSymbol(rx_data, rx_time_ns);
   if (rx_return > 0) {
     std::printf("Rx'd sample count %d\n", rx_return);
   } else if (rx_return < 0) {

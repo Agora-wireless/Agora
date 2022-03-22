@@ -56,7 +56,7 @@ class RadioConfigNoRxStream {
   std::atomic<size_t> num_radios_configured_;
 
   //Rx stream
-  std::vector<RadioSocket> rx_sockets_;
+  std::vector<std::unique_ptr<RadioSocket>> rx_sockets_;
   std::vector<SoapySDR::Stream*> rx_streams_;
   std::vector<SoapySDR::Stream*> tx_streams_;
 };
