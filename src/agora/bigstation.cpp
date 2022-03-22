@@ -130,8 +130,14 @@ finish:
 
 void BigStation::fftWorker(int tid)
 {
+    pin_to_core_with_offset(
+        ThreadType::kWorkerFFT, base_worker_core_offset_, tid - config_->fft_thread_offset,
+        true, config_->use_hyperthreading, config_->phy_core_num);
+        
     size_t ant_start = tid * config_->BS_ANT_NUM / config_->total_fft_workers;
     size_t ant_end = (tid + 1) * config_->BS_ANT_NUM / config_->total_fft_workers;
+
+    printf("FFT worker %d process ant [%zu,%zu)\n", tid, ant_start, ant_end);
 
     size_t cur_frame = 0;
     size_t cur_symbol = 0;
@@ -163,6 +169,7 @@ void BigStation::fftWorker(int tid)
             });
 
             do_fft->Launch(cur_frame, cur_symbol, cur_ant);
+            printf("Run FFT frame %zu symbol %zu ant %zu\n", cur_frame, cur_symbol, cur_ant);
 
             TRIGGER_TIMER({
                 size_t fft_tmp_tsc = rdtsc() - fft_start_tsc;
@@ -306,6 +313,11 @@ void BigStation::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size
 
 void BigStation::zfWorker(int tid)
 {
+    pin_to_core_with_offset(
+        ThreadType::kWorkerZF, base_worker_core_offset_, tid - config_->zf_thread_offset 
+            + config_->num_fft_workers[config_->bs_rru_addr_idx],
+            true, config_->use_hyperthreading, config_->phy_core_num);
+
     size_t sc_start = tid * config_->OFDM_DATA_NUM / config_->total_zf_workers;
     size_t sc_end = (tid + 1) * config_->OFDM_DATA_NUM / config_->total_zf_workers;
 
@@ -405,6 +417,12 @@ void BigStation::zfWorker(int tid)
 
 void BigStation::demulWorker(int tid)
 {
+    pin_to_core_with_offset(
+        ThreadType::kWorkerDemul, base_worker_core_offset_, tid - config_->demul_thread_offset 
+            + config_->num_fft_workers[config_->bs_rru_addr_idx]
+            + config_->num_zf_workers[config_->bs_rru_addr_idx],
+            true, config_->use_hyperthreading, config_->phy_core_num);
+
     size_t sc_start = tid * config_->OFDM_DATA_NUM / config_->total_demul_workers;
     size_t sc_end = (tid + 1) * config_->OFDM_DATA_NUM / config_->total_demul_workers;
 
@@ -497,6 +515,13 @@ void BigStation::demulWorker(int tid)
 
 void BigStation::decodeWorker(int tid)
 {
+    pin_to_core_with_offset(
+        ThreadType::kWorkerDecode, base_worker_core_offset_, tid - config_->decode_thread_offset 
+            + config_->num_fft_workers[config_->bs_rru_addr_idx]
+            + config_->num_zf_workers[config_->bs_rru_addr_idx]
+            + config_->num_demul_workers[config_->bs_rru_addr_idx],
+            true, config_->use_hyperthreading, config_->phy_core_num);
+
     size_t tid_offset = tid - config_->decode_thread_offset;
     size_t cur_decode_frame = 0;
     size_t cur_decode_idx = tid_offset;

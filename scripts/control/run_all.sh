@@ -95,6 +95,10 @@ if [ "${GEN_NEW_TRAFFIC_DATA}" == 1 ]; then
     { echored "Failed to generate RRU traffic data. Please check /tmp/hydra/install.log for details"; exit 1; }
 fi
 
+if [ "${HYDRA_RUN_MODE}" == 2 ]; then
+  exit
+fi
+
 if [ "${HYDRA_RUN_MODE}" == 0 ]; then
   # Run the Hydra application
   echocyan "Run Hydra applications and wait the initialization to finish"

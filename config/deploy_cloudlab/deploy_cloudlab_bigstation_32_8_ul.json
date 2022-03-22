@@ -3,24 +3,24 @@
         "node0"
     ],
     "hydra_servers": [
+        "node1",
         "node2",
-        "node3",
-        "node4"
+        "node3"
     ],
     "num_fft_workers": [
-        2,
-        2,
-        2
+        1,
+        1,
+        1
     ],
     "num_zf_workers": [
+        1,
+        1,
+        1
+    ],
+    "num_demul_workers": [
         2,
         2,
         2
-    ],
-    "num_demul_workers": [
-        4,
-        4,
-        4
     ],
     "num_decode_workers": [
         4,

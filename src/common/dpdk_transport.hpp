@@ -26,7 +26,8 @@
 #define JUMBO_FRAME_MAX_SIZE 0x2600 // allow max jumbo frame 9.5 KB
 /// Maximum number of packets received in rx_burst
 static constexpr size_t kRxBatchSize = 16;
-static constexpr size_t kTxBatchSize = 1;
+static constexpr size_t kTxBatchSize = 32;
+static constexpr size_t kMaxTxBufSize = 256;
 
 /// Offset to the payload starting from the beginning of the UDP frame
 static constexpr size_t kPayloadOffset = sizeof(struct rte_ether_hdr)

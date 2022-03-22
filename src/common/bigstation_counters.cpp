@@ -125,6 +125,8 @@ bool BigStationState::prepare_freq_iq_pkt(size_t frame_id, size_t symbol_id, siz
         return false;
     }
     num_freq_iq_pkts_prepared_[frame_id % kFrameWnd][symbol_id] ++;
+    printf("Prepare freq iq packet frame %zu symbol %zu count %zu required %zu\n", frame_id,
+        symbol_id, num_freq_iq_pkts_prepared_[frame_id % kFrameWnd][symbol_id].load(), num_freq_iq_pkts_prepared_per_symbol_);
     return true;
 }
 
