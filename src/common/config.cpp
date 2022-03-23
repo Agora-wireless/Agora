@@ -368,14 +368,15 @@ Config::Config(std::string jsonfile)
         for (size_t i = 0; i < num_fft_workers.size(); i++) {
             total_thread_num += num_fft_workers[i];
         }
-        for (size_t i = 0; i < BS_ANT_NUM; i ++) {
-            double tid = i * 1.0 * total_thread_num / BS_ANT_NUM;
-            if (tid < next_bar) {
-                ant_server_mapping[i] = cur_server_id;
-            } else {
+        for (size_t i = 0; i < total_thread_num; i ++) {
+            if (i >= next_bar) {
                 cur_server_id ++;
                 next_bar += num_fft_workers[cur_server_id];
-                ant_server_mapping[i] = cur_server_id;
+            }
+            size_t local_start = i * 1.0 * BS_ANT_NUM / total_thread_num;
+            size_t local_end = (i + 1) * 1.0 * BS_ANT_NUM / total_thread_num;
+            for (size_t j = local_start; j < local_end; j ++) {
+                ant_server_mapping[j] = cur_server_id;
             }
         }
         ant_start = -1;
@@ -405,14 +406,15 @@ Config::Config(std::string jsonfile)
         for (size_t i = 0; i < num_zf_workers.size(); i++) {
             total_thread_num += num_zf_workers[i];
         }
-        for (size_t i = 0; i < OFDM_DATA_NUM; i ++) {
-            double tid = i * 1.0 * total_thread_num / OFDM_DATA_NUM;
-            if (tid < next_bar) {
-                zf_server_mapping[i] = cur_server_id;
-            } else {
+        for (size_t i = 0; i < total_thread_num; i ++) {
+            if (i >= next_bar) {
                 cur_server_id ++;
                 next_bar += num_zf_workers[cur_server_id];
-                zf_server_mapping[i] = cur_server_id;
+            }
+            size_t local_start = i * 1.0 * OFDM_DATA_NUM / total_thread_num;
+            size_t local_end = (i + 1) * 1.0 * OFDM_DATA_NUM / total_thread_num;
+            for (size_t j = local_start; j < local_end; j ++) {
+                zf_server_mapping[j] = cur_server_id;
             }
         }
         zf_start = -1;
@@ -442,14 +444,15 @@ Config::Config(std::string jsonfile)
         for (size_t i = 0; i < num_demul_workers.size(); i++) {
             total_thread_num += num_demul_workers[i];
         }
-        for (size_t i = 0; i < OFDM_DATA_NUM; i ++) {
-            double tid = i * 1.0 * total_thread_num / OFDM_DATA_NUM;
-            if (tid < next_bar) {
-                demul_server_mapping[i] = cur_server_id;
-            } else {
+        for (size_t i = 0; i < total_thread_num; i ++) {
+            if (i >= next_bar) {
                 cur_server_id ++;
                 next_bar += num_demul_workers[cur_server_id];
-                demul_server_mapping[i] = cur_server_id;
+            }
+            size_t local_start = i * 1.0 * OFDM_DATA_NUM / total_thread_num;
+            size_t local_end = (i + 1) * 1.0 * OFDM_DATA_NUM / total_thread_num;
+            for (size_t j = local_start; j < local_end; j ++) {
+                demul_server_mapping[j] = cur_server_id;
             }
         }
         demul_start = -1;
@@ -479,14 +482,15 @@ Config::Config(std::string jsonfile)
         for (size_t i = 0; i < num_decode_workers.size(); i++) {
             total_thread_num += num_decode_workers[i];
         }
-        for (size_t i = 0; i < UE_NUM; i ++) {
-            double tid = i * 1.0 * total_thread_num / UE_NUM;
-            if (tid < next_bar) {
-                ue_server_mapping[i] = cur_server_id;
-            } else {
+        for (size_t i = 0; i < total_thread_num; i ++) {
+            if (i >= next_bar) {
                 cur_server_id ++;
                 next_bar += num_decode_workers[cur_server_id];
-                ue_server_mapping[i] = cur_server_id;
+            }
+            size_t local_start = i * 1.0 * UE_NUM / total_thread_num;
+            size_t local_end = (i + 1) * 1.0 * UE_NUM / total_thread_num;
+            for (size_t j = local_start; j < local_end; j ++) {
+                ue_server_mapping[j] = cur_server_id;
             }
         }
         ue_start = -1;

@@ -1,105 +1,130 @@
 <rspec xmlns="http://www.geni.net/resources/rspec/3" xmlns:emulab="http://www.protogeni.net/resources/rspec/ext/emulab/1" xmlns:tour="http://www.protogeni.net/resources/rspec/ext/apt-tour/1" xmlns:jacks="http://www.protogeni.net/resources/rspec/ext/jacks/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.geni.net/resources/rspec/3    http://www.geni.net/resources/rspec/3/request.xsd" type="request">
-  <node xmlns:emulab="http://www.protogeni.net/resources/rspec/ext/emulab/1" client_id="node0" exclusive="true" component_manager_id="urn:publicid:IDN+utah.cloudlab.us+authority+cm" component_id="urn:publicid:IDN+utah.cloudlab.us+node+hp129" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147645">
+  <node xmlns:emulab="http://www.protogeni.net/resources/rspec/ext/emulab/1" client_id="node0" exclusive="true" component_manager_id="urn:publicid:IDN+utah.cloudlab.us+authority+cm" component_id="urn:publicid:IDN+utah.cloudlab.us+node+hp076" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147934">
     <sliver_type name="raw-pc">
       <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU18-64-STD"/>
     </sliver_type>
     <hardware_type name="xl170"/>
-    <interface client_id="node0:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp129:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147649" mac_address="9cdc715dd541">
+    <interface client_id="node0:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp076:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147937" mac_address="9cdc715d6111">
       <ip address="10.10.1.1" netmask="255.255.255.0" type="ipv4"/>
     </interface>
-    <emulab:vnode name="hp129" hardware_type="xl170"/>
-    <host name="node0.junzhig-121255.opensketch-PG0.utah.cloudlab.us" ipv4="128.110.218.168"/>
+    <emulab:vnode name="hp076" hardware_type="xl170"/>
+    <host name="node0.junzhig-121288.opensketch-PG0.utah.cloudlab.us" ipv4="128.110.218.115"/>
     <services>
-      <login authentication="ssh-keys" hostname="hp129.utah.cloudlab.us" port="22" username="junzhig"/>
-      <login authentication="ssh-keys" hostname="hp129.utah.cloudlab.us" port="22" username="alazaris"/>
-      <login authentication="ssh-keys" hostname="hp129.utah.cloudlab.us" port="22" username="minlanyu"/>
-      <login authentication="ssh-keys" hostname="hp129.utah.cloudlab.us" port="22" username="moshrefj"/>
-      <login authentication="ssh-keys" hostname="hp129.utah.cloudlab.us" port="22" username="zmy"/>
-      <login authentication="ssh-keys" hostname="hp129.utah.cloudlab.us" port="22" username="JiaqiGao"/>
-      <login authentication="ssh-keys" hostname="hp129.utah.cloudlab.us" port="22" username="Omid"/>
+      <login authentication="ssh-keys" hostname="hp076.utah.cloudlab.us" port="22" username="junzhig"/>
+      <login authentication="ssh-keys" hostname="hp076.utah.cloudlab.us" port="22" username="alazaris"/>
+      <login authentication="ssh-keys" hostname="hp076.utah.cloudlab.us" port="22" username="minlanyu"/>
+      <login authentication="ssh-keys" hostname="hp076.utah.cloudlab.us" port="22" username="moshrefj"/>
+      <login authentication="ssh-keys" hostname="hp076.utah.cloudlab.us" port="22" username="zmy"/>
+      <login authentication="ssh-keys" hostname="hp076.utah.cloudlab.us" port="22" username="JiaqiGao"/>
+      <login authentication="ssh-keys" hostname="hp076.utah.cloudlab.us" port="22" username="Omid"/>
       <emulab:console server="boss.utah.cloudlab.us"/>
       <emulab:recovery available="true"/>
       <emulab:powercycle available="true"/>
       <emulab:imageable available="true"/>
     </services>
   </node>
-  <node xmlns:emulab="http://www.protogeni.net/resources/rspec/ext/emulab/1" client_id="node1" exclusive="true" component_manager_id="urn:publicid:IDN+utah.cloudlab.us+authority+cm" component_id="urn:publicid:IDN+utah.cloudlab.us+node+hp158" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147646">
+  <node xmlns:emulab="http://www.protogeni.net/resources/rspec/ext/emulab/1" client_id="node1" exclusive="true" component_manager_id="urn:publicid:IDN+utah.cloudlab.us+authority+cm" component_id="urn:publicid:IDN+utah.cloudlab.us+node+hp054" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147930">
     <sliver_type name="raw-pc">
       <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU18-64-STD"/>
     </sliver_type>
     <hardware_type name="xl170"/>
-    <interface client_id="node1:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp158:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147650" mac_address="9cdc715e0fe1">
+    <interface client_id="node1:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp054:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147938" mac_address="9cdc715d57f1">
       <ip address="10.10.1.2" netmask="255.255.255.0" type="ipv4"/>
     </interface>
-    <emulab:vnode name="hp158" hardware_type="xl170"/>
-    <host name="node1.junzhig-121255.opensketch-PG0.utah.cloudlab.us" ipv4="128.110.218.197"/>
+    <emulab:vnode name="hp054" hardware_type="xl170"/>
+    <host name="node1.junzhig-121288.opensketch-PG0.utah.cloudlab.us" ipv4="128.110.218.93"/>
     <services>
-      <login authentication="ssh-keys" hostname="hp158.utah.cloudlab.us" port="22" username="junzhig"/>
-      <login authentication="ssh-keys" hostname="hp158.utah.cloudlab.us" port="22" username="alazaris"/>
-      <login authentication="ssh-keys" hostname="hp158.utah.cloudlab.us" port="22" username="minlanyu"/>
-      <login authentication="ssh-keys" hostname="hp158.utah.cloudlab.us" port="22" username="moshrefj"/>
-      <login authentication="ssh-keys" hostname="hp158.utah.cloudlab.us" port="22" username="zmy"/>
-      <login authentication="ssh-keys" hostname="hp158.utah.cloudlab.us" port="22" username="JiaqiGao"/>
-      <login authentication="ssh-keys" hostname="hp158.utah.cloudlab.us" port="22" username="Omid"/>
+      <login authentication="ssh-keys" hostname="hp054.utah.cloudlab.us" port="22" username="junzhig"/>
+      <login authentication="ssh-keys" hostname="hp054.utah.cloudlab.us" port="22" username="alazaris"/>
+      <login authentication="ssh-keys" hostname="hp054.utah.cloudlab.us" port="22" username="minlanyu"/>
+      <login authentication="ssh-keys" hostname="hp054.utah.cloudlab.us" port="22" username="moshrefj"/>
+      <login authentication="ssh-keys" hostname="hp054.utah.cloudlab.us" port="22" username="zmy"/>
+      <login authentication="ssh-keys" hostname="hp054.utah.cloudlab.us" port="22" username="JiaqiGao"/>
+      <login authentication="ssh-keys" hostname="hp054.utah.cloudlab.us" port="22" username="Omid"/>
       <emulab:console server="boss.utah.cloudlab.us"/>
       <emulab:recovery available="true"/>
       <emulab:powercycle available="true"/>
       <emulab:imageable available="true"/>
     </services>
   </node>
-  <node xmlns:emulab="http://www.protogeni.net/resources/rspec/ext/emulab/1" client_id="node2" exclusive="true" component_manager_id="urn:publicid:IDN+utah.cloudlab.us+authority+cm" component_id="urn:publicid:IDN+utah.cloudlab.us+node+hp152" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147643">
+  <node xmlns:emulab="http://www.protogeni.net/resources/rspec/ext/emulab/1" client_id="node2" exclusive="true" component_manager_id="urn:publicid:IDN+utah.cloudlab.us+authority+cm" component_id="urn:publicid:IDN+utah.cloudlab.us+node+hp064" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147933">
     <sliver_type name="raw-pc">
       <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU18-64-STD"/>
     </sliver_type>
     <hardware_type name="xl170"/>
-    <interface client_id="node2:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp152:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147651" mac_address="9cdc715c9f51">
+    <interface client_id="node2:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp064:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147939" mac_address="9cdc7149c8a1">
       <ip address="10.10.1.3" netmask="255.255.255.0" type="ipv4"/>
     </interface>
-    <emulab:vnode name="hp152" hardware_type="xl170"/>
-    <host name="node2.junzhig-121255.opensketch-PG0.utah.cloudlab.us" ipv4="128.110.218.191"/>
+    <emulab:vnode name="hp064" hardware_type="xl170"/>
+    <host name="node2.junzhig-121288.opensketch-PG0.utah.cloudlab.us" ipv4="128.110.218.103"/>
     <services>
-      <login authentication="ssh-keys" hostname="hp152.utah.cloudlab.us" port="22" username="junzhig"/>
-      <login authentication="ssh-keys" hostname="hp152.utah.cloudlab.us" port="22" username="alazaris"/>
-      <login authentication="ssh-keys" hostname="hp152.utah.cloudlab.us" port="22" username="minlanyu"/>
-      <login authentication="ssh-keys" hostname="hp152.utah.cloudlab.us" port="22" username="moshrefj"/>
-      <login authentication="ssh-keys" hostname="hp152.utah.cloudlab.us" port="22" username="zmy"/>
-      <login authentication="ssh-keys" hostname="hp152.utah.cloudlab.us" port="22" username="JiaqiGao"/>
-      <login authentication="ssh-keys" hostname="hp152.utah.cloudlab.us" port="22" username="Omid"/>
+      <login authentication="ssh-keys" hostname="hp064.utah.cloudlab.us" port="22" username="junzhig"/>
+      <login authentication="ssh-keys" hostname="hp064.utah.cloudlab.us" port="22" username="alazaris"/>
+      <login authentication="ssh-keys" hostname="hp064.utah.cloudlab.us" port="22" username="minlanyu"/>
+      <login authentication="ssh-keys" hostname="hp064.utah.cloudlab.us" port="22" username="moshrefj"/>
+      <login authentication="ssh-keys" hostname="hp064.utah.cloudlab.us" port="22" username="zmy"/>
+      <login authentication="ssh-keys" hostname="hp064.utah.cloudlab.us" port="22" username="JiaqiGao"/>
+      <login authentication="ssh-keys" hostname="hp064.utah.cloudlab.us" port="22" username="Omid"/>
       <emulab:console server="boss.utah.cloudlab.us"/>
       <emulab:recovery available="true"/>
       <emulab:powercycle available="true"/>
       <emulab:imageable available="true"/>
     </services>
   </node>
-  <node xmlns:emulab="http://www.protogeni.net/resources/rspec/ext/emulab/1" client_id="node3" exclusive="true" component_manager_id="urn:publicid:IDN+utah.cloudlab.us+authority+cm" component_id="urn:publicid:IDN+utah.cloudlab.us+node+hp151" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147644">
+  <node xmlns:emulab="http://www.protogeni.net/resources/rspec/ext/emulab/1" client_id="node3" exclusive="true" component_manager_id="urn:publicid:IDN+utah.cloudlab.us+authority+cm" component_id="urn:publicid:IDN+utah.cloudlab.us+node+hp042" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147932">
     <sliver_type name="raw-pc">
       <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU18-64-STD"/>
     </sliver_type>
     <hardware_type name="xl170"/>
-    <interface client_id="node3:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp151:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147652" mac_address="9cdc7149a851">
+    <interface client_id="node3:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp042:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147940" mac_address="9cdc715d5141">
       <ip address="10.10.1.4" netmask="255.255.255.0" type="ipv4"/>
     </interface>
-    <emulab:vnode name="hp151" hardware_type="xl170"/>
-    <host name="node3.junzhig-121255.opensketch-PG0.utah.cloudlab.us" ipv4="128.110.218.190"/>
+    <emulab:vnode name="hp042" hardware_type="xl170"/>
+    <host name="node3.junzhig-121288.opensketch-PG0.utah.cloudlab.us" ipv4="128.110.218.81"/>
     <services>
-      <login authentication="ssh-keys" hostname="hp151.utah.cloudlab.us" port="22" username="junzhig"/>
-      <login authentication="ssh-keys" hostname="hp151.utah.cloudlab.us" port="22" username="alazaris"/>
-      <login authentication="ssh-keys" hostname="hp151.utah.cloudlab.us" port="22" username="minlanyu"/>
-      <login authentication="ssh-keys" hostname="hp151.utah.cloudlab.us" port="22" username="moshrefj"/>
-      <login authentication="ssh-keys" hostname="hp151.utah.cloudlab.us" port="22" username="zmy"/>
-      <login authentication="ssh-keys" hostname="hp151.utah.cloudlab.us" port="22" username="JiaqiGao"/>
-      <login authentication="ssh-keys" hostname="hp151.utah.cloudlab.us" port="22" username="Omid"/>
+      <login authentication="ssh-keys" hostname="hp042.utah.cloudlab.us" port="22" username="junzhig"/>
+      <login authentication="ssh-keys" hostname="hp042.utah.cloudlab.us" port="22" username="alazaris"/>
+      <login authentication="ssh-keys" hostname="hp042.utah.cloudlab.us" port="22" username="minlanyu"/>
+      <login authentication="ssh-keys" hostname="hp042.utah.cloudlab.us" port="22" username="moshrefj"/>
+      <login authentication="ssh-keys" hostname="hp042.utah.cloudlab.us" port="22" username="zmy"/>
+      <login authentication="ssh-keys" hostname="hp042.utah.cloudlab.us" port="22" username="JiaqiGao"/>
+      <login authentication="ssh-keys" hostname="hp042.utah.cloudlab.us" port="22" username="Omid"/>
       <emulab:console server="boss.utah.cloudlab.us"/>
       <emulab:recovery available="true"/>
       <emulab:powercycle available="true"/>
       <emulab:imageable available="true"/>
     </services>
   </node>
-  <link client_id="link-0" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147648" vlantag="496">
-    <interface_ref client_id="node0:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp129:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147649"/>
-    <interface_ref client_id="node1:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp158:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147650"/>
-    <interface_ref client_id="node2:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp152:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147651"/>
-    <interface_ref client_id="node3:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp151:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147652"/>
+  <node xmlns:emulab="http://www.protogeni.net/resources/rspec/ext/emulab/1" client_id="node4" exclusive="true" component_manager_id="urn:publicid:IDN+utah.cloudlab.us+authority+cm" component_id="urn:publicid:IDN+utah.cloudlab.us+node+hp049" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147931">
+    <sliver_type name="raw-pc">
+      <disk_image name="urn:publicid:IDN+emulab.net+image+emulab-ops//UBUNTU18-64-STD"/>
+    </sliver_type>
+    <hardware_type name="xl170"/>
+    <interface client_id="node4:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp049:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147941" mac_address="9cdc715d41f1">
+      <ip address="10.10.1.5" netmask="255.255.255.0" type="ipv4"/>
+    </interface>
+    <emulab:vnode name="hp049" hardware_type="xl170"/>
+    <host name="node4.junzhig-121288.opensketch-PG0.utah.cloudlab.us" ipv4="128.110.218.88"/>
+    <services>
+      <login authentication="ssh-keys" hostname="hp049.utah.cloudlab.us" port="22" username="junzhig"/>
+      <login authentication="ssh-keys" hostname="hp049.utah.cloudlab.us" port="22" username="alazaris"/>
+      <login authentication="ssh-keys" hostname="hp049.utah.cloudlab.us" port="22" username="minlanyu"/>
+      <login authentication="ssh-keys" hostname="hp049.utah.cloudlab.us" port="22" username="moshrefj"/>
+      <login authentication="ssh-keys" hostname="hp049.utah.cloudlab.us" port="22" username="zmy"/>
+      <login authentication="ssh-keys" hostname="hp049.utah.cloudlab.us" port="22" username="JiaqiGao"/>
+      <login authentication="ssh-keys" hostname="hp049.utah.cloudlab.us" port="22" username="Omid"/>
+      <emulab:console server="boss.utah.cloudlab.us"/>
+      <emulab:recovery available="true"/>
+      <emulab:powercycle available="true"/>
+      <emulab:imageable available="true"/>
+    </services>
+  </node>
+  <link client_id="link-0" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147936" vlantag="373">
+    <interface_ref client_id="node0:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp076:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147937"/>
+    <interface_ref client_id="node1:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp054:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147938"/>
+    <interface_ref client_id="node2:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp064:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147939"/>
+    <interface_ref client_id="node3:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp042:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147940"/>
+    <interface_ref client_id="node4:if0" component_id="urn:publicid:IDN+utah.cloudlab.us+interface+hp049:eth1" sliver_id="urn:publicid:IDN+utah.cloudlab.us+sliver+1147941"/>
     <component_manager name="urn:publicid:IDN+utah.cloudlab.us+authority+cm"/>
   </link>
   <rspec_tour xmlns="http://www.protogeni.net/resources/rspec/ext/apt-tour/1">
@@ -113,9 +138,9 @@ inside the profile).
 </instructions>
   </rspec_tour>
   <data_set xmlns="http://www.protogeni.net/resources/rspec/ext/profile-parameters/1">
-    <data_item name="emulab.net.parameter.NUMNODES">4</data_item>
+    <data_item name="emulab.net.parameter.NUMNODES">5</data_item>
   </data_set>
-  <emulab:portal name="cloudlab" url="https://www.cloudlab.us/status.php?uuid=df19ab17-aa09-11ec-b318-e4434b2381fc" project="opensketch" experiment="junzhig-121255"/>
+  <emulab:portal name="cloudlab" url="https://www.cloudlab.us/status.php?uuid=8e45f5b2-aa4c-11ec-b318-e4434b2381fc" project="opensketch" experiment="junzhig-121288"/>
   <rs:site_info xmlns:rs="http://www.protogeni.net/resources/rspec/ext/site-info/1">
     <rs:location country="US" latitude="40.750714" longitude="-111.893288"/>
   </rs:site_info>
