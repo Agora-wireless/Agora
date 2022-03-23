@@ -40,24 +40,28 @@ UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
 
   //Set node to nullptr for loopback
   char address_buffer[INET6_ADDRSTRLEN];
-  const char* node = &address_buffer[0u];
-  ::inet_pton(kAllowedAiFamily, local_address.c_str(), address_buffer);
+  //node = &address_buffer[0u];
+  //auto pton_result =
+  //    ::inet_pton(kAllowedAiFamily, local_address.c_str(), address_buffer);
+  //std::printf("Pton result %d\n", pton_result);
 
+  const char* node;
   addrinfo hints;
   std::memset(&hints, 0u, sizeof(hints));
   hints.ai_family = kAllowedAiFamily;
   hints.ai_socktype = SOCK_DGRAM;
   hints.ai_flags = AI_NUMERICSERV;
-  //hints.ai_flags = AI_NUMERICSERV;
   if (address_.empty()) {
-    //Set node to NULL for loopback or all interfaces
+    /// Set node to NULL for loopback or all interfaces
     node = nullptr;
-    hints.ai_flags |= AI_PASSIVE; /* wildcard */
+    /// wildcard
+    hints.ai_flags |= AI_PASSIVE;
   } else {
     node = address_.c_str();
     hints.ai_flags |= AI_NUMERICHOST;
   }
-  hints.ai_protocol = 0; /* Any protocol */
+  /// Any protocol
+  hints.ai_protocol = 0;
   hints.ai_canonname = nullptr;
   hints.ai_addr = nullptr;
   hints.ai_next = nullptr;

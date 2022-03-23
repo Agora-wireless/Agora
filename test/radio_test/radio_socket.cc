@@ -9,6 +9,18 @@
 
 constexpr size_t kRxBufferSize = 8192;
 
+constexpr size_t kDebugIrisRx = false;
+//constexpr size_t kDebugIrisTxStatus = false;
+
+#define SOCKET_DEBUG_OUTPUT
+#if defined(SOCKET_DEBUG_OUTPUT)
+#define DEBUG_OUTPUT(...)   \
+  std::printf(__VA_ARGS__); \
+  std::fflush(stdout)
+#else
+#define DEBUG_OUTPUT(...) ((void)0)
+#endif
+
 //#define MAX_TX_STATUS_DEPTH (64)
 
 // #define RX_SOCKET_BUFFER_BYTES
@@ -20,9 +32,6 @@ constexpr size_t kRxBufferSize = 8192;
 //   (16)  // 14 bytes + 2 bytes padding (holds size in bytes)
 // #define IPv6_UDP_SIZE (40 + 8)  // 40 bytes of IPv6 + 8 bytes of UDP header
 // #define TWBW_HDR_SIZE (sizeof(uint64_t) * 4)  // 4 transfers at 64-bits width
-
-constexpr size_t kDebugIrisRx = true;
-//constexpr size_t kDebugIrisTxStatus = false;
 
 /// Iris tx status header flags
 #define SEQUENCE_MASK (0xffff)
@@ -62,7 +71,7 @@ struct IrisCommData {
   uint64_t header_[2u];
   // Raw sample data, byte accessable
   uint8_t data_[];
-};
+} __attribute__((packed));
 static_assert(sizeof(IrisCommData::header_) == 16);
 
 //bytes_per_element is based on "WIRE" format
@@ -89,8 +98,8 @@ void RadioSocket::Create(const std::string& local_addr,
     throw std::runtime_error("Iris::setupStream: Failed to connect to " +
                              remote_addr + " : " + remote_port);
   }
-  std::printf(" ip6_dst %s\n udp_dst %s\n", socket_->Address().c_str(),
-              socket_->Port().c_str());
+  DEBUG_OUTPUT(" ip6_dst %s\n udp_dst %s\n", socket_->Address().c_str(),
+               socket_->Port().c_str());
 }
 
 int RadioSocket::RxSymbol(
@@ -102,13 +111,13 @@ int RadioSocket::RxSymbol(
       socket_->Recv(&rx_buffer_.at(rx_bytes_), (rx_buffer_.size() - rx_bytes_));
 
   if (rx_return > 0) {
-    std::printf("Received %d bytes\n", rx_return);
+    DEBUG_OUTPUT("Received %d bytes\n", rx_return);
     const size_t new_bytes = static_cast<size_t>(rx_return);
     const bool symbol_complete = CheckSymbolComplete(rx_buffer, rx_return);
     rx_bytes_ += new_bytes;
 
     if (symbol_complete) {
-      std::printf("Completed Symbol: %zu bytes\n", rx_bytes_);
+      DEBUG_OUTPUT("Completed Symbol: %zu bytes\n", rx_bytes_);
       num_samples = ParseRxSymbol(out_data, rx_time_ns);
       rx_bytes_ = 0;
       rx_samples_ = 0;
@@ -165,17 +174,16 @@ bool RadioSocket::CheckSymbolComplete(const std::byte* in_data,
   }
   const size_t start_sample = (rx_time_ticks & 0xFFFF);
   if (start_sample > rx_samples_) {
-    std::printf("***** Unexpected sample start received %zu:%zu *****\n",
-                start_sample, rx_samples_);
+    DEBUG_OUTPUT("***** Unexpected sample start received %zu:%zu *****\n",
+                 start_sample, rx_samples_);
     //rx_samples_ += start_sample;
   } else if (start_sample < rx_samples_) {
-    std::printf("***** Unexpected sample start received %zu:%zu *****\n",
-                start_sample, rx_samples_);
-    std::fflush(stdout);
+    DEBUG_OUTPUT("***** Unexpected sample start received %zu:%zu *****\n",
+                 start_sample, rx_samples_);
     throw std::runtime_error("Unexpected sample start received");
   }
   rx_samples_ += samples;
-  std::printf("Rx'd samples %zu:%zu\n", rx_samples_, samples_per_symbol_);
+  DEBUG_OUTPUT("Rx'd samples %zu:%zu\n", rx_samples_, samples_per_symbol_);
 
   RtAssert(rx_samples_ <= samples_per_symbol_,
            "Number of samples exceeds samples per symbol");
@@ -196,8 +204,6 @@ size_t RadioSocket::ParseRxSymbol(
 
   //Assumes that leading packets are == burst_size samples
   while (processed_bytes < rx_bytes_) {
-    std::printf("Processing bytes %zu:%zu\n", processed_bytes, rx_bytes_);
-
     // unpacker logic for twbw_rx_framer64
     const auto* rx_data =
         reinterpret_cast<const IrisCommData*>(&rx_buffer_.at(processed_bytes));
@@ -222,9 +228,10 @@ size_t RadioSocket::ParseRxSymbol(
         std::min(processed_samples + sample_count, rx_samples_);
     RtAssert(((current_total_samples % out_samples.size()) == 0),
              "Unexpected number of received samples");
-    std::printf("Current total samples %zu : %zu\n", current_total_samples,
-                rx_samples_);
-    fflush(stdout);
+
+    DEBUG_OUTPUT("Current total samples %zu : %zu\n", current_total_samples,
+                 rx_samples_);
+
     while (processed_samples < current_total_samples) {
       const uint16_t i_lsb = uint16_t(payload[byte_offset]);
       const uint16_t split = uint16_t(payload[byte_offset + 1u]);
@@ -248,7 +255,6 @@ size_t RadioSocket::ParseRxSymbol(
     } else {
       processed_bytes = current_address - rx_buffer_address;
     }
-    std::printf("*****Processed Bytes %zu\n", processed_bytes);
   }
   RtAssert(processed_bytes == rx_bytes_,
            "Did not process the correct number of bytes");

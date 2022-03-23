@@ -3,6 +3,7 @@
  * @brief Main file for the radio test program
  */
 #include "gflags/gflags.h"
+#include "logger.h"
 #include "network_utils.h"
 #include "radio_lib.h"
 #include "radio_lib_mod.h"
@@ -25,6 +26,7 @@ int main(int argc, char* argv[]) {
   gflags::SetVersionString(GetAgoraProjectVersion());
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   std::string conf_file;
+  AGORA_LOG_INIT();
 
   // For backwards compatibility
   if (argc == 2) {
@@ -55,6 +57,7 @@ int main(int argc, char* argv[]) {
   }
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
+  AGORA_LOG_SHUTDOWN();
   return ret;
 }
 
