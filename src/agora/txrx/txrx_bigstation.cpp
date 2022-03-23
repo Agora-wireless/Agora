@@ -210,7 +210,7 @@ int BigStationTXRX::recv_relocate(int tid)
             // }
             char* dst_ptr = freq_iq_buffer_[pkt->ant_id_] + (pkt->frame_id_ % kFrameWnd) * cfg_->symbol_num_perframe
                 * cfg_->packet_length + pkt->symbol_id_ * cfg_->packet_length + Packet::kOffsetOfData
-                + pkt->sc_id_ * 2 * sizeof(unsigned short);
+                + (cfg_->OFDM_DATA_START + pkt->sc_id_) * 2 * sizeof(unsigned short);
             memcpy(dst_ptr, pkt->data_, pkt->sc_len_ * 2 * sizeof(unsigned short));
             if (pkt->symbol_id_ < cfg_->pilot_symbol_num_perframe) {
                 if (!bigstation_state_->receive_pilot_pkt(pkt->frame_id_, pkt->ant_id_)) {
@@ -244,7 +244,7 @@ int BigStationTXRX::recv_relocate(int tid)
                 cfg_->running = false;
             }
         } else if (pkt->pkt_type_ == Packet::PktType::kPostZF) {
-            uint8_t* dst_ptr = ((uint8_t*)post_zf_buffer_[pkt->frame_id_][pkt->sc_id_]) + pkt->data_off_;
+            uint8_t* dst_ptr = ((uint8_t*)post_zf_buffer_[pkt->frame_id_%kFrameWnd][pkt->sc_id_]) + pkt->data_off_;
             memcpy(dst_ptr, pkt->data_, pkt->data_len_);
             if (!bigstation_state_->receive_zf_pkt(pkt->frame_id_, pkt->sc_id_)) {
                 cfg_->error = true;
@@ -288,6 +288,7 @@ void* BigStationTXRX::tx_thread(int tid)
                 size_t sc_offset = simple_hash(freq_iq_pkt_frame) % cfg_->UE_NUM;
 
                 struct rte_mbuf* tx_bufs[kMaxTxBufSize] __attribute__((aligned(64)));
+                size_t total_buf_id = 0;
                 for (size_t i = 0; i < cfg_->total_zf_workers; i ++) {
                     size_t sc_start = cfg_->OFDM_DATA_NUM * 1.0 * i / cfg_->total_zf_workers;
                     size_t sc_end = cfg_->OFDM_DATA_NUM * 1.0 * (i + 1) / cfg_->total_zf_workers;
@@ -301,40 +302,53 @@ void* BigStationTXRX::tx_thread(int tid)
                     }
                     size_t server_id = cfg_->zf_server_mapping[sc_start];
                     size_t sc_len = 0;
-                    if (last_possible_sc >= first_possible_sc + 1) {
-                        sc_len = (last_possible_sc - first_possible_sc + 1) * cfg_->UE_NUM;
+                    if (last_possible_sc >= first_possible_sc) {
+                        sc_len = last_possible_sc - first_possible_sc + cfg_->UE_NUM;
                     }
-                    uint8_t* src_ptr = ant_ptr + (cfg_->OFDM_DATA_START + first_possible_sc) * 2 * sizeof(unsigned short);
+                    uint8_t* src_ptr = ant_ptr + (cfg_->OFDM_DATA_START + first_possible_sc - 
+                        first_possible_sc % cfg_->UE_NUM) * 2 * sizeof(unsigned short);
                     
-                    tx_bufs[i] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 
-                        bs_server_mac_addrs_[server_id],
-                        bs_server_addrs_[cfg_->bs_server_addr_idx], bs_server_addrs_[server_id], 
-                        cfg_->demod_tx_port + freq_iq_pkt_ant, cfg_->demod_rx_port + freq_iq_pkt_ant, 
-                        Packet::kOffsetOfData + sc_len * 2 * sizeof(short));
-                    struct rte_ether_hdr* eth_hdr
-                        = rte_pktmbuf_mtod(tx_bufs[i], struct rte_ether_hdr*);
-                    char* payload = (char*)eth_hdr + kPayloadOffset;
-                    auto* pkt = reinterpret_cast<Packet*>(payload);
-                    pkt->pkt_type_ = Packet::PktType::kFreqIQ;
-                    pkt->frame_id_ = freq_iq_pkt_frame;
-                    pkt->symbol_id_ = freq_iq_pkt_symbol;
-                    pkt->ant_id_ = freq_iq_pkt_ant;
-                    pkt->server_id_ = cfg_->bs_server_addr_idx;
-                    pkt->sc_id_ = first_possible_sc;
-                    pkt->sc_len_ = sc_len;
-                    memcpy(pkt->data_, src_ptr, sc_len * 2 * sizeof(short));
+                    if (server_id == cfg_->bs_server_addr_idx) {
+                        char* dst_ptr = freq_iq_buffer_[freq_iq_pkt_ant] + (freq_iq_pkt_frame % kFrameWnd) * cfg_->symbol_num_perframe
+                            * cfg_->packet_length + freq_iq_pkt_symbol * cfg_->packet_length + Packet::kOffsetOfData
+                            + (cfg_->OFDM_DATA_START + first_possible_sc - first_possible_sc % cfg_->UE_NUM) * 2 * sizeof(unsigned short);
+                        memcpy(dst_ptr, src_ptr, sc_len * 2 * sizeof(unsigned short));
+                        if (!bigstation_state_->receive_pilot_pkt(freq_iq_pkt_frame, freq_iq_pkt_ant)) {
+                            cfg_->error = true;
+                            cfg_->running = false;
+                        }
+                    } else {
+                        tx_bufs[total_buf_id] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 
+                            bs_server_mac_addrs_[server_id],
+                            bs_server_addrs_[cfg_->bs_server_addr_idx], bs_server_addrs_[server_id], 
+                            cfg_->demod_tx_port + freq_iq_pkt_ant, cfg_->demod_rx_port + freq_iq_pkt_ant, 
+                            Packet::kOffsetOfData + sc_len * 2 * sizeof(short));
+                        struct rte_ether_hdr* eth_hdr
+                            = rte_pktmbuf_mtod(tx_bufs[total_buf_id], struct rte_ether_hdr*);
+                        char* payload = (char*)eth_hdr + kPayloadOffset;
+                        auto* pkt = reinterpret_cast<Packet*>(payload);
+                        pkt->pkt_type_ = Packet::PktType::kFreqIQ;
+                        pkt->frame_id_ = freq_iq_pkt_frame;
+                        pkt->symbol_id_ = freq_iq_pkt_symbol;
+                        pkt->ant_id_ = freq_iq_pkt_ant;
+                        pkt->server_id_ = cfg_->bs_server_addr_idx;
+                        pkt->sc_id_ = first_possible_sc - first_possible_sc % cfg_->UE_NUM;
+                        pkt->sc_len_ = sc_len;
+                        memcpy(pkt->data_, src_ptr, sc_len * 2 * sizeof(short));
+                        total_buf_id ++;
+                    }
                 }
                 // Send data (one OFDM symbol)
-                for (size_t buf_id = 0; buf_id < cfg_->total_zf_workers; buf_id += kTxBatchSize) {
-                    size_t batch_size = std::min(kTxBatchSize, cfg_->total_zf_workers - buf_id);
+                for (size_t buf_id = 0; buf_id < total_buf_id; buf_id += kTxBatchSize) {
+                    size_t batch_size = std::min(kTxBatchSize, total_buf_id - buf_id);
                     size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, batch_size);
                     if (unlikely(nb_tx_new != batch_size)) {
                         printf("rte_eth_tx_burst() failed\n");
                         exit(0);
                     }
                 }
-                printf("Send %zu freq iq packets frame %zu symbol %zu\n", cfg_->total_zf_workers,
-                        freq_iq_pkt_frame, freq_iq_pkt_symbol);
+                // printf("Send %zu freq iq packets frame %zu symbol %zu ant %zu\n", total_buf_id,
+                //         freq_iq_pkt_frame, freq_iq_pkt_symbol, freq_iq_pkt_ant);
             } else {
                 // uint8_t* ant_ptr = freq_iq_buffer_to_send_[freq_iq_pkt_frame][freq_iq_pkt_symbol][freq_iq_pkt_ant]; 
                 uint8_t* ant_ptr = (uint8_t*)freq_iq_buffer_to_send_[freq_iq_pkt_ant] + (freq_iq_pkt_frame % kFrameWnd) * 
@@ -343,42 +357,55 @@ void* BigStationTXRX::tx_thread(int tid)
                 size_t demul_end = 0;
                 size_t cur_demul_worker_num = 0;
                 struct rte_mbuf* tx_bufs[kMaxTxBufSize] __attribute__((aligned(64)));
+                size_t total_buf_id = 0;
                 for (size_t server_id = 0; server_id < cfg_->bs_server_addr_list.size(); server_id ++) {
                     demul_start = cfg_->OFDM_DATA_NUM * cur_demul_worker_num / cfg_->total_demul_workers;
                     cur_demul_worker_num += cfg_->num_demul_workers[server_id];
                     demul_end = cfg_->OFDM_DATA_NUM * cur_demul_worker_num / cfg_->total_demul_workers;
                     uint8_t* src_ptr = ant_ptr + (cfg_->OFDM_DATA_START + demul_start) * 2 * sizeof(unsigned short);
                     
-                    tx_bufs[server_id] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 
-                        bs_server_mac_addrs_[server_id],
-                        bs_server_addrs_[cfg_->bs_server_addr_idx], bs_server_addrs_[server_id], 
-                        cfg_->demod_tx_port + freq_iq_pkt_ant, cfg_->demod_rx_port + freq_iq_pkt_ant, 
-                        Packet::kOffsetOfData + (demul_end - demul_start) * 2 * sizeof(short));
-                    struct rte_ether_hdr* eth_hdr
-                        = rte_pktmbuf_mtod(tx_bufs[server_id], struct rte_ether_hdr*);
-                    char* payload = (char*)eth_hdr + kPayloadOffset;
-                    auto* pkt = reinterpret_cast<Packet*>(payload);
-                    pkt->pkt_type_ = Packet::PktType::kFreqIQ;
-                    pkt->frame_id_ = freq_iq_pkt_frame;
-                    pkt->symbol_id_ = freq_iq_pkt_symbol;
-                    pkt->ant_id_ = freq_iq_pkt_ant;
-                    pkt->server_id_ = cfg_->bs_server_addr_idx;
-                    pkt->sc_id_ = demul_start;
-                    pkt->sc_len_ = demul_end - demul_start;
-                    memcpy(pkt->data_, src_ptr, pkt->sc_len_ * 2 * sizeof(short));
+                    if (server_id == cfg_->bs_server_addr_idx) {
+                        char* dst_ptr = freq_iq_buffer_[freq_iq_pkt_ant] + (freq_iq_pkt_frame % kFrameWnd) * cfg_->symbol_num_perframe
+                            * cfg_->packet_length + freq_iq_pkt_symbol * cfg_->packet_length + Packet::kOffsetOfData
+                            + (cfg_->OFDM_DATA_START + demul_start) * 2 * sizeof(unsigned short);
+                        memcpy(dst_ptr, src_ptr, (demul_end - demul_start) * 2 * sizeof(unsigned short));
+                        if (!bigstation_state_->receive_ul_data_pkt(freq_iq_pkt_frame, freq_iq_pkt_symbol - cfg_->pilot_symbol_num_perframe, freq_iq_pkt_ant)) {
+                            cfg_->error = true;
+                            cfg_->running = false;
+                        }
+                    } else {
+                        tx_bufs[total_buf_id] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 
+                            bs_server_mac_addrs_[server_id],
+                            bs_server_addrs_[cfg_->bs_server_addr_idx], bs_server_addrs_[server_id], 
+                            cfg_->demod_tx_port + freq_iq_pkt_ant, cfg_->demod_rx_port + freq_iq_pkt_ant, 
+                            Packet::kOffsetOfData + (demul_end - demul_start) * 2 * sizeof(short));
+                        struct rte_ether_hdr* eth_hdr
+                            = rte_pktmbuf_mtod(tx_bufs[total_buf_id], struct rte_ether_hdr*);
+                        char* payload = (char*)eth_hdr + kPayloadOffset;
+                        auto* pkt = reinterpret_cast<Packet*>(payload);
+                        pkt->pkt_type_ = Packet::PktType::kFreqIQ;
+                        pkt->frame_id_ = freq_iq_pkt_frame;
+                        pkt->symbol_id_ = freq_iq_pkt_symbol;
+                        pkt->ant_id_ = freq_iq_pkt_ant;
+                        pkt->server_id_ = cfg_->bs_server_addr_idx;
+                        pkt->sc_id_ = demul_start;
+                        pkt->sc_len_ = demul_end - demul_start;
+                        memcpy(pkt->data_, src_ptr, pkt->sc_len_ * 2 * sizeof(short));
+                        total_buf_id ++;
+                    }
                 }
 
                 // Send data (one OFDM symbol)
-                for (size_t buf_id = 0; buf_id < cfg_->bs_server_addr_list.size(); buf_id += kTxBatchSize) {
-                    size_t batch_size = std::min(kTxBatchSize, cfg_->bs_server_addr_list.size() - buf_id);
+                for (size_t buf_id = 0; buf_id < total_buf_id; buf_id += kTxBatchSize) {
+                    size_t batch_size = std::min(kTxBatchSize, total_buf_id - buf_id);
                     size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, batch_size);
                     if (unlikely(nb_tx_new != batch_size)) {
                         printf("rte_eth_tx_burst() failed\n");
                         exit(0);
                     }
                 }
-                printf("Send %zu freq iq packets frame %zu symbol %zu\n", cfg_->bs_server_addr_list.size(),
-                        freq_iq_pkt_frame, freq_iq_pkt_symbol);
+                // printf("Send %zu freq iq packets frame %zu symbol %zu ant %zu\n", total_buf_id,
+                //         freq_iq_pkt_frame, freq_iq_pkt_symbol, freq_iq_pkt_ant);
             }
 
             freq_iq_pkt_ant ++;
@@ -407,31 +434,42 @@ void* BigStationTXRX::tx_thread(int tid)
                 if (last_possible_sc >= (int)sc_end) {
                     last_possible_sc -= cfg_->UE_NUM;
                 }
+                // printf("ZF TX tid %d sc range %zu to %zu\n", tid, first_possible_sc, last_possible_sc);
                 if (last_possible_sc >= first_possible_sc) {
                     for (int sc_id = first_possible_sc; sc_id <= last_possible_sc; sc_id += cfg_->UE_NUM) {
                         size_t server_start = cfg_->demul_server_mapping[sc_id - sc_id % cfg_->UE_NUM];
                         size_t server_end = cfg_->demul_server_mapping[sc_id - sc_id % cfg_->UE_NUM + cfg_->UE_NUM - 1];
-                        for (size_t server_id = server_start; server_id < server_end; server_id ++) {
+                        // printf("ZF TX tid %d sc %zu server range %zu to %zu\n", tid, sc_id, server_start, server_end);
+                        for (size_t server_id = server_start; server_id <= server_end; server_id ++) {
                             for (size_t byte_off = 0; byte_off < cfg_->BS_ANT_NUM * cfg_->UE_NUM * 2 * sizeof(float); byte_off += cfg_->post_zf_step_size) {                    
-                                uint8_t* src_ptr = post_zf_buffer_to_send_[zf_pkt_frame][sc_id - sc_id % cfg_->UE_NUM] + byte_off;
+                                uint8_t* src_ptr = post_zf_buffer_to_send_[zf_pkt_frame%kFrameWnd][sc_id - sc_id % cfg_->UE_NUM] + byte_off;
                                 size_t data_len = std::min(cfg_->BS_ANT_NUM * cfg_->UE_NUM * 2 * sizeof(float) - byte_off, (size_t)cfg_->post_zf_step_size);
-                                tx_bufs[total_buf_id] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 
-                                    bs_server_mac_addrs_[server_id],
-                                    bs_server_addrs_[cfg_->bs_server_addr_idx], bs_server_addrs_[server_id], 
-                                    cfg_->demod_tx_port + (sc_id % cfg_->UE_NUM), cfg_->demod_rx_port + (sc_id % cfg_->UE_NUM), 
-                                    Packet::kOffsetOfData + data_len);
-                                struct rte_ether_hdr* eth_hdr
-                                    = rte_pktmbuf_mtod(tx_bufs[total_buf_id], struct rte_ether_hdr*);
-                                char* payload = (char*)eth_hdr + kPayloadOffset;
-                                auto* pkt = reinterpret_cast<Packet*>(payload);
-                                pkt->pkt_type_ = Packet::PktType::kPostZF;
-                                pkt->frame_id_ = zf_pkt_frame;
-                                pkt->server_id_ = cfg_->bs_server_addr_idx;
-                                pkt->sc_id_ = sc_id - sc_id % cfg_->UE_NUM;
-                                pkt->data_off_ = byte_off;
-                                pkt->data_len_ = data_len;
-                                memcpy(pkt->data_, src_ptr, data_len);
-                                total_buf_id ++;
+                                if (server_id == cfg_->bs_server_addr_idx) {
+                                    uint8_t* dst_ptr = ((uint8_t*)post_zf_buffer_[zf_pkt_frame%kFrameWnd][sc_id - sc_id % cfg_->UE_NUM]) + byte_off;
+                                    memcpy(dst_ptr, src_ptr, data_len);
+                                    if (!bigstation_state_->receive_zf_pkt(zf_pkt_frame, sc_id - sc_id % cfg_->UE_NUM)) {
+                                        cfg_->error = true;
+                                        cfg_->running = false;
+                                    }
+                                } else {
+                                    tx_bufs[total_buf_id] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 
+                                        bs_server_mac_addrs_[server_id],
+                                        bs_server_addrs_[cfg_->bs_server_addr_idx], bs_server_addrs_[server_id], 
+                                        cfg_->demod_tx_port + (sc_id % cfg_->UE_NUM), cfg_->demod_rx_port + (sc_id % cfg_->UE_NUM), 
+                                        Packet::kOffsetOfData + data_len);
+                                    struct rte_ether_hdr* eth_hdr
+                                        = rte_pktmbuf_mtod(tx_bufs[total_buf_id], struct rte_ether_hdr*);
+                                    char* payload = (char*)eth_hdr + kPayloadOffset;
+                                    auto* pkt = reinterpret_cast<Packet*>(payload);
+                                    pkt->pkt_type_ = Packet::PktType::kPostZF;
+                                    pkt->frame_id_ = zf_pkt_frame;
+                                    pkt->server_id_ = cfg_->bs_server_addr_idx;
+                                    pkt->sc_id_ = sc_id - sc_id % cfg_->UE_NUM;
+                                    pkt->data_off_ = byte_off;
+                                    pkt->data_len_ = data_len;
+                                    memcpy(pkt->data_, src_ptr, data_len);
+                                    total_buf_id ++;
+                                }
                             }
                         }
                     }
@@ -447,37 +485,53 @@ void* BigStationTXRX::tx_thread(int tid)
                     exit(0);
                 }
             }
+            // printf("Tid %d Send %zu post zf packets for frame %zu\n", tid, total_buf_id,
+            //     zf_pkt_frame);
             zf_pkt_frame ++;
         }
 
         if (bigstation_state_->prepared_all_demod_pkts(demul_pkt_frame, demul_pkt_symbol_ul)) {
-            uint8_t* src_ptr = (uint8_t*)post_demul_buffer_to_send_[demul_pkt_frame][demul_pkt_symbol_ul][demul_pkt_ue] + cfg_->demul_start * cfg_->mod_order_bits;
+            uint8_t* src_ptr = (uint8_t*)post_demul_buffer_to_send_[demul_pkt_frame%kFrameWnd][demul_pkt_symbol_ul][demul_pkt_ue] + cfg_->demul_start * cfg_->mod_order_bits;
             struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
             size_t server_id = cfg_->ue_server_mapping[demul_pkt_ue];
-            tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 
-                bs_server_mac_addrs_[server_id],
-                bs_server_addrs_[cfg_->bs_server_addr_idx], bs_server_addrs_[server_id], 
-                cfg_->demod_tx_port + demul_pkt_ue, cfg_->demod_rx_port + demul_pkt_ue, 
-                Packet::kOffsetOfData + cfg_->get_num_demul_sc_to_process() * cfg_->mod_order_bits);
-            struct rte_ether_hdr* eth_hdr
-                = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
-            char* payload = (char*)eth_hdr + kPayloadOffset;
-            auto* pkt = reinterpret_cast<Packet*>(payload);
-            pkt->pkt_type_ = Packet::PktType::kDemod;
-            pkt->frame_id_ = demul_pkt_frame;
-            pkt->symbol_id_ = demul_pkt_symbol_ul;
-            pkt->ue_id_ = demul_pkt_ue;
-            pkt->server_id_ = cfg_->bs_server_addr_idx;
-            pkt->sc_id_ = cfg_->demul_start;
-            pkt->sc_len_ = cfg_->get_num_demul_sc_to_process();
-            memcpy(pkt->data_, src_ptr, cfg_->get_num_demul_sc_to_process() * cfg_->mod_order_bits);
 
-            // Send data (one OFDM symbol)
-            size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
-            if (unlikely(nb_tx_new != 1)) {
-                printf("rte_eth_tx_burst() failed\n");
-                exit(0);
+            if (server_id == cfg_->bs_server_addr_idx) { 
+                int8_t* dst_ptr = post_demul_buffer_[(demul_pkt_frame%kFrameWnd)*cfg_->ul_data_symbol_num_perframe+demul_pkt_symbol_ul] +
+                    cfg_->OFDM_DATA_NUM * kMaxModType * demul_pkt_ue + cfg_->demul_start * cfg_->mod_order_bits;
+                memcpy(dst_ptr, src_ptr, cfg_->get_num_demul_sc_to_process() * cfg_->mod_order_bits);
+                if (!bigstation_state_->receive_demod_pkt(demul_pkt_frame, demul_pkt_symbol_ul, demul_pkt_ue, cfg_->get_num_demul_sc_to_process())) {
+                    cfg_->error = true;
+                    cfg_->running = false;
+                }
+            } else {
+                tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[tid], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 
+                    bs_server_mac_addrs_[server_id],
+                    bs_server_addrs_[cfg_->bs_server_addr_idx], bs_server_addrs_[server_id], 
+                    cfg_->demod_tx_port + demul_pkt_ue, cfg_->demod_rx_port + demul_pkt_ue, 
+                    Packet::kOffsetOfData + cfg_->get_num_demul_sc_to_process() * cfg_->mod_order_bits);
+                struct rte_ether_hdr* eth_hdr
+                    = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
+                char* payload = (char*)eth_hdr + kPayloadOffset;
+                auto* pkt = reinterpret_cast<Packet*>(payload);
+                pkt->pkt_type_ = Packet::PktType::kDemod;
+                pkt->frame_id_ = demul_pkt_frame;
+                pkt->symbol_id_ = demul_pkt_symbol_ul;
+                pkt->ue_id_ = demul_pkt_ue;
+                pkt->server_id_ = cfg_->bs_server_addr_idx;
+                pkt->sc_id_ = cfg_->demul_start;
+                pkt->sc_len_ = cfg_->get_num_demul_sc_to_process();
+                memcpy(pkt->data_, src_ptr, cfg_->get_num_demul_sc_to_process() * cfg_->mod_order_bits);
+
+                // Send data (one OFDM symbol)
+                size_t nb_tx_new = rte_eth_tx_burst(0, tid, tx_bufs, 1);
+                if (unlikely(nb_tx_new != 1)) {
+                    printf("rte_eth_tx_burst() failed\n");
+                    exit(0);
+                }
             }
+
+            // printf("Send demod packet frame %zu symbol %zu ue %zu\n", demul_pkt_frame,
+            //     demul_pkt_symbol_ul, demul_pkt_ue);
 
             demul_pkt_ue ++;
             if (demul_pkt_ue == ue_end) {

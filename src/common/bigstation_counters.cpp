@@ -56,6 +56,9 @@ bool BigStationState::receive_pilot_pkt(size_t frame_id, size_t ant_id)
     }
 
     num_pilot_pkts_received_[frame_id % kFrameWnd] ++;
+    // printf("Recv pilot packets frame %zu ant %zu count %zu required %zu\n", 
+    //     frame_id, ant_id, num_pilot_pkts_received_[frame_id % kFrameWnd].load(), 
+    //     num_pilot_pkts_received_per_frame_);
     return true;
 }
 
@@ -115,6 +118,9 @@ bool BigStationState::receive_demod_pkt(size_t frame_id, size_t symbol_id_ul, si
     }
     
     num_demod_pkts_received_[frame_id % kFrameWnd][symbol_id_ul] += sc_len;
+    // printf("Recv demod packet frame %zu symbol %zu count %zu required %zu\n", frame_id,
+    //     symbol_id_ul, num_demod_pkts_received_[frame_id % kFrameWnd][symbol_id_ul].load(),
+    //     num_demod_pkts_received_per_symbol_);
     return true;
 }
 
@@ -125,8 +131,8 @@ bool BigStationState::prepare_freq_iq_pkt(size_t frame_id, size_t symbol_id, siz
         return false;
     }
     num_freq_iq_pkts_prepared_[frame_id % kFrameWnd][symbol_id] ++;
-    printf("Prepare freq iq packet frame %zu symbol %zu count %zu required %zu\n", frame_id,
-        symbol_id, num_freq_iq_pkts_prepared_[frame_id % kFrameWnd][symbol_id].load(), num_freq_iq_pkts_prepared_per_symbol_);
+    // printf("Prepare freq iq packet frame %zu symbol %zu count %zu required %zu\n", frame_id,
+    //     symbol_id, num_freq_iq_pkts_prepared_[frame_id % kFrameWnd][symbol_id].load(), num_freq_iq_pkts_prepared_per_symbol_);
     return true;
 }
 
@@ -139,12 +145,15 @@ bool BigStationState::prepare_zf_pkt(size_t frame_id)
     return true;
 }
 
-bool BigStationState::prepare_demod_pkt(size_t frame_id, size_t symbol_id_ul)
+bool BigStationState::prepare_demod_pkt(size_t frame_id, size_t symbol_id_ul, size_t sc_num)
 {
     if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
         return false;
     }
-    num_demod_pkts_prepared_[frame_id % kFrameWnd][symbol_id_ul] ++;
+    num_demod_pkts_prepared_[frame_id % kFrameWnd][symbol_id_ul] += sc_num;
+    // printf("Prepare demod packet frame %zu symbol %zu count %zu required %zu\n", frame_id,
+    //     symbol_id_ul, num_demod_pkts_prepared_[frame_id % kFrameWnd][symbol_id_ul].load(),
+    //     num_demod_pkts_prepared_per_symbol_);
     return true;
 }
 

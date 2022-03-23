@@ -24,7 +24,7 @@ public:
     // Packet prepare functions
     bool prepare_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t ant_id);
     bool prepare_zf_pkt(size_t frame_id);
-    bool prepare_demod_pkt(size_t frame_id, size_t symbol_id_ul);
+    bool prepare_demod_pkt(size_t frame_id, size_t symbol_id_ul, size_t sc_num);
 
     // Packet receiving checking functions
     bool received_all_time_iq_pkts(size_t frame_id, size_t symbol_id);

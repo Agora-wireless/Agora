@@ -169,7 +169,7 @@ void BigStation::fftWorker(int tid)
             });
 
             do_fft->Launch(cur_frame, cur_symbol, cur_ant);
-            printf("Run FFT frame %zu symbol %zu ant %zu\n", cur_frame, cur_symbol, cur_ant);
+            // printf("Run FFT frame %zu symbol %zu ant %zu\n", cur_frame, cur_symbol, cur_ant);
 
             TRIGGER_TIMER({
                 size_t fft_tmp_tsc = rdtsc() - fft_start_tsc;
@@ -219,7 +219,7 @@ void BigStation::fftWorker(int tid)
         cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration);
 
-    delete do_fft;
+    // delete do_fft;
 }
 
 void BigStation::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size,
@@ -238,6 +238,11 @@ void BigStation::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size
                 + (frame_slot * config_->symbol_num_perframe
                         * config_->packet_length)
                 + i * config_->packet_length);
+            
+            // for (size_t t = sc_start + config_->OFDM_DATA_START; t < sc_end + config_->OFDM_DATA_START; t ++) {
+            //     printf("(%u %u) ", pkt->data_[t*2], pkt->data_[t*2+1]);
+            // }
+            // printf("\n");
 
             // Subcarrier ranges should be aligned with kTransposeBlockSize
             // for (size_t block_idx = sc_range_.start / kTransposeBlockSize;
@@ -260,6 +265,11 @@ void BigStation::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size
                         reinterpret_cast<float*>(pkt->data_
                             + (config_->OFDM_DATA_START + sc_idx) * 2),
                         kSCsPerCacheline * 2);
+
+                    // for (size_t t = 0; t < kSCsPerCacheline; t ++) {
+                    //     printf("(%f %f) ", converted_sc[t*2], converted_sc[t*2+1]);
+                    // }
+                    // printf("\n");
 
                     const complex_float* src = converted_sc;
                     complex_float* dst = csi_buffer[frame_slot][i]
@@ -366,7 +376,13 @@ void BigStation::zfWorker(int tid)
             size_t tmp_count = 0;
             if (last_possible_sc >= first_possible_sc) {
                 for (int sc_id = first_possible_sc; sc_id <= last_possible_sc; sc_id += config_->UE_NUM) {
+                    // printf("Run ZF for frame %zu sc %zu\n", cur_zf_frame, sc_id);
                     runCsi(cur_zf_frame, sc_id - sc_id % config_->UE_NUM, config_->UE_NUM, csi_buffer);
+                    // unsigned short* dst_ptr = reinterpret_cast<unsigned short*>(csi_buffer[0][0]);
+                    // for (size_t t = 0; t < config_->UE_NUM * config_->BS_ANT_NUM; t ++) {
+                    //     printf("(%u %u) ", dst_ptr[t*2], dst_ptr[t*2+1]);
+                    // }
+                    // printf("\n");
                     do_zf->ZFFreqOrthogonalStatic(gen_tag_t::frm_sym_sc(cur_zf_frame, 0, sc_id - (sc_id % config_->UE_NUM))._tag);
                     tmp_count ++;
                 }
@@ -413,6 +429,7 @@ void BigStation::zfWorker(int tid)
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration);
 
     delete do_zf;
+    
 }
 
 void BigStation::demulWorker(int tid)
@@ -464,6 +481,7 @@ void BigStation::demulWorker(int tid)
                 demul_start_tsc = rdtsc();
             });
 
+            // printf("Run demul frame %zu symbol %zu sc %zu\n", cur_demul_frame, cur_demul_symbol_ul, sc_start);
             do_demul->LaunchStatic(cur_demul_frame, cur_demul_symbol_ul, sc_start, sc_end - sc_start);
 
             TRIGGER_TIMER({
@@ -473,7 +491,7 @@ void BigStation::demulWorker(int tid)
                 demul_start_tsc = rdtsc();
             });
 
-            if (!bigstation_state_.prepare_demod_pkt(cur_demul_frame, cur_demul_symbol_ul)) {
+            if (!bigstation_state_.prepare_demod_pkt(cur_demul_frame, cur_demul_symbol_ul, sc_end - sc_start)) {
                 config_->error = true;
                 config_->running = false;
             }
@@ -511,6 +529,7 @@ void BigStation::demulWorker(int tid)
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration);
 
     delete do_demul;
+    equal_buffer.free();
 }
 
 void BigStation::decodeWorker(int tid)
