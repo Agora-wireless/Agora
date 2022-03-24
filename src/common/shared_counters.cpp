@@ -299,6 +299,11 @@ void SharedState::print_receiving_encoded_pkts(size_t frame_id, size_t symbol_id
         frame_id, symbol_id_dl, num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl].load(), num_encoded_pkts_per_symbol_, res);
 }
 
+void SharedState::print_receiving_demoded_pkts(size_t ue_id, size_t frame_id. size_t symbol_id_dl)
+{
+    
+}
+
 bool SharedState::is_encode_ready(size_t frame_id, size_t symbol_id_dl) {
     if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
         return false;

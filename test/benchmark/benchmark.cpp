@@ -511,14 +511,28 @@ void run_precode(Table<int8_t>& input, complex_float* output,
 int main(int argc, char **argv)
 {
     int opt;
-    std::string conf_file = TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-ul.json";
-    while ((opt = getopt(argc, argv, "c:")) != -1) {
+    std::string conf_file = TOSTRING(PROJECT_DIRECTORY) "/config/bm_run.json";
+    std::string output_file = TOSTRING(PROJECT_DIRECTORY) "/data/benchmark.txt";
+    size_t default_ant_num = 0;
+    size_t default_ue_num = 0;
+    while ((opt = getopt(argc, argv, "c:a:u:o:")) != -1) {
         switch (opt) {
             case 'c':
                 conf_file = optarg;
                 break;
+            case 'a':
+                default_ant_num = atoi(optarg);
+                break;
+            case 'u':
+                default_ue_num = atoi(optarg);
+                break;
+            case 'o':
+                output_file = optarg;
+                break;
             default:
-                std::cerr << "Usage: " << argv[0] << " [-c conf_file]" << std::endl;
+                std::cerr << "Usage: " << argv[0] << " [-c conf_file]" << 
+                    " [-a BS_ANT_NUM]" << " [-u UE_NUM]" << " [-o output_file]"
+                    << std::endl;
                 exit(EXIT_FAILURE);
         }
     }
@@ -526,6 +540,13 @@ int main(int argc, char **argv)
     // gflags::ParseCommandLineFlags(&argc, &argv, true);
     cfg = new Config(conf_file.c_str());
     cfg->genData();
+
+    if (default_ant_num > 0) {
+        cfg->BS_ANT_NUM = default_ant_num;
+    }
+    if (default_ue_num > 0) {
+        cfg->UE_NUM = default_ue_num;
+    }
 
     const size_t num_codeblocks = cfg->UE_NUM;
 
@@ -629,6 +650,7 @@ int main(int argc, char **argv)
         }
     }
     size_t end_tsc = rdtsc();
+    double csi_res = 1000000000.0f / ((double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
     printf("%lf subcarriers/sec (%lf ns/subcarrier)\n", (double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
         1000000000.0f / ((double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
 
@@ -650,6 +672,7 @@ int main(int argc, char **argv)
     end_tsc = rdtsc();
     free(csi_gather_buffer);
     csi_buffer.free();
+    double zf_res = 1000000.0f / ((double)kZFIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
     printf("%lf times/sec (%lf us each matrix inversion)\n", 
         (double)kZFIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
         1000000.0f / ((double)kZFIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
@@ -694,6 +717,7 @@ int main(int argc, char **argv)
     free(data_gather_buffer);
     free(equaled_buffer_temp);
     free(equaled_buffer_temp_transposed);
+    double demul_res = 1000000000.0f / ((double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
     printf("%lf subcarriers/sec (%lf ns/subcarrier)\n", 
         (double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
         1000000000.0f / ((double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
@@ -712,6 +736,7 @@ int main(int argc, char **argv)
     end_tsc = rdtsc();
     free(resp_var_nodes);
     demod_buffer.free();
+    double decode_res = 1000000.0f / ((double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
     printf("%lf users/sec (%lf us/user)\n", 
         (double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
         1000000.0f / ((double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
@@ -731,6 +756,7 @@ int main(int argc, char **argv)
     free(encoded_buffer_temp);
     free(parity_buffer);
     decoded_buffer.free();
+    double encode_res = 1000000.0f / ((double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
     printf("%lf users/sec (%lf us/user)\n", 
         (double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
         1000000.0f / ((double)kNumIterations * 1000000.0f * cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
@@ -764,9 +790,13 @@ int main(int argc, char **argv)
     end_tsc = rdtsc();
     free(modulated_buffer_temp);
     free(precoded_buffer_temp);
+    double precode_res = 1000000000.0f / ((double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
     printf("%lf subcarriers/sec (%lf ns/subcarrier)\n", 
         (double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
         1000000000.0f / ((double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
+
+    FILE* outf = fopen(output_file, "a");
+    
 
     return 0;
 }

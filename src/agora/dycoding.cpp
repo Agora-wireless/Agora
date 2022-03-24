@@ -399,6 +399,13 @@ void DyDecode::StartWork()
         }
     }
 
+    if (cfg_->error) {
+        printf("DeDecode Thread %d error traceback: decode (frame %zu, symbol %zu, ue %zu), recvd packets done %d\n", tid_, 
+            cur_frame_, cur_symbol, cur_ue, shared_state_->received_all_demod_pkts(
+                    cur_ue, cur_frame_, cur_symbol));
+        shared_state_->print_receiving_encoded_pkts(demul_cur_frame_, demul_cur_sym_dl_);
+    }
+
     size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("DoDecode Thread %u duration stats: total time used %.2lfms, "
