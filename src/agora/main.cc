@@ -6,7 +6,6 @@
 #include "gflags/gflags.h"
 #include "logger.h"
 #include "version_config.h"
-#include "csv_logger.h"
 
 DEFINE_string(conf_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/tddconfig-sim-both.json",
@@ -28,9 +27,6 @@ int main(int argc, char* argv[]) {
   } else {
     conf_file = FLAGS_conf_file;
   }
-
-  CSV_LOG_INIT(0, kCsvLogCSI);
-  CSV_LOG_INIT(0, kCsvLogDLZF);
 
   std::unique_ptr<Config> cfg = std::make_unique<Config>(conf_file.c_str());
   cfg->GenData();

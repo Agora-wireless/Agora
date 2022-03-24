@@ -1,37 +1,54 @@
 #ifndef CSV_LOGGER_H_
 #define CSV_LOGGER_H_
 
+#include <armadillo>
 #include "logger.h"
 
 enum CsvLogID {
   kCsvLogDLPSNR,
   kCsvLogEVMSNR,
   kCsvLogBERSER,
-  kCsvLogCSI,
-  kCsvLogDLZF,
-  kCsvLogNUM
+  kMatLogCSI,
+  kMatLogDLZF
 };
 
-#if defined(CSV_LOG_LEVEL)
+#if defined(ENABLE_CSV_LOG)
 
 #include "spdlog/sinks/basic_file_sink.h"
 
-extern std::shared_ptr<spdlog::logger> csv_logger[kCsvLogNUM];
-extern void CsvLogInit(size_t dev_id, size_t log_id);
-
-#define CSV_LOG_INIT(DEV_ID, LOG_ID) CsvLogInit(DEV_ID, LOG_ID)
-#define CSV_LOG(LOG_ID, ...) \
-  if (csv_logger[LOG_ID] != nullptr) { \
-    csv_logger[LOG_ID]->CSV_LOG_LEVEL(fmt::sprintf(__VA_ARGS__)); \
+class CsvLogger {
+public:
+  CsvLogger(size_t dev_id, enum CsvLogID log_id);
+  inline void Write(const char *format, ...) {
+    char str[128];
+    va_list args;
+    va_start(args, format);
+    sprintf(str, format, args);
+    logger_->info(str);
+    va_end(args);
   }
-#define CSV_LOG_VAR(VAR, EXPR) VAR = EXPR
+private:
+  std::shared_ptr<spdlog::logger> logger_;
+};
 
 #else
 
-#define CSV_LOG_INIT(DEV_ID, LOG_ID)
-#define CSV_LOG(LOG_ID, ...)
-#define CSV_LOG_VAR(VAR, EXPR)
+class CsvLogger {
+public:
+  CsvLogger(size_t, enum CsvLogID);
+  inline void Write(const char *, ...) {}
+};
 
-#endif //CSV_LOG_LEVEL
+#endif //ENABLE_CSV_LOG
+
+class MatLogger : public CsvLogger {
+public:
+  MatLogger(size_t dev_id, enum CsvLogID log_id);
+  void UpdateMatBuf(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
+  void SaveMatBuf();
+private:
+  size_t mat_idx_;
+  bool is_active_;
+};
 
 #endif //CSV_LOGGER_H_

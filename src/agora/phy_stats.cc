@@ -9,13 +9,6 @@
 
 #include "logger.h"
 
-static constexpr enum CsvLogID kMatLogId[] = {kCsvLogCSI, kCsvLogDLZF};
-static constexpr size_t kMatLogs = sizeof(kMatLogId) / sizeof(enum CsvLogID),
-                        kMatLogFrames = 40, kMatLogSCs = 304,
-                        kMatLogBSAnts = 8, kMatLogUEAnts = 1;
-static complex_float mat_buffer[kMatLogs][kMatLogFrames][kMatLogSCs]
-                               [kMatLogBSAnts][kMatLogUEAnts];
-
 PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
   if (dir_ == Direction::kDownlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
@@ -67,6 +60,12 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                           Agora_memory::Alignment_t::kAlign64);
   csi_cond_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
                    Agora_memory::Alignment_t::kAlign64);
+
+  if (kEnableCsvLog) {
+    logger_berser_ = std::make_unique<CsvLogger>(cfg->UeId(), kCsvLogBERSER);
+    logger_evmsnr_ = std::make_unique<CsvLogger>(cfg->UeId(), kCsvLogEVMSNR);
+    logger_dlpsnr_ = std::make_unique<CsvLogger>(cfg->UeId(), kCsvLogDLPSNR);
+  }
 }
 
 PhyStats::~PhyStats() {
@@ -135,12 +134,16 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
 }
 
 void PhyStats::RecordEvmSnr(size_t frame_id) {
-  for (size_t i = 0; i < config_->UeAntNum(); i++) {
-    const float evm = evm_buffer_[frame_id % kFrameWnd][i] /
-                      config_->OfdmDataNum();
-    unused(evm);
-    CSV_LOG(kCsvLogEVMSNR, "%zu,-,%zu,%f,%f", frame_id, i,
-            100.0f * evm, -10.0f * std::log10(evm));
+  if (kEnableCsvLog) {
+    for (size_t i = 0; i < config_->UeAntNum(); i++) {
+      const float evm = evm_buffer_[frame_id % kFrameWnd][i] /
+                        config_->OfdmDataNum();
+      logger_evmsnr_->Write("%zu,-,%zu,%f,%f", frame_id, i,
+                            100.0f * evm, -10.0f * std::log10(evm));
+    }
+  }
+  else {
+    unused(frame_id);
   }
 }
 
@@ -165,12 +168,16 @@ void PhyStats::PrintDlSnrStats(size_t frame_id, size_t ant_id) {
 }
 
 void PhyStats::RecordDlPilotSnr(size_t frame_id, size_t ant_id) {
-  unused(frame_id);
-  unused(ant_id);
-  const size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
-  for (size_t i = 0; i < dl_pilots_num; i++) {
-    CSV_LOG(kCsvLogDLPSNR, "%zu,%zu,%zu,%f", frame_id, i, ant_id,
-            dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + i]);
+  if (kEnableCsvLog) {
+    const size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
+    for (size_t i = 0; i < dl_pilots_num; i++) {
+      logger_dlpsnr_->Write("%zu,%zu,%zu,%f", frame_id, i, ant_id,
+          dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + i]);
+    }
+  }
+  else {
+    unused(frame_id);
+    unused(ant_id);
   }
 }
 
@@ -332,52 +339,7 @@ void PhyStats::PrintZfStats(size_t frame_id) {
 void PhyStats::UpdateCsiCond(size_t frame_id, size_t sc_id, float cond) {
   csi_cond_[frame_id % kFrameWnd][sc_id] = cond;
 }
-/*
-void PhyStats::RecordMatZf(enum CsvLogID log_id, size_t frame_id,
-                           PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& buf) {
-  unused(log_id);
-  for (size_t sc_id = 0; sc_id < config_->OfdmDataNum(); sc_id++) {
-    const arma::cx_fmat mat(
-        reinterpret_cast<arma::cx_float*>(buf[frame_id % kFrameMatBuf][sc_id]),
-        config_->BsAntNum(), config_->UeAntNum(), false);
-    unused(mat);
-    for (size_t i = 0; i < config_->BsAntNum(); i++) {
-      for (size_t j = 0; j < config_->UeAntNum(); j++) {
-        CSV_LOG(log_id, "%zu,%zu,%zu,%zu,%f,%f", frame_id, sc_id, i, j,
-                mat(i, j).real(), mat(i, j).imag());
-      }
-    }
-  }
-}
 
-void PhyStats::RecordMatCsi(size_t frame_id) {
-  for (size_t sc_id = 0; sc_id < config_->OfdmDataNum(); sc_id++) {
-    for (size_t i = 0; i < config_->BsAntNum(); i++) {
-      for (size_t j = 0; j < config_->UeAntNum(); j++) {
-        const size_t offset = sc_id * config_->BsAntNum() * config_->UeAntNum()
-                              + i * config_->UeAntNum() + j;
-        const complex_float* cx = &mat_csi_[frame_id % kFrameMatBuf][offset];
-        unused(cx);
-        CSV_LOG(kCsvLogCSI, "%zu,%zu,%zu,%zu,%f,%f", frame_id, sc_id, i, j,
-                cx->re, cx->im);
-      }
-    }
-  }
-}
-
-void PhyStats::UpdateMatCsi(size_t frame_id, size_t sc_id,
-                            const arma::cx_fmat& mat_in) {
-  for (size_t i = 0; i < config_->BsAntNum() - 1; i++) {
-    for (size_t j = 0; j < config_->UeAntNum(); j++) {
-      const size_t offset = sc_id * config_->BsAntNum() * config_->UeAntNum()
-                            + i * config_->UeAntNum() + j;
-      complex_float* cx = &mat_csi_[frame_id % kFrameMatBuf][offset];
-      cx->re = mat_in(i, j).real();
-      cx->im = mat_in(i, j).imag();
-    }
-  }
-}
-*/
 void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
                               const arma::cx_fmat& eq) {
   if (num_rx_symbols_ > 0) {
@@ -419,12 +381,17 @@ float PhyStats::GetBitErrorRate(size_t ue_id, size_t offset) {
 }
 
 void PhyStats::RecordDecodeErrors(size_t frame_id, size_t symbol_id) {
-  const size_t offset = config_->GetTotalDataSymbolIdxUl(frame_id,
-                        config_->Frame().GetULSymbolIdx(symbol_id));
-  unused(offset);
-  for (size_t i = 0; i < config_->UeAntNum(); i++) {
-    CSV_LOG(kCsvLogBERSER, "%zu,%zu,%zu,%f,-", frame_id, symbol_id, i,
-            GetBitErrorRate(i, offset));
+  if (kEnableCsvLog) {
+    const size_t offset = config_->GetTotalDataSymbolIdxUl(frame_id,
+                          config_->Frame().GetULSymbolIdx(symbol_id));
+    for (size_t i = 0; i < config_->UeAntNum(); i++) {
+      logger_berser_->Write("%zu,%zu,%zu,%f,-", frame_id, symbol_id, i,
+                            GetBitErrorRate(i, offset));
+    }
+  }
+  else {
+    unused(frame_id);
+    unused(symbol_id);
   }
 }
 
@@ -447,54 +414,4 @@ void PhyStats::UpdateUncodedBitErrors(size_t ue_id, size_t offset,
 void PhyStats::UpdateUncodedBits(size_t ue_id, size_t offset,
                                  size_t new_bits_num) {
   uncoded_bits_count_[ue_id][offset] += new_bits_num;
-}
-
-void PhyStats::UpdateMatBuffer(enum CsvLogID log_id, size_t frame_id, size_t sc_id,
-                               const arma::cx_fmat& mat_in) {
-  size_t i, j, mat_idx = 0;
-  for (i = 0; i < kMatLogs; i++) {
-    if (kMatLogId[i] == log_id) {
-      mat_idx = i;
-      break;
-    }
-  }
-  if (i == kMatLogs || frame_id >= kMatLogFrames || sc_id >= kMatLogSCs) {
-    return;
-  }
-  const size_t bs_ants = mat_in.n_rows < kMatLogBSAnts ?
-                         mat_in.n_rows : kMatLogBSAnts;
-  const size_t ue_ants = mat_in.n_cols < kMatLogUEAnts ?
-                         mat_in.n_cols : kMatLogUEAnts;
-  for (i = 0; i < bs_ants; i++) {
-    for (j = 0; j < ue_ants; j++) {
-      complex_float* cx = &mat_buffer[mat_idx][frame_id][sc_id][i][j];
-      cx->re = mat_in(i, j).real();
-      cx->im = mat_in(i, j).imag();
-    }
-  }
-}
-
-void PhyStats::FlushMatBuffer(enum CsvLogID log_id) {
-  size_t i, j, mat_idx = 0;
-  for (i = 0; i < kMatLogs; i++) {
-    if (kMatLogId[i] == log_id) {
-      mat_idx = i;
-      break;
-    }
-  }
-  if (i == kMatLogs) { //log id not found
-    return;
-  }
-  for (size_t frame_id = 0; frame_id < kMatLogFrames; frame_id++) {
-    for (size_t sc_id = 0; sc_id < kMatLogSCs; sc_id++) {
-      for (i = 0; i < kMatLogBSAnts; i++) {
-        for (j = 0; j < kMatLogUEAnts; j++) {
-          const complex_float* cx = &mat_buffer[mat_idx][frame_id][sc_id][i][j];
-          unused(cx);
-          CSV_LOG(log_id, "%zu,%zu,%zu,%zu,%f,%f", frame_id, sc_id, i, j,
-                  cx->re, cx->im);
-        }
-      }
-    }
-  }
 }

@@ -4,7 +4,6 @@
  * subcarrier.
  */
 #include "dozf.h"
-#include "csv_logger.h"
 
 #include "concurrent_queue_wrapper.h"
 #include "doer.h"
@@ -72,6 +71,11 @@ DoZF::DoZF(Config* config, int tid,
       }
     }
   }
+
+  if (kEnableMatLog) {
+    logger_csi_ = std::make_unique<MatLogger>(0, kMatLogCSI);
+    logger_dlzf_ = std::make_unique<MatLogger>(0, kMatLogDLZF);
+  }
 }
 
 DoZF::~DoZF() {
@@ -80,9 +84,9 @@ DoZF::~DoZF() {
   calib_sc_vec_ptr_.reset();
   std::free(calib_gather_buffer_);
 
-  if (kPrintZfStats && tid_ == 0) {
-    phy_stats_->FlushMatBuffer(kCsvLogCSI);
-    phy_stats_->FlushMatBuffer(kCsvLogDLZF);
+  if (kEnableMatLog) {
+    logger_csi_->SaveMatBuf();
+    logger_dlzf_->SaveMatBuf();
   }
 }
 
@@ -384,11 +388,13 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
                                  dl_zf_matrices_[frame_slot][cur_sc_id]);
     if (kPrintZfStats) {
       phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
-      phy_stats_->UpdateMatBuffer(kCsvLogCSI, frame_id, cur_sc_id, mat_csi);
+    }
+    if (kEnableMatLog) {
+      logger_csi_->UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
       arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(
                               dl_zf_matrices_[frame_slot][cur_sc_id]),
                               cfg_->BsAntNum(), cfg_->UeAntNum(), false);
-      phy_stats_->UpdateMatBuffer(kCsvLogDLZF, frame_id, cur_sc_id, mat_dl_zf);
+      logger_dlzf_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_zf);
     }
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;

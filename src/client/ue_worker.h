@@ -18,6 +18,7 @@
 #include "doifft_client.h"
 #include "mkl_dfti.h"
 #include "stats.h"
+#include "csv_logger.h"
 
 static const size_t kVectorAlignment = 64;
 using myVec = std::vector<complex_float, boost::alignment::aligned_allocator<
@@ -153,5 +154,7 @@ class UeWorker {
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer_;
 
   std::vector<std::vector<std::complex<float>>>& ue_pilot_vec_;
+
+  std::unique_ptr<CsvLogger> logger_berser_, logger_evmsnr_;
 };
 #endif  // UE_WORKER_H_

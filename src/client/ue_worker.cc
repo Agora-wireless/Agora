@@ -4,7 +4,6 @@
  * each worker.
  */
 #include "ue_worker.h"
-#include "csv_logger.h"
 
 #include <memory>
 
@@ -68,6 +67,11 @@ UeWorker::UeWorker(
   (void)DftiCreateDescriptor(&mkl_handle_, DFTI_SINGLE, DFTI_COMPLEX, 1,
                              config_.OfdmCaNum());
   (void)DftiCommitDescriptor(mkl_handle_);
+
+  if (kEnableCsvLog) {
+    logger_berser_ = std::make_unique<CsvLogger>(config.UeId(), kCsvLogBERSER);
+    logger_evmsnr_ = std::make_unique<CsvLogger>(config.UeId(), kCsvLogEVMSNR);
+  }
 }
 
 UeWorker::~UeWorker() {
@@ -375,8 +379,10 @@ void UeWorker::DoFftData(size_t tag) {
     AGORA_LOG_INFO("Frame: %zu, Symbol: %zu, User: %zu, EVM: %f, SNR: %f\n",
                    frame_id, symbol_id, ant_id, (100.0f * evm),
                    (-10.0f * std::log10(evm)));
-    CSV_LOG(kCsvLogEVMSNR, "%zu,%zu,%zu,%f,%f", frame_id, symbol_id, ant_id,
-            100.0f * evm, -10.0f * std::log10(evm));
+  }
+  if (kEnableCsvLog) {
+    logger_evmsnr_->Write("%zu,%zu,%zu,%f,%f", frame_id, symbol_id, ant_id,
+                          100.0f * evm, -10.0f * std::log10(evm));
   }
 
   if (kDebugPrintPerTaskDone || kDebugPrintFft) {
@@ -478,10 +484,12 @@ void UeWorker::DoDemul(size_t tag) {
                      frame_id, symbol_id, ant_id, block_error);
     }
     phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, block_error);
-    CSV_LOG(kCsvLogBERSER, "%zu,%zu,%zu,%f,%f", frame_id, symbol_id, ant_id,
-            phy_stats_.GetBitErrorRate(ant_id, total_dl_symbol_id),
-            static_cast<float>(block_error) /
-            static_cast<float>(config_.GetOFDMDataNum()));
+    if (kEnableCsvLog) {
+      logger_berser_->Write("%zu,%zu,%zu,%f,%f", frame_id, symbol_id, ant_id,
+                      phy_stats_.GetBitErrorRate(ant_id, total_dl_symbol_id),
+                      static_cast<float>(block_error) /
+                      static_cast<float>(config_.GetOFDMDataNum()));
+    }
   }
 
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintDemul == true)) {

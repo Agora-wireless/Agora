@@ -431,6 +431,8 @@ void PhyUe::Start() {
             if (pilot_fft_complete) {
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintDlSnrStats(frame_id, ant_id);
+              }
+              if (kEnableCsvLog) {
                 this->phy_stats_->RecordDlPilotSnr(frame_id, ant_id);
               }
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);

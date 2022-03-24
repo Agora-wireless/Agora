@@ -64,6 +64,8 @@ class PhyStats {
 
   arma::cx_fmat gt_mat_;
   size_t num_rx_symbols_;
+
+  std::unique_ptr<CsvLogger> logger_berser_, logger_evmsnr_, logger_dlpsnr_;
 };
 
 #endif  // PHY_STATS_H_
