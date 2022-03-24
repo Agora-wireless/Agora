@@ -569,7 +569,7 @@ void BigStation::decodeWorker(int tid)
     while (config_->running && !SignalHandler::gotExitSignal()) {
         size_t work_start_tsc, decode_start_tsc;
         size_t cur_symbol_ul = cur_decode_idx / config_->get_num_ues_to_process();
-        size_t cur_ue = cur_decode_idx % config_->get_num_ues_to_process();
+        size_t cur_ue = cur_decode_idx % config_->get_num_ues_to_process() + config_->ue_start;
         if (bigstation_state_.received_all_demod_pkts(cur_decode_frame, cur_symbol_ul)) {
             if (unlikely(!state_trigger && cur_decode_frame >= 200)) {
                 start_tsc = rdtsc();
@@ -590,7 +590,7 @@ void BigStation::decodeWorker(int tid)
                 decode_start_tsc = rdtsc();
             });
 
-            cur_decode_idx += config_->num_demul_workers[config_->bs_server_addr_idx];
+            cur_decode_idx += config_->num_decode_workers[config_->bs_server_addr_idx];
             if (cur_decode_idx >= config_->get_num_ues_to_process() * config_->ul_data_symbol_num_perframe) {
                 cur_decode_idx = 0;
                 if (!bigstation_state_.decode_done(cur_decode_frame)) {
