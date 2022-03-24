@@ -481,8 +481,12 @@ void BigStation::demulWorker(int tid)
                 demul_start_tsc = rdtsc();
             });
 
-            // printf("Run demul frame %zu symbol %zu sc %zu\n", cur_demul_frame, cur_demul_symbol_ul, sc_start);
-            do_demul->LaunchStatic(cur_demul_frame, cur_demul_symbol_ul, sc_start, sc_end - sc_start);
+            for (size_t sc_id = sc_start - sc_start % config_->demul_block_size; sc_id < sc_end; sc_id += config_->demul_block_size) {
+                size_t cur_start = std::max(sc_start, sc_id);
+                size_t cur_end = std::min(sc_end, sc_id + config_->demul_block_size);
+                // printf("Run demul frame %zu symbol %zu sc %zu\n", cur_demul_frame, cur_demul_symbol_ul, sc_start);
+                do_demul->LaunchStatic(cur_demul_frame, cur_demul_symbol_ul, cur_start, cur_end - cur_start);
+            }
 
             TRIGGER_TIMER({
                 size_t demul_tmp_tsc = rdtsc() - demul_start_tsc;
