@@ -17,6 +17,7 @@
 #include "stats.h"
 #include "symbols.h"
 #include "utils.h"
+#include "csv_logger.h"
 
 class DoZF : public Doer {
  public:
@@ -110,6 +111,8 @@ class DoZF : public Doer {
   PhyStats* phy_stats_;
   arma::uvec ext_ref_id_;
   size_t num_ext_ref_;
+
+  std::unique_ptr<MatLogger> logger_csi_, logger_dlzf_;
 };
 
 #endif  // DOZF_H_

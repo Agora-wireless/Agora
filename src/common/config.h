@@ -301,6 +301,8 @@ class Config {
   inline size_t UeMacRxPort() const { return this->ue_mac_rx_port_; }
   inline size_t UeMacTxPort() const { return this->ue_mac_tx_port_; }
 
+  inline int UeId() const { return this->ue_id_; }
+
   /* Inline accessors (complex types) */
   inline const std::vector<int>& ClTxAdvance() const {
     return this->cl_tx_advance_;
@@ -521,6 +523,8 @@ class Config {
 
   size_t bs_ant_num_;  // Total number of BS antennas
   size_t bf_ant_num_;  // Number of antennas used in beamforming
+
+  int ue_id_;
 
   // The count of ues an instance is responsable for
   size_t ue_num_;

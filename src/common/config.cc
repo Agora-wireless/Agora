@@ -23,6 +23,7 @@ static const size_t kMaxSupportedZc = 256;
 
 Config::Config(const std::string& jsonfile, int ue_id)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
+      ue_id_(ue_id),
       ul_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_("") {
