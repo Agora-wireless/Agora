@@ -51,8 +51,7 @@ public:
   void UpdateMatBuf(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void SaveMatBuf();
 private:
-  size_t mat_idx_;
-  bool is_active_;
+  int mat_idx_;
 };
 
 #endif //CSV_LOGGER_H_
