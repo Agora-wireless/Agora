@@ -242,4 +242,6 @@ static const int kNumDemodTxThread = 1;
 
 static const size_t kDefaultMessageQueueSize = 512;
 static const size_t kDefaultWorkerQueueSize = 256;
+
+static constexpr size_t kMaxServers = 32;
 #endif

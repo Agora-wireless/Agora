@@ -795,8 +795,10 @@ int main(int argc, char **argv)
         (double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
         1000000000.0f / ((double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
 
-    FILE* outf = fopen(output_file, "a");
-    
+    FILE* outf = fopen(output_file.c_str(), "a");
+    fprintf(outf, "%zu %zu %zu %lf %lf %lf %lf %lf %lf\n", cfg->BS_ANT_NUM, cfg->UE_NUM, cfg->OFDM_DATA_NUM,
+        csi_res, zf_res, demul_res, decode_res, encode_res, precode_res);
+    fclose(outf);
 
     return 0;
 }

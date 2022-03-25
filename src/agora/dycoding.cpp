@@ -331,7 +331,7 @@ void DyDecode::StartWork()
             state_start_tsc = rdtsc();
         });
 
-        bool ret = shared_state_->received_all_demod_pkts(
+        bool ret = shared_state_->received_all_demod_pkts_loss_tolerant(
                 cur_ue_, cur_frame_, cur_symbol_);
         
         TRIGGER_TIMER({
@@ -401,9 +401,9 @@ void DyDecode::StartWork()
 
     if (cfg_->error) {
         printf("DeDecode Thread %d error traceback: decode (frame %zu, symbol %zu, ue %zu), recvd packets done %d\n", tid_, 
-            cur_frame_, cur_symbol, cur_ue, shared_state_->received_all_demod_pkts(
-                    cur_ue, cur_frame_, cur_symbol));
-        shared_state_->print_receiving_encoded_pkts(demul_cur_frame_, demul_cur_sym_dl_);
+            cur_frame_, cur_symbol_, cur_ue_, shared_state_->received_all_demod_pkts_loss_tolerant(
+                    cur_ue_, cur_frame_, cur_symbol_));
+        shared_state_->print_receiving_demod_pkts(cur_ue_, cur_frame_, cur_symbol_);
     }
 
     size_t whole_duration = rdtsc() - start_tsc;

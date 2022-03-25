@@ -21,7 +21,8 @@ public:
     // When receive a new freq iq packet, record it here
     bool receive_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t ant_id);
     // When receive a new demod packet, record it here
-    bool receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol_id_ul);
+    bool receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol_id_ul, size_t server_id);
+    bool receive_demod_pkt_loss_tolerant(size_t ue_id, size_t frame_id, size_t symbol_id_ul, size_t server_id);
     // When receive a new encode packet, record it here
     bool receive_encoded_pkt(size_t frame_id, size_t symbol_id_dl, size_t ue_id);
 
@@ -32,10 +33,12 @@ public:
     // Check whether demodulation can proceed for a symbol in a frame
     bool received_all_data_pkts(size_t frame_id, size_t symbol_id_ul);
     bool received_all_demod_pkts(size_t ue_id, size_t frame_id, size_t symbol_id_ul);
+    bool received_all_demod_pkts_loss_tolerant(size_t ue_id, size_t frame_id, size_t symbol_id_ul);
     bool received_all_encoded_pkts(size_t frame_id, size_t symbol_id_dl);
 
     // Print 
     void print_receiving_encoded_pkts(size_t frame_id, size_t symbol_id_dl);
+    void print_receiving_demod_pkts(size_t ue_id, size_t frame_id, size_t symbol_id_ul);
 
     // Check whether encoding can proceed for a frame
     bool is_encode_ready(size_t frame_id, size_t symbol_id_dl);
@@ -76,6 +79,7 @@ public:
     size_t rru_start_ = false;
 
 private:
+    Config *cfg_;
     // TODO: Instead of having all-atomic counter arrays, can we just make
     // the entire class atomic?
 
@@ -113,6 +117,11 @@ private:
 
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_demod_pkts_[kMaxUEs];
+    std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
+        num_demod_pkts_states_[kMaxUEs];
+    std::array<size_t, kMaxServers> demod_next_frame_;
+    std::array<size_t, kMaxServers> demod_next_symbol_;
+    std::array<size_t, kMaxServers> demod_next_ue_;
 
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_encoded_pkts_ = {};

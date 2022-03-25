@@ -2,7 +2,8 @@
 #include "utils.h"
 
 SharedState::SharedState(Config* cfg)
-    : last_frame_cycles_(worker_rdtsc())
+    : cfg_(cfg)
+    , last_frame_cycles_(worker_rdtsc())
     , freq_ghz_(measure_rdtsc_freq())
     , num_time_iq_pkts_per_symbol_(cfg->get_num_ant_to_process())
     , num_pilot_pkts_per_frame_(
@@ -48,6 +49,9 @@ SharedState::SharedState(Config* cfg)
         for (size_t j = 0; j < num_zf_tasks_per_frame_; j++) {
             zf_task_completed_[i][j] = false;
         }
+    }
+    for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
+        demod_next_ue_[i] = cfg->ue_start;
     }
 }
 
@@ -182,7 +186,7 @@ bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t 
     return true;
 }
 
-bool SharedState::receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol_id_ul)
+bool SharedState::receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol_id_ul, size_t server_id)
 {
     if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
         MLPD_ERROR(
@@ -193,10 +197,99 @@ bool SharedState::receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol
             (unsigned int)num_pkts_[cur_frame_ % kFrameWnd].load());
         return false;
     }
+
     num_demod_pkts_[ue_id][frame_id % kFrameWnd][symbol_id_ul]++;
+    if (unlikely(((num_demod_pkts_states_[ue_id][frame_id % kFrameWnd][symbol_id_ul] >> server_id) & 1) == 1)) {
+        printf("ERROR! Duplicate demod packet for frame %zu symbol %zu ue %zu server %zu\n", frame_id, symbol_id_ul, ue_id, server_id);
+        exit(0);
+    }
+    if (unlikely(server_id >= num_demod_pkts_per_symbol_per_ue_)) {
+        printf("ERROR! Server ID is larger than limit (%zu >= %zu)\n", server_id, num_demod_pkts_per_symbol_per_ue_);
+        exit(0);
+    }
+    num_demod_pkts_states_[ue_id][frame_id % kFrameWnd][symbol_id_ul] ^= (1 << server_id);
     if (num_demod_pkts_[ue_id][frame_id % kFrameWnd][symbol_id_ul] == num_demod_pkts_per_symbol_per_ue_) {
         MLPD_INFO("SharedCounters: received all demod packets in frame: %u, ue: %u, symbol: %u\n", frame_id, ue_id, symbol_id_ul);
     }
+    return true;
+}
+
+bool SharedState::receive_demod_pkt_loss_tolerant(size_t ue_id, size_t frame_id, size_t symbol_id_ul, size_t server_id) {
+    if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
+        MLPD_ERROR(
+            "SharedState error: Received demod packet for future "
+            "frame %zu beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
+            "happen if Agora is running slowly, e.g., in debug mode. \n",
+            frame_id, cur_frame_, kFrameWnd, cur_frame_, (unsigned int)num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
+            (unsigned int)num_pkts_[cur_frame_ % kFrameWnd].load());
+        return false;
+    }
+
+    // Handle pkt loss for demod pkts
+    if (frame_id != demod_next_frame_[server_id]) {
+        if (frame_id > demod_next_frame_[server_id]) {
+            for (size_t uid = demod_next_ue_[server_id]; uid < cfg_->ue_end; uid ++) {
+                num_demod_pkts_states_[uid][demod_next_frame_[server_id] % kFrameWnd][demod_next_symbol_[server_id]] ^= (1 << server_id);
+            }
+            for (size_t sid = demod_next_symbol_[server_id] + 1; sid < cfg_->ul_data_symbol_num_perframe; sid ++) {
+                for (size_t uid = cfg_->ue_start; uid < cfg_->ue_end; uid ++) {
+                    num_demod_pkts_states_[uid][demod_next_frame_[server_id] % kFrameWnd][sid] ^= (1 << server_id);
+                }
+            }
+            for (size_t fid = demod_next_frame_[server_id] + 1; fid < frame_id; fid ++) {
+                for (size_t sid = demod_next_symbol_[server_id] + 1; sid < cfg_->ul_data_symbol_num_perframe; sid ++) {
+                    for (size_t uid = cfg_->ue_start; uid < cfg_->ue_end; uid ++) {
+                        num_demod_pkts_states_[uid][fid % kFrameWnd][sid] ^= (1 << server_id);
+                    }
+                } 
+            }
+            for (size_t sid = 0; sid < symbol_id_ul; sid ++) {
+                for (size_t uid = cfg_->ue_start; uid < cfg_->ue_end; uid ++) {
+                    num_demod_pkts_states_[uid][frame_id % kFrameWnd][sid] ^= (1 << server_id);
+                }
+            }
+            for (size_t uid = cfg_->ue_start; uid < ue_id; uid ++) {
+                num_demod_pkts_states_[uid][frame_id % kFrameWnd][symbol_id_ul] ^= (1 << server_id);
+            }
+        }
+    } else if (symbol_id_ul != demod_next_symbol_[server_id]) {
+        if (symbol_id_ul > demod_next_symbol_[server_id]) {
+            for (size_t uid = demod_next_ue_[server_id]; uid < cfg_->ue_end; uid ++) {
+                num_demod_pkts_states_[uid][frame_id % kFrameWnd][demod_next_symbol_[server_id]] ^= (1 << server_id);
+            }
+            for (size_t sid = demod_next_symbol_[server_id] + 1; sid < symbol_id_ul; sid ++) {
+                for (size_t uid = cfg_->ue_start; uid < cfg_->ue_end; uid ++) {
+                    num_demod_pkts_states_[uid][frame_id % kFrameWnd][sid] ^= (1 << server_id);
+                }
+            }
+            for (size_t uid = cfg_->ue_start; uid < ue_id; uid ++) {
+                num_demod_pkts_states_[uid][frame_id % kFrameWnd][symbol_id_ul] ^= (1 << server_id);
+            }
+        }
+    } else if (ue_id != demod_next_ue_[server_id]) {
+        if (ue_id > demod_next_ue_[server_id]) {
+            for (size_t uid = demod_next_ue_[server_id]; uid < ue_id; uid ++) {
+                num_demod_pkts_states_[uid][frame_id % kFrameWnd][symbol_id_ul] ^= (1 << server_id);
+            }
+        }
+    }
+    num_demod_pkts_states_[ue_id][frame_id % kFrameWnd][symbol_id_ul] ^= (1 << server_id);
+
+    size_t next_ue = ue_id + 1;
+    size_t next_symbol = symbol_id_ul;
+    size_t next_frame = frame_id;
+    if (next_ue == cfg_->ue_end) {
+        next_ue = cfg_->ue_start;
+        next_symbol ++;
+        if (next_symbol == cfg_->ul_data_symbol_num_perframe) {
+            next_symbol = 0;
+            next_frame ++;
+        }
+    }
+    demod_next_frame_[server_id] = next_frame;
+    demod_next_symbol_[server_id] = next_symbol;
+    demod_next_ue_[server_id] = next_ue;
+    
     return true;
 }
 
@@ -270,6 +363,17 @@ bool SharedState::received_all_demod_pkts(
     return false;
 }
 
+bool SharedState::received_all_demod_pkts_loss_tolerant(size_t ue_id, size_t frame_id, size_t symbol_id_ul)
+{
+    if (num_demod_pkts_states_[ue_id][frame_id % kFrameWnd][symbol_id_ul] == (1UL << cfg_->bs_server_addr_list.size()) - 1) {
+        if (symbol_id_ul == 0) {
+            frame_decode_time_[frame_id] = get_us();
+        }
+        return true;
+    }
+    return false;
+}
+
 bool SharedState::received_all_encoded_pkts(size_t frame_id, size_t symbol_id_dl)
 {
     // static size_t frame_tag = 0;
@@ -299,9 +403,12 @@ void SharedState::print_receiving_encoded_pkts(size_t frame_id, size_t symbol_id
         frame_id, symbol_id_dl, num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl].load(), num_encoded_pkts_per_symbol_, res);
 }
 
-void SharedState::print_receiving_demoded_pkts(size_t ue_id, size_t frame_id. size_t symbol_id_dl)
+void SharedState::print_receiving_demod_pkts(size_t ue_id, size_t frame_id, size_t symbol_id_ul)
 {
-    
+    char res[64];
+    num_to_binary(res, num_demod_pkts_states_[ue_id][frame_id % kFrameWnd][symbol_id_ul].load(), num_demod_pkts_per_symbol_per_ue_);
+    printf("[Shared State] Frame %zu symbol %zu ue %zu: received %zu demod packets, required %zu, state %s\n",
+        frame_id, symbol_id_ul, ue_id, num_demod_pkts_[ue_id][frame_id % kFrameWnd][symbol_id_ul].load(), num_demod_pkts_per_symbol_per_ue_, res);
 }
 
 bool SharedState::is_encode_ready(size_t frame_id, size_t symbol_id_dl) {
@@ -373,6 +480,7 @@ void SharedState::decode_done(size_t frame_id)
             for (size_t i = 0; i < kMaxUEs; i ++) {
                 for (size_t j = 0; j < kMaxSymbols; j++) {
                     num_demod_pkts_[i][frame_slot][j] = 0;
+                    num_demod_pkts_states_[i][frame_slot][j] = 0;
                 }
             }
             for (size_t i = 0; i < kMaxSymbols; i++) {
