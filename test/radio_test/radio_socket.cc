@@ -12,7 +12,7 @@ constexpr size_t kRxBufferSize = 8192;
 constexpr size_t kDebugIrisRx = false;
 //constexpr size_t kDebugIrisTxStatus = false;
 
-#define SOCKET_DEBUG_OUTPUT
+//#define SOCKET_DEBUG_OUTPUT
 #if defined(SOCKET_DEBUG_OUTPUT)
 #define DEBUG_OUTPUT(...)   \
   std::printf(__VA_ARGS__); \
@@ -107,26 +107,34 @@ int RadioSocket::RxSymbol(
     long long& rx_time_ns) {
   size_t num_samples = 0;
   const auto* rx_buffer = &rx_buffer_.at(rx_bytes_);
-  const int rx_return =
-      socket_->Recv(&rx_buffer_.at(rx_bytes_), (rx_buffer_.size() - rx_bytes_));
+  bool try_rx = true;
 
-  if (rx_return > 0) {
-    DEBUG_OUTPUT("Received %d bytes\n", rx_return);
-    const size_t new_bytes = static_cast<size_t>(rx_return);
-    const bool symbol_complete = CheckSymbolComplete(rx_buffer, rx_return);
-    rx_bytes_ += new_bytes;
+  while (try_rx) {
+    try_rx = false;
+    const int rx_return = socket_->Recv(&rx_buffer_.at(rx_bytes_),
+                                        (rx_buffer_.size() - rx_bytes_));
 
-    if (symbol_complete) {
-      DEBUG_OUTPUT("Completed Symbol: %zu bytes\n", rx_bytes_);
-      num_samples = ParseRxSymbol(out_data, rx_time_ns);
-      rx_bytes_ = 0;
-      rx_samples_ = 0;
+    if (rx_return > 0) {
+      DEBUG_OUTPUT("Received %d bytes\n", rx_return);
+      const size_t new_bytes = static_cast<size_t>(rx_return);
+      const bool symbol_complete = CheckSymbolComplete(rx_buffer, rx_return);
+      rx_bytes_ += new_bytes;
+
+      if (symbol_complete) {
+        DEBUG_OUTPUT("Completed Symbol: %zu bytes\n", rx_bytes_);
+        num_samples = ParseRxSymbol(out_data, rx_time_ns);
+        rx_bytes_ = 0;
+        rx_samples_ = 0;
+      } else {
+        //Keep receiving (rx data but not the end of a symbol)
+        try_rx = true;
+      }
+    } else if (rx_return < 0) {
+      if ((errno != EAGAIN) && (errno != EWOULDBLOCK)) {
+        throw std::runtime_error("Error in socket receive call!");
+      }
     }
-  } else if (rx_return < 0) {
-    if ((errno != EAGAIN) && (errno != EWOULDBLOCK)) {
-      throw std::runtime_error("Error in scoket receive call!");
-    }
-  }
+  }  // end while (try_rx)
   return num_samples;
 }
 

@@ -32,8 +32,8 @@ class RadioConfigNoRxStream {
   void Go();
 
   // Thread functions
-  void InitBsRadio(size_t tid);
-  void ConfigureBsRadio(size_t tid);
+  void InitBsRadio(size_t radio);
+  void ConfigureBsRadio(size_t radio);
 
  private:
   void DrainBuffers();

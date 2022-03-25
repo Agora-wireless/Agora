@@ -220,14 +220,13 @@ RadioConfigNoRxStream::~RadioConfigNoRxStream() {
   hubs_.clear();
 }
 
-void RadioConfigNoRxStream::InitBsRadio(size_t tid) {
-  size_t i = tid;
+void RadioConfigNoRxStream::InitBsRadio(size_t radio) {
   auto channels = Utils::StrToChannels(cfg_->Channel());
   SoapySDR::Kwargs args;
   SoapySDR::Kwargs sargs;
   args["timeout"] = "1000000";
   args["driver"] = "iris";
-  args["serial"] = cfg_->RadioId().at(i);
+  args["serial"] = cfg_->RadioId().at(radio);
 
   SoapySDR::Device* bs_device = nullptr;
   for (size_t tries = 0; tries < kSoapyMakeMaxAttempts; tries++) {
@@ -236,97 +235,99 @@ void RadioConfigNoRxStream::InitBsRadio(size_t tid) {
       break;
     } catch (const std::runtime_error& e) {
       const auto* message = e.what();
-      std::printf("InitBsRadio[%zu] - Soapy error try %zu -- %s\n", tid, tries,
-                  message);
+      std::printf("InitBsRadio[%zu] - Soapy error try %zu -- %s\n", radio,
+                  tries, message);
     }
   }
   if (bs_device == nullptr) {
     std::printf("SoapySDR failed to locate the Bs radio %s in %zu attempts\n",
-                cfg_->RadioId().at(tid).c_str(), kSoapyMakeMaxAttempts);
+                cfg_->RadioId().at(radio).c_str(), kSoapyMakeMaxAttempts);
     throw std::runtime_error("SoapySDR failed to locate the Bs radio");
   }
-  ba_stn_.at(i) = bs_device;
+  ba_stn_.at(radio) = bs_device;
   for (auto ch : {0, 1}) {
-    ba_stn_.at(i)->setSampleRate(SOAPY_SDR_RX, ch, cfg_->Rate());
-    ba_stn_.at(i)->setSampleRate(SOAPY_SDR_TX, ch, cfg_->Rate());
+    ba_stn_.at(radio)->setSampleRate(SOAPY_SDR_RX, ch, cfg_->Rate());
+    ba_stn_.at(radio)->setSampleRate(SOAPY_SDR_TX, ch, cfg_->Rate());
   }
 
   // resets the DATA_clk domain logic.
-  ba_stn_.at(i)->writeSetting("RESET_DATA_LOGIC", "");
+  ba_stn_.at(radio)->writeSetting("RESET_DATA_LOGIC", "");
 
-  ConfigureRx(i);
+  ConfigureRx(radio);
 
-  //rx_streams_.at(i) =
-  //    ba_stn_.at(i)->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
-  tx_streams_.at(i) =
-      ba_stn_.at(i)->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
+  //rx_streams_.at(radio) =
+  //    ba_stn_.at(radio)->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
+  tx_streams_.at(radio) = ba_stn_.at(radio)->setupStream(
+      SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
   num_radios_initialized_.fetch_add(1);
 }
 
-void RadioConfigNoRxStream::ConfigureBsRadio(size_t tid) {
+void RadioConfigNoRxStream::ConfigureBsRadio(size_t radio) {
   // load channels
   auto channels = Utils::StrToChannels(cfg_->Channel());
 
   // use the TRX antenna port for both tx and rx
   for (auto ch : channels) {
-    ba_stn_.at(tid)->setAntenna(SOAPY_SDR_RX, ch, "TRX");
+    ba_stn_.at(radio)->setAntenna(SOAPY_SDR_RX, ch, "TRX");
   }
 
-  SoapySDR::Kwargs info = ba_stn_.at(tid)->getHardwareInfo();
+  SoapySDR::Kwargs info = ba_stn_.at(radio)->getHardwareInfo();
   for (auto ch : channels) {
-    ba_stn_.at(tid)->setBandwidth(SOAPY_SDR_RX, ch, cfg_->BwFilter());
-    ba_stn_.at(tid)->setBandwidth(SOAPY_SDR_TX, ch, cfg_->BwFilter());
+    ba_stn_.at(radio)->setBandwidth(SOAPY_SDR_RX, ch, cfg_->BwFilter());
+    ba_stn_.at(radio)->setBandwidth(SOAPY_SDR_TX, ch, cfg_->BwFilter());
 
-    // ba_stn_.at(tid)->setSampleRate(SOAPY_SDR_RX, ch, cfg->Rate());
-    // ba_stn_.at(tid)->setSampleRate(SOAPY_SDR_TX, ch, cfg->Rate());
+    // ba_stn_.at(radio)->setSampleRate(SOAPY_SDR_RX, ch, cfg->Rate());
+    // ba_stn_.at(radio)->setSampleRate(SOAPY_SDR_TX, ch, cfg->Rate());
 
-    ba_stn_.at(tid)->setFrequency(SOAPY_SDR_RX, ch, "RF", cfg_->RadioRfFreq());
-    ba_stn_.at(tid)->setFrequency(SOAPY_SDR_RX, ch, "BB",
-                                  kUseUHD ? 0 : cfg_->Nco());
-    ba_stn_.at(tid)->setFrequency(SOAPY_SDR_TX, ch, "RF", cfg_->RadioRfFreq());
-    ba_stn_.at(tid)->setFrequency(SOAPY_SDR_TX, ch, "BB",
-                                  kUseUHD ? 0 : cfg_->Nco());
+    ba_stn_.at(radio)->setFrequency(SOAPY_SDR_RX, ch, "RF",
+                                    cfg_->RadioRfFreq());
+    ba_stn_.at(radio)->setFrequency(SOAPY_SDR_RX, ch, "BB",
+                                    kUseUHD ? 0 : cfg_->Nco());
+    ba_stn_.at(radio)->setFrequency(SOAPY_SDR_TX, ch, "RF",
+                                    cfg_->RadioRfFreq());
+    ba_stn_.at(radio)->setFrequency(SOAPY_SDR_TX, ch, "BB",
+                                    kUseUHD ? 0 : cfg_->Nco());
 
     // Unified gains for both lime and frontend
     if (cfg_->SingleGain()) {
       // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:108]
-      ba_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch,
-                               ch != 0u ? cfg_->RxGainB() : cfg_->RxGainA());
+      ba_stn_.at(radio)->setGain(SOAPY_SDR_RX, ch,
+                                 ch != 0u ? cfg_->RxGainB() : cfg_->RxGainA());
       // w/CBRS 3.6GHz [0:105], 2.5GHZ [0:105]
-      ba_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch,
-                               ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());
+      ba_stn_.at(radio)->setGain(SOAPY_SDR_TX, ch,
+                                 ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());
     } else {
       if (info["frontend"].find("CBRS") != std::string::npos) {
         if (cfg_->Freq() > 3e9) {
-          ba_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "ATTN", -6);  //[-18,0]
+          ba_stn_.at(radio)->setGain(SOAPY_SDR_RX, ch, "ATTN", -6);  //[-18,0]
         } else if ((cfg_->Freq() > 2e9) && (cfg_->Freq() < 3e9)) {
-          ba_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "ATTN", -18);  //[-18,0]
+          ba_stn_.at(radio)->setGain(SOAPY_SDR_RX, ch, "ATTN", -18);  //[-18,0]
         } else {
-          ba_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "ATTN", -12);  //[-18,0]
+          ba_stn_.at(radio)->setGain(SOAPY_SDR_RX, ch, "ATTN", -12);  //[-18,0]
         }
-        ba_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "LNA2", 17);  //[0,17]
+        ba_stn_.at(radio)->setGain(SOAPY_SDR_RX, ch, "LNA2", 17);  //[0,17]
       }
 
-      ba_stn_.at(tid)->setGain(
+      ba_stn_.at(radio)->setGain(
           SOAPY_SDR_RX, ch, "LNA",
-          ch != 0u ? cfg_->RxGainB() : cfg_->RxGainA());     //[0,30]
-      ba_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "TIA", 0);  //[0,12]
-      ba_stn_.at(tid)->setGain(SOAPY_SDR_RX, ch, "PGA", 0);  //[-12,19]
+          ch != 0u ? cfg_->RxGainB() : cfg_->RxGainA());       //[0,30]
+      ba_stn_.at(radio)->setGain(SOAPY_SDR_RX, ch, "TIA", 0);  //[0,12]
+      ba_stn_.at(radio)->setGain(SOAPY_SDR_RX, ch, "PGA", 0);  //[-12,19]
 
       if (info["frontend"].find("CBRS") != std::string::npos) {
-        ba_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "ATTN",
-                                 -6);                          //[-18,0] by 3
-        ba_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "PA2", 0);  //[0|15]
+        ba_stn_.at(radio)->setGain(SOAPY_SDR_TX, ch, "ATTN",
+                                   -6);                          //[-18,0] by 3
+        ba_stn_.at(radio)->setGain(SOAPY_SDR_TX, ch, "PA2", 0);  //[0|15]
       }
-      ba_stn_.at(tid)->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);  //[-12,12]
-      ba_stn_.at(tid)->setGain(
+      ba_stn_.at(radio)->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);  //[-12,12]
+      ba_stn_.at(radio)->setGain(
           SOAPY_SDR_TX, ch, "PAD",
           ch != 0u ? cfg_->TxGainB() : cfg_->TxGainA());  //[0,30]
     }
   }
 
   for (auto ch : channels) {
-    ba_stn_.at(tid)->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
+    ba_stn_.at(radio)->setDCOffsetMode(SOAPY_SDR_RX, ch, true);
   }
   num_radios_configured_.fetch_add(1);
 }
