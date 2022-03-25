@@ -1,5 +1,5 @@
 {
-  "serial_file": "data/topology-vulture-ul.json",
+  "serial_file": "data/examples/topology-vulture.json",
   "cells": 1,
   "channel": "AB",
   "frequency": 3.56e9,

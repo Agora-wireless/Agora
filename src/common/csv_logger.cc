@@ -18,11 +18,15 @@ static const char* const kCsvHeader[] = {
   "Frame,Subcarrier,BS-Ant,UE-Ant,DLZF-Real,DLZF-Imag"
 };
 
-CsvLogger::CsvLogger(size_t dev_id, enum CsvLogID log_id) {
-  std::string filename = fmt::sprintf("%s-%zu.csv", kCsvName[log_id], dev_id);
+CsvLogger::CsvLogger(int dev_id, enum CsvLogID log_id) {
+  logger_ = spdlog::get(kCsvName[log_id]);
+  if (logger_ != nullptr) {
+    return;
+  }
+  std::string filename = fmt::sprintf("%s-%d.csv", kCsvName[log_id], dev_id);
   std::remove(filename.c_str());
   logger_ = spdlog::create_async_nb<spdlog::sinks::basic_file_sink_mt>
-      (fmt::sprintf("csv_logger_%zu", log_id), filename);
+            (kCsvName[log_id], filename);
   logger_->set_level(spdlog::level::info);
   logger_->set_pattern("%v");
   logger_->info(kCsvHeader[log_id]);
@@ -37,7 +41,7 @@ static constexpr size_t kMatLogs = sizeof(kMatLogID) / sizeof(enum CsvLogID),
 static std::complex<float> mat_buffer[kMatLogs][kMatLogFrames][kMatLogSCs]
                                      [kMatLogBSAnts][kMatLogUEAnts];
 
-MatLogger::MatLogger(size_t dev_id, enum CsvLogID log_id)
+MatLogger::MatLogger(int dev_id, enum CsvLogID log_id)
          : CsvLogger(dev_id, log_id) {
   size_t i;
   for (i = 0; i < kMatLogs; i++) {

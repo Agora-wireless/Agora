@@ -381,8 +381,8 @@ void UeWorker::DoFftData(size_t tag) {
                    (-10.0f * std::log10(evm)));
   }
   if (kEnableCsvLog) {
-    logger_evmsnr_->Write("%zu,%zu,%zu,%f,%f", frame_id, symbol_id, ant_id,
-                          100.0f * evm, -10.0f * std::log10(evm));
+    logger_evmsnr_->Write(frame_id, symbol_id, ant_id, 100.0f * evm,
+                          -10.0f * std::log10(evm));
   }
 
   if (kDebugPrintPerTaskDone || kDebugPrintFft) {
@@ -461,7 +461,7 @@ void UeWorker::DoDemul(size_t tag) {
           config_.Modulation(Direction::kDownlink).c_str());
   }
 
-  if ((kDownlinkHardDemod == true) && (kPrintPhyStats == true) &&
+  if (kDownlinkHardDemod && (kPrintPhyStats || kEnableCsvLog) &&
       (dl_symbol_id >= config_.Frame().ClientDlPilotSymbols())) {
     phy_stats_.UpdateDecodedBits(
         ant_id, total_dl_symbol_id,
@@ -479,13 +479,13 @@ void UeWorker::DoDemul(size_t tag) {
         block_error++;
       }
     }
-    if (block_error > 0) {
+    if (kPrintPhyStats && block_error > 0) {
       AGORA_LOG_INFO("Frame %zu Symbol %zu Ue %zu: %zu symbol errors\n",
                      frame_id, symbol_id, ant_id, block_error);
     }
     phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, block_error);
     if (kEnableCsvLog) {
-      logger_berser_->Write("%zu,%zu,%zu,%f,%f", frame_id, symbol_id, ant_id,
+      logger_berser_->Write(frame_id, symbol_id, ant_id,
                       phy_stats_.GetBitErrorRate(ant_id, total_dl_symbol_id),
                       static_cast<float>(block_error) /
                       static_cast<float>(config_.GetOFDMDataNum()));
