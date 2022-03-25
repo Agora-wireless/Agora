@@ -18,15 +18,20 @@ static const char* const kCsvHeader[] = {
   "Frame,Subcarrier,BS-Ant,UE-Ant,DLZF-Real,DLZF-Imag"
 };
 
+static std::mutex mtx;
+
 CsvLogger::CsvLogger(int dev_id, enum CsvLogID log_id) {
+  mtx.lock();
   logger_ = spdlog::get(kCsvName[log_id]);
   if (logger_ != nullptr) {
+    mtx.unlock();
     return;
   }
   std::string filename = fmt::sprintf("%s-%d.csv", kCsvName[log_id], dev_id);
   std::remove(filename.c_str());
   logger_ = spdlog::create_async_nb<spdlog::sinks::basic_file_sink_mt>
             (kCsvName[log_id], filename);
+  mtx.unlock();
   logger_->set_level(spdlog::level::info);
   logger_->set_pattern("%v");
   logger_->info(kCsvHeader[log_id]);
@@ -38,25 +43,25 @@ static constexpr enum CsvLogID kMatLogID[] = {kMatLogCSI, kMatLogDLZF};
 static constexpr size_t kMatLogs = sizeof(kMatLogID) / sizeof(enum CsvLogID),
                         kMatLogFrames = 1000, kMatLogSCs = 304,
                         kMatLogBSAnts = 8, kMatLogUEAnts = 1;
+static bool mat_log_active[kMatLogs];
+static size_t mat_last_frame[kMatLogs];
 static std::complex<float> mat_buffer[kMatLogs][kMatLogFrames][kMatLogSCs]
                                      [kMatLogBSAnts][kMatLogUEAnts];
 
 MatLogger::MatLogger(int dev_id, enum CsvLogID log_id)
-         : CsvLogger(dev_id, log_id) {
-  size_t i;
-  for (i = 0; i < kMatLogs; i++) {
+         : CsvLogger(dev_id, log_id), mat_idx_(-1) {
+  for (size_t i = 0; i < kMatLogs; i++) {
     if (log_id == kMatLogID[i]) {
-      this->mat_idx_ = i;
+      mat_idx_ = i;
+      mat_log_active[i] = true;
       break;
     }
   }
-  this->is_active_ = (i < kMatLogs);
 }
 
 void MatLogger::UpdateMatBuf(size_t frame_id, size_t sc_id,
                              const arma::cx_fmat& mat_in) {
-  if (this->is_active_ == false || frame_id >= kMatLogFrames
-                                || sc_id >= kMatLogSCs) {
+  if (mat_idx_ == -1 || frame_id >= kMatLogFrames || sc_id >= kMatLogSCs) {
     return;
   }
   const size_t bs_ants = mat_in.n_rows < kMatLogBSAnts ?
@@ -65,24 +70,29 @@ void MatLogger::UpdateMatBuf(size_t frame_id, size_t sc_id,
                          mat_in.n_cols : kMatLogUEAnts;
   for (size_t i = 0; i < bs_ants; i++) {
     for (size_t j = 0; j < ue_ants; j++) {
-      mat_buffer[this->mat_idx_][frame_id][sc_id][i][j] = mat_in(i, j);
+      mat_buffer[mat_idx_][frame_id][sc_id][i][j] = mat_in(i, j);
     }
+  }
+  if (frame_id > mat_last_frame[mat_idx_]) {
+    mat_last_frame[mat_idx_] = frame_id;
   }
 }
 
 void MatLogger::SaveMatBuf() {
-  if (this->is_active_ == false) {
+  mtx.lock();
+  if (mat_idx_ == -1 || mat_log_active[mat_idx_] == false) {
+    mtx.unlock();
     return;
   }
-  this->is_active_ = false;
-  for (size_t frame_id = 0; frame_id < kMatLogFrames; frame_id++) {
+  mat_log_active[mat_idx_] = false;
+  mtx.unlock();
+  for (size_t frame_id = 0; frame_id <= mat_last_frame[mat_idx_]; frame_id++) {
     for (size_t sc_id = 0; sc_id < kMatLogSCs; sc_id++) {
       for (size_t i = 0; i < kMatLogBSAnts; i++) {
         for (size_t j = 0; j < kMatLogUEAnts; j++) {
-          const std::complex<float>& cx = mat_buffer[this->mat_idx_][frame_id]
+          const std::complex<float>& cx = mat_buffer[mat_idx_][frame_id]
                                                     [sc_id][i][j];
-          this->Write("%zu,%zu,%zu,%zu,%f,%f", frame_id, sc_id, i, j,
-                      cx.real(), cx.imag());
+          Write(frame_id, sc_id, i, j, cx.real(), cx.imag());
         }
       }
     }
