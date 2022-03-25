@@ -20,11 +20,13 @@ public:
     bool receive_time_iq_pkt(size_t frame_id, size_t symbol_id);
     // When receive a new freq iq packet, record it here
     bool receive_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t ant_id);
+    bool receive_freq_iq_pkt_loss_tolerant(size_t frame_id, size_t symbol_id, size_t ant_id);
     // When receive a new demod packet, record it here
     bool receive_demod_pkt(size_t ue_id, size_t frame_id, size_t symbol_id_ul, size_t server_id);
     bool receive_demod_pkt_loss_tolerant(size_t ue_id, size_t frame_id, size_t symbol_id_ul, size_t server_id);
     // When receive a new encode packet, record it here
     bool receive_encoded_pkt(size_t frame_id, size_t symbol_id_dl, size_t ue_id);
+    bool receive_encoded_pkt_loss_tolerant(size_t frame_id, size_t symbol_id_dl, size_t ue_id);
 
     bool received_all_time_iq_pkts(size_t frame_id, size_t symbol_id);
     // Check whether all pilot packets are received for a frame
@@ -98,6 +100,8 @@ private:
     // packets received for frame i and symbol j
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_data_pkts_ = {};
+    std::array<size_t, kMaxAntennas> freq_iq_next_frame_;
+    std::array<size_t, kMaxAntennas> freq_iq_next_symbol_;
 
     std::array<size_t, kMaxAntennas> last_frame_symbol_each_ant_ = {};
 
@@ -127,6 +131,8 @@ private:
         num_encoded_pkts_ = {};
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_encoded_pkts_states_ = {};
+    std::array<size_t, kMaxUEs> encode_next_frame_;
+    std::array<size_t, kMaxUEs> encode_next_symbol_;
 
     // encode_ready_[i % kFrameWnd] represents whether encoding can proceed
     // for frame i
