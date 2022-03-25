@@ -1,7 +1,7 @@
 {
   /* General Settings */
   "cells": 1,
-  "bs_radio_num": 10,
+  "bs_radio_num": 12,
   "ue_radio_num": 8,
   "beamsweep": true,
   "beacon_antenna": 0,

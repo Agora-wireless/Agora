@@ -411,7 +411,7 @@ To compile the program with MAC enabled
 ```shell
 /Agora$ rm -rf build
 /Agora$ cd build
-/Agora/build$ cmake .. -DENABLE_MAC true
+/Agora/build$ cmake .. -DENABLE_MAC=true
 /Agora/build$ make -j8
 ```
 
