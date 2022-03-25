@@ -18,14 +18,18 @@ enum CsvLogID {
 
 class CsvLogger {
 public:
-  CsvLogger(size_t dev_id, enum CsvLogID log_id);
-  inline void Write(const char *format, ...) {
-    char str[128];
-    va_list args;
-    va_start(args, format);
-    sprintf(str, format, args);
+  CsvLogger(int dev_id, enum CsvLogID log_id);
+  inline void Write(size_t u1, size_t u2, size_t u3, float f1) {
+    logger_->info(fmt::sprintf("%zu,%zu,%zu,%f", u1, u2, u3, f1));
+  }
+  inline void Write(size_t u1, size_t u2, size_t u3, float f1, float f2) {
+    logger_->info(fmt::sprintf("%zu,%zu,%zu,%f,%f", u1, u2, u3, f1, f2));
+  }
+  inline void Write(size_t u1, size_t u2, size_t u3, size_t u4, float f1, float f2) {
+    logger_->info(fmt::sprintf("%zu,%zu,%zu,%zu,%f,%f", u1, u2, u3, u4, f1, f2));
+  }
+  inline void Write(std::string str) {
     logger_->info(str);
-    va_end(args);
   }
 private:
   std::shared_ptr<spdlog::logger> logger_;
@@ -35,15 +39,15 @@ private:
 
 class CsvLogger {
 public:
-  CsvLogger(size_t, enum CsvLogID);
-  inline void Write(const char *, ...) {}
+  CsvLogger(int, enum CsvLogID);
+  inline void Write(...) {}
 };
 
 #endif //ENABLE_CSV_LOG
 
 class MatLogger : public CsvLogger {
 public:
-  MatLogger(size_t dev_id, enum CsvLogID log_id);
+  MatLogger(int dev_id, enum CsvLogID log_id);
   void UpdateMatBuf(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void SaveMatBuf();
 private:

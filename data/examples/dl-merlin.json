@@ -1,5 +1,5 @@
 {
-    "serial_file": "data/topology-merlin.json",
+    "serial_file": "data/examples/topology-merlin.json",
     "cells": 1,
     "channel": "A",
     "frequency": 3.6e9,

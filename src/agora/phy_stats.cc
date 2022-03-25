@@ -62,8 +62,8 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                    Agora_memory::Alignment_t::kAlign64);
 
   if (kEnableCsvLog) {
-    logger_berser_ = std::make_unique<CsvLogger>(cfg->UeId(), kCsvLogBERSER);
-    logger_evmsnr_ = std::make_unique<CsvLogger>(cfg->UeId(), kCsvLogEVMSNR);
+    //logger_berser_ = std::make_unique<CsvLogger>(cfg->UeId(), kCsvLogBERSER);
+    //logger_evmsnr_ = std::make_unique<CsvLogger>(cfg->UeId(), kCsvLogEVMSNR);
     logger_dlpsnr_ = std::make_unique<CsvLogger>(cfg->UeId(), kCsvLogDLPSNR);
   }
 }
@@ -138,8 +138,8 @@ void PhyStats::RecordEvmSnr(size_t frame_id) {
     for (size_t i = 0; i < config_->UeAntNum(); i++) {
       const float evm = evm_buffer_[frame_id % kFrameWnd][i] /
                         config_->OfdmDataNum();
-      logger_evmsnr_->Write("%zu,-,%zu,%f,%f", frame_id, i,
-                            100.0f * evm, -10.0f * std::log10(evm));
+      logger_evmsnr_->Write(frame_id, 0u, i, 100.0f * evm,
+                            -10.0f * std::log10(evm));
     }
   }
   else {
@@ -171,7 +171,7 @@ void PhyStats::RecordDlPilotSnr(size_t frame_id, size_t ant_id) {
   if (kEnableCsvLog) {
     const size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
     for (size_t i = 0; i < dl_pilots_num; i++) {
-      logger_dlpsnr_->Write("%zu,%zu,%zu,%f", frame_id, i, ant_id,
+      logger_dlpsnr_->Write(frame_id, i, ant_id,
           dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + i]);
     }
   }
@@ -385,8 +385,7 @@ void PhyStats::RecordDecodeErrors(size_t frame_id, size_t symbol_id) {
     const size_t offset = config_->GetTotalDataSymbolIdxUl(frame_id,
                           config_->Frame().GetULSymbolIdx(symbol_id));
     for (size_t i = 0; i < config_->UeAntNum(); i++) {
-      logger_berser_->Write("%zu,%zu,%zu,%f,-", frame_id, symbol_id, i,
-                            GetBitErrorRate(i, offset));
+      logger_berser_->Write(frame_id, symbol_id, i, GetBitErrorRate(i, offset));
     }
   }
   else {
