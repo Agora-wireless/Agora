@@ -63,7 +63,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
 
   if (kEnableCsvLog) {
     logger_dlpsnr_ = std::make_unique<CsvLogger>(cfg->ListenerId(),
-                                                 kCsvLogDLPSNR);
+                                                 CsvLogger::kDLPSNR);
   }
 }
 
@@ -130,20 +130,6 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
      << "  EVM " << (100.0f * evm_mat.st()) << ", SNR "
      << (-10.0f * log10(evm_mat.st()));
   AGORA_LOG_INFO("%s\n", ss.str().c_str());
-}
-
-void PhyStats::RecordEvmSnr(size_t frame_id) {
-  if (kEnableCsvLog) {
-    for (size_t i = 0; i < config_->UeAntNum(); i++) {
-      const float evm = evm_buffer_[frame_id % kFrameWnd][i] /
-                        config_->OfdmDataNum();
-      logger_evmsnr_->Write(frame_id, 0u, i, 100.0f * evm,
-                            -10.0f * std::log10(evm));
-    }
-  }
-  else {
-    unused(frame_id);
-  }
 }
 
 float PhyStats::GetEvmSnr(size_t frame_id, size_t ue_id) {
@@ -377,20 +363,6 @@ void PhyStats::UpdateBlockErrors(size_t ue_id, size_t offset,
 float PhyStats::GetBitErrorRate(size_t ue_id, size_t offset) {
   return (static_cast<float>(bit_error_count_[ue_id][offset]) /
           static_cast<float>(decoded_bits_count_[ue_id][offset]));
-}
-
-void PhyStats::RecordDecodeErrors(size_t frame_id, size_t symbol_id) {
-  if (kEnableCsvLog) {
-    const size_t offset = config_->GetTotalDataSymbolIdxUl(frame_id,
-                          config_->Frame().GetULSymbolIdx(symbol_id));
-    for (size_t i = 0; i < config_->UeAntNum(); i++) {
-      logger_berser_->Write(frame_id, symbol_id, i, GetBitErrorRate(i, offset));
-    }
-  }
-  else {
-    unused(frame_id);
-    unused(symbol_id);
-  }
 }
 
 void PhyStats::IncrementDecodedBlocks(size_t ue_id, size_t offset) {
