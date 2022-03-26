@@ -35,7 +35,7 @@ class Config {
  public:
   static constexpr bool kDebugRecipCal = false;
   // Constructor
-  explicit Config(const std::string& /*jsonfile*/, int ue_id = -1);
+  explicit Config(const std::string& /*jsonfile*/, int listener_id = -1);
   ~Config();
 
   inline void Running(bool value) { this->running_.store(value); }
@@ -301,7 +301,7 @@ class Config {
   inline size_t UeMacRxPort() const { return this->ue_mac_rx_port_; }
   inline size_t UeMacTxPort() const { return this->ue_mac_tx_port_; }
 
-  inline int UeId() const { return this->ue_id_; }
+  inline int ListenerId() const { return this->listener_id_; }
 
   /* Inline accessors (complex types) */
   inline const std::vector<int>& ClTxAdvance() const {
@@ -524,7 +524,7 @@ class Config {
   size_t bs_ant_num_;  // Total number of BS antennas
   size_t bf_ant_num_;  // Number of antennas used in beamforming
 
-  int ue_id_;
+  int listener_id_;  // Listener ID if possitive; Normal user if zero
 
   // The count of ues an instance is responsable for
   size_t ue_num_;
@@ -669,7 +669,6 @@ class Config {
   size_t zf_thread_num_;
 
   size_t ue_core_offset_;
-  size_t ue_core_offset_step_;
   size_t ue_worker_thread_num_;
   size_t ue_socket_thread_num_;
 

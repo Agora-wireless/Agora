@@ -69,8 +69,10 @@ UeWorker::UeWorker(
   (void)DftiCommitDescriptor(mkl_handle_);
 
   if (kEnableCsvLog) {
-    logger_berser_ = std::make_unique<CsvLogger>(config.UeId(), kCsvLogBERSER);
-    logger_evmsnr_ = std::make_unique<CsvLogger>(config.UeId(), kCsvLogEVMSNR);
+    logger_berser_ = std::make_unique<CsvLogger>(config.ListenerId(),
+                                                 kCsvLogBERSER);
+    logger_evmsnr_ = std::make_unique<CsvLogger>(config.ListenerId(),
+                                                 kCsvLogEVMSNR);
   }
 }
 

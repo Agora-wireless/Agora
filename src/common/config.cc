@@ -21,9 +21,9 @@ static const size_t kMacAlignmentBytes = 64u;
 static constexpr bool kDebugPrintConfiguration = false;
 static const size_t kMaxSupportedZc = 256;
 
-Config::Config(const std::string& jsonfile, int ue_id)
+Config::Config(const std::string& jsonfile, int listener_id)
     : freq_ghz_(GetTime::MeasureRdtscFreq()),
-      ue_id_(ue_id),
+      listener_id_(listener_id),
       ul_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       dl_ldpc_config_(0, 0, 0, false, 0, 0, 0, 0),
       frame_("") {
@@ -116,8 +116,10 @@ Config::Config(const std::string& jsonfile, int ue_id)
     ss.clear();
 
     auto ue_serials = j_ue_serials.value("sdr", json::array());
-    if (ue_id >= 0) { //select one user only
-      ue_radio_id_.assign({ue_serials.at(ue_id)});
+    auto ue_listener_serials = j_ue_serials.value("sdr_listener",
+                                                  json::array());
+    if (listener_id_ > 0) {
+      ue_radio_id_.assign({ue_listener_serials.at(listener_id_ - 1)});
     }
     else {
       ue_radio_id_.assign(ue_serials.begin(), ue_serials.end());
@@ -413,13 +415,15 @@ Config::Config(const std::string& jsonfile, int ue_id)
     frame_ = FrameStats(sched);
   } else {
     json jframes = tdd_conf.value("frame_schedule", json::array());
+    json jframes_listener = tdd_conf.value("frame_schedule_listener",
+                                           json::array());
 
-    if (ue_id == -1) {
-      // Only allow 1 unique frame type
-      assert(jframes.size() == 1);
-    }
-    frame_ = FrameStats(jframes.at(ue_id > 0 && jframes.size() > 1 ? ue_id: 0)
-                        .get<std::string>());
+    // Only allow 1 unique frame type
+    assert(jframes.size() == 1);
+
+    frame_ = FrameStats(listener_id_ > 0 ?
+                        jframes_listener.at(0).get<std::string>() :
+                        jframes.at(0).get<std::string>());
   }
   AGORA_LOG_INFO("Config: Frame schedule %s (%zu symbols)\n",
                  frame_.FrameIdentifier().c_str(), frame_.NumTotalSyms());
@@ -484,11 +488,10 @@ Config::Config(const std::string& jsonfile, int ue_id)
   core_offset_ = tdd_conf.value("core_offset", 0);
   worker_thread_num_ = tdd_conf.value("worker_thread_num", 25);
   socket_thread_num_ = tdd_conf.value("socket_thread_num", 4);
-  ue_core_offset_ = tdd_conf.value("ue_core_offset", 0);
-  ue_core_offset_step_ = tdd_conf.value("ue_core_offset_step", 0);
-  if (ue_id > 0) {
-    ue_core_offset_ += ue_core_offset_step_ * ue_id;
-  }
+  ue_core_offset_ = listener_id_ > 0 ?
+                    tdd_conf.value("ue_core_offset_listener", json::array())
+                            .at(listener_id_ - 1).get<size_t>() :
+                    tdd_conf.value("ue_core_offset", 0);
   ue_worker_thread_num_ = tdd_conf.value("ue_worker_thread_num", 25);
   ue_socket_thread_num_ = tdd_conf.value("ue_socket_thread_num", 4);
   fft_thread_num_ = tdd_conf.value("fft_thread_num", 5);

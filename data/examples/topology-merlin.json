@@ -56,8 +56,10 @@
     },
     "Clients": {
         "sdr": [
-            "RF3E000068",
             "RF3E000027"
+        ],
+        "sdr_listener": [
+            "RF3E000068"
         ]
     }
 }
