@@ -719,12 +719,22 @@ void Agora::saveLatencyDataToFile()
     printf("Saving frame latency data to %s, ghz=%lf\n", filename.c_str(), freq_ghz_);
     FILE* fp = fopen(filename.c_str(), "w");
 
-    for (size_t i = 0; i < cfg->frames_to_test; i ++) {
-        fprintf(fp, "%zu %lu %lu %lu %lu %lu\n", i, shared_state_.frame_start_time_[i],
-            shared_state_.frame_iq_time_[i],
-            shared_state_.frame_sc_time_[i],
-            shared_state_.frame_decode_time_[i],
-            shared_state_.frame_end_time_[i]);
+    if (cfg->downlink_mode) {
+        for (size_t i = 0; i < cfg->frames_to_test; i ++) {
+            fprintf(fp, "%zu %lu %lu %lu %lu %lu\n", i, shared_state_.frame_start_time_[i],
+                shared_state_.frame_iq_time_[i],
+                shared_state_.frame_coding_time_[i],
+                shared_state_.frame_sc_time_[i],
+                shared_state_.frame_end_time_[i]);
+        }
+    } else {
+        for (size_t i = 0; i < cfg->frames_to_test; i ++) {
+            fprintf(fp, "%zu %lu %lu %lu %lu %lu\n", i, shared_state_.frame_start_time_[i],
+                shared_state_.frame_iq_time_[i],
+                shared_state_.frame_sc_time_[i],
+                shared_state_.frame_coding_time_[i],
+                shared_state_.frame_end_time_[i]);
+        }
     }
     fclose(fp);
 }

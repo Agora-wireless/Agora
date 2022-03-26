@@ -26,12 +26,12 @@ SharedState::SharedState(Config* cfg)
     frame_start_time_ = new uint64_t[cfg->frames_to_test];
     frame_iq_time_ = new uint64_t[cfg->frames_to_test];
     frame_sc_time_ = new uint64_t[cfg->frames_to_test];
-    frame_decode_time_ = new uint64_t[cfg->frames_to_test]; 
+    frame_coding_time_ = new uint64_t[cfg->frames_to_test]; 
     frame_end_time_ = new uint64_t[cfg->frames_to_test];
     memset(frame_start_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
     memset(frame_iq_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
     memset(frame_sc_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
-    memset(frame_decode_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+    memset(frame_coding_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
     memset(frame_end_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
     for (size_t i = 0; i < kFrameWnd; i++) {
         for (size_t j = 0; j < kMaxSymbols; j++) {
@@ -145,9 +145,10 @@ bool SharedState::receive_freq_iq_pkt_loss_tolerant(size_t frame_id, size_t symb
     }
 
     // Handle pkt loss for freq iq packets
+    size_t recvd_symbol_num = num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_;
     if (frame_id != freq_iq_next_frame_[ant_id]) {
         if (frame_id > freq_iq_next_frame_[ant_id]) {
-            for (size_t sid = freq_iq_next_symbol_[ant_id]; sid < cfg_->symbol_num_perframe; sid ++) {
+            for (size_t sid = freq_iq_next_symbol_[ant_id]; sid < recvd_symbol_num; sid ++) {
                 num_pkts_[freq_iq_next_frame_[ant_id] % kFrameWnd] ++;
                 if (sid < cfg_->pilot_symbol_num_perframe) {
                     num_pilot_pkts_[freq_iq_next_frame_[ant_id] % kFrameWnd] ++;
@@ -168,7 +169,7 @@ bool SharedState::receive_freq_iq_pkt_loss_tolerant(size_t frame_id, size_t symb
                 frame_iq_time_[freq_iq_next_frame_[ant_id]] = get_us();
             }
             for (size_t fid = freq_iq_next_frame_[ant_id] + 1; fid < frame_id; fid ++) {
-               for (size_t sid = 0; sid < cfg_->symbol_num_perframe; sid ++) {
+               for (size_t sid = 0; sid < recvd_symbol_num; sid ++) {
                     num_pkts_[fid % kFrameWnd] ++;
                     if (sid < cfg_->pilot_symbol_num_perframe) {
                         num_pilot_pkts_[fid % kFrameWnd] ++;
@@ -259,7 +260,7 @@ bool SharedState::receive_freq_iq_pkt_loss_tolerant(size_t frame_id, size_t symb
 
     size_t next_symbol = symbol_id + 1;
     size_t next_frame = frame_id;
-    if (next_symbol == cfg_->symbol_num_perframe) {
+    if (next_symbol == recvd_symbol_num) {
         next_symbol = 0;
         next_frame ++;
     }
@@ -487,7 +488,7 @@ bool SharedState::received_all_demod_pkts(
     if (num_demod_pkts_[ue_id][frame_id % kFrameWnd][symbol_id_ul]
         == num_demod_pkts_per_symbol_per_ue_) {
         if (symbol_id_ul == 0) {
-            frame_decode_time_[frame_id] = get_us();
+            frame_coding_time_[frame_id] = get_us();
         }
         return true;
     }
@@ -498,7 +499,7 @@ bool SharedState::received_all_demod_pkts_loss_tolerant(size_t ue_id, size_t fra
 {
     if (num_demod_pkts_states_[ue_id][frame_id % kFrameWnd][symbol_id_ul] == (1UL << cfg_->bs_server_addr_list.size()) - 1) {
         if (symbol_id_ul == 0) {
-            frame_decode_time_[frame_id] = get_us();
+            frame_coding_time_[frame_id] = get_us();
         }
         return true;
     }
@@ -514,6 +515,9 @@ bool SharedState::received_all_encoded_pkts(size_t frame_id, size_t symbol_id_dl
     // }
     if (num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl]
         == num_encoded_pkts_per_symbol_) {
+        if (symbol_id_dl == 0) {
+            frame_sc_time_[frame_id] = get_us();
+        }
         return true;
     }
     return false;
@@ -642,6 +646,7 @@ bool SharedState::precode_done(size_t frame_id)
     precode_mutex_.lock();
     num_precode_tasks_completed_[frame_id % kFrameWnd]++;
     while (frame_id == cur_frame_ && num_precode_tasks_completed_[frame_id % kFrameWnd] == num_precode_tasks_per_frame_) {
+        frame_end_time_[cur_frame_] = get_us();
         encode_ready_[frame_id % kFrameWnd] = false;
         size_t cur_cycle = worker_rdtsc();
         num_precode_tasks_completed_[frame_id % kFrameWnd] = 0;
@@ -710,6 +715,7 @@ bool SharedState::is_encode_tx_ready(size_t frame_id, size_t symbol_id_dl)
     }
     if (num_encode_tasks_completed_[frame_id % kFrameWnd][symbol_id_dl]
         == num_encode_tasks_required_) {
+        frame_coding_time_[frame_id] = get_us();
         return true;
     } 
     return false;

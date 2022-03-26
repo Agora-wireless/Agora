@@ -397,6 +397,8 @@ public:
     std::atomic<bool> running;
     std::atomic<bool> error;
 
+    double packet_loss_rate;
+
     size_t getNumAntennas() { return nRadios * nChannels; }
     int getSymbolId(size_t symbol_id);
 

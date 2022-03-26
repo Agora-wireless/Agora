@@ -532,6 +532,7 @@ Config::Config(std::string jsonfile)
 
     running = true;
     error = false;
+    packet_loss_rate = tddConf.value("packet_loss_rate", 0.0);
     printf("Config: %zu BS antennas, %zu UE antennas, %zu pilot symbols per "
            "frame,\n\t"
            "%zu uplink data symbols per frame, %zu downlink data "
