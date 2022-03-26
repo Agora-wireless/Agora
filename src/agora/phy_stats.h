@@ -22,14 +22,12 @@ class PhyStats {
   void UpdateDecodedBits(size_t ue_id, size_t offset, size_t new_bits_num);
   void UpdateBlockErrors(size_t ue_id, size_t offset, size_t block_error_count);
   float GetBitErrorRate(size_t ue_id, size_t offset);
-  void RecordDecodeErrors(size_t frame_id, size_t symbol_id);
   void IncrementDecodedBlocks(size_t ue_id, size_t offset);
   void UpdateUncodedBitErrors(size_t ue_id, size_t offset, size_t mod_bit_size,
                               uint8_t tx_byte, uint8_t rx_byte);
   void UpdateUncodedBits(size_t ue_id, size_t offset, size_t new_bits_num);
   void UpdateEvmStats(size_t frame_id, size_t sc_id, const arma::cx_fmat& eq);
   void PrintEvmStats(size_t frame_id);
-  void RecordEvmSnr(size_t frame_id);
   float GetEvmSnr(size_t frame_id, size_t ue_id);
   void UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
                       complex_float* fft_data);
@@ -43,9 +41,6 @@ class PhyStats {
   void PrintCalibSnrStats(size_t frame_id);
   void UpdateCsiCond(size_t frame_id, size_t sc_id, float cond);
   void PrintZfStats(size_t frame_id);
-  void UpdateMatBuffer(enum CsvLogID log_id, size_t frame_id, size_t sc_id,
-                       const arma::cx_fmat& mat_in);
-  void FlushMatBuffer(enum CsvLogID log_id);
 
  private:
   Config const* const config_;
@@ -65,7 +60,7 @@ class PhyStats {
   arma::cx_fmat gt_mat_;
   size_t num_rx_symbols_;
 
-  std::unique_ptr<CsvLogger> logger_berser_, logger_evmsnr_, logger_dlpsnr_;
+  std::unique_ptr<CsvLogger> logger_dlpsnr_;
 };
 
 #endif  // PHY_STATS_H_

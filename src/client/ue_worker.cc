@@ -70,9 +70,9 @@ UeWorker::UeWorker(
 
   if (kEnableCsvLog) {
     logger_berser_ = std::make_unique<CsvLogger>(config.ListenerId(),
-                                                 kCsvLogBERSER);
+                                                 CsvLogger::kBERSER);
     logger_evmsnr_ = std::make_unique<CsvLogger>(config.ListenerId(),
-                                                 kCsvLogEVMSNR);
+                                                 CsvLogger::kEVMSNR);
   }
 }
 

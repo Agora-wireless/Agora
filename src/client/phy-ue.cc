@@ -525,7 +525,6 @@ void PhyUe::Start() {
               }
             }
             PrintPerSymbolDone(PrintType::kDecode, frame_id, symbol_id);
-            //this->phy_stats_->RecordDecodeErrors(frame_id, symbol_id);
 
             bool decode_complete = decode_counters_.CompleteSymbol(frame_id);
             if (decode_complete == true) {

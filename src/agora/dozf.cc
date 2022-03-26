@@ -73,8 +73,8 @@ DoZF::DoZF(Config* config, int tid,
   }
 
   if (kEnableMatLog) {
-    logger_csi_ = std::make_unique<MatLogger>(0, kMatLogCSI);
-    logger_dlzf_ = std::make_unique<MatLogger>(0, kMatLogDLZF);
+    logger_csi_ = std::make_unique<MatLogger>(0, MatLogger::kCSI);
+    logger_dlzf_ = std::make_unique<MatLogger>(0, MatLogger::kDLZF);
   }
 }
 

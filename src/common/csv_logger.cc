@@ -2,32 +2,15 @@
 
 #if defined(ENABLE_CSV_LOG)
 
-static const char* const kCsvName[] = {
-  "log-dlpsnr-ue",
-  "log-evmsnr-ue",
-  "log-berser-ue",
-  "log-matcsi-bs",
-  "log-matdlzf-bs"
-};
-
-static const char* const kCsvHeader[] = {
-  "Frame,Symbol,UE-Ant,DL-Pilot-SNR",
-  "Frame,Symbol,UE-Ant,EVM,EVM-SNR",
-  "Frame,Symbol,UE-Ant,Bit-Error-Rate,Symbol-Error-Rate",
-  "Frame,Subcarrier,BS-Ant,UE-Ant,CSI-Real,CSI-Imag",
-  "Frame,Subcarrier,BS-Ant,UE-Ant,DLZF-Real,DLZF-Imag"
-};
-
-static std::mutex mtx;
-
-CsvLogger::CsvLogger(int dev_id, enum CsvLogID log_id) {
+CsvLogger::CsvLogger(int dev_id, LogID log_id) {
   mtx.lock();
   logger_ = spdlog::get(kCsvName[log_id]);
   if (logger_ != nullptr) {
     mtx.unlock();
     return;
   }
-  std::string filename = fmt::sprintf("%s-%d.csv", kCsvName[log_id], dev_id);
+  std::string filename = kCsvName[log_id] + "-" + std::to_string(dev_id)
+                                          + ".csv";
   std::remove(filename.c_str());
   logger_ = spdlog::create_async_nb<spdlog::sinks::basic_file_sink_mt>
             (kCsvName[log_id], filename);
@@ -39,16 +22,12 @@ CsvLogger::CsvLogger(int dev_id, enum CsvLogID log_id) {
 
 #if defined(ENABLE_MAT_LOG)
 
-static constexpr enum CsvLogID kMatLogID[] = {kMatLogCSI, kMatLogDLZF};
-static constexpr size_t kMatLogs = sizeof(kMatLogID) / sizeof(enum CsvLogID),
-                        kMatLogFrames = 1000, kMatLogSCs = 304,
-                        kMatLogBSAnts = 8, kMatLogUEAnts = 1;
-static bool mat_log_active[kMatLogs];
-static size_t mat_last_frame[kMatLogs];
-static std::complex<float> mat_buffer[kMatLogs][kMatLogFrames][kMatLogSCs]
-                                     [kMatLogBSAnts][kMatLogUEAnts];
+bool MatLogger::mat_log_active[kMatLogs];
+size_t MatLogger::mat_last_frame[kMatLogs];
+std::complex<float> MatLogger::mat_buffer[kMatLogs][kMatLogFrames][kMatLogSCs]
+                                         [kMatLogBSAnts][kMatLogUEAnts];
 
-MatLogger::MatLogger(int dev_id, enum CsvLogID log_id)
+MatLogger::MatLogger(int dev_id, LogID log_id)
          : CsvLogger(dev_id, log_id), mat_idx_(-1) {
   for (size_t i = 0; i < kMatLogs; i++) {
     if (log_id == kMatLogID[i]) {

@@ -61,10 +61,6 @@ class DoZF : public Doer {
   void ComputeCalib(size_t frame_id, size_t sc_id, arma::cx_fvec& calib_sc_vec);
   void ZfFreqOrthogonal(size_t tag);
 
-  void UpdateMatLogBuffer(size_t log_id, size_t frame_id, size_t sc_id,
-                          const arma::cx_fmat& mat_in);
-  void FlushMatLogBuffer();
-
   /**
    * Do prediction task for one subcarrier
    * @param tid: task thread index, used for selecting task ptok
@@ -112,7 +108,8 @@ class DoZF : public Doer {
   arma::uvec ext_ref_id_;
   size_t num_ext_ref_;
 
-  std::unique_ptr<MatLogger> logger_csi_, logger_dlzf_;
+  std::unique_ptr<MatLogger> logger_csi_;
+  std::unique_ptr<MatLogger> logger_dlzf_;
 };
 
 #endif  // DOZF_H_

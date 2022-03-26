@@ -155,6 +155,7 @@ class UeWorker {
 
   std::vector<std::vector<std::complex<float>>>& ue_pilot_vec_;
 
-  std::unique_ptr<CsvLogger> logger_berser_, logger_evmsnr_;
+  std::unique_ptr<CsvLogger> logger_berser_;
+  std::unique_ptr<CsvLogger> logger_evmsnr_;
 };
 #endif  // UE_WORKER_H_
