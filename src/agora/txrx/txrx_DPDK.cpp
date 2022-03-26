@@ -106,6 +106,27 @@ PacketTXRX::PacketTXRX(Config* cfg, size_t core_offset,
         }
     }
 
+    for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
+        if (i == cfg->bs_server_addr_idx) {
+            continue;
+        }
+        int ret = inet_pton(AF_INET, cfg->bs_server_addr_list[i].c_str(), &bs_server_addrs_[i]);
+        rt_assert(ret == 1, "Invalid sender IP address");
+        ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[i].c_str());
+        rt_assert(parsed_mac != NULL, "Invalid server mac address");
+        memcpy(&bs_server_mac_addrs_[i], parsed_mac, sizeof(ether_addr));
+        for (size_t j = 0; j < cfg->UE_NUM; j ++) {
+            uint16_t src_port = rte_cpu_to_be_16(cfg->encode_tx_port + j);
+            uint16_t dst_port = rte_cpu_to_be_16(cfg->encode_rx_port + j);
+            printf("Adding steering rule for src IP %s, dest IP %s, src port: %zu, "
+                "dst port: %zu, queue: %zu\n",
+                cfg->bs_server_addr_list[i].c_str(), cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(),
+                cfg->encode_tx_port + j, cfg->encode_rx_port + j, j % rx_thread_num_);
+            DpdkTransport::install_flow_rule(
+                port_id, j % rx_thread_num_, bs_server_addrs_[i], bs_server_addrs_[cfg->bs_server_addr_idx], src_port, dst_port);
+        }
+    }
+
     if (cfg_->use_time_domain_iq) {
         for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
             if (i == cfg->bs_server_addr_idx) {
@@ -235,7 +256,7 @@ void* PacketTXRX::fft_tx_thread(int tid)
                         memcpy(target_ant_ptr + sc_offset, ant_ptr + 2 * sizeof(unsigned short)
                                 * (cfg_->OFDM_DATA_START + cfg_->subcarrier_start),
                             cfg_->get_num_sc_to_process() * 2 * sizeof(unsigned short));
-                        if (!shared_state_->receive_freq_iq_pkt(fft_frame_to_send, fft_symbol_to_send, ant_id)) {
+                        if (!shared_state_->receive_freq_iq_pkt_loss_tolerant(fft_frame_to_send, fft_symbol_to_send, ant_id)) {
                             cfg_->error = true;
                             cfg_->running = false;
                         }
@@ -459,13 +480,13 @@ void* PacketTXRX::encode_tx_thread(int tid)
                         int8_t* target_ptr = cfg_->get_encoded_buf(encoded_buffer_to_precode_,
                             encode_frame_to_send_, encode_symbol_dl_to_send_, ue_id) + sc_start * cfg_->mod_order_bits;
                         memcpy(target_ptr, src_ptr, cfg_->get_num_sc_to_process() * cfg_->mod_order_bits);
-                        shared_state_->receive_encoded_pkt(encode_frame_to_send_, encode_symbol_dl_to_send_, ue_id);
+                        shared_state_->receive_encoded_pkt_loss_tolerant(encode_frame_to_send_, encode_symbol_dl_to_send_, ue_id);
                     } else {
                         struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
                         tx_bufs[0] = DpdkTransport::alloc_udp(mbuf_pool_[0], bs_server_mac_addrs_[cfg_->bs_server_addr_idx], 
                             bs_server_mac_addrs_[target_server_idx],
                             bs_server_addrs_[cfg_->bs_server_addr_idx], bs_server_addrs_[target_server_idx], 
-                            cfg_->encode_tx_port + encode_symbol_dl_to_send_, cfg_->encode_rx_port + encode_symbol_dl_to_send_, 
+                            cfg_->encode_tx_port + ue_id, cfg_->encode_rx_port + ue_id, 
                             Packet::kOffsetOfData + cfg_->subcarrier_num_list[target_server_idx] * cfg_->mod_order_bits);
                         struct rte_ether_hdr* eth_hdr
                             = rte_pktmbuf_mtod(tx_bufs[0], struct rte_ether_hdr*);
@@ -609,7 +630,7 @@ int PacketTXRX::recv_relocate(int tid)
 
             // get the position in rx_buffer
             cur_cycle = rdtsc();
-            if (!shared_state_->receive_freq_iq_pkt(pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_)) {
+            if (!shared_state_->receive_freq_iq_pkt_loss_tolerant(pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_)) {
                 cfg_->error = true;
                 cfg_->running = false;
             }
@@ -647,7 +668,7 @@ int PacketTXRX::recv_relocate(int tid)
                     pkt->frame_id_, symbol_idx_dl, pkt->ue_id_);
             memcpy(encode_ptr, pkt->data_,
                 cfg_->get_num_sc_to_process() * cfg_->mod_order_bits);
-            if (!shared_state_->receive_encoded_pkt(pkt->frame_id_, symbol_idx_dl, pkt->ue_id_)) {
+            if (!shared_state_->receive_encoded_pkt_loss_tolerant(pkt->frame_id_, symbol_idx_dl, pkt->ue_id_)) {
                 cfg_->error = true;
                 cfg_->running = false;
             }

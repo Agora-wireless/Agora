@@ -99,60 +99,141 @@ bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t 
         frame_start_time_[frame_id] = get_us();
     }
 
-    // if (frame_id == 0 && symbol_id == 0) {
-    //     printf("Recv pilot packet ant %zu\n", ant_id);
-    // }
+    const size_t frame_slot = frame_id % kFrameWnd;
+    num_pkts_[frame_slot]++;
+    if (num_pkts_[frame_slot]
+        == num_pkts_per_symbol_
+            * (num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_)) {
+        MLPD_INFO("SharedCounters: received all packets in frame: %u. "
+                "Pilot pkts = %zu of %zu\n",
+            frame_id, num_pilot_pkts_[frame_slot].load(),
+            num_pilot_pkts_per_frame_);
+        frame_iq_time_[frame_id] = get_us();
+    }
 
-    // size_t last_frame_symbol = last_frame_symbol_each_ant_[ant_id];
-    // size_t last_frame = last_frame_symbol >> 32;
-    // size_t last_symbol = last_frame_symbol & 0xffffffff;
-    // if (last_frame == frame_id) {
-    //     if (last_symbol < symbol_id) {
-    //         num_pkts_[frame_id % kFrameWnd] += (symbol_id - last_symbol);
-    //         if (symbol_id < num_pilot_symbols_per_frame_) {
-    //             num_pilot_pkts_[frame_id % kFrameWnd] += (symbol_id - last_symbol);
-    //         } else {
-    //             if (last_symbol < num_pilot_symbols_per_frame_) {
-    //                 num_pilot_pkts_[frame_id % kFrameWnd] += (num_pilot_symbols_per_frame_ - last_symbol);
-    //                 for (size_t si = num_pilot_symbols_per_frame_; si < symbol_id; si++) {
-    //                     num_data_pkts_[frame_id % kFrameWnd][si] ++;
-    //                 }
-    //             } else {
-    //                 for (size_t si = last_symbol; si < symbol_id; si++) {
-    //                     num_data_pkts_[frame_id % kFrameWnd][si] ++;
-    //                 } 
-    //             }
-    //         }
-    //     }
-    // } else if (last_frame < frame_id) {
-    //     num_pkts_[last_frame % kFrameWnd] += (symbol_num_per_frame_ - last_symbol);
-    //     if (last_symbol < num_pilot_symbols_per_frame_) {
-    //         num_pilot_pkts_[frame_id % kFrameWnd] += (num_pilot_symbols_per_frame_ - last_symbol);
-    //         for (size_t si = num_pilot_symbols_per_frame_; si < symbol_num_per_frame_; si++) {
-    //             num_data_pkts_[frame_id % kFrameWnd][si] ++;
-    //         }
-    //     } else {
-    //         for (size_t si = last_symbol; si < symbol_num_per_frame_; si++) {
-    //             num_data_pkts_[frame_id % kFrameWnd][si] ++;
-    //         } 
-    //     }
-    //     for (size_t fi = last_frame + 1; fi < frame_id; fi ++) {
-    //         num_pkts_[fi % kFrameWnd] += symbol_num_per_frame_;
-    //         num_pilot_pkts_[fi % kFrameWnd] += num_pilot_symbols_per_frame_;
-    //         for (size_t si = num_pilot_symbols_per_frame_; si < symbol_num_per_frame_; si ++) {
-    //             num_data_pkts_[fi % kFrameWnd][si] ++;
-    //         }
-    //     }
-    //     num_pkts_[frame_id % kFrameWnd] += symbol_id;
-    //     if (symbol_id < num_pilot_symbols_per_frame_) {
-    //         num_pilot_pkts_[frame_id % kFrameWnd] += symbol_id;
-    //     } else {
-    //         num_pilot_pkts_[frame_id % kFrameWnd] += num_pilot_symbols_per_frame_;
-    //         for (size_t si = num_pilot_symbols_per_frame_; si < symbol_id; si++) {
-    //             num_data_pkts_[frame_id % kFrameWnd][si] ++;
-    //         }
-    //     }
-    // }
+    if (symbol_id < num_pilot_symbols_per_frame_) {
+        num_pilot_pkts_[frame_slot]++;
+        if (num_pilot_pkts_[frame_slot] == num_pilot_pkts_per_frame_) {
+            MLPD_INFO("SharedCounters: received all pilots in frame: %u\n", frame_id);
+            encode_ready_[frame_slot] = true;
+        }
+    } else {
+        num_data_pkts_[frame_slot][symbol_id - num_pilot_symbols_per_frame_]++;
+    }
+
+    return true;
+}
+
+bool SharedState::receive_freq_iq_pkt_loss_tolerant(size_t frame_id, size_t symbol_id, size_t ant_id)
+{
+    if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
+        MLPD_ERROR(
+            "SharedState error: Received freq iq packet for future "
+            "frame %zu beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
+            "happen if Agora is running slowly, e.g., in debug mode. \n",
+            frame_id, cur_frame_, kFrameWnd, cur_frame_, (unsigned int)num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
+            (unsigned int)num_pkts_[cur_frame_ % kFrameWnd].load());
+        return false;
+    }
+
+    if (unlikely(!rru_start_)) {
+        rru_start_ = true;
+    }
+
+    if (unlikely(frame_start_time_[frame_id] == 0)) {
+        frame_start_time_[frame_id] = get_us();
+    }
+
+    // Handle pkt loss for freq iq packets
+    if (frame_id != freq_iq_next_frame_[ant_id]) {
+        if (frame_id > freq_iq_next_frame_[ant_id]) {
+            for (size_t sid = freq_iq_next_symbol_[ant_id]; sid < cfg_->symbol_num_perframe; sid ++) {
+                num_pkts_[freq_iq_next_frame_[ant_id] % kFrameWnd] ++;
+                if (sid < cfg_->pilot_symbol_num_perframe) {
+                    num_pilot_pkts_[freq_iq_next_frame_[ant_id] % kFrameWnd] ++;
+                    if (num_pilot_pkts_[freq_iq_next_frame_[ant_id] % kFrameWnd] == num_pilot_pkts_per_frame_) {
+                        MLPD_INFO("SharedCounters: received all pilots in frame: %u\n", freq_iq_next_frame_[ant_id]);
+                        encode_ready_[freq_iq_next_frame_[ant_id] % kFrameWnd] = true;
+                    }
+                } else {
+                    num_data_pkts_[freq_iq_next_frame_[ant_id] % kFrameWnd][sid - cfg_->pilot_symbol_num_perframe] ++;
+                }
+            }
+            if (num_pkts_[freq_iq_next_frame_[ant_id] % kFrameWnd] == num_pkts_per_symbol_
+                    * (num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_)) {
+                MLPD_INFO("SharedCounters: received all packets in frame: %u. "
+                        "Pilot pkts = %zu of %zu\n",
+                    freq_iq_next_frame_[ant_id], num_pilot_pkts_[freq_iq_next_frame_[ant_id] % kFrameWnd].load(),
+                    num_pilot_pkts_per_frame_);
+                frame_iq_time_[freq_iq_next_frame_[ant_id]] = get_us();
+            }
+            for (size_t fid = freq_iq_next_frame_[ant_id] + 1; fid < frame_id; fid ++) {
+               for (size_t sid = 0; sid < cfg_->symbol_num_perframe; sid ++) {
+                    num_pkts_[fid % kFrameWnd] ++;
+                    if (sid < cfg_->pilot_symbol_num_perframe) {
+                        num_pilot_pkts_[fid % kFrameWnd] ++;
+                        if (num_pilot_pkts_[fid % kFrameWnd] == num_pilot_pkts_per_frame_) {
+                            MLPD_INFO("SharedCounters: received all pilots in frame: %u\n", fid);
+                            encode_ready_[fid % kFrameWnd] = true;
+                        }
+                    } else {
+                        num_data_pkts_[fid % kFrameWnd][sid - cfg_->pilot_symbol_num_perframe] ++;
+                    }
+                }
+                if (num_pkts_[fid % kFrameWnd] == num_pkts_per_symbol_
+                        * (num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_)) {
+                    MLPD_INFO("SharedCounters: received all packets in frame: %u. "
+                            "Pilot pkts = %zu of %zu\n",
+                        fid, num_pilot_pkts_[fid % kFrameWnd].load(),
+                        num_pilot_pkts_per_frame_);
+                    frame_iq_time_[fid] = get_us();
+                }
+            }
+            for (size_t sid = 0; sid < symbol_id; sid ++) {
+                num_pkts_[frame_id % kFrameWnd] ++;
+                if (sid < cfg_->pilot_symbol_num_perframe) {
+                    num_pilot_pkts_[frame_id % kFrameWnd] ++;
+                    if (num_pilot_pkts_[frame_id % kFrameWnd] == num_pilot_pkts_per_frame_) {
+                        MLPD_INFO("SharedCounters: received all pilots in frame: %u\n", frame_id);
+                        encode_ready_[frame_id % kFrameWnd] = true;
+                    }
+                } else {
+                    num_data_pkts_[frame_id % kFrameWnd][sid - cfg_->pilot_symbol_num_perframe] ++;
+                }
+            }
+            if (num_pkts_[frame_id % kFrameWnd] == num_pkts_per_symbol_
+                    * (num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_)) {
+                MLPD_INFO("SharedCounters: received all packets in frame: %u. "
+                        "Pilot pkts = %zu of %zu\n",
+                    frame_id, num_pilot_pkts_[frame_id % kFrameWnd].load(),
+                    num_pilot_pkts_per_frame_);
+                frame_iq_time_[frame_id] = get_us();
+            }
+        }
+    } else if (symbol_id != freq_iq_next_symbol_[ant_id]) {
+        if (symbol_id > freq_iq_next_symbol_[ant_id]) {
+            for (size_t sid = freq_iq_next_symbol_[ant_id]; sid < symbol_id; sid ++) {
+                num_pkts_[frame_id % kFrameWnd] ++;
+                if (sid < cfg_->pilot_symbol_num_perframe) {
+                    num_pilot_pkts_[frame_id % kFrameWnd] ++;
+                    if (num_pilot_pkts_[frame_id % kFrameWnd] == num_pilot_pkts_per_frame_) {
+                        MLPD_INFO("SharedCounters: received all pilots in frame: %u\n", frame_id);
+                        encode_ready_[frame_id % kFrameWnd] = true;
+                    }
+                } else {
+                    num_data_pkts_[frame_id % kFrameWnd][sid - cfg_->pilot_symbol_num_perframe] ++;
+                }
+            }
+            if (num_pkts_[frame_id % kFrameWnd] == num_pkts_per_symbol_
+                    * (num_pilot_symbols_per_frame_ + num_ul_data_symbol_per_frame_)) {
+                MLPD_INFO("SharedCounters: received all packets in frame: %u. "
+                        "Pilot pkts = %zu of %zu\n",
+                    frame_id, num_pilot_pkts_[frame_id % kFrameWnd].load(),
+                    num_pilot_pkts_per_frame_);
+                frame_iq_time_[frame_id] = get_us();
+            }
+        }
+    }
 
     const size_t frame_slot = frame_id % kFrameWnd;
     num_pkts_[frame_slot]++;
@@ -176,13 +257,15 @@ bool SharedState::receive_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t 
         num_data_pkts_[frame_slot][symbol_id - num_pilot_symbols_per_frame_]++;
     }
 
-    // last_symbol = symbol_id + 1;
-    // if (last_symbol == symbol_num_per_frame_) {
-    //     last_symbol = 0;
-    //     last_frame = frame_id + 1;
-    // }
-    // last_frame_symbol_each_ant_[ant_id] = (((uint64_t)last_frame) << 32) | last_symbol;
-
+    size_t next_symbol = symbol_id + 1;
+    size_t next_frame = frame_id;
+    if (next_symbol == cfg_->symbol_num_perframe) {
+        next_symbol = 0;
+        next_frame ++;
+    }
+    freq_iq_next_frame_[ant_id] = next_frame;
+    freq_iq_next_symbol_[ant_id] = next_symbol;
+    
     return true;
 }
 
@@ -320,6 +403,54 @@ bool SharedState::receive_encoded_pkt(size_t frame_id, size_t symbol_id_dl, size
         printf("ERROR!\n");
         exit(0);
     }
+    return true;
+}
+
+bool SharedState::receive_encoded_pkt_loss_tolerant(size_t frame_id, size_t symbol_id_dl, size_t ue_id)
+{
+    if (unlikely(frame_id >= cur_frame_ + kFrameWnd)) {
+        MLPD_ERROR(
+            "SharedState error: Received encoded packet for future "
+            "frame %zu beyond frame window (%zu + %zu) (Pilot pkt num for frame %zu is %u, pkt num %u). This can "
+            "happen if Agora is running slowly, e.g., in debug mode. \n",
+            frame_id, cur_frame_, kFrameWnd, cur_frame_, (unsigned int)num_pilot_pkts_[cur_frame_ % kFrameWnd].load(), 
+            (unsigned int)num_pkts_[cur_frame_ % kFrameWnd].load());
+        return false;
+    }
+
+    // Handle packet loss for encode packets
+    if (frame_id != encode_next_frame_[ue_id]) {
+        if (frame_id > encode_next_frame_[ue_id]) {
+            for (size_t sid = encode_next_symbol_[ue_id]; sid < cfg_->dl_data_symbol_num_perframe; sid ++) {
+                num_encoded_pkts_[encode_next_frame_[ue_id] % kFrameWnd][sid] ++;
+            }
+            for (size_t fid = encode_next_frame_[ue_id] + 1; fid < frame_id; fid ++) {
+                for (size_t sid = 0; sid < cfg_->dl_data_symbol_num_perframe; sid ++) {
+                    num_encoded_pkts_[fid % kFrameWnd][sid] ++;
+                }
+            }
+            for (size_t sid = 0; sid < symbol_id_dl; sid ++) {
+                num_encoded_pkts_[frame_id % kFrameWnd][sid] ++;
+            }
+        }
+    } else if (symbol_id_dl != encode_next_symbol_[ue_id]) {
+        if (symbol_id_dl > encode_next_symbol_[ue_id]) {
+            for (size_t sid = encode_next_symbol_[ue_id]; sid < symbol_id_dl; sid ++) {
+                num_encoded_pkts_[frame_id % kFrameWnd][sid] ++;
+            }
+        }
+    }
+    num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl]++;
+
+    size_t next_symbol = symbol_id_dl + 1;
+    size_t next_frame = frame_id;
+    if (next_symbol == cfg_->dl_data_symbol_num_perframe) {
+        next_symbol = 0;
+        next_frame ++;
+    }
+    encode_next_frame_[ue_id] = next_frame;
+    encode_next_symbol_[ue_id] = next_symbol;
+
     return true;
 }
 
