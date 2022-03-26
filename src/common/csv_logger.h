@@ -1,7 +1,7 @@
 #ifndef CSV_LOGGER_H_
 #define CSV_LOGGER_H_
 
-#include <armadillo>
+#include "armadillo"
 #include "logger.h"
 
 enum CsvLogID {

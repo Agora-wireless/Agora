@@ -62,9 +62,8 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                    Agora_memory::Alignment_t::kAlign64);
 
   if (kEnableCsvLog) {
-    //logger_berser_ = std::make_unique<CsvLogger>(cfg->UeId(), kCsvLogBERSER);
-    //logger_evmsnr_ = std::make_unique<CsvLogger>(cfg->UeId(), kCsvLogEVMSNR);
-    logger_dlpsnr_ = std::make_unique<CsvLogger>(cfg->UeId(), kCsvLogDLPSNR);
+    logger_dlpsnr_ = std::make_unique<CsvLogger>(cfg->ListenerId(),
+                                                 kCsvLogDLPSNR);
   }
 }
 
