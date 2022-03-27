@@ -278,6 +278,13 @@ void DySubcarrier::StartWork()
         do_demul_->PrintOverhead();
     }
 
+    if (cfg_->error) {
+        printf("DySubcarrier Thread %d error traceback: csi (frame %zu, sc %zu), "
+            "zf (frame %zu, sc %zu), demul (frame %zu, symbol %zu, task %zu)\n", tid_, 
+            csi_cur_frame_, csi_cur_sc_, zf_cur_frame_, zf_cur_sc_, demul_cur_frame_,
+            demul_cur_sym_ul_, n_demul_tasks_done_);
+    }
+
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
     std::string filename = cur_directory + "/data/performance_dysubcarrier.txt";
     FILE* fp = fopen(filename.c_str(), "a");
