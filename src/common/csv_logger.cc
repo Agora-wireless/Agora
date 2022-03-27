@@ -1,3 +1,10 @@
+/**
+ * @file csv_logger.h
+ * @brief Implementation file for the CsvLogger and MatLogger classes which
+ * record runtime physical-layer performance data and zero-forcing matrices
+ * into csv files. Enabled or disabled by cmake flags.
+ */
+
 #include "csv_logger.h"
 
 #if defined(ENABLE_CSV_LOG)
