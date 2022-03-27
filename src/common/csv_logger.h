@@ -1,3 +1,10 @@
+/**
+ * @file csv_logger.h
+ * @brief Declaration file for the CsvLogger and MatLogger classes which
+ * record runtime physical-layer performance data and zero-forcing matrices
+ * into csv files. Enabled or disabled by cmake flags.
+ */
+
 #ifndef CSV_LOGGER_H_
 #define CSV_LOGGER_H_
 
@@ -49,7 +56,7 @@ class CsvLogger {
 public:
   typedef enum { kDLPSNR, kEVMSNR, kBERSER, kCSI, kDLZF } LogID;
   CsvLogger(int, LogID);
-  inline void Write(...) {}
+  void Write(...);
 };
 #endif //ENABLE_CSV_LOG
 
