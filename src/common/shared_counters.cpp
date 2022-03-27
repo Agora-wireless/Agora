@@ -321,7 +321,7 @@ bool SharedState::receive_demod_pkt_loss_tolerant(size_t ue_id, size_t frame_id,
                 }
             }
             for (size_t fid = demod_next_frame_[server_id] + 1; fid < frame_id; fid ++) {
-                for (size_t sid = demod_next_symbol_[server_id] + 1; sid < cfg_->ul_data_symbol_num_perframe; sid ++) {
+                for (size_t sid = 0; sid < cfg_->ul_data_symbol_num_perframe; sid ++) {
                     for (size_t uid = cfg_->ue_start; uid < cfg_->ue_end; uid ++) {
                         num_demod_pkts_states_[uid][fid % kFrameWnd][sid] ^= (1 << server_id);
                     }
