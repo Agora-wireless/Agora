@@ -9,7 +9,7 @@
 
 #if defined(ENABLE_CSV_LOG)
 
-CsvLogger::CsvLogger(int dev_id, LogID log_id) {
+CsvLogger::CsvLogger(int dev_id, enum LogID log_id) {
   mtx.lock();
   logger_ = spdlog::get(kCsvName[log_id]);
   if (logger_ != nullptr) {
@@ -34,7 +34,7 @@ size_t MatLogger::mat_last_frame[kMatLogs];
 std::complex<float> MatLogger::mat_buffer[kMatLogs][kMatLogFrames][kMatLogSCs]
                                          [kMatLogBSAnts][kMatLogUEAnts];
 
-MatLogger::MatLogger(int dev_id, LogID log_id)
+MatLogger::MatLogger(int dev_id, enum LogID log_id)
          : CsvLogger(dev_id, log_id), mat_idx_(-1) {
   for (size_t i = 0; i < kMatLogs; i++) {
     if (log_id == kMatLogID[i]) {

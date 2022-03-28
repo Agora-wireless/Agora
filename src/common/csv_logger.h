@@ -17,9 +17,9 @@
 
 class CsvLogger {
 public:
-  typedef enum { kDLPSNR, kEVMSNR, kBERSER, kCSI, kDLZF } LogID;
+  enum LogID { kDLPSNR, kEVMSNR, kBERSER, kCSI, kDLZF };
 
-  CsvLogger(int dev_id, LogID log_id);
+  CsvLogger(int dev_id, enum LogID log_id);
   inline void Write(size_t u1, size_t u2, size_t u3, float f1) {
     logger_->info("{},{},{},{}", u1, u2, u3, f1);
   }
@@ -54,8 +54,8 @@ protected:
 #else
 class CsvLogger {
 public:
-  typedef enum { kDLPSNR, kEVMSNR, kBERSER, kCSI, kDLZF } LogID;
-  CsvLogger(int, LogID);
+  enum LogID { kDLPSNR, kEVMSNR, kBERSER, kCSI, kDLZF };
+  CsvLogger(int, enum LogID);
   void Write(...);
 };
 #endif //ENABLE_CSV_LOG
@@ -63,7 +63,7 @@ public:
 #if defined(ENABLE_MAT_LOG)
 class MatLogger : public CsvLogger {
 public:
-  MatLogger(int dev_id, LogID log_id);
+  MatLogger(int dev_id, enum LogID log_id);
   void UpdateMatBuf(size_t frame_id, size_t sc_id, const arma::cx_fmat& mat_in);
   void SaveMatBuf();
 private:
@@ -82,7 +82,7 @@ private:
 #else
 class MatLogger : public CsvLogger {
 public:
-  MatLogger(int, LogID);
+  MatLogger(int, enum LogID);
   void UpdateMatBuf(...);
   void SaveMatBuf();
 };
