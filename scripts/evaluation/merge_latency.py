@@ -21,16 +21,15 @@ for i in range(n_servers):
             latency_data.append([int(words[0]), int(words[1]), int(words[2]), int(words[3]), int(words[4]), int(words[5])])
         else:
             tp = latency_data[j]
-            if tp[1] > int(words[1]):
-                tp[1] = int(words[1])
-            if tp[2] < int(words[2]):
-                tp[2] = int(words[2])
-            if tp[3] < int(words[3]):
-                tp[3] = int(words[3])
-            if tp[4] > int(words[4]):
-                tp[4] = int(words[4])
-            if tp[5] < int(words[5]):
-                tp[5] = int(words[5])
+            diff = tp[1] - int(words[1])
+            if tp[2] < int(words[2]) + diff:
+                tp[2] = int(words[2]) + diff
+            if tp[3] < int(words[3]) + diff:
+                tp[3] = int(words[3]) + diff
+            if tp[4] > int(words[4]) + diff:
+                tp[4] = int(words[4]) + diff
+            if tp[5] < int(words[5]) + diff:
+                tp[5] = int(words[5]) + diff
             latency_data[j] = tp
     f.close()
 

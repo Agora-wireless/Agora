@@ -8,15 +8,10 @@
 #include <iostream>
 #include "utils.h"
 
-static inline void rt_assert(bool condition, const char* throw_str) {
-  if (!condition) throw std::runtime_error(throw_str);
-}
-
 int main(int argc, char **argv) 
 {
     int opt;
     std::string conf_file = TOSTRING(PROJECT_DIRECTORY) "/config/run.json";
-    size_t remote_server_idx = 0;
     while ((opt = getopt(argc, argv, "c:")) != -1) {
         switch (opt) {
             case 'c':
@@ -54,7 +49,8 @@ int main(int argc, char **argv)
                     gettimeofday(&current_time, NULL);
                     *((uint64_t*)(payload + 4)) = current_time.tv_sec * 1000000000L + current_time.tv_usec;
                     rte_eth_tx_burst(0, 0, mbuf + i, 1);
-                    return 0;
+                } else {
+                    rte_pktmbuf_free(mbuf[i]);
                 }
             }
         }

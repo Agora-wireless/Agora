@@ -8,10 +8,6 @@
 #include <iostream>
 #include "utils.h"
 
-static inline void rt_assert(bool condition, const char* throw_str) {
-  if (!condition) throw std::runtime_error(throw_str);
-}
-
 int main(int argc, char **argv) 
 {
     int opt;
@@ -49,13 +45,13 @@ int main(int argc, char **argv)
     int ret = rte_eth_macaddr_get(0, &src_mac_addr);
     rt_assert(ret == 0, "Cannot get MAC address of the port");
 
-    ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[remote_server_idx]);
+    ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[remote_server_idx].c_str());
     rt_assert(parsed_mac != NULL, "Invalid server mac address");
     memcpy(&dst_mac_addr, parsed_mac, sizeof(ether_addr));
 
-    ret = inet_pton(AF_INET, cfg->bs_server_addr_list[cfg->bs_server_addr_idx], &src_ip);
+    ret = inet_pton(AF_INET, cfg->bs_server_addr_list[cfg->bs_server_addr_idx].c_str(), &src_ip);
     rt_assert(ret == 1, "Invalid src IP address");
-    ret = inet_pton(AF_INET, cfg->bs_server_addr_list[remote_server_idx], &dst_ip);
+    ret = inet_pton(AF_INET, cfg->bs_server_addr_list[remote_server_idx].c_str(), &dst_ip);
     rt_assert(ret == 1, "Invalid dst IP address");
 
     src_port = dst_port = 12000;
@@ -85,7 +81,7 @@ int main(int argc, char **argv)
                     uint64_t end_tc = end_time.tv_sec * 1000000000L + end_time.tv_usec;
                     int64_t latency = (int64_t)end_tc - (int64_t)start_tc;
                     int64_t middle = *((int64_t*)(payload + 4)) - (int64_t)start_tc;
-                    printf("Received timer %ld %ld %ld!\n", latency, middle, middle-latency/2);
+                    printf("Received timer %ld %ld %ld\n", latency, middle, middle-latency/2);
                     return 0;
                 }
             }
