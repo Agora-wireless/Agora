@@ -61,7 +61,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
   csi_cond_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
                    Agora_memory::Alignment_t::kAlign64);
 
-  if (kEnableCsvLog) {
+  if (kEnableCsvLog && cfg->ListenerId() >= 0) {
     logger_dlpsnr_ = std::make_unique<CsvLogger>(cfg->ListenerId(),
                                                  CsvLogger::kDLPSNR);
   }
