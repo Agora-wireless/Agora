@@ -364,8 +364,10 @@ void* Agora::fftWorker(int tid)
 void* Agora::subcarrierWorker(int tid)
 {
     if (config_->use_hyperthreading) {
-        pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, base_worker_core_offset_ - kNumDemodTxThread, 
-            tid + do_fft_threads_.size() + kNumDemodTxThread, true, true, config_->phy_core_num);
+        // pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, base_worker_core_offset_ - kNumDemodTxThread, 
+        //     tid + do_fft_threads_.size() + kNumDemodTxThread, true, true, config_->phy_core_num);
+        pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, base_worker_core_offset_, 
+            tid + do_fft_threads_.size(), true, true, config_->phy_core_num);
     } else {
         pin_to_core_with_offset(
             ThreadType::kWorkerSubcarrier, base_worker_core_offset_, tid + do_fft_threads_.size());
@@ -400,8 +402,11 @@ void* Agora::subcarrierWorker(int tid)
 void* Agora::decodeWorker(int tid)
 {
     if (config_->use_hyperthreading) {
-        pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_ - kNumDemodTxThread,
-            tid + do_fft_threads_.size() + do_subcarrier_threads_.size() + kNumDemodTxThread, 
+        // pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_ - kNumDemodTxThread,
+        //     tid + do_fft_threads_.size() + do_subcarrier_threads_.size() + kNumDemodTxThread, 
+        //     true, true, config_->phy_core_num);
+        pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_,
+            tid + do_fft_threads_.size() + do_subcarrier_threads_.size(), 
             true, true, config_->phy_core_num);
     } else {
         pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_,
@@ -719,12 +724,22 @@ void Agora::saveLatencyDataToFile()
     printf("Saving frame latency data to %s, ghz=%lf\n", filename.c_str(), freq_ghz_);
     FILE* fp = fopen(filename.c_str(), "w");
 
-    for (size_t i = 0; i < cfg->frames_to_test; i ++) {
-        fprintf(fp, "%zu %lu %lu %lu %lu %lu\n", i, shared_state_.frame_start_time_[i],
-            shared_state_.frame_iq_time_[i],
-            shared_state_.frame_sc_time_[i],
-            shared_state_.frame_decode_time_[i],
-            shared_state_.frame_end_time_[i]);
+    if (cfg->downlink_mode) {
+        for (size_t i = 0; i < cfg->frames_to_test; i ++) {
+            fprintf(fp, "%zu %lu %lu %lu %lu %lu\n", i, shared_state_.frame_start_time_[i],
+                shared_state_.frame_iq_time_[i],
+                shared_state_.frame_coding_time_[i],
+                shared_state_.frame_sc_time_[i],
+                shared_state_.frame_end_time_[i]);
+        }
+    } else {
+        for (size_t i = 0; i < cfg->frames_to_test; i ++) {
+            fprintf(fp, "%zu %lu %lu %lu %lu %lu\n", i, shared_state_.frame_start_time_[i],
+                shared_state_.frame_iq_time_[i],
+                shared_state_.frame_sc_time_[i],
+                shared_state_.frame_coding_time_[i],
+                shared_state_.frame_end_time_[i]);
+        }
     }
     fclose(fp);
 }

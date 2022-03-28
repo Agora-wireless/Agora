@@ -395,11 +395,15 @@ void* PacketTXRX::demod_tx_thread(int tid)
                     memcpy(pkt->data_, demod_ptr,
                         cfg_->get_num_sc_to_process() * cfg_->mod_order_bits);
 
-                    // Send data (one OFDM symbol)
-                    size_t nb_tx_new = rte_eth_tx_burst(0, 0, tx_bufs, 1);
-                    if (unlikely(nb_tx_new != 1)) {
-                        printf("rte_eth_tx_burst() failed\n");
-                        exit(0);
+                    if ((double)rand() / RAND_MAX < cfg_->packet_loss_rate) {
+                        rte_pktmbuf_free(tx_bufs[0]);
+                    } else {
+                        // Send data (one OFDM symbol)
+                        size_t nb_tx_new = rte_eth_tx_burst(0, 0, tx_bufs, 1);
+                        if (unlikely(nb_tx_new != 1)) {
+                            printf("rte_eth_tx_burst() failed\n");
+                            exit(0);
+                        }
                     }
                 }
             }
@@ -416,6 +420,11 @@ void* PacketTXRX::demod_tx_thread(int tid)
         }
 
         work_count += worked;
+    }
+
+    if (cfg_->error) {
+        printf("Demod TX error traceback: frame %zu symbol %zu\n", demod_frame_to_send_, 
+            demod_symbol_ul_to_send_);
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -500,11 +509,15 @@ void* PacketTXRX::encode_tx_thread(int tid)
                         memcpy(pkt->data_, src_ptr, cfg_->subcarrier_num_list[target_server_idx] * 
                             cfg_->mod_order_bits);
 
-                        // Send data (one OFDM symbol)
-                        size_t nb_tx_new = rte_eth_tx_burst(0, 0, tx_bufs, 1);
-                        if (unlikely(nb_tx_new != 1)) {
-                            printf("rte_eth_tx_burst() failed\n");
-                            exit(0);
+                        if ((double)rand() / RAND_MAX < cfg_->packet_loss_rate && likely(encode_frame_to_send_ < cfg_->frames_to_test - 1)) {
+                            rte_pktmbuf_free(tx_bufs[0]);
+                        } else {
+                            // Send data (one OFDM symbol)
+                            size_t nb_tx_new = rte_eth_tx_burst(0, 0, tx_bufs, 1);
+                            if (unlikely(nb_tx_new != 1)) {
+                                printf("rte_eth_tx_burst() failed\n");
+                                exit(0);
+                            }
                         }
                     }
                 }

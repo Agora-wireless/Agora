@@ -4,15 +4,38 @@
 #include <stdexcept>
 #include "gettime.h"
 #include <sys/time.h>
+#include "config.hpp"
+#include <iostream>
+#include "utils.h"
 
 static inline void rt_assert(bool condition, const char* throw_str) {
   if (!condition) throw std::runtime_error(throw_str);
 }
 
-int main() 
+int main(int argc, char **argv) 
 {
+    int opt;
+    std::string conf_file = TOSTRING(PROJECT_DIRECTORY) "/config/run.json";
+    size_t remote_server_idx = 0;
+    while ((opt = getopt(argc, argv, "c:r:")) != -1) {
+        switch (opt) {
+            case 'c':
+                conf_file = optarg;
+                break;
+            case 'r':
+                remote_server_idx = atoi(optarg);
+                break;
+            default:
+                std::cerr << "Usage: " << argv[0] << " [-c conf_file]" << 
+                    " [-r remote_server_idx]" << std::endl;
+                exit(EXIT_FAILURE);
+        }
+    }
+
+    Config* cfg = new Config(conf_file.c_str());
+
     rte_mempool *mbuf_pool;
-    DpdkTransport::dpdk_init(0, 1);
+    DpdkTransport::dpdk_init(0, 1, cfg->pci_addr);
     mbuf_pool = DpdkTransport::create_mempool();
     if (DpdkTransport::nic_init(0, mbuf_pool, 1, 1) != 0) {
         printf("NIC init error!\n");
@@ -26,13 +49,13 @@ int main()
     int ret = rte_eth_macaddr_get(0, &src_mac_addr);
     rt_assert(ret == 0, "Cannot get MAC address of the port");
 
-    ether_addr* parsed_mac = ether_aton("0c:42:a1:50:c8:06");
+    ether_addr* parsed_mac = ether_aton(cfg->bs_server_mac_list[remote_server_idx]);
     rt_assert(parsed_mac != NULL, "Invalid server mac address");
     memcpy(&dst_mac_addr, parsed_mac, sizeof(ether_addr));
 
-    ret = inet_pton(AF_INET, "192.168.21.181", &src_ip);
+    ret = inet_pton(AF_INET, cfg->bs_server_addr_list[cfg->bs_server_addr_idx], &src_ip);
     rt_assert(ret == 1, "Invalid src IP address");
-    ret = inet_pton(AF_INET, "192.168.21.184", &dst_ip);
+    ret = inet_pton(AF_INET, cfg->bs_server_addr_list[remote_server_idx], &dst_ip);
     rt_assert(ret == 1, "Invalid dst IP address");
 
     src_port = dst_port = 12000;

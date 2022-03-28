@@ -542,8 +542,14 @@ void* Sender::worker_thread(int tid)
                     cfg->bs_server_addr_list[i].c_str(),
                     cfg->bs_server_port + cur_radio);
             }
-            rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, cfg->bs_server_addr_list.size()) == cfg->bs_server_addr_list.size(),
-                "rte_eth_tx_burst() failed");
+            // if ((double)rand() / RAND_MAX < cfg->packet_loss_rate && likely(cur_frame < cfg->frames_to_test - 1)) {
+            //     rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, cfg->bs_server_addr_list.size() - 1) == cfg->bs_server_addr_list.size() - 1,
+            //         "rte_eth_tx_burst() failed");
+            //     rte_pktmbuf_free(tx_mbufs[cfg->bs_server_addr_list.size() - 1]);
+            // } else {
+                rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, cfg->bs_server_addr_list.size()) == cfg->bs_server_addr_list.size(),
+                    "rte_eth_tx_burst() failed");
+            // }
         }
 
         if (unlikely(++cur_radio == radio_hi)) {
