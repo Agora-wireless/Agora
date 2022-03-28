@@ -267,6 +267,16 @@ std::vector<uint32_t> Utils::Cint16ToUint32(
   return out;
 }
 
+std::vector<std::complex<float>> Utils::Cint16ToCfloat32(
+    std::vector<std::complex<int16_t>> in) {
+  std::vector<std::complex<float>> samps(in.size());
+  std::transform(
+      in.begin(), in.end(), samps.begin(), [](std::complex<int16_t> ci) {
+        return std::complex<float>(ci.real() / 32768.0, ci.imag() / 32768.0);
+      });
+  return samps;
+}
+
 std::vector<uint32_t> Utils::Cfloat32ToUint32(
     std::vector<std::complex<float>> in, bool conj, const std::string& order) {
   std::vector<uint32_t> out(in.size(), 0);

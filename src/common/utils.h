@@ -78,6 +78,8 @@ class Utils {
   static std::vector<uint32_t> Cint16ToUint32(
       std::vector<std::complex<int16_t>> in, bool conj,
       const std::string& order);
+  static std::vector<std::complex<float>> Cint16ToCfloat32(
+      std::vector<std::complex<int16_t>> in);
   static std::vector<uint32_t> Cfloat32ToUint32(
       std::vector<std::complex<float>> in, bool conj, const std::string& order);
   static std::vector<std::vector<size_t>> LoadSymbols(

@@ -437,6 +437,24 @@ void CommsLib::FFT(complex_float* in, int fftsize) {
   (void)(status);
 }
 
+float CommsLib::ComputeOfdmSnr(std::vector<std::complex<float>> data_t,
+                               size_t data_start_index,
+                               size_t data_stop_index) {
+  auto fft_data = CommsLib::FFT(data_t, data_t.size());
+  auto fft_mag = CommsLib::Abs2Avx(fft_data);
+  float rssi = 0;
+  float noise = 0;
+  for (size_t i = 0; i < fft_mag.size(); i++) {
+    rssi += fft_mag.at(i);
+    if (i < data_start_index || i >= data_stop_index) {
+      noise += fft_mag.at(i);
+    }
+  }
+  size_t noise_sc_size = fft_data.size() - (data_stop_index - data_start_index);
+  noise *= (fft_mag.size() / noise_sc_size);
+  return 10 * std::log10((rssi - noise) / noise);
+}
+
 std::vector<std::complex<float>> CommsLib::ComposePartialPilotSym(
     std::vector<std::complex<float>> pilot, size_t offset, size_t pilot_sc_num,
     size_t fftSize, size_t dataSize, size_t dataStart, size_t CP_LEN,

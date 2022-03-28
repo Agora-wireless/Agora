@@ -139,14 +139,8 @@ bool RadioConfig::FindTimeOffset(
     std::vector<int>& offset) {
   bool bad_data = false;
   size_t seq_len = cfg_->PilotCf32().size();
-  size_t read_len = rx_mat.at(0).size();
   for (size_t i = 0; i < rx_mat.size(); i++) {
-    std::vector<std::complex<float>> samps(read_len);
-    std::transform(rx_mat.at(i).begin(), rx_mat.at(i).end(), samps.begin(),
-                   [](std::complex<int16_t> ci) {
-                     return std::complex<float>(ci.real() / 32768.0,
-                                                ci.imag() / 32768.0);
-                   });
+    auto samps = Utils::Cint16ToCfloat32(rx_mat.at(i));
     size_t peak = CommsLib::FindPilotSeq(samps, cfg_->PilotCf32(), seq_len);
     offset[i] = peak < seq_len ? 0 : peak - seq_len;
     if (offset.at(i) == 0) {
@@ -189,15 +183,14 @@ void RadioConfig::AdjustDelays(std::vector<int> offset) {
 }
 
 void RadioConfig::CalibrateSampleOffset() {
-  std::vector<std::vector<std::complex<int16_t>>> ul_buff;
   size_t num_radios = cfg_->BfAntNum() / cfg_->NumChannels();
-  std::vector<int> ul_offset(num_radios, 0);
 
   size_t n = 0;
-  const size_t max_retries = 3;
+  const size_t max_retries = 10;
   // Transmit from Ref to Array and Adjust Delays Until Synced
   while (n < max_retries) {
     auto ul_buff = TxRefToArray(cfg_->PilotCi16());
+    std::vector<int> ul_offset(num_radios, 0);
     bool bad_data = this->FindTimeOffset(ul_buff, ul_offset);
     if (bad_data) {
       continue;
@@ -212,6 +205,34 @@ void RadioConfig::CalibrateSampleOffset() {
           << std::endl;
       AdjustDelays(ul_offset);
     } else {
+      // measure uplink SNR here
+      std::vector<float> snr;
+      std::cout << "*************************************************"
+                << std::endl;
+      std::cout << "Received SNR from the Reference Node At the Array"
+                << std::endl;
+      size_t pilot_start = ul_min_offset + cfg_->CpLen();
+      size_t pilot_stop = ul_min_offset + cfg_->CpLen() + cfg_->OfdmCaNum();
+      for (size_t i = 0; i < ul_buff.size(); i++) {
+        std::vector<std::complex<int16_t>> ofdm_samps(
+            ul_buff.at(i).begin() + pilot_start,
+            ul_buff.at(i).begin() + pilot_stop);
+        auto ofdm_data = Utils::Cint16ToCfloat32(ofdm_samps);
+        float snr_val = CommsLib::ComputeOfdmSnr(
+            ofdm_data, cfg_->OfdmDataStart(), cfg_->OfdmDataStop());
+        snr.push_back(snr_val);
+        std::cout << snr_val << " ";
+      }
+      std::cout << std::endl;
+      auto ul_max_snr_it = std::max_element(snr.begin(), snr.end());
+      auto ul_min_snr_it = std::min_element(snr.begin(), snr.end());
+      std::cout << "Min UL SNR at antenna " << ul_min_snr_it - snr.begin()
+                << ": " << *ul_min_snr_it << std::endl;
+      std::cout << "Max UL SNR at antenna " << ul_max_snr_it - snr.begin()
+                << ": " << *ul_max_snr_it << std::endl;
+      std::cout << "*************************************************"
+                << std::endl;
+      cfg_->OfdmRxZeroPrefixCalUl(ul_min_offset - (ul_min_offset % 4));
       break;
     }
     n++;
@@ -222,23 +243,60 @@ void RadioConfig::CalibrateSampleOffset() {
               << std::endl;
     exit(0);
   }
-  cfg_->OfdmRxZeroPrefixCalUl(ul_offset.at(0) - (ul_offset.at(0) % 4));
 
   // Transmit from Array to Ref and ensure they are all synced
-  std::vector<int> dl_offset(num_radios);
-  std::vector<std::vector<std::complex<int16_t>>> dl_buff;
-  dl_buff = TxArrayToRef(cfg_->PilotCi16());
-  this->FindTimeOffset(dl_buff, dl_offset);
+  n = 0;
+  while (n < max_retries) {
+    auto dl_buff = TxArrayToRef(cfg_->PilotCi16());
+    std::vector<int> dl_offset(num_radios);
+    bool bad_data = this->FindTimeOffset(dl_buff, dl_offset);
+    if (bad_data) {
+      continue;
+    }
 
-  int max_offset = *std::max_element(dl_offset.begin(), dl_offset.end());
-  int min_offset = *std::min_element(dl_offset.begin(), dl_offset.end());
-  std::cout << "Max dl_offset: " << max_offset
-            << ", Min dl_offset: " << min_offset << std::endl;
-  if (max_offset - min_offset > 4) {
-    std::cout << "Downlink pilot offsets not synced" << std::endl;
-    exit(0);
-  } else {
-    cfg_->OfdmRxZeroPrefixCalDl(min_offset - (min_offset % 4));
+    int max_offset = *std::max_element(dl_offset.begin(), dl_offset.end());
+    int min_offset = *std::min_element(dl_offset.begin(), dl_offset.end());
+    std::cout << "Max dl_offset: " << max_offset
+              << ", Min dl_offset: " << min_offset << std::endl;
+    if (max_offset - min_offset > 4) {
+      if (n + 1 < max_retries) {
+        std::cout << "Downlink offsets mismatch: Try " << n + 1 << std::endl;
+      } else {
+        std::cout << "Downlink pilot offsets not synced!" << std::endl;
+        exit(0);
+      }
+    } else {
+      // measure downlink SNR here
+      std::vector<float> snr;
+      std::cout << "*************************************************"
+                << std::endl;
+      std::cout << "Received SNR from the Reference Node At the Array"
+                << std::endl;
+      size_t pilot_start = min_offset + cfg_->CpLen();
+      size_t pilot_stop = min_offset + cfg_->CpLen() + cfg_->OfdmCaNum();
+      for (size_t i = 0; i < dl_buff.size(); i++) {
+        std::vector<std::complex<int16_t>> ofdm_samps(
+            dl_buff.at(i).begin() + pilot_start,
+            dl_buff.at(i).begin() + pilot_stop);
+        auto ofdm_data = Utils::Cint16ToCfloat32(ofdm_samps);
+        float snr_val = CommsLib::ComputeOfdmSnr(
+            ofdm_data, cfg_->OfdmDataStart(), cfg_->OfdmDataStop());
+        snr.push_back(snr_val);
+        std::cout << snr_val << " ";
+      }
+      std::cout << std::endl;
+      auto dl_max_snr_it = std::max_element(snr.begin(), snr.end());
+      auto dl_min_snr_it = std::min_element(snr.begin(), snr.end());
+      std::cout << "Min DL SNR at antenna " << dl_min_snr_it - snr.begin()
+                << ": " << *dl_min_snr_it << std::endl;
+      std::cout << "Max DL SNR at antenna " << dl_max_snr_it - snr.begin()
+                << ": " << *dl_max_snr_it << std::endl;
+      std::cout << "*************************************************"
+                << std::endl;
+      cfg_->OfdmRxZeroPrefixCalDl(min_offset - (min_offset % 4));
+      break;
+    }
+    n++;
   }
 }
 

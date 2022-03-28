@@ -63,6 +63,9 @@ class CommsLib {
   static void FFT(complex_float* /*in*/, int /*fftsize*/);
   static void IFFT(complex_float* /*in*/, int /*fftsize*/,
                    bool normalize = true);
+  static float ComputeOfdmSnr(std::vector<std::complex<float>> /*in*/,
+                              size_t /*data_start_index*/,
+                              size_t /*data_stop_index*/);
   static size_t FindPilotSeq(std::vector<std::complex<float>> iq,
                              std::vector<std::complex<float>> pilot,
                              size_t seq_len);
