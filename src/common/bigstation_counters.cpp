@@ -128,7 +128,7 @@ bool BigStationState::receive_encode_pkt(size_t frame_id, size_t symbol_id_dl, s
     return true;
 }
 
-bool BigStationState::receive_precode_pkt(size_t frame_id, size_t symbol_id_dl, size_t ant_id, size_t size_t sc_len)
+bool BigStationState::receive_precode_pkt(size_t frame_id, size_t symbol_id_dl, size_t ant_id, size_t sc_len)
 {
     if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
         MLPD_ERROR(
@@ -182,6 +182,7 @@ bool BigStationState::prepare_encode_pkt(size_t frame_id, size_t symbol_id_dl, s
         return false;
     }
     num_encode_pkts_prepared_[frame_id % kFrameWnd][symbol_id_dl] ++;
+    return true;
 }
 
 bool BigStationState::prepare_precode_pkt(size_t frame_id, size_t symbol_id_dl, size_t sc_num)

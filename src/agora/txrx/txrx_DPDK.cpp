@@ -678,7 +678,7 @@ int PacketTXRX::recv_relocate(int tid)
 
             int8_t* encode_ptr
                 = cfg_->get_encoded_buf(encoded_buffer_to_precode_,
-                    pkt->frame_id_, symbol_idx_dl, pkt->ue_id_);
+                    pkt->frame_id_, symbol_idx_dl, pkt->ue_id_); // Check bug possibility? (+ sc_start?)
             memcpy(encode_ptr, pkt->data_,
                 cfg_->get_num_sc_to_process() * cfg_->mod_order_bits);
             if (!shared_state_->receive_encoded_pkt_loss_tolerant(pkt->frame_id_, symbol_idx_dl, pkt->ue_id_)) {

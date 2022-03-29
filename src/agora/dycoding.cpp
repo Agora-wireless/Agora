@@ -327,8 +327,10 @@ void DyDecode::LaunchStatic(size_t frame_id, size_t symbol_id_ul, size_t ue_id)
 
 void DyDecode::StartWork()
 {
+    size_t last_frame = 0;
     cur_idx_ = tid_;
-    cur_symbol_ = cur_idx_ / total_ue_num_;
+    cur_frame_ = cur_idx_ / (total_ue_num_ * cfg_->ul_data_symbol_num_perframe);
+    cur_symbol_ = (cur_idx_ % (total_ue_num_* cfg_->ul_data_symbol_num_perframe)) / total_ue_num_;
     cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
 
     size_t start_tsc = 0;
@@ -386,16 +388,13 @@ void DyDecode::StartWork()
             });
 
             cur_idx_ += total_dycode_num_;
-            cur_symbol_ = cur_idx_ / total_ue_num_;
+            cur_frame_ = cur_idx_ / (total_ue_num_ * cfg_->ul_data_symbol_num_perframe);
+            cur_symbol_ = (cur_idx_ % (total_ue_num_* cfg_->ul_data_symbol_num_perframe)) / total_ue_num_;
             cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
-            if (cur_symbol_ >= cfg_->ul_data_symbol_num_perframe) {
-                cur_idx_ = tid_;
-                cur_symbol_ = cur_idx_ / total_ue_num_;
-                cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
-
-                shared_state_->decode_done(cur_frame_);
-
-                cur_frame_++;
+            if (cur_frame_ > last_frame) {
+                rt_assert(cur_frame_ == last_frame + 1, "Run cur frame calculation!");
+                shared_state_->decode_done(last_frame);
+                last_frame ++;
                 if (unlikely(cur_frame_ == cfg_->frames_to_test)) {
                     TRIGGER_TIMER({
                         state_operation_duration += rdtsc() - state_start_tsc;
@@ -408,6 +407,26 @@ void DyDecode::StartWork()
                     std::this_thread::sleep_for(std::chrono::microseconds(900));
                 }
             }
+            // if (cur_symbol_ >= cfg_->ul_data_symbol_num_perframe) {
+            //     cur_idx_ = tid_;
+            //     cur_symbol_ = cur_idx_ / total_ue_num_;
+            //     cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
+
+            //     shared_state_->decode_done(cur_frame_);
+
+            //     cur_frame_++;
+            //     if (unlikely(cur_frame_ == cfg_->frames_to_test)) {
+            //         TRIGGER_TIMER({
+            //             state_operation_duration += rdtsc() - state_start_tsc;
+            //             work_tsc_duration += rdtsc() - work_start_tsc;
+            //         });
+            //         break;
+            //     }
+
+            //     if (shouldSleep(control_info_table_[control_idx_list_[cur_frame_]].size())) {
+            //         std::this_thread::sleep_for(std::chrono::microseconds(900));
+            //     }
+            // }
             
             TRIGGER_TIMER({
                 state_operation_duration += rdtsc() - state_start_tsc;

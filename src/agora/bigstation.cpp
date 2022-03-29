@@ -19,44 +19,77 @@ BigStation::BigStation(Config* config)
     pin_to_core_with_offset(
         ThreadType::kMaster, config->core_offset, 0, false /* quiet */);
 
-    initializeBigStationBuffers();
+    if (config_->downlink_mode) {
+        initializeBigStationDLBuffers();
+    } else {
+        initializeBigStationULBuffers();
+    }
 
     bigstation_tx_rx_.reset(new BigStationTXRX(config, config->core_offset, time_iq_buffer_, freq_iq_buffer_to_send_,
         freq_iq_buffer_, post_zf_buffer_to_send_, post_zf_buffer_, post_demul_buffer_to_send_, post_demul_buffer_, 
-        post_decode_buffer_, &bigstation_state_));
+        post_decode_buffer_, dl_encoded_buffer_to_send_, dl_encoded_buffer_, dl_precoded_buffer_to_send_,
+        dl_precoded_buffer_, &bigstation_state_));
 
     base_worker_core_offset_ = config_->core_offset + kNumMasterThread + 
         config_->rx_thread_num + config_->tx_thread_num;
     
-    do_fft_threads_.resize(config_->num_fft_workers[config_->bs_server_addr_idx]);
-    for (size_t i = 0; i < do_fft_threads_.size(); ++i) {
-        do_fft_threads_[i] = std::thread(&BigStation::fftWorker, this, i + config_->fft_thread_offset);
-    }
-    do_zf_threads_.resize(config_->num_zf_workers[config_->bs_server_addr_idx]);
-    for (size_t i = 0; i < do_zf_threads_.size(); ++i) {
-        do_zf_threads_[i] = std::thread(&BigStation::zfWorker, this, i + config_->zf_thread_offset);
-    }
-    do_demul_threads_.resize(config_->num_demul_workers[config_->bs_server_addr_idx]);
-    for (size_t i = 0; i < do_demul_threads_.size(); ++i) {
-        do_demul_threads_[i] = std::thread(&BigStation::demulWorker, this, i + config_->demul_thread_offset);
-    }
-    do_decode_threads_.resize(config_->num_decode_workers[config_->bs_server_addr_idx]);
-    for (size_t i = 0; i < do_decode_threads_.size(); ++i) {
-        do_decode_threads_[i] = std::thread(&BigStation::decodeWorker, this, i + config_->decode_thread_offset);
-    }
+    if (config_->downlink_mode) {
+        do_ifft_threads_.resize(config_->num_ifft_workers[config_->bs_server_addr_idx]);
+        for (size_t i = 0; i < do_ifft_threads_.size(); ++i) {
+            do_ifft_threads_[i] = std::thread(&BigStation::ifftWorker, this, i + config_->ifft_thread_offset);
+        }
+        do_zf_threads_.resize(config_->num_zf_workers[config_->bs_server_addr_idx]);
+        for (size_t i = 0; i < do_zf_threads_.size(); ++i) {
+            do_zf_threads_[i] = std::thread(&BigStation::zfWorker, this, i + config_->zf_thread_offset);
+        }
+        do_precode_threads_.resize(config_->num_precode_workers[config_->bs_server_addr_idx]);
+        for (size_t i = 0; i < do_precode_threads_.size(); ++i) {
+            do_precode_threads_[i] = std::thread(&BigStation::precodeWorker, this, i + config_->precode_thread_offset);
+        }
+        do_encode_threads_.resize(config_->num_encode_workers[config_->bs_server_addr_idx]);
+        for (size_t i = 0; i < do_encode_threads_.size(); ++i) {
+            do_encode_threads_[i] = std::thread(&BigStation::encodeWorker, this, i + config_->encode_thread_offset);
+        }
 
-    printf("Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
-           "cores %zu--%zu\n",
-        config->core_offset, config->core_offset + kNumMasterThread,
-        config->core_offset + kNumMasterThread + config->rx_thread_num + config->tx_thread_num - 1,
-        base_worker_core_offset_,
-        base_worker_core_offset_ + do_fft_threads_.size() + do_zf_threads_.size() + 
-        do_demul_threads_.size() + do_decode_threads_.size() - 1);
+        printf("Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
+            "cores %zu--%zu\n",
+            config->core_offset, config->core_offset + kNumMasterThread,
+            config->core_offset + kNumMasterThread + config->rx_thread_num + config->tx_thread_num - 1,
+            base_worker_core_offset_,
+            base_worker_core_offset_ + do_ifft_threads_.size() + do_zf_threads_.size() + 
+            do_precode_threads_.size() + do_encode_threads_.size() - 1);
+    } else {
+        do_fft_threads_.resize(config_->num_fft_workers[config_->bs_server_addr_idx]);
+        for (size_t i = 0; i < do_fft_threads_.size(); ++i) {
+            do_fft_threads_[i] = std::thread(&BigStation::fftWorker, this, i + config_->fft_thread_offset);
+        }
+        do_zf_threads_.resize(config_->num_zf_workers[config_->bs_server_addr_idx]);
+        for (size_t i = 0; i < do_zf_threads_.size(); ++i) {
+            do_zf_threads_[i] = std::thread(&BigStation::zfWorker, this, i + config_->zf_thread_offset);
+        }
+        do_demul_threads_.resize(config_->num_demul_workers[config_->bs_server_addr_idx]);
+        for (size_t i = 0; i < do_demul_threads_.size(); ++i) {
+            do_demul_threads_[i] = std::thread(&BigStation::demulWorker, this, i + config_->demul_thread_offset);
+        }
+        do_decode_threads_.resize(config_->num_decode_workers[config_->bs_server_addr_idx]);
+        for (size_t i = 0; i < do_decode_threads_.size(); ++i) {
+            do_decode_threads_[i] = std::thread(&BigStation::decodeWorker, this, i + config_->decode_thread_offset);
+        }
+
+        printf("Master thread core %zu, TX/RX thread cores %zu--%zu, worker thread "
+            "cores %zu--%zu\n",
+            config->core_offset, config->core_offset + kNumMasterThread,
+            config->core_offset + kNumMasterThread + config->rx_thread_num + config->tx_thread_num - 1,
+            base_worker_core_offset_,
+            base_worker_core_offset_ + do_fft_threads_.size() + do_zf_threads_.size() + 
+            do_demul_threads_.size() + do_decode_threads_.size() - 1);
+    }
 }
 
 BigStation::~BigStation()
 {
-    freeBigStationBuffers();
+    if (!config_->downlink_mode)
+        freeBigStationULBuffers();
 
     for (auto& t : do_fft_threads_) {
         t.join();
@@ -68,6 +101,15 @@ BigStation::~BigStation()
         t.join();
     }
     for (auto& t : do_decode_threads_) {
+        t.join();
+    }
+    for (auto& t : do_precode_threads_) {
+        t.join();
+    }
+    for (auto& t : do_encode_threads_) {
+        t.join();
+    }
+    for (auto& t : do_ifft_threads_) {
         t.join();
     }
 }
@@ -718,7 +760,7 @@ void BigStation::encodeWorker(int tid)
 
             TRIGGER_TIMER({
                 work_start_tsc = rdtsc();
-                decode_start_tsc = rdtsc();
+                encode_start_tsc = rdtsc();
             });
 
             do_encode->LaunchStatic(cur_encode_frame, cur_symbol_dl, cur_ue);
@@ -789,9 +831,6 @@ void BigStation::precodeWorker(int tid)
     size_t cur_precode_frame = 0;
     size_t cur_precode_symbol_dl = 0;
 
-    const size_t task_buffer_symbol_num_dl
-        = config_->dl_data_symbol_num_perframe * kFrameWnd;
-
     std::vector<std::vector<ControlInfo> > dummy_table;
     std::vector<size_t> dummy_list;
 
@@ -804,7 +843,7 @@ void BigStation::precodeWorker(int tid)
 
     size_t last_sleep_tsc = 0;
 
-    DyPrecode *do_precode_ = new DyPrecode(config_, tid, freq_ghz_, dl_encoded_buffer_, post_zf_buffer_,
+    DyPrecode *do_precode = new DyPrecode(config_, tid, freq_ghz_, dl_encoded_buffer_, post_zf_buffer_,
         dl_precoded_buffer_to_send_, dummy_table, dummy_list);
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
@@ -835,7 +874,7 @@ void BigStation::precodeWorker(int tid)
                 precode_start_tsc = rdtsc();
             });
 
-            if (!bigstation_state_.prepare_precode_pkt(cur_precode_frame, cur_precode_symbol_ul, sc_end - sc_start)) {
+            if (!bigstation_state_.prepare_precode_pkt(cur_precode_frame, cur_precode_symbol_dl, sc_end - sc_start)) {
                 config_->error = true;
                 config_->running = false;
             }
@@ -908,7 +947,7 @@ void BigStation::ifftWorker(int tid)
 
     DoFFT *do_fft = new DoFFT(config_, tid, freq_ghz_, Range(ant_start, ant_end), time_iq_buffer_,
         freq_iq_buffer_to_send_, nullptr);
-    DoIFFT *do_ifft = new DoIFFT(config_, tid, freq_ghz_, dl_precoded_buffer_, dl_data_buffer_);
+    DoIFFT *do_ifft = new DoIFFT(config_, tid, freq_ghz_, dl_precoded_buffer_, dl_socket_buffer_);
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
         size_t work_start_tsc, fft_start_tsc, ifft_start_tsc;
@@ -965,7 +1004,7 @@ void BigStation::ifftWorker(int tid)
                     ifft_start_tsc = rdtsc();
                 });
 
-                do_ifft->Launch(cur_frame, cur_symbol - cfg->pilot_symbol_num_perframe, cur_ant);
+                do_ifft->Launch(cur_frame, cur_symbol - config_->pilot_symbol_num_perframe, cur_ant);
                 // printf("Run FFT frame %zu symbol %zu ant %zu\n", cur_frame, cur_symbol, cur_ant);
 
                 TRIGGER_TIMER({
@@ -990,7 +1029,7 @@ void BigStation::ifftWorker(int tid)
                 }
 
                 TRIGGER_TIMER({
-                    state_operation_duration += rdtsc() - fft_start_tsc;
+                    state_operation_duration += rdtsc() - ifft_start_tsc;
                     work_tsc_duration += rdtsc() - work_start_tsc;
                 });
             }
@@ -1059,9 +1098,14 @@ void BigStation::initializeBigStationDLBuffers()
     post_zf_buffer_to_send_.alloc(kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM * sizeof(complex_float)); // TODO: this could make packet size over limit
     post_zf_buffer_.alloc(kFrameWnd, cfg->OFDM_DATA_NUM, cfg->BS_ANT_NUM * cfg->UE_NUM);
     dl_data_buffer_.calloc(task_buffer_symbol_num, cfg->OFDM_DATA_NUM * cfg->mod_order_bits * cfg->UE_NUM, 64);
+    for (size_t i = 0; i < task_buffer_symbol_num; i ++) {
+        for (size_t j = 0; j < cfg->OFDM_DATA_NUM * cfg->mod_order_bits * cfg->UE_NUM; j ++) {
+            dl_data_buffer_[i][j] = rand() % cfg->mod_order;
+        }
+    }
     dl_encoded_buffer_to_send_.calloc(task_buffer_symbol_num, roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
     dl_encoded_buffer_.calloc(task_buffer_symbol_num, roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
     dl_precoded_buffer_to_send_.calloc(cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
-    dl_data_buffer_ = (char*)malloc(cfg_->BS_ANT_NUM * kFrameWnd
-        * cfg_->dl_data_symbol_num_perframe * cfg_->packet_size);
+    dl_socket_buffer_ = (char*)malloc(cfg->BS_ANT_NUM * kFrameWnd
+        * cfg->dl_data_symbol_num_perframe * cfg->packet_length);
 }

@@ -57,6 +57,9 @@ private:
     std::vector<std::thread> do_zf_threads_;
     std::vector<std::thread> do_demul_threads_;
     std::vector<std::thread> do_decode_threads_;
+    std::vector<std::thread> do_ifft_threads_;
+    std::vector<std::thread> do_precode_threads_;
+    std::vector<std::thread> do_encode_threads_;
 
     BigStationState bigstation_state_;
 
@@ -74,7 +77,7 @@ private:
     Table<int8_t> dl_data_buffer_;
     Table<int8_t> dl_encoded_buffer_to_send_;
     Table<int8_t> dl_encoded_buffer_;
-    Table<complex_float>& dl_precoded_buffer_to_send_;
-    Table<complex_float>& dl_precoded_buffer_;
-    char* dl_data_buffer_;
+    Table<complex_float> dl_precoded_buffer_to_send_;
+    Table<complex_float> dl_precoded_buffer_;
+    char* dl_socket_buffer_;
 };

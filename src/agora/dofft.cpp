@@ -240,7 +240,7 @@ void DoIFFT::Launch(size_t frame_id, size_t symbol_id_dl, size_t ant_id)
 
     if (kDebugPrintInTask) {
         printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
-            tid_, frame_id, symbol_id, ant_id);
+            tid_, frame_id, symbol_id_dl, ant_id);
     }
 
     size_t offset

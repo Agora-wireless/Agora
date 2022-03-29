@@ -21,7 +21,7 @@ public:
     bool receive_zf_pkt(size_t frame_id, size_t sc_id);
     bool receive_demod_pkt(size_t frame_id, size_t symbol_id_ul, size_t ue_id, size_t sc_len);
     bool receive_encode_pkt(size_t frame_id, size_t symbol_id_dl, size_t ue_id);
-    bool receive_precode_pkt(size_t frame_id, size_t symbol_id_dl, size_t ant_id, size_t size_t sc_len);
+    bool receive_precode_pkt(size_t frame_id, size_t symbol_id_dl, size_t ant_id, size_t sc_len);
 
     // Packet prepare functions
     bool prepare_freq_iq_pkt(size_t frame_id, size_t symbol_id, size_t ant_id);
@@ -47,7 +47,7 @@ public:
     bool prepared_all_precode_pkt(size_t frame_id, size_t symbol_id_dl);
 
     bool decode_done(size_t frame_id);
-    bool ifft_done(size_t frame_id)
+    bool ifft_done(size_t frame_id);
 
     size_t cur_frame_ = 0;
 
@@ -83,7 +83,7 @@ private:
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_precode_pkts_received_ = {};
 
-    std::array<size_t kFrameWnd> num_ifft_tasks_completed_ = {};
+    std::array<size_t, kFrameWnd> num_ifft_tasks_completed_ = {};
     std::array<std::mutex, kFrameWnd> ifft_mutex_ = {};
 
     std::mutex cur_frame_mutex_;

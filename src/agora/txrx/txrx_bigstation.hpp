@@ -41,6 +41,10 @@ public:
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& post_demul_buffer_to_send,
         Table<int8_t>& post_demul_buffer,
         PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_decode_buffer,
+        Table<int8_t>& dl_encoded_buffer_to_send,
+        Table<int8_t>& dl_encoded_buffer,
+        Table<complex_float>& dl_precoded_buffer_to_send,
+        Table<complex_float>& dl_precoded_buffer,
         BigStationState* bigstation_state);
 
     ~BigStationTXRX();
@@ -67,7 +71,8 @@ private:
     // the subcarrier range
     int recv_relocate(int tid);
 
-    void* tx_thread(int tid);
+    void* tx_thread_ul(int tid);
+    void* tx_thread_dl(int tid);
 
     Config* cfg_;
 
@@ -91,6 +96,10 @@ private:
     // PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_demul_buffer_;
     Table<int8_t>& post_demul_buffer_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t>& post_decode_buffer_;
+    Table<int8_t>& dl_encoded_buffer_to_send_;
+    Table<int8_t>& dl_encoded_buffer_;
+    Table<complex_float>& dl_precoded_buffer_to_send_;
+    Table<complex_float>& dl_precoded_buffer_;
 
     BigStationState* bigstation_state_;
 
