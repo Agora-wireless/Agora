@@ -4,7 +4,7 @@
     "use_general_worker": false,
     "worker_thread_num": 10,
     "demul_block_size": 8,
-    "antenna_num": 256,
+    "antenna_num": 224,
     "ue_num": 32,
     "core_offset": 0,
     "frames": [
@@ -29,7 +29,7 @@
     "sleep_mode": false,
     "ofdm_data_num": 1216,
     "slot_us": 1000,
-    "use_hyperthreading": "RXExclusive",
+    "use_hyperthreading": "off",
     "phy_core_num": 10
   }
   
