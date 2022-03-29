@@ -29,7 +29,7 @@
     "sleep_mode": false,
     "ofdm_data_num": 1216,
     "slot_us": 1000,
-    "use_hyperthreading": true,
+    "use_hyperthreading": "RXExclusive",
     "phy_core_num": 10
   }
   

@@ -75,15 +75,10 @@ private:
     SharedState *shared_state_;
 };
 
-#if 0
 class DoIFFT : public Doer {
 public:
     DoIFFT(Config* in_config, int in_tid, double freq_ghz,
-        moodycamel::ConcurrentQueue<EventData>& in_task_queue,
-        moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
-        moodycamel::ProducerToken* worker_producer_token,
-        Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
-        Stats* in_stats_manager);
+        Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer);
     ~DoIFFT();
 
     /**
@@ -109,14 +104,12 @@ public:
      *     2. add an event to the message queue to infrom main thread the
      * completion of this task
      */
-    EventData launch(size_t tag);
+    void Launch(size_t frame_id, size_t symbol_id_dl, size_t ant_id);
 
 private:
     Table<complex_float>& dl_ifft_buffer_;
     char* dl_socket_buffer_;
-    DurationStat* duration_stat;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
 };
-#endif
 
 #endif

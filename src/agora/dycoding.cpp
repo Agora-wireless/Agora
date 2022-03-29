@@ -69,9 +69,33 @@ void DyEncode::Launch(size_t frame_id, size_t symbol_id_dl, size_t ue_id)
         bits_to_bytes(cbCodewLen), cfg_->mod_order_bits);
 }
 
+void DyEncode::LaunchStatic(size_t frame_id, size_t symbol_id_dl, size_t ue_id)
+{
+    LDPCconfig LDPC_config = cfg_->LDPC_config;
+    if (kDebugPrintInTask) {
+        printf(
+            "In doEncode thread %d: frame: %zu, symbol: %zu, ue %zu\n",
+            tid_, frame_id, symbol_id_dl, ue_id);
+    }
+
+    size_t nRows = LDPC_config.Bg == 1 ? 46 : 42;
+    uint32_t cbCodewLen = ldpc_num_encoded_bits(LDPC_config.Bg, LDPC_config.Zc, nRows);
+
+    int8_t* input_ptr
+        = cfg_->get_info_bits(dl_bits_buffer_, symbol_id_dl, ue_id);
+
+    ldpc_encode_helper(LDPC_config.Bg, LDPC_config.Zc, nRows,
+        encoded_buffer_temp, parity_buffer, input_ptr);
+    
+    int8_t* final_output_ptr = cfg_->get_encoded_buf(
+        dl_encoded_buffer_, frame_id, symbol_id_dl, ue_id);
+    adapt_bits_for_mod(reinterpret_cast<uint8_t*>(encoded_buffer_temp),
+        reinterpret_cast<uint8_t*>(final_output_ptr),
+        bits_to_bytes(cbCodewLen), cfg_->mod_order_bits);
+}
+
 void DyEncode::StartWork() 
 {
-    printf("Encode tid %u starts to work!\n", tid_);
     cur_idx_ = tid_;
     cur_symbol_ = cur_idx_ / total_ue_num_;
     cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
@@ -303,7 +327,6 @@ void DyDecode::LaunchStatic(size_t frame_id, size_t symbol_id_ul, size_t ue_id)
 
 void DyDecode::StartWork()
 {
-    printf("Decode tid %u starts to work!\n", tid_);
     cur_idx_ = tid_;
     cur_symbol_ = cur_idx_ / total_ue_num_;
     cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;

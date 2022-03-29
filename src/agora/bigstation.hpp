@@ -34,12 +34,16 @@ private:
     void zfWorker(int tid);
     void demulWorker(int tid);
     void decodeWorker(int tid);
+    void encodeWorker(int tid);
+    void precodeWorker(int tid);
+    void ifftWorker(int tid);
 
     void runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size, 
         PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffer);
 
-    void initializeBigStationBuffers();
-    void freeBigStationBuffers();
+    void initializeBigStationULBuffers();
+    void initializeBigStationDLBuffers();
+    void freeBigStationULBuffers();
 
     const double freq_ghz_; // RDTSC frequency in GHz
 
@@ -57,17 +61,20 @@ private:
     BigStationState bigstation_state_;
 
     // Buffers for the BigStation mode
-    // PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t> time_iq_buffer_;
     Table<char> time_iq_buffer_;
-    // PtrGrid<kFrameWnd, kMaxAntennas, uint8_t> pilot_buffer_;
-    // PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t> freq_iq_buffer_to_send_;
     Table<char> freq_iq_buffer_to_send_;
-    // PtrCube<kFrameWnd, kMaxSymbols, kMaxAntennas, uint8_t> data_buffer_;
     Table<char> freq_iq_buffer_;
     PtrGrid<kFrameWnd, kMaxDataSCs, uint8_t> post_zf_buffer_to_send_;
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float> post_zf_buffer_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t> post_demul_buffer_to_send_;
-    // PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> post_demul_buffer_;
     Table<int8_t> post_demul_buffer_;
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, uint8_t> post_decode_buffer_;
+
+    // Buffers for BigStation downlink mode
+    Table<int8_t> dl_data_buffer_;
+    Table<int8_t> dl_encoded_buffer_to_send_;
+    Table<int8_t> dl_encoded_buffer_;
+    Table<complex_float>& dl_precoded_buffer_to_send_;
+    Table<complex_float>& dl_precoded_buffer_;
+    char* dl_data_buffer_;
 };

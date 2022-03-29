@@ -221,20 +221,12 @@ void DoFFT::partial_transpose(
     }
 }
 
-#if 0
 DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
-    moodycamel::ConcurrentQueue<EventData>& in_task_queue,
-    moodycamel::ConcurrentQueue<EventData>& complete_task_queue,
-    moodycamel::ProducerToken* worker_producer_token,
-    Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer,
-    Stats* in_stats_manager)
-    : Doer(in_config, in_tid, freq_ghz, in_task_queue, complete_task_queue,
-          worker_producer_token)
+    Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer)
+    : Doer(in_config, in_tid, freq_ghz)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_socket_buffer_(in_dl_socket_buffer)
 {
-    duration_stat
-        = in_stats_manager->get_duration_stat(DoerType::kIFFT, in_tid);
     (void)DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg_->OFDM_CA_NUM);
     (void)DftiCommitDescriptor(mkl_handle);
@@ -242,13 +234,9 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
 
 DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); }
 
-EventData DoIFFT::launch(size_t tag)
+void DoIFFT::Launch(size_t frame_id, size_t symbol_id_dl, size_t ant_id)
 {
-    size_t start_tsc = worker_rdtsc();
-    size_t ant_id = gen_tag_t(tag).ant_id;
-    size_t frame_id = gen_tag_t(tag).frame_id;
-    size_t symbol_id = gen_tag_t(tag).symbol_id;
-    size_t data_symbol_idx_dl = cfg_->get_dl_symbol_idx(frame_id, symbol_id);
+    size_t data_symbol_idx_dl = symbol_id_dl;
 
     if (kDebugPrintInTask) {
         printf("In doIFFT thread %d: frame: %zu, symbol: %zu, antenna: %zu\n",
@@ -259,9 +247,6 @@ EventData DoIFFT::launch(size_t tag)
         = (cfg_->get_total_data_symbol_idx_dl(frame_id, data_symbol_idx_dl)
               * cfg_->BS_ANT_NUM)
         + ant_id;
-
-    size_t start_tsc1 = worker_rdtsc();
-    duration_stat->task_duration[1] += start_tsc1 - start_tsc;
 
     float* ifft_buf_ptr = (float*)dl_ifft_buffer_[offset];
     memset(ifft_buf_ptr, 0, sizeof(float) * cfg_->OFDM_DATA_START * 2);
@@ -278,9 +263,6 @@ EventData DoIFFT::launch(size_t tag)
     cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg_->OFDM_CA_NUM, false);
     float post_scale = cfg_->OFDM_CA_NUM;
     mat_data /= post_scale;
-
-    size_t start_tsc2 = worker_rdtsc();
-    duration_stat->task_duration[2] += start_tsc2 - start_tsc1;
 
     int dl_socket_buffer_status_size = cfg_->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
         * cfg_->dl_data_symbol_num_perframe;
@@ -310,8 +292,6 @@ EventData DoIFFT::launch(size_t tag)
                 integer1);
     }
 
-    duration_stat->task_duration[2] += worker_rdtsc() - start_tsc2;
-
     // cout << "In ifft: frame: "<< frame_id<<", symbol: "<<
     // current_data_symbol_id<<", ant: " << ant_id << ", data: "; for (int j =
     // 0; j <OFDM_CA_NUM; j++) {
@@ -321,9 +301,4 @@ EventData DoIFFT::launch(size_t tag)
     //     socket_offset) + 2 * j + 1 )<<",   ";
     // }
     // cout<<"\n\n"<<endl;
-
-    duration_stat->task_count++;
-    duration_stat->task_duration[0] += worker_rdtsc() - start_tsc;
-    return EventData(EventType::kIFFT, tag);
 }
-#endif

@@ -189,25 +189,7 @@ int BigStationTXRX::recv_relocate(int tid)
 
         auto* pkt = reinterpret_cast<Packet*>(reinterpret_cast<uint8_t*>(eth_hdr) + kPayloadOffset);
 
-        // printf("Recv packet for frame %zu\n", pkt->frame_id_);
-
         if (pkt->pkt_type_ == Packet::PktType::kFreqIQ) {
-            // if (pkt->symbol_id < cfg_->pilot_symbol_num_perframe) {
-            //     char* dst_ptr = pilot_buffer_[pkt->frame_id][pkt->ant_id] + pkt->sc_id_ * 2 * sizeof(unsigned short);
-            //     memcpy(dst_ptr, pkt->data, pkt->sc_len_ * 2 * sizeof(unsigned short));
-            //     if (!bigstation_state_->receive_pilot_pkt(pkt->frame_id, pkt->ant_id)) {
-            //         cfg_->error = true;
-            //         cfg_->running = false;
-            //     }
-            // } else {
-            //     char* dst_ptr = data_buffer_[pkt->frame_id][pkt->symbol_id - cfg_->pilot_symbol_num_perframe][pkt->ant_id] 
-            //         + pkt->sc_id_ * 2 * sizeof(unsigned short); 
-            //     memcpy(dst_ptr, pkt->data, pkt->sc_len_ * 2 * sizeof(unsigned short));
-            //     if (!bigstation_state_->receive_ul_data_pkt(pkt->frame_id, pkt->symbol_id - cfg_->pilot_symbol_num_perframe, pkt->ant_id)) {
-            //         cfg_->error = true;
-            //         cfg_->running = false;
-            //     }
-            // }
             char* dst_ptr = freq_iq_buffer_[pkt->ant_id_] + (pkt->frame_id_ % kFrameWnd) * cfg_->symbol_num_perframe
                 * cfg_->packet_length + pkt->symbol_id_ * cfg_->packet_length + Packet::kOffsetOfData
                 + (cfg_->OFDM_DATA_START + pkt->sc_id_) * 2 * sizeof(unsigned short);
@@ -224,7 +206,6 @@ int BigStationTXRX::recv_relocate(int tid)
                 }
             }
         } else if (pkt->pkt_type_ == Packet::PktType::kDemod) {
-            // uint8_t* dst_ptr = post_demul_buffer_[pkt->frame_id_][pkt->symbol_id_][pkt->ue_id_] + pkt->sc_id_ * cfg_->mod_order_bits;
             int8_t* dst_ptr = post_demul_buffer_[(pkt->frame_id_%kFrameWnd)*cfg_->ul_data_symbol_num_perframe+pkt->symbol_id_] +
                 cfg_->OFDM_DATA_NUM * kMaxModType * pkt->ue_id_ + pkt->sc_id_ * cfg_->mod_order_bits;
             memcpy(dst_ptr, pkt->data_, pkt->sc_len_ * cfg_->mod_order_bits);
@@ -233,16 +214,15 @@ int BigStationTXRX::recv_relocate(int tid)
                 cfg_->running = false;
             }
         } else if (pkt->pkt_type_ == Packet::PktType::kTimeIQ) {
-            // uint8_t* iq_ptr = time_iq_buffer_[pkt->frame_id_][pkt->symbol_id_][pkt->ant_id_] + pkt->sc_id_ * 2 * sizeof(unsigned short);
             uint8_t* iq_ptr = (uint8_t*)time_iq_buffer_[pkt->ant_id_] + (pkt->frame_id_ % kFrameWnd) * cfg_->symbol_num_perframe
                 * cfg_->packet_length + pkt->symbol_id_ * cfg_->packet_length + Packet::kOffsetOfData
                 + pkt->sc_id_ * 2 * sizeof(unsigned short);
             memcpy(iq_ptr, (uint8_t*)pkt + Packet::kOffsetOfData, pkt->sc_len_ * 2 * sizeof(unsigned short));
-            // printf("Recv TimeIQ packet for frame %zu symbol %zu ant %zu\n", pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
             if (!bigstation_state_->receive_time_iq_pkt(pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_)) {
                 cfg_->error = true;
                 cfg_->running = false;
             }
+            valid_pkts ++;
         } else if (pkt->pkt_type_ == Packet::PktType::kPostZF) {
             uint8_t* dst_ptr = ((uint8_t*)post_zf_buffer_[pkt->frame_id_%kFrameWnd][pkt->sc_id_]) + pkt->data_off_;
             memcpy(dst_ptr, pkt->data_, pkt->data_len_);
@@ -281,7 +261,6 @@ void* BigStationTXRX::tx_thread(int tid)
     while (cfg_->running) {     
         if (bigstation_state_->prepared_all_freq_iq_pkts(freq_iq_pkt_frame, freq_iq_pkt_symbol)) {
             if (freq_iq_pkt_symbol < cfg_->pilot_symbol_num_perframe) {
-                // uint8_t* ant_ptr = freq_iq_buffer_to_send_[freq_iq_pkt_frame][freq_iq_pkt_symbol][freq_iq_pkt_ant];
                 uint8_t* ant_ptr = (uint8_t*)freq_iq_buffer_to_send_[freq_iq_pkt_ant] + 
                     (freq_iq_pkt_frame % kFrameWnd) * cfg_->symbol_num_perframe
                     * cfg_->packet_length + freq_iq_pkt_symbol * cfg_->packet_length;
@@ -347,10 +326,7 @@ void* BigStationTXRX::tx_thread(int tid)
                         exit(0);
                     }
                 }
-                // printf("Send %zu freq iq packets frame %zu symbol %zu ant %zu\n", total_buf_id,
-                //         freq_iq_pkt_frame, freq_iq_pkt_symbol, freq_iq_pkt_ant);
             } else {
-                // uint8_t* ant_ptr = freq_iq_buffer_to_send_[freq_iq_pkt_frame][freq_iq_pkt_symbol][freq_iq_pkt_ant]; 
                 uint8_t* ant_ptr = (uint8_t*)freq_iq_buffer_to_send_[freq_iq_pkt_ant] + (freq_iq_pkt_frame % kFrameWnd) * 
                     cfg_->symbol_num_perframe * cfg_->packet_length + freq_iq_pkt_symbol * cfg_->packet_length;
                 size_t demul_start = 0;
@@ -404,8 +380,6 @@ void* BigStationTXRX::tx_thread(int tid)
                         exit(0);
                     }
                 }
-                // printf("Send %zu freq iq packets frame %zu symbol %zu ant %zu\n", total_buf_id,
-                //         freq_iq_pkt_frame, freq_iq_pkt_symbol, freq_iq_pkt_ant);
             }
 
             freq_iq_pkt_ant ++;
@@ -434,12 +408,10 @@ void* BigStationTXRX::tx_thread(int tid)
                 if (last_possible_sc >= (int)sc_end) {
                     last_possible_sc -= cfg_->UE_NUM;
                 }
-                // printf("ZF TX tid %d sc range %zu to %zu\n", tid, first_possible_sc, last_possible_sc);
                 if (last_possible_sc >= first_possible_sc) {
                     for (int sc_id = first_possible_sc; sc_id <= last_possible_sc; sc_id += cfg_->UE_NUM) {
                         size_t server_start = cfg_->demul_server_mapping[sc_id - sc_id % cfg_->UE_NUM];
                         size_t server_end = cfg_->demul_server_mapping[sc_id - sc_id % cfg_->UE_NUM + cfg_->UE_NUM - 1];
-                        // printf("ZF TX tid %d sc %zu server range %zu to %zu\n", tid, sc_id, server_start, server_end);
                         for (size_t server_id = server_start; server_id <= server_end; server_id ++) {
                             for (size_t byte_off = 0; byte_off < cfg_->BS_ANT_NUM * cfg_->UE_NUM * 2 * sizeof(float); byte_off += cfg_->post_zf_step_size) {                    
                                 uint8_t* src_ptr = post_zf_buffer_to_send_[zf_pkt_frame%kFrameWnd][sc_id - sc_id % cfg_->UE_NUM] + byte_off;
@@ -485,8 +457,6 @@ void* BigStationTXRX::tx_thread(int tid)
                     exit(0);
                 }
             }
-            // printf("Tid %d Send %zu post zf packets for frame %zu\n", tid, total_buf_id,
-            //     zf_pkt_frame);
             zf_pkt_frame ++;
         }
 
@@ -529,9 +499,6 @@ void* BigStationTXRX::tx_thread(int tid)
                     exit(0);
                 }
             }
-
-            // printf("Send demod packet frame %zu symbol %zu ue %zu\n", demul_pkt_frame,
-            //     demul_pkt_symbol_ul, demul_pkt_ue);
 
             demul_pkt_ue ++;
             if (demul_pkt_ue == ue_end) {

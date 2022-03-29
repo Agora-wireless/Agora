@@ -28,7 +28,7 @@
   "num_load_levels": 1,
   "sleep_mode": false,
   "ofdm_data_num": 1200,
-  "use_hyperthreading": true,
+  "use_hyperthreading": "RXTXExclusive",
   "phy_core_num": 32
 }
   

@@ -360,7 +360,8 @@ public:
     size_t ant_start, ant_end;
 
     size_t slot_us;
-    bool use_hyperthreading;
+    enum HyperMode { kOff, kRXTXExclusive, kRXExclusive, kFull };
+    HyperMode use_hyperthreading;
     size_t phy_core_num; // Assumption: all servers have the same CPU core setting
 
     // Centralized scheduler mode
@@ -389,6 +390,19 @@ public:
     size_t zf_thread_offset;
     size_t demul_thread_offset;
     size_t decode_thread_offset;
+
+    std::vector<size_t> num_ifft_workers;
+    std::vector<size_t> num_precode_workers;
+    std::vector<size_t> num_encode_workers;
+    size_t total_ifft_workers;
+    size_t total_precode_workers;
+    size_t total_encode_workers;
+    
+    size_t precode_start, precode_end;
+    std::vector<size_t> precode_server_mapping;
+    size_t ifft_thread_offset;
+    size_t precode_thread_offset;
+    size_t encode_thread_offset;
 
     bool isUE;
     const size_t maxFrame = 1 << 30;

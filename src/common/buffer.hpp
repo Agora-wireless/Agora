@@ -225,7 +225,8 @@ struct Packet {
         kDemod, // A packet generated after the demodulation stage
         kEncode, // A packet generated after the encode stage
         kFFT,
-        kPostZF
+        kPostZF,
+        kPrecode
     };
 
     static const char* PktTypeStr(PktType pkt_type)
@@ -243,6 +244,8 @@ struct Packet {
             return "[Post FFT data]";
         case PktType::kPostZF:
             return "[Post ZF data]";
+        case PktType::kPrecode:
+            return "[Post Precode data]";
         default:
             return "[Invalid]";
         }

@@ -363,11 +363,12 @@ void* Agora::fftWorker(int tid)
 
 void* Agora::subcarrierWorker(int tid)
 {
-    if (config_->use_hyperthreading) {
-        // pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, base_worker_core_offset_ - kNumDemodTxThread, 
-        //     tid + do_fft_threads_.size() + kNumDemodTxThread, true, true, config_->phy_core_num);
+    if (config_->use_hyperthreading == Config::HyperMode::kRXTXExclusive) {
         pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, base_worker_core_offset_, 
             tid + do_fft_threads_.size(), true, true, config_->phy_core_num);
+    } else if (config_->use_hyperthreading == Config::HyperMode::kRXExclusive) {
+        pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, base_worker_core_offset_ - kNumDemodTxThread, 
+            tid + do_fft_threads_.size() + kNumDemodTxThread, true, true, config_->phy_core_num);
     } else {
         pin_to_core_with_offset(
             ThreadType::kWorkerSubcarrier, base_worker_core_offset_, tid + do_fft_threads_.size());
@@ -401,12 +402,13 @@ void* Agora::subcarrierWorker(int tid)
 
 void* Agora::decodeWorker(int tid)
 {
-    if (config_->use_hyperthreading) {
-        // pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_ - kNumDemodTxThread,
-        //     tid + do_fft_threads_.size() + do_subcarrier_threads_.size() + kNumDemodTxThread, 
-        //     true, true, config_->phy_core_num);
+    if (config_->use_hyperthreading == Config::HyperMode::kRXTXExclusive) {
         pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_,
             tid + do_fft_threads_.size() + do_subcarrier_threads_.size(), 
+            true, true, config_->phy_core_num);
+    } else if (config_->use_hyperthreading == Config::HyperMode::kRXExclusive) {
+        pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_ - kNumDemodTxThread,
+            tid + do_fft_threads_.size() + do_subcarrier_threads_.size() + kNumDemodTxThread, 
             true, true, config_->phy_core_num);
     } else {
         pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_,
@@ -432,7 +434,11 @@ void* Agora::decodeWorker(int tid)
 
 void* Agora::encodeWorker(int tid)
 {
-    if (config_->use_hyperthreading) {
+    if (config_->use_hyperthreading == Config::HyperMode::kRXTXExclusive) {
+        pin_to_core_with_offset(ThreadType::kWorkerEncode, base_worker_core_offset_,
+            tid + do_fft_threads_.size() + do_subcarrier_threads_.size(), 
+            true, true, config_->phy_core_num);
+    } else if (config_->use_hyperthreading == Config::HyperMode::kRXExclusive) {
         pin_to_core_with_offset(ThreadType::kWorkerEncode, base_worker_core_offset_ - kNumDemodTxThread,
             tid + do_fft_threads_.size() + do_subcarrier_threads_.size() + kNumDemodTxThread, 
             true, true, config_->phy_core_num);
@@ -455,8 +461,11 @@ void* Agora::encodeWorker(int tid)
 
 void* Agora::worker(int tid)
 {
-    if (config_->use_hyperthreading) {
+    if (config_->use_hyperthreading == Config::HyperMode::kRXTXExclusive) {
         pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset_, tid, 
+            true, true, config_->phy_core_num);
+    } else if (config_->use_hyperthreading == Config::HyperMode::kRXExclusive) {
+        pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset_ - kNumDemodTxThread, tid + kNumDemodTxThread, 
             true, true, config_->phy_core_num);
     } else {
         pin_to_core_with_offset(ThreadType::kWorker, base_worker_core_offset_, tid);
