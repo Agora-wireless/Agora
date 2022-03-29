@@ -10,11 +10,14 @@ elif len(sys.argv) == 3:
     parent_dir = sys.argv[2]
 
 latency_data = []
+num_useful_line = 999999999
 
 for i in range(n_servers):
     f = open('{0}/frame_latency_{1}.txt'.format(parent_dir, i), 'r')
     lines = f.readlines()
     n_lines = len(lines)
+    if n_lines < num_useful_line:
+        num_useful_line = n_lines
     for j in range(n_lines):
         words = lines[j].split()
         if len(latency_data) <= j:
@@ -35,7 +38,8 @@ for i in range(n_servers):
 
 out_f = open('{0}/frame_latency_all.txt'.format(parent_dir), 'w')
 
-for frame in latency_data:
+for idx in range(num_useful_line):
+    frame = latency_data[idx]
     print >>out_f, frame[0], (frame[2]-frame[1])/1000.0, (frame[3]-frame[2])/1000.0, (frame[4]-frame[3])/1000.0, (frame[5]-frame[4])/1000.0, (frame[5]-frame[1])/1000.0
 
 out_f.close()

@@ -149,7 +149,8 @@ void Agora::Start()
         if (cfg->use_central_scheduler) {
             handleEvents();
         } else {
-            sleep(1);
+            shared_state_.move_forward_and_clean_up_ul();
+            usleep(100);
         }
     }
     cfg->running = false;

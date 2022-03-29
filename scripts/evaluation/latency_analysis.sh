@@ -14,3 +14,4 @@ for (( i=0; i<${hydra_app_num}; i++ )) do
 done
 
 python ${hydra_root_dir}/scripts/evaluation/merge_latency.py ${hydra_app_num} ${hydra_root_dir}/data
+cat ${hydra_root_dir}/data/frame_latency_all.txt | awk 'NR > 200 { print $6 }' >> ${hydra_root_dir}/data/useful_latency_data.txt 

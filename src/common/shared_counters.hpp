@@ -67,6 +67,7 @@ public:
     bool is_demod_tx_ready(size_t frame_id, size_t symbol_id_ul);
     bool is_encode_tx_ready(size_t frame_id, size_t symbol_id_dl);
     bool is_zf_done(size_t frame_id, size_t zf_block_id);
+    bool move_forward_and_clean_up_ul();
 
     // Latency measurement counters for each frame
     uint64_t *frame_start_time_;

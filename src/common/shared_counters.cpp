@@ -590,12 +590,54 @@ void SharedState::demul_done(size_t frame_id, size_t symbol_id_ul, size_t num_ta
 void SharedState::decode_done(size_t frame_id)
 {
     rt_assert(frame_id < cur_frame_ + kFrameWnd && frame_id >= cur_frame_, "Wrong completed decode task!");
-    bool cont = false;
+    // bool cont = false;
     decode_mutex_[frame_id % kFrameWnd].lock();
     num_decode_tasks_completed_[frame_id % kFrameWnd]++;
-    cont = (num_decode_tasks_completed_[frame_id % kFrameWnd] == num_decode_tasks_per_frame_);
+    // cont = (num_decode_tasks_completed_[frame_id % kFrameWnd] == num_decode_tasks_per_frame_);
     decode_mutex_[frame_id % kFrameWnd].unlock();
 
+    // if (unlikely(cont)) {
+    //     cur_frame_mutex_.lock();
+    //     while (num_decode_tasks_completed_[cur_frame_ % kFrameWnd] == num_decode_tasks_per_frame_) {
+    //         frame_end_time_[cur_frame_] = get_us();
+    //         encode_ready_[(cur_frame_) % kFrameWnd] = false;
+    //         size_t cur_cycle = worker_rdtsc();
+    //         num_decode_tasks_completed_[(cur_frame_) % kFrameWnd] = 0;
+    //         size_t frame_slot = (cur_frame_) % kFrameWnd;
+    //         num_pkts_[frame_slot] = 0;
+    //         num_pilot_pkts_[frame_slot] = 0;
+    //         for (size_t j = 0; j < kMaxSymbols; j++) {
+    //             num_data_pkts_[frame_slot][j] = 0;
+    //         }
+    //         for (size_t i = 0; i < kMaxSymbols; i++) {
+    //             num_demul_tasks_completed_[frame_slot][i] = 0;
+    //         }
+    //         for (size_t i = 0; i < kMaxUEs; i ++) {
+    //             for (size_t j = 0; j < kMaxSymbols; j++) {
+    //                 num_demod_pkts_[i][frame_slot][j] = 0;
+    //                 num_demod_pkts_states_[i][frame_slot][j] = 0;
+    //             }
+    //         }
+    //         for (size_t i = 0; i < kMaxSymbols; i++) {
+    //             num_time_iq_pkts_[frame_slot][i] = 0;
+    //         }
+    //         for (size_t i = 0; i < kMaxSymbols; i++) {
+    //             num_fft_tasks_completed_[frame_slot][i] = 0;
+    //         }
+    //         for (size_t i = 0; i < num_zf_tasks_per_frame_; i++) {
+    //             zf_task_completed_[frame_slot][i] = false;
+    //         }
+    //         MLPD_INFO("Main thread: Decode done frame: %lu, for %.2lfms\n", cur_frame_, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
+    //         last_frame_cycles_ = cur_cycle;
+    //         cur_frame_ ++;
+    //     }
+    //     cur_frame_mutex_.unlock();
+    // }
+}
+
+bool SharedState::move_forward_and_clean_up_ul()
+{
+    bool cont = (num_decode_tasks_completed_[cur_frame_ % kFrameWnd] == num_decode_tasks_per_frame_);
     if (unlikely(cont)) {
         cur_frame_mutex_.lock();
         while (num_decode_tasks_completed_[cur_frame_ % kFrameWnd] == num_decode_tasks_per_frame_) {
@@ -633,6 +675,7 @@ void SharedState::decode_done(size_t frame_id)
         }
         cur_frame_mutex_.unlock();
     }
+    return true;
 }
 
 bool SharedState::precode_done(size_t frame_id)

@@ -35,7 +35,11 @@ USE_MATLAB_GEN_RAYLEIGH=0
 # 0 for not print
 PRINT_DIGEST_ALL=1
 
-while getopts "h?:frdms" opt; do
+# 1 for diagnosis
+# 0 for do not diagnosis
+ERROR_DIAGNOSIS=1
+
+while getopts "h?:frdmsx" opt; do
   case "$opt" in
     h|\?)
       echo "Help"
@@ -45,6 +49,7 @@ while getopts "h?:frdms" opt; do
       echo -e "\t-d\tenerate new input traffic data"
       echo -e "\t-m\tUse MATLAB to generate input traffic data for Rayleigh channel (require MATLAB to be installed)"
       echo -e "\t-s\tDo not print diagnosis digest for each Hydra server"
+      echo -e "\t-x\tDo not diagnosis"
       exit 0
       ;;
     f)
@@ -61,6 +66,9 @@ while getopts "h?:frdms" opt; do
       ;;
     s)
       PRINT_DIGEST_ALL=1
+      ;;
+    x)
+      ERROR_DIAGNOSIS=0
       ;;
   esac
 done
@@ -122,11 +130,13 @@ source ${hydra_root_dir}/scripts/control/check_running_all.sh
 if [ "${is_running}" == "1" ]; then
   echored "Hydra is still running (timeout), please check the log files. Now kill all Hydra processes"
   source ${hydra_root_dir}/scripts/control/stop_all.sh
-  exit
+  exit 1
 fi
 
 echocyan "All running logs will be stored in /tmp/hydra/log_[server].txt"
 
 if [ "${HYDRA_RUN_MODE}" == 0 ] && [ "${bigstation_mode}" != "true" ]; then
-  source ${hydra_root_dir}/scripts/control/error_diagnosis.sh
+  if [ "${ERROR_DIAGNOSIS}" == 1 ]; then
+    source ${hydra_root_dir}/scripts/control/error_diagnosis.sh
+  fi
 fi
