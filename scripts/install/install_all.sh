@@ -135,9 +135,9 @@ function install_dpdk() {
   tar xf dpdk-20.11.3.tar.xz >> /tmp/hydra/install.log 2>&1
   rm dpdk-20.11.3.tar.xz
   cd dpdk-stable-20.11.3
-  CFLAGS=-I${HYDRA_RUNNER_ROOT}/rdma-core/build/include meson build >> /tmp/hydra/install.log 2>&1
+  eval "CFLAGS=-I${HYDRA_RUNNER_ROOT}/rdma-core/build/include meson build >> /tmp/hydra/install.log 2>&1"
   cd build
-  CFLAGS=-I${HYDRA_RUNNER_ROOT}/rdma-core/build/include ninja >> /tmp/hydra/install.log 2>&1
+  eval "CFLAGS=-I${HYDRA_RUNNER_ROOT}/rdma-core/build/include ninja >> /tmp/hydra/install.log 2>&1"
   DESTDIR=${RTE_SDK}/build/install ninja install >> /tmp/hydra/install.log 2>&1
 }
 
