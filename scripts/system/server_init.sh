@@ -32,7 +32,7 @@ eval "sudo mount -t auto /dev/sda4 ${HYDRA_RUNNER_ROOT}"
 eval "sudo chown junzhig ${HYDRA_RUNNER_ROOT}"
 eval "sudo chgrp opensketch-PG0 ${HYDRA_RUNNER_ROOT}"
 
-echo "1" | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo
-sudo apt-get install -y linux-tools-$(uname -r)
-sudo cpupower frequency-set -g performance
-${hydra_root_dir}/scripts/system/set_smp_affinity.sh
+# echo "1" | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo
+# sudo apt-get install -y linux-tools-$(uname -r)
+# sudo cpupower frequency-set -g performance
+# ${hydra_root_dir}/scripts/system/set_smp_affinity.sh
