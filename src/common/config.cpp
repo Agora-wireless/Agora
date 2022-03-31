@@ -310,7 +310,7 @@ Config::Config(std::string jsonfile)
     fixed_control = tddConf.value("fixed_control", -1);
     user_level_list = tddConf.value("user_level_list", std::vector<size_t>(UE_NUM));
     num_load_levels = tddConf.value("num_load_levels", 10);
-    sleep_mode = tddConf.value("sleep_mode", true);
+    sleep_mode = tddConf.value("sleep_mode", false);
 
     if (downlink_mode) {
         std::vector<size_t> tmp_vec = tddConf.value("coding_thread_num", std::vector<size_t>());

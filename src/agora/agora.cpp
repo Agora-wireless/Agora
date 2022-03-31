@@ -16,7 +16,7 @@ Agora::Agora(Config* cfg)
     config_ = cfg;
 
     pin_to_core_with_offset(
-        ThreadType::kMaster, cfg->core_offset, 0, false /* quiet */);
+        ThreadType::kMaster, cfg->core_offset, 0, true /* quiet */);
     if (cfg->use_central_scheduler) {
         initializeQueues();
     }
@@ -154,11 +154,8 @@ void Agora::Start()
         }
     }
     cfg->running = false;
-    goto finish;
-    return;
 
 finish:
-
     if (cfg->error) {
         Diagnosis(cfg, &shared_state_, bottleneck_subcarrier_,
             bottleneck_decode_, bottleneck_encode_);

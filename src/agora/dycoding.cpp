@@ -48,7 +48,7 @@ void DyEncode::Launch(size_t frame_id, size_t symbol_id_dl, size_t ue_id)
             tid_, frame_id, symbol_id_dl, ue_id);
     }
 
-    std::vector<ControlInfo>& info_list = control_info_table_[control_idx_list_[frame_id]];
+    std::vector<ControlInfo>& info_list = cfg_->fixed_control != -1 ? control_info_table_[cfg_->fixed_control] : control_info_table_[control_idx_list_[frame_id]];
     if (ue_id >= info_list.size()) {
         return;
     }
@@ -218,7 +218,7 @@ void DyDecode::Launch(size_t frame_id, size_t symbol_id_ul, size_t ue_id)
             tid_, frame_id, symbol_id_ul, ue_id);
     }
 
-    std::vector<ControlInfo>& info_list = control_info_table_[control_idx_list_[frame_id]];
+    std::vector<ControlInfo>& info_list = cfg_->fixed_control != -1 ? control_info_table_[cfg_->fixed_control] : control_info_table_[control_idx_list_[frame_id]];
     if (ue_id >= info_list.size()) {
         return;
     }
@@ -403,7 +403,7 @@ void DyDecode::StartWork()
                     break;
                 }
 
-                if (shouldSleep(control_info_table_[control_idx_list_[cur_frame_]].size())) {
+                if (cfg_->fixed_control == -1 && shouldSleep(control_info_table_[control_idx_list_[cur_frame_]].size())) {
                     std::this_thread::sleep_for(std::chrono::microseconds(900));
                 }
             }

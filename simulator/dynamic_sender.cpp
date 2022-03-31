@@ -437,7 +437,7 @@ void* Sender::worker_thread(int tid)
     size_t cur_radio = radio_lo;
     size_t cur_frame = 0;
     size_t cur_symbol = 0;
-    size_t cur_slot_idx = control_idx_list_[0];
+    size_t cur_slot_idx = cfg->fixed_control != -1 ? cfg->fixed_control : control_idx_list_[0];
 
     printf("In thread %zu, %zu antennas, BS_ANT_NUM: %zu, num threads %zu:\n",
         (size_t)tid, ant_num_this_thread, cfg->BS_ANT_NUM, num_worker_threads_);
@@ -447,7 +447,7 @@ void* Sender::worker_thread(int tid)
         == Packet::kOffsetOfData
             + 2 * sizeof(unsigned short) * (cfg->CP_LEN + cfg->OFDM_CA_NUM));
 
-    double start_time = get_time();
+    // double start_time = get_time();
 
     size_t start_tsc_send;
     size_t local_sync_tsc = get_sync_tsc();
@@ -561,19 +561,19 @@ void* Sender::worker_thread(int tid)
                 if (unlikely(cur_frame == cfg->frames_to_test)) {
                     break;
                 }
-                cur_slot_idx = control_idx_list_[cur_frame];
+                cur_slot_idx = cfg->fixed_control != -1 ? cfg->fixed_control : control_idx_list_[cur_frame];
                 // delay_ticks(start_tsc_send, cur_frame * max_symbol_id * ticks_all);
-                printf("Thread %d send frame %zu in %.1f ms\n", tid, cur_frame - 1, (get_time() - start_time) / 1000.0f);
+                // printf("Thread %d send frame %zu in %.1f ms\n", tid, cur_frame - 1, (get_time() - start_time) / 1000.0f);
 
-                if (tid == 0) {
-                    rte_eth_stats stats;
-                    rte_eth_stats_get(0, &stats);
-                    printf("Traffic rate is %lf, packet rate is %lf\n", (double)(stats.obytes - tx_stats.obytes) * 8 / ((get_time() - start_time) * 1000.0f),
-                        (double)(stats.opackets - tx_stats.opackets) / ((get_time() - start_time)));
-                    memcpy(&tx_stats, &stats, sizeof(rte_eth_stats));
-                }
+                // if (tid == 0) {
+                //     rte_eth_stats stats;
+                //     rte_eth_stats_get(0, &stats);
+                //     // printf("Traffic rate is %lf, packet rate is %lf\n", (double)(stats.obytes - tx_stats.obytes) * 8 / ((get_time() - start_time) * 1000.0f),
+                //         // (double)(stats.opackets - tx_stats.opackets) / ((get_time() - start_time)));
+                //     memcpy(&tx_stats, &stats, sizeof(rte_eth_stats));
+                // }
 
-                start_time = get_time();
+                // start_time = get_time();
             }
             size_t real_symbol_num = cfg->symbol_num_perframe;
             if (cur_frame < 80) {

@@ -230,7 +230,7 @@ void DyZF::ZFFreqOrthogonal(size_t tag)
     double start_tsc1 = worker_rdtsc();
 
     // Gather CSIs from partially-transposed CSIs
-    std::vector<ControlInfo>& info_list = control_info_table_[control_idx_list_[frame_id]];
+    std::vector<ControlInfo>& info_list = cfg_->fixed_control != -1 ? control_info_table_[cfg_->fixed_control] : control_info_table_[control_idx_list_[frame_id]];
     size_t total_ue_sc = 0;
     for (size_t i = 0; i < info_list.size(); i ++) {
         size_t ue_id = info_list[i].ue_id;

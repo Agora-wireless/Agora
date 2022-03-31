@@ -122,7 +122,7 @@ void DyDemul::Launch(
         size_t cur_sc_id = base_sc_id + i;
 
         size_t ue_num = 0;
-        std::vector<ControlInfo>& control_list = control_info_table_[control_idx_list_[frame_id]];
+        std::vector<ControlInfo>& control_list = cfg_->fixed_control != -1 ? control_info_table_[cfg_->fixed_control] : control_info_table_[control_idx_list_[frame_id]];
         for (size_t j = 0; j < control_list.size(); j ++) {
             if (control_list[j].sc_start <= cur_sc_id && control_list[j].sc_end > cur_sc_id) {
                 ue_num ++;
@@ -167,7 +167,7 @@ void DyDemul::Launch(
     size_t kNumDoubleInSIMD256 = sizeof(__m256) / sizeof(double); // == 4
     float* equal_T_ptr = (float*)(equaled_buffer_temp_transposed_) + (base_sc_id % kSCsPerCacheline) * 2;
 
-    std::vector<ControlInfo>& info_list = control_info_table_[control_idx_list_[frame_id]];
+    std::vector<ControlInfo>& info_list = cfg_->fixed_control != -1 ? control_info_table_[cfg_->fixed_control] : control_info_table_[control_idx_list_[frame_id]];
     for (size_t i = 0; i < info_list.size(); i ++) {
         equal_T_ptr = (float*)(equaled_buffer_temp_transposed_) + (base_sc_id % kSCsPerCacheline) * 2;
         ControlInfo& info = info_list[i];
