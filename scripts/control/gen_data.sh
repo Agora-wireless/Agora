@@ -20,7 +20,8 @@ if [ "${USE_MATLAB_GEN_RAYLEIGH}" == 1 ]; then
     ./build/dynamic_generator -c ./config/run.json -m prechannel" >> /tmp/hydra/install.log 2>&1 || \
     { echo "Failed to run traffic data generator (prechannel mode) on ${server_name}"; exit 1; }
   scp -oStrictHostKeyChecking=no ${server_name}:/tmp/hydra/matlab_input.txt /tmp/hydra/ >> /tmp/hydra/install.log
-  cd ${hydra_root_dir}/matlab; matlab -batch "generate_uplink(${num_users}, ${num_antennas})" >> /tmp/hydra/install.log
+  cd ${hydra_root_dir}/matlab; matlab -batch "generate_uplink(${num_users}, ${num_antennas}, \
+    '/tmp/hydra/matlab_input.txt', '/tmp/hydra/matlab_output.txt')" >> /tmp/hydra/install.log
   scp -oStrictHostKeyChecking=no /tmp/hydra/matlab_output.txt ${server_name}:/tmp/hydra/ >> /tmp/hydra/install.log
   ssh -oStrictHostKeyChecking=no ${server_name} "source ${HYDRA_RUNNER_ROOT}/Agora/scripts/install/setvars.sh; \
     cd ${HYDRA_RUNNER_ROOT}/Agora; \
