@@ -37,7 +37,7 @@ touch /tmp/hydra/install.log
 # If not, report en error
 function check_sys_pkgs() {
   systemPkgs=(g++ cmake make liblapack-dev libblas-dev \
-    libboost-dev libnuma-dev python3-pip build-essential \
+    libboost-all-dev libnuma-dev python3-pip build-essential \
     gcc libudev-dev libnl-3-dev libnl-route-3-dev ninja-build \
     pkg-config valgrind python3-dev cython3 python3-docutils \
     pandoc jq rsync)
@@ -70,7 +70,7 @@ function install_sys_pkgs() {
   echo "[$(hostname)] Downloading required system packages"
   sudo apt-get update >> /tmp/hydra/install.log 2>&1
   sudo apt-get install -y g++ cmake make liblapack-dev libblas-dev \
-    libboost-dev libnuma-dev python3-pip build-essential gcc \
+    libboost-all-dev libnuma-dev python3-pip build-essential gcc \
     libudev-dev libnl-3-dev libnl-route-3-dev ninja-build \
     pkg-config valgrind python3-dev cython3 python3-docutils pandoc \
     jq rsync >> /tmp/hydra/install.log 2>&1
@@ -135,9 +135,12 @@ function install_dpdk() {
   tar xf dpdk-20.11.3.tar.xz >> /tmp/hydra/install.log 2>&1
   rm dpdk-20.11.3.tar.xz
   cd dpdk-stable-20.11.3
-  eval "CFLAGS=-I${HYDRA_RUNNER_ROOT}/rdma-core/build/include meson build >> /tmp/hydra/install.log 2>&1"
+  rm -rf build
+  # eval "CFLAGS=-I${HYDRA_RUNNER_ROOT}/rdma-core/build/include meson build" >> /tmp/hydra/install.log 2>&1
+  meson build >> /tmp/hydra/install.log 2>&1
   cd build
-  eval "CFLAGS=-I${HYDRA_RUNNER_ROOT}/rdma-core/build/include ninja >> /tmp/hydra/install.log 2>&1"
+  # eval "CFLAGS=-I${HYDRA_RUNNER_ROOT}/rdma-core/build/include ninja" >> /tmp/hydra/install.log 2>&1
+  ninja >> /tmp/hydra/install.log 2>&1
   DESTDIR=${RTE_SDK}/build/install ninja install >> /tmp/hydra/install.log 2>&1
 }
 
