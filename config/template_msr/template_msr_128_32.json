@@ -1,12 +1,12 @@
 {
-  "rx_thread_num": 4,
+  "rx_thread_num": 3,
   "use_central_scheduler": false,
   "use_general_worker": false,
   "worker_thread_num": 10,
   "demul_block_size": 8,
   "antenna_num": 128,
   "ue_num": 32,
-  "core_offset": 0,
+  "core_offset": 3,
   "frames": [
     "PUUUUUUUUUUUUU"
   ],
