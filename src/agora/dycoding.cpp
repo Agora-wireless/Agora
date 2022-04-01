@@ -113,8 +113,19 @@ void DyEncode::StartWork()
     size_t encode_max = 0;
 
     size_t last_sleep_tsc = 0;
+    size_t last_slow_loop_tsc = rdtsc();
 
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
+        size_t cur_sleep_tsc = rdtsc();
+        if (unlikely(cur_sleep_tsc - last_slow_loop_tsc > freq_ghz_ * 1000 * kSlowLoopThre)) {
+            MLPD_ERROR("Slow loop detected in decode thread %d!\n", tid_);
+        }
+        last_slow_loop_tsc = cur_sleep_tsc;
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ * 1000000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(2));
+        }
+
         TRIGGER_TIMER(loop_count ++);
         size_t work_start_tsc;
 
@@ -157,12 +168,6 @@ void DyEncode::StartWork()
                 state_operation_duration += rdtsc() - encode_start_tsc;
                 work_tsc_duration += rdtsc() - work_start_tsc;
             });
-        }
-
-        size_t cur_sleep_tsc = rdtsc();
-        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
-            last_sleep_tsc = cur_sleep_tsc;
-            std::this_thread::sleep_for(std::chrono::microseconds(1));
         }
     }
 
@@ -346,8 +351,19 @@ void DyDecode::StartWork()
     size_t decode_max = 0;
 
     size_t last_sleep_tsc = 0;
+    size_t last_slow_loop_tsc = rdtsc();
 
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
+        size_t cur_sleep_tsc = rdtsc();
+        if (unlikely(cur_sleep_tsc - last_slow_loop_tsc > freq_ghz_ * 1000 * kSlowLoopThre)) {
+            MLPD_ERROR("Slow loop detected in decode thread %d!\n", tid_);
+        }
+        last_slow_loop_tsc = cur_sleep_tsc;
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ * 1000000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(2));
+        }
+
         TRIGGER_TIMER(loop_count ++);
         size_t work_start_tsc, state_start_tsc;
 
@@ -357,6 +373,7 @@ void DyDecode::StartWork()
         });
 
         bool ret = shared_state_->received_all_demod_pkts_loss_tolerant(
+        // bool ret = shared_state_->received_all_demod_pkts(
                 cur_ue_, cur_frame_, cur_symbol_);
         
         TRIGGER_TIMER({
@@ -433,12 +450,6 @@ void DyDecode::StartWork()
                 work_tsc_duration += rdtsc() - work_start_tsc;
             });
         }
-
-        size_t cur_sleep_tsc = rdtsc();
-        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
-            last_sleep_tsc = cur_sleep_tsc;
-            std::this_thread::sleep_for(std::chrono::microseconds(1));
-        }
     }
 
     if (cfg_->error) {
@@ -475,8 +486,19 @@ void DyDecode::StartWorkCentral()
     bool state_trigger = false;
 
     size_t last_sleep_tsc = 0;
+    size_t last_slow_loop_tsc = rdtsc();
 
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
+        size_t cur_sleep_tsc = rdtsc();
+        if (unlikely(cur_sleep_tsc - last_slow_loop_tsc > freq_ghz_ * 1000 * kSlowLoopThre)) {
+            MLPD_ERROR("Slow loop detected in decode thread %d!\n", tid_);
+        }
+        last_slow_loop_tsc = cur_sleep_tsc;
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ * 1000000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(2));
+        }
+
         if (likely(state_trigger)) {
             loop_count ++;
         }
@@ -521,12 +543,6 @@ void DyDecode::StartWorkCentral()
                 exit(1);
                 break;
             }
-        }
-
-        size_t cur_sleep_tsc = rdtsc();
-        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
-            last_sleep_tsc = cur_sleep_tsc;
-            std::this_thread::sleep_for(std::chrono::microseconds(1));
         }
     }
 

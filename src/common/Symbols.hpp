@@ -250,4 +250,6 @@ static const size_t kDefaultMessageQueueSize = 512;
 static const size_t kDefaultWorkerQueueSize = 256;
 
 static constexpr size_t kMaxServers = 32;
+
+static constexpr size_t kSlowLoopThre = 1000;
 #endif

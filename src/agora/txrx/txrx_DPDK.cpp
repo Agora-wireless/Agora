@@ -371,6 +371,7 @@ void* PacketTXRX::demod_tx_thread(int tid)
                             demod_frame_to_send_, demod_symbol_ul_to_send_, ue_id, cfg_->subcarrier_start);
                     memcpy(target_demod_ptr, demod_ptr, cfg_->get_num_sc_to_process() * cfg_->mod_order_bits);
                     if (!shared_state_->receive_demod_pkt_loss_tolerant(ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_, target_server_idx)) {
+                    // if (!shared_state_->receive_demod_pkt(ue_id, demod_frame_to_send_, demod_symbol_ul_to_send_, target_server_idx)) {
                         cfg_->error = true;
                         cfg_->running = false;
                     }
@@ -663,6 +664,7 @@ int PacketTXRX::recv_relocate(int tid)
             memcpy(demod_ptr, pkt->data_,
                 cfg_->subcarrier_num_list[pkt->server_id_] * cfg_->mod_order_bits);
             if (!shared_state_->receive_demod_pkt_loss_tolerant(pkt->ue_id_, pkt->frame_id_, symbol_idx_ul, pkt->server_id_)) {
+            // if (!shared_state_->receive_demod_pkt(pkt->ue_id_, pkt->frame_id_, symbol_idx_ul, pkt->server_id_)) {
                 cfg_->error = true;
                 cfg_->running = false;
             }

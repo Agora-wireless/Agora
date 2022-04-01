@@ -90,7 +90,19 @@ void DySubcarrier::StartWork()
     size_t work_start_tsc, state_start_tsc;
     size_t last_sleep_tsc = 0;
 
+    size_t last_slow_loop_tsc = rdtsc();
+
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
+        size_t cur_sleep_tsc = rdtsc();
+        if (unlikely(cur_sleep_tsc - last_slow_loop_tsc > freq_ghz_ * 1000 * kSlowLoopThre)) {
+            MLPD_ERROR("Slow loop detected in subcarrier thread %d!\n", tid_);
+        }
+        last_slow_loop_tsc = cur_sleep_tsc;
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ * 1000000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(2));
+        }
+
         size_t worked = 0;
         TRIGGER_TIMER(loop_count ++);
 
@@ -249,12 +261,6 @@ void DySubcarrier::StartWork()
         }
 
         TRIGGER_TIMER(work_count += worked);
-
-        size_t cur_sleep_tsc = rdtsc();
-        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
-            last_sleep_tsc = cur_sleep_tsc;
-            std::this_thread::sleep_for(std::chrono::microseconds(1));
-        }
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -428,8 +434,19 @@ void DySubcarrier::StartWorkCentral() {
     size_t csi_start_tsc, zf_start_tsc, demod_start_tsc;
 
     size_t last_sleep_tsc = 0;
+    size_t last_slow_loop_tsc = rdtsc();
 
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
+        size_t cur_sleep_tsc = rdtsc();
+        if (unlikely(cur_sleep_tsc - last_slow_loop_tsc > freq_ghz_ * 1000 * kSlowLoopThre)) {
+            MLPD_ERROR("Slow loop detected in subcarrier thread %d!\n", tid_);
+        }
+        last_slow_loop_tsc = cur_sleep_tsc;
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ * 1000000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(2));
+        }
+
         EventData event, resp;
         size_t tag;
         size_t slot_id;
@@ -514,12 +531,6 @@ void DySubcarrier::StartWorkCentral() {
                 work_tsc_duration += rdtsc() - work_start_tsc;
             }
         }
-
-        size_t cur_sleep_tsc = rdtsc();
-        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
-            last_sleep_tsc = cur_sleep_tsc;
-            std::this_thread::sleep_for(std::chrono::microseconds(1));
-        }
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -567,7 +578,19 @@ void DySubcarrier::StartWorkDownlink() {
     size_t work_start_tsc, state_start_tsc;
     size_t last_sleep_tsc = 0;
 
+    size_t last_slow_loop_tsc = rdtsc();
+
     while (cfg_->running && !SignalHandler::gotExitSignal()) {
+        size_t cur_sleep_tsc = rdtsc();
+        if (unlikely(cur_sleep_tsc - last_slow_loop_tsc > freq_ghz_ * 1000 * kSlowLoopThre)) {
+            MLPD_ERROR("Slow loop detected in subcarrier thread %d!\n", tid_);
+        }
+        last_slow_loop_tsc = cur_sleep_tsc;
+        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ * 1000000) {
+            last_sleep_tsc = cur_sleep_tsc;
+            std::this_thread::sleep_for(std::chrono::microseconds(2));
+        }
+
         size_t worked = 0;
         TRIGGER_TIMER(loop_count ++);
 
@@ -731,12 +754,6 @@ void DySubcarrier::StartWorkDownlink() {
         }
 
         TRIGGER_TIMER(work_count += worked);
-
-        size_t cur_sleep_tsc = rdtsc();
-        if (cur_sleep_tsc - last_sleep_tsc > freq_ghz_ / 1000) {
-            last_sleep_tsc = cur_sleep_tsc;
-            std::this_thread::sleep_for(std::chrono::microseconds(1));
-        }
     }
 
     if (cfg_->error) {
