@@ -225,6 +225,9 @@ class Config {
     return this->ofdm_rx_zero_prefix_client_;
   }
   inline size_t SampsPerSymbol() const { return this->samps_per_symbol_; }
+  inline size_t SampsPerFrame() const {
+    return this->frame_.NumTotalSyms() * this->samps_per_symbol_;
+  }
   inline size_t PacketLength() const { return this->packet_length_; }
 
   inline float Scale() const { return this->scale_; }
