@@ -15,12 +15,14 @@ for (( i=0; i<${hydra_app_num}; i++ )) do
     num_lines=$(cat ${hydra_root_dir}/data/frame_latency_$i.txt | wc -l )
     if [ "${num_lines}" != "${slots_to_test}" ]; then
         valid=0
-        break
     fi
 done
 
 if [ "${valid}" == "1" ]; then
     python ${hydra_root_dir}/scripts/evaluation/merge_latency.py ${hydra_app_num} ${hydra_root_dir}/data
     cp ${hydra_root_dir}/data/frame_latency_all.txt ${hydra_root_dir}/data/frame_latency_all_$1.txt
+else
+    python ${hydra_root_dir}/scripts/evaluation/merge_latency.py ${hydra_app_num} ${hydra_root_dir}/data
+    cp ${hydra_root_dir}/data/frame_latency_all.txt ${hydra_root_dir}/data/frame_latency_all_error.txt
 fi
 # cat ${hydra_root_dir}/data/frame_latency_all.txt | awk 'NR > 1000 { print $6 }' >> ${hydra_root_dir}/data/useful_latency_data.txt 
