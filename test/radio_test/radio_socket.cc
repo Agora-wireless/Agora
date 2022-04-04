@@ -94,13 +94,16 @@ void RadioSocket::Create(const std::string& local_addr,
   //Creates a 1:1 connection for DATAGRAM sockets
   size_t ret = socket_->Connect(remote_addr, remote_port);
   if (ret != 0) {
-    throw std::runtime_error("Iris::setupStream: Failed to connect to " +
+    throw std::runtime_error("RadioSocket::setupStream: Failed to connect to " +
                              remote_addr + " : " + remote_port);
   }
   DEBUG_OUTPUT(" ip6_dst %s\n udp_dst %s\n", socket_->Address().c_str(),
                socket_->Port().c_str());
 }
 
+/// returns the number of samples inserted into out_data
+/// out_data unpacked symbol dara
+/// rx_time_ns rx time from symbol header (t0 of symbol)
 int RadioSocket::RxSymbol(
     std::vector<std::vector<std::complex<int16_t>>>& out_data,
     long long& rx_time_ns) {
@@ -121,6 +124,8 @@ int RadioSocket::RxSymbol(
 
       if (symbol_complete) {
         DEBUG_OUTPUT("Completed Symbol: %zu bytes\n", rx_bytes_);
+        //Could be multiple UDP rx calls, all the udp packets + headers that make up a symbol
+        //exist in the rx_buffer input.
         num_samples = ParseRxSymbol(out_data, rx_time_ns);
         rx_bytes_ = 0;
         rx_samples_ = 0;
@@ -137,6 +142,7 @@ int RadioSocket::RxSymbol(
   return num_samples;
 }
 
+// There is some redundant code between CheckSymbolComplete / ParseRxSymbol in looking at the UDP packet header.
 bool RadioSocket::CheckSymbolComplete(const std::byte* in_data,
                                       const int& in_count) {
   bool finished;
@@ -203,6 +209,7 @@ bool RadioSocket::CheckSymbolComplete(const std::byte* in_data,
   return finished;
 }
 
+//Unpacks the symbol data from the udp packets and data format exansion 24->32
 size_t RadioSocket::ParseRxSymbol(
     std::vector<std::vector<std::complex<int16_t>>>& out_samples,
     long long& rx_time_ns) {
@@ -224,7 +231,8 @@ size_t RadioSocket::ParseRxSymbol(
       rx_time_ns = rx_time_ticks;
     }
 
-    //const size_t start_sample = (rx_time_ticks & 0xFFFF);
+    //Probably best to shift the start sample (start_sample = (rx_time_ticks & 0xFFFF)) byt
+    //then the return value will need to be a samples + offset (more complex)
     //Burst count... (assumption)
     const size_t sample_count = size_t(rx_data->header_[0u] & 0xffff) + 1;
 
@@ -239,6 +247,7 @@ size_t RadioSocket::ParseRxSymbol(
     DEBUG_OUTPUT("Current total samples %zu : %zu\n", current_total_samples,
                  rx_samples_);
 
+    // Optimization point (multi channel mode may not be trivial)
     while (processed_samples < current_total_samples) {
       const uint16_t i_lsb = uint16_t(payload[byte_offset]);
       const uint16_t split = uint16_t(payload[byte_offset + 1u]);

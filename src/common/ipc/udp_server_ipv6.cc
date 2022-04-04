@@ -243,7 +243,7 @@ ssize_t UDPServerIPv6::Connect(const std::string& remote_address,
                     rem_connect->ai_family, rem_connect->ai_socktype,
                     rem_connect->ai_protocol);
   }
-  //Need to change this to rem_connect if we allow more than 1.
+  // Need to change this to rem_connect if we allow more than 1.
   r = ::connect(sock_fd_, connected_address_info_->ai_addr,
                 connected_address_info_->ai_addrlen);
   return r;
