@@ -1,6 +1,7 @@
 /**
  * @file radio_dc_iq_calibrate.cc
- * @brief Implementation file for the radio DC offset and IQ imbalance calibration functions
+ * @brief Implementation file for the radio analog calibration functions
+ * , i.e.  DC offset and IQ imbalance
  */
 #include "matplotlibcpp.h"
 #include "radio_lib.h"

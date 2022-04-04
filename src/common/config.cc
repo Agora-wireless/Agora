@@ -206,8 +206,8 @@ Config::Config(const std::string& jsonfile)
   radio_rf_freq_ = freq_ - nco_;
   beacon_ant_ = tdd_conf.value("beacon_antenna", 0);
   beamsweep_ = tdd_conf.value("beamsweep", false);
-  sample_cal_en_ = tdd_conf.value("sample_calibrate", false);
-  imbalance_cal_en_ = tdd_conf.value("imbalance_calibrate", false);
+  sample_cal_en_ = tdd_conf.value("calibrate_digital", false);
+  imbalance_cal_en_ = tdd_conf.value("calibrate_analog", false);
   init_calib_repeat_ = tdd_conf.value("init_calib_repeat", 0);
 
   bs_server_addr_ = tdd_conf.value("bs_server_addr", "127.0.0.1");

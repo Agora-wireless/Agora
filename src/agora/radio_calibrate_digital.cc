@@ -1,6 +1,7 @@
 /**
  * @file radio_calibrate.cc
- * @brief Implementation file for the radio configuration calibration functions
+ * @brief Implementation file for the digital (baseband) calibration 
+ * functions such as sample offset and reciprocity calibration
  */
 #include "matplotlibcpp.h"
 #include "radio_lib.h"
@@ -21,14 +22,14 @@ std::vector<std::complex<float>> RadioConfig::SnoopSamples(
   return samps;
 }
 
-std::vector<std::vector<std::complex<int16_t>>> RadioConfig::TxArrayToRef(
-    std::vector<std::complex<int16_t>> tx_vec) {
+auto RadioConfig::TxArrayToRef(
+    const std::vector<std::complex<int16_t>>& tx_vec) {
   size_t num_radios = cfg_->BfAntNum() / cfg_->NumChannels();
   size_t ref = cfg_->RefRadio(0);
   long long tx_time(0);
   long long rx_time(0);
   int read_len = tx_vec.size();
-  std::vector<void*> txbuff0(2);
+  std::vector<const void*> txbuff0(2);
   txbuff0[0] = tx_vec.data();
   if (cfg_->NumChannels() == 2) {
     std::vector<std::complex<int16_t>> zeros(read_len,
@@ -75,8 +76,8 @@ std::vector<std::vector<std::complex<int16_t>>> RadioConfig::TxArrayToRef(
   return dl_buff;
 }
 
-std::vector<std::vector<std::complex<int16_t>>> RadioConfig::TxRefToArray(
-    std::vector<std::complex<int16_t>> tx_vec) {
+auto RadioConfig::TxRefToArray(
+    const std::vector<std::complex<int16_t>>& tx_vec) {
   size_t num_radios = cfg_->BfAntNum() / cfg_->NumChannels();
   size_t ref = cfg_->RefRadio(0);
   long long tx_time(0);
@@ -86,7 +87,7 @@ std::vector<std::vector<std::complex<int16_t>>> RadioConfig::TxRefToArray(
   size_t read_len = tx_vec.size();
   std::vector<std::complex<int16_t>> dummy_ci16(read_len, 0);
 
-  std::vector<void*> txbuff0(2);
+  std::vector<const void*> txbuff0(2);
   txbuff0[0] = tx_vec.data();
   if (cfg_->NumChannels() == 2) {
     std::vector<std::complex<int16_t>> zeros(read_len,
@@ -134,7 +135,7 @@ std::vector<std::vector<std::complex<int16_t>>> RadioConfig::TxRefToArray(
 }
 
 bool RadioConfig::FindTimeOffset(
-    std::vector<std::vector<std::complex<int16_t>>> rx_mat,
+    const std::vector<std::vector<std::complex<int16_t>>>& rx_mat,
     std::vector<int>& offset) {
   bool bad_data = false;
   size_t seq_len = cfg_->PilotCf32().size();
@@ -212,6 +213,9 @@ void RadioConfig::CalibrateSampleOffset() {
                 << std::endl;
       size_t pilot_start = ul_min_offset + cfg_->CpLen();
       size_t pilot_stop = ul_min_offset + cfg_->CpLen() + cfg_->OfdmCaNum();
+      RtAssert(pilot_stop < cfg_->SampsPerSymbol(),
+               "Pilot samples go beyond received symbol boundary."
+               " Consider extending ofdm_tx_zero_postfix parameter!");
       for (size_t i = 0; i < ul_buff.size(); i++) {
         std::vector<std::complex<int16_t>> ofdm_samps(
             ul_buff.at(i).begin() + pilot_start,
@@ -273,6 +277,9 @@ void RadioConfig::CalibrateSampleOffset() {
                 << std::endl;
       size_t pilot_start = min_offset + cfg_->CpLen();
       size_t pilot_stop = min_offset + cfg_->CpLen() + cfg_->OfdmCaNum();
+      RtAssert(pilot_stop < cfg_->SampsPerSymbol(),
+               "Received pilot exceeds symbol boundary. Consider extending "
+               "ofdm_tx_zero_postfix parameter!");
       for (size_t i = 0; i < dl_buff.size(); i++) {
         std::vector<std::complex<int16_t>> ofdm_samps(
             dl_buff.at(i).begin() + pilot_start,

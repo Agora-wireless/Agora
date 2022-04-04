@@ -24,6 +24,8 @@
 
 #include <utility>
 
+#include "utils.h"
+
 size_t CommsLib::FindPilotSeq(std::vector<std::complex<float>> iq,
                               std::vector<std::complex<float>> pilot,
                               size_t seq_len) {
@@ -440,8 +442,11 @@ void CommsLib::FFT(complex_float* in, int fftsize) {
 float CommsLib::ComputeOfdmSnr(std::vector<std::complex<float>> data_t,
                                size_t data_start_index,
                                size_t data_stop_index) {
-  auto fft_data = CommsLib::FFT(data_t, data_t.size());
-  auto fft_mag = CommsLib::Abs2Avx(fft_data);
+  RtAssert(
+      (data_t.size() > data_stop_index) && (data_stop_index > data_start_index),
+      "Invalid ComputeOfdmSnr Inputs!");
+  const auto fft_data = CommsLib::FFT(data_t, data_t.size());
+  const auto fft_mag = CommsLib::Abs2Avx(fft_data);
   float rssi = 0;
   float noise = 0;
   for (size_t i = 0; i < fft_mag.size(); i++) {
@@ -452,7 +457,7 @@ float CommsLib::ComputeOfdmSnr(std::vector<std::complex<float>> data_t,
   }
   size_t noise_sc_size = fft_data.size() - (data_stop_index - data_start_index);
   noise *= (fft_mag.size() / noise_sc_size);
-  return 10 * std::log10((rssi - noise) / noise);
+  return 10.0f * std::log10((rssi - noise) / noise);
 }
 
 std::vector<std::complex<float>> CommsLib::ComposePartialPilotSym(
