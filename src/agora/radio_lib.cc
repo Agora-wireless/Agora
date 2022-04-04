@@ -242,10 +242,6 @@ void RadioConfig::InitBsRadio(size_t tid) {
     throw std::runtime_error("SoapySDR failed to locate the Bs radio");
   }
   ba_stn_.at(i) = bs_device;
-  for (auto ch : {0, 1}) {
-    ba_stn_.at(i)->setSampleRate(SOAPY_SDR_RX, ch, cfg_->Rate());
-    ba_stn_.at(i)->setSampleRate(SOAPY_SDR_TX, ch, cfg_->Rate());
-  }
 
   // resets the DATA_clk domain logic.
   ba_stn_.at(i)->writeSetting("RESET_DATA_LOGIC", "");
@@ -260,6 +256,10 @@ void RadioConfig::InitBsRadio(size_t tid) {
 void RadioConfig::ConfigureBsRadio(size_t tid) {
   // load channels
   auto channels = Utils::StrToChannels(cfg_->Channel());
+  for (auto ch : channels) {
+    ba_stn_.at(tid)->setSampleRate(SOAPY_SDR_RX, ch, cfg_->Rate());
+    ba_stn_.at(tid)->setSampleRate(SOAPY_SDR_TX, ch, cfg_->Rate());
+  }
 
   // use the TRX antenna port for both tx and rx
   for (auto ch : channels) {

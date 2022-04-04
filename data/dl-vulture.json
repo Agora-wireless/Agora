@@ -27,7 +27,8 @@
       "Zc": 18
     },
     "beamsweep": false,
-    "beacon_antenna": 0,
+    "beacon_antenna": 7,
+    "imbalance_calibrate" : true,
     "frame_schedule": [
         "BGCLGGPGGDDDG"
     ],
@@ -49,6 +50,7 @@
         144
     ],
     "ue_hw_framer": false,
+    "ue_resync_period": 1,
     "hw_framer": true,
     /* Compute configuration */
     "exclude_cores": [],
