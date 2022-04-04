@@ -125,8 +125,9 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     // We should be scaling the beamforming matrix, so the IFFT
     // output can be scaled with OfdmCaNum() across all antennas.
     // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
-    //float scale = 1 / (abs(mat_dl_zf_tmp).max());
-    //mat_dl_zf_tmp *= scale;
+    float scale = 1 / (abs(mat_dl_zf_tmp).max());
+    //arma::fmat scale = arma::diagmat(1 / sum(pow(abs(mat_dl_zf_tmp), 2), 0));
+    mat_dl_zf_tmp = mat_dl_zf_tmp * scale;
 
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       if (cfg_->ExternalRefNode(i)) {
