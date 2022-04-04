@@ -11,7 +11,7 @@
 static constexpr bool kUseSIMDGather = true;
 // Calculate the zeroforcing receiver using the formula W_zf = inv(H' * H) * H'.
 // This is faster but less accurate than using an SVD-based pseudoinverse.
-static constexpr size_t kUseInverseForZF = 1u;
+static constexpr bool kUseInverseForZF = true;
 static constexpr bool kUseUlZfForDownlink = true;
 
 DoZF::DoZF(Config* config, int tid,
@@ -97,11 +97,12 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
   arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(ul_zf_mem),
                           cfg_->UeAntNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_zf_tmp;
-  if (kUseInverseForZF != 0u) {
+  if (kUseInverseForZF) {
     try {
       mat_ul_zf_tmp = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
     } catch (std::runtime_error&) {
-      MLPD_WARN("Failed to invert channel matrix, falling back to pinv()\n");
+      AGORA_LOG_WARN(
+          "Failed to invert channel matrix, falling back to pinv()\n");
       arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
     }
   } else {
@@ -111,14 +112,23 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
   if (cfg_->Frame().NumDLSyms() > 0) {
     arma::cx_fmat mat_dl_zf_tmp;
     if (kUseUlZfForDownlink == true) {
-      arma::cx_fmat calib_mat = arma::diagmat(calib_sc_vec);
-      mat_dl_zf_tmp = mat_ul_zf_tmp * calib_mat;
+      // With orthonormal calib matrix:
+      // pinv(calib * csi) = pinv(csi)*inv(calib)
+      // This probably causes a performance hit since we are throwing
+      // magnitude info away by taking the sign of the calibration matrix
+      // Inv is already acheived by UL over DL division outside this function
+      arma::cx_fmat inv_calib_mat = arma::diagmat(arma::sign(calib_sc_vec));
+      mat_dl_zf_tmp = mat_ul_zf_tmp * inv_calib_mat;
     } else {
       arma::cx_fmat mat_dl_csi = arma::diagmat(calib_sc_vec) * mat_csi;
-      try {
-        mat_dl_zf_tmp =
-            arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
-      } catch (std::runtime_error&) {
+      if (kUseInverseForZF) {
+        try {
+          mat_dl_zf_tmp =
+              arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
+        } catch (std::runtime_error&) {
+          arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
+        }
+      } else {
         arma::pinv(mat_dl_zf_tmp, mat_dl_csi, 1e-2, "dc");
       }
     }
@@ -216,11 +226,11 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id,
           cfg_->OfdmDataNum(), cfg_->BfAntNum(), false);
 
       if (sc_id == 0) {
-        MLPD_TRACE(
+        AGORA_LOG_TRACE(
             "DoZF[%d]: (Frame %zu, sc_id %zu), ComputeCalib updating calib at "
             "slot %zu : prev %zu, old %zu\n",
-            tid_, frame_id, sc_id, frame_cal_slot, frame_cal_slot_prev,
-            frame_cal_slot_old);
+            tid_, frame_id, sc_id, cal_slot_complete, cal_slot_prev,
+            cal_slot_old);
       }
 
       // Add new value to old rolling sum.  Then subtract out the oldest.

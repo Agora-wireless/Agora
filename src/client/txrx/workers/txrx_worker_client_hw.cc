@@ -58,9 +58,9 @@ TxRxWorkerClientHw::~TxRxWorkerClientHw() = default;
 void TxRxWorkerClientHw::DoTxRx() {
   PinToCoreWithOffset(ThreadType::kWorkerTXRX, core_offset_, tid_);
 
-  MLPD_INFO("TxRxWorkerClientHw[%zu] has %zu:%zu total radios %zu\n", tid_,
-            interface_offset_, (interface_offset_ + num_interfaces_) - 1,
-            num_interfaces_);
+  AGORA_LOG_INFO("TxRxWorkerClientHw[%zu] has %zu:%zu total radios %zu\n", tid_,
+                 interface_offset_, (interface_offset_ + num_interfaces_) - 1,
+                 num_interfaces_);
 
   running_ = true;
 
@@ -73,7 +73,8 @@ void TxRxWorkerClientHw::DoTxRx() {
   program_start_ticks_ = GetTime::Rdtsc();
 
   if (num_interfaces_ == 0) {
-    MLPD_WARN("TxRxWorkerClientHw[%zu] has no interfaces, exiting\n", tid_);
+    AGORA_LOG_WARN("TxRxWorkerClientHw[%zu] has no interfaces, exiting\n",
+                   tid_);
     running_ = false;
     return;
   } else if (num_interfaces_ > 1) {
@@ -101,7 +102,7 @@ void TxRxWorkerClientHw::DoTxRx() {
     if (sync_index >= 0) {
       rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
                           Configuration()->OfdmTxZeroPrefix();
-      MLPD_INFO(
+      AGORA_LOG_INFO(
           "TxRxWorkerClientHw [%zu]: Beacon detected for radio %zu, "
           "sync_index: %ld, rx sample offset: %ld\n",
           tid_, local_interface + interface_offset_, sync_index,
@@ -110,7 +111,7 @@ void TxRxWorkerClientHw::DoTxRx() {
       AdjustRx(local_interface, alignment_samples + rx_adjust_samples);
       rx_adjust_samples = 0;
     } else if (Configuration()->Running()) {
-      MLPD_WARN(
+      AGORA_LOG_WARN(
           "TxRxWorkerClientHw [%zu]: Beacon could not be detected on interface "
           "%zu - sync_index: %ld\n",
           tid_, local_interface, sync_index);
@@ -150,7 +151,7 @@ void TxRxWorkerClientHw::DoTxRx() {
           if (sync_index >= 0) {
             rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
                                 Configuration()->OfdmTxZeroPrefix();
-            MLPD_INFO(
+            AGORA_LOG_INFO(
                 "TxRxWorkerClientHw [%zu]: Initial Sync - radio %zu, frame "
                 "%zu, symbol %zu sync_index: %ld, rx sample offset: %ld time0 "
                 "%lld\n",
@@ -182,7 +183,7 @@ void TxRxWorkerClientHw::DoTxRx() {
                                 rx_time, rx_adjust_samples);
       if (rx_pkts.size() == channels_per_interface_) {
         if (kDebugPrintInTask) {
-          std::printf(
+          AGORA_LOG_INFO(
               "DoTxRx[%zu]: radio %zu received frame id %zu, symbol id %zu at "
               "time %lld\n",
               tid_, local_interface + interface_offset_, rx_frame_id,
@@ -207,7 +208,7 @@ void TxRxWorkerClientHw::DoTxRx() {
           if (sync_index >= 0) {
             rx_adjust_samples = sync_index - Configuration()->BeaconLen() -
                                 Configuration()->OfdmTxZeroPrefix();
-            MLPD_INFO(
+            AGORA_LOG_INFO(
                 "TxRxWorkerClientHw [%zu]: Re-syncing radio %zu, sync_index: "
                 "%ld, rx sample offset: %ld tries %zu\n",
                 tid_, local_interface + interface_offset_, sync_index,
@@ -221,7 +222,7 @@ void TxRxWorkerClientHw::DoTxRx() {
           } else {
             resync_retry_cnt++;
             if (resync_retry_cnt > kReSyncRetryCount) {
-              MLPD_ERROR(
+              AGORA_LOG_ERROR(
                   "TxRxWorkerClientHw [%zu]: Exceeded resync retry limit (%zu) "
                   "for client %zu reached after %zu resync successes at frame: "
                   "%zu.  Stopping!\n",
@@ -275,8 +276,8 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
     } else {
       rx_samples.at(ch) = rx.RawPacket()->data_;
     }
-    MLPD_TRACE("TxRxWorkerClientHw[%zu]: Using Packet at location %zu\n", tid_,
-               reinterpret_cast<size_t>(&rx));
+    AGORA_LOG_TRACE("TxRxWorkerClientHw[%zu]: Using Packet at location %zu\n",
+                    tid_, reinterpret_cast<size_t>(&rx));
   }
 
   //Sample offset alignment
@@ -291,12 +292,12 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
   const int rx_status =
       radio_.RadioRx(radio_id, rx_samples.data(), num_rx_samps, receive_time);
   if (rx_status < 0) {
-    MLPD_ERROR(
+    AGORA_LOG_ERROR(
         "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
         "status = %d is less than 0\n",
         tid_, interface_id, interface_id + interface_offset_, rx_status);
   } else if (static_cast<size_t>(rx_status) != num_rx_samps) {
-    MLPD_ERROR(
+    AGORA_LOG_ERROR(
         "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
         "status = %d is less than num samples %zu\n",
         tid_, interface_id, interface_id + interface_offset_, rx_status,
@@ -318,7 +319,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
       }
 
       if (kDebugPrintInTask) {
-        std::printf(
+        AGORA_LOG_INFO(
             "TxRxWorkerClientHw [%zu]: Rx (Frame %zu, Symbol %zu, Radio "
             "%zu) - at time %lld\n",
             tid_, global_frame_id, global_symbol_id, radio_id, receive_time);
@@ -332,7 +333,7 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
               Packet(global_frame_id, global_symbol_id, 0, ant_ids.at(ant));
           result_packets.push_back(raw_pkt);
 
-          MLPD_FRAME(
+          AGORA_LOG_FRAME(
               "TxRxWorkerClientHw [%zu]: Rx Downlink (Frame %zu, Symbol %zu, "
               "Ant %zu) from Radio %zu at time %lld\n",
               tid_, global_frame_id, global_symbol_id, ant_ids.at(ant),
@@ -349,15 +350,16 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
   }
 
   //Free memory from most recent allocated to latest
-  MLPD_TRACE("TxRxWorkerClientHw[%zu]: Memory allocation %zu\n", tid_,
-             memory_tracking.size());
+  AGORA_LOG_TRACE("TxRxWorkerClientHw[%zu]: Memory allocation %zu\n", tid_,
+                  memory_tracking.size());
   for (ssize_t idx = (memory_tracking.size() - 1); idx > -1; idx--) {
     auto* memory_location = memory_tracking.at(idx);
-    MLPD_TRACE("TxRxWorkerClientHw[%zu]: Checking location %zu\n", tid_,
-               (intptr_t)memory_location);
+    AGORA_LOG_TRACE("TxRxWorkerClientHw[%zu]: Checking location %zu\n", tid_,
+                    (intptr_t)memory_location);
     if (memory_location != nullptr) {
-      MLPD_TRACE("TxRxWorkerClientHw[%zu]: Returning Packet at location %zu\n",
-                 tid_, (intptr_t)memory_location);
+      AGORA_LOG_TRACE(
+          "TxRxWorkerClientHw[%zu]: Returning Packet at location %zu\n", tid_,
+          (intptr_t)memory_location);
       ReturnRxPacket(*memory_location);
     }
   }
@@ -379,7 +381,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
     const size_t interface_id = ue_ant / channels_per_interface_;
     const size_t ant_offset = ue_ant % channels_per_interface_;
 
-    MLPD_FRAME(
+    AGORA_LOG_FRAME(
         "TxRxWorkerClientHw::DoTx[%zu]: Request to Transmit (Frame %zu, "
         "User %zu, Ant %zu) time0 %lld\n",
         tid_, frame_id, interface_id, ue_ant, time0);
@@ -424,7 +426,7 @@ size_t TxRxWorkerClientHw::DoTx(const long long time0) {
                         gen_tag_t::FrmSymUe(frame_id, 0, tx_ant).tag_);
           NotifyComplete(complete_event);
         }
-        MLPD_TRACE(
+        AGORA_LOG_TRACE(
             "TxRxWorkerClientHw::DoTx[%zu]: Frame %zu Transmit Complete for Ue "
             "%zu\n",
             tid_, frame_id, interface_id);
@@ -552,7 +554,7 @@ void TxRxWorkerClientHw::TxUplinkSymbols(size_t radio_id, size_t frame_id,
                 << "/" << samples_per_symbol << std::endl;
     }
     if (kDebugPrintInTask) {
-      std::printf(
+      AGORA_LOG_INFO(
           "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Symbol (Frame "
           "%zu:%zu, Symbol %zu, Ue %zu) at time %lld flags %d\n",
           tid_, frame_id, tx_frame_id, tx_symbol_id, radio_id, tx_time,
@@ -617,7 +619,7 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
   }
 
   if (kDebugPrintInTask) {
-    std::printf(
+    AGORA_LOG_INFO(
         "TxRxWorkerClientHw::DoTx[%zu]: Transmitted Pilot  (Frame "
         "%zu:%zu, Symbol %zu, Ue %zu, Ant %zu:%zu) at time %lld flags "
         "%d\n",

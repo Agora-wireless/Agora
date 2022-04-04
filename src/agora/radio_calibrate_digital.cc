@@ -300,8 +300,6 @@ void RadioConfig::CalibrateSampleOffset() {
 }
 
 bool RadioConfig::InitialCalib() {
-  static constexpr size_t kRxTimeoutUs = 1000000;
-  static constexpr size_t kTxTimeoutUs = 1000000;
   // excludes zero padding
   size_t seq_len = cfg_->PilotCf32().size();
   size_t read_len = cfg_->PilotCi16().size();

@@ -6,6 +6,8 @@
 
 #include <typeinfo>
 
+#include "logger.h"
+
 Stats::Stats(const Config* const cfg)
     : config_(cfg),
       task_thread_num_(cfg->WorkerThreadNum()),
@@ -63,35 +65,37 @@ void Stats::PrintPerThreadPerTask(std::string const& doer_string,
   }
 }
 
-void Stats::PrintPerFrame(std::string const& doer_string,
-                          FrameSummary const& frame_summary) {
+std::string Stats::PrintPerFrame(std::string const& doer_string,
+                                 FrameSummary const& frame_summary) {
+  std::stringstream output;
   if (frame_summary.count_all_threads_ > 0) {
-    std::printf("%s (%zu tasks): %.3f ms (~", doer_string.c_str(),
-                frame_summary.count_all_threads_,
-                (frame_summary.us_avg_threads_.at(0u) / 1000.0));
+    output << doer_string.c_str() << " (" << frame_summary.count_all_threads_
+           << " tasks): " << (frame_summary.us_avg_threads_.at(0u) / 1000.0f)
+           << " ms (~";
 
     for (size_t i = 1u; i < frame_summary.us_avg_threads_.size(); i++) {
       if (i != 1) {
-        std::printf("+ ");
+        output << "+ ";
       }
-      std::printf("%.4f ", frame_summary.us_avg_threads_.at(i) / 1000.0);
+      output << frame_summary.us_avg_threads_.at(i) / 1000.0f << " ";
     }
-    std::printf("ms), ");
+    output << "ms), ";
   }
+  return output.str();
 }
 
 void Stats::UpdateStats(size_t frame_id) {
   this->last_frame_id_ = frame_id;
   size_t frame_slot = (frame_id % kNumStatsFrames);
 
-  if (kIsWorkerTimingEnabled == true) {
+  if (kIsWorkerTimingEnabled) {
     std::vector<FrameSummary> work_summary(kAllDoerTypes.size());
     for (size_t i = 0u; i < task_thread_num_; i++) {
       for (size_t j = 0u; j < kAllDoerTypes.size(); j++) {
         PopulateSummary(&work_summary.at(j), i, kAllDoerTypes.at(j));
       }
 
-      if (kDebugPrintStatsPerThread == true) {
+      if (kDebugPrintStatsPerThread) {
         std::printf("In frame %zu, thread %zu, \t", frame_id, i);
         double sum_us_this_frame_this_thread = 0;
         for (size_t j = 0u; j < kAllDoerTypes.size(); j++) {
@@ -121,12 +125,16 @@ void Stats::UpdateStats(size_t frame_id) {
       }
     }
 
-    if (kStatsPrintFrameSummary == true) {
-      std::printf("Frame %zu summary: ", frame_id);
+    if (kStatsPrintFrameSummary) {
+      std::string print_summary =
+          "Frame " + std::to_string(frame_id) + " Summary: ";
+
       for (size_t i = 0u; i < kAllDoerTypes.size(); i++) {
-        PrintPerFrame(kDoerNames.at(kAllDoerTypes.at(i)), work_summary.at(i));
+        print_summary += PrintPerFrame(kDoerNames.at(kAllDoerTypes.at(i)),
+                                       work_summary.at(i));
       }
-      std::printf("Total: %.2f ms\n", sum_us / 1000);
+      print_summary += "Total: " + std::to_string(sum_us / 1000.0f) + " ms\n";
+      AGORA_LOG_INFO("%s", print_summary.c_str());
     }
   }
 }
@@ -134,7 +142,7 @@ void Stats::UpdateStats(size_t frame_id) {
 void Stats::SaveToFile() {
   const std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
   const std::string filename = cur_directory + "/data/timeresult.txt";
-  std::printf("Stats: Saving master timestamps to %s\n", filename.c_str());
+  AGORA_LOG_INFO("Stats: Saving master timestamps to %s\n", filename.c_str());
   FILE* fp_debug = std::fopen(filename.c_str(), "w");
   RtAssert(fp_debug != nullptr,
            std::string("Open file failed ") + std::to_string(errno));
@@ -255,8 +263,8 @@ void Stats::SaveToFile() {
   if (kIsWorkerTimingEnabled == true) {
     std::string filename_detailed =
         cur_directory + "/data/timeresult_detail.txt";
-    std::printf("Stats: Printing detailed results to %s\n",
-                filename_detailed.c_str());
+    AGORA_LOG_INFO("Stats: Printing detailed results to %s\n",
+                   filename_detailed.c_str());
 
     FILE* fp_debug_detailed = std::fopen(filename_detailed.c_str(), "w");
     RtAssert(fp_debug_detailed != nullptr,
@@ -331,9 +339,10 @@ size_t Stats::GetTotalTaskCount(DoerType doer_type, size_t thread_num) {
 }
 
 void Stats::PrintSummary() {
-  std::printf("Stats: total processed frames %zu\n", this->last_frame_id_ + 1);
+  AGORA_LOG_INFO("Stats: total processed frames %zu\n",
+                 this->last_frame_id_ + 1);
   if (kIsWorkerTimingEnabled == false) {
-    std::printf("Stats: Worker timing is disabled. Not printing summary\n");
+    AGORA_LOG_INFO("Stats: Worker timing is disabled. Not printing summary\n");
   } else {
     std::vector<size_t> num_tasks;
 

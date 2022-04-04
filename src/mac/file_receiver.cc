@@ -50,12 +50,12 @@ size_t FileReceiver::Load(unsigned char *destination, size_t requested_bytes) {
                         file_read_size - data_read);
 
       data_read += data_stream_.gcount();
-      MLPD_FRAME("[FileReceiver] data received: %zu:%zu \n", data_read,
-                 file_read_size);
+      AGORA_LOG_FRAME("[FileReceiver] data received: %zu:%zu \n", data_read,
+                      file_read_size);
 
       // Check for eof after read
       if (data_stream_.eof()) {
-        MLPD_INFO(
+        AGORA_LOG_INFO(
             "[FileReceiver]: ***EndofFileStream - requested %zu read count "
             "%zu\n",
             file_read_size, data_read);
@@ -80,7 +80,7 @@ size_t FileReceiver::Load(unsigned char *destination, size_t requested_bytes) {
     // Copy data from local buffer to requested memory location
     std::memcpy(destination, &local_rx_buffer_.at(data_start_offset_),
                 requested_bytes);
-    MLPD_FRAME("[FileReceiver] data loaded: %zu\n", requested_bytes);
+    AGORA_LOG_FRAME("[FileReceiver] data loaded: %zu\n", requested_bytes);
     data_start_offset_ += requested_bytes;
     data_available_ -= requested_bytes;
     loaded_bytes = requested_bytes;

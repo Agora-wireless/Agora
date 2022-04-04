@@ -7,6 +7,8 @@
 #include <cfloat>
 #include <cmath>
 
+#include "logger.h"
+
 PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
   if (dir_ == Direction::kDownlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
@@ -49,6 +51,9 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
     }
     gt_mat_ = gt_mat_.cols(cfg->OfdmDataStart(), (cfg->OfdmDataStop() - 1));
   }
+  dl_pilot_snr_.Calloc(kFrameWnd,
+                       cfg->UeAntNum() * cfg->Frame().ClientDlPilotSymbols(),
+                       Agora_memory::Alignment_t::kAlign64);
   pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
                     Agora_memory::Alignment_t::kAlign64);
   calib_pilot_snr_.Calloc(kFrameWnd, 2 * cfg->BsAntNum(),
@@ -71,6 +76,7 @@ PhyStats::~PhyStats() {
   pilot_snr_.Free();
   csi_cond_.Free();
   calib_pilot_snr_.Free();
+  dl_pilot_snr_.Free();
 }
 
 void PhyStats::PrintPhyStats() {
@@ -95,13 +101,16 @@ void PhyStats::PrintPhyStats() {
         total_decoded_blocks += decoded_blocks_count_[ue_id][i];
         total_block_errors += block_error_count_[ue_id][i];
       }
-      std::cout << "UE " << ue_id << ": " << tx_type << " bit errors (BER) "
-                << total_bit_errors << "/" << total_decoded_bits << "("
-                << 1.0 * total_bit_errors / total_decoded_bits
-                << "), block errors (BLER) " << total_block_errors << "/"
-                << total_decoded_blocks << " ("
-                << 1.0 * total_block_errors / total_decoded_blocks << ")"
-                << std::endl;
+
+      AGORA_LOG_INFO(
+          "UE %zu: %s bit errors (BER) %zu/%zu (%f), block errors (BLER) "
+          "%zu/%zu (%f)\n",
+          ue_id, tx_type.c_str(), total_bit_errors, total_decoded_bits,
+          static_cast<float>(total_bit_errors) /
+              static_cast<float>(total_decoded_bits),
+          total_block_errors, total_decoded_blocks,
+          static_cast<float>(total_block_errors) /
+              static_cast<float>(total_decoded_blocks));
     }
   }
 }
@@ -110,16 +119,32 @@ void PhyStats::PrintEvmStats(size_t frame_id) {
   arma::fmat evm_mat(evm_buffer_[frame_id % kFrameWnd], config_->UeAntNum(), 1,
                      false);
   evm_mat = evm_mat / config_->OfdmDataNum();
+
   std::stringstream ss;
   ss << "Frame " << frame_id << " Constellation:\n"
-     << "  EVM " << 100 * evm_mat.st() << ", SNR " << -10 * log10(evm_mat.st());
-  std::cout << ss.str();
+     << "  EVM " << (100.0f * evm_mat.st()) << ", SNR "
+     << (-10.0f * log10(evm_mat.st()));
+  AGORA_LOG_INFO("%s\n", ss.str().c_str());
 }
 
 float PhyStats::GetEvmSnr(size_t frame_id, size_t ue_id) {
   float evm = evm_buffer_[frame_id % kFrameWnd][ue_id];
   evm = evm / config_->OfdmDataNum();
-  return -10 * std::log10(evm);
+  return (-10.0f * std::log10(evm));
+}
+
+void PhyStats::PrintDlSnrStats(size_t frame_id, size_t ant_id) {
+  std::stringstream ss;
+  ss << "Frame " << frame_id << " Pilot SNR (dB) at UE Antenna " << ant_id
+     << ": [" << std::fixed << std::setw(5) << std::setprecision(1);
+  size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
+  for (size_t i = 0; i < dl_pilots_num; i++) {
+    float frame_snr =
+        dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + i];
+    ss << frame_snr << " ";
+  }
+  ss << "]" << std::endl;
+  std::cout << ss.str();
 }
 
 void PhyStats::PrintSnrStats(size_t frame_id) {
@@ -156,7 +181,7 @@ void PhyStats::PrintSnrStats(size_t frame_id) {
        << " ";
   }
   ss << std::endl;
-  std::cout << ss.str();
+  AGORA_LOG_INFO("%s", ss.str().c_str());
 }
 
 void PhyStats::PrintCalibSnrStats(size_t frame_id) {
@@ -197,25 +222,25 @@ void PhyStats::PrintCalibSnrStats(size_t frame_id) {
     ss << ": [" << min_snr << "," << max_snr << "] ";
   }
   ss << std::endl;
-  std::cout << ss.str();
+  AGORA_LOG_INFO("%s", ss.str().c_str());
 }
 
 void PhyStats::UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id,
                                    size_t ant_id, complex_float* fft_data) {
-  arma::cx_fmat fft_mat((arma::cx_float*)fft_data, config_->OfdmCaNum(), 1,
-                        false);
-  arma::fmat fft_abs_mat = abs(fft_mat);
+  const arma::cx_fmat fft_mat(reinterpret_cast<arma::cx_float*>(fft_data),
+                              config_->OfdmCaNum(), 1, false);
+  arma::fmat fft_abs_mat = arma::abs(fft_mat);
   arma::fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
-  const float rssi = as_scalar(sum(fft_abs_mag));
-  const float noise_per_sc1 =
-      as_scalar(mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
-  const float noise_per_sc2 = as_scalar(mean(
+  const float rssi = arma::as_scalar(arma::sum(fft_abs_mag));
+  const float noise_per_sc1 = arma::as_scalar(
+      arma::mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
+  const float noise_per_sc2 = arma::as_scalar(arma::mean(
       fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
   const float noise =
       config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
   const float snr = (rssi - noise) / noise;
   calib_pilot_snr_[frame_id % kFrameWnd][calib_sym_id * config_->BsAntNum() +
-                                         ant_id] = 10 * std::log10(snr);
+                                         ant_id] = (10.0f * std::log10(snr));
 }
 
 void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
@@ -224,16 +249,34 @@ void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
                         false);
   arma::fmat fft_abs_mat = abs(fft_mat);
   arma::fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
-  const float rssi = as_scalar(sum(fft_abs_mag));
-  const float noise_per_sc1 =
-      as_scalar(mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
-  const float noise_per_sc2 = as_scalar(mean(
+  const float rssi = arma::as_scalar(arma::sum(fft_abs_mag));
+  const float noise_per_sc1 = arma::as_scalar(
+      arma::mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
+  const float noise_per_sc2 = arma::as_scalar(arma::mean(
       fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
   const float noise =
       config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
   const float snr = (rssi - noise) / noise;
   pilot_snr_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
-      10 * std::log10(snr);
+      (10.0f * std::log10(snr));
+}
+
+void PhyStats::UpdateDlPilotSnr(size_t frame_id, size_t symbol_id,
+                                size_t ant_id, complex_float* fft_data) {
+  arma::cx_fmat fft_mat((arma::cx_float*)fft_data, config_->OfdmCaNum(), 1,
+                        false);
+  arma::fmat fft_abs_mat = arma::abs(fft_mat);
+  arma::fmat fft_abs_mag = fft_abs_mat % fft_abs_mat;
+  float rssi = arma::as_scalar(sum(fft_abs_mag));
+  float noise_per_sc1 = arma::as_scalar(
+      arma::mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
+  float noise_per_sc2 = arma ::as_scalar(arma::mean(
+      fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
+  float noise = config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
+  float snr = (rssi - noise) / noise;
+  size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
+  dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + symbol_id] =
+      10.0f * std::log10(snr);
 }
 
 void PhyStats::PrintZfStats(size_t frame_id) {
@@ -256,7 +299,7 @@ void PhyStats::PrintZfStats(size_t frame_id) {
   ss << "[" << min_cond << "," << max_cond
      << "], Mean: " << arma::mean(cond_vec);
   ss << std::endl;
-  std::cout << ss.str();
+  AGORA_LOG_INFO("%s", ss.str().c_str());
 }
 
 void PhyStats::UpdateCsiCond(size_t frame_id, size_t sc_id, float cond) {
@@ -276,8 +319,8 @@ void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
 void PhyStats::UpdateBitErrors(size_t ue_id, size_t offset, uint8_t tx_byte,
                                uint8_t rx_byte) {
   static constexpr size_t kBitsInByte = 8;
-  //std::printf("Updating bit errors: User %zu Offset  %zu Tx %d Rx %d\n", ue_id, offset, tx_byte,
-  //            rx_byte);
+  AGORA_LOG_TRACE("Updating bit errors: User %zu Offset  %zu Tx %d Rx %d\n",
+                  ue_id, offset, tx_byte, rx_byte);
   uint8_t xor_byte(tx_byte ^ rx_byte);
   size_t bit_errors = 0;
   for (size_t j = 0; j < kBitsInByte; j++) {

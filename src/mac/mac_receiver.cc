@@ -43,7 +43,7 @@ MacReceiver::MacReceiver(Config* const cfg, size_t num_frame_data_bytes,
 std::vector<std::thread> MacReceiver::StartRecv() {
   std::vector<std::thread> created_threads;
 
-  std::printf("MacReceiver:  Start Recv threads %zu\n", rx_thread_num_);
+  AGORA_LOG_INFO("MacReceiver:  Start Recv threads %zu\n", rx_thread_num_);
   created_threads.resize(rx_thread_num_);
 
   for (size_t i = 0; i < rx_thread_num_; i++) {
@@ -68,8 +68,9 @@ void* MacReceiver::LoopRecv(size_t tid) {
   }
 
   udp_server->MakeBlocking(1);
-  std::printf("MacReceiver: Set up UDP socket server listening to port %zu\n",
-              phy_port_ + ue_id);
+  AGORA_LOG_INFO(
+      "MacReceiver: Set up UDP socket server listening to port %zu\n",
+      phy_port_ + ue_id);
 
   // Create a rx buffer
   const size_t max_packet_length = data_bytes_;
@@ -90,16 +91,16 @@ void* MacReceiver::LoopRecv(size_t tid) {
       }
 
       if (kDebugMacReceiver) {
-        std::printf("MacReceiver: Thread %zu, Data Bytes: %zu:%zu, Data:", tid,
-                    recvlen, max_packet_length);
+        AGORA_LOG_INFO("MacReceiver: Thread %zu, Data Bytes: %zu:%zu, Data:",
+                       tid, recvlen, max_packet_length);
         for (size_t i = 0; i < static_cast<size_t>(recvlen); i++) {
-          std::printf(" %02x", rx_buffer[i]);
+          AGORA_LOG_INFO(" %02x", rx_buffer[i]);
         }
-        std::printf("\n");
+        AGORA_LOG_INFO("\n");
       }
 
       if (static_cast<size_t>(recvlen) != max_packet_length) {
-        MLPD_INFO(
+        AGORA_LOG_INFO(
             "MacReceiver: Thread %zu received less than max data bytes "
             "%zu:%zu\n",
             tid, recvlen, max_packet_length);
@@ -107,6 +108,6 @@ void* MacReceiver::LoopRecv(size_t tid) {
     }
   }
   delete[] rx_buffer;
-  std::printf("MacReceiver: Finished\n");
+  AGORA_LOG_INFO("MacReceiver: Finished\n");
   return nullptr;
 }

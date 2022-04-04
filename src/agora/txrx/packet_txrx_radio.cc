@@ -31,15 +31,15 @@ PacketTxRxRadio::~PacketTxRxRadio() {
   for (auto& worker_threads : worker_threads_) {
     worker_threads->Stop();
   }
-  MLPD_INFO("PacketTxRxRadio: shutting down radios\n");
+  AGORA_LOG_INFO("PacketTxRxRadio: shutting down radios\n");
   radio_config_->RadioStop();
   radio_config_.reset();
 }
 
 bool PacketTxRxRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
                                 Table<complex_float>& calib_ul_buffer) {
-  MLPD_FRAME("PacketTxRxRadio: StartTxRx threads %zu\n",
-             worker_threads_.size());
+  AGORA_LOG_FRAME("PacketTxRxRadio: StartTxRx threads %zu\n",
+                  worker_threads_.size());
   const bool status = radio_config_->RadioStart();
 
   //RadioStart creates the following: radio_config_->GetCalibDl() and radio_config_->GetCalibUl();
@@ -57,7 +57,8 @@ bool PacketTxRxRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
   } else {
     PacketTxRx::StartTxRx(calib_dl_buffer, calib_ul_buffer);
     std::this_thread::sleep_for(std::chrono::milliseconds(kRadioTriggerWaitMs));
-    MLPD_INFO("PacketTxRxRadio : All workers started triggering the radio\n");
+    AGORA_LOG_INFO(
+        "PacketTxRxRadio : All workers started triggering the radio\n");
     radio_config_->Go();
   }
   return status;
@@ -69,7 +70,7 @@ bool PacketTxRxRadio::CreateWorker(size_t tid, size_t interface_count,
                                    std::vector<RxPacket>& rx_memory,
                                    std::byte* const tx_memory) {
   const size_t num_channels = NumChannels();
-  MLPD_INFO(
+  AGORA_LOG_INFO(
       "PacketTxRxRadio[%zu]: Creating worker handling %zu interfaces starting "
       "at %zu - antennas %zu:%zu\n",
       tid, interface_count, interface_offset, interface_offset * num_channels,
