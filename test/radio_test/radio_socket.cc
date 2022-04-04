@@ -4,7 +4,6 @@
  */
 #include "radio_socket.h"
 
-#include "SoapyURLUtils.hpp"
 #include "utils.h"
 
 constexpr size_t kRxBufferSize = 8192;

@@ -6,7 +6,6 @@
 
 #include "SoapySDR/Formats.hpp"
 #include "SoapySDR/Logger.hpp"
-#include "SoapyURLUtils.hpp"
 #include "comms-lib.h"
 #include "nlohmann/json.hpp"
 
