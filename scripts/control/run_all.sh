@@ -107,6 +107,12 @@ if [ "${HYDRA_RUN_MODE}" == 2 ]; then
   exit
 fi
 
+# Reset completion state to 0
+for (( i=0; i<${hydra_server_num}; i++ )) do
+  server_name=$(cat ${HYDRA_SERVER_LIST_JSON} | jq --argjson i $i '. | keys | .[$i]' | tr -d '"')
+  echo 0 > /tmp/hydra/done_${server_name}.txt
+done
+
 if [ "${HYDRA_RUN_MODE}" == 0 ]; then
   # Run the Hydra application
   echocyan "Run Hydra applications and wait the initialization to finish"
@@ -119,9 +125,26 @@ if [ "${HYDRA_RUN_MODE}" == 0 ] || [ "${HYDRA_RUN_MODE}" == 1 ]; then
   source ${hydra_root_dir}/scripts/control/run_rru.sh
 fi
 
-time_to_run=$(( slot_us*slots_to_test/1000000+25 ))
-echocyan "Wait ${time_to_run} seconds for the test to finish"
-sleep ${time_to_run}
+# time_to_run=$(( slot_us*slots_to_test/1000000+25 ))
+# echocyan "Wait ${time_to_run} seconds for the test to finish"
+# sleep ${time_to_run}
+time_to_check=$(( slot_us*slots_to_test/1000000+25 ))
+for (( t=0; t<${time_to_check}; t++ )) do
+  ready=1
+  for (( i=0; i<${hydra_app_num}; i++ )) do
+    server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.hydra_servers[$i]' | tr -d '"')
+    res=$(cat /tmp/hydra/done_${server_name}.txt )
+    if [ "${res}" != "1" ]; then
+      ready=0
+      break
+    fi
+  done
+  if [ "${ready}" == "1" ]; then
+    break
+  fi
+  sleep 1
+done
+echo "Check for $t times and everything is done"
 
 set +e
 

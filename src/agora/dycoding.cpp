@@ -470,8 +470,8 @@ void DyDecode::StartWork()
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, loop_count == 0 ? 0 : work_count * 100.0f / loop_count);
 
-    bottleneck_decode_.decode = decode_tsc_duration * 100.0f / whole_duration;
-    bottleneck_decode_.idle = idle_duration * 100.0f / whole_duration;
+    // bottleneck_decode_.decode = decode_tsc_duration * 100.0f / whole_duration;
+    // bottleneck_decode_.idle = idle_duration * 100.0f / whole_duration;
 }
 
 void DyDecode::StartWorkCentral() 

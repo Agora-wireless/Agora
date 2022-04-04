@@ -167,6 +167,8 @@ finish:
     printf("BigStation: Input traffic rate is %.2lfGbps, output traffic rate is %.2lfGbps\n", (double)(end_stats.ibytes - start_stats.ibytes) * 8 / (cfg->frames_to_test * 0.001) / 1000000000.0,
         (double)(end_stats.obytes - start_stats.obytes) * 8 / (cfg->frames_to_test * 0.001) / 1000000000.0);
 
+    saveLatencyDataToFile();
+
     Stop();
 }
 
@@ -1108,4 +1110,36 @@ void BigStation::initializeBigStationDLBuffers()
     dl_precoded_buffer_to_send_.calloc(cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
     dl_socket_buffer_ = (char*)malloc(cfg->BS_ANT_NUM * kFrameWnd
         * cfg->dl_data_symbol_num_perframe * cfg->packet_length);
+}
+
+void BigStation::saveLatencyDataToFile()
+{
+    auto& cfg = config_;
+
+    std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
+    std::string filename = cur_directory + "/data/frame_latency.txt";
+    printf("Saving frame latency data to %s, ghz=%lf\n", filename.c_str(), freq_ghz_);
+    FILE* fp = fopen(filename.c_str(), "w");
+
+    if (cfg->downlink_mode) {
+        // for (size_t i = 0; i < cfg->frames_to_test; i ++) {
+        for (size_t i = 0; i < bigstation_state_.cur_frame_; i ++) {
+            fprintf(fp, "%zu %lu %lu %lu %lu %lu %lu\n", i, bigstation_state_.frame_start_time_[i],
+                bigstation_state_.frame_iq_time_[i],
+                bigstation_state_.frame_zf_time_[i],
+                bigstation_state_.frame_coding_time_[i],
+                bigstation_state_.frame_sc_time_[i],
+                bigstation_state_.frame_end_time_[i]);
+        }
+    } else {
+        // for (size_t i = 0; i < cfg->frames_to_test; i ++) {
+        for (size_t i = 0; i < bigstation_state_.cur_frame_; i ++) {
+            fprintf(fp, "%zu %lu %lu %lu %lu %lu\n", i, bigstation_state_.frame_start_time_[i],
+                bigstation_state_.frame_iq_time_[i],
+                bigstation_state_.frame_zf_time_[i],
+                bigstation_state_.frame_sc_time_[i],
+                bigstation_state_.frame_end_time_[i]);
+        }
+    }
+    fclose(fp);
 }

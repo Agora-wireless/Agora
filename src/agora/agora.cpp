@@ -67,7 +67,7 @@ Agora::Agora(Config* cfg)
             do_subcarrier_threads_[i]
                 = std::thread(&Agora::subcarrierWorker, this, i);
         }
-        bottleneck_subcarrier_.resize(do_subcarrier_threads_.size());
+        bottleneck_subcarrier_.resize(kMaxThreads);
 
         if (cfg->dl_data_symbol_num_perframe > 0) {
             do_encode_threads_.resize(cfg->encode_thread_num);
@@ -75,14 +75,14 @@ Agora::Agora(Config* cfg)
                 do_encode_threads_[i]
                     = std::thread(&Agora::encodeWorker, this, i);
             }
-            bottleneck_encode_.resize(do_encode_threads_.size());
+            bottleneck_encode_.resize(kMaxThreads);
         } else {
             do_decode_threads_.resize(cfg->decode_thread_num);
             for (size_t i = 0; i < do_decode_threads_.size(); i++) {
                 do_decode_threads_[i]
                     = std::thread(&Agora::decodeWorker, this, i);
             }
-            bottleneck_decode_.resize(do_decode_threads_.size());
+            bottleneck_decode_.resize(kMaxThreads);
         }
     }
 
@@ -149,7 +149,11 @@ void Agora::Start()
         if (cfg->use_central_scheduler) {
             handleEvents();
         } else {
-            shared_state_.move_forward_and_clean_up_ul();
+            if (cfg->downlink_mode) {
+                
+            } else {
+                shared_state_.move_forward_and_clean_up_ul();
+            }
             usleep(100);
         }
     }

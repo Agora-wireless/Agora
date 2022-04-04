@@ -29,9 +29,12 @@ elif [ "${installed_mkl}" == "local" ]; then
   eval "source ${HYDRA_RUNNER_ROOT}/intel/oneapi/setvars.sh --force"
 fi
 
-eval "export LIBRARY_PATH=${LIBRARY_PATH}:${HYDRA_RUNNER_ROOT}/rdma-core/build/lib"
-export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LIBRARY_PATH}
+if [ "${installed_dpdk}" == "global" ]; then
+  export RTE_SDK=/home/ankalia/dpdk-20.11
+fi
 
 if [ "${installed_dpdk}" == "local" ]; then
+  eval "export LIBRARY_PATH=${LIBRARY_PATH}:${HYDRA_RUNNER_ROOT}/rdma-core/build/lib"
+  export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LIBRARY_PATH}
   eval "export RTE_SDK=${HYDRA_RUNNER_ROOT}/dpdk-stable-20.11.3"
 fi

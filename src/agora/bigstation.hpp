@@ -45,6 +45,8 @@ private:
     void initializeBigStationDLBuffers();
     void freeBigStationULBuffers();
 
+    void saveLatencyDataToFile();
+
     const double freq_ghz_; // RDTSC frequency in GHz
 
     // Worker thread i runs on core base_worker_core_offset_ + i

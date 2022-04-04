@@ -304,10 +304,10 @@ void DySubcarrier::StartWork()
         cycles_to_us(csi_max, freq_ghz_), cycles_to_us(zf_max, freq_ghz_), cycles_to_us(demod_max, freq_ghz_));
     fclose(fp);
 
-    bn_message_.csi = csi_tsc_duration * 100.0f / whole_duration;
-    bn_message_.zf = zf_tsc_duration * 100.0f / whole_duration;
-    bn_message_.demul = demod_tsc_duration * 100.0f / whole_duration;
-    bn_message_.idle = idle_duration * 100.0f / whole_duration;
+    // bn_message_.csi = csi_tsc_duration * 100.0f / whole_duration;
+    // bn_message_.zf = zf_tsc_duration * 100.0f / whole_duration;
+    // bn_message_.demul = demod_tsc_duration * 100.0f / whole_duration;
+    // bn_message_.idle = idle_duration * 100.0f / whole_duration;
 }
 
 void DySubcarrier::runCsi(size_t frame_id, size_t base_sc_id, size_t sc_block_size)

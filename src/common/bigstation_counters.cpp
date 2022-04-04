@@ -22,7 +22,20 @@ BigStationState::BigStationState(Config *cfg)
     , num_precode_pkts_received_per_symbol_((cfg->ant_end - cfg->ant_start) * cfg->OFDM_DATA_NUM)
     , num_ifft_tasks_per_frame_(cfg->num_ifft_workers[cfg->bs_server_addr_idx])
 {
-
+    frame_start_time_ = new uint64_t[cfg->frames_to_test];
+    frame_iq_time_ = new uint64_t[cfg->frames_to_test];
+    frame_fft_time_ = new uint64_t[cfg->frames_to_test];
+    frame_zf_time_ = new uint64_t[cfg->frames_to_test];
+    frame_sc_time_ = new uint64_t[cfg->frames_to_test];
+    frame_coding_time_ = new uint64_t[cfg->frames_to_test]; 
+    frame_end_time_ = new uint64_t[cfg->frames_to_test];
+    memset(frame_start_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+    memset(frame_iq_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+    memset(frame_fft_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+    memset(frame_zf_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+    memset(frame_sc_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+    memset(frame_coding_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
+    memset(frame_end_time_, 0, sizeof(uint64_t) * cfg->frames_to_test);
 }
 
 // Packet receiving functions
@@ -40,6 +53,11 @@ bool BigStationState::receive_time_iq_pkt(size_t frame_id, size_t symbol_id, siz
     if (unlikely(!rru_start_)) {
         rru_start_ = true;
     }
+
+    if (unlikely(frame_start_time_[frame_id] == 0)) {
+        frame_start_time_[frame_id] = rdtsc();
+    }
+    frame_iq_time_[frame_id] = rdtsc();
 
     num_time_iq_pkts_received_[frame_id % kFrameWnd][symbol_id] ++;
     return true;
@@ -150,6 +168,7 @@ bool BigStationState::prepare_freq_iq_pkt(size_t frame_id, size_t symbol_id, siz
         return false;
     }
     num_freq_iq_pkts_prepared_[frame_id % kFrameWnd][symbol_id] ++;
+    frame_fft_time_[frame_id] = rdtsc();
     // printf("Prepare freq iq packet frame %zu symbol %zu count %zu required %zu\n", frame_id,
     //     symbol_id, num_freq_iq_pkts_prepared_[frame_id % kFrameWnd][symbol_id].load(), num_freq_iq_pkts_prepared_per_symbol_);
     return true;
@@ -161,6 +180,7 @@ bool BigStationState::prepare_zf_pkt(size_t frame_id)
         return false;
     }
     num_zf_pkts_prepared_[frame_id % kFrameWnd] ++;
+    frame_zf_time_[frame_id] = rdtsc();
     return true;
 }
 
@@ -170,6 +190,7 @@ bool BigStationState::prepare_demod_pkt(size_t frame_id, size_t symbol_id_ul, si
         return false;
     }
     num_demod_pkts_prepared_[frame_id % kFrameWnd][symbol_id_ul] += sc_num;
+    frame_sc_time_[frame_id] = rdtsc();
     // printf("Prepare demod packet frame %zu symbol %zu count %zu required %zu\n", frame_id,
     //     symbol_id_ul, num_demod_pkts_prepared_[frame_id % kFrameWnd][symbol_id_ul].load(),
     //     num_demod_pkts_prepared_per_symbol_);
@@ -182,6 +203,7 @@ bool BigStationState::prepare_encode_pkt(size_t frame_id, size_t symbol_id_dl, s
         return false;
     }
     num_encode_pkts_prepared_[frame_id % kFrameWnd][symbol_id_dl] ++;
+    frame_coding_time_[frame_id] = rdtsc();
     return true;
 }
 
@@ -191,6 +213,7 @@ bool BigStationState::prepare_precode_pkt(size_t frame_id, size_t symbol_id_dl, 
         return false;
     }
     num_precode_pkts_prepared_[frame_id % kFrameWnd][symbol_id_dl] += sc_num;
+    frame_sc_time_[frame_id] = rdtsc();
     return true;
 }
 
@@ -300,6 +323,7 @@ bool BigStationState::decode_done(size_t frame_id)
     num_decode_tasks_completed_[frame_id % kFrameWnd]++;
     cont = (num_decode_tasks_completed_[frame_id % kFrameWnd] == num_decode_tasks_per_frame_);
     decode_mutex_[frame_id % kFrameWnd].unlock();
+    frame_end_time_[frame_id] = rdtsc();
 
     if (unlikely(cont)) {
         cur_frame_mutex_.lock();
@@ -340,6 +364,7 @@ bool BigStationState::ifft_done(size_t frame_id)
     num_ifft_tasks_completed_[frame_id % kFrameWnd]++;
     cont = (num_ifft_tasks_completed_[frame_id % kFrameWnd] == num_ifft_tasks_per_frame_);
     ifft_mutex_[frame_id % kFrameWnd].unlock();
+    frame_end_time_[frame_id] = rdtsc();
 
     if (unlikely(cont)) {
         cur_frame_mutex_.lock();

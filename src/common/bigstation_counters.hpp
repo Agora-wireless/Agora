@@ -49,6 +49,15 @@ public:
     bool decode_done(size_t frame_id);
     bool ifft_done(size_t frame_id);
 
+    // Latency measurement counters for each frame
+    uint64_t *frame_start_time_;
+    uint64_t *frame_iq_time_;
+    uint64_t *frame_fft_time_;
+    uint64_t *frame_zf_time_;
+    uint64_t *frame_sc_time_;
+    uint64_t *frame_coding_time_;
+    uint64_t *frame_end_time_;
+
     size_t cur_frame_ = 0;
 
     size_t rru_start_ = false;

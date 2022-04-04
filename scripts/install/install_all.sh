@@ -229,20 +229,27 @@ else
   echo "[$(hostname)] Intel MKL is already installed"
 fi
 
-if [ "${installed_rdma}" == "none" ]; then
-  install_rdma_core
-  installed_rdma="local"
+if [ -d "/home/ankalia/dpdk-20.11" ]; then
+  installed_rdma="global"
+  installed_dpdk="global"
+  RTS_SDK=/home/ankalia/dpdk-20.11
   save_progress
 else
-  echo "[$(hostname)] RDMA core is already installed"
-fi
+  if [ "${installed_rdma}" == "none" ]; then
+    install_rdma_core
+    installed_rdma="local"
+    save_progress
+  else
+    echo "[$(hostname)] RDMA core is already installed"
+  fi
 
-if [ "${installed_dpdk}" == "none" ]; then
-  install_dpdk
-  installed_dpdk="local"
-  save_progress
-else
-  echo "[$(hostname)] DPDK is already installed"
+  if [ "${installed_dpdk}" == "none" ]; then
+    install_dpdk
+    installed_dpdk="local"
+    save_progress
+  else
+    echo "[$(hostname)] DPDK is already installed"
+  fi
 fi
 
 # Build and install Hydra app

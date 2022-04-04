@@ -15,14 +15,14 @@ source ${hydra_root_dir}/scripts/control/init_platform.sh
 # cat tmp_0.json | jq --arg ant ${ant_num} --arg ue ${ue_num} \
 #     '.hydra_server_deploy_json="onfig/deploy_cloudlab/deploy_cloudlab_hydra_$ant_$ue_ul.json"' > ${hydra_root_dir}/config/config.json
 
-target_line_num=100000
+target_line_num=200000
 # latency_file=${hydra_root_dir}/data/useful_latency_data.txt
 # line_num=$(cat ${latency_file} | wc -l )
 line_num=0
 run_time=0
 while [ ${line_num} -lt ${target_line_num} ]; do
     echo "Run Hydra for the ${run_time}-th time"
-    ${hydra_root_dir}/scripts/control/run_all.sh -x
+    ${hydra_root_dir}/scripts/control/run_all.sh -x || continue
     if [ "$?" == "0" ]; then
         ${hydra_root_dir}/scripts/evaluation/latency_analysis.sh ${run_time}
         if [ ! -f ${hydra_root_dir}/data/frame_latency_all_${run_time}.txt ]; then
