@@ -281,6 +281,7 @@ Config::Config(const std::string& jsonfile)
   RtAssert(ue_hw_framer_ == false,
            "User equiptment hardware framer (ue_hw_framer) set to true is "
            "unsupported in this version of Agora");
+  ue_resync_period_ = tdd_conf.value("ue_resync_period", 0);
 
   // If frames not specified explicitly, construct default based on frame_type /
   // symbol_num_perframe / pilot_num / ul_symbol_num_perframe /

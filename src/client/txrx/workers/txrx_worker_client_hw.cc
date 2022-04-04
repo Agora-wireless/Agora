@@ -125,6 +125,12 @@ void TxRxWorkerClientHw::DoTxRx() {
   bool resync = false;
   size_t resync_retry_cnt = 0;
   size_t resync_success = 0;
+  const size_t max_cfo = 200;  // in ppb, For Iris
+  const size_t frame_sync_period =
+      Configuration()->UeResyncPeriod() > 0
+          ? Configuration()->UeResyncPeriod()
+          : static_cast<size_t>(
+                std::floor(1e9 / (max_cfo * Configuration()->SampsPerFrame())));
 
   std::stringstream sout;
   rx_adjust_samples = 0;
@@ -182,12 +188,11 @@ void TxRxWorkerClientHw::DoTxRx() {
               tid_, local_interface + interface_offset_, rx_frame_id,
               rx_symbol_id, rx_time);
         }
-        // resync every kFrameSync frames:
+        // resync every frame_sync_period frames:
         // Only sync on beacon symbols
-        ///\todo: kFrameSync should be a function of sample rate and max CFO
         if ((rx_symbol_id == Configuration()->Frame().GetBeaconSymbolLast()) &&
-            ((rx_frame_id / kFrameSync) > 0) &&
-            ((rx_frame_id % kFrameSync) == 0)) {
+            ((rx_frame_id / frame_sync_period) > 0) &&
+            ((rx_frame_id % frame_sync_period) == 0)) {
           resync = true;
         }
 

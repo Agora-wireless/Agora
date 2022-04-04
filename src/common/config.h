@@ -60,6 +60,7 @@ class Config {
 
   inline bool HwFramer() const { return this->hw_framer_; }
   inline bool UeHwFramer() const { return this->ue_hw_framer_; }
+  inline bool UeResyncPeriod() const { return this->ue_resync_period_; }
   inline double FreqGhz() const { return this->freq_ghz_; };
   inline double Freq() const { return this->freq_; }
   inline double Rate() const { return this->rate_; }
@@ -633,6 +634,7 @@ class Config {
   // true: use hardware correlator; false: use software corrleator
   bool hw_framer_;
   bool ue_hw_framer_;
+  size_t ue_resync_period_;
 
   double freq_;
   double rate_;
