@@ -49,8 +49,14 @@ class RadioConfig {
 
  private:
   void CalibrateSampleOffset();
+  /* Transmit from each array atenna to ref antenna,
+   * return the received signal vector at the ref antenna
+  */
   std::vector<std::vector<std::complex<int16_t>>> TxArrayToRef(
       std::vector<std::complex<int16_t>> tx_vec);
+  /* Transmit from ref antenna to the rest of the array
+  * return the received signal vector at the array
+  */
   std::vector<std::vector<std::complex<int16_t>>> TxRefToArray(
       std::vector<std::complex<int16_t>> tx_vec);
   bool FindTimeOffset(std::vector<std::vector<std::complex<int16_t>>> rx_mat,
