@@ -1,3 +1,5 @@
+# USE_MKL_JIT has been disabled
+
 # Scheduler Instruction
 
 ## Environment set up
@@ -428,7 +430,7 @@ Run this command in advance:
 Run the following two commands at first:  
 
 ```shell
-./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 1 --conf_file data/mac-dl-sim.json
+./build/chsim --bs_threads 1 --ue_threads 1 --worker_threads 2 --core_offset 1 --conf_file data/mac-dl-sim.json --chan_snr 120.0
 ```
 
 ```shell
@@ -438,15 +440,15 @@ Run the following two commands at first:
 Run the following three commands together (as quick as possible):
 
 ```shell
-./build/macuser --conf_file data/mac-dl-sim.json --core_offset 19 --num_receiver_threads RCVT --result_file RXUE
+./build/macuser --conf_file data/mac-dl-sim.json --core_offset 19 --num_receiver_threads 8 --rx_file rx_ue.txt
 ```
 
 ```shell
-./build/agora --conf_file data/mac-dl-sim.json --select_num CAP
+./build/agora --conf_file data/mac-dl-sim.json --select_num 8
 ```
 
 ```shell
-./build/macbs --conf_file data/mac-dl-sim.json --core_offset 16 --enable_slow_start 1 --data_file "" --result_file RXBS
+./build/macbs --conf_file data/mac-dl-sim.json --core_offset 16 --enable_slow_start 1 --data_file "" --tx_file tx_bs.txt
 ```
 
 To reach higher bandwidth for test, here we use `data/mac-dl-sim.json` as configuration file, where
@@ -509,4 +511,7 @@ This matrix means only `{user[3],user[0],user[1]}` will receive data in this fra
 To help with debugging, simply call `Scheduler::PrintSelect(size_t frame_id, size_t symbol_id)`  to see the selection matrix.
 
 To support real application running with frame scheduling, scheduler separate the pointer of each users buffer, which means the data block of user that is not selected in this frame will be blocked by base station until its turn to receive data.
+
+
+
 

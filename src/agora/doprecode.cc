@@ -213,9 +213,9 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
            : 0));
 
   // QMACS: schedule the data
-  arma::cx_fmat mat_data(data_ptr, cfg_->UeNum(), 1, false);
+  arma::cx_fmat data_mat(data_ptr, cfg_->UeNum(), 1, false);
   arma::cx_fmat dst_mat;
-  cfg_->scheduler_->ScheduleDATA(frame_slot, cfg_->GetZfScId(sc_id), dst_mat, mat_data); // schedule data
+  cfg_->scheduler_->ScheduleDATA(frame_slot, cfg_->GetZfScId(sc_id), dst_mat, data_mat); // schedule data
   // std::cout << "***********data_select size: " << dst_mat.size() << "\n";
   auto* dst_ptr = dst_mat.begin();
   auto* precoded_ptr = reinterpret_cast<arma::cx_float*>(
@@ -225,9 +225,13 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
             (MKL_Complex8*)precoded_ptr);
   // QMACS
 #else
-  arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->UeAntNum(),
+  // arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->UeAntNum(),
+  //                            false);
+  // arma::cx_fmat mat_data(data_ptr, cfg_->UeAntNum(), 1, false);
+  // NOTE: QMACS test
+  arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->scheduler_->GetSelectNum(),
                              false);
-  arma::cx_fmat mat_data(data_ptr, cfg_->UeAntNum(), 1, false);
+  arma::cx_fmat mat_data(dst_ptr, cfg_->scheduler_->GetSelectNum(), 1, false);
   arma::cx_fmat mat_precoded(precoded_ptr, cfg_->BsAntNum(), 1, false);
   mat_precoded = mat_precoder * mat_data;
   // cout << "Precoder: \n" << mat_precoder << endl;
