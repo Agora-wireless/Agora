@@ -286,8 +286,8 @@ set(COMMON_SOURCES
   src/agora/phy_stats.cc
   src/common/framestats.cc
   src/agora/doencode.cc
-  src/common/config.cc
   src/common/utils.cc
+  src/common/config.cc
   src/common/comms-lib.cc
   src/common/comms-lib-avx.cc
   src/common/signal_handler.cc

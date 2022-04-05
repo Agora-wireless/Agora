@@ -31,8 +31,7 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid,
   ifft_out_ = static_cast<float*>(
       Agora_memory::PaddedAlignedAlloc(Agora_memory::Alignment_t::kAlign64,
                                        2 * cfg_->OfdmCaNum() * sizeof(float)));
-  ifft_scale_factor_ =
-      cfg_->OfdmCaNum();  // / std::sqrt(cfg_->BfAntNum() * 1.f);
+  ifft_scale_factor_ = cfg_->OfdmCaNum();
 }
 
 DoIFFT::~DoIFFT() {
@@ -99,19 +98,15 @@ EventData DoIFFT::Launch(size_t tag) {
     if (std::abs(sample_val) > max_abs) max_abs = std::abs(sample_val);
   }
   if (clipping) {
-    std::stringstream ss;
-    ss << "WARNING: Clipping Occured in Frame " << frame_id << " Symbol "
-       << symbol_id << " Antenna " << ant_id << std::endl;
-    std::cout << ss.str();
+    AGORA_LOG_WARN("Clipping occured in Frame %zu, Symbol %zu, Antenna %zu\n",
+                   frame_id, symbol_id, ant_id);
   }
   if (ant_id < cfg_->BfAntNum() && max_abs < 1e-4) {
-    std::stringstream ss;
-    ss << "WARNING: Possibly bad antenna " << ant_id
-       << " with max sample value " << max_abs << std::endl;
-    std::cout << ss.str();
+    AGORA_LOG_WARN("Possibly bad antenna %zu with max sample value %2.2f\n",
+                   ant_id, max_abs);
   }
   if (kPrintIfftStats) {
-    printf("%2.3f\n", max_abs);
+    std::printf("%2.3f\n", max_abs);
   }
 
   if (kPrintIFFTOutput) {

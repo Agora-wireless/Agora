@@ -70,18 +70,19 @@ class Utils {
 
   static std::vector<size_t> StrToChannels(const std::string& channel);
   static std::vector<std::complex<int16_t>> DoubleToCint16(
-      std::vector<std::vector<double>> in);
+      const std::vector<std::vector<double>>& in);
   static std::vector<std::complex<float>> DoubleToCfloat(
-      std::vector<std::vector<double>> in);
+      const std::vector<std::vector<double>>& in);
   static std::vector<std::complex<float>> Uint32tocfloat(
-      std::vector<uint32_t> in, const std::string& order);
-  static std::vector<uint32_t> Cint16ToUint32(
-      std::vector<std::complex<int16_t>> in, bool conj,
-      const std::string& order);
+      const std::vector<uint32_t>& in, const std::string& order);
   static std::vector<std::complex<float>> Cint16ToCfloat32(
-      std::vector<std::complex<int16_t>> in);
+      const std::vector<std::complex<int16_t>>& in);
+  static std::vector<uint32_t> Cint16ToUint32(
+      const std::vector<std::complex<int16_t>>& in, bool conj,
+      const std::string& order);
   static std::vector<uint32_t> Cfloat32ToUint32(
-      std::vector<std::complex<float>> in, bool conj, const std::string& order);
+      const std::vector<std::complex<float>>& in, bool conj,
+      const std::string& order);
   static std::vector<std::vector<size_t>> LoadSymbols(
       std::vector<std::string> const& frames, char sym);
   static void LoadDevices(std::string filename, std::vector<std::string>& data);
@@ -91,7 +92,7 @@ class Utils {
                        int samples);
   static void LoadTddConfig(const std::string& filename, std::string& jconfig);
   static std::vector<std::string> Split(const std::string& s, char delimiter);
-  static void PrintVector(std::vector<std::complex<int16_t>>& data);
+  static void PrintVector(const std::vector<std::complex<int16_t>>& data);
   static void WriteBinaryFile(const std::string& name, size_t elem_size,
                               size_t buffer_size, void* buff);
   static void PrintVec(arma::cx_fvec /*c*/, const std::string& /*ss*/);

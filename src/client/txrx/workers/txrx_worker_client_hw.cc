@@ -12,7 +12,6 @@
 #include "logger.h"
 
 static constexpr size_t kSyncDetectChannel = 0;
-static constexpr size_t kFrameSync = 1000u;
 static constexpr bool kVerifyFirstSync = true;
 static constexpr size_t kReSyncRetryCount = 100u;
 
@@ -127,6 +126,8 @@ void TxRxWorkerClientHw::DoTxRx() {
   size_t resync_retry_cnt = 0;
   size_t resync_success = 0;
   const size_t max_cfo = 200;  // in ppb, For Iris
+  // If JSON input if not default (0),
+  // Else calculate based of ppb and frame length
   const size_t frame_sync_period =
       Configuration()->UeResyncPeriod() > 0
           ? Configuration()->UeResyncPeriod()
