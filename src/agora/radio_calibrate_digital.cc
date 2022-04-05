@@ -308,8 +308,8 @@ void RadioConfig::CalibrateSampleOffset() {
 
 bool RadioConfig::InitialCalib() {
   // excludes zero padding
-  size_t seq_len = cfg_->PilotCf32().size();
-  size_t read_len = cfg_->PilotCi16().size();
+  const size_t seq_len = cfg_->PilotCf32().size();
+  const size_t read_len = cfg_->PilotCi16().size();
 
   // Transmitting from only one chain, create a null vector for chainB
   std::vector<std::complex<int16_t>> dummy_ci16(read_len, 0);
@@ -716,17 +716,18 @@ bool RadioConfig::InitialCalib() {
         std::vector<std::complex<float>> dn_ofdm(first_dn, last_dn);
         assert(dn_ofdm.size() == cfg_->OfdmCaNum());
 
-        auto dn_f = CommsLib::FFT(dn_ofdm, cfg_->OfdmCaNum());
-        auto up_f = CommsLib::FFT(up_ofdm, cfg_->OfdmCaNum());
+        //dn_ofdm / up_ofdm is transformed to the fft output at this point
+        CommsLib::FFT(dn_ofdm, cfg_->OfdmCaNum());
+        CommsLib::FFT(up_ofdm, cfg_->OfdmCaNum());
         if (cfg_->ExternalRefNode(0) == false &&
             i / cfg_->NumChannels() == ref) {
           for (size_t j = 0; j < cfg_->OfdmCaNum(); j++) {
-            dn_f[j] = std::complex<float>(1, 0);
-            up_f[j] = std::complex<float>(1, 0);
+            dn_ofdm[j] = std::complex<float>(1, 0);
+            up_ofdm[j] = std::complex<float>(1, 0);
           }
         }
         arma::cx_fvec dn_vec(
-            reinterpret_cast<arma::cx_float*>(&dn_f[cfg_->OfdmDataStart()]),
+            reinterpret_cast<arma::cx_float*>(&dn_ofdm[cfg_->OfdmDataStart()]),
             cfg_->OfdmDataNum(), false);
         arma::cx_fvec calib_dl_vec(
             reinterpret_cast<arma::cx_float*>(
@@ -735,7 +736,7 @@ bool RadioConfig::InitialCalib() {
         calib_dl_vec = dn_vec;
 
         arma::cx_fvec up_vec(
-            reinterpret_cast<arma::cx_float*>(&up_f[cfg_->OfdmDataStart()]),
+            reinterpret_cast<arma::cx_float*>(&up_ofdm[cfg_->OfdmDataStart()]),
             cfg_->OfdmDataNum(), false);
         arma::cx_fvec calib_ul_vec(
             reinterpret_cast<arma::cx_float*>(
