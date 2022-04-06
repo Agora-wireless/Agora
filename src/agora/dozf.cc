@@ -83,9 +83,15 @@ EventData DoZF::Launch(size_t tag) {
 }
 
 // NOTE: QMACS: takes sche_mat_csi as input parameter for dl
-float DoZF::ComputePrecoder(size_t frame_slot, const arma::cx_fmat& mat_csi, const arma::cx_fmat& sche_mat_csi,
-                            complex_float* calib_ptr, complex_float* _mat_ul_zf,
-                            complex_float* _mat_dl_zf) {
+float DoZF::ComputePrecoder(size_t frame_slot, size_t sc_id, const arma::cx_fmat& mat_csi,
+                            complex_float* calib_ptr) {
+
+  complex_float* _mat_ul_zf = ul_zf_matrices_[frame_slot][sc_id];
+  complex_float* _mat_dl_zf = dl_zf_matrices_[frame_slot][sc_id];
+
+  arma::cx_fmat sche_mat_csi;
+  this->cfg_->scheduler_->ScheduleCSI(frame_slot, sc_id, sche_mat_csi, mat_csi);
+
   arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
                           cfg_->UeAntNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_zf_tmp;
@@ -355,11 +361,9 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
     // NOTE: QMACS: compute scheduled CSI
-    arma::cx_fmat sche_mat_csi;
-    this->cfg_->scheduler_->ScheduleCSI(frame_slot, cur_sc_id, sche_mat_csi, mat_csi);
-
-    auto rcond = ComputePrecoder(frame_slot, mat_csi, sche_mat_csi, calib_gather_buffer_, 
-                ul_zf_matrices_[frame_slot][cur_sc_id], dl_zf_matrices_[frame_slot][cur_sc_id]);
+    auto rcond = ComputePrecoder(frame_slot, cur_sc_id, mat_csi, calib_gather_buffer_);
+    // auto rcond = ComputePrecoder(frame_slot, mat_csi, sche_mat_csi, calib_gather_buffer_, 
+    //             ul_zf_matrices_[frame_slot][cur_sc_id], dl_zf_matrices_[frame_slot][cur_sc_id]);
 
     // auto rcond = ComputePrecoder(mat_csi, calib_gather_buffer_,
     //                              ul_zf_matrices_[frame_slot][cur_sc_id],
@@ -449,11 +453,10 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
 
   // NOTE: QMACS: scheduler for ZfFreqOrthogonal haven't been tested
   // QMACS: compute scheduled CSI
-  arma::cx_fmat sche_mat_csi;
-  this->cfg_->scheduler_->ScheduleCSI(frame_slot, cfg_->GetZfScId(base_sc_id), sche_mat_csi, mat_csi);
-  ComputePrecoder(frame_slot, mat_csi, sche_mat_csi, calib_gather_buffer_,
-                  ul_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)],
-                  dl_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)]);
+  // arma::cx_fmat sche_mat_csi;
+  // this->cfg_->scheduler_->ScheduleCSI(frame_slot, cfg_->GetZfScId(base_sc_id), sche_mat_csi, mat_csi);
+  ComputePrecoder(frame_slot, cfg_->GetZfScId(base_sc_id), mat_csi, calib_gather_buffer_);
+                  
   // QMACS
 
   duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;

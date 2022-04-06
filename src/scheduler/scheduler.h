@@ -34,7 +34,7 @@ class Scheduler {
     size_t GetSelectNum(size_t frame_slot) {return this->capacity_[frame_slot];} // return select_num
 #endif
     size_t GetFrameID(size_t ue_id) {return (size_t) this->data_queue_[ue_id];} // return frame_id in queue
-    void ScheduleCSI(const size_t frame_slot, const size_t sc_id, arma::cx_fmat& dst_csi_mat, arma::cx_fmat& src_csi_mat); // schedule csi_buffer
+    void ScheduleCSI(const size_t frame_slot, const size_t sc_id, arma::cx_fmat& dst_csi_mat, const arma::cx_fmat& src_csi_mat); // schedule csi_buffer
     void ScheduleDATA(const size_t frame_slot, const size_t sc_id, arma::cx_fmat& dst_data_mat, arma::cx_fmat& src_data_mat); // schedule data_mat
     void UpdateQueue(size_t frame_id); // update the data queue according to schedule
 

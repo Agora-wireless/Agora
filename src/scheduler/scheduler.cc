@@ -66,10 +66,10 @@ void Scheduler::PrintSelect(size_t frame_slot, size_t symbol_id) {
   unsigned int *selection = selection_[frame_slot][symbol_id];
   arma::Mat<arma::u32> selection_mat(reinterpret_cast<arma::u32*>(selection), UeNum_, this->capacity_[frame_slot], false);
   // std::cout << "Full Matrix--- \n" << selection_mat << std::endl;
-  std::cout << "Selection Matrix--- \n" << selection_mat << std::endl;
+  std::cout << "Selection Matrix--- \n" << selection_mat.t() << std::endl;
 }
 
-void Scheduler::ScheduleCSI(const size_t frame_slot, const size_t sc_id, arma::cx_fmat& dst_csi_mat, arma::cx_fmat& src_csi_mat) {
+void Scheduler::ScheduleCSI(const size_t frame_slot, const size_t sc_id, arma::cx_fmat& dst_csi_mat, const arma::cx_fmat& src_csi_mat) {
   unsigned int *selection = selection_[frame_slot][0];
   arma::Mat<arma::u32> selection_mat(reinterpret_cast<arma::u32*>(selection), UeNum_, this->capacity_[frame_slot], false);
   dst_csi_mat = src_csi_mat * selection_mat; 
