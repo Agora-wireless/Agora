@@ -59,7 +59,7 @@ class DoZF : public Doer {
   //   float ComputePrecoder(const arma::cx_fmat& mat_csi, complex_float* calib_ptr,
   //                         complex_float* mat_ul_zf, complex_float* mat_dl_zf);
   
-  float ComputePrecoder(const arma::cx_fmat& mat_csi, const arma::cx_fmat& sche_mat_csi, 
+  float ComputePrecoder(size_t frame_slot, const arma::cx_fmat& mat_csi, const arma::cx_fmat& sche_mat_csi, 
                         complex_float* calib_ptr, complex_float* mat_ul_zf, complex_float* mat_dl_zf);
   // QMACS
   

@@ -34,7 +34,7 @@ DoPrecode::DoPrecode(
   // Output: C: BsAntNum() x 1
   // Leading dimensions: A: bs_ant_num(), B: ue_num(), C: bs_ant_num()
 
-  // QMACS: dim = select_num, modify gemm
+  // NOTE: QMACS: dim = select_num, modify gemm
   size_t dim = (cfg_->scheduler_ == nullptr ? cfg_->UeNum() : cfg_->scheduler_->GetSelectNum());
   std::cout << "Dim: " << dim << "\n";
 
@@ -113,7 +113,7 @@ EventData DoPrecode::Launch(size_t tag) {
     for (size_t i = 0; i < max_sc_ite; i = i + kSCsPerCacheline) {
       size_t start_tsc1 = GetTime::WorkerRdtsc();
       for (size_t user_id = 0; user_id < cfg_->UeAntNum(); user_id++) {
-        // QMACS: separate queue of data buffer
+        // NOTE: QMACS: separate queue of data buffer
         size_t total_symbol_idx =
               cfg_->GetTotalDataSymbolIdxDl(cfg_->scheduler_->GetFrameID(user_id), 
                                           symbol_idx_dl); // use frame_id in queue
@@ -138,7 +138,7 @@ EventData DoPrecode::Launch(size_t tag) {
       size_t start_tsc1 = GetTime::WorkerRdtsc();
       int cur_sc_id = base_sc_id + i;
       for (size_t user_id = 0; user_id < cfg_->UeAntNum(); user_id++) {
-        // QMACS: separate queue of data buffer
+        // NOTE: QMACS: separate queue of data buffer
         size_t total_symbol_idx =
               cfg_->GetTotalDataSymbolIdxDl(cfg_->scheduler_->GetFrameID(user_id), 
                                           symbol_idx_dl); // use frame_id in queue
@@ -212,7 +212,7 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
            ? (sc_id_in_block % kSCsPerCacheline * cfg_->UeAntNum())
            : 0));
 
-  // QMACS: schedule the data
+  // NOTE: QMACS: schedule the data
   arma::cx_fmat data_mat(data_ptr, cfg_->UeNum(), 1, false);
   arma::cx_fmat dst_mat;
   cfg_->scheduler_->ScheduleDATA(frame_slot, cfg_->GetZfScId(sc_id), dst_mat, data_mat); // schedule data
@@ -229,9 +229,9 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
   //                            false);
   // arma::cx_fmat mat_data(data_ptr, cfg_->UeAntNum(), 1, false);
   // NOTE: QMACS test
-  arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->scheduler_->GetSelectNum(),
+  arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->scheduler_->GetSelectNum(frame_slot),
                              false);
-  arma::cx_fmat mat_data(dst_ptr, cfg_->scheduler_->GetSelectNum(), 1, false);
+  arma::cx_fmat mat_data(dst_ptr, cfg_->scheduler_->GetSelectNum(frame_slot), 1, false);
   arma::cx_fmat mat_precoded(precoded_ptr, cfg_->BsAntNum(), 1, false);
   mat_precoded = mat_precoder * mat_data;
   // cout << "Precoder: \n" << mat_precoder << endl;

@@ -82,8 +82,8 @@ EventData DoZF::Launch(size_t tag) {
   return EventData(EventType::kZF, tag);
 }
 
-// QMACS: takes sche_mat_csi as input parameter for dl
-float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi, const arma::cx_fmat& sche_mat_csi,
+// NOTE: QMACS: takes sche_mat_csi as input parameter for dl
+float DoZF::ComputePrecoder(size_t frame_slot, const arma::cx_fmat& mat_csi, const arma::cx_fmat& sche_mat_csi,
                             complex_float* calib_ptr, complex_float* _mat_ul_zf,
                             complex_float* _mat_dl_zf) {
   arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(_mat_ul_zf),
@@ -111,7 +111,7 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi, const arma::cx_fmat& s
       // magnitude info away by taking the sign of the calibration matrix
       arma::cx_fmat calib_mat = arma::diagmat(arma::sign(calib_vec));
       mat_dl_zf_tmp = mat_ul_zf_tmp * inv(calib_mat);
-    } else { // QMACS: if use different zf, schedule for dl
+    } else { // NOTE: QMACS: if use different zf, schedule for dl
       // arma::cx_fmat mat_dl_csi = arma::diagmat(calib_vec) * mat_csi;
       arma::cx_fmat mat_dl_csi = arma::diagmat(calib_vec) * sche_mat_csi; // QMACS: use scheduled dl zf
       try {
@@ -135,11 +135,11 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi, const arma::cx_fmat& s
                           arma::fill::zeros));
       }
     }
-    // QMACS: correct the shape 
+    // NOTE: QMACS: correct the shape 
     // arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
                             // cfg_->BsAntNum(), cfg_->UeAntNum(), false);
     arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
-                            cfg_->BsAntNum(), cfg_->scheduler_->GetSelectNum(), false); // change this shape
+                            cfg_->BsAntNum(), cfg_->scheduler_->GetSelectNum(frame_slot), false); // change this shape
     // QMACS
     mat_dl_zf = mat_dl_zf_tmp.st();
   }
@@ -354,11 +354,11 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     double start_tsc3 = GetTime::WorkerRdtsc();
     duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
-    // QMACS: compute scheduled CSI
+    // NOTE: QMACS: compute scheduled CSI
     arma::cx_fmat sche_mat_csi;
     this->cfg_->scheduler_->ScheduleCSI(frame_slot, cur_sc_id, sche_mat_csi, mat_csi);
 
-    auto rcond = ComputePrecoder(mat_csi, sche_mat_csi, calib_gather_buffer_, 
+    auto rcond = ComputePrecoder(frame_slot, mat_csi, sche_mat_csi, calib_gather_buffer_, 
                 ul_zf_matrices_[frame_slot][cur_sc_id], dl_zf_matrices_[frame_slot][cur_sc_id]);
 
     // auto rcond = ComputePrecoder(mat_csi, calib_gather_buffer_,
@@ -447,11 +447,11 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
   arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
                         cfg_->BsAntNum(), cfg_->UeAntNum(), false);
 
-  // QMACS: scheduler for ZfFreqOrthogonal haven't been tested
+  // NOTE: QMACS: scheduler for ZfFreqOrthogonal haven't been tested
   // QMACS: compute scheduled CSI
   arma::cx_fmat sche_mat_csi;
   this->cfg_->scheduler_->ScheduleCSI(frame_slot, cfg_->GetZfScId(base_sc_id), sche_mat_csi, mat_csi);
-  ComputePrecoder(mat_csi, sche_mat_csi, calib_gather_buffer_,
+  ComputePrecoder(frame_slot, mat_csi, sche_mat_csi, calib_gather_buffer_,
                   ul_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)],
                   dl_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)]);
   // QMACS

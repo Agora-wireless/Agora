@@ -18,19 +18,24 @@
 #include "symbols.h"
 
 // #define SELECT_NUM 2
+// frame_id [0, inf), frame_slot [0, kFrameWnd)
 class Scheduler {
   public:
     Scheduler(size_t UeNum, size_t NumDLSyms, size_t UeAntNum, PtrGrid<kFrameWnd, kMaxUEs, complex_float>& csi_buffers);
     ~Scheduler();
     
     void Launch(size_t frame_id); // scheduling based on csi_buffer
-    void PrintSelect(size_t frame_id, size_t symbol_id); // print the selection mat
+    void PrintSelect(size_t frame_slot, size_t symbol_id); // print the selection mat
     void PrintQueue(); // print frame queues of each user
     size_t GetSelectNum() {return this->select_num;} // return select_num
+#if USE_MKL_JIT
+    size_t GetSelectNum(size_t frame_slot) {return this->select_num;} // return select_num
+#else
+    size_t GetSelectNum(size_t frame_slot) {return this->capacity_[frame_slot];} // return select_num
+#endif
     size_t GetFrameID(size_t ue_id) {return (size_t) this->data_queue_[ue_id];} // return frame_id in queue
-
-    void ScheduleCSI(const size_t frame_id, const size_t sc_id, arma::cx_fmat& dst_csi_mat, arma::cx_fmat& src_csi_mat); // schedule csi_buffer
-    void ScheduleDATA(const size_t frame_id, const size_t sc_id, arma::cx_fmat& dst_data_mat, arma::cx_fmat& src_data_mat); // schedule data_mat
+    void ScheduleCSI(const size_t frame_slot, const size_t sc_id, arma::cx_fmat& dst_csi_mat, arma::cx_fmat& src_csi_mat); // schedule csi_buffer
+    void ScheduleDATA(const size_t frame_slot, const size_t sc_id, arma::cx_fmat& dst_data_mat, arma::cx_fmat& src_data_mat); // schedule data_mat
     void UpdateQueue(size_t frame_id); // update the data queue according to schedule
 
   private:
@@ -48,6 +53,7 @@ class Scheduler {
     // 1 0 0
     // 0 0 1
     unsigned int *data_queue_; // in frame as unit
+    size_t *capacity_; // capacity of each frame
 
     size_t select_num;
     size_t last_ue;
