@@ -45,9 +45,9 @@ void Scheduler::Launch(size_t frame_id) {
     unsigned int *selection = selection_[frame_id][symbol_id];
     memset(selection, 0, sizeof(unsigned int)*select_num*UeNum_);
     for (size_t i = 0; i < cap; ++i) {
-      selection[last_ue*select_num + i] = 1; // last_ue is col, i is row
+      // selection[last_ue*select_num + i] = 1; // last_ue is col, i is row
       // selection[last_ue*select_num + i] = 1;
-      // selection[i*UeNum_ + last_ue] = 1;
+      selection[i*UeNum_ + last_ue] = 1;
       last_ue = (last_ue + 1)%UeNum_;
     }
   }
@@ -64,15 +64,15 @@ void Scheduler::PrintQueue() {
 
 void Scheduler::PrintSelect(size_t frame_slot, size_t symbol_id) {
   unsigned int *selection = selection_[frame_slot][symbol_id];
-  arma::Mat<arma::u32> selection_mat(reinterpret_cast<arma::u32*>(selection), select_num, UeNum_, false);
+  arma::Mat<arma::u32> selection_mat(reinterpret_cast<arma::u32*>(selection), UeNum_, this->capacity_[frame_slot], false);
   // std::cout << "Full Matrix--- \n" << selection_mat << std::endl;
-  std::cout << "Selection Matrix--- \n" << selection_mat.rows(0, this->capacity_[frame_slot]-1) << std::endl;
+  std::cout << "Selection Matrix--- \n" << selection_mat << std::endl;
 }
 
 void Scheduler::ScheduleCSI(const size_t frame_slot, const size_t sc_id, arma::cx_fmat& dst_csi_mat, arma::cx_fmat& src_csi_mat) {
   unsigned int *selection = selection_[frame_slot][0];
-  arma::Mat<arma::u32> selection_mat(reinterpret_cast<arma::u32*>(selection), select_num, UeNum_, false);
-  dst_csi_mat = src_csi_mat * selection_mat.rows(0, this->capacity_[frame_slot]-1).t(); 
+  arma::Mat<arma::u32> selection_mat(reinterpret_cast<arma::u32*>(selection), UeNum_, this->capacity_[frame_slot], false);
+  dst_csi_mat = src_csi_mat * selection_mat; 
   // if (update.exchange(false)) {
   //   std::cout << "*************Schedule Frame_slot: " << frame_slot << " sc_id: " << sc_id << "\n Sched CSI Matrix--- \n" << dst_csi_mat << std::endl;
   // }
@@ -80,8 +80,8 @@ void Scheduler::ScheduleCSI(const size_t frame_slot, const size_t sc_id, arma::c
 
 void Scheduler::ScheduleDATA(const size_t frame_slot, const size_t sc_id, arma::cx_fmat& dst_data_mat, arma::cx_fmat& src_data_mat) {
   unsigned int *selection = selection_[frame_slot][0];
-  arma::Mat<arma::u32> selection_mat(reinterpret_cast<arma::u32*>(selection), select_num, UeNum_, false);
-  dst_data_mat = (selection_mat.rows(0, this->capacity_[frame_slot]-1) * src_data_mat); 
+  arma::Mat<arma::u32> selection_mat(reinterpret_cast<arma::u32*>(selection), UeNum_, this->capacity_[frame_slot], false);
+  dst_data_mat = (selection_mat.t() * src_data_mat); 
   if (update.exchange(false)) {
     std::cout << "*************Schedule Frame_slot: " << frame_slot << " sc_id: " << sc_id 
           // << "\n Sched data Matrix--- \n" << dst_data_mat << std::endl;
@@ -92,9 +92,9 @@ void Scheduler::ScheduleDATA(const size_t frame_slot, const size_t sc_id, arma::
 void Scheduler::UpdateQueue(size_t frame_id) {
   frame_id %= kFrameWnd;
   unsigned int *selection = selection_[frame_id][0];
-  arma::Mat<arma::u32> selection_mat(reinterpret_cast<arma::u32*>(selection), this->select_num, UeNum_, false);
-  auto compression = arma::sum(selection_mat, 0);
-  auto dqueue = arma::Row<arma::u32>(reinterpret_cast<arma::u32*>(data_queue_), UeNum_, false);
+  arma::Mat<arma::u32> selection_mat(reinterpret_cast<arma::u32*>(selection), UeNum_, select_num, false);
+  auto compression = arma::sum(selection_mat, 1);
+  auto dqueue = arma::Col<arma::u32>(reinterpret_cast<arma::u32*>(data_queue_), UeNum_, false);
   dqueue += compression; // enable separate queue
   // dqueue += 1; // disable separate queue
   PrintQueue();
