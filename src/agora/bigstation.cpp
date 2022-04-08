@@ -255,8 +255,8 @@ void BigStation::fftWorker(int tid)
     }
 
     if (config_->error) {
-        printf("FFT Thread %d error traceback: fft (frame %zu, symbol %zu, ant %zu)\n",
-            tid, cur_frame, cur_symbol, cur_ant);
+        printf("FFT Thread %d error traceback: fft (frame %zu, symbol %zu, ant %zu, recv %d)\n",
+            tid, cur_frame, cur_symbol, cur_ant, bigstation_state_.received_all_time_iq_pkts(cur_frame, cur_symbol));
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -376,23 +376,24 @@ void BigStation::zfWorker(int tid)
         if (config_->downlink_mode) {
             pin_to_core_with_offset(
                 ThreadType::kWorkerZF, base_worker_core_offset_, tid - config_->zf_thread_offset 
-                    + config_->num_ifft_workers[config_->bs_rru_addr_idx],
+                    + config_->num_ifft_workers[config_->bs_server_addr_idx],
                     true, true, config_->phy_core_num);
         } else {
+            printf("tid %d offset %zu fft %zu\n", tid, config_->zf_thread_offset, config_->num_fft_workers[config_->bs_server_addr_idx]);
             pin_to_core_with_offset(
                 ThreadType::kWorkerZF, base_worker_core_offset_, tid - config_->zf_thread_offset 
-                    + config_->num_fft_workers[config_->bs_rru_addr_idx],
+                    + config_->num_fft_workers[config_->bs_server_addr_idx],
                     true, true, config_->phy_core_num);
         }
     } else {
         if (config_->downlink_mode) {
             pin_to_core_with_offset(
                 ThreadType::kWorkerZF, base_worker_core_offset_, tid - config_->zf_thread_offset 
-                    + config_->num_ifft_workers[config_->bs_rru_addr_idx]);
+                    + config_->num_ifft_workers[config_->bs_server_addr_idx]);
         } else {
             pin_to_core_with_offset(
                 ThreadType::kWorkerZF, base_worker_core_offset_, tid - config_->zf_thread_offset 
-                    + config_->num_fft_workers[config_->bs_rru_addr_idx]);
+                    + config_->num_fft_workers[config_->bs_server_addr_idx]);
         }
     }
 
@@ -483,8 +484,8 @@ void BigStation::zfWorker(int tid)
     }
 
     if (config_->error) {
-        printf("ZF Thread %d error traceback: zf (frame %zu)\n",
-            tid, cur_zf_frame);
+        printf("ZF Thread %d error traceback: zf (frame %zu, recv %d)\n",
+            tid, cur_zf_frame, bigstation_state_.received_all_pilot_pkts(cur_zf_frame));
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -504,14 +505,14 @@ void BigStation::demulWorker(int tid)
     if (config_->use_hyperthreading == Config::HyperMode::kRXTXExclusive) {
         pin_to_core_with_offset(
             ThreadType::kWorkerDemul, base_worker_core_offset_, tid - config_->demul_thread_offset 
-                + config_->num_fft_workers[config_->bs_rru_addr_idx]
-                + config_->num_zf_workers[config_->bs_rru_addr_idx],
+                + config_->num_fft_workers[config_->bs_server_addr_idx]
+                + config_->num_zf_workers[config_->bs_server_addr_idx],
                 true, true, config_->phy_core_num);
     } else {
         pin_to_core_with_offset(
             ThreadType::kWorkerDemul, base_worker_core_offset_, tid - config_->demul_thread_offset 
-                + config_->num_fft_workers[config_->bs_rru_addr_idx]
-                + config_->num_zf_workers[config_->bs_rru_addr_idx]);
+                + config_->num_fft_workers[config_->bs_server_addr_idx]
+                + config_->num_zf_workers[config_->bs_server_addr_idx]);
     }
 
     size_t sc_start = tid * config_->OFDM_DATA_NUM / config_->total_demul_workers;
@@ -593,8 +594,9 @@ void BigStation::demulWorker(int tid)
     }
 
     if (config_->error) {
-        printf("Demul Thread %d error traceback: demul (frame %zu, symbol %zu)\n",
-            tid, cur_demul_frame, cur_demul_symbol_ul);
+        printf("Demul Thread %d error traceback: demul (frame %zu, symbol %zu, recv %d and %d)\n",
+            tid, cur_demul_frame, cur_demul_symbol_ul, bigstation_state_.received_all_zf_pkts(cur_demul_frame),
+                bigstation_state_.received_all_ul_data_pkts(cur_demul_frame, cur_demul_symbol_ul));
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -615,21 +617,22 @@ void BigStation::decodeWorker(int tid)
     if (config_->use_hyperthreading == Config::HyperMode::kRXTXExclusive) {
         pin_to_core_with_offset(
             ThreadType::kWorkerDecode, base_worker_core_offset_, tid - config_->decode_thread_offset 
-                + config_->num_fft_workers[config_->bs_rru_addr_idx]
-                + config_->num_zf_workers[config_->bs_rru_addr_idx]
-                + config_->num_demul_workers[config_->bs_rru_addr_idx],
+                + config_->num_fft_workers[config_->bs_server_addr_idx]
+                + config_->num_zf_workers[config_->bs_server_addr_idx]
+                + config_->num_demul_workers[config_->bs_server_addr_idx],
                 true, true, config_->phy_core_num);
     } else {
         pin_to_core_with_offset(
             ThreadType::kWorkerDecode, base_worker_core_offset_, tid - config_->decode_thread_offset 
-                + config_->num_fft_workers[config_->bs_rru_addr_idx]
-                + config_->num_zf_workers[config_->bs_rru_addr_idx]
-                + config_->num_demul_workers[config_->bs_rru_addr_idx]);
+                + config_->num_fft_workers[config_->bs_server_addr_idx]
+                + config_->num_zf_workers[config_->bs_server_addr_idx]
+                + config_->num_demul_workers[config_->bs_server_addr_idx]);
     }
 
     size_t tid_offset = tid - config_->decode_thread_offset;
-    size_t cur_decode_frame = 0;
+    // size_t cur_decode_frame = 0;
     size_t cur_decode_idx = tid_offset;
+    size_t next_post_frame = 0;
 
     std::vector<std::vector<ControlInfo> > dummy_table;
     std::vector<size_t> dummy_list;
@@ -648,12 +651,14 @@ void BigStation::decodeWorker(int tid)
     DyDecode *do_decode = new DyDecode(config_, tid, freq_ghz_, post_demul_buffer_, post_decode_buffer_,
         dummy_table, dummy_list, nullptr, bottleneck_decode);
 
+    size_t cur_frame = cur_decode_idx / (config_->get_num_ues_to_process() * config_->ul_data_symbol_num_perframe);
+    // size_t cur_symbol_ul = cur_decode_idx / config_->get_num_ues_to_process();
+    size_t cur_symbol_ul = (cur_decode_idx % (config_->get_num_ues_to_process() * config_->ul_data_symbol_num_perframe)) / config_->get_num_ues_to_process();
+    size_t cur_ue = cur_decode_idx % config_->get_num_ues_to_process() + config_->ue_start;
     while (config_->running && !SignalHandler::gotExitSignal()) {
         size_t work_start_tsc, decode_start_tsc;
-        size_t cur_symbol_ul = cur_decode_idx / config_->get_num_ues_to_process();
-        size_t cur_ue = cur_decode_idx % config_->get_num_ues_to_process() + config_->ue_start;
-        if (bigstation_state_.received_all_demod_pkts(cur_decode_frame, cur_symbol_ul)) {
-            if (unlikely(!state_trigger && cur_decode_frame >= 200)) {
+        if (bigstation_state_.received_all_demod_pkts(cur_frame, cur_symbol_ul)) {
+            if (unlikely(!state_trigger && cur_frame >= 200)) {
                 start_tsc = rdtsc();
                 state_trigger = true;
             }
@@ -663,7 +668,7 @@ void BigStation::decodeWorker(int tid)
                 decode_start_tsc = rdtsc();
             });
 
-            do_decode->LaunchStatic(cur_decode_frame, cur_symbol_ul, cur_ue);
+            do_decode->LaunchStatic(cur_frame, cur_symbol_ul, cur_ue);
 
             TRIGGER_TIMER({
                 size_t decode_tmp_tsc = rdtsc() - decode_start_tsc;
@@ -673,13 +678,19 @@ void BigStation::decodeWorker(int tid)
             });
 
             cur_decode_idx += config_->num_decode_workers[config_->bs_server_addr_idx];
-            if (cur_decode_idx >= config_->get_num_ues_to_process() * config_->ul_data_symbol_num_perframe) {
-                cur_decode_idx = tid_offset;
-                if (!bigstation_state_.decode_done(cur_decode_frame)) {
+            cur_frame = cur_decode_idx / (config_->get_num_ues_to_process() * config_->ul_data_symbol_num_perframe);
+            // size_t cur_symbol_ul = cur_decode_idx / config_->get_num_ues_to_process();
+            cur_symbol_ul = (cur_decode_idx % (config_->get_num_ues_to_process() * config_->ul_data_symbol_num_perframe)) / config_->get_num_ues_to_process();
+            cur_ue = cur_decode_idx % config_->get_num_ues_to_process() + config_->ue_start;
+            // if (cur_decode_idx >= config_->get_num_ues_to_process() * config_->ul_data_symbol_num_perframe) {
+            if (cur_frame > next_post_frame) {
+                // cur_decode_idx = tid_offset;
+                if (!bigstation_state_.decode_done(next_post_frame)) {
                     config_->error = true;
                     config_->running = false;
                 }
-                cur_decode_frame++;
+                next_post_frame = cur_frame;
+                // cur_decode_frame++;
             }
 
             TRIGGER_TIMER({
@@ -697,7 +708,7 @@ void BigStation::decodeWorker(int tid)
 
     if (config_->error) {
         printf("Decode Thread %d error traceback: decode (frame %zu, idx %zu)\n",
-            tid, cur_decode_frame, cur_decode_idx);
+            tid, cur_frame, cur_decode_idx);
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -717,16 +728,16 @@ void BigStation::encodeWorker(int tid)
     if (config_->use_hyperthreading == Config::HyperMode::kRXTXExclusive) {
         pin_to_core_with_offset(
             ThreadType::kWorkerEncode, base_worker_core_offset_, tid - config_->encode_thread_offset 
-                + config_->num_ifft_workers[config_->bs_rru_addr_idx]
-                + config_->num_zf_workers[config_->bs_rru_addr_idx]
-                + config_->num_precode_workers[config_->bs_rru_addr_idx],
+                + config_->num_ifft_workers[config_->bs_server_addr_idx]
+                + config_->num_zf_workers[config_->bs_server_addr_idx]
+                + config_->num_precode_workers[config_->bs_server_addr_idx],
                 true, true, config_->phy_core_num);
     } else {
         pin_to_core_with_offset(
             ThreadType::kWorkerEncode, base_worker_core_offset_, tid - config_->encode_thread_offset 
-                + config_->num_ifft_workers[config_->bs_rru_addr_idx]
-                + config_->num_zf_workers[config_->bs_rru_addr_idx]
-                + config_->num_precode_workers[config_->bs_rru_addr_idx]);
+                + config_->num_ifft_workers[config_->bs_server_addr_idx]
+                + config_->num_zf_workers[config_->bs_server_addr_idx]
+                + config_->num_precode_workers[config_->bs_server_addr_idx]);
     }
 
     size_t tid_offset = tid - config_->encode_thread_offset;
@@ -817,14 +828,14 @@ void BigStation::precodeWorker(int tid)
     if (config_->use_hyperthreading == Config::HyperMode::kRXTXExclusive) {
         pin_to_core_with_offset(
             ThreadType::kWorkerPrecode, base_worker_core_offset_, tid - config_->precode_thread_offset 
-                + config_->num_ifft_workers[config_->bs_rru_addr_idx]
-                + config_->num_zf_workers[config_->bs_rru_addr_idx],
+                + config_->num_ifft_workers[config_->bs_server_addr_idx]
+                + config_->num_zf_workers[config_->bs_server_addr_idx],
                 true, true, config_->phy_core_num);
     } else {
         pin_to_core_with_offset(
             ThreadType::kWorkerPrecode, base_worker_core_offset_, tid - config_->precode_thread_offset 
-                + config_->num_ifft_workers[config_->bs_rru_addr_idx]
-                + config_->num_zf_workers[config_->bs_rru_addr_idx]);
+                + config_->num_ifft_workers[config_->bs_server_addr_idx]
+                + config_->num_zf_workers[config_->bs_server_addr_idx]);
     }
 
     size_t sc_start = tid * config_->OFDM_DATA_NUM / config_->total_precode_workers;

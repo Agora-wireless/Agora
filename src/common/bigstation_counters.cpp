@@ -15,12 +15,12 @@ BigStationState::BigStationState(Config *cfg)
         ceil_divide(cfg->BS_ANT_NUM * cfg->UE_NUM * 2 * sizeof(float), cfg->post_zf_step_size)) // TODO: modify this
     , num_demod_pkts_prepared_per_symbol_(cfg->demul_end - cfg->demul_start)
     , num_demod_pkts_received_per_symbol_((cfg->ue_end - cfg->ue_start) * cfg->OFDM_DATA_NUM)
-    , num_decode_tasks_per_frame_(cfg->num_decode_workers[cfg->bs_server_addr_idx])
+    , num_decode_tasks_per_frame_(cfg->downlink_mode ? 0 : cfg->num_decode_workers[cfg->bs_server_addr_idx])
     , num_encode_pkts_prepared_per_symbol_(cfg->ue_end - cfg->ue_start)
     , num_encode_pkts_received_per_symbol_(cfg->UE_NUM)
     , num_precode_pkts_prepared_per_symbol_(cfg->precode_end - cfg->precode_start)
     , num_precode_pkts_received_per_symbol_((cfg->ant_end - cfg->ant_start) * cfg->OFDM_DATA_NUM)
-    , num_ifft_tasks_per_frame_(cfg->num_ifft_workers[cfg->bs_server_addr_idx])
+    , num_ifft_tasks_per_frame_(cfg->downlink_mode ? cfg->num_ifft_workers[cfg->bs_server_addr_idx] : 0)
 {
     frame_start_time_ = new uint64_t[cfg->frames_to_test];
     frame_iq_time_ = new uint64_t[cfg->frames_to_test];
@@ -55,9 +55,9 @@ bool BigStationState::receive_time_iq_pkt(size_t frame_id, size_t symbol_id, siz
     }
 
     if (unlikely(frame_start_time_[frame_id] == 0)) {
-        frame_start_time_[frame_id] = rdtsc();
+        frame_start_time_[frame_id] = get_us();
     }
-    frame_iq_time_[frame_id] = rdtsc();
+    frame_iq_time_[frame_id] = get_us();
 
     num_time_iq_pkts_received_[frame_id % kFrameWnd][symbol_id] ++;
     return true;
@@ -168,7 +168,7 @@ bool BigStationState::prepare_freq_iq_pkt(size_t frame_id, size_t symbol_id, siz
         return false;
     }
     num_freq_iq_pkts_prepared_[frame_id % kFrameWnd][symbol_id] ++;
-    frame_fft_time_[frame_id] = rdtsc();
+    frame_fft_time_[frame_id] = get_us();
     // printf("Prepare freq iq packet frame %zu symbol %zu count %zu required %zu\n", frame_id,
     //     symbol_id, num_freq_iq_pkts_prepared_[frame_id % kFrameWnd][symbol_id].load(), num_freq_iq_pkts_prepared_per_symbol_);
     return true;
@@ -180,7 +180,7 @@ bool BigStationState::prepare_zf_pkt(size_t frame_id)
         return false;
     }
     num_zf_pkts_prepared_[frame_id % kFrameWnd] ++;
-    frame_zf_time_[frame_id] = rdtsc();
+    frame_zf_time_[frame_id] = get_us();
     return true;
 }
 
@@ -190,7 +190,7 @@ bool BigStationState::prepare_demod_pkt(size_t frame_id, size_t symbol_id_ul, si
         return false;
     }
     num_demod_pkts_prepared_[frame_id % kFrameWnd][symbol_id_ul] += sc_num;
-    frame_sc_time_[frame_id] = rdtsc();
+    frame_sc_time_[frame_id] = get_us();
     // printf("Prepare demod packet frame %zu symbol %zu count %zu required %zu\n", frame_id,
     //     symbol_id_ul, num_demod_pkts_prepared_[frame_id % kFrameWnd][symbol_id_ul].load(),
     //     num_demod_pkts_prepared_per_symbol_);
@@ -203,7 +203,7 @@ bool BigStationState::prepare_encode_pkt(size_t frame_id, size_t symbol_id_dl, s
         return false;
     }
     num_encode_pkts_prepared_[frame_id % kFrameWnd][symbol_id_dl] ++;
-    frame_coding_time_[frame_id] = rdtsc();
+    frame_coding_time_[frame_id] = get_us();
     return true;
 }
 
@@ -213,7 +213,7 @@ bool BigStationState::prepare_precode_pkt(size_t frame_id, size_t symbol_id_dl, 
         return false;
     }
     num_precode_pkts_prepared_[frame_id % kFrameWnd][symbol_id_dl] += sc_num;
-    frame_sc_time_[frame_id] = rdtsc();
+    frame_sc_time_[frame_id] = get_us();
     return true;
 }
 
@@ -323,7 +323,7 @@ bool BigStationState::decode_done(size_t frame_id)
     num_decode_tasks_completed_[frame_id % kFrameWnd]++;
     cont = (num_decode_tasks_completed_[frame_id % kFrameWnd] == num_decode_tasks_per_frame_);
     decode_mutex_[frame_id % kFrameWnd].unlock();
-    frame_end_time_[frame_id] = rdtsc();
+    frame_end_time_[frame_id] = get_us();
 
     if (unlikely(cont)) {
         cur_frame_mutex_.lock();
@@ -364,7 +364,7 @@ bool BigStationState::ifft_done(size_t frame_id)
     num_ifft_tasks_completed_[frame_id % kFrameWnd]++;
     cont = (num_ifft_tasks_completed_[frame_id % kFrameWnd] == num_ifft_tasks_per_frame_);
     ifft_mutex_[frame_id % kFrameWnd].unlock();
-    frame_end_time_[frame_id] = rdtsc();
+    frame_end_time_[frame_id] = get_us();
 
     if (unlikely(cont)) {
         cur_frame_mutex_.lock();

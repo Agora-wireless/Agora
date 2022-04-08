@@ -273,6 +273,17 @@ int BigStationTXRX::recv_relocate(int tid)
 
 void* BigStationTXRX::tx_thread_ul(int tid)
 {
+    size_t freq_ghz = measure_rdtsc_freq();
+
+    size_t start_tsc = 0;
+    size_t work_tsc_duration = 0;
+    size_t send_tsc_duration = 0;
+    size_t loop_count = 0;
+    size_t work_count = 0;
+    
+    size_t work_start_tsc, send_start_tsc, send_end_tsc;
+    size_t worked;
+
     size_t ant_start = cfg_->ant_start + tid * (double)(cfg_->get_num_ant_to_process()) / cfg_->tx_thread_num;
     size_t ant_end = cfg_->ant_start + (tid + 1) * (double)(cfg_->get_num_ant_to_process()) / cfg_->tx_thread_num;
     size_t freq_iq_pkt_frame = 0;
@@ -290,7 +301,19 @@ void* BigStationTXRX::tx_thread_ul(int tid)
     size_t demul_pkt_ue = ue_start;
 
     while (cfg_->running) {     
+        if (likely(start_tsc > 0)) {
+            loop_count ++;
+        }
+
+        worked = 0;
+
         if (bigstation_state_->prepared_all_freq_iq_pkts(freq_iq_pkt_frame, freq_iq_pkt_symbol)) {
+            if (unlikely(start_tsc == 0)) {
+                start_tsc = rdtsc();
+            }
+            work_start_tsc = rdtsc();
+            send_start_tsc = work_start_tsc;
+            worked = 1;
             if (freq_iq_pkt_symbol < cfg_->pilot_symbol_num_perframe) {
                 uint8_t* ant_ptr = (uint8_t*)freq_iq_buffer_to_send_[freq_iq_pkt_ant] + 
                     (freq_iq_pkt_frame % kFrameWnd) * cfg_->symbol_num_perframe
@@ -422,9 +445,20 @@ void* BigStationTXRX::tx_thread_ul(int tid)
                     freq_iq_pkt_frame ++;
                 }
             }
+
+            send_end_tsc = rdtsc();
+            send_tsc_duration += send_end_tsc - send_start_tsc;
+            work_tsc_duration += send_end_tsc - work_start_tsc;
         }
 
         if (bigstation_state_->prepared_all_zf_pkts(zf_pkt_frame)) {
+            if (unlikely(start_tsc == 0)) {
+                start_tsc = rdtsc();
+            }
+            work_start_tsc = rdtsc();
+            send_start_tsc = work_start_tsc;
+            worked = 1;
+
             size_t sc_offset = simple_hash(zf_pkt_frame) % cfg_->UE_NUM;
             struct rte_mbuf* tx_bufs[kMaxTxBufSize] __attribute__((aligned(64)));
             size_t total_buf_id = 0;
@@ -489,9 +523,20 @@ void* BigStationTXRX::tx_thread_ul(int tid)
                 }
             }
             zf_pkt_frame ++;
+
+            send_end_tsc = rdtsc();
+            send_tsc_duration += send_end_tsc - send_start_tsc;
+            work_tsc_duration += send_end_tsc - work_start_tsc;
         }
 
         if (bigstation_state_->prepared_all_demod_pkts(demul_pkt_frame, demul_pkt_symbol_ul)) {
+            if (unlikely(start_tsc == 0)) {
+                start_tsc = rdtsc();
+            }
+            work_start_tsc = rdtsc();
+            send_start_tsc = work_start_tsc;
+            worked = 1;
+
             uint8_t* src_ptr = (uint8_t*)post_demul_buffer_to_send_[demul_pkt_frame%kFrameWnd][demul_pkt_symbol_ul][demul_pkt_ue] + cfg_->demul_start * cfg_->mod_order_bits;
             struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
             size_t server_id = cfg_->ue_server_mapping[demul_pkt_ue];
@@ -540,8 +585,31 @@ void* BigStationTXRX::tx_thread_ul(int tid)
                     demul_pkt_frame ++;
                 }
             }
+
+            send_end_tsc = rdtsc();
+            send_tsc_duration += send_end_tsc - send_start_tsc;
+            work_tsc_duration += send_end_tsc - work_start_tsc;
         }
+        work_count += worked;
     }
+
+    if (cfg_->error) {
+        printf("TX error traceback: fft (frame %zu symbol %zu ant %zu), "
+            "zf (frame %zu), demul (frame %zu symbol %zu ue %zu)\n", 
+            freq_iq_pkt_frame, freq_iq_pkt_symbol, freq_iq_pkt_ant,
+            zf_pkt_frame,
+            demul_pkt_frame, demul_pkt_symbol_ul, demul_pkt_ue);
+    }
+
+    size_t whole_duration = rdtsc() - start_tsc;
+    size_t idle_duration = whole_duration - work_tsc_duration;
+    printf("TX Thread duration stats: total time used %.2lfms, "
+        "send %.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%), "
+        "working proportions (%zu/%zu: %.2lf%%)\n",
+        cycles_to_ms(whole_duration, freq_ghz),
+        cycles_to_ms(send_tsc_duration, freq_ghz), send_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(idle_duration, freq_ghz), idle_duration * 100.0f / whole_duration,
+        work_count, loop_count, work_count * 100.0f / loop_count);
 
     return nullptr;
 }

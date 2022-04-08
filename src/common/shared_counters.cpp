@@ -424,24 +424,29 @@ bool SharedState::receive_encoded_pkt_loss_tolerant(size_t frame_id, size_t symb
         if (frame_id > encode_next_frame_[ue_id]) {
             for (size_t sid = encode_next_symbol_[ue_id]; sid < cfg_->dl_data_symbol_num_perframe; sid ++) {
                 num_encoded_pkts_[encode_next_frame_[ue_id] % kFrameWnd][sid] ++;
+                num_encoded_pkts_states_[encode_next_frame_[ue_id] % kFrameWnd][sid] ^= (1 << ue_id);
             }
             for (size_t fid = encode_next_frame_[ue_id] + 1; fid < frame_id; fid ++) {
                 for (size_t sid = 0; sid < cfg_->dl_data_symbol_num_perframe; sid ++) {
                     num_encoded_pkts_[fid % kFrameWnd][sid] ++;
+                    num_encoded_pkts_states_[fid % kFrameWnd][sid] ^= (1 << ue_id);
                 }
             }
             for (size_t sid = 0; sid < symbol_id_dl; sid ++) {
                 num_encoded_pkts_[frame_id % kFrameWnd][sid] ++;
+                num_encoded_pkts_states_[frame_id % kFrameWnd][sid] ^= (1 << ue_id);
             }
         }
     } else if (symbol_id_dl != encode_next_symbol_[ue_id]) {
         if (symbol_id_dl > encode_next_symbol_[ue_id]) {
             for (size_t sid = encode_next_symbol_[ue_id]; sid < symbol_id_dl; sid ++) {
                 num_encoded_pkts_[frame_id % kFrameWnd][sid] ++;
+                num_encoded_pkts_states_[frame_id % kFrameWnd][sid] ^= (1 << ue_id);
             }
         }
     }
     num_encoded_pkts_[frame_id % kFrameWnd][symbol_id_dl]++;
+    num_encoded_pkts_states_[frame_id % kFrameWnd][symbol_id_dl] ^= (1 << ue_id);
 
     size_t next_symbol = symbol_id_dl + 1;
     size_t next_frame = frame_id;

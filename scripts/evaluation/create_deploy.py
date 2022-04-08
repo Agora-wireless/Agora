@@ -77,9 +77,15 @@ base_coding_core_per_server = core_num_for_coding / num_server
 super_server_num = core_num_for_coding % num_server
 new_coding_thread_num = []
 for i in range(super_server_num):
-    new_coding_thread_num.append(base_coding_core_per_server + 1)
+    if base_coding_core_per_server < 1:
+        new_coding_thread_num.append(1)
+    else:
+        new_coding_thread_num.append(base_coding_core_per_server + 1)
 for i in range(num_server - super_server_num):
-    new_coding_thread_num.append(base_coding_core_per_server)
+    if base_coding_core_per_server < 1:
+        new_coding_thread_num.append(1)
+    else:
+        new_coding_thread_num.append(base_coding_core_per_server)
 
 new_hydra_servers = []
 for i in range(num_server):

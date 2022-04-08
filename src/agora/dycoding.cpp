@@ -188,8 +188,8 @@ void DyEncode::StartWork()
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration,
         work_count, loop_count, loop_count == 0 ? 0 : work_count * 100.0f / loop_count);
 
-    bottleneck_encode_.encode = encode_tsc_duration * 100.0f / whole_duration;
-    bottleneck_encode_.idle = idle_duration * 100.0f / whole_duration;
+    // bottleneck_encode_.encode = encode_tsc_duration * 100.0f / whole_duration;
+    // bottleneck_encode_.idle = idle_duration * 100.0f / whole_duration;
 }
 
 DyDecode::DyDecode(Config* in_config, int in_tid, double freq_ghz,

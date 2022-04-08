@@ -447,7 +447,7 @@ void* Sender::worker_thread(int tid)
         == Packet::kOffsetOfData
             + 2 * sizeof(unsigned short) * (cfg->CP_LEN + cfg->OFDM_CA_NUM));
 
-    // double start_time = get_time();
+    double start_time = get_time();
 
     size_t start_tsc_send;
     size_t local_sync_tsc = get_sync_tsc();
@@ -459,7 +459,8 @@ void* Sender::worker_thread(int tid)
 
     delay_ticks(start_tsc_send, 0);
 
-    rte_mbuf** tx_mbufs = new rte_mbuf*[cfg->bs_server_addr_list.size()];
+    // rte_mbuf** tx_mbufs = new rte_mbuf*[cfg->bs_server_addr_list.size()];
+    rte_mbuf** tx_mbufs = new rte_mbuf*[32];
     rte_eth_stats tx_stats;
     memset(&tx_stats, 0, sizeof(rte_eth_stats));
 
@@ -492,13 +493,14 @@ void* Sender::worker_thread(int tid)
             rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, 1) == 1, "rte_eth_tx_burst() failed");
         } else if (cfg->use_bigstation_mode) {
             size_t server_id = cfg->ant_server_mapping[cur_radio];
+            size_t buf_id = 0;
             for (size_t i = 0; i < cfg->OFDM_CA_NUM; i += cfg->time_iq_sc_step_size) {
                 size_t cur_num_sc = std::min(cfg->time_iq_sc_step_size, cfg->OFDM_CA_NUM - i);
-                tx_mbufs[0] = DpdkTransport::alloc_udp(mbuf_pools_[tid], rru_mac_addr_list[cfg->bs_rru_addr_idx],
+                tx_mbufs[buf_id] = DpdkTransport::alloc_udp(mbuf_pools_[tid], rru_mac_addr_list[cfg->bs_rru_addr_idx],
                     server_mac_addr_list[server_id], bs_rru_addr_list[cfg->bs_rru_addr_idx], bs_server_addr_list[server_id],
                     cfg->bs_rru_port + cur_radio, cfg->bs_server_port + cur_radio,
                     Packet::kOffsetOfData + cur_num_sc * sizeof(unsigned short) * 2);
-                auto* pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[0], uint8_t*) + kPayloadOffset);
+                auto* pkt = (Packet*)(rte_pktmbuf_mtod(tx_mbufs[buf_id], uint8_t*) + kPayloadOffset);
                 pkt->pkt_type_ = Packet::PktType::kTimeIQ;
                 pkt->frame_id_ = cur_frame;
                 pkt->symbol_id_ = cfg->getSymbolId(cur_symbol);
@@ -516,8 +518,9 @@ void* Sender::worker_thread(int tid)
                     server_mac_addr_list[server_id].addr_bytes[3], server_mac_addr_list[server_id].addr_bytes[4], 
                     server_mac_addr_list[server_id].addr_bytes[5], cfg->bs_server_addr_list[server_id].c_str(),
                     cfg->bs_server_port + cur_radio);
-                rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, 1) == 1, "rte_eth_tx_burst() failed");
+                buf_id ++;
             }
+            rt_assert(rte_eth_tx_burst(0, tid, tx_mbufs, buf_id) == buf_id, "rte_eth_tx_burst() failed");
         } else {
             for (size_t i = 0; i < cfg->bs_server_addr_list.size(); i ++) {
                 tx_mbufs[i] = DpdkTransport::alloc_udp(mbuf_pools_[tid], rru_mac_addr_list[cfg->bs_rru_addr_idx],
@@ -568,12 +571,12 @@ void* Sender::worker_thread(int tid)
                 // if (tid == 0) {
                 //     rte_eth_stats stats;
                 //     rte_eth_stats_get(0, &stats);
-                //     // printf("Traffic rate is %lf, packet rate is %lf\n", (double)(stats.obytes - tx_stats.obytes) * 8 / ((get_time() - start_time) * 1000.0f),
-                //         // (double)(stats.opackets - tx_stats.opackets) / ((get_time() - start_time)));
+                //     printf("Traffic rate is %lf, packet rate is %lf\n", (double)(stats.obytes - tx_stats.obytes) * 8 / ((get_time() - start_time) * 1000.0f),
+                //         (double)(stats.opackets - tx_stats.opackets) / ((get_time() - start_time)));
                 //     memcpy(&tx_stats, &stats, sizeof(rte_eth_stats));
                 // }
 
-                // start_time = get_time();
+                start_time = get_time();
             }
             size_t real_symbol_num = cfg->symbol_num_perframe;
             if (cur_frame < 80) {
