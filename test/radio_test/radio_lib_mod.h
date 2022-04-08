@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <complex>
+#include <memory>
 #include <vector>
 
 #include "SoapySDR/Device.hpp"
@@ -53,7 +54,7 @@ class RadioConfigNoRxStream {
   std::atomic<size_t> num_radios_initialized_;
   std::atomic<size_t> num_radios_configured_;
 
-  std::vector<RadioDataPlane> rx_data_plane_;
+  std::vector<std::unique_ptr<RadioDataPlane>> rx_data_plane_;
   std::vector<SoapySDR::Stream*> tx_streams_;
 };
 #endif  // RADIO_LIB_MOD_H_

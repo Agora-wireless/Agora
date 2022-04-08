@@ -8,6 +8,7 @@
 #include "SoapySDR/Logger.hpp"
 #include "comms-lib.h"
 #include "nlohmann/json.hpp"
+#include "radio_data_plane_soapy.h"
 
 static constexpr bool kPrintCalibrationMats = false;
 static constexpr bool kPrintRadioSettings = false;
@@ -66,7 +67,6 @@ RadioConfigNoRxStream::RadioConfigNoRxStream(Config* cfg)
 
   ba_stn_.resize(radio_num_);
   tx_streams_.resize(radio_num_);
-  rx_streams_.resize(radio_num_);
   std::vector<std::thread> init_bs_threads;
 
   for (size_t i = 0; i < radio_num_; i++) {
@@ -206,7 +206,7 @@ RadioConfigNoRxStream::~RadioConfigNoRxStream() {
   }
 
   for (size_t i = 0; i < radio_num_; i++) {
-    ba_stn_.at(i)->closeStream(rx_streams_.at(i));
+    rx_data_plane_.at(i)->Close();
     ba_stn_.at(i)->closeStream(tx_streams_.at(i));
     SoapySDR::Device::unmake(ba_stn_.at(i));
     ba_stn_.at(i) = nullptr;
@@ -251,11 +251,9 @@ void RadioConfigNoRxStream::InitBsRadio(size_t radio) {
 
   // resets the DATA_clk domain logic.
   ba_stn_.at(radio)->writeSetting("RESET_DATA_LOGIC", "");
-
-  ConfigureRx(radio);
-
-  //rx_streams_.at(radio) =
-  //    ba_stn_.at(radio)->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
+  auto& dp = rx_data_plane_.emplace_back(
+      std::make_unique<RadioDataPlaneSoapy>(cfg_, ba_stn_.at(radio), radio));
+  dp->Setup();
   tx_streams_.at(radio) = ba_stn_.at(radio)->setupStream(
       SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
   num_radios_initialized_.fetch_add(1);
@@ -331,63 +329,6 @@ void RadioConfigNoRxStream::ConfigureBsRadio(size_t radio) {
   num_radios_configured_.fetch_add(1);
 }
 
-void RadioConfigNoRxStream::ConfigureRx(size_t radio_id) {
-  auto channels = Utils::StrToChannels(cfg_->Channel());
-
-  std::string stream_protocol =
-      ba_stn_.at(radio_id)->readSetting("STREAM_PROTOCOL");
-  if (stream_protocol != "twbw64") {
-    throw std::runtime_error("Stream protocol mismatch");
-  }
-
-  //query remote iris endpoint configuration
-  auto remote_address = ba_stn_.at(radio_id)->readSetting("ETH0_IPv6_ADDR");
-  const auto remote_port =
-      ba_stn_.at(radio_id)->readSetting("UDP_SERVICE_PORT");
-  if (remote_address.empty()) {
-    throw std::runtime_error(
-        "Iris::setupStream: Failed to query Iris IPv6 address");
-  }
-  if (remote_port.empty()) {
-    throw std::runtime_error(
-        "Iris::setupStream: Failed to query Iris UDP service port");
-  }
-
-  std::printf(
-      " STREAM_PROTOCOL  %s\n ETH0_IPv6_ADDR   %s\n UDP_SERVICE_PORT %s\n",
-      stream_protocol.c_str(), remote_address.c_str(), remote_port.c_str());
-
-  std::string connect_address;
-  const size_t local_interface = 5;
-  //get the scope id to get the remote ipv6 address with the local scope id
-  std::printf(" Remote address  %s\n", remote_address.c_str());
-  const auto percent_pos = remote_address.find_last_of('%');
-  if (percent_pos != std::string::npos) {
-    connect_address = remote_address.substr(0, percent_pos + 1) +
-                      std::to_string(local_interface);
-  }
-  std::printf(" Connect address %s\n", connect_address.c_str());
-
-  //Setup the socket interface to the radio for the rx stream
-  rx_sockets_.emplace_back(
-      std::make_unique<RadioSocket>(cfg_->SampsPerSymbol()));
-
-  auto& sock = rx_sockets_.back();
-  sock->Create(cfg_->BsServerAddr(), connect_address,
-               std::to_string(cfg_->BsServerPort() + radio_id), remote_port);
-
-  SoapySDR::Kwargs sargs;
-  //Not sure if "bypass mode" works
-  sargs["remote:prot"] = "none";
-  sargs["iris:ip6_dst"] = sock->Address();
-  sargs["iris:udp_dst"] = sock->Port();
-
-  std::printf(" iris:ip6_dst %s\n iris:udp_dst %s\n",
-              sargs["iris:ip6_dst"].c_str(), sargs["iris:udp_dst"].c_str());
-  rx_streams_.at(radio_id) = ba_stn_.at(radio_id)->setupStream(
-      SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
-}
-
 bool RadioConfigNoRxStream::RadioStart() {
   DrainBuffers();
   nlohmann::json conf;
@@ -451,7 +392,7 @@ bool RadioConfigNoRxStream::RadioStart() {
       ba_stn_.at(i)->writeSetting("BEACON_START", std::to_string(radio_num_));
     }
     ba_stn_.at(i)->setHardwareTime(0, "TRIGGER");
-    ba_stn_.at(i)->activateStream(rx_streams_.at(i));
+    rx_data_plane_.at(i)->Activate();
     ba_stn_.at(i)->activateStream(tx_streams_.at(i));
   }
   std::cout << "radio start done!" << std::endl;
@@ -492,7 +433,7 @@ int RadioConfigNoRxStream::RadioRx(
     long long& rx_time_ns) {
   // For now, radio rx will return 1 symbol
   int rx_return = 0;
-  rx_return = rx_sockets_.at(radio_id)->RxSymbol(rx_data, rx_time_ns);
+  rx_return = rx_data_plane_.at(radio_id)->Rx(rx_data, rx_time_ns);
   if (rx_return > 0) {
     std::printf("Rx'd sample count %d\n", rx_return);
   } else if (rx_return < 0) {
@@ -538,7 +479,7 @@ void RadioConfigNoRxStream::RadioStop() {
   std::string corr_conf_str = "{\"corr_enabled\":false}";
   std::string tdd_conf_str = "{\"tdd_enabled\":false}";
   for (size_t i = 0; i < radio_num_; i++) {
-    ba_stn_.at(i)->deactivateStream(rx_streams_.at(i));
+    rx_data_plane_.at(i)->Deactivate();
     ba_stn_.at(i)->deactivateStream(tx_streams_.at(i));
     ba_stn_.at(i)->writeSetting("TDD_MODE", "false");
     ba_stn_.at(i)->writeSetting("TDD_CONFIG", tdd_conf_str);

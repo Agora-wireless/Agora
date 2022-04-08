@@ -278,3 +278,13 @@ size_t RadioSocket::ParseRxSymbol(
            "Did not process the correct number of bytes");
   return processed_samples;
 }
+
+void RadioSocket::Flush(void) {
+  int rx_return = 1;
+
+  while (rx_return > 0) {
+    rx_return = socket_->Recv(&rx_buffer_.at(0), rx_buffer_.size());
+  }
+  rx_bytes_ = 0;
+  rx_samples_ = 0;
+}

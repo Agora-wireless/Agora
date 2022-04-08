@@ -30,6 +30,7 @@ class RadioSocket {
 
   int RxSymbol(std::vector<std::vector<std::complex<int16_t>>>& out_data,
                long long& rx_time_ns);
+  void Flush();
 
  private:
   bool CheckSymbolComplete(const std::byte* in_data, const int& in_count);
