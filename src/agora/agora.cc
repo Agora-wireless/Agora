@@ -19,6 +19,8 @@ static const bool kDebugDeferral = true;
 static const size_t kDefaultMessageQueueSize = 512;
 static const size_t kDefaultWorkerQueueSize = 256;
 
+static std::array<CsvLog::MatBuffer, CsvLog::kMatLogs> arr_mat_buf;
+
 Agora::Agora(Config* const cfg)
     : base_worker_core_offset_(cfg->CoreOffset() + 1 + cfg->SocketThreadNum()),
       config_(cfg),
@@ -88,6 +90,14 @@ Agora::Agora(Config* const cfg)
         std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
   }
 
+  if (kEnableMatLog) {
+    constexpr size_t kDevId = 0;
+    for (size_t i = 0; i < CsvLog::kMatLogs; i++) {
+      mat_logger_array_.at(i) = std::make_unique<CsvLog::MatLogger>(
+          CsvLog::Create(kDevId, i + CsvLog::kMatIdStart), arr_mat_buf.at(i));
+    }
+  }
+
   // Create worker threads
   CreateThreads();
 
@@ -112,6 +122,12 @@ Agora::~Agora() {
   FreeUplinkBuffers();
   FreeDownlinkBuffers();
 
+  if (kEnableMatLog) {
+    AGORA_LOG_INFO("Agora: saving mat log to files\n");
+    for (const auto& logger : mat_logger_array_) {
+      logger->SaveMatBuf();
+    }
+  }
   stats_.reset();
   phy_stats_.reset();
   FreeQueues();
@@ -877,7 +893,7 @@ void Agora::Worker(int tid) {
       this->config_, tid, this->csi_buffers_, calib_dl_buffer_,
       calib_ul_buffer_, this->calib_dl_msum_buffer_,
       this->calib_ul_msum_buffer_, this->ul_zf_matrices_, this->dl_zf_matrices_,
-      this->phy_stats_.get(), this->stats_.get());
+      this->phy_stats_.get(), this->stats_.get(), mat_logger_array_);
 
   auto compute_fft = std::make_unique<DoFFT>(
       this->config_, tid, this->data_buffer_, this->csi_buffers_,
@@ -996,7 +1012,8 @@ void Agora::WorkerZf(int tid) {
   std::unique_ptr<DoZF> compute_zf(
       new DoZF(config_, tid, csi_buffers_, calib_dl_buffer_, calib_ul_buffer_,
                calib_dl_msum_buffer_, calib_ul_msum_buffer_, ul_zf_matrices_,
-               dl_zf_matrices_, this->phy_stats_.get(), this->stats_.get()));
+               dl_zf_matrices_, this->phy_stats_.get(), this->stats_.get(),
+               mat_logger_array_));
 
   while (this->config_->Running() == true) {
     compute_zf->TryLaunch(*GetConq(EventType::kZF, 0), complete_task_queue_[0],

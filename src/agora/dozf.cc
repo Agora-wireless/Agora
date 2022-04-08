@@ -22,7 +22,8 @@ DoZF::DoZF(Config* config, int tid,
            Table<complex_float>& calib_ul_msum_buffer,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
-           PhyStats* in_phy_stats, Stats* stats_manager)
+           PhyStats* in_phy_stats, Stats* stats_manager,
+           CsvLog::MatLoggerArray& mat_logger_array)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
       calib_dl_buffer_(calib_dl_buffer),
@@ -31,7 +32,8 @@ DoZF::DoZF(Config* config, int tid,
       calib_ul_msum_buffer_(calib_ul_msum_buffer),
       ul_zf_matrices_(ul_zf_matrices),
       dl_zf_matrices_(dl_zf_matrices),
-      phy_stats_(in_phy_stats) {
+      phy_stats_(in_phy_stats),
+      mat_logger_array_(mat_logger_array) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kZF, tid);
   pred_csi_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
@@ -71,11 +73,6 @@ DoZF::DoZF(Config* config, int tid,
       }
     }
   }
-
-  if (kEnableMatLog) {
-    logger_csi_ = std::make_unique<MatLogger>(0, MatLogger::kCSI);
-    logger_dlzf_ = std::make_unique<MatLogger>(0, MatLogger::kDLZF);
-  }
 }
 
 DoZF::~DoZF() {
@@ -83,11 +80,6 @@ DoZF::~DoZF() {
   std::free(csi_gather_buffer_);
   calib_sc_vec_ptr_.reset();
   std::free(calib_gather_buffer_);
-
-  if (kEnableMatLog) {
-    logger_csi_->SaveMatBuf();
-    logger_dlzf_->SaveMatBuf();
-  }
 }
 
 EventData DoZF::Launch(size_t tag) {
@@ -390,11 +382,13 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
       phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
     }
     if (kEnableMatLog) {
-      logger_csi_->UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
+      mat_logger_array_.at(CsvLog::kMatCSI - CsvLog::kMatIdStart)->
+          UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
       arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(
                               dl_zf_matrices_[frame_slot][cur_sc_id]),
                               cfg_->BsAntNum(), cfg_->UeAntNum(), false);
-      logger_dlzf_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_zf);
+      mat_logger_array_.at(CsvLog::kMatDLZF - CsvLog::kMatIdStart)->
+          UpdateMatBuf(frame_id, cur_sc_id, mat_dl_zf);
     }
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;

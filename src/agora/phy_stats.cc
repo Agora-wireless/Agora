@@ -60,11 +60,6 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                           Agora_memory::Alignment_t::kAlign64);
   csi_cond_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
                    Agora_memory::Alignment_t::kAlign64);
-
-  if (kEnableCsvLog && cfg->ListenerId() >= 0) {
-    logger_dlpsnr_ = std::make_unique<CsvLogger>(cfg->ListenerId(),
-                                                 CsvLogger::kDLPSNR);
-  }
 }
 
 PhyStats::~PhyStats() {
@@ -152,13 +147,17 @@ void PhyStats::PrintDlSnrStats(size_t frame_id, size_t ant_id) {
   AGORA_LOG_INFO("%s", ss.str().c_str());
 }
 
-void PhyStats::RecordDlPilotSnr(size_t frame_id, size_t ant_id) {
+void PhyStats::RecordDlPilotSnr(std::unique_ptr<CsvLog::CsvLogger>& logger,
+                                size_t frame_id, size_t ant_id) {
   if (kEnableCsvLog) {
+    std::stringstream ss;
+    ss << frame_id << "," << ant_id;
     const size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
     for (size_t i = 0; i < dl_pilots_num; i++) {
-      logger_dlpsnr_->Write(frame_id, i, ant_id,
-          dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + i]);
+      ss << ","
+         << dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + i];
     }
+    logger->Write(ss.str());
   }
   else {
     unused(frame_id);

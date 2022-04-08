@@ -313,6 +313,7 @@ set(COMMON_SOURCES
   src/common/memory_manage.cc
   src/common/scrambler.cc
   src/common/csv_logger.cc
+  src/common/mat_logger.cc
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc
   src/encoder/iobuffer.cc)

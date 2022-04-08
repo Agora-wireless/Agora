@@ -45,10 +45,11 @@ TEST(TestZF, Perf) {
   auto phy_stats = std::make_unique<PhyStats>(cfg.get(), Direction::kUplink);
   auto stats = std::make_unique<Stats>(cfg.get());
 
+  CsvLog::MatLoggerArray mat_logger_array;
   auto compute_zf = std::make_unique<DoZF>(
       cfg.get(), tid, csi_buffers, calib_dl_msum_buffer, calib_ul_msum_buffer,
       calib_dl_buffer, calib_ul_buffer, ul_zf_matrices, dl_zf_matrices,
-      phy_stats.get(), stats.get());
+      phy_stats.get(), stats.get(), mat_logger_array);
 
   FastRand fast_rand;
   size_t start_tsc = GetTime::Rdtsc();

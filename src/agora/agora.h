@@ -33,6 +33,7 @@
 #include "signal_handler.h"
 #include "stats.h"
 #include "utils.h"
+#include "mat_logger.h"
 
 class Agora {
  public:
@@ -323,6 +324,8 @@ class Agora {
   uint8_t schedule_process_flags_;
 
   std::queue<size_t> encode_deferral_;
+
+  CsvLog::MatLoggerArray mat_logger_array_;
 };
 
 #endif  // AGORA_H_
