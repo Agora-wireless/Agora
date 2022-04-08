@@ -16,11 +16,15 @@
 ///Class to commicate with the Radios.  Including symbol parsing, packing and unpacking based on control plan MTU settings.
 class RadioSocket {
  public:
-  RadioSocket(size_t samples_per_symbol);
+  RadioSocket();
   ~RadioSocket() = default;
+  //Allow move, and disallow copy
+  explicit RadioSocket(RadioSocket&&) = default;
+  explicit RadioSocket(const RadioSocket&) = delete;
 
-  void Create(const std::string& local_addr, const std::string& remote_addr,
-              const std::string& local_port, const std::string& remote_port);
+  void Create(size_t samples_per_symbol, const std::string& local_addr,
+              const std::string& remote_addr, const std::string& local_port,
+              const std::string& remote_port);
   inline const std::string& Address() const { return socket_->Address(); }
   inline const std::string& Port() const { return socket_->Port(); };
 
@@ -38,7 +42,7 @@ class RadioSocket {
   size_t rx_bytes_;
   size_t rx_samples_;
 
-  const size_t samples_per_symbol_;
+  size_t samples_per_symbol_;
   const size_t bytes_per_element_;
 };
 #endif  // RADIO_SOCKET_H_

@@ -78,17 +78,19 @@ static_assert(sizeof(IrisCommData::header_) == 16);
 //info.optionNames = {"Complex int16", "Complex int12", "Complex int8"};
 // this is also a bit more complex and needs to be reviewed for multiple cases
 // 3 bytes == 1 Sample (8 bit + 4 bit) Real (8 bit + 4 bit) Img = 24 bits = 3 Bytes
-RadioSocket::RadioSocket(size_t samples_per_symbol)
+RadioSocket::RadioSocket()
     : rx_buffer_(kRxBufferSize, std::byte(0)),
       rx_bytes_(0),
       rx_samples_(0),
-      samples_per_symbol_(samples_per_symbol),
+      samples_per_symbol_(1),
       bytes_per_element_(3u) {}
 
-void RadioSocket::Create(const std::string& local_addr,
+void RadioSocket::Create(size_t samples_per_symbol,
+                         const std::string& local_addr,
                          const std::string& remote_addr,
                          const std::string& local_port,
                          const std::string& remote_port) {
+  samples_per_symbol_ = samples_per_symbol;
   socket_ = std::make_unique<UDPServerIPv6>(local_addr, local_port);
 
   //Creates a 1:1 connection for DATAGRAM sockets
