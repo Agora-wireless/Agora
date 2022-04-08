@@ -69,10 +69,11 @@ void MasterToWorkerDynamicWorker(
     // Wait
   }
 
+  CsvLog::MatLoggerArray mat_logger_array;
   auto compute_zf = std::make_unique<DoZF>(
       cfg, worker_id, csi_buffers, calib_dl_msum_buffer, calib_ul_msum_buffer,
       calib_dl_buffer, calib_ul_buffer, ul_zf_matrices, dl_zf_matrices,
-      phy_stats, stats);
+      phy_stats, stats, mat_logger_array);
 
   size_t start_tsc = GetTime::Rdtsc();
   size_t num_tasks = 0;

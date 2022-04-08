@@ -12,6 +12,7 @@ elif len(sys.argv) == 2:
 else:
   print('usage: python3 ' + sys.argv[0] + ' <number of UEs>')
   exit()
+num_dev = int(sys.argv[1])
 
 # start of customizable plot config #
 
@@ -19,11 +20,11 @@ title = 'Downlink User and Listener'
 
 enable_trace_plot = True
 enable_stats_plot = True
-xlims = [[] for i in range(20)]
+xlims = [[] for i in range(num_dev)]
 
 if use_csv_logger:
   cols = [
-    ['Frame', 'DL-Pilot-SNR'],
+    ['Frame', 'DL-Pilot-SNR-0'],
     ['Frame', 'EVM-SNR'],
     ['Frame', 'Bit-Error-Rate'],
     ['Frame', 'Symbol-Error-Rate']
@@ -38,22 +39,23 @@ if use_csv_logger:
   ylims = [[], [], [0.0,0.5], [0.0,0.5]]
 else:
   cols = [
-    ['Frame', 'DL-Pilot-SNR'],
+    ['Frame', 'DL-Pilot-SNR-0'],
+    ['Frame', 'DL-Pilot-Offset-0'],
     ['Frame', 'EVM-SNR'],
     ['Frame', 'Symbol-Errors']
   ]
   files = [
     'uedata-dlpsnr',
+    'uedata-dlpoff',
     'uedata-evmsnr',
     'uedata-se'
   ]
-  stats_zero_fill = [False, False, True]
-  ylims = [[], [], []]
+  stats_zero_fill = [False, False, False, True]
+  ylims = [[], [], [], []]
   qam_symbols_per_frame = 304 - (304 / 16)
 
 # end of customizable plot config #
 
-num_dev = int(sys.argv[1])
 num_file = len(files)
 xlabel = cols[0][0]
 ylabels = [cols[i][1] for i in range(num_file)]
@@ -72,7 +74,7 @@ for i in range(num_file):
       if xlims[j][1] > xminmax[1]:
         xlims[j][1] = xminmax[1]
 
-def series_str2float(ser):
+def str2float(ser):
   for idx, val in ser.items():
     if isinstance(val, str):
       ser[idx] = float(re.sub(r"([A-Z]+)|([a-z]+)", '', val))
@@ -84,7 +86,7 @@ if enable_trace_plot:
   for i in range(num_file):
     for j in range(num_dev):
       idx = i * num_dev + j
-      axs[i].plot(dfs[idx][xlabel], series_str2float(dfs[idx][ylabels[i]].copy()))
+      axs[i].plot(dfs[idx][xlabel], str2float(dfs[idx][ylabels[i]].copy()))
     axs[i].set_xlim(xlims[0])
     if ylims[i] != []:
       axs[i].set_ylim(ylims[i])
@@ -99,7 +101,7 @@ for i in range(num_file):
     idx = i * num_dev + j
     data_select = dfs[idx][ylabels[i]][dfs[idx][xlabel] \
                   .between(xlims[j][0], xlims[j][1])]
-    series_str2float(data_select)
+    str2float(data_select)
     if stats_zero_fill[i]:
       len_zeros = (xlims[j][1] - xlims[j][0] + 1) - len(data_select)
       if len_zeros > 0:

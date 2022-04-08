@@ -17,7 +17,7 @@
 #include "stats.h"
 #include "symbols.h"
 #include "utils.h"
-#include "csv_logger.h"
+#include "mat_logger.h"
 
 class DoZF : public Doer {
  public:
@@ -29,7 +29,8 @@ class DoZF : public Doer {
        Table<complex_float>& calib_ul_msum_buffer,
        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices_,
        PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices_,
-       PhyStats* in_phy_stats, Stats* stats_manager);
+       PhyStats* in_phy_stats, Stats* stats_manager,
+       CsvLog::MatLoggerArray& mat_logger_array);
   ~DoZF() override;
 
   /**
@@ -108,8 +109,7 @@ class DoZF : public Doer {
   arma::uvec ext_ref_id_;
   size_t num_ext_ref_;
 
-  std::unique_ptr<MatLogger> logger_csi_;
-  std::unique_ptr<MatLogger> logger_dlzf_;
+  CsvLog::MatLoggerArray& mat_logger_array_;
 };
 
 #endif  // DOZF_H_

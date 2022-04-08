@@ -38,7 +38,9 @@ UeWorker::UeWorker(
     Table<complex_float>& fft_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
-    std::vector<std::vector<std::complex<float>>>& ue_pilot_vec)
+    std::vector<std::vector<std::complex<float>>>& ue_pilot_vec,
+    std::unique_ptr<CsvLog::CsvLogger>& logger_evmsnr,
+    std::unique_ptr<CsvLog::CsvLogger>& logger_berser)
     : tid_(tid),
       notify_queue_(notify_queue),
       work_queue_(work_queue),
@@ -58,7 +60,9 @@ UeWorker::UeWorker(
       fft_buffer_(fft_buffer),
       demod_buffer_(demod_buffer),
       decoded_buffer_(decoded_buffer),
-      ue_pilot_vec_(ue_pilot_vec) {
+      ue_pilot_vec_(ue_pilot_vec),
+      logger_evmsnr_(logger_evmsnr),
+      logger_berser_(logger_berser) {
   ptok_ = std::make_unique<moodycamel::ProducerToken>(notify_queue);
 
   AllocBuffer1d(&rx_samps_tmp_, config_.SampsPerSymbol(),
@@ -67,13 +71,6 @@ UeWorker::UeWorker(
   (void)DftiCreateDescriptor(&mkl_handle_, DFTI_SINGLE, DFTI_COMPLEX, 1,
                              config_.OfdmCaNum());
   (void)DftiCommitDescriptor(mkl_handle_);
-
-  if (kEnableCsvLog) {
-    logger_berser_ = std::make_unique<CsvLogger>(config.ListenerId(),
-                                                 CsvLogger::kBERSER);
-    logger_evmsnr_ = std::make_unique<CsvLogger>(config.ListenerId(),
-                                                 CsvLogger::kEVMSNR);
-  }
 }
 
 UeWorker::~UeWorker() {
