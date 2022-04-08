@@ -37,7 +37,7 @@ touch /tmp/hydra/install.log
 # If not, report en error
 function check_sys_pkgs() {
   systemPkgs=(g++ cmake make liblapack-dev libblas-dev \
-    libboost-all-dev libnuma-dev python3-pip build-essential \
+    libboost-dev libnuma-dev python3-pip build-essential \
     gcc libudev-dev libnl-3-dev libnl-route-3-dev ninja-build \
     pkg-config valgrind python3-dev cython3 python3-docutils \
     pandoc jq rsync)
@@ -70,7 +70,7 @@ function install_sys_pkgs() {
   echo "[$(hostname)] Downloading required system packages"
   sudo apt-get update >> /tmp/hydra/install.log 2>&1
   sudo apt-get install -y g++ cmake make liblapack-dev libblas-dev \
-    libboost-all-dev libnuma-dev python3-pip build-essential gcc \
+    libboost-dev libnuma-dev python3-pip build-essential gcc \
     libudev-dev libnl-3-dev libnl-route-3-dev ninja-build \
     pkg-config valgrind python3-dev cython3 python3-docutils pandoc \
     jq rsync >> /tmp/hydra/install.log 2>&1
