@@ -405,8 +405,9 @@ void* Agora::subcarrierWorker(int tid)
 void* Agora::decodeWorker(int tid)
 {
     if (config_->use_hyperthreading == Config::HyperMode::kRXTXExclusive) {
+        size_t offset = (do_fft_threads_.size() + do_subcarrier_threads_.size()) % 2 == 0 ? 0 : 1;
         pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_,
-            tid + do_fft_threads_.size() + do_subcarrier_threads_.size(), 
+            tid + do_fft_threads_.size() + do_subcarrier_threads_.size() + offset, 
             true, true, config_->phy_core_num);
     } else if (config_->use_hyperthreading == Config::HyperMode::kRXExclusive) {
         pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_ - kNumDemodTxThread,
