@@ -163,3 +163,10 @@ if [ "${HYDRA_RUN_MODE}" == 0 ] && [ "${bigstation_mode}" != "true" ]; then
     source ${hydra_root_dir}/scripts/control/error_diagnosis.sh
   fi
 fi
+
+echo ""
+echo ""
+echo ""
+echo "Roce94"
+cat /tmp/hydra/log_roce94.txt | grep "DySubcarrier Thread" | tail -10
+cat /tmp/hydra/log_roce94.txt | grep "DoDecode Thread" | tail -10
