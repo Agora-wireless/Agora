@@ -1,0 +1,1 @@
+{"hydra_servers": ["roce95", "roce94", "roce83"], "coding_thread_num": [5, 5, 4], "subcarrier_num_list": [384, 416, 416], "subcarrier_block_list": [12, 12, 12], "rru_servers": ["roce84"]}
