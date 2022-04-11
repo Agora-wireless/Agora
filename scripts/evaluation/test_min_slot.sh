@@ -21,7 +21,8 @@ while [ "${over}" == "0" ]; do
     ${hydra_root_dir}/scripts/evaluation/latency_analysis.sh 0
     if [ ! -f ${hydra_root_dir}/data/frame_latency_all_0.txt ]; then
         echo "Run Hydra failed this time"
-        slot_us=$(( ${slot_us}+100 ))
+        step=$(( ${slot_us}/1000*100 ))
+        slot_us=$(( ${slot_us}+${step} ))
         continue
     fi
     over=1
