@@ -4,7 +4,7 @@ close all;
 symbol_size = 896;
 fft_size = 512;
 data_size = 304;
-offset = 157;
+offset = 160;
 cp = 32;
 n_user = 1;
 pig = 0;
