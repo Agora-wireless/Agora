@@ -1,8 +1,10 @@
 import json
 import sys
 
-app_node_list = ["node9", "node10", "node11", "node12", "node13", "node14", "node15", "node16", "node17", "node18", "node19", "node20", "node21", "node22", "node24"]
-server_num_min = 6
+# app_node_list = ["node9", "node10", "node11", "node12", "node13", "node14", "node15", "node16", "node17", "node18", "node19", "node20", "node21", "node22", "node24"]
+app_node_list = ["roce95", "roce94", "roce83"]
+# server_num_min = 6
+server_num_min = 1
 
 def ceil_divide(a, b):
     s = 0
@@ -46,7 +48,7 @@ num_server = ceil_divide(target_core_num, core_num_each_server)
 if num_server < server_num_min:
     num_server = server_num_min
 
-core_left_for_proc = (target_core_num - rx_thread_num * num_server) * 2 - num_server
+core_left_for_proc = (target_core_num - rx_thread_num * num_server) * 2 - num_server * 2
 target_core_num_for_subcarrier = core_left_for_proc * subcarrier_core_num / (subcarrier_core_num + coding_core_num) + 1
 
 subcarrier_block_total_num = ofdm_data_num / ue_num
