@@ -1,0 +1,35 @@
+{
+    "rx_thread_num": 1,
+    "use_central_scheduler": false,
+    "use_general_worker": false,
+    "worker_thread_num": 10,
+    "demul_block_size": 8,
+    "antenna_num": 64,
+    "ue_num": 16,
+    "core_offset": 1,
+    "frames": [
+      "PDDDDDDDDDDDDD"
+    ],
+    "bs_port": 11000,
+    "ue_rx_port": 10000,
+    "ue_tx_port": 9000,
+    "demod_tx_port": 8100,
+    "demod_rx_port": 8600,
+    "frames_to_test": 4000,
+    "Zc": 72,
+    "freq_orthogonal_pilot": true,
+    "modulation": "64QAM",
+    "test_mode": 0,
+    "dynamic_workload": true,
+    "fixed_control": 0,
+    "user_level_list": [
+      16
+    ],
+    "num_load_levels": 1,
+    "sleep_mode": false,
+    "ofdm_data_num": 1200,
+    "slot_us": 1000,
+    "use_hyperthreading": "RXExclusive",
+    "phy_core_num": 10
+  }
+  

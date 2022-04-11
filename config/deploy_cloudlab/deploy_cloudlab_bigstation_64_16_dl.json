@@ -1,0 +1,46 @@
+{
+    "rru_servers": [
+        "node27",
+        "node26"
+    ],
+    "hydra_servers": [
+        "node1",
+        "node2",
+        "node3",
+        "node4",
+        "node5",
+        "node6"
+    ],
+    "num_ifft_workers": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+    ],
+    "num_zf_workers": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+    ],
+    "num_precode_workers": [
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+    ],
+    "num_encode_workers": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+    ]
+}
