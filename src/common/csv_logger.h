@@ -69,7 +69,9 @@ class CsvLogger {
 public:
   CsvLogger(const std::string&);
   CsvLogger(void*);
-  void Write(...);
+  void Write(size_t, size_t, size_t, float, float);
+  void Write(size_t, size_t, size_t, size_t, float, float);
+  void Write(const std::string&);
 };
 #endif //ENABLE_CSV_LOG
 
