@@ -524,7 +524,9 @@ class Config {
   size_t bs_ant_num_;  // Total number of BS antennas
   size_t bf_ant_num_;  // Number of antennas used in beamforming
 
-  int listener_id_;  // Listener ID if possitive; Normal user if zero
+  int listener_id_;  // If possitive, using listener mode with ID;
+                     // If zero, using normal user mode;
+                     // If negative, meaning not a user program.
 
   // The count of ues an instance is responsable for
   size_t ue_num_;

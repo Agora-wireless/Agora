@@ -34,6 +34,7 @@ for file in $@; do
     elif [[ $line =~ $pattern_ber ]]; then
       printf "%s,%s,%s\n" ${BASH_REMATCH[2]} ${BASH_REMATCH[3]} ${BASH_REMATCH[4]} \
           >> "uedata-ber.csv"
+      printf "BER[%d] = %s\n" $idx ${BASH_REMATCH[4]}
     fi
   done < $file
   ((idx++))

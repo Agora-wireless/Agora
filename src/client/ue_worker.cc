@@ -193,7 +193,9 @@ void UeWorker::DoFftPilot(size_t tag) {
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
       std::fclose(f);
       fname = "txpilot_f_" + std::to_string(dl_symbol_id) + "_" +
-              std::to_string(ant_id) + ".bin";
+              std::to_string(ant_id) + (config_.ListenerId() > 0 ?
+              "_listener_" + std::to_string(config_.ListenerId()) : "") +
+              ".bin";
       f = std::fopen(fname.c_str(), "wb");
       std::fwrite(config_.UeSpecificPilot()[ant_id], 2 * sizeof(float),
                   config_.OfdmDataNum(), f);

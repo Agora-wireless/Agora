@@ -37,7 +37,8 @@ if use_csv_logger:
   ]
   stats_zero_fill = [False, False, False, False]
   ylims = [[], [], [0.0,0.5], [0.0,0.5]]
-else:
+
+else: # use log txt
   cols = [
     ['Frame', 'DL-Pilot-SNR-0'],
     ['Frame', 'DL-Pilot-Offset-0'],
@@ -63,7 +64,7 @@ ylabels = [cols[i][1] for i in range(num_file)]
 dfs = []
 for i in range(num_file):
   for j in range(num_dev):
-    df = pd.read_csv(files[i] + f'-{j}.csv', usecols=cols[i])
+    df = pd.read_csv(files[i] + f'-{j}.csv', usecols=cols[i]).dropna()
     dfs.append(df)
     xminmax = [min(df[xlabel]), max(df[xlabel])]
     if xlims[j] == []:
@@ -82,20 +83,22 @@ def str2float(ser):
 
 if enable_trace_plot:
   fig, axs = plt.subplots(num_file, 1, constrained_layout=True)
-  fig.suptitle(title + ' Traces')
+  fig.suptitle(title)
   for i in range(num_file):
     for j in range(num_dev):
       idx = i * num_dev + j
-      axs[i].plot(dfs[idx][xlabel], str2float(dfs[idx][ylabels[i]].copy()))
+      axs[i].plot(dfs[idx][xlabel], str2float(dfs[idx][ylabels[i]].copy()),
+                  label = 'UE ' + str(j))
     axs[i].set_xlim(xlims[0])
     if ylims[i] != []:
       axs[i].set_ylim(ylims[i])
     axs[i].set_xlabel(xlabel)
     axs[i].set_ylabel(ylabels[i])
+    axs[i].legend()
 
 if enable_stats_plot:
   fig, axs = plt.subplots(num_file, 1, constrained_layout=True)
-  fig.suptitle(title + ' Statistics')
+  fig.suptitle(title)
 for i in range(num_file):
   for j in range(num_dev):
     idx = i * num_dev + j
@@ -107,14 +110,16 @@ for i in range(num_file):
       if len_zeros > 0:
         data_select = pd.concat([data_select, pd.Series(np.zeros(len_zeros))])
     if enable_stats_plot:
-      axs[i].plot(np.sort(data_select), \
-          1. * np.arange(len(data_select)) / (len(data_select) - 1))
-    print(ylabels[i] + f': Mean[{j}] = %f, ' % sts.mean(data_select) + \
+      axs[i].plot(np.sort(data_select),
+                  1. * np.arange(len(data_select)) / (len(data_select) - 1),
+                  label = 'UE ' + str(j))
+    print(ylabels[i] + f': Mean[{j}] = %f, ' % sts.mean(data_select) +
           f'Median[{j}] = %f' % sts.median(data_select))
     if ylabels[i] == 'Symbol-Errors':
       print(f'SER[{j}] = %f' % (sts.mean(data_select) / qam_symbols_per_frame))
   if enable_stats_plot:
     axs[i].set_xlabel(ylabels[i])
     axs[i].set_ylabel('CDF')
+    axs[i].legend()
 if enable_trace_plot or enable_stats_plot:
   plt.show()
