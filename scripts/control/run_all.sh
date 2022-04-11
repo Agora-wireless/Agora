@@ -131,6 +131,14 @@ fi
 time_to_check=$(( slot_us*slots_to_test/1000000+25 ))
 for (( t=0; t<${time_to_check}; t++ )) do
   ready=1
+  for (( i=0; i<${hydra_rru_num}; i++ )) do
+    server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.rru_servers[$i]' | tr -d '"')
+    res=$(cat /tmp/hydra/done_${server_name}.txt )
+    if [ "${res}" != "1" ]; then
+      ready=0
+      break
+    fi
+  done
   for (( i=0; i<${hydra_app_num}; i++ )) do
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.hydra_servers[$i]' | tr -d '"')
     res=$(cat /tmp/hydra/done_${server_name}.txt )
@@ -164,9 +172,9 @@ if [ "${HYDRA_RUN_MODE}" == 0 ] && [ "${bigstation_mode}" != "true" ]; then
   fi
 fi
 
-echo ""
-echo ""
-echo ""
-echo "Roce94"
-cat /tmp/hydra/log_roce94.txt | grep "DySubcarrier Thread" | tail -10
-cat /tmp/hydra/log_roce94.txt | grep "DoDecode Thread" | tail -10
+# echo ""
+# echo ""
+# echo ""
+# echo "Roce94"
+# cat /tmp/hydra/log_roce94.txt | grep "DySubcarrier Thread" | tail -10
+# cat /tmp/hydra/log_roce94.txt | grep "DoDecode Thread" | tail -10
