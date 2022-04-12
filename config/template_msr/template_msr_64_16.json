@@ -3,7 +3,7 @@
   "use_central_scheduler": false,
   "use_general_worker": false,
   "worker_thread_num": 10,
-  "demul_block_size": 16,
+  "demul_block_size": 8,
   "antenna_num": 64,
   "ue_num": 16,
   "core_offset": 3,
