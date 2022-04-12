@@ -1,33 +1,33 @@
 {
-    "rru_servers": [
-        "roce96"
-    ],
-    "hydra_servers": [
-        "roce89",
-        "roce95"
-    ],
-    "subcarrier_num_list": [
-        208,
-        192,
-        208,
-        192,
-        208,
-        192
-    ],
-    "subcarrier_block_list": [
-        24,
-        24,
-        24,
-        24,
-        24,
-        24
-    ],
-    "decode_thread_num": [
-        3,
-        3,
-        3,
-        3,
-        2,
-        2
-    ]
+  "rru_servers": [
+    "roce96"
+  ],
+  "hydra_servers": [
+    "roce89",
+    "roce95"
+  ],
+  "subcarrier_num_list": [
+    208,
+    192,
+    208,
+    192,
+    208,
+    192
+  ],
+  "subcarrier_block_list": [
+    24,
+    24,
+    24,
+    24,
+    24,
+    24
+  ],
+  "decode_thread_num": [
+    3,
+    3,
+    3,
+    3,
+    2,
+    2
+  ]
 }
