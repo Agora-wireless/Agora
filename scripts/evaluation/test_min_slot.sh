@@ -13,8 +13,15 @@ slot_us=1000
 rm -f ${hydra_root_dir}/data/frame_latency_all_0.txt
 
 over=0
+run_limit=30
+num_run=0
 while [ "${over}" == "0" ]; do
-    echo "Run Hydra for the ${slot_us} us slot size"
+    num_run=$(( ${num_run}+1 ))
+    if [ "${num_run}" == "${run_limit}" ]; then
+        echo "Run time over limit ${run_limit}"
+        exit
+    fi
+    echo "Run Hydra ant $1 ue $2 core $3 for the ${slot_us} us slot size"
     cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson slot ${slot_us} '.slot_us=$slot' > tmp.json
     mv tmp.json ${HYDRA_SYSTEM_CONFIG_JSON}
     ${hydra_root_dir}/scripts/control/run_all.sh -x || continue

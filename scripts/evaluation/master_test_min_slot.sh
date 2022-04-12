@@ -33,6 +33,6 @@ for i in ${!ant_list[@]}; do
         HYDRA_SYSTEM_CONFIG_JSON=config/template_msr/template_msr_${ant_num}_${ue_num}_${c}c.json
         cat ${hydra_master_config_json} | jq --arg deploy "${HYDRA_SERVER_DEPLOY_JSON}" '.hydra_server_deploy_json=$deploy' > tmp.json
         cat tmp.json | jq --arg template "${HYDRA_SYSTEM_CONFIG_JSON}" '.hydra_system_config_json=$template' > ${hydra_master_config_json}
-        bash ${hydra_root_dir}/scripts/evaluation/test_min_slot.sh
+        bash ${hydra_root_dir}/scripts/evaluation/test_min_slot.sh ${ant_num} ${ue_num} ${c}
     done
 done
