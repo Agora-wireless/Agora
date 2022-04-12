@@ -693,12 +693,42 @@ bool SharedState::precode_done(size_t frame_id)
     // }
     precode_mutex_.lock();
     num_precode_tasks_completed_[frame_id % kFrameWnd]++;
-    while (frame_id == cur_frame_ && num_precode_tasks_completed_[frame_id % kFrameWnd] == num_precode_tasks_per_frame_) {
+    // while (frame_id == cur_frame_ && num_precode_tasks_completed_[frame_id % kFrameWnd] == num_precode_tasks_per_frame_) {
+    //     frame_end_time_[cur_frame_] = get_us();
+    //     encode_ready_[frame_id % kFrameWnd] = false;
+    //     size_t cur_cycle = worker_rdtsc();
+    //     num_precode_tasks_completed_[frame_id % kFrameWnd] = 0;
+    //     size_t frame_slot = frame_id % kFrameWnd;
+    //     num_pkts_[frame_slot] = 0;
+    //     num_pilot_pkts_[frame_slot] = 0;
+    //     for (size_t j = 0; j < kMaxSymbols; j++) {
+    //         num_data_pkts_[frame_slot][j] = 0;
+    //     }
+    //     for (size_t j = 0; j < kMaxSymbols; j++) {
+    //         num_encode_tasks_completed_[frame_slot][j] = 0;
+    //     }
+    //     // num_encode_tasks_completed_[frame_slot] = 0;
+    //     for (size_t j = 0; j < kMaxSymbols; j++) {
+    //         num_encoded_pkts_[frame_slot][j] = 0;
+    //         num_encoded_pkts_states_[frame_slot][j] = 0;
+    //     }
+    //     MLPD_INFO("Main thread: Precode done frame: %lu, for %.2lfms\n", cur_frame_, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
+    //     last_frame_cycles_ = cur_cycle;
+    //     cur_frame_ ++;
+    //     frame_id ++;
+    // }
+    precode_mutex_.unlock();
+    return true;
+}
+
+bool SharedState::move_forward_and_clean_up_dl()
+{
+    while (num_precode_tasks_completed_[cur_frame_ % kFrameWnd] == num_precode_tasks_per_frame_) {
         frame_end_time_[cur_frame_] = get_us();
-        encode_ready_[frame_id % kFrameWnd] = false;
+        encode_ready_[cur_frame_ % kFrameWnd] = false;
         size_t cur_cycle = worker_rdtsc();
-        num_precode_tasks_completed_[frame_id % kFrameWnd] = 0;
-        size_t frame_slot = frame_id % kFrameWnd;
+        num_precode_tasks_completed_[cur_frame_ % kFrameWnd] = 0;
+        size_t frame_slot = cur_frame_ % kFrameWnd;
         num_pkts_[frame_slot] = 0;
         num_pilot_pkts_[frame_slot] = 0;
         for (size_t j = 0; j < kMaxSymbols; j++) {
@@ -707,7 +737,6 @@ bool SharedState::precode_done(size_t frame_id)
         for (size_t j = 0; j < kMaxSymbols; j++) {
             num_encode_tasks_completed_[frame_slot][j] = 0;
         }
-        // num_encode_tasks_completed_[frame_slot] = 0;
         for (size_t j = 0; j < kMaxSymbols; j++) {
             num_encoded_pkts_[frame_slot][j] = 0;
             num_encoded_pkts_states_[frame_slot][j] = 0;
@@ -715,9 +744,7 @@ bool SharedState::precode_done(size_t frame_id)
         MLPD_INFO("Main thread: Precode done frame: %lu, for %.2lfms\n", cur_frame_, cycles_to_ms(cur_cycle - last_frame_cycles_, freq_ghz_));
         last_frame_cycles_ = cur_cycle;
         cur_frame_ ++;
-        frame_id ++;
     }
-    precode_mutex_.unlock();
     return true;
 }
 

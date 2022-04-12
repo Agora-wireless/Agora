@@ -148,9 +148,14 @@ void Agora::Start()
         }
         if (cfg->use_central_scheduler) {
             handleEvents();
+            if (cfg->downlink_mode) {
+                shared_state_.move_forward_and_clean_up_dl();
+            } else {
+                shared_state_.move_forward_and_clean_up_ul();
+            }
         } else {
             if (cfg->downlink_mode) {
-                
+                shared_state_.move_forward_and_clean_up_dl();
             } else {
                 shared_state_.move_forward_and_clean_up_ul();
             }
@@ -161,8 +166,18 @@ void Agora::Start()
 
 finish:
     if (cfg->error) {
-        Diagnosis(cfg, &shared_state_, bottleneck_subcarrier_,
-            bottleneck_decode_, bottleneck_encode_);
+        if (cfg->use_central_scheduler) {
+            printf("Central scheduler: cur slot %zu, csi_task_completed_ %zu, "
+                "zf_task_completed_ %zu, decode_task_completed_ %zu, "
+                "csi_launched_ %zu, demod_launch_symbol_ %zu, decode_launch_symbol_ %zu\n",
+                progress_.cur_slot_, progress_.csi_task_completed_, progress_.zf_task_completed_,
+                progress_.decode_task_completed_, progress_.csi_launched_, progress_.demod_launch_symbol_,
+                progress_.decode_launch_symbol_);
+            shared_state_.print_receiving_demod_pkts(cfg->ue_start, progress_.cur_slot_, progress_.decode_launch_symbol_);
+        } else {
+            Diagnosis(cfg, &shared_state_, bottleneck_subcarrier_,
+                bottleneck_decode_, bottleneck_encode_);
+        }
     } else {
         printf("Agora: No error detected\n");
     }
@@ -235,7 +250,8 @@ void Agora::handleEvents()
             progress_.demod_task_completed_[symbol_id_ul] ++;
             if (progress_.demod_task_completed_[symbol_id_ul] == demul_task_per_symbol) {
                 MLPD_INFO("Demod complete for (slot %d symbol %d)\n", progress_.cur_slot_, symbol_id_ul);
-                shared_state_.demul_done(progress_.cur_slot_, symbol_id_ul, demul_task_per_symbol);
+                // shared_state_.demul_done(progress_.cur_slot_, symbol_id_ul, demul_task_per_symbol);
+                shared_state_.demul_done(progress_.cur_slot_, symbol_id_ul, cfg->get_num_sc_to_process());
             }
             break;
         case EventType::kDecode:
@@ -320,7 +336,7 @@ void Agora::handleEvents()
         progress_.demod_task_completed_[progress_.decode_launch_symbol_] == demul_task_per_symbol) {
         bool received = true;
         for (size_t i = cfg->ue_start; i < cfg->ue_end; i ++) {
-            if (!shared_state_.received_all_demod_pkts(i, progress_.cur_slot_, progress_.decode_launch_symbol_)) {
+            if (!shared_state_.received_all_demod_pkts_loss_tolerant(i, progress_.cur_slot_, progress_.decode_launch_symbol_)) {
                 received = false;
                 break;
             }
@@ -345,8 +361,16 @@ void Agora::handleEvents()
 
 void* Agora::fftWorker(int tid)
 {
-    pin_to_core_with_offset(
-        ThreadType::kWorkerFFT, base_worker_core_offset_, tid);
+    if (config_->use_hyperthreading == Config::HyperMode::kRXTXExclusive) {
+        pin_to_core_with_offset(ThreadType::kWorkerFFT, base_worker_core_offset_, tid, 
+            true, true, config_->phy_core_num);
+    } else if (config_->use_hyperthreading == Config::HyperMode::kRXExclusive) {
+        pin_to_core_with_offset(ThreadType::kWorkerFFT, base_worker_core_offset_ - kNumDemodTxThread, 
+            tid + kNumDemodTxThread, true, true, config_->phy_core_num);
+    } else {
+        pin_to_core_with_offset(
+            ThreadType::kWorkerFFT, base_worker_core_offset_, tid);
+    }
 
     size_t ant_block = config_->get_num_ant_to_process() / config_->fft_thread_num;
     size_t ant_off = config_->get_num_ant_to_process() % config_->fft_thread_num;
@@ -366,8 +390,9 @@ void* Agora::fftWorker(int tid)
 void* Agora::subcarrierWorker(int tid)
 {
     if (config_->use_hyperthreading == Config::HyperMode::kRXTXExclusive) {
+        size_t offset = do_fft_threads_.size() % 2 == 0 ? 0 : 1;
         pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, base_worker_core_offset_, 
-            tid + do_fft_threads_.size(), true, true, config_->phy_core_num);
+            tid + do_fft_threads_.size() + offset, true, true, config_->phy_core_num);
     } else if (config_->use_hyperthreading == Config::HyperMode::kRXExclusive) {
         pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, base_worker_core_offset_ - kNumDemodTxThread, 
             tid + do_fft_threads_.size() + kNumDemodTxThread, true, true, config_->phy_core_num);
@@ -405,7 +430,9 @@ void* Agora::subcarrierWorker(int tid)
 void* Agora::decodeWorker(int tid)
 {
     if (config_->use_hyperthreading == Config::HyperMode::kRXTXExclusive) {
-        size_t offset = (do_fft_threads_.size() + do_subcarrier_threads_.size()) % 2 == 0 ? 0 : 1;
+        // size_t offset = (do_fft_threads_.size() + do_subcarrier_threads_.size()) % 2 == 0 ? 0 : 1;
+        size_t offset = do_fft_threads_.size() % 2 == 0 ? 0 : 1;
+        offset += do_subcarrier_threads_.size() % 2 == 0 ? 0 : 1;
         pin_to_core_with_offset(ThreadType::kWorkerDecode, base_worker_core_offset_,
             tid + do_fft_threads_.size() + do_subcarrier_threads_.size() + offset, 
             true, true, config_->phy_core_num);
