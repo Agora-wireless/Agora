@@ -18,7 +18,7 @@ over=0
 while [ "${over}" == "0" ]; do
     echo "Run Hydra for subcarrier block size ${sc_block_sz} and coding thread num ${coding_thread}"
     for (( i=0; i<${hydra_app_num}; i++ )) do
-        cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} num ${cur_coding_thread} '.coding_thread_num[$i]=$num' > tmp.json
+        cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} --argjson num ${cur_coding_thread} '.coding_thread_num[$i]=$num' > tmp.json
         mv tmp.json ${HYDRA_SYSTEM_CONFIG_JSON}
     done
     ${hydra_root_dir}/scripts/control/run_all.sh -x || continue
@@ -33,7 +33,7 @@ while [ "${over}" == "0" ]; do
 done
 
 for (( i=0; i<${hydra_app_num}; i++ )) do
-    cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} num ${coding_thread} '.coding_thread_num[$i]=$num' > tmp.json
+    cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} --argjson num ${coding_thread} '.coding_thread_num[$i]=$num' > tmp.json
     mv tmp.json ${HYDRA_SYSTEM_CONFIG_JSON}
 done
 
@@ -42,7 +42,7 @@ over=0
 while [ "${over}" == "0" ]; do
     echo "Run Hydra for subcarrier block size ${sc_block_sz} and coding thread num ${coding_thread}"
     for (( i=0; i<${hydra_app_num}; i++ )) do
-        cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} num ${cur_sc_block_sz} '.subcarrier_block_list[$i]=$num' > tmp.json
+        cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} --argjson num ${cur_sc_block_sz} '.subcarrier_block_list[$i]=$num' > tmp.json
         mv tmp.json ${HYDRA_SYSTEM_CONFIG_JSON}
     done
     ${hydra_root_dir}/scripts/control/run_all.sh -x || continue
@@ -57,6 +57,6 @@ while [ "${over}" == "0" ]; do
 done
 
 for (( i=0; i<${hydra_app_num}; i++ )) do
-    cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} num ${sc_block_size} '.subcarrier_block_list[$i]=$num' > tmp.json
+    cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} --argjson num ${sc_block_size} '.subcarrier_block_list[$i]=$num' > tmp.json
     mv tmp.json ${HYDRA_SYSTEM_CONFIG_JSON}
 done
