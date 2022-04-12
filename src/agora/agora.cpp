@@ -251,7 +251,11 @@ void Agora::handleEvents()
             if (progress_.demod_task_completed_[symbol_id_ul] == demul_task_per_symbol) {
                 MLPD_INFO("Demod complete for (slot %d symbol %d)\n", progress_.cur_slot_, symbol_id_ul);
                 // shared_state_.demul_done(progress_.cur_slot_, symbol_id_ul, demul_task_per_symbol);
-                shared_state_.demul_done(progress_.cur_slot_, symbol_id_ul, cfg->get_num_sc_to_process());
+                if (cfg->use_general_worker) {
+                    shared_state_.demul_done(progress_.cur_slot_, symbol_id_ul, demul_task_per_symbol);
+                } else {
+                    shared_state_.demul_done(progress_.cur_slot_, symbol_id_ul, cfg->get_num_sc_to_process());
+                }
             }
             break;
         case EventType::kDecode:
