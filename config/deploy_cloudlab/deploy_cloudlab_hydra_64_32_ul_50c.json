@@ -1,48 +1,48 @@
 {
-    "rru_servers": [
-        "node27",
-        "node1",
-        "node2",
-        "node3"
-    ],
-    "hydra_servers": [
-        "node9",
-        "node10",
-        "node11",
-        "node12",
-        "node13",
-        "node14",
-        "node15",
-        "node16"
-    ],
-    "subcarrier_num_list": [
-        128,
-        128,
-        160,
-        160,
-        160,
-        160,
-        160,
-        160
-    ],
-    "subcarrier_block_list": [
-        64,
-        64,
-        64,
-        64,
-        64,
-        64,
-        64,
-        64
-    ],
-    "coding_thread_num": [
-        7,
-        7,
-        7,
-        7,
-        7,
-        7,
-        7,
-        7
-    ]
+  "rru_servers": [
+    "node27",
+    "node1",
+    "node2",
+    "node3"
+  ],
+  "hydra_servers": [
+    "node9",
+    "node10",
+    "node11",
+    "node12",
+    "node13",
+    "node14",
+    "node15",
+    "node16"
+  ],
+  "subcarrier_num_list": [
+    128,
+    128,
+    160,
+    160,
+    160,
+    160,
+    160,
+    160
+  ],
+  "subcarrier_block_list": [
+    64,
+    64,
+    64,
+    64,
+    64,
+    64,
+    64,
+    64
+  ],
+  "coding_thread_num": [
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7,
+    7
+  ]
 }
