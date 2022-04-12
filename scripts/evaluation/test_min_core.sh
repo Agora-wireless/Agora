@@ -1,0 +1,62 @@
+#! /bin/bash
+
+set -e
+
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+hydra_root_dir=$( cd ${script_dir}/../.. >/dev/null 2>&1 && pwd )
+
+source ${hydra_root_dir}/scripts/utils/utils.sh
+source ${hydra_root_dir}/scripts/control/init_platform.sh
+
+sc_block_sz=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.subcarrier_block_list[0]')
+coding_thread=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.coding_thread_num[0]')
+
+rm -f ${hydra_root_dir}/data/frame_latency_all_0.txt
+
+cur_coding_thread=$(( ${coding_thread}-2 ))
+over=0
+while [ "${over}" == "0" ]; do
+    echo "Run Hydra for subcarrier block size ${sc_block_sz} and coding thread num ${coding_thread}"
+    for (( i=0; i<${hydra_app_num}; i++ )); do
+        cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} num ${cur_coding_thread} '.coding_thread_num[$i]=$num' > tmp.json
+        mv tmp.json ${HYDRA_SYSTEM_CONFIG_JSON}
+    done
+    ${hydra_root_dir}/scripts/control/run_all.sh -x || continue
+    ${hydra_root_dir}/scripts/evaluation/latency_analysis.sh 0
+    if [ -f ${hydra_root_dir}/data/frame_latency_all_0.txt ]; then
+        echo "Succeed this time"
+        coding_thread=${cur_coding_thread}
+        cur_coding_thread=$(( ${coding_thread}-2 ))
+        continue
+    fi
+    over=1
+done
+
+for (( i=0; i<${hydra_app_num}; i++ )); do
+    cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} num ${coding_thread} '.coding_thread_num[$i]=$num' > tmp.json
+    mv tmp.json ${HYDRA_SYSTEM_CONFIG_JSON}
+done
+
+cur_sc_block_sz=$(( ${sc_block_size}+2 ))
+over=0
+while [ "${over}" == "0" ]; do
+    echo "Run Hydra for subcarrier block size ${sc_block_sz} and coding thread num ${coding_thread}"
+    for (( i=0; i<${hydra_app_num}; i++ )); do
+        cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} num ${cur_sc_block_sz} '.subcarrier_block_list[$i]=$num' > tmp.json
+        mv tmp.json ${HYDRA_SYSTEM_CONFIG_JSON}
+    done
+    ${hydra_root_dir}/scripts/control/run_all.sh -x || continue
+    ${hydra_root_dir}/scripts/evaluation/latency_analysis.sh 0
+    if [ -f ${hydra_root_dir}/data/frame_latency_all_0.txt ]; then
+        echo "Succeed this time"
+        sc_block_size=${cur_sc_block_sz}
+        cur_sc_block_sz=$(( ${sc_block_size}+2 ))
+        continue
+    fi
+    over=1
+done
+
+for (( i=0; i<${hydra_app_num}; i++ )); do
+    cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} num ${sc_block_size} '.subcarrier_block_list[$i]=$num' > tmp.json
+    mv tmp.json ${HYDRA_SYSTEM_CONFIG_JSON}
+done

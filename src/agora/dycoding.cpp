@@ -96,8 +96,13 @@ void DyEncode::LaunchStatic(size_t frame_id, size_t symbol_id_dl, size_t ue_id)
 
 void DyEncode::StartWork() 
 {
+    size_t last_frame = 0;
+    // cur_idx_ = tid_;
+    // cur_symbol_ = cur_idx_ / total_ue_num_;
+    // cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
     cur_idx_ = tid_;
-    cur_symbol_ = cur_idx_ / total_ue_num_;
+    cur_frame_ = cur_idx_ / (total_ue_num_ * cfg_->dl_data_symbol_num_perframe);
+    cur_symbol_ = (cur_idx_ % (total_ue_num_* cfg_->dl_data_symbol_num_perframe)) / total_ue_num_;
     cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
 
     size_t start_tsc = 0;
@@ -152,17 +157,27 @@ void DyEncode::StartWork()
             });
 
             shared_state_->encode_done(cur_frame_, cur_symbol_);
-            cur_idx_ += total_dycode_num_;
-            cur_symbol_ = cur_idx_ / total_ue_num_;
-            cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
-            if (cur_symbol_ >= cfg_->dl_data_symbol_num_perframe) {
-                cur_idx_ = tid_;
-                cur_symbol_ = cur_idx_ / total_ue_num_;
-                cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
 
-                // shared_state_->encode_done(cur_frame_);
-                cur_frame_++;
+            cur_idx_ += total_dycode_num_;
+            cur_frame_ = cur_idx_ / (total_ue_num_ * cfg_->dl_data_symbol_num_perframe);
+            cur_symbol_ = (cur_idx_ % (total_ue_num_* cfg_->dl_data_symbol_num_perframe)) / total_ue_num_;
+            cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
+            if (cur_frame_ > last_frame) {
+                rt_assert(cur_frame_ == last_frame + 1, "Run cur frame calculation!");
+                last_frame ++;
             }
+
+            // cur_idx_ += total_dycode_num_;
+            // cur_symbol_ = cur_idx_ / total_ue_num_;
+            // cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
+            // if (cur_symbol_ >= cfg_->dl_data_symbol_num_perframe) {
+            //     cur_idx_ = tid_;
+            //     cur_symbol_ = cur_idx_ / total_ue_num_;
+            //     cur_ue_ = cur_idx_ % total_ue_num_ + cfg_->ue_start;
+
+            //     // shared_state_->encode_done(cur_frame_);
+            //     cur_frame_++;
+            // }
 
             TRIGGER_TIMER({
                 state_operation_duration += rdtsc() - encode_start_tsc;
