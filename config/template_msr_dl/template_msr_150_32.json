@@ -1,5 +1,5 @@
 {
-  "rx_thread_num": 3,
+  "rx_thread_num": 1,
   "use_central_scheduler": false,
   "use_general_worker": false,
   "worker_thread_num": 10,

@@ -1,1 +1,34 @@
-{"freq_orthogonal_pilot": true, "ue_rx_port": 10000, "demul_block_size": 8, "antenna_num": 128, "frames": ["PUUUUUUUUUUUUU"], "ofdm_data_num": 1216, "worker_thread_num": 10, "fixed_control": 0, "demod_tx_port": 8100, "rx_thread_num": 3, "phy_core_num": 32, "user_level_list": [32], "test_mode": 0, "modulation": "64QAM", "use_central_scheduler": false, "demod_rx_port": 8600, "use_general_worker": false, "frames_to_test": 10000, "dynamic_workload": true, "num_load_levels": 1, "sleep_mode": false, "core_offset": 3, "ue_tx_port": 9000, "ue_num": 32, "Zc": 72, "slot_us": 1000, "use_hyperthreading": "RXTXExclusive", "bs_port": 11000}
+{
+  "freq_orthogonal_pilot": true,
+  "ue_rx_port": 10000,
+  "demul_block_size": 8,
+  "antenna_num": 128,
+  "frames": [
+    "PUUUUUUUUUUUUU"
+  ],
+  "ofdm_data_num": 1216,
+  "worker_thread_num": 10,
+  "fixed_control": 0,
+  "demod_tx_port": 8100,
+  "rx_thread_num": 3,
+  "phy_core_num": 32,
+  "user_level_list": [
+    32
+  ],
+  "test_mode": 0,
+  "modulation": "64QAM",
+  "use_central_scheduler": false,
+  "demod_rx_port": 8600,
+  "use_general_worker": false,
+  "frames_to_test": 10000,
+  "dynamic_workload": true,
+  "num_load_levels": 1,
+  "sleep_mode": false,
+  "core_offset": 3,
+  "ue_tx_port": 9000,
+  "ue_num": 32,
+  "Zc": 72,
+  "slot_us": 1800,
+  "use_hyperthreading": "RXTXExclusive",
+  "bs_port": 11000
+}

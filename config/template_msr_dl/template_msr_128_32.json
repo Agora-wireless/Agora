@@ -1,5 +1,5 @@
 {
-  "rx_thread_num": 3,
+  "rx_thread_num": 1,
   "use_central_scheduler": false,
   "use_general_worker": false,
   "worker_thread_num": 10,
@@ -8,7 +8,7 @@
   "ue_num": 32,
   "core_offset": 3,
   "frames": [
-    "PUUUUUUUUUUUUU"
+    "PDDDDDDDDDDDDD"
   ],
   "bs_port": 11000,
   "ue_rx_port": 10000,
