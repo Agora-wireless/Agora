@@ -13,13 +13,13 @@
         384
     ],
     "subcarrier_block_list": [
-        24,
-        24,
-        24
+        16,
+        16,
+        16
     ],
     "coding_thread_num": [
-        10,
-        10,
-        10
+        8,
+        8,
+        8
     ]
 }
