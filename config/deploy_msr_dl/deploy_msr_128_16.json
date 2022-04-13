@@ -11,8 +11,8 @@
         592
     ],
     "subcarrier_block_list": [
-        40,
-        40
+        16,
+        16
     ],
     "coding_thread_num": [
         8,
