@@ -1,6 +1,9 @@
-# USE_MKL_JIT has been disabled
+# USE_MKL_JIT has been forced to disabled
 
-# Scheduler Instruction
+# About how the code has been modified from Agora v110
+updated 4.13.2022
+
+Please refer to the code if you see any conflicts.
 
 ## Environment set up
 
@@ -465,13 +468,13 @@ To reach higher bandwidth for test, here we use `data/mac-dl-sim.json` as config
 
 The `xx_threads` `core_offset` parameters can be adjust based on your hardware (physical thread of CPU), but make sure there is no core overlapping.
 
-`RCVT` : number of receiver threads, normally equal to UeNum
+`num_receiver_threads` : number of receiver threads, normally equal to UeNum
 
-`RXUE` : filename of DL (client) throughput, it will be stored in the folder `Agora/log`, no need to add path to `RXUE` (e.g. flag --result_file rx_ue.txt will store the log of throughput in `Agora/log/rx_ue.txt`)
+`rx_ue.txt` : filename of DL (client) throughput, it will be stored in the folder `Agora/log`, no need to add path to `RXUE` (e.g. flag --result_file rx_ue.txt will store the log of throughput in `Agora/log/rx_ue.txt`)
 
-`RXBS` : Same as the above
+`tx_bs.txt` : filename of DL (basestation) throughput, it will be stored in the folder `Agora/log`, no need to add path to `tx_bs.txt` (e.g. flag --result_file tx_bs.txt will store the log of throughput in `Agora/log/tx_bs.txt`)
 
-`CAP` : Channel capacity, number of **users** that base station will send data to in every time slot. It will be clip to UeNum if too large.
+`select_num` : Channel capacity, number of **users** that base station will send data to in every time slot. It will be clip to UeNum if too large. Currently we use `size_t cap = this->select_num - frame_id%3;` to test dynamic capacity.
 
 ## Customize Scheduling algorithm
 
@@ -513,5 +516,5 @@ To help with debugging, simply call `Scheduler::PrintSelect(size_t frame_id, siz
 To support real application running with frame scheduling, scheduler separate the pointer of each users buffer, which means the data block of user that is not selected in this frame will be blocked by base station until its turn to receive data.
 
 
-
+#### Contact: Xueshen Liu (liuxs AT umich DOT edu)
 

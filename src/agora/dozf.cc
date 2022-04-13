@@ -82,7 +82,7 @@ EventData DoZF::Launch(size_t tag) {
   return EventData(EventType::kZF, tag);
 }
 
-// NOTE: QMACS: takes sche_mat_csi as input parameter for dl
+// NOTE: QMACS: takes frame_slot sc_id as input parameter for dl
 float DoZF::ComputePrecoder(size_t frame_slot, size_t sc_id, const arma::cx_fmat& mat_csi,
                             complex_float* calib_ptr) {
 

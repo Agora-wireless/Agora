@@ -1,3 +1,5 @@
+# Scheduler's instruction can be found in SchedulerInstruction.md
+
 [![Build Status](https://falcon.ecg.rice.edu:443/buildStatus/icon?job=github_public_agora%2Fmac-dl-updates)](https://falcon.ecg.rice.edu:443/job/github_public_agora/job/mac-dl-updates/)
 
 Agora is a complete software realization of real-time massive MIMO baseband processing. 
