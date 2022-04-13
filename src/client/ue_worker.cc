@@ -24,6 +24,7 @@ static constexpr bool kPrintDownlinkPilotStats = false;
 static constexpr bool kPrintEqualizedSymbols = false;
 static constexpr bool kRecordDownlinkFrame = true;
 static constexpr size_t kRecordFrameIndex = 100;
+static constexpr size_t kShortIdLen = 3;
 static constexpr bool kDebugTxMemory = false;
 
 UeWorker::UeWorker(
@@ -187,17 +188,16 @@ void UeWorker::DoFftPilot(size_t tag) {
 
   if (kRecordDownlinkFrame) {
     if (frame_id == kRecordFrameIndex) {
-      constexpr size_t kShortIdLen = 3;
       const std::string& ue_radio_id = config_.UeRadioId().at(0);
       const std::string short_id = ue_radio_id.substr(ue_radio_id.length() -
                                                       kShortIdLen);
       std::string fname = "rxpilot" + std::to_string(dl_symbol_id) + "_" +
-                          std::to_string(ant_id) + "_" + short_id + ".bin";
+                          short_id + "_" + std::to_string(ant_id) + ".bin";
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
       std::fclose(f);
       fname = "txpilot_f_" + std::to_string(dl_symbol_id) + "_" +
-              std::to_string(ant_id) + "_" + short_id + ".bin";
+              short_id + "_" + std::to_string(ant_id) + ".bin";
       f = std::fopen(fname.c_str(), "wb");
       std::fwrite(config_.UeSpecificPilot()[ant_id], 2 * sizeof(float),
                   config_.OfdmDataNum(), f);
@@ -285,13 +285,16 @@ void UeWorker::DoFftData(size_t tag) {
 
   if (kRecordDownlinkFrame) {
     if (frame_id == kRecordFrameIndex) {
+      const std::string& ue_radio_id = config_.UeRadioId().at(0);
+      const std::string short_id = ue_radio_id.substr(ue_radio_id.length() -
+                                                      kShortIdLen);
       std::string fname = "rxdata" + std::to_string(dl_symbol_id) + "_" +
-                          std::to_string(ant_id) + ".bin";
+                          short_id + "_" + std::to_string(ant_id) + ".bin";
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
       std::fclose(f);
       fname = "txdata" + std::to_string(dl_symbol_id) + "_" +
-              std::to_string(ant_id) + ".bin";
+              short_id + "_" + std::to_string(ant_id) + ".bin";
       f = std::fopen(fname.c_str(), "wb");
       std::fwrite(config_.DlIqF()[dl_symbol_id] + ant_id * config_.OfdmCaNum(),
                   2 * sizeof(float), config_.OfdmCaNum(), f);

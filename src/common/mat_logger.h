@@ -35,7 +35,11 @@ using MatBuffer = void*;
 class MatLogger {
 public:
   MatLogger(const std::string&, MatBuffer&);
+#if defined(ENABLE_CSV_LOG)
+  MatLogger(std::shared_ptr<spdlog::logger>, MatBuffer&);
+#else
   MatLogger(void*, MatBuffer&);
+#endif
   bool UpdateMatBuf(const size_t, const size_t, const arma::cx_fmat&);
   void SaveMatBuf();
 };
