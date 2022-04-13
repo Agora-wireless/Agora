@@ -1,5 +1,4 @@
 #! /bin/bash
-
 set -e
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -7,6 +6,9 @@ hydra_root_dir=$( cd ${script_dir}/../.. >/dev/null 2>&1 && pwd )
 
 source ${hydra_root_dir}/scripts/utils/utils.sh
 source ${hydra_root_dir}/scripts/control/init_platform.sh
+
+echo "Checking out ${HYDRA_SERVER_DEPLOY_JSON}"
+git checkout ${HYDRA_SERVER_DEPLOY_JSON}
 
 sc_block_sz=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.subcarrier_block_list[0]')
 coding_thread=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq '.coding_thread_num[0]')
