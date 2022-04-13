@@ -64,3 +64,5 @@ for (( i=0; i<${hydra_app_num}; i++ )) do
     cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i ${i} --argjson num ${sc_block_sz} '.subcarrier_block_list[$i]=$num' > tmp.json
     mv tmp.json ${HYDRA_SERVER_DEPLOY_JSON}
 done
+
+echo "Final setup: subcarrier block size ${sc_block_sz}, coding thread num ${coding_thread}"
