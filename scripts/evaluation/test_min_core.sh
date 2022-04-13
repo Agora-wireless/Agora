@@ -17,10 +17,10 @@ cur_coding_thread=$(( ${coding_thread}-2 ))
 over=0
 while [ "${over}" == "0" ]; do
     rm -f ${hydra_root_dir}/data/frame_latency_all_0.txt
-    echo "Run Hydra for subcarrier block size ${sc_block_sz} and coding thread num ${coding_thread}"
+    echo "Run Hydra for subcarrier block size ${sc_block_sz} and coding thread num ${cur_coding_thread}"
     for (( i=0; i<${hydra_app_num}; i++ )) do
-        cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} --argjson num ${cur_coding_thread} '.coding_thread_num[$i]=$num' > tmp.json
-        mv tmp.json ${HYDRA_SYSTEM_CONFIG_JSON}
+        cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i ${i} --argjson num ${cur_coding_thread} '.coding_thread_num[$i]=$num' > tmp.json
+        cp tmp.json ${HYDRA_SERVER_DEPLOY_JSON}
     done
     ${hydra_root_dir}/scripts/control/run_all.sh -x || continue
     ${hydra_root_dir}/scripts/evaluation/latency_analysis.sh 0
@@ -34,18 +34,18 @@ while [ "${over}" == "0" ]; do
 done
 
 for (( i=0; i<${hydra_app_num}; i++ )) do
-    cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} --argjson num ${coding_thread} '.coding_thread_num[$i]=$num' > tmp.json
-    mv tmp.json ${HYDRA_SYSTEM_CONFIG_JSON}
+    cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i ${i} --argjson num ${coding_thread} '.coding_thread_num[$i]=$num' > tmp.json
+    mv tmp.json ${HYDRA_SERVER_DEPLOY_JSON}
 done
 
 cur_sc_block_sz=$(( ${sc_block_size}+2 ))
 over=0
 while [ "${over}" == "0" ]; do
     rm -f ${hydra_root_dir}/data/frame_latency_all_0.txt
-    echo "Run Hydra for subcarrier block size ${sc_block_sz} and coding thread num ${coding_thread}"
+    echo "Run Hydra for subcarrier block size ${sc_block_sz} and coding thread num ${cur_sc_block_sz}"
     for (( i=0; i<${hydra_app_num}; i++ )) do
-        cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} --argjson num ${cur_sc_block_sz} '.subcarrier_block_list[$i]=$num' > tmp.json
-        mv tmp.json ${HYDRA_SYSTEM_CONFIG_JSON}
+        cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i ${i} --argjson num ${cur_sc_block_sz} '.subcarrier_block_list[$i]=$num' > tmp.json
+        mv tmp.json ${HYDRA_SERVER_DEPLOY_JSON}
     done
     ${hydra_root_dir}/scripts/control/run_all.sh -x || continue
     ${hydra_root_dir}/scripts/evaluation/latency_analysis.sh 0
@@ -59,6 +59,6 @@ while [ "${over}" == "0" ]; do
 done
 
 for (( i=0; i<${hydra_app_num}; i++ )) do
-    cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} --argjson num ${sc_block_size} '.subcarrier_block_list[$i]=$num' > tmp.json
-    mv tmp.json ${HYDRA_SYSTEM_CONFIG_JSON}
+    cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i ${i} --argjson num ${sc_block_size} '.subcarrier_block_list[$i]=$num' > tmp.json
+    mv tmp.json ${HYDRA_SERVER_DEPLOY_JSON}
 done
