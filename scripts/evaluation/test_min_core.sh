@@ -51,7 +51,7 @@ while [ "${over}" == "0" ]; do
     ${hydra_root_dir}/scripts/evaluation/latency_analysis.sh 0
     if [ -f ${hydra_root_dir}/data/frame_latency_all_0.txt ]; then
         echo "Succeed this time"
-        sc_block_size=${cur_sc_block_sz}
+        sc_block_sz=${cur_sc_block_sz}
         cur_sc_block_sz=$(( ${sc_block_sz}+2 ))
         continue
     fi
@@ -59,6 +59,6 @@ while [ "${over}" == "0" ]; do
 done
 
 for (( i=0; i<${hydra_app_num}; i++ )) do
-    cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i ${i} --argjson num ${sc_block_size} '.subcarrier_block_list[$i]=$num' > tmp.json
+    cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i ${i} --argjson num ${sc_block_sz} '.subcarrier_block_list[$i]=$num' > tmp.json
     mv tmp.json ${HYDRA_SERVER_DEPLOY_JSON}
 done
