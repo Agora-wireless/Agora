@@ -57,7 +57,7 @@ while [ "${over}" != "2" ]; do
         cur_sc_block_sz=$(( ${sc_block_sz}+2 ))
         continue
     else
-        cur_sc_block_sz=$(( ${sc_block_sz}+2 ))
+        cur_sc_block_sz=$(( ${cur_sc_block_sz}+2 ))
     fi
     over=$(( ${over}+1 ))
 done
