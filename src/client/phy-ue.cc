@@ -105,11 +105,10 @@ PhyUe::PhyUe(Config* config)
         std::thread(&MacThreadClient::RunEventLoop, mac_thread_.get());
   }
 
-  if (kEnableCsvLog && config_->ListenerId() >= 0) {
-    const size_t kDevId = static_cast<size_t>(config_->ListenerId());
+  if (kEnableCsvLog) {
     for (size_t i = 0; i < CsvLog::kCsvLogs; i++) {
       csv_logger_array_.at(i) = std::make_unique<CsvLog::CsvLogger>(
-          CsvLog::Create(kDevId, i));
+          CsvLog::Create(config_->UeRadioId().at(0), i));
     }
   }
 

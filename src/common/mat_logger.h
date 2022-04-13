@@ -34,7 +34,8 @@ private:
 using MatBuffer = void*;
 class MatLogger {
 public:
-  MatLogger(...);
+  MatLogger(const std::string&, MatBuffer&);
+  MatLogger(void*, MatBuffer&);
   bool UpdateMatBuf(const size_t, const size_t, const arma::cx_fmat&);
   void SaveMatBuf();
 };

@@ -44,7 +44,7 @@ const std::array<std::string, kAllLogs> kCsvHeader = {
   "Frame,Subcarrier,BS-Ant,UE-Ant,CSI-Real,CSI-Imag",
   "Frame,Subcarrier,BS-Ant,UE-Ant,DLZF-Real,DLZF-Imag"
 };
-std::shared_ptr<spdlog::logger> Create(const size_t dev_id,
+std::shared_ptr<spdlog::logger> Create(const std::string& radio_id,
                                        const size_t log_id);
 class CsvLogger {
 public:
@@ -64,7 +64,7 @@ protected:
   std::shared_ptr<spdlog::logger> logger_;
 };
 #else
-void* Create(const size_t, const size_t);
+void* Create(const std::string&, const size_t);
 class CsvLogger {
 public:
   CsvLogger(const std::string&);

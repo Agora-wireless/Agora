@@ -25,10 +25,6 @@
     "Clients": {
         "sdr": [
             "RF3E000241"
-        ],
-        "sdr_listener": [
-            "RF3E000201",
-            "RF3D000016"
         ]
     }
 }

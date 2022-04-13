@@ -35,7 +35,7 @@ class Config {
  public:
   static constexpr bool kDebugRecipCal = false;
   // Constructor
-  explicit Config(const std::string& /*jsonfile*/, int listener_id = -1);
+  explicit Config(const std::string& /*jsonfile*/);
   ~Config();
 
   inline void Running(bool value) { this->running_.store(value); }
@@ -301,8 +301,6 @@ class Config {
   inline size_t UeMacRxPort() const { return this->ue_mac_rx_port_; }
   inline size_t UeMacTxPort() const { return this->ue_mac_tx_port_; }
 
-  inline int ListenerId() const { return this->listener_id_; }
-
   /* Inline accessors (complex types) */
   inline const std::vector<int>& ClTxAdvance() const {
     return this->cl_tx_advance_;
@@ -523,10 +521,6 @@ class Config {
 
   size_t bs_ant_num_;  // Total number of BS antennas
   size_t bf_ant_num_;  // Number of antennas used in beamforming
-
-  int listener_id_;  // If possitive, using listener mode with ID;
-                     // If zero, using normal user mode;
-                     // If negative, meaning not a user program.
 
   // The count of ues an instance is responsable for
   size_t ue_num_;

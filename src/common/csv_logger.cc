@@ -9,10 +9,11 @@
 #if defined(ENABLE_CSV_LOG)
 namespace CsvLog {
 
-std::shared_ptr<spdlog::logger> Create(const size_t dev_id,
+std::shared_ptr<spdlog::logger> Create(const std::string& radio_id,
                                        const size_t log_id) {
-  std::string filename = kCsvName.at(log_id) + "-" + std::to_string(dev_id)
-                                             + ".csv";
+  constexpr size_t kShortIdLen = 3;
+  const std::string short_id = radio_id.substr(radio_id.length() - kShortIdLen);
+  std::string filename = kCsvName.at(log_id) + "-" + short_id + ".csv";
   std::remove(filename.c_str());
   auto logger = spdlog::create_async_nb<spdlog::sinks::basic_file_sink_mt>
                 (kCsvName.at(log_id), filename);

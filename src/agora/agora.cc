@@ -91,10 +91,10 @@ Agora::Agora(Config* const cfg)
   }
 
   if (kEnableMatLog) {
-    constexpr size_t kDevId = 0;
     for (size_t i = 0; i < CsvLog::kMatLogs; i++) {
       mat_logger_array_.at(i) = std::make_unique<CsvLog::MatLogger>(
-          CsvLog::Create(kDevId, i + CsvLog::kMatIdStart), arr_mat_buf.at(i));
+          CsvLog::Create(cfg->RadioId().at(0), i + CsvLog::kMatIdStart),
+          arr_mat_buf.at(i));
     }
   }
 

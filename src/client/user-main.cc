@@ -15,8 +15,6 @@ DEFINE_string(conf_file,
               TOSTRING(PROJECT_DIRECTORY) "/data/userconfig_512.json",
               "Config filename");
 
-DEFINE_int32(listener, 0, "0 [default]: normal user; 1,2,...: listener id");
-
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");
   gflags::SetVersionString(GetAgoraProjectVersion());
@@ -34,7 +32,7 @@ int main(int argc, char* argv[]) {
     filename = FLAGS_conf_file;
   }
 
-  auto config = std::make_unique<Config>(filename.c_str(), FLAGS_listener);
+  auto config = std::make_unique<Config>(filename.c_str());
   config->GenData();
   int ret;
   try {

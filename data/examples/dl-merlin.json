@@ -30,9 +30,6 @@
     "frame_schedule": [
         "BGCLGGPGGDDDG"
     ],
-    "frame_schedule_listener": [
-        "BGCLGGGPGDDDG"
-    ],
     "client_dl_pilot_syms": 2,
     "ue_radio_num": 1,
     "ue_channel": "A",
@@ -56,7 +53,6 @@
     /* Compute configuration */
     "exclude_cores": [],
     "ue_core_offset": 7,
-    "ue_core_offset_listener": [13, 19],
     "ue_worker_thread_num": 4,
     "ue_socket_thread_num": 2,
     "core_offset": 0,
