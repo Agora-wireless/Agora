@@ -42,7 +42,7 @@ done
 
 cur_sc_block_sz=$(( ${sc_block_sz}+2 ))
 over=0
-while [ "${over}" == "0" ]; do
+while [ "${over}" != "2" ]; do
     rm -f ${hydra_root_dir}/data/frame_latency_all_0.txt
     echo "Run Hydra for subcarrier block size ${cur_sc_block_sz} and coding thread num ${coding_thread}"
     for (( i=0; i<${hydra_app_num}; i++ )) do
@@ -56,8 +56,10 @@ while [ "${over}" == "0" ]; do
         sc_block_sz=${cur_sc_block_sz}
         cur_sc_block_sz=$(( ${sc_block_sz}+2 ))
         continue
+    else
+        cur_sc_block_sz=$(( ${sc_block_sz}+2 ))
     fi
-    over=1
+    over=$(( ${over}+1 ))
 done
 
 for (( i=0; i<${hydra_app_num}; i++ )) do
