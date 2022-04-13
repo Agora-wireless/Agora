@@ -16,6 +16,7 @@ rm -f ${hydra_root_dir}/data/frame_latency_all_0.txt
 cur_coding_thread=$(( ${coding_thread}-2 ))
 over=0
 while [ "${over}" == "0" ]; do
+    rm -f ${hydra_root_dir}/data/frame_latency_all_0.txt
     echo "Run Hydra for subcarrier block size ${sc_block_sz} and coding thread num ${coding_thread}"
     for (( i=0; i<${hydra_app_num}; i++ )) do
         cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} --argjson num ${cur_coding_thread} '.coding_thread_num[$i]=$num' > tmp.json
@@ -40,6 +41,7 @@ done
 cur_sc_block_sz=$(( ${sc_block_size}+2 ))
 over=0
 while [ "${over}" == "0" ]; do
+    rm -f ${hydra_root_dir}/data/frame_latency_all_0.txt
     echo "Run Hydra for subcarrier block size ${sc_block_sz} and coding thread num ${coding_thread}"
     for (( i=0; i<${hydra_app_num}; i++ )) do
         cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq --argjson i ${i} --argjson num ${cur_sc_block_sz} '.subcarrier_block_list[$i]=$num' > tmp.json
