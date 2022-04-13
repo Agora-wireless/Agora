@@ -116,8 +116,7 @@ Config::Config(const std::string& jsonfile)
 
     auto ue_serials = j_ue_serials.value("sdr", json::array());
     ue_radio_id_.assign(ue_serials.begin(), ue_serials.end());
-  }
-  else if (kUseArgos == true) {
+  } else if (kUseArgos == true) {
     throw std::runtime_error(
         "Hardware is enabled but the serials files was not accessable");
   }
@@ -128,8 +127,11 @@ Config::Config(const std::string& jsonfile)
     cell_id_.resize(num_radios_, 0);
   }
 
-  ue_num_ = tdd_conf.value("ue_radio_num", ue_radio_id_.empty() ? 1 :
-                           ue_radio_id_.size());
+  if (ue_radio_id_.empty() == false) {
+    ue_num_ = ue_radio_id_.size();
+  } else {
+    ue_num_ = tdd_conf.value("ue_radio_num", 8);
+  }
 
   channel_ = tdd_conf.value("channel", "A");
   ue_channel_ = tdd_conf.value("ue_channel", channel_);
@@ -411,7 +413,6 @@ Config::Config(const std::string& jsonfile)
 
     // Only allow 1 unique frame type
     assert(jframes.size() == 1);
-
     frame_ = FrameStats(jframes.at(0).get<std::string>());
   }
   AGORA_LOG_INFO("Config: Frame schedule %s (%zu symbols)\n",
