@@ -113,6 +113,8 @@ for (( i=0; i<${hydra_server_num}; i++ )) do
   echo 0 > /tmp/hydra/done_${server_name}.txt
 done
 
+rm /tmp/hydra/log_*.txt
+
 if [ "${HYDRA_RUN_MODE}" == 0 ]; then
   # Run the Hydra application
   echocyan "Run Hydra applications and wait the initialization to finish"
