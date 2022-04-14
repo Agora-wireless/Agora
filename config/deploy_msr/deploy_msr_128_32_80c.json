@@ -5,9 +5,9 @@
     "roce83"
   ],
   "coding_thread_num": [
-    12,
-    11,
-    11
+    14,
+    14,
+    14
   ],
   "subcarrier_num_list": [
     384,
@@ -15,9 +15,9 @@
     416
   ],
   "subcarrier_block_list": [
-    12,
-    12,
-    12
+    16,
+    16,
+    16
   ],
   "rru_servers": [
     "roce84"
