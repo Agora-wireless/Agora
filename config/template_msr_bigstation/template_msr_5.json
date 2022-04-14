@@ -31,7 +31,7 @@
     "ofdm_data_num": 1216,
     "slot_us": 1000,
     "use_hyperthreading": "RXTXExclusive",
-    "phy_core_num": 10,
+    "phy_core_num": 32,
     "use_bigstation_mode": true,
     "time_iq_sc_step_size": 1200,
     "post_zf_step_size": 8600

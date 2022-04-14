@@ -1,13 +1,13 @@
 {
     "rx_thread_num": 4,
-    "tx_thread_num": 1,
+    "tx_thread_num": 2,
     "use_central_scheduler": false,
     "use_general_worker": false,
     "worker_thread_num": 10,
     "demul_block_size": 8,
     "antenna_num": 150,
     "ue_num": 32,
-    "core_offset": 0,
+    "core_offset": 3,
     "frames": [
       "PUUUUUUUUUUUUU"
     ],
@@ -31,7 +31,7 @@
     "ofdm_data_num": 1216,
     "slot_us": 1000,
     "use_hyperthreading": "RXTXExclusive",
-    "phy_core_num": 10,
+    "phy_core_num": 32,
     "use_bigstation_mode": true,
     "time_iq_sc_step_size": 1200,
     "post_zf_step_size": 8600
