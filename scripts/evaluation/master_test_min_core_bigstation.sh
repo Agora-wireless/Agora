@@ -57,7 +57,7 @@ function detect_bottleneck()
 {
     # Detect FFT bottleneck
     IFS=$'\n'
-    bar=$(( ${error_slot}+20 ))
+    bar=$(( ${error_slot}+50 ))
     bottleneck_reason=0
     res=$(cat /tmp/hydra/log_*.txt | grep "FFT Thread [0-9]* error traceback")
     for line in ${res}; do
@@ -65,6 +65,7 @@ function detect_bottleneck()
         frameStr=${frameStr%%, symbol*}
         if [ ${frameStr} -le ${bar} ]; then
             echo "FFT bottlenecked!"
+            echo ${line}
             bottleneck_reason=3
             recvStr=${line##*recv }
             recvStr=${recvStr%%)*}
@@ -82,6 +83,7 @@ function detect_bottleneck()
         frameStr=${frameStr%% symbol*}
         if [ ${frameStr} -le ${bar} ]; then
             echo "FFT TX bottlenecked!"
+            echo ${line}
             bottleneck_reason=2
             return
         fi
@@ -93,6 +95,7 @@ function detect_bottleneck()
         frameStr=${frameStr%%, recv*}
         if [ ${frameStr} -le ${bar} ]; then
             echo "ZF bottlenecked!"
+            echo ${line}
             bottleneck_reason=4
             recvStr=${line##*recv }
             recvStr=${recvStr%% (*}
@@ -110,6 +113,7 @@ function detect_bottleneck()
         frameStr=${frameStr%%), demul*}
         if [ ${frameStr} -le ${bar} ]; then
             echo "ZF TX bottlenecked!"
+            echo ${line}
             bottleneck_reason=2
             return
         fi
@@ -121,6 +125,7 @@ function detect_bottleneck()
         frameStr=${frameStr%%, symbol*}
         if [ ${frameStr} -le ${bar} ]; then
             echo "Demul bottlenecked!"
+            echo ${line}
             bottleneck_reason=5
             recvStr=${line##*recv }
             recvStr=${recvStr%% and*}
@@ -144,6 +149,7 @@ function detect_bottleneck()
         frameStr=${frameStr%% symbol*}
         if [ ${frameStr} -le ${bar} ]; then
             echo "Demul TX bottlenecked!"
+            echo ${line}
             bottleneck_reason=2
             return
         fi
@@ -155,6 +161,7 @@ function detect_bottleneck()
         frameStr=${frameStr%%, idx*}
         if [ ${frameStr} -le ${bar} ]; then
             echo "Decode bottlenecked!"
+            echo ${line}
             bottleneck_reason=6
             recvStr=${line##*recv }
             recvStr=${recvStr%%)*}
