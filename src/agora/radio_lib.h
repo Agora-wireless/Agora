@@ -72,12 +72,12 @@ class RadioConfig {
                            double /*txCenterTone*/);
   static void SetIqBalance(SoapySDR::Device* /*dev*/, int /*direction*/,
                            size_t /*channel*/, int /*gcorr*/, int /*iqcorr*/);
-  static void AdjustCalibrationGains(std::vector<SoapySDR::Device*> /*rxDevs*/,
-                                     SoapySDR::Device* /*txDev*/,
-                                     size_t /*channel*/, double /*fftBin*/,
-                                     bool plot = false);
-  static std::vector<std::complex<float>> SnoopSamples(
-      SoapySDR::Device* /*dev*/, size_t /*channel*/, size_t /*readSize*/);
+  static void AdjustCalibrationGains(std::vector<SoapySDR::Device*>& rx_devs,
+                                     SoapySDR::Device* tx_dev, size_t channel,
+                                     double fft_bin, bool plot = false);
+  static std::vector<std::complex<float>> SnoopSamples(SoapySDR::Device* dev,
+                                                       size_t channel,
+                                                       size_t read_size);
   void DciqCalibrationProc(size_t /*channel*/);
   Config* cfg_;
   std::vector<SoapySDR::Device*> hubs_;

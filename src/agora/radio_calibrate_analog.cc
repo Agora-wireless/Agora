@@ -1,5 +1,5 @@
 /**
- * @file radio_dc_iq_calibrate.cc
+ * @file radio_calibrate_analog.cc
  * @brief Implementation file for the radio analog calibration functions
  * , i.e.  DC offset and IQ imbalance
  */
@@ -9,52 +9,53 @@
 namespace plt = matplotlibcpp;
 static constexpr bool kIQImbalancePlot = false;
 
-void RadioConfig::AdjustCalibrationGains(std::vector<SoapySDR::Device*> rxDevs,
-                                         SoapySDR::Device* txDev,
-                                         size_t channel, double fftBin,
-                                         bool plot) {
+void RadioConfig::AdjustCalibrationGains(
+    std::vector<SoapySDR::Device*>& rx_devs, SoapySDR::Device* tx_dev,
+    size_t channel, double fft_bin, bool plot) {
   using std::cout;
   using std::endl;
-  double target_level = -10;
-  double attn_max = -18;
-  size_t n = 1024;
-  size_t rx_devs_size = rxDevs.size();
-  auto win = CommsLib::HannWindowFunction(n);
+  const double target_level = -10;
+  const double attn_max = -18;
+  const size_t n = 1024;
+  const size_t rx_devs_size = rx_devs.size();
+  const auto win = CommsLib::HannWindowFunction(n);
   const auto window_gain = CommsLib::WindowFunctionPower(win);
 
   // reset all gains
   for (size_t ch = 0; ch < 2; ch++) {
-    txDev->setGain(SOAPY_SDR_TX, ch, "PA2", 0);
-    txDev->setGain(SOAPY_SDR_TX, ch, "PAD", 0);
-    txDev->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);
-    txDev->setGain(SOAPY_SDR_TX, ch, "ATTN", attn_max);
+    tx_dev->setGain(SOAPY_SDR_TX, ch, "PA2", 0);
+    tx_dev->setGain(SOAPY_SDR_TX, ch, "PAD", 0);
+    tx_dev->setGain(SOAPY_SDR_TX, ch, "IAMP", 0);
+    tx_dev->setGain(SOAPY_SDR_TX, ch, "ATTN", attn_max);
   }
 
   for (size_t r = 0; r < rx_devs_size; r++) {
     for (size_t ch = 0; ch < 2; ch++) {
-      rxDevs[r]->setGain(SOAPY_SDR_RX, ch, "LNA", 0);
-      rxDevs[r]->setGain(SOAPY_SDR_RX, ch, "PGA", 0);
-      rxDevs[r]->setGain(SOAPY_SDR_RX, ch, "TIA", 0);
-      rxDevs[r]->setGain(SOAPY_SDR_RX, ch, "ATTN", attn_max);
-      rxDevs[r]->setGain(SOAPY_SDR_RX, ch, "LNA2", 14.0);
+      rx_devs.at(r)->setGain(SOAPY_SDR_RX, ch, "LNA", 0);
+      rx_devs.at(r)->setGain(SOAPY_SDR_RX, ch, "PGA", 0);
+      rx_devs.at(r)->setGain(SOAPY_SDR_RX, ch, "TIA", 0);
+      rx_devs.at(r)->setGain(SOAPY_SDR_RX, ch, "ATTN", attn_max);
+      rx_devs.at(r)->setGain(SOAPY_SDR_RX, ch, "LNA2", 14.0);
     }
   }
 
-  txDev->setGain(SOAPY_SDR_TX, channel, "PAD", 40);
+  tx_dev->setGain(SOAPY_SDR_TX, channel, "PAD", 40);
   std::this_thread::sleep_for(std::chrono::milliseconds(SETTLE_TIME_MS));
 
   float max_tone_level = -200;
   std::vector<bool> adjusted_radios(rx_devs_size, false);
   std::vector<float> tone_levels(rx_devs_size, 0);
   size_t remaining_radios = adjusted_radios.size();
+
   for (size_t r = 0; r < rx_devs_size; r++) {
-    const auto samps = RadioConfig::SnoopSamples(rxDevs[r], channel, n);
-    auto tone_level = CommsLib::MeasureTone(samps, win, window_gain, fftBin, n);
+    const auto samps = RadioConfig::SnoopSamples(rx_devs.at(r), channel, n);
+    auto tone_level =
+        CommsLib::MeasureTone(samps, win, window_gain, fft_bin, n);
     if (tone_level >= target_level) {
-      adjusted_radios[r] = true;
+      adjusted_radios.at(r) = true;
       remaining_radios--;
     }
-    tone_levels[r] = tone_level;
+    tone_levels.at(r) = tone_level;
     if (tone_level > max_tone_level) {
       max_tone_level = tone_level;
     }
@@ -64,39 +65,38 @@ void RadioConfig::AdjustCalibrationGains(std::vector<SoapySDR::Device*> rxDevs,
   std::string next_gain_stage;
   if (remaining_radios == rx_devs_size) {
     // if all need adjustment, try bumping up tx gain first
-    txDev->setGain(SOAPY_SDR_TX, channel, "ATTN",
-                   std::min((target_level - max_tone_level) + attn_max, -6.0));
+    tx_dev->setGain(SOAPY_SDR_TX, channel, "ATTN",
+                    std::min((target_level - max_tone_level) + attn_max, -6.0));
     cout << "Increasing TX gain level (ATTN) to "
          << std::min((target_level - max_tone_level) + attn_max, -6.0) << endl;
     next_gain_stage = "ATTN";
   } else {
     for (size_t r = 0; r < rx_devs_size; r++) {
-      if (adjusted_radios[r]) {
-        continue;
+      if (adjusted_radios.at(r) == false) {
+        rx_devs.at(r)->setGain(
+            SOAPY_SDR_RX, channel, "ATTN",
+            std::min((target_level - tone_levels.at(r)) + attn_max, 0.0));
+        cout << "Increasing RX gain level (ATTN) to "
+             << std::min((target_level - max_tone_level) + attn_max, 0.0)
+             << endl;
       }
-      rxDevs[r]->setGain(
-          SOAPY_SDR_RX, channel, "ATTN",
-          std::min((target_level - tone_levels[r]) + attn_max, 0.0));
-      cout << "Increasing RX gain level (ATTN) to "
-           << std::min((target_level - max_tone_level) + attn_max, 0.0) << endl;
     }
     next_gain_stage = "LNA";
   }
   std::this_thread::sleep_for(std::chrono::milliseconds(SETTLE_TIME_MS));
 
   for (size_t r = 0; r < rx_devs_size; r++) {
-    if (adjusted_radios[r]) {
-      continue;
+    if (adjusted_radios.at(r) == false) {
+      const auto samps = RadioConfig::SnoopSamples(rx_devs.at(r), channel, n);
+      const float tone_level =
+          CommsLib::MeasureTone(samps, win, window_gain, fft_bin, n);
+      if (tone_level >= target_level) {
+        adjusted_radios.at(r) = true;
+        remaining_radios--;
+      }
+      tone_levels.at(r) = tone_level;
+      cout << "Node " << r << ": toneLevel1=" << tone_level << endl;
     }
-    const auto samps = RadioConfig::SnoopSamples(rxDevs[r], channel, n);
-    float tone_level =
-        CommsLib::MeasureTone(samps, win, window_gain, fftBin, n);
-    if (tone_level >= target_level) {
-      adjusted_radios[r] = true;
-      remaining_radios--;
-    }
-    tone_levels[r] = tone_level;
-    cout << "Node " << r << ": toneLevel1=" << tone_level << endl;
   }
 
   if (remaining_radios == 0) {
@@ -111,30 +111,29 @@ void RadioConfig::AdjustCalibrationGains(std::vector<SoapySDR::Device*> rxDevs,
 
   // adjust next gain stage
   for (size_t r = 0; r < rx_devs_size; r++) {
-    if (adjusted_radios[r]) {
-      continue;
+    if (adjusted_radios.at(r) == false) {
+      rx_devs.at(r)->setGain(
+          SOAPY_SDR_RX, channel, next_gain_stage,
+          std::min((target_level - tone_levels.at(r)) + min_gain, max_gain));
+      cout << "Increasing RX gain level (" << next_gain_stage << ") to "
+           << std::min((target_level - tone_levels.at(r)) + min_gain, max_gain)
+           << endl;
     }
-    rxDevs[r]->setGain(
-        SOAPY_SDR_RX, channel, next_gain_stage,
-        std::min((target_level - tone_levels[r]) + min_gain, max_gain));
-    cout << "Increasing RX gain level (" << next_gain_stage << ") to "
-         << std::min((target_level - tone_levels[r]) + min_gain, max_gain)
-         << endl;
   }
   std::this_thread::sleep_for(std::chrono::milliseconds(SETTLE_TIME_MS));
 
   for (size_t r = 0; r < rx_devs_size; r++) {
-    if (adjusted_radios[r]) {
-      continue;
+    if (adjusted_radios.at(r) == false) {
+      const auto samps = RadioConfig::SnoopSamples(rx_devs.at(r), channel, n);
+      auto tone_level =
+          CommsLib::MeasureTone(samps, win, window_gain, fft_bin, n);
+      if (tone_level > target_level) {
+        adjusted_radios.at(r) = true;
+        remaining_radios--;
+      }
+      tone_levels.at(r) = tone_level;
+      cout << "Node " << r << ": toneLevel2=" << tone_level << endl;
     }
-    const auto samps = RadioConfig::SnoopSamples(rxDevs[r], channel, n);
-    auto tone_level = CommsLib::MeasureTone(samps, win, window_gain, fftBin, n);
-    if (tone_level > target_level) {
-      adjusted_radios[r] = true;
-      remaining_radios--;
-    }
-    tone_levels[r] = tone_level;
-    cout << "Node " << r << ": toneLevel2=" << tone_level << endl;
   }
 
   if (remaining_radios == 0 || next_gain_stage == "LNA") {
@@ -145,29 +144,29 @@ void RadioConfig::AdjustCalibrationGains(std::vector<SoapySDR::Device*> rxDevs,
   min_gain = 0;
   max_gain = 30;
   for (size_t r = 0; r < rx_devs_size; r++) {
-    if (adjusted_radios[r]) {
-      continue;
+    if (adjusted_radios.at(r) == false) {
+      rx_devs.at(r)->setGain(
+          SOAPY_SDR_RX, channel, "LNA",
+          std::min((target_level - tone_levels.at(r)), max_gain));
+      cout << "Increasing RX gain level (LNA) to "
+           << std::min((target_level - tone_levels.at(r)) + min_gain, max_gain)
+           << endl;
     }
-    rxDevs[r]->setGain(SOAPY_SDR_RX, channel, "LNA",
-                       std::min((target_level - tone_levels[r]), max_gain));
-    cout << "Increasing RX gain level (LNA) to "
-         << std::min((target_level - tone_levels[r]) + min_gain, max_gain)
-         << endl;
   }
   std::this_thread::sleep_for(std::chrono::milliseconds(SETTLE_TIME_MS));
 
   for (size_t r = 0; r < rx_devs_size; r++) {
-    if (adjusted_radios[r]) {
+    if (adjusted_radios.at(r)) {
       continue;
     }
-    auto samps = RadioConfig::SnoopSamples(rxDevs[r], channel, n);
+    auto samps = RadioConfig::SnoopSamples(rx_devs.at(r), channel, n);
     float tone_level =
-        CommsLib::MeasureTone(samps, win, window_gain, fftBin, n);
+        CommsLib::MeasureTone(samps, win, window_gain, fft_bin, n);
     if (tone_level > target_level) {
-      adjusted_radios[r] = true;
+      adjusted_radios.at(r) = true;
       remaining_radios--;
     }
-    tone_levels[r] = tone_level;
+    tone_levels.at(r) = tone_level;
     cout << "Node " << r << ": toneLevel3=" << tone_level << endl;
     if (kIQImbalancePlot && plot) {
       auto fft_mag = CommsLib::MagnitudeFft(samps, win, n);

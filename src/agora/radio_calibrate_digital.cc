@@ -1,5 +1,5 @@
 /**
- * @file radio_calibrate.cc
+ * @file radio_calibrate_digital.cc
  * @brief Implementation file for the digital (baseband) calibration 
  * functions such as sample offset and reciprocity calibration
  */
@@ -14,9 +14,9 @@ static constexpr size_t kRxTimeoutUs = 1000000;
 static constexpr size_t kTxTimeoutUs = 1000000;
 
 std::vector<std::complex<float>> RadioConfig::SnoopSamples(
-    SoapySDR::Device* dev, size_t channel, size_t readSize) {
+    SoapySDR::Device* dev, size_t channel, size_t read_size) {
   std::vector<uint32_t> samps_int =
-      dev->readRegisters("RX_SNOOPER", channel, readSize);
+      dev->readRegisters("RX_SNOOPER", channel, read_size);
   std::vector<std::complex<float>> samps =
       Utils::Uint32tocfloat(samps_int, "IQ");
   return samps;
