@@ -242,10 +242,6 @@ void RadioConfig::InitBsRadio(size_t tid) {
     throw std::runtime_error("SoapySDR failed to locate the Bs radio");
   }
   ba_stn_.at(i) = bs_device;
-  for (auto ch : {0, 1}) {
-    ba_stn_.at(i)->setSampleRate(SOAPY_SDR_RX, ch, cfg_->Rate());
-    ba_stn_.at(i)->setSampleRate(SOAPY_SDR_TX, ch, cfg_->Rate());
-  }
 
   // resets the DATA_clk domain logic.
   ba_stn_.at(i)->writeSetting("RESET_DATA_LOGIC", "");
@@ -260,6 +256,10 @@ void RadioConfig::InitBsRadio(size_t tid) {
 void RadioConfig::ConfigureBsRadio(size_t tid) {
   // load channels
   auto channels = Utils::StrToChannels(cfg_->Channel());
+  for (auto ch : channels) {
+    ba_stn_.at(tid)->setSampleRate(SOAPY_SDR_RX, ch, cfg_->Rate());
+    ba_stn_.at(tid)->setSampleRate(SOAPY_SDR_TX, ch, cfg_->Rate());
+  }
 
   // use the TRX antenna port for both tx and rx
   for (auto ch : channels) {
@@ -340,6 +340,9 @@ void RadioConfig::ConfigureBsRadio(size_t tid) {
 }
 
 bool RadioConfig::RadioStart() {
+  if (cfg_->SampleCalEn()) {
+    CalibrateSampleOffset();
+  }
   bool good_calib = false;
   AllocBuffer1d(&init_calib_dl_processed_,
                 cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
@@ -366,7 +369,7 @@ bool RadioConfig::RadioStart() {
       int max_iter = 1;
       std::cout << "Start initial reciprocity calibration..." << std::endl;
       while (good_calib == false) {
-        good_calib = InitialCalib(cfg_->SampleCalEn());
+        good_calib = InitialCalib();
         iter++;
         if ((iter == max_iter) && (good_calib == false)) {
           std::cout << "attempted " << max_iter

@@ -68,8 +68,7 @@ void Channel::ApplyChan(const arma::cx_fmat& fmat_src, arma::cx_fmat& fmat_dst,
     }
   }
   if (is_downlink) {
-    fmat_h = fmat_src * h_.st() /
-             (kDebugDownlink == true ? 1 : std::sqrt(cfg_->BsAntNum()));
+    fmat_h = fmat_src * h_.st();
   } else {
     fmat_h = fmat_src * h_;
   }
