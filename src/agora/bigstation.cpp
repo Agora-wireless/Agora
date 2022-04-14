@@ -230,7 +230,7 @@ void BigStation::fftWorker(int tid)
             });
 
             // bigstation_state_.prepare_freq_iq_pkt(cur_frame, cur_symbol, cur_ant);
-            for (size_t ant_id = ant_start; ant_id < ant_end; ant_id ++) 
+            for (size_t ant_id = ant_start; ant_id < ant_end; ant_id ++) {
                 bigstation_state_.prepare_freq_iq_pkt(cur_frame, cur_symbol, ant_id);
             }
             // cur_ant++;
@@ -259,9 +259,13 @@ void BigStation::fftWorker(int tid)
         }
     }
 
+    // if (config_->error) {
+    //     printf("FFT Thread %d error traceback: fft (frame %zu, symbol %zu, ant %zu, recv %d)\n",
+    //         tid, cur_frame, cur_symbol, cur_ant, bigstation_state_.received_all_time_iq_pkts(cur_frame, cur_symbol));
+    // }
     if (config_->error) {
-        printf("FFT Thread %d error traceback: fft (frame %zu, symbol %zu, ant %zu, recv %d)\n",
-            tid, cur_frame, cur_symbol, cur_ant, bigstation_state_.received_all_time_iq_pkts(cur_frame, cur_symbol));
+        printf("FFT Thread %d error traceback: fft (frame %zu, symbol %zu, recv %d)\n",
+            tid, cur_frame, cur_symbol, bigstation_state_.received_all_time_iq_pkts(cur_frame, cur_symbol));
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
