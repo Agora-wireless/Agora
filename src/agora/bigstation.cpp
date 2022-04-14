@@ -379,7 +379,6 @@ void BigStation::zfWorker(int tid)
                     + config_->num_ifft_workers[config_->bs_server_addr_idx],
                     true, true, config_->phy_core_num);
         } else {
-            printf("tid %d offset %zu fft %zu\n", tid, config_->zf_thread_offset, config_->num_fft_workers[config_->bs_server_addr_idx]);
             pin_to_core_with_offset(
                 ThreadType::kWorkerZF, base_worker_core_offset_, tid - config_->zf_thread_offset 
                     + config_->num_fft_workers[config_->bs_server_addr_idx],
@@ -484,8 +483,10 @@ void BigStation::zfWorker(int tid)
     }
 
     if (config_->error) {
-        printf("ZF Thread %d error traceback: zf (frame %zu, recv %d)\n",
-            tid, cur_zf_frame, bigstation_state_.received_all_pilot_pkts(cur_zf_frame));
+        printf("ZF Thread %d error traceback: zf (frame %zu, recv %d (%zu %zu))\n",
+            tid, cur_zf_frame, bigstation_state_.received_all_pilot_pkts(cur_zf_frame),
+            bigstation_state_.num_pilot_pkts_received_[cur_zf_frame % kFrameWnd].load(),
+            bigstation_state_.num_pilot_pkts_received_per_frame_);
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -707,8 +708,8 @@ void BigStation::decodeWorker(int tid)
     }
 
     if (config_->error) {
-        printf("Decode Thread %d error traceback: decode (frame %zu, idx %zu)\n",
-            tid, cur_frame, cur_decode_idx);
+        printf("Decode Thread %d error traceback: decode (frame %zu, idx %zu, recv %d)\n",
+            tid, cur_frame, cur_decode_idx, bigstation_state_.received_all_demod_pkts(cur_frame, cur_symbol_ul));
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -765,7 +766,8 @@ void BigStation::encodeWorker(int tid)
         size_t work_start_tsc, encode_start_tsc;
         size_t cur_symbol_dl = cur_encode_idx / config_->get_num_ues_to_process();
         size_t cur_ue = cur_encode_idx % config_->get_num_ues_to_process() + config_->ue_start;
-        if (bigstation_state_.cur_frame_ + 5 > cur_encode_frame) {
+        // if (bigstation_state_.cur_frame_ + 5 > cur_encode_frame) {
+        if (bigstation_state_.is_encode_ready(cur_encode_frame, cur_symbol_dl)) {
             if (unlikely(!state_trigger && cur_encode_frame >= 200)) {
                 start_tsc = rdtsc();
                 state_trigger = true;
@@ -911,8 +913,10 @@ void BigStation::precodeWorker(int tid)
     }
 
     if (config_->error) {
-        printf("Precode Thread %d error traceback: precode (frame %zu, symbol %zu)\n",
-            tid, cur_precode_frame, cur_precode_symbol_dl);
+        printf("Precode Thread %d error traceback: precode (frame %zu, symbol %zu, recv %d %d)\n",
+            tid, cur_precode_frame, cur_precode_symbol_dl, 
+            bigstation_state_.received_all_zf_pkts(cur_precode_frame),
+            bigstation_state_.received_all_encode_pkts(cur_precode_frame, cur_precode_symbol_dl));
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -938,14 +942,18 @@ void BigStation::ifftWorker(int tid)
             ThreadType::kWorkerIFFT, base_worker_core_offset_, tid - config_->ifft_thread_offset);
     }
         
-    size_t ant_start = tid * config_->BS_ANT_NUM / config_->total_fft_workers;
-    size_t ant_end = (tid + 1) * config_->BS_ANT_NUM / config_->total_fft_workers;
+    size_t ant_start = tid * config_->BS_ANT_NUM / config_->total_ifft_workers;
+    size_t ant_end = (tid + 1) * config_->BS_ANT_NUM / config_->total_ifft_workers;
 
     printf("IFFT worker %d process ant [%zu,%zu)\n", tid, ant_start, ant_end);
 
     size_t cur_frame = 0;
     size_t cur_symbol = 0;
     size_t cur_ant = ant_start;
+
+    size_t cur_frame_ifft = 0;
+    size_t cur_symbol_ifft = 0;
+    size_t cur_ant_ifft = ant_start;
 
     size_t start_tsc = 0;
     size_t work_tsc_duration = 0;
@@ -964,88 +972,87 @@ void BigStation::ifftWorker(int tid)
 
     while (config_->running && !SignalHandler::gotExitSignal()) {
         size_t work_start_tsc, fft_start_tsc, ifft_start_tsc;
-        if (cur_symbol < config_->pilot_symbol_num_perframe) {
-            if (bigstation_state_.received_all_time_iq_pkts(cur_frame, cur_symbol)) {
-                if (unlikely(!state_trigger && cur_frame >= 200)) {
-                    start_tsc = rdtsc();
-                    state_trigger = true;
+        if (bigstation_state_.received_all_time_iq_pkts(cur_frame, cur_symbol)) {
+            if (unlikely(!state_trigger && cur_frame >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
+
+            TRIGGER_TIMER({
+                work_start_tsc = rdtsc();
+                fft_start_tsc = rdtsc();
+            });
+
+            do_fft->Launch(cur_frame, cur_symbol, cur_ant);
+            // printf("Run FFT frame %zu symbol %zu ant %zu\n", cur_frame, cur_symbol, cur_ant);
+
+            TRIGGER_TIMER({
+                size_t fft_tmp_tsc = rdtsc() - fft_start_tsc;
+                fft_tsc_duration += fft_tmp_tsc;
+                fft_count ++;
+                fft_start_tsc = rdtsc();
+            });
+
+            bigstation_state_.prepare_freq_iq_pkt(cur_frame, cur_symbol, cur_ant);
+            cur_ant++;
+            if (cur_ant == ant_end) {
+                cur_ant = ant_start;
+                cur_symbol++;
+                if (cur_symbol == config_->pilot_symbol_num_perframe) {
+                    cur_symbol = 0;
+                    cur_frame++;
+                    // if (cur_frame == config_->frames_to_test) {
+                    //     break;
+                    // }
                 }
+            }
 
-                TRIGGER_TIMER({
-                    work_start_tsc = rdtsc();
-                    fft_start_tsc = rdtsc();
-                });
+            TRIGGER_TIMER({
+                state_operation_duration += rdtsc() - fft_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            });
+        }
 
-                do_fft->Launch(cur_frame, cur_symbol, cur_ant);
-                // printf("Run FFT frame %zu symbol %zu ant %zu\n", cur_frame, cur_symbol, cur_ant);
+        // if (bigstation_state_.received_all_precode_pkts(cur_frame, cur_symbol - config_->pilot_symbol_num_perframe)) {
+        if (bigstation_state_.prepared_all_precode_pkt(cur_frame_ifft, cur_symbol_ifft)) {
+            if (unlikely(!state_trigger && cur_frame >= 200)) {
+                start_tsc = rdtsc();
+                state_trigger = true;
+            }
 
-                TRIGGER_TIMER({
-                    size_t fft_tmp_tsc = rdtsc() - fft_start_tsc;
-                    fft_tsc_duration += fft_tmp_tsc;
-                    fft_count ++;
-                    fft_start_tsc = rdtsc();
-                });
+            TRIGGER_TIMER({
+                work_start_tsc = rdtsc();
+                ifft_start_tsc = rdtsc();
+            });
 
-                bigstation_state_.prepare_freq_iq_pkt(cur_frame, cur_symbol, cur_ant);
-                cur_ant++;
-                if (cur_ant == ant_end) {
-                    cur_ant = ant_start;
-                    cur_symbol++;
-                    if (cur_symbol == config_->symbol_num_perframe) {
-                        cur_symbol = 0;
-                        cur_frame++;
-                        if (cur_frame == config_->frames_to_test) {
-                            break;
-                        }
+            // do_ifft->Launch(cur_frame, cur_symbol - config_->pilot_symbol_num_perframe, cur_ant);
+            // printf("Run FFT frame %zu symbol %zu ant %zu\n", cur_frame, cur_symbol, cur_ant);
+
+            TRIGGER_TIMER({
+                size_t ifft_tmp_tsc = rdtsc() - ifft_start_tsc;
+                ifft_tsc_duration += ifft_tmp_tsc;
+                ifft_count ++;
+                ifft_start_tsc = rdtsc();
+            });
+
+            // cur_ant_ifft++;
+            // if (cur_ant_ifft == ant_end) {
+                // cur_ant_ifft = ant_start;
+                cur_symbol_ifft++;
+                if (cur_symbol_ifft == config_->dl_data_symbol_num_perframe) {
+                    bigstation_state_.ifft_done(cur_frame_ifft);
+                    cur_symbol_ifft = 0;
+                    cur_frame_ifft++;
+                    if (cur_frame_ifft == config_->frames_to_test) {
+                        break;
                     }
                 }
+            // }
 
-                TRIGGER_TIMER({
-                    state_operation_duration += rdtsc() - fft_start_tsc;
-                    work_tsc_duration += rdtsc() - work_start_tsc;
-                });
-            }
-        } else {
-            if (bigstation_state_.received_all_precode_pkts(cur_frame, cur_symbol)) {
-                if (unlikely(!state_trigger && cur_frame >= 200)) {
-                    start_tsc = rdtsc();
-                    state_trigger = true;
-                }
-
-                TRIGGER_TIMER({
-                    work_start_tsc = rdtsc();
-                    ifft_start_tsc = rdtsc();
-                });
-
-                do_ifft->Launch(cur_frame, cur_symbol - config_->pilot_symbol_num_perframe, cur_ant);
-                // printf("Run FFT frame %zu symbol %zu ant %zu\n", cur_frame, cur_symbol, cur_ant);
-
-                TRIGGER_TIMER({
-                    size_t ifft_tmp_tsc = rdtsc() - ifft_start_tsc;
-                    ifft_tsc_duration += ifft_tmp_tsc;
-                    ifft_count ++;
-                    ifft_start_tsc = rdtsc();
-                });
-
-                cur_ant++;
-                if (cur_ant == ant_end) {
-                    cur_ant = ant_start;
-                    cur_symbol++;
-                    if (cur_symbol == config_->symbol_num_perframe) {
-                        bigstation_state_.ifft_done(cur_frame);
-                        cur_symbol = 0;
-                        cur_frame++;
-                        if (cur_frame == config_->frames_to_test) {
-                            break;
-                        }
-                    }
-                }
-
-                TRIGGER_TIMER({
-                    state_operation_duration += rdtsc() - ifft_start_tsc;
-                    work_tsc_duration += rdtsc() - work_start_tsc;
-                });
-            }
+            TRIGGER_TIMER({
+                state_operation_duration += rdtsc() - ifft_start_tsc;
+                work_tsc_duration += rdtsc() - work_start_tsc;
+            });
         }
 
         size_t cur_sleep_tsc = rdtsc();
@@ -1056,16 +1063,18 @@ void BigStation::ifftWorker(int tid)
     }
 
     if (config_->error) {
-        printf("FFT Thread %d error traceback: fft (frame %zu, symbol %zu, ant %zu)\n",
-            tid, cur_frame, cur_symbol, cur_ant);
+        printf("FFT Thread %d error traceback: fft (frame %zu, symbol %zu, ant %zu, recv %d), ifft (frame %zu, symbol %zu, ant %zu, prep %d)\n",
+            tid, cur_frame, cur_symbol, cur_ant, bigstation_state_.received_all_time_iq_pkts(cur_frame, cur_symbol),
+            cur_frame_ifft, cur_symbol_ifft, cur_ant_ifft, bigstation_state_.prepared_all_precode_pkt(cur_frame_ifft, cur_symbol_ifft));
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("FFT Thread %u duration stats: total time used %.2lfms, "
-        "fft %.2lfms (%zu, %.2lf%%), stating %.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%)\n",
+        "fft %.2lfms (%zu, %.2lf%%), ifft %.2lfms (%zu, %.2lf%%), stating %.2lfms (%.2lf%%), idle %.2lfms (%.2lf%%)\n",
         tid, cycles_to_ms(whole_duration, freq_ghz_),
         cycles_to_ms(fft_tsc_duration, freq_ghz_), fft_count, fft_tsc_duration * 100.0f / whole_duration,
+        cycles_to_ms(ifft_tsc_duration, freq_ghz_), ifft_count, ifft_tsc_duration * 100.0f / whole_duration,
         cycles_to_ms(state_operation_duration, freq_ghz_), state_operation_duration * 100.0f / whole_duration,
         cycles_to_ms(idle_duration, freq_ghz_), idle_duration * 100.0f / whole_duration);
 
@@ -1119,8 +1128,11 @@ void BigStation::initializeBigStationDLBuffers()
     dl_encoded_buffer_to_send_.calloc(task_buffer_symbol_num, roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
     dl_encoded_buffer_.calloc(task_buffer_symbol_num, roundup<64>(cfg->OFDM_DATA_NUM) * cfg->UE_NUM, 64);
     dl_precoded_buffer_to_send_.calloc(cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
-    dl_socket_buffer_ = (char*)malloc(cfg->BS_ANT_NUM * kFrameWnd
-        * cfg->dl_data_symbol_num_perframe * cfg->packet_length);
+    dl_precoded_buffer_.calloc(cfg->BS_ANT_NUM * task_buffer_symbol_num, cfg->OFDM_CA_NUM, 64);
+    // dl_socket_buffer_ = (char*)malloc(cfg->BS_ANT_NUM * kFrameWnd
+    //     * cfg->dl_data_symbol_num_perframe * cfg->packet_length);
+    alloc_buffer_1d(&dl_socket_buffer_, cfg->BS_ANT_NUM * kFrameWnd
+        * cfg->dl_data_symbol_num_perframe * cfg->packet_length, 64, 0);
 }
 
 void BigStation::saveLatencyDataToFile()

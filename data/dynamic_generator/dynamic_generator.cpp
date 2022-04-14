@@ -289,13 +289,19 @@ int main(int argc, char* argv[])
     Table<complex_float> csi_matrices;
     csi_matrices.calloc(
         cfg->OFDM_CA_NUM, cfg->UE_ANT_NUM * cfg->BS_ANT_NUM, 32);
+    std::default_random_engine generator;
+    std::normal_distribution<float> distribution(0.0, 1.0);
     if (mode == 0 || mode == 1) {
         for (size_t i = 0; i < cfg->UE_ANT_NUM * cfg->BS_ANT_NUM; i++) {
+            // complex_float csi
+            //     = { rand_float_from_short(-1, 1), rand_float_from_short(-1, 1) };
             complex_float csi
-                = { rand_float_from_short(-1, 1), rand_float_from_short(-1, 1) };
+                = { distribution(generator), distribution(generator) };
             for (size_t j = 0; j < cfg->OFDM_CA_NUM; j++) {
-                complex_float noise = { rand_float_from_short(-1, 1) * kNoiseLevel,
-                    rand_float_from_short(-1, 1) * kNoiseLevel };
+                // complex_float noise = { rand_float_from_short(-1, 1) * kNoiseLevel,
+                //     rand_float_from_short(-1, 1) * kNoiseLevel };
+                complex_float noise = { distribution(generator) * kNoiseLevel,
+                    distribution(generator) * kNoiseLevel };
                 csi_matrices[j][i].re = csi.re + noise.re;
                 csi_matrices[j][i].im = csi.im + noise.im;
             }

@@ -49,6 +49,8 @@ public:
     bool decode_done(size_t frame_id);
     bool ifft_done(size_t frame_id);
 
+    bool is_encode_ready(size_t frame_id, size_t symbol_id_dl);
+
     // Latency measurement counters for each frame
     uint64_t *frame_start_time_;
     uint64_t *frame_iq_time_;
@@ -62,7 +64,7 @@ public:
 
     size_t rru_start_ = false;
 
-private:
+// private:
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
         num_time_iq_pkts_received_ = {};
     std::array<std::array<std::atomic<size_t>, kMaxSymbols>, kFrameWnd>
@@ -95,6 +97,8 @@ private:
     std::array<size_t, kFrameWnd> num_ifft_tasks_completed_ = {};
     std::array<std::mutex, kFrameWnd> ifft_mutex_ = {};
 
+    std::array<bool, kFrameWnd> encode_ready_;
+
     std::mutex cur_frame_mutex_;
     
     Config* cfg_;
@@ -114,4 +118,5 @@ private:
     const size_t num_precode_pkts_prepared_per_symbol_;
     const size_t num_precode_pkts_received_per_symbol_;
     const size_t num_ifft_tasks_per_frame_;
+    const size_t slot_us_;
 };

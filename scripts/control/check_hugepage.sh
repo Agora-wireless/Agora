@@ -2,6 +2,8 @@
 
 set -e
 
+# Check sudo without password
+
 # Checking hugepage amount on Hydra servers
 for (( i=0; i<${hydra_app_num}; i++ )) do
   server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.hydra_servers[$i]' | tr -d '"')
