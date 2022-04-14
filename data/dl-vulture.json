@@ -9,7 +9,7 @@
     "tx_gain_b": 81,
     "sample_rate": 7.68e6,
     "calibrate_digital": true,
-    "calibrate_analog" : true,
+    "calibrate_analog" : false,
     "ofdm_tx_zero_prefix": 160,
     "ofdm_tx_zero_postfix": 192,
     "ofdm_rx_zero_prefix_bs": 160,
