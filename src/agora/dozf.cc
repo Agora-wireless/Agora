@@ -116,8 +116,9 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
       // pinv(calib * csi) = pinv(csi)*inv(calib)
       // This probably causes a performance hit since we are throwing
       // magnitude info away by taking the sign of the calibration matrix
-      arma::cx_fmat calib_mat = arma::diagmat(arma::sign(calib_sc_vec));
-      mat_dl_zf_tmp = mat_ul_zf_tmp * arma::inv(calib_mat);
+      // Inv is already acheived by UL over DL division outside this function
+      arma::cx_fmat inv_calib_mat = arma::diagmat(arma::sign(calib_sc_vec));
+      mat_dl_zf_tmp = mat_ul_zf_tmp * inv_calib_mat;
     } else {
       arma::cx_fmat mat_dl_csi = arma::diagmat(calib_sc_vec) * mat_csi;
       if (kUseInverseForZF) {
@@ -134,8 +135,8 @@ float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
     // We should be scaling the beamforming matrix, so the IFFT
     // output can be scaled with OfdmCaNum() across all antennas.
     // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
-    float scale = 1 / (abs(mat_dl_zf_tmp).max());
-    mat_dl_zf_tmp *= scale;
+    const float scale = 1 / (abs(mat_dl_zf_tmp).max());
+    mat_dl_zf_tmp = mat_dl_zf_tmp * scale;
 
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
       if (cfg_->ExternalRefNode(i)) {
@@ -241,7 +242,7 @@ void DoZF::ComputeCalib(size_t frame_id, size_t sc_id,
     }
 
     calib_sc_vec =
-        (cur_calib_dl_msum_mat.row(sc_id) / cur_calib_ul_msum_mat.row(sc_id))
+        (cur_calib_ul_msum_mat.row(sc_id) / cur_calib_dl_msum_mat.row(sc_id))
             .st();
   }
   // Otherwise calib_sc_vec = identity from init

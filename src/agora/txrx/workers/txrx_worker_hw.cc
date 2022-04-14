@@ -11,6 +11,7 @@
 #include "logger.h"
 
 static constexpr bool kSymbolTimingEnabled = false;
+static constexpr bool kBeamsweepData = false;
 
 TxRxWorkerHw::TxRxWorkerHw(
     size_t core_offset, size_t tid, size_t interface_count,
@@ -448,15 +449,37 @@ size_t TxRxWorkerHw::DoTx(long long time0) {
       if (kDebugDownlink == true) {
         for (size_t ch = 0; ch < channels_per_interface_; ch++) {
           // Not exactly sure why 0 index was selected here.  Could it be a beacon ant?
-          if (ant_id != 0) {
+          if (!kBeamsweepData && ant_id != 0) {
             txbuf.at(ch) = zeros_.data();
           } else if (dl_symbol_idx <
                      Configuration()->Frame().ClientDlPilotSymbols()) {
+            std::vector<std::complex<int16_t>> pilot(
+                Configuration()->UeSpecificPilotT()[0],
+                Configuration()->UeSpecificPilotT()[0] +
+                    Configuration()->SampsPerSymbol());
+            std::vector<std::complex<int16_t>> nt_pilot(pilot);
+            for (auto& v : nt_pilot) {
+              v = -v;
+            }
+            size_t fr_id = tx_frame_id % Configuration()->BfAntNum();
             txbuf.at(ch) =
-                reinterpret_cast<void*>(Configuration()->UeSpecificPilotT()[0]);
+                kBeamsweepData && CommsLib::Hadamard2(ant_id, fr_id) == -1
+                    ? nt_pilot.data()
+                    : pilot.data();
           } else {
-            txbuf.at(ch) = reinterpret_cast<void*>(
-                Configuration()->DlIqT()[dl_symbol_idx]);
+            std::vector<std::complex<int16_t>> data_t(
+                Configuration()->DlIqT()[dl_symbol_idx],
+                Configuration()->DlIqT()[dl_symbol_idx] +
+                    Configuration()->SampsPerSymbol());
+            std::vector<std::complex<int16_t>> nt_data_t(data_t);
+            for (auto& v : nt_data_t) {
+              v = -v;
+            }
+            size_t fr_id = tx_frame_id % Configuration()->BfAntNum();
+            txbuf.at(ch) =
+                kBeamsweepData && CommsLib::Hadamard2(ant_id, fr_id) == -1
+                    ? nt_data_t.data()
+                    : data_t.data();
           }
         }
       } else {

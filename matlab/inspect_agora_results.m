@@ -1,14 +1,14 @@
 clear;
 close all;
 
-symbol_size = 2400;
-fft_size = 2048;
-data_size = 1200;
+symbol_size = 896;
+fft_size = 512;
+data_size = 304;
 offset = 160;
 cp = 32;
-n_user = 2;
-pig = 0:1;
-dig = [2];
+n_user = 1;
+pig = 0;
+dig = [1:2];
 
 nz_start_idx = (fft_size - data_size)/2;
 nz_sc_idx = nz_start_idx+1:nz_start_idx+data_size;
@@ -70,8 +70,11 @@ for u=1:n_user
       rx_pilot_f_tmp = fft(rx_pilot(start_id + 1:start_id + fft_size, u, p));
       ch_est(:, p) = rx_pilot_f_tmp(nz_sc_idx) ./ tx_pilot(:, u, p);
     end
-    
-    ch_est_mean = mean(ch_est, 2);    
+    if length(pig) == 1
+        ch_est_mean = ch_est;
+    else
+        ch_est_mean = mean(ch_est, 2);
+    end
     data_phase_corr = zeros(data_size, length(dig));
     aevms = zeros(u, length(dig));
     for d=1:length(dig)
@@ -79,7 +82,7 @@ for u=1:n_user
       data_eq = rx_data_f_tmp(nz_sc_idx) ./ ch_est_mean;
       
       % pilot tracking
-      phase_err = angle(mean((data_eq(1:plt_trk_sp:end, d) .* conj(tx_pilot(1:plt_trk_sp:end, u, d)))));
+      phase_err = angle(mean((data_eq(1:plt_trk_sp:end) .* conj(tx_pilot(1:plt_trk_sp:end, u)))));
       data_phase_corr(data_sc_idx, d) = data_eq(data_sc_idx) .* exp(-1j*phase_err);
       
       evm_mat = abs(data_phase_corr(data_sc_idx, d) - tx_data(data_sc_idx, u, d)).^2;

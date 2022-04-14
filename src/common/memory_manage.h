@@ -89,7 +89,7 @@ class Table {
     this->data_ = nullptr;
   }
 
-  T* At(size_t dim1) const { return (*this)[dim1]; }
+  const T* At(size_t dim1) const { return (data_ + (dim1 * dim2_)); }
 
   T* operator[](size_t dim1) {
     assert(this->dim1_ > dim1);
