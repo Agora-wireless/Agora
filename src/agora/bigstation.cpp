@@ -217,8 +217,10 @@ void BigStation::fftWorker(int tid)
                 fft_start_tsc = rdtsc();
             });
 
-            do_fft->Launch(cur_frame, cur_symbol, cur_ant);
-            // printf("Run FFT frame %zu symbol %zu ant %zu\n", cur_frame, cur_symbol, cur_ant);
+            // do_fft->Launch(cur_frame, cur_symbol, cur_ant);
+            for (size_t ant_id = ant_start; ant_id < ant_end; ant_id ++) {
+                do_fft->Launch(cur_frame, cur_symbol, ant_id);
+            }
 
             TRIGGER_TIMER({
                 size_t fft_tmp_tsc = rdtsc() - fft_start_tsc;
@@ -227,10 +229,13 @@ void BigStation::fftWorker(int tid)
                 fft_start_tsc = rdtsc();
             });
 
-            bigstation_state_.prepare_freq_iq_pkt(cur_frame, cur_symbol, cur_ant);
-            cur_ant++;
-            if (cur_ant == ant_end) {
-                cur_ant = ant_start;
+            // bigstation_state_.prepare_freq_iq_pkt(cur_frame, cur_symbol, cur_ant);
+            for (size_t ant_id = ant_start; ant_id < ant_end; ant_id ++) 
+                bigstation_state_.prepare_freq_iq_pkt(cur_frame, cur_symbol, ant_id);
+            }
+            // cur_ant++;
+            // if (cur_ant == ant_end) {
+            //     cur_ant = ant_start;
                 cur_symbol++;
                 if (cur_symbol == config_->symbol_num_perframe) {
                     cur_symbol = 0;
@@ -239,7 +244,7 @@ void BigStation::fftWorker(int tid)
                         break;
                     }
                 }
-            }
+            // }
 
             TRIGGER_TIMER({
                 state_operation_duration += rdtsc() - fft_start_tsc;
