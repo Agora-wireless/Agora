@@ -6,11 +6,11 @@ hydra_root_dir=$( cd ${script_dir}/../.. >/dev/null 2>&1 && pwd )
 source ${hydra_root_dir}/scripts/utils/utils.sh
 source ${hydra_root_dir}/scripts/control/init_platform.sh
 
-# server_list=("roce95" "roce94" "roce83")
-server_list=("node1" "node2" "node3" "node4" "node5" "node6" "node7" "node8" \
-    "node25" "node9" "node11" "node12" "node13" "node14" "node15" "node16")
-ant_list=(64 64 128 150)
-ue_list=(16 32 32 32)
+server_list=("roce95" "roce94" "roce91" "roce92" "roce83")
+# server_list=("node1" "node2" "node3" "node4" "node5" "node6" "node7" "node8" \
+#     "node25" "node9" "node11" "node12" "node13" "node14" "node15" "node16")
+ant_list=(150)
+ue_list=(32)
 
 phy_core_num=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.phy_core_num')
 core_offset=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.core_offset')
@@ -299,26 +299,32 @@ function create_deploy_json()
     done
 }
 
-bigstation_template_template=${hydra_root_dir}/config/template_cloudlab/template_cloudlab_bigstation_ul.json
-bigstation_deploy_template=${hydra_root_dir}/config/deploy_cloudlab/deploy_cloudlab_bigstation_ul.json
+# bigstation_template_template=${hydra_root_dir}/config/template_cloudlab/template_cloudlab_bigstation_ul.json
+# bigstation_deploy_template=${hydra_root_dir}/config/deploy_cloudlab/deploy_cloudlab_bigstation_ul.json
+bigstation_template_template=${hydra_root_dir}/config/template_msr_bigstation/template_msr_5.json
+bigstation_deploy_template=${hydra_root_dir}/config/deploy_msr_bigstation/deploy_msr_5.json
 
 for i in ${!ant_list[@]}; do
     cur_ant=${ant_list[$i]}
     cur_ue=${ue_list[$i]}
     echo "Test setup ant ${cur_ant} ue ${cur_ue}"
-    cp ${bigstation_template_template} ${hydra_root_dir}/config/template_cloudlab/template_cloudlab_bigstation_${cur_ant}_${cur_ue}_ul.json
-    HYDRA_SYSTEM_CONFIG_JSON=config/template_cloudlab/template_cloudlab_bigstation_${cur_ant}_${cur_ue}_ul.json
-    cp ${bigstation_deploy_template} ${hydra_root_dir}/config/deploy_cloudlab/deploy_cloudlab_bigstation_${cur_ant}_${cur_ue}_ul.json
-    HYDRA_SERVER_DEPLOY_JSON=config/deploy_cloudlab/deploy_cloudlab_bigstation_${cur_ant}_${cur_ue}_ul.json
+    # cp ${bigstation_template_template} ${hydra_root_dir}/config/template_cloudlab/template_cloudlab_bigstation_${cur_ant}_${cur_ue}_ul.json
+    # HYDRA_SYSTEM_CONFIG_JSON=config/template_cloudlab/template_cloudlab_bigstation_${cur_ant}_${cur_ue}_ul.json
+    # cp ${bigstation_deploy_template} ${hydra_root_dir}/config/deploy_cloudlab/deploy_cloudlab_bigstation_${cur_ant}_${cur_ue}_ul.json
+    # HYDRA_SERVER_DEPLOY_JSON=config/deploy_cloudlab/deploy_cloudlab_bigstation_${cur_ant}_${cur_ue}_ul.json
+    cp ${bigstation_template_template} ${hydra_root_dir}/config/template_msr_bigstation/template_msr_${cur_ant}_${cur_ue}.json
+    HYDRA_SYSTEM_CONFIG_JSON=config/template_msr_bigstation/template_msr_${cur_ant}_${cur_ue}.json
+    cp ${bigstation_deploy_template} ${hydra_root_dir}/config/deploy_msr_bigstation/deploy_msr_${cur_ant}_${cur_ue}.json
+    HYDRA_SERVER_DEPLOY_JSON=config/deploy_msr_bigstation/deploy_msr_${cur_ant}_${cur_ue}.json
     cat ${hydra_master_config_json} | jq --arg template ${HYDRA_SYSTEM_CONFIG_JSON} '.hydra_system_config_json=$template' | \
         jq --arg deploy ${HYDRA_SERVER_DEPLOY_JSON} '.hydra_server_deploy_json=$deploy' > tmp.json
     cp tmp.json ${hydra_master_config_json}
-    cur_rx_thread_num=3
-    cur_tx_thread_num=1
+    cur_rx_thread_num=4
+    cur_tx_thread_num=2
     cur_fft_block_per_thread=4
-    cur_zf_thread_num_total=${total_server_num}
-    cur_demul_thread_num_total=${total_server_num}
-    cur_decode_thread_num_per_server=4
+    cur_zf_thread_num_total=$(( ${total_server_num}*2 ))
+    cur_demul_thread_num_total=$(( ${total_server_num}*10 ))
+    cur_decode_thread_num_per_server=10
     consecutive_error_num=0
     fft_done=0
     zf_done=0
