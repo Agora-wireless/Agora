@@ -1,7 +1,7 @@
 {
   "freq_orthogonal_pilot": true,
   "ue_rx_port": 10000,
-  "demul_block_size": 16,
+  "demul_block_size": 8,
   "antenna_num": 128,
   "frames": [
     "PUUUUUUUUUUUUU"
