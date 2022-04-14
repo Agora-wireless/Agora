@@ -60,6 +60,7 @@ class Config {
 
   inline bool HwFramer() const { return this->hw_framer_; }
   inline bool UeHwFramer() const { return this->ue_hw_framer_; }
+  inline bool UeResyncPeriod() const { return this->ue_resync_period_; }
   inline double FreqGhz() const { return this->freq_ghz_; };
   inline double Freq() const { return this->freq_; }
   inline double Rate() const { return this->rate_; }
@@ -212,13 +213,22 @@ class Config {
   inline size_t OfdmRxZeroPrefixCalUl() const {
     return this->ofdm_rx_zero_prefix_cal_ul_;
   }
+  void OfdmRxZeroPrefixCalUl(size_t prefix) {
+    this->ofdm_rx_zero_prefix_cal_ul_ = prefix;
+  }
   inline size_t OfdmRxZeroPrefixCalDl() const {
     return this->ofdm_rx_zero_prefix_cal_dl_;
+  }
+  void OfdmRxZeroPrefixCalDl(const size_t prefix) {
+    this->ofdm_rx_zero_prefix_cal_dl_ = prefix;
   }
   inline size_t OfdmRxZeroPrefixClient() const {
     return this->ofdm_rx_zero_prefix_client_;
   }
   inline size_t SampsPerSymbol() const { return this->samps_per_symbol_; }
+  inline size_t SampsPerFrame() const {
+    return this->frame_.NumTotalSyms() * this->samps_per_symbol_;
+  }
   inline size_t PacketLength() const { return this->packet_length_; }
 
   inline float Scale() const { return this->scale_; }
@@ -624,6 +634,7 @@ class Config {
   // true: use hardware correlator; false: use software corrleator
   bool hw_framer_;
   bool ue_hw_framer_;
+  size_t ue_resync_period_;
 
   double freq_;
   double rate_;

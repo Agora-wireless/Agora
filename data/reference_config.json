@@ -38,8 +38,8 @@
   /* General settings */
   "beamsweep": false,
   "beacon_antenna": 0,
-  "sample_calibrate": false,
-  "imbalance_calibrate": false,
+  "calibrate_digital": false,
+  "calibrate_analog": false,
   "init_calib_repeat": 1,
   "correct_phase_shift": false,
   /* Hardware specific information */

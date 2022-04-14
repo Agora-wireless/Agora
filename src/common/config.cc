@@ -206,8 +206,8 @@ Config::Config(const std::string& jsonfile)
   radio_rf_freq_ = freq_ - nco_;
   beacon_ant_ = tdd_conf.value("beacon_antenna", 0);
   beamsweep_ = tdd_conf.value("beamsweep", false);
-  sample_cal_en_ = tdd_conf.value("sample_calibrate", false);
-  imbalance_cal_en_ = tdd_conf.value("imbalance_calibrate", false);
+  sample_cal_en_ = tdd_conf.value("calibrate_digital", false);
+  imbalance_cal_en_ = tdd_conf.value("calibrate_analog", false);
   init_calib_repeat_ = tdd_conf.value("init_calib_repeat", 0);
 
   bs_server_addr_ = tdd_conf.value("bs_server_addr", "127.0.0.1");
@@ -281,6 +281,7 @@ Config::Config(const std::string& jsonfile)
   RtAssert(ue_hw_framer_ == false,
            "User equiptment hardware framer (ue_hw_framer) set to true is "
            "unsupported in this version of Agora");
+  ue_resync_period_ = tdd_conf.value("ue_resync_period", 0);
 
   // If frames not specified explicitly, construct default based on frame_type /
   // symbol_num_perframe / pilot_num / ul_symbol_num_perframe /

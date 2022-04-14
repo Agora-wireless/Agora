@@ -301,8 +301,8 @@ set(COMMON_SOURCES
   src/agora/phy_stats.cc
   src/common/framestats.cc
   src/agora/doencode.cc
-  src/common/config.cc
   src/common/utils.cc
+  src/common/config.cc
   src/common/comms-lib.cc
   src/common/comms-lib-avx.cc
   src/common/signal_handler.cc
@@ -341,7 +341,8 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/doprecode.cc
   src/agora/dodecode.cc
   src/agora/radio_lib.cc
-  src/agora/radio_calibrate.cc
+  src/agora/radio_calibrate_digital.cc
+  src/agora/radio_calibrate_analog.cc
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/packet_txrx_radio.cc

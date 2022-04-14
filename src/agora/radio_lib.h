@@ -48,7 +48,19 @@ class RadioConfig {
   void ConfigureBsRadio(size_t tid);
 
  private:
-  bool InitialCalib(bool /*sample_adjust*/);
+  void CalibrateSampleOffset();
+  /* Transmit from each array atenna to ref antenna,
+   * return the received signal vector at the ref antenna
+  */
+  auto TxArrayToRef(const std::vector<std::complex<int16_t>>& tx_vec);
+  /* Transmit from ref antenna to the rest of the array
+  * return the received signal vector at the array
+  */
+  auto TxRefToArray(const std::vector<std::complex<int16_t>>& tx_vec);
+  bool FindTimeOffset(
+      const std::vector<std::vector<std::complex<int16_t>>>& rx_mat,
+      std::vector<int>& offset);
+  bool InitialCalib();
   static void DrainRxBuffer(SoapySDR::Device* ibsSdrs,
                             SoapySDR::Stream* istream, std::vector<void*> buffs,
                             size_t symSamp);
@@ -60,12 +72,12 @@ class RadioConfig {
                            double /*txCenterTone*/);
   static void SetIqBalance(SoapySDR::Device* /*dev*/, int /*direction*/,
                            size_t /*channel*/, int /*gcorr*/, int /*iqcorr*/);
-  static void AdjustCalibrationGains(std::vector<SoapySDR::Device*> /*rxDevs*/,
-                                     SoapySDR::Device* /*txDev*/,
-                                     size_t /*channel*/, double /*fftBin*/,
-                                     bool plot = false);
-  static std::vector<std::complex<float>> SnoopSamples(
-      SoapySDR::Device* /*dev*/, size_t /*channel*/, size_t /*readSize*/);
+  static void AdjustCalibrationGains(std::vector<SoapySDR::Device*>& rx_devs,
+                                     SoapySDR::Device* tx_dev, size_t channel,
+                                     double fft_bin, bool plot = false);
+  static std::vector<std::complex<float>> SnoopSamples(SoapySDR::Device* dev,
+                                                       size_t channel,
+                                                       size_t read_size);
   void DciqCalibrationProc(size_t /*channel*/);
   Config* cfg_;
   std::vector<SoapySDR::Device*> hubs_;
