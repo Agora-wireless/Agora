@@ -9,6 +9,7 @@ namespace plt = matplotlibcpp;
 
 static constexpr size_t kMaxArraySampleOffset = 10;
 static constexpr bool kReciprocalCalibPlot = false;
+static constexpr bool kPrintCalibrationMats = false;
 static constexpr bool kVerboseCalibration = false;
 static constexpr size_t kRxTimeoutUs = 1000000;
 static constexpr size_t kTxTimeoutUs = 1000000;
@@ -355,6 +356,99 @@ void RadioConfig::CalibrateSampleOffset() {
               << std::endl;
     exit(0);
   }
+}
+
+bool RadioConfig::InitialCalibLoop() {
+  bool good_calib = false;
+  AllocBuffer1d(&init_calib_dl_processed_,
+                cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
+                Agora_memory::Alignment_t::kAlign64, 1);
+  AllocBuffer1d(&init_calib_ul_processed_,
+                cfg_->OfdmDataNum() * cfg_->BfAntNum() * sizeof(arma::cx_float),
+                Agora_memory::Alignment_t::kAlign64, 1);
+  // initialize init_calib to a matrix of zeros
+  for (size_t i = 0; i < cfg_->OfdmDataNum() * cfg_->BfAntNum(); i++) {
+    init_calib_dl_processed_[i] = 0;
+    init_calib_ul_processed_[i] = 0;
+  }
+
+  calib_meas_num_ = cfg_->InitCalibRepeat();
+  if (calib_meas_num_ != 0u) {
+    init_calib_ul_.Calloc(calib_meas_num_,
+                          cfg_->OfdmDataNum() * cfg_->BfAntNum(),
+                          Agora_memory::Alignment_t::kAlign64);
+    init_calib_dl_.Calloc(calib_meas_num_,
+                          cfg_->OfdmDataNum() * cfg_->BfAntNum(),
+                          Agora_memory::Alignment_t::kAlign64);
+    if (cfg_->Frame().NumDLSyms() > 0) {
+      int iter = 0;
+      int max_iter = 1;
+      std::cout << "Start initial reciprocity calibration..." << std::endl;
+      while (good_calib == false) {
+        good_calib = InitialCalib();
+        iter++;
+        if ((iter == max_iter) && (good_calib == false)) {
+          std::cout << "attempted " << max_iter
+                    << " unsucessful calibration, stopping ..." << std::endl;
+          break;
+        }
+      }
+      if (good_calib == false) {
+        return good_calib;
+      } else {
+        std::cout << "initial calibration successful!" << std::endl;
+      }
+      // process initial measurements
+      arma::cx_fcube calib_dl_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
+                                   calib_meas_num_, arma::fill::zeros);
+      arma::cx_fcube calib_ul_cube(cfg_->OfdmDataNum(), cfg_->BfAntNum(),
+                                   calib_meas_num_, arma::fill::zeros);
+      for (size_t i = 0; i < calib_meas_num_; i++) {
+        arma::cx_fmat calib_dl_mat(init_calib_dl_[i], cfg_->OfdmDataNum(),
+                                   cfg_->BfAntNum(), false);
+        arma::cx_fmat calib_ul_mat(init_calib_ul_[i], cfg_->OfdmDataNum(),
+                                   cfg_->BfAntNum(), false);
+        calib_dl_cube.slice(i) = calib_dl_mat;
+        calib_ul_cube.slice(i) = calib_ul_mat;
+        if (kPrintCalibrationMats) {
+          Utils::PrintMat(calib_dl_mat, "calib_dl_mat" + std::to_string(i));
+          Utils::PrintMat(calib_ul_mat, "calib_ul_mat" + std::to_string(i));
+          Utils::PrintMat(calib_dl_mat / calib_ul_mat,
+                          "calib_mat" + std::to_string(i));
+        }
+        if (kRecordCalibrationMats == true) {
+          Utils::SaveMat(calib_dl_mat, "calib_dl_mat.m",
+                         "init_calib_dl_mat" + std::to_string(i),
+                         i > 0 /*append*/);
+          Utils::SaveMat(calib_ul_mat, "calib_ul_mat.m",
+                         "init_calib_ul_mat" + std::to_string(i),
+                         i > 0 /*append*/);
+        }
+      }
+      arma::cx_fmat calib_dl_mean_mat(init_calib_dl_processed_,
+                                      cfg_->OfdmDataNum(), cfg_->BfAntNum(),
+                                      false);
+      arma::cx_fmat calib_ul_mean_mat(init_calib_ul_processed_,
+                                      cfg_->OfdmDataNum(), cfg_->BfAntNum(),
+                                      false);
+      calib_dl_mean_mat = arma::mean(calib_dl_cube, 2);  // mean along dim 2
+      calib_ul_mean_mat = arma::mean(calib_ul_cube, 2);  // mean along dim 2
+      if (kPrintCalibrationMats) {
+        Utils::PrintMat(calib_dl_mean_mat, "calib_dl_mat");
+        Utils::PrintMat(calib_ul_mean_mat, "calib_ul_mat");
+        Utils::PrintMat(calib_dl_mean_mat / calib_ul_mean_mat, "calib_mat");
+      }
+      if (kRecordCalibrationMats == true) {
+        Utils::SaveMat(calib_dl_mean_mat, "calib_dl_mat.m",
+                       "init_calib_dl_mat_mean", true /*append*/);
+        Utils::SaveMat(calib_ul_mean_mat, "calib_ul_mat.m",
+                       "init_calib_ul_mat_mean", true /*append*/);
+      }
+    }
+    init_calib_dl_.Free();
+    init_calib_ul_.Free();
+  }
+  return true;
 }
 
 bool RadioConfig::InitialCalib() {

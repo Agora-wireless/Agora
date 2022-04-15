@@ -61,6 +61,7 @@ class RadioConfig {
       const std::vector<std::vector<std::complex<int16_t>>>& rx_mat,
       std::vector<int>& offset);
   bool InitialCalib();
+  bool InitialCalibLoop();
   static void DrainRxBuffer(SoapySDR::Device* ibsSdrs,
                             SoapySDR::Stream* istream, std::vector<void*> buffs,
                             size_t symSamp);
