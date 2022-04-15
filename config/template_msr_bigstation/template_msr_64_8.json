@@ -1,12 +1,12 @@
 {
-  "rx_thread_num": 6,
-  "tx_thread_num": 3,
+  "rx_thread_num": 4,
+  "tx_thread_num": 2,
   "use_central_scheduler": false,
   "use_general_worker": false,
   "worker_thread_num": 10,
   "demul_block_size": 8,
-  "antenna_num": 150,
-  "ue_num": 32,
+  "antenna_num": 64,
+  "ue_num": 8,
   "core_offset": 0,
   "frames": [
     "PUUUUUUUUUUUUU"
@@ -24,11 +24,11 @@
   "dynamic_workload": true,
   "fixed_control": 0,
   "user_level_list": [
-    32
+    8
   ],
   "num_load_levels": 1,
   "sleep_mode": false,
-  "ofdm_data_num": 1216,
+  "ofdm_data_num": 1200,
   "slot_us": 1000,
   "use_hyperthreading": "RXTXExclusive",
   "phy_core_num": 32,

@@ -11,31 +11,31 @@
     "roce83"
   ],
   "num_fft_workers": [
+    3,
+    2,
+    2,
+    2,
+    2
+  ],
+  "num_zf_workers": [
+    1,
+    1,
+    1,
+    1,
+    1
+  ],
+  "num_demul_workers": [
     6,
-    6,
-    6,
+    7,
+    7,
     6,
     6
   ],
-  "num_zf_workers": [
-    3,
-    3,
-    3,
-    3,
-    3
-  ],
-  "num_demul_workers": [
-    16,
-    16,
-    16,
-    16,
-    16
-  ],
   "num_decode_workers": [
-    15,
-    15,
-    15,
-    15,
-    15
+    19,
+    19,
+    19,
+    19,
+    19
   ]
 }
