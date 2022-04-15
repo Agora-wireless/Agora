@@ -8,9 +8,9 @@
 #include <armadillo>
 
 #include "config.h"
+#include "csv_logger.h"
 #include "memory_manage.h"
 #include "symbols.h"
-#include "csv_logger.h"
 
 class PhyStats {
  public:
@@ -35,8 +35,8 @@ class PhyStats {
                         complex_float* fft_data);
   void PrintSnrStats(size_t frame_id);
   void PrintDlSnrStats(size_t frame_id, size_t ant_id);
-  void RecordDlPilotSnr(std::unique_ptr<CsvLog::CsvLogger>& logger,
-                        size_t frame_id, size_t ant_id);
+  void RecordDlPilotSnr(CsvLog::CsvLogger* logger, size_t frame_id,
+                        size_t ant_id);
   void UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id, size_t ant_id,
                            complex_float* fft_data);
   void PrintCalibSnrStats(size_t frame_id);

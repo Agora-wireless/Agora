@@ -442,7 +442,8 @@ void PhyUe::Start() {
               }
               if (kEnableCsvLog) {
                 this->phy_stats_->RecordDlPilotSnr(
-                    csv_logger_array_.at(CsvLog::kDLPSNR), frame_id, ant_id);
+                    csv_logger_array_.at(CsvLog::kDLPSNR).get(), frame_id,
+                    ant_id);
               }
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
