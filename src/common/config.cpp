@@ -185,9 +185,9 @@ Config::Config(std::string jsonfile)
     tx_thread_num = tddConf.value("tx_thread_num", 4);
 
     demul_block_size = tddConf.value("demul_block_size", 48);
-    rt_assert(demul_block_size % kSCsPerCacheline == 0,
-        "Demodulation block size must be a multiple of subcarriers per "
-        "cacheline");
+    // rt_assert(demul_block_size % kSCsPerCacheline == 0,
+    //     "Demodulation block size must be a multiple of subcarriers per "
+    //     "cacheline");
     // rt_assert(demul_block_size % kTransposeBlockSize == 0,
     //     "Demodulation block size must be a multiple of transpose block size");
     rt_assert(demul_block_size > 0,
@@ -240,8 +240,8 @@ Config::Config(std::string jsonfile)
         //     "Subcarrier block size should be a multiple of zf_block_size)!");
         // rt_assert(subcarrier_block_size % kSCsPerCacheline == 0,
         //     "Subcarrier block size should be a multiple of cacheline size)!");
-        rt_assert(demul_block_size <= subcarrier_block_size,
-            "Demodulation block size must no larger than subcarrier block size!");
+        // rt_assert(demul_block_size <= subcarrier_block_size,
+        //     "Demodulation block size must no larger than subcarrier block size!");
 
         subcarrier_num_list = tddConf.value("subcarrier_num_list", std::vector<size_t>());
         rt_assert(bs_server_addr_list.size() == subcarrier_num_list.size(), "Subcarrier num list has a different size!");
