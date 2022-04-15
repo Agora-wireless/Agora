@@ -188,16 +188,18 @@ void UeWorker::DoFftPilot(size_t tag) {
 
   if (kRecordDownlinkFrame) {
     if (frame_id == kRecordFrameIndex) {
-      const std::string short_id = config_.UeRadioId().empty() ? "" :
-          "_" + config_.UeRadioId().at(0).substr(
-          config_.UeRadioId().at(0).length() - kShortIdLen);
+      const std::string short_id =
+          config_.UeRadioId().empty()
+              ? ""
+              : "_" + config_.UeRadioId().at(0).substr(
+                          config_.UeRadioId().at(0).length() - kShortIdLen);
       std::string fname = "rxpilot" + std::to_string(dl_symbol_id) + short_id +
                           "_" + std::to_string(ant_id) + ".bin";
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
       std::fclose(f);
-      fname = "txpilot_f_" + std::to_string(dl_symbol_id) + short_id +
-              "_" + std::to_string(ant_id) + ".bin";
+      fname = "txpilot_f_" + std::to_string(dl_symbol_id) + short_id + "_" +
+              std::to_string(ant_id) + ".bin";
       f = std::fopen(fname.c_str(), "wb");
       std::fwrite(config_.UeSpecificPilot()[ant_id], 2 * sizeof(float),
                   config_.OfdmDataNum(), f);
@@ -285,16 +287,18 @@ void UeWorker::DoFftData(size_t tag) {
 
   if (kRecordDownlinkFrame) {
     if (frame_id == kRecordFrameIndex) {
-      const std::string short_id = config_.UeRadioId().empty() ? "" :
-          "_" + config_.UeRadioId().at(0).substr(
-          config_.UeRadioId().at(0).length() - kShortIdLen);
+      const std::string short_id =
+          config_.UeRadioId().empty()
+              ? ""
+              : "_" + config_.UeRadioId().at(0).substr(
+                          config_.UeRadioId().at(0).length() - kShortIdLen);
       std::string fname = "rxdata" + std::to_string(dl_symbol_id) + short_id +
                           "_" + std::to_string(ant_id) + ".bin";
       FILE* f = std::fopen(fname.c_str(), "wb");
       std::fwrite(pkt->data_, 2 * sizeof(int16_t), config_.SampsPerSymbol(), f);
       std::fclose(f);
-      fname = "txdata" + std::to_string(dl_symbol_id) + short_id +
-              "_" + std::to_string(ant_id) + ".bin";
+      fname = "txdata" + std::to_string(dl_symbol_id) + short_id + "_" +
+              std::to_string(ant_id) + ".bin";
       f = std::fopen(fname.c_str(), "wb");
       std::fwrite(config_.DlIqF()[dl_symbol_id] + ant_id * config_.OfdmCaNum(),
                   2 * sizeof(float), config_.OfdmCaNum(), f);
@@ -491,10 +495,11 @@ void UeWorker::DoDemul(size_t tag) {
     }
     phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, block_error);
     if (kEnableCsvLog) {
-      logger_berser_->Write(frame_id, symbol_id, ant_id,
-                      phy_stats_.GetBitErrorRate(ant_id, total_dl_symbol_id),
-                      static_cast<float>(block_error) /
-                      static_cast<float>(config_.GetOFDMDataNum()));
+      logger_berser_->Write(
+          frame_id, symbol_id, ant_id,
+          phy_stats_.GetBitErrorRate(ant_id, total_dl_symbol_id),
+          static_cast<float>(block_error) /
+              static_cast<float>(config_.GetOFDMDataNum()));
     }
   }
 

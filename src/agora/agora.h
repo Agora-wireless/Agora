@@ -27,13 +27,13 @@
 #include "doprecode.h"
 #include "dozf.h"
 #include "mac_thread_basestation.h"
+#include "mat_logger.h"
 #include "memory_manage.h"
 #include "packet_txrx.h"
 #include "phy_stats.h"
 #include "signal_handler.h"
 #include "stats.h"
 #include "utils.h"
-#include "mat_logger.h"
 
 class Agora {
  public:

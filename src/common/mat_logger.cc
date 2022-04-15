@@ -10,11 +10,11 @@
 namespace CsvLog {
 
 MatLogger::MatLogger(const std::string& name, MatBuffer& mat_buffer)
-         : CsvLogger(name), mat_buffer_(mat_buffer) {}
+    : CsvLogger(name), mat_buffer_(mat_buffer) {}
 
 MatLogger::MatLogger(std::shared_ptr<spdlog::logger> logger,
                      MatBuffer& mat_buffer)
-         : CsvLogger(logger), mat_buffer_(mat_buffer) {}
+    : CsvLogger(logger), mat_buffer_(mat_buffer) {}
 
 bool MatLogger::UpdateMatBuf(const size_t frame_id, const size_t sc_id,
                              const arma::cx_fmat& mat_in) {
@@ -37,8 +37,8 @@ void MatLogger::SaveMatBuf() {
     for (size_t sc_id = 0; sc_id < kSCs; sc_id++) {
       for (size_t i = 0; i < kBSAnts; i++) {
         for (size_t j = 0; j < kUEAnts; j++) {
-          const arma::cx_float& cx = mat_buffer_.at(frame_id).at(sc_id)
-                                                .at(i).at(j);
+          const arma::cx_float& cx =
+              mat_buffer_.at(frame_id).at(sc_id).at(i).at(j);
           Write(frame_id, sc_id, i, j, cx.real(), cx.imag());
         }
       }
@@ -46,5 +46,5 @@ void MatLogger::SaveMatBuf() {
   }
 }
 
-}      //namespace CsvLog
-#endif //ENABLE_MAT_LOG
+}  //namespace CsvLog
+#endif  //ENABLE_MAT_LOG

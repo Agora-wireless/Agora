@@ -13,11 +13,11 @@
 #include "config.h"
 #include "doer.h"
 #include "gettime.h"
+#include "mat_logger.h"
 #include "phy_stats.h"
 #include "stats.h"
 #include "symbols.h"
 #include "utils.h"
-#include "mat_logger.h"
 
 class DoZF : public Doer {
  public:

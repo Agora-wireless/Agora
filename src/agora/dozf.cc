@@ -383,13 +383,13 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
       phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
     }
     if (kEnableMatLog) {
-      mat_logger_array_.at(CsvLog::kMatCSI - CsvLog::kMatIdStart)->
-          UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
+      mat_logger_array_.at(CsvLog::kMatCSI - CsvLog::kMatIdStart)
+          ->UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
       arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(
-                              dl_zf_matrices_[frame_slot][cur_sc_id]),
+                                  dl_zf_matrices_[frame_slot][cur_sc_id]),
                               cfg_->BsAntNum(), cfg_->UeAntNum(), false);
-      mat_logger_array_.at(CsvLog::kMatDLZF - CsvLog::kMatIdStart)->
-          UpdateMatBuf(frame_id, cur_sc_id, mat_dl_zf);
+      mat_logger_array_.at(CsvLog::kMatDLZF - CsvLog::kMatIdStart)
+          ->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_zf);
     }
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;

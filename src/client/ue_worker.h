@@ -13,12 +13,12 @@
 #include "buffer.h"
 #include "concurrentqueue.h"
 #include "config.h"
+#include "csv_logger.h"
 #include "dodecode_client.h"
 #include "doencode.h"
 #include "doifft_client.h"
 #include "mkl_dfti.h"
 #include "stats.h"
-#include "csv_logger.h"
 
 static const size_t kVectorAlignment = 64;
 using myVec = std::vector<complex_float, boost::alignment::aligned_allocator<
