@@ -285,10 +285,10 @@ void DySubcarrier::StartWork()
     }
 
     if (cfg_->error) {
-        printf("DySubcarrier Thread %d error traceback: csi (frame %zu, sc %zu), "
-            "zf (frame %zu, sc %zu), demul (frame %zu, symbol %zu, task %zu)\n", tid_, 
-            csi_cur_frame_, csi_cur_sc_, zf_cur_frame_, zf_cur_sc_, demul_cur_frame_,
-            demul_cur_sym_ul_, n_demul_tasks_done_);
+        printf("DySubcarrier Thread %d error traceback: csi (frame %zu, sc %zu, recv %d), "
+            "zf (frame %zu, sc %zu), demul (frame %zu, symbol %zu, task %zu, recv %d)\n", tid_, 
+            csi_cur_frame_, csi_cur_sc_, shared_state_->received_all_pilots(csi_cur_frame), zf_cur_frame_, zf_cur_sc_, demul_cur_frame_,
+            demul_cur_sym_ul_, n_demul_tasks_done_, shared_state_->received_all_data_pkts(demul_cur_frame_, demul_cur_sym_ul_));
     }
 
     std::string cur_directory = TOSTRING(PROJECT_DIRECTORY);
