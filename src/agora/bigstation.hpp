@@ -80,6 +80,6 @@ private:
     Table<int8_t> dl_encoded_buffer_to_send_;
     Table<int8_t> dl_encoded_buffer_;
     Table<complex_float> dl_precoded_buffer_to_send_;
-    Table<complex_float> dl_precoded_buffer_;
+    Table<complex_int16_t> dl_precoded_buffer_;
     char* dl_socket_buffer_;
 };

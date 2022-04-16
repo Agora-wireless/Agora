@@ -78,7 +78,7 @@ private:
 class DoIFFT : public Doer {
 public:
     DoIFFT(Config* in_config, int in_tid, double freq_ghz,
-        Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer);
+        Table<complex_int16_t>& in_dl_ifft_buffer, char* in_dl_socket_buffer);
     ~DoIFFT();
 
     /**
@@ -107,9 +107,11 @@ public:
     void Launch(size_t frame_id, size_t symbol_id_dl, size_t ant_id);
 
 private:
-    Table<complex_float>& dl_ifft_buffer_;
+    Table<complex_int16_t>& dl_ifft_buffer_;
     char* dl_socket_buffer_;
     DFTI_DESCRIPTOR_HANDLE mkl_handle;
+
+    complex_float* fft_inout; // Buffer for both FFT input and output
 };
 
 #endif

@@ -10,7 +10,7 @@
     "roce95",
     "roce94"
   ],
-  "num_fft_workers": [
+  "num_ifft_workers": [
     4,
     4,
     4,
@@ -24,14 +24,14 @@
     3,
     3
   ],
-  "num_demul_workers": [
+  "num_precode_workers": [
     6,
     6,
     6,
     6,
     6
   ],
-  "num_decode_workers": [
+  "num_encode_workers": [
     10,
     10,
     10,
