@@ -6,11 +6,11 @@ hydra_root_dir=$( cd ${script_dir}/../.. >/dev/null 2>&1 && pwd )
 source ${hydra_root_dir}/scripts/utils/utils.sh
 source ${hydra_root_dir}/scripts/control/init_platform.sh
 
-# server_list=("roce91" "roce92" "roce83" "roce95" "roce94" )
-server_list=("node1" "node2" "node3" "node4" "node5" "node6" "node7" "node8" \
-    "node17" "node9" "node11" "node12" "node13" "node14" "node15" "node16")
-ant_list=(64 128 128)
-ue_list=(16 16 32)
+server_list=("roce91" "roce92" "roce83" "roce95" "roce94" )
+# server_list=("node1" "node2" "node3" "node4" "node5" "node6" "node7" "node8" \
+#     "node17" "node9" "node11" "node12" "node13" "node14" "node15" "node16")
+ant_list=(64 64 64 128 128)
+ue_list=(8 16 32 16 32)
 
 phy_core_num=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.phy_core_num')
 core_offset=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.core_offset')
@@ -332,23 +332,23 @@ function create_deploy_json()
     done
 }
 
-bigstation_template_template=${hydra_root_dir}/config/template_cloudlab/template_cloudlab_bigstation_dl.json
-bigstation_deploy_template=${hydra_root_dir}/config/deploy_cloudlab/deploy_cloudlab_bigstation_dl.json
-# bigstation_template_template=${hydra_root_dir}/config/template_msr_bigstation_dl/template_msr_${total_server_num}.json
-# bigstation_deploy_template=${hydra_root_dir}/config/deploy_msr_bigstation_dl/deploy_msr_${total_server_num}.json
+# bigstation_template_template=${hydra_root_dir}/config/template_cloudlab/template_cloudlab_bigstation_dl.json
+# bigstation_deploy_template=${hydra_root_dir}/config/deploy_cloudlab/deploy_cloudlab_bigstation_dl.json
+bigstation_template_template=${hydra_root_dir}/config/template_msr_bigstation_dl/template_msr_${total_server_num}.json
+bigstation_deploy_template=${hydra_root_dir}/config/deploy_msr_bigstation_dl/deploy_msr_${total_server_num}.json
 
 for i in ${!ant_list[@]}; do
     cur_ant=${ant_list[$i]}
     cur_ue=${ue_list[$i]}
     echo "Test setup ant ${cur_ant} ue ${cur_ue}"
-    cp ${bigstation_template_template} ${hydra_root_dir}/config/template_cloudlab/template_cloudlab_bigstation_${cur_ant}_${cur_ue}_dl.json
-    HYDRA_SYSTEM_CONFIG_JSON=config/template_cloudlab/template_cloudlab_bigstation_${cur_ant}_${cur_ue}_dl.json
-    cp ${bigstation_deploy_template} ${hydra_root_dir}/config/deploy_cloudlab/deploy_cloudlab_bigstation_${cur_ant}_${cur_ue}_dl.json
-    HYDRA_SERVER_DEPLOY_JSON=config/deploy_cloudlab/deploy_cloudlab_bigstation_${cur_ant}_${cur_ue}_dl.json
-    # cp ${bigstation_template_template} ${hydra_root_dir}/config/template_msr_bigstation_dl/template_msr_${cur_ant}_${cur_ue}_${total_server_num}.json
-    # HYDRA_SYSTEM_CONFIG_JSON=config/template_msr_bigstation_dl/template_msr_${cur_ant}_${cur_ue}_${total_server_num}.json
-    # cp ${bigstation_deploy_template} ${hydra_root_dir}/config/deploy_msr_bigstation_dl/deploy_msr_${cur_ant}_${cur_ue}_${total_server_num}.json
-    # HYDRA_SERVER_DEPLOY_JSON=config/deploy_msr_bigstation_dl/deploy_msr_${cur_ant}_${cur_ue}_${total_server_num}.json
+    # cp ${bigstation_template_template} ${hydra_root_dir}/config/template_cloudlab/template_cloudlab_bigstation_${cur_ant}_${cur_ue}_dl.json
+    # HYDRA_SYSTEM_CONFIG_JSON=config/template_cloudlab/template_cloudlab_bigstation_${cur_ant}_${cur_ue}_dl.json
+    # cp ${bigstation_deploy_template} ${hydra_root_dir}/config/deploy_cloudlab/deploy_cloudlab_bigstation_${cur_ant}_${cur_ue}_dl.json
+    # HYDRA_SERVER_DEPLOY_JSON=config/deploy_cloudlab/deploy_cloudlab_bigstation_${cur_ant}_${cur_ue}_dl.json
+    cp ${bigstation_template_template} ${hydra_root_dir}/config/template_msr_bigstation_dl/template_msr_${cur_ant}_${cur_ue}_${total_server_num}.json
+    HYDRA_SYSTEM_CONFIG_JSON=config/template_msr_bigstation_dl/template_msr_${cur_ant}_${cur_ue}_${total_server_num}.json
+    cp ${bigstation_deploy_template} ${hydra_root_dir}/config/deploy_msr_bigstation_dl/deploy_msr_${cur_ant}_${cur_ue}_${total_server_num}.json
+    HYDRA_SERVER_DEPLOY_JSON=config/deploy_msr_bigstation_dl/deploy_msr_${cur_ant}_${cur_ue}_${total_server_num}.json
     cat ${hydra_master_config_json} | jq --arg template ${HYDRA_SYSTEM_CONFIG_JSON} '.hydra_system_config_json=$template' | \
         jq --arg deploy ${HYDRA_SERVER_DEPLOY_JSON} '.hydra_server_deploy_json=$deploy' > tmp.json
     cp tmp.json ${hydra_master_config_json}
