@@ -222,7 +222,7 @@ void DoFFT::partial_transpose(
 }
 
 DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
-    Table<complex_float>& in_dl_ifft_buffer, char* in_dl_socket_buffer)
+    Table<complex_int16_t>& in_dl_ifft_buffer, char* in_dl_socket_buffer)
     : Doer(in_config, in_tid, freq_ghz)
     , dl_ifft_buffer_(in_dl_ifft_buffer)
     , dl_socket_buffer_(in_dl_socket_buffer)
@@ -230,6 +230,10 @@ DoIFFT::DoIFFT(Config* in_config, int in_tid, double freq_ghz,
     (void)DftiCreateDescriptor(
         &mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, cfg_->OFDM_CA_NUM);
     (void)DftiCommitDescriptor(mkl_handle);
+
+    // Aligned for SIMD
+    fft_inout = reinterpret_cast<complex_float*>(
+        memalign(64, cfg_->OFDM_CA_NUM * sizeof(complex_float)));
 }
 
 DoIFFT::~DoIFFT() { DftiFreeDescriptor(&mkl_handle); }
@@ -248,10 +252,12 @@ void DoIFFT::Launch(size_t frame_id, size_t symbol_id_dl, size_t ant_id)
               * cfg_->BS_ANT_NUM)
         + ant_id;
 
-    float* ifft_buf_ptr = (float*)dl_ifft_buffer_[offset];
-    memset(ifft_buf_ptr, 0, sizeof(float) * cfg_->OFDM_DATA_START * 2);
-    memset(ifft_buf_ptr + (cfg_->OFDM_DATA_STOP) * 2, 0,
-        sizeof(float) * cfg_->OFDM_DATA_START * 2);
+    // float* ifft_buf_ptr = (float*)dl_ifft_buffer_[offset];
+    // memset(ifft_buf_ptr, 0, sizeof(float) * cfg_->OFDM_DATA_START * 2);
+    // memset(ifft_buf_ptr + (cfg_->OFDM_DATA_STOP) * 2, 0,
+    //     sizeof(float) * cfg_->OFDM_DATA_START * 2);
+    simd_convert_float16_to_float32((float*)fft_inout, (float*)dl_ifft_buffer_[offset], cfg_->OFDM_CA_NUM);
+    float* ifft_buf_ptr = (float*)fft_inout;
 
     DftiComputeBackward(mkl_handle, ifft_buf_ptr);
     // printf("data after ifft\n");
@@ -260,37 +266,37 @@ void DoIFFT::Launch(size_t frame_id, size_t symbol_id_dl, size_t ant_id)
     //         dl_ifft_buffer_[buffer_symbol_offset][i].im);
     // printf("\n");
 
-    cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg_->OFDM_CA_NUM, false);
-    float post_scale = cfg_->OFDM_CA_NUM;
-    mat_data /= post_scale;
+    // cx_fmat mat_data((cx_float*)ifft_buf_ptr, 1, cfg_->OFDM_CA_NUM, false);
+    // float post_scale = cfg_->OFDM_CA_NUM;
+    // mat_data /= post_scale;
 
-    int dl_socket_buffer_status_size = cfg_->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
-        * cfg_->dl_data_symbol_num_perframe;
-    int socket_symbol_offset = offset % dl_socket_buffer_status_size;
-    int packet_length = cfg_->packet_length;
-    struct Packet* pkt = (struct Packet*)&dl_socket_buffer_[socket_symbol_offset
-        * packet_length];
-    short* socket_ptr = &pkt->data_[2 * cfg_->TX_PREFIX_LEN];
+    // int dl_socket_buffer_status_size = cfg_->BS_ANT_NUM * SOCKET_BUFFER_FRAME_NUM
+    //     * cfg_->dl_data_symbol_num_perframe;
+    // int socket_symbol_offset = offset % dl_socket_buffer_status_size;
+    // int packet_length = cfg_->packet_length;
+    // struct Packet* pkt = (struct Packet*)&dl_socket_buffer_[socket_symbol_offset
+    //     * packet_length];
+    // short* socket_ptr = &pkt->data_[2 * cfg_->TX_PREFIX_LEN];
 
-    for (size_t sc_id = 0; sc_id < cfg_->OFDM_CA_NUM; sc_id += 8) {
-        /* ifft scaled results by OFDM_CA_NUM */
-        __m256 scale_factor = _mm256_set1_ps(32768.0);
-        __m256 ifft1 = _mm256_load_ps(ifft_buf_ptr + 2 * sc_id);
-        __m256 ifft2 = _mm256_load_ps(ifft_buf_ptr + 2 * sc_id + 8);
-        __m256 scaled_ifft1 = _mm256_mul_ps(ifft1, scale_factor);
-        __m256 scaled_ifft2 = _mm256_mul_ps(ifft2, scale_factor);
-        __m256i integer1 = _mm256_cvtps_epi32(scaled_ifft1);
-        __m256i integer2 = _mm256_cvtps_epi32(scaled_ifft2);
-        integer1 = _mm256_packs_epi32(integer1, integer2);
-        integer1 = _mm256_permute4x64_epi64(integer1, 0xD8);
-        //_mm256_stream_si256((__m256i*)&socket_ptr[2 * sc_id], integer1);
-        _mm256_stream_si256(
-            (__m256i*)&socket_ptr[2 * (sc_id + cfg_->CP_LEN)], integer1);
-        if (sc_id >= cfg_->OFDM_CA_NUM - cfg_->CP_LEN) // add CP
-            _mm256_stream_si256((__m256i*)&socket_ptr[2
-                                    * (sc_id + cfg_->CP_LEN - cfg_->OFDM_CA_NUM)],
-                integer1);
-    }
+    // for (size_t sc_id = 0; sc_id < cfg_->OFDM_CA_NUM; sc_id += 8) {
+    //     /* ifft scaled results by OFDM_CA_NUM */
+    //     __m256 scale_factor = _mm256_set1_ps(32768.0);
+    //     __m256 ifft1 = _mm256_load_ps(ifft_buf_ptr + 2 * sc_id);
+    //     __m256 ifft2 = _mm256_load_ps(ifft_buf_ptr + 2 * sc_id + 8);
+    //     __m256 scaled_ifft1 = _mm256_mul_ps(ifft1, scale_factor);
+    //     __m256 scaled_ifft2 = _mm256_mul_ps(ifft2, scale_factor);
+    //     __m256i integer1 = _mm256_cvtps_epi32(scaled_ifft1);
+    //     __m256i integer2 = _mm256_cvtps_epi32(scaled_ifft2);
+    //     integer1 = _mm256_packs_epi32(integer1, integer2);
+    //     integer1 = _mm256_permute4x64_epi64(integer1, 0xD8);
+    //     //_mm256_stream_si256((__m256i*)&socket_ptr[2 * sc_id], integer1);
+    //     _mm256_stream_si256(
+    //         (__m256i*)&socket_ptr[2 * (sc_id + cfg_->CP_LEN)], integer1);
+    //     if (sc_id >= cfg_->OFDM_CA_NUM - cfg_->CP_LEN) // add CP
+    //         _mm256_stream_si256((__m256i*)&socket_ptr[2
+    //                                 * (sc_id + cfg_->CP_LEN - cfg_->OFDM_CA_NUM)],
+    //             integer1);
+    // }
 
     // cout << "In ifft: frame: "<< frame_id<<", symbol: "<<
     // current_data_symbol_id<<", ant: " << ant_id << ", data: "; for (int j =

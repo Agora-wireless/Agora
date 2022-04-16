@@ -127,4 +127,18 @@ static inline void simd_convert_float32_to_float16(
 #endif
 }
 
+static inline void single_convert_float32_to_float16(
+    unsigned short* out_buf, unsigned int* in_buf)
+{
+    unsigned int fltInt32 = *(in_buf);
+    unsigned short fltInt16;
+
+    fltInt16 = (fltInt32 >> 31) << 5;
+    unsigned short tmp = (fltInt32 >> 23) & 0xff;
+    tmp = (tmp - 0x70) & ((unsigned int)((int)(0x70 - tmp) >> 4) >> 27);
+    fltInt16 = (fltInt16 | tmp) << 10;
+    fltInt16 |= (fltInt32 >> 13) & 0x3ff;
+    *out_buf = fltInt16;
+}
+
 #endif

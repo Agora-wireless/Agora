@@ -922,10 +922,12 @@ void BigStation::precodeWorker(int tid)
     }
 
     if (config_->error) {
-        printf("Precode Thread %d error traceback: precode (frame %zu, symbol %zu, recv %d %d)\n",
+        printf("Precode Thread %d error traceback: precode (frame %zu, symbol %zu, recv %d and %d)\n",
             tid, cur_precode_frame, cur_precode_symbol_dl, 
             bigstation_state_.received_all_zf_pkts(cur_precode_frame),
             bigstation_state_.received_all_encode_pkts(cur_precode_frame, cur_precode_symbol_dl));
+        printf("[Bigstation state] receive %zu required %zu\n", bigstation_state_.num_encode_pkts_received_[cur_precode_frame % kFrameWnd][cur_precode_symbol_dl].load(),
+            bigstation_state_.num_encode_pkts_received_per_symbol_);
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
@@ -992,7 +994,9 @@ void BigStation::ifftWorker(int tid)
                 fft_start_tsc = rdtsc();
             });
 
-            do_fft->Launch(cur_frame, cur_symbol, cur_ant);
+            for (size_t ant_id = ant_start; ant_id < ant_end; ant_id ++) {
+                do_fft->Launch(cur_frame, cur_symbol, ant_id);
+            }
             // printf("Run FFT frame %zu symbol %zu ant %zu\n", cur_frame, cur_symbol, cur_ant);
 
             TRIGGER_TIMER({
@@ -1002,10 +1006,12 @@ void BigStation::ifftWorker(int tid)
                 fft_start_tsc = rdtsc();
             });
 
-            bigstation_state_.prepare_freq_iq_pkt(cur_frame, cur_symbol, cur_ant);
-            cur_ant++;
-            if (cur_ant == ant_end) {
-                cur_ant = ant_start;
+            for (size_t ant_id = ant_start; ant_id < ant_end; ant_id ++) {
+                bigstation_state_.prepare_freq_iq_pkt(cur_frame, cur_symbol, ant_id);
+            }
+            // cur_ant++;
+            // if (cur_ant == ant_end) {
+                // cur_ant = ant_start;
                 cur_symbol++;
                 if (cur_symbol == config_->pilot_symbol_num_perframe) {
                     cur_symbol = 0;
@@ -1014,7 +1020,7 @@ void BigStation::ifftWorker(int tid)
                     //     break;
                     // }
                 }
-            }
+            // }
 
             TRIGGER_TIMER({
                 state_operation_duration += rdtsc() - fft_start_tsc;
@@ -1022,8 +1028,8 @@ void BigStation::ifftWorker(int tid)
             });
         }
 
-        // if (bigstation_state_.received_all_precode_pkts(cur_frame, cur_symbol - config_->pilot_symbol_num_perframe)) {
-        if (bigstation_state_.prepared_all_precode_pkt(cur_frame_ifft, cur_symbol_ifft)) {
+        if (bigstation_state_.received_all_precode_pkts(cur_frame_ifft, cur_symbol_ifft)) {
+        // if (bigstation_state_.prepared_all_precode_pkt(cur_frame_ifft, cur_symbol_ifft)) {
             if (unlikely(!state_trigger && cur_frame >= 200)) {
                 start_tsc = rdtsc();
                 state_trigger = true;
@@ -1034,7 +1040,9 @@ void BigStation::ifftWorker(int tid)
                 ifft_start_tsc = rdtsc();
             });
 
-            // do_ifft->Launch(cur_frame, cur_symbol - config_->pilot_symbol_num_perframe, cur_ant);
+            for (size_t ant_id = ant_start; ant_id < ant_end; ant_id ++) {
+                do_ifft->Launch(cur_frame_ifft, cur_symbol_ifft, ant_id);
+            }
             // printf("Run FFT frame %zu symbol %zu ant %zu\n", cur_frame, cur_symbol, cur_ant);
 
             TRIGGER_TIMER({
@@ -1072,9 +1080,9 @@ void BigStation::ifftWorker(int tid)
     }
 
     if (config_->error) {
-        printf("FFT Thread %d error traceback: fft (frame %zu, symbol %zu, ant %zu, recv %d), ifft (frame %zu, symbol %zu, ant %zu, prep %d)\n",
+        printf("FFT Thread %d error traceback: fft (frame %zu, symbol %zu, ant %zu, recv %d), ifft (frame %zu, symbol %zu, ant %zu, recv %d)\n",
             tid, cur_frame, cur_symbol, cur_ant, bigstation_state_.received_all_time_iq_pkts(cur_frame, cur_symbol),
-            cur_frame_ifft, cur_symbol_ifft, cur_ant_ifft, bigstation_state_.prepared_all_precode_pkt(cur_frame_ifft, cur_symbol_ifft));
+            cur_frame_ifft, cur_symbol_ifft, cur_ant_ifft, bigstation_state_.received_all_precode_pkts(cur_frame_ifft, cur_symbol_ifft));
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
