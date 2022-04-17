@@ -1,0 +1,26 @@
+{
+  "rru_servers": [
+    "roce84",
+    "roce93"
+  ],
+  "hydra_servers": [
+    "roce91",
+    "roce92"
+  ],
+  "num_fft_workers": [
+    8,
+    8
+  ],
+  "num_zf_workers": [
+    3,
+    2
+  ],
+  "num_demul_workers": [
+    17,
+    17
+  ],
+  "num_decode_workers": [
+    22,
+    22
+  ]
+}

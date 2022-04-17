@@ -1,0 +1,38 @@
+{
+  "rx_thread_num": 0,
+  "tx_thread_num": 0,
+  "use_central_scheduler": false,
+  "use_general_worker": false,
+  "worker_thread_num": 10,
+  "demul_block_size": 8,
+  "antenna_num": 64,
+  "ue_num": 32,
+  "core_offset": 0,
+  "frames": [
+    "PUUUUUUUUUUUUU"
+  ],
+  "bs_port": 11000,
+  "ue_rx_port": 10000,
+  "ue_tx_port": 9000,
+  "demod_tx_port": 8100,
+  "demod_rx_port": 8600,
+  "frames_to_test": 10000,
+  "Zc": 104,
+  "freq_orthogonal_pilot": true,
+  "modulation": "64QAM",
+  "test_mode": 0,
+  "dynamic_workload": true,
+  "fixed_control": 0,
+  "user_level_list": [
+    32
+  ],
+  "num_load_levels": 1,
+  "sleep_mode": false,
+  "ofdm_data_num": 1216,
+  "slot_us": 1000,
+  "use_hyperthreading": "RXTXExclusive",
+  "phy_core_num": 32,
+  "use_bigstation_mode": true,
+  "time_iq_sc_step_size": 1200,
+  "post_zf_step_size": 8600
+}
