@@ -655,6 +655,8 @@ void* BigStationTXRX::tx_thread_dl(int tid)
     size_t encode_pkt_symbol_dl = 0;
     size_t encode_pkt_ue = ue_start;
 
+    size_t precode_pkt_ant_start = tid * cfg_->BS_ANT_NUM / cfg_->tx_thread_num;
+    size_t precode_pkt_ant_end = (tid + 1) * cfg_->BS_ANT_NUM / cfg_->tx_thread_num;
     size_t precode_pkt_frame = 0;
     size_t precode_pkt_symbol_dl = 0;
     // size_t precode_pkt_ant = 0;
@@ -871,15 +873,15 @@ void* BigStationTXRX::tx_thread_dl(int tid)
         if (bigstation_state_->prepared_all_precode_pkt(precode_pkt_frame, precode_pkt_symbol_dl)) {
             size_t total_buf_id = 0;
             struct rte_mbuf* tx_bufs[kTxBatchSize] __attribute__((aligned(64)));
-            for (size_t precode_pkt_ant = 0; precode_pkt_ant < cfg_->BS_ANT_NUM; precode_pkt_ant ++) {
+            for (size_t precode_pkt_ant = precode_pkt_ant_start; precode_pkt_ant < precode_pkt_ant_end; precode_pkt_ant ++) {
                 size_t ant_offset = ((precode_pkt_frame % kFrameWnd) * cfg_->dl_data_symbol_num_perframe + precode_pkt_symbol_dl)
                     * cfg_->BS_ANT_NUM + precode_pkt_ant;
                 uint8_t* src_ptr = (uint8_t*)(&dl_precoded_buffer_to_send_[ant_offset][cfg_->precode_start]);
                 size_t server_id = cfg_->ant_server_mapping[precode_pkt_ant];
-                if (precode_pkt_symbol_dl == 0) {
-                    printf("Send precode packet %zu %zu %zu %zu %zu\n", precode_pkt_frame, precode_pkt_symbol_dl, precode_pkt_ant,
-                        cfg_->precode_start, cfg_->precode_end);
-                }
+                // if (precode_pkt_symbol_dl == 0) {
+                //     printf("Send precode packet %zu %zu %zu %zu %zu\n", precode_pkt_frame, precode_pkt_symbol_dl, precode_pkt_ant,
+                //         cfg_->precode_start, cfg_->precode_end);
+                // }
                 if (server_id == cfg_->bs_server_addr_idx) {
                     unsigned short* dst_ptr = (unsigned short*)(&dl_precoded_buffer_[ant_offset][cfg_->OFDM_DATA_START + cfg_->precode_start]);
                     // memcpy(dst_ptr, src_ptr, (cfg_->precode_end - cfg_->precode_start) * sizeof(complex_float));
