@@ -930,18 +930,23 @@ void* BigStationTXRX::tx_thread_dl(int tid)
                         single_convert_float32_to_float16((unsigned short*)pkt->data_ + i * 2, (unsigned int*)(src_ptr + i * 2 * sizeof(float)));
                         single_convert_float32_to_float16((unsigned short*)pkt->data_ + i * 2 + 1, (unsigned int*)(src_ptr + (i * 2 + 1) * sizeof(float)));
                     }
+                    size_t nb_tx_new = rte_eth_tx_burst_loop(0, tid, tx_bufs + total_buf_id, 1);
+                    if (unlikely(nb_tx_new != 1)) {
+                        printf("rte_eth_tx_burst() failed\n");
+                        exit(0);
+                    }
                     total_buf_id ++;
                 }
             }
             // Send data (one OFDM symbol)
-            for (size_t buf_id = 0; buf_id < total_buf_id; buf_id += kTxBatchSize) {
-                size_t batch_size = std::min(kTxBatchSize, total_buf_id - buf_id);
-                size_t nb_tx_new = rte_eth_tx_burst_loop(0, tid, tx_bufs + buf_id, batch_size);
-                if (unlikely(nb_tx_new != batch_size)) {
-                    printf("rte_eth_tx_burst() failed\n");
-                    exit(0);
-                }
-            }
+            // for (size_t buf_id = 0; buf_id < total_buf_id; buf_id += kTxBatchSize) {
+            //     size_t batch_size = std::min(kTxBatchSize, total_buf_id - buf_id);
+            //     size_t nb_tx_new = rte_eth_tx_burst_loop(0, tid, tx_bufs + buf_id, batch_size);
+            //     if (unlikely(nb_tx_new != batch_size)) {
+            //         printf("rte_eth_tx_burst() failed\n");
+            //         exit(0);
+            //     }
+            // }
             // precode_pkt_ant ++;
             // if (precode_pkt_ant == cfg_->BS_ANT_NUM) {
                 // precode_pkt_ant = 0;
