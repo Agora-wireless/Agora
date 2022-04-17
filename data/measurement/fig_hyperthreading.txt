@@ -1,0 +1,6 @@
+Data NoHype Hype
+ZF 19 43
+Equal+Demod 38 78
+Decode 32 84
+Encode 53 104
+Precode 71 0
