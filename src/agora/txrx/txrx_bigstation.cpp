@@ -932,6 +932,20 @@ void* BigStationTXRX::tx_thread_dl(int tid)
                         single_convert_float32_to_float16((unsigned short*)pkt->data_ + i * 2, (unsigned int*)(src_ptr + i * 2 * sizeof(float)));
                         single_convert_float32_to_float16((unsigned short*)pkt->data_ + i * 2 + 1, (unsigned int*)(src_ptr + (i * 2 + 1) * sizeof(float)));
                     }
+                    static size_t last_precode_frame = 200;
+                    static size_t last_precode_symbol = 0;
+                    if (precode_pkt_frame > 200) {
+                        if (precode_pkt_frame > last_precode_frame) {
+                            printf("Send precode packet for frame %zu symbol %zu\n", precode_pkt_frame, precode_pkt_symbol_dl);
+                            last_precode_frame = precode_pkt_frame;
+                            last_precode_symbol = precode_pkt_symbol_dl;
+                        } else if (precode_pkt_frame == last_precode_frame && precode_pkt_symbol_dl > last_precode_symbol) {
+                            printf("Send precode packet for frame %zu symbol %zu\n", precode_pkt_frame, precode_pkt_symbol_dl);
+                            last_precode_frame = precode_pkt_frame;
+                            last_precode_symbol = precode_pkt_symbol_dl;
+                        }
+                    }
+
                     // printf("Send precode packet to %zu, frame %zu symbol %zu ant %zu\n", server_id, 
                     //     precode_pkt_frame, precode_pkt_symbol_dl, precode_pkt_ant);
                     size_t nb_tx_new = rte_eth_tx_burst_loop(0, tid, tx_bufs + total_buf_id, 1);
