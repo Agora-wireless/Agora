@@ -275,6 +275,11 @@ int BigStationTXRX::recv_relocate(int tid)
                 * cfg_->BS_ANT_NUM + pkt->ant_id_;
             uint8_t* dst_ptr = (uint8_t*)(&dl_precoded_buffer_[ant_offset][cfg_->OFDM_DATA_START + pkt->sc_id_]);
             memcpy(dst_ptr, pkt->data_, pkt->sc_len_ * sizeof(complex_int16_t));
+            static size_t last_precode_frame = 200;
+            if (pkt->frame_id_ > 200 && pkt->frame_id_ > last_precode_frame) {
+                printf("Receive precode packet for frame %zu\n", pkt->frame_id_);
+                last_precode_frame = pkt->frame_id_;
+            }
             if (!bigstation_state_->receive_precode_pkt(pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_, pkt->sc_len_)) {
                 cfg_->error = true;
                 cfg_->running = false;
