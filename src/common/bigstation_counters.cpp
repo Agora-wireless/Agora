@@ -170,6 +170,11 @@ bool BigStationState::receive_precode_pkt(size_t frame_id, size_t symbol_id_dl, 
     }
 
     num_precode_pkts_received_[frame_id % kFrameWnd][symbol_id_dl] += sc_len;
+    if (symbol_id_dl == 0) {
+        printf("Receive precode pkt %zu %zu %zu %zu %zu\n", frame_id, symbol_id_dl, ant_id, 
+            num_precode_pkts_received_[frame_id % kFrameWnd][symbol_id_dl].load(),
+            num_precode_pkts_received_per_symbol_);
+    }
     return true;
 }
 
