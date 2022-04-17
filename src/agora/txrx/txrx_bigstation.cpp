@@ -275,19 +275,21 @@ int BigStationTXRX::recv_relocate(int tid)
                 * cfg_->BS_ANT_NUM + pkt->ant_id_;
             uint8_t* dst_ptr = (uint8_t*)(&dl_precoded_buffer_[ant_offset][cfg_->OFDM_DATA_START + pkt->sc_id_]);
             memcpy(dst_ptr, pkt->data_, pkt->sc_len_ * sizeof(complex_int16_t));
-            static size_t last_precode_frame = 200;
-            static size_t last_precode_symbol = 0;
-            if (pkt->frame_id_ > 200) {
-                if (pkt->frame_id_ > last_precode_frame) {
-                    printf("Receive precode packet for frame %zu symbol %zu\n", pkt->frame_id_, pkt->symbol_id_);
-                    last_precode_frame = pkt->frame_id_;
-                    last_precode_symbol = pkt->symbol_id_;
-                } else if (pkt->frame_id_ == last_precode_frame && pkt->symbol_id_ > last_precode_symbol) {
-                    printf("Receive precode packet for frame %zu symbol %zu\n", pkt->frame_id_, pkt->symbol_id_);
-                    last_precode_frame = pkt->frame_id_;
-                    last_precode_symbol = pkt->symbol_id_;
-                }
-            }
+            // static size_t last_precode_frame = 200;
+            // static size_t last_precode_symbol = 0;
+            // if (pkt->frame_id_ > 200) {
+            //     if (pkt->frame_id_ > last_precode_frame) {
+            //         printf("Receive precode packet for frame %zu symbol %zu\n", pkt->frame_id_, pkt->symbol_id_);
+            //         last_precode_frame = pkt->frame_id_;
+            //         last_precode_symbol = pkt->symbol_id_;
+            //     } else if (pkt->frame_id_ == last_precode_frame && pkt->symbol_id_ > last_precode_symbol) {
+            //         printf("Receive precode packet for frame %zu symbol %zu\n", pkt->frame_id_, pkt->symbol_id_);
+            //         last_precode_frame = pkt->frame_id_;
+            //         last_precode_symbol = pkt->symbol_id_;
+            //     }
+            // }
+            printf("Receive precode packet frame %zu symbol %zu ant %zu\n", 
+                pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_);
             if (!bigstation_state_->receive_precode_pkt(pkt->frame_id_, pkt->symbol_id_, pkt->ant_id_, pkt->sc_len_)) {
                 cfg_->error = true;
                 cfg_->running = false;
@@ -930,6 +932,8 @@ void* BigStationTXRX::tx_thread_dl(int tid)
                         single_convert_float32_to_float16((unsigned short*)pkt->data_ + i * 2, (unsigned int*)(src_ptr + i * 2 * sizeof(float)));
                         single_convert_float32_to_float16((unsigned short*)pkt->data_ + i * 2 + 1, (unsigned int*)(src_ptr + (i * 2 + 1) * sizeof(float)));
                     }
+                    printf("Send precode packet to %zu, frame %zu symbol %zu ant %zu\n", server_id, 
+                        precode_pkt_frame, precode_pkt_symbol_dl, precode_pkt_ant);
                     size_t nb_tx_new = rte_eth_tx_burst_loop(0, tid, tx_bufs + total_buf_id, 1);
                     if (unlikely(nb_tx_new != 1)) {
                         printf("rte_eth_tx_burst() failed\n");
