@@ -878,10 +878,10 @@ void* BigStationTXRX::tx_thread_dl(int tid)
                     * cfg_->BS_ANT_NUM + precode_pkt_ant;
                 uint8_t* src_ptr = (uint8_t*)(&dl_precoded_buffer_to_send_[ant_offset][cfg_->precode_start]);
                 size_t server_id = cfg_->ant_server_mapping[precode_pkt_ant];
-                if (precode_pkt_frame == 200 && precode_pkt_symbol_dl == 0) {
-                    printf("Send precode packet %zu %zu %zu %zu %zu to server %zu\n", precode_pkt_frame, precode_pkt_symbol_dl, precode_pkt_ant,
-                        cfg_->precode_start, cfg_->precode_end, server_id);
-                }
+                // if (precode_pkt_frame == 200 && precode_pkt_symbol_dl == 0) {
+                //     printf("Send precode packet %zu %zu %zu %zu %zu to server %zu\n", precode_pkt_frame, precode_pkt_symbol_dl, precode_pkt_ant,
+                //         cfg_->precode_start, cfg_->precode_end, server_id);
+                // }
                 if (server_id == cfg_->bs_server_addr_idx) {
                     unsigned short* dst_ptr = (unsigned short*)(&dl_precoded_buffer_[ant_offset][cfg_->OFDM_DATA_START + cfg_->precode_start]);
                     // memcpy(dst_ptr, src_ptr, (cfg_->precode_end - cfg_->precode_start) * sizeof(complex_float));

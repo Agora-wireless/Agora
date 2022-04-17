@@ -1083,6 +1083,8 @@ void BigStation::ifftWorker(int tid)
         printf("FFT Thread %d error traceback: fft (frame %zu, symbol %zu, ant %zu, recv %d), ifft (frame %zu, symbol %zu, ant %zu, recv %d)\n",
             tid, cur_frame, cur_symbol, cur_ant, bigstation_state_.received_all_time_iq_pkts(cur_frame, cur_symbol),
             cur_frame_ifft, cur_symbol_ifft, cur_ant_ifft, bigstation_state_.received_all_precode_pkts(cur_frame_ifft, cur_symbol_ifft));
+        printf("IFFT receiving: %zu %zu\n", bigstation_state_.num_precode_pkts_received_[cur_frame_ifft % kFrameWnd][cur_symbol_ifft].load(),
+            bigstation_state_.num_precode_pkts_received_per_symbol_);
     }
 
     size_t whole_duration = rdtsc() - start_tsc;
