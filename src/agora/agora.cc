@@ -90,8 +90,10 @@ Agora::Agora(Config* const cfg)
 
   if (kEnableMatLog) {
     for (size_t i = 0; i < mat_loggers_.size(); i++) {
-      mat_loggers_.at(i) =
-          std::make_shared<CsvLog::MatLogger>(cfg->RadioId().at(0), i);
+      if ((i != CsvLog::kMatDLZF) || (cfg->Frame().NumDLSyms() > 0)) {
+        mat_loggers_.at(i) =
+            std::make_shared<CsvLog::MatLogger>(cfg->RadioId().at(0), i);
+      }
     }
   }
 

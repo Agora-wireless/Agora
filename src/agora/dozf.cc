@@ -390,7 +390,6 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
       }
 
       if (dlzf_logger_) {
-        //What happens here if we are doing uplink only????
         arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(
                                     dl_zf_matrices_[frame_slot][cur_sc_id]),
                                 cfg_->BsAntNum(), cfg_->UeAntNum(), false);

@@ -16,7 +16,6 @@
 
 namespace CsvLog {
 
-//#if defined(ENABLE_MAT_LOG)
 constexpr size_t kFrames = 1000;
 constexpr size_t kSCs = 304;
 constexpr size_t kBSAnts = 8;
