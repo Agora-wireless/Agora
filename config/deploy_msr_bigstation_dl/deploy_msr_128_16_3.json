@@ -9,23 +9,23 @@
     "roce83"
   ],
   "num_ifft_workers": [
-    43,
-    43,
-    42
+    8,
+    8,
+    8
   ],
   "num_zf_workers": [
-    1,
-    1,
-    1
+    4,
+    4,
+    4
   ],
   "num_precode_workers": [
-    8,
-    8,
-    9
+    18,
+    18,
+    18
   ],
   "num_encode_workers": [
-    2,
-    2,
-    2
+    6,
+    6,
+    6
   ]
 }
