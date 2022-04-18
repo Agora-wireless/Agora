@@ -6,6 +6,7 @@
 #include "ue_worker.h"
 
 #include <memory>
+#include <utility>
 
 #include "datatype_conversion.h"
 #include "phy_ldpc_decoder_5gnr.h"
@@ -40,8 +41,8 @@ UeWorker::UeWorker(
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer,
     PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
     std::vector<std::vector<std::complex<float>>>& ue_pilot_vec,
-    std::unique_ptr<CsvLog::CsvLogger>& logger_evmsnr,
-    std::unique_ptr<CsvLog::CsvLogger>& logger_berser)
+    std::shared_ptr<CsvLog::CsvLogger> logger_evmsnr,
+    std::shared_ptr<CsvLog::CsvLogger> logger_berser)
     : tid_(tid),
       notify_queue_(notify_queue),
       work_queue_(work_queue),
@@ -62,8 +63,8 @@ UeWorker::UeWorker(
       demod_buffer_(demod_buffer),
       decoded_buffer_(decoded_buffer),
       ue_pilot_vec_(ue_pilot_vec),
-      logger_evmsnr_(logger_evmsnr),
-      logger_berser_(logger_berser) {
+      logger_evmsnr_(std::move(logger_evmsnr)),
+      logger_berser_(std::move(logger_berser)) {
   ptok_ = std::make_unique<moodycamel::ProducerToken>(notify_queue);
 
   AllocBuffer1d(&rx_samps_tmp_, config_.SampsPerSymbol(),
@@ -391,8 +392,10 @@ void UeWorker::DoFftData(size_t tag) {
                    (-10.0f * std::log10(evm)));
   }
   if (kEnableCsvLog) {
-    logger_evmsnr_->Write(frame_id, symbol_id, ant_id, 100.0f * evm,
-                          -10.0f * std::log10(evm));
+    if (logger_evmsnr_) {
+      logger_evmsnr_->Write(frame_id, symbol_id, ant_id, 100.0f * evm,
+                            -10.0f * std::log10(evm));
+    }
   }
 
   if (kDebugPrintPerTaskDone || kDebugPrintFft) {
@@ -495,11 +498,13 @@ void UeWorker::DoDemul(size_t tag) {
     }
     phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, block_error);
     if (kEnableCsvLog) {
-      logger_berser_->Write(
-          frame_id, symbol_id, ant_id,
-          phy_stats_.GetBitErrorRate(ant_id, total_dl_symbol_id),
-          static_cast<float>(block_error) /
-              static_cast<float>(config_.GetOFDMDataNum()));
+      if (logger_berser_) {
+        logger_berser_->Write(
+            frame_id, symbol_id, ant_id,
+            phy_stats_.GetBitErrorRate(ant_id, total_dl_symbol_id),
+            static_cast<float>(block_error) /
+                static_cast<float>(config_.GetOFDMDataNum()));
+      }
     }
   }
 

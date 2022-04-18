@@ -324,8 +324,7 @@ class Agora {
   uint8_t schedule_process_flags_;
 
   std::queue<size_t> encode_deferral_;
-
-  CsvLog::MatLoggerArray mat_logger_array_;
+  std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs> mat_loggers_;
 };
 
 #endif  // AGORA_H_
