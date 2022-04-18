@@ -26,6 +26,12 @@ function abort_detect()
     res=$(cat /tmp/hydra/log_*.txt | grep "Aborted")
     if [ "$?" != "0" ]; then
         abort=0
+        res=$(cat /tmp/hydra/log_*.txt | grep "Segmentation")
+        if [ "$?" != "0" ]; then
+            abort=0
+        else
+            abort=1
+        fi
     else
         abort=1
     fi
@@ -629,7 +635,7 @@ for i in ${!ant_list[@]}; do
     work=1
     consecutive_error_num=0
     while [ "${work}" == "1" ] && [ ${consecutive_error_num} -lt 5 ]; do
-        try_precode_thread_num_total=$(( ${cur_precode_thread_num_total}-1 ))
+        try_precode_thread_num_total=$(( ${cur_precode_thread_num_total}-2 ))
         if [ ${try_precode_thread_num_total} -ge ${total_server_num} ]; then
             runtime_error=0
             create_template_json ${cur_ant} ${cur_ue} ${cur_rx_thread_num} ${cur_tx_thread_num}
@@ -675,7 +681,7 @@ for i in ${!ant_list[@]}; do
     consecutive_error_num=0
     while [ "${work}" == "1" ] && [ ${consecutive_error_num} -lt 5 ]; do
         try_rx_thread_num=$(( ${cur_rx_thread_num}-1 ))
-        if [ ${try_rx_thread_num} -ge 0 ]; then
+        if [ ${try_rx_thread_num} -gt 0 ]; then
             runtime_error=0
             create_template_json ${cur_ant} ${cur_ue} ${try_rx_thread_num} ${cur_tx_thread_num}
             create_deploy_json ${cur_ifft_block_per_thread} ${cur_zf_thread_num_total} \
@@ -720,7 +726,7 @@ for i in ${!ant_list[@]}; do
     consecutive_error_num=0
     while [ "${work}" == "1" ] && [ ${consecutive_error_num} -lt 5 ]; do
         try_tx_thread_num=$(( ${cur_tx_thread_num}-1 ))
-        if [ ${try_tx_thread_num} -ge 0 ]; then
+        if [ ${try_tx_thread_num} -gt 0 ]; then
             runtime_error=0
             create_template_json ${cur_ant} ${cur_ue} ${cur_rx_thread_num} ${try_tx_thread_num}
             create_deploy_json ${cur_ifft_block_per_thread} ${cur_zf_thread_num_total} \
