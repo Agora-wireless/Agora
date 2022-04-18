@@ -17,6 +17,7 @@ core_offset=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.core_offset')
 rx_thread_num=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.rx_thread_num')
 tx_thread_num=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.tx_thread_num')
 core_left=$(( ${phy_core_num}-${core_offset}-1 ))
+total_ant_num=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.antenna_num')
 # total_server_num=${#server_list[@]}
 total_server_num=$1
 
@@ -376,7 +377,9 @@ for i in ${!ant_list[@]}; do
         if [ "${valid}" == "0" ]; then
             echo "Verify unsuccessful"
             if [ "${ifft_done}" == "0" ]; then
-                cur_ifft_block_per_thread=$(( ${cur_ifft_block_per_thread}+1 ))
+                if [ ${cur_ifft_block_per_thread} -lt $(( ${cur_ant}/${total_server_num} )) ]; then
+                    cur_ifft_block_per_thread=$(( ${cur_ifft_block_per_thread}+1 ))
+                fi
                 continue
             fi
             if [ "${zf_done}" == "0" ]; then
