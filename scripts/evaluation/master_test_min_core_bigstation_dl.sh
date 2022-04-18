@@ -353,8 +353,8 @@ for i in ${!ant_list[@]}; do
     cat ${hydra_master_config_json} | jq --arg template ${HYDRA_SYSTEM_CONFIG_JSON} '.hydra_system_config_json=$template' | \
         jq --arg deploy ${HYDRA_SERVER_DEPLOY_JSON} '.hydra_server_deploy_json=$deploy' > tmp.json
     cp tmp.json ${hydra_master_config_json}
-    cur_rx_thread_num=3
-    cur_tx_thread_num=1
+    cur_rx_thread_num=4
+    cur_tx_thread_num=2
     cur_ifft_block_per_thread=4
     cur_zf_thread_num_total=$(( ${total_server_num}*2 ))
     cur_precode_thread_num_total=$(( ${total_server_num}*10 ))
