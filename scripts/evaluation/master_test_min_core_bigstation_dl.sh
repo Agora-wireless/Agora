@@ -9,8 +9,8 @@ source ${hydra_root_dir}/scripts/control/init_platform.sh
 server_list=("roce91" "roce92" "roce83" "roce95" "roce94")
 # server_list=("node1" "node2" "node3" "node4" "node5" "node6" "node7" "node8" \
 #     "node17" "node9" "node11" "node12" "node13" "node14" "node15" "node16")
-ant_list=(64 64 64 128 128 150)
-ue_list=(8 16 32 16 32 32)
+ant_list=(64 128 128 150)
+ue_list=(32 16 32 32)
 
 phy_core_num=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.phy_core_num')
 core_offset=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.core_offset')
