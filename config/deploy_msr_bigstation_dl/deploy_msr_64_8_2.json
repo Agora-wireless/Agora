@@ -8,8 +8,8 @@
     "roce92"
   ],
   "num_ifft_workers": [
-    32,
-    32
+    8,
+    8
   ],
   "num_zf_workers": [
     2,
@@ -20,7 +20,7 @@
     10
   ],
   "num_encode_workers": [
-    2,
-    2
+    3,
+    3
   ]
 }
