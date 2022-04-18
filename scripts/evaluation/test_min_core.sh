@@ -68,3 +68,4 @@ for (( i=0; i<${hydra_app_num}; i++ )) do
 done
 
 echo "Final setup: subcarrier block size ${sc_block_sz}, coding thread num ${coding_thread}"
+echo "Final setup (${HYDRA_SERVER_DEPLOY_JSON}): subcarrier block size ${sc_block_sz}, coding thread num ${coding_thread}" >> result.txt

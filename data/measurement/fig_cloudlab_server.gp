@@ -35,7 +35,7 @@ set xtics format ""
 set grid ytics
 set offset -1,0,0,0
 
-set xtics font ', 17'
+set xtics font ', 18'
 set ytics font ', 20'
 # set xlabel 'Settings' font 'Times-Roman,20'
 set ylabel 'Minimum server usage' font 'Times-Roman,20'
