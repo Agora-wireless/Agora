@@ -104,7 +104,7 @@ function detect_bottleneck()
     res=$(cat /tmp/hydra/log_*.txt | grep "TX error traceback")
     for line in ${res}; do
         frameStr=${line##*zf (frame }
-        frameStr=${frameStr%%), demul*}
+        frameStr=${frameStr%%), encode*}
         if [ ${frameStr} -le ${bar} ]; then
             echo "ZF TX bottlenecked!"
             echo ${line}
