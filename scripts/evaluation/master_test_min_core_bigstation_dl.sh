@@ -6,11 +6,11 @@ hydra_root_dir=$( cd ${script_dir}/../.. >/dev/null 2>&1 && pwd )
 source ${hydra_root_dir}/scripts/utils/utils.sh
 source ${hydra_root_dir}/scripts/control/init_platform.sh
 
-server_list=("roce91" "roce92" "roce83" "roce95" "roce94" )
+server_list=("roce91" "roce92" "roce83" "roce95" "roce94")
 # server_list=("node1" "node2" "node3" "node4" "node5" "node6" "node7" "node8" \
 #     "node17" "node9" "node11" "node12" "node13" "node14" "node15" "node16")
-ant_list=(64 64 64 128 128)
-ue_list=(8 16 32 16 32)
+ant_list=(64 64 64 128 128 150)
+ue_list=(8 16 32 16 32 32)
 
 phy_core_num=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.phy_core_num')
 core_offset=$(cat ${HYDRA_SYSTEM_CONFIG_JSON} | jq '.core_offset')
@@ -64,12 +64,12 @@ function detect_bottleneck()
     res=$(cat /tmp/hydra/log_*.txt | grep "FFT Thread [0-9]* error traceback")
     for line in ${res}; do
         frameStr=${line##*fft (frame }
-        frameStr=${frameStr%%, symbol*}
+        frameStr=${frameStr%%, pilot*}
         if [ ${frameStr} -le ${bar} ]; then
             echo "FFT bottlenecked!"
             echo ${line}
             bottleneck_reason=3
-            recvStr=${line##*recv }
+            recvStr=${line##*recvp }
             recvStr=${recvStr%%), ifft*}
             if [ "${recvStr}" == "0" ]; then
                 echo "But Time IQ packet lost!"
@@ -189,7 +189,7 @@ function detect_bottleneck()
             echo "IFFT bottlenecked!"
             echo ${line}
             bottleneck_reason=7
-            recvStr=${line##*, recv }
+            recvStr=${line##*, recvd }
             recvStr=${recvStr%%)*}
             if [ "${recvStr}" == "0" ]; then
                 echo "But precode packet lost!"
