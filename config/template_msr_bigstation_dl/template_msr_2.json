@@ -7,7 +7,7 @@
     "demul_block_size": 8,
     "antenna_num": 150,
     "ue_num": 32,
-    "core_offset": 0,
+    "core_offset": 3,
     "frames": [
       "PDDDDDDDDDDDDD"
     ],
