@@ -1,0 +1,34 @@
+{
+  "rru_servers": [
+    "roce93",
+    "roce84"
+  ],
+  "hydra_servers": [
+    "roce83",
+    "roce91",
+    "roce92",
+    "roce95",
+    "roce94"
+  ],
+  "subcarrier_num_list": [
+    224,
+    224,
+    256,
+    256,
+    256
+  ],
+  "subcarrier_block_list": [
+    10,
+    10,
+    10,
+    10,
+    8
+  ],
+  "coding_thread_num": [
+    6,
+    6,
+    6,
+    6,
+    6
+  ]
+}
