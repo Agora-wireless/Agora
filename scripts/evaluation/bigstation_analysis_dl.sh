@@ -10,6 +10,8 @@ server_list=("roce91" "roce92" "roce83" "roce95" "roce94")
 # server_list=("node1" "node2" "node3" "node4" "node5" "node6" "node7" "node8" \
 #     "node25" "node9" "node11" "node12" "node13" "node14" "node15" "node16")
 
+total_server_num=$1
+
 function abort_detect()
 {
     res=$(cat /tmp/hydra/log_*.txt | grep "Aborted")
@@ -33,7 +35,8 @@ function error_detect()
 function get_error_slot()
 {
     error_slot=100000
-    for i in ${!server_list[@]}; do
+    # for i in ${!server_list[@]}; do
+    for (( i=0; i<${total_server_num}; i++ )) do
         server=${server_list[$i]}
         res=$(cat /tmp/hydra/log_${server}.txt | grep "frame window" | head -n 1)
         res=${res##*(}
@@ -52,7 +55,7 @@ function detect_bottleneck()
     bottleneck_reason=0
     res=$(cat /tmp/hydra/log_*.txt | grep "FFT Thread [0-9]* error traceback")
     for line in ${res}; do
-        frameStr=${line##*fft (frame }
+        frameStr=${line##*\: fft (frame }
         frameStr=${frameStr%%, pilot*}
         if [ ${frameStr} -le ${bar} ]; then
             echo "FFT bottlenecked!"
