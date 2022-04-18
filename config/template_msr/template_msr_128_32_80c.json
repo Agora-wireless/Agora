@@ -28,7 +28,7 @@
   "ue_tx_port": 9000,
   "ue_num": 32,
   "Zc": 72,
-  "slot_us": 1600,
+  "slot_us": 1000,
   "use_hyperthreading": "RXTXExclusive",
   "bs_port": 11000
 }

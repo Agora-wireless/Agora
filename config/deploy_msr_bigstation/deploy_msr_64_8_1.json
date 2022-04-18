@@ -10,12 +10,12 @@
     16
   ],
   "num_zf_workers": [
-    3
+    2
   ],
   "num_demul_workers": [
-    8
+    10
   ],
   "num_decode_workers": [
-    6
+    10
   ]
 }

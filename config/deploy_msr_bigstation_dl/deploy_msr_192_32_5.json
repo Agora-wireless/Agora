@@ -6,26 +6,36 @@
   "hydra_servers": [
     "roce91",
     "roce92",
-    "roce83"
+    "roce83",
+    "roce95",
+    "roce94"
   ],
   "num_ifft_workers": [
-    8,
-    8,
-    8
+    2,
+    2,
+    2,
+    2,
+    2
   ],
   "num_zf_workers": [
-    2,
-    2,
-    2
+    4,
+    4,
+    4,
+    4,
+    4
   ],
   "num_precode_workers": [
-    10,
-    10,
-    10
+    24,
+    24,
+    24,
+    24,
+    24
   ],
   "num_encode_workers": [
-    2,
-    2,
-    2
+    6,
+    6,
+    6,
+    6,
+    6
   ]
 }

@@ -4,7 +4,7 @@
   "use_general_worker": false,
   "worker_thread_num": 10,
   "demul_block_size": 8,
-  "antenna_num": 256,
+  "antenna_num": 240,
   "ue_num": 32,
   "core_offset": 3,
   "frames": [
