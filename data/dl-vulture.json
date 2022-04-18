@@ -3,17 +3,19 @@
     "cells": 1,
     "channel": "A",
     "frequency": 3.6e9,
-    "rx_gain_a": 65,
-    "tx_gain_a": 75,
-    "rx_gain_b": 65,
-    "tx_gain_b": 70,
-    "sample_rate": 3.84e6,
+    "rx_gain_a": 60,
+    "tx_gain_a": 81,
+    "rx_gain_b": 60,
+    "tx_gain_b": 81,
+    "sample_rate": 7.68e6,
+    "calibrate_digital": true,
+    "calibrate_analog" : false,
     "ofdm_tx_zero_prefix": 160,
-    "ofdm_tx_zero_postfix": 160,
+    "ofdm_tx_zero_postfix": 192,
     "ofdm_rx_zero_prefix_bs": 160,
     "ofdm_rx_zero_prefix_client": 160,
-    "ofdm_rx_zero_prefix_cal_dl": 288,
-    "ofdm_rx_zero_prefix_cal_ul": 168,
+    "ofdm_rx_zero_prefix_cal_dl": 324,
+    "ofdm_rx_zero_prefix_cal_ul": 136,
     "cp_size": 32,
     "fft_size": 512,
     "ofdm_data_num": 304,
@@ -25,29 +27,30 @@
         "modulation": "16QAM",
         "code_rate": 0.333
     },
-    "beamsweep": true,
-    "beacon_antenna": 0,
+    "beamsweep": false,
+    "beacon_antenna": 7,
     "frame_schedule": [
         "BGCLGGPGGDDDG"
     ],
-    "client_dl_pilot_syms": 2,
+    "client_dl_pilot_syms": 1,
     "ue_channel": "A",
     "ue_rx_gain_a": [
         65
     ],
     "ue_tx_gain_a": [
-        67
+        81
     ],
     "ue_rx_gain_b": [
         65
     ],
     "ue_tx_gain_b": [
-        80
+        81
     ],
     "tx_advance": [
-        140
+        144
     ],
     "ue_hw_framer": false,
+    "ue_resync_period": 1,
     "hw_framer": true,
     /* Compute configuration */
     "exclude_cores": [],

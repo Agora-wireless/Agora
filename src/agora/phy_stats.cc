@@ -270,7 +270,7 @@ void PhyStats::UpdateDlPilotSnr(size_t frame_id, size_t symbol_id,
   float rssi = arma::as_scalar(sum(fft_abs_mag));
   float noise_per_sc1 = arma::as_scalar(
       arma::mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
-  float noise_per_sc2 = arma ::as_scalar(arma::mean(
+  float noise_per_sc2 = arma::as_scalar(arma::mean(
       fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
   float noise = config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
   float snr = (rssi - noise) / noise;

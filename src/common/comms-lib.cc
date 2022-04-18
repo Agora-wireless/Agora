@@ -24,8 +24,11 @@
 
 #include <utility>
 
-size_t CommsLib::FindPilotSeq(std::vector<std::complex<float>> iq,
-                              std::vector<std::complex<float>> pilot,
+#include "logger.h"
+#include "utils.h"
+
+size_t CommsLib::FindPilotSeq(const std::vector<std::complex<float>>& iq,
+                              const std::vector<std::complex<float>>& pilot,
                               size_t seq_len) {
   // Re-arrange into complex vector, flip, and compute conjugate
   std::vector<std::complex<float>> pilot_conj;
@@ -46,7 +49,7 @@ size_t CommsLib::FindPilotSeq(std::vector<std::complex<float>> iq,
   return best_peak;
 }
 
-int CommsLib::FindLts(std::vector<std::complex<double>> iq, int seqLen) {
+int CommsLib::FindLts(const std::vector<std::complex<double>>& iq, int seqLen) {
   /*
    * Find 802.11-based LTS (Long Training Sequence)
    * Input:
@@ -115,10 +118,11 @@ int CommsLib::FindLts(std::vector<std::complex<double>> iq, int seqLen) {
   return best_peak;
 }
 
-float CommsLib::FindMaxAbs(Table<complex_float> in, size_t dim1, size_t dim2) {
+float CommsLib::FindMaxAbs(const Table<complex_float>& in, size_t dim1,
+                           size_t dim2) {
   float max_val = 0;
   for (size_t i = 0; i < dim1; i++) {
-    float cur_max_val = CommsLib::FindMaxAbs(in[i], dim2);
+    const float cur_max_val = CommsLib::FindMaxAbs(in.At(i), dim2);
     if (cur_max_val > max_val) {
       max_val = cur_max_val;
     }
@@ -126,10 +130,10 @@ float CommsLib::FindMaxAbs(Table<complex_float> in, size_t dim1, size_t dim2) {
   return max_val;
 }
 
-float CommsLib::FindMaxAbs(complex_float* in, size_t len) {
+float CommsLib::FindMaxAbs(const complex_float* in, size_t len) {
   float max_val = 0;
   for (size_t j = 0; j < len; j++) {
-    auto cur_val = CommsLib::AbsCf(in[j]);
+    const auto cur_val = CommsLib::AbsCf(in[j]);
     if (cur_val > max_val) {
       max_val = cur_val;
     }
@@ -137,15 +141,16 @@ float CommsLib::FindMaxAbs(complex_float* in, size_t len) {
   return max_val;
 }
 
-void CommsLib::Meshgrid(std::vector<int> x_in, std::vector<int> y_in,
+void CommsLib::Meshgrid(const std::vector<int>& x_in,
+                        const std::vector<int>& y_in,
                         std::vector<std::vector<int>>& x,
                         std::vector<std::vector<int>>& y) {
   /*
    * Simplified version of numpy's meshgrid function. Input vectors must be of
    * same length. Returns coordinate matrices from coordinate vectors.
    */
-  int nx = x_in.size();
-  int ny = y_in.size();
+  const int nx = x_in.size();
+  const int ny = y_in.size();
 
   if (nx != ny) {
     throw std::invalid_argument(
@@ -219,20 +224,22 @@ std::vector<float> CommsLib::MagnitudeFft(
     pre_fft[n] = samps[n] * win[n];
   }
 
-  std::vector<std::complex<float>> fft_samps = CommsLib::FFT(pre_fft, fftSize);
+  CommsLib::FFT(pre_fft, fftSize);
+  //pre_fft has now been modified, giving it another name for code clarity
+  std::vector<std::complex<float>>& fft_samps = pre_fft;
 
   // compute magnitudes
   std::vector<float> fft_mag;
   fft_mag.reserve(fftSize);
-  for (size_t n = fftSize / 2; n < fftSize; n++) {
+  for (size_t n = (fftSize / 2); n < fftSize; n++) {
     fft_mag.push_back(std::norm(fft_samps[n]));
   }
   for (size_t n = 0; n < fftSize / 2; n++) {
     fft_mag.push_back(std::norm(fft_samps[n]));
   }
-  std::reverse(fft_mag.begin(),
-               fft_mag.end());  // not sure why we need reverse here, but
+  // not sure why we need reverse here, but
   // this seems to give the right spectrum
+  std::reverse(fft_mag.begin(), fft_mag.end());
   return fft_mag;
 }
 
@@ -337,131 +344,219 @@ std::vector<std::complex<float>> CommsLib::GetPilotSc(int fftSize) {
   return pilot_sc;
 }
 
-std::vector<std::complex<float>> CommsLib::IFFT(
-    std::vector<std::complex<float>> in, int fftsize, bool normalize) {
+MKL_LONG CommsLib::IFFT(std::vector<std::complex<float>>& in_out, int fftsize,
+                        bool normalize) {
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
-  (void)DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1,
-                             fftsize);
-  (void)DftiCommitDescriptor(mkl_handle);
-  DftiComputeBackward(mkl_handle, in.data());
-  DftiFreeDescriptor(&mkl_handle);
-  if (normalize) {
-    float max_val = 0;
-    float scale = 0.5;
-    for (int i = 0; i < fftsize; i++) {
-      if (std::abs(in[i]) > max_val) {
-        max_val = std::abs(in[i]);
+  MKL_LONG status;
+  status =
+      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error creating descriptor in CommsLib::IFFT%s\n",
+                    DftiErrorMessage(status));
+  } else {
+    status = DftiCommitDescriptor(mkl_handle);
+  }
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error committing descriptor in CommsLib::IFFT%s\n",
+                    DftiErrorMessage(status));
+  } else {
+    status = DftiComputeBackward(mkl_handle, in_out.data());
+  }
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error compute backward in CommsLib::IFFT%s\n",
+                    DftiErrorMessage(status));
+  } else {
+    status = DftiFreeDescriptor(&mkl_handle);
+  }
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error free descriptor in CommsLib::IFFT%s\n",
+                    DftiErrorMessage(status));
+  } else {
+    if (normalize) {
+      float max_val = 0;
+      const float scale = 0.5;
+      for (int i = 0; i < fftsize; i++) {
+        if (std::abs(in_out[i]) > max_val) {
+          max_val = std::abs(in_out[i]);
+        }
+      }
+      // std::cout << "IFFT output is normalized with "
+      //         << std::to_string(max_val) << std::endl;
+      for (int i = 0; i < fftsize; i++) {
+        in_out[i] /= (max_val / scale);
+      }
+    } else {
+      for (int i = 0; i < fftsize; i++) {
+        in_out[i] /= fftsize;
       }
     }
-    // std::cout << "IFFT output is normalized with "
-    //         << std::to_string(max_val) << std::endl;
-    for (int i = 0; i < fftsize; i++) {
-      in[i] /= (max_val / scale);
-    }
-  } else {
-    for (int i = 0; i < fftsize; i++) {
-      in[i] /= fftsize;
-    }
   }
-  return in;
+  return status;
 }
 
-std::vector<std::complex<float>> CommsLib::FFT(
-    std::vector<std::complex<float>> in, int fftsize) {
-  DFTI_DESCRIPTOR_HANDLE mkl_handle;
-  (void)DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1,
-                             fftsize);
-  (void)DftiCommitDescriptor(mkl_handle);
-  /* compute FFT */
-  DftiComputeForward(mkl_handle, in.data());
-  DftiFreeDescriptor(&mkl_handle);
-  return in;
-}
-
-void CommsLib::IFFT(complex_float* in, int fftsize, bool normalize) {
+MKL_LONG CommsLib::FFT(std::vector<std::complex<float>>& in_out, int fftsize) {
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
   MKL_LONG status =
       DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
-  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
-    std::printf("Error in DftiCreateDescriptor: %s\n",
-                DftiErrorMessage(status));
-    assert(status != 0);
-  }
-  status = DftiCommitDescriptor(mkl_handle);
-  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
-    std::printf("Error in DftiErrorClass: %s\n", DftiErrorMessage(status));
-    assert(status != 0);
-  }
-  status = DftiComputeBackward(mkl_handle, in);
-  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
-    std::printf("Error in DftiComputeBackward: %s\n", DftiErrorMessage(status));
-    assert(status != 0);
-  }
-  status = DftiFreeDescriptor(&mkl_handle);
-  if (DftiErrorClass(status, DFTI_NO_ERROR) == 0) {
-    std::printf("Error in DftiFreeDescriptor: %s\n", DftiErrorMessage(status));
-    assert(status != 0);
-  }
-  if (normalize == true) {
-    float max_val = 0;
-    // int max_ind = 0;
-    float scale = 0.5;
-    for (int i = 0; i < fftsize; i++) {
-      float sc_abs = std::abs(std::complex<float>(in[i].re, in[i].im));
-      if (sc_abs > max_val) {
-        max_val = sc_abs;
-        // max_ind = i;
-      }
-    }
-    // std::cout << "IFFT output is normalized with "
-    //         << std::to_string(max_val) << std::endl;
-    for (int i = 0; i < fftsize; i++) {
-      in[i] = {in[i].re / (max_val / scale), in[i].im / (max_val / scale)};
-    }
+
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error creating descriptor in CommsLib::FFT%s\n",
+                    DftiErrorMessage(status));
   } else {
-    for (int i = 0; i < fftsize; i++) {
-      in[i].re /= fftsize;
-      in[i].im /= fftsize;
-    }
+    status = DftiCommitDescriptor(mkl_handle);
   }
+
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error committing descriptor in CommsLib::FFT%s\n",
+                    DftiErrorMessage(status));
+  } else {
+    /* compute FFT */
+    status = DftiComputeForward(mkl_handle, in_out.data());
+  }
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error compute forward in CommsLib::FFT%s\n",
+                    DftiErrorMessage(status));
+  } else {
+    status = DftiFreeDescriptor(&mkl_handle);
+  }
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error freeing descriptor in CommsLib::FFT%s\n",
+                    DftiErrorMessage(status));
+  }
+  return status;
 }
 
-void CommsLib::FFT(complex_float* in, int fftsize) {
+MKL_LONG CommsLib::IFFT(complex_float* in_out, int fftsize, bool normalize) {
+  DFTI_DESCRIPTOR_HANDLE mkl_handle;
+
+  MKL_LONG status =
+      DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error creating descriptor in CommsLib::IFFT%s\n",
+                    DftiErrorMessage(status));
+  } else {
+    status = DftiCommitDescriptor(mkl_handle);
+  }
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error committing descriptor in CommsLib::IFFT%s\n",
+                    DftiErrorMessage(status));
+  } else {
+    status = DftiComputeBackward(mkl_handle, in_out);
+  }
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error compute backward in CommsLib::IFFT%s\n",
+                    DftiErrorMessage(status));
+  } else {
+    status = DftiFreeDescriptor(&mkl_handle);
+  }
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error free descriptor in CommsLib::IFFT%s\n",
+                    DftiErrorMessage(status));
+  } else {
+    if (normalize == true) {
+      float max_val = 0;
+      const float scale = 0.5;
+      for (int i = 0; i < fftsize; i++) {
+        const float sc_abs =
+            std::abs(std::complex<float>(in_out[i].re, in_out[i].im));
+        if (sc_abs > max_val) {
+          max_val = sc_abs;
+        }
+      }
+      // std::cout << "IFFT output is normalized with "
+      //         << std::to_string(max_val) << std::endl;
+      for (int i = 0; i < fftsize; i++) {
+        in_out[i] = {in_out[i].re / (max_val / scale),
+                     in_out[i].im / (max_val / scale)};
+      }
+    } else {
+      for (int i = 0; i < fftsize; i++) {
+        in_out[i].re /= fftsize;
+        in_out[i].im /= fftsize;
+      }
+    }
+  }
+  return status;
+}
+
+MKL_LONG CommsLib::FFT(complex_float* in_out, int fftsize) {
   DFTI_DESCRIPTOR_HANDLE mkl_handle;
   MKL_LONG status =
       DftiCreateDescriptor(&mkl_handle, DFTI_SINGLE, DFTI_COMPLEX, 1, fftsize);
-  status = DftiCommitDescriptor(mkl_handle);
-  /* compute FFT */
-  status = DftiComputeForward(mkl_handle, in);
-  status = DftiFreeDescriptor(&mkl_handle);
-  (void)(status);
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error creating descriptor in CommsLib::IFFT%s\n",
+                    DftiErrorMessage(status));
+  } else {
+    status = DftiCommitDescriptor(mkl_handle);
+  }
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error committing descriptor in CommsLib::IFFT%s\n",
+                    DftiErrorMessage(status));
+  } else {
+    /* compute FFT */
+    status = DftiComputeForward(mkl_handle, in_out);
+  }
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error computing forward in CommsLib::IFFT%s\n",
+                    DftiErrorMessage(status));
+  } else {
+    status = DftiFreeDescriptor(&mkl_handle);
+  }
+  if (status != DFTI_NO_ERROR) {
+    AGORA_LOG_ERROR("Error freeing descriptor in CommsLib::IFFT%s\n",
+                    DftiErrorMessage(status));
+  }
+  return status;
+}
+
+float CommsLib::ComputeOfdmSnr(const std::vector<std::complex<float>>& data_t,
+                               size_t data_start_index,
+                               size_t data_stop_index) {
+  RtAssert(
+      (data_t.size() > data_stop_index) && (data_stop_index > data_start_index),
+      "Invalid ComputeOfdmSnr Inputs!");
+
+  //Copy the const input to an output vector and do an inplace transform
+  auto fft_data(data_t);
+  CommsLib::FFT(fft_data, fft_data.size());
+  const auto fft_mag = CommsLib::Abs2Avx(fft_data);
+  float rssi = 0;
+  float noise = 0;
+  for (size_t i = 0; i < fft_mag.size(); i++) {
+    rssi += fft_mag.at(i);
+    if (i < data_start_index || i >= data_stop_index) {
+      noise += fft_mag.at(i);
+    }
+  }
+  const size_t noise_sc_size =
+      fft_data.size() - (data_stop_index - data_start_index);
+  noise *= (fft_mag.size() / noise_sc_size);
+  return (10.0f * std::log10((rssi - noise) / noise));
 }
 
 std::vector<std::complex<float>> CommsLib::ComposePartialPilotSym(
-    std::vector<std::complex<float>> pilot, size_t offset, size_t pilot_sc_num,
-    size_t fftSize, size_t dataSize, size_t dataStart, size_t CP_LEN,
-    bool interleaved_pilot, bool timeDomain) {
-  std::vector<std::complex<float>> fft_in(fftSize, 0);
+    const std::vector<std::complex<float>>& pilot, size_t offset,
+    size_t pilot_sc_num, size_t fftSize, size_t dataSize, size_t dataStart,
+    size_t CP_LEN, bool interleaved_pilot, bool timeDomain) {
+  std::vector<std::complex<float>> result(fftSize, 0);
   size_t period = dataSize / pilot_sc_num;
   for (size_t i = 0; i < pilot_sc_num; i++) {
-    size_t index = interleaved_pilot ? i * period + offset : i + offset;
-    fft_in[index + dataStart] = pilot[index];
+    const size_t index = interleaved_pilot ? i * period + offset : i + offset;
+    result[index + dataStart] = pilot[index];
   }
   if (timeDomain) {
-    auto pilot_cf32 = CommsLib::IFFT(fft_in, fftSize);
-    for (auto& i : pilot_cf32) {
+    CommsLib::IFFT(result, fftSize);
+    for (auto& i : result) {
       i /= std::sqrt(period);
     }
-    pilot_cf32.insert(pilot_cf32.begin(), pilot_cf32.end() - CP_LEN,
-                      pilot_cf32.end());  // add CP
-    return pilot_cf32;
-  } else {
-    return fft_in;
+    result.insert(result.begin(), result.end() - CP_LEN,
+                  result.end());  // add CP
   }
+  return result;
 }
 
-void CommsLib::Ifft2tx(complex_float* in, std::complex<short>* out, size_t N,
-                       size_t prefix, size_t cp, float scale) {
+void CommsLib::Ifft2tx(const complex_float* in, std::complex<short>* out,
+                       size_t N, size_t prefix, size_t cp, float scale) {
   for (size_t j = 0; j < N; j++) {
     out[prefix + cp + j] =
         std::complex<int16_t>((int16_t)((in[j].re / scale) * 32768),
@@ -472,8 +567,8 @@ void CommsLib::Ifft2tx(complex_float* in, std::complex<short>* out, size_t N,
   }
 }
 
-std::vector<std::complex<float>> CommsLib::Modulate(std::vector<int8_t> in,
-                                                    int type) {
+std::vector<std::complex<float>> CommsLib::Modulate(
+    const std::vector<int8_t>& in, int type) {
   std::vector<std::complex<float>> out(in.size());
   if (type == kQpsk) {
     float qpsk_table[2][4];  // = init_qpsk();
@@ -484,7 +579,7 @@ std::vector<std::complex<float>> CommsLib::Modulate(std::vector<int8_t> in,
       qpsk_table[1][i] = mod_qpsk[i % 2];
     }
     for (size_t i = 0; i < in.size(); i++) {
-      if (in[i] >= 0 and in[i] < 4) {
+      if (in[i] >= 0 && in[i] < 4) {
         out[i] =
             std::complex<float>(qpsk_table[0][in[i]], qpsk_table[1][in[i]]);
       } else {
@@ -494,8 +589,8 @@ std::vector<std::complex<float>> CommsLib::Modulate(std::vector<int8_t> in,
     }
   } else if (type == kQaM16) {
     float qam16_table[2][16];  //= init_qam16();
-    float scale = 1 / sqrt(10);
-    float mod_16qam[4] = {-3 * scale, -1 * scale, 3 * scale, scale};
+    const float scale = 1 / sqrt(10);
+    const float mod_16qam[4] = {-3 * scale, -1 * scale, 3 * scale, scale};
     for (int i = 0; i < 16; i++) {
       qam16_table[0][i] = mod_16qam[i / 4];
       qam16_table[1][i] = mod_16qam[i % 4];
@@ -511,9 +606,9 @@ std::vector<std::complex<float>> CommsLib::Modulate(std::vector<int8_t> in,
     }
   } else if (type == kQaM64) {
     float qam64_table[2][64];  // = init_qam64();
-    float scale = 1 / sqrt(42);
-    float mod_64qam[8] = {-7 * scale, -5 * scale, -3 * scale, -1 * scale,
-                          scale,      3 * scale,  5 * scale,  7 * scale};
+    const float scale = 1 / sqrt(42);
+    const float mod_64qam[8] = {-7 * scale, -5 * scale, -3 * scale, -1 * scale,
+                                scale,      3 * scale,  5 * scale,  7 * scale};
     for (int i = 0; i < 64; i++) {
       qam64_table[0][i] = mod_64qam[i / 8];
       qam64_table[1][i] = mod_64qam[i % 8];
@@ -535,7 +630,7 @@ std::vector<std::complex<float>> CommsLib::Modulate(std::vector<int8_t> in,
 }
 
 std::vector<std::complex<float>> CommsLib::SeqCyclicShift(
-    std::vector<std::complex<float>> in, float alpha) {
+    const std::vector<std::complex<float>>& in, float alpha) {
   std::vector<std::complex<float>> out(in.size(), 0);
   for (size_t i = 0; i < in.size(); i++) {
     out[i] = in[i] * std::exp(std::complex<float>(0, i * alpha));

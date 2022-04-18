@@ -578,13 +578,10 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         for (size_t k = 0; k < this->cfg_->OfdmCaNum(); k++) {
           tx_symbol[2 * (k + this->cfg_->CpLen() +
                          this->cfg_->OfdmTxZeroPrefix())] =
-              static_cast<short>(32768 * ptr_ifft[k].re *
-                                 std::sqrt(this->cfg_->BsAntNum() * 1.f));
+              static_cast<short>(32768 * ptr_ifft[k].re);
           tx_symbol[2 * (k + this->cfg_->CpLen() +
                          this->cfg_->OfdmTxZeroPrefix()) +
-                    1] =
-              static_cast<short>(32768 * ptr_ifft[k].im *
-                                 std::sqrt(this->cfg_->BsAntNum() * 1.f));
+                    1] = static_cast<short>(32768 * ptr_ifft[k].im);
         }
         for (size_t k = 0; k < (2 * this->cfg_->CpLen()); k++) {
           tx_symbol[2 * this->cfg_->OfdmTxZeroPrefix() + k] =
