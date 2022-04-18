@@ -1510,7 +1510,7 @@ void Agora::InitializeDownlinkBuffers() {
     size_t dl_socket_buffer_size =
         config_->DlPacketLength() * dl_socket_buffer_status_size;
     AllocBuffer1d(&dl_socket_buffer_, dl_socket_buffer_size,
-                  Agora_memory::Alignment_t::kAlign64, 0);
+                  Agora_memory::Alignment_t::kAlign64, 1);
 
     size_t dl_bits_buffer_size =
         kFrameWnd * config_->MacBytesNumPerframe(Direction::kDownlink);
