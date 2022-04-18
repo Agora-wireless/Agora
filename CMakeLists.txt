@@ -435,6 +435,7 @@ add_executable(radio_test
     test/radio_test/radio_socket.cc
     test/radio_test/radio_data_plane.cc
     test/radio_test/radio_data_plane_soapy.cc
+    test/radio_test/radio_data_plane_socket.cc
     $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:shared_txrx_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)

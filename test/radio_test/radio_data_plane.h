@@ -13,9 +13,9 @@
 
 //Abstract class defination for the Radio data plane connection
 class RadioDataPlane {
+ public:
   enum Mode { kModeUninit, kModeShutdown, kModeDeactive, kModeActive };
 
- public:
   virtual ~RadioDataPlane();
   explicit RadioDataPlane(RadioDataPlane&&) = delete;
   explicit RadioDataPlane(const RadioDataPlane&) = delete;
@@ -33,6 +33,8 @@ class RadioDataPlane {
   inline const size_t& Id() const { return radio_id_; }
 
  protected:
+  virtual void Setup(const SoapySDR::Kwargs& args);
+
   inline const Config* Configuration() const { return cfg_; }
   inline const Mode& CheckMode() const { return mode_; }
   RadioDataPlane(const Config* cfg, SoapySDR::Device* device, size_t id);

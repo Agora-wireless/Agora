@@ -87,16 +87,20 @@ void RadioDataPlane::Close() {
   mode_ = kModeShutdown;
 }
 
-void RadioDataPlane::Setup() {
+void RadioDataPlane::Setup(const SoapySDR::Kwargs& args) {
   if (mode_ == kModeShutdown) {
-    SoapySDR::Kwargs sargs;
     auto channels = Utils::StrToChannels(cfg_->Channel());
     rx_stream_ =
-        device_->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, sargs);
+        device_->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, args);
     mode_ = kModeDeactive;
   } else {
     AGORA_LOG_WARN(
         "Attempting to Setup a previously configured data plane "
         "connection\n");
   }
+}
+
+void RadioDataPlane::Setup() {
+  SoapySDR::Kwargs args;
+  return RadioDataPlane::Setup(args);
 }

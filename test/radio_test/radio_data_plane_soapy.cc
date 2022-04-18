@@ -31,7 +31,10 @@ inline void RadioDataPlaneSoapy::Deactivate() {
 
 inline void RadioDataPlaneSoapy::Close() { return RadioDataPlane::Close(); }
 
-inline void RadioDataPlaneSoapy::Setup() { return RadioDataPlane::Setup(); }
+inline void RadioDataPlaneSoapy::Setup() {
+  SoapySDR::Kwargs sargs;
+  return RadioDataPlane::Setup(sargs);
+}
 
 // For now, radio rx will return 1 symbol
 int RadioDataPlaneSoapy::Rx(
