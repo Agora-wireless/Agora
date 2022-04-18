@@ -294,7 +294,10 @@ bool BigStationState::received_all_precode_pkts(size_t frame_id, size_t symbol_i
 // Packet prepare checking functions
 bool BigStationState::prepared_all_freq_iq_pkts(size_t frame_id, size_t symbol_id)
 {
-    if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
+    if (frame_id < cur_frame_) {
+        return true;
+    }
+    if (frame_id >= cur_frame_ + kFrameWnd) {
         return false;
     }
     return num_freq_iq_pkts_prepared_[frame_id % kFrameWnd][symbol_id] == num_freq_iq_pkts_prepared_per_symbol_;
@@ -302,7 +305,10 @@ bool BigStationState::prepared_all_freq_iq_pkts(size_t frame_id, size_t symbol_i
 
 bool BigStationState::prepared_all_zf_pkts(size_t frame_id)
 {
-    if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
+    if (frame_id < cur_frame_) {
+        return true;
+    }
+    if (frame_id >= cur_frame_ + kFrameWnd) {
         return false;
     }
     return num_zf_pkts_prepared_[frame_id % kFrameWnd] == num_zf_pkts_prepared_per_frame_;
@@ -310,7 +316,10 @@ bool BigStationState::prepared_all_zf_pkts(size_t frame_id)
 
 bool BigStationState::prepared_all_demod_pkts(size_t frame_id, size_t symbol_id_ul)
 {
-    if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
+    if (frame_id < cur_frame_) {
+        return true;
+    }
+    if (frame_id >= cur_frame_ + kFrameWnd) {
         return false;
     }
     return num_demod_pkts_prepared_[frame_id % kFrameWnd][symbol_id_ul] == num_demod_pkts_prepared_per_symbol_;
@@ -318,7 +327,10 @@ bool BigStationState::prepared_all_demod_pkts(size_t frame_id, size_t symbol_id_
 
 bool BigStationState::prepared_all_encode_pkts(size_t frame_id, size_t symbol_id_dl)
 {
-    if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
+    if (frame_id < cur_frame_) {
+        return true;
+    }
+    if (frame_id >= cur_frame_ + kFrameWnd) {
         return false;
     }
     return num_encode_pkts_prepared_[frame_id % kFrameWnd][symbol_id_dl] == num_encode_pkts_prepared_per_symbol_;
@@ -326,7 +338,10 @@ bool BigStationState::prepared_all_encode_pkts(size_t frame_id, size_t symbol_id
 
 bool BigStationState::prepared_all_precode_pkt(size_t frame_id, size_t symbol_id_dl)
 {
-    if (frame_id < cur_frame_ || frame_id >= cur_frame_ + kFrameWnd) {
+    if (frame_id < cur_frame_) {
+        return true;
+    }
+    if (frame_id >= cur_frame_ + kFrameWnd) {
         return false;
     }
     return num_precode_pkts_prepared_[frame_id % kFrameWnd][symbol_id_dl] == num_precode_pkts_prepared_per_symbol_;
