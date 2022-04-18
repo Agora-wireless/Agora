@@ -8,10 +8,10 @@
 
 constexpr size_t kRxBufferSize = 8192;
 
-constexpr size_t kDebugIrisRx = false;
-//constexpr size_t kDebugIrisTxStatus = false;
+constexpr bool kDebugIrisRx = true;
+//constexpr bool kDebugIrisTxStatus = false;
 
-//#define SOCKET_DEBUG_OUTPUT
+#define SOCKET_DEBUG_OUTPUT
 #if defined(SOCKET_DEBUG_OUTPUT)
 #define DEBUG_OUTPUT(...)   \
   std::printf(__VA_ARGS__); \

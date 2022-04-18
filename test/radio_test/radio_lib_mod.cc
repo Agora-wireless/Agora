@@ -9,6 +9,7 @@
 #include "comms-lib.h"
 #include "nlohmann/json.hpp"
 #include "radio_data_plane_soapy.h"
+#include "radio_data_plane_socket.h"
 
 static constexpr bool kPrintCalibrationMats = false;
 static constexpr bool kPrintRadioSettings = false;
@@ -252,7 +253,7 @@ void RadioConfigNoRxStream::InitBsRadio(size_t radio) {
   // resets the DATA_clk domain logic.
   ba_stn_.at(radio)->writeSetting("RESET_DATA_LOGIC", "");
   auto& dp = rx_data_plane_.emplace_back(
-      std::make_unique<RadioDataPlaneSoapy>(cfg_, ba_stn_.at(radio), radio));
+      std::make_unique<RadioDataPlaneSocket>(cfg_, ba_stn_.at(radio), radio));
   dp->Setup();
   tx_streams_.at(radio) = ba_stn_.at(radio)->setupStream(
       SOAPY_SDR_TX, SOAPY_SDR_CS16, channels, sargs);
@@ -435,7 +436,7 @@ int RadioConfigNoRxStream::RadioRx(
   int rx_return = 0;
   rx_return = rx_data_plane_.at(radio_id)->Rx(rx_data, rx_time_ns);
   if (rx_return > 0) {
-    std::printf("Rx'd sample count %d\n", rx_return);
+    //std::printf("Rx'd sample count %d\n", rx_return);
   } else if (rx_return < 0) {
     throw std::runtime_error("Error in RadioRx!");
   }
