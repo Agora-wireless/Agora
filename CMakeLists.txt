@@ -184,7 +184,10 @@ find_package(PythonLibs REQUIRED)
 set(PYTHON_LIB ${PYTHON_LIBRARIES})
 include_directories(${PYTHON_INCLUDE_DIRS})
 
-#Soapy (Static or Dynamic?)
+message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
+message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
+
+#Soapy
 find_package(SoapySDR "0.8.0" CONFIG)
 if(NOT SoapySDR_FOUND)
   message(FATAL_ERROR "SoapySDR development files not found")
@@ -192,11 +195,8 @@ endif()
 set(SOAPY_LIB ${SoapySDR_LIBRARIES})
 include_directories(${SOAPY_INCLUDE_DIRS})
 
-#include_directories(src/third_party/SoapySDR/include)
-#add_subdirectory(src/third_party/SoapySDR)
-#add_subdirectory(src/third_party/SoapyIris)
-#set(COMMON_LIBS SoapySDR)
-message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
+message(STATUS "SoapySDR_INCLUDE_DIRS: ${SoapySDR_INCLUDE_DIRS}")
+message(STATUS "SoapySDR_LIBRARIES: ${SoapySDR_LIBRARIES}")
 add_definitions(-DTHREADED_INIT)
 
 # Intel MKL
@@ -290,6 +290,7 @@ include_directories(SYSTEM src/third_party src/third_party/spdlog/include src/th
 set(COMMON_SOURCES
   src/agora/stats.cc
   src/agora/phy_stats.cc
+  src/common/framestats.cc
   src/agora/doencode.cc
   src/common/utils.cc
   src/common/config.cc
