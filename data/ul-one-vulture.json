@@ -50,7 +50,8 @@
   "ue_hw_framer": false,
   "hw_framer": true,
   /* Compute configuration */
-  "bs_server_addr": "fe80::4031:dfb9:d71d:8c18%5",
+  "bs_server_addr": "fe80::e42:a1ff:fe71:8ba7%5",
+  /* "bs_server_port": 80000, */
   "exclude_cores": [],
   "ue_core_offset": 0,
   "ue_worker_thread_num": 1,
