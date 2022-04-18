@@ -63,7 +63,7 @@ function detect_bottleneck()
     bottleneck_reason=0
     res=$(cat /tmp/hydra/log_*.txt | grep "FFT Thread [0-9]* error traceback")
     for line in ${res}; do
-        frameStr=${line##*fft (frame }
+        frameStr=${line##*\: fft (frame }
         frameStr=${frameStr%%, pilot*}
         if [ ${frameStr} -le ${bar} ]; then
             echo "FFT bottlenecked!"
@@ -112,7 +112,7 @@ function detect_bottleneck()
     res=$(cat /tmp/hydra/log_*.txt | grep "TX error traceback")
     for line in ${res}; do
         frameStr=${line##*zf (frame }
-        frameStr=${frameStr%%), demul*}
+        frameStr=${frameStr%%), encode*}
         if [ ${frameStr} -le ${bar} ]; then
             echo "ZF TX bottlenecked!"
             echo ${line}
@@ -188,7 +188,7 @@ function detect_bottleneck()
         if [ ${frameStr} -le ${bar} ]; then
             echo "IFFT bottlenecked!"
             echo ${line}
-            bottleneck_reason=7
+            bottleneck_reason=6
             recvStr=${line##*, recvd }
             recvStr=${recvStr%%)*}
             if [ "${recvStr}" == "0" ]; then
