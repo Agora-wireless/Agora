@@ -8,10 +8,10 @@
 
 constexpr size_t kRxBufferSize = 8192;
 
-constexpr bool kDebugIrisRx = true;
+constexpr bool kDebugIrisRx = false;
 //constexpr bool kDebugIrisTxStatus = false;
 
-#define SOCKET_DEBUG_OUTPUT
+//#define SOCKET_DEBUG_OUTPUT
 #if defined(SOCKET_DEBUG_OUTPUT)
 #define DEBUG_OUTPUT(...)   \
   std::printf(__VA_ARGS__); \
@@ -110,7 +110,6 @@ int RadioSocket::RxSymbol(
     std::vector<std::vector<std::complex<int16_t>>>& out_data,
     long long& rx_time_ns) {
   size_t num_samples = 0;
-  const auto* rx_buffer = &rx_buffer_.at(rx_bytes_);
   bool try_rx = true;
 
   while (try_rx) {
@@ -119,9 +118,10 @@ int RadioSocket::RxSymbol(
                                         (rx_buffer_.size() - rx_bytes_));
 
     if (rx_return > 0) {
-      DEBUG_OUTPUT("Received %d bytes\n", rx_return);
       const size_t new_bytes = static_cast<size_t>(rx_return);
-      const bool symbol_complete = CheckSymbolComplete(rx_buffer, rx_return);
+      DEBUG_OUTPUT("Received %zu bytes\n", new_bytes);
+      const bool symbol_complete =
+          CheckSymbolComplete(&rx_buffer_.at(rx_bytes_), new_bytes);
       rx_bytes_ += new_bytes;
 
       if (symbol_complete) {
