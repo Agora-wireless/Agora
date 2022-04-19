@@ -11,11 +11,11 @@
     600
   ],
   "subcarrier_block_list": [
-    24,
-    24
+    44,
+    44
   ],
   "coding_thread_num": [
-    8,
-    8
+    4,
+    4
   ]
 }
