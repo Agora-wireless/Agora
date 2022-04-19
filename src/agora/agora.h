@@ -27,6 +27,7 @@
 #include "doprecode.h"
 #include "dozf.h"
 #include "mac_thread_basestation.h"
+#include "mat_logger.h"
 #include "memory_manage.h"
 #include "packet_txrx.h"
 #include "phy_stats.h"
@@ -323,6 +324,7 @@ class Agora {
   uint8_t schedule_process_flags_;
 
   std::queue<size_t> encode_deferral_;
+  std::array<std::shared_ptr<CsvLog::MatLogger>, CsvLog::kMatLogs> mat_loggers_;
 };
 
 #endif  // AGORA_H_

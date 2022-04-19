@@ -88,6 +88,15 @@ Agora::Agora(Config* const cfg)
         std::thread(&MacThreadBaseStation::RunEventLoop, mac_thread_.get());
   }
 
+  if (kEnableMatLog) {
+    for (size_t i = 0; i < mat_loggers_.size(); i++) {
+      if ((i != CsvLog::kMatDLZF) || (cfg->Frame().NumDLSyms() > 0)) {
+        mat_loggers_.at(i) =
+            std::make_shared<CsvLog::MatLogger>(cfg->RadioId().at(0), i);
+      }
+    }
+  }
+
   // Create worker threads
   CreateThreads();
 
@@ -111,7 +120,6 @@ Agora::~Agora() {
   }
   FreeUplinkBuffers();
   FreeDownlinkBuffers();
-
   stats_.reset();
   phy_stats_.reset();
   FreeQueues();
@@ -877,7 +885,8 @@ void Agora::Worker(int tid) {
       this->config_, tid, this->csi_buffers_, calib_dl_buffer_,
       calib_ul_buffer_, this->calib_dl_msum_buffer_,
       this->calib_ul_msum_buffer_, this->ul_zf_matrices_, this->dl_zf_matrices_,
-      this->phy_stats_.get(), this->stats_.get());
+      this->phy_stats_.get(), this->stats_.get(),
+      mat_loggers_.at(CsvLog::kMatCSI), mat_loggers_.at(CsvLog::kMatDLZF));
 
   auto compute_fft = std::make_unique<DoFFT>(
       this->config_, tid, this->data_buffer_, this->csi_buffers_,
@@ -993,10 +1002,11 @@ void Agora::WorkerZf(int tid) {
   PinToCoreWithOffset(ThreadType::kWorkerZF, base_worker_core_offset_, tid);
 
   /* Initialize ZF operator */
-  std::unique_ptr<DoZF> compute_zf(
-      new DoZF(config_, tid, csi_buffers_, calib_dl_buffer_, calib_ul_buffer_,
-               calib_dl_msum_buffer_, calib_ul_msum_buffer_, ul_zf_matrices_,
-               dl_zf_matrices_, this->phy_stats_.get(), this->stats_.get()));
+  auto compute_zf(std::make_unique<DoZF>(
+      config_, tid, csi_buffers_, calib_dl_buffer_, calib_ul_buffer_,
+      calib_dl_msum_buffer_, calib_ul_msum_buffer_, ul_zf_matrices_,
+      dl_zf_matrices_, this->phy_stats_.get(), this->stats_.get(),
+      mat_loggers_.at(CsvLog::kMatCSI), mat_loggers_.at(CsvLog::kMatDLZF)));
 
   while (this->config_->Running() == true) {
     compute_zf->TryLaunch(*GetConq(EventType::kZF, 0), complete_task_queue_[0],

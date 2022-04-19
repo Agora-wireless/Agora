@@ -8,6 +8,7 @@
 #include <armadillo>
 
 #include "config.h"
+#include "csv_logger.h"
 #include "memory_manage.h"
 #include "symbols.h"
 
@@ -20,6 +21,7 @@ class PhyStats {
                        uint8_t rx_byte);
   void UpdateDecodedBits(size_t ue_id, size_t offset, size_t new_bits_num);
   void UpdateBlockErrors(size_t ue_id, size_t offset, size_t block_error_count);
+  float GetBitErrorRate(size_t ue_id, size_t offset);
   void IncrementDecodedBlocks(size_t ue_id, size_t offset);
   void UpdateUncodedBitErrors(size_t ue_id, size_t offset, size_t mod_bit_size,
                               uint8_t tx_byte, uint8_t rx_byte);
@@ -33,6 +35,8 @@ class PhyStats {
                         complex_float* fft_data);
   void PrintSnrStats(size_t frame_id);
   void PrintDlSnrStats(size_t frame_id, size_t ant_id);
+  void RecordDlPilotSnr(CsvLog::CsvLogger* logger, size_t frame_id,
+                        size_t ant_id);
   void UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id, size_t ant_id,
                            complex_float* fft_data);
   void PrintCalibSnrStats(size_t frame_id);

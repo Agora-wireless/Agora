@@ -31,6 +31,7 @@ int main(int argc, char* argv[]) {
   } else {
     filename = FLAGS_conf_file;
   }
+
   auto config = std::make_unique<Config>(filename.c_str());
   config->GenData();
   int ret;
@@ -50,5 +51,6 @@ int main(int argc, char* argv[]) {
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
   AGORA_LOG_SHUTDOWN();
+
   return ret;
 }
