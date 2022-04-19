@@ -96,7 +96,6 @@ for i in ${!ant_list[@]}; do
     cat ${hydra_master_config_json} | jq --arg deploy "${HYDRA_SERVER_DEPLOY_JSON}" '.hydra_server_deploy_json=$deploy' > tmp.json
     cat tmp.json | jq --arg template "${HYDRA_SYSTEM_CONFIG_JSON}" '.hydra_system_config_json=$template' > ${hydra_master_config_json}
     rm tmp.json
-    rm -r ${hydra_root_dir}/latency/msr_hydra_${ant_num}_${ue_num}_ul 
     mkdir -p ${hydra_root_dir}/latency/msr_hydra_${ant_num}_${ue_num}_ul 
     ${hydra_root_dir}/scripts/evaluation/evaluate_tail_latency.sh
     mv ${hydra_root_dir}/data/frame_latency_all_*.txt ${hydra_root_dir}/latency/msr_hydra_${ant_num}_${ue_num}_ul/
