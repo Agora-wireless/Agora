@@ -23,7 +23,8 @@ DoZF::DoZF(Config* config, int tid,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& ul_zf_matrices,
            PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
            PhyStats* in_phy_stats, Stats* stats_manager,
-           CsvLog::MatLoggerArray& mat_logger_array)
+           std::shared_ptr<CsvLog::MatLogger> csi_logger,
+           std::shared_ptr<CsvLog::MatLogger> dlzf_logger)
     : Doer(config, tid),
       csi_buffers_(csi_buffers),
       calib_dl_buffer_(calib_dl_buffer),
@@ -33,7 +34,8 @@ DoZF::DoZF(Config* config, int tid,
       ul_zf_matrices_(ul_zf_matrices),
       dl_zf_matrices_(dl_zf_matrices),
       phy_stats_(in_phy_stats),
-      mat_logger_array_(mat_logger_array) {
+      csi_logger_(std::move(csi_logger)),
+      dlzf_logger_(std::move(dlzf_logger)) {
   duration_stat_ = stats_manager->GetDurationStat(DoerType::kZF, tid);
   pred_csi_buffer_ =
       static_cast<complex_float*>(Agora_memory::PaddedAlignedAlloc(
@@ -383,13 +385,16 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
       phy_stats_->UpdateCsiCond(frame_id, cur_sc_id, rcond);
     }
     if (kEnableMatLog) {
-      mat_logger_array_.at(CsvLog::kMatCSI - CsvLog::kMatIdStart)->
-          UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
-      arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(
-                              dl_zf_matrices_[frame_slot][cur_sc_id]),
-                              cfg_->BsAntNum(), cfg_->UeAntNum(), false);
-      mat_logger_array_.at(CsvLog::kMatDLZF - CsvLog::kMatIdStart)->
-          UpdateMatBuf(frame_id, cur_sc_id, mat_dl_zf);
+      if (csi_logger_) {
+        csi_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_csi);
+      }
+
+      if (dlzf_logger_) {
+        arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(
+                                    dl_zf_matrices_[frame_slot][cur_sc_id]),
+                                cfg_->BsAntNum(), cfg_->UeAntNum(), false);
+        dlzf_logger_->UpdateMatBuf(frame_id, cur_sc_id, mat_dl_zf);
+      }
     }
 
     duration_stat_->task_duration_[3] += GetTime::WorkerRdtsc() - start_tsc3;

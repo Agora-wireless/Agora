@@ -235,6 +235,8 @@ endif()
 
 set(ENABLE_CSV_LOG False CACHE STRING "ENABLE_CSV_LOG defaulting to 'False'")
 set(ENABLE_MAT_LOG False CACHE STRING "ENABLE_MAT_LOG defaulting to 'False'")
+message(STATUS "ENABLE_CSV_LOG: ${ENABLE_CSV_LOG}")
+message(STATUS "ENABLE_MAT_LOG: ${ENABLE_MAT_LOG}")
 if(USE_SPDLOG AND ENABLE_CSV_LOG)
   add_definitions(-DENABLE_CSV_LOG=true)
   message(STATUS "Enabled Csv Logger")

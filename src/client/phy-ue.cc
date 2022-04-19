@@ -106,9 +106,9 @@ PhyUe::PhyUe(Config* config)
   }
 
   if (kEnableCsvLog) {
-    for (size_t i = 0; i < CsvLog::kCsvLogs; i++) {
-      csv_logger_array_.at(i) = std::make_unique<CsvLog::CsvLogger>(
-          CsvLog::Create(config_->UeRadioId().at(0), i));
+    for (size_t i = 0; i < csv_loggers_.size(); i++) {
+      csv_loggers_.at(i) =
+          std::make_shared<CsvLog::CsvLogger>(config_->UeRadioId().at(0), i);
     }
   }
 
@@ -118,8 +118,8 @@ PhyUe::PhyUe(Config* config)
         *work_producer_token_.get(), ul_bits_buffer_, ul_syms_buffer_,
         modul_buffer_, ifft_buffer_, tx_buffer_, rx_buffer_, csi_buffer_,
         equal_buffer_, non_null_sc_ind_, fft_buffer_, demod_buffer_,
-        decoded_buffer_, ue_pilot_vec_, csv_logger_array_.at(CsvLog::kEVMSNR),
-        csv_logger_array_.at(CsvLog::kBERSER));
+        decoded_buffer_, ue_pilot_vec_, csv_loggers_.at(CsvLog::kEVMSNR),
+        csv_loggers_.at(CsvLog::kBERSER));
 
     new_worker->Start(core_offset_worker);
     workers_.push_back(std::move(new_worker));
@@ -442,7 +442,7 @@ void PhyUe::Start() {
               }
               if (kEnableCsvLog) {
                 this->phy_stats_->RecordDlPilotSnr(
-                    csv_logger_array_.at(CsvLog::kDLPSNR), frame_id, ant_id);
+                    csv_loggers_.at(CsvLog::kDLPSNR).get(), frame_id, ant_id);
               }
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);

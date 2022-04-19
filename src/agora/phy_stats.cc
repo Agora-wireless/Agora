@@ -147,21 +147,19 @@ void PhyStats::PrintDlSnrStats(size_t frame_id, size_t ant_id) {
   AGORA_LOG_INFO("%s", ss.str().c_str());
 }
 
-void PhyStats::RecordDlPilotSnr(std::unique_ptr<CsvLog::CsvLogger>& logger,
-                                size_t frame_id, size_t ant_id) {
+void PhyStats::RecordDlPilotSnr(CsvLog::CsvLogger* logger, size_t frame_id,
+                                size_t ant_id) {
   if (kEnableCsvLog) {
-    std::stringstream ss;
-    ss << frame_id << "," << ant_id;
     const size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
-    for (size_t i = 0; i < dl_pilots_num; i++) {
-      ss << ","
-         << dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + i];
+    if ((logger != nullptr) && (dl_pilots_num > 0)) {
+      std::stringstream ss;
+      ss << frame_id << "," << ant_id;
+      for (size_t i = 0; i < dl_pilots_num; i++) {
+        ss << ","
+           << dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + i];
+      }
+      logger->Write(ss.str());
     }
-    logger->Write(ss.str());
-  }
-  else {
-    unused(frame_id);
-    unused(ant_id);
   }
 }
 
