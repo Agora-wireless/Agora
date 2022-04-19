@@ -6,19 +6,23 @@
   "hydra_servers": [
     "roce91",
     "roce92",
-    "roce83"
+    "roce83",
+    "roce95"
   ],
   "subcarrier_num_list": [
-    400,
-    400,
-    400
+    304,
+    304,
+    296,
+    296
   ],
   "subcarrier_block_list": [
-    16,
-    16,
-    16
+    12,
+    12,
+    12,
+    12
   ],
   "coding_thread_num": [
+    8,
     8,
     8,
     8
