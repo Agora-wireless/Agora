@@ -238,6 +238,23 @@ else ()
   message(STATUS "Using agora raw logger")
 endif()
 
+set(ENABLE_CSV_LOG False CACHE STRING "ENABLE_CSV_LOG defaulting to 'False'")
+set(ENABLE_MAT_LOG False CACHE STRING "ENABLE_MAT_LOG defaulting to 'False'")
+message(STATUS "ENABLE_CSV_LOG: ${ENABLE_CSV_LOG}")
+message(STATUS "ENABLE_MAT_LOG: ${ENABLE_MAT_LOG}")
+if(USE_SPDLOG AND ENABLE_CSV_LOG)
+  add_definitions(-DENABLE_CSV_LOG=true)
+  message(STATUS "Enabled Csv Logger")
+  if(ENABLE_MAT_LOG)
+    add_definitions(-DENABLE_MAT_LOG=true)
+    message(STATUS "Enabled Mat Logger")
+  else()
+    message(STATUS "Disabled Mat Logger")
+  endif()
+else()
+  message(STATUS "Disabled Csv/Mat Logger")
+endif()
+
 # Console logging level
 if(LOG_LEVEL STREQUAL "none")
   message(STATUS "Logging level = none.")
@@ -275,6 +292,7 @@ find_package(GTest REQUIRED)
 include_directories(
   src/common/
   src/common/ipc
+  src/common/loggers
   src/mac/
   src/agora/
   src/agora/txrx/
@@ -307,6 +325,8 @@ set(COMMON_SOURCES
   src/common/ipc/udp_server.cc
   src/common/ipc/udp_server_ipv6.cc
   src/common/ipc/network_utils.cc
+  src/common/loggers/csv_logger.cc
+  src/common/loggers/mat_logger.cc
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc
   src/encoder/iobuffer.cc)

@@ -1,5 +1,5 @@
 {
-    "serial_file": "data/topology-vulture-dl.json",
+    "serial_file": "data/examples/topology-vulture.json",
     "cells": 1,
     "channel": "A",
     "frequency": 3.6e9,
@@ -61,7 +61,6 @@
     "worker_thread_num": 4,
     "demul_block_size": 48,
     "ue_demul_block_size": 48,
-    /* 20 bs radios + 1 ref*/
     "socket_thread_num": 2,
     "max_frame": 1000
 }

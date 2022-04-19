@@ -144,7 +144,23 @@ void PhyStats::PrintDlSnrStats(size_t frame_id, size_t ant_id) {
     ss << frame_snr << " ";
   }
   ss << "]" << std::endl;
-  std::cout << ss.str();
+  AGORA_LOG_INFO("%s", ss.str().c_str());
+}
+
+void PhyStats::RecordDlPilotSnr(CsvLog::CsvLogger* logger, size_t frame_id,
+                                size_t ant_id) {
+  if (kEnableCsvLog) {
+    const size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
+    if ((logger != nullptr) && (dl_pilots_num > 0)) {
+      std::stringstream ss;
+      ss << frame_id << "," << ant_id;
+      for (size_t i = 0; i < dl_pilots_num; i++) {
+        ss << ","
+           << dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + i];
+      }
+      logger->Write(ss.str());
+    }
+  }
 }
 
 void PhyStats::PrintSnrStats(size_t frame_id) {
@@ -339,6 +355,11 @@ void PhyStats::UpdateBlockErrors(size_t ue_id, size_t offset,
                                  size_t block_error_count) {
   block_error_count_[ue_id][offset] +=
       static_cast<unsigned long>(block_error_count > 0);
+}
+
+float PhyStats::GetBitErrorRate(size_t ue_id, size_t offset) {
+  return (static_cast<float>(bit_error_count_[ue_id][offset]) /
+          static_cast<float>(decoded_bits_count_[ue_id][offset]));
 }
 
 void PhyStats::IncrementDecodedBlocks(size_t ue_id, size_t offset) {
