@@ -143,6 +143,18 @@ static constexpr bool kUseUHD = true;
 static constexpr bool kUseUHD = false;
 #endif
 
+#ifdef ENABLE_CSV_LOG
+static constexpr bool kEnableCsvLog = true;
+#else
+static constexpr bool kEnableCsvLog = false;
+#endif
+
+#ifdef ENABLE_MAT_LOG
+static constexpr bool kEnableMatLog = true;
+#else
+static constexpr bool kEnableMatLog = false;
+#endif
+
 // Use 12-bit IQ sample to reduce network throughput
 static constexpr bool kUse12BitIQ = false;
 static constexpr bool kDebug12BitIQ = false;

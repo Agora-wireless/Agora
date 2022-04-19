@@ -105,13 +105,21 @@ PhyUe::PhyUe(Config* config)
         std::thread(&MacThreadClient::RunEventLoop, mac_thread_.get());
   }
 
+  if (kEnableCsvLog) {
+    for (size_t i = 0; i < csv_loggers_.size(); i++) {
+      csv_loggers_.at(i) =
+          std::make_shared<CsvLog::CsvLogger>(config_->UeRadioId().at(0), i);
+    }
+  }
+
   for (size_t i = 0; i < config_->UeWorkerThreadNum(); i++) {
     auto new_worker = std::make_unique<UeWorker>(
         i, *config_, *stats_, *phy_stats_, complete_queue_, work_queue_,
         *work_producer_token_.get(), ul_bits_buffer_, ul_syms_buffer_,
         modul_buffer_, ifft_buffer_, tx_buffer_, rx_buffer_, csi_buffer_,
         equal_buffer_, non_null_sc_ind_, fft_buffer_, demod_buffer_,
-        decoded_buffer_, ue_pilot_vec_);
+        decoded_buffer_, ue_pilot_vec_, csv_loggers_.at(CsvLog::kEVMSNR),
+        csv_loggers_.at(CsvLog::kBERSER));
 
     new_worker->Start(core_offset_worker);
     workers_.push_back(std::move(new_worker));
@@ -431,6 +439,10 @@ void PhyUe::Start() {
             if (pilot_fft_complete) {
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintDlSnrStats(frame_id, ant_id);
+              }
+              if (kEnableCsvLog) {
+                this->phy_stats_->RecordDlPilotSnr(
+                    csv_loggers_.at(CsvLog::kDLPSNR).get(), frame_id, ant_id);
               }
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
