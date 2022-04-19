@@ -6,21 +6,25 @@
     "roce91",
     "roce92",
     "roce83",
-    "roce95"
+    "roce95",
+    "roce94"
   ],
   "subcarrier_num_list": [
-    336,
-    288,
-    288,
-    288
+    240,
+    240,
+    240,
+    240,
+    240
   ],
   "subcarrier_block_list": [
-    12,
-    12,
-    12,
-    12
+    8,
+    8,
+    8,
+    8,
+    8
   ],
   "coding_thread_num": [
+    16,
     16,
     16,
     16,
