@@ -286,6 +286,7 @@ find_package(GTest REQUIRED)
 
 include_directories(
   src/common/
+  src/common/loggers
   src/mac/
   src/agora/
   src/agora/txrx/
@@ -314,8 +315,8 @@ set(COMMON_SOURCES
   src/common/crc.cc
   src/common/memory_manage.cc
   src/common/scrambler.cc
-  src/common/csv_logger.cc
-  src/common/mat_logger.cc
+  src/common/loggers/csv_logger.cc
+  src/common/loggers/mat_logger.cc
   src/encoder/cyclic_shift.cc
   src/encoder/encoder.cc
   src/encoder/iobuffer.cc)
