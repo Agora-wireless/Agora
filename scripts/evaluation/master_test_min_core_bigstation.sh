@@ -178,7 +178,7 @@ function detect_bottleneck()
 
 function verify_core_num()
 {
-    fft_block_per_thread=$1
+    fft_thread_num_total=$1
     zf_thread_num_total=$2
     demul_thread_num_total=$3
     decode_thread_per_server=$4
@@ -186,15 +186,6 @@ function verify_core_num()
     tx_thread_num=$6
     ant_num=$7
     valid=1
-    if [ ${fft_block_per_thread} -eq 0 ]; then
-        valid=2
-        return
-    fi
-    fft_thread_num_total=$(( ${ant_num}/${fft_block_per_thread} ))
-    mod_res=$(( ${ant_num}%${fft_block_per_thread} ))
-    if [ "${mod_res}" != "0" ]; then
-        fft_thread_num_total=$(( ${fft_thread_num_total}+1 ))
-    fi
     if [ ${fft_thread_num_total} -lt ${total_server_num} ]; then
         valid=3
         return
@@ -249,16 +240,11 @@ function create_template_json()
 
 function create_deploy_json()
 {
-    fft_block_per_thread=$1
+    fft_thread_num_total=$1
     zf_thread_num_total=$2
     demul_thread_num_total=$3
     decode_thread_per_server=$4
     ant_num=$5
-    fft_thread_num_total=$(( ${ant_num}/${fft_block_per_thread} ))
-    mod_res=$(( ${ant_num}%${fft_block_per_thread} ))
-    if [ "${mod_res}" != "0" ]; then
-        fft_thread_num_total=$(( ${fft_thread_num_total}+1 ))
-    fi
     for (( i=0; i<${total_server_num}; i++ )) do
         fft_thread_num_list[$i]=0
         zf_thread_num_list[$i]=0
@@ -330,7 +316,7 @@ for i in ${!ant_list[@]}; do
     cp tmp.json ${hydra_master_config_json}
     cur_rx_thread_num=4
     cur_tx_thread_num=2
-    cur_fft_block_per_thread=4
+    cur_fft_thread_num_total=$(( ${total_server_num}*6 ))
     cur_zf_thread_num_total=$(( ${total_server_num}*2 ))
     cur_demul_thread_num_total=$(( ${total_server_num}*10 ))
     cur_decode_thread_num_per_server=10
@@ -342,34 +328,36 @@ for i in ${!ant_list[@]}; do
     work=0
     while [ ${consecutive_error_num} -lt 5 ] && [ ${work} -eq 0 ]; do
         echo "Verify ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-            "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+            "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
             "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
             "decode ${cur_decode_thread_num_per_server}"
-        verify_core_num ${cur_fft_block_per_thread} ${cur_zf_thread_num_total} \
+        verify_core_num ${cur_fft_thread_num_total} ${cur_zf_thread_num_total} \
             ${cur_demul_thread_num_total} ${cur_decode_thread_num_per_server} \
             ${cur_rx_thread_num} ${cur_tx_thread_num} ${cur_ant}
         echo "${valid} ${total_server_num}"
         if [ "${valid}" == "0" ]; then
             echo "Verify unsuccessful"
             if [ "${fft_done}" == "0" ]; then
-                cur_fft_block_per_thread=$(( ${cur_fft_block_per_thread}+1 ))
-                continue
+                if [ ${cur_fft_thread_num_total} -gt $(( ${total_server_num}*2 )) ]; then
+                    cur_fft_thread_num_total=$(( ${cur_fft_thread_num_total}-${total_server_num}*2 ))
+                    continue
+                fi
             fi
             if [ "${zf_done}" == "0" ]; then
-                if [ ${cur_zf_thread_num_total} -gt ${total_server_num} ]; then
-                    cur_zf_thread_num_total=$(( ${cur_zf_thread_num_total}-1 ))
+                if [ ${cur_zf_thread_num_total} -gt $(( ${total_server_num}*2 )) ]; then
+                    cur_zf_thread_num_total=$(( ${cur_zf_thread_num_total}-${total_server_num}*2 ))
                     continue
                 fi
             fi
             if [ "${demul_done}" == "0" ]; then
-                if [ ${cur_demul_thread_num_total} -gt ${total_server_num} ]; then
-                    cur_demul_thread_num_total=$(( ${cur_demul_thread_num_total}-1 ))
+                if [ ${cur_demul_thread_num_total} -gt $(( ${total_server_num}*2 )) ]; then
+                    cur_demul_thread_num_total=$(( ${cur_demul_thread_num_total}-${total_server_num}*2 ))
                     continue
                 fi
             fi
             if [ "${decode_done}" == "0" ]; then
-                if [ ${cur_decode_thread_num_per_server} -gt 1 ]; then
-                    cur_decode_thread_num_per_server=$(( ${cur_decode_thread_num_per_server}-1 ))
+                if [ ${cur_decode_thread_num_per_server} -gt 2 ]; then
+                    cur_decode_thread_num_per_server=$(( ${cur_decode_thread_num_per_server}-2 ))
                     continue
                 fi
             fi
@@ -379,17 +367,17 @@ for i in ${!ant_list[@]}; do
             echo "Verify successful"
             runtime_error=0
             create_template_json ${cur_ant} ${cur_ue} ${cur_rx_thread_num} ${cur_tx_thread_num}
-            create_deploy_json ${cur_fft_block_per_thread} ${cur_zf_thread_num_total} \
+            create_deploy_json ${cur_fft_thread_num_total} ${cur_zf_thread_num_total} \
                 ${cur_demul_thread_num_total} ${cur_decode_thread_num_per_server} ${cur_ant}
             echo "Testing ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                 "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                 "decode ${cur_decode_thread_num_per_server}"
             ${hydra_root_dir}/scripts/control/run_all.sh -x || runtime_error=1
             if [ "${runtime_error}" == "1" ]; then
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
                 echo "Runtime error for ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                    "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                    "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                     "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                     "decode ${cur_decode_thread_num_per_server}"
                 continue
@@ -397,7 +385,7 @@ for i in ${!ant_list[@]}; do
             abort_detect
             if [ "${abort}" == "1" ]; then
                 echo "Runtime abort for ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                    "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                    "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                     "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                     "decode ${cur_decode_thread_num_per_server}"
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
@@ -415,24 +403,19 @@ for i in ${!ant_list[@]}; do
                     cur_tx_thread_num=$(( ${cur_tx_thread_num}+1 ))
                     continue
                 elif [ "${bottleneck_reason}" == "3" ]; then
-                    if [ ${cur_fft_block_per_thread} -gt 1 ]; then
-                        cur_fft_block_per_thread=$(( ${cur_fft_block_per_thread}-1 ))
-                        fft_done=1
-                    else
-                        # Exit
-                        work=2
-                    fi
+                    cur_fft_thread_num_total=$(( ${cur_fft_thread_num_total}+${total_server_num}*2 ))
+                    fft_done=1
                     continue
                 elif [ "${bottleneck_reason}" == "4" ]; then
-                    cur_zf_thread_num_total=$(( ${cur_zf_thread_num_total}+1 ))
+                    cur_zf_thread_num_total=$(( ${cur_zf_thread_num_total}+${total_server_num}*2 ))
                     zf_done=1
                     continue
                 elif [ "${bottleneck_reason}" == "5" ]; then
-                    cur_demul_thread_num_total=$(( ${cur_demul_thread_num_total}+1 ))
+                    cur_demul_thread_num_total=$(( ${cur_demul_thread_num_total}+${total_server_num}*2 ))
                     demul_done=1
                     continue
                 elif [ "${bottleneck_reason}" == "6" ]; then
-                    cur_decode_thread_num_per_server=$(( ${cur_decode_thread_num_per_server}+1 ))
+                    cur_decode_thread_num_per_server=$(( ${cur_decode_thread_num_per_server}+2 ))
                     decode_done=1
                     continue
                 fi
@@ -440,16 +423,12 @@ for i in ${!ant_list[@]}; do
                 echo "Run successful"
                 work=1
             fi
-        elif [ "${valid}" == "3" ]; then
-            cur_fft_block_per_thread=$(( ${cur_fft_block_per_thread}-1 ))
-            fft_done=1
-            continue
         fi
     done
     if [ "${work}" == "2" ]; then
         echo "Failed to run ant ${cur_ant} ue ${cur_ue}"
         create_template_json ${cur_ant} ${cur_ue} 0 0
-        create_deploy_json ${cur_fft_block_per_thread} ${cur_zf_thread_num_total} \
+        create_deploy_json ${cur_fft_thread_num_total} ${cur_zf_thread_num_total} \
             ${cur_demul_thread_num_total} ${cur_decode_thread_num_per_server} ${cur_ant}
         continue
     fi
@@ -458,21 +437,21 @@ for i in ${!ant_list[@]}; do
     work=1
     consecutive_error_num=0
     while [ "${work}" == "1" ] && [ ${consecutive_error_num} -lt 5 ]; do
-        try_fft_block_per_thread=$(( ${cur_fft_block_per_thread}+1 ))
-        if [ ${try_fft_block_per_thread} -le $(( ${cur_ant}/${total_server_num} )) ]; then
+        try_fft_thread_num_total=$(( ${cur_fft_thread_num_total}-${total_server_num}*2 ))
+        if [ ${try_fft_thread_num_total} -ge $(( ${total_server_num}*2 )) ]; then
             runtime_error=0
             create_template_json ${cur_ant} ${cur_ue} ${cur_rx_thread_num} ${cur_tx_thread_num}
-            create_deploy_json ${try_fft_block_per_thread} ${cur_zf_thread_num_total} \
+            create_deploy_json ${try_fft_thread_num_total} ${cur_zf_thread_num_total} \
                 ${cur_demul_thread_num_total} ${cur_decode_thread_num_per_server} ${cur_ant}
             echo "Testing ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                "tx ${cur_tx_thread_num} fft ${try_fft_block_per_thread}" \
+                "tx ${cur_tx_thread_num} fft ${try_fft_thread_num_total}" \
                 "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                 "decode ${cur_decode_thread_num_per_server}"
             ${hydra_root_dir}/scripts/control/run_all.sh -x || runtime_error=1
             if [ "${runtime_error}" == "1" ]; then
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
                 echo "Runtime error for ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                    "tx ${cur_tx_thread_num} fft ${try_fft_block_per_thread}" \
+                    "tx ${cur_tx_thread_num} fft ${try_fft_thread_num_total}" \
                     "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                     "decode ${cur_decode_thread_num_per_server}"
                 continue
@@ -480,7 +459,7 @@ for i in ${!ant_list[@]}; do
             abort_detect
             if [ "${abort}" == "1" ]; then
                 echo "Runtime abort for ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                    "tx ${cur_tx_thread_num} fft ${try_fft_block_per_thread}" \
+                    "tx ${cur_tx_thread_num} fft ${try_fft_thread_num_total}" \
                     "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                     "decode ${cur_decode_thread_num_per_server}"
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
@@ -491,7 +470,7 @@ for i in ${!ant_list[@]}; do
             if [ "${error}" == "1" ]; then
                 work=0
             else
-                cur_fft_block_per_thread=${try_fft_block_per_thread}
+                cur_fft_thread_num_total=${try_fft_thread_num_total}
                 echo "Run successful"
             fi
         else
@@ -503,21 +482,21 @@ for i in ${!ant_list[@]}; do
     work=1
     consecutive_error_num=0
     while [ "${work}" == "1" ] && [ ${consecutive_error_num} -lt 5 ]; do
-        try_zf_thread_num_total=$(( ${cur_zf_thread_num_total}-1 ))
-        if [ ${try_zf_thread_num_total} -ge ${total_server_num} ]; then
+        try_zf_thread_num_total=$(( ${cur_zf_thread_num_total}-${total_server_num}*2 ))
+        if [ ${try_zf_thread_num_total} -ge $(( ${total_server_num}*2 )) ]; then
             runtime_error=0
             create_template_json ${cur_ant} ${cur_ue} ${cur_rx_thread_num} ${cur_tx_thread_num}
-            create_deploy_json ${cur_fft_block_per_thread} ${try_zf_thread_num_total} \
+            create_deploy_json ${cur_fft_thread_num_total} ${try_zf_thread_num_total} \
                 ${cur_demul_thread_num_total} ${cur_decode_thread_num_per_server} ${cur_ant}
             echo "Testing ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                 "zf ${try_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                 "decode ${cur_decode_thread_num_per_server}"
             ${hydra_root_dir}/scripts/control/run_all.sh -x || runtime_error=1
             if [ "${runtime_error}" == "1" ]; then
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
                 echo "Runtime error for ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                    "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                    "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                     "zf ${try_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                     "decode ${cur_decode_thread_num_per_server}"
                 continue
@@ -525,7 +504,7 @@ for i in ${!ant_list[@]}; do
             abort_detect
             if [ "${abort}" == "1" ]; then
                 echo "Runtime abort for ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                    "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                    "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                     "zf ${try_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                     "decode ${cur_decode_thread_num_per_server}"
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
@@ -548,21 +527,21 @@ for i in ${!ant_list[@]}; do
     work=1
     consecutive_error_num=0
     while [ "${work}" == "1" ] && [ ${consecutive_error_num} -lt 5 ]; do
-        try_demul_thread_num_total=$(( ${cur_demul_thread_num_total}-1 ))
-        if [ ${try_demul_thread_num_total} -ge ${total_server_num} ]; then
+        try_demul_thread_num_total=$(( ${cur_demul_thread_num_total}-${total_server_num}*2 ))
+        if [ ${try_demul_thread_num_total} -ge $(( ${total_server_num}*2 )) ]; then
             runtime_error=0
             create_template_json ${cur_ant} ${cur_ue} ${cur_rx_thread_num} ${cur_tx_thread_num}
-            create_deploy_json ${cur_fft_block_per_thread} ${cur_zf_thread_num_total} \
+            create_deploy_json ${cur_fft_thread_num_total} ${cur_zf_thread_num_total} \
                 ${try_demul_thread_num_total} ${cur_decode_thread_num_per_server} ${cur_ant}
             echo "Testing ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                 "zf ${cur_zf_thread_num_total} demul ${try_demul_thread_num_total}" \
                 "decode ${cur_decode_thread_num_per_server}"
             ${hydra_root_dir}/scripts/control/run_all.sh -x || runtime_error=1
             if [ "${runtime_error}" == "1" ]; then
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
                 echo "Runtime error for ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                    "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                    "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                     "zf ${cur_zf_thread_num_total} demul ${try_demul_thread_num_total}" \
                     "decode ${cur_decode_thread_num_per_server}"
                 continue
@@ -570,7 +549,7 @@ for i in ${!ant_list[@]}; do
             abort_detect
             if [ "${abort}" == "1" ]; then
                 echo "Runtime abort for ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                    "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                    "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                     "zf ${cur_zf_thread_num_total} demul ${try_demul_thread_num_total}" \
                     "decode ${cur_decode_thread_num_per_server}"
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
@@ -593,21 +572,21 @@ for i in ${!ant_list[@]}; do
     work=1
     consecutive_error_num=0
     while [ "${work}" == "1" ] && [ ${consecutive_error_num} -lt 5 ]; do
-        try_decode_thread_num_per_server=$(( ${cur_decode_thread_num_per_server}-1 ))
-        if [ ${try_decode_thread_num_per_server} -gt 0 ]; then
+        try_decode_thread_num_per_server=$(( ${cur_decode_thread_num_per_server}-2 ))
+        if [ ${try_decode_thread_num_per_server} -ge 2 ]; then
             runtime_error=0
             create_template_json ${cur_ant} ${cur_ue} ${cur_rx_thread_num} ${cur_tx_thread_num}
-            create_deploy_json ${cur_fft_block_per_thread} ${cur_zf_thread_num_total} \
+            create_deploy_json ${cur_fft_thread_num_total} ${cur_zf_thread_num_total} \
                 ${cur_demul_thread_num_total} ${try_decode_thread_num_per_server} ${cur_ant}
             echo "Testing ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                 "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                 "decode ${try_decode_thread_num_per_server}"
             ${hydra_root_dir}/scripts/control/run_all.sh -x || runtime_error=1
             if [ "${runtime_error}" == "1" ]; then
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
                 echo "Runtime error for ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                    "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                    "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                     "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                     "decode ${try_decode_thread_num_per_server}"
                 continue
@@ -615,7 +594,7 @@ for i in ${!ant_list[@]}; do
             abort_detect
             if [ "${abort}" == "1" ]; then
                 echo "Runtime abort for ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                    "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                    "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                     "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                     "decode ${try_decode_thread_num_per_server}"
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
@@ -642,17 +621,17 @@ for i in ${!ant_list[@]}; do
         if [ ${try_rx_thread_num} -gt 0 ]; then
             runtime_error=0
             create_template_json ${cur_ant} ${cur_ue} ${try_rx_thread_num} ${cur_tx_thread_num}
-            create_deploy_json ${cur_fft_block_per_thread} ${cur_zf_thread_num_total} \
+            create_deploy_json ${cur_fft_thread_num_total} ${cur_zf_thread_num_total} \
                 ${cur_demul_thread_num_total} ${cur_decode_thread_num_per_server} ${cur_ant}
             echo "Testing ant ${cur_ant} ue ${cur_ue} rx ${try_rx_thread_num}" \
-                "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                 "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                 "decode ${cur_decode_thread_num_per_server}"
             ${hydra_root_dir}/scripts/control/run_all.sh -x || runtime_error=1
             if [ "${runtime_error}" == "1" ]; then
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
                 echo "Runtime error for ant ${cur_ant} ue ${cur_ue} rx ${try_rx_thread_num}" \
-                    "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                    "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                     "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                     "decode ${cur_decode_thread_num_per_server}"
                 continue
@@ -660,7 +639,7 @@ for i in ${!ant_list[@]}; do
             abort_detect
             if [ "${abort}" == "1" ]; then
                 echo "Runtime abort for ant ${cur_ant} ue ${cur_ue} rx ${try_rx_thread_num}" \
-                    "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                    "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                     "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                     "decode ${cur_decode_thread_num_per_server}"
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
@@ -687,17 +666,17 @@ for i in ${!ant_list[@]}; do
         if [ ${try_tx_thread_num} -gt 0 ]; then
             runtime_error=0
             create_template_json ${cur_ant} ${cur_ue} ${cur_rx_thread_num} ${try_tx_thread_num}
-            create_deploy_json ${cur_fft_block_per_thread} ${cur_zf_thread_num_total} \
+            create_deploy_json ${cur_fft_thread_num_total} ${cur_zf_thread_num_total} \
                 ${cur_demul_thread_num_total} ${cur_decode_thread_num_per_server} ${cur_ant}
             echo "Testing ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                "tx ${try_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                "tx ${try_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                 "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                 "decode ${cur_decode_thread_num_per_server}"
             ${hydra_root_dir}/scripts/control/run_all.sh -x || runtime_error=1
             if [ "${runtime_error}" == "1" ]; then
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
                 echo "Runtime error for ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                    "tx ${try_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                    "tx ${try_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                     "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                     "decode ${cur_decode_thread_num_per_server}"
                 continue
@@ -705,7 +684,7 @@ for i in ${!ant_list[@]}; do
             abort_detect
             if [ "${abort}" == "1" ]; then
                 echo "Runtime abort for ant ${cur_ant} ue ${cur_ue} rx ${cur_rx_thread_num}" \
-                    "tx ${try_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+                    "tx ${try_tx_thread_num} fft ${cur_fft_thread_num_total}" \
                     "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
                     "decode ${cur_decode_thread_num_per_server}"
                 consecutive_error_num=$(( ${consecutive_error_num}+1 ))
@@ -725,11 +704,11 @@ for i in ${!ant_list[@]}; do
     done
 
     echo "Setup ant ${cur_ant} ue ${cur_ue} is rx ${cur_rx_thread_num}" \
-        "tx ${cur_tx_thread_num} fft ${cur_fft_block_per_thread}" \
+        "tx ${cur_tx_thread_num} fft ${cur_fft_thread_num_total}" \
         "zf ${cur_zf_thread_num_total} demul ${cur_demul_thread_num_total}" \
         "decode ${cur_decode_thread_num_per_server}"
     create_template_json ${cur_ant} ${cur_ue} ${cur_rx_thread_num} ${cur_tx_thread_num}
-    create_deploy_json ${cur_fft_block_per_thread} ${cur_zf_thread_num_total} \
+    create_deploy_json ${cur_fft_thread_num_total} ${cur_zf_thread_num_total} \
         ${cur_demul_thread_num_total} ${cur_decode_thread_num_per_server} ${cur_ant}
 done
 
