@@ -234,5 +234,6 @@ class PhyUe {
   FrameCounters tomac_counters_;
 
   size_t max_equaled_frame_ = 0;
+  std::array<std::shared_ptr<CsvLog::CsvLogger>, CsvLog::kCsvLogs> csv_loggers_;
 };
 #endif  // PHY_UE_H_

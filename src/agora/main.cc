@@ -44,8 +44,10 @@ int main(int argc, char* argv[]) {
     std::cerr << "SignalException: " << e.what() << std::endl;
     ret = EXIT_FAILURE;
   }
+
   PrintCoreAssignmentSummary();
   gflags::ShutDownCommandLineFlags();
   AGORA_LOG_SHUTDOWN();
+
   return ret;
 }
