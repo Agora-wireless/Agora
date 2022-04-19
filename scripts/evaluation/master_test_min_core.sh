@@ -7,8 +7,10 @@ hydra_root_dir=$( cd ${script_dir}/../.. >/dev/null 2>&1 && pwd )
 source ${hydra_root_dir}/scripts/utils/utils.sh
 source ${hydra_root_dir}/scripts/control/init_platform.sh
 
-ant_list=(64 64 64 128 128 128 128 240 240 240)
-ue_list=(24 40 48 8 24 40 48 8 16 24)
+ant_list=(64 128 128 128 240 240 240)
+ue_list=(40 8 40 48 8 16 24)
+
+rm -f result.txt
 
 for i in ${!ant_list[@]}; do
     ant_num=${ant_list[$i]}
