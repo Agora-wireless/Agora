@@ -46,11 +46,11 @@ set key outside above font 'Times-Roman,10' maxrows 1
 # set mxtics 1
 # set mytics 1
 set style fill pattern border -1
-set arrow from graph 0,first 28 to graph 1,first 29 nohead dashtype 17 lc "red" front
-set arrow from graph 0,first 56 to graph 1,first 58 nohead dashtype 17 lc "red" front
-set arrow from graph 0,first 84 to graph 1,first 87 nohead dashtype 17 lc "red" front
-set arrow from graph 0,first 112 to graph 1,first 116 nohead dashtype 17 lc "red" front
-set arrow from graph 0,first 140 to graph 1,first 145 nohead dashtype 17 lc "red" front
+set arrow from graph 0,first 28 to graph 1,first 28 nohead dashtype 17 lc "red" front
+set arrow from graph 0,first 56 to graph 1,first 56 nohead dashtype 17 lc "red" front
+set arrow from graph 0,first 84 to graph 1,first 84 nohead dashtype 17 lc "red" front
+set arrow from graph 0,first 112 to graph 1,first 112 nohead dashtype 17 lc "red" front
+set arrow from graph 0,first 140 to graph 1,first 140 nohead dashtype 17 lc "red" front
 set label "1 server" at 8.3, 22 font 'Times-Roman,8'
 set label "2 servers" at 8.3, 51 font 'Times-Roman,8'
 set label "3 servers" at 8.3, 80 font 'Times-Roman,8'
