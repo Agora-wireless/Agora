@@ -8,7 +8,7 @@
     "roce92"
   ],
   "num_fft_workers": [
-    7,
+    6,
     6
   ],
   "num_zf_workers": [
@@ -16,11 +16,11 @@
     2
   ],
   "num_demul_workers": [
-    9,
-    10
+    8,
+    8
   ],
   "num_decode_workers": [
-    7,
-    7
+    8,
+    8
   ]
 }

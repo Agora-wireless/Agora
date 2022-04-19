@@ -9,9 +9,9 @@
     "roce83"
   ],
   "num_fft_workers": [
-    6,
-    5,
-    5
+    4,
+    4,
+    4
   ],
   "num_zf_workers": [
     2,
@@ -19,9 +19,9 @@
     2
   ],
   "num_demul_workers": [
-    10,
-    11,
-    11
+    12,
+    12,
+    12
   ],
   "num_decode_workers": [
     20,

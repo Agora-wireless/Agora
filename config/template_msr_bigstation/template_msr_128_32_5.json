@@ -1,6 +1,6 @@
 {
-  "rx_thread_num": 0,
-  "tx_thread_num": 0,
+  "rx_thread_num": 3,
+  "tx_thread_num": 1,
   "use_central_scheduler": false,
   "use_general_worker": false,
   "worker_thread_num": 10,

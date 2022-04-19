@@ -8,8 +8,8 @@
     "roce92"
   ],
   "num_fft_workers": [
-    8,
-    8
+    6,
+    6
   ],
   "num_zf_workers": [
     2,

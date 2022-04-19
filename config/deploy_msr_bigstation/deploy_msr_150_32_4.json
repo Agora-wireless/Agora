@@ -6,9 +6,11 @@
   "hydra_servers": [
     "roce91",
     "roce92",
-    "roce83"
+    "roce83",
+    "roce95"
   ],
   "num_fft_workers": [
+    12,
     12,
     12,
     12
@@ -16,14 +18,17 @@
   "num_zf_workers": [
     4,
     4,
+    4,
     4
   ],
   "num_demul_workers": [
-    10,
-    10,
-    10
+    16,
+    16,
+    16,
+    16
   ],
   "num_decode_workers": [
+    8,
     8,
     8,
     8

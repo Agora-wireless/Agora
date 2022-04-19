@@ -9,23 +9,23 @@
     "roce83"
   ],
   "num_fft_workers": [
-    15,
+    14,
     14,
     14
   ],
   "num_zf_workers": [
-    2,
-    3,
-    3
-  ],
-  "num_demul_workers": [
-    10,
-    9,
-    9
-  ],
-  "num_decode_workers": [
     4,
     4,
     4
+  ],
+  "num_demul_workers": [
+    12,
+    12,
+    12
+  ],
+  "num_decode_workers": [
+    6,
+    6,
+    6
   ]
 }
