@@ -24,7 +24,7 @@ set xtics 0,8,56 font ', 20'
 set ytics font ', 20'
 set xlabel '# users' font 'Times-Roman,20'
 set ylabel '# cores' font 'Times-Roman,20'
-set key bottom right font 'Times-Roman,20'
+set key outside above font 'Times-Roman,20'
 set grid xtics ytics mxtics mytics
 set mxtics 1
 set mytics 1
