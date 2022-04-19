@@ -19,7 +19,6 @@ ${hydra_root_dir}/scripts/control/run_all.sh -x || continue
 ${hydra_root_dir}/scripts/evaluation/latency_analysis.sh 0
 if [ -f ${hydra_root_dir}/data/frame_latency_all_0.txt ]; then
     echo "Succeed this time"
-    continue
 else
     echo "Failed in the beginning"
     exit
