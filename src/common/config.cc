@@ -209,6 +209,8 @@ Config::Config(const std::string& jsonfile)
   sample_cal_en_ = tdd_conf.value("calibrate_digital", false);
   imbalance_cal_en_ = tdd_conf.value("calibrate_analog", false);
   init_calib_repeat_ = tdd_conf.value("init_calib_repeat", 0);
+  beamforming_str_ = tdd_conf.value("beamforming", "ZF");
+  beamforming_algo_ = kBeamformingStr.at(beamforming_str_);
 
   bs_server_addr_ = tdd_conf.value("bs_server_addr", "127.0.0.1");
   bs_rru_addr_ = tdd_conf.value("bs_rru_addr", "127.0.0.1");
@@ -1410,6 +1412,7 @@ void Config::Print() const {
               << "Beamsweep " << beamsweep_ << std::endl
               << "Sample Cal En: " << sample_cal_en_ << std::endl
               << "Imbalance Cal: " << imbalance_cal_en_ << std::endl
+              << "Beamforming: " << beamforming_str_ << std::endl
               << "Bs Channel: " << channel_ << std::endl
               << "Ue Channel: " << ue_channel_ << std::endl
               << "Max Frames: " << frames_to_test_ << std::endl

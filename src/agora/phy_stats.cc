@@ -56,6 +56,8 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                        Agora_memory::Alignment_t::kAlign64);
   pilot_snr_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
                     Agora_memory::Alignment_t::kAlign64);
+  bs_noise_.Calloc(kFrameWnd, cfg->UeAntNum() * cfg->BsAntNum(),
+                   Agora_memory::Alignment_t::kAlign64);
   calib_pilot_snr_.Calloc(kFrameWnd, 2 * cfg->BsAntNum(),
                           Agora_memory::Alignment_t::kAlign64);
   csi_cond_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
@@ -254,9 +256,11 @@ void PhyStats::UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
       arma::mean(fft_abs_mag.rows(0, config_->OfdmDataStart() - 1)));
   const float noise_per_sc2 = arma::as_scalar(arma::mean(
       fft_abs_mag.rows(config_->OfdmDataStop(), config_->OfdmCaNum() - 1)));
-  const float noise =
+  const float fb_noise =  // Full band noise power
       config_->OfdmCaNum() * (noise_per_sc1 + noise_per_sc2) / 2;
-  const float snr = (rssi - noise) / noise;
+  const float snr = (rssi - fb_noise) / fb_noise;
+  bs_noise_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
+      fb_noise / config_->OfdmCaNum();
   pilot_snr_[frame_id % kFrameWnd][ue_id * config_->BsAntNum() + ant_id] =
       (10.0f * std::log10(snr));
 }
@@ -360,4 +364,11 @@ void PhyStats::UpdateUncodedBitErrors(size_t ue_id, size_t offset,
 void PhyStats::UpdateUncodedBits(size_t ue_id, size_t offset,
                                  size_t new_bits_num) {
   uncoded_bits_count_[ue_id][offset] += new_bits_num;
+}
+
+float PhyStats::GetNoise(size_t frame_id) {
+  arma::fvec noise_vec(bs_noise_[frame_id % kFrameWnd],
+                       config_->BsAntNum() * config_->UeAntNum(), false);
+
+  return arma::as_scalar(arma::mean(noise_vec));
 }

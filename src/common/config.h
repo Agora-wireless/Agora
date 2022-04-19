@@ -101,6 +101,7 @@ class Config {
   inline bool Beamsweep() const { return this->beamsweep_; }
   inline bool SampleCalEn() const { return this->sample_cal_en_; }
   inline bool ImbalanceCalEn() const { return this->imbalance_cal_en_; }
+  inline size_t BeamformingAlgo() const { return this->beamforming_algo_; }
   inline bool ExternalRefNode(size_t id) const {
     return this->external_ref_node_.at(id);
   }
@@ -663,6 +664,8 @@ class Config {
   bool beamsweep_;
   bool sample_cal_en_;
   bool imbalance_cal_en_;
+  size_t beamforming_algo_;
+  std::string beamforming_str_;
   std::vector<bool> external_ref_node_;
   std::string channel_;
   std::string ue_channel_;

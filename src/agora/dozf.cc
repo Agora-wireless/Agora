@@ -92,21 +92,35 @@ EventData DoZF::Launch(size_t tag) {
 
 float DoZF::ComputePrecoder(const arma::cx_fmat& mat_csi,
                             const arma::cx_fvec& calib_sc_vec,
-                            complex_float* ul_zf_mem,
+                            const float noise, complex_float* ul_zf_mem,
                             complex_float* dl_zf_mem) {
   arma::cx_fmat mat_ul_zf(reinterpret_cast<arma::cx_float*>(ul_zf_mem),
                           cfg_->UeAntNum(), cfg_->BsAntNum(), false);
   arma::cx_fmat mat_ul_zf_tmp;
-  if (kUseInverseForZF) {
-    try {
-      mat_ul_zf_tmp = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
-    } catch (std::runtime_error&) {
-      AGORA_LOG_WARN(
-          "Failed to invert channel matrix, falling back to pinv()\n");
-      arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
-    }
-  } else {
-    arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
+  switch (cfg_->BeamformingAlgo()) {
+    case CommsLib::BeamformingAlgorithm::kZF:
+      if (kUseInverseForZF) {
+        try {
+          mat_ul_zf_tmp = arma::inv_sympd(mat_csi.t() * mat_csi) * mat_csi.t();
+        } catch (std::runtime_error&) {
+          AGORA_LOG_WARN(
+              "Failed to invert channel matrix, falling back to pinv()\n");
+          arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
+        }
+      } else {
+        arma::pinv(mat_ul_zf_tmp, mat_csi, 1e-2, "dc");
+      }
+      break;
+    case CommsLib::BeamformingAlgorithm::kMMSE:
+      mat_ul_zf_tmp =
+          arma::inv_sympd(mat_csi.t() * mat_csi +
+                          noise * arma::eye<arma::cx_fmat>(cfg_->UeAntNum(),
+                                                           cfg_->UeAntNum())) *
+          mat_csi.t();
+      break;
+    case CommsLib::BeamformingAlgorithm::kMRC:
+      mat_ul_zf_tmp = mat_csi.t();
+      break;
   }
 
   if (cfg_->Frame().NumDLSyms() > 0) {
@@ -374,7 +388,11 @@ void DoZF::ZfTimeOrthogonal(size_t tag) {
     double start_tsc3 = GetTime::WorkerRdtsc();
     duration_stat_->task_duration_[2] += start_tsc3 - start_tsc2;
 
-    auto rcond = ComputePrecoder(mat_csi, cal_sc_vec,
+    float noise = 0;
+    if (cfg_->BeamformingAlgo()) {
+      noise = phy_stats_->GetNoise(frame_id);
+    }
+    auto rcond = ComputePrecoder(mat_csi, cal_sc_vec, noise,
                                  ul_zf_matrices_[frame_slot][cur_sc_id],
                                  dl_zf_matrices_[frame_slot][cur_sc_id]);
     if (kPrintZfStats) {
@@ -455,7 +473,11 @@ void DoZF::ZfFreqOrthogonal(size_t tag) {
   arma::cx_fmat mat_csi(reinterpret_cast<arma::cx_float*>(csi_gather_buffer_),
                         cfg_->BsAntNum(), cfg_->UeAntNum(), false);
 
-  ComputePrecoder(mat_csi, cal_sc_vec,
+  float noise = 0;
+  if (cfg_->BeamformingAlgo()) {
+    noise = phy_stats_->GetNoise(frame_id);
+  }
+  ComputePrecoder(mat_csi, cal_sc_vec, noise,
                   ul_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)],
                   dl_zf_matrices_[frame_slot][cfg_->GetZfScId(base_sc_id)]);
 

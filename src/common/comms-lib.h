@@ -25,6 +25,9 @@
 #include "memory_manage.h"
 #include "mkl_dfti.h"
 
+static const std::map<std::string, size_t> kBeamformingStr{
+    {"ZF", 0}, {"MMSE", 1}, {"MRC", 2}};
+
 class CommsLib {
  public:
   enum SequenceType {
@@ -43,6 +46,8 @@ class CommsLib {
     kQaM64 = 6,
     kQaM256 = 8
   };
+
+  enum BeamformingAlgorithm { kZF = 0, kMMSE = 1, kMRC = 2 };
 
   explicit CommsLib(std::string);
   ~CommsLib();

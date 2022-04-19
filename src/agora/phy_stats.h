@@ -38,6 +38,7 @@ class PhyStats {
   void PrintCalibSnrStats(size_t frame_id);
   void UpdateCsiCond(size_t frame_id, size_t sc_id, float cond);
   void PrintZfStats(size_t frame_id);
+  float GetNoise(size_t frame_id);
 
  private:
   Config const* const config_;
@@ -53,6 +54,7 @@ class PhyStats {
   Table<float> dl_pilot_snr_;
   Table<float> calib_pilot_snr_;
   Table<float> csi_cond_;
+  Table<float> bs_noise_;
 
   arma::cx_fmat gt_mat_;
   size_t num_rx_symbols_;
