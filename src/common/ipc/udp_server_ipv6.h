@@ -7,6 +7,7 @@
 
 #include <netdb.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <mutex>
