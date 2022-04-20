@@ -143,16 +143,34 @@ float DoBeamWeights::ComputePrecoder(const arma::cx_fmat& mat_csi,
       arma::cx_fmat inv_calib_mat = arma::diagmat(arma::sign(calib_sc_vec));
       mat_dl_beam_tmp = mat_ul_beam_tmp * inv_calib_mat;
     } else {
-      arma::cx_fmat mat_dl_csi = arma::diagmat(calib_sc_vec) * mat_csi;
-      if (kUseInverseForZF) {
-        try {
+      arma::cx_fmat mat_dl_csi = inv(arma::diagmat(calib_sc_vec)) * mat_csi;
+      switch (cfg_->BeamformingAlgo()) {
+        case CommsLib::BeamformingAlgorithm::kZF:
+          if (kUseInverseForZF) {
+            try {
+              mat_dl_beam_tmp =
+                  arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
+            } catch (std::runtime_error&) {
+              AGORA_LOG_WARN(
+                  "Failed to invert channel matrix, falling back to pinv()\n");
+              arma::pinv(mat_dl_beam_tmp, mat_csi, 1e-2, "dc");
+            }
+          } else {
+            arma::pinv(mat_dl_beam_tmp, mat_csi, 1e-2, "dc");
+          }
+          break;
+        case CommsLib::BeamformingAlgorithm::kMMSE:
           mat_dl_beam_tmp =
-              arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi) * mat_dl_csi.t();
-        } catch (std::runtime_error&) {
-          arma::pinv(mat_dl_beam_tmp, mat_dl_csi, 1e-2, "dc");
-        }
-      } else {
-        arma::pinv(mat_dl_beam_tmp, mat_dl_csi, 1e-2, "dc");
+              arma::inv_sympd(mat_dl_csi.t() * mat_dl_csi +
+                              noise * arma::eye<arma::cx_fmat>(
+                                          cfg_->UeAntNum(), cfg_->UeAntNum())) *
+              mat_dl_csi.t();
+          break;
+        case CommsLib::BeamformingAlgorithm::kMRC:
+          mat_dl_beam_tmp = mat_dl_csi.t();
+          break;
+        default:
+          AGORA_LOG_ERROR("Beamforming algorithm is not implemented!");
       }
     }
     // We should be scaling the beamforming matrix, so the IFFT
