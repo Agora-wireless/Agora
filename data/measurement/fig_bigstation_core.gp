@@ -46,12 +46,12 @@ set key outside above font 'Times-Roman,10' maxrows 1
 # set mxtics 1
 # set mytics 1
 set style fill pattern border -1
-set arrow from graph 0,first 28 to graph 1,first 28 nohead dashtype 17 lc "red" front
-set arrow from graph 0,first 56 to graph 1,first 56 nohead dashtype 17 lc "red" front
-set arrow from graph 0,first 84 to graph 1,first 84 nohead dashtype 17 lc "red" front
-set label "1 server" at 6.3, 22 font 'Times-Roman,10'
-set label "2 servers" at 6.3, 50 font 'Times-Roman,10'
-set label "3 servers" at 6.3, 76 font 'Times-Roman,10'
+set arrow from graph 0,first 29 to graph 1,first 29 nohead dashtype 17 lc "red" front
+set arrow from graph 0,first 58 to graph 1,first 58 nohead dashtype 17 lc "red" front
+set arrow from graph 0,first 87 to graph 1,first 87 nohead dashtype 17 lc "red" front
+set label "1 server" at 6.3, 23 font 'Times-Roman,10'
+set label "2 servers" at 6.3, 52 font 'Times-Roman,10'
+set label "3 servers" at 6.3, 79 font 'Times-Roman,10'
 plot 'fig_bigstation_core.txt' using 2:xtic(1) title "Hydra-UL" linecolor rgb "#2B8CBE" lw 1.5 fs pattern 0, '' using 0:2:2 with labels notitle offset -2.5,0.6 font 'Times-Roman,10', \
 	'fig_bigstation_core.txt' using ($3>=8?$3/1.:1/0) title "BigStation-UL" linecolor rgb "#2B8CBE" lw 1.5 fs pattern 4, '' using 0:($3>=8?$3/1.:1/0):($3>=8?$3/1.:1/0) with labels notitle offset -0.8,0.6 font 'Times-Roman,10', \
 	'fig_bigstation_core.txt' using ($4>=8?$4/1.:1/0) title "Hydra-DL" linecolor rgb "#2B8CBE" lw 1.5 fs pattern 2, '' using 0:($4>=8?$4/1.:1/0):($4>=8?$4/1.:1/0) with labels notitle offset 0.8,0.6 font 'Times-Roman,10', \
