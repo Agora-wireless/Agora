@@ -117,6 +117,13 @@ void DoFFT::StartWork()
         }
     }
 
+    if (cfg_->error) {
+        size_t cur_symbol = cur_idx_ / cfg_->get_num_ant_to_process();
+        size_t cur_ant = cur_idx_ % cfg_->get_num_ant_to_process() + cfg_->ant_start;
+        printf("DoFFT Thread %d error traceback: fft (frame %zu, symbol %zu, ant %zu), recvd packets done %d\n", tid_, 
+            cur_frame_, cur_symbol, cur_ant, shared_state_->received_all_time_iq_pkts(cur_frame_, cur_symbol));
+    }
+
     size_t whole_duration = rdtsc() - start_tsc;
     size_t idle_duration = whole_duration - work_tsc_duration;
     printf("DoFFT Thread %d duration stats: total time used %.2lfms, "

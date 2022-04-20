@@ -4,7 +4,7 @@
  * running different components in massive MIMO baseband processing.
  */
 
-#include "comms-lib.h"
+// #include "comms-lib.h"
 #include "config.hpp"
 #include "control.hpp"
 #include "logger.h"
@@ -12,7 +12,7 @@
 #include "modulation.hpp"
 #include "utils_ldpc.hpp"
 #include "phy_ldpc_decoder_5gnr.h"
-#include "util.h"
+#include "utils.h"
 #include <armadillo>
 #include <bitset>
 #include <fstream>
@@ -510,11 +510,13 @@ void run_precode(Table<int8_t>& input, complex_float* output,
     }
 }
 
-void test_csi(int tid, Config* cfg, double freq_ghz, Table<complex_float>& csi_buffer, 
-    Table<complex_float>& rx_data_all_symbols)
+void test_csi(int tid, Config* cfg, double freq_ghz, Table<complex_float>* p_csi_buffer, 
+    Table<complex_float>* p_rx_data_all_symbols)
 {
+    Table<complex_float>& csi_buffer = *p_csi_buffer;
+    Table<complex_float>& rx_data_all_symbols = *p_rx_data_all_symbols;
     pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, 3, 
-        tid, true, true, cfg->phy_core_num);
+        tid, false, true, cfg->phy_core_num);
     size_t sc_start = tid == 0 ? 0 : cfg->OFDM_DATA_NUM / 2;
     size_t sc_end = tid == 0 ? cfg->OFDM_DATA_NUM / 2 : cfg->OFDM_DATA_NUM;
     size_t start_tsc = rdtsc();
@@ -530,11 +532,14 @@ void test_csi(int tid, Config* cfg, double freq_ghz, Table<complex_float>& csi_b
         1000000000.0f / ((double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / 2 / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
 }
 
-void test_zf(int tid, Config* cfg, double freq_ghz, Table<complex_float>& csi_buffer, 
-    Table<complex_float>& ul_zf_matrices, Table<complex_float>& dl_zf_matrices)
+void test_zf(int tid, Config* cfg, double freq_ghz, Table<complex_float>* p_csi_buffer, 
+    Table<complex_float>* p_ul_zf_matrices, Table<complex_float>* p_dl_zf_matrices)
 {
+    Table<complex_float>& csi_buffer = *p_csi_buffer;
+    Table<complex_float>& ul_zf_matrices = *p_ul_zf_matrices;
+    Table<complex_float>& dl_zf_matrices = *p_dl_zf_matrices;
     pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, 3, 
-        tid, true, true, cfg->phy_core_num);
+        tid, false, true, cfg->phy_core_num);
     size_t sc_start = tid == 0 ? 0 : cfg->OFDM_DATA_NUM / 2;
     size_t sc_end = tid == 0 ? cfg->OFDM_DATA_NUM / 2 : cfg->OFDM_DATA_NUM;
     complex_float* csi_gather_buffer = reinterpret_cast<complex_float*>(
@@ -547,18 +552,20 @@ void test_zf(int tid, Config* cfg, double freq_ghz, Table<complex_float>& csi_bu
     }
     size_t end_tsc = rdtsc();
     free(csi_gather_buffer);
-    csi_buffer.free();
     double zf_res = 1000000.0f / ((double)kZFIterations * 1000000.0f * cfg->OFDM_DATA_NUM / 2 / cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz));
     printf("%lf times/sec (%lf us each matrix inversion)\n", 
         (double)kZFIterations * 1000000.0f * cfg->OFDM_DATA_NUM / 2 / cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz),
         1000000.0f / ((double)kZFIterations * 1000000.0f * cfg->OFDM_DATA_NUM / 2 / cfg->UE_NUM / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
 }
 
-void test_demul(int tid, Config* cfg, double freq_ghz, Table<complex_float>& ul_zf_matrices,
-    Table<int8_t>& demod_buffer, Table<complex_float>& rx_data_all_symbols)
+void test_demul(int tid, Config* cfg, double freq_ghz, Table<complex_float>* p_ul_zf_matrices,
+    Table<int8_t>* p_demod_buffer, Table<complex_float>* p_rx_data_all_symbols)
 {
+    Table<complex_float>& ul_zf_matrices = *p_ul_zf_matrices;
+    Table<int8_t>& demod_buffer = *p_demod_buffer;
+    Table<complex_float>& rx_data_all_symbols = *p_rx_data_all_symbols;
     pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, 3, 
-        tid, true, true, cfg->phy_core_num);
+        tid, false, true, cfg->phy_core_num);
     complex_float* data_gather_buffer = reinterpret_cast<complex_float*>(
         memalign(64, cfg->OFDM_DATA_NUM * kMaxAntennas * sizeof(complex_float)));
     complex_float* equaled_buffer_temp = reinterpret_cast<complex_float*>(
@@ -593,8 +600,6 @@ void test_demul(int tid, Config* cfg, double freq_ghz, Table<complex_float>& ul_
         }
     }
     size_t end_tsc = rdtsc();
-    rx_data_all_symbols.free();
-    ul_zf_matrices.free();
     free(data_gather_buffer);
     free(equaled_buffer_temp);
     free(equaled_buffer_temp_transposed);
@@ -604,11 +609,13 @@ void test_demul(int tid, Config* cfg, double freq_ghz, Table<complex_float>& ul_
         1000000000.0f / ((double)kNumIterations * 1000000.0f * cfg->OFDM_DATA_NUM / 2 / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
 }
 
-void test_decode(int tid, Config* cfg, double freq_ghz, Table<int8_t>& demod_buffer,
-    Table<int8_t>& decoded_buffer)
+void test_decode(int tid, Config* cfg, double freq_ghz, Table<int8_t>* p_demod_buffer,
+    Table<int8_t>* p_decoded_buffer)
 {
+    Table<int8_t>& demod_buffer = *p_demod_buffer;
+    Table<int8_t>& decoded_buffer = *p_decoded_buffer;
     pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, 3, 
-        tid, true, true, cfg->phy_core_num);
+        tid, false, true, cfg->phy_core_num);
     size_t ue_start = tid == 0 ? 0 : cfg->UE_NUM / 2;
     size_t ue_end = tid == 0 ? cfg->UE_NUM / 2 : cfg->UE_NUM;
     int16_t* resp_var_nodes = (int16_t*)memalign(64, 1024 * 1024 * sizeof(int16_t));
@@ -620,18 +627,19 @@ void test_decode(int tid, Config* cfg, double freq_ghz, Table<int8_t>& demod_buf
     }
     size_t end_tsc = rdtsc();
     free(resp_var_nodes);
-    demod_buffer.free();
     double decode_res = 1000000.0f / ((double)kNumIterations * 1000000.0f * cfg->UE_NUM / 2 / cycles_to_us(end_tsc - start_tsc, freq_ghz));
     printf("%lf users/sec (%lf us/user)\n", 
         (double)kNumIterations * 1000000.0f * cfg->UE_NUM / 2 / cycles_to_us(end_tsc - start_tsc, freq_ghz),
         1000000.0f / ((double)kNumIterations * 1000000.0f * cfg->UE_NUM / 2 / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
 }
 
-void test_encode(int tid, Config* cfg, double freq_ghz, Table<int8_t>& decoded_buffer,
-    Table<int8_t>& encoded_buffer)
+void test_encode(int tid, Config* cfg, double freq_ghz, Table<int8_t>* p_decoded_buffer,
+    Table<int8_t>* p_encoded_buffer)
 {
+    Table<int8_t>& decoded_buffer = *p_decoded_buffer;
+    Table<int8_t>& encoded_buffer = *p_encoded_buffer;
     pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, 3, 
-        tid, true, true, cfg->phy_core_num);
+        tid, false, true, cfg->phy_core_num);
     size_t ue_start = tid == 0 ? 0 : cfg->UE_NUM / 2;
     size_t ue_end = tid == 0 ? cfg->UE_NUM / 2 : cfg->UE_NUM;
     int8_t* encoded_buffer_temp = (int8_t*)memalign(64, 32768);
@@ -645,20 +653,24 @@ void test_encode(int tid, Config* cfg, double freq_ghz, Table<int8_t>& decoded_b
     size_t end_tsc = rdtsc();
     free(encoded_buffer_temp);
     free(parity_buffer);
-    decoded_buffer.free();
     double encode_res = 1000000.0f / ((double)kNumIterations * 1000000.0f * cfg->UE_NUM / 2 / cycles_to_us(end_tsc - start_tsc, freq_ghz));
     printf("%lf users/sec (%lf us/user)\n", 
         (double)kNumIterations * 1000000.0f * cfg->UE_NUM / 2 / cycles_to_us(end_tsc - start_tsc, freq_ghz),
         1000000.0f / ((double)kNumIterations * 1000000.0f * cfg->UE_NUM / 2 / cycles_to_us(end_tsc - start_tsc, freq_ghz)));
 }
 
-void test_precode(int tid, Config* cfg, double freq_ghz, Table<int8_t>& encoded_buffer,
-    Table<complex_float>& dl_zf_matrices, Table<complex_float>& tx_data_all_symbols_precode)
+void test_precode(int tid, Config* cfg, double freq_ghz, Table<int8_t>* p_encoded_buffer,
+    Table<complex_float>* p_dl_zf_matrices, Table<complex_float>* p_tx_data_all_symbols_precode)
 {
+    Table<int8_t>& encoded_buffer = *p_encoded_buffer;
+    Table<complex_float>& dl_zf_matrices = *p_dl_zf_matrices;
+    Table<complex_float>& tx_data_all_symbols_precode = *p_tx_data_all_symbols_precode;
     pin_to_core_with_offset(ThreadType::kWorkerSubcarrier, 3, 
-        tid, true, true, cfg->phy_core_num);
+        tid, false, true, cfg->phy_core_num);
     void* jitter[kMaxUEs];
     cgemm_jit_kernel_t mkl_jit_cgemm[kMaxUEs];
+    MKL_Complex8 alpha = { 1, 0 };
+    MKL_Complex8 beta = { 0, 0 };
     complex_float* modulated_buffer_temp;
     alloc_buffer_1d(&modulated_buffer_temp, cfg->UE_NUM, 64, 0);
     complex_float* precoded_buffer_temp;
@@ -828,8 +840,8 @@ int main(int argc, char **argv)
     csi_buffer.calloc(cfg->UE_NUM, cfg->OFDM_DATA_NUM * cfg->BS_ANT_NUM, 64);
 
     std::thread csi_threads[2];
-    csi_threads[0] = std::thread(&test_csi, 0, cfg, freq_ghz, csi_buffer, rx_data_all_symbols);
-    csi_threads[1] = std::thread(&test_csi, 1, cfg, freq_ghz, csi_buffer, rx_data_all_symbols);
+    csi_threads[0] = std::thread(test_csi, 0, cfg, freq_ghz, &csi_buffer, &rx_data_all_symbols);
+    csi_threads[1] = std::thread(test_csi, 1, cfg, freq_ghz, &csi_buffer, &rx_data_all_symbols);
     csi_threads[0].join();
     csi_threads[1].join();
 
@@ -840,48 +852,53 @@ int main(int argc, char **argv)
     dl_zf_matrices.calloc(cfg->OFDM_DATA_NUM, cfg->UE_NUM * cfg->BS_ANT_NUM, 64);
 
     std::thread zf_threads[2];
-    zf_threads[0] = std::thread(&test_zf, 0, cfg, freq_ghz, csi_buffer, ul_zf_matrices, dl_zf_matrices);
-    zf_threads[1] = std::thread(&test_zf, 1, cfg, freq_ghz, csi_buffer, ul_zf_matrices, dl_zf_matrices);
+    zf_threads[0] = std::thread(test_zf, 0, cfg, freq_ghz, &csi_buffer, &ul_zf_matrices, &dl_zf_matrices);
+    zf_threads[1] = std::thread(test_zf, 1, cfg, freq_ghz, &csi_buffer, &ul_zf_matrices, &dl_zf_matrices);
     zf_threads[0].join();
     zf_threads[1].join();
+    csi_buffer.free();
 
     printf("Running Demul: ");    
     Table<int8_t> demod_buffer;
     demod_buffer.calloc(cfg->UE_NUM, kMaxModType * cfg->OFDM_DATA_NUM, 64);
 
     std::thread demul_threads[2];
-    demul_threads[0] = std::thread(&test_demul, 0, cfg, freq_ghz, ul_zf_matrices, demod_buffer, rx_data_all_symbols);
-    demul_threads[1] = std::thread(&test_demul, 1, cfg, freq_ghz, ul_zf_matrices, demod_buffer, rx_data_all_symbols);
+    demul_threads[0] = std::thread(test_demul, 0, cfg, freq_ghz, &ul_zf_matrices, &demod_buffer, &rx_data_all_symbols);
+    demul_threads[1] = std::thread(test_demul, 1, cfg, freq_ghz, &ul_zf_matrices, &demod_buffer, &rx_data_all_symbols);
     demul_threads[0].join();
     demul_threads[1].join();
+    rx_data_all_symbols.free();
+    ul_zf_matrices.free();
 
     printf("Running Decode: ");
     Table<int8_t> decoded_buffer;
     decoded_buffer.calloc(cfg->UE_NUM, roundup<64>(cfg->num_bytes_per_cb), 64);
 
     std::thread decode_threads[2];
-    decode_threads[0] = std::thread(&test_decode, 0, cfg, freq_ghz, demod_buffer, decoded_buffer);
-    decode_threads[1] = std::thread(&test_decode, 1, cfg, freq_ghz, demod_buffer, decoded_buffer);
+    decode_threads[0] = std::thread(test_decode, 0, cfg, freq_ghz, &demod_buffer, &decoded_buffer);
+    decode_threads[1] = std::thread(test_decode, 1, cfg, freq_ghz, &demod_buffer, &decoded_buffer);
     decode_threads[0].join();
     decode_threads[1].join();
+    demod_buffer.free();
 
     printf("Running Encode: ");
     Table<int8_t> encoded_buffer;
     encoded_buffer.calloc(cfg->UE_NUM, 32768, 64);
     
     std::thread encode_threads[2];
-    encode_threads[0] = std::thread(&test_encode, 0, cfg, freq_ghz, decoded_buffer, encoded_buffer);
-    encode_threads[1] = std::thread(&test_encode, 1, cfg, freq_ghz, decoded_buffer, encoded_buffer);
+    encode_threads[0] = std::thread(test_encode, 0, cfg, freq_ghz, &decoded_buffer, &encoded_buffer);
+    encode_threads[1] = std::thread(test_encode, 1, cfg, freq_ghz, &decoded_buffer, &encoded_buffer);
     encode_threads[0].join();
     encode_threads[1].join();
+    decoded_buffer.free();
 
     printf("Running Precode: ");
     Table<complex_float> tx_data_all_symbols_precode;
     tx_data_all_symbols_precode.calloc(1, cfg->OFDM_CA_NUM * cfg->BS_ANT_NUM, 64);
     
     std::thread precode_threads[2];
-    precode_threads[0] = std::thread(&test_precode, 0, cfg, freq_ghz, encoded_buffer, dl_zf_matrices, tx_data_all_symbols_precode);
-    precode_threads[1] = std::thread(&test_precode, 1, cfg, freq_ghz, encoded_buffer, dl_zf_matrices, tx_data_all_symbols_precode);
+    precode_threads[0] = std::thread(test_precode, 0, cfg, freq_ghz, &encoded_buffer, &dl_zf_matrices, &tx_data_all_symbols_precode);
+    precode_threads[1] = std::thread(test_precode, 1, cfg, freq_ghz, &encoded_buffer, &dl_zf_matrices, &tx_data_all_symbols_precode);
     precode_threads[0].join();
     precode_threads[1].join();
 

@@ -27,7 +27,7 @@ set size 1, 0.4
 
 red = "#FF0000"; green = "#00FF00"; blue = "#0000FF"; skyblue = "#87CEEB";
 c1 = "#eff3ff"; c2 = "#bdd7e7"; c3 = "#6baed6"; c4 = "#2171b5"; 
-set yrange [0:160]
+set yrange [0:100]
 set style data histogram
 set style histogram cluster gap 1
 set style fill solid
@@ -36,8 +36,8 @@ set xtics format ""
 set grid ytics
 set offset -1,0,0,0
 
-set xtics font ', 10'
-set ytics font ', 10'
+set xtics font ', 12'
+set ytics font ', 12'
 # set xlabel 'Settings' font 'Times-Roman,20'
 set ylabel 'Minimum core usage' font 'Times-Roman,10'
 set key outside above font 'Times-Roman,10' maxrows 1
@@ -49,14 +49,10 @@ set style fill pattern border -1
 set arrow from graph 0,first 28 to graph 1,first 28 nohead dashtype 17 lc "red" front
 set arrow from graph 0,first 56 to graph 1,first 56 nohead dashtype 17 lc "red" front
 set arrow from graph 0,first 84 to graph 1,first 84 nohead dashtype 17 lc "red" front
-set arrow from graph 0,first 112 to graph 1,first 112 nohead dashtype 17 lc "red" front
-set arrow from graph 0,first 140 to graph 1,first 140 nohead dashtype 17 lc "red" front
-set label "1 server" at 8.3, 22 font 'Times-Roman,8'
-set label "2 servers" at 8.3, 51 font 'Times-Roman,8'
-set label "3 servers" at 8.3, 80 font 'Times-Roman,8'
-set label "4 servers" at 8.3, 109 font 'Times-Roman,8'
-set label "5 servers" at 8.3, 138 font 'Times-Roman,8'
-plot 'fig_bigstation_core.txt' using 2:xtic(1) title "Hydra-UL" linecolor rgb "black" lw 1.5 fs pattern 0, '' using 0:2:2 with labels notitle offset -2.0,0.4 font 'Times-Roman,9', \
-	'fig_bigstation_core.txt' using ($3>=8?$3/1.:1/0) title "BigStation-UL" linecolor rgb "black" lw 1.5 fs pattern 4, '' using 0:($3>=8?$3/1.:1/0):($3>=8?$3/1.:1/0) with labels notitle offset -0.6,0.4 font 'Times-Roman,9', \
-	'fig_bigstation_core.txt' using ($4>=8?$4/1.:1/0) title "Hydra-DL" linecolor rgb "black" lw 1.5 fs pattern 2, '' using 0:($4>=8?$4/1.:1/0):($4>=8?$4/1.:1/0) with labels notitle offset 0.6,0.5 font 'Times-Roman,9', \
-	'fig_bigstation_core.txt' using ($5>=8?$5/1.:1/0) title "BigStation-DL" linecolor rgb "black" lw 1.5 fs pattern 3, '' using 0:($5>=8?$5/1.:1/0):($5>=8?$5/1.:1/0) with labels notitle offset 2.0,0.4 font 'Times-Roman,9'
+set label "1 server" at 6.3, 22 font 'Times-Roman,10'
+set label "2 servers" at 6.3, 50 font 'Times-Roman,10'
+set label "3 servers" at 6.3, 76 font 'Times-Roman,10'
+plot 'fig_bigstation_core.txt' using 2:xtic(1) title "Hydra-UL" linecolor rgb "black" lw 1.5 fs pattern 0, '' using 0:2:2 with labels notitle offset -2.5,0.6 font 'Times-Roman,10', \
+	'fig_bigstation_core.txt' using ($3>=8?$3/1.:1/0) title "BigStation-UL" linecolor rgb "black" lw 1.5 fs pattern 4, '' using 0:($3>=8?$3/1.:1/0):($3>=8?$3/1.:1/0) with labels notitle offset -0.8,0.6 font 'Times-Roman,10', \
+	'fig_bigstation_core.txt' using ($4>=8?$4/1.:1/0) title "Hydra-DL" linecolor rgb "black" lw 1.5 fs pattern 2, '' using 0:($4>=8?$4/1.:1/0):($4>=8?$4/1.:1/0) with labels notitle offset 0.8,0.6 font 'Times-Roman,10', \
+	'fig_bigstation_core.txt' using ($5>=8?$5/1.:1/0) title "BigStation-DL" linecolor rgb "black" lw 1.5 fs pattern 3, '' using 0:($5>=8?$5/1.:1/0):($5>=8?$5/1.:1/0) with labels notitle offset 2.5,0.6 font 'Times-Roman,10'
