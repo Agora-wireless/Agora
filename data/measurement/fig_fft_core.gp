@@ -26,7 +26,7 @@ set border 3 ls 501
 
 red = "#FF0000"; green = "#00FF00"; blue = "#0000FF"; skyblue = "#87CEEB";
 c1 = "#2B8CBE"; c2 = "#A6BDDB"; c3 = "#ECE7F2";
-set yrange [0:90]
+set yrange [0:75]
 set style data histogram
 set style histogram cluster gap 1
 set style fill solid
