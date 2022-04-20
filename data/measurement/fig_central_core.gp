@@ -26,7 +26,7 @@ set border 3 ls 501
 
 red = "#FF0000"; green = "#00FF00"; blue = "#0000FF"; skyblue = "#87CEEB";
 c1 = "#2B8CBE"; c2 = "#A6BDDB"; c3 = "#ECE7F2";
-set yrange [0:120]
+set yrange [0:90]
 set style data histogram
 set style histogram cluster gap 1
 set style fill solid
@@ -39,7 +39,7 @@ set xtics font ', 20'
 set ytics font ', 20'
 # set xlabel 'Settings' font 'Times-Roman,20'
 set ylabel 'Minimum core usage' font 'Times-Roman,20'
-set key top right font 'Times-Roman,20' 
+set key outside above right font 'Times-Roman,20' maxrows 1
 # set key off
 # set grid xtics ytics mxtics mytics
 # set mxtics 1
