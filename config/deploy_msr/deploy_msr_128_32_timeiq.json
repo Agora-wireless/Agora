@@ -3,23 +3,28 @@
     "roce84"
   ],
   "hydra_servers": [
+    "roce95",
     "roce94",
-    "roce95"
+    "roce83"
   ],
   "fft_thread_num": [
-    8,
-    8
+    12,
+    12,
+    12
   ],
   "subcarrier_num_list": [
-    608,
-    592
+    416,
+    416,
+    384
   ],
   "subcarrier_block_list": [
-    48,
-    48
+    24,
+    24,
+    24
   ],
   "coding_thread_num": [
-    16,
-    16
+    10,
+    10,
+    10
   ]
 }
