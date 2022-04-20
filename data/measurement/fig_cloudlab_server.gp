@@ -35,15 +35,15 @@ set xtics format ""
 set grid ytics
 set offset -1,0,0,0
 
-set xtics font ', 18'
-set ytics font ', 20'
+set xtics font ', 15'
+set ytics font ', 16'
 # set xlabel 'Settings' font 'Times-Roman,20'
 set ylabel 'Minimum server usage' font 'Times-Roman,20'
-set key top right font 'Times-Roman,20' maxrows 1
+set key outside above font 'Times-Roman,20' maxrows 1
 # set key off
 # set grid xtics ytics mxtics mytics
 # set mxtics 1
 # set mytics 1
 set style fill solid border -1
-plot 'fig_cloudlab_server.txt' using 2:xtic(1) title "Uplink" linecolor rgb c1 lw 1.5, '' using 0:2:2 with labels notitle offset -1.8,1 font 'Times-Roman,20', \
-	'fig_cloudlab_server.txt' using 3 title "Downlink" linecolor rgb c3 lw 1.5, '' using 0:3:3 with labels notitle offset 1.8,1 font 'Times-Roman,20'
+plot 'fig_cloudlab_server.txt' using 2:xtic(1) title "Uplink" linecolor "white" lw 1.5, '' using 0:2:2 with labels notitle offset -1.8,1 font 'Times-Roman,12', \
+	'fig_cloudlab_server.txt' using 3 title "Downlink" linecolor "black" lw 1.5, '' using 0:3:3 with labels notitle offset 1.8,1 font 'Times-Roman,12'
