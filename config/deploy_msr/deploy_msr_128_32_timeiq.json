@@ -1,6 +1,7 @@
 {
   "rru_servers": [
-    "roce84"
+    "roce84",
+    "roce93"
   ],
   "hydra_servers": [
     "roce95",
