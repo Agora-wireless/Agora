@@ -3,7 +3,8 @@
     "roce84"
   ],
   "hydra_servers": [
-    "roce94"
+    "roce94",
+    "roce95"
   ],
   "fft_thread_num": [
     8,
