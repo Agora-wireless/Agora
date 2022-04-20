@@ -1,5 +1,6 @@
 set terminal pdfcairo
 set output 'fig_core_user.pdf'
+set size ratio 0.3
 set style line 1 \
 	linecolor rgb '#a00000' \
 	linetype 1 linewidth 2
@@ -23,8 +24,8 @@ set yr [0:]
 set xtics 0,8,56 font ', 20'
 set ytics font ', 20'
 set xlabel '# users' font 'Times-Roman,20'
-set ylabel '# cores' font 'Times-Roman,20'
-set key outside above font 'Times-Roman,20'
+set ylabel 'Cores required' font 'Times-Roman,20'
+set key top left font 'Times-Roman,20'
 set grid xtics ytics mxtics mytics
 set mxtics 1
 set mytics 1

@@ -1,7 +1,8 @@
 set terminal pdfcairo size 5, 3
-set size 1, 1
+# set size 1, 1
 set lmargin 10
 set output 'fig_cdf_latency.pdf'
+set size ratio 0.4
 set style line 1 \
 	linecolor rgb '#a00000' \
 	linetype 1 linewidth 2
@@ -36,7 +37,7 @@ set yrange [ 0.00001 : 1.0 ]
 set ytics nolog
 set style line 501 lt 1 lc rgb "#000000" lw 2
 set border 3 ls 501
-set label "99.99th latency" at 0.1, 0.00006 font 'Times-Roman,20'
+set label "99.99th latency" at 0.1, 0.00005 font 'Times-Roman,20'
 # plot 'fig_cdf_latency.txt' using ($1/1.):($2/1.) title '64×8' with lines linestyle 1 dt 1, \
 # 	'fig_cdf_latency.txt' using ($1/1.):($4/1.) title '64×16' with lines linestyle 2 dt 2, \
 #     'fig_cdf_latency.txt' using ($1/1.):($6/1.) title '64×32' with lines linestyle 3 dt 3 lw 7, \

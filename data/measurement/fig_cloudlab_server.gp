@@ -1,5 +1,6 @@
 set terminal pdfcairo
 set output 'fig_cloudlab_server.pdf'
+set size ratio 0.4
 set style line 1 \
 	linecolor rgb '#a00000' \
 	linetype 1 linewidth 2
@@ -26,7 +27,7 @@ set border 3 ls 501
 
 red = "#FF0000"; green = "#00FF00"; blue = "#0000FF"; skyblue = "#87CEEB";
 c1 = "#2B8CBE"; c2 = "#A6BDDB"; c3 = "#ECE7F2";
-set yrange [0:20]
+set yrange [0:25]
 set style data histogram
 set style histogram cluster gap 1
 set style fill solid
@@ -38,8 +39,8 @@ set offset -1,0,0,0
 set xtics font ', 18'
 set ytics font ', 20'
 # set xlabel 'Settings' font 'Times-Roman,20'
-set ylabel 'Minimum server usage' font 'Times-Roman,20'
-set key outside above font 'Times-Roman,20' maxrows 1
+set ylabel 'Servers required' font 'Times-Roman,20'
+set key top left font 'Times-Roman,20' maxrows 1
 # set key off
 # set grid xtics ytics mxtics mytics
 # set mxtics 1

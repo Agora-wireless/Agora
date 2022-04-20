@@ -39,7 +39,7 @@ set offset -1,0,0,0
 set xtics font ', 12'
 set ytics font ', 12'
 # set xlabel 'Settings' font 'Times-Roman,20'
-set ylabel 'Minimum core usage' font 'Times-Roman,10'
+set ylabel 'Cores required' font 'Times-Roman,10'
 set key outside above font 'Times-Roman,10' maxrows 1
 # set key off
 # set grid xtics ytics mxtics mytics

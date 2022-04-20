@@ -1,5 +1,6 @@
 set terminal pdfcairo
 set output 'fig_fft_latency.pdf'
+set size ratio 0.4
 set style line 1 \
 	linecolor rgb '#a00000' \
 	linetype 1 linewidth 2
@@ -39,7 +40,8 @@ set xtics font ', 20'
 set ytics font ', 20'
 # set xlabel 'Settings' font 'Times-Roman,20'
 set ylabel '99.99-th latency (ms)' font 'Times-Roman,20'
-set key top right font 'Times-Roman,20'
+set key top left font 'Times-Roman,20'
+set key reverse Left
 # set key off
 # set grid xtics ytics mxtics mytics
 # set mxtics 1
