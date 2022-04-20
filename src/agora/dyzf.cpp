@@ -63,6 +63,7 @@ void DyZF::computePrecoder(const arma::cx_fmat& mat_csi,
             // std::cout << mat_csi << std::endl;
             // rt_assert(false);
             // arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
+            return;
         }
     } else {
         arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
