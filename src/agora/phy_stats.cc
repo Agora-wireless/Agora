@@ -299,11 +299,11 @@ void PhyStats::UpdateDlPilotSnr(size_t frame_id, size_t symbol_id,
       10.0f * std::log10(snr);
 }
 
-void PhyStats::PrintZfStats(size_t frame_id) {
+void PhyStats::PrintBeamStats(size_t frame_id) {
   const size_t frame_slot = frame_id % kFrameWnd;
   std::stringstream ss;
   ss << "Frame " << frame_id
-     << " ZF matrix inverse condition number range: " << std::fixed
+     << " Beamweight matrix inverse condition number range: " << std::fixed
      << std::setw(5) << std::setprecision(2);
   arma::fvec cond_vec(csi_cond_[frame_slot], config_->OfdmDataNum(), false);
   float max_cond = 0;

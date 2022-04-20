@@ -25,7 +25,7 @@ constexpr size_t kBERSER = 2;
 constexpr size_t kCsvLogs = 3;
 constexpr size_t kMatIdStart = kCsvLogs;
 constexpr size_t kMatCSI = 0;
-constexpr size_t kMatDLZF = 1;
+constexpr size_t kMatDlBeam = 1;
 constexpr size_t kMatLogs = 2;
 constexpr size_t kAllLogs = kCsvLogs + kMatLogs;
 

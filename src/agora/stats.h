@@ -40,7 +40,7 @@ enum class TsType : size_t {
   kPilotAllRX,         // All pilot packets received
   kRCAllRX,            // All Reciprocity Calibration Symbols received
   kFFTPilotsDone,      // Completed FFT for all pilots in this frame
-  kZFDone,             // Completed zeroforcing for this frame
+  kBeamDone,           // Completed zeroforcing for this frame
   kDemulDone,          // Completed demodulation for this frame
   kRXDone,             // All packets of a frame received
   kRCDone,             // Recirocity Calibration Computation done
@@ -188,7 +188,7 @@ class Stats {
 
   const size_t task_thread_num_;
   const size_t fft_thread_num_;
-  const size_t zf_thread_num_;
+  const size_t beam_thread_num_;
   const size_t demul_thread_num_;
   const size_t decode_thread_num_;
   const size_t break_down_num_ = kMaxStatBreakdown;

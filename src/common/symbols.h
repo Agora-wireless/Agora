@@ -42,7 +42,7 @@ enum class Direction : int { kDownlink, kUplink };
 enum class EventType : int {
   kPacketRX,
   kFFT,
-  kZF,
+  kBeam,
   kDemul,
   kIFFT,
   kPrecode,
@@ -66,7 +66,7 @@ static constexpr size_t kNumEventTypes =
 enum class DoerType : size_t {
   kFFT,
   kCSI,
-  kZF,
+  kBeam,
   kDemul,
   kDecode,
   kEncode,
@@ -76,7 +76,7 @@ enum class DoerType : size_t {
 };
 
 static constexpr std::array<DoerType, (static_cast<size_t>(DoerType::kRC) + 1)>
-    kAllDoerTypes = {DoerType::kFFT,   DoerType::kCSI,     DoerType::kZF,
+    kAllDoerTypes = {DoerType::kFFT,   DoerType::kCSI,     DoerType::kBeam,
                      DoerType::kDemul, DoerType::kDecode,  DoerType::kEncode,
                      DoerType::kIFFT,  DoerType::kPrecode, DoerType::kRC};
 static constexpr size_t kNumDoerTypes = kAllDoerTypes.size();
@@ -84,7 +84,7 @@ static constexpr size_t kNumDoerTypes = kAllDoerTypes.size();
 static const std::map<DoerType, std::string> kDoerNames = {
     {DoerType::kFFT, std::string("FFT")},
     {DoerType::kCSI, std::string("CSI")},
-    {DoerType::kZF, std::string("ZF")},
+    {DoerType::kBeam, std::string("Beamweights")},
     {DoerType::kDemul, std::string("Demul")},
     {DoerType::kDecode, std::string("Decode")},
     {DoerType::kEncode, std::string("Encode")},
@@ -98,7 +98,7 @@ enum class PrintType : int {
   kFFTPilots,
   kFFTData,
   kFFTCal,
-  kZF,
+  kBeam,
   kDemul,
   kIFFT,
   kPrecode,
@@ -170,7 +170,7 @@ static constexpr bool kUplinkHardDemod = false;
 static constexpr bool kExportConstellation = false;
 static constexpr bool kPrintPhyStats = true;
 static constexpr bool kCollectPhyStats = true;
-static constexpr bool kPrintZfStats = true;
+static constexpr bool kPrintBeamStats = true;
 
 static constexpr bool kStatsPrintFrameSummary = true;
 static constexpr bool kDebugPrintPerFrameDone = true;
@@ -194,7 +194,7 @@ enum class ThreadType {
   kMaster,
   kWorker,
   kWorkerFFT,
-  kWorkerZF,
+  kWorkerBeam,
   kWorkerDemul,
   kWorkerDecode,
   kWorkerRX,
@@ -213,8 +213,8 @@ static inline std::string ThreadTypeStr(ThreadType thread_type) {
       return "Worker";
     case ThreadType::kWorkerFFT:
       return "Worker (FFT)";
-    case ThreadType::kWorkerZF:
-      return "Worker (ZF)";
+    case ThreadType::kWorkerBeam:
+      return "Worker (Beamweights)";
     case ThreadType::kWorkerDemul:
       return "Worker (Demul)";
     case ThreadType::kWorkerDecode:

@@ -41,7 +41,7 @@ class PhyStats {
                            complex_float* fft_data);
   void PrintCalibSnrStats(size_t frame_id);
   void UpdateCsiCond(size_t frame_id, size_t sc_id, float cond);
-  void PrintZfStats(size_t frame_id);
+  void PrintBeamStats(size_t frame_id);
   float GetNoise(size_t frame_id);
 
  private:
