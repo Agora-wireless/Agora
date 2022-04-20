@@ -317,4 +317,4 @@ add_executable(benchmark_ht
   test/benchmark/benchmark_ht.cpp
   $<TARGET_OBJECTS:agora_sources_lib>
   $<TARGET_OBJECTS:common_sources_lib>)
-target_link_libraries(benchmark ${COMMON_LIBS})
+target_link_libraries(benchmark_ht ${COMMON_LIBS})
