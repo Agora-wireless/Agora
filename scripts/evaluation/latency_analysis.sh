@@ -15,7 +15,7 @@ for (( i=0; i<${hydra_app_num}; i++ )) do
         continue
     fi
     server_name=$(cat ${HYDRA_SERVER_DEPLOY_JSON} | jq --argjson i $i '.hydra_servers[$i]' | tr -d '"')
-    eval "scp ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/data/frame_latency.txt ${hydra_root_dir}/data/frame_latency_$i.txt"
+    eval "scp ${server_name}:${HYDRA_RUNNER_ROOT}/Agora/data/frame_latency.txt ${hydra_root_dir}/data/frame_latency_$j.txt"
     num_lines=$(cat ${hydra_root_dir}/data/frame_latency_$j.txt | wc -l )
     if [ "${num_lines}" != "${slots_to_test}" ]; then
         valid=0
