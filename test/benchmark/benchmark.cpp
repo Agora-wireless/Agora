@@ -283,13 +283,13 @@ void compute_precoder(const arma::cx_fmat& mat_csi, complex_float* _mat_ul_zf,
         arma::pinv(mat_ul_zf, mat_csi, 1e-2, "dc");
     }
 
-    arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
-        cfg->UE_NUM, cfg->BS_ANT_NUM, false);
-    mat_dl_zf = mat_ul_zf;
-    // We should be scaling the beamforming matrix, so the IFFT
-    // output can be scaled with OFDM_CA_NUM across all antennas.
-    // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
-    mat_dl_zf /= abs(mat_dl_zf).max();
+    // arma::cx_fmat mat_dl_zf(reinterpret_cast<arma::cx_float*>(_mat_dl_zf),
+    //     cfg->UE_NUM, cfg->BS_ANT_NUM, false);
+    // mat_dl_zf = mat_ul_zf;
+    // // We should be scaling the beamforming matrix, so the IFFT
+    // // output can be scaled with OFDM_CA_NUM across all antennas.
+    // // See Argos paper (Mobicom 2012) Sec. 3.4 for details.
+    // mat_dl_zf /= abs(mat_dl_zf).max();
 }
 
 void run_zf(Table<complex_float>& csi_buffer, complex_float* csi_gather_buffer, 
