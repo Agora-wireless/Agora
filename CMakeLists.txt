@@ -295,13 +295,14 @@ include_directories(
   src/common/loggers
   src/mac/
   src/agora/
-  src/agora/txrx/
+  src/agora/radio
+  src/agora/txrx
   src/agora/txrx/workers
-  src/client/
+  src/client
   src/client/txrx
   src/client/txrx/workers
-  /usr/include/mkl/
-  src/data_generator)
+  src/data_generator
+  /usr/include/mkl)
 
 include_directories(SYSTEM src/third_party src/third_party/spdlog/include src/third_party/nlohmann/single_include)
 
@@ -353,9 +354,13 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/dodemul.cc
   src/agora/doprecode.cc
   src/agora/dodecode.cc
-  src/agora/radio_lib.cc
-  src/agora/radio_calibrate_digital.cc
-  src/agora/radio_calibrate_analog.cc
+  src/agora/radio/radio_lib.cc
+  src/agora/radio/radio_calibrate_digital.cc
+  src/agora/radio/radio_calibrate_analog.cc
+  src/agora/radio/radio_socket.cc
+  src/agora/radio/radio_data_plane.cc
+  src/agora/radio/radio_data_plane_soapy.cc
+  src/agora/radio/radio_data_plane_socket.cc
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/packet_txrx_radio.cc
@@ -453,10 +458,6 @@ if (USE_ARGOS)
 add_executable(radio_test
     test/radio_test/main.cc
     test/radio_test/radio_lib_mod.cc
-    test/radio_test/radio_socket.cc
-    test/radio_test/radio_data_plane.cc
-    test/radio_test/radio_data_plane_soapy.cc
-    test/radio_test/radio_data_plane_socket.cc
     $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:shared_txrx_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)
