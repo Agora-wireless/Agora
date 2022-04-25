@@ -553,7 +553,7 @@ void RadioConfig::RadioTx(void** buffs) {
 }
 
 int RadioConfig::RadioTx(size_t radio_id, const void* const* buffs, int flags,
-                         long long& frameTime) {
+                         long long& tx_time) {
   static constexpr size_t kTxTimeoutUs = 1000000;
   int tx_flags = 0;
   if (flags == 1) {
@@ -567,10 +567,10 @@ int RadioConfig::RadioTx(size_t radio_id, const void* const* buffs, int flags,
   if (cfg_->HwFramer() == true) {
     w = ba_stn_.at(radio_id)->writeStream(tx_streams_.at(radio_id), buffs,
                                           cfg_->SampsPerSymbol(), tx_flags,
-                                          frameTime, kTxTimeoutUs);
+                                          tx_time, kTxTimeoutUs);
   } else {
     // For UHD device xmit from host using frameTimeNs
-    long long frame_time_ns = SoapySDR::ticksToTimeNs(frameTime, cfg_->Rate());
+    long long frame_time_ns = SoapySDR::ticksToTimeNs(tx_time, cfg_->Rate());
     w = ba_stn_.at(radio_id)->writeStream(tx_streams_.at(radio_id), buffs,
                                           cfg_->SampsPerSymbol(), tx_flags,
                                           frame_time_ns, kTxTimeoutUs);
@@ -579,9 +579,8 @@ int RadioConfig::RadioTx(size_t radio_id, const void* const* buffs, int flags,
     size_t chan_mask;
     long timeout_us(0);
     int status_flag = 0;
-    int s = ba_stn_.at(radio_id)->readStreamStatus(tx_streams_.at(radio_id),
-                                                   chan_mask, status_flag,
-                                                   frameTime, timeout_us);
+    int s = ba_stn_.at(radio_id)->readStreamStatus(
+        tx_streams_.at(radio_id), chan_mask, status_flag, tx_time, timeout_us);
     std::cout << "radio " << radio_id << " tx returned " << w << " and status "
               << s << " when flags was " << flags << std::endl;
   }

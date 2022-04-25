@@ -37,13 +37,6 @@ class ClientRadioConfig {
   void DrainBuffers();
   void Go();
   int Triggers(int i);
-  // static void dciqMinimize(SoapySDR::Device*, SoapySDR::Device*, int,
-  // size_t, double, double); static void setIQBalance(SoapySDR::Device*, int,
-  // size_t, int, int); static void
-  // adjustCalibrationGains(std::vector<SoapySDR::Device*>, SoapySDR::Device*,
-  // size_t, double, bool plot = false); static
-  // std::vector<std::complex<float>> snoopSamples(SoapySDR::Device*, size_t,
-  // size_t); void dciqCalibrationProc(size_t);
   ~ClientRadioConfig();
 
  private:
@@ -51,8 +44,6 @@ class ClientRadioConfig {
 
   const Config* const cfg_;
   std::vector<SoapySDR::Device*> cl_stn_;
-  SoapySDR::Device* ref_;
-  SoapySDR::Stream* ref_rx_stream_;
   std::vector<SoapySDR::Stream*> tx_streams_;
   std::vector<SoapySDR::Stream*> rx_streams_;
   size_t radio_num_;

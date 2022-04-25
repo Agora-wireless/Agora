@@ -32,7 +32,7 @@ class RadioConfig {
               long long& frameTime);
   int RadioTx(size_t radio_id,
               const std::vector<std::vector<std::complex<int16_t>>>& tx_data,
-              int flags, long long& frameTime);
+              int flags, long long& tx_time);
   int RadioRx(size_t radio_id, void** buffs, long long& rx_time_ns);
   int RadioRx(size_t radio_id,
               std::vector<std::vector<std::complex<int16_t>>>& rx_data,
@@ -82,7 +82,6 @@ class RadioConfig {
   Config* cfg_;
   std::vector<SoapySDR::Device*> hubs_;
   std::vector<SoapySDR::Device*> ba_stn_;
-  SoapySDR::Stream* ref_rx_stream_;
   std::vector<SoapySDR::Stream*> tx_streams_;
   std::vector<SoapySDR::Stream*> rx_streams_;
   arma::cx_float* init_calib_ul_processed_;
