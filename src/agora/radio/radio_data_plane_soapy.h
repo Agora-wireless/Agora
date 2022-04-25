@@ -15,7 +15,7 @@ class RadioDataPlaneSoapy : public RadioDataPlane {
   explicit RadioDataPlaneSoapy(const RadioDataPlaneSoapy&) = delete;
 
   RadioDataPlaneSoapy(const Config* cfg, SoapySDR::Device* device, size_t id);
-  ~RadioDataPlaneSoapy();
+  ~RadioDataPlaneSoapy() final = default;
 
   void Init(const Config* cfg, SoapySDR::Device* device, size_t id) final;
   void Setup() final;

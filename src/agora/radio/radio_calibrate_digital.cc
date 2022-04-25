@@ -209,8 +209,12 @@ void RadioConfig::CalibrateSampleOffset() {
         ul_offset_a.push_back(ul_offset.at(i));
         ul_offset_b.push_back(ul_offset.at(i + 1));
         int ul_offset_diff = std::abs(ul_offset_b.back() - ul_offset_a.back());
-        if (ul_offset_diff > max_ab_diff) max_ab_diff = ul_offset_diff;
-        if (ul_offset_diff < min_ab_diff) min_ab_diff = ul_offset_diff;
+        if (ul_offset_diff > max_ab_diff) {
+          max_ab_diff = ul_offset_diff;
+        }
+        if (ul_offset_diff < min_ab_diff) {
+          min_ab_diff = ul_offset_diff;
+        }
       }
       std::cout << "Rx max chan A & B offset diff: " << max_ab_diff
                 << ", Rx min chan A & B offset diff: " << min_ab_diff
@@ -241,10 +245,9 @@ void RadioConfig::CalibrateSampleOffset() {
       RtAssert(pilot_stop < cfg_->SampsPerSymbol(),
                "Pilot samples go beyond received symbol boundary."
                " Consider extending ofdm_tx_zero_postfix parameter!");
-      for (size_t i = 0; i < ul_buff.size(); i++) {
-        std::vector<std::complex<int16_t>> ofdm_samps(
-            ul_buff.at(i).begin() + pilot_start,
-            ul_buff.at(i).begin() + pilot_stop);
+      for (auto& i : ul_buff) {
+        std::vector<std::complex<int16_t>> ofdm_samps(i.begin() + pilot_start,
+                                                      i.begin() + pilot_stop);
         auto ofdm_data = Utils::Cint16ToCfloat32(ofdm_samps);
         float snr_val = CommsLib::ComputeOfdmSnr(
             ofdm_data, cfg_->OfdmDataStart(), cfg_->OfdmDataStop());
@@ -293,8 +296,12 @@ void RadioConfig::CalibrateSampleOffset() {
         dl_offset_a.push_back(dl_offset.at(i));
         dl_offset_b.push_back(dl_offset.at(i + 1));
         int dl_offset_diff = std::abs(dl_offset_b.back() - dl_offset_a.back());
-        if (dl_offset_diff > max_ab_diff) max_ab_diff = dl_offset_diff;
-        if (dl_offset_diff < min_ab_diff) min_ab_diff = dl_offset_diff;
+        if (dl_offset_diff > max_ab_diff) {
+          max_ab_diff = dl_offset_diff;
+        }
+        if (dl_offset_diff < min_ab_diff) {
+          min_ab_diff = dl_offset_diff;
+        }
       }
       std::cout << "Tx max chan A & B offset diff: " << max_ab_diff
                 << ", Tx min chan A & B offset diff: " << min_ab_diff
@@ -326,10 +333,9 @@ void RadioConfig::CalibrateSampleOffset() {
       RtAssert(pilot_stop < cfg_->SampsPerSymbol(),
                "Received pilot exceeds symbol boundary. Consider extending "
                "ofdm_tx_zero_postfix parameter!");
-      for (size_t i = 0; i < dl_buff.size(); i++) {
-        std::vector<std::complex<int16_t>> ofdm_samps(
-            dl_buff.at(i).begin() + pilot_start,
-            dl_buff.at(i).begin() + pilot_stop);
+      for (auto& i : dl_buff) {
+        std::vector<std::complex<int16_t>> ofdm_samps(i.begin() + pilot_start,
+                                                      i.begin() + pilot_stop);
         auto ofdm_data = Utils::Cint16ToCfloat32(ofdm_samps);
         float snr_val = CommsLib::ComputeOfdmSnr(
             ofdm_data, cfg_->OfdmDataStart(), cfg_->OfdmDataStop());

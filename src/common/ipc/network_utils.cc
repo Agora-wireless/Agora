@@ -77,7 +77,8 @@ int ListLocalInterfaces() {
         if (current_if_address->ifa_ifu.ifu_broadaddr != nullptr) {
           /* If the ifa_flags field indicates that this is a P2P interface */
           sa_family_t broad_family;
-          if (current_if_address->ifa_flags & IFF_POINTOPOINT) {
+          if ((current_if_address->ifa_flags & IFF_POINTOPOINT) ==
+              IFF_POINTOPOINT) {
             broad_family = current_if_address->ifa_ifu.ifu_dstaddr->sa_family;
             std::printf("Destination Addr:  ");
             if (broad_family == AF_INET) {

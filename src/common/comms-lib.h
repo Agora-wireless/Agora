@@ -60,7 +60,7 @@ class CommsLib {
   static MKL_LONG FFT(complex_float* in_out, int fftsize);
   static MKL_LONG IFFT(complex_float* in_out, int fftsize,
                        bool normalize = true);
-  static float ComputeOfdmSnr(const std::vector<std::complex<float>>& in,
+  static float ComputeOfdmSnr(const std::vector<std::complex<float>>& data_t,
                               size_t data_start_index, size_t data_stop_index);
   static size_t FindPilotSeq(const std::vector<std::complex<float>>& iq,
                              const std::vector<std::complex<float>>& pilot,
@@ -83,9 +83,6 @@ class CommsLib {
       std::vector<float> const& win, size_t fftSize);
   static std::vector<float> HannWindowFunction(size_t fftSize);
   static double WindowFunctionPower(std::vector<float> const& win);
-  // template <typename T>
-  // static T findTone(std::vector<T> const&, double, double, size_t, const
-  // size_t delta = 10);
   static float FindTone(std::vector<float> const& magnitude, double winGain,
                         double fftBin, size_t fftSize, const size_t delta = 10);
   static float MeasureTone(std::vector<std::complex<float>> const& samps,

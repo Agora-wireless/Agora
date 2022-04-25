@@ -129,8 +129,8 @@ void TxRxWorkerClientHw::DoTxRx() {
   // If JSON input if not default (0),
   // Else calculate based of ppb and frame length
   const size_t frame_sync_period =
-      Configuration()->UeResyncPeriod() > 0
-          ? Configuration()->UeResyncPeriod()
+      static_cast<int>(Configuration()->UeResyncPeriod()) > 0
+          ? static_cast<unsigned long>(Configuration()->UeResyncPeriod())
           : static_cast<size_t>(
                 std::floor(1e9 / (max_cfo * Configuration()->SampsPerFrame())));
 

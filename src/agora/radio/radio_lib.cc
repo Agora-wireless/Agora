@@ -591,14 +591,14 @@ int RadioConfig::RadioTx(size_t radio_id, const void* const* buffs, int flags,
 int RadioConfig::RadioTx(
     size_t radio_id,
     const std::vector<std::vector<std::complex<int16_t>>>& tx_data, int flags,
-    long long& frameTime)
+    long long& tx_time)
 
 {
   std::vector<const void*> buffs(tx_data.size());
   for (size_t i = 0; i < tx_data.size(); i++) {
     buffs.at(i) = tx_data.at(i).data();
   }
-  return RadioTx(radio_id, buffs.data(), flags, frameTime);
+  return RadioTx(radio_id, buffs.data(), flags, tx_time);
 }
 
 void RadioConfig::RadioRx(void** buffs) {
@@ -686,17 +686,17 @@ void RadioConfig::DrainBuffers() {
   }
 }
 
-void RadioConfig::DrainRxBuffer(SoapySDR::Device* ibsSdrs,
+void RadioConfig::DrainRxBuffer(SoapySDR::Device* ibs_sdrs,
                                 SoapySDR::Stream* istream,
-                                std::vector<void*> buffs, size_t symSamp) {
+                                std::vector<void*> buffs, size_t sym_samp) {
   long long frame_time = 0;
   int flags = 0;
   int r = 0;
   int i = 0;
   long timeout_us(0);
   while (r != -1) {
-    r = ibsSdrs->readStream(istream, buffs.data(), symSamp, flags, frame_time,
-                            timeout_us);
+    r = ibs_sdrs->readStream(istream, buffs.data(), sym_samp, flags, frame_time,
+                             timeout_us);
     i++;
   }
   //std::cout << "Number of reads needed to drain: " << i << std::endl;

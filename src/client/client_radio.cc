@@ -393,7 +393,7 @@ void ClientRadioConfig::Go() {
 
 int ClientRadioConfig::RadioTx(size_t r /*radio id*/, void** buffs,
                                size_t num_samps, int flags,
-                               long long& frameTime) {
+                               long long& tx_time) {
   int tx_flags = 0;
   if (flags == 1) {
     tx_flags = SOAPY_SDR_HAS_TIME;
@@ -403,9 +403,9 @@ int ClientRadioConfig::RadioTx(size_t r /*radio id*/, void** buffs,
   int w(0);
   if (cfg_->UeHwFramer()) {
     w = cl_stn_.at(r)->writeStream(this->tx_streams_.at(r), buffs, num_samps,
-                                   tx_flags, frameTime, 1000000);
+                                   tx_flags, tx_time, 1000000);
   } else {
-    long long frame_time_ns = SoapySDR::ticksToTimeNs(frameTime, cfg_->Rate());
+    long long frame_time_ns = SoapySDR::ticksToTimeNs(tx_time, cfg_->Rate());
     w = cl_stn_.at(r)->writeStream(this->tx_streams_.at(r), buffs, num_samps,
                                    tx_flags, frame_time_ns, 1000000);
   }
@@ -414,7 +414,7 @@ int ClientRadioConfig::RadioTx(size_t r /*radio id*/, void** buffs,
     long timeout_us(0);
     int status_flag = 0;
     int s = cl_stn_.at(r)->readStreamStatus(this->tx_streams_.at(r), chan_mask,
-                                            status_flag, frameTime, timeout_us);
+                                            status_flag, tx_time, timeout_us);
     std::cout << "radio " << r << " tx returned " << w << " and status " << s
               << " when flags was " << flags << std::endl;
   }
@@ -422,19 +422,19 @@ int ClientRadioConfig::RadioTx(size_t r /*radio id*/, void** buffs,
 }
 
 int ClientRadioConfig::RadioRx(size_t r /*radio id*/, void** buffs,
-                               size_t num_samps, long long& frameTime) {
+                               size_t num_samps, long long& rx_time) {
   static constexpr size_t kRxTimeoutuS = 1000000;
   int rx_flags = SOAPY_SDR_END_BURST;
   if (r < radio_num_) {
     int ret(0);
     if (cfg_->UeHwFramer()) {
       ret = cl_stn_.at(r)->readStream(this->rx_streams_.at(r), buffs, num_samps,
-                                      rx_flags, frameTime, kRxTimeoutuS);
+                                      rx_flags, rx_time, kRxTimeoutuS);
     } else {
       long long frame_time_ns = 0;
       ret = cl_stn_.at(r)->readStream(this->rx_streams_.at(r), buffs, num_samps,
                                       rx_flags, frame_time_ns, kRxTimeoutuS);
-      frameTime = SoapySDR::timeNsToTicks(frame_time_ns, cfg_->Rate());
+      rx_time = SoapySDR::timeNsToTicks(frame_time_ns, cfg_->Rate());
     }
     if (kDebugRadioRX) {
       if (ret != static_cast<int>(num_samps)) {
@@ -469,14 +469,14 @@ void ClientRadioConfig::DrainBuffers() {
 void ClientRadioConfig::DrainRxBuffer(SoapySDR::Device* dev,
                                       SoapySDR::Stream* istream,
                                       std::vector<void*> buffs,
-                                      size_t symSamp) {
+                                      size_t sym_samp) {
   long long frame_time = 0;
   int flags = 0;
   int r = 0;
   int i = 0;
   long timeout_us(0);
   while (r != -1) {
-    r = dev->readStream(istream, buffs.data(), symSamp, flags, frame_time,
+    r = dev->readStream(istream, buffs.data(), sym_samp, flags, frame_time,
                         timeout_us);
     i++;
   }

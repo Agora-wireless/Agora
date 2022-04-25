@@ -14,7 +14,7 @@ RadioDataPlaneSocket::RadioDataPlaneSocket()
 
 RadioDataPlaneSocket::RadioDataPlaneSocket(const Config* cfg,
                                            SoapySDR::Device* device, size_t id)
-    : RadioDataPlane(cfg, device, id), socket_() {}
+    : RadioDataPlane(cfg, device, id) {}
 
 RadioDataPlaneSocket::~RadioDataPlaneSocket() { Close(); }
 

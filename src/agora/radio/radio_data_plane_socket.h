@@ -16,7 +16,7 @@ class RadioDataPlaneSocket : public RadioDataPlane {
   explicit RadioDataPlaneSocket(const RadioDataPlaneSocket&) = delete;
 
   RadioDataPlaneSocket(const Config* cfg, SoapySDR::Device* device, size_t id);
-  ~RadioDataPlaneSocket();
+  ~RadioDataPlaneSocket() final;
 
   void Init(const Config* cfg, SoapySDR::Device* device, size_t id) final;
   void Setup() final;

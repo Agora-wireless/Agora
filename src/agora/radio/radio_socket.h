@@ -19,7 +19,7 @@ class RadioSocket {
   RadioSocket();
   ~RadioSocket() = default;
   //Allow move, and disallow copy
-  explicit RadioSocket(RadioSocket&&) = default;
+  RadioSocket(RadioSocket&&) = default;
   explicit RadioSocket(const RadioSocket&) = delete;
 
   void Create(size_t samples_per_symbol, const std::string& local_addr,
@@ -40,10 +40,10 @@ class RadioSocket {
 
   std::unique_ptr<UDPServerIPv6> socket_;
   std::vector<std::byte> rx_buffer_;
-  size_t rx_bytes_;
-  size_t rx_samples_;
+  size_t rx_bytes_{0};
+  size_t rx_samples_{0};
 
-  size_t samples_per_symbol_;
-  const size_t bytes_per_element_;
+  size_t samples_per_symbol_{1};
+  const size_t bytes_per_element_{3u};
 };
 #endif  // RADIO_SOCKET_H_

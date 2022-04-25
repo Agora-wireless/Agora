@@ -80,7 +80,7 @@ UDPServerIPv6::UDPServerIPv6(const std::string& local_address,
                                        : "???",
                 rp->ai_family, rp->ai_socktype, rp->ai_protocol);
     if (family == AF_INET6) {
-      auto address_ptr = &((sockaddr_in6*)rp->ai_addr)->sin6_addr;
+      auto* address_ptr = &((sockaddr_in6*)rp->ai_addr)->sin6_addr;
       std::printf("Internet Address:  %s \n",
                   ::inet_ntop(family, address_ptr, address_buffer,
                               sizeof(address_buffer)));
@@ -212,8 +212,8 @@ ssize_t UDPServerIPv6::Connect(const std::string& remote_address,
   hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
   hints.ai_protocol = server_address_info_->ai_protocol;
   hints.ai_canonname = server_address_info_->ai_canonname;
-  hints.ai_addr = NULL;
-  hints.ai_next = NULL;
+  hints.ai_addr = nullptr;
+  hints.ai_next = nullptr;
 
   int r = ::getaddrinfo(remote_address.c_str(), remote_port.c_str(), &hints,
                         &connected_address_info_);

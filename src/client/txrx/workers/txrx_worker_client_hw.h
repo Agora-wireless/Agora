@@ -28,12 +28,11 @@ class TxRxWorkerClientHw : public TxRxWorker {
                      std::condition_variable& sync_cond,
                      std::atomic<bool>& can_proceed,
                      ClientRadioConfig& radio_config);
-
+  TxRxWorkerClientHw() = delete;
   ~TxRxWorkerClientHw() final;
   void DoTxRx() final;
 
  private:
-  TxRxWorkerClientHw() = delete;
   size_t DoTx(const long long time0);
   std::vector<Packet*> DoRx(size_t interface_id, size_t& global_frame_id,
                             size_t& global_symbol_id, long long& receive_time,

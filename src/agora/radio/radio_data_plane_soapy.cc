@@ -14,8 +14,6 @@ RadioDataPlaneSoapy::RadioDataPlaneSoapy(const Config* cfg,
                                          SoapySDR::Device* device, size_t id)
     : RadioDataPlane(cfg, device, id) {}
 
-RadioDataPlaneSoapy::~RadioDataPlaneSoapy() {}
-
 void RadioDataPlaneSoapy::Init(const Config* cfg, SoapySDR::Device* device,
                                size_t id) {
   return RadioDataPlane::Init(cfg, device, id);
@@ -47,6 +45,7 @@ int RadioDataPlaneSoapy::Rx(
   long long frame_time_ns(0);
 
   std::vector<void*> buffs;
+  buffs.reserve(rx_data.size());
   for (auto& ch_buff : rx_data) {
     buffs.emplace_back(ch_buff.data());
   }
@@ -94,6 +93,7 @@ void RadioDataPlaneSoapy::Flush() {
       std::vector<std::complex<int16_t>>(Configuration()->SampsPerSymbol(),
                                          std::complex<int16_t>(0, 0)));
   std::vector<void*> ignore;
+  ignore.reserve(samples.size());
   for (auto& ch_buff : samples) {
     ignore.emplace_back(ch_buff.data());
   }

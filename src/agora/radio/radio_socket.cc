@@ -78,12 +78,7 @@ static_assert(sizeof(IrisCommData::header_) == 16);
 //info.optionNames = {"Complex int16", "Complex int12", "Complex int8"};
 // this is also a bit more complex and needs to be reviewed for multiple cases
 // 3 bytes == 1 Sample (8 bit + 4 bit) Real (8 bit + 4 bit) Img = 24 bits = 3 Bytes
-RadioSocket::RadioSocket()
-    : rx_buffer_(kRxBufferSize, std::byte(0)),
-      rx_bytes_(0),
-      rx_samples_(0),
-      samples_per_symbol_(1),
-      bytes_per_element_(3u) {}
+RadioSocket::RadioSocket() : rx_buffer_(kRxBufferSize, std::byte(0)) {}
 
 void RadioSocket::Create(size_t samples_per_symbol,
                          const std::string& local_addr,
@@ -182,10 +177,11 @@ bool RadioSocket::CheckSymbolComplete(const std::byte* in_data,
         "Rx Time: %lld\n"
         "Frame: %zu    Symbol: %zu\n"
         "===========================================\n",
-        in_count, rx_data->header_[0u], rx_data->header_[1u], has_time,
-        error_time, error_overflow, is_burst, is_trigger, burst_count,
-        payload_bytes, samples, rx_time_ticks, current_frame_id,
-        current_symbol_id);
+        in_count, rx_data->header_[0u], rx_data->header_[1u],
+        static_cast<int>(has_time), static_cast<int>(error_time),
+        static_cast<int>(error_overflow), static_cast<int>(is_burst),
+        static_cast<int>(is_trigger), burst_count, payload_bytes, samples,
+        rx_time_ticks, current_frame_id, current_symbol_id);
   }
   const size_t start_sample = (rx_time_ticks & 0xFFFF);
   if (start_sample > rx_samples_) {
@@ -279,7 +275,7 @@ size_t RadioSocket::ParseRxSymbol(
   return processed_samples;
 }
 
-void RadioSocket::Flush(void) {
+void RadioSocket::Flush() {
   int rx_return = 1;
 
   while (rx_return > 0) {

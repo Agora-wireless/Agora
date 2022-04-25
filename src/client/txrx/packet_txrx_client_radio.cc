@@ -39,7 +39,7 @@ PacketTxRxClientRadio::~PacketTxRxClientRadio() {
 bool PacketTxRxClientRadio::StartTxRx(Table<complex_float>& calib_dl_buffer,
                                       Table<complex_float>& calib_ul_buffer) {
   AGORA_LOG_FRAME("PacketTxRxClientRadio: StartTxRx threads %zu\n",
-             worker_threads_.size());
+                  worker_threads_.size());
   const bool status = radio_config_->RadioStart();
 
   if (status == false) {
