@@ -5,11 +5,11 @@
 #ifndef RADIO_LIB_H_
 #define RADIO_LIB_H_
 
-#include <SoapySDR/Device.hpp>
 #include <complex>
 #include <cstdlib>
 #include <vector>
 
+#include "SoapySDR/Device.hpp"
 #include "armadillo"
 #include "config.h"
 #include "memory_manage.h"
@@ -17,6 +17,8 @@
 class RadioConfig {
  public:
   explicit RadioConfig(Config* cfg);
+  ~RadioConfig();
+
   bool RadioStart();
   void RadioStop();
   void ReadSensors();
@@ -33,7 +35,6 @@ class RadioConfig {
   void Go();
   arma::cx_float* GetCalibUl() { return init_calib_ul_processed_; }
   arma::cx_float* GetCalibDl() { return init_calib_dl_processed_; }
-  ~RadioConfig();
 
   // Thread functions
   void InitBsRadio(size_t tid);
