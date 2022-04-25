@@ -103,14 +103,15 @@
 constexpr size_t kLogThreadPoolQueueSize = 32768;
 constexpr size_t kLogThreadCount = 1;
 
-#define AGORA_LOG_INIT()                                                       \
-  spdlog::init_thread_pool(kLogThreadPoolQueueSize, kLogThreadCount);          \
-  spdlog::default_logger() =                                                   \
-      spdlog::create_async_nb<spdlog::sinks::stdout_color_sink_mt>("console"); \
-  auto f = std::make_unique<spdlog::pattern_formatter>(                        \
-      spdlog::pattern_time_type::utc, std::string(""));                        \
-  f->set_pattern("[%S:%f][%^%L%$] %v");                                        \
-  spdlog::set_formatter(std::move(f));                                         \
+#define AGORA_LOG_INIT()                                              \
+  spdlog::init_thread_pool(kLogThreadPoolQueueSize, kLogThreadCount); \
+  spdlog::set_default_logger(                                         \
+      spdlog::create_async_nb<spdlog::sinks::stdout_color_sink_mt>(   \
+          "console"));                                                \
+  auto f = std::make_unique<spdlog::pattern_formatter>(               \
+      spdlog::pattern_time_type::utc, std::string(""));               \
+  f->set_pattern("[%S:%f][%^%L%$] %v");                               \
+  spdlog::set_formatter(std::move(f));                                \
   spdlog::set_level(SPDLOG_LEVEL);
 
 #define AGORA_LOG_SHUTDOWN() spdlog::shutdown();
