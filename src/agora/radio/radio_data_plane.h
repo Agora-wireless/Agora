@@ -17,7 +17,7 @@ class RadioDataPlane {
   enum Mode { kModeUninit, kModeShutdown, kModeDeactive, kModeActive };
 
   virtual ~RadioDataPlane();
-  explicit RadioDataPlane(RadioDataPlane&&) = delete;
+  RadioDataPlane(RadioDataPlane&&) noexcept = delete;
   explicit RadioDataPlane(const RadioDataPlane&) = delete;
 
   virtual void Init(const Config* cfg, SoapySDR::Device* device, size_t id) = 0;

@@ -11,7 +11,7 @@ class RadioDataPlaneSoapy : public RadioDataPlane {
  public:
   RadioDataPlaneSoapy();
   //Allow move and disallow copy
-  explicit RadioDataPlaneSoapy(RadioDataPlaneSoapy&&) = default;
+  RadioDataPlaneSoapy(RadioDataPlaneSoapy&&) noexcept = default;
   explicit RadioDataPlaneSoapy(const RadioDataPlaneSoapy&) = delete;
 
   RadioDataPlaneSoapy(const Config* cfg, SoapySDR::Device* device, size_t id);

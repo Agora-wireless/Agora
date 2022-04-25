@@ -12,7 +12,7 @@ class RadioDataPlaneSocket : public RadioDataPlane {
  public:
   RadioDataPlaneSocket();
   //Allow move and disallow copy
-  explicit RadioDataPlaneSocket(RadioDataPlaneSocket&&) = default;
+  RadioDataPlaneSocket(RadioDataPlaneSocket&&) noexcept = default;
   explicit RadioDataPlaneSocket(const RadioDataPlaneSocket&) = delete;
 
   RadioDataPlaneSocket(const Config* cfg, SoapySDR::Device* device, size_t id);

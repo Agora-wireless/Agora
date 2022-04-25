@@ -97,11 +97,11 @@ void TestRadioRxStream(Config* cfg, const uint32_t max_rx) {
 
   if (kUseArgos) {
     // Makes the soapy remote "HUB" / InitBsRadio / ConfigureBsRadio
-    auto radioconfig_ = std::make_unique<RadioConfig>(cfg);
-    radioconfig_->RadioStart();
+    auto radioconfig = std::make_unique<RadioConfig>(cfg);
+    radioconfig->RadioStart();
 
     //Radio Trigger (start rx)
-    radioconfig_->Go();
+    radioconfig->Go();
 
     uint32_t num_rx_symbols = 0;
     //Super thread loop
@@ -110,7 +110,7 @@ void TestRadioRxStream(Config* cfg, const uint32_t max_rx) {
       for (auto radio = radio_lo; radio < radio_hi; radio++) {
         long long rx_time;
         int rx_samples =
-            radioconfig_->RadioRx(radio, rx_buffs.at(radio).data(), rx_time);
+            radioconfig->RadioRx(radio, rx_buffs.at(radio).data(), rx_time);
         if (rx_samples > 0) {
           //Rx data.....
           size_t frame_id = 0;
@@ -140,7 +140,7 @@ void TestRadioRxStream(Config* cfg, const uint32_t max_rx) {
         }
       }  // end for each radio
     }    // while no exit signal
-    radioconfig_->RadioStop();
+    radioconfig->RadioStop();
   } else {
     std::cout << "Hardware is not enabled in the compile settings.  Please fix "
                  "and try again!"
@@ -173,11 +173,11 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
 
   if (kUseArgos) {
     // Makes the soapy remote "HUB" / InitBsRadio / ConfigureBsRadio
-    auto radioconfig_ = std::make_unique<RadioConfigNoRxStream>(cfg);
-    radioconfig_->RadioStart();
+    auto radioconfig = std::make_unique<RadioConfigNoRxStream>(cfg);
+    radioconfig->RadioStart();
 
     //Radio Trigger (start rx)
-    radioconfig_->Go();
+    radioconfig->Go();
 
     uint32_t num_rx_symbols = 0;
     //Super thread loop
@@ -186,7 +186,7 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
       for (auto radio = radio_lo; radio < radio_hi; radio++) {
         long long rx_time;
         int rx_samples =
-            radioconfig_->RadioRx(radio, rx_buffer.at(radio), rx_time);
+            radioconfig->RadioRx(radio, rx_buffer.at(radio), rx_time);
         if (rx_samples > 0) {
           //Rx data.....
           size_t frame_id = 0;
@@ -216,7 +216,7 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
         }
       }  // end for each radio
     }    // while no exit signal
-    radioconfig_->RadioStop();
+    radioconfig->RadioStop();
   } else {
     std::cout << "Hardware is not enabled in the compile settings.  Please fix "
                  "and try again!"

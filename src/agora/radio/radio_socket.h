@@ -19,7 +19,7 @@ class RadioSocket {
   RadioSocket();
   ~RadioSocket() = default;
   //Allow move, and disallow copy
-  RadioSocket(RadioSocket&&) = default;
+  RadioSocket(RadioSocket&&) noexcept = default;
   explicit RadioSocket(const RadioSocket&) = delete;
 
   void Create(size_t samples_per_symbol, const std::string& local_addr,
