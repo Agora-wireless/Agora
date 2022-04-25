@@ -542,17 +542,6 @@ void RadioConfig::Go() {
   }
 }
 
-void RadioConfig::RadioTx(void** buffs) {
-  static constexpr size_t kTxTimeoutUs = 1000000;
-  int flags = 0;
-  long long frame_time(0);
-  for (size_t i = 0; i < this->radio_num_; i++) {
-    ba_stn_.at(i)->writeStream(this->tx_streams_.at(i), buffs,
-                               cfg_->SampsPerSymbol(), flags, frame_time,
-                               kTxTimeoutUs);
-  }
-}
-
 int RadioConfig::RadioTx(size_t radio_id, const void* const* buffs, int flags,
                          long long& tx_time) {
   static constexpr size_t kTxTimeoutUs = 1000000;
@@ -599,18 +588,6 @@ int RadioConfig::RadioTx(
     buffs.at(i) = tx_data.at(i).data();
   }
   return RadioTx(radio_id, buffs.data(), flags, tx_time);
-}
-
-void RadioConfig::RadioRx(void** buffs) {
-  static constexpr size_t kTxTimeoutUs = 1000000;
-  long long frame_time(0);
-  int rx_flags = SOAPY_SDR_END_BURST;
-  for (size_t i = 0; i < this->radio_num_; i++) {
-    void** buff = buffs + (i * 2);
-    ba_stn_.at(i)->readStream(this->rx_streams_.at(i), buff,
-                              cfg_->SampsPerSymbol(), rx_flags, frame_time,
-                              kTxTimeoutUs);
-  }
 }
 
 int RadioConfig::RadioRx(size_t radio_id, void** buffs, long long& rx_time_ns) {

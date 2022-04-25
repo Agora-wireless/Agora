@@ -20,8 +20,6 @@ class RadioConfig {
   bool RadioStart();
   void RadioStop();
   void ReadSensors();
-  void RadioTx(void** buffs);
-  void RadioRx(void** buffs);
   int RadioTx(size_t radio_id, const void* const* buffs, int flags,
               long long& tx_time);
   int RadioTx(size_t radio_id,
@@ -72,7 +70,7 @@ class RadioConfig {
   static std::vector<std::complex<float>> SnoopSamples(SoapySDR::Device* dev,
                                                        size_t channel,
                                                        size_t read_size);
-  void DciqCalibrationProc(size_t /*channel*/);
+  void DciqCalibrationProc(size_t channel);
   Config* cfg_;
   std::vector<SoapySDR::Device*> hubs_;
   std::vector<SoapySDR::Device*> ba_stn_;
