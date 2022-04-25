@@ -2,24 +2,14 @@
  * @file client_radio.h
  * @brief Declaration file for the client radio config class
  */
-
 #ifndef CLIENT_RADIO_LIB_H_
 #define CLIENT_RADIO_LIB_H_
 
-#include <SoapySDR/Device.hpp>
-#include <SoapySDR/Errors.hpp>
-#include <SoapySDR/Formats.hpp>
-#include <SoapySDR/Time.hpp>
-#include <chrono>
-#include <csignal>
-#include <cstddef>
-#include <cstdint>
+#include <atomic>
 #include <cstdlib>
-#include <iostream>
-#include <string>
-#include <thread>
 #include <vector>
 
+#include "SoapySDR/Device.hpp"
 #include "config.h"
 
 class ClientRadioConfig {

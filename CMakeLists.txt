@@ -178,7 +178,7 @@ elseif(${USE_UHD})
 endif()
 
 #External Libraries
-find_package(Armadillo)
+find_package(Armadillo "11.0.0" REQUIRED)
 
 find_package(PythonLibs REQUIRED)
 set(PYTHON_LIB ${PYTHON_LIBRARIES})

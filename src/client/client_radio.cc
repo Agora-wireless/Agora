@@ -5,8 +5,9 @@
 
 #include "client_radio.h"
 
-#include <SoapySDR/Logger.hpp>
-
+#include "SoapySDR/Formats.h"
+#include "SoapySDR/Logger.hpp"
+#include "SoapySDR/Time.hpp"
 #include "comms-lib.h"
 #include "logger.h"
 #include "nlohmann/json.hpp"

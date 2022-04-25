@@ -6,19 +6,13 @@
 #define RADIO_LIB_H_
 
 #include <SoapySDR/Device.hpp>
-#include <SoapySDR/Errors.hpp>
-#include <SoapySDR/Formats.hpp>
-#include <SoapySDR/Time.hpp>
-#include <chrono>
 #include <complex>
-#include <csignal>
-#include <cstddef>
-#include <cstdint>
 #include <cstdlib>
-#include <iostream>
-#include <string>
+#include <vector>
 
+#include "armadillo"
 #include "config.h"
+#include "memory_manage.h"
 
 class RadioConfig {
  public:
