@@ -10,7 +10,7 @@
 class RadioDataPlaneSoapy : public RadioDataPlane {
  public:
   RadioDataPlaneSoapy();
-  //Allow move and disallow copy
+  // Allow move and disallow copy
   RadioDataPlaneSoapy(RadioDataPlaneSoapy&&) noexcept = default;
   explicit RadioDataPlaneSoapy(const RadioDataPlaneSoapy&) = delete;
 

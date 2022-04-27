@@ -11,7 +11,7 @@
 class RadioDataPlaneSocket : public RadioDataPlane {
  public:
   RadioDataPlaneSocket();
-  //Allow move and disallow copy
+  // Allow move and disallow copy
   RadioDataPlaneSocket(RadioDataPlaneSocket&&) noexcept = default;
   explicit RadioDataPlaneSocket(const RadioDataPlaneSocket&) = delete;
 

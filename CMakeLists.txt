@@ -355,6 +355,7 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/doprecode.cc
   src/agora/dodecode.cc
   src/agora/radio/radio_lib.cc
+  src/agora/radio/radio.cc
   src/agora/radio/radio_calibrate_digital.cc
   src/agora/radio/radio_calibrate_analog.cc
   src/agora/radio/radio_socket.cc
