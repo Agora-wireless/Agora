@@ -28,7 +28,7 @@ Radio::Radio()
 }
 
 Radio::~Radio() {
-  AGORA_LOG_INFO("Destory Radio %s(%zu)\n", serial_number_.c_str(), id_);
+  AGORA_LOG_INFO("Destroy Radio %s(%zu)\n", serial_number_.c_str(), id_);
   Close();
 }
 
@@ -88,11 +88,9 @@ void Radio::Init(const Config* cfg, size_t id, const std::string& serial,
                                serial_number_);
     }
     // resets the DATA_clk domain logic.
-    if (kUseUHD == false) {
-      SoapySDR::Kwargs hw_info = dev_->getHardwareInfo();
-      if (hw_info["revision"].find("Iris") != std::string::npos) {
-        dev_->writeSetting("RESET_DATA_LOGIC", "");
-      }
+    SoapySDR::Kwargs hw_info = dev_->getHardwareInfo();
+    if (hw_info["revision"].find("Iris") != std::string::npos) {
+      dev_->writeSetting("RESET_DATA_LOGIC", "");
     }
     rxs_ = dev_->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, enabled_channels,
                              sargs);
@@ -224,9 +222,13 @@ void Radio::Activate() {
   AGORA_LOG_INFO("Activate Radio %s(%zu)\n", serial_number_.c_str(), id_);
   if (kUseUHD == false) {
     dev_->setHardwareTime(0, "TRIGGER");
-    //SOAPY_SDR_WAIT_TRIGGER?
-    dev_->activateStream(rxs_, SOAPY_SDR_WAIT_TRIGGER);
-    dev_->activateStream(txs_, SOAPY_SDR_WAIT_TRIGGER);
+    //SOAPY_SDR_WAIT_TRIGGER for UEs??
+    //**********************************************************
+    //dev_->activateStream(rxs_, SOAPY_SDR_WAIT_TRIGGER);
+    //dev_->activateStream(txs_, SOAPY_SDR_WAIT_TRIGGER);
+    //**********************************************************
+    dev_->activateStream(rxs_);
+    dev_->activateStream(txs_);
   } else {
     dev_->setHardwareTime(0, "UNKNOWN_PPS");
     dev_->activateStream(rxs_, SOAPY_SDR_HAS_TIME, 1e9, 0);
@@ -242,7 +244,9 @@ void Radio::Deactivate() {
   dev_->deactivateStream(txs_);
   dev_->writeSetting("TDD_MODE", "false");
   dev_->writeSetting("TDD_CONFIG", tdd_conf_str);
-  dev_->writeSetting("CORR_CONFIG", corr_conf_str);
+  //**********************************************************
+  //dev_->writeSetting("CORR_CONFIG", corr_conf_str);
+  //**********************************************************
 }
 
 int Radio::Tx(const void* const* tx_buffs, size_t tx_size, int flags,
@@ -338,6 +342,8 @@ void Radio::ReadSensor() const {
 }
 
 void Radio::PrintSettings() const {
+  std::stringstream print_message;
+
   SoapySDR::Kwargs hw_info = dev_->getHardwareInfo();
   std::string label = hw_info["revision"];
   std::string frontend = "";
@@ -345,72 +351,90 @@ void Radio::PrintSettings() const {
     frontend = hw_info["frontend"];
   }
 
-  std::cout << serial_number_ << " (" << id_ << ") - " << label << " - "
-            << frontend << std::endl;
+  print_message << serial_number_ << " (" << id_ << ") - " << label << " - "
+                << frontend << std::endl;
 
   if (kPrintRadioSettings) {
-    for (auto c : enabled_channels_) {
+    for (const auto& c : enabled_channels_) {
       if (c < dev_->getNumChannels(SOAPY_SDR_RX)) {
-        AGORA_LOG_INFO("RX Channel %zu\n", c);
-        AGORA_LOG_INFO("Actual RX sample rate: %fMSps...\n",
-                       (dev_->getSampleRate(SOAPY_SDR_RX, c) / 1e6));
-        AGORA_LOG_INFO("Actual RX frequency: %fGHz...\n",
-                       (dev_->getFrequency(SOAPY_SDR_RX, c) / 1e9));
-        AGORA_LOG_INFO("Actual RX gain: %f...\n",
-                       (dev_->getGain(SOAPY_SDR_RX, c)));
+        print_message << "RX Channel " << c << std::endl
+                      << "Actual RX sample rate: "
+                      << (dev_->getSampleRate(SOAPY_SDR_RX, c) / 1e6)
+                      << "MSps..." << std::endl
+                      << "Actual RX frequency: "
+                      << (dev_->getFrequency(SOAPY_SDR_RX, c) / 1e9) << "GHz..."
+                      << std::endl
+                      << "Actual RX gain: " << (dev_->getGain(SOAPY_SDR_RX, c))
+                      << "..." << std::endl;
         if (kUseUHD == false) {
-          AGORA_LOG_INFO("Actual RX LNA gain: %f...\n",
-                         (dev_->getGain(SOAPY_SDR_RX, c, "LNA")));
-          AGORA_LOG_INFO("Actual RX PGA gain: %f...\n",
-                         (dev_->getGain(SOAPY_SDR_RX, c, "PGA")));
-          AGORA_LOG_INFO("Actual RX TIA gain: %f...\n",
-                         (dev_->getGain(SOAPY_SDR_RX, c, "TIA")));
+          print_message << "Actual RX LNA gain: "
+                        << (dev_->getGain(SOAPY_SDR_RX, c, "LNA")) << "..."
+                        << std::endl
+                        << "Actual RX PGA gain: "
+                        << (dev_->getGain(SOAPY_SDR_RX, c, "PGA")) << "..."
+                        << std::endl
+                        << "Actual RX TIA gain: "
+                        << (dev_->getGain(SOAPY_SDR_RX, c, "TIA")) << "..."
+                        << std::endl;
           if (dev_->getHardwareInfo()["frontend"].find("CBRS") !=
               std::string::npos) {
-            AGORA_LOG_INFO("Actual RX LNA1 gain: %f...\n",
-                           (dev_->getGain(SOAPY_SDR_RX, c, "LNA1")));
-            AGORA_LOG_INFO("Actual RX LNA2 gain: %f...\n",
-                           (dev_->getGain(SOAPY_SDR_RX, c, "LNA2")));
+            print_message << "Actual RX LNA1 gain: "
+                          << (dev_->getGain(SOAPY_SDR_RX, c, "LNA1")) << "..."
+                          << std::endl
+                          << "Actual RX LNA2 gain: "
+                          << (dev_->getGain(SOAPY_SDR_RX, c, "LNA2")) << "..."
+                          << std::endl;
           }
         }
-        AGORA_LOG_INFO("Actual RX bandwidth: %fM...\n",
-                       (dev_->getBandwidth(SOAPY_SDR_RX, c) / 1e6));
-        AGORA_LOG_INFO("Actual RX antenna: %s...\n",
-                       (dev_->getAntenna(SOAPY_SDR_RX, c).c_str()));
+        print_message << "Actual RX bandwidth: "
+                      << (dev_->getBandwidth(SOAPY_SDR_RX, c) / 1e6) << "M..."
+                      << std::endl
+                      << "Actual RX antenna: "
+                      << (dev_->getAntenna(SOAPY_SDR_RX, c)) << "..."
+                      << std::endl;
       }
     }
 
     for (auto c : enabled_channels_) {
       if (c < dev_->getNumChannels(SOAPY_SDR_TX)) {
-        AGORA_LOG_INFO("TX Channel %zu\n", c);
-        AGORA_LOG_INFO("Actual TX sample rate: %fMSps...\n",
-                       (dev_->getSampleRate(SOAPY_SDR_TX, c) / 1e6));
-        AGORA_LOG_INFO("Actual TX frequency: %fGHz...\n",
-                       (dev_->getFrequency(SOAPY_SDR_TX, c) / 1e9));
-        AGORA_LOG_INFO("Actual TX gain: %f...\n",
-                       (dev_->getGain(SOAPY_SDR_TX, c)));
+        print_message << "TX Channel " << c << std::endl
+                      << "Actual TX sample rate: "
+                      << (dev_->getSampleRate(SOAPY_SDR_TX, c) / 1e6)
+                      << "MSps..." << std::endl
+                      << "Actual TX frequency: "
+                      << (dev_->getFrequency(SOAPY_SDR_TX, c) / 1e9) << "GHz..."
+                      << std::endl
+                      << "Actual TX gain: " << (dev_->getGain(SOAPY_SDR_TX, c))
+                      << "..." << std::endl;
         if (kUseUHD == false) {
-          AGORA_LOG_INFO("Actual TX PAD gain: %f...\n",
-                         (dev_->getGain(SOAPY_SDR_TX, c, "PAD")));
-          AGORA_LOG_INFO("Actual TX IAMP gain: %f...\n",
-                         (dev_->getGain(SOAPY_SDR_TX, c, "IAMP")));
+          print_message << "Actual TX PAD gain: "
+                        << (dev_->getGain(SOAPY_SDR_TX, c, "PAD")) << "..."
+                        << std::endl
+                        << "Actual TX IAMP gain: "
+                        << (dev_->getGain(SOAPY_SDR_TX, c, "IAMP")) << "..."
+                        << std::endl;
           if (dev_->getHardwareInfo()["frontend"].find("CBRS") !=
               std::string::npos) {
-            AGORA_LOG_INFO("Actual TX PA1 gain: %f...\n",
-                           (dev_->getGain(SOAPY_SDR_TX, c, "PA1")));
-            AGORA_LOG_INFO("Actual TX PA2 gain: %f...\n",
-                           (dev_->getGain(SOAPY_SDR_TX, c, "PA2")));
-            AGORA_LOG_INFO("Actual TX PA3 gain: %f...\n",
-                           (dev_->getGain(SOAPY_SDR_TX, c, "PA3")));
+            print_message << "Actual TX PA1 gain: "
+                          << (dev_->getGain(SOAPY_SDR_TX, c, "PA1")) << "..."
+                          << std::endl
+                          << "Actual TX PA2 gain: "
+                          << (dev_->getGain(SOAPY_SDR_TX, c, "PA2")) << "..."
+                          << std::endl
+                          << "Actual TX PA3 gain: "
+                          << (dev_->getGain(SOAPY_SDR_TX, c, "PA3")) << "..."
+                          << std::endl;
           }
         }
-        AGORA_LOG_INFO("Actual TX bandwidth: %fM...\n",
-                       (dev_->getBandwidth(SOAPY_SDR_TX, c) / 1e6));
-        AGORA_LOG_INFO("Actual TX antenna: %s...\n",
-                       (dev_->getAntenna(SOAPY_SDR_TX, c).c_str()));
+        print_message << "Actual TX bandwidth: "
+                      << (dev_->getBandwidth(SOAPY_SDR_TX, c) / 1e6) << "M..."
+                      << std::endl
+                      << "Actual TX antenna: "
+                      << (dev_->getAntenna(SOAPY_SDR_TX, c)) << "... "
+                      << std::endl;
       }
     }
-    AGORA_LOG_INFO("\n");
+    AGORA_LOG_INFO("%s\n", print_message.str().c_str());
   }
 }
 
@@ -570,8 +594,9 @@ void Radio::ConfigureTddModeBs(bool is_ref_radio, size_t beacon_radio_id) {
       AGORA_LOG_ERROR("Unsupported channel %zu\n", channel);
       throw std::runtime_error("Unsupported channel");
     }
-    dev_->writeRegisters(std::string("BEACON_RAM_WGT_" + channel_letter), 0,
-                         beacon_weights);
+    std::string prog_reg = "BEACON_RAM_WGT_";
+    prog_reg.push_back(channel_letter);
+    dev_->writeRegisters(prog_reg, 0, beacon_weights);
     ++ndx;
   }
   dev_->writeSetting("BEACON_START", std::to_string(beacon_radio_id));
@@ -637,8 +662,9 @@ void Radio::ConfigureTddModeUe() {
       AGORA_LOG_ERROR("Unsupported channel %zu\n", channel);
       throw std::runtime_error("Unsupported channel");
     }
-    dev_->writeRegisters(std::string("TX_RAM_" + channel_letter), 0,
-                         cfg_->Pilot());
+    std::string prog_reg = "TX_RAM_";
+    prog_reg.push_back(channel_letter);
+    dev_->writeRegisters(prog_reg, 0, cfg_->Pilot());
   }
 
   std::string corr_conf_string =
