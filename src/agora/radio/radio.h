@@ -15,11 +15,13 @@ class Radio {
  public:
   Radio();
   ~Radio();
-  //inline SoapySDR::Device* RawDev() const { return dev_; };
   inline size_t Id() const { return id_; }
+  inline const std::string& SerialNumber() const { return serial_number_; }
 
-  void Init(const Config* cfg, size_t id);
-  void Setup();
+  void Init(const Config* cfg, size_t id, const std::string& serial,
+            const std::vector<size_t>& enabled_channels);
+  void Setup(const std::vector<double>& tx_gains,
+             const std::vector<double>& rx_gains);
   void Activate();    // Start?
   void Deactivate();  // Stop?
   void Close();
@@ -31,7 +33,8 @@ class Radio {
   std::vector<std::complex<float>> SnoopSamples(size_t channel,
                                                 size_t read_size);
 
-  void ConfigureTddMode(bool is_ref_radio, size_t beacon_radio_id);
+  void ConfigureTddModeBs(bool is_ref_radio, size_t beacon_radio_id);
+  void ConfigureTddModeUe();
 
   // Calibration helper functions
   void InitRefTx(size_t channel, double freq);
@@ -58,7 +61,8 @@ class Radio {
 
  private:
   size_t id_;
-  size_t num_channels_;
+  std::string serial_number_;
+  std::vector<size_t> enabled_channels_;
   SoapySDR::Device* dev_;
   SoapySDR::Stream* rxs_;
   SoapySDR::Stream* txs_;

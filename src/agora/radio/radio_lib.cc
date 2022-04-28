@@ -148,13 +148,22 @@ RadioConfig::RadioConfig(Config* cfg)
 }
 
 void RadioConfig::InitBsRadio(size_t radio_id) {
-  radios_.at(radio_id)->Init(cfg_, radio_id);
-  this->num_radios_initialized_.fetch_add(1);
+  radios_.at(radio_id)->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
+                             Utils::StrToChannels(cfg_->Channel()));
+  num_radios_initialized_.fetch_add(1);
 }
 
 void RadioConfig::ConfigureBsRadio(size_t radio_id) {
-  radios_.at(radio_id)->Setup();
-  this->num_radios_configured_.fetch_add(1);
+  std::vector<double> tx_gains;
+  tx_gains.emplace_back(cfg_->TxGainA());
+  tx_gains.emplace_back(cfg_->TxGainA());
+
+  std::vector<double> rx_gains;
+  rx_gains.emplace_back(cfg_->RxGainA());
+  rx_gains.emplace_back(cfg_->RxGainA());
+
+  radios_.at(radio_id)->Setup(tx_gains, rx_gains);
+  num_radios_configured_.fetch_add(1);
 }
 
 bool RadioConfig::RadioStart() {
@@ -253,10 +262,10 @@ bool RadioConfig::RadioStart() {
 
   const size_t beacon_radio = radio_num_;
   for (size_t i = 0; i < radio_num_; i++) {
-    if (cfg_->HwFramer() == true) {
+    if (cfg_->HwFramer()) {
       const size_t cell_id = cfg_->CellId().at(i);
       const bool is_ref_radio = (i == cfg_->RefRadio(cell_id));
-      radios_.at(i)->ConfigureTddMode(is_ref_radio, beacon_radio);
+      radios_.at(i)->ConfigureTddModeBs(is_ref_radio, beacon_radio);
     }
     radios_.at(i)->Activate();
   }
@@ -266,7 +275,6 @@ bool RadioConfig::RadioStart() {
     this->Go();  // to set all radio timestamps to zero
 
     ///\todo MUST fix this... for HwFramer == false
-    ///activateStream(this->rx_streams_.at(i), flags, 1e9, 0);
     for (auto& radio : radios_) {
       radio->Activate();
     }
