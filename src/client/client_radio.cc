@@ -13,7 +13,9 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
   std::cout << "Total Number of Client Radios " << total_radios_ << " with "
             << total_antennas_ << " antennas" << std::endl;
 
-  radios_.resize(total_radios_);
+  for (size_t i = 0; i < total_radios_; i++) {
+    radios_.emplace_back(std::make_unique<Radio>());
+  }
 
   std::vector<std::thread> radio_threads;
   num_client_radios_initialized_ = 0;

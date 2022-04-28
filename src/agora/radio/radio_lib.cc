@@ -6,9 +6,7 @@
 
 #include "SoapySDR/Formats.h"
 #include "SoapySDR/Logger.hpp"
-#include "SoapySDR/Time.hpp"
-#include "comms-lib.h"
-#include "nlohmann/json.hpp"
+#include "logger.h"
 
 constexpr bool kPrintCalibrationMats = false;
 
@@ -21,12 +19,10 @@ RadioConfig::RadioConfig(Config* cfg)
   SoapySDR::Kwargs sargs;
   // load channels
   auto channels = Utils::StrToChannels(cfg_->Channel());
-  ///Reduce the soapy log level
-  SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_SSI);
 
-  this->radio_num_ = cfg_->NumRadios();
-  this->antenna_num_ = cfg_->BsAntNum();
-  std::cout << "BS Radio num is " << this->radio_num_
+  radio_num_ = cfg_->NumRadios();
+  antenna_num_ = cfg_->BsAntNum();
+  std::cout << "BS Radio num is " << radio_num_
             << ", Antenna num: " << antenna_num_ << std::endl;
   if (kUseUHD == false) {
     for (size_t i = 0; i < cfg_->NumCells(); i++) {
@@ -64,10 +60,13 @@ RadioConfig::RadioConfig(Config* cfg)
     }
   }
 
-  radios_.resize(radio_num_);
+  for (size_t i = 0; i < radio_num_; i++) {
+    radios_.emplace_back(std::make_unique<Radio>());
+  }
+
   std::vector<std::thread> init_bs_threads;
 
-  for (size_t i = 0; i < this->radio_num_; i++) {
+  for (size_t i = 0; i < radio_num_; i++) {
 #ifdef THREADED_INIT
     init_bs_threads.emplace_back(&RadioConfig::InitBsRadio, this, i);
 #else
@@ -78,12 +77,12 @@ RadioConfig::RadioConfig(Config* cfg)
   // Block until all radios are initialized
   size_t num_checks = 0;
   size_t num_radios_init = num_radios_initialized_.load();
-  while (num_radios_init != this->radio_num_) {
+  while (num_radios_init != radio_num_) {
     num_checks++;
     if (num_checks > 1e9) {
       std::printf(
           "RadioConfig: Waiting for radio initialization, %zu of %zu ready\n",
-          num_radios_init, this->radio_num_);
+          num_radios_init, radio_num_);
       num_checks = 0;
     }
     num_radios_init = num_radios_initialized_.load();
@@ -104,7 +103,7 @@ RadioConfig::RadioConfig(Config* cfg)
   }
 
   std::vector<std::thread> config_bs_threads;
-  for (size_t i = 0; i < this->radio_num_; i++) {
+  for (size_t i = 0; i < radio_num_; i++) {
 #ifdef THREADED_INIT
     config_bs_threads.emplace_back(&RadioConfig::ConfigureBsRadio, this, i);
 #else
@@ -115,12 +114,12 @@ RadioConfig::RadioConfig(Config* cfg)
   num_checks = 0;
   // Block until all radios are configured
   size_t num_radios_config = num_radios_configured_.load();
-  while (num_radios_config != this->radio_num_) {
+  while (num_radios_config != radio_num_) {
     num_checks++;
     if (num_checks > 1e9) {
       std::printf(
           "RadioConfig: Waiting for radio initialization, %zu of %zu ready\n",
-          num_radios_config, this->radio_num_);
+          num_radios_config, radio_num_);
       num_checks = 0;
     }
     num_radios_config = num_radios_configured_.load();
@@ -272,7 +271,7 @@ bool RadioConfig::RadioStart() {
 
   //Stream is already activated?
   if (kUseUHD == false && cfg_->HwFramer() == false) {
-    this->Go();  // to set all radio timestamps to zero
+    Go();  // to set all radio timestamps to zero
 
     ///\todo MUST fix this... for HwFramer == false
     for (auto& radio : radios_) {

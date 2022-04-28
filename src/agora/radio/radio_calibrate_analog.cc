@@ -219,12 +219,12 @@ void RadioConfig::DciqMinimize(Radio* target_dev, Radio* ref_dev, int direction,
       step = 1;
     }
 
-    for (int i = start; i < stop; i += step) {
+    for (int j = start; j < stop; j += step) {
       // try I or Q arm based on iteration
       const auto dc_corr = ((i % 2) == 0)
                                ? std::complex<double>(best_dc_corr.real(),
-                                                      double(i) / fixed_scale)
-                               : std::complex<double>(double(i) / fixed_scale,
+                                                      double(j) / fixed_scale)
+                               : std::complex<double>(double(j) / fixed_scale,
                                                       best_dc_corr.imag());
       target_dev->SetDcOffset(direction, channel, dc_corr);
 

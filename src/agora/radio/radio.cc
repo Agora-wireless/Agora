@@ -23,13 +23,19 @@ Radio::Radio()
       txs_(nullptr),
       cfg_(nullptr) {
   //Reduce the soapy log level
+  AGORA_LOG_INFO("Create Null Radio\n");
   SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_NOTICE);
 }
 
-Radio::~Radio() { Close(); }
+Radio::~Radio() {
+  AGORA_LOG_INFO("Destory Radio %s(%zu)\n", serial_number_.c_str(), id_);
+  Close();
+}
 
 void Radio::Close() {
+  AGORA_LOG_INFO("Close Radio %s(%zu)\n", serial_number_.c_str(), id_);
   id_ = 0;
+  serial_number_ = "";
   if (rxs_ != nullptr) {
     dev_->closeStream(rxs_);
   }
@@ -46,6 +52,7 @@ void Radio::Close() {
 
 void Radio::Init(const Config* cfg, size_t id, const std::string& serial,
                  const std::vector<size_t>& enabled_channels) {
+  AGORA_LOG_INFO("Init Radio %s(%zu)\n", serial.c_str(), id);
   if (dev_ == nullptr) {
     id_ = id;
     cfg_ = cfg;
@@ -108,6 +115,7 @@ void Radio::Init(const Config* cfg, size_t id, const std::string& serial,
 
 void Radio::Setup(const std::vector<double>& tx_gains,
                   const std::vector<double>& rx_gains) {
+  AGORA_LOG_INFO("Setup Radio %s(%zu)\n", serial_number_.c_str(), id_);
   for (auto ch : enabled_channels_) {
     dev_->setSampleRate(SOAPY_SDR_RX, ch, cfg_->Rate());
     dev_->setSampleRate(SOAPY_SDR_TX, ch, cfg_->Rate());
@@ -213,7 +221,7 @@ void Radio::Setup(const std::vector<double>& tx_gains,
 }
 
 void Radio::Activate() {
-  AGORA_LOG_INFO("Activating Radio %s\n", serial_number_.c_str());
+  AGORA_LOG_INFO("Activate Radio %s(%zu)\n", serial_number_.c_str(), id_);
   if (kUseUHD == false) {
     dev_->setHardwareTime(0, "TRIGGER");
     //SOAPY_SDR_WAIT_TRIGGER?
@@ -227,7 +235,7 @@ void Radio::Activate() {
 }
 
 void Radio::Deactivate() {
-  AGORA_LOG_INFO("Deactivate Radio %s\n", serial_number_.c_str());
+  AGORA_LOG_INFO("Deactivate Radio %s(%zu)\n", serial_number_.c_str(), id_);
   const std::string corr_conf_str = "{\"corr_enabled\":false}";
   const std::string tdd_conf_str = "{\"tdd_enabled\":false}";
   dev_->deactivateStream(rxs_);
@@ -542,18 +550,28 @@ void Radio::ConfigureTddModeBs(bool is_ref_radio, size_t beacon_radio_id) {
   dev_->writeRegisters("BEACON_RAM", 0, cfg_->Beacon());
 
   size_t ndx = 0;
-  for (char const& c : enabled_channels_) {
+  for (const auto& channel : enabled_channels_) {
     const bool is_beacon_antenna =
         !cfg_->Beamsweep() && ndx == cfg_->BeaconAnt();
     std::vector<unsigned> beacon_weights(
         cfg_->NumRadios() * cfg_->NumChannels(), is_beacon_antenna ? 1 : 0);
-    std::string tx_ram_wgt = "BEACON_RAM_WGT_";
     if (cfg_->Beamsweep()) {
       for (size_t j = 0; j < beacon_weights.size(); j++) {
         beacon_weights.at(j) = CommsLib::Hadamard2(ndx, j);
       }
     }
-    dev_->writeRegisters(tx_ram_wgt + c, 0, beacon_weights);
+
+    char channel_letter;
+    if (channel == 0) {
+      channel_letter = 'A';
+    } else if (channel == 1) {
+      channel_letter = 'B';
+    } else {
+      AGORA_LOG_ERROR("Unsupported channel %zu\n", channel);
+      throw std::runtime_error("Unsupported channel");
+    }
+    dev_->writeRegisters(std::string("BEACON_RAM_WGT_" + channel_letter), 0,
+                         beacon_weights);
     ++ndx;
   }
   dev_->writeSetting("BEACON_START", std::to_string(beacon_radio_id));
@@ -609,15 +627,23 @@ void Radio::ConfigureTddModeUe() {
   // experimentally good value for dev front-end
   dev_->writeSetting("TX_SW_DELAY", "30");
   dev_->writeSetting("TDD_MODE", "true");
-  for (const auto& c : cfg_->UeChannel()) {
-    std::string tx_ram = "TX_RAM_";
-    dev_->writeRegisters(tx_ram + c, 0, cfg_->Pilot());
+  for (const auto& channel : cfg_->UeChannel()) {
+    char channel_letter;
+    if (channel == 0) {
+      channel_letter = 'A';
+    } else if (channel == 1) {
+      channel_letter = 'B';
+    } else {
+      AGORA_LOG_ERROR("Unsupported channel %zu\n", channel);
+      throw std::runtime_error("Unsupported channel");
+    }
+    dev_->writeRegisters(std::string("TX_RAM_" + channel_letter), 0,
+                         cfg_->Pilot());
   }
 
   std::string corr_conf_string =
       R"({"corr_enabled":true,"corr_threshold":)" + std::to_string(1) + "}";
   dev_->writeSetting("CORR_CONFIG", corr_conf_string);
   dev_->writeRegisters("CORR_COE", 0, cfg_->Coeffs());
-
   dev_->writeSetting("CORR_START", (cfg_->UeChannel() == "B") ? "B" : "A");
 }
