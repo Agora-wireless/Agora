@@ -268,17 +268,7 @@ bool RadioConfig::RadioStart() {
     }
     radios_.at(i)->Activate();
   }
-
-  //Stream is already activated?
-  if (kUseUHD == false && cfg_->HwFramer() == false) {
-    Go();  // to set all radio timestamps to zero
-
-    ///\todo MUST fix this... for HwFramer == false
-    for (auto& radio : radios_) {
-      radio->Activate();
-    }
-  }
-  std::cout << "radio start done!" << std::endl;
+  AGORA_LOG_INFO("RadioConfig::RadioStart complete!\n");
   return true;
 }
 

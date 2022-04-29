@@ -15,13 +15,17 @@ constexpr size_t kSoapyMakeMaxAttempts = 3;
 constexpr bool kPrintRadioSettings = false;
 constexpr double kAttnMax = -18.0f;
 
+// radio init time for UHD devices
+constexpr size_t kUhdInitTimeSec = 3;
+
 Radio::Radio()
     : id_(0),
       serial_number_(""),
       dev_(nullptr),
       rxs_(nullptr),
       txs_(nullptr),
-      cfg_(nullptr) {
+      cfg_(nullptr),
+      correlator_enabled_(false) {
   //Reduce the soapy log level
   AGORA_LOG_INFO("Create Null Radio\n");
   SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_NOTICE);
@@ -220,6 +224,7 @@ void Radio::Setup(const std::vector<double>& tx_gains,
 
 void Radio::Activate() {
   AGORA_LOG_INFO("Activate Radio %s(%zu)\n", serial_number_.c_str(), id_);
+  const bool is_ue = false;
   if (kUseUHD == false) {
     dev_->setHardwareTime(0, "TRIGGER");
     //SOAPY_SDR_WAIT_TRIGGER for UEs??
@@ -230,23 +235,35 @@ void Radio::Activate() {
     dev_->activateStream(rxs_);
     dev_->activateStream(txs_);
   } else {
-    dev_->setHardwareTime(0, "UNKNOWN_PPS");
-    dev_->activateStream(rxs_, SOAPY_SDR_HAS_TIME, 1e9, 0);
-    dev_->activateStream(txs_, SOAPY_SDR_HAS_TIME, 1e9, 0);
+    if (is_ue) {
+      dev_->setTimeSource("internal");
+      dev_->setClockSource("internal");
+      dev_->setHardwareTime(0, "UNKNOWN_PPS");
+    } else {
+      dev_->setClockSource("external");
+      dev_->setTimeSource("external");
+      dev_->setHardwareTime(0, "PPS");
+    }
+    // Wait for pps sync pulse ??
+    //std::this_thread::sleep_for(std::chrono::seconds(kUhdInitTimeSec -1));
+    dev_->activateStream(rxs_, SOAPY_SDR_HAS_TIME, kUhdInitTimeSec * 1e9, 0);
+    dev_->activateStream(txs_, SOAPY_SDR_HAS_TIME, kUhdInitTimeSec * 1e9, 0);
   }
 }
 
 void Radio::Deactivate() {
   AGORA_LOG_INFO("Deactivate Radio %s(%zu)\n", serial_number_.c_str(), id_);
-  const std::string corr_conf_str = "{\"corr_enabled\":false}";
   const std::string tdd_conf_str = "{\"tdd_enabled\":false}";
   dev_->deactivateStream(rxs_);
   dev_->deactivateStream(txs_);
   dev_->writeSetting("TDD_MODE", "false");
   dev_->writeSetting("TDD_CONFIG", tdd_conf_str);
-  //**********************************************************
-  //dev_->writeSetting("CORR_CONFIG", corr_conf_str);
-  //**********************************************************
+
+  if (correlator_enabled_) {
+    const std::string corr_conf_str = "{\"corr_enabled\":false}";
+    dev_->writeSetting("CORR_CONFIG", corr_conf_str);
+    correlator_enabled_ = false;
+  }
 }
 
 int Radio::Tx(const void* const* tx_buffs, size_t tx_size, int flags,
@@ -325,20 +342,23 @@ int Radio::Rx(void** rx_buffs, long long& rx_time_ns) {
 void Radio::Trigger() { dev_->writeSetting("TRIGGER_GEN", ""); }
 
 void Radio::ReadSensor() const {
-  std::cout << "TEMPs on Iris " << serial_number_ << "(" << id_ << ")"
-            << std::endl;
-  std::cout << "ZYNQ_TEMP  : " << dev_->readSensor("ZYNQ_TEMP") << std::endl;
-  std::cout << "LMS7_TEMP  : " << dev_->readSensor("LMS7_TEMP") << std::endl;
-  std::cout << "FE_TEMP  : " << dev_->readSensor("FE_TEMP") << std::endl;
-  std::cout << "TX0 TEMP  : " << dev_->readSensor(SOAPY_SDR_TX, 0, "TEMP")
-            << std::endl;
-  std::cout << "TX1 TEMP  : " << dev_->readSensor(SOAPY_SDR_TX, 1, "TEMP")
-            << std::endl;
-  std::cout << "RX0 TEMP  : " << dev_->readSensor(SOAPY_SDR_RX, 0, "TEMP")
-            << std::endl;
-  std::cout << "RX1 TEMP  : " << dev_->readSensor(SOAPY_SDR_RX, 1, "TEMP")
-            << std::endl;
-  std::cout << std::endl;
+  std::stringstream print_message;
+  print_message << "TEMPs on Iris " << serial_number_ << "(" << id_ << ")"
+                << std::endl;
+  print_message << "ZYNQ_TEMP  : " << dev_->readSensor("ZYNQ_TEMP")
+                << std::endl;
+  print_message << "LMS7_TEMP  : " << dev_->readSensor("LMS7_TEMP")
+                << std::endl;
+  print_message << "FE_TEMP  : " << dev_->readSensor("FE_TEMP") << std::endl;
+  print_message << "TX0 TEMP  : " << dev_->readSensor(SOAPY_SDR_TX, 0, "TEMP")
+                << std::endl;
+  print_message << "TX1 TEMP  : " << dev_->readSensor(SOAPY_SDR_TX, 1, "TEMP")
+                << std::endl;
+  print_message << "RX0 TEMP  : " << dev_->readSensor(SOAPY_SDR_RX, 0, "TEMP")
+                << std::endl;
+  print_message << "RX1 TEMP  : " << dev_->readSensor(SOAPY_SDR_RX, 1, "TEMP")
+                << std::endl;
+  AGORA_LOG_INFO("%s\n", print_message.str().c_str());
 }
 
 void Radio::PrintSettings() const {
@@ -652,7 +672,7 @@ void Radio::ConfigureTddModeUe() {
   // experimentally good value for dev front-end
   dev_->writeSetting("TX_SW_DELAY", "30");
   dev_->writeSetting("TDD_MODE", "true");
-  for (const auto& channel : cfg_->UeChannel()) {
+  for (const auto& channel : enabled_channels_) {
     char channel_letter;
     if (channel == 0) {
       channel_letter = 'A';
@@ -666,10 +686,24 @@ void Radio::ConfigureTddModeUe() {
     prog_reg.push_back(channel_letter);
     dev_->writeRegisters(prog_reg, 0, cfg_->Pilot());
   }
+  InitCorr();
+}
 
-  std::string corr_conf_string =
-      R"({"corr_enabled":true,"corr_threshold":)" + std::to_string(1) + "}";
-  dev_->writeSetting("CORR_CONFIG", corr_conf_string);
+void Radio::InitAgc(bool enabled, size_t setting) {
+  nlohmann::json agc_conf;
+  agc_conf["agc_enabled"] = enabled;
+  // 0 to 108
+  agc_conf["agc_gain_init"] = setting;
+  const std::string agc_confStr = agc_conf.dump();
+
+  dev_->writeSetting("AGC_CONFIG", agc_confStr);
+}
+
+void Radio::InitCorr() {
+  correlator_enabled_ = true;
+  std::string corrConfString =
+      "{\"corr_enabled\":true,\"corr_threshold\":" + std::to_string(1) + "}";
+  dev_->writeSetting("CORR_CONFIG", corrConfString);
   dev_->writeRegisters("CORR_COE", 0, cfg_->Coeffs());
   dev_->writeSetting("CORR_START", (cfg_->UeChannel() == "B") ? "B" : "A");
 }

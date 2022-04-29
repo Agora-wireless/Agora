@@ -75,18 +75,16 @@ bool ClientRadioConfig::RadioStart() {
   for (size_t i = 0; i < total_radios_; i++) {
     if (cfg_->UeHwFramer()) {
       radios_.at(i)->ConfigureTddModeUe();
-    } else {
-      radios_.at(i)->Activate();
     }
+    radios_.at(i)->Activate();
   }
-  std::cout << "radio start done!" << std::endl;
+  AGORA_LOG_INFO("ClientRadioConfig::RadioStart complete!\n");
   return true;
 }
 
 void ClientRadioConfig::Go() {
   if (kUseUHD == false) {
     for (size_t i = 0; i < total_radios_; i++) {
-      //std::cout << "triggering Iris ..." << i << std::endl;
       radios_.at(i)->Trigger();
     }
   }

@@ -15,6 +15,8 @@
 class ClientRadioConfig {
  public:
   explicit ClientRadioConfig(const Config* const cfg);
+  ~ClientRadioConfig();
+
   bool RadioStart();
   void RadioStop();
   void ReadSensors();
@@ -23,7 +25,6 @@ class ClientRadioConfig {
   int RadioRx(size_t radio_id, void** buffs, size_t num_samps,
               long long& rx_time);
   void Go();
-  ~ClientRadioConfig();
 
  private:
   void InitClientRadio(size_t radio_id);

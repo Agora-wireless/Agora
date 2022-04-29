@@ -53,6 +53,8 @@ class Radio {
   //Sets both tx and rx, is this ok?
   void SetFreqBb(size_t channel, double freq);
   void SetFreqRf(size_t channel, double freq);
+  //End Calibration Routines
+  void InitAgc(bool enabled, size_t setting);
 
   void ClearSyncDelay();
   void PrintSettings() const;
@@ -60,6 +62,8 @@ class Radio {
   void ReadSensor() const;
 
  private:
+  void InitCorr();
+
   size_t id_;
   std::string serial_number_;
   std::vector<size_t> enabled_channels_;
@@ -68,6 +72,7 @@ class Radio {
   SoapySDR::Stream* txs_;
   //Should remove this.
   const Config* cfg_;
+  bool correlator_enabled_;
 };
 
 #endif  // RADIO_H_
