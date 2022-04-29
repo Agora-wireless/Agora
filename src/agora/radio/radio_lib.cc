@@ -143,7 +143,7 @@ RadioConfig::RadioConfig(Config* cfg)
       }
     }
   }
-  std::cout << "radio init done!" << std::endl;
+  AGORA_LOG_INFO("RadioConfig init complete!\n");
 }
 
 void RadioConfig::InitBsRadio(size_t radio_id) {

@@ -258,12 +258,7 @@ void Radio::Deactivate() {
   dev_->deactivateStream(txs_);
   dev_->writeSetting("TDD_MODE", "false");
   dev_->writeSetting("TDD_CONFIG", tdd_conf_str);
-
-  if (correlator_enabled_) {
-    const std::string corr_conf_str = "{\"corr_enabled\":false}";
-    dev_->writeSetting("CORR_CONFIG", corr_conf_str);
-    correlator_enabled_ = false;
-  }
+  Correlator(false);
 }
 
 int Radio::Tx(const void* const* tx_buffs, size_t tx_size, int flags,
@@ -686,7 +681,7 @@ void Radio::ConfigureTddModeUe() {
     prog_reg.push_back(channel_letter);
     dev_->writeRegisters(prog_reg, 0, cfg_->Pilot());
   }
-  InitCorr();
+  Correlator(true);
 }
 
 void Radio::InitAgc(bool enabled, size_t setting) {
@@ -699,11 +694,20 @@ void Radio::InitAgc(bool enabled, size_t setting) {
   dev_->writeSetting("AGC_CONFIG", agc_confStr);
 }
 
-void Radio::InitCorr() {
-  correlator_enabled_ = true;
-  std::string corrConfString =
-      "{\"corr_enabled\":true,\"corr_threshold\":" + std::to_string(1) + "}";
-  dev_->writeSetting("CORR_CONFIG", corrConfString);
-  dev_->writeRegisters("CORR_COE", 0, cfg_->Coeffs());
-  dev_->writeSetting("CORR_START", (cfg_->UeChannel() == "B") ? "B" : "A");
+void Radio::Correlator(bool enable) {
+  if (enable) {
+    if (correlator_enabled_ == false) {
+      correlator_enabled_ = true;
+      const std::string corr_conf =
+          "{\"corr_enabled\":true,\"corr_threshold\":" + std::to_string(1) +
+          "}";
+      dev_->writeSetting("CORR_CONFIG", corr_conf);
+      dev_->writeRegisters("CORR_COE", 0, cfg_->Coeffs());
+      dev_->writeSetting("CORR_START", (cfg_->UeChannel() == "B") ? "B" : "A");
+    }
+  } else if (correlator_enabled_ == true) {
+    correlator_enabled_ = false;
+    const std::string corr_conf = "{\"corr_enabled\":false}";
+    dev_->writeSetting("CORR_CONFIG", corr_conf);
+  }
 }

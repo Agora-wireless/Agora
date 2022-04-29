@@ -62,7 +62,7 @@ class Radio {
   void ReadSensor() const;
 
  private:
-  void InitCorr();
+  void Correlator(bool enable);
 
   size_t id_;
   std::string serial_number_;
