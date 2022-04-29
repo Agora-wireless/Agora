@@ -10,6 +10,7 @@
 #include <memory>
 #include <vector>
 
+#include "SoapySDR/Device.hpp"
 #include "armadillo"
 #include "config.h"
 #include "memory_manage.h"

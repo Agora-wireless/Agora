@@ -323,6 +323,7 @@ set(COMMON_SOURCES
   src/common/memory_manage.cc
   src/common/scrambler.cc
   src/agora/radio/radio.cc
+  src/agora/radio/radio_soapysdr.cc
   src/common/ipc/udp_client.cc
   src/common/ipc/udp_server.cc
   src/common/ipc/udp_server_ipv6.cc

@@ -61,7 +61,7 @@ RadioConfig::RadioConfig(Config* cfg)
   }
 
   for (size_t i = 0; i < radio_num_; i++) {
-    radios_.emplace_back(std::make_unique<Radio>());
+    radios_.emplace_back(Radio::Create(Radio::SoapySdr));
   }
 
   std::vector<std::thread> init_bs_threads;
@@ -117,7 +117,7 @@ RadioConfig::RadioConfig(Config* cfg)
   while (num_radios_config != radio_num_) {
     num_checks++;
     if (num_checks > 1e9) {
-      std::printf(
+      AGORA_LOG_WARN(
           "RadioConfig: Waiting for radio initialization, %zu of %zu ready\n",
           num_radios_config, radio_num_);
       num_checks = 0;
@@ -155,11 +155,11 @@ void RadioConfig::InitBsRadio(size_t radio_id) {
 void RadioConfig::ConfigureBsRadio(size_t radio_id) {
   std::vector<double> tx_gains;
   tx_gains.emplace_back(cfg_->TxGainA());
-  tx_gains.emplace_back(cfg_->TxGainA());
+  tx_gains.emplace_back(cfg_->TxGainB());
 
   std::vector<double> rx_gains;
   rx_gains.emplace_back(cfg_->RxGainA());
-  rx_gains.emplace_back(cfg_->RxGainA());
+  rx_gains.emplace_back(cfg_->RxGainB());
 
   radios_.at(radio_id)->Setup(tx_gains, rx_gains);
   num_radios_configured_.fetch_add(1);

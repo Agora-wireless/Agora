@@ -14,7 +14,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
             << total_antennas_ << " antennas" << std::endl;
 
   for (size_t i = 0; i < total_radios_; i++) {
-    radios_.emplace_back(std::make_unique<Radio>());
+    radios_.emplace_back(Radio::Create(Radio::SoapySdr));
   }
 
   std::vector<std::thread> radio_threads;
@@ -60,11 +60,11 @@ void ClientRadioConfig::InitClientRadio(size_t radio_id) {
 
   std::vector<double> tx_gains;
   tx_gains.emplace_back(cfg_->ClientTxGainA(radio_id));
-  tx_gains.emplace_back(cfg_->ClientTxGainA(radio_id));
+  tx_gains.emplace_back(cfg_->ClientTxGainB(radio_id));
 
   std::vector<double> rx_gains;
   rx_gains.emplace_back(cfg_->ClientRxGainA(radio_id));
-  rx_gains.emplace_back(cfg_->ClientRxGainA(radio_id));
+  rx_gains.emplace_back(cfg_->ClientRxGainB(radio_id));
 
   radios_.at(radio_id)->Setup(tx_gains, rx_gains);
   this->num_client_radios_initialized_.fetch_add(1);
