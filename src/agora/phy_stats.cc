@@ -134,29 +134,37 @@ float PhyStats::GetEvmSnr(size_t frame_id, size_t ue_id) {
 }
 
 void PhyStats::PrintDlSnrStats(size_t frame_id, size_t ant_id) {
+  unused(ant_id);
   std::stringstream ss;
-  ss << "Frame " << frame_id << " Pilot SNR (dB) at UE Antenna " << ant_id
-     << ": [" << std::fixed << std::setw(5) << std::setprecision(1);
+  ss << "Frame " << frame_id << " DL Pilot SNR (dB) at "
+     << std::fixed << std::setw(5) << std::setprecision(1);
   size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
-  for (size_t i = 0; i < dl_pilots_num; i++) {
-    float frame_snr =
-        dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + i];
-    ss << frame_snr << " ";
+  for (size_t i = 0; i < config_->UeAntNum(); i++) {
+    ss << "UE Antenna " << i << ": [ ";
+    for (size_t j = 0; j < dl_pilots_num; j++) {
+      float frame_snr =
+          dl_pilot_snr_[frame_id % kFrameWnd][i * dl_pilots_num + j];
+      ss << frame_snr << " ";
+    }
+    ss << "] ";
   }
-  ss << "]" << std::endl;
+  ss << std::endl;
   AGORA_LOG_INFO("%s", ss.str().c_str());
 }
 
 void PhyStats::RecordDlPilotSnr(CsvLog::CsvLogger* logger, size_t frame_id,
                                 size_t ant_id) {
+  unused(ant_id);
   if (kEnableCsvLog) {
     const size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
     if ((logger != nullptr) && (dl_pilots_num > 0)) {
       std::stringstream ss;
-      ss << frame_id << "," << ant_id;
-      for (size_t i = 0; i < dl_pilots_num; i++) {
-        ss << ","
-           << dl_pilot_snr_[frame_id % kFrameWnd][ant_id * dl_pilots_num + i];
+      ss << frame_id;
+      for (size_t i = 0; i < config_->UeAntNum(); i++) {
+        for (size_t j = 0; j < dl_pilots_num; j++) {
+          ss << ","
+             << dl_pilot_snr_[frame_id % kFrameWnd][i * dl_pilots_num + j];
+        }
       }
       logger->Write(ss.str());
     }
