@@ -14,17 +14,21 @@ class RadioDataPlaneSocket : public RadioDataPlane {
   // Allow move and disallow copy
   RadioDataPlaneSocket(RadioDataPlaneSocket&&) noexcept = default;
   explicit RadioDataPlaneSocket(const RadioDataPlaneSocket&) = delete;
-
-  RadioDataPlaneSocket(const Config* cfg, SoapySDR::Device* device, size_t id);
   ~RadioDataPlaneSocket() final;
 
-  void Init(const Config* cfg, SoapySDR::Device* device, size_t id) final;
+  void Init(Radio* radio, const Config* cfg) final;
   void Setup() final;
   void Activate() final;
   void Deactivate() final;
   void Close() final;
 
   int Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
+         size_t rx_size, int rx_flags, long long& rx_time_ns) final;
+
+  int Rx(std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
+         size_t rx_size, int rx_flags, long long& rx_time_ns) final;
+
+  int Rx(std::vector<void*>& rx_locations, size_t rx_size, int rx_flags,
          long long& rx_time_ns) final;
 
   void Flush() final;

@@ -7,14 +7,16 @@
 
 #include "logger.h"
 
-ClientRadioConfig::ClientRadioConfig(const Config* const cfg) : cfg_(cfg) {
+ClientRadioConfig::ClientRadioConfig(const Config* const cfg,
+                                     Radio::RadioType radio_type)
+    : cfg_(cfg) {
   total_radios_ = cfg_->UeNum();
   total_antennas_ = cfg_->UeAntNum();
   std::cout << "Total Number of Client Radios " << total_radios_ << " with "
             << total_antennas_ << " antennas" << std::endl;
 
   for (size_t i = 0; i < total_radios_; i++) {
-    radios_.emplace_back(Radio::Create(Radio::SoapySdr));
+    radios_.emplace_back(Radio::Create(radio_type));
   }
 
   std::vector<std::thread> radio_threads;
@@ -95,9 +97,22 @@ int ClientRadioConfig::RadioTx(size_t radio_id, void** buffs, size_t num_samps,
   return radios_.at(radio_id)->Tx(buffs, num_samps, flags, tx_time);
 }
 
-int ClientRadioConfig::RadioRx(size_t radio_id, void** buffs, size_t num_samps,
-                               long long& rx_time) {
-  return radios_.at(radio_id)->Rx(buffs, rx_time);
+int ClientRadioConfig::RadioRx(
+    size_t radio_id, std::vector<std::vector<std::complex<int16_t>>>& rx_data,
+    size_t rx_size, int rx_flags, long long& rx_time_ns) {
+  return radios_.at(radio_id)->Rx(rx_data, rx_size, rx_flags, rx_time_ns);
+}
+
+int ClientRadioConfig::RadioRx(
+    size_t radio_id, std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
+    size_t rx_size, int rx_flags, long long& rx_time_ns) {
+  return radios_.at(radio_id)->Rx(rx_buffs, rx_size, rx_flags, rx_time_ns);
+}
+
+int ClientRadioConfig::RadioRx(size_t radio_id, std::vector<void*>& rx_locs,
+                               size_t rx_size, int rx_flags,
+                               long long& rx_time_ns) {
+  return radios_.at(radio_id)->Rx(rx_locs, rx_size, rx_flags, rx_time_ns);
 }
 
 void ClientRadioConfig::ReadSensors() {

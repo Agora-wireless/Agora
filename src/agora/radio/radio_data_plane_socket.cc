@@ -7,20 +7,14 @@
 
 #include "SoapySDR/Formats.h"
 #include "logger.h"
+#include "radio_soapysdr.h"
 #include "utils.h"
 
-RadioDataPlaneSocket::RadioDataPlaneSocket()
-    : RadioDataPlaneSocket(nullptr, nullptr, 0) {}
-
-RadioDataPlaneSocket::RadioDataPlaneSocket(const Config* cfg,
-                                           SoapySDR::Device* device, size_t id)
-    : RadioDataPlane(cfg, device, id) {}
-
+RadioDataPlaneSocket::RadioDataPlaneSocket() : RadioDataPlane() {}
 RadioDataPlaneSocket::~RadioDataPlaneSocket() { Close(); }
 
-void RadioDataPlaneSocket::Init(const Config* cfg, SoapySDR::Device* device,
-                                size_t id) {
-  return RadioDataPlane::Init(cfg, device, id);
+void RadioDataPlaneSocket::Init(Radio* radio, const Config* cfg) {
+  return RadioDataPlane::Init(radio, cfg);
 }
 
 inline void RadioDataPlaneSocket::Activate() {
@@ -35,16 +29,16 @@ inline void RadioDataPlaneSocket::Close() { return RadioDataPlane::Close(); }
 
 void RadioDataPlaneSocket::Setup() {
   if (CheckMode() == RadioDataPlane::Mode::kModeShutdown) {
-    auto channels = Utils::StrToChannels(Configuration()->Channel());
-
-    std::string stream_protocol = device_->readSetting("STREAM_PROTOCOL");
+    SoapySDR::Device* soapy_device =
+        dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
+    std::string stream_protocol = soapy_device->readSetting("STREAM_PROTOCOL");
     if (stream_protocol != "twbw64") {
       throw std::runtime_error("Stream protocol mismatch");
     }
 
     //query remote iris endpoint configuration
-    auto remote_address = device_->readSetting("ETH0_IPv6_ADDR");
-    const auto remote_port = device_->readSetting("UDP_SERVICE_PORT");
+    auto remote_address = soapy_device->readSetting("ETH0_IPv6_ADDR");
+    const auto remote_port = soapy_device->readSetting("UDP_SERVICE_PORT");
     if (remote_address.empty()) {
       throw std::runtime_error(
           "RadioDataPlaneSocket::Configure: Failed to query Iris IPv6 address");
@@ -72,10 +66,11 @@ void RadioDataPlaneSocket::Setup() {
     AGORA_LOG_INFO(" Connect address %s\n", connect_address.c_str());
 
     //Setup the socket interface to the radio for the rx stream
-    socket_.Create(Configuration()->SampsPerSymbol(),
-                   Configuration()->BsServerAddr(), connect_address,
-                   std::to_string(Configuration()->BsServerPort() + Id()),
-                   remote_port);
+    socket_.Create(
+        Configuration()->SampsPerSymbol(), Configuration()->BsServerAddr(),
+        connect_address,
+        std::to_string(Configuration()->BsServerPort() + radio_->Id()),
+        remote_port);
 
     SoapySDR::Kwargs rxstream_args;
     //Not sure if "bypass mode" works
@@ -97,9 +92,30 @@ void RadioDataPlaneSocket::Setup() {
 
 // For now, radio rx will return 1 symbol
 int RadioDataPlaneSocket::Rx(
-    std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-    long long& rx_time_ns) {
-  const int rx_return = socket_.RxSymbol(rx_data, rx_time_ns);
+    std::vector<std::vector<std::complex<int16_t>>>& rx_data, size_t rx_size,
+    int rx_flags, long long& rx_time_ns) {
+  std::vector<void*> rx_locs;
+  rx_locs.reserve(rx_data.size());
+  for (auto& loc : rx_data) {
+    rx_locs.emplace_back(loc.data());
+  }
+  return Rx(rx_locs, rx_size, rx_flags, rx_time_ns);
+}
+
+int RadioDataPlaneSocket::Rx(
+    std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs, size_t rx_size,
+    int rx_flags, long long& rx_time_ns) {
+  std::vector<void*> rx_locs;
+  rx_locs.reserve(rx_buffs.size());
+  for (auto& loc : rx_buffs) {
+    rx_locs.emplace_back(loc->data());
+  }
+  return Rx(rx_locs, rx_size, rx_flags, rx_time_ns);
+}
+
+int RadioDataPlaneSocket::Rx(std::vector<void*>& rx_locations, size_t rx_size,
+                             int rx_flags, long long& rx_time_ns) {
+  const int rx_return = socket_.RxSymbol(rx_locations, rx_time_ns);
   if (rx_return > 0) {
     AGORA_LOG_TRACE("Rx'd sample count %d\n", rx_return);
   } else if (rx_return < 0) {

@@ -6,13 +6,16 @@
 #ifndef RADIO_SOAPYSDR_H_
 #define RADIO_SOAPYSDR_H_
 
+#include <memory>
+
 #include "SoapySDR/Device.hpp"
 #include "config.h"
 #include "radio.h"
+#include "radio_data_plane.h"
 
 class RadioSoapySdr : public Radio {
  public:
-  RadioSoapySdr();
+  RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type);
   ~RadioSoapySdr() final;
 
   void Init(const Config* cfg, size_t id, const std::string& serial,
@@ -25,8 +28,14 @@ class RadioSoapySdr : public Radio {
 
   int Tx(const void* const* tx_buffs, size_t tx_size, int tx_flags,
          long long& tx_time_ns) final;
-  int Rx(void** rx_buffs, long long& rx_time_ns) final;
-  int Rx(void** rx_buffs, size_t rx_size, int rx_flags,
+
+  int Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
+         size_t rx_size, size_t rx_flags, long long& rx_time_ns) final;
+
+  int Rx(std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
+         size_t rx_size, int rx_flags, long long& rx_time_ns) final;
+
+  int Rx(std::vector<void*>& rx_locs, size_t rx_size, int rx_flags,
          long long& rx_time_ns) final;
   //End of generic interface
 
@@ -60,11 +69,13 @@ class RadioSoapySdr : public Radio {
   std::vector<std::complex<float>> SnoopSamples(size_t channel,
                                                 size_t read_size);
 
+  inline SoapySDR::Device* SoapyDevice() const { return dev_; }
+
  private:
   void Correlator(bool enable);
 
   SoapySDR::Device* dev_;
-  SoapySDR::Stream* rxs_;
+  std::unique_ptr<RadioDataPlane> rxp_;
   SoapySDR::Stream* txs_;
   bool correlator_enabled_;
 };

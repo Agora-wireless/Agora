@@ -101,9 +101,7 @@ void RadioSocket::Create(size_t samples_per_symbol,
 /// returns the number of samples inserted into out_data
 /// out_data unpacked symbol dara
 /// rx_time_ns rx time from symbol header (t0 of symbol)
-int RadioSocket::RxSymbol(
-    std::vector<std::vector<std::complex<int16_t>>>& out_data,
-    long long& rx_time_ns) {
+int RadioSocket::RxSymbol(std::vector<void*>& out_data, long long& rx_time_ns) {
   size_t num_samples = 0;
   bool try_rx = true;
 
@@ -208,9 +206,8 @@ bool RadioSocket::CheckSymbolComplete(const std::byte* in_data,
 }
 
 //Unpacks the symbol data from the udp packets and data format exansion 24->32
-size_t RadioSocket::ParseRxSymbol(
-    std::vector<std::vector<std::complex<int16_t>>>& out_samples,
-    long long& rx_time_ns) {
+size_t RadioSocket::ParseRxSymbol(std::vector<void*>& out_samples,
+                                  long long& rx_time_ns) {
   size_t processed_bytes = 0;
   size_t processed_samples = 0;
 
@@ -251,7 +248,10 @@ size_t RadioSocket::ParseRxSymbol(
       const uint16_t split = uint16_t(payload[byte_offset + 1u]);
       const uint16_t q_msb = uint16_t(payload[byte_offset + 2u]);
       //Sign extend the 16 bit value (zero out lsb)
-      out_samples.at(ch).at(processed_samples) =
+      auto* output_location = &static_cast<std::complex<int16_t>*>(
+          out_samples.at(ch))[processed_samples];
+
+      *output_location =
           std::complex<int16_t>(int16_t((split << 12u) | (i_lsb << 4u)),
                                 int16_t((q_msb << 8u) | (split & 0xf0)));
       ch++;

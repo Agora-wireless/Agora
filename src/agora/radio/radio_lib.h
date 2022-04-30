@@ -18,7 +18,7 @@
 
 class RadioConfig {
  public:
-  explicit RadioConfig(Config* cfg);
+  RadioConfig(Config* cfg, Radio::RadioType radio_type);
   ~RadioConfig();
 
   bool RadioStart();
@@ -29,10 +29,18 @@ class RadioConfig {
   int RadioTx(size_t radio_id,
               const std::vector<std::vector<std::complex<int16_t>>>& tx_data,
               int flags, long long& tx_time_ns);
-  int RadioRx(size_t radio_id, void** buffs, long long& rx_time_ns);
+
   int RadioRx(size_t radio_id,
               std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-              long long& rx_time_ns);
+              size_t rx_size, int rx_flags, long long& rx_time_ns);
+
+  int RadioRx(size_t radio_id,
+              std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
+              size_t rx_size, int rx_flags, long long& rx_time_ns);
+
+  int RadioRx(size_t radio_id, std::vector<void*>& rx_locs, size_t rx_size,
+              int rx_flags, long long& rx_time_ns);
+
   bool DoCalib() const { return calib_; }
   void Go();
   arma::cx_float* GetCalibUl() { return init_calib_ul_processed_; }

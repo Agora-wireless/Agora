@@ -9,6 +9,7 @@
 #include "SoapySDR/Logger.hpp"
 #include "SoapySDR/Time.hpp"
 #include "logger.h"
+#include "radio_data_plane.h"
 #include "symbols.h"
 
 constexpr size_t kSoapyMakeMaxAttempts = 3;
@@ -18,10 +19,10 @@ constexpr double kAttnMax = -18.0f;
 // radio init time for UHD devices
 constexpr size_t kUhdInitTimeSec = 3;
 
-RadioSoapySdr::RadioSoapySdr()
+RadioSoapySdr::RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type)
     : Radio(),
       dev_(nullptr),
-      rxs_(nullptr),
+      rxp_(RadioDataPlane::Create(rx_dp_type)),
       txs_(nullptr),
       correlator_enabled_(false) {
   //Reduce the soapy log level
@@ -37,10 +38,7 @@ RadioSoapySdr::~RadioSoapySdr() {
 
 void RadioSoapySdr::Close() {
   AGORA_LOG_INFO("Close RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(), Id());
-  if (rxs_ != nullptr) {
-    dev_->closeStream(rxs_);
-  }
-  rxs_ = nullptr;
+  rxp_.reset();
   if (txs_ != nullptr) {
     dev_->closeStream(txs_);
   }
@@ -93,17 +91,21 @@ void RadioSoapySdr::Init(const Config* cfg, size_t id,
     if (hw_info["revision"].find("Iris") != std::string::npos) {
       dev_->writeSetting("RESET_DATA_LOGIC", "");
     }
-    rxs_ = dev_->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, enabled_channels,
-                             sargs);
-    if (rxs_ == nullptr) {
+
+    if (rxp_ == nullptr) {
       AGORA_LOG_ERROR(
           "RadioSoapySdr::Init[%zu] - Radio rx control plane could not be "
           "configured\n",
           id);
     }
+    rxp_->Init(this, cfg_);
+    //rxs_ = dev_->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, enabled_channels,
+    //                         sargs);
+    rxp_->Setup();
+
     txs_ = dev_->setupStream(SOAPY_SDR_TX, SOAPY_SDR_CS16, enabled_channels,
                              sargs);
-    if (rxs_ == nullptr) {
+    if (txs_ == nullptr) {
       AGORA_LOG_ERROR(
           "RadioSoapySdr::Init[%zu] - Radio tx control plane could not be "
           "configured\n",
@@ -233,7 +235,8 @@ void RadioSoapySdr::Activate() {
     //dev_->activateStream(rxs_, SOAPY_SDR_WAIT_TRIGGER);
     //dev_->activateStream(txs_, SOAPY_SDR_WAIT_TRIGGER);
     //**********************************************************
-    dev_->activateStream(rxs_);
+    //dev_->activateStream(rxs_);
+    rxp_->Activate();
     dev_->activateStream(txs_);
   } else {
     if (is_ue) {
@@ -247,7 +250,8 @@ void RadioSoapySdr::Activate() {
     }
     // Wait for pps sync pulse ??
     //std::this_thread::sleep_for(std::chrono::seconds(kUhdInitTimeSec -1));
-    dev_->activateStream(rxs_, SOAPY_SDR_HAS_TIME, kUhdInitTimeSec * 1e9, 0);
+    //dev_->activateStream(rxs_, SOAPY_SDR_HAS_TIME, kUhdInitTimeSec * 1e9, 0);
+    rxp_->Activate();
     dev_->activateStream(txs_, SOAPY_SDR_HAS_TIME, kUhdInitTimeSec * 1e9, 0);
   }
 }
@@ -256,7 +260,7 @@ void RadioSoapySdr::Deactivate() {
   AGORA_LOG_INFO("Deactivate RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(),
                  Id());
   const std::string tdd_conf_str = "{\"tdd_enabled\":false}";
-  dev_->deactivateStream(rxs_);
+  rxp_->Deactivate();
   dev_->deactivateStream(txs_);
   dev_->writeSetting("TDD_MODE", "false");
   dev_->writeSetting("TDD_CONFIG", tdd_conf_str);
@@ -296,44 +300,38 @@ int RadioSoapySdr::Tx(const void* const* tx_buffs, size_t tx_size, int flags,
   return w;
 }
 
-int RadioSoapySdr::Rx(void** rx_buffs, size_t rx_size, int rx_flags,
-                      long long& rx_time_ns) {
-  int rx_status = 0;
-  constexpr long kRxTimeout = 1;  // 1uS
-  long long frame_time_ns = 0;
-  rx_status = dev_->readStream(rxs_, rx_buffs, rx_size, rx_flags, frame_time_ns,
-                               kRxTimeout);
+int RadioSoapySdr::Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
+                      size_t rx_size, size_t rx_flags, long long& rx_time_ns) {
+  rx_time_ns = 0;
 
-  if (cfg_->HwFramer() == true) {
-    rx_time_ns = frame_time_ns;
-  } else {
-    // for UHD device recv using ticks
-    rx_time_ns = SoapySDR::timeNsToTicks(frame_time_ns, cfg_->Rate());
+  const int rx_return = rxp_->Rx(rx_data, rx_size, rx_flags, rx_time_ns);
+  if (rx_return < 0) {
+    throw std::runtime_error("Error in RadioRx!");
   }
-
-  if (kDebugRadioRX) {
-    if (rx_status == static_cast<int>(rx_size)) {
-      std::cout << "Radio " << Id() << " received " << rx_status
-                << " flags: " << rx_flags << " MTU " << dev_->getStreamMTU(rxs_)
-                << std::endl;
-    } else {
-      if (!((rx_status == SOAPY_SDR_TIMEOUT) && (rx_flags == 0))) {
-        std::cout << "Unexpected RadioRx return value " << rx_status
-                  << " from radio " << Id() << " flags: " << rx_flags
-                  << std::endl;
-      }
-    }
-  }
-
-  /// If a timeout occurs tell the user you received 0 bytes
-  if (rx_status == SOAPY_SDR_TIMEOUT) {
-    rx_status = 0;
-  }
-  return rx_status;
+  return rx_return;
 }
 
-int RadioSoapySdr::Rx(void** rx_buffs, long long& rx_time_ns) {
-  return Rx(rx_buffs, cfg_->SampsPerSymbol(), SOAPY_SDR_END_BURST, rx_time_ns);
+int RadioSoapySdr::Rx(
+    std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs, size_t rx_size,
+    int rx_flags, long long& rx_time_ns) {
+  rx_time_ns = 0;
+
+  const int rx_return = rxp_->Rx(rx_buffs, rx_size, rx_flags, rx_time_ns);
+  if (rx_return < 0) {
+    throw std::runtime_error("Error in RadioRx!");
+  }
+  return rx_return;
+}
+
+int RadioSoapySdr::Rx(std::vector<void*>& rx_locs, size_t rx_size, int rx_flags,
+                      long long& rx_time_ns) {
+  rx_time_ns = 0;
+
+  const int rx_return = rxp_->Rx(rx_locs, rx_size, rx_flags, rx_time_ns);
+  if (rx_return < 0) {
+    throw std::runtime_error("Error in RadioRx!");
+  }
+  return rx_return;
 }
 
 void RadioSoapySdr::Trigger() { dev_->writeSetting("TRIGGER_GEN", ""); }

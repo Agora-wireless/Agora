@@ -161,8 +161,8 @@ std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
   long long frame_time;
 
   //Ok to read into sample memory for dummy read
-  const int rx_status =
-      radio_config_.RadioRx(radio_id, samp.data(), frame_time);
+  const int rx_status = radio_config_.RadioRx(
+      radio_id, samp, Configuration()->SampsPerSymbol(), 0, frame_time);
 
   //Should be Configuration()->SampsPerSymbol() but adding this check causes issues
   if (rx_status > 0) {
@@ -723,8 +723,9 @@ long long int TxRxWorkerHw::GetHwTime() {
       if (frm == 0) {
         const size_t rx_radio_id = interface_offset_;
         while (rx_status < 0) {
-          rx_status =
-              radio_config_.RadioRx(rx_radio_id, samp_buffer, rx_time_bs);
+          rx_status = radio_config_.RadioRx(rx_radio_id, samp_buffer,
+                                            Configuration()->SampsPerSymbol(),
+                                            0, rx_time_bs);
         }
         //First Frame has been rx'd by the first radio
         tx_time_bs = rx_time_bs + frame_time * TX_FRAME_DELTA;
@@ -737,7 +738,9 @@ long long int TxRxWorkerHw::GetHwTime() {
         //Finish rx'ing symbol 0 on remaining radios
         for (size_t radio_id = rx_radio_id + 1;
              radio_id < rx_radio_id + num_interfaces_; radio_id++) {
-          rx_status = radio_config_.RadioRx(radio_id, samp_buffer, rx_time_bs);
+          rx_status = radio_config_.RadioRx(radio_id, samp_buffer,
+                                            Configuration()->SampsPerSymbol(),
+                                            0, rx_time_bs);
           //---------------What to do about errors?
         }
         //Symbol complete
@@ -769,7 +772,9 @@ long long int TxRxWorkerHw::GetHwTime() {
            sym < Configuration()->Frame().NumTotalSyms(); sym++) {
         for (size_t radio_id = interface_offset_;
              radio_id < interface_offset_ + num_interfaces_; radio_id++) {
-          rx_status = radio_config_.RadioRx(radio_id, samp_buffer, rx_time_bs);
+          rx_status = radio_config_.RadioRx(radio_id, samp_buffer,
+                                            Configuration()->SampsPerSymbol(),
+                                            0, rx_time_bs);
           //---------------Check status?
         }
       }

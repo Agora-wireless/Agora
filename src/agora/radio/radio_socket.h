@@ -28,15 +28,12 @@ class RadioSocket {
   inline const std::string& Address() const { return socket_->Address(); }
   inline const std::string& Port() const { return socket_->Port(); };
 
-  int RxSymbol(std::vector<std::vector<std::complex<int16_t>>>& out_data,
-               long long& rx_time_ns);
+  int RxSymbol(std::vector<void*>& out_data, long long& rx_time_ns);
   void Flush();
 
  private:
   bool CheckSymbolComplete(const std::byte* in_data, const int& in_count);
-  size_t ParseRxSymbol(
-      std::vector<std::vector<std::complex<int16_t>>>& out_samples,
-      long long& rx_time_ns);
+  size_t ParseRxSymbol(std::vector<void*>& out_samples, long long& rx_time_ns);
 
   std::unique_ptr<UDPServerIPv6> socket_;
   std::vector<std::byte> rx_buffer_;

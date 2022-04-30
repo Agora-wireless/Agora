@@ -324,6 +324,10 @@ set(COMMON_SOURCES
   src/common/scrambler.cc
   src/agora/radio/radio.cc
   src/agora/radio/radio_soapysdr.cc
+  src/agora/radio/radio_data_plane.cc
+  src/agora/radio/radio_socket.cc
+  src/agora/radio/radio_data_plane_soapy.cc
+  src/agora/radio/radio_data_plane_socket.cc
   src/common/ipc/udp_client.cc
   src/common/ipc/udp_server.cc
   src/common/ipc/udp_server_ipv6.cc
@@ -359,10 +363,6 @@ set(AGORA_SOURCES ${AGORA_SOURCES}
   src/agora/radio/radio_lib.cc
   src/agora/radio/radio_calibrate_digital.cc
   src/agora/radio/radio_calibrate_analog.cc
-  src/agora/radio/radio_socket.cc
-  src/agora/radio/radio_data_plane.cc
-  src/agora/radio/radio_data_plane_soapy.cc
-  src/agora/radio/radio_data_plane_socket.cc
   src/mac/mac_thread_basestation.cc
   src/agora/txrx/packet_txrx_sim.cc
   src/agora/txrx/packet_txrx_radio.cc
@@ -459,7 +459,6 @@ target_link_libraries(macbs ${COMMON_LIBS})
 if (USE_ARGOS)
 add_executable(radio_test
     test/radio_test/main.cc
-    test/radio_test/radio_lib_mod.cc
     $<TARGET_OBJECTS:agora_sources_lib>
     $<TARGET_OBJECTS:shared_txrx_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)

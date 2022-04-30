@@ -6,7 +6,6 @@
 #include "logger.h"
 #include "network_utils.h"
 #include "radio_lib.h"
-#include "radio_lib_mod.h"
 #include "signal_handler.h"
 #include "version_config.h"
 
@@ -97,7 +96,8 @@ void TestRadioRxStream(Config* cfg, const uint32_t max_rx) {
 
   if (kUseArgos) {
     // Makes the soapy remote "HUB" / InitBsRadio / ConfigureBsRadio
-    auto radioconfig = std::make_unique<RadioConfig>(cfg);
+    auto radioconfig =
+        std::make_unique<RadioConfig>(cfg, Radio::SoapySdrStream);
     radioconfig->RadioStart();
 
     //Radio Trigger (start rx)
@@ -109,8 +109,8 @@ void TestRadioRxStream(Config* cfg, const uint32_t max_rx) {
            (num_rx_symbols < max_rx)) {
       for (auto radio = radio_lo; radio < radio_hi; radio++) {
         long long rx_time;
-        int rx_samples =
-            radioconfig->RadioRx(radio, rx_buffs.at(radio).data(), rx_time);
+        int rx_samples = radioconfig->RadioRx(
+            radio, rx_buffs.at(radio), cfg->SampsPerSymbol(), 0, rx_time);
         if (rx_samples > 0) {
           //Rx data.....
           size_t frame_id = 0;
@@ -173,7 +173,8 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
 
   if (kUseArgos) {
     // Makes the soapy remote "HUB" / InitBsRadio / ConfigureBsRadio
-    auto radioconfig = std::make_unique<RadioConfigNoRxStream>(cfg);
+    auto radioconfig =
+        std::make_unique<RadioConfig>(cfg, Radio::SoapySdrSocket);
     radioconfig->RadioStart();
 
     //Radio Trigger (start rx)
@@ -185,8 +186,8 @@ void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
            (num_rx_symbols < max_rx)) {
       for (auto radio = radio_lo; radio < radio_hi; radio++) {
         long long rx_time;
-        int rx_samples =
-            radioconfig->RadioRx(radio, rx_buffer.at(radio), rx_time);
+        const int rx_samples = radioconfig->RadioRx(
+            radio, rx_buffer.at(radio), cfg->SampsPerSymbol(), 0, rx_time);
         if (rx_samples > 0) {
           //Rx data.....
           size_t frame_id = 0;

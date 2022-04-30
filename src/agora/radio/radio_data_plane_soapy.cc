@@ -6,17 +6,12 @@
 #include "radio_data_plane_soapy.h"
 
 #include "SoapySDR/Time.hpp"
+#include "radio_soapysdr.h"
 
-RadioDataPlaneSoapy::RadioDataPlaneSoapy()
-    : RadioDataPlaneSoapy(nullptr, nullptr, 0) {}
+RadioDataPlaneSoapy::RadioDataPlaneSoapy() : RadioDataPlane() {}
 
-RadioDataPlaneSoapy::RadioDataPlaneSoapy(const Config* cfg,
-                                         SoapySDR::Device* device, size_t id)
-    : RadioDataPlane(cfg, device, id) {}
-
-void RadioDataPlaneSoapy::Init(const Config* cfg, SoapySDR::Device* device,
-                               size_t id) {
-  return RadioDataPlane::Init(cfg, device, id);
+void RadioDataPlaneSoapy::Init(Radio* radio, const Config* cfg) {
+  return RadioDataPlane::Init(radio, cfg);
 }
 
 inline void RadioDataPlaneSoapy::Activate() {
@@ -35,23 +30,46 @@ inline void RadioDataPlaneSoapy::Setup() {
 }
 
 // For now, radio rx will return 1 symbol
+//int RadioDataPlaneSoapy::Rx(
+//    std::vector<std::vector<std::complex<int16_t>>>& rx_data,
+//    long long& rx_time_ns) {
 int RadioDataPlaneSoapy::Rx(
-    std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-    long long& rx_time_ns) {
+    std::vector<std::vector<std::complex<int16_t>>>& rx_data, size_t rx_size,
+    int rx_flags, long long& rx_time_ns) {
+  std::vector<void*> rx_locations;
+  rx_locations.reserve(rx_data.size());
+
+  for (auto& buff : rx_data) {
+    rx_locations.emplace_back(buff.data());
+  }
+  return RadioDataPlaneSoapy::Rx(rx_locations, rx_size, rx_flags, rx_time_ns);
+}
+
+int RadioDataPlaneSoapy::Rx(
+    std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs, size_t rx_size,
+    int rx_flags, long long& rx_time_ns) {
+  std::vector<void*> rx_locations;
+  rx_locations.reserve(rx_buffs.size());
+
+  for (auto& buff : rx_buffs) {
+    rx_locations.emplace_back(buff->data());
+  }
+  return RadioDataPlaneSoapy::Rx(rx_locations, rx_size, rx_flags, rx_time_ns);
+}
+
+int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
+                            int rx_flags, long long& rx_time_ns) {
   constexpr long kRxTimeout = 1;  // 1uS
   // SOAPY_SDR_ONE_PACKET; SOAPY_SDR_END_BURST
-  int rx_flags = SOAPY_SDR_END_BURST;
+  //rx_flags = SOAPY_SDR_END_BURST;
+  //rx_size = Configuration()->SampsPerSymbol();
+
   int rx_status = 0;
   long long frame_time_ns(0);
+  auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
 
-  std::vector<void*> buffs;
-  buffs.reserve(rx_data.size());
-  for (auto& ch_buff : rx_data) {
-    buffs.emplace_back(ch_buff.data());
-  }
-  rx_status = device_->readStream(rx_stream_, buffs.data(),
-                                  Configuration()->SampsPerSymbol(), rx_flags,
-                                  frame_time_ns, kRxTimeout);
+  rx_status = device->readStream(remote_stream_, rx_locations.data(), rx_size,
+                                 rx_flags, frame_time_ns, kRxTimeout);
 
   if (Configuration()->HwFramer() == true) {
     rx_time_ns = frame_time_ns;
@@ -63,14 +81,14 @@ int RadioDataPlaneSoapy::Rx(
 
   if (kDebugRadioRX) {
     if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol())) {
-      std::cout << "Radio " << Id() << " received " << rx_status
-                << " flags: " << rx_flags << " MTU "
-                << device_->getStreamMTU(rx_stream_) << std::endl;
+      std::cout << "Radio " << radio_->SerialNumber() << "(" << radio_->Id()
+                << ") received " << rx_status << " flags: " << rx_flags
+                << " MTU " << device->getStreamMTU(remote_stream_) << std::endl;
     } else {
       if (!((rx_status == SOAPY_SDR_TIMEOUT) && (rx_flags == 0))) {
         std::cout << "Unexpected RadioRx return value " << rx_status
-                  << " from radio " << Id() << " flags: " << rx_flags
-                  << std::endl;
+                  << " from radio " << radio_->SerialNumber() << "("
+                  << radio_->Id() << ") flags: " << rx_flags << std::endl;
       }
     }
   }
@@ -87,6 +105,7 @@ void RadioDataPlaneSoapy::Flush() {
   int flags = 0;
   long long frame_time(0);
   int r = 0;
+  auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
 
   std::vector<std::vector<std::complex<int16_t>>> samples(
       Configuration()->NumChannels(),
@@ -97,10 +116,9 @@ void RadioDataPlaneSoapy::Flush() {
   for (auto& ch_buff : samples) {
     ignore.emplace_back(ch_buff.data());
   }
-
   while (r > 0) {
-    r = device_->readStream(rx_stream_, ignore.data(),
-                            Configuration()->SampsPerSymbol(), flags,
-                            frame_time, timeout_us);
+    r = device->readStream(remote_stream_, ignore.data(),
+                           Configuration()->SampsPerSymbol(), flags, frame_time,
+                           timeout_us);
   }
 }

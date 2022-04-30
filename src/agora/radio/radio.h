@@ -13,7 +13,7 @@
 
 class Radio {
  public:
-  enum RadioType { SoapySdr };
+  enum RadioType { SoapySdrStream, SoapySdrSocket };
   static std::unique_ptr<Radio> Create(RadioType type);
 
   virtual ~Radio();
@@ -35,8 +35,14 @@ class Radio {
 
   virtual int Tx(const void* const* tx_buffs, size_t tx_size, int tx_flags,
                  long long& tx_time_ns) = 0;
-  virtual int Rx(void** rx_buffs, long long& rx_time_ns) = 0;
-  virtual int Rx(void** rx_buffs, size_t rx_size, int rx_flags,
+
+  virtual int Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
+                 size_t rx_size, size_t rx_flags, long long& rx_time_ns) = 0;
+
+  virtual int Rx(std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
+                 size_t rx_size, int rx_flags, long long& rx_time_ns) = 0;
+
+  virtual int Rx(std::vector<void*>& rx_locs, size_t rx_size, int rx_flags,
                  long long& rx_time_ns) = 0;
 
   inline virtual void ConfigureTddModeBs(
@@ -50,11 +56,12 @@ class Radio {
   //For digital cal
   inline virtual void AdjustDelay([[maybe_unused]] const std::string& delay) {}
 
- protected:
-  Radio();
   inline const std::vector<size_t>& EnabledChannels() const {
     return enabled_channels_;
   }
+
+ protected:
+  Radio();
   //Should remove this.
   const Config* cfg_;
 

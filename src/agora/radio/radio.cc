@@ -10,8 +10,11 @@
 
 std::unique_ptr<Radio> Radio::Create(Radio::RadioType type) {
   switch (type) {
-    case SoapySdr: {
-      return std::make_unique<RadioSoapySdr>();
+    case SoapySdrStream: {
+      return std::make_unique<RadioSoapySdr>(RadioDataPlane::SoapyStream);
+    }
+    case SoapySdrSocket: {
+      return std::make_unique<RadioSoapySdr>(RadioDataPlane::LinuxSocket);
     }
     default: {
       AGORA_LOG_ERROR("Unknown or unsupported radio type\n");

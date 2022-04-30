@@ -13,7 +13,7 @@ constexpr bool kPrintCalibrationMats = false;
 constexpr size_t kSoapyMakeMaxAttempts = 3;
 constexpr size_t kHubMissingWaitMs = 100;
 
-RadioConfig::RadioConfig(Config* cfg)
+RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
     : cfg_(cfg), num_radios_initialized_(0), num_radios_configured_(0) {
   SoapySDR::Kwargs args;
   SoapySDR::Kwargs sargs;
@@ -61,7 +61,7 @@ RadioConfig::RadioConfig(Config* cfg)
   }
 
   for (size_t i = 0; i < radio_num_; i++) {
-    radios_.emplace_back(Radio::Create(Radio::SoapySdr));
+    radios_.emplace_back(Radio::Create(radio_type));
   }
 
   std::vector<std::thread> init_bs_threads;
@@ -305,18 +305,21 @@ int RadioConfig::RadioTx(
                                   tx_time);
 }
 
-int RadioConfig::RadioRx(size_t radio_id, void** buffs, long long& rx_time_ns) {
-  return radios_.at(radio_id)->Rx(buffs, rx_time_ns);
+int RadioConfig::RadioRx(
+    size_t radio_id, std::vector<std::vector<std::complex<int16_t>>>& rx_data,
+    size_t rx_size, int rx_flags, long long& rx_time_ns) {
+  return radios_.at(radio_id)->Rx(rx_data, rx_size, rx_flags, rx_time_ns);
 }
 
 int RadioConfig::RadioRx(
-    size_t radio_id, std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-    long long& rx_time_ns) {
-  std::vector<void*> buffs(rx_data.size());
-  for (size_t i = 0u; i < rx_data.size(); i++) {
-    buffs.at(i) = rx_data.at(i).data();
-  }
-  return radios_.at(radio_id)->Rx(buffs.data(), rx_time_ns);
+    size_t radio_id, std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
+    size_t rx_size, int rx_flags, long long& rx_time_ns) {
+  return radios_.at(radio_id)->Rx(rx_buffs, rx_size, rx_flags, rx_time_ns);
+}
+
+int RadioConfig::RadioRx(size_t radio_id, std::vector<void*>& rx_locs,
+                         size_t rx_size, int rx_flags, long long& rx_time_ns) {
+  return radios_.at(radio_id)->Rx(rx_locs, rx_size, rx_flags, rx_time_ns);
 }
 
 void RadioConfig::ReadSensors() {

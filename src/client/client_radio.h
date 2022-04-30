@@ -14,7 +14,7 @@
 
 class ClientRadioConfig {
  public:
-  explicit ClientRadioConfig(const Config* const cfg);
+  ClientRadioConfig(const Config* const cfg, Radio::RadioType radio_type);
   ~ClientRadioConfig();
 
   bool RadioStart();
@@ -22,8 +22,21 @@ class ClientRadioConfig {
   void ReadSensors();
   int RadioTx(size_t radio_id, void** buffs, size_t num_samps, int flags,
               long long& tx_time);
-  int RadioRx(size_t radio_id, void** buffs, size_t num_samps,
-              long long& rx_time);
+  //int RadioRx(size_t radio_id, void** buffs, size_t num_samps,
+  //            long long& rx_time);
+
+  int RadioRx(size_t radio_id,
+              std::vector<std::vector<std::complex<int16_t>>>& rx_data,
+              size_t rx_size, int rx_flags, long long& rx_time_ns);
+
+  int RadioRx(size_t radio_id,
+              std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
+              size_t rx_size, int rx_flags, long long& rx_time_ns);
+
+  int RadioRx(size_t radio_id,
+              std::vector<void *>& rx_locs,
+              size_t rx_size, int rx_flags, long long& rx_time_ns);
+
   void Go();
 
  private:

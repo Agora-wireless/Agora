@@ -25,16 +25,14 @@ auto RadioConfig::TxArrayToRef(
                                                  std::complex<int16_t>(0, 0));
 
   std::vector<const void*> txbuff(2, nullptr);
-  std::vector<void*> rxbuff(2);
-  if (cfg_->NumChannels() == 2) {
-    rxbuff.at(1) = dummybuff.data();
-  }
+  std::vector<std::vector<std::complex<int16_t>>*> rx_buffs(cfg_->NumChannels(),
+                                                            &dummybuff);
 
   for (size_t ant_i = 0; ant_i < cfg_->BfAntNum(); ant_i++) {
     // set up tx/rx buffers
     size_t radio_i = ant_i / cfg_->NumChannels();
     dl_buff.at(ant_i).resize(read_len);
-    rxbuff.at(0) = dl_buff.at(ant_i).data();  // ref always txrx on channel 0
+    rx_buffs.at(0) = &dl_buff.at(ant_i);  // ref always txrx on channel 0
     txbuff[ant_i % cfg_->NumChannels()] = tx_vec.data();
     if (cfg_->NumChannels() == 2) {
       txbuff[1 - (ant_i % 2)] = zeros.data();
@@ -53,7 +51,7 @@ auto RadioConfig::TxArrayToRef(
     Go();  // trigger
 
     int rx_flags = 0;
-    ret = radios_.at(ref)->Rx(rxbuff.data(), read_len, rx_flags, rx_time);
+    ret = radios_.at(ref)->Rx(rx_buffs, read_len, rx_flags, rx_time);
     if (ret < (int)read_len) {
       std::cout << "bad read (" << ret << ") at node " << ref
                 << " from antenna " << ant_i << std::endl;
@@ -81,7 +79,8 @@ auto RadioConfig::TxRefToArray(
   for (size_t i = 1; i < num_channels; i++) {
     txbuff.at(i) = zeros.data();
   }
-  std::vector<void*> rxbuff(num_channels);
+  std::vector<std::vector<std::complex<int16_t>>*> rx_buffs(num_channels,
+                                                            nullptr);
 
   // Allocate buffers for uplink directions
   std::vector<std::vector<std::complex<int16_t>>> ul_buff(cfg_->BfAntNum());
@@ -101,13 +100,11 @@ auto RadioConfig::TxRefToArray(
   int rx_flags = SOAPY_SDR_END_BURST;
   for (size_t radio_i = 0; radio_i < num_radios; radio_i++) {
     const size_t ant_i = radio_i * cfg_->NumChannels();
-    ul_buff.at(ant_i).resize(read_len);
-    rxbuff.at(0) = ul_buff.at(ant_i).data();
-    if (cfg_->NumChannels() == 2) {
-      ul_buff.at(ant_i + 1).resize(read_len);
-      rxbuff.at(1) = ul_buff.at(ant_i + 1).data();
+    for (size_t i = 0; i < cfg_->NumChannels(); i++) {
+      ul_buff.at(ant_i + i).resize(read_len);
+      rx_buffs.at(i) = &ul_buff.at(ant_i + i);
     }
-    ret = radios_.at(radio_i)->Rx(rxbuff.data(), read_len, rx_flags, rx_time);
+    ret = radios_.at(radio_i)->Rx(rx_buffs, read_len, rx_flags, rx_time);
 
     if (ret < (int)read_len) {
       std::cout << "Bad read (" << ret << ") at node " << radio_i
@@ -415,13 +412,11 @@ bool RadioConfig::InitialCalib() {
           Go();  // trigger
 
           int rx_flags = SOAPY_SDR_END_BURST;
-          std::vector<void*> rxbuff0(2);
-          rxbuff0.at(0) = buff.at(cfg_->NumChannels() * i + ch).data();
-          if (cfg_->NumChannels() == 2) {
-            rxbuff0.at(1) = dummybuff.data();
-          }
-          ret =
-              radios_.at(ref)->Rx(rxbuff0.data(), read_len, rx_flags, rx_time);
+          std::vector<std::vector<std::complex<int16_t>>*> rx_buff(
+              cfg_->NumChannels(), &dummybuff);
+          rx_buff.at(0) = &buff.at(cfg_->NumChannels() * i + ch);
+
+          ret = radios_.at(ref)->Rx(rx_buff, read_len, rx_flags, rx_time);
           if (ret < (int)read_len) {
             std::cout << "bad read (" << ret << ") at node " << ref
                       << " from node " << i << std::endl;
@@ -465,12 +460,13 @@ bool RadioConfig::InitialCalib() {
           if (i == ref) {
             continue;
           }
-          std::vector<void*> rxbuff(2);
-          rxbuff.at(0) = buff.at(m + cfg_->NumChannels() * i).data();
-          if (cfg_->NumChannels() == 2) {
-            rxbuff.at(1) = buff.at(m + cfg_->NumChannels() * i + 1).data();
+          std::vector<std::vector<std::complex<int16_t>>*> rx_buff(
+              cfg_->NumChannels());
+          for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
+            rx_buff.at(ch) = &buff.at(m + cfg_->NumChannels() * i + ch);
           }
-          ret = radios_.at(i)->Rx(rxbuff.data(), read_len, rx_flags, rx_time);
+
+          ret = radios_.at(i)->Rx(rx_buff, read_len, rx_flags, rx_time);
           if (ret < (int)read_len) {
             bad_read = true;
             std::cout << "Bad read (" << ret << ") at node " << i
@@ -495,15 +491,14 @@ bool RadioConfig::InitialCalib() {
         int rx_flags = SOAPY_SDR_END_BURST;
         radios_.at(i)->Activate();
 
-        std::vector<void*> rxbuff(2);
-        noise_buff.at(cfg_->NumChannels() * i).resize(read_len);
-        rxbuff.at(0) = noise_buff.at(cfg_->NumChannels() * i).data();
-
-        if (cfg_->NumChannels() == 2) {
-          noise_buff.at(cfg_->NumChannels() * i + 1).resize(read_len);
-          rxbuff.at(1) = noise_buff.at(cfg_->NumChannels() * i + 1).data();
+        std::vector<std::vector<std::complex<int16_t>>*> rx_buff(
+            cfg_->NumChannels());
+        for (size_t ch = 0; ch < cfg_->NumChannels(); ch++) {
+          noise_buff.at(cfg_->NumChannels() * i + ch).resize(read_len);
+          rx_buff.at(0) = &noise_buff.at(cfg_->NumChannels() * i + ch);
         }
-        int ret = radios_.at(i)->Rx(rxbuff.data(), read_len, rx_flags, rx_time);
+
+        int ret = radios_.at(i)->Rx(rx_buff, read_len, rx_flags, rx_time);
         if (ret < (int)read_len) {
           good_csi = false;
           std::cout << "bad noise read (" << ret << ") at node " << i

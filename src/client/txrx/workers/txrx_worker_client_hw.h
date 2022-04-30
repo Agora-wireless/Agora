@@ -52,6 +52,6 @@ class TxRxWorkerClientHw : public TxRxWorker {
 
   std::vector<std::vector<std::complex<int16_t>>> frame_zeros_;
   std::vector<std::vector<std::complex<int16_t>>> frame_storage_;
-  std::vector<void*> rx_frame_;
+  std::vector<std::vector<std::complex<int16_t>>*> rx_frame_;
 };
 #endif  // TXRX_WORKER_CLIENT_HW_H_

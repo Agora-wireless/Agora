@@ -8,29 +8,44 @@
 #include "SoapySDR/Formats.h"
 #include "SoapySDR/Time.hpp"
 #include "logger.h"
+#include "radio_data_plane_soapy.h"
+#include "radio_data_plane_socket.h"
+#include "radio_soapysdr.h"
 #include "utils.h"
 
-RadioDataPlane::RadioDataPlane() : RadioDataPlane(nullptr, nullptr, 0) {}
-
-RadioDataPlane::RadioDataPlane(const Config* cfg, SoapySDR::Device* device,
-                               size_t id)
-    : mode_(kModeUninit) {
-  RadioDataPlane::Init(cfg, device, id);
+std::unique_ptr<RadioDataPlane> RadioDataPlane::Create(
+    RadioDataPlane::DataPlaneType type) {
+  switch (type) {
+    case SoapyStream: {
+      return std::make_unique<RadioDataPlaneSoapy>();
+    }
+    case LinuxSocket: {
+      return std::make_unique<RadioDataPlaneSocket>();
+    }
+    default: {
+      AGORA_LOG_ERROR("Unknown or unsupported radio type\n");
+      return std::unique_ptr<RadioDataPlane>();
+    }
+  }
 }
+
+RadioDataPlane::RadioDataPlane()
+    : radio_(nullptr), remote_stream_(nullptr), mode_(kModeUninit) {}
 
 RadioDataPlane::~RadioDataPlane() { RadioDataPlane::Close(); }
 
-void RadioDataPlane::Init(const Config* cfg, SoapySDR::Device* device,
-                          size_t id) {
+void RadioDataPlane::Init(Radio* radio, const Config* cfg) {
   if (mode_ == kModeUninit) {
-    if ((cfg != nullptr) && (device != nullptr)) {
+    //This data plane class only works with RadioSoapySdr class
+    auto soapy_radio = dynamic_cast<RadioSoapySdr*>(radio);
+    if ((soapy_radio != nullptr) && (radio != nullptr)) {
       cfg_ = cfg;
-      device_ = device;
-      radio_id_ = id;
+      radio_ = radio;
       mode_ = kModeShutdown;
     } else {
       AGORA_LOG_WARN(
-          "Attempted to init the data plane with null cfg or device pointer\n");
+          "Attempted to init the data plane with an invalid radio pointer, "
+          "requires radio to be of type RadioSoapySdr\n");
     }
   } else {
     AGORA_LOG_ERROR(
@@ -41,11 +56,13 @@ void RadioDataPlane::Init(const Config* cfg, SoapySDR::Device* device,
 
 void RadioDataPlane::Activate() {
   if (mode_ == kModeDeactive) {
-    if ((device_ == nullptr) || (rx_stream_ == nullptr)) {
+    if ((radio_ == nullptr) || (remote_stream_ == nullptr)) {
       AGORA_LOG_ERROR(
-          "Device pointer or rx_stream is null in RadioDataPlane Activate");
+          "Device pointer or remote stream is null in RadioDataPlane "
+          "Activate");
     } else {
-      device_->activateStream(rx_stream_);
+      auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
+      device->activateStream(remote_stream_);
       mode_ = kModeActive;
     }
   } else {
@@ -56,11 +73,13 @@ void RadioDataPlane::Activate() {
 
 void RadioDataPlane::Deactivate() {
   if (mode_ == kModeActive) {
-    if ((device_ == nullptr) || (rx_stream_ == nullptr)) {
+    if ((radio_ == nullptr) || (remote_stream_ == nullptr)) {
       AGORA_LOG_ERROR(
-          "Device pointer or rx_stream is null in RadioDataPlane Deactivate");
+          "Device pointer or remote stream is null in RadioDataPlane "
+          "Deactivate");
     } else {
-      device_->deactivateStream(rx_stream_);
+      auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
+      device->deactivateStream(remote_stream_);
       mode_ = kModeDeactive;
     }
   } else {
@@ -71,7 +90,7 @@ void RadioDataPlane::Deactivate() {
 }
 
 void RadioDataPlane::Close() {
-  if (device_ == nullptr) {
+  if (radio_ == nullptr) {
     AGORA_LOG_ERROR("Device pointer is null in RadioDataPlane Close");
     return;
   }
@@ -81,17 +100,19 @@ void RadioDataPlane::Close() {
   }
 
   if (mode_ == kModeDeactive) {
-    device_->closeStream(rx_stream_);
-    rx_stream_ = nullptr;
+    auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
+    device->closeStream(remote_stream_);
+    remote_stream_ = nullptr;
   }
   mode_ = kModeShutdown;
 }
 
 void RadioDataPlane::Setup(const SoapySDR::Kwargs& args) {
   if (mode_ == kModeShutdown) {
-    auto channels = Utils::StrToChannels(cfg_->Channel());
-    rx_stream_ =
-        device_->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16, channels, args);
+    auto radio = dynamic_cast<RadioSoapySdr*>(radio_);
+    auto device = radio->SoapyDevice();
+    remote_stream_ = device->setupStream(SOAPY_SDR_RX, SOAPY_SDR_CS16,
+                                         radio->EnabledChannels(), args);
     mode_ = kModeDeactive;
   } else {
     AGORA_LOG_WARN(
