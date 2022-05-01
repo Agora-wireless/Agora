@@ -12,8 +12,10 @@
 PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
   if (dir_ == Direction::kDownlink) {
     num_rx_symbols_ = cfg->Frame().NumDLSyms();
+    num_data_symbols_ = cfg->Frame().NumDlDataSyms();
   } else {
     num_rx_symbols_ = cfg->Frame().NumULSyms();
+    num_data_symbols_ = cfg->Frame().NumUlDataSyms();
   }
   const size_t task_buffer_symbol_num = num_rx_symbols_ * kFrameWnd;
 
@@ -26,6 +28,8 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                                Agora_memory::Alignment_t::kAlign64);
   block_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                             Agora_memory::Alignment_t::kAlign64);
+  symbol_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
+                             Agora_memory::Alignment_t::kAlign64);
 
   uncoded_bits_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                              Agora_memory::Alignment_t::kAlign64);
@@ -58,6 +62,8 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                     Agora_memory::Alignment_t::kAlign64);
   calib_pilot_snr_.Calloc(kFrameWnd, 2 * cfg->BsAntNum(),
                           Agora_memory::Alignment_t::kAlign64);
+  evm_snr_.Calloc(kFrameWnd, cfg->UeAntNum(),
+                  Agora_memory::Alignment_t::kAlign64);
   csi_cond_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
                    Agora_memory::Alignment_t::kAlign64);
 }
@@ -133,8 +139,7 @@ float PhyStats::GetEvmSnr(size_t frame_id, size_t ue_id) {
   return (-10.0f * std::log10(evm));
 }
 
-void PhyStats::PrintDlSnrStats(size_t frame_id, size_t ant_id) {
-  unused(ant_id);
+void PhyStats::PrintDlSnrStats(size_t frame_id) {
   std::stringstream ss;
   ss << "Frame " << frame_id << " DL Pilot SNR (dB) at "
      << std::fixed << std::setw(5) << std::setprecision(1);
@@ -150,25 +155,6 @@ void PhyStats::PrintDlSnrStats(size_t frame_id, size_t ant_id) {
   }
   ss << std::endl;
   AGORA_LOG_INFO("%s", ss.str().c_str());
-}
-
-void PhyStats::RecordDlPilotSnr(CsvLog::CsvLogger* logger, size_t frame_id,
-                                size_t ant_id) {
-  unused(ant_id);
-  if (kEnableCsvLog) {
-    const size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
-    if ((logger != nullptr) && (dl_pilots_num > 0)) {
-      std::stringstream ss;
-      ss << frame_id;
-      for (size_t i = 0; i < config_->UeAntNum(); i++) {
-        for (size_t j = 0; j < dl_pilots_num; j++) {
-          ss << ","
-             << dl_pilot_snr_[frame_id % kFrameWnd][i * dl_pilots_num + j];
-        }
-      }
-      logger->Write(ss.str());
-    }
-  }
 }
 
 void PhyStats::PrintSnrStats(size_t frame_id) {
@@ -247,6 +233,64 @@ void PhyStats::PrintCalibSnrStats(size_t frame_id) {
   }
   ss << std::endl;
   AGORA_LOG_INFO("%s", ss.str().c_str());
+}
+
+void PhyStats::RecordDlPilotSnr(CsvLog::CsvLogger* logger, size_t frame_id) {
+  if (kEnableCsvLog) {
+    const size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
+    if ((logger != nullptr) && (dl_pilots_num > 0)) {
+      std::stringstream ss;
+      ss << frame_id;
+      for (size_t i = 0; i < config_->UeAntNum(); i++) {
+        for (size_t j = 0; j < dl_pilots_num; j++) {
+          ss << ","
+             << dl_pilot_snr_[frame_id % kFrameWnd][i * dl_pilots_num + j];
+        }
+      }
+      logger->Write(ss.str());
+    }
+  }
+}
+
+void PhyStats::RecordEvmSnr(CsvLog::CsvLogger* logger, size_t frame_id) {
+  if (kEnableCsvLog) {
+    if (logger != nullptr) {
+      std::stringstream ss;
+      ss << frame_id;
+      for (size_t i = 0; i < config_->UeAntNum(); i++) {
+        ss << "," << evm_snr_[frame_id % kFrameWnd][i];
+      }
+      logger->Write(ss.str());
+    }
+  }
+}
+
+void PhyStats::RecordBerSer(CsvLog::CsvLogger* logger, size_t frame_id) {
+  if (kEnableCsvLog) {
+    if (logger != nullptr) {
+      std::stringstream ss;
+      ss << frame_id;
+      for (size_t i = 0; i < config_->UeAntNum(); i++) {
+        size_t error_bits = 0;
+        size_t total_bits = 0;
+        size_t error_symbols = 0;
+        size_t total_symbols = 0;
+        for (size_t j = 0; j < num_data_symbols_; j++) {
+          const size_t offset = (frame_id % kFrameWnd) * num_data_symbols_ + j;
+          error_bits += bit_error_count_[i][offset];
+          total_bits += decoded_bits_count_[i][offset];
+          error_symbols += symbol_error_count_[i][offset];
+          total_symbols += decoded_blocks_count_[i][offset]
+                           * config_->GetOFDMDataNum();
+        }
+        ss << "," << (static_cast<float>(error_bits) /
+                      static_cast<float>(total_bits))
+           << "," << (static_cast<float>(error_symbols) /
+                      static_cast<float>(total_symbols));
+      }
+      logger->Write(ss.str());
+    }
+  }
 }
 
 void PhyStats::UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id,
@@ -340,6 +384,10 @@ void PhyStats::UpdateEvmStats(size_t frame_id, size_t sc_id,
   }
 }
 
+void PhyStats::UpdateEvmSnr(size_t frame_id, size_t ue_id, float evmsnr) {
+  evm_snr_[frame_id % kFrameWnd][ue_id] = evmsnr;
+}
+
 void PhyStats::UpdateBitErrors(size_t ue_id, size_t offset, uint8_t tx_byte,
                                uint8_t rx_byte) {
   static constexpr size_t kBitsInByte = 8;
@@ -363,11 +411,7 @@ void PhyStats::UpdateBlockErrors(size_t ue_id, size_t offset,
                                  size_t block_error_count) {
   block_error_count_[ue_id][offset] +=
       static_cast<unsigned long>(block_error_count > 0);
-}
-
-float PhyStats::GetBitErrorRate(size_t ue_id, size_t offset) {
-  return (static_cast<float>(bit_error_count_[ue_id][offset]) /
-          static_cast<float>(decoded_bits_count_[ue_id][offset]));
+  symbol_error_count_[ue_id][offset] += block_error_count;
 }
 
 void PhyStats::IncrementDecodedBlocks(size_t ue_id, size_t offset) {

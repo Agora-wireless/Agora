@@ -386,16 +386,13 @@ void UeWorker::DoFftData(size_t tag) {
                                    std::to_string(total_dl_symbol_id) +
                                    std::string("_") + std::to_string(ant_id));
   }
+  if (kCollectPhyStats) {
+    phy_stats_.UpdateEvmSnr(frame_id, ant_id, (-10.0f * std::log10(evm)));
+  }
   if (kPrintPhyStats) {
     AGORA_LOG_INFO("Frame: %zu, Symbol: %zu, User: %zu, EVM: %f, SNR: %f\n",
                    frame_id, symbol_id, ant_id, (100.0f * evm),
                    (-10.0f * std::log10(evm)));
-  }
-  if (kEnableCsvLog) {
-    if (logger_evmsnr_) {
-      logger_evmsnr_->Write(frame_id, symbol_id, ant_id, 100.0f * evm,
-                            -10.0f * std::log10(evm));
-    }
   }
 
   if (kDebugPrintPerTaskDone || kDebugPrintFft) {
@@ -497,7 +494,7 @@ void UeWorker::DoDemul(size_t tag) {
                      frame_id, symbol_id, ant_id, block_error);
     }
     phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, block_error);
-    if (kEnableCsvLog) {
+    /*if (kEnableCsvLog) {
       if (logger_berser_) {
         logger_berser_->Write(
             frame_id, symbol_id, ant_id,
@@ -505,7 +502,7 @@ void UeWorker::DoDemul(size_t tag) {
             static_cast<float>(block_error) /
                 static_cast<float>(config_.GetOFDMDataNum()));
       }
-    }
+    }*/
   }
 
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintDemul == true)) {
