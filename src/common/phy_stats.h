@@ -5,7 +5,7 @@
 #ifndef PHY_STATS_H_
 #define PHY_STATS_H_
 
-#include <armadillo>
+#include "armadillo"
 
 #include "config.h"
 #include "csv_logger.h"
