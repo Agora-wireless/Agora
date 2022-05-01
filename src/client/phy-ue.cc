@@ -438,12 +438,12 @@ void PhyUe::Start() {
                 fft_dlpilot_counters_.CompleteSymbol(frame_id);
             if (pilot_fft_complete) {
               if (kPrintPhyStats) {
-                this->phy_stats_->PrintDlSnrStats(frame_id, ant_id);
+                this->phy_stats_->PrintDlSnrStats(frame_id);
               }
-              if (kEnableCsvLog) {
-                this->phy_stats_->RecordDlPilotSnr(
-                    csv_loggers_.at(CsvLog::kDLPSNR).get(), frame_id, ant_id);
-              }
+              //if (kEnableCsvLog) {
+             //   this->phy_stats_->RecordDlPilotSnr(
+              //      csv_loggers_.at(CsvLog::kDLPSNR).get(), frame_id, ant_id);
+             // }
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
               ScheduleDefferedDownlinkSymbols(frame_id);
@@ -544,6 +544,14 @@ void PhyUe::Start() {
               bool finished =
                   FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
               if (finished == true) {
+                if (kEnableCsvLog) {
+                  this->phy_stats_->RecordDlPilotSnr(
+                      csv_loggers_.at(CsvLog::kDLPSNR).get(), frame_id);
+                  this->phy_stats_->RecordEvmSnr(
+                      csv_loggers_.at(CsvLog::kEVMSNR).get(), frame_id);
+                  this->phy_stats_->RecordBerSer(
+                      csv_loggers_.at(CsvLog::kBERSER).get(), frame_id);
+                }
                 if ((cur_frame_id + 1) >= config_->FramesToTest()) {
                   config_->Running(false);
                 } else {
