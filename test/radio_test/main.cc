@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
     agora_comm::ListLocalInterfaces();
     TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
     //TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
-    //TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
+    TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;
@@ -72,7 +72,7 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
   const size_t cell_id = 0;
   const size_t target_samples = cfg->SampsPerSymbol();
   // Radio::RxFlagCompleteSymbol | RxFlagNone
-  const auto rx_flag = Radio::RxFlagNone;
+  const auto rx_flag = Radio::RxFlagCompleteSymbol;
 
   std::cout << "Testing " << total_radios << " radios " << std::endl;
 
@@ -284,11 +284,14 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
     radioconfig->RadioStart();
 
     //Radio Trigger (start rx)
+    //Why is the trigger not needed here?  Maybe the channel didn't activate properly
     //radioconfig->Go();
 
     size_t num_rx_symbols = 0;
     size_t rx_samples = 0;
     size_t rx_calls_per_symbol = 0;
+    long long first_rx_time_of_symbol = 0;
+
     std::vector<void*> rx_locations(num_channels);
     //Super thread loop
     while ((SignalHandler::GotExitSignal() == false) &&
@@ -300,41 +303,104 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
           rx_locations.at(ch) = &rx_buffer.at(radio).at(ch).at(rx_samples);
         }
 
-        const int new_samples = radioconfig->RadioRx(
-            radio, rx_locations, target_samples - rx_samples, rx_flag, rx_time);
+        const size_t rx_size = target_samples - rx_samples;
+        const int new_samples = radioconfig->RadioRx(radio, rx_locations,
+                                                     rx_size, rx_flag, rx_time);
 
         if (new_samples > 0) {
+          //std::printf("Called radiorx for %zu samples and received %d\n",
+          //            rx_size, new_samples);
           rx_samples += static_cast<size_t>(new_samples);
           if (rx_samples < target_samples) {
+            //Symbol Rx not finished.... Adjust the subsequent reads
+            if (hw_framer) {
+              if (rx_calls_per_symbol == 0) {
+                first_rx_time_of_symbol = rx_time;
+              } else if (rx_time != 0) {
+                //rx_time == 0 indicates we can use the last rx time
+                const size_t rx_frame_id = static_cast<size_t>(rx_time >> 32);
+                const size_t rx_symbol_id =
+                    static_cast<size_t>((rx_time >> 16) & 0xFFFF);
+
+                const size_t first_frame_id =
+                    static_cast<size_t>(first_rx_time_of_symbol >> 32);
+                const size_t first_symbol_id = static_cast<size_t>(
+                    (first_rx_time_of_symbol >> 16) & 0xFFFF);
+
+                if ((rx_frame_id != first_frame_id) ||
+                    (rx_symbol_id != first_symbol_id)) {
+                  std::printf(
+                      "Unexpected Frame | Symbol pair during retry #%zu Frame: "
+                      "%zu:%zu Symbol: %zu:%zu received new samples %d with "
+                      "%zu total\n",
+                      rx_calls_per_symbol, rx_frame_id, first_frame_id,
+                      rx_symbol_id, first_symbol_id, new_samples, rx_samples);
+                  //Now we have mixed up samples.....
+                  //Need to shift back here??
+                  rx_samples = new_samples;
+                  rx_calls_per_symbol = SIZE_MAX;
+                  first_rx_time_of_symbol = rx_time;
+                }
+              }
+            }
             rx_calls_per_symbol++;
             //std::printf(
             //    "Received less than symbol amount of samples %d:%zu:%zu\n",
             //    new_samples, rx_samples, target_samples);
             //rx_samples = 0;
-            //Symbol Rx not finished.... Adjust the subsequent reads
           } else if (rx_samples == target_samples) {
             //Rx data.....
             size_t frame_id = 0;
             size_t symbol_id = num_rx_symbols;
             if (hw_framer) {
-              frame_id = static_cast<size_t>(rx_time >> 32);
-              symbol_id = static_cast<size_t>((rx_time >> 16) & 0xFFFF);
+              if (rx_calls_per_symbol > 0) {
+                frame_id = static_cast<size_t>(first_rx_time_of_symbol >> 32);
+                symbol_id = static_cast<size_t>(
+                    (first_rx_time_of_symbol >> 16) & 0xFFFF);
+
+                const size_t rx_frame_id = static_cast<size_t>(rx_time >> 32);
+                const size_t rx_symbol_id =
+                    static_cast<size_t>((rx_time >> 16) & 0xFFFF);
+
+                //rx == 0 means we previously read the start of the frame and there was data still pending.
+                if ((rx_time != 0) && ((frame_id != rx_frame_id) ||
+                                       (symbol_id != rx_symbol_id))) {
+                  std::printf(
+                      "Unexpected Frame | Symbol pair with complete samples "
+                      "%zu rx's - Frame: %zu:%zu Symbol: %zu:%zu received new "
+                      "samples %d with %zu total  at time %lld starting %lld\n",
+                      rx_calls_per_symbol + 1, rx_frame_id, frame_id,
+                      rx_symbol_id, symbol_id, new_samples, rx_samples, rx_time,
+                      first_rx_time_of_symbol);
+                  //Now we have mixed up samples.....
+                  //Need to shift data back  in buffer here!!!
+                  rx_samples = new_samples;
+                  rx_calls_per_symbol = 1;
+                  first_rx_time_of_symbol = rx_time;
+                  num_rx_symbols++;
+                }
+              } else {
+                frame_id = static_cast<size_t>(rx_time >> 32);
+                symbol_id = static_cast<size_t>((rx_time >> 16) & 0xFFFF);
+              }
             }
 
-            //There will be NumChannels "Packets" at this spot
-            for (size_t ch = 0; ch < num_channels; ch++) {
-              Packet* rx_packet =
-                  reinterpret_cast<Packet*>(packet_buffer.at(ch).data());
-              new (rx_packet) Packet(frame_id, symbol_id, cell_id,
-                                     (radio * num_channels) + ch);
+            if (rx_samples == target_samples) {
+              //There will be NumChannels "Packets" at this spot
+              for (size_t ch = 0; ch < num_channels; ch++) {
+                Packet* rx_packet =
+                    reinterpret_cast<Packet*>(packet_buffer.at(ch).data());
+                new (rx_packet) Packet(frame_id, symbol_id, cell_id,
+                                       (radio * num_channels) + ch);
 
-              std::printf("Rx Packet: %s Rx samples: %zu:%zu retries %zu\n",
-                          rx_packet->ToString().c_str(), rx_samples,
-                          target_samples, rx_calls_per_symbol);
+                std::printf("Rx Packet: %s Rx samples: %zu:%zu retries %zu\n",
+                            rx_packet->ToString().c_str(), rx_samples,
+                            target_samples, rx_calls_per_symbol);
+              }
+              num_rx_symbols++;
+              rx_samples -= target_samples;
+              rx_calls_per_symbol = 0;
             }
-            num_rx_symbols++;
-            rx_samples -= target_samples;
-            rx_calls_per_symbol = 0;
           } else {
             std::printf("Received too much data....%zu:%zu\n", rx_samples,
                         target_samples);
