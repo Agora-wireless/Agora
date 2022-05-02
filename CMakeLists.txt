@@ -460,6 +460,7 @@ if (USE_ARGOS)
 add_executable(radio_test
     test/radio_test/main.cc
     $<TARGET_OBJECTS:agora_sources_lib>
+    $<TARGET_OBJECTS:client_sources_lib>
     $<TARGET_OBJECTS:shared_txrx_sources_lib>
     $<TARGET_OBJECTS:common_sources_lib>)
 target_link_libraries(radio_test ${COMMON_LIBS})
