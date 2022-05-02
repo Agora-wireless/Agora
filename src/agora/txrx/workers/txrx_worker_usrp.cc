@@ -58,8 +58,8 @@ void TxRxWorkerUsrp::DoTxRx() {
   tx_time_bs_ = 0;
 
   std::cout << "Sync BS host and FGPA timestamp..." << std::endl;
-  radio_config_.RadioRx(0, samp_buffer, Configuration()->SampsPerSymbol(), 0,
-                        rx_time_bs_);
+  radio_config_.RadioRx(0, samp_buffer, Configuration()->SampsPerSymbol(),
+                        Radio::RxFlagNone, rx_time_bs_);
   // Schedule the first beacon in the future
   tx_time_bs_ = rx_time_bs_ + Configuration()->SampsPerSymbol() *
                                   Configuration()->Frame().NumTotalSyms() * 40;
@@ -68,8 +68,8 @@ void TxRxWorkerUsrp::DoTxRx() {
   for (int it = 0;
        it < std::floor(bs_init_rx_offset / Configuration()->SampsPerSymbol());
        it++) {
-    radio_config_.RadioRx(0, samp_buffer, Configuration()->SampsPerSymbol(), 0,
-                          rx_time_bs_);
+    radio_config_.RadioRx(0, samp_buffer, Configuration()->SampsPerSymbol(),
+                          Radio::RxFlagNone, rx_time_bs_);
   }
 
   std::cout << std::endl;
@@ -155,8 +155,9 @@ std::vector<Packet*> TxRxWorkerUsrp::RecvEnqueue(size_t radio_id,
       (Configuration()->IsUplink(frame_id, symbol_id) == false)) {
     dummy_read = true;
   }
-  const int tmp_ret = radio_config_.RadioRx(
-      radio_id, samp, Configuration()->SampsPerSymbol(), 0, rx_time_bs_);
+  const int tmp_ret =
+      radio_config_.RadioRx(radio_id, samp, Configuration()->SampsPerSymbol(),
+                            Radio::RxFlagNone, rx_time_bs_);
 
   if ((tmp_ret > 0) && (dummy_read == false)) {
     const size_t ant_id = radio_id * n_channels;

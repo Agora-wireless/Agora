@@ -301,7 +301,8 @@ int RadioSoapySdr::Tx(const void* const* tx_buffs, size_t tx_size, int flags,
 }
 
 int RadioSoapySdr::Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-                      size_t rx_size, size_t rx_flags, long long& rx_time_ns) {
+                      size_t rx_size, Radio::RxFlags rx_flags,
+                      long long& rx_time_ns) {
   rx_time_ns = 0;
 
   const int rx_return = rxp_->Rx(rx_data, rx_size, rx_flags, rx_time_ns);
@@ -313,7 +314,7 @@ int RadioSoapySdr::Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
 
 int RadioSoapySdr::Rx(
     std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs, size_t rx_size,
-    int rx_flags, long long& rx_time_ns) {
+    Radio::RxFlags rx_flags, long long& rx_time_ns) {
   rx_time_ns = 0;
 
   const int rx_return = rxp_->Rx(rx_buffs, rx_size, rx_flags, rx_time_ns);
@@ -323,8 +324,8 @@ int RadioSoapySdr::Rx(
   return rx_return;
 }
 
-int RadioSoapySdr::Rx(std::vector<void*>& rx_locs, size_t rx_size, int rx_flags,
-                      long long& rx_time_ns) {
+int RadioSoapySdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
+                      Radio::RxFlags rx_flags, long long& rx_time_ns) {
   rx_time_ns = 0;
 
   const int rx_return = rxp_->Rx(rx_locs, rx_size, rx_flags, rx_time_ns);

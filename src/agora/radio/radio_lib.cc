@@ -307,18 +307,19 @@ int RadioConfig::RadioTx(
 
 int RadioConfig::RadioRx(
     size_t radio_id, std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-    size_t rx_size, int rx_flags, long long& rx_time_ns) {
+    size_t rx_size, Radio::RxFlags rx_flags, long long& rx_time_ns) {
   return radios_.at(radio_id)->Rx(rx_data, rx_size, rx_flags, rx_time_ns);
 }
 
 int RadioConfig::RadioRx(
     size_t radio_id, std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-    size_t rx_size, int rx_flags, long long& rx_time_ns) {
+    size_t rx_size, Radio::RxFlags rx_flags, long long& rx_time_ns) {
   return radios_.at(radio_id)->Rx(rx_buffs, rx_size, rx_flags, rx_time_ns);
 }
 
 int RadioConfig::RadioRx(size_t radio_id, std::vector<void*>& rx_locs,
-                         size_t rx_size, int rx_flags, long long& rx_time_ns) {
+                         size_t rx_size, Radio::RxFlags rx_flags,
+                         long long& rx_time_ns) {
   return radios_.at(radio_id)->Rx(rx_locs, rx_size, rx_flags, rx_time_ns);
 }
 

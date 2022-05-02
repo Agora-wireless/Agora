@@ -14,6 +14,7 @@
 class Radio {
  public:
   enum RadioType { SoapySdrStream, SoapySdrSocket };
+  enum RxFlags { RxFlagNone = 0, RxFlagCompleteSymbol = 1 };
   static std::unique_ptr<Radio> Create(RadioType type);
 
   virtual ~Radio();
@@ -37,12 +38,12 @@ class Radio {
                  long long& tx_time_ns) = 0;
 
   virtual int Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-                 size_t rx_size, size_t rx_flags, long long& rx_time_ns) = 0;
+                 size_t rx_size, RxFlags rx_flags, long long& rx_time_ns) = 0;
 
   virtual int Rx(std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-                 size_t rx_size, int rx_flags, long long& rx_time_ns) = 0;
+                 size_t rx_size, RxFlags rx_flags, long long& rx_time_ns) = 0;
 
-  virtual int Rx(std::vector<void*>& rx_locs, size_t rx_size, int rx_flags,
+  virtual int Rx(std::vector<void*>& rx_locs, size_t rx_size, RxFlags rx_flags,
                  long long& rx_time_ns) = 0;
 
   inline virtual void ConfigureTddModeBs(

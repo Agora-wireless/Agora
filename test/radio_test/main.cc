@@ -17,8 +17,7 @@ DEFINE_uint32(rx_symbols, 10,
               "The number of symbols to receive before the program terminates");
 
 //Forward declaration
-void TestRadioRxStream(Config* cfg, const uint32_t max_rx);
-void TestRadioRxSocket(Config* cfg, const uint32_t max_rx);
+void TestRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type);
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");
@@ -47,8 +46,8 @@ int main(int argc, char* argv[]) {
     signal_handler.SetupSignalHandlers();
 
     agora_comm::ListLocalInterfaces();
-    TestRadioRxStream(cfg.get(), FLAGS_rx_symbols);
-    TestRadioRxSocket(cfg.get(), FLAGS_rx_symbols);
+    TestRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
+    //TestRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;
@@ -60,7 +59,7 @@ int main(int argc, char* argv[]) {
   return ret;
 }
 
-void TestRadioRxStream(Config* cfg, const uint32_t max_rx) {
+void TestRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
   const size_t total_radios = cfg->NumRadios();
   const size_t radio_lo = 0;
   const size_t radio_hi = total_radios;
@@ -96,8 +95,7 @@ void TestRadioRxStream(Config* cfg, const uint32_t max_rx) {
 
   if (kUseArgos) {
     // Makes the soapy remote "HUB" / InitBsRadio / ConfigureBsRadio
-    auto radioconfig =
-        std::make_unique<RadioConfig>(cfg, Radio::SoapySdrStream);
+    auto radioconfig = std::make_unique<RadioConfig>(cfg, type);
     radioconfig->RadioStart();
 
     //Radio Trigger (start rx)
@@ -110,84 +108,8 @@ void TestRadioRxStream(Config* cfg, const uint32_t max_rx) {
       for (auto radio = radio_lo; radio < radio_hi; radio++) {
         long long rx_time;
         int rx_samples = radioconfig->RadioRx(
-            radio, rx_buffs.at(radio), cfg->SampsPerSymbol(), 0, rx_time);
-        if (rx_samples > 0) {
-          //Rx data.....
-          size_t frame_id = 0;
-          size_t symbol_id = 0;
-          if (cfg->HwFramer() == true) {
-            frame_id = static_cast<size_t>(rx_time >> 32);
-            symbol_id = static_cast<size_t>((rx_time >> 16) & 0xFFFF);
-          }
-
-          //There will be NumChannels "Packets" at this spot
-          for (size_t ch = 0; ch < cfg->NumChannels(); ch++) {
-            Packet* rx_packet =
-                reinterpret_cast<Packet*>(packet_buffer.at(ch).data());
-            new (rx_packet) Packet(frame_id, symbol_id, cell_id,
-                                   (radio * cfg->NumChannels()) + ch);
-
-            std::printf("Rx Packet: %s Rx samples: %d:%zu\n",
-                        rx_packet->ToString().c_str(), rx_samples,
-                        cfg->SampsPerSymbol());
-          }
-          num_rx_symbols++;
-        } else if (rx_samples < 0) {
-          std::printf("Radio rx error %d - message %s\n", rx_samples,
-                      strerror(errno));
-          std::fflush(stdout);
-          throw std::runtime_error("Radio rx error!!");
-        }
-      }  // end for each radio
-    }    // while no exit signal
-    radioconfig->RadioStop();
-  } else {
-    std::cout << "Hardware is not enabled in the compile settings.  Please fix "
-                 "and try again!"
-              << std::endl;
-  }
-}
-
-void TestRadioRxSocket(Config* cfg, const uint32_t max_rx) {
-  const size_t total_radios = cfg->NumRadios();
-  const size_t radio_lo = 0;
-  const size_t radio_hi = total_radios;
-  const size_t cell_id = 0;
-
-  PinToCoreWithOffset(ThreadType::kMasterTX, 0, 0);
-  std::cout << "Testing " << total_radios << " radios " << std::endl;
-
-  //Create the memory for the rx samples
-  //Radio x Channels x SamplesPerSymbol, filled with 0 + 0i
-  std::vector<std::vector<std::vector<std::complex<int16_t>>>> rx_buffer(
-      total_radios, std::vector<std::vector<std::complex<int16_t>>>(
-                        cfg->NumChannels(), std::vector<std::complex<int16_t>>(
-                                                cfg->SampsPerSymbol(),
-                                                std::complex<int16_t>(0, 0))));
-
-  //Memory for 1 packet for each channel (could be extended for each radio if necessary)
-  // Channels x PacketLength (bytes)
-  std::vector<std::vector<std::byte>> packet_buffer(
-      cfg->NumChannels(),
-      std::vector<std::byte>(cfg->PacketLength(), std::byte(0)));
-
-  if (kUseArgos) {
-    // Makes the soapy remote "HUB" / InitBsRadio / ConfigureBsRadio
-    auto radioconfig =
-        std::make_unique<RadioConfig>(cfg, Radio::SoapySdrSocket);
-    radioconfig->RadioStart();
-
-    //Radio Trigger (start rx)
-    radioconfig->Go();
-
-    uint32_t num_rx_symbols = 0;
-    //Super thread loop
-    while ((SignalHandler::GotExitSignal() == false) &&
-           (num_rx_symbols < max_rx)) {
-      for (auto radio = radio_lo; radio < radio_hi; radio++) {
-        long long rx_time;
-        const int rx_samples = radioconfig->RadioRx(
-            radio, rx_buffer.at(radio), cfg->SampsPerSymbol(), 0, rx_time);
+            radio, rx_buffs.at(radio), cfg->SampsPerSymbol(),
+            Radio::RxFlagCompleteSymbol, rx_time);
         if (rx_samples > 0) {
           //Rx data.....
           size_t frame_id = 0;

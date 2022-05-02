@@ -23,13 +23,13 @@ class RadioDataPlaneSocket : public RadioDataPlane {
   void Close() final;
 
   int Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-         size_t rx_size, int rx_flags, long long& rx_time_ns) final;
+         size_t rx_size, Radio::RxFlags rx_flags, long long& rx_time_ns) final;
 
   int Rx(std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-         size_t rx_size, int rx_flags, long long& rx_time_ns) final;
+         size_t rx_size, Radio::RxFlags rx_flags, long long& rx_time_ns) final;
 
-  int Rx(std::vector<void*>& rx_locations, size_t rx_size, int rx_flags,
-         long long& rx_time_ns) final;
+  int Rx(std::vector<void*>& rx_locations, size_t rx_size,
+         Radio::RxFlags rx_flags, long long& rx_time_ns) final;
 
   void Flush() final;
 

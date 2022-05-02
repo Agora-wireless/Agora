@@ -93,7 +93,7 @@ void RadioDataPlaneSocket::Setup() {
 // For now, radio rx will return 1 symbol
 int RadioDataPlaneSocket::Rx(
     std::vector<std::vector<std::complex<int16_t>>>& rx_data, size_t rx_size,
-    int rx_flags, long long& rx_time_ns) {
+    Radio::RxFlags rx_flags, long long& rx_time_ns) {
   std::vector<void*> rx_locs;
   rx_locs.reserve(rx_data.size());
   for (auto& loc : rx_data) {
@@ -104,7 +104,7 @@ int RadioDataPlaneSocket::Rx(
 
 int RadioDataPlaneSocket::Rx(
     std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs, size_t rx_size,
-    int rx_flags, long long& rx_time_ns) {
+    Radio::RxFlags rx_flags, long long& rx_time_ns) {
   std::vector<void*> rx_locs;
   rx_locs.reserve(rx_buffs.size());
   for (auto& loc : rx_buffs) {
@@ -114,7 +114,7 @@ int RadioDataPlaneSocket::Rx(
 }
 
 int RadioDataPlaneSocket::Rx(std::vector<void*>& rx_locations, size_t rx_size,
-                             int rx_flags, long long& rx_time_ns) {
+                             Radio::RxFlags rx_flags, long long& rx_time_ns) {
   const int rx_return = socket_.RxSymbol(rx_locations, rx_time_ns);
   if (rx_return > 0) {
     AGORA_LOG_TRACE("Rx'd sample count %d\n", rx_return);

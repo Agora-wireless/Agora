@@ -290,8 +290,8 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
     num_rx_samps = sample_offset;
   }
 
-  const int rx_status =
-      radio_.RadioRx(radio_id, rx_samples, num_rx_samps, 0, receive_time);
+  const int rx_status = radio_.RadioRx(radio_id, rx_samples, num_rx_samps,
+                                       Radio::RxFlagNone, receive_time);
   if (rx_status < 0) {
     AGORA_LOG_ERROR(
         "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
@@ -442,8 +442,8 @@ void TxRxWorkerClientHw::AdjustRx(size_t local_interface,
   const size_t radio_id = local_interface + interface_offset_;
   long long rx_time = 0;
   while (Configuration()->Running() && (discard_samples > 0)) {
-    const int rx_status =
-        radio_.RadioRx(radio_id, rx_frame_, discard_samples, 0, rx_time);
+    const int rx_status = radio_.RadioRx(radio_id, rx_frame_, discard_samples,
+                                         Radio::RxFlagNone, rx_time);
 
     if (rx_status < 0) {
       std::cerr << "RadioTxRx [" << radio_id << "]: BAD SYNC Receive("
@@ -465,8 +465,8 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
 
   //\todo add a retry exit.
   while ((Configuration()->Running() == true) && (sync_index < 0)) {
-    const int rx_status =
-        radio_.RadioRx(radio_id, rx_frame_, sample_window, 0, rx_time);
+    const int rx_status = radio_.RadioRx(radio_id, rx_frame_, sample_window,
+                                         Radio::RxFlagNone, rx_time);
 
     if (rx_status != static_cast<int>(sample_window)) {
       std::cerr << "RadioTxRx [" << radio_id << "]: BAD SYNC Receive("
