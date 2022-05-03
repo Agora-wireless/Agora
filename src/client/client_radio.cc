@@ -53,7 +53,7 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg,
   for (const auto& radio : radios_) {
     radio->PrintSettings();
   }
-  std::cout << "radio init done!" << std::endl;
+  AGORA_LOG_INFO("radio init done!\n");
 }
 
 void ClientRadioConfig::InitClientRadio(size_t radio_id) {

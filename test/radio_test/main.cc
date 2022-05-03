@@ -3,6 +3,7 @@
  * @brief Main file for the radio test program
  */
 #include "client_radio.h"
+#include "comms-lib.h"
 #include "gflags/gflags.h"
 #include "logger.h"
 #include "network_utils.h"
@@ -24,6 +25,8 @@ static void TestUeRadioRx(Config* cfg, const uint32_t max_rx,
                           Radio::RadioType type);
 static ssize_t SyncBeacon(const std::complex<int16_t>* samples,
                           size_t detect_window, const Config* cfg);
+
+static bool HwFramerMatch(long long old_time, long long new_time);
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");
@@ -54,8 +57,10 @@ int main(int argc, char* argv[]) {
     PinToCoreWithOffset(ThreadType::kMasterTX, 0, 0);
     agora_comm::ListLocalInterfaces();
     //TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
-    //TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
-    TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
+    TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
+    //TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
+    //UE socket doesnt work right now...
+    //TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
     ret = EXIT_SUCCESS;
   } catch (SignalException& e) {
     std::cerr << "SignalException: " << e.what() << std::endl;
@@ -246,10 +251,11 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
   }
 }
 
+//Removed the hw_framer logic for this test
 void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
   const size_t total_radios = cfg->UeNum();
   const size_t num_channels = cfg->NumUeChannels();
-  const size_t hw_framer = cfg->UeHwFramer();
+  // /const size_t hw_framer = cfg->UeHwFramer();
   const size_t radio_lo = 0;
   const size_t radio_hi = total_radios;
   const size_t cell_id = 0;
@@ -294,7 +300,6 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
     size_t num_rx_symbols = 0;
     size_t rx_samples = 0;
     size_t rx_calls_per_symbol = 0;
-    long long first_rx_time_of_symbol = 0;
 
     std::vector<void*> rx_locations(num_channels);
     //Super thread loop
@@ -316,103 +321,35 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
           //            rx_size, new_samples);
           rx_samples += static_cast<size_t>(new_samples);
           if (rx_samples < target_samples) {
-            //Symbol Rx not finished.... Adjust the subsequent reads
-            if (hw_framer) {
-              if (rx_calls_per_symbol == 0) {
-                first_rx_time_of_symbol = rx_time;
-              } else if (rx_time != 0) {
-                //rx_time == 0 indicates we can use the last rx time
-                const size_t rx_frame_id = static_cast<size_t>(rx_time >> 32);
-                const size_t rx_symbol_id =
-                    static_cast<size_t>((rx_time >> 16) & 0xFFFF);
-
-                const size_t first_frame_id =
-                    static_cast<size_t>(first_rx_time_of_symbol >> 32);
-                const size_t first_symbol_id = static_cast<size_t>(
-                    (first_rx_time_of_symbol >> 16) & 0xFFFF);
-
-                if ((rx_frame_id != first_frame_id) ||
-                    (rx_symbol_id != first_symbol_id)) {
-                  std::printf(
-                      "Unexpected Frame | Symbol pair during retry #%zu Frame: "
-                      "%zu:%zu Symbol: %zu:%zu received new samples %d with "
-                      "%zu total\n",
-                      rx_calls_per_symbol, rx_frame_id, first_frame_id,
-                      rx_symbol_id, first_symbol_id, new_samples, rx_samples);
-                  //Now we have mixed up samples.....
-                  //Need to shift back here??
-                  rx_samples = new_samples;
-                  rx_calls_per_symbol = SIZE_MAX;
-                  first_rx_time_of_symbol = rx_time;
-                }
-              }
-            }
             rx_calls_per_symbol++;
-            //std::printf(
-            //    "Received less than symbol amount of samples %d:%zu:%zu\n",
-            //    new_samples, rx_samples, target_samples);
-            //rx_samples = 0;
+            AGORA_LOG_INFO("Received %zu:%zu samples\n", rx_samples,
+                           target_samples);
           } else if (rx_samples == target_samples) {
             //Rx data.....
             size_t frame_id = 0;
             size_t symbol_id = num_rx_symbols;
-            if (hw_framer) {
-              if (rx_calls_per_symbol > 0) {
-                frame_id = static_cast<size_t>(first_rx_time_of_symbol >> 32);
-                symbol_id = static_cast<size_t>(
-                    (first_rx_time_of_symbol >> 16) & 0xFFFF);
 
-                const size_t rx_frame_id = static_cast<size_t>(rx_time >> 32);
-                const size_t rx_symbol_id =
-                    static_cast<size_t>((rx_time >> 16) & 0xFFFF);
+            //There will be NumChannels "Packets" at this spot
+            for (size_t ch = 0; ch < num_channels; ch++) {
+              Packet* rx_packet =
+                  reinterpret_cast<Packet*>(packet_buffer.at(ch).data());
+              new (rx_packet) Packet(frame_id, symbol_id, cell_id,
+                                     (radio * num_channels) + ch);
 
-                //rx == 0 means we previously read the start of the frame and there was data still pending.
-                if ((rx_time != 0) && ((frame_id != rx_frame_id) ||
-                                       (symbol_id != rx_symbol_id))) {
-                  std::printf(
-                      "Unexpected Frame | Symbol pair with complete samples "
-                      "%zu rx's - Frame: %zu:%zu Symbol: %zu:%zu received new "
-                      "samples %d with %zu total  at time %lld starting %lld\n",
-                      rx_calls_per_symbol + 1, rx_frame_id, frame_id,
-                      rx_symbol_id, symbol_id, new_samples, rx_samples, rx_time,
-                      first_rx_time_of_symbol);
-                  //Now we have mixed up samples.....
-                  //Need to shift data back  in buffer here!!!
-                  rx_samples = new_samples;
-                  rx_calls_per_symbol = 1;
-                  first_rx_time_of_symbol = rx_time;
-                  num_rx_symbols++;
-                }
-              } else {
-                frame_id = static_cast<size_t>(rx_time >> 32);
-                symbol_id = static_cast<size_t>((rx_time >> 16) & 0xFFFF);
-              }
+              AGORA_LOG_INFO("Rx Packet: %s Rx samples: %zu:%zu retries %zu\n",
+                             rx_packet->ToString().c_str(), rx_samples,
+                             target_samples, rx_calls_per_symbol);
             }
-
-            if (rx_samples == target_samples) {
-              //There will be NumChannels "Packets" at this spot
-              for (size_t ch = 0; ch < num_channels; ch++) {
-                Packet* rx_packet =
-                    reinterpret_cast<Packet*>(packet_buffer.at(ch).data());
-                new (rx_packet) Packet(frame_id, symbol_id, cell_id,
-                                       (radio * num_channels) + ch);
-
-                std::printf("Rx Packet: %s Rx samples: %zu:%zu retries %zu\n",
-                            rx_packet->ToString().c_str(), rx_samples,
-                            target_samples, rx_calls_per_symbol);
-              }
-              num_rx_symbols++;
-              rx_samples -= target_samples;
-              rx_calls_per_symbol = 0;
-            }
+            num_rx_symbols++;
+            rx_samples -= target_samples;
+            rx_calls_per_symbol = 0;
           } else {
-            std::printf("Received too much data....%zu:%zu\n", rx_samples,
-                        target_samples);
+            AGORA_LOG_ERROR("Received too much data....%zu:%zu\n", rx_samples,
+                            target_samples);
           }
         } else if (new_samples < 0) {
-          std::printf("Radio rx error %d - message %s\n", new_samples,
-                      strerror(errno));
-          std::fflush(stdout);
+          AGORA_LOG_ERROR("Radio rx error %d - message %s\n", new_samples,
+                          strerror(errno));
           throw std::runtime_error("Radio rx error!!");
         }
       }  // end for each radio
@@ -424,12 +361,11 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
               << std::endl;
   }
 }
-}
 
 ssize_t SyncBeacon(const std::complex<int16_t>* samples, size_t detect_window,
                    const Config* cfg) {
   ssize_t sync_index = 0;
-  sync_index = FindSyncBeacon(samples, cfg->GoldCf32(), detect_window);
+  sync_index = CommsLib::FindBeaconAvx(samples, cfg->GoldCf32(), detect_window);
 
   if (sync_index >= 0) {
     auto rx_adjust_samples =
@@ -439,8 +375,31 @@ ssize_t SyncBeacon(const std::complex<int16_t>* samples, size_t detect_window,
         "%ld\n",
         sync_index, rx_adjust_samples);
   } else {
-    AGORA_LOG_INFO("RadioTest - No beacon detected %d in window %zu\n",
+    AGORA_LOG_INFO("RadioTest - No beacon detected %ld in window %zu\n",
                    sync_index, detect_window);
   }
   return sync_index;
+}
+
+bool HwFramerMatch(long long old_time, long long new_time) {
+  bool match;
+
+  const auto old_frame_id = static_cast<size_t>(old_time >> 32);
+  const auto old_symbol_id = static_cast<size_t>((old_time >> 16) & 0xFFFF);
+
+  const size_t new_frame_id = static_cast<size_t>(new_time >> 32);
+  const size_t new_symbol_id = static_cast<size_t>((new_time >> 16) & 0xFFFF);
+
+  if ((old_time == 0) || (new_time == 0)) {
+    AGORA_LOG_INFO("Old time %lld New Time %lld\n", old_time, new_time);
+  }
+
+  if ((old_frame_id == new_frame_id) && (old_symbol_id == new_symbol_id)) {
+    match = true;
+  } else {
+    match = false;
+    AGORA_LOG_INFO("Unexpected Frame: %zu:%zu Symbol: %zu:%zu received\n",
+                   old_frame_id, new_frame_id, old_symbol_id, new_symbol_id);
+  }
+  return match;
 }
