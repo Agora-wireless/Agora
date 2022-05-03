@@ -18,8 +18,12 @@ DEFINE_uint32(rx_symbols, 10,
               "The number of symbols to receive before the program terminates");
 
 //Forward declaration
-void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type);
-void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type);
+static void TestBsRadioRx(Config* cfg, const uint32_t max_rx,
+                          Radio::RadioType type);
+static void TestUeRadioRx(Config* cfg, const uint32_t max_rx,
+                          Radio::RadioType type);
+static ssize_t SyncBeacon(const std::complex<int16_t>* samples,
+                          size_t detect_window, const Config* cfg);
 
 int main(int argc, char* argv[]) {
   gflags::SetUsageMessage("conf_file : set the configuration filename");
@@ -49,7 +53,7 @@ int main(int argc, char* argv[]) {
 
     PinToCoreWithOffset(ThreadType::kMasterTX, 0, 0);
     agora_comm::ListLocalInterfaces();
-    TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
+    //TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
     //TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
     TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
     ret = EXIT_SUCCESS;
@@ -129,8 +133,8 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
                                                      rx_size, rx_flag, rx_time);
 
         if (new_samples > 0) {
-          //std::printf("Called radiorx for %zu samples and received %d\n",
-          //            rx_size, new_samples);
+          AGORA_LOG_TRACE("Called radiorx for %zu samples and received %d\n",
+                          rx_size, new_samples);
           rx_samples += static_cast<size_t>(new_samples);
           if (rx_samples < target_samples) {
             //Symbol Rx not finished.... Adjust the subsequent reads
@@ -285,7 +289,7 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
 
     //Radio Trigger (start rx)
     //Why is the trigger not needed here?  Maybe the channel didn't activate properly
-    //radioconfig->Go();
+    radioconfig->Go();
 
     size_t num_rx_symbols = 0;
     size_t rx_samples = 0;
@@ -419,4 +423,24 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
                  "and try again!"
               << std::endl;
   }
+}
+}
+
+ssize_t SyncBeacon(const std::complex<int16_t>* samples, size_t detect_window,
+                   const Config* cfg) {
+  ssize_t sync_index = 0;
+  sync_index = FindSyncBeacon(samples, cfg->GoldCf32(), detect_window);
+
+  if (sync_index >= 0) {
+    auto rx_adjust_samples =
+        sync_index - cfg->BeaconLen() - cfg->OfdmTxZeroPrefix();
+    AGORA_LOG_INFO(
+        "RadioTest - Beacon detected for at sync_index: %ld, rx sample offset: "
+        "%ld\n",
+        sync_index, rx_adjust_samples);
+  } else {
+    AGORA_LOG_INFO("RadioTest - No beacon detected %d in window %zu\n",
+                   sync_index, detect_window);
+  }
+  return sync_index;
 }

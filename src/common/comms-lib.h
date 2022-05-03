@@ -105,6 +105,12 @@ class CommsLib {
   }
   static int FindBeaconAvx(const std::vector<std::complex<float>>& iq,
                            const std::vector<std::complex<float>>& seq);
+
+  ///Find Beacon with raw samples from the radio
+  static ssize_t FindBeaconAvx(const std::complex<int16_t>* iq,
+                           const std::vector<std::complex<float>>& seq,
+                           size_t sample_window);
+
   static std::vector<float> CorrelateAvxS(std::vector<float> const& f,
                                           std::vector<float> const& g);
   static std::vector<float> Abs2Avx(std::vector<std::complex<float>> const& f);

@@ -481,24 +481,14 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
   return sync_index;
 }
 
-ssize_t TxRxWorkerClientHw::FindSyncBeacon(std::complex<int16_t>* check_data,
-                                           size_t sample_window) {
+ssize_t TxRxWorkerClientHw::FindSyncBeacon(
+    const std::complex<int16_t>* check_data, size_t sample_window) {
   ssize_t sync_index = -1;
   assert(sample_window <= (Configuration()->SampsPerSymbol() *
                            Configuration()->Frame().NumTotalSyms()));
 
-  //Allocate memory, only used for beacon detection
-  std::vector<std::complex<float>> sync_compare(
-      sample_window, std::complex<float>(0.0f, 0.0f));
-
-  // convert entire frame data to complex float for sync detection
-  for (size_t i = 0; i < sample_window; i++) {
-    sync_compare.at(i) = (std::complex<float>(
-        static_cast<float>(check_data[i].real()) / 32768.0f,
-        static_cast<float>(check_data[i].imag()) / 32768.0f));
-  }
-  sync_index =
-      CommsLib::FindBeaconAvx(sync_compare, Configuration()->GoldCf32());
+  sync_index = CommsLib::FindBeaconAvx(check_data, Configuration()->GoldCf32(),
+                                       sample_window);
   return sync_index;
 }
 

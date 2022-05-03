@@ -68,12 +68,6 @@ bool PacketTxRxClientRadio::CreateWorker(size_t tid, size_t interface_count,
       ((interface_offset * num_channels) + (interface_count * num_channels) -
        1));
 
-  //if ((kUseArgos == true) && (config_->UeHwFramer() == true)) {
-  //  txrx_threads_.at(i) = std::thread(&RadioTxRx::LoopTxRxArgos, this, i);
-  //} else if (kUseArgos || kUseUHD) {
-  //  txrx_threads_.at(i) = std::thread(&RadioTxRx::LoopTxRxArgosSync, this, i);
-  //}
-
   //This is the spot to choose what type of TxRxWorker you want....
   if (kUseArgos) {
     worker_threads_.emplace_back(std::make_unique<TxRxWorkerClientHw>(
