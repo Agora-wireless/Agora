@@ -108,7 +108,8 @@ PhyUe::PhyUe(Config* config)
   if (kEnableCsvLog) {
     for (size_t i = 0; i < csv_loggers_.size(); i++) {
       csv_loggers_.at(i) =
-          std::make_shared<CsvLog::CsvLogger>(config_->UeRadioId().at(0), i);
+          std::make_shared<CsvLog::CsvLogger>(config_->UeRadioId().at(0), i,
+                                              config_->LogIpAddr());
     }
   }
 

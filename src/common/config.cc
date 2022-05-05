@@ -219,6 +219,8 @@ Config::Config(const std::string& jsonfile)
   ue_rru_port_ = tdd_conf.value("ue_rru_port", 7000);
   ue_server_port_ = tdd_conf.value("ue_server_port", 6000);
 
+  log_ip_addr_ = tdd_conf.value("log_ip_addr", "");
+
   dpdk_num_ports_ = tdd_conf.value("dpdk_num_ports", 1);
   dpdk_port_offset_ = tdd_conf.value("dpdk_port_offset", 0);
   dpdk_mac_addrs_ = tdd_conf.value("dpdk_mac_addrs", "");

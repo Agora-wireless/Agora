@@ -294,6 +294,10 @@ class Config {
   inline int UeServerPort() const { return this->ue_server_port_; }
   inline int UeRruPort() const { return this->ue_rru_port_; }
 
+  inline const std::string& LogIpAddr() const {
+    return this->log_ip_addr_;
+  }
+
   inline size_t FramesToTest() const { return this->frames_to_test_; }
   inline float NoiseLevel() const { return this->noise_level_; }
   inline bool FftInRru() const { return this->fft_in_rru_; }
@@ -797,6 +801,8 @@ class Config {
 
   // Base RRU/channel simulator UDP port used by UEs to transmit uplink data
   int ue_rru_port_;
+
+  std::string log_ip_addr_; // IP address of the UDP sink for real-time log
 
   // Number of NIC ports used for DPDK
   uint16_t dpdk_num_ports_;

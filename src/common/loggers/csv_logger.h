@@ -14,6 +14,7 @@
 #include "spdlog/async.h"
 #include "spdlog/pattern_formatter.h"
 #include "spdlog/sinks/basic_file_sink.h"
+#include "spdlog/sinks/udp_sink.h"
 #include "spdlog/spdlog.h"
 #endif
 
@@ -39,11 +40,14 @@ const std::array<std::string, kAllLogs> kCsvHeader = {
     "Frame,Symbol,UE-Ant,Bit-Error-Rate,Symbol-Error-Rate",
     "Frame,Subcarrier,BS-Ant,UE-Ant,CSI-Real,CSI-Imag",
     "Frame,Subcarrier,BS-Ant,UE-Ant,DLZF-Real,DLZF-Imag"};
+const std::array<uint16_t, kAllLogs> kUdpPortNum = {
+    30301, 30302, 30303, 30304, 30305};
 #endif
 
 class CsvLogger {
  public:
-  CsvLogger(const std::string& radio_id, const size_t log_id);
+  CsvLogger(const std::string& radio_id, const size_t log_id,
+            const std::string& sink_ip_addr);
 
 #if defined(ENABLE_CSV_LOG)
   inline void Write(size_t u1, size_t u2, size_t u3, float f1, float f2) {

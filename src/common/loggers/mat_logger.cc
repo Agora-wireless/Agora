@@ -12,7 +12,7 @@
 namespace CsvLog {
 
 MatLogger::MatLogger(const std::string& radio_id, size_t mat_log_id)
-    : CsvLogger(radio_id, mat_log_id + kMatIdStart) {}
+         : CsvLogger(radio_id, mat_log_id + kMatIdStart, "") {}
 
 MatLogger::~MatLogger() { SaveMatBuf(); }
 
