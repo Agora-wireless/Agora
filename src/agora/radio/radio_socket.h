@@ -29,14 +29,28 @@ class RadioSocket {
   inline const std::string& Port() const { return socket_->Port(); };
 
   int RxSymbol(std::vector<void*>& out_data, long long& rx_time_ns);
+  int RxSamples(std::vector<void*>& out_data, long long& rx_time_ns,
+                size_t rx_samples);
   void Flush();
 
  private:
   bool CheckSymbolComplete(const std::byte* in_data, const int& in_count);
-  size_t ParseRxSymbol(std::vector<void*>& out_samples, long long& rx_time_ns);
+  size_t InspectRx(const std::byte* in_data, size_t in_count,
+                   long long& rx_time_ticks, size_t& burst_count);
+  size_t LoadSamples(std::vector<void*>& out_samples,
+                     const std::complex<int16_t>* in_samples,
+                     size_t num_in_samples);
+
+  size_t GetRxSamples(std::vector<void*>& out_samples, size_t req_samples,
+                      long long& rx_time);
 
   std::unique_ptr<UDPServerIPv6> socket_;
   std::vector<std::byte> rx_buffer_;
+
+  //Buffer to place "extra" samples that come during a socket read
+  std::vector<std::complex<int16_t>> sample_buffer_;
+  long long rx_time_unpacked_;
+
   size_t rx_bytes_{0};
   size_t rx_samples_{0};
 
