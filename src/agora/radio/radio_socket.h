@@ -17,7 +17,7 @@
 class RadioSocket {
  public:
   RadioSocket();
-  ~RadioSocket() = default;
+  ~RadioSocket();
   //Allow move, and disallow copy
   RadioSocket(RadioSocket&&) noexcept = default;
   explicit RadioSocket(const RadioSocket&) = delete;
