@@ -118,8 +118,7 @@ PhyUe::PhyUe(Config* config)
         *work_producer_token_.get(), ul_bits_buffer_, ul_syms_buffer_,
         modul_buffer_, ifft_buffer_, tx_buffer_, rx_buffer_, csi_buffer_,
         equal_buffer_, non_null_sc_ind_, fft_buffer_, demod_buffer_,
-        decoded_buffer_, ue_pilot_vec_, csv_loggers_.at(CsvLog::kEVMSNR),
-        csv_loggers_.at(CsvLog::kBERSER));
+        decoded_buffer_, ue_pilot_vec_);
 
     new_worker->Start(core_offset_worker);
     workers_.push_back(std::move(new_worker));
@@ -440,10 +439,10 @@ void PhyUe::Start() {
               if (kPrintPhyStats) {
                 this->phy_stats_->PrintDlSnrStats(frame_id);
               }
-              //if (kEnableCsvLog) {
-             //   this->phy_stats_->RecordDlPilotSnr(
-              //      csv_loggers_.at(CsvLog::kDLPSNR).get(), frame_id, ant_id);
-             // }
+              if (kEnableCsvLog) {
+                this->phy_stats_->RecordDlPilotSnr(
+                    csv_loggers_.at(CsvLog::kDLPSNR).get(), frame_id);
+              }
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
               ScheduleDefferedDownlinkSymbols(frame_id);
@@ -497,6 +496,15 @@ void PhyUe::Start() {
               this->stats_->MasterSetTsc(TsType::kDemulDone, frame_id);
               PrintPerFrameDone(PrintType::kDemul, frame_id);
               demul_counters_.Reset(frame_id);
+
+              if (kEnableCsvLog) {
+                this->phy_stats_->RecordEvmSnr(
+                    csv_loggers_.at(CsvLog::kEVMSNR).get(), frame_id);
+                if (kDownlinkHardDemod) {
+                  this->phy_stats_->RecordBerSer(
+                      csv_loggers_.at(CsvLog::kBERSER).get(), frame_id);
+                }
+              }
               if (kDownlinkHardDemod == true) {
                 bool finished =
                     FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
@@ -544,14 +552,6 @@ void PhyUe::Start() {
               bool finished =
                   FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
               if (finished == true) {
-                if (kEnableCsvLog) {
-                  this->phy_stats_->RecordDlPilotSnr(
-                      csv_loggers_.at(CsvLog::kDLPSNR).get(), frame_id);
-                  this->phy_stats_->RecordEvmSnr(
-                      csv_loggers_.at(CsvLog::kEVMSNR).get(), frame_id);
-                  this->phy_stats_->RecordBerSer(
-                      csv_loggers_.at(CsvLog::kBERSER).get(), frame_id);
-                }
                 if ((cur_frame_id + 1) >= config_->FramesToTest()) {
                   config_->Running(false);
                 } else {
