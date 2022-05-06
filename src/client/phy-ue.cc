@@ -549,6 +549,10 @@ void PhyUe::Start() {
               PrintPerFrameDone(PrintType::kDecode, frame_id);
               decode_counters_.Reset(frame_id);
 
+              if (kEnableCsvLog) {
+                this->phy_stats_->RecordBerSer(
+                    csv_loggers_.at(CsvLog::kBERSER).get(), frame_id);
+              }
               bool finished =
                   FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);
               if (finished == true) {

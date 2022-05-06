@@ -34,7 +34,7 @@ const std::array<std::string, kAllLogs> kCsvName = {
     "log-dlpsnr-ue", "log-evmsnr-ue", "log-berser-ue", "log-matcsi-bs",
     "log-matdlzf-bs"};
 const std::array<std::string, kAllLogs> kCsvHeader = {
-    "Frame,UE0-DLP0-SNR,UE0-DLP1-SNR,UE1-DLP0-SNR,UE1-DLP1-SNR",
+    "Frame,UE0-Downlink-SNR,UE0-DLP1-SNR,UE1-Downlink-SNR,UE1-DLP1-SNR",
     "Frame,UE0-EVM-SNR,UE1-EVM-SNR",
     "Frame,UE0-BER,UE0-SER,UE1-BER,UE1-SER",
     "Frame,Subcarrier,BS-Ant,UE-Ant,CSI-Real,CSI-Imag",

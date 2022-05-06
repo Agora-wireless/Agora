@@ -17,11 +17,13 @@ class PhyStats {
   explicit PhyStats(Config* const cfg, Direction dir);
   ~PhyStats();
   void PrintPhyStats();
-  void UpdateBitErrors(size_t ue_id, size_t offset, uint8_t tx_byte,
-                       uint8_t rx_byte);
-  void UpdateDecodedBits(size_t ue_id, size_t offset, size_t new_bits_num);
-  void UpdateBlockErrors(size_t ue_id, size_t offset, size_t block_error_count);
-  void IncrementDecodedBlocks(size_t ue_id, size_t offset);
+  void UpdateBitErrors(size_t ue_id, size_t offset, size_t frame_slot,
+                       uint8_t tx_byte, uint8_t rx_byte);
+  void UpdateDecodedBits(size_t ue_id, size_t offset, size_t frame_slot,
+                         size_t new_bits_num);
+  void UpdateBlockErrors(size_t ue_id, size_t offset, size_t frame_slot,
+                         size_t block_error_count);
+  void IncrementDecodedBlocks(size_t ue_id, size_t offset, size_t frame_slot);
   void RecordBerSer(CsvLog::CsvLogger* logger, size_t frame_id);
   void UpdateUncodedBitErrors(size_t ue_id, size_t offset, size_t mod_bit_size,
                               uint8_t tx_byte, uint8_t rx_byte);
@@ -49,6 +51,10 @@ class PhyStats {
   Direction dir_;
   Table<size_t> decoded_bits_count_;
   Table<size_t> bit_error_count_;
+  Table<size_t> frame_decoded_bits_;
+  Table<size_t> frame_bit_errors_;
+  Table<size_t> frame_symbol_errors_;
+  Table<size_t> frame_decoded_blocks_;
   Table<size_t> decoded_blocks_count_;
   Table<size_t> block_error_count_;
   Table<size_t> symbol_error_count_;
