@@ -39,9 +39,7 @@ class UeWorker {
       Table<complex_float>& fft_buffer,
       PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& demod_buffer,
       PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer,
-      std::vector<std::vector<std::complex<float>>>& ue_pilot_vec,
-      std::shared_ptr<CsvLog::CsvLogger> logger_evmsnr,
-      std::shared_ptr<CsvLog::CsvLogger> logger_berser);
+      std::vector<std::vector<std::complex<float>>>& ue_pilot_vec);
   ~UeWorker();
 
   void Start(size_t core_offset);
@@ -156,8 +154,5 @@ class UeWorker {
   PtrCube<kFrameWnd, kMaxSymbols, kMaxUEs, int8_t>& decoded_buffer_;
 
   std::vector<std::vector<std::complex<float>>>& ue_pilot_vec_;
-
-  std::shared_ptr<CsvLog::CsvLogger> logger_evmsnr_;
-  std::shared_ptr<CsvLog::CsvLogger> logger_berser_;
 };
 #endif  // UE_WORKER_H_
