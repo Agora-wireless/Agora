@@ -5,7 +5,7 @@
     "channel": "A",
     "frequency": 3.6e9,
     "rx_gain_a": 65,
-    "tx_gain_a": 72,
+    "tx_gain_a": 78,
     "rx_gain_b": 65,
     "tx_gain_b": 70,
     "sample_rate": 3.84e6,
@@ -38,7 +38,7 @@
         65
     ],
     "ue_tx_gain_a": [
-        67,
+        71,
         73
     ],
     "ue_rx_gain_b": [
@@ -65,5 +65,5 @@
     "ue_demul_block_size": 48,
     /* 20 bs radios + 1 ref*/
     "socket_thread_num": 4,
-    "max_frame": 9900
+    "max_frame": 5000
 }
