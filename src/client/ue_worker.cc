@@ -470,9 +470,9 @@ void UeWorker::DoDemul(size_t tag) {
   if (kDownlinkHardDemod && (kPrintPhyStats || kEnableCsvLog) &&
       (dl_symbol_id >= config_.Frame().ClientDlPilotSymbols())) {
     phy_stats_.UpdateDecodedBits(
-        ant_id, total_dl_symbol_id,
+        ant_id, total_dl_symbol_id, frame_slot,
         config_.GetOFDMDataNum() * config_.ModOrderBits(Direction::kDownlink));
-    phy_stats_.IncrementDecodedBlocks(ant_id, total_dl_symbol_id);
+    phy_stats_.IncrementDecodedBlocks(ant_id, total_dl_symbol_id, frame_slot);
     int8_t* tx_bytes = config_.GetModBitsBuf(
         config_.DlModBits(), Direction::kDownlink, 0, dl_symbol_id,
         kDebugDownlink ? 0 : ant_id, base_sc_id);
@@ -480,7 +480,8 @@ void UeWorker::DoDemul(size_t tag) {
     for (size_t i = 0; i < config_.GetOFDMDataNum(); i++) {
       uint8_t rx_byte = static_cast<uint8_t>(demod_ptr[i]);
       uint8_t tx_byte = static_cast<uint8_t>(tx_bytes[i]);
-      phy_stats_.UpdateBitErrors(ant_id, total_dl_symbol_id, tx_byte, rx_byte);
+      phy_stats_.UpdateBitErrors(ant_id, total_dl_symbol_id, frame_slot,
+                                 tx_byte, rx_byte);
       if (rx_byte != tx_byte) {
         block_error++;
       }
@@ -489,7 +490,8 @@ void UeWorker::DoDemul(size_t tag) {
       AGORA_LOG_INFO("Frame %zu Symbol %zu Ue %zu: %zu symbol errors\n",
                      frame_id, symbol_id, ant_id, block_error);
     }
-    phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, block_error);
+    phy_stats_.UpdateBlockErrors(ant_id, total_dl_symbol_id, frame_slot,
+                                 block_error);
   }
 
   if ((kDebugPrintPerTaskDone == true) || (kDebugPrintDemul == true)) {

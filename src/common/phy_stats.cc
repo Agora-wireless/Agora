@@ -23,12 +23,18 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                              Agora_memory::Alignment_t::kAlign64);
   bit_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                           Agora_memory::Alignment_t::kAlign64);
+  frame_decoded_bits_.Calloc(cfg->UeAntNum(), kFrameWnd,
+                             Agora_memory::Alignment_t::kAlign64);
+  frame_bit_errors_.Calloc(cfg->UeAntNum(), kFrameWnd,
+                          Agora_memory::Alignment_t::kAlign64);
 
   decoded_blocks_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                                Agora_memory::Alignment_t::kAlign64);
   block_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
                             Agora_memory::Alignment_t::kAlign64);
-  symbol_error_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
+  frame_symbol_errors_.Calloc(cfg->UeAntNum(), kFrameWnd,
+                             Agora_memory::Alignment_t::kAlign64);
+  frame_decoded_blocks_.Calloc(cfg->UeAntNum(), kFrameWnd,
                              Agora_memory::Alignment_t::kAlign64);
 
   uncoded_bits_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
@@ -275,18 +281,15 @@ void PhyStats::RecordBerSer(CsvLog::CsvLogger* logger, size_t frame_id) {
         size_t total_bits = 0;
         size_t error_symbols = 0;
         size_t total_symbols = 0;
-        for (size_t j = 0; j < num_data_symbols_; j++) {
-          const size_t offset = (frame_id % kFrameWnd) * num_data_symbols_ + j;
-          error_bits += bit_error_count_[i][offset];
-          total_bits += decoded_bits_count_[i][offset];
-          error_symbols += symbol_error_count_[i][offset];
-          total_symbols += decoded_blocks_count_[i][offset]
-                           * config_->GetOFDMDataNum();
-        }
-        ss << "," << (static_cast<float>(error_bits) /
-                      static_cast<float>(total_bits))
-           << "," << (static_cast<float>(error_symbols) /
-                      static_cast<float>(total_symbols));
+        error_bits += frame_bit_errors_[i][frame_id % kFrameWnd];
+        total_bits += frame_decoded_bits_[i][frame_id % kFrameWnd];
+        error_symbols += frame_symbol_errors_[i][frame_id % kFrameWnd];
+        total_symbols += frame_decoded_blocks_[i][frame_id % kFrameWnd]
+                          * config_->GetOFDMDataNum();
+        ss << "," << (static_cast<float>(error_bits))/* /
+                      static_cast<float>(total_bits))*/
+           << "," << (static_cast<float>(error_symbols))/* /
+                      static_cast<float>(total_symbols))*/;
       }
       logger->Write(ss.str());
     }
@@ -388,8 +391,8 @@ void PhyStats::UpdateEvmSnr(size_t frame_id, size_t ue_id, float evmsnr) {
   evm_snr_[frame_id % kFrameWnd][ue_id] = evmsnr;
 }
 
-void PhyStats::UpdateBitErrors(size_t ue_id, size_t offset, uint8_t tx_byte,
-                               uint8_t rx_byte) {
+void PhyStats::UpdateBitErrors(size_t ue_id, size_t offset, size_t frame_slot,
+                               uint8_t tx_byte, uint8_t rx_byte) {
   static constexpr size_t kBitsInByte = 8;
   AGORA_LOG_TRACE("Updating bit errors: User %zu Offset  %zu Tx %d Rx %d\n",
                   ue_id, offset, tx_byte, rx_byte);
@@ -400,22 +403,26 @@ void PhyStats::UpdateBitErrors(size_t ue_id, size_t offset, uint8_t tx_byte,
     xor_byte >>= 1;
   }
   bit_error_count_[ue_id][offset] += bit_errors;
+  frame_bit_errors_[ue_id][frame_slot] += bit_errors;
 }
 
-void PhyStats::UpdateDecodedBits(size_t ue_id, size_t offset,
+void PhyStats::UpdateDecodedBits(size_t ue_id, size_t offset, size_t frame_slot,
                                  size_t new_bits_num) {
   decoded_bits_count_[ue_id][offset] += new_bits_num;
+  frame_decoded_bits_[ue_id][frame_slot] += new_bits_num;
 }
 
-void PhyStats::UpdateBlockErrors(size_t ue_id, size_t offset,
+void PhyStats::UpdateBlockErrors(size_t ue_id, size_t offset, size_t frame_slot,
                                  size_t block_error_count) {
   block_error_count_[ue_id][offset] +=
       static_cast<unsigned long>(block_error_count > 0);
-  symbol_error_count_[ue_id][offset] += block_error_count;
+  frame_symbol_errors_[ue_id][frame_slot] += block_error_count;
 }
 
-void PhyStats::IncrementDecodedBlocks(size_t ue_id, size_t offset) {
+void PhyStats::IncrementDecodedBlocks(size_t ue_id, size_t offset,
+                                      size_t frame_slot) {
   decoded_blocks_count_[ue_id][offset]++;
+  frame_decoded_blocks_[ue_id][frame_slot]++;
 }
 
 void PhyStats::UpdateUncodedBitErrors(size_t ue_id, size_t offset,
