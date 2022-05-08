@@ -53,11 +53,10 @@ class PhyStats {
   Table<size_t> bit_error_count_;
   Table<size_t> frame_decoded_bits_;
   Table<size_t> frame_bit_errors_;
-  Table<size_t> frame_symbol_errors_;
-  Table<size_t> frame_decoded_blocks_;
   Table<size_t> decoded_blocks_count_;
   Table<size_t> block_error_count_;
-  Table<size_t> symbol_error_count_;
+  Table<size_t> frame_symbol_errors_;
+  Table<size_t> frame_decoded_symbols_;
   Table<size_t> uncoded_bits_count_;
   Table<size_t> uncoded_bit_error_count_;
   Table<float> evm_buffer_;
