@@ -34,7 +34,7 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                             Agora_memory::Alignment_t::kAlign64);
   frame_symbol_errors_.Calloc(cfg->UeAntNum(), kFrameWnd,
                              Agora_memory::Alignment_t::kAlign64);
-  frame_decoded_blocks_.Calloc(cfg->UeAntNum(), kFrameWnd,
+  frame_decoded_symbols_.Calloc(cfg->UeAntNum(), kFrameWnd,
                              Agora_memory::Alignment_t::kAlign64);
 
   uncoded_bits_count_.Calloc(cfg->UeAntNum(), task_buffer_symbol_num,
@@ -276,20 +276,20 @@ void PhyStats::RecordBerSer(CsvLog::CsvLogger* logger, size_t frame_id) {
     if (logger != nullptr) {
       std::stringstream ss;
       ss << frame_id;
+      const size_t frame_slot = frame_id % kFrameWnd;
       for (size_t i = 0; i < config_->UeAntNum(); i++) {
-        size_t error_bits = 0;
-        size_t total_bits = 0;
-        size_t error_symbols = 0;
-        size_t total_symbols = 0;
-        error_bits += frame_bit_errors_[i][frame_id % kFrameWnd];
-        total_bits += frame_decoded_bits_[i][frame_id % kFrameWnd];
-        error_symbols += frame_symbol_errors_[i][frame_id % kFrameWnd];
-        total_symbols += frame_decoded_blocks_[i][frame_id % kFrameWnd]
-                          * config_->GetOFDMDataNum();
-        ss << "," << (static_cast<float>(error_bits))/* /
-                      static_cast<float>(total_bits))*/
-           << "," << (static_cast<float>(error_symbols))/* /
-                      static_cast<float>(total_symbols))*/;
+        size_t& error_bits = frame_bit_errors_[i][frame_slot];
+        size_t& total_bits = frame_decoded_bits_[i][frame_slot];
+        size_t& error_symbols = frame_symbol_errors_[i][frame_slot];
+        size_t& total_symbols = frame_decoded_symbols_[i][frame_slot];
+        ss << "," << (static_cast<float>(error_bits) /
+                      static_cast<float>(total_bits))
+           << "," << (static_cast<float>(error_symbols) /
+                      static_cast<float>(total_symbols));
+        error_bits = 0;
+        total_bits = 0;
+        error_symbols = 0;
+        total_symbols = 0;
       }
       logger->Write(ss.str());
     }
@@ -422,7 +422,7 @@ void PhyStats::UpdateBlockErrors(size_t ue_id, size_t offset, size_t frame_slot,
 void PhyStats::IncrementDecodedBlocks(size_t ue_id, size_t offset,
                                       size_t frame_slot) {
   decoded_blocks_count_[ue_id][offset]++;
-  frame_decoded_blocks_[ue_id][frame_slot]++;
+  frame_decoded_symbols_[ue_id][frame_slot] += config_->GetOFDMDataNum();
 }
 
 void PhyStats::UpdateUncodedBitErrors(size_t ue_id, size_t offset,
