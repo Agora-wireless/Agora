@@ -258,7 +258,8 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
 
 void TestBsRadioRxNoRetry(Config* cfg, const uint32_t max_rx,
                           Radio::RadioType type) {
-  constexpr size_t kRxPerSymbol = 4;
+  //Tested with 1 and 4
+  constexpr size_t kRxPerSymbol = 1;
   const size_t total_radios = cfg->NumRadios();
   const size_t num_channels = cfg->NumChannels();
   const size_t hw_framer = cfg->HwFramer();
@@ -323,19 +324,20 @@ void TestBsRadioRxNoRetry(Config* cfg, const uint32_t max_rx,
 
         const size_t rx_size = target_samples;
         //In Hw framer mode, we should not call RX for bytes over the symbol boundaries
-        const int new_samples = radioconfig->RadioRx(radio, rx_locations,
-                                                     rx_size, rx_flag, rx_time);
+        const int rx_return = radioconfig->RadioRx(radio, rx_locations, rx_size,
+                                                   rx_flag, rx_time);
 
-        if (new_samples > 0) {
+        if (rx_return > 0) {
+          const auto new_samples = static_cast<size_t>(rx_return);
           AGORA_LOG_INFO(
-              "Called radiorx for %zu samples and received %d with %zu already "
-              "loaded\n",
+              "Called radiorx for %zu samples and received %zu with %zu "
+              "already loaded\n",
               rx_size, new_samples, rx_samples);
 
           rx_samples += static_cast<size_t>(new_samples);
           if (new_samples < target_samples) {
             AGORA_LOG_INFO(
-                "Received less than symbol amount of samples %d:%zu:%zu rx "
+                "Received less than symbol amount of samples %zu:%zu:%zu rx "
                 "time %lld\n",
                 new_samples, target_samples, rx_samples, rx_time);
             num_rx_symbols++;
@@ -366,8 +368,8 @@ void TestBsRadioRxNoRetry(Config* cfg, const uint32_t max_rx,
           } else if (rx_samples > cfg->SampsPerSymbol()) {
             throw std::runtime_error("RX samples exceeds samples per symbol");
           }
-        } else if (new_samples < 0) {
-          std::printf("Radio rx error %d - message %s\n", new_samples,
+        } else if (rx_return < 0) {
+          std::printf("Radio rx error %d - message %s\n", rx_return,
                       strerror(errno));
           std::fflush(stdout);
           throw std::runtime_error("Radio rx error!!");
