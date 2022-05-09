@@ -37,12 +37,18 @@ class RadioSocket {
   bool CheckSymbolComplete(const std::byte* in_data, const int& in_count);
   size_t InspectRx(const std::byte* in_data, size_t in_count,
                    long long& rx_time_ticks, size_t& burst_count);
+  size_t UnpackSamples(std::vector<void*>& out_samples, size_t req_samples,
+                       long long& rx_time);
+
   size_t LoadSamples(std::vector<void*>& out_samples,
                      const std::complex<int16_t>* in_samples,
                      size_t num_in_samples);
 
-  size_t GetRxSamples(std::vector<void*>& out_samples, size_t req_samples,
-                      long long& rx_time);
+  size_t GetUnpackedSamples(std::vector<void*>& out_samples, long long& rx_time,
+                            size_t req_samples);
+
+  size_t GetPackedSamples(std::vector<void*>& out_samples, long long& rx_time,
+                          size_t sample_offset, size_t req_samples);
 
   std::unique_ptr<UDPServerIPv6> socket_;
   std::vector<std::byte> rx_buffer_;

@@ -10,13 +10,13 @@
 #include "utils.h"
 
 constexpr size_t kMaxMTU = 9000;
-constexpr size_t kRxBufferSize = 8192;
+constexpr size_t kRxBufferSize = 16384;
 //This can be kRxBufferSize / 6 safely (1 sample per 6 bytes)
-constexpr size_t kRxSampleRemBufSize = 2048;
+constexpr size_t kRxSampleRemBufSize = 4096;
 
-constexpr bool kDebugIrisRx = true;
+constexpr bool kDebugIrisRx = false;
 
-#define SOCKET_DEBUG_OUTPUT
+//#define SOCKET_DEBUG_OUTPUT
 #if defined(SOCKET_DEBUG_OUTPUT)
 #define DEBUG_OUTPUT(...)   \
   std::printf(__VA_ARGS__); \
@@ -77,6 +77,45 @@ struct IrisCommData {
   uint8_t data_[];
 } __attribute__((packed));
 static_assert(sizeof(IrisCommData::header_) == 16);
+
+///If Samples to Load > 0 we should stop trying to receive
+///Otherwise, keep trying to get more data
+static inline size_t ValidateSamples(long long& stream_rx_time,
+                                     const long long& pkt_rx_time,
+                                     size_t previous_samples,
+                                     size_t new_samples,
+                                     size_t requested_samples,
+                                     size_t burst_samples, size_t output_dim) {
+  const size_t completed_samples = previous_samples + new_samples;
+  size_t samples_to_load = 0;
+  //Check for sample discontinuity and short packets (samples < burst)
+  if ((completed_samples < requested_samples) &&
+      (new_samples != (burst_samples * output_dim))) {
+    AGORA_LOG_WARN(
+        "Rx packet does not have burst count number of symbols %zu:%zu "
+        "with %zu available out of %zu requested\n",
+        new_samples, (burst_samples * output_dim), completed_samples,
+        requested_samples);
+    //Load all of the samples including this rx
+    samples_to_load = previous_samples + new_samples;
+  } else if (stream_rx_time == 0) {
+    //If stream rx time has not been set, then set for subsequent rx calls
+    stream_rx_time = pkt_rx_time;
+  } else if ((stream_rx_time + (long long)(previous_samples / output_dim)) !=
+             pkt_rx_time) {
+    AGORA_LOG_WARN(
+        "Rx packet has discontinuous samples %lld pending samples %zu, "
+        "new packet start time %lld\n",
+        stream_rx_time, previous_samples, pkt_rx_time);
+    //Load all samples availble previous to this rx
+    samples_to_load = previous_samples;
+  } else if (requested_samples <= completed_samples) {
+    samples_to_load = requested_samples;
+  } else {
+    samples_to_load = 0;
+  }
+  return samples_to_load;
+}
 
 //bytes_per_element is based on "WIRE" format
 //info.options = {SOAPY_SDR_CS16, SOAPY_SDR_CS12, SOAPY_SDR_CS8};
@@ -140,7 +179,7 @@ int RadioSocket::RxSymbol(std::vector<void*>& out_data, long long& rx_time_ns) {
         //Could be multiple UDP rx calls, all the udp packets + headers that make up a symbol
         //exist in the rx_buffer input.
         const size_t req_samples = std::min(samples_per_symbol_, rx_samples_);
-        num_samples = GetRxSamples(out_data, req_samples, rx_time_ns);
+        num_samples = UnpackSamples(out_data, req_samples, rx_time_ns);
         if ((rx_bytes_ != 0) || (rx_samples_ != 0)) {
           std::printf(
               "Unexpected Bytes %zu and Samples %zu Remaining. Requested %zu "
@@ -193,8 +232,7 @@ int RadioSocket::RxSamples(std::vector<void*>& out_data, long long& rx_time_ns,
   }
 
   //Loop until we have enough samples or there is no pending data at the socket
-  while (try_rx && (samples_available < req_total_samples) &&
-         (samples_to_load == 0)) {
+  while (try_rx) {
     const size_t udp_rx_size = (rx_buffer_.size() - rx_bytes_);
     //If the requested rec is < the pending udp packet then the remainer will be thrown out without knowledge
     assert(udp_rx_size > kMaxMTU);
@@ -215,34 +253,18 @@ int RadioSocket::RxSamples(std::vector<void*>& out_data, long long& rx_time_ns,
 
       rx_bytes_ += new_bytes;
       rx_samples_ += new_rx_samples;
-      const auto new_total_samples = samples_available + new_rx_samples;
-
-      //Check for sample discontinuity and short packets (samples < burst)
-      if ((new_total_samples < req_total_samples) &&
-          (new_rx_samples != (burst_count * num_channels))) {
-        AGORA_LOG_WARN(
-            "Rx packet does not have burst count number of symbols %zu:%zu "
-            "with %zu available out of %zu requested\n",
-            new_rx_samples, burst_count * num_channels, samples_available,
-            req_total_samples);
-        //Load all of the samples including this rx
-        samples_to_load = new_total_samples;
-      } else if (stream_rx_time == 0) {
-        //If stream rx time has not been set, then set for subsequent rx calls
-        stream_rx_time = pkt_rx_time;
-      } else if ((stream_rx_time + (long long)(samples_available /
-                                               num_channels)) != pkt_rx_time) {
-        AGORA_LOG_WARN(
-            "Rx packet has discontinuous samples %lld pending samples %zu, "
-            "new packet start time %lld\n",
-            stream_rx_time, samples_available, pkt_rx_time);
-        //Load all samples availble previous to this rx
-        samples_to_load = samples_available;
-      }
-      samples_available = new_total_samples;
-      try_rx = true;
       RtAssert((new_rx_samples % num_channels) == 0,
                "Newly received samples do not align with output dimensions");
+
+      //Modifies stream_rx_time for next call
+      samples_to_load = ValidateSamples(
+          stream_rx_time, pkt_rx_time, samples_available, new_rx_samples,
+          req_total_samples, burst_count, num_channels);
+
+      samples_available += new_rx_samples;
+      if (samples_to_load == 0) {
+        try_rx = true;
+      }
     } else if (rx_return < 0) {
       if ((errno != EAGAIN) && (errno != EWOULDBLOCK)) {
         throw std::runtime_error("Error in socket receive call!");
@@ -250,81 +272,28 @@ int RadioSocket::RxSamples(std::vector<void*>& out_data, long long& rx_time_ns,
     }
   }  // end while (try_rx)
 
-  //If enough data, then load the output
-  // and set rx_time_ns to the first time
-  if ((samples_to_load == 0) && (req_total_samples <= samples_available)) {
-    samples_to_load = req_total_samples;
-  } else if ((samples_to_load > req_total_samples)) {
-    //How to handle the samples_to_load > req_samples????????????????
-    samples_to_load = req_total_samples;
-  }
-
   if (samples_to_load > 0) {
-    std::printf(
+    DEBUG_OUTPUT(
         "Samples Available %zu out of %zu requested. Transferring %zu with "
         "Pending Total Samples (Packed %zu, Unpacked %zu)\n",
         samples_available, req_total_samples, samples_to_load, rx_samples_,
         unpacked_samples);
-    //Spots to be optimized....
-    //Load the unpacked samples first
-    if (unpacked_samples > 0) {
-      const size_t transfer_samples =
-          std::min(unpacked_samples, req_total_samples);
-      loaded_samples_per_channel =
-          LoadSamples(out_data, sample_buffer_.data(), transfer_samples);
 
-      rx_time_ns = rx_time_unpacked_;
-      AGORA_LOG_INFO("Loaded %zu:%zu samples from unpacked memory\n",
-                     loaded_samples_per_channel, transfer_samples);
+    loaded_samples_per_channel =
+        GetUnpackedSamples(out_data, rx_time_ns, samples_to_load);
 
-      if (req_total_samples > transfer_samples) {
-        sample_buffer_.clear();
-        rx_time_unpacked_ = 0;
-      } else {
-        //Remove the leading samples if some remain (shift left)
-        //req_total_samples < transfer_samples
-        AGORA_LOG_INFO(
-            "Requested less samples than were previously unpacked %zu:%zu\n",
-            req_total_samples, unpacked_samples);
+    DEBUG_OUTPUT(
+        "Loaded %zu Unpacked - Pending Samples (Packed %zu, Unpacked %zu)\n",
+        loaded_samples_per_channel, rx_samples_, sample_buffer_.size());
 
-        sample_buffer_.erase(sample_buffer_.begin(),
-                             sample_buffer_.begin() + transfer_samples);
-
-        //Should we adjust the rx_time by erase_count?
-        //rx_time_unpacked_ =
-        //    (rx_time_unpacked_ & ~0xFFFFll) +
-        //    (((rx_time_unpacked_ & 0xFFFF) + (erase_count & 0xFFFF)) & 0xFFFF);
-      }
-    }
-
-    //Get the remaining samples from the rx_buffer (unpacked + header)
     const size_t remaining_samples =
         (samples_to_load / num_channels) - loaded_samples_per_channel;
-    if (remaining_samples != 0) {
-      long long rx_time;
-      //Adjust the output locations in case unpacked samples were already loaded
-      std::vector<void*> out_offset;
-      out_offset.reserve(out_data.size());
-      for (auto& out_loc : out_data) {
-        out_offset.emplace_back(&static_cast<std::complex<int16_t>*>(
-            out_loc)[loaded_samples_per_channel]);
-      }
-      //This can be larger than the request
-      const size_t processed_samples =
-          GetRxSamples(out_offset, remaining_samples, rx_time);
-      std::printf(
-          "Processed samples %zu loading %zu total reqested samples "
-          "%zu. Pending Samples (Packed %zu, Unpacked %zu)\n",
-          processed_samples, remaining_samples, req_samples_per_channel,
-          rx_samples_, sample_buffer_.size());
-      RtAssert(processed_samples >= remaining_samples,
-               "Loaded less than the requested samples, unexpected");
-      loaded_samples_per_channel += remaining_samples;
-      //Only set the rx time if it has not already been set (above)
-      if (rx_time_ns == 0) {
-        rx_time_ns = rx_time;
-      }
-    }
+    loaded_samples_per_channel += GetPackedSamples(
+        out_data, rx_time_ns, loaded_samples_per_channel, remaining_samples);
+
+    DEBUG_OUTPUT(
+        "Loaded %zu Packed - Pending Samples (Packed %zu, Unpacked %zu)\n",
+        loaded_samples_per_channel, rx_samples_, sample_buffer_.size());
   }
   RtAssert(
       (loaded_samples_per_channel == 0) ||
@@ -334,19 +303,19 @@ int RadioSocket::RxSamples(std::vector<void*>& out_data, long long& rx_time_ns,
   return loaded_samples_per_channel;
 }
 
-size_t RadioSocket::GetRxSamples(std::vector<void*>& out_samples,
-                                 size_t req_samples, long long& rx_time) {
+///returns the number of processed_samples (unpacked / per channel) samples from the rx buffer
+///this function unpackes the data from the byte buffer
+size_t RadioSocket::UnpackSamples(std::vector<void*>& out_samples,
+                                  size_t req_samples, long long& rx_time) {
   const size_t num_out_dims = out_samples.size();
-  RtAssert(req_samples <= rx_samples_,
+  RtAssert((req_samples * num_out_dims) <= rx_samples_,
            "Unexpected and Invalid amount of rx_samples_");
 
-  //RtAssert(num_out_dims == 1,
-  //         "Multichannel case needs tested number of samples in header");
-
-  std::printf(
-      "GetRxSamples - Rx Bytes %zu, Requested Samples %zu Pending (Packed %zu, "
-      "Unpacked %zu)\n",
-      rx_bytes_, req_samples, rx_samples_, sample_buffer_.size());
+  AGORA_LOG_TRACE(
+      "UnpackSamples - Available (Bytes %zu Samples %zu). Samples Requested "
+      "%zu Pending (Packed %zu, Unpacked %zu)\n",
+      rx_bytes_, rx_samples_, req_samples * num_out_dims, rx_samples_,
+      sample_buffer_.size());
 
   size_t processed_bytes = 0;
   size_t processed_samples = 0;
@@ -368,17 +337,18 @@ size_t RadioSocket::GetRxSamples(std::vector<void*>& out_samples,
     //Assumption! (Verified in inspect), all burst sized packets until last
     const size_t pkt_samples =
         std::min(burst_count, (rx_samples_ / num_out_dims) - processed_samples);
-    //Not sure if this is per channel or total??????????????????????????
+
     processed_bytes += sizeof(rx_data->header_);
     //Number of total samples through the end of this data parsing const size_t
-    size_t current_total_samples = processed_samples + pkt_samples;
-    std::printf(
-        "Samples %zu:%zu header size %zu rx bytes %zu:%zu, Samples at end of "
-        "pkt %zu\n",
+    const size_t current_total_samples = processed_samples + pkt_samples;
+    AGORA_LOG_TRACE(
+        "UnpackSamples - Samples %zu:%zu header size %zu rx bytes %zu:%zu, "
+        "Samples at end of pkt %zu\n",
         processed_samples, req_samples, sizeof(rx_data->header_),
         processed_bytes, rx_bytes_, current_total_samples);
 
     size_t ch = 0;
+    //Maybe able to combine processed_bytes + pkt_byte_offset;
     size_t pkt_byte_offset = 0;
     while (processed_samples < current_total_samples) {
       // Optimization point (multi channel mode may not be trivial)
@@ -415,17 +385,16 @@ size_t RadioSocket::GetRxSamples(std::vector<void*>& out_samples,
       RtAssert(rx_bytes_ >= processed_bytes, "Exceeded rx byte count!");
     }  // end pkt
   }    // end (processed_samples < req_samples) && (processed_bytes < rx_bytes_)
-  //RtAssert(rx_bytes_ >= processed_bytes, "Exceeded rx byte count!");
   rx_bytes_ = rx_bytes_ - processed_bytes;
   rx_samples_ = rx_samples_ - (processed_samples * num_out_dims);
-  std::printf(
-      "GetRxSamples - Rx Bytes %zu, Pending Samples (Packed %zu, Unpacked "
+  AGORA_LOG_TRACE(
+      "UnpackSamples - Rx Bytes %zu, Pending Samples (Packed %zu, Unpacked "
       "%zu)\n",
       rx_bytes_, rx_samples_, sample_buffer_.size());
 
   //Shift any remaining samples to the front of the rx buffer (this maybe inefficient)
   if (rx_bytes_ > 0) {
-    std::printf("Shifting %zu rx bytes to front of buffer\n", rx_bytes_);
+    AGORA_LOG_WARN("Shifting %zu rx bytes to front of buffer\n", rx_bytes_);
     std::memmove(rx_buffer_.data(), &rx_buffer_.at(processed_bytes), rx_bytes_);
   }
   RtAssert(processed_samples >= req_samples,
@@ -433,7 +402,7 @@ size_t RadioSocket::GetRxSamples(std::vector<void*>& out_samples,
   return processed_samples;
 }
 
-// There is some redundant code between CheckSymbolComplete / GetRxSamples in looking at the UDP packet header.
+// There is some redundant code between CheckSymbolComplete / UnpackSamples in looking at the UDP packet header.
 bool RadioSocket::CheckSymbolComplete(const std::byte* in_data,
                                       const int& in_count) {
   bool finished;
@@ -508,8 +477,8 @@ size_t RadioSocket::LoadSamples(std::vector<void*>& out_samples,
     }
   } else {
     AGORA_LOG_ERROR(
-        "Invalid number of samples requested %zu in "
-        "RadioSocket::LoadSamples for number of streams %zu\n",
+        "Invalid number of samples requested %zu in RadioSocket::LoadSamples "
+        "for number of streams %zu\n",
         num_in_samples, total_channels);
   }
   return loaded_samples;
@@ -567,6 +536,89 @@ size_t RadioSocket::InspectRx(const std::byte* in_data, size_t in_count,
   return total_sample_count;
 }
 
-//Places the unpacked samples in a 1-dim array
-//void Unpack24to32(const std::byte* in_data, int in_count,
-//                  std::complex<int16_t>* out_samples, size_t out_count) {}
+//Only set the rx_time if samples were loaded
+size_t RadioSocket::GetUnpackedSamples(std::vector<void*>& out_samples,
+                                       long long& rx_time,
+                                       size_t req_total_samples) {
+  size_t loaded_samples_per_channel;
+  const size_t unpacked_samples = sample_buffer_.size();
+  //Spots to be optimized....
+  //Load the unpacked samples first
+  if ((req_total_samples > 0) && (unpacked_samples > 0)) {
+    const size_t transfer_samples =
+        std::min(unpacked_samples, req_total_samples);
+    loaded_samples_per_channel =
+        LoadSamples(out_samples, sample_buffer_.data(), transfer_samples);
+
+    rx_time = rx_time_unpacked_;
+    DEBUG_OUTPUT("Loaded %zu:%zu samples from unpacked memory\n",
+                 loaded_samples_per_channel, transfer_samples);
+
+    if (req_total_samples > transfer_samples) {
+      sample_buffer_.clear();
+      rx_time_unpacked_ = 0;
+    } else {
+      //Remove the leading samples if some remain (shift left)
+      //req_total_samples < transfer_samples
+      //Setting to warning to see if this happens.
+      AGORA_LOG_WARN(
+          "Requested less samples than were previously unpacked %zu:%zu\n",
+          req_total_samples, unpacked_samples);
+
+      sample_buffer_.erase(sample_buffer_.begin(),
+                           sample_buffer_.begin() + transfer_samples);
+
+      //Should we adjust the rx_time by erase_count / output dimensions?
+      //rx_time_unpacked_ =
+      //    (rx_time_unpacked_ & ~0xFFFFll) +
+      //    (((rx_time_unpacked_ & 0xFFFF) + (erase_count & 0xFFFF)) & 0xFFFF);
+    }
+  } else {
+    loaded_samples_per_channel = 0;
+  }
+  return loaded_samples_per_channel;
+}
+
+//Operates on per channel sample counts
+size_t RadioSocket::GetPackedSamples(std::vector<void*>& out_samples,
+                                     long long& rx_time_out,
+                                     size_t sample_offset, size_t req_samples) {
+  size_t loaded_samples;
+  if (req_samples > 0) {
+    long long* rx_time;
+    long long garbage;
+
+    std::vector<void*>* output_locations;
+    std::vector<void*> out_offset;
+    if (sample_offset > 0) {
+      //Adjust the output locations in case unpacked samples were already loaded
+      out_offset.reserve(out_samples.size());
+      for (auto& out_loc : out_samples) {
+        out_offset.emplace_back(
+            &static_cast<std::complex<int16_t>*>(out_loc)[sample_offset]);
+      }
+      output_locations = &out_offset;
+      rx_time = &garbage;
+    } else {
+      //Only set the rx time if it has not already been set (above)
+      output_locations = &out_samples;
+      rx_time = &rx_time_out;
+      RtAssert(rx_time_out == 0,
+               "Rx time out expected to be 0 when sample offset == 0");
+    }
+
+    //This can be larger than the request
+    const size_t processed_samples =
+        UnpackSamples(*output_locations, req_samples, *rx_time);
+    DEBUG_OUTPUT(
+        "GetPackedSamples - Processed samples %zu loading %zu. Pending Samples "
+        "(Packed %zu, Unpacked %zu)\n",
+        processed_samples, req_samples, rx_samples_, sample_buffer_.size());
+    RtAssert(processed_samples >= req_samples,
+             "Loaded less than the requested samples, unexpected");
+    loaded_samples = req_samples;
+  } else {
+    loaded_samples = 0;
+  }
+  return loaded_samples;
+}

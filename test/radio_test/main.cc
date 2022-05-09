@@ -329,17 +329,19 @@ void TestBsRadioRxNoRetry(Config* cfg, const uint32_t max_rx,
 
         if (rx_return > 0) {
           const auto new_samples = static_cast<size_t>(rx_return);
-          AGORA_LOG_INFO(
+          AGORA_LOG_TRACE(
               "Called radiorx for %zu samples and received %zu with %zu "
               "already loaded\n",
               rx_size, new_samples, rx_samples);
 
           rx_samples += static_cast<size_t>(new_samples);
           if (new_samples < target_samples) {
-            AGORA_LOG_INFO(
+            AGORA_LOG_WARN(
                 "Received less than symbol amount of samples %zu:%zu:%zu rx "
-                "time %lld\n",
-                new_samples, target_samples, rx_samples, rx_time);
+                "time %lld (Frame %zu, Symbol %zu)\n",
+                new_samples, target_samples, rx_samples, rx_time,
+                static_cast<size_t>(rx_time >> 32),
+                static_cast<size_t>((rx_time >> 16) & 0xFFFF));
             num_rx_symbols++;
             rx_samples = 0;
             //This is an error.... should probably dump samples maybe?
