@@ -55,8 +55,9 @@ void Radio::Setup([[maybe_unused]] const std::vector<double>& tx_gains,
   AGORA_LOG_INFO("Setup Radio %s(%zu)\n", serial_number_.c_str(), id_);
 }
 
-void Radio::Activate() {
-  AGORA_LOG_INFO("Activate Radio %s(%zu)\n", serial_number_.c_str(), id_);
+void Radio::Activate(Radio::ActivationTypes type) {
+  AGORA_LOG_INFO("Activate Radio %s(%zu) with type %d\n",
+                 serial_number_.c_str(), id_, static_cast<int>(type));
 }
 
 void Radio::Deactivate() {

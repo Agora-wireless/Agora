@@ -54,7 +54,7 @@ void RadioDataPlane::Init(Radio* radio, const Config* cfg) {
   }
 }
 
-void RadioDataPlane::Activate() {
+void RadioDataPlane::Activate(Radio::ActivationTypes type) {
   if (mode_ == kModeDeactive) {
     if ((radio_ == nullptr) || (remote_stream_ == nullptr)) {
       AGORA_LOG_ERROR(
@@ -62,7 +62,11 @@ void RadioDataPlane::Activate() {
           "Activate");
     } else {
       auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
-      device->activateStream(remote_stream_);
+      int soapy_flags = 0;
+      if (type == Radio::ActivationTypes::kActivateWaitTrigger) {
+        soapy_flags = SOAPY_SDR_WAIT_TRIGGER;
+      }
+      device->activateStream(remote_stream_, soapy_flags);
       mode_ = kModeActive;
     }
   } else {

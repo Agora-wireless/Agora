@@ -78,7 +78,7 @@ bool ClientRadioConfig::RadioStart() {
     if (cfg_->UeHwFramer()) {
       radios_.at(i)->ConfigureTddModeUe();
     }
-    radios_.at(i)->Activate();
+    radios_.at(i)->Activate(Radio::ActivationTypes::kActivateWaitTrigger);
   }
   AGORA_LOG_INFO("ClientRadioConfig::RadioStart complete!\n");
   return true;

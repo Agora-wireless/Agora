@@ -18,7 +18,8 @@ class RadioDataPlaneSocket : public RadioDataPlane {
 
   void Init(Radio* radio, const Config* cfg) final;
   void Setup() final;
-  void Activate() final;
+  void Activate(
+      Radio::ActivationTypes type = Radio::ActivationTypes::kActivate) final;
   void Deactivate() final;
   void Close() final;
 

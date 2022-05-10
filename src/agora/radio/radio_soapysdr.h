@@ -22,9 +22,11 @@ class RadioSoapySdr : public Radio {
             const std::vector<size_t>& enabled_channels) final;
   void Setup(const std::vector<double>& tx_gains,
              const std::vector<double>& rx_gains) final;
-  void Activate() final;
+  void Activate(
+      Radio::ActivationTypes type = Radio::ActivationTypes::kActivate) final;
   void Deactivate() final;
   void Close() final;
+  void Flush() final;
 
   int Tx(const void* const* tx_buffs, size_t tx_size, int tx_flags,
          long long& tx_time_ns) final;

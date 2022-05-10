@@ -16,8 +16,8 @@ void RadioDataPlaneSoapy::Init(Radio* radio, const Config* cfg) {
   return RadioDataPlane::Init(radio, cfg);
 }
 
-inline void RadioDataPlaneSoapy::Activate() {
-  return RadioDataPlane::Activate();
+inline void RadioDataPlaneSoapy::Activate(Radio::ActivationTypes type) {
+  return RadioDataPlane::Activate(type);
 }
 
 inline void RadioDataPlaneSoapy::Deactivate() {
@@ -68,7 +68,6 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
   if (rx_flags == Radio::RxFlagNone) {
     soapy_rx_flags = 0;
   }
-  //rx_size = Configuration()->SampsPerSymbol();
 
   int rx_status = 0;
   long long frame_time_ns(0);

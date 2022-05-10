@@ -17,6 +17,7 @@ class Radio {
   enum RxFlags { RxFlagNone = 0, RxFlagCompleteSymbol = 1 };
   static std::unique_ptr<Radio> Create(RadioType type);
 
+  enum ActivationTypes { kActivate, kActivateWaitTrigger };
   virtual ~Radio();
 
   //Accessors
@@ -29,10 +30,12 @@ class Radio {
                      const std::vector<double>& rx_gains) = 0;
 
   // Start?
-  virtual void Activate() = 0;
+  virtual void Activate(
+      Radio::ActivationTypes type = Radio::ActivationTypes::kActivate) = 0;
   // Stop?
   virtual void Deactivate() = 0;
   virtual void Close() = 0;
+  virtual void Flush() = 0;
 
   virtual int Tx(const void* const* tx_buffs, size_t tx_size, int tx_flags,
                  long long& tx_time_ns) = 0;

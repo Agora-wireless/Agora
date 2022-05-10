@@ -26,7 +26,8 @@ class RadioDataPlane {
 
   virtual void Init(Radio* radio, const Config* cfg) = 0;
   virtual void Setup() = 0;
-  virtual void Activate() = 0;
+  virtual void Activate(
+      Radio::ActivationTypes type = Radio::ActivationTypes::kActivate) = 0;
   virtual void Deactivate() = 0;
   virtual void Close() = 0;
 

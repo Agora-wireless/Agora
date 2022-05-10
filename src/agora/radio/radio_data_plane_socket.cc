@@ -17,8 +17,8 @@ void RadioDataPlaneSocket::Init(Radio* radio, const Config* cfg) {
   return RadioDataPlane::Init(radio, cfg);
 }
 
-inline void RadioDataPlaneSocket::Activate() {
-  return RadioDataPlane::Activate();
+inline void RadioDataPlaneSocket::Activate(Radio::ActivationTypes type) {
+  RadioDataPlane::Activate(type);
 }
 
 inline void RadioDataPlaneSocket::Deactivate() {
@@ -115,13 +115,12 @@ int RadioDataPlaneSocket::Rx(
 
 int RadioDataPlaneSocket::Rx(std::vector<void*>& rx_locations, size_t rx_size,
                              Radio::RxFlags rx_flags, long long& rx_time_ns) {
-  int rx_return;
   if (rx_flags == Radio::RxFlagCompleteSymbol) {
+    rx_size = Configuration()->SampsPerSymbol();
     //Ignore the rx_size if the complete symbol flag is set
-    rx_return = socket_.RxSymbol(rx_locations, rx_time_ns);
-  } else {
-    rx_return = socket_.RxSamples(rx_locations, rx_time_ns, rx_size);
+    //rx_return = socket_.RxSymbol(rx_locations, rx_time_ns);
   }
+  const int rx_return = socket_.RxSamples(rx_locations, rx_time_ns, rx_size);
   if (rx_return > 0) {
     AGORA_LOG_TRACE("Rx'd sample count %d\n", rx_return);
   } else if (rx_return < 0) {

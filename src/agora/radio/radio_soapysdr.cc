@@ -224,20 +224,23 @@ void RadioSoapySdr::Setup(const std::vector<double>& tx_gains,
   }
 }
 
-void RadioSoapySdr::Activate() {
+void RadioSoapySdr::Activate(Radio::ActivationTypes type) {
   AGORA_LOG_INFO("Activate RadioSoapySdr %s(%zu)\n", SerialNumber().c_str(),
                  Id());
   const bool is_ue = false;
   if (kUseUHD == false) {
     dev_->setHardwareTime(0, "TRIGGER");
-    //SOAPY_SDR_WAIT_TRIGGER for UEs??
+    //SOAPY_SDR_WAIT_TRIGGER for UE
     //**********************************************************
     //dev_->activateStream(rxs_, SOAPY_SDR_WAIT_TRIGGER);
     //dev_->activateStream(txs_, SOAPY_SDR_WAIT_TRIGGER);
     //**********************************************************
-    //dev_->activateStream(rxs_);
-    rxp_->Activate();
-    dev_->activateStream(txs_);
+    rxp_->Activate(type);
+    int soapy_flags = 0;
+    if (type == Radio::ActivationTypes::kActivateWaitTrigger) {
+      soapy_flags = SOAPY_SDR_WAIT_TRIGGER;
+    }
+    dev_->activateStream(txs_, soapy_flags);
   } else {
     if (is_ue) {
       dev_->setTimeSource("internal");
@@ -251,7 +254,7 @@ void RadioSoapySdr::Activate() {
     // Wait for pps sync pulse ??
     //std::this_thread::sleep_for(std::chrono::seconds(kUhdInitTimeSec -1));
     //dev_->activateStream(rxs_, SOAPY_SDR_HAS_TIME, kUhdInitTimeSec * 1e9, 0);
-    rxp_->Activate();
+    rxp_->Activate(type);
     dev_->activateStream(txs_, SOAPY_SDR_HAS_TIME, kUhdInitTimeSec * 1e9, 0);
   }
 }
@@ -712,4 +715,9 @@ void RadioSoapySdr::Correlator(bool enable) {
     const std::string corr_conf = "{\"corr_enabled\":false}";
     dev_->writeSetting("CORR_CONFIG", corr_conf);
   }
+}
+
+void RadioSoapySdr::Flush() {
+  AGORA_LOG_INFO("Flushing radio rx data plane%zu\n", Id());
+  rxp_->Flush();
 }

@@ -131,10 +131,7 @@ RadioSocket::RadioSocket()
   sample_buffer_.clear();
 }
 
-RadioSocket::~RadioSocket() {
-  Flush();
-  socket_.reset();
-}
+RadioSocket::~RadioSocket() { socket_.reset(); }
 
 void RadioSocket::Create(size_t samples_per_symbol,
                          const std::string& local_addr,
@@ -445,7 +442,7 @@ void RadioSocket::Flush() {
   while ((rx_return > 0) || (flush_attempts < kMaxFlushAttempts)) {
     rx_return = socket_->Recv(&rx_buffer_.at(0), rx_buffer_.size());
     if (rx_return > 0) {
-      DEBUG_OUTPUT("Flushing %d bytes from socket\n", rx_return);
+      AGORA_LOG_INFO("Flushing %d bytes from socket\n", rx_return);
     }
     flush_attempts++;
   }
