@@ -72,6 +72,21 @@ PhyStats::PhyStats(Config* const cfg, Direction dir) : config_(cfg), dir_(dir) {
                   Agora_memory::Alignment_t::kAlign64);
   csi_cond_.Calloc(kFrameWnd, cfg->OfdmDataNum(),
                    Agora_memory::Alignment_t::kAlign64);
+
+  if (kEnableCsvLog) {
+    if (dir_ == Direction::kUplink) {
+      for (size_t i = 0; i < CsvLog::kUlLogs; i++) {
+        ul_loggers_.at(i) = std::make_shared<CsvLog::CsvLogger>(
+            config_->RadioId().at(0), CsvLog::kUlIdStart + i);
+      }
+    }
+    else if (dir_ == Direction::kDownlink) {
+      for (size_t i = 0; i < CsvLog::kDlLogs; i++) {
+        dl_loggers_.at(i) = std::make_shared<CsvLog::CsvLogger>(
+            config_->UeRadioId().at(0), CsvLog::kDlIdStart + i);
+      }
+    }
+  }
 }
 
 PhyStats::~PhyStats() {
@@ -241,10 +256,35 @@ void PhyStats::PrintCalibSnrStats(size_t frame_id) {
   AGORA_LOG_INFO("%s", ss.str().c_str());
 }
 
-void PhyStats::RecordDlPilotSnr(CsvLog::CsvLogger* logger, size_t frame_id) {
+void PhyStats::RecordUlPilotSnr(size_t frame_id) {
+  if (kEnableCsvLog) {
+    std::stringstream ss;
+    ss << frame_id;
+    for (size_t i = 0; i < config_->UeAntNum(); i++) {
+      for (size_t j = 0; j < config_->BsAntNum() - 1; j++) {
+        ss << "," << pilot_snr_[frame_id % kFrameWnd]
+                               [i * config_->BsAntNum() + j];
+      }
+    }
+    ul_loggers_.at(CsvLog::kUlSnr)->Write(ss.str());
+  }
+}
+
+void PhyStats::RecordUlEvmSnr(size_t frame_id) {
+  if (kEnableCsvLog) {
+    std::stringstream ss;
+    ss << frame_id;
+    for (size_t i = 0; i < config_->UeAntNum(); i++) {
+      ss << "," << GetEvmSnr(frame_id, i);
+    }
+    ul_loggers_.at(CsvLog::kUlEvmSnr)->Write(ss.str());
+  }
+}
+
+void PhyStats::RecordDlPilotSnr(size_t frame_id) {
   if (kEnableCsvLog) {
     const size_t dl_pilots_num = config_->Frame().ClientDlPilotSymbols();
-    if ((logger != nullptr) && (dl_pilots_num > 0)) {
+    if (dl_pilots_num > 0) {
       std::stringstream ss;
       ss << frame_id;
       for (size_t i = 0; i < config_->UeAntNum(); i++) {
@@ -253,46 +293,42 @@ void PhyStats::RecordDlPilotSnr(CsvLog::CsvLogger* logger, size_t frame_id) {
              << dl_pilot_snr_[frame_id % kFrameWnd][i * dl_pilots_num + j];
         }
       }
-      logger->Write(ss.str());
+      dl_loggers_.at(CsvLog::kDlSnr)->Write(ss.str());
     }
   }
 }
 
-void PhyStats::RecordEvmSnr(CsvLog::CsvLogger* logger, size_t frame_id) {
+void PhyStats::RecordDlEvmSnr(size_t frame_id) {
   if (kEnableCsvLog) {
-    if (logger != nullptr) {
-      std::stringstream ss;
-      ss << frame_id;
-      for (size_t i = 0; i < config_->UeAntNum(); i++) {
-        ss << "," << evm_snr_[frame_id % kFrameWnd][i];
-      }
-      logger->Write(ss.str());
+    std::stringstream ss;
+    ss << frame_id;
+    for (size_t i = 0; i < config_->UeAntNum(); i++) {
+      ss << "," << evm_snr_[frame_id % kFrameWnd][i];
     }
+    dl_loggers_.at(CsvLog::kDlEvmSnr)->Write(ss.str());
   }
 }
 
-void PhyStats::RecordBerSer(CsvLog::CsvLogger* logger, size_t frame_id) {
+void PhyStats::RecordDlBerSer(size_t frame_id) {
   if (kEnableCsvLog) {
-    if (logger != nullptr) {
-      std::stringstream ss;
-      ss << frame_id;
-      const size_t frame_slot = frame_id % kFrameWnd;
-      for (size_t i = 0; i < config_->UeAntNum(); i++) {
-        size_t& error_bits = frame_bit_errors_[i][frame_slot];
-        size_t& total_bits = frame_decoded_bits_[i][frame_slot];
-        size_t& error_symbols = frame_symbol_errors_[i][frame_slot];
-        size_t& total_symbols = frame_decoded_symbols_[i][frame_slot];
-        ss << "," << (static_cast<float>(error_bits) /
-                      static_cast<float>(total_bits))
-           << "," << (static_cast<float>(error_symbols) /
-                      static_cast<float>(total_symbols));
-        error_bits = 0;
-        total_bits = 0;
-        error_symbols = 0;
-        total_symbols = 0;
-      }
-      logger->Write(ss.str());
+    std::stringstream ss;
+    ss << frame_id;
+    const size_t frame_slot = frame_id % kFrameWnd;
+    for (size_t i = 0; i < config_->UeAntNum(); i++) {
+      size_t& error_bits = frame_bit_errors_[i][frame_slot];
+      size_t& total_bits = frame_decoded_bits_[i][frame_slot];
+      size_t& error_symbols = frame_symbol_errors_[i][frame_slot];
+      size_t& total_symbols = frame_decoded_symbols_[i][frame_slot];
+      ss << "," << (static_cast<float>(error_bits) /
+                    static_cast<float>(total_bits))
+          << "," << (static_cast<float>(error_symbols) /
+                    static_cast<float>(total_symbols));
+      error_bits = 0;
+      total_bits = 0;
+      error_symbols = 0;
+      total_symbols = 0;
     }
+    dl_loggers_.at(CsvLog::kDlBerSer)->Write(ss.str());
   }
 }
 

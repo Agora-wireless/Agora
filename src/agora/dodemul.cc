@@ -275,6 +275,9 @@ EventData DoDemul::Launch(size_t tag) {
           if (kPrintPhyStats && cur_sc_id == 0) {
             phy_stats_->PrintEvmStats(frame_id - 1);
           }
+          if (kEnableCsvLog && cur_sc_id == 0) {
+            phy_stats_->RecordUlEvmSnr(frame_id - 1);
+          }
         }
       }
       size_t start_tsc3 = GetTime::WorkerRdtsc();

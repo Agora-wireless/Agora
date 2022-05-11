@@ -19,10 +19,19 @@
 
 namespace CsvLog {
 
-constexpr size_t kDLPSNR = 0;
-constexpr size_t kEVMSNR = 1;
-constexpr size_t kBERSER = 2;
-constexpr size_t kCsvLogs = 3;
+constexpr size_t kUlIdStart = 0;
+constexpr size_t kUlSnr = 0;
+constexpr size_t kUlEvmSnr = 1;
+constexpr size_t kUlBerSer = 2;
+constexpr size_t kUlLogs = 3;
+
+constexpr size_t kDlIdStart = kUlLogs;
+constexpr size_t kDlSnr = 0;
+constexpr size_t kDlEvmSnr = 1;
+constexpr size_t kDlBerSer = 2;
+constexpr size_t kDlLogs = 3;
+
+constexpr size_t kCsvLogs = kUlLogs + kDlLogs;
 constexpr size_t kMatIdStart = kCsvLogs;
 constexpr size_t kMatCSI = 0;
 constexpr size_t kMatDLZF = 1;
@@ -31,9 +40,13 @@ constexpr size_t kAllLogs = kCsvLogs + kMatLogs;
 
 #if defined(ENABLE_CSV_LOG)
 const std::array<std::string, kAllLogs> kCsvName = {
-    "log-dlpsnr-ue", "log-evmsnr-ue", "log-berser-ue", "log-matcsi-bs",
-    "log-matdlzf-bs"};
+    "log-ul-snr", "log-ul-evmsnr", "log-ul-berser",
+    "log-dl-snr", "log-dl-evmsnr", "log-dl-berser",
+    "log-mat-csi", "log-mat-dlzf"};
 const std::array<std::string, kAllLogs> kCsvHeader = {
+    "Frame,",
+    "Frame,",
+    "Frame,",
     "Frame,UE0-Downlink-SNR,UE0-DLP1-SNR,UE1-Downlink-SNR,UE1-DLP1-SNR",
     "Frame,UE0-EVM-SNR,UE1-EVM-SNR",
     "Frame,UE0-BER,UE0-SER,UE1-BER,UE1-SER",
