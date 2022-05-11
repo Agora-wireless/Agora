@@ -105,13 +105,6 @@ PhyUe::PhyUe(Config* config)
         std::thread(&MacThreadClient::RunEventLoop, mac_thread_.get());
   }
 
-  if (kEnableCsvLog) {
-    for (size_t i = 0; i < csv_loggers_.size(); i++) {
-      csv_loggers_.at(i) =
-          std::make_shared<CsvLog::CsvLogger>(config_->UeRadioId().at(0), i);
-    }
-  }
-
   for (size_t i = 0; i < config_->UeWorkerThreadNum(); i++) {
     auto new_worker = std::make_unique<UeWorker>(
         i, *config_, *stats_, *phy_stats_, complete_queue_, work_queue_,
@@ -440,8 +433,7 @@ void PhyUe::Start() {
                 this->phy_stats_->PrintDlSnrStats(frame_id);
               }
               if (kEnableCsvLog) {
-                this->phy_stats_->RecordDlPilotSnr(
-                    csv_loggers_.at(CsvLog::kDLPSNR).get(), frame_id);
+                this->phy_stats_->RecordDlPilotSnr(frame_id);
               }
               this->stats_->MasterSetTsc(TsType::kFFTPilotsDone, frame_id);
               PrintPerFrameDone(PrintType::kFFTPilots, frame_id);
@@ -498,11 +490,9 @@ void PhyUe::Start() {
               demul_counters_.Reset(frame_id);
 
               if (kEnableCsvLog) {
-                this->phy_stats_->RecordEvmSnr(
-                    csv_loggers_.at(CsvLog::kEVMSNR).get(), frame_id);
+                this->phy_stats_->RecordDlEvmSnr(frame_id);
                 if (kDownlinkHardDemod) {
-                  this->phy_stats_->RecordBerSer(
-                      csv_loggers_.at(CsvLog::kBERSER).get(), frame_id);
+                  this->phy_stats_->RecordDlBerSer(frame_id);
                 }
               }
               if (kDownlinkHardDemod == true) {
@@ -550,8 +540,7 @@ void PhyUe::Start() {
               decode_counters_.Reset(frame_id);
 
               if (kEnableCsvLog) {
-                this->phy_stats_->RecordBerSer(
-                    csv_loggers_.at(CsvLog::kBERSER).get(), frame_id);
+                this->phy_stats_->RecordDlBerSer(frame_id);
               }
               bool finished =
                   FrameComplete(frame_id, FrameTasksFlags::kDownlinkComplete);

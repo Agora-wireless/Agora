@@ -24,22 +24,24 @@ class PhyStats {
   void UpdateBlockErrors(size_t ue_id, size_t offset, size_t frame_slot,
                          size_t block_error_count);
   void IncrementDecodedBlocks(size_t ue_id, size_t offset, size_t frame_slot);
-  void RecordBerSer(CsvLog::CsvLogger* logger, size_t frame_id);
+  void RecordDlBerSer(size_t frame_id);
   void UpdateUncodedBitErrors(size_t ue_id, size_t offset, size_t mod_bit_size,
                               uint8_t tx_byte, uint8_t rx_byte);
   void UpdateUncodedBits(size_t ue_id, size_t offset, size_t new_bits_num);
   void UpdateEvmStats(size_t frame_id, size_t sc_id, const arma::cx_fmat& eq);
   void PrintEvmStats(size_t frame_id);
+  void RecordUlEvmSnr(size_t frame_id);
   float GetEvmSnr(size_t frame_id, size_t ue_id);
   void UpdateEvmSnr(size_t frame_id, size_t ue_id, float evmsnr);
-  void RecordEvmSnr(CsvLog::CsvLogger* logger, size_t frame_id);
+  void RecordDlEvmSnr(size_t frame_id);
   void UpdatePilotSnr(size_t frame_id, size_t ue_id, size_t ant_id,
                       complex_float* fft_data);
   void UpdateDlPilotSnr(size_t frame_id, size_t symbol_id, size_t ant_id,
                         complex_float* fft_data);
   void PrintSnrStats(size_t frame_id);
+  void RecordUlPilotSnr(size_t frame_id);
   void PrintDlSnrStats(size_t frame_id);
-  void RecordDlPilotSnr(CsvLog::CsvLogger* logger, size_t frame_id);
+  void RecordDlPilotSnr(size_t frame_id);
   void UpdateCalibPilotSnr(size_t frame_id, size_t calib_sym_id, size_t ant_id,
                            complex_float* fft_data);
   void PrintCalibSnrStats(size_t frame_id);
@@ -69,6 +71,9 @@ class PhyStats {
   arma::cx_fmat gt_mat_;
   size_t num_rx_symbols_;
   size_t num_data_symbols_;
+
+  std::array<std::shared_ptr<CsvLog::CsvLogger>, CsvLog::kUlLogs> ul_loggers_;
+  std::array<std::shared_ptr<CsvLog::CsvLogger>, CsvLog::kDlLogs> dl_loggers_;
 };
 
 #endif  // PHY_STATS_H_
