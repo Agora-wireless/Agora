@@ -12,6 +12,7 @@
 
 #include "buffer.h"
 #include "radio_lib.h"
+#include "rx_status_tracker.h"
 #include "txrx_worker.h"
 
 namespace TxRxWorkerRx {
@@ -60,6 +61,10 @@ class TxRxWorkerHw : public TxRxWorker {
 
   bool IsRxSymbol(size_t interface, size_t symbol_id);
 
+  //DoRx helper routines
+  void InitRxStatus();
+  void ResetRxStatus(size_t interface, bool reuse_memory);
+
   TxRxWorkerRx::RxParameters UpdateRxInterface(
       const TxRxWorkerRx::RxParameters& last_rx);
 
@@ -73,5 +78,8 @@ class TxRxWorkerHw : public TxRxWorker {
   const double freq_ghz_;
 
   std::vector<std::complex<int16_t>> zeros_;
+
+  //For each interface.
+  std::vector<TxRxWorkerRx::RxStatusTracker> rx_status_;
 };
 #endif  // TXRX_WORKER_SIM_H_

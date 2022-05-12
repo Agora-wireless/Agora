@@ -6,9 +6,10 @@
 #include "radio_data_plane_soapy.h"
 
 #include "SoapySDR/Time.hpp"
+#include "logger.h"
 #include "radio_soapysdr.h"
 
-constexpr bool kDebugRx = false;
+constexpr bool kDebugPrintRx = false;
 
 RadioDataPlaneSoapy::RadioDataPlaneSoapy() : RadioDataPlane() {}
 
@@ -76,40 +77,62 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
   rx_status = device->readStream(remote_stream_, rx_locations.data(), rx_size,
                                  soapy_rx_flags, frame_time_ns, kRxTimeout);
 
-  if (kDebugRx) {
-    if ((rx_status > 0) || (soapy_rx_flags != 0)) {
-      std::printf(
-          "Soapy RX return flags: %d - HAS TIME: %d | END BURST: %d\n",
-          soapy_rx_flags,
-          (soapy_rx_flags & SOAPY_SDR_HAS_TIME) == SOAPY_SDR_HAS_TIME,
-          (soapy_rx_flags & SOAPY_SDR_END_BURST) == SOAPY_SDR_END_BURST);
-    }
-  }
+  if (rx_status > 0) {
+    const size_t rx_samples = static_cast<size_t>(rx_status);
 
-  if (Configuration()->HwFramer() == true) {
-    rx_time_ns = frame_time_ns;
-  } else {
-    // for UHD device recv using ticks
-    rx_time_ns =
-        SoapySDR::timeNsToTicks(frame_time_ns, Configuration()->Rate());
-  }
+    //if end burst flag is not set, then we have partial data (hw_framer mode only)
+    if (Configuration()->HwFramer()) {
+      if ((soapy_rx_flags & SOAPY_SDR_END_BURST) == 0) {
+        //This usually happens when the timeout is not long enough to wait for multiple packets for a given requested rx length
+        AGORA_LOG_WARN(
+            "RadioDataPlaneSoapy::Rx - expected SOAPY_SDR_END_BURST but "
+            "didn't happen samples count %zu requested %zu symbols with flags "
+            "%d\n",
+            rx_samples, rx_size, soapy_rx_flags);
+      }
 
-  if (kDebugRadioRX) {
-    if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol())) {
-      std::cout << "Radio " << radio_->SerialNumber() << "(" << radio_->Id()
-                << ") received " << rx_status << " flags: " << rx_flags
-                << " MTU " << device->getStreamMTU(remote_stream_) << std::endl;
+      if ((soapy_rx_flags & SOAPY_SDR_MORE_FRAGMENTS) ==
+          SOAPY_SDR_MORE_FRAGMENTS) {
+        AGORA_LOG_WARN(
+            "RadioDataPlaneSoapy::Rx - fragments remaining on rx call for "
+            "sample count %zu requested %zu symbols with flags %d\n",
+            rx_samples, rx_size, soapy_rx_flags);
+      }
+      rx_time_ns = frame_time_ns;
     } else {
-      if (!((rx_status == SOAPY_SDR_TIMEOUT) && (rx_flags == 0))) {
-        std::cout << "Unexpected RadioRx return value " << rx_status
-                  << " from radio " << radio_->SerialNumber() << "("
-                  << radio_->Id() << ") flags: " << rx_flags << std::endl;
+      // for UHD device (or software framer) recv using ticks
+      rx_time_ns =
+          SoapySDR::timeNsToTicks(frame_time_ns, Configuration()->Rate());
+    }
+
+    if (kDebugPrintRx) {
+      std::printf(
+          "Soapy RX return count %d out of requested %zu - flags: %d - HAS "
+          "TIME: %d | END BURST: %d | MORE FRAGS: %d | SINGLE PKT: %d\n",
+          rx_status, rx_size, soapy_rx_flags,
+          (soapy_rx_flags & SOAPY_SDR_HAS_TIME) == SOAPY_SDR_HAS_TIME,
+          (soapy_rx_flags & SOAPY_SDR_END_BURST) == SOAPY_SDR_END_BURST,
+          (soapy_rx_flags & SOAPY_SDR_MORE_FRAGMENTS) ==
+              SOAPY_SDR_MORE_FRAGMENTS,
+          (soapy_rx_flags & SOAPY_SDR_ONE_PACKET) == SOAPY_SDR_ONE_PACKET);
+    }
+
+    if (kDebugRadioRX) {
+      if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol())) {
+        std::cout << "Radio " << radio_->SerialNumber() << "(" << radio_->Id()
+                  << ") received " << rx_status << " flags: " << rx_flags
+                  << " MTU " << device->getStreamMTU(remote_stream_)
+                  << std::endl;
+      } else {
+        if (!((rx_status == SOAPY_SDR_TIMEOUT) && (rx_flags == 0))) {
+          std::cout << "Unexpected RadioRx return value " << rx_status
+                    << " from radio " << radio_->SerialNumber() << "("
+                    << radio_->Id() << ") flags: " << rx_flags << std::endl;
+        }
       }
     }
-  }
-
-  /// If a timeout occurs tell the user you received 0 bytes
-  if (rx_status == SOAPY_SDR_TIMEOUT) {
+  } else if (rx_status == SOAPY_SDR_TIMEOUT) {
+    /// If a timeout occurs tell the requester there are 0 bytes
     rx_status = 0;
   }
   return rx_status;
