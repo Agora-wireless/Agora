@@ -40,6 +40,15 @@ class RxStatusTracker {
     }
   }
 
+  //Reset, reusing the same rx packet memory locations
+  void Reset() {
+    std::vector<RxPacket*> new_packets;
+    for (auto& tracker : tracking_) {
+      new_packets.emplace_back(tracker.rx_packet_memory_);
+    }
+    Reset(new_packets);
+  }
+
   const std::vector<RxPacket*> GetRxPackets() const {
     const size_t num_packets = tracking_.size();
     std::vector<RxPacket*> rx_packets;
@@ -67,8 +76,8 @@ class RxStatusTracker {
     samples_available_ += new_samples;
   }
 
-  inline const size_t SamplesAvailable() const { return samples_available_; }
-  inline const size_t NumChannels() const { return tracking_.size(); }
+  inline size_t SamplesAvailable() const { return samples_available_; }
+  inline size_t NumChannels() const { return tracking_.size(); }
   //Get memory locations for Rx calls
   inline const std::vector<void*> GetRxPtrs() const {
     const size_t num_locations = tracking_.size();

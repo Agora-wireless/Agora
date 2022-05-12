@@ -8,6 +8,7 @@
 #include "logger.h"
 #include "network_utils.h"
 #include "radio_lib.h"
+#include "rx_status_tracker.h"
 #include "signal_handler.h"
 #include "version_config.h"
 
@@ -56,9 +57,9 @@ int main(int argc, char* argv[]) {
 
     PinToCoreWithOffset(ThreadType::kMasterTX, 0, 0);
     agora_comm::ListLocalInterfaces();
-    //TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
+    TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
     //TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
-    TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
+    //TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
     //UE socket doesnt work right now... (never get any data)
     //TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
     ret = EXIT_SUCCESS;
@@ -73,7 +74,7 @@ int main(int argc, char* argv[]) {
 }
 
 void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
-  //Tested with 1 and 4
+  //Tested with 1 and 4 (!= 1 probably doesn't work after mods)
   constexpr size_t kRxPerSymbol = 1;
   const size_t total_radios = cfg->NumRadios();
   const size_t num_channels = cfg->NumChannels();
@@ -92,31 +93,37 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
   std::cout << "Testing " << total_radios << " radios with " << num_channels
             << " channels" << std::endl;
   size_t num_rx_symbols = 0;
-  size_t rx_samples = 0;
 
   //Create the memory for the rx samples
-  //Radio x Channels x SamplesPerSymbol, filled with 0 + 0i
-  std::vector<std::vector<std::vector<std::complex<int16_t>>>> rx_buffer(
-      total_radios, std::vector<std::vector<std::complex<int16_t>>>(
-                        num_channels, std::vector<std::complex<int16_t>>(
-                                          cfg->SampsPerSymbol(),
-                                          std::complex<int16_t>(0, 0))));
+  //Create Packet buffers for a better test
+  std::vector<std::vector<std::vector<std::byte>>> rx_buffers(
+      total_radios, std::vector<std::vector<std::byte>>(
+                        num_channels, std::vector<std::byte>(
+                                          cfg->PacketLength(), std::byte(0))));
 
-  //Radio x Channels
-  std::vector<std::vector<void*>> rx_buffs(
-      total_radios, std::vector<void*>(num_channels, nullptr));
-  //Setup pointers to all of the memory rx sections
-  for (auto radio = radio_lo; radio < radio_hi; radio++) {
-    const size_t radio_channels = rx_buffs.at(radio).size();
-    for (size_t ch = 0; ch < radio_channels; ch++) {
-      rx_buffs.at(radio).at(ch) = rx_buffer.at(radio).at(ch).data();
+  std::vector<RxPacket> packets;
+  for (size_t radio = 0; radio < total_radios; radio++) {
+    for (size_t ch = 0; ch < num_channels; ch++) {
+      auto* pkt_loc =
+          reinterpret_cast<Packet*>(rx_buffers.at(radio).at(ch).data());
+      packets.emplace_back(pkt_loc);
     }
   }
 
-  //Memory for 1 packet for each channel (could be extended for each radio if necessary)
-  // Channels x PacketLength (bytes)
-  std::vector<std::vector<std::byte>> packet_buffer(
-      num_channels, std::vector<std::byte>(cfg->PacketLength(), std::byte(0)));
+  std::vector<TxRxWorkerRx::RxStatusTracker> rx_status;
+  size_t pkt_idx = 0;
+  rx_status.resize(total_radios, TxRxWorkerRx::RxStatusTracker(num_channels));
+  std::vector<RxPacket*> rx_packets(num_channels);
+  for (auto& status : rx_status) {
+    for (auto& new_packet : rx_packets) {
+      new_packet = &packets.at(pkt_idx);
+      AGORA_LOG_TRACE("TestBsRadioRx: Using Packet at location %d\n",
+                      reinterpret_cast<intptr_t>(new_packet));
+      pkt_idx++;
+    }
+    //Allocate memory for each interface / channel
+    status.Reset(rx_packets);
+  }
 
   if (kUseArgos) {
     // Makes the soapy remote "HUB" / InitBsRadio / ConfigureBsRadio
@@ -128,41 +135,45 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
     radioconfig->Go();
     //Sometimes messages are "stuck, until the hub is triggered?"
 
-    std::vector<void*> rx_locations(num_channels);
     //Super thread loop
     while ((SignalHandler::GotExitSignal() == false) &&
            (num_rx_symbols < max_rx)) {
       for (auto radio = radio_lo; radio < radio_hi; radio++) {
         long long rx_time;
 
-        for (size_t ch = 0; ch < num_channels; ch++) {
-          rx_locations.at(ch) = &rx_buffer.at(radio).at(ch).at(rx_samples);
-        }
+        auto& rx_info = rx_status.at(radio);
+        //Need to modify so it works with multiple rx calls (target != samples_per_symbol)
+        const size_t request_samples =
+            target_samples - rx_info.SamplesAvailable();
+        RtAssert(target_samples > rx_info.SamplesAvailable(),
+                 "Requested Samples must be > 0");
+        auto rx_locations = rx_info.GetRxPtrs();
 
-        const size_t rx_size = target_samples;
         //In Hw framer mode, we should not call RX for bytes over the symbol boundaries
-        const int rx_return = radioconfig->RadioRx(radio, rx_locations, rx_size,
-                                                   rx_flag, rx_time);
+        const int rx_return = radioconfig->RadioRx(
+            radio, rx_locations, request_samples, rx_flag, rx_time);
 
         if (rx_return > 0) {
           const auto new_samples = static_cast<size_t>(rx_return);
-          AGORA_LOG_TRACE(
+          AGORA_LOG_INFO(
               "Called radiorx for %zu samples and received %zu with %zu "
               "already loaded\n",
-              rx_size, new_samples, rx_samples);
+              request_samples, new_samples, rx_info.SamplesAvailable());
 
-          rx_samples += static_cast<size_t>(new_samples);
-          if (new_samples < target_samples) {
+          rx_info.Update(new_samples, rx_time);
+          if (new_samples < request_samples) {
             AGORA_LOG_WARN(
                 "Received less than symbol amount of samples %zu:%zu:%zu rx "
                 "time %lld (Frame %zu, Symbol %zu)\n",
-                new_samples, target_samples, rx_samples, rx_time,
-                static_cast<size_t>(rx_time >> 32),
+                new_samples, request_samples, rx_info.SamplesAvailable(),
+                rx_time, static_cast<size_t>(rx_time >> 32),
                 static_cast<size_t>((rx_time >> 16) & 0xFFFF));
             num_rx_symbols++;
-            rx_samples = 0;
+            rx_info.Reset();
+            //throw std::runtime_error("Stop here for now");
+            //Check for short return / retry vs dump and try again
             //This is an error.... should probably dump samples maybe?
-          } else if (rx_samples == cfg->SampsPerSymbol()) {
+          } else if (new_samples == request_samples) {
             //Rx data.....
             size_t frame_id = 0;
             size_t symbol_id = num_rx_symbols;
@@ -172,20 +183,23 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
             }
 
             //There will be NumChannels "Packets" at this spot
+            auto packets = rx_info.GetRxPackets();
             for (size_t ch = 0; ch < num_channels; ch++) {
-              Packet* rx_packet =
-                  reinterpret_cast<Packet*>(packet_buffer.at(ch).data());
-              new (rx_packet) Packet(frame_id, symbol_id, cell_id,
-                                     (radio * num_channels) + ch);
+              auto* rx_packet = packets.at(ch);
+              auto* raw_pkt = rx_packet->RawPacket();
+              new (raw_pkt) Packet(frame_id, symbol_id, cell_id,
+                                   (radio * num_channels) + ch);
 
               std::printf("Rx Packet: %s Rx samples: %zu:%zu\n",
-                          rx_packet->ToString().c_str(), rx_samples,
-                          target_samples);
+                          raw_pkt->ToString().c_str(),
+                          rx_info.SamplesAvailable(), cfg->SampsPerSymbol());
             }
             num_rx_symbols++;
-            rx_samples = 0;
-          } else if (rx_samples > cfg->SampsPerSymbol()) {
-            throw std::runtime_error("RX samples exceeds samples per symbol");
+            //Reset stats, reuse the old rx locations
+            rx_info.Reset(packets);
+          } else if (new_samples > request_samples) {
+            throw std::runtime_error(
+                "RX samples exceeds the requested samples");
           }
         } else if (rx_return < 0) {
           AGORA_LOG_ERROR("Radio rx error %d - message %s\n", rx_return,
@@ -197,8 +211,8 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
     radioconfig->RadioStop();
   } else {
     AGORA_LOG_ERROR(
-        "Hardware is not enabled in the compile settings.  Please fix and try "
-        "again!\n");
+        "Hardware is not enabled in the compile settings.  Please fix and "
+        "try again!\n");
   }
 }
 
