@@ -27,14 +27,14 @@ class ClientRadioConfig {
 
   int RadioRx(size_t radio_id,
               std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-              size_t rx_size, Radio::RxFlags rx_flags, long long& rx_time_ns);
+              size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns);
 
   int RadioRx(size_t radio_id,
               std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-              size_t rx_size, Radio::RxFlags rx_flags, long long& rx_time_ns);
+              size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns);
 
   int RadioRx(size_t radio_id, std::vector<void*>& rx_locs, size_t rx_size,
-              Radio::RxFlags rx_flags, long long& rx_time_ns);
+              Radio::RxFlags& out_flags, long long& rx_time_ns);
 
   void Go();
 

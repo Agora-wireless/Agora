@@ -154,25 +154,20 @@ std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
   auto rx_locations = rx_info.GetRxPtrs();
   long long frame_time;
 
+  Radio::RxFlags out_flags;
   //Ok to read into sample memory for dummy read
-  const int rx_status =
-      radio_config_.RadioRx(radio_id, rx_locations, request_samples,
-                            Radio::RxFlagCompleteSymbol, frame_time);
+  const int rx_status = radio_config_.RadioRx(
+      radio_id, rx_locations, request_samples, out_flags, frame_time);
 
   if (rx_status > 0) {
     const size_t new_samples = static_cast<size_t>(rx_status);
-    RtAssert(
-        new_samples > request_samples,
-        "Received more samples than requested - possible memory overrun\n");
-
     rx_info.Update(new_samples, frame_time);
 
     //Check for successful finish
-    if (new_samples == request_samples) {
+    if ((new_samples == request_samples) ||
+        (out_flags == Radio::RxFlags::EndSamples)) {
       const size_t ant_id = radio_id * channels_per_interface_;
       const size_t cell_id = Configuration()->CellId().at(radio_id);
-      RtAssert(rx_info.SamplesAvailable() == Configuration()->SampsPerSymbol(),
-               "Samples Available should match SampsPerSymbol");
 
       //Finished successfully
       if (Configuration()->HwFramer() == true) {
@@ -183,19 +178,24 @@ std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
       const size_t frame_id = global_frame_id;
       const size_t symbol_id = global_symbol_id;
 
-      if (static_cast<size_t>(rx_status) != Configuration()->SampsPerSymbol()) {
-        AGORA_LOG_WARN(
-            "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted "
-            "Frame: %zu, Symbol: %zu, RX status = %d is not the expected "
-            "value\n",
-            tid_, interface_id, interface_id + interface_offset_, frame_id,
-            symbol_id, rx_status);
-      } else {
+      if (new_samples == request_samples) {
+        RtAssert(
+            rx_info.SamplesAvailable() == Configuration()->SampsPerSymbol(),
+            "Samples Available should match SampsPerSymbol");
+
         AGORA_LOG_FRAME(
             "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted "
             "Frame: %zu, Symbol: %zu, RX status = %d\n",
             tid_, interface_id, interface_id + interface_offset_, frame_id,
             symbol_id, rx_status);
+      } else {
+        AGORA_LOG_WARN(
+            "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu  - Attempted "
+            "Frame: %zu, Symbol: %zu, RX samples %zu is less than the desired "
+            "amount %zu\n",
+            tid_, interface_id, interface_id + interface_offset_, frame_id,
+            symbol_id, rx_info.SamplesAvailable(),
+            Configuration()->SampsPerSymbol());
       }
 
       const bool cal_rx =
@@ -235,6 +235,7 @@ std::vector<Packet*> TxRxWorkerHw::DoRx(size_t interface_id,
           false,
           "Received more samples than requested - possible memory overrun\n");
     }
+    //new_samples < request_samples (do nothing)
   } else if (rx_status < 0) {
     AGORA_LOG_ERROR(
         "TxRxWorkerHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
@@ -713,6 +714,7 @@ long long int TxRxWorkerHw::GetHwTime() {
     size_t frame_time = Configuration()->SampsPerSymbol() *
                         Configuration()->Frame().NumTotalSyms();
 
+    Radio::RxFlags out_flags;
     std::cout << "Sync BS host and FGPA timestamp..." << std::endl;
 
     //RX / TX all symbols in tx frame delta
@@ -724,9 +726,9 @@ long long int TxRxWorkerHw::GetHwTime() {
       if (frm == 0) {
         const size_t rx_radio_id = interface_offset_;
         while (rx_status < 0) {
-          rx_status = radio_config_.RadioRx(
-              rx_radio_id, samp_buffer, Configuration()->SampsPerSymbol(),
-              Radio::RxFlagCompleteSymbol, rx_time_bs);
+          rx_status = radio_config_.RadioRx(rx_radio_id, samp_buffer,
+                                            Configuration()->SampsPerSymbol(),
+                                            out_flags, rx_time_bs);
         }
         //First Frame has been rx'd by the first radio
         tx_time_bs = rx_time_bs + frame_time * TX_FRAME_DELTA;
@@ -739,9 +741,9 @@ long long int TxRxWorkerHw::GetHwTime() {
         //Finish rx'ing symbol 0 on remaining radios
         for (size_t radio_id = rx_radio_id + 1;
              radio_id < rx_radio_id + num_interfaces_; radio_id++) {
-          rx_status = radio_config_.RadioRx(
-              radio_id, samp_buffer, Configuration()->SampsPerSymbol(),
-              Radio::RxFlagCompleteSymbol, rx_time_bs);
+          rx_status = radio_config_.RadioRx(radio_id, samp_buffer,
+                                            Configuration()->SampsPerSymbol(),
+                                            out_flags, rx_time_bs);
           //---------------What to do about errors?
         }
         //Symbol complete
@@ -773,9 +775,9 @@ long long int TxRxWorkerHw::GetHwTime() {
            sym < Configuration()->Frame().NumTotalSyms(); sym++) {
         for (size_t radio_id = interface_offset_;
              radio_id < interface_offset_ + num_interfaces_; radio_id++) {
-          rx_status = radio_config_.RadioRx(
-              radio_id, samp_buffer, Configuration()->SampsPerSymbol(),
-              Radio::RxFlagCompleteSymbol, rx_time_bs);
+          rx_status = radio_config_.RadioRx(radio_id, samp_buffer,
+                                            Configuration()->SampsPerSymbol(),
+                                            out_flags, rx_time_bs);
           //---------------Check status?
         }
       }

@@ -27,6 +27,7 @@ inline void RadioDataPlaneSocket::Deactivate() {
 
 inline void RadioDataPlaneSocket::Close() { return RadioDataPlane::Close(); }
 
+//Need to add a port
 void RadioDataPlaneSocket::Setup() {
   if (CheckMode() == RadioDataPlane::Mode::kModeShutdown) {
     SoapySDR::Device* soapy_device =
@@ -66,6 +67,7 @@ void RadioDataPlaneSocket::Setup() {
     AGORA_LOG_INFO(" Connect address %s\n", connect_address.c_str());
 
     //Setup the socket interface to the radio for the rx stream
+    //Need to use Bs / Ue depending on what radios?
     socket_.Create(
         Configuration()->SampsPerSymbol(), Configuration()->BsServerAddr(),
         connect_address,
@@ -93,35 +95,37 @@ void RadioDataPlaneSocket::Setup() {
 // For now, radio rx will return 1 symbol
 int RadioDataPlaneSocket::Rx(
     std::vector<std::vector<std::complex<int16_t>>>& rx_data, size_t rx_size,
-    Radio::RxFlags rx_flags, long long& rx_time_ns) {
+    Radio::RxFlags& out_flags, long long& rx_time_ns) {
   std::vector<void*> rx_locs;
   rx_locs.reserve(rx_data.size());
   for (auto& loc : rx_data) {
     rx_locs.emplace_back(loc.data());
   }
-  return Rx(rx_locs, rx_size, rx_flags, rx_time_ns);
+  return Rx(rx_locs, rx_size, out_flags, rx_time_ns);
 }
 
 int RadioDataPlaneSocket::Rx(
     std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs, size_t rx_size,
-    Radio::RxFlags rx_flags, long long& rx_time_ns) {
+    Radio::RxFlags& out_flags, long long& rx_time_ns) {
   std::vector<void*> rx_locs;
   rx_locs.reserve(rx_buffs.size());
   for (auto& loc : rx_buffs) {
     rx_locs.emplace_back(loc->data());
   }
-  return Rx(rx_locs, rx_size, rx_flags, rx_time_ns);
+  return Rx(rx_locs, rx_size, out_flags, rx_time_ns);
 }
 
 int RadioDataPlaneSocket::Rx(std::vector<void*>& rx_locations, size_t rx_size,
-                             Radio::RxFlags rx_flags, long long& rx_time_ns) {
-  if (rx_flags == Radio::RxFlagCompleteSymbol) {
-    rx_size = Configuration()->SampsPerSymbol();
-    //Ignore the rx_size if the complete symbol flag is set
-    //rx_return = socket_.RxSymbol(rx_locations, rx_time_ns);
-  }
+                             Radio::RxFlags& out_flags, long long& rx_time_ns) {
   const int rx_return = socket_.RxSamples(rx_locations, rx_time_ns, rx_size);
+
   if (rx_return > 0) {
+    const size_t rx_samples = static_cast<size_t>(rx_return);
+    if (rx_samples != rx_size) {
+      out_flags = Radio::RxFlags::EndSamples;
+    } else {
+      out_flags = Radio::RxFlags::None;
+    }
     AGORA_LOG_TRACE("Rx'd sample count %d\n", rx_return);
   } else if (rx_return < 0) {
     throw std::runtime_error("Error in RadioRx!");

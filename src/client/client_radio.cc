@@ -99,20 +99,20 @@ int ClientRadioConfig::RadioTx(size_t radio_id, void** buffs, size_t num_samps,
 
 int ClientRadioConfig::RadioRx(
     size_t radio_id, std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-    size_t rx_size, Radio::RxFlags rx_flags, long long& rx_time_ns) {
-  return radios_.at(radio_id)->Rx(rx_data, rx_size, rx_flags, rx_time_ns);
+    size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns) {
+  return radios_.at(radio_id)->Rx(rx_data, rx_size, out_flags, rx_time_ns);
 }
 
 int ClientRadioConfig::RadioRx(
     size_t radio_id, std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-    size_t rx_size, Radio::RxFlags rx_flags, long long& rx_time_ns) {
-  return radios_.at(radio_id)->Rx(rx_buffs, rx_size, rx_flags, rx_time_ns);
+    size_t rx_size, Radio::RxFlags& out_flags, long long& rx_time_ns) {
+  return radios_.at(radio_id)->Rx(rx_buffs, rx_size, out_flags, rx_time_ns);
 }
 
 int ClientRadioConfig::RadioRx(size_t radio_id, std::vector<void*>& rx_locs,
-                               size_t rx_size, Radio::RxFlags rx_flags,
+                               size_t rx_size, Radio::RxFlags& out_flags,
                                long long& rx_time_ns) {
-  return radios_.at(radio_id)->Rx(rx_locs, rx_size, rx_flags, rx_time_ns);
+  return radios_.at(radio_id)->Rx(rx_locs, rx_size, out_flags, rx_time_ns);
 }
 
 void ClientRadioConfig::ReadSensors() {

@@ -32,12 +32,12 @@ class RadioSoapySdr : public Radio {
          long long& tx_time_ns) final;
 
   int Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-         size_t rx_size, RxFlags rx_flags, long long& rx_time_ns) final;
+         size_t rx_size, RxFlags& out_flags, long long& rx_time_ns) final;
 
   int Rx(std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-         size_t rx_size, RxFlags rx_flags, long long& rx_time_ns) final;
+         size_t rx_size, RxFlags& out_flags, long long& rx_time_ns) final;
 
-  int Rx(std::vector<void*>& rx_locs, size_t rx_size, RxFlags rx_flags,
+  int Rx(std::vector<void*>& rx_locs, size_t rx_size, RxFlags& out_flags,
          long long& rx_time_ns) final;
   //End of generic interface
 

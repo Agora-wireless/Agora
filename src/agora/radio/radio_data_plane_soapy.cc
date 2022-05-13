@@ -34,41 +34,35 @@ inline void RadioDataPlaneSoapy::Setup() {
 
 int RadioDataPlaneSoapy::Rx(
     std::vector<std::vector<std::complex<int16_t>>>& rx_data, size_t rx_size,
-    Radio::RxFlags rx_flags, long long& rx_time_ns) {
+    Radio::RxFlags& out_flags, long long& rx_time_ns) {
   std::vector<void*> rx_locations;
   rx_locations.reserve(rx_data.size());
 
   for (auto& buff : rx_data) {
     rx_locations.emplace_back(buff.data());
   }
-  return RadioDataPlaneSoapy::Rx(rx_locations, rx_size, rx_flags, rx_time_ns);
+  return RadioDataPlaneSoapy::Rx(rx_locations, rx_size, out_flags, rx_time_ns);
 }
 
 int RadioDataPlaneSoapy::Rx(
     std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs, size_t rx_size,
-    Radio::RxFlags rx_flags, long long& rx_time_ns) {
+    Radio::RxFlags& out_flags, long long& rx_time_ns) {
   std::vector<void*> rx_locations;
   rx_locations.reserve(rx_buffs.size());
 
   for (auto& buff : rx_buffs) {
     rx_locations.emplace_back(buff->data());
   }
-  return RadioDataPlaneSoapy::Rx(rx_locations, rx_size, rx_flags, rx_time_ns);
+  return RadioDataPlaneSoapy::Rx(rx_locations, rx_size, out_flags, rx_time_ns);
 }
 
 int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
-                            Radio::RxFlags rx_flags, long long& rx_time_ns) {
+                            Radio::RxFlags& out_flags, long long& rx_time_ns) {
   constexpr long kRxTimeout = 1;  // 1uS
+  out_flags = Radio::RxFlags::None;
   //constexpr long kRxTimeout = 1000000;  // 1uS
   // SOAPY_SDR_ONE_PACKET; SOAPY_SDR_END_BURST
   int soapy_rx_flags = 0;
-  if (rx_flags == Radio::RxFlagCompleteSymbol) {
-    //Done rxing for a while?
-    soapy_rx_flags = SOAPY_SDR_END_BURST;
-  }
-  if (rx_flags == Radio::RxFlagNone) {
-    soapy_rx_flags = 0;
-  }
 
   int rx_status = 0;
   long long frame_time_ns(0);
@@ -82,13 +76,30 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
 
     //if end burst flag is not set, then we have partial data (hw_framer mode only)
     if (Configuration()->HwFramer()) {
-      if ((soapy_rx_flags & SOAPY_SDR_END_BURST) == 0) {
-        //This usually happens when the timeout is not long enough to wait for multiple packets for a given requested rx length
-        AGORA_LOG_WARN(
-            "RadioDataPlaneSoapy::Rx - expected SOAPY_SDR_END_BURST but "
-            "didn't happen samples count %zu requested %zu symbols with flags "
-            "%d\n",
-            rx_samples, rx_size, soapy_rx_flags);
+      if (rx_samples != rx_size) {
+        if ((soapy_rx_flags & SOAPY_SDR_END_BURST) == 0) {
+          AGORA_LOG_TRACE(
+              "RadioDataPlaneSoapy::Rx - short rx call %zu:%zu, more data "
+              "could be available? %d\n",
+              rx_samples, rx_size, soapy_rx_flags);
+          //Soapy could print a 'D' if this happens. But this would be acceptable
+        } else if ((soapy_rx_flags & SOAPY_SDR_END_BURST) ==
+                   SOAPY_SDR_END_BURST) {
+          AGORA_LOG_WARN(
+              "RadioDataPlaneSoapy::Rx - short rx call %zu:%zu but it is the "
+              "end of the rx samples %d\n",
+              rx_samples, rx_size, soapy_rx_flags);
+          out_flags = Radio::RxFlags::EndSamples;
+        }
+      } else {
+        if ((soapy_rx_flags & SOAPY_SDR_END_BURST) == 0) {
+          //This usually happens when the timeout is not long enough to wait for multiple packets for a given requested rx length
+          AGORA_LOG_WARN(
+              "RadioDataPlaneSoapy::Rx - expected SOAPY_SDR_END_BURST but "
+              "didn't happen samples count %zu requested %zu symbols with "
+              "flags %d\n",
+              rx_samples, rx_size, soapy_rx_flags);
+        }
       }
 
       if ((soapy_rx_flags & SOAPY_SDR_MORE_FRAGMENTS) ==
@@ -120,14 +131,14 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
     if (kDebugRadioRX) {
       if (rx_status == static_cast<int>(Configuration()->SampsPerSymbol())) {
         std::cout << "Radio " << radio_->SerialNumber() << "(" << radio_->Id()
-                  << ") received " << rx_status << " flags: " << rx_flags
+                  << ") received " << rx_status << " flags: " << out_flags
                   << " MTU " << device->getStreamMTU(remote_stream_)
                   << std::endl;
       } else {
-        if (!((rx_status == SOAPY_SDR_TIMEOUT) && (rx_flags == 0))) {
+        if (!((rx_status == SOAPY_SDR_TIMEOUT) && (out_flags == 0))) {
           std::cout << "Unexpected RadioRx return value " << rx_status
                     << " from radio " << radio_->SerialNumber() << "("
-                    << radio_->Id() << ") flags: " << rx_flags << std::endl;
+                    << radio_->Id() << ") flags: " << out_flags << std::endl;
         }
       }
     }

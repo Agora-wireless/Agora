@@ -50,7 +50,7 @@ auto RadioConfig::TxArrayToRef(
     radios_.at(ref)->Activate();
     Go();  // trigger
 
-    const auto rx_flags = Radio::RxFlagNone;
+    auto rx_flags = Radio::RxFlags::None;
     ret = radios_.at(ref)->Rx(rx_buffs, read_len, rx_flags, rx_time);
     if (ret < (int)read_len) {
       std::cout << "bad read (" << ret << ") at node " << ref
@@ -97,7 +97,7 @@ auto RadioConfig::TxRefToArray(
   }
   Go();  // Trigger
 
-  const auto rx_flags = Radio::RxFlagCompleteSymbol;
+  auto rx_flags = Radio::RxFlags::None;
   for (size_t radio_i = 0; radio_i < num_radios; radio_i++) {
     const size_t ant_i = radio_i * cfg_->NumChannels();
     for (size_t i = 0; i < cfg_->NumChannels(); i++) {
@@ -411,7 +411,7 @@ bool RadioConfig::InitialCalib() {
           radios_.at(ref)->Activate();
           Go();  // trigger
 
-          const auto rx_flags = Radio::RxFlagCompleteSymbol;
+          auto rx_flags = Radio::RxFlags::None;
           std::vector<std::vector<std::complex<int16_t>>*> rx_buff(
               cfg_->NumChannels(), &dummybuff);
           rx_buff.at(0) = &buff.at(cfg_->NumChannels() * i + ch);
@@ -452,7 +452,7 @@ bool RadioConfig::InitialCalib() {
 
         Go();  // Trigger
 
-        const auto rx_flags = Radio::RxFlagCompleteSymbol;
+        auto rx_flags = Radio::RxFlags::None;
         for (size_t i = 0; i < r; i++) {
           if (good_csi == false) {
             break;
@@ -488,7 +488,7 @@ bool RadioConfig::InitialCalib() {
     if (good_csi == true) {
       noise_buff.resize(m);
       for (size_t i = 0; i < r; i++) {
-        const auto rx_flags = Radio::RxFlagCompleteSymbol;
+        auto rx_flags = Radio::RxFlags::None;
         radios_.at(i)->Activate();
 
         std::vector<std::vector<std::complex<int16_t>>*> rx_buff(

@@ -49,6 +49,7 @@ TxRxWorkerClientHw::TxRxWorkerClientHw(
            "Interface count must be set to 1 for use with this class");
 
   RtAssert(config->UeHwFramer() == false, "Must have ue hw framer disabled");
+  InitRxStatus();
 }
 
 TxRxWorkerClientHw::~TxRxWorkerClientHw() = default;
@@ -290,8 +291,9 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
     num_rx_samps = sample_offset;
   }
 
+  Radio::RxFlags out_flags;
   const int rx_status = radio_.RadioRx(radio_id, rx_samples, num_rx_samps,
-                                       Radio::RxFlagNone, receive_time);
+                                       out_flags, receive_time);
   if (rx_status < 0) {
     AGORA_LOG_ERROR(
         "TxRxWorkerClientHw[%zu]: Interface %zu | Radio %zu - Rx failure RX "
@@ -442,8 +444,9 @@ void TxRxWorkerClientHw::AdjustRx(size_t local_interface,
   const size_t radio_id = local_interface + interface_offset_;
   long long rx_time = 0;
   while (Configuration()->Running() && (discard_samples > 0)) {
+    Radio::RxFlags out_flags;
     const int rx_status = radio_.RadioRx(radio_id, rx_frame_, discard_samples,
-                                         Radio::RxFlagNone, rx_time);
+                                         out_flags, rx_time);
 
     if (rx_status < 0) {
       std::cerr << "RadioTxRx [" << radio_id << "]: BAD SYNC Receive("
@@ -465,8 +468,9 @@ ssize_t TxRxWorkerClientHw::SyncBeacon(size_t local_interface,
 
   //\todo add a retry exit.
   while ((Configuration()->Running() == true) && (sync_index < 0)) {
-    const int rx_status = radio_.RadioRx(radio_id, rx_frame_, sample_window,
-                                         Radio::RxFlagNone, rx_time);
+    Radio::RxFlags out_flags;
+    const int rx_status =
+        radio_.RadioRx(radio_id, rx_frame_, sample_window, out_flags, rx_time);
 
     if (rx_status != static_cast<int>(sample_window)) {
       std::cerr << "RadioTxRx [" << radio_id << "]: BAD SYNC Receive("
@@ -617,4 +621,33 @@ void TxRxWorkerClientHw::TxPilot(size_t pilot_ant, size_t frame_id,
         tid_, frame_id, tx_frame_id, pilot_symbol_id, radio, pilot_channel,
         pilot_ant, tx_time, flags_tx);
   }
+}
+
+void TxRxWorkerClientHw::InitRxStatus() {
+  rx_status_.resize(num_interfaces_,
+                    TxRxWorkerRx::RxStatusTracker(channels_per_interface_));
+  std::vector<RxPacket*> rx_packets(channels_per_interface_);
+  for (auto& status : rx_status_) {
+    for (auto& new_packet : rx_packets) {
+      new_packet = &GetRxPacket();
+      AGORA_LOG_TRACE("InitRxStatus[%zu]: Using Packet at location %d\n", tid_,
+                      reinterpret_cast<intptr_t>(new_packet));
+    }
+    //Allocate memory for each interface / channel
+    status.Reset(rx_packets);
+  }
+}
+
+void TxRxWorkerClientHw::ResetRxStatus(size_t interface, bool reuse_memory) {
+  auto& prev_status = rx_status_.at(interface);
+
+  std::vector<RxPacket*> rx_packets;
+  if (reuse_memory) {
+    rx_packets = rx_status_.at(interface).GetRxPackets();
+  } else {
+    for (size_t packets = 0; packets < prev_status.NumChannels(); packets++) {
+      rx_packets.emplace_back(&GetRxPacket());
+    }
+  }
+  prev_status.Reset(rx_packets);
 }

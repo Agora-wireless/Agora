@@ -28,6 +28,7 @@ RadioSoapySdr::RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type)
   //Reduce the soapy log level
   AGORA_LOG_INFO("Create RadioSoapySdr Radio\n");
   SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_NOTICE);
+  //SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_DEBUG);
 }
 
 RadioSoapySdr::~RadioSoapySdr() {
@@ -304,11 +305,11 @@ int RadioSoapySdr::Tx(const void* const* tx_buffs, size_t tx_size, int flags,
 }
 
 int RadioSoapySdr::Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-                      size_t rx_size, Radio::RxFlags rx_flags,
+                      size_t rx_size, Radio::RxFlags& out_flags,
                       long long& rx_time_ns) {
   rx_time_ns = 0;
 
-  const int rx_return = rxp_->Rx(rx_data, rx_size, rx_flags, rx_time_ns);
+  const int rx_return = rxp_->Rx(rx_data, rx_size, out_flags, rx_time_ns);
   if (rx_return < 0) {
     throw std::runtime_error("Error in RadioRx!");
   }
@@ -317,10 +318,10 @@ int RadioSoapySdr::Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
 
 int RadioSoapySdr::Rx(
     std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs, size_t rx_size,
-    Radio::RxFlags rx_flags, long long& rx_time_ns) {
+    Radio::RxFlags& out_flags, long long& rx_time_ns) {
   rx_time_ns = 0;
 
-  const int rx_return = rxp_->Rx(rx_buffs, rx_size, rx_flags, rx_time_ns);
+  const int rx_return = rxp_->Rx(rx_buffs, rx_size, out_flags, rx_time_ns);
   if (rx_return < 0) {
     throw std::runtime_error("Error in RadioRx!");
   }
@@ -328,10 +329,10 @@ int RadioSoapySdr::Rx(
 }
 
 int RadioSoapySdr::Rx(std::vector<void*>& rx_locs, size_t rx_size,
-                      Radio::RxFlags rx_flags, long long& rx_time_ns) {
+                      Radio::RxFlags& out_flags, long long& rx_time_ns) {
   rx_time_ns = 0;
 
-  const int rx_return = rxp_->Rx(rx_locs, rx_size, rx_flags, rx_time_ns);
+  const int rx_return = rxp_->Rx(rx_locs, rx_size, out_flags, rx_time_ns);
   if (rx_return < 0) {
     throw std::runtime_error("Error in RadioRx!");
   }

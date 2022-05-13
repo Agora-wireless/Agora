@@ -14,7 +14,8 @@
 class Radio {
  public:
   enum RadioType { SoapySdrStream, SoapySdrSocket };
-  enum RxFlags { RxFlagNone = 0, RxFlagCompleteSymbol = 1 };
+  //EndSamples is set when the samples returned are the last of a contiguous set
+  enum RxFlags { None = 0, EndSamples = 1 };
   static std::unique_ptr<Radio> Create(RadioType type);
 
   enum ActivationTypes { kActivate, kActivateWaitTrigger };
@@ -41,13 +42,13 @@ class Radio {
                  long long& tx_time_ns) = 0;
 
   virtual int Rx(std::vector<std::vector<std::complex<int16_t>>>& rx_data,
-                 size_t rx_size, RxFlags rx_flags, long long& rx_time_ns) = 0;
+                 size_t rx_size, RxFlags& out_flags, long long& rx_time_ns) = 0;
 
   virtual int Rx(std::vector<std::vector<std::complex<int16_t>>*>& rx_buffs,
-                 size_t rx_size, RxFlags rx_flags, long long& rx_time_ns) = 0;
+                 size_t rx_size, RxFlags& out_flags, long long& rx_time_ns) = 0;
 
-  virtual int Rx(std::vector<void*>& rx_locs, size_t rx_size, RxFlags rx_flags,
-                 long long& rx_time_ns) = 0;
+  virtual int Rx(std::vector<void*>& rx_locs, size_t rx_size,
+                 RxFlags& out_flags, long long& rx_time_ns) = 0;
 
   inline virtual void ConfigureTddModeBs(
       [[maybe_unused]] bool is_ref_radio,

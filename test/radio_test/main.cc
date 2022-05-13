@@ -57,8 +57,8 @@ int main(int argc, char* argv[]) {
 
     PinToCoreWithOffset(ThreadType::kMasterTX, 0, 0);
     agora_comm::ListLocalInterfaces();
-    TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
-    //TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
+    //TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
+    TestBsRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
     //TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrStream);
     //UE socket doesnt work right now... (never get any data)
     //TestUeRadioRx(cfg.get(), FLAGS_rx_symbols, Radio::SoapySdrSocket);
@@ -86,8 +86,8 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
   RtAssert(
       (cfg->SampsPerSymbol() % kRxPerSymbol) == 0,
       "Target must be a multiple of samples per symbol for hw framer mode!");
-  // Radio::RxFlagCompleteSymbol | RxFlagNone
-  const auto rx_flag = Radio::RxFlagNone;
+  // Radio::RxFlags::None | RxFlagNone
+  auto rx_flag = Radio::RxFlags::None;
   // Using RxFlagNone with a soapy radio will sometimes return sub symbol packets
 
   std::cout << "Testing " << total_radios << " radios with " << num_channels
@@ -155,24 +155,32 @@ void TestBsRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
 
         if (rx_return > 0) {
           const auto new_samples = static_cast<size_t>(rx_return);
-          AGORA_LOG_INFO(
+          AGORA_LOG_TRACE(
               "Called radiorx for %zu samples and received %zu with %zu "
               "already loaded\n",
               request_samples, new_samples, rx_info.SamplesAvailable());
 
           rx_info.Update(new_samples, rx_time);
           if (new_samples < request_samples) {
-            AGORA_LOG_WARN(
-                "Received less than symbol amount of samples %zu:%zu:%zu rx "
-                "time %lld (Frame %zu, Symbol %zu)\n",
-                new_samples, request_samples, rx_info.SamplesAvailable(),
-                rx_time, static_cast<size_t>(rx_time >> 32),
-                static_cast<size_t>((rx_time >> 16) & 0xFFFF));
-            num_rx_symbols++;
-            rx_info.Reset();
-            //throw std::runtime_error("Stop here for now");
-            //Check for short return / retry vs dump and try again
-            //This is an error.... should probably dump samples maybe?
+            if (rx_flag == Radio::RxFlags::EndSamples) {
+              AGORA_LOG_WARN(
+                  "Received less than symbol amount of samples %zu:%zu:%zu rx "
+                  "time %lld (Frame %zu, Symbol %zu)\n",
+                  new_samples, request_samples, rx_info.SamplesAvailable(),
+                  rx_time, static_cast<size_t>(rx_time >> 32),
+                  static_cast<size_t>((rx_time >> 16) & 0xFFFF));
+              num_rx_symbols++;
+              rx_info.Reset();
+              //throw std::runtime_error("Why are there not enough samples?");
+              //This is an error.... should probably dump samples maybe?
+            } else {
+              AGORA_LOG_INFO(
+                  "Received less than symbol amount of samples %zu:%zu:%zu rx "
+                  "time %lld (Frame %zu, Symbol %zu) - Retrying\n",
+                  new_samples, request_samples, rx_info.SamplesAvailable(),
+                  rx_time, static_cast<size_t>(rx_time >> 32),
+                  static_cast<size_t>((rx_time >> 16) & 0xFFFF));
+            }
           } else if (new_samples == request_samples) {
             //Rx data.....
             size_t frame_id = 0;
@@ -226,8 +234,8 @@ void TestUeRadioRx(Config* cfg, const uint32_t max_rx, Radio::RadioType type) {
   const size_t radio_hi = total_radios;
   const size_t cell_id = 0;
   const size_t target_samples = cfg->SampsPerSymbol();
-  // Radio::RxFlagCompleteSymbol | RxFlagNone
-  const auto rx_flag = Radio::RxFlagNone;
+  // Radio::RxFlags::None | RxFlagNone
+  auto rx_flag = Radio::RxFlags::None;
 
   std::cout << "Testing " << total_radios << " radios " << std::endl;
 

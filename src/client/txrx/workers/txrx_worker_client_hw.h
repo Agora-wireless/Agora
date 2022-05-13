@@ -12,6 +12,7 @@
 
 #include "buffer.h"
 #include "client_radio.h"
+#include "rx_status_tracker.h"
 #include "txrx_worker.h"
 
 class TxRxWorkerClientHw : public TxRxWorker {
@@ -46,6 +47,10 @@ class TxRxWorkerClientHw : public TxRxWorker {
   void TxUplinkSymbols(size_t radio_id, size_t frame_id, long long time0);
   void TxPilot(size_t pilot_ant, size_t frame_id, long long time0);
 
+  //DoRx helper routines
+  void InitRxStatus();
+  void ResetRxStatus(size_t interface, bool reuse_memory);
+
   // This object is created / owned by the parent process
   ClientRadioConfig& radio_;
   size_t program_start_ticks_;
@@ -53,5 +58,8 @@ class TxRxWorkerClientHw : public TxRxWorker {
   std::vector<std::vector<std::complex<int16_t>>> frame_zeros_;
   std::vector<std::vector<std::complex<int16_t>>> frame_storage_;
   std::vector<std::vector<std::complex<int16_t>>*> rx_frame_;
+
+  //For each interface.
+  std::vector<TxRxWorkerRx::RxStatusTracker> rx_status_;
 };
 #endif  // TXRX_WORKER_CLIENT_HW_H_
