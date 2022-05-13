@@ -13,8 +13,9 @@
 RadioDataPlaneSocket::RadioDataPlaneSocket() : RadioDataPlane() {}
 RadioDataPlaneSocket::~RadioDataPlaneSocket() { Close(); }
 
-void RadioDataPlaneSocket::Init(Radio* radio, const Config* cfg) {
-  return RadioDataPlane::Init(radio, cfg);
+void RadioDataPlaneSocket::Init(Radio* radio, const Config* cfg,
+                                bool hw_framer) {
+  return RadioDataPlane::Init(radio, cfg, hw_framer);
 }
 
 inline void RadioDataPlaneSocket::Activate(Radio::ActivationTypes type) {

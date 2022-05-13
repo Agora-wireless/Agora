@@ -58,7 +58,8 @@ ClientRadioConfig::ClientRadioConfig(const Config* const cfg,
 
 void ClientRadioConfig::InitClientRadio(size_t radio_id) {
   radios_.at(radio_id)->Init(cfg_, radio_id, cfg_->UeRadioId().at(radio_id),
-                             Utils::StrToChannels(cfg_->UeChannel()));
+                             Utils::StrToChannels(cfg_->UeChannel()),
+                             cfg_->UeHwFramer());
 
   std::vector<double> tx_gains;
   tx_gains.emplace_back(cfg_->ClientTxGainA(radio_id));

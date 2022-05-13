@@ -15,7 +15,7 @@ class RadioDataPlaneSoapy : public RadioDataPlane {
   explicit RadioDataPlaneSoapy(const RadioDataPlaneSoapy&) = delete;
   ~RadioDataPlaneSoapy() final = default;
 
-  void Init(Radio* radio, const Config* cfg) final;
+  void Init(Radio* radio, const Config* cfg, bool hw_framer) final;
   void Setup() final;
   void Activate(
       Radio::ActivationTypes type = Radio::ActivationTypes::kActivate) final;

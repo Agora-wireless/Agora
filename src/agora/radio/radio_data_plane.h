@@ -24,7 +24,7 @@ class RadioDataPlane {
   RadioDataPlane(RadioDataPlane&&) noexcept = delete;
   explicit RadioDataPlane(const RadioDataPlane&) = delete;
 
-  virtual void Init(Radio* radio, const Config* cfg) = 0;
+  virtual void Init(Radio* radio, const Config* cfg, bool hw_framer) = 0;
   virtual void Setup() = 0;
   virtual void Activate(
       Radio::ActivationTypes type = Radio::ActivationTypes::kActivate) = 0;
@@ -48,6 +48,7 @@ class RadioDataPlane {
   virtual void Setup(const SoapySDR::Kwargs& args);
   inline const Config* Configuration() const { return cfg_; }
   inline const Mode& CheckMode() const { return mode_; }
+  inline const bool& HwFramer() const { return hw_framer_; }
 
   Radio* radio_;
   SoapySDR::Stream* remote_stream_;
@@ -56,5 +57,6 @@ class RadioDataPlane {
   enum Mode mode_;
   //Should try to remove cfg_
   const Config* cfg_;
+  bool hw_framer_;
 };
 #endif  // RADIO_DATA_PLANE_H_

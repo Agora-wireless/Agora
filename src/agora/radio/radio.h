@@ -26,7 +26,8 @@ class Radio {
   inline const std::string& SerialNumber() const { return serial_number_; }
 
   virtual void Init(const Config* cfg, size_t id, const std::string& serial,
-                    const std::vector<size_t>& enabled_channels) = 0;
+                    const std::vector<size_t>& enabled_channels,
+                    bool hw_framer) = 0;
   virtual void Setup(const std::vector<double>& tx_gains,
                      const std::vector<double>& rx_gains) = 0;
 
@@ -74,6 +75,7 @@ class Radio {
   size_t id_;
   std::string serial_number_;
   std::vector<size_t> enabled_channels_;
+  bool hw_framer_;
 };
 
 #endif  // RADIO_H_

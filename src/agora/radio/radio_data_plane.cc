@@ -34,13 +34,14 @@ RadioDataPlane::RadioDataPlane()
 
 RadioDataPlane::~RadioDataPlane() { RadioDataPlane::Close(); }
 
-void RadioDataPlane::Init(Radio* radio, const Config* cfg) {
+void RadioDataPlane::Init(Radio* radio, const Config* cfg, bool hw_framer) {
   if (mode_ == kModeUninit) {
     //This data plane class only works with RadioSoapySdr class
     auto soapy_radio = dynamic_cast<RadioSoapySdr*>(radio);
     if ((soapy_radio != nullptr) && (radio != nullptr)) {
       cfg_ = cfg;
       radio_ = radio;
+      hw_framer_ = hw_framer;
       mode_ = kModeShutdown;
     } else {
       AGORA_LOG_WARN(

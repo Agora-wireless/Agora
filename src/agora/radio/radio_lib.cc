@@ -148,7 +148,8 @@ RadioConfig::RadioConfig(Config* cfg, Radio::RadioType radio_type)
 
 void RadioConfig::InitBsRadio(size_t radio_id) {
   radios_.at(radio_id)->Init(cfg_, radio_id, cfg_->RadioId().at(radio_id),
-                             Utils::StrToChannels(cfg_->Channel()));
+                             Utils::StrToChannels(cfg_->Channel()),
+                             cfg_->HwFramer());
   num_radios_initialized_.fetch_add(1);
 }
 

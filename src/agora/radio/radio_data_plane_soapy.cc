@@ -13,8 +13,9 @@ constexpr bool kDebugPrintRx = false;
 
 RadioDataPlaneSoapy::RadioDataPlaneSoapy() : RadioDataPlane() {}
 
-void RadioDataPlaneSoapy::Init(Radio* radio, const Config* cfg) {
-  return RadioDataPlane::Init(radio, cfg);
+void RadioDataPlaneSoapy::Init(Radio* radio, const Config* cfg,
+                               bool hw_framer) {
+  return RadioDataPlane::Init(radio, cfg, hw_framer);
 }
 
 inline void RadioDataPlaneSoapy::Activate(Radio::ActivationTypes type) {
@@ -150,6 +151,7 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
 }
 
 void RadioDataPlaneSoapy::Flush() {
+  constexpr size_t kMaxChannels = 2;
   const long timeout_us(0);
   int flags = 0;
   long long frame_time(0);
@@ -157,7 +159,7 @@ void RadioDataPlaneSoapy::Flush() {
   auto device = dynamic_cast<RadioSoapySdr*>(radio_)->SoapyDevice();
 
   std::vector<std::vector<std::complex<int16_t>>> samples(
-      Configuration()->NumChannels(),
+      kMaxChannels,
       std::vector<std::complex<int16_t>>(Configuration()->SampsPerSymbol(),
                                          std::complex<int16_t>(0, 0)));
   std::vector<void*> ignore;

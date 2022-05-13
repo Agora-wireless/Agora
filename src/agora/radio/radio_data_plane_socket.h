@@ -16,7 +16,7 @@ class RadioDataPlaneSocket : public RadioDataPlane {
   explicit RadioDataPlaneSocket(const RadioDataPlaneSocket&) = delete;
   ~RadioDataPlaneSocket() final;
 
-  void Init(Radio* radio, const Config* cfg) final;
+  void Init(Radio* radio, const Config* cfg, bool hw_framer) final;
   void Setup() final;
   void Activate(
       Radio::ActivationTypes type = Radio::ActivationTypes::kActivate) final;
