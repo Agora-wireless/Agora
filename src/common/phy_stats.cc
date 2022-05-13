@@ -261,7 +261,7 @@ void PhyStats::RecordUlPilotSnr(size_t frame_id) {
     std::stringstream ss;
     ss << frame_id;
     for (size_t i = 0; i < config_->UeAntNum(); i++) {
-      for (size_t j = 0; j < config_->BsAntNum() - 1; j++) {
+      for (size_t j = 0; j < config_->BsAntNum(); j++) {
         ss << "," << pilot_snr_[frame_id % kFrameWnd]
                                [i * config_->BsAntNum() + j];
       }
