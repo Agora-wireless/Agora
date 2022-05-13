@@ -352,6 +352,7 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
         pkt->Set(0, pkt_id, ue_id,
                  cfg_->MacPayloadMaxLength(Direction::kDownlink));
         this->GenMacData(pkt, ue_id);
+        std::cout << "GenMACData FINISHED!!!!!" << std::endl;
         pkt->Crc((uint16_t)(
             crc_obj->CalculateCrc24(
                 pkt->Data(), cfg_->MacPayloadMaxLength(Direction::kDownlink)) &
@@ -368,6 +369,11 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                      filename_input.c_str());
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
       for (size_t i = 0; i < cfg_->UeAntNum(); i++) {
+        if (profile_ == Profile::kSingleConstellation) {
+          auto data_temp = reinterpret_cast<uint8_t*>(dl_mac_info.at(i).data());
+          std::memset(data_temp, 0, num_dl_mac_bytes * sizeof(uint8_t));
+          std::cout << i << " " << data_temp[0] << std::endl;
+        }
         std::fwrite(reinterpret_cast<uint8_t*>(dl_mac_info.at(i).data()),
                     num_dl_mac_bytes, sizeof(uint8_t), fp_input);
       }
@@ -437,6 +443,11 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
                      filename_input.c_str());
       FILE* fp_input = std::fopen(filename_input.c_str(), "wb");
       for (size_t i = 0; i < num_dl_codeblocks; i++) {
+        if (profile_ == Profile::kSingleConstellation) {
+          auto data_temp = reinterpret_cast<uint8_t*>(&dl_information.at(i).at(0));
+          std::memset(data_temp, 0, dl_cb_bytes * sizeof(uint8_t));
+          std::cout << i << " " << data_temp[0] << std::endl;
+        }
         std::fwrite(reinterpret_cast<uint8_t*>(&dl_information.at(i).at(0)),
                     dl_cb_bytes, sizeof(uint8_t), fp_input);
       }
@@ -605,6 +616,11 @@ void DataGenerator::DoDataGeneration(const std::string& directory) {
     FILE* fp_dl_tx = std::fopen(filename_dl_tx.c_str(), "wb");
     for (size_t i = 0; i < this->cfg_->Frame().NumDLSyms(); i++) {
       short* ptr = dl_tx_data[i];
+      if (profile_ == Profile::kSingleConstellation) {
+        std::memset(ptr, 0, this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum() * 2 *
+                    sizeof(short));
+        std::cout << i << " " << ptr[0] << std::endl;
+      }
       std::fwrite(ptr,
                   this->cfg_->SampsPerSymbol() * this->cfg_->BsAntNum() * 2,
                   sizeof(short), fp_dl_tx);

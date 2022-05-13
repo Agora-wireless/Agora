@@ -1,5 +1,5 @@
-{
-    "serial_file": "data/examples/topology-vulture.json",
+{   
+    "serial_file": "data/examples/topology-vulture-listener.json",
     "cells": 1,
     "channel": "A",
     "frequency": 3.6e9,
@@ -15,7 +15,7 @@
     "rx_gain_b": 65,
     "tx_gain_b": 70,
     /*"sample_rate": 3.84e6,*/
-    "sample_rate":7.68e6,
+    "sample_rate": 7.68e6,
     "calibrate_digital": true,
     "calibrate_analog" : false,
     "ofdm_tx_zero_prefix": 160,
@@ -62,7 +62,8 @@
     "hw_framer": true,
     /* Compute configuration */
     "exclude_cores": [],
-    "ue_core_offset": 7,
+    /*"ue_core_offset": 7,*/
+    "ue_core_offset": 13,
     "ue_worker_thread_num": 4,
     "ue_socket_thread_num": 2,
     "core_offset": 0,

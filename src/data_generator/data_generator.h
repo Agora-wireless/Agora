@@ -23,7 +23,8 @@ class DataGenerator {
 
     // The input informatioon bytes are {1, 2, 3, 1, 2, 3, ...} for UE 0,
     // {4, 5, 6, 4, 5, 6, ...} for UE 1, and so on
-    kProfile123
+    kProfile123,
+    kSingleConstellation
   };
 
   explicit DataGenerator(Config* cfg, uint64_t seed = 0,
@@ -31,6 +32,12 @@ class DataGenerator {
       : cfg_(cfg), profile_(profile) {
     if (seed != 0) {
       fast_rand_.seed_ = seed;
+    }
+    if (profile == Profile::kSingleConstellation) {
+      std::cout << "is single constellation" << std::endl;
+    }
+    else {
+      std::cout << "NOT single constellation" << std::endl;
     }
   }
 
@@ -47,9 +54,12 @@ class DataGenerator {
     for (size_t i = 0; i < mac->PayloadLength(); i++) {
       if (profile_ == Profile::kRandom) {
         mac->DataPtr()[i] = static_cast<int8_t>(fast_rand_.NextU32());
+        // mac->DataPtr()[i] = 0;  //transmit a fixed constellation
       } else if (profile_ == Profile::kProfile123) {
         mac->DataPtr()[i] = 1 + (ue_id * 3) + (i % 3);
+        // mac->DataPtr()[i] = 0;  //transmit a fixed constellation
       }
+      std::cout << mac->DataPtr()[i];
     }
   }
 
@@ -71,6 +81,10 @@ class DataGenerator {
       } else if (profile_ == Profile::kProfile123) {
         information.at(i) = 1 + (ue_id * 3) + (i % 3);
       }
+      else if (profile_ == Profile::kSingleConstellation) {
+        information.at(i) = 0;
+      }
+      std::cout << information.at(i);
     }
   }
 

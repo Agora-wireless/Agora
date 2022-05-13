@@ -8,6 +8,8 @@
 
 static constexpr bool kUseSpatialLocality = true;
 
+static size_t countfunc = 0;
+
 DoPrecode::DoPrecode(
     Config* in_config, int in_tid,
     PtrGrid<kFrameWnd, kMaxDataSCs, complex_float>& dl_zf_matrices,
@@ -47,6 +49,8 @@ DoPrecode::DoPrecode(
   }
   my_cgemm_ = mkl_jit_get_cgemm_ptr(jitter_);
 #endif
+
+  arma::arma_rng::set_seed_random(); // IMPORTANT: always rememeber to set seed!
 }
 
 DoPrecode::~DoPrecode() {
@@ -59,6 +63,7 @@ DoPrecode::~DoPrecode() {
     std::fprintf(stderr, "!!!!Error: Error while destorying MKL JIT\n");
   }
 #endif
+std::cout << "countfunc = " << countfunc << "USE_MKL_JIT = " << USE_MKL_JIT << std::endl;
 }
 
 EventData DoPrecode::Launch(size_t tag) {
@@ -98,6 +103,29 @@ EventData DoPrecode::Launch(size_t tag) {
   size_t max_sc_ite =
       std::min(cfg_->DemulBlockSize(), cfg_->OfdmDataNum() - base_sc_id);
 
+  
+  arma::fmat thinvec = arma::ones<arma::fmat>(cfg_->BsAntNum() - 1, 1); // TEMPORARILY HARDCODE IT
+  int OFF; // num of OFF antennas in one-chain BS
+  OFF= 4;
+  int bsradio;
+  // bsradio = 8;  // hardcoded for a single-chain BS
+  bsradio = cfg_->BsAntNum() - 1;
+  arma::vec indexx = arma::randperm<arma::vec>(bsradio, OFF); 
+  for(int i=0; i < indexx.n_rows; i++)
+  {
+      thinvec(indexx(i)) = 0.0;
+      // std::cout <<"##"<< index(i) << std::endl; // check the rnd seed placed in DoZF
+  }
+  arma::fmat mat_singleton;   // there might be more efficient way
+  mat_singleton.zeros(1,1);
+  thinvec = arma::join_vert(thinvec, mat_singleton); //append an 0 to thinvec, to match size of mat_dl_zf
+  
+  // thinvec.ones(size(thinvec));    //CHECK: ALL-ONE THINVEC
+
+  // // if (symbol_idx_dl==0) {
+  // //   thinvec.ones(size(thinvec));  // check, all-one thinvec
+  // // }
+
   if (kUseSpatialLocality) {
     for (size_t i = 0; i < max_sc_ite; i = i + kSCsPerCacheline) {
       size_t start_tsc1 = GetTime::WorkerRdtsc();
@@ -111,7 +139,10 @@ EventData DoPrecode::Launch(size_t tag) {
       size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
       for (size_t j = 0; j < kSCsPerCacheline; j++) {
-        PrecodingPerSc(frame_slot, base_sc_id + i + j, i + j);
+        PrecodingPerSc(frame_slot, base_sc_id + i + j, i + j, thinvec);
+        if (frame_id == 0 && base_sc_id + i + j == 0) {
+          countfunc ++;
+        }
       }
       duration_stat_->task_count_ =
           duration_stat_->task_count_ + kSCsPerCacheline;
@@ -128,7 +159,7 @@ EventData DoPrecode::Launch(size_t tag) {
       size_t start_tsc2 = GetTime::WorkerRdtsc();
       duration_stat_->task_duration_[1] += start_tsc2 - start_tsc1;
 
-      PrecodingPerSc(frame_slot, cur_sc_id, i);
+      PrecodingPerSc(frame_slot, cur_sc_id, i, thinvec);
       duration_stat_->task_count_++;
       duration_stat_->task_duration_[2] += GetTime::WorkerRdtsc() - start_tsc2;
     }
@@ -182,7 +213,7 @@ void DoPrecode::LoadInputData(size_t symbol_idx_dl,
 }
 
 void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
-                               size_t sc_id_in_block) {
+                               size_t sc_id_in_block, arma::fmat& thinvec ) {
   auto* precoder_ptr = reinterpret_cast<arma::cx_float*>(
       dl_zf_matrices_[frame_slot][cfg_->GetZfScId(sc_id)]);
   auto* data_ptr = reinterpret_cast<arma::cx_float*>(
@@ -192,17 +223,34 @@ void DoPrecode::PrecodingPerSc(size_t frame_slot, size_t sc_id,
            : 0));
   auto* precoded_ptr = reinterpret_cast<arma::cx_float*>(
       precoded_buffer_temp_ + sc_id_in_block * cfg_->BsAntNum());
-#if USE_MKL_JIT
-  my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
-            (MKL_Complex8*)precoded_ptr);
-#else
+
   arma::cx_fmat mat_precoder(precoder_ptr, cfg_->BsAntNum(), cfg_->UeAntNum(),
                              false);
   arma::cx_fmat mat_data(data_ptr, cfg_->UeAntNum(), 1, false);
   arma::cx_fmat mat_precoded(precoded_ptr, cfg_->BsAntNum(), 1, false);
+
+    /*************************************************************************
+    *      Baseline#4: experiment with ASM random bmfm (per-frame-level)
+    **************************************************************************/
+   // Assuming SU-DM, the mat_dl_zf should be of Nt-by-1; however, Agora also takes REF
+    // into account, resulting in an (Nt+1)-by-1 mat_dl_zf;
+    // E.g., using one chain at BS, mat_dl_zf is of 9-by-1.
+
+  //arma::fmat thinvec = arma::ones<arma::fmat>(mat_dl_zf.n_rows-1, 1);
+  
+
+  mat_precoder = mat_precoder % thinvec;
+
+#if USE_MKL_JIT
+  my_cgemm_(jitter_, (MKL_Complex8*)precoder_ptr, (MKL_Complex8*)data_ptr,
+            (MKL_Complex8*)precoded_ptr);      // functions the same as below
+#else
   mat_precoded = mat_precoder * mat_data;
-  // cout << "Precoder: \n" << mat_precoder << endl;
-  // cout << "Data: \n" << mat_data << endl;
-  // cout << "Precoded data: \n" << mat_precoded << endl;
 #endif
+  // std::cout << "Precoder: \n" << mat_precoder << std::endl;
+  // std::cout << "Data: \n" << mat_data << std::endl;
+  // std::cout << "Precoded data: \n" << mat_precoded << std::endl;
+  
+  // std::cout << "thinning vector: \n" << thinvec << std::endl;
+  // std::cout << "cfg_->BsAntNum():" << cfg_->BsAntNum() << std::endl;
 }

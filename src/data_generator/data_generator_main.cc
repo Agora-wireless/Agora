@@ -32,9 +32,16 @@ int main(int argc, char* argv[]) {
   AGORA_LOG_INIT();
   auto cfg = std::make_unique<Config>(FLAGS_conf_file.c_str());
 
-  const DataGenerator::Profile profile =
-      FLAGS_profile == "123" ? DataGenerator::Profile::kProfile123
-                             : DataGenerator::Profile::kRandom;
+  DataGenerator::Profile profile;
+  if (FLAGS_profile == "sincon") {
+    profile = DataGenerator::Profile::kSingleConstellation;
+  }
+  else if (FLAGS_profile == "123") {
+    profile = DataGenerator::Profile::kProfile123;
+  }
+  else {
+    profile = DataGenerator::Profile::kRandom;
+  }
   std::unique_ptr<DataGenerator> data_generator =
       std::make_unique<DataGenerator>(cfg.get(), 0 /* RNG seed */, profile);
 
