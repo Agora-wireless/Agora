@@ -27,8 +27,8 @@ RadioSoapySdr::RadioSoapySdr(RadioDataPlane::DataPlaneType rx_dp_type)
       correlator_enabled_(false) {
   //Reduce the soapy log level
   AGORA_LOG_INFO("Create RadioSoapySdr Radio\n");
-  SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_NOTICE);
-  //SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_DEBUG);
+  //SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_NOTICE);
+  SoapySDR::setLogLevel(SoapySDR::LogLevel::SOAPY_SDR_DEBUG);
 }
 
 RadioSoapySdr::~RadioSoapySdr() {

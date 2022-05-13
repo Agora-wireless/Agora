@@ -76,7 +76,7 @@ int RadioDataPlaneSoapy::Rx(std::vector<void*>& rx_locations, size_t rx_size,
     const size_t rx_samples = static_cast<size_t>(rx_status);
 
     //if end burst flag is not set, then we have partial data (hw_framer mode only)
-    if (Configuration()->HwFramer()) {
+    if (HwFramer()) {
       if (rx_samples != rx_size) {
         if ((soapy_rx_flags & SOAPY_SDR_END_BURST) == 0) {
           AGORA_LOG_TRACE(
