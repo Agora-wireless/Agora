@@ -25,13 +25,13 @@ tx_data=zeros(data_size, n_user, length(dig));
 % read rx and tx pilot files
 for u=1:n_user
   for p=1:length(pig)
-    filename = 'rxpilot' + string(pig(p)) + '_' + string(u-1) + '.bin';
+    filename = strcat('rxpilot', int2str(pig(p)), '_', int2str(u-1), '.bin');
     fileID = fopen(filename, 'r');
     rx = fread(fileID, 'short');
     fclose(fileID);
     rx_pilot(:, u, p) = rx(1:2:end)/32768 + 1j*rx(2:2:end)/32768;
     
-    filename = 'txpilot_f_' + string(pig(p)) + '_' + string(u-1) + '.bin';
+    filename = strcat('txpilot_f_', int2str(pig(p)), '_', int2str(u-1), '.bin');
     fileID = fopen(filename, 'r');
     tx = fread(fileID, 'float');
     fclose(fileID);
@@ -42,13 +42,13 @@ end
 % read rx and tx data files
 for u=1:n_user
   for d=1:length(dig)
-    filename = 'rxdata' + string(dig(d)) + '_' + string(u-1) + '.bin';
+    filename = strcat('rxdata', int2str(dig(d)), '_', int2str(u-1), '.bin');
     fileID = fopen(filename, 'r');
     data = fread(fileID, 'short');
     fclose(fileID);
     rx_data(:, u, d) = data(1:2:end)/32768 + 1j*data(2:2:end)/32768;
     
-    filename = 'txdata' + string(dig(d)) + '_' + string(u-1) + '.bin';
+    filename = strcat('txdata', int2str(dig(d)), '_', int2str(u-1), '.bin');
     fileID = fopen(filename, 'r');
     data = fread(fileID, 'float');
     fclose(fileID);
@@ -90,9 +90,9 @@ for u=1:n_user
       
       cl = cl + 1;
       figure(cl);
-      scatter(real(data_phase_corr(data_sc_idx, d)), imag(data_phase_corr(data_sc_idx, d)),'ro')
+      scatter(real(data_phase_corr(data_sc_idx, d)), imag(data_phase_corr(data_sc_idx, d)),'r')
       hold on
-      scatter(real(tx_data(data_sc_idx)), imag(tx_data(data_sc_idx)),'bo')
+      scatter(real(tx_data(data_sc_idx)), imag(tx_data(data_sc_idx)),'b')
       title(['Constellation [User ', num2str(u), ', Symbol ', num2str(d), ']'])
     end
    
