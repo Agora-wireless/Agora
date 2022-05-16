@@ -52,7 +52,7 @@ TxRxWorkerClientHw::TxRxWorkerClientHw(
     scratch_rx_memory.Set(pkt_memory);
     rx_pkts_ptrs_.at(ch) = &scratch_rx_memory;
 
-    AGORA_LOG_INFO(
+    AGORA_LOG_TRACE(
         "TxRxWorkerClientHw - rx pkt memory %ld:%ld data location %ld\n",
         reinterpret_cast<intptr_t>(pkt_memory),
         reinterpret_cast<intptr_t>(scratch_rx_memory.RawPacket()),
@@ -119,9 +119,11 @@ void TxRxWorkerClientHw::DoTxRx() {
                           Configuration()->OfdmTxZeroPrefix();
       AGORA_LOG_INFO(
           "TxRxWorkerClientHw [%zu]: Beacon detected for radio %zu, "
-          "sync_index: %ld, rx sample offset: %ld, alignment removal %zu\n",
+          "sync_index: %ld, rx sample offset: %ld, window %zu, samples in "
+          "frame %zu, alignment removal %zu\n",
           tid_, local_interface + interface_offset_, sync_index,
-          rx_adjust_samples, alignment_samples);
+          rx_adjust_samples, beacon_detect_window, samples_per_frame,
+          alignment_samples);
 
       AdjustRx(local_interface, alignment_samples + rx_adjust_samples);
       rx_adjust_samples = 0;
@@ -275,15 +277,13 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
   std::vector<Packet*> result_packets;
   auto& rx_info = rx_status_.at(interface_id);
 
-  size_t num_rx_samps =
-      Configuration()->SampsPerSymbol() - rx_info.SamplesAvailable();
-  RtAssert(num_rx_samps > rx_info.SamplesAvailable(), "Rx Samples must be > 0");
-
+  size_t num_rx_samps;
   //Sample offset alignment
-  if (sample_offset < 0) {
+  if (sample_offset <= 0) {
     //Don't read an entire symbol due to the offset ( + a negative number )
-    num_rx_samps = num_rx_samps + sample_offset;
-  } else if (sample_offset > 0) {
+    num_rx_samps = Configuration()->SampsPerSymbol() + sample_offset;
+    //num_rx_samps = num_rx_samps + sample_offset;
+  } else {
     //Otherwise throw out the offset (could just add this to the next symbol but our buffers are not large enough)
     num_rx_samps = sample_offset;
   }
@@ -291,14 +291,26 @@ std::vector<Packet*> TxRxWorkerClientHw::DoRx(size_t interface_id,
   //Check for completion
   if (rx_info.SamplesAvailable() >= num_rx_samps) {
     sample_offset = 0;
+    AGORA_LOG_INFO(
+        "DoRx - Samples Per Symbol %zu, available %zu, offset %ld, exiting\n",
+        Configuration()->SampsPerSymbol(), rx_info.SamplesAvailable(),
+        sample_offset);
     if (rx_info.SamplesAvailable() > num_rx_samps) {
       //Reset Sample
-      throw std::runtime_error("Need to implment this!!!");
+      throw std::runtime_error("Need to implement this!!!");
     } else {
       ResetRxStatus(interface_id, true);
     }
-    //Reset Sample
   } else {
+    // Else ensures num_rx_samps > rx_info.SamplesAvailable()
+    num_rx_samps = num_rx_samps - rx_info.SamplesAvailable();
+
+    AGORA_LOG_TRACE(
+        "DoRx[%zu] - Calling RadioRx[%zu], available %zu, offset %ld, "
+        "requesting samples %zu:%zu\n",
+        tid_, radio_id, rx_info.SamplesAvailable(), sample_offset, num_rx_samps,
+        Configuration()->SampsPerSymbol());
+
     auto rx_locations = rx_info.GetRxPtrs();
 
     Radio::RxFlags out_flags;
@@ -692,7 +704,7 @@ void TxRxWorkerClientHw::InitRxStatus() {
   for (auto& status : rx_status_) {
     for (auto& new_packet : rx_packets) {
       new_packet = &GetRxPacket();
-      AGORA_LOG_INFO(
+      AGORA_LOG_TRACE(
           "InitRxStatus[%zu]: Using Packet at location %ld, data location "
           "%ld\n",
           tid_, reinterpret_cast<intptr_t>(new_packet),
